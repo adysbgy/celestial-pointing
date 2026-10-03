@@ -76,7 +76,10 @@ mencerminkan keadaan yang sebenarnya.
   di container `swift:6.0`.
 - Sapuan jalur kirim/rekam: tidak ada lagi pembacaan `bestObject` /
   `intent?.level` mentah di `Apps/`.
-- CI `Apple Build` + `Engine Tests (Linux)` pada commit siklus ini.
+- CI `Apple Build` run `37149633633` → **2× `BUILD SUCCEEDED`** dan gerbang
+  peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+- CI `Engine Tests (Linux)` run `37149633616` → **165 CelestialEngine + 131
+  PointingKit, 0 gagal**, kedua paket ditegakkan di CI.
 
 ### Siklus sebelumnya: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
 Fokus: menutup **satu-satunya temuan yang sengaja dibiarkan terbuka** oleh
