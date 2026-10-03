@@ -20,7 +20,34 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: kalibrasi yang dibuang tetap diklaim terpasang di jam
+### Siklus ini: audit mandiri penuh pembungkus app + verifikasi CI (tanpa regresi)
+Fokus: baca ulang **seluruh** berkas app (watchOS + iOS + Shared) dan
+seluruh `PointingKit`/`CelestialEngine` yang dirujuknya, lalu cari cacat
+nyata yang belum tertutup. Tidak ada satu baris pun yang diubah: hasilnya
+adalah **konfirmasi**, bukan perbaikan.
+
+**Yang diverifikasi mandiri (bukan sekadar percaya STATUS.md):**
+- `./swift-test.sh` dijalankan dari nol: **166 test CelestialEngine + 143 test
+  PointingKit, 0 gagal** (Swift 6.0, Docker, Linux).
+- `gh run list` terakhir: **Apple Build hijau** (run `37157355179`, 3m17s,
+  2026-10-03T22:07Z) — build + gerbang peringatan lewat.
+- Setiap simbol yang dibaca view sudah ada: `PointingTone`/`PointingState`/
+  `PointingSnapshot`/`PointingLinkMessage` (PointingKit), `WatchMetrics` &
+  `JSONArchiveDocument` & `ConfidenceTraceStore` (app), `@main` tepat **dua**
+  (satu per app). Tidak ada `try!`/`as!`/`fatalError` di `Apps` maupun
+  `PointingKit`.
+- Jalur data Watch↔iPhone, kalibrasi, haptic, dan Experiment 1 sudah
+  konsisten: objek sisa tidak bocor ke iPhone, kiriman gagal tidak memakan
+  kesempatan berikutnya, kalibrasi dibuang menyegarkan cuplikan jam,
+  sensor mati terlihat di layar, dan ambang dari iPhone diterapkan lewat
+  engine (bukan controller langsung) sehingga `snapshot` ikut berubah.
+
+**Kesimpulan:** semua item brief (1–3) sudah selesai dan terverifikasi.
+Satu-satunya baris `ROADMAP.md` yang belum tertutup adalah "Point & Slew POC
+1 teleskop" — itu menunggu perangkat keras fisik, bukan kode. Tidak ada
+pekerjaan repo tersisa.
+
+### Siklus sebelumnya: kalibrasi yang dibuang tetap diklaim terpasang di jam
 Fokus: menyisir **klaim kalibrasi** — apakah yang ditampilkan jam masih
 berlaku setelah pengguna membuang kalibrasinya. Logika engine **tidak
 disentuh**; aturan keras PRD tidak dilonggarkan.
