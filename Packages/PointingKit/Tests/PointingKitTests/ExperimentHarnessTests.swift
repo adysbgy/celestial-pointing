@@ -288,4 +288,52 @@ final class ExperimentHarnessTests: XCTestCase {
             XCTAssertNotEqual(target.id, "sun")
         }
     }
+
+    // MARK: - Biaya daftar target
+
+    /// Daftar target **tidak boleh dihitung ulang setiap kali dibaca**.
+    ///
+    /// Layar Experiment 1 membaca `availableTargets` di dalam `body`, dan
+    /// `body` dievaluasi pada setiap sampel sensor — 20 kali per detik.
+    /// Perhitungan ini menyapu seluruh katalog dan efemeris tata surya, jadi
+    /// tanpa cache ia berjalan 20 kali per detik sepanjang pengukuran
+    /// berlangsung: baterai habis dan layar tersendat, sementara daftar yang
+    /// dihitung ulang terlihat persis sama dengan yang di-cache.
+    func testTargetListIsNotRecomputedOnEveryRead() {
+        let h = harness()
+        let before = h.targetComputationCount
+        for _ in 0..<50 { _ = h.availableTargets }
+        XCTAssertEqual(h.targetComputationCount, before + 1,
+                       "50 pembacaan berturut-turut harus memakai satu perhitungan")
+    }
+
+    /// Berpindah tempat **wajib** membatalkan cache: daftar tempat lama tidak
+    /// berlaku di langit tempat baru.
+    func testTargetListIsRecomputedAfterMoving() {
+        let h = harness()
+        _ = h.availableTargets
+        let before = h.targetComputationCount
+
+        h.location = ObserverLocation(latitudeDeg: -0.18, longitudeDeg: -78.47,
+                                      label: "Quito", source: "test",
+                                      capturedAt: date)
+
+        _ = h.availableTargets
+        XCTAssertEqual(h.targetComputationCount, before + 1,
+                       "langit tempat baru belum pernah dihitung")
+    }
+
+    /// Memasang lokasi yang sama bukan perpindahan: cache tetap berlaku.
+    func testTargetListIsNotRecomputedForSamePlace() {
+        let h = harness()
+        _ = h.availableTargets
+        let before = h.targetComputationCount
+
+        h.location = ObserverLocation(latitudeDeg: -6.2, longitudeDeg: 106.8,
+                                      label: "Bandung lagi", source: "test",
+                                      capturedAt: Date(timeIntervalSince1970: 1_700_000_999))
+
+        _ = h.availableTargets
+        XCTAssertEqual(h.targetComputationCount, before, "tempatnya sama")
+    }
 }

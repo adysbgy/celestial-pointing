@@ -2,7 +2,64 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: memasang kalibrasi yang sama mereset alur tanpa alasan
+### Siklus ini: jawaban langit lama bertahan setelah pindah tempat
+Fokus: menyisir **pembatalan jawaban yang menumpang pada efek samping pemanggil
+lain** — kelas bug yang tidak terlihat di UI. Tidak ada aturan keras PRD yang
+dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **Perbaikan siklus lalu (kalibrasi yang sama = tanpa-efek) mematahkan
+  pembatalan yang ternyata dipakai orang lain.** `PointingEngine.update(location:)`
+  membatalkan jawaban lama dengan memanggil `apply(calibration:)` — yang
+  menghentikan alur. Begitu panggilan itu jadi tanpa-efek, **perpindahan tempat
+  berhenti membatalkan apa pun**: setelah pengguna pindah tempat, jam tetap
+  menampilkan objek yang dihitung untuk langit **lama**. Keadaan `lock` ikut
+  bertahan, jadi haptic "terkunci" tidak pernah berbunyi lagi di tempat baru.
+  Tidak ada satu pun bagian UI yang terlihat keliru.
+  - Perbaikan: pembatalan **melekat pada lokasi itu sendiri** lewat
+    `PointingController.setObserver(_:)` (hentikan alur, buang resolusi,
+    segarkan cuplikan). `observer` menjadi `private(set)` supaya tidak ada jalur
+    yang bisa menggantinya tanpa membatalkan. Memasang pengamat yang sama tetap
+    tanpa-efek. Kalibrasi **sengaja dipertahankan**: offset yaw adalah sifat
+    pemasangan jam, bukan sifat tempat.
+- **`CalibrationSession` menghitung daftar acuan untuk langit tempat lama.**
+  Bintang yang tampak di atas horizon di satu tempat bisa sudah terbenam di
+  tempat lain. Lokasi sungguhan tiba beberapa detik setelah layar kalibrasi
+  dibuka, jadi pengguna memilih bintang yang tidak ada di langitnya, lalu offset
+  kalibrasi dihitung dari kebenaran yang salah — dan daftar yang salah tempat
+  tampak sama normalnya dengan yang benar.
+  - Perbaikan: `referenceObserver` + `isReferenceListStale`, dan `CalibrationView`
+    menghitung ulang saat lokasi berubah.
+- **`PointingEngine.refreshSkyContext` menjalankan efemeris penuh 20 Hz.**
+  Dokumennya sendiri menyebut "dipanggil jarang", tapi ia dipanggil dari
+  `ingest(_:)` pada **setiap** sampel sensor: efemeris Matahari dan Bulan penuh
+  di main actor tiap sampel. Ditambah penjagaan 30 detik; perubahan lokasi
+  melewatinya, karena konteks tempat baru memang belum pernah dihitung.
+- **`ExperimentHarness.availableTargets` dihitung ulang tiap pembacaan.**
+  Layar Experiment 1 membacanya di dalam `body`, dan `body` dievaluasi pada
+  setiap sampel sensor — jadi seluruh katalog + efemeris tata surya disapu 20
+  kali per detik sepanjang pengukuran. Ditambah cache berjangka 30 detik yang
+  dibatalkan saat tempat berubah (dengan `isSamePlace`, supaya perbaikan GPS
+  yang hanya menggeser `capturedAt` tidak membuangnya), plus
+  `targetComputationCount` supaya daftar yang dihitung ulang tidak terlihat
+  sama dengan yang di-cache.
+
+**Tes baru (8):** `testChangingObserverDropsAnswerComputedForOldSky`,
+`testReapplyingSameObserverIsANoOp`, `testSetObserverKeepsCalibration`,
+`testReferenceListBecomesStaleWhenObserverMoves`,
+`testReferenceListStaysFreshWhenOnlyTimeChanges`,
+`testTargetListIsNotRecomputedOnEveryRead`,
+`testTargetListIsRecomputedAfterMoving`,
+`testTargetListIsNotRecomputedForSamePlace`.
+Uji pertama **dibuktikan MERAH lebih dulu** sebelum perbaikan: keadaan tetap
+`lock` dan Sirius tetap tampil setelah pindah Jakarta → Quito.
+
+**Status:** `./swift-test.sh` → **165 engine + 120 PointingKit, 0 gagal**.
+Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+`swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: memasang kalibrasi yang sama mereset alur tanpa alasan
 Fokus: menyisir operasi yang **tidak idempoten** padahal seharusnya. Tidak ada
 aturan keras PRD yang dilonggarkan.
 

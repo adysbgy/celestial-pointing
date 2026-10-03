@@ -84,8 +84,36 @@ public final class ExperimentHarness {
 
     public private(set) var trials: [AnalyzedTrial] = []
     /// Lokasi yang dipakai saat merekam.
-    public var location: ObserverLocation
+    ///
+    /// Mengubahnya membatalkan cache daftar target: langit di tempat baru
+    /// belum pernah dihitung, jadi daftar tempat lama tidak berlaku di sana.
+    ///
+    /// Yang menentukan adalah **koordinatnya**, bukan keseluruhan nilai:
+    /// `ObserverLocation` membawa `capturedAt` yang berubah di tiap pembaruan
+    /// GPS, jadi tanpa `isSamePlace` cache akan dibuang tiap detik dan
+    /// daftar target kembali dihitung 20 kali per detik.
+    public var location: ObserverLocation {
+        didSet {
+            guard !location.isSamePlace(as: oldValue) else { return }
+            targetCache = nil
+        }
+    }
     public let resolver: PointingResolver
+
+    /// Selang waktu (detik) daftar target dianggap masih berlaku.
+    public var targetListValidity: TimeInterval = 30
+
+    /// Berapa kali daftar target benar-benar dihitung dari katalog.
+    ///
+    /// Diumumkan karena alasan yang sama seperti `sampleCount` di engine:
+    /// perhitungan ini menyapu seluruh katalog dan efemeris tata surya, dan
+    /// layar Experiment 1 membacanya di dalam `body`. Tanpa angka ini, daftar
+    /// yang dihitung ulang 20 kali per detik terlihat persis sama dengan yang
+    /// di-cache.
+    public private(set) var targetComputationCount = 0
+
+    /// Cache daftar target terakhir.
+    private var targetCache: (observer: Observer, bucket: Int, targets: [PointingTarget])?
 
     public init(resolver: PointingResolver, location: ObserverLocation) {
         self.resolver = resolver
@@ -101,8 +129,24 @@ public final class ExperimentHarness {
     /// Hanya yang di atas horizon yang ditawarkan: menunjuk objek yang tidak
     /// ada di langit menghasilkan rekaman yang menyesatkan.
     public var availableTargets: [PointingTarget] {
-        resolver.availableTargets(observer: location.observer, date: Date())
+        let now = Date()
+        let observer = location.observer
+        let bucket = Int(now.timeIntervalSince1970 / targetListValidity)
+        if let cache = targetCache, cache.observer == observer, cache.bucket == bucket {
+            return cache.targets
+        }
+        let targets = resolver.availableTargets(observer: observer, date: now)
+        targetComputationCount += 1
+        targetCache = (observer, bucket, targets)
+        return targets
     }
+
+    /// Paksa perhitungan ulang daftar target pada akses berikutnya.
+    ///
+    /// Dipakai saat penguji berpindah tempat: daftar lama dihitung untuk langit
+    /// yang lain, dan daftar yang salah tempat tampak sama normalnya dengan
+    /// yang benar.
+    public func invalidateTargets() { targetCache = nil }
 
     /// Rekam satu percobaan.
     ///
