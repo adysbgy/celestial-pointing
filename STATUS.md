@@ -20,10 +20,11 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: arah tunjuk dari sensor yang sudah mati masih ikut terkirim ke iPhone
+### Siklus ini: arah tunjuk dari sensor yang sudah mati masih ikut terkirim, dan kegagalan kirim yang paling sering tidak terlihat
 Fokus: menyisir **predikat "berlaku sekarang"** yang sudah dipakai untuk objek dan
-keyakinan, dan memeriksa apakah **arah tunjuk** punya padanannya. Logika engine
-**tidak disentuh**; aturan keras PRD tidak dilonggarkan.
+keyakinan — apakah **arah tunjuk** punya padanannya — lalu memeriksa janji
+"kegagalan tidak boleh diam" di jalur kirim. Logika engine **tidak disentuh**;
+aturan keras PRD tidak dilonggarkan.
 
 **Cacat 8 — azimut/ketinggian dari beberapa detik lalu terkirim sebagai pengukuran
 sekarang.** Siklus sebelumnya (Cacat 7) menutup satu jalur bacaan arah tunjuk:
@@ -55,6 +56,25 @@ tetap ikut. Satu di antaranya secara eksplisit menegaskan bahwa
 `calibratedPointing` **memang** masih terisi saat sensor mati — itulah yang
 membuat kiriman mentah berbahaya, dan yang membuat uji ini bukan sekadar
 formalitas.
+
+**Cacat 9 — kegagalan kirim yang paling sering justru satu-satunya yang tidak
+terlihat.** `WatchLinkService.send(_:)` berkomentar sendiri: *"Gagal kirim
+**tidak** diam: penghitungnya naik supaya bisa dilihat saat pengujian lapangan."*
+Isinya tidak begitu — `guard ... else { return }` pada sesi yang belum aktif
+**tidak** menaikkan apa pun. `send(calibration:)` di berkas yang sama, dengan
+penjagaan yang identik, **memang** menaikkannya. Jadi dua jalur yang sama
+menjanjikan hal yang sama, dan hanya satu yang menepatinya — pola yang sama
+seperti Cacat 8.
+
+Akibatnya persis kebalikan dari niatnya: keadaan "jam belum tersambung ke iPhone"
+— kegagalan yang paling sering terjadi di lapangan — adalah satu-satunya yang
+tidak terlihat. Di layar jam angka "N gagal" tetap nol, dan penguji menyimpulkan
+tautannya baik-baik saja sementara tidak ada satu pun keputusan yang sampai.
+`requestState()` memakai jalur ini juga, jadi permintaan iPhone yang tidak pernah
+dijawab pun tidak meninggalkan jejak.
+
+Sekarang kedua jalur menghitung sesi-belum-aktif sebagai kegagalan, dengan pesan
+yang menyebut sebabnya.
 
 **Yang benar-benar dijalankan pada siklus ini:**
 - `./swift-test.sh` → **166 CelestialEngine + 139 PointingKit, 0 gagal** (exit 0).

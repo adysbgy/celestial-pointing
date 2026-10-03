@@ -111,8 +111,22 @@ public final class WatchLinkService: NSObject, ObservableObject {
 
     /// Kirim pesan apa adanya. Gagal kirim **tidak** diam: penghitungnya naik
     /// supaya bisa dilihat saat pengujian lapangan.
+    ///
+    /// Sesi yang belum aktif dihitung sebagai kegagalan, sama seperti
+    /// `send(calibration:)`. Sebelumnya jalur ini `return` tanpa menaikkan
+    /// penghitung, padahal komentarnya sendiri menjanjikan sebaliknya — jadi
+    /// justru kegagalan yang **paling sering** terjadi (jam tidak terjangkau
+    /// iPhone, sesi belum aktif) satu-satunya yang tidak terlihat. Di layar jam
+    /// angka "N gagal" tetap nol, dan penguji menyimpulkan tautannya baik-baik
+    /// saja sementara tidak ada satu pun keputusan yang sampai. Ini juga jalur
+    /// yang dipakai `requestState()`, jadi permintaan iPhone yang tidak pernah
+    /// dijawab pun tidak meninggalkan jejak.
     public func send(_ message: PointingLinkMessage) {
-        guard let session, session.activationState == .activated else { return }
+        guard let session, session.activationState == .activated else {
+            sendFailureCount += 1
+            lastMessageNote = "Pesan belum terkirim: sesi belum aktif."
+            return
+        }
         do {
             try session.updateApplicationContext(message.plist)
         } catch {
