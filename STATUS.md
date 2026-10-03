@@ -1,5 +1,18 @@
 # STATUS — Celestial Pointing Engine
 
+## Ringkasan keadaan (3 Okt 2026, malam)
+
+**Seluruh kode selesai.** Yang tersisa di `ROADMAP.md` hanyalah satu item yang
+**bukan kode**: "Point & Slew POC 1 teleskop — perencana aman sudah ada
+(`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
+pekerjaan repo ini.
+
+- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 120 test
+  PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux).
+- Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
+  (`Apple Build`) hijau** — bukan sekadar lolos parse.
+- CI: `engine-tests.yml` (ubuntu) + `ios-build.yml` (macos-15, XcodeGen).
+
 ## Progres terakhir (3 Okt 2026)
 
 ### Siklus ini: sensor mati di tengah pemakaian tidak terlihat di layar
