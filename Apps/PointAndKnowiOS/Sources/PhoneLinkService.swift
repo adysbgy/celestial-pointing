@@ -80,7 +80,10 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     }
 }
 
-extension PhoneLinkService: WCSessionDelegate {
+/// `@preconcurrency`: `WCSessionDelegate` tidak di-`@MainActor`, sedangkan
+/// kelas ini di-`@MainActor`. Setiap metode di bawah `nonisolated` dan
+/// menyerahkan hasilnya ke main actor lewat `Task`.
+extension PhoneLinkService: @preconcurrency WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     activationDidCompleteWith activationState: WCSessionActivationState,

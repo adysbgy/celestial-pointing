@@ -95,15 +95,20 @@ public final class MotionLogger: ObservableObject {
         controller?.stop()
     }
 
-    /// Dipakai uji/pratinjau: masukkan satu sampel attitude tanpa CoreMotion.
-    public func consume(_ motion: CMDeviceMotion) {
+    /// Proses satu sampel attitude tanpa CoreMotion (untuk uji/pratinjau).
+    ///
+    /// **Kenapa waktunya `Date()`, bukan `motion.timestamp`.** Properti itu
+    /// bukan waktu Unix, melainkan detik sejak perangkat menyala. Memakainya
+    /// akan membuat setiap sampel bertanggal 1970 — alur tidak akan pernah
+    /// melihat "pergelangan diam" (karena jeda antar-sampel jadi nol), dan
+    /// efemeris dihitung untuk tanggal yang salah. Waktu dinding dipakai
+    /// supaya keputusan alur dan posisi benda langit mengacu ke saat yang sama.
+    public func consume(_ motion: CMDeviceMotion, at date: Date = Date()) {
         guard let controller else { return }
         let q = motion.attitude.quaternion
         sampleCount += 1
         let update = controller.feed(cmX: q.x, cmY: q.y, cmZ: q.z, cmW: q.w,
-                                     timestamp: motion.timestamp > 0
-                                        ? Date(timeIntervalSince1970: motion.timestamp)
-                                        : Date())
+                                     timestamp: date)
         onUpdate?(update)
     }
 

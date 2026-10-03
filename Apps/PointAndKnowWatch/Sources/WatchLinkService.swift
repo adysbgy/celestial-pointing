@@ -91,7 +91,10 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 }
 
-extension WatchLinkService: WCSessionDelegate {
+/// `@preconcurrency`: `WCSessionDelegate` tidak di-`@MainActor`, sedangkan
+/// kelas ini di-`@MainActor`. Setiap metode di bawah `nonisolated` dan
+/// menyerahkan hasilnya ke main actor lewat `Task`.
+extension WatchLinkService: @preconcurrency WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     activationDidCompleteWith activationState: WCSessionActivationState,

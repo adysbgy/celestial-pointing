@@ -14,12 +14,20 @@ import PointingKit
 ///
 /// Satu implementasi dipakai app Watch maupun app iPhone.
 ///
-/// Metode delegasi wajib ditandai `@objc`: `CLLocationManagerDelegate` adalah
-/// protokol Objective-C, dan tanpa penanda itu metodenya tidak pernah dipanggil
-/// — gejalanya bukan galat kompilasi, melainkan lokasi yang tidak pernah
-/// muncul. Peringatan kompilernya sengaja tidak dibiarkan.
+/// **Kenapa `@preconcurrency` pada konformansnya.** `CLLocationManagerDelegate`
+/// adalah protokol Objective-C yang tidak di-`@MainActor`, sedangkan kelas ini
+/// di-`@MainActor`. Tanpa `@preconcurrency`, compiler menolak konformansnya.
+/// Penandanya di sini bukan untuk membungkam peringatan: setiap metode
+/// delegasi di bawah memang `nonisolated` dan menyerahkan hasilnya ke
+/// main actor lewat `Task`, jadi tidak ada state kelas ini yang disentuh dari
+/// thread lain.
+///
+/// Metode delegasi wajib ditandai `@objc`: tanpa penanda itu metodenya tidak
+/// pernah dipanggil — gejalanya bukan galat kompilasi, melainkan lokasi yang
+/// tidak pernah muncul. Urutannya harus `@objc nonisolated`; dibalik, parser
+/// menolaknya.
 @MainActor
-final class LocationProvider: NSObject, ObservableObject {
+final class LocationProvider: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
 
     /// Lokasi terakhir yang sah, atau `nil` bila belum ada.
     @Published private(set) var location: ObserverLocation?
