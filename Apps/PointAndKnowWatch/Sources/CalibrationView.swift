@@ -156,7 +156,11 @@ struct CalibrationView: View {
         guard let session else { return }
         let step = session.capture(objectID: target.id)
         statusMessage = step.message
-        engine.apply(calibration: engine.controller.calibration)
+        // Tidak ada yang dipasang ke controller di sini: mencatat acuan hanya
+        // menambah sampel ke alur, bukan mengubah kalibrasi yang berlaku.
+        // (Dulu baris ini memanggil `engine.apply(calibration:)` dengan
+        // kalibrasi yang sedang berlaku — yang hanya mereset perata orientasi
+        // dan menghentikan alur tanpa mengubah apa pun.)
     }
 
     private func captureNearest() {

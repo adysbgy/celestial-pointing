@@ -210,7 +210,16 @@ public final class PointingController {
     /// Perata orientasi direset karena acuan sebelum/sesudah kalibrasi tidak
     /// sebanding — membiarkannya akan membuat arah tunjuk meluncur pelan ke
     /// posisi baru, dan peluncuran itu terbaca sebagai "pergelangan diam".
+    ///
+    /// **Memasang kalibrasi yang sama bukan perubahan.** Tanpa penjagaan ini,
+    /// pemanggil yang mengulang kalibrasi yang sedang berlaku — mis. UI yang
+    /// menyegarkan tampilan setelah mencatat acuan — akan mereset perata
+    /// orientasi dan menghentikan alur tanpa ada yang berubah. Akibatnya jam
+    /// kehilangan kunci yang sudah benar, dan itu terjadi persis saat pengguna
+    /// sedang mengkalibrasi. Reset hanya masuk akal bila kalibrasinya memang
+    /// berubah, karena hanya perubahan yang membuat acuan lama tidak sebanding.
     public func apply(calibration newValue: PointingCalibration) {
+        guard newValue != calibration else { return }
         calibration = newValue
         smoother.reset()
         machine.stop()

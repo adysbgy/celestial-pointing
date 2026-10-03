@@ -349,6 +349,29 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertTrue(c.snapshot.isCalibrated)
     }
 
+    /// Memasang kalibrasi yang **sedang berlaku** bukan perubahan: tidak boleh
+    /// mereset perata orientasi atau menghentikan alur.
+    ///
+    /// Tanpa ini, pemanggil yang mengulang kalibrasi yang sama — mis. UI yang
+    /// menyegarkan tampilan setelah mencatat acuan, atau
+    /// `PointingEngine.update(location:)` yang mempertahankan kalibrasi —
+    /// membuang kunci yang sudah benar, persis saat pengguna sedang
+    /// mengkalibrasi.
+    func testReapplyingSameCalibrationIsANoOp() {
+        let resolver = singleStarResolver()
+        let calibration = PointingCalibration(yawOffsetDeg: 3, residualSpreadDeg: 1, sampleCount: 2)
+        let c = controller(resolver, calibration: calibration)
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.snapshot.state, .lock)
+
+        c.apply(calibration: calibration)
+
+        XCTAssertEqual(c.snapshot.state, .lock,
+                       "kalibrasi yang sama tidak boleh membuang kunci yang sudah benar")
+        XCTAssertNotNil(c.snapshot.intent)
+        XCTAssertTrue(c.snapshot.isCalibrated)
+    }
+
     // MARK: - Rencana GoTo (aturan keras PRD)
 
     /// Tanpa posisi Matahari yang diketahui, GoTo **ditolak**. Gagal-tertutup.
