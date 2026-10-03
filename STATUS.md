@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 140 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 142 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus sebelumnya **keduanya juga ditegakkan di CI Linux**, bukan
   hanya yang pertama.
@@ -20,7 +20,70 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: GoTo teleskop dihitung dari resolusi yang sudah tidak berlaku
+### Siklus ini: kiriman yang gagal memakan kesempatan berikutnya (iPhone terjebak di keadaan lama)
+Fokus: menyisir **janji "kegagalan tidak boleh diam"** sampai ke akibatnya pada
+**urutan operasi**, bukan hanya pada penghitungnya. Siklus sebelumnya (Cacat 9)
+membuat kegagalan kirim *terlihat*; siklus ini menemukan bahwa kegagalan itu
+masih *hilang*. Logika engine **tidak disentuh**; aturan keras PRD tidak
+dilonggarkan.
+
+**Cacat 11 — gerbang "kirim saat keputusan berubah" menandai terkirim sebelum
+mencoba mengirim.** `LinkReportGate` sengaja dibuat (Cacat 2) supaya iPhone
+tidak menerima 20 pesan per detik untuk keputusan yang sama, dan supaya
+kehilangan jawaban **tetap** terkirim. Tapi `PointAndKnowWatchWatchApp` dan
+`WatchLinkService.sendIfDecisionChanged` memanggilnya dengan urutan:
+
+    guard reportGate.shouldReport(snapshot) else { return false }   // tandai dulu
+    send(state: snapshot, ...)                                      // kirim kemudian
+
+`shouldReport` menyimpan `last = decision` saat ia dipanggil — **sebelum**
+pengiriman dicoba. Jadi begitu satu kiriman gagal, keputusan itu sudah tercatat
+"sudah dilaporkan", dan **tidak pernah dicoba lagi** selama keputusannya sama.
+
+Yang membuat ini bukan sekadar teori: kegagalan yang paling sering di lapangan
+adalah **jam belum tersambung ke iPhone** (Cacat 9 menyebutnya sendiri sebagai
+"kegagalan yang paling sering terjadi"). Justru kegagalan itulah yang paling
+lama bertahan — beberapa detik sampai menit — dan justru selama rentang itulah
+gerbangnya menelan setiap kesempatan berikutnya. Hasilnya persis kebalikan dari
+yang gerbang ini dibuat untuk mencegah: iPhone terjebak di keadaan lama (mis.
+**"terkunci"** pada Sirius) sementara di jam sudah bergerak dan keadaannya sudah
+berubah, **tanpa satu pun kiriman berikutnya yang membetulkannya** — sampai
+kebetulan keputusannya berubah lagi. Kegagalan yang *terlihat* (penghitung naik)
+tetap bisa berujung pada iPhone yang *salah*, dan tidak ada bagian UI yang
+tampak keliru.
+
+Diperbaiki di satu tempat, `PointingKit`: `LinkReportGate.deliver(_:via:)`
+membalik urutannya — **kirim dulu, tandai hanya bila berhasil**. Keputusan yang
+gagal tetap dianggap baru, jadi percobaan berikutnya mengulanginya sampai
+berhasil; dan karena `send` tetap menaikkan penghitung kegagalan, pengulangan
+itu terlihat, bukan diam. `WatchLinkService.send(_:)` / `send(state:)` kini
+mengembalikan `Bool` supaya keberhasilannya bisa diketahui pemanggil, bukan
+sekadar dihitung.
+
+Dua uji regresi baru (`LinkMessageTests`) dibuktikan **MERAH lebih dulu** pada
+urutan lama sebelum diperbaiki: percobaan kedua ditolak penyaringnya dan
+`attempts` tetap 1 — jadi ini bukan pembacaan kode, melainkan hasil uji yang
+benar-benar merah.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- Uji regresi dijalankan **dulu** pada urutan lama → **gagal** (5 assertion:
+  "gagal kirim bukan terkirim", "keputusan yang gagal harus diulang"). Setelah
+  perbaikan → **lulus**.
+- `./swift-test.sh` → **166 CelestialEngine + 142 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Pola `deliver(_:via:)` (gate `mutating` + closure di kelas `@MainActor`)
+  dibuktikan lebih dulu dengan probe `-typecheck` di container `swift:6.0`.
+- Sapuan ulang pemanggil `shouldReport`/`send(state:)` di `Apps/` dan
+  `PointingKit/Sources`: hanya `WatchLinkService.sendIfDecisionChanged` yang
+  memakai gerbang, dan ia kini lewat `deliver`.
+- CI `Engine Tests (Linux)` run `37154348034` pada commit `10dd936` → **166 +
+  142, 0 gagal** (kedua paket).
+- CI `Apple Build` run `37154348042` pada commit `10dd936` → **2× `BUILD
+  SUCCEEDED`** dan gerbang peringatan melaporkan *"Tidak ada peringatan compiler
+  pada Apps/."*
+
+### Siklus sebelumnya: GoTo teleskop dihitung dari resolusi yang sudah tidak berlaku
 Fokus: menyisir **predikat "jawaban berlaku sekarang"** ke jalur yang belum
 pernah diperiksa — jalur yang berujung ke **motor teleskop**. Siklus-siklus
 sebelumnya menutup objek sisa pada pesan ke iPhone dan riwayat keyakinan; yang
