@@ -2,7 +2,40 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: sampel dari jam membawa sigma yang tidak pernah berlaku
+### Siklus ini: tiap perbaikan GPS menghentikan alur dan mereset perata orientasi
+Fokus: menyisir **kesetaraan nilai** yang dipakai sebagai penanda perubahan.
+Tidak ada aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **`PointingEngine.update(location:)` memakai `!=`, padahal `ObserverLocation`
+  membawa `capturedAt`.** Tiap pembaruan lokasi membuat nilai itu berbeda, jadi
+  **setiap** perbaikan GPS — kira-kira tiap detik, selama app terbuka —
+  dianggap perpindahan tempat. Jalur itu menjalankan
+  `controller.apply(calibration:)`, yang **mereset perata orientasi dan
+  menghentikan mesin keadaan**.
+  - Akibatnya jam **tidak akan pernah sempat** menunggu pergelangan diam lalu
+    mengunci selama lokasi masih diperbarui, dan haptic "kembali ke idle"
+    berbunyi berulang tanpa pengguna melakukan apa pun.
+  - Getaran GPS puluhan meter hanya menggeser langit ≈0.0005° — tidak berarti
+    apa-apa dibanding sigma pointing. Yang benar-benar menggeser langit adalah
+    perpindahan tempat, bukan penajaman koordinat.
+  - Perbaikan: `ObserverLocation.isSamePlace(as:toleranceDeg:)` membandingkan
+    **koordinat saja** (ambang 0.01° ≈ 36″), dan menolak lokasi yang tidak sah.
+    `update(location:)` memakainya. Sifat ini ditaruh di tipe-nya supaya
+    perbandingan ini bisa diuji di Linux — bukan tersembunyi di lapisan app.
+- **Tes baru (2):** `testIsSamePlaceIgnoresTimestampAndJitter` (waktu berbeda +
+  getaran GPS → tempat yang sama; perpindahan 0.05° → bukan tempat yang sama),
+  `testInvalidLocationIsNeverSamePlace`. Tes pertama menyatakan eksplisit
+  `XCTAssertNotEqual(first, later)` — jadi ia gagal kalau pembandingnya
+  dikembalikan ke `!=`.
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 111, 0 gagal**.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: sampel dari jam membawa sigma yang tidak pernah berlaku
 Fokus: memastikan **konteks** yang menemani sampel benar, bukan hanya
 sampelnya. Tidak ada aturan keras PRD yang dilonggarkan.
 
