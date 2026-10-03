@@ -84,14 +84,20 @@ public final class MotionLogger: ObservableObject {
     }
 
     /// Hentikan sensor dan alur.
+    ///
+    /// **Kenapa tidak ada `pause()`.** Dulu ada metode bernama `pause()` yang
+    /// isinya **persis sama** dengan `stop()` — sensor dimatikan, alur
+    /// dihentikan. Tidak ada satu pun pemanggilnya. Namanya menjanjikan
+    /// sesuatu yang tidak dilakukannya: "pause" berarti bisa dilanjutkan,
+    /// sedangkan yang terjadi adalah penghentian penuh (`PointingStateMachine`
+    /// kembali ke `idle`, perata orientasi direset). Pemanggil berikutnya yang
+    /// menyambungkannya ke `scenePhase` akan mengira alurnya bisa dilanjutkan
+    /// tanpa mengarahkan ulang, lalu mendapat perilaku sebaliknya — tepat kelas
+    /// kesalahan siklus hidup yang tidak terlihat dari UI. Kalau jeda yang
+    /// benar-benar bisa dilanjutkan dibutuhkan, ia harus **berbeda** dari
+    /// `stop()` (mis. mempertahankan niat supaya pointing lanjut tanpa
+    /// mengarah ulang), bukan sekadar nama lain untuk hal yang sama.
     public func stop() {
-        if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
-        isRunning = false
-        controller?.stop()
-    }
-
-    /// Beri tahu alur bahwa app tidak lagi aktif (mis. pergelangan diturunkan).
-    public func pause() {
         if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
         isRunning = false
         controller?.stop()

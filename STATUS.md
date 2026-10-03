@@ -8,14 +8,78 @@
 pekerjaan repo ini.
 
 - Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 124 test
-  PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux).
+  PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
+  dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
+  yang pertama.
 - Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
-  (`Apple Build`) hijau** — bukan sekadar lolos parse.
-- CI: `engine-tests.yml` (ubuntu) + `ios-build.yml` (macos-15, XcodeGen).
+  (`Apple Build`) hijau** — bukan sekadar lolos parse. Build itu kini juga
+  **gagal bila ada peringatan compiler pada kode sendiri**, jadi peringatan
+  tidak bisa lagi menumpuk tanpa terlihat.
+- CI: `engine-tests.yml` (ubuntu, 2 paket) + `ios-build.yml` (macos-15,
+  XcodeGen, gerbang peringatan).
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: peringatan lokasi bawaan tidak boleh bergantung pada string mentah
+### Siklus ini: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
+Fokus: menutup **satu-satunya temuan yang sengaja dibiarkan terbuka** oleh
+siklus sebelumnya. Logika engine **tidak disentuh**; aturan keras PRD tidak
+dilonggarkan.
+
+**Temuan yang ditutup.** Siklus sebelumnya mencatat tiga peringatan build yang
+bertentangan dengan komentar di kodenya sendiri —
+`@preconcurrency attribute on conformance to '...' has no effect` di
+`LocationProvider.swift`, `WatchLinkService.swift`, dan `PhoneLinkService.swift`
+— dan memilih **tidak** menyentuhnya karena menghapusnya tanpa bisa membangun
+di macOS akan menjadi tebakan.
+
+**Yang membuatnya bukan tebakan lagi.** Compiler-nya sendiri memberi verdict,
+dan verdict itu bisa dibaca dari log CI yang sudah ada: Xcode 16.4 (16F6)
+menandai atribut itu **tidak berpengaruh** dan menawarkan fix-it untuk
+membuangnya. Compiler benar, dan alasannya bisa diperiksa di kode: **setiap**
+metode delegasi di ketiga berkas sudah `nonisolated` dan menyerahkan hasilnya
+ke main actor lewat `Task`, jadi tidak ada satu pun persyaratan protokol yang
+dilanggar isolasi. Atribut itu memang tidak mengerjakan apa-apa, dan komentar
+lama ("compiler menolak konformansnya tanpa atribut ini") sudah tidak berlaku.
+Tiga atribut dibuang; komentarnya diganti dengan alasan yang berlaku sekarang.
+
+**Arah perubahannya juga lebih gagal-tertutup.** Dengan atribut itu, kesalahan
+isolasi **baru** di kemudian hari (mis. metode delegasi yang lupa `nonisolated`)
+hanya menjadi peringatan runtime. Tanpa atribut, kesalahan yang sama menjadi
+**galat kompilasi** — jauh lebih awal ketahuan.
+
+**Agar tidak terulang.** Peringatan build hanya terlihat di log CI macOS, dan
+peringatan yang menganggur adalah cara paling halus untuk menutupi komentar
+kode yang sudah tidak berlaku — persis yang terjadi selama ini. Karena itu
+kedua build app kini menyimpan keluarannya, dan langkah baru
+**"Gerbang peringatan (kode sendiri)"** gagal bila ada `warning:` yang
+menunjuk berkas `Apps/`. Peringatan alat Xcode (urutan build manual, metadata
+AppIntents, swift-format) sengaja **tidak** dihitung — itu bukan kode ini, dan
+menjadikannya kegagalan hanya akan membuat gerbangnya dimatikan orang lain saat
+ia berbunyi.
+
+**Celah kedua yang ditemukan dan ditutup.** `engine-tests.yml` hanya
+menjalankan `CelestialEngine`, padahal kriteria "ENGINE SIAP" di `ROADMAP.md`
+berbunyi "165/165 engine + 124/124 PointingKit di Linux, **tanpa Mac**".
+Separuh kriteria itu karena itu tidak pernah ditegakkan di CI: perubahan pada
+`PointingKit` — tempat seluruh keputusan produk yang bisa salah hidup (kapan
+yakin, kapan menolak, apa yang direkam) — hanya akan tertangkap job macOS yang
+jauh lebih lambat. Kini `swift test --package-path Packages/PointingKit`
+dijalankan sebagai langkah kedua di sana.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- **Pola gerbang peringatan diuji terhadap log run `37147598026` yang
+  sebenarnya** (bukan dikarang): **16 peringatan kode tertangkap**, **6
+  peringatan alat diabaikan**.
+- CI `Apple Build` run `37148159414` → **2× `BUILD SUCCEEDED`**, langkah gerbang
+  melaporkan *"Tidak ada peringatan compiler pada Apps/."* → tiga peringatan
+  `@preconcurrency` **hilang**, terverifikasi di Apple SDK.
+- CI `Engine Tests (Linux)` run `37148349397` → **kedua paket hijau**
+  (165 + 124). CI `Apple Build` run `37148349347` → hijau.
+
+### Siklus sebelumnya: peringatan lokasi bawaan tidak boleh bergantung pada string mentah
 Fokus: menutup satu cacat laten di lapisan app. Logika engine **tidak
 disentuh**; aturan keras PRD tidak dilonggarkan.
 
@@ -38,18 +102,18 @@ Experiment 1, jadi kedua layar tidak bisa lagi berbeda pendapat).
 - `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
 - CI `Apple Build` + `Engine Tests (Linux)` pada commit siklus ini.
 
-**Temuan yang BELUM ditutup (jujur, belum diverifikasi):** build macOS hijau
-tetapi mengeluarkan tiga peringatan yang **bertentangan** dengan komentar di
-kodenya sendiri:
+**Temuan yang dulu BELUM ditutup — kini sudah (lihat entri siklus terbaru di
+atas).** Build macOS hijau tetapi mengeluarkan tiga peringatan yang
+**bertentangan** dengan komentar di kodenya sendiri:
 `@preconcurrency attribute on conformance to 'WCSessionDelegate' has no effect`
 (`WatchLinkService.swift:138`, `PhoneLinkService.swift:99`) dan
 `... to 'CLLocationManagerDelegate' has no effect` (`LocationProvider.swift:40`).
-Komentar di ketiga berkas menyatakan atribut itu **wajib**; Xcode 16.4
-mengatakan tidak berpengaruh. Salah satu pasti keliru. Sengaja **tidak**
-diubah pada siklus ini: menghapus atribut tanpa bisa membangun di macOS adalah
-tebakan, dan mempertahankannya adalah pilihan yang gagal-tertutup (paling buruk:
-peringatan yang tidak berguna, bukan galat). Perlu siklus yang menjadikan
-peringatan build sebagai gerbang sebelum disentuh.
+Siklus itu sengaja **tidak** mengubahnya: menghapus atribut tanpa bisa
+membangun di macOS adalah tebakan, dan mempertahankannya adalah pilihan yang
+gagal-tertutup (paling buruk: peringatan yang tidak berguna, bukan galat).
+Siklus berikutnya menutupnya — atributnya memang tidak berpengaruh (semua
+metode delegasi sudah `nonisolated`), dibuang, dan peringatan build pada kode
+sendiri kini menjadi gerbang di CI.
 
 ### Siklus sebelumnya: ekspor dataset benar-benar menjadi berkas bernama
 Fokus: menyisir berkas app terhadap daftar item yang tersisa, lalu menutup satu
