@@ -38,6 +38,19 @@ Experiment 1, jadi kedua layar tidak bisa lagi berbeda pendapat).
 - `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
 - CI `Apple Build` + `Engine Tests (Linux)` pada commit siklus ini.
 
+**Temuan yang BELUM ditutup (jujur, belum diverifikasi):** build macOS hijau
+tetapi mengeluarkan tiga peringatan yang **bertentangan** dengan komentar di
+kodenya sendiri:
+`@preconcurrency attribute on conformance to 'WCSessionDelegate' has no effect`
+(`WatchLinkService.swift:138`, `PhoneLinkService.swift:99`) dan
+`... to 'CLLocationManagerDelegate' has no effect` (`LocationProvider.swift:40`).
+Komentar di ketiga berkas menyatakan atribut itu **wajib**; Xcode 16.4
+mengatakan tidak berpengaruh. Salah satu pasti keliru. Sengaja **tidak**
+diubah pada siklus ini: menghapus atribut tanpa bisa membangun di macOS adalah
+tebakan, dan mempertahankannya adalah pilihan yang gagal-tertutup (paling buruk:
+peringatan yang tidak berguna, bukan galat). Perlu siklus yang menjadikan
+peringatan build sebagai gerbang sebelum disentuh.
+
 ### Siklus sebelumnya: ekspor dataset benar-benar menjadi berkas bernama
 Fokus: menyisir berkas app terhadap daftar item yang tersisa, lalu menutup satu
 cacat nyata. Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
