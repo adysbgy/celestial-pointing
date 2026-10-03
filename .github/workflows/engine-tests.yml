@@ -7,5 +7,19 @@ jobs:
       image: swift:6.0
     steps:
       - uses: actions/checkout@v4
-      - name: Run CelestialEngine tests
+
+      # Dua paket, bukan satu.
+      #
+      # Kriteria "ENGINE SIAP" di ROADMAP.md menyatakan suite hijau di Linux
+      # **tanpa Mac** untuk keduanya (165 CelestialEngine + 124 PointingKit).
+      # Sebelumnya job ini hanya menjalankan CelestialEngine, sehingga separuh
+      # kriteria itu tidak pernah ditegakkan di CI: perubahan pada PointingKit
+      # hanya akan tertangkap job macOS yang jauh lebih lambat. Karena seluruh
+      # keputusan produk yang bisa salah hidup di PointingKit (kapan yakin,
+      # kapan menolak, apa yang direkam), gerbang cepatnya justru yang paling
+      # perlu memeriksanya.
+      - name: Uji CelestialEngine
         run: swift test --package-path Packages/CelestialEngine
+
+      - name: Uji PointingKit
+        run: swift test --package-path Packages/PointingKit
