@@ -71,6 +71,15 @@ jarak sesungguhnya; kandidat tunggal → `nil`, bukan nol), 3 di
   `swift:6.0`.
 - Build macOS (app iPhone + jam) diverifikasi CI `Apple Build` pada commit ini.
 
+**Galat nyata yang hanya muncul saat dibangun di macOS (dan sudah diperbaiki):**
+- `PointingEngine.bind(location:)` ditulis `public` padahal parameternya tipe
+  internal `LocationProvider` → `error: method cannot be declared public
+  because its parameter uses an internal type`. Gerbang sintaks
+  (`swiftc -parse`) **tidak** memeriksa kontrol akses, jadi ini hanya
+  tertangkap build sungguhan. Method dibuat `internal`, dan CI hijau pada
+  commit berikutnya. Pelajaran yang layak diingat: `-parse` membuktikan
+  berkasnya *terbaca*, bukan bahwa berkasnya *saling cocok*.
+
 ### Siklus sebelumnya: ekspor diagnostik + verifikasi ulang
 Fokus: menyisir berkas app terhadap daftar item yang tersisa, dan menutup satu
 item yang benar-benar belum ada. Tidak ada aturan keras PRD yang dilonggarkan.
