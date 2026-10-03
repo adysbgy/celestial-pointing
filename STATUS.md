@@ -2,33 +2,40 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: anti-false-lock + instrumentasi Experiment 1 → FASE 1 SELESAI
-- ✅ `Confidence.swift` dirombak. Ambang keyakinan kini dinyatakan sebagai
-  kelipatan **sigma pointing**, bukan turunan dari `coneDeg`. Sebelumnya
-  ambang "pasti" ikut mengecil bila pengguna mempersempit kerucut pencarian —
-  itu keliru: ketidakpastian tunjuk tidak berubah hanya karena kita mencari
-  lebih sempit. `coneDeg` tetap menentukan siapa yang masuk pertimbangan.
-- ✅ Ambiguitas diukur dari **jarak antar-kandidat** (`nearestNeighbourDeg`),
-  bukan dari jarak masing-masing ke arah tunjuk. Dua benda bisa sama-sama
-  dekat ke arah tunjuk tapi berjauhan satu sama lain; yang menentukan ragu
-  atau tidak adalah yang kedua.
-- ✅ Ambang ambiguitas inklusif (tepat di batas = masih ragu). Arah aman.
-- ✅ `ConfidenceTests` (10 uji) — termasuk kasus ambigu wajib tidak HIGH.
-- ✅ **Ditemukan lewat uji nyata**: Jupiter 2026-01-01 hanya ~6.8° dari Pollux,
-  jadi engine dengan benar menolak HIGH saat ditunjuk ke Jupiter. Ini
-  anti-false-lock bekerja pada geometri langit sungguhan, bukan hanya di
-  unit test sintetis. (Diverifikasi dengan probe AstronomyKit.)
-- ✅ `ObservationLog.swift` — instrumentasi Experiment 1: `PointingTrial`
-  (arah tunjuk mentah + terkalibrasi, jawaban engine, label kebenaran),
-  `TrialAnalysis` (galat tunjuk terukur, `isFalseLock`), `ExperimentSummary`
-  (akurasi, median, p90, kriteria keselamatan), `TrialArchive` (JSON).
-  Model di `Models.swift` kini `Codable`/`Sendable` agar bisa diekspor dari
-  Watch/iPhone ke mesin analisis.
-- ✅ `swift test`: **65 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
+### Siklus ini: fondasi Fase 2 yang bisa diuji di Linux → 116 test hijau
+- ✅ `Geometry.swift` — `Vector3` + `Matrix3x3`, **tanpa `simd`** (tidak ada di
+  Linux). Penamaan `m11…m33` sengaja sama dengan `CMRotationMatrix` supaya
+  lapisan app bisa memetakan sensor tanpa berpikir ulang indeks.
+- ✅ `Rotation.swift` — `Quaternion` `(w,x,y,z)` + konversi `CMQuaternion`
+  (urutan x,y,z,w dipetakan di satu tempat). Ada `rotationMatrix`,
+  `rotated(_:)`, komposisi, dan konjugat.
+- ✅ `Frames.swift` — inti Fase 2 yang paling rawan salah:
+  - `LocalFrame` ENU (Timur–Utara–Atas) ⇄ `HorizontalCoord`, azimut dari Utara.
+  - `DeviceAttitude`: quaternion + **roll mengelilingi sumbu pandang** →
+    `deviceToWorld` → arah tunjuk di langit.
+  - `DeviceAimAxis` (`view` / `screenUp` / `screenRight`) — sumbu "arah tunjuk"
+    adalah keputusan UX, jadi diserahkan sebagai parameter, bukan dipatri.
+  - Temuan penting yang diuji eksplisit: **roll tidak mengubah arah pandang
+    keluar-layar** bila sumbu itu mendatar. Jadi kalibrasi yaw memang wajib —
+    bukan opsional.
+- ✅ `Calibration.swift` — kalibrasi dari titik acuan:
+  - Yaw diselesaikan dengan **rata-rata sirkular** (rata-rata biasa salah di
+    sekitar 0°/360°).
+  - Hanya **offset azimut** yang dikoreksi. Koreksi altitude akan menyembunyikan
+    galat sensor — bertentangan dengan prinsip PRD. Sebaran sisa dilaporkan
+    sebagai `residualSpreadDeg` (1σ).
+  - `confidencePolicy()` menyambung sigma terukur → `ConfidencePolicy`, jadi
+    ambang HIGH engine otomatis mengikuti hasil Experiment 1. Uji
+    `testSmallerSigmaAllowsHighWhereLooseSigmaDidNot` membuktikan efeknya.
+- ✅ Uji rantai penuh tanpa sensor: `FramesTests` membangun attitude sintetis
+  yang mengarah ke Sirius, lalu resolver harus mengembalikan "sirius". Ini
+  memvalidasi seluruh konversi ENU ↔ kerangka perangkat dua arah.
+- ✅ `swift test`: **116 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
 
 ### Siklus sebelumnya
+- ✅ anti-false-lock + instrumentasi Experiment 1 → Fase 1 selesai (65 test).
 - ✅ Penyaringan visibilitas + efemeris tersambung ke resolver (`Visibility`,
-  `diagnose()` dengan jejak audit, pengaman Matahari). 42 test hijau.
+  `diagnose()` dengan jejak audit, pengaman Matahari).
 - ✅ Efemeris Bulan & planet via AstronomyKit, divalidasi vs JPL Horizons
   (simpangan terburuk 8.91″).
 - ✅ Reduksi presesi J2000 → of-date di resolver (sebelumnya bintang meleset
@@ -49,14 +56,18 @@
 - AstronomyKit tersambung ke `PointingResolver` lewat `diagnose()`. Bulan &
   planet ikut jadi kandidat dengan koordinat of-date. Matahari hanya konteks,
   tidak pernah jadi target.
+- **Engine tidak menyentuh API Apple apa pun.** Yang butuh Mac hanyalah
+  pembungkus sensor/UI (Fase 2 app), bukan logika. Karena itu attitude,
+  kalibrasi, dan resolusi bisa dibuktikan di Linux.
 
-## Langkah berikutnya (FASE 2 — app watchOS)
-Fase 1 (engine) selesai: 65 test hijau, anti-false-lock teruji.
-1. Motion logger: `CMDeviceMotion` → rekam attitude + timestamp.
-2. Alur kalibrasi (uji beberapa metode).
+## Langkah berikutnya (sisa FASE 2 — app watchOS, butuh Mac)
+Logika inti sudah ada & teruji; yang tersisa adalah pembungkus platform:
+1. Motion logger: `CMDeviceMotion` → `DeviceAttitude` (lewat `init?(cmX:cmY:cmZ:cmW:)`)
+   + rekam timestamp; belum ada target Xcode (Apps/ masih kosong).
+2. Alur kalibrasi memakai `CalibrationSolver` (kumpulkan titik acuan → `apply`).
 3. UI: idle → pointing → searching → lock → uncertain → detail.
 4. Haptic sukses + state uncertain.
 5. Watch ↔ iPhone (WatchConnectivity).
 
-Catatan: unit test engine tetap jalan di Linux, tapi Fase 2 butuh Mac untuk
+Catatan: unit test engine tetap jalan di Linux, tapi Fase 2 app butuh Mac untuk
 build/run watchOS. Engine TIDAK boleh bergantung pada API Apple (sudah bersih).
