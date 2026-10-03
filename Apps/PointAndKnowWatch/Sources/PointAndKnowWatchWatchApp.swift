@@ -61,6 +61,11 @@ struct PointAndKnowWatchApp: App {
                 link.send(state: update.snapshot)
             }
         }
+        // Sumber keadaan untuk menjawab permintaan iPhone. Dibaca saat diminta,
+        // bukan disalin — supaya yang dikirim selalu keadaan yang berlaku.
+        link.currentSnapshot = { [weak engine] in
+            engine?.snapshot ?? PointingSnapshot(state: .idle)
+        }
         motion.start(controller: engine.controller)
         engine.setSensorAvailable(motion.isAvailable)
 

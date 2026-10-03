@@ -38,8 +38,18 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     }
 
     /// Kirim ambang keyakinan baru ke jam.
+    ///
+    /// Lewat `transferUserInfo`, **bukan** `updateApplicationContext`: ambang
+    /// ini peristiwa sekali-jadi, dan `updateApplicationContext` hanya menyimpan
+    /// satu kamus — kalau pengguna menekan "Minta keadaan terakhir" sesudahnya,
+    /// ambangnya tertimpa dan tidak pernah sampai ke jam, sementara di iPhone
+    /// tampak terkirim.
     public func send(policy: ConfidencePolicy) {
-        send(PointingLinkMessage.policy(policy))
+        guard let session, session.activationState == .activated else {
+            lastNote = "Jam belum terhubung — ambang belum terkirim."
+            return
+        }
+        session.transferUserInfo(PointingLinkMessage.policy(policy).plist)
     }
 
     /// Minta keadaan terakhir dari jam.
@@ -72,7 +82,10 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         case .policyUpdate:
             lastNote = "Jam mengirim ambang keyakinan"
         case .stateRequest:
-            requestState()
+            // Jam meminta keadaan — balas dengan yang terakhir kita punya.
+            // (Peran ini jarang terpakai, tapi harus ada supaya permintaan
+            // tidak berakhir tanpa jawaban.)
+            if let lastState { send(lastState) }
         case .acknowledgement:
             lastNote = "Tanda terima"
         }
@@ -119,6 +132,15 @@ extension PhoneLinkService: @preconcurrency WCSessionDelegate {
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
         guard let decoded = PointingLinkMessage(plist: message) else { return }
+        Task { @MainActor in self.handle(decoded) }
+    }
+
+    /// Pesan antre dari jam. Kalibrasi dan permintaan keadaan dikirim jam
+    /// dengan `transferUserInfo`, jadi keduanya tiba di sini — bukan di
+    /// `didReceiveApplicationContext`.
+    nonisolated public func session(_ session: WCSession,
+                                    didReceiveUserInfo userInfo: [String: Any]) {
+        guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
         Task { @MainActor in self.handle(decoded) }
     }
 }

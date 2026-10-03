@@ -11,10 +11,14 @@ import PointingKit
 /// masukan bagi apa pun selain pengukuran galat. Mengalirkannya ke perangkat
 /// lain hanya menambah peluang ia dipakai untuk hal yang salah.
 ///
-/// `updateApplicationContext` dipakai (bukan `sendMessage`) karena ia
-/// menyimpan pesan terakhir dan mengirimkannya saat pasangan kembali terjangkau
-/// — jam dan telepon sering tidak terhubung, dan keadaan terakhir itulah yang
-/// berguna, bukan antrean peristiwa lama.
+/// **Dua saluran, dan bedanya penting.** `updateApplicationContext` hanya
+/// menyimpan **satu** kamus: setiap kiriman menimpa yang sebelumnya. Itu
+/// memang yang diinginkan untuk keadaan alur ("apa kabar terakhir?"), tapi
+/// **salah** untuk kalibrasi: hasil kalibrasi akan tertimpa oleh pembaruan
+/// keadaan berikutnya, dan iPhone bisa tidak pernah menerimanya sama sekali
+/// sementara di jam kalibrasi tampak berhasil. Karena itu kalibrasi dikirim
+/// lewat `transferUserInfo`, yang mengantre dan dikirim berurutan — termasuk
+/// saat pasangan sedang tidak terjangkau.
 @MainActor
 public final class WatchLinkService: NSObject, ObservableObject {
 
@@ -31,6 +35,13 @@ public final class WatchLinkService: NSObject, ObservableObject {
     /// memakai angka yang sama — kalau tidak, hasil pengukuran di satu tempat
     /// tidak berlaku di tempat lain.
     public var onPolicyReceived: ((ConfidencePolicy) -> Void)?
+
+    /// Keadaan alur yang berlaku sekarang, untuk menjawab permintaan iPhone.
+    ///
+    /// Diisi oleh app jam. Tanpa ini, permintaan "kirim keadaan terakhir" tidak
+    /// bisa dijawab dan iPhone akan terus menampilkan keadaan lama tanpa tahu
+    /// bahwa permintaannya tidak menghasilkan apa-apa.
+    public var currentSnapshot: (() -> PointingSnapshot)?
 
     private var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
@@ -50,8 +61,19 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 
     /// Kirim hasil kalibrasi.
+    ///
+    /// Lewat `transferUserInfo`, **bukan** `updateApplicationContext`: hasil
+    /// kalibrasi adalah peristiwa sekali-jadi, bukan keadaan yang boleh
+    /// ditimpa. `residualSpreadDeg` di dalamnya adalah angka yang menyetel
+    /// ambang keyakinan di iPhone — kalau hilang, Experiment 1 kehilangan
+    /// satu-satunya pengukuran yang membuatnya berguna.
     public func send(calibration: PointingCalibration) {
-        send(PointingLinkMessage.calibration(calibration))
+        guard let session, session.activationState == .activated else {
+            sendFailureCount += 1
+            lastMessageNote = "Kalibrasi belum terkirim: sesi belum aktif."
+            return
+        }
+        session.transferUserInfo(PointingLinkMessage.calibration(calibration).plist)
     }
 
     /// Kirim pesan apa adanya. Gagal kirim **tidak** diam: penghitungnya naik
@@ -83,8 +105,14 @@ public final class WatchLinkService: NSObject, ObservableObject {
                 lastMessageNote = "Ambang keyakinan dari iPhone tidak sah — diabaikan"
             }
         case .stateRequest:
-            // Balasan disiapkan pemanggil; di sini cukup dicatat.
-            break
+            // Balas dengan keadaan yang berlaku sekarang. Kalau app belum
+            // menyediakan sumbernya, katakan terus terang — iPhone yang meminta
+            // dan tidak menerima apa-apa akan mengira jam tidak menjawab.
+            if let currentSnapshot {
+                send(state: currentSnapshot())
+            } else {
+                lastMessageNote = "Permintaan keadaan datang sebelum alur siap."
+            }
         default:
             break
         }
@@ -122,6 +150,15 @@ extension WatchLinkService: @preconcurrency WCSessionDelegate {
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
         guard let decoded = PointingLinkMessage(plist: message) else { return }
+        Task { @MainActor in self.handle(decoded) }
+    }
+
+    /// Pesan antre dari iPhone (ambang keyakinan dikirim dengan
+    /// `transferUserInfo`, jadi ia tiba di sini — bukan di
+    /// `didReceiveApplicationContext`).
+    nonisolated public func session(_ session: WCSession,
+                                    didReceiveUserInfo userInfo: [String: Any]) {
+        guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
         Task { @MainActor in self.handle(decoded) }
     }
 
