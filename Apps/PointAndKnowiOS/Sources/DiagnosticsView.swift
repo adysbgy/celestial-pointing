@@ -222,7 +222,7 @@ struct DiagnosticsView: View {
                 }
 
                 Section {
-                    ShareLink(item: exportText) {
+                    ShareLink(item: exportDocument) {
                         Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
                     }
                     .disabled(trace.samples.isEmpty)
@@ -294,9 +294,11 @@ struct DiagnosticsView: View {
     }
 
     /// Isi berkas ekspor: riwayat keyakinan **beserta konteks yang berlaku saat
-    /// merekam**. Kalau encoding gagal, yang dibagikan adalah pesan kesalahan —
-    /// bukan berkas kosong yang tampak seperti dataset valid.
-    private var exportText: String {
+    /// merekam**. Kalau encoding gagal, yang dibagikan adalah pesan kesalahan di
+    /// dalam berkas — bukan berkas kosong yang tampak seperti dataset valid.
+    /// Nama berkasnya memakai stempel waktu UTC dari `ConfidenceTraceArchive`.
+    private var exportDocument: JSONArchiveDocument {
+        let filename = ConfidenceTraceArchive.suggestedFilename()
         let export = ConfidenceTraceArchive.export(
             from: trace.trace,
             location: engine.location,
@@ -304,9 +306,10 @@ struct DiagnosticsView: View {
             confidenceSigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
         do {
             let data = try ConfidenceTraceArchive.encode(export)
-            return String(decoding: data, as: UTF8.self)
+            return JSONArchiveDocument(filename: filename, data: data)
         } catch {
-            return "{\"error\": \"gagal meng-encode riwayat keyakinan: \(error.localizedDescription)\"}"
+            let message = "{\"error\": \"gagal meng-encode riwayat keyakinan: \(error.localizedDescription)\"}"
+            return JSONArchiveDocument(filename: filename, data: Data(message.utf8))
         }
     }
 

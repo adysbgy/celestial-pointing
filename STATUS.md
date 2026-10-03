@@ -15,7 +15,39 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: objek sisa tampil sebagai hasil sekarang (anti false-confidence)
+### Siklus ini: ekspor dataset benar-benar menjadi berkas bernama
+Fokus: menyisir berkas app terhadap daftar item yang tersisa, lalu menutup satu
+cacat nyata. Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat yang ditemukan dan diperbaiki.** Dua layar ekspor ("Ekspor dataset
+(JSON)" di `DiagnosticsView` dan `Experiment1View`) membagikan **`String`**
+mentah lewat `ShareLink`. Akibatnya berkas yang keluar dari lembar berbagi
+adalah teks tanpa nama dan tanpa akhiran `.json`: di Files/penerima ia muncul
+sebagai "Teks", bukan dataset. Yang membuat ini jelas cacat, bukan sekadar
+kosmetik: helper nama berkas berstempel waktu UTC —
+`DatasetArchive.suggestedFilename(for:)` dan
+`ConfidenceTraceArchive.suggestedFilename(for:)` — **sudah ada dan sudah
+diuji** di `PointingKit`, tetapi **tidak pernah dipanggil dari app**. Jadi
+stempel waktu anti-tabrakan yang sengaja ditulis itu mati: dua ekspor bisa
+saling menimpa, dan item "ekspor dataset" baru terpenuhi setengah.
+
+Perbaikannya:
+- `Apps/PointAndKnowiOS/Sources/JSONArchiveDocument.swift` — pembungkus
+  `Transferable` (`FileRepresentation(exportedContentType: .json)`) yang menulis
+  `Data` ke berkas sementara dengan nama dari `suggestedFilename`, lalu
+  menyerahkan `SentTransferredFile(url)`. `ShareLink` kini menerima dokumen ini,
+  bukan `String`.
+- Kedua layar memakai helper nama yang sudah teruji; jalur gagal-encoding tetap
+  membagikan pesan kesalahan **di dalam berkas**, bukan berkas kosong yang
+  tampak sah.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- Gerbang sintaks: **seluruh 15 berkas app** (bertambah satu) lolos
+  `swiftc -parse -swift-version 5` di container `swift:6.0`.
+- `./swift-test.sh` → lihat angka terbaru di Ringkasan di atas (0 gagal).
+- Build macOS diverifikasi CI `Apple Build` pada commit siklus ini.
+
+### Siklus sebelumnya: objek sisa tampil sebagai hasil sekarang (anti false-confidence)
 Fokus: membaca sendiri setiap berkas app, lalu memperbaiki satu cacat nyata yang
 ditemukan — bukan menambah fitur. Logika engine **tidak disentuh** (165 test
 CelestialEngine tetap hijau); aturan keras PRD tidak dilonggarkan.
@@ -627,7 +659,8 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
   sebelum sebaran titik acuannya benar.
 - ✅ `WatchLinkService.swift` — mengirim **keputusan** (keadaan + objek), bukan
   sudut pergelangan mentah.
-- ✅ `SkyContextView.swift` — konteks langit (kapan gelap, tinggi Matahari).
+- ✅ `SkyContextView` (struct di dalam `PointingView.swift`) — konteks langit
+  (kapan gelap, tinggi Matahari).
 
 **iPhone (Apps/PointAndKnowiOS/):**
 - ✅ `DiagnosticsView.swift` — grafik keyakinan (Swift Charts) + ekspor dataset.
@@ -638,7 +671,12 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
   gagal**, bukan menyembunyikannya.
 - ✅ `PhoneLinkService.swift` + `LinkView.swift` — sisi iPhone dari
   WatchConnectivity; bisa mengirim ambang keyakinan hasil Experiment 1 ke jam.
-- ✅ `PointAndKnowApp.swift` — titik masuk app iPhone.
+- ✅ `JSONArchiveDocument.swift` — pembungkus `Transferable` supaya "Ekspor
+  dataset (JSON)" benar-benar menghasilkan berkas bernama berakhiran `.json`
+  (memakai `suggestedFilename` berstempel waktu dari `PointingKit`), bukan teks
+  tanpa nama.
+- ✅ `PointAndKnowiOSApp` (`@main`, di dalam `DiagnosticsView.swift`) — titik
+  masuk app iPhone.
 
 **Build:**
 - ✅ `project.yml` (XcodeGen) — satu proyek, **dua target app**

@@ -184,7 +184,7 @@ struct Experiment1View: View {
                 }
             }
 
-            ShareLink(item: exportText(recorder)) {
+            ShareLink(item: exportDocument(recorder)) {
                 Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
             }
             .disabled(trials.isEmpty)
@@ -230,16 +230,20 @@ struct Experiment1View: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Ekspor sebagai JSON lewat lembar berbagi.
+    /// Ekspor sebagai berkas JSON bernama, lewat lembar berbagi.
     ///
-    /// Kalau encoding gagal, yang dibagikan adalah pesan kesalahan — bukan
-    /// berkas kosong yang tampak seperti dataset valid.
-    private func exportText(_ recorder: ExperimentRecorder) -> String {
+    /// Kalau encoding gagal, yang dibagikan adalah pesan kesalahan di dalam
+    /// berkas — bukan berkas kosong yang tampak seperti dataset valid. Nama
+    /// berkasnya memakai stempel waktu UTC dari `DatasetArchive` supaya dua
+    /// ekspor tidak saling menimpa.
+    private func exportDocument(_ recorder: ExperimentRecorder) -> JSONArchiveDocument {
+        let filename = DatasetArchive.suggestedFilename()
         do {
             let data = try DatasetArchive.encode(recorder.dataset())
-            return String(decoding: data, as: UTF8.self)
+            return JSONArchiveDocument(filename: filename, data: data)
         } catch {
-            return "{\"error\": \"gagal meng-encode dataset: \(error.localizedDescription)\"}"
+            let message = "{\"error\": \"gagal meng-encode dataset: \(error.localizedDescription)\"}"
+            return JSONArchiveDocument(filename: filename, data: Data(message.utf8))
         }
     }
 
