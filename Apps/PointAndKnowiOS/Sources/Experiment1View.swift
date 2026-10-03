@@ -11,20 +11,13 @@ import PointingKit
 struct Experiment1View: View {
 
     @ObservedObject var engine: PointingEngine
-    @ObservedObject var motion: MotionLogger
-    @ObservedObject var location: LocationProvider
     @ObservedObject var link: PhoneLinkService
-    @ObservedObject var trace: ConfidenceTraceStore
 
     @StateObject private var recorder: ExperimentRecorder
 
-    init(engine: PointingEngine, motion: MotionLogger, location: LocationProvider,
-         link: PhoneLinkService, trace: ConfidenceTraceStore) {
+    init(engine: PointingEngine, link: PhoneLinkService) {
         self.engine = engine
-        self.motion = motion
-        self.location = location
         self.link = link
-        self.trace = trace
         // Recorder dibuat sekali dari engine yang sama. Kalau ia membuat
         // controller sendiri, rekaman akan memakai jalur pemrosesan yang
         // berbeda dari yang dilihat penguji di layar — dan hasilnya tidak lagi
@@ -52,21 +45,11 @@ struct Experiment1View: View {
                 }
             }
             .onAppear {
-                motion.onUpdate = { update in
-                    engine.ingest(update)
-                    trace.record(snapshot: update.snapshot,
-                                 sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
-                }
-                motion.start(controller: engine.controller)
-                engine.setSensorAvailable(motion.isAvailable)
-                location.start()
-                engine.bind(location: location)
+                // Kebenaran (ground truth) dihitung untuk lokasi yang berlaku
+                // sekarang. Lokasi sungguhan tiba setelah app dijalankan, jadi
+                // `onChange` di bawah yang menyusulkannya — di sini hanya
+                // mengejar keadaan yang sudah ada.
                 recorder.updateLocation(engine.location)
-            }
-            .onDisappear {
-                motion.stop()
-                engine.stop()
-                location.stop()
             }
             // Kebenaran harus mengikuti lokasi yang sedang dipakai engine.
             // Lokasi sungguhan tiba beberapa detik setelah `bind`, jadi tanpa
@@ -74,6 +57,9 @@ struct Experiment1View: View {
             .onChange(of: engine.location) { _, newLocation in
                 recorder.updateLocation(newLocation)
             }
+            // Sensor & lokasi dimiliki `RootView`, bukan tab ini: keduanya
+            // dibagi dengan tab Diagnostik, dan `TabView` menahan kedua tab
+            // tetap hidup.
         }
     }
 

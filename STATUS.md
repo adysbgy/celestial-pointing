@@ -15,7 +15,35 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: verifikasi independen ulang + koreksi klaim dokumen
+### Siklus ini: perbaikan bug siklus hidup sensor di app iPhone
+Fokus: membaca sendiri setiap berkas app, lalu memperbaiki satu cacat nyata yang
+ditemukan — bukan menambah fitur. Logika engine **tidak disentuh** (165 + 122
+test tetap hijau); aturan keras PRD tidak dilonggarkan.
+
+**Cacat yang ditemukan dan diperbaiki.** `DiagnosticsView` dan `Experiment1View`
+masing-masing menyalakan dan mematikan sensor **yang sama** di `onAppear` /
+`onDisappear`. `TabView` menahan kedua tabnya tetap hidup, jadi:
+- keduanya menyetel `motion.onUpdate` pada satu `MotionLogger` — penyambungan
+  yang belakangan menimpa yang duluan, sehingga salah satu tab berhenti merekam;
+- `onDisappear` salah satu tab memanggil `engine.stop()` untuk alur yang sedang
+  dipakai tab lain.
+
+Gejalanya persis jenis yang dilarang: layar tetap tampak hidup sementara sensor
+sudah mati. Perbaikannya: siklus hidup sensor/lokasi/alur dipindahkan ke
+`RootView` (satu kali untuk seluruh umur app, plus `scenePhase`), dan tiap tab
+tidak lagi memilikinya. `Experiment1View` kini hanya menerima `engine` + `link`.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **165 CelestialEngine + 122 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 14 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` setelah perubahan.
+- `gh run view` pada `Apple Build` HEAD `6e5edd8` → **2× `BUILD SUCCEEDED`**
+  (skema iPhone yang ikut membangun app jam, dan skema jam sendiri), **0 galat**.
+  Peringatan yang tersisa hanya bersifat kosmetik: `@preconcurrency ... has no
+  effect` (sudah ditangani compiler Xcode 16.4, tidak berpengaruh fungsional) dan
+  "Building targets in manual order is deprecated".
+
+### Siklus sebelumnya: verifikasi independen ulang + koreksi klaim dokumen
 Fokus: menjalankan sendiri seluruh verifikasi (bukan membaca klaim), lalu
 memperbaiki satu klaim dokumen yang tidak cocok dengan berkasnya. Tidak ada kode
 engine maupun app yang diubah; tidak ada aturan keras PRD yang dilonggarkan.

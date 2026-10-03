@@ -46,28 +46,71 @@ struct RootView: View {
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         TabView {
             DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
                 .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }
-            Experiment1View(engine: engine, motion: motion, location: location, link: link, trace: trace)
+            Experiment1View(engine: engine, link: link)
                 .tabItem { Label("Experiment 1", systemImage: "target") }
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
         }
-        .onAppear {
-            // Keputusan yang dikirim jam direkam ke riwayat keyakinan yang sama
-            // dengan sampel iPhone; `fromWatch` membedakan asal-usulnya.
-            //
-            // Tanpa penyambungan ini, `onMessage` tidak pernah dipanggil dan
-            // bagian "Sampel dari jam" di layar Tautan akan selalu nol — layar
-            // yang tampak baik-baik saja sambil menyembunyikan bahwa datanya
-            // tidak pernah masuk. Jam tidak mengirim jarak kandidat, jadi
-            // `ratioToSigma` sampel ini memang kosong; itu ditampilkan apa
-            // adanya, bukan diisi angka karangan.
-            link.onMessage = { message in trace.record(message: message) }
-            link.activate()
+        .onAppear { start() }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active: start()
+            case .inactive, .background: stop()
+            @unknown default: stop()
+            }
         }
+    }
+
+    /// Sensor, lokasi, dan alur adalah milik **app**, bukan milik satu tab.
+    ///
+    /// **Kenapa tidak di `onAppear` tiap tab.** `TabView` menahan semua tabnya
+    /// tetap hidup: membuka tab lain tidak mematikan tab sebelumnya. Kalau tiap
+    /// tab menyalakan sensornya sendiri, keduanya menyetel `motion.onUpdate` pada
+    /// `MotionLogger` yang **sama** — yang terakhir menang — dan `onDisappear`
+    /// salah satu tab akan memanggil `engine.stop()` untuk alur yang dipakai tab
+    /// lain. Gejalanya halus dan menyesatkan: layar tetap tampak hidup sementara
+    /// sensor sudah mati, atau riwayat keyakinan diam-diam berhenti terisi.
+    /// Menaruh siklus hidupnya di akar membuat ia berjalan tepat sekali untuk
+    /// seluruh umur app.
+    private func start() {
+        // Keputusan yang dikirim jam direkam ke riwayat keyakinan yang sama
+        // dengan sampel iPhone; `fromWatch` membedakan asal-usulnya.
+        //
+        // Tanpa penyambungan ini, `onMessage` tidak pernah dipanggil dan
+        // bagian "Sampel dari jam" di layar Tautan akan selalu nol — layar
+        // yang tampak baik-baik saja sambil menyembunyikan bahwa datanya
+        // tidak pernah masuk. Jam tidak mengirim jarak kandidat, jadi
+        // `ratioToSigma` sampel ini memang kosong; itu ditampilkan apa
+        // adanya, bukan diisi angka karangan.
+        link.onMessage = { message in trace.record(message: message) }
+        link.activate()
+
+        // Setiap sampel masuk ke engine **dan** ke riwayat keyakinan.
+        // Penyambungannya ada di sini, bukan di tiap tab, karena hanya ada
+        // satu `MotionLogger` yang dibagi kedua tab.
+        motion.onUpdate = { update in
+            engine.ingest(update)
+            trace.record(snapshot: update.snapshot,
+                         sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+        }
+        // iPhone tidak punya Taptic Engine.
+        engine.haptics = nil
+        motion.start(controller: engine.controller)
+        engine.setSensorAvailable(motion.isAvailable)
+        location.start()
+        engine.bind(location: location)
+    }
+
+    private func stop() {
+        motion.stop()
+        engine.stop()
+        location.stop()
     }
 }
 
@@ -183,23 +226,10 @@ struct DiagnosticsView: View {
                 }
             }
             .navigationTitle("Diagnostik")
-            .onAppear {
-                engine.haptics = nil
-                motion.onUpdate = { update in
-                    engine.ingest(update)
-                    trace.record(snapshot: update.snapshot,
-                                 sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
-                }
-                motion.start(controller: engine.controller)
-                engine.setSensorAvailable(motion.isAvailable)
-                location.start()
-                engine.bind(location: location)
-            }
-            .onDisappear {
-                motion.stop()
-                engine.stop()
-                location.stop()
-            }
+            // Siklus hidup sensor, lokasi, dan alur **tidak** ada di sini:
+            // ketiganya dibagi dengan tab Experiment 1, dan `TabView` menahan
+            // kedua tab tetap hidup. Siklus hidupnya ada di `RootView`, tempat
+            // ia berjalan tepat sekali untuk seluruh app.
         }
     }
 
