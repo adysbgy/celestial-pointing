@@ -1,0 +1,13 @@
+name: Apple Build
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build engine on Apple SDK
+        run: swift build --package-path Packages/CelestialEngine
+      # (App watchOS/iOS akan ditambahkan saat Fase 2)
