@@ -2,7 +2,40 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: tiap perbaikan GPS menghentikan alur dan mereset perata orientasi
+### Siklus ini: memasang kalibrasi yang sama mereset alur tanpa alasan
+Fokus: menyisir operasi yang **tidak idempoten** padahal seharusnya. Tidak ada
+aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **`PointingController.apply(calibration:)` selalu mereset perata orientasi dan
+  menghentikan mesin keadaan**, bahkan ketika kalibrasi yang dipasang persis
+  sama dengan yang sedang berlaku. Dua pemanggil memang mengirim nilai yang
+  sama:
+  - `PointingEngine.update(location:)` mempertahankan kalibrasi dengan
+    memanggil `apply(calibration: controller.calibration)` — nilai yang sama
+    persis.
+  - `CalibrationView.capture()` memanggilnya setelah mencatat acuan, padahal
+    mencatat acuan tidak mengubah kalibrasi yang berlaku.
+  - Akibatnya kunci yang sudah benar dibuang tanpa ada yang berubah — dan itu
+    terjadi justru saat pengguna sedang mengkalibrasi. Ini sisa dari siklus
+    lokasi: perbaikan `isSamePlace` menutup jalur yang paling sering, tapi
+    akarnya ada di sini.
+  - Perbaikan: penjagaan `newValue != calibration` ditaruh di controller supaya
+    pemanggil tidak bisa "lupa". Reset hanya masuk akal bila kalibrasinya
+    memang berubah, karena hanya perubahan yang membuat acuan lama tidak
+    sebanding. Baris berlebih di `CalibrationView.capture()` dibuang, dengan
+    komentar yang menjelaskan mengapa tidak perlu.
+- **Tes baru (1):** `testReapplyingSameCalibrationIsANoOp` — kalibrasi yang sama
+  tidak membuang kunci yang sudah benar. `testApplyingCalibrationResetsFlow`
+  yang sudah ada tetap memastikan kalibrasi yang **berbeda** tetap mereset alur.
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 112, 0 gagal**.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: tiap perbaikan GPS menghentikan alur dan mereset perata orientasi
 Fokus: menyisir **kesetaraan nilai** yang dipakai sebagai penanda perubahan.
 Tidak ada aturan keras PRD yang dilonggarkan.
 
