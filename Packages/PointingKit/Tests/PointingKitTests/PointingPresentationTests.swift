@@ -1,0 +1,68 @@
+import XCTest
+import CelestialEngine
+@testable import PointingKit
+
+/// Janji tampilan: engine yang ragu harus **terlihat** ragu.
+///
+/// Seluruh aturan anti-false-lock di engine bisa dibatalkan oleh UI yang
+/// memakai warna/ikon sama untuk `lock` dan `uncertain`. Uji ini menjaga jarak
+/// itu tetap ada.
+final class PointingPresentationTests: XCTestCase {
+
+    func testEveryStateHasDistinctTone() {
+        XCTAssertEqual(PointingState.idle.tone, .neutral)
+        XCTAssertEqual(PointingState.pointing.tone, .active)
+        XCTAssertEqual(PointingState.searching.tone, .active)
+        XCTAssertEqual(PointingState.lock.tone, .success)
+        XCTAssertEqual(PointingState.uncertain.tone, .warning)
+        XCTAssertEqual(PointingState.unavailable.tone, .danger)
+    }
+
+    /// Inti janji PRD: ragu tidak boleh tampil seperti yakin.
+    func testUncertainLooksDifferentFromLock() {
+        XCTAssertNotEqual(PointingState.lock.tone, PointingState.uncertain.tone)
+        XCTAssertNotEqual(PointingState.lock.symbolName, PointingState.uncertain.symbolName)
+        XCTAssertNotEqual(PointingState.lock.shortLabel, PointingState.uncertain.shortLabel)
+        XCTAssertNotEqual(PointingState.lock.guidance, PointingState.uncertain.guidance)
+        XCTAssertFalse(PointingState.uncertain.looksConfident)
+        XCTAssertTrue(PointingState.lock.looksConfident)
+    }
+
+    /// Setiap keadaan harus punya simbol yang bisa dirender.
+    func testAllStatesHaveSymbolsAndLabels() {
+        let states: [PointingState] = [.idle, .pointing, .searching, .lock, .uncertain, .unavailable]
+        for state in states {
+            XCTAssertFalse(state.symbolName.isEmpty, "\(state) tanpa simbol")
+            XCTAssertFalse(state.shortLabel.isEmpty, "\(state) tanpa label")
+            XCTAssertFalse(state.guidance.isEmpty, "\(state) tanpa panduan")
+        }
+        let symbols = Set(states.map(\.symbolName))
+        XCTAssertEqual(symbols.count, states.count, "simbol antar-keadaan harus berbeda")
+    }
+
+    func testConfidenceLevelPresentation() {
+        XCTAssertEqual(ConfidenceLevel.high.tone, .success)
+        XCTAssertEqual(ConfidenceLevel.medium.tone, .warning)
+        XCTAssertEqual(ConfidenceLevel.low.tone, .danger)
+        XCTAssertNotEqual(ConfidenceLevel.high.tone, ConfidenceLevel.medium.tone)
+        XCTAssertEqual(ConfidenceLevel.high.displayName, "Yakin")
+        XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
+    }
+
+    /// Snapshot membawa teks status yang cocok dengan keadaannya.
+    func testSnapshotStatusTextMatchesState() {
+        for state in [PointingState.idle, .pointing, .searching, .lock, .uncertain, .unavailable] {
+            let snapshot = PointingSnapshot(state: state)
+            XCTAssertEqual(snapshot.statusText, state.shortLabel)
+        }
+    }
+
+    func testSnapshotExposesBestObject() {
+        let object = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                     raDeg: 279, decDeg: 38, magnitude: 0.03)
+        let snapshot = PointingSnapshot(state: .lock,
+                                        intent: CelestialIntent(level: .high, best: object, candidates: []))
+        XCTAssertEqual(snapshot.bestObject?.id, "vega")
+        XCTAssertEqual(PointingSnapshot(state: .idle).bestObject, nil)
+    }
+}

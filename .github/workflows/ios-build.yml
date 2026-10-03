@@ -1,13 +1,92 @@
 name: Apple Build
+
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
+
+concurrency:
+  # Hanya build terbaru per ref yang perlu jalan; push berikutnya membatalkan
+  # yang masih mengantre.
+  group: apple-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
 jobs:
-  build:
+
+  # Paket Swift murni di Apple SDK. Linux (engine-tests.yml) sudah menguji
+  # logikanya; di sini yang diperiksa adalah apakah paketnya benar-benar
+  # dikompilasi SDK Apple — tempat `canImport(AstronomyKit)` dan ketersediaan
+  # API berbeda dari Linux.
+  packages:
+    name: Paket (Apple SDK)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build engine on Apple SDK
+      - name: Versi toolchain
+        run: swift --version
+      - name: Build CelestialEngine
         run: swift build --package-path Packages/CelestialEngine
-      # (App watchOS/iOS akan ditambahkan saat Fase 2)
+      - name: Build PointingKit
+        run: swift build --package-path Packages/PointingKit
+      - name: Uji PointingKit di Apple SDK
+        run: swift test --package-path Packages/PointingKit
+
+  # App iPhone + app jam. Dijalankan lewat proyek yang dihasilkan XcodeGen,
+  # karena .xcodeproj tidak di-commit.
+  apps:
+    name: App (iPhone + Watch)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pasang XcodeGen
+        run: brew install xcodegen
+
+      - name: Versi Xcode & XcodeGen
+        run: |
+          xcodebuild -version
+          xcodegen --version
+
+      - name: Hasilkan proyek Xcode
+        run: xcodegen generate
+
+      - name: Pastikan skema terbentuk
+        run: xcodebuild -list -project PointAndKnow.xcodeproj
+
+      # Skema iPhone ikut membangun app jam, karena app jam adalah dependensi
+      # yang ditanam ke dalam bundel iPhone. Jadi satu perintah ini mencakup
+      # kedua target.
+      - name: Build app iPhone (termasuk app jam)
+        run: |
+          xcodebuild build \
+            -project PointAndKnow.xcodeproj \
+            -scheme PointAndKnow \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build app jam sendiri
+        run: |
+          xcodebuild build \
+            -project PointAndKnow.xcodeproj \
+            -scheme PointAndKnowWatch \
+            -destination 'generic/platform=watchOS Simulator' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Log diagnostik hanya berguna saat gagal, tapi menaruhnya di sini
+      # membuat kegagalan pertama bisa langsung dibaca tanpa perlu mengulang
+      # build dengan flag tambahan.
+      - name: Ringkasan log (saat gagal)
+        if: failure()
+        run: |
+          echo "=== Hasil generate terakhir ==="
+          ls -la PointAndKnow.xcodeproj 2>/dev/null || echo "proyek tidak terbentuk"

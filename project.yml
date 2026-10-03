@@ -1,0 +1,156 @@
+# Spesifikasi proyek Xcode untuk CELESTIAL POINTING ENGINE.
+#
+# Kenapa XcodeGen dan bukan .xcodeproj yang di-commit: file .xcodeproj adalah
+# format yang tidak bisa ditinjau di pull request dan konfliknya hampir selalu
+# diselesaikan dengan menimpa milik orang lain. Di proyek ini seluruh logika
+# diuji di Linux lewat `swift test`, jadi satu-satunya bagian yang bergantung
+# pada Mac adalah pembungkus app — dan pembungkus itu lebih baik didefinisikan
+# sebagai teks yang bisa dibaca.
+#
+# Cara pakai di Mac:
+#   brew install xcodegen
+#   cd <root repo> && xcodegen generate
+#   open PointAndKnow.xcodeproj
+#
+# Target:
+#   - PointAndKnow       : app iPhone (diagnostik + Experiment 1)
+#   - PointAndKnow Watch : app jam (pointing + kalibrasi)
+#
+# Kedua app memakai paket SwiftPM lokal `PointingKit` (logika lapisan app) yang
+# di atasnya berdiri `CelestialEngine`. Tidak ada logika yang diduplikasi di
+# sini — app hanya berisi UI dan pembungkus sensor.
+
+name: PointAndKnow
+
+options:
+  bundleIdPrefix: dev.celestial
+  deploymentTarget:
+    iOS: "18.0"
+    watchOS: "11.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  # Proyek ini dibangun CI di macOS 15 / Xcode 16. XcodeGen sebelum perbaikan
+  # #1613 masih menaruh app jam di <Host>.app/Watch/; Xcode 16 ke atas
+  # mewajibkannya di <Host>.app/PlugIns/. postGenCommand di bawah menambal
+  # keduanya setelah proyek dibuat, jadi CI tidak bergantung pada versi
+  # XcodeGen yang kebetulan terpasang.
+  postGenCommand: |
+    set -e
+    f=PointAndKnow.xcodeproj/project.pbxproj
+    sed -i.bak -e 's|dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";|dstPath = "";|' \
+               -e 's|dstSubfolderSpec = 16;|dstSubfolderSpec = 13;|' "$f"
+    rm -f "$f.bak"
+    echo "postGen: app jam ditanam di PlugIns/ (Xcode 16+)"
+
+packages:
+  # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
+  # format pesan Watch<->iPhone. Semuanya teruji di Linux (92 tes).
+  PointingKit:
+    path: Packages/PointingKit
+  # Mesin inti: katalog, efemeris, resolver, keyakinan, pengaman slew.
+  CelestialEngine:
+    path: Packages/CelestialEngine
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # Kode ditulis dalam bahasa Indonesia; teks UI memang memuat karakter
+    # non-ASCII, jadi lokalisasi string otomatis tidak perlu.
+    SWIFT_EMIT_LOC_STRINGS: NO
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+
+targets:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # App iPhone: diagnostik + Experiment 1
+  # ─────────────────────────────────────────────────────────────────────────
+  PointAndKnow:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Apps/PointAndKnowiOS/Sources
+      - path: Apps/Shared
+      - path: Apps/PointAndKnowiOS/Resources
+    dependencies:
+      - package: PointingKit
+      - package: CelestialEngine
+      # App jam ikut ditanam ke dalam app iPhone: satu bundel, dua perangkat.
+      - target: PointAndKnow Watch
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow
+        PRODUCT_NAME: PointAndKnow
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel dan hasil pengukurannya ditandai belum tentu sah."
+        INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # App jam: pointing, kalibrasi, haptic
+  # ─────────────────────────────────────────────────────────────────────────
+  PointAndKnow Watch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: Apps/PointAndKnowWatch/Sources
+      - path: Apps/Shared
+      - path: Apps/PointAndKnowWatch/Resources
+    dependencies:
+      - package: PointingKit
+      - package: CelestialEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp
+        PRODUCT_NAME: PointAndKnowWatch
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "4"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
+        # Wajib untuk app jam mandiri berbasis SwiftUI: tanpa `WKApplication`,
+        # validasi App Store menolak bundelnya.
+        INFOPLIST_KEY_WKApplication: YES
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: dev.celestial.pointandknow
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda."
+        INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam."
+
+# Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
+# dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).
+schemes:
+  PointAndKnow:
+    build:
+      targets:
+        PointAndKnow: all
+      # Build paralel dimatikan: app jam adalah dependensi app iPhone, dan
+      # membangun keduanya sekaligus membuat pesan galatnya sulit dibaca.
+      parallelizeBuild: false
+    run:
+      config: Debug
+    test:
+      config: Debug
+    archive:
+      config: Release
+  PointAndKnowWatch:
+    build:
+      targets:
+        PointAndKnow Watch: all
+      parallelizeBuild: false
+    run:
+      config: Debug
+    archive:
+      config: Release

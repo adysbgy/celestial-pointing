@@ -60,16 +60,12 @@ public struct PointingSnapshot: Equatable, Sendable {
     public var bestObject: CelestialObject? { intent?.best }
 
     /// Teks status singkat untuk UI.
-    public var statusText: String {
-        switch state {
-        case .idle: return "Siap"
-        case .pointing: return "Arahkan…"
-        case .searching: return "Mencari…"
-        case .lock: return "Terkunci"
-        case .uncertain: return "Kurang yakin"
-        case .unavailable: return "Sensor tidak tersedia"
-        }
-    }
+    ///
+    /// Sengaja hanya meneruskan ke `PointingState.shortLabel` — kalau di sini
+    /// ada kalimat sendiri, jam bisa menampilkan kata yang berbeda dari teks
+    /// yang diuji, dan janji "engine yang ragu terlihat ragu" jadi tidak lagi
+    /// berlaku di layar.
+    public var statusText: String { state.shortLabel }
 }
 
 /// Hasil satu langkah: keadaan terbaru + peristiwa haptic yang harus dipicu.
@@ -354,5 +350,26 @@ public final class PointingController {
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0
         )
+    }
+}
+
+public extension PointingController {
+
+    /// Jawaban engine yang boleh dianggap berlaku **untuk arah tunjuk sekarang**.
+    ///
+    /// `nil` bila keadaan bukan `lock`/`uncertain`.
+    ///
+    /// Kenapa perlu: mesin keadaan sengaja mempertahankan `currentIntent` supaya
+    /// UI tidak berkedip saat pergelangan bergerak sedikit. Akibatnya
+    /// `snapshot.intent` bisa berisi jawaban dari arah tunjuk **sebelumnya**
+    /// sementara pengguna sudah mengarah ke tempat lain.
+    ///
+    /// Bagi tampilan itu tidak berbahaya (keadaan sudah memberi tahu). Bagi
+    /// Experiment 1 itu berbahaya: merekam jawaban lama sebagai jawaban untuk
+    /// arah baru akan mencatat false lock yang tidak pernah terjadi — dan
+    /// false lock adalah satu-satunya angka yang membuat eksperimen dinyatakan
+    /// gagal. Kegagalan engine tidak boleh dikarang oleh alat ukurnya.
+    var answeredIntent: CelestialIntent? {
+        snapshot.state.hasAnswer ? snapshot.intent : nil
     }
 }
