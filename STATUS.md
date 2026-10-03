@@ -109,6 +109,9 @@ sebaran sisa yang terlihat bagus. Keduanya kini menolak saat
   di container `swift:6.0`.
 - Sapuan jalur kirim/rekam: tidak ada lagi pembacaan `bestObject` /
   `intent?.level` mentah di `Apps/`.
+- CI `Apple Build` run `37150667798` dan `Engine Tests (Linux)` run
+  `37150667892` pada commit `4e15d90` → keduanya hijau (App iPhone+Watch
+  `BUILD SUCCEEDED`, 166 + 136 uji lolos).
 - CI `Apple Build` run `37149633633` → **2× `BUILD SUCCEEDED`** dan gerbang
   peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
 - CI `Engine Tests (Linux)` run `37149633616` → **165 CelestialEngine + 131

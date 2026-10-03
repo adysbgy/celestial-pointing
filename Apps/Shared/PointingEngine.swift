@@ -217,7 +217,14 @@ public final class PointingEngine: ObservableObject {
     }
 
     /// Arah tunjuk terkalibrasi, untuk ditampilkan sebagai angka.
-    public var pointing: HorizontalCoord? { snapshot.calibratedPointing }
+    ///
+    /// `nil` saat sensor tidak hidup: angka yang tersisa di cuplikan adalah
+    /// arah **terakhir sebelum sensor hilang**, dan menampilkannya tanpa
+    /// penanda membuat bacaan lama tampak seperti pengukuran sekarang —
+    /// persis yang dilarang PRD. Saat sensor hidup, ini arah yang berlaku.
+    public var pointing: HorizontalCoord? {
+        snapshot.hasSensor ? snapshot.calibratedPointing : nil
+    }
 
     /// Jawaban engine yang berlaku untuk arah tunjuk **sekarang**.
     ///
