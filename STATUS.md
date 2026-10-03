@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 134 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 136 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
   yang pertama.
@@ -90,9 +90,18 @@ lama (165 uji engine) berperilaku persis seperti sebelumnya, dan harness
 PointingKit sekarang meneruskan `state` yang selama ini sudah ia simpan di
 `stateAtCapture` tetapi tidak pernah dipakai.
 
+**Cacat 6 — kalibrasi bisa dipasang dari arah tunjuk yang sudah tidak berlaku.**
+Kelas yang sama, kali ini di `CalibrationSession`: kedua jalan masuknya
+(`capture(objectID:)` dan `captureNearest()`) membaca
+`controller.snapshot.rawPointing` — yang **tetap terisi** saat sensor mati.
+Akibatnya kalibrasi bisa dipasang dari arah terakhir sebelum sensor hilang:
+seluruh pointing sesudahnya bergeser, dan kesalahannya tersembunyi di balik
+sebaran sisa yang terlihat bagus. Keduanya kini menolak saat
+`snapshot.hasSensor == false`, dengan pesan yang menyebut sebabnya.
+
 **Yang benar-benar dijalankan pada siklus ini:**
-- `./swift-test.sh` → **166 CelestialEngine + 134 PointingKit, 0 gagal** (exit 0).
-  Sepuluh uji baru mengunci perilaku ini: objek sisa tidak terkirim
+- `./swift-test.sh` → **166 CelestialEngine + 136 PointingKit, 0 gagal** (exit 0).
+  Dua belas uji baru mengunci perilaku ini: objek sisa tidak terkirim
   (`LinkMessageTests`), tidak terekam (`ConfidenceTraceTests`), predikat
   "berlaku sekarang" (`PointingPresentationTests`), dan gerbang kiriman
   (`LinkMessageTests`).

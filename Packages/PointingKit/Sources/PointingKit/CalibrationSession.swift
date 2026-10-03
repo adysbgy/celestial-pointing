@@ -80,6 +80,18 @@ public final class CalibrationSession {
         referenceObserver != controller.observer
     }
 
+    /// Langkah yang dilaporkan saat sensor mati.
+    ///
+    /// Dipakai bersama oleh kedua jalan masuk supaya pesannya sama: yang
+    /// dicatat kalibrasi harus arah tunjuk **sekarang**, dan saat sensor mati
+    /// tidak ada arah sekarang.
+    private var sensorUnavailableStep: CalibrationSessionStep {
+        CalibrationSessionStep(flow: flow.currentUpdate,
+                               selectedTarget: nil,
+                               applied: false,
+                               message: "Sensor gerak tidak aktif — arah tunjuk yang tersisa bukan pengukuran sekarang. Tidak dicatat.")
+    }
+
     /// Catat satu acuan yang dipilih pengguna dari daftar, memakai arah tunjuk
     /// **mentah** yang sedang ada di controller.
     ///
@@ -87,9 +99,17 @@ public final class CalibrationSession {
     /// arah **sebelum** koreksi. Kalau arah yang sudah terkalibrasi ikut
     /// dicatat saat kalibrasi ulang, offset lama akan terhitung dua kali dan
     /// kesalahannya justru terlihat seperti kalibrasi yang bagus.
+    ///
+    /// Sensor harus benar-benar hidup. Saat sensor mati, `rawPointing` yang
+    /// tersisa di cuplikan adalah **nilai terakhir sebelum sensor hilang** —
+    /// nilainya tetap terisi, jadi tanpa penjagaan ini kalibrasi akan memakai
+    /// arah yang sudah tidak berlaku sebagai pengukuran, lalu memasang offset
+    /// yang salah. Kesalahannya tersembunyi di balik sebaran yang terlihat
+    /// bagus, dan seluruh pointing sesudahnya ikut salah tanpa terlihat.
     @discardableResult
     public func capture(objectID: String, date: Date = Date()) -> CalibrationSessionStep {
-        capture(objectID: objectID, measured: controller.snapshot.rawPointing, date: date)
+        guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
+        return capture(objectID: objectID, measured: controller.snapshot.rawPointing, date: date)
     }
 
     /// Catat satu acuan yang dipilih pengguna dari daftar.
@@ -144,9 +164,11 @@ public final class CalibrationSession {
     ///
     /// Sengaja memakai arah mentah yang sedang ada di controller, bukan arah
     /// yang dikirim pemanggil: yang dicatat harus arah **sebelum** koreksi.
+    /// Sensor harus hidup — lihat `capture(objectID:date:)` untuk alasannya.
     @discardableResult
     public func captureNearest(date: Date = Date()) -> CalibrationSessionStep {
-        captureNearest(measured: controller.snapshot.rawPointing, date: date)
+        guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
+        return captureNearest(measured: controller.snapshot.rawPointing, date: date)
     }
 
     /// Catat acuan dari arah tunjuk sekarang, dengan mencocokkannya ke target

@@ -175,6 +175,73 @@ final class CalibrationSessionTests: XCTestCase {
         XCTAssertTrue(step.message.contains("Tidak ada bintang acuan"))
     }
 
+    /// Kalibrasi tidak boleh memakai arah tunjuk yang tersisa saat sensor mati.
+    ///
+    /// Saat sensor hilang, `rawPointing` yang ada di cuplikan adalah nilai
+    /// **terakhir sebelum sensor hilang** — tetap terisi, jadi tanpa penjagaan
+    /// ia lolos sebagai pengukuran. Yang terjadi kalau lolos: kalibrasi dipasang
+    /// dari arah yang sudah tidak berlaku, seluruh pointing sesudahnya bergeser,
+    /// dan kesalahannya tersembunyi di balik sebaran yang terlihat bagus.
+    func testCaptureIsRefusedWhenSensorIsUnavailable() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        let references = visibleReferences()
+        guard references.count >= 2 else { return }
+
+        // Bawa sensor ke keadaan hidup dengan arah tunjuk nyata, lalu matikan.
+        let truth = c.resolver.horizontal(ofObjectID: references[0], observer: observer, date: date)!
+        let q = quaternion(viewPointingAt: truth)
+        c.feed(quaternion: q, timestamp: date)
+        XCTAssertTrue(c.snapshot.hasSensor)
+        XCTAssertNotNil(c.snapshot.rawPointing, "arah tunjuk tersisa tetap terisi")
+
+        c.setSensorAvailable(false)
+        XCTAssertFalse(c.snapshot.hasSensor)
+        XCTAssertNotNil(c.snapshot.rawPointing,
+                        "inilah jebakannya: nilainya masih ada saat sensor mati")
+
+        let step = session.capture(objectID: references[0])
+        XCTAssertTrue(session.flow.samples.isEmpty,
+                      "arah tunjuk sisa tidak boleh tercatat sebagai pengukuran")
+        XCTAssertFalse(step.applied)
+        XCTAssertNil(step.selectedTarget)
+        XCTAssertTrue(step.message.contains("Sensor gerak tidak aktif"), step.message)
+
+        let nearest = session.captureNearest()
+        XCTAssertTrue(session.flow.samples.isEmpty)
+        XCTAssertTrue(nearest.message.contains("Sensor gerak tidak aktif"), nearest.message)
+
+        XCTAssertNil(session.applyIfReady(), "tidak ada sampel -> tidak ada yang dipasang")
+        XCTAssertEqual(c.calibration, .none)
+    }
+
+    /// Arah tunjuk yang sama tetap boleh dicatat saat sensor hidup.
+    func testCaptureWorksWhenSensorIsAvailable() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        let references = visibleReferences()
+        guard !references.isEmpty else { return }
+
+        let truth = c.resolver.horizontal(ofObjectID: references[0], observer: observer, date: date)!
+        c.feed(quaternion: quaternion(viewPointingAt: truth), timestamp: date)
+
+        let step = session.capture(objectID: references[0])
+        XCTAssertEqual(session.flow.samples.count, 1)
+        XCTAssertEqual(step.selectedTarget?.id, references[0])
+    }
+
+    /// Sama seperti di `PointingControllerTests`: quaternion yang menunjuk ke
+    /// arah horizontal tertentu (roll = 0).
+    private func quaternion(viewPointingAt target: HorizontalCoord) -> Quaternion {
+        let v = LocalFrame.enuFromHorizontal(target)
+        let d = Vector3(x: v.y, y: v.z, z: v.x)
+        let from = Vector3.unitZ
+        let axis = from.cross(d)
+        if axis.magnitude < 1e-12 { return .identity }
+        let angle = acos(max(-1.0, min(1.0, from.dot(d))))
+        return Quaternion.axisAngle(axis: axis, radians: angle)!
+    }
+
     // MARK: - Siklus hidup
 
     func testRemoveLastAndReset() {
