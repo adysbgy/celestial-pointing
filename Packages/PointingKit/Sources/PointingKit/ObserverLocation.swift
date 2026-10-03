@@ -43,6 +43,16 @@ public struct ObserverLocation: Codable, Equatable, Sendable {
             && latitudeDeg.isFinite && longitudeDeg.isFinite
     }
 
+    /// Apakah ini lokasi darurat, bukan lokasi pengukuran.
+    ///
+    /// Dipakai UI untuk memperingatkan bahwa tinggi benda langit yang
+    /// ditampilkan dihitung untuk tempat lain. Tanpa peringatan itu, daftar
+    /// target yang salah tempat akan tampak sama normalnya dengan yang benar.
+    public var isFallback: Bool { source == ObserverLocation.fallbackSource }
+
+    /// Nilai `source` untuk lokasi darurat.
+    public static let fallbackSource = "fallback"
+
     /// Lokasi darurat untuk simulator/CI: Jakarta.
     ///
     /// Hanya dipakai saat aplikasi benar-benar tidak punya lokasi. Sengaja
@@ -52,6 +62,6 @@ public struct ObserverLocation: Codable, Equatable, Sendable {
         latitudeDeg: -6.2,
         longitudeDeg: 106.8,
         label: "Jakarta (bawaan)",
-        source: "fallback"
+        source: fallbackSource
     )
 }

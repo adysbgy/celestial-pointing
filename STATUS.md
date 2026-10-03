@@ -2,7 +2,47 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: lokasi sungguhan tidak pernah sampai ke engine
+### Siklus ini: jalur Watch ↔ iPhone tidak pernah benar-benar tersambung
+Fokus: memeriksa **transport** antar-perangkat, bukan isi pesannya. Tidak ada
+aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup (tiga defect, semuanya tidak terlihat dari UI):**
+
+**1. Kalibrasi selalu tertimpa sebelum sampai ke iPhone.**
+`updateApplicationContext` menyimpan **satu** kamus saja — setiap kiriman
+menggantikan yang sebelumnya. Hasil kalibrasi dikirim lewat jalur itu, jadi
+pembaruan keadaan berikutnya (yang dikirim tiap kali ada jawaban) menimpanya.
+Akibatnya iPhone bisa **tidak pernah** menerima kalibrasi, sementara di jam
+kalibrasi tampak berhasil dan pesannya terkirim tanpa galat. Yang hilang di
+sana bukan sekadar tampilan: `residualSpreadDeg` adalah sigma terukur yang
+menyetel ambang keyakinan di iPhone — jadi Experiment 1 kehilangan
+satu-satunya pengukuran yang membuatnya berguna.
+- Kalibrasi (dan ambang keyakinan dari iPhone, yang punya masalah sama) kini
+  lewat `transferUserInfo`, yang mengantre dan dikirim berurutan.
+- Kedua sisi mendapat `session(_:didReceiveUserInfo:)`; tanpa itu pesan
+  antre akan tiba dan dibuang diam-diam — lebih buruk daripada tidak dikirim.
+
+**2. Tombol "Minta keadaan terakhir" tidak pernah dijawab.** iPhone mengirim
+`.stateRequest`, dan handler di jam hanya berisi `break` dengan komentar
+*"Balasan disiapkan pemanggil; di sini cukup dicatat."* Tidak ada pemanggil
+yang melakukannya. Jadi tombol itu terlihat berfungsi, menaikkan penghitung
+pesan, dan tidak pernah menghasilkan apa pun. Jam kini menjawab dengan
+`currentSnapshot` (dibaca saat diminta, bukan disalin), dan kalau alurnya
+belum siap ia mengatakan itu — bukan diam.
+
+**3. Sisi iPhone membalas permintaan dengan permintaan.** `PhoneLinkService`
+menangani `.stateRequest` dengan memanggil `requestState()`, yang mengirim
+`.stateRequest` kembali. Dua perangkat bisa saling melempar permintaan yang
+tidak pernah dijawab. Kini ia membalas dengan keadaan terakhir yang diketahui.
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 106, 0 gagal**.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- **CI macOS hijau** (`Apple Build`): app iPhone (termasuk app jam) build
+  sukses.
+
+### Siklus sebelumnya: lokasi sungguhan tidak pernah sampai ke engine
 Fokus: menyisir pembungkus app terhadap janji yang **ditulis** di komentarnya
 sendiri. Tidak ada aturan keras PRD yang dilonggarkan.
 

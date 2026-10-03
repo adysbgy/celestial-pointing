@@ -25,6 +25,13 @@ public final class ExperimentRecorder: ObservableObject {
     public let harness: ExperimentHarness
     public private(set) var engine: PointingEngine
 
+    /// Lokasi yang sedang dipakai harness — sama dengan lokasi engine.
+    ///
+    /// Ditampilkan di layar supaya penguji bisa melihat bahwa kebenaran
+    /// dihitung untuk tempat yang benar. Kalau ini masih lokasi bawaan,
+    /// seluruh daftar target sedang salah dan itu harus terlihat.
+    @Published public private(set) var currentLocation: ObserverLocation
+
     /// Target yang dipilih penguji sebagai kebenaran.
     @Published public var selectedTargetID: String?
     /// Catatan bebas untuk percobaan berikutnya (kondisi langit, dll).
@@ -36,6 +43,24 @@ public final class ExperimentRecorder: ObservableObject {
         self.engine = engine
         self.harness = ExperimentHarness(resolver: engine.controller.resolver,
                                          location: engine.location)
+        self.currentLocation = engine.location
+        self.harness.location = engine.location
+    }
+
+    /// Sinkronkan kebenaran dengan lokasi engine yang berlaku sekarang.
+    ///
+    /// Kebenaran (ground truth) **wajib** memakai lokasi yang sama dengan yang
+    /// dipakai engine. Kalau tidak, daftar target di layar dihitung untuk
+    /// lokasi bawaan: tinggi objeknya salah, dan target yang tampak "di atas
+    /// horizon" bisa sebenarnya sudah terbenam — penguji memilih target yang
+    /// tidak bisa direkam, lalu rekamannya ditolak tanpa sebab yang jelas.
+    ///
+    /// Dipanggil pemanggil saat lokasi engine berubah (lokasi sungguhan tiba
+    /// beberapa detik setelah app dibuka), bukan disalin sekali di `init`.
+    public func updateLocation(_ location: ObserverLocation) {
+        guard location != currentLocation else { return }
+        currentLocation = location
+        harness.location = location
     }
 
     /// Target yang boleh dipakai sebagai kebenaran (di atas horizon, arahnya

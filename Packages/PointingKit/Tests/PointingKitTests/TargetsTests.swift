@@ -120,4 +120,27 @@ final class TargetsTests: XCTestCase {
         XCTAssertEqual(ObserverLocation.fallback.source, "fallback")
         XCTAssertTrue(ObserverLocation.fallback.label.contains("bawaan"))
     }
+
+    /// `isFallback` adalah pembeda yang dipakai UI untuk memperingatkan bahwa
+    /// tinggi benda langit dihitung untuk tempat lain. Kalau ia salah menjawab,
+    /// peringatannya hilang dan daftar target yang salah tempat tampak normal.
+    func testIsFallbackDistinguishesMeasuredLocation() {
+        XCTAssertTrue(ObserverLocation.fallback.isFallback)
+
+        let measured = ObserverLocation(latitudeDeg: -6.2,
+                                        longitudeDeg: 106.8,
+                                        label: "Jakarta (bawaan)",
+                                        source: "corelocation")
+        XCTAssertFalse(measured.isFallback,
+                       "label yang mirip tidak boleh membuat lokasi terukur dianggap darurat")
+
+        // Bahkan koordinat yang persis sama dengan fallback tetap bukan
+        // fallback bila asalnya pengukuran: yang menentukan adalah sumbernya.
+        XCTAssertEqual(measured.latitudeDeg, ObserverLocation.fallback.latitudeDeg)
+        XCTAssertEqual(measured.longitudeDeg, ObserverLocation.fallback.longitudeDeg)
+
+        let manual = ObserverLocation(latitudeDeg: 0, longitudeDeg: 0,
+                                      label: "manual", source: "manual")
+        XCTAssertFalse(manual.isFallback)
+    }
 }

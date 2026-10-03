@@ -61,11 +61,18 @@ struct Experiment1View: View {
                 engine.setSensorAvailable(motion.isAvailable)
                 location.start()
                 engine.bind(location: location)
+                recorder.updateLocation(engine.location)
             }
             .onDisappear {
                 motion.stop()
                 engine.stop()
                 location.stop()
+            }
+            // Kebenaran harus mengikuti lokasi yang sedang dipakai engine.
+            // Lokasi sungguhan tiba beberapa detik setelah `bind`, jadi tanpa
+            // ini daftar target tetap dihitung untuk lokasi bawaan.
+            .onChange(of: engine.location) { _, newLocation in
+                recorder.updateLocation(newLocation)
             }
         }
     }
@@ -93,6 +100,15 @@ struct Experiment1View: View {
             Text("Target")
         } footer: {
             Text("Kebenaran diambil dari katalog, bukan dari jawaban engine. Kalau engine salah mengenali, kita tetap tahu objek yang sebenarnya dituju.")
+            // Kalau lokasinya masih yang bawaan, seluruh daftar ini dihitung
+            // untuk tempat lain — dan tinggi objeknya salah. Itu harus terlihat,
+            // bukan tersembunyi di balik daftar yang tampak normal.
+            Text(recorder.currentLocation.isFallback
+                 ? "Lokasi belum didapat — tinggi di bawah dihitung untuk \(recorder.currentLocation.label), bukan tempat Anda."
+                 : "Dihitung untuk \(recorder.currentLocation.label).")
+                .foregroundStyle(recorder.currentLocation.isFallback
+                                 ? PointingTone.warning.color
+                                 : .secondary)
         }
     }
 
