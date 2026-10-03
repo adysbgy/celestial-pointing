@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 124 test
+- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 131 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
   yang pertama.
@@ -20,7 +20,65 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
+### Siklus ini: objek sisa bocor ke iPhone, dan jam berhenti bicara tepat saat jawabannya hilang
+Fokus: menyisir **jalur yang mengirim dan merekam** "apa yang engine katakan
+sekarang" — tempat objek yang sengaja dipertahankan mesin keadaan bisa keluar
+dari layar jam (yang menandainya sisa) menuju tempat yang tidak punya penanda
+itu. Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat 1 — objek sisa terkirim sebagai jawaban sekarang.** Mesin keadaan
+sengaja mempertahankan `currentIntent` supaya panel jam tidak berkedip saat
+pergelangan bergerak sedikit (`PointingFlow.swift`). `PointingView` sudah
+menanganinya: objek sisa ditampilkan **dengan** peringatan, dan badge keyakinan
+disembunyikan. Tapi dua jalur lain membaca `snapshot.bestObject` /
+`snapshot.intent?.level` mentah:
+
+- `PointingLinkMessage.state(from:)` — pesan ke iPhone;
+- `ConfidenceTrace.record(snapshot:)` — riwayat keyakinan di iPhone.
+
+Keduanya **tidak** punya penanda "sisa". Akibatnya, tepat setelah jam kehilangan
+jawabannya (pergelangan bergerak lagi), iPhone menerima dan merekam objek dari
+arah tunjuk **sebelumnya** lengkap dengan badge "Yakin" dari keyakinan lama.
+Ini persis false confidence yang dilarang PRD, dan ia muncul justru pada momen
+paling menyesatkan. Diperbaiki di **satu tempat**: `PointingSnapshot` kini punya
+predikat semantik `answeredObject` / `answeredLevel` / `answeredSeparationDeg`
+(yang berlaku hanya bila `state.hasAnswer`), dan kedua jalur memakainya.
+`displayedObject` sengaja tetap mempertahankan objek terakhir — itu benar untuk
+layar jam, yang menandainya sisa.
+
+**Cacat 2 — jam berhenti bicara tepat saat jawabannya hilang, dan mengirim 20×
+per detik saat terkunci.** `PointAndKnowWatchWatchApp` menyaring kiriman dengan
+`update.snapshot.state.hasAnswer`, padahal komentarnya sendiri menjanjikan
+"bukan tiap sampel 20 Hz". Syarat itu salah dua kali sekaligus: selama terkunci
+jawabannya **terus** ada, jadi syaratnya tetap benar dan jam mengirim 20×/detik
+(persis yang ingin dicegah); dan tepat saat jawabannya **hilang** syaratnya
+menjadi salah, jadi kiriman berhenti — iPhone membeku di objek terkunci terakhir
+seolah masih berlaku, tanpa cara apa pun untuk tahu bahwa jam sudah tidak
+mengidentifikasi apa pun. Diganti dengan `LinkReportGate` (di `PointingKit`,
+teruji di Linux): kirim saat **keputusan berubah** — keadaan, objek, atau
+keyakinan — termasuk saat berubah menjadi "tidak ada jawaban".
+
+**Cacat 3 — dua kontrol di layar Diagnostik iPhone yang tidak mengatakan
+keadaannya.** Saklar "Rekam keyakinan" menulis langsung ke
+`trace.trace.isRecording`; `ConfidenceTrace` bukan `ObservableObject`, jadi
+perubahan itu tidak dipublikasikan dan saklarnya bisa tampak tidak menanggapi.
+Tombol "Kosongkan riwayat" tetap aktif saat perekaman **dijeda** — tampak siap
+menghapus padahal tidak ada yang tersimpan lagi. Keduanya kini lewat store dan
+mencerminkan keadaan yang sebenarnya.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **165 CelestialEngine + 131 PointingKit, 0 gagal** (exit 0).
+  Tujuh uji baru mengunci perilaku ini: objek sisa tidak terkirim
+  (`LinkMessageTests`), tidak terekam (`ConfidenceTraceTests`), predikat
+  "berlaku sekarang" (`PointingPresentationTests`), dan gerbang kiriman
+  (`LinkMessageTests`).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan jalur kirim/rekam: tidak ada lagi pembacaan `bestObject` /
+  `intent?.level` mentah di `Apps/`.
+- CI `Apple Build` + `Engine Tests (Linux)` pada commit siklus ini.
+
+### Siklus sebelumnya: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
 Fokus: menutup **satu-satunya temuan yang sengaja dibiarkan terbuka** oleh
 siklus sebelumnya. Logika engine **tidak disentuh**; aturan keras PRD tidak
 dilonggarkan.

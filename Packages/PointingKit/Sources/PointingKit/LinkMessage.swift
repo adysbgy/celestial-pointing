@@ -126,6 +126,17 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     /// jawaban engine, bukan sudut pergelangan. Mengirim sudut mentah ke
     /// perangkat lain hanya menambah peluang ia dipakai untuk hal yang salah.
     ///
+    /// **Objek dan keyakinan hanya ikut bila keadaan punya jawaban sekarang.**
+    /// `snapshot.bestObject` sengaja mempertahankan objek terakhir supaya panel
+    /// jam tidak berkedip — itu benar untuk layar jam, yang menandai objek sisa
+    /// sebagai sisa. Di sini tidak ada penanda seperti itu: mengirim objek sisa
+    /// akan membuat iPhone menampilkannya sebagai keadaan jam sekarang, lengkap
+    /// dengan badge "Yakin" dari keyakinan lama. Itu persis false confidence
+    /// yang dilarang PRD, dan ia terjadi justru pada momen yang paling
+    /// menyesatkan — tepat saat jam kehilangan jawabannya. Saat tidak ada
+    /// jawaban, `state` tetap dikirim (itu faktanya); objek dan keyakinannya
+    /// kosong.
+    ///
     /// `sigmaDeg` **ikut** dikirim. Bukan untuk keputusan apa pun di iPhone —
     /// melainkan karena riwayat keyakinan di sana menyimpan konteks bersama
     /// sampelnya, dan sigma adalah bagian dari konteks itu. Tanpa ini, sampel
@@ -138,9 +149,9 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
             kind: .pointingState,
             sentAt: date,
             state: snapshot.state,
-            objectID: snapshot.bestObject?.id,
-            objectName: snapshot.bestObject?.name,
-            level: snapshot.intent?.level,
+            objectID: snapshot.answeredObject?.id,
+            objectName: snapshot.answeredObject?.name,
+            level: snapshot.answeredLevel,
             altitudeDeg: snapshot.calibratedPointing?.altitudeDeg,
             azimuthDeg: snapshot.calibratedPointing?.azimuthDeg,
             angularRateDegPerSec: snapshot.angularRateDegPerSec,
@@ -186,5 +197,59 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
         return PointingCalibration(yawOffsetDeg: yaw,
                                    residualSpreadDeg: spread,
                                    sampleCount: sampleCount ?? 0)
+    }
+}
+
+/// Penyaring kiriman keadaan Watch → iPhone.
+///
+/// `updateApplicationContext` hanya menyimpan **satu** kamus, jadi mengirim pada
+/// tiap sampel sensor (20 Hz) tidak menambah informasi apa pun — hanya memakai
+/// radio dan baterai jam — sementara yang berguna di iPhone adalah **keputusan
+/// terakhir**, bukan banjir sampel.
+///
+/// Menyaringnya dengan "apakah ada jawaban?" (`state.hasAnswer`) salah dua kali
+/// sekaligus:
+/// - selama terkunci, jawabannya **terus** ada, jadi syarat itu tetap benar dan
+///   jam mengirim 20 kali per detik — persis yang ingin dicegah;
+/// - tepat saat jam **kehilangan** jawabannya (pergelangan bergerak lagi),
+///   syarat itu menjadi salah dan kiriman berhenti — iPhone tetap menampilkan
+///   objek terkunci terakhir seolah masih berlaku, padahal jam sudah tidak
+///   mengidentifikasi apa pun.
+///
+/// Yang benar adalah mengirim saat **keputusannya berubah** — keadaan, objek,
+/// atau keyakinan — termasuk saat berubah menjadi "tidak ada jawaban". Itu
+/// membuat kiriman jarang (hanya pada perpindahan) sekaligus tidak pernah
+/// menyembunyikan hilangnya jawaban.
+///
+/// Ditaruh di paket ini, bukan di app, supaya aturannya bisa diuji di Linux:
+/// perilaku "kapan jam bicara" menentukan apa yang dilihat pengguna di iPhone.
+public struct LinkReportGate: Sendable {
+
+    /// Isi pesan yang menentukan apakah ada sesuatu yang baru.
+    private struct Decision: Equatable, Sendable {
+        var state: PointingState
+        var objectID: String?
+        var level: ConfidenceLevel?
+    }
+
+    private var last: Decision?
+
+    public init() {}
+
+    /// Apakah cuplikan ini membawa keputusan baru — jadi harus dikirim.
+    ///
+    /// Cuplikan pertama selalu dikirim: iPhone belum tahu apa-apa.
+    ///
+    /// Angka yang terus berubah (arah tunjuk, laju pergelangan) sengaja **tidak**
+    /// ikut menentukan: kalau ikut, tiap sampel akan dianggap baru dan
+    /// penyaringnya tidak menyaring apa pun. Pesan yang dikirim tetap membawa
+    /// angka terbaru saat itu — yang disaring hanyalah **kapan** ia dikirim.
+    public mutating func shouldReport(_ snapshot: PointingSnapshot) -> Bool {
+        let decision = Decision(state: snapshot.state,
+                                objectID: snapshot.answeredObject?.id,
+                                level: snapshot.answeredLevel)
+        guard decision != last else { return false }
+        last = decision
+        return true
     }
 }

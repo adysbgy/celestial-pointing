@@ -79,6 +79,15 @@ public final class ConfidenceTrace {
 
     /// Rekam satu cuplikan keadaan.
     ///
+    /// **Yang direkam adalah jawaban yang berlaku sekarang, bukan objek yang
+    /// dipertahankan.** `snapshot.intent` sengaja tetap terisi setelah keadaan
+    /// kehilangan jawabannya (supaya layar jam tidak berkedip), jadi membacanya
+    /// langsung akan menuliskan objek dan keyakinan dari arah tunjuk sebelumnya
+    /// sebagai jawaban untuk arah sekarang — riwayat yang tampak normal sambil
+    /// memuat false lock yang tidak pernah terjadi. Cuplikan sudah membawa
+    /// predikatnya (`answeredObject`/`answeredLevel`/`answeredSeparationDeg`),
+    /// jadi aturannya satu tempat saja.
+    ///
     /// - Parameters:
     ///   - snapshot: cuplikan controller.
     ///   - sigmaDeg: sigma pointing yang **berlaku saat itu**. Diambil dari
@@ -97,10 +106,10 @@ public final class ConfidenceTrace {
                        fromWatch: Bool = false,
                        at date: Date = Date()) {
         record(state: snapshot.state,
-               level: snapshot.intent?.level,
-               objectID: snapshot.bestObject?.id,
-               objectName: snapshot.bestObject?.name,
-               separationDeg: snapshot.intent?.candidates.first?.separationDeg,
+               level: snapshot.answeredLevel,
+               objectID: snapshot.answeredObject?.id,
+               objectName: snapshot.answeredObject?.name,
+               separationDeg: snapshot.answeredSeparationDeg,
                sigmaDeg: sigmaDeg,
                nearestNeighbourDeg: nearestNeighbourDeg ?? snapshot.nearestNeighbourDeg,
                fromWatch: fromWatch,

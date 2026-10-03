@@ -125,4 +125,29 @@ public extension PointingSnapshot {
     func isDisplayingStaleObject(lastLocked: CelestialObject?) -> Bool {
         displayedObject(lastLocked: lastLocked) != nil && !state.hasAnswer
     }
+
+    /// Objek yang berlaku **untuk arah tunjuk sekarang**.
+    ///
+    /// `bestObject` sengaja mempertahankan objek terakhir supaya panel jam tidak
+    /// berkedip saat pergelangan bergerak sedikit — itu benar untuk tampilan,
+    /// yang menandai objek sisa sebagai sisa. Untuk apa pun yang **mengirim atau
+    /// merekam** "apa yang engine katakan sekarang" (pesan ke iPhone, riwayat
+    /// keyakinan), objek yang dipertahankan itu bukan jawaban: ia berasal dari
+    /// arah tunjuk sebelumnya. Yang berlaku hanya saat keadaan punya jawaban.
+    var answeredObject: CelestialObject? { state.hasAnswer ? intent?.best : nil }
+
+    /// Tingkat keyakinan yang berlaku untuk arah tunjuk sekarang.
+    ///
+    /// `nil` saat keadaan tidak punya jawaban — termasuk saat `intent` masih
+    /// membawa keyakinan lama. Keyakinan yang menempel pada keadaan tanpa
+    /// jawaban adalah klaim yang tidak berlaku.
+    var answeredLevel: ConfidenceLevel? { state.hasAnswer ? intent?.level : nil }
+
+    /// Jarak kandidat terbaik ke arah tunjuk, hanya bila ada jawaban sekarang.
+    ///
+    /// Ini angka yang dipakai `ConfidenceModel` untuk memutuskan; jarak dari
+    /// resolusi lama bukan jarak sekarang, jadi ia tidak boleh ikut terekam.
+    var answeredSeparationDeg: Double? {
+        state.hasAnswer ? intent?.candidates.first?.separationDeg : nil
+    }
 }

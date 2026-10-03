@@ -47,6 +47,9 @@ public final class WatchLinkService: NSObject, ObservableObject {
         WCSession.isSupported() ? WCSession.default : nil
     }
 
+    /// Penyaring kiriman: kirim saat keputusan berubah, bukan tiap sampel.
+    private var reportGate = LinkReportGate()
+
     public override init() { super.init() }
 
     public func activate() {
@@ -64,6 +67,30 @@ public final class WatchLinkService: NSObject, ObservableObject {
                      at date: Date = Date(),
                      sigmaDeg: Double? = nil) {
         send(PointingLinkMessage.state(from: snapshot, at: date, sigmaDeg: sigmaDeg))
+    }
+
+    /// Kirim keadaan **bila keputusannya berubah** — dipakai pada tiap sampel
+    /// sensor.
+    ///
+    /// Jam dan telepon sering tidak terhubung, dan `updateApplicationContext`
+    /// hanya menyimpan satu kamus: mengirim 20 kali per detik tidak menambah
+    /// informasi, hanya memakai radio dan baterai. Yang berguna di iPhone adalah
+    /// keputusan terakhir.
+    ///
+    /// Menyaringnya dengan "apakah ada jawaban?" salah dua kali: selama terkunci
+    /// syaratnya selalu benar (jadi tetap 20 Hz), dan tepat saat jawabannya
+    /// **hilang** syaratnya salah — iPhone membeku di objek terakhir seolah
+    /// masih berlaku. Aturannya ada di `LinkReportGate` (teruji di Linux); di
+    /// sini hanya menjalankannya.
+    ///
+    /// - Returns: `true` bila pesan benar-benar dikirim.
+    @discardableResult
+    public func sendIfDecisionChanged(state snapshot: PointingSnapshot,
+                                      at date: Date = Date(),
+                                      sigmaDeg: Double? = nil) -> Bool {
+        guard reportGate.shouldReport(snapshot) else { return false }
+        send(state: snapshot, at: date, sigmaDeg: sigmaDeg)
+        return true
     }
 
     /// Kirim hasil kalibrasi.

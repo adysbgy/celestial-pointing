@@ -141,4 +141,52 @@ final class ConfidenceTraceTests: XCTestCase {
         trace.reset()
         XCTAssertTrue(trace.samples.isEmpty)
     }
+
+    // MARK: - Objek sisa tidak boleh terekam sebagai jawaban
+
+    private let vega = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                       raDeg: 279, decDeg: 38, magnitude: 0.03)
+
+    /// Riwayat harus mencatat jawaban yang **berlaku sekarang**, bukan objek
+    /// yang sengaja dipertahankan mesin keadaan.
+    ///
+    /// `snapshot.intent` tetap terisi setelah keadaan kehilangan jawabannya
+    /// (supaya layar jam tidak berkedip). Membacanya langsung akan menuliskan
+    /// objek dan keyakinan dari arah tunjuk sebelumnya sebagai jawaban untuk
+    /// arah sekarang: riwayat yang tampak normal sambil memuat false lock yang
+    /// tidak pernah terjadi — dan grafik diagnostik akan menunjuk perbaikan
+    /// yang salah.
+    func testStaleObjectIsNotRecordedAsAnswer() {
+        let trace = ConfidenceTrace()
+        let stale = PointingSnapshot(state: .pointing,
+                                     intent: CelestialIntent(
+                                        level: .high,
+                                        best: vega,
+                                        candidates: [Candidate(object: vega, separationDeg: 0.4)]))
+        trace.record(snapshot: stale, sigmaDeg: 2)
+
+        let sample = try! XCTUnwrap(trace.samples.last)
+        XCTAssertEqual(sample.state, .pointing, "keadaannya tetap dicatat apa adanya")
+        XCTAssertNil(sample.objectID, "objek dari arah tunjuk sebelumnya bukan jawaban")
+        XCTAssertNil(sample.level, "keyakinan lama tidak boleh menempel")
+        XCTAssertNil(sample.separationDeg, "jarak resolusi lama bukan jarak sekarang")
+        XCTAssertNil(sample.ratioToSigma)
+    }
+
+    /// Keadaan yang punya jawaban tetap merekam objek, keyakinan, dan jaraknya.
+    func testLiveAnswerIsRecordedWithItsDecisionVariables() {
+        let trace = ConfidenceTrace()
+        let live = PointingSnapshot(state: .lock,
+                                    intent: CelestialIntent(
+                                        level: .high,
+                                        best: vega,
+                                        candidates: [Candidate(object: vega, separationDeg: 0.4)]))
+        trace.record(snapshot: live, sigmaDeg: 2)
+
+        let sample = try! XCTUnwrap(trace.samples.last)
+        XCTAssertEqual(sample.objectID, "vega")
+        XCTAssertEqual(sample.level, .high)
+        XCTAssertEqual(try! XCTUnwrap(sample.separationDeg), 0.4, accuracy: 1e-12)
+        XCTAssertEqual(try! XCTUnwrap(sample.ratioToSigma), 0.2, accuracy: 1e-12)
+    }
 }

@@ -27,7 +27,15 @@ struct PointingView: View {
                     // tiap kali pergelangan bergerak sedikit).
                     if let object = engine.displayedObject {
                         ObjectDetailView(object: object,
-                                         level: engine.snapshot.intent?.level,
+                                         // `answeredLevel`, bukan `intent?.level`:
+                                         // badge ini mengklaim keyakinan atas objek
+                                         // yang ditampilkan, dan keyakinan hanya
+                                         // berlaku bila keadaan punya jawaban.
+                                         // `isStale` sudah menyembunyikannya pada
+                                         // objek sisa; memakai predikat yang sama
+                                         // membuat klaim itu tidak bisa bocor kalau
+                                         // gerbang tampilannya berubah.
+                                         level: engine.snapshot.answeredLevel,
                                          isStale: engine.isDisplayingStaleObject)
                     }
                     if let note = motion.unavailableReason ?? engine.sensorNote {

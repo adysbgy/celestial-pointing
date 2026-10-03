@@ -144,6 +144,21 @@ final class ConfidenceTraceStore: ObservableObject {
         count = 0
     }
 
+    /// Nyalakan/jeda perekaman.
+    ///
+    /// **Lewat store, bukan binding langsung ke `trace.trace.isRecording`.**
+    /// `ConfidenceTrace` bukan `ObservableObject`, jadi menulis propertinya dari
+    /// binding tidak memicu render: saklarnya bisa tampak tidak menanggapi
+    /// ketukan. Melewati `@Published` di sini membuat setiap perubahan
+    /// dipublikasikan.
+    func setRecording(_ isRecording: Bool) {
+        trace.isRecording = isRecording
+        count = trace.samples.count
+    }
+
+    /// Apakah sampel yang datang sedang disimpan.
+    var isRecording: Bool { trace.isRecording }
+
     var samples: [ConfidenceSample] { trace.samples }
 }
 
@@ -215,10 +230,14 @@ struct DiagnosticsView: View {
 
                 Section("Kontrol") {
                     Toggle("Rekam keyakinan", isOn: Binding(
-                        get: { trace.trace.isRecording },
-                        set: { trace.trace.isRecording = $0 }))
+                        get: { trace.isRecording },
+                        set: { trace.setRecording($0) }))
                     Button("Kosongkan riwayat") { trace.reset() }
-                        .disabled(trace.samples.isEmpty)
+                        // Riwayat kosong **atau** perekaman dijeda: tombol yang
+                        // tampak siap menghapus padahal tidak ada yang disimpan
+                        // lagi hanya membuat pengguna mengira riwayatnya masih
+                        // terkumpul. Keadaannya ditampilkan apa adanya.
+                        .disabled(trace.samples.isEmpty || !trace.isRecording)
                 }
 
                 Section {

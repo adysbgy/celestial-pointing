@@ -113,4 +113,29 @@ final class PointingPresentationTests: XCTestCase {
             XCTAssertFalse(snapshot.isDisplayingStaleObject(lastLocked: vega))
         }
     }
+
+    /// Jawaban yang berlaku sekarang dipisahkan dari objek yang ditampilkan.
+    ///
+    /// Yang **ditampilkan** sengaja mempertahankan objek terakhir (layar jam
+    /// menandainya sisa). Yang **berlaku** hanya saat keadaan punya jawaban —
+    /// itu yang boleh dikirim ke iPhone dan direkam ke riwayat, karena di sana
+    /// tidak ada penanda "sisa" yang bisa menyelamatkan.
+    func testAnsweredPredicatesIgnoreRetainedIntent() {
+        let retained = CelestialIntent(
+            level: .high, best: vega,
+            candidates: [Candidate(object: vega, separationDeg: 0.7)])
+        let stale = PointingSnapshot(state: .pointing, intent: retained)
+
+        XCTAssertEqual(stale.bestObject?.id, "vega", "tampilan tetap mempertahankannya")
+        XCTAssertNil(stale.answeredObject, "tapi itu bukan jawaban sekarang")
+        XCTAssertNil(stale.answeredLevel)
+        XCTAssertNil(stale.answeredSeparationDeg)
+
+        for state in [PointingState.lock, .uncertain] {
+            let live = PointingSnapshot(state: state, intent: retained)
+            XCTAssertEqual(live.answeredObject?.id, "vega")
+            XCTAssertEqual(live.answeredLevel, .high)
+            XCTAssertEqual(live.answeredSeparationDeg, 0.7)
+        }
+    }
 }

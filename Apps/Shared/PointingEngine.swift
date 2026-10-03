@@ -138,7 +138,12 @@ public final class PointingEngine: ObservableObject {
         if !update.haptics.isEmpty { haptics?(update.haptics) }
         if update.snapshot.state == .lock {
             if !wasLocked { lockCount += 1 }
-            lastLockedObject = update.snapshot.bestObject
+            // `answeredObject` — sama dengan yang dipakai pesan dan riwayat.
+            // Di sini hasilnya identik (`lock` selalu punya jawaban), tapi
+            // memakai satu predikat yang sama berarti "objek terakhir yang
+            // terkunci" tidak bisa diam-diam menjadi objek yang dipertahankan
+            // mesin keadaan kalau aturan `lock` berubah.
+            lastLockedObject = update.snapshot.answeredObject
         }
         refreshSkyContext(at: date)
     }

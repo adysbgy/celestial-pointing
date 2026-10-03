@@ -143,4 +143,83 @@ final class LinkMessageTests: XCTestCase {
         XCTAssertNil(calibration.residualSpreadDeg)
         XCTAssertNil(calibration.confidencePolicy())
     }
+
+    // MARK: - Objek sisa tidak boleh ikut terkirim
+
+    private let vega = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                       raDeg: 279, decDeg: 38, magnitude: 0.03)
+
+    /// Objek dan keyakinan hanya ikut bila keadaan **punya jawaban sekarang**.
+    ///
+    /// Mesin keadaan sengaja mempertahankan objek terakhir supaya panel jam
+    /// tidak berkedip. Di jam itu benar — layar menandai objek sisa sebagai
+    /// sisa. Di pesan ini tidak ada penanda seperti itu: mengirim objek sisa
+    /// membuat iPhone menampilkannya sebagai keadaan jam sekarang, lengkap
+    /// dengan badge "Yakin" dari keyakinan lama. Itu false confidence yang
+    /// dilarang PRD, dan ia muncul tepat saat jam kehilangan jawabannya.
+    func testStaleObjectIsNotSentAsCurrentAnswer() {
+        let stale = PointingSnapshot(state: .pointing,
+                                     intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        let message = PointingLinkMessage.state(from: stale)
+
+        XCTAssertEqual(message.state, .pointing, "keadaannya tetap dilaporkan apa adanya")
+        XCTAssertNil(message.objectID, "objek dari arah tunjuk sebelumnya bukan jawaban sekarang")
+        XCTAssertNil(message.objectName)
+        XCTAssertNil(message.level, "keyakinan lama tidak boleh menempel pada keadaan tanpa jawaban")
+    }
+
+    /// Keadaan yang benar-benar punya jawaban tetap mengirim objek + keyakinan.
+    func testLiveAnswerIsSentWithObjectAndLevel() {
+        for state in [PointingState.lock, .uncertain] {
+            let live = PointingSnapshot(state: state,
+                                        intent: CelestialIntent(level: .high, best: vega, candidates: []))
+            let message = PointingLinkMessage.state(from: live)
+            XCTAssertEqual(message.objectID, "vega", "\(state) adalah jawaban sekarang")
+            XCTAssertEqual(message.objectName, "Vega")
+            XCTAssertEqual(message.level, .high)
+        }
+    }
+
+    // MARK: - Kapan jam bicara
+
+    /// Kirim saat **keputusan berubah**, bukan tiap sampel.
+    ///
+    /// Menyaring dengan "apakah ada jawaban?" salah dua kali: selama terkunci
+    /// syaratnya selalu benar (jadi tetap 20 Hz), dan tepat saat jawabannya
+    /// hilang syaratnya salah — iPhone membeku di objek terakhir seolah masih
+    /// berlaku.
+    func testGateReportsOnDecisionChangeOnly() {
+        var gate = LinkReportGate()
+        let locked = PointingSnapshot(state: .lock,
+                                      intent: CelestialIntent(level: .high, best: vega, candidates: []))
+
+        XCTAssertTrue(gate.shouldReport(locked), "cuplikan pertama selalu dikirim")
+
+        // Sampel berikutnya dengan keputusan yang sama tidak dikirim, walau
+        // angka yang berubah-ubah (laju pergelangan) terus datang.
+        var stillLocked = locked
+        stillLocked.angularRateDegPerSec = 1.25
+        XCTAssertFalse(gate.shouldReport(stillLocked),
+                       "20 sampel per detik dengan keputusan sama bukan informasi baru")
+
+        // Jawaban **hilang** — inilah yang dulu tidak pernah sampai ke iPhone.
+        let lost = PointingSnapshot(state: .pointing,
+                                    intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        XCTAssertTrue(gate.shouldReport(lost), "hilangnya jawaban harus dikirim, bukan disembunyikan")
+
+        // Kembali terkunci pada objek yang sama: keadaan berubah lagi.
+        XCTAssertTrue(gate.shouldReport(locked))
+        XCTAssertFalse(gate.shouldReport(locked))
+    }
+
+    /// Keyakinan yang berubah pada objek yang sama adalah keputusan baru.
+    func testGateReportsLevelChange() {
+        var gate = LinkReportGate()
+        let high = PointingSnapshot(state: .lock,
+                                    intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        let medium = PointingSnapshot(state: .uncertain,
+                                      intent: CelestialIntent(level: .medium, best: vega, candidates: []))
+        XCTAssertTrue(gate.shouldReport(high))
+        XCTAssertTrue(gate.shouldReport(medium), "yakin → ragu adalah kabar yang harus dikirim")
+    }
 }
