@@ -2,7 +2,38 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: kebenaran Experiment 1 dihitung untuk tempat yang salah
+### Siklus ini: sampel dari jam membawa sigma yang tidak pernah berlaku
+Fokus: memastikan **konteks** yang menemani sampel benar, bukan hanya
+sampelnya. Tidak ada aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **`ConfidenceTrace.record(message:)` mencatat sigma bawaan.** Jam tidak
+  pernah menyertakan sigma dalam pesan keadaannya, jadi cabang ini memakai
+  `ConfidencePolicy().pointingSigmaDeg` — angka yang **tidak pernah berlaku di
+  jam**. Berkas ekspor karena itu memuat konteks yang dikarang, tanpa cara bagi
+  pembacanya untuk mengetahuinya. Ini bertentangan langsung dengan alasan
+  `ConfidenceTraceArchive` menyimpan lokasi/kalibrasi/sigma bersama sampel:
+  *"berkas berisi derajat saja adalah anekdot."*
+  - `PointingLinkMessage.state(from:at:sigmaDeg:)` dan
+    `WatchLinkService.send(state:at:sigmaDeg:)` kini membawa sigma yang berlaku
+    di jam. Bukan untuk keputusan apa pun di iPhone — melainkan karena riwayat
+    keyakinan menyimpan konteks bersama sampelnya.
+  - `record(message:)` memakai **nol** bila sigma tidak ada, bukan bawaan. Nol
+    berarti "tidak terukur", dan `ratioToSigma` sengaja kosong untuk sigma nol.
+    Menuliskan bawaan berarti mengarang konteks; menulis nol membuat
+    ketidak-tahuannya terlihat.
+  - Layar Tautan memperingatkan bila ada sampel tanpa sigma, supaya `0` tidak
+    terbaca sebagai akurasi sempurna.
+- **Tes baru (2):** `testStateMessageCarriesWatchSigma` (sigma ikut dalam pesan
+  keadaan), `testStateMessageWithoutSigmaKeepsItNil` (`nil` tetap `nil`).
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 109, 0 gagal**.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: kebenaran Experiment 1 dihitung untuk tempat yang salah
 Fokus: menyisir jalur **kebenaran** (ground truth) di Experiment 1. Tidak ada
 aturan keras PRD yang dilonggarkan.
 
