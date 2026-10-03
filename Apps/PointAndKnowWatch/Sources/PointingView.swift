@@ -36,7 +36,13 @@ struct PointingView: View {
                             .foregroundStyle(PointingTone.danger.color)
                             .multilineTextAlignment(.center)
                     }
-                    if !engine.location.source.elementsEqual("corelocation") {
+                    // Peringatan ini harus muncul tepat saat lokasinya BUKAN
+                    // hasil pengukuran. Dibandingkan lewat `isFallback`, bukan
+                    // lewat string `source` apa adanya: string itu bisa berubah
+                    // di `LocationProvider` tanpa ada yang ingat memeriksanya,
+                    // dan perbandingan mentah akan **membalik** peringatan ini
+                    // diam-diam — memperingatkan justru saat lokasi sungguhan.
+                    if engine.location.isFallback {
                         Text("Lokasi: \(engine.location.label)")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)

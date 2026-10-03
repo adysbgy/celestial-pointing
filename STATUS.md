@@ -15,7 +15,30 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: ekspor dataset benar-benar menjadi berkas bernama
+### Siklus ini: peringatan lokasi bawaan tidak boleh bergantung pada string mentah
+Fokus: menutup satu cacat laten di lapisan app. Logika engine **tidak
+disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat yang ditemukan dan diperbaiki.** `PointingView` memutuskan apakah
+menampilkan peringatan "lokasi belum didapat" lewat perbandingan string mentah:
+`!engine.location.source.elementsEqual("corelocation")`. Padahal
+`ObserverLocation` sudah punya predikat semantik `isFallback`. Perbandingan itu
+benar **hari ini** hanya karena `LocationProvider` kebetulan menulis
+`source: "corelocation"`. Begitu string itu berubah (atau ada sumber lokasi lain
+yang ditambahkan), peringatan itu **terbalik diam-diam**: ia muncul justru saat
+lokasi sungguhan, dan hilang tepat saat tinggi benda langit dihitung untuk
+tempat lain. Itu persis kelas kesalahan yang PRD larang — UI yang tampak
+normal sambil menyembunyikan bahwa angkanya tidak berlaku. Diganti dengan
+`engine.location.isFallback` (predikat yang sama dengan yang dipakai layar
+Experiment 1, jadi kedua layar tidak bisa lagi berbeda pendapat).
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
+- CI `Apple Build` + `Engine Tests (Linux)` pada commit siklus ini.
+
+### Siklus sebelumnya: ekspor dataset benar-benar menjadi berkas bernama
 Fokus: menyisir berkas app terhadap daftar item yang tersisa, lalu menutup satu
 cacat nyata. Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
 
