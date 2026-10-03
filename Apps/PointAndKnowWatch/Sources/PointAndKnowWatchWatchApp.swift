@@ -58,7 +58,8 @@ struct PointAndKnowWatchApp: App {
             // sampel 20 Hz. Jam dan telepon sering tidak terhubung, dan yang
             // berguna di sana adalah keputusan terakhir, bukan banjir sampel.
             if update.snapshot.state.hasAnswer || update.haptics.contains(.sensorUnavailable) {
-                link.send(state: update.snapshot)
+                link.send(state: update.snapshot,
+                          sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
             }
         }
         // Sumber keadaan untuk menjawab permintaan iPhone. Dibaca saat diminta,

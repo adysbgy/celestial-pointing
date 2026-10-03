@@ -63,6 +63,13 @@ struct LinkView: View {
                     Text("Sampel dari jam tidak membawa jarak kandidat, jadi rasionya terhadap σ kosong. Yang bisa dilihat dari sini adalah keadaan dan keyakinan yang dilaporkan jam.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    if fromWatch.contains(where: { $0.sigmaDeg <= 0 }) {
+                        // σ nol berarti jam tidak menyertakannya. Menampilkannya
+                        // sebagai "0.0°" akan terbaca seperti akurasi sempurna.
+                        Text("Sebagian sampel tidak menyertakan σ. Sigma yang tidak terukur ditulis 0, bukan angka bawaan — jangan dibaca sebagai akurasi sempurna.")
+                            .font(.footnote)
+                            .foregroundStyle(PointingTone.warning.color)
+                    }
                 }
             }
             .navigationTitle("Tautan")

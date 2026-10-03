@@ -137,6 +137,12 @@ public final class ConfidenceTrace {
     /// objek, dan keyakinan. Jarak kandidat **tidak** ikut dikirim (jam tidak
     /// mengirim sudut pergelangan ke perangkat lain), jadi `ratioToSigma` akan
     /// kosong — dan itu ditampilkan apa adanya, bukan diisi angka karangan.
+    ///
+    /// Sigma diambil dari pesannya. Kalau jam tidak menyertakannya, yang dicatat
+    /// adalah **nol** — bukan sigma bawaan. Nol berarti "tidak terukur", dan
+    /// `ratioToSigma` sengaja kosong untuk sigma nol. Memakai bawaan akan
+    /// menuliskan angka yang tidak pernah berlaku di jam ke dalam berkas
+    /// ekspor, dan pembacanya tidak punya cara mengetahui itu.
     public func record(message: PointingLinkMessage) {
         guard message.kind == .pointingState, let state = message.state else { return }
         record(state: state,
@@ -144,7 +150,7 @@ public final class ConfidenceTrace {
                objectID: message.objectID,
                objectName: message.objectName,
                separationDeg: nil,
-               sigmaDeg: message.pointingSigmaDeg ?? ConfidencePolicy().pointingSigmaDeg,
+               sigmaDeg: message.pointingSigmaDeg ?? 0,
                fromWatch: true,
                at: message.sentAt)
     }

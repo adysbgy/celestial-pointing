@@ -85,6 +85,25 @@ final class LinkMessageTests: XCTestCase {
         XCTAssertEqual(try! XCTUnwrap(decoded.confidencePolicy).pointingSigmaDeg, 3.5, accuracy: 1e-12)
     }
 
+    /// Sigma yang berlaku di jam harus ikut dalam pesan keadaan. Riwayat
+    /// keyakinan di iPhone menyimpan konteks bersama sampelnya; tanpa sigma,
+    /// sampel dari jam tercatat dengan angka yang tidak pernah berlaku di jam.
+    func testStateMessageCarriesWatchSigma() {
+        let snapshot = PointingSnapshot(state: .lock)
+        let message = PointingLinkMessage.state(from: snapshot,
+                                               at: Date(timeIntervalSince1970: 1_700_000_000),
+                                               sigmaDeg: 4.25)
+        let decoded = try! XCTUnwrap(PointingLinkMessage(plist: message.plist))
+        XCTAssertEqual(decoded.pointingSigmaDeg!, 4.25, accuracy: 1e-12)
+        XCTAssertEqual(decoded.kind, .pointingState)
+    }
+
+    /// Tanpa sigma, `nil` tetap `nil` — bukan 0 yang terbaca seperti "sempurna".
+    func testStateMessageWithoutSigmaKeepsItNil() {
+        let message = PointingLinkMessage.state(from: PointingSnapshot(state: .lock))
+        XCTAssertNil(message.pointingSigmaDeg)
+    }
+
     // MARK: - Pesan rusak
 
     func testUnknownKindIsRejected() {

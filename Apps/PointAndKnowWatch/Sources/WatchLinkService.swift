@@ -56,8 +56,14 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 
     /// Kirim keadaan alur sekarang.
-    public func send(state snapshot: PointingSnapshot, at date: Date = Date()) {
-        send(PointingLinkMessage.state(from: snapshot, at: date))
+    ///
+    /// `sigmaDeg` sebaiknya diisi dengan sigma yang **berlaku di jam**, supaya
+    /// sampel yang direkam iPhone membawa konteks yang benar. `nil` berarti
+    /// penerima memakai bawaannya.
+    public func send(state snapshot: PointingSnapshot,
+                     at date: Date = Date(),
+                     sigmaDeg: Double? = nil) {
+        send(PointingLinkMessage.state(from: snapshot, at: date, sigmaDeg: sigmaDeg))
     }
 
     /// Kirim hasil kalibrasi.

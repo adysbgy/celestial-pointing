@@ -125,8 +125,15 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     /// `rawPointing` **tidak** dikirim: yang perlu diketahui iPhone adalah
     /// jawaban engine, bukan sudut pergelangan. Mengirim sudut mentah ke
     /// perangkat lain hanya menambah peluang ia dipakai untuk hal yang salah.
+    ///
+    /// `sigmaDeg` **ikut** dikirim. Bukan untuk keputusan apa pun di iPhone —
+    /// melainkan karena riwayat keyakinan di sana menyimpan konteks bersama
+    /// sampelnya, dan sigma adalah bagian dari konteks itu. Tanpa ini, sampel
+    /// dari jam akan tercatat dengan sigma bawaan, sehingga berkas ekspor
+    /// menyatakan sesuatu yang tidak pernah berlaku di jam.
     public static func state(from snapshot: PointingSnapshot,
-                             at date: Date = Date()) -> PointingLinkMessage {
+                             at date: Date = Date(),
+                             sigmaDeg: Double? = nil) -> PointingLinkMessage {
         PointingLinkMessage(
             kind: .pointingState,
             sentAt: date,
@@ -137,6 +144,7 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
             altitudeDeg: snapshot.calibratedPointing?.altitudeDeg,
             azimuthDeg: snapshot.calibratedPointing?.azimuthDeg,
             angularRateDegPerSec: snapshot.angularRateDegPerSec,
+            pointingSigmaDeg: sigmaDeg,
             note: snapshot.isCalibrated ? "terkalibrasi" : "belum terkalibrasi"
         )
     }
