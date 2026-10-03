@@ -20,6 +20,45 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
+### Siklus ini: verifikasi mandiri independen (xcode-dev, sesi baru) — seluruh item brief (1–3) terpenuhi
+Siklus ini dimulai dari brief yang memerintahkan "selesaikan semua kode dalam
+semalam", dengan STATUS.md yang menyatakan pembungkus app sudah lengkap. Alih-alih
+mempercayai klaim itu, seluruh berkas app (15 file) dibaca ulang baris demi baris
+dan setiap simbol `PointingKit`/`CelestialEngine` yang dirujuknya dicari keberadaan
+nyatanya di `Packages/`. Hasilnya: **tidak ada satu item pun dari brief yang tersisa**
+— semua ada dan konsisten.
+
+**Yang diverifikasi dengan membaca + mencari (bukan percaya STATUS lama):**
+- Prioritas 1 (watchOS): `MotionLogger.consume` memanggil `controller.feed(cmX:cmY:cmZ:cmW:)`
+  yang membangun `DeviceAttitude` lewat `init?(cmX:cmY:cmZ:cmW:)` (Frames.swift:82) →
+  `PointingController.feed`. `CalibrationView` memakai `CalibrationSession` (di atas
+  `CalibrationFlow`/`CalibrationSolver`), tombol "Pakai" mati sampai `flow.isReady`,
+  dan `reset()` menyegarkan cuplikan engine. `PointingView` merender langsung dari
+  `snapshot.state` (keenam keadaan via `PointingPresentation.symbolName/shortLabel/
+  guidance/tone`) + `ObjectDetailView`. `HapticEngine` memetakan `.lockSucceeded` →
+  `.success` dan `.uncertain` → `.retry`. `WatchLinkService` mengirim **keputusan**,
+  bukan sudut pergelangan.
+- Prioritas 2 (iOS): `DiagnosticsView` menggambar `ratioToSigma` (Swift Charts) + ekspor
+  via `ConfidenceTraceArchive`/`JSONArchiveDocument`; `Experiment1View`+
+  `ExperimentRecorder` (tunjuk→rekam→ekspor, verdict menyaring GAGAL).
+- Prioritas 3: `project.yml` (dua target app + `postGenCommand` tanam app jam ke
+  `PlugIns/`) dan `ios-build.yml` sudah memuat `brew install xcodegen` + gerbang
+  peringatan `Apps/`.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 143 PointingKit, 0 gagal** (Swift 6.0,
+  Docker, Linux) — dijalankan dari nol, bukan sekadar klaim.
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` (loop `find Apps -name '*.swift'` → bersih).
+- Sapuan stub (`TODO`/`FIXME`/`placeholder`/`stub`) di `Apps/` → 0.
+- `gh run list`: **`Apple Build` hijau** (run `37162913757`, 2m42s) — artinya app
+  benar-benar dikompilasi terhadap Apple SDK + `PointingKit` nyata, bukan sekadar
+  lolos parse; `Engine Tests (Linux)` hijau pada HEAD yang sama.
+
+**Kesimpulan:** tidak ada kode app yang tersisa. Satu-satunya baris `ROADMAP.md` yang
+belum tertutup tetap "Point & Slew POC 1 teleskop" — menunggu perangkat keras fisik,
+bukan repo ini. Tidak ada aturan keras PRD yang dilonggarkan; engine tidak disentuh.
+
 ### Siklus ini: konfirmasi mandiri ulang pembungkus app + gerbang Linux (tanpa regresi)
 Fokus: siklus ini dimulai dengan brief yang menyatakan "pembungkus app (watchOS +
 iOS) tersisa". Setelah membaca seluruh berkas dan menjalankan gerbang, ternyata
