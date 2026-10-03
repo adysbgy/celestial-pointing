@@ -65,6 +65,12 @@ yang menyebut Sirius beserta koordinatnya — jadi ia bukan sekadar formalitas.
   memeriksa apakah keadaan punya jawaban. `lastResolution` kini hanya dipakai
   untuk jarak tetangga diagnostik (aman: keadaan yang menampilkannya juga sudah
   memberi tahu) dan oleh `slewDecision` yang sudah dijaga.
+- CI `Engine Tests (Linux)` run `37153246327` pada commit `ce3da4c` → **166
+  CelestialEngine + 140 PointingKit, 0 gagal** (kedua paket).
+- CI `Apple Build` run `37153246367` pada commit `ce3da4c` → **2× `BUILD
+  SUCCEEDED`** (skema iPhone yang ikut membangun app jam, dan skema jam sendiri),
+  uji PointingKit di Apple SDK **140, 0 gagal**, dan langkah gerbang melaporkan
+  *"Tidak ada peringatan compiler pada Apps/."*
 
 ### Siklus sebelumnya: arah tunjuk dari sensor yang sudah mati masih ikut terkirim, dan kegagalan kirim yang paling sering tidak terlihat
 Fokus: menyisir **predikat "berlaku sekarang"** yang sudah dipakai untuk objek dan
