@@ -1,6 +1,6 @@
 # STATUS — Celestial Pointing Engine
 
-## Ringkasan keadaan (3 Okt 2026, malam)
+## Ringkasan keadaan (4 Okt 2026, dini hari)
 
 **Seluruh kode selesai.** Yang tersisa di `ROADMAP.md` hanyalah satu item yang
 **bukan kode**: "Point & Slew POC 1 teleskop — perencana aman sudah ada
@@ -12,6 +12,56 @@ pekerjaan repo ini.
 - Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
   (`Apple Build`) hijau** — bukan sekadar lolos parse.
 - CI: `engine-tests.yml` (ubuntu) + `ios-build.yml` (macos-15, XcodeGen).
+
+## Progres terakhir (4 Okt 2026)
+
+### Siklus ini: audit independen seluruh daftar item app (tanpa regresi)
+Fokus: **memverifikasi, bukan mempercayai** — membaca ulang setiap berkas app
+dan engine, lalu menjalankan suite, untuk memastikan tidak ada item yang
+diklaim selesai padahal belum. Tidak ada aturan keras PRD yang dilonggarkan,
+dan tidak ada kode engine yang diubah (165 + 122 test tetap hijau).
+
+**Yang diverifikasi ulang satu per satu (semuanya sudah ada):**
+- `MotionLogger` memetakan `CMDeviceMotion.attitude.quaternion` → `DeviceAttitude`
+  lewat `init?(cmX:cmY:cmZ:cmW:)` → `controller.feed(...)` (`MotionLogger.swift:112`).
+- `CalibrationView` memakai `CalibrationSession` (di atas `CalibrationFlow` →
+  `CalibrationSolver`) dan hanya memasang kalibrasi lewat `engine.apply` setelah
+  sebaran acuan sempit (`CalibrationView.swift:153,186`).
+- `PointingView` merender **langsung** dari `PointingSnapshot`; keenam keadaan
+  (`idle/pointing/searching/lock/uncertain/unavailable`) dipetakan lengkap di
+  `PointingPresentation` (simbol, label, panduan, nada) — tidak ada keadaan tanpa
+  cabang.
+- Haptic dipicu **hanya pada perpindahan keadaan**, di
+  `PointingController.hapticEvents(from:to:)` dengan penjagaan `previous != current`
+  — jadi tidak bergetar tiap sampel 20 Hz. `.lock` → `.success`, `.uncertain` →
+  `.retry` (`HapticEngine.swift:33-36`).
+- `WatchLinkService`/`PhoneLinkService` memakai bentuk kabel yang sama
+  (`PointingLinkMessage.plist` / `init?(plist:)`); kalibrasi lewat
+  `transferUserInfo` (tidak tertimpa), keadaan lewat `updateApplicationContext`.
+  `rawPointing` **tidak** pernah dikirim.
+- iOS: `DiagnosticsView` menggambar rasio jarak-kandidat/σ (Swift Charts) +
+  `ShareLink` ekspor JSON; `Experiment1View`/`ExperimentRecorder` merekam
+  tunjuk→rekam→ekspor dengan kebenaran mengikuti `engine.location`.
+- `project.yml` menunjuk path yang benar-benar ada (termasuk
+  `Resources/Assets.xcassets` dengan `AppIcon-1024.png`), `ios-build.yml` sudah
+  memuat `brew install xcodegen`.
+
+**Aturan keras PRD diperiksa ulang di kode:** `rawPointing` (sudut pergelangan)
+hanya dipakai di dua tempat yang memang diizinkan — `CalibrationSession` (titik
+acuan) dan `ExperimentHarness` (pengukuran galat). Tidak ada di jalur mana pun
+yang menuju motor. `SlewPlanner`/`SlewCommand` tetap satu-satunya jalan membentuk
+perintah GoTo, diturunkan dari objek teridentifikasi, gagal-tertutup.
+
+**Tidak ada perubahan kode** — siklus ini murni verifikasi. Yang dijalankan:
+- `./swift-test.sh` → **165 CelestialEngine + 122 PointingKit, 0 gagal** (exit 0).
+- `gh run list` → **CI macOS `Apple Build` + CI Linux `Engine Tests` hijau** pada
+  commit `12b4ce9` (HEAD), pohon git bersih.
+- Sapuan stub (`TODO`/`FIXME`/`placeholder`) → bersih; satu-satunya kemunculan
+  kata "placeholder" adalah komentar di `Confidence.swift` yang **menjelaskan**
+  mengapa sigma awal sengaja longgar.
+
+**Kesimpulan:** seluruh item kode di `ROADMAP.md` terpenuhi; satu-satunya item
+yang tersisa adalah POC teleskop fisik, yang menunggu perangkat keras.
 
 ## Progres terakhir (3 Okt 2026)
 
