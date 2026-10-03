@@ -47,7 +47,9 @@ struct PointAndKnowWatchApp: App {
         engine.haptics = { events in player.play(events) }
 
         location.start()
-        engine.update(location: location.effectiveLocation)
+        // Lokasi sungguhan datang setelah `start()`, jadi engine disambungkan
+        // ke sumbernya — bukan diberi satu cuplikan lalu ditinggal.
+        engine.bind(location: location)
         engine.refreshSkyContext()
 
         motion.onUpdate = { update in

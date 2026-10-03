@@ -263,6 +263,48 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertNil(c.snapshot.intent)
     }
 
+    // MARK: - Lokasi
+
+    /// Lokasi yang salah menggeser seluruh langit.
+    ///
+    /// Ini alasan mengapa lokasi **wajib** disambungkan ulang saat koordinat
+    /// sungguhan tiba: engine yang tetap memakai lokasi bawaan akan menjawab
+    /// dengan bintang yang salah, dan tidak ada bagian UI yang terlihat keliru.
+    /// Uji ini membuktikan efeknya nyata, bukan teoretis.
+    func testWrongObserverShiftsTheWholeSky() {
+        let resolver = singleStarResolver()
+        // Jakarta (lokasi bawaan app) vs Quito — garis bujur berbeda ~28°.
+        let jakarta = PointingController(resolver: resolver,
+                                         observer: Observer(latitudeDeg: -6.2, longitudeDeg: 106.8),
+                                         config: PointingControllerConfig(coneDeg: 5))
+        let quito = PointingController(resolver: resolver,
+                                       observer: Observer(latitudeDeg: -0.18, longitudeDeg: -78.47),
+                                       config: PointingControllerConfig(coneDeg: 5))
+
+        let siriusAtJakarta = resolver.horizontal(of: sirius,
+                                                  observer: jakarta.observer, date: date)!
+        let siriusAtQuito = resolver.horizontal(of: sirius,
+                                                observer: quito.observer, date: date)!
+
+        // Langitnya benar-benar bergeser — ini bukan perbedaan kecil.
+        let shift = SkyMath.angularSeparationHorizontalDeg(siriusAtJakarta, siriusAtQuito)
+        XCTAssertGreaterThan(shift, 20,
+                             "bujur berbeda 185° seharusnya menggeser langit jauh lebih dari 20°")
+
+        // Arahkan tepat ke Sirius menurut Jakarta, lalu tanya engine Quito.
+        let update = quito.feed(quaternion: quaternion(viewPointingAt: siriusAtJakarta),
+                                timestamp: at(0))
+        for step in 1..<12 {
+            quito.feed(quaternion: quaternion(viewPointingAt: siriusAtJakarta),
+                       timestamp: at(Double(step) * 0.1))
+        }
+
+        XCTAssertNotEqual(quito.snapshot.bestObject?.id, "sirius",
+                          "lokasi yang salah seharusnya membuat bintangnya meleset")
+        XCTAssertNotNil(update.snapshot.rawPointing,
+                        "arah tunjuk tetap ada — yang salah adalah langitnya")
+    }
+
     // MARK: - Kalibrasi
 
     /// Kalibrasi hanya boleh menggeser azimut, tidak pernah altitude.

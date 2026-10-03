@@ -60,7 +60,7 @@ struct Experiment1View: View {
                 motion.start(controller: engine.controller)
                 engine.setSensorAvailable(motion.isAvailable)
                 location.start()
-                engine.update(location: location.effectiveLocation)
+                engine.bind(location: location)
             }
             .onDisappear {
                 motion.stop()

@@ -12,6 +12,16 @@ import PointingKit
 /// `ObserverLocation.fallback` yang jelas berlabel "bawaan" — supaya rekaman
 /// Experiment 1 tidak pernah diam-diam memakai lokasi karangan.
 ///
+/// **Kenapa ada `onLocationChanged`.** Lokasi sungguhan datang beberapa detik
+/// setelah `start()` — yaitu setelah UI selesai dirender. Kalau tidak ada yang
+/// memberi tahu engine saat itu, engine akan menghitung seluruh langit untuk
+/// lokasi bawaan (Jakarta) selamanya, sementara layar menampilkan koordinat
+/// sungguhan di sebelahnya. Langit yang tergeser ratusan derajat tapi terlihat
+/// normal persis jenis kesalahan yang tidak boleh dibiarkan: tidak ada yang
+/// akan menyadarinya dari UI. Callback ini memindahkan tanggung jawab itu ke
+/// pemanggil (biasanya `PointingEngine`), sehingga tidak ada jalur di mana
+/// lokasi berubah tanpa engine ikut tahu.
+///
 /// Satu implementasi dipakai app Watch maupun app iPhone.
 ///
 /// **Kenapa `@preconcurrency` pada konformansnya.** `CLLocationManagerDelegate`
@@ -33,6 +43,13 @@ final class LocationProvider: NSObject, ObservableObject, @preconcurrency CLLoca
     @Published private(set) var location: ObserverLocation?
     /// Penjelasan status untuk ditampilkan ke pengguna.
     @Published private(set) var statusText = "Lokasi belum diminta"
+
+    /// Dijalankan **setiap kali** lokasi sungguhan berubah.
+    ///
+    /// Dijalankan di main actor. Pemanggil bertanggung jawab meneruskan
+    /// perubahan ini ke engine; kalau tidak, engine akan memakai lokasi lama
+    /// tanpa ada yang menyadarinya.
+    var onLocationChanged: ((ObserverLocation) -> Void)?
 
     /// Lokasi yang harus dipakai sekarang — lokasi sungguhan bila ada,
     /// kalau tidak lokasi darurat yang jelas berlabel.
@@ -96,14 +113,18 @@ final class LocationProvider: NSObject, ObservableObject, @preconcurrency CLLoca
         Task { @MainActor in
             let label = String(format: "%.4f, %.4f",
                                coordinate.latitude, coordinate.longitude)
-            self.location = ObserverLocation(
+            let location = ObserverLocation(
                 latitudeDeg: coordinate.latitude,
                 longitudeDeg: coordinate.longitude,
                 label: label,
                 source: "corelocation",
                 capturedAt: last.timestamp
             )
+            self.location = location
             self.statusText = String(format: "Lokasi ±%.0f m", accuracy)
+            // Beri tahu pemanggil supaya engine memakai koordinat ini, bukan
+            // lokasi bawaan yang dipakai saat `start()`.
+            self.onLocationChanged?(location)
         }
     }
 

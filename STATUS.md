@@ -2,21 +2,45 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: menutup rantai variabel keputusan yang putus di diagnostik
+### Siklus ini: lokasi sungguhan tidak pernah sampai ke engine
 Fokus: menyisir pembungkus app terhadap janji yang **ditulis** di komentarnya
 sendiri. Tidak ada aturan keras PRD yang dilonggarkan.
 
-**Yang ditemukan & ditutup (satu rantai, bukan satu titik):**
-- **Dimensi "ambigu" di diagnostik tidak pernah bisa terisi.** `ConfidenceTrace`
-  punya `neighbourRatioToSigma` dan `uncertainReason(for:)` bisa mengembalikan
-  `.ambiguous` — tapi `nearestNeighbourDeg` tidak pernah diisi oleh siapa pun
-  untuk sampel dari perangkat sendiri. Akibatnya, `uncertainReason` **selalu**
-  menjawab `.tooFar` atau `.none`, dan kalimat diagnostik
-  *"Semua jawaban ragu karena kandidat terlalu jauh. Perbaiki kalibrasi dulu."*
-  akan muncul bahkan ketika sebab sebenarnya adalah dua bintang berdekatan —
-  yang perbaikannya sama sekali berbeda (keterbatasan akurasi, bukan kalibrasi).
-  Ini persis jenis kebohongan yang dilarang: alat diagnostik yang menunjuk
-  perbaikan yang salah.
+**Yang ditemukan & ditutup (dua defect, keduanya kelas "tidak akan terlihat dari UI"):**
+
+**1. Lokasi sungguhan tidak pernah dipakai engine.** `engine.update(location:)`
+dipanggil **tepat sekali**, di `onAppear`/`start()` — yaitu sebelum CoreLocation
+menjawab. Setelah itu tidak ada satu pun kode yang meneruskan lokasi sungguhan
+ke engine (`onChange`/`onReceive`/`sink` tidak ada di seluruh Apps/). Akibatnya:
+- Watch dan iPhone **selamanya** menghitung langit untuk `ObserverLocation.fallback`
+  (Jakarta), di mana pun pengguna berada — sementara layar Diagnostik di
+  sebelahnya menampilkan koordinat sungguhan. Dua angka yang bertentangan di satu
+  layar, dan yang salah adalah yang dipakai menjawab.
+- Untuk Final Challenge di lokasi selain Jakarta, seluruh langit tergeser;
+  dan karena rentang geserannya sama untuk semua kandidat, **tidak ada bagian
+  UI yang terlihat keliru**. Experiment 1 akan mengukur galat yang sebagian
+  besar berasal dari lokasi, bukan dari akurasi Watch — persis kesalahan yang
+  membuat eksperimennya tidak menjawab pertanyaannya.
+- Perbaikan: `LocationProvider.onLocationChanged` dijalankan pada tiap
+  pembaruan lokasi, dan `PointingEngine.bind(location:)` menyambungkannya ke
+  `update(location:)`. Ketiga titik pemakaian (`PointingWatchApp`,
+  `DiagnosticsView`, `Experiment1View`) kini memanggil `bind`, bukan memberi
+  satu cuplikan lalu ditinggal. Penyambungan ditaruh di dalam engine supaya app
+  tidak bisa "lupa" melakukannya.
+- Uji `testWrongObserverShiftsTheWholeSky` membuktikan efeknya nyata: langit
+  bergeser > 20° antara Jakarta dan Quito, sehingga Sirius yang tepat ditunjuk
+  tidak lagi dikenali. Uji ini akan merah kalau lokasi diabaikan.
+
+**2. Dimensi "ambigu" di diagnostik tidak pernah bisa terisi.** `ConfidenceTrace`
+punya `neighbourRatioToSigma` dan `uncertainReason(for:)` bisa mengembalikan
+`.ambiguous` — tapi `nearestNeighbourDeg` tidak pernah diisi oleh siapa pun
+untuk sampel dari perangkat sendiri. Akibatnya, `uncertainReason` **selalu**
+menjawab `.tooFar` atau `.none`, dan kalimat diagnostik
+*"Semua jawaban ragu karena kandidat terlalu jauh. Perbaiki kalibrasi dulu."*
+akan muncul bahkan ketika sebab sebenarnya adalah dua bintang berdekatan —
+yang perbaikannya sama sekali berbeda (keterbatasan akurasi, bukan kalibrasi).
+Ini persis jenis kebohongan yang dilarang: alat diagnostik yang menunjuk
+perbaikan yang salah.
   - **Akarnya di engine.** Jarak tetangga dihitung di `diagnose()`, dipakai
     `ConfidenceModel`, lalu dibuang. Kini disimpan di
     `Resolution.nearestNeighbourDeg` — **angka yang sama** yang dipakai
@@ -31,22 +55,18 @@ sendiri. Tidak ada aturan keras PRD yang dilonggarkan.
     yang diberikan, bukan menunggu pemanggil mengisinya. Cuplikan sudah membawa
     variabel keputusannya; satu tempat saja yang tahu dari mana angka itu
     berasal.
-- **Verifikasi yang menangkapnya.** Uji baru di `PointingControllerTests`
-  gagal lebih dulu (`.none` vs `.ambiguous`) sebelum perbaikan selesai — jadi
-  klaim ini bukan pembacaan kode, melainkan hasil uji yang benar-benar merah.
+  - Uji baru di `PointingControllerTests` sempat **gagal lebih dulu**
+    (`.none` vs `.ambiguous`) sebelum perbaikan selesai — jadi klaim ini bukan
+    pembacaan kode, melainkan hasil uji yang benar-benar merah.
 
-**Tes baru (5):**
-- `ResolverTests`: jarak tetangga dilaporkan **dan** sama dengan jarak
-  sesungguhnya di langit (bukan sekadar "tidak nil"); kandidat tunggal → `nil`,
-  bukan nol.
-- `PointingControllerTests`: dua bintang berimpit → jarak tetangga sampai ke
-  cuplikan, dan riwayat menyebut sebabnya `.ambiguous`; `stop()` mengosongkan
-  jarak itu.
-- 2 tes resolver + 2 tes controller + 1 perubahan `ConfidenceTrace` →
-  **CelestialEngine 165, PointingKit 105, 0 gagal.**
+**Tes baru (6):** 2 di `ResolverTests` (jarak tetangga dilaporkan & sama dengan
+jarak sesungguhnya; kandidat tunggal → `nil`, bukan nol), 3 di
+`PointingControllerTests` (jarak tetangga sampai ke cuplikan → sebabnya
+`.ambiguous`; `stop()` mengosongkan jarak itu; lokasi salah menggeser langit),
+1 perubahan `ConfidenceTrace`.
 
 **Verifikasi (yang benar-benar dijalankan):**
-- `./swift-test.sh` → **165 + 105, 0 gagal** (exit 0).
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 106, 0 gagal** (exit 0).
 - Seluruh berkas app lolos `swiftc -parse -swift-version 5` di container
   `swift:6.0`.
 - Build macOS (app iPhone + jam) diverifikasi CI `Apple Build` pada commit ini.

@@ -62,6 +62,23 @@ public final class PointingEngine: ObservableObject {
         lastLockedObject = nil
     }
 
+    /// Sambungkan sumber lokasi ke engine: lokasi yang sudah berlaku dipasang
+    /// sekarang, dan **setiap** perubahan berikutnya diteruskan otomatis.
+    ///
+    /// **Kenapa pemanggil tidak boleh hanya memanggil `update(location:)`
+    /// sekali.** Lokasi sungguhan datang beberapa detik setelah `start()` —
+    /// setelah UI selesai dirender. Kalau penyambungan ini tidak ada, engine
+    /// akan memakai lokasi bawaan selamanya sementara layar menampilkan
+    /// koordinat sungguhan; seluruh langit bergeser ratusan derajat dan tidak
+    /// ada satu pun bagian UI yang terlihat salah. Menaruh penyambungan di
+    /// dalam engine membuat app tidak bisa "lupa" menyambungkannya.
+    public func bind(location provider: LocationProvider) {
+        provider.onLocationChanged = { [weak self] newValue in
+            self?.update(location: newValue)
+        }
+        update(location: provider.effectiveLocation)
+    }
+
     /// Dipanggil `MotionLogger` untuk setiap sampel sensor.
     public func ingest(_ update: PointingUpdate, at date: Date = Date()) {
         let wasLocked = snapshot.state == .lock
