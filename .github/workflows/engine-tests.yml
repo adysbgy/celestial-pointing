@@ -11,7 +11,7 @@ jobs:
       # Dua paket, bukan satu.
       #
       # Kriteria "ENGINE SIAP" di ROADMAP.md menyatakan suite hijau di Linux
-      # **tanpa Mac** untuk keduanya (165 CelestialEngine + 124 PointingKit).
+      # **tanpa Mac** untuk keduanya (166 CelestialEngine + 142 PointingKit).
       # Sebelumnya job ini hanya menjalankan CelestialEngine, sehingga separuh
       # kriteria itu tidak pernah ditegakkan di CI: perubahan pada PointingKit
       # hanya akan tertangkap job macOS yang jauh lebih lambat. Karena seluruh

@@ -20,7 +20,52 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: kiriman yang gagal memakan kesempatan berikutnya (iPhone terjebak di keadaan lama)
+### Siklus ini: sesi tautan yang sudah mati tetap diklaim "Aktif" (dan tidak bisa diaktifkan ulang)
+Fokus: menyisir **klaim keadaan tautan** di lapisan app — satu-satunya bagian
+yang belum pernah diperiksa dari sisi "apakah yang ditampilkan masih berlaku?".
+Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat 12 — `PhoneLinkService.activate()` dijaga oleh flag yang tidak pernah
+dibersihkan.** `isActivated` dilaporkan ke UI (layar Tautan: "Aktif" /
+"Belum aktif") dan nilainya hanya diubah dari `activationDidCompleteWith`.
+Ketika sesi benar-benar berhenti — `sessionDidDeactivate` dipanggil saat
+pasangan berpindah, mis. jam baru dipasangkan — flag itu tetap `true`.
+
+Akibatnya ada dua, dan keduanya tidak terlihat dari UI:
+
+1. **Layar Tautan terus berbohong.** iPhone menampilkan "Aktif" selamanya
+   padahal tidak ada satu pun pesan yang bisa lewat. Itu persis klaim tanpa
+   dasar yang dilarang PRD ("uncertainty > false confidence") — versi
+   tautannya, bukan versi pointing.
+2. **Sesi tidak akan pernah diaktifkan ulang.** Penjaganya `!isActivated`,
+   jadi panggilan `activate()` dari `sessionDidDeactivate` — yang komentarnya
+   sendiri menjanjikan "Aktifkan ulang" — **langsung `return`** karena flag-nya
+   masih `true`. Setelah jam baru dipasangkan, tautan mati sampai app dibunuh
+   dan dibuka ulang.
+
+Diperbaiki di `PhoneLinkService`: penjaga `activate()` sekarang memakai keadaan
+sesi yang sebenarnya (`session.activationState != .activated`), dan
+`sessionDidDeactivate` mengosongkan `isActivated`/`isReachable` sebelum
+memanggil `activate()` — jadi UI jujur **dan** pengaktifan ulang benar-benar
+dijalankan. Ini memperbaiki **kelas** cacatnya, bukan satu gejalanya:
+`WatchLinkService` tidak punya penjaga seperti ini, jadi tidak ada jalur
+kembar yang perlu ikut diperbaiki.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 142 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` setelah perubahan.
+- CI `Engine Tests (Linux)` run `37154632209` pada commit `85a1744` → **166 +
+  142, 0 gagal** (kedua paket).
+- CI `Apple Build` run `37154632211` pada commit `85a1744` → **2× `BUILD
+  SUCCEEDED`** (iPhone termasuk app jam, dan app jam sendiri) dan gerbang
+  peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+- Cacat dokumentasi ikut ditutup: `ROADMAP.md` dan komentar di
+  `engine-tests.yml` masih menyebut **140/140** dan **165 + 124**, padahal
+  suite Linux yang benar-benar dijalankan adalah **166 + 142**. Angka di
+  keduanya disamakan dengan hasil nyata.
+
+### Siklus sebelumnya: kiriman yang gagal memakan kesempatan berikutnya (iPhone terjebak di keadaan lama)
 Fokus: menyisir **janji "kegagalan tidak boleh diam"** sampai ke akibatnya pada
 **urutan operasi**, bukan hanya pada penghitungnya. Siklus sebelumnya (Cacat 9)
 membuat kegagalan kirim *terlihat*; siklus ini menemukan bahwa kegagalan itu

@@ -31,8 +31,23 @@ public final class PhoneLinkService: NSObject, ObservableObject {
 
     public override init() { super.init() }
 
+    /// Aktifkan sesi. Aman dipanggil berkali-kali selama sesinya memang aktif.
+    ///
+    /// **Kenapa penjaganya bukan `!isActivated`.** `isActivated` sengaja
+    /// dilaporkan ke UI ("Aktif" / "Belum aktif" di layar Tautan), dan nilainya
+    /// hanya diubah dari `activationDidCompleteWith`. Kalau penjaganya memakai
+    /// flag itu, pemanggil **tidak akan pernah bisa** mengaktifkan ulang sesi
+    /// yang sudah pernah aktif lalu mati (`sessionDidDeactivate`) — `activate()`
+    /// akan langsung `return` karena flag-nya masih `true`. Padahal justru
+    /// itulah yang dibutuhkan: pasangan berpindah (jam baru dipasangkan) dan
+    /// sesinya perlu diaktifkan lagi. Akibatnya iPhone menampilkan "Aktif"
+    /// selamanya sementara tautannya sudah mati.
+    ///
+    /// Penjaganya sekarang memakai keadaan sesi yang sebenarnya
+    /// (`activationState`), dan `sessionDidDeactivate` mengosongkan flag itu —
+    /// jadi UI ikut jujur, dan pengaktifan ulang benar-benar dijalankan.
     public func activate() {
-        guard let session, !isActivated else { return }
+        guard let session, session.activationState != .activated else { return }
         session.delegate = self
         session.activate()
     }
@@ -120,9 +135,21 @@ extension PhoneLinkService: WCSessionDelegate {
 
     nonisolated public func sessionDidBecomeInactive(_ session: WCSession) {}
 
+    /// Sesi berhenti (pasangan berpindah — mis. jam baru dipasangkan).
+    ///
+    /// **Kenapa `isActivated` dikosongkan di sini.** Flag itu ditampilkan di
+    /// layar Tautan sebagai "Aktif"/"Belum aktif". Tanpa mengosongkannya, ia
+    /// tetap `true` setelah sesi benar-benar berhenti: iPhone terus mengklaim
+    /// tautannya aktif padahal tidak ada pesan yang bisa lewat. Itu persis
+    /// klaim tanpa dasar yang dilarang PRD, dan ia juga yang dulu membuat
+    /// `activate()` tak bisa memulihkan sesinya (penjaganya `!isActivated`).
+    /// Sekarang pengaktifan ulang dijalankan, dan layar ikut jujur.
     nonisolated public func sessionDidDeactivate(_ session: WCSession) {
-        // Pasangan berpindah (mis. jam baru dipasangkan). Aktifkan ulang.
-        Task { @MainActor in self.activate() }
+        Task { @MainActor in
+            self.isActivated = false
+            self.isReachable = false
+            self.activate()
+        }
     }
 
     nonisolated public func sessionReachabilityDidChange(_ session: WCSession) {
