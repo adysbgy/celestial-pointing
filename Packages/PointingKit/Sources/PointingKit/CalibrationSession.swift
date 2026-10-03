@@ -120,6 +120,16 @@ public final class CalibrationSession {
             .first { $0.id == id }
     }
 
+    /// Catat acuan dari arah tunjuk **sekarang**, dengan mencocokkannya ke
+    /// target terdekat.
+    ///
+    /// Sengaja memakai arah mentah yang sedang ada di controller, bukan arah
+    /// yang dikirim pemanggil: yang dicatat harus arah **sebelum** koreksi.
+    @discardableResult
+    public func captureNearest(date: Date = Date()) -> CalibrationSessionStep {
+        captureNearest(measured: controller.snapshot.rawPointing, date: date)
+    }
+
     /// Catat acuan dari arah tunjuk sekarang, dengan mencocokkannya ke target
     /// terdekat.
     ///

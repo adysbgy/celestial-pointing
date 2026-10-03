@@ -6,6 +6,11 @@ Kenapa digenerate, bukan disimpan sebagai biner: ikon harus ada supaya
 lewat diff. Skrip ini deterministik — gambar yang sama selalu menghasilkan
 berkas yang sama, jadi bisa dijalankan ulang kapan saja.
 
+Satu gambar 1024x1024 per app, bukan dua puluh ukuran. Sejak Xcode 14, katalog
+aset hanya butuh satu gambar sumber; Xcode menurunkan ukuran lainnya sendiri.
+Daftar ukuran lama (22pt, 24pt, 29pt, …) justru menghasilkan peringatan
+"unassigned children" karena slot-slotnya sudah tidak dipakai lagi.
+
 Pakai:
     python3 Tools/make_app_icons.py
 """
@@ -22,6 +27,9 @@ TOP = (14, 18, 48)
 BOTTOM = (58, 32, 92)
 GLOW = (120, 90, 190)
 STAR = (255, 250, 235)
+
+# Ukuran sumber tunggal untuk kedua platform.
+SOURCE_SIZE = 1024
 
 
 def _png(width: int, height: int, pixels: bytes) -> bytes:
@@ -63,8 +71,8 @@ def _stars(count: int, size: int, seed: int = 20261003):
 
 
 def render(size: int) -> bytes:
-    """Gambar ikon: gradien malam + bintang + titik terang."""
-    stars = _stars(60, size)
+    """Gambar ikon: gradien malam + bintang + cahaya lembut di tengah."""
+    stars = _stars(140, size)
     center = size * 0.5
     pixels = bytearray()
 
@@ -97,56 +105,32 @@ def write(path: str, size: int) -> None:
     print(f"{path}  {size}x{size}")
 
 
-# watchOS: satu set ikon dengan banyak ukuran.
-WATCH_ICONS = [
-    (22, "2x", 44),
-    (24, "2x", 48),
-    (27.5, "2x", 55),
-    (29, "2x", 58),
-    (29, "3x", 87),
-    (30, "2x", 60),
-    (32, "2x", 64),
-    (33, "2x", 66),
-    (40, "2x", 80),
-    (44, "2x", 88),
-    (46, "2x", 92),
-    (50, "2x", 100),
-    (51, "2x", 102),
-    (54, "2x", 108),
-    (86, "2x", 172),
-    (98, "2x", 196),
-    (108, "2x", 216),
-    (117, "2x", 234),
-    (129, "2x", 258),
-]
+def appiconset(directory: str, *, platform: str) -> None:
+    """Tulis satu PNG sumber + Contents.json bentuk satu-ukuran.
 
-# iOS: satu ukuran 1024 (Xcode 14+ menurunkan sisanya sendiri).
-IOS_ICONS = [(1024, "1x", 1024)]
+    - `platform`: "ios" atau "watchos". Xcode menulisnya huruf kecil, dan
+      untuk watchOS nilai ini yang membedakan app icon jam dari app icon iOS
+      yang kebetulan sama ukurannya.
+    """
+    name = "AppIcon-1024.png"
+    write(os.path.join(directory, name), SOURCE_SIZE)
 
-
-def appiconset(directory: str, entries, *, include_marketing: bool) -> None:
-    images = []
-    for point, scale, px in entries:
-        name = f"icon-{px}.png"
-        write(os.path.join(directory, name), px)
-        images.append(
+    contents = {
+        "images": [
             {
                 "filename": name,
-                "idiom": "watch" if not include_marketing else "universal",
-                "scale": scale,
-                "size": f"{point:g}x{point:g}",
+                "idiom": "universal",
+                "platform": platform,
+                "size": f"{SOURCE_SIZE}x{SOURCE_SIZE}",
             }
-        )
-    if include_marketing:
-        images.append({"idiom": "ios-marketing", "scale": "1x", "size": "1024x1024",
-                       "filename": images[0]["filename"]})
-
-    contents = {"images": images, "info": {"author": "xcode", "version": 1}}
+        ],
+        "info": {"author": "xcode", "version": 1},
+    }
     os.makedirs(directory, exist_ok=True)
     with open(os.path.join(directory, "Contents.json"), "w") as handle:
         json.dump(contents, handle, indent=2)
         handle.write("\n")
-    print(f"{directory}/Contents.json  ({len(images)} entri)")
+    print(f"{directory}/Contents.json")
 
 
 def catalog_root(directory: str) -> None:
@@ -161,11 +145,11 @@ def main() -> None:
 
     watch = os.path.join(root, "Apps/PointAndKnowWatch/Resources/Assets.xcassets")
     catalog_root(watch)
-    appiconset(os.path.join(watch, "AppIcon.appiconset"), WATCH_ICONS, include_marketing=False)
+    appiconset(os.path.join(watch, "AppIcon.appiconset"), platform="watchos")
 
     ios = os.path.join(root, "Apps/PointAndKnowiOS/Resources/Assets.xcassets")
     catalog_root(ios)
-    appiconset(os.path.join(ios, "AppIcon.appiconset"), IOS_ICONS, include_marketing=True)
+    appiconset(os.path.join(ios, "AppIcon.appiconset"), platform="ios")
 
 
 if __name__ == "__main__":

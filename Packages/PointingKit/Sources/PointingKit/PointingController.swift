@@ -118,7 +118,12 @@ public final class PointingController {
     /// Parameter alur.
     public var config: PointingControllerConfig
     /// Resolver engine (katalog + efemeris).
-    public let resolver: PointingResolver
+    ///
+    /// `private(set)`: resolver sengaja tidak bisa diganti setelah controller
+    /// dibuat — menukar katalog/efemeris di tengah alur akan membuat jawaban
+    /// lama dan baru tidak bisa dibandingkan. Yang **boleh** berubah adalah
+    /// ambang keyakinannya, lewat `setConfidencePolicy(_:)`.
+    public private(set) var resolver: PointingResolver
 
     /// Cuplikan terakhir, untuk dirender ulang tanpa sampel baru.
     public private(set) var snapshot: PointingSnapshot
@@ -199,6 +204,28 @@ public final class PointingController {
         smoother.reset()
         machine.stop()
         refreshSnapshot()
+    }
+
+    /// Pasang ambang keyakinan baru.
+    ///
+    /// Dipakai saat hasil Experiment 1 (atau kalibrasi) mengubah sigma pointing
+    /// yang kita akui. Alur dihentikan karena jawaban yang sudah ada dihitung
+    /// dengan ambang lama — membiarkannya tampil setelah ambang berubah berarti
+    /// mengklaim keyakinan yang tidak lagi berlaku.
+    ///
+    /// Ambang yang tidak masuk akal (nol, negatif, tak berhingga) **ditolak**,
+    /// bukan diterapkan: sigma nol membuat engine selalu ragu, dan sigma tak
+    /// berhingga membuatnya selalu yakin — dua-duanya melanggar prinsip
+    /// "uncertainty > false confidence".
+    @discardableResult
+    public func setConfidencePolicy(_ policy: ConfidencePolicy) -> Bool {
+        guard policy.pointingSigmaDeg.isFinite, policy.pointingSigmaDeg > 0 else { return false }
+        guard policy != resolver.confidencePolicy else { return false }
+        resolver.confidencePolicy = policy
+        machine.stop()
+        lastResolution = nil
+        refreshSnapshot()
+        return true
     }
 
     // MARK: - Sampel sensor

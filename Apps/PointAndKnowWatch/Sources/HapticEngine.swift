@@ -14,11 +14,13 @@ import PointingKit
 /// Perbedaan itu yang menjaga janji PRD: pengguna tidak boleh mengira engine
 /// yakin saat engine sebenarnya ragu. Kalau keduanya berbunyi sama, "lock"
 /// berhenti bermakna.
+///
+/// Tidak ada pemeriksaan "apakah perangkat mendukung getaran": `WKInterfaceDevice`
+/// tidak punya API seperti itu, dan di simulator `play(_:)` memang tidak
+/// berbunyi. Memeriksa sesuatu yang tidak bisa diperiksa hanya akan
+/// menghasilkan getaran yang diam-diam hilang di perangkat asli.
 @MainActor
 final class HapticEngine {
-
-    /// Apakah getaran tersedia (tidak tersedia di pratinjau/simulator).
-    var isAvailable: Bool { WKInterfaceDevice.current().isDeviceSupported }
 
     /// Mainkan getaran untuk sekumpulan peristiwa.
     func play(_ events: [HapticEvent]) {
@@ -27,7 +29,6 @@ final class HapticEngine {
 
     func play(_ event: HapticEvent) {
         let device = WKInterfaceDevice.current()
-        guard device.isDeviceSupported else { return }
         switch event {
         case .lockSucceeded:
             device.play(.success)

@@ -92,6 +92,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # SDKROOT ditulis eksplisit, bukan diwarisi dari preset platform
+        # XcodeGen. Nilainya sama dengan yang akan dipakai preset (`iphoneos`),
+        # tapi dengan ditulis di sini proyek tetap benar walau berkas preset
+        # tidak terbaca — dan spec ini bisa diverifikasi utuh dari Linux.
+        SDKROOT: iphoneos
         INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
@@ -121,6 +126,12 @@ targets:
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Lihat catatan SDKROOT di target iPhone: ditulis eksplisit supaya
+        # proyek tidak bergantung pada preset platform yang ter-load.
+        SDKROOT: watchos
+        # App jam selalu diinstal bersama app iPhone, jadi ia tidak pernah
+        # dibuat sebagai arsip mandiri.
+        SKIP_INSTALL: YES
         INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
         # Wajib untuk app jam mandiri berbasis SwiftUI: tanpa `WKApplication`,
         # validasi App Store menolak bundelnya.

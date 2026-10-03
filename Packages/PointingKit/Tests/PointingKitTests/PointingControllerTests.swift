@@ -325,6 +325,56 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertNil(c.slewDecision(date: at(0)))
     }
 
+    // MARK: - Ambang keyakinan yang bisa berubah
+
+    /// Mengubah ambang harus benar-benar mengubah keputusan, dan jawaban lama
+    /// yang dihitung dengan ambang sebelumnya tidak boleh tetap tampil.
+    func testSettingConfidencePolicyChangesDecisionsAndStopsFlow() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.snapshot.state, .lock)
+
+        // Sigma jauh lebih ketat: kandidat yang tadinya dianggap dekat kini
+        // di luar ambang, jadi keyakinan harus turun.
+        XCTAssertTrue(c.setConfidencePolicy(ConfidencePolicy(pointingSigmaDeg: 0.01)))
+        XCTAssertEqual(c.snapshot.state, .idle, "alur harus dihentikan saat ambang berubah")
+        XCTAssertNil(c.lastResolution, "resolusi lama dihitung dengan ambang lama")
+    }
+
+    /// Ambang yang tidak masuk akal ditolak, bukan diterapkan.
+    func testInvalidConfidencePolicyIsRejected() {
+        let c = controller(singleStarResolver())
+        let original = c.resolver.confidencePolicy
+        for bad in [0.0, -1.0, .infinity, .nan] {
+            XCTAssertFalse(c.setConfidencePolicy(ConfidencePolicy(pointingSigmaDeg: bad)),
+                           "sigma \(bad) tidak boleh diterima")
+        }
+        XCTAssertEqual(c.resolver.confidencePolicy, original)
+    }
+
+    /// Jawaban yang berlaku hanya ada saat keadaan memang punya jawaban.
+    ///
+    /// Ini yang membuat Experiment 1 tidak mencatat false lock karangan:
+    /// jawaban dari arah tunjuk sebelumnya tidak boleh dianggap jawaban untuk
+    /// arah sekarang.
+    func testAnsweredIntentOnlyExistsWhenStateHasAnswer() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        XCTAssertNil(c.answeredIntent, "idle tidak punya jawaban")
+
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.answeredIntent?.best?.id, "sirius")
+
+        // Arahkan ke tempat lain: keadaan kembali menunjuk, jawaban lama
+        // dipertahankan untuk tampilan tapi tidak lagi berlaku.
+        let elsewhere = quaternion(viewPointingAt: HorizontalCoord(altitudeDeg: 60,
+                                                                  azimuthDeg: 250))
+        c.feed(quaternion: elsewhere, timestamp: at(5.0))
+        XCTAssertEqual(c.snapshot.state, .pointing)
+        XCTAssertNil(c.answeredIntent)
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat

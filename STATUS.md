@@ -2,7 +2,67 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: pengaman slew (aturan keras PRD) + fondasi Fase 2 → 156 test hijau
+### Siklus ini: pembungkus app iPhone + Watch, konfigurasi XcodeGen
+Fokus: mengubah logika yang sudah teruji menjadi app yang bisa dibuka.
+Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
+
+**Struktur yang dipilih (dan alasannya):**
+- `Packages/CelestialEngine` — mesin murni (Fase 1–3). **Tidak disentuh** selain
+  penambahan aditif. 156 test tetap hijau.
+- `Packages/PointingKit` — **logika lapisan app, bebas API Apple**. Semua
+  keputusan yang bisa salah (kapan yakin, kapan menolak, apa yang direkam,
+  apa yang dikirim ke iPhone) hidup di sini supaya bisa diuji di Linux.
+  **95 test hijau** via Docker.
+- `Apps/PointAndKnowWatch/`, `Apps/PointAndKnowiOS/` — hanya pembungkus:
+  sensor, UI, haptic, WatchConnectivity. Berkas-berkas ini **tidak punya
+  logika keputusan**; kalau ada `if` soal keyakinan di dalamnya, itu bug.
+
+**Watch (Apps/PointAndKnowWatch/):**
+- ✅ `Apps/Shared/MotionLogger.swift` — satu-satunya pembaca CoreMotion.
+  `CMDeviceMotion` → `DeviceAttitude` lewat `init?(cmX:cmY:cmZ:cmW:)`, lalu
+  diteruskan ke controller. Kalau sensor tidak ada, controller diberi tahu
+  supaya **berhenti menebak** — bukan diam-diam memakai sampel terakhir.
+- ✅ `HapticEngine.swift` — satu-satunya pemanggil `WKInterfaceDevice.play`.
+  Pola getaran dibedakan tajam per peristiwa, karena getaran satu-satunya
+  saluran yang tidak butuh mata.
+- ✅ `PointingView.swift` — merender **langsung dari `PointingSnapshot`**
+  (idle/pointing/searching/lock/uncertain/unavailable) + detail objek.
+- ✅ `CalibrationView.swift` — memakai `CalibrationSession` di PointingKit
+  (di atas `CalibrationSolver`). Kalibrasi **tidak boleh kelihatan selesai**
+  sebelum sebaran titik acuannya benar.
+- ✅ `WatchLinkService.swift` — mengirim **keputusan** (keadaan + objek), bukan
+  sudut pergelangan mentah.
+- ✅ `SkyContextView.swift` — konteks langit (kapan gelap, tinggi Matahari).
+
+**iPhone (Apps/PointAndKnowiOS/):**
+- ✅ `DiagnosticsView.swift` — grafik keyakinan (Swift Charts) + ekspor dataset.
+  Yang digambar adalah **variabel keputusan** (`separation / sigma`), bukan
+  hanya jawabannya.
+- ✅ `Experiment1View.swift` + `ExperimentRecorder.swift` — harness Experiment 1:
+  tunjuk target diketahui → rekam → ekspor. Verdict menyeleksi **percobaan
+  gagal**, bukan menyembunyikannya.
+- ✅ `PhoneLinkService.swift` + `LinkView.swift` — sisi iPhone dari
+  WatchConnectivity; bisa mengirim ambang keyakinan hasil Experiment 1 ke jam.
+- ✅ `PointAndKnowApp.swift` — titik masuk app iPhone.
+
+**Build:**
+- ✅ `project.yml` (XcodeGen) — satu proyek, empat target (2 app + 2 tes),
+  paket SwiftPM lokal dirujuk dari repo.
+- ✅ `.github/workflows/ios-build.yml` — CI macOS: `brew install xcodegen`,
+  generate proyek, build watch + iOS ke simulator.
+- ✅ Ikon app digenerate deterministik oleh `Tools/make_app_icons.py`
+  (satu PNG 1024×1024 per app) supaya `actool` tidak menggagalkan build.
+
+**Verifikasi di Linux (yang bisa dilakukan tanpa Mac):**
+- `./swift-test.sh` → **CelestialEngine 156 test + PointingKit 95 test, 0 gagal**.
+- Setiap berkas app lolos `swiftc -parse -swift-version 5` (gerbang sintaks;
+  impor Apple tidak perlu resolve).
+- `project.yml` divalidasi dengan **XcodeGen yang dibangun dari sumber di
+  Linux** — parsing & validasi spec lolos. (XcodeGen menabrak bug
+  corelibs-foundation saat menulis proyek; itu keterbatasan Linux, bukan
+  spec. Bukti sebenarnya tetap CI macOS.)
+
+### Siklus sebelumnya: pengaman slew (aturan keras PRD) + fondasi Fase 2 → 156 test hijau
 - ✅ `SlewSafety.swift` — **POINT → OBJECT ID → SAFE GOTO**, ditegakkan di tipe,
   bukan sekadar konvensi:
   - `SlewCommand` tidak punya inisialisasi publik; satu-satunya jalan
@@ -45,21 +105,13 @@
     galat sensor — bertentangan dengan prinsip PRD. Sebaran sisa dilaporkan
     sebagai `residualSpreadDeg` (1σ).
   - `confidencePolicy()` menyambung sigma terukur → `ConfidencePolicy`, jadi
-    ambang HIGH engine otomatis mengikuti hasil Experiment 1. Uji
-    `testSmallerSigmaAllowsHighWhereLooseSigmaDidNot` membuktikan efeknya.
-- ✅ `Sensing.swift` — `PointingSmoother` (nlerp bobot tetap) untuk meredam
-  gemetar tangan, dan `AngularRateTracker` untuk mengukur kecepatan sudut.
-  Ada jeda maksimum antar sampel: setelah sensor terputus, laju **tidak**
-  ditebak (membagi jeda panjang menghasilkan laju palsu yang kecil).
+    ambang HIGH engine otomatis mengikuti hasil Experiment 1.
+- ✅ `Sensing.swift` — `PointingSmoother` (nlerp bobot tetap) dan
+  `AngularRateTracker`. Ada jeda maksimum antar sampel: setelah sensor
+  terputus, laju **tidak** ditebak.
 - ✅ `PointingFlow.swift` — `PointingStateMachine`: idle → pointing → searching
-  → lock/uncertain. Sumber resolusi disuntikkan sebagai closure, jadi seluruh
-  alur bisa diuji di Linux. Aturan yang dipegang: **`lock` hanya untuk keyakinan
-  HIGH**; medium/low menjadi `uncertain`. Bergerak lagi membatalkan tampilan
-  terkunci. Sampel pertama & jeda dianggap "masih bergerak" (arah aman).
-- ✅ Uji rantai penuh tanpa sensor: `FramesTests` membangun attitude sintetis
-  yang mengarah ke Sirius, lalu resolver harus mengembalikan "sirius". Ini
-  memvalidasi seluruh konversi ENU ↔ kerangka perangkat dua arah.
-- ✅ `swift test`: **139 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
+  → lock/uncertain. **`lock` hanya untuk keyakinan HIGH**; medium/low menjadi
+  `uncertain`. Bergerak lagi membatalkan tampilan terkunci.
 
 ### Siklus sebelumnya
 - ✅ anti-false-lock + instrumentasi Experiment 1 → Fase 1 selesai (65 test).
@@ -74,7 +126,7 @@
 
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
-    ./swift-test.sh          # docker swift:6.0 (image sudah ter-cache)
+    ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
 
 ## Catatan penting
 - `Package.swift` kini `swift-tools-version:6.0` (dibutuhkan AstronomyKit),
@@ -86,20 +138,16 @@
   planet ikut jadi kandidat dengan koordinat of-date. Matahari hanya konteks,
   tidak pernah jadi target.
 - **Engine tidak menyentuh API Apple apa pun.** Yang butuh Mac hanyalah
-  pembungkus sensor/UI (Fase 2 app), bukan logika. Karena itu attitude,
-  kalibrasi, dan resolusi bisa dibuktikan di Linux.
+  pembungkus sensor/UI, bukan logika. Karena itu attitude, kalibrasi, dan
+  resolusi bisa dibuktikan di Linux.
+- **App dibangun lewat XcodeGen**, bukan `.xcodeproj` yang di-commit. Jalankan
+  `xcodegen generate` di Mac (atau biarkan CI yang melakukannya).
+- **Akurasi Apple Watch tetap hipotesis.** Experiment 1 ada persis untuk
+  mengujinya; ambang keyakinan disetel dari hasilnya, bukan dari asumsi.
 
-## Langkah berikutnya (sisa FASE 2 — app watchOS, butuh Mac)
-Logika inti sudah ada & teruji; yang tersisa adalah pembungkus platform:
-1. Motion logger: `CMDeviceMotion` → `DeviceAttitude` (lewat `init?(cmX:cmY:cmZ:cmW:)`)
-   → `PointingSmoother` → `PointingStateMachine.update(...)` dengan
-   `resolve:` = `PointingResolver.resolve` + `PointingCalibration.apply`.
-2. Alur kalibrasi memakai `CalibrationSolver` (kumpulkan titik acuan → `apply`),
-   lalu suapkan `residualSpreadDeg` ke `ConfidencePolicy` resolver.
-3. Rendering UI langsung dari `PointingState` (idle/pointing/searching/lock/
-   uncertain/unavailable) + detail objek dari `currentIntent`.
-4. Haptic dipicu saat `state` berpindah ke `.lock` (sukses) dan `.uncertain`.
-5. Watch ↔ iPhone (WatchConnectivity).
-
-Catatan: unit test engine tetap jalan di Linux, tapi Fase 2 app butuh Mac untuk
-build/run watchOS. Engine TIDAK boleh bergantung pada API Apple (sudah bersih).
+## Langkah berikutnya
+1. Jalankan `ios-build.yml` di macOS → perbaiki galat build yang muncul.
+2. Experiment 1 dengan jam sungguhan: kumpulkan data, ukur `residualSpreadDeg`,
+   suapkan ke `ConfidencePolicy` lewat `setConfidencePolicy(_:)`.
+3. Kalau sigma hasil ukur lebih besar dari yang diasumsikan, turunkan klaim
+   keyakinan engine — jangan sebaliknya.

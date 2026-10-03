@@ -13,6 +13,11 @@ import PointingKit
 /// Experiment 1 tidak pernah diam-diam memakai lokasi karangan.
 ///
 /// Satu implementasi dipakai app Watch maupun app iPhone.
+///
+/// Metode delegasi wajib ditandai `@objc`: `CLLocationManagerDelegate` adalah
+/// protokol Objective-C, dan tanpa penanda itu metodenya tidak pernah dipanggil
+/// — gejalanya bukan galat kompilasi, melainkan lokasi yang tidak pernah
+/// muncul. Peringatan kompilernya sengaja tidak dibiarkan.
 @MainActor
 final class LocationProvider: NSObject, ObservableObject {
 
@@ -58,7 +63,7 @@ final class LocationProvider: NSObject, ObservableObject {
 
     // MARK: - Delegasi
 
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    @objc nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         Task { @MainActor in
             switch status {
@@ -75,8 +80,8 @@ final class LocationProvider: NSObject, ObservableObject {
         }
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didUpdateLocations locations: [CLLocation]) {
+    @objc nonisolated func locationManager(_ manager: CLLocationManager,
+                                            didUpdateLocations locations: [CLLocation]) {
         guard let last = locations.last, last.horizontalAccuracy >= 0 else { return }
         let coordinate = last.coordinate
         let accuracy = last.horizontalAccuracy
@@ -94,8 +99,8 @@ final class LocationProvider: NSObject, ObservableObject {
         }
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didFailWithError error: Error) {
+    @objc nonisolated func locationManager(_ manager: CLLocationManager,
+                                            didFailWithError error: Error) {
         let message = error.localizedDescription
         Task { @MainActor in
             self.statusText = "Lokasi gagal: \(message)"
