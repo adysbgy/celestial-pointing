@@ -35,18 +35,33 @@ public struct Resolution: Equatable {
     /// dijalankan dan pemanggil harus memperlakukannya sebagai tidak diketahui.
     public var sunHorizontal: HorizontalCoord?
 
+    /// Jarak sudut terkecil antara kandidat terbaik dan kandidat lain di langit
+    /// (derajat), dihitung dari posisi keduanya. `nil` bila kandidat < 2.
+    ///
+    /// **Kenapa disimpan, bukan dihitung ulang oleh pemanggil.** Inilah angka
+    /// yang dipakai `ConfidenceModel` untuk memutuskan ambiguitas. Kalau
+    /// pemanggil menghitungnya sendiri dari `intent.candidates`, ia hanya
+    /// melihat tiga kandidat teratas — sedangkan keputusan engine dihitung dari
+    /// seluruh kandidat dalam kerucut. Dua angka yang berbeda untuk pertanyaan
+    /// yang sama adalah cara paling mudah membuat diagnostik berbohong tentang
+    /// alasan engine ragu. Jadi yang disimpan adalah angka yang benar-benar
+    /// dipakai.
+    public var nearestNeighbourDeg: Double?
+
     public init(intent: CelestialIntent,
                 context: SkyContext,
                 rejected: [RejectedObject] = [],
                 ephemerisFailures: [EphemerisBody] = [],
                 consideredCount: Int = 0,
-                sunHorizontal: HorizontalCoord? = nil) {
+                sunHorizontal: HorizontalCoord? = nil,
+                nearestNeighbourDeg: Double? = nil) {
         self.intent = intent
         self.context = context
         self.rejected = rejected
         self.ephemerisFailures = ephemerisFailures
         self.consideredCount = consideredCount
         self.sunHorizontal = sunHorizontal
+        self.nearestNeighbourDeg = nearestNeighbourDeg
     }
 }
 
@@ -203,10 +218,14 @@ public struct PointingResolver {
         }
 
         candidates.sort { $0.separationDeg < $1.separationDeg }
+        // Dihitung sekali dan disimpan: angka yang sama dipakai untuk keputusan
+        // keyakinan **dan** dilaporkan sebagai jejak audit. Kalau dua tempat
+        // menghitungnya sendiri-sendiri, cepat atau lambat keduanya berbeda.
+        let nearestNeighbour = Self.nearestNeighbourSeparation(candidates)
         let intent = ConfidenceModel.evaluate(
             candidates: candidates,
             coneDeg: coneDeg,
-            nearestNeighbourDeg: Self.nearestNeighbourSeparation(candidates),
+            nearestNeighbourDeg: nearestNeighbour,
             policy: confidencePolicy
         )
 
@@ -215,7 +234,8 @@ public struct PointingResolver {
                           rejected: rejected,
                           ephemerisFailures: failures,
                           consideredCount: considered,
-                          sunHorizontal: sunHorizontal)
+                          sunHorizontal: sunHorizontal,
+                          nearestNeighbourDeg: nearestNeighbour)
     }
 
     /// Ubah sampel efemeris menjadi entri katalog agar bisa ikut diresolusi.

@@ -31,6 +31,15 @@ public struct PointingSnapshot: Equatable, Sendable {
     public var calibratedPointing: HorizontalCoord?
     /// Kecepatan sudut pergelangan terakhir (derajat/detik).
     public var angularRateDegPerSec: Double?
+    /// Jarak sudut kandidat terbaik ke tetangga terdekatnya di langit (derajat).
+    /// `nil` = tidak ada kandidat lain, atau belum ada resolusi.
+    ///
+    /// Ini variabel keputusan kedua dari `ConfidenceModel`: kandidat boleh saja
+    /// sangat dekat dengan arah tunjuk, tapi kalau ada tetangga di dalam
+    /// `ambiguitySigma` σ, jawabannya tidak boleh HIGH. Tanpa angka ini di
+    /// cuplikan, diagnostik tidak bisa membedakan "ragu karena jauh" dari "ragu
+    /// karena ambigu" — padahal keduanya butuh perbaikan yang berbeda.
+    public var nearestNeighbourDeg: Double?
     /// Sumbu badan yang dianggap "arah tunjuk".
     public var aim: DeviceAimAxis
     /// Apakah sensor sedang tersedia.
@@ -43,6 +52,7 @@ public struct PointingSnapshot: Equatable, Sendable {
                 rawPointing: HorizontalCoord? = nil,
                 calibratedPointing: HorizontalCoord? = nil,
                 angularRateDegPerSec: Double? = nil,
+                nearestNeighbourDeg: Double? = nil,
                 aim: DeviceAimAxis = .view,
                 hasSensor: Bool = true,
                 isCalibrated: Bool = false) {
@@ -51,6 +61,7 @@ public struct PointingSnapshot: Equatable, Sendable {
         self.rawPointing = rawPointing
         self.calibratedPointing = calibratedPointing
         self.angularRateDegPerSec = angularRateDegPerSec
+        self.nearestNeighbourDeg = nearestNeighbourDeg
         self.aim = aim
         self.hasSensor = hasSensor
         self.isCalibrated = isCalibrated
@@ -301,6 +312,7 @@ public final class PointingController {
             rawPointing: rawPointing,
             calibratedPointing: pointing,
             angularRateDegPerSec: machine.angularRateDegPerSec,
+            nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0
@@ -373,6 +385,7 @@ public final class PointingController {
             rawPointing: snapshot.rawPointing,
             calibratedPointing: snapshot.calibratedPointing,
             angularRateDegPerSec: machine.angularRateDegPerSec,
+            nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0

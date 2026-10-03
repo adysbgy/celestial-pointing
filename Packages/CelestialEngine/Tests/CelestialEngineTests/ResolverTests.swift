@@ -256,6 +256,64 @@ final class ResolverEphemerisTests: XCTestCase {
         XCTAssertTrue(resolution.ephemerisFailures.isEmpty,
                       "tidak seharusnya ada kegagalan efemeris: \(resolution.ephemerisFailures)")
     }
+
+    /// Jarak tetangga yang **dipakai** untuk memutuskan ambiguitas harus
+    /// dilaporkan apa adanya — bukan hanya jadi angka internal.
+    ///
+    /// Kalau angka ini tidak pernah keluar dari `Resolution`, diagnostik
+    /// kehilangan satu-satunya cara membedakan "ragu karena jauh" dari "ragu
+    /// karena ambigu". Karena itu nilainya diperiksa terhadap jarak sesungguhnya
+    /// antara dua bintang, bukan sekadar "tidak nil".
+    func testNearestNeighbourIsReportedAndMatchesTheAmbiguityDecision() {
+        let obs = Observer(latitudeDeg: -6.2, longitudeDeg: 106.8)
+        let when = Date(timeIntervalSince1970: 1_700_000_000)
+        let sirius = CelestialObject(id: "sirius", name: "Sirius", kind: .star,
+                                     raDeg: 101.28715533, decDeg: -16.71611586,
+                                     magnitude: -1.46)
+        // Tetangga 0.05° di sebelahnya: jauh di dalam radius ambiguitas default
+        // (2σ = 20°), jadi jawabannya harus MEDIUM — dan angkanya harus muncul.
+        let twin = CelestialObject(id: "twin", name: "Twin", kind: .star,
+                                   raDeg: sirius.raDeg + 0.05, decDeg: sirius.decDeg,
+                                   magnitude: 1.0)
+        let resolver = PointingResolver(catalogue: [sirius, twin], policy: .permissive)
+
+        let pointing = resolver.horizontal(of: sirius, observer: obs, date: when)!
+        let resolution = resolver.diagnose(pointing: pointing, observer: obs,
+                                           date: when, coneDeg: 5)
+
+        XCTAssertEqual(resolution.intent.level, .medium,
+                       "dua kandidat berimpit tidak boleh HIGH")
+        guard let reported = resolution.nearestNeighbourDeg else {
+            return XCTFail("jarak tetangga tidak dilaporkan padahal ada dua kandidat")
+        }
+
+        // Jarak yang dilaporkan harus sama dengan jarak sesungguhnya di langit.
+        // (Presesi dan konversi ke horizontal keduanya rotasi, jadi jarak sudut
+        // tidak berubah — perbedaannya hanya galat pembulatan.)
+        let twinHorizontal = resolver.horizontal(of: twin, observer: obs, date: when)!
+        let actual = SkyMath.angularSeparationHorizontalDeg(pointing, twinHorizontal)
+        XCTAssertEqual(reported, actual, accuracy: 1e-4)
+
+        // Dan angka itu memang berada di dalam ambang ambiguitas yang berlaku.
+        XCTAssertLessThanOrEqual(reported, resolver.confidencePolicy.ambiguityDeg)
+    }
+
+    /// Kandidat tunggal: tidak ada tetangga, dan itu harus terlihat sebagai
+    /// `nil` — bukan nol (nol berarti "ada tetangga yang persis sama").
+    func testNearestNeighbourIsNilForLoneCandidate() {
+        let obs = Observer(latitudeDeg: -6.2, longitudeDeg: 106.8)
+        let when = Date(timeIntervalSince1970: 1_700_000_000)
+        let sirius = CelestialObject(id: "sirius", name: "Sirius", kind: .star,
+                                     raDeg: 101.28715533, decDeg: -16.71611586,
+                                     magnitude: -1.46)
+        let resolver = PointingResolver(catalogue: [sirius], policy: .permissive)
+        let pointing = resolver.horizontal(of: sirius, observer: obs, date: when)!
+
+        let resolution = resolver.diagnose(pointing: pointing, observer: obs,
+                                           date: when, coneDeg: 5)
+        XCTAssertEqual(resolution.intent.level, .high)
+        XCTAssertNil(resolution.nearestNeighbourDeg)
+    }
 }
 
 #endif

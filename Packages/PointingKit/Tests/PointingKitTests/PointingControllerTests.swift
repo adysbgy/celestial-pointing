@@ -173,6 +173,56 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertFalse(events.contains(.lockSucceeded), "ragu tidak boleh terasa seperti sukses")
     }
 
+    /// Jarak tetangga harus sampai ke cuplikan yang dibaca UI.
+    ///
+    /// Ini rantai yang sebelumnya putus: engine tahu jaraknya (dipakai untuk
+    /// memutuskan ambiguitas) tetapi angka itu tidak pernah keluar dari
+    /// `Resolution`, sehingga riwayat diagnostik selalu kehilangan dimensi
+    /// ambiguitas — ragu karena dua bintang berdekatan akan tercatat sama
+    /// seperti ragu karena kandidat jauh. Keduanya butuh perbaikan berbeda.
+    func testAmbiguousLockExposesNearestNeighbourToDiagnostics() {
+        let resolver = ambiguousResolver()
+        let c = controller(resolver)
+        let q = quaternion(viewPointingAt: siriusDirection(resolver))
+
+        for step in 0..<12 {
+            c.feed(quaternion: q, timestamp: at(Double(step) * 0.1))
+        }
+
+        XCTAssertEqual(c.snapshot.state, .uncertain)
+        guard let neighbour = c.snapshot.nearestNeighbourDeg else {
+            return XCTFail("jarak tetangga tidak sampai ke cuplikan")
+        }
+        XCTAssertLessThanOrEqual(neighbour, resolver.confidencePolicy.ambiguityDeg,
+                                 "dua bintang berimpit seharusnya di dalam ambang ambiguitas")
+
+        // Dan dengan angka itu, riwayat bisa menyebut sebabnya dengan benar.
+        let trace = ConfidenceTrace()
+        trace.record(snapshot: c.snapshot,
+                     sigmaDeg: resolver.confidencePolicy.pointingSigmaDeg)
+        guard let sample = trace.samples.last else { return XCTFail("tidak ada sampel") }
+        XCTAssertEqual(trace.uncertainReason(for: sample,
+                                             policy: resolver.confidencePolicy), .ambiguous)
+    }
+
+    /// Resolusi lama tidak boleh menempel saat tidak ada jawaban lagi.
+    ///
+    /// Setelah alur dihentikan, `lastResolution` dibuang; kalau cuplikan masih
+    /// membawa jarak tetangga dari resolusi lama, riwayat akan mencatat angka
+    /// dari pandangan sebelumnya seolah milik pandangan sekarang.
+    func testStoppedFlowDoesNotCarryStaleNeighbourDistance() {
+        let resolver = ambiguousResolver()
+        let c = controller(resolver)
+        let q = quaternion(viewPointingAt: siriusDirection(resolver))
+        for step in 0..<12 {
+            c.feed(quaternion: q, timestamp: at(Double(step) * 0.1))
+        }
+        XCTAssertNotNil(c.snapshot.nearestNeighbourDeg)
+
+        c.stop()
+        XCTAssertNil(c.snapshot.nearestNeighbourDeg)
+    }
+
     /// Tidak ada kandidat → searching, tanpa getaran jawaban.
     func testNoCandidateStaysSearchingSilently() {
         let resolver = singleStarResolver()

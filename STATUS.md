@@ -2,7 +2,56 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: menutup sisa app — ekspor diagnostik + verifikasi ulang
+### Siklus ini: menutup rantai variabel keputusan yang putus di diagnostik
+Fokus: menyisir pembungkus app terhadap janji yang **ditulis** di komentarnya
+sendiri. Tidak ada aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup (satu rantai, bukan satu titik):**
+- **Dimensi "ambigu" di diagnostik tidak pernah bisa terisi.** `ConfidenceTrace`
+  punya `neighbourRatioToSigma` dan `uncertainReason(for:)` bisa mengembalikan
+  `.ambiguous` — tapi `nearestNeighbourDeg` tidak pernah diisi oleh siapa pun
+  untuk sampel dari perangkat sendiri. Akibatnya, `uncertainReason` **selalu**
+  menjawab `.tooFar` atau `.none`, dan kalimat diagnostik
+  *"Semua jawaban ragu karena kandidat terlalu jauh. Perbaiki kalibrasi dulu."*
+  akan muncul bahkan ketika sebab sebenarnya adalah dua bintang berdekatan —
+  yang perbaikannya sama sekali berbeda (keterbatasan akurasi, bukan kalibrasi).
+  Ini persis jenis kebohongan yang dilarang: alat diagnostik yang menunjuk
+  perbaikan yang salah.
+  - **Akarnya di engine.** Jarak tetangga dihitung di `diagnose()`, dipakai
+    `ConfidenceModel`, lalu dibuang. Kini disimpan di
+    `Resolution.nearestNeighbourDeg` — **angka yang sama** yang dipakai
+    keputusan, bukan hasil hitung ulang. Menghitungnya kembali dari
+    `intent.candidates` akan salah: `candidates` hanya tiga teratas, sedangkan
+    keputusan dihitung dari seluruh kandidat dalam kerucut.
+  - `PointingSnapshot.nearestNeighbourDeg` meneruskannya ke UI, dan
+    `PointingController` mengisinya dari `lastResolution` — termasuk di
+    `refreshSnapshot`, dan **dikosongkan** saat `stop()` supaya jarak dari
+    pandangan lama tidak menempel pada pandangan baru.
+  - `ConfidenceTrace.record(snapshot:)` kini membaca jarak itu dari cuplikan
+    yang diberikan, bukan menunggu pemanggil mengisinya. Cuplikan sudah membawa
+    variabel keputusannya; satu tempat saja yang tahu dari mana angka itu
+    berasal.
+- **Verifikasi yang menangkapnya.** Uji baru di `PointingControllerTests`
+  gagal lebih dulu (`.none` vs `.ambiguous`) sebelum perbaikan selesai — jadi
+  klaim ini bukan pembacaan kode, melainkan hasil uji yang benar-benar merah.
+
+**Tes baru (5):**
+- `ResolverTests`: jarak tetangga dilaporkan **dan** sama dengan jarak
+  sesungguhnya di langit (bukan sekadar "tidak nil"); kandidat tunggal → `nil`,
+  bukan nol.
+- `PointingControllerTests`: dua bintang berimpit → jarak tetangga sampai ke
+  cuplikan, dan riwayat menyebut sebabnya `.ambiguous`; `stop()` mengosongkan
+  jarak itu.
+- 2 tes resolver + 2 tes controller + 1 perubahan `ConfidenceTrace` →
+  **CelestialEngine 165, PointingKit 105, 0 gagal.**
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **165 + 105, 0 gagal** (exit 0).
+- Seluruh berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- Build macOS (app iPhone + jam) diverifikasi CI `Apple Build` pada commit ini.
+
+### Siklus sebelumnya: ekspor diagnostik + verifikasi ulang
 Fokus: menyisir berkas app terhadap daftar item yang tersisa, dan menutup satu
 item yang benar-benar belum ada. Tidak ada aturan keras PRD yang dilonggarkan.
 

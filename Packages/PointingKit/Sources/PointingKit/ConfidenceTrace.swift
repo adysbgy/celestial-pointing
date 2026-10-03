@@ -85,6 +85,11 @@ public final class ConfidenceTrace {
     ///     kebijakan resolver, bukan dari bawaan, supaya riwayat lama tetap
     ///     terbaca setelah ambangnya diperketat.
     ///   - nearestNeighbourDeg: jarak kandidat terbaik ke tetangga terdekat.
+    ///     Bila `nil`, nilai diambil dari `snapshot.nearestNeighbourDeg` —
+    ///     cuplikan itulah yang membawa variabel keputusan engine, jadi
+    ///     pemanggil yang tidak punya alasan khusus tidak perlu mengisinya
+    ///     sendiri. Mengisinya di sini secara manual berarti ada dua tempat
+    ///     yang tahu dari mana angka itu berasal.
     ///   - fromWatch: `true` bila sampel datang dari jam.
     public func record(snapshot: PointingSnapshot,
                        sigmaDeg: Double,
@@ -97,7 +102,7 @@ public final class ConfidenceTrace {
                objectName: snapshot.bestObject?.name,
                separationDeg: snapshot.intent?.candidates.first?.separationDeg,
                sigmaDeg: sigmaDeg,
-               nearestNeighbourDeg: nearestNeighbourDeg,
+               nearestNeighbourDeg: nearestNeighbourDeg ?? snapshot.nearestNeighbourDeg,
                fromWatch: fromWatch,
                at: date)
     }

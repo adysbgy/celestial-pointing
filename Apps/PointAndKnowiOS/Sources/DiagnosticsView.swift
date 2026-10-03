@@ -81,7 +81,13 @@ final class ConfidenceTraceStore: ObservableObject {
     @Published private(set) var count = 0
 
     func record(snapshot: PointingSnapshot, sigmaDeg: Double, nearestNeighbourDeg: Double? = nil) {
-        trace.record(snapshot: snapshot, sigmaDeg: sigmaDeg, nearestNeighbourDeg: nearestNeighbourDeg)
+        // `nearestNeighbourDeg` tidak diisi dari sini: cuplikan sudah membawa
+        // angka yang dipakai engine untuk memutuskan ambiguitas, dan
+        // `ConfidenceTrace` membacanya dari sana. Satu tempat saja yang tahu
+        // dari mana angka itu berasal.
+        trace.record(snapshot: snapshot,
+                     sigmaDeg: sigmaDeg,
+                     nearestNeighbourDeg: nearestNeighbourDeg)
         count = trace.samples.count
     }
 
