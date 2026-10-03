@@ -72,7 +72,11 @@ public final class PointingEngine: ObservableObject {
     /// koordinat sungguhan; seluruh langit bergeser ratusan derajat dan tidak
     /// ada satu pun bagian UI yang terlihat salah. Menaruh penyambungan di
     /// dalam engine membuat app tidak bisa "lupa" menyambungkannya.
-    public func bind(location provider: LocationProvider) {
+    ///
+    /// Sengaja `internal`, bukan `public`: `LocationProvider` adalah tipe
+    /// internal modul app (ia menyentuh CoreLocation), jadi anggota publik
+    /// tidak boleh mengeksposnya.
+    func bind(location provider: LocationProvider) {
         provider.onLocationChanged = { [weak self] newValue in
             self?.update(location: newValue)
         }
