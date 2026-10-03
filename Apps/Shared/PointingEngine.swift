@@ -49,6 +49,29 @@ public final class PointingEngine: ObservableObject {
         snapshot = controller.snapshot
     }
 
+    /// Pasang ambang keyakinan baru (mis. hasil Experiment 1 dari iPhone).
+    ///
+    /// **Kenapa ini ada, bukan `controller.setConfidencePolicy(_:)` langsung.**
+    /// Mengubah ambang menghentikan alur dan membuang resolusi terakhir, karena
+    /// jawaban yang sudah ada dihitung dengan ambang **lama**. Kalau pemanggil
+    /// menyentuh controller langsung, `snapshot` — satu-satunya sumber yang
+    /// dibaca UI — tidak ikut berubah: jam tetap menampilkan objek terkunci
+    /// yang diperoleh dengan ambang yang lebih longgar, di bawah ambang baru
+    /// yang lebih ketat. Itu klaim yakin yang tidak lagi berlaku.
+    ///
+    /// - Returns: `true` bila ambangnya benar-benar berubah.
+    @discardableResult
+    public func setConfidencePolicy(_ policy: ConfidencePolicy) -> Bool {
+        let changed = controller.setConfidencePolicy(policy)
+        snapshot = controller.snapshot
+        if changed {
+            // Objek itu dikunci dengan ambang lama; ambangnya sudah tidak
+            // berlaku, jadi jangan disimpan sebagai jawaban terakhir.
+            lastLockedObject = nil
+        }
+        return changed
+    }
+
     /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi jawaban
     /// yang sudah dihitung untuk langit lama **dibatalkan** — bukan dipertahankan.
     ///

@@ -72,8 +72,11 @@ struct PointAndKnowWatchApp: App {
 
         // Ambang keyakinan dari iPhone (hasil Experiment 1) diterapkan ke
         // resolver jam, sehingga kedua perangkat memakai ambang yang sama.
+        // Lewat engine, bukan controller langsung: mengubah ambang membatalkan
+        // jawaban yang dihitung dengan ambang lama, dan pembatalan itu harus
+        // sampai ke `snapshot` yang dirender layar.
         link.onPolicyReceived = { policy in
-            engine.controller.setConfidencePolicy(policy)
+            engine.setConfidencePolicy(policy)
         }
 
         link.activate()
