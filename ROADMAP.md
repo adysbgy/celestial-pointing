@@ -33,7 +33,7 @@ jangan pernah wrist-angle → motor.
 - [ ] Point & Slew POC 1 teleskop (setelah engine terbukti) — perencana aman sudah ada (`SlewSafety`), perangkat keras belum
 
 ## Kriteria "ENGINE SIAP"
-- [x] swift test hijau (166/166 engine + 142/142 PointingKit di Linux, tanpa Mac)
+- [x] swift test hijau (166/166 engine + 143/143 PointingKit di Linux, tanpa Mac)
 - [x] Resolver mengembalikan objek benar untuk target diketahui
 - [x] Tidak pernah HIGH saat kandidat ambigu (diuji eksplisit)
 - [x] Apple build hijau (macOS) — diverifikasi di CI

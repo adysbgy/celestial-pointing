@@ -264,6 +264,33 @@ final class CalibrationSessionTests: XCTestCase {
         XCTAssertEqual(c.calibration, .none)
     }
 
+    /// Membuang kalibrasi harus terbaca dari cuplikan controller.
+    ///
+    /// UI membaca **cuplikan**, bukan `controller.calibration`. Kalau `reset()`
+    /// membuang kalibrasinya tetapi cuplikan masih membawa `isCalibrated` lama,
+    /// layar jam terus menampilkan "Kalibrasi: Sudah" dan ikon scope padahal
+    /// offsetnya sudah hilang — pengguna mempercayai arah tunjuk yang sebenarnya
+    /// belum terkalibrasi. Itu klaim tanpa dasar, dan tidak ada bagian layar
+    /// yang terlihat keliru. Test ini mengunci janji bahwa pembersihan benar
+    /// benar terlihat di satu-satunya sumber yang dibaca UI.
+    func testResetClearsCalibrationFromPublishedSnapshot() throws {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        let references = visibleReferences()
+        try XCTSkipIf(references.count < 2, "butuh minimal dua bintang acuan")
+
+        for id in references.prefix(3) {
+            session.capture(objectID: id, measured: measured(id, yawError: 4, date: date), date: date)
+        }
+        try XCTUnwrap(session.applyIfReady())
+        XCTAssertTrue(c.snapshot.isCalibrated, "kalibrasi yang dipasang harus terbaca di cuplikan")
+
+        session.reset()
+
+        XCTAssertFalse(c.snapshot.isCalibrated,
+                       "kalibrasi yang dibuang tidak boleh tetap diklaim terpasang di cuplikan")
+    }
+
     /// Sigma terukur harus mengalir sampai ke usulan ambang keyakinan.
     func testSuggestedPolicyFollowsMeasuredSpread() throws {
         let c = controller()

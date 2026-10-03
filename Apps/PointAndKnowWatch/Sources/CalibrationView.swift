@@ -194,6 +194,15 @@ struct CalibrationView: View {
 
     private func reset() {
         session?.reset()
+        // `CalibrationSession` menyentuh controller, bukan engine. Kalau
+        // cuplikan engine tidak disegarkan di sini, layar jam tetap membaca
+        // `isCalibrated == true` dari cuplikan lama: ikon "scope" dan baris
+        // "Kalibrasi: Sudah" terus mengklaim kalibrasi terpasang padahal
+        // offsetnya sudah dibuang. Pengguna lalu mempercayai arah tunjuk yang
+        // sebenarnya belum terkalibrasi — persis klaim tanpa dasar yang
+        // dilarang PRD. `apply()` sudah menyegarkan lewat engine; `reset()`
+        // harus lewat jalur yang sama, bukan diam-diam melewatinya.
+        engine.apply(calibration: .none)
         statusMessage = "Kalibrasi dihapus. Mulai dari awal."
     }
 

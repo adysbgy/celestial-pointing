@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 142 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 143 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus sebelumnya **keduanya juga ditegakkan di CI Linux**, bukan
   hanya yang pertama.
@@ -20,7 +20,54 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: sesi tautan yang sudah mati tetap diklaim "Aktif" (dan tidak bisa diaktifkan ulang)
+### Siklus ini: kalibrasi yang dibuang tetap diklaim terpasang di jam
+Fokus: menyisir **klaim kalibrasi** — apakah yang ditampilkan jam masih
+berlaku setelah pengguna membuang kalibrasinya. Logika engine **tidak
+disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat 13 — `CalibrationView.reset()` membuang kalibrasi tanpa menyegarkan
+cuplikan engine.** Tombol "Ulang" memanggil `CalibrationSession.reset()`, yang
+memang membuang offset di controller (`controller.apply(calibration: .none)`).
+Masalahnya: layar jam **tidak membaca controller** — ia membaca
+`engine.snapshot`. `reset()` tidak pernah menyegarkan cuplikan itu, sedangkan
+`apply()` (jalur "Pakai") melakukannya lewat `engine.apply(calibration:)`.
+Jadi satu jalur memperbarui tampilan dan satu jalur tidak, padahal keduanya
+mengubah kalibrasi yang sama.
+
+Akibatnya tidak terlihat sama sekali dari layar: ikon "scope" di toolbar dan
+baris "Kalibrasi: Sudah" di panel detail **tetap menyala** setelah kalibrasi
+dibuang. Pengguna lalu mempercayai arah tunjuk yang sebenarnya belum
+terkalibrasi — persis klaim tanpa dasar yang dilarang PRD
+("uncertainty > false confidence"). Ini sekaligus membuat tombol "Ulang"
+terasa tidak bekerja: kalibrasi memang hilang, tapi tampilannya berkata
+sebaliknya.
+
+Diperbaiki di `CalibrationView.reset()`: setelah `session?.reset()`, jalur
+yang sama dengan `apply()` dipakai — `engine.apply(calibration: .none)` —
+sehingga cuplikan yang dirender ikut berubah. Ini memperbaiki **kelas**
+cacatnya, bukan satu gejalanya: setiap perubahan kalibrasi di UI kini lewat
+`PointingEngine`, tidak ada lagi jalur yang menyentuh controller di belakang
+tampilan.
+
+**Janji engine-nya dikunci dengan uji.** Selama ini tidak ada satu pun test
+yang menegakkan "membuang kalibrasi harus terbaca di cuplikan" — `reset()`
+diuji hanya lewat `c.calibration == .none`, bukan lewat `c.snapshot`. Uji
+regresi baru (`CalibrationSessionTests.testResetClearsCalibrationFromPublishedSnapshot`)
+dibuktikan **MERAH lebih dulu**: dengan `controller.apply(calibration: .none)`
+dihapus dari `reset()`, assertion gagal
+("kalibrasi yang dibuang tidak boleh tetap diklaim terpasang di cuplikan").
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 143 PointingKit, 0 gagal** (exit 0).
+- Uji regresi baru dijalankan **dulu** pada `reset()` tanpa pembersihan →
+  **gagal**; setelah perbaikan → **lulus**.
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` setelah perubahan.
+- Sapuan ulang jalur kalibrasi: hanya `CalibrationView` yang memanggil
+  `CalibrationSession`; `apply()` sudah lewat engine, dan `reset()` kini ikut.
+- CI untuk commit ini dipantau di sini (lihat catatan hasil di bawah).
+
+### Siklus sebelumnya: sesi tautan yang sudah mati tetap diklaim "Aktif" (dan tidak bisa diaktifkan ulang)
 Fokus: menyisir **klaim keadaan tautan** di lapisan app — satu-satunya bagian
 yang belum pernah diperiksa dari sisi "apakah yang ditampilkan masih berlaku?".
 Logika engine **tidak disentuh**; aturan keras PRD tidak dilonggarkan.
