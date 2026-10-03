@@ -52,15 +52,19 @@ public struct Resolution: Equatable {
 public struct PointingResolver {
     public var catalogue: [CelestialObject]
     public var policy: VisibilityPolicy
+    /// Ambang keyakinan. Bisa dikalibrasi lewat Experiment 1.
+    public var confidencePolicy: ConfidencePolicy
 
     /// Sumber efemeris. `nil` berarti benda tata surya tidak dipertimbangkan.
     public let ephemeris: SolarSystemEphemeris?
 
     public init(catalogue: [CelestialObject],
                 policy: VisibilityPolicy = VisibilityPolicy(),
+                confidencePolicy: ConfidencePolicy = ConfidencePolicy(),
                 ephemeris: SolarSystemEphemeris? = nil) {
         self.catalogue = catalogue
         self.policy = policy
+        self.confidencePolicy = confidencePolicy
         self.ephemeris = ephemeris
     }
 
@@ -191,7 +195,12 @@ public struct PointingResolver {
         }
 
         candidates.sort { $0.separationDeg < $1.separationDeg }
-        let intent = ConfidenceModel.evaluate(candidates: candidates, coneDeg: coneDeg)
+        let intent = ConfidenceModel.evaluate(
+            candidates: candidates,
+            coneDeg: coneDeg,
+            nearestNeighbourDeg: Self.nearestNeighbourSeparation(candidates),
+            policy: confidencePolicy
+        )
 
         return Resolution(intent: intent,
                           context: context,
@@ -210,5 +219,23 @@ public struct PointingResolver {
             decDeg: sample.decDeg,
             magnitude: sample.magnitude
         )
+    }
+
+    /// Jarak sudut terkecil antara kandidat terbaik dan kandidat lain,
+    /// dihitung dari koordinat sesungguhnya (bukan selisih jarak ke arah tunjuk).
+    ///
+    /// Dihitung di ruang ekuatorial of-date; kandidat sudah dalam kerangka itu
+    /// (bintang sudah dipresesi, benda tata surya of-date dari efemeris).
+    /// `nil` kalau kandidatnya kurang dari dua.
+    static func nearestNeighbourSeparation(_ candidates: [Candidate]) -> Double? {
+        guard candidates.count >= 2 else { return nil }
+        let best = EquatorialCoord(raDeg: candidates[0].object.raDeg,
+                                   decDeg: candidates[0].object.decDeg)
+        var nearest = Double.greatestFiniteMagnitude
+        for other in candidates.dropFirst() {
+            let coord = EquatorialCoord(raDeg: other.object.raDeg, decDeg: other.object.decDeg)
+            nearest = min(nearest, SkyMath.angularSeparationDeg(best, coord))
+        }
+        return nearest == .greatestFiniteMagnitude ? nil : nearest
     }
 }

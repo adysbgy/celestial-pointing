@@ -11,8 +11,8 @@ jangan pernah wrist-angle → motor.
 - [x] ConfidenceModel: HIGH/MEDIUM/LOW (anti false-lock)
 - [x] Tambah Bulan & planet terang (via AstronomyKit ephemeris) — divalidasi vs JPL Horizons, simpangan terburuk 8.91″
 - [x] Visibility/context filtering (di bawah horizon, magnitude, siang/malam, pengaman Matahari)
-- [ ] Instrumentasi/logging untuk Experiment 1
-- [ ] Uji: kandidat ambigu → tidak boleh HIGH
+- [x] Instrumentasi/logging untuk Experiment 1 (`ObservationLog`: `PointingTrial`, `TrialAnalysis`, `ExperimentSummary`, arsip JSON)
+- [x] Uji: kandidat ambigu → tidak boleh HIGH (`ConfidenceTests`)
 
 ## FASE 2 — App watchOS
 - [ ] Motion logger: CMDeviceMotion → rekam attitude + timestamp
@@ -27,7 +27,7 @@ jangan pernah wrist-angle → motor.
 - [ ] Point & Slew POC 1 teleskop (setelah engine terbukti)
 
 ## Kriteria "ENGINE SIAP"
-- [ ] swift test hijau (semua)
-- [ ] Resolver mengembalikan objek benar untuk target diketahui
-- [ ] Tidak pernah HIGH saat kandidat ambigu
-- [ ] Apple build hijau (macOS)
+- [x] swift test hijau (65/65 di Linux, tanpa Mac)
+- [x] Resolver mengembalikan objek benar untuk target diketahui
+- [x] Tidak pernah HIGH saat kandidat ambigu (diuji eksplisit)
+- [ ] Apple build hijau (macOS) — diverifikasi di CI

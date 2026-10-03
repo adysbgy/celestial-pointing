@@ -153,7 +153,12 @@ final class ResolverEphemerisTests: XCTestCase {
     }
 
     /// Arahkan tepat ke Jupiter -> harus dapat Jupiter.
-    func testPointingAtJupiterResolvesToJupiter() throws {
+    ///
+    /// Tapi Jupiter tidak boleh berkeyakinan HIGH di sini: pada 2026-01-01
+    /// ia hanya ~6.8° dari Pollux, jadi keduanya berada dalam ketidakpastian
+    /// pointing kita. Ini justru contoh anti-false-lock yang bekerja pada
+    /// geometri langit sungguhan.
+    func testPointingAtJupiterResolvesToJupiterButNotHigh() throws {
         let ephemeris = AstronomyKitEphemeris()
         let sample = try ephemeris.apparent(.jupiter, at: date, from: jakarta)
         let jd = SkyMath.julianDate(from: date)
@@ -163,8 +168,28 @@ final class ResolverEphemerisTests: XCTestCase {
         )
 
         let intent = resolver().resolve(pointing: hor, observer: jakarta, date: date, coneDeg: 10)
-        XCTAssertEqual(intent.best?.id, "jupiter")
-        XCTAssertEqual(intent.level, .high)
+        XCTAssertEqual(intent.best?.id, "jupiter", "Jupiter tetap tebakan terbaik")
+        XCTAssertEqual(intent.level, .medium,
+                       "Jupiter ~6.8° dari Pollux, jadi tidak boleh diklaim pasti")
+        XCTAssertTrue(intent.candidates.contains { $0.object.id == "pollux" },
+                      "Pollux harus ikut dilaporkan sebagai alternatif")
+    }
+
+    /// Sebaliknya: arahkan ke bintang yang jauh dari benda terang lain ->
+    /// boleh HIGH. Kalau ini gagal, engine terlalu pelit dan tidak berguna.
+    func testPointingAtIsolatedStarCanBeHigh() throws {
+        let jd = SkyMath.julianDate(from: date)
+        let sirius = EquatorialCoord(raDeg: 101.28715533, decDeg: -16.71611586)
+        let hor = SkyMath.equatorialToHorizontal(
+            SkyMath.precessJ2000ToDate(sirius, jd: jd), observer: jakarta, jd: jd
+        )
+
+        let resolution = resolver(policy: VisibilityPolicy()).diagnose(
+            pointing: hor, observer: jakarta, date: date, coneDeg: 10
+        )
+        XCTAssertEqual(resolution.intent.best?.id, "sirius")
+        XCTAssertEqual(resolution.intent.level, .high,
+                       "Sirius ~40° dari Jupiter dan ~45° dari Betelgeuse; harus boleh HIGH")
     }
 
     /// Matahari TIDAK PERNAH boleh muncul sebagai kandidat, dalam kondisi apa pun.

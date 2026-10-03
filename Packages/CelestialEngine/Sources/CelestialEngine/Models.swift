@@ -1,7 +1,7 @@
 import Foundation
 
 /// Pengamat di Bumi.
-public struct Observer: Equatable {
+public struct Observer: Equatable, Codable, Sendable {
     public var latitudeDeg: Double
     public var longitudeDeg: Double
     public init(latitudeDeg: Double, longitudeDeg: Double) {
@@ -11,7 +11,7 @@ public struct Observer: Equatable {
 }
 
 /// Koordinat ekuatorial (J2000).
-public struct EquatorialCoord: Equatable {
+public struct EquatorialCoord: Equatable, Codable, Sendable {
     public var raDeg: Double
     public var decDeg: Double
     public init(raDeg: Double, decDeg: Double) {
@@ -21,7 +21,7 @@ public struct EquatorialCoord: Equatable {
 }
 
 /// Koordinat horizontal (alt-az).
-public struct HorizontalCoord: Equatable {
+public struct HorizontalCoord: Equatable, Codable, Sendable {
     public var altitudeDeg: Double
     public var azimuthDeg: Double
     public init(altitudeDeg: Double, azimuthDeg: Double) {
@@ -30,14 +30,14 @@ public struct HorizontalCoord: Equatable {
     }
 }
 
-public enum ObjectKind: String, Equatable {
+public enum ObjectKind: String, Equatable, Codable, Sendable {
     case moon, planet, star, deepSky
     /// Matahari hanya dipakai sebagai konteks, tidak pernah sebagai target.
     case sun
 }
 
 /// Benda langit di katalog.
-public struct CelestialObject: Equatable {
+public struct CelestialObject: Equatable, Codable, Sendable {
     public var id: String
     public var name: String
     public var kind: ObjectKind
@@ -51,11 +51,11 @@ public struct CelestialObject: Equatable {
     }
 }
 
-public enum ConfidenceLevel: String, Equatable {
+public enum ConfidenceLevel: String, Equatable, Codable, Sendable {
     case high, medium, low
 }
 
-public struct Candidate: Equatable {
+public struct Candidate: Equatable, Codable, Sendable {
     public var object: CelestialObject
     public var separationDeg: Double
     public init(object: CelestialObject, separationDeg: Double) {
@@ -64,7 +64,7 @@ public struct Candidate: Equatable {
 }
 
 /// Hasil resolusi niat: objek terbaik + tingkat keyakinan.
-public struct CelestialIntent: Equatable {
+public struct CelestialIntent: Equatable, Codable, Sendable {
     public var level: ConfidenceLevel
     public var best: CelestialObject?
     public var candidates: [Candidate]
