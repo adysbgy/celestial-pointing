@@ -156,7 +156,10 @@ public final class ExperimentHarness {
     ///   - rawPointing: arah tunjuk mentah dari sensor.
     ///   - calibratedPointing: arah tunjuk setelah kalibrasi (kalau ada).
     ///   - intent: jawaban engine saat itu.
-    ///   - state: keadaan alur saat tombol ditekan.
+    ///   - state: keadaan alur saat tombol ditekan. Ikut menentukan false lock:
+    ///     keadaan tanpa jawaban (`pointing`/`searching`/`idle`/`unavailable`)
+    ///     tidak bisa menghasilkan false lock, karena engine tidak sedang
+    ///     menampilkan klaim apa pun.
     ///   - angularRateDegPerSec: laju pergelangan saat itu, untuk menafsirkan
     ///     apakah galat besar disebabkan gerakan yang belum tenang.
     ///   - timestamp: waktu percobaan.
@@ -187,7 +190,7 @@ public final class ExperimentHarness {
                                   intent: intent,
                                   groundTruthObjectID: targetObjectID,
                                   note: note)
-        let analysis = ObservationLog.analyze(trial, truthDirection: truth)
+        let analysis = ObservationLog.analyze(trial, truthDirection: truth, state: state)
 
         let analyzed = AnalyzedTrial(trial: trial,
                                      analysis: analysis,

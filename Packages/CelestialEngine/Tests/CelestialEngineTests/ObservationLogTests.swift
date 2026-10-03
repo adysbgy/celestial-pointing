@@ -76,6 +76,42 @@ final class ObservationLogTests: XCTestCase {
                        "MEDIUM yang salah bukan kebohongan; engine sudah jujur ragu")
     }
 
+    /// Keadaan tanpa jawaban tidak bisa menghasilkan false lock.
+    ///
+    /// Mesin keadaan sengaja mempertahankan intent terakhir saat pergelangan
+    /// bergerak, jadi rekaman pada keadaan `pointing` bisa membawa intent sisa
+    /// berlevel HIGH. Engine tidak sedang mengklaim apa pun pada keadaan itu —
+    /// menghitungnya sebagai false lock akan menuduh engine salah satu hal yang
+    /// tidak pernah ia lakukan, dan angka itu yang menentukan lulus/gagal.
+    func testStateWithoutAnswerCannotBeAFalseLock() throws {
+        let t = trial(pointingAlt: 40, pointingAz: 180, bestID: "vega",
+                      level: .high, truthID: "sirius")
+        let truth = HorizontalCoord(altitudeDeg: 40, azimuthDeg: 180)
+
+        // Tanpa state: perilaku lama, murni dari intent.
+        let withoutState = try XCTUnwrap(ObservationLog.analyze(t, truthDirection: truth))
+        XCTAssertTrue(withoutState.isFalseLock,
+                      "tanpa state, HIGH + salah tetap dihitung false lock")
+
+        for state in [PointingState.pointing, .searching, .idle, .unavailable] {
+            let analysis = try XCTUnwrap(
+                ObservationLog.analyze(t, truthDirection: truth, state: state)
+            )
+            XCTAssertFalse(analysis.isFalseLock,
+                           "\(state) tidak menampilkan jawaban -> bukan false lock")
+            XCTAssertFalse(analysis.isCorrect)
+        }
+
+        // Keadaan yang menampilkan jawaban tetap dihitung apa adanya.
+        for state in [PointingState.lock, .uncertain] {
+            let analysis = try XCTUnwrap(
+                ObservationLog.analyze(t, truthDirection: truth, state: state)
+            )
+            XCTAssertTrue(analysis.isFalseLock,
+                          "\(state) menampilkan jawaban -> HIGH + salah adalah false lock")
+        }
+    }
+
     /// Galat tunjuk diukur dari arah MENTAH, bukan dari hasil engine.
     func testPointingErrorIsMeasuredFromRawDirection() throws {
         let t = trial(pointingAlt: 50, pointingAz: 180, bestID: "sirius",

@@ -155,6 +155,53 @@ final class ExperimentHarnessTests: XCTestCase {
         XCTAssertEqual(summary.p90RawPointingErrorDeg!, 3.7, accuracy: 0.05)
     }
 
+    /// Rekaman pada keadaan tanpa jawaban tidak boleh dicatat sebagai false
+    /// lock, walau `intent` sisa masih berlevel HIGH.
+    ///
+    /// Ini yang membuat `stateAtCapture` berguna: tanpa memakainya, harness
+    /// bisa melaporkan false lock untuk rekaman yang engine-nya tidak pernah
+    /// menampilkan jawaban — dan angka itu yang menentukan lulus/gagal
+    /// Experiment 1.
+    func testRecordWithoutDisplayedAnswerIsNotAFalseLock() {
+        let h = harness()
+        let t = truth("vega")
+        let recorded = h.record(targetObjectID: "vega",
+                                rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
+                                                             azimuthDeg: t.azimuthDeg),
+                                calibratedPointing: nil,
+                                // Intent sisa dari arah sebelumnya.
+                                intent: intent(level: .high, object: star("sirius")),
+                                state: .pointing,
+                                angularRateDegPerSec: 12.0,
+                                calibration: .none,
+                                timestamp: date)
+        let analysis = try! XCTUnwrap(recorded?.analysis)
+        XCTAssertFalse(analysis.isCorrect)
+        XCTAssertFalse(analysis.isFalseLock,
+                       "engine tidak menampilkan jawaban -> tidak ada klaim yang bisa salah")
+        XCTAssertEqual(h.summary.falseLockCount, 0)
+        XCTAssertTrue(h.summary.passesSafetyCriterion)
+        // Percobaannya tetap disimpan — yang dihindari adalah tuduhan palsu,
+        // bukan menghapus rekaman.
+        XCTAssertEqual(h.trials.count, 1)
+        XCTAssertEqual(recorded?.stateAtCapture, .pointing)
+    }
+
+    /// Rekaman saat benar-benar terkunci tetap dihitung apa adanya.
+    func testRecordWithDisplayedAnswerStillFlagsFalseLock() {
+        let h = harness()
+        let t = truth("vega")
+        h.record(targetObjectID: "vega",
+                 rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
+                 calibratedPointing: nil,
+                 intent: intent(level: .high, object: star("sirius")),
+                 state: .lock,
+                 angularRateDegPerSec: 0.1,
+                 calibration: .none,
+                 timestamp: date)
+        XCTAssertEqual(h.summary.falseLockCount, 1)
+    }
+
     // MARK: - Kebijakan keyakinan dari hasil
 
     /// Tanpa false lock, sigma terukur dari kalibrasi yang dipakai.

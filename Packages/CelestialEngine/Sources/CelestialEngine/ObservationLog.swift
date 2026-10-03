@@ -73,11 +73,27 @@ public enum ObservationLog {
 
     /// Analisis satu percobaan terhadap kebenaran yang diketahui.
     ///
-    /// - Parameter truthDirection: arah horizontal objek yang sebenarnya
-    ///   dituju. Kalau `groundTruthObjectID` tidak ada, panggil dengan `nil`.
+    /// - Parameters:
+    ///   - trial: percobaan yang direkam.
+    ///   - truthDirection: arah horizontal objek yang sebenarnya
+    ///     dituju. Kalau `groundTruthObjectID` tidak ada, panggil dengan `nil`.
+    ///   - state: keadaan alur saat tombol ditekan, bila diketahui.
+    ///
+    /// **Kenapa `state` ikut menentukan false lock.** False lock berarti
+    /// "engine menampilkan jawaban yakin, dan jawabannya salah" — keduanya
+    /// harus benar. `intent` saja tidak cukup untuk membuktikannya: mesin
+    /// keadaan sengaja **mempertahankan** intent terakhir saat pergelangan
+    /// bergerak, jadi rekaman yang diambil pada keadaan tanpa jawaban
+    /// (`pointing`/`searching`/`idle`/`unavailable`) bisa membawa intent sisa
+    /// yang levelnya masih `.high`. Menghitungnya sebagai false lock akan
+    /// menuduh engine melakukan sesuatu yang tidak pernah ia lakukan — dan
+    /// tuduhan itu masuk ke angka yang justru menentukan lulus/gagal
+    /// Experiment 1. Tanpa `state`, fungsi ini memakai perilaku lama
+    /// (murni `intent.level`) demi pemanggil yang memang tidak punya state.
     public static func analyze(
         _ trial: PointingTrial,
-        truthDirection: HorizontalCoord?
+        truthDirection: HorizontalCoord?,
+        state: PointingState? = nil
     ) -> TrialAnalysis? {
         guard let truth = truthDirection,
               let truthID = trial.groundTruthObjectID else { return nil }
@@ -90,7 +106,13 @@ public enum ObservationLog {
         let isCorrect = trial.intent.best?.id == truthID
         // False lock = yakin tinggi tapi salah. Sengaja TIDAK menghitung
         // MEDIUM sebagai false lock: engine yang ragu bukanlah kebohongan.
-        let isFalseLock = (trial.intent.level == .high) && !isCorrect
+        //
+        // Dan sengaja TIDAK menghitung keadaan tanpa jawaban: bila `state`
+        // diketahui dan bukan keadaan yang menampilkan jawaban, maka tidak ada
+        // klaim keyakinan yang bisa salah — apa pun yang tersisa di `intent`
+        // adalah sisa arah sebelumnya, bukan jawaban untuk arah ini.
+        let displayedAnswer = state?.hasAnswer ?? true
+        let isFalseLock = displayedAnswer && (trial.intent.level == .high) && !isCorrect
 
         return TrialAnalysis(
             rawPointingErrorDeg: rawError,

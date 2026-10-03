@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 132 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 134 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
   yang pertama.
@@ -76,9 +76,23 @@ justru ada untuk mengukur akurasi Watch. Alat ukur tidak boleh mengarang data.
 Kini sensor harus benar-benar hidup; tombol Rekam di layar ikut mati saat sensor
 mati supaya penguji tidak mengira percobaannya tercatat.
 
+**Cacat 5 — alat ukur Experiment 1 bisa melaporkan false lock palsu.**
+`ObservationLog.analyze` menghitung `isFalseLock` murni dari `intent.level`.
+Padahal `intent` sengaja **dipertahankan** oleh mesin keadaan saat pergelangan
+bergerak: rekaman yang diambil pada keadaan `pointing` masih membawa intent
+sisa berlevel HIGH. Hasilnya: engine dituduh "yakin tapi salah" untuk jawaban
+yang tidak pernah ia tampilkan — dan `falseLockCount` inilah yang menentukan
+lulus/gagal Experiment 1 (`passesSafetyCriterion`). Alat ukur tidak boleh
+memproduksi kegagalan yang tidak terjadi. `analyze` kini menerima `state`
+opsional: keadaan tanpa jawaban (`pointing`/`searching`/`idle`/`unavailable`)
+tidak bisa menghasilkan false lock. Parameter berdefault `nil` supaya pemanggil
+lama (165 uji engine) berperilaku persis seperti sebelumnya, dan harness
+PointingKit sekarang meneruskan `state` yang selama ini sudah ia simpan di
+`stateAtCapture` tetapi tidak pernah dipakai.
+
 **Yang benar-benar dijalankan pada siklus ini:**
-- `./swift-test.sh` → **165 CelestialEngine + 132 PointingKit, 0 gagal** (exit 0).
-  Delapan uji baru mengunci perilaku ini: objek sisa tidak terkirim
+- `./swift-test.sh` → **166 CelestialEngine + 134 PointingKit, 0 gagal** (exit 0).
+  Sepuluh uji baru mengunci perilaku ini: objek sisa tidak terkirim
   (`LinkMessageTests`), tidak terekam (`ConfidenceTraceTests`), predikat
   "berlaku sekarang" (`PointingPresentationTests`), dan gerbang kiriman
   (`LinkMessageTests`).
