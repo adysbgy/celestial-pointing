@@ -180,6 +180,42 @@ final class LinkMessageTests: XCTestCase {
         }
     }
 
+    // MARK: - Arah tunjuk dari sensor yang sudah mati
+
+    /// Saat sensor mati, `calibratedPointing` yang tersisa di cuplikan adalah
+    /// arah **terakhir sebelum sensor hilang** — dan pesan ini tidak punya
+    /// penanda apa pun bahwa angkanya sudah tidak berlaku. Mengirimkannya
+    /// membuat iPhone menampilkan azimut/ketinggian lama sebagai pengukuran
+    /// sekarang, persis false confidence yang dilarang PRD.
+    ///
+    /// (Di layar jam sendiri nilai yang sama masih boleh dibaca, karena keadaan
+    /// `unavailable` ditampilkan tepat di sebelah angkanya. Di pesan ini tidak
+    /// ada penanda seperti itu.)
+    func testPointingAnglesAreNotSentWhenSensorIsDead() {
+        let dead = PointingSnapshot(state: .unavailable,
+                                    calibratedPointing: HorizontalCoord(altitudeDeg: 42.5,
+                                                                        azimuthDeg: 133.25),
+                                    hasSensor: false)
+        XCTAssertEqual(dead.calibratedPointing?.altitudeDeg, 42.5,
+                       "cuplikan memang mempertahankannya — itu yang membuat kiriman mentah berbahaya")
+
+        let message = PointingLinkMessage.state(from: dead)
+        XCTAssertEqual(message.state, .unavailable, "keadaannya tetap dilaporkan apa adanya")
+        XCTAssertNil(message.altitudeDeg, "arah dari beberapa detik lalu bukan pengukuran sekarang")
+        XCTAssertNil(message.azimuthDeg)
+    }
+
+    /// Sensor hidup → arah tunjuk tetap ikut, apa adanya.
+    func testPointingAnglesAreSentWhileSensorIsAlive() {
+        let live = PointingSnapshot(state: .lock,
+                                    calibratedPointing: HorizontalCoord(altitudeDeg: 42.5,
+                                                                        azimuthDeg: 133.25),
+                                    hasSensor: true)
+        let message = PointingLinkMessage.state(from: live)
+        XCTAssertEqual(message.altitudeDeg!, 42.5, accuracy: 1e-12)
+        XCTAssertEqual(message.azimuthDeg!, 133.25, accuracy: 1e-12)
+    }
+
     // MARK: - Kapan jam bicara
 
     /// Kirim saat **keputusan berubah**, bukan tiap sampel.

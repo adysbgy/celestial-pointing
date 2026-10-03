@@ -142,6 +142,15 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     /// sampelnya, dan sigma adalah bagian dari konteks itu. Tanpa ini, sampel
     /// dari jam akan tercatat dengan sigma bawaan, sehingga berkas ekspor
     /// menyatakan sesuatu yang tidak pernah berlaku di jam.
+    ///
+    /// **Arah tunjuk hanya ikut bila sensor hidup** (`reportedPointing`).
+    /// `calibratedPointing` sengaja dipertahankan di cuplikan, jadi saat sensor
+    /// mati ia berisi arah **terakhir sebelum sensor hilang**. Mengirimkannya
+    /// membuat iPhone menampilkan azimut/ketinggian itu tanpa penanda apa pun —
+    /// bacaan lama tampak seperti pengukuran sekarang, persis yang dilarang PRD.
+    /// Di layar jam sendiri keadaan `unavailable` tampil di sebelah angkanya,
+    /// jadi di sana nilainya masih bisa dibaca sebagai bacaan lama; di pesan ini
+    /// tidak ada penanda seperti itu.
     public static func state(from snapshot: PointingSnapshot,
                              at date: Date = Date(),
                              sigmaDeg: Double? = nil) -> PointingLinkMessage {
@@ -152,8 +161,8 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
             objectID: snapshot.answeredObject?.id,
             objectName: snapshot.answeredObject?.name,
             level: snapshot.answeredLevel,
-            altitudeDeg: snapshot.calibratedPointing?.altitudeDeg,
-            azimuthDeg: snapshot.calibratedPointing?.azimuthDeg,
+            altitudeDeg: snapshot.reportedPointing?.altitudeDeg,
+            azimuthDeg: snapshot.reportedPointing?.azimuthDeg,
             angularRateDegPerSec: snapshot.angularRateDegPerSec,
             pointingSigmaDeg: sigmaDeg,
             note: snapshot.isCalibrated ? "terkalibrasi" : "belum terkalibrasi"

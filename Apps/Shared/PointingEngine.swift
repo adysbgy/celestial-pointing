@@ -222,8 +222,11 @@ public final class PointingEngine: ObservableObject {
     /// arah **terakhir sebelum sensor hilang**, dan menampilkannya tanpa
     /// penanda membuat bacaan lama tampak seperti pengukuran sekarang —
     /// persis yang dilarang PRD. Saat sensor hidup, ini arah yang berlaku.
+    ///
+    /// Aturannya ada di `PointingKit` (`PointingSnapshot.reportedPointing`)
+    /// supaya jalur ini dan pesan ke iPhone tidak bisa berbeda pendapat.
     public var pointing: HorizontalCoord? {
-        snapshot.hasSensor ? snapshot.calibratedPointing : nil
+        snapshot.reportedPointing
     }
 
     /// Jawaban engine yang berlaku untuk arah tunjuk **sekarang**.

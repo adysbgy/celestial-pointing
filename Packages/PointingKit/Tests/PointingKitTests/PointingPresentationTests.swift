@@ -158,4 +158,27 @@ final class PointingPresentationTests: XCTestCase {
             XCTAssertEqual(live.answeredSeparationDeg, 0.7)
         }
     }
+
+    /// Arah tunjuk juga punya predikat "berlaku sekarang", terpisah dari yang
+    /// **disimpan** di cuplikan.
+    ///
+    /// `calibratedPointing` sengaja dipertahankan supaya panel jam tidak
+    /// berkedip; akibatnya ia tetap terisi saat sensor mati, dengan nilai
+    /// terakhir sebelum sensor hilang. Dua jalur membacanya untuk **dilaporkan
+    /// ke tempat lain** — layar Ketelitian di jam dan pesan ke iPhone — dan
+    /// keduanya harus berhenti pada saat yang sama. Kalau aturannya ditulis dua
+    /// kali, keduanya bisa berbeda pendapat, dan yang paling berbahaya adalah
+    /// versi yang tetap melaporkan angka lama tanpa penanda.
+    func testReportedPointingIsNilWhenSensorIsDead() {
+        let coord = HorizontalCoord(altitudeDeg: 42.5, azimuthDeg: 133.25)
+
+        let dead = PointingSnapshot(state: .unavailable,
+                                    calibratedPointing: coord,
+                                    hasSensor: false)
+        XCTAssertEqual(dead.calibratedPointing, coord, "nilai tersimpan tetap ada")
+        XCTAssertNil(dead.reportedPointing, "tapi bukan pengukuran sekarang")
+
+        let live = PointingSnapshot(state: .lock, calibratedPointing: coord, hasSensor: true)
+        XCTAssertEqual(live.reportedPointing, coord)
+    }
 }

@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 136 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 139 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
   yang pertama.
@@ -20,7 +20,57 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: objek sisa bocor ke iPhone, dan jam berhenti bicara tepat saat jawabannya hilang
+### Siklus ini: arah tunjuk dari sensor yang sudah mati masih ikut terkirim ke iPhone
+Fokus: menyisir **predikat "berlaku sekarang"** yang sudah dipakai untuk objek dan
+keyakinan, dan memeriksa apakah **arah tunjuk** punya padanannya. Logika engine
+**tidak disentuh**; aturan keras PRD tidak dilonggarkan.
+
+**Cacat 8 — azimut/ketinggian dari beberapa detik lalu terkirim sebagai pengukuran
+sekarang.** Siklus sebelumnya (Cacat 7) menutup satu jalur bacaan arah tunjuk:
+`PointingEngine.pointing` kini `nil` saat `snapshot.hasSensor == false`, karena
+`calibratedPointing` sengaja **dipertahankan** di cuplikan dan saat sensor mati
+isinya adalah arah terakhir sebelum sensor hilang. Tapi perbaikan itu hanya
+menyentuh **layar jam**. Jalur kedua membaca field yang sama dan tidak pernah
+diperiksa:
+
+`PointingLinkMessage.state(from:)` — pesan keadaan ke iPhone — mengirim
+`snapshot.calibratedPointing?.altitudeDeg` / `.azimuthDeg` **tanpa penjagaan
+sensor**. Saat jam kehilangan sensornya, pesan yang terkirim tetap membawa
+azimut/ketinggian dari beberapa detik sebelumnya, dan di iPhone tidak ada penanda
+apa pun bahwa angkanya sudah tidak berlaku — persis kelas yang sama dengan Cacat 7,
+kali ini di jalur yang Cacat 7 tidak mencapai.
+
+Cara menutupnya sama seperti objek/keyakinan: aturannya dipindahkan ke
+`PointingKit` sebagai predikat semantik
+(`PointingSnapshot.reportedPointing`, berlaku hanya bila sensor hidup), lalu
+**kedua** jalur memakainya — `PointingEngine.pointing` dan
+`PointingLinkMessage.state(from:)`. Dengan begitu keduanya tidak bisa lagi berbeda
+pendapat tentang kapan sebuah arah tunjuk boleh dilaporkan; sebelum ini aturannya
+ditulis dua kali, dan hanya satu yang benar.
+
+Dua uji baru mengunci perilakunya (`LinkMessageTests`,
+`PointingPresentationTests`): sensor mati → `altitudeDeg`/`azimuthDeg` **tidak
+dikirim** (sementara `state` tetap dilaporkan apa adanya), sensor hidup → arah
+tetap ikut. Satu di antaranya secara eksplisit menegaskan bahwa
+`calibratedPointing` **memang** masih terisi saat sensor mati — itulah yang
+membuat kiriman mentah berbahaya, dan yang membuat uji ini bukan sekadar
+formalitas.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 139 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan ulang seluruh pembacaan field cuplikan yang dipertahankan
+  (`snapshot.intent` / `bestObject` / `calibratedPointing` / `rawPointing`) di
+  `Apps/` dan `PointingKit/Sources`: tidak ada lagi jalur kirim/rekam/tampil yang
+  membacanya mentah. Tersisa hanya `ExperimentRecorder` (arah tunjuk **mentah**
+  untuk mengukur galat, sudah dijaga `hasSensor` di pemanggilnya) dan
+  `CalibrationSession` (titik acuan, sudah dijaga `hasSensor` di kedua jalan
+  masuknya).
+- `angularRateDegPerSec` **diperiksa dan ternyata benar**: `AngularRateTracker`
+  ikut direset saat sensor hilang, jadi `nil` — bukan nilai lama. Tidak diubah.
+
+### Siklus sebelumnya: objek sisa bocor ke iPhone, dan jam berhenti bicara tepat saat jawabannya hilang
 Fokus: menyisir **jalur yang mengirim dan merekam** "apa yang engine katakan
 sekarang" — tempat objek yang sengaja dipertahankan mesin keadaan bisa keluar
 dari layar jam (yang menandainya sisa) menuju tempat yang tidak punya penanda

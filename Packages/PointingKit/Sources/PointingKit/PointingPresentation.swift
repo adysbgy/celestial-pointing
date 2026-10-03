@@ -150,4 +150,20 @@ public extension PointingSnapshot {
     var answeredSeparationDeg: Double? {
         state.hasAnswer ? intent?.candidates.first?.separationDeg : nil
     }
+
+    /// Arah tunjuk yang boleh dilaporkan sebagai pengukuran **sekarang**.
+    ///
+    /// `calibratedPointing` sengaja dipertahankan di cuplikan supaya panel jam
+    /// tidak berkedip saat pergelangan bergerak, jadi ia **tetap terisi** saat
+    /// sensor mati — dengan nilai terakhir sebelum sensor hilang. Bagi layar jam
+    /// itu aman: keadaan `unavailable` ditampilkan tepat di sebelah angkanya.
+    /// Bagi apa pun yang **dikirim atau ditampilkan di tempat lain** tidak ada
+    /// penanda seperti itu, sehingga azimut/ketinggian dari beberapa detik lalu
+    /// terbaca sebagai bacaan sekarang. Yang berlaku hanya bila sensor benar-
+    /// benar hidup.
+    ///
+    /// Satu predikat dipakai bersama oleh layar jam (`PointingEngine.pointing`)
+    /// dan pesan ke iPhone (`PointingLinkMessage.state(from:)`) supaya kedua
+    /// jalur tidak bisa lagi berbeda pendapat tentang kapan arah tunjuk berlaku.
+    var reportedPointing: HorizontalCoord? { hasSensor ? calibratedPointing : nil }
 }
