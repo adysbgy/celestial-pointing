@@ -2,7 +2,53 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: jawaban langit lama bertahan setelah pindah tempat
+### Siklus ini: sensor mati di tengah pemakaian tidak terlihat di layar
+Fokus: menyisir **perubahan keadaan yang tidak pernah sampai ke UI**. Tidak ada
+aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **`MotionLogger.handleFailure` menghentikan alur tanpa memberi tahu UI.**
+  Jalur galat CoreMotion (sensor dilepas, izin dicabut, hardware gagal) memanggil
+  `controller.setSensorAvailable(false)` langsung — yang memang membuang
+  jawaban di dalam controller. Tapi `PointingEngine.snapshot`, satu-satunya
+  sumber yang dibaca `PointingView`, **tidak ikut berubah**: sampel sudah
+  berhenti mengalir, jadi `onUpdate` tidak pernah dipanggil lagi.
+  - Akibatnya jam tetap menampilkan objek terakhir **seolah masih
+    terkonfirmasi**, beserta getaran "terkunci" yang terakhir — persis yang
+    dilarang PRD ("jangan pernah salah identifikasi demi magic"). Tidak ada
+    bagian UI yang terlihat keliru, karena yang terlihat justru jawaban lama
+    yang tampak normal.
+  - Perbaikan: kehilangan sensor dikirim lewat **saluran yang sama dengan
+    sampel sensor** (`PointingUpdate` yang sudah diperbarui + peristiwa haptic),
+    bukan dengan menyentuh controller diam-diam. Jalur "perangkat tanpa device
+    motion" di `start(controller:)` juga dialihkan ke jalur yang sama — di sana
+    ia dijalankan sebelum `self.controller` diset, jadi sebelumnya sensor tidak
+    pernah ditandai mati sama sekali.
+- **`ExperimentHarness.availableTargets` dihitung ulang tiap pembacaan.**
+  Layar Experiment 1 membacanya di dalam `body`, dan `body` dievaluasi pada
+  setiap sampel sensor — jadi seluruh katalog + efemeris tata surya disapu 20
+  kali per detik sepanjang pengukuran. Ditambah cache berjangka 30 detik yang
+  dibatalkan saat tempat berubah (dengan `isSamePlace`, supaya perbaikan GPS
+  yang hanya menggeser `capturedAt` tidak membuangnya), plus
+  `targetComputationCount` supaya daftar yang dihitung ulang tidak terlihat
+  sama dengan yang di-cache.
+
+**Tes baru (8):** `testChangingObserverDropsAnswerComputedForOldSky`,
+`testReapplyingSameObserverIsANoOp`, `testSetObserverKeepsCalibration`,
+`testReferenceListBecomesStaleWhenObserverMoves`,
+`testReferenceListStaysFreshWhenOnlyTimeChanges`,
+`testTargetListIsNotRecomputedOnEveryRead`,
+`testTargetListIsRecomputedAfterMoving`,
+`testTargetListIsNotRecomputedForSamePlace`.
+Uji pertama **dibuktikan MERAH lebih dulu** sebelum perbaikan: keadaan tetap
+`lock` dan Sirius tetap tampil setelah pindah Jakarta → Quito.
+
+**Status:** `./swift-test.sh` → **165 engine + 120 PointingKit, 0 gagal**.
+Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+`swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: jawaban langit lama bertahan setelah pindah tempat
 Fokus: menyisir **pembatalan jawaban yang menumpang pada efek samping pemanggil
 lain** — kelas bug yang tidak terlihat di UI. Tidak ada aturan keras PRD yang
 dilonggarkan.

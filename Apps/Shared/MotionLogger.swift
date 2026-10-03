@@ -59,7 +59,9 @@ public final class MotionLogger: ObservableObject {
         self.controller = controller
         guard manager.isDeviceMotionAvailable else {
             unavailableReason = "Perangkat ini tidak menyediakan device motion."
-            controller.setSensorAvailable(false)
+            // Lewat saluran yang sama dengan sampel: cuplikan UI harus ikut
+            // berubah, bukan hanya controller di belakangnya.
+            publishSensorLoss()
             return
         }
         guard !manager.isDeviceMotionActive else { return }
@@ -114,10 +116,30 @@ public final class MotionLogger: ObservableObject {
 
     // MARK: - Bantu
 
+    /// Sensor mati di tengah pemakaian. **Ini harus terlihat di layar.**
+    ///
+    /// `controller.setSensorAvailable(false)` saja tidak cukup: ia menghentikan
+    /// alur dan membuang jawaban, tapi `PointingEngine.snapshot` — satu-satunya
+    /// sumber yang dibaca UI — tidak ikut berubah, karena sampel sudah berhenti
+    /// mengalir dan `onUpdate` tidak pernah dipanggil lagi. Akibatnya jam tetap
+    /// menampilkan objek terakhir **seolah masih terkonfirmasi**, padahal
+    /// sensornya sudah mati. Itu persis yang dilarang PRD.
+    ///
+    /// Karena itu peristiwa ini dikirim lewat saluran yang sama dengan sampel:
+    /// cuplikan yang sudah diperbarui + peristiwa haptic. Pemanggil (biasanya
+    /// `PointingEngine`) yang memutuskan cara menyuarakannya.
     private func handleFailure(_ reason: String) {
         unavailableReason = reason
         isRunning = false
         if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
-        controller?.setSensorAvailable(false)
+        publishSensorLoss()
+    }
+
+    /// Beritahu pemanggil bahwa sensor hilang, memakai saluran yang sama dengan
+    /// sampel sensor — supaya cuplikan di UI tidak tertinggal di keadaan lama.
+    private func publishSensorLoss() {
+        guard let controller else { return }
+        let events = controller.setSensorAvailable(false)
+        onUpdate?(PointingUpdate(snapshot: controller.snapshot, haptics: events))
     }
 }
