@@ -18,10 +18,12 @@ jangan pernah wrist-angle → motor.
 - [x] Matematika attitude bebas-Apple: `Vector3`/`Matrix3x3`/`Quaternion` (tanpa `simd`, teruji di Linux)
 - [x] Attitude → pointing: kerangka ENU, pemetaan device→langit, roll sumbu pandang (`Frames.swift`)
 - [x] Kalibrasi yaw + sigma pointing terukur dari titik acuan (`Calibration.swift`) — menyambung Experiment 1 ke `ConfidencePolicy`
+- [x] Perata orientasi (nlerp) + pelacak kecepatan sudut (`Sensing.swift`) — syarat "pergelangan diam" sebelum mengunci
+- [x] Mesin keadaan alur: idle → pointing → searching → lock/uncertain (`PointingFlow.swift`, sumber resolusi disuntik)
 - [ ] Motion logger: CMDeviceMotion → rekam attitude + timestamp (butuh Mac)
 - [ ] Calibration flow (uji beberapa metode) — UI/app, butuh Mac
-- [ ] UI: idle → pointing → searching → lock → uncertain → detail (butuh Mac)
-- [ ] Haptic sukses + state uncertain (butuh Mac)
+- [ ] Rendering UI dari keadaan alur + detail (butuh Mac)
+- [ ] Pemicu haptic dari state lock/uncertain (butuh Mac)
 - [ ] Watch ↔ iPhone (WatchConnectivity) (butuh Mac)
 
 ## FASE 3 — iOS companion + POC
@@ -30,7 +32,7 @@ jangan pernah wrist-angle → motor.
 - [ ] Point & Slew POC 1 teleskop (setelah engine terbukti)
 
 ## Kriteria "ENGINE SIAP"
-- [x] swift test hijau (116/116 di Linux, tanpa Mac)
+- [x] swift test hijau (139/139 di Linux, tanpa Mac)
 - [x] Resolver mengembalikan objek benar untuk target diketahui
 - [x] Tidak pernah HIGH saat kandidat ambigu (diuji eksplisit)
 - [x] Apple build hijau (macOS) — diverifikasi di CI

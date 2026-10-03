@@ -2,13 +2,14 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: fondasi Fase 2 yang bisa diuji di Linux → 116 test hijau
+### Siklus ini: fondasi Fase 2 yang bisa diuji di Linux → 139 test hijau
 - ✅ `Geometry.swift` — `Vector3` + `Matrix3x3`, **tanpa `simd`** (tidak ada di
   Linux). Penamaan `m11…m33` sengaja sama dengan `CMRotationMatrix` supaya
   lapisan app bisa memetakan sensor tanpa berpikir ulang indeks.
 - ✅ `Rotation.swift` — `Quaternion` `(w,x,y,z)` + konversi `CMQuaternion`
   (urutan x,y,z,w dipetakan di satu tempat). Ada `rotationMatrix`,
-  `rotated(_:)`, komposisi, dan konjugat.
+  `rotated(_:)`, komposisi, konjugat, sudut antar-orientasi, dan **nlerp**
+  yang menangani *double cover*.
 - ✅ `Frames.swift` — inti Fase 2 yang paling rawan salah:
   - `LocalFrame` ENU (Timur–Utara–Atas) ⇄ `HorizontalCoord`, azimut dari Utara.
   - `DeviceAttitude`: quaternion + **roll mengelilingi sumbu pandang** →
@@ -27,10 +28,19 @@
   - `confidencePolicy()` menyambung sigma terukur → `ConfidencePolicy`, jadi
     ambang HIGH engine otomatis mengikuti hasil Experiment 1. Uji
     `testSmallerSigmaAllowsHighWhereLooseSigmaDidNot` membuktikan efeknya.
+- ✅ `Sensing.swift` — `PointingSmoother` (nlerp bobot tetap) untuk meredam
+  gemetar tangan, dan `AngularRateTracker` untuk mengukur kecepatan sudut.
+  Ada jeda maksimum antar sampel: setelah sensor terputus, laju **tidak**
+  ditebak (membagi jeda panjang menghasilkan laju palsu yang kecil).
+- ✅ `PointingFlow.swift` — `PointingStateMachine`: idle → pointing → searching
+  → lock/uncertain. Sumber resolusi disuntikkan sebagai closure, jadi seluruh
+  alur bisa diuji di Linux. Aturan yang dipegang: **`lock` hanya untuk keyakinan
+  HIGH**; medium/low menjadi `uncertain`. Bergerak lagi membatalkan tampilan
+  terkunci. Sampel pertama & jeda dianggap "masih bergerak" (arah aman).
 - ✅ Uji rantai penuh tanpa sensor: `FramesTests` membangun attitude sintetis
   yang mengarah ke Sirius, lalu resolver harus mengembalikan "sirius". Ini
   memvalidasi seluruh konversi ENU ↔ kerangka perangkat dua arah.
-- ✅ `swift test`: **116 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
+- ✅ `swift test`: **139 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
 
 ### Siklus sebelumnya
 - ✅ anti-false-lock + instrumentasi Experiment 1 → Fase 1 selesai (65 test).
@@ -63,10 +73,13 @@
 ## Langkah berikutnya (sisa FASE 2 — app watchOS, butuh Mac)
 Logika inti sudah ada & teruji; yang tersisa adalah pembungkus platform:
 1. Motion logger: `CMDeviceMotion` → `DeviceAttitude` (lewat `init?(cmX:cmY:cmZ:cmW:)`)
-   + rekam timestamp; belum ada target Xcode (Apps/ masih kosong).
-2. Alur kalibrasi memakai `CalibrationSolver` (kumpulkan titik acuan → `apply`).
-3. UI: idle → pointing → searching → lock → uncertain → detail.
-4. Haptic sukses + state uncertain.
+   → `PointingSmoother` → `PointingStateMachine.update(...)` dengan
+   `resolve:` = `PointingResolver.resolve` + `PointingCalibration.apply`.
+2. Alur kalibrasi memakai `CalibrationSolver` (kumpulkan titik acuan → `apply`),
+   lalu suapkan `residualSpreadDeg` ke `ConfidencePolicy` resolver.
+3. Rendering UI langsung dari `PointingState` (idle/pointing/searching/lock/
+   uncertain/unavailable) + detail objek dari `currentIntent`.
+4. Haptic dipicu saat `state` berpindah ke `.lock` (sukses) dan `.uncertain`.
 5. Watch ↔ iPhone (WatchConnectivity).
 
 Catatan: unit test engine tetap jalan di Linux, tapi Fase 2 app butuh Mac untuk

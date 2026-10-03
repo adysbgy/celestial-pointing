@@ -50,6 +50,41 @@ public struct Quaternion: Equatable, Codable, Sendable {
         )
     }
 
+    public func dot(_ other: Quaternion) -> Double {
+        w * other.w + x * other.x + y * other.y + z * other.z
+    }
+
+    /// Sudut rotasi terpendek antara dua orientasi (derajat).
+    ///
+    /// Dua quaternion `q` dan `-q` mewakili orientasi yang sama, jadi dipakai
+    /// nilai absolut hasil dot. `nil` bila salah satunya tidak sah.
+    public func angleDegrees(to other: Quaternion) -> Double? {
+        guard let a = normalized, let b = other.normalized else { return nil }
+        let d = abs(max(-1.0, min(1.0, a.dot(b))))
+        return SkyMath.rad2deg(2 * acos(d))
+    }
+
+    /// Interpolasi linear ternormalisasi (nlerp) menuju `other`.
+    ///
+    /// `t` dijepit ke 0…1. Menangani *double cover*: kalau dot negatif, `other`
+    /// dinegasikan dulu supaya interpolasi menempuh busur terpendek, bukan
+    /// memutar hampir 360°. Cukup untuk smoothing sensor; presisi kecepatan
+    /// sudut seragam (slerp) tidak dibutuhkan di sini.
+    public func interpolated(to other: Quaternion, t: Double) -> Quaternion? {
+        guard let a = normalized, other.normalized != nil else { return nil }
+        let target = a.dot(other) < 0
+            ? Quaternion(w: -other.w, x: -other.x, y: -other.y, z: -other.z)
+            : other
+        guard let b = target.normalized else { return nil }
+        let tt = max(0.0, min(1.0, t))
+        return Quaternion(
+            w: a.w + (b.w - a.w) * tt,
+            x: a.x + (b.x - a.x) * tt,
+            y: a.y + (b.y - a.y) * tt,
+            z: a.z + (b.z - a.z) * tt
+        ).normalized
+    }
+
     /// Quaternion dari sudut (radian) dan sumbu rotasi.
     public static func axisAngle(axis: Vector3, radians: Double) -> Quaternion? {
         guard let n = axis.normalized else { return nil }
