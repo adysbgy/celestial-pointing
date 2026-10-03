@@ -20,7 +20,42 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: audit mandiri penuh pembungkus app + verifikasi CI (tanpa regresi)
+### Siklus ini: konfirmasi mandiri ulang pembungkus app + gerbang Linux (tanpa regresi)
+Fokus: siklus ini dimulai dengan brief yang menyatakan "pembungkus app (watchOS +
+iOS) tersisa". Setelah membaca seluruh berkas dan menjalankan gerbang, ternyata
+ketiga prioritas brief **sudah terpasang lengkap** dan hanya perlu dikonfirmasi,
+bukan dikerjakan. Tidak ada aturan keras PRD yang dilonggarkan; engine tidak
+disentuh.
+
+**Yang diverifikasi ulang (bukan sekadar percaya STATUS.md lama):**
+- Prioritas 1 (watchOS) — semua ada: `MotionLogger` (`CMDeviceMotion` →
+  `DeviceAttitude` lewat `init?(cmX:cmY:cmZ:cmW:)`, diverifikasi rantainya di
+  `Frames.swift:82` + `PointingController.feed`); `CalibrationView` di atas
+  `CalibrationSession`/`CalibrationSolver`; `PointingView` merender langsung dari
+  `PointingSnapshot.state` (keenam keadaan); `HapticEngine` memicu `.lockSucceeded`
+  / `.uncertain` (lewati `PointingController.hapticEvents`); `WatchLinkService`.
+- Prioritas 2 (iOS) — `DiagnosticsView` (grafik `separation/σ` Swift Charts +
+  `ShareLink` ekspor JSON via `JSONArchiveDocument`) dan `Experiment1View` +
+  `ExperimentRecorder` (tunjuk→rekam→ekspor, verdict menyaring **gagal**).
+- Prioritas 3 — `project.yml` XcodeGen (dua target app + `postGenCommand`
+  tanam app jam ke `PlugIns/`) dan `ios-build.yml` sudah memuat
+  `brew install xcodegen` + gerbang peringatan Apps/.
+- Tidak ada stub: sapuan `TODO`/`FIXME`/`placeholder`/`stub` di `Apps/` → 0.
+  `Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` ada di kedua app.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 143 PointingKit, 0 gagal** (Swift
+  6.0, Docker, Linux).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- `gh run list`: `Apple Build` (macOS) run `37160377165` hijau pada HEAD
+  `a8b8856`; `Engine Tests (Linux)` hijau.
+
+**Kesimpulan:** tidak ada kode app yang tersisa. Satu-satunya baris `ROADMAP.md`
+yang belum tertutup tetap "Point & Slew POC 1 teleskop" — menunggu perangkat
+keras fisik, bukan repo ini.
+
+### Siklus sebelumnya: audit mandiri penuh pembungkus app + verifikasi CI (tanpa regresi)
 Fokus: baca ulang **seluruh** berkas app (watchOS + iOS + Shared) dan
 seluruh `PointingKit`/`CelestialEngine` yang dirujuknya, lalu cari cacat
 nyata yang belum tertutup. Tidak ada satu baris pun yang diubah: hasilnya
