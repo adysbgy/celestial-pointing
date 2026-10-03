@@ -9,7 +9,7 @@ jangan pernah wrist-angle → motor.
 - [x] Katalog 20+ bintang terang (J2000)
 - [x] PointingResolver: pointing+konteks → kandidat
 - [x] ConfidenceModel: HIGH/MEDIUM/LOW (anti false-lock)
-- [ ] Tambah Bulan & planet terang (via AstronomyKit ephemeris)
+- [x] Tambah Bulan & planet terang (via AstronomyKit ephemeris) — divalidasi vs JPL Horizons, simpangan terburuk 8.91″
 - [ ] Visibility/context filtering (di bawah horizon, magnitude)
 - [ ] Instrumentasi/logging untuk Experiment 1
 - [ ] Uji: kandidat ambigu → tidak boleh HIGH

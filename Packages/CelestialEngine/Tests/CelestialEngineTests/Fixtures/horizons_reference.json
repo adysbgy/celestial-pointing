@@ -1,0 +1,25 @@
+{
+  "_note": "Golden reference for ephemeris validation. NOT produced by this project's code.",
+  "_source": "NASA/JPL Horizons API (https://ssd.jpl.nasa.gov/api/horizons.api)",
+  "_retrieved": "2026-10-03",
+  "_frame": "Airless apparent RA/Dec, Earth equator & equinox of date, geocentric (CENTER='500@399')",
+  "_query": "QUANTITIES='2,9' ANG_FORMAT='DEG' APPARENT='AIRLESS'",
+  "_ephemeris": "DE441 (Moon/planets), jup365_merged (Jupiter), sat441l (Saturn), mar099 (Mars)",
+  "samples": [
+    { "body": "moon",    "utc": "2000-01-01T00:00:00Z", "raDeg": 216.66953, "decDeg":  -8.99442, "magnitude":  -8.868 },
+    { "body": "moon",    "utc": "2024-01-01T00:00:00Z", "raDeg": 159.11842, "decDeg":  12.62750, "magnitude": -11.150 },
+    { "body": "moon",    "utc": "2026-06-15T12:00:00Z", "raDeg":  89.82967, "decDeg":  27.90577, "magnitude":  -4.774 },
+    { "body": "venus",   "utc": "2000-01-01T00:00:00Z", "raDeg": 239.27231, "decDeg": -18.31362, "magnitude":  -4.068 },
+    { "body": "venus",   "utc": "2024-01-01T00:00:00Z", "raDeg": 240.95055, "decDeg": -18.76928, "magnitude":  -4.039 },
+    { "body": "venus",   "utc": "2026-06-15T12:00:00Z", "raDeg": 125.15153, "decDeg":  21.60588, "magnitude":  -4.001 },
+    { "body": "mars",    "utc": "2000-01-01T00:00:00Z", "raDeg": 330.14520, "decDeg": -13.32237, "magnitude":   1.089 },
+    { "body": "mars",    "utc": "2024-01-01T00:00:00Z", "raDeg": 267.05442, "decDeg": -23.96139, "magnitude":   1.418 },
+    { "body": "mars",    "utc": "2026-06-15T12:00:00Z", "raDeg":  48.10232, "decDeg":  17.39048, "magnitude":   1.277 },
+    { "body": "jupiter", "utc": "2000-01-01T00:00:00Z", "raDeg":  23.84999, "decDeg":   8.58459, "magnitude":  -2.525 },
+    { "body": "jupiter", "utc": "2024-01-01T00:00:00Z", "raDeg":  33.68549, "decDeg":  12.26398, "magnitude":  -2.589 },
+    { "body": "jupiter", "utc": "2026-06-15T12:00:00Z", "raDeg": 119.04621, "decDeg":  21.18889, "magnitude":  -1.840 },
+    { "body": "saturn",  "utc": "2000-01-01T00:00:00Z", "raDeg":  38.77607, "decDeg":  12.61568, "magnitude":   0.101 },
+    { "body": "saturn",  "utc": "2024-01-01T00:00:00Z", "raDeg": 335.77827, "decDeg": -11.83908, "magnitude":   0.955 },
+    { "body": "saturn",  "utc": "2026-06-15T12:00:00Z", "raDeg":  13.17448, "decDeg":   3.13069, "magnitude":   0.833 }
+  ]
+}
