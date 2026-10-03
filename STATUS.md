@@ -7,10 +7,10 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 139 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 140 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
-  yang pertama.
+  dan sejak siklus sebelumnya **keduanya juga ditegakkan di CI Linux**, bukan
+  hanya yang pertama.
 - Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
   (`Apple Build`) hijau** — bukan sekadar lolos parse. Build itu kini juga
   **gagal bila ada peringatan compiler pada kode sendiri**, jadi peringatan
@@ -20,7 +20,53 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: arah tunjuk dari sensor yang sudah mati masih ikut terkirim, dan kegagalan kirim yang paling sering tidak terlihat
+### Siklus ini: GoTo teleskop dihitung dari resolusi yang sudah tidak berlaku
+Fokus: menyisir **predikat "jawaban berlaku sekarang"** ke jalur yang belum
+pernah diperiksa — jalur yang berujung ke **motor teleskop**. Siklus-siklus
+sebelumnya menutup objek sisa pada pesan ke iPhone dan riwayat keyakinan; yang
+tersisa justru jalur paling berbahaya. Logika engine **tidak disentuh**;
+aturan keras PRD tidak dilonggarkan.
+
+**Cacat 10 — perintah GoTo diambil dari arah tunjuk sebelumnya.** `lastResolution`
+sengaja dipertahankan agar cuplikan tetap membawa jarak tetangga untuk
+diagnostik, dan ia hanya dibuang saat alur **dihentikan** (atau saat
+lokasi/ambang berubah) — **bukan** saat arah tunjuk bergeser dan keadaan
+kehilangan jawabannya. `PointingController.slewDecision(date:policy:)`
+membacanya mentah: `guard let resolution = lastResolution`, lalu
+`SlewPlanner.plan(...)`.
+
+Akibatnya: selama pergelangan bergerak menjauh setelah sempat terkunci,
+`lastResolution` masih berisi resolusi Sirius. Keadaannya sudah kembali
+`pointing` (tidak punya jawaban sekarang), tapi `slewDecision` tetap
+mengembalikan `.allowed(...)` untuk Sirius — dengan arah target dihitung dari
+**posisi objek**, sesuai aturan PRD, tapi objek itu sudah tidak ada di arah
+tunjuk sekarang. Langkah OBJECT ID dilewati: POINT → **SAFE GOTO**, tanpa
+identifikasi yang berlaku. Ini kelas yang sama dengan Cacat 1 (objek sisa bocor
+ke iPhone) — kali ini ujungnya motor, bukan layar.
+
+Diperbaiki dengan predikat yang sudah dipakai jalur-jalur lain: `slewDecision`
+kini gagal-tertutup (`nil`) kecuali `snapshot.state.hasAnswer`. Objek yang
+dikunci dengan ambang lama pun tidak bisa lagi lolos, karena mengubah ambang
+sudah menghentikan alur dan membuang jawabannya.
+
+Satu uji baru menguncinya (`PointingControllerTests.testSlewDecisionRefusedWhenAnswerIsStale`):
+terkunci di Sirius → GoTo diizinkan; arahkan 170° menjauh → `slewDecision` **nil**
+(bukan lagi `.allowed` untuk Sirius). Uji ini gagal pada kode lama dengan pesan
+yang menyebut Sirius beserta koordinatnya — jadi ia bukan sekadar formalitas.
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- Uji regresi dijalankan **dulu** pada kode lama → **gagal** (`.allowed` untuk
+  Sirius saat arah tunjuk 170° menjauh). Setelah perbaikan → **lulus**.
+- `./swift-test.sh` → **166 CelestialEngine + 140 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 15 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan ulang `lastResolution`/`answeredIntent`/`hasAnswer` di `Apps/` dan
+  `PointingKit/Sources`: tidak ada lagi jalur yang membaca resolusi lama tanpa
+  memeriksa apakah keadaan punya jawaban. `lastResolution` kini hanya dipakai
+  untuk jarak tetangga diagnostik (aman: keadaan yang menampilkannya juga sudah
+  memberi tahu) dan oleh `slewDecision` yang sudah dijaga.
+
+### Siklus sebelumnya: arah tunjuk dari sensor yang sudah mati masih ikut terkirim, dan kegagalan kirim yang paling sering tidak terlihat
 Fokus: menyisir **predikat "berlaku sekarang"** yang sudah dipakai untuk objek dan
 keyakinan — apakah **arah tunjuk** punya padanannya — lalu memeriksa janji
 "kegagalan tidak boleh diam" di jalur kirim. Logika engine **tidak disentuh**;

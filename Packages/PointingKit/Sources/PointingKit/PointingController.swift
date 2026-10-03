@@ -390,15 +390,28 @@ public final class PointingController {
 
     // MARK: - Rencana GoTo
 
-    /// Rencana GoTo teleskop untuk resolusi terakhir.
+    /// Rencana GoTo teleskop untuk jawaban yang **berlaku sekarang**.
     ///
     /// Arah target diambil dari **posisi objek yang teridentifikasi**, bukan
     /// dari arah tunjuk pergelangan — aturan keras PRD, dan satu-satunya jalan
     /// agar tidak ada sudut pergelangan yang pernah sampai ke motor.
     ///
-    /// - Returns: `nil` bila belum ada resolusi.
+    /// **Kenapa keadaan harus punya jawaban, bukan sekadar ada resolusi.**
+    /// `lastResolution` sengaja dipertahankan supaya cuplikan tetap membawa
+    /// jarak tetangga untuk diagnostik, dan ia hanya dibuang saat alur
+    /// dihentikan (atau saat lokasi/ambang berubah) — **bukan** saat arah
+    /// tunjuk bergeser dan keadaan kehilangan jawabannya. Jadi begitu
+    /// pergelangan bergerak menjauh, `lastResolution` masih berisi resolusi
+    /// dari arah tunjuk **sebelumnya**. Membacanya mentah berarti teleskop
+    /// diarahkan ke objek yang sudah tidak ada di arah tunjuk sekarang: langkah
+    /// OBJECT ID dilewati dan GoTo dihitung dari niat lama. Itu kelas yang sama
+    /// dengan objek sisa yang bocor ke iPhone — kali ini ke motor.
+    ///
+    /// - Returns: `nil` bila belum ada resolusi **atau** keadaan sekarang tidak
+    ///   punya jawaban (`lock`/`uncertain`).
     public func slewDecision(date: Date,
                              policy: SlewSafetyPolicy = SlewSafetyPolicy()) -> SlewDecision? {
+        guard snapshot.state.hasAnswer else { return nil }
         guard let resolution = lastResolution else { return nil }
         let object = resolution.intent.best
         let target = object.flatMap {

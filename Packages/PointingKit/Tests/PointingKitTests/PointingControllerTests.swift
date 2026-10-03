@@ -545,6 +545,42 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertNil(c.answeredIntent)
     }
 
+    /// Rencana GoTo tidak boleh berasal dari resolusi yang sudah tidak berlaku.
+    ///
+    /// `lastResolution` sengaja dipertahankan agar cuplikan tetap membawa jarak
+    /// tetangga untuk diagnostik, dan ia hanya dibuang saat alur **dihentikan**
+    /// (atau saat lokasi/ambang berubah) — **bukan** saat arah tunjuk bergeser
+    /// dan keadaan kehilangan jawabannya. Jadi selama pergelangan bergerak,
+    /// `lastResolution` masih berisi resolusi dari arah tunjuk **sebelumnya**.
+    /// Membacanya mentah berarti teleskop bisa diarahkan ke objek yang sudah
+    /// tidak ada di arah tunjuk sekarang — persis aturan keras PRD
+    /// "POINT → OBJECT ID → SAFE GOTO", dengan langkah OBJECT ID dilewati.
+    /// Yang menentukan adalah apakah keadaan **punya jawaban sekarang**.
+    func testSlewDecisionRefusedWhenAnswerIsStale() {
+        let resolver = resolverWithEphemeris()
+        let c = controller(resolver)
+        let policy = SlewSafetyPolicy(minSunSeparationDeg: 0,
+                                      minAltitudeDeg: -90,
+                                      maxAltitudeDeg: 90,
+                                      limitingMagnitude: 30,
+                                      requiredConfidence: .high)
+
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.snapshot.state, .lock)
+        XCTAssertTrue(try! XCTUnwrap(c.slewDecision(date: at(1.2), policy: policy)).isAllowed)
+
+        // Arahkan ke tempat lain: keadaan kembali `pointing` dan tidak punya
+        // jawaban sekarang — tapi resolusi Sirius masih tersimpan.
+        let elsewhere = quaternion(viewPointingAt: HorizontalCoord(altitudeDeg: 60,
+                                                                  azimuthDeg: 250))
+        c.feed(quaternion: elsewhere, timestamp: at(5.0))
+        XCTAssertEqual(c.snapshot.state, .pointing)
+        XCTAssertNil(c.answeredIntent, "keadaan tanpa jawaban")
+
+        XCTAssertNil(c.slewDecision(date: at(5.0), policy: policy),
+                     "GoTo tidak boleh dihitung dari resolusi arah tunjuk sebelumnya")
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat
