@@ -10,7 +10,7 @@ jangan pernah wrist-angle → motor.
 - [x] PointingResolver: pointing+konteks → kandidat
 - [x] ConfidenceModel: HIGH/MEDIUM/LOW (anti false-lock)
 - [x] Tambah Bulan & planet terang (via AstronomyKit ephemeris) — divalidasi vs JPL Horizons, simpangan terburuk 8.91″
-- [ ] Visibility/context filtering (di bawah horizon, magnitude)
+- [x] Visibility/context filtering (di bawah horizon, magnitude, siang/malam, pengaman Matahari)
 - [ ] Instrumentasi/logging untuk Experiment 1
 - [ ] Uji: kandidat ambigu → tidak boleh HIGH
 

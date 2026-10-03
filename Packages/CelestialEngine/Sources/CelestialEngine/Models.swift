@@ -32,6 +32,8 @@ public struct HorizontalCoord: Equatable {
 
 public enum ObjectKind: String, Equatable {
     case moon, planet, star, deepSky
+    /// Matahari hanya dipakai sebagai konteks, tidak pernah sebagai target.
+    case sun
 }
 
 /// Benda langit di katalog.

@@ -2,20 +2,29 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: efemeris Bulan & planet, divalidasi terhadap JPL Horizons
-- ✅ `Ephemeris.swift` — protokol `SolarSystemEphemeris` + backend
-  `AstronomyKitEphemeris` (AstronomyKit 0.2.3 / Astronomy Engine 2.1.19, MIT).
-- ✅ Benda didukung: Bulan, Merkurius, Venus, Mars, Jupiter, Saturnus.
-  Koordinat **apparent of-date** (bukan J2000 — Bulan bergerak ~0.5°/jam).
-- ✅ `EphemerisTests`: 6 test baru. **Simpangan terburuk vs Horizons 8.91″**
-  (Saturnus), toleransi 30″. Uji ini memakai fixture Horizons yang di-commit,
-  jadi deterministik dan tanpa jaringan.
-- ✅ Bug ditemukan & diperbaiki: satuan `Observer.height` adalah **meter**,
-  bukan km. Observer "geosentris" sebelumnya 6 km di bawah permukaan →
-  Bulan meleset 0.8° karena parallax. Sekarang `-6378137` m.
-- ✅ `swift test`: **14 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
+### Siklus ini: efemeris disambungkan ke resolver + penyaringan visibilitas
+- ✅ `Visibility.swift` — `VisibilityPolicy`, `SkyContext`, `VisibilityFilter`.
+  Alasan penolakan eksplisit: di bawah horizon, terlalu redup, siang,
+  terlalu dekat Matahari. Semua ambang bisa dikalibrasi tanpa mengubah engine.
+- ✅ `PointingResolver` dirombak: `diagnose()` mengembalikan `Resolution`
+  berisi jawaban + jejak audit (kandidat yang ditolak & alasannya, kegagalan
+  efemeris, jumlah benda yang dipertimbangkan).
+- ✅ Bulan & planet kini ikut jadi kandidat, memakai koordinat of-date dari
+  efemeris (tanpa presesi ganda).
+- ✅ **Pengaman Matahari**: `EphemerisBody.pointableBodies` tidak memuat
+  Matahari. Menunjuk teleskop ke Matahari merusak alat & mata, jadi Matahari
+  tidak pernah masuk proses kandidat sama sekali — hanya dipakai sebagai
+  konteks. Ada uji khusus untuk ini.
+- ✅ Kebijakan `permissive` yang konsisten (sebelumnya bisa bertentangan
+  dengan `context.isDark`; sekarang gelap/terang selalu dihitung dari
+  `policy` + ketinggian Matahari).
+- ✅ `swift test`: **42 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
 
 ### Siklus sebelumnya
+- ✅ Efemeris Bulan & planet via AstronomyKit, divalidasi vs JPL Horizons
+  (simpangan terburuk 8.91″).
+- ✅ Reduksi presesi J2000 → of-date di resolver (sebelumnya bintang meleset
+  ~0.3°). Ditemukan & diperbaiki.
 - ✅ Scaffold monorepo + CelestialEngine (Fase 1 inti).
 - ✅ Terbukti engine bisa diuji di VPS2 TANPA Mac (via `./swift-test.sh`).
 
@@ -29,11 +38,10 @@
 - `Package.resolved` di-commit → build CI reprodusibel.
 - Fixture acuan: `Packages/CelestialEngine/Tests/CelestialEngineTests/Fixtures/horizons_reference.json`
   (dari JPL Horizons DE441). Segarkan dengan `python3 Tools/fetch_horizons_reference.py`.
-- AstronomyKit **belum tersambung ke `PointingResolver`**. Saat ini ia hanya
-  penyedia posisi; katalog yang diresolusi masih bintang saja.
+- AstronomyKit tersambung ke `PointingResolver` lewat `diagnose()`. Bulan &
+  planet ikut jadi kandidat dengan koordinat of-date. Matahari hanya konteks,
+  tidak pernah jadi target.
 
 ## Langkah berikutnya
-1. Sambungkan efemeris ke `PointingResolver` (Bulan/planet jadi kandidat).
-2. Visibility/context filtering (magnitudo, ambang ketinggian, cahaya siang).
-3. Uji anti-false-lock: kandidat ambigu TIDAK boleh HIGH.
-4. Instrumentasi/logging untuk Experiment 1.
+1. Uji anti-false-lock: kandidat ambigu TIDAK boleh HIGH.
+2. Instrumentasi/logging untuk Experiment 1.

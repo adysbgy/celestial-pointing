@@ -6,15 +6,25 @@ import AstronomyKit
 
 /// Benda tata surya yang didukung efemeris dinamis.
 ///
-/// Sengaja dibatasi pada benda terang yang bisa ditunjuk mata telanjang
-/// (PRD: katalog kecil dulu). Pluto/Uranus/Neptunus tidak relevan untuk
-/// pointing tanpa alat bantu.
+/// Matahari ada di sini **hanya sebagai konteks** (menentukan siang/malam dan
+/// sudut aman teleskop). Matahari tidak pernah boleh menjadi kandidat target:
+/// menunjuk teleskop ke Matahari merusak peralatan dan mata. Lihat
+/// `EphemerisBody.pointableBodies`.
 public enum EphemerisBody: String, CaseIterable, Equatable {
-    case moon, mercury, venus, mars, jupiter, saturn
+    case sun, moon, mercury, venus, mars, jupiter, saturn
+
+    /// Benda yang boleh menjadi target pointing. Matahari TIDAK termasuk.
+    public static let pointableBodies: [EphemerisBody] = [
+        .moon, .mercury, .venus, .mars, .jupiter, .saturn
+    ]
+
+    /// Apakah benda ini aman dijadikan target pointing.
+    public var isPointable: Bool { self != .sun }
 
     /// Nama tampilan untuk UI.
     public var displayName: String {
         switch self {
+        case .sun: return "Matahari"
         case .moon: return "Bulan"
         case .mercury: return "Merkurius"
         case .venus: return "Venus"
@@ -28,6 +38,7 @@ public enum EphemerisBody: String, CaseIterable, Equatable {
     /// bukan pengganti perhitungan efemeris.
     public var typicalBrightestMagnitude: Double {
         switch self {
+        case .sun: return -26.7
         case .moon: return -12.7
         case .mercury: return -1.9
         case .venus: return -4.9
@@ -52,12 +63,16 @@ public struct EphemerisSample: Equatable {
     public var magnitude: Double
     /// Radius sudut semu (derajat). Bulan ~0.26°, planet < 0.02°.
     public var angularRadiusDeg: Double
+    /// Fraksi piringan yang menyala (0…1). Untuk bintang/planet jauh nilainya 1.
+    public var illuminationFraction: Double
 
-    public init(raDeg: Double, decDeg: Double, magnitude: Double, angularRadiusDeg: Double = 0) {
+    public init(raDeg: Double, decDeg: Double, magnitude: Double,
+                angularRadiusDeg: Double = 0, illuminationFraction: Double = 1) {
         self.raDeg = raDeg
         self.decDeg = decDeg
         self.magnitude = magnitude
         self.angularRadiusDeg = angularRadiusDeg
+        self.illuminationFraction = illuminationFraction
     }
 }
 
@@ -132,6 +147,7 @@ public struct AstronomyKitEphemeris: SolarSystemEphemeris {
 
         let celestial: CelestialBody
         switch body {
+        case .sun: celestial = .sun
         case .moon: celestial = .moon
         case .mercury: celestial = .mercury
         case .venus: celestial = .venus
@@ -164,7 +180,8 @@ public struct AstronomyKitEphemeris: SolarSystemEphemeris {
             raDeg: eq.rightAscension * 15.0,
             decDeg: eq.declination,
             magnitude: illum.magnitude,
-            angularRadiusDeg: angularRadiusDeg
+            angularRadiusDeg: angularRadiusDeg,
+            illuminationFraction: illum.phaseFraction
         )
     }
 }
