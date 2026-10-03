@@ -258,4 +258,51 @@ final class LinkMessageTests: XCTestCase {
         XCTAssertTrue(gate.shouldReport(high))
         XCTAssertTrue(gate.shouldReport(medium), "yakin → ragu adalah kabar yang harus dikirim")
     }
+
+    /// **Kiriman yang gagal tidak boleh memakan kesempatan berikutnya.**
+    ///
+    /// `shouldReport` menandai keputusan sebagai "sudah dilaporkan" saat
+    /// dipanggil — sebelum pengiriman dicoba. Kalau urutannya begitu, kiriman
+    /// yang gagal (jam belum tersambung ke iPhone — kegagalan yang paling
+    /// sering di lapangan) membuat keputusan itu tercatat terkirim, sehingga
+    /// **tidak pernah dicoba lagi** selama keputusannya sama. iPhone terjebak
+    /// di keadaan lama sementara di jam sudah berubah, dan tidak ada kiriman
+    /// berikutnya yang membetulkannya.
+    ///
+    /// Uji ini akan merah kalau `deliver` dikembalikan ke urutan lama
+    /// (tandai dulu, kirim kemudian): percobaan kedua akan langsung ditolak
+    /// penyaringnya dan `attempts` tetap 1.
+    func testFailedSendIsRetriedInsteadOfSwallowed() {
+        var gate = LinkReportGate()
+        let locked = PointingSnapshot(state: .lock,
+                                      intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        var attempts = 0
+
+        // Percobaan pertama gagal: sesi belum aktif.
+        let first = gate.deliver(locked) { _ in attempts += 1; return false }
+        XCTAssertFalse(first, "gagal kirim bukan terkirim")
+
+        // Keputusan yang sama, percobaan berikutnya: harus dicoba lagi.
+        let second = gate.deliver(locked) { _ in attempts += 1; return true }
+        XCTAssertTrue(second, "kiriman yang gagal tidak boleh dianggap sudah tersampaikan")
+        XCTAssertEqual(attempts, 2, "keputusan yang gagal harus diulang")
+
+        // Setelah benar-benar terkirim, keputusan yang sama tidak dikirim lagi.
+        XCTAssertFalse(gate.deliver(locked) { _ in attempts += 1; return true })
+        XCTAssertEqual(attempts, 2, "20 sampel dengan keputusan sama bukan informasi baru")
+    }
+
+    /// Kehilangan jawaban tetap terkirim walau ada kiriman yang gagal
+    /// sebelumnya — inilah kabar yang dulu tidak pernah sampai ke iPhone.
+    func testLostAnswerIsStillDeliveredAfterAFailedSend() {
+        var gate = LinkReportGate()
+        let locked = PointingSnapshot(state: .lock,
+                                      intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        let lost = PointingSnapshot(state: .pointing,
+                                    intent: CelestialIntent(level: .high, best: vega, candidates: []))
+
+        XCTAssertFalse(gate.deliver(locked) { _ in false }, "kiriman pertama gagal")
+        XCTAssertTrue(gate.deliver(lost) { _ in true },
+                      "kehilangan jawaban harus tetap bisa dikirim setelah kegagalan")
+    }
 }

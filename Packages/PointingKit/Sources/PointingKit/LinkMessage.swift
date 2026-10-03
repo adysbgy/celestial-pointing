@@ -261,4 +261,40 @@ public struct LinkReportGate: Sendable {
         last = decision
         return true
     }
+
+    /// Kirim sebuah keputusan lewat `send`, dan tandai terkirim **hanya bila
+    /// pengirimannya benar-benar berhasil**.
+    ///
+    /// **Kenapa ini ada, bukan sekadar `shouldReport` + `send` berurutan.**
+    /// `shouldReport` menandai keputusan sebagai "sudah dilaporkan" saat ia
+    /// dipanggil, sebelum pengiriman dicoba. Kalau pengirimannya gagal — dan
+    /// kegagalan yang paling sering di lapangan adalah jam yang belum
+    /// tersambung ke iPhone — keputusan itu sudah tercatat sebagai terkirim,
+    /// sehingga **tidak pernah dicoba lagi**: pengiriman berikutnya untuk
+    /// keputusan yang sama akan dilewati penyaringnya. iPhone lalu terjebak di
+    /// keadaan lama (mis. `lock`) sementara di jam keadaannya sudah berubah,
+    /// dan tidak ada kiriman berikutnya yang membetulkannya.
+    ///
+    /// Itu tepat membatalkan alasan gerbang ini ada. Gerbang ini dibuat supaya
+    /// "hilangnya jawaban" tidak disembunyikan; kalau kiriman yang gagal
+    /// memakan kesempatan berikutnya, justru itulah yang terjadi.
+    ///
+    /// Karena itu urutannya dibalik: **kirim dulu, tandai setelah sukses**.
+    /// Gagal kirim berarti keputusannya belum tersampaikan, jadi percobaan
+    /// berikutnya (keputusan yang sama, beberapa detik kemudian) masih
+    /// dianggap baru dan dicoba lagi — sampai berhasil. Penghitung kegagalan
+    /// tetap naik, jadi percobaan ulang ini terlihat, bukan diam-diam.
+    ///
+    /// - Returns: `true` hanya bila `send` benar-benar berhasil.
+    @discardableResult
+    public mutating func deliver(_ snapshot: PointingSnapshot,
+                                 via send: (PointingSnapshot) -> Bool) -> Bool {
+        let decision = Decision(state: snapshot.state,
+                                objectID: snapshot.answeredObject?.id,
+                                level: snapshot.answeredLevel)
+        guard decision != last else { return false }
+        guard send(snapshot) else { return false }
+        last = decision
+        return true
+    }
 }

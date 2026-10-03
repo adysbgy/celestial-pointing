@@ -63,9 +63,14 @@ public final class WatchLinkService: NSObject, ObservableObject {
     /// `sigmaDeg` sebaiknya diisi dengan sigma yang **berlaku di jam**, supaya
     /// sampel yang direkam iPhone membawa konteks yang benar. `nil` berarti
     /// penerima memakai bawaannya.
+    ///
+    /// - Returns: `true` bila pesannya benar-benar terkirim. Dipakai
+    ///   `sendIfDecisionChanged` untuk memutuskan apakah keputusan ini boleh
+    ///   dianggap sudah tersampaikan.
+    @discardableResult
     public func send(state snapshot: PointingSnapshot,
                      at date: Date = Date(),
-                     sigmaDeg: Double? = nil) {
+                     sigmaDeg: Double? = nil) -> Bool {
         send(PointingLinkMessage.state(from: snapshot, at: date, sigmaDeg: sigmaDeg))
     }
 
@@ -83,14 +88,26 @@ public final class WatchLinkService: NSObject, ObservableObject {
     /// masih berlaku. Aturannya ada di `LinkReportGate` (teruji di Linux); di
     /// sini hanya menjalankannya.
     ///
-    /// - Returns: `true` bila pesan benar-benar dikirim.
+    /// **Kenapa lewat `deliver`, bukan `shouldReport` lalu `send`.** Kalau
+    /// penyaringnya ditanya lebih dulu, keputusan ditandai "sudah dilaporkan"
+    /// sebelum pengiriman dicoba. Kiriman yang gagal — dan yang paling sering
+    /// di lapangan adalah jam yang belum tersambung ke iPhone — karena itu
+    /// **tidak pernah dicoba lagi** untuk keputusan yang sama. iPhone terjebak
+    /// di keadaan lama (mis. `lock`) sementara di jam sudah berubah, tanpa
+    /// kiriman berikutnya yang membetulkannya. `deliver` menandai terkirim
+    /// hanya setelah benar-benar berhasil, jadi percobaan berikutnya masih
+    /// dianggap baru. Itu sekaligus memenuhi janji `send(_:)` bahwa kegagalan
+    /// tidak diam: penghitungnya naik **dan** kiriman itu diulang.
+    ///
+    /// - Returns: `true` bila pesan benar-benar terkirim.
     @discardableResult
     public func sendIfDecisionChanged(state snapshot: PointingSnapshot,
                                       at date: Date = Date(),
                                       sigmaDeg: Double? = nil) -> Bool {
-        guard reportGate.shouldReport(snapshot) else { return false }
-        send(state: snapshot, at: date, sigmaDeg: sigmaDeg)
-        return true
+        reportGate.deliver(snapshot) { [weak self] snapshot in
+            guard let self else { return false }
+            return self.send(state: snapshot, at: date, sigmaDeg: sigmaDeg)
+        }
     }
 
     /// Kirim hasil kalibrasi.
@@ -121,17 +138,25 @@ public final class WatchLinkService: NSObject, ObservableObject {
     /// saja sementara tidak ada satu pun keputusan yang sampai. Ini juga jalur
     /// yang dipakai `requestState()`, jadi permintaan iPhone yang tidak pernah
     /// dijawab pun tidak meninggalkan jejak.
-    public func send(_ message: PointingLinkMessage) {
+    ///
+    /// - Returns: `true` bila pesannya benar-benar terkirim. Kegagalan yang
+    ///   terlihat saja tidak cukup: pemanggil (lewat `sendIfDecisionChanged`)
+    ///   butuh jawaban ini untuk tahu bahwa keputusannya **belum** tersampaikan
+    ///   dan masih harus diulang.
+    @discardableResult
+    public func send(_ message: PointingLinkMessage) -> Bool {
         guard let session, session.activationState == .activated else {
             sendFailureCount += 1
             lastMessageNote = "Pesan belum terkirim: sesi belum aktif."
-            return
+            return false
         }
         do {
             try session.updateApplicationContext(message.plist)
+            return true
         } catch {
             sendFailureCount += 1
             lastMessageNote = "Gagal mengirim: \(error.localizedDescription)"
+            return false
         }
     }
 
