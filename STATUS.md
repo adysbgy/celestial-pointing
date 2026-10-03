@@ -45,7 +45,19 @@ Perbaikannya:
 - Gerbang sintaks: **seluruh 15 berkas app** (bertambah satu) lolos
   `swiftc -parse -swift-version 5` di container `swift:6.0`.
 - `./swift-test.sh` → lihat angka terbaru di Ringkasan di atas (0 gagal).
-- Build macOS diverifikasi CI `Apple Build` pada commit siklus ini.
+
+**Galat nyata yang hanya muncul saat dibangun di macOS (dan sudah diperbaiki):**
+- Percobaan pertama memakai `ShareLink(item:)` dengan label tapi **tanpa**
+  `preview:`. Di macOS, `ShareLink` hanya mengimplementasikan sebagian
+  permutasi initializer-nya: bila `item:` bukan `String`/`URL` **dan** tidak ada
+  `preview:`, tidak ada initializer yang cocok →
+  `error: no exact matches in call to initializer` (lalu satu galat susulan
+  "type of expression is ambiguous" di baris berikutnya). Ditambahkan
+  `preview: SharePreview(...)` pada kedua layar. Gerbang `swiftc -parse` **tidak**
+  bisa menangkap ini: ia memeriksa sintaks, bukan resolusi overload — sama
+  seperti kasus kontrol akses `PointingEngine.bind` di siklus sebelumnya.
+  Pelajaran: untuk API SwiftUI baru, `-parse` bukan bukti; hanya build macOS
+  yang membuktikan.
 
 ### Siklus sebelumnya: objek sisa tampil sebagai hasil sekarang (anti false-confidence)
 Fokus: membaca sendiri setiap berkas app, lalu memperbaiki satu cacat nyata yang

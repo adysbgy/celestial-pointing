@@ -184,7 +184,8 @@ struct Experiment1View: View {
                 }
             }
 
-            ShareLink(item: exportDocument(recorder)) {
+            ShareLink(item: exportDocument(recorder),
+                      preview: SharePreview("Dataset Experiment 1")) {
                 Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
             }
             .disabled(trials.isEmpty)

@@ -222,7 +222,8 @@ struct DiagnosticsView: View {
                 }
 
                 Section {
-                    ShareLink(item: exportDocument) {
+                    ShareLink(item: exportDocument,
+                              preview: SharePreview("Riwayat keyakinan")) {
                         Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
                     }
                     .disabled(trace.samples.isEmpty)
