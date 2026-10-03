@@ -2,7 +2,26 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: fondasi Fase 2 yang bisa diuji di Linux → 139 test hijau
+### Siklus ini: pengaman slew (aturan keras PRD) + fondasi Fase 2 → 156 test hijau
+- ✅ `SlewSafety.swift` — **POINT → OBJECT ID → SAFE GOTO**, ditegakkan di tipe,
+  bukan sekadar konvensi:
+  - `SlewCommand` tidak punya inisialisasi publik; satu-satunya jalan
+    membuatnya adalah `SlewPlanner.plan(...)`. Jadi mustahil membentuk perintah
+    motor dari sudut pergelangan tanpa lewat pemeriksaan.
+  - Arah target perintah = **posisi objek yang teridentifikasi**, bukan arah
+    tunjuk. Ini persis aturan PRD.
+  - Gagal-tertutup: tanpa target, keyakinan di bawah syarat, atau posisi
+    Matahari tidak diketahui → **ditolak**, tidak pernah diasumsikan aman.
+  - Bahaya dilaporkan sebagai daftar unik & terurut (`SlewHazard`).
+- ✅ `Resolution.sunHorizontal` diekspos supaya pengaman teleskop bisa dihitung
+  dari jejak audit resolver (sebelumnya arah Matahari tidak pernah keluar).
+- ✅ Uji integrasi pada geometri langit sungguhan: Bulan → identifikasi HIGH →
+  GoTo **diizinkan**; Jupiter yang ambigu (~6.8° dari Pollux) → hanya MEDIUM →
+  GoTo **ditolak** (`lowConfidence`). Aturan "jangan salah identifikasi demi
+  magic" terbukti berlaku sampai ke teleskop.
+- ✅ `swift test`: **156 test, 0 gagal** (Swift 6.0, Docker, Linux aarch64).
+
+### Siklus sebelumnya: fondasi Fase 2 yang bisa diuji di Linux (139 test)
 - ✅ `Geometry.swift` — `Vector3` + `Matrix3x3`, **tanpa `simd`** (tidak ada di
   Linux). Penamaan `m11…m33` sengaja sama dengan `CMRotationMatrix` supaya
   lapisan app bisa memetakan sensor tanpa berpikir ulang indeks.

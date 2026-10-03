@@ -27,13 +27,15 @@ jangan pernah wrist-angle → motor.
 - [ ] Watch ↔ iPhone (WatchConnectivity) (butuh Mac)
 
 ## FASE 3 — iOS companion + POC
+- [x] Pengaman slew (`SlewSafety.swift`): POINT → OBJECT ID → SAFE GOTO. Aturan "wrist angle TIDAK PERNAH → motor" ditegakkan di tipe: `SlewCommand` hanya bisa dibuat oleh `SlewPlanner`, dan perintah diturunkan dari objek teridentifikasi (arah target = posisi objek, bukan arah tunjuk). Gagal-tertutup: tanpa target/keyakinan cukup/Matahari tak diketahui → tolak.
 - [ ] iOS diagnostik (grafik confidence, ekspor dataset)
 - [ ] Experiment 1 harness: tunjuk target diketahui → rekam → ekspor
 - [ ] Point & Slew POC 1 teleskop (setelah engine terbukti)
 
 ## Kriteria "ENGINE SIAP"
-- [x] swift test hijau (139/139 di Linux, tanpa Mac)
+- [x] swift test hijau (156/156 di Linux, tanpa Mac)
 - [x] Resolver mengembalikan objek benar untuk target diketahui
 - [x] Tidak pernah HIGH saat kandidat ambigu (diuji eksplisit)
 - [x] Apple build hijau (macOS) — diverifikasi di CI
 - [x] Rantai attitude→resolver utuh & teruji tanpa sensor (attitude sintetis → bintang benar)
+- [x] Slew hanya diizinkan dari objek teridentifikasi berkeyakinan tinggi; gagal-tertutup teruji

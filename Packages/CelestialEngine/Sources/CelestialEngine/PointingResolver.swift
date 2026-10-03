@@ -28,17 +28,25 @@ public struct Resolution: Equatable {
     public var ephemerisFailures: [EphemerisBody]
     /// Jumlah benda yang dipertimbangkan (bintang + benda tata surya).
     public var consideredCount: Int
+    /// Arah Matahari saat itu, bila efemeris tersedia.
+    ///
+    /// Diekspos karena pengaman teleskop (Fase 3) butuh tahu seberapa jauh
+    /// target dari Matahari. Kalau tidak ada, penyaring Matahari tidak bisa
+    /// dijalankan dan pemanggil harus memperlakukannya sebagai tidak diketahui.
+    public var sunHorizontal: HorizontalCoord?
 
     public init(intent: CelestialIntent,
                 context: SkyContext,
                 rejected: [RejectedObject] = [],
                 ephemerisFailures: [EphemerisBody] = [],
-                consideredCount: Int = 0) {
+                consideredCount: Int = 0,
+                sunHorizontal: HorizontalCoord? = nil) {
         self.intent = intent
         self.context = context
         self.rejected = rejected
         self.ephemerisFailures = ephemerisFailures
         self.consideredCount = consideredCount
+        self.sunHorizontal = sunHorizontal
     }
 }
 
@@ -206,7 +214,8 @@ public struct PointingResolver {
                           context: context,
                           rejected: rejected,
                           ephemerisFailures: failures,
-                          consideredCount: considered)
+                          consideredCount: considered,
+                          sunHorizontal: sunHorizontal)
     }
 
     /// Ubah sampel efemeris menjadi entri katalog agar bisa ikut diresolusi.
