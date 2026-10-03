@@ -65,6 +65,9 @@ dihapus dari `reset()`, assertion gagal
   di container `swift:6.0` setelah perubahan.
 - Sapuan ulang jalur kalibrasi: hanya `CalibrationView` yang memanggil
   `CalibrationSession`; `apply()` sudah lewat engine, dan `reset()` kini ikut.
+- Cacat dokumentasi ikut ditutup: komentar di `project.yml` masih menyebut
+  **92 tes** untuk `PointingKit`, padahal suite Linux yang benar-benar
+  dijalankan adalah **143**. Angka disamakan dengan hasil nyata.
 - CI `Engine Tests (Linux)` run `37157040232` pada commit `1fb57ff` → **166 +
   143, 0 gagal** (kedua paket).
 - CI `Apple Build` run `37157040221` pada commit `1fb57ff` → **2× `BUILD

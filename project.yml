@@ -44,7 +44,7 @@ options:
 
 packages:
   # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
-  # format pesan Watch<->iPhone. Semuanya teruji di Linux (92 tes).
+  # format pesan Watch<->iPhone. Semuanya teruji di Linux (143 tes).
   PointingKit:
     path: Packages/PointingKit
   # Mesin inti: katalog, efemeris, resolver, keyakinan, pengaman slew.
