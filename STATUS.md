@@ -53,14 +53,38 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
 - ✅ Ikon app digenerate deterministik oleh `Tools/make_app_icons.py`
   (satu PNG 1024×1024 per app) supaya `actool` tidak menggagalkan build.
 
-**Verifikasi di Linux (yang bisa dilakukan tanpa Mac):**
-- `./swift-test.sh` → **CelestialEngine 156 test + PointingKit 95 test, 0 gagal**.
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 163 test + PointingKit 95 test, 0 gagal**.
 - Setiap berkas app lolos `swiftc -parse -swift-version 5` (gerbang sintaks;
   impor Apple tidak perlu resolve).
 - `project.yml` divalidasi dengan **XcodeGen yang dibangun dari sumber di
-  Linux** — parsing & validasi spec lolos. (XcodeGen menabrak bug
-  corelibs-foundation saat menulis proyek; itu keterbatasan Linux, bukan
-  spec. Bukti sebenarnya tetap CI macOS.)
+  Linux** — parsing + validasi spec lolos, dan proyek yang dihasilkan
+  diperiksa: 2 target app, sumber & dependensi paket terpasang benar, app jam
+  ditanam ke `PlugIns/` milik app iPhone.
+- **CI macOS hijau** (`Apple Build`): `xcodegen generate` → `xcodebuild` untuk
+  app iPhone (termasuk app jam) dan app jam sendiri, keduanya **build sukses**.
+
+**Galat nyata yang hanya muncul saat dibangun di macOS (dan sudah diperbaiki):**
+- `WKInterfaceDevice.isDeviceSupported` tidak ada → dihapus. `play(_:)` diam
+  saja di perangkat tanpa Taptic Engine, jadi tidak perlu dijaga.
+- `nonisolated @objc` → `@objc nonisolated`. Urutan ini satu-satunya yang
+  diterima parser; dibuktikan dengan probe terpisah.
+- `LocationProvider` tidak mendeklarasikan `CLLocationManagerDelegate` sama
+  sekali → ditambahkan, plus `@preconcurrency` karena protokol ObjC tidak
+  di-`@MainActor` sedangkan kelasnya `@MainActor`. Hal yang sama diterapkan
+  pada dua konformans `WCSessionDelegate`.
+- `MotionLogger` memakai `CMDeviceMotion.timestamp` sebagai waktu Unix — itu
+  keliru (detik sejak perangkat menyala), jadi tiap sampel akan bertanggal
+  1970: alur tidak akan pernah melihat pergelangan diam dan efemeris dihitung
+  untuk tanggal yang salah. Sekarang memakai waktu dinding.
+- Dua sumber teks status (`PointingController.statusText` vs
+  `PointingState.shortLabel`) → disatukan, supaya janji "ragu terlihat ragu"
+  tidak bisa dibatalkan di layar.
+- `CalibrationSession` menyimpan controller sebagai `unowned` → kuat; alur
+  kalibrasi boleh hidup lebih lama dari pemanggilnya.
+- `PointingController.resolver` dibuat `private(set)`; penggantian ambang
+  keyakinan kini lewat `setConfidencePolicy(_:)` yang menolak sigma nol,
+  negatif, atau tak berhingga.
 
 ### Siklus sebelumnya: pengaman slew (aturan keras PRD) + fondasi Fase 2 → 156 test hijau
 - ✅ `SlewSafety.swift` — **POINT → OBJECT ID → SAFE GOTO**, ditegakkan di tipe,
@@ -146,8 +170,12 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
   mengujinya; ambang keyakinan disetel dari hasilnya, bukan dari asumsi.
 
 ## Langkah berikutnya
-1. Jalankan `ios-build.yml` di macOS → perbaiki galat build yang muncul.
-2. Experiment 1 dengan jam sungguhan: kumpulkan data, ukur `residualSpreadDeg`,
+1. Jalankan app di perangkat sungguhan: izinkan lokasi & gerak, lalu kalibrasi
+   dengan satu bintang terang. Kalau kalibrasi tidak pernah selesai, itu
+   memang jawaban yang benar — sebaran titik acuannya belum cukup rapat.
+2. Experiment 1: kumpulkan data lapangan, ukur `residualSpreadDeg`, lalu
    suapkan ke `ConfidencePolicy` lewat `setConfidencePolicy(_:)`.
 3. Kalau sigma hasil ukur lebih besar dari yang diasumsikan, turunkan klaim
-   keyakinan engine — jangan sebaliknya.
+   keyakinan engine — jangan sebaliknya. Angka akurasi Watch tetap hipotesis
+   sampai Experiment 1 selesai; tidak ada satu pun bagian kode yang
+   mengasumsikannya.
