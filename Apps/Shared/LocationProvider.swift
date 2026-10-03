@@ -24,20 +24,28 @@ import PointingKit
 ///
 /// Satu implementasi dipakai app Watch maupun app iPhone.
 ///
-/// **Kenapa `@preconcurrency` pada konformansnya.** `CLLocationManagerDelegate`
-/// adalah protokol Objective-C yang tidak di-`@MainActor`, sedangkan kelas ini
-/// di-`@MainActor`. Tanpa `@preconcurrency`, compiler menolak konformansnya.
-/// Penandanya di sini bukan untuk membungkam peringatan: setiap metode
-/// delegasi di bawah memang `nonisolated` dan menyerahkan hasilnya ke
-/// main actor lewat `Task`, jadi tidak ada state kelas ini yang disentuh dari
-/// thread lain.
+/// **Kenapa TIDAK ada `@preconcurrency` pada konformansnya.** Atribut itu dulu
+/// dipakai di sini karena `CLLocationManagerDelegate` adalah protokol
+/// Objective-C yang tidak di-`@MainActor`, sedangkan kelas ini di-`@MainActor`.
+/// Ternyata ia tidak berpengaruh sama sekali: **setiap** metode delegasi di
+/// bawah sudah `nonisolated` dan menyerahkan hasilnya ke main actor lewat
+/// `Task`, jadi tidak ada satu pun persyaratan protokol yang dilanggar isolasi.
+/// Compiler Xcode 16.4 mengatakannya sendiri —
+/// `@preconcurrency attribute on conformance to 'CLLocationManagerDelegate' has
+/// no effect` — dan fix-it-nya memang membuang atribut itu.
+///
+/// Sengaja dibuang, bukan dibiarkan sebagai peringatan yang menganggur: dengan
+/// atribut itu, kesalahan isolasi **baru** di kemudian hari (mis. metode
+/// delegasi yang lupa `nonisolated`) diturunkan menjadi peringatan runtime.
+/// Tanpa atribut, kesalahan yang sama menjadi **galat kompilasi** — jauh lebih
+/// awal ketahuan, dan itu arah yang benar untuk aturan "gagal-tertutup".
 ///
 /// Metode delegasi wajib ditandai `@objc`: tanpa penanda itu metodenya tidak
 /// pernah dipanggil — gejalanya bukan galat kompilasi, melainkan lokasi yang
 /// tidak pernah muncul. Urutannya harus `@objc nonisolated`; dibalik, parser
 /// menolaknya.
 @MainActor
-final class LocationProvider: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
+final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// Lokasi terakhir yang sah, atau `nil` bila belum ada.
     @Published private(set) var location: ObserverLocation?

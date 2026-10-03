@@ -62,25 +62,51 @@ jobs:
       # Skema iPhone ikut membangun app jam, karena app jam adalah dependensi
       # yang ditanam ke dalam bundel iPhone. Jadi satu perintah ini mencakup
       # kedua target.
+      #
+      # Keluarannya disimpan ke berkas supaya bisa diperiksa: peringatan
+      # compiler hanya terlihat di sini, dan siklus sebelumnya meninggalkan
+      # tiga peringatan yang bertentangan dengan komentar di kodenya sendiri
+      # (`@preconcurrency ... has no effect`). Peringatan yang menganggur
+      # adalah cara paling halus untuk menutupi niat kode yang sudah tidak
+      # berlaku, jadi ia dijadikan gerbang — bukan dibiarkan lewat.
       - name: Build app iPhone (termasuk app jam)
         run: |
+          set -o pipefail
           xcodebuild build \
             -project PointAndKnow.xcodeproj \
             -scheme PointAndKnow \
             -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation \
             -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-iphone.log
 
       - name: Build app jam sendiri
         run: |
+          set -o pipefail
           xcodebuild build \
             -project PointAndKnow.xcodeproj \
             -scheme PointAndKnowWatch \
             -destination 'generic/platform=watchOS Simulator' \
             -skipPackagePluginValidation \
             -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-watch.log
+
+      # Gerbang peringatan: satu-satunya peringatan yang dianggap kegagalan
+      # adalah peringatan yang menunjuk berkas **kode kita sendiri**
+      # (`Apps/...`). Peringatan dari alat Xcode (urutan build manual, metadata
+      # AppIntents, swift-format) sengaja tidak dihitung — itu bukan kode ini,
+      # dan menjadikannya kegagalan hanya akan membuat gerbangnya dimatikan
+      # orang lain saat ia berbunyi.
+      - name: Gerbang peringatan (kode sendiri)
+        run: |
+          set -e
+          hits=$(grep -hE '^/.*/Apps/.*: warning:' build-iphone.log build-watch.log || true)
+          if [ -n "$hits" ]; then
+            echo "Peringatan compiler pada kode sendiri:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "Tidak ada peringatan compiler pada Apps/."
 
       # Log diagnostik hanya berguna saat gagal, tapi menaruhnya di sini
       # membuat kegagalan pertama bisa langsung dibaca tanpa perlu mengulang

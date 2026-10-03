@@ -93,10 +93,17 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     }
 }
 
-/// `@preconcurrency`: `WCSessionDelegate` tidak di-`@MainActor`, sedangkan
-/// kelas ini di-`@MainActor`. Setiap metode di bawah `nonisolated` dan
-/// menyerahkan hasilnya ke main actor lewat `Task`.
-extension PhoneLinkService: @preconcurrency WCSessionDelegate {
+/// **Kenapa TIDAK ada `@preconcurrency` pada konformansnya.**
+/// `WCSessionDelegate` tidak di-`@MainActor`, sedangkan kelas ini
+/// di-`@MainActor`; atribut itu dulu dipakai untuk itu. Ternyata ia tidak
+/// berpengaruh, karena **setiap** metode di bawah `nonisolated` dan menyerahkan
+/// hasilnya ke main actor lewat `Task` — tidak ada persyaratan protokol yang
+/// dilanggar isolasi. Compiler Xcode 16.4 mengatakannya sendiri
+/// (`... to 'WCSessionDelegate' has no effect`) dan fix-it-nya membuang atribut
+/// itu. Sengaja dibuang: dengan atribut itu, kesalahan isolasi baru di masa
+/// depan diturunkan menjadi peringatan runtime; tanpanya ia menjadi galat
+/// kompilasi.
+extension PhoneLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     activationDidCompleteWith activationState: WCSessionActivationState,
