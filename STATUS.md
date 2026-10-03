@@ -99,6 +99,14 @@ seluruh pointing sesudahnya bergeser, dan kesalahannya tersembunyi di balik
 sebaran sisa yang terlihat bagus. Keduanya kini menolak saat
 `snapshot.hasSensor == false`, dengan pesan yang menyebut sebabnya.
 
+**Cacat 7 — bacaan arah tunjuk tetap tampil dari sensor yang sudah mati.**
+`PointingEngine.pointing` meneruskan `snapshot.calibratedPointing` apa adanya.
+Saat sensor hilang, nilai itu adalah arah **terakhir sebelum sensor mati**, dan
+layar Ketelitian menampilkannya sebagai azimut/ketinggian tanpa penanda — bacaan
+lama tampak seperti pengukuran sekarang. Ini kelas yang sama dengan enam cacat
+di atas (nilai yang sengaja dipertahankan, dibaca sebagai nilai berlaku), dan
+kini disamakan: `nil` saat `snapshot.hasSensor == false`.
+
 **Yang benar-benar dijalankan pada siklus ini:**
 - `./swift-test.sh` → **166 CelestialEngine + 136 PointingKit, 0 gagal** (exit 0).
   Dua belas uji baru mengunci perilaku ini: objek sisa tidak terkirim
@@ -109,6 +117,8 @@ sebaran sisa yang terlihat bagus. Keduanya kini menolak saat
   di container `swift:6.0`.
 - Sapuan jalur kirim/rekam: tidak ada lagi pembacaan `bestObject` /
   `intent?.level` mentah di `Apps/`.
+- CI `Apple Build` run `37150857427` dan `Engine Tests (Linux)` run
+  `37150857564` pada commit `d43d0a9` → keduanya hijau.
 - CI `Apple Build` run `37150667798` dan `Engine Tests (Linux)` run
   `37150667892` pada commit `4e15d90` → keduanya hijau (App iPhone+Watch
   `BUILD SUCCEEDED`, 166 + 136 uji lolos).
