@@ -55,6 +55,19 @@ struct RootView: View {
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
         }
+        .onAppear {
+            // Keputusan yang dikirim jam direkam ke riwayat keyakinan yang sama
+            // dengan sampel iPhone; `fromWatch` membedakan asal-usulnya.
+            //
+            // Tanpa penyambungan ini, `onMessage` tidak pernah dipanggil dan
+            // bagian "Sampel dari jam" di layar Tautan akan selalu nol — layar
+            // yang tampak baik-baik saja sambil menyembunyikan bahwa datanya
+            // tidak pernah masuk. Jam tidak mengirim jarak kandidat, jadi
+            // `ratioToSigma` sampel ini memang kosong; itu ditampilkan apa
+            // adanya, bukan diisi angka karangan.
+            link.onMessage = { message in trace.record(message: message) }
+            link.activate()
+        }
     }
 }
 

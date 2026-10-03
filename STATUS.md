@@ -26,6 +26,12 @@ item yang benar-benar belum ada. Tidak ada aturan keras PRD yang dilonggarkan.
   - 8 tes baru (`ConfidenceTraceArchiveTests`): bolak-balik mempertahankan
     variabel keputusan, waktu berpecahan detik, sigma nol tetap `nil`, sampel jam
     tetap tanpa jarak, arsip kosong tetap sah, berkas rusak **gagal** dibaca.
+- **`PhoneLinkService.onMessage` tidak pernah disambungkan.** Hook-nya ada dan
+  `ConfidenceTraceStore.record(message:)` juga ada, tapi tidak ada yang
+  memanggil `onMessage` — jadi bagian "Sampel dari jam" di layar Tautan akan
+  selamanya nol sambil tampak normal. Kini disambungkan di akar `RootView`,
+  sekalian mengaktifkan sesi sekali (sebelumnya hanya di `LinkView.onAppear`,
+  sehingga pesan yang tiba sebelum tab itu dibuka tidak terekam).
 
 **Yang diverifikasi ulang (tidak diubah, ternyata sudah ada):**
 - `WatchLinkService.sessionReachabilityDidChange` **sudah** ada; `isReachable`
@@ -33,7 +39,6 @@ item yang benar-benar belum ada. Tidak ada aturan keras PRD yang dilonggarkan.
 - `MotionLogger` sudah memetakan `CMDeviceMotion` → `init?(cmX:cmY:cmZ:cmW:)`.
 - Haptic `.lock`/`.uncertain` sudah dipicu dari perpindahan keadaan di
   `PointingController.hapticEvents(from:to:)`, bukan di lapisan UI.
-- `PhoneLinkService.onMessage` sudah tersambung ke `ConfidenceTraceStore.record(message:)`.
 
 **Verifikasi (yang benar-benar dijalankan):**
 - `./swift-test.sh` → **CelestialEngine 163 test + PointingKit 103 test, 0 gagal**
