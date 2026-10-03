@@ -65,7 +65,11 @@ dihapus dari `reset()`, assertion gagal
   di container `swift:6.0` setelah perubahan.
 - Sapuan ulang jalur kalibrasi: hanya `CalibrationView` yang memanggil
   `CalibrationSession`; `apply()` sudah lewat engine, dan `reset()` kini ikut.
-- CI untuk commit ini dipantau di sini (lihat catatan hasil di bawah).
+- CI `Engine Tests (Linux)` run `37157040232` pada commit `1fb57ff` → **166 +
+  143, 0 gagal** (kedua paket).
+- CI `Apple Build` run `37157040221` pada commit `1fb57ff` → **2× `BUILD
+  SUCCEEDED`** (iPhone termasuk app jam, dan app jam sendiri) dan gerbang
+  peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
 
 ### Siklus sebelumnya: sesi tautan yang sudah mati tetap diklaim "Aktif" (dan tidak bisa diaktifkan ulang)
 Fokus: menyisir **klaim keadaan tautan** di lapisan app — satu-satunya bagian
