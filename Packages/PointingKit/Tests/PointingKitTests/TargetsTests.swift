@@ -114,6 +114,47 @@ final class TargetsTests: XCTestCase {
         XCTAssertEqual(location.observer, observer)
     }
 
+    /// `isSamePlace` memisahkan perpindahan tempat yang sungguhan dari getaran
+    /// GPS. `ObserverLocation` membawa `capturedAt` yang berubah tiap pembaruan,
+    /// jadi `==` tidak bisa dipakai: ia akan menganggap tiap perbaikan GPS
+    /// sebagai perpindahan, dan seluruh alur akan direset tiap detik.
+    func testIsSamePlaceIgnoresTimestampAndJitter() {
+        let first = ObserverLocation(latitudeDeg: -6.2, longitudeDeg: 106.8,
+                                     label: "a", source: "corelocation",
+                                     capturedAt: Date(timeIntervalSince1970: 0))
+        // Tempat yang sama, waktu berbeda — dan getaran GPS ~10 m.
+        let later = ObserverLocation(latitudeDeg: -6.20003, longitudeDeg: 106.80004,
+                                     label: "b", source: "corelocation",
+                                     capturedAt: Date(timeIntervalSince1970: 600))
+
+        XCTAssertNotEqual(first, later, "nilai lengkapnya memang berbeda")
+        XCTAssertTrue(first.isSamePlace(as: later),
+                      "getaran GPS puluhan meter bukan perpindahan tempat")
+
+        // Perpindahan sungguhan harus terdeteksi.
+        let elsewhere = ObserverLocation(latitudeDeg: -6.3, longitudeDeg: 106.8,
+                                         label: "c", source: "corelocation")
+        XCTAssertFalse(first.isSamePlace(as: elsewhere))
+
+        // Perpindahan kecil tapi nyata (0.05° ≈ 5.5 km) juga harus terdeteksi,
+        // supaya ambangnya tidak terlalu longgar.
+        let nearbyCity = ObserverLocation(latitudeDeg: -6.25, longitudeDeg: 106.8,
+                                          label: "d", source: "corelocation")
+        XCTAssertFalse(first.isSamePlace(as: nearbyCity))
+    }
+
+    /// Lokasi yang tidak sah tidak boleh dianggap "tempat yang sama" dengan
+    /// apa pun — menerimanya berarti memakai koordinat yang tidak masuk akal.
+    func testInvalidLocationIsNeverSamePlace() {
+        let valid = ObserverLocation(latitudeDeg: 0, longitudeDeg: 0,
+                                     label: "ok", source: "manual")
+        let invalid = ObserverLocation(latitudeDeg: 120, longitudeDeg: 0,
+                                       label: "bad", source: "manual")
+        XCTAssertFalse(invalid.isSamePlace(as: valid))
+        XCTAssertFalse(valid.isSamePlace(as: invalid))
+        XCTAssertFalse(invalid.isSamePlace(as: invalid))
+    }
+
     /// Lokasi darurat harus jelas menandai dirinya supaya tidak salah dianggap
     /// lokasi pengukuran.
     func testFallbackIsLabelled() {

@@ -53,6 +53,25 @@ public struct ObserverLocation: Codable, Equatable, Sendable {
     /// Nilai `source` untuk lokasi darurat.
     public static let fallbackSource = "fallback"
 
+    /// Apakah dua lokasi ini **tempat yang sama**, sejauh yang berarti bagi
+    /// langit.
+    ///
+    /// Dipakai untuk membedakan perpindahan tempat yang sungguhan dari getaran
+    /// GPS. `ObserverLocation` membawa `capturedAt`, jadi dua pembaruan dari
+    /// tempat yang sama **tidak** pernah `==` — dan memperlakukannya sebagai
+    /// perpindahan berarti seluruh langit dihitung ulang, alur dihentikan, dan
+    /// jam tampak berubah pikiran tiap detik, padahal penggunanya diam.
+    ///
+    /// Ambang bawaannya dari geseran langit: 1° bujur menggeser langit 1°, jadi
+    /// 0.01° ≈ 36″ — jauh di bawah sigma pointing mana pun yang masuk akal.
+    /// Getaran GPS puluhan meter hanya ≈ 0.0005°, sepuluh kali lebih kecil dari
+    /// ambang ini.
+    public func isSamePlace(as other: ObserverLocation, toleranceDeg: Double = 0.01) -> Bool {
+        guard isValid, other.isValid else { return false }
+        return abs(latitudeDeg - other.latitudeDeg) <= toleranceDeg
+            && abs(longitudeDeg - other.longitudeDeg) <= toleranceDeg
+    }
+
     /// Lokasi darurat untuk simulator/CI: Jakarta.
     ///
     /// Hanya dipakai saat aplikasi benar-benar tidak punya lokasi. Sengaja

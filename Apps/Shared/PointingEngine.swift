@@ -51,8 +51,18 @@ public final class PointingEngine: ObservableObject {
 
     /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi alur
     /// dihentikan dulu supaya tidak ada jawaban yang dihitung dengan lokasi lama.
+    ///
+    /// **Yang menentukan perpindahan adalah koordinatnya, bukan keseluruhan
+    /// nilai.** `ObserverLocation` membawa `capturedAt` yang berubah di tiap
+    /// pembaruan GPS, jadi membandingkan dengan `!=` akan menganggap tiap
+    /// perbaikan GPS sebagai perpindahan: langit dihitung ulang, perata
+    /// orientasi direset, dan alur dihentikan — tiap detik, selama app terbuka.
+    /// Akibatnya jam tidak akan pernah sempat mengunci selama lokasi masih
+    /// diperbarui, dan haptic "kembali ke idle" berbunyi berulang tanpa
+    /// pengguna melakukan apa pun. Getaran GPS puluhan meter menggeser langit
+    /// ~0.0005°, yang tidak berarti apa-apa dibanding sigma pointing.
     public func update(location newValue: ObserverLocation) {
-        guard newValue != location else { return }
+        guard !newValue.isSamePlace(as: location) else { return }
         location = newValue
         controller.observer = newValue.observer
         // Kalibrasi dipertahankan: offset yaw adalah sifat pemasangan jam,
