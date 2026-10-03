@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 120 test
+- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 122 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux).
 - Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
   (`Apple Build`) hijau** — bukan sekadar lolos parse.
@@ -15,7 +15,31 @@ pekerjaan repo ini.
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: sensor mati di tengah pemakaian tidak terlihat di layar
+### Siklus ini: kalibrasi yaw diterapkan DUA KALI (galat sisa 2× offset)
+Fokus: menguji **siklus kalibrasi penuh**, bukan hanya potongan fungsinya.
+
+**Bug yang ditemukan (dan tidak terlihat oleh 165+120 test lama):**
+- `PointingController` memakai `calibration.yawOffsetDeg` **dua kali**:
+  sekali sebagai `rollAboutViewDeg` saat membangun `DeviceAttitude`
+  (`PointingController.swift:299`, `:328`), lalu sekali lagi sebagai koreksi
+  azimut lewat `calibration.apply(to:)`.
+- Akibatnya offset yang *benar* menghasilkan galat sisa ≈ 2×offset. Probe
+  numerik dengan offset 37° memberi galat **35.36°**, `state = .searching`,
+  `bestObject = nil` — jam gagal mengunci bintang yang ditunjuk tepat, padahal
+  kalibrasinya sudah benar.
+- Setelah diperbaiki (offset hanya lewat `calibration.apply`): galat sisa
+  **8.5e-07°**, `state = .lock`, `bestObject = sirius`.
+- **Mengapa lolos selama ini:** suite lama menguji `PointingCalibration.apply`
+  dan `DeviceAttitude(rollAboutViewDeg:)` secara terpisah, tapi tidak pernah
+  menjalankan satu siklus lengkap "kalibrasi → tunjuk → kunci". Bug hanya
+  muncul saat keduanya dirangkai.
+- **Regresi permanen:** `CalibrationRoundTripTests` (2 test) mengunci perilaku
+  ini — offset diterapkan tepat sekali, azimut terkoreksi, altitude tidak
+  tersentuh, dan hasil akhirnya `.lock` pada target yang benar.
+  **Pelajaran:** uji jalur ujung-ke-ujung, bukan hanya unit terpisah; offset
+  ganda adalah kelas bug yang tak terlihat dari test per-komponen.
+
+### Siklus sebelumnya: sensor mati di tengah pemakaian tidak terlihat di layar
 Fokus: menyisir **perubahan keadaan yang tidak pernah sampai ke UI**. Tidak ada
 aturan keras PRD yang dilonggarkan.
 

@@ -295,8 +295,9 @@ public final class PointingController {
     @discardableResult
     public func feed(cmX: Double, cmY: Double, cmZ: Double, cmW: Double,
                      timestamp: Date) -> PointingUpdate {
-        guard let attitude = DeviceAttitude(cmX: cmX, cmY: cmY, cmZ: cmZ, cmW: cmW,
-                                            rollAboutViewDeg: calibration.yawOffsetDeg)
+        // Tanpa `rollAboutViewDeg`: arah tunjuk mentah harus murni dari sensor.
+        // Lihat `feed(quaternion:timestamp:)` untuk alasan lengkapnya.
+        guard let attitude = DeviceAttitude(cmX: cmX, cmY: cmY, cmZ: cmZ, cmW: cmW)
         else {
             // Quaternion tidak sah: sensor rusak/nol. Jangan menebak arah.
             // Ini juga menandai sensor tidak tersedia, karena satu-satunya
@@ -324,8 +325,12 @@ public final class PointingController {
         let smoothed = smoother.update(raw) ?? raw
 
         // 2. Arah tunjuk dari attitude teredam.
-        let attitude = DeviceAttitude(quaternion: smoothed,
-                                      rollAboutViewDeg: calibration.yawOffsetDeg)
+        //
+        //    `rollAboutViewDeg` sengaja TIDAK diberikan di sini. Kalibrasi
+        //    yaw sudah diterapkan sekali sebagai koreksi azimut di langkah 3;
+        //    memasukkannya lagi sebagai roll akan memutar kerangka perangkat
+        //    dan menambahkan offset yang sama untuk kedua kalinya.
+        let attitude = DeviceAttitude(quaternion: smoothed)
         guard let rawPointing = attitude.horizontalPointing(aim: config.aim) else {
             // Attitude tidak terdefinisi (mis. sensor memberi vektor nol).
             refreshSnapshot(state: .unavailable)
