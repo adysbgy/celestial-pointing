@@ -15,7 +15,37 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: audit independen seluruh daftar item app (tanpa regresi)
+### Siklus ini: verifikasi independen ulang + koreksi klaim dokumen
+Fokus: menjalankan sendiri seluruh verifikasi (bukan membaca klaim), lalu
+memperbaiki satu klaim dokumen yang tidak cocok dengan berkasnya. Tidak ada kode
+engine maupun app yang diubah; tidak ada aturan keras PRD yang dilonggarkan.
+
+**Yang benar-benar dijalankan:**
+- `./swift-test.sh` → **165 CelestialEngine + 122 PointingKit, 0 gagal** (exit 0).
+- Gerbang sintaks: **seluruh 14 berkas app** lolos
+  `swiftc -parse -swift-version 5` di container `swift:6.0`.
+- `gh run list` → **`Apple Build` (macOS) dan `Engine Tests (Linux)` hijau** pada
+  commit HEAD `abd2d64` (pohon git bersih) — jadi app benar-benar dikompilasi
+  Apple SDK, bukan sekadar lolos parse.
+- Sapuan stub (`TODO`/`FIXME`/`placeholder`) → bersih; satu-satunya kemunculan
+  kata "placeholder" adalah komentar di `Confidence.swift` yang menjelaskan
+  mengapa sigma awal sengaja longgar.
+- Penyisiran jalur `rawPointing`: hanya di `CalibrationSession` (titik acuan),
+  `ExperimentHarness`/`ExperimentRecorder` (pengukuran galat), dan `PointingView`
+  (tidak dipakai). Tidak ada jalur yang menuju motor — `SlewCommand` tetap hanya
+  bisa dibentuk `SlewPlanner`, dari objek teridentifikasi, gagal-tertutup.
+
+**Koreksi dokumen (bukan kode):** `STATUS.md` menyebut `project.yml` punya
+"empat target (2 app + 2 tes)". Berkasnya — dan seluruh riwayatnya — hanya pernah
+mendefinisikan **dua target app** (`type: application`); tidak pernah ada target
+tes Xcode. Tes memang hidup di paket SwiftPM (`swift test`), bukan sebagai target
+Xcode. Klaimnya dikoreksi supaya cocok dengan berkasnya; tidak ada perubahan
+build, jadi hijau CI tidak terpengaruh.
+
+**Kesimpulan:** seluruh item kode di `ROADMAP.md` terpenuhi; satu-satunya item
+yang tersisa adalah POC teleskop fisik, yang menunggu perangkat keras.
+
+### Siklus sebelumnya: audit independen seluruh daftar item app (tanpa regresi)
 Fokus: **memverifikasi, bukan mempercayai** — membaca ulang setiap berkas app
 dan engine, lalu menjalankan suite, untuk memastikan tidak ada item yang
 diklaim selesai padahal belum. Tidak ada aturan keras PRD yang dilonggarkan,
@@ -546,8 +576,13 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
 - ✅ `PointAndKnowApp.swift` — titik masuk app iPhone.
 
 **Build:**
-- ✅ `project.yml` (XcodeGen) — satu proyek, empat target (2 app + 2 tes),
-  paket SwiftPM lokal dirujuk dari repo.
+- ✅ `project.yml` (XcodeGen) — satu proyek, **dua target app**
+  (`PointAndKnow` + `PointAndKnow Watch`), paket SwiftPM lokal dirujuk dari repo.
+  Tes tidak hidup sebagai target Xcode: seluruh logika ada di paket SwiftPM
+  (`CelestialEngine`, `PointingKit`) dan dijalankan lewat `swift test` — di Linux
+  (`engine-tests.yml`) maupun di Apple SDK (job `Paket` di `ios-build.yml`).
+  Berkas app sendiri tidak punya logika keputusan, jadi tidak ada yang perlu
+  diuji di sana.
 - ✅ `.github/workflows/ios-build.yml` — CI macOS: `brew install xcodegen`,
   generate proyek, build watch + iOS ke simulator.
 - ✅ Ikon app digenerate deterministik oleh `Tools/make_app_icons.py`
