@@ -105,13 +105,33 @@ final class PointingPresentationTests: XCTestCase {
         XCTAssertEqual(searching.displayedObject(lastLocked: vega)?.id, "vega")
         XCTAssertTrue(searching.isDisplayingStaleObject(lastLocked: vega))
 
-        // Saat idle/unavailable tidak ada objek yang ditampilkan sama sekali.
+        // Tanpa intent tertinggal, idle/unavailable tidak menampilkan apa pun.
         for state in [PointingState.idle, .unavailable] {
             let snapshot = PointingSnapshot(state: state)
             XCTAssertNil(snapshot.displayedObject(lastLocked: vega),
                          "\(state) tidak boleh menampilkan objek apa pun")
             XCTAssertFalse(snapshot.isDisplayingStaleObject(lastLocked: vega))
         }
+    }
+
+    /// Sensor mati di tengah pandangan menyisakan objek lama — dan itu **wajib**
+    /// tetap ditandai sisa.
+    ///
+    /// `refreshSnapshot(state: .unavailable)` sengaja tidak membuang
+    /// `currentIntent` (mesin keadaan hanya membuangnya saat `stop()`), jadi
+    /// keadaan ini benar-benar bisa membawa objek dari pandangan sebelumnya —
+    /// bukan sekadar kemungkinan teoretis. Menyembunyikan panelnya bukan
+    /// pilihan (panel yang hilang lalu muncul lagi terbaca sebagai pengukuran
+    /// baru); yang tidak boleh adalah menampilkannya **tanpa** penanda, dan
+    /// badge keyakinannya ikut hilang karena keadaan ini tidak punya jawaban.
+    func testUnavailableWithRetainedIntentStillFlagsItAsStale() {
+        let stale = PointingSnapshot(state: .unavailable,
+                                     intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        XCTAssertEqual(stale.displayedObject(lastLocked: nil)?.id, "vega")
+        XCTAssertTrue(stale.isDisplayingStaleObject(lastLocked: nil),
+                      "objek dari pandangan sebelumnya harus ditandai sisa")
+        XCTAssertNil(stale.answeredObject, "sensor mati tidak punya jawaban sekarang")
+        XCTAssertNil(stale.answeredLevel, "keyakinan lama tidak berlaku saat sensor mati")
     }
 
     /// Jawaban yang berlaku sekarang dipisahkan dari objek yang ditampilkan.

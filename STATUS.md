@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 131 test
+- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 132 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
   dan sejak siklus ini **keduanya juga ditegakkan di CI Linux**, bukan hanya
   yang pertama.
@@ -67,8 +67,8 @@ menghapus padahal tidak ada yang tersimpan lagi. Keduanya kini lewat store dan
 mencerminkan keadaan yang sebenarnya.
 
 **Yang benar-benar dijalankan pada siklus ini:**
-- `./swift-test.sh` → **165 CelestialEngine + 131 PointingKit, 0 gagal** (exit 0).
-  Tujuh uji baru mengunci perilaku ini: objek sisa tidak terkirim
+- `./swift-test.sh` → **165 CelestialEngine + 132 PointingKit, 0 gagal** (exit 0).
+  Delapan uji baru mengunci perilaku ini: objek sisa tidak terkirim
   (`LinkMessageTests`), tidak terekam (`ConfidenceTraceTests`), predikat
   "berlaku sekarang" (`PointingPresentationTests`), dan gerbang kiriman
   (`LinkMessageTests`).
@@ -80,6 +80,13 @@ mencerminkan keadaan yang sebenarnya.
   peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
 - CI `Engine Tests (Linux)` run `37149633616` → **165 CelestialEngine + 131
   PointingKit, 0 gagal**, kedua paket ditegakkan di CI.
+- Siklus yang sama juga menutup klaim tes yang terlalu longgar:
+  `displayedObject` mengembalikan `intent?.best` tanpa memandang keadaan,
+  padahal tesnya menjanjikan "idle/unavailable tidak menampilkan objek apa
+  pun" — janji itu hanya benar karena tesnya memakai intent kosong. Sensor yang
+  mati di tengah pandangan memang menyisakan objek lama, jadi sekarang diuji
+  apa adanya: panelnya tetap tampil **dengan** penanda sisa dan tanpa badge
+  keyakinan (**132** tes PointingKit).
 
 ### Siklus sebelumnya: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
 Fokus: menutup **satu-satunya temuan yang sengaja dibiarkan terbuka** oleh
