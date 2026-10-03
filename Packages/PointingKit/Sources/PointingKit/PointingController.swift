@@ -83,6 +83,17 @@ public struct PointingSnapshot: Equatable, Sendable {
 public struct PointingUpdate: Equatable, Sendable {
     public var snapshot: PointingSnapshot
     public var haptics: [HapticEvent]
+
+    /// Kenapa ini publik: perubahan keadaan tidak selalu datang dari sampel
+    /// sensor. Sensor yang mati, ambang yang diganti, atau kalibrasi baru juga
+    /// mengubah cuplikan — dan pemanggil di luar modul ini (app jam) perlu
+    /// menyampaikan cuplikan itu ke UI lewat saluran yang sama dengan sampel.
+    /// Tanpa inisialisasi publik, satu-satunya cara adalah menyentuh controller
+    /// diam-diam, dan UI akan tertinggal di keadaan lama.
+    public init(snapshot: PointingSnapshot, haptics: [HapticEvent]) {
+        self.snapshot = snapshot
+        self.haptics = haptics
+    }
 }
 
 /// Parameter alur yang bisa diubah dari UI/pengaturan.
