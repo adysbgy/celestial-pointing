@@ -69,6 +69,11 @@ formalitas.
   masuknya).
 - `angularRateDegPerSec` **diperiksa dan ternyata benar**: `AngularRateTracker`
   ikut direset saat sensor hilang, jadi `nil` — bukan nilai lama. Tidak diubah.
+- CI `Apple Build` run `37151800262` pada commit `775b89f` → **2× `BUILD
+  SUCCEEDED`** (skema iPhone yang ikut membangun app jam, dan skema jam sendiri),
+  dan langkah gerbang melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+- CI `Engine Tests (Linux)` run `37151800258` → **166 CelestialEngine + 139
+  PointingKit, 0 gagal**, kedua paket ditegakkan di CI.
 
 ### Siklus sebelumnya: objek sisa bocor ke iPhone, dan jam berhenti bicara tepat saat jawabannya hilang
 Fokus: menyisir **jalur yang mengirim dan merekam** "apa yang engine katakan
