@@ -151,6 +151,17 @@ struct DiagnosticsView: View {
                     Button("Kosongkan riwayat") { trace.reset() }
                         .disabled(trace.samples.isEmpty)
                 }
+
+                Section {
+                    ShareLink(item: exportText) {
+                        Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(trace.samples.isEmpty)
+                } header: {
+                    Text("Ekspor")
+                } footer: {
+                    Text("Berkas ini memuat lokasi, kalibrasi, dan sigma yang berlaku saat merekam — tanpa itu, jarak kandidat dalam derajat tidak bisa ditafsirkan kembali.")
+                }
             }
             .navigationTitle("Diagnostik")
             .onAppear {
@@ -223,6 +234,23 @@ struct DiagnosticsView: View {
         HStack(spacing: 3) {
             Circle().fill(tone.color).frame(width: 7, height: 7)
             Text(label)
+        }
+    }
+
+    /// Isi berkas ekspor: riwayat keyakinan **beserta konteks yang berlaku saat
+    /// merekam**. Kalau encoding gagal, yang dibagikan adalah pesan kesalahan —
+    /// bukan berkas kosong yang tampak seperti dataset valid.
+    private var exportText: String {
+        let export = ConfidenceTraceArchive.export(
+            from: trace.trace,
+            location: engine.location,
+            calibration: engine.controller.calibration,
+            confidenceSigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+        do {
+            let data = try ConfidenceTraceArchive.encode(export)
+            return String(decoding: data, as: UTF8.self)
+        } catch {
+            return "{\"error\": \"gagal meng-encode riwayat keyakinan: \(error.localizedDescription)\"}"
         }
     }
 

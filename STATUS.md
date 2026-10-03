@@ -2,7 +2,50 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: pembungkus app iPhone + Watch, konfigurasi XcodeGen
+### Siklus ini: menutup sisa app — ekspor diagnostik + verifikasi ulang
+Fokus: menyisir berkas app terhadap daftar item yang tersisa, dan menutup satu
+item yang benar-benar belum ada. Tidak ada aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **Tab Diagnostik tidak punya ekspor dataset.** Grafik keyakinannya ada, tapi
+  riwayatnya hanya hidup di memori — item "iOS diagnostik: grafik confidence +
+  ekspor dataset" belum terpenuhi sepenuhnya.
+  - `Packages/PointingKit/Sources/PointingKit/ConfidenceTraceArchive.swift` —
+    `ConfidenceTraceExport` + `ConfidenceTraceArchive` (encode/decode/nama berkas).
+  - **Kenapa konteks ikut diekspor.** `ratioToSigma` hanya bisa ditafsirkan kalau
+    sigma yang berlaku saat itu ikut tersimpan; lokasi, kalibrasi, dan sigma
+    ditulis bersama sampelnya. Berkas berisi derajat saja adalah anekdot.
+  - Memakai pengekod arsip yang sama dengan `DatasetArchive`
+    (`JSONEncoder.pointingArchive()`) supaya pecahan detik tidak hilang dan
+    urutan sampel tetap bisa direkonstruksi.
+  - Sampel dari jam **tidak** diberi jarak kandidat karangan — jam memang tidak
+    mengirim sudut pergelangan, jadi `separationDeg` tetap kosong.
+  - `DiagnosticsView` kini punya `ShareLink` "Ekspor dataset (JSON)"; kalau
+    encoding gagal, yang dibagikan adalah pesan kesalahan, bukan berkas kosong
+    yang tampak sah.
+  - 8 tes baru (`ConfidenceTraceArchiveTests`): bolak-balik mempertahankan
+    variabel keputusan, waktu berpecahan detik, sigma nol tetap `nil`, sampel jam
+    tetap tanpa jarak, arsip kosong tetap sah, berkas rusak **gagal** dibaca.
+
+**Yang diverifikasi ulang (tidak diubah, ternyata sudah ada):**
+- `WatchLinkService.sessionReachabilityDidChange` **sudah** ada; `isReachable`
+  di layar jam memang ikut berubah. (Sempat saya duga hilang — ternyata tidak.)
+- `MotionLogger` sudah memetakan `CMDeviceMotion` → `init?(cmX:cmY:cmZ:cmW:)`.
+- Haptic `.lock`/`.uncertain` sudah dipicu dari perpindahan keadaan di
+  `PointingController.hapticEvents(from:to:)`, bukan di lapisan UI.
+- `PhoneLinkService.onMessage` sudah tersambung ke `ConfidenceTraceStore.record(message:)`.
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 163 test + PointingKit 103 test, 0 gagal**
+  (exit 0). PointingKit naik dari 95 → 103 karena 8 tes arsip baru.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` **di dalam
+  container swift:6.0** (swiftc tidak ada di host; gerbang sintaks dijalankan
+  lewat Docker yang sama dengan suite).
+- `ROADMAP.md` disinkronkan: item Fase 2/3 app yang sudah terwujud ditandai,
+  dan baris "156/156" dikoreksi menjadi 163/163.
+- Verifikasi build macOS ada di CI (`Apple Build`) pada commit ini.
+
+### Siklus sebelumnya: pembungkus app iPhone + Watch, konfigurasi XcodeGen
 Fokus: mengubah logika yang sudah teruji menjadi app yang bisa dibuka.
 Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
 

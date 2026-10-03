@@ -20,20 +20,20 @@ jangan pernah wrist-angle → motor.
 - [x] Kalibrasi yaw + sigma pointing terukur dari titik acuan (`Calibration.swift`) — menyambung Experiment 1 ke `ConfidencePolicy`
 - [x] Perata orientasi (nlerp) + pelacak kecepatan sudut (`Sensing.swift`) — syarat "pergelangan diam" sebelum mengunci
 - [x] Mesin keadaan alur: idle → pointing → searching → lock/uncertain (`PointingFlow.swift`, sumber resolusi disuntik)
-- [ ] Motion logger: CMDeviceMotion → rekam attitude + timestamp (butuh Mac)
-- [ ] Calibration flow (uji beberapa metode) — UI/app, butuh Mac
-- [ ] Rendering UI dari keadaan alur + detail (butuh Mac)
-- [ ] Pemicu haptic dari state lock/uncertain (butuh Mac)
-- [ ] Watch ↔ iPhone (WatchConnectivity) (butuh Mac)
+- [x] Motion logger: CMDeviceMotion → rekam attitude + timestamp (`Apps/Shared/MotionLogger.swift`) — dibangun di CI macOS
+- [x] Calibration flow (uji beberapa metode) — `CalibrationView` di atas `CalibrationSession`; tombol "Pakai" mati sampai sebaran acuan sempit
+- [x] Rendering UI dari keadaan alur + detail (`PointingView`, langsung dari `PointingSnapshot`)
+- [x] Pemicu haptic dari state lock/uncertain (`HapticEngine`; `.success` vs `.retry` dibedakan tajam)
+- [x] Watch ↔ iPhone (WatchConnectivity) — `WatchLinkService`/`PhoneLinkService` mengirim **keputusan**, bukan sudut pergelangan
 
 ## FASE 3 — iOS companion + POC
 - [x] Pengaman slew (`SlewSafety.swift`): POINT → OBJECT ID → SAFE GOTO. Aturan "wrist angle TIDAK PERNAH → motor" ditegakkan di tipe: `SlewCommand` hanya bisa dibuat oleh `SlewPlanner`, dan perintah diturunkan dari objek teridentifikasi (arah target = posisi objek, bukan arah tunjuk). Gagal-tertutup: tanpa target/keyakinan cukup/Matahari tak diketahui → tolak.
-- [ ] iOS diagnostik (grafik confidence, ekspor dataset)
-- [ ] Experiment 1 harness: tunjuk target diketahui → rekam → ekspor
-- [ ] Point & Slew POC 1 teleskop (setelah engine terbukti)
+- [x] iOS diagnostik (grafik confidence `DiagnosticsView`, ekspor dataset `ConfidenceTraceArchive`)
+- [x] Experiment 1 harness: tunjuk target diketahui → rekam → ekspor (`ExperimentRecorder`/`Experiment1View`)
+- [ ] Point & Slew POC 1 teleskop (setelah engine terbukti) — perencana aman sudah ada (`SlewSafety`), perangkat keras belum
 
 ## Kriteria "ENGINE SIAP"
-- [x] swift test hijau (156/156 di Linux, tanpa Mac)
+- [x] swift test hijau (163/163 engine + 103/103 PointingKit di Linux, tanpa Mac)
 - [x] Resolver mengembalikan objek benar untuk target diketahui
 - [x] Tidak pernah HIGH saat kandidat ambigu (diuji eksplisit)
 - [x] Apple build hijau (macOS) — diverifikasi di CI

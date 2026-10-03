@@ -94,6 +94,13 @@ public final class WatchLinkService: NSObject, ObservableObject {
 /// `@preconcurrency`: `WCSessionDelegate` tidak di-`@MainActor`, sedangkan
 /// kelas ini di-`@MainActor`. Setiap metode di bawah `nonisolated` dan
 /// menyerahkan hasilnya ke main actor lewat `Task`.
+///
+/// `sessionReachabilityDidChange` **wajib** ada di sini: `isReachable`
+/// ditampilkan di layar jam ("iPhone terhubung" / "tidak terjangkau"), dan tanpa
+/// metode itu nilainya hanya pernah ditetapkan sekali saat aktivasi — layar akan
+/// terus berbohong tentang keadaan tautan yang sebenarnya. Jam yang menampilkan
+/// "terhubung" padahal tidak adalah persis jenis klaim yang tidak boleh dibuat
+/// tanpa dasar.
 extension WatchLinkService: @preconcurrency WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
