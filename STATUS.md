@@ -6,6 +6,16 @@
 Fokus: menyisir **perubahan keadaan yang tidak pernah sampai ke UI**. Tidak ada
 aturan keras PRD yang dilonggarkan.
 
+**CI macOS menangkap satu kesalahan yang Linux tidak bisa lihat:**
+- `PointingUpdate` tidak punya inisialisasi publik (memberwise default bersifat
+  `internal`), sehingga `MotionLogger.publishSensorLoss()` ditolak dengan
+  *"'PointingUpdate' initializer is inaccessible due to 'internal' protection
+  level"*. Ditutup dengan `public init(snapshot:haptics:)`.
+  **Pelajaran:** `swiftc -parse` hanya memeriksa sintaks — ia tidak tahu soal
+  tingkat akses antar-modul. Untuk app, macOS CI adalah verifikasi sebenarnya.
+- Setelah perbaikan: **CI macOS hijau** (`Apple Build`, run `37140770415`) dan
+  **CI Linux hijau** (run `37140770436`).
+
 **Yang ditemukan & ditutup:**
 - **`MotionLogger.handleFailure` menghentikan alur tanpa memberi tahu UI.**
   Jalur galat CoreMotion (sensor dilepas, izin dicabut, hardware gagal) memanggil
