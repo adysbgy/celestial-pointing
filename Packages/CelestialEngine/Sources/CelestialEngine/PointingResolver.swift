@@ -17,7 +17,10 @@ public struct PointingResolver {
         var candidates: [Candidate] = []
 
         for obj in catalogue {
-            let eq = EquatorialCoord(raDeg: obj.raDeg, decDeg: obj.decDeg)
+            // Katalog bintang disimpan dalam J2000; ekuator/ekuinoks bergeser
+            // karena presesi. Tanpa reduksi ini bintang meleset ~0.3° (2026).
+            let j2000 = EquatorialCoord(raDeg: obj.raDeg, decDeg: obj.decDeg)
+            let eq = SkyMath.precessJ2000ToDate(j2000, jd: jd)
             let hor = SkyMath.equatorialToHorizontal(eq, observer: observer, jd: jd)
             if hor.altitudeDeg < minAltitudeDeg { continue }
             let sep = SkyMath.angularSeparationHorizontalDeg(pointing, hor)
