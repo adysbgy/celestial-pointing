@@ -1,0 +1,220 @@
+import Foundation
+import CelestialEngine
+
+/// Satu titik acuan saat kalibrasi: apa yang **ditunjuk** pengguna, dan apa
+/// yang sebenarnya ada di sana menurut katalog.
+///
+/// `trueDirection` sengaja dihitung dari katalog, bukan dari mata pengguna —
+/// supaya yang terukur adalah galat sensor, bukan galat mata.
+public struct CalibrationSample: Codable, Equatable, Sendable {
+    /// Objek yang diklaim pengguna sedang ditunjuk.
+    public var objectID: String
+    /// Arah tunjuk mentah saat pengguna menekan tombol.
+    public var measured: HorizontalCoord
+    /// Arah objek yang sebenarnya saat itu (dari katalog/efemeris).
+    public var trueDirection: HorizontalCoord
+    /// Waktu pengambilan.
+    public var timestamp: Date
+    /// Selisih sudut antara keduanya (derajat) — galat mentah titik ini.
+    public var separationDeg: Double
+
+    public init(objectID: String,
+                measured: HorizontalCoord,
+                trueDirection: HorizontalCoord,
+                timestamp: Date) {
+        self.objectID = objectID
+        self.measured = measured
+        self.trueDirection = trueDirection
+        self.timestamp = timestamp
+        self.separationDeg = SkyMath.angularSeparationHorizontalDeg(measured, trueDirection)
+    }
+}
+
+/// Tahap alur kalibrasi.
+public enum CalibrationPhase: String, Equatable, Sendable {
+    /// Belum mulai; belum ada sampel.
+    case idle
+    /// Sudah ada sampel, tapi sebarannya masih terlalu lebar untuk dipercaya.
+    case collecting
+    /// Sebaran sisa sudah cukup sempit; kalibrasi boleh dipakai.
+    case ready
+    /// Kalibrasi sudah dipakai oleh controller.
+    case applied
+}
+
+/// Hasil satu langkah alur kalibrasi.
+public struct CalibrationUpdate: Equatable, Sendable {
+    public var phase: CalibrationPhase
+    /// Kalibrasi yang dihitung dari sampel saat ini (kalau ada).
+    public var calibration: PointingCalibration?
+    /// Sampel yang sudah terkumpul.
+    public var samples: [CalibrationSample]
+    /// Penjelasan singkat untuk ditampilkan ke pengguna.
+    public var message: String
+}
+
+/// Alur kalibrasi berbasis beberapa titik acuan.
+///
+/// **Kenapa lebih dari satu titik.** PRD melarang mengasumsikan akurasi Watch.
+/// Satu titik acuan hanya memberi offset yaw, tanpa cara apa pun untuk tahu
+/// seberapa konsisten pengukuran itu. Dengan dua titik atau lebih,
+/// `CalibrationSolver` juga melaporkan `residualSpreadDeg` — estimasi sigma
+/// pointing yang nyata — dan sigma itulah yang menyetel ambang keyakinan
+/// engine. Kalau sebarannya masih lebar, alur menolak menyatakan "siap".
+///
+/// Alur ini juga sengaja **tidak** memakai objek terbaik dari engine sebagai
+/// kebenaran: kalau engine salah mengenali, kalibrasi akan ikut salah dan
+/// kesalahannya tak akan pernah ketahuan. Kebenaran diambil dari id objek yang
+/// dipilih pengguna.
+public struct CalibrationFlow {
+
+    /// Objek yang boleh dipakai sebagai acuan.
+    ///
+    /// Hanya bintang: posisinya di katalog, jadi kebenarannya tidak bergantung
+    /// pada efemeris yang bisa gagal. Bulan/planet boleh ditambahkan kalau
+    /// efemerisnya tersedia — tapi itu keputusan pemanggil, lewat `add(...)`.
+    public var referenceObjects: [CelestialObject]
+
+    /// Sebaran sisa maksimum (derajat, 1σ) agar kalibrasi dinyatakan siap.
+    ///
+    /// Bawaan 3°: masih di bawah resolusi pointing manusia dan jauh di bawah
+    /// ambang HIGH engine bawaan (sigma 10°). Kalau hasil Experiment 1
+    /// menunjukkan sebaran lebih lebar, angka ini yang harus diubah — bukan
+    /// ambang keyakinannya, supaya kualitas kalibrasi tetap terlihat.
+    public var maxResidualSpreadDeg: Double
+
+    /// Jumlah sampel minimum sebelum kalibrasi boleh dipakai.
+    public var minimumSamples: Int
+
+    public private(set) var samples: [CalibrationSample] = []
+    public private(set) var calibration: PointingCalibration?
+    public private(set) var phase: CalibrationPhase = .idle
+
+    public init(referenceObjects: [CelestialObject] = CalibrationFlow.defaultReferences,
+                maxResidualSpreadDeg: Double = 3.0,
+                minimumSamples: Int = 2) {
+        self.referenceObjects = referenceObjects
+        self.maxResidualSpreadDeg = maxResidualSpreadDeg
+        self.minimumSamples = max(2, minimumSamples)
+    }
+
+    /// Bintang acuan bawaan: terang, dan tersebar di langit.
+    ///
+    /// Sebaran penting: dua acuan yang berdekatan memberi yaw yang sama-sama
+    /// rapuh terhadap satu kesalahan kecil. Empat acuan ini (Sirius, Vega,
+    /// Arcturus, Fomalhaut) tersebar di belahan langit yang berbeda.
+    public static let defaultReferences: [CelestialObject] = {
+        let wanted = ["sirius", "vega", "arcturus", "fomalhaut", "capella", "altair"]
+        let byID = Dictionary(uniqueKeysWithValues: Catalogue.brightStars.map { ($0.id, $0) })
+        return wanted.compactMap { byID[$0] }
+    }()
+
+    /// Tambahkan satu titik acuan.
+    ///
+    /// - Parameters:
+    ///   - objectID: id objek yang dituju pengguna.
+    ///   - measured: arah tunjuk mentah saat tombol ditekan.
+    ///   - resolver: dipakai untuk menghitung arah objek yang sebenarnya.
+    ///   - observer: lokasi pengamat.
+    ///   - date: waktu pengambilan.
+    /// - Returns: `nil` bila objek tidak dikenal atau arahnya tidak bisa
+    ///   dihitung — sampel yang tidak bisa diverifikasi **tidak** disimpan.
+    @discardableResult
+    public mutating func add(objectID: String,
+                             measured: HorizontalCoord,
+                             resolver: PointingResolver,
+                             observer: Observer,
+                             date: Date) -> CalibrationUpdate? {
+        guard let truth = resolver.horizontal(ofObjectID: objectID,
+                                              observer: observer,
+                                              date: date) else {
+            return nil
+        }
+        samples.append(CalibrationSample(objectID: objectID,
+                                         measured: measured,
+                                         trueDirection: truth,
+                                         timestamp: date))
+        recompute()
+        return currentUpdate
+    }
+
+    /// Buang sampel terakhir (mis. pengguna salah tekan).
+    @discardableResult
+    public mutating func removeLast() -> CalibrationUpdate {
+        if !samples.isEmpty { samples.removeLast() }
+        recompute()
+        return currentUpdate
+    }
+
+    /// Lupakan semuanya, mulai dari nol.
+    public mutating func reset() {
+        samples = []
+        calibration = nil
+        phase = .idle
+    }
+
+    /// Cuplikan alur saat ini.
+    public var currentUpdate: CalibrationUpdate {
+        CalibrationUpdate(phase: phase,
+                          calibration: calibration,
+                          samples: samples,
+                          message: message)
+    }
+
+    /// Apakah kalibrasi sudah layak dipakai.
+    public var isReady: Bool { phase == .ready || phase == .applied }
+
+    /// Kalibrasi untuk dipakai — hanya bila sudah siap.
+    ///
+    /// Sengaja mengembalikan `nil` saat belum siap: memasang kalibrasi setengah
+    /// matang lebih berbahaya daripada tidak mengkalibrasi sama sekali, karena
+    /// offsetnya bisa membalik jawaban engine tanpa terlihat.
+    public var applicableCalibration: PointingCalibration? {
+        isReady ? calibration : nil
+    }
+
+    /// Tandai kalibrasi sudah dipasang ke controller.
+    public mutating func markApplied() {
+        if isReady { phase = .applied }
+    }
+
+    // MARK: - Bantu
+
+    private mutating func recompute() {
+        guard samples.count >= minimumSamples else {
+            calibration = samples.count == 1
+                ? CalibrationSolver.solve(measured: samples.map(\.measured),
+                                          truth: samples.map(\.trueDirection))
+                : nil
+            phase = samples.isEmpty ? .idle : .collecting
+            return
+        }
+        calibration = CalibrationSolver.solve(measured: samples.map(\.measured),
+                                              truth: samples.map(\.trueDirection))
+        guard let spread = calibration?.residualSpreadDeg else {
+            phase = .collecting
+            return
+        }
+        phase = spread <= maxResidualSpreadDeg ? .ready : .collecting
+    }
+
+    private var message: String {
+        switch phase {
+        case .idle:
+            return "Tunjuk bintang acuan, lalu tekan untuk mencatat."
+        case .collecting:
+            if samples.count < minimumSamples {
+                return "Butuh minimal \(minimumSamples) acuan (\(samples.count) tercatat)."
+            }
+            let spread = calibration?.residualSpreadDeg ?? .nan
+            return String(format: "Sebaran %.1f° masih terlalu lebar (maks %.1f°). Tambah acuan.",
+                          spread, maxResidualSpreadDeg)
+        case .ready:
+            let spread = calibration?.residualSpreadDeg ?? .nan
+            return String(format: "Siap — sebaran %.1f° dari %d acuan.",
+                          spread, samples.count)
+        case .applied:
+            return "Kalibrasi dipakai."
+        }
+    }
+}

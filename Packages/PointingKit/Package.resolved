@@ -1,0 +1,24 @@
+{
+  "originHash" : "4f0ff2e76fbe893673b75109ac89eaf2ca33d24fa99d934c150bbdaa4a504e16",
+  "pins" : [
+    {
+      "identity" : "astronomykit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/heirloomlogic/AstronomyKit",
+      "state" : {
+        "revision" : "0dd5d3115be808338d3c94f0ed5f0e20fb0ddd28",
+        "version" : "0.2.3+upstream-2.1.19"
+      }
+    },
+    {
+      "identity" : "swiftformatplugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/HeirloomLogic/SwiftFormatPlugin",
+      "state" : {
+        "revision" : "42d85ed19fbb5e48dad1e42afff02e3aae3784b2",
+        "version" : "1.6.2"
+      }
+    }
+  ],
+  "version" : 3
+}

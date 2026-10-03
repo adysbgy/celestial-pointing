@@ -230,6 +230,80 @@ public struct PointingResolver {
         )
     }
 
+    // MARK: - Arah benda saat ini
+
+    /// Arah horizontal sebuah benda **saat ini** (bukan arah tunjuk).
+    ///
+    /// Dipakai oleh tiga hal di lapisan app yang semuanya butuh arah objek
+    /// yang sebenarnya, bukan arah pergelangan:
+    /// - kebenaran acuan saat kalibrasi (`CalibrationSolver.solve`),
+    /// - label ground-truth Experiment 1 (`ObservationLog.analyze`),
+    /// - target GoTo teleskop (`SlewPlanner.plan` — aturan PRD: teleskop
+    ///   bergerak ke **posisi objek**, tidak pernah ke arah tunjuk).
+    ///
+    /// Aturan yang sama seperti `diagnose`: bintang dipresesi J2000 → of-date,
+    /// benda tata surya diambil of-date dari efemeris (tidak dipresesi).
+    ///
+    /// - Returns: `nil` untuk Matahari (tidak pernah boleh jadi target), benda
+    ///   tata surya tanpa efemeris, atau benda tata surya yang efemerisnya gagal.
+    public func horizontal(of object: CelestialObject,
+                           observer: Observer,
+                           date: Date) -> HorizontalCoord? {
+        // Benda tata surya dikenali dari id-nya (dibuat oleh
+        // `catalogueObject(for:sample:)`). Matahari sengaja mengembalikan
+        // `nil`: mengarahkan apa pun ke Matahari dilarang.
+        if let body = EphemerisBody(rawValue: object.id) {
+            guard body.isPointable else { return nil }
+            return horizontal(ofBody: body, observer: observer, date: date)
+        }
+        let jd = SkyMath.julianDate(from: date)
+        let ofDate = SkyMath.precessJ2000ToDate(
+            EquatorialCoord(raDeg: object.raDeg, decDeg: object.decDeg), jd: jd
+        )
+        return SkyMath.equatorialToHorizontal(ofDate, observer: observer, jd: jd)
+    }
+
+    /// Arah horizontal benda berdasarkan **id** — bintang katalog maupun benda
+    /// tata surya. `nil` bila id tidak dikenal atau arahnya tidak bisa dihitung.
+    ///
+    /// Ini jalur yang dipakai lapisan app untuk dua hal yang keduanya butuh
+    /// arah objek dari sebuah id (bukan dari arah tunjuk):
+    /// kalibrasi (`CalibrationSolver`) dan label ground-truth Experiment 1
+    /// (`ObservationLog.analyze`).
+    public func horizontal(ofObjectID id: String,
+                           observer: Observer,
+                           date: Date) -> HorizontalCoord? {
+        if let object = catalogue.first(where: { $0.id == id }) {
+            return horizontal(of: object, observer: observer, date: date)
+        }
+        if let body = EphemerisBody(rawValue: id) {
+            return horizontal(ofBody: body, observer: observer, date: date)
+        }
+        return nil
+    }
+
+    /// Arah horizontal sebuah benda tata surya. `nil` bila efemeris tidak
+    /// tersedia atau perhitungannya gagal — tidak pernah ditebak.
+    ///
+    /// Matahari **selalu** ditolak di sini. Arah Matahari hanya boleh keluar
+    /// lewat `Resolution.sunHorizontal`, yaitu jalur yang dipakai pengaman
+    /// teleskop untuk menghitung jarak aman — bukan sebagai arah yang bisa
+    /// diserahkan ke motor.
+    public func horizontal(ofBody body: EphemerisBody,
+                           observer: Observer,
+                           date: Date) -> HorizontalCoord? {
+        guard body.isPointable else { return nil }
+        guard let ephemeris else { return nil }
+        guard let sample = try? ephemeris.apparent(body, at: date, from: observer) else {
+            return nil
+        }
+        return SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sample.raDeg, decDeg: sample.decDeg),
+            observer: observer,
+            jd: SkyMath.julianDate(from: date)
+        )
+    }
+
     /// Jarak sudut terkecil antara kandidat terbaik dan kandidat lain,
     /// dihitung dari koordinat sesungguhnya (bukan selisih jarak ke arah tunjuk).
     ///
