@@ -95,3 +95,34 @@ public extension ConfidenceLevel {
         }
     }
 }
+
+public extension PointingSnapshot {
+
+    /// Objek yang layak ditampilkan di panel detail.
+    ///
+    /// Saat keadaan punya jawaban (`lock`/`uncertain`) itu jawaban engine.
+    /// Saat `searching`, objek terakhir yang pernah terkunci dipertahankan
+    /// supaya panel tidak kosong hanya karena pergelangan bergerak sedikit —
+    /// dan panel itu **wajib** ditandai lewat `isDisplayingStaleObject`.
+    ///
+    /// Logikanya ditaruh di sini, bukan di pembungkus UI, karena ia menegakkan
+    /// aturan PRD: objek lama tidak boleh tampil seolah hasil pengukuran
+    /// sekarang. Di sini ia bisa diuji di Linux bersama janji tampilan lain.
+    func displayedObject(lastLocked: CelestialObject?) -> CelestialObject? {
+        if let best = intent?.best { return best }
+        return state == .searching ? lastLocked : nil
+    }
+
+    /// Apakah objek yang ditampilkan adalah sisa dari pandangan sebelumnya.
+    ///
+    /// **Yang menentukan adalah apakah keadaan punya jawaban sekarang**
+    /// (`state.hasAnswer`), bukan dari mana objek itu diambil. Mesin keadaan
+    /// sengaja mempertahankan `intent` supaya tampilan tidak berkedip, jadi
+    /// `intent?.best` tetap terisi objek **dari arah tunjuk sebelumnya** saat
+    /// keadaan sudah kembali `pointing`. Menilai "basi" dari `intent?.best ==
+    /// nil` karena itu justru melaporkan "bukan sisa" untuk objek yang paling
+    /// basi — dan peringatan di layar tidak pernah bisa muncul.
+    func isDisplayingStaleObject(lastLocked: CelestialObject?) -> Bool {
+        displayedObject(lastLocked: lastLocked) != nil && !state.hasAnswer
+    }
+}

@@ -19,7 +19,13 @@ struct PointingView: View {
             ScrollView {
                 VStack(spacing: 6) {
                     statusCard
-                    if let object = engine.displayedObject, engine.snapshot.state.hasAnswer {
+                    // Ditampilkan selama ada objek — termasuk saat keadaannya
+                    // sudah tidak punya jawaban lagi. Di situlah
+                    // `isDisplayingStaleObject` berbunyi: objek dari pandangan
+                    // sebelumnya ditampilkan **dengan peringatan**, bukan
+                    // disembunyikan (menyembunyikannya membuat jam berkedip
+                    // tiap kali pergelangan bergerak sedikit).
+                    if let object = engine.displayedObject {
                         ObjectDetailView(object: object,
                                          level: engine.snapshot.intent?.level,
                                          isStale: engine.isDisplayingStaleObject)
@@ -127,7 +133,11 @@ struct ObjectDetailView: View {
                 Text(object.name)
                     .font(.system(size: WatchMetrics.titleSize, weight: .bold))
                 Spacer(minLength: 2)
-                if let level {
+                // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
+                // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan
+                // terbaca sebagai klaim keyakinan atas pengukuran sekarang —
+                // persis false confidence yang dilarang PRD.
+                if let level, !isStale {
                     Text(level.displayName)
                         .font(.system(size: 10, weight: .semibold))
                         .padding(.horizontal, 5)

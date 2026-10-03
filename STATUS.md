@@ -7,7 +7,7 @@
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
 pekerjaan repo ini.
 
-- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 122 test
+- Engine (Fase 1–3) + logika app: **165 test CelestialEngine + 124 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux).
 - Pembungkus app (watchOS + iOS): **terpasang lengkap**, dan **CI macOS
   (`Apple Build`) hijau** — bukan sekadar lolos parse.
@@ -15,7 +15,44 @@ pekerjaan repo ini.
 
 ## Progres terakhir (4 Okt 2026)
 
-### Siklus ini: perbaikan bug siklus hidup sensor di app iPhone
+### Siklus ini: objek sisa tampil sebagai hasil sekarang (anti false-confidence)
+Fokus: membaca sendiri setiap berkas app, lalu memperbaiki satu cacat nyata yang
+ditemukan — bukan menambah fitur. Logika engine **tidak disentuh** (165 test
+CelestialEngine tetap hijau); aturan keras PRD tidak dilonggarkan.
+
+**Cacat yang ditemukan dan diperbaiki.** `PointingEngine.isDisplayingStaleObject`
+menilai "objek basi" dari `snapshot.bestObject == nil`. Itu **salah**, karena
+mesin keadaan sengaja mempertahankan `currentIntent` supaya panel tidak berkedip:
+saat keadaan sudah kembali `pointing` setelah pergelangan bergerak,
+`bestObject` **tetap terisi** objek dari arah tunjuk sebelumnya. Akibatnya
+sinyal "sisa pandangan sebelumnya" bernilai `false` tepat pada objek yang paling
+basi. Dua akibat nyata:
+
+- Peringatan "Sisa pandangan sebelumnya" di `PointingView` (jam) **tidak pernah
+  bisa muncul** — syarat render lamanya (`state.hasAnswer`) hanya lolos saat
+  `bestObject != nil`, dan saat itu `isStale` selalu `false`.
+- `DiagnosticsView` (iPhone) menampilkan `displayedObject` tanpa penjagaan di
+  bagian berjudul **"Sekarang"**, sehingga objek lama terbaca sebagai hasil
+  pengukuran sekarang.
+
+Perbaikannya: aturan pindah ke `PointingKit`
+(`PointingSnapshot.displayedObject(lastLocked:)` +
+`isDisplayingStaleObject(lastLocked:)`) supaya bisa diuji di Linux, dan
+"basi" kini ditentukan oleh **`state.hasAnswer`**, bukan dari mana objek diambil.
+`PointingView` menampilkan panel detail **dengan** peringatan sisa (bukan
+disembunyikan, yang membuat jam berkedip) dan menyembunyikan badge keyakinan
+pada objek sisa; `DiagnosticsView` menandai barisnya "Objek (sisa) — bukan hasil
+sekarang".
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
+  Dua uji regresi baru menjaga aturan ini (`PointingPresentationTests`).
+- Gerbang sintaks: **seluruh 14 berkas app** lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` setelah perubahan.
+- `gh run view` pada `Apple Build` HEAD `6e5edd8` → **2× `BUILD SUCCEEDED`**
+  (skema iPhone yang ikut membangun app jam, dan skema jam sendiri), **0 galat**.
+
+### Siklus sebelumnya: perbaikan bug siklus hidup sensor di app iPhone
 Fokus: membaca sendiri setiap berkas app, lalu memperbaiki satu cacat nyata yang
 ditemukan — bukan menambah fitur. Logika engine **tidak disentuh** (165 + 122
 test tetap hijau); aturan keras PRD tidak dilonggarkan.

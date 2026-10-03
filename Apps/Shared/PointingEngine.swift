@@ -186,15 +186,29 @@ public final class PointingEngine: ObservableObject {
     /// Objek yang ditampilkan di panel detail.
     ///
     /// Saat terkunci/ragu: jawaban engine. Saat mencari: objek terakhir yang
-    /// pernah terkunci — tapi UI **wajib** membedakannya lewat `state`, karena
-    /// `lastLockedObject` bisa berasal dari pandangan sebelumnya.
+    /// pernah terkunci — tapi UI **wajib** membedakannya lewat
+    /// `isDisplayingStaleObject`, karena `lastLockedObject` bisa berasal dari
+    /// pandangan sebelumnya.
+    ///
+    /// Aturannya sendiri ada di `PointingKit`
+    /// (`PointingSnapshot.displayedObject(lastLocked:)`) supaya bisa diuji di
+    /// Linux — lihat `PointingPresentationTests`. Di sini hanya meneruskan.
     public var displayedObject: CelestialObject? {
-        snapshot.bestObject ?? (snapshot.state == .searching ? lastLockedObject : nil)
+        snapshot.displayedObject(lastLocked: lastLockedObject)
     }
 
     /// Apakah objek yang ditampilkan adalah sisa dari pandangan sebelumnya.
+    ///
+    /// **Kenapa bukan `snapshot.bestObject == nil`.** Mesin keadaan sengaja
+    /// mempertahankan `currentIntent` supaya panel tidak berkedip saat
+    /// pergelangan bergerak sedikit. Akibatnya `snapshot.bestObject` tetap
+    /// berisi objek **dari arah tunjuk sebelumnya** saat keadaan sudah kembali
+    /// `pointing` — jadi menilai "basi" dari `bestObject == nil` justru
+    /// melaporkan "bukan sisa" untuk objek yang paling basi, dan peringatan
+    /// "sisa pandangan sebelumnya" di layar jam tidak pernah bisa muncul.
+    /// Yang menentukan adalah apakah keadaan **punya jawaban sekarang**.
     public var isDisplayingStaleObject: Bool {
-        snapshot.bestObject == nil && displayedObject != nil
+        snapshot.isDisplayingStaleObject(lastLocked: lastLockedObject)
     }
 
     /// Arah tunjuk terkalibrasi, untuk ditampilkan sebagai angka.

@@ -65,4 +65,52 @@ final class PointingPresentationTests: XCTestCase {
         XCTAssertEqual(snapshot.bestObject?.id, "vega")
         XCTAssertEqual(PointingSnapshot(state: .idle).bestObject, nil)
     }
+
+    // MARK: - Objek sisa (anti false-confidence di layar)
+
+    private let vega = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                       raDeg: 279, decDeg: 38, magnitude: 0.03)
+
+    /// Objek dari pandangan sebelumnya tidak boleh tampil sebagai hasil
+    /// sekarang.
+    ///
+    /// Mesin keadaan sengaja mempertahankan `intent` supaya panel tidak
+    /// berkedip saat pergelangan bergerak sedikit. Akibatnya `intent?.best`
+    /// **tetap terisi** saat keadaan sudah kembali `pointing`. Menilai "basi"
+    /// dari `intent?.best == nil` karena itu salah: ia melaporkan "bukan sisa"
+    /// tepat pada objek yang paling basi, dan peringatan di layar tidak pernah
+    /// bisa muncul. Yang menentukan adalah apakah keadaan punya jawaban.
+    func testStaleObjectIsFlaggedWhenStateHasNoAnswer() {
+        // Keadaan sudah tidak punya jawaban, tapi intent lama masih menempel —
+        // inilah bentuk yang dulu lolos.
+        let stale = PointingSnapshot(state: .pointing,
+                                     intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        XCTAssertNotNil(stale.displayedObject(lastLocked: nil))
+        XCTAssertTrue(stale.isDisplayingStaleObject(lastLocked: nil),
+                      "objek dari arah tunjuk sebelumnya harus ditandai sisa")
+
+        // Keadaan benar-benar punya jawaban → bukan sisa.
+        for state in [PointingState.lock, .uncertain] {
+            let live = PointingSnapshot(state: state,
+                                        intent: CelestialIntent(level: .high, best: vega, candidates: []))
+            XCTAssertFalse(live.isDisplayingStaleObject(lastLocked: nil),
+                           "\(state) adalah jawaban sekarang, bukan sisa")
+        }
+    }
+
+    /// Objek terakhir yang pernah terkunci boleh tetap tampil saat mencari —
+    /// tapi **harus** ditandai sisa.
+    func testLastLockedObjectShownWhileSearchingIsStale() {
+        let searching = PointingSnapshot(state: .searching)
+        XCTAssertEqual(searching.displayedObject(lastLocked: vega)?.id, "vega")
+        XCTAssertTrue(searching.isDisplayingStaleObject(lastLocked: vega))
+
+        // Saat idle/unavailable tidak ada objek yang ditampilkan sama sekali.
+        for state in [PointingState.idle, .unavailable] {
+            let snapshot = PointingSnapshot(state: state)
+            XCTAssertNil(snapshot.displayedObject(lastLocked: vega),
+                         "\(state) tidak boleh menampilkan objek apa pun")
+            XCTAssertFalse(snapshot.isDisplayingStaleObject(lastLocked: vega))
+        }
+    }
 }

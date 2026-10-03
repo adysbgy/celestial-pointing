@@ -174,7 +174,14 @@ struct DiagnosticsView: View {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))
                     }
                     if let object = engine.displayedObject {
-                        row("Objek", object.name)
+                        // Sama seperti di jam: objek sisa harus terlihat sebagai
+                        // sisa. Baris ini berada di bagian "Sekarang", jadi
+                        // tanpa penanda ia terbaca sebagai hasil pengukuran
+                        // sekarang.
+                        row(engine.isDisplayingStaleObject ? "Objek (sisa)" : "Objek",
+                            engine.isDisplayingStaleObject
+                                ? "\(object.name) — bukan hasil sekarang"
+                                : object.name)
                     }
                     if let pointing = engine.pointing {
                         row("Arah", String(format: "%.1f° / %.1f°",
