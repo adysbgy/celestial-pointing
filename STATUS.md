@@ -2,7 +2,44 @@
 
 ## Progres terakhir (3 Okt 2026)
 
-### Siklus ini: jalur Watch ↔ iPhone tidak pernah benar-benar tersambung
+### Siklus ini: kebenaran Experiment 1 dihitung untuk tempat yang salah
+Fokus: menyisir jalur **kebenaran** (ground truth) di Experiment 1. Tidak ada
+aturan keras PRD yang dilonggarkan.
+
+**Yang ditemukan & ditutup:**
+- **`ExperimentHarness` memakai lokasi bawaan, bukan lokasi penguji.**
+  Harness dibuat sekali di `init` dengan `engine.location` — yang saat itu
+  masih `ObserverLocation.fallback` (Jakarta), karena lokasi sungguhan baru
+  tiba beberapa detik setelahnya. `harness.location` hanya disinkronkan di
+  dalam `record()`. Akibatnya:
+  - Daftar target "di atas horizon" dihitung untuk Jakarta di mana pun
+    penguji berada. Tinggi objek yang ditampilkan salah, dan target yang
+    tampak terlihat bisa sebenarnya sudah terbenam.
+  - Penguji memilih target itu, menekan Rekam, dan rekamannya ditolak
+    ("arah target tidak bisa dihitung") tanpa sebab yang bisa dipahami.
+  - Saat rekaman berhasil, `trial` dan `target` memakai lokasi yang berbeda,
+    sehingga galat yang diukur mencampur galat lokasi dengan galat sensor —
+    persis kekeliruan yang membuat Experiment 1 tidak menjawab pertanyaannya.
+  - Perbaikan: `ExperimentRecorder.updateLocation(_:)` menyinkronkan kebenaran,
+    dipanggil saat `onAppear` **dan** setiap kali `engine.location` berubah.
+  - Layar kini memperingatkan bila lokasinya masih bawaan, karena daftar yang
+    salah tempat tampak sama normalnya dengan yang benar.
+- **`ObserverLocation.isFallback`** ditambahkan (dengan uji di Linux) untuk
+  memisahkan lokasi terukur dari lokasi darurat. Label yang mirip **tidak**
+  boleh membuat lokasi terukur dianggap darurat — yang menentukan adalah
+  `source`. Uji ini akan merah kalau pembedanya dibalik ke perbandingan label.
+- **Sisa dari siklus lalu:** hook `ExperimentRecorder` kini ikut memakai
+  lokasi yang sama, sehingga tidak ada lagi dua sumber kebenaran lokasi.
+
+**Tes baru (1):** `TargetsTests.testIsFallbackDistinguishesMeasuredLocation`.
+
+**Verifikasi (yang benar-benar dijalankan):**
+- `./swift-test.sh` → **CelestialEngine 165 + PointingKit 107, 0 gagal**.
+- Seluruh 14 berkas app lolos `swiftc -parse -swift-version 5` di container
+  `swift:6.0`.
+- **CI macOS hijau** (`Apple Build`) + **CI Linux hijau** pada commit ini.
+
+### Siklus sebelumnya: jalur Watch ↔ iPhone tidak pernah benar-benar tersambung
 Fokus: memeriksa **transport** antar-perangkat, bukan isi pesannya. Tidak ada
 aturan keras PRD yang dilonggarkan.
 
