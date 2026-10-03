@@ -44,7 +44,11 @@ Perbaikannya:
 **Yang benar-benar dijalankan pada siklus ini:**
 - Gerbang sintaks: **seluruh 15 berkas app** (bertambah satu) lolos
   `swiftc -parse -swift-version 5` di container `swift:6.0`.
-- `./swift-test.sh` → lihat angka terbaru di Ringkasan di atas (0 gagal).
+- `./swift-test.sh` → **165 CelestialEngine + 124 PointingKit, 0 gagal** (exit 0).
+- CI `Apple Build` pada commit akhir siklus → **2× `BUILD SUCCEEDED`** (skema
+  iPhone yang ikut membangun app jam, dan skema jam sendiri); `Engine Tests
+  (Linux)` hijau. Percobaan pertama **gagal** (lihat di bawah) dan diperbaiki
+  sebelum hijau.
 
 **Galat nyata yang hanya muncul saat dibangun di macOS (dan sudah diperbaiki):**
 - Percobaan pertama memakai `ShareLink(item:)` dengan label tapi **tanpa**
