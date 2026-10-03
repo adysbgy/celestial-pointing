@@ -89,6 +89,9 @@ yang menyebut sebabnya.
   masuknya).
 - `angularRateDegPerSec` **diperiksa dan ternyata benar**: `AngularRateTracker`
   ikut direset saat sensor hilang, jadi `nil` — bukan nilai lama. Tidak diubah.
+- CI `Apple Build` run `37152202855` pada commit `a74d5be` → **2× `BUILD
+  SUCCEEDED`**, gerbang peringatan *"Tidak ada peringatan compiler pada Apps/."*
+- CI `Engine Tests (Linux)` run `37152202846` → **166 + 139, 0 gagal**.
 - CI `Apple Build` run `37151800262` pada commit `775b89f` → **2× `BUILD
   SUCCEEDED`** (skema iPhone yang ikut membangun app jam, dan skema jam sendiri),
   dan langkah gerbang melaporkan *"Tidak ada peringatan compiler pada Apps/."*
