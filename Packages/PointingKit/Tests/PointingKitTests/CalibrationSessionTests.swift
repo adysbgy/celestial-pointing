@@ -48,6 +48,37 @@ final class CalibrationSessionTests: XCTestCase {
         }
     }
 
+    /// Daftar acuan harus dihitung untuk **tempat sekarang**, bukan tempat lama.
+    ///
+    /// Bintang yang tampak di atas horizon di satu tempat bisa sudah terbenam di
+    /// tempat lain. Lokasi sungguhan tiba beberapa detik setelah layar kalibrasi
+    /// dibuka, jadi tanpa sinyal basi ini daftar tetap berisi bintang tempat
+    /// lama — pengguna memilihnya, lalu offset kalibrasi dihitung dari kebenaran
+    /// yang tidak ada di langitnya, dan kesalahannya tidak terlihat.
+    func testReferenceListBecomesStaleWhenObserverMoves() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        XCTAssertFalse(session.isReferenceListStale, "baru dihitung: belum basi")
+
+        c.setObserver(Observer(latitudeDeg: -0.18, longitudeDeg: -78.47))
+
+        XCTAssertTrue(session.isReferenceListStale,
+                      "daftar masih dihitung untuk langit tempat lama")
+
+        session.refreshReferenceTargets()
+        XCTAssertFalse(session.isReferenceListStale, "sudah dihitung ulang")
+        XCTAssertEqual(session.referenceObserver, c.observer)
+    }
+
+    /// Perhitungan ulang yang tidak mengubah apa pun tidak boleh dianggap basi
+    /// hanya karena waktunya berbeda — yang menentukan adalah **tempatnya**.
+    func testReferenceListStaysFreshWhenOnlyTimeChanges() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        session.refreshReferenceTargets()
+        XCTAssertFalse(session.isReferenceListStale)
+    }
+
     // MARK: - Pencatatan
 
     func testCaptureWithoutPointingRecordsNothing() {

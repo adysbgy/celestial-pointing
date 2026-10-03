@@ -33,6 +33,14 @@ struct CalibrationView: View {
         }
         .navigationTitle("Kalibrasi")
         .onAppear { ensureSession() }
+        // Daftar acuan bergantung pada lokasi: lokasi sungguhan tiba beberapa
+        // detik setelah layar ini dibuka, dan bintang yang tampak "di atas
+        // horizon" di tempat lama bisa sudah terbenam di tempat sebenarnya.
+        // Daftar yang salah tempat tampak sama normalnya dengan yang benar,
+        // jadi perhitungan ulang dipaksa setiap lokasi berubah.
+        .onChange(of: engine.location) { _, _ in
+            session?.refreshReferenceTargets()
+        }
     }
 
     // MARK: - Kartu tahap

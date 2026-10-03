@@ -39,6 +39,14 @@ public final class CalibrationSession {
 
     /// Target acuan yang boleh dipilih pengguna saat ini.
     public private(set) var referenceTargets: [PointingTarget] = []
+    /// Observer yang dipakai saat `referenceTargets` terakhir dihitung.
+    ///
+    /// Daftar acuan bergantung pada **lokasi** pengamat: bintang yang tampak di
+    /// atas horizon di satu tempat bisa sudah terbenam di tempat lain. Kalau
+    /// daftar dibiarkan dari tempat lama, pengguna memilih bintang yang
+    /// sebenarnya tidak ada di langitnya — lalu `capture` memakai arah bintang
+    /// itu sebagai kebenaran dan offset kalibrasinya salah tanpa terlihat.
+    public private(set) var referenceObserver: Observer?
     /// Target yang sedang dipilih pengguna (kalau UI memakai daftar).
     public var selectedTargetID: String?
 
@@ -59,6 +67,17 @@ public final class CalibrationSession {
         referenceTargets = controller.resolver
             .availableTargets(observer: controller.observer, date: date)
             .filter { wanted.contains($0.id) }
+        referenceObserver = controller.observer
+    }
+
+    /// Apakah daftar acuan dihitung untuk langit yang berbeda dari sekarang.
+    ///
+    /// Dipakai UI untuk memaksa perhitungan ulang saat lokasi pengamat berubah.
+    /// Lokasi sungguhan tiba beberapa detik setelah layar kalibrasi dibuka, jadi
+    /// tanpa sinyal ini daftar acuan tetap berisi bintang tempat lama — dan
+    /// daftar yang salah tempat tampak sama normalnya dengan yang benar.
+    public var isReferenceListStale: Bool {
+        referenceObserver != controller.observer
     }
 
     /// Catat satu acuan yang dipilih pengguna dari daftar, memakai arah tunjuk

@@ -123,7 +123,12 @@ public final class PointingController {
     // MARK: - Keadaan
 
     /// Lokasi pengamat. Mengubah ini menggeser seluruh langit.
-    public var observer: Observer
+    ///
+    /// `private(set)`: penggantian **wajib** lewat `setObserver(_:)`, karena
+    /// mengubah lokasi membatalkan jawaban yang sudah dihitung untuk langit
+    /// yang lama. Kalau pemanggil bisa menulisnya langsung, jawaban lama akan
+    /// tetap tampil setelah langitnya bergeser.
+    public private(set) var observer: Observer
     /// Kalibrasi yang sedang dipakai.
     public private(set) var calibration: PointingCalibration
     /// Parameter alur.
@@ -223,6 +228,27 @@ public final class PointingController {
         calibration = newValue
         smoother.reset()
         machine.stop()
+        refreshSnapshot()
+    }
+
+    /// Pasang pengamat baru. Mengubah lokasi menggeser seluruh langit.
+    ///
+    /// **Kenapa ini ada, bukan sekadar `observer = nilai`.** Jawaban engine
+    /// disimpan di mesin keadaan (`currentIntent`) dan hanya dibuang saat alur
+    /// dihentikan. Mengganti lokasi tanpa menghentikan alur akan menyisakan
+    /// `snapshot.intent` berisi objek yang dihitung untuk langit **lama** —
+    /// dan objek itu bisa berbeda dari yang benar-benar ada di arah tunjuk
+    /// sekarang. Tidak ada bagian UI yang terlihat keliru, jadi kesalahan ini
+    /// tidak akan ketahuan sampai pengguna memindahkan jam ke tempat lain dan
+    /// melihat bintang yang salah.
+    ///
+    /// Memasang pengamat yang **sama** bukan perubahan: langitnya tidak
+    /// bergeser, jadi jawaban yang sudah benar tidak boleh dibuang.
+    public func setObserver(_ newValue: Observer) {
+        guard newValue != observer else { return }
+        observer = newValue
+        machine.stop()
+        lastResolution = nil
         refreshSnapshot()
     }
 

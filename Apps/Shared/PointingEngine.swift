@@ -49,8 +49,8 @@ public final class PointingEngine: ObservableObject {
         snapshot = controller.snapshot
     }
 
-    /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi alur
-    /// dihentikan dulu supaya tidak ada jawaban yang dihitung dengan lokasi lama.
+    /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi jawaban
+    /// yang sudah dihitung untuk langit lama **dibatalkan** — bukan dipertahankan.
     ///
     /// **Yang menentukan perpindahan adalah koordinatnya, bukan keseluruhan
     /// nilai.** `ObserverLocation` membawa `capturedAt` yang berubah di tiap
@@ -61,15 +61,29 @@ public final class PointingEngine: ObservableObject {
     /// diperbarui, dan haptic "kembali ke idle" berbunyi berulang tanpa
     /// pengguna melakukan apa pun. Getaran GPS puluhan meter menggeser langit
     /// ~0.0005°, yang tidak berarti apa-apa dibanding sigma pointing.
+    ///
+    /// **Kenapa pembatalannya ada di `setObserver`.** Sebelumnya pembatalan
+    /// ini menumpang pada `apply(calibration:)` — yang kebetulan menghentikan
+    /// alur. Ketika pemasangan kalibrasi yang sama dijadikan tanpa-efek,
+    /// tumpangan itu hilang dan perpindahan tempat berhenti membatalkan apa
+    /// pun: objek dari langit lama tetap tampil seolah masih berlaku, tanpa
+    /// satu pun bagian UI yang terlihat keliru. Sekarang lokasi membatalkan
+    /// jawabannya sendiri, jadi tidak bergantung pada efek samping pemanggil
+    /// lain. Kalibrasi tetap dipertahankan: offset yaw adalah sifat pemasangan
+    /// jam, bukan sifat tempat.
     public func update(location newValue: ObserverLocation) {
         guard !newValue.isSamePlace(as: location) else { return }
         location = newValue
-        controller.observer = newValue.observer
-        // Kalibrasi dipertahankan: offset yaw adalah sifat pemasangan jam,
-        // bukan sifat tempat. Yang dibuang hanyalah alur yang sedang berjalan.
-        controller.apply(calibration: controller.calibration)
+        controller.setObserver(newValue.observer)
         snapshot = controller.snapshot
         lastLockedObject = nil
+        // Konteks langit (Matahari/Bulan) dihitung untuk **tempat**, jadi
+        // konteks tempat lama tidak berlaku di tempat baru. Perhitungan ulang
+        // dipaksa: penjagaan waktu di `refreshSkyContext` ada untuk membatasi
+        // pemanggilan 20 Hz dari sampel sensor, bukan untuk menahan perubahan
+        // lokasi.
+        skyContextAt = nil
+        refreshSkyContext()
     }
 
     /// Sambungkan sumber lokasi ke engine: lokasi yang sudah berlaku dipasang
@@ -108,9 +122,30 @@ public final class PointingEngine: ObservableObject {
 
     /// Perbarui konteks langit (Matahari/Bulan). Dipanggil jarang — konteks
     /// berubah lambat dan efemeris tidak murah.
+    ///
+    /// **Kenapa ada penjagaan waktu.** Metode ini dipanggil dari `ingest(_:)`,
+    /// yaitu pada **setiap** sampel sensor — 20 kali per detik. Tanpa penjagaan
+    /// ini, tiap sampel menjalankan efemeris Matahari dan Bulan penuh di main
+    /// actor, membebani baterai dan membuat UI tersendat, sementara nilainya
+    /// praktis tidak berubah dalam hitungan detik. Ambang bawaan mengikuti
+    /// seberapa cepat konteks benar-benar bergerak: Bulan ~0.5°/jam.
+    ///
+    /// Perubahan **lokasi** melewati penjagaan ini: `PointingEngine` memanggil
+    /// `refreshSkyContext` langsung saat lokasi baru dipasang, karena langit di
+    /// tempat baru belum pernah dihitung.
     public func refreshSkyContext(at date: Date = Date()) {
+        if let last = skyContextAt,
+           date.timeIntervalSince(last) < Self.skyContextInterval {
+            return
+        }
+        skyContextAt = date
         skyContext = controller.resolver.skyContext(observer: location.observer, date: date)
     }
+
+    /// Jarak waktu minimum antar perhitungan konteks langit (detik).
+    static let skyContextInterval: TimeInterval = 30
+
+    private var skyContextAt: Date?
 
     /// Sensor hilang / tersedia.
     public func setSensorAvailable(_ available: Bool) {

@@ -305,6 +305,61 @@ final class PointingControllerTests: XCTestCase {
                         "arah tunjuk tetap ada — yang salah adalah langitnya")
     }
 
+    /// Memindahkan pengamat harus **membatalkan** jawaban yang dihitung untuk
+    /// langit lama.
+    ///
+    /// Ini regresi yang pernah lolos: pembatalan dulu menumpang pada
+    /// `apply(calibration:)` yang kebetulan menghentikan alur. Begitu
+    /// pemasangan kalibrasi yang sama dijadikan tanpa-efek, perpindahan tempat
+    /// berhenti membatalkan apa pun — dan objek dari langit lama tetap tampil
+    /// seolah masih berlaku, tanpa satu pun bagian UI yang terlihat keliru.
+    func testChangingObserverDropsAnswerComputedForOldSky() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.snapshot.state, .lock)
+        XCTAssertNotNil(c.lastResolution)
+
+        // Pindah jauh (Quito) — langit bergeser > 20°, jadi jawaban lama
+        // tidak lagi sah untuk arah tunjuk yang sama.
+        c.setObserver(Observer(latitudeDeg: -0.18, longitudeDeg: -78.47))
+
+        XCTAssertEqual(c.snapshot.state, .idle,
+                       "jawaban langit lama tidak boleh tetap tampil setelah pindah")
+        XCTAssertNil(c.snapshot.intent)
+        XCTAssertNil(c.lastResolution,
+                     "resolusi lama dihitung untuk langit lama")
+    }
+
+    /// Memasang pengamat yang **sama** bukan perubahan: langitnya tidak
+    /// bergeser, jadi jawaban yang sudah benar tidak boleh dibuang. Ini yang
+    /// membuat pembaruan lokasi berulang dari tempat yang sama tidak mematikan
+    /// kunci yang baru saja didapat.
+    func testReapplyingSameObserverIsANoOp() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        lockController(c, quaternion: quaternion(viewPointingAt: siriusDirection(resolver)))
+        XCTAssertEqual(c.snapshot.state, .lock)
+
+        c.setObserver(observer)
+
+        XCTAssertEqual(c.snapshot.state, .lock)
+        XCTAssertNotNil(c.snapshot.intent)
+    }
+
+    /// Pindah tempat tidak boleh membuang kalibrasi: offset yaw adalah sifat
+    /// pemasangan jam, bukan sifat tempat.
+    func testChangingObserverKeepsCalibration() {
+        let resolver = singleStarResolver()
+        let calibration = PointingCalibration(yawOffsetDeg: 7, residualSpreadDeg: 1, sampleCount: 3)
+        let c = controller(resolver, calibration: calibration)
+
+        c.setObserver(Observer(latitudeDeg: -0.18, longitudeDeg: -78.47))
+
+        XCTAssertEqual(c.calibration, calibration)
+        XCTAssertTrue(c.snapshot.isCalibrated)
+    }
+
     // MARK: - Kalibrasi
 
     /// Kalibrasi hanya boleh menggeser azimut, tidak pernah altitude.
