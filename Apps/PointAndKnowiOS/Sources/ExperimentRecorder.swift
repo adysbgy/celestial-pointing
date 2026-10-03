@@ -77,6 +77,17 @@ public final class ExperimentRecorder: ObservableObject {
             statusMessage = "Pilih target dulu — tanpa kebenaran, rekaman tidak bisa dianalisis."
             return nil
         }
+        // Sensor harus benar-benar hidup. Saat sensor mati, `rawPointing` yang
+        // ada di cuplikan adalah **nilai terakhir sebelum sensor hilang** —
+        // nilainya tetap terisi, jadi pemeriksaan "ada arah tunjuk?" saja akan
+        // meloloskannya. Yang terekam saat itu adalah arah dari beberapa detik
+        // lalu yang dipasangkan dengan target yang dipilih sekarang: sebuah
+        // pengukuran yang tidak pernah terjadi, di dalam dataset yang justru
+        // ada untuk menguji akurasi. Alat ukur tidak boleh mengarang data.
+        guard engine.snapshot.hasSensor else {
+            statusMessage = "Sensor gerak tidak aktif — arah tunjuk yang tersisa bukan pengukuran sekarang. Tidak ada yang direkam."
+            return nil
+        }
         guard let raw = engine.snapshot.rawPointing else {
             statusMessage = "Belum ada arah tunjuk dari sensor — tidak ada yang direkam."
             return nil

@@ -66,6 +66,16 @@ Tombol "Kosongkan riwayat" tetap aktif saat perekaman **dijeda** — tampak siap
 menghapus padahal tidak ada yang tersimpan lagi. Keduanya kini lewat store dan
 mencerminkan keadaan yang sebenarnya.
 
+**Cacat 4 — Experiment 1 bisa merekam pengukuran yang tidak pernah terjadi.**
+`ExperimentRecorder.record()` hanya memeriksa "ada arah tunjuk?" (`rawPointing
+!= nil`). Saat sensor mati, `rawPointing` yang tersisa di cuplikan adalah
+**nilai terakhir sebelum sensor hilang** — nilainya tetap terisi, jadi
+pemeriksaan itu meloloskannya. Yang akan terekam: arah dari beberapa detik lalu
+dipasangkan dengan target yang dipilih sekarang, lalu masuk ke dataset yang
+justru ada untuk mengukur akurasi Watch. Alat ukur tidak boleh mengarang data.
+Kini sensor harus benar-benar hidup; tombol Rekam di layar ikut mati saat sensor
+mati supaya penguji tidak mengira percobaannya tercatat.
+
 **Yang benar-benar dijalankan pada siklus ini:**
 - `./swift-test.sh` → **165 CelestialEngine + 132 PointingKit, 0 gagal** (exit 0).
   Delapan uji baru mengunci perilaku ini: objek sisa tidak terkirim
@@ -87,6 +97,8 @@ mencerminkan keadaan yang sebenarnya.
   mati di tengah pandangan memang menyisakan objek lama, jadi sekarang diuji
   apa adanya: panelnya tetap tampil **dengan** penanda sisa dan tanpa badge
   keyakinan (**132** tes PointingKit).
+- CI `Apple Build` run `37149935666` dan `Engine Tests (Linux)` run
+  `37149935687` pada commit berikutnya → keduanya hijau.
 
 ### Siklus sebelumnya: menutup temuan peringatan @preconcurrency + menjadikannya gerbang
 Fokus: menutup **satu-satunya temuan yang sengaja dibiarkan terbuka** oleh

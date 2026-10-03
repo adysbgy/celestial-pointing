@@ -120,7 +120,11 @@ struct Experiment1View: View {
             } label: {
                 Label("Rekam percobaan", systemImage: "record.circle")
             }
-            .disabled(recorder.selectedTargetID == nil)
+            // Sensor mati juga mematikan tombolnya: tanpa ini penguji bisa
+            // menekan Rekam dan mengira percobaannya tercatat, padahal
+            // `ExperimentRecorder` menolaknya (arah tunjuk yang tersisa bukan
+            // pengukuran sekarang). Keadaan alurnya sudah tampil di baris atas.
+            .disabled(recorder.selectedTargetID == nil || !engine.snapshot.hasSensor)
 
             Button("Buang percobaan terakhir", role: .destructive) {
                 recorder.removeLast()
