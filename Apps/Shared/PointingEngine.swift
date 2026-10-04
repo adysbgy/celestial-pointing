@@ -157,6 +157,12 @@ public final class PointingEngine: ObservableObject {
         // lokasi.
         skyContextAt = nil
         refreshSkyContext()
+        // Putusan GoTo dihitung untuk **langit di tempat itu**: arah Matahari
+        // dan ketinggian target keduanya bergeser bersama lokasi. Tanda tangan
+        // (keadaan, objek) tidak menangkap itu — objek yang sama di langit baru
+        // tetap bertanda tangan sama — jadi gerbangnya direset supaya putusan
+        // lama tidak bertahan di tempat baru.
+        slewVerdictGate.reset()
     }
 
     /// Sambungkan sumber lokasi ke engine: lokasi yang sudah berlaku dipasang
@@ -304,19 +310,24 @@ public final class PointingEngine: ObservableObject {
         refreshSlewVerdict(at: Date())
     }
 
-    /// Tanda tangan putusan GoTo terakhir yang dihitung.
+    /// Gerbang penyegaran putusan GoTo.
     ///
-    /// Perhitungannya butuh efemeris (arah target), jadi ia tidak boleh jalan
-    /// di `body` — yang dievaluasi 20 kali per detik. Tapi ia juga tidak boleh
-    /// jalan 20 kali per detik: arah benda langit bergerak ~0.25°/menit, jadi
-    /// hasilnya tidak berubah antara dua sampel berturut-turut.
+    /// **Kenapa gerbang, bukan sekadar tanda tangan.** Perhitungannya butuh
+    /// efemeris (arah target), jadi ia tidak boleh jalan di `body` — yang
+    /// dievaluasi 20 kali per detik. Versi pertama membatasi dengan tanda tangan
+    /// (keadaan, objek) saja, dan itu **membekukan** putusan selama pengguna
+    /// menahan tunjukan: geometri Matahari & objek terus bergerak, tapi tanda
+    /// tangannya tidak. Objek yang terkunci di 30.2° dari Matahari bisa
+    /// melintasi ambang 30° tanpa satu pun perhitungan ulang, sehingga layar
+    /// terus berkata "aman" atas langit yang sudah tidak ada.
     ///
-    /// Yang membatasi di sini adalah **tanda tangan**, bukan waktu: dihitung
-    /// ulang tepat saat jawabannya berubah (objek berbeda, atau ada/tidak ada
-    /// jawaban). Objek yang sama dihitung sekali; objek baru langsung.
-    private var slewVerdictSignature: String?
+    /// Gerbang ini menambahkan **umur** di samping tanda tangan, jadi putusan
+    /// tidak bisa hidup lebih lama dari 30 detik — dan alasannya lengkap ada di
+    /// `SlewVerdictRefreshGate` (teruji di Linux). Aturannya tinggal di sana
+    /// supaya batas keterlambatannya bisa diuji tanpa jam sungguhan.
+    private var slewVerdictGate = SlewVerdictRefreshGate()
 
-    /// Hitung ulang putusan GoTo bila jawabannya berubah.
+    /// Hitung ulang putusan GoTo bila subjeknya berubah atau umurnya habis.
     private func refreshSlewVerdict(at date: Date) {
         // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
         // gerbang kedatangan kunci. Memakai satu predikat yang sama berarti
@@ -325,9 +336,11 @@ public final class PointingEngine: ObservableObject {
         // jawaban.
         let objectID = snapshot.answeredObject?.id ?? "-"
         let signature = "\(snapshot.state.rawValue)|\(objectID)"
-        guard signature != slewVerdictSignature else { return }
-        slewVerdictSignature = signature
+        guard slewVerdictGate.needsRecompute(signature: signature, at: date) else { return }
         slewVerdict = controller.slewDecision(date: date)
+        // Dicatat **setelah** putusan benar-benar dihitung: kalau dicatat lebih
+        // dulu, umur putusan lama akan diperpanjang tanpa isinya diperbarui.
+        slewVerdictGate.record(signature: signature, at: date)
     }
 
     /// Tulis snapshot complication saat keadaan/objek benar-benar berubah.
