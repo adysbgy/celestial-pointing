@@ -2,12 +2,12 @@
 
 ## Ringkasan keadaan (4 Okt 2026, dini hari)
 
-**Misi UI/UX dimulai (Bagian 1).** Visual prosedural sekarang **terpasang**
-di kedua app dan sudah melintasi CI macOS.
+**Misi UI/UX berjalan (Bagian 1 + awal Bagian 2).** Visual prosedural
+terpasang di kedua app, dan token permukaannya sekarang **teruji di Linux**.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 167 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 179 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan **kedua workflow CI hijau** di HEAD `59fee76`.
+  dan **kedua workflow CI hijau** di HEAD `e0aec92`.
 - Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
   `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
   Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
@@ -17,6 +17,68 @@ di kedua app dan sudah melintasi CI macOS.
 - Gate baru di CI: **nilai palet & ciri pengenal planet, dan urutan terang mode
   malam, sekarang teruji di Linux** — karena "cincin = Saturnus" adalah klaim
   identitas, dan klaim identitas tidak bisa diuji dengan membaca.
+
+## Progres terakhir (4 Okt 2026 — Bagian 2: polish ala Mobbin)
+
+### Premis siklus ini: klaim numerik harus dihitung, bukan dibaca
+
+Brief meminta "kontras ≥ 4.5:1 (WCAG)". Itu **klaim numerik**, dan
+klaim seperti ini tidak bisa dibuktikan dengan membaca kode — harus dihitung.
+Selama ini tidak ada yang menghitungnya. Akibatnya `SurfacePalette` (RGB
+mentah, tanpa SwiftUI) sekarang ada di `PointingKit`, dengan
+`SurfacePaletteTests` yang menjaga angkanya di Linux; `Apps/Shared/SurfaceTokens.swift`
+hanya menjembatanikannya ke `Color`.
+
+### Tiga temuan nyata dari menghitung, bukan membaca
+
+1. **`nightAwareSecondary` lama punya kontras 1.49:1 di mode malam** — bukan
+   4.5:1. Syarat WCAG di brief sebenarnya tidak pernah terpenuhi di mode
+   malam. Sekarang semua warna sekunder datang dari `SurfacePalette`, dan tes
+   mengatakannya.
+2. **Plafon kontras mode malam = 5.25:1** (merah murni di atas hitam tidak bisa
+   lebih terang dari itu). Artinya "teks utama" vs "sekunder" hanya punya ruang
+   kanal 1.00 → 0.95: pada mode malam **taksonomi** lebih berguna daripada
+   terang-versus-redup. Dicatat di palet + diuji, supaya tidak nanti
+   "diperbaiki" ke abu pucat demi "kontras" lalu membatalkan alasan mode malam.
+3. **`surfaceSteps` harus dihitung dalam kanal sRGB, bukan luminance.**
+   Permukaan malam punya hijau/biru nol, jadi luminance-nya hanya ~1/4 dari abu
+   equivalent — ambang "langkah terlalu tipis" jadi tidak berwarna. Diperbaiki ke
+   selisih kanal terbesar; **satu ambang berlaku untuk dua mode**.
+
+### Yang berubah di UI
+
+- Latar `#0A0A0F` / `#121216` + tiga lapis **surface stepping** (dari
+  kecerahan, bukan shadow — di layar gelap shadow tak terlihat).
+- Aksen gradien "ruang → nebula" hanya di keadaan `.lock`, supaya "aktif"
+  tetap berarti sesuatu.
+- **`.ultraThinMaterial` diganti warna solid.** Glassmorphism ada di brief, tapi
+  warnanya bergantung apa yang ada di belakangnya sehingga klaim kontras yang
+  sudah dihitung tidak bisa dijamin. Overrule dicatat di `NightMode.swift`,
+  bukan diam-diam.
+- **Dynamic Type**: semua `.system(size:)` di `PointingView` dan
+  `ReducedLuminanceView` → semantic font. Angka tetap hanya untuk metric (jarak,
+  radius, gambar).
+- **Always-On**: kontras pakai `textPrimary`, bukan tone keadaan — watchOS
+  menahan kromatik dan cyan/hijau di atas gelap hilang duluan. Ditambah label
+  VoiceOver yang pendek.
+
+### Cacat CI kedua yang hanya macOS bisa tangkap
+
+CI pada `7e5b1de` gagal: `SurfaceTokens.swift:57: error: missing return in
+getter expected to return 'LinearGradient'`. Semua getter di berkas itu kini
+`return` eksplisit, jadi implicit-return tidak bisa menggigit lagi di sana.
+`swiftc -parse` tetap lolos. Verde di `e0aec92` (Apple Build run
+`37172701449` + Engine Tests run `37172701444`).
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 179 PointingKit, 0 gagal**
+  (naik dari 167 → 179: 12 uji palet baru).
+- Uji kontras **dibuktikan MERAH lebih dulu** pada metrik `surfaceSteps`
+  berbasis luminance sebelum diperbaiki ke sRGB.
+- Gerbang sintaks seluruh 17 berkas app lolos `swiftc -parse` di `swift:6.0`.
+- Sapuan CJK di `Apps/` dan `Packages/`: 0.
+- CI: Apple Build hijau + gerbang peringatan lolos; Engine Tests hijau.
 
 ## Progres terakhir (4 Okt 2026 — Bagian 1: visual objek)
 
