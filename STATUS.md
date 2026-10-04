@@ -1,5 +1,80 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — seluruh alur kalibrasi tak pernah bisa diterjemahkan)
+
+### Kalimat yang lahir di dalam paket, bukan di view
+
+Aturan 4 menyapu literal `Text("…")` di `Apps/`. Aturan 6 memeriksa paritas
+`LocalizedText.allKeys` dengan katalog. Keduanya hijau — padahal **seluruh alur
+kalibrasi** menghasilkan kalimat Bahasa Indonesia di dalam
+`Packages/PointingKit`, tempat tidak satu pun dari dua gerbang itu menjangkaunya:
+
+| Kalimat | Berkas |
+|---|---|
+| `Tunjuk bintang acuan, lalu tekan untuk mencatat.` | `CalibrationFlow.message` |
+| `Butuh minimal %lld acuan (%lld tercatat).` | `CalibrationFlow.message` |
+| `Sebaran %.1f° masih terlalu lebar (maks %.1f°). Tambah acuan.` | `CalibrationFlow.message` |
+| `Siap — sebaran %.1f° dari %lld acuan.` | `CalibrationFlow.message` |
+| `Kalibrasi dipakai.` | `CalibrationFlow.message` |
+| `Sensor gerak tidak aktif — … Tidak dicatat.` | `CalibrationSession` |
+| `Belum ada arah tunjuk dari sensor.` | `CalibrationSession` (×2) |
+| `Arah objek %@ tidak bisa dihitung — tidak dicatat.` | `CalibrationSession` |
+| `Tidak ada bintang acuan yang jelas di arah itu — …` | `CalibrationSession` |
+| `Tahap: %@.`, `%lld acuan tercatat.`, `Offset …`, `Sebaran …` | `CalibrationSpeech` |
+| `Pakai kalibrasi ini` / `Pakai kalibrasi, belum bisa dipakai` | `CalibrationSpeech` |
+| `Catat %@ sebagai acuan, %.0f derajat tinggi.` | `CalibrationSpeech` |
+| `Tunjuk bintang acuan, lalu tekan Catat.` | `CalibrationView.statusMessage` |
+| `Kalibrasi sudah terpasang: offset %.1f°.` | `CalibrationView` |
+| `Belum siap dipakai: sebarannya masih terlalu lebar.` | `CalibrationView` |
+| `Terpasang. Offset %.1f°, sebaran %.1f°.` | `CalibrationView` |
+| `Kalibrasi dihapus. Mulai dari awal.` | `CalibrationView` |
+| `Offset %.1f°`, `Sebaran %.1f° (maks %.1f°)` | `CalibrationView` |
+| `Belum ada acuan` / `Mengumpulkan acuan` / … | `CalibrationPhase` (layar **dan** suara) |
+
+Tidak satu pun ada di `Localizable.xcstrings`. Dua sebab yang berbeda, keduanya
+senyap:
+
+- Kalimat yang lahir di `CalibrationFlow`/`CalibrationSession`/`CalibrationSpeech`
+  tidak pernah melewati `LocalizedText`, jadi ia tidak punya kunci untuk
+  dibandingkan Aturan 6 — dan Aturan 4 tidak menyapu `Packages/`.
+- Kalimat di `CalibrationView` **dihitung**, bukan literal: bentuknya
+  `statusMessage = String(format: "…", …)` atau `statusMessage = "…" + …`.
+  Regex argumen-langsung Aturan 4 tidak melihat nilai yang dirakit lebih dulu.
+
+Akibatnya seluruh alur kalibrasi — layar dan suara — tampil dalam Bahasa
+Indonesia di semua bahasa, dengan setiap gerbang hijau. Ini kelas cacat yang
+sama dengan yang ditutup `SensorStatusText` dan `ObjectSpeech`, tetapi
+berkas-berkas ini tertinggal di belakang.
+
+### Dua sumber yang sudah bisa menyimpang
+
+`CalibrationPhase` punya nama tahap **dua kali**: `phaseLabel` (literal di
+`CalibrationView`, bentuk pendek) dan `spokenName` (literal di paket, bentuk
+panjang). Layar dan suara menyebut keadaan yang sama dengan kalimat yang
+berbeda, di dua tempat berbeda — satu perubahan bisa membuat keduanya tak lagi
+sepakat.
+
+### Yang diubah
+
+- **`CalibrationText`** (PointingKit, teruji Linux) — 27 kunci: pesan tahap,
+  pesan kegagalan langkah, label yang diucapkan, pesan status, angka ringkas
+  kartu, dan nama tahap. Angka masuk lewat `String(format:)` (`%lld` untuk
+  jumlah bulat: `%d` di Linux Swift membaca 32-bit dan memotong `Int` 64-bit).
+- **27 kunci katalog `calibration.*`** dengan terjemahan Inggris; `allKeys`
+  78 → 105; katalog 209 → 236.
+- `CalibrationFlow`, `CalibrationSession`, `CalibrationSpeech`, dan
+  `CalibrationView` membaca frasa itu. `CalibrationPhase.displayName` (layar)
+  dan `.spokenName` (suara) kini membaca katalog yang sama, jadi keduanya tak
+  bisa lagi menyimpang.
+
+Sebelas uji baru (`CalibrationTextTests`), termasuk yang memasang terjemahan
+Inggris untuk membuktikan setiap aksesor benar-benar membacanya, dan yang
+mengunci kesamaan layar/suara.
+
+Gerbang: `swift-test.sh` **166 + 433 hijau** (README diperbarui lewat Aturan 10),
+ui-lint hijau (Aturan 6 paritas tetap sebanding), typecheck hijau.
+CI macOS run `37229231996` (Engine Linux) + `37229231864` (Apple Build) hijau.
+
 ## Progres terakhir (4 Okt 2026 — pesan izin & sensor tidak pernah bisa diterjemahkan)
 
 ### Literal yang ditugaskan ke properti, bukan diteruskan ke `Text`
