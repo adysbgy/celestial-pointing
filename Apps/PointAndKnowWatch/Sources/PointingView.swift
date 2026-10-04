@@ -19,6 +19,15 @@ struct PointingView: View {
     /// `PointingTone.color` / `Color.nightAwareSecondary`).
     @AppStorage(NightModeStorage.key) private var nightMode = false
 
+    /// Pengumuman perubahan keadaan untuk VoiceOver.
+    ///
+    /// Tanpa ini, pengguna yang memakai VoiceOver **tidak pernah tahu** kapan
+    /// jam berhasil mengunci — padahal haptic "terkunci" adalah satu-satunya
+    /// saluran yang tidak butuh mata, dan saluran itu tidak menjangkau mereka.
+    /// Ini versi audio dari janji yang sama: keadaan yang berubah harus
+    /// terdengar, bukan hanya terlihat.
+    @State private var announcedState: PointingState?
+
     var body: some View {
         // Saat layar redup (Always-On), watchOS mengabaikan sebagian gestur dan
         // meredupkan warna halus — jadi tampilan diganti versi sederhana &
@@ -84,6 +93,10 @@ struct PointingView: View {
                     } label: {
                         Image(systemName: "info.circle")
                     }
+                    // Tombol berbasis ikon tidak punya teks, jadi tanpa label
+                    // VoiceOver mengucapkan nama SF Symbol-nya ("info dot
+                    // circle"), bukan maksud tombolnya.
+                    .accessibilityLabel("Konteks langit dan ketelitian")
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
@@ -96,6 +109,15 @@ struct PointingView: View {
                                              ? PointingTone.success.color
                                              : PointingTone.warning.color)
                     }
+                    // Keadaan kalibrasi ikut diumumkan: ikon "scope" vs
+                    // tanda-seru membedakan keduanya **hanya** secara visual,
+                    // jadi pengguna VoiceOver tidak akan pernah tahu apakah
+                    // jamnya sudah terkalibrasi — padahal pointing yang belum
+                    // terkalibrasi adalah yang paling berbahaya untuk
+                    // dipercaya.
+                    .accessibilityLabel(engine.snapshot.isCalibrated
+                                        ? "Kalibrasi, sudah terpasang"
+                                        : "Kalibrasi, belum terpasang")
                 }
                 // Mode Malam: 1 ketuk. Ikon bulan berubah jadi bulan-terselubung
                 // saat aktif supaya keadaannya terbaca tanpa warna.
@@ -112,6 +134,40 @@ struct PointingView: View {
         // Latar merah redup saat malam: menekan cahaya putih/biru yang
         // mematikan rhodopsin. Di siang tetap transparan (sistem yang menentu).
         .preferredColorScheme(nightMode ? .dark : nil)
+        // Umumkan **perubahan** keadaan, bukan tiap sampel 20 Hz.
+        //
+        // `announcedState` menyimpan keadaan terakhir yang diumumkan, jadi
+        // pengumuman hanya terjadi saat keadaannya benar-benar berganti —
+        // kalau tidak, VoiceOver akan mengucapkan "Terkunci" berpuluh kali per
+        // menit dan menutupi semua hal lain yang ingin dibaca pengguna.
+        .onChange(of: engine.snapshot.state) { _, newState in
+            guard announcedState != newState else { return }
+            announcedState = newState
+            AccessibilityNotification.Announcement(announcementText(for: newState)).post()
+        }
+    }
+
+    /// Teks yang diumumkan saat keadaan berubah.
+    ///
+    /// Kunci (`.lock`) diumumkan **dengan nama objeknya**, karena itulah
+    /// satu-satunya momen yang ditunggu pengguna; mengumumkan "Terkunci" tanpa
+    /// nama akan memaksanya mengusap layar untuk mencari tahu terkunci pada
+    /// apa. Sebaliknya, kehilangan jawaban diumumkan sebagai "kehilangan" —
+    /// bukan diam, karena diam di sini terbaca sebagai "masih terkunci".
+    private func announcementText(for state: PointingState) -> String {
+        switch state {
+        case .lock:
+            if let name = engine.snapshot.answeredObject?.name {
+                return "Terkunci pada \(name)."
+            }
+            return "Terkunci."
+        case .uncertain:
+            return "Kurang yakin. \(state.guidance)"
+        case .unavailable:
+            return "Sensor mati. \(state.guidance)"
+        case .idle, .pointing, .searching:
+            return "\(state.shortLabel). \(state.guidance)"
+        }
     }
 
     // MARK: - Kartu keadaan
@@ -122,6 +178,10 @@ struct PointingView: View {
             HStack(spacing: 6) {
                 Image(systemName: state.symbolName)
                     .foregroundStyle(state.tone.color)
+                    // Simbolnya murni hiasan: label kartu di bawah sudah
+                    // menyebut keadaannya. Tanpa baris ini VoiceOver
+                    // mengucapkan nama berkas SF Symbol-nya.
+                    .accessibilityHidden(true)
                 Text(state.shortLabel)
                     .font(.system(size: WatchMetrics.statusSize, weight: .semibold))
                     .foregroundStyle(state.tone.color)
@@ -141,6 +201,27 @@ struct PointingView: View {
         .frame(maxWidth: .infinity)
         .padding(WatchMetrics.cardPadding)
         .background(state.tone.color.opacity(0.12), in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        // Digabung jadi SATU elemen: tanpa `.combine`, VoiceOver membaca
+        // simbol, label, panduan, dan laju sebagai empat item terpisah yang
+        // harus diusap satu per satu — padahal keempatnya satu pengumuman.
+        // Laju dibaca sebagai "laju pergélangan ... derajat per detik", bukan
+        // "°/dtk" yang tak bermakna bagi pembaca layar.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(statusAccessibilityLabel)
+    }
+
+    /// Label kartu keadaan untuk VoiceOver.
+    ///
+    /// Sengaja tidak menyalin teks layar mentah: "°/dtk" tidak bermakna saat
+    /// diucapkan, dan nama SF Symbol bukan kata yang bisa dibaca. Yang
+    /// diumumkan adalah keadaan, panduannya, dan laju dengan satuannya.
+    private var statusAccessibilityLabel: String {
+        let state = engine.snapshot.state
+        var parts = ["Keadaan: \(state.shortLabel).", state.guidance]
+        if let rate = engine.snapshot.angularRateDegPerSec {
+            parts.append(String(format: "Laju pergelangan %.0f derajat per detik.", rate))
+        }
+        return parts.joined(separator: " ")
     }
 
     // MARK: - Baris tautan iPhone
@@ -149,6 +230,7 @@ struct PointingView: View {
         HStack(spacing: 4) {
             Image(systemName: link.isReachable ? "iphone.gen3.radiowaves.left.and.right" : "iphone.slash")
                 .font(.system(size: 10))
+                .accessibilityHidden(true)
             Text(link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau")
                 .font(.system(size: 10))
             if link.sendFailureCount > 0 {
@@ -158,6 +240,18 @@ struct PointingView: View {
             }
         }
         .foregroundStyle(Color.nightAwareSecondary)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(linkAccessibilityLabel)
+    }
+
+    private var linkAccessibilityLabel: String {
+        // Kegagalan kirim diumumkan, bukan hanya digambar: "· 3 gagal" tidak
+        // terbaca sebagai kalimat bila digabung mentah.
+        var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+        if link.sendFailureCount > 0 {
+            text += ". \(link.sendFailureCount) kiriman gagal."
+        }
+        return text
     }
 }
 
@@ -203,6 +297,40 @@ struct ObjectDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
         .background(NightMode.detailCardBackground, in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        // Satu elemen, karena nama + jenis + magnitudo + badge adalah satu
+        // pengumuman. Yang paling penting di sini: **penanda sisa ikut
+        // diucapkan**. Pengguna VoiceOver tidak melihat teks peringatannya,
+        // jadi tanpa ini objek dari pandangan sebelumnya terdengar persis
+        // seperti hasil pengukuran sekarang — false confidence dalam bentuk
+        // audio, yang sama dilarangnya dengan versi visualnya.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(detailAccessibilityLabel)
+    }
+
+    /// Label panel objek untuk VoiceOver.
+    ///
+    /// `mag`, `RA`, dan `Dec` diucapkan lengkap ("magnitudo", bukan "mag"):
+    /// singkatan yang hanya masuk akal secara visual tidak terbaca.
+    private var detailAccessibilityLabel: String {
+        var parts = [object.name]
+        if let level, !isStale {
+            parts.append("tingkat keyakinan \(level.displayName)")
+        }
+        parts.append(kindAccessibilityLabel)
+        if isStale {
+            parts.append("Sisa pandangan sebelumnya, bukan hasil sekarang.")
+        }
+        return parts.joined(separator: ". ")
+    }
+
+    private var kindAccessibilityLabel: String {
+        var parts = [kindLabel]
+        parts.append(String(format: "magnitudo %.2f", object.magnitude))
+        if object.kind == .star {
+            parts.append(String(format: "RA %.1f derajat, deklinasi %+.1f derajat",
+                                object.raDeg, object.decDeg))
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var kindLine: String {
@@ -265,5 +393,10 @@ struct SkyContextView: View {
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
         .font(.system(size: 12))
+        // Baris "judul … nilai": tanpa penggabungan, VoiceOver membacanya
+        // sebagai dua elemen terpisah tanpa hubungan — "Matahari" lalu
+        // "-12" tanpa konteks apa yang diukur.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }
