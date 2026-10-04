@@ -39,7 +39,20 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     public var sampleCount: Int?
     /// Ambang keyakinan (untuk `policyUpdate`).
     public var pointingSigmaDeg: Double?
+    /// Catatan bebas (mis. galat sistem saat pengiriman gagal).
+    ///
+    /// **Bukan** untuk kalimat status yang bisa dihitung: yang seperti itu
+    /// disimpan sebagai **keadaan** (mis. `isCalibrated`) dan kalimatnya
+    /// lahir di lapisan tampilan lewat `noteText`. Alasannya ada di komentar
+    /// `state(from:at:sigmaDeg:)` — ringkasnya, kalimat jadi di dalam pesan
+    /// tidak punya kunci katalog, jadi ia tampil dalam Bahasa Indonesia di
+    /// semua bahasa tanpa satu gerbang pun merah.
     public var note: String?
+    /// Apakah jam menyatakan dirinya terkalibrasi (untuk `pointingState`).
+    ///
+    /// Disimpan sebagai **keadaan**, bukan kalimat, supaya kalimatnya bisa
+    /// diterjemahkan. Lihat `noteText`.
+    public var isCalibrated: Bool?
 
     public init(kind: LinkMessageKind,
                 sentAt: Date = Date(),
@@ -54,7 +67,8 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
                 residualSpreadDeg: Double? = nil,
                 sampleCount: Int? = nil,
                 pointingSigmaDeg: Double? = nil,
-                note: String? = nil) {
+                note: String? = nil,
+                isCalibrated: Bool? = nil) {
         self.kind = kind
         self.sentAt = sentAt
         self.state = state
@@ -69,6 +83,7 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
         self.sampleCount = sampleCount
         self.pointingSigmaDeg = pointingSigmaDeg
         self.note = note
+        self.isCalibrated = isCalibrated
     }
 
     // MARK: - Bentuk kabel
@@ -91,6 +106,7 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
         if let sampleCount { out["sampleCount"] = sampleCount }
         if let pointingSigmaDeg { out["pointingSigmaDeg"] = pointingSigmaDeg }
         if let note { out["note"] = note }
+        if let isCalibrated { out["isCalibrated"] = isCalibrated }
         return out
     }
 
@@ -116,6 +132,7 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
         self.sampleCount = plist["sampleCount"] as? Int
         self.pointingSigmaDeg = plist["pointingSigmaDeg"] as? Double
         self.note = plist["note"] as? String
+        self.isCalibrated = plist["isCalibrated"] as? Bool
     }
 
     // MARK: - Pembuat
@@ -151,6 +168,14 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     /// Di layar jam sendiri keadaan `unavailable` tampil di sebelah angkanya,
     /// jadi di sana nilainya masih bisa dibaca sebagai bacaan lama; di pesan ini
     /// tidak ada penanda seperti itu.
+    ///
+    /// **`note` tidak dikirim, dan tidak lagi menyimpan kalimat jadi.** Dulu ia
+    /// diisi `"terkalibrasi"`/`"belum terkalibrasi"` di sini — literal Bahasa
+    /// Indonesia yang **tampil di iPhone** (`LinkView` merender `state.note`)
+    /// tanpa pernah punya kunci katalog: Aturan 6 memeriksa kunci yang
+    /// dideklarasikan, dan kalimat ini tidak punya kunci. Kini yang tersimpan
+    /// adalah **keadaan** (`isCalibrated`), dan kalimatnya lahir di lapisan
+    /// tampilan lewat `PointingLinkMessage.noteText` — katalog, teruji Linux.
     public static func state(from snapshot: PointingSnapshot,
                              at date: Date = Date(),
                              sigmaDeg: Double? = nil) -> PointingLinkMessage {
@@ -165,7 +190,7 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
             azimuthDeg: snapshot.reportedPointing?.azimuthDeg,
             angularRateDegPerSec: snapshot.angularRateDegPerSec,
             pointingSigmaDeg: sigmaDeg,
-            note: snapshot.isCalibrated ? "terkalibrasi" : "belum terkalibrasi"
+            isCalibrated: snapshot.isCalibrated
         )
     }
 
@@ -207,6 +232,40 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
                                    residualSpreadDeg: spread,
                                    sampleCount: sampleCount ?? 0)
     }
+
+    /// Kalimat yang **tampil** untuk keadaan terkalibrasi jam.
+    ///
+    /// **Kenapa ini accessor, bukan `note` yang sudah jadi.** Nilainya dulu
+    /// ditulis sebagai literal di `state(from:at:sigmaDeg:)` dan ikut dikirim
+    /// sebagai `note`; iPhone merendernya lewat `LinkView`. Literal di dalam
+    /// paket seperti itu tidak punya kunci katalog — Aturan 6 memeriksa kunci
+    /// yang **dideklarasikan**, dan kalimat ini tidak punya kunci — jadi
+    /// pengguna Bahasa Inggris membaca "terkalibrasi" tanpa satu gerbang merah.
+    /// Yang boleh disimpan di pesan hanyalah **keadaan**; kalimatnya lahir di
+    /// sini, lewat katalog, teruji di Linux.
+    ///
+    /// `nil` bila pesan ini memang tidak membawa keadaan kalibrasi — lapisan
+    /// tampilan lalu tidak menampilkan baris apa pun, bukan baris kosong.
+    public var calibrationNoteText: String? {
+        guard let isCalibrated else { return nil }
+        return TextLocalization.text(
+            isCalibrated ? .linkNoteCalibrated : .linkNoteNotCalibrated)
+    }
+}
+
+// MARK: - Katalog kunci
+
+public extension LocalizedText {
+
+    /// Keadaan jam: terkalibrasi.
+    static let linkNoteCalibrated = LocalizedText(
+        key: "link.note.calibrated",
+        id: "terkalibrasi")
+
+    /// Keadaan jam: belum terkalibrasi.
+    static let linkNoteNotCalibrated = LocalizedText(
+        key: "link.note.notCalibrated",
+        id: "belum terkalibrasi")
 }
 
 /// Penyaring kiriman keadaan Watch → iPhone.

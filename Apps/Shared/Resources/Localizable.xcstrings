@@ -464,6 +464,28 @@
         }
       }
     },
+    "link.note.calibrated": {
+      "comment": "Keadaan jam: terkalibrasi. Tampil di layar Tautan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "calibrated"
+          }
+        }
+      }
+    },
+    "link.note.notCalibrated": {
+      "comment": "Keadaan jam: belum terkalibrasi. Tampil di layar Tautan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "not calibrated"
+          }
+        }
+      }
+    },
     "row.speech.error": {
       "comment": "Kalimat galat pointing: kata, angka, satuan. Urutan tipe specifier wajib sama dengan template kode (%@ %.1f %@) — Aturan 11 menegakkannya.",
       "localizations": {

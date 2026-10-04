@@ -305,4 +305,71 @@ final class LinkMessageTests: XCTestCase {
         XCTAssertTrue(gate.deliver(lost) { _ in true },
                       "kehilangan jawaban harus tetap bisa dikirim setelah kegagalan")
     }
+
+    // MARK: - Kalimat keadaan, bukan kalimat jadi di dalam pesan
+
+    /// Keadaan kalibrasi disimpan sebagai **keadaan**, bukan kalimat.
+    ///
+    /// Dulu `note` diisi `"terkalibrasi"` di dalam paket, lalu iPhone
+    /// merendernya lewat `LinkView`. Literal itu tidak punya kunci katalog —
+    /// Aturan 6 memeriksa kunci yang **dideklarasikan**, dan kalimat itu tidak
+    /// punya kunci — jadi ia tampil Bahasa Indonesia di semua bahasa dengan
+    /// setiap gerbang hijau. Uji ini menuntut yang dikirim adalah nilai
+    /// boolean, bukan kata.
+    func testStateCarriesCalibrationAsAFlagNotASentence() {
+        let calibrated = PointingLinkMessage.state(
+            from: PointingSnapshot(state: .lock, isCalibrated: true))
+        XCTAssertEqual(calibrated.isCalibrated, true)
+        XCTAssertNil(calibrated.note, "kalimat jadi tidak boleh lahir di dalam paket")
+
+        let notCalibrated = PointingLinkMessage.state(
+            from: PointingSnapshot(state: .pointing, isCalibrated: false))
+        XCTAssertEqual(notCalibrated.isCalibrated, false)
+        XCTAssertNil(notCalibrated.note)
+    }
+
+    /// Bendera kalibrasi selamat melewati bentuk kabel.
+    ///
+    /// Kalau ia tidak ikut diserialisasi, iPhone menerima pesan tanpa keadaan
+    /// kalibrasi dan menampilkan jam sebagai "belum terkalibrasi" walau sudah
+    /// dikalibrasi — salah, dan tidak terlihat dari sisi jam.
+    func testCalibrationFlagSurvivesTheWire() {
+        let message = PointingLinkMessage.state(
+            from: PointingSnapshot(state: .lock, isCalibrated: true))
+        let decoded = try! XCTUnwrap(PointingLinkMessage(plist: message.plist))
+        XCTAssertEqual(decoded.isCalibrated, true)
+    }
+
+    /// Kalimatnya datang dari katalog, dan `nil` saat tidak ada keadaan.
+    func testCalibrationNoteTextComesFromTheCatalog() {
+        let calibrated = PointingLinkMessage(kind: .pointingState, isCalibrated: true)
+        XCTAssertEqual(calibrated.calibrationNoteText, "terkalibrasi")
+
+        let notCalibrated = PointingLinkMessage(kind: .pointingState, isCalibrated: false)
+        XCTAssertEqual(notCalibrated.calibrationNoteText, "belum terkalibrasi")
+
+        // Tanpa keadaan: tidak ada baris, bukan baris kosong.
+        let silent = PointingLinkMessage(kind: .acknowledgement)
+        XCTAssertNil(silent.calibrationNoteText)
+    }
+
+    /// Terjemahan memasang kata yang menggantikan bawaan.
+    func testCalibrationNoteTextIsTranslatable() {
+        TextLocalization.install { key in
+            [
+                "link.note.calibrated": "calibrated",
+                "link.note.notCalibrated": "not calibrated",
+            ][key]
+        }
+        defer { TextLocalization.reset() }
+
+        XCTAssertEqual(
+            PointingLinkMessage(kind: .pointingState, isCalibrated: true)
+                .calibrationNoteText,
+            "calibrated")
+        XCTAssertEqual(
+            PointingLinkMessage(kind: .pointingState, isCalibrated: false)
+                .calibrationNoteText,
+            "not calibrated")
+    }
 }

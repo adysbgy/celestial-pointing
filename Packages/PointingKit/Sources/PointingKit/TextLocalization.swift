@@ -343,5 +343,9 @@ public extension LocalizedText {
         // `RowSpeech.swift`.
         .rowSpeechLabel, .rowSpeechDegrees, .rowSpeechDegreesPerSecond,
         .rowSpeechErrorWord, .rowSpeechError,
+        // Kalimat keadaan kalibrasi yang tampil di layar Tautan. Disimpan di
+        // paket sebagai keadaan + accessor (bukan kalimat jadi di pesan) supaya
+        // punya kunci katalog — lihat `PointingLinkMessage.calibrationNoteText`.
+        .linkNoteCalibrated, .linkNoteNotCalibrated,
     ]
 }

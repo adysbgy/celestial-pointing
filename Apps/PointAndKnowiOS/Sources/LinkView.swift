@@ -42,7 +42,7 @@ struct LinkView: View {
                                     spokenValue: RowSpeech.spokenRate(rate)))
                         }
                         row("Waktu", state.sentAt.formatted(date: .omitted, time: .standard))
-                        if let note = state.note {
+                        if let note = state.calibrationNoteText ?? state.note {
                             Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                         }
                     } else {

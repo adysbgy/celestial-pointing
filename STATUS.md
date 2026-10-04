@@ -1,5 +1,87 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — `PointingLinkMessage.note` menyimpan kalimat Bahasa Indonesia di dalam paket)
+
+### Premis: lanjutan langsung dari siklus `RowSpeech`, di berkas lain
+
+Siklus sebelumnya menutup `RowSpeech` — teks yang diucapkan, lahir di paket,
+tanpa kunci katalog. Sapuan yang sama (berkas yang menghasilkan teks tapi
+tidak mendeklarasikan satu kunci pun) menyisakan satu berkas paket lain:
+`LinkMessage.swift`.
+
+Di dalamnya, `state(from:at:sigmaDeg:)` mengisi:
+
+```swift
+note: snapshot.isCalibrated ? "terkalibrasi" : "belum terkalibrasi"
+```
+
+Kalimat itu **menyeberang dari jam ke iPhone** dan dirender apa adanya di
+`LinkView` — `Text(note)`, di bawah baris "Waktu". Pengguna Bahasa Inggris
+membaca "terkalibrasi" dalam Bahasa Indonesia.
+
+### Kenapa licin — dan kenapa beda dari `RowSpeech`
+
+`RowSpeech` tidak punya kunci sama sekali. Yang ini punya tetangga yang
+**sudah benar**: `LinkMessageKind.displayName` tepat di sebelahnya membaca
+`TextLocalization` dengan rapi. Jadi berkasnya terlihat seperti berkas yang
+sudah ditutup — dan bagian yang belum justru duduk di dalam *pabrik pesan*,
+bukan di lapisan tampilan.
+
+Dua gerbang tetap hijau:
+
+- **Aturan 4** hanya menyapu literal yang **langsung** di dalam argumen
+  `Text(...)`. Di sini literalnya ada di service, bukan di view — jadi tidak
+  ada yang bisa dilihat.
+- **Aturan 6** memeriksa paritas kunci yang **dideklarasikan**. Kalimat ini
+  tidak punya kunci, jadi tidak ada yang bisa dibandingkan.
+
+### Yang diubah, dan kenapa bentuknya begini
+
+Yang disimpan di pesan sekarang **keadaan**, bukan kalimat:
+
+- **`isCalibrated: Bool?`** menggantikan `note: "terkalibrasi"`. Ia ikut
+  bentuk kabel (`plist`) dan diuji selamat melewatinya — kalau tidak, iPhone
+  menerima pesan tanpa keadaan kalibrasi dan menampilkan jam sebagai "belum
+  terkalibrasi" walau sudah dikalibrasi, salah, dan tidak terlihat dari sisi
+  jam.
+- **`calibrationNoteText`** menghasilkan kalimatnya lewat katalog, teruji di
+  Linux. `nil` bila pesan memang tidak membawa keadaan kalibrasi — lapisan
+  tampilan lalu tidak menampilkan baris apa pun, bukan baris kosong.
+- **`note` tetap ada** untuk catatan bebas (mis. `localizedDescription` dari
+  galat sistem, yang sudah dilokalkan oleh OS). Yang dilarang adalah
+  **kalimat status yang bisa dihitung**; yang boleh tetap string bebas.
+- **`LinkView` dan `WatchLinkService`** membaca `calibrationNoteText` lebih
+  dulu, lalu jatuh ke `note`, lalu ke `displayName`.
+
+### Bukti merah
+
+| Mutasi | Gerbang | Hasil |
+|---|---|---|
+| `link.note.calibrated` dihapus dari katalog | Aturan 6 | **MERAH**: menunjuk kunci itu |
+| `note: "terkalibrasi"` dikembalikan ke pabrik pesan | `swift-test.sh` | **MERAH**: tiga assertion di dua uji — `isCalibrated` jadi `nil`, dan `note` berisi `"terkalibrasi"` |
+
+### Batas yang jujur — dan unit berikutnya sudah terukur
+
+Dua belas kalimat status tautan yang **tampil di layar Tautan** masih literal
+di `PhoneLinkService` (7) dan `WatchLinkService` (5): "Jam belum terhubung —
+pesan tidak terkirim.", "Terkirim: …", "Tanda terima", dan seterusnya.
+Sapuan pola `\w*(Note|Message)\s*=\s*"…"` menemukan tepat 12 kemunculan, dan
+**semuanya** kalimat tampilan — tidak ada positif palsu, jadi bentuk ini layak
+dijadikan gerbang. Belum dikerjakan di siklus ini supaya unitnya tetap kecil;
+ia unit berikutnya.
+
+Alasan bentuk gerbang itu belum ada sekarang: Aturan 4 **tidak bisa** menutup
+kelas ini apa adanya — nilai `lastNote` adalah kalimat jadi yang melewati
+cabang, dan menuntutnya ada di katalog akan menandai setiap baris status
+sebagai "teks UI", termasuk yang memang bukan. Yang benar adalah aturan baru
+yang sempit (pola penugasan `*Note`/`*Message`), bukan melonggarkan Aturan 4.
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 454 PointingKit**, 0 gagal.
+- `swift-ui-lint.sh` → **11 aturan hijau**.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+
 ## Progres terakhir (4 Okt 2026 — `RowSpeech` mengucapkan kalimat Indonesia tanpa satu pun kunci katalog)
 
 ### Premis siklus ini: sapu berkas yang menghasilkan teks tapi tidak mendeklarasikan satu kunci pun
