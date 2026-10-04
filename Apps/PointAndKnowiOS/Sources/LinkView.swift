@@ -32,7 +32,14 @@ struct LinkView: View {
                         row("Objek", state.objectName ?? "—")
                         row("Keyakinan", state.level?.displayName ?? "—")
                         if let rate = state.angularRateDegPerSec {
+                            // Nilainya ditulis "0.5°/dtk" untuk mata; yang
+                            // diucapkan bentuk katanya. Dua-duanya dari
+                            // angka yang sama — tidak ada versi kedua yang
+                            // bisa menyimpang.
                             row("Laju", String(format: "%.1f°/dtk", rate))
+                                .accessibilityLabel(RowSpeech.spokenRow(
+                                    title: "Laju",
+                                    spokenValue: RowSpeech.spokenRate(rate)))
                         }
                         row("Waktu", state.sentAt.formatted(date: .omitted, time: .standard))
                         if let note = state.note {
@@ -86,5 +93,14 @@ struct LinkView: View {
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
+        // Baris "judul … nilai" digabung jadi **satu** pengumuman.
+        //
+        // Tanpa ini VoiceOver membaca dua elemen tanpa hubungan: "Laju"
+        // lalu "0.5°/dtk" — dan pada layar ini nilainya justru yang penting.
+        // Kalimatnya dari `PointingKit` (`RowSpeech`), bukan dirangkai di
+        // sini, supaya ketiga layar yang punya `row` identik tidak punya
+        // tiga versi aturan pengumuman. Lihat juga `SkyContextView.row`.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(RowSpeech.label(title: title, value: value))
     }
 }

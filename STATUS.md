@@ -1,6 +1,109 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (5 Okt 2026 — complication watchOS + gerbang typecheck kedua)
+## Progres terakhir (4 Okt 2026 — gerbang sapu UI: aturan yang hilang karena tidak ada yang menegakkannya)
+
+### Premis siklus ini: aturan yang sudah ditegakkan, lalu muncul lagi
+
+STATUS lama mencatat Dynamic Type selesai: "Semua font sudah semantic, 0
+`.system(size:)` di kode". Audit siklus ini menemukan klaim itu **sudah tidak
+berlaku** — ada satu pelanggaran nyata di
+`ComplicationWidget.swift:102`, `.font(.system(size: 11, weight: .semibold))`.
+
+Bukan karena ada yang sengaja melanggar. Berkas itu ditambahkan **siklus
+lalu** (complication watchOS), setelah sapuan Dynamic Type terakhir dijalankan.
+Dan tidak ada satu pun gerbang yang melihatnya:
+
+| Gerbang | Apakah ia melihatnya |
+|---|---|
+| `swiftc -parse` | tidak — sintaks tidak peduli ukuran font |
+| `swift test` (Linux) | tidak — berkas SwiftUI tidak ikut terbangun |
+| CI macOS | tidak — ia hanya gagal bila ada *warning* |
+
+Jadi satu-satunya penjaga aturan ini adalah **ingatan orang yang sedang
+menulis**, dan itulah yang gagal. Ini kelas cacat yang berbeda dari lima
+siklus sebelumnya (geometri raster yang tak terbaca): di sini kodenya benar,
+niatnya benar, dan **prosesnya** yang tidak punya penjaga.
+
+### Kenapa ini bukan sekadar satu baris
+
+Lingkaran complication adalah **ruang terkecil di seluruh app**. Ukurannya
+kecil justru karena ia dibaca sekilas — dan teks yang dibaca sekilas paling
+perlu bisa membesar mengikuti Dynamic Type. Ukuran tetap 11pt mengabaikan
+skala pengguna **sepenuhnya**: di jam 41mm dengan teks diperbesar, angka itu
+tidak bergerak.
+
+Ini juga cacat yang paling mudah muncul lagi. Complication adalah berkas baru;
+berkas baru adalah tempat aturan lama paling sering tidak ikut terbawa.
+
+### Yang diubah, dan kenapa begini
+
+- **`swift-ui-lint.sh` (baru)** — sapu teks untuk aturan UI yang tidak bisa
+  ditegakkan compiler. Menutup **kelasnya**, bukan satu gejalanya: berkas
+  complication berikutnya (atau view baru apa pun) ikut tercakup tanpa ada
+  yang perlu ingat.
+  - **Komentar sengaja dilewati.** Proyek ini mendokumentasikan "kenapa"
+    panjang lebar, dan beberapa komentar menyebut `.system(size:)` sebagai
+    contoh yang **dilarang**. Sapu naif akan selalu merah — dan gerbang yang
+    selalu merah akan dimatikan orang lain saat ia berbunyi. Yang diperiksa
+    adalah bagian sebelum `//`.
+- **Dipasang di kedua workflow, bukan hanya macOS.** Alasan praktisnya:
+  pelanggaran ketahuan dalam detik di Linux, tanpa menunggu antrean runner
+  macOS. Alasan prinsipnya: sapunya murni teks, jadi ia **bisa** berjalan di
+  Linux — menjadikannya gerbang macOS-only berarti membuang kemampuan itu.
+- **Dibuktikan dua arah**, bukan hanya hijau: **MERAH** (keluar 1) pada
+  pelanggaran yang ada, dan **HIJAU** (keluar 0) setelah diperbaiki di salinan
+  sementara. Gerbang yang belum pernah merah tidak bisa dipercaya hijaunya.
+- **Perbaikan nyata**: `.caption2.weight(.semibold)`. Beratnya dipertahankan,
+  ukurannya diserahkan ke sistem.
+
+### Aturan 2: peringatan yang sengaja tidak dijadikan kegagalan
+
+Sapu kedua mencari singkatan **visual** — `°/dtk`, `RA`, `Dec`, `mag`.
+Itu terbaca oleh mata dan tidak terbaca oleh pembaca layar. Sapu **tidak
+bisa** membuktikan bahwa padanan yang diucapkan ada, jadi menjadikannya
+kegagalan hanya akan memaksa orang menulis `// swift-ui-lint: disable`.
+Dibiarkan sebagai peringatan yang harus dibaca.
+
+Ia langsung menemukan inkonsistensi nyata (belum diperbaiki, lihat bawah).
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 266 PointingKit, 0 gagal**.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `./swift-ui-lint.sh` → **MERAH dulu** pada pelanggaran nyata, lalu **HIJAU**
+  setelah perbaikan; dibuktikan pada salinan sementara.
+- **CI hijau pada push pertama** (`354801e`): `Apple Build` run `37197032727`
+  **success** (termasuk gerbang peringatan "Tidak ada peringatan compiler pada
+  Apps/"), `Engine Tests (Linux)` run `37197032731` **success**. Langkah
+  "Gerbang sapu UI (font tetap)" terlihat **benar-benar berjalan di log kedua
+  workflow**, bukan sekadar dilewati.
+
+### Inkonsistensi yang ditemukan dan sengaja BELUM diperbaiki
+
+Aturan 2 membuktikan bahwa aturan "singkatan visual harus punya padanan yang
+diucapkan" **tidak dipegang merata**:
+
+| Tempat | VoiceOver |
+|---|---|
+| `PointingView.statusCard` | benar — laju diucapkan "derajat per detik" |
+| `SkyContextView.row` | benar — `.accessibilityLabel("\(title): \(value)")` |
+| `DiagnosticsView.row` | **tidak ada** — "0.5°/dtk" terbaca apa adanya |
+| `LinkView.row` | **tidak ada** |
+| `Experiment1View` (baris + `detailLine`) | **tidak ada** |
+
+Dua tempat sudah benar, tiga tidak — persis pola "dua jalur yang seharusnya
+sama justru berbeda" yang sudah dua kali jadi cacat di repo ini. Sengaja
+dicatat di sini, bukan dikerjakan di siklus yang sama: siklus ini menambah
+gerbangnya dulu, dan gerbang itu yang akan membuktikan perbaikannya.
+
+### Pelajaran
+
+Lima siklus terakhir menemukan cacat dengan **menghitung** (kutub Mars
+0.26R, cincin Saturnus 0.9R, pita Bulan terbalik, lencana ragu 0.132R).
+Siklus ini berbeda: cacatnya bukan angka, melainkan **aturan yang tidak punya
+penjaga**. Menghitung akan tetap menemukan cacat geometri; yang menemukan
+kelas ini adalah bertanya *"gerbang mana yang akan merah kalau ini
+dilanggar?"* — dan bila jawabannya "tidak ada", menulis gerbangnya.
 
 ### Premis siklus ini: Fase C item 1 — complication WidgetKit
 

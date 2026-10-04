@@ -224,6 +224,58 @@ struct Experiment1View: View {
                 .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
         }
+        // Baris percobaan diumumkan sebagai **satu** kalimat, dengan dua
+        // penyesuaian yang tidak bisa dilakukan oleh gabungan mentah:
+        //
+        // 1. "FALSE LOCK" adalah singkatan visual. Diucapkan apa adanya ia
+        //    terdengar seperti dua kata bahasa Inggris, bukan kegagalan
+        //    keselamatan — padahal inilah satu-satunya hasil di layar ini
+        //    yang **wajib** terdengar berbeda.
+        // 2. `detailLine` berisi "°.1f°/dtk" dan "galat %.1f°"; bentuk
+        //    katanya disusul lewat `spokenDetailLine`.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(trialAccessibilityLabel(trial))
+    }
+
+    /// Kalimat terucap untuk satu baris percobaan.
+    ///
+    /// Urutannya sengaja **kebalik** dari tampilan: verdict lebih dulu, lalu
+    /// nama, baru detail. Di layar mata melihat nama besar di kiri dan
+    /// verdict kecil di kanan; di suara tidak ada "kiri" dan "kanan", dan
+    /// yang menentukan apakah baris ini layak dibuka adalah verdict-nya.
+    private func trialAccessibilityLabel(_ trial: AnalyzedTrial) -> String {
+        var parts: [String] = []
+        if let analysis = trial.analysis {
+            if analysis.isFalseLock {
+                parts.append("False lock: engine yakin tapi salah.")
+            } else {
+                parts.append(analysis.isCorrect ? "Benar." : "Salah.")
+            }
+        } else {
+            parts.append("Tidak dianalisis.")
+        }
+        parts.append(trialTitle(trial) + ".")
+        parts.append(spokenDetailLine(trial))
+        return parts.joined(separator: " ")
+    }
+
+    /// Padanan terucap dari `detailLine` — satuan jadi kata.
+    ///
+    /// Sengaja **bukan** mengubah `detailLine`: baris itu dipakai juga
+    /// sebagai teks tampilan, dan mengubahnya akan mengubah tampilan. Dua
+    /// bentuk, satu sumber angka.
+    private func spokenDetailLine(_ trial: AnalyzedTrial) -> String {
+        var parts: [String] = []
+        if let error = trial.analysis?.rawPointingErrorDeg {
+            parts.append(RowSpeech.spokenError(error))
+        }
+        parts.append("jawab \(trial.trial.intent.best?.name ?? "—")")
+        parts.append("keyakinan \(trial.trial.intent.level.displayName)")
+        parts.append("keadaan \(trial.stateAtCapture.shortLabel)")
+        if let rate = trial.angularRateAtCaptureDegPerSec {
+            parts.append(RowSpeech.spokenRate(rate))
+        }
+        return parts.joined(separator: ", ")
     }
 
     /// Headline baris percobaan: **nama** objek yang ditunjuk, bukan slug-nya.
@@ -281,5 +333,11 @@ struct Experiment1View: View {
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
+        // Satu pengumuman, sumber yang sama dengan `DiagnosticsView` &
+        // `LinkView` (`RowSpeech`). Baris di layar ini isinya angka hasil
+        // ukur — "Percobaan" lalu "12" tanpa hubungan tidak memberitahu apa
+        // yang dihitung.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(RowSpeech.label(title: title, value: value))
     }
 }

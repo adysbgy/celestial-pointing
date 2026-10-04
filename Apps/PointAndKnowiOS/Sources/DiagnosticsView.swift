@@ -232,6 +232,12 @@ struct DiagnosticsView: View {
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))
+                            // "0.5°/dtk" terbaca oleh mata, tidak oleh suara.
+                            // Yang diucapkan bentuk katanya — angkanya sama,
+                            // jadi tidak ada versi kedua yang bisa menyimpang.
+                            .accessibilityLabel(RowSpeech.spokenRow(
+                                title: "Laju pergelangan",
+                                spokenValue: RowSpeech.spokenRate(rate)))
                     }
                     if let object = engine.displayedObject {
                         // Sama seperti di jam: objek sisa harus terlihat sebagai
@@ -449,6 +455,11 @@ struct DiagnosticsView: View {
                 .foregroundStyle(SurfacePalette.active.textSecondaryColor)
         }
         .font(.footnote)
+        // Sama seperti `row`: judul dan nilai adalah satu pengumuman. Baris
+        // ini justru lebih rawan — isinya RA/Dec/Id, yaitu pengenal yang
+        // diucapkan tanpa judulnya terdengar seperti deretan karakter.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(RowSpeech.label(title: title, value: value))
     }
 
     private func row(_ title: String, _ value: String) -> some View {
@@ -457,6 +468,12 @@ struct DiagnosticsView: View {
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
+        // Satu pengumuman, bukan dua elemen tanpa hubungan. Kalimatnya dari
+        // `RowSpeech` (PointingKit) — sumber yang **sama** dengan `LinkView`
+        // dan `SkyContextView`, supaya tiga `row` yang identik tidak punya
+        // tiga versi aturan pengumuman.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(RowSpeech.label(title: title, value: value))
     }
 
     /// Panel detail besar (iPhone): gambar prosedural + nama + jenis, dengan
@@ -520,10 +537,23 @@ struct DiagnosticsView: View {
                         // membuat lima angka bersaing dengan satu jawaban.
                         DisclosureGroup {
                             VStack(alignment: .leading, spacing: 2) {
+                                // Setiap baris teknis diberi label terucap
+                                // sendiri. Tanpa itu yang diucapkan adalah
+                                // "101.2871°" — angka tanpa konteks apa yang
+                                // diukur, persis di baris yang isinya
+                                // pengenal. Presisinya mengikuti tampilan,
+                                // supaya suara dan layar tidak menyebut dua
+                                // angka berbeda untuk nilai yang sama.
                                 DiagnosticsView.detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
                                 if object.kind == .star {
                                     DiagnosticsView.detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                        .accessibilityLabel(RowSpeech.label(
+                                            title: "RA",
+                                            value: RowSpeech.spokenDegrees(object.raDeg, precision: 4)))
                                     DiagnosticsView.detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                        .accessibilityLabel(RowSpeech.label(
+                                            title: "Dec",
+                                            value: RowSpeech.spokenDegrees(object.decDeg, precision: 4)))
                                 }
                                 DiagnosticsView.detailRow("Id katalog", object.id)
                             }
