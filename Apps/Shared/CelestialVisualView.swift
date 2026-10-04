@@ -553,29 +553,48 @@ struct CelestialVisualView: View {
     // MARK: - Objek langit dalam
 
     private func drawDeepSky(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        // Kabut lembut: cincin tumpang-tindih dengan opasitas rendah, tanpa
+        // Kabut lembut: blob tumpang-tindih dengan opasitas rendah, tanpa
         // tepi keras. Tepi adalah ciri yang paling keliru untuk nebula/galaksi
         // -- tepi yang tepat justru terlihat "digambar".
         //
-        // **Geometri blob datang dari `VisualFrame.nebula`.** Blob digeser dari
-        // pusat supaya kabut tidak simetris sempurna, dan geseran itu
-        // memperkecil ruang yang tersisa ke tepi frame. Memakai radius tetap
-        // untuk semua blob membuat blob yang digeser terpotong **tegak** oleh
-        // `Canvas` -- tepat di tengah gradiennya, jadi potongannya terlihat.
-        // Itulah yang dihitung model, dan ujinya ada di Linux.
+        // **Bentuknya datang dari morfologi objek, bukan dari satu rumus.**
+        // Sampai siklus ini semua objek langit dalam digambar dengan tiga blob
+        // yang sama, jadi galaksi Andromeda, gugus terbuka Pleiades, dan gugus
+        // bola Hercules tampil **identik** -- tidak ada satu pun teks di layar
+        // yang bisa membedakannya. Sekarang morfologinya dibaca dari
+        // `DeepSkyCatalogue` (teruji di Linux) dan geometrinya dari
+        // `VisualFrame.deepSky`, yang menjaga setiap bentuk tetap di dalam
+        // frame. Morfologi `nil` (id tak dikenal) sengaja jatuh ke kabut
+        // netral, bukan ke salah satu bentuk: menebak "ini galaksi" adalah
+        // klaim identitas yang justru dilarang PRD.
         let core = Self.accent(CelestialVisual.accents.deepSky)
-        let nebula = VisualFrame.nebula(fuzziness: visual.fuzziness)
-        for blob in nebula.blobs {
-            let r = CGFloat(blob.radius) * radius
-            guard r > 0 else { continue }
+        let morphology = visual.objectID.flatMap(DeepSkyCatalogue.morphology(forObjectID:))
+        let geometry = VisualFrame.deepSky(morphology: morphology,
+                                           fuzziness: visual.fuzziness)
+        for blob in geometry.blobs {
+            let halfWidth = CGFloat(blob.halfWidth) * radius
+            let halfHeight = CGFloat(blob.halfHeight) * radius
+            guard halfWidth > 0, halfHeight > 0 else { continue }
             let centerOfBlob = CGPoint(x: center.x + CGFloat(blob.offsetX) * radius,
                                        y: center.y + CGFloat(blob.offsetY) * radius)
-            context.fill(Path(ellipseIn: CGRect(x: centerOfBlob.x - r, y: centerOfBlob.y - r,
-                                               width: r * 2, height: r * 2)),
-                         with: .radialGradient(
-                            Gradient(colors: [core.opacity(blob.opacity),
-                                              core.opacity(0)]),
-                            center: centerOfBlob, startRadius: 0, endRadius: r))
+            // Gradiennya digambar di ruang yang **di-skala**, bukan pada
+            // elips: `radialGradient` selalu melingkar, jadi menaruhnya pada
+            // path elips akan memotong gradien di sumbu pendek dan
+            // meninggalkan tepi rata -- persis cacat "digambar" yang ingin
+            // dihindari. Skala sumbu y membuat gradiennya elips utuh.
+            var blobContext = context
+            blobContext.translateBy(x: centerOfBlob.x, y: centerOfBlob.y)
+            if blob.angleDegrees != 0 {
+                blobContext.rotate(by: .degrees(blob.angleDegrees))
+            }
+            blobContext.scaleBy(x: 1, y: halfHeight / halfWidth)
+            blobContext.fill(
+                Path(ellipseIn: CGRect(x: -halfWidth, y: -halfWidth,
+                                       width: halfWidth * 2, height: halfWidth * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [core.opacity(blob.opacity),
+                                      core.opacity(0)]),
+                    center: .zero, startRadius: 0, endRadius: halfWidth))
         }
     }
 

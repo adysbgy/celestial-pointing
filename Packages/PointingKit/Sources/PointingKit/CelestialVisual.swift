@@ -116,6 +116,20 @@ public struct CelestialVisual: Equatable, Sendable {
     /// "titik kabur" dari "kabut lebar".
     public var fuzziness: Double
 
+    /// Id objek dari engine, bila ada.
+    ///
+    /// **Kenapa id ikut ke model, padahal "bentuk" sudah ada di `fuzziness`.**
+    /// `fuzziness` hanya mengatur **lebar**; bentuknya (nebula vs galaksi vs
+    /// gugus) tidak bisa dipulihkan dari satu angka. Tanpa id, lapisan gambar
+    /// hanya bisa menggambar satu bentuk untuk seluruh kelas objek langit
+    /// dalam — galaksi, gugus terbuka, dan gugus bola tampil identik. Id ini
+    /// yang membuat view bisa menanyakan `DeepSkyCatalogue.morphology`
+    /// (teruji di Linux) alih-alih menebak bentuk dari lebarnya.
+    ///
+    /// `nil` untuk benda tata surya & bintang: bentuk mereka sudah ditentukan
+    /// `kind`/`planet`, jadi id tidak menambah apa pun di sana.
+    public var objectID: String?
+
     /// Apakah gambar ini perlu denyut sama sekali.
     ///
     /// **Kenapa ini milik model, bukan milik view.** Hanya glow bintang yang
@@ -140,7 +154,8 @@ public struct CelestialVisual: Equatable, Sendable {
                 brightLimbAngleRadians: Double? = nil,
                 colorIndexBV: Double = 0,
                 relativeSize: Double = 0.5,
-                fuzziness: Double = 0) {
+                fuzziness: Double = 0,
+                objectID: String? = nil) {
         self.kind = kind
         self.planet = planet
         self.illuminationFraction = illuminationFraction
@@ -149,6 +164,7 @@ public struct CelestialVisual: Equatable, Sendable {
         self.colorIndexBV = colorIndexBV
         self.relativeSize = relativeSize
         self.fuzziness = fuzziness
+        self.objectID = objectID
     }
 
     // MARK: - Pembuatan dari objek engine
@@ -188,11 +204,14 @@ public struct CelestialVisual: Equatable, Sendable {
             // Objek langit dalam tidak punya magnitudo yang sebanding dengan
             // bintang (magnitudonya terintegrasi, bukan titik), jadi ukurannya
             // tidak diturunkan dari angka itu. Yang membedakan satu objek dari
-            // yang lain adalah **bentuknya** (`fuzziness`), dan itu dibaca dari
-            // tabel per id: satu angka untuk semua akan membuat seluruh kelas
-            // ini tampil sebagai bentuk yang sama persis.
+            // yang lain adalah **bentuknya**, dan itu datang dari dua tempat:
+            // `fuzziness` (seberapa lebar) dan id objek (bentuk apa). Id
+            // diteruskan supaya lapisan gambar bisa menanyakan morfologinya
+            // (`DeepSkyCatalogue.morphology`, teruji di Linux) -- tanpa id,
+            // galaksi, gugus terbuka, dan gugus bola digambar identik.
             self.init(kind: .deepSky, relativeSize: 0.7,
-                      fuzziness: DeepSkyCatalogue.fuzziness(forObjectID: object.id))
+                      fuzziness: DeepSkyCatalogue.fuzziness(forObjectID: object.id),
+                      objectID: object.id)
         }
     }
 
@@ -679,7 +698,7 @@ public enum VisualFrame {
         ring.halfWidth * bodyFraction
     }
 
-    /// Geometri kabut nebula: tiga blob tumpang-tindih tanpa tepi keras.
+    /// Geometri kabut objek langit dalam: sekumpulan blob tanpa tepi keras.
     ///
     /// **Kenapa ini di model, bukan di view.** Blob digeser dari pusat
     /// (supaya kabut tidak simetris sempurna, yang justru terlihat
@@ -687,13 +706,33 @@ public enum VisualFrame {
     /// blob yang terpusat aman dicek secara radial, blob yang digeser
     /// keluar frame lebih cepat. Karena itu ukurannya dihitung dari sisa
     /// ruang ke tepi frame, bukan dari radius mentah.
+    ///
+    /// Nama `NebulaGeometry` dipertahankan karena satu kelas blob yang sama
+    /// dipakai untuk **semua** bentuk objek langit dalam (nebula, galaksi,
+    /// gugus terbuka, gugus bola) — yang berbeda hanya susunannya. Lihat
+    /// `deepSky(morphology:fuzziness:)`.
     public struct NebulaGeometry: Equatable, Sendable {
         public struct Blob: Equatable, Sendable {
             /// Geseran pusat blob dari tengah frame, sumbu x & y (satuan radius).
             public var offsetX: Double
             public var offsetY: Double
-            /// Jari-jari blob (satuan radius).
-            public var radius: Double
+            /// Setengah lebar blob (sumbu x, satuan radius).
+            ///
+            /// **Kenapa lebar & tinggi dipisah, bukan satu `radius`.** Galaksi
+            /// harus digambar sebagai **cakram miring** — elips, bukan
+            /// lingkaran. Dengan satu radius, satu-satunya bentuk yang bisa
+            /// dihasilkan adalah lingkaran, jadi galaksi tampil sama dengan
+            /// nebula. Dua angka ini yang membuat rasionya bisa dinyatakan
+            /// dan diuji.
+            public var halfWidth: Double
+            /// Setengah tinggi blob (sumbu y, satuan radius).
+            public var halfHeight: Double
+            /// Rotasi blob terhadap sumbu x, derajat. `0` = lebar mendatar.
+            ///
+            /// Dipakai galaksi supaya cakramnya miring, bukan mendatar
+            /// sempurna — cakram mendatar pada ikon persegi terbaca sebagai
+            /// garis, bukan sebagai galaksi.
+            public var angleDegrees: Double
             /// Opasitas puncak blob (di pusatnya; memudar ke 0 di tepi).
             public var opacity: Double
         }
@@ -798,6 +837,11 @@ public enum VisualFrame {
 
     /// Kabut nebula yang **pas di frame**.
     ///
+    /// Ini bentuk **netral** yang dipakai bila morfologi objek tidak diketahui
+    /// (lihat `deepSky(morphology:fuzziness:)`). Ia sengaja tidak menyatakan
+    /// "galaksi" maupun "gugus": satu-satunya klaim yang jujur dari sebuah
+    /// kabut tanpa identitas adalah "ada sesuatu yang menyebar di sini".
+    ///
     /// Jari-jari tiap blob dipotong supaya blob tidak pernah keluar dari frame:
     /// `radius <= jarak tersisa ke tepi terdekat`. Konsekuensinya ukuran
     /// maksimal bergantung pada geseran -- blob yang digeser jauh harus
@@ -810,26 +854,141 @@ public enum VisualFrame {
     ///   - frameHalfExtent: setengah lebar frame.
     public static func nebula(fuzziness: Double,
                        frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
-        let clamped = min(1, max(0, fuzziness))
         // Geseran ditulis tetap: bentuk kabut yang asimetris adalah yang
         // membuatnya tidak tampak seperti lingkaran yang digambar.
-        let layout: [(Double, Double, Double, Double)] = [
-            // (offsetX, offsetY, skala, opasitas)
-            (-0.18, 0.12, 1.00, 0.42),
-            ( 0.22, -0.16, 0.68, 0.30),
-            ( 0.05, -0.04, 0.40, 0.55)
+        let layout: [(Double, Double, Double, Double, Double, Double)] = [
+            // (offsetX, offsetY, skala lebar, rasio sumbu, sudut°, opasitas)
+            (-0.18, 0.12, 1.00, 1.0, 0.0, 0.42),
+            ( 0.22, -0.16, 0.68, 1.0, 0.0, 0.30),
+            ( 0.05, -0.04, 0.40, 1.0, 0.0, 0.55)
         ]
-        let blobs = layout.map { offsetX, offsetY, scale, opacity in
-            // Ruang yang tersisa dari pusat blob ke tepi frame terdekat.
+        return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                            frameHalfExtent: frameHalfExtent)
+    }
+
+    /// Bentuk objek langit dalam untuk morfologi tertentu.
+    ///
+    /// **Kenapa satu fungsi untuk semua bentuk, bukan satu per jenis.**
+    /// Susunan blob-lah yang membedakan galaksi dari gugus bola, bukan kode
+    /// gambar yang berbeda: semuanya kabut tanpa tepi keras, hanya jumlah,
+    /// letak, dan rasio sumbunya yang berubah. Menaruhnya di satu tempat
+    /// membuat aturan "jangan keluar frame" berlaku untuk **semua** bentuk
+    /// sekaligus. Kalau tiap bentuk punya fungsi sendiri, bentuk yang
+    /// ditambahkan belakangan bisa lupa memeriksanya -- dan itu justru bentuk
+    /// yang paling jarang dilihat.
+    ///
+    /// - Parameters:
+    ///   - morphology: bentuk objek. `nil` = tidak diketahui → kabut netral.
+    ///   - fuzziness: 0 = titik, 1 = paling lebar.
+    ///   - frameHalfExtent: setengah lebar frame.
+    public static func deepSky(morphology: DeepSkyCatalogue.Morphology?,
+                               fuzziness: Double,
+                               frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
+        guard let morphology else {
+            // Tidak tahu bentuknya: gambar kabut netral, **jangan** menebak
+            // salah satu jenis. Lihat `DeepSkyCatalogue.morphology(forObjectID:)`.
+            return nebula(fuzziness: fuzziness, frameHalfExtent: frameHalfExtent)
+        }
+        switch morphology {
+        case .nebula:
+            return nebula(fuzziness: fuzziness, frameHalfExtent: frameHalfExtent)
+
+        case .galaxy:
+            // Cakram miring + tonjolan inti. Dua hal yang membuatnya terbaca
+            // sebagai galaksi, bukan nebula lonjong: rasio sumbu tiap lapisan
+            // < 1 (elips), dan lapisan **makin bulat ke dalam** (inti 0.42,
+            // cakram 0.34) -- tonjolan pusat yang khas.
+            let layout: [(Double, Double, Double, Double, Double, Double)] = [
+                (0.0, 0.0, 1.00, 0.34, -18.0, 0.30),
+                (0.0, 0.0, 0.66, 0.30, -18.0, 0.26),
+                (0.0, 0.0, 0.26, 0.42, -18.0, 0.60)
+            ]
+            return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
+
+        case .openCluster:
+            // Bintang tersebar **jarang**, tanpa inti: blob-blobnya kecil,
+            // tersebar sampai dekat tepi, dan **tidak ada yang di tengah**.
+            // Yang membedakannya dari gugus bola adalah ketiadaan pusat,
+            // bukan ukurannya — jadi tidak ada blob di sekitar pusat, dan
+            // ukurannya nyaris seragam supaya tidak ada yang tampak sebagai
+            // inti.
+            let layout: [(Double, Double, Double, Double, Double, Double)] = [
+                ( 0.000000, -0.620000, 0.34, 1.0, 0.0, 0.55),
+                (-0.560000, -0.300000, 0.31, 1.0, 0.0, 0.50),
+                ( 0.520000, -0.340000, 0.33, 1.0, 0.0, 0.45),
+                (-0.680000,  0.180000, 0.29, 1.0, 0.0, 0.52),
+                ( 0.620000,  0.220000, 0.31, 1.0, 0.0, 0.48),
+                (-0.340000,  0.580000, 0.33, 1.0, 0.0, 0.42),
+                ( 0.300000,  0.620000, 0.29, 1.0, 0.0, 0.55)
+            ]
+            return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
+
+        case .globularCluster:
+            // Inti padat di tengah (blob terbesar & paling terang), dikelilingi
+            // dua cincin bintang yang makin redup ke luar. Bentuk **memusat**
+            // inilah yang membedakannya dari gugus terbuka.
+            let layout: [(Double, Double, Double, Double, Double, Double)] = [
+                ( 0.000000,  0.000000, 0.46, 1.0, 0.0, 0.55),
+                ( 0.289778,  0.077646, 0.22, 1.0, 0.0, 0.38),
+                ( 0.077646,  0.289778, 0.22, 1.0, 0.0, 0.38),
+                (-0.212132,  0.212132, 0.22, 1.0, 0.0, 0.38),
+                (-0.289778, -0.077646, 0.22, 1.0, 0.0, 0.38),
+                (-0.077646, -0.289778, 0.22, 1.0, 0.0, 0.38),
+                ( 0.212132, -0.212132, 0.22, 1.0, 0.0, 0.38),
+                ( 0.325269,  0.325269, 0.17, 1.0, 0.0, 0.22),
+                (-0.119057,  0.444326, 0.17, 1.0, 0.0, 0.22),
+                (-0.444326,  0.119057, 0.17, 1.0, 0.0, 0.22),
+                (-0.325269, -0.325269, 0.17, 1.0, 0.0, 0.22),
+                ( 0.119057, -0.444326, 0.17, 1.0, 0.0, 0.22),
+                ( 0.444326, -0.119057, 0.17, 1.0, 0.0, 0.22)
+            ]
+            return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
+        }
+    }
+
+    /// Menyusun blob dari layout, **tanpa pernah** membiarkannya keluar frame.
+    ///
+    /// Lebar & tinggi dikecilkan **bersama** (`room`), bukan tiap sumbu
+    /// dipotong terpisah: memotong sumbu secara terpisah akan mengubah rasio
+    /// sumbu galaksi persis pada blob yang paling dekat tepi -- bentuk yang
+    /// justru paling terlihat.
+    ///
+    /// **Rotasi ikut dihitung.** Elips yang diputar `θ` tidak lagi sejajar
+    /// sumbu: bentangnya menjadi `hw·(|cos θ| + aspect·|sin θ|)` di x dan
+    /// `hw·(|sin θ| + aspect·|cos θ|)` di y. Mengabaikan suku `sin θ` membuat
+    /// cakram galaksi yang miring **keluar frame** justru pada bentuk yang
+    /// paling terlihat -- dan itu memang terjadi sebelum rumus ini diperbaiki
+    /// (cakram 18° keluar 0.056 R, ditemukan oleh
+    /// `testEveryDeepSkyBlobStaysInsideTheFrame`).
+    ///
+    /// - Parameter layout: (offsetX, offsetY, skala lebar, rasio sumbu,
+    ///   sudut°, opasitas). `rasio sumbu` = setengah tinggi / setengah lebar.
+    private static func buildDeepSky(
+        layout: [(Double, Double, Double, Double, Double, Double)],
+        fuzziness: Double,
+        frameHalfExtent: Double) -> NebulaGeometry {
+        let clamped = min(1, max(0, fuzziness))
+        // Lebar kabut mengikuti `fuzziness`, tetapi tidak pernah melebihi
+        // ruang yang tersisa (lihat `nebula`).
+        let growth = 0.62 + 0.38 * clamped
+        let blobs = layout.map { offsetX, offsetY, widthScale, aspect, angle, opacity in
             let headroomX = frameHalfExtent - abs(offsetX)
             let headroomY = frameHalfExtent - abs(offsetY)
-            let headroom = min(headroomX, headroomY)
-            // Lebar kabut: mengikuti `fuzziness`, tetapi tidak pernah
-            // melebihi ruang yang tersisa.
-            let extent = headroom * (0.62 + 0.38 * clamped)
+            let theta = angle * .pi / 180
+            let cosT = abs(cos(theta))
+            let sinT = abs(sin(theta))
+            // Berapa setengah-lebar yang diizinkan tiap sumbu, setelah rotasi.
+            let roomX = headroomX / max(cosT + aspect * sinT, 1e-9)
+            let roomY = headroomY / max(sinT + aspect * cosT, 1e-9)
+            let halfWidth = min(roomX, roomY) * growth * widthScale
             return NebulaGeometry.Blob(offsetX: offsetX,
                                        offsetY: offsetY,
-                                       radius: extent * scale,
+                                       halfWidth: halfWidth,
+                                       halfHeight: halfWidth * aspect,
+                                       angleDegrees: angle,
                                        opacity: opacity)
         }
         return NebulaGeometry(blobs: blobs)

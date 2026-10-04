@@ -58,6 +58,72 @@ final class DeepSkyCatalogueTests: XCTestCase {
         }
     }
 
+    // MARK: - Morfologi: bentuk apa, bukan cuma seberapa lebar
+
+    /// Setiap objek harus punya entri morfologi.
+    ///
+    /// `fuzziness` hanya mengatur **lebar**; tanpa morfologi, galaksi, gugus
+    /// terbuka, dan gugus bola digambar dengan bentuk yang sama persis. Uji
+    /// ini menuntut setiap objek menyatakan bentuknya — supaya menambah
+    /// objek baru tidak memberinya bentuk bawaan yang tampak sah padahal
+    /// tidak dipilih.
+    func testEveryDeepSkyObjectHasAMorphologyEntry() {
+        for object in DeepSkyCatalogue.objects {
+            XCTAssertNotNil(DeepSkyCatalogue.morphologyByID[object.id],
+                            "\(object.id) belum punya morfologi — bentuknya akan menebak")
+        }
+    }
+
+    /// Tidak ada entri morfologi yang yatim.
+    func testNoMorphologyEntryIsOrphaned() {
+        let ids = Set(DeepSkyCatalogue.objects.map(\.id))
+        for key in DeepSkyCatalogue.morphologyByID.keys {
+            XCTAssertTrue(ids.contains(key),
+                          "entri morfologi '\(key)' tidak punya objeknya")
+        }
+    }
+
+    /// Id tak dikenal **tidak** menebak bentuk.
+    ///
+    /// Ini beda penting dengan `fuzziness`, yang boleh jatuh ke nilai tengah:
+    /// lebar yang tidak diketahui tidak mengklaim apa pun, sedangkan setiap
+    /// morfologi menyatakan "ini galaksi" atau "ini gugus bola". Menebak
+    /// salah satunya adalah klaim identitas yang keliru — persis yang
+    /// dilarang PRD. Jadi `nil`, dan lapisan gambar memakai kabut netral.
+    func testUnknownIDHasNoMorphologyRatherThanGuessing() {
+        XCTAssertNil(DeepSkyCatalogue.morphology(forObjectID: "bukan-objek-nyata"),
+                     "id tak dikenal harus mengembalikan nil, bukan bentuk bawaan")
+    }
+
+    /// Katalog produksi harus memakai **lebih dari satu** morfologi.
+    ///
+    /// Kalau semua objek kebetulan satu bentuk, uji per-objek di atas tetap
+    /// hijau sementara kelas cacatnya kembali: layar menampilkan bentuk yang
+    /// sama untuk semua. Ini yang mengunci niatnya.
+    func testCatalogueUsesMoreThanOneMorphology() {
+        let shapes = Set(DeepSkyCatalogue.objects.compactMap {
+            DeepSkyCatalogue.morphology(forObjectID: $0.id)
+        })
+        XCTAssertGreaterThan(shapes.count, 1,
+                             "seluruh katalog memakai satu bentuk — semua objek akan tampil identik")
+    }
+
+    /// Setiap morfologi yang dideklarasikan **benar-benar dipakai**.
+    ///
+    /// Menambah `case` baru ke `Morphology` tanpa memetakannya ke objek mana
+    /// pun berarti bentuk itu tidak pernah digambar — jalur mati yang tidak
+    /// bisa dilihat dari layar. Daftarnya diambil dari `allCases`, jadi
+    /// penambahan `case` langsung menuntut objeknya.
+    func testEveryMorphologyIsUsedByTheCatalogue() {
+        let used = Set(DeepSkyCatalogue.objects.compactMap {
+            DeepSkyCatalogue.morphology(forObjectID: $0.id)
+        })
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            XCTAssertTrue(used.contains(morphology),
+                          "morfologi \(morphology) tidak dipakai objek mana pun — bentuknya tidak akan pernah tampil")
+        }
+    }
+
     /// Id harus unik: dua objek ber-id sama membuat yang satu menutupi yang
     /// lain di `Dictionary`/`first(where:)`, dan arah yang dilaporkan bisa
     /// milik objek yang salah.

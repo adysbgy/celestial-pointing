@@ -85,4 +85,63 @@ public enum DeepSkyCatalogue {
     public static func fuzziness(forObjectID id: String) -> Double {
         fuzzinessByID[id] ?? 0.6
     }
+
+    // MARK: - Bentuk: apa objeknya, bukan cuma seberapa lebar
+
+    /// Morfologi — **jenis** objek langit dalam.
+    ///
+    /// **Kenapa `fuzziness` saja tidak cukup.** `fuzziness` hanya mengatur
+    /// **seberapa lebar** kabutnya; semua objek langit dalam tetap digambar
+    /// dengan tiga blob yang sama. Di katalog produksi itu berarti galaksi
+    /// spiral, gugus terbuka, dan gugus bola tampil sebagai **satu bentuk
+    /// yang persis sama** — pengguna tidak bisa membedakan satu dari yang
+    /// lain, dan yang paling halus: tidak ada satu teks di layar yang bisa
+    /// membacanya. PRD melarang menampilkan visual yang mengklaim identitas
+    /// yang tidak dimiliki objek; gambar yang **sama untuk semua** adalah
+    /// bentuk klaim yang paling sulit terlihat, karena tidak ada yang salah
+    /// untuk dilihat.
+    ///
+    /// Tabelnya per id, sama seperti `fuzzinessByID`, supaya menambah objek
+    /// baru tidak memberinya bentuk bawaan yang tampak sah padahal tidak
+    /// dipilih — kelas cacat yang sama dengan tabel warna bintang.
+    public enum Morphology: String, Equatable, Sendable, CaseIterable {
+        /// Nebula emisi/pantulan: kabut asimetris yang menyebar.
+        case nebula
+        /// Galaksi: cakram miring dengan tonjolan inti — terlihat dari rasio
+        /// sumbu elipsnya, bukan cuma dari lebarnya.
+        case galaxy
+        /// Gugus terbuka: bintang-bintang tersebar **jarang**, tanpa inti.
+        case openCluster
+        /// Gugus bola: inti padat dengan bintang yang mengerumun rapat.
+        case globularCluster
+    }
+
+    /// Bentuk tiap objek, per id.
+    ///
+    /// Dipisah dari `fuzzinessByID` dan bukan digabung ke dalamnya, karena
+    /// keduanya menjawab pertanyaan berbeda ("seberapa lebar" vs "bentuk
+    /// apa") dan punya **gagal-bawaan** yang berbeda: lebar boleh jatuh ke
+    /// nilai tengah, sedangkan bentuk **tidak boleh menebak**. Lihat
+    /// `morphology(forObjectID:)`.
+    static let morphologyByID: [String: Morphology] = [
+        "m45": .openCluster,      // Pleiades — gugus terbuka
+        "m31": .galaxy,           // Andromeda — galaksi
+        "m7":  .openCluster,      // Ptolemy — gugus terbuka
+        "m42": .nebula,           // Orion — nebula emisi
+        "m13": .globularCluster,  // Hercules — gugus bola
+        "m8":  .nebula            // Laguna — nebula emisi
+    ]
+
+    /// Bentuk sebuah objek langit dalam, dari id-nya.
+    ///
+    /// **Kenapa jatuh ke `nil`, bukan ke bentuk bawaan.** Untuk `fuzziness`,
+    /// nilai tengah (0.6) masuk akal: lebar yang tidak diketahui tetap tidak
+    /// mengklaim apa pun. Bentuk tidak punya "nilai tengah" — setiap pilihan
+    /// menyatakan "ini galaksi" atau "ini gugus bola". Menebak salah satunya
+    /// adalah klaim identitas yang keliru, persis yang dilarang PRD. Jadi
+    /// id yang tidak dikenal mengembalikan `nil`, dan lapisan gambar lalu
+    /// memakai bentuk netral yang **tidak** menyatakan salah satu jenis.
+    public static func morphology(forObjectID id: String) -> Morphology? {
+        morphologyByID[id]
+    }
 }

@@ -685,6 +685,19 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(offset, 0.4, accuracy: 1e-12)
     }
 
+    /// Setengah-bentang sumbu-x sebuah blob setelah rotasi.
+    ///
+    /// Elips yang diputar tidak lagi sejajar sumbu: bentang x-nya bertambah
+    /// `hh·|sin θ|`. Mengabaikan suku ini akan membuat uji "tidak keluar
+    /// frame" melaporkan aman untuk cakram galaksi yang sebenarnya keluar di
+    /// sudutnya -- persis blob yang paling terlihat.
+    private func rotatedHalfExtents(_ blob: VisualFrame.NebulaGeometry.Blob) -> (x: Double, y: Double) {
+        let theta = blob.angleDegrees * .pi / 180
+        let c = abs(cos(theta)), s = abs(sin(theta))
+        return (blob.halfWidth * c + blob.halfHeight * s,
+                blob.halfWidth * s + blob.halfHeight * c)
+    }
+
     func testEveryDeepSkyBlobStaysInsideTheFrame() {
         // Kabut nebula memakai gradien yang sudah memudar ke transparan di
         // tepi blob, jadi keluar sedikit tidak merusak. Tapi keluar **cukup
@@ -693,15 +706,29 @@ final class CelestialVisualTests: XCTestCase {
         // Uji ini memakai geometri model yang sama dengan view, bukan angka
         // yang disalin ulang -- kalau disalin, view bisa menyimpang tanpa
         // ada yang memberi tahu.
-        for fuzziness in [0.0, 0.4, 0.8, 1.0] {
-            let nebula = VisualFrame.nebula(fuzziness: fuzziness)
-            for (index, blob) in nebula.blobs.enumerated() {
-                let spill = VisualFrame.overflow(centerX: abs(blob.offsetX),
-                                                 centerY: abs(blob.offsetY),
-                                                 halfWidth: blob.radius,
-                                                 halfHeight: blob.radius)
-                XCTAssertLessThanOrEqual(spill, 1e-12,
-                                         "blob nebula \(index) keluar \(spill) R di luar frame pada fuzziness \(fuzziness)")
+        //
+        // **Semua morfologi ikut diuji**, termasuk `nil`. Bentuk yang
+        // ditambahkan belakangan adalah yang paling mudah lupa diperiksa,
+        // jadi daftarnya diambil dari `Morphology.allCases` -- bukan ditulis
+        // tangan di sini, yang bisa tertinggal saat jenis baru muncul.
+        var shapes: [DeepSkyCatalogue.Morphology?] = DeepSkyCatalogue.Morphology.allCases.map { $0 }
+        shapes.append(nil)
+        for morphology in shapes {
+            for fuzziness in [0.0, 0.4, 0.8, 1.0] {
+                let geometry = VisualFrame.deepSky(morphology: morphology,
+                                                   fuzziness: fuzziness)
+                XCTAssertFalse(geometry.blobs.isEmpty,
+                               "\(String(describing: morphology)) harus punya blob")
+                for (index, blob) in geometry.blobs.enumerated() {
+                    let extents = rotatedHalfExtents(blob)
+                    let spill = VisualFrame.overflow(centerX: abs(blob.offsetX),
+                                                     centerY: abs(blob.offsetY),
+                                                     halfWidth: extents.x,
+                                                     halfHeight: extents.y)
+                    XCTAssertLessThanOrEqual(
+                        spill, 1e-9,
+                        "blob \(index) \(String(describing: morphology)) keluar \(spill) R di luar frame pada fuzziness \(fuzziness)")
+                }
             }
         }
     }
@@ -712,7 +739,7 @@ final class CelestialVisualTests: XCTestCase {
         // `fuzziness` diabaikan semua objek langit dalam tampil sama.
         let tight = VisualFrame.nebula(fuzziness: 0.0)
         let wide = VisualFrame.nebula(fuzziness: 1.0)
-        XCTAssertGreaterThan(wide.blobs[0].radius, tight.blobs[0].radius,
+        XCTAssertGreaterThan(wide.blobs[0].halfWidth, tight.blobs[0].halfWidth,
                              "fuzziness harus memperlebar kabut")
     }
 
@@ -723,6 +750,159 @@ final class CelestialVisualTests: XCTestCase {
         let offsets = nebula.blobs.map { hypot($0.offsetX, $0.offsetY) }
         XCTAssertGreaterThan(offsets.max() ?? 0, 0.1,
                              "blob harus digeser dari pusat supaya tidak tampak digambar")
+    }
+
+    // MARK: - Morfologi: bentuk yang benar-benar berbeda di layar
+
+    /// **Pengunci cacat lama.** Sebelum siklus ini, satu-satunya geometri
+    /// objek langit dalam adalah `nebula(fuzziness:)` — tiga blob yang sama
+    /// untuk setiap objek. Akibatnya galaksi Andromeda, gugus terbuka
+    /// Pleiades, dan gugus bola Hercules tampil **identik**. Uji ini
+    /// membuktikan cacatnya nyata dengan membandingkan geometri lama (satu
+    /// bentuk untuk semua) terhadap geometri sekarang.
+    func testLegacyDeepSkyGeometryWasIdenticalForEveryObject() {
+        // Geometri lama tidak menerima morfologi sama sekali, jadi objek
+        // berkategori berbeda menghasilkan blob dengan **bentuk yang sama**;
+        // yang berbeda hanya skalanya. Itu justru masalahnya: galaksi vs
+        // gugus bola tidak boleh dibedakan hanya oleh lebar.
+        let galaxy = VisualFrame.nebula(fuzziness: 1.0)    // Andromeda
+        let globular = VisualFrame.nebula(fuzziness: 0.35) // Hercules
+        for geometry in [galaxy, globular] {
+            let aspects = geometry.blobs.map { $0.halfHeight / $0.halfWidth }
+            XCTAssertTrue(aspects.allSatisfy { abs($0 - 1.0) < 1e-12 },
+                          "geometri lama selalu bulat — galaksi tidak mungkin berbentuk cakram")
+        }
+    }
+
+    /// Galaksi harus benar-benar **elips**, bukan lingkaran.
+    ///
+    /// Kalau semua rasio sumbu mendekati 1, "galaksi" hanya nama untuk kabut
+    /// bulat yang sama dengan nebula — pengguna tidak bisa membedakannya.
+    func testGalaxyIsAnEllipticalDiscNotACircle() {
+        let geometry = VisualFrame.deepSky(morphology: .galaxy, fuzziness: 1.0)
+        let aspects = geometry.blobs.map { $0.halfHeight / $0.halfWidth }
+        XCTAssertLessThan(aspects.max() ?? 1, 0.5,
+                          "cakram galaksi harus jelas lebih lebar daripada tingginya")
+        XCTAssertGreaterThan(aspects.min() ?? 0, 0,
+                             "rasio sumbu harus positif")
+    }
+
+    /// Galaksi harus **miring**, bukan mendatar sempurna.
+    ///
+    /// Cakram mendatar pada ikon persegi terbaca sebagai garis, bukan galaksi.
+    func testGalaxyDiscIsTilted() {
+        let geometry = VisualFrame.deepSky(morphology: .galaxy, fuzziness: 1.0)
+        XCTAssertTrue(geometry.blobs.contains { abs($0.angleDegrees) > 1 },
+                      "cakram galaksi harus miring supaya terbaca sebagai galaksi")
+    }
+
+    /// Galaksi harus punya **tonjolan inti** yang lebih bulat daripada cakram.
+    ///
+    /// Ini yang membedakannya dari nebula lonjong: lapisan paling dalam makin
+    /// mendekati bulat. Kalau semua lapisan punya rasio sama, hasilnya elips
+    /// datar tanpa pusat.
+    func testGalaxyHasARounderCoreThanItsDisc() {
+        let geometry = VisualFrame.deepSky(morphology: .galaxy, fuzziness: 1.0)
+        let aspects = geometry.blobs.map { $0.halfHeight / $0.halfWidth }
+        guard let widest = aspects.first, let roundest = aspects.max() else {
+            return XCTFail("galaksi harus punya blob")
+        }
+        XCTAssertGreaterThan(roundest, widest,
+                             "lapisan inti harus lebih bulat daripada cakram terluar")
+    }
+
+    /// Gugus bola harus **memusat**: ada inti di tengah yang lebih besar
+    /// daripada bintang di sekelilingnya.
+    func testGlobularClusterHasADenseCentre() {
+        let geometry = VisualFrame.deepSky(morphology: .globularCluster, fuzziness: 1.0)
+        guard let core = geometry.blobs.first else {
+            return XCTFail("gugus bola harus punya blob")
+        }
+        XCTAssertEqual(hypot(core.offsetX, core.offsetY), 0, accuracy: 1e-12,
+                       "inti gugus bola harus di tengah")
+        let maxHalfWidth = geometry.blobs.map(\.halfWidth).max() ?? 0
+        XCTAssertEqual(core.halfWidth, maxHalfWidth, accuracy: 1e-12,
+                       "inti gugus bola harus blob terbesar — kalau tidak, bentuknya tidak memusat")
+    }
+
+    /// Gugus terbuka harus **tersebar**: tidak ada inti di pusat.
+    ///
+    /// Ketiadaan pusat inilah yang membedakannya dari gugus bola, bukan
+    /// ukurannya. Dua hal diperiksa, dan keduanya mengukur "ketiadaan inti":
+    /// tidak ada blob yang duduk di tengah, dan rata-rata jaraknya jauh dari
+    /// pusat. Kalau bintangnya mengerumun di tengah, bentuknya jadi gugus bola.
+    func testOpenClusterHasNoCentralCore() {
+        let geometry = VisualFrame.deepSky(morphology: .openCluster, fuzziness: 1.0)
+        XCTAssertFalse(geometry.blobs.isEmpty, "gugus terbuka harus punya blob")
+        // Tidak ada blob yang menempel di pusat.
+        let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
+        XCTAssertGreaterThan(nearest, 0.3,
+                             "gugus terbuka tidak boleh punya blob di pusat — itu ciri gugus bola")
+        // Dan rata-rata blob harus jauh dari pusat.
+        let meanRadius = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.reduce(0, +)
+            / Double(geometry.blobs.count)
+        XCTAssertGreaterThan(meanRadius, 0.4,
+                             "bintang gugus terbuka harus tersebar, bukan mengerumun di pusat")
+    }
+
+    /// **Pembeda langsung** gugus bola vs gugus terbuka: seberapa memusat.
+    ///
+    /// Ini properti yang benar-benar memisahkan keduanya di layar. Menguji
+    /// ukuran blob saja tidak cukup — yang membuat gugus bola terbaca sebagai
+    /// "bola" adalah bintang-bintangnya **mengumpul ke pusat**, sedangkan
+    /// gugus terbuka menyebar merata. Uji ini membandingkan keduanya, jadi ia
+    /// tidak bisa hijau kalau keduanya sama-sama memusat atau sama-sama rata.
+    func testGlobularIsMoreConcentratedThanOpenCluster() {
+        func concentration(_ morphology: DeepSkyCatalogue.Morphology) -> Double {
+            let blobs = VisualFrame.deepSky(morphology: morphology, fuzziness: 1.0).blobs
+            return blobs.map { hypot($0.offsetX, $0.offsetY) }.reduce(0, +) / Double(blobs.count)
+        }
+        let globular = concentration(.globularCluster)
+        let open = concentration(.openCluster)
+        XCTAssertLessThan(globular, open,
+                          "gugus bola harus lebih memusat daripada gugus terbuka (bola \(globular) vs terbuka \(open))")
+    }
+
+    /// Bentuk yang berbeda harus menghasilkan geometri yang **berbeda**.
+    ///
+    /// Ini uji paling langsung terhadap kelas cacatnya: kalau dua morfologi
+    /// menghasilkan blob yang sama, layar menampilkan bentuk yang sama.
+    func testDifferentMorphologiesProduceDifferentGeometry() {
+        let shapes: [DeepSkyCatalogue.Morphology] = [.nebula, .galaxy, .openCluster, .globularCluster]
+        let geometries = shapes.map { VisualFrame.deepSky(morphology: $0, fuzziness: 0.7) }
+        for i in geometries.indices {
+            for j in geometries.indices where j > i {
+                XCTAssertNotEqual(
+                    geometries[i].blobs, geometries[j].blobs,
+                    "\(shapes[i]) dan \(shapes[j]) menghasilkan geometri identik — keduanya akan tampil sama")
+            }
+        }
+    }
+
+    /// Morfologi `nil` (id tak dikenal) harus jatuh ke kabut netral, **bukan**
+    /// menebak salah satu bentuk.
+    func testUnknownMorphologyFallsBackToNeutralNebula() {
+        let unknown = VisualFrame.deepSky(morphology: nil, fuzziness: 0.6)
+        let neutral = VisualFrame.nebula(fuzziness: 0.6)
+        XCTAssertEqual(unknown.blobs, neutral.blobs,
+                       "morfologi tak dikenal harus memakai kabut netral")
+        // Dan bentuk netral itu tidak boleh sama dengan bentuk galaksi/gugus.
+        let galaxy = VisualFrame.deepSky(morphology: .galaxy, fuzziness: 0.6)
+        XCTAssertNotEqual(unknown.blobs, galaxy.blobs,
+                          "kabut netral tidak boleh mengklaim bentuk galaksi")
+    }
+
+    /// `objectID` harus diteruskan dari objek engine ke model visual.
+    ///
+    /// Tanpa ini, view tidak bisa menanyakan morfologi — dan seluruh jalur
+    /// bentuk kembali menjadi satu bentuk untuk semua, tanpa satu pun uji
+    /// yang menangkapnya.
+    func testDeepSkyVisualCarriesTheObjectID() {
+        for object in DeepSkyCatalogue.objects {
+            let visual = CelestialVisual(object: object)
+            XCTAssertEqual(visual.objectID, object.id,
+                           "id objek harus diteruskan supaya morfologinya bisa dicari")
+        }
     }
 
     // MARK: - Geometri bintang: glow & spike tidak boleh terpotong tegak
