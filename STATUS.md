@@ -1,6 +1,27 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — peringatan keselamatan yang mewarisi timer efemeris)
+## Progres terakhir (4 Okt 2026 — satu putusan keselamatan, satu bobot)
+
+### Putusan GoTo tidak boleh turun pangkat di iPhone
+
+Putusan yang sama (`SlewDecision` dari `SlewPlanner`, FASE 3) tampil sebagai
+**dua hal yang berbeda** di dua permukaan. Di jam ia kartu berikon berlatar
+bertingkat (`SlewVerdictBanner`); di iPhone ia turun pangkat menjadi
+`row("GoTo", …)` — teks abu-abu dengan bobot visual yang **persis sama** dengan
+baris data di sebelahnya ("Kalibrasi: Sudah").
+
+Itu bukan soal rasa. Baris itu menyamakan penolakan karena `sunProximity`
+(melindungi peralatan dan mata dari cahaya Matahari) dengan penolakan karena
+`lowConfidence` (soal ketelitian) — dan menyamakannya dengan baris yang tidak
+penting sama sekali. Dua permukaan yang menyimpang soal seberapa mendesak
+sebuah penolakan adalah cacat yang **tidak terlihat dari layar mana pun**:
+masing-masing layar tampak benar sendiri.
+
+Perbaikannya memakai `SlewVerdictBanner` yang sudah ada di iPhone juga — satu
+sumber untuk "seberapa mendesak", bukan dua. Banner itu `nil` saat GoTo aman,
+jadi ia tidak pernah berbunyi di sebelah GoTo yang justru berjalan.
+
+## Progres sebelumnya (4 Okt 2026 — putusan GoTo dihitung sekali, bukan dua kali)
 
 ### Putusan GoTo kini punya wajah, dan punya satu jalan saja
 
