@@ -70,12 +70,19 @@ struct CelestialVisualView: View {
     /// Ubah komponen warna mentah dari model menjadi `Color` yang hormat mode
     /// malam.
     ///
-    /// **Kenapa kecerahan diambil dari `luminance`, bukan dari satu kanal.**
+    /// **Kenapa kecerahan diambil dari `nightModeBrightness`, bukan `luminance`.**
     /// Mode malam membuang hue (paksa merah), jadi yang harus bertahan adalah
     /// **urutan terang** — planet yang tadinya paling terang tetap paling
     /// terang, kalau tidak setiap planet berubah menjadi satu merah rata dan
-    /// mode malam justru menghilangkan informasi yang bisa dibaca. `luminance`
-    /// ada di model (dan diuji) supaya aturan ini punya satu sumber.
+    /// mode malam justru menghilangkan informasi yang bisa dibaca.
+    ///
+    /// Dan "paling terang" itu harus diukur dalam **kanal merah**, bukan
+    /// luminance penuh. Luminance penuh menghitung hijau dan biru yang
+    /// tidak akan pernah sampai ke mata di mode malam — dan mengatakannya
+    /// membuat Merkurius (abu terang) tampak lebih terang dari Mars
+    /// (merah), membalik urutan yang benar. Aturan ini sudah tinggal di
+    /// model (`CelestialVisual.RGBComponents.nightModeBrightness`) dan
+    /// diuji di Linux; di sini tidak ada angka warna sendiri.
     private static func color(_ raw: CelestialVisual.RGBComponents) -> Color {
         guard NightMode.isOn else {
             return Color(red: raw.red, green: raw.green, blue: raw.blue)
