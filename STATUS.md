@@ -2,6 +2,107 @@
 
 ## Ringkasan keadaan (4 Okt 2026, dini hari)
 
+**Misi UI/UX dimulai (Bagian 1).** Visual prosedural sekarang **terpasang**
+di kedua app dan sudah melintasi CI macOS.
+
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 167 test
+  PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
+  dan **kedua workflow CI hijau** di HEAD `59fee76`.
+- Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
+  `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
+  Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
+  Bulan dari fraksi iluminasi engine**, bintang (glow + warna spektral +
+  ukuran dari magnitudo), Matahari berkorona, nebula kabur. Tanpa aset
+  eksternal.
+- Gate baru di CI: **nilai palet & ciri pengenal planet, dan urutan terang mode
+  malam, sekarang teruji di Linux** — karena "cincin = Saturnus" adalah klaim
+  identitas, dan klaim identitas tidak bisa diuji dengan membaca.
+
+## Progres terakhir (4 Okt 2026 — Bagian 1: visual objek)
+
+### Cacat yang ditemukan: visual yang belum pernah dibangun CI
+
+Siklus ini dimulai dari brief "tingkatkan UI/UX, tambahkan visual objek".
+`CelestialVisualView.swift` ternyata **belum pernah ter-commit** — ia ada di
+disk sebagai berkas untracked. Akibatnya isinya belum pernah melewati satu pun
+build. Dua cacat yang pasti:
+
+1. **`PlanetPalette` tidak akan pernah bisa dikompilasi.** Ia memanggil
+   `.mercuryBody`, `.venusBody`, `.marsBody`, `.jupiterBody` — enum
+   `SphereEnd` yang dideklarasikan hanya punya `.neutralBody`,
+   `.neutralShadow`, `.saturnBody`, `.saturnShadow`. Empat case tidak ada.
+   `switch`-nya pun tidak lengkap, jadi `SphereEnd` adalah Dead enum.
+2. **Cincin Saturnus tidak akan pernah bisa dikompilasi.**
+   `context.clip(to:)` tanpa `restoreClip()` — `GraphicsContext.clip(to:)` ada
+   hanya di API yang tidak aktif, dan apelasi di sini memakai yang aktif.
+3. **Dan kalau sempat terkompilasi, sabitnya terbalik saat gibbous.** Sisi limb
+   diambil dari `sign(terminatorOffset)`; untuk fase gibbous tanda itu
+   **berlawanan** dengan sisi yang menyala. Ini persis jebakan yang
+   `phaseGeometry(waxing:)` perbaiki di commit sebelumnya — modelnya sudah
+   benar, pemanggilnya belum.
+
+Yang ketiganya lolos karena `-parse` hanya memeriksa sintaks: ia tidak
+menyelesaikan tipe, tidak menyelesaikan enum case, dan tidak menyelesaikan
+overload API.
+
+### Yang diperbaiki, dan kenapa begini
+
+- **Palet & ciri pengenal planet pindah ke `PointingKit`.** Warna dan
+  `DistinguishingFeature` (pita / cincin / kutub / kawah / kabut) kini bagian
+  dari model, jadi **teruji di Linux**: setiap planet punya warna berbeda,
+  setiap planet punya ciri unik, dan `saturn → .rings` terverifikasi. Selama
+  ini pemetaan itu hanya ada sebagai enum lokal di app yang belum pernah
+  dibangun — ARTIFAK yang paling berbahaya, karena "gambar yang salah" lebih
+  meyakinkan daripada teks yang salah dan tidak ada yang mengetahuinya.
+- **`DistinguishingFeature` sengaja dipisah dari warna.** Warna bola boleh
+  tampil saat engine ragu (bola abu tidak menunjuk planet tertentu), ciri
+  pengenal **tidak boleh** (cincin = Saturnus). View uphold: `guard
+  isConfirmed` sebelum menggambar ciri. Dan `isConfirmed` di layar diambil dari
+  predikat yang **sama** dengan badge keyakinan (`!isStale`) — kalau gambar
+  dan badge mengambil keputusan sendiri, gambar bisa tampil pasti sementara
+  badge-nya disembunyikan, dan gambar lebih meyakinkan daripada badge.
+- **`nightModeBrightness` = kanal merah, bukan luminance Rec.709.** Uji
+  pertamanya **REDAH** dengan luminance: mode malam membuang hijau/biru, jadi
+  yang benar-benar sampai ke mata hanya kanal merah. Memakai luminance penuh
+  membuat planet abu terang (Merkurius, 0.70) tampak **lebih** terang dari
+  Mars (0.51) — kebalikan dari bola mereka di langit. Diperbaiki ke kanal
+  merah, dan sekarang **setiap** planet punya kanal merah berbeda (teruji), jadi
+  mode malam tidak pernah mengubah lima planet menjadi satu bayangan sama.
+- **`visualForDisplayedObject` memakai sumber yang ter-cache.** Arah fase
+  (waxing/waning) dihitung **sekali per refresh konteks**, bukan di `body`.
+  Pemanggilan di `body` berarti efemeris Matahari + Bulan dihitung ulang 20×
+  per detik hanya untuk menggambar satu sabit. Bundle-nya satu: fraksi fase
+  dari `skyContext`, arah fase dihitung pada sampel yang sama — jadi gambar dan
+  angka "Fase Bulan" di layar Ketelitian tidak bisa berbeda.
+- **`ObjectKind.displayName`/`spokenName` jadi satu sumber** di
+  `Apps/Shared/ObjectKindLabels.swift`; switch duplikat di `PointingView`
+  dihapus. Dua salinan akan cepat berbeda, lalu benda yang sama tampil dengan
+  nama berbeda di jam dan iPhone.
+
+### Cacat build yang hanya CI macOS bisa tangkap
+
+CI pertama pada commit `23bc897` **gagal**:
+`CelestialVisualView.swift:205: error: extraneous argument label 'rect:' in call`.
+`Path` tidak punya inisialisasi `rect:` — harus `Path(CGRect)`. `swiftc -parse`
+tetap bilang bersih. Perbaikan di `59fee76`; CI hijau di kedua workflow
+(`Apple Build` run `37171706500` — 2× `BUILD SUCCEEDED`, gerbang peringatan
+melaporkan "Tidak ada peringatan compiler pada Apps/"; `Engine Tests (Linux)`
+run `37171706423`).
+
+### Yang benar-benar dijalankan pada siklus ini
+
+- `./swift-test.sh` → **166 CelestialEngine + 167 PointingKit, 0 gagal** (naik
+  dari 143 → 167: 4 uji baru + 2 uji yang ditulis ulang).
+- Uji baru `testNightModeKeepsBrightnessOrdering` dibuktikan **MERAH lebih
+  dulu** pada versi luminance sebelum diperbaiki ke kanal merah.
+- Gerbang sintaks: seluruh 16 berkas app lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan karakter asing (CJK) di `Apps/`: 0.
+- Sapuan simbol enum yang tidak ada di `Apps/` — 0 setelah perbaikan.
+- CI: `Apple Build` hijau + `Engine Tests (Linux)` hijau di HEAD `59fee76`.
+
+## Ringkasan keadaan (4 Okt 2026, dini hari — sebelum Bagian 1)
+
 **Seluruh kode selesai.** Yang tersisa di `ROADMAP.md` hanyalah satu item yang
 **bukan kode**: "Point & Slew POC 1 teleskop — perencana aman sudah ada
 (`SlewSafety`), perangkat keras belum". Itu menunggu teleskop fisik, bukan
