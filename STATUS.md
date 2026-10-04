@@ -1,8 +1,51 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — izin lokasi ditolak akhirnya terlihat, bukan diam)
+## Progres terakhir (5 Okt 2026 — complication watchOS: objek terkunci terlihat sekilas)
 
-### Premis siklus ini: Fase C dimulai dari celah yang paling berdampak
+### Premis siklus ini: Fase C item 1 — complication WidgetKit
+
+Item 4 (izin lokasi ditolak terlihat) sudah hijau. Sekarang celah tersisa
+terbesar: **complication watchOS**. Tanpa dia, pengguna harus membuka app
+setiap kali ingin tahu apa yang terakhir dikunci — persis gesit yang membedakan
+app astronomi premium (Star Walk menaruh objek terkunci di wajah jam).
+
+### Yang ditambah, dan kenapa begini
+
+- **`Apps/Shared/Complication/ComplicationStore.swift`** — satu sumber baca/tulis
+  snapshot (`ComplicationSnapshot`: `stateRaw`, `objectName`, `objectKindDisplay`,
+  `confirmed`, `updatedAt`). Complication berjalan di **proses terpisah** dari app
+  jam, jadi tidak bisa baca `@StateObject` engine. Ia membaca berkas JSON yang
+  dibagi lewat **App Group** `group.dev.celestial.pointandknow`, dengan **fallback
+  ke caches** bila container `nil` (CI tanpa tanda tangan / Simulator tanpa grup).
+  Fallback itu sadar: di perangkat nyata dengan grup aktif, app & complication
+  pakai URL sama; tanpa grup, penyimpanan tetap jalan (hanya tak terbaca lintas
+  proses) — jadi tidak ada "kegagalan diam" di build CI.
+- **`Apps/PointAndKnowWatch/Complications/ComplicationWidget.swift`** — target
+  WidgetKit (`@main struct … Widget`, `StaticConfiguration`, `supportedFamilies`
+  `accessoryCircular`/`accessoryRectangular`/`accessoryInline`). Tidak butuh
+  `PointingKit`/`CelestialEngine` — cuma merender **string** dari snapshot
+  (nama objek + jenis), jadi ringan dan bebas dependensi engine.
+- **Throttle tulis di `PointingEngine.publish`** — `recordComplicationIfChanged()`
+  hanya menulis bila tanda tangan `state|objectID|confirmed` berubah. `publish`
+  dipanggil 20×/dtk; menulis berkas 20×/dtk cuma bakar baterai & picu reload
+  timeline percuma. Dengan throttle, tulis terjadi tepat saat transisi (kunci
+  baru / ganti objek / kembali "mencari").
+- **Dua `.entitlements`** (app jam + complication) berisi App Group, dan target
+  `PointAndKnow Watch Complication` (`type: app-extension`,
+  `com.apple.widgetkit-extension`) **terbenam** di app jam lewat `embed: true`.
+  `PointingState.symbolName`/`shortLabel` sudah di PointingKit, jadi widget
+  (yang depend `PointingKit`) kompilasi tanpa duplikasi nama.
+
+### Risiko yang diketahui
+
+- Complication butuh App Group benar-benar **aktif di profil provisi** untuk
+  berbagi data lintas proses. Di CI (unsigned) ia tetap **kompilasi & lolos**,
+  tapi complication hanya membaca snapshot bila grup tersedia di perangkat.
+  Itu diperlukan oleh platform, bukan cacat — tidak ada cara berbagi tanpa grup.
+- `swift-test.sh` (Linux) tetap **165 + 252 hijau**; perubahan `PointingEngine`
+  tidak menyentuh logika teruji.
+
+### Premis siklus lalu: Fase C dimulai dari celah yang paling berdampak
 
 Bagian 1–4 (visual + polish) dan Fase A (malam, AOD, VoiceOver) serta Fase B
 (animasi, Dynamic Type, audio) sudah terpasang. Dari empat celah Fase C, tiga

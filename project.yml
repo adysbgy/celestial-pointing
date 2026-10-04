@@ -104,6 +104,44 @@ targets:
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
 
   # ─────────────────────────────────────────────────────────────────────────
+  # Complication watchOS (WidgetKit) — terbenam di dalam app jam.
+  # ─────────────────────────────────────────────────────────────────────────
+  PointAndKnow Watch Complication:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: Apps/PointAndKnowWatch/Complications
+      # Store bersama (App Group) dipakai app jam (tulis) & complication (baca).
+      # Hanya berkas ini yang dibutuhkan complication — ia tidak perlu tahu
+      # PointingKit/CelestialEngine sama sekali.
+      - path: Apps/Shared/Complication
+    dependencies:
+      - package: PointingKit
+      - package: CelestialEngine
+    info:
+      path: Apps/PointAndKnowWatch/Complications/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    # App Group agar app jam & complication berbagi berkas snapshot.
+    # Di CI (tanpa tanda tangan) container ini `nil` → store pakai fallback
+    # cache, jadi build tetap hijau; di perangkat nyata dengan profil yang
+    # mengaktifkan group ini, complication benar-benar membaca tulisan app.
+    entitlements: Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp.widgets
+        PRODUCT_NAME: PointAndKnowWatchComplication
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+      configs:
+        Debug:
+          CODE_SIGNING_ALLOWED: NO
+
+  # ─────────────────────────────────────────────────────────────────────────
   # App jam: pointing, kalibrasi, haptic
   # ─────────────────────────────────────────────────────────────────────────
   PointAndKnow Watch:
@@ -117,6 +155,9 @@ targets:
     dependencies:
       - package: PointingKit
       - package: CelestialEngine
+      # Complication terbenam di dalam app jam: satu bundel, dua proses.
+      - target: PointAndKnow Watch Complication
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp
@@ -139,6 +180,10 @@ targets:
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: dev.celestial.pointandknow
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda."
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam."
+        # App Group agar app jam & complication berbagi berkas snapshot.
+        # Sama dengan target complication; tanpa ini complication hanya membaca
+        # cache-nya sendiri (fallback store), bukan tulisan app.
+        entitlements: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
 
 # Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
 # dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).

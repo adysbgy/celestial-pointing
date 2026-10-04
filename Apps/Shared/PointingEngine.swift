@@ -210,6 +210,15 @@ public final class PointingEngine: ObservableObject {
 
     private var skyContextAt: Date?
 
+    /// Tanda tangan snapshot complication terakhir yang ditulis.
+
+    /// `publish` dipanggil 20×/dtk, tapi complication hanya peduli saat
+    /// **keadaan atau objek berubah** — menulis berkas 20×/dtk cuma membuang
+    /// baterai & memicu reload timeline yang tidak perlu. Tanda tangan ini
+    /// membatasi tulis ke transisi sungguhan (kunci baru, berpindah objek,
+    /// kembali ke "mencari").
+    private var lastComplicationSignature: String?
+
     /// Sensor hilang / tersedia.
     public func setSensorAvailable(_ available: Bool) {
         sensorNote = available ? nil : "Data gerak tidak tersedia."
@@ -234,6 +243,27 @@ public final class PointingEngine: ObservableObject {
     private func publish(_ value: PointingSnapshot) {
         snapshot = value
         lockArrival = arrivalGate.update(with: value)
+        recordComplicationIfChanged()
+    }
+
+    /// Tulis snapshot complication saat keadaan/objek benar-benar berubah.
+
+    /// Dipanggil dari `publish` (satu-satunya jalan tulis snapshot). Hanya
+    /// menulis bila tanda tangannya beda dari tulisan terakhir — jadi complication
+    /// mendapat entri timeline baru tepat saat sesuatu berubah, bukan 20×/dtk.
+    /// Complication membaca lewat `ComplicationStore.shared` (proses terpisah).
+    private func recordComplicationIfChanged() {
+        let object = displayedObject
+        let signature = "\(snapshot.state.rawValue)|\(object?.id ?? "")|\(confirmsDisplayedIdentity)"
+        guard signature != lastComplicationSignature else { return }
+        lastComplicationSignature = signature
+        let snapshot = ComplicationSnapshot(
+            stateRaw: snapshot.state.rawValue,
+            objectName: object?.name,
+            objectKindDisplay: object?.kind.displayName,
+            confirmed: confirmsDisplayedIdentity,
+            updatedAt: Date())
+        ComplicationStore.shared.record(snapshot)
     }
 
     // MARK: - Alur
