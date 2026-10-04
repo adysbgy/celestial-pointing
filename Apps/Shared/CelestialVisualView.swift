@@ -83,7 +83,24 @@ struct CelestialVisualView: View {
     /// (merah), membalik urutan yang benar. Aturan ini sudah tinggal di
     /// model (`CelestialVisual.RGBComponents.nightModeBrightness`) dan
     /// diuji di Linux; di sini tidak ada angka warna sendiri.
-    private static func color(_ raw: CelestialVisual.RGBComponents) -> Color {
+    /// **Satu-satunya** tempat warna gambar diubah menjadi warna SwiftUI, dan
+    /// satu-satunya tempat mode malam diterapkan.
+    ///
+    /// Kenapa hanya satu: versi sebelumnya punya tiga pintasan terpisah
+    /// (`color`, `accent`, `shadowAccent`), masing-masing memanggil
+    /// pemetaan malamnya sendiri. Itu memungkinkan pemetaan **dua
+    /// kali** -- dan pemetaan tidak idempoten. Dihitung: piringan gelap
+    /// bulan dipetakan ke kanal merah 0,047; kalau peta itu dijalankan lagi
+    /// sebagai permukaan, hasilnya 0,357 -- hampir delapan kali lebih terang,
+    /// tanpa ada yang menulis angka baru pun. Kecerahan bergeser
+    /// tanpa ada yang menulis angka baru pun, jadi cacat seperti ini
+    /// tidak akan pernah terlihat dari membaca kode.
+    ///
+    /// Perannya dinyatakan sebagai argumen, bukan lewat pintasan terpisah,
+    /// supaya "terlalu gelap ikut dipetakan seperti permukaan" tidak bisa
+    /// ditulis.
+    private static func color(_ raw: CelestialVisual.RGBComponents,
+                              isShadow: Bool = false) -> Color {
         guard NightMode.isOn else {
             return Color(red: raw.red, green: raw.green, blue: raw.blue)
         }
@@ -92,38 +109,27 @@ struct CelestialVisualView: View {
         // warna, dan 10 dari 13 di antaranya bukan merah murni -- pita terang
         // Bulan, misalnya, menyimpan 77% luminansinya di hijau/biru,
         // padahal file ini menjanjikan "merah murni ... termasuk pada
-        // gambar". Aturannya sekarang satu (`NightVisual.surface`), sama
-        // dengan bola planet, dan punya uji di Linux.
-        return Color(NightVisual.surface(raw))
+        // gambar". Aturannya sekarang satu (`NightVisual`), sama dengan bola
+        // planet, dan punya uji di Linux.
+        let night = NightVisual.mapped(raw, isShadow: isShadow)
+        return Color(red: night.red, green: night.green, blue: night.blue)
     }
 
-    /// Warna aksen gambar pada mode yang sedang aktif.
-    ///
-    /// Sengaja **satu pintasan** untuk seluruh aksen: warna siangnya ada satu
-    /// kali di `CelestialVisual.accents`, dan malamnya dihitung dari kanal
-    /// merah yang sama. View tidak lagi memegang satu pun angka warna aksen
-    /// -- jadi tidak ada tempat lagi di sini tempat "merah-ish" bisa ditulis
-    /// dan lolos tanpa ada yang menghitungnya.
+    /// Aksen yang memancarkan cahaya (pita, cincin, kutub, kabut).
     private static func accent(_ raw: CelestialVisual.RGBComponents) -> Color {
-        guard NightMode.isOn else {
-            return Color(red: raw.red, green: raw.green, blue: raw.blue)
-        }
-        return Color(NightVisual.surface(raw))
+        color(raw)
     }
 
-    /// Warna aksen untuk bagian yang **tidak memancarkan cahaya**
-    /// (piringan bulan gelap, isi lencana ragu).
+    /// Aksen untuk bagian yang **tidak memancarkan cahaya**: piringan gelap
+    /// bulan dan isi lencana ragu.
     ///
     /// Terpisah dari `accent` dengan alasan yang diuji: memetakan bagian
-    /// gelap lewat aturan permukaan akan menaikkannya ke kanal merah 0.44,
-    /// dan kontras sabit terhadap gelap jatuh ke 2.99:1 -- di layar yang
+    /// gelap lewat aturan permukaan akan menaikkannya ke kanal merah 0,44,
+    /// dan kontras sabit terhadap gelap jatuh ke 2,99:1 -- di layar yang
     /// justru paling dipakai untuk melihat bulan, tepat saat mode malam
     /// dipilih supaya penglihatan malam terjaga.
     private static func shadowAccent(_ raw: CelestialVisual.RGBComponents) -> Color {
-        guard NightMode.isOn else {
-            return Color(red: raw.red, green: raw.green, blue: raw.blue)
-        }
-        return Color(NightVisual.shadow(raw))
+        color(raw, isShadow: true)
     }
 
     // MARK: - Planet
@@ -490,7 +496,7 @@ struct CelestialVisualView: View {
         // Warna siang dihitung dari indeks B−V di `PointingKit`
         // (`CelestialVisual.starRGB`) -- rumus warna tidak lagi tinggal di
         // view, jadi urutannya bisa diuji di Linux.
-        let base = Color(CelestialVisual.starRGB(forColorIndex: visual.colorIndexBV))
+        let base = Self.color(CelestialVisual.starRGB(forColorIndex: visual.colorIndexBV))
         guard NightMode.isOn else { return base }
         // Kecerahan diambil dari ukuran relatif (bintang paling terang tetap
         // paling terang), lalu warnanya dipaksakan ke merah. Kecerahan tetap
