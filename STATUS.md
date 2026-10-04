@@ -1,6 +1,41 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — penolakan bahaya dan penolakan mutu tidak lagi sama bobotnya)
+## Progres terakhir (4 Okt 2026 — peringatan keselamatan tidak lagi hilang saat layar redup)
+
+### Layar yang paling miskin justru paling butuh satu baris ini
+
+Layar Always-On (`ReducedLuminanceView`) sengaja hanya memuat yang tidak boleh
+terlewat: satu nama objek dan dua kata status. Sisa penolakan GoTo sengaja
+dibuang, dan untuk hampir semuanya itu benar — "terlalu redup untuk diamati"
+mengecewakan, bukan berbahaya, dan pengguna bisa mengetahuinya begitu mengangkat
+pergelangan. Batas ini bahkan sudah dicatat sebagai batas yang diterima di STATUS
+sebelumnya ("hint tidak muncul di layar redup").
+
+Tapi bahaya **keselamatan** bukan kelas yang sama. Kalau `sunProximity` hilang
+dari layar redup, pengguna melihat nama objek terkunci tanpa satu pun tanda
+bahwa teleskop **menolak bergerak** — dibaca sebagai keberhasilan, tepat pada
+satu-satunya penolakan yang bisa merusak alat atau mata. Yang paling berbahaya
+justru yang paling mudah disamarkan oleh layar yang sengaja miskin.
+
+- **`SlewDecision.safetyWarningText`** — kalimat putusan, tapi hanya saat ada
+  bahaya keselamatan. Ambangnya memakai `isSafety` yang **sama** dengan
+  `verdictTone`, bukan daftar yang ditulis ulang: kalau suatu saat sebuah bahaya
+  dipindahkan kelasnya, warna peringatan di layar penuh dan kehadirannya di
+  layar redup ikut berpindah bersama. Tidak ada dua daftar yang bisa berbeda
+  pendapat.
+- **`ReducedLuminanceView`** menampilkan baris itu (ikon + kalimat, `caption2`),
+  dan **VoiceOver ikut mengucapkannya** — layar redup yang membacakan nama objek
+  tanpa alasan teleskop menolak terdengar seperti keberhasilan.
+
+Tiga uji baru (`SlewVerdictTests`) menjaga: bahaya keselamatan tampil, bahaya
+mutu tidak, campuran tetap tampil karena keselamatan ada, dan GoTo aman tetap
+sunyi di layar redup.
+
+Gerbang: `swift-test.sh` **166 + 387 hijau** (README diperbarui), typecheck
+hijau, ui-lint hijau. CI: Engine Tests (Linux) `37224500311` = success, Apple
+Build `37224500279` = success.
+
+
 
 ### Pemisahan yang berhenti di tengah jalan
 
