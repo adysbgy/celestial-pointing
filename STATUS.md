@@ -6710,6 +6710,73 @@ Gate: lint **13/13**, typecheck lulus. CI: Engine + Apple Build **success**
 (`37236063140` + `37236063163`) — termasuk "Gerbang peringatan (kode sendiri)",
 yang gagal bila ada warning dari kode kita.
 
+## Siklus 2026-10-04 (9) — perluas katalog visual langit dalam (Fase C #5)
+
+### Cacat yang ditemukan (dibaca dari kode, bukan ditebak)
+
+Katalog produksi (`DeepSkyCatalogue.objects`) cuma punya 11 objek. Jalur
+gambar objek langit dalam sudah lengkap dan umum — `CelestialVisual.Kind
+.deepSky`, `VisualFrame.nebula(fuzziness:)`, `NightVisual.deepSky`, dan
+`CelestialVisualView.drawDeepSky` semuanya sudah ada dan teruji. Yang kurang
+bukan jalur, tapi **isi**: empat Messier yang masuk akal ditunjuk dengan
+binokuler belum ada, padahal koordinat & magnitudonya data publik.
+
+Ini bukan cacat yang merusak (seperti cacat sebelumnya), tapi celah
+penyempurnaan tanpa-henti yang bernilai nyata: pengguna yang menunjuk
+Nebula Cincin atau Galaksi Pusaran saat ini tidak mendapat apa-apa, karena
+objek itu tidak ada di katalog.
+
+### Kenapa ini aman, bukan risiko
+
+- `productionCatalogue = Catalogue.brightStars + DeepSkyCatalogue.objects`
+  (EngineFactory). Menambah entri ke `DeepSkyCatalogue.objects` langsung
+  mengalirkannya ke **kedua** app (jam + iPhone) tanpa satu pun sentuhan
+  di `Apps/` — jalur yang sudah ditutup oleh siklus (3)/(5)/(7).
+- Aturan kejujuran dipertahankan: setiap objek baru punya entri **eksplisit**
+  di `fuzzinessByID` dan `morphologyByID`. Tidak ada yang jatuh ke default
+  `fuzziness` (0.6) atau ke `nil` morfologi — jadi bentuknya tidak pernah
+  ditebak. Itu syarat PRD: jangan menampilkan visual yang mengklaim identitas
+  yang tidak dimiliki objek.
+- M51 (mag 8.4) berada di bawah ambang magnitudo terbatas bawaan (6.0).
+  Itu **bukan** bug: penyaring visibilitas memang menolak objek yang terlalu
+  redup untuk mata/binokuler telanjang. Honesti tetap utuh — engine tidak
+  mengklaim M51 terlihat bila tidak.
+
+### Yang ditambahkan
+
+- `DeepSkyCatalogue.objects`: +M27 (Nebula Dumbel, mag 7.4), M57 (Nebula
+  Cincin, mag 8.8), M51 (Galaksi Pusaran, mag 8.4), M11 (Gugus Bebek Liar,
+  mag 6.3). Koordinat J2000 dari data publik (SIMBAD/Wikipedia), bukan
+  karangan.
+- `fuzzinessByID`: M27 0.68, M57 0.40, M51 0.92, M11 0.42.
+- `morphologyByID`: M27/M57 `.nebula`, M51 `.galaxy`, M11 `.openCluster`.
+
+M51 menjadi wakil **galaksi berlengan** selain cakram miring M31/M33 —
+variasi bentuk yang bisa dibaca dari layar, bukan cuma label. Jumlah objek
+11 → 15.
+
+### Verifikasi
+
+- `DeepSkyCatalogueTests` mengunci: koordinat in-range (RA 0..<360, Dec
+  -90..90), id unik, **setiap** objek punya morfologi, dan ≥2 wakil per
+  morfologi. Keempat tambahan lulus semuanya.
+- swift-test (Docker swift:6.0): CelestialEngine **171**, PointingKit **485**,
+  0 failures.
+- CI: Engine Tests (Linux) `37245347857` = success; Apple Build `37245347814`
+  = success (termasuk gerbang "Peringatan kode sendiri" — gagal bila ada
+  warning kode kita). View SwiftUI yang mengonsumsi `DeepSkyCatalogue`
+  terkompilasi bersih di macOS.
+
+### Kenapa bukan perluasan katalog planet
+
+`CelestialVisual.Planet` cuma Mercury–Saturn, tapi itu **bukan** celah:
+`EphemerisBody` engine (`Ephemeris.swift:14`) hanya mencantumkan
+sun/moon/mercury/venus/mars/jupiter/saturn. Uranus & Neptune tidak ada di
+engine, jadi menambah kasus planet ke model visual = kode mati yang tidak
+pernah diproduksi engine. Memperluas katalog planet butuh perubahan engine
+(di luar ruang lingkup "hanya Apps/ + logika murni PointingKit"), jadi
+ditunda.
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
