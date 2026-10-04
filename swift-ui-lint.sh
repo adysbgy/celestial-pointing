@@ -87,8 +87,30 @@ echo "== Aturan 3: tidak ada aksara CJK/Cyrillic/fullwidth di kode =="
 # Cakup **seluruh** kode, bukan hanya `Apps/`: selip yang sama bisa muncul
 # di `Packages/`, yang tidak akan pernah terjangkau sapuan `Apps/` saja.
 # Satu sapuan untuk satu aturan.
-cjk=$(grep -rnP --include='*.swift' '[\x{3000}-\x{303F}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{AC00}-\x{D7AF}\x{FF00}-\x{FFEF}\x{0400}-\x{04FF}]' \
-        Apps Packages 2>/dev/null || true)
+#
+# Cakupan diperluas ke `*.sh`, `*.yml`, dan `project.yml`. Tiga tempat itu
+# sebelumnya **tidak terjangkau aturan mana pun** — STATUS sudah mencatatnya
+# sebagai batas berulang kali — padahal selip yang sama bisa mendarat di
+# sana, dan `project.yml` justru berkas yang menentukan build. Sapuan
+# menunjukkan ketiganya bersih, jadi memperluas cakupannya tidak menambah
+# pelanggaran apa pun; yang berubah hanya ada-tidaknya penjaga.
+#
+# `*.md` sengaja **tidak** ikut, dan itu keputusan, bukan kelalaian:
+# STATUS.md memuat aksara CJK **sebagai bukti** cacat yang pernah terjadi —
+# mengutipnya apa adanya, lengkap dengan aksaranya. Memasukkan `.md` akan
+# membuat aturan memerah pada dokumentasinya sendiri, persis kegagalan yang
+# membuat gerbang salah-merah lalu dimatikan orang. Batas ini dicatat di
+# sini supaya tidak terbaca sebagai kelalaian.
+#
+# Catatan yang sama berlaku untuk komentar ini sendiri: awalnya kalimat di
+# atas mengutip aksara CJK-nya, dan aturan yang baru diperluas ini langsung
+# memerah pada skrip yang memuatnya. Kutipannya dihapus, bukan dikecualikan —
+# lebih baik komentarnya kehilangan contoh harfiah daripada aturannya
+# mendapat lubang pengecualian.
+cjk=$(grep -rnP --include='*.swift' --include='*.sh' --include='*.yml' --include='*.yaml' \
+        '[\x{3000}-\x{303F}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{AC00}-\x{D7AF}\x{FF00}-\x{FFEF}\x{0400}-\x{04FF}]' \
+        Apps Packages Tools project.yml \
+        swift-ui-lint.sh swift-test.sh swift-typecheck.sh red-test.sh 2>/dev/null || true)
 if [ -n "$cjk" ]; then
   echo "Aksara non-Latin ditemukan — repo ini ditulis bahasa Indonesia:"
   echo "$cjk"

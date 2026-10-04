@@ -1,5 +1,81 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — cakupan Aturan 3 diperluas, dan aturan baru langsung menangkap penulisnya sendiri)
+
+### Premis siklus ini: ambil batas yang sudah dicatat, dan uji apakah ia masih benar
+
+STATUS mencatat berulang kali, di setiap "Batas yang diketahui":
+
+> Aturan 3 masih buta di `*.sh`, `project.yml`, dan `*.md`.
+
+Kalimat itu dicatat sebagai batas, **bukan** dikerjakan. Siklus ini menguji
+apakah batasnya masih ada, lalu menutup bagian yang bisa ditutup.
+
+### Apa yang ditemukan
+
+Sapuan keempat jenis berkas itu menemukan **nol** pelanggaran di `*.sh`,
+`*.yml`, dan `project.yml` — tetapi hanya karena tidak ada yang mencari,
+bukan karena ada penjaga. Tiga hit CJK yang ada semuanya di `STATUS.md`,
+dan ketiganya **kutipan bukti** cacat lama, bukan selip.
+
+Itu memisahkan batasnya jadi dua hal yang berbeda, dan hanya satu yang
+benar-benar celah:
+
+- `*.sh`, `*.yml`, `project.yml` → bersih, **tak terjaga**. Bisa ditutup.
+- `*.md` → berisi aksara CJK dengan **sengaja** (dokumentasi cacat).
+  Memasang penjaga di sini akan membuat aturan memerah pada dokumentasinya
+  sendiri.
+
+### Yang dikerjakan
+
+Cakupan Aturan 3 diperluas ke `*.sh`, `*.yml`, `project.yml`, dan keempat
+skrip gerbang. `project.yml` ikut karena itu berkas yang **menentukan
+build** — selip di sana dampaknya lebih besar daripada di satu view.
+
+`*.md` sengaja tidak ikut, dengan alasannya ditulis di skrip supaya tidak
+terbaca sebagai kelalaian.
+
+### Aturan baru langsung menangkap penulisnya sendiri
+
+Komentar yang menjelaskan pengecualian `*.md` awalnya **mengutip** aksara
+CJK-nya sebagai contoh. Cakupan yang baru diperluas itu langsung memerah —
+pada skrip yang memuat aturannya. Lint keluar **exit 1** dengan menunjuk
+`swift-ui-lint.sh:100`.
+
+Itu bukan gangguan; itu bukti bahwa perluasannya benar-benar bekerja. Dua
+pilihan ada di depan: mengecualikan skripnya sendiri (menambah lubang), atau
+menghapus kutipannya. Yang dipilih **menghapus kutipannya** — lebih baik
+komentar kehilangan contoh harfiah daripada aturan mendapat lubang
+pengecualian. Kegagalannya dicatat di komentar, jadi alasannya tidak hilang.
+
+### Bukti dua arah
+
+Salinan bersih di `scratch/lintcheck4` → baseline **exit 0**. Lalu:
+
+| Suntikan | Diharapkan | Hasil |
+|---|---|---|
+| Aksara CJK di `swift-test.sh` | MERAH | **MERAH** |
+| Aksara Cyrillic di `project.yml` | MERAH | **MERAH** |
+| Aksara CJK di `STATUS.md` (kontrol negatif) | hijau | hijau |
+| Kembalikan ke semula | hijau | hijau |
+
+Kontrol negatifnya penting: tanpa itu, aturan ini bisa "lulus" hanya karena
+memeriksa tempat yang salah.
+
+### Kenapa tidak sekalian memasukkan `*.md`
+
+Karena gerbang yang salah-merah akan dimatikan orang lain saat ia berbunyi —
+alasan yang sama yang sudah dipakai repo ini untuk menolak `append` di
+daftar peritel. STATUS yang mengutip cacat lama adalah pemakaian yang sah;
+menuntutnya menulis ulang bukti historisnya akan merusak dokumentasinya.
+
+### Gerbang
+
+- `bash -n swift-ui-lint.sh` → OK; `./swift-ui-lint.sh` → **8 aturan hijau**.
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 failures**.
+- `./swift-typecheck.sh` → semua gerbang lulus.
+
+
 ## Progres terakhir (4 Okt 2026 — satu kata Jerman di tengah kalimat Indonesia, dan kenapa daftar kata sendiri dulu menghalangi)
 
 ### Premis siklus ini: kelas cacat yang sudah dicatat tiga kali tapi tak pernah punya penjaga
@@ -189,8 +265,10 @@ tanpa itu, aturan ini bisa "lulus" karena menandai segalanya.
 - **`append` belum ditutup** — lihat di atas. Kandidat yang benar bukan
   menambahkannya ke daftar peritel, melainkan memeriksa **tipe** targetnya,
   dan itu di luar jangkauan sapu teks.
-- **Aturan 3 masih buta di `*.sh`, `project.yml`, dan `*.md`** — tidak
-  berubah.
+- **Aturan 3 dulu buta di `*.sh`, `project.yml`, dan `*.md`** — dua yang
+  pertama **sudah ditutup** di siklus berikutnya; `*.md` tetap di luar
+  cakupan dengan alasan yang dicatat di skrip (STATUS memuat aksara CJK
+  sebagai bukti, bukan sebagai selip).
 - **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — tidak
   berubah.
 
