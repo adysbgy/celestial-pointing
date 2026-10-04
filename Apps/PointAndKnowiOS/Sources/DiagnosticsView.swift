@@ -3,20 +3,6 @@ import Charts
 import CelestialEngine
 import PointingKit
 
-/// Palet warna per nada. Sama seperti di jam, dan sengaja sama: warna "yakin"
-/// tidak boleh berbeda antara dua perangkat.
-extension PointingTone {
-    var color: Color {
-        switch self {
-        case .neutral: return .secondary
-        case .active: return .cyan
-        case .success: return .green
-        case .warning: return .orange
-        case .danger: return .red
-        }
-    }
-}
-
 /// Akar app iPhone.
 ///
 /// iPhone tidak menunjuk; ia **mengukur dan menjelaskan**. Karena itu dua tab:
@@ -48,6 +34,12 @@ struct RootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Preferensi mode malam — **satu untuk seluruh app**, bukan per-tab.
+    /// `TabView` menahan semua tab tetap hidup, jadi menaruhnya di akar
+    /// berarti paletnya berubah serentak di Diagnostik, Experiment 1, dan
+    /// Tautan. Kuncinya sama dengan app jam (lihat `NightModeStorage.key`).
+    @AppStorage(NightModeStorage.key) private var nightMode = false
+
     var body: some View {
         TabView {
             DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
@@ -57,6 +49,8 @@ struct RootView: View {
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
         }
+        // Palet merah murni saat malam, berlaku untuk **seluruh** tab.
+        .preferredColorScheme(nightMode ? .dark : nil)
         .onAppear { start() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -179,6 +173,11 @@ struct DiagnosticsView: View {
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
 
+    /// Preferensi mode malam. Menulis ke kunci yang **sama** dengan `RootView`
+    /// (`NightModeStorage.key`), jadi saklar ini dan palet seluruh app tidak
+    /// bisa berbeda pendapat — keduanya membaca `UserDefaults` yang sama.
+    @AppStorage(NightModeStorage.key) private var nightMode = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -209,7 +208,7 @@ struct DiagnosticsView: View {
                 Section("Keyakinan") {
                     if trace.samples.isEmpty {
                         Text("Belum ada sampel. Angkat iPhone dan arahkan ke langit.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.nightAwareSecondary)
                     } else {
                         confidenceChart
                         Text(trace.trace.diagnosis(
@@ -229,6 +228,7 @@ struct DiagnosticsView: View {
                 }
 
                 Section("Kontrol") {
+                    Toggle("Mode Malam (merah)", isOn: $nightMode)
                     Toggle("Rekam keyakinan", isOn: Binding(
                         get: { trace.isRecording },
                         set: { trace.setRecording($0) }))
@@ -273,7 +273,7 @@ struct DiagnosticsView: View {
             if points.isEmpty {
                 Text("Sampel ada, tapi belum ada jarak kandidat yang terukur.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.nightAwareSecondary)
             } else {
                 Chart {
                     ForEach(points, id: \.0) { index, ratio in
@@ -337,7 +337,7 @@ struct DiagnosticsView: View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
     }
 }

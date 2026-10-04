@@ -26,7 +26,7 @@ struct CalibrationView: View {
                 actions
                 Text(statusMessage)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.nightAwareSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 2)
@@ -55,13 +55,13 @@ struct CalibrationView: View {
                     .foregroundStyle(phaseTone.color)
             }
             if let flow = session?.flow {
-                Text("\(flow.samples.count) acuan tercatat")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                if let calibration = flow.calibration {
-                    Text(String(format: "Offset %.1f°", calibration.yawOffsetDeg))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+            Text("\(flow.samples.count) acuan tercatat")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.nightAwareSecondary)
+            if let calibration = flow.calibration {
+                Text(String(format: "Offset %.1f°", calibration.yawOffsetDeg))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Color.nightAwareSecondary)
                     if let spread = calibration.residualSpreadDeg {
                         Text(String(format: "Sebaran %.1f° (maks %.1f°)",
                                     spread, session?.flow.maxResidualSpreadDeg ?? 3))
@@ -84,7 +84,7 @@ struct CalibrationView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Acuan di atas horizon")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.nightAwareSecondary)
 
             if let targets = session?.referenceTargets, !targets.isEmpty {
                 ForEach(targets) { target in
@@ -100,7 +100,7 @@ struct CalibrationView: View {
                                     .font(.system(size: 13, weight: .medium))
                                 Text(String(format: "%.0f° tinggi", target.direction.altitudeDeg))
                                     .font(.system(size: 10))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.nightAwareSecondary)
                             }
                             Spacer()
                             Image(systemName: "plus.circle")
@@ -141,7 +141,7 @@ struct CalibrationView: View {
             if let policy = session?.suggestedConfidencePolicy {
                 Text(String(format: "Ambang keyakinan usulan: σ %.1f°", policy.pointingSigmaDeg))
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.nightAwareSecondary)
             }
         }
     }

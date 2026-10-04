@@ -21,7 +21,7 @@ struct LinkView: View {
                     row("Terjangkau", link.isReachable ? "Ya" : "Tidak")
                     row("Pesan diterima", "\(link.receivedCount)")
                     if let note = link.lastNote {
-                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                        Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                     }
                     Button("Minta keadaan terakhir") { link.requestState() }
                 }
@@ -36,11 +36,11 @@ struct LinkView: View {
                         }
                         row("Waktu", state.sentAt.formatted(date: .omitted, time: .standard))
                         if let note = state.note {
-                            Text(note).font(.footnote).foregroundStyle(.secondary)
+                            Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                         }
                     } else {
                         Text("Belum ada keadaan dari jam.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.nightAwareSecondary)
                     }
                 }
 
@@ -53,7 +53,7 @@ struct LinkView: View {
                         row("Jumlah acuan", calibration.sampleCount.map(String.init) ?? "—")
                     } else {
                         Text("Jam belum melaporkan kalibrasi.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.nightAwareSecondary)
                     }
                 }
 
@@ -62,7 +62,7 @@ struct LinkView: View {
                     row("Terekam", "\(fromWatch.count)")
                     Text("Sampel dari jam tidak membawa jarak kandidat, jadi rasionya terhadap σ kosong. Yang bisa dilihat dari sini adalah keadaan dan keyakinan yang dilaporkan jam.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.nightAwareSecondary)
                     if fromWatch.contains(where: { $0.sigmaDeg <= 0 }) {
                         // σ nol berarti jam tidak menyertakannya. Menampilkannya
                         // sebagai "0.0°" akan terbaca seperti akurasi sempurna.
@@ -81,7 +81,7 @@ struct LinkView: View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
     }
 }

@@ -14,6 +14,11 @@ struct PointingView: View {
     @ObservedObject var motion: MotionLogger
     @ObservedObject var link: WatchLinkService
 
+    /// Preferensi mode malam, disimpan ke `UserDefaults` lewat `NightMode`.
+    /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
+    /// `PointingTone.color` / `Color.nightAwareSecondary`).
+    @AppStorage(NightModeStorage.key) private var nightMode = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -53,7 +58,7 @@ struct PointingView: View {
                     if engine.location.isFallback {
                         Text("Lokasi: \(engine.location.label)")
                             .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.nightAwareSecondary)
                     }
                     linkRow
                 }
@@ -80,8 +85,21 @@ struct PointingView: View {
                                              : PointingTone.warning.color)
                     }
                 }
+                // Mode Malam: 1 ketuk. Ikon bulan berubah jadi bulan-terselubung
+                // saat aktif supaya keadaannya terbaca tanpa warna.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        nightMode.toggle()
+                    } label: {
+                        Image(systemName: nightMode ? "moon.fill" : "moon")
+                    }
+                    .accessibilityLabel(nightMode ? "Nonaktifkan Mode Malam" : "Aktifkan Mode Malam")
+                }
             }
         }
+        // Latar merah redup saat malam: menekan cahaya putih/biru yang
+        // mematikan rhodopsin. Di siang tetap transparan (sistem yang menentu).
+        .preferredColorScheme(nightMode ? .dark : nil)
     }
 
     // MARK: - Kartu keadaan
@@ -98,14 +116,14 @@ struct PointingView: View {
             }
             Text(state.guidance)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.nightAwareSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let rate = engine.snapshot.angularRateDegPerSec {
                 Text(String(format: "%.0f°/dtk", rate))
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(rate > 8 ? PointingTone.warning.color : .secondary)
+                    .foregroundStyle(rate > 8 ? PointingTone.warning.color : Color.nightAwareSecondary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -127,7 +145,7 @@ struct PointingView: View {
                     .foregroundStyle(PointingTone.warning.color)
             }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.nightAwareSecondary)
     }
 }
 
@@ -163,7 +181,7 @@ struct ObjectDetailView: View {
             }
             Text(kindLine)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.nightAwareSecondary)
             if isStale {
                 Text("Sisa pandangan sebelumnya — bukan hasil sekarang")
                     .font(.system(size: 10))
@@ -172,7 +190,7 @@ struct ObjectDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
-        .background(.ultraThinMaterial, in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        .background(NightMode.detailCardBackground, in: .rect(cornerRadius: WatchMetrics.cornerRadius))
     }
 
     private var kindLine: String {
@@ -232,7 +250,7 @@ struct SkyContextView: View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
         .font(.system(size: 12))
     }

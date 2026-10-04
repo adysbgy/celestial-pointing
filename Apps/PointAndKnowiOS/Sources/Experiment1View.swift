@@ -94,7 +94,7 @@ struct Experiment1View: View {
                  : "Dihitung untuk \(recorder.currentLocation.label).")
                 .foregroundStyle(recorder.currentLocation.isFallback
                                  ? PointingTone.warning.color
-                                 : .secondary)
+                                 : Color.nightAwareSecondary)
         }
     }
 
@@ -108,7 +108,7 @@ struct Experiment1View: View {
                 if let rate = engine.snapshot.angularRateDegPerSec {
                     Text(String(format: "%.0f°/dtk", rate))
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.nightAwareSecondary)
                 }
             }
             TextField("Catatan (opsional)", text: Binding(
@@ -133,7 +133,7 @@ struct Experiment1View: View {
 
             Text(recorder.statusMessage)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.nightAwareSecondary)
         }
     }
 
@@ -142,7 +142,7 @@ struct Experiment1View: View {
             let summary = recorder.summary
             if summary.trialCount == 0 {
                 Text("Belum ada percobaan yang bisa dianalisis.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.nightAwareSecondary)
             } else {
                 row("Percobaan", "\(summary.trialCount)")
                 row("Benar", "\(summary.correctCount)")
@@ -171,7 +171,7 @@ struct Experiment1View: View {
                 } else {
                     Text("Belum cukup data untuk mengusulkan ambang baru — engine tetap memakai ambang konservatif bawaannya.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.nightAwareSecondary)
                 }
             }
         }
@@ -181,7 +181,7 @@ struct Experiment1View: View {
         Section("Percobaan") {
             let trials = recorder.harness.trials
             if trials.isEmpty {
-                Text("Belum ada percobaan.").foregroundStyle(.secondary)
+                Text("Belum ada percobaan.").foregroundStyle(Color.nightAwareSecondary)
             } else {
                 ForEach(Array(trials.enumerated().reversed()), id: \.offset) { _, trial in
                     trialRow(trial)
@@ -212,12 +212,12 @@ struct Experiment1View: View {
                 } else {
                     Text("tak dianalisis")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.nightAwareSecondary)
                 }
             }
             Text(detailLine(trial))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.nightAwareSecondary)
         }
     }
 
@@ -256,7 +256,7 @@ struct Experiment1View: View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
     }
 }
