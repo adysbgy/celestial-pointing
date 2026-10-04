@@ -438,7 +438,7 @@ public enum VisualFrame {
     ///     sungguhan tampak miring saat menghadap kita, dan untuk ikon 2D
     ///     rasio sekitar 1:3 terbaca sebagai "cincin" -- asal **tidak** penuh,
     ///     karena elips penuh terbaca sebagai piring.
-    static func saturnRing(frameHalfExtent: Double = halfExtent,
+    public static func saturnRing(frameHalfExtent: Double = halfExtent,
                            axialRatio: Double = 1.0 / 3.2) -> RingGeometry {
         let halfWidth = frameHalfExtent
         return RingGeometry(halfWidth: halfWidth,
@@ -459,7 +459,7 @@ public enum VisualFrame {
     ///   - bodyFraction: jari-jari bola sebagai pecahan dari setengah lebar
     ///     cincin.
 
-    static func saturnBodyRadius(for ring: RingGeometry,
+    public static func saturnBodyRadius(for ring: RingGeometry,
                                  bodyFraction: Double = 0.53) -> Double {
         ring.halfWidth * bodyFraction
     }
@@ -500,7 +500,7 @@ public enum VisualFrame {
     /// - Parameters:
     ///   - fuzziness: 0 = titik, 1 = kabut paling lebar.
     ///   - frameHalfExtent: setengah lebar frame.
-    static func nebula(fuzziness: Double,
+    public static func nebula(fuzziness: Double,
                        frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
         let clamped = min(1, max(0, fuzziness))
         // Geseran ditulis tetap: bentuk kabut yang asimetris adalah yang
