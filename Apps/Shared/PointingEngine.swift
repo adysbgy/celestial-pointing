@@ -253,17 +253,15 @@ public final class PointingEngine: ObservableObject {
     /// mendapat entri timeline baru tepat saat sesuatu berubah, bukan 20×/dtk.
     /// Complication membaca lewat `ComplicationStore.shared` (proses terpisah).
     private func recordComplicationIfChanged() {
-        let object = displayedObject
-        let signature = "\(snapshot.state.rawValue)|\(object?.id ?? "")|\(confirmsDisplayedIdentity)"
+        let digest = ComplicationDigest(snapshot: snapshot, lastLocked: lastLockedObject)
+        // Bandingkan dengan tanda tangan dari digest yang **sudah dihitung**,
+        // bukan menghitung ulang: `displayedObject`/`confirmsIdentity` cukup
+        // dipanggil sekali untuk membentuk digest. Yang menentukan "perubahan"
+        // hanyalah (keadaan, nama objek, konfirmasi).
+        let signature = "\(digest.stateRaw)|\(digest.objectName ?? "")|\(digest.isConfirmed)"
         guard signature != lastComplicationSignature else { return }
         lastComplicationSignature = signature
-        let snapshot = ComplicationSnapshot(
-            stateRaw: snapshot.state.rawValue,
-            objectName: object?.name,
-            objectKindDisplay: object?.kind.displayName,
-            confirmed: confirmsDisplayedIdentity,
-            updatedAt: Date())
-        ComplicationStore.shared.record(snapshot)
+        ComplicationStore.shared.record(digest)
     }
 
     // MARK: - Alur

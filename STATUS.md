@@ -1,6 +1,6 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (5 Okt 2026 — complication watchOS: objek terkunci terlihat sekilas)
+## Progres terakhir (5 Okt 2026 — complication watchOS + gerbang typecheck kedua)
 
 ### Premis siklus ini: Fase C item 1 — complication WidgetKit
 
@@ -11,39 +11,69 @@ app astronomi premium (Star Walk menaruh objek terkunci di wajah jam).
 
 ### Yang ditambah, dan kenapa begini
 
-- **`Apps/Shared/Complication/ComplicationStore.swift`** — satu sumber baca/tulis
-  snapshot (`ComplicationSnapshot`: `stateRaw`, `objectName`, `objectKindDisplay`,
-  `confirmed`, `updatedAt`). Complication berjalan di **proses terpisah** dari app
-  jam, jadi tidak bisa baca `@StateObject` engine. Ia membaca berkas JSON yang
-  dibagi lewat **App Group** `group.dev.celestial.pointandknow`, dengan **fallback
-  ke caches** bila container `nil` (CI tanpa tanda tangan / Simulator tanpa grup).
-  Fallback itu sadar: di perangkat nyata dengan grup aktif, app & complication
-  pakai URL sama; tanpa grup, penyimpanan tetap jalan (hanya tak terbaca lintas
-  proses) — jadi tidak ada "kegagalan diam" di build CI.
+- **`ComplicationDigest` di PointingKit** (`PointingPresentation.swift`) — ini
+  inti keputusannya. Complication hidup di proses terpisah, jadi ia hanya
+  menerima beberapa nilai sederhana. Tapi aturan "bagaimana ringkasan ini
+  ditampilkan" adalah **janji tampilan**, dan janji itu harus bisa diuji di
+  Linux. Kalau bentuknya diletakkan di `Apps/`, satu-satunya verifikasi yang
+  ada hanyalah "kompilasi di Mac" — persis celah yang membuat
+  `CelestialSnapshot` dulu bisa menampilkan identitas saat engine ragu.
+  Maka bentuk + aturannya diletakkan di `PointingKit` (yang sudah punya
+  `PointingPresentationTests`), dipakai bersama oleh app dan complication.
+  - **`objectKindRaw`, bukan labelnya.** Label Bahasa Indonesia tiap jenis
+    benda (`"Objek langit dalam"`) adalah urusan app dan boleh berubah saat UX
+    berubah. Kalau label ikut di-*snapshot*, setiap perubahan label jadi **data
+    lama yang salah** sampai app menyimpan ulang. Menyimpan `ObjectKind`
+    (nilai engine yang stabil) membuat label selalu dihitung saat render.
+  - **`.uncertain` tetap menampilkan nama kandidat** (`headline`), persis
+    seperti layar utama — tapi `isConfirmed` hanya `true` saat `.lock`, lewat
+    `looksConfident` yang sudah ada. Empat tes baru menjaga ini, termasuk
+    `testDigestKeepsObjectNameButRefusesToClaimIdentity`.
+- **`Apps/Shared/Complication/ComplicationStore.swift`** — satu-satunya tempat
+  baca/tulis berkas. App Group `group.dev.celestial.pointandknow` (wajib untuk
+  berbagi antar-proses di watchOS) dengan **fallback ke caches** bila container
+  `nil` (CI tanpa tanda tangan / Simulator tanpa grup). Fallback itu sadar dan
+  terdokumentasi — bukan "kegagalan diam", sebab di perangkat nyata dengan grup
+  aktif, app & complication memakai URL yang sama.
 - **`Apps/PointAndKnowWatch/Complications/ComplicationWidget.swift`** — target
-  WidgetKit (`@main struct … Widget`, `StaticConfiguration`, `supportedFamilies`
-  `accessoryCircular`/`accessoryRectangular`/`accessoryInline`). Tidak butuh
-  `PointingKit`/`CelestialEngine` — cuma merender **string** dari snapshot
-  (nama objek + jenis), jadi ringan dan bebas dependensi engine.
-- **Throttle tulis di `PointingEngine.publish`** — `recordComplicationIfChanged()`
-  hanya menulis bila tanda tangan `state|objectID|confirmed` berubah. `publish`
-  dipanggil 20×/dtk; menulis berkas 20×/dtk cuma bakar baterai & picu reload
-  timeline percuma. Dengan throttle, tulis terjadi tepat saat transisi (kunci
-  baru / ganti objek / kembali "mencari").
-- **Dua `.entitlements`** (app jam + complication) berisi App Group, dan target
-  `PointAndKnow Watch Complication` (`type: app-extension`,
-  `com.apple.widgetkit-extension`) **terbenam** di app jam lewat `embed: true`.
-  `PointingState.symbolName`/`shortLabel` sudah di PointingKit, jadi widget
-  (yang depend `PointingKit`) kompilasi tanpa duplikasi nama.
+  WidgetKit (`@main`, `StaticConfiguration`, `supportedFamilies` circular/
+  rectangular/inline). Timeline `policy: .never` + satu entri: kita tidak tahu
+  kapan pengguna mengunci, jadi **app** yang memicu reload saat transisi.
+- **Throttle tulis di `PointingEngine.publish`** — hanya menulis bila tanda
+  tangan (keadaan, nama objek, konfirmasi) berubah. `publish` dipanggil
+  20×/dtk; menulis berkas 20×/dtk membakar baterai & memicu reload percuma.
+- **Target + entitlements** — `PointAndKnow Watch Complication`
+  (`type: app-extension`, `NSExtensionPointIdentifier: com.apple.widgetkit-extension`,
+  `entitlementsPath`) terbenam di app jam lewat `embed: true`.
+
+### Cacat yang ditemukan siklus ini: gerbang lokal terlalu lemah
+
+Tiga kegagalan berturut-turut, dan **dua di antaranya tidak terlihat lokal**:
+
+1. `entitlements:` vs `entitlementsPath:` — XcodeGen menolak spec-nya, jadi
+   baru ketahuan dari CI (parse gagal sebelum kompilasi dimulai).
+2. `replaceItem(at:withItemAt:)` — Linux **tipe-check**-nya tidak, jadi
+   argumen yang kurang (`backupItemName:`, `resultingItemURL:`) lolos `parse`
+   lalu meledak di macOS.
+3. `containerURL(forSecurityApplicationGroupIdentifier:)` — API Apple-only;
+   `parse` di Linux tidak pernah menyentuhnya.
+
+**Akar masalahnya sama**: `swiftc -parse` hanya memeriksa sintaks. Semua cacat
+tipe lolos lokal lalu menunggu CI macOS — satu siklus penuh per kesalahan.
+Maka **`swift-typecheck.sh`** dibuat: ia menjalankan `swiftc -typecheck` (bukan
+`parse`) untuk berkas yang hanya mengimpor Foundation/CelestialEngine/
+PointingKit, di dalam Docker yang sama. Batasnya ditulis jujur di kepala
+berkas: berkas SwiftUI (Canvas/WidgetKit/Combine) tetap hanya bisa di-parse di
+Linux. Yang bisa diperiksa lokal, diperiksa lokal.
 
 ### Risiko yang diketahui
 
-- Complication butuh App Group benar-benar **aktif di profil provisi** untuk
-  berbagi data lintas proses. Di CI (unsigned) ia tetap **kompilasi & lolos**,
-  tapi complication hanya membaca snapshot bila grup tersedia di perangkat.
-  Itu diperlukan oleh platform, bukan cacat — tidak ada cara berbagi tanpa grup.
-- `swift-test.sh` (Linux) tetap **165 + 252 hijau**; perubahan `PointingEngine`
-  tidak menyentuh logika teruji.
+- Complication butuh App Group **aktif di profil provisi** untuk berbagi data
+  lintas proses. Di CI (unsigned) ia tetap kompilasi & lolos, tapi di sana
+  complication hanya membaca bila grup tersedia. Ini kebutuhan platform, bukan
+  cacat — tidak ada cara berbagi tanpa grup.
+- `swift-test.sh`: **166 CelestialEngine + 256 PointingKit = 422 hijau** (4 tes
+  baru untuk `ComplicationDigest`).
 
 ### Premis siklus lalu: Fase C dimulai dari celah yang paling berdampak
 

@@ -116,6 +116,10 @@ targets:
       # Hanya berkas ini yang dibutuhkan complication — ia tidak perlu tahu
       # PointingKit/CelestialEngine sama sekali.
       - path: Apps/Shared/Complication
+      # Label jenis benda (`ObjectKind.displayName`) dipakai untuk baris kedua
+      # di complication rectangular. Label ini di app, jadi satu-satunya cara
+      # menjaga complication & panel detail menampilkan nama jenis yang sama.
+      - path: Apps/Shared/ObjectKindLabels.swift
     dependencies:
       - package: PointingKit
       - package: CelestialEngine

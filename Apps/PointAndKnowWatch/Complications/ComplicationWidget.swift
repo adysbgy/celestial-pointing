@@ -1,5 +1,7 @@
 import SwiftUI
 import WidgetKit
+import CelestialEngine
+import PointingKit
 
 /// Complication watchOS: tampilkan objek terkunci terakhir / keadaan engine
 /// tanpa membuka app.
@@ -37,26 +39,26 @@ struct PointAndKnowComplication: Widget {
     }
 }
 
-/// Entri timeline — cuma membungkus snapshot yang dibaca dari store.
+/// Entri timeline — cuma membungkus ringkasan yang dibaca dari store.
 struct ComplicationEntry: TimelineEntry {
     let date: Date
-    let snapshot: ComplicationSnapshot?
+    let digest: ComplicationDigest?
 }
 
-/// Penyedia timeline: baca snapshot terakhir dari store bersama.
+/// Penyedia timeline: baca ringkasan terakhir dari store bersama.
 struct ComplicationProvider: TimelineProvider {
 
     func placeholder(in context: Context) -> ComplicationEntry {
-        ComplicationEntry(date: Date(), snapshot: ComplicationStore.shared.read())
+        ComplicationEntry(date: Date(), digest: ComplicationStore.shared.read())
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-        completion(ComplicationEntry(date: Date(), snapshot: ComplicationStore.shared.read()))
+        completion(ComplicationEntry(date: Date(), digest: ComplicationStore.shared.read()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-        let entry = ComplicationEntry(date: Date(), snapshot: ComplicationStore.shared.read())
-        // Satu entrik yang berlaku terus sampai app meminta reload. Kita tidak
+        let entry = ComplicationEntry(date: Date(), digest: ComplicationStore.shared.read())
+        // Satu entri yang berlaku terus sampai app meminta reload. Kita tidak
         // bisa memprediksi kapan objek berikutnya terkunci, jadi tidak ada
         // entri masa depan — app yang memicu `reloadAllTimelines()`.
         completion(Timeline(entries: [entry], policy: .never))
@@ -67,13 +69,11 @@ struct ComplicationProvider: TimelineProvider {
 struct ComplicationView: View {
     let entry: ComplicationEntry
 
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
-        // `accessoryWidgetGroup` menangani mask keluarga; di dalamnya kita
-        // beralih berdasarkan keluarga yang aktif. Baik ada jawaban maupun
-        // tidak, kita pakai `content(for:)` yang membaca snapshot — bedanya
-        // hanya string yang diambil (`headline` vs nama objek).
-        if let snap = entry.snapshot {
-            content(for: snap)
+        if let digest = entry.digest {
+            content(for: digest)
         } else {
             fallback
         }
@@ -81,29 +81,30 @@ struct ComplicationView: View {
 
     /// Konten per keluarga. `widgetFamily` dari environment menentukan bentuk.
     @ViewBuilder
-    private func content(for snap: ComplicationSnapshot) -> some View {
+    private func content(for digest: ComplicationDigest) -> some View {
         switch family {
         case .accessoryInline:
             // Teks pendek di sebelah waktu.
-            Text(snap.headline)
+            Text(digest.headline)
         case .accessoryCircular:
             // Lingkaran: simbol keadaan + nama objek (jika ada).
             Gauge(value: 1) {
-                Image(systemName: symbol(for: snap))
+                Image(systemName: symbol(for: digest))
             } currentValueLabel: {
-                Text(snap.objectName ?? snap.shortLabelFallback)
+                Text(digest.headline)
                     .font(.system(size: 11, weight: .semibold))
+                    .minimumScaleFactor(0.6)
             }
             .gaugeStyle(.accessoryCircular)
         case .accessoryRectangular:
             // Persegi panjang: simbol + nama + jenis.
             HStack(spacing: 4) {
-                Image(systemName: symbol(for: snap))
+                Image(systemName: symbol(for: digest))
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(snap.objectName ?? snap.shortLabelFallback)
+                    Text(digest.headline)
                         .font(.headline)
-                    if let kind = snap.objectKindDisplay {
+                    if let kind = digest.objectKind?.displayName {
                         Text(kind)
                             .font(.caption2)
                     }
@@ -111,7 +112,7 @@ struct ComplicationView: View {
             }
             .widgetCurvesContent()
         @unknown default:
-            Text(snap.headline)
+            Text(digest.headline)
         }
     }
 
@@ -129,17 +130,8 @@ struct ComplicationView: View {
     }
 
     /// Simbol SF sesuai keadaan.
-    private func symbol(for snap: ComplicationSnapshot) -> String {
-        PointingState(rawValue: snap.stateRaw)?.symbolName ?? "scope"
-    }
-
-    @Environment(\.widgetFamily) private var family
-}
-
-private extension ComplicationSnapshot {
-    /// Label keadaan bila tidak ada objek (fallback nama).
-    var shortLabelFallback: String {
-        PointingState(rawValue: stateRaw)?.shortLabel ?? "Point & Know"
+    private func symbol(for digest: ComplicationDigest) -> String {
+        digest.state?.symbolName ?? "scope"
     }
 }
 
@@ -148,23 +140,23 @@ private extension ComplicationSnapshot {
 #Preview(as: .accessoryCircular) {
     PointAndKnowComplication()
 } timeline: {
-    ComplicationEntry(date: .now, snapshot: ComplicationSnapshot(
+    ComplicationEntry(date: .now, digest: ComplicationDigest(
         stateRaw: "lock", objectName: "Sirius",
-        objectKindDisplay: "Bintang", confirmed: true, updatedAt: .now))
+        objectKindRaw: "star", isConfirmed: true, updatedAt: .now))
 }
 
 #Preview(as: .accessoryRectangular) {
     PointAndKnowComplication()
 } timeline: {
-    ComplicationEntry(date: .now, snapshot: ComplicationSnapshot(
+    ComplicationEntry(date: .now, digest: ComplicationDigest(
         stateRaw: "lock", objectName: "Jupiter",
-        objectKindDisplay: "Planet", confirmed: true, updatedAt: .now))
+        objectKindRaw: "planet", isConfirmed: true, updatedAt: .now))
 }
 
 #Preview(as: .accessoryInline) {
     PointAndKnowComplication()
 } timeline: {
-    ComplicationEntry(date: .now, snapshot: ComplicationSnapshot(
+    ComplicationEntry(date: .now, digest: ComplicationDigest(
         stateRaw: "searching", objectName: nil,
-        objectKindDisplay: nil, confirmed: false, updatedAt: .now))
+        objectKindRaw: nil, isConfirmed: false, updatedAt: .now))
 }

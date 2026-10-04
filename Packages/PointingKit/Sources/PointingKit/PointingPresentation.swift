@@ -186,3 +186,95 @@ public extension PointingSnapshot {
     /// jalur tidak bisa lagi berbeda pendapat tentang kapan arah tunjuk berlaku.
     var reportedPointing: HorizontalCoord? { hasSensor ? calibratedPointing : nil }
 }
+
+/// Ringkasan sekali-pakai untuk **complication jam** (WidgetKit).
+///
+/// **Kenapa bentuk ini, bukan struct Codable milik app.** Complication berjalan
+/// di proses terpisah dan tidak boleh menarik `PointingKit`/`CelestialEngine`
+/// ke dalam target extension-nya. Yang perlu ia tahu hanyalah beberapa
+/// nilai sederhana — nama objek, keadaan — yang sudah dihitung di app. Tapi
+/// aturan merangkumnya ("jangan tampilkan nama sebagai jawaban kalau ragu")
+/// adalah **janji tampilan**, dan janji itu harus bisa diuji di Linux bareng
+/// `confirmsIdentity` yang lain. Maka bentuk ini:
+/// - `Codable` & `Sendable` supaya bisa disimpan/diteruskan lintas proses,
+/// - **tidak** menyimpan objek engine, jadi tidak ada cara satu nama ditulis
+///   dengan dua ejaan berbeda,
+/// - logika `headline`/`hasAnswer`/`isConfirmed` diuji di `PointingKitTests`.
+///
+/// **Kenapa menyimpan `ObjectKind`, bukan labelnya.** Label Bahasa Indonesia
+/// milik tiap jenis benda (`"Objek langit dalam"`, `"Bintang"`, …) adalah
+/// urusan **lapisan aplikasi** — ia tinggal di `Apps/Shared`, bukan di engine,
+/// dan boleh berubah sewaktu-waktu saat UX berubah. Kalau label ikut di-*snapshot*,
+/// maka setiap perubahan label jadi **data lama yang salah** di complication
+/// sampai app menyimpan ulang. Menyimpan `ObjectKind` (nilai engine yang stabil)
+/// membuat label selalu dihitung saat render — satu sumber label, selalu mutakhir.
+public struct ComplicationDigest: Codable, Sendable, Equatable {
+    /// Keadaan engine (`PointingState` rawValue — `String, Codable`).
+    public var stateRaw: String
+    /// Nama objek terkunci, bila ada.
+    public var objectName: String?
+    /// Jenis objek sebagai `ObjectKind` mentah (bukan label tampilan).
+    public var objectKindRaw: String?
+    /// Apakah identitas terkonfirmasi (`state.looksConfident`, hanya `.lock`).
+    public var isConfirmed: Bool
+    /// Kapan ringkasan ini ditulis.
+    public var updatedAt: Date
+
+    public init(stateRaw: String,
+                objectName: String?,
+                objectKindRaw: String?,
+                isConfirmed: Bool,
+                updatedAt: Date) {
+        self.stateRaw = stateRaw
+        self.objectName = objectName
+        self.objectKindRaw = objectKindRaw
+        self.isConfirmed = isConfirmed
+        self.updatedAt = updatedAt
+    }
+
+    /// Bangun digest dari cuplikan engine + objek terakhir yang terkunci.
+    ///
+    /// App tidak pernah menyusun string status sendiri — ia melepas keputusan
+    /// "tampil sebagai apa" ke sini, supaya complication, status card, dan
+    /// panel detail tidak punya tiga versi aturan yang berbeda.
+    public init(snapshot: PointingSnapshot, lastLocked: CelestialObject?) {
+        let object = snapshot.displayedObject(lastLocked: lastLocked)
+        self.init(stateRaw: snapshot.state.rawValue,
+                  objectName: object?.name,
+                  objectKindRaw: object?.kind.rawValue,
+                  isConfirmed: snapshot.confirmsIdentity(lastLocked: lastLocked),
+                  updatedAt: Date())
+    }
+
+    /// Keadaan sebagai enum, atau `nil` bila `stateRaw` tak dikenal.
+    public var state: PointingState? { PointingState(rawValue: stateRaw) }
+
+    /// Jenis objek sebagai enum, atau `nil` bila tidak ada / tak dikenal.
+    public var objectKind: ObjectKind? {
+        objectKindRaw.flatMap { ObjectKind(rawValue: $0) }
+    }
+
+    /// Apakah snapshot ini berisi hasil pengenalan yang layak dipajang.
+    ///
+    /// Sama persis dengan `PointingState.hasAnswer`: `.lock` **dan** `.uncertain`.
+    /// `.uncertain` tetap dihitung sebagai "ada jawaban" karena memang ada
+    /// kandidat — yang ditahan adalah klaim *pasti*-nya lewat `isConfirmed`,
+    /// bukan keberadaannya.
+    public var hasAnswer: Bool { state?.hasAnswer ?? false }
+
+    /// Baris utama complication: nama objek bila terkunci, atau label keadaan.
+    ///
+    /// **`uncertain` tetap menampilkan nama kandidat**, sama seperti layar
+    /// utama — menutupinya di sini akan membuat complication berbeda dari app
+    /// dan menyembunyikan informasi yang memang jujur ("ada kandidat, belum
+    /// pasti"). Yang dijaga `isConfirmed`: identitas tidak pernah diklaim pasti.
+    public var headline: String {
+        if let name = objectName, hasAnswer {
+            return name
+        }
+        return state?.shortLabel ?? "Point & Know"
+    }
+
+    /// Label keadaan untuk fallback (mis. saat nama kosong).
+    public var stateLabel: String { state?.shortLabel ?? "Point & Know" }
+}

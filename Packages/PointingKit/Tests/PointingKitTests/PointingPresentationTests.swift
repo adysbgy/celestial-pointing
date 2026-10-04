@@ -263,4 +263,75 @@ final class PointingPresentationTests: XCTestCase {
         XCTAssertTrue(separating.contains(.uncertain),
                       "`.uncertain` harus jadi keadaan yang membedakan keduanya")
     }
+
+    // MARK: - Ringkasan complication (janji lintas-proses)
+
+    /// Complication hidup di proses terpisah, jadi ia hanya menerima ringkasan
+    /// string. Yang paling berbahaya dari bentuk itu: penerima bisa saja
+    /// menampilkan nama objek sebagai **jawaban**, sementara di app nama itu
+    /// sudah ditandai ragu. Ringkasan harus menolak melakukan itu sendiri.
+    func testDigestKeepsObjectNameButRefusesToClaimIdentity() {
+        let snapshot = PointingSnapshot(
+            state: .uncertain,
+            intent: CelestialIntent(level: .medium, best: vega, candidates: []))
+        let digest = ComplicationDigest(snapshot: snapshot, lastLocked: nil)
+
+        XCTAssertEqual(digest.headline, "Vega",
+                       "kandidat yang jujur tetap tampil di complication")
+        XCTAssertFalse(digest.isConfirmed,
+                       "tapi identitasnya tidak boleh diklaim pasti")
+        XCTAssertTrue(digest.hasAnswer)
+    }
+
+    /// Saat terkunci, complication boleh menampilkan nama tanpa tanda ragu.
+    func testDigestConfirmsIdentityOnlyOnLock() {
+        let locked = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+            lastLocked: nil)
+        XCTAssertTrue(locked.isConfirmed)
+        XCTAssertEqual(locked.headline, "Vega")
+
+        // Tidak ada keadaan selain `.lock` boleh mengonfirmasi identitas.
+        for state in [PointingState.idle, .pointing, .searching, .uncertain, .unavailable] {
+            let digest = ComplicationDigest(
+                snapshot: PointingSnapshot(
+                    state: state,
+                    intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+                lastLocked: nil)
+            XCTAssertFalse(digest.isConfirmed,
+                           "\(state) tidak boleh mengirim identitas pasti ke complication")
+        }
+    }
+
+    /// Keadaan tanpa jawaban harus menampilkan **label keadaan**, bukan nama
+    /// objek sisa dari pandangan sebelumnya.
+    func testDigestShowsStateLabelWhenNoAnswer() {
+        for state in [PointingState.idle, .pointing, .searching, .unavailable] {
+            let digest = ComplicationDigest(
+                snapshot: PointingSnapshot(state: state),
+                lastLocked: vega)
+            XCTAssertEqual(digest.headline, state.shortLabel,
+                           "\(state) tidak punya jawaban — jangan tampilkan nama")
+            XCTAssertFalse(digest.hasAnswer)
+        }
+    }
+
+    /// Digest harus bisa melewati batas proses: encode → decode tidak boleh
+    /// mengubah apa yang dilihat pengguna.
+    func testDigestSurvivesCodableRoundTrip() {
+        let original = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+            lastLocked: nil)
+        let data = try? JSONEncoder().encode(original)
+        let decoded = data.flatMap { try? JSONDecoder().decode(ComplicationDigest.self, from: $0) }
+
+        XCTAssertEqual(decoded?.headline, original.headline)
+        XCTAssertEqual(decoded?.isConfirmed, original.isConfirmed)
+        XCTAssertEqual(decoded?.stateRaw, original.stateRaw)
+        XCTAssertEqual(decoded, original, "round trip harus sama persis")
+    }
 }
