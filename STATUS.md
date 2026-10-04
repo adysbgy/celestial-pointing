@@ -87,7 +87,18 @@ Dua uji baru:
   tidak, dengan pesan yang menyebut konsekuensinya (30 frame/detik).
 - `testPulseFollowsTheObjectKindForEveryCatalogueEntry` — **seluruh 25
   entri katalog**, bukan hanya enum tangan, supaya cabang baru yang lupa
-  ketahuan oleh data.
+  ketahuan oleh data — **ditambah** enam benda di luar katalog
+  (`jupiter`/`saturn`/`mars` sebagai `.planet`, `moon` sebagai `.moon`,
+  `sun` sebagai `.sun`, `m42` sebagai `.deepSky`).
+
+  Versi pertamanya memanggil `object(id: "moon", kind: .planet)` — salah
+  jenis, dan karena itu **lulus tanpa pernah menguji apa pun**: planet pun
+  memang tidak berdenyut, jadi apa pun yang diperiksa untuk `moon` akan hijau.
+  Uji yang terlihat benar dan tidak memeriksa apa pun lebih berbahaya
+  daripada tidak menulis ujinya, karena ia menutup celah yang sebenarnya
+  terbuka. Diperbaiki ke jenis yang sebenarnya; katalog `brightStars`
+  memang hanya berisi bintang (25 entri, dihitung), jadi tanpa loop luar
+  ini `planet`/`moon`/`sun`/`deepSky` **tidak akan pernah** ikut teruji.
 
 ### Yang benar-benar dijalankan
 
@@ -96,16 +107,17 @@ Dua uji baru:
 - `./swift-ui-lint.sh` → **7 aturan hijau**.
 - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan aksara non-Latin: **0**.
-- CI di `ad552d8`: `Apple Build` run `37209021353` → **2× `BUILD
+- CI di `8070012`: `Apple Build` run `37209410461` → **2× `BUILD
   SUCCEEDED`** + "Tidak ada peringatan compiler pada Apps/."; `Engine
   Tests (Linux)` → hijau.
 
 ### Catatan jujur soal proses
 
-Dua kali During penulisan berkasnya alat `write_file` menyisipkan karakter
-asing (`希望`, `RALAT`, `仓库`, kata Latin grotesk seperti `Swiftly`,
-`iList`, `hava`) ke dalam komentar — termasuk di dalam pesan commit. Semuanya
-disapu sebelum commit. Ini bukan novelty: kelas cacat yang sama sudah
+Selama siklus ini, alat `write_file` menyisipkan karakter asing ke dalam
+komentar **beberapa kali** — termasuk `希望`, `仓库` (aksara CJK), `RALAT`,
+serta potongan Latin yang tidak masuk akal seperti `Swiftly`/`iList`. Semuanya
+ketahuan karena ada penyapu, dan semuanya dibuang sebelum commit — satu
+potongan sempat bocor ke pesan commit pertama sebelum ikut dibersihkan. Ini bukan novelty: kelas cacat yang sama sudah
 menimpa repo ini berulang kali, dan sekarang ada aturan yang menangkapnya
 untuk kode aplikasi (aturan 3). Yang **belum** ada adalah penjaga yang
 sama untuk `*.sh` dan `STATUS.md` — dan itu tercatat di entri aturan 7
