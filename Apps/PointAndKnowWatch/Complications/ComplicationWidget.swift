@@ -22,10 +22,11 @@ struct PointAndKnowComplication: Widget {
     private let kind = "PointAndKnowComplication"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind) { entry in
+        // `StaticConfiguration` butuh label argumen `provider:` — closure
+        // timeline tanpa label dibaca sebagai trailing closure, yang tidak
+        // ada di initializer ini.
+        StaticConfiguration(kind: kind, provider: ComplicationProvider()) { entry in
             ComplicationView(entry: entry)
-        } timelineProvider: {
-            ComplicationProvider()
         }
         .configurationDisplayName("Point & Know")
         .description("Objek terakhir yang dikenali, tanpa membuka app.")
@@ -66,6 +67,13 @@ struct ComplicationProvider: TimelineProvider {
 }
 
 /// Tampilan complication, per keluarga.
+///
+/// **Kenapa `AnyView`.** `WidgetFamily` punya banyak kasus (termasuk yang akan
+/// datang), dan tiap kasus menghasilkan tipe `some View` berbeda —
+/// `Text` untuk inline, `Gauge` untuk circular, `HStack` untuk rectangular.
+/// Tanpa pembungkus tunggal, `switch` gagal dengan "branches have mismatching
+/// types". `AnyView` di sini mengubah pertanyaan tipe menjadi pertanyaan
+/// `@ViewBuilder` — dan biayanya sepele untuk tiga tampilan sekecil ini.
 struct ComplicationView: View {
     let entry: ComplicationEntry
 
@@ -80,25 +88,24 @@ struct ComplicationView: View {
     }
 
     /// Konten per keluarga. `widgetFamily` dari environment menentukan bentuk.
-    @ViewBuilder
-    private func content(for digest: ComplicationDigest) -> some View {
+    private func content(for digest: ComplicationDigest) -> AnyView {
         switch family {
         case .accessoryInline:
             // Teks pendek di sebelah waktu.
-            Text(digest.headline)
+            AnyView(Text(digest.headline))
         case .accessoryCircular:
             // Lingkaran: simbol keadaan + nama objek (jika ada).
-            Gauge(value: 1) {
+            AnyView(Gauge(value: 1) {
                 Image(systemName: symbol(for: digest))
             } currentValueLabel: {
                 Text(digest.headline)
                     .font(.system(size: 11, weight: .semibold))
                     .minimumScaleFactor(0.6)
             }
-            .gaugeStyle(.accessoryCircular)
+            .gaugeStyle(.accessoryCircular))
         case .accessoryRectangular:
             // Persegi panjang: simbol + nama + jenis.
-            HStack(spacing: 4) {
+            AnyView(HStack(spacing: 4) {
                 Image(systemName: symbol(for: digest))
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 0) {
@@ -110,22 +117,25 @@ struct ComplicationView: View {
                     }
                 }
             }
-            .widgetCurvesContent()
-        @unknown default:
-            Text(digest.headline)
+            .widgetCurvesContent())
+        default:
+            // Keluarga lain (corner, container, dll.) belum didesain; menampilkan
+            // baris utama apa adanya lebih baik daripada widget kosong.
+            AnyView(Text(digest.headline))
         }
     }
 
     /// Tampilan saat belum ada data sama sekali.
-    private var fallback: some View {
+    private var fallback: AnyView {
         switch family {
         case .accessoryInline:
-            Text("Point & Know")
+            AnyView(Text("Point & Know"))
         case .accessoryCircular:
-            Image(systemName: "scope")
-                .font(.headline)
+            AnyView(Image(systemName: "scope").font(.headline))
+        case .accessoryRectangular:
+            AnyView(Label("Point & Know", systemImage: "scope"))
         default:
-            Label("Point & Know", systemImage: "scope")
+            AnyView(Text("Point & Know"))
         }
     }
 

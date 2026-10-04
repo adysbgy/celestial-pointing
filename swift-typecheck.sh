@@ -9,10 +9,19 @@
 # `containerURL(forSecurityApplicationGroupIdentifier:)` yang hanya ada di
 # Apple platform.
 #
-# Batasnya jujur dan disengaja: yang bisa di-typecheck di Linux hanyalah berkas
-# yang hanya mengimpor Foundation/CelestialEngine/PointingKit. Berkas SwiftUI
-# (Canvas/WidgetKit/Combine) tetap hanya bisa di-parse di sini, dan diuji penuh
-# oleh CI macOS. Sesuatu yang bisa diperiksa lokal, diperiksa lokal.
+# Batasnya jujur dan disengaja, dan batasnya **tidak bisa dihapus** di Linux:
+#
+# 1. Hanya berkas yang mengimpor Foundation/CelestialEngine/PointingKit yang
+#    bisa di-typecheck di sini. Berkas SwiftUI (WidgetKit/Canvas/Combine) tidak
+#    bisa — SDK-nya tidak ada. Itu bukan kelalaian, itu batas platform.
+# 2. Akibatnya cacat tipe di berkas SwiftUI (mis. `switch` yang cabangnya
+#    bertipe beda, atau initializer WidgetKit yang salah) **tetap hanya ketahuan
+#    dari CI macOS**. Gate ini menutup jalur Foundation/store, bukan jalur UI.
+#    Batas kedua itu tidak akan pernah bisa ditutup di Linux.
+#
+# Jadi: jangan menganggap gate ini sebagai pengganti CI untuk berkas UI.
+# Yang bisa diperiksa lokal, diperiksa lokal; yang tidak bisa, jujur tetap
+# menunggu CI.
 #
 # Pakai: ./swift-typecheck.sh
 set -uo pipefail
