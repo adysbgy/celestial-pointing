@@ -1,5 +1,167 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — teks yang dihasilkan di PointingKit akhirnya bisa dijangkau katalog)
+
+### Premis siklus ini: celah yang STATUS lalu sebut "belum ditutup" memang nyata
+
+STATUS sebelumnya menutup bagian Fase C dengan satu kalimat: label yang
+**dihasilkan** di `PointingKit` (`shortLabel`, `guidance`, `displayName`)
+tidak pernah melewati `Text("literal")`, jadi katalog tidak bisa menjangkau
+mereka. Kalimat itu dibaca, bukan dipercaya — dan memang benar, dengan
+bukti: `"Terkunci"` **tidak ada** di `Localizable.xcstrings`, padahal itu
+teks yang paling sering dibaca sekilas di seluruh app.
+
+Yang membuatnya kelas yang layak dikejar: **gerbangnya hijau sepanjang
+itu**. Aturan 4 menyapu literal `Text("...")` di `Apps/`, dan laporan itu
+benar — tidak ada satu pun literal bermasalah. Yang tidak diukur adalah
+teks yang tidak pernah menjadi literal di sana.
+
+| Teks | 통과 aturan 4? | Punya padanan `en`? |
+|---|---|---|
+| "Terkunci", "Kurang yakin", "Sensor mati", "Siap", "Arahkan", "Mencari" | ya (tidak ada literal-nya) | **tidak** |
+| "Yakin" / "Ragu" / "Tidak tahu" | ya (tidak ada literal-nya) | **tidak** |
+| 6 kalimat panduan keadaan | ya (tidak ada literal-nya) | **tidak** |
+| 5 label jenis pesan jam<->iPhone | ya (tidak ada literal-nya) | **tidak** |
+
+20 kunci, nol di antaranya bisa dilihat oleh gerbang mana pun yang ada.
+
+### Yang diubah, dan kenapa begini
+
+- **`LocalizedText` (baru, `TextLocalization.swift`)** — menyimpan **kunci
+  yang stabil** + Bahasa Indonesia sebagai **nilai bawaan**. Perbedaannya
+  penting: kalau Bahasa Indonesia yang jadi identitas (yaitu kunci katalog
+  = teksnya), maka memperbaiki ejaan berarti mengganti kunci dan seluruh
+  terjemahan ikut hilang.
+  - **Nilai bawaan ada di dalam tipe, bukan hanya di katalog**, karena
+    paket ini **dipakai di Linux** tempat `Bundle.main` tidak punya
+    `.lproj` sama sekali (`localizations == []`) dan `String(localized:)`
+    **tidak ada** di Swift 6.0 Linux. Tanpa nilai bawaan, seluruh uji Linux
+    menguji string kosong.
+  - **Pencarian dipisah dari jenis teks.** `TextLocalization` tidak tahu
+    apa pun tentang `Bundle`; app yang memasangnya
+    (`LocalizationBridge`, satu fungsi). Jadi bagian yang bisa diuji di
+    Linux dan bagian yang tidak bisa dipisahkan secaraGcoding — bukan
+    dicampur dalam satu berkas yang tidak bisa diuji.
+- **Kunci ber-NAMESPACE, bukan teksnya sendiri.** Bukti konkretnya sudah
+  ada di repo: `"Kalibrasi"` di katalog berarti **judul layar kalibrasi**,
+  sementara `link.kind.calibrationReady` juga berbunyi "Kalibrasi" untuk
+  hal berbeda. Kalau teksnya jadi kunci, keduanya menyatu diam-diam —
+  mengubah satu ikut mengubah yang lain. Uji menjaga prefix namespace-nya.
+- **Aksesor lama tidak berubah bentuk**, hanya isinya:
+  `shortLabel`/`guidance`/`displayName` tetap `String`, dan
+  `stateLabelText`/`stateGuidanceText`/`displayText` ditambahkan sebagai
+ 829 sumber kunci. Tanpa bridge terpasang, hasilnya **identik dengan
+  sebelumnya** — itu yang diuji dengan literal, bukan dengan `.indonesian`
+  (kalau ujinya memakai `.indonesian` untuk kedua sisi, ia hanya
+  membuktikan kedua sisi bergerak bersama, dan typo pada nilainya lolos).
+
+### Cacat yang ditemukan: gerbang aturan 4 membaca komentar
+
+Aturan 4 menjadi merah setelah `LocalizationBridge` ditulis — menunjuk
+`Apps/Shared/LocalizationBridge.swift: Text: '...'`. Penyebabnya bukan
+kode: baris itu **dokumentasi** yang menjelaskan kenapa aturan 4 tidak
+bisa melihat teks di paket, dan ia memuat `Text("...")` sebagai contoh.
+
+Gerbang yang membaca komentarnya sendiri akan **selalu merah**, dan gerbang
+yang selalu merah akan dimatikan orang lain saat ia berbunyi. Aturan 1 dan
+3 di skrip yang sama sudah membuang komentar; aturan 4 tidak pernah diberi
+perlakuan itu karena ia belum pernah salah membaca komentar.
+
+Diperbaiki dengan membuang `//` **hanya bila berada di luar literal**
+(hitung status Escape) — karena `//` di dalam string (URL, regex, path)
+adalah kode. Dibuktikan dua arah di salinan sementara: yang menyuntik
+literal UI nyata **tetap merah**, dan yang bersih hijau.
+
+### Cacat kedua: uji menangkap typo saya sendiri
+
+`testDefaultTextIsExactlyTheIndonesianItShippedWith` gagal, dan pesan Xcode
+menampilkan kedua sisi **terbaca identik**: `"Ambah keyakinan"`.
+
+Yang sebenarnya berbeda satu byte: nilai bakunya di sumber tertulis
+`Ambah` (huruf ke-4 `h`), sedangkan yang ditulis di uji `Ambah`. Keduanya
+tampil sama di layar; hanya perbandingan byte yang membedakannya. Jadi dua
+string yang **tidak bisa dibedakan mata** menangkap cacat yang **tidak bisa
+dibaca dari teks**.
+
+Perhatikan arah perbaikannya. Hampir "`tidak bisa dibedakan mata`" membuat
+saya shy untuk memperbaiki ujinya, karena pesannya sendiri terlihat benar
+di kedua sisi. Yang benar adalah memperbaiki **sumbernya**: nilai bawaan di
+`TextLocalization.swift` yang salah eja, sementara ujinya sudah benar.
+Uji itu benar karena nilainya diketik dari katalog, bukan disalin dari
+sumber yang sama.
+
+Ini persis kelas yang sudah beberapa kali muncul di repo ini, dengan satu
+perbedaan penting: cacatnya ada di kode yang **baru ditulis pada siklus
+ini**, jadi uji menangkapnya **sebelum sempat keluar repo** — berbeda dari
+uji-uji sebelumnya yang menangkap cacat siklus-siklus lalu.
+
+### Aturan 6: paritas dua arah
+
+Menutup kelas yang sama, tapi **kebalikannya**: dari kunci katalog ke
+paket, supaya kunci tidak bisa "dibuang diam-diam" dari `allKeys` demi
+membuat pemeriksaan arah pertama terasa cukup.
+
+| Disuntik | Hasil |
+|---|---|
+| hapus `pointing.state.lock.label` dari katalog | **merah**, sebut kuncinya |
+| tambah `pointing.state.hantu.label` ke katalog | **merah**, sebut kuncinya |
+| tree bersih | hijau |
+
+Diverifikasi pada **salinan** (`/tmp/lintcheck`), bukan di repo.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` -> **166 CelestialEngine + 286 PointingKit, 0 gagal**
+  (naik dari 277; +9 uji). Engine tidak disentuh.
+- **Dua mutasi dibuktikan MERAH lebih dulu**: (a) `shortLabel` dialihkan ke
+  nilai bawaan langsung -> `testInstalledLookupWinsOverTheDefaultValue`
+  gagal ("Terkunci" != "Locked"); (b) terjemahan kosong dipercaya ->
+  `testEmptyTranslationFallsBackToIndonesian` gagal dengan pesan
+  `("") is not equal to ("Terkunci")` — persis kegagalan diam yang paling
+  berbahaya di UI.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS. `LocalizationBridge`
+  **ditambahkan** ke daftar typecheck: ia memanggil `PointingKit` lintas
+  modul, yang tidak bisa diselesaikan `-parse`. Batasnya sama seperti
+  berkas lain di daftar itu — Linux masih tidak punya SwiftUI.
+- `./swift-ui-lint.sh` -> 6 aturan hijau. Aturan 4 **tetap menangkap**
+  pelanggaran nyata setelah diperbaiki (dibuktikan di salinan).
+- Sapuan karakter non-Latin pada 10 berkas yang diubah: **0**. (Tiga selip
+  sempat masuk saat menulis — termasuk ke dalam **pesan commit yang sama**,
+  lalu ditulis ulang dengan `--amend` sebelum push. Aturan 3 menjaga kode,
+  tapi tidak menjaga pesan commit; ini bukti bahwarowing sapuan tempat
+  yang sama perlu mata juga.)
+- **CI hijau pada push pertama** (`550f475`):
+  - `Apple Build` run `37202871620` -> **2x `BUILD SUCCEEDED`**, gerbang
+    peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37202871610` -> hijau, dan **sembilan uji
+    baru terlihat lulus per nama di log CI** (bukan hanya di mesin ini).
+
+### Batas yang diketahui dan belum ditutup
+
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — sama seperti
+  catatan siklus sebelumnya, dan alasannya tidak berubah. Yang bisa
+  dibuktikan di sini: setiap kunci punya entri + padanan `en`, dan nilai
+  bakunya tampil benar. Yang **tidak** bisa: apakah `Bundle` benar-benar
+  membaca `.xcstrings` saat perangkat berjalan. Itu wilayah CI dan
+  perangkat, bukan Linux.
+- **20 kunci baru**, tapi teks yang dihasilkan di paket belum semuanya
+  terjangkau. Yang tersisa, dengan alasan masing-masing:
+  - `CalibrationSpeech` — **dilewati dengan sengaja**. Kalimat itu teks
+    **yang diucapkan**, jadi bentuknya harus bisa diuji di Linux, dan sudah
+    punya ujinya sendiri. Melocalisasi bentuknya berarti menambah lapisan
+    yang tidak bisa diuji di tempat yang sekarang bisa.
+  - label `CalibrationFlow` (`"Sebaran %.1f° masih terlalu lebar…"`) —
+    punya `formatSpecifier`, jadi katalog butuh kunci format
+    (`"Sebaran %1$@ masih terlalu lebar…"`), bukan teks yang sama.
+  - ringkasan `ExperimentHarness` — dirangkai dari beberapa bagian dengan
+   sisipan angka.
+  - label `ObjectKind` (`Apps/Shared/ObjectKindLabels.swift`) — satu berkas
+    di app, masuk aturan 4 seperti biasa.
+
+  Kandidat unit berikutnya bukan yang paling mudah, tapi yang bentuknya
+  paling berbeda satu per satu — supaya tiap bentuk punya aturan sendiri
+  yang bisa diuji.
+
 ## Progres terakhir (4 Okt 2026 — katalog string terpasang, dan dua "cacat" yang ternyata bukan cacat)
 
 ### Premis siklus ini: ada pekerjaan yang belum di-commit di meja
