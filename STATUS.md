@@ -1,5 +1,96 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — `RowSpeech` mengucapkan kalimat Indonesia tanpa satu pun kunci katalog)
+
+### Premis siklus ini: sapu berkas yang menghasilkan teks tapi tidak mendeklarasikan satu kunci pun
+
+Aturan 6 memeriksa paritas antara `LocalizedText.allKeys` dan katalog. Itu
+benar — tetapi ia hanya bisa memeriksa kunci yang **dideklarasikan**. Berkas
+yang mengembalikan frasa Bahasa Indonesia tanpa pernah melewati
+`LocalizedText` tidak punya kunci untuk diperiksa, dan Aturan 4 tidak menyapu
+`Packages/`. Jadi bentuk itu tidak terjangkau keduanya.
+
+Sapuan yang dipakai bukan membaca satu berkas, melainkan **mencari berkas yang
+memuat literal Indonesia tetapi tidak punya deklarasi `LocalizedText` sama
+sekali**. Hasilnya pendek, dan yang terbesar adalah `RowSpeech`:
+
+| Kalimat | Fungsi |
+|---|---|
+| `"%@ derajat"` / `"%@ derajat per detik"` | `spokenDegrees`/`spokenRate` |
+| `"galat %.1f derajat"` | `spokenError` |
+| `"\(title): \(value)"` | `label`/`spokenRow` |
+
+Ini bukan berkas pinggiran: `RowSpeech` dipakai **15 kali di seluruh `Apps/`**
+untuk setiap baris "judul … nilai" yang diucapkan. Pengguna Bahasa Inggris
+mendengar "5.0 derajat per detik" dan "galat 2.5 derajat" di tiga layar, dengan
+setiap gerbang hijau.
+
+### Kenapa bentuknya licin
+
+- **Bukan literal yang disapu.** Kalimatnya lahir di dalam paket, dan Aturan 4
+  hanya menyapu `Apps/`.
+- **Bukan kunci yang bisa diperiksa.** Tidak satu pun frasa melewati
+  `LocalizedText`, jadi `allKeys` tidak memuatnya dan Aturan 6 tidak punya
+  pasangan untuk dibandingkan.
+- **Tidak ada layar yang salah.** Yang salah hanya bahasa, dan hanya bagi
+  pengguna yang bukan penutur Bahasa Indonesia — tidak ada penanda di layar.
+
+Kelasnya sama persis dengan `SensorStatusText`, `CalibrationText`,
+`ObjectSpeech`, dan `ExperimentText` — tetapi keempatnya sudah ditutup, dan
+berkas ini tertinggal di belakang.
+
+### Yang diubah, dan kenapa bentuknya begini
+
+- **Lima kunci `row.speech.*`**: template penggabungan baris, dua satuan dalam
+  bentuk kata, kata yang menyebut apa yang diukur galat, dan kalimat galatnya.
+- **Presisi tetap angka, bukan template.** `spokenRate(_:precision:)` dan
+  `spokenDegrees(_:precision:)` menyisipkan presisi ke dalam specifier
+  (`"%.\(precision)f"`), bukan mengambil template dari katalog. `String(format:)`
+  tidak bisa memakai specifier yang datang dari nilai runtime, jadi bentuk
+  yang benar adalah menyusun specifier-nya di kode dan mengambil **satuannya**
+  dari katalog. Yang dikatalogkan adalah kata; yang dihitung adalah angka.
+- **Kata "galat" dan satuan "derajat" adalah dua kunci terpisah.** `%1$@` tidak
+  dipakai karena ia bekerja berbeda di CoreFoundation vs Swift Foundation —
+  jebakan yang tidak bisa dibuktikan di Linux. Dua `%@` biasa bekerja sama di
+  keduanya.
+- **Judul kosong melewati format sama sekali** (`guard !title.isEmpty`), supaya
+  baris tanpa judul tidak pernah menghasilkan pemisah yang menggantung.
+
+### Bukti merah
+
+| Mutasi | Gerbang yang menangkap | Hasil |
+|---|---|---|
+| lima kunci `row.speech.*` dihapus dari katalog | Aturan 6 | **MERAH**: menunjuk kelima kunci |
+
+Tiga uji baru (`RowSpeechTests`): terjemahan Inggris memasang kata yang
+menggantikan bawaan untuk **setiap** aksesor, urutan template kalimat galat
+benar-benar dipakai (bukan hanya kata-katanya yang ditukar), dan judul kosong
+tidak memanggil format.
+
+### Batas yang jujur
+
+- **Terjemahan `en` tidak bisa diverifikasi di Linux** — sama seperti siklus
+  sebelumnya. Yang terbukti: setiap kunci punya entri + padanan `en`.
+- **`row.speech.label` adalah `"%@: %@"`** — pemisahnya milik katalog, tetapi
+  bahasa yang butuh pemisah berbeda (mis. tanpa titik dua) belum diuji dengan
+  penutur asli.
+- **Berkas lain dengan bentuk yang sama belum semuanya ditutup.** Sapuan yang
+  sama menemukan `Targets.kindLabel` (label jenis yang menduplikasi
+  `ObjectKind.displayName`), `LinkMessage` (catatan kalibrasi yang melintas
+  Watch↔iPhone), `ArchiveCoding` (teks galat decoder — bukan teks tampilan),
+  dan `PhoneLinkService`/`WatchLinkService` (selusin catatan status tautan
+  yang tampil di `LinkView`). Masing-masing adalah unit berikutnya; yang
+  terbesar dan paling sering dibaca dikerjakan lebih dulu.
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 450 PointingKit**, 0 gagal.
+  Engine tidak disentuh.
+- `swift-ui-lint.sh` → **10 aturan hijau**; Aturan 6 dibuktikan bisa MERAH
+  lewat mutasi di atas.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan aksara non-Latin: 0.
+
 ## Progres terakhir (4 Okt 2026 — laporan alat ukur lahir di dalam paket, tak terjangkau dua gerbang sekaligus)
 
 ### Premis siklus ini: cari teks yang lahir di luar jangkauan kedua gerbang, bukan yang salah bentuk

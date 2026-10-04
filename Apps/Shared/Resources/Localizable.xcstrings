@@ -420,6 +420,61 @@
         }
       }
     },
+    "row.speech.label": {
+      "comment": "Penggabungan satu baris judul:nilai untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: %@"
+          }
+        }
+      }
+    },
+    "row.speech.degrees": {
+      "comment": "Satuan sudut dalam bentuk kata (diucapkan).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "degrees"
+          }
+        }
+      }
+    },
+    "row.speech.degreesPerSecond": {
+      "comment": "Satuan laju sudut dalam bentuk kata (diucapkan).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "degrees per second"
+          }
+        }
+      }
+    },
+    "row.speech.errorWord": {
+      "comment": "Kata yang menyebut apa yang diukur galat pointing.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "error"
+          }
+        }
+      }
+    },
+    "row.speech.error": {
+      "comment": "Kalimat galat pointing: kata, angka, satuan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %.1f %@"
+          }
+        }
+      }
+    },
     "calibration.message.idle": {
       "comment": "Panduan awal alur kalibrasi.",
       "localizations": {

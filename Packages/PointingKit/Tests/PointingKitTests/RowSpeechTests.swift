@@ -131,4 +131,61 @@ final class RowSpeechTests: XCTestCase {
             XCTAssertTrue(spoken.contains("derajat"), spoken)
         }
     }
+
+    // MARK: - Kata-katanya milik katalog, bukan literal di dalam paket
+
+    /// Terjemahan memasang kata yang menggantikan bawaan.
+    ///
+    /// Seluruh `RowSpeech` mengembalikan frasa Bahasa Indonesia tanpa melewati
+    /// `LocalizedText` sampai unit ini: Aturan 6 memeriksa kunci yang
+    /// **dideklarasikan**, dan frasa ini tidak punya kunci sama sekali.
+    /// Akibatnya pengguna Bahasa Inggris mendengar "5.0 derajat per detik" dan
+    /// "galat 2.5 derajat" tanpa satu pun gerbang merah. Uji ini memasang
+    /// terjemahan Inggris untuk seluruh kunci `row.speech.*` dan memastikan
+    /// setiap aksesornya membacanya.
+    func testEnglishTranslationControlsTheWords() {
+        let english: [String: String] = [
+            "row.speech.label": "%@: %@",
+            "row.speech.degrees": "degrees",
+            "row.speech.degreesPerSecond": "degrees per second",
+            "row.speech.errorWord": "error",
+            "row.speech.error": "%@ %.1f %@",
+        ]
+        TextLocalization.install { english[$0] }
+        defer { TextLocalization.reset() }
+
+        XCTAssertEqual(RowSpeech.label(title: "State", value: "Locked"),
+                       "State: Locked")
+        XCTAssertEqual(RowSpeech.spokenRate(5), "5.0 degrees per second")
+        XCTAssertEqual(RowSpeech.spokenDegrees(41.2), "41.2 degrees")
+        XCTAssertEqual(RowSpeech.spokenDegrees(101.2871, precision: 4),
+                       "101.2871 degrees")
+        XCTAssertEqual(RowSpeech.spokenError(2.5), "error 2.5 degrees")
+    }
+
+    /// Urutan kata di kalimat galat dikendalikan katalog.
+    ///
+    /// Bahasa Indonesia menaruh angkanya di akhir. Bahasa lain bisa
+    /// menaruhnya di awal; uji ini membuktikan template-nya benar-benar
+    /// dipakai, bukan hanya kata-katanya yang ditukar.
+    func testErrorSentenceOrderComesFromTheCatalog() {
+        TextLocalization.install { key in
+            key == "row.speech.error" ? "%.1f %@ %@" : nil
+        }
+        defer { TextLocalization.reset() }
+
+        XCTAssertEqual(RowSpeech.spokenError(2.5), "2.5 galat derajat",
+                       "urutan template katalog harus dipakai apa adanya")
+    }
+
+    /// Judul kosong tidak memanggil format sama sekali.
+    ///
+    /// Kalau ia melewati format, hasilnya `": Terkunci"` — pemisah yang
+    /// menggantung tanpa judul di depannya.
+    func testEmptyTitleBypassesTheFormat() {
+        TextLocalization.install { _ in "%@" }
+        defer { TextLocalization.reset() }
+
+        XCTAssertEqual(RowSpeech.label(title: "", value: "Terkunci"), "Terkunci")
+    }
 }

@@ -336,5 +336,12 @@ public extension LocalizedText {
         .experimentDiagnosisNoMeasurableCause, .experimentDiagnosisRatio,
         .experimentSuggestedThreshold,
         .experimentLocationFallback, .experimentLocationComputed,
+        // Frasa yang diucapkan untuk baris "judul … nilai" dan nilai bertanda
+        // satuan. Masuk daftar karena seluruh `RowSpeech` mengembalikan frasa
+        // Bahasa Indonesia tanpa melewati `LocalizedText` — Aturan 6 tidak
+        // melihatnya dan Aturan 4 tidak menyapu `Packages/`. Lihat
+        // `RowSpeech.swift`.
+        .rowSpeechLabel, .rowSpeechDegrees, .rowSpeechDegreesPerSecond,
+        .rowSpeechErrorWord, .rowSpeechError,
     ]
 }

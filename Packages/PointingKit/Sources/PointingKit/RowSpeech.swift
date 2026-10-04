@@ -20,6 +20,16 @@ import Foundation
 /// **janji produk**. "0.5°/dtk" yang terbaca apa adanya tidak terlihat salah
 /// di layar mana pun, dan tidak ada uji di `Apps/` yang bisa menangkapnya —
 /// berkas SwiftUI tidak ikut terbangun di Linux. Di sini ia bisa diuji.
+///
+/// **Batas yang dulu terbuka, dan sekarang ditutup.** Seluruh berkas ini
+/// mengembalikan frasa **Bahasa Indonesia** yang tidak melewati
+/// `TextLocalization`, jadi tidak satu pun punya kunci katalog: Aturan 6
+/// (paritas `LocalizedText.allKeys`) tidak melihatnya, dan Aturan 4 tidak
+/// menyapu `Packages/`. Akibatnya pengguna Bahasa Inggris mendengar
+/// "5.0 derajat per detik" dan "galat 2.5 derajat" tanpa satu pun gerbang
+/// merah — kelas yang sama dengan `SensorStatusText`, `CalibrationText`,
+/// `ObjectSpeech`, dan `ExperimentText`. Sekarang setiap frasa punya kunci
+/// (`row.speech.*`), jadi menghapusnya dari katalog menjadi MERAH.
 public enum RowSpeech {
 
     /// Satu pengumuman untuk baris "judul … nilai".
@@ -34,7 +44,7 @@ public enum RowSpeech {
     ///   `spokenRow` bila nilainya bertanda.
     public static func label(title: String, value: String) -> String {
         guard !title.isEmpty else { return value }
-        return "\(title): \(value)"
+        return String(format: TextLocalization.text(.rowSpeechLabel), title, value)
     }
 
     /// Baris yang nilainya **sudah dalam bentuk yang bisa diucapkan**.
@@ -67,13 +77,19 @@ public enum RowSpeech {
     /// tertulis "0.4°/dtk" — **suara dan layar menyebut dua angka berbeda
     /// untuk nilai yang sama**. Cacat ini persis sekelas dengan RA/Dec di
     /// `spokenDegrees`, jadi penanganannya dibuat sama.
+    ///
+    /// Presisi masuk sebagai **angka**, bukan sebagai `%@` yang sudah jadi
+    /// `"%.1f"`: `String(format:)` tidak bisa memakai specifier yang datang
+    /// dari nilai runtime, dan menyerahkan penyusunannya ke pemanggil berarti
+    /// setiap pemanggil harus tahu bentuk format yang benar.
     public static func spokenRate(_ degPerSec: Double, precision: Int) -> String {
-        String(format: "%.\(precision)f derajat per detik", degPerSec)
+        let unit = TextLocalization.text(.rowSpeechDegreesPerSecond)
+        return String(format: "%.\(precision)f \(unit)", degPerSec)
     }
 
     /// Sudut dalam bentuk **kata**.
     public static func spokenDegrees(_ deg: Double) -> String {
-        String(format: "%.1f derajat", deg)
+        spokenDegrees(deg, precision: 1)
     }
 
     /// Sudut dengan jumlah desimal yang mengikuti **tampilannya**.
@@ -83,11 +99,59 @@ public enum RowSpeech {
     /// dan layar menyebut angka yang berbeda untuk nilai yang sama — dan
     /// baris ini justru dipakai untuk **membandingkan** dua kolom angka.
     public static func spokenDegrees(_ deg: Double, precision: Int) -> String {
-        String(format: "%.\(precision)f derajat", deg)
+        let unit = TextLocalization.text(.rowSpeechDegrees)
+        return String(format: "%.\(precision)f \(unit)", deg)
     }
 
     /// Galat pointing dalam bentuk **kata**.
+    ///
+    /// Bentuknya `"%@ %@ <angka>"` dengan **dua** sisipan: kata "galat" dan
+    /// kata "derajat" datang dari katalog, sehingga bahasa lain bisa
+    /// menempatkannya di urutan yang berbeda (mis. "error 2.5 degrees").
+    /// Menyisipkan angkanya lebih dulu lalu menerjemahkan hasilnya tidak
+    /// mungkin — katalog bekerja pada template, bukan pada hasil akhir.
     public static func spokenError(_ deg: Double) -> String {
-        String(format: "galat %.1f derajat", deg)
+        String(format: TextLocalization.text(.rowSpeechError),
+               TextLocalization.text(.rowSpeechErrorWord),
+               deg,
+               TextLocalization.text(.rowSpeechDegrees))
     }
+}
+
+// MARK: - Katalog kunci
+
+public extension LocalizedText {
+
+    /// Penggabungan satu baris "judul: nilai" untuk VoiceOver.
+    ///
+    /// Dua sisipan, dan pemisahnya (`": "`) milik katalog: sebagian bahasa
+    /// memakai titik dua yang berbeda atau tidak memakainya sama sekali.
+    static let rowSpeechLabel = LocalizedText(
+        key: "row.speech.label",
+        id: "%@: %@")
+
+    /// Satuan sudut dalam bentuk kata.
+    static let rowSpeechDegrees = LocalizedText(
+        key: "row.speech.degrees",
+        id: "derajat")
+
+    /// Satuan laju sudut dalam bentuk kata.
+    static let rowSpeechDegreesPerSecond = LocalizedText(
+        key: "row.speech.degreesPerSecond",
+        id: "derajat per detik")
+
+    /// Kata yang menyebut **apa yang diukur** oleh galat pointing.
+    ///
+    /// Tanpa kata ini, "2.5 derajat" terdengar seperti nilai apa saja.
+    static let rowSpeechErrorWord = LocalizedText(
+        key: "row.speech.errorWord",
+        id: "galat")
+
+    /// Kalimat galat lengkap: kata, satuan, lalu angkanya.
+    ///
+    /// Urutannya milik katalog supaya bahasa lain bisa menaruh angkanya di
+    /// tempat yang benar — urutan Indonesia menaruh angka di akhir.
+    static let rowSpeechError = LocalizedText(
+        key: "row.speech.error",
+        id: "%@ %.1f %@")
 }
