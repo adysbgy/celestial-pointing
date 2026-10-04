@@ -124,6 +124,27 @@ final class DeepSkyCatalogueTests: XCTestCase {
         }
     }
 
+    /// Setiap morfologi punya **lebih dari satu** wakil di katalog.
+    ///
+    /// **Kenapa satu wakil tidak cukup.** Uji di atas bisa hijau dengan satu
+    /// objek per bentuk, dan itu memang keadaan katalog sebelumnya — tapi
+    /// pengguna yang hanya pernah melihat satu galaksi tidak punya cara tahu
+    /// mana ciri galaksi dan mana kebetulan objek itu. Dengan dua wakil,
+    /// bentuk yang berulang di dua objek berbeda menjadi **pola**, bukan
+    /// anekdot, dan itulah yang membuat visual bisa mengajari. Uji ini yang
+    /// mengunci niat itu, supaya katalog tidak bisa menyusut kembali ke satu
+    /// contoh per bentuk tanpa ada yang menyadarinya.
+    func testEveryMorphologyHasMoreThanOneRepresentative() {
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            let representatives = DeepSkyCatalogue.objects.filter {
+                DeepSkyCatalogue.morphology(forObjectID: $0.id) == morphology
+            }
+            XCTAssertGreaterThanOrEqual(
+                representatives.count, 2,
+                "morfologi \(morphology) hanya punya \(representatives.count) wakil — pengguna tidak punya pembanding untuk tahu mana yang khas")
+        }
+    }
+
     /// Id harus unik: dua objek ber-id sama membuat yang satu menutupi yang
     /// lain di `Dictionary`/`first(where:)`, dan arah yang dilaporkan bisa
     /// milik objek yang salah.
@@ -323,5 +344,64 @@ final class DeepSkyCatalogueTests: XCTestCase {
 
         XCTAssertFalse(session.referenceTargets.contains { $0.kind == .deepSky },
                        "objek langit dalam ditawarkan sebagai acuan kalibrasi")
+    }
+
+    // MARK: - Jangkauan langit: setiap objek harus bisa benar-benar terlihat
+
+    /// Setiap koordinat katalog harus sah.
+    ///
+    /// `raDeg` di luar `0..<360` tidak membungkus di semua jalur perhitungan
+    /// horizontal, dan `decDeg` di luar `-90…90` bukan koordinat langit sama
+    /// sekali. Objek dengan koordinat salah tetap **terlihat** benar di
+    /// layar — ia hanya muncul di tempat yang salah — jadi tidak ada yang
+    /// bisa melihat cacatnya tanpa uji ini.
+    func testEveryCatalogueCoordinateIsInRange() {
+        for object in DeepSkyCatalogue.objects {
+            XCTAssertGreaterThanOrEqual(object.raDeg, 0, "\(object.id) RA < 0")
+            XCTAssertLessThan(object.raDeg, 360, "\(object.id) RA >= 360")
+            XCTAssertGreaterThanOrEqual(object.decDeg, -90, "\(object.id) deklinasi < -90")
+            XCTAssertLessThanOrEqual(object.decDeg, 90, "\(object.id) deklinasi > 90")
+        }
+    }
+
+    /// Setiap objek harus benar-benar **naik di atas horizon** di lokasi
+    /// aplikasi ini dipakai, setidaknya pada suatu malam dalam setahun.
+    ///
+    /// **Kenapa ini bukan formalitas.** Katalog yang menawarkan objek yang
+    /// tidak pernah terbit di lintang pengguna adalah janji yang tidak bisa
+    /// ditepati: pengguna mengarahkan jam ke langit malam-malam dan tidak
+    /// pernah menemukannya, tanpa satu pun pesan yang menjelaskan mengapa.
+    /// Untuk lintang 6.2°S, objek dengan deklinasi di bawah sekitar −84°
+    /// **tidak pernah terbit** (batasnya `dec = −(90 − |lat|)`).
+    ///
+    /// Ujinya mencari bukti, bukan berasumsi: ia menyapu satu tahun jam
+    /// demi jam dan menuntut setidaknya satu waktu dengan altitude > 10°.
+    /// Ambang 10° (bukan 0°) karena benda yang hanya menyentuh horizon
+    /// selama beberapa menit tidak berguna untuk penunjukan — dan itu
+    /// membuat uji ini menangkap objek yang "secara teknis terbit" tapi
+    /// praktis tak terlihat.
+    func testEveryObjectRisesAboveTheHorizonForTheTargetLatitude() {
+        // Lintang Jakarta — lokasi darurat yang dipakai engine saat izin
+        // lokasi ditolak, jadi ini lintang yang **pasti** dialami sebagian
+        // pengguna, bukan asumsi tentang tempat mereka.
+        let observer = Observer(latitudeDeg: -6.2, longitudeDeg: 106.8)
+        let resolver = EngineFactory.makeResolver(includeSolarSystem: false)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+
+        for object in DeepSkyCatalogue.objects {
+            var bestAltitude = -90.0
+            // Satu tahun, dua jam sekali: cukup rapat untuk tidak melewatkan
+            // kulminasi benda mana pun di katalog ini.
+            for step in 0..<(365 * 12) {
+                let date = base.addingTimeInterval(Double(step) * 7200)
+                if let horizontal = resolver.horizontal(ofObjectID: object.id,
+                                                        observer: observer,
+                                                        date: date) {
+                    bestAltitude = max(bestAltitude, horizontal.altitudeDeg)
+                }
+            }
+            XCTAssertGreaterThan(bestAltitude, 10,
+                                 "\(object.name) (\(object.id)) tidak pernah naik di atas 10° di lintang \(observer.latitudeDeg): target yang tidak bisa ditemukan")
+        }
     }
 }

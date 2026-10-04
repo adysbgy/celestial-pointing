@@ -37,6 +37,22 @@ public enum DeepSkyCatalogue {
     /// pengguna mata telanjang atau binokuler benar-benar bisa menemukannya —
     /// menawarkan target yang tidak terlihat hanya menghasilkan penunjukan
     /// yang menyesatkan.
+    ///
+    /// **Kenapa kemudian ditambah menjadi sebelas.** Enam objek pertama
+    /// memberi **satu** galaksi dan **satu** gugus bola; dengan begitu dua
+    /// bentuk di katalog hanya terlihat sekali, dan pengguna tidak punya
+    /// pembanding untuk tahu mana yang khas dan mana yang kebetulan. Lima
+    /// objek berikutnya menambah satu galaksi lagi (M33), satu gugus bola
+    /// lagi (M22), dan dua gugus terbuka (M44, M6) — sehingga tiap bentuk
+    /// punya setidaknya dua wakil, dan perbedaan antar-bentuk bisa dibaca
+    /// dari layar, bukan hanya dari label. Semuanya masih objek terang
+    /// (mag ≤ 6) yang terlihat dengan mata telanjang atau binokuler.
+    ///
+    /// Koordinatnya J2000 dari data publik (epoch 2000.0), bukan karangan:
+    /// objek langit dalam tidak punya satu titik terang untuk dikoreksi,
+    /// jadi posisi yang salah tetap tampak benar di layar dan hanya muncul
+    /// di tempat yang keliru — `testEveryObjectRisesAboveTheHorizonForTheTargetLatitude`
+    /// yang menutupnya, bukan mata.
     public static let objects: [CelestialObject] = [
         CelestialObject(id: "m45", name: "Pleiades",       kind: .deepSky,
                         raDeg:  56.75000000, decDeg:  24.11670000, magnitude: 1.60),
@@ -49,7 +65,18 @@ public enum DeepSkyCatalogue {
         CelestialObject(id: "m13", name: "Gugus Hercules", kind: .deepSky,
                         raDeg: 250.42329167, decDeg:  36.46130556, magnitude: 5.80),
         CelestialObject(id: "m8",  name: "Nebula Laguna",  kind: .deepSky,
-                        raDeg: 270.90000000, decDeg: -24.38330000, magnitude: 6.00)
+                        raDeg: 270.90000000, decDeg: -24.38330000, magnitude: 6.00),
+        // Kelompok kedua: satu wakil lagi untuk tiap bentuk.
+        CelestialObject(id: "m44", name: "Gugus Sarang Lebah", kind: .deepSky,
+                        raDeg: 130.10000000, decDeg:  19.98333333, magnitude: 3.70),
+        CelestialObject(id: "m33", name: "Galaksi Triangulum", kind: .deepSky,
+                        raDeg:  23.45841667, decDeg:  30.66019444, magnitude: 5.72),
+        CelestialObject(id: "m22", name: "Gugus Sagitarius", kind: .deepSky,
+                        raDeg: 279.09975000, decDeg: -23.90475000, magnitude: 5.10),
+        CelestialObject(id: "m6",  name: "Gugus Kupu-kupu", kind: .deepSky,
+                        raDeg: 265.02500000, decDeg: -32.21666667, magnitude: 4.20),
+        CelestialObject(id: "m17", name: "Nebula Omega",   kind: .deepSky,
+                        raDeg: 275.10833333, decDeg: -16.17666667, magnitude: 6.00)
     ]
 
     /// Seberapa "menyebar" tiap objek (0 = titik, 1 = kabut paling lebar).
@@ -73,7 +100,12 @@ public enum DeepSkyCatalogue {
         "m7":  0.50,   // Ptolemy — gugus terbuka, longgar
         "m42": 0.90,   // Orion — nebula emisi, besar
         "m13": 0.35,   // Hercules — gugus bola, padat
-        "m8":  0.80    // Laguna — nebula emisi
+        "m8":  0.80,   // Laguna — nebula emisi
+        "m44": 0.45,   // Sarang Lebah — gugus terbuka paling lebar (95′)
+        "m33": 0.95,   // Triangulum — galaksi, lebih lebar dari Andromeda
+        "m22": 0.30,   // Sagitarius — gugus bola, lebih longgar dari Hercules
+        "m6":  0.48,   // Kupu-kupu — gugus terbuka, lebih kecil dari Ptolemy
+        "m17": 0.72    // Omega — nebula emisi, lebih sempit dari Orion
     ]
 
     /// Seberapa menyebar sebuah objek langit dalam, dari id-nya.
@@ -129,7 +161,12 @@ public enum DeepSkyCatalogue {
         "m7":  .openCluster,      // Ptolemy — gugus terbuka
         "m42": .nebula,           // Orion — nebula emisi
         "m13": .globularCluster,  // Hercules — gugus bola
-        "m8":  .nebula            // Laguna — nebula emisi
+        "m8":  .nebula,           // Laguna — nebula emisi
+        "m44": .openCluster,      // Sarang Lebah — gugus terbuka
+        "m33": .galaxy,           // Triangulum — galaksi
+        "m22": .globularCluster,  // Sagitarius — gugus bola
+        "m6":  .openCluster,      // Kupu-kupu — gugus terbuka
+        "m17": .nebula            // Omega — nebula emisi
     ]
 
     /// Bentuk sebuah objek langit dalam, dari id-nya.
