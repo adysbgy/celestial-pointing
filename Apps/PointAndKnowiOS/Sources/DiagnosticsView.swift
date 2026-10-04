@@ -358,6 +358,15 @@ struct DiagnosticsView: View {
                                              // pengenal tepat saat badge
                                              // bertuliskan "Ragu".
                                              isConfirmed: engine.confirmsDisplayedIdentity,
+                                             // Tingkat keyakinan yang berlaku
+                                             // untuk arah tunjuk sekarang.
+                                             // `answeredLevel` — bukan
+                                             // `intent?.level` — karena
+                                             // keyakinan yang menempel pada
+                                             // keadaan tanpa jawaban adalah
+                                             // klaim yang tidak berlaku (lihat
+                                             // `PointingPresentation`).
+                                             level: engine.snapshot.answeredLevel,
                                              lockArrivalToken: engine.lockArrival?.token,
                                              pulse: pulsePhase)
                         }
@@ -584,6 +593,18 @@ struct DiagnosticsView: View {
         /// Apakah gambar boleh mengklaim identitas — ambang **lebih ketat**
         /// daripada `!isStale` (lihat `PointingSnapshot.confirmsIdentity`).
         let isConfirmed: Bool
+        /// Tingkat keyakinan yang berlaku untuk arah tunjuk sekarang.
+        ///
+        /// `nil` saat keadaan tidak punya jawaban, **atau** saat objek ini
+        /// sisa — dua keadaan yang berbeda, dan keduanya berarti "jangan
+        /// tampilkan badge". Tanpa `level` di sini, badge itu tidak ada, dan
+        /// komentar di `DiagnosticsView` yang berkata "gambar tidak pernah
+        /// lebih yakin daripada badge di sebelahnya" menunjuk benda yang tidak
+        /// digambar — pengguna yang melihat cincin Saturnus tidak punya cara
+        /// tahu engine sedang ragu, karena satu-satunya penanda yang tersisa
+        /// (`.uncertain` → gambar disamar) bekerja lewat absen, bukan lewat
+        /// pernyataan.
+        let level: ConfidenceLevel?
         let lockArrivalToken: Int?
         let pulse: Double
 
@@ -682,9 +703,25 @@ struct DiagnosticsView: View {
                 // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
                 // basi terdengar persis seperti hasil pengukuran sekarang.
                 VStack(alignment: .leading, spacing: 4) {
-                    // Nama = informasi utama: paling besar.
-                    Text(object.name)
-                        .font(.title2.bold())
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        // Nama = informasi utama: paling besar.
+                        Text(object.name)
+                            .font(.title2.bold())
+                        // Badge keyakinan — permukaan yang **sama** dengan app
+                        // jam, memakai `level.tone` yang sama. Ia hanya muncul
+                        // untuk jawaban yang berlaku sekarang: pada objek sisa,
+                        // "Yakin" di sebelahnya terbaca sebagai klaim keyakinan
+                        // atas pengukuran sekarang — persis false confidence
+                        // yang dilarang PRD.
+                        if let level, !isStale {
+                            Text(level.displayName)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(level.tone.badgeFillColor, in: .capsule)
+                                .foregroundStyle(level.tone.color)
+                        }
+                    }
                     Text(object.kind.displayName)
                         .font(.subheadline)
                         .foregroundStyle(SurfacePalette.active.textSecondaryColor)
@@ -731,7 +768,8 @@ struct DiagnosticsView: View {
                     stale: isStale,
                     includeTechnicalDetails: false,
                     visual: visual,
-                    isConfirmed: isConfirmed))
+                    isConfirmed: isConfirmed,
+                    level: level))
             }
         }
     }
@@ -757,8 +795,19 @@ struct DiagnosticsView: View {
                                   stale: Bool,
                                   includeTechnicalDetails: Bool = true,
                                   visual: CelestialVisual? = nil,
-                                  isConfirmed: Bool = true) -> String {
-        var parts = [object.name, object.kind.spokenName]
+                                  isConfirmed: Bool = true,
+                                  level: ConfidenceLevel? = nil) -> String {
+        var parts = [object.name]
+        // Tingkat keyakinan ikut diucapkan, sama seperti badge-nya ikut
+        // digambar. Keduanya memakai ambang yang sama (`!stale`): pada objek
+        // sisa, "Yakin" di sebelahnya terdengar sebagai klaim keyakinan atas
+        // pengukuran sekarang — persis false confidence yang dilarang PRD.
+        // `nil` berarti tidak ada yang boleh diklaim (keadaan tanpa jawaban),
+        // bukan "ragu".
+        if let level, !stale {
+            parts.append(ObjectSpeech.confidence(level))
+        }
+        parts.append(object.kind.spokenName)
         // Fase Bulan: satu-satunya informasi di panel ini yang **hanya** bisa
         // dilihat. Bentuk sabit/cembung/purnama tampil sebagai gambar, dan
         // "Bulan" tidak mengatakan apa-apa tentang bentuknya. Jenis lain
