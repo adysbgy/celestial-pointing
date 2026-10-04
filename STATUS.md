@@ -1,5 +1,137 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — 23 teks yang tampil di layar, tak terlihat gerbang mana pun)
+
+### Premis siklus ini: STATUS lalu menunjuk ke tempat yang salah
+
+STATUS sebelumnya menutup dengan batas yang jujur:
+
+> **`detailRow` dengan argumen non-literal masih bisa lolos** — sapuan ini
+> menangkap literalnya, tapi kalau argumennya
+> `.accessibilityLabel(RowSpeech…)` yang membawa teks, jalur itu tidak
+> diperiksa.
+
+Kalimat itu **benar**, dan justru itu sebabnya berbahaya: ia menutup celah
+dengan diagnosa yang tepat sasaran ke tempat yang **bukan** masalahnya.
+Argumen yang bukan literal memang di luar jangkauan sapu teks — tidak ada yang
+bisa diperbuat untuk itu. Yang tidak pernah diperiksa adalah **argumen kedua
+yang literal**.
+
+Pola lamanya satu regex:
+
+```
+\b(Text|row|…)\s*\(\s*"((?:[^"\\]|\\.)*)"
+```
+
+Satu literal, dan ia **harus** persis setelah tanda buka. Jadi:
+
+| Bentuk — keduanya ada di repo | Terbaca? |
+|---|---|
+| `row("Keadaan", state.shortLabel)` | ya |
+| `row("Device motion", motion.isAvailable ? "Ada" : "Tidak ada")` | **tidak** |
+
+Argumen kedua sebuah `row` **selalu** teks tampilan — itu definisi helper-nya
+(`row(_ title: String, _ value: String)`). Jadi **nilai**, yaitu separuh isi
+setiap baris tabel di seluruh app, tidak pernah diperiksa. Dibuktikan dengan
+menjalankan pola lama atas seluruh `Apps/`:
+
+```
+laporan pola lama: 0
+```
+
+Nol. Sementara **23 teks** yang benar-benar tampil di layar tidak punya satu
+pun padanan bahasa Inggris — termasuk `Gelap`/`Terang`, `Sudah`/`Belum`,
+`Aktif`/`Belum aktif`, `Ya`/`Tidak`, `Ada`/`Tidak ada`, `iPhone terhubung`,
+empat label tombol Mode Malam & bunyi, dan tiga label kalibrasi.
+
+### Kelas yang sama, ketiga kali — dan kali ini di dalam aturan penutupnya sendiri
+
+"Gerbang hijau karena ada satu jalur yang tidak pernah diperiksa" sudah dua
+kali muncul: aturan 4 buta terhadap metadata WidgetKit, lalu aturan 4 buta
+terhadap `row`/`detailRow`. Ini ketiga kalinya, dan yang paling ironis:
+**buta terhadap separuh argumen dari fungsi yang baru saja dimasukkan ke
+daftar peritel** untuk menutup kejadian kedua. Menambahkan peritel tanpa
+memperbaiki *cara* argumennya dibaca hanya memindahkan lubangnya.
+
+### Yang diubah, dan kenapa begini
+
+Pola regex tunggal diganti **pembaca argumen**:
+
+- **`read_literal`** membaca satu literal utuh dan memperlakukan `\(…)`
+  sebagai **satu kesatuan**, jadi tanda kutip di dalam interpolasi tidak
+  menutup literal. Itu bentuk yang memang dipakai repo ini
+  (`"· \(link.sendFailureCount) gagal"`), dan tanpa penanganan itu sapuannya
+  salah baca tepat di tempat yang paling rawan.
+- **`direct_arguments`** hanya mengumpulkan literal pada **kedalaman argumen
+  1**. Literal bersarang (`String(format: "%.1f°", x)`) tidak ikut dianggap
+  teks tampilan, sementara `row("Judul", flag ? "A" : "B")` tetap terbaca
+  **keduanya**.
+- **Label `systemImage` disaring karena data, bukan tebakan.** Diperiksa lebih
+  dulu: satu-satunya parameter berlabel yang membawa literal di seluruh
+  `Apps/` adalah `systemImage`, dan isinya nama SF Symbol
+  (`"square.and.arrow.up"`) — memang bukan teks tampilan.
+- **Template format murni dikecualikan**, tapi dengan syarat yang menentukan:
+  hanya bila setelah specifier dibuang **tidak ada huruf tersisa**. Itu yang
+  membuat `"%.0f%%"` gugur sementara `"%lld gagal"` tetap diperiksa sebagai
+  teks — bentuk kedua memang punya padanan `en` di katalog.
+
+### Katalog: 23 kunci, murni aditif
+
+`Localizable.xcstrings` 127 → **150** kunci, semuanya dengan padanan `en`.
+Urutan kunci lama **tidak disentuh** — katalog ditulis tangan, jadi urutan
+berarti — dan diff-nya:
+
+```
+253 baris masuk, 0 keluar
+```
+
+Nol penghapusan, jadi tidak ada reformat yang menyamarkan perubahan.
+
+`FALSE LOCK` sengaja masuk katalog dengan nilai `en` **yang sama**: itu
+istilah teknis huruf besar yang dipakai sebagai singkatan visual (alasannya
+sudah ada di komentar `Experiment1View`), dan menaruhnya di katalog membuat
+keputusan itu terbaca, bukan tersembunyi.
+
+### Uji injeksi: dua arah
+
+Dijalankan pada salinan, bukan di repo:
+
+| Injeksi | Diharapkan | Hasil |
+|---|---|---|
+| literal baru sebagai argumen **kedua** `row()` | MERAH, sebut **keduanya** | **MERAH** |
+| `Label("Ekspor", systemImage: "arrow.up.doc.on.clipboard")` | hijau | hijau |
+| `row("JudulUIBaru", String(format: "%.1f°", 3.0))` | MERAH, sebut judulnya saja | **MERAH** |
+| `row("JudulUIBaru", flag ? "NilaiA" : "NilaiB")` | MERAH, sebut ketiganya | **MERAH** |
+| `// Text("TeksDiDalamKomentar")` | hijau | hijau |
+| tree bersih | hijau | hijau |
+
+### Yang benar-benar dijalankan
+
+- `./swift-ui-lint.sh` → **7 aturan hijau**; aturan 4 **MERAH dulu** (33 situs,
+  23 kunci) sebelum katalog diisi, lalu hijau.
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 gagal**.
+  Engine tidak disentuh; tidak ada satu baris Swift pun yang berubah di unit
+  ini.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan CJK/Cyrillic pada berkas yang diubah: **0**.
+- CI: menunggu push.
+
+### Batas yang diketahui dan belum ditutup
+
+- **Sapuan tetap tidak bisa melihat teks yang tidak pernah menjadi literal.**
+  `.accessibilityLabel(RowSpeech.label(title:value:))` membawa teks lewat
+  variabel, dan tidak ada sapu teks yang bisa mengikutinya. Yang berubah:
+  batas itu sekarang **benar-benar** batasnya, bukan alasan untuk melewatkan
+  argumen kedua yang literal.
+- **Aturan 3 masih buta di `*.sh`, `project.yml`, dan `*.md`** — tidak
+  berubah dari siklus sebelumnya. `STATUS.md` sendiri masih menyimpan tiga
+  aksara CJK di tiga baris, yang ditulis sebagai **contoh** selip; sapuan
+  tidak mencakup `*.md`, jadi contoh dan selip tidak bisa dibedakan oleh
+  gerbang mana pun.
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux.** Yang terbukti:
+  setiap kunci punya entri + padanan `en`, dan diff-nya aditif. Yang tidak:
+  apakah `Bundle` benar-benar membacanya di perangkat.
+
 ## Progres terakhir (4 Okt 2026 — iPhone menampilkan "Mencari" lalu diam, dan aturan yang buta di label tabel)
 
 ### Dua temuan, dan yang kedua tidak akan ketahuan tanpa yang pertama

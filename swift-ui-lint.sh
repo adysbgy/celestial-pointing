@@ -152,24 +152,148 @@ SKIP_PREFIX = ("Usulan ambang keyakinan",)
 # Kandidat yang tidak pernah muncul di repo ini sengaja tidak dimasukkan:
 # daftar panjang peritel yang tidak pernah dipakai hanya menambah permukaan
 # untuk salah baca, bukan perlindungan.
-POS = re.compile(
-    r'\b(Text|navigationTitle|navigationSubtitle|Button|Label|Toggle|Picker|'
+POS_NAMES = (
+    r'Text|navigationTitle|navigationSubtitle|Button|Label|Toggle|Picker|'
     r'Section|NavigationLink|accessibilityLabel|accessibilityHint|'
     r'accessibilityValue|accessibilityActionName|confirmationDialog|alert|'
     r'confirmationTitle|cancelTitle|primaryActionTitle|destructiveTitle|'
-    r'configurationDisplayName|description|help|footer|header|prompt|message'
+    r'configurationDisplayName|description|help|footer|header|prompt|message|'
     # `row`/`detailRow` adalah helper label-lebar di repo ini: keduanya
     # **menampilkan teksnya ke layar**, jadi keduanya wajib berpadanan.
-    #
-    # Inklusi ini bukan hasil menebak. Uji injeksi pada aturan ini
-    # membuktikan bentuk sebelumnya buta di sini: `Text("TeksUIYangBaru")`
-    # dilaporkan, `row("LabelUIYangBaru")` lolos tanpa laporan. Jadi
-    # label tabel adalah jalur paling umum dari teks tak terlokalisasi
-    # yang masih tampil di layar — persis bentuk "hijau yang tidak hijau" yang
-    # aturan ini ada untuk menutupnya.
-    r'|row|detailRow'
-    r')\(\s*"((?:[^"\\]|\\.)*)"'
+    r'row|detailRow'
 )
+
+# Sapuan mencari **setiap literal langsung di dalam argumen** sebuah peritel
+# teks, bukan hanya yang pertama.
+#
+# Kenapa harus begitu — dan ini kelas cacat yang sama seperti dua siklus
+# sebelumnya, kali ini di dalam aturan yang dibuat untuk menutupnya. Bentuk
+# lama memakai pola `\b(Text|row|...)\s*\(\s*"(...)"`: satu literal, dan ia
+# **harus** persis setelah tanda buka. Konsekuensinya terukur:
+# `row("Keadaan", state.shortLabel)` terbaca, sementara
+# `row("Device motion", motion.isAvailable ? "Ada" : "Tidak ada")` tidak
+# terbaca sama sekali. Jadi nilai — separuh isi setiap baris tabel — tidak
+# pernah diperiksa, dan gerbangnya hijau sepanjang waktu.
+#
+# Argumen kedua sebuah `row` **selalu** teks tampilan: itu definisi helper-nya
+# (`row(_ title: String, _ value: String)`). Jadi yang membedakan teks
+# tampilan dari bukan-teks bukan posisi argumen, melainkan peritelnya.
+POS = re.compile(r'\b(' + POS_NAMES + r')\s*\(')
+
+# `%`-specifier printf, dipakai hanya untuk mengenali **template format**
+# (`"%.1f°"`, `"%lld gagal"`) yang memang bukan teks tampilan. Tanpa ini,
+# setiap `String(format:)` di repo dilaporkan sebagai teks yang hilang — dan
+# gerbang yang selalu merah akan dimatikan orang lain saat ia berbunyi.
+# `%%` ikut dikenali supaya `"%.0f%%"` (tanda persen harfiah) juga gugur.
+CONV = re.compile(r'%(?:%|(?:[-+ #0]*)[\d*]*(?:\.\d+|\.\*)?[a-zA-Z@])')
+
+
+def strip_line_comments(text):
+    """Buang komentar `//` yang berada di **luar** literal string.
+
+    Baris sebaris hanya boleh dibuang kalau `//` ada di luar literal — yang
+    pertama bisa jadi bagian dari literal itu sendiri (URL, regex, path).
+    `Text("// ...")` adalah kode; `// Text("...")` adalah penjelasan.
+
+    Kenapa ini penting: tanpa itu, komentar yang **menjelaskan** aturan ini
+    akan dilaporkan sebagai pelanggaran oleh aturan ini sendiri — persis
+    gerbang yang selalu merah dan akan dimatikan orang lain saat ia berbunyi.
+    """
+    lines = []
+    for raw in text.split("\n"):
+        out, in_string, escaped, i = [], False, False, 0
+        while i < len(raw):
+            ch = raw[i]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+            else:
+                if ch == '"':
+                    in_string = True
+                elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                    break
+            out.append(ch)
+            i += 1
+        lines.append("".join(out))
+    return "\n".join(lines)
+
+
+def read_literal(src, start):
+    """Baca satu literal string mulai dari tanda kutip di `start`.
+
+    Mengembalikan `(indeks setelah kutip penutup, isi tanpa kutip, ada
+    interpolasi)`. Interpolasi `\\(...)` dihitung sebagai **satu kesatuan**,
+    jadi tanda kutip di dalamnya tidak menutup literal — itu bentuk yang
+    memang dipakai repo ini (`"· \\(link.sendFailureCount) gagal"`).
+    """
+    i, escaped, buf, interpolated = start + 1, False, [], False
+    while i < len(src):
+        ch = src[i]
+        if escaped:
+            escaped = False
+            if ch == "(":
+                interpolated = True
+                j, depth = i, 0
+                while j < len(src):
+                    inner = src[j]
+                    if inner == '"':
+                        j = read_literal(src, j)[0]
+                        continue
+                    if inner == "(":
+                        depth += 1
+                    elif inner == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    j += 1
+                buf.append(src[i:j + 1])
+                i = j + 1
+                continue
+            buf.append(ch)
+        elif ch == "\\":
+            escaped = True
+            buf.append(ch)
+        elif ch == '"':
+            return i + 1, "".join(buf), interpolated
+        else:
+            buf.append(ch)
+        i += 1
+    return i, "".join(buf), interpolated
+
+
+def direct_arguments(src, open_index):
+    """Literal pada **kedalaman argumen 1**, beserta label parameternya.
+
+    Kedalaman dipakai sebagai pengganti daftar nama parameter yang akan selalu
+    usang. Hasilnya diperiksa terhadap repo: satu-satunya label yang pernah
+    muncul di sana adalah `systemImage`, dan literal di bawahnya memang nama
+    SF Symbol (`"square.and.arrow.up"`), bukan teks tampilan. Jadi label itu
+    disaring **karena data**, bukan karena tebakan.
+    """
+    depth, i, found = 0, open_index, []
+    while i < len(src):
+        ch = src[i]
+        if ch == '"':
+            end, text, interpolated = read_literal(src, i)
+            if depth == 1:
+                before = src[max(0, i - 60):i]
+                label = re.search(r'([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$', before)
+                found.append((i, text, interpolated,
+                              label.group(1) if label else None))
+            i = end
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return found
+        i += 1
+    return found
 
 found = []
 for root, _, files in os.walk("Apps"):
@@ -177,45 +301,36 @@ for root, _, files in os.walk("Apps"):
         if not name.endswith(".swift"):
             continue
         path = os.path.join(root, name)
-        # Baris sebaris **hanya** boleh dibuang kalau `//` ada di luar
-        # literal — yang pertama adalah bagian dari literal itu sendiri
-        # (URL, regex, path). `Text("// ...")` adalah kode; `// Text("...")`
-        # adalah penjelasan. Awk tidak punya regex non-greedy portabel, jadi
-        # uraiannya dilakukan manual, sambil menghitung status Escape.
-        #
-        # Kenapa ini penting: tanpa itu, komentar yang **menjelaskan**
-        # aturan ini akan dilaporkan sebagai pelanggaran oleh aturan ini
-        # sendiri — persis gerbang yang selalu merah dan akan dimatikan.
-        code_lines = []
-        for raw in open(path, encoding="utf-8").read().split("\n"):
-            out, in_string, escaped, i = [], False, False, 0
-            while i < len(raw):
-                ch = raw[i]
-                if in_string:
-                    if escaped:
-                        escaped = False
-                    elif ch == "\\":
-                        escaped = True
-                    elif ch == '"':
-                        in_string = False
-                else:
-                    if ch == '"':
-                        in_string = True
-                    elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
-                        break
-                out.append(ch)
-                i += 1
-            code_lines.append("".join(out))
+        source = strip_line_comments(
+            open(path, encoding="utf-8").read())
 
-        for m in POS.finditer("\n".join(code_lines)):
-            raw = m.group(2)
-            if any(raw.startswith(p) for p in SKIP_PREFIX):
-                continue
-            key = FORMATS.get(raw, raw)
-            if key in NOT_LOCALIZED or key in keys:
-                continue
-            where = f"{path}: {m.group(1)}"
-            found.append(f"  {where}: {key!r}")
+        for m in POS.finditer(source):
+            line = source[:m.start()].count("\n") + 1
+            for offset, text, interpolated, label in direct_arguments(
+                    source, m.end() - 1):
+                # Nama SF Symbol: satu-satunya parameter berlabel yang
+                # membawa literal di repo ini, dan isinya bukan teks tampilan.
+                if label == "systemImage":
+                    continue
+                if any(text.startswith(p) for p in SKIP_PREFIX):
+                    continue
+                if text in FORMATS:
+                    key = FORMATS[text]
+                elif interpolated:
+                    # Interpolasi murni tidak punya bentuk katalog; yang
+                    # punya bentuk dipetakan lewat FORMATS di atas.
+                    continue
+                elif CONV.search(text) and not re.search(
+                        r"[A-Za-z]", CONV.sub("", text)):
+                    # Template format murni (`"%.1f°"`), bukan teks tampilan.
+                    # Syarat "tanpa huruf" itu yang menjaga `"%lld gagal"`
+                    # tetap diperiksa sebagai teks.
+                    continue
+                else:
+                    key = text
+                if key in NOT_LOCALIZED or key in keys:
+                    continue
+                found.append(f"  {path}:{line}: {key!r}")
 
 print("\n".join(found) if found else "")
 PY

@@ -1398,6 +1398,259 @@
           }
         }
       }
+    },
+    "Kalibrasi belum dimulai.": {
+      "comment": "Label VoiceOver kartu kalibrasi saat sesi belum dimulai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration has not started."
+          }
+        }
+      }
+    },
+    "Pakai kalibrasi, belum bisa dipakai": {
+      "comment": "Label VoiceOver tombol Pakai saat kalibrasi belum layak dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use calibration, not available yet"
+          }
+        }
+      }
+    },
+    "Kalibrasi, sudah terpasang": {
+      "comment": "Label VoiceOver ikon kalibrasi saat kalibrasi sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, already applied"
+          }
+        }
+      }
+    },
+    "Kalibrasi, belum terpasang": {
+      "comment": "Label VoiceOver ikon kalibrasi saat jam belum terkalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, not applied yet"
+          }
+        }
+      }
+    },
+    "Aktifkan Mode Malam": {
+      "comment": "Label VoiceOver tombol Mode Malam saat mode malam nonaktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Night Mode"
+          }
+        }
+      }
+    },
+    "Nonaktifkan Mode Malam": {
+      "comment": "Label VoiceOver tombol Mode Malam saat mode malam aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off Night Mode"
+          }
+        }
+      }
+    },
+    "Aktifkan bunyi saat kunci": {
+      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi nonaktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on lock sound"
+          }
+        }
+      }
+    },
+    "Nonaktifkan bunyi saat kunci": {
+      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off lock sound"
+          }
+        }
+      }
+    },
+    "iPhone terhubung": {
+      "comment": "Status tautan jam ke iPhone saat iPhone terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connected"
+          }
+        }
+      }
+    },
+    "iPhone tidak terjangkau": {
+      "comment": "Status tautan jam ke iPhone saat iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone not reachable"
+          }
+        }
+      }
+    },
+    "Gelap": {
+      "comment": "Nilai baris Langit saat langit gelap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        }
+      }
+    },
+    "Terang": {
+      "comment": "Nilai baris Langit saat langit masih terang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bright"
+          }
+        }
+      }
+    },
+    "Sudah": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah ada.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "Belum": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi belum ada.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "Objek (sisa)": {
+      "comment": "Judul baris objek yang ditampilkan adalah hasil kedaluwarsa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object (stale)"
+          }
+        }
+      }
+    },
+    "Ada": {
+      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        }
+      }
+    },
+    "Tidak ada": {
+      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        }
+      }
+    },
+    "FALSE LOCK": {
+      "comment": "Verdict percobaan: engine mengunci objek yang salah. Sengaja huruf besar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FALSE LOCK"
+          }
+        }
+      }
+    },
+    "Aktif": {
+      "comment": "Nilai baris Status saat tautan jam-iPhone aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        }
+      }
+    },
+    "Belum aktif": {
+      "comment": "Nilai baris Status saat tautan jam-iPhone belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not active yet"
+          }
+        }
+      }
+    },
+    "Ya": {
+      "comment": "Nilai baris Terjangkau saat iPhone terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "Tidak": {
+      "comment": "Nilai baris Terjangkau saat iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "—": {
+      "comment": "Penanda nilai kosong pada baris tabel.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        }
+      }
     }
   }
 }
