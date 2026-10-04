@@ -1,6 +1,79 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — lima peritel teks yang tidak pernah masuk daftar, dan cara menemukannya tanpa mengingat)
+## Progres terakhir (4 Okt 2026 — satu kata Jerman di tengah kalimat Indonesia, dan kenapa daftar kata sendiri dulu menghalangi)
+
+### Premis siklus ini: kelas cacat yang sudah dicatat tiga kali tapi tak pernah punya penjaga
+
+Aturan 3 menangkap aksara CJK dan Cyrillic. Yang **tidak** pernah ditangkap
+adalah kata asing yang memakai huruf Latin — terbaca wajar oleh mata, lolos
+total dari setiap gerbang. Kelas ini sudah muncul di STATUS berulang kali
+(`di-George`, `Memorial celebrating`, `danasticity`) dan setiap kali hanya
+**diperbaiki**, tidak pernah **dijaga**. Pola itu yang diakhiri di sini.
+
+### Yang ditemukan: bukti nyata, bukan hipotesis
+
+`Apps/Shared/LocalizationBridge.swift:39` memuat kata fungsi bahasa Jerman
+di tengah kalimat Indonesia:
+
+    /// tidak menahannya. `TextLocalization.text` deshalb menolak hasil yang
+
+Kata itu lolos dari: lint (7 aturan waktu itu), typecheck, 471 test, dan CI
+macOS. Tidak ada satu pun yang melihatnya.
+
+### Kenapa daftarnya HANYA kata Jerman — dan itu keputusan yang diuji, bukan ditebak
+
+Sapuan pertama memakai daftar kata Inggris + Jerman. Hasilnya satu hit yang
+**bukan** cacat:
+
+    OnboardingView.swift: /// Layar perkenalan "value-first": satu kartu singkat...
+
+`value-first` adalah istilah desain yang sah, dan `first` menandainya. Jadi
+kata Inggris umum dibuang dari daftar: ongkos positif palsunya lebih besar
+daripada nilai tangkapannya. Sisa daftar kata Jerman memindai **103 berkas
+→ 1 hit, dan hit itu memang cacat**. Presisi 100% pada cakupan itu.
+
+### Jebakan yang harus dilewati: aturan tidak boleh menandai daftar katanya sendiri
+
+Versi pertama Aturan 8 melaporkan **41 pelanggaran palsu** — semuanya berasal
+dari definisi daftar kata dan komentar rasionalnya sendiri di dalam skrip.
+Memecah daftar jadi dua string tidak menyelesaikannya: setiap kata tetap utuh
+di dalam satu literal.
+
+Perbaikannya bukan mengecualikan seluruh berkas skrip (itu akan membutakan
+aturan pada skrip yang justru memuatnya), melainkan penanda sempit dan
+eksplisit `aturan8:abaikan-mulai` / `aturan8:abaikan-selesai` yang membatasi
+hanya pada definisi daftar. **Diuji bahwa penandanya tidak bocor**: selip
+Jerman yang ditaruh *setelah* penanda selesai tetap membuat lint MERAH.
+
+### Bukti dua arah
+
+Salinan bersih di `scratch/lintcheck3` → baseline **exit 0**. Lalu:
+
+| Suntikan | Hasil |
+|---|---|
+| Kata Jerman di `.swift` | MERAH, menunjuk `LocalizationBridge.swift:41` |
+| Kata Jerman di `project.yml` | MERAH, menunjuk `project.yml:2` |
+| Kata Jerman **setelah** penanda selesai | MERAH — penanda tidak bocor |
+| Kembalikan ke semula | hijau |
+
+`project.yml` sengaja diuji karena itu salah satu tempat yang **tidak**
+tercakup Aturan 3 — celah yang sudah dicatat berulang kali.
+
+### Batas yang jujur
+
+Daftar ini tidak akan menangkap kata Latin korup yang di luar daftarnya.
+Yang ditutup adalah kelas yang benar-benar muncul di repo ini, bukan seluruh
+kemungkinannya. Itu dicatat sebagai batas, bukan diklaim sebagai penutupan
+penuh.
+
+### Gerbang
+
+- `bash -n swift-ui-lint.sh` → OK; `./swift-ui-lint.sh` → **8 aturan hijau**.
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 failures**.
+- `./swift-typecheck.sh` → semua gerbang lulus.
+- Sapuan CJK pada berkas yang diubah → **0**.
+
+
 
 ### Premis siklus ini: daftar peritelnya sendiri belum pernah diturunkan dari data
 

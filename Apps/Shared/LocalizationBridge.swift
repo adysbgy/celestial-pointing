@@ -36,7 +36,7 @@ enum LocalizationBridge {
     /// Karena `value:` adalah nama kuncinya, kunci yang hilang dari katalog
     /// tidak muncul sebagai ketiadaan: ia kembali sebagai **nama kunci itu
     /// sendiri**, non-kosong, jadi pemeriksaan "terjemahan tidak kosong" saja
-    /// tidak menahannya. `TextLocalization.text` deshalb menolak hasil yang
+    /// tidak menahannya. `TextLocalization.text` karena itu menolak hasil yang
     /// sama dengan nama kuncinya dan jatuh ke nilai bawaan Bahasa Indonesia.
     /// Perbaikannya ada di paket, bukan di sini, supaya setiap bridge di masa
     /// depan otomatis ikut terlindungi — termasuk yang belum ada sekarang.

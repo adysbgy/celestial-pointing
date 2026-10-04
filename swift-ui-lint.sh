@@ -639,6 +639,100 @@ else
   echo "Bersih: setiap API gerak punya penjaga reduce-motion."
 fi
 
+# ── Aturan 8: kata asing yang terselip di komentar/kode ───────────────────
+# Kelas ini sudah lama tercatat sebagai batas yang belum ditutup, dan
+# sekarang tertutup sebagian dengan cakupan yang bisa diperiksa.
+#
+# Buktinya nyata, bukan dugaan: `Apps/Shared/LocalizationBridge.swift`
+# memuat satu kata fungsi bahasa Jerman di tengah kalimat Indonesia, dan
+# tidak ada gerbang yang melihatnya. Aturan 3 menangkap aksara CJK serta
+# Cyrillic, tapi kata Latin yang terbaca wajar oleh mata lolos total.
+#
+# Daftar kata sengaja memuat kata fungsi bahasa Jerman saja. Alasannya
+# ditemukan dengan menguji, bukan menebak:
+#
+#   - Kata Inggris umum menghasilkan positif palsu pada istilah yang
+#     memang dipakai repo ini. Terbukti: sapuan kata Inggris menandai
+#     istilah desain berbahasa Inggris di `OnboardingView` yang sah.
+#   - Kata Jerman yang dipakai bersih: 103 berkas dipindai, satu hit,
+#     dan hit itu memang cacat.
+#
+# Batas yang jujur: daftar ini tidak akan menangkap kata Latin korup yang
+# di luar daftarnya. Yang ditutup adalah kelas yang benar-benar muncul,
+# bukan seluruh kemungkinannya.
+echo
+echo "== Aturan 8: kata asing yang terselip di komentar/kode =="
+foreign=$(python3 - <<'PY'
+import os, re
+
+# Kata fungsi Jerman: tidak mungkin muncul sah dalam kalimat Bahasa Indonesia
+# maupun sebagai istilah produk berbahasa Inggris di repo ini.
+FOREIGN = set((
+    # aturan8:abaikan-mulai — definisi daftar ini sendiri tidak dipindai,
+    # karena sebuah aturan tidak boleh menandai daftar katanya sendiri.
+    "deshalb trotzdem obwohl waehrend während natuerlich natürlich "
+    "zunaechst zunächst jedoch bereits ebenfalls allerdings somit sodass "
+    "werden wurde "
+    "nicht auch sind kann muss dass wenn aber nur noch schon mehr sehr "
+    "ganz durch ueber über unter zwischen damit dabei dazu dafür dafuer"
+    # aturan8:abaikan-selesai
+).split())
+
+TARGETS = []
+for base in ("Apps", "Packages/PointingKit/Sources", "Packages/PointingKit/Tests",
+             "Packages/CelestialEngine/Sources", "Packages/CelestialEngine/Tests",
+             "Tools"):
+    for root, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if d != ".build"]
+        for name in sorted(files):
+            if name.endswith((".swift", ".sh", ".yml")):
+                TARGETS.append(os.path.join(root, name))
+# `project.yml` dan skrip gerbang ikut dipindai: dua tempat yang justru
+# **tidak** tercakup aturan 3, dan itu celah yang sudah dicatat berulang kali.
+for name in ("project.yml", "swift-ui-lint.sh", "swift-test.sh",
+             "swift-typecheck.sh", "red-test.sh"):
+    if os.path.exists(name):
+        TARGETS.append(name)
+
+# Pindai baris mentah, bukan hanya komentar: satu kata asing di dalam kode
+# sama salahnya, dan bentuk ini terbukti sama tepatnya (1 hit, dan hit itu
+# memang cacat) tanpa perlu mengurai komentar.
+#
+# Definisi daftar kata di atas dibatasi penanda `aturan8:abaikan-*`, karena
+# sebuah aturan tidak boleh menandai daftar katanya sendiri. Penanda itu
+# sengaja eksplisit dan sempit — bukan pengecualian untuk seluruh berkas —
+# supaya cakupan aturan tetap bisa diperiksa.
+WORD = re.compile(r"[A-Za-zÄÖÜäöüß]+")
+SKIP_BEGIN = "aturan8:abaikan-mulai"
+SKIP_END = "aturan8:abaikan-selesai"
+
+for path in TARGETS:
+    ignoring = False
+    for number, raw in enumerate(
+            open(path, encoding="utf-8").read().split("\n"), 1):
+        if SKIP_BEGIN in raw:
+            ignoring = True
+            continue
+        if SKIP_END in raw:
+            ignoring = False
+            continue
+        if ignoring:
+            continue
+        for match in WORD.finditer(raw):
+            if match.group(0).lower() in FOREIGN:
+                print(f"  {path}:{number}: {match.group(0)!r}  {raw.strip()[:80]}")
+PY
+)
+if [ -n "$foreign" ]; then
+  echo "Kata asing ditemukan — repo ini ditulis bahasa Indonesia:"
+  echo "$foreign"
+  echo "-> Ganti dengan kata Indonesia yang dimaksud. Kalau kata itu memang"
+  echo "   disengaja, tambahkan ke daftar FOREIGN dengan alasannya."
+  status=1
+else
+  echo "Bersih: tidak ada kata asing yang terselip."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
