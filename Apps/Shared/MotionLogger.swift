@@ -58,7 +58,7 @@ public final class MotionLogger: ObservableObject {
     public func start(controller: PointingController) {
         self.controller = controller
         guard manager.isDeviceMotionAvailable else {
-            unavailableReason = "Perangkat ini tidak menyediakan device motion."
+            unavailableReason = SensorStatusText.motionMissing
             // Lewat saluran yang sama dengan sampel: cuplikan UI harus ikut
             // berubah, bukan hanya controller di belakangnya.
             publishSensorLoss()

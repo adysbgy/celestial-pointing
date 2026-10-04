@@ -50,7 +50,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     /// Lokasi terakhir yang sah, atau `nil` bila belum ada.
     @Published private(set) var location: ObserverLocation?
     /// Penjelasan status untuk ditampilkan ke pengguna.
-    @Published private(set) var statusText = "Lokasi belum diminta"
+    @Published private(set) var statusText = SensorStatusText.locationNotRequested
     /// Peringatan yang **harus dilihat** pengguna: `nil` di luar keadaan
     /// gagal.
     ///
@@ -97,11 +97,11 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
             // **harus terlihat**, bukan diam (PRD: jangan diam saat izin
             // ditolak). `note` yang menampilkannya ada di `PointingView` &
             // `DiagnosticsView`; `statusText` sendirian tidak pernah dibaca UI.
-            statusText = "Izin lokasi ditolak — memakai lokasi bawaan"
-            note = "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta)."
+            statusText = SensorStatusText.locationDeniedStatus
+            note = SensorStatusText.locationDeniedNote
         default:
             manager.startUpdatingLocation()
-            statusText = "Mencari lokasi…"
+            statusText = SensorStatusText.locationSearching
             note = nil
         }
     }
@@ -118,15 +118,15 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
                 manager.startUpdatingLocation()
-                self.statusText = "Mencari lokasi…"
+                self.statusText = SensorStatusText.locationSearching
                 self.note = nil
             case .denied, .restricted:
-                self.statusText = "Izin lokasi ditolak — memakai lokasi bawaan"
-                self.note = "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta)."
+                self.statusText = SensorStatusText.locationDeniedStatus
+                self.note = SensorStatusText.locationDeniedNote
             case .notDetermined:
-                self.statusText = "Menunggu izin lokasi…"
+                self.statusText = SensorStatusText.locationWaiting
             @unknown default:
-                self.statusText = "Status lokasi tidak dikenal"
+                self.statusText = SensorStatusText.locationUnknownStatus
             }
         }
     }
@@ -147,7 +147,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
                 capturedAt: last.timestamp
             )
             self.location = location
-            self.statusText = String(format: "Lokasi ±%.0f m", accuracy)
+            self.statusText = SensorStatusText.locationAccuracy(meters: accuracy)
             // Penolakan izin tadi sudah lewat: sekarang ada lokasi sungguhan,
             // jadi peringatannya tidak lagi berlaku.
             self.note = nil
@@ -161,8 +161,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
                                             didFailWithError error: Error) {
         let message = error.localizedDescription
         Task { @MainActor in
-            self.statusText = "Lokasi gagal: \(message)"
-            self.note = "Lokasi gagal: \(message). Memakai lokasi bawaan (Jakarta)."
+            self.statusText = SensorStatusText.locationFailedStatus(message)
+            self.note = SensorStatusText.locationFailedNote(message)
         }
     }
 }

@@ -1927,6 +1927,83 @@
         }
       }
     },
+    "sensor.motion.missing": {
+      "comment": "Pesan saat perangkat tidak menyediakan device motion. Tampil di app jam & iPhone.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This device does not provide device motion." } },
+        "id": { "stringUnit": { "state": "translated", "value": "Perangkat ini tidak menyediakan device motion." } }
+      }
+    },
+    "sensor.motion.unavailable": {
+      "comment": "Catatan engine saat data gerak tidak tersedia.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Motion data unavailable." } },
+        "id": { "stringUnit": { "state": "translated", "value": "Data gerak tidak tersedia." } }
+      }
+    },
+    "sensor.location.notRequested": {
+      "comment": "Status lokasi sebelum izin diminta.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location not requested yet" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Lokasi belum diminta" } }
+      }
+    },
+    "sensor.location.searching": {
+      "comment": "Status saat lokasi sedang dicari.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finding location…" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Mencari lokasi…" } }
+      }
+    },
+    "sensor.location.waiting": {
+      "comment": "Status saat menunggu jawaban izin lokasi.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Waiting for location permission…" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Menunggu izin lokasi…" } }
+      }
+    },
+    "sensor.location.denied.status": {
+      "comment": "Status singkat saat izin lokasi ditolak.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location permission denied — using the default location" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Izin lokasi ditolak — memakai lokasi bawaan" } }
+      }
+    },
+    "sensor.location.unknown.status": {
+      "comment": "Status saat sistem mengembalikan status izin lokasi yang tidak dikenal.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unknown location status" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Status lokasi tidak dikenal" } }
+      }
+    },
+    "sensor.location.denied.note": {
+      "comment": "Penjelasan saat izin lokasi ditolak — apa yang bisa dilakukan pengguna.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location permission denied. Open Settings to allow it, or use the default location (Jakarta)." } },
+        "id": { "stringUnit": { "state": "translated", "value": "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta)." } }
+      }
+    },
+    "sensor.location.accuracy": {
+      "comment": "Status akurasi lokasi. %.0f = meter.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location ±%.0f m" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Lokasi ±%.0f m" } }
+      }
+    },
+    "sensor.location.failed.status": {
+      "comment": "Status saat lokasi gagal. %@ = pesan sistem.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location failed: %@" } },
+        "id": { "stringUnit": { "state": "translated", "value": "Lokasi gagal: %@" } }
+      }
+    },
+    "sensor.location.failed.note": {
+      "comment": "Penjelasan saat lokasi gagal. %@ = pesan sistem.",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Location failed: %@. Using the default location (Jakarta)." } },
+        "id": { "stringUnit": { "state": "translated", "value": "Lokasi gagal: %@. Memakai lokasi bawaan (Jakarta)." } }
+      }
+    },
     "pointing.announce.locked": {
       "comment": "VoiceOver: keadaan terkunci tetapi nama objeknya tidak tersedia. Diucapkan saat keadaan berubah, bukan tiap sampel.",
       "localizations": {

@@ -272,5 +272,16 @@ public extension LocalizedText {
         // `ObjectSpeech.swift`.
         .objectSpeechMagnitude, .objectSpeechStale,
         .objectSpeechConfidence, .objectSpeechCoordinates,
+        // Status sensor & izin. Masuk daftar karena inilah satu-satunya jalur
+        // pesan "izin ditolak" dan "sensor tidak tersedia" sampai ke layar —
+        // dan karena versi lamanya hidup sebagai literal yang ditugaskan ke
+        // properti (`note = "…"`) di tiga berkas `Apps/Shared/`, tempat katalog
+        // tidak bisa menjangkaunya. Lihat `SensorStatusText.swift`.
+        .sensorMotionMissing, .sensorMotionUnavailable,
+        .sensorLocationNotRequested, .sensorLocationSearching,
+        .sensorLocationWaiting, .sensorLocationDeniedStatus,
+        .sensorLocationUnknownStatus, .sensorLocationDeniedNote,
+        .sensorLocationAccuracy, .sensorLocationFailedStatus,
+        .sensorLocationFailedNote,
     ]
 }

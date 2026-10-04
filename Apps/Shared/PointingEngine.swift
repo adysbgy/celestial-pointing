@@ -269,7 +269,7 @@ public final class PointingEngine: ObservableObject {
 
     /// Sensor hilang / tersedia.
     public func setSensorAvailable(_ available: Bool) {
-        sensorNote = available ? nil : "Data gerak tidak tersedia."
+        sensorNote = available ? nil : SensorStatusText.motionUnavailable
         controller.setSensorAvailable(available)
         publish(controller.snapshot)
     }
