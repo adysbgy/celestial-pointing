@@ -204,7 +204,7 @@ struct Experiment1View: View {
     private func trialRow(_ trial: AnalyzedTrial) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(trial.trial.groundTruthObjectID ?? "—")
+                Text(trialTitle(trial))
                     .font(.subheadline.weight(.medium))
                 Spacer()
                 if let analysis = trial.analysis {
@@ -226,13 +226,31 @@ struct Experiment1View: View {
         }
     }
 
+    /// Headline baris percobaan: **nama** objek yang ditunjuk, bukan slug-nya.
+    ///
+    /// Baris ini adalah laporan alat ukur, jadi yang ditulis di depan adalah
+    /// jawaban yang dicari pengguna. `groundTruthObjectID` menyimpan slug
+    /// (`sirius`) karena itulah bentuk yang dipakai mesin; menampilkannya apa
+    /// adanya membuat laporan berbunyi seperti file log, bukan seperti hasil.
+    ///
+    /// `resolver.catalogue` dipakai — bukan `brightStars` — karena resolver dan
+    /// tombol-tombol layar ini berjalan dengan katalog yang sama. Kalau
+    /// katalognya berbeda, nama akan hilang persis di baris yang paling butuh
+    /// kejelasan.
+    private func trialTitle(_ trial: AnalyzedTrial) -> String {
+        guard let id = trial.trial.groundTruthObjectID else { return "—" }
+        return DisplayLabel.objectNameOrIdentifier(
+            forObjectID: id,
+            catalogue: engine.controller.resolver.catalogue)
+    }
+
     private func detailLine(_ trial: AnalyzedTrial) -> String {
         var parts: [String] = []
         if let error = trial.analysis?.rawPointingErrorDeg {
             parts.append(String(format: "galat %.1f°", error))
         }
         parts.append("jawab \(trial.trial.intent.best?.name ?? "—")")
-        parts.append("keyakinan \(trial.trial.intent.level.rawValue)")
+        parts.append("keyakinan \(trial.trial.intent.level.displayName)")
         parts.append("keadaan \(trial.stateAtCapture.shortLabel)")
         if let rate = trial.angularRateAtCaptureDegPerSec {
             parts.append(String(format: "%.0f°/dtk", rate))

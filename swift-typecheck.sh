@@ -34,28 +34,36 @@ TYPECHECKABLE=(
 )
 
 echo "== Build paket (modul untuk typecheck) =="
-swift build --package-path Packages/PointingKit   2>&1 | tail -1
-swift build --package-path Packages/CelestialEngine 2>&1 | tail -1
+docker_run() {
+  sudo -n docker run --rm -v "$PWD":/src -w /src swift:6.0 "$@"
+}
+
+docker_run bash -lc 'swift build --package-path Packages/PointingKit   2>&1 | tail -1'
+docker_run bash -lc 'swift build --package-path Packages/CelestialEngine 2>&1 | tail -1'
 
 # swiftc di Linux tidak bisa menemukan .build di dalam package; path-nya
-# Ditentukan dari arsitektur host.
+# ditentukan dari arsitektur host. Jadi semua typecheck juga di dalam Docker —
+# flank: menjalankan swiftc di luar container menghasilkan "command not found"
+# yang terlihat seperti "gate lulus".
 ARCH=$(uname -m)
-PK="Packages/PointingKit/.build/${ARCH}-unknown-linux-gnu/debug"
-CE="Packages/CelestialEngine/.build/${ARCH}-unknown-linux-gnu/debug"
-CA="Packages/PointingKit/.build/checkouts/AstronomyKit/Sources/CLibAstronomy"
+PK="/src/Packages/PointingKit/.build/${ARCH}-unknown-linux-gnu/debug"
+CE="/src/Packages/CelestialEngine/.build/${ARCH}-unknown-linux-gnu/debug"
+CA="/src/Packages/PointingKit/.build/checkouts/AstronomyKit/Sources/CLibAstronomy"
 
 echo "== Typecheck: ${TYPECHECKABLE[*]} =="
-swiftc -typecheck -swift-version 5 \
-  -I "$PK/Modules" -I "$CE/Modules" -I "$CA" \
-  -Xcc -fmodule-map-file="$CA/module.modulemap" \
-  -L "$PK" -L "$CE" \
-  "${TYPECHECKABLE[@]}"
+docker_run bash -lc "swiftc -typecheck -swift-version 5 \
+  -I '$PK/Modules' -I '$CE/Modules' -I '$CA' \
+  -Xcc -fmodule-map-file='$CA/module.modulemap' \
+  -L '$PK' -L '$CE' \
+  ${TYPECHECKABLE[*]}"
 status=$?
 
 echo "== Parse semua berkas Apps/ (sintaks saja) =="
+docker_run bash -lc '
 while IFS= read -r f; do
-  swiftc -parse -swift-version 5 "$f" || { echo "PARSE FAIL: $f"; status=1; }
-done < <(find Apps -name '*.swift')
+  swiftc -parse -swift-version 5 "$f" || { echo "PARSE FAIL: $f"; exit 1; }
+done < <(find Apps -name "*.swift")'
+[ $? -ne 0 ] && status=1
 
 if [ "$status" -eq 0 ]; then
   echo "== SEMUA GERBANG LULUS =="

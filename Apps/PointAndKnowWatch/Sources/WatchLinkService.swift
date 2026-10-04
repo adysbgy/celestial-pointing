@@ -166,7 +166,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 
     private func handle(_ message: PointingLinkMessage) {
-        lastMessageNote = message.note ?? message.kind.rawValue
+        lastMessageNote = message.note ?? message.kind.displayName
         switch message.kind {
         case .policyUpdate:
             if let policy = message.confidencePolicy {

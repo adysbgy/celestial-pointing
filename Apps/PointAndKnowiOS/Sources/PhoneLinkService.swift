@@ -79,7 +79,7 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         }
         do {
             try session.updateApplicationContext(message.plist)
-            lastNote = "Terkirim: \(message.kind.rawValue)"
+            lastNote = "Terkirim: \(message.kind.displayName)"
         } catch {
             lastNote = "Gagal mengirim: \(error.localizedDescription)"
         }
