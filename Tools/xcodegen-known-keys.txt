@@ -1,0 +1,48 @@
+# Kunci `project.yml` yang BENAR-BENAR dibaca XcodeGen.
+#
+# Diambil dari sumber XcodeGen 2.46.0 dengan perintah:
+#   grep -oE 'jsonDictionary\.json\(atKeyPath: "[A-Za-z]+"\)' Sources/ProjectSpec/SpecOptions.swift
+# (`configs` dari Project.swift; sisanya dari `settings.base` repo ini).
+#
+# Kenapa daftar ini ada sebagai berkas: XcodeGen membaca YAML dengan
+# pemetaan LENIENT — kunci yang tidak dikenal diabaikan diam-diam dan
+# `xcodegen generate` tetap keluar 0. Jadi satu baris keliru di
+# `project.yml` bisa bertahan tanpa batas waktu tanpa build yang gagal.
+# Daftar ini membuat baris itu punya penjaga; `./swift-ui-lint.sh`
+# aturan 5 yang membacanya.
+#
+# Perbarui dengan perintah di atas saat XcodeGen naik versi, lalu cocokkan
+# dengan yang terpasang di CI (`brew install xcodegen` -- tanpa versi).
+
+bundleIdPrefix
+carthageBuildPath
+carthageExecutablePath
+createIntermediateGroups
+defaultConfig
+defaultSourceDirectoryType
+deploymentTarget
+developmentLanguage
+disabledValidations
+fileTypes
+findCarthageFrameworks
+generateEmptyDirectories
+groupOrdering
+groupSortPosition
+indentWidth
+localPackagesGroup
+minimumXcodeGenVersion
+postGenCommand
+preGenCommand
+projectFormat
+schemePathPrefix
+settingPresets
+tabWidth
+transitivelyLinkDependencies
+useBaseInternationalization
+usesTabs
+xcodeVersion
+configs
+SWIFT_VERSION
+ENABLE_USER_SCRIPT_SANDBOXING
+DEVELOPMENT_LANGUAGE
+SWIFT_EMIT_LOC_STRINGS

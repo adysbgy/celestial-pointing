@@ -1,6 +1,168 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — README, lalu VoiceOver baris; dua siklus)
+## Progres terakhir (4 Okt 2026 — katalog string terpasang, dan dua "cacat" yang ternyata bukan cacat)
+
+### Premis siklus ini: ada pekerjaan yang belum di-commit di meja
+
+`git status` menunjukkan unit Fase C item 2 (katalog string) sudah ditulis:
+`Localizable.xcstrings` (63 kunci, semua punya padanan `en`), entri resource di
+`project.yml`, dan aturan 4 di `swift-ui-lint.sh`. Sebelum push, isinya dibaca
+ulang - dan **dua dari tiga hal yang saya kira cacat ternyata bukan cacat.**
+Bagian paling berharga dari siklus ini justru catatan itu.
+
+### Yang saya klaim cacat, lalu saya buktikan sendiri tidak jadi
+
+| Klaim awal | Kenyataan |
+|---|---|
+| `knownRegions` di `options` membuat CI gagal | **Bukan opsi XcodeGen sama sekali** - diabaikan diam-diam |
+| Entri `Apps/Shared/Resources` menggandakan katalog | XcodeGen sudah memetakan `.xcstrings` ke resources; hasilnya **identik** |
+
+Keduanya saya buktikan dengan cara yang tidak bisa dibantah: saya **membangun
+XcodeGen 2.46.0 sendiri** di container `swift:6.0` (187 detik), lalu
+menjalankan `xcodegen generate` pada repo ini dan pada salinan yang
+`project.yml`-nya dikembalikan ke versi lama. Hasilnya sama persis:
+`developmentRegion = id`, `knownRegions = (Base, en, id)`, katalog jadi
+2 build file (satu per app), 1 fileRef.
+
+Pelajarannya bukan soal dua baris YAML. **`project.yml` tidak punya gerbang.**
+`swiftc -parse` tidak membaca YAML, `swift test` tidak membangun proyek, dan
+CI memanggil `xcodegen generate` yang keluar 0 meski isinya salah total.
+Jadi kelas cacat ini mustahil ditangkap gerbang yang ada - dan saya baru
+menyadarinya setelah hampir mendorong dua "perbaikan" yang tidak memperbaiki
+apa pun.
+
+### Cacat NYATA yang ditemukan di unit yang sama: `developmentRegion` selalu `en`
+
+Kunci yang benar-benar ditemukan bukan yang saya duga. `developmentRegion`
+diisi dari `options.developmentLanguage` (`PBXProjGenerator:99`,
+`project.options.developmentLanguage ?? "en"`), **bukan** dari build setting
+`DEVELOPMENT_LANGUAGE` di `settings.base` yang sudah ada.
+
+Dibuktikan di tiga kondisi:
+
+| Kondisi | `developmentRegion` |
+|---|---|
+| `project.yml` di HEAD apa adanya | **`en`** |
+| `knownRegions` tak dikenal, tanpa `developmentLanguage` | **`en`** |
+| `developmentLanguage: id` | **`id`** |
+
+Jadi sejak katalog ini belum pernah ada, proyek menyatakan bahasa
+pengembangan `en` sementara seluruh teks sumbernya bahasa Indonesia. Dan
+`knownRegions` pun ikut salah: tanpa `id`, bahasa Indonesia tidak pernah
+muncul sebagai bahasa yang bisa dipilih di Xcode - padahal brief dan Fase C
+meminta dua bahasa siap pakai.
+
+Perbaikannya satu baris (`developmentLanguage: id`) plus penjelasan kenapa
+build setting saja **tidak cukup** - keduanya memang perlu, dan hanya
+menuliskan yang satu meninggalkan keadaan yang sama.
+
+### Gerbang baru: aturan 5, dan dua false positive yang harus dibunuh
+
+Kelas cacat "kunci `project.yml` yang diabaikan diam-diam" tidak boleh bisa
+berulang, jadi `./swift-ui-lint.sh` dapat **aturan 5**: kunci di `options:` dan
+`settings:` dicek terhadap daftar yang diambil dari sumber XcodeGen
+(`Tools/xcodegen-known-keys.txt`, beserta perintah untuk memperbarinya).
+
+Gerbang ini harus direvisi dua kali sebelum benar, dan itu bagian paling
+bernilai untuk dicatat:
+
+1. Versi pertama menelusuri seluruh turunan YAML, lalu melaporkan `base`,
+   `Debug`, `Release`, `iOS`, `watchOS`, dan `SWIFT_ACTIVE_COMPILATION_CONDITIONS`
+   sebagai "tidak dikenal". Semuanya **sah**. Gerbang yang selalu merah akan
+   dimatikan orang lain saat berbunyi, jadi ini bukan sekadar soal tampilan -
+   itu alasan gerbang tidak boleh longgar.
+2. Perbaikannya menyisakan `base` (anak sah dari `settings:`), sehingga
+   perbaikannya sendiri masih merah. Butuh daftar anak yang dikecualikan
+   secara eksplisit.
+
+Sekarang terbukti keempat arah di salinan sementara: tree bersih **hijau**;
+`knownRegions` disuntik **merah** (tepat satu kunci); `opsiNgawur` **merah**;
+dikembalikan lagi **hijau**.
+
+Gerbang aturan 4 juga dibuktikan dua arah pada siklus ini (kunci
+`Text("Kunci baru tanpa entri katalog")` disuntik -> keluar 1; tree bersih
+-> keluar 0), karena katalog **tidak** diisi otomatis
+(`SWIFT_EMIT_LOC_STRINGS: NO`) sehingga tidak ada gerbang Xcode yang bisa
+melihat teks yang belum punya terjemahan.
+
+### Temuan yang harus dicatat: `xcodegen generate` mengubah `Info.plist`
+
+Menjalankan XcodeGen di repo ini **menghapus** `CFBundleDisplayName` dari
+`Apps/PointAndKnowWatch/Complications/Info.plist` dan menggantinya dengan
+tab. Berkas itu di-commit, jadi menjalankan generator di mesin kerja langsung
+membuat tree kotor - dan kalau tidak sengaja ikut ter-commit, complication
+kehilangan nama tampilnya. Dikembalikan dengan `git checkout --`.
+
+Batasnya jujur: ini efek samping yang saya temukan tanpa sengaja, **bukan**
+uji. Yang diketahui pasti: generator menulis ulang `Info.plist` yang
+dispesifikasikan di `project.yml`, dan `Info.plist` yang di-commit bisa
+menjadi lebih kaya daripada hasil generator. Yang belum diperiksa: apakah
+Xcode di CI melihat perubahan yang sama.
+
+### Batas yang diketahui dan belum ditutup
+
+- **Terjemahan `en` tidak bisa diverifikasi di Linux.** `Bundle.main` di Linux
+  tidak punya `.lproj` (`localizations == []`), dan `String(localized:)`
+  **tidak ada** di Swift 6.0 Linux - hanya
+  `Bundle.localizedString(forKey:value:table:)`, yang selalu mengembalikan
+  fallback di sini. Jadi yang bisa dibuktikan di Linux: setiap kunci punya
+  entri, dan setiap pasangan key/`en` punya paritas `%`-specifier. Yang
+  **tidak**: terjemahan itu benar dibaca perangkat. Itu tetap wilayah
+  CI dan perangkat.
+- Katalog berisi 63 kunci; `Text(...)` di `Apps/` yang tidak punya entri
+  **nol** menurut aturan 4. Tapi label yang **dihasilkan** di `PointingKit`
+  (`shortLabel`, `guidance`, `displayName`) tidak pernah melewati
+  `Text("literal")`, jadi katalog tidak bisa menjangkau mereka. Itu celah
+  Fase C yang belum ditutup, dan kandidat unit berikutnya.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` -> **166 CelestialEngine + 277 PointingKit, 0 gagal**.
+  Engine tidak disentuh.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- `./swift-ui-lint.sh` -> 5 aturan, semua hijau; aturan 4 dan 5 dibuktikan
+  merah lalu hijau di salinan sementara.
+- `xcodegen generate` (XcodeGen 2.46.0, dibangun lokal) -> proyek terbentuk,
+  `developmentRegion = id`, `knownRegions = (Base, en, id)`, katalog 2 build
+  file dan 1 fileRef, `postGenCommand` berjalan.
+- Sapuan karakter non-Latin pada semua berkas yang diubah: **0**.
+  Beberapa selip sempat masuk ke dalam komentar, dan tertangkap aturan 3
+  sebelum commit - itulah alasan aturannya ada. Entri STATUS.md ini sendiri
+  pertama kali kena cacat yang sama, lalu ditulis ulang per bagian.
+
+
+## Progres terakhir (4 Okt 2026 — baris keempat + gerbang aksara, lalu README, lalu VoiceOver)
+
+### Siklus 4 — kelas cacat yang saya klaim selesai, padahal tidak
+
+Siklus 2 menulis: "`row(_:_:)` dipakai di **tiga** layar". Itu salah.
+Ada **empat** — `SkyContextView.row` di jam punya bentuk yang sama persis,
+tapi masih merangkai kalimatnya sendiri. Jadi kelas cacat "dua jalur yang
+seharusnya identik, hanya satu yang diperbaiki" **masih ada**, persis seperti
+yang diklaim sudah ditutup.
+
+Yang membuatnya berbahaya: STATUS.md sudah mencatatnya selesai, jadi tidak
+ada yang akan mencarinya lagi. Persis kondisi yang membuat siklus 1 terjadi —
+klaim "sudah beres" yang tidak pernah diverifikasi ulang.
+
+**Gerbang aturan 3** sekarang menjaga dua hal sekaligus:
+
+1. `row(_:_:)` tidak lagi menangkai kalimat pengumuman sendiri.
+2. Tidak ada aksara CJK/Cyrillic/fullwidth di kode.
+
+Yang kedua terjadi **berulang dalam satu siklus**, termasuk pada pesan
+commit yang sama. Bukan keputusan yang salah — selip yang di tengah kalimat
+Indonesia terbaca sebagai satu kata lalu dilewati. Persis kelas cacat yang
+tak terlihat mata dan tak tertangkap compiler.
+
+Sapaan diperluas dari `Apps/` ke `Apps/` + `Packages/`. Terbukti dua arah:
+tree bersih lulus, tree dengan karakter disuntikkan gagal.
+
+### Catatan kejujuran
+
+Satu commit sempat terpush dengan CJK di pesannya, lalu ditulis ulang
+dengan `--force-with-lease`. Riwayat bersih sekarang; tidak ada commit
+dengan CJK yang masih terjangkau di `main`.
 
 ### Siklus 3 — README: isi yang paling dibutuhkan orang yang baru membuka repo
 

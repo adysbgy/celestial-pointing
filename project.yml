@@ -24,11 +24,36 @@ name: PointAndKnow
 
 options:
   bundleIdPrefix: dev.celestial
+  # `id` = bahasa pengembangan, dan ini yang **benar-benar** mengisi
+  # `developmentRegion` di proyek yang dihasilkan
+  # (`PBXProjGenerator`: `project.options.developmentLanguage ?? "en"`).
+  # `developmentRegion` lalu ikut masuk `knownRegions`, yang bersama daftar
+  # bahasa dari katalog menentukan bahasa apa yang bisa dipilih di Xcode.
+  #
+  # Kenapa tidak cukup `DEVELOPMENT_LANGUAGE` di `settings.base` (yang juga
+  # ada): build setting itu hanya memengaruhi proses build, **bukan** spec
+  # XcodeGen. Tanpa baris di sini, `developmentRegion` jatuh ke `"en"`
+  # sedangkan teks sumbernya bahasa Indonesia — jadi proyek menyatakan dua
+  # bahasa pengembangan yang berbeda, dan yang salah adalah yang tampil di
+  # Xcode. Dua hal ini harus ditulis bersama; hanya satu tidak cukup.
+  developmentLanguage: id
   deploymentTarget:
     iOS: "18.0"
     watchOS: "11.0"
   createIntermediateGroups: true
   groupSortPosition: top
+  # CATATAN: `knownRegions` sengaja TIDAK ditulis di sini karena itu bukan
+  # opsi XcodeGen. `SpecOptions` tidak punya field tersebut; XcodeGen
+  # menurunkan `knownRegions` sendiri dari isi katalog string
+  # (`SourceGenerator`: `knownRegions.formUnion(stringCatalogsLocales)`),
+  # lalu menambah `developmentRegion` dan `Base`. Baris `knownRegions` pernah
+  # ada di sini dengan komentar yang terdengar benar, tapi tidak beersília
+  # apa pun ke hasil generate.
+  #
+  # Kenapa dicatat: opsi yang tidak dikenal TIDAK menggagalkan
+  # `xcodegen generate`, jadi kunci yang keliru di `project.yml` lolos tanpa
+  # suara. Gerbang yang bisa menangkapnya bukan Xcode, melainkan pemeriksaan
+  # `project.yml` di `./swift-ui-lint.sh`.
   # Proyek ini dibangun CI di macOS 15 / Xcode 16. XcodeGen sebelum perbaikan
   # #1613 masih menaruh app jam di <Host>.app/Watch/; Xcode 16 ke atas
   # mewajibkannya di <Host>.app/PlugIns/. postGenCommand di bawah menambal
@@ -44,7 +69,10 @@ options:
 
 packages:
   # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
-  # format pesan Watch<->iPhone. Semuanya teruji di Linux (143 tes).
+  # format pesan Watch<->iPhone, model visual, palet. Semuanya teruji di
+  # Linux. Jumlah tes ikut berubah tiap siklus — `STATUS.md` yang mencatatnya
+  # lebih jujur daripada angka yang dibekukan di sini, jadi yang penting
+  # adalah bahwa paketnya **tidak** punya logika yang hanya bisa diuji di Mac.
   PointingKit:
     path: Packages/PointingKit
   # Mesin inti: katalog, efemeris, resolver, keyakinan, pengaman slew.
@@ -55,8 +83,22 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
-    # Kode ditulis dalam bahasa Indonesia; teks UI memang memuat karakter
-    # non-ASCII, jadi lokalisasi string otomatis tidak perlu.
+    # Pasangan dari `options.developmentLanguage: id` di atas, dan keduanya
+    # memang perlu: opsi itu mengisi `developmentRegion` di proyek, sedangkan
+    # build setting ini memberi tahu proses build apa bahasa sumbernya.
+    # Tanpa build setting ini, Xcode tetap menandai kunci katalog sebagai
+    # "missing from Indonesian" walau `developmentRegion` sudah `id`.
+    DEVELOPMENT_LANGUAGE: id
+    # Katalog `Localizable.xcstrings` **ditulis tangan** dan di-commit, jadi
+    # `SWIFT_EMIT_LOC_STRINGS` sengaja TIDAK dinyalakan: flag itu membuat
+    # Xcode menulis ulang katalog dari literal yang ditemukan di kode. Itu
+    # akan menimpa terjemahan Inggris dan membalikkan katalog ke keadaan
+    # "63 kunci tanpa terjemahan" setiap kali proyek dibangun.
+    #
+    # Konsekuensinya, katalog tidak ikut **terisi otomatis**: kunci yang
+    # baru dipakai di kode tetapi belum ada di katalog akan terlihat sebagai
+    # teks tak terlokalisasi, tanpa peringatan. `./swift-ui-lint.sh` yang
+    # menjaga itu (aturan 4), karena tidak ada gerbang lain yang bisa.
     SWIFT_EMIT_LOC_STRINGS: NO
   configs:
     Debug:
@@ -77,6 +119,16 @@ targets:
       - path: Apps/PointAndKnowiOS/Sources
       - path: Apps/Shared
       - path: Apps/PointAndKnowiOS/Resources
+      # Katalog string ikut lewat glob `Apps/Shared` di atas: file
+      # `Localizable.xcstrings` ada di dalam direktori itu. Dulu ada entri
+      # kedua yang menyebut `Apps/Shared/Resources` secara eksplisit dengan
+      # `buildPhase: resources`, dengan alasan "XcodeGen hanya mengenali
+      # `.xcstrings` sebagai resource bila path-nya disebut langsung".
+      # Alasan itu **salah**: XcodeGen sudah memetakan
+      # `"xcstrings": FileType(buildPhase: .resources)` secara default
+      # (Sources/ProjectSpec/FileType.swift). Akibatnya berkas yang sama
+      # di-*claim* dua kali oleh dua entri `sources`, dan tidak ada satu
+      # pun gerbang yang bisa melihatnya.
     dependencies:
       - package: PointingKit
       - package: CelestialEngine
@@ -156,6 +208,10 @@ targets:
       - path: Apps/PointAndKnowWatch/Sources
       - path: Apps/Shared
       - path: Apps/PointAndKnowWatch/Resources
+      # Katalog string ikut lewat glob `Apps/Shared` di atas — sama dengan
+      # app iPhone: satu teks, dua perangkat. Kalau katalognya terpisah per
+      # app, perubahan satu kalimat harus diulang dua kali, dan cepat-cepat
+      # berbeda.
     dependencies:
       - package: PointingKit
       - package: CelestialEngine

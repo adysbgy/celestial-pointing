@@ -98,6 +98,166 @@ else
   echo "Bersih: tidak ada aksara non-Latin."
 fi
 
+# ── Aturan 4: setiap teks UI harus ada di katalog string ───────────────────
+# Katalog `Localizable.xcstrings` sengaja **tidak** diisi otomatis
+# (`SWIFT_EMIT_LOC_STRINGS: NO`, alasannya di `project.yml`). Konsekuensinya
+# yang biasanya dianggap jelas: string baru yang dipakai di view tapi belum
+# ada di katalog **tidak menghasilkan peringatan apa pun** — teksnya
+# muncul apa adanya, hanya tidak punya padanan bahasa Inggris.
+#
+# Itu persis bentuk "hijau yang tidak hijau": build sukses, tidak ada
+# warning, tapi lokalisasi sudah setengah jadi tanpa ada yang memberitahu.
+# Karena tidak ada gerbang Xcode yang bisa melihatnya, sapuan ini yang
+# menggantinya.
+echo
+echo "== Aturan 4: teks UI tanpa entri di katalog string =="
+missing=$(python3 - <<'PY'
+import json, os, re, sys
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+if not os.path.exists(CATALOG):
+    sys.exit(0)  # belum ada katalog: aturan belum berlaku, bukan kegagalan
+
+keys = set(json.load(open(CATALOG, encoding="utf-8"))["strings"])
+# Nama produk dan nama percobaan sengaja tidak diterjemahkan.
+NOT_LOCALIZED = {"Point & Know", "Experiment 1"}
+
+# Interpolasi SwiftUI tidak bisa jadi kunci katalog; bentuknya dipetakan
+# ke kunci format yang benar supaya sapuan ini tidak melaporkannya sebagai
+# hilang (dan supaya bug formatSpecifier-nya tetap terlihat).
+FORMATS = {
+    r"Status: \(statusMessage)": "Status: %@.",
+    r"\(flow.samples.count) acuan tercatat": "%lld acuan tercatat",
+    r"Lokasi: \(engine.location.label)": "Lokasi: %@",
+    r"· \(link.sendFailureCount) gagal": "%lld gagal",
+}
+# `String(format:)` di dalam interpolasi tidak bisa diekstrak; dilewati
+# dengan jujur daripada dikarang menjadi kunci.
+SKIP_PREFIX = ("Usulan ambang keyakinan",)
+
+POS = re.compile(
+    r'\b(Text|navigationTitle|navigationSubtitle|Button|Label|Toggle|Picker|'
+    r'Section|NavigationLink|accessibilityLabel|accessibilityHint|'
+    r'accessibilityValue|confirmationDialog|alert)\(\s*"((?:[^"\\]|\\.)*)"'
+)
+
+found = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        for m in POS.finditer(open(path, encoding="utf-8").read()):
+            raw = m.group(2)
+            if any(raw.startswith(p) for p in SKIP_PREFIX):
+                continue
+            key = FORMATS.get(raw, raw)
+            if key in NOT_LOCALIZED or key in keys:
+                continue
+            where = f"{path}: {m.group(1)}"
+            found.append(f"  {where}: {key!r}")
+
+print("\n".join(found) if found else "")
+PY
+)
+if [ -n "$missing" ]; then
+  echo "Teks UI berikut belum ada di katalog (tanpa padanan bahasa Inggris):"
+  echo "$missing"
+  echo "-> Tambahkan kunci + terjemahan 'en' ke Localizable.xcstrings."
+  status=1
+else
+  echo "Bersih: setiap teks UI punya entri di katalog."
+fi
+
+# ── Aturan 5: kunci `project.yml` yang benar-benar dibaca XcodeGen ─────────
+# `project.yml` tidak pernah dikompilasi. XcodeGen membaca YAML-nya dengan
+# pemetaan LENIENT: kunci yang tidak dikenal diabaikan diam-diam, dan
+# `xcodegen generate` tetap keluar 0.
+#
+# Yang nyata terjadi di repo ini: `knownRegions: [id, en]` ditulis dengan
+# komentar yang terdengar benar ("tanpa ini Xcode tidak tahu `en` ada"),
+# padahal `SpecOptions` tidak punya field itu. XcodeGen menurunkan
+# `knownRegions` sendiri dari isi katalog string. Kuncinya tidak pernah
+# menyebutkan apa pun ke hasil generate, dan tidak ada gerbang yang
+# melihatnya: `swiftc -parse` tidak membaca YAML, `swift test` tidak
+# membangun proyek, dan CI hanya memanggil `xcodegen generate` yang keluar 0.
+#
+# Batasnya dinyatakan jujur: daftar kunci diambil dari XcodeGen 2.46.0,
+# jadi ia usang begitu XcodeGen menambah opsi. Karena itu daftar itu simpan
+# sebagai berkas (`Tools/xcodegen-known-keys.txt`) beserta perintah untuk
+# memperbarui, bukan dikubur di dalam skrip ini.
+echo
+echo "== Aturan 5: kunci options/settings di project.yml yang dikenal XcodeGen =="
+KEYS_FILE="Tools/xcodegen-known-keys.txt"
+if [ ! -s "$KEYS_FILE" ]; then
+  echo "PERINGATAN: $KEYS_FILE tidak ada atau kosong."
+  echo "Aturan 5 DILEWATI, bukan lulus."
+else
+  unknown=$(KEYS_FILE="$KEYS_FILE" python3 - <<'PY'
+import os, re
+
+known = set(open(os.environ["KEYS_FILE"], encoding="utf-8").read().split())
+lines = open("project.yml", encoding="utf-8").read().split("\n")
+
+# Yang diperiksa adalah kunci LANGSUNG di `options:` dan `settings:`, pada
+# tingkat indentasi yang sama dengan header itu sendiri.
+#
+# Kenapa harus sebatas itu, dan kenapa anak-anak dikecualikan: YAML di bawah
+# `settings:` punya anak yang **sah** (`base:`, `configs:`), dan kunci di
+# bawah keduanya **bebas** -- nama konfigurasi (`Debug`) dan build setting
+# apa pun (`SWIFT_ACTIVE_COMPILATION_CONDITIONS`). Versi pertama menelusuri
+# seluruh turunan dan melaporkan enam kunci yang sah sebagai "tidak dikenal":
+# itu persis bentuk gerbang yang selalu merah, yang akan dimatikan orang lain
+# saat ia berbunyi. Kunci target juga punya skema sendiri
+# (`sources`, `dependencies`, ...) dan tidak terkait aturan ini.
+STRUCTURAL = {"base", "configs"}
+OPTIONS_SCHEMA = {
+    "deploymentTarget",   # map platform -> versi
+    "disabledValidations",
+    "fileTypes",
+    "groupOrdering",
+}
+
+def direct_keys(header, allowed_children):
+    found, inside, parent_indent = [], False, 0
+    for raw in lines:
+        if re.match(header, raw):
+            inside, parent_indent = True, len(raw) - len(raw.lstrip())
+            continue
+        if inside:
+            stripped = raw.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indent = len(raw) - len(raw.lstrip())
+            if indent <= parent_indent:
+                break
+            if indent != parent_indent + 2:
+                continue  # sudah masuk anak, biarkan
+            m = re.match(r"\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", raw)
+            if m and m.group(1) not in allowed_children:
+                found.append(m.group(1))
+    return found
+
+bad = []
+for key in (direct_keys(r"^options:\s*$", OPTIONS_SCHEMA)
+           + direct_keys(r"^settings:\s*$", STRUCTURAL)):
+    if key not in known:
+        bad.append(key)
+
+print("\n".join(sorted(set(bad))))
+PY
+)
+  if [ -n "$unknown" ]; then
+    echo "Kunci yang TIDAK dikenal XcodeGen (diabaikan diam-diam):"
+    echo "$unknown" | sed 's/^/  - /'
+    echo "-> Kalau memang opsi XcodeGen, tambahkan ke $KEYS_FILE."
+    echo "   Kalau bukan, hapus dari project.yml."
+    status=1
+  else
+    echo "Bersih: semua kunci options/settings dikenal XcodeGen."
+  fi
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
