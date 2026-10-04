@@ -187,8 +187,12 @@ public struct CelestialVisual: Equatable, Sendable {
         case .deepSky:
             // Objek langit dalam tidak punya magnitudo yang sebanding dengan
             // bintang (magnitudonya terintegrasi, bukan titik), jadi ukurannya
-            // tidak diturunkan dari angka itu.
-            self.init(kind: .deepSky, relativeSize: 0.7, fuzziness: 0.8)
+            // tidak diturunkan dari angka itu. Yang membedakan satu objek dari
+            // yang lain adalah **bentuknya** (`fuzziness`), dan itu dibaca dari
+            // tabel per id: satu angka untuk semua akan membuat seluruh kelas
+            // ini tampil sebagai bentuk yang sama persis.
+            self.init(kind: .deepSky, relativeSize: 0.7,
+                      fuzziness: DeepSkyCatalogue.fuzziness(forObjectID: object.id))
         }
     }
 

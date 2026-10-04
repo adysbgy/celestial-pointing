@@ -10,16 +10,36 @@ import CelestialEngine
 /// ambang yang berbeda dan hasil eksperimennya jadi tidak bisa dibandingkan.
 public enum EngineFactory {
 
+    /// Katalog produksi: bintang terang + objek langit dalam.
+    ///
+    /// **Kenapa bukan `Catalogue.brightStars` langsung.** Sampai berkas ini
+    /// diperbaiki, resolver produksi hanya pernah melihat bintang — padahal
+    /// resolver, visual, label, dan pengucapan untuk objek langit dalam
+    /// semuanya sudah ada dan teruji. Yang hilang hanya satu: tidak ada
+    /// katalog yang memuat objek ber-`kind: .deepSky`, jadi jalur itu tidak
+    /// pernah berjalan di aplikasi. Menggabungkannya di sini (satu tempat,
+    /// teruji di Linux) menutupnya untuk **kedua** app sekaligus, bukan hanya
+    /// yang kebetulan merakit resolver dengan katalog yang lebih luas.
+    ///
+    /// `Catalogue.brightStars` sendiri sengaja tidak disentuh: ia dikunci
+    /// oleh uji engine (`testCatalogueNotEmpty`, `testAuditTrailIsConsistent`)
+    /// dan oleh uji warna bintang yang menuntut **setiap** anggotanya
+    /// ber-`kind: .star`. Menambah objek langit dalam ke sana akan memecahkan
+    /// keduanya — dan keduanya benar: katalog itu memang katalog **bintang**.
+    public static let productionCatalogue: [CelestialObject] =
+        Catalogue.brightStars + DeepSkyCatalogue.objects
+
     /// Resolver produksi.
     ///
     /// - Parameters:
-    ///   - catalogue: katalog bintang. Bawaan: bintang terang PRD.
+    ///   - catalogue: katalog bintang. Bawaan: katalog produksi (bintang
+    ///     terang + objek langit dalam).
     ///   - policy: ambang visibilitas.
     ///   - confidencePolicy: ambang keyakinan. Ganti dengan hasil
     ///     `CalibrationFlow` begitu sigma pointing terukur.
     ///   - includeSolarSystem: sertakan Bulan & planet via efemeris.
     public static func makeResolver(
-        catalogue: [CelestialObject] = Catalogue.brightStars,
+        catalogue: [CelestialObject] = productionCatalogue,
         policy: VisibilityPolicy = VisibilityPolicy(),
         confidencePolicy: ConfidencePolicy = ConfidencePolicy(),
         includeSolarSystem: Bool = true
@@ -50,7 +70,7 @@ public enum EngineFactory {
     /// itu ambang konservatif bawaan **tetap** dipakai, bukan diganti angka
     /// karangan. Ini aturan PRD: uncertainty > false confidence.
     public static func makeResolver(calibration: PointingCalibration,
-                                    catalogue: [CelestialObject] = Catalogue.brightStars,
+                                    catalogue: [CelestialObject] = productionCatalogue,
                                     policy: VisibilityPolicy = VisibilityPolicy(),
                                     includeSolarSystem: Bool = true) -> PointingResolver {
         makeResolver(catalogue: catalogue,

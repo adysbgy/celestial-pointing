@@ -62,11 +62,21 @@ public final class CalibrationSession {
     /// Hanya acuan dari `flow.referenceObjects` yang ditawarkan. Sengaja tidak
     /// memakai seluruh katalog: menawarkan 25 bintang yang semuanya harus
     /// ditunjuk satu per satu membuat kalibrasi terasa mustahil.
+    ///
+    /// **Sengaja hanya bintang** (`kind == .star`), dan itu bukan sekadar
+    /// menyaring daftar yang lebih pendek. Kebenaran kalibrasi diambil dari
+    /// posisi katalog; objek langit dalam posisinya juga di katalog, tapi ia
+    /// **tidak punya tepi** — pengguna tidak bisa tahu bagian mana dari kabut
+    /// Orion yang sedang ia tunjuk, jadi sampel acuannya jauh lebih berisik
+    /// daripada bintang. Memasukkan objek bertepi kabur ke daftar acuan akan
+    /// memperlebar `residualSpreadDeg` dan membuat kalibrasi terlihat lebih
+    /// buruk daripada sesungguhnya — atau, lebih buruk, terlihat "siap"
+    /// dengan offset yang salah.
     public func refreshReferenceTargets(date: Date = Date()) {
         let wanted = Set(flow.referenceObjects.map(\.id))
         referenceTargets = controller.resolver
             .availableTargets(observer: controller.observer, date: date)
-            .filter { wanted.contains($0.id) }
+            .filter { $0.kind == .star && wanted.contains($0.id) }
         referenceObserver = controller.observer
     }
 
