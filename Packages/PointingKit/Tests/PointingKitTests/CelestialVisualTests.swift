@@ -275,4 +275,66 @@ final class CelestialVisualTests: XCTestCase {
     func testBrightestMagnitudeIsCappedAtOne() {
         XCTAssertLessThanOrEqual(CelestialVisual.sizeFromMagnitude(-30), 1.0)
     }
+
+    // MARK: - Geometri kutub planet
+
+    /// Titik terjauh elips kutub dari pusat bola, dalam satuan radius.
+    ///
+    /// Elips kutub adalah gambaran di dalam `CGRect` view; agar bisa diuji
+    /// di Linux (tanpa SwiftUI), bentuknya dihitung ulang di sini dari
+    /// `topY/height/halfWidth` yang sama persis dengan yang dipakai view.
+    private func maxDistanceFromCenter(topY: Double,
+                                        height: Double,
+                                        halfWidth: Double) -> Double {
+        let steps = 2000
+        var worst = 0.0
+        for i in 0...steps {
+            let t = 2 * Double.pi * Double(i) / Double(steps)
+            let x = halfWidth * cos(t)
+            let y = topY + height / 2 + (height / 2) * sin(t)
+            worst = max(worst, hypot(x, y))
+        }
+        return worst
+    }
+
+    func testPolarCapsStayOnThePlanetSurface() {
+        // **Regresi untuk kutub selatan yang menembus 0.26R keluar dari bola.**
+        //
+        // Versi lama memakai `y - radius` untuk kutub utara tapi
+        // `y + radius - capHeight` untuk kutub selatan, dengan tinggi elips
+        // `2 · capHeight` — jadi kutub selatan berakhir di y = 1.26, jauh di
+        // luar bola: kutub putih menggantung di ruang kosong, bukan
+        // menempel di permukaan. Uji ini gagal pada geometri lama.
+        let caps = CelestialVisual.polarCaps()
+        for (name, cap) in [("north", caps.north), ("south", caps.south)] {
+            let farthest = maxDistanceFromCenter(topY: cap.topY,
+                                                  height: cap.height,
+                                                  halfWidth: cap.halfWidth)
+            // Toleransi kecil hanya untuk pembulatan titik sampel; kutub
+            // memang sedikit menyentuh tepi bola di kutub utara.
+            XCTAssertLessThanOrEqual(farthest, 1.01,
+                                     "kutub \(name) menembus \(farthest - 1) R di luar bola")
+        }
+    }
+
+    func testPolarCapsAreMirrorImagesOfEachOther() {
+        // Kutub Mars harus simetris terhadap ekuator. Versi lama tidak
+        // (utara hanya meleset 0.004R, selatan 0.26R), dan simetri itulah
+        // yang membuat keduanya melekat pada bola.
+        let caps = CelestialVisual.polarCaps()
+        XCTAssertEqual(caps.north.topY, -caps.south.topY - caps.south.height,
+                       accuracy: 1e-12,
+                       "kedua kutub harus cermin terhadap ekuator")
+        XCTAssertEqual(caps.north.height, caps.south.height)
+        XCTAssertEqual(caps.north.halfWidth, caps.south.halfWidth)
+    }
+
+    func testPolarCapDefaultsAreInRadiusUnits() {
+        // Model tidak boleh bocor satuan: hasilnya proporsional radius
+        // (satuan 1), supaya view cukup mengalikan sendiri.
+        let caps = CelestialVisual.polarCaps()
+        XCTAssertEqual(caps.north.topY, -1.0, accuracy: 1e-12)
+        XCTAssertEqual(caps.north.height, 0.52, accuracy: 1e-12)
+        XCTAssertEqual(caps.north.halfWidth, 0.55, accuracy: 1e-12)
+    }
 }

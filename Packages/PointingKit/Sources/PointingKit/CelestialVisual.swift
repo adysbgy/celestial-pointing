@@ -351,6 +351,75 @@ public extension CelestialVisual {
     }
 }
 
+// MARK: - Geometri ciri planet
+
+public extension CelestialVisual {
+
+    /// Kutub es planet, dalam satuan radius dan relatif terhadap pusat bola.
+    ///
+    /// Satu tipe untuk **kedua** kutub, bukan satu angka per kutub.
+    struct PolarCaps: Equatable, Sendable {
+        /// Sisi atas (utara): tepi elipsnya tepat di tepi bola.
+        public var north: Rect
+        /// Sisi bawah (selatan): cermin dari utara terhadap ekuator.
+        public var south: Rect
+        /// Satu kutub: posisi & ukuran elipsnya.
+        public struct Rect: Equatable, Sendable {
+            /// Tepi atas elips, relatif terhadap pusat bola.
+            public var topY: Double
+            public var height: Double
+            public var halfWidth: Double
+        }
+
+        public init(north: Rect, south: Rect) {
+            self.north = north
+            self.south = south
+        }
+    }
+
+    /// Geometri kutub yang **benar secara konstruktif**: kutub selatan
+    /// dihitung sebagai cermin kutub utara, bukan dari rumus kedua.
+    ///
+    /// **Kenapa ini di model, bukan di view.** Kutub adalah ciri pengenal
+    /// Mars, dan PRD melarang visual yang mengklaim identitas — jadi bentuk
+    /// yang salah adalah **klaim yang salah**, bukan sekadar rasa. Tapi
+    /// bentuk yang salah mustahil dibaca dari teks mana pun di layar, jadi
+    /// ia hanya bisa dijaga di tempat yang bisa diuji di Linux.
+    ///
+    /// **Bug yang ditutup oleh bentuk kacau ini.** Versi sebelumnya memakai
+    /// `y - radius` untuk kutub utara tapi `y + radius - capHeight` untuk
+    /// kutub selatan, dengan tinggi elips `2 · capHeight`. Kutub selatan
+    /// berakhir di y = 1.26 — yaitu **0.26R di luar bola**, menggantung di
+    /// ruang kosong — sementara kutub utara hanya meleset 0.004R. Jadi Mars
+    /// tampil dengan kutub putih yang tidak simetris dan tidak menempel,
+    /// persis di tanda yang paling mudah dibaca mata telanjang. Satu tipe
+    /// dengan dua kutub yang dicerminkan membuat ketidak-simetrisan seperti
+    /// ini tidak bisa ditulis ulang tanpa mengubah bentuk yang benar.
+    ///
+    /// - Parameters:
+    ///   - capHeightFraction: setengah tinggi kutub, dalam satuan radius.
+    ///   - halfWidthFraction: setengah lebar kutub, dalam satuan radius.
+    ///
+    /// Hasil dalam **satuan radius** (bukan poin): view yang sudah punya
+    /// radius cukup mengalikan sendiri, jadi model ini tidak perlu tahu
+    /// satuan apa yang sedang digambar.
+    static func polarCaps(capHeightFraction: Double = 0.26,
+                          halfWidthFraction: Double = 0.55) -> PolarCaps {
+        let height = 2 * capHeightFraction
+        // Kutub utara mulai tepat di tepi bola; kutub selatan cerminnya
+        // mulai `2 · capHeight` di dalam tepi bawah — jadi keduanya berakhir
+        // pada jarak yang sama dari ekuator.
+        let northTop = -1.0
+        let southTop = 1.0 - height
+        func rect(_ topY: Double) -> PolarCaps.Rect {
+            PolarCaps.Rect(topY: topY,
+                           height: height,
+                           halfWidth: halfWidthFraction)
+        }
+        return PolarCaps(north: rect(northTop), south: rect(southTop))
+    }
+}
+
 public extension CelestialVisual.Planet {
 
     /// Palet warna + ciri pengenal planet ini.

@@ -226,12 +226,25 @@ struct CelestialVisualView: View {
         let capColor: Color = NightMode.isOn
             ? Color(red: 0.55, green: 0.18, blue: 0.14)
             : Color(red: 0.97, green: 0.95, blue: 0.93)
-        let capHeight = radius * 0.26
-        for isNorth in [true, false] {
-            let rect = CGRect(x: center.x - radius * 0.55,
-                              y: isNorth ? center.y - radius : center.y + radius - capHeight,
-                              width: radius * 1.10,
-                              height: capHeight * 2)
+        // Geometri kutub datang dari `CelestialVisual.polarCaps`, yang teruji
+        // di Linux — **di sini tidak ada rumus kutub lagi**.
+        //
+        // Versi lama menghitung kutub utara `y - radius` tapi kutub selatan
+        // `y + radius - capHeight`, dengan tinggi elips `2 · capHeight`.
+        // Akibatnya kutub selatan berakhir di y = 1.26: **0.26R di luar
+        // bola**, menggantung di ruang kosong, dan tidak simetris dengan
+        // kutub utara (yang hanya meleset 0.004R). Kutub adalah ciri
+        // pengenal Mars, jadi bentuk yang salah bukan soal rasa — ia lewat
+        // apa yang PRD larang: gambar yang mengklaim identitas.
+        // Sekarang kutub selatan adalah cermin kutub utara secara
+        // konstruktif, jadi ketidak-simetrisan seperti itu tidak bisa
+        // ditulis ulang tanpa mengubah bentuknya di sini juga.
+        let caps = CelestialVisual.polarCaps()
+        for cap in [caps.north, caps.south] {
+            let rect = CGRect(x: center.x - CGFloat(cap.halfWidth) * radius,
+                              y: center.y + CGFloat(cap.topY) * radius,
+                              width: CGFloat(cap.halfWidth) * radius * 2,
+                              height: CGFloat(cap.height) * radius)
             context.fill(Path(ellipseIn: rect), with: .color(capColor.opacity(0.85)))
         }
     }
