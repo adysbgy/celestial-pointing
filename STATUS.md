@@ -5166,6 +5166,47 @@ warning). Yang paling penting:
 Gate: `./swift-ui-lint.sh` 9/9 bersih, `./swift-typecheck.sh` lulus.
 CI: Engine Tests (Linux) + Apple Build keduanya **success** (`32367c8`).
 
+## Siklus 2026-10-04 (6) — hitungan uji di README membusuk tanpa gerbang
+
+**Unit terkecil:** angka di README. Terlihat sepele, tapi kelas cacatnya
+sama dengan yang sudah berkali-kali muncul di repo ini: nilai yang **benar
+saat ditulis**, lalu menjadi salah tanpa ada yang berubah secara salah.
+
+### Yang ditemukan
+
+README menjanjikan "CelestialEngine 166, PointingKit **277**". Suite
+sebenarnya sudah **367**. Selisih 90 uji yang tidak pernah terlihat siapa
+pun, karena:
+
+- menambah uji tidak menyentuh README;
+- tidak ada gerbang yang membandingkan keduanya;
+- dan angka itu justru satu-satunya ukuran seberapa tebal jaring pengaman
+  proyek ini bagi pembaca baru.
+
+Angka yang membusuk perlahan adalah bentuk paling murni dari cacat yang
+tidak bisa dilihat: ia tidak pernah "salah" pada satu commit tertentu.
+
+### Yang diperbaiki
+
+- **Aturan 10** di `swift-ui-lint.sh`: menghitung `func test` per paket dan
+  membandingkan dengan klaim di README. Merah kalau tidak cocok.
+- README: 277 → **367**; bagian penjelasan `swift-ui-lint.sh` juga diperbarui
+  — ia menyebut satu aturan (font tetap) padahal berkasnya sudah 10.
+
+### Kenapa hitungan statis cukup
+
+Yang dijaga adalah **kelas** drift (angka vs kenyataan), bukan angka
+tepatnya. `func test` per berkas sama persis dengan jumlah yang dijalankan
+sekarang (diverifikasi: 367 dan 166). Kalau suatu saat uji dihasilkan
+dinamis sehingga hitungan statis menyimpang, aturan ini yang pertama
+memberi tahu — dan itu justru tujuannya.
+
+### Verifikasi
+
+Dibuktikan **merah lebih dulu**: aturan melaporkan "README bilang PointingKit
+277, berkas uji berisi 367", lalu hijau setelah README diperbaiki. Gate lint
+**10/10**, typecheck lulus. CI: Engine + Apple Build **success** (`fc5a57f`).
+
 ## Siklus 2026-10-04 (5) — gambar langit dalam lebih yakin daripada badge "Ragu"
 
 **Unit terkecil:** keyakinan engine sebagai penentu bentuk yang boleh
