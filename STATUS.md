@@ -74,6 +74,11 @@ menuntutnya menulis ulang bukti historisnya akan merusak dokumentasinya.
 - `bash -n swift-ui-lint.sh` → OK; `./swift-ui-lint.sh` → **8 aturan hijau**.
 - `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 failures**.
 - `./swift-typecheck.sh` → semua gerbang lulus.
+- **CI hijau pada push pertama** (`3d72c1c`):
+  - `Apple Build` run `37212597698` → 2× `BUILD SUCCEEDED` + gerbang
+    *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37212597676` → hijau; `Executed 166 tests`,
+    `Executed 305 tests`, dan `SEMUA GERBANG UI LULUS` terlihat di log CI.
 
 
 ## Progres terakhir (4 Okt 2026 — satu kata Jerman di tengah kalimat Indonesia, dan kenapa daftar kata sendiri dulu menghalangi)
