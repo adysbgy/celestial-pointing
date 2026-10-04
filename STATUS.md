@@ -78,6 +78,28 @@ bagian 4.4 ("fade/scale saat objek muncul") belum terwujud di layar.
   Lolos `-parse`, tapi `-parse` tidak menyelesaikan tipe, jadi CI macOS adalah
   verifikasi sebenarnya (sama seperti siklus-siklus sebelumnya).
 
+### CI macOS pertama GAGAL — dan itu kegagalan nyata, bukan peringatan alat
+
+Push pertama (`18ba900`) ditolak oleh `Apple Build` dengan **5 galat compile**
+yang `-parse` tidak bisa lihat (sesuai dugaan di atas):
+
+- `DiagnosticsView.swift:260: error: cannot find 'visual' in scope` — call site
+  `LockArrivalPanel(visual: visual, ...)` kehilangan binding `visual` karena
+  blok `if let visual = ...` lama ikut terhapus saat panel dipindah. Diperbaiki
+  dengan membungkus call site: `if let visual = engine.visualForDisplayedObject { ... }`.
+- `DiagnosticsView.swift:485/487/488/490/503: error: instance member 'detailRow'/
+  'visualPanelLabel' of type 'DiagnosticsView' cannot be used on instance of
+  nested type 'DiagnosticsView.LockArrivalPanel'` — kedua helper itu `private
+  func` instance, tak terjangkau dari nested type. Diperbaiki jadi `static` (ia
+  murni: hanya pakai `SurfacePalette`/argumen) dan dipanggil via
+  `DiagnosticsView.detailRow`/`visualPanelLabel`.
+
+Push kedua (`9745f9f`) → **Apple Build hijau** (2× `BUILD SUCCEEDED`, gerbang
+peringatan "Tidak ada peringatan compiler pada Apps/") + Engine Tests hijau.
+Pelajaran yang sudah berkali-kali terbukti di sini: `swiftc -parse` hanya
+memeriksa sintaks; **hanya build macOS yang membuktikan resolusi tipe/overload**,
+dan nested type vs instance method adalah jebakan yang tepat di situ.
+
 ## Progres terakhir (4 Okt 2026 — sisa Bagian 4: onboarding + audio + @ScaledMetric)
 
 Siklus ini menutup tiga item terakhir dari brief yang benar-benar belum ada:
