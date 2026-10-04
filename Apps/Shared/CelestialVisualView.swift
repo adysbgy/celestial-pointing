@@ -526,10 +526,29 @@ struct CelestialVisualView: View {
     /// Ditempatkan di sudut kanan atas, bukan di tengah: penanda di tengah
     /// menutupi gambar dan membuat kelihatan rusak. Sudut cukup jelas tanpa
     /// menutupi.
+    ///
+    /// **Geometri lencana datang dari `VisualFrame.candidateMarker`, bukan
+    /// dari angka di sini.** Lencana ini satu-satunya penanda di layar yang
+    /// mengatakan "engine ragu" — jadi kalau ia terpotong tegak oleh
+    /// `Canvas`, yang tersisa hanyalah gambar objek **tanpa** penanda, dan
+    /// gambar tanpa penanda terbaca sebagai identitas yang pasti. Cacat pada
+    /// bentuk ini justru membatalkan alasan bentuk ini ada.
+    ///
+    /// Jebakannya: lencana berada di **sudut**, jadi dua sisinya dekat tepi
+    /// frame sekaligus. Versi lama memakai radius `0.22 · lebar` dengan pusat
+    /// di `0.846 · lebar`, sehingga sisi kanan **dan** sisi atasnya keluar
+    /// 0.132 R — 30% radiusnya hilang di dua sisi — dan lingkarannya tampil
+    /// sebagai busur yang berhenti mendadak, bukan sebagai lingkaran. Itu
+    /// dihitung, bukan ditebak, dan dikunci di Linux
+    /// (`testLegacyCandidateMarkerOverflowedOnTwoSides`).
     private func drawCandidateMarker(context: GraphicsContext, size: CGSize) {
-        let badgeRadius = size.width * 0.22
-        let center = CGPoint(x: size.width - badgeRadius * 0.7,
-                             y: badgeRadius * 0.7)
+        // Satuan model adalah radius frame; `radius` di sini adalah satuan
+        // yang sama dengan yang dipakai seluruh gambar lain.
+        let marker = VisualFrame.candidateMarker()
+        let radius = min(size.width, size.height) / 2
+        let badgeRadius = CGFloat(marker.radius) * radius
+        let center = CGPoint(x: size.width / 2 + CGFloat(marker.centerX) * radius,
+                             y: size.height / 2 + CGFloat(marker.centerY) * radius)
         let circle = Path(ellipseIn: CGRect(x: center.x - badgeRadius,
                                            y: center.y - badgeRadius,
                                            width: badgeRadius * 2, height: badgeRadius * 2))
@@ -541,7 +560,7 @@ struct CelestialVisualView: View {
         // diwarnai/ diperbesar oleh Dynamic Type, dan supaya konsisten di kedua
         // platform tanpa aset font.
         var glyph = Path()
-        let r = badgeRadius * 0.52
+        let r = CGFloat(marker.glyphRadius) * radius
         let top = center.y - r * 0.55
         glyph.move(to: CGPoint(x: center.x - r, y: top))
         glyph.addCurve(to: CGPoint(x: center.x, y: top + r * 0.55),

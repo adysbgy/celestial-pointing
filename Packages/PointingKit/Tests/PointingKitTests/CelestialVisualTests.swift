@@ -611,4 +611,111 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertGreaterThan(faint.coreRadius, 0.05,
                              "inti bintang paling redup tidak boleh menghilang")
     }
+
+    // MARK: - Penanda kandidat: penanda keraguan tidak boleh ikut terpotong
+
+    /// Geometri lencana versi lama: radius `0.22 · lebar`, pusat di
+    /// `(0.846 · lebar, 0.154 · lebar)` — diukur dari pojok kiri atas.
+    ///
+    /// Dipakai sebagai **bukti merah**, bukan dokumentasi: `testCandidateMarkerOverflowedOnTwoSides`
+    /// menghitung ulang angka ini dan membuktikan lencana lama benar-benar
+    /// keluar frame, sehingga perbaikannya bukan sekadar perbedaan rasa
+    /// tentang seberapa besar lencana yang pantas.
+    private func legacyCandidateMarker() -> VisualFrame.CandidateMarker {
+        // Konversi dari satuan "lebar" (0…1 dari pojok) ke satuan "radius"
+        // (dari tengah frame): `r = 2 · (x − 0.5)`.
+        let widthRadius = 0.22 * 2.0
+        return VisualFrame.CandidateMarker(
+            centerX: (0.846 - 0.5) * 2.0,
+            centerY: (0.154 - 0.5) * 2.0,
+            radius: widthRadius,
+            glyphFraction: 0.52)
+    }
+
+    func testLegacyCandidateMarkerOverflowedOnTwoSides() {
+        // **Pengunci cacat lama.** Lencana berada di **sudut**, jadi dua
+        // sisinya dekat tepi frame sekaligus — bukan satu.
+        let legacy = legacyCandidateMarker()
+        let spill = legacy.overflow()
+        XCTAssertGreaterThan(spill, 0.1,
+                             "lencana lama harus terbukti keluar frame; spill=\(spill) R")
+        // Sisi kanan **dan** sisi atas keduanya keluar: itulah sebabnya
+        // lingkarannya tampil sebagai busur yang berhenti mendadak, bukan
+        // sebagai lingkaran.
+        XCTAssertGreaterThan(abs(legacy.centerX) + legacy.radius,
+                             VisualFrame.halfExtent,
+                             "sisi kanan lencana lama keluar dari frame")
+        XCTAssertGreaterThan(abs(legacy.centerY) + legacy.radius,
+                             VisualFrame.halfExtent,
+                             "sisi atas lencana lama keluar dari frame")
+    }
+
+    func testCandidateMarkerStaysInsideTheFrame() {
+        // Lencana adalah satu-satunya penanda di layar yang mengatakan
+        // "engine ragu". Kalau ia terpotong tegak, yang tersisa hanya gambar
+        // objek tanpa penanda — dan gambar tanpa penanda terbaca sebagai
+        // identitas yang pasti. Cacat pada bentuk ini membatalkan alasan
+        // bentuk ini ada.
+        let marker = VisualFrame.candidateMarker()
+        XCTAssertLessThanOrEqual(marker.overflow(), 1e-12,
+                                 "lencana kandidat keluar \(marker.overflow()) R di luar frame")
+    }
+
+    func testCandidateMarkerStaysInsideForAnySize() {
+        // Yang membuat batas ini konstruktif: `d + radius = corner`. Jadi
+        // memperbesar lencana tidak bisa mendorongnya keluar — ia menempel
+        // makin dekat ke tengah. Polanya sama dengan `star`, dan alasannya
+        // sama: lencana ini dipakai di kartu jam 38pt dan panel iPhone
+        // 132pt, jadi radiusnya tidak boleh bergantung pada siapa yang
+        // menggambar.
+        for fraction in [0.1, 0.34, 0.6, 1.0] {
+            let marker = VisualFrame.candidateMarker(cornerFraction: fraction)
+            XCTAssertLessThanOrEqual(marker.overflow(), 1e-12,
+                                     "lencana \(fraction) keluar \(marker.overflow()) R dari frame")
+        }
+        for extent in [0.5, 1.0, 2.0] {
+            let marker = VisualFrame.candidateMarker(frameHalfExtent: extent)
+            let spill = marker.overflow(frameHalfExtent: extent)
+            XCTAssertLessThanOrEqual(spill, 1e-12,
+                                     "lencana pada frame \(extent) keluar \(spill) R")
+        }
+    }
+
+    func testCandidateMarkerKeepsInsetFromTheEdge() {
+        // Lencana yang menempel pada bingkai kartu tampak seperti cacat
+        // render, bukan seperti penanda. Jaraknya harus nyata.
+        // Diukur terhadap frame yang dipakai lencana itu, bukan terhadap
+        // konstanta: kalau tidak, uji ini hanya kebetulan benar untuk frame 1.0.
+        for extent in [0.5, 1.0, 2.0] {
+            let marker = VisualFrame.candidateMarker(frameHalfExtent: extent)
+            let gap = extent - (abs(marker.centerX) + marker.radius)
+            XCTAssertGreaterThan(gap, 0.05 * extent,
+                                 "lencana menempel pada tepi frame (jarak \(gap) R)")
+        }
+    }
+
+    func testCandidateMarkerIsVisibleButDoesNotCoverTheObject() {
+        // Dua batas yang saling menarik: lencana harus cukup besar untuk
+        // terbaca sebagai tanda tanya di kartu jam 38pt, tapi tidak boleh
+        // menutupi gambar objeknya — kalau menutupi, pengguna kehilangan
+        // justru informasi yang masih boleh ditampilkan saat ragu (warna
+        // bola tetap boleh tampil).
+        let marker = VisualFrame.candidateMarker()
+        XCTAssertGreaterThan(marker.radius, 0.15,
+                             "lencana terlalu kecil untuk terbaca")
+        XCTAssertLessThan(marker.radius, 0.45,
+                          "lencana menutupi gambar objeknya")
+        // Glif tanda tanya harus muat di dalam lingkarannya.
+        XCTAssertLessThanOrEqual(marker.glyphRadius, marker.radius,
+                                 "glif tanda tanya keluar dari lingkaran lencana")
+    }
+
+    func testCandidateMarkerSitsInTheTopRightCorner() {
+        // Letaknya di sudut kanan atas, **bukan** di tengah: penanda di
+        // tengah menutupi gambar dan membuat kelihatan rusak. Sudut cukup
+        // jelas tanpa menutupi.
+        let marker = VisualFrame.candidateMarker()
+        XCTAssertGreaterThan(marker.centerX, 0, "lencana harus di sisi kanan")
+        XCTAssertLessThan(marker.centerY, 0, "lencana harus di sisi atas")
+    }
 }

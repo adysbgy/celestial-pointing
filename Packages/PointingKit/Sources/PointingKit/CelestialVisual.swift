@@ -619,6 +619,88 @@ public enum VisualFrame {
         }
         return NebulaGeometry(blobs: blobs)
     }
+
+    // MARK: - Penanda kandidat (lencana tanda tanya)
+
+    /// Geometri lencana tanda tanya untuk objek yang **belum pasti**.
+    ///
+    /// **Kenapa lencana ini ikut dihitung, padahal ia "cuma lencana".** Ia
+    /// adalah satu-satunya penanda di layar yang mengatakan "engine ragu".
+    /// Kalau ia terpotong tegak oleh `Canvas`, yang tersisa hanyalah gambar
+    /// objeknya **tanpa** penanda — dan gambar tanpa penanda terbaca sebagai
+    /// identitas yang pasti. Jadi cacat pada bentuk ini justru membatalkan
+    /// alasan bentuk ini ada: pelanggaran PRD yang ingin dicegahnya
+    /// ("JANGAN tampilkan visual yang mengklaim identitas saat engine ragu").
+    ///
+    /// Jebakannya sama dengan bentuk-bentuk sebelumnya, tapi lebih licin:
+    /// lencana diletakkan di **sudut**, jadi dua sisinya dekat tepi frame
+    /// sekaligus. Versi lama menaruh pusatnya di `0.846 · lebar` dengan
+    /// radius `0.22 · lebar`, sehingga sisi kanan **dan** sisi atasnya keluar
+    /// 0.132 R — 30% dari radius lencana hilang, di dua sisi sekaligus.
+    /// Lingkarannya lalu tampil sebagai busur yang berhenti mendadak, bukan
+    /// sebagai lingkaran.
+    public struct CandidateMarker: Equatable, Sendable {
+        /// Jarak pusat lencana dari tengah frame, sumbu x (satuan radius).
+        public var centerX: Double
+        /// Jarak pusat lencana dari tengah frame, sumbu y (satuan radius;
+        /// negatif = ke atas, karena lencana berada di sudut kanan atas).
+        public var centerY: Double
+        /// Radius lencana (satuan radius).
+        public var radius: Double
+        /// Radius glif tanda tanya sebagai pecahan radius lencana.
+        public var glyphFraction: Double
+
+        public init(centerX: Double, centerY: Double,
+                    radius: Double, glyphFraction: Double) {
+            self.centerX = centerX
+            self.centerY = centerY
+            self.radius = radius
+            self.glyphFraction = glyphFraction
+        }
+
+        /// Radius glif tanda tanya (satuan radius).
+        public var glyphRadius: Double { radius * glyphFraction }
+
+        /// Berapa jauh lencana keluar dari frame, satuan radius. `<= 0` aman.
+        ///
+        /// `frameHalfExtent` ikut sebagai argumen, **bukan** dibaca dari
+        /// `VisualFrame.halfExtent`: lencana dihitung untuk frame yang
+        /// diberikan ke `candidateMarker`, jadi batasnya harus diukur
+        /// terhadap frame itu juga. Mengunci ke 1.0 membuat uji untuk frame
+        /// lain melaporkan "keluar" padahal tidak ada yang keluar.
+        public func overflow(frameHalfExtent: Double = halfExtent) -> Double {
+            max(abs(centerX) + radius, abs(centerY) + radius) - frameHalfExtent
+        }
+    }
+
+    /// Lencana kandidat yang **pas di frame**, diletakkan di sudut kanan atas.
+    ///
+    /// Sama seperti `star`: radius dihitung dari **sudut yang diizinkan**,
+    /// bukan dari lebar yang diinginkan lalu dibiarkan meluber. Karena
+    /// `pusat + radius = corner` secara konstruktif, memperbesar lencana
+    /// tidak bisa lagi mendorongnya keluar — ia akan menempel makin dekat ke
+    /// tengah, bukan makin keluar dari tepi.
+    ///
+    /// - Parameters:
+    ///   - frameHalfExtent: setengah lebar frame.
+    ///   - cornerFraction: radius lencana sebagai pecahan jarak ke sudut
+    ///     yang diizinkan.
+    ///   - inset: jarak minimum dari tepi frame ke tepi lencana, sebagai
+    ///     **pecahan** `frameHalfExtent` (bukan angka mutlak). Pecahan, bukan
+    ///     tetap: lencana digambar pada kartu 38pt dan panel 132pt, dan jarak
+    ///     yang tetap akan menempel pada bingkai di ukuran besar.
+    ///   - glyphFraction: radius glif tanda tanya terhadap radius lencana.
+    public static func candidateMarker(frameHalfExtent: Double = halfExtent,
+                                       cornerFraction: Double = 0.34,
+                                       inset: Double = 0.06,
+                                       glyphFraction: Double = 0.52) -> CandidateMarker {
+        let corner = max(0, frameHalfExtent * (1 - min(1, max(0, inset))))
+        let radius = corner * min(1, max(0, cornerFraction))
+        // `d + radius == corner`, jadi lencana tidak mungkin keluar.
+        let d = corner - radius
+        return CandidateMarker(centerX: d, centerY: -d,
+                               radius: radius, glyphFraction: glyphFraction)
+    }
 }
 
 // MARK: - Geometri ciri planet
