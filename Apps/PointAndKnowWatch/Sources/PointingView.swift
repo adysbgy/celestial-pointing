@@ -551,6 +551,15 @@ struct ObjectDetailView: View {
         if let morphology = visual?.spokenDeepSkyMorphology(isConfirmed: isConfirmed) {
             parts.append(morphology)
         }
+        // Warna spektral bintang: titik digambar biru (Rigel), merah
+        // (Betelgeuse), putih-biru (Sirius) dari indeks B−V, dan `spokenName`
+        // ("bintang") tidak membedakan satu pun dari yang lain. Tanpa ini
+        // kedua bintang di atas terdengar sama padahal di layar warnanya
+        // bertolak belakang. `spokenStarColor` mengembalikan `nil` untuk
+        // bukan-bintang, jadi tidak ada warna yang ditebak.
+        if let color = visual?.spokenStarColor {
+            parts.append(color)
+        }
         parts.append(ObjectSpeech.magnitude(object.magnitude))
         if object.kind == .star {
             parts.append(ObjectSpeech.coordinates(raDeg: object.raDeg,

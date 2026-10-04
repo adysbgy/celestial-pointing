@@ -6784,3 +6784,48 @@ dan diam-diam salah begitu ada id yang tidak mengikuti pola itu.
    keyakinan engine — jangan sebaliknya. Angka akurasi Watch tetap hipotesis
    sampai Experiment 1 selesai; tidak ada satu pun bagian kode yang
    mengasumsikannya.
+
+## Progres terakhir (4 Okt 2026 — warna spektral bintang kini terdengar VoiceOver, Fase C #7)
+
+### Premis: kelas informasi "hanya-bisa-dilihat" yang terakhir masih buta
+Tiga kelas informasi yang cuma muncul sebagai gambar sudah punya jalur ucapan:
+fase Bulan (`MoonPhaseSpeech`), bentuk objek langit dalam (`DeepSkySpeech`),
+dan nama jenis benda (`ObjectKindLabels`). Yang keempat — **warna spektral
+bintang** — belum. Titik bintang diwarnai dari indeks B−V katalog (Rigel biru,
+Betelgeuse merah, Sirius putih-biru), tapi pengguna VoiceOver cuma dengar
+"bintang Sirius": warnanya tak pernah diucapkan. Itu persis bentuk cacat yang
+sudah tiga kali ditutup di repo ini — gerbang hijau, yang diukur bukan bagian
+bermasalah.
+
+### Yang diubah, dan kenapa bentuknya begini
+- **`StarColorSpeech.swift` (baru, PointingKit):** `CelestialVisual.spokenStarColor`
+  — `nil` untuk bukan-bintang (planet/Bulan/Matahari/langit-dalam punya warna
+  render, bukan klaim spektral), `String` warna untuk bintang. Murnya ada di
+  `starColorText(_:)` yang memetakan indeks B−V ke pita: biru (≤ −0,10),
+  putih kebiruan (−0,10…0,25), kuning (0,25…0,95), jingga (0,95…1,50), merah
+  (> 1,50). Persis ambang kelas spektral nyata, supaya ucapan cocok dengan
+  warna yang digambar UI.
+- **Kunci katalog:** 5 `LocalizedText` baru (`star.color.*.spoken.label`),
+  masuk `allKeys` dan `Localizable.xcstrings` (id + en). Aturan 6 jaga paritas
+  dua arah.
+- **Dua label aksesibilitas dipasangi:** `DiagnosticsView.visualPanelLabel`
+  (iPhone) dan `PointingView.kindAccessibilityLabel` (jam) kini menambahkan
+  warna bintang, persis seperti fase Bulan dan morfologi langit-dalam yang
+  sudah ada di sana.
+- **4 tes baru** di `CelestialVisualTests`: pemetaan pita, batas eksak antar-
+  pita, konsistensi bintang katalog (Rigel/Sirius/Betelgeuse), dan bahwa hanya
+  bintang yang diucapkan warnanya.
+
+### Satu harapan yang salah, ketemu tesnya
+Ekspektasi awal: Rigel (B−V −0,03) = "biru". Tes merah benar: −0,03 di pita
+putih-biruan (biru murni cuma kelas B paling awal, B−V ≤ −0,10). Ini *betul* —
+Rigel B8 memang biru-putih, bukan biru tua. Diperbaiki ekspektasi tes, bukan
+pemetaan. Itu persis bentuk "tes menangkap asumsi salah" yang diminta Fase C #10.
+
+### Gerbang
+- `./swift-test.sh`: CelestialEngine 171 + PointingKit 485 hijau (naik 4 dari
+  481 — 4 tes baru).
+- `./swift-typecheck.sh`: bersih.
+- `./swift-ui-lint.sh`: 13 aturan bersih (Aturan 6 paritas & Aturan 10 hitungan
+  README diperbarui; README 481 → 485, `allKeys` 175 → 180).
+

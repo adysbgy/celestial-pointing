@@ -1420,4 +1420,87 @@ final class CelestialVisualTests: XCTestCase {
         let quarter = moon(fraction: 0.5, waxing: nil)
         XCTAssertEqual(quarter.spokenPhase, LocalizedText.moonPhaseQuarter.indonesian)
     }
+
+    // MARK: - Warna spektral bintang (VoiceOver)
+
+    /// Pemetaan indeks B−V ke pita warna mengikuti kelas spektral nyata.
+    ///
+    /// Diuji lewat `starColorText` (murni) dan bukan `spokenStarColor`, karena
+    /// `spokenStarColor` memanggil `TextLocalization`, yang di Linux selalu
+    /// mengembalikan Bahasa Indonesia — maka uji langsung hanya menguji nilai
+    /// bawaan. Yang benar-benar penting adalah **pemilihan** pita: batasnya
+    /// tidak meleset, dan bintang di katalog jatuh ke pita yang benar.
+    func testStarColorFollowsSpectralBands() {
+        // Biru: kelas B ke awal A.
+        XCTAssertEqual(CelestialVisual.starColorText(-0.30), .starColorBlue)
+        XCTAssertEqual(CelestialVisual.starColorText(-0.10), .starColorBlue)
+        // Putih kebiruan: kelas A ke awal F (Sirius, B−V 0,00).
+        XCTAssertEqual(CelestialVisual.starColorText(-0.09), .starColorWhiteBlue)
+        XCTAssertEqual(CelestialVisual.starColorText(0.00), .starColorWhiteBlue)
+        XCTAssertEqual(CelestialVisual.starColorText(0.25), .starColorWhiteBlue)
+        // Kuning: kelas F ke awal K (Polaris, B−V 0,60).
+        XCTAssertEqual(CelestialVisual.starColorText(0.26), .starColorYellow)
+        XCTAssertEqual(CelestialVisual.starColorText(0.95), .starColorYellow)
+        // Jingga: kelas K (Arcturus, B−V 1,23).
+        XCTAssertEqual(CelestialVisual.starColorText(0.96), .starColorOrange)
+        XCTAssertEqual(CelestialVisual.starColorText(1.50), .starColorOrange)
+        // Merah: kelas M (Betelgeuse, B−V 1,85).
+        XCTAssertEqual(CelestialVisual.starColorText(1.51), .starColorRed)
+        XCTAssertEqual(CelestialVisual.starColorText(2.00), .starColorRed)
+    }
+
+    /// Batas antar-pita eksak, supaya pembulatan tidak menyisipkan pita ekstra.
+    func testStarColorBandBoundariesAreExact() {
+        // −0,10 adalah batas biru↔putih-biru: di kiri biru, di kanan putih-biru.
+        XCTAssertEqual(CelestialVisual.starColorText(-0.10), .starColorBlue)
+        XCTAssertEqual(CelestialVisual.starColorText(-0.099), .starColorWhiteBlue)
+        // 0,25 batas putih-biru↔kuning.
+        XCTAssertEqual(CelestialVisual.starColorText(0.25), .starColorWhiteBlue)
+        XCTAssertEqual(CelestialVisual.starColorText(0.251), .starColorYellow)
+        // 0,95 batas kuning↔jingga.
+        XCTAssertEqual(CelestialVisual.starColorText(0.95), .starColorYellow)
+        XCTAssertEqual(CelestialVisual.starColorText(0.951), .starColorOrange)
+        // 1,50 batas jingga↔merah.
+        XCTAssertEqual(CelestialVisual.starColorText(1.50), .starColorOrange)
+        XCTAssertEqual(CelestialVisual.starColorText(1.501), .starColorRed)
+    }
+
+    /// Setiap bintang di katalog jatuh ke pita yang konsisten dengan warna
+    /// yang digambar UI-nya.
+    ///
+    /// UI mewarnai titik dari `colorIndex(forStarID:)`, yang nilainya bersumber
+    /// dari tabel B−V yang sama — jadi ucapan tidak boleh berlawanan dengan
+    /// gambar. Rigel (biru) dan Betelgeuse (merah) adalah ujung yang paling
+    /// mudah salah: keduanya "bintang", dan tanpa warna yang diucapkan keduanya
+    /// terdengar sama padahal di layar warnanya bertolak belakang.
+    func testCatalogStarsGetConsistentSpokenColor() {
+        let rigel = CelestialVisual(object: object(id: "rigel", kind: .star,
+                                                   magnitude: 0.1))
+        // Rigel B−V −0,03 → still in the white-blue band (biru murni hanya
+        // kelas B paling awal, B−V ≤ −0,10). Ucapan sesuai warna yang digambar.
+        XCTAssertEqual(rigel.spokenStarColor, LocalizedText.starColorWhiteBlue.indonesian)
+        let sirius = CelestialVisual(object: object(id: "sirius", kind: .star,
+                                                    magnitude: -1.5))
+        XCTAssertEqual(sirius.spokenStarColor, LocalizedText.starColorWhiteBlue.indonesian)
+        let betelgeuse = CelestialVisual(object: object(id: "betelgeuse", kind: .star,
+                                                       magnitude: 0.5))
+        XCTAssertEqual(betelgeuse.spokenStarColor, LocalizedText.starColorRed.indonesian)
+    }
+
+    /// Hanya bintang yang diucapkan warnanya. Planet, Bulan, Matahari, dan
+    /// objek langit dalam punya warna di gambar, tapi itu sifat render, bukan
+    /// klaim spektral — dan tidak boleh diucapkan sebagai warna spektral
+    /// bintang.
+    func testOnlyStarsSpeakASpectralColor() {
+        XCTAssertNil(CelestialVisual(object: object(id: "jupiter", kind: .planet))
+            .spokenStarColor)
+        XCTAssertNil(CelestialVisual(object: object(id: "moon", kind: .moon))
+            .spokenStarColor)
+        XCTAssertNil(CelestialVisual(object: object(id: "sun", kind: .sun))
+            .spokenStarColor)
+        XCTAssertNil(CelestialVisual(object: object(id: "m42", kind: .deepSky))
+            .spokenStarColor)
+        XCTAssertNotNil(CelestialVisual(object: object(id: "sirius", kind: .star))
+            .spokenStarColor)
+    }
 }

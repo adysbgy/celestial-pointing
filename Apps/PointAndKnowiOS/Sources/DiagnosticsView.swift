@@ -833,6 +833,17 @@ struct DiagnosticsView: View {
         if let morphology = visual?.spokenDeepSkyMorphology(isConfirmed: isConfirmed) {
             parts.append(morphology)
         }
+        // Warna spektral bintang — lihat catatan panjang di `StarColorSpeech`.
+        // Ini kategori yang sama dengan fase Bulan: satu-satunya informasi di
+        // panel ini yang **hanya** bisa dilihat (warna titik dari indeks B−V),
+        // dan jenisnya ("bintang") tidak membedakan satu pun bintang dari
+        // yang lain. Tanpa ini, "Rigel" dan "Betelgeuse" terdengar sama
+        // persis padahal di layar keduanya digambar biru vs merah.
+        // `spokenStarColor` mengembalikan `nil` untuk bukan-bintang, jadi tidak
+        // ada warna yang ditebak di sini.
+        if let color = visual?.spokenStarColor {
+            parts.append(color)
+        }
         if includeTechnicalDetails {
             parts.append(ObjectSpeech.magnitude(object.magnitude))
         }

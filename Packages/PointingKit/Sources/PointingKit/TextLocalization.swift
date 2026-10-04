@@ -407,6 +407,13 @@ public extension LocalizedText {
         .rowSpeechLabel, .rowSpeechDegrees, .rowSpeechDegreesPerSecond,
         .rowSpeechErrorWord, .rowSpeechError, .rowSpeechWristRate,
         .rowSpeechWristRateWord, .rowSpeechStateLine,
+        // Warna spektral bintang. Masuk daftar karena inilah satu-satunya
+        // jalur warna sampai ke pengguna VoiceOver: gambar prosedural mewarnai
+        // titik bintang dari indeks B−V katalog, dan tanpa kunci ini "Rigel"
+        // dan "Betelgeuse" terdengar sama persis padahal di layar keduanya
+        // digambar biru vs merah. Lihat `StarColorSpeech.swift`.
+        .starColorBlue, .starColorWhiteBlue, .starColorYellow,
+        .starColorOrange, .starColorRed,
         // Kalimat keadaan kalibrasi yang tampil di layar Tautan. Disimpan di
         // paket sebagai keadaan + accessor (bukan kalimat jadi di pesan) supaya
         // punya kunci katalog — lihat `PointingLinkMessage.calibrationNoteText`.

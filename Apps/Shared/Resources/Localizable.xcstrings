@@ -3323,6 +3323,61 @@
           }
         }
       }
+    },
+    "star.color.blue.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: biru (kelas B hingga awal A, B−V ≤ −0,10). Lihat StarColorSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "blue"
+          }
+        }
+      }
+    },
+    "star.color.whiteBlue.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: putih kebiruan (kelas A hingga awal F, −0,10 … 0,25). Sirius jatuh ke sini. Lihat StarColorSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "white-blue"
+          }
+        }
+      }
+    },
+    "star.color.yellow.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: kuning (kelas F hingga awal K, 0,25 … 0,95). Lihat StarColorSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yellow"
+          }
+        }
+      }
+    },
+    "star.color.orange.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: jingga (kelas K, 0,95 … 1,50). Lihat StarColorSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "orange"
+          }
+        }
+      }
+    },
+    "star.color.red.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: merah (kelas M, B−V > 1,50). Betelgeuse jatuh ke sini. Lihat StarColorSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "red"
+          }
+        }
+      }
     }
   }
 }
