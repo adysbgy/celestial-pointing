@@ -539,17 +539,27 @@ struct DiagnosticsView: View {
 
         var body: some View {
             Group {
-                if motion.allowsContinuousMotion {
+                // `visual.hasPulse` ikut di ambang, bukan hanya
+                // `motion.allowsContinuousMotion`. Tanpa itu, setiap planet
+                // memakai jalur TimelineView: 30 render per detik untuk
+                // `Canvas` yang menggambar piksel identik setiap frame,
+                // karena `pulse` hanya dibaca di `drawStar`. Properti
+                // `hasPulse` diuji di Linux, jadi keputusan ini tidak
+                // bergantung pada ingatan orang yang sedang menulis di view.
+                if motion.allowsContinuousMotion && visual.hasPulse {
                     TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
                         content(pulse: pulse)
                     }
                 } else {
-                    // Tanpa `TimelineView`: view tidak pernah di-refresh
-                    // per frame, jadi denyut benar-benar berhenti — bukan
-                    // "cukup kecil". `motion.allowsContinuousMotion` sudah
-                    // nol saat reduceMotion/redup, dan `pulsePhase` mengembalikan
-                    // **nol persis** di keadaan itu (bukan amplitude kecil),
-                    // jadi kedua jalur menghasilkan gambar yang sama persis.
+                    // Tanpa `TimelineView`: view tidak pernah di-refresh per
+                    // frame, jadi denyut benar-benar berhenti — bukan
+                    // "cukup kecil". Tiga hal bisa membawa ke sini:
+                    // `reduceMotion`/redup (geraknya memang tidak boleh
+                    // jalan), `hasPulse` salah (gambarnya memang diam), dan
+                    // `pulsePhase` mengembalikan **nol persis** di keadaan
+                    // gated — bukan amplitude kecil. Ketiganya menghasilkan
+                    // gambar yang sama persis, dan itu yang membuat cabang
+                    // ini boleh dicabut tanpa perlu menebak apa yang berubah.
                     content(pulse: 0)
                 }
             }

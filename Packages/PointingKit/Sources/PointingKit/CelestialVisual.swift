@@ -89,6 +89,23 @@ public struct CelestialVisual: Equatable, Sendable {
     /// "titik kabur" dari "kabut lebar".
     public var fuzziness: Double
 
+    /// Apakah gambar ini perlu denyut sama sekali.
+    ///
+    /// **Kenapa ini milik model, bukan milik view.** Hanya glow bintang yang
+    /// benar-benar berubah dari waktu ke waktu; planet, Bulan, Matahari, dan
+    /// nebula digambar dari konstanta saja. Tapi pemanggil tidak bisa
+    /// menanyakan itu ke view: `TimelineView` harus dipasang **sebelum**
+    /// tahu apa yang akan digambar, jadi jalan yang tersedia tanpa properti
+    /// ini adalah menjalankannya untuk semua jenis dan berharap pengoptimasian
+    /// menyusul. Properti ini membuat pertanyaannya punya satu jawaban yang
+    /// bisa diuji di Linux.
+    ///
+    /// Yang dilindungi di sini bukan nilai boolean-nya. Yang dilindungi
+    /// adalah jumlah redraw: `TimelineView` 30 fps di sekitar planet berarti 30
+    /// frame yang identik per detik, terus-menerus, sementara pengguna
+    /// menatap bola yang diam.
+    public var hasPulse: Bool { kind == .star }
+
     public init(kind: Kind,
                 planet: Planet? = nil,
                 illuminationFraction: Double? = nil,

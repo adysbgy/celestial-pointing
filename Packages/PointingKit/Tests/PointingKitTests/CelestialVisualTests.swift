@@ -852,4 +852,55 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertGreaterThan(marker.centerX, 0, "lencana harus di sisi kanan")
         XCTAssertLessThan(marker.centerY, 0, "lencana harus di sisi atas")
     }
+
+    // MARK: - Apakah gambar ini perlu denyut sama sekali
+
+    /// **Kelas cacat: timer yang menggambar gambar yang sama 30 kali per
+    /// detik.** `DiagnosticsView` membungkus panel kunci dalam
+    /// `TimelineView(.animation(minimumInterval: 1/30))` supaya glow bintang
+    /// bisa berdenyut. Tapi `pulse` hanya dibaca di `drawStar` — untuk planet,
+    /// Bulan, Matahari, dan nebula, `Canvas` menggambar piksel yang persis
+    /// sama setiap frame. Hasilnya bukan gambar yang lebih halus: itu 30
+    /// render per detik untuk gambar diam, dan dua app tidak bisa tahu
+    /// apakah objek yang tampil memang berdenyut.
+    ///
+    /// Yang dikunci di sini adalah properti **model**, bukan memindahkan
+    /// `TimelineView`: apakah sebuah visual punya denyut adalah pertanyaan
+    /// tentang bendanya, dan pertanyaan itu harus punya satu jawaban yang
+    /// bisa diuji di Linux.
+    func testOnlyStarsPulse() {
+        for kind in [CelestialVisual.Kind.planet, .moon, .sun, .deepSky] {
+            let visual = CelestialVisual(kind: kind)
+            XCTAssertFalse(visual.hasPulse,
+                           "\(kind.rawValue) tidak punya denyut; TimelineView akan tetap menggambar 30 frame per detik untuknya")
+        }
+        XCTAssertTrue(CelestialVisual(kind: .star).hasPulse,
+                      "bintang satu-satunya jenis yang benar-benar berdenyut")
+    }
+
+    /// Properti ini harus ikut cara pembuatan dari objek engine, bukan hanya
+    /// enum tangan: kalau ada cabang baru yang lupa, katalog penuh akan
+    /// kegagalan diam-diam.
+    func testPulseFollowsTheObjectKindForEveryCatalogueEntry() {
+        for star in Catalogue.brightStars {
+            let visual = CelestialVisual(object: star)
+            XCTAssertEqual(visual.hasPulse, visual.kind == .star,
+                           "katalog \(star.id) punya jenis \(visual.kind.rawValue) tapi hasPulse=\(visual.hasPulse)")
+        }
+        // Benda di luar katalog juga diperiksa, tapi dengan **jenisnya yang
+        // sebenarnya** — katalog `brightStars` hanya berisi bintang, jadi
+        // planet/Bulan/Matahari tidak akan pernah ikut loop di atas. Loop ini
+        // memanggil `object(id:kind:)` dengan jenis yang benar; versi
+        // pertamanya memakai `.planet` untuk semua id termasuk "moon" dan
+        // "sun", jadi ia lulus tanpa pernah menguji apa pun.
+        let outsideCatalogue: [(String, ObjectKind)] = [
+            ("jupiter", .planet), ("saturn", .planet), ("mars", .planet),
+            ("moon", .moon), ("sun", .sun), ("m42", .deepSky),
+        ]
+        for (id, kind) in outsideCatalogue {
+            let visual = CelestialVisual(object: object(id: id, kind: kind))
+            XCTAssertFalse(visual.hasPulse,
+                           "\(id) (\(kind)) tidak berdenyut; jenis yang lebih baru harus ikut dijaga")
+        }
+    }
 }

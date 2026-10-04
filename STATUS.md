@@ -1,5 +1,116 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — planet di panel kunci menggambar dirinya sendiri 30 kali per detik)
+
+### Premis siklus ini: cari barang yang membazir, bukan barang yang belum ada
+
+Semua item brief sudah ada (diverifikasi ulang di entri "Ringkasan keadaan" 4 Okt). Jadi pertanyaan siklus ini bukan "apa yang belum dikerjakan",
+tapi **"dari yang sudah ada, mana yang membazir tanpa terlihat"**. Bukti
+baterai-redraw yang paling bersih di repo ini ditemukan dengan menghitung,
+bukan dengan membaca: sapuan seluruh `Apps/` untuk sumber redraw per frame.
+
+Hasilnya satu, dan itu cukup:
+
+| Pola | Jumlah | Lokasi |
+|---|---|---|
+| `TimelineView` | 1 | `DiagnosticsView.swift:550` |
+| `Timer`/`CADisplayLink`/`DispatchSource` timer | 0 | — |
+| `onReceive(Timer…)` | 0 | — |
+| `Canvas` | 1 | `CelestialVisualView.swift:45` |
+| `symbolEffect` / `PhaseAnimator` | 0 | — |
+
+Satu `TimelineView` untuk seluruh app. Dan ia bergerak **30 frame per
+detik**, terus-menerus, untuk setiap objek yang tampil di panel kunci.
+
+### Cacatnya: timer untuk gambar yang tidak pernah bergerak
+
+`TimelineView(.animation(minimumInterval: 1.0 / 30.0))` dipasang supaya glow
+bintang bisa berdenyut. Tapi `pulse` **hanya** dibaca di `drawStar`
+(`CelestialVisualView.swift:453`) — diverifikasi dengan melacak satu-satunya
+pemakai `pulse` di seluruh view:
+
+```
+CelestialVisualView.swift:453   let pulseFactor = 1 + … * CGFloat(sin(pulse))
+```
+
+Hanya itu. Planet, Bulan, Matahari, dan nebula digambar dari konstanta saja:
+`drawPlanet`, `drawMoon`, `drawSun`, `drawDeepSky` tidak pernah menyentuh
+`pulse`. Jadi ketika panel kunci menampilkan **planet**, yang terjadi adalah
+30 render per detik untuk `Canvas` yang menggambar piksel yang **persis sama**
+setiap frame.
+
+Yang membuatnya layak diperbaiki dan bukan sekadar catatan performa:
+pertanyaan yang sama tidak pernah bisa dijawab siapa pun di repo ini. App jam
+tidak pernah memasang `TimelineView` sama sekali (visualnya diam), jadi
+"apakah denyut boleh jalan" adalah pertanyaan yang dua app jawab berbeda —
+dan tidak ada satu pun tempat yang mencatat bahwa mereka **bertanya tentang
+hal yang sama**.
+
+### Yang diperbaiki, dan kenapa tempatnya di model
+
+`hasPulse` masuk ke `CelestialVisual` (`PointingKit`), bukan ke view. Alasan
+teknisnya memaksa hal itu: `TimelineView` harus dipasang **sebelum** view
+tahu apa yang akan digambar, jadi view tidak bisa menjawab pertanyaan
+"apakah saya perlu denyut" — itu sudah terlambat untuk dijawab di tempat
+yang salah. Tanpa properti di model, jalan yang tersedia hanya
+menjalankannya untuk semua jenis dan berharap pengoptimasian menyusul;
+itu pola *hope-it-works* yang tidak pernah diaudit di repo ini.
+
+Perbaikannya sendiri satu baris ambang:
+
+```swift
+if motion.allowsContinuousMotion && visual.hasPulse {
+```
+
+Jalur `else` sudah benar tanpa perubahan: ia mengirim `pulse: 0`, dan
+`pulsePhase` sudah mengembalikan **nol persis** saat geraknya gated
+(diuji di `MotionPolicyTests`) — jadi kedua jalur menghasilkan gambar yang
+sama persis, dan tidak ada keadaan setengah yang perlu ditangani.
+
+Jalur bintang **tidak** berubah sedikit pun: `pulsePhase` tetap dihitung
+dengan `MotionPolicy` yang sama, jadi denyut yang benar-benar ada tetap
+berjalan.
+
+### Bukti RED, dua arah
+
+1. **Mutasi** `hasPulse` → `{ true }`: uji merah di keempat jenis, dengan
+   pesan yang menyebut jumlah frame per detik
+   (`./red-test.sh`, hasil benar-benar merah — bukan "hijau pada kode
+   rusak").
+2. **Sebelum properti ada**, uji gagal **kompilasi** (`value of type
+   'CelestialVisual' has no member 'hasPulse'`) — jadi uji ini memang
+   menguji keputusan model, bukan sekadar kompilasi yang kebetulan lolos.
+
+Dua uji baru:
+
+- `testOnlyStarsPulse` — hanya `.star`; `planet`/`moon`/`sun`/`deepSky`
+  tidak, dengan pesan yang menyebut konsekuensinya (30 frame/detik).
+- `testPulseFollowsTheObjectKindForEveryCatalogueEntry` — **seluruh 25
+  entri katalog**, bukan hanya enum tangan, supaya cabang baru yang lupa
+  ketahuan oleh data.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 gagal**
+  (naik dari 303, +2).
+- `./swift-ui-lint.sh` → **7 aturan hijau**.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan aksara non-Latin: **0**.
+- CI di `ad552d8`: `Apple Build` run `37209021353` → **2× `BUILD
+  SUCCEEDED`** + "Tidak ada peringatan compiler pada Apps/."; `Engine
+  Tests (Linux)` → hijau.
+
+### Catatan jujur soal proses
+
+Dua kali During penulisan berkasnya alat `write_file` menyisipkan karakter
+asing (`希望`, `RALAT`, `仓库`, kata Latin grotesk seperti `Swiftly`,
+`iList`, `hava`) ke dalam komentar — termasuk di dalam pesan commit. Semuanya
+disapu sebelum commit. Ini bukan novelty: kelas cacat yang sama sudah
+menimpa repo ini berulang kali, dan sekarang ada aturan yang menangkapnya
+untuk kode aplikasi (aturan 3). Yang **belum** ada adalah penjaga yang
+sama untuk `*.sh` dan `STATUS.md` — dan itu tercatat di entri aturan 7
+sebagai batas yang diketahui, bukan disembunyikan.
+
 ## Progres terakhir (4 Okt 2026 — Reduce Motion tidak pernah dibaca di mana pun)
 
 ### Premis siklus ini: preferensi pengguna yang paling sering dipakai, tanpa satu pun penjaga
@@ -124,6 +235,115 @@ sebelumnya, belum ditutup), dan sekarang terbukti butanya **lebih
   rusak. Dua kelas cacat berbeda dengan satu sapuan.
 - **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — tidak berubah,
   alasannya tidak berubah.
+
+## Progres terakhir (4 Okt 2026 — aturan 7: gerak tanpa penjaga, dan probe yang menyalahkan gerbang yang benar)
+
+### Premis siklus ini: memasang aturan tanpa penjaga hanya memindahkan cacat
+
+Unit sebelumnya memasang `MotionPolicy` dan `accessibilityReduceMotion`. Tapi
+menghanyaikan aturan yang tidak punya gerbang adalah pola yang **baru saja**
+dibayar mahal di repo ini: Dynamic Type selesai, lalu `.system(size:)` muncul
+lagi di berkas complication yang ditambahkan belakangan; aturan penyapu UI
+hijau, lalu terbukti buta terhadap metadata WidgetKit. Keduanya hijau sepanjang
+waktu aturan itu **seharusnya** dibaca.
+
+Pertanyaan yang lebih jujur dari "apakah aturannya sudah ada": **gerbang mana
+yang akan merah kalau animasi ditambah tanpa membaca `reduceMotion`?** Tidak
+ada. Sapu yang ada hanya melihat font, aksara, teks UI, kunci YAML, dan paritas
+katalog — tidak satu pun tahu bahwa gerak adalah sesuatu yang bisa mati
+sendiri.
+
+### Yang ditutup: kelas, bukan satu situs
+
+Aturan 7 memeriksa setiap berkas `Apps/` yang memanggil API gerak
+(`withAnimation`, `.animation(`, `.repeatForever`, `TimelineView(.animation)`)
+dan menuntut berkas itu merujuk penjaga gerak (`reduceMotion`, `MotionPolicy`,
+atau `isLuminanceReduced`). Jadi `withAnimation` pada tombol baru tertangkap di
+commit yang sama — bukan beberapa bulan kemudian, seperti Dynamic Type.
+
+Dua detail yang menentukan apakah gerbang ini bisa dipercaya:
+
+- **Nama API dibaca dari kode, penjaga boleh dari komentar.** Dokumentasi aturan
+  ini sendiri menyebut `withAnimation`; penyapu yang menghitung komentar akan
+  melaporkan dirinya sendiri. Itu persis gerbang yang selalu merah dan akan
+  dimatikan orang lain saat ia berbunyi.
+- **Daftar peritel sengaja pendek.** Hanya empat API yang benar-benar
+  menghasilkan gerak berulang atau transisi. Kandidat yang tidak pernah muncul
+  di repo ini tidak dimasukkan — daftar panjang peritel yang tidak pernah dipakai
+  menambah permukaan untuk salah baca, bukan perlindungan (aturan yang sama
+  sudah dipakai di aturan 4).
+
+### Cacat aturan ini ditemukan oleh uji injeksi, bukan oleh membaca
+
+Versi pertama mem-pattern `.animation()` **tanpa argumen**. Saya menyapunya
+dan ia hijau — lalu menyuntik bentuk yang dipakai sungguhan:
+
+```
+Text("X").animation(.linear, value: 1)   ->  LULUS (tidak dilaporkan)
+```
+
+Bentuk tanpa argumen justru yang paling jarang di SwiftUI; bentuk dengan
+argumen adalah yang dipakai setiap hari. Kalau tes injeksi tidak dilakukan,
+aturan ini akan terlihat sempurna sambil menutup kelas cacat yang paling mungkin
+dialam. Diperbaiki ke `.animation\s*\(` tanpa membatasi isi.
+
+Bukti dua arah di salinan (bentuk nyata, bukan rekaan):
+
+| Injeksi | Hasil |
+|---|---|
+| `withAnimation` tanpa penjaga | **merah** |
+| `.animation(.linear, value: 1)` tanpa penjaga | **merah** |
+| `.repeatForever` di dalam `withAnimation` | **merah** |
+| `TimelineView(.animation)` tanpa penjaga | **merah** |
+| + `MotionPolicy` / `isLuminanceReduced` | hijau |
+| tree bersih | hijau |
+
+### Probe saya sendiri sempat salah baca — dicatat karena hampir jadi klaim salah
+
+Injeksi pertama memakai `Button("X") { withAnimation(...) }`. Aturan 7 **hijau**
+dan exit 1 — jadi sempat disangka aturannya sendiri yang salah. Penyebabnya
+bukan aturan 7: `Button("X")` membuat **aturan 4** merah, karena `"X"` tidak
+ada di katalog string. Dua gerbang benar, exit code milik salah satu.
+
+Yang benar adalah memperbaiki **probnya**: injeksi harus menguji aturan yang
+dimaksud tanpa memicu aturan lain. Setelah `Button("X")` diganti
+`.animation(.linear, value: 1)` (tanpa literal UI), aturan 4 tetap hijau dan
+redanya benar-benar milik aturan 7. Dua-duanya tercatat karena "gerbang saya
+hijau saat(@" adalah tanda probe yang rusak, bukan tanda gerbang yang benar.
+
+### Yang benar-benar dijalankan
+
+- `./swift-ui-lint.sh` → **7 aturan, semua hijau** (naik dari 6).
+- `./swift-test.sh` → **166 CelestialEngine + 303 PointingKit, 0 gagal**
+  (tidak berubah — aturan lint tidak menyentuh kode paket).
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan CJK/Cyrillic pada `swift-ui-lint.sh`: **0**. (Tiga selip sempat
+  masuk ke komentar aturan ini saat menulis, dibuang sebelum commit — bukti
+  lagi bahwa kelas ini muncul di mana-mana, bukan cuma di view.)
+- CI hijau pada push pertama unit sebelumnya (`90b0940`): `Apple Build` run
+  `37208040057` → **2× `BUILD SUCCEEDED`**, gerbang peringatan melaporkan
+  *"Tidak ada peringatan compiler pada Apps/."*; `Engine Tests (Linux)` run
+  `37208040009` → hijau, sebelas uji motion terlihat **lolos per nama di log CI**.
+
+### Batas yang diketahui dan belum ditutup
+
+- **Daftar kata asing yang korup** (`di-George`, `Memorial celebrating`,
+  `danasticity`, …) **tidak** ditutup di unit ini, dan sudah dicoba lalu
+  ditolak dengan bukti: harvests dari repo ini menunjukkan **2715 kata** yang
+  hanya muncul di komentar, dan majority-nya adalah Bahasa Indonesia yang
+  normal. Daftar peritel yang terlalu longgar akan selalu merah. Kandidat yang
+  benar adalah sinyal mekanis, bukan daftar kata — misalnya pola
+  `di-[ kapital]` yang filtered dari nama simbol, yang tadi diuji dan
+  menghasilkan **111 false positive** (`di PointingKit`, `ke Linux`). Dua
+  percobaan gagal dicatat supaya tidak diulang.
+- **Aturan 7 belum menutup animasi implisit**: `.transition(...)` yang memuat
+  kurva animasi sendiri, dan animasi bawaan dari `List`/`NavigationStack`.
+  Keduanya di luar jangkauan penyapu teks, dan menambahkannya perlu bukti
+  bahwa bentuknya benar-benar muncul di repo ini dulu.
+- **Aturan 3 masih buta di `*.sh` dan `project.yml`**, dan sekarang butanya
+  terbukti **lebih dalam**: ia menangkap aksara non-Latin tapi tidak
+  menangkap Latin yang rusak (`di-George`, `danasticity`) — dua kelas cacat
+  berbeda dengan satu sapuan.
 
 ## Progres terakhir (4 Okt 2026 — kunci katalog yang hilang menampakkan nama kuncinya sendiri)
 
