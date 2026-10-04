@@ -160,7 +160,32 @@ POS_NAMES = (
     r'configurationDisplayName|description|help|footer|header|prompt|message|'
     # `row`/`detailRow` adalah helper label-lebar di repo ini: keduanya
     # **menampilkan teksnya ke layar**, jadi keduanya wajib berpadanan.
-    r'row|detailRow'
+    r'row|detailRow|'
+    # Daftar ini **diturunkan dari data**, bukan dari ingatan. Sapuan
+    # dijalankan atas seluruh `Apps/` untuk mencari setiap pemanggilan yang
+    # argumen pertamanya sebuah literal, lalu hasilnya dikelompokkan per nama.
+    # Yang muncul dan teksnya benar-benar tampil masuk ke daftar ini; yang
+    # tidak, tidak. Lima nama di bawah ditemukan begitu — masing-masing
+    # memuat literal yang **tampil di layar** dan sebelumnya tidak diperiksa
+    # gerbang mana pun:
+    #
+    #   SharePreview  judul berkas di lembar berbagi (2 situs)
+    #   TextField     label bidang isian ("Catatan (opsional)")
+    #   chartYAxisLabel  label sumbu grafik
+    #   value         label nilai Swift Charts — nama pendek, tapi API-nya
+    #                 memang selalu dipanggil `.value(...)` dan argumennya
+    #                 selalu label sumbu
+    #   legend        helper legenda lokal di `DiagnosticsView`, argumennya
+    #                 teks yang tampil
+    #
+    # Yang **sengaja tidak** dimasukkan, dengan alasannya masing-masing:
+    #   NSLog         pesan log, tidak pernah terlihat pengguna
+    #   append        nama terlalu umum (`Array.append`/`String.append`):
+    #                 memasukkannya akan menandai setiap `append("...")` di
+    #                 repo, termasuk yang bukan teks tampilan. Gerbang yang
+    #                 salah merah akan dimatikan orang lain saat ia berbunyi.
+    #                 Batas ini dicatat, bukan disembunyikan.
+    r'SharePreview|TextField|chartYAxisLabel|value|legend'
 )
 
 # Sapuan mencari **setiap literal langsung di dalam argumen** sebuah peritel

@@ -1651,6 +1651,116 @@
           }
         }
       }
+    },
+    "Riwayat keyakinan": {
+      "comment": "Judul berkas di lembar berbagi saat mengekspor riwayat keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence history"
+          }
+        }
+      }
+    },
+    "σ": {
+      "comment": "Label sumbu Y grafik keyakinan: simpangan baku (sigma). Simbol sama di kedua bahasa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "σ"
+          }
+        }
+      }
+    },
+    "Ambang yakin": {
+      "comment": "Garis ambang di grafik: batas di mana engine menyatakan yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certainty threshold"
+          }
+        }
+      }
+    },
+    "Ambang ambigu": {
+      "comment": "Garis ambang di grafik: batas di mana engine menyatakan ragu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambiguity threshold"
+          }
+        }
+      }
+    },
+    "jarak kandidat / σ": {
+      "comment": "Label sumbu Y grafik keyakinan: jarak kandidat dalam satuan sigma.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "candidate distance / σ"
+          }
+        }
+      }
+    },
+    "Yakin": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.high.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certain"
+          }
+        }
+      }
+    },
+    "Ragu": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.medium.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uncertain"
+          }
+        }
+      }
+    },
+    "Tidak tahu": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.low.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        }
+      }
+    },
+    "Catatan (opsional)": {
+      "comment": "Label bidang isian catatan pada layar percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note (optional)"
+          }
+        }
+      }
+    },
+    "Dataset Experiment 1": {
+      "comment": "Judul berkas di lembar berbagi saat mengekspor dataset percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1 dataset"
+          }
+        }
+      }
     }
   }
 }

@@ -1,5 +1,121 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — lima peritel teks yang tidak pernah masuk daftar, dan cara menemukannya tanpa mengingat)
+
+### Premis siklus ini: daftar peritelnya sendiri belum pernah diturunkan dari data
+
+Unit sebelumnya memperbaiki **cara** argumen dibaca. Yang belum pernah
+diperiksa adalah **daftar peritelnya** — 27 nama yang ditulis tangan, dan
+tidak satu pun punya alasan yang bisa diperiksa. Itu persis bentuk yang sudah
+tiga kali menjadi cacat di repo ini: daftar yang tumbuh dari apa yang
+**diingat** orang, bukan dari apa yang ada di kode.
+
+Jadi pertanyaannya dibalik. Bukan "peritel apa yang harus ditambahkan",
+melainkan: **pemanggilan mana di seluruh `Apps/` yang argumen pertamanya
+sebuah literal?** Sapuan itu tidak butuh daftar sama sekali. Hasilnya
+dikelompokkan per nama:
+
+| Nama | literal | Diperiksa? |
+|---|---|---|
+| `Text` | 33 | ya |
+| `row` | 32 | ya |
+| `Section` | 12 | ya |
+| `Label` | 7 | ya |
+| `Button` | 6 | ya |
+| **`SharePreview`** | 2 | **tidak** |
+| **`TextField`** | 1 | **tidak** |
+| **`chartYAxisLabel`** | 1 | **tidak** |
+| **`legend`** | 3 | **tidak** |
+| **`value`** | 4 | **tidak** |
+
+Lima nama terakhir memuat teks yang **tampil di layar** dan tidak pernah
+diperiksa gerbang mana pun: judul berkas di lembar berbagi, label bidang
+isian, label sumbu grafik, dan tiga label legenda grafik keyakinan.
+
+### Sepuluh teks, dan yang paling penting bukan yang paling mudah terlihat
+
+Yang paling mencolok justru yang paling gampang dilewatkan: **`σ`**, label
+sumbu Y grafik keyakinan. Satu karakter, tidak punya huruf sama sekali —
+bentuk yang sama seperti template format, dan justru karena itu tidak pernah
+terpikir sebagai "teks". Ia tampil di grafik yang jadi inti layar
+Diagnostik.
+
+Tiga label legenda (`Yakin`/`Ragu`/`Tidak tahu`) punya masalah kedua yang
+lebih halus: padanan `en`-nya **harus** sama dengan
+`confidence.level.*.label`, karena keduanya menyebut tingkat keyakinan yang
+sama di layar yang berbeda. Kalau diterjemahkan bebas, satu layar berkata
+"Certain" dan layar lain "Sure" untuk konsep yang identik. Dipakai
+`Certain`/`Uncertain`/`Unknown` — **dibaca dari katalog yang sudah ada**,
+bukan dikarang.
+
+`Dataset Experiment 1` sengaja **tidak** dimasukkan ke `NOT_LOCALIZED`: ia
+berisi nama percobaan yang memang tidak diterjemahkan (`Experiment 1`), tapi
+kata `Dataset` perlu padanan, jadi kunci penuhnya didaftarkan. Ini kebalikan
+dari `Point & Know` yang seluruhnya nama produk.
+
+### Yang sengaja TIDAK dimasukkan, dan kenapa itu keputusan
+
+Dua nama muncul di sapuan dan **ditolak dengan alasan**, bukan dilewatkan:
+
+- **`NSLog`** — pesan log. Tidak pernah terlihat pengguna, jadi menuntut
+  padanan bahasa Inggris untuknya hanya menambah 20 kunci mati ke katalog.
+- **`append`** — delapan literal, dan semuanya memang teks tampilan
+  (`"Tidak dianalisis."`, `"False lock: engine yakin tapi salah."`). Tapi
+  `append` adalah nama `Array.append`/`String.append`: memasukkannya akan
+  menandai **setiap** `append("...")` di repo, termasuk yang bukan teks
+  tampilan. Gerbang yang salah merah akan dimatikan orang lain saat ia
+  berbunyi — itu alasan yang sama yang sudah dipakai repo ini untuk menolak
+  daftar kata asing. Jadi batasnya dicatat di komentar skrip, bukan
+  disembunyikan.
+
+`append` tetap celah yang **nyata**, dan statusnya sekarang jujur: ia
+terdaftar sebagai batas, bukan sebagai selesai.
+
+### Katalog: 150 → 160 kunci, murni aditif
+
+```
+110 baris masuk, 0 keluar
+```
+
+Urutan kunci lama tetap tidak disentuh.
+
+### Uji injeksi: enam arah, termasuk kontrol negatif
+
+Dijalankan pada salinan:
+
+| Injeksi | Diharapkan | Hasil |
+|---|---|---|
+| `TextField("LabelIsianBaru", …)` | MERAH | **MERAH** |
+| `SharePreview("JudulBagikanBaru")` | MERAH | **MERAH** |
+| `.chartYAxisLabel("SumbuBaru")` | MERAH | **MERAH** |
+| `legend("LegendaBaru", …)` | MERAH | **MERAH** |
+| `.value("NilaiBaru", 1.0)` | MERAH | **MERAH** |
+| `NSLog("pesan log internal %@", …)` | hijau | hijau |
+| tree bersih | hijau | hijau |
+
+Enam dari tujuh adalah bukti **merah**; yang ketujuh adalah kontrol negatif —
+tanpa itu, aturan ini bisa "lulus" karena menandai segalanya.
+
+### Yang benar-benar dijalankan
+
+- `./swift-ui-lint.sh` → **7 aturan hijau**; aturan 4 MERAH dulu (11 situs,
+  10 kunci) lalu hijau.
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 gagal**.
+  Tidak ada satu baris Swift pun yang berubah di unit ini.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan CJK/Cyrillic pada berkas yang diubah: **0**.
+- CI: menunggu push.
+
+### Batas yang diketahui dan belum ditutup
+
+- **`append` belum ditutup** — lihat di atas. Kandidat yang benar bukan
+  menambahkannya ke daftar peritel, melainkan memeriksa **tipe** targetnya,
+  dan itu di luar jangkauan sapu teks.
+- **Aturan 3 masih buta di `*.sh`, `project.yml`, dan `*.md`** — tidak
+  berubah.
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — tidak
+  berubah.
+
 ## Progres terakhir (4 Okt 2026 — 23 teks yang tampil di layar, tak terlihat gerbang mana pun)
 
 ### Premis siklus ini: STATUS lalu menunjuk ke tempat yang salah
