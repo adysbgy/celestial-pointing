@@ -128,6 +128,16 @@ barunya cuma "ikut hijau" dan tidak membuktikan apa pun.
 - `./swift-ui-lint.sh` → 8 aturan hijau; `./swift-typecheck.sh` → lulus.
 - Sapuan CJK pada 4 berkas yang diubah → **0**.
 
+### CI
+
+Push `c351739` hijau pada percobaan pertama:
+
+- **Apple Build** run `37213512576` — `BUILD SUCCEEDED` untuk app iPhone dan
+  app jam, dan gerbang peringatan melaporkan "Tidak ada peringatan compiler
+  pada Apps/".
+- **Engine Tests** run `37213512564` — 166 + 310 test, 0 failures, dan
+  gerbang UI (`SEMUA GERBANG UI LULUS`) ikut hijau di macOS.
+
 
 ## Progres terakhir (4 Okt 2026 — cakupan Aturan 3 diperluas, dan aturan baru langsung menangkap penulisnya sendiri)
 
