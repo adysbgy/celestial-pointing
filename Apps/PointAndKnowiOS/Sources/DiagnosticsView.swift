@@ -264,13 +264,23 @@ struct DiagnosticsView: View {
                     // `slewDecision` nol konsumen di `Apps/` — jadi penolakan
                     // karena `sunProximity` (melindungi alat & mata) dan
                     // penolakan karena `lowConfidence` (soal ketelitian)
-                    // terlihat sama: tidak terlihat. Baris ini hanya muncul
-                    // saat ada yang perlu diperingatkan (`verdictText` `nil`
-                    // saat GoTo aman), jadi ia tidak pernah berbunyi di
-                    // sebelah GoTo yang justru berjalan.
-                    if let verdict = engine.slewVerdictText {
-                        row("GoTo", verdict)
-                    }
+                    // terlihat sama: tidak terlihat.
+                    //
+                    // **Kenapa memakai `SlewVerdictBanner`, bukan `row`.**
+                    // Versi pertama menampilkannya lewat `row("GoTo", verdict)`,
+                    // dan itu menyamakan peringatan **keselamatan alat** dengan
+                    // baris data biasa di sebelahnya ("Kalibrasi: Sudah") —
+                    // bobot visual yang sama untuk dua hal yang tidak sama
+                    // pentingnya. Di jam, putusan yang sama tampil sebagai kartu
+                    // berikon (satu sumber: `SlewVerdictBanner`); di iPhone ia
+                    // justru turun pangkat menjadi teks abu-abu. Dua permukaan
+                    // yang menyimpang soal seberapa mendesak sebuah penolakan
+                    // adalah cacat yang tidak terlihat dari layar mana pun.
+                    // Banner yang sama menutupnya, dan `nil`-nya berarti tidak
+                    // ada yang perlu diperingatkan (`verdictText` `nil` saat
+                    // GoTo aman), jadi ia tidak pernah berbunyi di sebelah GoTo
+                    // yang justru berjalan.
+                    SlewVerdictBanner(verdict: engine.slewVerdictText)
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))
