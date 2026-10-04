@@ -62,7 +62,11 @@ struct PointingView: View {
                                          // membuat klaim itu tidak bisa bocor kalau
                                          // gerbang tampilannya berubah.
                                          level: engine.snapshot.answeredLevel,
-                                         isStale: engine.isDisplayingStaleObject)
+                                         isStale: engine.isDisplayingStaleObject,
+                                         // Visual dari sumber yang **sama** dengan
+                                         // objeknya, jadi gambar tidak mungkin
+                                         // milik benda lain.
+                                         visual: engine.visualForDisplayedObject)
                     }
                     if let note = motion.unavailableReason ?? engine.sensorNote {
                         Text(note)
@@ -264,34 +268,58 @@ struct ObjectDetailView: View {
     let object: CelestialObject
     let level: ConfidenceLevel?
     let isStale: Bool
+    /// Model gambar untuk objek ini.
+    ///
+    /// Lewat parameter, bukan diambil dari engine di dalam view: panel ini
+    /// sudah menerima `object` dari luar, jadi membaca sumber kedua membuat
+    /// dua jalur yang bisa berbeda pendapat tentang benda mana yang sedang
+    /// ditampilkan — dan gambar bisa jadi milik objek yang bukan yang
+    /// tertulis di sebelahnya. `nil` → tidak ada gambar, bukan gambar generik.
+    var visual: CelestialVisual?
+    /// Diameter gambar dalam poin. Berbeda antara jam dan iPhone: kartu jam
+    /// sempit, panel iPhone lega.
+    var visualDiameter: CGFloat = 34
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack {
-                Text(object.name)
-                    .font(.system(size: WatchMetrics.titleSize, weight: .bold))
-                Spacer(minLength: 2)
-                // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
-                // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan
-                // terbaca sebagai klaim keyakinan atas pengukuran sekarang —
-                // persis false confidence yang dilarang PRD.
-                if let level, !isStale {
-                    Text(level.displayName)
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(level.tone.color.opacity(0.2),
-                                    in: .capsule)
-                        .foregroundStyle(level.tone.color)
-                }
+        HStack(alignment: .center, spacing: 8) {
+            if let visual {
+                CelestialVisualView(visual: visual,
+                                     diameter: visualDiameter,
+                                     // Predikat yang **sama** dengan badge
+                                     // keyakinan. Kalau gambar dan badge
+                                     // mengambil keputusan sendiri, gambar bisa
+                                     // tampil sebagai pasti sementara badge-nya
+                                     // disembunyikan — dan gambar lebih
+                                     // meyakinkan daripada badge.
+                                     isConfirmed: !isStale)
             }
-            Text(kindLine)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.nightAwareSecondary)
-            if isStale {
-                Text("Sisa pandangan sebelumnya — bukan hasil sekarang")
-                    .font(.system(size: 10))
-                    .foregroundStyle(PointingTone.warning.color)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(object.name)
+                        .font(.system(size: WatchMetrics.titleSize, weight: .bold))
+                    Spacer(minLength: 2)
+                    // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
+                    // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan
+                    // terbaca sebagai klaim keyakinan atas pengukuran sekarang —
+                    // persis false confidence yang dilarang PRD.
+                    if let level, !isStale {
+                        Text(level.displayName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(level.tone.color.opacity(0.2),
+                                        in: .capsule)
+                            .foregroundStyle(level.tone.color)
+                    }
+                }
+                Text(kindLine)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.nightAwareSecondary)
+                if isStale {
+                    Text("Sisa pandangan sebelumnya — bukan hasil sekarang")
+                        .font(.system(size: 10))
+                        .foregroundStyle(PointingTone.warning.color)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -302,7 +330,7 @@ struct ObjectDetailView: View {
         // diucapkan**. Pengguna VoiceOver tidak melihat teks peringatannya,
         // jadi tanpa ini objek dari pandangan sebelumnya terdengar persis
         // seperti hasil pengukuran sekarang — false confidence dalam bentuk
-        // audio, yang sama dilarangnya dengan versi visualnya.
+        // audio, yang sama bentuknya dengan versi visualnya.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(detailAccessibilityLabel)
     }
@@ -324,7 +352,9 @@ struct ObjectDetailView: View {
     }
 
     private var kindAccessibilityLabel: String {
-        var parts = [kindLabel]
+        // `spokenName`, bukan `displayName`: frasa "Objek langit dalam"
+        // terdengar janggal saat diucapkan, jadi pengucapannya terpisah.
+        var parts = [object.kind.spokenName]
         parts.append(String(format: "magnitudo %.2f", object.magnitude))
         if object.kind == .star {
             parts.append(String(format: "RA %.1f derajat, deklinasi %+.1f derajat",
@@ -342,15 +372,10 @@ struct ObjectDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    private var kindLabel: String {
-        switch object.kind {
-        case .star: return "Bintang"
-        case .moon: return "Bulan"
-        case .planet: return "Planet"
-        case .deepSky: return "Objek langit dalam"
-        case .sun: return "Matahari"
-        }
-    }
+    /// Label jenis untuk tampilan dan pengumuman — **satu sumber** untuk
+    /// jam dan iPhone (`ObjectKindLabels`), jadi keduanya tidak bisa
+    /// menampilkan nama berbeda untuk benda yang sama.
+    private var kindLabel: String { object.kind.displayName }
 }
 
 /// Layar kepercayaan pengukuran: apa yang engine ketahui tentang ketelitiannya

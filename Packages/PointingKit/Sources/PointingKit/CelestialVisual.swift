@@ -18,8 +18,8 @@ import CelestialEngine
 ///    pengguna melihat Bulan sabit yang terbalik tanpa ada peringatan apa pun.
 ///
 /// Yang **tidak** ada di sini: warna, gradien, `Canvas`, apa pun dari SwiftUI.
-/// itu semua ada di `Apps/Shared/CelestialVisual.swift`. Pemisahannya sengaja:
-/// model ini diuji di Linux, sedangkan warnanya tidak bisa.
+/// Itu semua ada di `Apps/Shared/CelestialVisualView.swift`. Pemisahannya
+/// sengaja: model ini diuji di Linux, sedangkan warnanya tidak bisa.
 public struct CelestialVisual: Equatable, Sendable {
 
     /// Jenis gambar yang harus digambar lapisan UI.
@@ -59,15 +59,16 @@ public struct CelestialVisual: Equatable, Sendable {
     public var illuminationFraction: Double?
     /// Apakah sabit membesar (waxing) — menentukan sisi mana yang menyala.
     ///
-    /// `nil` bila arah fasenya tidak diketahui. Saat `nil`, UI menggambar
-    /// fase **simetris** (tidak memilih sisi), bukan menebak: sabit yang
-    /// menghadap ke arah yang salah jauh lebih buruk daripada sabit yang
-    /// tidak memihak, karena yang pertama terbaca sebagai fakta.
+    /// `nil` bila arah fasenya tidak diketahui. Saat `nil`,
+    /// `phaseGeometry` mengembalikan `nil` dan UI menggambar piringan **tanpa
+    /// fase** — bukan sabit yang memilih sisi. Sabit yang menghadap ke arah
+    /// yang salah jauh lebih buruk daripada piringan tanpa fase, karena yang
+    /// pertama terbaca sebagai fakta sedangkan yang kedua jujur tidak tahu.
     public var isWaxing: Bool?
 
     // MARK: - Bintang
 
-    /// Indeks warna B−V (magnitudo). Positif = merah, negatif = biru.
+    /// Indeks warna B−V. Positif = merah, negatif = biru.
     ///
     /// Diisi dari **tabel warna nyata per bintang**, bukan dari magnitudo:
     /// magnitudo mengatakan seberapa terang, bukan warna apa. Merah dan biru
@@ -75,8 +76,8 @@ public struct CelestialVisual: Equatable, Sendable {
     /// pengguna, jadi kesalahannya tidak akan pernah dilaporkan — persis
     /// jenis klaim tanpa dasar yang harus diuji, bukan diasumsikan.
     public var colorIndexBV: Double
-    /// Radius sudut relatif untuk digambar, 0…1 (1 = bintang paling terang
-    /// yang ada di katalog).
+    /// Radius relatif untuk digambar, 0…1 (1 = benda paling terang yang ada
+    /// di katalog).
     public var relativeSize: Double
 
     // MARK: - Objek langit dalam
@@ -157,51 +158,54 @@ public struct CelestialVisual: Equatable, Sendable {
     public struct PhaseGeometry: Equatable, Sendable {
         /// Posisi x terminator di ekuator, dalam satuan radius piringan (−1…1).
         ///
-        /// Tanda = sisi yang **menyala**: positif berarti terminator berada di
-        /// kanan sehingga pita terangnya menempel pada limb kanan (waxing);
-        /// negatif berarti sebaliknya. Besar = setengah sumbu mendatar elips
-        /// terminator: `1` → tidak ada yang menyala, `0` → terminator lurus
-        /// (setengah piringan), `−1` → purnama.
+        /// Pita yang menyala adalah daerah **antara** kurva terminator ini dan
+        /// limb pada `litSide`. Untuk fase sabit nilainya positif (terminator
+        /// berada di sisi yang terang, menyisakan pita tipis); untuk gibbous
+        /// nilainya negatif (terminator sudah melewati pusat ke sisi gelap,
+        /// menyisakan pita lebar).
         public var terminatorOffset: Double
 
-        /// Apakah fase-nya gibbous (lebih dari setengah).
+        /// Sisi piringan yang menyala: `+1` kanan, `−1` kiri.
         ///
-        /// Sabat dan gibbous memakai **sisi piringan yang berlawanan** sebagai
-        /// acuan terminator, jadi UI harus tahu yang mana. Salah memilih
-        /// membuat Bulan tampak cekung — separuh terangnya melengkung ke arah
-        /// yang salah.
+        /// Sengaja terpisah dari tanda `terminatorOffset`, karena untuk fase
+        /// gibbous keduanya **berlawanan**: sabit membesar yang hampir
+        /// purnama punya terminator di kiri sementara sisi yang menyala tetap
+        /// kanan. Mengambil sisi dari tanda `terminatorOffset` akan
+        /// membalikkan arah sabit tepat pada fase yang paling mudah dikenali.
+        public var litSide: Double
+
+        /// Apakah fase-nya gibbous (lebih dari setengah).
         public var isGibbous: Bool
 
         /// Separuh sumbu mendatar elips terminator (selalu ≥ 0).
         public var terminatorSemiWidth: Double { abs(terminatorOffset) }
+
+        /// Lebar pita yang menyala di ekuator, dalam satuan radius (0…2).
+        ///
+        /// Berguna untuk uji dan untuk memastikan sabit tidak pernah melebar
+        /// melebihi piringan: untuk bulan baru nilainya nol.
+        public var litBandWidth: Double { abs(litSide - terminatorOffset) }
     }
 
     /// Hitung geometri fase dari fraksi iluminasi.
     ///
-    /// Fraksi piringan yang menyala berbanding lurus dengan lebar pita
-    /// terangnya, yaitu `(1 − terminatorOffset) / 2`, sehingga
-    /// `terminatorOffset = 1 − 2f`. Untuk f = 0 → +1 (tidak ada yang
-    /// menyala), f = 0.5 → 0 (setengah), f = 1 → −1 (purnama — terminator
-    /// sudah keluar dari piringan).
+    /// Lebar pita terang di ekuator berbanding lurus dengan fraksi iluminasi,
+    /// yaitu `|litSide − terminatorOffset| = 2f`, sehingga
+    /// `terminatorOffset = litSide · (1 − 2f)`.
     ///
-    /// - Parameter waxing: arah fase. `nil` saat tidak diketahui.
-    /// - Returns: `nil` bila tidak ada fase yang bisa digambar (bukan Bulan,
-    ///   atau fraksinya tidak tersedia).
+    /// - Parameter waxing: arah fase. **`nil` menghasilkan `nil`**: tanpa arah,
+    ///   gambar apa pun yang digambar akan memihak ke satu sisi, dan itu
+    ///   pernyataan yang tidak dihitung engine.
+    /// - Returns: `nil` bila fase tidak bisa digambar (bukan Bulan, fraksi
+    ///   tidak tersedia, atau arah tidak diketahui). UI lalu menggambar
+    ///   piringan tanpa fase — bukan sabit yang memilih sisi.
     public func phaseGeometry(waxing: Bool?) -> PhaseGeometry? {
-        guard kind == .moon, let f = illuminationFraction else { return nil }
+        guard kind == .moon, let f = illuminationFraction, let waxing else { return nil }
         let clamped = min(1, max(0, f))
-        let offset = 1 - 2 * clamped
-        // Arah menentukan **tanda**, bukan besar. `nil` → 0: terminator
-        // lurus di tengah. Itu bukan "fase setengah palsu" melainkan
-        // pengakuan bahwa arahnya tidak diketahui — elipsnya simetris, jadi
-        // gambar tidak memihak ke kiri maupun kanan.
-        let sign: Double
-        if let waxing {
-            sign = waxing ? 1 : -1
-        } else {
-            sign = 0
-        }
-        return PhaseGeometry(terminatorOffset: offset * sign,
+        let litSide: Double = waxing ? 1 : -1
+        let offset = litSide * (1 - 2 * clamped)
+        return PhaseGeometry(terminatorOffset: offset,
+                             litSide: litSide,
                              isGibbous: clamped > 0.5)
     }
 
@@ -274,7 +278,113 @@ public struct CelestialVisual: Equatable, Sendable {
     }
 }
 
+// MARK: - Palet & ciri pengenal planet
+
+public extension CelestialVisual {
+
+    /// Warna mentah (0…1 per kanal) — **bukan** `SwiftUI.Color`.
+    ///
+    /// Sengaja bukan `Color`: model ini hidup di `PointingKit` supaya bisa
+    /// diuji di Linux, dan `Color` tidak ada di sana. Lapisan UI yang
+    /// mengubahnya menjadi `Color` (dan yang mewarnainya ulang menjadi merah
+    /// saat mode malam).
+    struct RGBComponents: Equatable, Sendable {
+        public var red: Double
+        public var green: Double
+        public var blue: Double
+
+        public init(red: Double, green: Double, blue: Double) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+
+        /// Kecerahan **dalam mode malam**: kanal merahnya.
+        ///
+        /// Bukan luminance penuh (0.2126R + 0.7152G + 0.0722B), dan itu
+        /// disengaja. Mode malam membuang hijau & biru sepenuhnya, jadi yang
+        /// benar-benar sampai ke mata hanyalah kanal merah — urutan terang
+        /// yang dilihat pengguna **harus** diturunkan dari kanal itu.
+        /// Memakai luminance penuh justru salah: planet abu terang seperti
+        /// Merkurius punya luminance tinggi karena hijau-birunya, dan saat
+        /// dikunci ke merah ia akan tampak **lebih** terang dari Mars —
+        /// kebalikan dari apa yang terjadi pada bola di langit.
+        ///
+        /// Uji `testNightModeKeepsBrightnessOrdering` mengunci urutan ini, jadi
+        /// koreksi palet tidak bisa diam-diam membalik urutan terang di malam.
+        public var nightModeBrightness: Double { red }
+    }
+
+    /// Ciri pengenal yang **hanya boleh digambar bila identitasnya pasti**.
+    ///
+    /// Kenapa ini dipisah dari warna: warna bola masih boleh tampil saat engine
+    /// ragu (ia tidak menunjuk planet tertentu), tetapi **ciri** ini menunjuk
+    /// planet tertentu dengan keyakinan yang sama seperti teks namanya.
+    /// Cincin Saturnus pada kandidat yang belum dikonfirmasi adalah klaim
+    /// identitas, bukan sekadar gaya — karena itu ia dikunci oleh uji.
+    enum DistinguishingFeature: String, Equatable, Sendable {
+        /// Tidak ada ciri khusus: bola polos (planet yang tidak dikenali).
+        case none
+        /// Pita sejajar ekuator + Bintik Merah Besar.
+        case bands
+        /// Cincin.
+        case rings
+        /// Tudung es di kedua kutub.
+        case polarCaps
+        /// Permukaan berkawah.
+        case craters
+        /// Kabut tebal yang menutupi permukaan.
+        case haze
+    }
+
+    /// Palet sebuah planet: warna bola + ciri pengenalnya.
+    struct Palette: Equatable, Sendable {
+        public var light: RGBComponents
+        public var dark: RGBComponents
+        public var feature: DistinguishingFeature
+
+        public init(light: RGBComponents, dark: RGBComponents, feature: DistinguishingFeature) {
+            self.light = light
+            self.dark = dark
+            self.feature = feature
+        }
+    }
+}
+
 public extension CelestialVisual.Planet {
+
+    /// Palet warna + ciri pengenal planet ini.
+    ///
+    /// **Kenapa ada di `PointingKit`, bukan di view.** Pemetaan planet → ciri
+    /// adalah pernyataan identitas: `saturn → rings` berkata "Saturnus
+    /// bercincin". Salah memetakan (mis. cincin pada Jupiter) akan terlihat
+    /// sama meyakinkannya dengan yang benar bagi pengguna, dan tidak ada teks
+    /// di layar yang bisa mengeceknya. Karena itu pemetaannya diuji
+    /// (`CelestialVisualTests`), bukan hanya diklaim di komentar.
+    var palette: CelestialVisual.Palette {
+        switch self {
+        case .mercury:
+            return .init(light: .init(red: 0.72, green: 0.70, blue: 0.68),
+                         dark:  .init(red: 0.26, green: 0.25, blue: 0.24),
+                         feature: .craters)
+        case .venus:
+            return .init(light: .init(red: 0.99, green: 0.94, blue: 0.76),
+                         dark:  .init(red: 0.62, green: 0.53, blue: 0.30),
+                         feature: .haze)
+        case .mars:
+            return .init(light: .init(red: 0.88, green: 0.42, blue: 0.26),
+                         dark:  .init(red: 0.38, green: 0.13, blue: 0.08),
+                         feature: .polarCaps)
+        case .jupiter:
+            return .init(light: .init(red: 0.90, green: 0.78, blue: 0.61),
+                         dark:  .init(red: 0.45, green: 0.29, blue: 0.17),
+                         feature: .bands)
+        case .saturn:
+            return .init(light: .init(red: 0.93, green: 0.84, blue: 0.62),
+                         dark:  .init(red: 0.44, green: 0.36, blue: 0.22),
+                         feature: .rings)
+        }
+    }
 
     /// Kenali planet dari `CelestialObject.id`.
     ///

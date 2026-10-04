@@ -168,7 +168,20 @@ public final class PointingEngine: ObservableObject {
         }
         skyContextAt = date
         skyContext = controller.resolver.skyContext(observer: location.observer, date: date)
+        // Arah fase dihitung **di sini**, sekali per perhitungan konteks —
+        // bukan di `body` tiap render. `body` dievaluasi ulang pada setiap
+        // sampel sensor, jadi menghitungnya di sana berarti memanggil efemeris
+        // Matahari + Bulan 20× per detik hanya untuk menggambar satu sabit.
+        // Disimpan bersama konteks supaya gambar dan angka "Fase Bulan" pada
+        // layar Ketelitian berasal dari sampel yang sama.
+        moonIsWaxing = controller.resolver.isMoonWaxing(at: date)
     }
+
+    /// Arah fase Bulan hasil perhitungan terakhir.
+    ///
+    /// `nil` berarti "tidak diketahui" — UI lalu menggambar piringan **tanpa
+    /// fase**, bukan sabit yang memilih satu sisi.
+    private var moonIsWaxing: Bool?
 
     /// Jarak waktu minimum antar perhitungan konteks langit (detik).
     static let skyContextInterval: TimeInterval = 30
@@ -234,4 +247,33 @@ public final class PointingEngine: ObservableObject {
     /// Dipakai Experiment 1 saat merekam. Lihat `PointingController.answeredIntent`
     /// untuk alasan mengapa `snapshot.intent` saja tidak cukup.
     public var answeredIntent: CelestialIntent? { controller.answeredIntent }
+
+    /// Model visual prosedural untuk objek yang sedang ditampilkan.
+    ///
+    /// **Kenapa fraksi fase diambil dari `skyContext`, bukan dari
+    /// `moonIlluminationFraction(at:)` langsung.** Konteks punya cache 30
+    /// detik yang sengaja menjaga efemeris tetap murah, sementara pemanggilan
+    /// langsung menghitung ulang tiap render — dan `body` dievaluasi ulang
+    /// pada setiap sampel sensor. Yang lebih penting: `skyContext` adalah
+    /// sumber yang **sama** dengan angka "Fase Bulan" yang tampil di layar
+    /// Ketelitian. Gambar dan angka harus berasal dari sampel yang sama,
+    /// kalau tidak layar bisa menunjukkan sabit 80% di sebelah teks 40%.
+    ///
+    /// `nil` bila tidak ada objek yang ditampilkan — **bukan** gambar
+    /// generik. Visual tanpa nama akan menampilkan benda yang tidak
+    /// ditentukan engine, dan itu klaim yang dilarang PRD.
+    ///
+    /// Fraksi & arah fase `nil` untuk benda selain Bulan: meneruskannya ke
+    /// planet lain akan menggambar fase pada Venus.
+    public var visualForDisplayedObject: CelestialVisual? {
+        guard let object = displayedObject else { return nil }
+        let isMoon = object.kind == .moon
+        let fraction = isMoon ? skyContext?.moonIlluminationFraction : nil
+        // Arah fase (waxing/waning) hanya bermakna untuk Bulan; untuk benda
+        // lain nil → model tidak menggambar fase sama sekali.
+        let waxing = isMoon ? moonIsWaxing : nil
+        return CelestialVisual(object: object,
+                              moonIlluminationFraction: fraction,
+                              isWaxing: waxing)
+    }
 }

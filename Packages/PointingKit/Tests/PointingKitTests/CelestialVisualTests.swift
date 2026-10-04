@@ -73,24 +73,27 @@ final class CelestialVisualTests: XCTestCase {
 
     func testCrescentSignFollowsWaxingDirection() {
         // Inilah inti Bagian 1: sabit harus benar **arahnya**.
-        // Waxing → menyala di kanan (+), waning → di kiri (−).
-        let waxing = CelestialVisual(kind: .moon, illuminationFraction: 0.2, isWaxing: true)
-        let waning = CelestialVisual(kind: .moon, illuminationFraction: 0.2, isWaxing: false)
-        XCTAssertGreaterThan(waxing.phaseGeometry(waxing: true)?.terminatorOffset ?? 0, 0)
-        XCTAssertLessThan(waning.phaseGeometry(waxing: false)?.terminatorOffset ?? 0, 0)
+        // Waxing → menyala di kanan, waning → di kiri.
+        let waxing = CelestialVisual(kind: .moon, illuminationFraction: 0.2)
+        let waning = CelestialVisual(kind: .moon, illuminationFraction: 0.2)
+        XCTAssertEqual(waxing.phaseGeometry(waxing: true)?.litSide ?? 0, 1,
+                       accuracy: 1e-9, "sabit membesar harus menyala di kanan")
+        XCTAssertEqual(waning.phaseGeometry(waxing: false)?.litSide ?? 0, -1,
+                       accuracy: 1e-9, "sabit mengecil harus menyala di kiri")
     }
 
     func testCrescentMagnitudeTracksIlluminationFraction() {
-        // Besar sabit mengikuti fraksi: f = 0.5 → terminator lurus (nol),
-        // f = 1 → terminator keluar dari piringan (−1, purnama).
+        // Lebar pita terang di ekuator = 2·f (dalam satuan radius). Ini yang
+        // membuat gambar sabit mengikuti fase yang dihitung engine, bukan
+        // fase yang "terlihat bagus".
+        XCTAssertEqual(CelestialVisual(kind: .moon, illuminationFraction: 0.25)
+                        .phaseGeometry(waxing: true)?.litBandWidth ?? -1, 0.5,
+                       accuracy: 1e-9)
         XCTAssertEqual(CelestialVisual(kind: .moon, illuminationFraction: 0.5)
-                        .phaseGeometry(waxing: true)?.terminatorOffset ?? 99, 0,
+                        .phaseGeometry(waxing: true)?.litBandWidth ?? -1, 1.0,
                        accuracy: 1e-9)
         XCTAssertEqual(CelestialVisual(kind: .moon, illuminationFraction: 1.0)
-                        .phaseGeometry(waxing: true)?.terminatorOffset ?? 0, -1,
-                       accuracy: 1e-9)
-        XCTAssertEqual(CelestialVisual(kind: .moon, illuminationFraction: 0.0)
-                        .phaseGeometry(waxing: true)?.terminatorOffset ?? 0, 1,
+                        .phaseGeometry(waxing: true)?.litBandWidth ?? -1, 2.0,
                        accuracy: 1e-9)
     }
 
@@ -98,19 +101,35 @@ final class CelestialVisualTests: XCTestCase {
         // Bulan baru: lebar pita terangnya nol. Kalau ini tidak nol, layar
         // menampilkan sabit pada saat Bulan sama sekali tidak menyala.
         let newMoon = CelestialVisual(kind: .moon, illuminationFraction: 0.0)
-        XCTAssertEqual(newMoon.phaseGeometry(waxing: true)?.terminatorSemiWidth ?? -1, 1,
+        XCTAssertEqual(newMoon.phaseGeometry(waxing: true)?.litBandWidth ?? -1, 0,
                        accuracy: 1e-9)
         XCTAssertFalse(newMoon.phaseGeometry(waxing: true)?.isGibbous ?? true)
     }
 
-    func testUnknownWaxingDirectionDrawsSymmetricPhase() {
-        // Arah yang tidak diketahui harus menghasilkan gambar yang **tidak
-        // memihak**, bukan gambar yang memilih satu sisi. Memilih sisi berarti
-        // menyatakan arah yang tidak dihitung engine.
+    func testGibbousKeepsTerminatorOppositeToLitSide() {
+        // Fase gibbous adalah jebakan: sisi yang menyala tetap kanan, tapi
+        // terminatornya sudah bergeser ke kiri melewati pusat. Mengambil sisi
+        // dari tanda terminator akan membalikkan arah sabit tepat pada fase
+        // yang paling sering dikenali pengguna (hampir purnama).
+        let gibbous = CelestialVisual(kind: .moon, illuminationFraction: 0.85)
+            .phaseGeometry(waxing: true)
+        XCTAssertEqual(gibbous?.litSide ?? 0, 1, accuracy: 1e-9)
+        XCTAssertLessThan(gibbous?.terminatorOffset ?? 1, 0,
+                          "terminator gibbous harus berada di sisi gelap")
+        XCTAssertTrue(gibbous?.isGibbous ?? false)
+    }
+
+    func testUnknownWaxingDirectionDrawsNoPhase() {
+        // Arah yang tidak diketahui harus menghasilkan **tanpa fase**, bukan
+        // fase yang memilih satu sisi. Menggambar sabit miring berarti
+        // menyatakan arah yang tidak dihitung engine — dan layar tidak punya
+        // cara memberitahu pengguna bahwa arahnya tebakan.
         let unknown = CelestialVisual(kind: .moon, illuminationFraction: 0.25, isWaxing: nil)
-        XCTAssertEqual(unknown.phaseGeometry(waxing: nil)?.terminatorOffset ?? 99, 0,
-                       accuracy: 1e-9,
-                       "arah fase yang tidak diketahui tidak boleh menggambar sabit miring")
+        XCTAssertNil(unknown.phaseGeometry(waxing: nil),
+                     "arah fase yang tidak diketahui tidak boleh menggambar sabit miring")
+        // Fraksi yang tidak ada pun sama: UI menggambar piringan polos.
+        XCTAssertNil(CelestialVisual(kind: .moon, illuminationFraction: nil)
+                        .phaseGeometry(waxing: true))
     }
 
     func testGibbousSwitchesAtHalfPhase() {
@@ -121,13 +140,13 @@ final class CelestialVisualTests: XCTestCase {
     }
 
     func testIlluminationFractionIsClampedToPhysicalRange() {
-        // Efemeris yang memberi 1.4 atau −0.2 tidak boleh membuat elips
-        // terminator keluar dari piringan (sabit "meledek" ke luar Bulan).
+        // Efemeris yang memberi 1.4 atau −0.2 tidak boleh membuat pita terang
+        // melebar melebihi piringan (sabit "meledak" keluar dari Bulan).
         let over = CelestialVisual(kind: .moon, illuminationFraction: 1.4)
-        XCTAssertEqual(over.phaseGeometry(waxing: true)?.terminatorOffset ?? 0, -1,
+        XCTAssertEqual(over.phaseGeometry(waxing: true)?.litBandWidth ?? -1, 2.0,
                        accuracy: 1e-9)
         let under = CelestialVisual(kind: .moon, illuminationFraction: -0.2)
-        XCTAssertEqual(under.phaseGeometry(waxing: true)?.terminatorOffset ?? 0, 1,
+        XCTAssertEqual(under.phaseGeometry(waxing: true)?.litBandWidth ?? -1, 0.0,
                        accuracy: 1e-9)
     }
 
@@ -157,7 +176,71 @@ final class CelestialVisualTests: XCTestCase {
                        accuracy: 1e-9)
     }
 
-    func testEveryCatalogueBrightStarHasAColourEntry() {
+    func testEveryPlanetHasADistinctPalette() {
+        // Palet planet dipakai **sebelum** identitas dikonfirmasi (warna bola
+        // boleh tampil, ciri pengenal belum). Kalau satu case tidak punya
+        // palet, switch-nya tidak akan lengkap; yang diuji di sini adalah
+        // bahwa warnanya benar-benar **berbeda per planet** — palet yang sama
+        // untuk semua planet berarti warna tidak membawa informasi, padahal
+        // warna adalah satu-satunya hal yang masih jujur tampil saat ragu.
+        var palettes: Set<String> = []
+        for planet in CelestialVisual.Planet.allCases {
+            let palette = planet.palette
+            palettes.insert("\(palette.light.red),\(palette.light.green),\(palette.light.blue)")
+        }
+        XCTAssertEqual(palettes.count, CelestialVisual.Planet.allCases.count,
+                       "tiap planet harus punya warna sendiri, bukan warna bersama")
+    }
+
+    func testDistinguishingFeatureMatchesTheActualPlanet() {
+        // Ciri pengenal adalah **klaim identitas**: cincin berkata "Saturnus",
+        // pita + bintik merah berkata "Jupiter". Salah memetakan akan
+        // menghasilkan gambar yang tampak sama meyakinkannya dengan yang
+        // benar, tanpa satu pun teks di layar yang bisa mengeceknya.
+        XCTAssertEqual(CelestialVisual.Planet.saturn.palette.feature, .rings)
+        XCTAssertEqual(CelestialVisual.Planet.jupiter.palette.feature, .bands)
+        XCTAssertEqual(CelestialVisual.Planet.mars.palette.feature, .polarCaps)
+        XCTAssertEqual(CelestialVisual.Planet.mercury.palette.feature, .craters)
+        XCTAssertEqual(CelestialVisual.Planet.venus.palette.feature, .haze)
+    }
+
+    func testEveryPlanetHasAUniqueFeature() {
+        // Kalau dua planet berbagi ciri, ciri itu berhenti menjadi penanda
+        // identitas — dan UI lalu menggambar ciri yang salah tanpa bisa
+        // dibedakan dari yang benar.
+        let features = Set(CelestialVisual.Planet.allCases.map { $0.palette.feature })
+        XCTAssertEqual(features.count, CelestialVisual.Planet.allCases.count,
+                       "ciri pengenal harus unik per planet")
+        XCTAssertFalse(features.contains(.none),
+                       "planet yang dikenali tidak boleh digambar sebagai bola generik")
+    }
+
+    func testNightModeKeepsBrightnessOrdering() {
+        // Mode malam membuang hue (paksa merah), tapi **urutan terang** harus
+        // tetap mengikuti apa yang terjadi pada bola di langit — dan yang
+        // terlihat di malam hanyalah kanal merah. Urutan diuji per pasangan
+        // planet yang benar-benar berbeda saat siang, bukan lewat angka
+        // luminance penuh: metrik yang dipakai mode malam adalah kanal merah,
+        // jadi itu yang harus diuji.
+        func red(_ planet: CelestialVisual.Planet) -> Double {
+            planet.palette.light.nightModeBrightness
+        }
+        XCTAssertGreaterThan(red(.venus), red(.mars),
+                             "Venus harus lebih terang dari Mars di mode malam")
+        XCTAssertGreaterThan(red(.saturn), red(.mars),
+                             "Saturnus harus lebih terang dari Mars di mode malam")
+        XCTAssertGreaterThan(red(.jupiter), red(.mars),
+                             "Jupiter harus lebih terang dari Mars di mode malam")
+        // Setiap planet harus punya kanal merah berbeda: kalau dua planet
+        // berbagi nilai, mode malam mengubah semuanya menjadi satu bayangan
+        // yang sama.
+        let reds = Set(CelestialVisual.Planet.allCases.map {
+            String(format: "%.3f", red($0))
+        })
+        XCTAssertEqual(reds.count, CelestialVisual.Planet.allCases.count)
+    }
+
+    func testEveryCatalogueStarHasAKnownColorIndex() {
         // Kalau katalog bertambah tanpa tabel warna ikut, bintang baru akan
         // digambar putih — tampak sah, padahal warnanya tidak diketahui.
         // Uji ini membuat penambahan katalog wajib menyentuh tabelnya.

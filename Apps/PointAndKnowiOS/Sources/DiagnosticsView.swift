@@ -178,6 +178,21 @@ struct DiagnosticsView: View {
     /// bisa berbeda pendapat — keduanya membaca `UserDefaults` yang sama.
     @AppStorage(NightModeStorage.key) private var nightMode = false
 
+    /// Fase denyut glow untuk gambar bintang.
+    ///
+    /// Berhenti saat scene tidak aktif: denyut yang jalan di latar belakang
+    /// hanya membebani baterai tanpa pernah terlihat. `TimelineView` sendiri
+    /// sudah berhenti saat scene tidak aktif, tapi jamnya di sini supaya
+    /// nilainya tidak melompat saat app kembali dibuka — denyut yang melompat
+    /// terbaca sebagai kedipan, bukan denyut.
+    @State private var pulseStart = Date()
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var pulsePhase: Double {
+        guard scenePhase == .active else { return 0 }
+        return Date().timeIntervalSince(pulseStart) * 1.1
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -196,6 +211,39 @@ struct DiagnosticsView: View {
                             engine.isDisplayingStaleObject
                                 ? "\(object.name) — bukan hasil sekarang"
                                 : object.name)
+                        // Panel besar: di iPhone ada ruang untuk gambar penuh,
+                        // dan justru di tempat pengguna memeriksa "apakah ini
+                        // benar?" picture lebih cepat dibaca daripada teks.
+                        //
+                        // Disamar penuh saat engine ragu: `isConfirmed` memakai
+                        // predikat yang sama dengan badge keyakinan, jadi gambar
+                        // tidak pernah lebih yakin daripada teksnya.
+                        if let visual = engine.visualForDisplayedObject {
+                            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                                HStack(alignment: .center, spacing: 16) {
+                                    CelestialVisualView(visual: visual,
+                                                         diameter: 132,
+                                                         isConfirmed: !engine.isDisplayingStaleObject,
+                                                         pulse: pulsePhase)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(object.name)
+                                            .font(.title2.bold())
+                                        Text(object.kind.displayName)
+                                            .font(.subheadline)
+                                            .foregroundStyle(Color.nightAwareSecondary)
+                                        // Detail teknis di lapisan sekunder —
+                                        // bukan informasi utama.
+                                        Text(String(format: "mag %.2f", object.magnitude))
+                                            .font(.footnote.monospacedDigit())
+                                            .foregroundStyle(Color.nightAwareSecondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(visualPanelLabel(object: object,
+                                                                   stale: engine.isDisplayingStaleObject))
+                        }
                     }
                     if let pointing = engine.pointing {
                         row("Arah", String(format: "%.1f° / %.1f°",
@@ -339,5 +387,22 @@ struct DiagnosticsView: View {
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }
+    }
+
+    /// Label panel gambar untuk VoiceOver.
+    ///
+    /// **Tidak pernah menyebut visualnya.** "Gambar Jupiter dengan pita
+    /// oranye" tidak menambah informasi yang tidak sudah ada di nama dan jenis
+    /// benda, tapi ia menambah satu kalimat panjang yang harus didengarkan
+    /// setiap kali pengguna menyapu. Yang wajib ikut diucapkan adalah penanda
+    /// **sisa** — tanpa itu, gambar objek basi terdengar persis seperti
+    /// hasil pengukuran sekarang.
+    private func visualPanelLabel(object: CelestialObject, stale: Bool) -> String {
+        var parts = [object.name, object.kind.spokenName,
+                     String(format: "magnitudo %.2f", object.magnitude)]
+        if stale {
+            parts.append("Sisa pandangan sebelumnya, bukan hasil sekarang.")
+        }
+        return parts.joined(separator: ". ")
     }
 }
