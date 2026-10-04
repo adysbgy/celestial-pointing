@@ -38,23 +38,29 @@ enum NightMode {
 /// Lihat `PointingPresentationTests` — ia menguji `tone` (enum), bukan
 /// `color`, jadi pemetaan warna ini bebas diubah tanpa merusak uji.
 extension PointingTone {
+    /// Warna nada yang **dihitung**, sadar mode malam.
+    ///
+    /// Semua nilai berasal dari `TonePalette` (teruji di Linux), bukan dari
+    /// warna sistem yang bergerak antar OS. `SurfacePalette.active` membaca
+    /// `NightMode.isOn` tiap render, jadi warna ikut berubah begitu preferensi
+    /// dibalik — satu sumber kebenaran, bukan dua daftar warna.
+    ///
+    /// Lihat `TonePaletteTests` untuk gerbang kontrasnya: di mode malam,
+    /// kelima nada **harus** ≥ 4.5:1 terhadap permukaan malam, yang tidak
+    /// pernah dipenuhi oleh nilai lama (red 0.50 / 0.62 / 0.80).
     var color: Color {
-        if NightMode.isOn {
-            switch self {
-            case .neutral:  return Color(red: 0.50, green: 0.00, blue: 0.00)
-            case .active:   return Color(red: 0.80, green: 0.00, blue: 0.00)
-            case .success:  return Color(red: 1.00, green: 0.00, blue: 0.00)
-            case .warning:  return Color(red: 0.62, green: 0.00, blue: 0.00)
-            case .danger:   return Color(red: 1.00, green: 0.00, blue: 0.00)
-            }
-        }
-        switch self {
-        case .neutral:  return .secondary
-        case .active:   return .cyan
-        case .success:  return .green
-        case .warning:  return .orange
-        case .danger:   return .red
-        }
+        SurfacePalette.active.tones.color(for: self).color
+    }
+
+    /// Latar kapsul badge keyakinan yang **dihitung**, sadar mode malam.
+    ///
+    /// Di siang: campuran nada @ 0.2 di atas permukaan paling terang yang
+    /// dijadikan **opak**. Di mode malam: permukaan tingkat dua, karena warna
+    /// nada di kanal merah tidak boleh mem-back badge (jarak teks-latar akan
+    /// menyusut). Lihat `TonePalette` untuk alasannya — dan `TonePaletteTests`
+    /// untuk gerbangnya.
+    var badgeFillColor: Color {
+        SurfacePalette.active.badgeFills.fill(for: self).color
     }
 }
 

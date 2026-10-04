@@ -2646,6 +2646,64 @@ view.** Yang bisa ditutup di sini hanya logika murni; kompilasi view harus
 dibuktikan CI macOS, dan pola berisiko (`Color(<expr>)`) sebaiknya disisir
 sebelum push, karena tidak ada gerbang lokal yang menangkapnya.
 
+## Siklus 2026-10-04 (2) — warna nada lolos dari gate kontras
+
+**Unit terkecil:** warna nada (`PointingTone.color`) — label keadaan, badge
+keyakinan, ikon kalibrasi — pernah ditulis manual di `Apps/Shared/NightMode.swift`
+dan **tidak punya uji kontras sama sekali**, karena `PointingPresentationTests`
+hanya memeriksa enum `tone`, bukan keluarannya sebagai warna.
+
+### Yang ditemukan (dihitung, bukan ditebak)
+
+Mode malam mengirimkan `red 0.50 / 0.62 / 0.80 / 1.00`. Rasio kontrasnya
+terhadap permukaan malam:
+
+| nada | nilai lama | rasio | ambang |
+|---|---|---|---|
+| neutral | 0.50 | 1.49:1 | ✗ |
+| warning | 0.62 | 2.06:1 | ✗ |
+| active | 0.80 | 3.10:1 | ✗ |
+| success/danger | 1.00 | 5.25:1 | ✓ |
+
+Tiga dari lima nada **tidak terbaca sebagai teks** justru di mode yang dipilih
+supaya penglihatan malam terjaga. Mode siang memakai warna sistem (`.cyan`,
+`.green`, `.orange`, `.red`, `.secondary`) yang **tidak bisa dihitung** — nilainya
+bisa bergeser antar OS tanpa satu uji pun menyentuhnya. Dan badge keyakinan
+memakai `nada.color.opacity(0.2)`: di mode malam itu justru **mendekatkan**
+latar kapsul ke teksnya, bukan menjauhkannya (inversi kontras).
+
+### Yang diperbaiki
+
+- `TonePalette.swift` (PointingKit, **teruji di Linux**): semua warna nada hari &
+  malam dipin ke `SurfaceColor` dengan kontras yang dihitung. Mode malam =
+  merah murni di kanal 0.94…1.0 (semua ≥ 4.5:1; plafon fisik 5.25:1).
+- `BadgeFills`: isi kapsul dihitung sebagai nada @ 0.2 di atas permukaan paling
+  terang lalu dijadikan **opak** (hari), atau **permukaan tingkat dua** (malam,
+  karena warna nada merah tidak boleh mem-back badge). Bukan `opacity(0.2)` di
+  view.
+- Jembatan `PointingTone.color` (NightMode.swift) sekarang memanggil
+  `SurfacePalette.active.tones` — satu sumber kebenaran, bukan dua daftar warna.
+- `PointingView.swift`: badge pakai `.badgeFillColor`, bukan `.color.opacity(0.2)`.
+
+### Kenapa (fisika, bukan rasa)
+
+Mode malam membuang hijau/biru → semua warna hidup di kanal merah saja. Merah
+murni di atas hitam punya plafon kontras **5.25:1**, jadi rentang yang boleh
+dipakai untuk teks 4.5:1 hanya 0.9365…1.0 (6% kanal). Konsekuensinya: di mode
+malam warna nada **tidak lagi** membedakan keadaan (selisih ujung-ujung 1.12:1,
+praktis tak terlihat) — yang membedakan adalah terang-vs-gelap penuh. Badge
+keyakinan di mode malam dibedakan lewat **teksnya** ("Yakin"/"Ragu"/"Tidak tahu"),
+bukan warna. Dicatat di komentar palet supaya tidak nanti "diperbaiki" dengan
+melanggar batas merah murni.
+
+### Verifikasi
+
+8 uji baru di `TonePaletteTests` (kontras nada hari & malam vs ketiga permukaan,
+badge, bebas hijau/biru, urutan tak berbalik, kedua mode lewat satu pintu).
+**252 hijau (166 engine + 86 PointingKit), tanpa warning.** Kompilasi view
+(badge bridge) dibuktikan CI macOS (`ios-build.yml`) — Linux tidak menyentuh
+file view.
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit

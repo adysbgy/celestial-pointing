@@ -402,7 +402,7 @@ struct ObjectDetailView: View {
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(level.tone.color.opacity(0.2),
+                            .background(level.tone.badgeFillColor,
                                         in: .capsule)
                             .foregroundStyle(level.tone.color)
                     }
