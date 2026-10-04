@@ -780,10 +780,10 @@ struct DiagnosticsView: View {
             parts.append(morphology)
         }
         if includeTechnicalDetails {
-            parts.append(String(format: "magnitudo %.2f", object.magnitude))
+            parts.append(ObjectSpeech.magnitude(object.magnitude))
         }
         if stale {
-            parts.append("Sisa pandangan sebelumnya, bukan hasil sekarang.")
+            parts.append(ObjectSpeech.staleNote)
         }
         return parts.joined(separator: ". ")
     }

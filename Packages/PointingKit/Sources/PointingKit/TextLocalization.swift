@@ -264,5 +264,13 @@ public extension LocalizedText {
         // menjangkaunya. Lihat `StateAnnouncement.swift`.
         .announceLockedOn, .announceLocked, .announceUncertain,
         .announceUnavailable, .announceState,
+        // Frasa pengumuman panel objek. Masuk daftar karena inilah satu-satunya
+        // jalur magnitudo, tingkat keyakinan, koordinat, dan penanda "sisa"
+        // sampai ke pengguna VoiceOver — dan karena versi lamanya hidup
+        // sebagai literal yang disusun lewat `String(format:)` di dalam dua
+        // view, tempat katalog tidak bisa menjangkaunya. Lihat
+        // `ObjectSpeech.swift`.
+        .objectSpeechMagnitude, .objectSpeechStale,
+        .objectSpeechConfidence, .objectSpeechCoordinates,
     ]
 }

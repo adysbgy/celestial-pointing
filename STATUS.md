@@ -1,5 +1,59 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — frasa VoiceOver panel objek, disalin di dua app dan tak terlihat katalog)
+
+### Kelas yang sama, sekali lagi: teks yang tampil, tapi tak dijangkau gerbang mana pun
+
+Aturan 4 menyapu literal `Text("…")` dan `row("…", …)` di `Apps/`. Itu benar,
+dan ia tetap hijau — padahal frasa yang diucapkan saat pengguna VoiceOver
+membuka panel objek **tidak pernah menjadi argumen langsung mana pun**. Ia
+disusun lewat `String(format: "magnitudo %.2f", …)` dan `parts.append("Sisa
+pandangan sebelumnya, bukan hasil sekarang.")` di dalam helper — bentuk yang
+regex argumen-langsung tidak lihat. `grep` menemukan empat frasa yang tampil di
+layar, dan **tidak satu pun** ada di `Localizable.xcstrings`:
+
+| Frasa | Muncul di |
+|---|---|
+| `magnitudo %.2f` | jam **dan** iPhone |
+| `Sisa pandangan sebelumnya, bukan hasil sekarang.` | jam **dan** iPhone |
+| `tingkat keyakinan \(level.displayName)` | jam |
+| `RA %.1f derajat, deklinasi %+.1f derajat` | jam |
+
+Akibatnya pengguna Bahasa Inggris mendengar "magnitudo 1.46", "tingkat
+keyakinan Yakin", dan "Sisa pandangan sebelumnya, bukan hasil sekarang." tanpa
+satu pun gerbang merah.
+
+### Salinan yang sudah mulai berbeda
+
+Ketiga frasa pertama muncul di **dua** app, dan salinannya sudah menyimpang
+diam-diam: `DiagnosticsView` memisahkan bagiannya dengan `". "`, `PointingView`
+memakai `", "`. Perbedaan pemisah masih bisa dibaca; yang berbahaya adalah
+kalimatnya sendiri — cukup satu salinan diperbaiki, dan pengguna dua app
+mendengar dua kalimat berbeda untuk objek yang sama. Ini alasan yang sama
+dengan `PointingState.shortLabel` dan `PointingSnapshot.guidanceText` dulu
+dipindahkan ke paket.
+
+### Yang diubah
+
+- **`ObjectSpeech`** (PointingKit, teruji di Linux) — `magnitude(_:)`,
+  `confidence(_:)`, `coordinates(raDeg:decDeg:)`, `staleNote`. Kedua app
+  membaca frasa yang sama, jadi tidak bisa lagi menyimpang.
+- **Empat kunci katalog baru** (`object.speech.*`) dengan terjemahan Inggris,
+  sehingga pengguna Bahasa Inggris mendengar kalimat yang utuh — termasuk
+  tingkat keyakinan yang disisipkan, yang tetap diterjemahkan sendiri lewat
+  `confidence.level.*`.
+- **Batas yang dijaga:** yang disediakan hanyalah **potongan** kalimat; urutan
+  dan pemisahnya tetap milik tiap layar, karena kedua panel memang disusun
+  berbeda (jam memasukkan RA/Dec dan tingkat keyakinan; iPhone memisahkan detail
+  teknis ke pembukaan panel). Yang dijaga adalah bahannya, bukan susunannya.
+
+Tujuh uji baru (`ObjectSpeechTests`), termasuk yang memasang terjemahan Inggris
+untuk membuktikan kata dan posisi sisipan dikendalikan katalog, dan yang
+memastikan tanda deklinasi selatan tidak hilang saat diucapkan.
+
+Gerbang: `swift-test.sh` **166 + 417 hijau** (README diperbarui lewat Aturan 10),
+ui-lint hijau, typecheck hijau.
+
 ## Progres terakhir (4 Okt 2026 — iPhone tidak pernah mengumumkan apa pun ke VoiceOver)
 
 ### Jam berbunyi, iPhone diam, dan tidak ada layar yang tampak salah

@@ -1883,6 +1883,50 @@
         }
       }
     },
+    "object.speech.confidence": {
+      "comment": "VoiceOver: tingkat keyakinan objek. %@ = nama tingkat (Yakin/Ragu/Tidak tahu), sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "confidence %@"
+          }
+        }
+      }
+    },
+    "object.speech.coordinates": {
+      "comment": "VoiceOver: koordinat bintang. Argumen 1 = RA derajat, argumen 2 = deklinasi derajat (bertanda).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA %.1f degrees, declination %+.1f degrees"
+          }
+        }
+      }
+    },
+    "object.speech.magnitude": {
+      "comment": "VoiceOver: magnitudo tampak objek. Angka tidak pernah diucapkan tanpa katanya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magnitude %.2f"
+          }
+        }
+      }
+    },
+    "object.speech.stale": {
+      "comment": "VoiceOver: penanda bahwa objek berasal dari pandangan sebelumnya, bukan hasil pengukuran sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From an earlier view, not a current reading."
+          }
+        }
+      }
+    },
     "pointing.announce.locked": {
       "comment": "VoiceOver: keadaan terkunci tetapi nama objeknya tidak tersedia. Diucapkan saat keadaan berubah, bukan tiap sampel.",
       "localizations": {

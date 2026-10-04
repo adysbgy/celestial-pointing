@@ -499,11 +499,11 @@ struct ObjectDetailView: View {
     private var detailAccessibilityLabel: String {
         var parts = [object.name]
         if let level, !isStale {
-            parts.append("tingkat keyakinan \(level.displayName)")
+            parts.append(ObjectSpeech.confidence(level))
         }
         parts.append(kindAccessibilityLabel)
         if isStale {
-            parts.append("Sisa pandangan sebelumnya, bukan hasil sekarang.")
+            parts.append(ObjectSpeech.staleNote)
         }
         return parts.joined(separator: ". ")
     }
@@ -534,10 +534,10 @@ struct ObjectDetailView: View {
         if let morphology = visual?.spokenDeepSkyMorphology(isConfirmed: isConfirmed) {
             parts.append(morphology)
         }
-        parts.append(String(format: "magnitudo %.2f", object.magnitude))
+        parts.append(ObjectSpeech.magnitude(object.magnitude))
         if object.kind == .star {
-            parts.append(String(format: "RA %.1f derajat, deklinasi %+.1f derajat",
-                                object.raDeg, object.decDeg))
+            parts.append(ObjectSpeech.coordinates(raDeg: object.raDeg,
+                                                  decDeg: object.decDeg))
         }
         return parts.joined(separator: ", ")
     }
