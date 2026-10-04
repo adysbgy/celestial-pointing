@@ -200,11 +200,14 @@ struct CelestialVisualView: View {
         drawSphere(context: context, center: center, radius: radius,
                    from: palette.light, to: palette.dark)
 
-        // Depan cincin (paruh bawah) — digambar di atas bola.
+        // Depan cincin (paruh bawah) — digambar di atas bola. Batas bawahnya
+        // adalah **setengah bawah frame** (`CGRect` penuh, bukan
+        // `Path(ellipseIn:)`), jadi cincin tepat melewati ekuator bola — yang
+        // persis seperti yang terlihat pada Saturnus.
         var front = context
-        front.clip(to: Path(rect: CGRect(x: 0, y: center.y,
-                                         width: outer.maxX,
-                                         height: outer.maxY - center.y)))
+        front.clip(to: Path(CGRect(x: 0, y: center.y,
+                                  width: outer.maxX,
+                                  height: outer.maxY - center.y)))
         front.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.8)))
         // Pembelah cincin (Cassini): cincin tidak pekat seragam.
         let gap = outer.insetBy(dx: radius * 0.34, dy: radius * 0.11)
