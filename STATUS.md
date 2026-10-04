@@ -1,6 +1,27 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — baris detail jadi satu pengumuman VoiceOver; satuan jadi kata)
+## Progres terakhir (4 Okt 2026 — README, lalu VoiceOver baris; dua siklus)
+
+### Siklus 3 — README: isi yang paling dibutuhkan orang yang baru membuka repo
+
+Repo ini belum punya README, padahal isinya persis yang dibutuhkan:
+cara membangunnya, mengapa logika ada di paket dan bukan di app, dan
+**bagaimana cara mengukur** klaim "akurasi jam adalah hipotesis".
+
+Yang ditulis lebih penting daripada daftar perintah:
+
+- `POINT → OBJECT ID → SAFE GOTO` dan kenapa arah pergelangan tidak boleh
+  pernah jadi perintah motor.
+- Kenapa `Packages/` ada: seluruhnya teruji di Linux — pemisahan inilah
+  yang membuat cacat logika bisa ditangkap tanpa Mac.
+- Kenapa kalimat VoiceOver pindah ke paket: kalimat terucap tidak pernah
+  terlihat salah di layar mana pun, jadi satu-satunya penangkapnya uji.
+- Tiga gerbang dicatat sebagai tiga **celas berbeda**, bukan duplikat.
+
+Setiap angka dan nama berkas diverifikasi terhadap repo sebelum commit:
+166 engine + 277 PointingKit, 3 tab iPhone (bukan 2 — klaim pertama salah),
+macos-15, dan batas `red-test.sh` (hanya PointingKit) dinyatakan apa adanya
+alih-alih diklaim universal.
 
 ### Siklus 2 — cacat yang ditemukan oleh gerbang siklus 1
 

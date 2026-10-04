@@ -71,6 +71,33 @@ else
   echo "Bersih."
 fi
 
+# ── Aturan 3: tidak ada aksara non-Latin yang tidak disengaja ───────────────
+# Repo ini ditulis dalam bahasa Indonesia dan seluruh teks UI berbahasa
+# Indonesia, jadi **seluruh** kode dan komentar harus Latin. Karakter CJK/
+# Cyrillic/fullwidth yang muncul hampir selalu **selip**: bukan keputusan
+# bahasa, tapi tembolan yang ikut masuk lewat papan ketik atau tempelan.
+#
+# Kenapa jadi gerbang: selipnya nyaris tak terlihat — di tengah kalimat
+# Indonesia ia terbaca sebagai satu kata aneh lalu dilewati — tapi merusak
+# repo yang dinyatakan "semua teks Bahasa Indonesia", dan merusak diff
+# review. Kasus ini sudah terjadi di repo ini, dan hanya terlihat karena
+# sapuan karakter, bukan karena ada yang membaca ulang.
+echo
+echo "== Aturan 3: tidak ada aksara CJK/Cyrillic/fullwidth di kode =="
+# Cakup **seluruh** kode, bukan hanya `Apps/`: selip yang sama bisa muncul
+# di `Packages/`, yang tidak akan pernah terjangkau sapuan `Apps/` saja.
+# Satu sapuan untuk satu aturan.
+cjk=$(grep -rnP --include='*.swift' '[\x{3000}-\x{303F}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{AC00}-\x{D7AF}\x{FF00}-\x{FFEF}\x{0400}-\x{04FF}]' \
+        Apps Packages 2>/dev/null || true)
+if [ -n "$cjk" ]; then
+  echo "Aksara non-Latin ditemukan — repo ini ditulis bahasa Indonesia:"
+  echo "$cjk"
+  echo "-> Hapus karakter tersebut; kemungkinan besar selip, bukan pilihan."
+  status=1
+else
+  echo "Bersih: tidak ada aksara non-Latin."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

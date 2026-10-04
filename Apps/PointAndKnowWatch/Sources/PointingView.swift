@@ -557,6 +557,9 @@ struct SkyContextView: View {
         // sebagai dua elemen terpisah tanpa hubungan — "Matahari" lalu
         // "-12" tanpa konteks apa yang diukur.
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title): \(value)")
+        // Bentuk kalimatnya dari `RowSpeech`, bukan dirangkai di sini: ini
+        // adalah duplikat keempat dari `row(_:_:)` dengan format yang sama
+        // persis, dan menyatukan sumbernya menutup kelas cacat ini.
+        .accessibilityLabel(RowSpeech.label(title: title, value: value))
     }
 }
