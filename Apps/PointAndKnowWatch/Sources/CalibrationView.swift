@@ -18,6 +18,15 @@ struct CalibrationView: View {
     @State private var session: CalibrationSession?
     @State private var statusMessage = "Tunjuk bintang acuan, lalu tekan Catat."
 
+    /// Pesan status terakhir yang **sudah diumumkan** ke VoiceOver.
+    ///
+    /// Tanpa ini, menekan "Catat" kelihatan berhasil: haptic boleh berbunyi,
+    /// teks berubah — tapi pengguna yang tidak melihat layar tidak pernah
+    /// diberi tahu apakah acuan tercatat atau ditolak. Itu kelas kesalahan
+    /// yang sama dengan "kegagalan diam": yang membuat berbahaya justru
+    /// tidak adanya apa pun yang keliru.
+    @State private var announcedStatus: String?
+
     var body: some View {
         NightAwareContainer {
             calibrationContent
@@ -37,9 +46,15 @@ struct CalibrationView: View {
                 referenceList
                 actions
                 Text(statusMessage)
-                    .font(.system(size: 11))
+                    // Semantic, bukan `.system(size: 11)`. Angka tetap
+                    // mengabaikan Dynamic Type, jadi di layar 42mm teks
+                    // 11pt ini tidak bisa membesar sama sekali — dan kalibrasi
+                    // justru layar yang paling sering dipakai pengguna yang
+                    // perlu glasses di lapangan.
+                    .font(.footnote)
                     .foregroundStyle(Color.nightAwareSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Status: \(statusMessage)")
             }
             .padding(.horizontal, 2)
         }
@@ -53,6 +68,19 @@ struct CalibrationView: View {
         .onChange(of: engine.location) { _, _ in
             session?.refreshReferenceTargets()
         }
+        // Umumkan **hasil setiap aksi**, bukan hanya perubahan keadaan engine.
+        //
+        // Layar ini tidak punya `.onChange(of: engine.snapshot.state)` seperti
+        // `PointingView`, jadi tanpa baris ini tidak ada satu pun umpan balik
+        // yang sampai ke VoiceOver sama sekali. `announcedStatus` menjaga
+        // pengumuman tetap pada perubahan: `onChange` sudah tidak memicu saat
+        // nilai sama, tapi pesan "Belum siap dipakai" bisa muncul berkali-kali
+        // untuk satu masalah yang sama.
+        .onChange(of: statusMessage) { _, newMessage in
+            guard announcedStatus != newMessage else { return }
+            announcedStatus = newMessage
+            AccessibilityNotification.Announcement(newMessage).post()
+        }
     }
 
     // MARK: - Kartu tahap
@@ -63,21 +91,21 @@ struct CalibrationView: View {
                 Image(systemName: phaseSymbol)
                     .foregroundStyle(phaseTone.color)
                 Text(phaseLabel)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(phaseTone.color)
             }
             if let flow = session?.flow {
             Text("\(flow.samples.count) acuan tercatat")
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
             if let calibration = flow.calibration {
                 Text(String(format: "Offset %.1f°", calibration.yawOffsetDeg))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(Color.nightAwareSecondary)
                     if let spread = calibration.residualSpreadDeg {
                         Text(String(format: "Sebaran %.1f° (maks %.1f°)",
                                     spread, session?.flow.maxResidualSpreadDeg ?? 3))
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(spread <= (session?.flow.maxResidualSpreadDeg ?? 3)
                                              ? PointingTone.success.color
                                              : PointingTone.warning.color)
@@ -88,6 +116,13 @@ struct CalibrationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
         .background(phaseTone.color.opacity(0.12), in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        // Satu elemen: tahap, jumlah acuan, offset, dan sebaran adalah satu
+        // pengumuman. Tanpa penggabungan, VoiceOver membaca empat item
+        // terpisah yang harus diusap satu per satu. Teksnya dari
+        // `PointingKit` (teruji di Linux), bukan ditulis di sini — kalau
+        // kalimatnya salah, ujinya yang merah, bukan layar.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(session?.flow.spokenPhaseSummary ?? "Kalibrasi belum dimulai.")
     }
 
     // MARK: - Daftar acuan
@@ -95,7 +130,7 @@ struct CalibrationView: View {
     private var referenceList: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Acuan di atas horizon")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.nightAwareSecondary)
 
             if let targets = session?.referenceTargets, !targets.isEmpty {
@@ -105,25 +140,37 @@ struct CalibrationView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundStyle(PointingTone.active.color)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(target.name)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.subheadline.weight(.medium))
                                 Text(String(format: "%.0f° tinggi", target.direction.altitudeDeg))
-                                    .font(.system(size: 10))
+                                    .font(.caption2)
                                     .foregroundStyle(Color.nightAwareSecondary)
                             }
                             Spacer()
                             Image(systemName: "plus.circle")
-                                .font(.system(size: 12))
+                                .font(.caption)
+                                .accessibilityHidden(true)
                         }
                     }
                     .buttonStyle(.plain)
+                    // Label tombol, bukan isi tombol mentah.
+                    //
+                    // `accessibilityHidden` di dua ikon itu wajib: tanpa itu
+                    // VoiceOver membacakan "bintang, plus lingkaran, Sirius,
+                    // 40 derajat tinggi, plus lingkaran" — ikon dekoratif ikut
+                    // diucapkan sebagai kata. Label di sini juga menyebut
+                    // **aksinya** ("Catat … sebagai acuan"), karena ada
+                    // tombol lain di layar ini yang juga mencatat — tanpa
+                    // perbedaan itu keduanya terdengar sama.
+                    .accessibilityLabel(target.spokenCaptureLabel)
                 }
             } else {
                 Text("Tidak ada acuan yang terlihat sekarang. Acuan bawaan adalah bintang terang; tunggu sampai salah satunya terbit.")
-                    .font(.system(size: 11))
+                    .font(.footnote)
                     .foregroundStyle(PointingTone.warning.color)
             }
         }
@@ -137,22 +184,36 @@ struct CalibrationView: View {
                 captureNearest()
             } label: {
                 Label("Catat yang ditunjuk", systemImage: "dot.scope")
-                    .font(.system(size: 12))
+                    .font(.caption.weight(.semibold))
             }
             .buttonStyle(.borderedProminent)
+            // `.accessibilityLabel`, bukan `.accessibilityHint`: hint hanya
+            // dibaca setelah pengguna menahan tombol, jadi aksi ini — yang
+            // satu-satunya jalan mencatat tanpa memilih bintang — harus
+            // ikut terlihat di nama tombolnya sendiri. Label juga menyebut
+            // bahwa ia memakai arah yang sedang ditunjuk, karena ada
+            // tombol lain di layar ini yang juga mencatat acuan.
+            .accessibilityLabel("Catat yang sedang ditunjuk sebagai acuan")
 
             HStack(spacing: 4) {
                 Button("Pakai") { apply() }
-                    .font(.system(size: 12))
+                    .font(.caption.weight(.semibold))
                     .disabled(!(session?.flow.isReady ?? false))
+                    // Keadaan tombol ikut diucapkan. Tanpa ini tombol yang
+                    // mati terdengar persis sama dengan yang hidup — dan
+                    // "Pakai" yang ditolak karena sebaran terlalu lebar
+                    // adalah hasil yang paling mudah disalahartikan.
+                    .accessibilityLabel(session?.flow.spokenApplyButtonLabel
+                                        ?? "Pakai kalibrasi, belum bisa dipakai")
                 Button("Ulang") { reset() }
-                    .font(.system(size: 12))
+                    .font(.caption.weight(.semibold))
                     .disabled((session?.flow.samples.isEmpty ?? true))
+                    .accessibilityLabel("Ulangi kalibrasi dari awal")
             }
 
             if let policy = session?.suggestedConfidencePolicy {
                 Text(String(format: "Ambang keyakinan usulan: σ %.1f°", policy.pointingSigmaDeg))
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(Color.nightAwareSecondary)
             }
         }
