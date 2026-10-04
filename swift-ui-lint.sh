@@ -811,6 +811,75 @@ else
   echo "Bersih: setiap WidgetKit punya pemanggil reload."
 fi
 
+# ── Aturan 10: hitungan uji di README harus cocok dengan uji yang ada ──────
+# README menyebut "CelestialEngine 166, PointingKit N". Angka itu adalah janji
+# ke pembaca tentang seberapa tebal jaring pengamannya, dan ia **tidak bisa
+# dijaga compiler**: menambah uji tidak menyentuh README, jadi angka itu
+# membusuk perlahan tanpa satu pun gerbang merah. Pernah terjadi: README
+# tertinggal di 277 sementara suite sudah 367 — selisih 90 uji yang tidak
+# terlihat siapa pun karena tidak ada yang membandingkannya.
+#
+# Hitungannya statis (`func test` per berkas), dan itu cukup di sini: yang
+# dijaga adalah **kelas** drift (angka vs kenyataan), bukan angka tepatnya.
+# Kalau suatu saat uji dihasilkan dinamis sehingga hitungan statis tidak lagi
+# sama dengan yang dijalankan, aturan ini yang pertama akan memberi tahu.
+echo
+echo "== Aturan 10: hitungan uji di README cocok dengan berkas uji =="
+readme=$(python3 - <<'PY'
+import glob, os, re
+
+def count(glob_pat):
+    total = 0
+    for path in glob.glob(glob_pat, recursive=True):
+        total += len(re.findall(r"\bfunc\s+test",
+                               open(path, encoding="utf-8").read()))
+    return total
+
+engine = count("Packages/CelestialEngine/Tests/**/*.swift")
+kit = count("Packages/PointingKit/Tests/**/*.swift")
+
+if not os.path.exists("README.md"):
+    print("PERINGATAN: README.md tidak ada.")
+    print("Aturan 10 DILEWATI, bukan lulus.")
+    raise SystemExit
+
+text = open("README.md", encoding="utf-8").read()
+problems = []
+
+# Cari klaim "CelestialEngine <angka>" dan "PointingKit <angka>".
+for label, actual in (("CelestialEngine", engine), ("PointingKit", kit)):
+    found = re.findall(rf"{label}\s*\*{{0,2}}(\d+)", text)
+    if not found:
+        problems.append(f"README tidak menyebut hitungan uji {label} sama sekali.")
+        continue
+    for number in found:
+        if int(number) != actual:
+            problems.append(
+                f"README bilang {label} {number}, berkas uji berisi {actual}.")
+
+if problems:
+    for p in problems:
+        print(p)
+    print("-> Perbarui angka di README.md, atau perbaiki kalau uji terhapus.")
+else:
+    # Sengaja tidak mencetak apa pun saat bersih: blok ini memakai konvensi
+    # yang sama dengan aturan lain di berkas ini — python hanya bicara saat
+    # ada masalah, dan shell yang menulis "Bersih". Mencetak baris sukses di
+    # sini akan terbaca sebagai keluaran tidak kosong, lalu dihitung sebagai
+    # kegagalan oleh `if [ -n "$readme" ]` di bawah.
+    pass
+PY
+)
+if [ -n "$readme" ]; then
+  echo "$readme"
+  case "$readme" in
+    *"DILEWATI"*) : ;;   # peringatan saja, bukan kegagalan
+    *) status=1 ;;
+  esac
+else
+  echo "Bersih: hitungan uji di README cocok."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
