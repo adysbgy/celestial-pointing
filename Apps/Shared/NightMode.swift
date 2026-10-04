@@ -61,26 +61,43 @@ extension PointingTone {
 extension Color {
     /// Teks sekunder sadar mode malam.
     ///
-    /// Di siang: `.secondary` (kelabu yang menyesuaikan penampilan sistem).
-    /// Di mode malam: merah redup, bukan kelabu/putih yang merusak rhodopsin.
-    /// Ganti **setiap** `.secondary` di lapisan app dengan ini supaya teks
-    /// sekunder ikut menjadi merah saat malam.
+    /// Di siang: abu terang dari token yang **sudah diuji** di Linux. Di mode
+    /// malam: merah yang sama persis dengan `textSecondary` palet malam.
+    ///
+    /// **Dua temuan yang membuat helper ini tidak lagi punya warna sendiri.**
+    ///
+    /// 1. Nilai lamanya, merah 0.42, punya kontras **1.49:1** terhadap latar
+    ///    malam — bukan 4.5:1. Jadi syarat kontras di brief, di mode malam,
+    ///    sebenarnya tidak pernah terpenuhi di kode lama; sekarang ia
+    ///    terhitung dan dijaga.
+    /// 2. Nilai itu juga hidup di berkas yang tidak bisa diuji. Semua warna
+    ///    sekarang datang dari `SurfacePalette`, jadi kalau palet diubah, teks
+    ///    sekunder ikut berubah — dan tes kontras mengatakannya.
+    ///
+    /// Helper ini tetap ada (banyak pemanggilan), tapi ia tidak lagi boleh
+    /// memiliki angka warna sendiri; kalau suatu saat ia menulis warna
+    /// langsung di sini, warna itu keluar dari gate.
     static var nightAwareSecondary: Color {
-        NightMode.isOn
-            ? Color(red: 0.42, green: 0.00, blue: 0.00)
-            : .secondary
+        SurfacePalette.active.textSecondaryColor
     }
 }
 
 extension NightMode {
     /// Latar kartu detail.
     ///
-    /// Di siang: material sistem (`.ultraThinMaterial`) seperti sebelumnya.
-    /// Di mode malam: merah sangat redup — **bukan** material putih/translusan
-    /// yang menyala dan menghancurkan penglihatan malam.
+    /// Di siang: warna permukaan dari token yang sudah diuji, **bukan**
+    /// `.ultraThinMaterial`.
+    ///
+    /// **Kenapa material diganti.** Glassmorphism itu enak dilihat, dan brief
+    /// memang memintanya. Tapi warnanya bergantung apa yang ada di belakangnya:
+    /// kontras teks di atas `.ultraThinMaterial` tidak bisa dijamin, jadi
+    /// material membuat klaim "kontras ≥ 4.5:1" yang sudah kita hitung
+    /// menjadi tidak bisa dipercaya. Di palet yang warnanya sudah diketahui,
+    /// material hanya mengurangi ketajaman hierarki. Kalau glassmorphism tetap
+    /// dipakai di sini, ia harus ikut diuji — bukan ditambahkan sebagai
+    /// hiasan. Ini keputusan produk dan bisa berubah; yang penting, saat
+    /// berubah, angka kontrasnya ikut dihitung lagi.
     static var detailCardBackground: AnyShapeStyle {
-        isOn
-            ? AnyShapeStyle(Color(red: 0.16, green: 0.00, blue: 0.00))
-            : AnyShapeStyle(.ultraThinMaterial)
+        AnyShapeStyle(SurfacePalette.active.surface1Color)
     }
 }

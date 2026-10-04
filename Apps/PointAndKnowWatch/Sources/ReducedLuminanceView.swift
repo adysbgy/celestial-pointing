@@ -29,7 +29,13 @@ struct ReducedLuminanceView: View {
                 // pengamat saat layar redup.
                 if let object = engine.displayedObject {
                     Text(object.name)
-                        .font(.system(size: 20, weight: .bold))
+                        // Nama = informasi utama, jadi `title2` (besar & tebal).
+                        // Bukan `.system(size: 20)`: angka tetap mengabaikan
+                        // Dynamic Type, jadi pengguna yang memperbesar teks tetap
+                        // membaca nama besar yang sama kecilnya dengan label
+                        // di bawahnya — persis hierarki yang dibalik.
+                        .font(.title2.bold())
+                        .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                         .minimumScaleFactor(0.5)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
@@ -39,19 +45,26 @@ struct ReducedLuminanceView: View {
                     // layarnya lebih sederhana.
                     if engine.isDisplayingStaleObject {
                         Text("sisa")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                     }
                 }
 
-                // Status: dua kata, kontras tinggi.
+                // Status: dua kata, kontras tinggi. Warna **primary**, bukan
+                // tone keadaan — di layar redup watchOS menahan sebagian
+                // kromatik, dan warna status yang paling cepat hilang adalah
+                // cyan/hijau di atas latar gelap. Kontras tekstual selalu
+                // menang di sini.
                 Text(engine.snapshot.state.shortLabel)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.headline)
+                    .foregroundStyle(SurfacePalette.active.textPrimaryColor)
 
                 // Hanya tampil saat sensor mati — pesan yang benar-benar mengubah
                 // perilaku, bukan angka pelengkap.
                 if let note = motionNote {
                     Text(note)
-                        .font(.system(size: 11))
+                        .font(.caption)
+                        .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -59,6 +72,26 @@ struct ReducedLuminanceView: View {
             .padding(.horizontal, 2)
             .frame(maxWidth: .infinity)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(reducedAccessibilityLabel)
+    }
+
+    /// Label layar redup untuk VoiceOver.
+    ///
+    /// Sengaja pendek: saat layar redup, pembaca layar berjalan lebih lambat,
+    /// dan pengumuman panjang justru menutupi informasi yang paling penting.
+    /// Penanda sisa tetap ikut diucapkan — di layar redup yang satu-satunya
+    /// jalan membedakan "baru diukur" dari "sisa".
+    private var reducedAccessibilityLabel: String {
+        var parts: [String] = []
+        if let object = engine.displayedObject {
+            parts.append(object.name)
+        }
+        parts.append(engine.snapshot.state.shortLabel)
+        if engine.isDisplayingStaleObject {
+            parts.append("sisa pandangan sebelumnya")
+        }
+        return parts.joined(separator: ". ")
     }
 
     private var motionNote: String? { engine.sensorNote }

@@ -82,8 +82,8 @@ struct PointingView: View {
                     // diam-diam — memperingatkan justru saat lokasi sungguhan.
                     if engine.location.isFallback {
                         Text("Lokasi: \(engine.location.label)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.nightAwareSecondary)
+                            .font(.caption2)
+                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     }
                     linkRow
                 }
@@ -181,34 +181,48 @@ struct PointingView: View {
         return VStack(spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: state.symbolName)
+                    .font(.headline)
                     .foregroundStyle(state.tone.color)
                     // Simbolnya murni hiasan: label kartu di bawah sudah
                     // menyebut keadaannya. Tanpa baris ini VoiceOver
                     // mengucapkan nama berkas SF Symbol-nya.
                     .accessibilityHidden(true)
                 Text(state.shortLabel)
-                    .font(.system(size: WatchMetrics.statusSize, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(state.tone.color)
             }
             Text(state.guidance)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.nightAwareSecondary)
+                .font(.caption)
+                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let rate = engine.snapshot.angularRateDegPerSec {
                 Text(String(format: "%.0f°/dtk", rate))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(rate > 8 ? PointingTone.warning.color : Color.nightAwareSecondary)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(rate > 8 ? PointingTone.warning.color
+                                               : SurfacePalette.active.textSecondaryColor)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(WatchMetrics.cardPadding)
-        .background(state.tone.color.opacity(0.12), in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        .surfaceCard(level: .card, radius: WatchMetrics.cornerRadius)
+        // Aksen tipis **hanya** di keadaan terkunci — satu-satunya momen yang
+        // layak dirayakan, dan hanya di situ. Kalau aksen dipakai di semua
+        // keadaan, "aktif" tidak berarti apa-apa; kalau dipakai di beberapa,
+        // yang terpilih adalah yang benar.
+        .overlay(alignment: .top) {
+            if state == .lock {
+                Capsule()
+                    .fill(SurfacePalette.active.accentGradient)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+            }
+        }
         // Digabung jadi SATU elemen: tanpa `.combine`, VoiceOver membaca
         // simbol, label, panduan, dan laju sebagai empat item terpisah yang
         // harus diusap satu per satu — padahal keempatnya satu pengumuman.
-        // Laju dibaca sebagai "laju pergélangan ... derajat per detik", bukan
+        // Laju dibaca sebagai "laju pergelangan ... derajat per detik", bukan
         // "°/dtk" yang tak bermakna bagi pembaca layar.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(statusAccessibilityLabel)
@@ -233,17 +247,17 @@ struct PointingView: View {
     private var linkRow: some View {
         HStack(spacing: 4) {
             Image(systemName: link.isReachable ? "iphone.gen3.radiowaves.left.and.right" : "iphone.slash")
-                .font(.system(size: 10))
+                .font(.caption2)
                 .accessibilityHidden(true)
             Text(link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau")
-                .font(.system(size: 10))
+                .font(.caption2)
             if link.sendFailureCount > 0 {
                 Text("· \(link.sendFailureCount) gagal")
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(PointingTone.warning.color)
             }
         }
-        .foregroundStyle(Color.nightAwareSecondary)
+        .foregroundStyle(SurfacePalette.active.textSecondaryColor)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(linkAccessibilityLabel)
     }
@@ -278,7 +292,7 @@ struct ObjectDetailView: View {
     var visual: CelestialVisual?
     /// Diameter gambar dalam poin. Berbeda antara jam dan iPhone: kartu jam
     /// sempit, panel iPhone lega.
-    var visualDiameter: CGFloat = 34
+    var visualDiameter: CGFloat = WatchMetrics.visualDiameter
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -296,7 +310,9 @@ struct ObjectDetailView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(object.name)
-                        .font(.system(size: WatchMetrics.titleSize, weight: .bold))
+                        // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
+                        // tebal di kartu, karena inilah yang dicari pengguna.
+                        .font(.title3.bold())
                     Spacer(minLength: 2)
                     // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
                     // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan
@@ -304,7 +320,7 @@ struct ObjectDetailView: View {
                     // persis false confidence yang dilarang PRD.
                     if let level, !isStale {
                         Text(level.displayName)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(level.tone.color.opacity(0.2),
@@ -313,18 +329,18 @@ struct ObjectDetailView: View {
                     }
                 }
                 Text(kindLine)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.nightAwareSecondary)
+                    .font(.caption)
+                    .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                 if isStale {
                     Text("Sisa pandangan sebelumnya — bukan hasil sekarang")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(PointingTone.warning.color)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
-        .background(NightMode.detailCardBackground, in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        .surfaceCard(level: .card, radius: WatchMetrics.cornerRadius)
         // Satu elemen, karena nama + jenis + magnitudo + badge adalah satu
         // pengumuman. Yang paling penting di sini: **penanda sisa ikut
         // diucapkan**. Pengguna VoiceOver tidak melihat teks peringatannya,
@@ -415,9 +431,9 @@ struct SkyContextView: View {
         HStack {
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(Color.nightAwareSecondary)
+            Text(value).foregroundStyle(SurfacePalette.active.textSecondaryColor)
         }
-        .font(.system(size: 12))
+        .font(.subheadline)
         // Baris "judul … nilai": tanpa penggabungan, VoiceOver membacanya
         // sebagai dua elemen terpisah tanpa hubungan — "Matahari" lalu
         // "-12" tanpa konteks apa yang diukur.
