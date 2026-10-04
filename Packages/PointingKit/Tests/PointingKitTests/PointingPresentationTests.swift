@@ -305,6 +305,129 @@ final class PointingPresentationTests: XCTestCase {
         }
     }
 
+    /// **Regresi: complication menampilkan nama kandidat seolah sudah pasti.**
+    ///
+    /// `digest.headline` sengaja menampilkan nama kandidat pada `.uncertain`
+    /// (menutupinya akan membuat complication berbeda dari app). Tapi nama
+    /// itu **ditempel tanpa satu penanda pun** — bukan dirupa teks, bukan
+    /// ikon: complication hanya bisa menampilkan `headline` + simbol keadaan.
+    ///
+    /// Tiga permukaan lain sudah teach aturan yang sama dalam dua bentuk:
+    /// gambar tidak boleh menampilkan ciri pengenal (`confirmsIdentity`), dan
+    /// badge "Ragu" tampil di sebelah nama (`statusCard`, `LockArrivalPanel`).
+    /// Complication adalah **permukaan keempat dari satu jawaban**, dan satu-
+    /// satunya yang ikut ke pergelangan tangan — justru yang paling sering
+    /// dipakai untuk "sekilas, lalu lanjut".
+    ///
+    /// `digest.isConfirmed` sudah ada, sudah ikut JSON, dan sudah diuji
+    /// round-trip — tapi **tidak ada satu pun view yang membacanya**. Uji ini
+    /// menuntut bentuk yang benar-benar dirender mengikutinya.
+    func testUncertainCandidateNeverRendersIdenticallyToALock() {
+        let locked = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+            lastLocked: nil)
+        let candidate = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .uncertain,
+                intent: CelestialIntent(level: .medium, best: vega, candidates: [])),
+            lastLocked: nil)
+
+        // Nama yang sama boleh tampil di keduanya (menutupinya saat ragu akan
+        // menyembunyikan informasi yang jujur).
+        XCTAssertEqual(locked.headline, candidate.headline)
+
+        // Tapi keduanya tidak boleh **sama persis** sebagai tampilan: kalau
+        // teks dan simbolnya sama, pergelangan tidak punya satu pun jalan untuk
+        // tahu mana yang engine yakini dan mana yang tebakan.
+        XCTAssertNotEqual(locked.presentedSymbolName, candidate.presentedSymbolName,
+                          "kandidat ragu tidak boleh memakai simbol yang sama dengan terkunci")
+        XCTAssertTrue(candidate.carriesUncertaintyMarker,
+                      "kandidat yang belum pasti harus punya penanda di complicasi")
+        XCTAssertFalse(locked.carriesUncertaintyMarker,
+                       "terkunci tidak boleh memakai penanda ragu")
+    }
+
+    /// Penanda ragu hanya boleh muncul kalau memang ada **nama yang bisa
+    /// disesatkan** — bukan di semua keadaan.
+    func testUncertaintyMarkerOnlyAppearsWhereANameIsShown() {
+        // Tanpa nama tidak ada yang bisa diklaim, jadi tidak ada penanda.
+        let searching = ComplicationDigest(snapshot: PointingSnapshot(state: .searching),
+                                           lastLocked: nil)
+        XCTAssertFalse(searching.carriesUncertaintyMarker)
+
+        // `hasAnswer` + `!isConfirmed` adalah syaratnya: nama kandidat yang
+        // belum pasti. Keadaan tanpa jawaban jatuh ke label keadaan, dan
+        // label keadaan sudah jujur tanpa tambahan penanda.
+        for state in [PointingState.idle, .pointing, .searching, .unavailable] {
+            let digest = ComplicationDigest(
+                snapshot: PointingSnapshot(
+                    state: state,
+                    intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+                lastLocked: nil)
+            XCTAssertFalse(digest.carriesUncertaintyMarker,
+                           "\(state) menampilkan label keadaan, bukan nama")
+        }
+    }
+
+    /// Penanda ragu harus **memakai** simbol keadaan ragu, bukan simbol
+    /// netral. Ini yang membuatnya terbaca sekilas: di complication ada satu
+    /// slot ikon, dan ikon itulah satu-satunya kanal kromatik.
+    func testUncertainMarkerUsesTheStatesOwnSymbol() {
+        let candidate = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .uncertain,
+                intent: CelestialIntent(level: .medium, best: vega, candidates: [])),
+            lastLocked: nil)
+        XCTAssertEqual(candidate.presentedSymbolName,
+                       PointingState.uncertain.symbolName,
+                       "penanda harus ikut keadaan, bukan ikon tetap")
+        XCTAssertEqual(candidate.presentedSymbolName, "questionmark.circle")
+    }
+
+    /// Baris kedua complication harus **berpindah prioritas**: begitu nama
+    /// menjadi kandidat yang belum pasti, jenis benda dikalahkan oleh penanda.
+    ///
+    /// Yang diuji di sini adalah **keputusan isi baris kedua**, bukan
+    /// susunan kalimat: view hanya punya satu slot baris, dan urutan prioritas
+    /// itu hidup di sana. Yang bisa dijaga di Linux adalah syaratnya — penanda
+    /// boleh jadi isi baris kedua tepat ketika `carriesUncertaintyMarker`, dan
+    /// tidak boleh pada keadaan yang lain.
+    ///
+    /// Versi pertama uji ini cuma mengecek bahwa penanda tidak mengandung nama
+    /// objek — pernyataan yang benar tetapi tidak bisa gagal: penanda memang
+    /// tidak akan pernah memuat nama, karena ia bukan kalimat. Mengganti
+    /// seluruh isi baris kedua dengan `objectKind.displayName` **tetap hijau**
+    /// pada bentuk itu, padahal itulah persis cacatnya.
+    func testUncertaintyMarkerOutranksTheObjectKindOnTheSubline() {
+        // Penanda jadi isi baris kedua tepat pada keadaan ragu-yang-punya-nama.
+        let candidate = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .uncertain,
+                intent: CelestialIntent(level: .medium, best: vega, candidates: [])),
+            lastLocked: nil)
+        XCTAssertTrue(candidate.carriesUncertaintyMarker)
+        XCTAssertEqual(candidate.sublineContent, .uncertaintyMarker,
+                       "saat ragu, penanda harus mengalahkan jenis benda")
+
+        // Dan jenis benda tetap jadi isi baris kedua saat tidak ada penanda —
+        // kalau tidak, baris kedua jadi kosong di keadaan yang paling biasa.
+        let locked = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+            lastLocked: nil)
+        XCTAssertEqual(locked.sublineContent, .objectKind)
+
+        // Keadaan tanpa jawaban tidak punya nama untuk diklaim dan tidak punya
+        // jenis benda untuk disebut — baris kedua kosong lebih jujur daripada
+        // mengulang label keadaan yang sudah jadi baris pertama.
+        let idle = ComplicationDigest(snapshot: PointingSnapshot(state: .idle),
+                                      lastLocked: nil)
+        XCTAssertEqual(idle.sublineContent, .none)
+    }
+
     /// Keadaan tanpa jawaban harus menampilkan **label keadaan**, bukan nama
     /// objek sisa dari pandangan sebelumnya.
     func testDigestShowsStateLabelWhenNoAnswer() {

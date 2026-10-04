@@ -236,9 +236,15 @@ final class TextLocalizationTests: XCTestCase {
     /// kalimat keadaan; dan `calibration.display.suggestedSigma`, lambang σ
     /// yang tidak bisa diucapkan sebagai kata sehingga harus tinggal di
     /// dalam slot `%@`).
+    /// 174 → 175 pada siklus "penanda ragu complication": satu kunci
+    /// `confidence.uncertain.marker`, "Belum pasti". Kuncinya **bukan**
+    /// `confidence.level.medium.label` yang sudah ada, dan itu keputusan yang
+    /// diuji di tempat lain: di complication konteksnya hilang (tidak ada teks
+    /// "tingkat keyakinan" di sampingnya), jadi kata yang sama akan punya dua
+    /// arti — "kandidat belum pasti" versus "sedang mencari".
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 174, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 175, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

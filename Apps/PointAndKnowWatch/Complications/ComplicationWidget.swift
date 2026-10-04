@@ -116,12 +116,19 @@ struct ComplicationView: View {
     private func content(for digest: ComplicationDigest) -> AnyView {
         switch family {
         case .accessoryInline:
-            // Teks pendek di sebelah waktu.
+            // Teks pendek di sebelah waktu. Slot satu baris, jadi tidak ada
+            // ruang untuk kata tambahan — penanda ragu masuk lewat ikon di
+            // keluarga lain.
             AnyView(Text(digest.headline))
         case .accessoryCircular:
             // Lingkaran: simbol keadaan + nama objek (jika ada).
+            //
+            // Ikon **ikut keadaan** (`presentedSymbolName`), bukan ikon tetap:
+            // di pergelangan tangan inilah satu-satunya penanda yang tersedia,
+            // dan tanpa itu nama kandidat `.uncertain` terbaca persis seperti
+            // nama yang sudah terkunci. Lihat `carriesUncertaintyMarker`.
             AnyView(Gauge(value: 1) {
-                Image(systemName: symbol(for: digest))
+                Image(systemName: digest.presentedSymbolName)
             } currentValueLabel: {
                 Text(digest.headline)
                     // Semantik, bukan `.system(size: 11)`. Lingkaran
@@ -137,13 +144,17 @@ struct ComplicationView: View {
         case .accessoryRectangular:
             // Persegi panjang: simbol + nama + jenis.
             AnyView(HStack(spacing: 4) {
-                Image(systemName: symbol(for: digest))
+                Image(systemName: digest.presentedSymbolName)
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(digest.headline)
                         .font(.headline)
-                    if let kind = digest.objectKind?.displayName {
-                        Text(kind)
+                    // Baris kedua sudah punya ruang, jadi penanda ragu tampil
+                    // sebagai **kata**, bukan hanya ikon. Ini yang membuat
+                    // keadaan ragu terbaca tanpa perlu mengermat ke ikon —
+                    // persis seperti badge di app jam dan iPhone.
+                    if let subline = subline(for: digest) {
+                        Text(subline)
                             .font(.caption2)
                     }
                 }
@@ -153,6 +164,27 @@ struct ComplicationView: View {
             // Keluarga lain (corner, container, dll.) belum didesain; menampilkan
             // baris utama apa adanya lebih baik daripada widget kosong.
             AnyView(Text(digest.headline))
+        }
+    }
+
+    /// Baris kedua untuk keluarga persegi panjang.
+    ///
+    /// **Prioritasnya diputuskan di model, bukan di sini.** `sublineContent`
+    /// sudah menimbang penanda ragu di atas jenis benda, dan itu teruji di
+    /// Linux. View ini hanya menerjemahkan keputusannya menjadi teks, lewat
+    /// `TextLocalization` supaya kata yang tampil berasal dari katalog.
+    ///
+    /// Kalau urutan ini ditulis ulang sebagai dua `if` terpisah di sini, ia
+    /// tidak akan bisa diuji — WidgetKit tidak ada di Linux — dan tepat di
+    /// keadaan ragu baris kedua akan kembali menampilkan jenis benda.
+    private func subline(for digest: ComplicationDigest) -> String? {
+        switch digest.sublineContent {
+        case .uncertaintyMarker:
+            return TextLocalization.text(.confidenceUncertainMarker)
+        case .objectKind:
+            return digest.objectKind?.displayName
+        case .none:
+            return nil
         }
     }
 
@@ -168,11 +200,6 @@ struct ComplicationView: View {
         default:
             AnyView(Text("Point & Know"))
         }
-    }
-
-    /// Simbol SF sesuai keadaan.
-    private func symbol(for digest: ComplicationDigest) -> String {
-        digest.state?.symbolName ?? "scope"
     }
 }
 

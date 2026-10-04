@@ -209,6 +209,26 @@ public extension LocalizedText {
     static let levelLow = LocalizedText(key: "confidence.level.low.label",
                                         id: "Tidak tahu")
 
+    /// Penanda ragu untuk complication — **satu kata**, bukan kalimat.
+    ///
+    /// **Kenapa kata khusus, bukan `levelMedium`.** `confidence.level.medium.label`
+    /// ("Ragu") sudah dipakai sebagai badge di app jam dan iPhone, jadi memakainya
+    /// lagi di complication terdengar benar: satu istilah untuk satu konsep.
+    ///
+    /// Tapi di complication konteksnya hilang — tidak ada teks "tingkat keyakinan"
+    /// di sampingnya yang memberi tahu **tentang apa** kata itu. "Ragu" sendirian
+    /// pernah berarti "ragu apakah sedang mengukur" (itulah makna aslinya di
+    /// layar utama saat `state == .searching`). Kunci terpisah supaya
+    /// penerjemah punya konteks, dan nilainya sedikit lebih eksplisit.
+    ///
+    /// **Batasnya yang jujur: ruangnya satu baris.** Di `.accessoryInline` dan
+    /// `.accessoryCircular` kata ini **tidak muncul** — di sana penanda ragu
+    /// dibawa ikon keadaan (`questionmark.circle`). Menambahkannya di sana akan
+    /// memotong nama objek, dan nama objek adalah informasinya.
+    static let confidenceUncertainMarker = LocalizedText(
+        key: "confidence.uncertain.marker",
+        id: "Belum pasti")
+
     // MARK: Jenis pesan (jam <-> iPhone)
 
     static let linkKindPointingState = LocalizedText(key: "link.kind.pointingState.label",
@@ -233,6 +253,10 @@ public extension LocalizedText {
         .stateIdleGuidance, .statePointingGuidance, .stateSearchingGuidance,
         .stateLockGuidance, .stateUncertainGuidance, .stateUnavailableGuidance,
         .levelHigh, .levelMedium, .levelLow,
+        // Penanda ragu untuk complication. Masuk daftar karena ia tampil di layar
+        // — dan karena Aturan 6 memeriksa dua arah, kunci yang ada di katalog
+        // tapi tidak dideklarasikan akan ketahuan juga.
+        .confidenceUncertainMarker,
         .linkKindPointingState, .linkKindCalibrationReady, .linkKindPolicyUpdate,
         .linkKindStateRequest, .linkKindAcknowledgement,
         // Label jenis benda: nama tampilan maupun pengucapan. Keduanya

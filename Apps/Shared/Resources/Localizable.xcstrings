@@ -1729,6 +1729,17 @@
         }
       }
     },
+    "confidence.uncertain.marker": {
+      "comment": "Penanda ragu untuk complication: nama kandidat yang belum dipastikan. Hanya tampil di keluarga persegi panjang; inline dan lingkaran memakai ikon keadaan (questionmark.circle).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain"
+          }
+        }
+      }
+    },
     "link.kind.acknowledgement.label": {
       "comment": "Label jenis pesan tanda terima.",
       "localizations": {
