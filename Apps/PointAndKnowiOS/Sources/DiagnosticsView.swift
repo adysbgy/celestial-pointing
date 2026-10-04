@@ -675,7 +675,8 @@ struct DiagnosticsView: View {
                 .accessibilityLabel(DiagnosticsView.visualPanelLabel(
                     object: object,
                     stale: isStale,
-                    includeTechnicalDetails: false))
+                    includeTechnicalDetails: false,
+                    visual: visual))
             }
         }
     }
@@ -699,8 +700,18 @@ struct DiagnosticsView: View {
     /// yang sedang dilihat.
     static func visualPanelLabel(object: CelestialObject,
                                   stale: Bool,
-                                  includeTechnicalDetails: Bool = true) -> String {
+                                  includeTechnicalDetails: Bool = true,
+                                  visual: CelestialVisual? = nil) -> String {
         var parts = [object.name, object.kind.spokenName]
+        // Fase Bulan: satu-satunya informasi di panel ini yang **hanya** bisa
+        // dilihat. Bentuk sabit/cembung/purnama tampil sebagai gambar, dan
+        // "Bulan" tidak mengatakan apa-apa tentang bentuknya. Jenis lain
+        // sengaja tidak dideskripsikan gambarannya — lihat catatan di atas.
+        // `spokenPhase` mengembalikan `nil` untuk bukan-Bulan dan untuk fase
+        // yang tidak diketahui, jadi tidak ada fase yang ditebak di sini.
+        if let phase = visual?.spokenPhase {
+            parts.append(phase)
+        }
         if includeTechnicalDetails {
             parts.append(String(format: "magnitudo %.2f", object.magnitude))
         }

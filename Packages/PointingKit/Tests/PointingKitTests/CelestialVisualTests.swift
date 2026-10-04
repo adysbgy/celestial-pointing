@@ -992,4 +992,137 @@ final class CelestialVisualTests: XCTestCase {
                            "\(id) (\(kind)) tidak berdenyut; jenis yang lebih baru harus ikut dijaga")
         }
     }
+
+    // MARK: - Nama fase Bulan untuk VoiceOver
+
+    /// Membangun visual Bulan dengan fraksi iluminasi tertentu.
+    private func moon(fraction: Double, waxing: Bool?) -> CelestialVisual {
+        CelestialVisual(object: object(id: "moon", kind: .moon),
+                        moonIlluminationFraction: fraction,
+                        isWaxing: waxing)
+    }
+
+    /// Ambang fase memilih nama yang benar, termasuk batasnya.
+    ///
+    /// Diuji lewat `moonPhaseText` (murni) dan bukan `spokenPhase`, karena
+    /// `spokenPhase` memanggil `TextLocalization`, yang di Linux selalu
+    /// mengembalikan nilai bawaan — jadi mengujinya langsung hanya akan
+    /// menguji teksnya, bukan pemilihannya.
+    func testMoonPhaseNamesFollowTheIlluminationThresholds() {
+        // Purnama dan bulan baru simetris: arahnya tidak diperlukan.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.99,
+                                                      isWaxing: nil).rawValue,
+                       LocalizedText.moonPhaseFull.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.01,
+                                                      isWaxing: nil).rawValue,
+                       LocalizedText.moonPhaseNew.rawValue)
+        // Sabit: arah menentukan nama, dan tanpanya nama netral.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.20,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseWaxingCrescent.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.20,
+                                                      isWaxing: false).rawValue,
+                       LocalizedText.moonPhaseWaningCrescent.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.20,
+                                                      isWaxing: nil).rawValue,
+                       LocalizedText.moonPhaseCrescent.rawValue)
+        // Separuh.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.50,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseFirstQuarter.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.50,
+                                                      isWaxing: false).rawValue,
+                       LocalizedText.moonPhaseLastQuarter.rawValue)
+        // Cembung.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.80,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseWaxingGibbous.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.80,
+                                                      isWaxing: false).rawValue,
+                       LocalizedText.moonPhaseWaningGibbous.rawValue)
+    }
+
+    /// Batasnya tepat, bukan "kira-kira": fraksi persis di ambang masuk
+    /// golongan yang benar.
+    ///
+    /// Diuji karena ambang adalah satu-satunya tempat pemilihan fase bisa
+    /// salah tanpa ada yang melihatnya: sabit tipis yang disebut "separuh"
+    /// tetap terdengar masuk akal, dan tidak ada teks di layar yang bisa
+    /// dipakai pengguna untuk membantahnya.
+    ///
+    /// Pita "separuh" **tertutup di kedua ujungnya** — 0.46 dan 0.54
+    /// keduanya separuh — jadi ambangnya diuji dari kedua sisi, bukan hanya
+    /// pada nilainya. Versi pertama uji ini menegaskan 0.54 = cembung dan
+    /// 0.96 = purnama, dan keduanya gagal: itu memang bukan perilaku yang
+    /// ditulis. Batas yang tidak diuji dari dua sisi adalah batas yang
+    /// kebetulan.
+    func testMoonPhaseThresholdsAreExact() {
+        // 0.04 sudah bukan bulan baru lagi.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.04,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseWaxingCrescent.rawValue)
+        // 0.46 sudah bukan sabit lagi, dan masih separuh.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.46,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseFirstQuarter.rawValue)
+        // 0.539 masih separuh; 0.541 sudah cembung. Pita separuh = [0.46, 0.54].
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.539,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseFirstQuarter.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.541,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseWaxingGibbous.rawValue)
+        // 0.96 masih cembung; di atasnya baru purnama.
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.96,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseWaxingGibbous.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 0.961,
+                                                      isWaxing: true).rawValue,
+                       LocalizedText.moonPhaseFull.rawValue)
+    }
+
+    /// Di luar rentang 0…1 tidak menghasilkan fase yang salah.
+    func testMoonPhaseClampsOutOfRangeFractions() {
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: -0.5,
+                                                      isWaxing: nil).rawValue,
+                       LocalizedText.moonPhaseNew.rawValue)
+        XCTAssertEqual(CelestialVisual.moonPhaseText(illuminationFraction: 1.7,
+                                                      isWaxing: nil).rawValue,
+                       LocalizedText.moonPhaseFull.rawValue)
+    }
+
+    /// Hanya Bulan yang punya fase untuk diucapkan.
+    ///
+    /// Planet dan bintang tidak menampilkan fase di layar, jadi mengucapkan
+    /// fase untuk mereka akan memberi pengguna VoiceOver informasi yang
+    /// **tidak** dimiliki pengguna yang melihat — kebalikan dari aksesibilitas.
+    func testOnlyTheMoonSpeaksAPhase() {
+        XCTAssertNil(CelestialVisual(object: object(id: "jupiter", kind: .planet))
+            .spokenPhase)
+        XCTAssertNil(CelestialVisual(object: object(id: "sirius", kind: .star))
+            .spokenPhase)
+        XCTAssertNil(CelestialVisual(object: object(id: "m42", kind: .deepSky))
+            .spokenPhase)
+        // Bulan tanpa fraksi iluminasi: tidak ada fase yang bisa diklaim.
+        XCTAssertNil(CelestialVisual(object: object(id: "moon", kind: .moon))
+            .spokenPhase)
+        // Bulan dengan fraksi: ada.
+        XCTAssertNotNil(moon(fraction: 0.5, waxing: true).spokenPhase)
+    }
+
+    /// Fase yang tidak diketahui tidak pernah menjadi tebakan yang pasti.
+    ///
+    /// Kalau arah waxing tidak diketahui, sabitnya **tidak** disebut "muda"
+    /// maupun "tua" — dua nama itu mengklaim arah. Yang diucapkan adalah
+    /// bentuk netralnya.
+    func testUnknownDirectionNeverClaimsWaxingOrWaning() {
+        let crescent = moon(fraction: 0.2, waxing: nil)
+        XCTAssertEqual(crescent.spokenPhase, LocalizedText.moonPhaseCrescent.indonesian)
+        XCTAssertNotEqual(crescent.spokenPhase, LocalizedText.moonPhaseWaxingCrescent.indonesian)
+        XCTAssertNotEqual(crescent.spokenPhase, LocalizedText.moonPhaseWaningCrescent.indonesian)
+        let gibbous = moon(fraction: 0.8, waxing: nil)
+        XCTAssertEqual(gibbous.spokenPhase, LocalizedText.moonPhaseGibbous.indonesian)
+        let quarter = moon(fraction: 0.5, waxing: nil)
+        XCTAssertEqual(quarter.spokenPhase, LocalizedText.moonPhaseQuarter.indonesian)
+    }
 }

@@ -1025,6 +1025,127 @@
         }
       }
     },
+    "moon.phase.new.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: bulan baru.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New moon"
+          }
+        }
+      }
+    },
+    "moon.phase.full.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: purnama.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full moon"
+          }
+        }
+      }
+    },
+    "moon.phase.crescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral, karena \"muda\" dan \"tua\" mengklaim arah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crescent moon"
+          }
+        }
+      }
+    },
+    "moon.phase.waxingCrescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: sabit membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waxing crescent"
+          }
+        }
+      }
+    },
+    "moon.phase.waningCrescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: sabit mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waning crescent"
+          }
+        }
+      }
+    },
+    "moon.phase.gibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gibbous moon"
+          }
+        }
+      }
+    },
+    "moon.phase.waxingGibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: cembung membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waxing gibbous"
+          }
+        }
+      }
+    },
+    "moon.phase.waningGibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: cembung mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waning gibbous"
+          }
+        }
+      }
+    },
+    "moon.phase.quarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Half moon"
+          }
+        }
+      }
+    },
+    "moon.phase.firstQuarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: separuh membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First quarter"
+          }
+        }
+      }
+    },
+    "moon.phase.lastQuarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: separuh mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last quarter"
+          }
+        }
+      }
+    },
     "Objek terakhir yang dikenali, tanpa membuka app.": {
       "comment": "Deskripsi complication jam.",
       "localizations": {

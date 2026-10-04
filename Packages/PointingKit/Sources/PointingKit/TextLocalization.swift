@@ -226,5 +226,13 @@ public extension LocalizedText {
         .kindSunLabel, .kindDeepSkyLabel,
         .kindStarSpoken, .kindPlanetSpoken, .kindMoonSpoken,
         .kindSunSpoken, .kindDeepSkySpoken,
+        // Nama fase Bulan. Masuk daftar karena inilah **satu-satunya** jalur
+        // fase sampai ke pengguna VoiceOver: gambar prosedural menampilkan
+        // bentuknya, dan tanpa kunci ini yang terdengar hanya "Bulan" — sama
+        // untuk purnama maupun sabit tipis. Lihat `MoonPhaseSpeech.swift`.
+        .moonPhaseNew, .moonPhaseFull, .moonPhaseCrescent,
+        .moonPhaseWaxingCrescent, .moonPhaseWaningCrescent,
+        .moonPhaseGibbous, .moonPhaseWaxingGibbous, .moonPhaseWaningGibbous,
+        .moonPhaseQuarter, .moonPhaseFirstQuarter, .moonPhaseLastQuarter,
     ]
 }

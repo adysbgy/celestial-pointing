@@ -1,5 +1,132 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — bentuk Bulan terlihat, tapi tidak terdengar)
+
+### Premis siklus ini: cari informasi yang hanya punya satu indera
+
+Siklus lalu menemukan sabit Bulan menghadap arah yang salah — cacat yang
+tak terbaca karena gambar yang salah tetap berbentuk sabit. Siklus ini
+mengambil kelas yang bersebelahan: **informasi yang hanya bisa dilihat.**
+
+Gambar prosedural Bulan menampilkan **bentuk** yang berubah sepanjang bulan:
+sabit tipis, separuh, cembung, purnama. Bagi pengguna yang melihat itu
+informasi langsung. Bagi pengguna VoiceOver, yang terdengar hanya `"Bulan"` —
+dan `"Bulan"` sama saja untuk purnama maupun untuk sabit tipis satu persen.
+Fasenya hilang sepenuhnya.
+
+### Kenapa ini bukan "label kurang deskriptif"
+
+`visualPanelLabel` di iPhone **sengaja** tidak mendeskripsikan gambarannya,
+dan komentarnya menjelaskan alasannya dengan benar: *"Gambar Jupiter dengan
+pita oranye" tidak menambah informasi yang tidak sudah ada di nama dan jenis
+benda, tapi ia menambah satu kalimat panjang yang harus didengarkan setiap
+kali.*
+
+Alasan itu benar untuk Jupiter. Pitanya tidak mengubah apa pun yang bisa
+diklaim — Jupiter tetap Jupiter, dengan atau tanpa pita. Alasan itu **tidak**
+benar untuk Bulan, karena fase adalah **data**: fraksi iluminasi yang
+dihitung engine, dan yang tampil di layar sebagai bentuk. Membuangnya bukan
+menyederhanakan pengumuman, melainkan menghilangkan isi.
+
+Jadi yang ditutup bukan kekurangan gaya, melainkan **satu kelas informasi
+yang hanya punya satu indera**: terlihat di layar, tidak pernah terdengar.
+
+### Kenapa tidak ada gerbang yang menangkapnya
+
+Bentuknya sama dengan kelas-kelas sebelumnya di repo ini:
+
+- **Uji visual menguji geometri, bukan penyampaiannya.** `litBandWidth`,
+  `phaseGeometry`, `brightLimbAngle` — semuanya benar dan semuanya tentang
+  **cara menggambar**. Tidak ada satu pun yang bertanya "apakah fase ini
+  sampai ke pengguna yang tidak melihat?"
+- **Uji aksesibilitas menguji label yang ada, bukan yang hilang.** Gerbang
+  memeriksa bahwa setiap `accessibilityLabel` yang **ada** memakai
+  `RowSpeech`/`TextLocalization`. Label yang **tidak menyebut fase** tidak
+  melanggar apa pun — dan memang tidak bisa: tidak ada daftar "informasi yang
+  seharusnya diucapkan".
+- **Menambahkannya tidak akan menyalakan apa pun.** Tanpa uji dan tanpa
+  kunci katalog, `"Bulan sabit muda"` bisa ditulis sebagai literal dan semua
+  gerbang tetap hijau.
+
+### Perbaikannya: nama fase dari fraksi, dengan arah yang jujur
+
+`CelestialVisual.spokenPhase` (di PointingKit, bisa diuji di Linux) memilih
+nama fase dari fraksi iluminasi:
+
+| Fraksi | Arah diketahui | Arah tidak diketahui |
+|---|---|---|
+| < 0.04 | Bulan baru | Bulan baru |
+| 0.04 – 0.46 | Sabit muda / sabit tua | **Bulan sabit** |
+| 0.46 – 0.54 | Separuh awal / separuh akhir | **Bulan separuh** |
+| 0.54 – 0.96 | Cembung membesar / mengecil | **Bulan cembung** |
+| > 0.96 | Bulan purnama | Bulan purnama |
+
+Perhatikan kolom ketiga. Kalau arah waxing/waning tidak diketahui, yang
+diucapkan adalah bentuk **netral** — bukan tebakan. Ini aturan yang sama
+dengan `litSide = waxing ? 1 : -1` yang diperbaiki siklus lalu: **uncertainty
+lebih baik daripada keyakinan palsu.** "Sabit muda" mengklaim arah; "Bulan
+sabit" tidak.
+
+Purnama dan bulan baru tidak punya masalah itu: keduanya simetris, jadi
+namanya sah tanpa arah.
+
+### Yang sengaja **tidak** dilakukan: mengucapkan angkanya
+
+Mengucapkan `"Bulan, dua puluh dua persen menyala"` terlihat lebih
+"lengkap", dan itu justru salah. Tidak ada satu pun angka yang tampil di
+layar. Pengguna yang melihat mendapat **bentuk**; memberi pengguna yang
+mendengar **presisi** berarti memberi mereka informasi yang lebih — bukan
+aksesibilitas, melainkan dua versi kebenaran. Yang diucapkan adalah hal yang
+setara dengan yang terlihat: nama bentuknya.
+
+### Tiga kesalahan, dan bagaimana ketahuan
+
+Ditulis apa adanya:
+
+1. **Dua ambang salah tulis di uji.** Ditegaskan 0.54 = cembung dan
+   0.96 = purnama; keduanya gagal, karena pita "separuh" tertutup di kedua
+   ujung dan 0.96 masih cembung. Ketahuan dari **uji, bukan dari membaca
+   ulang**: ini yang membuat ambang diuji dari dua sisi (0.539/0.541,
+   0.96/0.961) alih-alih pada nilainya saja.
+2. **Gerbang hitungan kunci menyala, dan itu benar.** Uji
+   `testDeclaredKeysAreUniqueNonEmptyAndComplete` mengunci `allKeys.count`
+   pada angka. Ditambah 11 kunci → merah. Angkanya diperbarui (30 → 41),
+   bersama penjelasan mengapa angka itu memang **harus** diperbarui setiap
+   kali: gerbang paritas membaca `allKeys`, jadi kunci yang masuk katalog
+   tanpa masuk daftar akan lolos tanpa ada yang melihatnya.
+3. **`spokenPhase` diuji lewat `spokenPhase`, hampir.** Uji pertama menyentuh
+   `spokenPhase` langsung, yang di Linux selalu mengembalikan nilai bawaan —
+   jadi ia hanya akan menguji teksnya, bukan pemilihan fasenya. Diuji lewat
+   `moonPhaseText` (murni) untuk ambangnya, dan lewat `spokenPhase` hanya
+   untuk keberadaan/ketiadaan.
+
+### Bukti merah
+
+Disuntikkan `return nil` di depan `spokenPhase` (persis keadaan sebelum
+siklus ini: fase tidak pernah diucapkan) → **4 assertion MERAH** di 2 uji.
+Berkas dipulihkan, diverifikasi sha256.
+
+### Batas yang jujur
+
+- **Belum pernah didengar di perangkat.** Uji menegakkan pemilihan fase;
+  bahwa VoiceOver benar-benar membacanya dengan urutan dan jeda yang enak
+  belum diverifikasi — itu butuh perangkat.
+- **Ambangnya konvensi, bukan fisika.** Batas 4% / 46% / 54% / 96% adalah
+  tata nama fase yang lazim dipakai, bukan hasil pengukuran. Uji menegakkan
+  **batas itu diterapkan**, bukan bahwa batas itu yang paling benar.
+- **Nama fase adalah kunci katalog**, jadi gerbang paritas menjaganya; tapi
+  terjemahan Inggrisnya belum pernah dibaca penutur asli.
+
+### Gerbang
+
+- `./swift-test.sh` → **166 CelestialEngine + 315 PointingKit** (naik dari
+  310), **0 failures**.
+- `./swift-ui-lint.sh` → **8 aturan hijau**, termasuk Aturan 6 (paritas
+  katalog) yang memvalidasi 11 kunci baru di kedua sisi.
+- `./swift-typecheck.sh` → lulus. Sapuan CJK pada 7 berkas yang diubah → 0.
+- Katalog: 160 → **171 kunci**, murni aditif (0 penghapusan).
+
+
 ## Progres terakhir (4 Okt 2026 — sabit Bulan menghadap arah yang salah di Indonesia, dan galatnya 85 derajat)
 
 ### Premis siklus ini: periksa asumsi yang paling tidak mungkin salah

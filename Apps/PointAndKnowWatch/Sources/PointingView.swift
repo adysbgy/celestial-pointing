@@ -520,6 +520,16 @@ struct ObjectDetailView: View {
         // `spokenName`, bukan `displayName`: frasa "Objek langit dalam"
         // terdengar janggal saat diucapkan, jadi pengucapannya terpisah.
         var parts = [object.kind.spokenName]
+        // Fase Bulan menyusul jenisnya, bukan menggantikannya: "bulan, sabit
+        // muda" — jenis dulu, lalu bentuknya. Ini satu-satunya informasi di
+        // panel jam yang **hanya** bisa dilihat: gambarnya menampilkan bentuk
+        // fase, sedangkan `magnitudo` dan RA/Dec tidak memberi tahu apa pun
+        // tentang bentuknya. `spokenPhase` mengembalikan `nil` untuk bukan
+        // Bulan dan untuk fase yang tidak diketahui, jadi tidak ada yang
+        // ditebak di sini.
+        if let phase = visual?.spokenPhase {
+            parts.append(phase)
+        }
         parts.append(String(format: "magnitudo %.2f", object.magnitude))
         if object.kind == .star {
             parts.append(String(format: "RA %.1f derajat, deklinasi %+.1f derajat",
