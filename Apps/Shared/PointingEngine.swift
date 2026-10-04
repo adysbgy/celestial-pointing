@@ -27,10 +27,28 @@ public final class PointingEngine: ObservableObject {
     @Published public private(set) var lastLockedObject: CelestialObject?
     /// Ringkasan langit untuk konteks (Matahari terbit/tenggelam, Bulan).
     @Published public private(set) var skyContext: SkyContext?
-    /// Berapa kali engine berpindah **ke** `lock` — dipakai UI untuk animasi.
-    @Published public private(set) var lockCount = 0
+    /// Kedatangan kunci **baru** — sinyal bagi UI untuk merayakan lock.
+    ///
+    /// Bukan `state == .lock`, dan bukan `lockCount`. Keduanya salah: yang
+    /// pertama menyalakan animasi terus-menerus selama terkunci (cuplikan
+    /// ditulis ulang 20 kali per detik), dan keduanya bisa merayakan **objek
+    /// sisa** — jawaban dari pandangan sebelumnya yang sengaja
+    /// dipertahankan mesin keadaan. Aturannya ada di `LockArrivalGate`
+    /// (teruji di Linux); di sini hanya meneruskan.
+    @Published public private(set) var lockArrival: LockArrival?
     /// Jumlah sampel sensor yang sudah diproses.
     @Published public private(set) var sampleCount = 0
+
+    /// Gerbang kedatangan kunci.
+    ///
+    /// **Ada karena `snapshot` ditulis di enam tempat.** Setiap penulisan itu
+    /// mengubah layar, jadi setiap penulisan itu juga harus memperbarui
+    /// pertanyaan "sudah ada kabar baru?". Kalau aturan ini hidup di view
+    /// sebagai `onChange`, enam pemanggil harus menyalinnya sendiri — dan itu
+    /// persis cara aturan yang sama mulai berbeda pendapat antar tempat.
+    /// `setSensorAvailable` dan `stop` bahkan tidak lewat `ingest`, jadi
+    /// `onChange` di view tidak akan pernah melihat perubahan mereka.
+    private var arrivalGate = LockArrivalGate()
 
     public let controller: PointingController
     /// Cara menyuarakan peristiwa haptic. `nil` = tidak ada haptic (iPhone).
@@ -46,7 +64,7 @@ public final class PointingEngine: ObservableObject {
     /// Pasang kalibrasi (dari `CalibrationSession`).
     public func apply(calibration: PointingCalibration) {
         controller.apply(calibration: calibration)
-        snapshot = controller.snapshot
+        publish(controller.snapshot)
     }
 
     /// Pasang ambang keyakinan baru (mis. hasil Experiment 1 dari iPhone).
@@ -63,7 +81,7 @@ public final class PointingEngine: ObservableObject {
     @discardableResult
     public func setConfidencePolicy(_ policy: ConfidencePolicy) -> Bool {
         let changed = controller.setConfidencePolicy(policy)
-        snapshot = controller.snapshot
+        publish(controller.snapshot)
         if changed {
             // Objek itu dikunci dengan ambang lama; ambangnya sudah tidak
             // berlaku, jadi jangan disimpan sebagai jawaban terakhir.
@@ -98,7 +116,7 @@ public final class PointingEngine: ObservableObject {
         guard !newValue.isSamePlace(as: location) else { return }
         location = newValue
         controller.setObserver(newValue.observer)
-        snapshot = controller.snapshot
+        publish(controller.snapshot)
         lastLockedObject = nil
         // Konteks langit (Matahari/Bulan) dihitung untuk **tempat**, jadi
         // konteks tempat lama tidak berlaku di tempat baru. Perhitungan ulang
@@ -132,17 +150,15 @@ public final class PointingEngine: ObservableObject {
 
     /// Dipanggil `MotionLogger` untuk setiap sampel sensor.
     public func ingest(_ update: PointingUpdate, at date: Date = Date()) {
-        let wasLocked = snapshot.state == .lock
         sampleCount += 1
-        snapshot = update.snapshot
+        publish(update.snapshot)
         if !update.haptics.isEmpty { haptics?(update.haptics) }
         if update.snapshot.state == .lock {
-            if !wasLocked { lockCount += 1 }
-            // `answeredObject` — sama dengan yang dipakai pesan dan riwayat.
-            // Di sini hasilnya identik (`lock` selalu punya jawaban), tapi
-            // memakai satu predikat yang sama berarti "objek terakhir yang
-            // terkunci" tidak bisa diam-diam menjadi objek yang dipertahankan
-            // mesin keadaan kalau aturan `lock` berubah.
+            // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
+            // gerbang kedatangan kunci. Memakai satu predikat yang sama
+            // berarti "objek terakhir yang terkunci" tidak bisa diam-diam
+            // menjadi objek yang dipertahankan mesin keadaan kalau aturan
+            // `lock` berubah.
             lastLockedObject = update.snapshot.answeredObject
         }
         refreshSkyContext(at: date)
@@ -192,13 +208,34 @@ public final class PointingEngine: ObservableObject {
     public func setSensorAvailable(_ available: Bool) {
         sensorNote = available ? nil : "Data gerak tidak tersedia."
         controller.setSensorAvailable(available)
-        snapshot = controller.snapshot
+        publish(controller.snapshot)
     }
+
+    // MARK: - Satu-satunya jalan menulis snapshot
+
+    /// Tulis cuplikan ke UI sekaligus memperbarui gerbang kedatangan kunci.
+    ///
+    /// **Kenapa keduanya harus di satu tempat.** `snapshot` adalah satu-satunya
+    /// sumber yang dibaca semua layar, dan ia ditulis dari enam jalur berbeda.
+    /// Kalau penulisan cuplikan dan pencatatan "kabar baru" dipisahkan, satu
+    /// dari keduanya bisa terlewat — dan gejalanya tidak terlihat di layar:
+    /// layar tetap menampilkan keadaan yang benar, hanya tanpa tanda arrival
+    /// yang baru (atau dengan tanda yang salah). Kalau aturannya diduplikasi
+    /// di tiap pemanggil, aturan yang sama mulai berbeda pendapat enam kali.
+    ///
+    /// Karena itu semua penulisan snapshot **wajib** lewat sini. Kalau
+    /// `snapshot = ...` muncul lagi di berkas ini, itu bug.
+    private func publish(_ value: PointingSnapshot) {
+        snapshot = value
+        lockArrival = arrivalGate.update(with: value)
+    }
+
+    // MARK: - Alur
 
     /// Alur dihentikan (layar pergi, pergelangan diturunkan).
     public func stop() {
         controller.stop()
-        snapshot = controller.snapshot
+        publish(controller.snapshot)
     }
 
     /// Objek yang ditampilkan di panel detail.
