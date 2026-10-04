@@ -130,7 +130,7 @@ targets:
     # Di CI (tanpa tanda tangan) container ini `nil` → store pakai fallback
     # cache, jadi build tetap hijau; di perangkat nyata dengan profil yang
     # mengaktifkan group ini, complication benar-benar membaca tulisan app.
-    entitlements: Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
+    entitlementsPath: Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp.widgets
@@ -183,7 +183,7 @@ targets:
         # App Group agar app jam & complication berbagi berkas snapshot.
         # Sama dengan target complication; tanpa ini complication hanya membaca
         # cache-nya sendiri (fallback store), bukan tulisan app.
-        entitlements: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+        entitlementsPath: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
 
 # Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
 # dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).
