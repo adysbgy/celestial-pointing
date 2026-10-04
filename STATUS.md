@@ -2857,6 +2857,49 @@ file view.
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
+    ./swift-typecheck.sh     # typecheck + parse semua berkas Apps/
+    ./red-test.sh <berkas-uji> <nama-test> <berkas-sumber> <lama> <baru>
+
+## Dua gerbang yang dulu tidak benar-benar berjalan
+
+**`swift-typecheck.sh` tidak pernah bisa lulus di VPS2.** Skrip itu memanggil
+`swift build`/`swiftc` langsung di host, dan di host tidak ada Swift — hanya di
+dalam Docker. Jadi "tidak ada error" yang tercetak berasal dari
+`command not found`, bukan dari kode yang bersih; skrip tetap keluar 0 karena
+`$?` diambil dari pipeline yang sudah hancur. Itu menjelaskan tiga siklus
+berturut-turut yang menemukan cacat baru tepat setelah push. Sekarang
+seluruh perintah dijalankan di dalam container dan status diambil dari sana.
+
+**`red-test.sh` (baru) membuktikan uji benar-benar menangkap cacat.** Uji yang
+tidak pernah merah adalah formalitas: ia hanya membuktikan kode sekarang cocok
+dengan ekspektasi penulisnya. Skrip ini menerapkan satu mutasi, memastikan uji
+MERAH, lalu mengembalikan sumber — sehingga "uji ini menangkap mutasi" adalah
+klaim yang bisa diulang, bukan cadangan.
+
+Dua cacat di siklus ini ditemukan oleh gerbang itu, bukan oleh mata:
+- Uji label-vs-slug pertama membandingkan dengan `lowercased()`. Katalog
+  menyimpan `name` sebagai slug yang hanya dib capitalized (`sirius`/`Sirius`),
+  jadi perbandingan itu **tidak mungkin gagal** — uji formalitas yang lolos
+  begitu saya tulis. Diperbaiki ke perbandingan byte.
+- `write_file` sempat menyisipkan fragmen CJK (`仓库`, `把它`) ke komentar.
+  Damage itu lolos kompilasi dan lolos CI. Pemeriksaan CJK sekarang jadi
+  bagian siklus.
+
+## Teks layar bukan pengenal mesin
+
+Empat teks menampilkan nilai yang dibuat untuk mesin (`DisplayLabels.swift`,
+`DisplayLabelTests` — 9 uji). Yang paling terlihat: headline tiap baris
+percobaan di Experiment 1 menulis slug katalog apa adanya — `sirius` di tempat
+yang seharusnya `Sirius`. Aksesor yang benar sudah ada
+(`ConfidenceLevel.displayName`); masalahnya pemanggil mengambil `rawValue`.
+
+Bentuk kabel dan label kini dipisah: `rawValue` untuk serialisasi,
+`displayName` untuk layar. `LinkMessageKind.rawValue` **tidak** diubah — itu
+kunci `plist`; ujinya menjaga agar memperbaiki tampilan tidak pernah menyentuh
+bentuk kabel. `objectName(forObjectID:)` mengembalikan `nil` untuk id tak
+dikenal: mengarang nama dari id terlihat benar untuk seluruh katalog sekarang
+dan diam-diam salah begitu ada id yang tidak mengikuti pola itu.
+`ExperimentRecorder` tetap memakai `aim.rawValue` — itu JSON untuk mesin.
 
 ## Catatan penting
 - `Package.swift` kini `swift-tools-version:6.0` (dibutuhkan AstronomyKit),
