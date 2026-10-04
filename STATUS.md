@@ -1,5 +1,112 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — lencana tanda tanya terpotong 0.132 R di dua sisi Canvas)
+
+### Premis siklus ini: bentuk yang tersisa bukan yang belum ada, tapi yang belum dihitung
+
+Tiga siklus terakhir menemukan cacat di kelas yang sama — **geometri raster
+yang tidak terbaca dari teks** — dan masing-masing ditutup dengan memindahkan
+angka batas ke `VisualFrame`. Siklus ini membalik pertanyaannya: alih-alih
+mencari bentuk baru, **setiap** bentuk di `Canvas` dihitung ulang untuk tahu
+mana yang belum punya uji batas. Hasilnya: cincin Saturnus, blob nebula, dan
+bintang sudah punya; pita Jupiter, Bintik Merah Besar, kawah Merkurius, kabut
+Venus, Maria Bulan, korona Matahari, dan pembelah Cassini semuanya **0
+overflow**. Yang tersisa tinggal satu — dan justru yang paling penting.
+
+### Cacat yang ditemukan: lencana keraguan terpotong di dua sisi sekaligus
+
+`drawCandidateMarker` menaruh lencana di sudut kanan atas dengan radius
+`0.22 · lebar` dan pusat di `(0.846 · lebar, 0.154 · lebar)`. Karena lencana
+berada di **sudut**, dua sisinya dekat tepi frame sekaligus — bukan satu:
+
+| Sisi | Posisi | Batas frame | Keluar |
+|---|---|---|---|
+| Kanan | 1.132 R | 1.0 R | **+0.132 R** |
+| Atas | −1.132 R | −1.0 R | **+0.132 R** |
+
+30% radius lencana hilang, di dua sisi. Karena `Canvas` memotong dengan **tepi
+lurus**, lingkarannya tidak tampak "agak kepotong" — ia tampil sebagai busur
+yang berhenti mendadak di dua tepi kartu.
+
+### Kenapa ini bukan cacat kosmetik (dan beda dari tiga pendahulunya)
+
+Cincin Saturnus yang terpotong membuat **satu planet** tampil salah. Ini
+berbeda: lencana tanda tanya adalah **satu-satunya penanda di layar yang
+mengatakan "engine ragu"**. Kalau ia terpotong habis, yang tersisa hanya
+gambar objek **tanpa** penanda — dan gambar tanpa penanda terbaca sebagai
+identitas yang pasti. Jadi cacat pada bentuk ini **membatalkan alasan bentuk
+ini ada**: pelanggaran PRD ("JANGAN tampilkan visual yang mengklaim identitas
+saat engine ragu") justru terjadi lewat hilangnya penanda yang mencegahnya.
+
+Ini juga cacat yang paling mudah lolos: lencana hanya tampil saat engine
+ragu — keadaan yang sengaja jarang, jadi hampir tidak pernah terlihat saat
+menguji sekilas dalam keadaan terkunci.
+
+### Yang diubah, dan kenapa begini
+
+- **`VisualFrame.candidateMarker()` menghitung radius dari sudut yang
+  diizinkan**, bukan dari lebar yang diinginkan lalu dibiarkan meluber — pola
+  yang sama dengan `VisualFrame.star`. Karena `jarak + radius = corner`
+  secara konstruktif, memperbesar lencana tidak bisa lagi mendorongnya keluar:
+  ia menempel makin dekat ke tengah.
+- **Inset dibuat pecahan frame, bukan angka mutlak.** Versi pertama memakai
+  `inset` tetap; uji `testCandidateMarkerKeepsInsetFromTheEdge` menangkapnya
+  merah pada frame 2.0 (jarak 0.06 vs syarat 0.1). Lencana digambar di kartu
+  jam 38pt **dan** panel iPhone 132pt, jadi jarak yang tetap akan menempel
+  pada bingkai di ukuran besar.
+- **`overflow(frameHalfExtent:)` menerima frame yang diukur**, bukan membaca
+  konstanta `halfExtent`. Kesalahan pertama ada di sini dan ketahuan oleh uji
+  sendiri pada frame 2.0: batasnya dilaporkan "0.94 R keluar" padahal tidak
+  ada yang keluar. Diperbaiki di model, bukan di uji.
+- **View tidak punya rumus lencana lagi.** `drawCandidateMarker` membaca
+  `marker.centerX/centerY/radius/glyphRadius`. Ini mempertahankan aturan
+  repo: keputusan visual yang bisa salah tanpa ada yang bisa mengujinya tidak
+  boleh tinggal di view.
+
+### Uji dibuktikan MERAH lebih dulu
+
+Dengan geometri lama dikembalikan (`radius = 0.44`, `jarak = 0.692` dalam
+satuan radius):
+
+- `testCandidateMarkerStaysInsideForAnySize` → **gagal** pada seluruh 4
+  ukuran (0.132 R) dan pada frame 0.5 (0.632 R).
+- `testCandidateMarkerKeepsInsetFromTheEdge` → **gagal**: jarak −0.132 R.
+- `testLegacyCandidateMarkerOverflowedOnTwoSides` mengunci angka lama
+  sebagai bukti cacatnya nyata — dan angkanya cocok persis dengan hitungan
+  Python mandiri (0.132 R di kanan **dan** atas).
+
+Satu uji awalnya salah dan diperbaiki, bukan ditambal: ia mengukur jarak ke
+tepi dengan `VisualFrame.halfExtent` (konstanta 1.0) sehingga hanya kebetulan
+benar untuk frame 1.0. Diubah mengukur terhadap frame yang dipakai lencana
+itu, dan dijalankan pada 0.5/1.0/2.0.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 224 PointingKit, 0 gagal** (naik
+  dari 218 → 224). Engine tidak disentuh.
+- Keempat uji lencana **dibuktikan MERAH lebih dulu**, bukan hanya hijau.
+- Gerbang sintaks: seluruh 22 berkas app lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan CJK/Cyrillic pada berkas yang diubah: **0** (satu kata CJK sempat
+  lolos di komentar uji, dibuang sebelum commit).
+- **CI hijau pada push pertama** (`0714d2b`):
+  - `Apple Build` run `37182401570` → **2× `BUILD SUCCEEDED`** + gerbang
+    peringatan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37182401575` → hijau, ke-6 uji lencana
+    terlihat **lolos di log CI** (bukan hanya di mesin ini).
+
+### Pelajaran yang berulang (empat siklus berturut-turut)
+
+Empat siklus terakhir menemukan cacatnya di kelas yang **sama**: geometri
+raster yang tidak terbaca dari teks. Kutub Mars menembus 0.26R; cincin
+Saturnus terpotong 0.9R; bintang terpotong 0.81R; dan sekarang lencana
+keraguan terpotong 0.132R. Keempatnya lolos `swiftc -parse`, keempatnya lolos
+`swift test` yang ada sebelum uji batasnya ditulis. Polanya kini cukup
+konsisten untuk dibaca sebagai aturan operasional: **setiap bentuk di `Canvas`
+yang ukurannya dikalikan dari angka dasar harus punya uji batas di
+`VisualFrame`** — dan audit siklus ini memakai aturan itu untuk menyisir
+seluruh `Canvas`, bukan menunggu kecurigaan datang.
+
 ## Ringkasan keadaan (4 Okt 2026, pagi)
 
 **Brief UI/UX (Bagian 1–4) sudah terpasang penuh — dan diverifikasi ulang dari
@@ -14,15 +121,16 @@ diffraction spike bintang terpotong tepi `Canvas` pada **24 dari 25 bintang
 di katalog** — Sirius paling parah, 0.81R hilang. Detail di entri "Progres
 terakhir" di bawah.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 218 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 224 test
   PointingKit, 0 gagal** (`./swift-test.sh` dari nol, Swift 6.0 Docker,
-  Linux) — dan **kedua workflow CI hijau** di HEAD `3ab030e` (Apple Build
+  Linux) — dan **kedua workflow CI hijau** di HEAD `0714d2b` (Apple Build
   `37181603764` 2× `BUILD SUCCEEDED` + gerbang peringatan "Tidak ada
   peringatan compiler pada Apps/."; Engine Tests `37181603824`, keenam uji
   bintang terlihat lolos di log CI).
-- Rincian: `166 + 218` naik dari `166 + 212` (+6 uji batas bintang, lihat
-  entri siklus ini). Sebelumnya `166 + 212` naik dari `166 + 201` (+11 uji
-  batas frame).
+- Rincian: `166 + 224` naik dari `166 + 218` (+6 uji batas lencana kandidat,
+  lihat entri siklus ini). Sebelumnya `166 + 218` naik dari `166 + 212`
+  (+6 uji batas bintang), dan `166 + 212` dari `166 + 201` (+11 uji batas
+  frame).
 
 ### Yang diverifikasi ulang (bukan dengan mempercayai STATUS lama)
 
