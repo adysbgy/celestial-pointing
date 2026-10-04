@@ -160,9 +160,11 @@ struct Experiment1View: View {
                 }
                 Text(recorder.verdict)
                     .font(.footnote)
-                    .foregroundStyle(summary.passesSafetyCriterion
-                                     ? PointingTone.success.color
-                                     : PointingTone.danger.color)
+                    // Nada dari putusan itu sendiri, bukan dari
+                    // `passesSafetyCriterion`: yang terakhir bernilai `true`
+                    // bahkan untuk satu percobaan bersih, sehingga "belum
+                    // cukup bukti" akan tampil hijau sukses.
+                    .foregroundStyle(summary.safetyVerdict.tone.color)
 
                 if let policy = recorder.suggestedPolicy() {
                     VStack(alignment: .leading, spacing: 2) {

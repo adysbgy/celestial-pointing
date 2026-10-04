@@ -258,6 +258,13 @@ public final class ExperimentHarness {
     }
 
     /// Kalimat penilaian untuk ditampilkan ke pengguna.
+    ///
+    /// **Kenapa "nol false lock" saja tidak cukup untuk bilang "lulus".**
+    /// Lihat `ExperimentSummary.safetyVerdict`: gagal butuh satu contoh
+    /// tandingan, lulus butuh sampel yang cukup. Satu percobaan bersih
+    /// sebelumnya dicetak sebagai "Lulus syarat keselamatan" — klaim
+    /// keselamatan dari satu titik data. Kini keadaan itu punya kalimatnya
+    /// sendiri yang jujur menyebut sampelnya belum cukup.
     public var verdict: String {
         let analyzable = trials.compactMap(\.analysis)
         guard !analyzable.isEmpty else { return "Belum ada percobaan yang bisa dianalisis." }
@@ -267,12 +274,20 @@ public final class ExperimentHarness {
         let median = summary.medianRawPointingErrorDeg.map { String(format: "%.1f°", $0) } ?? "—"
         let p90 = summary.p90RawPointingErrorDeg.map { String(format: "%.1f°", $0) } ?? "—"
 
-        if summary.falseLockCount > 0 {
+        switch summary.safetyVerdict {
+        case .failed:
             return "GAGAL: \(summary.falseLockCount) false lock — engine yakin tapi salah. "
                 + "Ambang keyakinan harus diperketat. Akurasi \(accuracy), galat median \(median), P90 \(p90)."
+        case .insufficientEvidence:
+            // Jangan ucapkan "lulus": yang diketahui cuma "belum ketemu".
+            return "Belum bisa disimpulkan: 0 false lock dari \(summary.trialCount) percobaan — "
+                + "sampel belum cukup (butuh minimal \(ExperimentSummary.minimumTrialsForSafetyClaim)). "
+                + "Akurasi \(accuracy), galat tunjuk median \(median), P90 \(p90). "
+                + "Ini bukan bukti aman, hanya belum ada bukti sebaliknya."
+        case .passed:
+            return "Lulus syarat keselamatan (0 false lock dari \(summary.trialCount) percobaan). "
+                + "Akurasi \(accuracy), galat tunjuk median \(median), P90 \(p90)."
         }
-        return "Lulus syarat keselamatan (0 false lock). Akurasi \(accuracy), "
-            + "galat tunjuk median \(median), P90 \(p90), dari \(summary.trialCount) percobaan."
     }
 }
 
