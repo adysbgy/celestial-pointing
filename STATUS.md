@@ -1,5 +1,96 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — cahaya Bulan tidak pernah menggeser batas magnitudo)
+
+### Premis: angka yang benar, dan keputusan yang tidak pernah diambil
+
+`SkyContext.moonIlluminationFraction` dihitung setiap resolusi, disimpan, lalu
+ditampilkan sebagai "Fase Bulan" di layar Ketelitian. Semuanya benar. Tapi
+`grep` di seluruh jalur penyaringan tidak menemukan **satu pun** pembacaan nilai
+itu: `VisibilityFilter.classify` membandingkan magnitudo dengan
+`policy.limitingMagnitude` polos.
+
+Jadi ambang magnitudo tidak bergerak **sama sekali** antara langit tanpa Bulan dan
+langit purnama. Untuk pengguna yang sedang berburu bintang redup, ini bukan
+sekadar kurang akurat — engine menyatakan bahwa sesuatu "terlalu redup" untuk
+langit yang memang jauh lebih terang dari yang disangka pengguna. Dan karena
+`tooFaint` masuk ke `SearchHint`, engine punya alasan yang **salah** untuk
+menolak kandidat: bukan "terlalu redup" (betul di bawah purnama), tapi ambang
+yang tidak bergerak (berbahaya di mana saja).
+
+Ini tipe defect yang berbeda dari dua siklus sebelumnya. Bukan "nilai dibuang"
+— nilainya dipakai, hanya untuk **menggambar**. Yang terbuang adalah
+**keputusan**: apakah cahaya Bulan ikut membatasi pengamatan.
+
+### Angka 1.6, dan kenapa angka itu bukan klaim
+
+`moonBrighteningMagnitudes` default 1.6 magnitudo pada fraksi penuh. Itu
+memindahkan batas mata telanjang dari sekitar 6.5 ke sekitar 4.9 — angka kasar
+yang lazim dipakai peminat pengamatan, **bukan** hasil pengukuran di instrument.
+Uji tidak menjaga angkanya; uji menjaga **arahnya** (makin terang makin ketat) dan
+**monotonnya**. Angka fisika tidak bisa dipertahankan sebagai fakta di sini,
+jadi repo tidak mengklaimnya sebagai fakta.
+
+Hanya fraksi yang dipakai, bukan juga ketinggian dan sudut: fraksi satu-satunya
+yang punya sumber sudah teruji (`EphemerisBody.illuminationFraction`), dan menambah
+dua faktor lain butuh plumbing efemeris baru untuk pengaruh orde dua.
+
+### Tiga keputusan kecil yang justru lebih penting dari yang besar
+
+1. **`nil` kembali ke batas dasar.** "Tidak diketahui" bukan "tidak ada".
+   Memperlakukan unknowns sebagai langit paling terang akan membuang bintang
+   dengan alasan yang tidak pernah terjadi — dan penolakan palsu seperti itu
+   tidak bisa dibedakan pengguna dari penolakan yang benar.
+2. **`permissive` dapat `0`.** Tanpa itu policy pengujian tetap membuang bintang
+   redup saat ada purnama, jadi "tidak membuang apa pun" jadi setengah benar.
+3. **Monoton.** Batas yang mengetat lalu mengendur adalah kesalahan paling halus,
+   karena arah perubahannya masih "mengetat" dan terlihat masuk akal. Uji
+   `testBrighterMoonNeverLoosensTheLimit` menjaga bentuknya, bukan angkanya.
+
+### Cacat alat yang ketemu di tengah: `red-test.sh` bisa melaporkan hijau palsuk
+
+Ini yang paling layak dicatat. Saat membuktikan mutasi **tanda minus jadi plus**,
+skrip melaporkan "uji ini tidak menangkap mutasi" — padahal uji itu jelas harus
+merah (batas yang melonggar membuat magnitudo 4.5 tetap lolos).
+
+Penyebabnya: `red-test.sh` memaku `cd /src/Packages/PointingKit`. Uji engine
+berjalan di paket yang **tidak punya** uji itu, jadi `swift test` keluar 0 dengan
+`0 tests passed` — dan skrip membaca "keluar 0" sebagai "tidak merah".
+
+Perbaikan: paket diturunkan dari letak berkas uji, dan `0 tests` kini
+dianggap **kegagalan** (keluar 3), bukan bukti hijau.
+
+Bentuk cacatnya persis bentuk yang skrip itu dibuat untuk cegah: tidak terlihat
+dari mana pun, semuanya tetap kompilasi, semua gerbang hijau, dan
+kesimpulan yang salah.
+
+### Bukti
+
+| Mutasi | Uji | Hasil |
+|---|---|---|
+| tanda `-` jadi `+` | `testMoonlightTightensTheLimitingMagnitude` | **MERAH** |
+| `permissive` kehilangan `moonBrighteningMagnitudes: 0` | `testPermissivePolicyIgnoresMoonlight` | **MERAH**: 1.6 ≠ 0.0 |
+| `nil` dipaksa lebih ketat | `testUnknownMoonKeepsTheBaseMagnitudeLimit` | **MERAH**: 3.0 ≠ 6.0 |
+| pengetatan tidak monoton | `testBrighterMoonNeverLoosensTheLimit` | **MERAH**: 5.68 > 4.4 |
+
+Dua mutasi pertama sempat **hijau** sebelum `red-test.sh` diperbaiki dan dua uji
+tambahan ditulis — keduanya karena uji yang ada tidak punya kasus yang bisa
+menangkapnya, bukan karena mutasinya tidak berbahaya.
+
+### Gerbang
+
+- `swift-test.sh` → **170 CelestialEngine** (166 → 170, +4) **+ 469 PointingKit**.
+- `swift-ui-lint.sh` → **13 aturan hijau** (Aturan 10 menangkap angka README).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-test.sh` → empat mutasi merah, setelah skripnya diperbaiki.
+- CI: `37239219070` (Apple Build) + `37239219113` (Engine Linux) — hijau.
+
+### Catatan kejujuran
+
+Perubahan ini membuat engine **lebih jarang** menjawab, dan itu disengaja.
+Ambang yang tidak bergerak terlihat aman, tapi ia mengarang keterbatasan yang
+tidak bisa ia bantah dan yang tidak pernah disangka pengguna. Batas yang bergerak
+mengikuti pengamatan nyata — dan bisa diuji.
 ## Progres terakhir (4 Okt 2026 — complication menampilkan kandidat ragu tanpa penanda)
 
 ### Premis: kebenaran yang sudah dihitung, lalu dibuang
