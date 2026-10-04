@@ -400,7 +400,26 @@ struct CelestialVisualView: View {
 
         // `clip` ke piringan: wajib, karena untuk fase gibbous sisi limb bisa
         // keluar dari disk.
+        //
+        // **Seluruh pita diputar sebesar sudut sisi terang**, bukan hanya
+        // dicerminkan. Sabit yang digambar di sini berdiri tegak dengan sisi
+        // terang ke kanan; di langit, sisi terang menghadap Matahari, dan di
+        // lintang Indonesia (dekat ekuator) arah itu sering menghadap ke
+        // **bawah**. Tanpa putaran ini gambar akan benar untuk pengamat di
+        // lintang tinggi dan salah untuk pengamat di tempat aplikasi ini
+        // dipakai -- dan salahnya tidak terlihat, karena sabitnya tetap
+        // berbentuk sabit.
+        //
+        // `angle == nil` berarti sudutnya tidak diketahui: pita digambar apa
+        // adanya (tanpa putaran), bukan diputar ke sudut karangan.
         context.drawLayer { layer in
+            if let angle = visual.brightLimbAngleRadians {
+                // `rotate` berputar terhadap titik asal, jadi titik pusat
+                // piringan harus dibawa ke asal dulu lalu dikembalikan.
+                layer.translateBy(x: center.x, y: center.y)
+                layer.rotate(by: .radians(angle))
+                layer.translateBy(x: -center.x, y: -center.y)
+            }
             layer.clip(to: disc)
             // Pita yang menyala: **permukaan**, jadi aturan `surface`.
             // Versi lama menulis (0.95, 0.85, 0.80) untuk malam -- 77%

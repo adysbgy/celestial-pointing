@@ -66,6 +66,33 @@ public struct CelestialVisual: Equatable, Sendable {
     /// pertama terbaca sebagai fakta sedangkan yang kedua jujur tidak tahu.
     public var isWaxing: Bool?
 
+    /// Sudut sisi terang Bulan **di langit**, dalam radian.
+    ///
+    /// `0` = sisi terang ke kanan, `+pi/2` = ke atas, `pi` = ke kiri,
+    /// `-pi/2` = ke bawah. Diukur dari proyeksi vektor Bulan→Matahari ke
+    /// bidang gambar.
+    ///
+    /// **Kenapa arah saja tidak cukup, dan `isWaxing` tidak bisa
+    /// menggantikannya.** `isWaxing` hanya memberi dua kemungkinan (kanan
+    /// atau kiri), dan itu benar hanya bila sabitnya berdiri tegak —
+    /// keadaan yang berlaku di lintang tinggi, bukan di Indonesia. Jakarta
+    /// berada di lintang -6.2 derajat, di dekat ekuator, tempat sabit
+    /// muda justru terlihat "terlentang": sisi terangnya menghadap **bawah**
+    /// ke tempat Matahari terbenam. Menggambarnya sebagai sabit tegak
+    /// menghadap kanan bukan sekadar kurang mirip — itu gambar yang salah
+    /// arah pada aplikasi yang seluruh nilainya bergantung pada tidak
+    /// menampilkan klaim yang keliru.
+    ///
+    /// Aturan fisisnya tunggal dan berlaku di mana saja: **sisi terang
+    /// selalu menghadap Matahari.** Sudut inilah terjemahan aturan itu ke
+    /// bidang gambar, jadi tidak ada cabang per-belahan-bumi di sini —
+    /// lintang sudah masuk lewat posisi Matahari dan Bulan yang dihitung
+    /// engine.
+    ///
+    /// `nil` berarti "tidak diketahui", dan UI lalu **tidak memutar**
+    /// gambar (kembali ke perilaku lama), bukan menebak sudutnya.
+    public var brightLimbAngleRadians: Double?
+
     // MARK: - Bintang
 
     /// Indeks warna B−V. Positif = merah, negatif = biru.
@@ -110,6 +137,7 @@ public struct CelestialVisual: Equatable, Sendable {
                 planet: Planet? = nil,
                 illuminationFraction: Double? = nil,
                 isWaxing: Bool? = nil,
+                brightLimbAngleRadians: Double? = nil,
                 colorIndexBV: Double = 0,
                 relativeSize: Double = 0.5,
                 fuzziness: Double = 0) {
@@ -117,6 +145,7 @@ public struct CelestialVisual: Equatable, Sendable {
         self.planet = planet
         self.illuminationFraction = illuminationFraction
         self.isWaxing = isWaxing
+        self.brightLimbAngleRadians = brightLimbAngleRadians
         self.colorIndexBV = colorIndexBV
         self.relativeSize = relativeSize
         self.fuzziness = fuzziness
@@ -132,14 +161,18 @@ public struct CelestialVisual: Equatable, Sendable {
     ///     Hanya dipakai bila objeknya benar-benar Bulan — meneruskannya ke
     ///     benda lain akan menggambar fase pada Venus.
     ///   - isWaxing: arah fase Bulan, bila diketahui.
+    ///   - brightLimbAngleRadians: sudut sisi terang Bulan di langit, bila
+    ///     diketahui. Hanya dipakai bila objeknya Bulan.
     public init(object: CelestialObject,
                 moonIlluminationFraction: Double? = nil,
-                isWaxing: Bool? = nil) {
+                isWaxing: Bool? = nil,
+                moonBrightLimbAngleRadians: Double? = nil) {
         switch object.kind {
         case .moon:
             self.init(kind: .moon,
                       illuminationFraction: moonIlluminationFraction,
                       isWaxing: isWaxing,
+                      brightLimbAngleRadians: moonBrightLimbAngleRadians,
                       relativeSize: 1.0)
         case .planet:
             self.init(kind: .planet,
@@ -275,6 +308,82 @@ public struct CelestialVisual: Equatable, Sendable {
     }
 
     // MARK: - Warna bintang
+
+    /// Sudut sisi terang Bulan **di bidang gambar** — fungsi murni, tanpa
+    /// efemeris.
+    ///
+    /// **Kenapa ada di sini, bukan di `PointingResolver`.** Efemeris tidak
+    /// tersedia saat uji di Linux (tidak ada `AstronomyKit`), jadi rumus
+    /// yang tinggal di dalamnya **tidak bisa diuji sama sekali** — padahal
+    /// justru rumus inilah yang menentukan apakah sabit menghadap arah yang
+    /// benar. Dengan dipisah, geometrinya diuji memakai alt/az yang ditulis
+    /// tangan; yang tersisa di lapisan tak-teruji hanyalah pemanggilan
+    /// efemerisnya.
+    ///
+    /// **Kenapa sudut, bukan boolean kanan/kiri.** `isWaxing` hanya benar
+    /// bila sabitnya berdiri tegak — keadaan lintang tinggi. Di dekat
+    /// ekuator (Jakarta, lintang -6.2 derajat) sabit muda justru terlentang,
+    /// sisi terangnya menghadap **bawah**. Jadi `isWaxing` bukan aproksimasi
+    /// kasar untuk sudut ini; ia jawaban yang salah di tempat aplikasi ini
+    /// dipakai.
+    ///
+    /// Langkah-langkahnya:
+    ///
+    /// 1. Vektor Bulan→Matahari dalam kerangka ENU (x = Timur, y = Utara,
+    ///    z = Atas), dari **beda vektor satuan** — bukan beda sudut alt/az,
+    ///    yang punya titik singular di kutub dan di zenit.
+    /// 2. Buang komponen sepanjang garis pandang, sisakan proyeksi di bidang
+    ///    gambar. **Tanpa langkah ini**, vektor dengan komponen mendalam
+    ///    besar menghasilkan arah yang menunjuk keluar layar: sudutnya
+    ///    berayun liar saat Bulan dekat zenit, padahal yang dilihat mata
+    ///    justru berubah paling lambat di sana.
+    /// 3. Ukur sudutnya dari "kanan" dengan "atas" positif (konvensi sudut
+    ///    layar, searah jarum jam karena y layar menghadap ke bawah).
+    ///
+    /// Karena kerangkanya lokal, **tidak ada cabang per-belahan-bumi di
+    /// sini**: lintang sudah masuk lewat posisi Matahari dan Bulan.
+    ///
+    /// - Returns: `nil` bila Bulan dan Matahari berimpit (tidak ada arah),
+    ///   atau bila vektor Bulan→Matahari tepat sepanjang garis pandang
+    ///   (tidak ada sudut di bidang gambar). UI lalu **tidak memutar**
+    ///   gambar, bukan menebak sudutnya.
+    public static func brightLimbAngle(moon: HorizontalCoord,
+                                       sun: HorizontalCoord) -> Double? {
+        func enu(_ h: HorizontalCoord) -> (e: Double, n: Double, u: Double) {
+            let alt = SkyMath.deg2rad(h.altitudeDeg)
+            let az = SkyMath.deg2rad(h.azimuthDeg)
+            return (cos(alt) * sin(az), cos(alt) * cos(az), sin(alt))
+        }
+
+        let m = enu(moon)
+        let s = enu(sun)
+        let delta = (e: s.e - m.e, n: s.n - m.n, u: s.u - m.u)
+        let length = (delta.e * delta.e + delta.n * delta.n
+                      + delta.u * delta.u).squareRoot()
+        guard length > 1e-9 else { return nil }
+
+        let depth = delta.e * m.e + delta.n * m.n + delta.u * m.u
+        let screenE = delta.e - depth * m.e
+        let screenN = delta.n - depth * m.n
+        let screenU = delta.u - depth * m.u
+        guard screenE * screenE + screenN * screenN + screenU * screenU > 1e-18
+        else { return nil }
+
+        // Pengamat menghadap Bulan. Basis gambar diturunkan sebagai vektor,
+        // bukan dari sudut alt/az: `right = m x atas-dunia`, `up = right x m`.
+        // Dijumlahkan sebagai vektor, jadi sahih untuk azimut berapa pun --
+        // termasuk saat Bulan tepat di zenit, tempat rumus berbasis sudut
+        // kehilangan acuan. (Versi pertama fungsi ini menulis kedua basis
+        // dari tangan dan keduanya salah: `right` terbalik, dan `up` bahkan
+        // tidak tegak lurus terhadap `m`. Itu ketahuan dari uji, bukan dari
+        // membaca ulang rumusnya.)
+        let right = screenE * m.n + screenN * (-m.e)
+        let up = screenE * (-m.e * m.u)
+               + screenN * (-m.n * m.u)
+               + screenU * (m.e * m.e + m.n * m.n)
+        guard right != 0 || up != 0 else { return nil }
+        return atan2(up, right)
+    }
 
     /// Indeks warna B−V untuk bintang yang ada di katalog.
     ///
@@ -962,6 +1071,43 @@ public extension PointingResolver {
         guard let ephemeris else { return nil }
         guard let moon = try? ephemeris.apparent(.moon, at: date) else { return nil }
         return min(1, max(0, moon.illuminationFraction))
+    }
+
+    /// Sudut sisi terang Bulan **di langit pengamat**, dalam radian.
+    ///
+    /// **Kenapa ini ada, padahal `isWaxing` sudah ada.** `isWaxing` hanya
+    /// memberi dua kemungkinan: sisi terang di kanan atau di kiri. Itu benar
+    /// hanya bila sabitnya berdiri tegak — keadaan lintang tinggi. Di dekat
+    /// ekuator (dan Jakarta ada di lintang -6.2 derajat) sabit muda justru
+    /// terlihat terlentang, dengan sisi terang menghadap **bawah** ke tempat
+    /// Matahari terbenam. Jadi `isWaxing` bukan aproksimasi kasar untuk
+    /// sudutnya; ia jawaban yang **salah** pada lintang tempat aplikasi ini
+    /// dipakai.
+    ///
+    /// Aturan fisisnya tunggal: **sisi terang selalu menghadap Matahari.**
+    /// Sudut ini adalah terjemahan aturan itu ke bidang gambar, dan karena
+    /// kerangkanya lokal (alt/az pengamat), **tidak ada cabang
+    /// per-belahan-bumi di sini**: lintang sudah masuk lewat posisi Matahari
+    /// dan Bulan yang dihitung engine.
+    ///
+    /// - Returns: `nil` bila efemeris tidak tersedia, perhitungannya gagal,
+    ///   atau arahnya tidak bisa ditentukan. UI lalu **tidak memutar**
+    ///   gambar, bukan menebak sudutnya.
+    func moonBrightLimbAngle(at date: Date = Date(),
+                             observer: Observer) -> Double? {
+        guard let ephemeris else { return nil }
+        guard let moon = try? ephemeris.apparent(.moon, at: date, from: observer),
+              let sun = try? ephemeris.apparent(.sun, at: date, from: observer)
+        else { return nil }
+
+        let jd = SkyMath.julianDate(from: date)
+        let moonHorizontal = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: moon.raDeg, decDeg: moon.decDeg),
+            observer: observer, jd: jd)
+        let sunHorizontal = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sun.raDeg, decDeg: sun.decDeg),
+            observer: observer, jd: jd)
+        return CelestialVisual.brightLimbAngle(moon: moonHorizontal, sun: sunHorizontal)
     }
 
     /// Bungkus sudut ke rentang 0…360.

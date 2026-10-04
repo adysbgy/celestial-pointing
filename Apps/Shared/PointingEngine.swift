@@ -197,6 +197,13 @@ public final class PointingEngine: ObservableObject {
         // Disimpan bersama konteks supaya gambar dan angka "Fase Bulan" pada
         // layar Ketelitian berasal dari sampel yang sama.
         moonIsWaxing = controller.resolver.isMoonWaxing(at: date)
+        // Sudut sisi terang juga dihitung di sini, dengan alasan yang sama:
+        // ia butuh dua efemeris (Bulan dan Matahari), jadi menghitungnya di
+        // `body` berarti 20x per detik. Bedanya dengan `isWaxing`: sudut ini
+        // butuh **lokasi pengamat**, karena arah sabit di layar bergantung
+        // lintang -- itulah cacat yang diperbaiki siklus ini.
+        moonBrightLimbAngle = controller.resolver.moonBrightLimbAngle(
+            at: date, observer: location.observer)
     }
 
     /// Arah fase Bulan hasil perhitungan terakhir.
@@ -204,6 +211,14 @@ public final class PointingEngine: ObservableObject {
     /// `nil` berarti "tidak diketahui" — UI lalu menggambar piringan **tanpa
     /// fase**, bukan sabit yang memilih satu sisi.
     private var moonIsWaxing: Bool?
+
+    /// Sudut sisi terang Bulan hasil perhitungan terakhir, radian.
+    ///
+    /// Terpisah dari `moonIsWaxing`, bukan menggantikannya: `isWaxing` tetap
+    /// dipakai sebagai penentu sisi saat sudutnya tidak tersedia, dan
+    /// keduanya bisa berbeda ketersediaannya (sudut butuh lokasi pengamat,
+    /// `isWaxing` tidak).
+    private var moonBrightLimbAngle: Double?
 
     /// Jarak waktu minimum antar perhitungan konteks langit (detik).
     static let skyContextInterval: TimeInterval = 30
@@ -360,8 +375,13 @@ public final class PointingEngine: ObservableObject {
         // Arah fase (waxing/waning) hanya bermakna untuk Bulan; untuk benda
         // lain nil → model tidak menggambar fase sama sekali.
         let waxing = isMoon ? moonIsWaxing : nil
+        // Sudut sisi terang: hanya untuk Bulan, dan nil bila tidak diketahui.
+        // Saat nil, model tidak berputar -- lebih baik sabit yang belum
+        // berorientasi daripada sabit yang salah arah.
+        let limbAngle = isMoon ? moonBrightLimbAngle : nil
         return CelestialVisual(object: object,
                               moonIlluminationFraction: fraction,
-                              isWaxing: waxing)
+                              isWaxing: waxing,
+                              moonBrightLimbAngleRadians: limbAngle)
     }
 }

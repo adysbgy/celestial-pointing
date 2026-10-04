@@ -1,5 +1,134 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — sabit Bulan menghadap arah yang salah di Indonesia, dan galatnya 85 derajat)
+
+### Premis siklus ini: periksa asumsi yang paling tidak mungkin salah
+
+Brief Bagian 1 menulis satu syarat pendek yang mudah dilewati: **"Sabit
+harus benar arahnya."** Seluruh geometri fase sudah teruji — kurva
+terminator, luas pita, perpindahan di f = 0.5 — dan semua hijau. Yang belum
+pernah ditanyakan bukan **besar** fasenya, melainkan **arah** sabitnya di
+langit pengguna.
+
+### Cacatnya: sisi sabit ditentukan oleh satu boolean
+
+`CelestialVisual.phaseGeometry` menentukan sisi terang dengan:
+
+    let litSide: Double = waxing ? 1 : -1
+
+Artinya: waxing → sisi terang di **kanan**, waning → di **kiri**. Konvensi
+ini benar untuk pengamat di lintang tinggi, tempat sabit berdiri tegak.
+Repo ini, bagaimanapun, memakai **Jakarta** sebagai pengamat bawaan
+(`ObserverLocation` bawaan: lintang **-6.2**). Jakarta ada di dekat ekuator,
+dan di sana sabit muda justru terlihat **terlentang** — sisi terangnya
+menghadap ke bawah, ke tempat Matahari terbenam.
+
+Jadi bukan soal kurang mirip. Aplikasi ini menampilkan sabit yang menghadap
+**kanan** pada pengamat yang seharusnya melihatnya menghadap **bawah**.
+
+### Kenapa tidak ada gerbang yang menangkapnya
+
+Tiga sebab sekaligus, dan ketiganya sudah berulang di repo ini:
+
+1. **Semua uji fase menguji besar, bukan arah.** `litBandWidth`,
+   `litBandAreaMatchesTheIlluminatedFraction`, `isGibbous` — semuanya
+   simetris terhadap sisi. Membalik sisi tidak mengubah satu pun.
+2. **`litSide` diuji sebagai nilai, bukan sebagai kebenaran.** Ada uji yang
+   menegaskan `litSide == 1` saat waxing — jadi konvensi itu **dikunci**,
+   bukan diverifikasi.
+3. **Gambar tidak bisa dibaca salahnya.** Sabit yang menghadap arah salah
+   tetap berbentuk sabit. Tidak ada teks di layar yang memberitahu pengguna,
+   dan tidak ada yang akan melaporkannya.
+
+### Perbaikannya: sudut, bukan boolean
+
+Aturan fisisnya tunggal dan berlaku di lintang mana pun: **sisi terang selalu
+menghadap Matahari.** Jadi yang dihitung bukan "kanan atau kiri", melainkan
+**sudut** sisi terang di bidang gambar:
+
+1. Vektor Bulan→Matahari dalam kerangka ENU (Timur–Utara–Atas), dari **beda
+   vektor satuan** — bukan beda sudut alt/az, yang singular di kutub dan di
+   zenit.
+2. Buang komponen sepanjang garis pandang, sisakan proyeksi di bidang
+   gambar. Tanpa langkah ini sudutnya berayun liar saat Bulan dekat zenit,
+   padahal justru di sana yang terlihat berubah paling lambat.
+3. Ukur dari "kanan" dengan "atas" positif.
+
+Konsekuensinya bagus: **tidak ada cabang per-belahan-bumi di mana pun.**
+Lintang sudah masuk lewat posisi Matahari dan Bulan, jadi belahan utara,
+selatan, dan lintang tinggi semuanya keluar dari satu rumus yang sama.
+
+### Dua kesalahan yang dibuat di siklus ini, dan bagaimana ketahuan
+
+Ditulis apa adanya karena keduanya instruktif:
+
+1. **Fungsi murninya salah tempat.** Ia awalnya masuk ke `extension
+   PointingResolver`, bukan ke `CelestialVisual` — compiler menolaknya
+   (`has no member 'brightLimbAngle'`). Dipindahkan, dan `PointingResolver`
+   kini mendelegasikan.
+2. **Basis gambar ditulis dari tangan, dan keduanya salah.** Versi pertama
+   menulis `right = (-N, E, 0)` dan `up = (-E, -N, U)`. Yang pertama
+   **terbalik** (harusnya `(N, -E, 0)`), dan yang kedua **tidak tegak lurus**
+   terhadap vektor pandang — ia bahkan bukan basis yang sah. Ketahuan
+   **dari uji, bukan dari membaca ulang rumusnya**: hasilnya 2.99 radian
+   (~171 derajat) di tempat yang seharusnya ~0. Diganti dengan turunan
+   vektor yang benar: `right = m x atas-dunia`, `up = right x m`.
+
+Kesalahan kedua itu sendiri adalah argumen mengapa fungsi ini harus murni
+dan teruji: rumus basis yang salah baca tetap menghasilkan sabit yang
+berbentuk sabit.
+
+### Uji yang menangkapnya (dan kenapa angkanya bukan karangan)
+
+Angka alt/az di uji adalah geometri langit Jakarta sesaat setelah Matahari
+terbenam — Bulan rendah di barat, hampir tepat di atas Matahari yang baru
+tenggelam, jadi elongasinya kecil seperti sabit muda sungguhan:
+
+| Kasus | Masukan (Bulan / Matahari) | Hasil | Perilaku lama |
+|---|---|---|---|
+| Sabit muda Jakarta | 20°, az 283° / -2°, az 285° | **-85°** (bawah) | 0° (kanan) → **galat 85°** |
+| Lintang menengah | 30°, az 250° / -1°, az 285° | -37° (kanan-bawah) | 0° |
+| Kutub, azimut sama | 10°, az 90° / 25°, az 90° | **+90°** (atas) | 0° |
+
+Baris ketiga menunjukkan hal yang tidak bisa dijawab `isWaxing` **sama
+sekali**: pada azimut yang sama dengan Matahari lebih tinggi, sisi terang
+menghadap ke atas.
+
+Dua di antaranya adalah **kontrol negatif**: kasus lintang menengah
+memastikan perbaikannya tidak sekadar membalik semua sisi, dan uji
+`testWaxingAloneCannotExpressTheLimbAngle` mengunci alasan keberadaan sudut
+ini — kalau kelak ada yang menyederhanakannya kembali menjadi boolean,
+uji itu gagal.
+
+### Bukti merah: perilaku lama benar-benar gagal uji ini
+
+Disuntikkan `return 0.0` (persis konvensi lama: sisi terang selalu kanan) ke
+fungsi yang sudah diperbaiki, lalu uji dijalankan ulang:
+
+    6 assertion MERAH di 4 uji, semuanya di CelestialVisualTests
+
+Berkas dipulihkan dan diverifikasi lewat sha256. Tanpa langkah ini, uji
+barunya cuma "ikut hijau" dan tidak membuktikan apa pun.
+
+### Batas yang jujur
+
+- **Sudut ini belum pernah dilihat mata manusia di perangkat.** Uji
+  menegakkan geometrinya terhadap alt/az yang ditulis tangan; bahwa
+  `equatorialToHorizontal` memberi alt/az yang benar sudah diuji terpisah.
+  Yang belum: bahwa rumus proyeksi ini cocok dengan foto langit sungguhan.
+- **`isWaxing` tetap dipakai** sebagai penentu sisi saat sudutnya tidak
+  tersedia. Sudut hanya dipakai bila ia terhitung.
+- Sudut tidak tersedia → gambar **tidak diputar**, bukan diputar ke sudut
+  karangan. Perilaku lama tetap menjadi jaring pengaman, bukan jawaban.
+
+### Gerbang
+
+- `./swift-test.sh` → **166 CelestialEngine + 310 PointingKit** (naik dari
+  305), **0 failures**.
+- `./swift-ui-lint.sh` → 8 aturan hijau; `./swift-typecheck.sh` → lulus.
+- Sapuan CJK pada 4 berkas yang diubah → **0**.
+
+
 ## Progres terakhir (4 Okt 2026 — cakupan Aturan 3 diperluas, dan aturan baru langsung menangkap penulisnya sendiri)
 
 ### Premis siklus ini: ambil batas yang sudah dicatat, dan uji apakah ia masih benar

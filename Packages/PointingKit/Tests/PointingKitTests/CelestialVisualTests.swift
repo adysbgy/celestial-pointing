@@ -284,6 +284,95 @@ final class CelestialVisualTests: XCTestCase {
                        accuracy: 1e-9)
     }
 
+    // MARK: - Sudut sisi terang Bulan
+
+    /// Sabit muda dari Jakarta: sisi terang menghadap **bawah**, bukan kanan.
+    ///
+    /// Angka alt/az di sini adalah geometri langit Jakarta (lintang -6.2
+    /// derajat) sesaat setelah Matahari terbenam: Bulan rendah di barat,
+    /// hampir tepat di atas Matahari yang baru tenggelam — elongasi kecil,
+    /// seperti sabit muda sungguhan.
+    ///
+    ///   Bulan  : tinggi 20 derajat, azimut 283 derajat (barat)
+    ///   Matahari: tinggi -2 derajat, azimut 285 derajat (barat)
+    ///
+    /// Inilah **kasus yang membuat cacat lama terlihat**. Perilaku lama
+    /// (sisi = `waxing ? kanan : kiri`) menghasilkan 0 derajat di sini,
+    /// padahal geometrinya menuntut sekitar -85 derajat: **galat 85
+    /// derajat**. Di lintang tinggi kedua jawaban itu kebetulan berdekatan,
+    /// jadi cacatnya tidak pernah terlihat di sana — persis alasan mengapa
+    /// lintangnya harus dipakai, bukan diasumsikan.
+    func testCrescentInJakartaFacesDownNotRight() {
+        let angle = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
+        guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
+        XCTAssertEqual(value, -.pi / 2, accuracy: SkyMath.deg2rad(10),
+                       "sisi terang harus menghadap bawah; dapat \(SkyMath.rad2deg(value)) derajat")
+        XCTAssertLessThan(value, 0,
+                          "sisi terang harus di bawah (sudut negatif), bukan di kanan")
+        // Jarak dari jawaban lama membuktikan ini bukan perbedaan kosmetik.
+        XCTAssertGreaterThan(abs(value), SkyMath.deg2rad(45),
+                             "jawaban lama (0 derajat) harus jauh dari yang benar")
+    }
+
+    /// Sabit yang lebih tua, di lintang utara menengah: sisi terang condong
+    /// **kanan-bawah**, bukan tegak ke kanan.
+    ///
+    ///   Bulan  : tinggi 30 derajat, azimut 250 derajat
+    ///   Matahari: tinggi -1 derajat, azimut 285 derajat
+    ///
+    /// Ujinya sengaja menyatakan **rentang**, bukan satu angka: yang bisa
+    /// diklaim dengan yakin adalah sisi terang berada di kuadran
+    /// kanan-bawah. Menulis angka persis akan mengunci presisi yang tidak
+    /// dimiliki masukan yang ditulis tangan ini.
+    func testMidLatitudeCrescentFacesRightAndDown() {
+        let angle = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
+            sun: HorizontalCoord(altitudeDeg: -1, azimuthDeg: 285))
+        guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
+        XCTAssertLessThan(value, 0, "harus condong ke bawah")
+        XCTAssertGreaterThan(value, -.pi / 2, "harus condong ke kanan, bukan tegak ke bawah")
+    }
+
+    /// Kutub: sisi terang menghadap **atas** saat Matahari lebih tinggi pada
+    /// azimut yang sama. Ini yang tidak bisa dijawab `isWaxing` sama sekali.
+    func testPolarCrescentFacesUpWhenSunIsHigher() {
+        let angle = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 10, azimuthDeg: 90),
+            sun: HorizontalCoord(altitudeDeg: 25, azimuthDeg: 90))
+        guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
+        XCTAssertEqual(value, .pi / 2, accuracy: SkyMath.deg2rad(1),
+                       "Matahari lebih tinggi di azimut yang sama -> sisi terang ke atas")
+    }
+
+    /// Kontrol negatif: `isWaxing` **tidak** bisa menghasilkan sudut ini.
+    ///
+    /// Uji ini mengunci alasan keberadaan `brightLimbAngle`: dua keadaan
+    /// dengan arah waxing yang sama tetapi lintang berbeda harus memberi
+    /// sudut yang berbeda jauh. Kalau kelak ada yang "menyederhanakan" sudut
+    /// ini kembali menjadi boolean kanan/kiri, uji ini akan gagal.
+    func testWaxingAloneCannotExpressTheLimbAngle() {
+        let jakarta = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
+        let midLatitude = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
+            sun: HorizontalCoord(altitudeDeg: -1, azimuthDeg: 285))
+        guard let a = jakarta, let b = midLatitude else {
+            return XCTFail("kedua sudut harus terdefinisi")
+        }
+        XCTAssertGreaterThan(abs(a - b), SkyMath.deg2rad(30),
+                             "dua lintang dengan waxing sama harus beda sudut jauh")
+    }
+
+    /// Sudut tidak diketahui: `nil`, bukan angka karangan.
+    func testUnknownGeometryYieldsNoAngle() {
+        // Bulan dan Matahari berimpit: tidak ada arah yang bisa ditentukan.
+        let same = HorizontalCoord(altitudeDeg: 10, azimuthDeg: 100)
+        XCTAssertNil(CelestialVisual.brightLimbAngle(moon: same, sun: same))
+    }
+
     // MARK: - Warna bintang
 
     func testRedGiantsAreRedAndHotStarsAreBlue() {
