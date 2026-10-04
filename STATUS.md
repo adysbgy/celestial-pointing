@@ -5166,6 +5166,58 @@ warning). Yang paling penting:
 Gate: `./swift-ui-lint.sh` 9/9 bersih, `./swift-typecheck.sh` lulus.
 CI: Engine Tests (Linux) + Apple Build keduanya **success** (`32367c8`).
 
+## Siklus 2026-10-04 (5) — gambar langit dalam lebih yakin daripada badge "Ragu"
+
+**Unit terkecil:** keyakinan engine sebagai penentu bentuk yang boleh
+digambar. Cacat ini **dibuka oleh siklus morfologi sebelumnya** — jadi ini
+perbaikan atas pekerjaan sendiri, bukan pekerjaan baru.
+
+### Yang ditemukan
+
+`drawPlanet` sudah lama punya aturan ini, dan alasannya tertulis di repo:
+
+> Saat identitas belum pasti, hanya **warnanya** yang boleh tampil —
+> bentuknya tidak. Cincin Saturnus adalah penanda yang sama meyakinkannya
+> dengan pita Jupiter, jadi menampilkannya pada kandidat yang belum terkunci
+> berarti menyampaikan identitas yang tidak dimiliki engine.
+
+`drawDeepSky` tidak punya aturan itu. Ia membaca
+`morphology(forObjectID:)` **langsung**, tanpa melihat `isConfirmed`. Jadi
+galaksi berpalung dan gugus bola berinti padat digambar penuh di sebelah
+badge "Ragu".
+
+Sebelum siklus morfologi, cacat ini tidak bisa terlihat: semua objek langit
+dalam digambar sebagai kabut yang sama, jadi tidak ada ciri pengenal yang
+bisa bocor. Begitu bentuk yang berbeda-beda ditambahkan, cacatnya ikut
+terbuka. Pelajaran yang berulang di repo ini: **menambah detail pada gambar
+menambah pula yang bisa salah diklaim.**
+
+### Yang diperbaiki
+
+- `DeepSkyCatalogue.drawableMorphology(forObjectID:isConfirmed:)` — satu
+  tempat, murni, diuji di Linux, aturan yang sama dengan planet dengan cara
+  yang sama. Saat `isConfirmed == false` hasilnya `nil` → kabut netral yang
+  tidak mengklaim jenis apa pun (bukan bentuk objeknya, bukan bentuk lain).
+- `drawBody` meneruskan `isConfirmed` ke `drawDeepSky`.
+- `spokenDeepSkyMorphology` kini menerima `isConfirmed`. Ini penting: tanpa
+  itu pengguna VoiceOver mendengar "galaksi" di sebelah badge yang justru
+  tidak menggambarnya — suara yang lebih yakin daripada gambar. Kedua call
+  site (jam & iPhone) dan `visualPanelLabel` ikut diperbarui.
+
+### Verifikasi
+
+5 uji baru (363 → **367** PointingKit, +166 engine = **533 hijau**, tanpa
+warning). Tiga yang mengunci aturannya:
+
+- `testUnconfirmedObjectClaimsNoShape` — **setiap** objek katalog, jadi
+  objek baru tidak bisa lolos.
+- `testConfirmedObjectDrawsItsOwnShape` — mengunci bahwa `nil` bukan jawaban
+  tetap: uji pertama bisa lulus dengan cara yang salah (selalu `nil`).
+- `testUnconfirmedObjectDoesNotSpeakAShape` — pasangan suaranya.
+
+Gate: lint 9/9, typecheck lulus. CI: Engine + Apple Build **success**
+(`9beb2c9`).
+
 ## Siklus 2026-10-04 (4) — bentuk objek langit dalam tidak terdengar
 
 **Unit terkecil:** pengumuman VoiceOver untuk bentuk objek langit dalam.
