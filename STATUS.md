@@ -1,38 +1,153 @@
 # STATUS — Celestial Pointing Engine
 
-## Ringkasan keadaan (4 Okt 2026)
+## Ringkasan keadaan (4 Okt 2026, pagi)
 
-**Misi UI/UX SELESAI (Bagian 1–4 lengkap).** Visual prosedural terpasang di
-kedua app, token permukaannya teruji di Linux, tiga celah wajib Bagian 3
-tertutup, dan sisa Bagian 4 (onboarding, audio, `@ScaledMetric`) selesai di
-commit `17a5c32`.
+**Brief UI/UX (Bagian 1–4) sudah terpasang penuh — dan diverifikasi ulang dari
+awal pada siklus ini, bukan dipercaya dari klaim lama.** Visual objek
+(prosedural, tanpa aset), token permukaan & kontras, mode malam merah,
+always-on, VoiceOver, animasi kedatangan kunci, onboarding, audio, dan
+`@ScaledMetric` semuanya **ada di kode dan berjalan**. Dua workflow CI hijau
+di HEAD `3b9dcf2`.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 198 test
-  PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan **kedua workflow CI hijau** di HEAD `c414cc5` (Apple Build `37178623141`
-  + Engine Tests `37178623098`).
-- Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
-  `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
-  Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
-  Bulan dari fraksi iluminasi engine**, bintang (glow + warna spektral +
-  ukuran dari magnitudo), Matahari berkorona, nebula kabur. Tanpa aset
-  eksternal.
-- Gate baru di CI: **nilai palet & ciri pengenal planet, urutan terang mode
-  malam, dan kalimat yang diucapkan untuk alur kalibrasi, sekarang teruji di
-  Linux**.
+Yang ditemukan siklus ini bukan "fitur kurang", melainkan **satu cacat
+geometri yang tidak terlihat dari teks mana pun di layar** — kutub Mars
+menembus 0.26R keluar dari bola. Detail di entri "Progres terakhir" di bawah.
 
-### Yang masih tersisa dari brief (hasil audit, bukan tekad sendiri)
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 201 test
+  PointingKit, 0 gagal** (`./swift-test.sh` dari nol, Swift 6.0 Docker,
+  Linux) — dan **kedua workflow CI hijau** di HEAD `3b9dcf2` (Apple Build
+  `37179379077` 2× `BUILD SUCCEEDED` + gerbang peringatan "Tidak ada
+  peringatan compiler pada Apps/."; Engine Tests `37179379101` 166 + 201).
+- Rincian: `166 + 201` naik dari `166 + 198` (+3 uji kutub Mars, lihat
+  entri siklus ini).
 
-Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
+### Yang diverifikasi ulang (bukan dengan mempercayai STATUS lama)
 
-| Item | Status |
-|---|---|
-| 4.4 animasi halus (`withAnimation` saat state→lock) | **Plumbing model SELESAI sejak siklus lalu** (`LockArrivalGate`, 10 test + `PointingEngine.lockArrival`) — **tapi pemanggil UI-nya baru diwiring siklus ini.** Sebelum ini `withAnimation` tidak ada di satu pun berkas app, jadi kartu/panel objek muncul tanpa animasi. Rincian di entri "Bagian 4.4: animasi kedatangan kunci di UI" di bawah. |
-| Onboarding value-first | SELESAI — `Apps/Shared/OnboardingView.swift` (1 kartu, sekali pakai via `OnboardingStorage`) di `PointingView` (jam) + `RootView` (iPhone) |
-| 4.6 audio opsional saat lock | SELESAI — `Apps/Shared/AudioCue.swift` (nada 880Hz prosedural, `AVAudioEngine`/`AVAudioPCMBuffer`), hanya `.lockSucceeded`, toggle `Bunyi saat kunci` |
-| `@ScaledMetric` | SELESAI — ikon status `PointingView` pakai `@ScaledMetric(relativeTo: .headline)`; `WatchMetrics.iconSize` mati dibuang |
+Seluruh 22 berkas `Apps/` + model visual di `PointingKit` dibaca ulang, lalu
+**dihitung** (bukan dibaca) untuk klaim yang bersifat numerik. Hasilnya:
 
-## Progres terakhir (4 Okt 2026 — Bagian 2 susulan: latar premium belum pernah dilukis)
+1. **Visual objek lengkap** — `CelestialVisualView.swift` (498 baris,
+   `Canvas` murni, tanpa aset): planet (pita Jupiter + Bintik Merah Besar,
+   cincin Saturnus dua-lapis dengan `clip`, kutub Mars, kawah Merkurius,
+   kabut Venus), **fase Bulan dari fraksi engine** dengan `litSide` terpisah
+   dari tanda terminator, bintang (glow berlapis + 4 diffraction spike,
+   warna B−V dari tabel per bintang, ukuran logaritmik dari magnitudo),
+   Matahari berkorona, nebula kabur.
+2. **Penanda ragu** — `isConfirmed: !isStale`, predikat yang **sama** dengan
+   badge keyakinan; ciri pengenal (cincin/pita/kutub) ditolak saat ragu,
+   warna bola tetap boleh tampil.
+3. **Semuanya teruji di Linux** — palet, ciri, geometri fase, tabel B−V,
+   palet permukaan & kontras WCAG, urutan terang mode malam, kalimat
+   VoiceOver kalibrasi, gerbang kedatangan kunci.
+4. **Token dipakai kedua app** — `SurfaceTokens.swift` (jembatan ke `Color`),
+   `forceDarkScheme()`, `.appBackground()` + `scrollContentBackground(.hidden)`
+   di semua layar; mode malam lewat `PointingTone.color` **satu** sumber.
+5. **Celah wajib Bagian 3 tertutup** — mode malam (1 ketuk, `@AppStorage`,
+   semua visual ikut merah), always-on (`NightAwareContainer` +
+   `ReducedLuminanceView`, tanpa animasi), VoiceOver (label status/panel/tombol
+   + pengumuman perubahan keadaan).
+6. **Bagian 4** — animasi spring saat `lockArrivalToken` naik (bukan
+   `state == .lock`), Dynamic Type penuh (0 `.system(size:)` di kode), audio
+   opsional prosedural 880Hz, `@ScaledMetric` pada ikon status.
+7. **Onboarding di kedua app** — `PointAndKnowWatchWatchApp.swift:23,39-41`
+   dan `DiagnosticsView.swift:43,60-63` (STATUS lama menyebutnya "hanya di
+   jam + RootView"; sekarang keduanya dikonfirmasi di lokasi nyata).
+
+Tidak ada satu pun item brief yang tersisa. Yang belum ada tetap item
+`ROADMAP.md` yang bukan kode: teleskop fisik.
+
+## Progres terakhir (4 Okt 2026 — kutub Mars menembus 0.26R keluar dari bola)
+
+### Cacat yang ditemukan: dua rumus untuk satu bentuk simetris
+
+Siklus ini diawali dengan brief yang sama seperti sebelumnya, jadi STATUS lama
+**layap dibaca, bukan dipercaya**. Hasilnya berbeda dari beberapa siklus
+sebelumnya: brief-nya memang sudah terpenuhi seluruhnya. Jadi pekerjaan
+siklus ini berubah dari "menambah fitur" menjadi **menyisir raster prosedural
+secara numerik** — karena di situlah satu-satunya kelas kesalahan yang tidak
+bisa ditangkap hanya dengan membaca kode.
+
+`drawPolarCaps` memakai **dua rumus berbeda untuk dua kutub**:
+
+    utara:  y = center.y - radius
+    selatan: y = center.y + radius - capHeight      // <-- bukan cermin
+    tinggi elips: 2 * capHeight
+
+Karena tinggi elips adalah `2 · capHeight` (bukan `capHeight`), kutub selatan
+berakhir di **y = 1.26R** — yaitu **0.26R di luar bola**. Diperiksa dengan
+menghitung titik terjauh elips dari pusat, bukan dengan mengira: elips di
+y∈[0.74, 1.26] punya titik di y=1.26 yang jaraknya 1.26R.
+
+| Kutub | Protrusion versi lama | Protrusion versi ini |
+|---|---|---|
+| Utara | 0.0038R | 0.0038R |
+| **Selatan** | **0.2600R** | **0.0038R** |
+
+Jadi Mars tampil dengan kutub putih yang **menggantung di ruang kosong** di
+bawah bola, dan tidak simetris dengan kutub utara — tepat di tanda yang
+paling mudah dibaca mata telanjang.
+
+**Cakupan dicek, bukan diasumsikan.** Pita Jupiter (7 pita), 5 kawah
+Merkurius, dan kabut Venus dihitung dengan cara yang sama: **0 protrusion**
+semuanya. Jadi hanya kutub yang salah, dan tidak ada "perbaikan" yang
+menyentuh ciri planet lain.
+
+### Kenapa ini bukan sekadar rasa
+
+PRD melarang visual yang **menglaim identitas** saat engine ragu, dan logika
+yang sama berlaku lebih luas: gambar adalah klaim. Kutub adalah **ciri
+pengenal Mars** — persis kelas yang sudah dipisahkan dari warna di
+`DistinguishingFeature` (cincin Saturnus ≠ pita Jupiter). Bentuk kutub yang
+salah bukan sekadar soal rasa: tidak ada teks di layar yang bisa dibaca
+pengguna untuk memeriksanya, dan Mars tidak punya sabit/cincin yang bisa
+menutupinya.
+
+### Yang diubah
+
+- **`CelestialVisual.polarCaps()` + `CelestialVisual.PolarCaps` di
+  `PointingKit`** — kutub selatan dihitung sebagai **cermin kutub utara**
+  (`southTop = 1 - height`), jadi keduanya simetris secara **konstruktif**,
+  bukan dua rumus yang harus dicocokkan manual. Hasilnya dalam satuan radius,
+  supaya model tidak perlu tahu satuan apa yang sedang digambar.
+- **View memakai tipe itu; tidak ada rumus kutub lagi di `Apps/`.** Ini
+  menjaga pemisahan yang sudah jadi aturan repo: keputusan visual yang bisa
+  salah tanpa ada yang bisa mengujinya **tidak boleh tinggal di view**.
+
+### Tiga uji, semuanya dibuktikan MERAH dulu
+
+Dengan `southTop` dikembalikan ke `1 - capHeightFraction` (geometri lama):
+
+- `testPolarCapsStayOnThePlanetSurface` → **gagal**: `1.26 > 1.01`,
+  pesan *"kutub south menembus 0.26 R di luar bola"*.
+- `testPolarCapsAreMirrorImagesOfEachOther` → **gagal**: `-1.0` vs `-1.26`.
+- `testPolarCapDefaultsAreInRadiusUnits` → hijau (kebetulan tidak menyentuh
+  bug; dipertahankan karena mengunci satuan agar view tidak salah skala).
+
+Jadi dua dari tiga uji menangkap bug ini secara numerik, bukan sebagai
+formalitas.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 201 PointingKit, 0 gagal**
+  (naik dari 198 → 201). Engine **tidak disentuh**.
+- Gerbang sintaks: **seluruh 22 berkas app** lolos `swiftc -parse
+  -swift-version 5` di container `swift:6.0`.
+- `swift build` `PointingKit` di container: **Build complete**.
+- Sapuan CJK/Cyrillic di `Apps/` + `Packages/`: **0**.
+- **CI macOS hijau** di `3b9dcf2`: `Apple Build` run `37179379077` → **2×
+  `BUILD SUCCEEDED`** (iPhone termasuk app jam, dan app jam sendiri), gerbang
+  peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+  `Engine Tests (Linux)` run `37179379101` → **166 + 201**, ketiga uji kutub
+  terlihat **lulus di log CI** (bukan hanya di mesin ini).
+
+### Pelajaran yang diulang (dan masih berlaku)
+
+`swiftc -parse` lolos untuk **seluruh** perubahan di sini — termasuk tiga uji
+yang gagal pada geometri lama. `-parse` memeriksa sintaks, bukan perilaku;
+hanya `swift test` yang bisa merah. Dan `Color`/SwiftUI tidak bisa
+diuji di Linux sama sekali, yang justru alasan geometri kutub **dipindahkan ke
+`PointingKit`**: bentuknya tidak bisa diverifikasi di lapisan yang tidak
+memiliki gerbang.
 
 ### Audit awal: visual sudah ada, tapi latarnya tidak pernah tampil
 
