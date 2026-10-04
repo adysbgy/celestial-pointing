@@ -464,6 +464,149 @@
         }
       }
     },
+    "link.status.calibrationNotSent": {
+      "comment": "Hasil kalibrasi tidak terkirim: sesi WatchConnectivity belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration not sent: session is not active yet."
+          }
+        }
+      }
+    },
+    "link.status.messageNotSent": {
+      "comment": "Pesan tidak terkirim: sesi WatchConnectivity belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message not sent: session is not active yet."
+          }
+        }
+      }
+    },
+    "link.status.sendFailed": {
+      "comment": "Pengiriman gagal, dengan alasan dari sistem. %@ = localizedDescription OS (tidak diterjemahkan ulang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send failed: %@"
+          }
+        }
+      }
+    },
+    "link.status.sent": {
+      "comment": "Pengiriman berhasil. %@ = nama jenis pesan untuk manusia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent: %@"
+          }
+        }
+      }
+    },
+    "link.status.watchSaw": {
+      "comment": "Jam melihat sebuah objek. %@ = nama objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch saw %@"
+          }
+        }
+      }
+    },
+    "link.status.stateFromWatch": {
+      "comment": "Keadaan diterima dari jam, tanpa nama objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State from the watch"
+          }
+        }
+      }
+    },
+    "link.status.calibrationFromWatch": {
+      "comment": "Hasil kalibrasi diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration from the watch"
+          }
+        }
+      }
+    },
+    "link.status.policyFromWatch": {
+      "comment": "Ambang keyakinan diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The watch sent a confidence threshold"
+          }
+        }
+      }
+    },
+    "link.status.acknowledgement": {
+      "comment": "Tanda terima diterima.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acknowledgement"
+          }
+        }
+      }
+    },
+    "link.status.invalidPolicy": {
+      "comment": "Ambang keyakinan dari iPhone tidak sah, jadi diabaikan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence threshold from the iPhone is not valid — ignored"
+          }
+        }
+      }
+    },
+    "link.status.stateRequestTooEarly": {
+      "comment": "Permintaan keadaan datang sebelum alur siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State request arrived before the flow was ready."
+          }
+        }
+      }
+    },
+    "link.status.watchUnreachablePolicy": {
+      "comment": "Jam belum terhubung sehingga ambang keyakinan tidak terkirim.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch not connected — threshold not sent."
+          }
+        }
+      }
+    },
+    "link.status.watchUnreachableMessage": {
+      "comment": "Jam belum terhubung sehingga pesan tidak terkirim.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch not connected — message not sent."
+          }
+        }
+      }
+    },
     "link.note.calibrated": {
       "comment": "Keadaan jam: terkalibrasi. Tampil di layar Tautan iPhone.",
       "localizations": {

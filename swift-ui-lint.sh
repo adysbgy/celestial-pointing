@@ -958,6 +958,67 @@ else
   echo "Bersih: tipe specifier katalog cocok dengan template kode."
 fi
 
+# ── Aturan 12: kalimat tampilan tidak boleh lahir sebagai literal ───────────
+# Aturan 4 menyapu literal yang **langsung** ada di dalam argumen `Text(...)`.
+# Aturan 6 memeriksa paritas kunci yang **dideklarasikan**. Di antara keduanya
+# ada celah: service menyimpan kalimat ke properti tampilan
+# (`lastNote`, `lastMessageNote`, ...), lalu view merendernya lewat
+# `Text(note)`. Literalnya tak pernah menyentuh `Text(...)` dan tak pernah
+# punya kunci — dua gerbang tetap hijau, pengguna Bahasa Inggris membaca
+# kalimat Indonesia. Aturan ini menutup celah itu.
+echo
+echo "== Aturan 12: kalimat tampilan tidak lahir sebagai literal =="
+literal_note=$(python3 - <<'PY'
+import os, re
+
+# Properti yang jelas-jelas berakhir di layar / diucapkan.
+NAME = re.compile(r'\b(\w*(?:Note|Message|Label|Title|Subtitle|Hint|Reason|Warning|Error|Body|Caption|Detail|Speech|Spoken)\w*)\s*=\s*([^\n]*)')
+LIT  = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
+# Kunci katalog: titik-pemisah, huruf kecil, tanpa spasi.
+KEY  = re.compile(r'^[a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$')
+
+def is_sentence(s):
+    if KEY.match(s):          # kunci katalog, bukan kalimat
+        return False
+    if len(s) < 3 or " " not in s:
+        return False          # satu kata = nama, bukan kalimat
+    if not re.search(r'[A-Za-z]', s):
+        return False
+    return True
+
+hits = []
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for f in files:
+        if not f.endswith(".swift"):
+            continue
+        p = os.path.join(root, f)
+        with open(p, encoding="utf-8") as fh:
+            for i, line in enumerate(fh, 1):
+                if line.lstrip().startswith("//"):
+                    continue
+                m = NAME.search(line)
+                if not m:
+                    continue
+                for lit in LIT.findall(m.group(2)):
+                    if is_sentence(lit):
+                        hits.append(f"{p}:{i}  {m.group(1)} = \"{lit[:70]}\"")
+
+print("\n".join(hits))
+PY
+)
+if [ -n "$literal_note" ]; then
+  echo "Kalimat tampilan ditulis sebagai literal di kode:"
+  echo "$literal_note"
+  echo "-> Pindahkan kalimatnya ke PointingKit lewat kunci katalog"
+  echo "   (pola: RowSpeech / LinkStatusText), supaya Aturan 6 dan"
+  echo "   Aturan 11 bisa melihatnya. Service hanya menyimpan *keadaan*;"
+  echo "   kalimat jadi lahir dari katalog."
+  status=1
+else
+  echo "Bersih: tak ada kalimat tampilan yang lahir sebagai literal."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

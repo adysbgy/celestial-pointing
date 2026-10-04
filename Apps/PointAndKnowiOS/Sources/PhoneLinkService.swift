@@ -61,7 +61,7 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// tampak terkirim.
     public func send(policy: ConfidencePolicy) {
         guard let session, session.activationState == .activated else {
-            lastNote = "Jam belum terhubung — ambang belum terkirim."
+            lastNote = LinkStatusText.watchUnreachablePolicy
             return
         }
         session.transferUserInfo(PointingLinkMessage.policy(policy).plist)
@@ -74,14 +74,14 @@ public final class PhoneLinkService: NSObject, ObservableObject {
 
     public func send(_ message: PointingLinkMessage) {
         guard let session, session.activationState == .activated else {
-            lastNote = "Jam belum terhubung — pesan tidak terkirim."
+            lastNote = LinkStatusText.watchUnreachableMessage
             return
         }
         do {
             try session.updateApplicationContext(message.plist)
-            lastNote = "Terkirim: \(message.kind.displayName)"
+            lastNote = LinkStatusText.sent(message.kind.displayName)
         } catch {
-            lastNote = "Gagal mengirim: \(error.localizedDescription)"
+            lastNote = LinkStatusText.sendFailed(error.localizedDescription)
         }
     }
 
@@ -90,19 +90,20 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         switch message.kind {
         case .pointingState:
             lastState = message
-            lastNote = message.objectName.map { "Jam melihat \($0)" } ?? "Keadaan dari jam"
+            lastNote = message.objectName.map { LinkStatusText.watchSaw($0) }
+                ?? LinkStatusText.stateFromWatch
         case .calibrationReady:
             lastCalibration = message
-            lastNote = "Kalibrasi dari jam"
+            lastNote = LinkStatusText.calibrationFromWatch
         case .policyUpdate:
-            lastNote = "Jam mengirim ambang keyakinan"
+            lastNote = LinkStatusText.policyFromWatch
         case .stateRequest:
             // Jam meminta keadaan — balas dengan yang terakhir kita punya.
             // (Peran ini jarang terpakai, tapi harus ada supaya permintaan
             // tidak berakhir tanpa jawaban.)
             if let lastState { send(lastState) }
         case .acknowledgement:
-            lastNote = "Tanda terima"
+            lastNote = LinkStatusText.acknowledgement
         }
         onMessage?(message)
     }

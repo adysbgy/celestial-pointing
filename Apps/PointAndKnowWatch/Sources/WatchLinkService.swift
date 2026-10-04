@@ -120,7 +120,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
     public func send(calibration: PointingCalibration) {
         guard let session, session.activationState == .activated else {
             sendFailureCount += 1
-            lastMessageNote = "Kalibrasi belum terkirim: sesi belum aktif."
+            lastMessageNote = LinkStatusText.calibrationNotSent
             return
         }
         session.transferUserInfo(PointingLinkMessage.calibration(calibration).plist)
@@ -147,7 +147,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
     public func send(_ message: PointingLinkMessage) -> Bool {
         guard let session, session.activationState == .activated else {
             sendFailureCount += 1
-            lastMessageNote = "Pesan belum terkirim: sesi belum aktif."
+            lastMessageNote = LinkStatusText.messageNotSent
             return false
         }
         do {
@@ -155,7 +155,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
             return true
         } catch {
             sendFailureCount += 1
-            lastMessageNote = "Gagal mengirim: \(error.localizedDescription)"
+            lastMessageNote = LinkStatusText.sendFailed(error.localizedDescription)
             return false
         }
     }
@@ -176,7 +176,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
                 onPolicyReceived?(policy)
             } else {
                 // Ambang tidak masuk akal ditolak, bukan diterapkan diam-diam.
-                lastMessageNote = "Ambang keyakinan dari iPhone tidak sah — diabaikan"
+                lastMessageNote = LinkStatusText.invalidPolicyIgnored
             }
         case .stateRequest:
             // Balas dengan keadaan yang berlaku sekarang. Kalau app belum
@@ -185,7 +185,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
             if let currentSnapshot {
                 send(state: currentSnapshot())
             } else {
-                lastMessageNote = "Permintaan keadaan datang sebelum alur siap."
+                lastMessageNote = LinkStatusText.stateRequestTooEarly
             }
         default:
             break

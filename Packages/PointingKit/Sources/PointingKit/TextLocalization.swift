@@ -347,5 +347,13 @@ public extension LocalizedText {
         // paket sebagai keadaan + accessor (bukan kalimat jadi di pesan) supaya
         // punya kunci katalog — lihat `PointingLinkMessage.calibrationNoteText`.
         .linkNoteCalibrated, .linkNoteNotCalibrated,
+        // Kalimat status tautan yang tampil di layar Tautan. Dulu literal di
+        // dalam `PhoneLinkService`/`WatchLinkService` — lihat `LinkStatusText`.
+        .linkStatusCalibrationNotSent, .linkStatusMessageNotSent,
+        .linkStatusSendFailed, .linkStatusSent, .linkStatusWatchSaw,
+        .linkStatusStateFromWatch, .linkStatusCalibrationFromWatch,
+        .linkStatusPolicyFromWatch, .linkStatusAcknowledgement,
+        .linkStatusInvalidPolicy, .linkStatusStateRequestTooEarly,
+        .linkStatusWatchUnreachablePolicy, .linkStatusWatchUnreachableMessage,
     ]
 }

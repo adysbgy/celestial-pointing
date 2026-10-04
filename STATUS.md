@@ -1,5 +1,68 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — dua `LinkService` menyimpan kalimat status ke properti; kedua gerbang buta)
+
+### Premis: kelas yang sama, tiga kali, di tiga tempat berbeda
+
+Siklus ini menutup kemunculan ketiga dari satu kelas cacat yang sama:
+**teks yang berakhir di layar pengguna tapi tidak pernah menyentuh katalog.**
+
+| Siklus | Tempat | Kenapa gerbang buta |
+|---|---|---|
+| 1 | `ExperimentText` | Kalimat dirakit di paket, jauh dari `Text(...)` |
+| 2 | `RowSpeech` | Kalimat **diucapkan**, bukan dirender |
+| 3 | `PointingLinkMessage.note` | Kalimat di dalam pabrik pesan |
+| **4** | **`PhoneLinkService` / `WatchLinkService`** | **Kalimat disimpan ke properti, view merender properti itu** |
+
+Pola yang sama, wujud yang berbeda. Yang keempat paling licin: service
+menulis `lastNote = "Jam melihat \(name)"`, lalu `LinkView` merender
+`Text(note)`. Aturan 4 hanya melihat literal yang **langsung** ada di dalam
+`Text(...)` — di sini yang sampai ke `Text` hanyalah **nama variabelnya**.
+Aturan 6 memeriksa paritas kunci yang **dideklarasikan** — kalimat ini tidak
+punya kunci, jadi tak ada yang bisa dibandingkan. Dua gerbang hijau.
+
+### Yang dikerjakan
+
+`LinkStatusText` di PointingKit (13 kalimat, 13 kunci katalog `link.status.*`),
+dipakai **kedua** service. Kalimatnya identik di dua perangkat, jadi satu
+sumber — dua salinan literal pasti menyimpang: satu diperbaiki, satu tertinggal.
+
+Dua keputusan yang sengaja:
+
+- **`error.localizedDescription` disisipkan apa adanya**, tidak dibungkus
+  katalog. Ia sudah dilokalkan OS ke bahasa perangkat; menerjemahkannya lagi
+  akan menimpa lokalisasi yang benar dengan tebakan kita.
+- **Bukan 1 kunci per service.** `sendFailed` dipakai iPhone dan jam sekaligus;
+  satu kunci untuk dua pemanggil lebih jujur daripada dua kunci kembar.
+
+### Gerbang baru: Aturan 12
+
+Aturan 12 menyapu **literal yang di-assign ke properti tampilan**
+(`*Note`, `*Message`, `*Label`, `*Title`, `*Subtitle`, `*Hint`, `*Reason`,
+`*Warning`, `*Error`, `*Body`, `*Caption`, `*Detail`, `*Speech`, `*Spoken`).
+
+Penyaringnya sengaja dua lapis supaya tidak berisik:
+- **kunci katalog** (mengandung titik, huruf kecil, tanpa spasi) → lolos;
+- **satu kata** tanpa spasi → lolos (nama objek, bukan kalimat);
+- sisanya: kalimat → **MERAH**.
+
+Terhadap seluruh `Apps/` setelah perbaikan: **0 hit**. Sebelum perbaikan:
+12 hit, semuanya cacat nyata. Jadi aturannya menangkap kelasnya tanpa satu pun
+positif palsu.
+
+### Bukti merah
+
+| Mutasi | Gerbang | Hasil |
+|---|---|---|
+| `lastNote = "Tanda terima sudah diterima oleh iPhone"` dikembalikan | Aturan 12 | **MERAH**: `PhoneLinkService.swift:106` |
+| kunci `link.status.watchSaw` dihapus dari katalog | Aturan 6 | **MERAH**: menunjuk kunci |
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 458 PointingKit**, 0 gagal.
+- `swift-ui-lint.sh` → **12 aturan hijau**.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+
 ## Progres terakhir (4 Okt 2026 — `PointingLinkMessage.note` menyimpan kalimat Bahasa Indonesia di dalam paket)
 
 ### Premis: lanjutan langsung dari siklus `RowSpeech`, di berkas lain
@@ -81,6 +144,8 @@ yang sempit (pola penugasan `*Note`/`*Message`), bukan melonggarkan Aturan 4.
 - `swift-test.sh` → **166 CelestialEngine + 454 PointingKit**, 0 gagal.
 - `swift-ui-lint.sh` → **11 aturan hijau**.
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- CI: `37231726014` (Apple Build) + `37231725992` (Engine Linux) —
+  **dua-duanya hijau**.
 
 ## Progres terakhir (4 Okt 2026 — `RowSpeech` mengucapkan kalimat Indonesia tanpa satu pun kunci katalog)
 
