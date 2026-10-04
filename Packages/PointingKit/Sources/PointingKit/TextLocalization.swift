@@ -194,5 +194,13 @@ public extension LocalizedText {
         .levelHigh, .levelMedium, .levelLow,
         .linkKindPointingState, .linkKindCalibrationReady, .linkKindPolicyUpdate,
         .linkKindStateRequest, .linkKindAcknowledgement,
+        // Label jenis benda: nama tampilan maupun pengucapan. Keduanya
+        // masuk daftar karena keduanya tampil di layar, dan keduanya dulu
+        // hidup di `Apps/Shared/ObjectKindLabels.swift` — berkas yang tidak
+        // bisa dijangkau satu pun gerbang (lihat komentar berkas itu).
+        .kindStarLabel, .kindPlanetLabel, .kindMoonLabel,
+        .kindSunLabel, .kindDeepSkyLabel,
+        .kindStarSpoken, .kindPlanetSpoken, .kindMoonSpoken,
+        .kindSunSpoken, .kindDeepSkySpoken,
     ]
 }

@@ -914,6 +914,116 @@
           }
         }
       }
+    },
+    "object.kind.star.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (bintang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star"
+          }
+        }
+      }
+    },
+    "object.kind.planet.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (planet).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planet"
+          }
+        }
+      }
+    },
+    "object.kind.moon.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (bulan).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        }
+      }
+    },
+    "object.kind.sun.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (matahari).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        }
+      }
+    },
+    "object.kind.deepSky.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (benda langit jauh: nebula, galaksi, gugus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deep-sky object"
+          }
+        }
+      }
+    },
+    "object.kind.star.spoken.label": {
+      "comment": "Pengucapan nama jenis (bintang) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "star"
+          }
+        }
+      }
+    },
+    "object.kind.planet.spoken.label": {
+      "comment": "Pengucapan nama jenis (planet) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "planet"
+          }
+        }
+      }
+    },
+    "object.kind.moon.spoken.label": {
+      "comment": "Pengucapan nama jenis (bulan) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "moon"
+          }
+        }
+      }
+    },
+    "object.kind.sun.spoken.label": {
+      "comment": "Pengucapan nama jenis (matahari) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sun"
+          }
+        }
+      }
+    },
+    "object.kind.deepSky.spoken.label": {
+      "comment": "Pengucapan nama jenis (benda langit jauh) untuk VoiceOver — bukan bentuk tampilan, karena \"Objek langit dalam\" terdengar janggal saat diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deep-sky object"
+          }
+        }
+      }
     }
   }
 }

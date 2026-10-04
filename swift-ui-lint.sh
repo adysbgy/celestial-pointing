@@ -312,20 +312,30 @@ if [ ! -f "$SRC" ]; then
   echo "PERINGATAN: $SRC tidak ada."
   echo "Aturan 6 DILEWATI, bukan lulus."
 else
-  parity=$(SRC="$SRC" python3 - <<'PY'
-import json, os, re, sys
+  parity=$(SRC_DIR="Packages/PointingKit/Sources/PointingKit" python3 - <<'PY'
+import glob, json, os, re, sys
 
 CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
-src = open(os.environ["SRC"], encoding="utf-8").read()
 
-# Kunci diambil dari daftar `allKeys`, bukan dari seluruh literal di berkas:
-# berkas itu juga memuat nilai bawaan Bahasa Indonesia, dan nilai itu bukan
-# kunci katalog. Mengambil `LocalizedText(key:` dari seluruh berkas akan
-# ikut menghitung setiap deklarasi statis — termasuk yang memang harus ikut,
-# tapi juga setiap kunci sementara di komentar atau pengujian.
-declared = set(re.findall(r'key:\s*"([^"]+)"', src))
+# Kunci dibaca dari SELURUH sumber paket, bukan hanya satu berkas.
+#
+# Versi pertama hanya membaca `TextLocalization.swift`. Itu cukup selama
+# semua kunci dideklarasikan di sana — tapi begitu kunci label jenis benda
+# hidup di berkas sendiri (`ObjectKindLabels.swift`), `declared` kehilangan
+# seluruh 10 kunci itu: Arah 1 tidak akan melaporkan "dideklarasikan tapi
+# tidak ada di katalog", dan suite tetap hijau. Persis "hijau yang tidak
+# hijau" yang aturan ini dibuat untuk menutup — terjadi di dalam aturan
+# itu sendiri.
+#
+# Arah 2 (kunci katalog yang tak dideklarasikan) tetap menangkap kunci
+# `object.kind.*` hanya kalau namespace-nya ikut ditambahkan di bawah —
+# itu yang diverifikasi dua arah di salinan.
+declared = set()
+for path in sorted(glob.glob(os.path.join(os.environ["SRC_DIR"], "*.swift"))):
+    src = open(path, encoding="utf-8").read()
+    declared.update(re.findall(r'key:\s*"([^"]+)"', src))
 if not declared:
-    print("PERINGATAN:tidak ada kunci yang bisa dibaca dari " + os.environ["SRC"])
+    print("PERINGATAN:tidak ada kunci yang bisa dibaca dari " + os.environ["SRC_DIR"])
     sys.exit(0)
 
 if not os.path.exists(CATALOG):
@@ -342,21 +352,29 @@ for key in sorted(declared - set(strings)):
 
 # Arah 2: ada di katalog, tapi tidak dideklarasikan di paket. Ini yang
 # membuat kunci tidak bisa "dibuang diam-diam" dari `allKeys` supaya
-# pemeriksaan Directions 1 terasa cukup.
-namespace = re.compile(r"^(pointing\.state|confidence\.level|link\.kind)\.")
+# pemeriksaan Arah 1 terasa cukup.
+#
+# Namespace `object.kind.` ikut dicantumkan karena label jenis benda juga
+# dihasilkan di paket — lewat `LocalizedText`, sama seperti tiga kelompok
+# lainnya. Tanpa ia, menghapus `kindStarLabel` dari `allKeys` tidak akan
+# terlihat oleh gerbang ini.
+namespace = re.compile(
+    r"^(pointing\.state|confidence\.level|link\.kind|object\.kind)\.")
 for key in sorted(set(strings) - declared):
     if namespace.match(key):
         problems.append(f"  kunci katalog tak dideklarasikan di paket: {key!r}")
 
-# Arah 3: nilai bawaan Bahasa Indonesia pada paket harus **sama** dengan
-# apa yang tercatat sebagai terjemahan `id`... yang tidak ada. Yang bisa
-# diperiksa adalah bahwa nilai bakunya bukan string kosong dan bukan kunci
-# itu sendiri (kalau iya, `text()` tidak bisa membedakan dua kasus).
-for key, value in re.findall(r'key:\s*"([^"]+)",\s*\n?\s*id:\s*"([^"]*)"', src):
-    if not value:
-        problems.append(f"  nilai bawaan kosong: {key!r}")
-    elif value == key:
-        problems.append(f"  nilai bawaan sama dengan kunci: {key!r}")
+# Arah 3: nilai bawaan Bahasa Indonesia pada paket harus **tidak kosong**
+# dan tidak sama dengan kuncinya (kalau iya, `text()` tidak bisa
+# membedakan dua kasus itu).
+for path in sorted(glob.glob(os.path.join(os.environ["SRC_DIR"], "*.swift"))):
+    src = open(path, encoding="utf-8").read()
+    for key, value in re.findall(
+            r'key:\s*"([^"]+)",\s*\n?\s*id:\s*"([^"]*)"', src):
+        if not value:
+            problems.append(f"  nilai bawaan kosong: {key!r}")
+        elif value == key:
+            problems.append(f"  nilai bawaan sama dengan kunci: {key!r}")
 
 print("\n".join(problems) if problems else "")
 PY

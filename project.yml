@@ -168,10 +168,19 @@ targets:
       # Hanya berkas ini yang dibutuhkan complication — ia tidak perlu tahu
       # PointingKit/CelestialEngine sama sekali.
       - path: Apps/Shared/Complication
-      # Label jenis benda (`ObjectKind.displayName`) dipakai untuk baris kedua
-      # di complication rectangular. Label ini di app, jadi satu-satunya cara
-      # menjaga complication & panel detail menampilkan nama jenis yang sama.
-      - path: Apps/Shared/ObjectKindLabels.swift
+      # Label jenis benda (`ObjectKind.displayName`) TIDAK lagi masuk daftar
+      # sumber di sini. Semula `Apps/Shared/ObjectKindLabels.swift` disebut
+      # eksplisit, karena label itu tinggal di app sementara
+      # complication membacanya. Sekarang label itu hidup di `PointingKit`
+      # (yang sudah jadi dependensi target ini), jadi berkas app itu dihapus
+      # dan tidak ada yang perlu disebut.
+      #
+      # Yang TIDAK ikut ke sini: `LocalizationBridge.swift`. Complication
+      # berjalan di proses terpisah yang tidak memanggil `.install()`, jadi
+      # `TextLocalization` tidak punya sumber terjemahan — dan itu **benar**:
+      # tanpa bridge, label jatuh ke nilai bawaan Bahasa Indonesia, bukan ke
+      # string kosong. Bridge sengaja tidak dipasang di complication agar
+      # labelnya tidak bergantung pada `Bundle.main` proses ekstensi.
     dependencies:
       - package: PointingKit
       - package: CelestialEngine

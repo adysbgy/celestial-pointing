@@ -28,9 +28,18 @@ set -uo pipefail
 cd "$(dirname "$0")"
 
 # Berkas yang tidak mengimpor SwiftUI/UIKit/AppKit/Combine — aman di Linux.
+#
+# `LocalizationBridge.swift` tetap di sini meski ia satu fungsi: ia memanggil
+# `PointingKit` lintas modul, dan `swiftc -parse` tidak menyelesaikan simbol
+# dari paket — hanya `-typecheck` yang bisa. Yang membuat daftar ini perlu
+# dirawat adalah berkasnya boleh **pindah**: penghapusan
+# `Apps/Shared/ObjectKindLabels.swift` (label jenis benda pindah ke paket)
+# membuat gerbang ini merah dengan pesan "no such file", bukan karena kodenya
+# salah, tapi karena daftar ini menunjuk berkas yang tidak ada lagi. Itu
+# hal yang benar: lebih baik gerbang gagal keras daripada diam-diam memeriksa
+# satu berkas lebih sedikit.
 TYPECHECKABLE=(
   Apps/Shared/Complication/ComplicationStore.swift
-  Apps/Shared/ObjectKindLabels.swift
   Apps/Shared/LocalizationBridge.swift
 )
 

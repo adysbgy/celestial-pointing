@@ -179,7 +179,7 @@ final class TextLocalizationTests: XCTestCase {
     /// tidak bisa lolos hanya karena "tidak ada yang menyebutnya".
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 20, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 30, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
@@ -216,6 +216,110 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertTrue(text.rawValue.hasPrefix("confidence.level."),
                           "\(level) tanpa namespace")
             XCTAssertNotEqual(text.indonesian, "Kalibrasi")
+        }
+    }
+
+    // MARK: - Label jenis benda
+
+    /// Sepuluh label jenis benda harus punya nilai bawaan Bahasa Indonesia yang
+    /// **persis seperti sebelum** perpindahan berkasnya ke paket.
+    ///
+    /// Nilainya dikunci dengan literal, bukan dengan `.indonesian`: kalau uji
+    /// memakai `.indonesian` untuk kedua sisi, ia hanya membuktikan kedua sisi
+    /// bergerak bersama, dan typo pada nilainya lolos — persis jebakan yang
+    /// pernah menangkap salah eja pada siklus sebelumnya.
+    func testKindLabelsAreExactlyTheIndonesianTheyShippedWith() {
+        XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
+        XCTAssertEqual(ObjectKind.planet.displayName, "Planet")
+        XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
+        XCTAssertEqual(ObjectKind.sun.displayName, "Matahari")
+        XCTAssertEqual(ObjectKind.deepSky.displayName, "Objek langit dalam")
+
+        XCTAssertEqual(ObjectKind.star.spokenName, "bintang")
+        XCTAssertEqual(ObjectKind.planet.spokenName, "planet")
+        XCTAssertEqual(ObjectKind.moon.spokenName, "bulan")
+        XCTAssertEqual(ObjectKind.sun.spokenName, "matahari")
+        XCTAssertEqual(ObjectKind.deepSky.spokenName, "objek langit jauh")
+    }
+
+    /// Setiap jenis punya label sendiri, untuk tampilan **dan** pengucapan.
+    ///
+    /// Dua pengujian terpisah karena keduanya bisa benar sendiri-sendiri:
+    /// `switch` bisa mengembalikan teks yang sama untuk dua jenis dan
+    /// `isEmpty` tetap false — persis yang terjadi pada uji label keadaan
+    /// lebih dulu.
+    func testEveryKindKeepsItsOwnDisplayAndSpokenLabel() {
+        let kinds: [ObjectKind] = [.star, .planet, .moon, .sun, .deepSky]
+        let displays = kinds.map(\.displayName)
+        let spokens = kinds.map(\.spokenName)
+        for (index, kind) in kinds.enumerated() {
+            XCTAssertFalse(displays[index].isEmpty, "\(kind) tanpa label tampilan")
+            XCTAssertFalse(spokens[index].isEmpty, "\(kind) tanpa label pengucapan")
+        }
+        XCTAssertEqual(Set(displays).count, kinds.count,
+                       "dua jenis memakai label tampilan yang sama: \(displays)")
+        XCTAssertEqual(Set(spokens).count, kinds.count,
+                       "dua jenis memakai label pengucapan yang sama: \(spokens)")
+    }
+
+    /// Kunci jenis benda harus ber-namespace `object.kind.` dan **tidak**
+    /// berbagi kunci dengan bentuk tampilan maupun pengucapan.
+    ///
+    /// Yang menjaga pemisahan tampilan/pengucapan adalah alasan "frasa
+    /// majemuk terdengar janggal" — jadi saat seseorang menyatukan
+    /// `spokenName` ke `displayName` supaya lebih ringingkas, pemisahan ini
+    /// yang harus lebih dulu merah.
+    func testKindKeysAreNamespacedAndSplitByDisplayAndSpoken() {
+        for kind in [ObjectKind.star, .planet, .moon, .sun, .deepSky] {
+            let display = kind.displayText
+            let spoken = kind.spokenText
+            XCTAssertTrue(display.rawValue.hasPrefix("object.kind."),
+                          "\(kind) label tampilan tanpa namespace")
+            XCTAssertTrue(spoken.rawValue.hasPrefix("object.kind."),
+                          "\(kind) pengucapan tanpa namespace")
+            XCTAssertNotEqual(display.rawValue, spoken.rawValue,
+                              "\(kind) tampilan dan pengucapan berbagi kunci")
+            XCTAssertNotEqual(display.rawValue, kind.rawValue,
+                              "\(kind) kunci diturunkan dari rawValue-nya sendiri")
+        }
+    }
+
+    /// Label jenis benda harus ikut terjemahan, seperti label lain.
+    ///
+    /// Inilah bukti bahwa perpindahan ke paket itu berarti: sebelum ini,
+    /// bridge yang terpasang tidak punya apa pun untuk dibaca untuk label
+    /// jenis — kuncinya belum pernah ada di katalog.
+    func testInstalledLookupReachesKindLabelsToo() {
+        TextLocalization.install { key in
+            switch key {
+            case "object.kind.star.display.label":   return "Star"
+            case "object.kind.deepSky.spoken.label": return "deep-sky object"
+            default: return nil
+            }
+        }
+        XCTAssertEqual(ObjectKind.star.displayName, "Star")
+        XCTAssertEqual(ObjectKind.deepSky.spokenName, "deep-sky object")
+        // Yang tidak diterjemahkan harus tetap Bahasa Indonesia, bukan kosong.
+        XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
+    }
+
+    /// Bukti bahwa nilai bawaan != terjemahan, untuk kunci baru.
+    ///
+    /// Tanpa pembeda ini, bukti "terjemahan benar-benar dipakai" hilang
+    /// bersama kemungkinan tertukarnya nilai bawaan dengan padanannya — dan
+    /// suite tetap hijau.
+    func testKindDefaultsDifferFromTheirEnglishTranslations() {
+        let pairs: [(LocalizedText, String)] = [
+            (.kindStarLabel, "Star"),
+            (.kindMoonLabel, "Moon"),
+            (.kindSunLabel, "Sun"),
+            (.kindDeepSkyLabel, "Deep-sky object"),
+            (.kindStarSpoken, "star"),
+            (.kindDeepSkySpoken, "deep-sky object"),
+        ]
+        for (text, english) in pairs {
+            XCTAssertNotEqual(text.indonesian, english,
+                              "\(text.rawValue): nilai bawaan sama dengan terjemahan")
         }
     }
 }
