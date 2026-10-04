@@ -1,5 +1,125 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — 10 label yang tampil di layar tidak punya terjemahan)
+
+### Premis siklus ini: STATUS sebelumnya menutup satu celah dengan kalimat yang salah
+
+STATUS lalu menulis, di bagian "Batas yang diketahui":
+
+> label `ObjectKind` (`Apps/Shared/ObjectKindLabels.swift`) — satu berkas di
+> app, masuk aturan 4 seperti biasa.
+
+Kalimat itu **diuji, bukan dipercaya** — dan ia salah. Aturan 4 tidak bisa
+melihat berkas itu sama sekali. Aturan itu menyapu literal
+`Text("...")`/`Button`/`Label`/`accessibilityLabel`, sedangkan
+`return "Bintang"` di dalam `switch` **tidak pernah menjadi salah satu dari
+itu**.
+
+Dibuktikan di salinan, di berkas yang sama: menyuntik
+`Text("Literal nyata tanpa entri katalog")` **membuat aturan 4 merah**,
+sementara sepuluh label yang benar-benar tampil di layar tidak punya satu pun
+padanan bahasa Inggris. Aturan 4 menangkap jebakan yang salah dan meloloskan
+yang benar — dua-duanya pada berkas yang sama.
+
+| Label | Layar | Ada padanan `en`? |
+|---|---|---|
+| "Bintang", "Planet", "Bulan", "Matahari", "Objek langit dalam" | panel detail jam, panel detail iPhone, complication rectangular | **tidak** |
+| "bintang", "planet", … "objek langit jauh" | VoiceOver di kedua app | **tidak** |
+
+Aturan 6 tidak menolong — dan itu menarik. Aturan 6 menjaga kunci yang
+*dideklarasikan di paket*, sementara teks ini justru hidup di app. Dua
+aturan itu sama-sama benar, dan keduanya mengukur bagian yang tidak
+bermasalah: persis bentuk "hijau yang tidak hijau" yang sudah tiga kali
+muncul di repo ini, kali ini **di dalam gerbang yang dibuat untuk menutupnya**.
+
+### Cacat kedua, yang muncul dari perbaikannya sendiri
+
+Label itu dipindahkan ke paket supaya bisa diuji dan bisa menjangkau katalog.
+Setelah dipindahkan, **aturan 6 ikut kehilangan 10 kuncinya**: `declared`
+dibaca dari `TextLocalization.swift` saja, sementara kunci baru hidup di
+`ObjectKindLabels.swift`. Arah 1 ("dideklarasikan tapi tidak ada di katalog")
+tidak akan melaporkannya, dan suite tetap hijau — termasuk saat semua katalog
+hilang.
+
+Jadi gerbang yang lahir untuk menangkap "kunci yang dideklarasikan tapi tidak
+punya entri" justru buta terhadap kunci yang dideklarasikan di berkas kedua.
+Diperbaiki dengan membaca kunci dari **seluruh** sumber paket, bukan menambah
+pemeriksaan baru; dan namespace `object.kind.` ditambahkan ke Arah 2.
+
+### Yang diubah, dan kenapa begini
+
+- **`ObjectKindLabels.swift` pindah ke `PointingKit`**, memakai
+  `LocalizedText` — sama seperti `PointingState.shortLabel` dan
+  `ConfidenceLevel.displayName`. Katalog 83 -> **93** kunci, sepuluh di
+  antaranya punya padanan `en`.
+  Yang dipindahkan bukan cuma bentuk tampilannya. Complication berjalan di
+  **proses terpisah** dan hanya menarik `PointingKit`, jadi selama labelnya di
+  app, satu-satunya penjaga konsistensinya adalah pathway compile yang
+  kebetulan menyertakannya — bukan aturan apa pun.
+- **`spokenName` tidak disatukan ke `displayName`.** "Objek langit dalam"
+  memang terdengar janggal saat diucapkan; menyatukannya demi lebih ringkas
+  akan menghapus justru alasan pemisahannya. Uji menjaga keduanya punya kunci
+  sendiri.
+- **`swift-typecheck.sh`**: berkas dihapus dari daftar typecheck, dan
+  daftarnya dibiarkan gagal keras (`no such file`) bila berkasus hilang —
+  lebih baik begitu daripada diam-diam memeriksa satu berkas lebih sedikit.
+- **`project.yml`**: `Apps/Shared/ObjectKindLabels.swift` tidak lagi disebut
+  eksplisit sebagai sumber target complication.
+
+**Nilai Bahasa Indonesia tidak berubah satu karakter pun** — yang dipindah adalah
+*tampilannya di bahasa kedua*.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` -> **166 CelestialEngine + 291 PointingKit, 0 gagal**
+  (naik dari 286; +5 uji). Engine tidak disentuh.
+- **Dua mutasi dibuktikan MERAH lebih dulu** lewat `./red-test.sh`:
+  (a) `spokenName` disatukan ke `displayText` ->
+  `testInstalledLookupReachesKindLabelsToo` gagal; (b) nilai bawaan
+  `id: "bintang"` -> `"star"` -> **2 uji** gagal. Uji yang tidak pernah merah
+  adalah formalitas.
+- **Aturan 6 diperkuat, dibuktikan tiga arah di salinan**: kunci
+  `object.kind.star.display.label` dibuang dari katalog -> **merah**; kunci
+  `object.kind.hantu.display.label` disuntik -> **merah**; tree bersih ->
+  **hijau**.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- `./swift-ui-lint.sh` -> 6 aturan hijau.
+- Sapuan karakter non-Latin pada `Apps/`, `Packages/`, `Tools/`, dan skrip: **0**.
+- **CI hijau pada push pertama** (`4063338`):
+  - `Apple Build` run `37204467679` -> **2x `BUILD SUCCEEDED`**, gerbang
+    peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37204467708` -> hijau.
+
+### Catatan kejujuran: selip non-Latin terjadi lagi, di tempat yang tidak dijaga
+
+Aturan 3 menjaga `Apps/` + `Packages/`, tapi **tidak** menjaga `project.yml`
+maupun skrip gerbang. Tiga selip CJK masuk ke komentar saat menulis (satu di
+paket, satu di `swift-ui-lint.sh`, satu di `project.yml`) dan tidak ada
+gerbang yang melihatnya — keduanya harus dipindai manual. Satu di antaranya
+sudah ikut ke reviewer yang sama sebelum dibuang. Dua kandidat perbaikan
+nanti: perluas aturan 3 ke `project.yml` + `*.sh`, atau minimal beri tahu
+skrip gerbang bahwa ia sendiri tidak tercakup sapuannya.
+
+### Batas yang diketahui dan belum ditutup
+
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — `Bundle.main`
+  di Linux tidak punya `.lproj`, dan `String(localized:)` tidak ada di
+  Swift 6.0 Linux. Yang bisa dibuktikan: setiap kunci punya entri + padanan
+  `en`. Yang tidak: apakah `Bundle` benar-benar membaca `.xcstrings` saat
+  perangkat berjalan. Itu wilayah CI dan perangkat.
+- **Bridge tidak dipasang di complication.** Complication adalah proses
+  terpisah yang tidak memanggil `.install()`, jadi labelnya selalu Bahasa
+  Indonesia — bukan string kosong, dan itu jujur. Tapi kalau layer lokalisasi
+  nanti ditambah, complication akan tertinggal. Belum ada gerbang yang menjaga
+  hal itu.
+- Teks yang dihasilkan di paket yang **belum** terjangkau katalog, dengan
+  alasan masing-masing: `CalibrationSpeech` (dilewati dengan sengaja — kalimat
+  itu **diucapkan**, jadi bentuknya harus bisa diuji di Linux); label
+  `CalibrationFlow` (punya `formatSpecifier`, jadi katalog butuh kunci format,
+  bukan teks yang sama); ringkasan `ExperimentHarness` (dirangkai dari
+  beberapa bagian dengan sisipan angka).
+
+
 ## Progres terakhir (4 Okt 2026 — teks yang dihasilkan di PointingKit akhirnya bisa dijangkau katalog)
 
 ### Premis siklus ini: celah yang STATUS lalu sebut "belum ditutup" memang nyata
