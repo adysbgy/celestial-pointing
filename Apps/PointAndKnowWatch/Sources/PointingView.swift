@@ -75,6 +75,19 @@ struct PointingView: View {
                                          // gerbang tampilannya berubah.
                                          level: engine.snapshot.answeredLevel,
                                          isStale: engine.isDisplayingStaleObject,
+                                         // **Bukan** `!isStale`: `.uncertain`
+                                         // punya jawaban tapi engine menyatakan
+                                         // diri kurang yakin, dan `hasAnswer`
+                                         // mencakupnya. Tanpa predikat ini,
+                                         // selama ragu gambar menampilkan
+                                         // seluruh ciri pengenal (cincin
+                                         // Saturnus, pita Jupiter) sementara
+                                         // badge di sebelahnya bertuliskan
+                                         // "Ragu" — gambar lebih yakin daripada
+                                         // teksnya, dan mata membaca gambar
+                                         // lebih dulu. Lihat
+                                         // `PointingSnapshot.confirmsIdentity`.
+                                         isConfirmed: engine.confirmsDisplayedIdentity,
                                          // Visual dari sumber yang **sama** dengan
                                          // objeknya, jadi gambar tidak mungkin
                                          // milik benda lain.
@@ -323,6 +336,14 @@ struct ObjectDetailView: View {
     /// ditampilkan — dan gambar bisa jadi milik objek yang bukan yang
     /// tertulis di sebelahnya. `nil` → tidak ada gambar, bukan gambar generik.
     var visual: CelestialVisual?
+    /// Apakah gambar boleh mengklaim identitas objek ini.
+    ///
+    /// Diterima dari luar (bukan `!isStale`), karena ambangnya **lebih ketat**
+    /// daripada "bukan sisa": `.uncertain` punya jawaban, tapi engine
+    /// menyatakan diri kurang yakin — dan pada keadaan itulah ciri pengenal
+    /// (cincin Saturnus, pita Jupiter) paling berbahaya tampil, karena badge
+    /// di sebelahnya justru bertuliskan "Ragu".
+    var isConfirmed: Bool = true
     /// Diameter gambar dalam poin. Berbeda antara jam dan iPhone: kartu jam
     /// sempit, panel iPhone lega.
     var visualDiameter: CGFloat = WatchMetrics.visualDiameter
@@ -353,13 +374,17 @@ struct ObjectDetailView: View {
             if let visual {
                 CelestialVisualView(visual: visual,
                                      diameter: visualDiameter,
-                                     // Predikat yang **sama** dengan badge
-                                     // keyakinan. Kalau gambar dan badge
-                                     // mengambil keputusan sendiri, gambar bisa
-                                     // tampil sebagai pasti sementara badge-nya
-                                     // disembunyikan — dan gambar lebih
-                                     // meyakinkan daripada badge.
-                                     isConfirmed: !isStale)
+                                     // Ambang ini **bukan** `!isStale`.
+                                     // `.uncertain` punya jawaban (jadi bukan
+                                     // sisa), tapi engine menyatakan diri
+                                     // kurang yakin — dan pada keadaan itulah
+                                     // gambar paling berbahaya: ia menampilkan
+                                     // seluruh ciri pengenal sementara badge
+                                     // di sebelahnya bertuliskan "Ragu". Mata
+                                     // membaca gambar lebih dulu daripada
+                                     // badge, jadi gambar tidak boleh lebih
+                                     // yakin daripada teksnya.
+                                     isConfirmed: isConfirmed)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack {

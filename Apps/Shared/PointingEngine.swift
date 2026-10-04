@@ -272,6 +272,23 @@ public final class PointingEngine: ObservableObject {
         snapshot.isDisplayingStaleObject(lastLocked: lastLockedObject)
     }
 
+    /// Apakah gambar boleh **mengklaim identitas** objek yang ditampilkan.
+    ///
+    /// **Kenapa ini bukan sekadar `!isDisplayingStaleObject`.** `isStale`
+    /// dihitung dari `hasAnswer`, dan `hasAnswer` mencakup `.uncertain` —
+    /// keadaan tempat engine menyatakan diri kurang yakin. Menurunkan
+    /// `isConfirmed` dari `!isStale` meloloskan seluruh ciri pengenal (cincin
+    /// Saturnus, pita Jupiter) tepat saat badge di sebelahnya bertuliskan
+    /// "Ragu": gambar jadi lebih yakin daripada teksnya, dan mata membaca
+    /// gambar lebih dulu daripada badge.
+    ///
+    /// Aturannya sendiri ada di `PointingKit`
+    /// (`PointingSnapshot.confirmsIdentity(lastLocked:)`) supaya teruji di
+    /// Linux bersama janji tampilan lain. Di sini hanya meneruskan.
+    public var confirmsDisplayedIdentity: Bool {
+        snapshot.confirmsIdentity(lastLocked: lastLockedObject)
+    }
+
     /// Arah tunjuk terkalibrasi, untuk ditampilkan sebagai angka.
     ///
     /// `nil` saat sensor tidak hidup: angka yang tersisa di cuplikan adalah

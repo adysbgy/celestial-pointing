@@ -181,4 +181,86 @@ final class PointingPresentationTests: XCTestCase {
         let live = PointingSnapshot(state: .lock, calibratedPointing: coord, hasSensor: true)
         XCTAssertEqual(live.reportedPointing, coord)
     }
+
+    // MARK: - Gambar tidak boleh lebih yakin daripada teksnya
+
+    /// **Regresi: selama `.uncertain` gambar menampilkan seluruh ciri
+    /// pengenal tanpa lencana tanda tanya.**
+    ///
+    /// Gerbang lamanya `isConfirmed = !isStale`, dan `isStale` dihitung dari
+    /// `hasAnswer` — yang mencakup `.uncertain`. Jadi tepat pada keadaan
+    /// tempat engine menyatakan diri **kurang yakin**, gambar menampilkan
+    /// cincin Saturnus / pita Jupiter / kutub Mars secara utuh, sementara
+    /// badge di sebelahnya bertuliskan "Ragu".
+    ///
+    /// Ini false confidence dalam bentuk yang paling sulit ditangkap: teksnya
+    /// jujur, tidak ada yang bisa dibaca pengguna untuk mengeceknya, dan mata
+    /// membaca gambar lebih dulu daripada badge.
+    func testUncertainDoesNotConfirmIdentityToTheImage() {
+        let candidate = PointingSnapshot(
+            state: .uncertain,
+            intent: CelestialIntent(level: .medium, best: vega, candidates: []))
+        XCTAssertTrue(candidate.displayedObject(lastLocked: nil) != nil,
+                      "ragu tetap menampilkan kandidatnya")
+        XCTAssertFalse(candidate.isDisplayingStaleObject(lastLocked: nil),
+                       "ragu bukan sisa — ini yang membuat gerbang lama lolos")
+        XCTAssertFalse(candidate.confirmsIdentity(lastLocked: nil),
+                       "tapi gambar tidak boleh mengklaim identitas saat engine ragu")
+    }
+
+    func testOnlyLockConfirmsIdentityToTheImage() {
+        // Ambangnya `looksConfident` (hanya `.lock`), bukan `hasAnswer`.
+        let locked = PointingSnapshot(
+            state: .lock,
+            intent: CelestialIntent(level: .high, best: vega, candidates: []))
+        XCTAssertTrue(locked.confirmsIdentity(lastLocked: nil))
+
+        // Semua keadaan lain — termasuk yang punya jawaban dan yang
+        // mempertahankan intent lama — tidak boleh mengklaim identitas.
+        for state in [PointingState.idle, .pointing, .searching, .uncertain, .unavailable] {
+            let snapshot = PointingSnapshot(
+                state: state,
+                intent: CelestialIntent(level: .high, best: vega, candidates: []))
+            XCTAssertFalse(snapshot.confirmsIdentity(lastLocked: nil),
+                           "\\(state) tidak boleh menggambar ciri pengenal")
+        }
+    }
+
+    /// Gambar yang mengklaim identitas mensyaratkan objek yang benar-benar
+    /// ditampilkan. Tanpa ini, keadaan `.lock` tanpa kandidat akan menggambar
+    /// ciri pengenal di atas bola generik.
+    func testConfirmingIdentityRequiresAnObjectToShow() {
+        let empty = PointingSnapshot(state: .lock)
+        XCTAssertNil(empty.displayedObject(lastLocked: nil))
+        XCTAssertFalse(empty.confirmsIdentity(lastLocked: nil),
+                       "terkunci tanpa objek tidak boleh mengklaim identitas")
+    }
+
+    /// Ambang gambar harus **lebih ketat** daripada ambang sisa, bukan sama.
+    ///
+    /// Inilah inti cacatnya: gerbang lama menurunkan `isConfirmed` dari
+    /// `!isStale`, sehingga kedua ambang runtuh menjadi satu dan `.uncertain`
+    /// lolos sebagai gambar pasti. Uji ini mengunci bahwa ada keadaan yang
+    /// **bukan sisa** tetapi tetap **tidak** mengonfirmasi identitas — yaitu
+    /// bukti langsung bahwa dua ambang itu berbeda.
+    func testIdentityThresholdIsStricterThanTheStaleThreshold() {
+        // Cari keadaan yang membedakan kedua ambang: bukan sisa, tapi juga
+        // tidak mengonfirmasi identitas.
+        // `PointingState` sengaja tidak `CaseIterable` (enum engine), jadi
+        // daftar kasusnya ditulis eksplisit — ikut merah bila ada keadaan
+        // baru yang lupa dipertimbangkan di sini.
+        let allStates: [PointingState] = [.idle, .pointing, .searching, .lock,
+                                          .uncertain, .unavailable]
+        let separating = allStates.filter { state in
+            let snapshot = PointingSnapshot(
+                state: state,
+                intent: CelestialIntent(level: .high, best: vega, candidates: []))
+            return !snapshot.isDisplayingStaleObject(lastLocked: nil)
+                && !snapshot.confirmsIdentity(lastLocked: nil)
+        }
+        XCTAssertFalse(separating.isEmpty,
+                       "ambang gambar tidak boleh runtuh menjadi ambang sisa")
+        XCTAssertTrue(separating.contains(.uncertain),
+                      "`.uncertain` harus jadi keadaan yang membedakan keduanya")
+    }
 }

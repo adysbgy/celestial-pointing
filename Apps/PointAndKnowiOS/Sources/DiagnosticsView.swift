@@ -261,6 +261,15 @@ struct DiagnosticsView: View {
                             LockArrivalPanel(visual: visual,
                                              object: object,
                                              isStale: engine.isDisplayingStaleObject,
+                                             // **Bukan** `!isStale`: selama
+                                             // `.uncertain` engine punya
+                                             // kandidat tapi menyatakan diri
+                                             // kurang yakin. Menurunkan
+                                             // `isConfirmed` dari `!isStale`
+                                             // meloloskan seluruh ciri
+                                             // pengenal tepat saat badge
+                                             // bertuliskan "Ragu".
+                                             isConfirmed: engine.confirmsDisplayedIdentity,
                                              lockArrivalToken: engine.lockArrival?.token,
                                              pulse: pulsePhase)
                         }
@@ -465,6 +474,9 @@ struct DiagnosticsView: View {
         let visual: CelestialVisual
         let object: CelestialObject
         let isStale: Bool
+        /// Apakah gambar boleh mengklaim identitas — ambang **lebih ketat**
+        /// daripada `!isStale` (lihat `PointingSnapshot.confirmsIdentity`).
+        let isConfirmed: Bool
         let lockArrivalToken: Int?
         let pulse: Double
 
@@ -476,7 +488,12 @@ struct DiagnosticsView: View {
                 HStack(alignment: .center, spacing: 16) {
                     CelestialVisualView(visual: visual,
                                          diameter: 132,
-                                         isConfirmed: !isStale,
+                                         // Bukan `!isStale`: `.uncertain`
+                                         // bukan sisa, tapi engine kurang
+                                         // yakin — gambar tidak boleh lebih
+                                         // yakin daripada badge "Ragu" di
+                                         // sebelahnya.
+                                         isConfirmed: isConfirmed,
                                          pulse: pulse)
                     // Nama + jenis digabung jadi satu pengumuman VoiceOver,
                     // dengan penanda **sisa** ikut terbawa — tanpa itu, objek

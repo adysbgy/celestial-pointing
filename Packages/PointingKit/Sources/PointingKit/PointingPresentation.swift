@@ -126,6 +126,25 @@ public extension PointingSnapshot {
         displayedObject(lastLocked: lastLocked) != nil && !state.hasAnswer
     }
 
+    /// Apakah identitas objek boleh **diklaim oleh gambar**.
+    ///
+    /// Ambang ini sengaja **lebih ketat** daripada `isDisplayingStaleObject`,
+    /// dan perbedaannya bukan sekadar rasa. `hasAnswer` mencakup `.lock`
+    /// **dan** `.uncertain`: pada `.uncertain` engine memang punya kandidat,
+    /// tapi ia menyatakan diri kurang yakin. Menurunkan `isConfirmed` dari
+    /// `!isStale` karena itu meloloskan **seluruh ciri pengenal** tepat pada
+    /// keadaan ragu — cincin Saturnus, pita Jupiter, kutub Mars — sementara
+    /// badge di sebelahnya bertuliskan "Ragu".
+    ///
+    /// Gambar yang lebih yakin daripada teksnya adalah bentuk false
+    /// confidence yang paling sulit ditangkap: teksnya jujur, dan mata
+    /// membaca gambar lebih dulu daripada badge. Karena itu ambangnya
+    /// `state.looksConfident` (hanya `.lock`) — predikat yang **sudah ada dan
+    /// sudah diuji**, bukan yang baru ditulis untuk keperluan ini.
+    func confirmsIdentity(lastLocked: CelestialObject?) -> Bool {
+        displayedObject(lastLocked: lastLocked) != nil && state.looksConfident
+    }
+
     /// Objek yang berlaku **untuk arah tunjuk sekarang**.
     ///
     /// `bestObject` sengaja mempertahankan objek terakhir supaya panel jam tidak
