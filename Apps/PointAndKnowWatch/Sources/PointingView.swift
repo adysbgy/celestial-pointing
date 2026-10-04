@@ -102,6 +102,14 @@ struct PointingView: View {
                                          // `LockArrival`/`ObjectDetailView`.
                                          lockArrivalToken: engine.lockArrival?.token)
                     }
+                    // Putusan GoTo: mengapa teleskop boleh / tidak boleh
+                    // bergerak. `SlewPlanner` sudah menghitungnya sejak FASE 3,
+                    // tapi tidak satu layar pun pernah membacanya — jadi
+                    // penolakan karena Matahari (melindungi alat & mata) dan
+                    // penolakan karena keyakinan rendah terlihat sama: tidak
+                    // terlihat. `nil` saat aman, jadi baris ini tidak pernah
+                    // berbunyi di sebelah GoTo yang justru berjalan.
+                    SlewVerdictBanner(verdict: engine.slewVerdictText)
                     if let note = motion.unavailableReason ?? engine.sensorNote {
                         Text(note)
                             .font(.footnote)

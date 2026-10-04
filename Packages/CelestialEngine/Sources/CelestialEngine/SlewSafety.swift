@@ -1,7 +1,7 @@
 import Foundation
 
 /// Bahaya yang ditemukan pada rencana GoTo.
-public enum SlewHazard: String, Equatable, Codable, Sendable {
+public enum SlewHazard: String, Equatable, Codable, Sendable, CaseIterable {
     /// Target terlalu dekat Matahari.
     case sunProximity
     /// Target di bawah batas ketinggian teleskop.

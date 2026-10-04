@@ -259,6 +259,18 @@ struct DiagnosticsView: View {
                     // `guidanceText` (bukan `state.guidance`) supaya alasan
                     // "mengapa tidak ada objek" dari engine ikut terbaca.
                     row("Panduan", engine.snapshot.guidanceText)
+                    // Putusan GoTo. Aturan keras PRD "POINT → OBJECT ID → SAFE
+                    // GOTO" sudah dihitung `SlewPlanner` sejak FASE 3, tetapi
+                    // `slewDecision` nol konsumen di `Apps/` — jadi penolakan
+                    // karena `sunProximity` (melindungi alat & mata) dan
+                    // penolakan karena `lowConfidence` (soal ketelitian)
+                    // terlihat sama: tidak terlihat. Baris ini hanya muncul
+                    // saat ada yang perlu diperingatkan (`verdictText` `nil`
+                    // saat GoTo aman), jadi ia tidak pernah berbunyi di
+                    // sebelah GoTo yang justru berjalan.
+                    if let verdict = engine.slewVerdictText {
+                        row("GoTo", verdict)
+                    }
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))

@@ -217,9 +217,14 @@ final class TextLocalizationTests: XCTestCase {
     /// (`deepSky.morphology.*`), yang menutup satu kelas informasi yang hanya
     /// bisa dilihat — gambar menampilkan cakram galaksi vs inti padat gugus
     /// bola, sedangkan jenisnya sama-sama "objek langit jauh".
+    ///
+    /// 50 → 58 pada siklus putusan GoTo: delapan kunci (`slew.verdict.*` +
+    /// `slew.hazard.*`). `SlewPlanner` menghitung putusan keselamatan sejak
+    /// FASE 3 tetapi tidak pernah membacanya di layar; tanpa kunci ini,
+    /// penolakan karena Matahari tidak bisa dibedakan dari keyakinan rendah.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 50, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 58, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

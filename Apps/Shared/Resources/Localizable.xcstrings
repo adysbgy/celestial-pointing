@@ -1981,6 +1981,105 @@
           }
         }
       }
+    },
+    "slew.verdict.rejected.prefix": {
+      "comment": "Pembuka kalimat putusan GoTo. Dipisah dari kalimat bahayanya supaya terjemahan bisa menaruh kata \"ditolak\" di tempat yang benar. Lihat SlewVerdict.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo rejected:"
+          }
+        }
+      }
+    },
+    "slew.hazard.sunProximity": {
+      "comment": "Bahaya GoTo: target terlalu dekat Matahari. Melindungi alat & mata, bukan sekadar soal ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too close to the Sun."
+          }
+        }
+      }
+    },
+    "slew.hazard.belowAltitudeLimit": {
+      "comment": "Bahaya GoTo: target di bawah batas mekanis ketinggian teleskop.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outside the telescope's altitude limit."
+          }
+        }
+      }
+    },
+    "slew.hazard.belowHorizon": {
+      "comment": "Bahaya GoTo: target belum terbit.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still below the horizon."
+          }
+        }
+      }
+    },
+    "slew.hazard.tooFaint": {
+      "comment": "Bahaya GoTo: target di luar magnitudo batas.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too faint to observe."
+          }
+        }
+      }
+    },
+    "slew.hazard.noTarget": {
+      "comment": "Bahaya GoTo: tidak ada objek target, atau arah targetnya tidak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object to point at."
+          }
+        }
+      }
+    },
+    "slew.hazard.lowConfidence": {
+      "comment": "Bahaya GoTo: keyakinan identifikasi di bawah ambang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The engine is not confident enough about which object is meant."
+          }
+        }
+      }
+    },
+    "slew.hazard.sunPositionUnknown": {
+      "comment": "Bahaya GoTo: gagal-tertutup saat posisi Matahari tidak diketahui.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Sun's position is unknown, so the safety check cannot run."
+          }
+        }
+      }
+    },
+    "GoTo": {
+      "comment": "Judul baris putusan GoTo di layar Diagnostik iPhone. Nilai `en` sengaja sama: istilah teknis yang dipakai sebagai singkatan visual, dan menaruhnya di katalog membuat keputusan itu terbaca, bukan tersembunyi. Lihat SlewVerdictBanner.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo"
+          }
+        }
+      }
     }
   }
 }

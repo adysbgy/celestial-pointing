@@ -27,6 +27,20 @@ public final class PointingEngine: ObservableObject {
     @Published public private(set) var lastLockedObject: CelestialObject?
     /// Ringkasan langit untuk konteks (Matahari terbit/tenggelam, Bulan).
     @Published public private(set) var skyContext: SkyContext?
+    /// Putusan GoTo terakhir yang dihitung, bila ada jawaban.
+    ///
+    /// **Kenapa disimpan di sini, bukan dihitung di `body`.** Aturan keras PRD
+    /// "POINT → OBJECT ID → SAFE GOTO" sudah dihitung `SlewPlanner` sejak FASE 3,
+    /// tetapi `PointingController.slewDecision(date:)` nol konsumen — jadi
+    /// penolakan karena `sunProximity` (melindungi alat & mata) terlihat persis
+    /// sama dengan penolakan karena `lowConfidence` (soal ketelitian): tidak
+    /// terlihat sama sekali.
+    ///
+    /// Perhitungannya butuh efemeris (arah target), jadi ia mengikuti
+    /// `skyContext` dan memakai penjagaan waktu yang sama — `body` dievaluasi
+    /// ulang pada tiap sampel sensor 20 Hz, dan memanggil efemeris di sana
+    /// berarti 20× per detik hanya untuk menggambar satu baris peringatan.
+    @Published public private(set) var slewVerdict: SlewDecision?
     /// Kedatangan kunci **baru** — sinyal bagi UI untuk merayakan lock.
     ///
     /// Bukan `state == .lock`, dan bukan `lockCount`. Keduanya salah: yang
@@ -219,6 +233,34 @@ public final class PointingEngine: ObservableObject {
             at: date, observer: location.observer)
     }
 
+    /// Tanda tangan putusan GoTo terakhir yang dihitung.
+    ///
+    /// Perhitungannya butuh efemeris (arah target), jadi ia tidak boleh jalan
+    /// di `body` — yang dievaluasi 20 kali per detik. Tapi ia juga tidak boleh
+    /// jalan 20 kali per detik: arah benda langit bergerak ~0.25°/menit, jadi
+    /// hasilnya tidak berubah antara dua sampel berturut-turut.
+    ///
+    /// Yang membatasi di sini adalah **tanda tangan**, bukan waktu: dihitung
+    /// ulang tepat saat jawabannya berubah (objek berbeda, atau ada/tidak ada
+    /// jawaban). Objek yang sama dihitung sekali; objek baru langsung. Itu
+    /// penting untuk peringatan keselamatan — kalau tertinggal, ia bukan
+    /// sekadar terlambat, ia **salah**.
+    private var slewVerdictSignature: String?
+
+    /// Hitung ulang putusan GoTo bila jawabannya berubah.
+    private func refreshSlewVerdict(at date: Date) {
+        // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
+        // gerbang kedatangan kunci. Memakai satu predikat yang sama berarti
+        // putusan ini tidak bisa diam-diam menjadi putusan atas objek yang
+        // dipertahankan mesin keadaan padahal keadaannya sudah tidak punya
+        // jawaban.
+        let objectID = snapshot.answeredObject?.id ?? "-"
+        let signature = "\(snapshot.state.rawValue)|\(objectID)"
+        guard signature != slewVerdictSignature else { return }
+        slewVerdictSignature = signature
+        slewVerdict = controller.slewDecision(date: date)
+    }
+
     /// Arah fase Bulan hasil perhitungan terakhir.
     ///
     /// `nil` berarti "tidak diketahui" — UI lalu menggambar piringan **tanpa
@@ -272,6 +314,48 @@ public final class PointingEngine: ObservableObject {
         snapshot = value
         lockArrival = arrivalGate.update(with: value)
         recordComplicationIfChanged()
+        // Putusan GoTo ikut diperbarui di sini — **satu tempat**, bersama
+        // snapshot yang ia jelaskan.
+        //
+        // **Kenapa di `publish`, bukan di `ingest`.** Putusan ini adalah
+        // penjelasan atas sebuah jawaban, jadi ia harus berubah tepat saat
+        // jawabannya berubah — dan jawaban berubah lewat enam jalur yang
+        // menulis snapshot, bukan hanya lewat sampel sensor. Kalau ia dipasang
+        // di `ingest` saja, `stop()` dan `setSensorAvailable` akan
+        // meninggalkan peringatan atas benda yang sudah tidak ditunjuk lagi:
+        // layar menampilkan "Tidak ada objek yang bisa diarahkan" di sebelah
+        // keadaan "Sensor mati", dan tidak ada yang terlihat keliru.
+        //
+        // Peringatan keselamatan yang tertinggal bukan sekadar terlambat — ia
+        // **salah**. Karena itu ia tidak boleh punya jalur hidup sendiri di
+        // luar satu-satunya jalan tulis snapshot.
+        refreshSlewVerdict(at: Date())
+    }
+
+    /// Tanda tangan putusan GoTo terakhir yang dihitung.
+    ///
+    /// Perhitungannya butuh efemeris (arah target), jadi ia tidak boleh jalan
+    /// di `body` — yang dievaluasi 20 kali per detik. Tapi ia juga tidak boleh
+    /// jalan 20 kali per detik: arah benda langit bergerak ~0.25°/menit, jadi
+    /// hasilnya tidak berubah antara dua sampel berturut-turut.
+    ///
+    /// Yang membatasi di sini adalah **tanda tangan**, bukan waktu: dihitung
+    /// ulang tepat saat jawabannya berubah (objek berbeda, atau ada/tidak ada
+    /// jawaban). Objek yang sama dihitung sekali; objek baru langsung.
+    private var slewVerdictSignature: String?
+
+    /// Hitung ulang putusan GoTo bila jawabannya berubah.
+    private func refreshSlewVerdict(at date: Date) {
+        // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
+        // gerbang kedatangan kunci. Memakai satu predikat yang sama berarti
+        // putusan ini tidak bisa diam-diam menjadi putusan atas objek yang
+        // dipertahankan mesin keadaan padahal keadaannya sudah tidak punya
+        // jawaban.
+        let objectID = snapshot.answeredObject?.id ?? "-"
+        let signature = "\(snapshot.state.rawValue)|\(objectID)"
+        guard signature != slewVerdictSignature else { return }
+        slewVerdictSignature = signature
+        slewVerdict = controller.slewDecision(date: date)
     }
 
     /// Tulis snapshot complication saat keadaan/objek benar-benar berubah.
@@ -369,6 +453,16 @@ public final class PointingEngine: ObservableObject {
     /// Dipakai Experiment 1 saat merekam. Lihat `PointingController.answeredIntent`
     /// untuk alasan mengapa `snapshot.intent` saja tidak cukup.
     public var answeredIntent: CelestialIntent? { controller.answeredIntent }
+
+    /// Kalimat putusan GoTo untuk ditampilkan; `nil` bila **tidak ada** yang
+    /// perlu diperingatkan.
+    ///
+    /// `nil` mencakup dua hal yang berbeda dan keduanya benar untuk tidak
+    /// ditampilkan: GoTo aman, dan belum ada jawaban sama sekali. Kalimatnya
+    /// sendiri datang dari `SlewDecision.verdictText` (teruji di Linux) — bukan
+    /// dirangkai di sini, supaya jam dan iPhone tidak bisa berbeda pendapat
+    /// tentang mengapa teleskop menolak bergerak.
+    public var slewVerdictText: String? { slewVerdict?.verdictText }
 
     /// Model visual prosedural untuk objek yang sedang ditampilkan.
     ///

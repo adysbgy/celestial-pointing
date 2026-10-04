@@ -247,5 +247,15 @@ public extension LocalizedText {
         // Lihat `DeepSkySpeech.swift`.
         .deepSkyMorphologyNebula, .deepSkyMorphologyGalaxy,
         .deepSkyMorphologyOpenCluster, .deepSkyMorphologyGlobularCluster,
+        // Putusan GoTo. Masuk daftar karena inilah satu-satunya jalur putusan
+        // keselamatan sampai ke layar: `SlewPlanner` sudah menghitungnya sejak
+        // FASE 3, tetapi `slewDecision` nol konsumen di `Apps/`. Tanpa kunci
+        // ini, penolakan karena Matahari (melindungi alat & mata) tidak bisa
+        // dibedakan dari penolakan karena keyakinan rendah. Lihat
+        // `SlewVerdict.swift`.
+        .slewVerdictRejectedPrefix,
+        .slewHazardSunProximity, .slewHazardBelowAltitudeLimit,
+        .slewHazardBelowHorizon, .slewHazardTooFaint, .slewHazardNoTarget,
+        .slewHazardLowConfidence, .slewHazardSunPositionUnknown,
     ]
 }
