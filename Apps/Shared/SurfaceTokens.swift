@@ -17,7 +17,7 @@ extension SurfaceColor {
     /// di model sudah sRGB 0…1, jadi tidak ada konversi yang bisa menggeser
     /// hasilnya di luar yang sudah diuji.
     var color: Color {
-        Color(.sRGB, red: red, green: green, blue: blue, opacity: 1)
+        return Color(.sRGB, red: red, green: green, blue: blue, opacity: 1)
     }
 }
 
@@ -26,14 +26,14 @@ extension SurfacePalette {
     /// Palet aktif saat ini — mengikuti mode malam, dibaca ulang tiap
     /// akses supaya `body` SwiftUI yang dievaluasi ulang otomatis ikut berubah.
     static var active: SurfacePalette {
-        NightMode.isOn ? .night : .day
+        return NightMode.isOn ? .night : .day
     }
 
-    var backgroundColor: Color { background.color }
-    var surface1Color: Color { surface1.color }
-    var surface2Color: Color { surface2.color }
-    var textPrimaryColor: Color { textPrimary.color }
-    var textSecondaryColor: Color { textSecondary.color }
+    var backgroundColor: Color { return background.color }
+    var surface1Color: Color { return surface1.color }
+    var surface2Color: Color { return surface2.color }
+    var textPrimaryColor: Color { return textPrimary.color }
+    var textSecondaryColor: Color { return textSecondary.color }
 
     /// Gradien aksen "ruang" → "nebula".
     ///
@@ -41,21 +41,23 @@ extension SurfacePalette {
     /// kehilangan makna "aktif" — dan di produk ini keaktifan justru
     /// informasi yang paling berharga (engine sedang mengukur, atau terkunci).
     var accentGradient: LinearGradient {
-        LinearGradient(colors: [accentStart.color, accentEnd.color],
-                       startPoint: .leading, endPoint: .trailing)
+        return LinearGradient(
+            colors: [accentStart.color, accentEnd.color],
+            startPoint: .leading, endPoint: .trailing)
     }
 
-    /// Latar yang benar-benar di gambar di balik segalanya.
+    /// Latar yang benar-benar digambar di balik segalanya.
     ///
     /// `Color` polos, bukan `Material`: material di atas latar yang diketahui
     /// warnanya bisa menggeser kontras ke arah yang tidak diuji, dan
-    /// dan kontras-lah yang sudah kita nyatakan.
+    /// kontras-lah yang sudah kita nyatakan.
     static var appBackground: LinearGradient {
         let palette = active
         // Gradien sangat tipis pada latar: cukup untuk terasa seperti
         // atmosfer, tidak cukup untuk mengganggu pembacaan teks.
-        LinearGradient(colors: [palette.surface2.color.opacity(0.55), palette.background.color],
-                       startPoint: .top, endPoint: .bottom)
+        return LinearGradient(
+            colors: [palette.surface2.color.opacity(0.55), palette.background.color],
+            startPoint: .top, endPoint: .bottom)
     }
 }
 
