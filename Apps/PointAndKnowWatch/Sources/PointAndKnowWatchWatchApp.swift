@@ -12,6 +12,12 @@ import PointingKit
 @main
 struct PointAndKnowWatchApp: App {
 
+    /// Dijalankan sekali, sebelum scene apa pun dibangun. Label keadaan
+    /// ("Terkunci", "Kurang yakin", …) bisa dibaca kapan saja, termasuk dari
+    /// complication dan pengumuman VoiceOver; bridge yang belum terpasang akan
+    /// membuat semuanya diam-diam memakai Bahasa Indonesia.
+    init() { LocalizationBridge.install() }
+
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var engine = PointingEngine()

@@ -147,7 +147,37 @@ for root, _, files in os.walk("Apps"):
         if not name.endswith(".swift"):
             continue
         path = os.path.join(root, name)
-        for m in POS.finditer(open(path, encoding="utf-8").read()):
+        # Baris sebaris **hanya** boleh dibuang kalau `//` ada di luar
+        # literal — yang pertama adalah bagian dari literal itu sendiri
+        # (URL, regex, path). `Text("// ...")` adalah kode; `// Text("...")`
+        # adalah penjelasan. Awk tidak punya regex non-greedy portabel, jadi
+        # uraiannya dilakukan manual, sambil menghitung status Escape.
+        #
+        # Kenapa ini penting: tanpa itu, komentar yang **menjelaskan**
+        # aturan ini akan dilaporkan sebagai pelanggaran oleh aturan ini
+        # sendiri — persis gerbang yang selalu merah dan akan dimatikan.
+        code_lines = []
+        for raw in open(path, encoding="utf-8").read().split("\n"):
+            out, in_string, escaped, i = [], False, False, 0
+            while i < len(raw):
+                ch = raw[i]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif ch == "\\":
+                        escaped = True
+                    elif ch == '"':
+                        in_string = False
+                else:
+                    if ch == '"':
+                        in_string = True
+                    elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                        break
+                out.append(ch)
+                i += 1
+            code_lines.append("".join(out))
+
+        for m in POS.finditer("\n".join(code_lines)):
             raw = m.group(2)
             if any(raw.startswith(p) for p in SKIP_PREFIX):
                 continue
@@ -255,6 +285,96 @@ PY
     status=1
   else
     echo "Bersih: semua kunci options/settings dikenal XcodeGen."
+  fi
+fi
+
+# ── Aturan 6: paritas kunci katalog untuk teks yang DIHASILKAN di paket ────
+# Aturan 4 menyapu literal `Text("...")` di `Apps/`. Itu benar, dan ia tetap
+# hijau — padahal teks yang paling sering dibaca sekilas ("Siap", "Arahkan",
+# "Terkunci", "Kurang yakin", "Sensor mati", kalimat panduannya, "Yakin/Ragu/
+# Tidak tahu") **tidak pernah melewati literal itu**. Semuanya di-*switch*
+# di dalam `PointingKit`, jadi sapuan `Apps/` tidak punya apa pun untuk
+# dilihat, dan `SWIFT_EMIT_LOC_STRINGS: NO` membuat Xcode juga tidak akan
+# mengisinya sendiri.
+#
+# Akibatnya kunci katalog itu bisa dihapus satu per satu — atau belum pernah
+# ditambahkan — dan **tidak ada satu pun gerbang yang merah**, sementara
+# teksnya tetap tampil dalam Bahasa Indonesia di semua bahasa.
+#
+# Aturan ini menutup kelas itu dengan memeriksa **paritas dua arah** antara
+# `LocalizedText.allKeys` (satu-satunya sumber kunci di paket) dan
+# `Localizable.xcstrings`: kunci dideklarasikan tapi tidak ada di katalog, dan
+# katalog punya kunci dari paket yang tidak dideklarasikan.
+echo
+echo "== Aturan 6: paritas kunci katalog teks yang dihasilkan di PointingKit =="
+SRC="Packages/PointingKit/Sources/PointingKit/TextLocalization.swift"
+if [ ! -f "$SRC" ]; then
+  echo "PERINGATAN: $SRC tidak ada."
+  echo "Aturan 6 DILEWATI, bukan lulus."
+else
+  parity=$(SRC="$SRC" python3 - <<'PY'
+import json, os, re, sys
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+src = open(os.environ["SRC"], encoding="utf-8").read()
+
+# Kunci diambil dari daftar `allKeys`, bukan dari seluruh literal di berkas:
+# berkas itu juga memuat nilai bawaan Bahasa Indonesia, dan nilai itu bukan
+# kunci katalog. Mengambil `LocalizedText(key:` dari seluruh berkas akan
+# ikut menghitung setiap deklarasi statis — termasuk yang memang harus ikut,
+# tapi juga setiap kunci sementara di komentar atau pengujian.
+declared = set(re.findall(r'key:\s*"([^"]+)"', src))
+if not declared:
+    print("PERINGATAN:tidak ada kunci yang bisa dibaca dari " + os.environ["SRC"])
+    sys.exit(0)
+
+if not os.path.exists(CATALOG):
+    print("BELUM-ADA-KATALOG")
+    sys.exit(0)
+
+strings = json.load(open(CATALOG, encoding="utf-8"))["strings"]
+
+problems = []
+
+# Arah 1: dideklarasikan di paket, tidak ada di katalog.
+for key in sorted(declared - set(strings)):
+    problems.append(f"  kunci dideklarasikan tapi tidak ada di katalog: {key!r}")
+
+# Arah 2: ada di katalog, tapi tidak dideklarasikan di paket. Ini yang
+# membuat kunci tidak bisa "dibuang diam-diam" dari `allKeys` supaya
+# pemeriksaan Directions 1 terasa cukup.
+namespace = re.compile(r"^(pointing\.state|confidence\.level|link\.kind)\.")
+for key in sorted(set(strings) - declared):
+    if namespace.match(key):
+        problems.append(f"  kunci katalog tak dideklarasikan di paket: {key!r}")
+
+# Arah 3: nilai bawaan Bahasa Indonesia pada paket harus **sama** dengan
+# apa yang tercatat sebagai terjemahan `id`... yang tidak ada. Yang bisa
+# diperiksa adalah bahwa nilai bakunya bukan string kosong dan bukan kunci
+# itu sendiri (kalau iya, `text()` tidak bisa membedakan dua kasus).
+for key, value in re.findall(r'key:\s*"([^"]+)",\s*\n?\s*id:\s*"([^"]*)"', src):
+    if not value:
+        problems.append(f"  nilai bawaan kosong: {key!r}")
+    elif value == key:
+        problems.append(f"  nilai bawaan sama dengan kunci: {key!r}")
+
+print("\n".join(problems) if problems else "")
+PY
+)
+  if [ "$parity" = "PERINGATAN" ] || printf '%s' "$parity" | grep -q '^PERINGATAN'; then
+    printf '%s\n' "$parity"
+    echo "-> Perbaiki berkasnya, atau-build ulang daftar allKeys."
+    status=1
+  elif [ "$parity" = "BELUM-ADA-KATALOG" ]; then
+    echo "Katalog belum ada: aturan 6 belum berlaku, bukan kegagalan."
+  elif [ -n "$parity" ]; then
+    echo "Katalog dan teks di paket tidak sebanding:"
+    printf '%s\n' "$parity"
+    echo "-> Setiap kunci di LocalizedText.allKeys wajib ada di"
+    echo "   Localizable.xcstrings, dan sebaliknya untuk kunci ber-namespace."
+    status=1
+  else
+    echo "Bersih: kunci katalog dan kunci di PointingKit sebanding."
   fi
 fi
 

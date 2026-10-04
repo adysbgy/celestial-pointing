@@ -46,26 +46,50 @@ public extension PointingState {
     }
 
     /// Label singkat untuk layar jam.
-    var shortLabel: String {
+    ///
+    /// Diambil lewat `TextLocalization`, bukan ditulis sebagai `return "Siap"`.
+    /// Alasannya bukan Opportunitas estetika: label ini adalah **teks yang
+    /// paling sering dibaca sekilas** di seluruh app, dan sebelum ini ia tidak
+    /// pernah melewati `Text("literal")` — sehingga katalog string tidak bisa
+    /// menjangkauinya dan `swift-ui-lint.sh` melaporkan hijau sementara Bahasa
+    /// Inggrisnya tidak ada. Yang terjadi di sini bukan sekadar terjemahan:
+    /// kalau label ini ikut berubah, tiga layar (jam, complication, panel
+    /// iPhone) semuanya ikut, karena semuanya membaca accessor yang sama.
+    var shortLabel: String { TextLocalization.text(stateLabelText) }
+
+    /// Kunci + nilai bawaan untuk label singkat keadaan ini.
+    ///
+    /// Dipisah dari `shortLabel` supaya aturan paritas katalog di
+    /// `./swift-ui-lint.sh` bisa **menyebut kunci yang tidak punya entri**
+    /// (dengan nama keyst-nya), bukan hanya "ada teks yang hilang".
+    var stateLabelText: LocalizedText {
         switch self {
-        case .idle: return "Siap"
-        case .pointing: return "Arahkan"
-        case .searching: return "Mencari"
-        case .lock: return "Terkunci"
-        case .uncertain: return "Kurang yakin"
-        case .unavailable: return "Sensor mati"
+        case .idle: return .stateIdleLabel
+        case .pointing: return .statePointingLabel
+        case .searching: return .stateSearchingLabel
+        case .lock: return .stateLockLabel
+        case .uncertain: return .stateUncertainLabel
+        case .unavailable: return .stateUnavailableLabel
         }
     }
 
     /// Kalimat penjelasan — apa yang harus dilakukan pengguna.
-    var guidance: String {
+    ///
+    /// Ini kalimat yang **dibaca**, bukan sekadar dihias: jadi ia memakai
+    /// jalur katalog yang sama dengan `shortLabel`, dan nilai bakunya tetap
+    /// Bahasa Indonesia sehingga Linux (tanpa `.lproj`) tetap menampilkan
+    /// kalimat yang benar.
+    var guidance: String { TextLocalization.text(stateGuidanceText) }
+
+    /// Kunci + nilai bawaan untuk kalimat panduan keadaan ini.
+    var stateGuidanceText: LocalizedText {
         switch self {
-        case .idle: return "Angkat jam dan arahkan ke langit."
-        case .pointing: return "Tahan arah tunjuk sampai jam berhenti bergerak."
-        case .searching: return "Belum ada objek di arah itu."
-        case .lock: return "Objek dikenali dengan keyakinan tinggi."
-        case .uncertain: return "Ada kandidat, tapi belum cukup yakin untuk memastikan."
-        case .unavailable: return "Jam tidak memberi data gerak. Coba lagi."
+        case .idle: return .stateIdleGuidance
+        case .pointing: return .statePointingGuidance
+        case .searching: return .stateSearchingGuidance
+        case .lock: return .stateLockGuidance
+        case .uncertain: return .stateUncertainGuidance
+        case .unavailable: return .stateUnavailableGuidance
         }
     }
 
@@ -75,11 +99,19 @@ public extension PointingState {
 
 public extension ConfidenceLevel {
     /// Label Indonesia untuk ditampilkan.
-    var displayName: String {
+    ///
+    /// Lewat `TextLocalization` dengan alasan yang sama seperti
+    /// `PointingState.shortLabel`: label ini tampil di tiga layar sekaligus dan
+    /// berasal dari `PointingKit`, jadi katalog string tidak bisa menjangkauinya
+    /// selama ia ditulis sebagai string biasa.
+    var displayName: String { TextLocalization.text(displayText) }
+
+    /// Kunci + nilai bawaan untuk label tingkat keyakinan ini.
+    var displayText: LocalizedText {
         switch self {
-        case .high: return "Yakin"
-        case .medium: return "Ragu"
-        case .low: return "Tidak tahu"
+        case .high: return .levelHigh
+        case .medium: return .levelMedium
+        case .low: return .levelLow
         }
     }
 

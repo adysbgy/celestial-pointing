@@ -17,6 +17,11 @@ struct PointAndKnowiOSApp: App {
     @StateObject private var link = PhoneLinkService()
     @StateObject private var trace = ConfidenceTraceStore()
 
+    /// Sama seperti app jam: label keadaan dan keyakinan berasal dari
+    /// `PointingKit`, jadi bridge harus terpasang sebelum layar pertama
+    /// dirender — bukan saat tab pertama dibuka.
+    init() { LocalizationBridge.install() }
+
     var body: some Scene {
         WindowGroup {
             RootView(engine: engine, motion: motion, location: location, link: link, trace: trace)

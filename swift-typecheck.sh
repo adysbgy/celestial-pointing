@@ -31,6 +31,7 @@ cd "$(dirname "$0")"
 TYPECHECKABLE=(
   Apps/Shared/Complication/ComplicationStore.swift
   Apps/Shared/ObjectKindLabels.swift
+  Apps/Shared/LocalizationBridge.swift
 )
 
 echo "== Build paket (modul untuk typecheck) =="

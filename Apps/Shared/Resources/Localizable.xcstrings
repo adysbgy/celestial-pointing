@@ -673,6 +673,226 @@
         }
       }
     },
+    "confidence.level.high.label": {
+      "comment": "Label tingkat keyakinan tinggi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certain"
+          }
+        }
+      }
+    },
+    "confidence.level.low.label": {
+      "comment": "Label tingkat keyakinan rendah: tidak tahu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        }
+      }
+    },
+    "confidence.level.medium.label": {
+      "comment": "Label tingkat keyakinan sedang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uncertain"
+          }
+        }
+      }
+    },
+    "link.kind.acknowledgement.label": {
+      "comment": "Label jenis pesan tanda terima.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acknowledgement"
+          }
+        }
+      }
+    },
+    "link.kind.calibrationReady.label": {
+      "comment": "Label jenis pesan kalibrasi siap dipakai antara jam dan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration ready"
+          }
+        }
+      }
+    },
+    "link.kind.pointingState.label": {
+      "comment": "Label jenis pesan keadaan tunjuk antara jam dan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pointing state"
+          }
+        }
+      }
+    },
+    "link.kind.policyUpdate.label": {
+      "comment": "Label jenis pesan pembaruan ambang keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence threshold"
+          }
+        }
+      }
+    },
+    "link.kind.stateRequest.label": {
+      "comment": "Label jenis pesan permintaan keadaan dari iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State request"
+          }
+        }
+      }
+    },
+    "pointing.state.idle.guidance": {
+      "comment": "Kalimat panduan keadaan diam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raise the watch and aim it at the sky."
+          }
+        }
+      }
+    },
+    "pointing.state.idle.label": {
+      "comment": "Label singkat keadaan diam pada kartu status jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        }
+      }
+    },
+    "pointing.state.lock.guidance": {
+      "comment": "Kalimat panduan keadaan terkunci.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object identified with high confidence."
+          }
+        }
+      }
+    },
+    "pointing.state.lock.label": {
+      "comment": "Label singkat keadaan terkunci (objek dikenali dengan keyakinan tinggi).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked"
+          }
+        }
+      }
+    },
+    "pointing.state.pointing.guidance": {
+      "comment": "Kalimat panduan keadaan sedang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold the aim steady until the watch stops moving."
+          }
+        }
+      }
+    },
+    "pointing.state.pointing.label": {
+      "comment": "Label singkat keadaan sedang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aiming"
+          }
+        }
+      }
+    },
+    "pointing.state.searching.guidance": {
+      "comment": "Kalimat panduan keadaan mencari: belum ada objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object in that direction yet."
+          }
+        }
+      }
+    },
+    "pointing.state.searching.label": {
+      "comment": "Label singkat keadaan sedang mencari objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching"
+          }
+        }
+      }
+    },
+    "pointing.state.unavailable.guidance": {
+      "comment": "Kalimat panduan saat sensor gerak tidak memberi data.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The watch is not reporting motion data. Try again."
+          }
+        }
+      }
+    },
+    "pointing.state.unavailable.label": {
+      "comment": "Label singkat keadaan saat sensor gerak tidak memberi data.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor unavailable"
+          }
+        }
+      }
+    },
+    "pointing.state.uncertain.guidance": {
+      "comment": "Kalimat panduan keadaan ragu; tidak mengklaim identitas.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is a candidate, but not enough certainty to confirm it."
+          }
+        }
+      }
+    },
+    "pointing.state.uncertain.label": {
+      "comment": "Label singkat keadaan ragu: ada kandidat tapi belum pasti.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain"
+          }
+        }
+      }
+    },
     "sisa": {
       "comment": "Label sisa pengujian pada tampilan redup.",
       "localizations": {

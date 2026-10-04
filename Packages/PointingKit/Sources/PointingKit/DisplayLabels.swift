@@ -100,13 +100,16 @@ public extension LinkMessageKind {
     ///
     /// Uji `DisplayLabelTests` menjaga bahwa tidak ada label yang **sama
     /// dengan** `rawValue`-nya, karena itulah tanda accessor ini hilang.
-    var displayName: String {
+    var displayName: String { TextLocalization.text(displayText) }
+
+    /// Kunci + nilai bawaan untuk label jenis pesan ini.
+    var displayText: LocalizedText {
         switch self {
-        case .pointingState:    return "Keadaan"
-        case .calibrationReady: return "Kalibrasi"
-        case .policyUpdate:     return "Ambang keyakinan"
-        case .stateRequest:     return "Permintaan keadaan"
-        case .acknowledgement:  return "Tanda terima"
+        case .pointingState:    return .linkKindPointingState
+        case .calibrationReady: return .linkKindCalibrationReady
+        case .policyUpdate:     return .linkKindPolicyUpdate
+        case .stateRequest:     return .linkKindStateRequest
+        case .acknowledgement:  return .linkKindAcknowledgement
         }
     }
 }

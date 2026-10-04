@@ -1,0 +1,198 @@
+import Foundation
+
+/// Satu teks yang destined ke layar, bersama **kunci katalognya**.
+///
+/// **Kenapa berkas ini ada.** Label yang paling sering dibaca sekilas di app ini
+/// justru **yang paling sulit dilokalisasi**: "Siap", "Arahkan", "Terkunci", dan
+/// kalimat panduannya tidak pernah melewati `Text("literal")` — semuanya
+/// **dihasilkan** di `PointingKit`. Akibatnya `Localizable.xcstrings` tidak
+/// bisa menjangkau mereka, dan aturan 4 di `./swift-ui-lint.sh` (yang menyapu
+/// literal di `Apps/`) melaporkan **hijau** sementara separuh teks yang
+/// benar-benar tampil di layar belum punya padanan bahasa Inggris.
+///
+/// Itu persis bentuk "hijau yang tidak hijau" yang sudah dua kali muncul di
+/// repo ini: gerbang berjalan, gerbang itu benar, dan yang diukur bukan
+/// bagian yang bermasalah.
+///
+/// Yang diperbaiki bukan "tambah kunci", tapi **cara teks sampai ke katalog**:
+/// teks tidak lagi memakai string Bahasa Indonesia sebagai identitasnya.
+/// Identitasnya adalah kunci yang stabil, dan Bahasa Indonesia menjadi
+/// **nilai bawaan** — bukan nama kunci.
+/// Sengaja **tidak** conforms ke `RawRepresentable`, meskipun nama
+///anggotanya `rawValue`. Konformansi itu menuntut `init?(rawValue:)` yang
+/// harus mengembalikan `nil` untuk kunci yang tak dikenal — dan initsiator itu
+/// tidak ada pemanggilnya di seluruh repo. Deklarasikannya sempat ada karena
+/// "kunci = data mentah"; konformansinya gagal karena Swift tidak mengarang
+/// initsiator untuk struct dengan penyimpanan tambahan, dan pesannya hanya
+/// menyebut `LocalizedText` tanpa menyebut baris yang salah. Jadi konformansi
+/// dibuang, bukan diberi supaya dipoles.
+public struct LocalizedText: Hashable, Sendable {
+
+    /// Kunci katalog, mis. `"pointing.state.lock.label"`.
+    ///
+    /// Sengaja memakai **namespace**, bukan teks Bahasa Indonesia. Alasannya
+    /// konkrit: `"Kalibrasi"` sudah ada di katalog sebagai **judul layar
+    /// kalibrasi**, sementara `LinkMessageKind.calibrationReady` juga
+    /// menghasilkan kalimat "Kalibrasi" untuk hal yang berbeda. Kalau teksnya
+    /// sendiri yang jadi kunci, keduanya menyatu diam-diam — mengubah satu
+    /// ikut mengubah yang lain, dan tidak ada yang memberi tahu.
+    public let rawValue: String
+
+    /// Teks Bahasa Indonesia — nilai bawaan saat katalog tidak punya
+    /// terjemahan.
+    ///
+    /// Ini bukan gaya: `sourceLanguage` proyek adalah `id`, dan paket ini
+    /// **dipakai di Linux**, tempat `Bundle.main` tidak punya `.lproj` sama
+    /// sekali (`localizations == []`). Tanpa nilai bawaan di dalam tipe,
+    /// seluruh uji Linux akan menguji string kosong.
+    public let indonesian: String
+
+    public init(key: String, id: String) {
+        self.rawValue = key
+        self.indonesian = id
+    }
+}
+
+/// Sumber terjemahan untuk `LocalizedText`.
+///
+/// **Kenapa tidak memakai `String(localized:)` langsung.** API itu tidak ada
+/// di Swift 6.0 Linux — hanya `Bundle.localizedString(forKey:value:table:)`,
+/// yang di sini selalu mengembalikan nilai bawaan. Paket ini harus tetap bisa
+/// diuji di Linux, jadi **pencarian dipisah dari tempat jenis teksnya
+/// ditentukan**: enum ini tidak tahu apa pun tentang `Bundle`, dan pemasangannya
+/// dilakukan oleh app.
+public enum TextLocalization {
+
+    /// Fungsi pencarian: menerima kunci katalog, mengembalikan teks pada
+    /// bahasa aktif, atau `nil` bila tidak ada terjemahannya.
+    public typealias Lookup = @Sendable (String) -> String?
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var installed: Lookup?
+
+    /// Daftarkan sumber terjemahan (dari app: `Bundle.localizedString`).
+    ///
+    /// Aman dipanggil lebih dari sekali; pemanggilan terakhir menang. Sengaja
+    /// **tidak** ada yang dipasang di dalam paket: tanpa app, Bahasa
+    /// Indonesia tetap benar — dan itulah yang diuji di Linux.
+    public static func install(_ lookup: @escaping Lookup) {
+        lock.lock()
+        defer { lock.unlock() }
+        installed = lookup
+    }
+
+    /// Melepas sumber terjemahan.
+    ///
+    /// Bukan untuk pemakaian app — untuk uji, supaya satu pengujian yang
+    /// memasang `Lookup` tidak bocor ke pengujian berikutnya. Bocornya
+    /// akan terlihat sebagai "katalog terpasang sendiri", bukan sebagai
+    /// kegagalan — persis kelas kesalahpahaman yang gerbang ini hunts.
+    public static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        installed = nil
+    }
+
+    private static var lookup: Lookup? {
+        lock.lock()
+        defer { lock.unlock() }
+        return installed
+    }
+
+    /// Teks untuk ditampilkan, dalam bahasa aktif.
+    ///
+    /// **Kontrak: tidak pernah kosong.** Dua kemungkinan diperiksa berurutan:
+    ///
+    /// 1. Terjemahan ditemukan dan tidak kosong -> dipakai.
+    /// 2. Selain itu -> nilai bawaan Bahasa Indonesia; dan kalau **tetap**
+    ///    kosong (kunci hastily dideklarasikan tanpa teks), teks kuncinya
+    ///    sendiri yang dikembalikan. String kosong membuat baris terlihat
+    ///    kosong tanpa penjelasan, sedangkan kunci mentah setidaknya jujur
+    ///    menyatakan "ini pengenal, bukan teks".
+    public static func text(_ key: LocalizedText) -> String {
+        if let found = lookup?(key.rawValue), !found.isEmpty {
+            return found
+        }
+        return key.indonesian.isEmpty ? key.rawValue : key.indonesian
+    }
+}
+
+// MARK: - Katalog kunci
+
+/// Kunci + nilai bawaan untuk setiap teks yang **dihasilkan** di paket.
+///
+/// Daftar ini adalah satu-satunya tempat yang tahu bentuk katalognya, sehingga
+/// aturan 6 di `./swift-ui-lint.sh` bisa memverifikasi **paritas** dengan
+/// `Localizable.xcstrings` — kesenjangan yang tidak bisa ditutup dengan menyapu
+/// `Apps/` saja.
+public extension LocalizedText {
+
+    // MARK: Keadaan engine (label jam + kalimat panduan)
+
+    static let stateIdleLabel = LocalizedText(key: "pointing.state.idle.label",
+                                              id: "Siap")
+    static let statePointingLabel = LocalizedText(key: "pointing.state.pointing.label",
+                                                  id: "Arahkan")
+    static let stateSearchingLabel = LocalizedText(key: "pointing.state.searching.label",
+                                                   id: "Mencari")
+    static let stateLockLabel = LocalizedText(key: "pointing.state.lock.label",
+                                              id: "Terkunci")
+    static let stateUncertainLabel = LocalizedText(key: "pointing.state.uncertain.label",
+                                                   id: "Kurang yakin")
+    static let stateUnavailableLabel = LocalizedText(key: "pointing.state.unavailable.label",
+                                                     id: "Sensor mati")
+
+    static let stateIdleGuidance = LocalizedText(
+        key: "pointing.state.idle.guidance",
+        id: "Angkat jam dan arahkan ke langit.")
+    static let statePointingGuidance = LocalizedText(
+        key: "pointing.state.pointing.guidance",
+        id: "Tahan arah tunjuk sampai jam berhenti bergerak.")
+    static let stateSearchingGuidance = LocalizedText(
+        key: "pointing.state.searching.guidance",
+        id: "Belum ada objek di arah itu.")
+    static let stateLockGuidance = LocalizedText(
+        key: "pointing.state.lock.guidance",
+        id: "Objek dikenali dengan keyakinan tinggi.")
+    static let stateUncertainGuidance = LocalizedText(
+        key: "pointing.state.uncertain.guidance",
+        id: "Ada kandidat, tapi belum cukup yakin untuk memastikan.")
+    static let stateUnavailableGuidance = LocalizedText(
+        key: "pointing.state.unavailable.guidance",
+        id: "Jam tidak memberi data gerak. Coba lagi.")
+
+    // MARK: Tingkat keyakinan
+
+    static let levelHigh = LocalizedText(key: "confidence.level.high.label", id: "Yakin")
+    static let levelMedium = LocalizedText(key: "confidence.level.medium.label", id: "Ragu")
+    static let levelLow = LocalizedText(key: "confidence.level.low.label",
+                                        id: "Tidak tahu")
+
+    // MARK: Jenis pesan (jam <-> iPhone)
+
+    static let linkKindPointingState = LocalizedText(key: "link.kind.pointingState.label",
+                                                      id: "Keadaan")
+    static let linkKindCalibrationReady = LocalizedText(
+        key: "link.kind.calibrationReady.label", id: "Kalibrasi")
+    static let linkKindPolicyUpdate = LocalizedText(key: "link.kind.policyUpdate.label",
+                                                    id: "Ambang keyakinan")
+    static let linkKindStateRequest = LocalizedText(key: "link.kind.stateRequest.label",
+                                                    id: "Permintaan keadaan")
+    static let linkKindAcknowledgement = LocalizedText(
+        key: "link.kind.acknowledgement.label", id: "Tanda terima")
+
+    /// Setiap kunci yang dideklarasikan di sini.
+    ///
+    /// Satu sumber untuk gerbang paritas dan untuk uji — supaya "kunci yang
+    /// dideklarasikan tapi tidak punya entri katalog" tidak bisa lolos tanpa
+    /// ada yang melihatnya.
+    static let allKeys: [LocalizedText] = [
+        .stateIdleLabel, .statePointingLabel, .stateSearchingLabel,
+        .stateLockLabel, .stateUncertainLabel, .stateUnavailableLabel,
+        .stateIdleGuidance, .statePointingGuidance, .stateSearchingGuidance,
+        .stateLockGuidance, .stateUncertainGuidance, .stateUnavailableGuidance,
+        .levelHigh, .levelMedium, .levelLow,
+        .linkKindPointingState, .linkKindCalibrationReady, .linkKindPolicyUpdate,
+        .linkKindStateRequest, .linkKindAcknowledgement,
+    ]
+}
