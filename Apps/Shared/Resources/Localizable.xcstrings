@@ -1937,6 +1937,50 @@
           }
         }
       }
+    },
+    "deepSky.morphology.nebula.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: nebula.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nebula"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.galaxy.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "galaxy"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.openCluster.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open cluster"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.globularCluster.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus bola.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "globular cluster"
+          }
+        }
+      }
     }
   }
 }

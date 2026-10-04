@@ -205,16 +205,21 @@ final class TextLocalizationTests: XCTestCase {
 
     /// `allKeys` adalah sumber untuk gerbang paritas, jadi ia harus benar
     /// **sebagai daftar**: tanpa duplikat, tanpa kunci kosong, dan lengkap
-    /// (46 kunci). Hitungan dikunci dengan angka supaya kunci yang hilang
+    /// (50 kunci). Hitungan dikunci dengan angka supaya kunci yang hilang
     /// tidak bisa lolos hanya karena "tidak ada yang menyebutnya".
     ///
     /// Angka ini **sengaja** harus diperbarui setiap kali kunci ditambah:
     /// gerbang paritas membaca `allKeys`, jadi kunci yang ditambahkan ke
     /// katalog tanpa masuk daftar ini akan lolos tanpa ada yang melihatnya.
     /// Memperbarui angkanya adalah harga untuk itu, bukan gangguan.
+    ///
+    /// 46 → 50 pada siklus bentuk objek langit dalam: empat kunci morfologi
+    /// (`deepSky.morphology.*`), yang menutup satu kelas informasi yang hanya
+    /// bisa dilihat — gambar menampilkan cakram galaksi vs inti padat gugus
+    /// bola, sedangkan jenisnya sama-sama "objek langit jauh".
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 46, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 50, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

@@ -530,6 +530,17 @@ struct ObjectDetailView: View {
         if let phase = visual?.spokenPhase {
             parts.append(phase)
         }
+        // Bentuk objek langit dalam: galaksi, gugus bola, gugus terbuka,
+        // nebula. Sama alasannya dengan fase Bulan — gambarnya menampilkan
+        // bentuk yang berbeda per jenis, dan `spokenName` ("objek langit
+        // jauh") tidak membedakan satu pun dari yang lain. Tanpa ini, "Gugus
+        // Ptolemy" dan "Gugus Hercules" terdengar sama persis padahal di
+        // layar keduanya digambar berbeda. `spokenDeepSkyMorphology`
+        // mengembalikan `nil` untuk bukan objek langit dalam dan untuk id
+        // yang tidak ada di katalog, jadi tidak ada bentuk yang ditebak.
+        if let morphology = visual?.spokenDeepSkyMorphology {
+            parts.append(morphology)
+        }
         parts.append(String(format: "magnitudo %.2f", object.magnitude))
         if object.kind == .star {
             parts.append(String(format: "RA %.1f derajat, deklinasi %+.1f derajat",

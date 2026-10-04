@@ -905,6 +905,104 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    // MARK: - Bentuk objek langit dalam untuk VoiceOver
+
+    /// Setiap morfologi punya **kata sendiri**.
+    ///
+    /// Diuji lewat `deepSkyMorphologyText` (murni) dan bukan
+    /// `spokenDeepSkyMorphology`, karena yang terakhir memanggil
+    /// `TextLocalization` — di Linux selalu nilai bawaan, jadi mengujinya
+    /// langsung hanya menguji teksnya, bukan pemilihannya.
+    ///
+    /// Yang dijaga di sini bukan terjemahan, melainkan **pembedanya**: kalau
+    /// dua jenis berbagi satu kata, pengguna VoiceOver mendengar bentuk yang
+    /// sama untuk dua gambar yang berbeda — persis cacat yang ingin ditutup.
+    func testEveryMorphologyHasItsOwnSpokenWord() {
+        let words = DeepSkyCatalogue.Morphology.allCases.map {
+            CelestialVisual.deepSkyMorphologyText($0).rawValue
+        }
+        XCTAssertEqual(Set(words).count, words.count,
+                       "dua morfologi berbagi kata — keduanya akan terdengar sama")
+    }
+
+    /// Pemetaannya benar per jenis, bukan sekadar unik.
+    func testMorphologyMapsToTheRightWord() {
+        XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.nebula).rawValue,
+                       LocalizedText.deepSkyMorphologyNebula.rawValue)
+        XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.galaxy).rawValue,
+                       LocalizedText.deepSkyMorphologyGalaxy.rawValue)
+        XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.openCluster).rawValue,
+                       LocalizedText.deepSkyMorphologyOpenCluster.rawValue)
+        XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.globularCluster).rawValue,
+                       LocalizedText.deepSkyMorphologyGlobularCluster.rawValue)
+    }
+
+    /// Objek langit dalam **yang ada di katalog** harus punya bentuk terdengar.
+    ///
+    /// Ini yang mengunci jalurnya: gambar memakai morfologi, jadi pengumuman
+    /// harus memakainya juga. Kalau salah satu `nil`, artinya gambar dan
+    /// suara berbeda pendapat tentang objek yang sama.
+    func testEveryCatalogueDeepSkyObjectHasASpokenMorphology() {
+        for object in DeepSkyCatalogue.objects {
+            let visual = CelestialVisual(object: object)
+            XCTAssertNotNil(visual.spokenDeepSkyMorphology,
+                            "\(object.id) punya bentuk di layar tapi tidak terdengar")
+        }
+    }
+
+    /// **Pengunci pembeda nyata:** dua gugus dengan jenis yang sama harus
+    /// terdengar berbeda.
+    ///
+    /// Ini cacat yang sesungguhnya — "Gugus Ptolemy" dan "Gugus Hercules"
+    /// sama-sama `kind: .deepSky`, dan sebelum ini diumumkan dengan kalimat
+    /// yang sama persis, padahal di layar keduanya digambar berbeda.
+    func testTwoClustersWithTheSameKindSoundDifferent() {
+        let ptolemy = DeepSkyCatalogue.objects.first { $0.id == "m7" }!
+        let hercules = DeepSkyCatalogue.objects.first { $0.id == "m13" }!
+        XCTAssertEqual(ptolemy.kind, hercules.kind,
+                       "prasyarat: keduanya jenis yang sama, jadi jenisnya tidak membedakan")
+        let a = CelestialVisual(object: ptolemy).spokenDeepSkyMorphology
+        let b = CelestialVisual(object: hercules).spokenDeepSkyMorphology
+        XCTAssertNotNil(a); XCTAssertNotNil(b)
+        XCTAssertNotEqual(a, b,
+                          "gugus terbuka dan gugus bola harus terdengar berbeda")
+    }
+
+    /// Bukan objek langit dalam → **tidak ada** bentuk yang diucapkan.
+    ///
+    /// Planet, Bulan, dan bintang punya bentuk yang sudah ditentukan
+    /// jenisnya; mengucapkan morfologi untuk mereka berarti mengarang
+    /// informasi yang tidak ada di layar.
+    func testNonDeepSkyObjectsHaveNoSpokenMorphology() {
+        let notDeepSky: [CelestialVisual] = [
+            CelestialVisual(kind: .planet, planet: .jupiter, objectID: "jupiter"),
+            CelestialVisual(kind: .star, objectID: "sirius"),
+            CelestialVisual(kind: .sun, objectID: "sun"),
+            CelestialVisual(kind: .moon, illuminationFraction: 0.5, isWaxing: true,
+                            objectID: "moon")
+        ]
+        for visual in notDeepSky {
+            XCTAssertNil(visual.spokenDeepSkyMorphology,
+                         "\(visual.kind) tidak boleh mengucapkan bentuk objek langit dalam")
+        }
+    }
+
+    /// Id tak dikenal → **tidak ada** bentuk yang ditebak.
+    ///
+    /// Sama dengan `morphology(forObjectID:)` yang mengembalikan `nil`: gambar
+    /// memakai kabut netral, dan pengumuman tidak menyebut bentuk apa pun.
+    /// Kalau di sini menebak, suara akan mengklaim bentuk yang tidak ada di
+    /// layar.
+    func testUnknownDeepSkyIDDoesNotGuessASpokenMorphology() {
+        let visual = CelestialVisual(kind: .deepSky, fuzziness: 0.6,
+                                     objectID: "bukan-objek-nyata")
+        XCTAssertNil(visual.spokenDeepSkyMorphology,
+                     "id tak dikenal tidak boleh menebak bentuk")
+        // Dan objek langit dalam tanpa id sama sekali juga tidak menebak.
+        let noID = CelestialVisual(kind: .deepSky, fuzziness: 0.6)
+        XCTAssertNil(noID.spokenDeepSkyMorphology)
+    }
+
     // MARK: - Geometri bintang: glow & spike tidak boleh terpotong tegak
 
     /// Ujung terluar bintang pada geometri **lama** (inti dihitung maju dari

@@ -240,5 +240,12 @@ public extension LocalizedText {
         // Lihat `SearchHint.swift`.
         .searchHintDaylight, .searchHintBelowHorizon, .searchHintTooFaint,
         .searchHintTooCloseToSun, .searchHintNoCandidates,
+        // Bentuk objek langit dalam. Masuk daftar karena inilah satu-satunya
+        // jalur bentuk sampai ke pengguna VoiceOver: gambar prosedural
+        // menampilkan cakram galaksi vs inti padat gugus bola, dan tanpa kunci
+        // ini "Gugus Ptolemy" dan "Gugus Hercules" terdengar sama persis.
+        // Lihat `DeepSkySpeech.swift`.
+        .deepSkyMorphologyNebula, .deepSkyMorphologyGalaxy,
+        .deepSkyMorphologyOpenCluster, .deepSkyMorphologyGlobularCluster,
     ]
 }

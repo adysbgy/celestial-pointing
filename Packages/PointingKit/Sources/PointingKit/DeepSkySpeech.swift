@@ -1,0 +1,96 @@
+import Foundation
+
+/// Bentuk objek langit dalam, untuk diucapkan VoiceOver.
+///
+/// **Kenapa ini ada.** Gambar prosedural objek langit dalam sekarang
+/// menampilkan **bentuk** yang berbeda per jenis: galaksi sebagai cakram
+/// miring berinti, gugus bola sebagai inti padat, gugus terbuka sebagai
+/// bintik-bintik tersebar, nebula sebagai kabut. Bagi pengguna yang melihat,
+/// itu informasi langsung — bukan hiasan.
+///
+/// Bagi pengguna VoiceOver, tidak satu pun dari itu terdengar. Yang paling
+/// tajam: **"Gugus Ptolemy" dan "Gugus Hercules" diumumkan dengan kalimat
+/// yang sama persis** — nama, "objek langit jauh", magnitudo. Padahal yang
+/// pertama gugus terbuka dan yang kedua gugus bola, dan di layar keduanya
+/// kini digambar berbeda. Jenisnya (`ObjectKind.deepSky`) tidak membedakan
+/// mereka, jadi pengumuman yang ada kehilangan satu kelas informasi yang
+/// hanya bisa dilihat.
+///
+/// Ini bentuk yang sama dengan `spokenPhase` untuk Bulan, dan alasannya sama:
+/// fase Bulan dan morfologi objek langit dalam adalah **data**, bukan
+/// deskripsi hiasan. Karena itu aturannya juga sama — hanya bentuk yang
+/// benar-benar ditampilkan yang diucapkan, dan yang tidak diketahui tidak
+/// ditebak.
+///
+/// **Kenapa bukan sekadar mendeskripsikan gambarnya.** `visualPanelLabel`
+/// sengaja tidak pernah menceritakan gambar (lihat komentarnya: "Gambar
+/// Jupiter dengan pita oranye" tidak menambah informasi). Alasan itu tetap
+/// benar untuk planet: pita Jupiter tidak mengubah apa pun yang bisa
+/// diklaim. Ia **tidak** benar di sini, karena bentuknya berbeda antar objek
+/// di katalog yang sama.
+///
+/// **Batasnya, dan trade-off yang disengaja.** Untuk objek yang namanya
+/// sudah menyebut jenisnya ("Galaksi Andromeda"), kata morfologinya jadi
+/// sedikit berulang saat diucapkan. Itu dibiarkan, bukan karena tidak
+/// terasa, tapi karena alternatifnya — memeriksa apakah nama pada bahasa
+/// aktif sudah memuat kata jenisnya — berarti mencocokkan teks yang
+/// dilokalisasi, dan itu rapuh persis pada bahasa yang belum ada
+/// terjemahannya. Pengulangan kecil lebih baik daripada aturan yang bisa
+/// diam-diam salah.
+public extension CelestialVisual {
+
+    /// Nama bentuk untuk diucapkan, atau `nil` bila tidak berlaku.
+    ///
+    /// `nil` dalam dua keadaan, dan keduanya sengaja:
+    ///
+    /// 1. **Bukan objek langit dalam.** Planet, Bulan, dan bintang punya
+    ///    bentuk yang sudah ditentukan jenisnya; morfologi tidak berlaku.
+    /// 2. **Bentuknya tidak diketahui.** Ini yang penting: `objectID` yang
+    ///    tidak ada di katalog mengembalikan `nil` (lihat
+    ///    `DeepSkyCatalogue.morphology(forObjectID:)`), dan di situ tidak ada
+    ///    satu pun bentuk yang boleh diklaim. Mengucapkan tebakan lebih buruk
+    ///    daripada diam — sama seperti fase Bulan yang tidak diketahui.
+    ///
+    /// Keadaan ini juga membuat pengucapannya **cocok dengan gambarnya**:
+    /// gambar memakai kabut netral saat bentuknya tidak diketahui, dan
+    /// pengumuman tidak menyebut bentuk apa pun.
+    var spokenDeepSkyMorphology: String? {
+        guard kind == .deepSky,
+              let id = objectID,
+              let morphology = DeepSkyCatalogue.morphology(forObjectID: id) else {
+            return nil
+        }
+        return TextLocalization.text(Self.deepSkyMorphologyText(morphology))
+    }
+
+    /// Kunci + nilai bawaan untuk sebuah morfologi — **fungsi murni**.
+    ///
+    /// Murni karena alasan yang sama dengan `moonPhaseText`: `TextLocalization`
+    /// mengembalikan Bahasa Indonesia di Linux (tidak ada `.lproj`), jadi
+    /// menguji `spokenDeepSkyMorphology` langsung hanya akan menguji nilai
+    /// bawaan. Yang bisa diuji — dan yang memang penting — adalah
+    /// **pemetaan** morfologi ke teksnya: setiap jenis punya kata sendiri,
+    /// dan tidak ada dua jenis yang berbagi kata.
+    static func deepSkyMorphologyText(_ morphology: DeepSkyCatalogue.Morphology) -> LocalizedText {
+        switch morphology {
+        case .nebula:          return .deepSkyMorphologyNebula
+        case .galaxy:          return .deepSkyMorphologyGalaxy
+        case .openCluster:     return .deepSkyMorphologyOpenCluster
+        case .globularCluster: return .deepSkyMorphologyGlobularCluster
+        }
+    }
+}
+
+// MARK: - Katalog kunci
+
+public extension LocalizedText {
+
+    static let deepSkyMorphologyNebula = LocalizedText(
+        key: "deepSky.morphology.nebula.spoken.label", id: "nebula")
+    static let deepSkyMorphologyGalaxy = LocalizedText(
+        key: "deepSky.morphology.galaxy.spoken.label", id: "galaksi")
+    static let deepSkyMorphologyOpenCluster = LocalizedText(
+        key: "deepSky.morphology.openCluster.spoken.label", id: "gugus terbuka")
+    static let deepSkyMorphologyGlobularCluster = LocalizedText(
+        key: "deepSky.morphology.globularCluster.spoken.label", id: "gugus bola")
+}

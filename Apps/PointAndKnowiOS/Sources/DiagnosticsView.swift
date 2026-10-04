@@ -714,6 +714,14 @@ struct DiagnosticsView: View {
         if let phase = visual?.spokenPhase {
             parts.append(phase)
         }
+        // Bentuk objek langit dalam — lihat catatan panjang di
+        // `spokenDeepSkyMorphology`. Ini kategori yang sama dengan fase Bulan:
+        // satu-satunya informasi di panel ini yang **hanya** bisa dilihat
+        // (bentuk galaksi vs gugus bola vs gugus terbuka), dan jenisnya
+        // ("objek langit jauh") tidak membedakan satu pun dari yang lain.
+        if let morphology = visual?.spokenDeepSkyMorphology {
+            parts.append(morphology)
+        }
         if includeTechnicalDetails {
             parts.append(String(format: "magnitudo %.2f", object.magnitude))
         }
