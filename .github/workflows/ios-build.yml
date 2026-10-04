@@ -45,6 +45,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Aturan UI yang tidak bisa ditegakkan compiler (ukuran font tetap
+      # mengabaikan Dynamic Type) diperiksa di sini **sebelum** build panjang,
+      # supaya pelanggarannya ketahuan dalam detik, bukan menit. Sapunya murni
+      # teks, jadi ia berjalan di Linux maupun macOS.
+      - name: Gerbang sapu UI (font tetap)
+        run: ./swift-ui-lint.sh
+
       - name: Pasang XcodeGen
         run: brew install xcodegen
 

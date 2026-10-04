@@ -99,7 +99,13 @@ struct ComplicationView: View {
                 Image(systemName: symbol(for: digest))
             } currentValueLabel: {
                 Text(digest.headline)
-                    .font(.system(size: 11, weight: .semibold))
+                    // Semantik, bukan `.system(size: 11)`. Lingkaran
+                    // complication adalah ruang terkecil di seluruh app —
+                    // justru di situ teks paling perlu bisa membesar mengikuti
+                    // Dynamic Type, dan ukuran tetap mengabaikannya sama
+                    // sekali. `.caption2` + semibold mempertahankan beratnya
+                    // sambil menyerahkan ukurannya ke sistem.
+                    .font(.caption2.weight(.semibold))
                     .minimumScaleFactor(0.6)
             }
             .gaugeStyle(.accessoryCircular))

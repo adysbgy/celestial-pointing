@@ -21,5 +21,12 @@ jobs:
       - name: Uji CelestialEngine
         run: swift test --package-path Packages/CelestialEngine
 
+      # Aturan UI yang tidak bisa ditegakkan compiler: ukuran font tetap
+      # mengabaikan Dynamic Type. `swiftc` tidak peduli, dan berkas SwiftUI
+      # tidak ikut terbangun di Linux — jadi ini satu-satunya penjaga. Sapunya
+      # murni teks, sehingga ia bisa berjalan di Linux tanpa Apple SDK.
+      - name: Gerbang sapu UI (font tetap)
+        run: ./swift-ui-lint.sh
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
