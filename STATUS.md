@@ -1,6 +1,49 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — satu putusan keselamatan, satu bobot)
+## Progres terakhir (4 Okt 2026 — penolakan bahaya dan penolakan mutu tidak lagi sama bobotnya)
+
+### Pemisahan yang berhenti di tengah jalan
+
+`SlewVerdictBanner` lahir untuk memisahkan dua penolakan yang dulu "terlihat
+persis sama": `sunProximity` (melindungi alat dan **mata**) versus
+`lowConfidence` (soal ketelitian). Tapi yang ia pisahkan hanya **kalimatnya**.
+Keduanya tetap digambar dengan warna peringatan yang sama dan ikon yang sama —
+jadi pemisahan itu berhenti tepat di titik yang paling menentukan: pengguna yang
+membaca sekilas. Dan Mode Malam menutup jalan terakhir, karena palet malam
+menyempit jadi satu merah (`TonePalette` sudah mencatat itu sebagai konsekuensi
+yang diterima), sehingga warna berhenti membedakan tepat di mode yang paling
+sering dipakai saat mengamati langit.
+
+Perbaikannya memindahkan pembeda itu ke model, tempat ia bisa diuji di Linux:
+
+- **`SlewHazard.isSafety`** — tiga bahaya yang melindungi alat & mata
+  (`sunProximity`, `belowAltitudeLimit`, `sunPositionUnknown`) dipisahkan dari
+  empat bahaya mutu (`belowHorizon`, `tooFaint`, `noTarget`, `lowConfidence`).
+  `sunPositionUnknown` masuk kelas keselamatan karena ia bukan bahaya yang
+  diamati, melainkan **pengaman yang tidak bisa dijalankan**: kalau posisi
+  Matahari tak diketahui, perencana sengaja gagal-tertutup. Menaruhnya di kelas
+  mutu akan membuatnya terlihat seperti soal ketelitian.
+- **`SlewDecision.verdictTone`** — keselamatan → `.danger`, mutu → `.warning`.
+  Keselamatan **menang apa pun urutan array**-nya; memilih "bahaya pertama" akan
+  membuat warna bergantung pada urutan, bukan pada kepentingan.
+- **`SlewDecision.verdictSymbolName`** — ikon yang **tidak ikut menyempit** di
+  Mode Malam. Karena warna berhenti membedakan di sana, ikon yang memikul
+  pembedaan itu.
+- **`SlewVerdictBanner` kini menerima `SlewDecision`, bukan `String?`** — supaya
+  warna dan ikon datang dari satu tempat yang teruji, dan jam maupun iPhone
+  tidak bisa berbeda pendapat.
+- **`PointingEngine.slewVerdictText` dihapus** — nol pemanggil setelah banner
+  membaca putusannya utuh.
+
+Lima uji baru (`SlewVerdictTests`) menjaga klasifikasi lengkap, kemenangan
+keselamatan atas mutu di **dua** urutan array, nada `success` saat GoTo aman,
+dan ikon yang berbeda antara `danger` dan `warning`.
+
+Gerbang: `swift-test.sh` **166 + 384 hijau** (README diperbarui), typecheck
+hijau, ui-lint hijau. CI: Engine Tests (Linux) `37224080767` = success, Apple
+Build `37224080719` = success.
+
+
 
 ### Putusan GoTo tidak boleh turun pangkat di iPhone
 
