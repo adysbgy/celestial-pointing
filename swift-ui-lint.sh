@@ -135,10 +135,30 @@ FORMATS = {
 # dengan jujur daripada dikarang menjadi kunci.
 SKIP_PREFIX = ("Usulan ambang keyakinan",)
 
+# Nama fungsi yang teksnya **tampil ke pengguna**, jadi teksnya wajib ada di
+# katalog.
+#
+# Versi pertama hanya berisi view modifier. Itu menutup `Text`, tombol, dan
+# label aksesibilitas — tapi **tidak** menutup metadata WidgetKit. Terbukti
+# di berkas yang sama: `ComplicationWidget.swift` menyatu
+# `.description("Objek terakhir yang dikenali, tanpa membuka app.")`, yaitu
+# teks yang benar-benar tampil di layar pemilihan complication watchOS, dan
+# sapuan ini **tidak melihatnya** — ia hanya melaporkan tiga kemunculan
+# "Point & Know" yang memang tidak diterjemahkan.
+#
+# Jadi daftar ini diperluas ke peritel yang teksnya kelihatan: metadata
+# complication, dan pengenal aksesibilitas. Semuanya ditambahkan karena
+# masing-masing **memang menampilkan teks**, bukan karena "kira-kira juga".
+# Kandidat yang tidak pernah muncul di repo ini sengaja tidak dimasukkan:
+# daftar panjang peritel yang tidak pernah dipakai hanya menambah permukaan
+# untuk salah baca, bukan perlindungan.
 POS = re.compile(
     r'\b(Text|navigationTitle|navigationSubtitle|Button|Label|Toggle|Picker|'
     r'Section|NavigationLink|accessibilityLabel|accessibilityHint|'
-    r'accessibilityValue|confirmationDialog|alert)\(\s*"((?:[^"\\]|\\.)*)"'
+    r'accessibilityValue|accessibilityActionName|confirmationDialog|alert|'
+    r'confirmationTitle|cancelTitle|primaryActionTitle|destructiveTitle|'
+    r'configurationDisplayName|description|help|footer|header|prompt|message'
+    r')\(\s*"((?:[^"\\]|\\.)*)"'
 )
 
 found = []

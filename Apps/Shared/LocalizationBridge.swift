@@ -32,6 +32,15 @@ enum LocalizationBridge {
     /// ada di katalog, hasilnya adalah `value` — dan string kosong akan
     /// membuat baris terlihat kosong tanpa penjelasan saat ada kesalahan.
     ///
+    /// **Konsekuensi yang harus diketahui, dan ditangani di `text()`.**
+    /// Karena `value:` adalah nama kuncinya, kunci yang hilang dari katalog
+    /// tidak muncul sebagai ketiadaan: ia kembali sebagai **nama kunci itu
+    /// sendiri**, non-kosong, jadi pemeriksaan "terjemahan tidak kosong" saja
+    /// tidak menahannya. `TextLocalization.text` deshalb menolak hasil yang
+    /// sama dengan nama kuncinya dan jatuh ke nilai bawaan Bahasa Indonesia.
+    /// Perbaikannya ada di paket, bukan di sini, supaya setiap bridge di masa
+    /// depan otomatis ikut terlindungi — termasuk yang belum ada sekarang.
+    ///
     /// `Bundle.localizedString(forKey:value:table:)` dipilih, bukan
     /// `String(localized:)`, karena yang terakhir tidak ada di Swift 6.0 Linux
     /// sementara yang pertama ada di kedua platform.

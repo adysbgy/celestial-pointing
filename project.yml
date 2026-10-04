@@ -168,19 +168,31 @@ targets:
       # Hanya berkas ini yang dibutuhkan complication — ia tidak perlu tahu
       # PointingKit/CelestialEngine sama sekali.
       - path: Apps/Shared/Complication
-      # Label jenis benda (`ObjectKind.displayName`) TIDAK lagi masuk daftar
-      # sumber di sini. Semula `Apps/Shared/ObjectKindLabels.swift` disebut
-      # eksplisit, karena label itu tinggal di app sementara
-      # complication membacanya. Sekarang label itu hidup di `PointingKit`
-      # (yang sudah jadi dependensi target ini), jadi berkas app itu dihapus
-      # dan tidak ada yang perlu disebut.
+      # Katalog string **wajib** ikut ke sini, dan ini satu-satunya baris yang
+      # membuatnya terjadi: tanpa entri eksplisit di bawah, katalog TIDAK ikut
+      # ke bundel complication.
       #
-      # Yang TIDAK ikut ke sini: `LocalizationBridge.swift`. Complication
-      # berjalan di proses terpisah yang tidak memanggil `.install()`, jadi
-      # `TextLocalization` tidak punya sumber terjemahan — dan itu **benar**:
-      # tanpa bridge, label jatuh ke nilai bawaan Bahasa Indonesia, bukan ke
-      # string kosong. Bridge sengaja tidak dipasang di complication agar
-      # labelnya tidak bergantung pada `Bundle.main` proses ekstensi.
+      # Kenapa ia perlu: complication menampilkan `ComplicationDigest.headline`,
+      # yang isinya `PointingState.shortLabel`, dan baris kedua
+      # `objectKind.displayName` — keduanya teks yang **dihasilkan di
+      # PointingKit** lewat `TextLocalization`. Dua hal harus benar
+      # bersamaan: katalog ikut terbawa **dan** ada yang membacanya
+      # (`ComplicationLocalization`, dipasang di `ComplicationProvider.init()`).
+      # Kalau hanya satu, hasilnya tetap Bahasa Indonesia tanpa penjelasan.
+      #
+      # Status lama mengira katalog sudah ikut "lewat glob `Apps/Shared`".
+      # Terbukti salah: target ini tidak pernah menarik `Apps/Shared` sebagai
+      # sumber — hanya `Apps/Shared/Complication`. Dibuktikan dengan membangun
+      # XcodeGen lalu membaca `project.pbxproj` yang dihasilkannya: sebelum
+      # perubahan ini target complication **tidak punya fase Resources sama
+      # sekali**, dan `Localizable.xcstrings` hanya ada di dua app.
+      #
+      # Yang TIDAK ikut ke sini: `LocalizationBridge.swift`. Itu milik app dan
+      # tidak boleh ikut karena `Bundle.main` dalam proses extension menunjuk
+      # ke bundel widget, bukan ke app jam — bridge-nya adalah
+      # `ComplicationLocalization`.
+      - path: Apps/Shared/Resources
+        buildPhase: resources
     dependencies:
       - package: PointingKit
       - package: CelestialEngine

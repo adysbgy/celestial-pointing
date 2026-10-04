@@ -171,7 +171,37 @@ final class TextLocalizationTests: XCTestCase {
         XCTAssertEqual(TextLocalization.text(orphan), "pointing.state.tidak.ada.label")
     }
 
+    // MARK: - Kontrak lookup ala Bundle
+
+    /// `Bundle.localizedString(forKey:value:table:)` **tidak pernah
+    /// mengembalikan `nil`**: kalau kuncinya tidak ada di katalog, hasilnya
+    /// adalah `value` yang diberikan. Itu terverifikasi langsung di Linux
+    /// (`Bundle.main.localizations == []`), dan persis bentuk yang dipakai
+    /// `LocalizationBridge`.
+    ///
+    /// Bahaya yang muncul dari sana: `text()` memeriksa `!found.isEmpty`,
+    /// lalu memakai hasilnya apa adanya. Kalau `value` yang diberi adalah
+    /// nama kuncinya sendiri — pola yang benar untuk `localizedString`, karena
+    /// string kosong membuat baris terlihat kosong tanpa penjelasan — maka
+    /// kunci yang hilang **bukan** `nil`, bukan kosong: ia teks **yang
+    /// salah**, dan `text()` menerimanya.
+    ///
+    /// Yang tampil di layar bukan "Terkunci" melainkan
+    /// `pointing.state.lock.label`. Uji ini mengunci hal itu: bridge yang
+    /// meniru kontrak Bundle apa adanya harus tetap jatuh ke Bahasa
+    /// Indonesia, bukan menampakkan nama kunci.
+    func testMissingCatalogKeyFallsBackToIndonesianNotToTheKeyItself() {
+        // Persis bentuk yang dipasang `LocalizationBridge`.
+        TextLocalization.install { key in
+            Bundle.main.localizedString(forKey: key, value: key, table: nil)
+        }
+        XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
+        XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
+        XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
+    }
+
     // MARK: - Paritas katalog (dipakai aturan 6 di swift-ui-lint.sh)
+
 
     /// `allKeys` adalah sumber untuk gerbang paritas, jadi ia harus benar
     /// **sebagai daftar**: tanpa duplikat, tanpa kunci kosong, dan lengkap

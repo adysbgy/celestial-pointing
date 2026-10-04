@@ -49,6 +49,28 @@ struct ComplicationEntry: TimelineEntry {
 /// Penyedia timeline: baca ringkasan terakhir dari store bersama.
 struct ComplicationProvider: TimelineProvider {
 
+    /// Dipasang sekali, sebelum entri timeline apa pun diminta.
+    ///
+    /// **Kenapa bridge dipasang di sini, padahal tidak ada di
+    /// `LocalizationBridge.swift` milik app.** Complication adalah target
+    /// terpisah yang tidak menarik berkas app mana pun, dan ia berjalan di
+    /// proses sendiri. `ComplicationDigest.headline` membaca
+    /// `PointingState.shortLabel`, dan baris kedua membaca
+    /// `objectKind.displayName` — keduanya teks yang **dihasilkan di
+    /// PointingKit** lewat `TextLocalization`, jadi tanpa bridge semuanya
+    /// jatuh ke nilai bawaan Bahasa Indonesia.
+    ///
+    /// Dulu katalog pun tidak ikut ke bundel ini (lihat `project.yml`), jadi
+    /// kedua sisi sama-sama tidak ada: tanpa katalog, `Bundle` tidak punya
+    /// apa-apa untuk dibaca. Sekarang katalog ikut (lihat `project.yml`),
+    /// dan bridge di sini yang membacanya.
+    ///
+    /// Dipasang di `init()` provider — satu titik yang dijamin berjalan
+    /// sebelum `body` dirender, dan tidak bergantung pada lifecycle app.
+    init() {
+        ComplicationLocalization.install()
+    }
+
     func placeholder(in context: Context) -> ComplicationEntry {
         ComplicationEntry(date: Date(), digest: ComplicationStore.shared.read())
     }

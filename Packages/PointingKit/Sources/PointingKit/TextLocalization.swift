@@ -101,16 +101,40 @@ public enum TextLocalization {
 
     /// Teks untuk ditampilkan, dalam bahasa aktif.
     ///
-    /// **Kontrak: tidak pernah kosong.** Dua kemungkinan diperiksa berurutan:
+    /// **Kontrak: tidak pernah kosong, dan tidak pernah nama kunci.**
+    /// Tiga kemungkinan diperiksa berurutan:
     ///
-    /// 1. Terjemahan ditemukan dan tidak kosong -> dipakai.
+    /// 1. Terjemahan ditemukan, tidak kosong, **dan bukan nama kuncinya
+    ///    sendiri** -> dipakai.
     /// 2. Selain itu -> nilai bawaan Bahasa Indonesia; dan kalau **tetap**
     ///    kosong (kunci hastily dideklarasikan tanpa teks), teks kuncinya
     ///    sendiri yang dikembalikan. String kosong membuat baris terlihat
     ///    kosong tanpa penjelasan, sedangkan kunci mentah setidaknya jujur
     ///    menyatakan "ini pengenal, bukan teks".
+    ///
+    /// **Kenapa syarat "bukan nama kuncinya sendiri" itu ada.** Sumber
+    /// terjemahan dari app adalah `Bundle.localizedString(forKey:value:)`,
+    /// dan fungsi itu **tidak pernah mengembalikan `nil` maupun string
+    /// kosong**: kalau kuncinya tidak ada di katalog, hasilnya persis
+    /// `value` yang diberikan. Karena bridge itu memberikan `value: key`
+    /// (pola yang benar sendiri — string kosong akan membuat baris terlihat
+    /// kosong tanpa penjelasan), kunci yang hilang sampai ke sini sebagai
+    /// **teks yang salah**, bukan sebagai ketiadaan. Dipakai apa adanya, ia
+    /// menampakkan pengenal mentah di layar: bukannya "Terkunci" yang
+    /// tampil, melainkan `pointing.state.lock.label`.
+    ///
+    /// Kalau ini tidak dijaga, teorinya "label yang paling sering dibaca
+    /// sekilas punya terjemahan" tetap benar sementara **layar**nya salah —
+    /// dan tidak ada satu pun gerbang yang bisa melihatnya: aturan 4 menyapu
+    /// literal `Apps/`, sedangkan teks ini di-*switch* di dalam paket.
+    ///
+    /// Syaratnya aman karena kunci dijaga ber-namespace tanpa spasi (bukti:
+    /// `testDeclaredKeysAreUniqueNonEmptyAndComplete`), jadi tidak mungkin
+    /// sama dengan kalimat terjemahan yang sah.
     public static func text(_ key: LocalizedText) -> String {
-        if let found = lookup?(key.rawValue), !found.isEmpty {
+        if let found = lookup?(key.rawValue),
+           !found.isEmpty,
+           found != key.rawValue {
             return found
         }
         return key.indonesian.isEmpty ? key.rawValue : key.indonesian
