@@ -1,22 +1,107 @@
 # STATUS — Celestial Pointing Engine
 
-## Ringkasan keadaan (4 Okt 2026, dini hari)
+## Ringkasan keadaan (4 Okt 2026)
 
-**Misi UI/UX berjalan (Bagian 1 + awal Bagian 2).** Visual prosedural
-terpasang di kedua app, dan token permukaannya sekarang **teruji di Linux**.
+**Misi UI/UX berjalan (Bagian 1 + 2, Bagian 3 lengkap, awal Bagian 4).**
+Visual prosedural terpasang di kedua app, token permukaannya teruji di
+Linux, tiga celah wajib Bagian 3 sudah tertutup.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 179 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 188 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan **kedua workflow CI hijau** di HEAD `e0aec92`.
+  dan **kedua workflow CI hijau** di HEAD `0b5fee6`.
 - Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
   `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
   Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
   Bulan dari fraksi iluminasi engine**, bintang (glow + warna spektral +
   ukuran dari magnitudo), Matahari berkorona, nebula kabur. Tanpa aset
   eksternal.
-- Gate baru di CI: **nilai palet & ciri pengenal planet, dan urutan terang mode
-  malam, sekarang teruji di Linux** — karena "cincin = Saturnus" adalah klaim
-  identitas, dan klaim identitas tidak bisa diuji dengan membaca.
+- Gate baru di CI: **nilai palet & ciri pengenal planet, urutan terang mode
+  malam, dan kalimat yang diucapkan untuk alur kalibrasi, sekarang teruji di
+  Linux**.
+
+### Yang masih tersisa dari brief (hasil audit, bukan tekad sendiri)
+
+Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
+
+| Item | Status |
+|---|---|
+| 4.4 animasi halus (`withAnimation` saat state→lock) | belum ada — satu-satunya animasi adalah `TimelineView` denyut di iPhone |
+| Onboarding value-first | belum ada sama sekali |
+| 4.6 audio opsional saat lock | belum ada |
+| `@ScaledMetric` | belum dipakai (semua font sudah semantic) |
+
+## Progres terakhir (4 Okt 2026 — kalibrasi: VoiceOver + Dynamic Type)
+
+### Dua klaim STATUS.md yang ternyata tidak berlaku
+
+Siklus ini dimulai dari brief yang sama seperti sebelumnya, jadi STATUS.md
+layap dibaca bukan dipercaya. Dua klaim di dalamnya **tidak berlaku**:
+
+1. **"Dynamic Type: semua `.system(size:)` sudah diganti."** Benar untuk
+   `PointingView` dan `ReducedLuminanceView` — tapi `CalibrationView.swift`
+   masih punya **13** `.system(size:)`, yaitu 20% dari berkas app. Dan itu
+   bukan layar pinggir: kalibrasi justru layar yang paling sering dipakai
+   pengguna yang perlu kacamata di lapangan. Semua angka sudah gone sekarang
+   (sweep `\.system\(size:` di `Apps/` → **0 di kode**, sisanya komentar).
+2. **"Bagian 3.3 selesai."** `statusCard` dan `ObjectDetailView` memang
+   berlabel, tapi brief menyebut secara khusus **tombol kalibrasi & "Catat"** —
+   keduanya tidak punya label, dan `statusMessage` tidak pernah diumumkan.
+
+### Tiga cacat nyata di layar kalibrasi (bukan sekadar label yang belum ada)
+
+1. **`statusMessage` tidak pernah sampai ke VoiceOver.** Layar ini tidak punya
+   `.onChange(of: engine.snapshot.state)` seperti `PointingView`, jadi **tidak
+   ada satu pun** pengumuman di seluruh alur. Akibatnya menekan "Catat" bisa
+   **ditolak** tanpa umpan balik apa pun — kelas "kegagalan diam" yang sama
+   dengan Cacat 9/11 di riwayat, dan justru paling merusak di sini: satu-satunya
+   jalan memasang kalibrasi.
+2. **Ikon dekoratif ikut diucapkan.** Tombol acuan tidak
+   `accessibilityHidden` pada ikon, jadi VoiceOver membacakan "bintang, plus
+   lingkaran, Sirius, 40 derajat tinggi, plus lingkaran".
+3. **Label tombol "Pakai" tidak membedakan hidup/mati.** `.disabled` adalah
+   sifat visual; penolakan karena sebaran terlalu lebar — hasil yang paling
+   mudah disalahartikan di seluruh alur ini — tidak pernah sampai ke pengguna
+   suara.
+
+### Teks yang diucapkan pindah ke `PointingKit` — dan kenapa
+
+`CalibrationSpeech.swift` (baru) memuat `spokenPhaseSummary`,
+`spokenApplyButtonLabel`, `spokenName`, `spokenCaptureLabel`.
+
+Alasannya bukan kerapian. Kalimat-kalimat ini adalah **janji produk yang
+bisa salah tanpa ada satu pun bagian UI yang keliru**: kalau label lupa menyebut
+tahap, layar tetap menampilkan "Siap dipakai" dengan hijau, dan pengguna yang
+tidak melihat layar tidak punya jalan apa pun untuk mengetahuinya. Persis kelas
+"objek sisa tampil sebagai hasil sekarang" — UI yang tampak benar sambil
+menyembunyikan apa yang sebenarnya berlaku. Konsekuensi yang ikut: angka
+diucapkan sebagai kata ("derajat"), karena derajat adalah singkatan visual yang
+tidak terbaca sebagai kata.
+
+### Yang benar-benar dijalankan pada siklus ini
+
+- `./swift-test.sh` → **166 CelestialEngine + 188 PointingKit, 0 gagal** (naik
+  dari 179 → 188: 9 uji `CalibrationSpeechTests`).
+- **Kedua mutasi dibuktikan MERAH lebih dulu**, bukan hanya hijau:
+  - `spokenApplyButtonLabel` diabaikan `isReady` → **2 test gagal**;
+  - `offset`/`sebaran` dikarang (`?? 0`) saat kalibrasi belum ada → **2 test
+    gagal**.
+- Semua keadaan diuji lewat alur **sungguhan** (`add`/`markApplied`), bukan
+  menyetel `phase` langsung: `phase` `private(set)` dan dihitung dari sampel, jadi
+  itulah satu-satunya cara mengujinya tanpa mengarang keadaan.
+- Gerbang sintaks: **seluruh 20 berkas app** lolos `swiftc -parse -swift-version 5`
+  di `swift:6.0`.
+- Sapuan CJK/Cyrillic di `Apps/` + `Packages/`: **0**. Sapuan
+  `\.system(size:` di `Apps/` → 0 di kode.
+- CI `Apple Build` run `37173802303` → **2× `BUILD SUCCEEDED`** dan gerbang
+  peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*; CI
+  `Engine Tests (Linux)` run `37173802319` → hijau.
+
+### Temuan yang sengaja TIDAK diperbaiki siklus ini
+
+`CalibrationSessionTests.swift:285` menghasilkan `warning: result of call to
+'XCTUnwrap(...)' is unused` — terlihat di log CI macOS. Sekali baris saja
+(`_ =`), tapi di luar satuan kerja siklus ini dan tidak ada hubungannya dengan VoiceOver.
+Dicatat supaya tidak dibaca ulang sebagai penemuan baru.
 
 ## Progres terakhir (4 Okt 2026 — Bagian 2: polish ala Mobbin)
 
