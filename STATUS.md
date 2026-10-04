@@ -67,6 +67,25 @@ menggantikan bawaan untuk **setiap** aksesor, urutan template kalimat galat
 benar-benar dipakai (bukan hanya kata-katanya yang ditukar), dan judul kosong
 tidak memanggil format.
 
+### Jebakan kedua yang tertangkap di CI, bukan di Linux
+
+Uji urutan template itu pertama ditulis dengan template `"%.1f %@ %@"`.
+`spokenError` mengirim `(String, Double, String)`; template itu memberi
+`%.1f` sebuah `String`. **Di CoreFoundation itu crash, bukan keluaran yang
+salah** — dan Linux memaafkannya, jadi bentuk itu hijau di `swift-test.sh`
+(450 lulus) dan baru meledak di CI macOS.
+
+Pelajaran yang masuk ke uji itu sendiri: template pengganti **wajib
+type-compatible** dengan argumennya. Yang diuji adalah *urutan*, jadi
+template-nya kini `"[%@|%@|%.1f]"` — urutan tetap dibuktikan, tipenya tetap
+cocok. Dua jebakan berbeda, dua-duanya tak terlihat di Linux:
+
+1. `%1$@` posisional bekerja berbeda di CoreFoundation vs Swift Foundation.
+2. Specifier yang tak cocok dengan tipe argumen = crash di CoreFoundation,
+   diabaikan glibc.
+
+Keduanya membuat katalog terlihat seperti kode yang aman padahal tidak.
+
 ### Batas yang jujur
 
 - **Terjemahan `en` tidak bisa diverifikasi di Linux** — sama seperti siklus

@@ -168,13 +168,20 @@ final class RowSpeechTests: XCTestCase {
     /// Bahasa Indonesia menaruh angkanya di akhir. Bahasa lain bisa
     /// menaruhnya di awal; uji ini membuktikan template-nya benar-benar
     /// dipakai, bukan hanya kata-katanya yang ditukar.
+    ///
+    /// Template pengganti **wajib type-compatible** dengan argumen yang
+    /// dikirim `spokenError` (`%@`, `%.1f`, `%@`). Menukar posisi `%.1f`
+    /// dengan `%@` tidak sekadar mengubah urutan kata — ia memberi specifier
+    /// angka kepada `String`, dan di CoreFoundation itu **crash**, bukan
+    /// sekadar keluaran yang salah. Linux memaafkannya, jadi bentuk itu lolos
+    /// `swift-test.sh` dan baru meledak di CI macOS.
     func testErrorSentenceOrderComesFromTheCatalog() {
         TextLocalization.install { key in
-            key == "row.speech.error" ? "%.1f %@ %@" : nil
+            key == "row.speech.error" ? "[%@|%@|%.1f]" : nil
         }
         defer { TextLocalization.reset() }
 
-        XCTAssertEqual(RowSpeech.spokenError(2.5), "2.5 galat derajat",
+        XCTAssertEqual(RowSpeech.spokenError(2.5), "[galat|derajat|2.5]",
                        "urutan template katalog harus dipakai apa adanya")
     }
 
