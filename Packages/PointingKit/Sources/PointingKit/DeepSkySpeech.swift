@@ -41,7 +41,7 @@ public extension CelestialVisual {
 
     /// Nama bentuk untuk diucapkan, atau `nil` bila tidak berlaku.
     ///
-    /// `nil` dalam dua keadaan, dan keduanya sengaja:
+    /// `nil` dalam tiga keadaan, dan ketiganya sengaja:
     ///
     /// 1. **Bukan objek langit dalam.** Planet, Bulan, dan bintang punya
     ///    bentuk yang sudah ditentukan jenisnya; morfologi tidak berlaku.
@@ -50,14 +50,21 @@ public extension CelestialVisual {
     ///    `DeepSkyCatalogue.morphology(forObjectID:)`), dan di situ tidak ada
     ///    satu pun bentuk yang boleh diklaim. Mengucapkan tebakan lebih buruk
     ///    daripada diam — sama seperti fase Bulan yang tidak diketahui.
+    /// 3. **Engine belum yakin.** Bentuk adalah ciri pengenal, jadi ia hanya
+    ///    boleh diklaim saat `isConfirmed`. Parameter itu diteruskan dari
+    ///    pemanggil karena `CelestialVisual` sendiri tidak menyimpan
+    ///    keyakinan — ia hanya tahu objeknya apa.
     ///
-    /// Keadaan ini juga membuat pengucapannya **cocok dengan gambarnya**:
-    /// gambar memakai kabut netral saat bentuknya tidak diketahui, dan
-    /// pengumuman tidak menyebut bentuk apa pun.
-    var spokenDeepSkyMorphology: String? {
+    /// Keadaan 2 dan 3 membuat pengucapannya **cocok dengan gambarnya**:
+    /// gambar memakai kabut netral saat bentuknya tidak diketahui *atau* saat
+    /// engine ragu (`drawableMorphology`), dan pengumuman tidak menyebut
+    /// bentuk apa pun. Tanpa keadaan 3, pengguna VoiceOver akan mendengar
+    /// "galaksi" di sebelah badge "Ragu" yang justru tidak menggambarnya.
+    func spokenDeepSkyMorphology(isConfirmed: Bool) -> String? {
         guard kind == .deepSky,
               let id = objectID,
-              let morphology = DeepSkyCatalogue.morphology(forObjectID: id) else {
+              let morphology = DeepSkyCatalogue.drawableMorphology(forObjectID: id,
+                                                                   isConfirmed: isConfirmed) else {
             return nil
         }
         return TextLocalization.text(Self.deepSkyMorphologyText(morphology))

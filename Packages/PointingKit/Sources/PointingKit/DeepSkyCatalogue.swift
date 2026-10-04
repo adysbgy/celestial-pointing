@@ -144,4 +144,30 @@ public enum DeepSkyCatalogue {
     public static func morphology(forObjectID id: String) -> Morphology? {
         morphologyByID[id]
     }
+
+    /// Bentuk yang boleh **digambar** untuk sebuah objek, mengingat
+    /// keyakinan engine saat ini.
+    ///
+    /// **Kenapa ini fungsi, bukan `morphology(...)` langsung di view.**
+    /// Bentuk adalah **ciri pengenal**: gugus bola yang berinti padat adalah
+    /// penanda yang sama meyakinkannya dengan cincin Saturnus, dan galaksi
+    /// berpalung adalah penanda seperti pita Jupiter. Aturan yang sudah
+    /// berlaku untuk planet — saat engine belum pasti, hanya warna yang
+    /// boleh tampil, cirinya tidak — karena itu harus berlaku juga di sini,
+    /// dengan cara yang **sama**: satu tempat, diuji di Linux.
+    ///
+    /// Bahayanya konkret dan sudah pernah terjadi di repo ini: badge di
+    /// sebelah gambar bisa bertuliskan "Ragu", sementara gambar di sebelahnya
+    /// memperlihatkan bentuk galaksi yang khas. Mata membaca gambar lebih
+    /// dulu daripada badge, jadi gambar yang lebih yakin daripada teksnya
+    /// adalah klaim identitas yang justru dilarang PRD.
+    ///
+    /// Saat `isConfirmed == false` hasilnya `nil` — bentuk **netral**, bukan
+    /// bentuk objeknya, dan bukan bentuk objek lain. Nama `nil` di sini
+    /// berarti "tidak ada bentuk yang boleh diklaim", bukan "tidak tahu".
+    public static func drawableMorphology(forObjectID id: String,
+                                          isConfirmed: Bool) -> Morphology? {
+        guard isConfirmed else { return nil }
+        return morphology(forObjectID: id)
+    }
 }

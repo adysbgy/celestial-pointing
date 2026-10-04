@@ -61,7 +61,11 @@ struct CelestialVisualView: View {
         case .moon: drawMoon(context: context, center: center, radius: radius)
         case .star: drawStar(context: context, center: center, radius: radius)
         case .sun: drawSun(context: context, center: center, radius: radius)
-        case .deepSky: drawDeepSky(context: context, center: center, radius: radius)
+        case .deepSky:
+            // Keyakinan diteruskan: bentuk adalah ciri pengenal, sama seperti
+            // cincin Saturnus. Lihat `DeepSkyCatalogue.drawableMorphology`.
+            drawDeepSky(context: context, center: center, radius: radius,
+                        isConfirmed: isConfirmed)
         }
     }
 
@@ -552,7 +556,8 @@ struct CelestialVisualView: View {
 
     // MARK: - Objek langit dalam
 
-    private func drawDeepSky(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+    private func drawDeepSky(context: GraphicsContext, center: CGPoint, radius: CGFloat,
+                             isConfirmed: Bool) {
         // Kabut lembut: blob tumpang-tindih dengan opasitas rendah, tanpa
         // tepi keras. Tepi adalah ciri yang paling keliru untuk nebula/galaksi
         // -- tepi yang tepat justru terlihat "digambar".
@@ -567,8 +572,18 @@ struct CelestialVisualView: View {
         // frame. Morfologi `nil` (id tak dikenal) sengaja jatuh ke kabut
         // netral, bukan ke salah satu bentuk: menebak "ini galaksi" adalah
         // klaim identitas yang justru dilarang PRD.
+        //
+        // **Keyakinan ikut menentukan bentuk mana yang boleh tampil.**
+        // Bentuk adalah ciri pengenal, sama seperti cincin Saturnus dan pita
+        // Jupiter -- jadi aturannya sama: saat engine belum pasti, cirinya
+        // tidak digambar. `drawableMorphology` mengembalikan `nil` saat
+        // belum pasti, dan kabut netral yang tersisa tidak mengklaim jenis
+        // apa pun. Sebelum ini, galaksi berpalung digambar penuh di sebelah
+        // badge "Ragu", sehingga gambar lebih yakin daripada teksnya.
         let core = Self.accent(CelestialVisual.accents.deepSky)
-        let morphology = visual.objectID.flatMap(DeepSkyCatalogue.morphology(forObjectID:))
+        let morphology = visual.objectID.flatMap {
+            DeepSkyCatalogue.drawableMorphology(forObjectID: $0, isConfirmed: isConfirmed)
+        }
         let geometry = VisualFrame.deepSky(morphology: morphology,
                                            fuzziness: visual.fuzziness)
         for blob in geometry.blobs {

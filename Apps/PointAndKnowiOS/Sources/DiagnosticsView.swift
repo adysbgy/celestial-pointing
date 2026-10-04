@@ -678,7 +678,8 @@ struct DiagnosticsView: View {
                     object: object,
                     stale: isStale,
                     includeTechnicalDetails: false,
-                    visual: visual))
+                    visual: visual,
+                    isConfirmed: isConfirmed))
             }
         }
     }
@@ -703,7 +704,8 @@ struct DiagnosticsView: View {
     static func visualPanelLabel(object: CelestialObject,
                                   stale: Bool,
                                   includeTechnicalDetails: Bool = true,
-                                  visual: CelestialVisual? = nil) -> String {
+                                  visual: CelestialVisual? = nil,
+                                  isConfirmed: Bool = true) -> String {
         var parts = [object.name, object.kind.spokenName]
         // Fase Bulan: satu-satunya informasi di panel ini yang **hanya** bisa
         // dilihat. Bentuk sabit/cembung/purnama tampil sebagai gambar, dan
@@ -719,7 +721,10 @@ struct DiagnosticsView: View {
         // satu-satunya informasi di panel ini yang **hanya** bisa dilihat
         // (bentuk galaksi vs gugus bola vs gugus terbuka), dan jenisnya
         // ("objek langit jauh") tidak membedakan satu pun dari yang lain.
-        if let morphology = visual?.spokenDeepSkyMorphology {
+        // `isConfirmed` diteruskan supaya pengumuman **cocok dengan gambar**:
+        // saat engine ragu, gambar memakai kabut netral, jadi bentuknya juga
+        // tidak boleh diucapkan.
+        if let morphology = visual?.spokenDeepSkyMorphology(isConfirmed: isConfirmed) {
             parts.append(morphology)
         }
         if includeTechnicalDetails {

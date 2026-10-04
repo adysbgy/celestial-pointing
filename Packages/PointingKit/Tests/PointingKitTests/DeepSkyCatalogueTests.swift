@@ -132,6 +132,51 @@ final class DeepSkyCatalogueTests: XCTestCase {
         XCTAssertEqual(Set(ids).count, ids.count, "ada id objek langit dalam yang duplikat")
     }
 
+    // MARK: - Bentuk hanya boleh diklaim saat engine yakin
+
+    /// Saat engine belum pasti, **tidak ada** bentuk yang boleh digambar.
+    ///
+    /// Bentuk adalah ciri pengenal: gugus bola berinti padat adalah penanda
+    /// yang sama meyakinkannya dengan cincin Saturnus. Aturan yang sudah
+    /// berlaku untuk planet — saat belum pasti, hanya warna yang tampil —
+    /// karena itu berlaku juga untuk objek langit dalam. Tanpa uji ini,
+    /// galaksi berpalung bisa digambar penuh di sebelah badge "Ragu".
+    func testUnconfirmedObjectClaimsNoShape() {
+        for object in DeepSkyCatalogue.objects {
+            XCTAssertNil(
+                DeepSkyCatalogue.drawableMorphology(forObjectID: object.id,
+                                                    isConfirmed: false),
+                "\(object.name) tetap menggambar bentuknya saat engine ragu — gambar jadi lebih yakin daripada badge di sebelahnya")
+        }
+    }
+
+    /// Saat engine yakin, bentuknya **kembali** — bukan hilang selamanya.
+    ///
+    /// Uji sebelumnya bisa lulus dengan cara yang salah: mengembalikan `nil`
+    /// untuk semua keadaan. Ini yang memastikan keyakinan benar-benar menjadi
+    /// penentu, bukan jawaban tetap.
+    func testConfirmedObjectDrawsItsOwnShape() {
+        for object in DeepSkyCatalogue.objects {
+            XCTAssertEqual(
+                DeepSkyCatalogue.drawableMorphology(forObjectID: object.id,
+                                                    isConfirmed: true),
+                DeepSkyCatalogue.morphology(forObjectID: object.id),
+                "\(object.name) kehilangan bentuknya padahal engine sudah yakin")
+        }
+    }
+
+    /// Objek tak dikenal tetap tanpa bentuk, yakin maupun tidak.
+    ///
+    /// Dua jalur menuju `nil` berbeda alasannya: yang satu "engine ragu",
+    /// yang lain "tidak tahu bentuknya". Keduanya harus tetap `nil`, dan
+    /// keyakinan tidak boleh mengubah yang kedua.
+    func testUnknownObjectStaysShapelessEitherWay() {
+        XCTAssertNil(DeepSkyCatalogue.drawableMorphology(forObjectID: "bukan-objek-nyata",
+                                                         isConfirmed: true))
+        XCTAssertNil(DeepSkyCatalogue.drawableMorphology(forObjectID: "bukan-objek-nyata",
+                                                         isConfirmed: false))
+    }
+
     // MARK: - Bentuk berbeda, bukan satu bentuk untuk semua
 
     /// `fuzziness` harus benar-benar membedakan objek.

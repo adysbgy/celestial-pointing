@@ -536,9 +536,10 @@ struct ObjectDetailView: View {
         // jauh") tidak membedakan satu pun dari yang lain. Tanpa ini, "Gugus
         // Ptolemy" dan "Gugus Hercules" terdengar sama persis padahal di
         // layar keduanya digambar berbeda. `spokenDeepSkyMorphology`
-        // mengembalikan `nil` untuk bukan objek langit dalam dan untuk id
-        // yang tidak ada di katalog, jadi tidak ada bentuk yang ditebak.
-        if let morphology = visual?.spokenDeepSkyMorphology {
+        // mengembalikan `nil` untuk bukan objek langit dalam, untuk id
+        // yang tidak ada di katalog, **dan saat engine ragu** — jadi tidak
+        // ada bentuk yang ditebak, dan pengumuman selalu cocok dengan gambar.
+        if let morphology = visual?.spokenDeepSkyMorphology(isConfirmed: isConfirmed) {
             parts.append(morphology)
         }
         parts.append(String(format: "magnitudo %.2f", object.magnitude))

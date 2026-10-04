@@ -945,7 +945,7 @@ final class CelestialVisualTests: XCTestCase {
     func testEveryCatalogueDeepSkyObjectHasASpokenMorphology() {
         for object in DeepSkyCatalogue.objects {
             let visual = CelestialVisual(object: object)
-            XCTAssertNotNil(visual.spokenDeepSkyMorphology,
+            XCTAssertNotNil(visual.spokenDeepSkyMorphology(isConfirmed: true),
                             "\(object.id) punya bentuk di layar tapi tidak terdengar")
         }
     }
@@ -961,8 +961,8 @@ final class CelestialVisualTests: XCTestCase {
         let hercules = DeepSkyCatalogue.objects.first { $0.id == "m13" }!
         XCTAssertEqual(ptolemy.kind, hercules.kind,
                        "prasyarat: keduanya jenis yang sama, jadi jenisnya tidak membedakan")
-        let a = CelestialVisual(object: ptolemy).spokenDeepSkyMorphology
-        let b = CelestialVisual(object: hercules).spokenDeepSkyMorphology
+        let a = CelestialVisual(object: ptolemy).spokenDeepSkyMorphology(isConfirmed: true)
+        let b = CelestialVisual(object: hercules).spokenDeepSkyMorphology(isConfirmed: true)
         XCTAssertNotNil(a); XCTAssertNotNil(b)
         XCTAssertNotEqual(a, b,
                           "gugus terbuka dan gugus bola harus terdengar berbeda")
@@ -982,7 +982,7 @@ final class CelestialVisualTests: XCTestCase {
                             objectID: "moon")
         ]
         for visual in notDeepSky {
-            XCTAssertNil(visual.spokenDeepSkyMorphology,
+            XCTAssertNil(visual.spokenDeepSkyMorphology(isConfirmed: true),
                          "\(visual.kind) tidak boleh mengucapkan bentuk objek langit dalam")
         }
     }
@@ -996,11 +996,28 @@ final class CelestialVisualTests: XCTestCase {
     func testUnknownDeepSkyIDDoesNotGuessASpokenMorphology() {
         let visual = CelestialVisual(kind: .deepSky, fuzziness: 0.6,
                                      objectID: "bukan-objek-nyata")
-        XCTAssertNil(visual.spokenDeepSkyMorphology,
+        XCTAssertNil(visual.spokenDeepSkyMorphology(isConfirmed: true),
                      "id tak dikenal tidak boleh menebak bentuk")
         // Dan objek langit dalam tanpa id sama sekali juga tidak menebak.
         let noID = CelestialVisual(kind: .deepSky, fuzziness: 0.6)
-        XCTAssertNil(noID.spokenDeepSkyMorphology)
+        XCTAssertNil(noID.spokenDeepSkyMorphology(isConfirmed: true))
+    }
+
+    /// **Saat engine ragu, bentuknya tidak diucapkan.**
+    ///
+    /// Ini pasangan suara dari aturan gambar: saat `isConfirmed == false`,
+    /// gambar memakai kabut netral (lihat `DeepSkyCatalogue.drawableMorphology`),
+    /// jadi pengumuman tidak boleh menyebut bentuk apa pun. Tanpa ini,
+    /// pengguna VoiceOver mendengar "galaksi" di sebelah badge "Ragu" — suara
+    /// yang lebih yakin daripada gambar yang menemani badge itu.
+    func testUnconfirmedObjectDoesNotSpeakAShape() {
+        for object in DeepSkyCatalogue.objects {
+            let visual = CelestialVisual(object: object)
+            XCTAssertNotNil(visual.spokenDeepSkyMorphology(isConfirmed: true),
+                            "prasyarat: saat yakin, bentuknya terdengar")
+            XCTAssertNil(visual.spokenDeepSkyMorphology(isConfirmed: false),
+                         "\(object.name) mengucapkan bentuknya saat engine ragu")
+        }
     }
 
     // MARK: - Geometri bintang: glow & spike tidak boleh terpotong tegak
