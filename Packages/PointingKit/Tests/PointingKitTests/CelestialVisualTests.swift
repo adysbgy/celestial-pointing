@@ -132,6 +132,140 @@ final class CelestialVisualTests: XCTestCase {
                         .phaseGeometry(waxing: true))
     }
 
+    // MARK: - Luas pita terang: kurva yang benar-benar digambar
+
+    /// Luas pita terang sebagai pecahan piringan, dihitung dengan rumus
+    /// shoelace pada kurva yang **sama** dengan yang dipakai view.
+    ///
+    /// Diulang di sini justru karena view tidak bisa diuji di Linux: tanpa
+    /// pengulangan ini, "kurva yang benar" hanya sebuah klaim. Jumlah segmen
+    /// = 72, sama seperti `drawMoon`, sehingga angka yang diuji adalah angka
+    /// yang benar-benar digambar -- bukan versi ideal yang tidak pernah
+    /// sampai ke layar.
+    private func litAreaFraction(phase: CelestialVisual.PhaseGeometry,
+                                 steps: Int = 72,
+                                 useAbsoluteOffset: Bool = false) -> Double {
+        var points: [(x: Double, y: Double)] = []
+        // Limb: kutub bawah ke kutub atas.
+        for step in 0...steps {
+            let h = -1 + 2 * Double(step) / Double(steps)
+            points.append((phase.limbX(atNormalizedHeight: h), h))
+        }
+        // Terminator: kutub atas ke kutub bawah.
+        let offset = useAbsoluteOffset ? abs(phase.terminatorOffset)
+                                       : phase.terminatorOffset
+        for step in stride(from: steps, through: 0, by: -1) {
+            let h = -1 + 2 * Double(step) / Double(steps)
+            points.append((phase.terminatorX(atNormalizedHeight: h, offset: offset), h))
+        }
+        var twiceArea = 0.0
+        for index in 0..<(points.count - 1) {
+            twiceArea += points[index].x * points[index + 1].y
+                - points[index + 1].x * points[index].y
+        }
+        return abs(twiceArea) / 2 / Double.pi
+    }
+
+    func testLitBandAreaMatchesTheIlluminatedFraction() {
+        // **Pita terang harus sebesar fraksi iluminasi, bukan komplemennya.**
+        //
+        // Ini pengunci cacat yang menutup seluruh uji sebelumnya.
+        // `terminatorOffset` sudah membawa tanda sisi terminator
+        // (`litSide * (1 - 2f)`), tetapi view mengambil nilai mutlaknya lalu
+        // mengalikan lagi dengan sisi. Tanda itu hilang, sehingga untuk
+        // f > 0.5 terminator terpaku kembali ke sisi yang menyala dan pita
+        // yang digambar menjadi komplemen dari yang benar: 85% menampilkan
+        // 15%, dan bulan purnama (f = 1) menampilkan piringan gelap --
+        // sementara angka "Fase Bulan 100%" tampil persis di atasnya.
+        //
+        // Geometri seperti ini lolos semua gerbang yang ada: `swiftc -parse`
+        // hanya memeriksa sintaks, `swift test` di Linux tidak punya `Canvas`,
+        // dan tidak ada teks di layar yang bisa dibaca pengguna untuk
+        // mengeceknya. Yang menutupnya hanya menghitung luas kurvanya.
+        for fraction in [0.05, 0.20, 0.25, 0.50, 0.75, 0.80, 0.85, 0.95] {
+            for waxing in [true, false] {
+                let phase = CelestialVisual(kind: .moon,
+                                            illuminationFraction: fraction)
+                    .phaseGeometry(waxing: waxing)
+                XCTAssertNotNil(phase)
+                guard let phase else { continue }
+                let drawn = litAreaFraction(phase: phase)
+                XCTAssertEqual(drawn, fraction, accuracy: 0.01,
+                               "pita terang digambar \(drawn * 100) persen untuk fraksi "
+                               + "\(fraction * 100) persen (\(waxing ? "membesar" : "mengecil"))")
+            }
+        }
+    }
+
+    func testFullMoonFillsTheDiscInsteadOfGoingBlack() {
+        // Kasus batas yang paling merusak, dipisah supaya pesannya menyebut
+        // gejalanya: purnama harus penuh, bukan kosong. Pada geometri lama
+        // pita purnama ternyata 0 persen -- piringan gelap, kontradiksi
+        // langsung dengan angka "Fase Bulan 100%" di layar Ketelitian.
+        let full = CelestialVisual(kind: .moon, illuminationFraction: 1.0)
+            .phaseGeometry(waxing: true)
+        XCTAssertNotNil(full)
+        guard let full else { return }
+        XCTAssertGreaterThan(litAreaFraction(phase: full), 0.98,
+                             "bulan purnama harus menampilkan piringan penuh, bukan gelap")
+    }
+
+    func testLegacyAbsoluteTerminatorDrewTheComplement() {
+        // Pengunci cacat lama, supaya "diperbaiki" tidak berarti angka yang
+        // sama ditulis ulang dengan nama lain: nilai mutlak dari
+        // `terminatorOffset` dikalikan lagi dengan sisi -- persis yang
+        // dilakukan view sebelum siklus ini.
+        let gibbous = CelestialVisual(kind: .moon, illuminationFraction: 0.85)
+            .phaseGeometry(waxing: true)
+        XCTAssertNotNil(gibbous)
+        guard let gibbous else { return }
+        let legacy = litAreaFraction(phase: gibbous, useAbsoluteOffset: true)
+        XCTAssertLessThan(legacy, 0.25,
+                          "geometri lama harus terbukti menampilkan komplemennya")
+        // Untuk bulan baru hasilnya justru benar -- itulah sebabnya cacat ini
+        // bertahan lama: separuh fase (sabit) tergambar akurat, jadi siapa
+        // pun yang memeriksa sabit tidak akan menemukan apa pun.
+        let crescent = CelestialVisual(kind: .moon, illuminationFraction: 0.25)
+            .phaseGeometry(waxing: true)
+        XCTAssertNotNil(crescent)
+        guard let crescent else { return }
+        XCTAssertEqual(litAreaFraction(phase: crescent, useAbsoluteOffset: true),
+                       0.25, accuracy: 0.01,
+                       "sabit benar pada geometri lama -- itu yang menutupi cacatnya")
+    }
+
+    func testBothCurvesStayOnTheDisc() {
+        // Kedua kurva harus berada di dalam piringan pada semua ketinggian:
+        // limb menyentuh tepi, dan terminator tidak boleh keluar karena yang
+        // keluar tidak terlihat (serta `Canvas` memotongnya tegak).
+        let geometry = CelestialVisual(kind: .moon, illuminationFraction: 0.85)
+            .phaseGeometry(waxing: true)
+        XCTAssertNotNil(geometry)
+        guard let geometry else { return }
+        for step in 0...40 {
+            let h = -1 + 2 * Double(step) / 40
+            XCTAssertLessThanOrEqual(abs(geometry.limbX(atNormalizedHeight: h)), 1.0 + 1e-12,
+                                     "limb keluar dari piringan pada h=\(h)")
+            XCTAssertLessThanOrEqual(abs(geometry.terminatorX(atNormalizedHeight: h)), 1.0 + 1e-12,
+                                     "terminator keluar dari piringan pada h=\(h)")
+        }
+    }
+
+    func testBothCurvesMeetAtThePoles() {
+        // Di kedua kutub kedua kurva harus bertemu; kalau tidak, pita terang
+        // tidak tertutup dan ada celah gelap di basis piringan.
+        let geometry = CelestialVisual(kind: .moon, illuminationFraction: 0.3)
+            .phaseGeometry(waxing: false)
+        XCTAssertNotNil(geometry)
+        guard let geometry else { return }
+        for h in [-1.0, 1.0] {
+            XCTAssertEqual(geometry.limbX(atNormalizedHeight: h),
+                           geometry.terminatorX(atNormalizedHeight: h),
+                           accuracy: 1e-12,
+                           "kedua kurva harus bertemu di kutub h=\(h)")
+        }
+    }
+
     func testGibbousSwitchesAtHalfPhase() {
         XCTAssertFalse(CelestialVisual(kind: .moon, illuminationFraction: 0.4)
                         .phaseGeometry(waxing: true)?.isGibbous ?? true)

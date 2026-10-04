@@ -316,34 +316,42 @@ struct CelestialVisualView: View {
             return
         }
 
-        // Pita terang = daerah antara terminator dan limb di sisi yang menyala.
-        // Bentuknya dibangun dari dua kurva, jadi digambar sebagai Path tertutup.
+        // Pita terang = daerah antara limb dan terminator, dari kutub atas ke
+        // kutub bawah. Bentuknya dibangun dari dua kurva, jadi digambar sebagai
+        // Path tertutup.
         //
-        // Sisi limb diambil dari `litSide`, **bukan** dari tanda
-        // `terminatorOffset`: untuk fase gibbous keduanya berlawanan. Ambil dari
-        // tanda terminator → sabit menghadap ke belakang tepat pada fase yang
-        // paling mudah dikenali pengguna, dan tidak ada teks di layar yang
-        // memberitahu mereka.
-        let side = CGFloat(phase.litSide)
-        let semiWidth = CGFloat(phase.terminatorSemiWidth)
+        // **Kedua kurva datang dari model (`PhaseGeometry`), bukan dari rumus
+        // di sini.** Bukan sekadar kerapian: rumus yang sama pernah hidup di
+        // view dan mengambil `abs(terminatorOffset)` lalu mengalikan lagi
+        // dengan sisi — membuang tanda yang sudah menentukan sisi terminator.
+        // Akibatnya untuk tiap fase di atas separuh (f > 0.5) pita yang
+        // digambar menjadi **komplemen** dari fraksi yang benar: bulan 85%
+        // tampil sebagai sabit 15%, dan bulan purnama tampil sebagai
+        // **piringan gelap** — sementara angka "Fase Bulan 100%" tertulis
+        // persis di atasnya pada layar Ketelitian.
+        //
+        // Cacat itu lolos karena separuh fase lainnya memang benar (sabit
+        // 25% tergambar 25%), dan karena tidak ada teks di layar yang bisa
+        // dibaca pengguna untuk mengeceknya. Sekarang luas kurvanya diuji di
+        // Linux (`testLitBandAreaMatchesTheIlluminatedFraction`), sehingga
+        // view tidak lagi bisa menyimpang diam-diam.
         let steps = 72
         var lit = Path()
-        // Limb: busur dari kutub atas ke kutub bawah di sisi yang terang.
+        // Limb: kutub atas ke kutub bawah di sisi yang menyala.
         for step in 0...steps {
             let t = Double(step) / Double(steps)
-            let angle = -.pi / 2 + t * .pi
-            let point = CGPoint(x: center.x + CGFloat(cos(angle)) * radius * side,
-                                y: center.y + CGFloat(sin(angle)) * radius)
+            let normalizedY = -1 + 2 * t
+            let point = CGPoint(x: center.x + CGFloat(phase.limbX(atNormalizedHeight: normalizedY)) * radius,
+                                y: center.y + CGFloat(normalizedY) * radius)
             step == 0 ? lit.move(to: point) : lit.addLine(to: point)
         }
-        // Kembali lewat terminator (kutub bawah → kutub atas):
-        // x = offset · R · √(1 − (y/R)²).
+        // Kembali lewat terminator (kutub bawah ke kutub atas), memakai
+        // **offset bertanda** dari model.
         for step in stride(from: steps, through: 0, by: -1) {
             let t = Double(step) / Double(steps)
-            let y = center.y - radius + 2 * radius * CGFloat(t)
-            let dy = (y - center.y) / radius
-            let x = side * semiWidth * radius * CGFloat(sqrt(max(0, 1 - dy * dy)))
-            lit.addLine(to: CGPoint(x: center.x + x, y: y))
+            let normalizedY = -1 + 2 * t
+            let x = CGFloat(phase.terminatorX(atNormalizedHeight: normalizedY)) * radius
+            lit.addLine(to: CGPoint(x: center.x + x, y: center.y + CGFloat(normalizedY) * radius))
         }
         lit.closeSubpath()
 

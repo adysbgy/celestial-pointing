@@ -177,14 +177,62 @@ public struct CelestialVisual: Equatable, Sendable {
         /// Apakah fase-nya gibbous (lebih dari setengah).
         public var isGibbous: Bool
 
-        /// Separuh sumbu mendatar elips terminator (selalu ≥ 0).
-        public var terminatorSemiWidth: Double { abs(terminatorOffset) }
-
         /// Lebar pita yang menyala di ekuator, dalam satuan radius (0…2).
         ///
         /// Berguna untuk uji dan untuk memastikan sabit tidak pernah melebar
         /// melebihi piringan: untuk bulan baru nilainya nol.
+        ///
+        /// **Peringatan: nilai ini bukan ukuran yang benar-benar digambar.**
+        /// Ia hanya selisih antara limb dan terminator di ekuator, dan ia
+        /// **tetap positif pada fase gibbous** — padahal kurvanya sudah
+        /// terbalik ke sisi gelap. Lebar yang benar harus dihitung dari luas
+        /// kurva (lihat `testLitBandAreaMatchesTheIlluminatedFraction`).
         public var litBandWidth: Double { abs(litSide - terminatorOffset) }
+
+        // MARK: Kurva batas (satuan: radius piringan = 1.0)
+
+        /// Titik limb pada ketinggian tertentu, dalam satuan radius.
+        ///
+        /// - Parameter h: tinggi ternormalisasi, −1 (kutub bawah) … +1
+        ///   (kutub atas).
+        public func limbX(atNormalizedHeight h: Double) -> Double {
+            return litSide * sqrt(max(0, 1 - h * h))
+        }
+
+        /// Titik terminator pada ketinggian tertentu, dalam satuan radius.
+        ///
+        /// **Kenapa tanda `terminatorOffset` dipakai apa adanya di sini.**
+        /// Nilainya sudah `litSide · (1 − 2f)`, jadi **tandanya sudah
+        /// menentukan sisi** terminator: positif untuk sabit (terminator di
+        /// sisi yang menyala, menyisakan pita tipis), negatif untuk gibbous
+        /// (sudah menyeberang ke sisi gelap, menyisakan pita lebar).
+        ///
+        /// Mengambil nilai mutlaknya lalu mengalikan lagi dengan `litSide`
+        /// membuang tanda itu — dan hasilnya bukan sekadar beda rasa, tapi
+        /// komplemen: untuk f > 0.5 terminator terpaku kembali ke sisi yang
+        /// menyala, sehingga pita yang digambar sebesar `1 − f`. Geometri
+        /// itu menampilkan bulan 85% sebagai sabit 15%, dan bulan purnama
+        /// sebagai piringan gelap, sementara angka "Fase Bulan 100%" tampil
+        /// persis di atasnya.
+        ///
+        /// Karena itu rumus kurvanya **tidak boleh tinggal di view**: view
+        /// tidak bisa diuji di Linux, dan bug seperti ini lolos `swiftc
+        /// -parse`, lolos seluruh uji yang hanya memeriksa `litSide` dan
+        /// lebar pita, serta tidak punya satu pun teks layar yang bisa dibaca
+        /// pengguna untuk memeriksanya.
+        ///
+        /// - Parameters:
+        ///   - h: tinggi ternormalisasi, −1 … +1.
+        ///   - offset: offset terminator. Sengaja opsional (bukan nilai
+        ///     bawaan yang membaca properti instans — Swift melarang
+        ///     instance member sebagai nilai default parameter), supaya uji
+        ///     bisa mengunci cacat lama dengan memanggil
+        ///     `abs(terminatorOffset)` secara eksplisit.
+        public func terminatorX(atNormalizedHeight h: Double,
+                                offset explicitOffset: Double? = nil) -> Double {
+            let offset = explicitOffset ?? terminatorOffset
+            return offset * sqrt(max(0, 1 - h * h))
+        }
     }
 
     /// Hitung geometri fase dari fraksi iluminasi.
