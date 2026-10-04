@@ -1,5 +1,112 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — laporan alat ukur lahir di dalam paket, tak terjangkau dua gerbang sekaligus)
+
+### Premis siklus ini: cari teks yang lahir di luar jangkauan kedua gerbang, bukan yang salah bentuk
+
+Aturan 4 menyapu literal `Text("…")` di `Apps/`. Aturan 6 memeriksa paritas
+`LocalizedText.allKeys` dengan katalog. Keduanya hijau. Yang belum pernah
+diperiksa adalah teks yang **tidak lahir di `Apps/` dan tidak melewati
+`LocalizedText`** — yaitu kalimat yang lahir di dalam `Packages/PointingKit`
+(`ExperimentHarness.verdict`, `ConfidenceTrace.diagnosis`) atau dirakit lebih
+dulu ke sebuah `String` di dalam view (`statusMessage = "…\(…)…"`). Bentuk itu
+tidak punya argumen langsung untuk disapu Aturan 4, dan tidak punya kunci untuk
+diperiksa Aturan 6.
+
+Yang paling penting justru yang paling dirugikan: **Experiment 1 adalah alat
+ukur repo ini sendiri**, dan putusannya — "GAGAL: N false lock", "Belum bisa
+disimpulkan", "Ini bukan bukti aman, hanya belum ada bukti sebaliknya" —
+tampil dalam Bahasa Indonesia di semua bahasa, dengan setiap gerbang hijau.
+Alat ukur yang tidak bisa diterjemahkan berarti penguji berbahasa Inggris
+membaca putusan keselamatan dalam bahasa yang tidak ia pahami.
+
+### Kenapa bentuknya licin
+
+- **Aturan 4 buta karena teksnya dirakit lebih dulu.** `statusMessage =
+  "Tercatat: galat \(error), \(verdict). Jawaban engine: \(name)."` — yang
+  tampil adalah nilai sebuah `String`, bukan argumen langsung. Diverifikasi:
+  mengembalikan bentuk lama itu ke view membuat Aturan 4 **tetap hijau**.
+- **Aturan 6 buta karena teksnya tidak lewat `LocalizedText`.** `verdict` dan
+  `diagnosis` memakai literal `String(format: "%.0f%% jawaban yakin…")` di
+  dalam paket, tempat tidak ada daftar kunci untuk diperiksa.
+- **Tidak ada yang bisa dilihat.** Semua kalimatnya benar, dalam Bahasa
+  Indonesia, dan tampil apa adanya. Hanya satu bahasa yang hilang, tanpa
+  penanda.
+
+### Yang diubah, dan kenapa tempatnya di paket
+
+- **`ExperimentText`** (PointingKit, teruji Linux) — pesan status recorder,
+  kata putusan (bentuk pendek **dan** bentuk kalimat untuk suara), baris
+  detail, ringkasan, diagnosis, usulan ambang, dan kalimat lokasi. Satu
+  sumber untuk layar dan suara, seperti `CalibrationText`, `SensorStatusText`,
+  dan `ObjectSpeech` sebelumnya.
+- **`ExperimentHarness.verdict` dan `ConfidenceTrace.diagnosis` membaca
+  `ExperimentText`** — bukan lagi literal di dalam paket. Keduanya adalah
+  tempat kalimat itu lahir, jadi keduanya harus jadi tempat ia bisa
+  diterjemahkan.
+- **38 kunci katalog `experiment.*`** dengan terjemahan Inggris; `allKeys`
+  105 → 143 (naik tepat 38), katalog 236 → **274** kunci.
+- **Angka masuk lewat `String(format:)`** (`%lld` untuk jumlah bulat: `%d` di
+  Linux Swift membaca 32-bit dan memotong `Int` 64-bit) supaya bahasa lain
+  bisa menempatkan angka di urutan berbeda.
+
+### Dua kesalahan yang dibuat di siklus ini, dan bagaimana ketahuan
+
+Ditulis apa adanya:
+
+1. **Dua aksesor dipakai sebelum kuncinya ada.** `ExperimentText` sempat
+   memanggil `locationFallbackWarning`/`locationComputed`, tetapi
+   `experimentLocationFallback`/`experimentLocationComputed` belum pernah
+   dideklarasikan — `swift build` menolak dengan
+   `type 'LocalizedText' has no member`. Ketahuan **dari kompiler, bukan dari
+   membaca ulang**, dan itu tepat: dua kalimat lokasi itu adalah sisa langkah
+   yang belum selesai.
+2. **Kalimat lokasi masih dirakit di view.** `Text(recorder.currentLocation
+   .isFallback ? "Lokasi belum didapat — … \(label), …" : "Dihitung untuk
+   \(label).")` — bentuk yang sama persis dengan cacat yang sedang ditutup,
+   di berkas yang sama. Ikut dipindah ke paket; tanpa itu, separuh perbaikan
+   hanya memindahkan lubangnya.
+
+### Bukti merah: dua arah, dan keduanya benar-benar dijalankan
+
+| Mutasi | Gerbang yang menangkap | Hasil |
+|---|---|---|
+| bentuk lama dikembalikan (literal dirakit di view) | Aturan 4 | **hijau** — membuktikan bentuk itu memang tak terjangkau |
+| dua kunci `experiment.location.*` dihapus dari katalog | Aturan 6 | **MERAH**: menunjuk kedua kunci yang hilang |
+
+Baris pertama sengaja **bukan** merah: itu bukti bahwa cacat lama memang
+tak terlihat oleh Aturan 4. Baris kedua membuktikan perbaikan barunya
+**terjaga** — kunci yang hilang langsung merah.
+
+Dua uji baru (`ExperimentTextTests`): peringatan lokasi bawaan menyebut
+labelnya dan **berbeda** dari keterangan biasa, dan keterangan biasa menyebut
+labelnya. Uji terjemahan Inggris yang sudah ada diperluas ke kedua kalimat itu,
+sehingga ia membuktikan kata yang dipasang katalog benar-benar menggantikan
+bawaan.
+
+### Batas yang jujur
+
+- **Terjemahan `en` tidak bisa diverifikasi di Linux.** Yang terbukti: setiap
+  kunci punya entri + padanan `en`, dan diff katalognya aditif. Yang tidak:
+  apakah `Bundle` benar-benar membacanya di perangkat.
+- **Bentuk kalimat yang dirakit dari `parts.joined(separator:)` tetap milik
+  tiap layar.** Yang dipindah adalah bahannya (potongan kalimat), bukan
+  susunannya — alasan yang sama dengan `ObjectSpeech`: kedua panel memang
+  disusun berbeda, dan menyamakan susunannya akan memaksa satu permukaan
+  kehilangan bentuk yang benar untuknya.
+- **`ExperimentText` belum punya pembaca VoiceOver yang diuji di perangkat.**
+  Kalimatnya dipakai di label yang sudah ada; bahwa VoiceOver mengucapkannya
+  dengan jeda yang enak adalah wilayah perangkat, bukan Linux.
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 447 PointingKit**, 0 gagal.
+  Engine tidak disentuh.
+- `swift-ui-lint.sh` → **10 aturan hijau**; Aturan 4 dan Aturan 6 keduanya
+  hijau setelah perbaikan, dan dibuktikan bisa merah lewat dua mutasi di atas.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Sapuan aksara non-Latin: 0.
+
 ## Progres terakhir (4 Okt 2026 — seluruh alur kalibrasi tak pernah bisa diterjemahkan)
 
 ### Kalimat yang lahir di dalam paket, bukan di view

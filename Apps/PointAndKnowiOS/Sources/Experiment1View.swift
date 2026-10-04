@@ -82,7 +82,8 @@ struct Experiment1View: View {
                     set: { recorder.selectedTargetID = $0 })) {
                     Text("Belum dipilih").tag(String?.none)
                     ForEach(targets) { target in
-                        Text(String(format: "%@ · %.0f°", target.name, target.direction.altitudeDeg))
+                        Text(ExperimentText.targetOption(name: target.name,
+                                                         altitudeDeg: target.direction.altitudeDeg))
                             .tag(String?.some(target.id))
                     }
                 }
@@ -94,9 +95,14 @@ struct Experiment1View: View {
             // Kalau lokasinya masih yang bawaan, seluruh daftar ini dihitung
             // untuk tempat lain — dan tinggi objeknya salah. Itu harus terlihat,
             // bukan tersembunyi di balik daftar yang tampak normal.
+            // Kalimatnya dibaca dari paket, bukan dirakit di sini: yang dirakit
+            // lebih dulu ke sebuah `String` tidak punya kunci katalog, jadi ia
+            // tidak bisa diterjemahkan dan tidak terlihat gerbang mana pun.
             Text(recorder.currentLocation.isFallback
-                 ? "Lokasi belum didapat — tinggi di bawah dihitung untuk \(recorder.currentLocation.label), bukan tempat Anda."
-                 : "Dihitung untuk \(recorder.currentLocation.label).")
+                 ? ExperimentText.locationFallbackWarning(
+                     label: recorder.currentLocation.label)
+                 : ExperimentText.locationComputed(
+                     label: recorder.currentLocation.label))
                 .foregroundStyle(recorder.currentLocation.isFallback
                                  ? PointingTone.warning.color
                                  : Color.nightAwareSecondary)
@@ -168,7 +174,7 @@ struct Experiment1View: View {
 
                 if let policy = recorder.suggestedPolicy() {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Usulan ambang keyakinan: σ \(String(format: "%.1f°", policy.pointingSigmaDeg))")
+                        Text(ExperimentText.suggestedThreshold(sigmaDeg: policy.pointingSigmaDeg))
                             .font(.footnote)
                         Button("Kirim ambang ke jam") {
                             link.send(policy: policy)
@@ -249,12 +255,13 @@ struct Experiment1View: View {
         var parts: [String] = []
         if let analysis = trial.analysis {
             if analysis.isFalseLock {
-                parts.append("False lock: engine yakin tapi salah.")
+                parts.append(ExperimentText.verdictFalseLockSentence)
             } else {
-                parts.append(analysis.isCorrect ? "Benar." : "Salah.")
+                parts.append(analysis.isCorrect ? ExperimentText.verdictCorrectSentence
+                                                : ExperimentText.verdictWrongSentence)
             }
         } else {
-            parts.append("Tidak dianalisis.")
+            parts.append(ExperimentText.verdictNotAnalyzedSentence)
         }
         parts.append(trialTitle(trial) + ".")
         parts.append(spokenDetailLine(trial))
@@ -271,9 +278,10 @@ struct Experiment1View: View {
         if let error = trial.analysis?.rawPointingErrorDeg {
             parts.append(RowSpeech.spokenError(error))
         }
-        parts.append("jawab \(trial.trial.intent.best?.name ?? "—")")
-        parts.append("keyakinan \(trial.trial.intent.level.displayName)")
-        parts.append("keadaan \(trial.stateAtCapture.shortLabel)")
+        parts.append(ExperimentText.detailAnswer(
+            trial.trial.intent.best?.name ?? ExperimentText.detailNoAnswer))
+        parts.append(ExperimentText.detailConfidence(trial.trial.intent.level.displayName))
+        parts.append(ExperimentText.detailState(trial.stateAtCapture.shortLabel))
         if let rate = trial.angularRateAtCaptureDegPerSec {
             parts.append(RowSpeech.spokenRate(rate))
         }
@@ -301,13 +309,14 @@ struct Experiment1View: View {
     private func detailLine(_ trial: AnalyzedTrial) -> String {
         var parts: [String] = []
         if let error = trial.analysis?.rawPointingErrorDeg {
-            parts.append(String(format: "galat %.1f°", error))
+            parts.append(ExperimentText.detailError(degrees: error))
         }
-        parts.append("jawab \(trial.trial.intent.best?.name ?? "—")")
-        parts.append("keyakinan \(trial.trial.intent.level.displayName)")
-        parts.append("keadaan \(trial.stateAtCapture.shortLabel)")
+        parts.append(ExperimentText.detailAnswer(
+            trial.trial.intent.best?.name ?? ExperimentText.detailNoAnswer))
+        parts.append(ExperimentText.detailConfidence(trial.trial.intent.level.displayName))
+        parts.append(ExperimentText.detailState(trial.stateAtCapture.shortLabel))
         if let rate = trial.angularRateAtCaptureDegPerSec {
-            parts.append(String(format: "%.0f°/dtk", rate))
+            parts.append(ExperimentText.detailRate(degPerSec: rate))
         }
         return parts.joined(separator: " · ")
     }

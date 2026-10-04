@@ -267,7 +267,7 @@ public final class ExperimentHarness {
     /// sendiri yang jujur menyebut sampelnya belum cukup.
     public var verdict: String {
         let analyzable = trials.compactMap(\.analysis)
-        guard !analyzable.isEmpty else { return "Belum ada percobaan yang bisa dianalisis." }
+        guard !analyzable.isEmpty else { return ExperimentText.summaryNoAnalyzable }
         let summary = ObservationLog.summarize(analyzable)
 
         let accuracy = summary.accuracy.map { String(format: "%.0f%%", $0 * 100) } ?? "—"
@@ -276,17 +276,23 @@ public final class ExperimentHarness {
 
         switch summary.safetyVerdict {
         case .failed:
-            return "GAGAL: \(summary.falseLockCount) false lock — engine yakin tapi salah. "
-                + "Ambang keyakinan harus diperketat. Akurasi \(accuracy), galat median \(median), P90 \(p90)."
+            return ExperimentText.summaryFailed(falseLockCount: summary.falseLockCount,
+                                                accuracy: accuracy,
+                                                median: median,
+                                                p90: p90)
         case .insufficientEvidence:
             // Jangan ucapkan "lulus": yang diketahui cuma "belum ketemu".
-            return "Belum bisa disimpulkan: 0 false lock dari \(summary.trialCount) percobaan — "
-                + "sampel belum cukup (butuh minimal \(ExperimentSummary.minimumTrialsForSafetyClaim)). "
-                + "Akurasi \(accuracy), galat tunjuk median \(median), P90 \(p90). "
-                + "Ini bukan bukti aman, hanya belum ada bukti sebaliknya."
+            return ExperimentText.summaryInsufficient(
+                trialCount: summary.trialCount,
+                minimum: ExperimentSummary.minimumTrialsForSafetyClaim,
+                accuracy: accuracy,
+                median: median,
+                p90: p90)
         case .passed:
-            return "Lulus syarat keselamatan (0 false lock dari \(summary.trialCount) percobaan). "
-                + "Akurasi \(accuracy), galat tunjuk median \(median), P90 \(p90)."
+            return ExperimentText.summaryPassed(trialCount: summary.trialCount,
+                                                accuracy: accuracy,
+                                                median: median,
+                                                p90: p90)
         }
     }
 }

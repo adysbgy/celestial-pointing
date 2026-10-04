@@ -307,5 +307,34 @@ public extension LocalizedText {
         .calibrationDisplayOffset, .calibrationDisplaySpread,
         .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,
         .calibrationPhaseReadyLabel, .calibrationPhaseAppliedLabel,
+        // Experiment 1. Masuk daftar karena inilah satu-satunya jalur pesan
+        // status recorder, kata putusan, baris detail, ringkasan alat ukur,
+        // dan diagnosis sampai ke pengguna — dan karena versi lamanya lahir
+        // sebagai literal di dalam `Packages/PointingKit`
+        // (`ExperimentHarness.verdict`, `ConfidenceTrace.diagnosis`) atau
+        // dirakit lebih dulu ke sebuah `String` di dalam view
+        // (`statusMessage = "…\(…)…"`), tempat tidak ada argumen langsung
+        // untuk disapu Aturan 4 dan tidak ada kunci untuk diperiksa Aturan 6.
+        // Lihat `ExperimentText.swift`.
+        .experimentStatusInitial, .experimentStatusNoTarget,
+        .experimentStatusSensorOff, .experimentStatusNoPointing,
+        .experimentStatusTargetUncomputable, .experimentStatusRecorded,
+        .experimentStatusRemoved, .experimentStatusNothingToRemove,
+        .experimentStatusReset,
+        .experimentVerdictFalseLock, .experimentVerdictCorrect,
+        .experimentVerdictWrong, .experimentVerdictNotAnalyzed,
+        .experimentVerdictFalseLockSentence, .experimentVerdictCorrectSentence,
+        .experimentVerdictWrongSentence, .experimentVerdictNotAnalyzedSentence,
+        .experimentDetailNoAnswer, .experimentDetailNoError,
+        .experimentDetailAnswer, .experimentDetailConfidence,
+        .experimentDetailState, .experimentDetailError, .experimentDetailRate,
+        .experimentTargetOption,
+        .experimentSummaryNoAnalyzable, .experimentSummaryFailed,
+        .experimentSummaryInsufficient, .experimentSummaryPassed,
+        .experimentDiagnosisNoSamples, .experimentDiagnosisNoAnswers,
+        .experimentDiagnosisTooFar, .experimentDiagnosisAmbiguous,
+        .experimentDiagnosisNoMeasurableCause, .experimentDiagnosisRatio,
+        .experimentSuggestedThreshold,
+        .experimentLocationFallback, .experimentLocationComputed,
     ]
 }

@@ -37,7 +37,7 @@ public final class ExperimentRecorder: ObservableObject {
     /// Catatan bebas untuk percobaan berikutnya (kondisi langit, dll).
     @Published public var note: String = ""
     /// Pesan terakhir untuk penguji.
-    @Published public private(set) var statusMessage = "Pilih target, arahkan, lalu rekam."
+    @Published public private(set) var statusMessage = ExperimentText.statusInitial
 
     public init(engine: PointingEngine) {
         self.engine = engine
@@ -74,7 +74,7 @@ public final class ExperimentRecorder: ObservableObject {
     @discardableResult
     public func record(at date: Date = Date()) -> AnalyzedTrial? {
         guard let targetID = selectedTargetID else {
-            statusMessage = "Pilih target dulu — tanpa kebenaran, rekaman tidak bisa dianalisis."
+            statusMessage = ExperimentText.statusNoTarget
             return nil
         }
         // Sensor harus benar-benar hidup. Saat sensor mati, `rawPointing` yang
@@ -85,11 +85,11 @@ public final class ExperimentRecorder: ObservableObject {
         // pengukuran yang tidak pernah terjadi, di dalam dataset yang justru
         // ada untuk menguji akurasi. Alat ukur tidak boleh mengarang data.
         guard engine.snapshot.hasSensor else {
-            statusMessage = "Sensor gerak tidak aktif — arah tunjuk yang tersisa bukan pengukuran sekarang. Tidak ada yang direkam."
+            statusMessage = ExperimentText.statusSensorOff
             return nil
         }
         guard let raw = engine.snapshot.rawPointing else {
-            statusMessage = "Belum ada arah tunjuk dari sensor — tidak ada yang direkam."
+            statusMessage = ExperimentText.statusNoPointing
             return nil
         }
 
@@ -109,30 +109,35 @@ public final class ExperimentRecorder: ObservableObject {
                                          calibration: engine.controller.calibration,
                                          timestamp: date,
                                          note: note.isEmpty ? nil : note) else {
-            statusMessage = "Arah target \(targetID) tidak bisa dihitung — percobaan tidak disimpan."
+            statusMessage = ExperimentText.statusTargetUncomputable(targetID: targetID)
             return nil
         }
 
-        let error = trial.analysis.map { String(format: "%.1f°", $0.rawPointingErrorDeg) } ?? "—"
-        let verdict = trial.analysis?.isFalseLock == true ? "FALSE LOCK" :
-            (trial.analysis?.isCorrect == true ? "benar" : "salah")
-        statusMessage = "Tercatat: galat \(error), \(verdict). "
-            + "Jawaban engine: \(intent.best?.name ?? "belum ada")."
+        let error = trial.analysis.map { ExperimentText.detailError(degrees: $0.rawPointingErrorDeg) }
+            ?? ExperimentText.detailNoError
+        let verdict = trial.analysis?.isFalseLock == true ? ExperimentText.verdictFalseLock
+            : (trial.analysis?.isCorrect == true ? ExperimentText.verdictCorrect
+                                                 : ExperimentText.verdictWrong)
+        statusMessage = ExperimentText.statusRecorded(
+            error: error,
+            verdict: verdict,
+            answer: intent.best?.name ?? ExperimentText.detailNoAnswer)
         return trial
     }
 
     /// Buang percobaan terakhir (mis. salah pilih target).
     public func removeLast() {
         guard let removed = harness.removeLast() else {
-            statusMessage = "Tidak ada percobaan untuk dibuang."
+            statusMessage = ExperimentText.statusNothingToRemove
             return
         }
-        statusMessage = "Dibuang: \(removed.trial.groundTruthObjectID ?? "—")."
+        statusMessage = ExperimentText.statusRemoved(
+            objectID: removed.trial.groundTruthObjectID ?? ExperimentText.detailNoError)
     }
 
     public func reset() {
         harness.reset()
-        statusMessage = "Dataset dikosongkan."
+        statusMessage = ExperimentText.statusReset
     }
 
     /// Dataset lengkap dengan konteks rekaman.

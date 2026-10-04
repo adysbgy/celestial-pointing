@@ -224,28 +224,26 @@ public final class ConfidenceTrace {
 
     /// Kalimat diagnostik untuk ditampilkan — apa yang harus diperbaiki.
     public func diagnosis(policy: ConfidencePolicy = ConfidencePolicy()) -> String {
-        guard !samples.isEmpty else { return "Belum ada sampel." }
+        guard !samples.isEmpty else { return ExperimentText.diagnosisNoSamples }
         let counts = stateCounts
         let locks = counts[.lock] ?? 0
         let uncertain = counts[.uncertain] ?? 0
         let reasons = uncertainReasonCounts(policy: policy)
 
         if locks == 0 && uncertain == 0 {
-            return "Belum ada jawaban sama sekali. Arahkan ke langit dan tahan sampai pergelangan diam."
+            return ExperimentText.diagnosisNoAnswers
         }
         if locks == 0 {
             let dominant = reasons.max { $0.value < $1.value }?.key ?? .none
             switch dominant {
             case .tooFar:
-                return "Semua jawaban ragu karena kandidat terlalu jauh dari arah tunjuk. Perbaiki kalibrasi dulu."
+                return ExperimentText.diagnosisTooFar
             case .ambiguous:
-                return "Semua jawaban ragu karena ada dua kandidat berdekatan. Ini keterbatasan akurasi, bukan kesalahan kalibrasi."
+                return ExperimentText.diagnosisAmbiguous
             case .none:
-                return "Jawaban ragu tanpa sebab terukur — periksa apakah arah tunjuk masuk akal."
+                return ExperimentText.diagnosisNoMeasurableCause
             }
         }
-        let ratio = Double(locks) / Double(locks + uncertain)
-        return String(format: "%.0f%% jawaban yakin (%d yakin, %d ragu).",
-                      ratio * 100, locks, uncertain)
+        return ExperimentText.diagnosisRatio(locks: locks, uncertain: uncertain)
     }
 }
