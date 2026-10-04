@@ -1,5 +1,61 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — iPhone tidak pernah mengumumkan apa pun ke VoiceOver)
+
+### Jam berbunyi, iPhone diam, dan tidak ada layar yang tampak salah
+
+App jam mengumumkan perubahan keadaan ke VoiceOver sejak lama
+(`PointingView.onChange(of: engine.snapshot.state)`). App iPhone **tidak
+pernah**: `grep -rn AccessibilityNotification Apps/` mengembalikan dua hasil,
+keduanya di app jam, nol di `Apps/PointAndKnowiOS/`. Janji produknya sama di
+kedua perangkat — "keadaan yang berubah harus terdengar, bukan hanya terlihat"
+— tetapi hanya satu yang memenuhinya.
+
+Yang membuat cacat ini bertahan adalah bentuknya: jam berbunyi, iPhone diam,
+dan **keduanya tampak benar sendiri-sendiri**. Tidak ada layar yang salah, tidak
+ada uji yang merah. Ini kelas yang sudah berulang di repo ini (complication yang
+membeku, `.deepSky` yang tak tersambung, `rejected` yang nol konsumen): satu
+permukaan diperbaiki, permukaan kembarnya tidak.
+
+### Kenapa kalimatnya dipindah, bukan disalin
+
+Jalan termurah adalah menyalin `announcementText(for:)` dari `PointingView` ke
+`DiagnosticsView`. Itu akan menghasilkan **dua versi kebenaran** untuk cuplikan
+yang sama — persis alasan `PointingState.shortLabel` dan
+`PointingSnapshot.guidanceText` dulu dipindahkan ke paket. Dan versi lama itu
+sendiri cacat: ia menyusun kalimatnya dari literal di dalam view
+(`"Terkunci pada \(name)."`), jadi `Localizable.xcstrings` tidak bisa
+menjangkaunya. Aturan 4 menyapu literal `Apps/`, tetapi
+`Apps/PointAndKnowWatch/Sources/` bukan satu-satunya tempat teks bisa
+bersembunyi — teks yang di-*switch* di paket juga tidak terlihat, dan pengguna
+Bahasa Inggris mendengar kalimat Indonesia tanpa satu pun gerbang merah.
+
+- **`StateAnnouncement.text(for:)`** (PointingKit, teruji di Linux) — satu
+  fungsi melayani jam **dan** iPhone, jadi keduanya tidak bisa menyebut hal
+  berbeda untuk cuplikan yang sama. Nama objek dibaca dari
+  `snapshot.answeredObject`, predikat yang sama dengan `LockArrival`, pesan ke
+  iPhone, dan riwayat keyakinan — bukan `intent`, yang sengaja dipertahankan
+  saat keadaan turun kembali ke `.pointing` dan akan mengumumkan objek sisa
+  persis seperti hasil pengukuran sekarang.
+- **Lima kunci katalog baru** (`pointing.announce.*`) dengan terjemahan
+  Inggris, memakai `%@` — bukan interpolasi Swift — karena bagian yang
+  disisipkan sudah diterjemahkan sendiri, jadi terjemahan Inggrisnya harus bisa
+  menempatkannya sesuai tata bahasanya.
+- **Yang tidak berubah, dan itu penting:** yang memutuskan **kapan**
+  mengumumkan tetap pemanggil. `snapshot` ditulis ulang 20×/detik; pengumuman
+  tetap dijaga `announcedState`, sehingga VoiceOver tidak mengucapkan
+  "Terkunci" berpuluh kali per menit. iPhone memakai gerbang yang sama.
+
+Sepuluh uji baru (`StateAnnouncementTests`), termasuk yang memastikan `intent`
+yang dipertahankan **tidak** membocorkan nama objek, dan yang memasang
+terjemahan Inggris untuk membuktikan posisi sisipan benar-benar dikendalikan
+katalog.
+
+Gerbang: `swift-test.sh` **166 + 410 hijau** (README diperbarui lewat Aturan 10),
+ui-lint hijau (Aturan 6 menangkap paritas katalog; Aturan 10 menangkap angka
+README yang tertinggal di 401). Batas jujur: apakah VoiceOver **benar-benar**
+mengucapkannya adalah wilayah perangkat dan CI macOS, bukan Linux.
+
 ## Progres terakhir (4 Okt 2026 — putusan GoTo tidak lagi membeku selama tunjukan ditahan)
 
 ### Putusan keselamatan yang membeku atas langit yang sudah bergerak

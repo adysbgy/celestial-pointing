@@ -46,6 +46,16 @@ struct RootView: View {
     @AppStorage(NightModeStorage.key) private var nightMode = false
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
     @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+    /// Keadaan terakhir yang sudah diumumkan ke VoiceOver.
+    ///
+    /// **Kenapa disimpan.** `engine.snapshot` ditulis ulang 20 kali per detik.
+    /// Mengumumkan pada setiap perubahan cuplikan berarti VoiceOver mengucapkan
+    /// "Mencari" berpuluh kali per menit dan menutupi semua hal lain yang ingin
+    /// dibaca pengguna — jadi pengumuman hanya terjadi saat **keadaannya**
+    /// benar-benar berganti. Ini pola yang sama dengan app jam, dan kalimatnya
+    /// pun satu sumber (`StateAnnouncement`), supaya kedua app tidak bisa
+    /// mengucapkan dua hal berbeda untuk cuplikan yang sama.
+    @State private var announcedState: PointingState?
     /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
     /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
     private let audioCue = AudioCueEngine()
@@ -76,6 +86,26 @@ struct RootView: View {
             case .inactive, .background: stop()
             @unknown default: stop()
             }
+        }
+        // Umumkan **perubahan** keadaan, bukan tiap sampel 20 Hz — sama
+        // seperti app jam.
+        //
+        // **Kenapa ini ada, padahal iPhone bukan alat penunjuk.** Justru
+        // karena itu: iPhone adalah tempat pengguna memeriksa "apakah ini
+        // benar?", dan pengguna VoiceOver yang memeriksa hasil pengukuran di
+        // sini dulu tidak mendapat kabar apa pun saat engine berpindah dari
+        // "Mencari" ke "Terkunci". Janji produknya sama di kedua perangkat —
+        // keadaan yang berubah harus terdengar — tetapi hanya app jam yang
+        // memenuhinya, dan tidak ada layar yang tampak salah.
+        //
+        // Keadaan awal (`nil`) sengaja tidak diumumkan: membuka app bukan
+        // peristiwa yang perlu dikabarkan, dan mengumumkan "Siap" pada
+        // peluncuran hanya menunda pembacaan isi layar.
+        .onChange(of: engine.snapshot.state) { _, newState in
+            guard announcedState != newState else { return }
+            announcedState = newState
+            AccessibilityNotification.Announcement(
+                StateAnnouncement.text(for: engine.snapshot)).post()
         }
     }
 

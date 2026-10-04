@@ -257,5 +257,12 @@ public extension LocalizedText {
         .slewHazardSunProximity, .slewHazardBelowAltitudeLimit,
         .slewHazardBelowHorizon, .slewHazardTooFaint, .slewHazardNoTarget,
         .slewHazardLowConfidence, .slewHazardSunPositionUnknown,
+        // Kalimat pengumuman VoiceOver saat keadaan berubah. Masuk daftar
+        // karena inilah satu-satunya jalur perubahan keadaan sampai ke
+        // pengguna yang tidak melihat layar — dan karena versi lamanya hidup
+        // sebagai literal di dalam `PointingView`, tempat katalog tidak bisa
+        // menjangkaunya. Lihat `StateAnnouncement.swift`.
+        .announceLockedOn, .announceLocked, .announceUncertain,
+        .announceUnavailable, .announceState,
     ]
 }

@@ -216,30 +216,14 @@ struct PointingView: View {
         .onChange(of: engine.snapshot.state) { _, newState in
             guard announcedState != newState else { return }
             announcedState = newState
-            AccessibilityNotification.Announcement(announcementText(for: newState)).post()
-        }
-    }
-
-    /// Teks yang diumumkan saat keadaan berubah.
-    ///
-    /// Kunci (`.lock`) diumumkan **dengan nama objeknya**, karena itulah
-    /// satu-satunya momen yang ditunggu pengguna; mengumumkan "Terkunci" tanpa
-    /// nama akan memaksanya mengusap layar untuk mencari tahu terkunci pada
-    /// apa. Sebaliknya, kehilangan jawaban diumumkan sebagai "kehilangan" —
-    /// bukan diam, karena diam di sini terbaca sebagai "masih terkunci".
-    private func announcementText(for state: PointingState) -> String {
-        switch state {
-        case .lock:
-            if let name = engine.snapshot.answeredObject?.name {
-                return "Terkunci pada \(name)."
-            }
-            return "Terkunci."
-        case .uncertain:
-            return "Kurang yakin. \(engine.snapshot.guidanceText)"
-        case .unavailable:
-            return "Sensor mati. \(engine.snapshot.guidanceText)"
-        case .idle, .pointing, .searching:
-            return "\(state.shortLabel). \(engine.snapshot.guidanceText)"
+            // Kalimatnya datang dari `StateAnnouncement` (PointingKit), bukan
+            // dari `switch` di sini. Dulu ia hidup sebagai literal di view ini,
+            // dan itu berarti (a) katalog string tidak bisa menjangkaunya, jadi
+            // pengguna Bahasa Inggris mendengar kalimat Indonesia, dan (b)
+            // iPhone — yang kini mengumumkan hal yang sama — harus menyalin
+            // kalimatnya, dengan dua versi kebenaran sebagai hasilnya.
+            AccessibilityNotification.Announcement(
+                StateAnnouncement.text(for: engine.snapshot)).post()
         }
     }
 

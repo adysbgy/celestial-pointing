@@ -1883,6 +1883,61 @@
         }
       }
     },
+    "pointing.announce.locked": {
+      "comment": "VoiceOver: keadaan terkunci tetapi nama objeknya tidak tersedia. Diucapkan saat keadaan berubah, bukan tiap sampel.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked."
+          }
+        }
+      }
+    },
+    "pointing.announce.lockedOn": {
+      "comment": "VoiceOver: terkunci pada sebuah objek. %@ = nama objek, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked on %@."
+          }
+        }
+      }
+    },
+    "pointing.announce.state": {
+      "comment": "VoiceOver: keadaan berubah tanpa jawaban. Argumen 1 = label keadaan, argumen 2 = kalimat panduan; keduanya sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "pointing.announce.unavailable": {
+      "comment": "VoiceOver: sensor tidak tersedia. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor unavailable. %@"
+          }
+        }
+      }
+    },
+    "pointing.announce.uncertain": {
+      "comment": "VoiceOver: ada kandidat tetapi engine tidak cukup yakin. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain. %@"
+          }
+        }
+      }
+    },
     "pointing.search.hint.daylight": {
       "comment": "Alasan: langit belum cukup gelap untuk melihat bintang.",
       "localizations": {
