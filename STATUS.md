@@ -114,7 +114,13 @@ Dijalankan pada salinan, bukan di repo:
   ini.
 - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan CJK/Cyrillic pada berkas yang diubah: **0**.
-- CI: menunggu push.
+- **CI hijau pada push pertama** (`98c10e4`):
+  - `Apple Build` run `37211406351` → **2× `BUILD SUCCEEDED`** + gerbang
+    peringatan *"Tidak ada peringatan compiler pada Apps/."*; langkah
+    "Gerbang sapu UI" terlihat benar-benar berjalan di log.
+  - `Engine Tests (Linux)` run `37211406453` → hijau, dan `Bersih: setiap
+    teks UI punya entri di katalog.` + `== SEMUA GERBANG UI LULUS ==`
+    terlihat **di log CI**, bukan hanya di mesin ini.
 
 ### Batas yang diketahui dan belum ditutup
 
