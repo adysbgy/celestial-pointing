@@ -5078,6 +5078,94 @@ badge, bebas hijau/biru, urutan tak berbalik, kedua mode lewat satu pintu).
 (badge bridge) dibuktikan CI macOS (`ios-build.yml`) — Linux tidak menyentuh
 file view.
 
+## Siklus 2026-10-04 (3) — galaksi, gugus terbuka, dan gugus bola digambar sama
+
+**Unit terkecil:** bentuk objek langit dalam. `CelestialVisual.Kind.deepSky`
+sudah ada, katalog produksi sudah berisi enam objek (M45, M31, M7, M42, M13,
+M8), `VisualFrame.nebula(fuzziness:)` sudah menghitung geometri, `drawDeepSky`
+sudah menggambar, dan `fuzzinessByID` sudah membedakan lebarnya. Yang hilang
+hanya satu: **pembeda bentuknya**.
+
+### Yang ditemukan (dibaca dari kode, bukan ditebak)
+
+`fuzziness` hanya mengatur **seberapa lebar** kabut. Bentuknya selalu tiga
+blob yang sama. Akibatnya, di katalog produksi:
+
+- M31 (galaksi Andromeda) — lebar 1.00
+- M7 (gugus terbuka Ptolemy) — lebar 0.50
+- M13 (gugus bola Hercules) — lebar 0.35
+
+ketiganya digambar dengan **susunan blob yang identik**; yang berbeda cuma
+skala. Galaksi tidak punya cakram, gugus bola tidak punya inti padat, gugus
+terbuka tidak "terbuka" di mana pun. Tidak ada satu pun teks di layar yang
+bisa membedakan mereka, jadi ini klaim bentuk yang paling sulit terlihat —
+tidak ada yang salah untuk dilihat.
+
+Ini kelas cacat yang sama dengan yang sudah berulang di repo ini: **setiap
+bagian benar secara terpisah, yang hilang adalah jalur/pembeda yang
+menghubungkannya.**
+
+### Yang diperbaiki
+
+- `DeepSkyCatalogue.Morphology` (`nebula` / `galaxy` / `openCluster` /
+  `globularCluster`) + `morphologyByID`, per id seperti `fuzzinessByID`.
+- `VisualFrame.deepSky(morphology:fuzziness:)` menyusun blob per bentuk:
+  - **galaksi** — cakram miring (rasio sumbu 0.34, rotasi −18°) dengan inti
+    yang lebih bulat (0.42): tonjolan pusat yang khas;
+  - **gugus bola** — inti padat di tengah (blob terbesar & paling terang),
+    dikelilingi dua cincin bintang yang makin redup ke luar;
+  - **gugus terbuka** — bintik-bintik nyaris seragam yang tersebar, **tanpa
+    blob di pusat**;
+  - **nebula** — kabut asimetris (bentuk lama, tetap).
+- `CelestialVisual.objectID` diteruskan dari objek engine, supaya view bisa
+  menanyakan morfologi (`DeepSkyCatalogue.morphology`, teruji di Linux) alih-alih
+  menebak bentuk dari lebarnya.
+- View menggambar elips berotasi dengan gradien **utuh**: gradien digambar di
+  ruang yang di-skala (`scaleBy(x:1, y:hh/hw)`), bukan `radialGradient` melingkar
+  pada path elips — yang akan memotong gradien di sumbu pendek dan meninggalkan
+  tepi rata, persis cacat "digambar" yang ingin dihindari.
+
+### Kenapa id tak dikenal **tidak** menebak bentuk
+
+`fuzziness` boleh jatuh ke nilai tengah (0.6): lebar yang tidak diketahui tidak
+mengklaim apa pun. Morfologi tidak punya "nilai tengah" — setiap pilihan
+menyatakan "ini galaksi" atau "ini gugus bola". Menebak salah satunya adalah
+klaim identitas yang keliru, persis yang dilarang PRD. Jadi
+`morphology(forObjectID:)` mengembalikan `nil`, dan lapisan gambar memakai kabut
+netral yang tidak menyatakan salah satu jenis.
+
+### Cacat yang ditemukan uji saat implementasi
+
+Rumus ruang pertama saya mengabaikan rotasi. Elips yang diputar tidak lagi
+sejajar sumbu: bentang x-nya bertambah `hh·|sin θ|`. Akibatnya cakram galaksi
+18° **keluar frame 0.056 R** — ditemukan oleh
+`testEveryDeepSkyBlobStaysInsideTheFrame` (bukan oleh mata, karena 0.056 R
+kecil). Rumusnya sekarang memakai bentang terotasi
+`hw·(|cos θ| + aspect·|sin θ|)`.
+
+Uji yang sama juga menangkap bahwa gugus terbuka saya masih terlalu seragam
+ukurannya untuk bisa dibedakan dari gugus bola; layoutnya diperbaiki
+(ukuran nyaris seragam **dan** tidak ada blob di pusat), dan ujinya diubah
+untuk mengukur properti yang benar-benar memisahkan keduanya —
+**konsentrasi**, bukan ukuran blob.
+
+### Verifikasi
+
+15 uji baru (342 → **357** PointingKit, +166 engine = **523 hijau**, tanpa
+warning). Yang paling penting:
+- `testLegacyDeepSkyGeometryWasIdenticalForEveryObject` — pengunci cacat lama;
+- `testDifferentMorphologiesProduceDifferentGeometry` — dua morfologi tidak
+  boleh menghasilkan blob yang sama;
+- `testGlobularIsMoreConcentratedThanOpenCluster` — pembeda langsung bola vs
+  terbuka;
+- `testEveryMorphologyIsUsedByTheCatalogue` — daftar dari `allCases`, jadi
+  menambah `case` baru tanpa objeknya langsung merah (bukan jalur mati);
+- `testEveryDeepSkyBlobStaysInsideTheFrame` — kini menyapu **semua** morfologi
+  termasuk `nil`, dengan bentang terotasi.
+
+Gate: `./swift-ui-lint.sh` 9/9 bersih, `./swift-typecheck.sh` lulus.
+CI: Engine Tests (Linux) + Apple Build keduanya **success** (`32367c8`).
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
