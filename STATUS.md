@@ -9,8 +9,8 @@ commit `17a5c32`.
 
 - Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 198 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan **kedua workflow CI hijau** di HEAD `17a5c32` (Apple Build `37176415267`
-  + Engine Tests `37176415270`).
+  dan **kedua workflow CI hijau** di HEAD `c414cc5` (Apple Build `37178623141`
+  + Engine Tests `37178623098`).
 - Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
   `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
   Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
@@ -31,6 +31,52 @@ Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
 | Onboarding value-first | SELESAI — `Apps/Shared/OnboardingView.swift` (1 kartu, sekali pakai via `OnboardingStorage`) di `PointingView` (jam) + `RootView` (iPhone) |
 | 4.6 audio opsional saat lock | SELESAI — `Apps/Shared/AudioCue.swift` (nada 880Hz prosedural, `AVAudioEngine`/`AVAudioPCMBuffer`), hanya `.lockSucceeded`, toggle `Bunyi saat kunci` |
 | `@ScaledMetric` | SELESAI — ikon status `PointingView` pakai `@ScaledMetric(relativeTo: .headline)`; `WatchMetrics.iconSize` mati dibuang |
+
+## Progres terakhir (4 Okt 2026 — Bagian 2 susulan: latar premium belum pernah dilukis)
+
+### Audit awal: visual sudah ada, tapi latarnya tidak pernah tampil
+
+Siklus ini diawali dengan memercayai bahwa Bagian 1–4 sudah selesai (klaim
+STATUS lama), lalu membaca ulang seluruh berkas app alih-alih mempercayainya.
+Yang ditemukan: model visual, mode malam, always-on, VoiceOver, animasi, dan
+onboarding **semua sudah ada dan teruji** — tetapi gradien latar `#0A0A0F`/
+`#121216` yang sudah dihitung & diuji kontrasnya di `SurfacePalette.appBackground`
+**hanya dilukis di `OnboardingView`**. Seluruh layar konten (jam + `ReducedLuminanceView`
++ ketiga `List` iPhone) dirender di latar bawaan sistem, dan siang memakai
+`preferredColorScheme(nil)` — jadi di iPhone yang disetel terang, `List` dan
+chrome sistem berbalik putih sementara token `SurfacePalette` mengasumsikan
+gelap. Itu sumber nyata keluhan "masih jelek / tidak konsisten": permukaan
+bertinting (surface-stepping) dan kontras 4.5:1 yang diklaim di brief **ada
+di kode tapi tidak pernah terlihat** di layar.
+
+### Apa yang diubah, dan kenapa begini
+
+- **`SurfaceTokens.forceDarkScheme()`** — pembungkus `preferredColorScheme(.dark)`.
+  Skema dipaksa gelap di **seluruh** app, bukan `nil` saat siang. Alasannya
+  bukan "mode gelap pilihan": token permukaan dirancang untuk latar gelap, dan
+  menyerahkannya ke sistem berarti chrome putih di iPhone terang merusak
+  kontras yang sudah diuji. Skema gelap di sini adalah **kontrak** dengan
+  palet; mode malam (merah) adalah lapisan di atasnya, bukan pengganti.
+- **Latar gradien dipasang ke akar semua layar:** `PointingView` +
+  `ReducedLuminanceView` (jam), dan `DiagnosticsView`/`Experiment1View`/
+  `LinkView` (iPhone) masing-masing dapat `.appBackground()`. Pada ketiga
+  `List` iPhone ditambah `scrollContentBackground(.hidden)` supaya chrome
+  `List` bawaan tidak menutupi gradien — kartu tetap memakai `surfaceCard`.
+- `OnboardingView` sudah benar (memakai `SurfacePalette.appBackground` secara
+  langsung); tidak diubah.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 198 PointingKit, 0 gagal** (engine
+  dan `PointingKit` tidak disentuh; perubahan murna `Apps/`).
+- Gerbang sintaks: seluruh 20 berkas app lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0` (setelah satu galat tutup-kurung berlebih di
+  `SurfaceTokens` diperbaiki saat edit).
+- **CI macOS (Apple Build) hijau** di `c414cc5` (run `37178623141`, 2× `BUILD
+  SUCCEEDED`) + gerbang peringatan melaporkan *"Tidak ada peringatan compiler
+  pada Apps/."* — `scrollContentBackground`/`preferredColorScheme` hanya
+  terbukti resolve di sini, bukan di `-parse`. `Engine Tests (Linux)` run
+  `37178623098` hijau.
 
 ## Progres terakhjah (4 Okt 2026 — Bagian 4.4: animasi kedatangan kunci di UI)
 
