@@ -1,5 +1,56 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — peringatan keselamatan yang mewarisi timer efemeris)
+
+### Putusan GoTo kini punya wajah, dan punya satu jalan saja
+
+`SlewPlanner` sudah menghitung putusan keselamatan sejak FASE 3, dan
+`PointingController.slewDecision(date:)` sudah menyambungkannya ke engine yang
+berjalan. Sampai commit ini, `slewDecision` **nol pemanggil di seluruh
+`Apps/`** — satu-satunya aturan keras PRD yang menyangkut keselamatan alat
+("POINT → OBJECT ID → SAFE GOTO") tidak punya wajah di layar. Pengguna tidak
+bisa tahu apakah teleskopnya boleh bergerak, dan kalau tidak, mengapa.
+
+Yang ditambahkan: `SlewVerdictBanner` (satu view di `Apps/Shared`, dipakai
+bersama oleh kartu jam dan baris iPhone), dan `PointingEngine.slewVerdict`
+yang dihitung di `publish` — satu-satunya jalan tulis snapshot.
+
+### Cacat yang ditangkap kompiler, bukan mata
+
+Versi pertama memasang perhitungan itu **dua kali**: sekali di dalam blok
+berjangka-waktu `refreshSkyContext` (yang dibatasi `skyContextInterval` 30
+detik), sekali lagi di blok tanda tangan. Salinan pertama adalah sisa langkah
+yang belakangan dipindah; ia tidak ikut terhapus.
+
+Akibatnya bukan sekadar deklarasi ganda. Ia membuat penjagaan waktu milik
+**efemeris** menjadi penjagaan **putusan keselamatan** juga. Itu keliru kelas:
+
+- `refreshSkyContext` sengaja dibatasi 30 detik karena arah benda langit
+  bergerak ~0.25°/menit — hasilnya tidak berubah antara dua sampel.
+- Putusan GoTo **bukan** fakta lambat seperti itu. Ia penjelasan atas sebuah
+  **jawaban**, dan jawaban berubah lewat enam jalur yang menulis snapshot
+  (sampel sensor, `stop()`, `setSensorAvailable`, …), bukan hanya lewat waktu.
+  Kalau jawaban hilang — mis. sensor mati saat objek masih terkunci — peringatan
+  yang tertinggal bukan sekadar terlambat, ia **salah**: layar menampilkan
+  "Terlalu dekat Matahari." di sebelah keadaan "Sensor mati".
+
+Karena itu perhitungannya dipindah ke `publish`, dengan penjagaan **tanda
+tangan** (`keadaan|id objek`), bukan waktu. Objek yang sama dihitung sekali;
+objek baru langsung; jawaban yang hilang langsung mencabut peringatannya.
+
+Kompiler menolak build karena deklarasi ganda — dan itulah yang menyelamatkan
+aturan ini dari diam-diam dilanggar. Kalau kedua salinan itu punya nama yang
+berbeda, tidak ada gerbang yang akan menangkapnya: keduanya menghasilkan
+`SlewDecision` yang sama benar, dan hanya yang **kedua** (jalur `publish`)
+yang diuji.
+
+### Gerbang
+- `swift-test.sh`: **CelestialEngine 166**, **PointingKit 379** — 46 suite,
+  0 kegagalan.
+- `swift-typecheck.sh` + `swift-ui-lint.sh`: hijau.
+- CI `Apple Build` (macos-15) hijau setelah perbaikan; commit pertama
+  (a4cbc1c) **gagal** karena `invalid redeclaration of 'refreshSlewVerdict(at:)'`.
+
 ## Progres terakhir (4 Okt 2026 — engine tahu MENGAPA tidak ada objek, tapi tidak pernah mengatakannya)
 
 ### Siklus ketiga berturut-turut: jalur yang dihitung lalu dibuang
