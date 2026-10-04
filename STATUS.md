@@ -53,7 +53,8 @@ katalog.
 
 Gerbang: `swift-test.sh` **166 + 410 hijau** (README diperbarui lewat Aturan 10),
 ui-lint hijau (Aturan 6 menangkap paritas katalog; Aturan 10 menangkap angka
-README yang tertinggal di 401). Batas jujur: apakah VoiceOver **benar-benar**
+README yang tertinggal di 401). CI: Engine Tests (Linux) `37227131073` = success,
+Apple Build `37227131047` = success. Batas jujur: apakah VoiceOver **benar-benar**
 mengucapkannya adalah wilayah perangkat dan CI macOS, bukan Linux.
 
 ## Progres terakhir (4 Okt 2026 — putusan GoTo tidak lagi membeku selama tunjukan ditahan)
