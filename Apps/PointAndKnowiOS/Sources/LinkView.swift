@@ -73,8 +73,11 @@ struct LinkView: View {
                 }
             }
             .navigationTitle("Tautan")
+            .scrollContentBackground(.hidden)
             .onAppear { link.activate() }
         }
+        .appBackground()
+        .forceDarkScheme()
     }
 
     private func row(_ title: String, _ value: String) -> some View {

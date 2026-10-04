@@ -72,6 +72,8 @@ struct ReducedLuminanceView: View {
             .padding(.horizontal, 2)
             .frame(maxWidth: .infinity)
         }
+        .appBackground()
+        .forceDarkScheme()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(reducedAccessibilityLabel)
     }

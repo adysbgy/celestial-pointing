@@ -34,6 +34,9 @@ struct Experiment1View: View {
                 trialsSection
             }
             .navigationTitle("Experiment 1")
+            // Sembunyikan latar `List` bawaan supaya gradien aplikasi
+            // terlihat di balik kartu, bukan chrome sistem.
+            .scrollContentBackground(.hidden)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -61,6 +64,8 @@ struct Experiment1View: View {
             // dibagi dengan tab Diagnostik, dan `TabView` menahan kedua tab
             // tetap hidup.
         }
+        .appBackground()
+        .forceDarkScheme()
     }
 
     // MARK: - Bagian

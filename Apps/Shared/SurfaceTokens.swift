@@ -84,6 +84,22 @@ extension View {
         background(SurfacePalette.appBackground.ignoresSafeArea())
     }
 
+    /// Paksa skema gelap di seluruh app.
+    ///
+    /// **Kenapa bukan `nil` saat siang.** Token permukaan (`SurfacePalette`)
+    /// sengaja dirancang untuk latar gelap bertingkat (`#0A0A0F`/`#121216`):
+
+    /// teks terang, kartu abu bertingkat, dan kontras 4.5:1 dihitung melawan
+    /// latar itu. Meninggalkan skema ke sistem berarti di iPhone yang disetel
+    /// terang, `List` dan chrome sistemnya berbalik menjadi putih sementara
+    /// token kita mengasumsikan gelap — hasilnya justru kontras yang
+    /// berantakan dan rasa yang tidak konsisten. Skema gelap di sini bukan
+    /// "mode gelap pilihan", melainkan **kontrak** dengan palet yang sudah
+    /// diuji; mode malam (merah) adalah lapisan di atasnya, bukan pengganti.
+    func forceDarkScheme() -> some View {
+        preferredColorScheme(.dark)
+    }
+
     /// Permukaan kartu: warna yang sudah **diuji**, plus garis rambut.
     ///
     /// Kenapa memakai warna solid dan bukan `.ultraThinMaterial`: material

@@ -322,6 +322,10 @@ struct DiagnosticsView: View {
                 }
             }
             .navigationTitle("Diagnostik")
+            // Sembunyikan latar `List` bawaan supaya gradien aplikasi
+            // (`#0A0A0F`/`#121216`) terlihat di balik kartu, bukan chrome
+            // sistem yang menutupinya. Kartu tetap memakai `surfaceCard`.
+            .scrollContentBackground(.hidden)
             // Set ulang denyut tepat saat app aktif lagi.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { resyncPulse() }
@@ -331,6 +335,8 @@ struct DiagnosticsView: View {
             // kedua tab tetap hidup. Siklus hidupnya ada di `RootView`, tempat
             // ia berjalan tepat sekali untuk seluruh app.
         }
+        .appBackground()
+        .forceDarkScheme()
     }
 
     /// Rasio terhadap sigma. Garis ambang digambar dari kebijakan yang **sedang

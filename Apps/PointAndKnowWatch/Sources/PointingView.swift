@@ -163,9 +163,13 @@ struct PointingView: View {
                 }
             }
         }
-        // Latar merah redup saat malam: menekan cahaya putih/biru yang
-        // mematikan rhodopsin. Di siang tetap transparan (sistem yang menentu).
-        .preferredColorScheme(nightMode ? .dark : nil)
+        // Latar aplikasi (gradien `#0A0A0F`/`#121216` bertingkat) digambar di
+        // akar, dan skema dipaksa gelap supaya token permukaan yang sudah
+        // diuji kontrasnya benar-benar muncul — bukan chrome sistem yang
+        // berbalik terang di iPhone yang disetel terang. Mode malam (merah)
+        // adalah lapisan di atas skema gelap ini, bukan penggantinya.
+        .appBackground()
+        .forceDarkScheme()
         // Umumkan **perubahan** keadaan, bukan tiap sampel 20 Hz.
         //
         // `announcedState` menyimpan keadaan terakhir yang diumumkan, jadi
