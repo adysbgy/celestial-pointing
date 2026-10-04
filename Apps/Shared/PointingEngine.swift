@@ -53,6 +53,11 @@ public final class PointingEngine: ObservableObject {
     public let controller: PointingController
     /// Cara menyuarakan peristiwa haptic. `nil` = tidak ada haptic (iPhone).
     public var haptics: (([HapticEvent]) -> Void)?
+    /// Cara menyuarakan **bunyi** opsional saat kejadian tertentu (mis. kunci).
+    /// `nil` = tidak ada bunyi. Mirror `haptics`: keduanya dijaga dari satu
+    /// jalur `ingest`, dan keduanya hanya memetakan peristiwa yang sudah
+    /// dipilih engine — UI tidak pernah memilih peristiwa mana yang berbunyi.
+    public var audioCue: (([HapticEvent]) -> Void)?
 
     public init(location: ObserverLocation = .fallback,
                 config: PointingControllerConfig = PointingControllerConfig()) {
@@ -153,6 +158,7 @@ public final class PointingEngine: ObservableObject {
         sampleCount += 1
         publish(update.snapshot)
         if !update.haptics.isEmpty { haptics?(update.haptics) }
+        if !update.haptics.isEmpty { audioCue?(update.haptics) }
         if update.snapshot.state == .lock {
             // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
             // gerbang kedatangan kunci. Memakai satu predikat yang sama

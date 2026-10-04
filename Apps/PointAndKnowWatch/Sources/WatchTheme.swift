@@ -21,7 +21,8 @@ enum WatchMetrics {
     /// Lebar gambar benda langit di kartu jam. Metric, bukan teks — jadi
     /// tidak ikut Dynamic Type.
     static let visualDiameter: CGFloat = 38
-    /// Ukuran ikon status. Mengikuti `TextStyle` yang sama supaya ikon dan
-    /// label mendapat tekanan yang sama saat Dynamic Type berubah.
-    static let iconSize: CGFloat = 16
+    // Ukuran ikon status sengaja TIDAK ada di sini: ia harus ikut Dynamic
+    // Type, jadi di `PointingView` ia dipegang sebagai `@ScaledMetric`
+    // (relatif ke `.headline`) — bukan angka `static` yang mati saat teks
+    // diperbesar. Angka tetap hanya untuk hal yang memang tak boleh scale.
 }

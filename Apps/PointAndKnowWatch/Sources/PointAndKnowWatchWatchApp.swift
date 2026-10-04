@@ -19,16 +19,27 @@ struct PointAndKnowWatchApp: App {
     @StateObject private var link = WatchLinkService()
     @StateObject private var location = LocationProvider()
 
+    /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
+    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+
     /// Pemutar getaran. Satu instance untuk seluruh umur app: membuatnya ulang
     /// tiap render tidak berbahaya, tapi menyimpannya membuat pemetaan
     /// peristiwa → pola getaran tidak pernah berubah di tengah jalan.
     private let haptics = HapticEngine()
+    /// Pemutar bunyi opsional saat kunci — saluran multi-modal bagi pengguna
+    /// yang tidak melihat layar. Satu instance untuk seluruh umur app.
+    private let audioCue = AudioCueEngine()
 
     var body: some Scene {
         WindowGroup {
             PointingView(engine: engine, motion: motion, link: link)
                 .onAppear(perform: start)
                 .onDisappear { stop() }
+                .sheet(isPresented: .init(
+                    get: { !onboardingSeen },
+                    set: { seen in onboardingSeen = seen })) {
+                    OnboardingView(onDone: { onboardingSeen = true })
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -45,6 +56,9 @@ struct PointAndKnowWatchApp: App {
     private func start() {
         let player = haptics
         engine.haptics = { events in player.play(events) }
+
+        let cue = audioCue
+        engine.audioCue = { events in cue.play(events) }
 
         location.start()
         // Lokasi sungguhan datang setelah `start()`, jadi engine disambungkan

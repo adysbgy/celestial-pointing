@@ -18,6 +18,9 @@ struct PointingView: View {
     /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
     /// `PointingTone.color` / `Color.nightAwareSecondary`).
     @AppStorage(NightModeStorage.key) private var nightMode = false
+    /// Bunyi pendek saat engine mengunci — aksesibilitas multi-modal.
+    /// Default nyala (lihat `AudioCue.isOn`); dimatikan via toolbar.
+    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
 
     /// Pengumuman perubahan keadaan untuk VoiceOver.
     ///
@@ -27,6 +30,15 @@ struct PointingView: View {
     /// Ini versi audio dari janji yang sama: keadaan yang berubah harus
     /// terdengar, bukan hanya terlihat.
     @State private var announcedState: PointingState?
+
+    /// Ukuran ikon status, mengikuti Dynamic Type.
+    ///
+    /// `@ScaledMetric` — bukan angka tetap — supaya ikon dan teks mendapat
+    /// tekanan yang sama saat pengguna memperbesar teks. `WatchMetrics.iconSize`
+    /// memang diniatkan ikut scale (lihat komentarnya), dan ini cara
+    /// mengaktifkannya tanpa memecah `WatchMetrics` yang dipakai sebagai
+    /// constan di tempat lain.
+    @ScaledMetric(relativeTo: .headline) private var statusIconSize: CGFloat = 16
 
     var body: some View {
         // Saat layar redup (Always-On), watchOS mengabaikan sebagian gestur dan
@@ -133,6 +145,16 @@ struct PointingView: View {
                     }
                     .accessibilityLabel(nightMode ? "Nonaktifkan Mode Malam" : "Aktifkan Mode Malam")
                 }
+                // Bunyi saat kunci: 1 ketuk. Default nyala (aksesibilitas
+                // multi-modal), bisa dimatikan bila mengganggu.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        audioCueEnabled.toggle()
+                    } label: {
+                        Image(systemName: audioCueEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    }
+                    .accessibilityLabel(audioCueEnabled ? "Nonaktifkan bunyi saat kunci" : "Aktifkan bunyi saat kunci")
+                }
             }
         }
         // Latar merah redup saat malam: menekan cahaya putih/biru yang
@@ -182,6 +204,7 @@ struct PointingView: View {
             HStack(spacing: 6) {
                 Image(systemName: state.symbolName)
                     .font(.headline)
+                    .frame(width: statusIconSize, height: statusIconSize)
                     .foregroundStyle(state.tone.color)
                     // Simbolnya murni hiasan: label kartu di bawah sudah
                     // menyebut keadaannya. Tanpa baris ini VoiceOver

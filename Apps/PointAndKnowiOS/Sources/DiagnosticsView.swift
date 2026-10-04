@@ -17,6 +17,13 @@ struct PointAndKnowiOSApp: App {
     @StateObject private var link = PhoneLinkService()
     @StateObject private var trace = ConfidenceTraceStore()
 
+    /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
+    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+
+    /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
+    /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
+    private let audioCue = AudioCueEngine()
+
     var body: some Scene {
         WindowGroup {
             RootView(engine: engine, motion: motion, location: location, link: link, trace: trace)
@@ -48,6 +55,14 @@ struct RootView: View {
                 .tabItem { Label("Experiment 1", systemImage: "target") }
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
+        }
+        // Perkenalan sekali pakai: satu kartu, bukan tur panjang. Dibungkus
+        // sheet supaya layar utama (dan hasil pengukuran) tetap hidup di
+        // belakang — menutupnya tidak mereset alur.
+        .sheet(isPresented: .init(
+            get: { !onboardingSeen },
+            set: { seen in onboardingSeen = seen })) {
+            OnboardingView(onDone: { onboardingSeen = true })
         }
         // Palet merah murni saat malam, berlaku untuk **seluruh** tab.
         .preferredColorScheme(nightMode ? .dark : nil)
@@ -95,6 +110,10 @@ struct RootView: View {
         }
         // iPhone tidak punya Taptic Engine.
         engine.haptics = nil
+        // Bunyi pendek saat kunci: saluran multi-modal bagi pengguna yang
+        // tidak melihat layar. Mirror pola haptic di jam.
+        let cue = audioCue
+        engine.audioCue = { events in cue.play(events) }
         motion.start(controller: engine.controller)
         engine.setSensorAvailable(motion.isAvailable)
         location.start()
@@ -177,6 +196,9 @@ struct DiagnosticsView: View {
     /// (`NightModeStorage.key`), jadi saklar ini dan palet seluruh app tidak
     /// bisa berbeda pendapat — keduanya membaca `UserDefaults` yang sama.
     @AppStorage(NightModeStorage.key) private var nightMode = false
+    /// Bunyi saat kunci, disimpan ke `UserDefaults` lewat `AudioCueStorage`.
+    /// Satu preferensi untuk seluruh app, sama seperti mode malam.
+    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
 
     /// Fase denyut glow untuk gambar bintang.
     ///
@@ -325,6 +347,7 @@ struct DiagnosticsView: View {
 
                 Section("Kontrol") {
                     Toggle("Mode Malam (merah)", isOn: $nightMode)
+                    Toggle("Bunyi saat kunci", isOn: $audioCueEnabled)
                     Toggle("Rekam keyakinan", isOn: Binding(
                         get: { trace.isRecording },
                         set: { trace.setRecording($0) }))
