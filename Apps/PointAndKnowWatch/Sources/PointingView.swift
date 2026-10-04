@@ -87,11 +87,11 @@ struct PointingView: View {
                                          // teksnya, dan mata membaca gambar
                                          // lebih dulu. Lihat
                                          // `PointingSnapshot.confirmsIdentity`.
-                                         isConfirmed: engine.confirmsDisplayedIdentity,
                                          // Visual dari sumber yang **sama** dengan
                                          // objeknya, jadi gambar tidak mungkin
                                          // milik benda lain.
                                          visual: engine.visualForDisplayedObject,
+                                         isConfirmed: engine.confirmsDisplayedIdentity,
                                          // Token kedatangan kunci memicu animasi
                                          // "muncul" kartu **sekali** — bukan tiap
                                          // sampel 20 Hz selama terkunci, dan bukan
