@@ -5166,6 +5166,70 @@ warning). Yang paling penting:
 Gate: `./swift-ui-lint.sh` 9/9 bersih, `./swift-typecheck.sh` lulus.
 CI: Engine Tests (Linux) + Apple Build keduanya **success** (`32367c8`).
 
+## Siklus 2026-10-04 (7) — tiap bentuk langit dalam punya pembanding, bukan satu contoh
+
+**Unit terkecil:** katalog objek langit dalam. Sebelas baris data, tanpa satu
+pun kode gambar baru — tapi ia mengubah apa yang **bisa dipelajari** dari
+layar.
+
+**Keadaannya sebelum siklus ini.** Enam objek: satu galaksi (M31), satu gugus
+bola (M13), dua gugus terbuka (M45, M7), dua nebula (M42, M8). Jadi tiap
+bentuk muncul **sekali**. Itu cukup untuk membuktikan bentuknya digambar
+berbeda — dan memang sudah diuji — tapi tidak cukup untuk membuat pengguna
+**belajar** membedakannya. Orang yang baru pernah melihat satu galaksi tidak
+punya cara tahu mana ciri galaksi dan mana kebetulan objek itu. Pola baru
+terbaca saat bentuk yang sama muncul di dua objek berbeda.
+
+**Yang ditambahkan** (semuanya mag ≤ 6, terlihat mata telanjang atau
+binokuler — menawarkan target tak terlihat hanya menghasilkan penunjukan yang
+menyesatkan):
+
+    M44 Gugus Sarang Lebah  gugus terbuka   mag 3.7
+    M33 Galaksi Triangulum  galaksi         mag 5.7
+    M22 Gugus Sagitarius    gugus bola      mag 5.1
+    M6  Gugus Kupu-kupu     gugus terbuka   mag 4.2
+    M17 Nebula Omega        nebula emisi    mag 6.0
+
+Sekarang tiap bentuk punya minimal dua wakil.
+
+**Kenapa koordinatnya harus dari data, bukan ditebak.** Objek langit dalam
+tidak punya satu titik terang untuk dikoreksi. Posisi yang salah **tetap
+tampak benar** di layar; ia hanya muncul di tempat yang keliru, dan tidak ada
+satu teks pun di layar yang bisa membacanya. Jadi koordinatnya diambil dari
+data publik J2000 (epoch 2000.0), dan dua uji yang menutupnya menuntut bukti
+alih-alih asumsi:
+
+- `testEveryObjectRisesAboveTheHorizonForTheTargetLatitude` menyapu satu
+  tahun jam demi jam di lintang 6.2°S — lintang darurat yang **pasti**
+  dialami pengguna saat izin lokasi ditolak, jadi bukan asumsi tentang tempat
+  mereka — dan menuntut setiap objek naik di atas 10°. Ambang 10°, bukan 0°:
+  benda yang hanya menyentuh horizon beberapa menit tidak berguna untuk
+  penunjukan, dan ambang longgar akan meloloskan target yang praktis tak
+  terlihat.
+- `testEveryCatalogueCoordinateIsInRange` mengunci RA di `0..<360` dan
+  deklinasi di `−90…90`.
+
+**Satu uji mengunci niatnya, bukan cuma hasilnya.**
+`testEveryMorphologyHasMoreThanOneRepresentative` menuntut setiap morfologi
+punya ≥ 2 wakil. Tanpa itu, katalog bisa menyusut kembali ke satu contoh per
+bentuk dan semua uji lain tetap hijau — keadaannya sebelum siklus ini.
+
+**Tabel paritas menolak objek baru yang tidak dipilih bentuknya.**
+`fuzzinessByID` dan `morphologyByID` ikut diperluas, dan uji paritas yang
+sudah ada (`testEveryDeepSkyObjectHasAFuzzinessEntry`,
+`testEveryDeepSkyObjectHasAMorphologyEntry`) akan merah kalau objek baru
+mengandalkan nilai bawaan yang **tampak sah** padahal bentuknya tidak pernah
+dipilih — kelas cacat yang sudah pernah terjadi di repo ini pada tabel warna
+bintang.
+
+**Hasil:** PointingKit 370 (dari 367), CelestialEngine 166. Gerbang UI 10
+aturan hijau, `swift-typecheck.sh` hijau. Aturan 10 — yang baru dipasang
+siklus sebelumnya — langsung membuktikan gunanya: ia merah begitu uji
+bertambah, karena README masih menyebut 367.
+
+Commit `d8f0c0a`. CI: Engine Tests (Linux) 37221366114 + Apple Build
+37221366098, keduanya hijau.
+
 ## Siklus 2026-10-04 (6) — hitungan uji di README membusuk tanpa gerbang
 
 **Unit terkecil:** angka di README. Terlihat sepele, tapi kelas cacatnya
