@@ -51,6 +51,8 @@ bridge-nya yang menanggung beban, bukan uji paritasnya.
 - `swift-test.sh` → **166 CelestialEngine + 459 PointingKit**, 0 gagal.
 - `swift-ui-lint.sh` → **12 aturan hijau**.
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- CI: `37232670778` (Apple Build) + `37232670752` (Engine Linux) —
+  **dua-duanya hijau**.
 
 ## Progres terakhir (4 Okt 2026 — dua `LinkService` menyimpan kalimat status ke properti; kedua gerbang buta)
 
