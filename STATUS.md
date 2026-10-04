@@ -1,8 +1,37 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — gerbang sapu UI: aturan yang hilang karena tidak ada yang menegakkannya)
+## Progres terakhir (4 Okt 2026 — baris detail jadi satu pengumuman VoiceOver; satuan jadi kata)
 
-### Premis siklus ini: aturan yang sudah ditegakkan, lalu muncul lagi
+### Siklus 2 — cacat yang ditemukan oleh gerbang siklus 1
+
+Aturan 2 (`°/dtk` tanpa padanan ucapan) mem-flag 5 situs. Pemeriksaan
+lebih dalam menemukan **kelas cacat yang sama** dengan siklus 1: dua jalur
+yang seharusnya identik, hanya satu yang dibenahi.
+
+`row(_:_:)` dipakai di tiga layar dengan kode yang benar-benar identik
+(`Text(title)` — `Spacer()` — `Text(value)`). Dua (`PointingView.statusCard`,
+`SkyContextView.row`) mengumumkannya sebagai satu kalimat; yang ketiga tidak
+mengumumkan apa pun. Akibatnya VoiceOver membaca **dua elemen tanpa
+hubungan** — "Laju pergelangan" lalu "0.5°/dtk" — dan "/dtk" bukan kata.
+
+Perbaikannya bukan menambal yang tertinggal, melainkan membuat ketiganya
+memakai satu sumber (`RowSpeech` di PointingKit) sehingga tidak ada lagi
+jalur yang bisa tertinggal. Kalimat terucap adalah **janji produk** yang
+tidak terlihat salah di layar mana pun — jadi ia harus teruji.
+
+**Cacat yang ditemukan saat menulisnya:** `spokenRate` awalnya `%.0f`, jadi
+tampilan "0.4°/dtk" diucapkan "0 derajat per detik". Laju pergelangan saat
+diam memang bernilai di bawah 1 — jadi "bergerak pelan" terdengar sama
+dengan "diam". Uji ditulis dulu, dibuktikan merah, baru diperbaiki.
+Presisi kini mengikuti tampilan (`spokenDegrees(_:precision:)`), sama
+seperti RA/Dec yang ditulis `%.4f°`.
+
+Baris percobaan diumumkan dengan **verdict lebih dulu**: di layar mata
+melihat nama besar di kiri dan verdict kecil di kanan, tapi di suara tidak
+ada "kiri" dan "kanan" — dan yang menentukan apakah baris itu layak dibuka
+adalah verdict-nya.
+
+### Premis siklus 1: aturan yang sudah ditegakkan, lalu muncul lagi
 
 STATUS lama mencatat Dynamic Type selesai: "Semua font sudah semantic, 0
 `.system(size:)` di kode". Audit siklus ini menemukan klaim itu **sudah tidak
