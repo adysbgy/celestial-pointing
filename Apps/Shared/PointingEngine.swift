@@ -426,16 +426,6 @@ public final class PointingEngine: ObservableObject {
     /// untuk alasan mengapa `snapshot.intent` saja tidak cukup.
     public var answeredIntent: CelestialIntent? { controller.answeredIntent }
 
-    /// Kalimat putusan GoTo untuk ditampilkan; `nil` bila **tidak ada** yang
-    /// perlu diperingatkan.
-    ///
-    /// `nil` mencakup dua hal yang berbeda dan keduanya benar untuk tidak
-    /// ditampilkan: GoTo aman, dan belum ada jawaban sama sekali. Kalimatnya
-    /// sendiri datang dari `SlewDecision.verdictText` (teruji di Linux) — bukan
-    /// dirangkai di sini, supaya jam dan iPhone tidak bisa berbeda pendapat
-    /// tentang mengapa teleskop menolak bergerak.
-    public var slewVerdictText: String? { slewVerdict?.verdictText }
-
     /// Model visual prosedural untuk objek yang sedang ditampilkan.
     ///
     /// **Kenapa fraksi fase diambil dari `skyContext`, bukan dari

@@ -280,7 +280,7 @@ struct DiagnosticsView: View {
                     // ada yang perlu diperingatkan (`verdictText` `nil` saat
                     // GoTo aman), jadi ia tidak pernah berbunyi di sebelah GoTo
                     // yang justru berjalan.
-                    SlewVerdictBanner(verdict: engine.slewVerdictText)
+                    SlewVerdictBanner(decision: engine.slewVerdict)
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))

@@ -31,6 +31,41 @@ import CelestialEngine
 /// sebelah GoTo yang ditolak.
 public extension SlewHazard {
 
+    /// Apakah bahaya ini menyangkut **keselamatan alat & mata**, bukan mutu
+    /// pengamatan.
+    ///
+    /// **Kenapa harus dipisahkan, dan kenapa di sini.** Semua bahaya di
+    /// `SlewDecision` ditolak dengan cara yang sama (teleskop tidak bergerak),
+    /// tapi tidak semua **sama pentingnya**. Tiga di antaranya berarti
+    /// mengarahkan teleskop bisa **merusak peralatan atau melukai mata**:
+    /// cahaya Matahari yang masuk ke lensa memanaskannya, dan melihatnya
+    /// merusak retina. Sisanya (`belowHorizon`, `tooFaint`, `noTarget`,
+    /// `lowConfidence`) hanya berarti "tidak ada yang bisa diamati sekarang" —
+    /// mengecewakan, tidak berbahaya.
+    ///
+    /// Kalau dua kelas itu digambar dengan bobot visual yang sama, pengguna
+    /// membaca sekilas akan menganggap "terlalu redup" sama mendesaknya dengan
+    /// "terlalu dekat Matahari" — dan yang paling berbahaya justru yang paling
+    /// mudah diabaikan. Berkas ini lahir untuk memisahkan dua penolakan yang
+    /// dulu "terlihat persis sama"; tanpa pemisahan **bobot**, pemisahan
+    /// kalimatnya berhenti di tengah jalan.
+    ///
+    /// **Kenapa `sunPositionUnknown` ikut kelas keselamatan.** Ia bukan
+    /// bahaya yang diamati, melainkan **pengaman yang tidak bisa dijalankan**:
+    /// kalau posisi Matahari tidak diketahui, `SlewPlanner` sengaja
+    /// gagal-tertutup dan menolak, karena ia tidak bisa membuktikan teleskop
+    /// aman dari Matahari. Menaruhnya di kelas mutu akan membuatnya terlihat
+    /// seperti soal ketelitian, padahal ia adalah keselamatan yang tidak bisa
+    /// diverifikasi — persis keadaan yang paling tidak boleh diremehkan.
+    var isSafety: Bool {
+        switch self {
+        case .sunProximity, .belowAltitudeLimit, .sunPositionUnknown:
+            return true
+        case .belowHorizon, .tooFaint, .noTarget, .lowConfidence:
+            return false
+        }
+    }
+
     /// Kalimat untuk ditampilkan ke pengguna, dalam bahasa aktif.
     ///
     /// Lewat `TextLocalization` dengan alasan yang sama seperti
@@ -61,6 +96,57 @@ public extension SlewDecision {
     /// karena tidak ada yang perlu diperingatkan. Sama seperti `searchHint`
     /// yang `nil` saat ada objek.
     var hasVerdict: Bool { !isAllowed }
+
+    /// Seberapa mendesak putusan ini — dipakai untuk memilih warna peringatan.
+    ///
+    /// **Kenapa ini ada, padahal `verdictText` sudah punya semua sebabnya.**
+    /// Berkas ini lahir untuk memisahkan dua penolakan yang dulu "terlihat
+    /// persis sama": `sunProximity` (melindungi peralatan dan **mata** dari
+    /// cahaya Matahari) dan `lowConfidence` (soal ketelitian). Tapi versi
+    /// pertama hanya memisahkan **kalimatnya** — `SlewVerdictBanner`
+    /// menggambar keduanya dengan warna peringatan yang sama dan ikon yang
+    /// sama. Jadi pemisahan itu berhenti tepat di titik yang paling
+    /// menentukan: pengguna yang membaca sekilas tetap melihat satu jenis
+    /// peringatan untuk dua bahaya yang berbeda kelas, dan yang paling
+    /// berbahaya justru yang paling mudah disamakan dengan yang sepele.
+    ///
+    /// Warna **bukan** satu-satunya pembeda — di Mode Malam warna nada
+    /// menyempit jadi nyaris tak terbedakan (lihat `TonePalette`). Karena itu
+    /// nada di sini dipasangkan dengan ikon di view: di mode malam ikon yang
+    /// tetap membedakannya. Tapi dasar keputusannya **satu**, di sini, supaya
+    /// kedua permukaan (jam dan iPhone) tidak bisa berbeda pendapat.
+    ///
+    /// **Kenapa `danger` untuk seluruh kelas keselamatan.** Ketiga bahaya
+    /// keselamatan sama-sama berarti "teleskop tidak boleh bergerak karena
+    /// bisa merusak alat atau membahayakan mata", dan perbedaan di antara
+    /// ketiganya adalah soal *sebab*, bukan soal *tingkat bahaya*. Memberi
+    /// mereka tiga warna berbeda akan mengarang gradasi yang tidak ada, dan
+    /// gradasi yang dikarang justru melemahkan yang paling serius.
+    var verdictTone: PointingTone {
+        guard case .rejected(let hazards) = self, !hazards.isEmpty else { return .success }
+        // Bahaya keselamatan lebih dulu, dan ia menang atas bahaya mutu.
+        // Urutannya penting: putusan bisa memuat keduanya sekaligus
+        // (`sunProximity` **dan** `belowAltitudeLimit`), dan memilih "yang
+        // pertama" berarti warna bergantung pada urutan array — yang
+        // kebetulan terurut menurut `rawValue`, bukan menurut kepentingan.
+        if hazards.contains(where: { $0.isSafety }) { return .danger }
+        return .warning
+    }
+
+    /// Nama SF Symbol untuk putusan ini.
+    ///
+    /// **Kenapa ikon, padahal sudah ada warna.** Di Mode Malam seluruh palet
+    /// menyempit jadi satu warna merah (lihat `TonePalette`), jadi `danger` dan
+    /// `warning` **tidak bisa lagi dibedakan lewat warna** — tepat di mode yang
+    /// paling sering dipakai saat mengamati langit. Kalau pembeda satu-satunya
+    /// hilang, pengguna Mode Malam kembali ke masalah awal: "terlalu dekat
+    /// Matahari" dan "terlalu redup" terlihat sama. Ikon tidak ikut menyempit,
+    /// jadi ia yang memikul pembedaan itu. Karena itu ikon ditentukan di sini,
+    /// di samping `verdictTone` — bukan di view — supaya kedua permukaan
+    /// memakai pembeda yang sama persis.
+    var verdictSymbolName: String {
+        verdictTone == .danger ? "exclamationmark.triangle.fill" : "info.circle"
+    }
 
     /// Kalimat jujur untuk ditampilkan; **`nil` bila GoTo aman**.
     ///

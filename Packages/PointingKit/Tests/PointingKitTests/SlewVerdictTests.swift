@@ -150,4 +150,80 @@ final class SlewVerdictTests: XCTestCase {
         XCTAssertEqual(allowed.hazards, [])
         XCTAssertNil(allowed.verdictText)
     }
+
+    // MARK: - Bobot visual: bahaya keselamatan ≠ sekadar mutu
+
+    /// Setiap bahaya tergolong tepat satu kelas, dan klasifikasinya lengkap.
+    ///
+    /// Kalau sebuah `case` baru ditambahkan ke `SlewHazard` tapi lupa
+    /// diklasifikasi, `switch` di `isSafety` berhenti meng-compile — itu
+    /// pengaman yang benar. Uji ini menjaga sisi lain: bahwa hasilnya memang
+    /// terbagi, bukan semuanya jatuh ke satu kelas karena kelalaian.
+    func testSafetyClassificationCoversEveryHazard() {
+        let safety = SlewHazard.allCases.filter(\.isSafety)
+        let quality = SlewHazard.allCases.filter { !$0.isSafety }
+
+        XCTAssertEqual(safety.count + quality.count, SlewHazard.allCases.count)
+        XCTAssertFalse(safety.isEmpty, "tak ada satu pun bahaya keselamatan — klasifikasi salah")
+        XCTAssertFalse(quality.isEmpty, "tak ada satu pun bahaya mutu — klasifikasi salah")
+
+        // Ketiga bahaya yang melindungi alat & mata harus di kelas keselamatan.
+        for hazard in [SlewHazard.sunProximity, .belowAltitudeLimit, .sunPositionUnknown] {
+            XCTAssertTrue(hazard.isSafety, "\(hazard) seharusnya bahaya keselamatan")
+        }
+    }
+
+    /// Bahaya keselamatan -> nada `danger`; bahaya mutu -> nada `warning`.
+    ///
+    /// Inilah pembeda yang dulu hilang: `SlewVerdictBanner` menggambar
+    /// "terlalu dekat Matahari" dan "terlalu redup" dengan warna yang sama.
+    func testSafetyHazardsAreDangerAndQualityHazardsAreWarning() {
+        for hazard in SlewHazard.allCases {
+            let decision = SlewDecision.rejected(hazards: [hazard])
+            let expected: PointingTone = hazard.isSafety ? .danger : .warning
+            XCTAssertEqual(decision.verdictTone, expected,
+                           "\(hazard) memberi nada \(decision.verdictTone), seharusnya \(expected)")
+        }
+    }
+
+    /// Campuran keselamatan + mutu -> keselamatan yang menang, **apa pun
+    /// urutan array-nya**.
+    ///
+    /// Uji dua urutan, bukan satu: kalau `verdictTone` mengambil "bahaya
+    /// pertama", ia akan lulus untuk satu urutan dan gagal untuk urutan lain —
+    /// artinya warna bergantung pada urutan array, bukan pada bahaya yang
+    /// paling serius.
+    func testSafetyWinsOverQualityRegardlessOfOrder() {
+        let safetyFirst = SlewDecision.rejected(hazards: [.sunProximity, .tooFaint])
+        let qualityFirst = SlewDecision.rejected(hazards: [.tooFaint, .sunProximity])
+        XCTAssertEqual(safetyFirst.verdictTone, .danger)
+        XCTAssertEqual(qualityFirst.verdictTone, .danger)
+    }
+
+    /// Putusan aman -> nada `success`, dan **tidak** ada ikon peringatan.
+    ///
+    /// Menyalakan nada bahaya di sebelah GoTo yang justru berjalan adalah
+    /// kebohongan yang sama bentuknya dengan visual yang mengklaim identitas
+    /// saat engine ragu.
+    func testAllowedDecisionIsSuccessTone() {
+        let allowed = allowedDecision(for: CelestialObject(
+            id: "vega", name: "Vega", kind: .star,
+            raDeg: 279.234, decDeg: 38.784, magnitude: 0.03))
+        XCTAssertTrue(allowed.isAllowed)
+        XCTAssertEqual(allowed.verdictTone, .success)
+        XCTAssertNil(allowed.verdictText)
+    }
+
+    /// `danger` dan `warning` memakai ikon yang **berbeda**.
+    ///
+    /// Di Mode Malam seluruh palet menyempit jadi satu merah, jadi warna tak
+    /// lagi membedakan. Kalau ikonnya sama, pembeda terakhir ikut hilang tepat
+    /// di mode yang paling sering dipakai saat mengamati langit.
+    func testDangerAndWarningUseDifferentSymbols() {
+        let danger = SlewDecision.rejected(hazards: [.sunProximity])
+        let warning = SlewDecision.rejected(hazards: [.tooFaint])
+        XCTAssertNotEqual(danger.verdictSymbolName, warning.verdictSymbolName)
+        XCTAssertFalse(danger.verdictSymbolName.isEmpty)
+        XCTAssertFalse(warning.verdictSymbolName.isEmpty)
+    }
 }

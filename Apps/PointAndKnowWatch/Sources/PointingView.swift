@@ -109,7 +109,7 @@ struct PointingView: View {
                     // penolakan karena keyakinan rendah terlihat sama: tidak
                     // terlihat. `nil` saat aman, jadi baris ini tidak pernah
                     // berbunyi di sebelah GoTo yang justru berjalan.
-                    SlewVerdictBanner(verdict: engine.slewVerdictText)
+                    SlewVerdictBanner(decision: engine.slewVerdict)
                     if let note = motion.unavailableReason ?? engine.sensorNote {
                         Text(note)
                             .font(.footnote)
