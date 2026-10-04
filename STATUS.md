@@ -1,5 +1,147 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — kunci katalog yang hilang menampakkan nama kuncinya sendiri)
+
+### Premis siklus ini: STATUS lalu menutup satu celah dengan kalimat yang benar, tapi tidak lengkap
+
+STATUS sebelumnya menulis, di "Batas yang diketahui":
+
+> Bridge tidak dipasang di complication. Complication adalah proses terpisah
+> yang tidak memanggil `.install()`, jadi labelnya selalu Bahasa Indonesia —
+> bukan string kosong, dan itu jujur. Tapi kalau layer lokalisasi nanti
+> ditambah, complication akan tertinggal.
+
+Kalimat itu **benar** — dan karena itu berbahaya. Ia menutup celah dengan
+diagnosa yang benar, sementara yang sebenarnya hilang bukan hanya bridge.
+Dibuktikan dengan membangun XcodeGen lalu membaca `project.pbxproj` yang
+dihasilkannya: target complication **tidak punya fase Resources sama
+sekali**, dan `Localizable.xcstrings` hanya ada di dua app. Jadi bukan
+satu lapis yang hilang, tapi dua: tidak ada katalog untuk dibaca, dan tidak
+ada yang membacanya.
+
+### Cacat pertama: `Bundle.localizedString` tidak pernah mengembalikan `nil`
+
+`LocalizationBridge` memasang
+`Bundle.localizedString(forKey:value:table:)` dengan `value:` = nama
+kuncinya sendiri. Pola itu **benar sendiri** — string kosong membuat baris
+terlihat kosong tanpa penjelasan. Tapi konsekuensinya belum pernah
+dipikirkan: kalau kunci tidak ada di katalog, hasilnya adalah `value` — jadi
+kunci yang hilang kembali sebagai **nama kuncinya**, non-kosong, dan
+pemeriksaan "terjemahan tidak kosong" di `TextLocalization.text` **tidak
+menahannya**.
+
+Diverifikasi dengan program kecil, bukan dengan membaca (`Bundle.main` di
+Linux memang tidak punya `.lproj`, `localizations == []`):
+
+| Kunci | `localizedString` mengembalikan |
+|---|---|
+| tidak ada di katalog | `pointing.state.lock.label` — **namanya sendiri** |
+| `value: ""` | `pointing.state.lock.label` juga (kosong dicegah oleh API) |
+
+Jadi tiga label yang paling sering dibaca sekilas di seluruh app akan tampil
+sebagai pengenal mentah begitu bridge terpasang dan katalog tidak ikut:
+`pointing.state.lock.label`, `object.kind.star.display.label`,
+`confidence.level.medium.label`.
+
+Yang membuatnya bertahan: **teorinya benar** — "label punya terjemahan"
+memang terbukti (93 kunci + padanan `en`), aturan 6 hijau, dan satu-satunya
+gejalanya ada di tempat yang tidak pernah difoto: label tampil sebagai pengenal mentah hanya bila kunci hilang dari katalog,
+dan tidak ada satu pun gerbang yang bisa membuat katalog kehilangan kunci.
+
+### Perbaikannya di paket, bukan di bridge
+
+`TextLocalization.text` sekarang menolak hasil yang **sama dengan nama
+kuncinya**, lalu jatuh ke Bahasa Indonesia. Di paket, bukan di `Apps/`,
+supaya setiap bridge di masa depan otomatis ikut terlindungi — termasuk yang
+belum ada sekarang, termasuk `ComplicationLocalization` yang baru dibuat di
+siklus ini.
+
+Konsekuensinya dinyatakan jujur di kode: kalau katalog suatu saat hilang
+**total**, layar kembali Bahasa Indonesia tanpa terlihat rusak. Itu
+trade-off yang benar — lebih baik Bahasa Indonesia daripada
+`pointing.state.lock.label` di wajah pengguna.
+
+### Cacat kedua: tiga selip CJK yang tidak tertangkap aturan 3
+
+Aturan 3 menyapu `*.swift` di `Apps/` dan `Packages/`. Yang tertulis di
+`swift-ui-lint.sh` dan `project.yml` **tidak** tercakup — dan STATUS lama
+sudah memperingatkan soal ini sebagai kandidat perbaikan. Terbukti sekali
+lagi di siklus ini, bukan sebagai kemungkinan:
+
+| Tempat | Selip | Tertangkap? |
+|---|---|---|
+| `swift-ui-lint.sh` (komentar aturan 4) | 2 kata asing tersisip | **tidak** |
+| `ComplicationLocalization.swift` (komentar) | 3 kata asing tersisip | **ya** (aturan 3) |
+| `ComplicationWidget.swift` (komentar) | 4 kata asing tersisip | **ya** (aturan 3) |
+
+Selipnya sengaja **tidak ditulis ulang di sini** dengan huruf aslinya: kalau
+huruf itu ikut tercantum, sapuan karakter akan menandainya di dokumen status
+yang justru mencatat tempat selip itu. Yang dicatat jumlahnya, bukan isinya.
+
+Jadi aturan 3 menangkap selip di kode tapi buta di gerbang & konfigurasi —
+persis pola "hijau yang tidak hijau", kali ini pada alat yang auditorsnya
+gunakan. Kandidat penutup: perluas sapuannya ke `*.sh` + `project.yml`.
+
+### Cacat ketiga: aturan 4 buta terhadap metadata WidgetKit
+
+Aturan 4 menyapu view modifier (`Text`, tombol, label aksesibilitas).
+`.description("Objek terakhir yang dikenali, tanpa membuka app.")` — teks
+yang tampil di layar pemilihan complication watchOS — **tidak pernah
+disapu**, karena `description` bukan salah satu nama yang dipindai.
+Terbukti: di `ComplicationWidget.swift` yang sama, aturan 4 hanya melaporkan
+tiga kemunculan `Point & Know` (yang memang sengaja tidak diterjemahkan)
+sementara deskripsi complication yang sebenarnya tidak punya padanan `en`
+lolos.
+
+Daftar peritel diperluas ke yang teksnya kelihatan: metadata complication
+(`configurationDisplayName`, `description`), judul dialog konfirmasi, dan
+pengenal aksesibilitas. Kandidat yang tidak pernah muncul di repo ini
+sengaja **tidak** ditambahkan — daftar peritel yang tidak pernah dipakai
+hanya menambah permukaan untuk salah baca, bukan perlindungan.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 292 PointingKit, 0 gagal**
+  (naik dari 291; +1 uji). Engine tidak disentuh.
+- Uji baru **dibuktikan MERAH lebih dulu** pada `text()` lama: 3 assertion
+  gagal, menyebut gejalanya — *`("pointing.state.lock.label") is not equal
+  to ("Terkunci")`*, `("object.kind.star.display.label") is not equal to
+  ("Bintang")`, `("confidence.level.medium.label") is not equal to ("Ragu")`*.
+  Uji yang tidak pernah merah adalah formalitas.
+- Aturan 4 yang diperluas **dibuktikan dua arah di salinan**: tree bersih
+  hijau; `accessibilityHint("Petunjuk barkas tanpa entri katalog")` yang
+  disuntik → **merah**, sebut kuncinya.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS. `./swift-ui-lint.sh` → 6
+  aturan hijau.
+- XcodeGen **dibangun sendiri** (2.45.3, 185 detik) di container `swift:6.0`;
+  `xcodegen generate` pada repo → ketiga target punya
+  `Localizable.xcstrings` di fase Resources. **Sebelum perubahan: hanya
+  dua**, dan target complication tidak punya fase Resources sama sekali.
+- **CI hijau pada push pertama** (`a4ce1d0`):
+  - `Apple Build` run `37206180937` → **2× `BUILD SUCCEEDED`**, gerbang
+    peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37206180938` → hijau, dan uji baru
+    **terlihat lulus per nama di log CI** (bukan hanya di mesin ini).
+
+### Batas yang diketahui dan belum ditutup
+
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux.** `Bundle.main`
+  tidak punya `.lproj`, dan `String(localized:)` tidak ada di Swift 6.0
+  Linux. Yang terbukti: katalog ikut ke **setiap** bundel, dan setiap
+  proses extension punya bridge yang membacanya. Yang tidak: apakah `.xcstrings`
+  benar-benar diterjemahkan saat perangkat berjalan. Itu wilayah CI dan
+  perangkat.
+- **Daftar kunci aturan 5 bisa jadi sudah usang.** `Tools/xcodegen-known-keys.txt`
+  dibuat dari XcodeGen **2.46.0**, sedangkan yang bisa dibangun di VPS ini
+  tag-nya **2.45.3**. Perbedaannya tidak diperiksa, jadi aturan 5 mungkin
+  sudah menilai kunci yang sebenarnya berubah nama.
+- **Aturan 3 masih buta di `*.sh` dan `project.yml`** — dibuktikan di atas,
+  bukan asumsi.
+- `ComplicationProvider.init()` memasang bridge, tapi `TextLocalization` itu
+  singleton proses: kalau suatu saat complication punya lebih dari satu
+  sumber (mis. setelah `AppIntent`), urutan pemasangan jadi hal yang harus
+  dijaga. Saat ini hanya ada satu, jadi belum jadi masalah.
+
 ## Progres terakhir (4 Okt 2026 — 10 label yang tampil di layar tidak punya terjemahan)
 
 ### Premis siklus ini: STATUS sebelumnya menutup satu celah dengan kalimat yang salah
