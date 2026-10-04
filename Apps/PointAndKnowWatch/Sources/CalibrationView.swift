@@ -19,6 +19,18 @@ struct CalibrationView: View {
     @State private var statusMessage = "Tunjuk bintang acuan, lalu tekan Catat."
 
     var body: some View {
+        NightAwareContainer {
+            calibrationContent
+        } reduced: {
+            // Saat layar redup, alur kalibrasi tidak bisa dijalankan (gestur
+            // diabaikan sistem), dan layar ini memang tidak punya apa pun yang
+            // harus terbaca sekilas selain nama objek & status. Karena itu
+            // tampilan jam yang dipakai — bukan versi khusus kedua.
+            ReducedLuminanceView(engine: engine)
+        }
+    }
+
+    private var calibrationContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
                 phaseCard

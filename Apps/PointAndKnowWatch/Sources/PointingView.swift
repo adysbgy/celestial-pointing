@@ -20,6 +20,18 @@ struct PointingView: View {
     @AppStorage(NightModeStorage.key) private var nightMode = false
 
     var body: some View {
+        // Saat layar redup (Always-On), watchOS mengabaikan sebagian gestur dan
+        // meredupkan warna halus — jadi tampilan diganti versi sederhana &
+        // kontras tinggi, bukan sekadar diredupkan. Pilihan ini dibuat di satu
+        // tempat (`NightAwareContainer`) supaya tidak ada layar yang lupa.
+        NightAwareContainer {
+            fullView
+        } reduced: {
+            ReducedLuminanceView(engine: engine)
+        }
+    }
+
+    private var fullView: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 6) {
