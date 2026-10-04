@@ -16,7 +16,7 @@ struct CalibrationView: View {
     @ObservedObject var link: WatchLinkService
 
     @State private var session: CalibrationSession?
-    @State private var statusMessage = "Tunjuk bintang acuan, lalu tekan Catat."
+    @State private var statusMessage = CalibrationText.initialStatus
 
     /// Pesan status terakhir yang **sudah diumumkan** ke VoiceOver.
     ///
@@ -99,14 +99,15 @@ struct CalibrationView: View {
                 .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
             if let calibration = flow.calibration {
-                Text(String(format: "Offset %.1f°", calibration.yawOffsetDeg))
+                Text(CalibrationText.offsetDisplay(degrees: calibration.yawOffsetDeg))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(Color.nightAwareSecondary)
                     if let spread = calibration.residualSpreadDeg {
-                        Text(String(format: "Sebaran %.1f° (maks %.1f°)",
-                                    spread, session?.flow.maxResidualSpreadDeg ?? 3))
+                        let maxSpread = session?.flow.maxResidualSpreadDeg ?? 3
+                        Text(CalibrationText.spreadDisplay(spreadDeg: spread,
+                                                           maxDeg: maxSpread))
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(spread <= (session?.flow.maxResidualSpreadDeg ?? 3)
+                            .foregroundStyle(spread <= maxSpread
                                              ? PointingTone.success.color
                                              : PointingTone.warning.color)
                     }
@@ -228,8 +229,7 @@ struct CalibrationView: View {
         session?.refreshReferenceTargets()
         if let calibration = engine.controller.calibration as PointingCalibration?,
            calibration.sampleCount > 0, session?.flow.samples.isEmpty == true {
-            statusMessage = "Kalibrasi sudah terpasang: offset "
-                + String(format: "%.1f°", calibration.yawOffsetDeg) + "."
+            statusMessage = CalibrationText.alreadyInstalled(offsetDeg: calibration.yawOffsetDeg)
         }
     }
 
@@ -253,16 +253,16 @@ struct CalibrationView: View {
     private func apply() {
         guard let session else { return }
         guard let calibration = session.applyIfReady() else {
-            statusMessage = "Belum siap dipakai: sebarannya masih terlalu lebar."
+            statusMessage = CalibrationText.notReadyStatus
             return
         }
         engine.apply(calibration: calibration)
         // Kirim hasil kalibrasi ke iPhone: sigma ini yang menyetel ambang
         // keyakinan di sisi sana.
         link.send(calibration: calibration)
-        statusMessage = String(format: "Terpasang. Offset %.1f°, sebaran %.1f°.",
-                               calibration.yawOffsetDeg,
-                               calibration.residualSpreadDeg ?? .nan)
+        statusMessage = CalibrationText.installed(
+            offsetDeg: calibration.yawOffsetDeg,
+            spreadDeg: calibration.residualSpreadDeg ?? .nan)
     }
 
     private func reset() {
@@ -276,18 +276,13 @@ struct CalibrationView: View {
         // dilarang PRD. `apply()` sudah menyegarkan lewat engine; `reset()`
         // harus lewat jalur yang sama, bukan diam-diam melewatinya.
         engine.apply(calibration: .none)
-        statusMessage = "Kalibrasi dihapus. Mulai dari awal."
+        statusMessage = CalibrationText.resetStatus
     }
 
     // MARK: - Tampilan tahap
 
     private var phaseLabel: String {
-        switch session?.flow.phase ?? .idle {
-        case .idle: return "Belum ada acuan"
-        case .collecting: return "Mengumpulkan"
-        case .ready: return "Siap dipakai"
-        case .applied: return "Sudah dipakai"
-        }
+        (session?.flow.phase ?? .idle).displayName
     }
 
     private var phaseSymbol: String {

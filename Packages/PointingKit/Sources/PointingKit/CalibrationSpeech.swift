@@ -29,14 +29,14 @@ public extension CalibrationFlow {
     /// Angka diucapkan lengkap ("2.4 derajat"), bukan "2.4°": derajat adalah
     /// singkatan visual yang tidak terbaca sebagai kata.
     var spokenPhaseSummary: String {
-        var parts = ["Tahap: \(phase.spokenName)."]
-        parts.append("\(samples.count) acuan tercatat.")
+        var parts = [CalibrationText.spokenPhasePrefix(phase.spokenName)]
+        parts.append(CalibrationText.spokenSamplesRecorded(samples.count))
         if let offset = calibration?.yawOffsetDeg {
-            parts.append(String(format: "Offset %.1f derajat.", offset))
+            parts.append(CalibrationText.spokenOffset(degrees: offset))
         }
         if let spread = calibration?.residualSpreadDeg {
-            parts.append(String(format: "Sebaran %.1f derajat, batas %.1f derajat.",
-                                spread, maxResidualSpreadDeg))
+            parts.append(CalibrationText.spokenSpread(spreadDeg: spread,
+                                                      maxDeg: maxResidualSpreadDeg))
         }
         return parts.joined(separator: " ")
     }
@@ -49,25 +49,32 @@ public extension CalibrationFlow {
     /// terdengar **persis sama** dengan tombol yang bisa dipakai — padahal itu
     /// hasil yang paling mudah disalahartikan di seluruh alur ini.
     var spokenApplyButtonLabel: String {
-        isReady ? "Pakai kalibrasi ini" : "Pakai kalibrasi, belum bisa dipakai"
+        isReady ? CalibrationText.spokenApplyReady
+                : CalibrationText.spokenApplyNotReady
     }
 }
 
 public extension CalibrationPhase {
 
-    /// Nama tahap untuk diucapkan.
+    /// Nama tahap untuk **layar** — frasa pendek yang enak dibaca.
     ///
-    /// Beda dari label `phaseLabel` di view yang berupa kata/frasa singkat
-    /// ("Siap dipakai"). Untuk layar, frasa pendek lebih enak dibaca; untuk
-    /// suara, kalimat penuh lebih jelas tanpa simbol.
-    var spokenName: String {
+    /// Satu sumber dengan `spokenName`: dulu keduanya literal di tempat
+    /// berbeda, jadi satu perubahan bisa membuat layar dan suara menyebut
+    /// tahap yang berbeda untuk keadaan yang sama.
+    var displayName: String {
         switch self {
-        case .idle:      return "Belum ada acuan"
-        case .collecting: return "Mengumpulkan acuan"
-        case .ready:     return "Siap dipakai"
-        case .applied:   return "Sudah dipakai"
+        case .idle:       return TextLocalization.text(.calibrationPhaseIdleLabel)
+        case .collecting: return TextLocalization.text(.calibrationPhaseCollectingLabel)
+        case .ready:      return TextLocalization.text(.calibrationPhaseReadyLabel)
+        case .applied:    return TextLocalization.text(.calibrationPhaseAppliedLabel)
         }
     }
+
+    /// Nama tahap untuk diucapkan.
+    ///
+    /// Untuk suara, kalimat penuh lebih jelas tanpa simbol; nilainya kini
+    /// sama dengan label layar karena keduanya membaca katalog yang sama.
+    var spokenName: String { displayName }
 }
 
 public extension PointingTarget {
@@ -79,7 +86,7 @@ public extension PointingTarget {
     /// perbedaan itu keduanya terdengar sama. Dan "tinggi" diucapkan sebagai
     /// "derajat tinggi", karena "40° tinggi" bukan kalimat.
     var spokenCaptureLabel: String {
-        "Catat \(name) sebagai acuan, "
-            + String(format: "%.0f derajat tinggi.", direction.altitudeDeg)
+        CalibrationText.spokenCaptureLabel(name: name,
+                                           altitudeDeg: direction.altitudeDeg)
     }
 }

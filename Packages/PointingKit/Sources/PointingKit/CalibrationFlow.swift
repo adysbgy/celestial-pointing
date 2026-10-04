@@ -201,20 +201,21 @@ public struct CalibrationFlow {
     private var message: String {
         switch phase {
         case .idle:
-            return "Tunjuk bintang acuan, lalu tekan untuk mencatat."
+            return CalibrationText.idleMessage
         case .collecting:
             if samples.count < minimumSamples {
-                return "Butuh minimal \(minimumSamples) acuan (\(samples.count) tercatat)."
+                return CalibrationText.needMoreMessage(minimum: minimumSamples,
+                                                       recorded: samples.count)
             }
             let spread = calibration?.residualSpreadDeg ?? .nan
-            return String(format: "Sebaran %.1f° masih terlalu lebar (maks %.1f°). Tambah acuan.",
-                          spread, maxResidualSpreadDeg)
+            return CalibrationText.spreadTooWideMessage(spreadDeg: spread,
+                                                        maxDeg: maxResidualSpreadDeg)
         case .ready:
             let spread = calibration?.residualSpreadDeg ?? .nan
-            return String(format: "Siap — sebaran %.1f° dari %d acuan.",
-                          spread, samples.count)
+            return CalibrationText.readyMessage(spreadDeg: spread,
+                                                sampleCount: samples.count)
         case .applied:
-            return "Kalibrasi dipakai."
+            return CalibrationText.appliedMessage
         }
     }
 }

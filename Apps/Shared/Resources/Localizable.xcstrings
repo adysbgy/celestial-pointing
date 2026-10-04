@@ -2,6 +2,303 @@
   "sourceLanguage": "id",
   "version": "1.0",
   "strings": {
+    "calibration.message.idle": {
+      "comment": "Panduan awal alur kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at a reference star, then tap to record."
+          }
+        }
+      }
+    },
+    "calibration.message.needMore": {
+      "comment": "Belum cukup acuan; dua angka disisipkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Need at least %lld references (%lld recorded)."
+          }
+        }
+      }
+    },
+    "calibration.message.spreadTooWide": {
+      "comment": "Sebaran sisa terlalu lebar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f° is still too wide (max %.1f°). Add more references."
+          }
+        }
+      }
+    },
+    "calibration.message.ready": {
+      "comment": "Kalibrasi sudah layak dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready — spread %.1f° from %lld references."
+          }
+        }
+      }
+    },
+    "calibration.message.applied": {
+      "comment": "Kalibrasi sudah dipasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration applied."
+          }
+        }
+      }
+    },
+    "calibration.message.sensorUnavailable": {
+      "comment": "Sensor gerak mati saat mencatat acuan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor is off — the remaining aim is not a current measurement. Not recorded."
+          }
+        }
+      }
+    },
+    "calibration.message.noPointing": {
+      "comment": "Sensor belum memberi arah tunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No aim from the sensor yet."
+          }
+        }
+      }
+    },
+    "calibration.message.directionUncomputable": {
+      "comment": "Arah objek acuan tidak bisa dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction of %@ can't be computed — not recorded."
+          }
+        }
+      }
+    },
+    "calibration.message.noNearbyStar": {
+      "comment": "Tidak ada bintang acuan yang jelas.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No clear reference star in that direction — aim closer to a bright star."
+          }
+        }
+      }
+    },
+    "calibration.speech.phasePrefix": {
+      "comment": "Awalan pengumuman tahap kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phase: %@."
+          }
+        }
+      }
+    },
+    "calibration.speech.samplesRecorded": {
+      "comment": "Jumlah acuan yang tercatat, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references recorded."
+          }
+        }
+      }
+    },
+    "calibration.speech.offset": {
+      "comment": "Offset kalibrasi, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offset %.1f degrees."
+          }
+        }
+      }
+    },
+    "calibration.speech.spread": {
+      "comment": "Sebaran sisa, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f degrees, limit %.1f degrees."
+          }
+        }
+      }
+    },
+    "calibration.speech.applyReady": {
+      "comment": "Label tombol Pakai saat kalibrasi siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this calibration"
+          }
+        }
+      }
+    },
+    "calibration.speech.applyNotReady": {
+      "comment": "Label tombol Pakai saat belum bisa dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this calibration, not usable yet"
+          }
+        }
+      }
+    },
+    "calibration.speech.captureLabel": {
+      "comment": "Label tombol Catat acuan, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record %@ as reference, %.0f degrees high."
+          }
+        }
+      }
+    },
+    "calibration.status.initial": {
+      "comment": "Status awal layar kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at a reference star, then tap Record."
+          }
+        }
+      }
+    },
+    "calibration.status.alreadyInstalled": {
+      "comment": "Kalibrasi sesi sebelumnya sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration already installed: offset %.1f°."
+          }
+        }
+      }
+    },
+    "calibration.status.notReady": {
+      "comment": "Tombol Pakai ditekan sebelum siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not ready: the spread is still too wide."
+          }
+        }
+      }
+    },
+    "calibration.status.installed": {
+      "comment": "Kalibrasi baru saja dipasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed. Offset %.1f°, spread %.1f°."
+          }
+        }
+      }
+    },
+    "calibration.status.reset": {
+      "comment": "Kalibrasi dibuang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration cleared. Start over."
+          }
+        }
+      }
+    },
+    "calibration.display.offset": {
+      "comment": "Angka offset ringkas di kartu kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offset %.1f°"
+          }
+        }
+      }
+    },
+    "calibration.display.spread": {
+      "comment": "Angka sebaran ringkas di kartu kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f° (max %.1f°)"
+          }
+        }
+      }
+    },
+    "calibration.phase.idle.label": {
+      "comment": "Label tahap kalibrasi: belum ada acuan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reference yet"
+          }
+        }
+      }
+    },
+    "calibration.phase.collecting.label": {
+      "comment": "Label tahap kalibrasi: mengumpulkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collecting references"
+          }
+        }
+      }
+    },
+    "calibration.phase.ready.label": {
+      "comment": "Label tahap kalibrasi: siap dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to use"
+          }
+        }
+      }
+    },
+    "calibration.phase.applied.label": {
+      "comment": "Label tahap kalibrasi: sudah dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already applied"
+          }
+        }
+      }
+    },
     "%lld acuan tercatat": {
       "comment": "Jumlah acuan kalibrasi yang tercatat.",
       "localizations": {

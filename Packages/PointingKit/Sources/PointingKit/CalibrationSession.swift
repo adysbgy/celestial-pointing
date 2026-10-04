@@ -99,7 +99,7 @@ public final class CalibrationSession {
         CalibrationSessionStep(flow: flow.currentUpdate,
                                selectedTarget: nil,
                                applied: false,
-                               message: "Sensor gerak tidak aktif — arah tunjuk yang tersisa bukan pengukuran sekarang. Tidak dicatat.")
+                               message: CalibrationText.sensorUnavailableMessage)
     }
 
     /// Catat satu acuan yang dipilih pengguna dari daftar, memakai arah tunjuk
@@ -135,7 +135,7 @@ public final class CalibrationSession {
             return CalibrationSessionStep(flow: flow.currentUpdate,
                                           selectedTarget: nil,
                                           applied: false,
-                                          message: "Belum ada arah tunjuk dari sensor.")
+                                          message: CalibrationText.noPointingMessage)
         }
         guard let update = flow.add(objectID: objectID,
                                     measured: measured,
@@ -145,7 +145,7 @@ public final class CalibrationSession {
             return CalibrationSessionStep(flow: flow.currentUpdate,
                                           selectedTarget: nil,
                                           applied: false,
-                                          message: "Arah objek \(objectID) tidak bisa dihitung — tidak dicatat.")
+                                          message: CalibrationText.directionUncomputableMessage(objectID: objectID))
         }
         let target = target(forObjectID: objectID, date: date)
         return CalibrationSessionStep(flow: update,
@@ -195,7 +195,7 @@ public final class CalibrationSession {
             return CalibrationSessionStep(flow: flow.currentUpdate,
                                           selectedTarget: nil,
                                           applied: false,
-                                          message: "Belum ada arah tunjuk dari sensor.")
+                                          message: CalibrationText.noPointingMessage)
         }
         guard let target = controller.resolver.nearestTarget(to: measured,
                                                             observer: controller.observer,
@@ -203,7 +203,7 @@ public final class CalibrationSession {
             return CalibrationSessionStep(flow: flow.currentUpdate,
                                           selectedTarget: nil,
                                           applied: false,
-                                          message: "Tidak ada bintang acuan yang jelas di arah itu — dekatkan tunjuk ke bintang terang.")
+                                          message: CalibrationText.noNearbyStarMessage)
         }
         return capture(objectID: target.id, measured: measured, date: date)
     }

@@ -283,5 +283,29 @@ public extension LocalizedText {
         .sensorLocationUnknownStatus, .sensorLocationDeniedNote,
         .sensorLocationAccuracy, .sensorLocationFailedStatus,
         .sensorLocationFailedNote,
+        // Alur kalibrasi. Masuk daftar karena inilah satu-satunya jalur
+        // pesan tahap, pesan kegagalan, label yang diucapkan, dan angka kartu
+        // kalibrasi sampai ke pengguna — dan karena versi lamanya hidup
+        // sebagai literal di dalam `Packages/PointingKit` (`CalibrationFlow`,
+        // `CalibrationSession`, `CalibrationSpeech`) serta sebagai literal
+        // yang ditugaskan ke `statusMessage` di dalam view. Aturan 4 tidak
+        // menjangkau paket, dan Aturan 6 tidak melihat literal tanpa kunci,
+        // jadi seluruh alur kalibrasi tampil dalam Bahasa Indonesia di semua
+        // bahasa dengan setiap gerbang hijau. Lihat `CalibrationText.swift`.
+        .calibrationMessageIdle, .calibrationMessageNeedMore,
+        .calibrationMessageSpreadTooWide, .calibrationMessageReady,
+        .calibrationMessageApplied, .calibrationMessageSensorUnavailable,
+        .calibrationMessageNoPointing, .calibrationMessageDirectionUncomputable,
+        .calibrationMessageNoNearbyStar,
+        .calibrationSpeechPhasePrefix, .calibrationSpeechSamplesRecorded,
+        .calibrationSpeechOffset, .calibrationSpeechSpread,
+        .calibrationSpeechApplyReady, .calibrationSpeechApplyNotReady,
+        .calibrationSpeechCaptureLabel,
+        .calibrationStatusInitial, .calibrationStatusAlreadyInstalled,
+        .calibrationStatusNotReady, .calibrationStatusInstalled,
+        .calibrationStatusReset,
+        .calibrationDisplayOffset, .calibrationDisplaySpread,
+        .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,
+        .calibrationPhaseReadyLabel, .calibrationPhaseAppliedLabel,
     ]
 }
