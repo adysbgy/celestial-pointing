@@ -251,12 +251,14 @@ struct DiagnosticsView: View {
                     // tidak ada sekilas pun, jadi layar utama iPhone
                     // menampilkan "Mencari" dan lalu diam.
                     //
-                    // Barisnya sengaja memakai `stateGuidanceText` yang sama
+                    // Barisnya sengaja memakai `guidanceText` yang sama
                     // dan kunci katalog yang sama, bukan kalimat baru: kalau
                     // kalimatnya ditulis terpisah di view, ia bisa menyimpang
                     // dari yang diucapkan jam — dan dua app yang memberi
                     // petunjuk berbeda adalah cacat yang paling buruk.
-                    row("Panduan", engine.snapshot.state.guidance)
+                    // `guidanceText` (bukan `state.guidance`) supaya alasan
+                    // "mengapa tidak ada objek" dari engine ikut terbaca.
+                    row("Panduan", engine.snapshot.guidanceText)
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))

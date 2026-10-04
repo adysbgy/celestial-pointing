@@ -47,6 +47,17 @@ public struct PointingSnapshot: Equatable, Sendable {
     /// Apakah kalibrasi sudah pernah diselesaikan.
     public var isCalibrated: Bool
 
+    /// Mengapa engine tidak menemukan objek — hanya terisi saat keadaan
+    /// `.searching`, `nil` selebihnya.
+    ///
+    /// **Kenapa hanya `.searching`.** Saat `.pointing` pergelangan masih
+    /// bergerak dan resolusi terakhir berasal dari arah yang sudah ditinggalkan;
+    /// menampilkan "semua objek di bawah horizon" untuk arah yang **lama** akan
+    /// menjelaskan sesuatu yang tidak sedang ditunjuk. Saat ada jawaban
+    /// (`lock`/`uncertain`) `Resolution.searchHint` sendiri sudah `nil`. Jadi
+    /// hint hanya jujur di satu keadaan: diam, sudah diresolusi, tanpa kandidat.
+    public var searchHint: SearchHint?
+
     public init(state: PointingState,
                 intent: CelestialIntent? = nil,
                 rawPointing: HorizontalCoord? = nil,
@@ -55,7 +66,8 @@ public struct PointingSnapshot: Equatable, Sendable {
                 nearestNeighbourDeg: Double? = nil,
                 aim: DeviceAimAxis = .view,
                 hasSensor: Bool = true,
-                isCalibrated: Bool = false) {
+                isCalibrated: Bool = false,
+                searchHint: SearchHint? = nil) {
         self.state = state
         self.intent = intent
         self.rawPointing = rawPointing
@@ -65,6 +77,7 @@ public struct PointingSnapshot: Equatable, Sendable {
         self.aim = aim
         self.hasSensor = hasSensor
         self.isCalibrated = isCalibrated
+        self.searchHint = searchHint
     }
 
     /// Objek terbaik yang sedang ditampilkan.
@@ -366,7 +379,11 @@ public final class PointingController {
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             hasSensor: isSensorAvailable,
-            isCalibrated: calibration.sampleCount > 0
+            isCalibrated: calibration.sampleCount > 0,
+            // Alasan hanya jujur saat `.searching`: pergelangan sudah diam dan
+            // resolusi memang untuk arah tunjuk sekarang. Lihat
+            // `PointingSnapshot.searchHint`.
+            searchHint: state == .searching ? lastResolution?.searchHint : nil
         )
 
         let events = hapticEvents(from: previous, to: state)
@@ -443,8 +460,9 @@ public final class PointingController {
     }
 
     private func refreshSnapshot(state: PointingState? = nil) {
+        let resolved = state ?? machine.state
         snapshot = PointingSnapshot(
-            state: state ?? machine.state,
+            state: resolved,
             intent: machine.currentIntent,
             rawPointing: snapshot.rawPointing,
             calibratedPointing: snapshot.calibratedPointing,
@@ -452,7 +470,8 @@ public final class PointingController {
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             hasSensor: isSensorAvailable,
-            isCalibrated: calibration.sampleCount > 0
+            isCalibrated: calibration.sampleCount > 0,
+            searchHint: resolved == .searching ? lastResolution?.searchHint : nil
         )
     }
 }

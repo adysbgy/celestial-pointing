@@ -234,5 +234,11 @@ public extension LocalizedText {
         .moonPhaseWaxingCrescent, .moonPhaseWaningCrescent,
         .moonPhaseGibbous, .moonPhaseWaxingGibbous, .moonPhaseWaningGibbous,
         .moonPhaseQuarter, .moonPhaseFirstQuarter, .moonPhaseLastQuarter,
+        // Alasan "mengapa tidak ada objek". Masuk daftar karena inilah
+        // satu-satunya jalur alasan penolakan engine sampai ke layar:
+        // `Resolution.rejected` sudah lama dihitung dan tidak pernah dibaca.
+        // Lihat `SearchHint.swift`.
+        .searchHintDaylight, .searchHintBelowHorizon, .searchHintTooFaint,
+        .searchHintTooCloseToSun, .searchHintNoCandidates,
     ]
 }

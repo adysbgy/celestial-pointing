@@ -1882,6 +1882,61 @@
           }
         }
       }
+    },
+    "pointing.search.hint.daylight": {
+      "comment": "Alasan: langit belum cukup gelap untuk melihat bintang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sky is still bright — stars are not visible yet."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.belowHorizon": {
+      "comment": "Alasan: semua objek katalog sedang di bawah horizon.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every object in the catalogue is below the horizon."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.tooFaint": {
+      "comment": "Alasan: objek di arah itu terlalu redup.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The objects in that direction are too faint to see."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.tooCloseToSun": {
+      "comment": "Alasan: objek terlalu dekat Matahari untuk diamati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The objects are too close to the Sun to observe safely."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.noCandidates": {
+      "comment": "Alasan: tidak ada objek yang cocok di arah tunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object matches that direction yet."
+          }
+        }
+      }
     }
   }
 }

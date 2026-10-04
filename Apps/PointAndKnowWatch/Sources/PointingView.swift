@@ -227,11 +227,11 @@ struct PointingView: View {
             }
             return "Terkunci."
         case .uncertain:
-            return "Kurang yakin. \(state.guidance)"
+            return "Kurang yakin. \(engine.snapshot.guidanceText)"
         case .unavailable:
-            return "Sensor mati. \(state.guidance)"
+            return "Sensor mati. \(engine.snapshot.guidanceText)"
         case .idle, .pointing, .searching:
-            return "\(state.shortLabel). \(state.guidance)"
+            return "\(state.shortLabel). \(engine.snapshot.guidanceText)"
         }
     }
 
@@ -253,7 +253,7 @@ struct PointingView: View {
                     .font(.headline)
                     .foregroundStyle(state.tone.color)
             }
-            Text(state.guidance)
+            Text(engine.snapshot.guidanceText)
                 .font(.caption)
                 .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                 .multilineTextAlignment(.center)
@@ -297,7 +297,7 @@ struct PointingView: View {
     /// diumumkan adalah keadaan, panduannya, dan laju dengan satuannya.
     private var statusAccessibilityLabel: String {
         let state = engine.snapshot.state
-        var parts = ["Keadaan: \(state.shortLabel).", state.guidance]
+        var parts = ["Keadaan: \(state.shortLabel).", engine.snapshot.guidanceText]
         if let rate = engine.snapshot.angularRateDegPerSec {
             parts.append(String(format: "Laju pergelangan %.0f derajat per detik.", rate))
         }

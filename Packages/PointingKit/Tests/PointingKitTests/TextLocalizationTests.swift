@@ -205,7 +205,7 @@ final class TextLocalizationTests: XCTestCase {
 
     /// `allKeys` adalah sumber untuk gerbang paritas, jadi ia harus benar
     /// **sebagai daftar**: tanpa duplikat, tanpa kunci kosong, dan lengkap
-    /// (41 kunci). Hitungan dikunci dengan angka supaya kunci yang hilang
+    /// (46 kunci). Hitungan dikunci dengan angka supaya kunci yang hilang
     /// tidak bisa lolos hanya karena "tidak ada yang menyebutnya".
     ///
     /// Angka ini **sengaja** harus diperbarui setiap kali kunci ditambah:
@@ -214,7 +214,7 @@ final class TextLocalizationTests: XCTestCase {
     /// Memperbarui angkanya adalah harga untuk itu, bukan gangguan.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 41, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 46, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
