@@ -257,11 +257,13 @@ struct DiagnosticsView: View {
                         // sisa). `TimelineView` di bawah menyegarkan 30×/detik,
                         // jadi pop dijaga `.onChange` agar hanya berjalan sekali
                         // per kedatangan, bukan per frame.
-                        LockArrivalPanel(visual: visual,
-                                         object: object,
-                                         isStale: engine.isDisplayingStaleObject,
-                                         lockArrivalToken: engine.lockArrival?.token,
-                                         pulse: pulsePhase)
+                        if let visual = engine.visualForDisplayedObject {
+                            LockArrivalPanel(visual: visual,
+                                             object: object,
+                                             isStale: engine.isDisplayingStaleObject,
+                                             lockArrivalToken: engine.lockArrival?.token,
+                                             pulse: pulsePhase)
+                        }
                     }
                     if let pointing = engine.pointing {
                         row("Arah", String(format: "%.1f° / %.1f°",
@@ -409,7 +411,12 @@ struct DiagnosticsView: View {
     /// Monospaced bukan gaya — angka RA/Dec yang rata kanan adalah bentuk
     /// yang membuat dua kolom angka bisa dibandingkan sekilas, dan
     /// `disclosure` ini dipakai untuk membandingkan.
-    private func detailRow(_ title: String, _ value: String) -> some View {
+    ///
+    /// `static` karena dipakai juga oleh `LockArrivalPanel` (nested type),
+    /// yang tidak bisa memanggil instance method `DiagnosticsView`. Murni:
+    /// hanya memakai `SurfacePalette` static + argumennya, jadi aman lepas
+    /// dari instance.
+    static func detailRow(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
                 .foregroundStyle(SurfacePalette.active.textSecondaryColor)
@@ -482,12 +489,12 @@ struct DiagnosticsView: View {
                         // membuat lima angka bersaing dengan satu jawaban.
                         DisclosureGroup {
                             VStack(alignment: .leading, spacing: 2) {
-                                detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
+                                DiagnosticsView.detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
                                 if object.kind == .star {
-                                    detailRow("RA", String(format: "%.4f°", object.raDeg))
-                                    detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                    DiagnosticsView.detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                    DiagnosticsView.detailRow("Dec", String(format: "%+.4f°", object.decDeg))
                                 }
-                                detailRow("Id katalog", object.id)
+                                DiagnosticsView.detailRow("Id katalog", object.id)
                             }
                             .padding(.top, 4)
                         } label: {
@@ -500,7 +507,7 @@ struct DiagnosticsView: View {
                     .accessibilityElement(children: .contain)
                     // Label ini hanya untuk bagian **atas**; grup dan disclosure
                     // di bawahnya tetap elemen terpisah supaya bisa dibuka.
-                    .accessibilityLabel(visualPanelLabel(
+                    .accessibilityLabel(DiagnosticsView.visualPanelLabel(
                         object: object,
                         stale: isStale,
                         includeTechnicalDetails: false))
@@ -530,6 +537,9 @@ struct DiagnosticsView: View {
 
     /// Label panel gambar untuk VoiceOver.
     ///
+    /// `static` karena dipanggil dari `LockArrivalPanel` (nested type). Murni:
+    /// hanya bergantung pada argumen + `object.kind`, tidak pada instance.
+    ///
     /// **Tidak pernah menyebut visualnya.** "Gambar Jupiter dengan pita
     /// oranye" tidak menambah informasi yang tidak sudah ada di nama dan jenis
     /// benda, tapi ia menambah satu kalimat panjang yang harus didengarkan
@@ -542,7 +552,7 @@ struct DiagnosticsView: View {
     /// memang membuka detail. Kalau detail ikut di pengumuman utama, setiap
     /// kali panel tampil pengguna mendengar lima angka sebelum tahu benda apa
     /// yang sedang dilihat.
-    private func visualPanelLabel(object: CelestialObject,
+    static func visualPanelLabel(object: CelestialObject,
                                   stale: Bool,
                                   includeTechnicalDetails: Bool = true) -> String {
         var parts = [object.name, object.kind.spokenName]
