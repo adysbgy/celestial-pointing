@@ -32,7 +32,7 @@ struct PointAndKnowWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PointingView(engine: engine, motion: motion, link: link)
+            PointingView(engine: engine, motion: motion, link: link, location: location)
                 .onAppear(perform: start)
                 .onDisappear { stop() }
                 .sheet(isPresented: .init(

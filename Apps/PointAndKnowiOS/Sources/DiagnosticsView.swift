@@ -302,6 +302,14 @@ struct DiagnosticsView: View {
                     if let reason = motion.unavailableReason {
                         Text(reason).foregroundStyle(PointingTone.danger.color)
                     }
+                    // Penolakan izin lokasi (atau kegagalan pengambilan) harus
+                    // terlihat, bukan diam: engine tetap jalan dengan lokasi
+                    // darurat (Jakarta), tapi langit dihitung untuk tempat yang
+                    // salah. `note` `nil` saat normal, jadi tidak pernah
+                    // memunculkan pesan menakutkan saat segalanya beres.
+                    if let note = location.note {
+                        Text(note).foregroundStyle(PointingTone.warning.color)
+                    }
                 }
 
                 Section("Kontrol") {

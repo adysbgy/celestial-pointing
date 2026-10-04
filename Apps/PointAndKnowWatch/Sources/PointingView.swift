@@ -13,6 +13,9 @@ struct PointingView: View {
     @ObservedObject var engine: PointingEngine
     @ObservedObject var motion: MotionLogger
     @ObservedObject var link: WatchLinkService
+    /// Pemasok lokasi: dibutuhkan supaya penolakan izinnya bisa ditampilkan
+    /// (lihat `location.note`), bukan diam.
+    @ObservedObject var location: LocationProvider
 
     /// Preferensi mode malam, disimpan ke `UserDefaults` lewat `NightMode`.
     /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
@@ -103,6 +106,19 @@ struct PointingView: View {
                         Text(note)
                             .font(.footnote)
                             .foregroundStyle(PointingTone.danger.color)
+                            .multilineTextAlignment(.center)
+                    }
+                    // Izin lokasi ditolak (atau gagal) **harus terlihat**, bukan
+                    // diam: engine tetap jalan dengan lokasi darurat, tapi
+                    // pengguna berhak tahu bahwa langit dihitung untuk Jakarta,
+                    // bukan tempatnya. `note` ini `nil` saat normal — beda dari
+                    // `statusText` yang memakai teks netral — jadi menampilkannya
+                    // tidak pernah memunculkan pesan menakutkan saat segalanya
+                    // beres.
+                    if let note = location.note {
+                        Text(note)
+                            .font(.footnote)
+                            .foregroundStyle(PointingTone.warning.color)
                             .multilineTextAlignment(.center)
                     }
                     // Peringatan ini harus muncul tepat saat lokasinya BUKAN

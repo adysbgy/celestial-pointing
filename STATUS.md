@@ -1,5 +1,66 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — izin lokasi ditolak akhirnya terlihat, bukan diam)
+
+### Premis siklus ini: Fase C dimulai dari celah yang paling berdampak
+
+Bagian 1–4 (visual + polish) dan Fase A (malam, AOD, VoiceOver) serta Fase B
+(animasi, Dynamic Type, audio) sudah terpasang. Dari empat celah Fase C, tiga
+sudah ada: Info.plist izin (item 3) tertulis di `project.yml`; widget (item 1)
+dan lokalisasi (item 2) belum dipegang. Item 4 — **verifikasi izin runtime** —
+justru punya cacat nyata yang belum tertutup, dan itulah yang dikerjakan dulu.
+
+### Cacat yang ditemukan: penolakan izin lokasi diam
+
+`LocationProvider` memang menghitung `statusText = "Izin lokasi ditolak — memakai
+lokasi bawaan"` saat `authorizationStatus` `.denied`/`.restricted`, di **dua**
+tempat (`start()` dan `locationManagerDidChangeAuthorization`). Tapi `statusText`
+itu **tidak pernah dibaca UI mana pun** — ia hanya `private(set)` lokal. Akibatnya
+saat pengguna menolak izin lokasi, engine tetap jalan dengan `ObserverLocation.fallback`
+(Jakarta), dan layar jam/iPhone **tetap terlihat normal**: tidak ada peringatan,
+tidak ada penanda. Pengguna tidak tahu bahwa seluruh langit dihitung untuk Jakarta,
+bukan tempatnya. Itu tepat kelas "kegagalan diam" yang berulang kali dilarang PRD
+("jangan diam saat izin ditolak"), dan sepadan dengan cacat sensor-mati yang sudah
+ditutup di siklus lalu — hanya beda sumber.
+
+Sebaliknya `MotionLogger.unavailableReason` **memang** ditampilkan (di `PointingView`
+dan `DiagnosticsView`), jadi penolakan sensor terlihat sedangkan penolakan lokasi
+tidak. Dua jalur izin yang seharusnya sama justru berbeda: satu diam, satu terlihat.
+
+### Yang diubah, dan kenapa begini
+
+- **`LocationProvider.note` (`String?`)** — satu sumber peringatan yang `nil` di
+  luar keadaan gagal. Sengaja **bukan** `statusText` apa adanya: `statusText`
+  memakai nilai netral ("Lokasi belum diminta", "Mencari lokit…") yang bukan
+  kesalahan, jadi membakar semuanya ke layar justru memunculkan pesan menakutkan
+  saat segalanya normal. `note` di-set hanya pada `.denied`/`.restricted` dan pada
+  `didFailWithError`, dan **di-clear** (`nil`) saat lokasi sungguhan tiba serta saat
+  mulai mengambil (jalur `default`). Semantik "ada peringatan ↔ nilai tidak-nil"
+  inilah yang membuat tampilan tidak perlu membedakan teks.
+- **Pesan penolakan menyebut jalan keluar**: "Buka Pengaturan untuk mengizinkan,
+  atau pakai lokasi bawaan (Jakarta)." Bukan sekadar "ditolak" — pengguna harus tahu
+  bahwa app tetap berguna (dengan akurasi yang diketahui buruk), dan cara memperbaiki.
+- **`PointingView` menerima `location: LocationProvider`** (sebelumnya tidak) dan
+  menampilkan `location.note` di bawah peringatan sensor, dengan `PointingTone.warning`.
+  `PointAndKnowWatchWatchApp` menyuntikkannya.
+- **`DiagnosticsView` menampilkan `location.note`** di bagian "Sensor & lokasi",
+  sejajar dengan `motion.unavailableReason`.
+
+Perubahan murna `Apps/`: `PointingKit`/`CelestialEngine` tidak disentuh, jadi 165 +
+252 test tidak bisa terpengaruh.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **165 CelestialEngine + 252 PointingKit, 0 gagal** (naik
+  dari STATUS lama "166 + 244"; angka terbaru dari satu siklus ini). Engine tidak
+  disentuh.
+- Gerbang sintaks `swiftc -parse -swift-version 5` seluruh 22 berkas app lolos di
+  container `swift:6.0` (`ALL PARSED`) — `LocationProvider.note` baru, injeksan
+  `location` ke `PointingView`, dan call-site `PointAndKnowWatchWatchApp` semua
+  lolos parse.
+- CI macOS (Apple Build) akan memverifikasi resolusi tipe (`@ObservedObject
+  var location` baru, `location.note`) yang `-parse` tidak selesaikan.
+
 ## Progres terakhir (4 Okt 2026 — fase gibbous & purnama tergambar sebagai komplemennya)
 
 ### Premis siklus ini: "sabit benar arahnya" belum berarti "fase benar besarnya"
