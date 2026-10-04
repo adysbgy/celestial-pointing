@@ -1,6 +1,49 @@
 # STATUS — Celestial Pointing Engine
 
-## Progres terakhir (4 Okt 2026 — peringatan keselamatan tidak lagi hilang saat layar redup)
+## Progres terakhir (4 Okt 2026 — putusan GoTo tidak lagi membeku selama tunjukan ditahan)
+
+### Putusan keselamatan yang membeku atas langit yang sudah bergerak
+
+`PointingEngine` menyimpan `SlewDecision` supaya efemeris tidak dijalankan
+20×/detik dari `publish`. Versi sebelumnya membatasi dengan **tanda tangan**
+(keadaan, objek) saja. Itu menjawab satu pertanyaan dengan benar — "apakah
+subjek putusannya berubah?" — dan melewatkan pertanyaan kedua: putusan GoTo
+bergantung bukan hanya pada objek **mana** yang ditunjuk, melainkan pada **di
+mana** objek itu dan **di mana** Matahari saat putusan dihitung. Keduanya
+bergerak.
+
+Akibatnya, objek yang terkunci di 30.2° dari Matahari (aman) bisa melintasi
+ambang 30° tanpa satu pun perhitungan ulang. Selama pengguna menahan tunjukan,
+tanda tangannya tidak pernah berubah, jadi putusan lamanya bertahan — dan layar
+terus berkata "aman" atas geometri yang sudah tidak ada. Ini kelas cacat yang
+sama dengan complication yang membaca snapshot sekali lalu membeku, kali ini
+pada satu-satunya bagian yang menyangkut keselamatan alat dan mata.
+
+- **`SlewVerdictRefreshGate`** (PointingKit, teruji di Linux) — putusan boleh
+  dipakai selama subjeknya sama **dan** umurnya di bawah 30 detik. Dua jalur
+  harus ada: menghilangkan cabang umur tidak membuat apa pun terlihat salah di
+  layar sampai sebuah penolakan keselamatan diam-diam berubah menjadi izin.
+- **Umur 30 detik sengaja sama dengan `skyContextInterval`** — keduanya
+  menjawab pertanyaan yang sama ("berapa lama hasil efemeris masih berlaku"),
+  dan dua angka berbeda untuk satu pertanyaan adalah cara aturan yang sama mulai
+  berbeda pendapat.
+- **Batasnya dicatat jujur.** Matahari dan objek masing-masing bergerak
+  ~0.25°/menit terhadap horizon, jadi jaraknya berubah paling cepat ~0.5°/menit;
+  dengan umur 30 detik, putusan bisa **terlambat** paling banyak ~0.25° sebelum
+  dihitung ulang — dua orde di bawah ambang terkecil (10°). Keterlambatannya
+  terbatas dan diketahui, bukan tak terbatas seperti sebelumnya.
+- **`update(location:)` me-reset gerbang** — arah Matahari dan ketinggian target
+  bergeser bersama lokasi, dan tanda tangan (keadaan, objek) tidak menangkap
+  itu: objek yang sama di langit baru tetap bertanda tangan sama.
+
+Tujuh uji baru (`SlewVerdictRefreshGateTests`), termasuk uji inti yang gagal
+tanpa cabang umur.
+
+Gerbang: `swift-test.sh` **166 + 394 hijau** (README diperbarui), typecheck
+hijau, ui-lint hijau. CI: Engine Tests (Linux) `37225024147` = success, Apple
+Build `37225024142` = success.
+
+
 
 ### Layar yang paling miskin justru paling butuh satu baris ini
 
