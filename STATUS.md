@@ -1,5 +1,143 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — jalur objek langit dalam ada, tapi tak pernah tersambung)
+
+### Premis siklus ini: cari jalur yang mati, bukan bentuk yang salah
+
+Tiga belas siklus terakhir bergerak di dalam satu kelas: bentuk raster yang
+salah — terpotong, menembus bola, keluar `Canvas`, warna malam bukan merah.
+Semua ditutup dengan memindahkan angka batas ke model yang teruji. Siklus ini
+membalik pertanyaannya: bukan "bentuk mana yang salah", tapi **"jalur mana
+yang tidak pernah berjalan"**.
+
+Jawabannya dihitung, bukan ditebak: seluruh jalur visual **objek langit
+dalam** ada dan teruji — `CelestialVisual.Kind.deepSky`,
+`VisualFrame.nebula(fuzziness:)`, aksen `NightVisual.deepSky`, label &
+pengucapan `ObjectKind.deepSky`, `drawDeepSky`, dan resolver yang **sudah**
+menulis `for object in catalogue where object.kind == .star || object.kind ==
+.deepSky`. Tapi tidak ada satu pun katalog yang memuat objek ber-`kind:
+.deepSky`. Jadi `drawDeepSky` **tidak pernah berjalan di aplikasi mana pun**;
+satu-satunya yang pernah membangun `CelestialVisual(kind: .deepSky)` adalah
+uji.
+
+### Kenapa ini kelas cacat yang paling sulit dilihat
+
+Bentuknya sama dengan kelas yang sudah berulang di repo ini: **setiap bagian
+benar secara terpisah, dan yang hilang adalah jalur yang menghubungkannya.**
+Yang membuatnya lebih licin daripada cacat geometri:
+
+- **Tidak ada yang bisa dilihat.** Cacat geometri menghasilkan gambar yang
+  salah — mata bisa menangkapnya kalau tahu harus melihat ke mana. Ini
+  menghasilkan **tidak ada gambar sama sekali** untuk kelas objek itu. Layar
+  tampak normal; hanya saja satu kelas benda yang sudah dijanjikan di seluruh
+  kode tidak pernah muncul.
+- **Tidak ada gerbang yang menyala.** Uji visual menguji geometri
+  `nebula(fuzziness:)` dengan nilai yang **ditulis tangan** di uji — jadi
+  fungsinya terbukti benar tanpa pernah dipanggil dengan objek sungguhan. Uji
+  label menguji `ObjectKind.deepSky` sebagai enum. Uji `hasPulse` memanggil
+  `object(id: "m42", kind: .deepSky)` — yang **membuat** objeknya di uji.
+  Semuanya hijau, dan semuanya benar.
+- **Katalog yang ada tidak boleh diubah.** `Catalogue.brightStars` dikunci
+  oleh uji engine: `testAuditTrailIsConsistent` menuntut
+  `consideredCount == brightStars.count + pointableBodies.count`, dan uji
+  warna menuntut **setiap** anggotanya ber-`kind: .star`. Menambahkan nebula
+  ke sana akan memecahkan keduanya — dan keduanya benar: itu memang katalog
+  **bintang**. Jadi jalurnya tidak bisa ditutup dengan menambah satu baris ke
+  katalog lama; ia butuh katalog baru.
+
+### Yang diubah, dan kenapa begini
+
+- **`DeepSkyCatalogue` (PointingKit, teruji di Linux)** — enam objek yang
+  paling dikenal dan terang (Pleiades, Andromeda, Ptolemy, Orion, Hercules,
+  Laguna), koordinat J2000. Ditaruh di `PointingKit`, bukan `CelestialEngine`,
+  karena engine **tidak disentuh** oleh siklus ini (166-nya tidak boleh
+  berubah).
+- **`EngineFactory.productionCatalogue = brightStars + deepSky`, dan kedua
+  `makeResolver` memakainya.** Satu tempat yang menggabungkan, dan itu tempat
+  yang sama yang dipakai **kedua** app — jadi jalurnya terbuka untuk jam dan
+  iPhone sekaligus, bukan untuk yang kebetulan merakit resolver dengan
+  katalog lebih luas. Ini juga yang membuatnya bisa diuji di Linux.
+- **`fuzziness` per id, bukan satu angka untuk semua.** Versi lama memakai
+  `0.8` untuk setiap objek langit dalam — nebula, gugus, dan galaksi tampil
+  sebagai bentuk yang identik. Galaksi Andromeda (1.0, lebar & samar) dan
+  gugus bola Hercules (0.35, padat & kecil) adalah pasangan yang paling
+  berbeda; menyamakannya menghapus satu-satunya informasi yang membedakan
+  kelas ini dari bintang. Id tak dikenal mengembalikan nilai tengah (0.6),
+  **bukan 0**: nol berarti "titik", dan nebula tak dikenal yang digambar
+  sebagai titik mengklaim bentuk yang tidak dimilikinya.
+- **`CalibrationSession` hanya menawarkan bintang sebagai acuan.** Ini bukan
+  kosmetik. Kebenaran kalibrasi diambil dari posisi katalog, dan posisi objek
+  langit dalam juga di katalog — jadi menyaringnya **bukan** soal posisi.
+  Yang salah: objek ini **tidak punya tepi**, jadi pengguna tidak bisa tahu
+  bagian mana dari kabut Orion yang ia tunjuk. Sampel acuannya jauh lebih
+  berisik, dan itu melebarkan `residualSpreadDeg` — membuat kalibrasi terlihat
+  lebih buruk daripada sesungguhnya, atau lebih buruk lagi: terlihat "siap"
+  dengan offset yang salah.
+
+### Uji: 11 regresi, tiga mutasi dibuktikan MERAH lebih dulu
+
+Dijalankan lewat `./red-test.sh` (yang menerapkan satu mutasi, memastikan uji
+MERAH, lalu mengembalikan sumber):
+
+| Mutasi | Uji yang menangkap | Hasil |
+|---|---|---|
+| `productionCatalogue` dikembalikan ke `brightStars` saja | `testProductionCatalogueContainsDeepSkyObjects` | **MERAH**: `0` ≠ `6` |
+| `fuzziness` dikembalikan ke `0.8` untuk semua | `testDeepSkyTargetReachesVisualWithItsOwnShape` | **MERAH**: `0.8` ≠ `0.55`/`1.0`/`0.5`/`0.9`/`0.35` |
+| filter `kind == .star` dibuang dari daftar acuan | `testDeepSkyObjectsAreNeverOfferedAsCalibrationReferences` | **MERAH**: nebula ditawarkan sebagai acuan |
+
+Uji kalibrasi sengaja **tidak vacuous**: ia lebih dulu mencari waktu ketika M42
+benar-benar di atas horizon dan membuktikan objeknya lolos penyaring horizon —
+jadi tanpa filter jenis, ia memang akan masuk daftar acuan. Uji yang tidak bisa
+gagal adalah formalitas.
+
+Dua mutasi pertama menemukan cacat yang sudah ada (jalur mati). Mutasi ketiga
+adalah **regresi yang sengaja ditambahkan siklus ini** — kelas cacat baru yang
+akan lahir kalau objek bertepi kabur masuk ke daftar acuan, dan yang tidak akan
+terlihat dari layar.
+
+### Bukti merah
+
+Ketiga baris tabel di atas dijalankan sungguhan; keluarannya cocok persis
+dengan yang diharapkan. Sumber dipulihkan dan diverifikasi lewat `git status`
+(bersih sebelum commit).
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 326 PointingKit** (naik dari
+  315 → 326: 11 uji baru), **0 gagal**. Engine **tidak disentuh**.
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS** (build paket + parse
+  seluruh `Apps/`).
+- `./swift-ui-lint.sh` → **8 aturan hijau** (termasuk paritas katalog &
+  sapuan aksara).
+- Sapuan CJK pada 5 berkas yang diubah/ditambah → **0**.
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat.** Uji menegakkan bahwa jalur objek
+  langit dalam **ada dan tersambung** (katalog → resolver → target → visual
+  dengan `fuzziness` yang benar). Bahwa nebula sungguhan tampak bagus di
+  layar jam 41mm belum diverifikasi — itu butuh perangkat.
+- **Koordinat & magnitudo dari ingatan, bukan dari katalog acuan.** Enam
+  objek itu koordinat J2000 dan magnitudo terintegrasinya adalah nilai yang
+  lazim dipakai, bukan hasil unduhan katalog. Untuk *penunjukan* ini cukup
+  (galat busur tidak mengubah kesimpulan), tapi tidak boleh disebut
+  "terverifikasi" sampai dicocokkan dengan sumber acuan seperti `brightStars`
+  yang punya fixture JPL Horizons.
+- **Ambang `fuzziness` adalah pilihan bentuk, bukan pengukuran.** Nilai
+  0.35…1.0 dipilih supaya bentuk antar-objek berbeda; ia bukan ukuran sudut
+  objek di langit. Uji menegakkan **bahwa** bentuknya berbeda dan berada di
+  rentang yang sah, bukan bahwa nilai itu yang paling benar.
+
+### CI
+
+Push `504a923` hijau pada percobaan pertama:
+
+- **Engine Tests (Linux)** run `37215870794` — 166 + 326, 0 failures, gerbang
+  sapu UI hijau di macOS.
+- **Apple Build** run `37215870706` — `BUILD SUCCEEDED` untuk app iPhone dan
+  app jam, gerbang peringatan bersih, plus job **Paket (Apple SDK)** yang
+  membangun kedua paket dan menjalankan uji PointingKit di SDK Apple.
+
 ## Progres terakhir (4 Okt 2026 — bentuk Bulan terlihat, tapi tidak terdengar)
 
 ### Premis siklus ini: cari informasi yang hanya punya satu indera
