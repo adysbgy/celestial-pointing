@@ -6385,7 +6385,9 @@ memakai **terjemahan** sebagai cetakan — kalau ia membaca `key.indonesian`,
 semua nilai terformat akan selalu Bahasa Indonesia tanpa satu pun kegagalan
 terlihat.
 
-Gate: lint **13/13**, typecheck lulus.
+Gate: lint **13/13**, typecheck lulus. CI: Engine + Apple Build **success**
+(`37236063140` + `37236063163`) — termasuk "Gerbang peringatan (kode sendiri)",
+yang gagal bila ada warning dari kode kita.
 
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
