@@ -163,26 +163,27 @@ final class RowSpeechTests: XCTestCase {
         XCTAssertEqual(RowSpeech.spokenError(2.5), "error 2.5 degrees")
     }
 
-    /// Urutan kata di kalimat galat dikendalikan katalog.
+    /// Kalimat galat memakai template katalog **apa adanya**, bukan template
+    /// bawaan yang dikubur di kode.
     ///
-    /// Bahasa Indonesia menaruh angkanya di akhir. Bahasa lain bisa
-    /// menaruhnya di awal; uji ini membuktikan template-nya benar-benar
-    /// dipakai, bukan hanya kata-katanya yang ditukar.
+    /// Kalau `spokenError` mengabaikan katalog dan memakai `id:` bawaannya,
+    /// uji ini merah. Itu bentuk yang benar-benar pernah terjadi di repo ini:
+    /// teks yang lahir di paket tanpa melewati `LocalizedText` sama sekali.
     ///
-    /// Template pengganti **wajib type-compatible** dengan argumen yang
-    /// dikirim `spokenError` (`%@`, `%.1f`, `%@`). Menukar posisi `%.1f`
-    /// dengan `%@` tidak sekadar mengubah urutan kata — ia memberi specifier
-    /// angka kepada `String`, dan di CoreFoundation itu **crash**, bukan
-    /// sekadar keluaran yang salah. Linux memaafkannya, jadi bentuk itu lolos
-    /// `swift-test.sh` dan baru meledak di CI macOS.
-    func testErrorSentenceOrderComesFromTheCatalog() {
+    /// **Kenapa tidak ada uji yang menukar urutan angka ke depan.** Itu
+    /// memang keinginan bahasa lain, dan memang **tidak bisa** dilakukan lewat
+    /// katalog: memindahkan `%.1f` melewati `%@` mengubah urutan tipe
+    /// specifier, dan `%.1f` yang menerima `String` = crash di
+    /// CoreFoundation. Aturan 11 menegakkan larangan itu untuk seluruh
+    /// katalog. Batas ini nyata dan dicatat, bukan disembunyikan.
+    func testErrorSentenceComesFromTheCatalogVerbatim() {
         TextLocalization.install { key in
-            key == "row.speech.error" ? "[%@|%@|%.1f]" : nil
+            key == "row.speech.error" ? "«%@» %.1f [%@]" : nil
         }
         defer { TextLocalization.reset() }
 
-        XCTAssertEqual(RowSpeech.spokenError(2.5), "[galat|derajat|2.5]",
-                       "urutan template katalog harus dipakai apa adanya")
+        XCTAssertEqual(RowSpeech.spokenError(2.5), "«galat» 2.5 [derajat]",
+                       "template katalog harus dipakai apa adanya")
     }
 
     /// Judul kosong tidak memanggil format sama sekali.

@@ -465,7 +465,7 @@
       }
     },
     "row.speech.error": {
-      "comment": "Kalimat galat pointing: kata, angka, satuan.",
+      "comment": "Kalimat galat pointing: kata, angka, satuan. Urutan tipe specifier wajib sama dengan template kode (%@ %.1f %@) — Aturan 11 menegakkannya.",
       "localizations": {
         "en": {
           "stringUnit": {

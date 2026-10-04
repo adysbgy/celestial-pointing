@@ -880,6 +880,84 @@ else
   echo "Bersih: hitungan uji di README cocok."
 fi
 
+# ── Aturan 11: specifier katalog harus cocok tipe dengan template kode ─────
+# Katalog adalah berkas terjemahan. Bentuk yang paling wajar ditulis
+# penerjemah — menukar posisi specifier supaya angkanya di depan — bisa
+# **menjatuhkan app**, bukan sekadar salah kata.
+#
+# Buktinya nyata di repo ini, dan baru muncul di CI macOS: `spokenError`
+# mengirim `(String, Double, String)` dengan template `"%@ %.1f %@"`. Uji
+# urutan menulis template pengganti `"%.1f %@ %@"`; `%.1f` menerima sebuah
+# `String`. **Di CoreFoundation itu crash**; glibc memaafkannya, jadi
+# `swift-test.sh` hijau 450 uji dan hanya CI macOS yang merah.
+#
+# Jebakan yang sama sudah tercatat sekali (specifier posisional `%1$@`
+# berperilaku beda di CoreFoundation vs Swift Foundation). Dua-duanya bentuk
+# yang tak bisa ditangkap di Linux — jadi penjaganya harus perbandingan
+# **teks**, bukan uji runtime.
+#
+# Yang dibandingkan: urutan tipe specifier pada template bawaan kode
+# (`id:`) vs setiap nilai terjemahan untuk kunci yang sama. Tipe harus sama
+# persis. Posisi boleh berbeda (itu memang alasan katalog ada) — tapi
+# `%.1f` tidak boleh bertemu tempat yang diisi `String`.
+echo
+echo "== Aturan 11: specifier katalog cocok tipe dengan template kode =="
+specifier=$(python3 - <<'PY'
+import glob, json, os, re
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+SRC_DIR = "Packages/PointingKit/Sources/PointingKit"
+
+# Satu konversi printf, dengan huruf tipenya ditangkap. `%%` bukan konversi
+# (tanda persen harfiah), jadi ia dibuang lebih dulu oleh pemanggil.
+CONV = re.compile(
+    r"%(?:[0-9]+\$)?[-+ #0]*(?:[0-9]+|\*)?(?:\.(?:[0-9]+|\*))?"
+    r"(?:hh|h|ll|l|q|L|z|t|j)?([diouxXeEfgGaAcspn@])")
+
+def types(template):
+    """Urutan tipe specifier, mengabaikan `%%`."""
+    return CONV.findall(template.replace("%%", ""))
+
+defaults = {}
+for path in sorted(glob.glob(os.path.join(SRC_DIR, "*.swift"))):
+    src = open(path, encoding="utf-8").read()
+    for key, value in re.findall(
+            r'key:\s*"([^"]+)",\s*\n?\s*id:\s*"([^"]*)"', src):
+        defaults[key] = value
+
+if not os.path.exists(CATALOG):
+    raise SystemExit
+
+strings = json.load(open(CATALOG, encoding="utf-8"))["strings"]
+
+problems = []
+for key, unit in sorted(strings.items()):
+    if key not in defaults:
+        continue
+    expected = types(defaults[key])
+    for lang, entry in sorted(unit.get("localizations", {}).items()):
+        value = entry.get("stringUnit", {}).get("value", "")
+        got = types(value)
+        if got != expected:
+            problems.append(
+                f"  {key!r} [{lang}]: kode {expected} vs katalog {got}"
+                f"  ({value!r})")
+
+print("\n".join(problems) if problems else "")
+PY
+)
+if [ -n "$specifier" ]; then
+  echo "Tipe specifier katalog tidak cocok dengan template kode:"
+  echo "$specifier"
+  echo "-> Urutan **dan** tipe specifier katalog harus sama dengan template"
+  echo "   kode. Menukar posisi dua specifier berbeda tipe = crash di"
+  echo "   CoreFoundation. Bahasa yang menuntut urutan lain harus diubah"
+  echo "   lewat kode, bukan lewat berkas terjemahan."
+  status=1
+else
+  echo "Bersih: tipe specifier katalog cocok dengan template kode."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

@@ -105,11 +105,24 @@ public enum RowSpeech {
 
     /// Galat pointing dalam bentuk **kata**.
     ///
-    /// Bentuknya `"%@ %@ <angka>"` dengan **dua** sisipan: kata "galat" dan
-    /// kata "derajat" datang dari katalog, sehingga bahasa lain bisa
-    /// menempatkannya di urutan yang berbeda (mis. "error 2.5 degrees").
-    /// Menyisipkan angkanya lebih dulu lalu menerjemahkan hasilnya tidak
-    /// mungkin — katalog bekerja pada template, bukan pada hasil akhir.
+    /// Bentuknya `"%@ %.1f %@"`: kata "galat" dan satuan "derajat" datang dari
+    /// katalog, sehingga bahasa lain bisa menyusunnya sendiri. Menyisipkan
+    /// angkanya lebih dulu lalu menerjemahkan hasilnya tidak mungkin —
+    /// katalog bekerja pada template, bukan pada hasil akhir.
+    ///
+    /// **Kenapa urutan tipe specifier-nya dijaga gerbang, bukan hanya
+    /// diuji.** Argumennya `(String, Double, String)`, jadi penerjemah yang
+    /// menulis `"%.1f %@ %@"` — wajar, ia ingin angkanya di depan — memberi
+    /// `%.1f` sebuah `String`. Di CoreFoundation itu **crash**, bukan sekadar
+    /// keluaran yang salah; glibc memaafkannya, jadi bentuk itu hijau di
+    /// Linux dan meledak hanya di perangkat pengguna. Karena itu urutan tipe
+    /// wajib sama dengan template kode, dan Aturan 11 memeriksanya untuk
+    /// **setiap** kunci di katalog — bukan hanya yang ini.
+    ///
+    /// Batasnya jujur: bahasa yang menuntut angka di depan **tidak bisa**
+    /// diterjemahkan lewat katalog saja. Itu memang benar — memindahkan
+    /// specifier bertipe berbeda butuh tahu tipe argumennya, jadi perubahan
+    /// itu harus lewat kode, bukan lewat berkas terjemahan.
     public static func spokenError(_ deg: Double) -> String {
         String(format: TextLocalization.text(.rowSpeechError),
                TextLocalization.text(.rowSpeechErrorWord),

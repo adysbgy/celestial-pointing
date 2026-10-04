@@ -67,24 +67,45 @@ menggantikan bawaan untuk **setiap** aksesor, urutan template kalimat galat
 benar-benar dipakai (bukan hanya kata-katanya yang ditukar), dan judul kosong
 tidak memanggil format.
 
-### Jebakan kedua yang tertangkap di CI, bukan di Linux
+### Jebakan kedua: katalog terjemahan bisa **menjatuhkan app**
 
 Uji urutan template itu pertama ditulis dengan template `"%.1f %@ %@"`.
 `spokenError` mengirim `(String, Double, String)`; template itu memberi
 `%.1f` sebuah `String`. **Di CoreFoundation itu crash, bukan keluaran yang
-salah** — dan Linux memaafkannya, jadi bentuk itu hijau di `swift-test.sh`
+salah** — dan glibc memaafkannya, jadi bentuk itu hijau di `swift-test.sh`
 (450 lulus) dan baru meledak di CI macOS.
 
-Pelajaran yang masuk ke uji itu sendiri: template pengganti **wajib
-type-compatible** dengan argumennya. Yang diuji adalah *urutan*, jadi
-template-nya kini `"[%@|%@|%.1f]"` — urutan tetap dibuktikan, tipenya tetap
-cocok. Dua jebakan berbeda, dua-duanya tak terlihat di Linux:
+Percobaan pertama memperbaikinya dengan memformat angka lebih dulu di kode
+(`String(format: "%.1f", deg)`) sehingga seluruh template hanya berisi `%@`.
+Itu **salah**, dan tertangkap saat memeriksa apakah bentuk itu bisa dijadikan
+gerbang: memindahkan specifier bertipe berbeda melewati satu sama lain adalah
+**persis operasi yang crash**. Kalau urutannya diwajibkan sama, keuntungan
+"semua `%@`" hilang — dan harganya adalah kehilangan kemampuan menaruh angka
+di depan untuk bahasa yang menuntutnya.
+
+Jadi bentuknya dikembalikan, dan yang dibangun adalah gerbangnya:
+
+**Aturan 11** membandingkan urutan **tipe** specifier pada template bawaan
+kode (`id:`) dengan setiap nilai terjemahan untuk kunci yang sama, untuk
+**seluruh** katalog. Urutan harus sama persis — bukan karena urutan itu suci,
+tapi karena menukar dua specifier berbeda tipe berarti memberi specifier
+angka sebuah `String`, dan itulah crash-nya.
+
+Bukti merah: `"%.1f %@ %@"` dipasang kembali di `row.speech.error` → Aturan 11
+menunjuk `kode ['@', 'f', '@'] vs katalog ['f', '@', '@']` — **persis mutasi
+yang menjatuhkan CI macOS**.
+
+Batasnya jujur dan dicatat di kode: bahasa yang menuntut angka di depan
+**tidak bisa** diterjemahkan lewat katalog saja. Itu memang benar — perubahan
+semacam itu harus lewat kode, bukan lewat berkas terjemahan.
+
+Tiga jebakan berbeda, tiga-tiganya tak terlihat di Linux:
 
 1. `%1$@` posisional bekerja berbeda di CoreFoundation vs Swift Foundation.
-2. Specifier yang tak cocok dengan tipe argumen = crash di CoreFoundation,
-   diabaikan glibc.
-
-Keduanya membuat katalog terlihat seperti kode yang aman padahal tidak.
+2. Specifier yang tak cocok tipe argumen = crash di CoreFoundation,
+   diabaikan glibc — **sekarang dijaga Aturan 11**.
+3. Berkas terjemahan diperlakukan sebagai data, padahal ia bisa menjatuhkan
+   app.
 
 ### Batas yang jujur
 
@@ -105,8 +126,9 @@ Keduanya membuat katalog terlihat seperti kode yang aman padahal tidak.
 
 - `swift-test.sh` → **166 CelestialEngine + 450 PointingKit**, 0 gagal.
   Engine tidak disentuh.
-- `swift-ui-lint.sh` → **10 aturan hijau**; Aturan 6 dibuktikan bisa MERAH
-  lewat mutasi di atas.
+- `swift-ui-lint.sh` → **11 aturan hijau**; Aturan 6 dibuktikan bisa MERAH
+  lewat mutasi di atas, dan Aturan 11 lewat mutasi yang persis menjatuhkan
+  CI macOS.
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan aksara non-Latin: 0.
 
