@@ -1,5 +1,99 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — iPhone menampilkan "Mencari" lalu diam, dan aturan yang buta di label tabel)
+
+### Dua temuan, dan yang kedua tidak akan ketahuan tanpa yang pertama
+
+Temuan pertama berasal dari menghitung, bukan membaca: berapa kali
+`guidance` muncul di tiap app?
+
+| Berkas | `guidance` |
+|---|---|
+| `PointAndKnowWatch/Sources/PointingView.swift` | **5** |
+| `PointAndKnowiOS/Sources/DiagnosticsView.swift` | **0** |
+| `Complications/ComplicationWidget.swift` | 0 |
+
+Jadi app jam menampilkan panduan keadaan di bawah badge
+(`PointingView.swift:256`, `:234`, `:300`), dan **layar utama iPhone tidak
+menampilkan sama sekali**. Barisnya cuma `row("Keadaan",
+state.shortLabel)` — "Mencari" — lalu layar diam.
+
+Yang membuatnya cacat, bukan sekadar beda: `shortLabel` menjawab **apa**
+keadaannya, tidak pernah menjawab **apa yang harus dilakukan**. Dua app
+untuk keadaan yang sama memberi petunjuk berbeda: jam berkata "Tahan arah
+tunjuk sampai jam berhenti bergerak", iPhone tidak berkata apa pun. Ke
+enam kalimat panduan sudah ada di `TextLocalization`, sudah diuji di Linux
+(`PointingPresentationTests`, `TextLocalizationTests`) — yang hilang hanya
+tempat menampilkannya.
+
+### Barisnya memakai kunci yang sama, bukan kalimat baru
+
+`row("Panduan", engine.snapshot.state.guidance)` — bukan string harfian di
+view. Kalau kalimatnya ditulis terpisah di iPhone, ia bisa menyimpang dari
+yang diucapkan jam, dan dua app yang memberi petunjuk berbeda adalah cacat
+yang paling buruk: pengguna jam mendapat instruksi, pengguna iPhone tidak,
+dan tidak ada yang bisa tahu itu disengaja.
+
+### Temuan kedua: aturan 4 buta tepat di jalur paling umum
+
+Bukti RED-nya lewat injeksi, bukan dengan membaca aturan:
+
+```
+Text("TeksUIYangBaru")      ->  merah
+row("LabelUIYangBaru")      ->  LOLOS, tanpa laporan
+```
+
+`Text` ada di daftar peritel aturan 4; `row` — helper label-lebar yang
+dipakai **empat berkas** — tidak. Padahal label tabel adalah jalur paling
+banyak dari teks yang benar-benar tampil di layar. `row` dan `detailRow`
+ditambahkan ke `POS`.
+
+Setelah diperlebar, aturan itu langsung melaporkan **36 label yang hilang
+sungguhan** di empat berkas. Ini pola yang sama seperti dua kali
+sebelumnya: gerbang hijau, aturannya ada, penerapannya juga ada — tapi ada
+satu jalur yang tidak pernah diperiksa, dan jalurnya justru yang paling
+sering dipakai.
+
+Tiga puluh tiga di antaranya saya masukkan ke `Localizable.xcstrings`
+lengkap dengan padanan bahasa Inggris dan komentar singkat — termasuk
+`Panduan` yang barusan ditambahkan oleh perubahan ini.
+
+### Urutan katalog tidak boleh disentuh
+
+Katalog ditulis tangan (`SWIFT_EMIT_LOC_STRINGS: NO`, alasannya di
+`project.yml`), jadi **urutan kuncinya berarti**. Versi pertama saya
+menjalankan `sorted()` atas seluruh kunci demi kerapian dan menghasilkan
+**83 baris churn** yang tidak ada hubungannya dengan pekerjaan ini — diff
+yang terlihat busy dan menutupi sebenarnya. Dikembalikan, dan kunci baru
+ditambahkan di akhir dengan `OrderedDict`:
+
+```
+363 baris masuk, 0 keluar
+```
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 305 PointingKit, 0 gagal**.
+- `./swift-ui-lint.sh` → **7 aturan hijau**.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- Injeksi ulang setelah perbaikan: `row`, `detailRow`, dan `Text`
+  **ketiganya merah**; tree bersih tetap hijau.
+- CI di `e719e65`: `Apple Build` run `37210235342` → 2× `BUILD SUCCEEDED`
+  + "Tidak ada peringatan compiler pada Apps/."; `Engine Tests (Linux)` →
+  hijau.
+
+### Yang masih terbuka
+
+- **`detailRow` dengan argumen non-literal masih bisa lolos** — sapuan ini
+  menangkap literalnya, tapi kalau argumennya
+  `.accessibilityLabel(RowSpeech…)` yang membawa teks, jalur itu tidak
+  diperiksa. Terpisah dari perubahan ini.
+- **Complication tetap tanpa panduan** (`0`), dan itu **memang benar**:
+  layar complication satu baris, dan `shortLabel` memang yang tepat di
+  sana. Tidak diubah karena tidak ada yang rusak.
+- **Terjemahan `en` untuk 33 kunci baru tidak bisa diverifikasi di Linux**
+  — tidak berubah dari siklus sebelumnya, alasannya juga tidak berubah.
+
 ## Progres terakhir (4 Okt 2026 — planet di panel kunci menggambar dirinya sendiri 30 kali per detik)
 
 ### Premis siklus ini: cari barang yang membazir, bukan barang yang belum ada
