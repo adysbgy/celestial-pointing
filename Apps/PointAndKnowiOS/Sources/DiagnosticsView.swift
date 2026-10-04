@@ -17,13 +17,6 @@ struct PointAndKnowiOSApp: App {
     @StateObject private var link = PhoneLinkService()
     @StateObject private var trace = ConfidenceTraceStore()
 
-    /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
-    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
-
-    /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
-    /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
-    private let audioCue = AudioCueEngine()
-
     var body: some Scene {
         WindowGroup {
             RootView(engine: engine, motion: motion, location: location, link: link, trace: trace)
@@ -46,6 +39,11 @@ struct RootView: View {
     /// berarti paletnya berubah serentak di Diagnostik, Experiment 1, dan
     /// Tautan. Kuncinya sama dengan app jam (lihat `NightModeStorage.key`).
     @AppStorage(NightModeStorage.key) private var nightMode = false
+    /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
+    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+    /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
+    /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
+    private let audioCue = AudioCueEngine()
 
     var body: some View {
         TabView {
