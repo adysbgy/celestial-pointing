@@ -106,6 +106,7 @@ bawaan.
   hijau setelah perbaikan, dan dibuktikan bisa merah lewat dua mutasi di atas.
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan aksara non-Latin: 0.
+- CI macOS run `37229977845` (Apple Build) + `37229977853` (Engine Linux) hijau.
 
 ## Progres terakhir (4 Okt 2026 — seluruh alur kalibrasi tak pernah bisa diterjemahkan)
 
