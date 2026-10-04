@@ -78,7 +78,13 @@ struct PointingView: View {
                                          // Visual dari sumber yang **sama** dengan
                                          // objeknya, jadi gambar tidak mungkin
                                          // milik benda lain.
-                                         visual: engine.visualForDisplayedObject)
+                                         visual: engine.visualForDisplayedObject,
+                                         // Token kedatangan kunci memicu animasi
+                                         // "muncul" kartu **sekali** — bukan tiap
+                                         // sampel 20 Hz selama terkunci, dan bukan
+                                         // pada objek sisa. Lihat komentar di
+                                         // `LockArrival`/`ObjectDetailView`.
+                                         lockArrivalToken: engine.lockArrival?.token)
                     }
                     if let note = motion.unavailableReason ?? engine.sensorNote {
                         Text(note)
@@ -316,6 +322,27 @@ struct ObjectDetailView: View {
     /// Diameter gambar dalam poin. Berbeda antara jam dan iPhone: kartu jam
     /// sempit, panel iPhone lega.
     var visualDiameter: CGFloat = WatchMetrics.visualDiameter
+    /// Token kedatangan kunci (monoton, dari `LockArrival`).
+    ///
+    /// Dipakai memicu animasi "muncul" kartu. `LockArrival` sengaja memakai
+    /// `Int` monoton (bukan `Date()`/`UUID()`) karena keduanya membuat setiap
+    /// render menghasilkan nilai baru — dan itu justru membuat animasi diputar
+    /// ulang terus-menerus. `nil` berarti "belum pernah terkunci" — `.onChange`
+    /// di bawah mengabaikannya, jadi kartu tidak beranimasi saat membuka app
+    /// di atas objek sisa, dan tidak memperingati keadaan yang sudah tidak
+    /// berlaku (kelas false confidence).
+    var lockArrivalToken: Int?
+
+    /// Skala & opasitas untuk pop saat kunci baru tiba.
+    ///
+    /// Dipisah dari `lockArrivalToken` supaya animasinya hanya berjalan saat
+    /// token **naik** (kedatangan kunci baru), bukan saat kembali `nil`
+    /// (kunci dilepas → objek jadi sisa). Kalau memakai `.id(token)` langsung,
+    /// identitas kartu berubah juga saat token jadi `nil`, sehingga kartu
+    /// "dirayakan" kembali tepat saat jawabannya tidak lagi berlaku — justru
+    /// yang dilarang PRD.
+    @State private var appearScale: CGFloat = 1
+    @State private var appearOpacity: Double = 1
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -364,6 +391,30 @@ struct ObjectDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
         .surfaceCard(level: .card, radius: WatchMetrics.cornerRadius)
+        // Animasi halus saat kunci baru tiba: kartu memudar + sedikit
+        // membesar lewat spring. Dipicu oleh `lockArrivalToken` yang **naik**,
+        // bukan oleh `state == .lock`: kalau memakai keadaan, kartu berkedip
+        // tiap sampel 20 Hz selama terkunci, dan objek sisa (yang
+        // dipertahankan mesin keadaan) ikut "dirayakan". `LockArrivalGate`
+        // sudah menyaring kedua kasus itu — token hanya naik saat ada
+        // **kedatangan kunci baru** dengan objek yang berlaku sekarang.
+        // `onChange` di bawah memainkan pop **sekali** saat token berubah, dan
+        // mengabaikan saat token kembali `nil` (kunci dilepas), supaya kita
+        // tidak merayakan jawaban yang sudah tidak berlaku.
+        .scaleEffect(appearScale)
+        .opacity(appearOpacity)
+        .onChange(of: lockArrivalToken) { oldToken, newToken in
+            // Hanya pop saat ada kedatangan baru (token naik dari nilai
+            // sebelumnya), bukan saat kembali ke `nil`.
+            guard let new = newToken, new != oldToken else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                appearScale = 1.04
+                appearOpacity = 1
+            }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.08)) {
+                appearScale = 1
+            }
+        }
         // Satu elemen, karena nama + jenis + magnitudo + badge adalah satu
         // pengumuman. Yang paling penting di sini: **penanda sisa ikut
         // diucapkan**. Pengguna VoiceOver tidak melihat teks peringatannya,

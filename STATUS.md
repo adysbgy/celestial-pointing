@@ -27,10 +27,56 @@ Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
 
 | Item | Status |
 |---|---|
-| 4.4 animasi halus (`withAnimation` saat state→lock) | SELESAI — `LockArrivalGate` (PointingKit, 10 test) + `PointingEngine.publish(_:)`. `lockCount` lama dibuang (tak pernah dibaca) |
+| 4.4 animasi halus (`withAnimation` saat state→lock) | **Plumbing model SELESAI sejak siklus lalu** (`LockArrivalGate`, 10 test + `PointingEngine.lockArrival`) — **tapi pemanggil UI-nya baru diwiring siklus ini.** Sebelum ini `withAnimation` tidak ada di satu pun berkas app, jadi kartu/panel objek muncul tanpa animasi. Rincian di entri "Bagian 4.4: animasi kedatangan kunci di UI" di bawah. |
 | Onboarding value-first | SELESAI — `Apps/Shared/OnboardingView.swift` (1 kartu, sekali pakai via `OnboardingStorage`) di `PointingView` (jam) + `RootView` (iPhone) |
 | 4.6 audio opsional saat lock | SELESAI — `Apps/Shared/AudioCue.swift` (nada 880Hz prosedural, `AVAudioEngine`/`AVAudioPCMBuffer`), hanya `.lockSucceeded`, toggle `Bunyi saat kunci` |
 | `@ScaledMetric` | SELESAI — ikon status `PointingView` pakai `@ScaledMetric(relativeTo: .headline)`; `WatchMetrics.iconSize` mati dibuang |
+
+## Progres terakhjah (4 Okt 2026 — Bagian 4.4: animasi kedatangan kunci di UI)
+
+### Audit awal: 4.4 ternyata hanya setengah jadi
+
+Siklus ini diawali dengan mengaudit klaim STATUS lama, bukan memercayainya.
+Table di atas menandai 4.4 "SELESAI" — tapi yang ditulis di sana hanyalah
+plumbing model (`LockArrivalGate` + `PointingEngine.publish`). Pemanggil
+UI-nya **tidak ada**: satu-satunya kejadian `withAnimation` di seluruh `Apps/`
+adalah di `ReducedLuminanceView` (komentar, bukan pemanggilan). Jadi saat
+objek baru terkunci, kartu di jam dan panel di iPhone muncul **tanpa** animasi —
+bagian 4.4 ("fade/scale saat objek muncul") belum terwujud di layar.
+
+### Apa yang diubah, dan kenapa begini
+
+- **`ObjectDetailView` (jam)** sekarang menerima `lockArrivalToken: Int?` dan
+  memainkan pop (scale 1 → 1.04 → 1 + opasitas) lewat `withAnimation(.spring)`
+  saat token **naik**. Dipicu oleh `engine.lockArrival?.token`, bukan oleh
+  `state == .lock`, karena `snapshot` ditulis ulang 20×/detik selama terkunci —
+  memakai keadaan membuat kartu berkedip terus-menerus. `LockArrivalGate` sudah
+  menyaring itu: token hanya naik saat ada **kedatangan kunci baru** dengan
+  objek yang berlaku sekarang, dan kembali `nil` saat kunci dilepas. `.onChange`
+  hanya memutar pop saat token naik, mengabaikan saat kembali `nil` — supaya
+  kita tidak "merayakan" objek sisa (kelas false confidence yang dilarang PRD).
+- **iPhone**: panel yang tadinya bersarang langsung di `List` dipecah menjadi
+  `LockArrivalPanel` (di `DiagnosticsView`). Pemecahan ini penting karena panel
+  lama berada di dalam `TimelineView(.animation(30 Hz))` yang merender ulang
+  per frame — menaruh state animasi di atasnya berarti pop diputar ulang tiap
+  frame. `LockArrivalPanel` memegang `@State appearScale/appearOpacity`
+  sendiri dan dipicu oleh `.onChange(of: lockArrivalToken)` yang sama dengan
+  jam, dengan penjagaan naik-token yang sama. Gambar besar (diameter 132) +
+  denyut glow bintang tetap dipertahankan di dalam `TimelineView` internalnya.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 198 PointingKit, 0 gagal**
+  (engine tidak disentuh; UI hanya membaca `lockArrival` yang sudah ada).
+- Gerbang sintaks: **seluruh berkas app lolos `swiftc -parse -swift-version 5`**
+  di container `swift:6.0`.
+- Perubahan hanya di `Apps/` (jam + iPhone); tidak ada simbol `PointingKit`/
+  `CelestialEngine` yang disentuh, jadi 198 test tidak bisa terpengaruh.
+- Belum dijalankan di sini: build macOS CI sebenarnya (`ios-build.yml`), karena
+  VPS ini tanpa Xcode — itu yang akan membuktikan resolusi overload/tipe
+  (`@State` di `ObjectDetailView`, `LockArrivalPanel`, `.onChange` dua-argumen).
+  Lolos `-parse`, tapi `-parse` tidak menyelesaikan tipe, jadi CI macOS adalah
+  verifikasi sebenarnya (sama seperti siklus-siklus sebelumnya).
 
 ## Progres terakhir (4 Okt 2026 — sisa Bagian 4: onboarding + audio + @ScaledMetric)
 

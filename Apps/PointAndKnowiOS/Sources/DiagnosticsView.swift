@@ -249,69 +249,19 @@ struct DiagnosticsView: View {
                         // Disamar penuh saat engine ragu: `isConfirmed` memakai
                         // predikat yang sama dengan badge keyakinan, jadi gambar
                         // tidak pernah lebih yakin daripada teksnya.
-                        if let visual = engine.visualForDisplayedObject {
-                            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
-                                HStack(alignment: .center, spacing: 16) {
-                                    CelestialVisualView(visual: visual,
-                                                         diameter: 132,
-                                                         isConfirmed: !engine.isDisplayingStaleObject,
-                                                         pulse: pulsePhase)
-                                    // Nama + jenis digabung jadi satu
-                                    // pengumuman VoiceOver, dengan penanda
-                                    // **sisa** ikut terbawa — tanpa itu, objek
-                                    // basi terdengar persis seperti hasil
-                                    // pengukuran sekarang.
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        // Nama = informasi utama: paling besar.
-                                        Text(object.name)
-                                            .font(.title2.bold())
-                                        Text(object.kind.displayName)
-                                            .font(.subheadline)
-                                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        // **Detail teknis disembunyikan di balik
-                                        // Disclosure.** RA/Dec/mag adalah alat
-                                        // verifikasi, bukan yang dicari saat
-                                        // mengarahkan jam. Menampilkannya
-                                        // di samping nama membuat lima angka
-                                        // bersaing dengan satu jawaban, dan
-                                        // pengguna tidak tahu mana yang penting.
-                                        // Buka hanya saat memang sedang memeriksa.
-                                        DisclosureGroup {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
-                                                if object.kind == .star {
-                                                    detailRow("RA", String(format: "%.4f°", object.raDeg))
-                                                    detailRow("Dec", String(format: "%+.4f°", object.decDeg))
-                                                }
-                                                detailRow("Id katalog", object.id)
-                                            }
-                                            .padding(.top, 4)
-                                        } label: {
-                                            Text("Detail teknikal")
-                                                .font(.footnote)
-                                                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
-                                        }
-                                        .tint(SurfacePalette.active.textSecondaryColor)
-                                    }
-                                    .accessibilityElement(children: .contain)
-                                    // Label ini hanya untuk bagian **atas**; grup
-                                    // dan disclosure di bawahnya tetap elemen
-                                    // terpisah supaya bisa dibuka.
-                                    .accessibilityLabel(visualPanelLabel(
-                                        object: object,
-                                        stale: engine.isDisplayingStaleObject,
-                                        includeTechnicalDetails: false))
-                                }
-                            }
-                            .padding(.vertical, 6)
-                            // Hanya bagian **atas** panel yang digabung, bukan
-                            // seluruhnya. Kalau `DisclosureGroup` ikut
-                            // digabung, isinya tidak bisa lagi dibuka — dan
-                            // pengguna VoiceOver tidak punya jalan lain untuk
-                            // membacanya.
-                            .accessibilityElement(children: .contain)
-                        }
+                        // Animasi halus saat kunci baru tiba (lihat komentar di
+                        // `LockArrival` / `ObjectDetailView` di app jam): pop
+                        // memudar + sedikit membesar lewat spring, dipicu oleh
+                        // token yang **naik**, bukan oleh `state == .lock`, dan
+                        // tidak diputar ulang saat kunci dilepas (objek jadi
+                        // sisa). `TimelineView` di bawah menyegarkan 30×/detik,
+                        // jadi pop dijaga `.onChange` agar hanya berjalan sekali
+                        // per kedatangan, bukan per frame.
+                        LockArrivalPanel(visual: visual,
+                                         object: object,
+                                         isStale: engine.isDisplayingStaleObject,
+                                         lockArrivalToken: engine.lockArrival?.token,
+                                         pulse: pulsePhase)
                     }
                     if let pointing = engine.pointing {
                         row("Arah", String(format: "%.1f° / %.1f°",
@@ -476,6 +426,105 @@ struct DiagnosticsView: View {
             Text(title)
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
+        }
+    }
+
+    /// Panel detail besar (iPhone): gambar prosedural + nama + jenis, dengan
+    /// animasi "muncul" halus saat kunci baru tiba.
+    ///
+    /// Dipisah dari `DiagnosticsView` supaya status animasi (`@State`
+    /// `appearScale`/`appearOpacity`) punya masa hidup sendiri dan tidak ikut
+    /// dirender ulang oleh `TimelineView` 30 Hz yang hanya bertugas
+    /// menyegarkan denyut glow bintang. Kalau pop ditaruh di atas
+    /// `TimelineView`, ia diputar ulang tiap frame.
+    ///
+    /// **Kenapa pop dipicu oleh `lockArrivalToken` yang naik, bukan `state ==
+    /// .lock`.** Pada iPhone `snapshot` diperbarui terus (sampel sensor +
+    /// observer), dan `state` tetap `.lock` selama kunci bertahan — memakai
+    /// keadaan membuat panel berkedip terus-menerus. `LockArrivalGate` sudah
+    /// menyaring itu: token hanya naik saat ada **kedatangan kunci baru** dengan
+    /// objek yang berlaku sekarang, dan kembali `nil` saat kunci dilepas.
+    /// `.onChange` di bawah memainkan pop **sekali**, dan mengabaikan saat
+    /// token jadi `nil` — kita tidak merayakan jawaban yang sudah tidak berlaku
+    /// (kelas false confidence yang dilarang PRD).
+    struct LockArrivalPanel: View {
+
+        let visual: CelestialVisual
+        let object: CelestialObject
+        let isStale: Bool
+        let lockArrivalToken: Int?
+        let pulse: Double
+
+        @State private var appearScale: CGFloat = 1
+        @State private var appearOpacity: Double = 1
+
+        var body: some View {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                HStack(alignment: .center, spacing: 16) {
+                    CelestialVisualView(visual: visual,
+                                         diameter: 132,
+                                         isConfirmed: !isStale,
+                                         pulse: pulse)
+                    // Nama + jenis digabung jadi satu pengumuman VoiceOver,
+                    // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
+                    // basi terdengar persis seperti hasil pengukuran sekarang.
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Nama = informasi utama: paling besar.
+                        Text(object.name)
+                            .font(.title2.bold())
+                        Text(object.kind.displayName)
+                            .font(.subheadline)
+                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // **Detail teknis disembunyikan di balik Disclosure.**
+                        // RA/Dec/mag adalah alat verifikasi, bukan yang dicari
+                        // saat mengarahkan jam. Menampilkannya di samping nama
+                        // membuat lima angka bersaing dengan satu jawaban.
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 2) {
+                                detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
+                                if object.kind == .star {
+                                    detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                    detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                }
+                                detailRow("Id katalog", object.id)
+                            }
+                            .padding(.top, 4)
+                        } label: {
+                            Text("Detail teknikal")
+                                .font(.footnote)
+                                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                        }
+                        .tint(SurfacePalette.active.textSecondaryColor)
+                    }
+                    .accessibilityElement(children: .contain)
+                    // Label ini hanya untuk bagian **atas**; grup dan disclosure
+                    // di bawahnya tetap elemen terpisah supaya bisa dibuka.
+                    .accessibilityLabel(visualPanelLabel(
+                        object: object,
+                        stale: isStale,
+                        includeTechnicalDetails: false))
+                }
+            }
+            .padding(.vertical, 6)
+            // Pop "muncul" saat kunci baru: sedikit membesar lalu kembali,
+            // plus opasitas penuh. Penampilan yang diwujudkan di sini hanya
+            // sebagai umpan balik visual halus — tidak mengubah satu pun
+            // klaim teks/identitas.
+            .scaleEffect(appearScale)
+            .opacity(appearOpacity)
+            .onChange(of: lockArrivalToken) { oldToken, newToken in
+                guard let new = newToken, new != oldToken else { return }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                    appearScale = 1.04
+                    appearOpacity = 1
+                }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.08)) {
+                    appearScale = 1
+                }
+            }
+            // Hanya bagian **atas** panel yang digabung, bukan seluruhnya.
+            .accessibilityElement(children: .contain)
         }
     }
 
