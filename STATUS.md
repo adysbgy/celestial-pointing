@@ -48,7 +48,7 @@ app astronomi premium (Star Walk menaruh objek terkunci di wajah jam).
 
 ### Cacat yang ditemukan siklus ini: gerbang lokal terlalu lemah
 
-Tiga kegagalan berturut-turut, dan **dua di antaranya tidak terlihat lokal**:
+Empat kegagalan berturut-turut, dan **tiga di antaranya tidak terlihat lokal**:
 
 1. `entitlements:` vs `entitlementsPath:` — XcodeGen menolak spec-nya, jadi
    baru ketahuan dari CI (parse gagal sebelum kompilasi dimulai).
@@ -57,14 +57,30 @@ Tiga kegagalan berturut-turut, dan **dua di antaranya tidak terlihat lokal**:
    lalu meledak di macOS.
 3. `containerURL(forSecurityApplicationGroupIdentifier:)` — API Apple-only;
    `parse` di Linux tidak pernah menyentuhnya.
+4. **Tiga cacat SwiftUI sekaligus** di widget: `StaticConfiguration` butuh
+   label `provider:`; `switch` di atas `WidgetFamily` tidak exhaustive
+   (`@unknown default` tidak menutup kasus yang *sudah ada*, hanya kasus
+   yang belum dikenal); dan cabang `switch` yang bertipe beda (`Text` vs
+   `Gauge` vs `HStack`) — `@ViewBuilder` tidak bisa mengembalikan satu
+   tipe dari beberapa view berbeda.
 
 **Akar masalahnya sama**: `swiftc -parse` hanya memeriksa sintaks. Semua cacat
 tipe lolos lokal lalu menunggu CI macOS — satu siklus penuh per kesalahan.
 Maka **`swift-typecheck.sh`** dibuat: ia menjalankan `swiftc -typecheck` (bukan
 `parse`) untuk berkas yang hanya mengimpor Foundation/CelestialEngine/
 PointingKit, di dalam Docker yang sama. Batasnya ditulis jujur di kepala
-berkas: berkas SwiftUI (Canvas/WidgetKit/Combine) tetap hanya bisa di-parse di
-Linux. Yang bisa diperiksa lokal, diperiksa lokal.
+berkas: berkas SwiftUI (WidgetKit/Canvas/Combine) tetap hanya bisa di-parse di
+Linux. Cacat #4 membuktikan batas itu nyata, bukan sekadar angan-angan.
+
+### Verifikasi
+
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS** (typecheck store + label,
+  parse semua `Apps/**/*.swift`).
+- `./swift-test.sh` → **166 CelestialEngine + 256 PointingKit = 422 hijau**.
+- CI macOS: `App (iPhone + Watch)` **success** — termasuk langkah
+  **"Gerbang peringatan (kode sendiri)"**, artinya complication kompilasi dengan
+  **nol warning**. `Paket (Apple SDK)` success, `Engine Tests (Linux)` success.
+- Run: `37193453845` (Apple) & `37193453796` (Engine).
 
 ### Risiko yang diketahui
 
