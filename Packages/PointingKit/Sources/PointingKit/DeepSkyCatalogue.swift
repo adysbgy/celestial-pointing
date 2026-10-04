@@ -76,7 +76,21 @@ public enum DeepSkyCatalogue {
         CelestialObject(id: "m6",  name: "Gugus Kupu-kupu", kind: .deepSky,
                         raDeg: 265.02500000, decDeg: -32.21666667, magnitude: 4.20),
         CelestialObject(id: "m17", name: "Nebula Omega",   kind: .deepSky,
-                        raDeg: 275.10833333, decDeg: -16.17666667, magnitude: 6.00)
+                        raDeg: 275.10833333, decDeg: -16.17666667, magnitude: 6.00),
+        // Kelompok ketiga: memperluas cakupan bentuk & menambah wakil langka.
+        // M27/M57 = nebula planetari (cincin/belah ketupat), M51 = galaksi
+        // spiral berlengan, M11 = gugus terbuka padat. Keempatnya objek
+        // Messier terang yang masuk akal ditunjuk dengan binokuler, dan
+        // ketiganya menambah variasi yang bisa dibaca dari layar: galaksi
+        // kini punya wakil berlengan (M51) selain cakram miring (M31/M33).
+        CelestialObject(id: "m27", name: "Nebula Dumbel",   kind: .deepSky,
+                        raDeg: 299.90166667, decDeg:  22.72175000, magnitude: 7.40),
+        CelestialObject(id: "m57", name: "Nebula Cincin",   kind: .deepSky,
+                        raDeg: 283.39620000, decDeg:  33.02910000, magnitude: 8.80),
+        CelestialObject(id: "m51", name: "Galaksi Pusaran", kind: .deepSky,
+                        raDeg: 202.46957500, decDeg: 47.19525800, magnitude: 8.40),
+        CelestialObject(id: "m11", name: "Gugus Bebek Liar", kind: .deepSky,
+                        raDeg: 277.77500000, decDeg:  -6.26666667, magnitude: 6.30)
     ]
 
     /// Seberapa "menyebar" tiap objek (0 = titik, 1 = kabut paling lebar).
@@ -105,7 +119,11 @@ public enum DeepSkyCatalogue {
         "m33": 0.95,   // Triangulum — galaksi, lebih lebar dari Andromeda
         "m22": 0.30,   // Sagitarius — gugus bola, lebih longgar dari Hercules
         "m6":  0.48,   // Kupu-kupu — gugus terbuka, lebih kecil dari Ptolemy
-        "m17": 0.72    // Omega — nebula emisi, lebih sempit dari Orion
+        "m17": 0.72,   // Omega — nebula emisi, lebih sempit dari Orion
+        "m27": 0.68,   // Dumbel — nebula planetari, kabut memanjang
+        "m57": 0.40,   // Cincin — nebula planetari kecil & padat
+        "m51": 0.92,   // Pusaran — galaksi spiral, kabut lebar
+        "m11": 0.42    // Bebek Liar — gugus terbuka padat (22′)
     ]
 
     /// Seberapa menyebar sebuah objek langit dalam, dari id-nya.
@@ -166,7 +184,11 @@ public enum DeepSkyCatalogue {
         "m33": .galaxy,           // Triangulum — galaksi
         "m22": .globularCluster,  // Sagitarius — gugus bola
         "m6":  .openCluster,      // Kupu-kupu — gugus terbuka
-        "m17": .nebula            // Omega — nebula emisi
+        "m17": .nebula,           // Omega — nebula emisi
+        "m27": .nebula,           // Dumbel — nebula planetari
+        "m57": .nebula,           // Cincin — nebula planetari
+        "m51": .galaxy,           // Pusaran — galaksi spiral
+        "m11": .openCluster       // Bebek Liar — gugus terbuka padat
     ]
 
     /// Bentuk sebuah objek langit dalam, dari id-nya.
