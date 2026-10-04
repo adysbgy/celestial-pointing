@@ -104,6 +104,29 @@ public enum LinkStatusText {
     public static var watchUnreachableMessage: String {
         TextLocalization.text(.linkStatusWatchUnreachableMessage)
     }
+
+    /// Jumlah pengiriman tautan yang gagal, sebagai kalimat VoiceOver.
+    ///
+    /// **Kenapa ini bentuk lengkap, bukan potongan.** Pemanggil di jam
+    /// menyusun kalimatnya di dalam `.accessibilityLabel` dan sebelumnya
+    /// merakitnya dengan menyambung string:
+    ///
+    /// ```swift
+    /// var text = link.isReachable ? "iPhone terhubung" : "…"
+    /// text += ". \(link.sendFailureCount) kiriman gagal."
+    /// ```
+    ///
+    /// Dua kelas cacat sekaligus. Pertama, potongannya literal — jadi tak ada
+    /// kunci katalog dan pengguna Bahasa Inggris mendengar Bahasa Indonesia.
+    /// Kedua, dan lebih halus: **menyambung** kalimat berarti penerjemah
+    /// Bahasa lain tidak bisa mengubah **urutannya**. Bahasa yang menempatkan
+    /// keterangan jumlah sebelum kata "gagal" tidak bisa mengatakannya, karena
+    /// posisinya dipaku di kode. Bentuk `%@ %lld %@` membebaskan itu.
+    public static func sendFailures(_ count: Int) -> String {
+        String(format: TextLocalization.text(.linkStatusSendFailures),
+               TextLocalization.text(.linkStatusSendFailuresWord),
+               Int64(count))
+    }
 }
 
 // MARK: - Katalog kunci
@@ -161,4 +184,23 @@ public extension LocalizedText {
     static let linkStatusWatchUnreachableMessage = LocalizedText(
         key: "link.status.watchUnreachableMessage",
         id: "Jam belum terhubung — pesan tidak terkirim.")
+
+    /// Kalimat jumlah pengiriman gagal, sebagai satu kesatuan.
+    ///
+    /// Semula pemanggil menyusunnya dengan **menyambung** string
+    /// (`text += ". N kiriman gagal."`). Itu bukan sekadar masalah terjemahan:
+    /// menyambung memaku **urutan** di kode, sehingga bahasa yang ingin
+    /// meletakkan jumlah sebelum kata "gagal" tidak bisa mengatakannya.
+    static let linkStatusSendFailures = LocalizedText(
+        key: "link.status.sendFailures",
+        id: ". %lld %@.")
+
+    /// Kata yang menyebut **benda** yang gagal dikirim — "kiriman", bukan "gagal".
+    ///
+    /// Sengaja dipisah dari `link.status.sendFailed` ("Gagal mengirim: %@"),
+    /// yang menggambarkan **satu** kejadian. Yang ini menggambarkan **jumlah**,
+    /// dan dua kalimat itu memang punya bentuk berbeda.
+    static let linkStatusSendFailuresWord = LocalizedText(
+        key: "link.status.sendFailuresWord",
+        id: "kiriman gagal")
 }

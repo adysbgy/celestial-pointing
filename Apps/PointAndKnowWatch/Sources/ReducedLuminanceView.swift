@@ -115,6 +115,12 @@ struct ReducedLuminanceView: View {
     /// dan pengumuman panjang justru menutupi informasi yang paling penting.
     /// Penanda sisa tetap ikut diucapkan — di layar redup yang satu-satunya
     /// jalan membedakan "baru diukur" dari "sisa".
+    ///
+    /// **Tapi bentuknya bukan "sisa".** Di layar satu kata sudah cukup karena
+    /// ada panel peringatan di bawahnya yang memberi konteks; di VoiceOver
+    /// tidak ada panel itu, dan "sisa" sendirian terdengar seperti pecahan
+    /// kalimat — "…LK · sisa" bukan "…LK · sisa pandangan sebelumnya". Satu
+    /// kunci, dua panjang: `staleShort` untuk suara, `stale` untuk layar penuh.
     private var reducedAccessibilityLabel: String {
         var parts: [String] = []
         if let object = engine.displayedObject {
@@ -128,7 +134,7 @@ struct ReducedLuminanceView: View {
             parts.append(warning)
         }
         if engine.isDisplayingStaleObject {
-            parts.append("sisa pandangan sebelumnya")
+            parts.append(TextLocalization.text(.objectSpeechStaleShort))
         }
         return parts.joined(separator: ". ")
     }

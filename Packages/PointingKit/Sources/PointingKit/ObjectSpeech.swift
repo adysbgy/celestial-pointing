@@ -60,6 +60,44 @@ public enum ObjectSpeech {
         String(format: TextLocalization.text(.objectSpeechCoordinates),
                raDeg, decDeg)
     }
+
+    /// "RA 101.3° Dec +16.7°" — bentuk **ringkas untuk layar**, bukan suara.
+    ///
+    /// **Kenapa ini ada padahal `coordinates` sudah ada.** Baris jenis objek di
+    /// kartu jam merakit kalimatnya sendiri sebagai literal
+    /// (`parts.append(String(format: "RA %.1f° Dec %+.1f°", …))`) — bentuk
+    /// yang tidak bisa dijangkau Aturan 4 (bukan argumen `Text(...)`) maupun
+    /// Aturan 6 (tanpa kunci). Akibatnya baris itu tampil dalam Bahasa
+    /// Indonesia di semua bahasa, dan **tidak ada yang bisa melihatnya**:
+    /// derajat sudut sama di mana-mana, jadi tidak ada yang terlihat salah.
+    ///
+    /// Bentuknya sengaja berbeda dari `coordinates`: layar memakai `°` (mata
+    /// membacanya sebagai satuan), suara memakai kata "derajat" (`°` tidak
+    /// diucapkan). Dua kunci, dua bentuk — bukan satu bentuk yang dipaksakan
+    /// ke dua indera.
+    public static func coordinatesDisplay(raDeg: Double, decDeg: Double) -> String {
+        String(format: TextLocalization.text(.objectDisplayCoordinates),
+               raDeg, decDeg)
+    }
+
+    /// "magnitudo 1.46" pada layar — bentuk ringkas, `mag` bukan kata.
+    ///
+    /// Pasangan layar dari `magnitude(_:)`. Dipakai baris jenis objek yang dulu
+    /// menulis `String(format: "mag %.2f", …)` sebagai literal.
+    public static func magnitudeDisplay(_ value: Double) -> String {
+        String(format: TextLocalization.text(.objectDisplayMagnitude), value)
+    }
+
+    /// Penanda sisa yang **pendek**, untuk layar yang sengaja miskin.
+    ///
+    /// Layar redup (Always-On) tidak punya ruang untuk kalimat penuh
+    /// `staleNote`; versi ini menyatakan hal yang sama dengan tiga kata.
+    /// Tetap punya kunci sendiri supaya tidak lahir sebagai literal di view —
+    /// dan tetap **bukan** `"sisa"` satu kata: di layar yang tidak menampilkan
+    /// panel peringatan, "sisa" sendirian tidak menjelaskan sisa **apa**.
+    public static var staleShortNote: String {
+        TextLocalization.text(.objectSpeechStaleShort)
+    }
 }
 
 // MARK: - Katalog kunci
@@ -79,4 +117,31 @@ public extension LocalizedText {
     static let objectSpeechCoordinates = LocalizedText(
         key: "object.speech.coordinates",
         id: "RA %.1f derajat, deklinasi %+.1f derajat")
+
+    /// Koordinat dalam bentuk **ringkas untuk layar** (`°`, bukan "derajat").
+    ///
+    /// Dipisah dari `object.speech.coordinates` karena bentuknya berbeda
+    /// menurut indera: mata membaca `°` sebagai satuan, suara tidak
+    /// mengucapkannya. Baris jenis objek di kartu jam dulu menulis bentuk ini
+    /// sebagai literal di dalam `String(format:)`, tempat tidak ada gerbang
+    /// yang bisa melihatnya.
+    static let objectDisplayCoordinates = LocalizedText(
+        key: "object.display.coordinates",
+        id: "RA %.1f° Dec %+.1f°")
+
+    /// Magnitudo dalam bentuk **ringkas untuk layar** (`mag`, bukan
+    /// "magnitudo"). Pasangan layar dari `object.speech.magnitude`.
+    static let objectDisplayMagnitude = LocalizedText(
+        key: "object.display.magnitude",
+        id: "mag %.2f")
+
+    /// Penanda sisa versi pendek untuk layar redup (Always-On).
+    ///
+    /// Bukan `"sisa"` satu kata: di layar yang tidak punya panel peringatan,
+    /// satu kata tidak menjelaskan sisa **apa**, dan yang dibaca pengguna
+    /// adalah nama objek yang terlihat persis seperti hasil pengukuran
+    /// sekarang — persis false confidence yang dilarang PRD.
+    static let objectSpeechStaleShort = LocalizedText(
+        key: "object.speech.staleShort",
+        id: "sisa pandangan sebelumnya")
 }

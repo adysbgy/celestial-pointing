@@ -60,7 +60,7 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertEqual(label, state.stateLabelText.indonesian,
                            "\(state) tidak lagi memakai nilai bawaan Bahasa Indonesia")
         }
-        XCTAssertEqual(Set(labels).count, states.count,
+    XCTAssertEqual(Set(labels).count, states.count,
                        "dua keadaan memakai label yang sama: \(labels)")
     }
 
@@ -78,7 +78,7 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertFalse(text.isEmpty, "\(state) tanpa panduan")
             XCTAssertEqual(text, state.stateGuidanceText.indonesian)
         }
-        XCTAssertEqual(Set(guidance).count, states.count,
+    XCTAssertEqual(Set(guidance).count, states.count,
                        "dua keadaan memakai panduan yang sama: \(guidance)")
     }
 
@@ -89,28 +89,28 @@ final class TextLocalizationTests: XCTestCase {
     /// bergerak bersama, dan typo pada nilainya lolos. Kuncinya adalah sumber
     /// kebenarannya: teks Bahasa Indonesia yang tertulis di katalog.
     func testDefaultTextIsExactlyTheIndonesianItShippedWith() {
-        // Angka ini bukan "harus tetap begitu selamanya" — ia menyatakan
-        // bahwa nilai bawaan di dalam tipe adalah teks yang benar, dan
-        // katalog punya padanan Inggris yang **beda** dari nilai bakunya
-        // (lihat uji terjemahan di bawah).
-        XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
-        XCTAssertEqual(PointingState.uncertain.shortLabel, "Kurang yakin")
-        XCTAssertEqual(PointingState.unavailable.shortLabel, "Sensor mati")
-        XCTAssertEqual(PointingState.idle.shortLabel, "Siap")
-        XCTAssertEqual(PointingState.pointing.shortLabel, "Arahkan")
-        XCTAssertEqual(PointingState.searching.shortLabel, "Mencari")
+    // Angka ini bukan "harus tetap begitu selamanya" — ia menyatakan
+    // bahwa nilai bawaan di dalam tipe adalah teks yang benar, dan
+    // katalog punya padanan Inggris yang **beda** dari nilai bakunya
+    // (lihat uji terjemahan di bawah).
+    XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
+    XCTAssertEqual(PointingState.uncertain.shortLabel, "Kurang yakin")
+    XCTAssertEqual(PointingState.unavailable.shortLabel, "Sensor mati")
+    XCTAssertEqual(PointingState.idle.shortLabel, "Siap")
+    XCTAssertEqual(PointingState.pointing.shortLabel, "Arahkan")
+    XCTAssertEqual(PointingState.searching.shortLabel, "Mencari")
 
-        XCTAssertEqual(PointingState.lock.guidance,
+    XCTAssertEqual(PointingState.lock.guidance,
                        "Objek dikenali dengan keyakinan tinggi.")
-        XCTAssertEqual(PointingState.uncertain.guidance,
+    XCTAssertEqual(PointingState.uncertain.guidance,
                        "Ada kandidat, tapi belum cukup yakin untuk memastikan.")
 
-        XCTAssertEqual(ConfidenceLevel.high.displayName, "Yakin")
-        XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
-        XCTAssertEqual(ConfidenceLevel.low.displayName, "Tidak tahu")
+    XCTAssertEqual(ConfidenceLevel.high.displayName, "Yakin")
+    XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
+    XCTAssertEqual(ConfidenceLevel.low.displayName, "Tidak tahu")
 
-        XCTAssertEqual(LinkMessageKind.calibrationReady.displayName, "Kalibrasi")
-        XCTAssertEqual(LinkMessageKind.policyUpdate.displayName, "Ambang keyakinan")
+    XCTAssertEqual(LinkMessageKind.calibrationReady.displayName, "Kalibrasi")
+    XCTAssertEqual(LinkMessageKind.policyUpdate.displayName, "Ambang keyakinan")
     }
 
     /// Nilaibawaan harus **tidak sama** dengan terjemahan Inggrisnya.
@@ -119,7 +119,7 @@ final class TextLocalizationTests: XCTestCase {
     /// dan seluruh bukti "terjemahan benar-benar dipakai" ikut hilang bersama
     /// pembeda itu. Uji ini menjaga agar bukti itu selalu ada.
     func testDefaultsDifferFromTheirEnglishTranslations() {
-        // Known-good pairs, ditulis tangan dari isi katalog.
+    // Known-good pairs, ditulis tangan dari isi katalog.
         let pairs: [(LocalizedText, String)] = [
             (.stateLockLabel, "Locked"),
             (.stateUncertainLabel, "Not certain"),
@@ -139,10 +139,10 @@ final class TextLocalizationTests: XCTestCase {
     /// Saat bridge terpasang, teks aktif mengikuti apa yang dikembalikan.
     func testInstalledLookupWinsOverTheDefaultValue() {
         TextLocalization.install { key in key == "pointing.state.lock.label" ? "Locked" : nil }
-        XCTAssertEqual(PointingState.lock.shortLabel, "Locked")
-        // Yang tidak punya terjemahan harus tetap jatuh ke Bahasa Indonesia —
-        // bridge yang mengembalikan `nil` bukan berarti "tampilkan kosong".
-        XCTAssertEqual(PointingState.idle.shortLabel, "Siap")
+    XCTAssertEqual(PointingState.lock.shortLabel, "Locked")
+    // Yang tidak punya terjemahan harus tetap jatuh ke Bahasa Indonesia —
+    // bridge yang mengembalikan `nil` bukan berarti "tampilkan kosong".
+    XCTAssertEqual(PointingState.idle.shortLabel, "Siap")
     }
 
     /// Terjemahan **kosong** diperlakukan sama dengan tidak ada.
@@ -153,8 +153,8 @@ final class TextLocalizationTests: XCTestCase {
     /// penjelasan — persis yang dilarang di `LocalizedText.text`.
     func testEmptyTranslationFallsBackToIndonesian() {
         TextLocalization.install { _ in "" }
-        XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
-        XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
+    XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
+    XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
     }
 
     /// Kunci tanpa teks bawaan tetap menampilkan **sesuatu**.
@@ -164,11 +164,11 @@ final class TextLocalizationTests: XCTestCase {
     /// mentah setidaknya jujur — ia menyatakan pengenal, bukan teks.
     func testKeyWithoutDefaultNeverRendersAsEmptyString() {
         let orphan = LocalizedText(key: "pointing.state.tidak.ada.label", id: "")
-        XCTAssertEqual(TextLocalization.text(orphan), "pointing.state.tidak.ada.label")
+    XCTAssertEqual(TextLocalization.text(orphan), "pointing.state.tidak.ada.label")
 
-        // Junction: bridge yang terpasang tapi mengembalikan `nil` untuknya.
+    // Junction: bridge yang terpasang tapi mengembalikan `nil` untuknya.
         TextLocalization.install { _ in nil }
-        XCTAssertEqual(TextLocalization.text(orphan), "pointing.state.tidak.ada.label")
+    XCTAssertEqual(TextLocalization.text(orphan), "pointing.state.tidak.ada.label")
     }
 
     // MARK: - Kontrak lookup ala Bundle
@@ -191,13 +191,13 @@ final class TextLocalizationTests: XCTestCase {
     /// meniru kontrak Bundle apa adanya harus tetap jatuh ke Bahasa
     /// Indonesia, bukan menampakkan nama kunci.
     func testMissingCatalogKeyFallsBackToIndonesianNotToTheKeyItself() {
-        // Persis bentuk yang dipasang `LocalizationBridge`.
+    // Persis bentuk yang dipasang `LocalizationBridge`.
         TextLocalization.install { key in
             Bundle.main.localizedString(forKey: key, value: key, table: nil)
         }
-        XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
-        XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
-        XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
+    XCTAssertEqual(PointingState.lock.shortLabel, "Terkunci")
+    XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
+    XCTAssertEqual(ConfidenceLevel.medium.displayName, "Ragu")
     }
 
     // MARK: - Paritas katalog (dipakai aturan 6 di swift-ui-lint.sh)
@@ -222,9 +222,23 @@ final class TextLocalizationTests: XCTestCase {
     /// `slew.hazard.*`). `SlewPlanner` menghitung putusan keselamatan sejak
     /// FASE 3 tetapi tidak pernah membacanya di layar; tanpa kunci ini,
     /// penolakan karena Matahari tidak bisa dibedakan dari keyakinan rendah.
+    ///
+    /// 164 → 172 pada siklus "teks yang lahir di dalam view": delapan kunci
+    /// untuk kalimat yang sebelumnya dirakit sebagai literal
+    /// `String(format:)` / `parts.append(…)` di dalam `Apps/`. Kelas cacat
+    /// ini tidak pernah terlihat oleh aturan 4 (bukan argumen `Text`) maupun
+    /// aturan 6 (literal-nya berformat, jadi tak kena sapuan), dan tidak
+    /// terlihat benar secara visual karena angka dan derajat sama di semua
+    /// bahasa — padahal urutan kata dan pilihannya bukan.
+    ///
+    /// 172 → 174 pada siklus Aturan 13: dua kunci terakhir yang ditemukan
+    /// gerbang itu sendiri (`row.speech.stateLine`, "Keadaan: %@." — awalan
+    /// kalimat keadaan; dan `calibration.display.suggestedSigma`, lambang σ
+    /// yang tidak bisa diucapkan sebagai kata sehingga harus tinggal di
+    /// dalam slot `%@`).
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 164, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 174, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
@@ -274,17 +288,17 @@ final class TextLocalizationTests: XCTestCase {
     /// bergerak bersama, dan typo pada nilainya lolos — persis jebakan yang
     /// pernah menangkap salah eja pada siklus sebelumnya.
     func testKindLabelsAreExactlyTheIndonesianTheyShippedWith() {
-        XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
-        XCTAssertEqual(ObjectKind.planet.displayName, "Planet")
-        XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
-        XCTAssertEqual(ObjectKind.sun.displayName, "Matahari")
-        XCTAssertEqual(ObjectKind.deepSky.displayName, "Objek langit dalam")
+    XCTAssertEqual(ObjectKind.star.displayName, "Bintang")
+    XCTAssertEqual(ObjectKind.planet.displayName, "Planet")
+    XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
+    XCTAssertEqual(ObjectKind.sun.displayName, "Matahari")
+    XCTAssertEqual(ObjectKind.deepSky.displayName, "Objek langit dalam")
 
-        XCTAssertEqual(ObjectKind.star.spokenName, "bintang")
-        XCTAssertEqual(ObjectKind.planet.spokenName, "planet")
-        XCTAssertEqual(ObjectKind.moon.spokenName, "bulan")
-        XCTAssertEqual(ObjectKind.sun.spokenName, "matahari")
-        XCTAssertEqual(ObjectKind.deepSky.spokenName, "objek langit jauh")
+    XCTAssertEqual(ObjectKind.star.spokenName, "bintang")
+    XCTAssertEqual(ObjectKind.planet.spokenName, "planet")
+    XCTAssertEqual(ObjectKind.moon.spokenName, "bulan")
+    XCTAssertEqual(ObjectKind.sun.spokenName, "matahari")
+    XCTAssertEqual(ObjectKind.deepSky.spokenName, "objek langit jauh")
     }
 
     /// Setiap jenis punya label sendiri, untuk tampilan **dan** pengucapan.
@@ -301,9 +315,9 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertFalse(displays[index].isEmpty, "\(kind) tanpa label tampilan")
             XCTAssertFalse(spokens[index].isEmpty, "\(kind) tanpa label pengucapan")
         }
-        XCTAssertEqual(Set(displays).count, kinds.count,
+    XCTAssertEqual(Set(displays).count, kinds.count,
                        "dua jenis memakai label tampilan yang sama: \(displays)")
-        XCTAssertEqual(Set(spokens).count, kinds.count,
+    XCTAssertEqual(Set(spokens).count, kinds.count,
                        "dua jenis memakai label pengucapan yang sama: \(spokens)")
     }
 
@@ -342,10 +356,10 @@ final class TextLocalizationTests: XCTestCase {
             default: return nil
             }
         }
-        XCTAssertEqual(ObjectKind.star.displayName, "Star")
-        XCTAssertEqual(ObjectKind.deepSky.spokenName, "deep-sky object")
-        // Yang tidak diterjemahkan harus tetap Bahasa Indonesia, bukan kosong.
-        XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
+    XCTAssertEqual(ObjectKind.star.displayName, "Star")
+    XCTAssertEqual(ObjectKind.deepSky.spokenName, "deep-sky object")
+    // Yang tidak diterjemahkan harus tetap Bahasa Indonesia, bukan kosong.
+    XCTAssertEqual(ObjectKind.moon.displayName, "Bulan")
     }
 
     /// Bukti bahwa nilai bawaan != terjemahan, untuk kunci baru.
@@ -366,5 +380,84 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertNotEqual(text.indonesian, english,
                               "\(text.rawValue): nilai bawaan sama dengan terjemahan")
         }
+    }
+
+    // MARK: - Overload berformat (teks yang lahir di dalam view)
+
+    /// Overload `text(_:_:)` harus memakai **terjemahan** sebagai cetakan,
+    /// bukan nilai bawaannya.
+    ///
+    /// Kegagalan yang diuji: kalau overload ini membaca
+    /// `key.indonesian` langsung, terjemahan tetap punya slot yang benar —
+    /// jadi setiap nilai terformat akan **selalu Bahasa Indonesia**,
+    /// termasuk "%lld %@" yang menempel ke Bahasa Inggris tanpa satu pun
+    /// kegagalan yang terlihat. Suite hijau, tidak ada yang salah sampai ada
+    /// yang benar-benar membaca.
+    func testFormattedOverloadUsesTheTranslationAsThePattern() {
+        TextLocalization.install { key in
+            key == "link.status.sendFailures" ? "%lld %@ were not delivered." : nil
+        }
+        let result = TextLocalization.text(.linkStatusSendFailures,
+                                          Int64(3),
+                                          TextLocalization.text(.linkStatusSendFailuresWord))
+    XCTAssertEqual(result, "3 kiriman gagal were not delivered.",
+                       "overload memakai nilai bawaan, bukan terjemahan")
+    }
+
+    /// Argumennya harus bisa berupa nilai non-`String` — `%lld` untuk jumlah,
+    /// `%@` untuk teks. Kalau overload ini hanya menerima `String...`,
+    /// pemanggil `sendFailureCount` (Int) harus memanggil
+    /// `String(describing:)` sendiri, dan setiap pemanggil punya kesempatan
+    /// lupa — dan lupa itu gagal diam-diam untuk `%lld`.
+    func testFormattedOverloadAcceptsNonStringArguments() {
+        TextLocalization.install { _ in nil }
+    // Tanpa bridge: harus jatuh ke nilai Indonesia dan format normal.
+    XCTAssertEqual(TextLocalization.text(.linkStatusSendFailures,
+                                              Int64(7),
+                                              TextLocalization.text(.linkStatusSendFailuresWord)),
+                       ". 7 kiriman gagal.")
+    XCTAssertEqual(TextLocalization.text(.objectDisplayMagnitude, 1.42), "mag 1.42")
+    // Tanda ikut terbawa: tanpa tanda, deklinasi negatif terdengar sama
+    // dengan positifnya — dan itu bukan detail kecil, karena itulah yang
+    // menentukan apakah teleskop boleh bergerak ke atas atau ke bawah.
+    XCTAssertEqual(TextLocalization.text(.objectDisplayCoordinates,
+                                              101.287, -16.716),
+                       "RA 101.3° Dec -16.7°")
+    }
+
+    /// Overload baru tidak boleh mengubah arti overload yang sudah ada.
+    ///
+    /// Swift memilih overload berdasarkan tipe argumen, jadi `text(_:)`
+    /// tunggal tetap harus mengembalikan string **tanpa** memproses format.
+    /// Kalau tidak, kunci tanpa placeholder pun ikut berubah — dan katalog
+    /// penuh dengan `%` harfiah seperti "100%%" yang tidak boleh diurai.
+    func testUnformattedOverloadIsUnaffectedByTheFormattedOne() {
+        TextLocalization.install { key in
+            key == "object.speech.staleShort" ? "100%% certain" : nil
+        }
+    // Tidak ada argumen → overload tunggal → tidak ada pemrosesan `%`.
+    XCTAssertEqual(TextLocalization.text(.objectSpeechStaleShort), "100%% certain")
+    }
+
+    /// Kunci baru harus punya bentuk yang **beda** dari bentuk yang sudah ada,
+    /// atau nama barunya tidak berarti apa-apa.
+    ///
+    /// `object.display.magnitude` ("mag %.2f") sengaja tidak memakai kembali
+    /// `object.speech.magnitude` ("magnitudo %.2f"): yang pertama berdiri
+    /// sendiri di bawah nama besar di layar, yang kedua diucapkan sebagai
+    /// bagian kalimat. Kalau keduanya berbagi kunci, perbaikan yang salah
+    /// adalah men-shortcut-nya — dan kemampuan membedakan keduanya hilang
+    /// untuk selamanya.
+    func testNewDisplayKeysDifferFromTheirSpokenCounterparts() {
+    XCTAssertNotEqual(LocalizedText.objectDisplayMagnitude.indonesian,
+                          LocalizedText.objectSpeechMagnitude.indonesian)
+    XCTAssertNotEqual(LocalizedText.objectDisplayCoordinates.indonesian,
+                          LocalizedText.objectSpeechCoordinates.indonesian)
+    XCTAssertNotEqual(LocalizedText.objectSpeechStaleShort.indonesian,
+                      LocalizedText.objectSpeechStale.indonesian)
+        // Bentuk pendek harus benar-benar lebih pendek — kalau sama, layar
+        // redup tidak hemat apa pun dan salah satunya pasti dibuang suatu hari.
+        XCTAssertLessThan(LocalizedText.objectSpeechStaleShort.indonesian.count,
+                          LocalizedText.objectSpeechStale.indonesian.count)
     }
 }

@@ -1019,6 +1019,182 @@ else
   echo "Bersih: tak ada kalimat tampilan yang lahir sebagai literal."
 fi
 
+# ── Aturan 13: kalimat yang lahir di dalam String(format:) pun harus berkunci ─
+# Aturan 4 menyapu literal di dalam `Text(...)`. Aturan 12 menyapu literal yang
+# **ditugaskan** ke variabel berakhiran Note/Label/Speech lalu dirender.
+# Yang tersisa adalah kelas yang keduanya tidak lihat: kalimat yang dirakit
+# **sebagai argumen**, di dalam `String(format: …)`, `parts.append(…)`, atau
+# `text += …`.
+#
+# Kenapa kelas ini lolos dari semua gerbang lain, dan kenapa ia berbahaya:
+#   1. Bentuknya bukan argumen `Text`, jadi Aturan 4 tidak menyapunya.
+#   2. Tidak pernah jadi nilai variabel berakhiran Note/Label, jadi Aturan 12
+#      juga tidak.
+#   3. Yang paling penting: **tidak terlihat salah**. "mag %.2f" dan
+#      "%.0f° tinggi" berisi angka dan derajat yang identik di semua bahasa,
+#      jadi diff dan tangkapan layar tidak menunjukkan apa pun. Yang berbeda —
+#      kata pengantar dan **urutannya** — baru terasa oleh pengguna yang
+#      membaca bahasa lain.
+# Bukti nyata di repo ini: delapan kalimat seperti bentuk, antara lain
+# "Laju pergelangan %.0f derajat per detik." yang memaksa Bahasa Inggris
+# mengucapkan "derajat", dan "Keadaan: %@." yang memaksa awalan
+# Bahasa Indonesia dibaca lebih dulu.
+echo
+echo "== Aturan 13: kalimat di dalam String(format:)/append harus berkunci =="
+assembled_note=$(python3 - <<'PY'
+import json, os, re
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+
+# Kata yang TIDAK diterjemahkan: nama produk & istilah yang watchOS sendiri
+# gunakan apa adanya. Ini daftar **kata**, bukan daftar kalimat yang boleh
+# lolos — jadi ia tak perlu bertambah tiap kalimat baru, dan tak bisa dipakai
+# untuk men-justifikasi kalimat yang sebenarnya perlu diterjemahkan.
+PROPER = {"iPhone", "iPad", "watchOS", "iOS", "GoTo", "Swift", "Wi-Fi",
+          "Bluetooth", "Experiment", "Point", "Know", "False", "lock"}
+
+# Satu konversi printf dengan huruf tipenya. `%%` bukan konversi, jadi ia
+# dibuang lebih dulu (dipakai juga oleh Aturan 11).
+CONV = re.compile(r"%(?:[0-9]+\$)?[-+ #0]*(?:[0-9]+|\*)?(?:\.(?:[0-9]+|\*))?"
+                  r"(?:hh|h|ll|l|q|L|z|t|j)?[diouxXeEfgGaAcspn@]")
+# Kata yang "dinyatakan": minimal 3 huruf, supaya "%@" dan "°" tidak dihitung.
+WORD = re.compile(r"[A-Za-z][A-Za-z]{2,}")
+
+# Konteks: tempat kalimat bisa lahir. `var x = [` / `let x = [`
+#   menangkap kumpulan bagian kalimat yang dirakit pelan-pelan.
+CTX = re.compile(r"(String\(format:|\.append\(|\.insert\(|\+=|"
+                 r"\bvar\s+\w+\s*(?::[^=]*)?=\s*\[|\blet\s+\w+\s*=\s*\[)")
+
+
+def strip_line_comments(text):
+    """Hapus `// …`, tapi hanya di luar literal string."""
+    lines = []
+    for raw in text.split("\n"):
+        out, in_string, escaped, i = [], False, False, 0
+        while i < len(raw):
+            ch = raw[i]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+            else:
+                if ch == '"':
+                    in_string = True
+                elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                    break
+            out.append(ch)
+            i += 1
+        lines.append("".join(out))
+    return "\n".join(lines)
+
+
+def read_literal(src, start):
+    """Baca satu literal mulai tanda kutip di `start`.
+
+    Mengembalikan (akhir, teks_tanpa_interpolasi, teks_penuh, ada_interpolasi).
+    Teks tanpa interpolasi dipakai untuk menilai **kata** yang ada; teks penuh
+    dipakai untuk melaporkannya ke pemakai gerbang.
+    """
+    i = start + 1
+    escaped = False
+    buf, plain, interp = [], [], False
+    while i < len(src):
+        ch = src[i]
+        if escaped:
+            escaped = False
+            if ch == "(":
+                interp = True
+                # Lewati seluruh ekspresi interpolasi, termasuk literal
+                # string di dalamnya — `\(x ? "a" : "b")`.
+                j, depth = i, 0
+                while j < len(src):
+                    inner = src[j]
+                    if inner == '"':
+                        j = read_literal(src, j)[0]
+                        continue
+                    if inner == "(":
+                        depth += 1
+                    elif inner == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    j += 1
+                buf.append(src[i:j + 1])
+                i = j + 1
+                continue
+            buf.append(ch)
+            plain.append(ch)
+        elif ch == "\\":
+            escaped = True
+            buf.append(ch)
+        elif ch == '"':
+            return i + 1, "".join(plain), "".join(buf), interp
+        else:
+            buf.append(ch)
+            plain.append(ch)
+        i += 1
+    return i, "".join(plain), "".join(buf), interp
+
+
+keys = set(json.load(open(CATALOG, encoding="utf-8"))["strings"])
+
+hits = []
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        source = strip_line_comments(open(path, encoding="utf-8").read())
+        for lineno, line in enumerate(source.split("\n"), 1):
+            if "NSLog(" in line or not CTX.search(line):
+                continue
+            i = 0
+            while i < len(line):
+                if line[i] != '"':
+                    i += 1
+                    continue
+                end, plain, raw, interp = read_literal(line, i)
+                i = end
+                # `"…"` tanpa spasi = satu kata, bukan kalimat; `"{…}"`
+                # adalah string multi-baris yang isinya ditangani per baris.
+                if raw.startswith("{") or " " not in raw:
+                    continue
+                # Sudah punya kunci: literal ini adalah nilai bawaan katalog
+                # yang ikut dimuat di view, bukan kalimat yang belum bernama.
+                if raw in keys:
+                    continue
+                words = [w for w in WORD.findall(CONV.sub("", plain))
+                         if w not in PROPER]
+                if not words:
+                    continue
+                hits.append((path, lineno, raw, interp))
+
+if hits:
+    for path, lineno, raw, interp in hits:
+        suffix = " (interpolasi)" if interp else ""
+        print(f"  {path}:{lineno}: {raw[:96]!r}{suffix}")
+PY
+)
+if [ -n "$assembled_note" ]; then
+  echo "Kalimat dirakit sebagai argumen, tanpa kunci katalog:"
+  echo "$assembled_note"
+  echo "-> Bentuk kalimatnya milik PointingKit, bukan view. Ambil dari"
+  echo "   TextLocalization.text(.kunci, …) — atau pakai helper yang"
+  echo "   sudah ada (RowSpeech.stateLine, RowSpeech.spokenWristRate,"
+  echo "   RowSpeech.spokenError, LinkStatusText.sendFailures,"
+  echo "   CalibrationText.spreadDisplay)."
+  echo "   Alasannya bukan cuma terjemahan: urutan kata ikut terpaku di"
+  echo "   kode, dan bentuk seperti ini tidak terlihat salah karena"
+  echo "   angka & derajat sama di semua bahasa."
+  status=1
+else
+  echo "Bersih: tak ada kalimat yang dirakit sebagai argumen."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

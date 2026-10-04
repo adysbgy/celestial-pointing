@@ -464,6 +464,39 @@
         }
       }
     },
+    "row.speech.wristRate": {
+      "comment": "Kalimat pengumuman laju pergelangan di kartu keadaan jam. Urutan specifier WAJIB sama dengan kode: %@ = kata pengukur (row.speech.wristRateWord), %.0f = angka, %@ = satuan (row.speech.degrees). Menukar posisinya = crash di CoreFoundation — lihat Aturan 11 di swift-ui-lint.sh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %.0f %@ per second."
+          }
+        }
+      }
+    },
+    "row.speech.wristRateWord": {
+      "comment": "Kata yang menyebut apa yang diukur laju pergelangan pada pengumuman.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrist rate"
+          }
+        }
+      }
+    },
+    "row.speech.stateLine": {
+      "comment": "Awalan kalimat keadaan untuk pengumuman kartu jam. %@ = label keadaan (pointing.state.*.label, yang punya kuncinya sendiri). Semula literal \"Keadaan: \\(state.shortLabel).\" di dalam view.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status: %@."
+          }
+        }
+      }
+    },
     "location.fallback.label": {
       "comment": "Label lokasi darurat (Jakarta) yang tampil di layar utama jam. Bukan lokasi pengukuran.",
       "localizations": {
@@ -614,6 +647,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Watch not connected — message not sent."
+          }
+        }
+      }
+    },
+    "link.status.sendFailures": {
+      "comment": "Kalimat jumlah pengiriman tautan yang gagal. %lld = jumlah, %@ = kata benda. Semula pemanggil merakitnya dengan MENYAMBUNG string, sehingga urutannya terpaku di kode dan bahasa lain tidak bisa mengatakannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". %lld %@."
+          }
+        }
+      }
+    },
+    "link.status.sendFailuresWord": {
+      "comment": "Kata benda untuk kiriman yang gagal. Dipisah dari link.status.sendFailed karena yang ini menyebut JUMLAH kiriman, bukan satu kejadian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "messages failed"
           }
         }
       }
@@ -878,6 +933,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Calibration cleared. Start over."
+          }
+        }
+      }
+    },
+    "calibration.display.captureAltitude": {
+      "comment": "Keterangan tinggi acuan di baris daftar acuan layar kalibrasi. Semula literal String(format:) di dalam view.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.0f° altitude"
+          }
+        }
+      }
+    },
+    "calibration.display.suggestedSigma": {
+      "comment": "Keterangan ambang keyakinan yang diusulkan engine, di bawah daftar acuan. σ (sigma) dibiarkan sebagai lambang di dalam slot %@ karena tidak bisa diucapkan sebagai kata; kata pengantar dan satuan tetap milik terjemahan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggested confidence threshold: σ %.1f°"
           }
         }
       }
@@ -2847,6 +2924,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "RA %.1f degrees, declination %+.1f degrees"
+          }
+        }
+      }
+    },
+    "object.display.coordinates": {
+      "comment": "Koordinat untuk baris jenis objek di kartu jam — bentuk LAYAR (pakai tanda derajat), bukan bentuk suara. Semula literal String(format:) di dalam view, yang tidak terlihat Aturan 4 maupun Aturan 6.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA %.1f° Dec %+.1f°"
+          }
+        }
+      }
+    },
+    "object.display.magnitude": {
+      "comment": "Magnitudo untuk baris jenis objek — bentuk LAYAR ringkas (\"mag\"), bukan bentuk suara object.speech.magnitude (\"magnitudo\").",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mag %.2f"
+          }
+        }
+      }
+    },
+    "object.speech.staleShort": {
+      "comment": "Penanda sisa versi pendek untuk layar redup (Always-On). Bukan satu kata \"sisa\": di layar tanpa panel peringatan, satu kata tidak menjelaskan sisa APA.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "from an earlier view"
           }
         }
       }

@@ -165,6 +165,18 @@ public enum CalibrationText {
         String(format: TextLocalization.text(.calibrationDisplaySpread),
                spreadDeg, maxDeg)
     }
+
+    /// "40° tinggi" — keterangan tinggi acuan di baris daftar acuan.
+    ///
+    /// **Kenapa ini ada.** Kalimatnya dulu lahir sebagai literal di dalam
+    /// `String(format: "%.0f° tinggi", …)` di `CalibrationView` — bentuk yang
+    /// tidak dilihat Aturan 4 (bukan argumen `Text(...)`) maupun Aturan 6
+    /// (tanpa kunci). Kata "tinggi" adalah teks yang harus diterjemahkan;
+    /// `°` dan angkanya tidak.
+    public static func captureAltitudeDisplay(altitudeDeg: Double) -> String {
+        String(format: TextLocalization.text(.calibrationDisplayCaptureAltitude),
+               altitudeDeg)
+    }
 }
 
 // MARK: - Katalog kunci
@@ -233,10 +245,27 @@ public extension LocalizedText {
         key: "calibration.status.reset",
         id: "Kalibrasi dihapus. Mulai dari awal.")
 
+    /// Keterangan ambang keyakinan yang **diusulkan** engine, di bawah daftar
+    /// acuan.
+    ///
+    /// Bentuk "%@: σ %.1f°" — kata pengantar, lalu lambang sigma di dalam slot
+    /// `%@`, lalu sudut. Sigma bukan "kata" yang bisa diucapkan, jadi ia
+    /// dibiarkan sebagai lambang; yang boleh berubah lewat terjemahan adalah
+    /// kata pengantar dan satuan, bukan lambangnya.
+    static let calibrationDisplaySuggestedSigma = LocalizedText(
+        key: "calibration.display.suggestedSigma",
+        id: "Ambang keyakinan usulan: σ %.1f°")
+
     static let calibrationDisplayOffset = LocalizedText(
         key: "calibration.display.offset", id: "Offset %.1f°")
     static let calibrationDisplaySpread = LocalizedText(
         key: "calibration.display.spread", id: "Sebaran %.1f° (maks %.1f°)")
+
+    /// Keterangan tinggi acuan di baris daftar acuan (`CalibrationView`).
+    /// Dulu literal `String(format: "%.0f° tinggi", …)` — kata "tinggi"
+    /// tampil dalam Bahasa Indonesia di semua bahasa tanpa ada yang melihat.
+    static let calibrationDisplayCaptureAltitude = LocalizedText(
+        key: "calibration.display.captureAltitude", id: "%.0f° tinggi")
 
     // Nama tahap. Dipakai untuk layar (`phaseLabel` di view) **dan** suara
     // (`spokenName`); keduanya dulu literal di tempat berbeda, jadi satu

@@ -147,7 +147,8 @@ struct CalibrationView: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(target.name)
                                     .font(.subheadline.weight(.medium))
-                                Text(String(format: "%.0f° tinggi", target.direction.altitudeDeg))
+                                Text(String(format: TextLocalization.text(.calibrationDisplayCaptureAltitude),
+                                                target.direction.altitudeDeg))
                                     .font(.caption2)
                                     .foregroundStyle(Color.nightAwareSecondary)
                             }
@@ -213,7 +214,8 @@ struct CalibrationView: View {
             }
 
             if let policy = session?.suggestedConfidencePolicy {
-                Text(String(format: "Ambang keyakinan usulan: σ %.1f°", policy.pointingSigmaDeg))
+                Text(String(format: TextLocalization.text(.calibrationDisplaySuggestedSigma),
+                                                policy.pointingSigmaDeg))
                     .font(.caption2)
                     .foregroundStyle(Color.nightAwareSecondary)
             }

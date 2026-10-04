@@ -289,9 +289,17 @@ struct PointingView: View {
     /// diumumkan adalah keadaan, panduannya, dan laju dengan satuannya.
     private var statusAccessibilityLabel: String {
         let state = engine.snapshot.state
-        var parts = ["Keadaan: \(state.shortLabel).", engine.snapshot.guidanceText]
+        var parts = [RowSpeech.stateLine(state), engine.snapshot.guidanceText]
         if let rate = engine.snapshot.angularRateDegPerSec {
-            parts.append(String(format: "Laju pergelangan %.0f derajat per detik.", rate))
+            // Bentuk kalimat utuh dari katalog, bukan `String(format:)` literal.
+            // Alasannya bukan cuma terjemahan: menyisipkan kata "derajat"
+            // sebagai literal memaksa Bahasa Inggris mengucapkan "derajat",
+            // dan "%0.f derajat" adalah kehendak Bahasa Indonesia yang tidak
+            // bisa dinyatakan sebagai angka polos.
+            parts.append(TextLocalization.text(.rowSpeechWristRate,
+                                              TextLocalization.text(.rowSpeechWristRateWord),
+                                              rate,
+                                              TextLocalization.text(.rowSpeechDegrees)))
         }
         return parts.joined(separator: " ")
     }
@@ -319,9 +327,18 @@ struct PointingView: View {
     private var linkAccessibilityLabel: String {
         // Kegagalan kirim diumumkan, bukan hanya digambar: "· 3 gagal" tidak
         // terbaca sebagai kalimat bila digabung mentah.
+        //
+        // Ditambahannya **disusun oleh katalog**, bukan `text += "…"` seperti
+        // sebelumnya. Yang salah bukan cuma literalnya: menyambung string
+        // memaku urutan di kode — Bahasa Inggris bisa sah menulis "3 messages
+        // failed" maupun "4 failed messages" dengan urutan berbeda, dan katalog
+        // hanya bisa mengizinkan satu.
         var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
         if link.sendFailureCount > 0 {
-            text += ". \(link.sendFailureCount) kiriman gagal."
+            text += TextLocalization.text(
+                .linkStatusSendFailures,
+                link.sendFailureCount,
+                TextLocalization.text(.linkStatusSendFailuresWord))
         }
         return text
     }
@@ -542,11 +559,23 @@ struct ObjectDetailView: View {
         return parts.joined(separator: ", ")
     }
 
+    /// Baris jenis untuk tampilan layar — **ringkas**, karena berdiri sendiri
+    /// di bawah nama besar dan sudah tidak dibaca sebagai kalimat.
+    ///
+    /// Berbeda dari `speechLine` di atasnya, yang diucapkan dan karena itu
+    /// memakai kata penuh ("magnitudo 1.4", "RA … derajat"). Baris ini memakai
+    /// bentuk layar yang sudah punya bentuknya sendiri di katalog
+    /// (`object.display.magnitude`, `object.display.coordinates`): "mag 1.4",
+    /// "RA 101.3° Dec −16.7°". Keduanya dulu dirakit sebagai literal
+    /// `String(format:)` di dalam view — yang lolos dari Aturan 4 (bukan
+    /// argumen `Text`) dan Aturan 6 (tanpa kunci katalog), dan yang tidak
+    /// terlihat salah karena angka dan derajat sama di semua bahasa.
     private var kindLine: String {
         var parts = [kindLabel]
-        parts.append(String(format: "mag %.2f", object.magnitude))
+        parts.append(TextLocalization.text(.objectDisplayMagnitude, object.magnitude))
         if object.kind == .star {
-            parts.append(String(format: "RA %.1f° Dec %+.1f°", object.raDeg, object.decDeg))
+            parts.append(TextLocalization.text(.objectDisplayCoordinates,
+                                              object.raDeg, object.decDeg))
         }
         return parts.joined(separator: " · ")
     }

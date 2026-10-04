@@ -6304,6 +6304,89 @@ harus terdengar berbeda; `testUnknownDeepSkyIDDoesNotGuessASpokenMorphology`
 Gate: lint 9/9, typecheck lulus. CI: Engine + Apple Build **success**
 (`4ff6a6d`).
 
+## Siklus 2026-10-04 (8) — kalimat yang lahir di dalam view punya kunci sendiri
+
+### Cacat yang ditemukan
+
+Aturan 4 menyapu literal di dalam `Text(...)`. Aturan 12 menyapu literal yang
+**ditugaskan** ke variabel berakhiran `Note`/`Label` lalu dirender. Di antara
+keduanya ada celah yang tidak pernah ditutup: kalimat yang dirakit **sebagai
+argumen**, di dalam `String(format: …)`, `parts.append(…)`, atau `text += …`.
+
+Sepuluh kalimat di `Apps/` kena. Contoh yang paling merusak:
+
+    String(format: "Laju pergelangan %.0f derajat per detik.", rate)
+    text += ". \(link.sendFailureCount) kiriman gagal."
+    var parts = ["Keadaan: \(state.shortLabel).", …]
+
+### Kenapa kelas ini lolos dari semua gerbang, dan kenapa ia berbahaya
+
+1. Bentuknya bukan argumen `Text`, jadi Aturan 4 tidak menyapunya.
+2. Tidak pernah jadi nilai variabel berakhiran `Note`/`Label`, jadi Aturan 12
+   juga tidak.
+3. Yang paling menentukan: **tidak terlihat salah.** "mag %.2f" dan
+   "%.0f° tinggi" berisi angka dan derajat yang identik di semua bahasa, jadi
+   diff dan tangkapan layar tidak menunjukkan apa pun. Yang berbeda — kata
+   pengantar dan **urutannya** — baru terasa oleh pengguna yang membaca bahasa
+   lain.
+
+Dua di antaranya bahkan kelas yang lebih halus:
+
+- `text += ". N kiriman gagal."` — **menyambung** string. Bukan sekadar
+  terjemahan: menyambung memaku *urutan* di kode, dan Bahasa Inggris bisa sah
+  menulis "3 messages failed" maupun "4 failed messages" dengan urutan
+  berbeda. Katalog hanya bisa mengizinkan satu.
+- `String(format: "Laju pergelangan %.0f derajat per detik.", …)` — memaksa
+  Bahasa Inggris mengucapkan kata Indonesia "derajat" di tengah kalimat
+  Inggeris.
+
+### Yang diperbaiki
+
+- 10 kunci baru (`.objectDisplayCoordinates`, `.objectDisplayMagnitude`,
+  `.objectSpeechStaleShort`, `.rowSpeechWristRate`, `.rowSpeechWristRateWord`,
+  `.rowSpeechStateLine`, `.calibrationDisplayCaptureAltitude`,
+  `.calibrationDisplaySuggestedSigma`, `.linkStatusSendFailures`,
+  `.linkStatusSendFailuresWord`). Kunci = **174** (dari 164).
+- `TextLocalization.text(_:_:)` — overload berformat. **Kenapa butuh
+  overload terpisah, bukan `String(format: text(key), …)` di tiap pemanggil:**
+  setelah katalog diterjemahkan, terjemahan boleh memuat `%lld` di tempat
+  berbeda; yang memanggil overload ini hanya menyerahkan kunci dan nilai,
+  **urutan argumennya milik terjemahan**, bukan milik pemanggil.
+- Helper yang dipakai pemanggil: `RowSpeech.stateLine(_:)` (awalan kalimat
+  keadaan), `RowSpeech.spokenWristRate(_:)` (kalimat laju pergelangan),
+  `LinkStatusText.sendFailures(_:)` (kalimat jumlah kiriman gagal).
+
+### Gerbang baru: Aturan 13
+
+Aturan 13 menyapu `Apps/` untuk literal **di dalam konteks perakitan kalimat**
+(`String(format:`, `.append(`, `.insert(`, `+=`, `var x = [`, `let x = [`) yang
+tidak ada sebagai kunci katalog.
+
+Dua keputusan desain yang membuat gerbang ini bisa dipercaya:
+
+- **Daftar yang dikecualikan adalah daftar _kata_, bukan daftar _kalimat_**:
+  `iPhone`, `watchOS`, `GoTo`, `False lock`. Kalau daftarnya kalimat, setiap
+  kalimat baru yang belum pernah disetuji akan ditambahkan ke sana dan
+  gerbangnya jadi tidak berguna apa-apa.
+- **Ambang "ada kata yang harus diterjemahkan"** dihitung setelah specifier
+  `%…f` dibuang, minimal 3 huruf — supaya `%.0f°` (murni simbol) lolos tapi
+  `"%.0f° tinggi"` (ada katanya) tertangkap.
+
+**Gerbang ini sudah dibuktikan menyala**: literal `Ambang keyakinan usulan:
+σ %.1f°` sengaja dikembalikan ke view, Aturan 13 memerah dan menyebut barisnya,
+lalu dikembalikan lagi dan gerbang hijau. Gerbang yang tak pernah menyala
+tidak dihitung sebagai penjaga.
+
+### Verifikasi
+
+6 uji baru (459 → **465** PointingKit, +166 engine = **631 hijau**).
+`testFormattedOverloadUsesTheTranslationAsThePattern` mengunci bahwa overload
+memakai **terjemahan** sebagai cetakan — kalau ia membaca `key.indonesian`,
+semua nilai terformat akan selalu Bahasa Indonesia tanpa satu pun kegagalan
+terlihat.
+
+Gate: lint **13/13**, typecheck lulus.
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit

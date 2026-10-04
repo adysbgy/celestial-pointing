@@ -196,4 +196,41 @@ final class RowSpeechTests: XCTestCase {
 
         XCTAssertEqual(RowSpeech.label(title: "", value: "Terkunci"), "Terkunci")
     }
+
+    // MARK: - Kalimat keadaan
+
+    /// `stateLine` harus membentuk **kalimat** dari awalan katalog + label
+    /// keadaan, bukan menyambung dua string di view.
+    ///
+    /// Kegagalan yang diuji: kalau `stateLine` kembali ke
+    /// `"Keadaan: \(state.shortLabel)."`, bentuknya tetap sama di Bahasa
+    /// Indonesia dan **selalu** sama di semua bahasa — jadi tidak ada satu pun
+    /// uji yang memerah. Yang diuji di sini adalah bahwa kata "Keadaan"
+    /// datang dari katalog, sehingga bisa diganti.
+    func testStateLineUsesTheCatalogPrefixAndTheStateLabel() {
+        defer { TextLocalization.reset() }
+        TextLocalization.install { key in
+            switch key {
+            case "row.speech.stateLine":       return "[%@] ..."
+            case "pointing.state.lock.label":  return "Locked"
+            default:                            return nil
+            }
+        }
+        XCTAssertEqual(RowSpeech.stateLine(.lock), "[Locked] ...",
+                       "awalan harus dari katalog, label dari kunci keadaannya")
+    }
+
+    /// Tanpa bridge, `stateLine` harus tetap menghasilkan kalimat Bahasa
+    /// Indonesia yang utuh — bukan setengah kalimat yang kehilangan awalan.
+    ///
+    /// Dipakai `.uncertain` dan bukan `.lock` saja karena keduanya punya
+    /// **label yang berbeda panjang** ("Kurang yakin" vs "Terkunci"), dan itu
+    /// bagian dari yang diuji: kalimat yang dirakit benar harus menyisipkan
+    /// label sepanjang apa adanya, bukan label tetap.
+    func testStateLineFallsBackToIndonesianSentence() {
+        defer { TextLocalization.reset() }
+        TextLocalization.install { _ in nil }
+        XCTAssertEqual(RowSpeech.stateLine(.lock), "Keadaan: Terkunci.")
+        XCTAssertEqual(RowSpeech.stateLine(.uncertain), "Keadaan: Kurang yakin.")
+    }
 }

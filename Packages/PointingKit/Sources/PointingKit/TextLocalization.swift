@@ -139,6 +139,23 @@ public enum TextLocalization {
         }
         return key.indonesian.isEmpty ? key.rawValue : key.indonesian
     }
+
+    /// Bentuk berformat dari kunci katalog.
+    ///
+    /// **Kenapa butuh overload terpisah, bukan `String(format: text(key), …)`
+    /// di tiap pemanggil.** Setelah katalog diterjemahkan, terjemahan boleh
+    /// memuat `%lld` di tempat berbeda dari aslinya — bahasa Carthaginian
+    /// (gramatikal nomor dua) punya bentuk berbeda untuk "3 messages failed"
+    /// dan "1 message failed", dan bentuk itu harus datang dari katalog. Yang
+    /// memanggil overload ini hanya menyerahkan kunci dan nilai; **urutan
+    /// argumennya milik terjemahan**, bukan milik pemanggil.
+    ///
+    /// Kalau katalog tidak punya terjemahan, format dijalankan terhadap nilai
+    /// Indonesia — bukan terhadap kunci, yang akan membuat `%` dicetak apa
+    /// adanya dan menutupi slot.
+    public static func text(_ key: LocalizedText, _ arguments: CVarArg...) -> String {
+        String(format: text(key), arguments: arguments)
+    }
 }
 
 // MARK: - Katalog kunci
@@ -272,6 +289,13 @@ public extension LocalizedText {
         // `ObjectSpeech.swift`.
         .objectSpeechMagnitude, .objectSpeechStale,
         .objectSpeechConfidence, .objectSpeechCoordinates,
+        // Bentuk **layar** dari tiga hal yang sama dengan bentuk suaranya.
+        // Semuanya lahir sebagai literal `String(format:)` / `parts.append(…)`
+        // di dalam view — bentuk yang tidak dilihat Aturan 4 (bukan argumen
+        // `Text`) maupun Aturan 6 (tanpa kunci), dan yang tidak terlihat salah
+        // karena angka dan derajat sama di semua bahasa.
+        .objectDisplayCoordinates, .objectDisplayMagnitude,
+        .objectSpeechStaleShort,
         // Status sensor & izin. Masuk daftar karena inilah satu-satunya jalur
         // pesan "izin ditolak" dan "sensor tidak tersedia" sampai ke layar —
         // dan karena versi lamanya hidup sebagai literal yang ditugaskan ke
@@ -305,6 +329,7 @@ public extension LocalizedText {
         .calibrationStatusNotReady, .calibrationStatusInstalled,
         .calibrationStatusReset,
         .calibrationDisplayOffset, .calibrationDisplaySpread,
+        .calibrationDisplayCaptureAltitude, .calibrationDisplaySuggestedSigma,
         .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,
         .calibrationPhaseReadyLabel, .calibrationPhaseAppliedLabel,
         // Experiment 1. Masuk daftar karena inilah satu-satunya jalur pesan
@@ -342,7 +367,8 @@ public extension LocalizedText {
         // melihatnya dan Aturan 4 tidak menyapu `Packages/`. Lihat
         // `RowSpeech.swift`.
         .rowSpeechLabel, .rowSpeechDegrees, .rowSpeechDegreesPerSecond,
-        .rowSpeechErrorWord, .rowSpeechError,
+        .rowSpeechErrorWord, .rowSpeechError, .rowSpeechWristRate,
+        .rowSpeechWristRateWord, .rowSpeechStateLine,
         // Kalimat keadaan kalibrasi yang tampil di layar Tautan. Disimpan di
         // paket sebagai keadaan + accessor (bukan kalimat jadi di pesan) supaya
         // punya kunci katalog — lihat `PointingLinkMessage.calibrationNoteText`.
@@ -355,6 +381,7 @@ public extension LocalizedText {
         .linkStatusPolicyFromWatch, .linkStatusAcknowledgement,
         .linkStatusInvalidPolicy, .linkStatusStateRequestTooEarly,
         .linkStatusWatchUnreachablePolicy, .linkStatusWatchUnreachableMessage,
+        .linkStatusSendFailures, .linkStatusSendFailuresWord,
         // Label lokasi darurat yang tampil di layar utama jam & rincian.
         // Dulu literal di `ObserverLocation.fallback` — lihat berkas itu.
         .locationFallbackLabel,

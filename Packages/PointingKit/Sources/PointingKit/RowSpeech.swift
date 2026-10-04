@@ -1,3 +1,4 @@
+import CelestialEngine
 import Foundation
 
 /// Teks yang **diucapkan** untuk baris "judul … nilai" dan nilai bertanda
@@ -53,6 +54,23 @@ public enum RowSpeech {
     /// `"Laju pergelangan 5 derajat per detik."`).
     public static func spokenRow(title: String, spokenValue: String) -> String {
         label(title: title, value: spokenValue)
+    }
+
+    /// Kalimat keadaan untuk pengumuman, berbentuk **"Keadaan: X."**
+    ///
+    /// Ini bukan `spokenRow`: yang terakhir adalah baris **judul…nilai**
+    /// (dipakai `SkyContextView`, `CalibrationView`, `LinkView`), sedangkan
+    /// yang ini adalah **kalimat** — keadaan diumumkan sebagai kalimat, lalu
+    /// kalimat panduan menyusul sebagai kalimat tersendiri.
+    ///
+    /// Bentuk lengkapnya sebelumnya hidup sebagai literal
+    /// `"Keadaan: \(state.shortLabel)."` di dalam view. Yang salah bukan cuma
+    /// literalnya: awalan "Keadaan:" adalah kata yang harus ikut
+    /// diterjemahkan, dan menaruhnya di kode membuat pembaca layar berbahasa
+    /// Inggris tetap membaca "Keadaan" sebelum membaca sisanya.
+    public static func stateLine(_ state: PointingState) -> String {
+        String(format: TextLocalization.text(.rowSpeechStateLine),
+               state.shortLabel)
     }
 
     /// Laju pergelangan dalam bentuk **kata**, bukan simbol.
@@ -129,6 +147,26 @@ public enum RowSpeech {
                deg,
                TextLocalization.text(.rowSpeechDegrees))
     }
+
+    /// Baris laju pergelangan untuk **pengumuman**, bukan untuk layar.
+    ///
+    /// **Kenapa bukan `spokenRate`.** `spokenRate` menghasilkan "0.5 derajat
+    /// per detik" sebagai **nilai** — benar untuk jadi argumen `spokenRow`.
+    /// Pengumuman kartu keadaan jam butuh kalimat sendiri: ia menyebut
+    /// **apa** yang diukur ("laju pergelangan") lalu angkanya, karena sekali
+    /// itu terdengar, tidak ada lagi baris layar yang mengiringinya. Tanpa
+    /// pemisahan itu, pengumuman berbunyi "0.5 derajat per detik" dan
+    /// pendengar tidak tahu itu laju tangan atau laju bintang.
+    ///
+    /// Presisi mengikuti **tampilannya** (`%.0f°/dtk` di kartu keadaan jam),
+    /// dengan alasan yang sama seperti `spokenRate`: suara dan layar tidak
+    /// boleh menyebut angka berbeda untuk nilai yang sama.
+    public static func spokenWristRate(_ degPerSec: Double) -> String {
+        String(format: TextLocalization.text(.rowSpeechWristRate),
+               TextLocalization.text(.rowSpeechWristRateWord),
+               degPerSec,
+               TextLocalization.text(.rowSpeechDegrees))
+    }
 }
 
 // MARK: - Katalog kunci
@@ -167,4 +205,42 @@ public extension LocalizedText {
     static let rowSpeechError = LocalizedText(
         key: "row.speech.error",
         id: "%@ %.1f %@")
+
+    /// Kalimat pengumuman laju pergelangan, lengkap dengan kata "per detik".
+    ///
+    /// Terpisah dari `rowSpeechDegreesPerSecond` ("derajat per detik") karena
+    /// dua ini dipakai di tempat berbeda: yang satu adalah **nilai** baris
+    /// tabel, yang ini **kalimat** pengumuman. Menggabungkannya memaksa
+    /// salah satu kehilangan konteksnya.
+
+    /// Kalimat laju pergelangan: **"kata, angka, satuan"** — urutan yang sama
+    /// dengan `row.speech.error` di atas, dan alasannya sama: angka tidak
+    /// pernah diucapkan sendirian, dan urutan katanya milik terjemahan.
+    ///
+    /// **Bentuk specifier-nya terkunci** oleh Aturan 11 di `swift-ui-lint.sh`.
+    /// Nilai aslinya `"%@ %.0f %@ per detik."` punya urutan tipe `@ f @`,
+    /// sedangkan terjemahannya hanya punya `%.0f` — persis kelas yang
+    /// **crash di CoreFoundation** dan lolos diam-diam di glibc, jadi
+    /// `swift-test.sh` hijau sementara CI macOS merah. Karena `%.0f` tidak
+    /// boleh bertemu `String` pada posisi tetap, keduanya disamakan dengan
+    /// konvensi `row.speech.error`: angka diserahkan sebagai argumen dan
+    /// katalog yang memiliki ejaannya.
+    static let rowSpeechWristRate = LocalizedText(
+        key: "row.speech.wristRate",
+        id: "%@ %.0f %@ per detik.")
+
+    /// Kata yang menyebut **apa** yang diukur oleh laju pada pengumuman.
+    static let rowSpeechWristRateWord = LocalizedText(
+        key: "row.speech.wristRateWord",
+        id: "Laju pergelangan")
+
+    /// Awalan kalimat keadaan: `"Keadaan: %@."`
+    ///
+    /// `%@` = `PointingState.shortLabel`, yang **sendiri** sudah punya kunci
+    /// (`pointing.state.*.label`). Dua lapis terjemahan, dan itu memang perlu:
+    /// kata "Keadaan" tidak bisa ikut dari labelnya sendiri, karena bentuk
+    /// kalimatnya berbeda dari bentuk labelnya.
+    static let rowSpeechStateLine = LocalizedText(
+        key: "row.speech.stateLine",
+        id: "Keadaan: %@.")
 }
