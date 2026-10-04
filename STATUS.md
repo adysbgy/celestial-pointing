@@ -1,5 +1,46 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — iPhone tidak pernah menampilkan tingkat keyakinan pada panel objek)
+
+### Komentar yang menunjuk badge yang tidak pernah digambar
+
+`DiagnosticsView` menyebut "badge di sebelahnya" **dua kali** — di
+`LockArrivalPanel` ("gambar tidak pernah lebih yakin daripada badge 'Ragu' di
+sebelahnya") dan di komentar `isConfirmed`. Badge itu tidak ada. Baris objek
+iPhone hanya menampilkan nama; app jam menampilkan badge `Yakin`/`Ragu` yang
+sama persis.
+
+Akibatnya paling tajam justru pada keadaan yang paling penting: pengguna iPhone
+melihat **cincin Saturnus** digambar penuh, dan tidak ada satu pun penanda teks
+di sebelahnya yang berkata engine sedang ragu. Satu-satunya penanda yang
+tersisa — `isConfirmed` menyamar gambar saat `.uncertain` — bekerja lewat
+**absen**, bukan pernyataan. Penanda yang bekerja lewat absen hanya terbaca
+oleh orang yang sudah tahu apa yang seharusnya ada.
+
+### Kenapa ini bukan sekadar "kurang satu label"
+
+App jam dan iPhone adalah **dua permukaan dari satu jawaban**. App jam sudah
+menyelesaikan pertanyaan ini: badge keyakinan tampil hanya untuk jawaban yang
+berlaku sekarang (`!isStale`), karena pada objek sisa "Yakin" di sebelahnya
+terbaca sebagai klaim keyakinan atas pengukuran sekarang — persis false
+confidence yang dilarang PRD. Aturan itu sudah ditulis dan diuji di app jam,
+tetapi tidak pernah menyeberang ke iPhone. Ini kelas "dua permukaan, satu
+diperbaiki" yang sudah berulang di repo ini.
+
+### Yang diubah
+
+- `LockArrivalPanel` menerima `level`, dan badge-nya memakai `level.tone` yang
+  **sama** dengan app jam — bukan warna lokal baru.
+- Sumbernya `snapshot.answeredLevel` (predikat teruji: `state.hasAnswer ?
+  intent?.level : nil`), **bukan** `intent?.level` langsung. Keyakinan yang
+  menempel pada keadaan tanpa jawaban adalah klaim yang tidak berlaku.
+- Ambang `!isStale` yang sama dengan app jam: pada objek sisa, badge hilang.
+- Label VoiceOver ikut menyebut tingkatnya (`ObjectSpeech.confidence`), jadi
+  yang mendengar dan yang melihat menerima klaim yang sama.
+
+Gerbang: `swift-test.sh` **166 + 417 hijau**, ui-lint hijau, typecheck hijau.
+CI macOS run `37228149520` (Engine Linux) + `37228149480` (Apple Build) hijau.
+
 ## Progres terakhir (4 Okt 2026 — frasa VoiceOver panel objek, disalin di dua app dan tak terlihat katalog)
 
 ### Kelas yang sama, sekali lagi: teks yang tampil, tapi tak dijangkau gerbang mana pun
