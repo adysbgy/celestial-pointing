@@ -104,7 +104,12 @@ tanpa itu, aturan ini bisa "lulus" karena menandai segalanya.
   Tidak ada satu baris Swift pun yang berubah di unit ini.
 - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan CJK/Cyrillic pada berkas yang diubah: **0**.
-- CI: menunggu push.
+- **CI hijau pada push pertama** (`53a6f14`):
+  - `Apple Build` run `37211768305` → **`BUILD SUCCEEDED`** + gerbang
+    peringatan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37211768310` → hijau; `Executed 166 tests`,
+    `Executed 305 tests`, dan `== SEMUA GERBANG UI LULUS ==` terlihat di log
+    CI.
 
 ### Batas yang diketahui dan belum ditutup
 
