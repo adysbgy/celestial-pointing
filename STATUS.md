@@ -126,6 +126,16 @@ Berkas dipulihkan, diverifikasi sha256.
 - `./swift-typecheck.sh` → lulus. Sapuan CJK pada 7 berkas yang diubah → 0.
 - Katalog: 160 → **171 kunci**, murni aditif (0 penghapusan).
 
+### CI
+
+Push `e27024c` hijau pada percobaan pertama:
+
+- **Apple Build** run `37214082562` — `BUILD SUCCEEDED` untuk app iPhone dan
+  app jam, gerbang peringatan melaporkan "Tidak ada peringatan compiler pada
+  Apps/".
+- **Engine Tests** run `37214082529` — 166 + 315 test, 0 failures, dan
+  gerbang UI (`SEMUA GERBANG UI LULUS`) ikut hijau di macOS.
+
 
 ## Progres terakhir (4 Okt 2026 — sabit Bulan menghadap arah yang salah di Indonesia, dan galatnya 85 derajat)
 
