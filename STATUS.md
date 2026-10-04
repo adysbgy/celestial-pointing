@@ -1,5 +1,86 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — gambar lebih yakin daripada teksnya saat engine ragu)
+
+### Premis siklus ini: cacatnya bukan bentuk yang salah, tapi klaim yang salah
+
+Empat siklus terakhir menemukan cacat di kelas **geometri raster** — bentuk
+yang terpotong, menembus bola, keluar dari `Canvas`. Semua ditutup dengan
+memindahkan angka batas ke `VisualFrame`. Siklus ini menemukan cacat di kelas
+yang berbeda, dan lebih berbahaya: **bentuknya benar, klaimnya salah.**
+
+Selama keadaan `.uncertain` — engine secara eksplisit menyatakan diri *kurang
+yakin* — layar menampilkan **seluruh ciri pengenal objek**: cincin Saturnus,
+pita Jupiter, kutub Mars, tanpa lencana tanda tanya apa pun. Sementara itu,
+badge di sebelahnya bertuliskan **"Ragu"**.
+
+### Mengapa ini lolos dari empat siklus audit
+
+Gerbangnya adalah `isConfirmed: !isStale`, dan `isStale` dihitung dari
+`hasAnswer`. `hasAnswer` adalah `.lock || .uncertain` — jadi `.uncertain`
+**bukan** sisa, dan dengan demikian lolos sebagai gambar "pastu".
+
+Keduanya benar secara terpisah:
+
+- `.uncertain` memang bukan sisa (ia punya jawaban *sekarang*),
+- `.uncertain` memang tidak boleh mengklaim identitas.
+
+Cacatnya adalah menggunakan **satu ambang untuk dua pertanyaan yang berbeda**.
+"Apakah ini hasil kedaluwarsa?" dan "Bolehkah gambar mengklaim ini benda itu?"
+punya jawaban berbeda tepat pada `.uncertain`.
+
+### Mengapa ini bentuk false confidence yang paling sulit ditangkap
+
+Teksnya jujur. Badge-nya mengatakan "Ragu". Tidak ada yang bisa dibaca
+pengguna untuk mengecek gambar itu — pengguna tidak tahu bahwa cincin
+Saturnus adalah klaim identitas, bukan dekorasi. Dan **mata membaca gambar
+lebih dulu daripada badge**: gambar menetapkan kesan, teks hanya mengoreksinya
+kalau sempat terbaca.
+
+Ini persis larangan PRD: *jangan salah identifikasi demi "magic"; uncertainty >
+false confidence*. Cacatnya bukan menampilkan sesuatu yang tidak ada, tapi
+menampilkan sesuatu **dengan tingkat kepastian yang salah**.
+
+### Perbaikannya memakai predikat yang sudah ada
+
+Tidak ada predikat baru yang ditulis. `PointingState.looksConfident`
+(hanya `.lock`) **sudah ada di PointingKit dan sudah punya uji** — hanya saja
+belum pernah dipakai UI mana pun. Itu tanda cacatnya: ambang yang benar sudah
+tersedia, dan UI mengambil turunan yang lebih longgar.
+
+- `PointingSnapshot.confirmsIdentity(lastLocked:)` — ambang gambar; memakai
+  `state.looksConfident`, dan mensyaratkan objek benar-benar ditampilkan
+  (tanpa itu, `.lock` tanpa kandidat akan menggambar ciri pengenal di atas
+  bola generik).
+- `PointingEngine.confirmsDisplayedIdentity` meneruskannya.
+- `ObjectDetailView` (jam) & `LockArrivalPanel` (iPhone) memakai ambang baru.
+
+`isStale` tetap dipakai untuk peringatan sisa — dua ambang, dua pertanyaan.
+
+### Uji: 4 regresi, 3 di antaranya merah terhadap logika lama
+
+Diverifikasi dengan mengembalikan predikat ke `hasAnswer` dan menjalankan
+ulang: 3 uji merah, lalu hijau kembali setelah dikembalikan.
+
+Uji keempat (`testIdentityThresholdIsStricterThanTheStaleThreshold`) sengaja
+mengunci **perbedaan** kedua ambang secara konstruktif: ia mencari keadaan
+yang bukan sisa tetapi tidak mengonfirmasi identitas, dan menuntut
+`.uncertain` ada di dalamnya. Menyatukan kembali dua ambang itu sekarang tidak
+bisa dilakukan tanpa ada uji yang merah.
+
+- `166` engine + `228` PointingKit (224 + 4 baru), 0 gagal.
+- CI: Engine Tests (Linux) hijau, Apple Build hijau (termasuk gerbang
+  tanpa peringatan).
+
+### Satu cacat compile yang hanya muncul di CI macOS
+
+`argument 'visual' must precede argument 'isConfirmed'` — Swift mewajibkan
+urutan argumen mengikuti deklarasi, dan `isConfirmed` disisipkan sebelum
+`visual`. Tidak tertangkap di Linux karena `Apps/` tidak ikut terbangun di
+`swift-test.sh`. Ini pola yang berulang: perubahan di `Apps/` hanya
+terverifikasi oleh CI macOS, jadi setiap penyisipan parameter baru di call
+site SwiftUI harus dicek urutannya terhadap deklarasi.
+
 ## Progres terakhir (4 Okt 2026 — lencana tanda tanya terpotong 0.132 R di dua sisi Canvas)
 
 ### Premis siklus ini: bentuk yang tersisa bukan yang belum ada, tapi yang belum dihitung
