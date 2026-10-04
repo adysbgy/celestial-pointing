@@ -13,12 +13,12 @@ Yang ditemukan siklus ini bukan "fitur kurang", melainkan **satu cacat
 geometri yang tidak terlihat dari teks mana pun di layar** — kutub Mars
 menembus 0.26R keluar dari bola. Detail di entri "Progres terakhir" di bawah.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 201 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 212 test
   PointingKit, 0 gagal** (`./swift-test.sh` dari nol, Swift 6.0 Docker,
   Linux) — dan **kedua workflow CI hijau** di HEAD `3b9dcf2` (Apple Build
   `37179379077` 2× `BUILD SUCCEEDED` + gerbang peringatan "Tidak ada
   peringatan compiler pada Apps/."; Engine Tests `37179379101` 166 + 201).
-- Rincian: `166 + 201` naik dari `166 + 198` (+3 uji kutub Mars, lihat
+- Rincian: `166 + 212` naik dari `166 + 201` (+11 uji batas frame, lihat
   entri siklus ini).
 
 ### Yang diverifikasi ulang (bukan dengan mempercayai STATUS lama)
@@ -55,6 +55,113 @@ Seluruh 22 berkas `Apps/` + model visual di `PointingKit` dibaca ulang, lalu
 
 Tidak ada satu pun item brief yang tersisa. Yang belum ada tetap item
 `ROADMAP.md` yang bukan kode: teleskop fisik.
+
+## Progres terakhir (4 Okt 2026 — dua bentuk raster terpotong tepi Canvas)
+
+### Premis siklus ini: STATUS lama dibaca, lalu diuji dengan menghitung
+
+STATUS lama menyatakan Bagian 1–4 "sudah terpasang penuh dan diverifikasi
+ulang". Audit siklus ini menerima klaimnya untuk **logika** (palet, ciri
+pengenal, geometri fase, tabel B−V memang lengkap dan teruji), lalu mengalihkan
+pertanyaan ke tempat yang belum pernah dihitung: **bentuk raster yang
+dilukis `Canvas`**. Alasannya sama dengan siklus kutub Mars — dan terbukti
+tepat.
+
+### Cacat yang ditemukan: `Canvas` memotong dengan tepi lurus
+
+`Canvas` menggambar hanya di dalam `frame`-nya sendiri, dan ia memotong dengan
+**tepi lurus**, bukan dengan memudar. Jadi bentuk yang kelewat besar tidak
+tampak "agak kepotong" — ia tampak sebagai garis yang berhenti mendadak. Dua
+bentuk melanggar batas itu, keduanya dihitung (bukan dibaca):
+
+| Bentuk | Ukuran lama | Batas frame | Keluar |
+|---|---|---|---|
+| Cincin Saturnus | `3.8 × radius` (ujung di x = ±1.9R) | ±1.0R | **0.90R** |
+| Blob kabut nebula (yang digeser) | radius tetap | ±1.0R | **0.28R** |
+
+Cincin Saturnus adalah yang paling parah dan paling mudah dikenali: hampir
+separuh lebarnya berada di luar kotak, jadi yang tampil di layar **bukan
+cincin** melainkan dua garis yang berhenti mendadak di tepi kartu. Di kartu jam
+38pt potongan itu sangat mudah tidak disadari.
+
+Nebula punya jebakan sendiri: blob-nya **digeser** dari pusat (supaya kabut
+tidak simetris sempurna), dan batas frame bersifat **per sumbu**, bukan radial.
+Jadi blob yang terpusat aman sementara blob yang digeser keluar — dan potongannya
+jatuh **tepat di tengah gradien yang belum selesai memudar** (opasitas 0.084 di
+situ), persis ciri "terlihat digambar" yang ingin dihindari nebula.
+
+### Kenapa ini tidak bisa ditangkap dengan membaca
+
+Tiga lapis verifikasi di repo ini semuanya lolos: `swiftc -parse` hanya
+memeriksa sintaks; `swift test` di Linux tidak bisa menyentuh warna/`Canvas`;
+dan tidak ada satu pun teks di layar yang memberitahu pengguna bahwa gambarnya
+terpotong. Yang tersisa hanyalah **menghitungnya** — persis teknik yang
+menemukan kutub Mars menembus 0.26R pada siklus lalu.
+
+### Yang diubah, dan kenapa begini
+
+- **Angka batas pindah ke `PointingKit` sebagai `VisualFrame`.** Enum ini
+  adalah satu-satunya tempat yang tahu ukuran frame, dengan
+  `overflow(centerX:centerY:halfWidth:halfHeight:)` yang mengembalikan nilai
+  ≥ 0 bila bentuk keluar. `saturnRing()` dan `nebula(fuzziness:)` keduanya
+  **dihitung dari sisa ruang ke tepi frame**, bukan dari radius mentah — jadi
+  memperbesar bentuk tidak bisa lagi diam-diam melewati batas.
+- **`saturnBodyRadius(for:)` dipisah dari `saturnRing`.** Bola harus mengecil
+  mengikuti cincin; kalau bola tetap memakai radius frame penuh sementara cincin
+  mengisi frame, bola menutupi cincin dan hasilnya **piring**, bukan Saturnus.
+  Mengambilnya dari lebar cincin membuat proporsi itu benar secara
+  konstruktif.
+- **View tidak punya rumus sendiri lagi.** `drawRings` dan `drawDeepSky` kini
+  membaca model. Ini mempertahankan aturan repo yang sudah berlaku: keputusan
+  visual yang bisa salah tanpa ada yang bisa mengujinya **tidak boleh tinggal
+  di view**.
+
+### Uji dibuktikan MERAH lebih dulu
+
+Dengan geometri lama dikembalikan (`halfWidth = frameHalfExtent × 1.9`):
+
+- `testSaturnRingStaysInsideTheFrame` → **gagal**: `0.8999999999999999 > 0`,
+  pesan *"cincin keluar 0.9 R di luar frame dan akan terpotong tegak"*.
+- `testSaturnBodyFitsInsideItsRing` → **gagal**: `1.007` vs `0.594`.
+- `testEveryDeepSkyBlobStaysInsideTheFrame` → **gagal**: *"blob nebula 0 keluar
+  0.28 R di luar frame"*.
+- `testLegacySaturnRingOverflowedTheFrame` ditambahkan justru untuk **mengunci
+  angka lama** sebagai bukti bahwa cacatnya nyata, bukan perbedaan rasa.
+
+Satu uji awalnya salah dan diperbaiki, bukan ditambal: ia menuntut bola lebih
+kecil dari **tinggi** cincin. Itu keliru — cincin Saturnus tampak miring, jadi
+tinggi elipsnya memang lebih kecil dari jari-jari bola, dan justru dua ujung
+cincin yang tampil di luar bola itulah yang membuatnya terbaca sebagai
+Saturnus. Yang benar adalah bola harus lebih kecil dari **lebar** cincin.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 212 PointingKit, 0 gagal** (naik
+  dari 201 → 212: 11 uji batas frame baru). Engine tidak disentuh.
+- Ketiga uji di atas **dibuktikan MERAH lebih dulu**, bukan hanya hijau.
+- Gerbang sintaks: seluruh 22 berkas app lolos `swiftc -parse -swift-version 5`
+  di container `swift:6.0`.
+- Sapuan CJK/Cyrillic di berkas yang diubah: **0**.
+- **CI macOS sempat MERAH dan itu cacat nyata**: push pertama (`61defdb`)
+  ditolak dengan 3 × `error: 'saturnRing'/'saturnBodyRadius'/'nebula' is
+  inaccessible due to 'internal' protection level`. Tiga helper `static` di
+  dalam `public enum` turun ke `internal` (default Swift) — dan **tidak satu
+  pun** gerbang Linux yang bisa melihatnya, karena uji hidup di modul yang
+  sama. Diperbaiki di `c5ff66c` dengan mengekspor kelimanya ke `public`.
+- CI hijau di `c5ff66c`: `Apple Build` run `37180733204` → **2 × `BUILD
+  SUCCEEDED`** + gerbang peringatan *"Tidak ada peringatan compiler pada
+  Apps/."*; `Engine Tests (Linux)` run `37180733201` hijau dengan kelima uji
+  batas frame **terlihat lolos di log CI** (bukan hanya di mesin ini).
+
+### Pelajaran yang berulang (dan kali ini dua kali berturut-turut)
+
+Dua siklus terakhir menemukan cacatnya di tempat yang sama: **geometri
+raster yang tidak bisa dibaca dari teks**. Kutub Mars menembus 0.26R; cincin
+Saturnus terpotong 0.9R. Keduanya lolos `-parse`, keduanya lolos `swift test`
+yang ada, dan keduanya hanya ketahuan dengan menghitung. Dan kali ini
+tambahannya: **akses `internal` vs `public` adalah cacat kelas ketiga yang
+hanya build macOS yang bisa tangkap** — `swift test` di Linux tidak bisa
+melihatnya sama sekali karena pengujinya satu modul.
 
 ## Progres terakhir (4 Okt 2026 — kutub Mars menembus 0.26R keluar dari bola)
 
