@@ -1,5 +1,57 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — label lokasi darurat + `Targets.kindLabel` mati yang menipu)
+
+### Premis: dua sisa dari sapuan yang sama
+
+Sapuan "berkas paket yang menghasilkan teks tampilan tanpa kunci" menyisakan
+dua berkas setelah `LinkStatusText` ditutup. Keduanya jenis yang berbeda:
+
+**1. `ObserverLocation.fallback.label` — literal yang benar-benar tampil.**
+Labelnya adalah `"Jakarta (bawaan)"`, dan `PointingView` merendernya apa
+adanya: `Text("Lokasi: \(engine.location.label)")` di layar utama jam, plus
+baris rinciannya. Pengguna Bahasa Inggris membaca label Indonesia tanpa
+penanda apa pun. Tak terlihat Aturan 4 (bukan argumen `Text(...)`) dan tak
+punya kunci untuk diperiksa Aturan 6.
+
+**2. `Targets.kindLabel` — duplikat mati.**
+`CelestialObject.kindLabel` mengulang `switch` yang sudah ada di
+`ObjectKind.displayName` — tapi versi ini mengembalikan literal Indonesia
+("Bintang", "Bulan", …) dan **tidak dipakai siapa pun**. `PointingView`
+memakai `object.kind.displayName` yang sudah lewat katalog. Tidak ada uji yang
+menyentuhnya. Duplikat yang tak terpakai tidak "tidak berbahaya": ia
+menawarkan jalur lokal yang **tampak** benar kepada orang berikutnya yang
+butuh label jenis, dan jalur itu diam-diam melewatkan katalog. Dihapus.
+
+### Satu jebakan yang tertangkap saat mengerjakannya
+
+Perbaikan pertama menulis `label: TextLocalization.text(.locationFallbackLabel)`
+di dalam `static let fallback`. Itu **beku pada akses pertama**: bridge
+terjemahan dipasang saat app diluncurkan, jadi siapa pun yang menyentuh
+`.fallback` lebih dulu (mis. `PointingEngine.init` yang memakai
+`location: .fallback`) mengunci label Indonesia untuk selamanya — dan
+perbaikannya tampak benar padahal tidak berpengaruh.
+
+Karena itu `.fallback` menjadi **`static var` computed**: nilainya dihitung
+ulang tiap akses, jadi selalu mengikuti bahasa aktif. Biayanya satu struct
+kecil; harganya salah kalau dibiarkan.
+
+Uji kedua sengaja ada untuk itu — dan hanya uji itu yang menangkap jebakannya:
+
+| Mutasi | Uji yang menangkap | Hasil |
+|---|---|---|
+| `label:` dikembalikan jadi literal | `testFallbackLabelFollowsTheBridge` | **MERAH**: `"Jakarta (bawaan)"` ≠ `"Jakarta (default)"` |
+
+`testFallbackIsLabelled` (paritas katalog) **tetap hijau** terhadap mutasi itu,
+karena nilai `id` bawaannya memang teks Indonesia yang sama. Itulah kenapa uji
+bridge-nya yang menanggung beban, bukan uji paritasnya.
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 459 PointingKit**, 0 gagal.
+- `swift-ui-lint.sh` → **12 aturan hijau**.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+
 ## Progres terakhir (4 Okt 2026 — dua `LinkService` menyimpan kalimat status ke properti; kedua gerbang buta)
 
 ### Premis: kelas yang sama, tiga kali, di tiga tempat berbeda

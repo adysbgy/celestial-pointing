@@ -187,9 +187,32 @@ final class TargetsTests: XCTestCase {
 
     /// Lokasi darurat harus jelas menandai dirinya supaya tidak salah dianggap
     /// lokasi pengukuran.
+    ///
+    /// Labelnya juga harus **lewat katalog**: ia ditampilkan apa adanya di
+    /// layar utama jam (`Text("Lokasi: \(engine.location.label)")`). Selama
+    /// teksnya literal di `ObserverLocation.fallback`, ia tak terlihat Aturan 4
+    /// (bukan argumen `Text(...)`) dan tak punya kunci untuk diperiksa
+    /// Aturan 6 — pengguna Bahasa Inggris membaca label Indonesia.
+    ///
+    /// Nilai `id` bawaan sengaja tetap "Jakarta (bawaan)" supaya perilaku tanpa
+    /// bridge tidak berubah; yang berubah adalah **jalurnya**.
     func testFallbackIsLabelled() {
         XCTAssertEqual(ObserverLocation.fallback.source, "fallback")
         XCTAssertTrue(ObserverLocation.fallback.label.contains("bawaan"))
+        XCTAssertEqual(ObserverLocation.fallback.label,
+                       TextLocalization.text(.locationFallbackLabel))
+    }
+
+    /// Bridge benar-benar mengganti label darurat.
+    ///
+    /// Tanpa uji ini, kunci yang terdaftar tapi tidak pernah dibaca `fallback`
+    /// akan tampak benar padahal tidak berpengaruh.
+    func testFallbackLabelFollowsTheBridge() {
+        TextLocalization.install { key in
+            key == "location.fallback.label" ? "Jakarta (default)" : nil
+        }
+        defer { TextLocalization.reset() }
+        XCTAssertEqual(ObserverLocation.fallback.label, "Jakarta (default)")
     }
 
     /// `isFallback` adalah pembeda yang dipakai UI untuk memperingatkan bahwa

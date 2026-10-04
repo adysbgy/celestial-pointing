@@ -34,16 +34,6 @@ public struct PointingTarget: Equatable, Sendable, Identifiable {
     public func separation(from pointing: HorizontalCoord) -> Double {
         SkyMath.angularSeparationHorizontalDeg(pointing, direction)
     }
-
-    public var kindLabel: String {
-        switch kind {
-        case .star: return "Bintang"
-        case .moon: return "Bulan"
-        case .planet: return "Planet"
-        case .deepSky: return "Objek langit dalam"
-        case .sun: return "Matahari"
-        }
-    }
 }
 
 public extension PointingResolver {

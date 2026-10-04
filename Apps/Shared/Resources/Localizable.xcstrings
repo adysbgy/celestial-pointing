@@ -464,6 +464,17 @@
         }
       }
     },
+    "location.fallback.label": {
+      "comment": "Label lokasi darurat (Jakarta) yang tampil di layar utama jam. Bukan lokasi pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jakarta (default)"
+          }
+        }
+      }
+    },
     "link.status.calibrationNotSent": {
       "comment": "Hasil kalibrasi tidak terkirim: sesi WatchConnectivity belum aktif.",
       "localizations": {

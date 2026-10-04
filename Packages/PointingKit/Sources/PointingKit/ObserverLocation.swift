@@ -77,10 +77,35 @@ public struct ObserverLocation: Codable, Equatable, Sendable {
     /// Hanya dipakai saat aplikasi benar-benar tidak punya lokasi. Sengaja
     /// diberi label yang mencolok supaya tidak ada yang salah mengira ini
     /// lokasi pengukuran.
-    public static let fallback = ObserverLocation(
-        latitudeDeg: -6.2,
-        longitudeDeg: 106.8,
-        label: "Jakarta (bawaan)",
-        source: fallbackSource
-    )
+    ///
+    /// **Kenapa `var` computed, bukan `let`.** `label` ditampilkan apa adanya —
+    /// `PointingView` menulis `Text("Lokasi: \(engine.location.label)")` dan
+    /// baris rinciannya. Sebelumnya teksnya literal di sini, jadi pengguna
+    /// Bahasa Inggris membaca "Jakarta (bawaan)" dalam Bahasa Indonesia;
+    /// literalnya tak terlihat Aturan 4 (bukan argumen `Text(...)`) dan tak
+    /// punya kunci untuk diperiksa Aturan 6 — celah yang sama seperti
+    /// `LinkStatusText`.
+    ///
+    /// Kalau ini `static let`, labelnya **beku pada akses pertama**. Bridge
+    /// terjemahan dipasang saat app diluncurkan; siapa pun yang menyentuh
+    /// `.fallback` lebih dulu akan mengunci label Indonesia untuk selamanya.
+    /// Karena itu nilainya dihitung ulang tiap akses — murah (satu struct
+    /// kecil), dan selalu mengikuti bahasa yang sedang aktif.
+    public static var fallback: ObserverLocation {
+        ObserverLocation(
+            latitudeDeg: -6.2,
+            longitudeDeg: 106.8,
+            label: TextLocalization.text(.locationFallbackLabel),
+            source: fallbackSource
+        )
+    }
+}
+
+public extension LocalizedText {
+
+    /// Label lokasi darurat. Nilai `id` sengaja **tetap** "Jakarta (bawaan)"
+    /// supaya perilaku tanpa bridge (Linux, uji) persis seperti sebelumnya.
+    static let locationFallbackLabel = LocalizedText(
+        key: "location.fallback.label",
+        id: "Jakarta (bawaan)")
 }
