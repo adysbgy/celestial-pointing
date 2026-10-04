@@ -1,5 +1,118 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — complication menampilkan kandidat ragu tanpa penanda)
+
+### Premis: kebenaran yang sudah dihitung, lalu dibuang
+
+Sapuan "nilai dihitung tapi tidak pernah dikonsumsi" kembali. Kali ini bukan
+tentang kode mati, tapi tentang **kehilangan penanda** di permukaan yang paling
+sempit.
+
+`ComplicationDigest` sudah membawa `isConfirmed`. Field itu sudah ikut diuji
+lewat round-trip JSON (`testDigestSurvivesTheWidgetRoundTrip`), jadi nilainya
+benar. Tapi `grep isConfirmed Apps/PointAndKnowWatch/Complications/*.swift`
+mengembalikan **kosong** — tidak ada satu pun view yang membacanya. Complication
+hanya menampilkan `headline` + `objectKind`.
+
+Akibatnya: nama kandidat pada `.uncertain` tampil **persis seperti** nama yang
+sudah terkunci. Di complication ini lebih serius, karena dibaca tanpa membuka
+app — tidak ada konteks lain yang bisa menolong pembaca membedakan kandidat dari
+yang terkunci. Tiga permukaan lain sudah jujur soal ini dalam dua bentuk berbeda
+(`CelestialVisualView` menyembunyikan ciri pengenal saat ragu; `statusCard` dan
+`LockArrivalPanel` memakai badge), jadi ini permukaan keempat yang tertinggal —
+dan yang paling cepat dibaca keliru.
+
+### Dua kanal, dua bentuk solusi
+
+Complication hanya punya **dua kanal**: satu ikon dan satu baris teks (dua di
+keluarga persegi panjang). Ini yang menentukan bentuk perbaikannya.
+
+- **`.accessoryInline`** — satu slot baris. Satu kata tambahan sudah memenuhi
+  ruang, jadi tidak ada teks yang bisa ditambahkan. Penandanya harus lewat
+  ikon, tapi keluarga ini tidak punya ikon sama sekali.
+- **`.accessoryCircular`** — punya ikon, jadi `presentedSymbolName` jadi kanal
+  penandanya. Sumbernya tetap `state.symbolName` yang sudah ada, sehingga
+  tidak ada daftar ikon kedua yang bisa berbeda pendapat dengan keadaan.
+- **`.accessoryRectangular`** — baris kedua memang ada ruang, jadi penanda
+  tampil sebagai **kata** ("Belum pasti"), bukan hanya ikon.
+
+### Kenapa enum, bukan `String?`
+
+`sublineContent` adalah enum dengan tiga kasus, bukan `String?`.
+Alasannya bukan selera gaya: yang paling mudah **dibajak** di sini adalah
+urutan prioritas. Penanda ragu harus **mengalahkan** jenis benda, karena
+pertanyaan yang dijawabnya ("apakah nama ini sudah pasti") lebih penting
+daripada pertanyaan yang dijawab jenis benda ("ini benda apa").
+
+Kalau itu ditulis sebagai dua `if` terpisah di dalam
+`ComplicationWidget.swift`, urutannya hidup di berkas yang **tidak bisa diuji
+di Linux** — WidgetKit tidak ada di sana. Itu persis kelas "jalur dihitung lalu
+dibuang" yang sedang kita perbaiki, hanya dalam bentuk yang lebih halus. Sebagai
+enum, prioritasnya jadi bagian dari model dan bisa diuji.
+
+Sisi lain: enum **bukan** teks. View yang memanggil `TextLocalization` untuk
+tiap kasus, karena nilai katalog setiap kunci harus punya entri di katalog
+(Aturan 6), dan enum tidak bisa dijaga Aturan 6 dari sisi teksnya.
+
+### Kunci baru, bukan kunci yang dipakai ulang
+
+`confidence.uncertain.marker` = "Belum pasti". Sengaja **tidak** memakai ulang
+`confidence.level.medium.label` ("Ragu"). Di complication konteksnya hilang —
+tidak ada teks "tingkat keyakinan" di sampingnya — jadi kata yang sama akan
+punya dua arti: "kandidat belum pasti" versus "sedang mencari". Katalognya
+makin panjang, jadi ini keputusan yang perlu dijelaskan, bukan sekadar soal
+kenyamanan.
+
+### Bukti: tiga mutasi, ketiganya merah
+
+`red-test.sh` dipakai untuk memastikan uji baru benar-benar **menanggung
+beban** — uji yang hijau di atas kode rusak sama dengan tidak ada uji.
+
+| Mutasi | Uji yang menangkap | Hasil |
+|---|---|---|
+| `carriesUncertaintyMarker` → `hasAnswer` (penanda hilang) | `testUncertainCandidateNeverRendersIdenticallyToALock` | **MERAH**: terkunci ikut memakai penanda |
+| `sublineContent` dibalik (jenis benda menang) | `testUncertaintyMarkerOutranksTheObjectKindOnTheSubline` | **MERAH**: `"objectKind"` ≠ `"uncertaintyMarker"` |
+| semua ikon disamakan jadi `"scope"` | `testUncertainCandidateNeverRendersIdenticallyToALock` | **MERAH**: simbol ragukan simbol terkunci |
+
+Dua mutasi pertama menjaga **penanda**, yang ketiga menjaga **pembedanya**.
+Keduanya harus merah; kalau salah satu hijau, ujinya cuma mengulang
+implementasi.
+
+### Tiga kegagalan yang muncul saat running
+
+Tidak semuanya cacat yang saya temukan — dua adalah **salah tebakan dari
+sisi saya**, dan itu memang berguna karena menunjukkan batas apa yang bisa
+dijaga di Linux:
+
+1. `XCTAssertFalse(candidate.carriesUncertaintyMarker)` — saya menulis
+   **kebalikan** dari yang dimaksud. Penanda justru harus **ada** pada
+   kandidat. Ditukar.
+2. `XCTAssertNil(idle.sublineContent)` — membandingkan enum dengan `nil`,
+   padahal kasus "tidak ada baris kedua" adalah `.none`. Ditukar ke
+   `XCTAssertEqual(..., .none)`.
+3. `TextLocalizationTests` — gerbang jumlah kunci menangkap **175 ≠ 174**. Itulah persis
+   yang harusnya ia tangkap: daftar kunci tidak bisa bertambah diam-diam.
+
+Aturan 10 (hitungan uji di README) juga menangkap `README` yang masih
+mengaku 465. Dua gerbang yang menangkap kesalahan saya sendiri.
+
+### Gerbang
+
+- `swift-test.sh` → **166 CelestialEngine + 469 PointingKit**, 0 gagal
+  (465 → 469, +4).
+- `swift-ui-lint.sh` → **13 aturan hijau** (Aturan 10 yang menangkap README).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-test.sh` → tiga mutasi, ketiganya merah.
+- CI: `37237741445` (Apple Build) + `37237741447` (Engine Linux) —
+  **dua-duanya hijau**.
+
+### Apa yang TIDAK diselesaikan siklus ini
+
+Ini memperbaiki **satu** permukaan dari empat, dan tiga lainnya memang
+sudah benar. Yang belum berubah: daftar celah terbuka di bawah. Keempat
+permukaan sekarang sama-sama jujur soal ketidakpastian, tapi satu permukaan
+yang benar tidak berarti empat celah yang lebih lebar sudah tertutup.
+
 ## Progres terakhir (4 Okt 2026 — label lokasi darurat + `Targets.kindLabel` mati yang menipu)
 
 ### Premis: dua sisa dari sapuan yang sama
