@@ -205,17 +205,26 @@ struct DiagnosticsView: View {
 
     /// Fase denyut glow untuk gambar bintang.
     ///
-    /// Berhenti saat scene tidak aktif: denyut yang jalan di latar belakang
-    /// hanya membebani baterai tanpa pernah terlihat. `TimelineView` sendiri
-    /// sudah berhenti saat scene tidak aktif, tapi jamnya di sini supaya
-    /// nilainya tidak melompat saat app kembali dibuka — denyut yang melompat
-    /// terbaca sebagai kedipan, bukan denyut.
+    /// Berhenti saat scene tidak aktif **dan** saat pengguna meminta reduksi
+    /// gerak: denyut yang jalan di latar belakang hanya membebani baterai
+    /// tanpa pernah terlihat, dan denyut yang terus-menerus tanpa henti
+    /// persis yang diminta untuk dihentikan oleh pengguna yang menyalakan
+    /// Reduce Motion. `MotionPolicy` di `PointingKit` (**teruji di Linux**)
+    /// adalah satu-satunya sumber aturan ini — view tidak punya ambangnya
+    /// sendiri, supaya tidak bisa berbeda pendapat dengan app jam.
+    ///
+    /// `TimelineView` sendiri sudah berhenti saat scene tidak aktif, tapi
+    /// jamnya di sini supaya nilainya tidak melompat saat app kembali dibuka
+    /// — denyut yang melompat terbaca sebagai kedipan, bukan denyut.
     @State private var pulseStart = Date()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var pulsePhase: Double {
-        guard scenePhase == .active else { return 0 }
-        return Date().timeIntervalSince(pulseStart) * 1.1
+        MotionPolicy(reduceMotion: reduceMotion,
+                     isLuminanceReduced: false,
+                     isSceneActive: scenePhase == .active)
+            .pulsePhase(elapsedSeconds: Date().timeIntervalSince(pulseStart))
     }
 
     /// Saat app kembali aktif, jam denyut di-set ulang **sekali**.
@@ -512,71 +521,36 @@ struct DiagnosticsView: View {
 
         @State private var appearScale: CGFloat = 1
         @State private var appearOpacity: Double = 1
+        /// Pengguna meminta reduksi gerak: pop dimatikan, dan `TimelineView`
+        /// denyut ikut berhenti (lihat `MotionPolicy` di `PointingKit`).
+        ///
+        /// `isLuminanceReduced` selalu `false` di iPhone: itu Always-On
+        /// watchOS. Dimasukkan sebagai argumen eksplisit, bukan sekadar
+        /// formalitas, supaya pemanggil di app jam dan di sini punya **bentuk
+        /// yang sama** — kalau suatu saat ada layar redup di iPhone, aturannya
+        /// sudah ada dan tidak perlu ditebak lagi.
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        private var motion: MotionPolicy {
+            MotionPolicy(reduceMotion: reduceMotion,
+                         isLuminanceReduced: false,
+                         isSceneActive: true)
+        }
 
         var body: some View {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
-                HStack(alignment: .center, spacing: 16) {
-                    CelestialVisualView(visual: visual,
-                                         diameter: 132,
-                                         // Bukan `!isStale`: `.uncertain`
-                                         // bukan sisa, tapi engine kurang
-                                         // yakin — gambar tidak boleh lebih
-                                         // yakin daripada badge "Ragu" di
-                                         // sebelahnya.
-                                         isConfirmed: isConfirmed,
-                                         pulse: pulse)
-                    // Nama + jenis digabung jadi satu pengumuman VoiceOver,
-                    // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
-                    // basi terdengar persis seperti hasil pengukuran sekarang.
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Nama = informasi utama: paling besar.
-                        Text(object.name)
-                            .font(.title2.bold())
-                        Text(object.kind.displayName)
-                            .font(.subheadline)
-                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        // **Detail teknis disembunyikan di balik Disclosure.**
-                        // RA/Dec/mag adalah alat verifikasi, bukan yang dicari
-                        // saat mengarahkan jam. Menampilkannya di samping nama
-                        // membuat lima angka bersaing dengan satu jawaban.
-                        DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 2) {
-                                // Setiap baris teknis diberi label terucap
-                                // sendiri. Tanpa itu yang diucapkan adalah
-                                // "101.2871°" — angka tanpa konteks apa yang
-                                // diukur, persis di baris yang isinya
-                                // pengenal. Presisinya mengikuti tampilan,
-                                // supaya suara dan layar tidak menyebut dua
-                                // angka berbeda untuk nilai yang sama.
-                                DiagnosticsView.detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
-                                if object.kind == .star {
-                                    DiagnosticsView.detailRow("RA", String(format: "%.4f°", object.raDeg))
-                                        .accessibilityLabel(RowSpeech.label(
-                                            title: "RA",
-                                            value: RowSpeech.spokenDegrees(object.raDeg, precision: 4)))
-                                    DiagnosticsView.detailRow("Dec", String(format: "%+.4f°", object.decDeg))
-                                        .accessibilityLabel(RowSpeech.label(
-                                            title: "Dec",
-                                            value: RowSpeech.spokenDegrees(object.decDeg, precision: 4)))
-                                }
-                                DiagnosticsView.detailRow("Id katalog", object.id)
-                            }
-                            .padding(.top, 4)
-                        } label: {
-                            Text("Detail teknikal")
-                                .font(.footnote)
-                                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
-                        }
-                        .tint(SurfacePalette.active.textSecondaryColor)
+            Group {
+                if motion.allowsContinuousMotion {
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                        content(pulse: pulse)
                     }
-                    .accessibilityElement(children: .contain)
-                    // Label ini hanya untuk bagian **atas**; grup dan disclosure
-                    // di bawahnya tetap elemen terpisah supaya bisa dibuka.
-                    .accessibilityLabel(DiagnosticsView.visualPanelLabel(
-                        object: object,
-                        stale: isStale,
-                        includeTechnicalDetails: false))
+                } else {
+                    // Tanpa `TimelineView`: view tidak pernah di-refresh
+                    // per frame, jadi denyut benar-benar berhenti — bukan
+                    // "cukup kecil". `motion.allowsContinuousMotion` sudah
+                    // nol saat reduceMotion/redup, dan `pulsePhase` mengembalikan
+                    // **nol persis** di keadaan itu (bukan amplitude kecil),
+                    // jadi kedua jalur menghasilkan gambar yang sama persis.
+                    content(pulse: 0)
                 }
             }
             .padding(.vertical, 6)
@@ -588,6 +562,14 @@ struct DiagnosticsView: View {
             .opacity(appearOpacity)
             .onChange(of: lockArrivalToken) { oldToken, newToken in
                 guard let new = newToken, new != oldToken else { return }
+                // Transisi dimatikan saat pengguna meminta reduksi gerak.
+                // Bukan hanya karena bandwidth: `LockArrivalGate` sudah
+                // menyaring agar token hanya naik pada kedatangan kunci yang
+                // **sungguhan** baru, jadi satu-satunya gerak yang tersisa di
+                // sini adalah gerak yang tidak diminta. `MotionPolicy` yang
+                // memutuskan, bukan view ini — supaya app jam dan iPhone tidak
+                // bisa berbeda pendapat.
+                guard motion.allowsTransitions else { return }
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
                     appearScale = 1.04
                     appearOpacity = 1
@@ -598,6 +580,79 @@ struct DiagnosticsView: View {
             }
             // Hanya bagian **atas** panel yang digabung, bukan seluruhnya.
             .accessibilityElement(children: .contain)
+        }
+
+        /// Isi panel, dipisah dari pembungkus denyut.
+        ///
+        /// Dipisah karena dua bentuk gerak di sini punya aturan berbeda:
+        /// denyut kontinu punya `TimelineView`-nya sendiri, sementara isi
+        /// panel harus tetap tampil sama persis saat denyut mati. Kalau isi
+        /// panel ikut hidup di dalam `TimelineView`, mematikan denyut berarti
+        /// mematikan panel — dan panel adalah **jawaban**, bukan hiasan.
+        private func content(pulse currentPulse: Double) -> some View {
+            HStack(alignment: .center, spacing: 16) {
+                CelestialVisualView(visual: visual,
+                                     diameter: 132,
+                                     // Bukan `!isStale`: `.uncertain`
+                                     // bukan sisa, tapi engine kurang
+                                     // yakin — gambar tidak boleh lebih
+                                     // yakin daripada badge "Ragu" di
+                                     // sebelahnya.
+                                     isConfirmed: isConfirmed,
+                                     pulse: currentPulse)
+                // Nama + jenis digabung jadi satu pengumuman VoiceOver,
+                // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
+                // basi terdengar persis seperti hasil pengukuran sekarang.
+                VStack(alignment: .leading, spacing: 4) {
+                    // Nama = informasi utama: paling besar.
+                    Text(object.name)
+                        .font(.title2.bold())
+                    Text(object.kind.displayName)
+                        .font(.subheadline)
+                        .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // **Detail teknis disembunyikan di balik Disclosure.**
+                    // RA/Dec/mag adalah alat verifikasi, bukan yang dicari
+                    // saat mengarahkan jam. Menampilkannya di samping nama
+                    // membuat lima angka bersaing dengan satu jawaban.
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 2) {
+                            // Setiap baris teknis diberi label terucap
+                            // sendiri. Tanpa itu yang diucapkan adalah
+                            // "101.2871°" — angka tanpa konteks apa yang
+                            // diukur, persis di baris yang isinya
+                            // pengenal. Presisinya mengikuti tampilan,
+                            // supaya suara dan layar tidak menyebut dua
+                            // angka berbeda untuk nilai yang sama.
+                            DiagnosticsView.detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
+                            if object.kind == .star {
+                                DiagnosticsView.detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                    .accessibilityLabel(RowSpeech.label(
+                                        title: "RA",
+                                        value: RowSpeech.spokenDegrees(object.raDeg, precision: 4)))
+                                DiagnosticsView.detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                    .accessibilityLabel(RowSpeech.label(
+                                        title: "Dec",
+                                        value: RowSpeech.spokenDegrees(object.decDeg, precision: 4)))
+                            }
+                            DiagnosticsView.detailRow("Id katalog", object.id)
+                        }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("Detail teknikal")
+                            .font(.footnote)
+                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                    }
+                    .tint(SurfacePalette.active.textSecondaryColor)
+                }
+                .accessibilityElement(children: .contain)
+                // Label ini hanya untuk bagian **atas**; grup dan disclosure
+                // di bawahnya tetap elemen terpisah supaya bisa dibuka.
+                .accessibilityLabel(DiagnosticsView.visualPanelLabel(
+                    object: object,
+                    stale: isStale,
+                    includeTechnicalDetails: false))
+            }
         }
     }
 

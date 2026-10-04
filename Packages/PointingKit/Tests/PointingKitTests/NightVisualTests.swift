@@ -6,7 +6,7 @@ import XCTest
 ///
 /// **Kelas cacat yang dijaga di sini.** `CelestialVisualView` menjanjikan
 /// "mode malam benar-benar merah murni -- termasuk pada gambar, bukan hanya
-/// pada teks", dan_colors_nyaelly ditulis satu per satu di view. Sebagian
+/// pada teks", dan warnanya ditulis satu per satu di view. Sebagian
 /// besar dari angka malam itu ternyata **bukan** merah murni: pita terang
 /// Bulan menyimpan 77% luminansinya di hijau/biru, cincin Saturnus 63%,
 /// kabut Venus 60%. Di layar semuanya terlihat "merah"; hanya menghitungnya
@@ -18,8 +18,8 @@ import XCTest
 ///    batas yang bisa diuji, jadi hanya "nol" yang punya arti.
 /// 2. **Urutan terang.** Mode malam mengorbankan hue secara sengaja,
 ///    jadi yang tersisa hanyalah terang. Warna malam yang dipilih satu per
-///    satu bisa membalik urutan itu -- danasticity tidak terlihat di layar
-///    malam karena semuanya sudah merah semua.
+///    satu bisa membalik urutan itu -- dan kelihatannya tidak terlihat di
+///    layar malam karena semuanya sudah merah semua.
 final class NightVisualTests: XCTestCase {
 
     // MARK: - Kemurnian

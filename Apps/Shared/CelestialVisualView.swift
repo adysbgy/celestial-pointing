@@ -51,7 +51,7 @@ struct CelestialVisualView: View {
         .frame(width: diameter, height: diameter)
         // Grafis tidak pernah diumumkan sebagai teks — VoiceOver membaca nama
         // objek & keyakinannya (lihat `ObjectDetailView`), dan menambah
-        // deskripsi gambar hanya menambah yang harus di-George.
+        // deskripsi gambar hanya menambah yang harus dilalui pengguna.
         .accessibilityHidden(true)
     }
 

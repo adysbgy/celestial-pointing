@@ -40,7 +40,7 @@ final class LockArrivalTests: XCTestCase {
     ///
     /// Ini berbeda dari "hanya saat masuk lock" — dan selisihnya menentukan
     /// apakah animasi berkedip atau tidak. Kalau latch ikut dilepas tiap sampel,
-    /// `nil` akan flowing 20 kali per detik dan view yang memakai
+    /// `nil` akan berubah 20 kali per detik dan view yang memakai
     /// `id(token)` akan sleepless. Yang penting: token **tidak pernah naik**
     /// tanpa perpindahan keadaan yang nyata.
     func testStayingLockedKeepsSameTokenWithoutNewArrival() {
@@ -89,7 +89,7 @@ final class LockArrivalTests: XCTestCase {
     /// Keadaan `lock` tanpa objek **tidak** merayakan apa pun.
     ///
     /// `.lock` tanpa `intent` bisa muncul pada sampel pertama setelah
-    /// pemulihan sensor. Merayakannya berarti Memorial celebrating untuk
+    /// pemulihan sensor. Merayakannya berarti merayakan sesuatu untuk
     /// benda yang tidak ada.
     func testLockWithoutAnswerDoesNotCelebrate() {
         var gate = LockArrivalGate()

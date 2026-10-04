@@ -385,6 +385,30 @@ struct ObjectDetailView: View {
     @State private var appearScale: CGFloat = 1
     @State private var appearOpacity: Double = 1
 
+    /// Pengguna meminta reduksi gerak.
+    ///
+    /// `NightAwareContainer` sudah mematikan animasi saat layar redup, dan itu
+    /// bentuk lain dari aturan yang sama — dua bentuk gerak, satu ambang.
+    /// Yang belum ada sebelum unit ini adalah sisi **pengguna**: pengguna yang
+    /// menyalakan Reduce Motion akan tetap melihat kartu memompa setiap kali
+    /// kunci baru, karena layar jam normal tidak pernah membaca preferensi itu.
+    ///
+    /// `MotionPolicy` di `PointingKit` yang memutuskan — teruji di Linux, dan
+    /// dipakai iPhone juga, supaya kedua app tidak bisa berbeda pendapat.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var motion: MotionPolicy {
+        MotionPolicy(reduceMotion: reduceMotion,
+                     // Layar redup tidak pernah mencapai kartu ini: saat
+                     // `isLuminanceReduced` menyala, `NightAwareContainer`
+                     // merender `ReducedLuminanceView` sebagai gantinya.
+                     // `false` jadi jujur, bukan sekadar formalitas — kalau
+                     // suatu saat kartu ikut dirender di layar redup, nilainya
+                     // sudah ada dan tidak perlu ditebak.
+                     isLuminanceReduced: false,
+                     isSceneActive: true)
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             if let visual {
@@ -452,6 +476,12 @@ struct ObjectDetailView: View {
             // Hanya pop saat ada kedatangan baru (token naik dari nilai
             // sebelumnya), bukan saat kembali ke `nil`.
             guard let new = newToken, new != oldToken else { return }
+            // Dan hanya kalau pengguna tidak meminta reduksi gerak. Tanpa
+            // baris ini, preferensi Reduce Motion di iPhone **tidak pernah**
+            // berpengaruh di jam: `NightAwareContainer` hanya menangani
+            // Always-On, dan layar jam normal berjalan 20 kali per detik
+            // tanpa pernah membaca preferensi pengguna.
+            guard motion.allowsTransitions else { return }
             withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
                 appearScale = 1.04
                 appearOpacity = 1
