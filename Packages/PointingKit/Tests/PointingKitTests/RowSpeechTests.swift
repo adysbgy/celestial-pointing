@@ -96,10 +96,10 @@ final class RowSpeechTests: XCTestCase {
     /// angka 0.4 yang berarti "bergerak pelan" terdengar sama dengan "diam".
     func testSubOneRateIsNotRoundedAway() {
         let spoken = RowSpeech.spokenRate(0.4)
-        XCTAssertTrue(spoken.contains("0.4"),
+        XCTAssertTrue(spoken.contains("0,4"),
                       "laju kecil tidak boleh hilang karena pembulatan: \(spoken)")
         XCTAssertFalse(spoken.hasPrefix("0 "),
-                       "0.4 tidak boleh terdengar sebagai nol: \(spoken)")
+                       "0,4 tidak boleh terdengar sebagai nol: \(spoken)")
     }
 
     /// Baris yang memakai nilai terucap tetap menyebut judulnya.
@@ -117,7 +117,7 @@ final class RowSpeechTests: XCTestCase {
     /// berarti suara dan layar menyebut angka berbeda untuk nilai yang sama.
     func testHighPrecisionSurvivesSpeech() {
         let spoken = RowSpeech.spokenDegrees(101.2871, precision: 4)
-        XCTAssertTrue(spoken.contains("101.2871"),
+        XCTAssertTrue(spoken.contains("101,2871"),
                       "presisi tampilan harus ikut diucapkan: \(spoken)")
         XCTAssertTrue(spoken.contains("derajat"), spoken)
     }
@@ -151,8 +151,11 @@ final class RowSpeechTests: XCTestCase {
             "row.speech.errorWord": "error",
             "row.speech.error": "%@ %.1f %@",
         ]
-        TextLocalization.install { english[$0] }
-        defer { TextLocalization.reset() }
+        EnglishTranslation.install(english)
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
 
         XCTAssertEqual(RowSpeech.label(title: "State", value: "Locked"),
                        "State: Locked")
@@ -176,13 +179,23 @@ final class RowSpeechTests: XCTestCase {
     /// specifier, dan `%.1f` yang menerima `String` = crash di
     /// CoreFoundation. Aturan 11 menegakkan larangan itu untuk seluruh
     /// katalog. Batas ini nyata dan dicatat, bukan disembunyikan.
+    ///
+    /// **Kenapa angka di sini berbahasa Indonesia.** Uji ini memasang satu
+    /// kunci terisolasi untuk membuktikan template katalog dipakai apa adanya —
+    /// ia sengaja **tidak** memasang terjemahan, jadi Bahasa Indonesia yang
+    /// aktif dan pemisahnya ikut koma (`2,5`). Kalau angka diuji dengan
+    /// pemisah titik, subjeknya jadi pemisah, bukan template verbatim.
+    /// Perilaku dua bahasa diuji terpisah lewat `EnglishTranslation`.
     func testErrorSentenceComesFromTheCatalogVerbatim() {
         TextLocalization.install { key in
             key == "row.speech.error" ? "«%@» %.1f [%@]" : nil
         }
-        defer { TextLocalization.reset() }
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
 
-        XCTAssertEqual(RowSpeech.spokenError(2.5), "«galat» 2.5 [derajat]",
+        XCTAssertEqual(RowSpeech.spokenError(2.5), "«galat» 2,5 [derajat]",
                        "template katalog harus dipakai apa adanya")
     }
 
@@ -192,7 +205,10 @@ final class RowSpeechTests: XCTestCase {
     /// menggantung tanpa judul di depannya.
     func testEmptyTitleBypassesTheFormat() {
         TextLocalization.install { _ in "%@" }
-        defer { TextLocalization.reset() }
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
 
         XCTAssertEqual(RowSpeech.label(title: "", value: "Terkunci"), "Terkunci")
     }
@@ -208,7 +224,10 @@ final class RowSpeechTests: XCTestCase {
     /// uji yang memerah. Yang diuji di sini adalah bahwa kata "Keadaan"
     /// datang dari katalog, sehingga bisa diganti.
     func testStateLineUsesTheCatalogPrefixAndTheStateLabel() {
-        defer { TextLocalization.reset() }
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
         TextLocalization.install { key in
             switch key {
             case "row.speech.stateLine":       return "[%@] ..."
@@ -228,7 +247,10 @@ final class RowSpeechTests: XCTestCase {
     /// bagian dari yang diuji: kalimat yang dirakit benar harus menyisipkan
     /// label sepanjang apa adanya, bukan label tetap.
     func testStateLineFallsBackToIndonesianSentence() {
-        defer { TextLocalization.reset() }
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
         TextLocalization.install { _ in nil }
         XCTAssertEqual(RowSpeech.stateLine(.lock), "Keadaan: Terkunci.")
         XCTAssertEqual(RowSpeech.stateLine(.uncertain), "Keadaan: Kurang yakin.")

@@ -270,9 +270,9 @@ public final class ExperimentHarness {
         guard !analyzable.isEmpty else { return ExperimentText.summaryNoAnalyzable }
         let summary = ObservationLog.summarize(analyzable)
 
-        let accuracy = summary.accuracy.map { String(format: "%.0f%%", $0 * 100) } ?? "—"
-        let median = summary.medianRawPointingErrorDeg.map { String(format: "%.1f°", $0) } ?? "—"
-        let p90 = summary.p90RawPointingErrorDeg.map { String(format: "%.1f°", $0) } ?? "—"
+        let accuracy = summary.accuracy.map { NumberFormat.percent($0) } ?? "—"
+        let median = summary.medianRawPointingErrorDeg.map { NumberFormat.degrees($0) } ?? "—"
+        let p90 = summary.p90RawPointingErrorDeg.map { NumberFormat.degrees($0) } ?? "—"
 
         switch summary.safetyVerdict {
         case .failed:

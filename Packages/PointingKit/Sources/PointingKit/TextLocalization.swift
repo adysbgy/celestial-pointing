@@ -153,8 +153,22 @@ public enum TextLocalization {
     /// Kalau katalog tidak punya terjemahan, format dijalankan terhadap nilai
     /// Indonesia — bukan terhadap kunci, yang akan membuat `%` dicetak apa
     /// adanya dan menutupi slot.
+    ///
+    /// **Kenapa `locale:` wajib di sini, dan bukan opsional.** Tanpa
+    /// `locale:`, `String(format:)` memakai locale proses, dan pemisah
+    /// desimal ikut ikut: pembaca Bahasa Indonesia melihat `Offset 4.2°`
+    /// untuk nilai yang ia baca sebagai `4,2°` — sepuluh kali lebih besar.
+    /// Angka tidak boleh jadi satu-satunya bagian layar yang berbicara
+    /// bahasa berbeda dari teksnya, jadi pemisah desimalnya ikut bahasa yang
+    /// membaca katalog, sama seperti katanya.
+    ///
+    /// Bahasanya datang dari `NumberFormat`, bukan `Locale.current`, supaya
+    /// teks dan angka tidak bisa berbeda pendapat: bridge yang memasang
+    /// katalog juga yang memasang pemisah angka.
     public static func text(_ key: LocalizedText, _ arguments: CVarArg...) -> String {
-        String(format: text(key), arguments: arguments)
+        String(format: text(key),
+               locale: Locale(identifier: NumberFormat.activeLocaleId),
+               arguments: arguments)
     }
 }
 

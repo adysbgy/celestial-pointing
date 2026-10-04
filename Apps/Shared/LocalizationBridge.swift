@@ -48,5 +48,10 @@ enum LocalizationBridge {
         TextLocalization.install { key in
             Bundle.main.localizedString(forKey: key, value: key, table: nil)
         }
+        // Angka ikut bahasa yang sama. Tanpa ini, `NumberFormat` memakai
+        // locale proses, dan pemisah desimalnya ikut bahasa sistem — bukan
+        // bahasa yang sedang membaca katalog. Keduanya bisa berbeda, dan kalau
+        // berbeda, teksnya satu bahasa sementara angkanya bahasa lain.
+        NumberFormat.install(localeId: Locale.preferredLanguages.first ?? NumberFormat.defaultLocaleId)
     }
 }

@@ -15,7 +15,10 @@ import XCTest
 final class ExperimentTextTests: XCTestCase {
 
     override func tearDown() {
+        // Kedua bridge dilepas: melepas hanya katalog membocorkan bahasa
+        // angka milik uji ini ke berkas lain.
         TextLocalization.reset()
+        NumberFormat.reset()
         super.tearDown()
     }
 
@@ -117,7 +120,7 @@ final class ExperimentTextTests: XCTestCase {
     func testDetailErrorAndRateInsertNumbers() {
         let error = ExperimentText.detailError(degrees: 1.25)
         let rate = ExperimentText.detailRate(degPerSec: 12.7)
-        XCTAssertTrue(error.contains("1.2"), "galat hilang: \(error)")
+        XCTAssertTrue(error.contains("1,2"), "galat hilang: \(error)")
         XCTAssertTrue(rate.contains("13"), "laju hilang: \(rate)")
     }
 
@@ -164,7 +167,7 @@ final class ExperimentTextTests: XCTestCase {
             "experiment.location.fallback": "Location not yet available — computed for %@.",
             "experiment.location.computed": "Computed for %@.",
         ]
-        TextLocalization.install { english[$0] }
+        EnglishTranslation.install(english)
 
         XCTAssertEqual(ExperimentText.statusInitial,
                        "Pick a target, aim, then record.")

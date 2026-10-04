@@ -137,8 +137,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         let coordinate = last.coordinate
         let accuracy = last.horizontalAccuracy
         Task { @MainActor in
-            let label = String(format: "%.4f, %.4f",
-                               coordinate.latitude, coordinate.longitude)
+            let label = NumberFormat.decimal(coordinate.latitude, fractionDigits: 4)
+                + ", " + NumberFormat.decimal(coordinate.longitude, fractionDigits: 4)
             let location = ObserverLocation(
                 latitudeDeg: coordinate.latitude,
                 longitudeDeg: coordinate.longitude,

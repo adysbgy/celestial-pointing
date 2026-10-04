@@ -40,19 +40,19 @@ public enum CalibrationText {
     /// memotong nilai `Int` 64-bit — perbedaan yang tidak terlihat sampai
     /// angkanya besar.
     public static func needMoreMessage(minimum: Int, recorded: Int) -> String {
-        String(format: TextLocalization.text(.calibrationMessageNeedMore),
+        TextLocalization.text(.calibrationMessageNeedMore,
                Int64(minimum), Int64(recorded))
     }
 
     /// Sebaran sisa masih terlalu lebar.
     public static func spreadTooWideMessage(spreadDeg: Double, maxDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationMessageSpreadTooWide),
+        TextLocalization.text(.calibrationMessageSpreadTooWide,
                spreadDeg, maxDeg)
     }
 
     /// Kalibrasi sudah layak dipakai.
     public static func readyMessage(spreadDeg: Double, sampleCount: Int) -> String {
-        String(format: TextLocalization.text(.calibrationMessageReady),
+        TextLocalization.text(.calibrationMessageReady,
                spreadDeg, Int64(sampleCount))
     }
 
@@ -75,7 +75,7 @@ public enum CalibrationText {
 
     /// Arah objek yang dipilih tidak bisa dihitung.
     public static func directionUncomputableMessage(objectID: String) -> String {
-        String(format: TextLocalization.text(.calibrationMessageDirectionUncomputable),
+        TextLocalization.text(.calibrationMessageDirectionUncomputable,
                objectID)
     }
 
@@ -88,23 +88,23 @@ public enum CalibrationText {
 
     /// "Tahap: Siap dipakai."
     public static func spokenPhasePrefix(_ phase: String) -> String {
-        String(format: TextLocalization.text(.calibrationSpeechPhasePrefix), phase)
+        TextLocalization.text(.calibrationSpeechPhasePrefix, phase)
     }
 
     /// "3 acuan tercatat."
     public static func spokenSamplesRecorded(_ count: Int) -> String {
-        String(format: TextLocalization.text(.calibrationSpeechSamplesRecorded),
+        TextLocalization.text(.calibrationSpeechSamplesRecorded,
                Int64(count))
     }
 
     /// "Offset 4.2 derajat."
     public static func spokenOffset(degrees: Double) -> String {
-        String(format: TextLocalization.text(.calibrationSpeechOffset), degrees)
+        TextLocalization.text(.calibrationSpeechOffset, degrees)
     }
 
     /// "Sebaran 2.4 derajat, batas 3.0 derajat."
     public static func spokenSpread(spreadDeg: Double, maxDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationSpeechSpread),
+        TextLocalization.text(.calibrationSpeechSpread,
                spreadDeg, maxDeg)
     }
 
@@ -120,7 +120,7 @@ public enum CalibrationText {
 
     /// "Catat Vega sebagai acuan, 40 derajat tinggi."
     public static func spokenCaptureLabel(name: String, altitudeDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationSpeechCaptureLabel),
+        TextLocalization.text(.calibrationSpeechCaptureLabel,
                name, altitudeDeg)
     }
 
@@ -133,7 +133,7 @@ public enum CalibrationText {
 
     /// Kalibrasi dari sesi sebelumnya sudah terpasang.
     public static func alreadyInstalled(offsetDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationStatusAlreadyInstalled),
+        TextLocalization.text(.calibrationStatusAlreadyInstalled,
                offsetDeg)
     }
 
@@ -144,7 +144,7 @@ public enum CalibrationText {
 
     /// Kalibrasi baru saja dipasang.
     public static func installed(offsetDeg: Double, spreadDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationStatusInstalled),
+        TextLocalization.text(.calibrationStatusInstalled,
                offsetDeg, spreadDeg)
     }
 
@@ -157,12 +157,12 @@ public enum CalibrationText {
 
     /// "Offset 4.2°" — bentuk ringkas untuk kartu.
     public static func offsetDisplay(degrees: Double) -> String {
-        String(format: TextLocalization.text(.calibrationDisplayOffset), degrees)
+        TextLocalization.text(.calibrationDisplayOffset, degrees)
     }
 
     /// "Sebaran 2.4° (maks 3.0°)" — bentuk ringkas untuk kartu.
     public static func spreadDisplay(spreadDeg: Double, maxDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationDisplaySpread),
+        TextLocalization.text(.calibrationDisplaySpread,
                spreadDeg, maxDeg)
     }
 
@@ -174,7 +174,7 @@ public enum CalibrationText {
     /// (tanpa kunci). Kata "tinggi" adalah teks yang harus diterjemahkan;
     /// `°` dan angkanya tidak.
     public static func captureAltitudeDisplay(altitudeDeg: Double) -> String {
-        String(format: TextLocalization.text(.calibrationDisplayCaptureAltitude),
+        TextLocalization.text(.calibrationDisplayCaptureAltitude,
                altitudeDeg)
     }
 }

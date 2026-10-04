@@ -36,7 +36,7 @@ struct LinkView: View {
                             // diucapkan bentuk katanya. Dua-duanya dari
                             // angka yang sama — tidak ada versi kedua yang
                             // bisa menyimpang.
-                            row("Laju", String(format: "%.1f°/dtk", rate))
+                            row("Laju", NumberFormat.degreesPerSecond(rate))
                                 .accessibilityLabel(RowSpeech.spokenRow(
                                     title: "Laju",
                                     spokenValue: RowSpeech.spokenRate(rate)))
@@ -54,9 +54,9 @@ struct LinkView: View {
                 Section("Kalibrasi terakhir dari jam") {
                     if let calibration = link.lastCalibration {
                         row("Offset yaw",
-                            calibration.yawOffsetDeg.map { String(format: "%.1f°", $0) } ?? "—")
+                            calibration.yawOffsetDeg.map { NumberFormat.degrees($0) } ?? "—")
                         row("Sebaran",
-                            calibration.residualSpreadDeg.map { String(format: "%.1f°", $0) } ?? "—")
+                            calibration.residualSpreadDeg.map { NumberFormat.degrees($0) } ?? "—")
                         row("Jumlah acuan", calibration.sampleCount.map(String.init) ?? "—")
                     } else {
                         Text("Jam belum melaporkan kalibrasi.")

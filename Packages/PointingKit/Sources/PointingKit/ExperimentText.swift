@@ -55,7 +55,7 @@ public enum ExperimentText {
 
     /// Arah target yang dipilih tidak bisa dihitung.
     public static func statusTargetUncomputable(targetID: String) -> String {
-        String(format: TextLocalization.text(.experimentStatusTargetUncomputable),
+        TextLocalization.text(.experimentStatusTargetUncomputable,
                targetID)
     }
 
@@ -68,13 +68,13 @@ public enum ExperimentText {
     public static func statusRecorded(error: String,
                                       verdict: String,
                                       answer: String) -> String {
-        String(format: TextLocalization.text(.experimentStatusRecorded),
+        TextLocalization.text(.experimentStatusRecorded,
                error, verdict, answer)
     }
 
     /// Percobaan terakhir dibuang.
     public static func statusRemoved(objectID: String) -> String {
-        String(format: TextLocalization.text(.experimentStatusRemoved), objectID)
+        TextLocalization.text(.experimentStatusRemoved, objectID)
     }
 
     /// Tidak ada percobaan yang bisa dibuang.
@@ -141,30 +141,30 @@ public enum ExperimentText {
     }
 
     public static func detailAnswer(_ name: String) -> String {
-        String(format: TextLocalization.text(.experimentDetailAnswer), name)
+        TextLocalization.text(.experimentDetailAnswer, name)
     }
 
     public static func detailConfidence(_ level: String) -> String {
-        String(format: TextLocalization.text(.experimentDetailConfidence), level)
+        TextLocalization.text(.experimentDetailConfidence, level)
     }
 
     public static func detailState(_ state: String) -> String {
-        String(format: TextLocalization.text(.experimentDetailState), state)
+        TextLocalization.text(.experimentDetailState, state)
     }
 
     /// Galat dalam bentuk tampilan, dengan presisi yang mengikuti tampilan.
     public static func detailError(degrees: Double) -> String {
-        String(format: TextLocalization.text(.experimentDetailError), degrees)
+        TextLocalization.text(.experimentDetailError, degrees)
     }
 
     /// Laju pergelangan dalam bentuk tampilan (simbol `/dtk`).
     public static func detailRate(degPerSec: Double) -> String {
-        String(format: TextLocalization.text(.experimentDetailRate), degPerSec)
+        TextLocalization.text(.experimentDetailRate, degPerSec)
     }
 
     /// Opsi di pemilih target: `"Vega · 42°"`.
     public static func targetOption(name: String, altitudeDeg: Double) -> String {
-        String(format: TextLocalization.text(.experimentTargetOption),
+        TextLocalization.text(.experimentTargetOption,
                name, altitudeDeg)
     }
 
@@ -180,7 +180,7 @@ public enum ExperimentText {
                                      accuracy: String,
                                      median: String,
                                      p90: String) -> String {
-        String(format: TextLocalization.text(.experimentSummaryFailed),
+        TextLocalization.text(.experimentSummaryFailed,
                Int64(falseLockCount), accuracy, median, p90)
     }
 
@@ -192,7 +192,7 @@ public enum ExperimentText {
                                            accuracy: String,
                                            median: String,
                                            p90: String) -> String {
-        String(format: TextLocalization.text(.experimentSummaryInsufficient),
+        TextLocalization.text(.experimentSummaryInsufficient,
                Int64(trialCount), Int64(minimum), accuracy, median, p90)
     }
 
@@ -201,7 +201,7 @@ public enum ExperimentText {
                                      accuracy: String,
                                      median: String,
                                      p90: String) -> String {
-        String(format: TextLocalization.text(.experimentSummaryPassed),
+        TextLocalization.text(.experimentSummaryPassed,
                Int64(trialCount), accuracy, median, p90)
     }
 
@@ -234,7 +234,7 @@ public enum ExperimentText {
     public static func diagnosisRatio(locks: Int, uncertain: Int) -> String {
         let total = locks + uncertain
         let ratio = total > 0 ? Double(locks) / Double(total) : 0
-        return String(format: TextLocalization.text(.experimentDiagnosisRatio),
+        return TextLocalization.text(.experimentDiagnosisRatio,
                       ratio * 100, Int64(locks), Int64(uncertain))
     }
 
@@ -242,7 +242,7 @@ public enum ExperimentText {
 
     /// Usulan ambang keyakinan dari sigma terukur.
     public static func suggestedThreshold(sigmaDeg: Double) -> String {
-        String(format: TextLocalization.text(.experimentSuggestedThreshold),
+        TextLocalization.text(.experimentSuggestedThreshold,
                sigmaDeg)
     }
 
@@ -252,13 +252,13 @@ public enum ExperimentText {
     /// lain — tinggi objeknya salah. Itu harus terlihat, bukan tersembunyi di
     /// balik daftar yang tampak normal.
     public static func locationFallbackWarning(label: String) -> String {
-        String(format: TextLocalization.text(.experimentLocationFallback),
+        TextLocalization.text(.experimentLocationFallback,
                label)
     }
 
     /// Keterangan lokasi tempat tinggi objek dihitung.
     public static func locationComputed(label: String) -> String {
-        String(format: TextLocalization.text(.experimentLocationComputed), label)
+        TextLocalization.text(.experimentLocationComputed, label)
     }
 }
 

@@ -117,7 +117,7 @@ struct Experiment1View: View {
                 Text(engine.snapshot.state.shortLabel)
                 Spacer()
                 if let rate = engine.snapshot.angularRateDegPerSec {
-                    Text(String(format: "%.0f°/dtk", rate))
+                    Text(NumberFormat.degreesPerSecond(rate, fractionDigits: 0))
                         .font(.caption.monospaced())
                         .foregroundStyle(Color.nightAwareSecondary)
                 }
@@ -159,10 +159,10 @@ struct Experiment1View: View {
                 row("Benar", "\(summary.correctCount)")
                 row("False lock", "\(summary.falseLockCount)")
                 if let median = summary.medianRawPointingErrorDeg {
-                    row("Galat median", String(format: "%.1f°", median))
+                    row("Galat median", NumberFormat.degrees(median))
                 }
                 if let p90 = summary.p90RawPointingErrorDeg {
-                    row("Galat P90", String(format: "%.1f°", p90))
+                    row("Galat P90", NumberFormat.degrees(p90))
                 }
                 Text(recorder.verdict)
                     .font(.footnote)

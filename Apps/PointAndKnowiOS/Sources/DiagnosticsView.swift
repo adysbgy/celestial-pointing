@@ -313,7 +313,7 @@ struct DiagnosticsView: View {
                     SlewVerdictBanner(decision: engine.slewVerdict)
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
-                        row("Laju pergelangan", String(format: "%.1f°/dtk", rate))
+                        row("Laju pergelangan", NumberFormat.degreesPerSecond(rate))
                             // "0.5°/dtk" terbaca oleh mata, tidak oleh suara.
                             // Yang diucapkan bentuk katanya — angkanya sama,
                             // jadi tidak ada versi kedua yang bisa menyimpang.
@@ -372,11 +372,12 @@ struct DiagnosticsView: View {
                         }
                     }
                     if let pointing = engine.pointing {
-                        row("Arah", String(format: "%.1f° / %.1f°",
-                                           pointing.altitudeDeg, pointing.azimuthDeg))
+                        row("Arah", "\(NumberFormat.degrees(pointing.altitudeDeg)) / "
+                                 + "\(NumberFormat.degrees(pointing.azimuthDeg))")
                     }
-                    row("Sigma dipakai", String(format: "%.1f°",
-                                                engine.controller.resolver.confidencePolicy.pointingSigmaDeg))
+                    row("Sigma dipakai",
+                        NumberFormat.degrees(
+                            engine.controller.resolver.confidencePolicy.pointingSigmaDeg))
                 }
 
                 Section("Keyakinan") {
@@ -739,13 +740,17 @@ struct DiagnosticsView: View {
                             // pengenal. Presisinya mengikuti tampilan,
                             // supaya suara dan layar tidak menyebut dua
                             // angka berbeda untuk nilai yang sama.
-                            DiagnosticsView.detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
+                            DiagnosticsView.detailRow("Magnitudo",
+                                                        NumberFormat.decimal(object.magnitude,
+                                                                             fractionDigits: 2))
                             if object.kind == .star {
-                                DiagnosticsView.detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                DiagnosticsView.detailRow("RA", NumberFormat.degrees(object.raDeg,
+                                                                                   fractionDigits: 4))
                                     .accessibilityLabel(RowSpeech.label(
                                         title: "RA",
                                         value: RowSpeech.spokenDegrees(object.raDeg, precision: 4)))
-                                DiagnosticsView.detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                DiagnosticsView.detailRow("Dec",
+                                                            NumberFormat.signedDegrees(object.decDeg))
                                     .accessibilityLabel(RowSpeech.label(
                                         title: "Dec",
                                         value: RowSpeech.spokenDegrees(object.decDeg, precision: 4)))

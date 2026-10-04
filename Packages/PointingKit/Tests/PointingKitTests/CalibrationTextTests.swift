@@ -13,7 +13,10 @@ import XCTest
 final class CalibrationTextTests: XCTestCase {
 
     override func tearDown() {
+        // Kedua bridge dilepas: melepas hanya katalog membocorkan bahasa
+        // angka milik uji ini ke berkas lain.
         TextLocalization.reset()
+        NumberFormat.reset()
         super.tearDown()
     }
 
@@ -44,8 +47,8 @@ final class CalibrationTextTests: XCTestCase {
     func testSpreadTooWideInsertsBothDegrees() {
         let message = CalibrationText.spreadTooWideMessage(spreadDeg: 5.4,
                                                            maxDeg: 3)
-        XCTAssertTrue(message.contains("5.4"), "sebaran hilang: \(message)")
-        XCTAssertTrue(message.contains("3.0"), "batas hilang: \(message)")
+        XCTAssertTrue(message.contains("5,4"), "sebaran hilang: \(message)")
+        XCTAssertTrue(message.contains("3,0"), "batas hilang: \(message)")
     }
 
     func testDirectionUncomputableInsertsObjectID() {
@@ -56,9 +59,9 @@ final class CalibrationTextTests: XCTestCase {
     func testSpokenOffsetAndSpreadInsertDegrees() {
         let offset = CalibrationText.spokenOffset(degrees: 4.2)
         let spread = CalibrationText.spokenSpread(spreadDeg: 2.4, maxDeg: 3)
-        XCTAssertTrue(offset.contains("4.2"), "offset hilang: \(offset)")
-        XCTAssertTrue(spread.contains("2.4"), "sebaran hilang: \(spread)")
-        XCTAssertTrue(spread.contains("3.0"), "batas hilang: \(spread)")
+        XCTAssertTrue(offset.contains("4,2"), "offset hilang: \(offset)")
+        XCTAssertTrue(spread.contains("2,4"), "sebaran hilang: \(spread)")
+        XCTAssertTrue(spread.contains("3,0"), "batas hilang: \(spread)")
     }
 
     func testCaptureLabelInsertsNameAndAltitude() {
@@ -71,10 +74,10 @@ final class CalibrationTextTests: XCTestCase {
     func testStatusNumbersInsertDegrees() {
         let installed = CalibrationText.installed(offsetDeg: 4.2, spreadDeg: 2.4)
         let display = CalibrationText.spreadDisplay(spreadDeg: 2.4, maxDeg: 3)
-        XCTAssertTrue(installed.contains("4.2"), "offset hilang: \(installed)")
-        XCTAssertTrue(installed.contains("2.4"), "sebaran hilang: \(installed)")
-        XCTAssertTrue(display.contains("2.4"), "sebaran hilang: \(display)")
-        XCTAssertTrue(display.contains("3.0"), "batas hilang: \(display)")
+        XCTAssertTrue(installed.contains("4,2"), "offset hilang: \(installed)")
+        XCTAssertTrue(installed.contains("2,4"), "sebaran hilang: \(installed)")
+        XCTAssertTrue(display.contains("2,4"), "sebaran hilang: \(display)")
+        XCTAssertTrue(display.contains("3,0"), "batas hilang: \(display)")
     }
 
     /// Layar dan suara membaca nama tahap dari **satu** sumber.
@@ -121,7 +124,7 @@ final class CalibrationTextTests: XCTestCase {
             "calibration.display.spread": "Spread %.1f° (max %.1f°)",
             "calibration.phase.ready.label": "Ready to use",
         ]
-        TextLocalization.install { english[$0] }
+        EnglishTranslation.install(english)
 
         XCTAssertEqual(CalibrationText.idleMessage,
                        "Point at a star, then tap to record.")

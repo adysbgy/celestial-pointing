@@ -35,7 +35,7 @@ public enum ObjectSpeech {
     /// memberi tahu apa pun, dan singkatan "mag" yang dipakai di layar tidak
     /// terbaca saat diucapkan.
     public static func magnitude(_ value: Double) -> String {
-        String(format: TextLocalization.text(.objectSpeechMagnitude), value)
+        TextLocalization.text(.objectSpeechMagnitude, value)
     }
 
     /// Penanda bahwa objek yang diumumkan berasal dari pandangan sebelumnya.
@@ -48,7 +48,7 @@ public enum ObjectSpeech {
 
     /// "tingkat keyakinan Yakin" — tingkat keyakinan dengan katanya.
     public static func confidence(_ level: ConfidenceLevel) -> String {
-        String(format: TextLocalization.text(.objectSpeechConfidence),
+        TextLocalization.text(.objectSpeechConfidence,
                level.displayName)
     }
 
@@ -57,7 +57,7 @@ public enum ObjectSpeech {
     /// `decDeg` memakai `%+.1f` supaya tandanya ikut diucapkan sebagai bagian
     /// dari angka; tanpa tanda, deklinasi selatan terbaca sama dengan utara.
     public static func coordinates(raDeg: Double, decDeg: Double) -> String {
-        String(format: TextLocalization.text(.objectSpeechCoordinates),
+        TextLocalization.text(.objectSpeechCoordinates,
                raDeg, decDeg)
     }
 
@@ -76,7 +76,7 @@ public enum ObjectSpeech {
     /// diucapkan). Dua kunci, dua bentuk — bukan satu bentuk yang dipaksakan
     /// ke dua indera.
     public static func coordinatesDisplay(raDeg: Double, decDeg: Double) -> String {
-        String(format: TextLocalization.text(.objectDisplayCoordinates),
+        TextLocalization.text(.objectDisplayCoordinates,
                raDeg, decDeg)
     }
 
@@ -85,7 +85,7 @@ public enum ObjectSpeech {
     /// Pasangan layar dari `magnitude(_:)`. Dipakai baris jenis objek yang dulu
     /// menulis `String(format: "mag %.2f", …)` sebagai literal.
     public static func magnitudeDisplay(_ value: Double) -> String {
-        String(format: TextLocalization.text(.objectDisplayMagnitude), value)
+        TextLocalization.text(.objectDisplayMagnitude, value)
     }
 
     /// Penanda sisa yang **pendek**, untuk layar yang sengaja miskin.

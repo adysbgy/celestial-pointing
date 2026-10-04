@@ -1,5 +1,101 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — angka di layar berbicara bahasa berbeda dari teksnya)
+
+### Premis: unit `NumberFormat` sudah di tengah jalan, dan jalur yang penting masih buta
+
+Unit di tengah jalan (`NumberFormat` + `LocalizationBridge` yang memasangnya)
+benar pada ide dasarnya: angka yang diformat dengan `String(format: "%.1f")`
+**tanpa `locale:`** mengikuti locale proses, bukan bahasa yang membaca katalog.
+Di perangkat berbahasa Indonesia, `42.5°` muncul di tengah layar yang sisanya
+Bahasa Indonesia — dan pembaca bisa membacanya sebagai `425` (sepuluh kali
+lebih besar).
+
+Tapi unit itu **setengah selesai**, dan bagian yang tertinggal adalah justru
+jalur yang paling banyak dipakai:
+
+- `TextLocalization.text(_:key, _:arguments)` — overload berformat yang
+  **didokumentasikan** sebagai jalur locale-aman — berjalan tanpa `locale:`.
+- **24 situs produksi** memformat template katalog lewat bentuk
+  `String(format: text(.key), arg…)` yang juga tanpa `locale:`. Di situlah
+  hampir semua angka yang tampil lahir (kalibrasi, RA/Dec, galat, magnitudo,
+  status tautan, ringkasan eksperimen).
+- Dua situs `Apps/` (`CalibrationView.swift:150,217`) selamat dari sapuan awal
+  karena sama-sama memakai kunci katalog.
+- Bridge `NumberFormat.install` yang dipasang di `LocalizationBridge` **tidak
+  punya satu pun uji** — setiap uji menyebut `localeId:` secara eksplisit, jadi
+  jalur yang benar-benar jalan di perangkat tidak pernah dijalankan.
+
+Ini bukan "kurang satu situs". Ini kelas yang sama persis dengan yang repo ini
+berulang-turun tutup: jalur yang menghitung lalu dibuang — hanya bahwa yang
+"dibuang" kali ini bukan sebuah keputusan, melainkan **pemisah desimal**.
+
+### Yang diubah, dan kenapa bentuknya begini
+
+1. **Overload berformat ikut `locale:`.** `TextLocalization.swift:170` sekarang
+   memformat lewat `Locale(identifier: NumberFormat.activeLocaleId)`, bukan
+   locale proses. `%@`, `%lld`, dan `%%` tetap utuh (dibuktikan di Linux bahwa
+   argumen `String` Swift dan `Int64` tidak rusak setelah `locale:` dipasang).
+2. **52 situs `String(format: text(.key), …)` → `text(.key, …)`.** Satu rewrite
+   mekanis (penyeimbangan kurung, bukan regex mentah) menyalurkan seluruh
+   format katalog lewat overload yang sudah locale-aman. Tanpa ini, 24 situs
+   produksi tetap menampilkan titik di perangkat Indonesia.
+3. **`RowSpeech.spokenRate`/`spokenDegrees` lewat `NumberFormat`.** Kedua
+   fungsi merakit specifier `"%.\(precision)f \(unit)"` di kode, jadi ia **tidak
+   pernah** melewati katalog dan overload tidak bisa menjangkaunya. Mereka
+   memakai `NumberFormat.decimal(_:fractionDigits:)` — satu sumber pemisah,
+   sama seperti sisa angka.
+4. **Ringkasan eksperimen lewat `NumberFormat`.** `ExperimentHarness.verdict`
+   memakai `accuracy`/`median`/`p90` (`Galat median`, `Galat P90`) yang tampil
+   di layar Experiment 1 iPhone; dulu `String(format:)` telanjang. Kini ikut
+   bahasa aktif.
+5. **Bridge diuji, bukan cuma dideklarasikan.** `NumberFormatTests` menambah 6
+   uji: bawaan Bahasa Indonesia, bahasa terpasang benar-benar mengganti
+   pemisah, dan `reset()` melepasnya (karena kebocoran bridge antar-uji tidak
+   pernah muncul sebagai kegagalan, hanya sebagai angka yang tiba-tiba salah
+   di berkas lain). `TextLocalizationTests` menambah 2 uji yang menembak jalur
+   **tampilan nyata** (`CalibrationText.offsetDisplay`) lewat dan tanpa bridge,
+   supaya kalau ada jalur yang kembali ke format tanpa locale, angka di layar
+   berubah lagi dan gerbang mana pun tidak menyala.
+6. **`EnglishTranslation.install`** — helper bersama yang memasang **kata dan
+   bahasa sekaligus**. Ini menutup celah coupling yang ketemu di tengah: dulu
+   uji boleh memasang terjemahan Inggris tanpa memasang `en_US`, hasilnya teks
+   campur ("Ready — spread 2,0° from 3 refs."). Semua uji terjemahan Inggris
+   sekarang lewat helper itu, dan `tearDown` melepas **kedua** bridge.
+
+### Bukti merah (jalur ini memang buta sebelum diperbaiki)
+
+Sebelum overload diperbaiki, `testFormattedNumbersFollowTheLanguageReadingTheCatalog`
+mengharapkan `"mag 1.42"` — dan itulah cacatnya tertulis sebagai hijau.
+Setelah perbaikan, harapan itu jadi `"mag 1,42"`. Tiga uji baru dijalankan
+merah lebih dulu: `text(.objectDisplayCoordinates, …)` mengembalikan `"RA 101.3°
+Dec -16.7°"` (titik) sebelum `locale:`; setelahnya `"RA 101,3° Dec -16,7°"`
+(koma). Lima uji `CalibrationText`/`ExperimentText`/`ObjectSpeech`/`RowSpeech`
+yang mengharapkan titik ikut merah, lalu di-update ke koma — mereka bukan yang
+mengubah perilaku, mereka **mengencode** perilaku lama.
+
+### Batas yang jujur
+
+- **Bahasa Inggris di perangkat belum pernah dibaca penutur asli.** Yang
+  dibuktikan: setiap kunci punya entri `en`, overload memakai locale-nya, dan
+  `EnglishTranslation` memasang keduanya bersama. Bahwa iOS benar-benar
+  membacanya dengan separator titik belum diverifikasi di perangkat.
+- **`en` untuk dua kunci kalibrasi tadinya yatim.** `calibration.display.*
+  (captureAltitude, suggestedSigma)` punya nilai `en` tapi tidak ada entri `id`
+  di `xcstrings`; default Indonesian-nya hidup di kode (`LocalizedText(id:)`).
+  Aturan 6 memeriksa paritas `allKeys`, bukan kehadiran `id`, jadi tidak
+  menangkapnya. Sekarang keduanya mengalir lewat overload dengan default
+  tersebut, jadi tidak ada regresi — tapi itu berarti `en`-nya adalah satu-satunya
+  terjemahan di luar pasangan `id`/`en` yang biasa, dan perlu diketahui.
+- **Engine 170 tetap utuh.** Perubahan hanya di `PointingKit` + `Apps/`, dan
+  `swift-test.sh` tetap 170 + 481 (naik 475 → 481, +6 uji bridge/lokalisasi).
+
+### Gerbang
+
+- `swift-test.sh` → **170 CelestialEngine + 481 PointingKit**, 0 gagal.
+- `swift-ui-lint.sh` → **13 aturan hijau** (Aturan 10 menangkap README 475→481).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+
 ## Progres terakhir (4 Okt 2026 — cahaya Bulan tidak pernah menggeser batas magnitudo)
 
 ### Premis: angka yang benar, dan keputusan yang tidak pernah diambil

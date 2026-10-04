@@ -55,15 +55,15 @@ public enum StateAnnouncement {
             guard let name = snapshot.answeredObject?.name, !name.isEmpty else {
                 return TextLocalization.text(.announceLocked)
             }
-            return String(format: TextLocalization.text(.announceLockedOn), name)
+            return TextLocalization.text(.announceLockedOn, name)
         case .uncertain:
-            return String(format: TextLocalization.text(.announceUncertain),
+            return TextLocalization.text(.announceUncertain,
                           snapshot.guidanceText)
         case .unavailable:
-            return String(format: TextLocalization.text(.announceUnavailable),
+            return TextLocalization.text(.announceUnavailable,
                           snapshot.guidanceText)
         case .idle, .pointing, .searching:
-            return String(format: TextLocalization.text(.announceState),
+            return TextLocalization.text(.announceState,
                           snapshot.state.shortLabel, snapshot.guidanceText)
         }
     }

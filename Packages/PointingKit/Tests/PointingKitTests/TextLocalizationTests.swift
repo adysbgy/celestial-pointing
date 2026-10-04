@@ -415,6 +415,14 @@ final class TextLocalizationTests: XCTestCase {
     /// pemanggil `sendFailureCount` (Int) harus memanggil
     /// `String(describing:)` sendiri, dan setiap pemanggil punya kesempatan
     /// lupa — dan lupa itu gagal diam-diam untuk `%lld`.
+    ///
+    /// **Kenapa desimalnya koma, bukan titik.** Angka `%.1f` di sini bukan
+        /// milik uji ini — uji ini soal tipe argumen. Tapi nilainya ikut apa
+        /// yang overload lakukan: pemisah desimalnya mengikuti bahasa aktif
+        /// (bawaan `id_ID`), jadi `1.42` tampil `1,42`. Nilai ini sebelumnya
+        /// diperiksa sebagai `"mag 1.42"` — dan itulah cacatnya, bukan
+        /// kebetulan: konvensi titik ikut locale proses, sehingga angka jadi
+        /// satu-satunya bagian layar yang berbicara bahasa berbeda dari teksnya.
     func testFormattedOverloadAcceptsNonStringArguments() {
         TextLocalization.install { _ in nil }
     // Tanpa bridge: harus jatuh ke nilai Indonesia dan format normal.
@@ -422,13 +430,13 @@ final class TextLocalizationTests: XCTestCase {
                                               Int64(7),
                                               TextLocalization.text(.linkStatusSendFailuresWord)),
                        ". 7 kiriman gagal.")
-    XCTAssertEqual(TextLocalization.text(.objectDisplayMagnitude, 1.42), "mag 1.42")
+    XCTAssertEqual(TextLocalization.text(.objectDisplayMagnitude, 1.42), "mag 1,42")
     // Tanda ikut terbawa: tanpa tanda, deklinasi negatif terdengar sama
     // dengan positifnya — dan itu bukan detail kecil, karena itulah yang
     // menentukan apakah teleskop boleh bergerak ke atas atau ke bawah.
     XCTAssertEqual(TextLocalization.text(.objectDisplayCoordinates,
                                               101.287, -16.716),
-                       "RA 101.3° Dec -16.7°")
+                       "RA 101,3° Dec -16,7°")
     }
 
     /// Overload baru tidak boleh mengubah arti overload yang sudah ada.
@@ -443,6 +451,46 @@ final class TextLocalizationTests: XCTestCase {
         }
     // Tidak ada argumen → overload tunggal → tidak ada pemrosesan `%`.
     XCTAssertEqual(TextLocalization.text(.objectSpeechStaleShort), "100%% certain")
+    }
+
+    // MARK: - Angka ikut bahasa yang membaca katalog
+
+    /// **Ini cacat yang diperbaiki siklus ini, diuji di tempatnya.**
+    /// Hampir semua format di repo ini melewati overload berformat, dan
+    /// overload itu dulu berjalan tanpa `locale:` — jadi pemisah desimalnya
+    /// ikut locale **proses**, bukan bahasa yang sedang membaca katalog.
+    /// Di perangkat berbahasa Indonesia, `Offset 4.2°` muncul di layar yang
+    /// sisanya Bahasa Indonesia.
+    ///
+    /// Uji ini sengaja menguji lewat teks nyata yang **tampil di layar**, bukan
+    /// lewat `text(_:_:)` langsung: kalau nanti ada jalur tampilan yang
+    /// kembali ke format tanpa locale, angka di layar berubah lagi dan
+    /// gerbang mana pun tidak menyala.
+    func testFormattedNumbersFollowTheLanguageReadingTheCatalog() {
+        TextLocalization.install { _ in nil }
+        let message = CalibrationText.offsetDisplay(degrees: 4.2)
+        XCTAssertEqual(message, "Offset 4,2°",
+                       "angka di layar harus memakai pemisah bahasa aktif")
+
+        NumberFormat.install(localeId: "en_US")
+        defer { NumberFormat.reset() }
+        XCTAssertEqual(CalibrationText.offsetDisplay(degrees: 4.2), "Offset 4.2°",
+                       "berganti bahasa harus mengganti pemisah desimal juga")
+    }
+
+    /// Jumlah bulat (`%lld`) tidak boleh ikut berubah pemisah — dan urutan
+    /// tipe specifier harus tetap sama seperti sebelumnya.
+    ///
+    /// Ini penjaga bahwa memperbaiki desimal tidak merusak yang lain: nilai
+    /// bulat, `%@`, dan `%` harfiah tetap utuh setelah `locale:` dipasang.
+    func testAddingLocaleKeepsNonDecimalConversionsIntact() {
+        TextLocalization.install { _ in nil }
+        XCTAssertEqual(CalibrationText.spreadDisplay(spreadDeg: 2.4, maxDeg: 3),
+                       "Sebaran 2,4° (maks 3,0°)")
+        XCTAssertEqual(CalibrationText.spokenSamplesRecorded(7),
+                       "7 acuan tercatat.")
+        XCTAssertEqual(CalibrationText.spreadTooWideMessage(spreadDeg: 5.4, maxDeg: 3),
+                       "Sebaran 5,4° masih terlalu lebar (maks 3,0°). Tambah acuan.")
     }
 
     /// Kunci baru harus punya bentuk yang **beda** dari bentuk yang sudah ada,

@@ -74,17 +74,17 @@ public enum SensorStatusText {
 
     /// Status akurasi lokasi yang diterima.
     public static func locationAccuracy(meters: Double) -> String {
-        String(format: TextLocalization.text(.sensorLocationAccuracy), meters)
+        TextLocalization.text(.sensorLocationAccuracy, meters)
     }
 
     /// Status saat lokasi gagal, dengan pesan sistem.
     public static func locationFailedStatus(_ message: String) -> String {
-        String(format: TextLocalization.text(.sensorLocationFailedStatus), message)
+        TextLocalization.text(.sensorLocationFailedStatus, message)
     }
 
     /// Penjelasan saat lokasi gagal, dengan pesan sistem.
     public static func locationFailedNote(_ message: String) -> String {
-        String(format: TextLocalization.text(.sensorLocationFailedNote), message)
+        TextLocalization.text(.sensorLocationFailedNote, message)
     }
 }
 

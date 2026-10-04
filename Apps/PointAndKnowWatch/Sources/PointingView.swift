@@ -252,7 +252,7 @@ struct PointingView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let rate = engine.snapshot.angularRateDegPerSec {
-                Text(String(format: "%.0f°/dtk", rate))
+                Text(NumberFormat.degreesPerSecond(rate, fractionDigits: 0))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(rate > 8 ? PointingTone.warning.color
                                                : SurfacePalette.active.textSecondaryColor)
@@ -597,12 +597,12 @@ struct SkyContextView: View {
         List {
             if let context = engine.skyContext {
                 row("Langit", context.isDark ? "Gelap" : "Terang")
-                row("Matahari", String(format: "%.0f°", context.sunAltitudeDeg))
+                row("Matahari", NumberFormat.degrees(context.sunAltitudeDeg, fractionDigits: 0))
                 if let moonAlt = context.moonAltitudeDeg {
-                    row("Bulan", String(format: "%.0f°", moonAlt))
+                    row("Bulan", NumberFormat.degrees(moonAlt, fractionDigits: 0))
                 }
                 if let fraction = context.moonIlluminationFraction {
-                    row("Fase Bulan", String(format: "%.0f%%", fraction * 100))
+                    row("Fase Bulan", NumberFormat.percent(fraction, fractionDigits: 0))
                 }
             } else {
                 Text("Konteks langit belum dihitung.")
@@ -610,8 +610,8 @@ struct SkyContextView: View {
             Section("Ketelitian") {
                 row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                 if let pointing = engine.pointing {
-                    row("Azimut", String(format: "%.1f°", pointing.azimuthDeg))
-                    row("Ketinggian", String(format: "%.1f°", pointing.altitudeDeg))
+                    row("Azimut", NumberFormat.degrees(pointing.azimuthDeg))
+                    row("Ketinggian", NumberFormat.degrees(pointing.altitudeDeg))
                 }
                 row("Lokasi", engine.location.label)
                 row("Asal lokasi", engine.location.source)

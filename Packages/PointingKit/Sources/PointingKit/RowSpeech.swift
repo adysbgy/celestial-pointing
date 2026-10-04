@@ -45,7 +45,7 @@ public enum RowSpeech {
     ///   `spokenRow` bila nilainya bertanda.
     public static func label(title: String, value: String) -> String {
         guard !title.isEmpty else { return value }
-        return String(format: TextLocalization.text(.rowSpeechLabel), title, value)
+        return TextLocalization.text(.rowSpeechLabel, title, value)
     }
 
     /// Baris yang nilainya **sudah dalam bentuk yang bisa diucapkan**.
@@ -69,7 +69,7 @@ public enum RowSpeech {
     /// diterjemahkan, dan menaruhnya di kode membuat pembaca layar berbahasa
     /// Inggris tetap membaca "Keadaan" sebelum membaca sisanya.
     public static func stateLine(_ state: PointingState) -> String {
-        String(format: TextLocalization.text(.rowSpeechStateLine),
+        TextLocalization.text(.rowSpeechStateLine,
                state.shortLabel)
     }
 
@@ -100,9 +100,19 @@ public enum RowSpeech {
     /// `"%.1f"`: `String(format:)` tidak bisa memakai specifier yang datang
     /// dari nilai runtime, dan menyerahkan penyusunannya ke pemanggil berarti
     /// setiap pemanggil harus tahu bentuk format yang benar.
+    ///
+    /// **Kenapa lewat `NumberFormat`, bukan `String(format:)` telanjang.**
+    /// Bentuk `"%.\(precision)f \(unit)"` dirakit di sini, jadi ia **tidak
+    /// pernah melewati katalog** — dan tanpa `locale:` pemisah desimalnya ikut
+    /// locale proses. Itu membuat angka berbicara bahasa lain dari katanya:
+    /// pendengar Bahasa Indonesia mendengar "0.4 derajat per detik", lalu
+    /// menganggap nilainya sepuluh kali lebih besar daripada yang tampil.
+    /// `NumberFormat` sudah memegang pemisah bahasa aktif, jadi di sini hanya
+    /// perlu `precision`-nya.
+    /// `precision`-nya.
     public static func spokenRate(_ degPerSec: Double, precision: Int) -> String {
         let unit = TextLocalization.text(.rowSpeechDegreesPerSecond)
-        return String(format: "%.\(precision)f \(unit)", degPerSec)
+        return NumberFormat.decimal(degPerSec, fractionDigits: precision) + " " + unit
     }
 
     /// Sudut dalam bentuk **kata**.
@@ -116,9 +126,12 @@ public enum RowSpeech {
     /// desimal (`%.4f°`). Mengucapkannya dengan satu desimal berarti suara
     /// dan layar menyebut angka yang berbeda untuk nilai yang sama — dan
     /// baris ini justru dipakai untuk **membandingkan** dua kolom angka.
+    ///
+    /// Lewat `NumberFormat` dengan alasan yang sama seperti `spokenRate`:
+    /// specifier-nya dirakit di sini, jadi tidak pernah melewati katalog.
     public static func spokenDegrees(_ deg: Double, precision: Int) -> String {
         let unit = TextLocalization.text(.rowSpeechDegrees)
-        return String(format: "%.\(precision)f \(unit)", deg)
+        return NumberFormat.decimal(deg, fractionDigits: precision) + " " + unit
     }
 
     /// Galat pointing dalam bentuk **kata**.
@@ -142,7 +155,7 @@ public enum RowSpeech {
     /// specifier bertipe berbeda butuh tahu tipe argumennya, jadi perubahan
     /// itu harus lewat kode, bukan lewat berkas terjemahan.
     public static func spokenError(_ deg: Double) -> String {
-        String(format: TextLocalization.text(.rowSpeechError),
+        TextLocalization.text(.rowSpeechError,
                TextLocalization.text(.rowSpeechErrorWord),
                deg,
                TextLocalization.text(.rowSpeechDegrees))
@@ -162,7 +175,7 @@ public enum RowSpeech {
     /// dengan alasan yang sama seperti `spokenRate`: suara dan layar tidak
     /// boleh menyebut angka berbeda untuk nilai yang sama.
     public static func spokenWristRate(_ degPerSec: Double) -> String {
-        String(format: TextLocalization.text(.rowSpeechWristRate),
+        TextLocalization.text(.rowSpeechWristRate,
                TextLocalization.text(.rowSpeechWristRateWord),
                degPerSec,
                TextLocalization.text(.rowSpeechDegrees))

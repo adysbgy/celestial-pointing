@@ -32,7 +32,10 @@ final class ObjectSpeechTests: XCTestCase {
     }
 
     override func tearDown() {
+        // Kedua bridge dilepas: melepas hanya katalog membocorkan bahasa
+        // angka milik uji ini ke berkas lain.
         TextLocalization.reset()
+        NumberFormat.reset()
         super.tearDown()
     }
 
@@ -41,7 +44,7 @@ final class ObjectSpeechTests: XCTestCase {
         let spoken = ObjectSpeech.magnitude(-1.46)
         XCTAssertTrue(spoken.contains("magnitudo"),
                       "angka tanpa kata tidak memberi tahu apa pun saat diucapkan")
-        XCTAssertTrue(spoken.contains("1.46") || spoken.contains("-1.46"),
+        XCTAssertTrue(spoken.contains("1,46") || spoken.contains("-1,46"),
                       "nilai magnitudonya harus ikut")
     }
 
@@ -76,7 +79,7 @@ final class ObjectSpeechTests: XCTestCase {
         let spoken = ObjectSpeech.coordinates(raDeg: 101.3, decDeg: -16.7)
         XCTAssertTrue(spoken.contains("RA"), "RA harus disebut lengkap")
         XCTAssertTrue(spoken.contains("deklinasi"), "deklinasi harus disebut lengkap")
-        XCTAssertTrue(spoken.contains("-16.7") || spoken.contains("−16.7"),
+        XCTAssertTrue(spoken.contains("-16,7") || spoken.contains("−16,7"),
                       "tanda deklinasi selatan tidak boleh hilang")
     }
 
@@ -109,7 +112,13 @@ final class ObjectSpeechTests: XCTestCase {
             default: return nil
             }
         }
-        defer { TextLocalization.reset() }
+        // Bahasa ikut kata: kalau hanya katalog yang dipasang, kalimatnya
+        // Inggris tapi pemisah desimalnya Indonesia — teks campur.
+        NumberFormat.install(localeId: "en_US")
+        defer {
+            TextLocalization.reset()
+            NumberFormat.reset()
+        }
 
         XCTAssertEqual(ObjectSpeech.magnitude(1.46), "magnitude 1.46")
         XCTAssertEqual(ObjectSpeech.confidence(.high), "confidence Certain")
@@ -122,7 +131,7 @@ final class ObjectSpeechTests: XCTestCase {
     /// Tanpa katalog terpasang (Linux), frasanya tetap Bahasa Indonesia dan
     /// tidak pernah kosong.
     func testDefaultsRemainIndonesianWithoutACatalog() {
-        XCTAssertEqual(ObjectSpeech.magnitude(1.46), "magnitudo 1.46")
+        XCTAssertEqual(ObjectSpeech.magnitude(1.46), "magnitudo 1,46")
         XCTAssertEqual(ObjectSpeech.confidence(.high), "tingkat keyakinan Yakin")
         XCTAssertEqual(ObjectSpeech.staleNote,
                        "Sisa pandangan sebelumnya, bukan hasil sekarang.")

@@ -48,19 +48,19 @@ public enum LinkStatusText {
     /// `reason` **tidak** diterjemahkan di sini — `localizedDescription` sudah
     /// datang dalam bahasa perangkat.
     public static func sendFailed(_ reason: String) -> String {
-        String(format: TextLocalization.text(.linkStatusSendFailed), reason)
+        TextLocalization.text(.linkStatusSendFailed, reason)
     }
 
     /// Pengiriman berhasil; `kindName` adalah nama jenis pesan untuk manusia.
     public static func sent(_ kindName: String) -> String {
-        String(format: TextLocalization.text(.linkStatusSent), kindName)
+        TextLocalization.text(.linkStatusSent, kindName)
     }
 
     // MARK: - Penerimaan di iPhone
 
     /// Jam melihat sebuah objek bernama `name`.
     public static func watchSaw(_ name: String) -> String {
-        String(format: TextLocalization.text(.linkStatusWatchSaw), name)
+        TextLocalization.text(.linkStatusWatchSaw, name)
     }
 
     /// Keadaan diterima dari jam, tanpa nama objek.
@@ -123,7 +123,7 @@ public enum LinkStatusText {
     /// keterangan jumlah sebelum kata "gagal" tidak bisa mengatakannya, karena
     /// posisinya dipaku di kode. Bentuk `%@ %lld %@` membebaskan itu.
     public static func sendFailures(_ count: Int) -> String {
-        String(format: TextLocalization.text(.linkStatusSendFailures),
+        TextLocalization.text(.linkStatusSendFailures,
                TextLocalization.text(.linkStatusSendFailuresWord),
                Int64(count))
     }
