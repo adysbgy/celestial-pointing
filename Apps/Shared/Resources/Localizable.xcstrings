@@ -1035,6 +1035,369 @@
           }
         }
       }
+    },
+    "Langit": {
+      "comment": "Pengarahan langit pada sudut sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
+    },
+    "Matahari": {
+      "comment": "Posisi Matahari untuk membandingkan DATE dengan pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        }
+      }
+    },
+    "Bulan": {
+      "comment": "Posisi Bulan pada sudut sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        }
+      }
+    },
+    "Fase Bulan": {
+      "comment": "Frasi piringan Bulan yang menyala dan arah sabit.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon phase"
+          }
+        }
+      }
+    },
+    "Azimut": {
+      "comment": "Arah mendatar, 0-360 derajat dari utara.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azimuth"
+          }
+        }
+      }
+    },
+    "Ketinggian": {
+      "comment": "Ketinggian di atas cakrawala, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altitude"
+          }
+        }
+      }
+    },
+    "Lokasi": {
+      "comment": "Lokasi pengamat yang dipakai resolver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        }
+      }
+    },
+    "Asal lokasi": {
+      "comment": "Dari mana koordinat datang, dan apakah itu sungguhan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
+          }
+        }
+      }
+    },
+    "Keadaan": {
+      "comment": "Keadaan alur pointing sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        }
+      }
+    },
+    "Panduan": {
+      "comment": "Apa yang harus dilakukan pengguna pada keadaan ini.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guidance"
+          }
+        }
+      }
+    },
+    "Laju pergelangan": {
+      "comment": "Laju sudut pergelangan, derajat per detik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrist rate"
+          }
+        }
+      }
+    },
+    "Arah": {
+      "comment": "Sudut tunjuk yang diukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction"
+          }
+        }
+      }
+    },
+    "Sigma dipakai": {
+      "comment": "Lebar sigma yang dipakai resolver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigma used"
+          }
+        }
+      }
+    },
+    "Device motion": {
+      "comment": "Laju gerak mentah dari sensor, tanpa kalibrasi apa pun.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device motion"
+          }
+        }
+      }
+    },
+    "Sampel": {
+      "comment": "Jumlah sampel yang sudah terkumpul.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples"
+          }
+        }
+      }
+    },
+    "Magnitudo": {
+      "comment": "Magnitudo tampak objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnitude"
+          }
+        }
+      }
+    },
+    "RA": {
+      "comment": "Asensio recta, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA"
+          }
+        }
+      }
+    },
+    "Dec": {
+      "comment": "Deklinasi, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        }
+      }
+    },
+    "Id katalog": {
+      "comment": "Id mentah dari katalog, untuk pemeriksaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catalogue ID"
+          }
+        }
+      }
+    },
+    "Benar": {
+      "comment": "Jumlah cuplikan yang benar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct"
+          }
+        }
+      }
+    },
+    "False lock": {
+      "comment": "Cuplikan yang terkunci pada objek yang salah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "False lock"
+          }
+        }
+      }
+    },
+    "Galat median": {
+      "comment": "Galat sudut median antar cuplikan yang berpasangan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error"
+          }
+        }
+      }
+    },
+    "Galat P90": {
+      "comment": "Galat sudut pada persentil ke-90, yaitu batas atas yang biasanya dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "P90 error"
+          }
+        }
+      }
+    },
+    "Status": {
+      "comment": "Status terakhir dari tautan jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Terjangkau": {
+      "comment": "Apakah jam sedang terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reachable"
+          }
+        }
+      }
+    },
+    "Pesan diterima": {
+      "comment": "Pesan terakhir yang diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message received"
+          }
+        }
+      }
+    },
+    "Objek": {
+      "comment": "Objek yang sedang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object"
+          }
+        }
+      }
+    },
+    "Laju": {
+      "comment": "Laju sudut saat ini.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rate"
+          }
+        }
+      }
+    },
+    "Waktu": {
+      "comment": "Waktu pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        }
+      }
+    },
+    "Offset yaw": {
+      "comment": "Koreksi arah yang dipakai untuk kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yaw offset"
+          }
+        }
+      }
+    },
+    "Sebaran": {
+      "comment": "Sebaran antar cuplikan yang berpasangan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread"
+          }
+        }
+      }
+    },
+    "Jumlah acuan": {
+      "comment": "Jumlah acuan kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference count"
+          }
+        }
+      }
+    },
+    "Terekam": {
+      "comment": "Status perekaman Experiment 1.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded"
+          }
+        }
+      }
     }
   }
 }

@@ -243,6 +243,20 @@ struct DiagnosticsView: View {
             List {
                 Section("Sekarang") {
                     row("Keadaan", engine.snapshot.state.shortLabel)
+                    // Panduan berikutnya. `shortLabel` menjawab **apa**
+                    // keadaan itu ("Mencari"), yang tidak pernah memberi tahu
+                    // pengguna harus melakukan apa — dan di iPhone tidak ada
+                    // tempat lain yang mengatakannya: app jam menampilkannya
+                    // di bawah keadaan (`PointingView`), sedangkan di sini
+                    // tidak ada sekilas pun, jadi layar utama iPhone
+                    // menampilkan "Mencari" dan lalu diam.
+                    //
+                    // Barisnya sengaja memakai `stateGuidanceText` yang sama
+                    // dan kunci katalog yang sama, bukan kalimat baru: kalau
+                    // kalimatnya ditulis terpisah di view, ia bisa menyimpang
+                    // dari yang diucapkan jam — dan dua app yang memberi
+                    // petunjuk berbeda adalah cacat yang paling buruk.
+                    row("Panduan", engine.snapshot.state.guidance)
                     row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
                     if let rate = engine.snapshot.angularRateDegPerSec {
                         row("Laju pergelangan", String(format: "%.1f°/dtk", rate))

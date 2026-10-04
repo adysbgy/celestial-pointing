@@ -117,8 +117,9 @@ Selama siklus ini, alat `write_file` menyisipkan karakter asing ke dalam
 komentar **beberapa kali** — termasuk `希望`, `仓库` (aksara CJK), `RALAT`,
 serta potongan Latin yang tidak masuk akal seperti `Swiftly`/`iList`. Semuanya
 ketahuan karena ada penyapu, dan semuanya dibuang sebelum commit — satu
-potongan sempat bocor ke pesan commit pertama sebelum ikut dibersihkan. Ini bukan novelty: kelas cacat yang sama sudah
-menimpa repo ini berulang kali, dan sekarang ada aturan yang menangkapnya
+potongan sempat bocor ke pesan commit pertama sebelum ikut dibersihkan.
+Ini bukan kebaru: kelas cacat yang sama sudah menimpa repo ini berulang
+kali, dan sekarang ada aturan yang menangkapnya
 untuk kode aplikasi (aturan 3). Yang **belum** ada adalah penjaga yang
 sama untuk `*.sh` dan `STATUS.md` — dan itu tercatat di entri aturan 7
 sebagai batas yang diketahui, bukan disembunyikan.
@@ -242,7 +243,7 @@ sebelumnya, belum ditutup), dan sekarang terbukti butanya **lebih
   Kandidat: `MotionPolicy` exposing/hanya dibaca di view yang memanggil
   `withAnimation`/`TimelineView`/`repeatForever` — sapuan statis baru.
 - **Aturan 3 masih buta di `*.sh` dan `project.yml`** (dicatat di siklus
-  sebelumnya, belum ditutup), dan sekarang terbuktijugak Butanya **lebih
+  sebelumnya, belum ditutup), dan sekarang terbukti butanya **lebih
   dalam**: ia menangkap aksara non-Latin tapi tidak menangkap Latin yang
   rusak. Dua kelas cacat berbeda dengan satu sapuan.
 - **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — tidak berubah,
@@ -253,7 +254,7 @@ sebelumnya, belum ditutup), dan sekarang terbukti butanya **lebih
 ### Premis siklus ini: memasang aturan tanpa penjaga hanya memindahkan cacat
 
 Unit sebelumnya memasang `MotionPolicy` dan `accessibilityReduceMotion`. Tapi
-menghanyaikan aturan yang tidak punya gerbang adalah pola yang **baru saja**
+mengabaikan aturan yang tidak punya gerbang adalah pola yang **baru saja**
 dibayar mahal di repo ini: Dynamic Type selesai, lalu `.system(size:)` muncul
 lagi di berkas complication yang ditambahkan belakangan; aturan penyapu UI
 hijau, lalu terbukti buta terhadap metadata WidgetKit. Keduanya hijau sepanjang

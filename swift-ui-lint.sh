@@ -158,6 +158,16 @@ POS = re.compile(
     r'accessibilityValue|accessibilityActionName|confirmationDialog|alert|'
     r'confirmationTitle|cancelTitle|primaryActionTitle|destructiveTitle|'
     r'configurationDisplayName|description|help|footer|header|prompt|message'
+    # `row`/`detailRow` adalah helper label-lebar di repo ini: keduanya
+    # **menampilkan teksnya ke layar**, jadi keduanya wajib berpadanan.
+    #
+    # Inklusi ini bukan hasil menebak. Uji injeksi pada aturan ini
+    # membuktikan bentuk sebelumnya buta di sini: `Text("TeksUIYangBaru")`
+    # dilaporkan, `row("LabelUIYangBaru")` lolos tanpa laporan. Jadi
+    # label tabel adalah jalur paling umum dari teks tak terlokalisasi
+    # yang masih tampil di layar — persis bentuk "hijau yang tidak hijau" yang
+    # aturan ini ada untuk menutupnya.
+    r'|row|detailRow'
     r')\(\s*"((?:[^"\\]|\\.)*)"'
 )
 
