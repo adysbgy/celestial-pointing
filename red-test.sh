@@ -54,9 +54,27 @@ PY
 [ $? -ne 0 ] && { restore; trap - EXIT; exit 2; }
 
 echo "== Mutasi diterapkan =="
-sudo -n docker run --rm -v "$PWD":/src -w /src/Packages/PointingKit \
+# Paket uji diturunkan dari letak berkas uji, bukan ditulis mati di sini.
+# Kalau dipatok ke PointingKit, filter untuk uji engine akan berjalan di paket
+# yang tidak punya uji itu: swift test keluar 0 dengan "0 tests passed", dan
+# Mutasi GAGAL akan dilaporkan sebagai "uji ini tidak menangkap mutasi" —
+# hijau palsuk yang persis yang harusnya dicegah oleh skrip ini.
+PKG_DIR=$(cd "$(dirname "$TEST_FILE")/../.." && pwd)
+REL_PKG=${PKG_DIR#"$PWD"/}
+sudo -n docker run --rm -v "$PWD":/src -w "/src/$REL_PKG" \
   swift:6.0 swift test --filter "$TEST_NAME" > /tmp/red-test.log 2>&1
 status=$?
+
+# "0 tests" adalah hijau yang menipu: filter tidak cocok dengan nama uji
+# mana pun, jadi tidak ada yang diuji dan tidak ada yang gagal.
+if ! grep -qE "Executed [1-9][0-9]* tests?" /tmp/red-test.log; then
+  echo "== UJI TIDAK BERJALAN — hasil hijau diabaikan =="
+  echo "   paket: $REL_PKG, filter: $TEST_NAME"
+  grep -E "error:|warning:" /tmp/red-test.log | head -5
+  restore
+  trap - EXIT
+  exit 3
+fi
 
 if [ "$status" -ne 0 ]; then
   echo "== UJI MERAH pada kode yang rusak (diharapkan) =="

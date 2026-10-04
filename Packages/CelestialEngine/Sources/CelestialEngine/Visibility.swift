@@ -35,28 +35,47 @@ public struct VisibilityPolicy: Equatable {
     /// Sudut minimum dari Matahari (derajat) agar aman ditunjuk. Ini pengaman
     /// teleskop: membarui GoTo ke arah Matahari bisa merusak alat dan mata.
     public var minSunSeparationDeg: Double
+    /// Seberapa jauh ambang magnitudo boleh mengetat karena cahaya Bulan,
+    /// dalam satuan magnitudo, pada fraksi iluminasi penuh.
+    ///
+    /// Default 1.6: purnama menurunkan batas penglihatan mata telanjang dari
+    /// sekitar 6.5 ke sekitar 4.9 — angka kasar yang lazim dipakai peminat
+    /// pengamatan, bukan hasil pengukuran di instrument. Yang dijaga uji adalah
+    /// **arahnya** (lihat `testMoonlightTightensTheLimitingMagnitude`), karena
+    /// angka yang tepat bergantung pada pengamat, latitude, dan kebersihan
+    /// langit.
+    ///
+    /// `0` untuk policy permisif: policy pengujian harus tetap tidak membuang
+    /// apa pun.
+    public var moonBrighteningMagnitudes: Double
 
     public init(minAltitudeDeg: Double = 5.0,
                 limitingMagnitude: Double = 6.0,
                 sunAltitudeForDarknessDeg: Double = -6.0,
-                minSunSeparationDeg: Double = 30.0) {
+                minSunSeparationDeg: Double = 30.0,
+                moonBrighteningMagnitudes: Double = 1.6) {
         self.minAltitudeDeg = minAltitudeDeg
         self.limitingMagnitude = limitingMagnitude
         self.sunAltitudeForDarknessDeg = sunAltitudeForDarknessDeg
         self.minSunSeparationDeg = minSunSeparationDeg
+        self.moonBrighteningMagnitudes = moonBrighteningMagnitudes
     }
 
     /// Kebijakan santai untuk pengujian: tidak membuang apa pun.
     ///
     /// `sunAltitudeForDarknessDeg: 91` membuat langit selalu dianggap gelap
     /// (Matahari tidak pernah setinggi itu), `minAltitudeDeg: -90` meloloskan
-    /// benda di bawah horizon, dan `minSunSeparationDeg: 0` mematikan
-    /// penyaring Matahari.
+    /// benda di bawah horizon, `minSunSeparationDeg: 0` mematikan
+    /// penyaring Matahari, dan `moonBrighteningMagnitudes: 0` mematikan
+    /// penyaringan cahaya Bulan — tanpa itu policy permisif akan tetap membuang
+    /// bintang redup saat ada purnama, dan "tidak membuang apa pun" jadi
+    /// setengah benar.
     public static let permissive = VisibilityPolicy(
         minAltitudeDeg: -90,
         limitingMagnitude: 30,
         sunAltitudeForDarknessDeg: 91,
-        minSunSeparationDeg: 0
+        minSunSeparationDeg: 0,
+        moonBrighteningMagnitudes: 0
     )
 }
 
@@ -108,12 +127,36 @@ public enum VisibilityFilter {
                                 context: SkyContext,
                                 policy: VisibilityPolicy) -> Visibility {
         if altitudeDeg < policy.minAltitudeDeg { return .belowHorizon }
-        if magnitude > policy.limitingMagnitude { return .tooFaint }
+        if magnitude > effectiveLimitingMagnitude(context: context, policy: policy) {
+            return .tooFaint
+        }
         if let separation = separationFromSunDeg, separation < policy.minSunSeparationDeg {
             return .tooCloseToSun
         }
         if !isDark(sunAltitudeDeg: context.sunAltitudeDeg, policy: policy) { return .daylight }
         return .visible
+    }
+
+    /// Batas magnitudo **efektif** untuk konteks langit ini.
+    ///
+    /// Cahaya Bulan menutupi bintang redup, jadi ambang magnitudo ikut
+    /// bergerak: makin terang langit, makin ketat ambangnya.
+    ///
+    /// **Kenapa hanya fraksi, bukan juga ketinggian dan sudut.** Karena fraksi
+    /// saja yang punya sumber sudah teruji di engine
+    /// (`EphemerisBody.illuminationFraction`); menambahkan dua faktor lain
+    /// butuh plumbing efemeris baru untuk pengaruh orde dua. Aturan repo:
+    /// jangan menambah presisi yang belum ada sumbernya.
+    ///
+    /// Mengembalikan batas dasar saat fraksi `nil` (Bulan tidak diketahui):
+    /// "tidak tahu" berarti **jangan menebak lebih buruk**, bukan "asumsikan
+    /// paling gelap". Asumsi terbaik tanpa bukti adalah batas paling longgar,
+    /// dan itu juga yang paling tidak berbohong tentang apa yang bisa dilihat.
+    public static func effectiveLimitingMagnitude(context: SkyContext,
+                                                  policy: VisibilityPolicy) -> Double {
+        let fraction = context.moonIlluminationFraction ?? 0
+        guard fraction > 0 else { return policy.limitingMagnitude }
+        return policy.limitingMagnitude - policy.moonBrighteningMagnitudes * fraction
     }
 
     /// Apakah langit dianggap gelap untuk konteks ini.

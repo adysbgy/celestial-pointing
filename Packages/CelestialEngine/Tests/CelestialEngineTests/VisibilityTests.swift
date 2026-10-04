@@ -97,6 +97,43 @@ final class VisibilityTests: XCTestCase {
         XCTAssertEqual(result, .belowHorizon)
     }
 
+    // MARK: - Cahaya Bulan
+
+    /// **Bulan menerangi langit, jadi ia harus menggeser batas magnitudo.**
+    ///
+    /// Fraksi iluminasi sudah dihitung (`SkyContext.moonIlluminationFraction`)
+    /// dan sudah ditampilkan sebagai "Fase Bulan", tapi tidak pernah ikut
+    /// memengaruhi penyaringan. Akibatnya ambang magnitudo tidak bergerak sama
+    /// sekali antara langit tanpa Bulan dan langit purnama — padahal dua
+    /// langit itu jelas tidak sama, dan pengamat yang sedang mengejar bintang
+    /// redup akan dikecewakan.
+    ///
+    /// Yang diuji adalah **arah** pengaruh, bukan angkanya: fraksi besar harus
+    /// membuat ambang **lebih ketat** — benda yang lolos tanpa Bulan menjadi
+    /// terlalu redup bersamanya. Angka pastinya soal fisika; yang tidak bisa
+    /// dibantah adalah arahnya, jadi itu yang dijaga di sini.
+    func testMoonlightTightensTheLimitingMagnitude() {
+        let withoutMoon = SkyContext(sunAltitudeDeg: -40, isDark: true)
+        let withFullMoon = SkyContext(sunAltitudeDeg: -40,
+                                      moonAltitudeDeg: 30,
+                                      moonIlluminationFraction: 1.0,
+                                      isDark: true)
+
+        // Magnitudo 4.5: lolos di langit gelap, tidak lolos di bawah purnama.
+        let dark = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 4.5, separationFromSunDeg: 120,
+            context: withoutMoon, policy: policy
+        )
+        let moonlit = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 4.5, separationFromSunDeg: 120,
+            context: withFullMoon, policy: policy
+        )
+
+        XCTAssertEqual(dark, .visible, "benda ini harus terlihat tanpa Bulan")
+        XCTAssertEqual(moonlit, .tooFaint,
+                       "purnama menerangi langit, jadi ambang magnitudo harus mengetat")
+    }
+
     // MARK: - Batas senja
 
     func testDarknessBoundary() {
@@ -119,6 +156,70 @@ final class VisibilityTests: XCTestCase {
                                "kebijakan permissive tidak boleh menolak apa pun")
             }
         }
+    }
+
+    /// **Permisif berarti permisif, termasuk di bawah purnama.**
+    ///
+    /// Policy pengujian dipakai untuk menyaring kode yang tidak boleh menyentuh
+    /// visibilitas. Kalau `permissive` masih membawa penyaringan cahaya Bulan,
+    /// ia bukan permisif — dan uji "permissive membuang apa pun" tetap hijau,
+    /// karena uji lamanya hanya memeriksa konteks tanpa Bulan.
+    ///
+    /// Benda yang dipakai di sini sengaja **redup**: magnitudo 20 lolos begitu
+    /// saja kalau tidak ada penyaringan bulan, jadi uji ini hanya bisa hijau
+    /// kalau `moonBrighteningMagnitudes` benar-benar nol.
+    func testPermissivePolicyIgnoresMoonlight() {
+        let moonlit = SkyContext(sunAltitudeDeg: -40,
+                                moonAltitudeDeg: 30,
+                                moonIlluminationFraction: 1.0,
+                                isDark: true)
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 20, separationFromSunDeg: 0,
+            context: moonlit, policy: .permissive
+        )
+        XCTAssertEqual(result, .visible,
+                       "policy permisif harus tetap meloloskan apa pun meski purnama")
+        XCTAssertEqual(VisibilityPolicy.permissive.moonBrighteningMagnitudes, 0)
+    }
+
+    /// **Bulan yang tidak diketahui tidak boleh membuat langit lebih buruk dari
+    /// asumsi terbaik.**
+    ///
+    /// Fraksi `nil` berarti "tidak diketahui", bukan "tidak ada". Kalau `nil`
+    /// diperlakukan sebagai langit paling terang, engine akan membuang bintang
+    /// dengan alasan yang tidak pernah terjadi — dan penolakan palsu itu tidak
+    /// bisa dibedakan dari penolakan yang benar oleh pengguna.
+    func testUnknownMoonKeepsTheBaseMagnitudeLimit() {
+        let unknown = SkyContext(sunAltitudeDeg: -40, isDark: true)
+        XCTAssertNil(unknown.moonIlluminationFraction)
+        XCTAssertEqual(VisibilityFilter.effectiveLimitingMagnitude(context: unknown,
+                                                                    policy: policy),
+                       policy.limitingMagnitude,
+                       "tidak diketahui berarti batas dasar, bukan batas yang lebih ketat")
+    }
+
+    /// Cahaya Bulan mengetat secara **monoton**, bukan melompat-lompat.
+    ///
+    /// Fraksi yang lebih besar tidak boleh pernah memberi batas magnitudo yang
+    /// lebih longgar. Ini yang menjaga bentuk koreksinya: kelonggaran adalah
+    /// bentuk kesalahan yang paling halus, karena arahnya tetap "mengetat" dan
+    /// masih terlihat masuk akal.
+    func testBrighterMoonNeverLoosensTheLimit() {
+        var previous = Double.infinity
+        for step in 0...10 {
+            let fraction = Double(step) / 10
+            let context = SkyContext(sunAltitudeDeg: -40,
+                                    moonAltitudeDeg: 30,
+                                    moonIlluminationFraction: fraction,
+                                    isDark: true)
+            let limit = VisibilityFilter.effectiveLimitingMagnitude(context: context,
+                                                                     policy: policy)
+            XCTAssertLessThanOrEqual(limit, previous,
+                                     "fraksi \(fraction) memberi batas lebih longgar dari sebelumnya")
+            previous = limit
+        }
+        XCTAssertLessThan(previous, policy.limitingMagnitude,
+                          "purnama harus mengetat dari batas dasar")
     }
 }
 
