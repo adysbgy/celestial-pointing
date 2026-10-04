@@ -501,4 +501,114 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertGreaterThan(offsets.max() ?? 0, 0.1,
                              "blob harus digeser dari pusat supaya tidak tampak digambar")
     }
+
+    // MARK: - Geometri bintang: glow & spike tidak boleh terpotong tegak
+
+    /// Ujung terluar bintang pada geometri **lama** (inti dihitung maju dari
+    /// ukuran yang diinginkan: `0.22 + 0.30 · relativeSize`).
+    ///
+    /// Angka ini persis yang dipakai view sebelum siklus ini, jadi uji
+    /// `testLegacyStarOverflowedTheFrame` bisa membuktikan cacatnya nyata —
+    /// bukan perbedaan rasa tentang seberapa besar glow yang pantas.
+    private func legacyStarOuterRadius(relativeSize: Double) -> (glow: Double, spike: Double) {
+        let core = 0.22 + 0.30 * relativeSize
+        return (core * 3.0, core * 3.2 * 1.10)
+    }
+
+    func testLegacyStarOverflowedTheFrame() {
+        // **Pengunci cacat lama.** Inti dihitung maju dari `relativeSize`,
+        // lalu glow dikalikan 3× dan spike 3.2× — tanpa pernah memeriksa
+        // apakah hasilnya masih di dalam frame. Di seluruh katalog bintang
+        // terang, hampir semuanya keluar.
+        var overflowing = 0
+        for star in Catalogue.brightStars {
+            let legacy = legacyStarOuterRadius(
+                relativeSize: CelestialVisual.sizeFromMagnitude(star.magnitude))
+            if max(legacy.glow, legacy.spike) > VisualFrame.halfExtent {
+                overflowing += 1
+            }
+        }
+        XCTAssertGreaterThan(overflowing, 20,
+                             "geometri lama harus terbukti memotong hampir seluruh katalog")
+        // Sirius (bintang paling terang) adalah yang paling parah: ujungnya
+        // 0.81R di luar frame, jadi lebih dari separuh lebarnya hilang.
+        let siriusLegacy = legacyStarOuterRadius(
+            relativeSize: CelestialVisual.sizeFromMagnitude(-1.46))
+        XCTAssertGreaterThan(siriusLegacy.spike - VisualFrame.halfExtent, 0.5,
+                             "Sirius harus terbukti keluar >0.5 R pada geometri lama")
+    }
+
+    func testEveryCatalogueStarStaysInsideTheFrame() {
+        // Inti bintang kecil, tapi glow dan spike-nya dikalikan beberapa
+        // kali dari inti itu — jadi batasnya harus dihitung dari **ujung
+        // terluar**, bukan dari inti. `Canvas` memotong dengan tepi lurus,
+        // jadi yang kelewat besar tidak tampak "agak kepotong": ia tampak
+        // sebagai bola cahaya yang berhenti mendadak di keempat tepi kartu.
+        for star in Catalogue.brightStars {
+            let geometry = VisualFrame.star(
+                relativeSize: CelestialVisual.sizeFromMagnitude(star.magnitude))
+            let spill = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                             halfWidth: geometry.outerRadius,
+                                             halfHeight: geometry.outerRadius)
+            XCTAssertLessThanOrEqual(spill, 1e-12,
+                                     "\(star.id) keluar \(spill) R di luar frame dan akan terpotong tegak")
+        }
+    }
+
+    func testStarPulsePeakStaysInsideTheFrame() {
+        // **Denyut harus ikut dihitung.** Ukurannya dipilih saat diam,
+        // sedangkan denyut mengembangkannya **setelahnya** — jadi bintang
+        // yang muat saat diam bisa terpotong setiap kali denyut memuncak.
+        // Cacat yang muncul dan hilang seperti ini yang paling mudah lolos.
+        let geometry = VisualFrame.star(relativeSize: 1.0)
+        let peak = geometry.coreRadius * geometry.outermostScale * (1 + geometry.pulseAmplitude)
+        XCTAssertEqual(geometry.outerRadius, peak, accuracy: 1e-12,
+                       "outerRadius harus sudah termasuk denyut puncak")
+        let spill = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                         halfWidth: peak, halfHeight: peak)
+        XCTAssertLessThanOrEqual(spill, 1e-12,
+                                 "denyut puncak mengeluarkan bintang \(spill) R dari frame")
+    }
+
+    func testBrighterStarIsStillDrawnLarger() {
+        // Memperkecil inti demi muat tidak boleh meratakan seluruh bintang
+        // menjadi satu ukuran: "ukuran mengikuti magnitudo" adalah informasi
+        // yang masih terbaca di layar, dan memotongnya dengan plafon tetap
+        // akan membuat Sirius dan Polaris tampak sama.
+        let sirius = VisualFrame.star(
+            relativeSize: CelestialVisual.sizeFromMagnitude(-1.46))
+        let polaris = VisualFrame.star(
+            relativeSize: CelestialVisual.sizeFromMagnitude(1.98))
+        XCTAssertGreaterThan(sirius.coreRadius, polaris.coreRadius,
+                             "bintang terang harus tetap lebih besar")
+        XCTAssertGreaterThan(sirius.outerRadius, polaris.outerRadius,
+                             "ujung terluar bintang terang harus tetap lebih jauh")
+    }
+
+    func testEnlargingTheGlowCannotPushTheStarOutOfFrame() {
+        // Yang membuat batas ini konstruktif: inti dihitung **mundur** dari
+        // ruang yang tersedia. Jadi memperbesar glow/spike tidak bisa
+        // mendorong ujungnya keluar — inti menyusut sendiri mengikutinya.
+        for spikeScale in [3.2, 5.0, 12.0] {
+            for glowScales in [[3.0, 1.9, 1.0], [6.0, 4.0, 2.0], [20.0]] {
+                let geometry = VisualFrame.star(relativeSize: 1.0,
+                                                glowScales: glowScales,
+                                                spikeScale: spikeScale)
+                let spill = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                                 halfWidth: geometry.outerRadius,
+                                                 halfHeight: geometry.outerRadius)
+                XCTAssertLessThanOrEqual(spill, 1e-12,
+                                         "glow \(glowScales)/spike \(spikeScale) mengeluarkan bintang \(spill) R")
+            }
+        }
+    }
+
+    func testStarCoreStaysVisible() {
+        // Batasnya tidak boleh bekerja dengan mengecilkan inti sampai nol:
+        // bintang paling redup pun harus tetap punya inti yang terlihat,
+        // bukan hanya glow kosong.
+        let faint = VisualFrame.star(relativeSize: 0.0)
+        XCTAssertGreaterThan(faint.coreRadius, 0.05,
+                             "inti bintang paling redup tidak boleh menghilang")
+    }
 }

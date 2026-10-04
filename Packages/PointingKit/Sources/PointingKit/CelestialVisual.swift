@@ -488,6 +488,99 @@ public enum VisualFrame {
         public init(blobs: [Blob]) { self.blobs = blobs }
     }
 
+    // MARK: - Bintang: glow + diffraction spike
+
+    /// Geometri bintang: inti, glow berlapis, dan empat diffraction spike.
+    ///
+    /// **Kenapa ini ikut dihitung di model, padahal bintang "cuma titik".**
+    /// Bintang justru bentuk yang paling mudah keluar frame tanpa terasa:
+    /// intinya kecil, tapi glow dan spike-nya dikalikan **3×** dari inti itu.
+    /// Jadi inti yang nyaman di 0.5R menghasilkan ujung terluar di 1.8R —
+    /// hampir dua kali frame — dan `Canvas` memotongnya **tegak**, karena ia
+    /// memotong dengan tepi lurus, bukan dengan memudar. Yang tampil lalu
+    /// bukan bintang bercahaya, melainkan bola cahaya yang berhenti
+    /// mendadak di keempat tepi kartu.
+    ///
+    /// Ini cacat yang sama dengan cincin Saturnus (0.9R keluar) dan blob
+    /// nebula (0.28R keluar) — dan untuk **24 dari 25 bintang di katalog**,
+    /// dihitung bukan ditebak.
+    public struct StarGeometry: Equatable, Sendable {
+        /// Radius inti bintang, satuan radius frame.
+        public var coreRadius: Double
+        /// Pengali radius untuk tiap lapis glow (dari terluar ke terdalam).
+        public var glowScales: [Double]
+        /// Pengali panjang diffraction spike, dari radius inti.
+        public var spikeScale: Double
+        /// Amplitudo denyut: ujung terluar mengembang `1 + amplitude` kali.
+        public var pulseAmplitude: Double
+
+        public init(coreRadius: Double,
+                    glowScales: [Double],
+                    spikeScale: Double,
+                    pulseAmplitude: Double) {
+            self.coreRadius = coreRadius
+            self.glowScales = glowScales
+            self.spikeScale = spikeScale
+            self.pulseAmplitude = pulseAmplitude
+        }
+
+        /// Pengali terbesar dari inti ke ujung terluar yang digambar.
+        public var outermostScale: Double {
+            max(glowScales.max() ?? 0, spikeScale)
+        }
+
+        /// Ujung terluar yang benar-benar tampil, **sudah termasuk denyut
+        /// puncak**, dalam satuan radius frame.
+        ///
+        /// Denyut harus ikut dihitung di sini, bukan di view: frame-nya
+        /// berukuran tetap, sedangkan denyut mengembangkan gambar **setelah**
+        /// ukuran inti dipilih. Menghitung batas dari keadaan diam berarti
+        /// gambar muat saat diam dan terpotong setiap kali denyut memuncak —
+        /// cacat yang muncul dan hilang, jadi paling mudah tidak disadari.
+        public var outerRadius: Double {
+            coreRadius * outermostScale * (1 + pulseAmplitude)
+        }
+    }
+
+    /// Bintang yang **pas di frame**, untuk ukuran relatif tertentu.
+    ///
+    /// Inti dihitung **mundur dari ruang yang tersedia**, bukan maju dari
+    /// ukuran yang diinginkan. Itu yang membuat batas ini konstruktif:
+    /// memperbesar glow atau spike tanpa sengaja tidak bisa lagi mendorong
+    /// ujungnya keluar frame, karena inti menyusut sendiri mengikutinya.
+    ///
+    /// Urutan terang tetap terjaga — bintang yang lebih terang mendapat
+    /// ujung terluar **dan** inti yang lebih besar (`outerFraction` naik
+    /// bersama `relativeSize`). Itu penting: memotong inti dengan plafon
+    /// tetap justru akan meratakan Sirius dan Polaris menjadi dua titik
+    /// yang sama, dan "ukuran mengikuti magnitudo" hilang.
+    ///
+    /// - Parameters:
+    ///   - relativeSize: 0 = bintang paling redup, 1 = paling terang.
+    ///   - pulseAmplitude: amplitudo denyut (0.10 = ±10%).
+    ///   - glowScales: pengali tiap lapis glow.
+    ///   - spikeScale: panjang spike dari radius inti.
+    ///   - frameHalfExtent: setengah lebar frame.
+    ///   - outerFraction: ujung terluar sebagai pecahan frame, pada
+    ///     `relativeSize` 0 → 1.
+    public static func star(relativeSize: Double,
+                            pulseAmplitude: Double = 0.10,
+                            glowScales: [Double] = [3.0, 1.9, 1.0],
+                            spikeScale: Double = 3.2,
+                            frameHalfExtent: Double = halfExtent,
+                            outerFraction: (faint: Double, bright: Double) = (0.62, 0.92)) -> StarGeometry {
+        let clamped = min(1, max(0, relativeSize))
+        let outer = frameHalfExtent * (outerFraction.faint
+                                       + (outerFraction.bright - outerFraction.faint) * clamped)
+        // Ruang yang tersedia sudah termasuk denyut puncak, jadi inti
+        // dibagi lagi dengan `(1 + pulseAmplitude)`.
+        let growth = max(glowScales.max() ?? 1, spikeScale) * (1 + pulseAmplitude)
+        return StarGeometry(coreRadius: outer / growth,
+                            glowScales: glowScales,
+                            spikeScale: spikeScale,
+                            pulseAmplitude: pulseAmplitude)
+    }
+
     /// Kabut nebula yang **pas di frame**.
     ///
     /// Jari-jari tiap blob dipotong supaya blob tidak pernah keluar dari frame:

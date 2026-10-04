@@ -375,25 +375,44 @@ struct CelestialVisualView: View {
     // MARK: - Bintang
 
     private func drawStar(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let coreRadius = radius * CGFloat(0.22 + 0.30 * visual.relativeSize)
+        // **Geometri bintang datang dari `VisualFrame`, bukan dari angka di
+        // sini.** Bintang adalah bentuk yang paling mudah keluar frame tanpa
+        // terasa: intinya kecil, tapi glow dan spike-nya dikalikan beberapa
+        // kali dari inti itu, dan `Canvas` memotong apa pun di luar frame
+        // dengan **tepi lurus** — bukan dengan memudar. Jadi yang kelewat
+        // besar tidak tampak "agak kepotong"; ia tampak sebagai bola cahaya
+        // yang berhenti mendadak di keempat tepi kartu. Di katalog bintang
+        // terang, 24 dari 25 di antaranya keluar (dihitung, bukan ditebak),
+        // dan Sirius yang paling parah: 0.81R hilang.
+        //
+        // Inti kini dihitung **mundur dari ruang yang tersedia**, jadi
+        // memperbesar glow/spike tidak bisa lagi mendorong ujungnya keluar.
+        // Ujinya ada di Linux (`testEveryCatalogueStarStaysInsideTheFrame`).
+        let geometry = VisualFrame.star(relativeSize: visual.relativeSize)
+        let coreRadius = radius * CGFloat(geometry.coreRadius)
         let color = starColor
         // Denyut halus datang dari `pulse` — bukan timer di dalam view, supaya
         // layar redup bisa menghentikannya (lihat `NightAwareContainer`).
-        let pulseFactor = 1 + 0.10 * CGFloat(sin(pulse))
+        // Amplitudonya dibaca dari geometri yang sama, karena batas frame
+        // dihitung pada **puncak** denyut: kalau view berdenyut lebih besar
+        // daripada yang dipakai model saat menghitung batas, bintang akan
+        // muat saat diam dan terpotong setiap kali denyut memuncak.
+        let pulseFactor = 1 + CGFloat(geometry.pulseAmplitude) * CGFloat(sin(pulse))
 
         // Glow berlapis: cincin dengan opasitas menurun.
-        for (index, scale) in [3.0, 1.9, 1.0].enumerated() {
+        for (index, scale) in geometry.glowScales.enumerated() {
             let r = coreRadius * CGFloat(scale) * pulseFactor
             context.fill(Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r,
                                                width: r * 2, height: r * 2)),
                          with: .radialGradient(
-                            Gradient(colors: [color.opacity([0.10, 0.22, 1.0][index]),
+                            Gradient(colors: [color.opacity(Self.glowOpacities[
+                                min(index, Self.glowOpacities.count - 1)]),
                                               color.opacity(0)]),
                             center: center, startRadius: 0, endRadius: r))
         }
         // Empat diffraction spike tipis — ciri mata telanjang, sekaligus
         // membuat bintang terasa besar tanpa memperbesar disk intinya.
-        let spikeLength = coreRadius * 3.2 * pulseFactor
+        let spikeLength = coreRadius * CGFloat(geometry.spikeScale) * pulseFactor
         var spikes = Path()
         spikes.move(to: CGPoint(x: center.x - spikeLength, y: center.y))
         spikes.addLine(to: CGPoint(x: center.x + spikeLength, y: center.y))
@@ -402,6 +421,13 @@ struct CelestialVisualView: View {
         context.stroke(spikes, with: .color(color.opacity(0.45)),
                        lineWidth: max(0.5, coreRadius * 0.18))
     }
+
+    /// Opasitas tiap lapis glow, dari terluar ke terdalam.
+    ///
+    /// Terluar paling redup dan terdalam pekat: glow yang pekat di seluruh
+    /// lebarnya tidak tampak seperti cahaya yang memudar, melainkan seperti
+    /// piringan padat.
+    private static let glowOpacities: [Double] = [0.10, 0.22, 1.0]
 
     /// Warna bintang dari indeks B−V, diwarnai ulang ke merah saat mode malam.
     ///
