@@ -87,16 +87,37 @@ mengubah perilaku, mereka **mengencode** perilaku lama.
   menangkapnya. Sekarang keduanya mengalir lewat overload dengan default
   tersebut, jadi tidak ada regresi — tapi itu berarti `en`-nya adalah satu-satunya
   terjemahan di luar pasangan `id`/`en` yang biasa, dan perlu diketahui.
-- **Engine 170 tetap utuh.** Perubahan hanya di `PointingKit` + `Apps/`, dan
-  `swift-test.sh` tetap 170 + 481 (naik 475 → 481, +6 uji bridge/lokalisasi).
+- **Engine 170 → 171 (aditif).** Perubahan hanya di `PointingKit` + `Apps/`, dan
+  `swift-test.sh` tetap 171 + 481 (naik 475 → 481, +6 uji bridge/lokalisasi; +1
+  uji regression "bulan redup" di CelestialEngine).
 
 ### Gerbang
 
-- `swift-test.sh` → **170 CelestialEngine + 481 PointingKit**, 0 gagal.
+- `swift-test.sh` → **171 CelestialEngine + 481 PointingKit**, 0 gagal.
 - `swift-ui-lint.sh` → **13 aturan hijau** (Aturan 10 menangkap README 475→481).
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
 
 ## Progres terakhir (4 Okt 2026 — cahaya Bulan tidak pernah menggeser batas magnitudo)
+
+### Siklus ini: regression test "bulan redup" ujung-ke-ujung (Fase C #6)
+
+**Apa yang ditambahkan.** Satu uji `testBrightMoonRemovesFaintStarFromCandidates`
+di `ResolverEphemerisTests`, plus seam pengujian non-breaking `overrideContext`
+pada `PointingResolver.diagnose` (default `nil`, semua panggilan produksi tetap
+berjalan sama).
+
+**Kenapa.** `VisibilityFilter` sudah mengunci bahwa cahaya Bulan **mengetatkan**
+batas magnitudo (`testMoonlightTightensTheLimitingMagnitude`), tapi tidak ada
+satu pun uji yang mengunci **jalur ujung-ke-ujung**: bahwa penyaring itu benar-
+benar mengeluarkan bintang redup dari *kandidat pointing* saat purnama tinggi,
+dan melaporkannya sebagai `.tooFaint` — bukan diam-diam mendiamkannya. Itu tepat
+kasus "bulan redup" yang diminta brief Fase C #6 ("tambah tes untuk tepi kasus").
+Tanpa uji ini, seseorang bisa kelak memutuskan penyaring bulan hanya untuk teks,
+dan engine kembali menawarkan bintang mag 5 di bawah purnama: klaim "bisa kamu
+lihat" yang keliru, persis yang dilarang PRD.
+
+**Hasil.** CelestialEngine 170 → **171** (aditif). PointingKit tetap 481.
+README + STATUS diperbarui ke 171.
 
 ### Premis: angka yang benar, dan keputusan yang tidak pernah diambil
 
@@ -175,7 +196,7 @@ menangkapnya, bukan karena mutasinya tidak berbahaya.
 
 ### Gerbang
 
-- `swift-test.sh` → **170 CelestialEngine** (166 → 170, +4) **+ 469 PointingKit**.
+- `swift-test.sh` → **171 CelestialEngine** (166 → 171, +5) **+ 469 PointingKit**.
 - `swift-ui-lint.sh` → **13 aturan hijau** (Aturan 10 menangkap angka README).
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - `red-test.sh` → empat mutasi merah, setelah skripnya diperbaiki.

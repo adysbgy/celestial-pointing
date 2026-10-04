@@ -314,6 +314,69 @@ final class ResolverEphemerisTests: XCTestCase {
         XCTAssertEqual(resolution.intent.level, .high)
         XCTAssertNil(resolution.nearestNeighbourDeg)
     }
+
+    /// **Bulan redup (brief Fase C #6): cahaya Bulan benar-benar mengeluarkan
+    /// bintang redup dari hasil pointing — sampai ke ujung.**
+    ///
+    /// `testMoonlightTightensTheLimitingMagnitude` sudah mengunci bahwa
+    /// penyaringnya mengetat; tapi itu diuji di level `VisibilityFilter`
+    /// saja. Yang tidak pernah dikunci adalah **jalur ujung ke ujung**: saat
+    /// Bulan purnama tinggi di langit, sebuah bintang redup yang di malam
+    /// gelap lolos sebagai kandidat, *harus* hilang dari kandidat — dan
+    /// dilaporkan dengan alasan `.tooFaint`, bukan diam-diam didiamkan.
+    ///
+    /// Tanpa uji ini, seseorang bisa (kelak) memutuskan bahwa penyaring
+    /// cahaya Bulan hanya dipakai untuk menampilkan teks, bukan untuk
+    /// menyaring — dan engine akan kembali menawarkan bintang mag 5 di
+    /// bawah purnama. Itu klaim "bisa kamu lihat" yang keliru, persis yang
+    /// dilarang PRD: pengguna mengejar bintang yang Bulan sudah tenggelamkan.
+    func testBrightMoonRemovesFaintStarFromCandidates() throws {
+        // Bintang redup (mag 5.0): aman terlihat mata telanjang di malam
+        // gelap, tapi di bawah ambang saat purnama (6.0 - 1.6 ≈ 4.4).
+        // Kita arahkan TEPAT ke posisinya (sama seperti uji pointing lainnya)
+        // supaya bintangnya benar-benar masuk kerucut dan dipertimbangkan.
+        let faint = CelestialObject(id: "faint", name: "Bintang Redup", kind: .star,
+                                    raDeg: 101.28715533, decDeg: -16.71611586,
+                                    magnitude: 5.0)
+        // Resolver harus memuat bintang redup ini — `resolver(policy:)` hanya
+        // memuat katalog bintang terang, jadi kita susun katalognya sendiri
+        // dengan bintang redup ditambahkan.
+        let strict = PointingResolver(
+            catalogue: [faint] + Catalogue.brightStars,
+            policy: VisibilityPolicy(),
+            ephemeris: AstronomyKitEphemeris())
+        let pointing = try XCTUnwrap(
+            strict.horizontal(of: faint, observer: jakarta, date: date),
+            "arah bintang redup harus bisa dihitung")
+        // Pastikan bintangnya memang di atas horizon pada saat uji — kalau
+        // tidak, uji ini jadi vacuous (penolakan terjadi karena horizon,
+        // bukan karena cahaya Bulan).
+        XCTAssertGreaterThan(pointing.altitudeDeg, strict.policy.minAltitudeDeg,
+                             "bintang redup harus di atas horizon pada saat uji")
+
+        // Malam gelap tanpa Bulan: harus lolos sebagai kandidat.
+        let darkContext = SkyContext(sunAltitudeDeg: -40, isDark: true)
+        let darkResolution = strict.diagnose(
+            pointing: pointing, observer: jakarta, date: date, coneDeg: 40,
+            overrideContext: darkContext)
+        XCTAssertTrue(darkResolution.intent.candidates.contains { $0.object.id == "faint" },
+                      "bintang mag 5 harus jadi kandidat di malam gelap")
+
+        // Purnama tinggi di langit: harus DIBUANG sebagai .tooFaint, bukan
+        // tetap jadi kandidat.
+        let moonlitContext = SkyContext(sunAltitudeDeg: -40,
+                                        moonAltitudeDeg: 55,
+                                        moonIlluminationFraction: 1.0,
+                                        isDark: true)
+        let moonlitResolution = strict.diagnose(
+            pointing: pointing, observer: jakarta, date: date, coneDeg: 40,
+            overrideContext: moonlitContext)
+        XCTAssertFalse(moonlitResolution.intent.candidates.contains { $0.object.id == "faint" },
+                       "purnama harus mengeluarkan bintang mag 5 dari kandidat")
+        XCTAssertTrue(moonlitResolution.rejected.contains {
+            $0.object.id == "faint" && $0.visibility == .tooFaint
+        }, "penolakan bintang redup di bawah purnama harus dilaporkan sebagai .tooFaint")
+    }
 }
 
 #endif

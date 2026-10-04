@@ -143,12 +143,21 @@ public struct PointingResolver {
     }
 
     /// Resolusi lengkap dengan alasan keputusan.
+    ///
+    /// - Parameter overrideContext: konteks langit yang dipakai penyaring
+    ///   visibilitas. `nil` (bawaan) berarti hitung dari efemeris lewat
+    ///   `skyContext`. Parameter ini **hanya** jalur pengujian: ia memungkinkan
+    ///   uji mengunci penyaringan ujung-ke-ujung (mis. cahaya Bulan mengeluarkan
+    ///   bintang redup dari kandidat) tanpa harus merekayasa posisi Bulan
+    ///   sungguhan di suatu tanggal. Tanpa default `nil`, semua panggilan
+    ///   produksi tetap berjalan persis seperti sebelumnya.
     public func diagnose(pointing: HorizontalCoord,
                          observer: Observer,
                          date: Date,
-                         coneDeg: Double = 20.0) -> Resolution {
+                         coneDeg: Double = 20.0,
+                         overrideContext: SkyContext? = nil) -> Resolution {
         let jd = SkyMath.julianDate(from: date)
-        let context = skyContext(observer: observer, date: date)
+        let context = overrideContext ?? skyContext(observer: observer, date: date)
 
         // Arahkan Matahari, untuk penyaring "terlalu dekat Matahari".
         var sunHorizontal: HorizontalCoord?
