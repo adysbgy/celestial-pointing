@@ -2561,6 +2561,63 @@ Tidak ada aturan keras PRD yang dilonggarkan; yang berubah hanya pembungkusnya.
 - ✅ Scaffold monorepo + CelestialEngine (Fase 1 inti).
 - ✅ Terbukti engine bisa diuji di VPS2 TANPA Mac (via `./swift-test.sh`).
 
+## Siklus 2026-10-04 — audit numerik mode malam pada gambar
+
+**Unit terkecil:** "semua warna, termasuk visual, ikut mode malam" — janji yang
+tertulis di `CelestialVisualView` dan Night Mode, tapi tidak pernah diuji.
+
+### Yang ditemukan
+
+Mode malam dipraktekan sebagai **daftar warna** yang ditulis satu per satu di
+view, tepat di sebelah warna siangnya. Menghitungnya menunjukkan 10 dari 13
+warna aksen **bukan merah murni**:
+
+| bagian gambar | hijau | biru | porsi luminansi di kanal merusak |
+|---|---|---|---|
+| pita terang Bulan | 0.85 | 0.80 | 77% |
+| cincin Saturnus | 0.30 | 0.16 | 63% |
+| kabut Venus | 0.26 | 0.12 | 60% |
+
+Di layar semuanya terlihat "merah", dan itu sebabnya cacat ini bertahan:
+yang diuji adalah **penampilan**, bukan **nilainya**. Justru warna-warna itu
+yang paling merusak, di mode yang dipilih justru untuk melindungi mata.
+
+Dua kelas cacat lain yang muncul dari perhitungan yang sama:
+
+1. **Urutan terang terbalik.** Pita Jupiter paling gelap (kanal merah 0.72)
+   punya angka malam 0.43; paling terang (0.85) punya 0.34. Di mode malam
+   pita gelap tampak lebih terang dari pita terang — dan tidak ada yang bisa
+   melihatnya, karena semuanya sudah merah semua.
+2. **Kontras sabit runtuh.** `shadow` untuk piringan gelap bulan
+   dinaikkan ke 0.44, sehingga kontras sabit terhadap gelap turun ke 2.99:1 —
+   di bawah WCAG AA, di layar yang justru paling dipakai untuk melihat bulan.
+
+### Yang diperbaiki
+
+- Aksen pindah ke `CelestialVisual.accents` (`NightVisual.swift`): **hanya
+  warna siang** yang disimpan di sana. Warna malam diturunkan secara
+  mekanis dari kanal merah — jadi "hampir merah" tidak mungkin terjadi, dan
+  mengubah satu aksen tidak bisa meninggalkan malamnya tertinggal.
+- `NightVisual.surface` (memancarkan) vs `.shadow` (gelap) dipisah sebagai
+  dua peran; satu-satunya jalan masuknya `mapped(_:isShadow:)`, supaya
+  "lupa dipetakan" tidak bisa ditulis.
+- Kecerahan malam bintang diambil dari **ukuran relatif**, bukan dari
+  warnanya: konversi B−V → RGB tidak menjamin kanal merahnya mengikuti terang
+  bintang sungguhan.
+- `starRGB` pindah dari view ke `PointingKit` **dan dijepit ke 0...1**.
+  Sebelum dijepit, Betelgeuse (B−V 1.85) menghasilkan kanal merah **1,11** —
+  di luar rentang yang punya arti; luminance ikut terangkat dan urutan terang
+  ikut berubah. Ini tidak terlihat di layar ("merah tetap merah").
+
+### Verifikasi
+
+11 uji baru di `NightVisualTests`. Yang paling penting: **mutasi**. `surface`
+sengaja dibuat membocorkan hijau/biru dan `shadow` dikolapskan jadi `surface`,
+lalu uji dijalankan — kebocoran hijau/biru dan kontras sabit 2.88 (vs 4.5)
+terdeteksi. Uji yang hanya membaca kode tidak akan menangkap keduanya.
+
+**166 + 244 hijau, tanpa warning.**
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit

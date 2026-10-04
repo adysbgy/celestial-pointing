@@ -1,0 +1,221 @@
+import Foundation
+
+// MARK: - Mode malam untuk gambar prosedural
+
+/// Mode malam untuk setiap bagian gambar -- **satu aturan**, bukan warna per
+/// elemen.
+///
+/// **Kenapa ini ada di `PointingKit`, bukan di view.** Yang diselesaikan mode
+/// malam adalah *rhodopsin*, bukan selera: batang (sel rod) paling sensitif
+/// di ~498-530nm, sedangkan cahaya >620nm tidak memicu rhodopsin. Layar
+/// putih/biru mematikan adaptasi gelap selama 20-40 menit. Jadi "merah
+/// murni" bukan istilah yang bisa ditafsirkan longgar -- itu syaratnya, dan
+/// syaratnya hanya bisa dijaga di tempat yang bisa diuji.
+///
+/// **Cacat yang ditutup oleh ini.** `CelestialVisualView` sudah
+/// menjanjikan "mode malam benar-benar merah murni -- termasuk pada gambar,
+/// bukan hanya pada teks", tapi **10 dari 13** warna gambar yang hidup di
+/// mode malam **bukan** merah murni. Semuanya ditulis sebagai "merah-ish"
+/// pilihan sendiri:
+///
+///     cincin Saturnus    (0.62, 0.30, 0.16)
+///     pita terang Bulan (0.95, 0.85, 0.80)
+///     kabut Venus        (0.72, 0.30, 0.16)
+///
+/// Di layar mana pun itu akan terlihat "cukup merah". Setelah luminansi
+/// dihitung -- satu-satunya cara mengetahuinya -- **dua pertiga** cahaya yang
+/// dipancarkan pita terang Bulan berada di kanal yang justru paling merusak
+/// penglihatan malam. Dan tidak ada satu pun teks di layar yang memberitahu
+/// pengguna.
+///
+/// Dua aturan yang harus dijaga supaya kelas cacat ini tidak bisa muncul
+/// lagi:
+///
+/// 1. **Murni.** Hijau & biru **nol**, bukan "kecil". "Kecil" hanya terasa
+///    benar bagi mata; tidak ada yang menghitungnya.
+/// 2. **Urutan terang ikut yang di langit.** Mode malam mengorbankan
+///    *hue*, dan itu trade-off yang disengaja. Yang tidak boleh hilang
+///    adalah terang-gelap: planet yang paling terang tetap paling terang.
+///    Warna "merah-ish" yang dipilih satu per satu melanggar aturan ini
+///    diam-diam -- di pita Jupiter, pita paling gelap (kanal merah 0.72)
+///    menjadi **lebih terang** dari pita paling terang (0.85), karena
+///    angka malamnya ditulis 0.43 vs 0.34. Persis hal yang
+///    `testNightModeKeepsBrightnessOrdering` lindungi untuk bola planet,
+///    tapi tidak satu pun uji menyentuh aksen.
+///
+/// Karena itu kecerahan malam **diturunkan dari kanal merah warna siang**,
+/// persis seperti bola planet: aturan yang sama, satu definisi "terang".
+/// Warna malamnya bukan daftar kedua yang bisa tertinggal -- ia dihitung,
+/// jadi tidak mungkin berbeda dari warna siang tanpa ada yang menambah
+/// warna kedua.
+public enum NightVisual {
+
+    /// Kecerahan terendah untuk permukaan yang harus tetap terlihat.
+    ///
+    /// Bukan nol: pada latar merah tua, permukaan dengan kanal merah ~0
+    /// menghilang ke latar dan objeknya tidak terbaca. Nilainya sama dengan
+    /// yang dipakai bola planet, supaya "terang" punya satu arti di seluruh
+    /// gambar.
+    public static let floorBrightness: Double = 0.35
+    /// Bentang kanal merah ke rentang yang terlihat, di atas batas bawah.
+    public static let rangeBrightness: Double = 0.65
+
+    /// Satu-satunya jalan dari warna siang ke warna malam.
+    ///
+    /// Ada sebagai satu fungsi, bukan dua pemanggilan terpisah, karena
+    /// kegagalan yang nyata sebelumnya adalah **pemanggil yang salah
+    /// memilih**: `shadow(...)` di satu tempat dan `surface(...)` di tempat
+    /// lain, tanpa apa pun yang bisa tahu pemanggilnya keliru. Dengan
+    /// niat dinyatakan sebagai argumen, "lupa dipetakan" tidak bisa ditulis.
+    public static func mapped(_ day: CelestialVisual.RGBComponents,
+                              isShadow: Bool) -> CelestialVisual.RGBComponents {
+        isShadow ? shadow(day) : surface(day)
+    }
+
+    /// Mode malam untuk **permukaan**: memetakan kanal merah ke merah
+    /// murni.
+    ///
+    /// - Parameter day: warna siang. **Hanya kanal merahnya yang dipakai.**
+    ///   Hijau dan biru dibuang total -- itulah seluruh isi aturan mode
+    ///   malam.
+    public static func surface(_ day: CelestialVisual.RGBComponents) -> CelestialVisual.RGBComponents {
+        let brightness = floorBrightness
+            + rangeBrightness * min(1, max(0, day.nightModeBrightness))
+        return .init(red: brightness, green: 0, blue: 0)
+    }
+
+    /// Mode malam untuk bagian **gelap** -- piringan bulan yang tidak
+    /// menyala, isi lencana ragu.
+    ///
+    /// **Kenapa bukan `surface`.** Elemen ini bukan permukaan yang perlu
+    /// terlihat, melainkan hal yang **tidak memancarkan cahaya**. Memetakan
+    /// lewat `surface` akan menaikkan piringan gelap ke kanal merah
+    /// 0.44 -- jauh lebih terang dari aslinya, dan kontras sabit versus
+    /// gelap runtuh di layar yang justru paling dipakai untuk melihat
+    /// bulan (naik ke 0.44 membuat kontrasnya 2.99:1, di bawah 4.5:1).
+    /// Yang perlu dijaga justru gelapnya, jadi aturannya terpisah.
+    ///
+    /// - Parameter day: warna siang; sekali lagi hanya kanal merahnya.
+    /// - Returns: merah murni dengan kanal merah setengah dari kanal merah
+    ///   siang, supaya tetap terlihat sebagai "gelap" dan bukan lubang hitam
+    ///   di atas latar.
+    public static func shadow(_ day: CelestialVisual.RGBComponents) -> CelestialVisual.RGBComponents {
+        .init(red: min(1, max(0, day.nightModeBrightness)) * shadowFraction,
+              green: 0,
+              blue: 0)
+    }
+
+    /// Pecahan kanal merah siang yang dipertahankan untuk bagian gelap.
+    ///
+    /// Dijaga lewat kontrasnya terhadap pita yang menyala
+    /// (`testNightShadowKeepsTheMoonPhaseReadable`), bukan lewat angka ini
+    /// sendiri -- supaya nilainya boleh diubah selama fase bulan masih
+    /// terbaca.
+    public static let shadowFraction: Double = 0.5
+}
+
+// MARK: - Aksen gambar
+
+public extension CelestialVisual {
+
+    /// Warna **siang** untuk setiap detail gambar, sebagai RGB mentah.
+    ///
+    /// **Kenapa warna aksen ikut pindah ke sini.** Semuanya berada di view,
+    /// dan warna malamnya ditulis satu per satu di sebelahnya. Itu dua
+    /// kesalahan sekaligus: warnanya bisa tidak murni merah tanpa ada yang
+    /// mengetahuinya, dan mengedit aksen siang berarti mengedit *dua* warna
+    /// sekaligus -- jadi malamnya bisa tertinggal. Keduanya benar-benar
+    /// terjadi: satu warna sudah "merah-ish" bukan merah, dan urutan terang
+    /// pita Jupiter terbalik antara siang dan malam.
+    ///
+    /// Di sini **hanya warna siang yang ada**. Warna malamnya diturunkan
+    /// `NightVisual` dari kanal merah yang sama, jadi tidak bisa gagal
+    /// bergeser antara siang dan malam tanpa ada yang menambahkan warna kedua.
+    struct Accents: Equatable, Sendable {
+
+        // MARK: Jupiter -- pita & Bintik Merah Besar
+        /// Pita paling terang (abu-krem).
+        public var jupiterBandCream: RGBComponents
+        /// Pita paling gelap secara kanal merah.
+        public var jupiterBandRust: RGBComponents
+        /// Pita tengah (krem gelap).
+        public var jupiterBandTan: RGBComponents
+        /// Bintik Merah Besar.
+        public var jupiterSpot: RGBComponents
+
+        // MARK: Ciri planet lain
+        /// Cincin Saturnus.
+        public var saturnRing: RGBComponents
+        /// Kutub es Mars.
+        public var marsPolarCap: RGBComponents
+        /// Kabut Venus.
+        public var venusHaze: RGBComponents
+
+        // MARK: Bulan
+        /// Pita yang menyala.
+        public var moonLit: RGBComponents
+        /// Piringan yang **tidak** menyala -- bagian gelap.
+        public var moonUnlit: RGBComponents
+
+        // MARK: Matahari
+        /// Inti fotosfer.
+        public var sunCore: RGBComponents
+        /// Tepi fotosfer.
+        public var sunPhotosphere: RGBComponents
+
+        // MARK: Objek langit dalam & penanda
+        /// Kabut nebula/galaksi.
+        public var deepSky: RGBComponents
+        /// Isi lencana tanda tanya (kandidat).
+        public var candidateFill: RGBComponents
+
+        public init(jupiterBandCream: RGBComponents,
+                    jupiterBandRust: RGBComponents,
+                    jupiterBandTan: RGBComponents,
+                    jupiterSpot: RGBComponents,
+                    saturnRing: RGBComponents,
+                    marsPolarCap: RGBComponents,
+                    venusHaze: RGBComponents,
+                    moonLit: RGBComponents,
+                    moonUnlit: RGBComponents,
+                    sunCore: RGBComponents,
+                    sunPhotosphere: RGBComponents,
+                    deepSky: RGBComponents,
+                    candidateFill: RGBComponents) {
+            self.jupiterBandCream = jupiterBandCream
+            self.jupiterBandRust = jupiterBandRust
+            self.jupiterBandTan = jupiterBandTan
+            self.jupiterSpot = jupiterSpot
+            self.saturnRing = saturnRing
+            self.marsPolarCap = marsPolarCap
+            self.venusHaze = venusHaze
+            self.moonLit = moonLit
+            self.moonUnlit = moonUnlit
+            self.sunCore = sunCore
+            self.sunPhotosphere = sunPhotosphere
+            self.deepSky = deepSky
+            self.candidateFill = candidateFill
+        }
+    }
+
+    /// Aksen gambar pada mode terang.
+    ///
+    /// Satu konstanta, bukan konstanta per pemanggil: kalau ada dua salinan,
+    /// satu bisa tertinggal saat palet diubah dan tidak ada yang mengetahuinya
+    /// -- persis jebakan yang sudah menutupi satu bug warna di siklus lalu.
+    static let accents = Accents(
+        jupiterBandCream: .init(red: 0.90, green: 0.83, blue: 0.72),
+        jupiterBandRust: .init(red: 0.72, green: 0.52, blue: 0.38),
+        jupiterBandTan: .init(red: 0.85, green: 0.76, blue: 0.62),
+        jupiterSpot: .init(red: 0.85, green: 0.35, blue: 0.25),
+        saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
+        marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
+        venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
+        moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
+        moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
+        sunCore: .init(red: 1.00, green: 0.93, blue: 0.62),
+        sunPhotosphere: .init(red: 1.00, green: 0.72, blue: 0.24),
+        deepSky: .init(red: 0.72, green: 0.78, blue: 0.95),
+        candidateFill: .init(red: 0.10, green: 0.10, blue: 0.13)
+    )
+}

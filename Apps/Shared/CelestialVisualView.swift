@@ -87,10 +87,43 @@ struct CelestialVisualView: View {
         guard NightMode.isOn else {
             return Color(red: raw.red, green: raw.green, blue: raw.blue)
         }
-        // Rentang kanal merah dipetakan ke 0.35…1: merah paling redup masih
-        // kontras di layar gelap, dan tidak ada yang berubah jadi putih.
-        let brightness = 0.35 + 0.65 * min(1, max(0, raw.nightModeBrightness))
-        return Color(red: brightness, green: 0, blue: 0)
+        // Mode malam **diturunkan dari kanal merah warna siang**, bukan
+        // dipetakan di sini. Versi lama menulis angka malam sendiri per
+        // warna, dan 10 dari 13 di antaranya bukan merah murni -- pita terang
+        // Bulan, misalnya, menyimpan 77% luminansinya di hijau/biru,
+        // padahal file ini menjanjikan "merah murni ... termasuk pada
+        // gambar". Aturannya sekarang satu (`NightVisual.surface`), sama
+        // dengan bola planet, dan punya uji di Linux.
+        return Color(NightVisual.surface(raw))
+    }
+
+    /// Warna aksen gambar pada mode yang sedang aktif.
+    ///
+    /// Sengaja **satu pintasan** untuk seluruh aksen: warna siangnya ada satu
+    /// kali di `CelestialVisual.accents`, dan malamnya dihitung dari kanal
+    /// merah yang sama. View tidak lagi memegang satu pun angka warna aksen
+    /// -- jadi tidak ada tempat lagi di sini tempat "merah-ish" bisa ditulis
+    /// dan lolos tanpa ada yang menghitungnya.
+    private static func accent(_ raw: CelestialVisual.RGBComponents) -> Color {
+        guard NightMode.isOn else {
+            return Color(red: raw.red, green: raw.green, blue: raw.blue)
+        }
+        return Color(NightVisual.surface(raw))
+    }
+
+    /// Warna aksen untuk bagian yang **tidak memancarkan cahaya**
+    /// (piringan bulan gelap, isi lencana ragu).
+    ///
+    /// Terpisah dari `accent` dengan alasan yang diuji: memetakan bagian
+    /// gelap lewat aturan permukaan akan menaikkannya ke kanal merah 0.44,
+    /// dan kontras sabit terhadap gelap jatuh ke 2.99:1 -- di layar yang
+    /// justru paling dipakai untuk melihat bulan, tepat saat mode malam
+    /// dipilih supaya penglihatan malam terjaga.
+    private static func shadowAccent(_ raw: CelestialVisual.RGBComponents) -> Color {
+        guard NightMode.isOn else {
+            return Color(red: raw.red, green: raw.green, blue: raw.blue)
+        }
+        return Color(NightVisual.shadow(raw))
     }
 
     // MARK: - Planet
@@ -162,13 +195,21 @@ struct CelestialVisualView: View {
                               y: y - radius * 0.055,
                               width: halfWidth * 2,
                               height: radius * 0.11)
-            let shade = index % 3
-            let color: Color = NightMode.isOn
-                ? Color(red: 0.34 + 0.18 * Double(shade) / 2, green: 0, blue: 0)
-                : (shade == 0 ? Color(red: 0.85, green: 0.76, blue: 0.62)
-                  : shade == 1 ? Color(red: 0.72, green: 0.52, blue: 0.38)
-                  : Color(red: 0.90, green: 0.83, blue: 0.72))
-            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.55)))
+            // Warna pita dibaca dari model, mode malam dihitung dari kanal
+            // merahnya. Versi lama menulis angka malam sendiri
+            // (`0.34 + 0.18 * shade / 2`), dan urutan hasilnya **terbalik**:
+            // pita paling gelap (kanal merah 0.72) menjadi lebih terang dari
+            // pita paling terang (0.85) -- 0.43 vs 0.34. Mode malam
+            // mengorbankan hue secara sengaja, tapi terang-gelap tidak boleh
+            // ikut terbalik; itu informasi yang masih terbaca di malam.
+            let bandColor: CelestialVisual.RGBComponents
+            switch index % 3 {
+            case 0: bandColor = CelestialVisual.accents.jupiterBandTan
+            case 1: bandColor = CelestialVisual.accents.jupiterBandRust
+            default: bandColor = CelestialVisual.accents.jupiterBandCream
+            }
+            context.fill(Path(ellipseIn: rect),
+                         with: .color(Self.accent(bandColor).opacity(0.55)))
         }
         // Bintik Merah Besar: elips merah di belahan selatan, sedikit di bawah
         // ekuator — posisinya memang di sana secara nyata.
@@ -177,9 +218,7 @@ struct CelestialVisualView: View {
                           width: radius * 0.52,
                           height: radius * 0.26)
         context.fill(Path(ellipseIn: spot),
-                     with: .color(NightMode.isOn
-                                  ? Color(red: 0.75, green: 0.12, blue: 0)
-                                  : Color(red: 0.85, green: 0.35, blue: 0.25)))
+                     with: .color(Self.accent(CelestialVisual.accents.jupiterSpot)))
     }
 
     /// Cincin Saturnus: elips yang digambar **di belakang** bola dan **di
@@ -210,9 +249,7 @@ struct CelestialVisualView: View {
                            y: center.y - CGFloat(ring.halfHeight) * radius,
                            width: CGFloat(ring.fullWidth) * radius,
                            height: CGFloat(ring.fullHeight) * radius)
-        let ringColor: Color = NightMode.isOn
-            ? Color(red: 0.62, green: 0.30, blue: 0.16)
-            : Color(red: 0.86, green: 0.78, blue: 0.60)
+        let ringColor = Self.accent(CelestialVisual.accents.saturnRing)
 
         // Belakang cincin (paruh atas).
         context.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.45)))
@@ -238,9 +275,7 @@ struct CelestialVisualView: View {
 
     /// Kutub Mars: kapsul es di utara dan selatan.
     private func drawPolarCaps(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let capColor: Color = NightMode.isOn
-            ? Color(red: 0.55, green: 0.18, blue: 0.14)
-            : Color(red: 0.97, green: 0.95, blue: 0.93)
+        let capColor = Self.accent(CelestialVisual.accents.marsPolarCap)
         // Geometri kutub datang dari `CelestialVisual.polarCaps`, yang teruji
         // di Linux — **di sini tidak ada rumus kutub lagi**.
         //
@@ -284,9 +319,7 @@ struct CelestialVisualView: View {
 
     /// Venus: kabut tebal yang menutupi detail permukaan.
     private func drawHaze(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let haze = NightMode.isOn
-            ? Color(red: 0.72, green: 0.30, blue: 0.16)
-            : Color(red: 0.99, green: 0.96, blue: 0.82)
+        let haze = Self.accent(CelestialVisual.accents.venusHaze)
         context.fill(Path(ellipseIn: CGRect(x: center.x - radius * 0.55,
                                            y: center.y - radius * 0.72,
                                            width: radius * 1.10,
@@ -304,9 +337,13 @@ struct CelestialVisualView: View {
                                           width: radius * 2, height: radius * 2))
         // Piringan gelap dulu (bagian yang tidak menyala) — tanpa ini sabit
         // akan tampak seperti bulan sabit berdiri sendiri di ruang kosong.
-        context.fill(disc, with: .color(NightMode.isOn
-                                        ? Color(red: 0.09, green: 0.03, blue: 0.02)
-                                        : Color(red: 0.13, green: 0.13, blue: 0.16)))
+        // Piringan gelap memakai aturan `shadow`, bukan `surface`: ia tidak
+        // memancarkan cahaya, dan memetakannya lewat aturan permukaan akan
+        // menaikkannya ke kanal merah 0.44 sehingga kontras sabit terhadap
+        // gelap jatuh ke 2.99:1 -- tepat di layar yang paling dipakai untuk
+        // melihat bulan, dan tepat saat mode malam dipilih.
+        context.fill(disc,
+                     with: .color(Self.shadowAccent(CelestialVisual.accents.moonUnlit)))
 
         guard let phase = visual.phaseGeometry(waxing: visual.isWaxing) else {
             // Fase tidak diketahui: gambar piringan polos redup. Piringan penuh
@@ -359,9 +396,11 @@ struct CelestialVisualView: View {
         // keluar dari disk.
         context.drawLayer { layer in
             layer.clip(to: disc)
-            layer.fill(lit, with: .color(NightMode.isOn
-                                         ? Color(red: 0.95, green: 0.85, blue: 0.80)
-                                         : Color(red: 0.97, green: 0.95, blue: 0.90)))
+            // Pita yang menyala: **permukaan**, jadi aturan `surface`.
+            // Versi lama menulis (0.95, 0.85, 0.80) untuk malam -- 77%
+            // luminansinya ada di hijau dan biru, kanal yang paling merusak
+            // penglihatan malam. Angka itu justru terlihat "merah" di layar.
+            layer.fill(lit, with: .color(Self.accent(CelestialVisual.accents.moonLit)))
             // Maria: bercak gelap **di dalam** bagian yang menyala saja, jadi
             // Maria digambar **hanya** di dalam bagian yang menyala, jadi
             // bercak ini tidak pernah mengubah lebar sabit yang terlihat.
@@ -448,39 +487,29 @@ struct CelestialVisualView: View {
     /// tidak boleh hilang adalah kontras terang-gelap, karena itulah yang
     /// masih terbaca di malam.
     private var starColor: Color {
-        let base = Self.starColor(forColorIndex: visual.colorIndexBV)
+        // Warna siang dihitung dari indeks B−V di `PointingKit`
+        // (`CelestialVisual.starRGB`) -- rumus warna tidak lagi tinggal di
+        // view, jadi urutannya bisa diuji di Linux.
+        let base = Color(CelestialVisual.starRGB(forColorIndex: visual.colorIndexBV))
         guard NightMode.isOn else { return base }
         // Kecerahan diambil dari ukuran relatif (bintang paling terang tetap
-        // paling terang), lalu warnanya dipaksakan ke merah.
-        let brightness = 0.35 + 0.55 * visual.relativeSize
+        // paling terang), lalu warnanya dipaksakan ke merah. Kecerahan tetap
+        // berasal dari **ukuran**, bukan dari warnanya: konversi B−V → RGB
+        // tidak menjamin kanal merahnya mengikuti terang bintang sungguhan,
+        // jadi menjadikannya sumber kecerahan akan membuat dua bintang dengan
+        // terang berbeda berubah menjadi dua titik merah yang sama persis.
+        // Mode malam memang membuang warna; ia tidak seharusnya membuang
+        // terang juga.
+        let brightness = NightVisual.floorBrightness
+            + NightVisual.rangeBrightness * min(1, max(0, visual.relativeSize))
         return Color(red: brightness, green: 0, blue: 0)
-    }
-
-    /// RGB dari indeks warna B−V.
-    ///
-    /// Monochromat: panjang gelombang "berat" = merah. B−V positif (Merah,
-    /// Arcturus, Betelgeuse) → hangat; negatif (biru, Rigel, Alnitak) → dingin.
-    /// Ini tren yang benar secara astronomi dan cukup untuk perbedaan yang
-    /// dilihat pengguna mata telanjang.
-    static func starColor(forColorIndex index: Double) -> Color {
-        let clamped = min(2.0, max(-0.5, index))
-        // −0.35 … +1.35 → 0 … 1 (biru ke merah), lalu dingatkan sedikit di
-        // ujung biru supaya Rigel tidak tampak ungu.
-        let warmth = (clamped + 0.35) / 1.70
-        return Color(red: 0.62 + 0.38 * warmth,
-                     green: 0.78 - 0.16 * warmth,
-                     blue: 1.00 - 0.72 * warmth)
     }
 
     // MARK: - Matahari
 
     private func drawSun(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let core = NightMode.isOn
-            ? Color(red: 0.95, green: 0.45, blue: 0.10)
-            : Color(red: 1.0, green: 0.93, blue: 0.62)
-        let photosphere = NightMode.isOn
-            ? Color(red: 1.0, green: 0.72, blue: 0.25)
-            : Color(red: 1.0, green: 0.72, blue: 0.24)
+        let core = Self.accent(CelestialVisual.accents.sunCore)
+        let photosphere = Self.accent(CelestialVisual.accents.sunPhotosphere)
         context.fill(Path(ellipseIn: CGRect(x: center.x - radius * 0.72,
                                            y: center.y - radius * 0.72,
                                            width: radius * 1.44, height: radius * 1.44)),
@@ -509,9 +538,7 @@ struct CelestialVisualView: View {
         // untuk semua blob membuat blob yang digeser terpotong **tegak** oleh
         // `Canvas` -- tepat di tengah gradiennya, jadi potongannya terlihat.
         // Itulah yang dihitung model, dan ujinya ada di Linux.
-        let core = NightMode.isOn
-            ? Color(red: 0.78, green: 0.20, blue: 0.12)
-            : Color(red: 0.72, green: 0.78, blue: 0.95)
+        let core = Self.accent(CelestialVisual.accents.deepSky)
         let nebula = VisualFrame.nebula(fuzziness: visual.fuzziness)
         for blob in nebula.blobs {
             let r = CGFloat(blob.radius) * radius
@@ -560,9 +587,8 @@ struct CelestialVisualView: View {
         let circle = Path(ellipseIn: CGRect(x: center.x - badgeRadius,
                                            y: center.y - badgeRadius,
                                            width: badgeRadius * 2, height: badgeRadius * 2))
-        context.fill(circle, with: .color(NightMode.isOn
-                                          ? Color(red: 0.18, green: 0.02, blue: 0.01)
-                                          : Color(red: 0.10, green: 0.10, blue: 0.13)))
+        context.fill(circle,
+                     with: .color(Self.shadowAccent(CelestialVisual.accents.candidateFill)))
         context.stroke(circle, with: .color(PointingTone.warning.color), lineWidth: 1.5)
         // Tanda tanya digambar sebagai Path, bukan teks: supaya tidak ikut
         // diwarnai/ diperbesar oleh Dynamic Type, dan supaya konsisten di kedua

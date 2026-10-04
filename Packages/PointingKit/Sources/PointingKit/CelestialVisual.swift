@@ -307,6 +307,43 @@ public struct CelestialVisual: Equatable, Sendable {
         "polaris":     0.60    // F7 — putih kekuningan
     ]
 
+    /// RGB **siang** untuk sebuah indeks B−V, sebagai komponen mentah.
+    ///
+    /// Monokromatik: panjang gelombang "berat" = merah. B−V positif
+    /// (Betelgeuse, Arcturus, Aldebaran) → hangat; negatif (Rigel, Alnitak,
+    /// Acrux) → dingin. Trennya benar secara astronomi dan cukup untuk
+    /// perbedaan yang dilihat pengguna mata telanjang.
+    ///
+    /// **Kenapa rumusnya pindah dari view ke sini.** Ini satu-satunya
+    /// persamaan warna yang masih tersisa di `CelestialVisualView`, dan
+    /// yang diawasi bukan hanya "apakah warnanya masuk akal" tapi satu yang
+    /// lebih halus: **apakah urutan luminansinya masih benar**. Mode malam
+    /// membuang hue seluruhnya, jadi yang tersisa hanyalah terang. Kalau
+    /// konversi ini membuat Rigel lebih terang dari Aldebaran, maka di malam
+    /// keduanya menjadi titik merah dengan ukuran yang sama -- dan informasi
+    /// yang hilang bukan hanya warna, tapi terang juga. Itu tidak bisa dibaca
+    /// dari layar mana pun, jadi harus diuji, bukan diklaim.
+    /// Menjepit satu komponen kanal ke 0...1.
+    private static func unit(_ value: Double) -> Double { min(1, max(0, value)) }
+
+public static func starRGB(forColorIndex index: Double) -> RGBComponents {
+        let clamped = min(2.0, max(-0.5, index))
+        // −0.35 … +1.35 → 0 … 1 (biru ke merah), lalu dingatkan sedikit di
+        // ujung biru supaya Rigel tidak tampak ungu.
+        let warmth = (clamped + 0.35) / 1.70
+        // Kanal **harus** dijepit ke 0...1. Tanpa itu, B−V >= ~1.35
+        // menghasilkan kanal merah > 1 -- dan itu bukan "sedikit terlalu
+        // terang": `Color(red:green:blue:)` tidak punya nilai di luar 1, jadi
+        // hasilnya bergantung pada perilaku penjepitan diam-diam milik
+        // SwiftUI. Untuk Betelgeuse (B−V 1.85) warna siang yang keluar
+        //literally 1.11 di kanal merah: lebih terang dari putih, dan
+        // luminance-nya ikut terangkat sehingga urutannya terhadap bintang
+        // lain ikut berubah. Dijepit di sini supaya "merah" berarti merah.
+        return RGBComponents(red: unit(0.62 + 0.38 * warmth),
+                             green: unit(0.78 - 0.16 * warmth),
+                             blue: unit(1.00 - 0.72 * warmth))
+    }
+
     // MARK: - Ukuran dari magnitudo
 
     /// Radius gambar relatif dari magnitudo tampak, 0…1.
