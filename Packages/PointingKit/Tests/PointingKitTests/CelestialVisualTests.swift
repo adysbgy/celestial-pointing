@@ -337,4 +337,168 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(caps.north.height, 0.52, accuracy: 1e-12)
         XCTAssertEqual(caps.north.halfWidth, 0.55, accuracy: 1e-12)
     }
+
+    // MARK: - Batas frame: tidak ada bentuk yang boleh keluar dari Canvas
+    //
+    // `Canvas` memotong apa pun di luar `frame`-nya dengan **tepi lurus**.
+    // Bentuk yang keluar tidak terlihat "sedikit kebaca" seperti pada bug
+    // lain -- ia terlihat **tidak sengaja terpotong**, dan tidak ada teks di
+    // layar yang bisa memberi tahu. Karena itu setiap bentuk yang punya
+    // bagian keluar frame harus punya batas yang diuji di sini.
+
+    /// Cincin versi lama, dipakai sebagai **bukti merah** (lihat
+    /// `testSaturnRingStaysInsideTheFrame`).
+    private static let legacySaturnRing = VisualFrame.RingGeometry(
+        halfWidth: 1.9,
+        halfHeight: 0.62)
+
+    func testSaturnRingStaysInsideTheFrame() {
+        // **Regresi untuk cincin Saturnus yang terpotong tegak.**
+        //
+        // Versi lama menggambar cincin selebar `3.8 x radius` di dalam
+        // `Canvas` selebar `2 x radius`: ujung elips berada di x = +/-1.9,
+        // yaitu 0.9R **di luar** frame, jadi `Canvas` memotongnya dengan tepi
+        // lurus. Hasilnya bukan cincin, melainkan dua garis yang berhenti
+        // mendadak. Uji ini gagal pada geometri lama dengan pesan yang
+        // menyebut berapa jauh keluar frame.
+        let ring = VisualFrame.saturnRing()
+        let spill = VisualFrame.overflow(centerX: 0,
+                                         centerY: 0,
+                                         halfWidth: ring.halfWidth,
+                                         halfHeight: ring.halfHeight)
+        XCTAssertLessThanOrEqual(spill, 0,
+                                 "cincin keluar \(spill) R di luar frame dan akan terpotong tegak")
+    }
+
+    func testLegacySaturnRingOverflowedTheFrame() {
+        // Bukti bahwa geometri lama benar-benar salah, bukan sekadar
+        //beda rasa: dihitung, bukan diklaim. Tanpa ini, "diperbaiki" bisa
+        // berarti angka yang sama ditulis ulang dengan nama lain.
+        let spill = VisualFrame.overflow(centerX: 0,
+                                         centerY: 0,
+                                         halfWidth: Self.legacySaturnRing.halfWidth,
+                                         halfHeight: Self.legacySaturnRing.halfHeight)
+        XCTAssertGreaterThan(spill, 0.8,
+                             "cincin lama hampir seluruhnya di luar frame -- inilah cacatnya")
+    }
+
+    func testSaturnRingTipsRemainVisibleBeyondTheBody() {
+        // Bola harus **lebih kecil dari lebar cincin**, bukan dari
+        // tingginya. Cincin Saturnus tampak miring, jadi tinggi elipsnya
+        // memang lebih kecil dari jari-jari bola -- dan itu benar: bola
+        // menutupi bagian tengah cincin, sementara dua ujung cincin harus
+        // tetap tampil keluar di kiri dan kanan. Yang membuatnya terbaca
+        // sebagai Saturnus justru dua ujung itu.
+        //
+        // Yang salah adalah memakai jari-jari bola sebesar frame
+        // (`bodyFraction = 1`): cincin tertutup seluruhnya dan hasilnya
+        // piring. Itu sebabnya `saturnBodyRadius` dihitung dari lebar
+        // cincin, bukan ditulis sendiri di view.
+        let ring = VisualFrame.saturnRing()
+        let body = VisualFrame.saturnBodyRadius(for: ring)
+        XCTAssertLessThan(body, ring.halfWidth,
+                          "bola menutupi seluruh cincin -- hasilnya piring, bukan Saturnus")
+        // Ujung cincin harus benar-benar terlihat, bukan cuma selisih nol.
+        let exposed = ring.halfWidth - body
+        XCTAssertGreaterThan(exposed, 0.2 * VisualFrame.halfExtent,
+                             "ujung cincin harus tampil di luar bola, bukan menempel")
+    }
+
+    func testSaturnBodyStaysInsideTheFrame() {
+        // Bola tidak boleh melebihi frame hanya karena cincinnya pas.
+        let ring = VisualFrame.saturnRing()
+        let body = VisualFrame.saturnBodyRadius(for: ring)
+        let spill = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                         halfWidth: body, halfHeight: body)
+        XCTAssertLessThanOrEqual(spill, 0,
+                                 "bola Saturnus keluar \(spill) R di luar frame")
+    }
+
+    func testSaturnBodyScalesWithTheRing() {
+        // Kalau lebar cincin diubah, bola **harus** ikut. inilah alasan
+        // `saturnBodyRadius` ada: proporsi bola terhadap cincinnya tidak
+        // boleh bergantung pada angka yang ditulis manual di view.
+        let wide = VisualFrame.saturnRing(frameHalfExtent: 1.0)
+        let wideBody = VisualFrame.saturnBodyRadius(for: wide)
+        let narrow = VisualFrame.saturnRing(frameHalfExtent: 0.5)
+        let narrowBody = VisualFrame.saturnBodyRadius(for: narrow)
+        XCTAssertEqual(wideBody / narrowBody, 2.0, accuracy: 1e-12,
+                       "bola harus ikut cincin, persis linear")
+    }
+
+    func testSaturnRingIsNotAFullDisc() {
+        // Cincin harus **pipih**. Elips penuh (axialRatio 1.0) terbaca sebagai
+        // piring, bukan cincin -- dan itulah bentuk yang tampil kalau rasio
+        // lebar/tinggi cincin hilang.
+        let ring = VisualFrame.saturnRing()
+        XCTAssertLessThan(ring.fullHeight / ring.fullWidth, 0.5,
+                          "cincin harus pipih; elips penuh terbaca sebagai piring")
+        XCTAssertGreaterThan(ring.fullHeight, 0,
+                             "cincin tidak boleh nol tinggi")
+    }
+
+    func testOverflowReportsNothingForCentredSmallShapes() {
+        // Fungsi batas harus benar untuk bentuk yang memang muat: nilai
+        // negatif berarti "tidak ada yang keluar", bukan "kurang"/"lebih".
+        let spill = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                         halfWidth: 0.5, halfHeight: 0.5)
+        XCTAssertEqual(spill, -0.5, accuracy: 1e-12)
+        // Bentuk yang tepat di tepi: nol, bukan positif.
+        let edge = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                        halfWidth: 1.0, halfHeight: 1.0)
+        XCTAssertEqual(edge, 0, accuracy: 1e-12)
+    }
+
+    func testOverflowAccountsForOffsetCentres() {
+        // Bentuk yang **digeser** (blob nebula) keluar frame lebih cepat
+        // daripada yang terpusat, dan bedanya nyata: yang terpusat cukup
+        // dicek secara radial, yang digeser harus dicek per sumbu. Uji ini
+        // menjaga `overflow` menghitung **per sumbu**, bukan radial.
+        let centred = VisualFrame.overflow(centerX: 0, centerY: 0,
+                                           halfWidth: 0.9, halfHeight: 0.9)
+        let offset = VisualFrame.overflow(centerX: 0.5, centerY: 0,
+                                          halfWidth: 0.9, halfHeight: 0.9)
+        XCTAssertEqual(centred, -0.1, accuracy: 1e-12)
+        XCTAssertEqual(offset, 0.4, accuracy: 1e-12)
+    }
+
+    func testEveryDeepSkyBlobStaysInsideTheFrame() {
+        // Kabut nebula memakai gradien yang sudah memudar ke transparan di
+        // tepi blob, jadi keluar sedikit tidak merusak. Tapi keluar **cukup
+        // jauh** memotong gradien di opasitas yang masih terlihat, dan tepi
+        // rata-rata itu persis yang membuat nebula terlihat "digambar".
+        // Uji ini memakai geometri model yang sama dengan view, bukan angka
+        // yang disalin ulang -- kalau disalin, view bisa menyimpang tanpa
+        // ada yang memberi tahu.
+        for fuzziness in [0.0, 0.4, 0.8, 1.0] {
+            let nebula = VisualFrame.nebula(fuzziness: fuzziness)
+            for (index, blob) in nebula.blobs.enumerated() {
+                let spill = VisualFrame.overflow(centerX: abs(blob.offsetX),
+                                                 centerY: abs(blob.offsetY),
+                                                 halfWidth: blob.radius,
+                                                 halfHeight: blob.radius)
+                XCTAssertLessThanOrEqual(spill, 1e-12,
+                                         "blob nebula \(index) keluar \(spill) R di luar frame pada fuzziness \(fuzziness)")
+            }
+        }
+    }
+
+    func testNebulaGrowsWithFuzziness() {
+        // Kabut yang lebih menyebar harus lebih besar -- itulah satu-satunya
+        // hal yang membedakan "titik kabur" dari "kabut lebar", dan kalau
+        // `fuzziness` diabaikan semua objek langit dalam tampil sama.
+        let tight = VisualFrame.nebula(fuzziness: 0.0)
+        let wide = VisualFrame.nebula(fuzziness: 1.0)
+        XCTAssertGreaterThan(wide.blobs[0].radius, tight.blobs[0].radius,
+                             "fuzziness harus memperlebar kabut")
+    }
+
+    func testNebulaIsAsymmetric() {
+        // Kabut yang simetris sempurna tampak seperti lingkaran yang
+        // digambar. Geserannya harus nyata, bukan nol.
+        let nebula = VisualFrame.nebula(fuzziness: 0.8)
+        let offsets = nebula.blobs.map { hypot($0.offsetX, $0.offsetY) }
+        XCTAssertGreaterThan(offsets.max() ?? 0, 0.1,
+                             "blob harus digeser dari pusat supaya tidak tampak digambar")
+    }
 }

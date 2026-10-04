@@ -192,10 +192,24 @@ struct CelestialVisualView: View {
     /// transparan — jadi cincin belakang tetap terlihat penuh melewati bola
     /// dan hasilnya bukan cincin melainkan piring.
     private func drawRings(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let outer = CGRect(x: center.x - radius * 1.9,
-                           y: center.y - radius * 0.62,
-                           width: radius * 3.8,
-                           height: radius * 1.24)
+        // **Geometri cincin datang dari `VisualFrame`, bukan dari angka di
+        // sini.** Cincin adalah bentuk yang paling mudah salah secara tak
+        // terlihat: `Canvas` memotong apa pun di luar `frame`-nya dengan tepi
+        // lurus, jadi cincin yang terlalu lebar tidak tampak "agak kepotong"
+        // -- ia tampak sebagai dua garis yang berhenti mendadak. Versi lama
+        // memakai `3.8 x radius` (ujungnya di x = +/-1.9R, yaitu 0.9R di luar
+        // frame) dan terpotong tegak. Uji `testSaturnRingStaysInsideTheFrame`
+        // menutupnya di Linux, tempat bentuk ini bisa diuji.
+        let ring = VisualFrame.saturnRing()
+        // Bola **mengecil** mengikuti cincin. Kalau bola tetap memakai radius
+        // frame penuh sementara cincin mengisi frame, bola menutupi cincin dan
+        // hasilnya piring, bukan Saturnus.
+        let bodyRadius = VisualFrame.saturnBodyRadius(for: ring)
+
+        let outer = CGRect(x: center.x - CGFloat(ring.halfWidth) * radius,
+                           y: center.y - CGFloat(ring.halfHeight) * radius,
+                           width: CGFloat(ring.fullWidth) * radius,
+                           height: CGFloat(ring.fullHeight) * radius)
         let ringColor: Color = NightMode.isOn
             ? Color(red: 0.62, green: 0.30, blue: 0.16)
             : Color(red: 0.86, green: 0.78, blue: 0.60)
@@ -204,20 +218,21 @@ struct CelestialVisualView: View {
         context.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.45)))
 
         let palette = CelestialVisual.Planet.saturn.palette
-        drawSphere(context: context, center: center, radius: radius,
+        drawSphere(context: context, center: center, radius: CGFloat(bodyRadius) * radius,
                    from: palette.light, to: palette.dark)
 
-        // Depan cincin (paruh bawah) — digambar di atas bola. Batas bawahnya
+        // Depan cincin (paruh bawah) -- digambar di atas bola. Batas bawahnya
         // adalah **setengah bawah frame** (`CGRect` penuh, bukan
-        // `Path(ellipseIn:)`), jadi cincin tepat melewati ekuator bola — yang
-        // persis seperti yang terlihat pada Saturnus.
+        // `Path(ellipseIn:)`), jadi cincin tepat melewati ekuator bola --
+        // yang persis seperti yang terlihat pada Saturnus.
         var front = context
         front.clip(to: Path(CGRect(x: 0, y: center.y,
                                   width: outer.maxX,
                                   height: outer.maxY - center.y)))
         front.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.8)))
         // Pembelah cincin (Cassini): cincin tidak pekat seragam.
-        let gap = outer.insetBy(dx: radius * 0.34, dy: radius * 0.11)
+        let gap = outer.insetBy(dx: CGFloat(bodyRadius) * radius * 0.34,
+                                dy: outer.height * 0.09)
         front.fill(Path(ellipseIn: gap), with: .color(Color.black.opacity(0.28)))
     }
 
@@ -451,21 +466,28 @@ struct CelestialVisualView: View {
 
     private func drawDeepSky(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         // Kabut lembut: cincin tumpang-tindih dengan opasitas rendah, tanpa
-        // tepi keras. Tepi adalah ciri yang paling keliru untuk nebula/galaksi —
-        // tepi yang tepat justru terlihat "digambar".
+        // tepi keras. Tepi adalah ciri yang paling keliru untuk nebula/galaksi
+        // -- tepi yang tepat justru terlihat "digambar".
+        //
+        // **Geometri blob datang dari `VisualFrame.nebula`.** Blob digeser dari
+        // pusat supaya kabut tidak simetris sempurna, dan geseran itu
+        // memperkecil ruang yang tersisa ke tepi frame. Memakai radius tetap
+        // untuk semua blob membuat blob yang digeser terpotong **tegak** oleh
+        // `Canvas` -- tepat di tengah gradiennya, jadi potongannya terlihat.
+        // Itulah yang dihitung model, dan ujinya ada di Linux.
         let core = NightMode.isOn
             ? Color(red: 0.78, green: 0.20, blue: 0.12)
             : Color(red: 0.72, green: 0.78, blue: 0.95)
-        let extent = radius * CGFloat(0.7 + 0.5 * visual.fuzziness)
-        for (index, scale) in [1.0, 0.68, 0.40].enumerated() {
-            let r = extent * CGFloat(scale)
-            let offsetX = CGFloat([-0.18, 0.22, 0.05][index]) * radius
-            let offsetY = CGFloat([0.12, -0.16, -0.04][index]) * radius
-            let centerOfBlob = CGPoint(x: center.x + offsetX, y: center.y + offsetY)
+        let nebula = VisualFrame.nebula(fuzziness: visual.fuzziness)
+        for blob in nebula.blobs {
+            let r = CGFloat(blob.radius) * radius
+            guard r > 0 else { continue }
+            let centerOfBlob = CGPoint(x: center.x + CGFloat(blob.offsetX) * radius,
+                                       y: center.y + CGFloat(blob.offsetY) * radius)
             context.fill(Path(ellipseIn: CGRect(x: centerOfBlob.x - r, y: centerOfBlob.y - r,
                                                width: r * 2, height: r * 2)),
                          with: .radialGradient(
-                            Gradient(colors: [core.opacity([0.42, 0.30, 0.55][index]),
+                            Gradient(colors: [core.opacity(blob.opacity),
                                               core.opacity(0)]),
                             center: centerOfBlob, startRadius: 0, endRadius: r))
         }

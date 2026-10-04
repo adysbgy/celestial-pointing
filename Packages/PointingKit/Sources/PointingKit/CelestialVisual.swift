@@ -351,6 +351,183 @@ public extension CelestialVisual {
     }
 }
 
+// MARK: - Batas gambar: berapa jauh tiap bentuk keluar dari frame
+
+/// Batas kerangka gambar -- satu-satunya tempat yang tahu ukuran `Canvas`.
+///
+/// **Kenapa model ini ada.** `Canvas` di SwiftUI memotong apa pun di luar
+/// `frame`-nya sendiri, dan ia memotong dengan **tepi lurus**, bukan dengan
+/// memudar. Cacat yang paling mudah lolos karena begitu: cincin Saturnus
+/// digambar selebar `3.8 x radius` -- hampir dua kali frame -- sehingga
+/// `Canvas` memotong kedua ujungnya tegak. Hasilnya bukan cincin, melainkan
+/// dua garis lurus yang berhenti mendadak di tepi kotak.
+///
+/// Kenapa ia bertahan lama: `swiftc -parse` tidak melihatnya, `swift test`
+/// tidak melihatnya (warnanya tidak bisa diuji di Linux), dan di kartu jam
+/// 38pt ujungnya bisa saja tidak disadari. Yang bisa menutupnya hanya satu:
+/// memindahkan **angka batas** ke tempat yang bisa diuji, lalu membuat view
+/// memakai angka itu alih-alih punya rumus sendiri.
+///
+/// Satuan semua angka: **1.0 = setengah lebar frame** (yaitu `radius`).
+/// Frame adalah persegi, jadi batasnya sama di keempat sisi.
+public enum VisualFrame {
+
+    /// Batas luar yang boleh dicapai bentuk sebelum terpotong tegak.
+    ///
+    /// `Canvas` memakai frame persegi, bukan lingkaran -- jadi bentuk yang
+    /// keluar sampai 1.0 di keempat arah masih utuh, dan lebih dari itu
+    /// terpotong. Bentuk simetris (cincin, kutub) tidak membedakan dua hal
+    /// itu, tapi bentuk yang digeser (blob nebula) berbeda jauh.
+    public static let halfExtent: Double = 1.0
+
+    /// Berapa jauh sebuah bentuk keluar dari frame, dalam satuan radius.
+    ///
+    /// - Parameters:
+    ///   - centerX: jarak pusat bentuk dari tengah frame, sumbu x.
+    ///   - centerY: jarak pusat bentuk dari tengah frame, sumbu y.
+    ///   - halfWidth: setengah lebar bentuk, sumbu x.
+    ///   - halfHeight: setengah tinggi bentuk, sumbu y.
+    /// - Returns: nilai **>= 0**. `0` berarti seluruh bentuk di dalam frame;
+    ///   nilai lebih besar adalah bagian yang akan terpotong tegak.
+    public static func overflow(centerX: Double,
+                                centerY: Double,
+                                halfWidth: Double,
+                                halfHeight: Double) -> Double {
+        max(centerX + halfWidth, centerY + halfHeight) - halfExtent
+    }
+
+    /// Cincin Saturnus: bentuk elips terluar, dalam satuan radius.
+    ///
+    /// Satu tipe untuk **kedua** belahan cincin (belakang dan depan), bukan
+    /// dua rumus terpisah -- kelas kesalahan yang sama yang membuat kutub
+    /// Mars tidak simetris (satu rumus untuk utara, satu lagi untuk selatan).
+    public struct RingGeometry: Equatable, Sendable {
+        /// Setengah lebar cincin (sumbu x), satuan radius.
+        public var halfWidth: Double
+        /// Setengah tinggi cincin (sumbu y), satuan radius.
+        public var halfHeight: Double
+
+        public init(halfWidth: Double, halfHeight: Double) {
+            self.halfWidth = halfWidth
+            self.halfHeight = halfHeight
+        }
+
+        /// Lebar cincin yang tampil di layar: ujung elips berada di
+        /// `x = +/-halfWidth`, jadi lebar penuhnya `2 x halfWidth` --
+        /// bukan nilai ini dikali 1.9 seperti versi lama.
+        public var fullWidth: Double { 2 * halfWidth }
+        /// Tinggi cincin yang tampil di layar (2 x halfHeight).
+        public var fullHeight: Double { 2 * halfHeight }
+    }
+
+    /// Cincin Saturnus yang **pas di frame**.
+    ///
+    /// Lebar cincin dipilih agar ujung elips terluar menyentuh tepi frame
+    /// **tepat pada batasnya**: `halfWidth = halfExtent`. Mengapa 1.9R bukan
+    /// pilihan yang benar: ujung elips di `x = +/-1.9` berada 0.9R **di luar**
+    /// frame, jadi `Canvas` memotongnya tegak.
+    ///
+    /// Konsekuensi yang harus disadari: bola harus **mengecil** supaya cincin
+    /// muat. Saturnus sungguhan memang tidak sebesar itu dibanding
+    /// cincinnya -- tapi membesarkan cincin sampai keluar frame hanya
+    /// memindahkan cacat ke tempat lain, bukan menutupnya.
+    ///
+    /// - Parameters:
+    ///   - frameHalfExtent: setengah lebar frame (1.0 untuk `Canvas` persegi).
+    ///   - axialRatio: setengah tinggi dibagi setengah lebar. Cincin Saturnus
+    ///     sungguhan tampak miring saat menghadap kita, dan untuk ikon 2D
+    ///     rasio sekitar 1:3 terbaca sebagai "cincin" -- asal **tidak** penuh,
+    ///     karena elips penuh terbaca sebagai piring.
+    static func saturnRing(frameHalfExtent: Double = halfExtent,
+                           axialRatio: Double = 1.0 / 3.2) -> RingGeometry {
+        let halfWidth = frameHalfExtent
+        return RingGeometry(halfWidth: halfWidth,
+                            halfHeight: halfWidth * axialRatio)
+    }
+
+    /// Jari-jari bola di dalam cincin Saturnus, dalam satuan radius frame.
+    ///
+    /// **Dipisah dari `saturnRing` dengan alasan yang bisa diuji.** Jari-jari
+    /// bola harus mengikuti lebar cincin: kalau cincin mengisi frame
+    /// (`halfWidth = 1.0`) sementara bola tetap memakai radius frame penuh,
+    /// bola menutupi cincin dan hasilnya piring. Mengambil dari lebar cincin
+    /// membuat proporsi itu benar **secara konstruktif**, dan mengubah lebar
+    /// cincin tanpa harus mengingat memperkecil bola secara terpisah.
+    ///
+    /// - Parameters:
+    ///   - ring: cincin dari `saturnRing`.
+    ///   - bodyFraction: jari-jari bola sebagai pecahan dari setengah lebar
+    ///     cincin.
+
+    static func saturnBodyRadius(for ring: RingGeometry,
+                                 bodyFraction: Double = 0.53) -> Double {
+        ring.halfWidth * bodyFraction
+    }
+
+    /// Geometri kabut nebula: tiga blob tumpang-tindih tanpa tepi keras.
+    ///
+    /// **Kenapa ini di model, bukan di view.** Blob digeser dari pusat
+    /// (supaya kabut tidak simetris sempurna, yang justru terlihat
+    /// "digambar"). Geseran itu membuat batasnya **berbeda per sumbu**:
+    /// blob yang terpusat aman dicek secara radial, blob yang digeser
+    /// keluar frame lebih cepat. Karena itu ukurannya dihitung dari sisa
+    /// ruang ke tepi frame, bukan dari radius mentah.
+    public struct NebulaGeometry: Equatable, Sendable {
+        public struct Blob: Equatable, Sendable {
+            /// Geseran pusat blob dari tengah frame, sumbu x & y (satuan radius).
+            public var offsetX: Double
+            public var offsetY: Double
+            /// Jari-jari blob (satuan radius).
+            public var radius: Double
+            /// Opasitas puncak blob (di pusatnya; memudar ke 0 di tepi).
+            public var opacity: Double
+        }
+
+        public var blobs: [Blob]
+
+        public init(blobs: [Blob]) { self.blobs = blobs }
+    }
+
+    /// Kabut nebula yang **pas di frame**.
+    ///
+    /// Jari-jari tiap blob dipotong supaya blob tidak pernah keluar dari frame:
+    /// `radius <= jarak tersisa ke tepi terdekat`. Konsekuensinya ukuran
+    /// maksimal bergantung pada geseran -- blob yang digeser jauh harus
+    /// lebih kecil. Itu **benar**, dan itulah alasan rumusnya begini:
+    /// memakai radius tetap membuat blob yang digeser terpotong tegak,
+    /// sementara gradiennya belum selesai memudar di situ.
+    ///
+    /// - Parameters:
+    ///   - fuzziness: 0 = titik, 1 = kabut paling lebar.
+    ///   - frameHalfExtent: setengah lebar frame.
+    static func nebula(fuzziness: Double,
+                       frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
+        let clamped = min(1, max(0, fuzziness))
+        // Geseran ditulis tetap: bentuk kabut yang asimetris adalah yang
+        // membuatnya tidak tampak seperti lingkaran yang digambar.
+        let layout: [(Double, Double, Double, Double)] = [
+            // (offsetX, offsetY, skala, opasitas)
+            (-0.18, 0.12, 1.00, 0.42),
+            ( 0.22, -0.16, 0.68, 0.30),
+            ( 0.05, -0.04, 0.40, 0.55)
+        ]
+        let blobs = layout.map { offsetX, offsetY, scale, opacity in
+            // Ruang yang tersisa dari pusat blob ke tepi frame terdekat.
+            let headroomX = frameHalfExtent - abs(offsetX)
+            let headroomY = frameHalfExtent - abs(offsetY)
+            let headroom = min(headroomX, headroomY)
+            // Lebar kabut: mengikuti `fuzziness`, tetapi tidak pernah
+            // melebihi ruang yang tersisa.
+            let extent = headroom * (0.62 + 0.38 * clamped)
+            return NebulaGeometry.Blob(offsetX: offsetX,
+                                       offsetY: offsetY,
+                                       radius: extent * scale,
+                                       opacity: opacity)
+        }
+        return NebulaGeometry(blobs: blobs)
+    }
+}
+
 // MARK: - Geometri ciri planet
 
 public extension CelestialVisual {
