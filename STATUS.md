@@ -131,6 +131,10 @@ Tiga jebakan berbeda, tiga-tiganya tak terlihat di Linux:
   CI macOS.
 - `swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - Sapuan aksara non-Latin: 0.
+- CI: `37231190548` (Apple Build, macos-15) + `37231190543` (Engine Linux) —
+  **dua-duanya hijau**. Apple Build sempat MERAH dua kali (`37230467244`,
+  `37230839317`) karena crash CoreFoundation di atas; itulah bukti jebakan
+  ini nyata, bukan teoretis.
 
 ## Progres terakhir (4 Okt 2026 — laporan alat ukur lahir di dalam paket, tak terjangkau dua gerbang sekaligus)
 
