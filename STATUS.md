@@ -2,13 +2,15 @@
 
 ## Ringkasan keadaan (4 Okt 2026)
 
-**Misi UI/UX berjalan (Bagian 1 + 2, Bagian 3 lengkap, awal Bagian 4).**
-Visual prosedural terpasang di kedua app, token permukaannya teruji di
-Linux, tiga celah wajib Bagian 3 sudah tertutup.
+**Misi UI/UX SELESAI (Bagian 1–4 lengkap).** Visual prosedural terpasang di
+kedua app, token permukaannya teruji di Linux, tiga celah wajib Bagian 3
+tertutup, dan sisa Bagian 4 (onboarding, audio, `@ScaledMetric`) selesai di
+commit `17a5c32`.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 188 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 198 test
   PointingKit, 0 gagal** (`./swift-test.sh`, Swift 6.0 di Docker, Linux) —
-  dan **kedua workflow CI hijau** di HEAD `0b5fee6`.
+  dan **kedua workflow CI hijau** di HEAD `17a5c32` (Apple Build `37176415267`
+  + Engine Tests `37176415270`).
 - Visual objek: model di `PointingKit` (teruji di Linux), renderer prosedural di
   `Apps/Shared/CelestialVisualView.swift`. Planet (pita Jupiter + Bintik Merah
   Besar, cincin Saturnus, kutub Mars, kawah Merkurius, kabut Venus), **fase
@@ -26,9 +28,68 @@ Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
 | Item | Status |
 |---|---|
 | 4.4 animasi halus (`withAnimation` saat state→lock) | SELESAI — `LockArrivalGate` (PointingKit, 10 test) + `PointingEngine.publish(_:)`. `lockCount` lama dibuang (tak pernah dibaca) |
-| Onboarding value-first | belum ada sama sekali |
-| 4.6 audio opsional saat lock | belum ada |
-| `@ScaledMetric` | belum dipakai (semua font sudah semantic) |
+| Onboarding value-first | SELESAI — `Apps/Shared/OnboardingView.swift` (1 kartu, sekali pakai via `OnboardingStorage`) di `PointingView` (jam) + `RootView` (iPhone) |
+| 4.6 audio opsional saat lock | SELESAI — `Apps/Shared/AudioCue.swift` (nada 880Hz prosedural, `AVAudioEngine`/`AVAudioPCMBuffer`), hanya `.lockSucceeded`, toggle `Bunyi saat kunci` |
+| `@ScaledMetric` | SELESAI — ikon status `PointingView` pakai `@ScaledMetric(relativeTo: .headline)`; `WatchMetrics.iconSize` mati dibuang |
+
+## Progres terakhir (4 Okt 2026 — sisa Bagian 4: onboarding + audio + @ScaledMetric)
+
+Siklus ini menutup tiga item terakhir dari brief yang benar-benar belum ada:
+onboarding value-first, audio opsional saat lock, dan `@ScaledMetric` (font
+sudah semantic, jadi yang tersisa adalah metric yang belum ikut scale). Aturan
+keras PRD tidak dilonggarkan; engine tidak disentuh.
+
+### Yang dikerjakan, dan kenapa begini
+
+1. **Onboarding value-first (`Apps/Shared/OnboardingView.swift`).** Satu kartu
+   singkat: "Arahkan jam ke langit → ketahui apa yang kamu lihat", plus janji
+   jujur "jika ragu, engine akan mengatakannya". Tidak ada tur panjang: saat
+   pengguna mengangkat pergelangan di malam hari, lima layar instruksi justru
+   menunda hal yang dicari. Ditampilkan sekali lewat `.sheet` (kunci
+   `OnboardingStorage.key`), dan menutupnya tidak mereset alur. **Tidak ada
+   satu pun klaim hasil ukur** di kartu ini, jadi tidak ada risiko false
+   confidence dari layar pembuka.
+
+2. **Audio opsional saat lock (`Apps/Shared/AudioCue.swift`).** `AudioCueEngine`
+   menyintesis nada 880Hz di memori (`AVAudioEngine` + `AVAudioPCMBuffer`,
+   amplop naik-turun) — **tanpa aset**, sejalan dengan visual yang tanpa aset.
+   Dipasang tepat seperti `HapticEngine`: closure `engine.audioCue` (paralel
+   `haptics`, dipanggil dari `ingest`), jadi tidak menyentuh logika engine
+   teruji. Hanya berbunyi untuk `.lockSucceeded` — bunyi saat ragu sama
+   berbahayanya dengan getaran saat ragu (false confidence berwujud suara).
+   `AudioCue.isOn` default **nyala** (aksesibilitas multi-modal), ada toggle
+   "Bunyi saat kunci" di kedua app. `setCategory(.playback, .mixWithOthers)`
+   supaya tidak memotong musik latar pengguna.
+
+3. **`@ScaledMetric` pada ikon status.** Semua *font* memang sudah semantic,
+   tapi `WatchMetrics.iconSize` (16, tetap) diniatkan ikut scale menurut
+   komentarnya sendiri namun tidak pernah dipakai. Diganti `@ScaledMetric(
+   relativeTo: .headline)` di `PointingView` untuk frame simbol status, supaya
+   ikon dan teks mendapat tekanan yang sama saat Dynamic Type diubah. Anggota
+   mati `WatchMetrics.iconSize` dibuang; komentarnya diubah menjelaskan bahwa
+   metric yang *memang* tak boleh scale (diameter visual, radius) tetap angka
+   tetap.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 198 PointingKit, 0 gagal** (naik
+  dari 188 → 198: 10 uji `LockArrivalGate` ditambahkan siklus sebelumnya,
+  terhitung di sini). Engine/logika app tidak disentuh.
+- Gerbang sintaks `swiftc -parse` seluruh 20 berkas app lolos di `swift:6.0`
+  setelah perubahan.
+- **CI macOS (Apple Build) GAGAL dulu pada `e8f8bb9`**, lalu hijau di `17a5c32`:
+  - Kegagalan pertama murni salah letak: `onboardingSeen` & `audioCue` mendarat
+    di struct `PointAndKnowiOSApp` (cocok salah dengan `@StateObject trace`),
+    padahal dirujuk di `RootView` → "cannot find in scope". Dipindah ke
+    `RootView`, bukan cuma di-`_fix_`.
+  - Dua catatan CI yang tersisa **bukan** kode kita: (a) `swift-format cannot
+    parse configuration` (alat, sengaja diabaikan gate), (b)
+    `CalibrationSessionTests.swift:285` `XCTUnwrap` unused — berkas *test*
+    `PointingKit` di luar scope `Apps/`; sudah tercatat di STATUS lama sebagai
+    sengaja tidak diubah.
+  - Gerbang peringatan "kode sendiri" (`Apps/`) lolos: Tidak ada peringatan
+    compiler pada Apps/.
+- **Engine Tests (Linux) hijau** di `17a5c32`.
 
 ## Progres terakhir (4 Okt 2026 — kalibrasi: VoiceOver + Dynamic Type)
 
