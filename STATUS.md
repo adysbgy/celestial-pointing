@@ -5166,6 +5166,64 @@ warning). Yang paling penting:
 Gate: `./swift-ui-lint.sh` 9/9 bersih, `./swift-typecheck.sh` lulus.
 CI: Engine Tests (Linux) + Apple Build keduanya **success** (`32367c8`).
 
+## Siklus 2026-10-04 (4) — bentuk objek langit dalam tidak terdengar
+
+**Unit terkecil:** pengumuman VoiceOver untuk bentuk objek langit dalam.
+Siklus sebelumnya membuat galaksi, gugus bola, dan gugus terbuka digambar
+berbeda — tapi tidak satu pun dari itu terdengar.
+
+### Yang ditemukan
+
+"Gugus Ptolemy" (M7, gugus terbuka) dan "Gugus Hercules" (M13, gugus bola)
+sama-sama ber-`kind: .deepSky`. Pengumumannya karena itu **sama persis**:
+nama, `spokenName` ("objek langit jauh"), magnitudo. Padahal di layar keduanya
+kini digambar berbeda (bintik tersebar vs inti padat). Satu kelas informasi
+yang hanya bisa dilihat.
+
+Ini kategori yang sama dengan fase Bulan, dan itu sudah pernah ditutup di
+repo ini (`spokenPhase`, `MoonPhaseSpeech.swift`). Yang belum tertutup adalah
+kelas **bentuk objek langit dalam** — jenisnya tidak membedakan mereka.
+
+### Yang diperbaiki
+
+- `DeepSkySpeech.swift` (PointingKit, teruji di Linux):
+  `spokenDeepSkyMorphology` + `deepSkyMorphologyText` (murni, tanpa bundle —
+  supaya pemilihannya bisa diuji, bukan cuma teksnya).
+- Empat kunci katalog baru (`deepSky.morphology.*`, id + en) + entri di
+  `LocalizedText.allKeys`, jadi gerbang paritas aturan 6 ikut menjaganya.
+- Dua call site diperbarui: label VoiceOver jam (`PointingView`) dan iPhone
+  (`visualPanelLabel`), tepat setelah fase Bulan.
+- Hitungan kunci di `testDeclaredKeysAreUniqueNonEmptyAndComplete` naik
+  46 → 50 — gerbang itu sengaja memaksa angka diperbarui setiap kunci
+  ditambah, supaya kunci yang masuk katalog tanpa masuk `allKeys` tidak lolos.
+
+### Kenapa `nil` untuk id tak dikenal (bukan tebakan)
+
+Sama dengan `morphology(forObjectID:)`: gambar memakai kabut **netral** saat
+bentuknya tidak diketahui, jadi pengumuman tidak boleh menyebut bentuk apa
+pun. `spokenDeepSkyMorphology` mengembalikan `nil` untuk bukan objek langit
+dalam **dan** untuk id tak dikenal — sehingga suara selalu cocok dengan
+gambar, bukan versi kedua dari kebenaran.
+
+### Trade-off yang disengaja
+
+Untuk objek yang namanya sudah menyebut jenisnya ("Galaksi Andromeda"), kata
+morfologinya sedikit berulang saat diucapkan. Dibiarkan: alternatifnya adalah
+mencocokkan teks yang dilokalisasi untuk melihat apakah nama sudah memuat
+kata jenisnya, dan itu rapuh persis pada bahasa yang belum ada terjemahannya.
+Pengulangan kecil lebih baik daripada aturan yang bisa diam-diam salah.
+
+### Verifikasi
+
+6 uji baru (357 → **363** PointingKit, +166 engine = **529 hijau**, tanpa
+warning). Yang mengunci pembedanya:
+`testTwoClustersWithTheSameKindSoundDifferent` — dua objek berjenis sama
+harus terdengar berbeda; `testUnknownDeepSkyIDDoesNotGuessASpokenMorphology`
+— suara tidak mengklaim bentuk yang tidak ada di layar.
+
+Gate: lint 9/9, typecheck lulus. CI: Engine + Apple Build **success**
+(`4ff6a6d`).
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
