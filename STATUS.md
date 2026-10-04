@@ -1,5 +1,130 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — Reduce Motion tidak pernah dibaca di mana pun)
+
+### Premis siklus ini: preferensi pengguna yang paling sering dipakai, tanpa satu pun penjaga
+
+Brief sudah terpasang: Fase B menutup animasi halus, denyut glow bintang, dan
+pop spring saat kunci. Yang **tidak pernah** ditanyakan adalah apakah semua
+itu boleh berjalan untuk pengguna yang minta jangan bergerak. Sapu diverifikasi
+terlebih dulu, bukan dibaca sambil lalu:
+
+```
+$ grep -rn "accessibilityReduceMotion" Apps Packages/*/Sources
+(nihil)
+```
+
+Nol. Sementara di repo yang sama ada **empat** `withAnimation(.spring)`
+(`PointingView` 2, `DiagnosticsView` 2) dan satu `TimelineView(.animation)`
+30 Hz yang menyegarkan denyut glow bintang — berulang tanpa henti selama layar
+menyala. Jadi bentuk gerak yang paling mengganggu (yang tidak pernah
+berhenti sendiri) justru yang paling tidak bisa dihentikan.
+
+Kelas cacatnya persis yang sudah repo ini tutup berulang kali: **aturan ada,
+penerapannya tidak.** Bandingkan dengan Dynamic Type (muncul lagi di berkas
+complication yang ditambahkan belakangan) dan aturan penyapu UI (buta terhadap
+metadata WidgetKit). Yang membuat kelas ini bertahan: tidak ada satu pun gerbang
+yang bisa merah kalau `accessibilityReduceMotion` tidak dibaca, karena tidak ada
+gerbang yang tahu bahwa preferensi itu **seharusnya** dibaca.
+
+### Yang membedakan unit ini dari "tambah AnimatedFeature"
+
+Aturan motion dipindah ke `PointingKit` sebagai `MotionPolicy`, bukan ditulis
+di view. Alasannya bukan kerapian: `accessibilityReduceMotion`,
+`TimelineView`, dan `Canvas` **tidak bisa dibangun di Linux**, jadi kalau
+aturannya tinggal di view satu-satunya pembuktiannya adalah "berkompilasi di
+Mac" — persis celah yang membuat geometri kutub Mars bisa menembus 0.26R
+selama lima siklus.
+
+Yang lebih penting, ada **dua bentuk gerak dengan jawaban yang berbeda**, dan
+menyamakan keduanya adalah jebakan:
+
+| Bentuk | Contoh | `reduceMotion` | Layar redup | Scene tak aktif |
+|---|---|---|---|---|
+| Kontinu | denyut glow bintang | **stop** | **stop** | **stop** |
+| Transisi | pop saat kunci | **stop** | **stop** | **boleh** |
+
+Baris terakhir adalah inti keputusan. `isSceneActive` menghentikan denyut
+karena denyut di latar belakang hanya membebani baterai tanpa pernah terlihat.
+Tapi **transisi dipicu aksi pengguna**, jadi saat transisi berjalan layarnya
+aktif — dan memasukkan `isSceneActive` ke sana akan mematikan umpan balik
+"kunci berhasil" tepat saat itu. Uji `testInactiveSceneDoesNotKillTransitions`
+mengunci perbedaan itu secara eksplisit, dan mutasinya **dibuktikan MERAH**.
+
+Menulis unit ini memasukkan lima selip CJK (satu di `MotionPolicy.swift`,
+
+empat di `MotionPolicyTests.swift`) — semuanya di komentar, semua terlihat
+benar di layar. Tapi sapuan yang sudah ada menangkapnya seperti biasa.
+  denyutnya diam. Hanya perbandingan yang menangkapnya.
+- **Laju denyut** (1,1 rad/dtk → satu denyut penuh tiap 5,712 detik) dipindah
+  dari literal `* 1.1` di view ke konstanta bernama, karena angka yang sampai
+  ke mata pengguna setiap detik harus punya satu sumber yang bisa diuji.
+
+### Cacat kedua yang ditemukan: aturan 3 menangkap CJK tapi buta terhadap Latin rusak
+
+Menulis unit inilatorCC imposed five CJK slips (satu di `MotionPolicy.swift`,
+empat di `MotionPolicyTests.swift`) — semuanya di komentar, semua terlihat
+benar di layar. TapiSapuan yang sudah ada menangkapnya seperti biasa.
+
+Yang **tidak** tertangkap adalah temuan lain: **empat kata Latin korup** yang
+sudah lama ada di repo, termasuk di dalam test suite:
+
+| Tempat | Selip | since |
+|---|---|---|
+| `Apps/Shared/CelestialVisualView.swift:54` | `di-George` | siklus moon-phase |
+| `LockArrivalTests.swift:43` | `nil` akan *flowing* 20 kali/detik | — |
+| `LockArrivalTests.swift:92` | *Memorial celebrating* untuk benda yang tidak ada | — |
+| `NightVisualTests.swift:9` | `dan_colors_nyaelly` | — |
+| `NightVisualTests.swift:21` | `danasticity` (menggantikan "dan elastisitasnya") | — |
+
+Semuanya **jejak CJK yang hilang** — huruf CJK dihapus dari kalimat Indonesia,
+dan sisa gagalnya menyatu jadi satu kata aneh (`danasticity` =
+"dan" + "asticity"). Karena itu aturannya lolos: sapuan CJK tidak melihatnya,
+dan sapuan Latin tidak punya daftar kata jenis itu. `di-George` dan
+`Memorial celebrating` lebih buruk lagi karena **terbaca benar** sebagai
+bahasa Inggris, bukan salah eja.
+
+Kandidat unit berikutnya sudah jelas: daftar kata asing yang **tidak** pernah
+muncul dalam kode ini — diturunkan dari apa yang benar-benar tampil sebagai
+teks, bukan dari daftar umum. Sama seperti aturan 4 yang hanya memindai
+peritel yang memang dipakai.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 303 PointingKit, 0 gagal**
+  (naik dari 292; +11 uji). Engine tidak disentuh.
+- **Dua mutasi dibuktikan MERAH lebih dulu** lewat `./red-test.sh`:
+  - `allowsTransitions` ikut `isSceneActive` → `testInactiveSceneDoesNotKillTransitions`
+    gagal: *"transisi dipicu aksi pengguna, jadi layar aktif saat ia berjalan"*.
+  - `pulsePhase` `0` → `0.0001` → `testPulsePhaseIsExactlyZeroWhenContinuousMotionIsDenied`
+    gagal di 12 titik: *`("0.0001") is not equal to ("0.0")`*.
+- `./swift-ui-lint.sh` → 6 aturan hijau.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS (build kedua paket + parse 23
+  berkas `Apps/`).
+- Sapuan CJK/Cyrillic/fullwidth pada seluruh berkas yang diubah: **0**
+  (lima selip tertangkap dan dibuang sebelum commit).
+- **CI hijau pada push pertama** (`90b0940`):
+  - `Apple Build` run `37208040057` → **2× `BUILD SUCCEEDED`**, gerbang
+sebelumnya, belum ditutup), dan sekarang terbukti butanya **lebih
+  - `Engine Tests (Linux)` run `37208040009` → hijau, sebelas uji motion
+    terlihat **lolos per nama di log CI** (bukan hanya di mesin ini).
+
+### Batas yang diketahui dan belum ditutup
+
+- **`accessibilityReduceMotion` baru dipasang di dua tempat**: pop saat kunci
+  (jam + iPhone) dan denyut glow (iPhone). Yang **belum** disambungkan:
+  animasi lain yang mungkin muncul nanti, dan `TimelineView` denyut **di
+  app jam** — jam memang tidak punya denyut kontinu (gambar di sana statis),
+  jadi tidak ada yang perlu dihentikan, tapi itu **kebetulan**, bukan aturan.
+  Kandidat: `MotionPolicy` exposing/hanya dibaca di view yang memanggil
+  `withAnimation`/`TimelineView`/`repeatForever` — sapuan statis baru.
+- **Aturan 3 masih buta di `*.sh` dan `project.yml`** (dicatat di siklus
+  sebelumnya, belum ditutup), dan sekarang terbuktijugak Butanya **lebih
+  dalam**: ia menangkap aksara non-Latin tapi tidak menangkap Latin yang
+  rusak. Dua kelas cacat berbeda dengan satu sapuan.
+- **Terjemahan `en` tetap tidak bisa diverifikasi di Linux** — tidak berubah,
+  alasannya tidak berubah.
+
 ## Progres terakhir (4 Okt 2026 — kunci katalog yang hilang menampakkan nama kuncinya sendiri)
 
 ### Premis siklus ini: STATUS lalu menutup satu celah dengan kalimat yang benar, tapi tidak lengkap

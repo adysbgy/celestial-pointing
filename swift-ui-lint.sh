@@ -416,6 +416,79 @@ PY
   fi
 fi
 
+# ── Aturan 7: gerak tanpa penjaga reduce-motion ────────────────────────────
+# `accessibilityReduceMotion` **tidak pernah** dibaca di repo ini sampai unit
+# MotionPolicy, padahal ada empat `withAnimation(.spring)` dan satu
+# `TimelineView(.animation)` 30 Hz. Persis kelas yang sudah beberapa kali
+# menutup siklus sebelumnya: Dynamic Type kembali muncul di berkas yang
+# ditambahkan belakangan, aturan 4 buta terhadap metadata WidgetKit. Semuanya
+# "hijau yang tidak hijau" — tidak ada gerbang yang merah karena tidak ada
+# gerbang yang tahu aturan itu **seharusnya** dibaca.
+#
+# Yang ditutup di sini adalah **kelas**-nya, bukan satu situs: berkas mana pun
+# yang memanggil API gerak wajib merujuk penjaga gerak. `withAnimation` pada
+# tombol baru akan tertangkap di commit yang sama, bukan bulan kemudian.
+#
+# Yang diperiksa adalah nama API **di kode**, sementara penjaga boleh disebut
+# di mana saja di berkas (kode atau komentar). Alasannya: dokumentasi aturan
+# ini sendiri menyebut `withAnimation`, jadi penyapu yang ikut menghitung
+# komentar akan melaporkan dirinya sendiri -- persis gerbang yang selalu merah
+# dan akan dimatikan orang lain saat ia berbunyi.
+echo
+echo "== Aturan 7: API gerak harus punya penjaga reduce-motion =="
+motion=$(python3 - <<'PY'
+import os, re
+
+# API yang menghasilkan gerak berulang atau transisi.
+# `\.animation(` sengaja **tidak** dibatasi isinya. Versi pertama hanya
+# mem-pattern `.animation()` (tanpa argumen) -- dan uji injeksi pada
+# `.animation(.linear, value: 1)` membuktikan ia lolos. Bentuk tanpa argumen
+# justru yang paling jarang di SwiftUI; bentuk dengan argumen adalah yang
+# dipakai sungguhan, jadi daftar peritel yang sempit akan menutup kelas cacat
+# ini dengan lubang di tempat yang paling mungkin dialam.
+MOTION_API = re.compile(
+    r"\bwithAnimation\b"
+    r"|\.repeatForever\b"
+    r"|TimelineView\(\s*\.animation"
+    r"|\.animation\s*\(")
+
+# Penjaga yang membuat gerak boleh atau tidak berjalan. `isLuminanceReduced`
+# ikut dihitung karena `NightAwareContainer` sudah memakainya sebelum aturan
+# ini ada; berkas yang hanyavíا Always-On itu tidak otomatis salah.
+GUARD = re.compile(
+    r"\breduceMotion\b|\bMotionPolicy\b|\bisLuminanceReduced\b")
+
+bad = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for n, raw in enumerate(lines, 1):
+            # Komentar dibuang hanya dari sisi yang diperiksa (nama API):
+            # dokumentasi aturan ini menyebut `withAnimation`, jadi termasuk
+            # kalau tidak dibuang akan melaporkan dirinya sendiri.
+            code = raw[:raw.find("//")] if "//" in raw else raw
+            if MOTION_API.search(code):
+                whole = "\n".join(lines)
+                if not GUARD.search(whole):
+                    bad.append(f"  {path}:{n}: {raw.strip()[:70]}")
+                break  # satu laporan per berkas sudah cukup
+print("\n".join(bad) if bad else "")
+PY
+)
+if [ -n "$motion" ]; then
+  echo "Gerak dipanggil tanpa penjaga reduce-motion di berkas ini:"
+  echo "$motion"
+  echo "-> Baca MotionPolicy.allowsContinuousMotion / allowsTransitions"
+  echo "   dari PointingKit. Kalau memang boleh tanpa, itu satu kebetulan"
+  echo "   yang belum ditulis di mana pun."
+  status=1
+else
+  echo "Bersih: setiap API gerak punya penjaga reduce-motion."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
