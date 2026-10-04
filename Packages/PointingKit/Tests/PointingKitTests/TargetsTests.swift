@@ -98,6 +98,36 @@ final class TargetsTests: XCTestCase {
         XCTAssertNil(r.nearestTarget(to: below, observer: observer, date: date))
     }
 
+    /// Objek langit dalam **tidak boleh** menjadi acuan kalibrasi.
+    ///
+    /// `CalibrationSession.refreshReferenceTargets` sengaja menyaring
+    /// `kind == .star`, dan alasannya ada di komentarnya: kebenaran kalibrasi
+    /// diambil dari posisi katalog, dan objek langit dalam posisinya juga di
+    /// katalog — yang salah adalah ia **tidak punya tepi**, jadi pengguna tidak
+    /// bisa tahu bagian mana dari kabut Orion yang ia tunjuk, dan sampelnya
+    /// jauh lebih berisik.
+    ///
+    /// Tapi `captureNearest` **tidak lewat daftar itu**: ia memanggil
+    /// `nearestTarget` langsung, lalu `capture(objectID:)`, dan tidak satu pun
+    /// memeriksa jenis benda. Jadi seluruh penjagaan "acuan harus bintang"
+    /// bergantung pada daftar yang justru dilewati oleh jalur "tunjuk lalu
+    /// catat". Selama tidak ada objek langit dalam di katalog mana pun, jalur
+    /// ini tidak bisa dijangkau dan tidak ada yang tahu. Begitu katalog
+    /// produksi memuatnya (lihat `DeepSkyCatalogue`), menunjuk ke arah M42 dan
+    /// menekan "Catat" akan memakai kabut itu sebagai acuan kalibrasi.
+    func testNearestTargetNeverResolvesToADeepSkyObject() {
+        let r = PointingResolver(catalogue: DeepSkyCatalogue.objects,
+                                 policy: .permissive)
+        let nebula = DeepSkyCatalogue.objects.first { $0.id == "m42" }!
+        let truth = r.horizontal(of: nebula, observer: observer, date: date)!
+
+        // Arahnya **tepat** ke nebula: tanpa penyaringan, ini kandidat
+        // sempurna dengan jarak nol dan pasti terpilih.
+        XCTAssertNil(r.nearestTarget(to: truth, observer: observer, date: date,
+                                     aboveHorizonOnly: false),
+                     "nebula tidak punya tepi — tidak boleh jadi acuan kalibrasi")
+    }
+
     // MARK: - Lokasi
 
     func testLocationValidity() {

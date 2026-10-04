@@ -94,6 +94,16 @@ public extension PointingResolver {
     ///
     /// Dipakai kalibrasi: kalau pengguna menunjuk Sirius, kita perlu tahu itu
     /// Sirius — bukan bintang lain yang kebetulan terdekat di katalog.
+    ///
+    /// **Sengaja hanya bintang**, sama seperti daftar acuan di
+    /// `CalibrationSession.refreshReferenceTargets`. Penjagaan itu tidak boleh
+    /// hanya ada di daftar: `captureNearest` melewati daftar dan memanggil
+    /// fungsi ini langsung, jadi aturan "acuan harus punya tepi" harus tinggal
+    /// di tempat yang **kedua** jalur lalui. Objek langit dalam tidak punya
+    /// tepi, dan benda tata surya bergerak serta berfase; keduanya membuat
+    /// "bagian mana yang kamu tunjuk" tidak punya jawaban, dan sampel acuannya
+    /// berisik — melebarkan `residualSpreadDeg` atau, lebih buruk, memasang
+    /// offset yang salah tanpa terlihat.
     func nearestTarget(to pointing: HorizontalCoord,
                        observer: Observer,
                        date: Date,
@@ -102,6 +112,7 @@ public extension PointingResolver {
         let candidates = availableTargets(observer: observer,
                                           date: date,
                                           aboveHorizonOnly: aboveHorizonOnly)
+            .filter { $0.kind == .star }
             .map { (target: $0, separation: $0.separation(from: pointing)) }
             .filter { $0.separation <= withinDeg }
             .sorted { $0.separation < $1.separation }
