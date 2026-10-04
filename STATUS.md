@@ -25,7 +25,7 @@ Bagian 1–3 **lengkap**. Yang belum ada, urut dari yang paling jelas:
 
 | Item | Status |
 |---|---|
-| 4.4 animasi halus (`withAnimation` saat state→lock) | belum ada — satu-satunya animasi adalah `TimelineView` denyut di iPhone |
+| 4.4 animasi halus (`withAnimation` saat state→lock) | SELESAI — `LockArrivalGate` (PointingKit, 10 test) + `PointingEngine.publish(_:)`. `lockCount` lama dibuang (tak pernah dibaca) |
 | Onboarding value-first | belum ada sama sekali |
 | 4.6 audio opsional saat lock | belum ada |
 | `@ScaledMetric` | belum dipakai (semua font sudah semantic) |
