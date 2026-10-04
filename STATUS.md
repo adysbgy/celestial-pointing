@@ -1,5 +1,111 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — engine tahu MENGAPA tidak ada objek, tapi tidak pernah mengatakannya)
+
+### Siklus ketiga berturut-turut: jalur yang dihitung lalu dibuang
+
+Dua siklus sebelumnya menemukan jalur yang **tidak pernah tersambung** —
+`.deepSky` yang tak ada objeknya di katalog, lalu `reloadAllTimelines` yang
+tak pernah dipanggil. Siklus ini menemukan bentuk ketiga: jalur yang
+**dihitung lalu dibuang**, dan sudah begitu sejak sebelum repo ini punya UI.
+
+`PointingResolver.diagnose` mengisi `Resolution.rejected` sejak awal: setiap
+benda yang tidak lolos penyaring masuk bersama `Visibility`-nya
+(`belowHorizon`, `tooFaint`, `tooCloseToSun`, `daylight`), dan
+`SkyContext.isDark` menyatakan apakah langit sedang terang. Semua itu
+**nol konsumen** di seluruh repo — tidak ada satu pun pembaca.
+
+Akibatnya jam selalu menampilkan satu kalimat yang sama, "Belum ada objek di
+arah itu.", untuk tiga situasi yang butuh tindakan berbeda:
+
+- **Langit masih siang** → pengguna harus menunggu gelap.
+- **Semua objek di bawah horizon** → pengguna harus mengarah ke tempat lain.
+- **Semua objek terlalu redup** → tidak ada yang bisa dilihat malam ini.
+
+Mesin yang jujur seharusnya membedakannya. Yang diperbaiki bukan "menambah
+fitur": seluruh informasi sudah ada dan sudah benar; yang hilang hanya jalur
+dari tempat ia dihitung ke tempat ia dibaca.
+
+### `SearchHint` — `nil` saat ada jawaban, jadi mustahil berbohong
+
+`Resolution.searchHint` mengembalikan **`nil`** bila ada objek (`intent.best
+!= nil`). Itu bukan detail: sebuah hint adalah penjelasan atas **ketiadaan**
+jawaban. Kalau ia juga bisa ada saat jawaban ada, setiap pemanggil harus ingat
+memeriksa keadaan sebelum menampilkannya — dan satu tempat yang lupa akan
+menampilkan "semua objek di bawah horizon" di sebelah nama objek yang justru
+terkunci. Dengan `nil` sebagai satu-satunya jawaban untuk "ada objek", dua
+keadaan itu tidak bisa muncul bersamaan.
+
+Urutan keputusannya:
+
+1. **`daylight`** lebih dulu, dibaca dari `context.isDark` — **sifat langit**,
+   bukan sifat satu benda. `VisibilityFilter.classify` memeriksa ketinggian
+   lebih dulu, jadi saat siang sebagian benda dilaporkan `belowHorizon` dan
+   sebagian `daylight`; menebak dari situ bisa salah.
+2. **Sebab tunggal per-benda** (di bawah horizon / terlalu redup / terlalu
+   dekat Matahari) — hanya bila **seragam**. Alasan bercampur tidak punya satu
+   kalimat jujur.
+3. **`noCandidates`** — sisanya, termasuk katalog kosong. "Tidak ada yang
+   cocok" tetap benar, dan mengarang sebab yang lebih spesifik justru
+   melanggar aturan jujur.
+
+### Hint hanya hidup di satu keadaan: `.searching`
+
+`PointingSnapshot.searchHint` hanya terisi saat keadaan `.searching`. Saat
+`.pointing` pergelangan masih bergerak dan resolusi terakhir berasal dari arah
+yang **sudah ditinggalkan**; menampilkan "semua objek di bawah horizon" untuk
+arah lama akan menjelaskan sesuatu yang tidak sedang ditunjuk. Saat ada
+jawaban (`lock`/`uncertain`) `Resolution.searchHint` sendiri sudah `nil`. Jadi
+hint jujur di tepat satu keadaan: diam, sudah diresolusi, tanpa kandidat.
+
+### Satu sumber kalimat untuk jam, iPhone, dan VoiceOver
+
+`PointingSnapshot.guidanceText` memilih kalimatnya — bukan view. Alasannya
+sama dengan `PointingState.shortLabel`: kalau tiap layar memilih sendiri, jam
+bisa berkata "langit masih terang" sementara iPhone berkata "belum ada objek"
+untuk cuplikan yang sama. Dua versi kebenaran, dan hanya satu yang diuji.
+`PointingView` (kartu + pengumuman VoiceOver) dan `DiagnosticsView` (baris
+"Panduan") memakai sumber yang sama.
+
+### Uji: semua dibuktikan MERAH lebih dulu
+
+| Mutasi | Uji/gerbang yang menangkap | Hasil |
+|---|---|---|
+| `guard intent.best == nil` → `!= nil` | `testNoHintWhenThereIsAnAnswer` | **MERAH**: hint muncul bersama jawaban |
+| `if !context.isDark` → `if !context.isDark && rejected.isEmpty` | `testDaylightWinsOverPerObjectReasons` | **MERAH**: `allBelowHorizon` menang atas `daylight` |
+| gerbang keadaan di `feed` dilepas | `testControllerDropsHintWhileMoving` | **MERAH**: hint bocor saat pergelangan bergerak |
+| hapus 1 kunci dari `Localizable.xcstrings` | Aturan 6 `swift-ui-lint.sh` | **MERAH**: gerbang menunjuk kunci yang hilang |
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 342 PointingKit**, 0 gagal
+  (naik dari 327 → 342, +15 uji).
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS**.
+- `./swift-ui-lint.sh` → **9 aturan hijau**; Aturan 6 (paritas katalog)
+  memverifikasi 46 kunci `allKeys` sebanding dengan katalog.
+
+### Batas yang jujur
+
+- **`daylight` belum pernah teruji dengan efemeris nyata di Linux.**
+  `skyContext` mengembalikan `isDark: true` saat tidak ada efemeris, jadi uji
+  integrasi di sini hanya menyentuh jalur per-benda. Cabang `daylight` diuji
+  sebagai **fungsi murni** (`testDaylightWinsOverPerObjectReasons`) dengan
+  `SkyContext` yang ditulis tangan — bukan lewat efemeris. Yang belum
+  diverifikasi: bahwa `SunAltitude` dari `AstronomyKitEphemeris` benar-benar
+  melewati ambang `-6°` seperti yang diharapkan di lapangan.
+- **Hint tidak muncul di layar redup.** `ReducedLuminanceView` sengaja hanya
+  menampilkan status dua kata; alasan penuh tidak masuk ke sana. Itu pilihan
+  (layar redup untuk sekilas, bukan membaca), tapi berarti pengguna AOD tidak
+  melihat alasan sampai mengangkat pergelangan.
+
+### CI
+
+Push `9477cd4` hijau:
+
+- **Apple Build** run `37217699916` — `BUILD SUCCEEDED` app iPhone + app jam,
+  gerbang peringatan bersih, job **Paket (Apple SDK)** hijau.
+- **Engine Tests (Linux)** run `37217699913` — 166 + 342, 0 failures.
+
 ## Progres terakhir (4 Okt 2026 — complication yang membaca snapshot sekali lalu membeku)
 
 ### Dua siklus berturut-turut membuka jalur mati, lalu menemukan cacat di pintunya
