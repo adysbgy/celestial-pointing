@@ -1,5 +1,61 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — pesan izin & sensor tidak pernah bisa diterjemahkan)
+
+### Literal yang ditugaskan ke properti, bukan diteruskan ke `Text`
+
+Aturan 4 menyapu literal `Text("…")` dan `row("…", …)` di `Apps/`. Ia benar,
+dan ia tetap hijau — padahal **lima** kalimat yang justru wajib terlihat saat
+izin ditolak atau sensor mati hidup sebagai literal di tiga berkas
+`Apps/Shared/`:
+
+| Kalimat | Berkas |
+|---|---|
+| `Perangkat ini tidak menyediakan device motion.` | `MotionLogger` |
+| `Data gerak tidak tersedia.` | `PointingEngine` |
+| `Izin lokasi ditolak. Buka Pengaturan … (Jakarta).` | `LocationProvider` (×2) |
+| `Lokasi gagal: … Memakai lokasi bawaan (Jakarta).` | `LocationProvider` |
+
+Bentuknya `note = "…"`, `sensorNote = "…"`, `statusText = "…"` — ditugaskan ke
+properti, **bukan** menjadi argumen langsung mana pun. Regex argumen-langsung
+tidak melihatnya. Tidak satu pun kalimat itu ada di `Localizable.xcstrings`,
+jadi pengguna Bahasa Inggris melihat "Izin lokasi ditolak" tanpa satu pun
+gerbang merah.
+
+Ini paling mahal justru pada permukaan yang paling diatur PRD: penolakan izin
+**harus terlihat**, bukan senyap — dan teksnya adalah satu-satunya yang
+menyampaikannya.
+
+### Dua salinan yang sudah menyimpang
+
+`locationDeniedNote` dan `locationFailedNote` disusun **dua kali** di
+`LocationProvider` (di `start()` dan di `locationManagerDidChangeAuthorization`)
+dengan bentuk kalimat yang berbeda. Perbedaan yang masih terbaca; yang
+berbahaya adalah ketika salah satu diperbaiki.
+
+### Yang diubah
+
+- **`SensorStatusText`** (PointingKit, teruji Linux) — pesan sensor gerak,
+  status lokasi (`notRequested`/`searching`/`waiting`/`denied`/`unknown`),
+  penjelasan penolakan izin, akurasi, dan kegagalan lokasi. Kedua app membaca
+  frasa yang sama.
+- **11 kunci katalog `sensor.*`** dengan terjemahan Inggris.
+- `LocationProvider`, `MotionLogger`, `PointingEngine` membaca frasa itu —
+  salinan ganda di `LocationProvider` ikut menyatu.
+
+Lima uji baru (`SensorStatusTextTests`), termasuk yang memasang terjemahan
+Inggris untuk membuktikan setiap aksesor benar-benar membacanya, dan yang
+memastikan dua keadaan sensor yang berbeda tetap terbaca berbeda.
+
+**Batas yang masih terbuka:** `statusText` (mis. "Lokasi ±12 m") masih belum
+pernah ditampilkan view mana pun — `note` yang tampil. Ia ikut masuk katalog
+karena status yang tidak pernah dibaca tetap bisa muncul kelak, dan menambah
+kunci belakangan lebih mahal daripada sekarang.
+
+Gerbang: `swift-test.sh` **166 + 422 hijau** (README diperbarui lewat Aturan 10),
+ui-lint hijau (Aturan 6 paritas tetap sebanding), typecheck hijau.
+CI macOS run `37228546269` (Engine Linux) + `37228546280` (Apple Build) hijau.
+
 ## Progres terakhir (4 Okt 2026 — iPhone tidak pernah menampilkan tingkat keyakinan pada panel objek)
 
 ### Komentar yang menunjuk badge yang tidak pernah digambar
