@@ -1,5 +1,103 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — complication yang membaca snapshot sekali lalu membeku)
+
+### Dua siklus berturut-turut membuka jalur mati, lalu menemukan cacat di pintunya
+
+Siklus sebelumnya menambahkan objek langit dalam ke katalog produksi dan
+menutup jalur visual yang selama ini mati. Siklus ini melanjutkan pola yang
+sama — cari jalur yang **tidak pernah berjalan** — dan menemukan dua:
+
+1. **Nebula bisa jadi acuan kalibrasi** lewat jalur "tunjuk lalu catat"
+   (`captureNearest`), yang melewati daftar acuan yang justru menjaganya.
+2. **Complication tidak pernah menyegar**: tidak ada satu pun pemanggil
+   `WidgetCenter.shared.reload...` di seluruh repo.
+
+Keduanya kelas yang sama: setiap bagian benar secara terpisah, dan yang hilang
+adalah jalur yang menghubungkannya.
+
+### Cacat 1 — penjagaan "acuan harus bintang" hanya ada di daftar yang dilewati
+
+`CalibrationSession.refreshReferenceTargets` sengaja menyaring `kind == .star`,
+dengan alasan yang tertulis panjang di komentarnya: objek langit dalam tidak
+punya tepi, jadi pengguna tidak bisa tahu bagian mana dari kabut Orion yang ia
+tunjuk, dan sampelnya berisik. Tapi `captureNearest` — jalur "tunjuk lalu tekan
+Catat" — **tidak lewat daftar itu**. Ia memanggil `PointingResolver.nearestTarget`
+langsung, lalu `capture(objectID:)`, dan tidak satu pun memeriksa jenis benda.
+
+Selama tidak ada objek langit dalam di katalog mana pun, jalur ini tidak bisa
+dijangkau, jadi tidak ada yang tahu. Siklus sebelumnya membuatnya bisa
+dijangkau. Perbaikan: penjagaan dipindah ke `nearestTarget` — satu tempat yang
+**kedua** jalur lalui, jadi aturan tidak bisa lagi dilewati dengan menambah
+jalan masuk baru.
+
+### Cacat 2 — menulis berkas tidak menggambar ulang complication
+
+Complication membaca ringkasan dari berkas yang dibagi, dan timeline-nya
+`Timeline(entries:policy:.never)`: satu entri yang berlaku sampai ada yang
+meminta watchOS menghitung ulang. App menulis berkas itu tiap keadaan berubah.
+Tapi tidak ada pemanggil `reloadAllTimelines` — hanya **dua komentar** yang
+menjanjikannya. Akibatnya complication menampilkan objek pertama yang pernah
+terkunci lalu membeku di situ selamanya; berkasnya selalu mutakhir, layarnya
+tidak pernah bergerak. Membaca kode justru membuatnya tampak selesai, karena
+komentarnya menyebut reload yang tidak ada.
+
+Perbaikan mengikuti pola yang sudah ada di repo ini: `haptics` dan `audioCue`
+disuntikkan sebagai closure supaya `PointingEngine` tidak perlu tahu API Apple
+yang tidak ada di Linux. `complicationReload` mengikuti jalur yang sama —
+disuntikkan, dan app jam memasang `WidgetCenter.shared.reloadAllTimelines()`.
+
+### Gerbang baru: Aturan 9 — WidgetKit wajib punya pemanggil reload
+
+Cacat ini tidak bisa ditangkap gerbang mana pun yang ada:
+
+- `swiftc -parse` tidak peduli timeline tidak pernah dihitung ulang.
+- `swift test` di Linux tidak bisa membangun SwiftUI sama sekali — `WidgetKit`
+  tidak ada di sana.
+- CI macOS hanya gagal bila ada **warning**; pemanggilan yang hilang bukan
+  warning.
+
+Jadi penjaganya harus sapu teks: bila ada `struct ...: Widget` di `Apps/`,
+harus ada pemanggil `WidgetCenter.shared.reload...` di kode. **Dibuktikan
+MERAH lebih dulu** — mengosongkan pemanggil membuat gerbang gagal dan menunjuk
+`ComplicationWidget.swift:23`. Sebuah gerbang yang tidak pernah merah adalah
+formalitas.
+
+### Uji: dua mutasi dibuktikan MERAH lebih dulu
+
+| Mutasi | Uji/gerbang yang menangkap | Hasil |
+|---|---|---|
+| filter `kind == .star` dibuang dari `nearestTarget` | `testNearestTargetNeverResolvesToADeepSkyObject` | **MERAH**: M42 kembali sebagai acuan |
+| pemanggil `WidgetCenter...reload` dikosongkan | Aturan 9 `swift-ui-lint.sh` | **MERAH**: gerbang menunjuk widget-nya |
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 327 PointingKit**, 0 gagal.
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS**.
+- `./swift-ui-lint.sh` → **9 aturan hijau** (naik dari 8).
+
+### Batas yang jujur
+
+- **Complication belum pernah dilihat di perangkat.** Yang dibuktikan: kode
+  memanggil reload saat keadaan berubah (gerbang), dan ia **kompilasi** di
+  macOS (CI Apple Build hijau). Bahwa watchOS benar-benar menggambar ulang di
+  jam sungguhan belum diverifikasi — itu butuh perangkat. Reload adalah
+  permintaan, bukan jaminan; watchOS boleh menundanya.
+- **Reload hanya terjadi saat app aktif.** `complicationReload` dipasang di
+  `start()`, dan app dihentikan saat pergelangan diturunkan. Hari ini tidak ada
+  perubahan keadaan dari latar, jadi tidak ada yang hilang — tapi bila nanti
+  ada pembaruan latar (mis. dari iPhone lewat WatchConnectivity), reload harus
+  dipasang di jalur itu juga.
+
+### CI
+
+Push `bbfb96c` hijau:
+
+- **Apple Build** run `37216760021` — `BUILD SUCCEEDED` app iPhone + app jam,
+  gerbang peringatan bersih, job **Paket (Apple SDK)** hijau. Ini yang
+  membuktikan perubahan WidgetKit benar-benar kompilasi di macOS.
+- **Engine Tests (Linux)** run `37216759989` — 166 + 327, 0 failures.
+
 ## Progres terakhir (4 Okt 2026 — jalur objek langit dalam ada, tapi tak pernah tersambung)
 
 ### Premis siklus ini: cari jalur yang mati, bukan bentuk yang salah
