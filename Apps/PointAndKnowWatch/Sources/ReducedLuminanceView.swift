@@ -59,6 +59,37 @@ struct ReducedLuminanceView: View {
                     .font(.headline)
                     .foregroundStyle(SurfacePalette.active.textPrimaryColor)
 
+                // Peringatan **keselamatan** — satu-satunya penolakan yang
+                // lolos ke layar redup.
+                //
+                // **Kenapa ini ada di layar yang sengaja miskin.** Sisa layar
+                // ini hanya memuat yang tidak boleh terlewat. Kalau sebuah
+                // nama objek terkunci tampil di sini tanpa tanda bahwa
+                // teleskop **menolak bergerak**, pengguna membaca "berhasil"
+                // dari layar yang justru sedang menyembunyikan bahaya — dan
+                // bahaya itu (cahaya Matahari ke lensa) adalah satu-satunya
+                // yang bisa merusak alat atau mata. Bahaya mutu ("terlalu
+                // redup") tetap tidak masuk: ia mengecewakan, bukan
+                // berbahaya, dan pengguna bisa mengetahuinya begitu mengangkat
+                // pergelangan.
+                //
+                // Kalimatnya datang dari `SlewDecision.safetyWarningText`
+                // (teruji di Linux) — ambangnya memakai `isSafety` yang sama
+                // dengan warna peringatan di layar penuh, jadi kedua layar
+                // tidak bisa berbeda pendapat soal mana yang bahaya.
+                if let warning = engine.slewVerdict?.safetyWarningText {
+                    HStack(alignment: .top, spacing: 3) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .accessibilityHidden(true)
+                        Text(warning)
+                            .font(.caption2.weight(.semibold))
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 // Hanya tampil saat sensor mati — pesan yang benar-benar mengubah
                 // perilaku, bukan angka pelengkap.
                 if let note = motionNote {
@@ -90,6 +121,12 @@ struct ReducedLuminanceView: View {
             parts.append(object.name)
         }
         parts.append(engine.snapshot.state.shortLabel)
+        // Peringatan keselamatan ikut diucapkan: ia alasan teleskop tidak
+        // bergerak, dan layar redup yang membacakan nama objek tanpa alasan
+        // itu terdengar seperti keberhasilan.
+        if let warning = engine.slewVerdict?.safetyWarningText {
+            parts.append(warning)
+        }
         if engine.isDisplayingStaleObject {
             parts.append("sisa pandangan sebelumnya")
         }

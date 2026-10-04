@@ -148,6 +148,31 @@ public extension SlewDecision {
         verdictTone == .danger ? "exclamationmark.triangle.fill" : "info.circle"
     }
 
+    /// Kalimat putusan, **hanya bila ada bahaya keselamatan**; `nil` untuk
+    /// bahaya mutu maupun GoTo yang aman.
+    ///
+    /// **Kenapa butuh varian terpisah, padahal `verdictText` sudah ada.**
+    /// Layar Always-On (`ReducedLuminanceView`) sengaja hanya memuat hal yang
+    /// **tidak boleh terlewat** — dua kata status dan satu nama objek. Di sana
+    /// setiap baris tambahan mengambil ruang dari yang paling penting, jadi
+    /// "terlalu redup untuk diamati" tidak layak masuk: ia mengecewakan, bukan
+    /// berbahaya, dan pengguna bisa mengetahuinya begitu mengangkat pergelangan.
+    /// "Terlalu dekat Matahari" berbeda kelas: kalau ia hilang dari layar
+    /// redup, pengguna melihat nama objek terkunci tanpa satu pun tanda bahwa
+    /// teleskop **menolak bergerak** — dan itu satu-satunya jenis penolakan
+    /// yang menghilang dari pandangan justru saat pengguna paling tidak
+    /// mencarinya.
+    ///
+    /// Ambangnya memakai `isSafety` yang sama dengan `verdictTone`, bukan daftar
+    /// bahaya yang ditulis ulang: kalau suatu saat sebuah bahaya dipindahkan
+    /// kelasnya, warna dan kehadiran di layar redup ikut berpindah bersama —
+    /// tidak ada dua daftar yang bisa berbeda pendapat.
+    var safetyWarningText: String? {
+        guard case .rejected(let hazards) = self,
+              hazards.contains(where: { $0.isSafety }) else { return nil }
+        return verdictText
+    }
+
     /// Kalimat jujur untuk ditampilkan; **`nil` bila GoTo aman**.
     ///
     /// **Kenapa `nil`, bukan kalimat "aman".** Sama alasannya dengan

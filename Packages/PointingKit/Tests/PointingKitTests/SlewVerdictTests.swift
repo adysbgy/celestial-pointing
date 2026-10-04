@@ -226,4 +226,37 @@ final class SlewVerdictTests: XCTestCase {
         XCTAssertFalse(danger.verdictSymbolName.isEmpty)
         XCTAssertFalse(warning.verdictSymbolName.isEmpty)
     }
+
+    // MARK: - Layar redup: hanya bahaya keselamatan yang lolos
+
+    /// Bahaya keselamatan **tampil** di layar redup; bahaya mutu **tidak**.
+    ///
+    /// Layar Always-On hanya memuat yang tidak boleh terlewat. Kalau "terlalu
+    /// dekat Matahari" hilang di sana, pengguna melihat nama objek terkunci
+    /// tanpa satu pun tanda bahwa teleskop menolak bergerak.
+    func testReducedScreenShowsSafetyHazardsOnly() {
+        let safety = SlewDecision.rejected(hazards: [.sunProximity])
+        XCTAssertNotNil(safety.safetyWarningText)
+        XCTAssertEqual(safety.safetyWarningText, safety.verdictText,
+                       "layar redup tidak boleh mengarang kalimat sendiri")
+
+        let quality = SlewDecision.rejected(hazards: [.tooFaint])
+        XCTAssertNil(quality.safetyWarningText)
+    }
+
+    /// Campuran keselamatan + mutu -> tetap tampil, karena keselamatan ada.
+    func testReducedScreenShowsMixedRejectionBecauseOfSafety() {
+        let mixed = SlewDecision.rejected(hazards: [.tooFaint, .sunProximity])
+        XCTAssertNotNil(mixed.safetyWarningText)
+    }
+
+    /// GoTo aman -> tidak ada peringatan di layar redup, sama seperti di layar
+    /// penuh.
+    func testReducedScreenIsSilentWhenAllowed() {
+        let allowed = allowedDecision(for: CelestialObject(
+            id: "polaris", name: "Polaris", kind: .star,
+            raDeg: 37.95, decDeg: 89.26, magnitude: 1.98))
+        XCTAssertTrue(allowed.isAllowed)
+        XCTAssertNil(allowed.safetyWarningText)
+    }
 }
