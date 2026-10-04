@@ -2618,6 +2618,34 @@ terdeteksi. Uji yang hanya membaca kode tidak akan menangkap keduanya.
 
 **166 + 244 hijau, tanpa warning.**
 
+### Satu cacat yang tidak terlihat di Linux
+
+Apple Build gagal pada versi pertama: `Color(NightVisual.surface(raw))`.
+Tidak ada overload `Color(_:)` yang menerima `RGBComponents` — SwiftUI
+tidak punya konversi itu, dan build Linux tidak pernah menyentuh file view,
+jadi `./swift-test.sh` tetap hijau. Semua kelas kesalahan view
+harus dicek dengan menyisir polanya, bukan dengan menunggu test.
+
+Yang terungkap saat memperbaikinya justru lebih penting dari
+kesalahannya sendiri: tiga pintasan (`color`, `accent`, `shadowAccent`) memanggil
+pemetaan malamnya **masing-masing**, dan `accent()` memanggil
+`color(surface(raw))` — jadi peta diterapkan **dua kali**. Pemetaan tidak
+idempoten. Dihitung: piringan gelap bulan (kanal merah 0,047) dipetakan lagi
+sebagai permukaan menjadi **0,357** — hampir delapan kali lebih terang, tanpa
+satu pun angka baru yang ditulis. Cacat seperti ini tidak akan pernah terlihat
+dari membaca kode, karena tidak ada baris yang salah; yang salah adalah
+**urutan** pemanggilan.
+
+Sekarang ada **satu** pintasan `color(_:isShadow:)`. Perannya dinyatakan sebagai
+argumen, bukan lewat pintasan terpisah, supaya "bagian gelap ikut dipetakan
+seperti permukaan" tidak bisa ditulis — persis kelas bug yang ketahuan lewat
+perhitungan, bukan lewat mata.
+
+Catatan untuk siklus berikutnya: **uji di Linux tidak menutup kelas kesalahan
+view.** Yang bisa ditutup di sini hanya logika murni; kompilasi view harus
+dibuktikan CI macOS, dan pola berisiko (`Color(<expr>)`) sebaiknya disisir
+sebelum push, karena tidak ada gerbang lokal yang menangkapnya.
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
