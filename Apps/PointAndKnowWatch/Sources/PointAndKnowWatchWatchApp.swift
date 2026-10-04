@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 import PointingKit
 
 /// Titik masuk app jam.
@@ -65,6 +66,15 @@ struct PointAndKnowWatchApp: App {
 
         let cue = audioCue
         engine.audioCue = { events in cue.play(events) }
+
+        // Complication membaca ringkasan dari berkas yang dibagi, tapi
+        // timeline-nya `.never`: menulis berkas tidak membuat watchOS menggambar
+        // ulang apa pun. Tanpa panggilan ini complication menampilkan objek
+        // pertama yang pernah terkunci lalu membeku di situ — berkasnya selalu
+        // benar, layarnya yang tidak pernah menyegar. `reloadAllTimelines` aman
+        // dipanggil saat app aktif; ia hanya menandai timeline perlu dihitung
+        // ulang, bukan menggambar langsung.
+        engine.complicationReload = { WidgetCenter.shared.reloadAllTimelines() }
 
         location.start()
         // Lokasi sungguhan datang setelah `start()`, jadi engine disambungkan

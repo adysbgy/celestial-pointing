@@ -755,6 +755,62 @@ else
   echo "Bersih: tidak ada kata asing yang terselip."
 fi
 
+# ── Aturan 9: WidgetKit tanpa pemanggil reload tidak pernah menyegar ───────
+# Complication (WidgetKit) berjalan di proses terpisah dan memakai
+# `Timeline(entries:policy:.never)` — satu entri yang berlaku sampai ada yang
+# meminta watchOS menghitung ulang. Menulis berkas snapshot **tidak** membuat
+# watchOS menggambar ulang apa pun. Tanpa `WidgetCenter.shared.reload...`,
+# complication membaca ringkasan sekali lalu membeku di objek pertama selamanya:
+# berkasnya selalu benar, layarnya yang tidak pernah berubah.
+#
+# Bentuk cacat ini tidak bisa dilihat di layar (complication hanya ada di
+# perangkat), tidak bisa diuji di Linux (WidgetKit hanya ada di Apple), dan
+# tidak membuat `swiftc -parse` mengeluh. Karena itu penjaganya harus sapu
+# teks, bukan ingatan orang yang menulis.
+#
+# Yang diperiksa bukan gaya: kalau ada deklarasi `struct ...: Widget` di
+# `Apps/`, maka harus ada pemanggilan `WidgetCenter.shared.reload...` di kode.
+# Komentar dilewati, sama seperti aturan 1 — proyek ini menyebut API itu di
+# dokumentasi, dan yang dihitung hanya kode.
+echo
+echo "== Aturan 9: WidgetKit yang ada harus punya pemanggil reload =="
+reload=$(python3 - <<'PY'
+import os, re
+
+widget_decl = re.compile(r"struct\s+\w+\s*:\s*Widget\b")
+reload_call = re.compile(r"WidgetCenter\.shared\.reload\w*")
+
+widgets, reloads = [], []
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d != ".build"]
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        for number, raw in enumerate(
+                open(path, encoding="utf-8").read().split("\n"), 1):
+            line = raw.split("//", 1)[0]  # buang komentar sebaris
+            if widget_decl.search(line):
+                widgets.append(f"{path}:{number}")
+            if reload_call.search(line):
+                reloads.append(f"{path}:{number}")
+
+if widgets and not reloads:
+    print("WidgetKit ada, tetapi tidak ada pemanggil reload:")
+    for w in widgets:
+        print(f"  {w}")
+    print("-> Tambahkan WidgetCenter.shared.reloadAllTimelines() (atau")
+    print("   reloadTimelines(ofKind:)) saat snapshot berubah. Timeline")
+    print("   `policy: .never` tidak pernah dihitung ulang tanpa ini.")
+PY
+)
+if [ -n "$reload" ]; then
+  echo "$reload"
+  status=1
+else
+  echo "Bersih: setiap WidgetKit punya pemanggil reload."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

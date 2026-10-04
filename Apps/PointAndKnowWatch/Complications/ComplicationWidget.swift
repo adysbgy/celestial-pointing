@@ -14,8 +14,11 @@ import PointingKit
 /// **Kenapa timeline statis + reload.** Kita tidak tahu kapan pengguna
 /// mengunci, jadi entri tunggal berlaku "selamanya" (sampai app memanggil
 /// `WidgetCenter.shared.reloadAllTimelines()` saat snapshot berubah). Di sini
-/// kita cukup beri satu entri; app memicu reload lewat `ComplicationStore`
-/// (lihat `PointingEngine.recordComplicationIfChanged`).
+/// kita cukup beri satu entri; app memicu reload lewat
+/// `PointingEngine.complicationReload` (lihat `recordComplicationIfChanged`).
+/// Panggilan itu **wajib**: menulis berkas snapshot tidak membuat watchOS
+/// menggambar ulang apa pun, jadi tanpa reload complication membaca sekali lalu
+/// membeku di objek pertama selamanya.
 @main
 struct PointAndKnowComplication: Widget {
 

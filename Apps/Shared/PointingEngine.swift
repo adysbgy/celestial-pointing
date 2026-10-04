@@ -59,6 +59,19 @@ public final class PointingEngine: ObservableObject {
     /// dipilih engine — UI tidak pernah memilih peristiwa mana yang berbunyi.
     public var audioCue: (([HapticEvent]) -> Void)?
 
+    /// Cara meminta complication (WidgetKit) membaca ulang ringkasan.
+    /// `nil` = tidak ada complication (iPhone).
+    ///
+    /// **Kenapa disuntikkan, bukan dipanggil langsung.** `WidgetCenter` hanya
+    /// ada di Apple platform, dan kelas ini diuji di Linux — persis alasan
+    /// `haptics` juga berupa closure. Di sini alasan itu lebih keras lagi:
+    /// menulis berkas snapshot **tidak** membuat watchOS menggambar ulang apa
+    /// pun. Complication memakai `Timeline(entries:policy:.never)` — satu entri
+    /// yang berlaku sampai ada yang memintanya berhenti — jadi tanpa panggilan
+    /// ini ia membaca ringkasan sekali lalu membeku di objek pertama selamanya.
+    /// Berkasnya selalu benar; layarnya yang tidak pernah menyegar.
+    public var complicationReload: (() -> Void)?
+
     public init(location: ObserverLocation = .fallback,
                 config: PointingControllerConfig = PointingControllerConfig()) {
         self.location = location
@@ -277,6 +290,12 @@ public final class PointingEngine: ObservableObject {
         guard signature != lastComplicationSignature else { return }
         lastComplicationSignature = signature
         ComplicationStore.shared.record(digest)
+        // Menulis berkas tidak membuat watchOS menggambar ulang complication:
+        // timeline-nya `.never`, jadi ia membaca sekali lalu membeku. Panggilan
+        // ini yang memintanya membaca ulang. Sengaja di dalam penjagaan
+        // `signature` — reload adalah kerja sistem, dan memanggilnya 20×/detik
+        // untuk ringkasan yang sama hanya membakar baterai.
+        complicationReload?()
     }
 
     // MARK: - Alur
