@@ -1,5 +1,132 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (4 Okt 2026 — fase gibbous & purnama tergambar sebagai komplemennya)
+
+### Premis siklus ini: "sabit benar arahnya" belum berarti "fase benar besarnya"
+
+Brief menyebut sabit harus benar arahnya, dan itu memang sudah terperbaiki
+serta teruji (`litSide`). Tapi pengujian lama hanya memeriksa **tanda** dan
+**lebar pita di ekuator** — dua bilangan yang keduanya benar untuk separuh
+fase dan **salah total untuk separuh lainnya**. Yang tidak pernah diuji: apakah
+luas yang benar-benar digambar sama dengan fraksi iluminasi.
+
+### Cacat yang ditemukan: tanda yang dibuang, lalu dikalikan ulang
+
+`drawMoon` menulis:
+
+    let side = CGFloat(phase.litSide)
+    let semiWidth = CGFloat(phase.terminatorSemiWidth)   // abs(terminatorOffset)
+    x = side * semiWidth * radius * sqrt(1 - dy*dy)
+
+`terminatorOffset` sudah bernilai `litSide · (1 − 2f)`, jadi **tandanya sudah
+menentukan sisi terminator**: positif untuk sabit, negatif untuk gibbous. View
+mengambil nilai mutlaknya, lalu mengalikan lagi dengan `litSide` — tanda itu
+ikut hilang, dan untuk `f > 0.5` kurvanya terpaku kembali ke sisi yang menyala.
+Pita yang digambar menjadi **komplemen** dari fraksi yang benar:
+
+| f (engine) | Pita digambar | Selisih |
+|---|---|---|
+| 0.25 | 0.2503 | benar |
+| 0.50 | 0.4998 | benar |
+| 0.75 | 0.2503 | **−0.50** |
+| 0.85 | 0.1504 | **−0.70** |
+| 0.95 | 0.0506 | **−0.90** |
+| **1.00** | **0.0007** | **−1.00** |
+
+Dihitung dengan rumus shoelace pada poligon yang **sama** dengan yang
+digambar `Canvas` (72 segmen), bukan dengan Integral analitik — supaya angka
+yang diuji adalah angka yang sampai ke layar. Diskritisasi 72 segmen menambah
+~0.001, jauh di bawah cacatnya.
+
+### Akibat yang paling merusak: bulan purnama tampil sebagai piringan gelap
+
+Pada `f = 1.0` luas pita yang digambar **0.0007** — praktis nol. Jadi di layar
+Ketelitian tertulis **"Fase Bulan 100%"** sementara tepat di bawahnya
+tergambar piringan gelap. Ini bukan sekadar salah gambar: PRD melarang visual
+yang **lebih yakin** atau bertentangan dengan teksnya, dan di sini keduanya
+saling meniadakan — teksnya benar, gambarnya menyatakan kebalikannya. Tidak
+ada jalur yang bisa dibaca pengguna untuk memperbaiki sendiri: gambar dan
+angka berasal dari sampel yang sama, jadi ketidakcocokan ini bukan soal data
+basi.
+
+### Mengapa ia bertahan melewati 224 uji
+
+1. **Setengah fase memang benar.** Sabit 25% tergambar 25% (selisih 0.0003).
+   Setiap pemeriksaan visual yang dilakukan orang — dan setiap uji lama —
+   kebetulan jatuh di sisi yang benar.
+2. **Uji lama mengukur bilangan yang salah.** `litSide` benar untuk semua
+   fase. `litBandWidth` benar untuk semua fase **karena ia selalu positif**
+   (memakai `abs`) — ia tidak pernah bisa membedakan gibbous dari sabit.
+   Uji yang paling tampak lengkap justru tidak bisa menangkapnya.
+3. **`swiftc -parse` hanya sintaks**, `swift test` di Linux tidak punya
+   `Canvas`, dan tidak ada teks layar lain yang bisa diperiksa.
+4. Geometri ini **tidak pernah dihitung** — hanya dibaca. Membaca
+   `abs(bertanda) * sisi` memang terlihat "benar" bagi mata.
+
+### Yang diubah, dan kenapa begini
+
+- **Kurva limb & terminator pindah ke `PhaseGeometry`** sebagai
+  `limbX(atNormalizedHeight:)` dan `terminatorX(atNormalizedHeight:offset:)`,
+  memakai **offset bertanda** apa adanya. View kini hanya meneruskan model.
+  Ini mengikuti aturan repo yang sudah berlaku: keputusan visual yang bisa
+  salah tanpa ada yang bisa mengujinya **tidak boleh tinggal di view**.
+- **`terminatorSemiWidth` dihapus.** Isinya persis
+  `abs(terminatorOffset)` — yaitu pemicunya — dan setelah view diperbaiki ia
+  **tidak punya pemanggil sama sekali**. Membiarkannya berarti menyisakan
+  jebakan yang bisa dipakai ulang persis oleh bug yang sama.
+- **`litBandWidth` diberi peringatan di komentarnya** bahwa ia bukan ukuran
+  yang digambar, dan tidak bisa membedakan gibbous dari sabit.
+- Parameter `offset:` pada `terminatorX` sengaja ada hanya supaya uji bisa
+  memanggil `abs(...)` secara eksplisit untuk mengunci cacat lama. Swift
+  **melarang instance member sebagai nilai default parameter**, jadi ia
+  `Double? = nil` dengan fallback di dalam badan — bukan `= terminatorOffset`.
+
+### Uji dibuktikan MERAH lebih dulu
+
+Dengan `terminatorX` dikembalikan ke geometri lama (`litSide * abs(...)`):
+
+- `testLitBandAreaMatchesTheIlluminatedFraction` → **8 assertion gagal**,
+  pesan menyebut angkanya: *"pita terang digambar 14.97 persen untuk fraksi
+  85.0 persen (membesar)"*.
+- `testFullMoonFillsTheDiscInsteadOfGoingBlack` → gagal: `5.3e-17` vs `0.98`
+  (piringan gelap, seperti diterangkan di atas).
+- `testLegacyAbsoluteTerminatorDrewTheComplement` → **hijau** pada geometri
+  lama, sesuai desainnya: ia mengunci angka cacat yang lama, bukan geometri
+  yang sekarang.
+- **Yang tetap hijau** pada geometri lama: `f = 0.05, 0.20, 0.25, 0.50` —
+  dipertahankan sebagai bukti langsung bahwa separuh fase memang benar
+  sejak dulu.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 233 PointingKit, 0 gagal**
+  (naik dari 228 → 233). Engine **tidak disentuh**.
+- Kelima uji baru **dibuktikan MERAH lebih dulu** pada geometri lama.
+- Gerbang sintaks: seluruh **22** berkas app lolos `swiftc -parse -swift-version
+  5` di container `swift:6.0`.
+- Sapuan CJK/Cyrillic/simbol fullwidth pada berkas yang diubah: **0** (dua
+  kata asing sempat lolos ke komentar saat penulisan, dibuang sebelum commit).
+- **CI hijau pada push pertama** (`41f58d1`):
+  - `Apple Build` run `37185919763` → **2× `BUILD SUCCEEDED`** dan gerbang
+    peringatan melaporkan *"Tidak ada peringatan compiler pada Apps/."*
+    (`swiftc -parse` tidak akan pernah menangkap unresolved call ke tipe
+    `PointingKit` — hanya build Apple SDK yang bisa).
+  - `Engine Tests (Linux)` run `37185919693` → hijau, kelima uji fase terlihat
+    **lulus di log CI** (bukan hanya di mesin ini).
+
+### Pelajaran yang berulang (lima siklus berturut-turut)
+
+Lima siklus terakhir menemukan cacat di kelas yang **sama**: keputusan visual
+yang benar secara terpisah tapi salah secara gabungan, dan tidak terlihat dari
+teks mana pun di layar — kutub Mars menembus 0.26R, cincin Saturnus terpotong
+0.9R, bintang terpotong 0.81R, lencana ragu terpotong 0.132R, dan sekarang
+pita terang yang terbalik pada separuh fase. Semuanya lolos `swiftc -parse`,
+semuanya lolos `swift test` yang ada, dan semuanya hanya ketahuan dengan
+**menghitung**. Polanya cukup konsisten untuk aturan operasional: setiap
+bentuk di `Canvas` harus punya **uji yang mengukur hasil yang benar-benar
+tampil** — luas, bukan hanya koordinat — karena koordinat yang "masuk akal"
+bukan jaminan bahwa bentuknya yang benar.
+
 ## Progres terakhir (4 Okt 2026 — gambar lebih yakin daripada teksnya saat engine ragu)
 
 ### Premis siklus ini: cacatnya bukan bentuk yang salah, tapi klaim yang salah
