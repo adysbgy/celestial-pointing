@@ -193,6 +193,17 @@ struct DiagnosticsView: View {
         return Date().timeIntervalSince(pulseStart) * 1.1
     }
 
+    /// Saat app kembali aktif, jam denyut di-set ulang **sekali**.
+    ///
+    /// Tanpa ini, `pulseStart` tetap menunjuk waktu app terakhir aktif, jadi
+    /// denyut melompat maju beberapa detik dalam satu frame — dan lompatan itu
+    /// terlihat seperti kedipan, bukan denyut. Efeknya persis kebalikan dari
+    /// yang diinginkan: denyut yang lembut menenangkan, denyut yang melompat
+    /// memberi tahu pengguna ada yang salah.
+    private func resyncPulse() {
+        pulseStart = Date()
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -225,24 +236,61 @@ struct DiagnosticsView: View {
                                                          diameter: 132,
                                                          isConfirmed: !engine.isDisplayingStaleObject,
                                                          pulse: pulsePhase)
-                                    VStack(alignment: .leading, spacing: 6) {
+                                    // Nama + jenis digabung jadi satu
+                                    // pengumuman VoiceOver, dengan penanda
+                                    // **sisa** ikut terbawa — tanpa itu, objek
+                                    // basi terdengar persis seperti hasil
+                                    // pengukuran sekarang.
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        // Nama = informasi utama: paling besar.
                                         Text(object.name)
                                             .font(.title2.bold())
                                         Text(object.kind.displayName)
                                             .font(.subheadline)
-                                            .foregroundStyle(Color.nightAwareSecondary)
-                                        // Detail teknis di lapisan sekunder —
-                                        // bukan informasi utama.
-                                        Text(String(format: "mag %.2f", object.magnitude))
-                                            .font(.footnote.monospacedDigit())
-                                            .foregroundStyle(Color.nightAwareSecondary)
+                                            .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        // **Detail teknis disembunyikan di balik
+                                        // Disclosure.** RA/Dec/mag adalah alat
+                                        // verifikasi, bukan yang dicari saat
+                                        // mengarahkan jam. Menampilkannya
+                                        // di samping nama membuat lima angka
+                                        // bersaing dengan satu jawaban, dan
+                                        // pengguna tidak tahu mana yang penting.
+                                        // Buka hanya saat memang sedang memeriksa.
+                                        DisclosureGroup {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                detailRow("Magnitudo", String(format: "%.2f", object.magnitude))
+                                                if object.kind == .star {
+                                                    detailRow("RA", String(format: "%.4f°", object.raDeg))
+                                                    detailRow("Dec", String(format: "%+.4f°", object.decDeg))
+                                                }
+                                                detailRow("Id katalog", object.id)
+                                            }
+                                            .padding(.top, 4)
+                                        } label: {
+                                            Text("Detail teknikal")
+                                                .font(.footnote)
+                                                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                                        }
+                                        .tint(SurfacePalette.active.textSecondaryColor)
                                     }
+                                    .accessibilityElement(children: .contain)
+                                    // Label ini hanya untuk bagian **atas**; grup
+                                    // dan disclosure di bawahnya tetap elemen
+                                    // terpisah supaya bisa dibuka.
+                                    .accessibilityLabel(visualPanelLabel(
+                                        object: object,
+                                        stale: engine.isDisplayingStaleObject,
+                                        includeTechnicalDetails: false))
                                 }
                             }
                             .padding(.vertical, 6)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel(visualPanelLabel(object: object,
-                                                                   stale: engine.isDisplayingStaleObject))
+                            // Hanya bagian **atas** panel yang digabung, bukan
+                            // seluruhnya. Kalau `DisclosureGroup` ikut
+                            // digabung, isinya tidak bisa lagi dibuka — dan
+                            // pengguna VoiceOver tidak punya jalan lain untuk
+                            // membacanya.
+                            .accessibilityElement(children: .contain)
                         }
                     }
                     if let pointing = engine.pointing {
@@ -301,6 +349,10 @@ struct DiagnosticsView: View {
                 }
             }
             .navigationTitle("Diagnostik")
+            // Set ulang denyut tepat saat app aktif lagi.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { resyncPulse() }
+            }
             // Siklus hidup sensor, lokasi, dan alur **tidak** ada di sini:
             // ketiganya dibagi dengan tab Experiment 1, dan `TabView` menahan
             // kedua tab tetap hidup. Siklus hidupnya ada di `RootView`, tempat
@@ -381,6 +433,23 @@ struct DiagnosticsView: View {
         }
     }
 
+    /// Baris detail teknis: nilai monospaced + sekunder.
+    ///
+    /// Monospaced bukan gaya — angka RA/Dec yang rata kanan adalah bentuk
+    /// yang membuat dua kolom angka bisa dibandingkan sekilas, dan
+    /// `disclosure` ini dipakai untuk membandingkan.
+    private func detailRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+            Spacer(minLength: 12)
+            Text(value)
+                .monospacedDigit()
+                .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+        }
+        .font(.footnote)
+    }
+
     private func row(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
@@ -397,9 +466,19 @@ struct DiagnosticsView: View {
     /// setiap kali pengguna menyapu. Yang wajib ikut diucapkan adalah penanda
     /// **sisa** — tanpa itu, gambar objek basi terdengar persis seperti
     /// hasil pengukuran sekarang.
-    private func visualPanelLabel(object: CelestialObject, stale: Bool) -> String {
-        var parts = [object.name, object.kind.spokenName,
-                     String(format: "magnitudo %.2f", object.magnitude)]
+    /// `includeTechnicalDetails` memisahkan dua hal yang harusnya tidak
+    /// tercampur: nama + jenis adalah **pengumuman utama** (dibacakan saat
+    /// panel muncul), sementara RA/Dec/mag dibaca hanya kalau pengguna
+    /// memang membuka detail. Kalau detail ikut di pengumuman utama, setiap
+    /// kali panel tampil pengguna mendengar lima angka sebelum tahu benda apa
+    /// yang sedang dilihat.
+    private func visualPanelLabel(object: CelestialObject,
+                                  stale: Bool,
+                                  includeTechnicalDetails: Bool = true) -> String {
+        var parts = [object.name, object.kind.spokenName]
+        if includeTechnicalDetails {
+            parts.append(String(format: "magnitudo %.2f", object.magnitude))
+        }
         if stale {
             parts.append("Sisa pandangan sebelumnya, bukan hasil sekarang.")
         }
