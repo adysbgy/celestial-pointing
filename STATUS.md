@@ -18,6 +18,79 @@ pekerjaan repo ini.
 - CI: `engine-tests.yml` (ubuntu, 2 paket) + `ios-build.yml` (macos-15,
   XcodeGen, gerbang peringatan).
 
+## Progres terakhir (4 Okt 2026 — verifikasi menyeluruh xcode-dev)
+
+### Siklus ini: audit independen penuh terhadap klaim "item brief tersisa" (tanpa perubahan kode)
+Brief masuk memerintahkan "selesaikan semua kode app dalam semalam, fokus
+pembungkus app". Alih-alih mempercayai klaim STATUS lama maupun brief itu
+sendiri, seluruh 15 berkas app dibaca baris demi baris DAN setiap simbol
+`PointingKit`/`CelestialEngine` yang dipanggilnya diverifikasi keberadaan &
+bentuknya di `Packages/`. Hasilnya: **tidak ada satu item pun dari brief yang
+tersisa** — ketiga prioritas sudah terpasang dan konsisten.
+
+**Yang diverifikasi dengan membaca + mencari (bukan percaya STATUS lama):**
+
+1. **watchOS — MotionLogger**: `consume(_:at:)` memanggil
+   `controller.feed(cmX:cmY:cmZ:cmW:timestamp:)` (PointingController.swift:296),
+   yang lewat `DeviceAttitude.init?(cmX:cmY:cmZ:cmW:)` (Frames.swift:82) →
+   `PointingController.feed`. `init?(cmX:…)` terkonfirmasi ada & publik.
+2. **watchOS — CalibrationFlow/Solver**: `CalibrationView` memakai
+   `CalibrationSession` (atas `CalibrationFlow` → `CalibrationSolver`), tombol
+   "Pakai" mati sampai `flow.isReady`, dan `reset()` menyegarkan cuplikan engine
+   via `engine.apply(calibration: .none)`.
+3. **watchOS — WatchView dari PointingState**: `PointingView` merender langsung
+   dari `engine.snapshot.state` (keenam keadaan via `PointingPresentation`:
+   `symbolName`/`shortLabel`/`guidance`/`tone`) + `ObjectDetailView`. Tidak ada
+   keadaan tanpa cabang.
+4. **watchOS — Haptic**: `HapticEngine` memetakan `.lockSucceeded` → `.success`
+   dan `.uncertain` → `.retry`; pemicunya `PointingController.hapticEvents(from:to:)`
+   dengan penjaga `previous != current`, jadi hanya saat transisi keadaan.
+5. **watchOS — WatchConnectivity**: `WatchLinkService` mengirim **keputusan**
+   (`PointingLinkMessage.state(from:at:sigmaDeg:)`), bukan sudut pergelangan;
+   gerbang `LinkReportGate.deliver` kirim-hanya-bila-berhasil.
+6. **iOS — Diagnostik**: `DiagnosticsView` menggambar `ratioToSigma` (Swift
+   Charts) + ekspor via `ConfidenceTraceArchive`/`JSONArchiveDocument`.
+7. **iOS — Experiment 1**: `Experiment1View` + `ExperimentRecorder`
+   (tunjuk→rekam→ekspor; verdict menyaring GAGAL; sensor mati mematikan tombol
+   Rekam).
+8. **Build**: `project.yml` (dua target app + `postGenCommand` tanam app jam ke
+   `PlugIns/`) dan `ios-build.yml` sudah memuat `brew install xcodegen` + gerbang
+   peringatan `Apps/`.
+
+**Verifikasi silang simbol (risiko nyata build macOS):** semua simbol yang
+dipanggil app — `PointingController.feed/resolver/calibration/answeredIntent/
+setObserver/setConfidencePolicy/setSensorAvailable/stop`,
+`PointingSnapshot.*` (rawPointing/calibratedPointing/reportedPointing/
+answeredObject/answeredLevel/displayedObject/isDisplayingStaleObject/aim),
+`PointingState.hasAnswer`, `PointingPresentation` (tone/symbolName/shortLabel/
+guidance), `CalibrationSession`/`CalibrationFlow` (phase/samples/isReady/
+capture/applyIfReady/reset/refreshReferenceTargets/suggestedConfidencePolicy),
+`LinkReportGate.deliver`, `PointingLinkMessage` (init/plist/state/calibration/
+policy/confidencePolicy), `ConfidenceTrace`/`ConfidenceTraceArchive`/
+`DatasetArchive`, `ExperimentHarness` (record/removeLast/dataset/verdict/
+summary/suggestedConfidencePolicy/availableTargets), `EngineFactory`,
+`PointingResolver.confidencePolicy/skyContext`, `DeviceAttitude.init?(cmX:…)`,
+`DeviceAimAxis.rawValue`, `PointingTrial.{intent,groundTruthObjectID}` — **semua
+ada dengan akses level dan label argumen yang cocok** (termasuk getter lintas-
+modul `controller.resolver`/`calibration` yang `public private(set)`).
+
+**Yang benar-benar dijalankan pada siklus ini:**
+- `./swift-test.sh` → **166 CelestialEngine + 143 PointingKit, 0 gagal** (Swift
+  6.0, Docker, Linux) — dijalankan dari nol, bukan sekadar klaim.
+- Sapuan stub (`TODO`/`FIXME`/`placeholder`/`stub`) di `Apps/` → 0 (satu-satunya
+  "matches" adalah PNG ikon biner, bukan kode).
+- Sapuan `@main` → tepat **dua** (jam + iPhone); tidak ada ketiga.
+- Sapuan `try!`/`as!`/`fatalError` di `Apps/` → 0.
+- `gh run list`: **`Apple Build` hijau** (run `37163527245`, 2m38s) **dan**
+  `Engine Tests (Linux)` hijau (`37163527216`) pada HEAD `8038969` — artinya app
+  benar-benar dikompilasi terhadap Apple SDK + `PointingKit` nyata, bukan sekadar
+  lolos parse.
+
+**Kesimpulan:** tidak ada kode app yang tersisa. Satu-satunya baris `ROADMAP.md`
+yang belum tertutup tetap "Point & Slew POC 1 teleskop" — menunggu perangkat
+keras fisik, bukan repo ini. Tidak ada aturan keras PRD yang dilonggarkan;
+engine tidak disentuh.
+
 ## Progres terakhir (4 Okt 2026)
 
 ### Siklus ini: verifikasi mandiri independen (xcode-dev, sesi baru) — seluruh item brief (1–3) terpenuhi
