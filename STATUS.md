@@ -6,20 +6,23 @@
 awal pada siklus ini, bukan dipercaya dari klaim lama.** Visual objek
 (prosedural, tanpa aset), token permukaan & kontras, mode malam merah,
 always-on, VoiceOver, animasi kedatangan kunci, onboarding, audio, dan
-`@ScaledMetric` semuanya **ada di kode dan berjalan**. Dua workflow CI hijau
-di HEAD `3b9dcf2`.
+`@ScaledMetric` semuanya **ada di kode dan berjalan**.
 
 Yang ditemukan siklus ini bukan "fitur kurang", melainkan **satu cacat
-geometri yang tidak terlihat dari teks mana pun di layar** — kutub Mars
-menembus 0.26R keluar dari bola. Detail di entri "Progres terakhir" di bawah.
+geometri yang tidak terlihat dari teks mana pun di layar**: glow dan
+diffraction spike bintang terpotong tepi `Canvas` pada **24 dari 25 bintang
+di katalog** — Sirius paling parah, 0.81R hilang. Detail di entri "Progres
+terakhir" di bawah.
 
-- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 212 test
+- Engine (Fase 1–3) + logika app: **166 test CelestialEngine + 218 test
   PointingKit, 0 gagal** (`./swift-test.sh` dari nol, Swift 6.0 Docker,
-  Linux) — dan **kedua workflow CI hijau** di HEAD `3b9dcf2` (Apple Build
-  `37179379077` 2× `BUILD SUCCEEDED` + gerbang peringatan "Tidak ada
-  peringatan compiler pada Apps/."; Engine Tests `37179379101` 166 + 201).
-- Rincian: `166 + 212` naik dari `166 + 201` (+11 uji batas frame, lihat
-  entri siklus ini).
+  Linux) — dan **kedua workflow CI hijau** di HEAD `3ab030e` (Apple Build
+  `37181603764` 2× `BUILD SUCCEEDED` + gerbang peringatan "Tidak ada
+  peringatan compiler pada Apps/."; Engine Tests `37181603824`, keenam uji
+  bintang terlihat lolos di log CI).
+- Rincian: `166 + 218` naik dari `166 + 212` (+6 uji batas bintang, lihat
+  entri siklus ini). Sebelumnya `166 + 212` naik dari `166 + 201` (+11 uji
+  batas frame).
 
 ### Yang diverifikasi ulang (bukan dengan mempercayai STATUS lama)
 
@@ -162,6 +165,119 @@ yang ada, dan keduanya hanya ketahuan dengan menghitung. Dan kali ini
 tambahannya: **akses `internal` vs `public` adalah cacat kelas ketiga yang
 hanya build macOS yang bisa tangkap** — `swift test` di Linux tidak bisa
 melihatnya sama sekali karena pengujinya satu modul.
+
+## Progres terakhir (4 Okt 2026 — glow & spike bintang terpotong tepi Canvas, 24 dari 25 bintang)
+
+### Premis siklus ini: geometri yang sudah punya `VisualFrame` harus dihitung, bukan hanya dibaca
+
+Dua siklus terakhir menemukan cacat di tempat yang sama — **geometri raster
+yang tidak terbaca dari teks** — dan keduanya ditutup dengan memindahkan
+angka batas ke `VisualFrame` di `PointingKit`. Siklus ini memperluas
+pertanyaannya: `VisualFrame` sudah mengurusi **cincin Saturnus** dan **blob
+nebula**, tapi ada bentuk ketiga di `Canvas` yang sama-sama dikalikan dari
+ukuran dasar dan **tidak punya uji batas sama sekali** — bintang.
+
+### Cacat yang ditemukan: inti dihitung maju, batasnya tidak pernah dihitung
+
+`drawStar` menghitung `coreRadius = 0.22 + 0.30 · relativeSize`, lalu
+mengalikannya: glow terluar `×3.0` dan spike `×3.2`. Tidak ada satu pun
+bagian yang memeriksa apakah hasilnya masih di dalam frame. Karena
+`Canvas` memotong dengan **tepi lurus**, bukan dengan memudar, yang tampil
+bukan "bintang yang agak kepotong" melainkan **bola cahaya yang berhenti
+mendadak di keempat tepi kartu**.
+
+Dihitung untuk seluruh katalog, bukan ditebak:
+
+| Bintang | Ujung terluar | Keluar frame |
+|---|---|---|
+| **Sirius** | 1.811R | **+0.811R** |
+| Canopus | 1.519R | +0.519R |
+| Arcturus | 1.316R | +0.316R |
+| Vega | 1.296R | +0.296R |
+| Polaris | 0.987R | −0.013R (satu-satunya yang muat) |
+
+**24 dari 25 bintang terpotong**, dan yang paling parah justru bintang
+paling terang — yang paling sering dikunci pengguna. Ini cacat yang lebih
+luas daripada dua pendahulunya: cincin Saturnus hanya salah pada satu
+planet, blob nebula pada satu kelas objek, sedangkan ini salah pada
+hampir seluruh katalog bintang.
+
+### Kenapa denyut harus ikut dihitung (dan kenapa itu cacat yang paling mudah lolos)
+
+Geometri lama memakai `pulseFactor = 1 + 0.10 · sin(pulse)`, yang
+mengembangkan gambar **setelah** ukuran inti dipilih. Jadi batas yang
+dihitung dari keadaan diam meloloskan gambar yang terpotong **hanya saat
+denyut memuncak** — cacat yang muncul dan hilang berulang, persis kelas
+yang paling mudah tidak disadari saat menguji sekilas. Karena itu
+`outerRadius` dihitung pada **puncak** denyut, bukan pada keadaan diam.
+
+### Yang diubah, dan kenapa begini
+
+- **`VisualFrame.star(relativeSize:)` menghitung inti MUNDUR dari ruang
+  yang tersedia**, bukan maju dari ukuran yang diinginkan. Ini yang
+  membuat batasnya **konstruktif**: memperbesar glow atau spike tanpa
+  sengaja tidak bisa lagi mendorong ujungnya keluar frame, karena inti
+  menyusut sendiri mengikutinya. Dua siklus sebelumnya memperbaiki gejala
+  per bentuk; ini memperbaiki **kelasnya** — rumusnya tidak bisa lagi
+  menghasilkan ujung yang keluar, berapa pun pengalinya.
+- **Urutan magnitudo tetap terjaga lewat `outerFraction` (0.62 → 0.92).**
+  Bahaya yang sengaja dihindari: memotong inti dengan plafon tetap akan
+  meratakan Sirius dan Polaris menjadi dua titik yang sama, dan
+  "ukuran mengikuti magnitudo" hilang — informasi yang masih terbaca di
+  layar. Uji `testBrighterStarIsStillDrawnLarger` menguncinya.
+- **View tidak punya rumus bintang lagi.** `drawStar` membaca
+  `geometry.coreRadius`, `glowScales`, `spikeScale`, dan `pulseAmplitude`
+  dari model. Ini mempertahankan aturan repo yang sudah berlaku:
+  keputusan visual yang bisa salah tanpa ada yang bisa mengujinya **tidak
+  boleh tinggal di view**. Opasitas glow (`glowOpacities`) ikut naik ke
+  konstanta bernama, karena array literal di dalam loop sebelumnya
+  bergantung secara diam-diam pada jumlah lapis yang sama dengan
+  `glowScales`.
+
+### Uji dibuktikan MERAH lebih dulu
+
+Dengan geometri lama dikembalikan (`outer = 0.22 + 0.30 · clamped`,
+`growth = 1.0`):
+
+- `testEveryCatalogueStarStaysInsideTheFrame` → **gagal**, dan pesannya
+  menyebut bintangnya satu per satu: *"sirius keluar 0.8111258278291038 R
+  di luar frame dan akan terpotong tegak"*, *canopus 0.5186*, *arcturus
+  0.3160*, *vega 0.2964* … angkanya cocok persis dengan hitungan Python
+  mandiri di atas.
+- `testEnlargingTheGlowCannotPushTheStarOutOfFrame` → **gagal** pada
+  seluruh 9 kombinasi pengali (terburuk 10.44R), membuktikan bahwa
+  rumusnya memang tidak punya batas, bukan kebetulan muat.
+- `testLegacyStarOverflowedTheFrame` ditambahkan justru untuk **mengunci
+  angka lama** sebagai bukti bahwa cacatnya nyata, bukan perbedaan rasa
+  tentang seberapa besar glow yang pantas.
+
+### Yang benar-benar dijalankan
+
+- `./swift-test.sh` → **166 CelestialEngine + 218 PointingKit, 0 gagal**
+  (naik dari 212 → 218). Engine tidak disentuh.
+- Ketiga uji di atas **dibuktikan MERAH lebih dulu**, bukan hanya hijau.
+- Gerbang sintaks: seluruh 22 berkas app lolos `swiftc -parse
+  -swift-version 5` di container `swift:6.0`.
+- Sapuan CJK/Cyrillic pada berkas yang diubah: **0**.
+- **CI hijau pada push pertama** (`3ab030e`) — tidak ada kejutan `internal`
+  vs `public` seperti siklus lalu, karena `star(...)`, `StarGeometry`, dan
+  seluruh anggotanya dideklarasikan `public` sejak awal:
+  - `Apple Build` run `37181603764` → **2× `BUILD SUCCEEDED`** + gerbang
+    peringatan *"Tidak ada peringatan compiler pada Apps/."*
+  - `Engine Tests (Linux)` run `37181603824` hijau, keenam uji bintang
+    terlihat **lolos di log CI** (bukan hanya di mesin ini).
+
+### Pelajaran yang berulang (tiga siklus berturut-turut)
+
+Tiga siklus terakhir menemukan cacat di kelas yang **sama**: geometri
+raster yang tidak terbaca dari teks. Kutub Mars menembus 0.26R; cincin
+Saturnus terpotong 0.9R; dan sekarang bintang terpotong 0.81R. Ketiganya
+lolos `swiftc -parse` (sintaks saja), ketiganya lolos `swift test` yang
+ada sebelum uji batasnya ditulis, dan ketiganya hanya ketahuan dengan
+**menghitung**. Polanya sudah cukup konsisten untuk dibaca sebagai aturan:
+setiap bentuk di `Canvas` yang ukurannya dikalikan dari angka dasar harus
+punya uji batas di `VisualFrame`, atau ia akan terpotong tanpa ada yang
+memberi tahu.
 
 ## Progres terakhir (4 Okt 2026 — kutub Mars menembus 0.26R keluar dari bola)
 
