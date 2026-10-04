@@ -233,34 +233,6 @@ public final class PointingEngine: ObservableObject {
             at: date, observer: location.observer)
     }
 
-    /// Tanda tangan putusan GoTo terakhir yang dihitung.
-    ///
-    /// Perhitungannya butuh efemeris (arah target), jadi ia tidak boleh jalan
-    /// di `body` — yang dievaluasi 20 kali per detik. Tapi ia juga tidak boleh
-    /// jalan 20 kali per detik: arah benda langit bergerak ~0.25°/menit, jadi
-    /// hasilnya tidak berubah antara dua sampel berturut-turut.
-    ///
-    /// Yang membatasi di sini adalah **tanda tangan**, bukan waktu: dihitung
-    /// ulang tepat saat jawabannya berubah (objek berbeda, atau ada/tidak ada
-    /// jawaban). Objek yang sama dihitung sekali; objek baru langsung. Itu
-    /// penting untuk peringatan keselamatan — kalau tertinggal, ia bukan
-    /// sekadar terlambat, ia **salah**.
-    private var slewVerdictSignature: String?
-
-    /// Hitung ulang putusan GoTo bila jawabannya berubah.
-    private func refreshSlewVerdict(at date: Date) {
-        // `answeredObject` — sama dengan yang dipakai pesan, riwayat, dan
-        // gerbang kedatangan kunci. Memakai satu predikat yang sama berarti
-        // putusan ini tidak bisa diam-diam menjadi putusan atas objek yang
-        // dipertahankan mesin keadaan padahal keadaannya sudah tidak punya
-        // jawaban.
-        let objectID = snapshot.answeredObject?.id ?? "-"
-        let signature = "\(snapshot.state.rawValue)|\(objectID)"
-        guard signature != slewVerdictSignature else { return }
-        slewVerdictSignature = signature
-        slewVerdict = controller.slewDecision(date: date)
-    }
-
     /// Arah fase Bulan hasil perhitungan terakhir.
     ///
     /// `nil` berarti "tidak diketahui" — UI lalu menggambar piringan **tanpa
