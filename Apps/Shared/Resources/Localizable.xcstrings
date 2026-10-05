@@ -4774,6 +4774,61 @@
           }
         }
       }
+    },
+    "chart.speech.measured": {
+      "comment": "Jumlah sampel yang punya jarak kandidat terukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld samples measured."
+          }
+        }
+      }
+    },
+    "chart.speech.band.confident": {
+      "comment": "Jumlah sampel di bawah atau tepat pada batas yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld confident."
+          }
+        }
+      }
+    },
+    "chart.speech.band.middle": {
+      "comment": "Jumlah sampel yang melewati batas yakin tapi belum batas jauh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld between the two thresholds."
+          }
+        }
+      }
+    },
+    "chart.speech.band.tooFar": {
+      "comment": "Jumlah sampel yang melewati batas jauh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld too far."
+          }
+        }
+      }
+    },
+    "chart.speech.unmeasured": {
+      "comment": "Jumlah sampel tanpa jarak kandidat terukur; hanya diucapkan kalau bukan nol.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld without a measured distance."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

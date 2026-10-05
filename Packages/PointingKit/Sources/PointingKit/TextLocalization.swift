@@ -421,6 +421,24 @@ public extension LocalizedText {
     static let skyContextNotComputed = LocalizedText(
         key: "skyContext.notComputed", id: "Konteks langit belum dihitung.")
 
+    // MARK: Ringkasan verbal grafik keyakinan (VoiceOver)
+
+    /// "%lld sampel terukur." — jumlah yang punya jarak kandidat.
+    static let chartSpeechMeasuredCount = LocalizedText(
+        key: "chart.speech.measured", id: "%lld sampel terukur.")
+    /// "%lld yakin" — di bawah atau tepat pada batas yakin.
+    static let chartSpeechBandConfident = LocalizedText(
+        key: "chart.speech.band.confident", id: "%lld yakin,")
+    /// "%lld di antara dua batas" — melewati batas yakin, belum melewati batas jauh.
+    static let chartSpeechBandMiddle = LocalizedText(
+        key: "chart.speech.band.middle", id: "%lld di antara dua batas,")
+    /// "%lld terlalu jauh" — melewati batas jauh.
+    static let chartSpeechBandTooFar = LocalizedText(
+        key: "chart.speech.band.tooFar", id: "%lld terlalu jauh.")
+    /// "%lld tanpa jarak terukur" — hanya diucapkan kalau jumlahnya bukan nol.
+    static let chartSpeechUnmeasuredCount = LocalizedText(
+        key: "chart.speech.unmeasured", id: "%lld tanpa jarak terukur.")
+
     /// Setiap kunci yang dideklarasikan di sini.
     ///
     /// Satu sumber untuk gerbang paritas dan untuk uji — supaya "kunci yang
@@ -685,5 +703,11 @@ public extension LocalizedText {
         .complicationStaleMarker,
         .onboardingTitle, .onboardingSubtitle, .onboardingHonesty,
         .onboardingStart, .onboardingLabel,
+        // Ringkasan verbal grafik keyakinan untuk VoiceOver. Kunci ini
+        // dirakit di `ConfidenceChartSpeech`, dan grafiknya sendiri tidak
+        // pernah punya pengumuman sebelum unit ini.
+        .chartSpeechMeasuredCount, .chartSpeechBandConfident,
+        .chartSpeechBandMiddle, .chartSpeechBandTooFar,
+        .chartSpeechUnmeasuredCount,
     ]
 }

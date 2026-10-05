@@ -571,6 +571,29 @@ struct DiagnosticsView: View {
                 }
                 .chartYAxisLabel("jarak kandidat / σ")
                 .frame(height: 180)
+                // **Satu-satunya bagian layar ini yang sebelumnya diam.**
+                //
+                // Swift Charts tidak memberi deskripsi yang berguna: yang bisa
+                // di Accessibility Reader hanyalah setiap titik satu per satu,
+                // dan tidak ada pembaca layar yang akan menarik garis dari
+                // sana. Setiap elemen data lain di layar ini punya pengumuman
+                // (`RowSpeech`, `visualPanelLabel`), jadi grafiknyalah yang
+                // terlihat paling kaya secara visual dan paling sunyi.
+                //
+                // Yang diucapkan bukan angka mentah, tapi **kesimpulan**: berapa
+                // sampel jatuh di tiap pita ambang. Angka mentah sudah ada di
+                // ekspor, dan membacanya satu per satu tidak menghasilkan
+                // informasi apa pun. Pita batasnya dihitung di `PointingKit`
+                // dari `policy` yang sama dengan yang dipakai engine -- kalau
+                // ambangnya ditulis ulang di sini, ringkasan suara bisa
+                // menyimpulkan "terlalu jauh" untuk titik yang jelas masih di
+                // bawah garis yang sedang dilihat pengguna.
+                //
+                // `nil` saat tidak ada satu pun jarak terukur: lalu **tidak ada
+                // yang diucapkan**, karena kalimat berisi nol-nol akan terbaca
+                // sebagai elemen yang sudah dibaca tapi tidak bermakna.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(spokenChartSummary)
             }
 
             HStack(spacing: 12) {
@@ -580,6 +603,36 @@ struct DiagnosticsView: View {
             }
             .font(.caption2)
         }
+    }
+
+    /// Ringkasan verbal grafik, dihitung dari sampel yang sama dengan yang
+    /// diplot.
+    ///
+    /// `nil` kalau tidak ada sampel dengan jarak terukur -- sama dengan kondisi
+    /// `points.isEmpty` yang sudah menggambar pesan penggantinya, sehingga
+    /// cabang keduanya tidak bisa berbeda pendapat soal "ada yang bisa
+    /// dikatakan atau tidak".
+    private var chartSpeech: ConfidenceChartSpeech? {
+        ConfidenceChartSpeech(samples: trace.samples.map(\.ratioToSigma),
+                              policy: engine.controller.resolver.confidencePolicy)
+    }
+
+    /// Pengumuman grafik, atau `nil` saat tidak ada yang bisa dikatakan.
+    ///
+    /// Sengaja opsional dan bukan `?? ""`. Dua alasan, dan keduanya nyata:
+    ///
+    /// 1. `""` adalah literal di view, jadi Aturan 4 akan menandainya sebagai
+    ///    teks UI tanpa padanan bahasa Inggris — yang benar, karena string
+    ///    kosong memang tidak punya padanan apa pun.
+    /// 2. Pengumuman kosong bukan "tidak ada pengumuman". Pembaca layar akan
+    ///    tetap menemukan elemen itu dan membacanya sebagai satu hal yang sudah
+    ///    terucap tapi tidak bermakna. Ketiadaan pengumuman dan pengumuman
+    ///    kosong harus tetap dua hal yang berbeda.
+    ///
+    /// `accessibilityLabel(_:)` menerima `String?`, jadi ketiadaan bisa
+    /// diteruskan apa adanya tanpa harus dikarang menjadi teks.
+    private var spokenChartSummary: String? {
+        chartSpeech?.spokenSummary
     }
 
     private func legend(_ label: String, _ tone: PointingTone) -> some View {
