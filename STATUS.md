@@ -9949,3 +9949,90 @@ yang hanya bisa lulus bukan gerbang.
     kelalaian. Lihat tabel di atas untuk alasannya.
   - Siklus ini tidak memeriksa apakah warna netral "terlihat enak" — hanya
     bahwa ia sama untuk semua bintang dan berbeda dari warna terkunci.
+
+## Siklus: complication inline — permukaan ketiga, kanal yang hilang (2026-10-05)
+
+### Premis: aturan yang sudah dituliskan tetap bisa bocor di permukaan yang belum diperiksa
+
+Siklus sebelumnya menuliskan aturannya: ciri yang dicari dari id yang
+dikunci tidak boleh tampil saat ragu. Siklus ini memeriksa **permukaan
+ketiga** — complication — karena app jam dan iPhone sudah diperiksa, dan
+complication berjalan di proses terpisah dengan bentuk yang berbeda.
+
+### Temuan: satu keluarga kehilangan satu-satunya kanalnya
+
+Complication punya **dua** kanal: satu ikon dan satu baris teks. Model sudah
+menyediakan keduanya (`presentedSymbolName(at:)`, `sublineContent(at:)`), dan
+dokumentasi `presentedSymbolName` menulis alasannya sendiri:
+
+> "Kalau `.uncertain` memakai ikon yang sama dengan `.lock`, pergelangan
+> membaca 'Vega' berdampingan dengan centang hijau, lalu menyimpulkan engine
+> yakin. Kalau teksnya yang dirubah — sayangnya **satu kata tambahan sudah
+> memenuhi ruang di `.accessoryInline`** — jadi ikon yang jadi kanal penanda."
+
+`.accessoryInline` mengembalikan `Text(digest.headline)` saja. Jadi keluarga
+yang **paling sempit**, dan karena itu paling bergantung pada ikon, justru
+satu-satunya yang tidak punya penanda: nama kandidat `.uncertain` tampil
+persis seperti nama yang sudah terkunci. Cacat yang sama ada di cabang
+`default`.
+
+Yang membuat ini bertahan adalah bentuk dokumentasinya, bukan bug pemetaan —
+persis pola yang sudah tercatat di repo ini (lihat catatan `presentedSymbolName`
+tentang bentuk tanpa waktu). Dokumen itu panjang dan benar; ia berhenti satu
+kalimat sebelum pertanyaan yang lebih besar: **keluarga mana yang memakainya?**
+
+### Perbaikannya memakai kanal yang sudah ada
+
+Bukan penanda baru: ikon diambil dari `presentedSymbolName(at:)` yang sama
+dengan dua keluarga lain, sehingga ragu (`questionmark.circle`) dan basi
+(`clock.badge.exclamationmark`) ikut terbaca tanpa aturan terpisah.
+`accessoryInline` memang menerima gambar ("satu baris teks dan gambar
+opsional", watchOS 9+ — sama dengan ambang deployment di `project.yml`), dan
+gambar disisipkan lewat interpolasi `Image` di dalam `Text`, bentuk yang
+memang dipakai contoh resmi Apple untuk keluarga ini.
+
+### Gerbang baru: Aturan 23
+
+Setiap cabang keluarga complication yang menampilkan `digest.headline` wajib
+merender `presentedSymbolName` **di cabang yang sama**.
+
+Diperiksa per cabang, bukan per ekspresi, dan itu keputusan yang lahir dari
+uji coba pertama: versi per-ekspresi melaporkan tiga pelanggaran padahal dua
+di antaranya benar — keluarga lingkaran dan persegi panjang merender ikonnya
+sebagai view **sebelah** teksnya. Aturan yang menuduh kode benar akan
+dimatikan orang, jadi batasnya digeser ke unit yang memang jadi syaratnya:
+satu cabang keluarga.
+
+Diverifikasi berbunyi: mengembalikan kedua cabang ke bentuk lama membuatnya
+melaporkan tepat dua pelanggaran itu.
+
+### Aturan 10 diperluas ke kelas drift yang sama
+
+Kalimat "berkasnya tumbuh jadi **21 aturan**" di README adalah janji ke
+pembaca yang tidak bisa dijaga compiler — kelas yang sama persis dengan
+hitungan uji yang sudah dijaga Aturan 10. Dan ia memang sudah membusuk:
+aturan ke-22 dan ke-23 ditambahkan tanpa ada yang menyentuhnya. Diperluas, ia
+langsung melaporkan "README bilang 21 aturan, swift-ui-lint.sh punya 23".
+
+Sumber angkanya adalah aturan yang **benar-benar mencetak**, bukan nomor
+tertinggi: kalau `Aturan 12` pernah dihapus, menghitung maksimum akan tetap
+bilang 23. Yang dijaga nomor terkecil yang hilang, supaya celah penomoran pun
+ketahuan.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 174, PointingKit 600, 0 gagal.
+  - `./swift-ui-lint.sh` -> **23** aturan hijau (Aturan 10 diperluas,
+    Aturan 23 baru).
+  - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+  - `python3 Tools/check-visuals.py --check` -> 45 pemeriksaan hijau.
+  - CI: Engine Tests `37344648762` + Apple Build `37344648834`, keduanya
+    success.
+
+### Yang TIDAK diklaim
+
+  - Aturan 23 memeriksa **kehadiran** kanal ikon, bukan bahwa ikonnya benar.
+    Kebenaran ikonnya sudah diuji di Linux
+    (`testAllStatesHaveSymbolsAndLabels`) — dua gerbang, dua pertanyaan.
+  - Keluarga `accessoryCorner` belum didesain; ia jatuh ke `default`, yang
+    sekarang punya penanda. Bukan desain final, hanya tidak lagi menyesatkan.
