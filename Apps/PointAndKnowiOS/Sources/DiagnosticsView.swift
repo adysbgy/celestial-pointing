@@ -838,7 +838,19 @@ struct DiagnosticsView: View {
                                      // yakin daripada badge "Ragu" di
                                      // sebelahnya.
                                      isConfirmed: isConfirmed,
-                                     pulse: currentPulse)
+                                     // Gerbang `hasPulse` **di sini juga**,
+                                     // bukan hanya di kondisi `TimelineView`
+                                     // di atas. Kondisi itu ada agar
+                                     // `TimelineView` tidak dibangun untuk
+                                     // planet; gerbang ini ada agar
+                                     // `Canvas` tidak digambar ulang oleh
+                                     // denyut. Kalau cabang di atas diubah
+                                     // orang lain, baris ini tetap menjaga
+                                     // invariannya — gerbangnya menempel
+                                     // pada pemanggilan, bukan pada cabang
+                                     // yang bisa dihapus tanpa jejak.
+                                     // Dijaga Aturan 21 di `swift-ui-lint.sh`.
+                                     pulse: visual.hasPulse ? currentPulse : 0)
                 // Nama + jenis digabung jadi satu pengumuman VoiceOver,
                 // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
                 // basi terdengar persis seperti hasil pengukuran sekarang.

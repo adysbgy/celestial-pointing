@@ -420,6 +420,29 @@ struct ObjectDetailView: View {
     @State private var appearScale: CGFloat = 1
     @State private var appearOpacity: Double = 1
 
+    /// Jam denyut glow bintang.
+    ///
+    /// Kenapa jamnya di sini, bukan di `PointingView`: denyut adalah properti
+    /// **kartu**, sama seperti `appearScale` di atas — dan kartu sudah
+    /// dirender ulang 20×/detik selama jam mengarahkan, karena setiap sampel
+    /// sensor adalah perubahan `@Published` di `engine`. Jadi fase bisa
+    /// dihitung langsung dari waktu, **tanpa `TimelineView`**: view ini tidak
+    /// perlu membangunkan dirinya sendiri, ia memang sudah bangun. Itu sebabnya
+    /// iPhone butuh `TimelineView` (kontainernya bukan 20 Hz) sementara jam
+    /// tidak.
+    ///
+    /// `@State` dan bukan `Date()` di setiap frame: tanpa titik awal yang
+    /// tetap, `Date().timeIntervalSince(Date())` selalu nol dan denyutnya
+    /// tidak pernah bergerak — diam yang tampak benar sampai seseorang
+    /// mengukurnya.
+    @State private var pulseStart = Date()
+
+    /// Scene sedang aktif (terlihat di layar).
+    ///
+    /// Dibaca supaya denyut berhenti di latar belakang: berdenyut di sana
+    /// hanya membuang baterai tanpa pernah terlihat.
+    @Environment(\.scenePhase) private var scenePhase
+
     /// Pengguna meminta reduksi gerak.
     ///
     /// `NightAwareContainer` sudah mematikan animasi saat layar redup, dan itu
@@ -441,7 +464,21 @@ struct ObjectDetailView: View {
                      // suatu saat kartu ikut dirender di layar redup, nilainya
                      // sudah ada dan tidak perlu ditebak.
                      isLuminanceReduced: false,
-                     isSceneActive: true)
+                     // Scene tidak aktif ikut mematikan denyut. Ini **alasan
+                     // baterai**, bukan aksesibilitas (lihat `MotionPolicy`):
+                     // denyut di latar belakang tidak pernah terlihat, jadi
+                     // tidak ada yang dikorbankan.
+                     isSceneActive: scenePhase == .active)
+    }
+
+    /// Fase denyut glow, dalam radian — atau **nol persis** saat denyut tidak
+    /// boleh berjalan.
+    ///
+    /// Dihitung dari `MotionPolicy` di `PointingKit`, bukan dari ambang lokal:
+    /// jam dan iPhone harus memakai aturan yang sama, dan hanya versi di paket
+    /// itu yang bisa diuji di Linux.
+    private var pulsePhase: Double {
+        motion.pulsePhase(elapsedSeconds: Date().timeIntervalSince(pulseStart))
     }
 
     var body: some View {
@@ -459,7 +496,36 @@ struct ObjectDetailView: View {
                                      // membaca gambar lebih dulu daripada
                                      // badge, jadi gambar tidak boleh lebih
                                      // yakin daripada teksnya.
-                                     isConfirmed: isConfirmed)
+                                     isConfirmed: isConfirmed,
+                                     // Denyut glow bintang. Sebelum unit ini
+                                     // kartu jam **tidak pernah** meneruskan
+                                     // `pulse`, jadi bintang yang di iPhone
+                                     // berdenyut halus diam total di jam —
+                                     // padahal jam adalah permukaan utamanya,
+                                     // dan komentar `CelestialVisualView`
+                                     // sendiri menulis bahwa denyut diberi
+                                     // dari luar justru "supaya jam bisa
+                                     // menghentikannya saat layar redup",
+                                     // kalimat yang tidak mungkin benar tanpa
+                                     // jalur ini. Nilainya **nol persis** saat
+                                     // Reduce Motion atau scene tidak aktif,
+                                     // jadi tidak ada denyut yang bocor.
+                                     //
+                                     // **Gerbang `hasPulse` bukan hiasan.**
+                                     // `Canvas` digambar ulang setiap kali nilai
+                                     // yang ditangkapnya berubah, jadi `pulse`
+                                     // yang bergerak 20×/detik memaksa setiap
+                                     // planet, Bulan, dan Matahari digambar
+                                     // ulang 20×/detik untuk piksel yang
+                                     // identik — denyut hanya dibaca
+                                     // `drawStar`. Nol untuk yang bukan bintang
+                                     // membuat `Canvas` planet **tidak pernah**
+                                     // digambar ulang karena denyut. Aturan
+                                     // yang sama dipakai iPhone lewat
+                                     // `visual.hasPulse`; keduanya membaca
+                                     // properti yang diuji di Linux itu, bukan
+                                     // daftar jenis lokal yang bisa basi.
+                                     pulse: visual.hasPulse ? pulsePhase : 0)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
@@ -524,6 +590,16 @@ struct ObjectDetailView: View {
             withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.08)) {
                 appearScale = 1
             }
+        }
+        // Saat jam kembali aktif, jam denyut di-set ulang **sekali**.
+        //
+        // Tanpa ini, `pulseStart` tetap menunjuk waktu terakhir scene aktif,
+        // jadi denyut melompat maju beberapa detik dalam satu frame — dan
+        // lompatan itu terlihat seperti kedipan, bukan denyut. Alasan yang
+        // sama dengan `resyncPulse` di app iPhone.
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            pulseStart = Date()
         }
         // Satu elemen, karena nama + jenis + magnitudo + badge adalah satu
         // pengumuman. Yang paling penting di sini: **penanda sisa ikut

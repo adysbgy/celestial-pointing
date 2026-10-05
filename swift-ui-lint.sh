@@ -1983,6 +1983,89 @@ else
   echo "Bersih: setiap permukaan kartu datang dari token yang diuji."
 fi
 
+# ── Aturan 21: denyut harus digerbangi `hasPulse` ──────────────────────────
+# Aturan 7 memastikan API gerak **punya penjaga** di berkasnya. Ia tidak bisa
+# melihat apakah denyut benar-benar sampai ke gambar, dan tidak bisa melihat
+# apakah ia sampai ke gambar yang **tidak seharusnya** berdenyut.
+#
+# Dua cacat nyata, dua arah:
+# 1. Kartu jam tidak pernah meneruskan `pulse` sama sekali. Bintang yang di
+#    iPhone berdenyut halus diam total di jam — permukaan utamanya — padahal
+#    komentar `CelestialVisualView` sendiri menulis denyut diberi dari luar
+#    "supaya jam bisa menghentikannya saat layar redup".
+# 2. `Canvas` digambar ulang setiap kali nilai yang ditangkapnya berubah.
+#    `pulse` yang bergerak 20x/detik karena itu memaksa planet, Bulan, dan
+#    Matahari digambar ulang 20x/detik untuk piksel yang identik — denyut
+#    hanya dibaca `drawStar`. Di jam, view memang sudah dirender 20 Hz oleh
+#    sampel sensor, jadi ini ongkos yang nyata: baterai, di layar yang paling
+#    peduli baterai.
+#
+# Yang diperiksa: setiap pemanggilan `CelestialVisualView(...)` yang
+# meneruskan `pulse:` dengan nilai **bukan** literal nol wajib menyebut
+# `hasPulse` di daftar argumen yang sama. Nama itu properti teruji di Linux
+# (`CelestialVisual.hasPulse`), jadi aturannya tidak bergantung pada daftar
+# jenis lokal yang bisa basi.
+echo
+echo "== Aturan 21: denyut gambar digerbangi hasPulse =="
+ungated_pulse=$(python3 - <<'PY' 2>&1
+import os, re
+
+CALL = "CelestialVisualView("
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        # Komentar dibuang sebelum mencari argumen: dokumentasi aturan ini
+        # sendiri menyebut `pulse:` dan akan melaporkan dirinya sendiri.
+        lines = text.split("\n")
+        code_lines = [l.split("//", 1)[0] for l in lines]
+        code = "\n".join(code_lines)
+        start = 0
+        while True:
+            i = code.find(CALL, start)
+            if i < 0:
+                break
+            # Telusuri sampai tanda kurung seimbang -> seluruh daftar argumen.
+            j = i + len(CALL)
+            depth = 1
+            while j < len(code) and depth:
+                if code[j] == "(":
+                    depth += 1
+                elif code[j] == ")":
+                    depth -= 1
+                j += 1
+            args = code[i + len(CALL):j - 1]
+            start = j
+            m = re.search(r"\bpulse\s*:\s*([^,]*)", args)
+            if not m:
+                continue
+            value = m.group(1).strip()
+            if value in ("0", "0.0", ".zero"):
+                continue
+            if not re.search(r"\bhasPulse\b", args):
+                line_no = code[:i].count("\n") + 1
+                problems.append(
+                    f"  {path}:{line_no}: pulse: {value[:40]} tanpa hasPulse")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Gerbangi dengan `visual.hasPulse`: `pulse: visual.hasPulse ? fase : 0`.")
+    print("   Tanpa gerbang, planet digambar ulang 20x/detik untuk piksel yang sama.")
+PY
+)
+if [ -n "$ungated_pulse" ]; then
+  echo "$ungated_pulse"
+  echo "   Sebab: Canvas digambar ulang tiap nilai tangkapan berubah; denyut"
+  echo "   hanya dibaca drawStar, jadi denyut pada planet cuma membuang baterai."
+  status=1
+else
+  echo "Bersih: setiap denyut gambar digerbangi hasPulse."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
