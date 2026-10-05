@@ -420,29 +420,6 @@ struct ObjectDetailView: View {
     @State private var appearScale: CGFloat = 1
     @State private var appearOpacity: Double = 1
 
-    /// Jam denyut glow bintang.
-    ///
-    /// Kenapa jamnya di sini, bukan di `PointingView`: denyut adalah properti
-    /// **kartu**, sama seperti `appearScale` di atas — dan kartu sudah
-    /// dirender ulang 20×/detik selama jam mengarahkan, karena setiap sampel
-    /// sensor adalah perubahan `@Published` di `engine`. Jadi fase bisa
-    /// dihitung langsung dari waktu, **tanpa `TimelineView`**: view ini tidak
-    /// perlu membangunkan dirinya sendiri, ia memang sudah bangun. Itu sebabnya
-    /// iPhone butuh `TimelineView` (kontainernya bukan 20 Hz) sementara jam
-    /// tidak.
-    ///
-    /// `@State` dan bukan `Date()` di setiap frame: tanpa titik awal yang
-    /// tetap, `Date().timeIntervalSince(Date())` selalu nol dan denyutnya
-    /// tidak pernah bergerak — diam yang tampak benar sampai seseorang
-    /// mengukurnya.
-    @State private var pulseStart = Date()
-
-    /// Scene sedang aktif (terlihat di layar).
-    ///
-    /// Dibaca supaya denyut berhenti di latar belakang: berdenyut di sana
-    /// hanya membuang baterai tanpa pernah terlihat.
-    @Environment(\.scenePhase) private var scenePhase
-
     /// Pengguna meminta reduksi gerak.
     ///
     /// `NightAwareContainer` sudah mematikan animasi saat layar redup, dan itu
@@ -454,6 +431,12 @@ struct ObjectDetailView: View {
     /// `MotionPolicy` di `PointingKit` yang memutuskan — teruji di Linux, dan
     /// dipakai iPhone juga, supaya kedua app tidak bisa berbeda pendapat.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Scene sedang aktif (terlihat di layar).
+    ///
+    /// Dibaca supaya `motion` di bawah jujur. Denyut itu sendiri dikelola
+    /// `PulsingCelestialVisual`, yang punya `scenePhase`-nya sendiri.
+    @Environment(\.scenePhase) private var scenePhase
 
     private var motion: MotionPolicy {
         MotionPolicy(reduceMotion: reduceMotion,
@@ -471,61 +454,27 @@ struct ObjectDetailView: View {
                      isSceneActive: scenePhase == .active)
     }
 
-    /// Fase denyut glow, dalam radian — atau **nol persis** saat denyut tidak
-    /// boleh berjalan.
-    ///
-    /// Dihitung dari `MotionPolicy` di `PointingKit`, bukan dari ambang lokal:
-    /// jam dan iPhone harus memakai aturan yang sama, dan hanya versi di paket
-    /// itu yang bisa diuji di Linux.
-    private var pulsePhase: Double {
-        motion.pulsePhase(elapsedSeconds: Date().timeIntervalSince(pulseStart))
-    }
-
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             if let visual {
-                CelestialVisualView(visual: visual,
-                                     diameter: visualDiameter,
-                                     // Ambang ini **bukan** `!isStale`.
-                                     // `.uncertain` punya jawaban (jadi bukan
-                                     // sisa), tapi engine menyatakan diri
-                                     // kurang yakin — dan pada keadaan itulah
-                                     // gambar paling berbahaya: ia menampilkan
-                                     // seluruh ciri pengenal sementara badge
-                                     // di sebelahnya bertuliskan "Ragu". Mata
-                                     // membaca gambar lebih dulu daripada
-                                     // badge, jadi gambar tidak boleh lebih
-                                     // yakin daripada teksnya.
-                                     isConfirmed: isConfirmed,
-                                     // Denyut glow bintang. Sebelum unit ini
-                                     // kartu jam **tidak pernah** meneruskan
-                                     // `pulse`, jadi bintang yang di iPhone
-                                     // berdenyut halus diam total di jam —
-                                     // padahal jam adalah permukaan utamanya,
-                                     // dan komentar `CelestialVisualView`
-                                     // sendiri menulis bahwa denyut diberi
-                                     // dari luar justru "supaya jam bisa
-                                     // menghentikannya saat layar redup",
-                                     // kalimat yang tidak mungkin benar tanpa
-                                     // jalur ini. Nilainya **nol persis** saat
-                                     // Reduce Motion atau scene tidak aktif,
-                                     // jadi tidak ada denyut yang bocor.
-                                     //
-                                     // **Gerbang `hasPulse` bukan hiasan.**
-                                     // `Canvas` digambar ulang setiap kali nilai
-                                     // yang ditangkapnya berubah, jadi `pulse`
-                                     // yang bergerak 20×/detik memaksa setiap
-                                     // planet, Bulan, dan Matahari digambar
-                                     // ulang 20×/detik untuk piksel yang
-                                     // identik — denyut hanya dibaca
-                                     // `drawStar`. Nol untuk yang bukan bintang
-                                     // membuat `Canvas` planet **tidak pernah**
-                                     // digambar ulang karena denyut. Aturan
-                                     // yang sama dipakai iPhone lewat
-                                     // `visual.hasPulse`; keduanya membaca
-                                     // properti yang diuji di Linux itu, bukan
-                                     // daftar jenis lokal yang bisa basi.
-                                     pulse: visual.hasPulse ? pulsePhase : 0)
+                // Visual + denyutnya dipegang `PulsingCelestialVisual`: denyut
+                // butuh `TimelineView`-nya sendiri (lihat komentar di sana),
+                // dan kartu ini **tidak boleh** ikut hidup di dalamnya —
+                // kartu adalah jawaban, bukan hiasan.
+                PulsingCelestialVisual(visual: visual,
+                                       diameter: visualDiameter,
+                                       // Ambang ini **bukan** `!isStale`.
+                                       // `.uncertain` punya jawaban (jadi bukan
+                                       // sisa), tapi engine menyatakan diri
+                                       // kurang yakin — dan pada keadaan itulah
+                                       // gambar paling berbahaya: ia menampilkan
+                                       // seluruh ciri pengenal sementara badge
+                                       // di sebelahnya bertuliskan "Ragu". Mata
+                                       // membaca gambar lebih dulu daripada
+                                       // badge, jadi gambar tidak boleh lebih
+                                       // yakin daripada teksnya.
+                                       isConfirmed: isConfirmed,
+                                       motion: motion)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
@@ -591,16 +540,8 @@ struct ObjectDetailView: View {
                 appearScale = 1
             }
         }
-        // Saat jam kembali aktif, jam denyut di-set ulang **sekali**.
-        //
-        // Tanpa ini, `pulseStart` tetap menunjuk waktu terakhir scene aktif,
-        // jadi denyut melompat maju beberapa detik dalam satu frame — dan
-        // lompatan itu terlihat seperti kedipan, bukan denyut. Alasan yang
-        // sama dengan `resyncPulse` di app iPhone.
-        .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active else { return }
-            pulseStart = Date()
-        }
+        // Saat jam kembali aktif, jam denyut di-set ulang **sekali** — lihat
+        // `PulsingCelestialVisual`, yang memegang denyutnya sendiri.
         // Satu elemen, karena nama + jenis + magnitudo + badge adalah satu
         // pengumuman. Yang paling penting di sini: **penanda sisa ikut
         // diucapkan**. Pengguna VoiceOver tidak melihat teks peringatannya,
@@ -703,6 +644,80 @@ struct ObjectDetailView: View {
     /// jam dan iPhone (`ObjectKindLabels`), jadi keduanya tidak bisa
     /// menampilkan nama berbeda untuk benda yang sama.
     private var kindLabel: String { object.kind.displayName }
+}
+
+/// Gambar benda langit beserta denyut glow-nya.
+///
+/// **Kenapa view terpisah, bukan `pulse:` langsung di kartu.** Denyut butuh
+/// penyegaran per frame, dan itu **hanya** bisa diandalkan lewat `TimelineView`.
+/// Membaca `Date()` di dalam `body` kartu tidak cukup: `CelestialVisual`
+/// adalah `Equatable`, jadi selama terkunci pada satu bintang argumen kartu
+/// tidak berubah antar sampel sensor — SwiftUI boleh melewati evaluasi ulang
+/// `body`, dan `Date()` bukan dependensi yang bisa dilihatnya. Hasilnya bintang
+/// yang diam: cacat yang sama, hanya berpindah tempat.
+///
+/// Dipisah dari kartu juga karena alasan yang sudah dipakai di app iPhone:
+/// denyut dan isi panel punya aturan berbeda. Kalau kartu ikut hidup di dalam
+/// `TimelineView`, mematikan denyut berarti mematikan kartu — dan kartu adalah
+/// **jawaban**, bukan hiasan.
+///
+/// `motion` diterima dari kartu, bukan dihitung ulang di sini: satu sumber
+/// aturan (`MotionPolicy` di `PointingKit`) untuk jam dan iPhone.
+struct PulsingCelestialVisual: View {
+
+    let visual: CelestialVisual
+    let diameter: CGFloat
+    let isConfirmed: Bool
+    let motion: MotionPolicy
+
+    /// Jam denyut. Di-set ulang **sekali** saat scene kembali aktif: tanpa itu
+    /// fase melompat maju beberapa detik dalam satu frame, dan lompatan itu
+    /// terbaca sebagai kedipan, bukan denyut — alasan yang sama dengan
+    /// `resyncPulse` di app iPhone.
+    @State private var pulseStart = Date()
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        Group {
+            // Gerbang `hasPulse` bukan hiasan: `Canvas` digambar ulang setiap
+            // kali nilai yang ditangkapnya berubah, jadi `pulse` yang bergerak
+            // memaksa planet, Bulan, dan Matahari digambar ulang untuk piksel
+            // yang identik — denyut hanya dibaca `drawStar`. `hasPulse` diuji
+            // di Linux, jadi keputusan ini tidak bergantung pada daftar jenis
+            // lokal yang bisa basi. Dijaga Aturan 21.
+            if motion.allowsContinuousMotion && visual.hasPulse {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                    CelestialVisualView(visual: visual,
+                                        diameter: diameter,
+                                        isConfirmed: isConfirmed,
+                                        // Gerbang `hasPulse` juga di sini, bukan
+                                        // hanya di kondisi `if` di atas —
+                                        // supaya invariannya menempel pada
+                                        // pemanggilan dan tidak bisa hilang saat
+                                        // kondisinya direfaktor. Dijaga Aturan 21.
+                                        pulse: visual.hasPulse ? pulsePhase : 0)
+                }
+            } else {
+                // Tanpa `TimelineView` denyut benar-benar berhenti, bukan
+                // "cukup kecil". `pulsePhase` mengembalikan **nol persis** di
+                // keadaan gated, jadi kedua cabang menghasilkan gambar yang
+                // sama saat gerak mati.
+                CelestialVisualView(visual: visual,
+                                    diameter: diameter,
+                                    isConfirmed: isConfirmed,
+                                    pulse: 0)
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            pulseStart = Date()
+        }
+    }
+
+    /// Fase denyut dalam radian — **nol persis** saat denyut tidak boleh jalan.
+    private var pulsePhase: Double {
+        motion.pulsePhase(elapsedSeconds: Date().timeIntervalSince(pulseStart))
+    }
 }
 
 /// Layar kepercayaan pengukuran: apa yang engine ketahui tentang ketelitiannya

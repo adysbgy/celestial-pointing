@@ -26,15 +26,27 @@ jadi `pulse` selalu bernilai bawaan nol di sana. Akibatnya:
 Ini bukan cacat yang bisa ditangkap uji: view tidak bisa dijalankan di Linux,
 dan yang hilang bukan sebuah perhitungan, melainkan sebuah **argumen**.
 
-### Kenapa jam tidak butuh `TimelineView`
+### Kenapa jam tetap butuh `TimelineView` — dan kenapa percobaan pertama salah
 
-iPhone memakai `TimelineView(.animation(minimumInterval: 1/30))` untuk
-menyegarkan denyut, karena kontainer panelnya bukan render-loop. Kartu jam
-berbeda: selama mengarahkan, setiap sampel sensor adalah perubahan
-`@Published` di `engine`, jadi kartu sudah dirender ulang 20×/detik. Fase
-denyut karena itu bisa dihitung langsung dari waktu (`Date().timeIntervalSince(pulseStart)`)
-tanpa `TimelineView` sama sekali — view tidak perlu membangunkan dirinya
-sendiri, ia memang sudah bangun.
+Dugaan pertama saya: kartu jam sudah dirender ulang 20×/detik selama
+mengarahkan (setiap sampel sensor adalah perubahan `@Published`), jadi fase
+denyut bisa dihitung langsung dari `Date()` di dalam `body` **tanpa**
+`TimelineView`. Itu **salah**, dan salahnya persis jenis yang harus ditangkap
+sebelum dikirim:
+
+`CelestialVisual` adalah `Equatable`. Selama terkunci pada satu bintang,
+argumen kartu tidak berubah antar sampel sensor — jadi SwiftUI boleh melewati
+evaluasi ulang `body`, dan `Date()` yang dibaca di dalamnya **bukan
+dependensi yang bisa dilihat SwiftUI**. Hasilnya bintang yang diam: cacat yang
+sama, hanya berpindah tempat. "Dirender 20×/detik" bukan jaminan; yang
+menjamin adalah penyegaran yang eksplisit.
+
+Jadi denyut di jam memakai `TimelineView(.animation(minimumInterval: 1/30))`
+lewat `PulsingCelestialVisual` — view kecil yang memegang jam denyutnya
+sendiri, sama seperti panel iPhone. Dipisah dari kartu karena alasan yang
+sudah dipakai di iPhone: kalau kartu ikut hidup di dalam `TimelineView`,
+mematikan denyut berarti mematikan kartu — dan kartu adalah **jawaban**, bukan
+hiasan.
 
 `pulseStart` diset ulang **sekali** saat scene kembali aktif, dengan alasan
 yang sama seperti `resyncPulse` di iPhone: tanpa itu fase melompat maju
