@@ -159,6 +159,17 @@ public enum CalibrationText {
         TextLocalization.text(.calibrationStatusReset)
     }
 
+    /// Peringatan di atas daftar acuan: daftar dihitung untuk langit/tempat
+    /// yang sudah lewat dan sedang disegarkan.
+    public static var staleBanner: String {
+        TextLocalization.text(.calibrationStatusStaleBanner)
+    }
+
+    /// Label VoiceOver untuk banner basi — menyebut penyebabnya.
+    public static var staleBannerHint: String {
+        TextLocalization.text(.calibrationStatusStaleBannerHint)
+    }
+
     // MARK: - Angka ringkas di kartu kalibrasi (layar, bukan suara)
 
     /// "Offset 4.2°" — bentuk ringkas untuk kartu.
@@ -275,6 +286,19 @@ public extension LocalizedText {
     /// tampil dalam Bahasa Indonesia di semua bahasa tanpa ada yang melihat.
     static let calibrationDisplayCaptureAltitude = LocalizedText(
         key: "calibration.display.captureAltitude", id: "%.0f° tinggi")
+
+    /// Peringatan di atas daftar acuan: daftar dihitung untuk langit/tempat
+    /// yang sudah lewat dan sedang disegarkan. Muncul saat `isReferenceListStale`
+    /// benar — yang bisa terjadi karena lokasi sungguhan belum tiba saat layar
+    /// dibuka, atau karena sudah lewat batas usianya.
+    static let calibrationStatusStaleBanner = LocalizedText(
+        key: "calibration.status.staleBanner",
+        id: "Daftar acuan belum segar — menyegarkan…")
+    /// Label VoiceOver untuk banner di atas — menyebutkan **penyebabnya**
+    /// (menunggu perhitungan ulang), bukan cuma mengulang teks visual.
+    static let calibrationStatusStaleBannerHint = LocalizedText(
+        key: "calibration.status.staleBannerHint",
+        id: "Daftar acuan belum segar, menunggu perhitungan ulang.")
 
     // Nama tahap. Dipakai untuk layar (`phaseLabel` di view) **dan** suara
     // (`spokenName`); keduanya dulu literal di tempat berbeda, jadi satu

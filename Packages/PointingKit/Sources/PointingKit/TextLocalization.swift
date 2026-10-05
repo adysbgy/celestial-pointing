@@ -373,6 +373,7 @@ public extension LocalizedText {
         .calibrationStatusInitial, .calibrationStatusAlreadyInstalled,
         .calibrationStatusNotReady, .calibrationStatusInstalled,
         .calibrationStatusReset,
+        .calibrationStatusStaleBanner, .calibrationStatusStaleBannerHint,
         .calibrationDisplayOffset, .calibrationDisplaySpread,
         .calibrationDisplayCaptureAltitude, .calibrationDisplaySuggestedSigma,
         .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,

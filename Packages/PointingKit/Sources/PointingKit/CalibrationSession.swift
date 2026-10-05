@@ -147,7 +147,11 @@ public final class CalibrationSession {
     @discardableResult
     public func capture(objectID: String, date: Date = Date()) -> CalibrationSessionStep {
         guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
-        return capture(objectID: objectID, measured: controller.snapshot.rawPointing, date: date)
+        // Penjagaan horizon harus menilai ketinggian pada saat arah dicatat,
+        // bukan saat tombol ditekan — pakai waktu feed terakhir bila ada.
+        return capture(objectID: objectID,
+                        measured: controller.snapshot.rawPointing,
+                        date: controller.lastFeedTimestamp ?? date)
     }
 
     /// Catat satu acuan yang dipilih pengguna dari daftar.
@@ -229,7 +233,10 @@ public final class CalibrationSession {
     @discardableResult
     public func captureNearest(date: Date = Date()) -> CalibrationSessionStep {
         guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
-        return captureNearest(measured: controller.snapshot.rawPointing, date: date)
+        // Sama dengan `capture(objectID:)`: penjagaan horizon menilai ketinggian
+        // pada saat arah dicatat, bukan saat tombol ditekan.
+        return captureNearest(measured: controller.snapshot.rawPointing,
+                              date: controller.lastFeedTimestamp ?? date)
     }
 
     /// Catat acuan dari arah tunjuk sekarang, dengan mencocokkannya ke target

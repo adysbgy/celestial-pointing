@@ -167,6 +167,13 @@ public final class PointingController {
 
     /// Cuplikan terakhir, untuk dirender ulang tanpa sampel baru.
     public private(set) var snapshot: PointingSnapshot
+    /// Waktu (epoch) terakhir `feed` memasukkan arah tunjuk. Dipakai sebagai
+    /// default `capture`/`captureNearest` supaya penjagaan horizon menilai
+    /// ketinggian objek pada **saat yang sama** dengan arah yang dicatat,
+    /// bukan pada jam dinding saat tombol ditekan — keduanya bisa berbeda
+    /// detik sampai jam, dan menilai horizon di waktu yang salah membuat
+    /// objek tampak "di bawah cakrawala" padahal sedang ditunjuk.
+    public private(set) var lastFeedTimestamp: Date?
     /// Resolusi lengkap terakhir, termasuk `sunHorizontal` untuk pengaman slew.
     public private(set) var lastResolution: Resolution?
 
@@ -333,6 +340,8 @@ public final class PointingController {
             refreshSnapshot()
             return PointingUpdate(snapshot: snapshot, haptics: [])
         }
+
+        lastFeedTimestamp = timestamp
 
         // 1. Perata: meredam gemetar tanpa menunda gerakan besar.
         let smoothed = smoother.update(raw) ?? raw

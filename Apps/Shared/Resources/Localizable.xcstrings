@@ -3609,6 +3609,28 @@
           }
         }
       }
+    },
+    "calibration.status.staleBanner": {
+      "comment": "Peringatan di atas daftar acuan: daftar dihitung untuk langit/tempat yang sudah lewat dan sedang disegarkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference list is stale — refreshing…"
+          }
+        }
+      }
+    },
+    "calibration.status.staleBannerHint": {
+      "comment": "Label VoiceOver banner daftar acuan basi — menyebut penyebabnya (menunggu perhitungan ulang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference list is stale, waiting to be recomputed."
+          }
+        }
+      }
     }
   }
 }

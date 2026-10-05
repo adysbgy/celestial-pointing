@@ -113,12 +113,12 @@ struct CalibrationView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.caption2)
                 .accessibilityHidden(true)
-            Text("Daftar acuan belum segar — menyegarkan…")
+            Text(CalibrationText.staleBanner)
                 .font(.caption2)
         }
         .foregroundStyle(PointingTone.warning.color)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Daftar acuan belum segar, menunggu perhitungan ulang.")
+        .accessibilityLabel(CalibrationText.staleBannerHint)
     }
 
     // MARK: - Kartu tahap
