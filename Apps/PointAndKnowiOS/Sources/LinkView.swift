@@ -16,70 +16,78 @@ struct LinkView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Tautan") {
-                    row("Status", link.isActivated ? "Aktif" : "Belum aktif")
-                    row("Terjangkau", link.isReachable ? "Ya" : "Tidak")
-                    row("Pesan diterima", "\(link.receivedCount)")
+                Section(TextLocalization.text(.linkSectionTitle)) {
+                    row(TextLocalization.text(.linkRowStatus),
+                        link.isActivated
+                        ? TextLocalization.text(.linkValueActive)
+                        : TextLocalization.text(.linkValueInactive))
+                    row(TextLocalization.text(.linkRowReachable),
+                        link.isReachable
+                        ? TextLocalization.text(.linkValueYes)
+                        : TextLocalization.text(.linkValueNo))
+                    row(TextLocalization.text(.linkRowMessagesReceived), "\(link.receivedCount)")
                     if let note = link.lastNote {
                         Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                     }
-                    Button("Minta keadaan terakhir") { link.requestState() }
+                    Button(TextLocalization.text(.linkRequestState)) { link.requestState() }
                 }
 
-                Section("Keadaan terakhir dari jam") {
+                Section(TextLocalization.text(.linkSectionLastState)) {
                     if let state = link.lastState {
-                        row("Keadaan", state.state?.shortLabel ?? "—")
-                        row("Objek", state.objectName ?? "—")
-                        row("Keyakinan", state.level?.displayName ?? "—")
+                        row(TextLocalization.text(.linkRowState), state.state?.shortLabel ?? "—")
+                        row(TextLocalization.text(.linkRowObject), state.objectName ?? "—")
+                        row(TextLocalization.text(.linkRowConfidence), state.level?.displayName ?? "—")
                         if let rate = state.angularRateDegPerSec {
                             // Nilainya ditulis "0.5°/dtk" untuk mata; yang
                             // diucapkan bentuk katanya. Dua-duanya dari
                             // angka yang sama — tidak ada versi kedua yang
                             // bisa menyimpang.
-                            row("Laju", NumberFormat.degreesPerSecond(rate))
+                            row(TextLocalization.text(.linkRowRate), NumberFormat.degreesPerSecond(rate))
                                 .accessibilityLabel(RowSpeech.spokenRow(
-                                    title: "Laju",
+                                    title: TextLocalization.text(.linkRowRate),
                                     spokenValue: RowSpeech.spokenRate(rate)))
                         }
-                        row("Waktu", state.sentAt.formatted(date: .omitted, time: .standard))
+                        row(TextLocalization.text(.linkRowTime),
+                            state.sentAt.formatted(date: .omitted, time: .standard))
                         if let note = state.calibrationNoteText ?? state.note {
                             Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                         }
                     } else {
-                        Text("Belum ada keadaan dari jam.")
+                        Text(TextLocalization.text(.linkNoStateYet))
                             .foregroundStyle(Color.nightAwareSecondary)
                     }
                 }
 
-                Section("Kalibrasi terakhir dari jam") {
+                Section(TextLocalization.text(.linkSectionLastCalibration)) {
                     if let calibration = link.lastCalibration {
-                        row("Offset yaw",
+                        row(TextLocalization.text(.linkRowYawOffset),
                             calibration.yawOffsetDeg.map { NumberFormat.degrees($0) } ?? "—")
-                        row("Sebaran",
+                        row(TextLocalization.text(.linkRowSpread),
                             calibration.residualSpreadDeg.map { NumberFormat.degrees($0) } ?? "—")
-                        row("Jumlah acuan", calibration.sampleCount.map(String.init) ?? "—")
+                        row(TextLocalization.text(.linkRowReferenceCount),
+                            calibration.sampleCount.map(String.init) ?? "—")
                     } else {
-                        Text("Jam belum melaporkan kalibrasi.")
+                        Text(TextLocalization.text(.linkNoCalibrationYet))
                             .foregroundStyle(Color.nightAwareSecondary)
                     }
                 }
 
-                Section("Sampel dari jam") {
+                Section(TextLocalization.text(.linkSectionSamples)) {
                     let fromWatch = trace.samples.filter(\.fromWatch)
-                    row("Terekam", "\(fromWatch.count)")
-                    Text("Sampel dari jam tidak membawa jarak kandidat, jadi rasionya terhadap σ kosong. Yang bisa dilihat dari sini adalah keadaan dan keyakinan yang dilaporkan jam.")
+                    row(TextLocalization.text(.linkRowRecorded), "\(fromWatch.count)")
+                    Text(TextLocalization.text(.linkSamplesNote))
                         .font(.footnote)
                         .foregroundStyle(Color.nightAwareSecondary)
                     if fromWatch.contains(where: { $0.sigmaDeg <= 0 }) {
                         // σ nol berarti jam tidak menyertakannya. Menampilkannya
                         // sebagai "0.0°" akan terbaca seperti akurasi sempurna.
-                        Text("Sebagian sampel tidak menyertakan σ. Sigma yang tidak terukur ditulis 0, bukan angka bawaan — jangan dibaca sebagai akurasi sempurna.")
+                        Text(TextLocalization.text(.linkSigmaMissingNote))
                             .font(.footnote)
                             .foregroundStyle(PointingTone.warning.color)
                     }
                 }
             }
-            .navigationTitle("Tautan")
+            .navigationTitle(TextLocalization.text(.linkSectionTitle))
             .scrollContentBackground(.hidden)
             .onAppear { link.activate() }
         }

@@ -1,1052 +1,6 @@
 {
   "sourceLanguage": "id",
-  "version": "1.0",
   "strings": {
-    "experiment.status.initial": {
-      "comment": "Panduan awal layar Experiment 1.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pick a target, aim, then record."
-          }
-        }
-      }
-    },
-    "experiment.status.noTarget": {
-      "comment": "Rekam ditekan tanpa memilih target.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pick a target first — without ground truth, the recording can't be analyzed."
-          }
-        }
-      }
-    },
-    "experiment.status.sensorOff": {
-      "comment": "Sensor gerak mati saat merekam percobaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Motion sensor is off — the remaining aim is not a current measurement. Nothing was recorded."
-          }
-        }
-      }
-    },
-    "experiment.status.noPointing": {
-      "comment": "Sensor belum memberi arah tunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No aim from the sensor yet — nothing was recorded."
-          }
-        }
-      }
-    },
-    "experiment.status.targetUncomputable": {
-      "comment": "Arah target kebenaran tidak bisa dihitung.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Direction of target %@ can't be computed — the trial was not saved."
-          }
-        }
-      }
-    },
-    "experiment.status.recorded": {
-      "comment": "Ringkasan satu percobaan tersimpan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recorded: error %@, %@. Engine answer: %@."
-          }
-        }
-      }
-    },
-    "experiment.status.removed": {
-      "comment": "Percobaan terakhir dibuang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Removed: %@."
-          }
-        }
-      }
-    },
-    "experiment.status.nothingToRemove": {
-      "comment": "Tidak ada percobaan yang bisa dibuang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No trial to remove."
-          }
-        }
-      }
-    },
-    "experiment.status.reset": {
-      "comment": "Seluruh dataset dikosongkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dataset cleared."
-          }
-        }
-      }
-    },
-    "experiment.verdict.falseLock": {
-      "comment": "Putusan percobaan: engine yakin tapi salah (huruf besar, sengaja).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FALSE LOCK"
-          }
-        }
-      }
-    },
-    "experiment.verdict.correct": {
-      "comment": "Putusan percobaan: benar (bentuk pendek di daftar).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "correct"
-          }
-        }
-      }
-    },
-    "experiment.verdict.wrong": {
-      "comment": "Putusan percobaan: salah (bentuk pendek di daftar).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "wrong"
-          }
-        }
-      }
-    },
-    "experiment.verdict.notAnalyzed": {
-      "comment": "Putusan percobaan: tak dianalisis (bentuk pendek di daftar).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not analyzed"
-          }
-        }
-      }
-    },
-    "experiment.verdict.falseLock.sentence": {
-      "comment": "Putusan percobaan untuk diucapkan: false lock.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "False lock: the engine was confident but wrong."
-          }
-        }
-      }
-    },
-    "experiment.verdict.correct.sentence": {
-      "comment": "Putusan percobaan untuk diucapkan: benar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Correct."
-          }
-        }
-      }
-    },
-    "experiment.verdict.wrong.sentence": {
-      "comment": "Putusan percobaan untuk diucapkan: salah.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wrong."
-          }
-        }
-      }
-    },
-    "experiment.verdict.notAnalyzed.sentence": {
-      "comment": "Putusan percobaan untuk diucapkan: tak dianalisis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not analyzed."
-          }
-        }
-      }
-    },
-    "experiment.detail.noAnswer": {
-      "comment": "Kata pengganti nama objek saat engine belum menjawab.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "none yet"
-          }
-        }
-      }
-    },
-    "experiment.detail.noError": {
-      "comment": "Kata pengganti galat saat tidak ada analisis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "—"
-          }
-        }
-      }
-    },
-    "experiment.detail.answer": {
-      "comment": "Baris detail: jawaban engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "answer %@"
-          }
-        }
-      }
-    },
-    "experiment.detail.confidence": {
-      "comment": "Baris detail: tingkat keyakinan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "confidence %@"
-          }
-        }
-      }
-    },
-    "experiment.detail.state": {
-      "comment": "Baris detail: keadaan alur saat direkam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "state %@"
-          }
-        }
-      }
-    },
-    "experiment.detail.error": {
-      "comment": "Baris detail: galat tunjuk, bentuk tampilan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "error %.1f°"
-          }
-        }
-      }
-    },
-    "experiment.detail.rate": {
-      "comment": "Baris detail: laju pergelangan, bentuk tampilan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%.0f°/s"
-          }
-        }
-      }
-    },
-    "experiment.target.option": {
-      "comment": "Opsi pemilih target: nama dan tinggi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · %.0f°"
-          }
-        }
-      }
-    },
-    "experiment.summary.noAnalyzable": {
-      "comment": "Ringkasan: belum ada percobaan yang bisa dianalisis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No trial that can be analyzed yet."
-          }
-        }
-      }
-    },
-    "experiment.summary.failed": {
-      "comment": "Ringkasan: ada false lock, klaim keselamatan gagal.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FAILED: %lld false lock — the engine was confident but wrong. The confidence threshold must be tightened. Accuracy %@, median error %@, P90 %@."
-          }
-        }
-      }
-    },
-    "experiment.summary.insufficient": {
-      "comment": "Ringkasan: nol false lock tapi sampel belum cukup.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cannot conclude yet: 0 false lock out of %lld trials — the sample is not enough (needs at least %lld). Accuracy %@, median pointing error %@, P90 %@. This is not proof of safety, only an absence of counter-evidence."
-          }
-        }
-      }
-    },
-    "experiment.summary.passed": {
-      "comment": "Ringkasan: sampel cukup dan tanpa false lock.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Passed the safety requirement (0 false lock out of %lld trials). Accuracy %@, median pointing error %@, P90 %@."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.noSamples": {
-      "comment": "Diagnosis: belum ada sampel.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No samples yet."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.noAnswers": {
-      "comment": "Diagnosis: belum ada jawaban sama sekali.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No answers at all yet. Aim at the sky and hold until the wrist is still."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.tooFar": {
-      "comment": "Diagnosis: semua jawaban ragu karena kandidat terlalu jauh.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every answer was uncertain because the candidate was too far from the aim. Fix the calibration first."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.ambiguous": {
-      "comment": "Diagnosis: semua jawaban ragu karena dua kandidat berdekatan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every answer was uncertain because two candidates were close together. This is an accuracy limit, not a calibration mistake."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.noMeasurableCause": {
-      "comment": "Diagnosis: ragu tanpa sebab terukur.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Answers were uncertain with no measurable cause — check whether the aim makes sense."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.ratio": {
-      "comment": "Diagnosis: rasio jawaban yakin.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%.0f%% confident answers (%lld confident, %lld uncertain)."
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.mixed": {
-      "comment": "Diagnosis saat dua sebab atau lebih berbagi hitungan tertinggi. Satu slot %@ menerima daftar sebab yang sudah disambung; pemisahnya punya kunci sendiri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reasons for uncertainty are shared: %@"
-          }
-        }
-      }
-    },
-    "experiment.diagnosis.mixedSeparator": {
-      "comment": "Pemisah antarsebab pada kalimat diagnosis seri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "; and "
-          }
-        }
-      }
-    },
-    "experiment.suggestedThreshold": {
-      "comment": "Usulan ambang keyakinan dari sigma terukur.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suggested confidence threshold: σ %.1f°"
-          }
-        }
-      }
-    },
-    "experiment.location.fallback": {
-      "comment": "Peringatan lokasi masih bawaan: tinggi objek dihitung untuk tempat lain.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location not yet available — the altitudes below are computed for %@, not your place."
-          }
-        }
-      }
-    },
-    "experiment.location.computed": {
-      "comment": "Keterangan lokasi tempat tinggi objek dihitung.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Computed for %@."
-          }
-        }
-      }
-    },
-    "row.speech.label": {
-      "comment": "Penggabungan satu baris judul:nilai untuk VoiceOver.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@: %@"
-          }
-        }
-      }
-    },
-    "row.speech.degrees": {
-      "comment": "Satuan sudut dalam bentuk kata (diucapkan).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "degrees"
-          }
-        }
-      }
-    },
-    "row.speech.degreesPerSecond": {
-      "comment": "Satuan laju sudut dalam bentuk kata (diucapkan).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "degrees per second"
-          }
-        }
-      }
-    },
-    "row.speech.errorWord": {
-      "comment": "Kata yang menyebut apa yang diukur galat pointing.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "error"
-          }
-        }
-      }
-    },
-    "row.speech.wristRate": {
-      "comment": "Kalimat pengumuman laju pergelangan di kartu keadaan jam. Urutan specifier WAJIB sama dengan kode: %@ = kata pengukur (row.speech.wristRateWord), %.0f = angka, %@ = satuan (row.speech.degrees). Menukar posisinya = crash di CoreFoundation — lihat Aturan 11 di swift-ui-lint.sh.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %.0f %@ per second."
-          }
-        }
-      }
-    },
-    "row.speech.wristRateWord": {
-      "comment": "Kata yang menyebut apa yang diukur laju pergelangan pada pengumuman.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wrist rate"
-          }
-        }
-      }
-    },
-    "row.speech.stateLine": {
-      "comment": "Awalan kalimat keadaan untuk pengumuman kartu jam. %@ = label keadaan (pointing.state.*.label, yang punya kuncinya sendiri). Semula literal \"Keadaan: \\(state.shortLabel).\" di dalam view.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status: %@."
-          }
-        }
-      }
-    },
-    "location.fallback.label": {
-      "comment": "Label lokasi darurat (Jakarta) yang tampil di layar utama jam. Bukan lokasi pengukuran.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jakarta (default)"
-          }
-        }
-      }
-    },
-    "link.status.calibrationNotSent": {
-      "comment": "Hasil kalibrasi tidak terkirim: sesi WatchConnectivity belum aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration not sent: session is not active yet."
-          }
-        }
-      }
-    },
-    "link.status.messageNotSent": {
-      "comment": "Pesan tidak terkirim: sesi WatchConnectivity belum aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Message not sent: session is not active yet."
-          }
-        }
-      }
-    },
-    "link.status.sendFailed": {
-      "comment": "Pengiriman gagal, dengan alasan dari sistem. %@ = localizedDescription OS (tidak diterjemahkan ulang).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send failed: %@"
-          }
-        }
-      }
-    },
-    "link.status.sent": {
-      "comment": "Pengiriman berhasil. %@ = nama jenis pesan untuk manusia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sent: %@"
-          }
-        }
-      }
-    },
-    "link.status.watchSaw": {
-      "comment": "Jam melihat sebuah objek. %@ = nama objek.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Watch saw %@"
-          }
-        }
-      }
-    },
-    "link.status.stateFromWatch": {
-      "comment": "Keadaan diterima dari jam, tanpa nama objek.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "State from the watch"
-          }
-        }
-      }
-    },
-    "link.status.calibrationFromWatch": {
-      "comment": "Hasil kalibrasi diterima dari jam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration from the watch"
-          }
-        }
-      }
-    },
-    "link.status.policyFromWatch": {
-      "comment": "Ambang keyakinan diterima dari jam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The watch sent a confidence threshold"
-          }
-        }
-      }
-    },
-    "link.status.acknowledgement": {
-      "comment": "Tanda terima diterima.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acknowledgement"
-          }
-        }
-      }
-    },
-    "link.status.invalidPolicy": {
-      "comment": "Ambang keyakinan dari iPhone tidak sah, jadi diabaikan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Confidence threshold from the iPhone is not valid — ignored"
-          }
-        }
-      }
-    },
-    "link.status.stateRequestTooEarly": {
-      "comment": "Permintaan keadaan datang sebelum alur siap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "State request arrived before the flow was ready."
-          }
-        }
-      }
-    },
-    "link.status.watchUnreachablePolicy": {
-      "comment": "Jam belum terhubung sehingga ambang keyakinan tidak terkirim.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Watch not connected — threshold not sent."
-          }
-        }
-      }
-    },
-    "link.status.watchUnreachableMessage": {
-      "comment": "Jam belum terhubung sehingga pesan tidak terkirim.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Watch not connected — message not sent."
-          }
-        }
-      }
-    },
-    "link.status.sendFailures": {
-      "comment": "Kalimat jumlah pengiriman tautan yang gagal. %lld = jumlah, %@ = kata benda. Semula pemanggil merakitnya dengan MENYAMBUNG string, sehingga urutannya terpaku di kode dan bahasa lain tidak bisa mengatakannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": ". %lld %@."
-          }
-        }
-      }
-    },
-    "link.status.sendFailuresWord": {
-      "comment": "Kata benda untuk kiriman yang gagal. Dipisah dari link.status.sendFailed karena yang ini menyebut JUMLAH kiriman, bukan satu kejadian.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "messages failed"
-          }
-        }
-      }
-    },
-    "link.note.calibrated": {
-      "comment": "Keadaan jam: terkalibrasi. Tampil di layar Tautan iPhone.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "calibrated"
-          }
-        }
-      }
-    },
-    "link.note.notCalibrated": {
-      "comment": "Keadaan jam: belum terkalibrasi. Tampil di layar Tautan iPhone.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not calibrated"
-          }
-        }
-      }
-    },
-    "row.speech.error": {
-      "comment": "Kalimat galat pointing: kata, angka, satuan. Urutan tipe specifier wajib sama dengan template kode (%@ %.1f %@) — Aturan 11 menegakkannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %.1f %@"
-          }
-        }
-      }
-    },
-    "calibration.message.idle": {
-      "comment": "Panduan awal alur kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Point at a reference star, then tap to record."
-          }
-        }
-      }
-    },
-    "calibration.message.needMore": {
-      "comment": "Belum cukup acuan; dua angka disisipkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Need at least %lld references (%lld recorded)."
-          }
-        }
-      }
-    },
-    "calibration.message.spreadTooWide": {
-      "comment": "Sebaran sisa terlalu lebar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spread %.1f° is still too wide (max %.1f°). Add more references."
-          }
-        }
-      }
-    },
-    "calibration.message.ready": {
-      "comment": "Kalibrasi sudah layak dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ready — spread %.1f° from %lld references."
-          }
-        }
-      }
-    },
-    "calibration.message.applied": {
-      "comment": "Kalibrasi sudah dipasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration applied."
-          }
-        }
-      }
-    },
-    "calibration.message.sensorUnavailable": {
-      "comment": "Sensor gerak mati saat mencatat acuan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Motion sensor is off — the remaining aim is not a current measurement. Not recorded."
-          }
-        }
-      }
-    },
-    "calibration.message.noPointing": {
-      "comment": "Sensor belum memberi arah tunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No aim from the sensor yet."
-          }
-        }
-      }
-    },
-    "calibration.message.directionUncomputable": {
-      "comment": "Arah objek acuan tidak bisa dihitung.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Direction of %@ can't be computed — not recorded."
-          }
-        }
-      }
-    },
-    "calibration.message.noNearbyStar": {
-      "comment": "Tidak ada bintang acuan yang jelas.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No clear reference star in that direction — aim closer to a bright star."
-          }
-        }
-      }
-    },
-    "calibration.speech.phasePrefix": {
-      "comment": "Awalan pengumuman tahap kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Phase: %@."
-          }
-        }
-      }
-    },
-    "calibration.speech.samplesRecorded": {
-      "comment": "Jumlah acuan yang tercatat, diucapkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld references recorded."
-          }
-        }
-      }
-    },
-    "calibration.speech.offset": {
-      "comment": "Offset kalibrasi, diucapkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offset %.1f degrees."
-          }
-        }
-      }
-    },
-    "calibration.speech.spread": {
-      "comment": "Sebaran sisa, diucapkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spread %.1f degrees, limit %.1f degrees."
-          }
-        }
-      }
-    },
-    "calibration.speech.applyReady": {
-      "comment": "Label tombol Pakai saat kalibrasi siap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use this calibration"
-          }
-        }
-      }
-    },
-    "calibration.speech.applyNotReady": {
-      "comment": "Label tombol Pakai saat belum bisa dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use this calibration, not usable yet"
-          }
-        }
-      }
-    },
-    "calibration.speech.captureLabel": {
-      "comment": "Label tombol Catat acuan, diucapkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record %@ as reference, %.0f degrees high."
-          }
-        }
-      }
-    },
-    "calibration.status.initial": {
-      "comment": "Status awal layar kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Point at a reference star, then tap Record."
-          }
-        }
-      }
-    },
-    "calibration.status.alreadyInstalled": {
-      "comment": "Kalibrasi sesi sebelumnya sudah terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration already installed: offset %.1f°."
-          }
-        }
-      }
-    },
-    "calibration.status.notReady": {
-      "comment": "Tombol Pakai ditekan sebelum siap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not ready: the spread is still too wide."
-          }
-        }
-      }
-    },
-    "calibration.status.installed": {
-      "comment": "Kalibrasi baru saja dipasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installed. Offset %.1f°, spread %.1f°."
-          }
-        }
-      }
-    },
-    "calibration.status.reset": {
-      "comment": "Kalibrasi dibuang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration cleared. Start over."
-          }
-        }
-      }
-    },
-    "calibration.display.captureAltitude": {
-      "comment": "Keterangan tinggi acuan di baris daftar acuan layar kalibrasi. Semula literal String(format:) di dalam view.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%.0f° altitude"
-          }
-        }
-      }
-    },
-    "calibration.display.suggestedSigma": {
-      "comment": "Keterangan ambang keyakinan yang diusulkan engine, di bawah daftar acuan. σ (sigma) dibiarkan sebagai lambang di dalam slot %@ karena tidak bisa diucapkan sebagai kata; kata pengantar dan satuan tetap milik terjemahan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suggested confidence threshold: σ %.1f°"
-          }
-        }
-      }
-    },
-    "calibration.display.offset": {
-      "comment": "Angka offset ringkas di kartu kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offset %.1f°"
-          }
-        }
-      }
-    },
-    "calibration.display.spread": {
-      "comment": "Angka sebaran ringkas di kartu kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spread %.1f° (max %.1f°)"
-          }
-        }
-      }
-    },
-    "calibration.phase.idle.label": {
-      "comment": "Label tahap kalibrasi: belum ada acuan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No reference yet"
-          }
-        }
-      }
-    },
-    "calibration.phase.collecting.label": {
-      "comment": "Label tahap kalibrasi: mengumpulkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collecting references"
-          }
-        }
-      }
-    },
-    "calibration.phase.ready.label": {
-      "comment": "Label tahap kalibrasi: siap dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ready to use"
-          }
-        }
-      }
-    },
-    "calibration.phase.applied.label": {
-      "comment": "Label tahap kalibrasi: sudah dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Already applied"
-          }
-        }
-      }
-    },
     "%lld acuan tercatat": {
       "comment": "Jumlah acuan kalibrasi yang tercatat.",
       "localizations": {
@@ -1080,6 +34,83 @@
         }
       }
     },
+    "Ada": {
+      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        }
+      }
+    },
+    "Aktif": {
+      "comment": "Nilai baris Status saat tautan jam-iPhone aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        }
+      }
+    },
+    "Aktifkan Mode Malam": {
+      "comment": "Label VoiceOver tombol Mode Malam saat mode malam nonaktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Night Mode"
+          }
+        }
+      }
+    },
+    "Aktifkan bunyi saat kunci": {
+      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi nonaktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on lock sound"
+          }
+        }
+      }
+    },
+    "Ambang ambigu": {
+      "comment": "Garis ambang di grafik: batas di mana engine menyatakan ragu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ambiguity threshold"
+          }
+        }
+      }
+    },
+    "Ambang yakin": {
+      "comment": "Garis ambang di grafik: batas di mana engine menyatakan yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certainty threshold"
+          }
+        }
+      }
+    },
+    "Arah": {
+      "comment": "Sudut tunjuk yang diukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction"
+          }
+        }
+      }
+    },
     "Arahkan jam ke langit": {
       "comment": "Judul kartu perkenalan.",
       "localizations": {
@@ -1087,6 +118,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Point your watch at the sky"
+          }
+        }
+      }
+    },
+    "Asal lokasi": {
+      "comment": "Dari mana koordinat datang, dan apakah itu sungguhan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
+          }
+        }
+      }
+    },
+    "Azimut": {
+      "comment": "Arah mendatar, 0-360 derajat dari utara.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azimuth"
+          }
+        }
+      }
+    },
+    "Belum": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi belum ada.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
           }
         }
       }
@@ -1135,6 +199,17 @@
         }
       }
     },
+    "Belum aktif": {
+      "comment": "Nilai baris Status saat tautan jam-iPhone belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not active yet"
+          }
+        }
+      }
+    },
     "Belum cukup data untuk mengusulkan ambang baru — engine tetap memakai ambang konservatif bawaannya.": {
       "comment": "",
       "localizations": {
@@ -1157,6 +232,17 @@
         }
       }
     },
+    "Benar": {
+      "comment": "Jumlah cuplikan yang benar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct"
+          }
+        }
+      }
+    },
     "Berkas ini memuat lokasi, kalibrasi, dan sigma yang berlaku saat merekam — tanpa itu, jarak kandidat dalam derajat tidak bisa ditafsirkan kembali.": {
       "comment": "",
       "localizations": {
@@ -1175,6 +261,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Discard the last trial?"
+          }
+        }
+      }
+    },
+    "Bulan": {
+      "comment": "Posisi Bulan pada sudut sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
           }
         }
       }
@@ -1212,6 +309,39 @@
         }
       }
     },
+    "Catatan (opsional)": {
+      "comment": "Label bidang isian catatan pada layar percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note (optional)"
+          }
+        }
+      }
+    },
+    "Dataset Experiment 1": {
+      "comment": "Judul berkas di lembar berbagi saat mengekspor dataset percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1 dataset"
+          }
+        }
+      }
+    },
+    "Dec": {
+      "comment": "Deklinasi, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        }
+      }
+    },
     "Detail teknikal": {
       "comment": "Judul lapisan expandable berisi RA, Dec, dan id katalog.",
       "localizations": {
@@ -1219,6 +349,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Technical details"
+          }
+        }
+      }
+    },
+    "Device motion": {
+      "comment": "Laju gerak mentah dari sensor, tanpa kalibrasi apa pun.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device motion"
           }
         }
       }
@@ -1256,6 +397,83 @@
         }
       }
     },
+    "FALSE LOCK": {
+      "comment": "Verdict percobaan: engine mengunci objek yang salah. Sengaja huruf besar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FALSE LOCK"
+          }
+        }
+      }
+    },
+    "False lock": {
+      "comment": "Cuplikan yang terkunci pada objek yang salah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "False lock"
+          }
+        }
+      }
+    },
+    "Fase Bulan": {
+      "comment": "Frasi piringan Bulan yang menyala dan arah sabit.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon phase"
+          }
+        }
+      }
+    },
+    "Galat P90": {
+      "comment": "Galat sudut pada persentil ke-90, yaitu batas atas yang biasanya dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "P90 error"
+          }
+        }
+      }
+    },
+    "Galat median": {
+      "comment": "Galat sudut median antar cuplikan yang berpasangan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error"
+          }
+        }
+      }
+    },
+    "Gelap": {
+      "comment": "Nilai baris Langit saat langit gelap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        }
+      }
+    },
+    "GoTo": {
+      "comment": "Judul baris putusan GoTo di layar Diagnostik iPhone. Nilai `en` sengaja sama: istilah teknis yang dipakai sebagai singkatan visual, dan menaruhnya di katalog membuat keputusan itu terbaca, bukan tersembunyi. Lihat SlewVerdictBanner.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo"
+          }
+        }
+      }
+    },
     "Hasil": {
       "comment": "Judul bagian hasil Experiment 1.",
       "localizations": {
@@ -1263,6 +481,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Results"
+          }
+        }
+      }
+    },
+    "Id katalog": {
+      "comment": "Id mentah dari katalog, untuk pemeriksaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catalogue ID"
           }
         }
       }
@@ -1289,6 +518,17 @@
         }
       }
     },
+    "Jumlah acuan": {
+      "comment": "Jumlah acuan kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference count"
+          }
+        }
+      }
+    },
     "Kalibrasi": {
       "comment": "Judul layar kalibrasi.",
       "localizations": {
@@ -1300,6 +540,17 @@
         }
       }
     },
+    "Kalibrasi belum dimulai.": {
+      "comment": "Label VoiceOver kartu kalibrasi saat sesi belum dimulai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration has not started."
+          }
+        }
+      }
+    },
     "Kalibrasi terakhir dari jam": {
       "comment": "Judul bagian kalibrasi pada layar tautan.",
       "localizations": {
@@ -1307,6 +558,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Latest calibration from the watch"
+          }
+        }
+      }
+    },
+    "Kalibrasi, belum terpasang": {
+      "comment": "Label VoiceOver ikon kalibrasi saat jam belum terkalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, not applied yet"
+          }
+        }
+      }
+    },
+    "Kalibrasi, sudah terpasang": {
+      "comment": "Label VoiceOver ikon kalibrasi saat kalibrasi sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, already applied"
+          }
+        }
+      }
+    },
+    "Keadaan": {
+      "comment": "Keadaan alur pointing sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
           }
         }
       }
@@ -1340,6 +624,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Precision"
+          }
+        }
+      }
+    },
+    "Ketinggian": {
+      "comment": "Ketinggian di atas cakrawala, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altitude"
           }
         }
       }
@@ -1410,6 +705,50 @@
         }
       }
     },
+    "Laju": {
+      "comment": "Laju sudut saat ini.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rate"
+          }
+        }
+      }
+    },
+    "Laju pergelangan": {
+      "comment": "Laju sudut pergelangan, derajat per detik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrist rate"
+          }
+        }
+      }
+    },
+    "Langit": {
+      "comment": "Pengarahan langit pada sudut sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
+    },
+    "Lokasi": {
+      "comment": "Lokasi pengamat yang dipakai resolver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        }
+      }
+    },
     "Lokasi: %@": {
       "comment": "",
       "localizations": {
@@ -1417,6 +756,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Location: %@"
+          }
+        }
+      }
+    },
+    "Magnitudo": {
+      "comment": "Magnitudo tampak objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnitude"
+          }
+        }
+      }
+    },
+    "Matahari": {
+      "comment": "Posisi Matahari untuk membandingkan DATE dengan pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
           }
         }
       }
@@ -1454,6 +815,72 @@
         }
       }
     },
+    "Nonaktifkan Mode Malam": {
+      "comment": "Label VoiceOver tombol Mode Malam saat mode malam aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off Night Mode"
+          }
+        }
+      }
+    },
+    "Nonaktifkan bunyi saat kunci": {
+      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off lock sound"
+          }
+        }
+      }
+    },
+    "Objek": {
+      "comment": "Objek yang sedang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object"
+          }
+        }
+      }
+    },
+    "Objek (sisa)": {
+      "comment": "Judul baris objek yang ditampilkan adalah hasil kedaluwarsa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object (stale)"
+          }
+        }
+      }
+    },
+    "Objek terakhir yang dikenali, tanpa membuka app.": {
+      "comment": "Deskripsi complication jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last object recognised, without opening the app."
+          }
+        }
+      }
+    },
+    "Offset yaw": {
+      "comment": "Koreksi arah yang dipakai untuk kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yaw offset"
+          }
+        }
+      }
+    },
     "Pakai": {
       "comment": "Tombol memakai acuan terpilih.",
       "localizations": {
@@ -1461,6 +888,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Use"
+          }
+        }
+      }
+    },
+    "Pakai kalibrasi, belum bisa dipakai": {
+      "comment": "Label VoiceOver tombol Pakai saat kalibrasi belum layak dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use calibration, not available yet"
+          }
+        }
+      }
+    },
+    "Panduan": {
+      "comment": "Apa yang harus dilakukan pengguna pada keadaan ini.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guidance"
           }
         }
       }
@@ -1483,6 +932,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Introduction. Point your watch at the sky to find out what you are looking at. When it is unsure, the engine says so."
+          }
+        }
+      }
+    },
+    "Pesan diterima": {
+      "comment": "Pesan terakhir yang diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message received"
+          }
+        }
+      }
+    },
+    "RA": {
+      "comment": "Asensio recta, derajat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA"
+          }
+        }
+      }
+    },
+    "Ragu": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.medium.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uncertain"
           }
         }
       }
@@ -1516,6 +998,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Record trial"
+          }
+        }
+      }
+    },
+    "Riwayat keyakinan": {
+      "comment": "Judul berkas di lembar berbagi saat mengekspor riwayat keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence history"
+          }
+        }
+      }
+    },
+    "Sampel": {
+      "comment": "Jumlah sampel yang sudah terkumpul.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples"
           }
         }
       }
@@ -1564,6 +1068,17 @@
         }
       }
     },
+    "Sebaran": {
+      "comment": "Sebaran antar cuplikan yang berpasangan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread"
+          }
+        }
+      }
+    },
     "Sekarang": {
       "comment": "Judul bagian keadaan sekarang di layar diagnostik.",
       "localizations": {
@@ -1586,6 +1101,17 @@
         }
       }
     },
+    "Sigma dipakai": {
+      "comment": "Lebar sigma yang dipakai resolver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigma used"
+          }
+        }
+      }
+    },
     "Sisa pandangan sebelumnya — bukan hasil sekarang": {
       "comment": "",
       "localizations": {
@@ -1597,6 +1123,17 @@
         }
       }
     },
+    "Status": {
+      "comment": "Status terakhir dari tautan jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
     "Status: %@.": {
       "comment": "",
       "localizations": {
@@ -1604,6 +1141,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Status: %@."
+          }
+        }
+      }
+    },
+    "Sudah": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah ada.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
           }
         }
       }
@@ -1641,6 +1189,61 @@
         }
       }
     },
+    "Terang": {
+      "comment": "Nilai baris Langit saat langit masih terang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bright"
+          }
+        }
+      }
+    },
+    "Terekam": {
+      "comment": "Status perekaman Experiment 1.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded"
+          }
+        }
+      }
+    },
+    "Terjangkau": {
+      "comment": "Apakah jam sedang terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reachable"
+          }
+        }
+      }
+    },
+    "Tidak": {
+      "comment": "Nilai baris Terjangkau saat iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "Tidak ada": {
+      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        }
+      }
+    },
     "Tidak ada acuan yang terlihat sekarang. Acuan bawaan adalah bintang terang; tunggu sampai salah satunya terbit.": {
       "comment": "",
       "localizations": {
@@ -1659,6 +1262,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "No target above the horizon right now."
+          }
+        }
+      }
+    },
+    "Tidak tahu": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.low.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
           }
         }
       }
@@ -1696,6 +1310,39 @@
         }
       }
     },
+    "Waktu": {
+      "comment": "Waktu pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        }
+      }
+    },
+    "Ya": {
+      "comment": "Nilai baris Terjangkau saat iPhone terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "Yakin": {
+      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.high.label.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certain"
+          }
+        }
+      }
+    },
     "batas ambigu": {
       "comment": "Label sumbu diagram keyakinan.",
       "localizations": {
@@ -1714,6 +1361,523 @@
           "stringUnit": {
             "state": "translated",
             "value": "confident threshold"
+          }
+        }
+      }
+    },
+    "calibration.apply.label": {
+      "comment": "Label tombol Pakai (pasang kalibrasi).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply"
+          }
+        }
+      }
+    },
+    "calibration.apply.notReadyHint": {
+      "comment": "Label VoiceOver tombol Pakai saat belum siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply calibration, not ready yet"
+          }
+        }
+      }
+    },
+    "calibration.captureNearest.hint": {
+      "comment": "Label VoiceOver tombol Catat yang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record what is currently pointed at as a reference"
+          }
+        }
+      }
+    },
+    "calibration.captureNearest.label": {
+      "comment": "Label tombol Catat yang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture what is pointed at"
+          }
+        }
+      }
+    },
+    "calibration.display.captureAltitude": {
+      "comment": "Keterangan tinggi acuan di baris daftar acuan layar kalibrasi. Semula literal String(format:) di dalam view.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.0f° altitude"
+          }
+        }
+      }
+    },
+    "calibration.display.offset": {
+      "comment": "Angka offset ringkas di kartu kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offset %.1f°"
+          }
+        }
+      }
+    },
+    "calibration.display.spread": {
+      "comment": "Angka sebaran ringkas di kartu kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f° (max %.1f°)"
+          }
+        }
+      }
+    },
+    "calibration.display.suggestedSigma": {
+      "comment": "Keterangan ambang keyakinan yang diusulkan engine, di bawah daftar acuan. σ (sigma) dibiarkan sebagai lambang di dalam slot %@ karena tidak bisa diucapkan sebagai kata; kata pengantar dan satuan tetap milik terjemahan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggested confidence threshold: σ %.1f°"
+          }
+        }
+      }
+    },
+    "calibration.message.applied": {
+      "comment": "Kalibrasi sudah dipasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration applied."
+          }
+        }
+      }
+    },
+    "calibration.message.belowHorizon": {
+      "comment": "Objek acuan sudah di bawah cakrawala; mencatatnya hanya menghasilkan sampel hantu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ has set — not recorded as a reference."
+          }
+        }
+      }
+    },
+    "calibration.message.directionUncomputable": {
+      "comment": "Arah objek acuan tidak bisa dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction of %@ can't be computed — not recorded."
+          }
+        }
+      }
+    },
+    "calibration.message.idle": {
+      "comment": "Panduan awal alur kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at a reference star, then tap to record."
+          }
+        }
+      }
+    },
+    "calibration.message.needMore": {
+      "comment": "Belum cukup acuan; dua angka disisipkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Need at least %lld references (%lld recorded)."
+          }
+        }
+      }
+    },
+    "calibration.message.noNearbyStar": {
+      "comment": "Tidak ada bintang acuan yang jelas.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No clear reference star in that direction — aim closer to a bright star."
+          }
+        }
+      }
+    },
+    "calibration.message.noPointing": {
+      "comment": "Sensor belum memberi arah tunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No aim from the sensor yet."
+          }
+        }
+      }
+    },
+    "calibration.message.ready": {
+      "comment": "Kalibrasi sudah layak dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready — spread %.1f° from %lld references."
+          }
+        }
+      }
+    },
+    "calibration.message.sensorUnavailable": {
+      "comment": "Sensor gerak mati saat mencatat acuan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor is off — the remaining aim is not a current measurement. Not recorded."
+          }
+        }
+      }
+    },
+    "calibration.message.spreadTooWide": {
+      "comment": "Sebaran sisa terlalu lebar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f° is still too wide (max %.1f°). Add more references."
+          }
+        }
+      }
+    },
+    "calibration.noVisibleReference": {
+      "comment": "Pesan saat tidak ada acuan terlihat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reference visible right now. The default references are bright stars; wait until one of them rises."
+          }
+        }
+      }
+    },
+    "calibration.notStarted": {
+      "comment": "Label VoiceOver saat alur kalibrasi belum dimulai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration not started."
+          }
+        }
+      }
+    },
+    "calibration.phase.applied.label": {
+      "comment": "Label tahap kalibrasi: sudah dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already applied"
+          }
+        }
+      }
+    },
+    "calibration.phase.collecting.label": {
+      "comment": "Label tahap kalibrasi: mengumpulkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collecting references"
+          }
+        }
+      }
+    },
+    "calibration.phase.idle.label": {
+      "comment": "Label tahap kalibrasi: belum ada acuan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reference yet"
+          }
+        }
+      }
+    },
+    "calibration.phase.ready.label": {
+      "comment": "Label tahap kalibrasi: siap dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to use"
+          }
+        }
+      }
+    },
+    "calibration.referenceHeading": {
+      "comment": "Judul daftar acuan (hanya bintang di atas horizon).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "References above the horizon"
+          }
+        }
+      }
+    },
+    "calibration.reset.hint": {
+      "comment": "Label VoiceOver tombol Ulang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart calibration from the beginning"
+          }
+        }
+      }
+    },
+    "calibration.reset.label": {
+      "comment": "Label tombol Ulang (buang kalibrasi).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "calibration.samplesRecorded": {
+      "comment": "Jumlah acuan yang sudah tercatat di kartu tahap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references recorded"
+          }
+        }
+      }
+    },
+    "calibration.speech.applyNotReady": {
+      "comment": "Label tombol Pakai saat belum bisa dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this calibration, not usable yet"
+          }
+        }
+      }
+    },
+    "calibration.speech.applyReady": {
+      "comment": "Label tombol Pakai saat kalibrasi siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this calibration"
+          }
+        }
+      }
+    },
+    "calibration.speech.captureLabel": {
+      "comment": "Label tombol Catat acuan, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record %@ as reference, %.0f degrees high."
+          }
+        }
+      }
+    },
+    "calibration.speech.offset": {
+      "comment": "Offset kalibrasi, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offset %.1f degrees."
+          }
+        }
+      }
+    },
+    "calibration.speech.phasePrefix": {
+      "comment": "Awalan pengumuman tahap kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phase: %@."
+          }
+        }
+      }
+    },
+    "calibration.speech.samplesRecorded": {
+      "comment": "Jumlah acuan yang tercatat, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references recorded."
+          }
+        }
+      }
+    },
+    "calibration.speech.spread": {
+      "comment": "Sebaran sisa, diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spread %.1f degrees, limit %.1f degrees."
+          }
+        }
+      }
+    },
+    "calibration.status.alreadyInstalled": {
+      "comment": "Kalibrasi sesi sebelumnya sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration already installed: offset %.1f°."
+          }
+        }
+      }
+    },
+    "calibration.status.appliedShort": {
+      "comment": "Bentuk pendek 'Sudah' di baris ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "calibration.status.initial": {
+      "comment": "Status awal layar kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at a reference star, then tap Record."
+          }
+        }
+      }
+    },
+    "calibration.status.installed": {
+      "comment": "Kalibrasi baru saja dipasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed. Offset %.1f°, spread %.1f°."
+          }
+        }
+      }
+    },
+    "calibration.status.notAppliedShort": {
+      "comment": "Bentuk pendek 'Belum' di baris ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "calibration.status.notReady": {
+      "comment": "Tombol Pakai ditekan sebelum siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not ready: the spread is still too wide."
+          }
+        }
+      }
+    },
+    "calibration.status.reset": {
+      "comment": "Kalibrasi dibuang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration cleared. Start over."
+          }
+        }
+      }
+    },
+    "calibration.status.staleBanner": {
+      "comment": "Peringatan di atas daftar acuan: daftar dihitung untuk langit/tempat yang sudah lewat dan sedang disegarkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference list is stale — refreshing…"
+          }
+        }
+      }
+    },
+    "calibration.status.staleBannerHint": {
+      "comment": "Label VoiceOver banner daftar acuan basi — menyebut penyebabnya (menunggu perhitungan ulang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference list is stale, waiting to be recomputed."
+          }
+        }
+      }
+    },
+    "calibration.statusPrefix": {
+      "comment": "Awalan baris status kalibrasi (Status: …).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status: %@"
+          }
+        }
+      }
+    },
+    "calibration.title": {
+      "comment": "Judul layar kalibrasi (navigationTitle).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibrate"
+          }
+        }
+      }
+    },
+    "complication.stale": {
+      "comment": "Baris kedua complication saat cuplikan terakhir sudah terlalu tua.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "from earlier"
           }
         }
       }
@@ -1758,6 +1922,831 @@
           "stringUnit": {
             "state": "translated",
             "value": "Not certain"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.galaxy.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "galaxy"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.globularCluster.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus bola.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "globular cluster"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.nebula.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: nebula.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nebula"
+          }
+        }
+      }
+    },
+    "deepSky.morphology.openCluster.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open cluster"
+          }
+        }
+      }
+    },
+    "experiment.capture.section": {
+      "comment": "Judul bagian rekam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
+          }
+        }
+      }
+    },
+    "experiment.correct.label": {
+      "comment": "Judul baris jumlah jawaban benar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct"
+          }
+        }
+      }
+    },
+    "experiment.dataset.sharePreview": {
+      "comment": "Judul pratinjau berbagi dataset.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1 dataset"
+          }
+        }
+      }
+    },
+    "experiment.detail.answer": {
+      "comment": "Baris detail: jawaban engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "answer %@"
+          }
+        }
+      }
+    },
+    "experiment.detail.confidence": {
+      "comment": "Baris detail: tingkat keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "confidence %@"
+          }
+        }
+      }
+    },
+    "experiment.detail.error": {
+      "comment": "Baris detail: galat tunjuk, bentuk tampilan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "error %.1f°"
+          }
+        }
+      }
+    },
+    "experiment.detail.noAnswer": {
+      "comment": "Kata pengganti nama objek saat engine belum menjawab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "none yet"
+          }
+        }
+      }
+    },
+    "experiment.detail.noError": {
+      "comment": "Kata pengganti galat saat tidak ada analisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "—"
+          }
+        }
+      }
+    },
+    "experiment.detail.rate": {
+      "comment": "Baris detail: laju pergelangan, bentuk tampilan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.0f°/s"
+          }
+        }
+      }
+    },
+    "experiment.detail.state": {
+      "comment": "Baris detail: keadaan alur saat direkam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "state %@"
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.ambiguous": {
+      "comment": "Diagnosis: semua jawaban ragu karena dua kandidat berdekatan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every answer was uncertain because two candidates were close together. This is an accuracy limit, not a calibration mistake."
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.mixed": {
+      "comment": "Diagnosis saat dua sebab atau lebih berbagi hitungan tertinggi. Satu slot %@ menerima daftar sebab yang sudah disambung; pemisahnya punya kunci sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasons for uncertainty are shared: %@"
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.mixedSeparator": {
+      "comment": "Pemisah antarsebab pada kalimat diagnosis seri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "; and "
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.noAnswers": {
+      "comment": "Diagnosis: belum ada jawaban sama sekali.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answers at all yet. Aim at the sky and hold until the wrist is still."
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.noMeasurableCause": {
+      "comment": "Diagnosis: ragu tanpa sebab terukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answers were uncertain with no measurable cause — check whether the aim makes sense."
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.noSamples": {
+      "comment": "Diagnosis: belum ada sampel.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No samples yet."
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.ratio": {
+      "comment": "Diagnosis: rasio jawaban yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.0f%% confident answers (%lld confident, %lld uncertain)."
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.tooFar": {
+      "comment": "Diagnosis: semua jawaban ragu karena kandidat terlalu jauh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every answer was uncertain because the candidate was too far from the aim. Fix the calibration first."
+          }
+        }
+      }
+    },
+    "experiment.export.label": {
+      "comment": "Label tombol ekspor dataset JSON.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export dataset (JSON)"
+          }
+        }
+      }
+    },
+    "experiment.falseLock.label": {
+      "comment": "Judul baris jumlah false lock.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "False lock"
+          }
+        }
+      }
+    },
+    "experiment.groundTruthFooter": {
+      "comment": "Keterangan bagian target: kebenaran dari katalog.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ground truth comes from the catalogue, not from the engine's answer. If the engine misidentifies, we still know which object was actually pointed at."
+          }
+        }
+      }
+    },
+    "experiment.insufficientForThreshold": {
+      "comment": "Pesan saat data belum cukup untuk mengusulkan ambang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough data to propose a new threshold — the engine keeps its conservative built-in threshold."
+          }
+        }
+      }
+    },
+    "experiment.location.computed": {
+      "comment": "Keterangan lokasi tempat tinggi objek dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computed for %@."
+          }
+        }
+      }
+    },
+    "experiment.location.fallback": {
+      "comment": "Peringatan lokasi masih bawaan: tinggi objek dihitung untuk tempat lain.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location not yet available — the altitudes below are computed for %@, not your place."
+          }
+        }
+      }
+    },
+    "experiment.medianError.label": {
+      "comment": "Judul baris galat median.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error"
+          }
+        }
+      }
+    },
+    "experiment.noAnalyzable": {
+      "comment": "Pesan saat belum ada percobaan yang bisa dianalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trial can be analysed yet."
+          }
+        }
+      }
+    },
+    "experiment.noTargets": {
+      "comment": "Pesan saat tidak ada target di atas horizon.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No target above the horizon right now."
+          }
+        }
+      }
+    },
+    "experiment.noTrials": {
+      "comment": "Pesan saat belum ada percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trials yet."
+          }
+        }
+      }
+    },
+    "experiment.noneSelected": {
+      "comment": "Opsi 'belum ada target terpilih' di pemilih.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None selected"
+          }
+        }
+      }
+    },
+    "experiment.note.placeholder": {
+      "comment": "Placeholder kolom catatan opsional.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note (optional)"
+          }
+        }
+      }
+    },
+    "experiment.p90Error.label": {
+      "comment": "Judul baris galat P90.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "P90 error"
+          }
+        }
+      }
+    },
+    "experiment.record.label": {
+      "comment": "Label tombol rekam percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record trial"
+          }
+        }
+      }
+    },
+    "experiment.removeLast.label": {
+      "comment": "Label tombol buang percobaan terakhir.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard last trial"
+          }
+        }
+      }
+    },
+    "experiment.reset.label": {
+      "comment": "Label VoiceOver tombol buang (ikon tong sampah).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard all trials"
+          }
+        }
+      }
+    },
+    "experiment.result.section": {
+      "comment": "Judul bagian hasil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Results"
+          }
+        }
+      }
+    },
+    "experiment.row.countNotAnalyzed": {
+      "comment": "Judul baris jumlah percobaan yang tercatat tapi tidak teranalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials not analyzed"
+          }
+        }
+      }
+    },
+    "experiment.sendThreshold.label": {
+      "comment": "Label tombol kirim ambang ke jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send threshold to watch"
+          }
+        }
+      }
+    },
+    "experiment.status.initial": {
+      "comment": "Panduan awal layar Experiment 1.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a target, aim, then record."
+          }
+        }
+      }
+    },
+    "experiment.status.noPointing": {
+      "comment": "Sensor belum memberi arah tunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No aim from the sensor yet — nothing was recorded."
+          }
+        }
+      }
+    },
+    "experiment.status.noTarget": {
+      "comment": "Rekam ditekan tanpa memilih target.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a target first — without ground truth, the recording can't be analyzed."
+          }
+        }
+      }
+    },
+    "experiment.status.nothingToRemove": {
+      "comment": "Tidak ada percobaan yang bisa dibuang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trial to remove."
+          }
+        }
+      }
+    },
+    "experiment.status.recorded": {
+      "comment": "Ringkasan satu percobaan tersimpan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded: error %@, %@. Engine answer: %@."
+          }
+        }
+      }
+    },
+    "experiment.status.removed": {
+      "comment": "Percobaan terakhir dibuang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed: %@."
+          }
+        }
+      }
+    },
+    "experiment.status.reset": {
+      "comment": "Seluruh dataset dikosongkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dataset cleared."
+          }
+        }
+      }
+    },
+    "experiment.status.sensorOff": {
+      "comment": "Sensor gerak mati saat merekam percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor is off — the remaining aim is not a current measurement. Nothing was recorded."
+          }
+        }
+      }
+    },
+    "experiment.status.targetUncomputable": {
+      "comment": "Arah target kebenaran tidak bisa dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction of target %@ can't be computed — the trial was not saved."
+          }
+        }
+      }
+    },
+    "experiment.suggestedThreshold": {
+      "comment": "Usulan ambang keyakinan dari sigma terukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggested confidence threshold: σ %.1f°"
+          }
+        }
+      }
+    },
+    "experiment.summary.failed": {
+      "comment": "Ringkasan: ada false lock, klaim keselamatan gagal.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FAILED: %lld false lock — the engine was confident but wrong. The confidence threshold must be tightened. Accuracy %@, median error %@, P90 %@."
+          }
+        }
+      }
+    },
+    "experiment.summary.insufficient": {
+      "comment": "Ringkasan: nol false lock tapi sampel belum cukup.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot conclude yet: 0 false lock out of %lld trials — the sample is not enough (needs at least %lld). Accuracy %@, median pointing error %@, P90 %@. This is not proof of safety, only an absence of counter-evidence."
+          }
+        }
+      }
+    },
+    "experiment.summary.noAnalyzable": {
+      "comment": "Ringkasan: belum ada percobaan yang bisa dianalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trial that can be analyzed yet."
+          }
+        }
+      }
+    },
+    "experiment.summary.passed": {
+      "comment": "Ringkasan: sampel cukup dan tanpa false lock.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passed the safety requirement (0 false lock out of %lld trials). Accuracy %@, median pointing error %@, P90 %@."
+          }
+        }
+      }
+    },
+    "experiment.target.option": {
+      "comment": "Opsi pemilih target: nama dan tinggi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %.0f°"
+          }
+        }
+      }
+    },
+    "experiment.targetHeader": {
+      "comment": "Judul bagian target.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target"
+          }
+        }
+      }
+    },
+    "experiment.targetPicker": {
+      "comment": "Label pemilih target kebenaran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target (ground truth)"
+          }
+        }
+      }
+    },
+    "experiment.title": {
+      "comment": "Judul layar Experiment 1.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1"
+          }
+        }
+      }
+    },
+    "experiment.trials.countLabel": {
+      "comment": "Judul baris jumlah percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials"
+          }
+        }
+      }
+    },
+    "experiment.trials.section": {
+      "comment": "Judul bagian daftar percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials"
+          }
+        }
+      }
+    },
+    "experiment.unanalyzable.warning": {
+      "comment": "Peringatan bahwa percobaan tak teranalisis tidak menambah bukti untuk klaim lulus.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld recorded trials could not be analyzed — they add no evidence."
+          }
+        }
+      }
+    },
+    "experiment.verdict.correct": {
+      "comment": "Putusan percobaan: benar (bentuk pendek di daftar).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "correct"
+          }
+        }
+      }
+    },
+    "experiment.verdict.correct.sentence": {
+      "comment": "Putusan percobaan untuk diucapkan: benar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct."
+          }
+        }
+      }
+    },
+    "experiment.verdict.falseLock": {
+      "comment": "Putusan percobaan: engine yakin tapi salah (huruf besar, sengaja).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FALSE LOCK"
+          }
+        }
+      }
+    },
+    "experiment.verdict.falseLock.sentence": {
+      "comment": "Putusan percobaan untuk diucapkan: false lock.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "False lock: the engine was confident but wrong."
+          }
+        }
+      }
+    },
+    "experiment.verdict.notAnalyzed": {
+      "comment": "Putusan percobaan: tak dianalisis (bentuk pendek di daftar).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "not analyzed"
+          }
+        }
+      }
+    },
+    "experiment.verdict.notAnalyzed.sentence": {
+      "comment": "Putusan percobaan untuk diucapkan: tak dianalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not analyzed."
+          }
+        }
+      }
+    },
+    "experiment.verdict.wrong": {
+      "comment": "Putusan percobaan: salah (bentuk pendek di daftar).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wrong"
+          }
+        }
+      }
+    },
+    "experiment.verdict.wrong.sentence": {
+      "comment": "Putusan percobaan untuk diucapkan: salah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrong."
+          }
+        }
+      }
+    },
+    "iPhone terhubung": {
+      "comment": "Status tautan jam ke iPhone saat iPhone terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connected"
+          }
+        }
+      }
+    },
+    "iPhone tidak terjangkau": {
+      "comment": "Status tautan jam ke iPhone saat iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone not reachable"
+          }
+        }
+      }
+    },
+    "jarak kandidat / σ": {
+      "comment": "Label sumbu Y grafik keyakinan: jarak kandidat dalam satuan sigma.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "candidate distance / σ"
+          }
+        }
+      }
+    },
+    "link.empty.noCalibration": {
+      "comment": "Jam belum melaporkan kalibrasi",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The watch has not reported a calibration yet."
+          }
+        }
+      }
+    },
+    "link.empty.noState": {
+      "comment": "Belum ada keadaan dari jam",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No state from the watch yet."
           }
         }
       }
@@ -1813,6 +2802,1073 @@
           "stringUnit": {
             "state": "translated",
             "value": "State request"
+          }
+        }
+      }
+    },
+    "link.note.calibrated": {
+      "comment": "Keadaan jam: terkalibrasi. Tampil di layar Tautan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "calibrated"
+          }
+        }
+      }
+    },
+    "link.note.notCalibrated": {
+      "comment": "Keadaan jam: belum terkalibrasi. Tampil di layar Tautan iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "not calibrated"
+          }
+        }
+      }
+    },
+    "link.note.samples": {
+      "comment": "Catatan keterbatasan sampel jam",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples from the watch carry no candidate distance, so their ratio to σ is empty. What you can see here is the state and confidence reported by the watch."
+          }
+        }
+      }
+    },
+    "link.note.sigmaMissing": {
+      "comment": "Catatan sigma yang tidak terukur",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some samples do not include σ. An unmeasured sigma is written as 0, not a default value — do not read it as perfect accuracy."
+          }
+        }
+      }
+    },
+    "link.requestState": {
+      "comment": "Tombol minta keadaan terakhir",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request latest state"
+          }
+        }
+      }
+    },
+    "link.row.confidence": {
+      "comment": "Baris keyakinan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence"
+          }
+        }
+      }
+    },
+    "link.row.messagesReceived": {
+      "comment": "Jumlah pesan diterima",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messages received"
+          }
+        }
+      }
+    },
+    "link.row.object": {
+      "comment": "Baris objek",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object"
+          }
+        }
+      }
+    },
+    "link.row.rate": {
+      "comment": "Baris laju sudut",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rate"
+          }
+        }
+      }
+    },
+    "link.row.reachable": {
+      "comment": "Baris keterjangkauan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reachable"
+          }
+        }
+      }
+    },
+    "link.row.recorded": {
+      "comment": "Baris jumlah terekam",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recorded"
+          }
+        }
+      }
+    },
+    "link.row.referenceCount": {
+      "comment": "Baris jumlah acuan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference count"
+          }
+        }
+      }
+    },
+    "link.row.spread": {
+      "comment": "Baris sebaran sisa",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Residual spread"
+          }
+        }
+      }
+    },
+    "link.row.state": {
+      "comment": "Baris keadaan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        }
+      }
+    },
+    "link.row.status": {
+      "comment": "Baris status tautan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "link.row.time": {
+      "comment": "Baris waktu",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        }
+      }
+    },
+    "link.row.yawOffset": {
+      "comment": "Baris offset yaw",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yaw offset"
+          }
+        }
+      }
+    },
+    "link.section.lastCalibration": {
+      "comment": "Bagian kalibrasi terakhir",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest calibration from watch"
+          }
+        }
+      }
+    },
+    "link.section.lastState": {
+      "comment": "Bagian keadaan terakhir",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest state from watch"
+          }
+        }
+      }
+    },
+    "link.section.samples": {
+      "comment": "Bagian sampel dari jam",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples from watch"
+          }
+        }
+      }
+    },
+    "link.sectionTitle": {
+      "comment": "Judul bagian tautan",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link"
+          }
+        }
+      }
+    },
+    "link.status.acknowledgement": {
+      "comment": "Tanda terima diterima.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acknowledgement"
+          }
+        }
+      }
+    },
+    "link.status.calibrationFromWatch": {
+      "comment": "Hasil kalibrasi diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration from the watch"
+          }
+        }
+      }
+    },
+    "link.status.calibrationNotSent": {
+      "comment": "Hasil kalibrasi tidak terkirim: sesi WatchConnectivity belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration not sent: session is not active yet."
+          }
+        }
+      }
+    },
+    "link.status.invalidPolicy": {
+      "comment": "Ambang keyakinan dari iPhone tidak sah, jadi diabaikan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confidence threshold from the iPhone is not valid — ignored"
+          }
+        }
+      }
+    },
+    "link.status.messageNotSent": {
+      "comment": "Pesan tidak terkirim: sesi WatchConnectivity belum aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message not sent: session is not active yet."
+          }
+        }
+      }
+    },
+    "link.status.policyFromWatch": {
+      "comment": "Ambang keyakinan diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The watch sent a confidence threshold"
+          }
+        }
+      }
+    },
+    "link.status.sendFailed": {
+      "comment": "Pengiriman gagal, dengan alasan dari sistem. %@ = localizedDescription OS (tidak diterjemahkan ulang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send failed: %@"
+          }
+        }
+      }
+    },
+    "link.status.sendFailures": {
+      "comment": "Kalimat jumlah pengiriman tautan yang gagal. %lld = jumlah, %@ = kata benda. Semula pemanggil merakitnya dengan MENYAMBUNG string, sehingga urutannya terpaku di kode dan bahasa lain tidak bisa mengatakannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". %lld %@."
+          }
+        }
+      }
+    },
+    "link.status.sendFailuresWord": {
+      "comment": "Kata benda untuk kiriman yang gagal. Dipisah dari link.status.sendFailed karena yang ini menyebut JUMLAH kiriman, bukan satu kejadian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "messages failed"
+          }
+        }
+      }
+    },
+    "link.status.sent": {
+      "comment": "Pengiriman berhasil. %@ = nama jenis pesan untuk manusia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent: %@"
+          }
+        }
+      }
+    },
+    "link.status.stateFromWatch": {
+      "comment": "Keadaan diterima dari jam, tanpa nama objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State from the watch"
+          }
+        }
+      }
+    },
+    "link.status.stateRequestTooEarly": {
+      "comment": "Permintaan keadaan datang sebelum alur siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State request arrived before the flow was ready."
+          }
+        }
+      }
+    },
+    "link.status.watchSaw": {
+      "comment": "Jam melihat sebuah objek. %@ = nama objek.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch saw %@"
+          }
+        }
+      }
+    },
+    "link.status.watchUnreachableMessage": {
+      "comment": "Jam belum terhubung sehingga pesan tidak terkirim.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch not connected — message not sent."
+          }
+        }
+      }
+    },
+    "link.status.watchUnreachablePolicy": {
+      "comment": "Jam belum terhubung sehingga ambang keyakinan tidak terkirim.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch not connected — threshold not sent."
+          }
+        }
+      }
+    },
+    "link.value.active": {
+      "comment": "Tautan aktif",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        }
+      }
+    },
+    "link.value.inactive": {
+      "comment": "Tautan belum aktif",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not active yet"
+          }
+        }
+      }
+    },
+    "link.value.no": {
+      "comment": "Tidak",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "link.value.yes": {
+      "comment": "Ya",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "location.fallback.label": {
+      "comment": "Label lokasi darurat (Jakarta) yang tampil di layar utama jam. Bukan lokasi pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jakarta (default)"
+          }
+        }
+      }
+    },
+    "moon.phase.crescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral, karena \"muda\" dan \"tua\" mengklaim arah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crescent moon"
+          }
+        }
+      }
+    },
+    "moon.phase.firstQuarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: separuh membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First quarter"
+          }
+        }
+      }
+    },
+    "moon.phase.full.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: purnama.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full moon"
+          }
+        }
+      }
+    },
+    "moon.phase.gibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gibbous moon"
+          }
+        }
+      }
+    },
+    "moon.phase.lastQuarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: separuh mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last quarter"
+          }
+        }
+      }
+    },
+    "moon.phase.new.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: bulan baru.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New moon"
+          }
+        }
+      }
+    },
+    "moon.phase.quarter.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Half moon"
+          }
+        }
+      }
+    },
+    "moon.phase.waningCrescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: sabit mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waning crescent"
+          }
+        }
+      }
+    },
+    "moon.phase.waningGibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: cembung mengecil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waning gibbous"
+          }
+        }
+      }
+    },
+    "moon.phase.waxingCrescent.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: sabit membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waxing crescent"
+          }
+        }
+      }
+    },
+    "moon.phase.waxingGibbous.spoken.label": {
+      "comment": "Nama fase Bulan untuk VoiceOver: cembung membesar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waxing gibbous"
+          }
+        }
+      }
+    },
+    "object.display.coordinates": {
+      "comment": "Koordinat untuk baris jenis objek di kartu jam — bentuk LAYAR (pakai tanda derajat), bukan bentuk suara. Semula literal String(format:) di dalam view, yang tidak terlihat Aturan 4 maupun Aturan 6.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA %.1f° Dec %+.1f°"
+          }
+        }
+      }
+    },
+    "object.display.magnitude": {
+      "comment": "Magnitudo untuk baris jenis objek — bentuk LAYAR ringkas (\"mag\"), bukan bentuk suara object.speech.magnitude (\"magnitudo\").",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mag %.2f"
+          }
+        }
+      }
+    },
+    "object.display.staleName": {
+      "comment": "Layar iPhone: nama objek yang ditandai sebagai sisa. %@ = nama objek. Penanda diletakkan di belakang nama dalam Bahasa Indonesia; dalam bahasa lain boleh pindah ke depan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — not a current result"
+          }
+        }
+      }
+    },
+    "object.kind.deepSky.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (benda langit jauh: nebula, galaksi, gugus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deep-sky object"
+          }
+        }
+      }
+    },
+    "object.kind.deepSky.spoken.label": {
+      "comment": "Pengucapan nama jenis (benda langit jauh) untuk VoiceOver — bukan bentuk tampilan, karena \"Objek langit dalam\" terdengar janggal saat diucapkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deep-sky object"
+          }
+        }
+      }
+    },
+    "object.kind.moon.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (bulan).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        }
+      }
+    },
+    "object.kind.moon.spoken.label": {
+      "comment": "Pengucapan nama jenis (bulan) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "moon"
+          }
+        }
+      }
+    },
+    "object.kind.planet.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (planet).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planet"
+          }
+        }
+      }
+    },
+    "object.kind.planet.spoken.label": {
+      "comment": "Pengucapan nama jenis (planet) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "planet"
+          }
+        }
+      }
+    },
+    "object.kind.star.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (bintang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Star"
+          }
+        }
+      }
+    },
+    "object.kind.star.spoken.label": {
+      "comment": "Pengucapan nama jenis (bintang) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "star"
+          }
+        }
+      }
+    },
+    "object.kind.sun.display.label": {
+      "comment": "Nama jenis benda untuk tampilan (matahari).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        }
+      }
+    },
+    "object.kind.sun.spoken.label": {
+      "comment": "Pengucapan nama jenis (matahari) untuk VoiceOver.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sun"
+          }
+        }
+      }
+    },
+    "object.speech.confidence": {
+      "comment": "VoiceOver: tingkat keyakinan objek. %@ = nama tingkat (Yakin/Ragu/Tidak tahu), sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "confidence %@"
+          }
+        }
+      }
+    },
+    "object.speech.coordinates": {
+      "comment": "VoiceOver: koordinat bintang. Argumen 1 = RA derajat, argumen 2 = deklinasi derajat (bertanda).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA %.1f degrees, declination %+.1f degrees"
+          }
+        }
+      }
+    },
+    "object.speech.magnitude": {
+      "comment": "VoiceOver: magnitudo tampak objek. Angka tidak pernah diucapkan tanpa katanya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "magnitude %.2f"
+          }
+        }
+      }
+    },
+    "object.speech.stale": {
+      "comment": "VoiceOver: penanda bahwa objek berasal dari pandangan sebelumnya, bukan hasil pengukuran sekarang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From an earlier view, not a current reading."
+          }
+        }
+      }
+    },
+    "object.speech.staleShort": {
+      "comment": "Penanda sisa versi pendek untuk layar redup (Always-On). Bukan satu kata \"sisa\": di layar tanpa panel peringatan, satu kata tidak menjelaskan sisa APA.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "from an earlier view"
+          }
+        }
+      }
+    },
+    "objectDetail.staleNote.display": {
+      "comment": "Peringatan visual objek sisa di kartu detail.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leftover from a previous view — not the current result"
+          }
+        }
+      }
+    },
+    "onboarding.honesty": {
+      "comment": "Janji produk onboarding: ketidak-pastian ditampilkan apa adanya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If it is unsure, the engine will say so. Nothing is claimed as certain until it is."
+          }
+        }
+      }
+    },
+    "onboarding.label": {
+      "comment": "Label VoiceOver kartu onboarding utuh (merangkum ketiga baris).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduction. Point your watch at the sky to learn what you are looking at. If unsure, the engine will say so."
+          }
+        }
+      }
+    },
+    "onboarding.start.label": {
+      "comment": "Label tombol tutup kartu onboarding.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        }
+      }
+    },
+    "onboarding.subtitle": {
+      "comment": "Subjudul onboarding: apa yang didapat setelah menunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aim at a body and learn what you are looking at — and how confident the engine is."
+          }
+        }
+      }
+    },
+    "onboarding.title": {
+      "comment": "Judul kartu perkenalan value-first (layar onboarding).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point your watch at the sky"
+          }
+        }
+      }
+    },
+    "pointing.announce.locked": {
+      "comment": "VoiceOver: keadaan terkunci tetapi nama objeknya tidak tersedia. Diucapkan saat keadaan berubah, bukan tiap sampel.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked."
+          }
+        }
+      }
+    },
+    "pointing.announce.lockedOn": {
+      "comment": "VoiceOver: terkunci pada sebuah objek. %@ = nama objek, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locked on %@."
+          }
+        }
+      }
+    },
+    "pointing.announce.state": {
+      "comment": "VoiceOver: keadaan berubah tanpa jawaban. Argumen 1 = label keadaan, argumen 2 = kalimat panduan; keduanya sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "pointing.announce.unavailable": {
+      "comment": "VoiceOver: sensor tidak tersedia. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor unavailable. %@"
+          }
+        }
+      }
+    },
+    "pointing.announce.uncertain": {
+      "comment": "VoiceOver: ada kandidat tetapi engine tidak cukup yakin. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain. %@"
+          }
+        }
+      }
+    },
+    "pointing.audioCue.off": {
+      "comment": "Label VoiceOver tombol bunyi kunci saat mati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on sound on lock"
+          }
+        }
+      }
+    },
+    "pointing.audioCue.on": {
+      "comment": "Label VoiceOver tombol bunyi kunci saat nyala.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off sound on lock"
+          }
+        }
+      }
+    },
+    "pointing.calibration.installed": {
+      "comment": "Label VoiceOver ikon kalibrasi saat terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, installed"
+          }
+        }
+      }
+    },
+    "pointing.calibration.notInstalled": {
+      "comment": "Label VoiceOver ikon kalibrasi saat belum terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, not installed"
+          }
+        }
+      }
+    },
+    "pointing.link.connected": {
+      "comment": "Baris status tautan iPhone terhubung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connected"
+          }
+        }
+      }
+    },
+    "pointing.link.disconnected": {
+      "comment": "Baris status tautan iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone unreachable"
+          }
+        }
+      }
+    },
+    "pointing.link.failures": {
+      "comment": "Penanda jumlah kegagalan kirim di baris tautan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %lld failed"
+          }
+        }
+      }
+    },
+    "pointing.locationFallback": {
+      "comment": "Baris lokasi darurat (Lokasi: …). %@ adalah label lokasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location: %@"
+          }
+        }
+      }
+    },
+    "pointing.nightMode.off": {
+      "comment": "Label VoiceOver tombol mode malam saat mati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Night Mode"
+          }
+        }
+      }
+    },
+    "pointing.nightMode.on": {
+      "comment": "Label VoiceOver tombol mode malam saat aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off Night Mode"
+          }
+        }
+      }
+    },
+    "pointing.search.hint.belowHorizon": {
+      "comment": "Alasan: semua objek katalog sedang di bawah horizon.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every object in the catalogue is below the horizon."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.daylight": {
+      "comment": "Alasan: langit belum cukup gelap untuk melihat bintang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sky is still bright — stars are not visible yet."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.noCandidates": {
+      "comment": "Alasan: tidak ada objek yang cocok di arah tunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object matches that direction yet."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.tooCloseToSun": {
+      "comment": "Alasan: objek terlalu dekat Matahari untuk diamati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The objects are too close to the Sun to observe safely."
+          }
+        }
+      }
+    },
+    "pointing.search.hint.tooFaint": {
+      "comment": "Alasan: objek di arah itu terlalu redup.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The objects in that direction are too faint to see."
+          }
+        }
+      }
+    },
+    "pointing.skyContext.label": {
+      "comment": "Label VoiceOver tombol info konteks langit.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky context and accuracy"
           }
         }
       }
@@ -1949,382 +4005,107 @@
         }
       }
     },
-    "sisa": {
-      "comment": "Label sisa pengujian pada tampilan redup.",
+    "pointing.title": {
+      "comment": "Judul layar utama (navigationTitle).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "left"
+            "value": "Point & Know"
           }
         }
       }
     },
-    "tak dianalisis": {
-      "comment": "Status percobaan yang belum dianalisis.",
+    "row.count.of": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "not analysed"
+            "value": "%lld of %lld"
           }
         }
       }
     },
-    "object.kind.star.display.label": {
-      "comment": "Nama jenis benda untuk tampilan (bintang).",
+    "row.speech.degrees": {
+      "comment": "Satuan sudut dalam bentuk kata (diucapkan).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Star"
+            "value": "degrees"
           }
         }
       }
     },
-    "object.kind.planet.display.label": {
-      "comment": "Nama jenis benda untuk tampilan (planet).",
+    "row.speech.degreesPerSecond": {
+      "comment": "Satuan laju sudut dalam bentuk kata (diucapkan).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Planet"
+            "value": "degrees per second"
           }
         }
       }
     },
-    "object.kind.moon.display.label": {
-      "comment": "Nama jenis benda untuk tampilan (bulan).",
+    "row.speech.error": {
+      "comment": "Kalimat galat pointing: kata, angka, satuan. Urutan tipe specifier wajib sama dengan template kode (%@ %.1f %@) — Aturan 11 menegakkannya.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Moon"
+            "value": "%@ %.1f %@"
           }
         }
       }
     },
-    "object.kind.sun.display.label": {
-      "comment": "Nama jenis benda untuk tampilan (matahari).",
+    "row.speech.errorWord": {
+      "comment": "Kata yang menyebut apa yang diukur galat pointing.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sun"
+            "value": "error"
           }
         }
       }
     },
-    "object.kind.deepSky.display.label": {
-      "comment": "Nama jenis benda untuk tampilan (benda langit jauh: nebula, galaksi, gugus).",
+    "row.speech.label": {
+      "comment": "Penggabungan satu baris judul:nilai untuk VoiceOver.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deep-sky object"
+            "value": "%@: %@"
           }
         }
       }
     },
-    "object.kind.star.spoken.label": {
-      "comment": "Pengucapan nama jenis (bintang) untuk VoiceOver.",
+    "row.speech.stateLine": {
+      "comment": "Awalan kalimat keadaan untuk pengumuman kartu jam. %@ = label keadaan (pointing.state.*.label, yang punya kuncinya sendiri). Semula literal \"Keadaan: \\(state.shortLabel).\" di dalam view.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "star"
+            "value": "Status: %@."
           }
         }
       }
     },
-    "object.kind.planet.spoken.label": {
-      "comment": "Pengucapan nama jenis (planet) untuk VoiceOver.",
+    "row.speech.wristRate": {
+      "comment": "Kalimat pengumuman laju pergelangan di kartu keadaan jam. Urutan specifier WAJIB sama dengan kode: %@ = kata pengukur (row.speech.wristRateWord), %.0f = angka, %@ = satuan (row.speech.degrees). Menukar posisinya = crash di CoreFoundation — lihat Aturan 11 di swift-ui-lint.sh.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "planet"
+            "value": "%@ %.0f %@ per second."
           }
         }
       }
     },
-    "object.kind.moon.spoken.label": {
-      "comment": "Pengucapan nama jenis (bulan) untuk VoiceOver.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "moon"
-          }
-        }
-      }
-    },
-    "object.kind.sun.spoken.label": {
-      "comment": "Pengucapan nama jenis (matahari) untuk VoiceOver.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "sun"
-          }
-        }
-      }
-    },
-    "object.kind.deepSky.spoken.label": {
-      "comment": "Pengucapan nama jenis (benda langit jauh) untuk VoiceOver — bukan bentuk tampilan, karena \"Objek langit dalam\" terdengar janggal saat diucapkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "deep-sky object"
-          }
-        }
-      }
-    },
-    "moon.phase.new.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: bulan baru.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New moon"
-          }
-        }
-      }
-    },
-    "moon.phase.full.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: purnama.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Full moon"
-          }
-        }
-      }
-    },
-    "moon.phase.crescent.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral, karena \"muda\" dan \"tua\" mengklaim arah.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crescent moon"
-          }
-        }
-      }
-    },
-    "moon.phase.waxingCrescent.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: sabit membesar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waxing crescent"
-          }
-        }
-      }
-    },
-    "moon.phase.waningCrescent.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: sabit mengecil.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waning crescent"
-          }
-        }
-      }
-    },
-    "moon.phase.gibbous.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gibbous moon"
-          }
-        }
-      }
-    },
-    "moon.phase.waxingGibbous.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: cembung membesar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waxing gibbous"
-          }
-        }
-      }
-    },
-    "moon.phase.waningGibbous.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: cembung mengecil.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waning gibbous"
-          }
-        }
-      }
-    },
-    "moon.phase.quarter.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver saat arah waxing/waning tidak diketahui — sengaja netral.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Half moon"
-          }
-        }
-      }
-    },
-    "moon.phase.firstQuarter.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: separuh membesar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "First quarter"
-          }
-        }
-      }
-    },
-    "moon.phase.lastQuarter.spoken.label": {
-      "comment": "Nama fase Bulan untuk VoiceOver: separuh mengecil.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last quarter"
-          }
-        }
-      }
-    },
-    "Objek terakhir yang dikenali, tanpa membuka app.": {
-      "comment": "Deskripsi complication jam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The last object recognised, without opening the app."
-          }
-        }
-      }
-    },
-    "Langit": {
-      "comment": "Pengarahan langit pada sudut sekarang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sky"
-          }
-        }
-      }
-    },
-    "Matahari": {
-      "comment": "Posisi Matahari untuk membandingkan DATE dengan pengukuran.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sun"
-          }
-        }
-      }
-    },
-    "Bulan": {
-      "comment": "Posisi Bulan pada sudut sekarang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moon"
-          }
-        }
-      }
-    },
-    "Fase Bulan": {
-      "comment": "Frasi piringan Bulan yang menyala dan arah sabit.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moon phase"
-          }
-        }
-      }
-    },
-    "Azimut": {
-      "comment": "Arah mendatar, 0-360 derajat dari utara.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Azimuth"
-          }
-        }
-      }
-    },
-    "Ketinggian": {
-      "comment": "Ketinggian di atas cakrawala, derajat.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altitude"
-          }
-        }
-      }
-    },
-    "Lokasi": {
-      "comment": "Lokasi pengamat yang dipakai resolver.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location"
-          }
-        }
-      }
-    },
-    "Asal lokasi": {
-      "comment": "Dari mana koordinat datang, dan apakah itu sungguhan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location source"
-          }
-        }
-      }
-    },
-    "Keadaan": {
-      "comment": "Keadaan alur pointing sekarang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "State"
-          }
-        }
-      }
-    },
-    "Panduan": {
-      "comment": "Apa yang harus dilakukan pengguna pada keadaan ini.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guidance"
-          }
-        }
-      }
-    },
-    "Laju pergelangan": {
-      "comment": "Laju sudut pergelangan, derajat per detik.",
+    "row.speech.wristRateWord": {
+      "comment": "Kata yang menyebut apa yang diukur laju pergelangan pada pengumuman.",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -2334,718 +4115,87 @@
         }
       }
     },
-    "Arah": {
-      "comment": "Sudut tunjuk yang diukur.",
+    "sensor.location.accuracy": {
+      "comment": "Status akurasi lokasi. %.0f = meter.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Direction"
-          }
-        }
-      }
-    },
-    "Sigma dipakai": {
-      "comment": "Lebar sigma yang dipakai resolver.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigma used"
-          }
-        }
-      }
-    },
-    "Device motion": {
-      "comment": "Laju gerak mentah dari sensor, tanpa kalibrasi apa pun.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Device motion"
-          }
-        }
-      }
-    },
-    "Sampel": {
-      "comment": "Jumlah sampel yang sudah terkumpul.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Samples"
-          }
-        }
-      }
-    },
-    "Magnitudo": {
-      "comment": "Magnitudo tampak objek.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Magnitude"
-          }
-        }
-      }
-    },
-    "RA": {
-      "comment": "Asensio recta, derajat.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RA"
-          }
-        }
-      }
-    },
-    "Dec": {
-      "comment": "Deklinasi, derajat.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dec"
-          }
-        }
-      }
-    },
-    "Id katalog": {
-      "comment": "Id mentah dari katalog, untuk pemeriksaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Catalogue ID"
-          }
-        }
-      }
-    },
-    "Benar": {
-      "comment": "Jumlah cuplikan yang benar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Correct"
-          }
-        }
-      }
-    },
-    "False lock": {
-      "comment": "Cuplikan yang terkunci pada objek yang salah.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "False lock"
-          }
-        }
-      }
-    },
-    "Galat median": {
-      "comment": "Galat sudut median antar cuplikan yang berpasangan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Median error"
-          }
-        }
-      }
-    },
-    "Galat P90": {
-      "comment": "Galat sudut pada persentil ke-90, yaitu batas atas yang biasanya dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "P90 error"
-          }
-        }
-      }
-    },
-    "Status": {
-      "comment": "Status terakhir dari tautan jam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status"
-          }
-        }
-      }
-    },
-    "Terjangkau": {
-      "comment": "Apakah jam sedang terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reachable"
-          }
-        }
-      }
-    },
-    "Pesan diterima": {
-      "comment": "Pesan terakhir yang diterima dari jam.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Message received"
-          }
-        }
-      }
-    },
-    "Objek": {
-      "comment": "Objek yang sedang ditunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Object"
-          }
-        }
-      }
-    },
-    "Laju": {
-      "comment": "Laju sudut saat ini.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rate"
-          }
-        }
-      }
-    },
-    "Waktu": {
-      "comment": "Waktu pengukuran.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Time"
-          }
-        }
-      }
-    },
-    "Offset yaw": {
-      "comment": "Koreksi arah yang dipakai untuk kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yaw offset"
-          }
-        }
-      }
-    },
-    "Sebaran": {
-      "comment": "Sebaran antar cuplikan yang berpasangan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spread"
-          }
-        }
-      }
-    },
-    "Jumlah acuan": {
-      "comment": "Jumlah acuan kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reference count"
-          }
-        }
-      }
-    },
-    "Terekam": {
-      "comment": "Status perekaman Experiment 1.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recorded"
-          }
-        }
-      }
-    },
-    "Kalibrasi belum dimulai.": {
-      "comment": "Label VoiceOver kartu kalibrasi saat sesi belum dimulai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration has not started."
-          }
-        }
-      }
-    },
-    "Pakai kalibrasi, belum bisa dipakai": {
-      "comment": "Label VoiceOver tombol Pakai saat kalibrasi belum layak dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use calibration, not available yet"
-          }
-        }
-      }
-    },
-    "Kalibrasi, sudah terpasang": {
-      "comment": "Label VoiceOver ikon kalibrasi saat kalibrasi sudah terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration, already applied"
-          }
-        }
-      }
-    },
-    "Kalibrasi, belum terpasang": {
-      "comment": "Label VoiceOver ikon kalibrasi saat jam belum terkalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration, not applied yet"
-          }
-        }
-      }
-    },
-    "Aktifkan Mode Malam": {
-      "comment": "Label VoiceOver tombol Mode Malam saat mode malam nonaktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on Night Mode"
-          }
-        }
-      }
-    },
-    "Nonaktifkan Mode Malam": {
-      "comment": "Label VoiceOver tombol Mode Malam saat mode malam aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn off Night Mode"
-          }
-        }
-      }
-    },
-    "Aktifkan bunyi saat kunci": {
-      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi nonaktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on lock sound"
-          }
-        }
-      }
-    },
-    "Nonaktifkan bunyi saat kunci": {
-      "comment": "Label VoiceOver tombol bunyi saat kunci ketika bunyi aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn off lock sound"
-          }
-        }
-      }
-    },
-    "iPhone terhubung": {
-      "comment": "Status tautan jam ke iPhone saat iPhone terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone connected"
-          }
-        }
-      }
-    },
-    "iPhone tidak terjangkau": {
-      "comment": "Status tautan jam ke iPhone saat iPhone tidak terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone not reachable"
-          }
-        }
-      }
-    },
-    "Gelap": {
-      "comment": "Nilai baris Langit saat langit gelap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dark"
-          }
-        }
-      }
-    },
-    "Terang": {
-      "comment": "Nilai baris Langit saat langit masih terang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bright"
-          }
-        }
-      }
-    },
-    "Sudah": {
-      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah ada.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yes"
-          }
-        }
-      }
-    },
-    "Belum": {
-      "comment": "Nilai baris Kalibrasi saat kalibrasi belum ada.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No"
-          }
-        }
-      }
-    },
-    "Objek (sisa)": {
-      "comment": "Judul baris objek yang ditampilkan adalah hasil kedaluwarsa.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Object (stale)"
-          }
-        }
-      }
-    },
-    "Ada": {
-      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Available"
-          }
-        }
-      }
-    },
-    "Tidak ada": {
-      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not available"
-          }
-        }
-      }
-    },
-    "FALSE LOCK": {
-      "comment": "Verdict percobaan: engine mengunci objek yang salah. Sengaja huruf besar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "FALSE LOCK"
-          }
-        }
-      }
-    },
-    "Aktif": {
-      "comment": "Nilai baris Status saat tautan jam-iPhone aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Active"
-          }
-        }
-      }
-    },
-    "Belum aktif": {
-      "comment": "Nilai baris Status saat tautan jam-iPhone belum aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not active yet"
-          }
-        }
-      }
-    },
-    "Ya": {
-      "comment": "Nilai baris Terjangkau saat iPhone terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yes"
-          }
-        }
-      }
-    },
-    "Tidak": {
-      "comment": "Nilai baris Terjangkau saat iPhone tidak terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No"
-          }
-        }
-      }
-    },
-    "—": {
-      "comment": "Penanda nilai kosong pada baris tabel.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "—"
-          }
-        }
-      }
-    },
-    "Riwayat keyakinan": {
-      "comment": "Judul berkas di lembar berbagi saat mengekspor riwayat keyakinan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Confidence history"
-          }
-        }
-      }
-    },
-    "σ": {
-      "comment": "Label sumbu Y grafik keyakinan: simpangan baku (sigma). Simbol sama di kedua bahasa.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "σ"
-          }
-        }
-      }
-    },
-    "Ambang yakin": {
-      "comment": "Garis ambang di grafik: batas di mana engine menyatakan yakin.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Certainty threshold"
-          }
-        }
-      }
-    },
-    "Ambang ambigu": {
-      "comment": "Garis ambang di grafik: batas di mana engine menyatakan ragu.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ambiguity threshold"
-          }
-        }
-      }
-    },
-    "jarak kandidat / σ": {
-      "comment": "Label sumbu Y grafik keyakinan: jarak kandidat dalam satuan sigma.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "candidate distance / σ"
-          }
-        }
-      }
-    },
-    "Yakin": {
-      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.high.label.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Certain"
-          }
-        }
-      }
-    },
-    "Ragu": {
-      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.medium.label.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uncertain"
-          }
-        }
-      }
-    },
-    "Tidak tahu": {
-      "comment": "Legenda grafik. Padanan 'en' sengaja sama dengan confidence.level.low.label.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown"
-          }
-        }
-      }
-    },
-    "Catatan (opsional)": {
-      "comment": "Label bidang isian catatan pada layar percobaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Note (optional)"
-          }
-        }
-      }
-    },
-    "Dataset Experiment 1": {
-      "comment": "Judul berkas di lembar berbagi saat mengekspor dataset percobaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Experiment 1 dataset"
-          }
-        }
-      }
-    },
-    "object.speech.confidence": {
-      "comment": "VoiceOver: tingkat keyakinan objek. %@ = nama tingkat (Yakin/Ragu/Tidak tahu), sudah diterjemahkan sendiri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "confidence %@"
-          }
-        }
-      }
-    },
-    "object.speech.coordinates": {
-      "comment": "VoiceOver: koordinat bintang. Argumen 1 = RA derajat, argumen 2 = deklinasi derajat (bertanda).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RA %.1f degrees, declination %+.1f degrees"
-          }
-        }
-      }
-    },
-    "object.display.coordinates": {
-      "comment": "Koordinat untuk baris jenis objek di kartu jam — bentuk LAYAR (pakai tanda derajat), bukan bentuk suara. Semula literal String(format:) di dalam view, yang tidak terlihat Aturan 4 maupun Aturan 6.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RA %.1f° Dec %+.1f°"
-          }
-        }
-      }
-    },
-    "object.display.magnitude": {
-      "comment": "Magnitudo untuk baris jenis objek — bentuk LAYAR ringkas (\"mag\"), bukan bentuk suara object.speech.magnitude (\"magnitudo\").",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "mag %.2f"
-          }
-        }
-      }
-    },
-    "object.speech.staleShort": {
-      "comment": "Penanda sisa versi pendek untuk layar redup (Always-On). Bukan satu kata \"sisa\": di layar tanpa panel peringatan, satu kata tidak menjelaskan sisa APA.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "from an earlier view"
-          }
-        }
-      }
-    },
-    "object.speech.magnitude": {
-      "comment": "VoiceOver: magnitudo tampak objek. Angka tidak pernah diucapkan tanpa katanya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "magnitude %.2f"
-          }
-        }
-      }
-    },
-    "object.speech.stale": {
-      "comment": "VoiceOver: penanda bahwa objek berasal dari pandangan sebelumnya, bukan hasil pengukuran sekarang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "From an earlier view, not a current reading."
-          }
-        }
-      }
-    },
-    "sensor.motion.missing": {
-      "comment": "Pesan saat perangkat tidak menyediakan device motion. Tampil di app jam & iPhone.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This device does not provide device motion."
+            "value": "Location ±%.0f m"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Perangkat ini tidak menyediakan device motion."
+            "value": "Lokasi ±%.0f m"
           }
         }
       }
     },
-    "sensor.motion.unavailable": {
-      "comment": "Catatan engine saat data gerak tidak tersedia.",
+    "sensor.location.denied.note": {
+      "comment": "Penjelasan saat izin lokasi ditolak — apa yang bisa dilakukan pengguna.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Motion data unavailable."
+            "value": "Location permission denied. Open Settings to allow it, or use the default location (Jakarta)."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Data gerak tidak tersedia."
+            "value": "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta)."
+          }
+        }
+      }
+    },
+    "sensor.location.denied.status": {
+      "comment": "Status singkat saat izin lokasi ditolak.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location permission denied — using the default location"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin lokasi ditolak — memakai lokasi bawaan"
+          }
+        }
+      }
+    },
+    "sensor.location.failed.note": {
+      "comment": "Penjelasan saat lokasi gagal. %@ = pesan sistem.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location failed: %@. Using the default location (Jakarta)."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi gagal: %@. Memakai lokasi bawaan (Jakarta)."
+          }
+        }
+      }
+    },
+    "sensor.location.failed.status": {
+      "comment": "Status saat lokasi gagal. %@ = pesan sistem.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location failed: %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi gagal: %@"
           }
         }
       }
@@ -3084,40 +4234,6 @@
         }
       }
     },
-    "sensor.location.waiting": {
-      "comment": "Status saat menunggu jawaban izin lokasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for location permission…"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Menunggu izin lokasi…"
-          }
-        }
-      }
-    },
-    "sensor.location.denied.status": {
-      "comment": "Status singkat saat izin lokasi ditolak.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location permission denied — using the default location"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Izin lokasi ditolak — memakai lokasi bawaan"
-          }
-        }
-      }
-    },
     "sensor.location.unknown.status": {
       "comment": "Status saat sistem mengembalikan status izin lokasi yang tidak dikenal.",
       "localizations": {
@@ -3135,829 +4251,97 @@
         }
       }
     },
-    "sensor.location.denied.note": {
-      "comment": "Penjelasan saat izin lokasi ditolak — apa yang bisa dilakukan pengguna.",
+    "sensor.location.waiting": {
+      "comment": "Status saat menunggu jawaban izin lokasi.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Location permission denied. Open Settings to allow it, or use the default location (Jakarta)."
+            "value": "Waiting for location permission…"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta)."
+            "value": "Menunggu izin lokasi…"
           }
         }
       }
     },
-    "sensor.location.accuracy": {
-      "comment": "Status akurasi lokasi. %.0f = meter.",
+    "sensor.motion.missing": {
+      "comment": "Pesan saat perangkat tidak menyediakan device motion. Tampil di app jam & iPhone.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Location ±%.0f m"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lokasi ±%.0f m"
-          }
-        }
-      }
-    },
-    "sensor.location.failed.status": {
-      "comment": "Status saat lokasi gagal. %@ = pesan sistem.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location failed: %@"
+            "value": "This device does not provide device motion."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lokasi gagal: %@"
+            "value": "Perangkat ini tidak menyediakan device motion."
           }
         }
       }
     },
-    "sensor.location.failed.note": {
-      "comment": "Penjelasan saat lokasi gagal. %@ = pesan sistem.",
+    "sensor.motion.unavailable": {
+      "comment": "Catatan engine saat data gerak tidak tersedia.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Location failed: %@. Using the default location (Jakarta)."
+            "value": "Motion data unavailable."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lokasi gagal: %@. Memakai lokasi bawaan (Jakarta)."
+            "value": "Data gerak tidak tersedia."
           }
         }
       }
     },
-    "pointing.announce.locked": {
-      "comment": "VoiceOver: keadaan terkunci tetapi nama objeknya tidak tersedia. Diucapkan saat keadaan berubah, bukan tiap sampel.",
+    "sisa": {
+      "comment": "Label sisa pengujian pada tampilan redup.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Locked."
+            "value": "left"
           }
         }
       }
     },
-    "pointing.announce.lockedOn": {
-      "comment": "VoiceOver: terkunci pada sebuah objek. %@ = nama objek, sudah diterjemahkan sendiri.",
+    "skyContext.altitude": {
+      "comment": "Judul baris ketinggian.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Locked on %@."
+            "value": "Altitude"
           }
         }
       }
     },
-    "pointing.announce.state": {
-      "comment": "VoiceOver: keadaan berubah tanpa jawaban. Argumen 1 = label keadaan, argumen 2 = kalimat panduan; keduanya sudah diterjemahkan sendiri.",
+    "skyContext.azimuth": {
+      "comment": "Judul baris azimut.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@. %2$@"
+            "value": "Azimuth"
           }
         }
       }
     },
-    "pointing.announce.unavailable": {
-      "comment": "VoiceOver: sensor tidak tersedia. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
+    "skyContext.calibration": {
+      "comment": "Judul baris kalibrasi.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sensor unavailable. %@"
-          }
-        }
-      }
-    },
-    "pointing.announce.uncertain": {
-      "comment": "VoiceOver: ada kandidat tetapi engine tidak cukup yakin. %@ = kalimat panduan, sudah diterjemahkan sendiri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not certain. %@"
-          }
-        }
-      }
-    },
-    "pointing.search.hint.daylight": {
-      "comment": "Alasan: langit belum cukup gelap untuk melihat bintang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The sky is still bright — stars are not visible yet."
-          }
-        }
-      }
-    },
-    "pointing.search.hint.belowHorizon": {
-      "comment": "Alasan: semua objek katalog sedang di bawah horizon.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every object in the catalogue is below the horizon."
-          }
-        }
-      }
-    },
-    "pointing.search.hint.tooFaint": {
-      "comment": "Alasan: objek di arah itu terlalu redup.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The objects in that direction are too faint to see."
-          }
-        }
-      }
-    },
-    "pointing.search.hint.tooCloseToSun": {
-      "comment": "Alasan: objek terlalu dekat Matahari untuk diamati.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The objects are too close to the Sun to observe safely."
-          }
-        }
-      }
-    },
-    "pointing.search.hint.noCandidates": {
-      "comment": "Alasan: tidak ada objek yang cocok di arah tunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No object matches that direction yet."
-          }
-        }
-      }
-    },
-    "deepSky.morphology.nebula.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: nebula.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "nebula"
-          }
-        }
-      }
-    },
-    "deepSky.morphology.galaxy.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "galaxy"
-          }
-        }
-      }
-    },
-    "deepSky.morphology.openCluster.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "open cluster"
-          }
-        }
-      }
-    },
-    "deepSky.morphology.globularCluster.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus bola.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "globular cluster"
-          }
-        }
-      }
-    },
-    "slew.verdict.rejected.prefix": {
-      "comment": "Pembuka kalimat putusan GoTo. Dipisah dari kalimat bahayanya supaya terjemahan bisa menaruh kata \"ditolak\" di tempat yang benar. Lihat SlewVerdict.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GoTo rejected:"
-          }
-        }
-      }
-    },
-    "slew.hazard.sunProximity": {
-      "comment": "Bahaya GoTo: target terlalu dekat Matahari. Melindungi alat & mata, bukan sekadar soal ketelitian.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too close to the Sun."
-          }
-        }
-      }
-    },
-    "slew.hazard.belowAltitudeLimit": {
-      "comment": "Bahaya GoTo: target di bawah batas mekanis ketinggian teleskop.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outside the telescope's altitude limit."
-          }
-        }
-      }
-    },
-    "slew.hazard.belowHorizon": {
-      "comment": "Bahaya GoTo: target belum terbit.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Still below the horizon."
-          }
-        }
-      }
-    },
-    "slew.hazard.tooFaint": {
-      "comment": "Bahaya GoTo: target di luar magnitudo batas.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too faint to observe."
-          }
-        }
-      }
-    },
-    "slew.hazard.noTarget": {
-      "comment": "Bahaya GoTo: tidak ada objek target, atau arah targetnya tidak tersedia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No object to point at."
-          }
-        }
-      }
-    },
-    "slew.hazard.lowConfidence": {
-      "comment": "Bahaya GoTo: keyakinan identifikasi di bawah ambang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The engine is not confident enough about which object is meant."
-          }
-        }
-      }
-    },
-    "slew.hazard.sunPositionUnknown": {
-      "comment": "Bahaya GoTo: gagal-tertutup saat posisi Matahari tidak diketahui.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The Sun's position is unknown, so the safety check cannot run."
-          }
-        }
-      }
-    },
-    "GoTo": {
-      "comment": "Judul baris putusan GoTo di layar Diagnostik iPhone. Nilai `en` sengaja sama: istilah teknis yang dipakai sebagai singkatan visual, dan menaruhnya di katalog membuat keputusan itu terbaca, bukan tersembunyi. Lihat SlewVerdictBanner.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GoTo"
-          }
-        }
-      }
-    },
-    "star.color.blue.spoken.label": {
-      "comment": "Warna spektral bintang untuk VoiceOver: biru (kelas B hingga awal A, B−V ≤ −0,10). Lihat StarColorSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "blue"
-          }
-        }
-      }
-    },
-    "star.color.whiteBlue.spoken.label": {
-      "comment": "Warna spektral bintang untuk VoiceOver: putih kebiruan (kelas A hingga awal F, −0,10 … 0,25). Sirius jatuh ke sini. Lihat StarColorSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "white-blue"
-          }
-        }
-      }
-    },
-    "star.color.yellow.spoken.label": {
-      "comment": "Warna spektral bintang untuk VoiceOver: kuning (kelas F hingga awal K, 0,25 … 0,95). Lihat StarColorSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "yellow"
-          }
-        }
-      }
-    },
-    "star.color.orange.spoken.label": {
-      "comment": "Warna spektral bintang untuk VoiceOver: jingga (kelas K, 0,95 … 1,50). Lihat StarColorSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "orange"
-          }
-        }
-      }
-    },
-    "star.color.red.spoken.label": {
-      "comment": "Warna spektral bintang untuk VoiceOver: merah (kelas M, B−V > 1,50). Betelgeuse jatuh ke sini. Lihat StarColorSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "red"
-          }
-        }
-      }
-    },
-    "object.display.staleName": {
-      "comment": "Layar iPhone: nama objek yang ditandai sebagai sisa. %@ = nama objek. Penanda diletakkan di belakang nama dalam Bahasa Indonesia; dalam bahasa lain boleh pindah ke depan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ — not a current result"
-          }
-        }
-      }
-    },
-    "uncertain.reason.tooFar": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Candidate too far"
-          }
-        }
-      }
-    },
-    "uncertain.reason.ambiguous": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neighbour too close"
-          }
-        }
-      }
-    },
-    "uncertain.reason.none": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No measured cause"
-          }
-        }
-      }
-    },
-    "row.count.of": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld of %lld"
-          }
-        }
-      }
-    },
-    "experiment.unanalyzable.warning": {
-      "comment": "Peringatan bahwa percobaan tak teranalisis tidak menambah bukti untuk klaim lulus.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld recorded trials could not be analyzed — they add no evidence."
-          }
-        }
-      }
-    },
-    "experiment.row.countNotAnalyzed": {
-      "comment": "Judul baris jumlah percobaan yang tercatat tapi tidak teranalisis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trials not analyzed"
-          }
-        }
-      }
-    },
-    "complication.stale": {
-      "comment": "Baris kedua complication saat cuplikan terakhir sudah terlalu tua.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "from earlier"
-          }
-        }
-      }
-    },
-    "calibration.message.belowHorizon": {
-      "comment": "Objek acuan sudah di bawah cakrawala; mencatatnya hanya menghasilkan sampel hantu.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ has set — not recorded as a reference."
-          }
-        }
-      }
-    },
-    "calibration.status.staleBanner": {
-      "comment": "Peringatan di atas daftar acuan: daftar dihitung untuk langit/tempat yang sudah lewat dan sedang disegarkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reference list is stale — refreshing…"
-          }
-        }
-      }
-    },
-    "calibration.status.staleBannerHint": {
-      "comment": "Label VoiceOver banner daftar acuan basi — menyebut penyebabnya (menunggu perhitungan ulang).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reference list is stale, waiting to be recomputed."
-          }
-        }
-      }
-    },
-    "onboarding.title": {
-      "comment": "Judul kartu perkenalan value-first (layar onboarding).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Point your watch at the sky"
-          }
-        }
-      }
-    },
-    "onboarding.subtitle": {
-      "comment": "Subjudul onboarding: apa yang didapat setelah menunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aim at a body and learn what you are looking at — and how confident the engine is."
-          }
-        }
-      }
-    },
-    "onboarding.honesty": {
-      "comment": "Janji produk onboarding: ketidak-pastian ditampilkan apa adanya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "If it is unsure, the engine will say so. Nothing is claimed as certain until it is."
-          }
-        }
-      }
-    },
-    "onboarding.start.label": {
-      "comment": "Label tombol tutup kartu onboarding.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start"
-          }
-        }
-      }
-    },
-    "onboarding.label": {
-      "comment": "Label VoiceOver kartu onboarding utuh (merangkum ketiga baris).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Introduction. Point your watch at the sky to learn what you are looking at. If unsure, the engine will say so."
-          }
-        }
-      }
-    },
-    "calibration.title": {
-      "comment": "Judul layar kalibrasi (navigationTitle).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibrate"
-          }
-        }
-      }
-    },
-    "calibration.samplesRecorded": {
-      "comment": "Jumlah acuan yang sudah tercatat di kartu tahap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld references recorded"
-          }
-        }
-      }
-    },
-    "calibration.notStarted": {
-      "comment": "Label VoiceOver saat alur kalibrasi belum dimulai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration not started."
-          }
-        }
-      }
-    },
-    "calibration.referenceHeading": {
-      "comment": "Judul daftar acuan (hanya bintang di atas horizon).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "References above the horizon"
-          }
-        }
-      }
-    },
-    "calibration.noVisibleReference": {
-      "comment": "Pesan saat tidak ada acuan terlihat.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No reference visible right now. The default references are bright stars; wait until one of them rises."
-          }
-        }
-      }
-    },
-    "calibration.captureNearest.label": {
-      "comment": "Label tombol Catat yang ditunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Capture what is pointed at"
-          }
-        }
-      }
-    },
-    "calibration.captureNearest.hint": {
-      "comment": "Label VoiceOver tombol Catat yang ditunjuk.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record what is currently pointed at as a reference"
-          }
-        }
-      }
-    },
-    "calibration.apply.label": {
-      "comment": "Label tombol Pakai (pasang kalibrasi).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apply"
-          }
-        }
-      }
-    },
-    "calibration.apply.notReadyHint": {
-      "comment": "Label VoiceOver tombol Pakai saat belum siap.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apply calibration, not ready yet"
-          }
-        }
-      }
-    },
-    "calibration.reset.label": {
-      "comment": "Label tombol Ulang (buang kalibrasi).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reset"
-          }
-        }
-      }
-    },
-    "calibration.reset.hint": {
-      "comment": "Label VoiceOver tombol Ulang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restart calibration from the beginning"
-          }
-        }
-      }
-    },
-    "calibration.statusPrefix": {
-      "comment": "Awalan baris status kalibrasi (Status: …).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status: %@"
-          }
-        }
-      }
-    },
-    "pointing.title": {
-      "comment": "Judul layar utama (navigationTitle).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Point & Know"
-          }
-        }
-      }
-    },
-    "pointing.skyContext.label": {
-      "comment": "Label VoiceOver tombol info konteks langit.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sky context and accuracy"
-          }
-        }
-      }
-    },
-    "pointing.calibration.installed": {
-      "comment": "Label VoiceOver ikon kalibrasi saat terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration, installed"
-          }
-        }
-      }
-    },
-    "pointing.calibration.notInstalled": {
-      "comment": "Label VoiceOver ikon kalibrasi saat belum terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration, not installed"
-          }
-        }
-      }
-    },
-    "pointing.nightMode.on": {
-      "comment": "Label VoiceOver tombol mode malam saat aktif.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn off Night Mode"
-          }
-        }
-      }
-    },
-    "pointing.nightMode.off": {
-      "comment": "Label VoiceOver tombol mode malam saat mati.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on Night Mode"
-          }
-        }
-      }
-    },
-    "pointing.audioCue.on": {
-      "comment": "Label VoiceOver tombol bunyi kunci saat nyala.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn off sound on lock"
-          }
-        }
-      }
-    },
-    "pointing.audioCue.off": {
-      "comment": "Label VoiceOver tombol bunyi kunci saat mati.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on sound on lock"
-          }
-        }
-      }
-    },
-    "pointing.link.connected": {
-      "comment": "Baris status tautan iPhone terhubung.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone connected"
-          }
-        }
-      }
-    },
-    "pointing.link.disconnected": {
-      "comment": "Baris status tautan iPhone tidak terjangkau.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone unreachable"
-          }
-        }
-      }
-    },
-    "pointing.link.failures": {
-      "comment": "Penanda jumlah kegagalan kirim di baris tautan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "· %lld failed"
-          }
-        }
-      }
-    },
-    "objectDetail.staleNote.display": {
-      "comment": "Peringatan visual objek sisa di kartu detail.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Leftover from a previous view — not the current result"
-          }
-        }
-      }
-    },
-    "pointing.locationFallback": {
-      "comment": "Baris lokasi darurat (Lokasi: …). %@ adalah label lokasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location: %@"
+            "value": "Calibration"
           }
         }
       }
@@ -3984,13 +4368,24 @@
         }
       }
     },
-    "skyContext.sun": {
-      "comment": "Judul baris altitude Matahari.",
+    "skyContext.location": {
+      "comment": "Judul baris lokasi.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sun"
+            "value": "Location"
+          }
+        }
+      }
+    },
+    "skyContext.locationSource": {
+      "comment": "Judul baris asal lokasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
           }
         }
       }
@@ -4017,72 +4412,6 @@
         }
       }
     },
-    "skyContext.section": {
-      "comment": "Judul bagian ketelitian.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accuracy"
-          }
-        }
-      }
-    },
-    "skyContext.calibration": {
-      "comment": "Judul baris kalibrasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration"
-          }
-        }
-      }
-    },
-    "skyContext.azimuth": {
-      "comment": "Judul baris azimut.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Azimuth"
-          }
-        }
-      }
-    },
-    "skyContext.altitude": {
-      "comment": "Judul baris ketinggian.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altitude"
-          }
-        }
-      }
-    },
-    "skyContext.location": {
-      "comment": "Judul baris lokasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location"
-          }
-        }
-      }
-    },
-    "skyContext.locationSource": {
-      "comment": "Judul baris asal lokasi.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location source"
-          }
-        }
-      }
-    },
     "skyContext.notComputed": {
       "comment": "Pesan saat konteks langit belum dihitung.",
       "localizations": {
@@ -4094,291 +4423,237 @@
         }
       }
     },
-    "calibration.status.appliedShort": {
-      "comment": "Bentuk pendek 'Sudah' di baris ketelitian.",
+    "skyContext.section": {
+      "comment": "Judul bagian ketelitian.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yes"
+            "value": "Accuracy"
           }
         }
       }
     },
-    "calibration.status.notAppliedShort": {
-      "comment": "Bentuk pendek 'Belum' di baris ketelitian.",
+    "skyContext.sun": {
+      "comment": "Judul baris altitude Matahari.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No"
+            "value": "Sun"
           }
         }
       }
     },
-    "experiment.title": {
-      "comment": "Judul layar Experiment 1.",
+    "slew.hazard.belowAltitudeLimit": {
+      "comment": "Bahaya GoTo: target di bawah batas mekanis ketinggian teleskop.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Experiment 1"
+            "value": "Outside the telescope's altitude limit."
           }
         }
       }
     },
-    "experiment.noTargets": {
-      "comment": "Pesan saat tidak ada target di atas horizon.",
+    "slew.hazard.belowHorizon": {
+      "comment": "Bahaya GoTo: target belum terbit.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No target above the horizon right now."
+            "value": "Still below the horizon."
           }
         }
       }
     },
-    "experiment.targetPicker": {
-      "comment": "Label pemilih target kebenaran.",
+    "slew.hazard.lowConfidence": {
+      "comment": "Bahaya GoTo: keyakinan identifikasi di bawah ambang.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Target (ground truth)"
+            "value": "The engine is not confident enough about which object is meant."
           }
         }
       }
     },
-    "experiment.noneSelected": {
-      "comment": "Opsi 'belum ada target terpilih' di pemilih.",
+    "slew.hazard.noTarget": {
+      "comment": "Bahaya GoTo: tidak ada objek target, atau arah targetnya tidak tersedia.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "None selected"
+            "value": "No object to point at."
           }
         }
       }
     },
-    "experiment.targetHeader": {
-      "comment": "Judul bagian target.",
+    "slew.hazard.sunPositionUnknown": {
+      "comment": "Bahaya GoTo: gagal-tertutup saat posisi Matahari tidak diketahui.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Target"
+            "value": "The Sun's position is unknown, so the safety check cannot run."
           }
         }
       }
     },
-    "experiment.groundTruthFooter": {
-      "comment": "Keterangan bagian target: kebenaran dari katalog.",
+    "slew.hazard.sunProximity": {
+      "comment": "Bahaya GoTo: target terlalu dekat Matahari. Melindungi alat & mata, bukan sekadar soal ketelitian.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ground truth comes from the catalogue, not from the engine's answer. If the engine misidentifies, we still know which object was actually pointed at."
+            "value": "Too close to the Sun."
           }
         }
       }
     },
-    "experiment.capture.section": {
-      "comment": "Judul bagian rekam.",
+    "slew.hazard.tooFaint": {
+      "comment": "Bahaya GoTo: target di luar magnitudo batas.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Record"
+            "value": "Too faint to observe."
           }
         }
       }
     },
-    "experiment.note.placeholder": {
-      "comment": "Placeholder kolom catatan opsional.",
+    "slew.verdict.rejected.prefix": {
+      "comment": "Pembuka kalimat putusan GoTo. Dipisah dari kalimat bahayanya supaya terjemahan bisa menaruh kata \"ditolak\" di tempat yang benar. Lihat SlewVerdict.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Note (optional)"
+            "value": "GoTo rejected:"
           }
         }
       }
     },
-    "experiment.record.label": {
-      "comment": "Label tombol rekam percobaan.",
+    "star.color.blue.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: biru (kelas B hingga awal A, B−V ≤ −0,10). Lihat StarColorSpeech.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Record trial"
+            "value": "blue"
           }
         }
       }
     },
-    "experiment.removeLast.label": {
-      "comment": "Label tombol buang percobaan terakhir.",
+    "star.color.orange.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: jingga (kelas K, 0,95 … 1,50). Lihat StarColorSpeech.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Discard last trial"
+            "value": "orange"
           }
         }
       }
     },
-    "experiment.result.section": {
-      "comment": "Judul bagian hasil.",
+    "star.color.red.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: merah (kelas M, B−V > 1,50). Betelgeuse jatuh ke sini. Lihat StarColorSpeech.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Results"
+            "value": "red"
           }
         }
       }
     },
-    "experiment.noAnalyzable": {
-      "comment": "Pesan saat belum ada percobaan yang bisa dianalisis.",
+    "star.color.whiteBlue.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: putih kebiruan (kelas A hingga awal F, −0,10 … 0,25). Sirius jatuh ke sini. Lihat StarColorSpeech.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No trial can be analysed yet."
+            "value": "white-blue"
           }
         }
       }
     },
-    "experiment.trials.countLabel": {
-      "comment": "Judul baris jumlah percobaan.",
+    "star.color.yellow.spoken.label": {
+      "comment": "Warna spektral bintang untuk VoiceOver: kuning (kelas F hingga awal K, 0,25 … 0,95). Lihat StarColorSpeech.swift.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trials"
+            "value": "yellow"
           }
         }
       }
     },
-    "experiment.correct.label": {
-      "comment": "Judul baris jumlah jawaban benar.",
+    "tak dianalisis": {
+      "comment": "Status percobaan yang belum dianalisis.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Correct"
+            "value": "not analysed"
           }
         }
       }
     },
-    "experiment.falseLock.label": {
-      "comment": "Judul baris jumlah false lock.",
+    "uncertain.reason.ambiguous": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "False lock"
+            "value": "Neighbour too close"
           }
         }
       }
     },
-    "experiment.medianError.label": {
-      "comment": "Judul baris galat median.",
+    "uncertain.reason.none": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Median error"
+            "value": "No measured cause"
           }
         }
       }
     },
-    "experiment.p90Error.label": {
-      "comment": "Judul baris galat P90.",
+    "uncertain.reason.tooFar": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "P90 error"
+            "value": "Candidate too far"
           }
         }
       }
     },
-    "experiment.sendThreshold.label": {
-      "comment": "Label tombol kirim ambang ke jam.",
+    "σ": {
+      "comment": "Label sumbu Y grafik keyakinan: simpangan baku (sigma). Simbol sama di kedua bahasa.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send threshold to watch"
+            "value": "σ"
           }
         }
       }
     },
-    "experiment.insufficientForThreshold": {
-      "comment": "Pesan saat data belum cukup untuk mengusulkan ambang.",
+    "—": {
+      "comment": "Penanda nilai kosong pada baris tabel.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Not enough data to propose a new threshold — the engine keeps its conservative built-in threshold."
-          }
-        }
-      }
-    },
-    "experiment.trials.section": {
-      "comment": "Judul bagian daftar percobaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trials"
-          }
-        }
-      }
-    },
-    "experiment.noTrials": {
-      "comment": "Pesan saat belum ada percobaan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No trials yet."
-          }
-        }
-      }
-    },
-    "experiment.dataset.sharePreview": {
-      "comment": "Judul pratinjau berbagi dataset.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Experiment 1 dataset"
-          }
-        }
-      }
-    },
-    "experiment.export.label": {
-      "comment": "Label tombol ekspor dataset JSON.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Export dataset (JSON)"
-          }
-        }
-      }
-    },
-    "experiment.reset.label": {
-      "comment": "Label VoiceOver tombol buang (ikon tong sampah).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Discard all trials"
+            "value": "—"
           }
         }
       }
     }
-  }
+  },
+  "version": "1.0"
 }

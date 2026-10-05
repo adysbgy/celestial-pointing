@@ -311,6 +311,49 @@ public extension LocalizedText {
     static let calibrationStatusNotAppliedShort = LocalizedText(
         key: "calibration.status.notAppliedShort", id: "Belum")
 
+    // MARK: Layar tautan iOS↔jam (`LinkView`)
+
+    static let linkSectionTitle = LocalizedText(
+        key: "link.sectionTitle", id: "Tautan")
+    static let linkRowStatus = LocalizedText(key: "link.row.status", id: "Status")
+    static let linkValueActive = LocalizedText(key: "link.value.active", id: "Aktif")
+    static let linkValueInactive = LocalizedText(
+        key: "link.value.inactive", id: "Belum aktif")
+    static let linkRowReachable = LocalizedText(key: "link.row.reachable", id: "Terjangkau")
+    static let linkValueYes = LocalizedText(key: "link.value.yes", id: "Ya")
+    static let linkValueNo = LocalizedText(key: "link.value.no", id: "Tidak")
+    static let linkRowMessagesReceived = LocalizedText(
+        key: "link.row.messagesReceived", id: "Pesan diterima")
+    static let linkRequestState = LocalizedText(
+        key: "link.requestState", id: "Minta keadaan terakhir")
+    static let linkSectionLastState = LocalizedText(
+        key: "link.section.lastState", id: "Keadaan terakhir dari jam")
+    static let linkRowState = LocalizedText(key: "link.row.state", id: "Keadaan")
+    static let linkRowObject = LocalizedText(key: "link.row.object", id: "Objek")
+    static let linkRowConfidence = LocalizedText(
+        key: "link.row.confidence", id: "Keyakinan")
+    static let linkRowRate = LocalizedText(key: "link.row.rate", id: "Laju")
+    static let linkRowTime = LocalizedText(key: "link.row.time", id: "Waktu")
+    static let linkNoStateYet = LocalizedText(
+        key: "link.empty.noState", id: "Belum ada keadaan dari jam.")
+    static let linkSectionLastCalibration = LocalizedText(
+        key: "link.section.lastCalibration", id: "Kalibrasi terakhir dari jam")
+    static let linkRowYawOffset = LocalizedText(key: "link.row.yawOffset", id: "Offset yaw")
+    static let linkRowSpread = LocalizedText(key: "link.row.spread", id: "Sebaran")
+    static let linkRowReferenceCount = LocalizedText(
+        key: "link.row.referenceCount", id: "Jumlah acuan")
+    static let linkNoCalibrationYet = LocalizedText(
+        key: "link.empty.noCalibration", id: "Jam belum melaporkan kalibrasi.")
+    static let linkSectionSamples = LocalizedText(
+        key: "link.section.samples", id: "Sampel dari jam")
+    static let linkRowRecorded = LocalizedText(key: "link.row.recorded", id: "Terekam")
+    static let linkSamplesNote = LocalizedText(
+        key: "link.note.samples",
+        id: "Sampel dari jam tidak membawa jarak kandidat, jadi rasionya terhadap σ kosong. Yang bisa dilihat dari sini adalah keadaan dan keyakinan yang dilaporkan jam.")
+    static let linkSigmaMissingNote = LocalizedText(
+        key: "link.note.sigmaMissing",
+        id: "Sebagian sampel tidak menyertakan σ. Sigma yang tidak terukur ditulis 0, bukan angka bawaan — jangan dibaca sebagai akurasi sempurna.")
+
     // MARK: Layar utama (PointingView) & konteks langit
 
     static let pointingTitle = LocalizedText(key: "pointing.title",
@@ -493,6 +536,14 @@ public extension LocalizedText {
         .calibrationApplyNotReadyHint, .calibrationResetLabel,
         .calibrationResetHint, .calibrationStatusPrefix,
         .calibrationStatusAppliedShort, .calibrationStatusNotAppliedShort,
+        // Layar tautan (`LinkView`) — lihat blok "// MARK: Layar tautan" di atas.
+        .linkSectionTitle, .linkRowStatus, .linkValueActive, .linkValueInactive,
+        .linkRowReachable, .linkValueYes, .linkValueNo, .linkRowMessagesReceived,
+        .linkRequestState, .linkSectionLastState, .linkRowState, .linkRowObject,
+        .linkRowConfidence, .linkRowRate, .linkRowTime, .linkNoStateYet,
+        .linkSectionLastCalibration, .linkRowYawOffset, .linkRowSpread,
+        .linkRowReferenceCount, .linkNoCalibrationYet, .linkSectionSamples,
+        .linkRowRecorded, .linkSamplesNote, .linkSigmaMissingNote,
         .pointingTitle, .pointingSkyContextLabel,
         .pointingCalibrationInstalled, .pointingCalibrationNotInstalled,
         .pointingNightModeOn, .pointingNightModeOff,
