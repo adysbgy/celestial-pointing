@@ -7285,3 +7285,67 @@ semuanya sudah di bawah penjaga. Baris 546 memakai `.white`, tapi hanya di
 cabang `else` (siang) — saat malam ia memakai `core` yang merah murni.
 Jadi klaim di komentar berkas ("Semua warna membaca NightMode.isOn")
 terbukti, bukan sekadar tertulis.
+
+---
+
+## Siklus: katalog wajib punya terjemahan `en` — uji yang terbukti berbunyi
+
+Sapuan atas `public` API PointingKit yang **tidak pernah disebut di berkas
+uji** menemukan 67 nama, dan di antaranya yang paling berbobot:
+`ExperimentText.verdictWrong` dan `.verdictNotAnalyzed`. Keduanya tampil
+sebagai badge di baris percobaan `Experiment1View`, tapi uji terjemahan
+yang ada hanya memeriksa `verdictFalseLock` dan `verdictCorrect` — dua
+putusan tersisa tidak pernah dibuktikan punya padanan bahasa.
+
+Kenapa itu cacat, bukan sekadar uji yang kurang: katalog punya
+`sourceLanguage: id`, dan kunci `experiment.verdict.wrong` **tidak punya
+`stringUnit` sendiri** — hanya `localizations.en`. Tanpa entri `en`,
+`text()` jatuh diam-diam ke bawaan Bahasa Indonesia. Pengguna berbahasa
+Inggris melihat badge "salah" di tengah layar yang serba Inggris, tanpa
+satu pun uji yang tahu.
+
+### Uji pertama yang saya tulis HIJAU PALSU
+
+Uji awal memasang kamusnya sendiri lewat `EnglishTranslation.install`,
+jadi ia membuktikan **mekanisme** penerjemahan bekerja — bukan bahwa
+katalognya lengkap. Terukur: saya hapus entri `en` untuk
+`experiment.verdict.wrong`, dan **488 uji tetap hijau**. Tidak ada yang
+berbunyi.
+
+Perbaikan: uji kedua (`testCatalogueShipsAnEnglishFormForEveryVerdict`)
+membaca **berkas katalognya sendiri**.
+
+| Kondisi | Hasil |
+|---|---|
+| Katalog utuh | 489 hijau |
+| `en` dihapus (`experiment.verdict.wrong`) | MERAH, menyebut kuncinya |
+| `en` dihapus (`Aktifkan Mode Malam`, kunci acak) | MERAH, menyebut kuncinya |
+
+Baris ketiga yang penting: cacat dibuktikan pada kunci **acak**, bukan
+pada kunci yang dipilih — supaya yang terbukti adalah cakupannya, bukan
+kebetulannya.
+
+### Diperluas ke seluruh katalog, bukan delapan putusan
+
+Uji pada akhirnya memeriksa **312 kunci**, bukan 8. Alasannya: cacatnya
+bukan pada delapan kunci itu, melainkan pada siapa pun yang menambah kunci
+dan lupa menerjemahkannya. Pemeriksaan yang hanya mencakup delapan kunci
+akan membiarkan 304 sisinya membusuk tanpa suara. Sapuan membuktikan
+seluruh 312 kunci kini punya `en`, jadi perluasan ini tidak membuat uji
+merah sekarang — ia membuat kunci baru yang tak diterjemahkan langsung
+tertolak.
+
+Uji sengaja **GAGAL** bila katalog tidak ditemukan, bukan dilewati:
+pemeriksaan yang dilewati akan berhenti berlaku tanpa ada yang melihatnya.
+
+### Catatan: CI merah sekali, dan itu tepat
+
+Commit uji ini membuat Engine Tests **merah** pada Aturan 10: README
+bilang PointingKit 487, berkas uji berisi 489. Gerbang itu bekerja
+persis seperti yang dirancang — ia menolak dokumentasi yang tidak lagi
+cocok dengan kenyataan. Diperbaiki di commit berikutnya; CI hijau.
+
+### Dibuktikan
+- `./swift-test.sh`: 489 uji hijau, 0 gagal.
+- `./swift-ui-lint.sh`: 15 aturan lulus.
+- CI: Engine Tests (Linux) + Apple Build, keduanya `success`.
