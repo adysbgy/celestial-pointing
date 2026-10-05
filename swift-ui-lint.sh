@@ -1478,6 +1478,178 @@ else
   echo "Bersih: setiap warna prosedural melewati penjaga mode malam."
 fi
 
+# ── Aturan 16: kalimat aksesibilitas harus datang dari katalog ─────────────
+# Aturan 4 menyapu literal di dalam `accessibilityLabel(...)` — dan ia tetap
+# hijau pada cacat yang nyata ada di repo ini:
+#
+# ```swift
+# private var linkAccessibilityLabel: String {
+#     var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+#     ...
+# }
+# ```
+#
+# Dua sebab, dan keduanya sudah dipakai bentuk lain di berkas ini:
+#
+# 1. **Bentuknya**, bukan teksnya. Keduanya literal di dalam `var ... =` —
+#    Aturan 12 menyapu penugasan ke properti berakhiran Note/Label/Title/…,
+#    tapi `var text` berakhiran `text`, bukan salah satu dari itu.
+# 2. **Nilainya bukan argumen peritel mana pun.** Ia dilalui ke
+#    `.accessibilityLabel(linkAccessibilityLabel)`, jadi yang sampai ke
+#    peritel hanyalah nama variabelnya.
+#
+# Yang membuatnya bertahan lama lebih halus: **baris yang sama sudah benar.**
+# `linkRow` dua baris di atas menampilkannya lewat
+# `TextLocalization.text(.pointingLinkConnected)` — jadi terlihat, pakai Bahasa
+# Inggris, dan punya kunci katalog. Yang salah cuma kalimat untuk VoiceOver,
+# tepat di sebelah yang benar. Kalau view dirender, tidak ada yang terlihat
+# keliru.
+#
+# Tapi yang didengar adalah yang berbeda: pengguna VoiceOver mendengar Bahasa
+# Indonesia sementara matanya membaca Bahasa Inggris, di komponen yang sama.
+echo
+echo "== Aturan 16: kalimat aksesibilitas tidak lahir sebagai literal =="
+a11y_literal=$(python3 - <<'PY'
+import os, re
+
+# Satu-satunya peritelist: nama produk, yang memang tidak diterjemahkan.
+#
+# **Kenapa nilai katalog TIDAK diperbolehkan.** Itu sempat jadi "")
+# whitelist di versi pertama - dengan alasan "kalimat ini sudah punya terjemahan". Dan whitelist itu persis yang membuat aturan ini hijau pada
+# cacat yang diklaimnya menangkap: kunci katalog di repo ini **sama dengan
+# teks Bahasa Indonesia-nya** (`pointing.link.connected` punya kunci
+# `"iPhone terhubung"`), jadi setiap literal bermasalah cocok dengan nama
+# kunci dan lolos.
+#
+# Yang ditanyakan aturan ini bukan "apakah kalimat ini punya padanan bahasa
+# lain", melainkan "apakah layar membacanya lewat katalog". Kalimat literal
+# tidak pernah melewati katalog, sekecil apa pun perbedaannya — dan itulah
+# yang membuat pengucapan dan tampilan bisa berbeda bahasa di komponen yang
+# sama.
+NOT_LOCALIZED = {"Point & Know", "Experiment 1"}
+
+# Yang dicari: variabel `String` yang (a) bodinya memuat literal bertanda
+# kata, dan (b) hasilnya **benar-benar diumumkan** lewat modifier aksesibilitas.
+#
+# Kenapa dua syarat itu harus bersama:
+#   - Tanpa (a), setiap `var label = "…"` di repo dilaporkan, termasuk yang
+#     bukan teks UI (nama aset, pengenal internal) — gerbang yang terlalu
+#     berisik akan dimatikan orang lain saat ia berbunyi.
+#   - Tanpa (b), pemeriksaan tidak tahu mana yang **tampil ke pengguna**.
+#     Kalimat yang tidak diucapkan tidak perlu diterjemahkan.
+A11Y_USE = re.compile(
+    r'accessibility(?:Label|Value|Hint)\(\s*([A-Za-z_][A-Za-z0-9_]*)')
+
+
+def strip_line_comments(text):
+    lines, out = [], []
+    in_str = False
+    for raw in text.split("\n"):
+        line, esc, i = [], False, 0
+        while i < len(raw):
+            ch = raw[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                    break
+            line.append(ch)
+            i += 1
+        out.append("".join(line))
+    return "\n".join(out)
+
+
+def is_sentence(value):
+    """Apakah ini kalimat Bahasa Indonesia, bukan data atau format."""
+    # Format printf / template koordinat: bukan teks tampilan.
+    stripped = re.sub(r"%(?:%|(?:[-+ #0]*)(?:\d+|\*)?(?:\.\d+|\.\*)?[a-zA-Z@])",
+                      "", value)
+    stripped = re.sub(r"\\\(.*?\)", "", stripped)
+    words = re.findall(r"[A-Za-z]{2,}", stripped)
+    if not words:
+        return False            # "54.2°" — angka & satuan, bukan kalimat
+    if " " not in stripped.strip():
+        return False            # satu kata = nama, bukan kalimat
+    if re.fullmatch(r"[\w./:+-]+", stripped.strip()):
+        return False            # pengenal: "pointing.state.lock"
+    return True
+
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        code = strip_line_comments(open(path, encoding="utf-8").read())
+
+        # Hanya variabel yang hasilnya benar-benar diumumkan. Tanpa ini,
+        # aturan ini akan meledak pada setiap `var label = "…"` di repo —
+        # termasuk yang memang bukan teks UI (nama aset, label internal).
+        announced = {m.group(1) for m in A11Y_USE.finditer(code)}
+        if not announced:
+            continue
+
+        for m in re.finditer(
+                r'\b(?:var|let)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*String\b',
+                code):
+            name = m.group(1)
+            if name not in announced:
+                continue
+            # Badan variabel: dari deklarasi sampai penutup badan pada indentasi
+            # yang sama.
+            #
+            # Kenapa kurung kurangnya dihitung, bukan `tail.find("\n    }")`:
+            # accessor privat di `PointingView` closes dengan `\n    }`, tapi
+            # accessor bersarang atau `body` punya indentasi berbeda — batas
+            # yang dipatok akan menelan seluruh sisa berkas, dan literal di
+            # view lain ikut dilaporkan sebagai punya variabel ini.
+            tail = code[m.end():]
+            body, depth = [], 0
+            started = False
+            for ch in tail:
+                body.append(ch)
+                if ch == "{":
+                    depth += 1
+                    started = True
+                elif ch == "}":
+                    depth -= 1
+                    if started and depth == 0:
+                        break
+            body = "".join(body)
+            for lit in re.findall(r'"([^"\\]{3,})"', body):
+                if lit in NOT_LOCALIZED:
+                    continue
+                if not is_sentence(lit):
+                    continue
+                line = code[:m.start()].count("\n") + 1
+                problems.append(
+                    f"  {path}:{line}: {name} memuat literal {lit!r} "
+                    f"dan dipakai accessibility*")
+                break
+
+if problems:
+    print("\n".join(problems))
+    print("-> Ambil dari katalog (TextLocalization.text) lewat kunci yang ada,")
+    print("   atau taruh kalimatnya di PointingKit seperti kelas teks lain.")
+PY
+)
+if [ -n "$a11y_literal" ]; then
+  echo "$a11y_literal"
+  echo "   Sebab: yang dilihat dan yang didengar harus bahasa yang sama."
+  echo "   Kalimat literal hanya punya Bahasa Indonesia selamanya."
+  status=1
+else
+  echo "Bersih: kalimat aksesibilitas berasal dari katalog."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

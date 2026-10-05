@@ -124,4 +124,91 @@ final class LinkStatusTextTests: BridgedTextTestCase {
         XCTAssertEqual(LinkStatusText.activationFailed("timeout"),
                        "Session failed: timeout")
     }
+
+    // MARK: - Kalimat utuh baris tautan (dipakai `.accessibilityLabel`)
+
+    /// **Cacat yang ditutup di sini.** `linkAccessibilityLabel` di
+    /// `PointingView` merakit kalimatnya sendiri:
+    ///
+    /// ```swift
+    /// var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+    /// text += LinkStatusText.sendFailures(link.sendFailureCount)
+    /// ```
+    ///
+    /// Bagian pertamanya **tidak pernah melewati katalog**. Dua gerbang yang
+    /// biasa menangkap literal Bahasa Indonesia di `Apps/` buta di sini, dan
+    /// ketiganya dibuktikan: Aturan 4 (bukan argumen `Text(...)`), Aturan 12
+    /// (penugasan ke `var text`, bukan properti berakhiran Note/Label), dan
+    /// Aturan 16 (bukan literal peritel aksesibilitas — yang diiwa adalah
+    /// **nama variabelnya**).
+    ///
+    /// Yang membuatnya bertahan lama adalah bentuknya: baris yang
+    /// **ditampilkan** di layar memakai kunci yang benar dengan teks yang sama
+    /// persis, jadi komponennya terlihat benar, Bahasa Inggrinya ada, dan
+    /// tidak ada layar yang tampak keliru.
+    ///
+    /// Uji ini mengunci nilai **mutlak**, bukan perbandingan dua bentuk —
+    /// mutasi "kalimat literal" tetap hijau bila yang dibandingkan hanya
+    /// "boleh memakai kunci apa pun yang menghasilkan teks yang sama".
+    func testReachableSentenceIsNotAHardcodedIndonesianLiteral() {
+        let spoken = LinkStatusText.linkSpeech(isReachable: true,
+                                               sendFailureCount: 0)
+        XCTAssertEqual(spoken, TextLocalization.text(.pointingLinkConnected) + ".",
+                       "kalimat yang diucapkan harus dari katalog, bukan literal")
+        XCTAssertNotEqual(spoken, "iPhone terhubung",
+                          "literal Bahasa Indonesia bocor ke pengumuman")
+    }
+
+    /// Keadaan tidak terjangkau harus **terdengar berbeda** dari terjangkau.
+    ///
+    /// Nilai mutlak kedua, karena yang pertama sudah tertutup: accessor bisa
+    /// mengembalikan satu kalimat benar untuk salah satu keadaan, lalu diam-diam
+    /// memakai kalimat yang sama untuk yang lain. Dan "iPhone terhubung" saat
+    /// iPhone justru tidak terjangkau lebih buruk daripada teks yang tidak
+    /// diterjemahkan: ia **menyatakan sesuatu yang tidak benar**.
+    func testUnreachableSentenceDiffersFromTheReachableOne() {
+        let reachable = LinkStatusText.linkSpeech(isReachable: true,
+                                                   sendFailureCount: 0)
+        let unreachable = LinkStatusText.linkSpeech(isReachable: false,
+                                                     sendFailureCount: 0)
+        XCTAssertNotEqual(reachable, unreachable)
+        XCTAssertEqual(unreachable, TextLocalization.text(.linkSpeechUnreachable))
+        XCTAssertNotEqual(unreachable, TextLocalization.text(.linkSpeechReachable))
+    }
+
+    /// Bagian jumlah **ikut** kalimat, dan nol **tidak** ikut.
+    ///
+    /// Dua arah sengaja. Kalau nol ikut, kalimatnya berbunyi "iPhone
+    /// terhubung. 0 kiriman gagal." — itu menyatakan ada masalah yang tidak
+    /// terjadi, dan yang didengar pengguna seperti ada yang salah. Kalau jumlah
+    /// tidak pernah ikut, kegagalan pengiriman kembali senyap di pengumuman.
+    func testFailureCountIsAppendedOnlyWhenItIsPositive() {
+        XCTAssertEqual(LinkStatusText.linkSpeech(isReachable: true,
+                                                 sendFailureCount: 0),
+                       "iPhone terhubung.")
+        XCTAssertEqual(LinkStatusText.linkSpeech(isReachable: true,
+                                                 sendFailureCount: 3),
+                       "iPhone terhubung. 3 kiriman gagal.")
+    }
+
+    /// Kalimat utuh mengikuti katalog **semuanya**, bukan cuma bagian jumlah.
+    ///
+    /// Yang dijaga: versi Inggris, supaya apa pun yang diumumkan pengguna
+    /// Bahasa Inggris benar-benar Bahasa Inggris — termasuk bagian pembuka
+    /// yang salah sebelum siklus ini. Bagian itu literal, jadi memasang
+    /// terjemahan pada bagian jumlah saja tidak mengubah apa pun.
+    func testTheWholeSentenceFollowsTheCatalog() {
+        EnglishTranslation.install([
+            "link.speech.reachable": "The phone is connected.",
+            "link.speech.unreachable": "The phone cannot be reached.",
+            "link.status.sendFailuresClause": " %lld %@.",
+            "link.status.sendFailuresWord": "messages failed",
+        ])
+        XCTAssertEqual(LinkStatusText.linkSpeech(isReachable: true,
+                                                 sendFailureCount: 2),
+                       "The phone is connected. 2 messages failed.")
+        XCTAssertEqual(LinkStatusText.linkSpeech(isReachable: false,
+                                                 sendFailureCount: 0),
+                       "The phone cannot be reached.")
+    }
 }

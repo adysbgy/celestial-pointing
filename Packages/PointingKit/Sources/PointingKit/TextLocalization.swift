@@ -652,6 +652,8 @@ public extension LocalizedText {
         .linkStatusInvalidPolicy, .linkStatusStateRequestTooEarly,
         .linkStatusWatchUnreachablePolicy, .linkStatusWatchUnreachableMessage,
         .linkStatusSendFailures, .linkStatusSendFailuresWord,
+        .linkStatusSendFailuresClause,
+        .linkSpeechReachable, .linkSpeechUnreachable,
         // Label lokasi darurat yang tampil di layar utama jam & rincian.
         // Dulu literal di `ObserverLocation.fallback` — lihat berkas itu.
         .locationFallbackLabel,

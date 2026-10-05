@@ -333,22 +333,31 @@ struct PointingView: View {
     }
 
     private var linkAccessibilityLabel: String {
-        // Kegagalan kirim diumumkan, bukan hanya digambar: "· 3 gagal" tidak
-        // terbaca sebagai kalimat bila digabung mentah.
+        // Keseluruhan kalimat, termasuk bagian jumlah kegagalan, **disusun di
+        // `LinkStatusText`** — bukan di sini.
         //
-        // Ditambahannya **disusun oleh katalog**, bukan `text += "…"` seperti
-        // sebelumnya. Yang salah bukan cuma literalnya: menyambung string
-        // memaku urutan di kode — Bahasa Inggris bisa sah menulis "3 messages
-        // failed" maupun "4 failed messages" dengan urutan berbeda, dan katalog
-        // hanya bisa mengizinkan satu.
-        var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
-        if link.sendFailureCount > 0 {
-            text += TextLocalization.text(
-                .linkStatusSendFailures,
-                link.sendFailureCount,
-                TextLocalization.text(.linkStatusSendFailuresWord))
-        }
-        return text
+        // Versi sebelumnya merakitnya sendiri:
+        //
+        // ```swift
+        // var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+        // text += LinkStatusText.sendFailures(link.sendFailureCount)
+        // ```
+        //
+        // Dua cacat sekaligus. Yang pertama, literal pertamanya tidak pernah
+        // melewati katalog — dan tidak ada gerbang yang melihatnya: bukan
+        // argumen `Text(...)` (Aturan 4), bukan penugasan ke properti
+        // berakhiran Note/Label (Aturan 12), dan bukan literal peritel
+        // aksesibilitas mana pun (Aturan 16 dibuat untuk kelas ini). Yang
+        // kedua, `text += …` memaku urutan di kode, sehingga bahasa yang
+        // ingin meletakkan jumlah sebelum kata "gagal" tidak bisa mengatakannya.
+        //
+        // Yang membuatnya bertahan lama: **baris yang ditampilkan di atasnya
+        // sudah benar.** `linkRow` memakai
+        // `TextLocalization.text(.pointingLinkConnected)` — teks yang sama,
+        // punya kunci, ada Bahasa Inggrinya. Jadi komponennya terlihat benar
+        // di layar, dan yang salah cuma kalimat yang dibacakan.
+        LinkStatusText.linkSpeech(isReachable: link.isReachable,
+                                  sendFailureCount: link.sendFailureCount)
     }
 }
 

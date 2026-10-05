@@ -266,9 +266,21 @@ final class TextLocalizationTests: XCTestCase {
     /// bahasa, dan menuliskannya di kode akan memaksa satu tata bahasa pada
     /// semua bahasa — cacat yang Aturan 11 tidak bisa lihat, karena ia hanya
     /// menjaga tipe specifier.
+    /// 293 → 295 pada siklus "kalimat tautan untuk VoiceOver": `link.speech.reachable`
+    /// dan `link.speech.unreachable`. Keduanya lahir dari satu temuan:
+    /// `.accessibilityLabel` di `PointingView` merakit kalimatnya dari literal
+    /// `"iPhone terhubung"` yang tidak pernah melewati katalog, sementara baris
+    /// yang **ditampilkan** di atasnya sudah memakai kunci yang benar dengan teks
+    /// yang sama persis — jadi komponennya terlihat benar dan tidak ada layar
+    /// yang tampak keliru.
+    ///
+    /// 295 → 296 pada siklus yang sama: `link.status.sendFailuresClause`, bentuk
+    /// klausa tanpa pemisah pemuka. Kuncinya terpisah karena pemisah adalah tata
+    /// bahasa tiap bahasa — memangkasnya di kode akan memaksa satu tata bahasa ke
+    /// semua bahasa.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 293, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 296, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

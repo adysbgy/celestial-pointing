@@ -145,11 +145,107 @@ public enum LinkStatusText {
     /// Kedua, dan lebih halus: **menyambung** kalimat berarti penerjemah
     /// Bahasa lain tidak bisa mengubah **urutannya**. Bahasa yang menempatkan
     /// keterangan jumlah sebelum kata "gagal" tidak bisa mengatakannya, karena
-    /// posisinya dipaku di kode. Bentuk `%@ %lld %@` membebaskan itu.
+    /// posisinya dipaku di kode. Bentuk `%lld %@` membebaskan itu.
+    ///
+    /// **CACAT URUTAN ARGUMEN — diperbaiki siklus ini.** Katalog berbunyi
+    /// `. %lld %@.`: **jumlah dulu, baru kata**. Versi sebelum perbaikan ini mengirim
+    /// argumen dalam urutan sebaliknya:
+    ///
+    /// ```swift
+    /// TextLocalization.text(.linkStatusSendFailures,
+    ///        TextLocalization.text(.linkStatusSendFailuresWord),  // ← String
+    ///        Int64(count))                                       // ← harus pertama
+    /// ```
+    ///
+    /// `String(format:)` memetakan argumen ke specifier **sesuai posisi**, bukan
+    /// sesuai tipe: argumen pertama selalu mengisi `%lld`. Jadi `String` masuk ke
+    /// specifier integer dan `Int64` masuk ke `%@`, dan Apple **traps** — bukan
+    /// teks salah, bukan angka aneh, tapi `Fatal error` yang menjatuhkan seluruh
+    /// proses.
+    ///
+    /// Kenapa bisa lama tidak noticed: jalur ini **tidak pernah dipanggil di
+    /// produksi** dengan jumlah > 0. View memanggilnya hanya dari
+    /// `.accessibilityLabel`, dan `sendFailureCount` di sana nol selama tautan
+    /// sehat — pada kondisi itu `linkSpeech` melewati cabang jumlah ini tanpa
+    /// pernah menyentuh format. Yang memanggilnya pertama kali adalah tes.
+    ///
+    /// Dan tes itu tidak pernah ada sebelumnya karena cacatnya **di luar
+    /// jangkauan**: fungsi ini menjembatani UI → logika murni, tapi tidak ada satu pun
+    /// dari 15 gerbang yang memandangi **isi** fungsi berformat — hanya cara
+    /// pemanggilnya menulis argumen.
     public static func sendFailures(_ count: Int) -> String {
+        // Urutan mengikuti specifier di katalog: jumlah, lalu kata.
         TextLocalization.text(.linkStatusSendFailures,
-               TextLocalization.text(.linkStatusSendFailuresWord),
-               Int64(count))
+                              Int64(count),
+                              TextLocalization.text(.linkStatusSendFailuresWord))
+    }
+
+    /// **`sendFailures` tanpa pemisah ectopic**, untuk menyambung di belakang
+    /// kalimat yang sudah selesai.
+    ///
+    /// **Kenapa kunci terpisah, dan bukan memangkas pemisahnya.** Bentuk yang
+    /// sudah ada diawali pemisah — `". 7 kiriman gagal."` — karena asalnya
+    /// untuk disambung dengan `+=` ke baris yang belum diakhiri titik. Menghapus
+    /// pemisah itu di sini akan merusak pemanggil lama; memangkas karakter
+    /// secara programatis lebih buruk lagi: pemisah adalah **tata bahasa tiap
+    /// bahasa**, dan memangkas titik mengunci satu tata bahasa pada semua bahasa.
+    /// Bahasa yang tidak mengakhiri kalimat dengan titik akan kehilangan tanda
+    /// baca yang ia butuhkan, dan tidak ada katalog yang bisa memperbaikinya.
+    ///
+    /// Jadi dua peran, dua kunci. Keduanya boleh punya bentuk berbeda karena
+    /// memang berbeda: satu berdiri sendiri setelah pemisah, satu menempel pada
+    /// kalimat yang utuh.
+    static func sendFailuresClause(_ count: Int) -> String {
+        TextLocalization.text(.linkStatusSendFailuresClause,
+                              Int64(count),
+                              TextLocalization.text(.linkStatusSendFailuresWord))
+    }
+
+    /// **Seluruh** kalimat baris tautan untuk VoiceOver, sebagai satu kesatuan.
+    ///
+    /// **Premis siklus ini.** Bagian "berapa yang gagal" sudah dikembalikan ke
+    /// katalog lewat `sendFailures(_:)`, tapi bagian **sebelum**nya masih
+    /// literal di dalam view:
+    ///
+    /// ```swift
+    /// var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+    /// text += LinkStatusText.sendFailures(link.sendFailureCount)
+    /// ```
+    ///
+    /// Kalimat itu sama persis dengan yang sudah tampil di layar **dua baris di
+    /// atas** (`TextLocalization.text(.pointingLinkConnected)`) — jadi
+    /// komponennya sendiri terlihat benar, punya kunci katalog, dan Bahasa
+    /// Inggrinya ada. Yang salah cuma kalimat yang **dibacakan**, tepat di
+    /// sebelah yang benar. Melihat layar tidak menemukan apa pun.
+    ///
+    /// Dan `text += …` yang menyusulnya adalah cacat kedua: menyambung memaku
+    /// **urutan** di kode, sehingga bahasa yang ingin meletakkan jumlah sebelum
+    /// kata "gagal" tidak bisa mengatakannya.
+    ///
+    /// **Kenapa accessor ini, dan bukan view membaca katalog sendiri.** Satu
+    /// kalimat jadi dua bentuk — tampil dan diucapkan — dan bentuk keduanya
+    /// berasal dari kunci yang **sama**, lewat `sendFailures(_:)`. Kalau view
+    /// menyusun sendiri dari dua kunci terpisah, layar dan suara bisa
+    /// berhenti sepakat pada saat yang tidak disengaja, dan tidak ada gerbang
+    /// yang bisa melihatnya: yang diumumkan bukan literal `Text(...)`.
+    ///
+    /// **Aturan 4 dan 12 buta terhadap literal itu**, dan Aturan 16 di
+    /// `swift-ui-lint.sh` dibuat justru karena ketiganya buta.
+    ///
+    /// - Parameters:
+    ///   - isReachable: apakah iPhone terjangkau saat ini.
+    ///   - sendFailureCount: jumlah pengiriman yang gagal.
+    /// - Returns: kalimat utuh; bagian jumlah **tidak** ada saat nol, karena
+    ///   "0 kiriman gagal" menyatakan ada masalah yang tidak terjadi.
+    public static func linkSpeech(isReachable: Bool, sendFailureCount: Int) -> String {
+        var sentence = TextLocalization.text(
+            isReachable ? .linkSpeechReachable : .linkSpeechUnreachable)
+        if sendFailureCount > 0 {
+            // Klausanya sudah berawalan sendiri: `sendFailures` bawa pemisah
+            // pemuka dan akan menghasilkan "terhubung.. 3 kiriman gagal."
+            sentence += sendFailuresClause(sendFailureCount)
+        }
+        return sentence
     }
 }
 
@@ -239,4 +335,46 @@ public extension LocalizedText {
     static let linkStatusSendFailuresWord = LocalizedText(
         key: "link.status.sendFailuresWord",
         id: "kiriman gagal")
+
+    /// Bentuk **klausa** jumlah gagal, untuk menempel di belakang kalimat yang
+    /// sudah selesai.
+    ///
+    /// Bedanya dari `link.status.sendFailures` hanya pemisah di depan: bentuk ini
+    /// membawa **spasi** (bentuk lama membawa titik), karena kalimat tu sudah
+    /// berakhir dan yang dilampirkan hanya klausa.
+    ///
+    /// **Kenapa pemisah tetap di katalog, dan bukan disambung di kode.**
+    /// Spasi sebelum klausa terlihat sepele, tapi pemisah adalah tata bahasa tiap
+    /// bahasa. Menulis `" " + klausa` di kode memaksa jarak Bahasa Indonesia ke
+    /// semua bahasa, dan beberapa bahasa tidak butuh spasi setelah titik.
+    /// Katalog yang memuat pemisahnya membiarkan penerjemah mengatakannya.
+    ///
+    /// Karena itu pemisah **tidak pernah dipangkas** dari nilai katalog oleh
+    /// kode. Pemangkasan karakter pertama seemed like a tidy one-character save,
+    /// tapi ia menghapus kemampuan bahasa lain mengatur jaraknya sendiri.
+    static let linkStatusSendFailuresClause = LocalizedText(
+        key: "link.status.sendFailuresClause",
+        id: " %lld %@.")
+
+    /// Kalimat pembuka baris tautan saat iPhone terjangkau.
+    ///
+    /// **Kenapa kunci baru, dan bukan pakai ulang
+    /// `pointing.link.connected`.** Nilai bakunya sama persis — "iPhone
+    /// terhubung" — dan itu justru alasan tidak memakainya. Kalau dua kunci
+    /// punya teks yang sama, memperbaiki salah satunya hanya memperbaiki
+    /// separuh: layar berubah, suara tidak (atau sebaliknya), dan perbedaan
+    /// sebesar itu tidak akan terlihat dari kode mana pun.
+    ///
+    /// Sebaliknya: kata kuncinya **harus berbeda**, karena dua peran itu
+    /// memang berbeda. `pointing.link.connected` adalah **label baris** —
+    /// teks pendek yang tampil; yang ini adalah **kalimat pengumuman**, yang
+    /// lalu disambung bagian jumlah kegagalannya.
+    static let linkSpeechReachable = LocalizedText(
+        key: "link.speech.reachable",
+        id: "iPhone terhubung.")
+
+    /// Kalimat pembuka baris tautan saat iPhone tidak terjangkau.
+    static let linkSpeechUnreachable = LocalizedText(
+        key: "link.speech.unreachable",
+        id: "iPhone tidak terjangkau.")
 }

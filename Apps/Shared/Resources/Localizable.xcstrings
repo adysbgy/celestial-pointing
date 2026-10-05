@@ -4730,6 +4730,39 @@
           }
         }
       }
+    },
+    "link.speech.reachable": {
+      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone terjangkau. Bentuk penuh (ada titik akhir), bukan label baris 'pointing.link.connected'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone is connected."
+          }
+        }
+      }
+    },
+    "link.speech.unreachable": {
+      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone tidak terjangkau. Bentuk penuh, bukan label baris.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone is not reachable."
+          }
+        }
+      }
+    },
+    "link.status.sendFailuresClause": {
+      "comment": "Klausa jumlah kiriman gagal yang menempel di belakang kalimat yang sudah selesai. Membawa pemisah di depan (spasi) karena kalimat tu sudah berakhir; bentuk . yang membawa titik dipakai untuk baris yang belum diakhiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " %lld %@."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
