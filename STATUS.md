@@ -9694,3 +9694,140 @@ string UI yang lolos dari katalog.
 - `./swift-ui-lint.sh` -> **19 aturan** hijau.
 - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
 - CI: Apple Build `37307694866` + Engine Tests `37307694628`, keduanya success.
+
+---
+
+## Siklus: lapisan gambar akhirnya bisa DILIHAT dan DIUKUR (2026-10-05)
+
+### Premis: bagian yang paling sering salah adalah bagian yang tidak bisa diperiksa
+
+Repo ini sudah punya disiplin gerbang yang kuat: 174 + 597 uji di Linux,
+19 aturan sapu UI, gerbang warna mode malam yang dibuktikan berbunyi. Tapi
+semua itu memeriksa **model** — `CelestialVisual`, `VisualFrame`,
+`PhaseGeometry`, `SurfacePalette`. Yang tidak diperiksa siapa pun adalah
+**terjemahan model itu ke piksel**, karena `CelestialVisualView` hanya
+terbangun di macOS dan VPS ini Linux.
+
+Bukti bahwa celah itu nyata bukan hipotesis: dua commit terakhir sebelum
+siklus ini adalah dua cacat yang lahir persis di sana.
+
+| Cacat | Kenapa lolos semua gerbang |
+|---|---|
+| Sabit Bulan tercermin vertikal (tanda `rotate` dibalik) | Modelnya benar dan ujinya hijau. Di layar sabitnya tetap berbentuk sabit — sisi terang menghadap arah yang salah, dan tidak ada teks di layar yang bisa membuktikannya. |
+| Denyut jam mati (`Date()` di dalam `body`) | View-nya tidak pernah dijalankan di Linux, jadi tidak ada yang bisa mengamati bahwa denyutnya tidak bergerak. |
+
+Keduanya kelas yang sama: **model benar, terjemahan salah, tidak ada yang
+melihat.** Selama celah itu terbuka, tiap perubahan visual berikutnya punya
+peluang yang sama untuk salah tanpa ketahuan.
+
+### Yang dibangun
+
+Lapisan menggambar diport ke Python — tanpa dependensi, tanpa Apple SDK,
+tanpa internet — lalu hasilnya **diukur**, bukan sekadar digambar:
+
+| Alat | Guna |
+|---|---|
+| `Tools/render-visuals.py` | Menggambar 28 kasus (planet, Bulan semua fase, bintang, Matahari, objek langit dalam, tiap kasus ragu) jadi PNG + `index.html` — untuk **mata manusia**. |
+| `Tools/check-visuals.py` | Mengukur **42 invarian** dari pikselnya — untuk **gerbang**. Keluar != 0 kalau ada yang rusak. |
+
+Yang diukur adalah hal yang punya jawaban benar/salah:
+
+- **Luas sabit mengikuti fraksi iluminasi.** f=0.18 -> 0.180, f=0.50 ->
+  0.498, f=0.98 -> 0.979. Ini yang tidak bisa dilakukan uji model: yang
+  diuji di sana adalah **rumus kurvanya**, bukan daerah yang benar-benar
+  terisi setelah dipotong ke piringan dan diputar.
+- **Sisi terang sabit menghadap sudut yang diminta**, diukur sebagai pusat
+  massa sisi tersinari: sudut `-pi/2` -> bawah, `+pi/2` -> atas, `0` ->
+  kanan, `pi` -> kiri. Cacat tanda rotasi tertangkap di sini.
+- **Ciri pengenal hilang saat ragu, dan ada saat yakin.** Keduanya perlu:
+  uji "ciri hilang saat ragu" saja akan diloloskan sempurna oleh view yang
+  berhenti menggambar **semua** ciri.
+- **Mode malam murni**: kanal hijau & biru **nol** di piksel, bukan "kecil".
+- **Urutan warna bintang**: Betelgeuse (R−B 236) lebih merah dari Rigel
+  (−44) — diukur dari piksel yang benar-benar jadi.
+
+### Dua cacat yang ditemukan di alat baru ini sendiri
+
+Alat ukur yang salah lebih berbahaya daripada tidak ada alat: ia memberi
+angka yang terlihat sah. Dua cacat ditemukan saat membangunnya, keduanya
+diperbaiki:
+
+1. **`Canvas.to_png` menulis byte filter PNG dua kali.** Ia menambahkan
+   byte filter 0 per baris **dan** menyerahkan buffer itu ke `_png()`, yang
+   menambahkan byte filter lagi lalu memotong ulang buffer seolah tidak ada
+   filter. Setiap baris bergeser satu byte. Gejalanya: sudut gambar keluar
+   `00 0a 0a 0f` alih-alih `0a 0a 0f ff`, dan **setiap** kasus melaporkan
+   "jangkauan 1.402 R" yang sama persis — angka yang terlalu seragam untuk
+   benar. Yang membuatnya layak dicatat: PNG-nya tetap "kelihatan seperti
+   planet", cukup untuk tidak dicurigai.
+
+2. **`Canvas.fill` membuang alfa dari `color_at`.** View memakai alfa nol
+   sebagai cara "tidak menggambar sama sekali" (maria Bulan hanya tergambar
+   di dalam pita yang menyala, `(lit, 0.0)` di luarnya). Karena alfa itu
+   dibuang, maria yang seharusnya gelap 12% tergambar **penuh** — dan itu
+   terbaca sebagai sabit yang jauh lebih lebar dari fasenya. Setelah
+   diperbaiki, luas sabit langsung jatuh ke nilai yang benar.
+
+### Gerbangnya dibuktikan berbunyi, bukan sekadar mencetak "OK"
+
+Gerbang yang lulus pada kode benar **dan** pada kode salah lebih buruk
+daripada tidak ada gerbang, karena ia membuat orang berhenti memeriksa.
+Karena itu lima cacat disuntikkan satu per satu:
+
+| Mutasi | Tertangkap |
+|---|---|
+| Tanda rotasi tidak dibalik (cacat asli) | 2/4 pemeriksaan arah gagal |
+| Maria menggambar penuh | 4/9 pemeriksaan luas gagal |
+| Cincin Saturnus tidak digambar | 1/3 pemeriksaan ciri gagal |
+| Visual pasti ditampilkan saat ragu | 3/3 pemeriksaan "hilang saat ragu" gagal |
+| Mode malam tidak menyaring hijau/biru | 4/7 pemeriksaan kemurnian gagal |
+
+Percobaan pertama mutasi ini **gagal mendeteksi apa pun**, dan sebabnya
+layak dicatat: `check-visuals.py` memuat modul render-nya sendiri, jadi
+memutasi modul yang di-`import` dari luar tidak menyentuh apa yang benar-benar
+dipakai pemeriksaan. Mutasi yang "tidak tertangkap" hampir membuat saya
+menyimpulkan gerbangnya tuli; yang benar adalah mutasinya mengenai objek
+yang salah. Mutasi harus disuntikkan ke `CV.R` — instance yang dipakai.
+
+### Uji regresi untuk cacat PNG
+
+`check_png_roundtrip` membandingkan buffer di memori dengan hasil
+encode-decode. Ini menangkap pergeseran satu byte **tanpa perlu ada yang
+membuka gambarnya** — penting justru karena cacat itu bertahan lama
+semata-mata karena hasilnya masih terlihat wajar.
+
+### Pemeriksaan pergeseran (drift)
+
+Port ini hidup di Python, view-nya di Swift, dan keduanya memuat angka yang
+sama (opasitas glow, rasio cincin, fraksi bola, opasitas maria). Kalau
+seseorang mengubah view dan lupa port-nya, semua pemeriksaan di atas tetap
+hijau sambil mengukur gambar yang **sudah tidak ada lagi**.
+`check_port_matches_swift_constants` membaca angka itu langsung dari sumber
+Swift, jadi perubahannya tertangkap.
+
+### Yang TIDAK diklaim
+
+Bahwa hasil Python sama dengan SwiftUI di perangkat. Itu tidak bisa
+dibuktikan di sini, dan tidak diklaim. Yang dijaga adalah: port-nya
+konsisten dengan dirinya sendiri, konstantanya masih sama dengan sumber
+Swift, dan invarian yang bisa diukur memang terpenuhi. Penilaian estetika
+("apakah ini cantik") tetap milik mata manusia — `render-visuals.py` ada
+untuk itu.
+
+### Gerbang
+
+- `./swift-test.sh` -> **174 CelestialEngine + 597 PointingKit**, 0 gagal.
+  (Naik dari 572: bukan dari siklus ini — engine tidak disentuh sama sekali.)
+- `python3 Tools/check-visuals.py --check` -> **42 pemeriksaan, 0 gagal**
+  (26 detik, tanpa dependensi).
+- `./swift-ui-lint.sh` -> hijau.
+- CI: Engine Tests `37340713070` + Apple Build `37340712942`, keduanya
+  success. Langkah "Gerbang gambar objek (port Python)" ikut hijau di Linux.
+
+### Kenapa dipasang di CI
+
+Tanpa langkah CI, `check-visuals.py` hanya alat yang dipakai kalau ada yang
+ingat menjalankannya. Gerbang yang harus diingat untuk dijalankan adalah
+gerbang yang akan dilewati. Karena itu ia masuk `engine-tests.yml` — job
+Linux, tempat ia memang bisa berjalan.
+
