@@ -188,7 +188,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **23 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **24 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -196,9 +196,11 @@ katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 permukaan kartu yang harus datang dari token yang kontrasnya dihitung
 (aturan 20), denyut gambar yang harus digerbangi `hasPulse` supaya
 `Canvas` planet tidak digambar ulang 20×/detik untuk piksel yang sama
-(aturan 21), dan setiap cabang complication yang wajib merender ikon
+(aturan 21), setiap cabang complication yang wajib merender ikon
 keadaan bersama nama objeknya, supaya kandidat yang belum pasti tidak
-terbaca sebagai identitas yang terkunci (aturan 23).
+terbaca sebagai identitas yang terkunci (aturan 23), dan indeks warna
+bintang yang hanya boleh sampai ke gambar lewat `drawableStarColorIndex`
+supaya warna tidak diklaim saat engine ragu (aturan 24).
 
 ### Uji harus pernah merah
 

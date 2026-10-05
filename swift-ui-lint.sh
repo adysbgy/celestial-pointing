@@ -2265,6 +2265,69 @@ else
   echo "Bersih: nama objek di complication selalu tampil bersama ikon keadaan."
 fi
 
+# ── Aturan 24: indeks warna bintang tidak boleh dipakai mentah ──────────────
+# Warna spektral adalah ciri pengenal, jadi satu-satunya jalan yang sah dari
+# `colorIndexBV` ke gambar adalah lewat `drawableStarColorIndex(_:isConfirmed:)`
+# — fungsi yang mengembalikan warna "tidak mengklaim" saat engine ragu.
+#
+# **Kenapa aturan ini perlu, padahal cacatnya sudah pernah diperbaiki dan
+# diuji.** Uji Swift menguji **model**-nya (`drawableStarColorIndex`), bukan
+# pemakaiannya di view. Gerbang gambar (`Tools/check-visuals.py`) menguji
+# **port Python**-nya, bukan view Swift-nya. Keduanya bisa hijau sementara view
+# Swift kembali memakai `visual.colorIndexBV` mentah: port tetap benar, model
+# tetap benar, dan satu-satunya berkas yang salah justru yang tidak diperiksa
+# siapa pun. Itu persis bentuk cacat yang baru saja diperbaiki, jadi ia layak
+# dijaga di tempat yang melihat berkas Swift-nya.
+echo
+echo "== Aturan 24: indeks warna bintang hanya lewat drawableStarColorIndex =="
+raw_star_colour=$(python3 - <<'PY' 2>&1
+import os, re
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        if "colorIndexBV" not in code:
+            continue
+        lines = code.split("\n")
+        for i, line in enumerate(lines):
+            if "colorIndexBV" not in line:
+                continue
+            # Pernyataan bisa membungkus baris, jadi gabungkan dengan baris
+            # sebelumnya lalu cari **daftar argumen** pemanggilannya.
+            combined = (lines[i - 1] + "\n" if i > 0 else "") + line
+            call = re.search(
+                r"drawableStarColorIndex\s*\(([^)]*)\)", combined, re.S)
+            # Aman hanya kalau `colorIndexBV` benar-benar jadi argumen
+            # `drawableStarColorIndex`, **dan** argumen penjaganya ikut
+            # dikirim. Memakai nama fungsi yang benar tanpa `isConfirmed:`
+            # tetap mengklaim warna saat ragu — bentuk cacat yang nyaris
+            # lolos dari versi pertama aturan ini.
+            if call and "colorIndexBV" in call.group(1) \
+                    and "isConfirmed" in call.group(1):
+                continue
+            problems.append(
+                f"  {path}:{i + 1}: `colorIndexBV` tidak lewat "
+                f"`drawableStarColorIndex(_:isConfirmed:)` — warna diklaim "
+                f"saat ragu")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Salurkan lewat `CelestialVisual.drawableStarColorIndex(_:isConfirmed:)` "
+          "supaya warna netral saat engine ragu.")
+PY
+)
+if [ -n "$raw_star_colour" ]; then
+  echo "$raw_star_colour"
+  status=1
+else
+  echo "Bersih: indeks warna bintang selalu lewat drawableStarColorIndex."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
