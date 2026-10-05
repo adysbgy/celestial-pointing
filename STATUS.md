@@ -1,3 +1,58 @@
+## Progres terakhir (5 Okt 2026 — penjaga horizon kalibrasi menilai waktu yang salah)
+
+### Cacat: `capture` menilai horizon di jam dinding, bukan saat arah dicatat
+
+Siklus ini memulai dari pohon kerja yang sudah membawa fitur setengah jadi
+(banner daftar acuan basi + penjaga "objek di bawah cakrawala" di
+`captureReference`). Menutup fitur itu menemukan satu cacat asli yang belum
+tertutup: penjaga horizon di `capture`/`captureNearest` memanggil
+`resolver.horizontal(ofObjectID:observer:date:)` dengan `date = Date()`
+(jam dinding saat tombol ditekan), padahal arah tunjuk yang dicatat diambil
+dari `controller.snapshot.rawPointing` yang dihasilkan `feed` pada
+**timestamp lain** (saat pengguna benar-benar menunjuk).
+
+Dua waktu itu bisa beda detik sampai menit. Saat berbeda, objek yang sedang
+ditunjuk (di atas horizon pada `feed`) tampak "di bawah cakrawala" pada
+`Date()` — penjaga menolak pencatatan, `flow.samples` kosong, dan kalibrasi
+gagal tanpa alasan yang jujur. Ini tepat kelas cacat yang dijaga penjaga itu
+sendiri: sampel hantu. Bedanya, di sini yang hilang justru sampel **asli**.
+
+### Kenapa gerbang tidak menangkapnya
+
+`testCaptureWorksWhenSensorIsAvailable` memberi makan quaternion pada `date`
+tetap lalu memanggil `capture(objectID:)` tanpa argumen `date` → `Date()`.
+Di mesin uji, `Date()` (2026) berbeda jauh dari `date` fixture
+(1700000000), sehingga `sirius` berada di bawah horizon pada waktu uji dan
+penjaga menolak. Gerbang lolos di sesi sebelumnya hanya karena cacat itu
+belum ada; setelah penjaga horizon ditambahkan, tes itu merah.
+
+### Perbaikan (diuji, bukan sekadar digeser)
+
+- `PointingController`: simpan `lastFeedTimestamp` di `feed(quaternion:timestamp:)`.
+- `CalibrationSession.capture(objectID:)` dan `captureNearest()`: default
+  `date` ke `controller.lastFeedTimestamp ?? Date()`, sehingga penjaga horizon
+  menilai ketinggian pada **epoch arah yang dicatat**, bukan saat tombol
+  ditekan. Jalur `capture(objectID:measured:date:)` eksplisit tetap memakai
+  `date` panggilannya (pengujian ujung-ke-ujung yang memberi waktu sendiri
+  tidak berubah).
+
+Dokumentasi "kenapa" (bukan cuma "apa"): waktu penilaian horizon harus sama
+dengan waktu arah tunjuk yang diverifikasi, atau penjaga melindungi dari
+sampel hantu dengan cara membuang sampel nyata.
+
+### Gerbang lain yang ikut ditutup di siklus ini
+
+- `TextLocalization.allKeys`: dua kunci banner basi (`calibrationStatusStaleBanner`,
+  `calibrationStatusStaleBannerHint`) belum masuk registry yang dihitung gerbang
+  (191 → 193). Tanpa itu, `testDeclaredKeysAreUniqueNonEmptyAndComplete` merah
+  meski katalog sudah punya entri. Ditambahkan ke `allKeys` + padanan EN di
+  `Localizable.xcstrings`.
+- README: hitungan uji 527 → 529 (2 tes penjaga horizon/capture baru).
+
+Verifikasi: `./swift-test.sh` 529/0 hijau; `./swift-ui-lint.sh` semua gerbang
+lulus; CI `Engine Tests (Linux)` + `Apple Build` hijau pada 37265874682 /
+37265874709.
+
 ## Progres terakhir (5 Okt 2026 — complication menampilkan lock basi sebagai centang hijau)
 
 ### Cacat yang hanya hidup di kanal yang tidak bisa diuji compiler
