@@ -4115,6 +4115,270 @@
           }
         }
       }
+    },
+    "experiment.title": {
+      "comment": "Judul layar Experiment 1.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1"
+          }
+        }
+      }
+    },
+    "experiment.noTargets": {
+      "comment": "Pesan saat tidak ada target di atas horizon.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No target above the horizon right now."
+          }
+        }
+      }
+    },
+    "experiment.targetPicker": {
+      "comment": "Label pemilih target kebenaran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target (ground truth)"
+          }
+        }
+      }
+    },
+    "experiment.noneSelected": {
+      "comment": "Opsi 'belum ada target terpilih' di pemilih.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None selected"
+          }
+        }
+      }
+    },
+    "experiment.targetHeader": {
+      "comment": "Judul bagian target.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target"
+          }
+        }
+      }
+    },
+    "experiment.groundTruthFooter": {
+      "comment": "Keterangan bagian target: kebenaran dari katalog.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ground truth comes from the catalogue, not from the engine's answer. If the engine misidentifies, we still know which object was actually pointed at."
+          }
+        }
+      }
+    },
+    "experiment.capture.section": {
+      "comment": "Judul bagian rekam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
+          }
+        }
+      }
+    },
+    "experiment.note.placeholder": {
+      "comment": "Placeholder kolom catatan opsional.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note (optional)"
+          }
+        }
+      }
+    },
+    "experiment.record.label": {
+      "comment": "Label tombol rekam percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record trial"
+          }
+        }
+      }
+    },
+    "experiment.removeLast.label": {
+      "comment": "Label tombol buang percobaan terakhir.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard last trial"
+          }
+        }
+      }
+    },
+    "experiment.result.section": {
+      "comment": "Judul bagian hasil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Results"
+          }
+        }
+      }
+    },
+    "experiment.noAnalyzable": {
+      "comment": "Pesan saat belum ada percobaan yang bisa dianalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trial can be analysed yet."
+          }
+        }
+      }
+    },
+    "experiment.trials.countLabel": {
+      "comment": "Judul baris jumlah percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials"
+          }
+        }
+      }
+    },
+    "experiment.correct.label": {
+      "comment": "Judul baris jumlah jawaban benar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct"
+          }
+        }
+      }
+    },
+    "experiment.falseLock.label": {
+      "comment": "Judul baris jumlah false lock.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "False lock"
+          }
+        }
+      }
+    },
+    "experiment.medianError.label": {
+      "comment": "Judul baris galat median.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error"
+          }
+        }
+      }
+    },
+    "experiment.p90Error.label": {
+      "comment": "Judul baris galat P90.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "P90 error"
+          }
+        }
+      }
+    },
+    "experiment.sendThreshold.label": {
+      "comment": "Label tombol kirim ambang ke jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send threshold to watch"
+          }
+        }
+      }
+    },
+    "experiment.insufficientForThreshold": {
+      "comment": "Pesan saat data belum cukup untuk mengusulkan ambang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough data to propose a new threshold — the engine keeps its conservative built-in threshold."
+          }
+        }
+      }
+    },
+    "experiment.trials.section": {
+      "comment": "Judul bagian daftar percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials"
+          }
+        }
+      }
+    },
+    "experiment.noTrials": {
+      "comment": "Pesan saat belum ada percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trials yet."
+          }
+        }
+      }
+    },
+    "experiment.dataset.sharePreview": {
+      "comment": "Judul pratinjau berbagi dataset.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1 dataset"
+          }
+        }
+      }
+    },
+    "experiment.export.label": {
+      "comment": "Label tombol ekspor dataset JSON.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export dataset (JSON)"
+          }
+        }
+      }
+    },
+    "experiment.reset.label": {
+      "comment": "Label VoiceOver tombol buang (ikon tong sampah).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard all trials"
+          }
+        }
+      }
     }
   }
 }

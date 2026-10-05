@@ -33,7 +33,7 @@ struct Experiment1View: View {
                 resultSection
                 trialsSection
             }
-            .navigationTitle("Experiment 1")
+            .navigationTitle(ExperimentText.title)
             // Sembunyikan latar `List` bawaan supaya gradien aplikasi
             // terlihat di balik kartu, bukan chrome sistem.
             .scrollContentBackground(.hidden)
@@ -45,6 +45,9 @@ struct Experiment1View: View {
                         Image(systemName: "trash")
                     }
                     .disabled(recorder.harness.trials.isEmpty)
+                    // Ikon tong sampah tidak punya teks: tanpa label, VoiceOver
+                    // mengucapkan nama SF Symbol-nya, bukan akibatnya.
+                    .accessibilityLabel(ExperimentText.resetLabel)
                 }
             }
             .onAppear {
@@ -74,13 +77,13 @@ struct Experiment1View: View {
         Section {
             let targets = recorder.availableTargets
             if targets.isEmpty {
-                Text("Tidak ada target di atas horizon sekarang.")
+                Text(ExperimentText.noTargets)
                     .foregroundStyle(PointingTone.warning.color)
             } else {
-                Picker("Target (kebenaran)", selection: Binding(
+                Picker(ExperimentText.targetPicker, selection: Binding(
                     get: { recorder.selectedTargetID },
                     set: { recorder.selectedTargetID = $0 })) {
-                    Text("Belum dipilih").tag(String?.none)
+                    Text(ExperimentText.noneSelected).tag(String?.none)
                     ForEach(targets) { target in
                         Text(ExperimentText.targetOption(name: target.name,
                                                          altitudeDeg: target.direction.altitudeDeg))
@@ -89,9 +92,9 @@ struct Experiment1View: View {
                 }
             }
         } header: {
-            Text("Target")
+            Text(ExperimentText.targetHeader)
         } footer: {
-            Text("Kebenaran diambil dari katalog, bukan dari jawaban engine. Kalau engine salah mengenali, kita tetap tahu objek yang sebenarnya dituju.")
+            Text(ExperimentText.groundTruthFooter)
             // Kalau lokasinya masih yang bawaan, seluruh daftar ini dihitung
             // untuk tempat lain — dan tinggi objeknya salah. Itu harus terlihat,
             // bukan tersembunyi di balik daftar yang tampak normal.
@@ -110,7 +113,7 @@ struct Experiment1View: View {
     }
 
     private var captureSection: some View {
-        Section("Rekam") {
+        Section(ExperimentText.captureSection) {
             HStack {
                 Image(systemName: engine.snapshot.state.symbolName)
                     .foregroundStyle(engine.snapshot.state.tone.color)
@@ -122,14 +125,14 @@ struct Experiment1View: View {
                         .foregroundStyle(Color.nightAwareSecondary)
                 }
             }
-            TextField("Catatan (opsional)", text: Binding(
+            TextField(ExperimentText.notePlaceholder, text: Binding(
                 get: { recorder.note },
                 set: { recorder.note = $0 }))
 
             Button {
                 recorder.record()
             } label: {
-                Label("Rekam percobaan", systemImage: "record.circle")
+                Label(ExperimentText.recordLabel, systemImage: "record.circle")
             }
             // Sensor mati juga mematikan tombolnya: tanpa ini penguji bisa
             // menekan Rekam dan mengira percobaannya tercatat, padahal
@@ -137,7 +140,7 @@ struct Experiment1View: View {
             // pengukuran sekarang). Keadaan alurnya sudah tampil di baris atas.
             .disabled(recorder.selectedTargetID == nil || !engine.snapshot.hasSensor)
 
-            Button("Buang percobaan terakhir", role: .destructive) {
+            Button(ExperimentText.removeLastLabel, role: .destructive) {
                 recorder.removeLast()
             }
             .disabled(recorder.harness.trials.isEmpty)
@@ -149,10 +152,10 @@ struct Experiment1View: View {
     }
 
     private var resultSection: some View {
-        Section("Hasil") {
+        Section(ExperimentText.resultSection) {
             let summary = recorder.summary
             if recorder.recordedCount == 0 {
-                Text("Belum ada percobaan yang bisa dianalisis.")
+                Text(ExperimentText.noAnalyzable)
                     .foregroundStyle(Color.nightAwareSecondary)
             } else {
                 // Angka "Percobaan" sengaja memakai `recordedCount`, bukan
@@ -161,13 +164,13 @@ struct Experiment1View: View {
                 // sedikit percobaan dari yang benar-benar ditekan pengguna —
                 // dan selisihnya tidak pernah dijelaskan. Baris berikutnya
                 // yang menyebut jumlah yang tidak teranalisis.
-                row("Percobaan", "\(recorder.recordedCount)")
+                row(ExperimentText.trialsCountLabel, "\(recorder.recordedCount)")
                 if recorder.unanalyzableCount > 0 {
                     row(ExperimentText.rowCountNotAnalyzed,
                         "\(recorder.unanalyzableCount)")
                 }
-                row("Benar", "\(summary.correctCount)")
-                row("False lock", "\(summary.falseLockCount)")
+                row(ExperimentText.correctLabel, "\(summary.correctCount)")
+                row(ExperimentText.falseLockLabel, "\(summary.falseLockCount)")
                 if recorder.hasUnanalyzableTrials {
                     // Disebutkan eksplisit karena akibatnya tidak terlihat dari
                     // angka: percobaan ini tidak menambah bukti, jadi ambang
@@ -178,10 +181,10 @@ struct Experiment1View: View {
                         .foregroundStyle(PointingTone.warning.color)
                 }
                 if let median = summary.medianRawPointingErrorDeg {
-                    row("Galat median", NumberFormat.degrees(median))
+                    row(ExperimentText.medianErrorLabel, NumberFormat.degrees(median))
                 }
                 if let p90 = summary.p90RawPointingErrorDeg {
-                    row("Galat P90", NumberFormat.degrees(p90))
+                    row(ExperimentText.p90ErrorLabel, NumberFormat.degrees(p90))
                 }
                 Text(recorder.verdict)
                     .font(.footnote)
@@ -195,13 +198,13 @@ struct Experiment1View: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ExperimentText.suggestedThreshold(sigmaDeg: policy.pointingSigmaDeg))
                             .font(.footnote)
-                        Button("Kirim ambang ke jam") {
+                        Button(ExperimentText.sendThresholdLabel) {
                             link.send(policy: policy)
                         }
                         .font(.footnote)
                     }
                 } else {
-                    Text("Belum cukup data untuk mengusulkan ambang baru — engine tetap memakai ambang konservatif bawaannya.")
+                    Text(ExperimentText.insufficientForThreshold)
                         .font(.footnote)
                         .foregroundStyle(Color.nightAwareSecondary)
                 }
@@ -210,10 +213,10 @@ struct Experiment1View: View {
     }
 
     private var trialsSection: some View {
-        Section("Percobaan") {
+        Section(ExperimentText.trialsSection) {
             let trials = recorder.harness.trials
             if trials.isEmpty {
-                Text("Belum ada percobaan.").foregroundStyle(Color.nightAwareSecondary)
+                Text(ExperimentText.noTrials).foregroundStyle(Color.nightAwareSecondary)
             } else {
                 ForEach(Array(trials.enumerated().reversed()), id: \.offset) { _, trial in
                     trialRow(trial)
@@ -221,8 +224,8 @@ struct Experiment1View: View {
             }
 
             ShareLink(item: exportDocument(recorder),
-                      preview: SharePreview("Dataset Experiment 1")) {
-                Label("Ekspor dataset (JSON)", systemImage: "square.and.arrow.up")
+                      preview: SharePreview(ExperimentText.datasetSharePreview)) {
+                Label(ExperimentText.exportLabel, systemImage: "square.and.arrow.up")
             }
             .disabled(trials.isEmpty)
         }

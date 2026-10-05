@@ -535,6 +535,20 @@ public extension LocalizedText {
         .experimentDiagnosisMixed, .experimentDiagnosisMixedSeparator,
         .experimentSuggestedThreshold,
         .experimentLocationFallback, .experimentLocationComputed,
+        // Label layar Experiment 1 (`Experiment1View`) — lihat blok
+        // "// Label layar Experiment 1" di `ExperimentText.swift`.
+        .experimentTitle, .experimentNoTargets, .experimentTargetPicker,
+        .experimentNoneSelected, .experimentTargetHeader,
+        .experimentGroundTruthFooter, .experimentCaptureSection,
+        .experimentNotePlaceholder, .experimentRecordLabel,
+        .experimentRemoveLastLabel, .experimentResultSection,
+        .experimentNoAnalyzable, .experimentTrialsCountLabel,
+        .experimentCorrectLabel, .experimentFalseLockLabel,
+        .experimentMedianErrorLabel, .experimentP90ErrorLabel,
+        .experimentSendThresholdLabel, .experimentInsufficientForThreshold,
+        .experimentTrialsSection, .experimentNoTrials,
+        .experimentDatasetSharePreview, .experimentExportLabel,
+        .experimentResetLabel,
         // Frasa yang diucapkan untuk baris "judul … nilai" dan nilai bertanda
         // satuan. Masuk daftar karena seluruh `RowSpeech` mengembalikan frasa
         // Bahasa Indonesia tanpa melewati `LocalizedText` — Aturan 6 tidak

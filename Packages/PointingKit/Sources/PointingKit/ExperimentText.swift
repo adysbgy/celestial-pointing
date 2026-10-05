@@ -311,6 +311,39 @@ public enum ExperimentText {
     public static func locationComputed(label: String) -> String {
         TextLocalization.text(.experimentLocationComputed, label)
     }
+
+    // MARK: - Label layar (`Experiment1View`)
+
+    public static var title: String { TextLocalization.text(.experimentTitle) }
+    public static var noTargets: String { TextLocalization.text(.experimentNoTargets) }
+    public static var targetPicker: String { TextLocalization.text(.experimentTargetPicker) }
+    public static var noneSelected: String { TextLocalization.text(.experimentNoneSelected) }
+    public static var targetHeader: String { TextLocalization.text(.experimentTargetHeader) }
+    public static var groundTruthFooter: String {
+        TextLocalization.text(.experimentGroundTruthFooter)
+    }
+    public static var captureSection: String { TextLocalization.text(.experimentCaptureSection) }
+    public static var notePlaceholder: String { TextLocalization.text(.experimentNotePlaceholder) }
+    public static var recordLabel: String { TextLocalization.text(.experimentRecordLabel) }
+    public static var removeLastLabel: String { TextLocalization.text(.experimentRemoveLastLabel) }
+    public static var resultSection: String { TextLocalization.text(.experimentResultSection) }
+    public static var noAnalyzable: String { TextLocalization.text(.experimentNoAnalyzable) }
+    public static var trialsCountLabel: String { TextLocalization.text(.experimentTrialsCountLabel) }
+    public static var correctLabel: String { TextLocalization.text(.experimentCorrectLabel) }
+    public static var falseLockLabel: String { TextLocalization.text(.experimentFalseLockLabel) }
+    public static var medianErrorLabel: String { TextLocalization.text(.experimentMedianErrorLabel) }
+    public static var p90ErrorLabel: String { TextLocalization.text(.experimentP90ErrorLabel) }
+    public static var sendThresholdLabel: String { TextLocalization.text(.experimentSendThresholdLabel) }
+    public static var insufficientForThreshold: String {
+        TextLocalization.text(.experimentInsufficientForThreshold)
+    }
+    public static var trialsSection: String { TextLocalization.text(.experimentTrialsSection) }
+    public static var noTrials: String { TextLocalization.text(.experimentNoTrials) }
+    public static var datasetSharePreview: String {
+        TextLocalization.text(.experimentDatasetSharePreview)
+    }
+    public static var exportLabel: String { TextLocalization.text(.experimentExportLabel) }
+    public static var resetLabel: String { TextLocalization.text(.experimentResetLabel) }
 }
 
 // MARK: - Katalog kunci
@@ -460,4 +493,60 @@ public extension LocalizedText {
     static let experimentLocationComputed = LocalizedText(
         key: "experiment.location.computed",
         id: "Dihitung untuk %@.")
+
+    // Label layar Experiment 1 yang dulu literal Bahasa Indonesia di dalam
+    // `Experiment1View`. Bentuk yang sama seperti layar lain: bisa diterjemahkan
+    // (judul, label tombol, nama baris) vs. angka/unit yang tidak.
+    static let experimentTitle = LocalizedText(
+        key: "experiment.title", id: "Experiment 1")
+    static let experimentNoTargets = LocalizedText(
+        key: "experiment.noTargets",
+        id: "Tidak ada target di atas horizon sekarang.")
+    static let experimentTargetPicker = LocalizedText(
+        key: "experiment.targetPicker", id: "Target (kebenaran)")
+    static let experimentNoneSelected = LocalizedText(
+        key: "experiment.noneSelected", id: "Belum dipilih")
+    static let experimentTargetHeader = LocalizedText(
+        key: "experiment.targetHeader", id: "Target")
+    static let experimentGroundTruthFooter = LocalizedText(
+        key: "experiment.groundTruthFooter",
+        id: "Kebenaran diambil dari katalog, bukan dari jawaban engine. Kalau engine salah mengenali, kita tetap tahu objek yang sebenarnya dituju.")
+    static let experimentCaptureSection = LocalizedText(
+        key: "experiment.capture.section", id: "Rekam")
+    static let experimentNotePlaceholder = LocalizedText(
+        key: "experiment.note.placeholder", id: "Catatan (opsional)")
+    static let experimentRecordLabel = LocalizedText(
+        key: "experiment.record.label", id: "Rekam percobaan")
+    static let experimentRemoveLastLabel = LocalizedText(
+        key: "experiment.removeLast.label", id: "Buang percobaan terakhir")
+    static let experimentResultSection = LocalizedText(
+        key: "experiment.result.section", id: "Hasil")
+    static let experimentNoAnalyzable = LocalizedText(
+        key: "experiment.noAnalyzable",
+        id: "Belum ada percobaan yang bisa dianalisis.")
+    static let experimentTrialsCountLabel = LocalizedText(
+        key: "experiment.trials.countLabel", id: "Percobaan")
+    static let experimentCorrectLabel = LocalizedText(
+        key: "experiment.correct.label", id: "Benar")
+    static let experimentFalseLockLabel = LocalizedText(
+        key: "experiment.falseLock.label", id: "False lock")
+    static let experimentMedianErrorLabel = LocalizedText(
+        key: "experiment.medianError.label", id: "Galat median")
+    static let experimentP90ErrorLabel = LocalizedText(
+        key: "experiment.p90Error.label", id: "Galat P90")
+    static let experimentSendThresholdLabel = LocalizedText(
+        key: "experiment.sendThreshold.label", id: "Kirim ambang ke jam")
+    static let experimentInsufficientForThreshold = LocalizedText(
+        key: "experiment.insufficientForThreshold",
+        id: "Belum cukup data untuk mengusulkan ambang baru — engine tetap memakai ambang konservatif bawaannya.")
+    static let experimentTrialsSection = LocalizedText(
+        key: "experiment.trials.section", id: "Percobaan")
+    static let experimentNoTrials = LocalizedText(
+        key: "experiment.noTrials", id: "Belum ada percobaan.")
+    static let experimentDatasetSharePreview = LocalizedText(
+        key: "experiment.dataset.sharePreview", id: "Dataset Experiment 1")
+    static let experimentExportLabel = LocalizedText(
+        key: "experiment.export.label", id: "Ekspor dataset (JSON)")
+    static let experimentResetLabel = LocalizedText(
+        key: "experiment.reset.label", id: "Buang semua percobaan")
 }
