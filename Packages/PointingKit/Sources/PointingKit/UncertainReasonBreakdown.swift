@@ -222,4 +222,11 @@ public extension LocalizedText {
 
     /// "%lld dari %lld" — jumlah terhadap totalnya.
     static let rowCountOf = LocalizedText(key: "row.count.of", id: "%lld dari %lld")
+
+    /// Penanda basi untuk complication.
+    ///
+    /// Bentuknya frasa pendek, bukan kalimat: baris kedua complication sudah
+    /// berisi nama objek, jadi yang ditambahkan hanya keterangan umurnya.
+    static let complicationStaleMarker = LocalizedText(
+        key: "complication.stale", id: "hasil jam lalu")
 }

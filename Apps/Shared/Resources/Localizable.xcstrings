@@ -3587,6 +3587,17 @@
           }
         }
       }
+    },
+    "complication.stale": {
+      "comment": "Baris kedua complication saat cuplikan terakhir sudah terlalu tua.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "from earlier"
+          }
+        }
+      }
     }
   }
 }

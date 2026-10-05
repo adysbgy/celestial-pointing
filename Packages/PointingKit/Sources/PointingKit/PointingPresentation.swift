@@ -353,12 +353,82 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     /// katalog (Aturan 6), dan enum tidak bisa dijaga Aturan 6 dari sisi
     /// teksnya.
     public enum Subline: Equatable, Sendable {
-        /// Penanda "belum pasti" — menang atas `objectKind`.
+        /// Penanda "belum pasti" — menang atas `objectKind` **dan** atas
+        /// `staleMarker`.
         case uncertaintyMarker
+        /// Penanda "ini hasil jam lalu, bukan sekarang".
+        case staleMarker
         /// Label jenis benda.
         case objectKind
         /// Tidak ada baris kedua.
         case none
+    }
+
+    /// Umur maksimum cuplikan yang masih boleh diklaim sebagai jawaban
+    /// **sekarang**.
+    ///
+    /// **Dari mana angka 15 menit.** Ini bukan angka estetika — ia batas
+    /// "keadaan tidak berubah" yang masih bisa dijelaskan. Dalam 15 menit
+    /// langit bergerak terlalu sedikit untuk mengubah nama yang tampil, dan
+    /// pergelangan yang diam selama itu hampir selalu berarti tangan
+    /// terangkat sebentar lalu dilepas, bukan pengukuran yang sedang berjalan.
+    ///
+    /// Yang membuat batas ini **wajib ada**: complication ditulis hanya saat
+    /// tanda tangannya berubah (`PointingEngine.recordComplicationIfChanged`).
+    /// Tanpa batas, pergelangan yang berhenti bergerak akan membekukan nama
+    /// objek di pergelangan sampai app dibuka lagi — dan kunci itu akan
+    /// tampil seolah hasil pengukuran yang sedang berlangsung.
+    public static let maximumClaimedAge: TimeInterval = 15 * 60
+
+    /// Apakah cuplikan ini sudah terlalu tua untuk diklaim sebagai jawaban
+    /// yang berlaku sekarang.
+    ///
+    /// **Umur negatif dianggap basi, bukan segar.** Jam device yang salah
+    /// Mundur atau maju akan menghasilkan `updatedAt` di masa depan; itu bukan
+    /// bukti bahwa jarinya baru saja bergerak. Membacanya sebagai "segera"
+    /// membuat klausa pengecualian ini mustahil dijaga — klausa yang tidak
+    /// bisa diuji adalah klausa yang tidak bisa dipercaya.
+    public func isStale(at now: Date) -> Bool {
+        guard now.timeIntervalSince(updatedAt) > Self.maximumClaimedAge else {
+            // Umur negatif: belum basi menurut ambang, tapi bukan juga
+            // bukti kekinian.
+            return now.timeIntervalSince(updatedAt) < 0
+        }
+        return true
+    }
+
+    /// Klaim identitas **setelah** memperhitungkan umur cuplikan.
+    ///
+    /// Ini yang harus dipakai view, bukan `isConfirmed` mentah. `isConfirmed`
+    /// menjawab "apakah engine sedang menampilkan jawaban", sedangkan yang
+    /// perlu dijawab complication adalah "apakah jawaban itu masih berlaku" —
+    /// dan dua itu berbeda begitu cuplikan menua.
+    ///
+    /// Yang dicabut di sini bukan cuma teks penandanya, tapi hak gambar memakai
+    /// ciri pengenal (cincin Saturnus, pita Jupiter). Kalau gambar tetap
+    /// menampilkan ciri itu sementara teksnya sudah basi, gambar lebih yakin
+    /// daripada teksnya — bentuk false confidence yang paling sulit ditangkap,
+    /// karena yang salahnya tidak pernah tertulis sebagai klaim.
+    public func confirmsIdentityNow(at now: Date) -> Bool {
+        isConfirmed && !isStale(at: now)
+    }
+
+    /// Penanda ragu, dengan memperhitungkan umur.
+    ///
+    /// **Kenapa basi tidak ikut di sini.** Bentuk pertama menulis
+    /// `hasAnswer && !confirmsIdentityNow(at:)`, dan itu salah: cuplikan yang
+    /// basi otomatis memenuhi syarat itu, sehingga `sublineContent(at:)`
+    /// selalu mengembalikan `.uncertaintyMarker` dan `staleMarker` tidak
+    /// pernah muncul sama sekali — penanda basi yang baru dibuat akan jadi
+    /// jalur mati.
+    ///
+    /// Yang ditanyakan penanda ragu adalah "apakah engine sendiri menyatakan
+    /// ini belum pasti". Itu persis `!isConfirmed`, dan **waktu tidak
+    /// menjawabnya**: umurnya tidak membuat engine jadi lebih atau kurang
+    /// yakin. Penanda basi menjawab pertanyaan lain ("kapan?"), jadi
+    /// keduanya bisa benar bersamaan dan harus diurutkan terpisah.
+    public func carriesUncertaintyMarker(at now: Date) -> Bool {
+        hasAnswer && !isConfirmed
     }
 
     /// Isi baris kedua untuk keluarga persegi panjang.
@@ -371,6 +441,26 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     /// di keadaan yang paling butuhkannya.
     public var sublineContent: Subline {
         if carriesUncertaintyMarker { return .uncertaintyMarker }
+        if hasAnswer, objectKind != nil { return .objectKind }
+        return .none
+    }
+
+    /// Isi baris kedua pada waktu tertentu.
+    ///
+    /// **Kenapa butuh versi berparameter waktu.** Complication berjalan di
+    /// proses terpisah dan tidak menerima cuplikan baru kecuali ada perubahan,
+    /// jadi "menurut `now`" adalah satu-satunya cara ia bisa tahu bahwa
+    /// tulisannya sudah tua. Versi tanpa parameter tetap ada untuk pemanggil
+    /// yang memang sedang menampilkan cuplikan itu — tapi view yang
+    /// menampilkan klaim lewat complication **wajib** memakai yang ini.
+    ///
+    /// Urutannya: ragu dulu, lalu basi, baru jenis benda. Ragu menjawab
+    /// "apakah nama ini benar", basi menjawab "kapan?" — jadi kalau basi
+    /// diperiksa lebih dulu, penanda ragu hilang tepat pada keadaan di mana
+    /// ia paling dibutuhkan.
+    public func sublineContent(at now: Date) -> Subline {
+        if carriesUncertaintyMarker(at: now) { return .uncertaintyMarker }
+        if isStale(at: now) { return .staleMarker }
         if hasAnswer, objectKind != nil { return .objectKind }
         return .none
     }

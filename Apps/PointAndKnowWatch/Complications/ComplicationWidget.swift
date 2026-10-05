@@ -178,9 +178,16 @@ struct ComplicationView: View {
     /// tidak akan bisa diuji — WidgetKit tidak ada di Linux — dan tepat di
     /// keadaan ragu baris kedua akan kembali menampilkan jenis benda.
     private func subline(for digest: ComplicationDigest) -> String? {
-        switch digest.sublineContent {
+        // `Date()` bukan pilihan gaya: satu-satunya cara complication tahu
+        // bahwa cuplikan terakhirnya sudah tua. Complication tidak menerima
+        // cuplikan baru kecuali ada perubahan, jadi tanpa memeriksa
+        // umur, nama objek membeku di pergelangan dan tetap tampil
+        // seolah hasil pengukuran yang sedang berjalan.
+        switch digest.sublineContent(at: Date()) {
         case .uncertaintyMarker:
             return TextLocalization.text(.confidenceUncertainMarker)
+        case .staleMarker:
+            return TextLocalization.text(.complicationStaleMarker)
         case .objectKind:
             return digest.objectKind?.displayName
         case .none:

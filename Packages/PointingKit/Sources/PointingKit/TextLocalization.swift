@@ -453,5 +453,10 @@ public extension LocalizedText {
         // yang hanya menghitung yang teranalisis — sehingga rekaman yang
         // hilang tidak pernah terlihat. Lihat `ExperimentHarness.swift`.
         .experimentRowCountNotAnalyzed, .experimentUnanalyzableWarning,
+        // Penanda "hasil jam lalu" untuk complication. complication ditulis
+        // hanya saat tanda tangannya berubah, jadi tanpa penanda ini nama
+        // objek bisa membeku di pergelangan dan tetap tampil seolah hasil
+        // pengukuran yang sedang berjalan. Lihat `ComplicationDigest.isStale`.
+        .complicationStaleMarker,
     ]
 }
