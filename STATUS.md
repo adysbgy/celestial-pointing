@@ -1,3 +1,106 @@
+## Progres terakhir (5 Okt 2026 - catatan ketukan yang terbuang menghitung bintang, bukan ketukan)
+
+### Dua hitungan yang sama-sama `Int`, dan tidak ada yang bisa memilih
+
+Siklus lalu menambah `redundantTapCount` - jumlah **ketukan** yang tidak
+menambah pengukuran - lengkap dengan identitas yang dijaga:
+`samples.count == distinctReferenceCount + redundantTapCount`. View-nya
+tidak memakainya. Yang dipakai `CalibrationView` adalah:
+
+```swift
+if !flow.repeatedReferenceIDs.isEmpty {
+    Text(CalibrationText.repeatedReferenceHint(
+            repeatedCount: flow.repeatedReferenceIDs.count))
+```
+
+`repeatedReferenceIDs.count` menghitung **bintang** yang diulang. Kalimatnya
+menyebut **ketukan**. Untuk tiga ketukan pada Sirius, kartu menampilkan
+"3 acuan tercatat" lalu "1 ketukan di acuan yang sama tidak menambah
+pengukuran" - padahal yang terbuang 2.
+
+Dua baris itu **saling meniadakan**: pengguna menghitung 3 + 1 dan
+menyimpulkan ada empat ketukan, padahal tiga yang terjadi. Dan pada keadaan
+yang paling sering terjadi (satu bintang diketuk berulang), catatan itu
+selalu berbunyi "1", jadi ia tidak pernah memberi informasi apa pun.
+
+### Kenapa gerbang tetap hijau
+
+- **Aturan 4 dan 6** hanya melihat kunci katalog - dan kuncinya memang
+  sama persis. Yang salah adalah **argumennya**, bukan teksnya.
+- **Uji yang menangkapnya memanggil `CalibrationText` dengan angka yang
+  benar secara manual.** `testDisplayHintCountsTapsNotReferences` menguji
+  *jalurnya sendiri* - fungsi pemformat dengan angka pilihan penulis -
+  bukan jalur yang dirender. Formatter yang benar dengan pemanggil yang
+  salah menghasilkan dua-duanya hijau.
+
+Bentuk paling licin dari kelas yang berulang di repo ini: uji-ujinya benar,
+dokumentasinya benar, dan tidak ada layar yang salah secara terpisah.
+
+### Yang diperbaiki: bentuk pemanggilannya, bukan angkanya
+
+Accessor yang salah (`redundantTapCount`) sudah benar sejak siklus lalu.
+Yang tidak ada adalah **pemanggil tunggal** yang tidak bisa salah pilih:
+
+- **`CalibrationFlow.repetitionHint`** jadi satu-satunya sumber catatan.
+  Syaratnya `> 0`, bukan `> 1`: ketukan **kedua** sudah tidak menambah apa
+  pun, jadi catatan wajib tampil sejak sana. `nil` alih-alih catatan
+  bernilai nol - "0 ketukan ... tidak menambah pengukuran" menyatakan
+  sesuatu yang tidak terjadi.
+- **`CalibrationText.redundantTapHint(repeatedTapCount:)`** - parameternya
+  menyebut benda yang dihitung, jadi `repeatedReferenceIDs.count` tidak
+  bisa masuk tanpa terlihat salah. Bentuk lama `repeatedCount:` **dihapus**,
+  bukan di-deprecate: menyisakannya berarti kelas bug ini masih bisa terjadi
+  lagi, dan tidak ada satu pun pemanggil lain yang butuh ia.
+- Uji lama yang memanggil bentuk itu dihapus; perannya diambil alih
+  `testOnScreenHintCountsTapsNotRepeatedStars` yang lewat accessor.
+
+### Bukti merah: empat mutasi, keempatnya MERAH
+
+| Mutasi | Uji | Hasil |
+|---|---|---|
+| accessor -> `repeatedReferenceIDs.count` | `testOnScreenHintCountsTapsNotRepeatedStars` | **MERAH**: "1 ketukan" untuk tiga ketukan - persis cacat yang ada di layar |
+| syarat `> 0` -> `> 1` | `testHintAppearsFromTheFirstRedundantTap` | **MERAH**: catatan hilang tepat di keadaan yang paling sering |
+| syarat `> 0` -> `>= 0` | `testNoRepetitionMeansNoHintAtAll` | **MERAH**: "0 ketukan di acuan yang sama tidak menambah pengukuran" |
+| identitas rusak | `testTheHintAndTheCountLineAddUpToTheRealTapCount` | **MERAH**: 8 != 5 |
+
+Mutasi ketiga adalah yang paling penting: ia memunculkan **fakta yang
+dikarang** - kalimat yang menyatakan ada kejadian yang tidak terjadi - dan
+bukan cuma angka yang salah. Itu arah yang paling dilarang oleh PRD v0.4.
+
+### Kesalahan saya di tengah
+
+Assertion pertama yang saya tulis menyatakan dua hitungan itu **selalu
+berbeda**. Padahal tidak: untuk satu bintang yang diketuk dua kali keduanya
+sama (1). Dan justru itu sebabnya hitungan bintang lolos tanpa terlihat -
+pada keadaan yang paling sering, angka yang salah **kebetulan benar**.
+
+Jadi penjaga yang saya tulis ulang akan hijau di atas kode yang salah persis
+seperti penjaga yang ia gantikan. Assertion diganti, dan alasannya ditulis di
+sumber supaya orang berikutnya tidak menulisnya lagi.
+
+### Gerbang
+
+- `swift-test.sh` -> **174 CelestialEngine + 587 PointingKit** (583 -> 587, +4).
+  **Engine tidak disentuh.**
+- `swift-ui-lint.sh` -> **19 aturan hijau**. Aturan 10 menangkap README yang
+  masih 583, persis fungsinya.
+- `swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- `red-test.sh` -> empat mutasi merah, termasuk yang memunculkan fakta dikarang.
+- CI: `37323113577` (Engine Tests Linux) + `37323113536` (Apple Build macos-15)
+  - **dua-duanya hijau**.
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat.** Yang dibuktikan: hitungan ketukan
+  benar di kedua arah, pemanggil tunggal tidak bisa salah pilih, penamaan
+  parameter menutup jalur salah, dan build macOS hijau.
+- **Katalog tidak berubah sama sekali.** Tidak ada kunci baru, dan kunci lama
+  dipakai dengan hitungan yang benar - jadi tidak ada satu pun terjemahan yang
+  perlu ditulis ulang atau diverifikasi ulang.
+- **Dua angka ini masih boleh sama.** Itu bukan bug yang tersisa; itu
+  kebetulan yang membuat cacat ini sulit dilihat. Yang dijaga sekarang
+  adalah jalurnya (satu pemanggil), bukan kesamaan angkanya.
+
 ## Progres terakhir (5 Okt 2026 — kunci katalog yang tak dirujuk kode mana pun)
 
 ### Satu entri katalog yang tidak pernah dipakai siapa pun
