@@ -27,11 +27,6 @@ public struct SurfaceColor: Equatable, Sendable {
         self.blue = blue
     }
 
-    /// True bila ketiga kanal identik — abu kelabu asli.
-    public var isGrey: Bool {
-        red == green && green == blue
-    }
-
     /// Kecerahan relatif WCAG 2.1 — **bukan** luminance yang dikalikan
     /// langsung.
     ///
