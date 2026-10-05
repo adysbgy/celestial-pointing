@@ -143,12 +143,14 @@ struct CalibrationView: View {
                                       Int64(flow.distinctReferenceCount)))
                 .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
-            // Pengulangan tidak pernah disembunyikan. Jumlahnya tampil sebagai
-            // catatan kecil di bawah hitungan, supaya tampilan layar dan
-            // pengumuman suara tidak jadi bertentangan dengan prioritas berbeda.
-            if !flow.repeatedReferenceIDs.isEmpty {
-                Text(CalibrationText.repeatedReferenceHint(
-                        repeatedCount: flow.repeatedReferenceIDs.count))
+            // Pengulangan tidak pernah disembunyikan. Yang ditampilkan adalah
+            // accessor dari alur, bukan hitungan yang dihitung view: ada dua
+            // angka yang sama-sama masuk akal di sini (bintang yang diulang vs
+            // ketukan yang terbuang) dan view tidak punya cara memilih yang
+            // benar. Hitungan di atas ("3 acuan") dan hitungan di sini saling
+            // meniadakan: 3 + 1 bukan jumlah ketukan yang benar-benar terjadi.
+            if let hint = flow.repetitionHint {
+                Text(hint)
                     .font(.caption2)
                     .foregroundStyle(PointingTone.warning.color)
             }

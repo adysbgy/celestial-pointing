@@ -149,6 +149,37 @@ public struct CalibrationFlow {
         samples.count - distinctReferenceCount
     }
 
+    /// Catatan kecil yang tampil di bawah hitungan acuan — `nil` saat tidak
+    /// ada ketukan yang terbuang.
+    ///
+    /// **Kenapa ini accessor, bukan view yang menghitung sendiri.** Ada dua
+    /// angka hidup berdampingan di tipe ini dan keduanya `Int`: jumlah
+    /// **bintang** yang diulang (`repeatedReferenceIDs.count`) dan jumlah
+    /// **ketukan** yang terbuang (`redundantTapCount`). Pemanggil yang memilih
+    /// sendiri punya peluang memilih yang salah, dan pilihan yang salah itu
+    /// tidak terlihat: dua-duanya bilangan yang masuk akal untuk kalimat yang
+    /// sama.
+    ///
+    /// Yang terjadi nyata: kartu menampilkan "3 acuan tercatat" lalu "1
+    /// ketukan tidak menambah pengukuran" untuk tiga ketukan pada Sirius.
+    /// Dua angka itu **saling meniadakan** — pengguna menghitung 3+1 dan
+    /// menyimpulkan ada 4 ketukan, padahal 3 yang terjadi — dan yang terbuang
+    /// sebenarnya justru 2. Pada keadaan yang paling sering terjadi (satu
+    /// bintang diketuk berulang), catatan itu selalu berbunyi "1", jadi ia
+    /// tidak pernah memberi informasi apa pun.
+    ///
+    /// `nil` alih-alih catatan bernilai nol: "0 ketukan tidak menambah
+    /// pengukuran" menyatakan sesuatu yang tidak terjadi, dan lapis kedua
+    /// seperti itu adalah tempat layar mulai mengarang.
+    ///
+    /// Syaratnya `> 0`, bukan `> 1`: ketukan **kedua** pada satu bintang
+    /// sudah tidak menambah apa pun, jadi sejak itu catatan wajib ada.
+    public var repetitionHint: String? {
+        redundantTapCount > 0
+            ? CalibrationText.redundantTapHint(repeatedTapCount: redundantTapCount)
+            : nil
+    }
+
     public init(referenceObjects: [CelestialObject] = CalibrationFlow.defaultReferences,
                 maxResidualSpreadDeg: Double = 3.0,
                 minimumSamples: Int = 2) {

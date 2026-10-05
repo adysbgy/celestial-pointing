@@ -118,9 +118,24 @@ public enum CalibrationText {
     /// (lihat `spokenRepeatedReference`). Karena itu ada dua versi, bukan
     /// satu kalimat dipakai dua kali: di layar ada ruang untuk menyebut
     /// jumlahnya, di suara ada ruang hanya untuk akibatnya.
-    public static func repeatedReferenceHint(repeatedCount: Int) -> String {
+    ///
+    /// **Parameter-nya adalah jumlah KETUKAN.** Ini bukan kerapian: di alur ini
+    /// ada dua hitungan yang keduanya masuk akal untuk kalimat yang sama --
+    /// jumlah bintang yang diulang, dan jumlah ketukan yang terbuang. Untuk
+    /// tiga ketukan pada satu bintang, yang terbuang 2, bukan 1.
+    ///
+    /// Bentuk lama menerima `Int` bebas (`repeatedCount:`), dan itulah yang
+    /// membuat cacat ini mungkin: pemanggil boleh mengirim hitungan yang salah
+    /// tanpa apa pun yang terlihat. Nama parameternya sekarang menyebut
+    /// **benda yang dihitung**, jadi `repeatedReferenceIDs.count` tidak lagi
+    /// bisa masuk ke sini tanpa terlihat salah.
+    ///
+    /// Tetap saja, accessor yang benar ada di `CalibrationFlow.repetitionHint`
+    /// dan itulah yang dipakai view. Fungsi ini hanya dipakai dari dalam paket,
+    /// supaya hitungannya sudah benar sebelum kalimatnya lahir.
+    public static func redundantTapHint(repeatedTapCount: Int) -> String {
         TextLocalization.text(.calibrationMessageRepeatedReferenceHint,
-               Int64(repeatedCount))
+               Int64(repeatedTapCount))
     }
 
     /// "Tahap: Siap dipakai."

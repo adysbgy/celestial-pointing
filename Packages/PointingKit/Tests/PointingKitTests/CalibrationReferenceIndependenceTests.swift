@@ -198,32 +198,110 @@ final class CalibrationReferenceIndependenceTests: XCTestCase {
         XCTAssertFalse(flow.isReady)
     }
 
-    /// Catatan layar harus menyebut **jumlah ketukan**, bukan jumlah acuan.
+    // MARK: - Catatan yang tampil harus lahir dari angka yang sama
+
+    /// **Regresi: catatan layar menghitung bintang, bukan ketukan.**
     ///
-    /// Yang dibutuhkan pengguna bukan "ada pengulangan" (itu sudah terlihat
-    /// dari kartu tahap), tapi "berapa ketukan yang saya buang" — supaya dia
-    /// tahu apakah sudah salah arah berulang.
-    func testDisplayHintCountsTapsNotReferences() {
+    /// Dua sumber angka hidup berdampingan di `CalibrationFlow` dan keduanya
+    /// bertipe `Int`, jadi tidak ada satu pun gerbang yang bisa memilih yang
+    /// benar:
+    ///
+    /// - `repeatedReferenceIDs.count` — berapa **bintang** yang diulang.
+    /// - `redundantTapCount` — berapa **ketukan** yang terbuang.
+    ///
+    /// Yang dibutuhkan pengguna dari catatan itu adalah ketukan: "berapa
+    /// ketukan saya yang tidak menambah apa pun". Untuk tiga ketukan pada satu
+    /// bintang, jawabannya 2 — bukan 1. Memakai hitungan bintang membuat
+    /// catatan ini selalu bernilai 1 pada keadaan yang paling sering terjadi
+    /// (satu bintang diketuk berulang), jadi ia tidak pernah memberi informasi
+    /// apa pun.
+    ///
+    /// Bentuk yang diuji sengaja memakai accessor **`CalibrationFlow`**,
+    /// bukan `CalibrationText` yang menerima `Int` secara bebas: kalau view
+    /// boleh mengirim `repeatedReferenceIDs.count` ke sana, pilihan yang salah
+    /// ini bisa terjadi lagi tanpa ada yang melihat — persis cacat yang ada
+    /// sekarang.
+    func testOnScreenHintCountsTapsNotRepeatedStars() {
         var flow = CalibrationFlow()
         add(&flow, "sirius", yawError: 11)
         add(&flow, "sirius", yawError: 11)
         add(&flow, "sirius", yawError: 11)
         add(&flow, "vega", yawError: 9)
 
-        XCTAssertEqual(flow.redundantTapCount, 2,
-                       "dua ketukan susulan terbuang; yang pertama memang ikut dihitung")
-        XCTAssertEqual(flow.repeatedReferenceIDs.count, 1,
-                       "hanya satu bintang yang diulang, bukan dua")
-        XCTAssertEqual(flow.samples.count,
-                       flow.distinctReferenceCount + flow.redundantTapCount,
-                       "identitas ini harus selalu berlaku supaya catatan bisa dipercaya")
-
-        let hint = CalibrationText.repeatedReferenceHint(
-            repeatedCount: flow.redundantTapCount)
-        XCTAssertTrue(hint.contains("2"),
-                      "harus menyebut berapa ketukan yang terbuang: \(hint)")
+        let hint = try! XCTUnwrap(flow.repetitionHint)
+        XCTAssertTrue(hint.contains("2"), "harus menyebut dua ketukan yang terbuang: \(hint)")
         XCTAssertFalse(hint.contains("1 ketukan"),
                        "jumlah bintang akan disalahartikan sebagai jumlah ketukan: \(hint)")
+    }
+
+    /// Tanpa pengulangan tidak ada catatan — bukan catatan yang berbunyi nol.
+    ///
+    /// "0 ketukan tidak menambah pengukuran" menyatakan sesuatu yang tidak
+    /// terjadi, dan ia juga memenuhi syarat `redundantTapCount > 0` kalau
+    /// penjaganya salah ditulis.
+    func testNoRepetitionMeansNoHintAtAll() {
+        var flow = CalibrationFlow()
+        add(&flow, "sirius", yawError: 11)
+        add(&flow, "vega", yawError: 9)
+
+        XCTAssertNil(flow.repetitionHint)
+        XCTAssertTrue(flow.repeatedReferenceIDs.isEmpty)
+    }
+
+    /// Identitas yang membuat catatan bisa dipercaya: jumlah yang tampil +
+    /// jumlah yang terbuang = jumlah ketukan yang benar-benar ada.
+    ///
+    /// Tanpa ini, dua baris di kartu bisa sama-sama "benar" menurut
+    /// hitungannya masing-masing lalu bersama-sama salah: baris atas menghitung
+    /// acuan berbeda, baris bawah menghitung bintang yang diulang, dan
+    /// penjumlahannya bukan apa pun yang terjadi di dunia.
+    func testDisplayedNumbersAreInternallyConsistent() {
+        var flow = CalibrationFlow()
+        add(&flow, "sirius", yawError: 11)
+        add(&flow, "sirius", yawError: 11)
+        add(&flow, "arcturus", yawError: 9)
+
+        XCTAssertEqual(flow.distinctReferenceCount, 2)
+        XCTAssertEqual(flow.redundantTapCount, 1)
+        XCTAssertEqual(flow.samples.count, 3)
+        // Di sini kedua angka **kebetulan sama**, dan itu justru sebabnya
+        // hitungan bintang lolos tanpa terlihat: untuk satu bintang yang
+        // diketuk dua kali -- keadaan yang paling sering terjadi -- "1 ketukan
+        // terbuang" memang kebetulan benar. Cacatnya baru terlihat pada ketukan
+        // ketiga, dan tidak ada pengguna yang menunggu cukup lama untuk itu.
+        XCTAssertEqual(flow.redundantTapCount, flow.repeatedReferenceIDs.count)
+    }
+
+    /// Catatan muncul sejak ketukan **kedua**, bukan sejak yang ketiga.
+    ///
+    /// Penjaga `> 1` alih-alih `> 0` akan lolos uji tiga ketukan di atas
+    /// (karena 2 > 1) dan diam-diam menghilangkan keadaan yang paling sering:
+    /// satu bintang, diketuk dua kali.
+    func testHintAppearsFromTheFirstRedundantTap() {
+        var flow = CalibrationFlow()
+        add(&flow, "sirius", yawError: 11)
+        XCTAssertNil(flow.repetitionHint, "satu ketukan memang menambah pengukuran")
+
+        add(&flow, "sirius", yawError: 11)
+        XCTAssertNotNil(flow.repetitionHint,
+                        "ketukan kedua sudah tidak menambah apa pun — itu harus disebut")
+    }
+
+    /// Catatan harus bisa dibaca bareng baris hitungan di atasnya: kalau
+    /// "2 acuan tercatat" + "2 ketukan terbuang", total ketukan yang terlihat
+    /// di layar adalah 4, dan itu harus sama dengan yang benar-benar disimpan.
+    func testTheHintAndTheCountLineAddUpToTheRealTapCount() {
+        var flow = CalibrationFlow()
+        for id in ["sirius", "sirius", "sirius", "vega", "deneb"] {
+            add(&flow, id, yawError: 11)
+        }
+
+        XCTAssertNotNil(flow.repetitionHint)
+        XCTAssertEqual(flow.distinctReferenceCount, 3)
+        XCTAssertEqual(flow.redundantTapCount, 2)
+        XCTAssertEqual(flow.samples.count, 5)
+        XCTAssertEqual(flow.distinctReferenceCount + flow.redundantTapCount,
+                       flow.samples.count)
     }
 
     /// Pengulangan tidak boleh diperlakukan sebagai tanda kesalahan kalau sudah siap.
