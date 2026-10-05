@@ -151,13 +151,32 @@ struct Experiment1View: View {
     private var resultSection: some View {
         Section("Hasil") {
             let summary = recorder.summary
-            if summary.trialCount == 0 {
+            if recorder.recordedCount == 0 {
                 Text("Belum ada percobaan yang bisa dianalisis.")
                     .foregroundStyle(Color.nightAwareSecondary)
             } else {
-                row("Percobaan", "\(summary.trialCount)")
+                // Angka "Percobaan" sengaja memakai `recordedCount`, bukan
+                // `summary.trialCount`. Yang terakhir hanya menghitung yang
+                // teranalisis, jadi memakainya membuat layar melaporkan lebih
+                // sedikit percobaan dari yang benar-benar ditekan pengguna —
+                // dan selisihnya tidak pernah dijelaskan. Baris berikutnya
+                // yang menyebut jumlah yang tidak teranalisis.
+                row("Percobaan", "\(recorder.recordedCount)")
+                if recorder.unanalyzableCount > 0 {
+                    row(ExperimentText.rowCountNotAnalyzed,
+                        "\(recorder.unanalyzableCount)")
+                }
                 row("Benar", "\(summary.correctCount)")
                 row("False lock", "\(summary.falseLockCount)")
+                if recorder.hasUnanalyzableTrials {
+                    // Disebutkan eksplisit karena akibatnya tidak terlihat dari
+                    // angka: percobaan ini tidak menambah bukti, jadi ambang
+                    // "lulus" tidak makin dekat. Tanpa kalimat ini, pengguna
+                    // akan mengira tinggal menambah percobaan saja.
+                    Text(ExperimentText.countNotAnalyzedWarning(recorder.unanalyzableCount))
+                        .font(.footnote)
+                        .foregroundStyle(PointingTone.warning.color)
+                }
                 if let median = summary.medianRawPointingErrorDeg {
                     row("Galat median", NumberFormat.degrees(median))
                 }

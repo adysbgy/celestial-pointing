@@ -3565,6 +3565,28 @@
           }
         }
       }
+    },
+    "experiment.unanalyzable.warning": {
+      "comment": "Peringatan bahwa percobaan tak teranalisis tidak menambah bukti untuk klaim lulus.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld recorded trials could not be analyzed — they add no evidence."
+          }
+        }
+      }
+    },
+    "experiment.row.countNotAnalyzed": {
+      "comment": "Judul baris jumlah percobaan yang tercatat tapi tidak teranalisis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trials not analyzed"
+          }
+        }
+      }
     }
   }
 }

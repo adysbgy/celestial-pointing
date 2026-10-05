@@ -59,7 +59,39 @@ public struct ExperimentDataset: Codable, Equatable, Sendable {
     }
 
     /// Percobaan yang belum bisa dianalisis (label atau arah kebenaran hilang).
+    ///
+    /// **Kenapa ini harus ada dan bukan cuma `summary`.** `summary` dibangun dari
+    /// `trials.compactMap(\.analysis)`, jadi `trialCount` menghitung **hanya**
+    /// yang teranalisis. Tanpa penghitung ini, rekaman yang tidak bisa dinilai
+    /// hilang tanpa suara: layar menampilkan "Percobaan 12" padahal ada 14
+    /// rekaman, dan selisihnya tidak pernah dijelaskan.
+    ///
+    /// Yang hilang bukan angka kosmetik. `trialCount` itu yang menentukan
+    /// `hasEnoughEvidenceForSafetyClaim`, jadi percobaan yang tak teranalisis
+    /// membuat penguji mengira sampelnya bertambah tanpa bukti baru masuk —
+    /// persis "yakin padahal belum tahu" versi pengukuran.
     public var unanalyzableCount: Int { trials.filter { $0.analysis == nil }.count }
+
+    /// Percobaan yang benar-benar ikut dihitung dalam vonis.
+    ///
+    /// Berbeda dari `summary.trialCount` hanya karena dihitung di sini, bukan
+    /// diambil dari ringkasan — supaya layar bisa menampilkan kedua angka
+    /// berdampingan tanpa menghitung ulang di view.
+    public var analyzedCount: Int { trials.count - unanalyzableCount }
+
+    /// Semua rekaman yang ada, termasuk yang tidak bisa dinilai.
+    ///
+    /// Inilah angka yang jujur untuk baris "Percobaan": yang dihitung engine
+    /// adalah rekaman, dan pengguna menekan tombol sebanyak itu.
+    public var recordedCount: Int { trials.count }
+
+    /// Apakah ada rekaman yang tercatat tapi tidak bisa dinilai.
+    ///
+    /// Penanda ini perlu karena "belum cukup bukti" punya dua sebab yang
+    /// butuh tindakan berbeda: sampel memang masih sedikit, atau sampelnya
+    /// ada tapi separuhnya tidak bisa dinilai. Tanpa penanda, keduanya tampil
+    /// sama dan pengguna akan mengira dia belum menekan tombol cukup kali.
+    public var hasUnanalyzableTrials: Bool { unanalyzableCount > 0 }
 
     /// Percobaan yang engine-nya salah **tetapi** yakin tinggi.
     /// Nol adalah syarat lulus; apa pun di atas nol adalah kegagalan.

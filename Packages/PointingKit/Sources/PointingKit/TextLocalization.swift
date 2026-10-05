@@ -447,5 +447,11 @@ public extension LocalizedText {
         // bisa tampil. Lihat `UncertainReasonBreakdown.swift`.
         .uncertainReasonTooFar, .uncertainReasonAmbiguous,
         .uncertainReasonNone, .rowCountOf,
+        // Percobaan Experiment 1 yang tercatat tapi tidak bisa dinilai.
+        // `unanalyzableCount` sudah ada dan sudah teruji, tapi **nol
+        // konsumen di `Apps/`**: layar hasil menampilkan `trialCount`,
+        // yang hanya menghitung yang teranalisis — sehingga rekaman yang
+        // hilang tidak pernah terlihat. Lihat `ExperimentHarness.swift`.
+        .experimentRowCountNotAnalyzed, .experimentUnanalyzableWarning,
     ]
 }

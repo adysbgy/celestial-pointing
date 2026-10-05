@@ -128,6 +128,32 @@ public enum ExperimentText {
         TextLocalization.text(.experimentVerdictNotAnalyzedSentence)
     }
 
+    // MARK: - Percobaan yang tercatat tapi tidak teranalisis
+
+    /// Judul baris "Percobaan tidak teranalisis".
+    ///
+    /// **Kenapa satu kunci penuh, bukan label yang dirakit.** Label baris
+    /// sebelumnya dicoba dirakit dari `Text("Percobaan") + " " + countNotAnalyzed`.
+    /// Dua string yang disambung di view menghasilkan urutan yang salah di
+    /// bahasa lain, dan Aturan 4 di `swift-ui-lint.sh` menolaknya. Satu kunci
+    /// penuh menyelesaikan keduanya.
+    ///
+    /// Jumlahnya **tidak** ikut di sini: nilainya sudah jadi kolom kanan baris
+    /// itu, jadi menyebutkannya lagi akan mencetak angka yang sama dua kali.
+    public static var rowCountNotAnalyzed: String {
+        TextLocalization.text(.experimentRowCountNotAnalyzed)
+    }
+
+    /// Peringatan yang menyebut berapa yang hilang dan akibatnya.
+    ///
+    /// **Kenapa kalimat, bukan sekadar angka.** Angka "2" tanpa penjelasan
+    /// membuat pengguna mengira ada yang belum selesai. Yang hilang
+    /// justru akibatnya: percobaan itu tidak menambah bukti, jadi ambang
+    /// "lulus" tidak makin dekat.
+    public static func countNotAnalyzedWarning(_ count: Int) -> String {
+        TextLocalization.text(.experimentUnanalyzableWarning, Int64(count))
+    }
+
     // MARK: - Baris detail percobaan
 
     /// Kata pengganti nama objek saat engine belum menjawab.
@@ -327,6 +353,14 @@ public extension LocalizedText {
         key: "experiment.verdict.wrong", id: "salah")
     static let experimentVerdictNotAnalyzed = LocalizedText(
         key: "experiment.verdict.notAnalyzed", id: "tak dianalisis")
+    /// Judul baris jumlah percobaan yang tercatat tapi tidak teranalisis.
+    static let experimentRowCountNotAnalyzed = LocalizedText(
+        key: "experiment.row.countNotAnalyzed",
+        id: "Percobaan tidak teranalisis")
+    /// "%lld percobaan tercatat tapi tidak teranalisis — tidak menambah bukti."
+    static let experimentUnanalyzableWarning = LocalizedText(
+        key: "experiment.unanalyzable.warning",
+        id: "%lld percobaan tercatat tapi tidak teranalisis — tidak menambah bukti.")
     static let experimentVerdictFalseLockSentence = LocalizedText(
         key: "experiment.verdict.falseLock.sentence",
         id: "False lock: engine yakin tapi salah.")

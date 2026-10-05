@@ -153,6 +153,37 @@ public final class ExperimentRecorder: ObservableObject {
     /// Ringkasan angka.
     public var summary: ExperimentSummary { harness.summary }
 
+    /// Rekaman apa adanya, tanpa konteks ekspor.
+    ///
+    /// Dipakai sebagai sumber angka tampilan. Yang dihitung dari sini adalah
+    /// `trials` — bukan ringkasan analisis — supaya "Percobaan" sama dengan
+    /// jumlah baris yang benar-benar ada di daftar di bawahnya.
+    private var recordedTrials: ExperimentDataset {
+        harness.dataset(calibration: engine.controller.calibration,
+                        confidenceSigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg,
+                        aim: engine.snapshot.aim.rawValue)
+    }
+
+    /// Jumlah rekaman yang benar-benar tercatat, termasuk yang tak teranalisis.
+    ///
+    /// **Kenapa view butuh ini, bukan cuma `summary`.** `summary.trialCount`
+    /// hanya menghitung percobaan yang teranalisis, sedangkan daftar di layar
+    /// menampilkan semua rekaman. Kalau view hanya punya `summary`, "Percobaan"
+    /// akan terlihat lebih sedikit dari baris yang benar-benar ada — dan
+    /// selisihnya tidak akan pernah dijelaskan.
+    public var recordedCount: Int { recordedTrials.recordedCount }
+
+    /// Percobaan yang tercatat tapi tidak bisa dinilai.
+    ///
+    /// Ketentuannya sengaja **dibaca** dari paket, bukan dihitung ulang di sini:
+    /// `ExperimentDataset` sudah menghitungnya, dan dua definisi "tak
+    /// teranalisis" yang berbeda diam-diam akan membuat layar dan vonis
+    /// memakai dua definisi yang berbeda.
+    public var unanalyzableCount: Int { recordedTrials.unanalyzableCount }
+
+    /// Apakah ada rekaman yang tercatat tapi tidak bisa dinilai.
+    public var hasUnanalyzableTrials: Bool { recordedTrials.hasUnanalyzableTrials }
+
     /// Usulan ambang keyakinan dari hasil yang sudah terkumpul.
     ///
     /// `nil` berarti belum cukup data — engine tetap memakai ambang bawaannya,
