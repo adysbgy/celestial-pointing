@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import re
 import struct
 import sys
 import zlib
@@ -752,6 +753,69 @@ def check_port_matches_swift_constants(results):
             f" di {where}"))
 
 
+def swift_tuple_triples(source, anchor, terminator="]"):
+    """Semua `(a, b, c)` dari sumber Swift, mulai setelah `anchor`.
+
+    Dipakai untuk membandingkan **seluruh** larik, bukan elemen pertamanya.
+    Angka dikembalikan sebagai `float` supaya `0.10` dan `0.1` dianggap sama —
+    yang dibandingkan nilainya, bukan cara menulisnya.
+    """
+    start = source.index(anchor) + len(anchor)
+    end = source.index(terminator, start)
+    region = source[start:end]
+    return [tuple(float(v) for v in match)
+            for match in re.findall(
+                r"\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,"
+                r"\s*(-?\d+(?:\.\d+)?)\s*\)", region)]
+
+
+def check_feature_arrays_match_the_view(results):
+    """Larik kawah & maria harus cocok **seluruhnya**, bukan elemen pertamanya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Gerbang pergeseran di atas menjaga
+    `CRATERS[0]` dan `MARIA[0]` — satu elemen dari lima dan satu dari empat.
+    Sisa tujuh angka tidak dijaga siapa pun: mengubah kawah keempat Merkurius
+    di view akan **membiarkan setiap pemeriksaan hijau** sambil mengukur
+    gambar yang sudah tidak ada lagi. Itu persis cacat yang berkas ini ada
+    untuk mencegah, dan polanya sama dengan yang sudah dua kali muncul:
+    gerbang yang mengukur sebagian dari apa yang diklaimnya.
+
+    Elemen pertama saja yang dijaga kemungkinan besar karena menulis sepuluh
+    pemeriksaan satu per satu terasa berlebihan — dan itu tepat alasan yang
+    membuat lubangnya tidak terlihat. Di sini kedua sisi **dibaca dari
+    sumbernya**: larik port dari berkas port, larik view dari teks Swift-nya.
+    Tidak ada daftar yang harus diperbarui dengan tangan, jadi tidak ada
+    daftar yang bisa tertinggal separuh.
+
+    Arahnya juga dua bahasa: pemeriksaan ini merah kalau port menyimpang
+    **atau** kalau view berubah tanpa port-nya ikut — yang kedua tidak bisa
+    dilihat oleh pemeriksaan gambar mana pun, karena gambar itu sendiri yang
+    ikut berubah.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    for label, port_array, anchor in (
+            ("kawah Merkurius", R.CRATERS,
+             "let craters: [(CGFloat, CGFloat, CGFloat)] = ["),
+            ("maria Bulan", R.MARIA, "for (dx, dy, size) in [")):
+        swift_array = swift_tuple_triples(view, anchor)
+        results.append(Result(
+            f"larik {label}: jumlah sama dengan view",
+            len(swift_array) == len(port_array),
+            f"port {len(port_array)}, view {len(swift_array)}"))
+        # Dibandingkan elemen per elemen supaya pesannya menyebut **indeks**
+        # yang berbeda: "lariknya tidak sama" tidak memberi tahu apakah ada
+        # yang salah tempat, hilang, atau bertambah di akhir.
+        mismatched = [i for i, (a, b) in enumerate(zip(port_array, swift_array))
+                      if any(abs(x - y) > 1e-9 for x, y in zip(a, b))]
+        results.append(Result(
+            f"larik {label}: tiap elemen sama dengan view",
+            not mismatched and len(swift_array) == len(port_array),
+            "semua elemen cocok" if not mismatched
+            else f"beda di indeks {mismatched}: port "
+                 f"{[port_array[i] for i in mismatched]}, view "
+                 f"{[swift_array[i] for i in mismatched]}"))
+
+
 def check_night_mode_purity(results, size=200, ss=2):
     """Mode malam: hijau & biru harus **nol**, bukan "kecil".
 
@@ -1062,6 +1126,7 @@ def main():
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
+    check_feature_arrays_match_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_png_is_well_formed(results)
