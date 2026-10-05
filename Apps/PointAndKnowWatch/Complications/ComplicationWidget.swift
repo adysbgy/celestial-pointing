@@ -127,8 +127,15 @@ struct ComplicationView: View {
             // di pergelangan tangan inilah satu-satunya penanda yang tersedia,
             // dan tanpa itu nama kandidat `.uncertain` terbaca persis seperti
             // nama yang sudah terkunci. Lihat `carriesUncertaintyMarker`.
+            //
+            // Dan ikon **ikut umur** — pakai versi `at:`. Keluarga ini tidak
+            // punya baris kedua, jadi `.staleMarker` tidak pernah dirender di
+            // sini; tanpa bentuk yang memperhitungkan waktu, cuplikan yang
+            // sudah 90 menit tetap tampil sebagai centang hijau + nama,
+            // persis seperti lock yang baru saja terjadi. Lihat
+            // `presentedSymbolName(at:)`.
             AnyView(Gauge(value: 1) {
-                Image(systemName: digest.presentedSymbolName)
+                Image(systemName: digest.presentedSymbolName(at: Date()))
             } currentValueLabel: {
                 Text(digest.headline)
                     // Semantik, bukan `.system(size: 11)`. Lingkaran
@@ -144,7 +151,13 @@ struct ComplicationView: View {
         case .accessoryRectangular:
             // Persegi panjang: simbol + nama + jenis.
             AnyView(HStack(spacing: 4) {
-                Image(systemName: digest.presentedSymbolName)
+                // Versi `at:`, sama seperti lingkaran. Baris kedua di sini
+                // memang sudah bisa menampilkan `.staleMarker`, tapi ikon tetap
+                // kanal utama yang dibaca lebih dulu — centang hijau di sebelah
+                // "hasil jam lalu" masih terbaca sebagai keberhasilan.
+                // Satu aksesor untuk kedua keluarga yang punya ikon, supaya
+                // tidak ada daftar ikon kedua yang bisa berbeda pendapat.
+                Image(systemName: digest.presentedSymbolName(at: Date()))
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(digest.headline)

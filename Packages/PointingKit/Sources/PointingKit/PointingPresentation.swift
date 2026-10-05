@@ -482,7 +482,58 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     /// Satu-satunya sumber nilainya adalah `symbolName` yang sudah ada dan
     /// sudah diuji (`testAllStatesHaveSymbolsAndLabels`), jadi tidak ada daftar
     /// ikon kedua yang bisa berbeda pendapat dengan keadaan.
+    ///
+    /// **Batasnya: bentuk ini tidak tahu tentang waktu.** Bentuk ini yang tepat untuk
+    /// pemanggil yang sedang menampilkan cuplikan itu sendiri (saat ini tidak
+    /// ada — app jam tidak memakai digest). Untuk complication, yang berjalan di
+    /// proses terpisah dan **hanya** menerima cuplikan baru saat ada
+    /// perubahan, bentuk inilah yang bocor: lihat `presentedSymbolName(at:)`.
     public var presentedSymbolName: String {
         state?.symbolName ?? "scope"
     }
+
+    /// Ikon untuk complication, **memperhitungkan umur cuplikan**.
+    ///
+    /// **Premis siklus ini.** Seluruh lapisan basi di digest ini
+    /// (`isStale(at:)`, `confirmsIdentityNow(at:)`, `sublineContent(at:)`)
+    /// hanya menjangkau kanal **teks**. Complication punya dua kanal, dan di
+    /// `.accessoryCircular` — keluarga yang tidak punya baris kedua —
+    /// ikon adalah satu-satunya penanda yang ada. Karena bentuk tanpa waktu
+    /// mengembalikan `stateRaw` mentah, cuplikan yang sudah basi tetap
+    /// menampilkan `checkmark.circle.fill` persis seperti lock yang baru saja
+    /// terjadi. Di pergelangan: centang hijau + nama, tanpa satu penanda pun.
+    ///
+    /// Yang membuat ini bertahan adalah bentuk dokumentasinya, bukan bug
+    /// pemetaan: dokumen di aksesor ini panjang dan **benar** — ia benar-benar
+    /// memindahkan ikon supaya `.uncertain` tak terbaca seperti `.lock`.
+    /// Dokumen itu berhenti satu kalimat sebelum pertanyaan yang lebih besar:
+    /// keadaan **yang**? Waktu tidak pernah ikut dipertimbangkan, dan karena
+    /// `stateRaw` tidak pernah berubah sendiri, tidak ada yang melihatnya.
+    ///
+    /// **Kenapa jawabannya bukan "hapus ikonnya".** Ikon adalah satu-satunya
+    /// penanda di lingkaran; menghapusnya membuat kunci yang lalu terlihat dan
+    /// ragu jadi sama persis. Yang berubah hanya **makna** ikon: dari
+    /// "kunci berhasil" jadi "kunci ini sudah tua".
+    ///
+    /// Simbol dipilih dari keluarga `clock.badge` yang sudah ada di SF Symbols
+    /// (iOS 16/watchOS 9), jadi tidak menambah kebutuhan deployment baru —
+    /// ambang di `project.yml` tetap 18.0/11.0 dan tidak perlu disentuh.
+    public func presentedSymbolName(at now: Date) -> String {
+        // Basi hanya bermakna kalau memang ada **nama** yang bisa basi. Pada
+        // `searching` tidak ada nama sama sekali, jadi "kunci ini lama" adalah
+        // kalimat yang tidak merujuk apa pun — dan menempelkannya ke sana
+        // akan membuat keadaan tanpa jawaban tampil seolah ia punya jawaban
+        // yang sudah lama. Keadaan tanpa jawaban dikembalikan apa adanya.
+        guard hasAnswer, isStale(at: now) else {
+            return state?.symbolName ?? "scope"
+        }
+        return Self.staleSymbolName
+    }
+
+    /// Ikon yang menyatakan "cuplikan ini sudah tua".
+    ///
+    /// Satu token, bukan daftar per keadaan: satu-satunya keadaan yang bisa
+    /// basi sambil masih punya jawaban adalah `.lock` dan `.uncertain`, dan
+    /// keduanya sudah membaca ikonnya sendiri sebelum sampai ke sini.
+    static let staleSymbolName = "clock.badge.exclamationmark"
 }
