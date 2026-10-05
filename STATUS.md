@@ -1,3 +1,63 @@
+## Progres terakhir (5 Okt 2026 — kunci katalog yang tak dirujuk kode mana pun)
+
+### Satu entri katalog yang tidak pernah dipakai siapa pun
+
+Menyisir 434 kunci di `Localizable.xcstrings` terhadap seluruh kode sumber
+menghasilkan **satu** kunci yang benar-benar tak dirujuk: `Status: %@.`
+
+Kunci itu berbentuk **literal Bahasa Indonesia**, bukan konvensi
+`calibration.statusPrefix` seperti semua kunci lain di katalog — jadi ia
+tidak mungkin dirujuk `TextLocalization`, yang mencari lewat nama kunci.
+=`grep -rn 'Status: %@' Apps Packages` mengembalikan nol hasil di luar
+katalog itu sendiri.
+
+Mengapa ini penting, dan kenapa bukan sekadar kerapian:
+
+**Katalog adalah satu-satunya sumber teks untuk bahasa selain Bahasa
+Indonesia.** `SWIFT_EMIT_LOC_STRINGS: NO` (sengaja, `project.yml:102`)
+membuat Xcode tidak akan pernah mengisinya sendiri — jadi yang menulis entri
+itu adalah manusia, dan entri yatim mengaku sebagai terjemahan yang tidak
+diverifikasi siapa pun. Kalau nanti ada yang memutuskan "terjemahan ini sudah
+selesai", entri yatim membuatnya terlihat selesai.
+
+**Yang lebih berbahaya adalah kebalikannya.** Kalau ada kode yang memanggil
+kunci yang **hanya** hidup di katalog sebagai entri yatim — bukan lewat
+`TextLocalization` — maka `text()` jatuh ke nilai bawaan Bahasa Indonesia
+**tanpa pernah memberi tahu**. Di app berbahasa Inggris, teks itu muncul
+dalam Bahasa Indonesia dan tidak ada satu pun gerbang yang menyala. Itu
+persis kelas "hijau yang tidak hijau" yang menjadi alasan Aturan 6 ada.
+
+**Aturan 6 tidak menangkapnya.** Aturan 6 menjaga paritas dua arah hanya
+untuk kunci ber-namespace — `pointing.state.`, `confidence.level.`,
+`link.kind.`, `object.kind.`. Kunci di luar namespace itu memang tidak
+pernah dicek arah baliknya, jadi katalog boleh memuat entri mati dan suite
+tetap hijau.
+
+Entri itu dihapus (434 → 433). Format berkas dijaga: diff-nya 11 baris
+hapus, tanpa satu pun baris lain yang berubah.
+
+### Aturan 19: kunci katalog yang tak terpakai
+
+Gerbang baru, untuk kelas "hijau yang tidak hijau" yang sama.
+
+Pemeriksaannya sengaja **menyilang seluruh berkas `.swift`** di `Apps/` dan
+`Packages/`, lalu menganggap kunci "dipakai" bila muncul sebagai substring di
+mana saja. Itu kedengarannya longgar, dan memang sengaja longgar: yang
+dilarang adalah **ketiadaan** kunci, bukan kesalahan pengenalan pola.
+Memakai satu pohon saja akan melaporkan kunci yang sah sebagai yatim — dan
+itulah merah yang tidak merah. Kunci bisa dirujuk lewat `key:`, lewat enum
+ber-kasus, atau lewat `LocalizedText`; ketiganya berakhir sebagai substring
+yang sama.
+
+Sudah dibuktikan dua arah, bukan cuma diasumsikan bekerja:
+
+- **Merah** — entri `KunciYatimSengajaDibuat` disisipkan → gerbang merah
+  dan menyebut kuncinya.
+- **Hijau** — entri itu dihapus kembali → semua 19 gerbang hijau.
+
+Kunci `Status: %@.` dihapus, Aturan 19 dipasang. 174 CelestialEngine +
+566 PointingKit tetap hijau.
+
 ## Progres terakhir (5 Okt 2026 — nilai bawaan yang mengklaim identitas saat engine ragu)
 
 ### Tiga tempat membawa baku `= true` untuk pertanyaan yang harusnya `false`

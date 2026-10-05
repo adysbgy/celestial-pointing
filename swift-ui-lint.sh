@@ -1849,6 +1849,75 @@ else
   echo "Bersih: klaim identitas tidak ada yang berbaku true."
 fi
 
+# ── Aturan 19: kunci katalog yang tak terpakai (kunci yatim) ───────────────
+# Aturan 6 menjaga paritas dua arah, tapi hanya untuk kunci **ber-namespace**
+# (`pointing.state.`, `confidence.level.`, `link.kind.`, `object.kind.`). Kunci
+# di luar namespace itu tidak pernah dicek arah baliknya: katalog boleh
+# memuat entri yang tidak dirujuk oleh satu baris kode pun, dan suite tetap
+# hijau.
+#
+# Ini bukan sekadar kerapian. Katalog adalah **satu-satunya** sumber teks
+# untuk bahasa selain Bahasa Indonesia, dan entri yatim mengaku sebagai
+# terjemahan yang belum diverifikasi siapa pun. Lebih buruk: entri yatim
+# berpotensi menutupi kebalikannya. Kalau kode memanggil kunci yang **hanya**
+# ada di katalog sebagai entri yatim (bukan lewat `TextLocalization`), maka
+# `TextLocalization.text()` jatuh ke nilai bawaan Bahasa Indonesia tanpa
+# pernah memberi tahu -- persis kelas "hijau yang tidak hijau" yang menjadi
+# alasan Aturan 6 ditulis.
+#
+# Yang ditemukan saat aturan ini ditulis: `Status: %@.` -- satu entri berkunci
+# literal (bukan `calibration.statusPrefix`), tanpa satu rujukan pun di
+# `Apps/` maupun `Packages/`, lengkap dengan terjemahan `en`. Satu-satunya
+# kunci yatim di katalog. Ia dihapus, dan aturan ini mencegahnya kembali.
+#
+# Pemeriksaannya sengaja **menyilang seluruh berkas .swift**: kunci bisa
+# dirujuk lewat `key:`, lewat enum ber-kasus, atau lewat `LocalizedText`.
+# Yang dihitung adalah ketiadaan kunci di seluruh kode sumber.
+echo
+echo "== Aturan 19: kunci katalog yang tidak dipakai kode mana pun =="
+orphan_keys=$(python3 - <<'PY' 2>&1
+import json, os
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+if not os.path.exists(CATALOG):
+    print("BELUM-ADA-KATALOG")
+    raise SystemExit(0)
+
+strings = json.load(open(CATALOG, encoding="utf-8"))["strings"]
+
+# Seluruh kode sumber, sekali, menjadi satu teks. Kunci bisa dirujuk dari
+# Apps/ (pemanggil) maupun Packages/ (deklarasi kunci), jadi kedua pohon
+# harus ikut -- memeriksa hanya satu pohon akan melaporkan kunci yang sah
+# sebagai yatim, dan itulah "merah yang tidak merah".
+blob = []
+for root in ("Apps", "Packages"):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d != ".build"]
+        for name in sorted(filenames):
+            if name.endswith(".swift"):
+                path = os.path.join(dirpath, name)
+                try:
+                    blob.append(open(path, encoding="utf-8", errors="ignore").read())
+                except OSError:
+                    continue
+source = "\n".join(blob)
+
+orphans = sorted(k for k in strings if k not in source)
+print("\n".join(f"  {k!r}" for k in orphans))
+PY
+)
+if [ "$orphan_keys" = "BELUM-ADA-KATALOG" ]; then
+  echo "Katalog belum ada: aturan 19 belum berlaku, bukan kegagalan."
+elif [ -n "$orphan_keys" ]; then
+  echo "Katalog memuat kunci yang tidak dirujuk kode mana pun:"
+  printf '%s\n' "$orphan_keys"
+  echo "-> Hapus entri itu, atau rujuk ia dari kode. Entri yatim adalah"
+  echo "   terjemahan yang tidak diverifikasi siapa pun."
+  status=1
+else
+  echo "Bersih: setiap kunci katalog dirujuk oleh kode."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

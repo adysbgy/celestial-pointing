@@ -1134,17 +1134,6 @@
         }
       }
     },
-    "Status: %@.": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status: %@."
-          }
-        }
-      }
-    },
     "Sudah": {
       "comment": "Nilai baris Kalibrasi saat kalibrasi sudah ada.",
       "localizations": {
