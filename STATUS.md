@@ -1,3 +1,87 @@
+## Progres terakhir (5 Okt 2026 — arsip eksperimen bisa berbohong soal keselamatan)
+
+### Dua bentuk kebenaran yang tidak saling mengikat
+
+`ExperimentDataset` membawa dua field yang isinya **sama**: `trials`
+(daftar rekaman) dan `summary` (hasil hitungannya). `summary` dihitung
+sekali di `init`, lalu ikut disalin ke arsip JSON sebagai field biasa, dan
+`DatasetArchive.decode` menerimanya apa adanya.
+
+Akibatnya `safetyVerdict` — yang membaca `falseLockCount` — bisa dibangun
+dari hitungan yang **tidak pernah dihitung**. Bukan crash, bukan warna salah,
+dan tidak ada gerbang yang menyala: `trials` benar, `summary` juga "benar"
+menurut dirinya sendiri.
+
+Yang membuatnya tidak bisa diabaikan: berkas ini **persis** yang dipilih
+pengguna untuk dibawa keluar app sebagai bukti. Alat ukur repo ini sendiri
+(PRD v0.4: akurasi jam adalah hipotesis) exporting vonis keselamatan dari
+angka yang bisa diganti tangan adalah kegagalan di tempat yang paling harus
+jujur.
+
+### Yang diperbaiki
+
+`summary` jadi **computed** dari `trials`. `trials` tetap ikut di arsip supaya
+berkas ekspor tetap berdiri sendiri sebagai bukti yang bisa dibaca pihak lain;
+yang hilang adalah ukuran ringkasannya — yang sebelumnya berarti data kedua
+yang harus dipercaya tanpa pernah diverifikasi.
+
+Arah pembedaannya penting: memperbaiki dengan **membuang** `summary` dari
+arsip juga akan membuat cacat ini hilang, tapi ia menghapus sumber kebenaran
+dari alat bukti. Yang benar adalah menjadikan `trials` satu-satunya sumber
+dan membiarkan ringkasan selalu menyertainya.
+
+### Bukti merah: mutasi yang benar-benar membatalkan perbaikan
+
+Dua percobaan pertama gagal dan keduanya salah karena alasan yang salah:
+
+1. **Mutasi tidak bisa dikompilasi.** `summary` dikembalikan jadi property
+   tersimpan tanpa initializing di `init` → error kompiler. Itu bukan bukti.
+   compiler menangkap bentuk salah, bukan bentuk yang berbahaya.
+2. **Uji pertama hijau di atas kode rusak.** Bentuk pertamanya menuliskan
+   JSON literal dengan `trials: []` dan `falseLockCount: 0` — jadi kedua
+   angka itu **memang sudah cocok** dan tidak ada yang bertentangan. Uji itu
+   tidak menanggung beban sama sekali.
+
+Bentuk yang benar membangun arsip **sungguhan** dari rekaman yang berisi satu
+false lock, lalu mengganti field `summary`-nya. Isinya benar-benar
+bertentangan: ringkasan bilang 0, rekaman bilang 1.
+
+Baris paling penting di uji itu adalah **prasyaratnya**
+(`decoded.falseLocks.count == 1`) — tanpa itu, mutasi apa pun yang membuat
+`trials` kosong akan membuat uji tetap hijau karena kedua angka sama-sama nol.
+
+Mutasi yang lolos kompilasi (menjadikan `summary` field yang dipercaya dari
+arsip, lengkap dengan `init(from:)`/`encode(to:)`) → **MERAH tepat di uji
+baru**: `("0") is not equal to ("1")`.
+
+### Pelajaran yang berulang
+
+Ini pola yang sudah muncul di siklus "Percobaan menyusut" dan di Aturan 17:
+**hijau dari uji yang tidak bisa dibatalkan bukan bukti apa pun.** Yang
+menjadinya ketahuan adalah mutasi, bukan `swift-test.sh` — keduanya hijau.
+
+### Gerbang
+
+- `swift-test.sh` → **172 CelestialEngine + 549 PointingKit**, 0 gagal
+  (547 → 549, +2). **Engine tidak disentuh** (perubahan hanya di `PointingKit`).
+- `swift-ui-lint.sh` → **17 aturan hijau** (Aturan 10 menangkap README 547 → 549).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- CI: Engine Tests (Linux) + Apple Build (macos-15) — **dua-duanya hijau** pada 3800c13.
+
+### Batas yang jujur
+
+- **Yang ditutup adalah pemalsuan lewat arsip, bukan rekaman yang salah.**
+  Percobaan yang keliru tetap keliru; yang berubah adalah ia kini selalu
+  konsisten dengan ringkasannya, jadi bisa diperiksa.
+- **`trials` masih `public var`.** Tidak ada mutasi di `Apps/` sekarang,
+  jadi tidak ada dua sumber kebenaran yang aktif — tapi sifatnya masih
+  terbuka. Mengunci `trials` (mis. `private(set)`) adalah unit berikutnya
+  kalau sapuan menemukan pemanggil yang butuh.
+- **`falseLocks` masih nol konsumen di `Apps/`.** Sekarang ia bukan lagi
+  sumber kedua yang bisa menyimpang, karena `falseLocks` dan `summary`
+  diturunkan dari `trials` yang sama — tapi ia tetap aksesor yang belum
+  dipakai layar.
+
 ## Progres terakhir (5 Okt 2026 — aksesor display didokumentasikan sebagai dipakai, lalu disalin)
 
 ### Premis siklus ini: "dipakai view" yang tidak pernah dipakai
