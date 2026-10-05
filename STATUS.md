@@ -1,3 +1,74 @@
+## Progres terakhir (5 Okt 2026 — PNG alat render tak sah, dan pembaca yang menutupinya)
+
+### Cacatnya: penulis dan pembaca repo ini sepakat satu sama lain, dunia luar tidak
+
+`Tools/render-visuals.py` adalah alat yang dipakai untuk **menilai mutu
+gambar** — ia merender planet, Bulan, bintang, nebula ke `out/visuals/`,
+lalu `Tools/check-visuals.py` mengukurnya. Seluruh nilai alat itu
+bergantung pada satu hal: PNG-nya bisa dibuka.
+
+Ternyata tidak bisa. `_png()` menggabungkan baris RGBA **apa adanya**,
+tanpa byte filter 0 di awal tiap baris:
+
+```python
+raw = b"".join(pixels[y * width * 4:(y + 1) * width * 4] for y in range(height))
+```
+
+Byte filter per baris itu bagian dari spesifikasi PNG, bukan pilihan.
+Arus IDAT yang dihasilkan berukuran `h * w * 4` (16384 byte untuk 64×64),
+sedangkan pembaca mana pun menuntut `h * (w * 4 + 1)` (16448). Byte
+pertama tiap baris dibaca sebagai **tipe filter**; nilainya (mis. `0x0a`)
+di luar 0…4, jadi berkasnya ditolak: `ffmpeg` menolak setiap PNG dengan
+`IEND without all image`, dan Preview/browser sama.
+
+### Kenapa tidak ada yang menangkapnya: pembacanya ikut salah
+
+`decode_png` di `check-visuals.py` **sengaja toleran**. Ia mengukur
+panjang arus, lalu memilih "tidak ada byte filter" kalau panjangnya
+kurang:
+
+```python
+filtered = len(raw) == height * (stride + 1)
+```
+
+Jadi `check_png_roundtrip` — uji regresi yang ditulis **persis** untuk
+cacat filter byte ini — tetap hijau: penulis dan pembaca repo ini sepakat
+satu sama lain sementara setiap pembaca PNG di dunia tidak. Komentar
+`_png()` sendiri sudah mengklaim "menyisipkan satu byte filter 0 per
+baris"; ia tidak melakukannya. Kelas cacat yang sama dengan yang sudah
+dijaga berkas ini: **gerbang yang diam-diam mengukur hal lain**, dan
+gambarnya "kelihatan seperti planet" sehingga tidak ada yang mencurigainya.
+
+`Tools/make_app_icons.py` sudah benar sejak awal (`b"\x00" + ...`) — jadi
+tidak ada alasan bahwa `_png()` yang kedua tidak.
+
+### Perbaikan (regression test dulu, baru perbaikan)
+
+`check_png_is_well_formed` baru di `Tools/check-visuals.py` menguji
+invarian spesifikasi PNG **langsung dari arus IDAT**, tanpa memakai
+`decode_png` yang toleran itu: panjang arus harus `h * (w * 4 + 1)`, dan
+setiap byte filter di awal baris harus 0…4. Itu definisi yang dipakai
+pembaca mana pun, jadi gerbangnya tidak bisa sepakat dengan penulis yang
+salah.
+
+Terbukti MERAH dulu (4 gagal):
+
+```
+GAGAL PNG sah: planet-jupiter-confirmed   arus IDAT 16384 byte, spesifikasi menuntut 16448
+```
+
+Lalu `_png()` menulis `b"\x00"` di awal tiap baris, dan komentar
+`decode_png` diperjelas: toleransi itu bukan izin.
+
+### Verifikasi
+
+- 49 pemeriksaan visual hijau (dari 45 → 49; 4 pemeriksaan baru).
+- `ffmpeg` kini mendekode tiap PNG tanpa keluhan — bukti dari pembaca di
+  luar repo, bukan dari pembaca kita sendiri.
+- 600 tes Swift tetap hijau; lint UI 24 aturan hijau.
+- Diverifikasi lewat `vision_analyze`: Jupiter terbaca berpita + Bintik
+  Merah Besar, Saturnus terbaca bercincin.
+
 ## Progres terakhir (5 Okt 2026 — sabit Bulan yang tercermin, dan kenapa tak ada uji yang bisa melihatnya)
 
 ### Cacatnya: gambar yang benar di model, salah di layar
