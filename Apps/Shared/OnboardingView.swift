@@ -34,12 +34,12 @@ struct OnboardingView: View {
                     .foregroundStyle(SurfacePalette.active.accentGradient)
                     .accessibilityHidden(true)
 
-                Text("Arahkan jam ke langit")
+                Text(TextLocalization.text(.onboardingTitle))
                     .font(.title2.bold())
                     .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                     .multilineTextAlignment(.center)
 
-                Text("Tunjuk sebuah benda, dan ketahui apa yang sedang kamu lihat — bersama seberapa yakin engine mengenalinya.")
+                Text(TextLocalization.text(.onboardingSubtitle))
                     .font(.subheadline)
                     .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     .multilineTextAlignment(.center)
@@ -49,14 +49,14 @@ struct OnboardingView: View {
                 // apa adanya. Ini satu-satunya tempat yang berani mengatakan
                 // "mungkin tidak tahu", supaya ekspektasi pengguna jujur sejak
                 // pertama kali membuka app.
-                Text("Jika ragu, engine akan mengatakannya. Tidak ada yang diklaim sebagai pasti bila belum.")
+                Text(TextLocalization.text(.onboardingHonesty))
                     .font(.caption)
                     .foregroundStyle(PointingTone.warning.color)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
 
                 Button(action: onDone) {
-                    Text("Mulai")
+                    Text(TextLocalization.text(.onboardingStart))
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
@@ -68,6 +68,6 @@ struct OnboardingView: View {
             .padding()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Perkenalan. Arahkan jam ke langit untuk mengetahui benda yang kamu lihat. Jika ragu, engine akan mengatakannya.")
+        .accessibilityLabel(TextLocalization.text(.onboardingLabel))
     }
 }

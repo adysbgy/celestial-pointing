@@ -3631,6 +3631,61 @@
           }
         }
       }
+    },
+    "onboarding.title": {
+      "comment": "Judul kartu perkenalan value-first (layar onboarding).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point your watch at the sky"
+          }
+        }
+      }
+    },
+    "onboarding.subtitle": {
+      "comment": "Subjudul onboarding: apa yang didapat setelah menunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aim at a body and learn what you are looking at — and how confident the engine is."
+          }
+        }
+      }
+    },
+    "onboarding.honesty": {
+      "comment": "Janji produk onboarding: ketidak-pastian ditampilkan apa adanya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If it is unsure, the engine will say so. Nothing is claimed as certain until it is."
+          }
+        }
+      }
+    },
+    "onboarding.start.label": {
+      "comment": "Label tombol tutup kartu onboarding.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        }
+      }
+    },
+    "onboarding.label": {
+      "comment": "Label VoiceOver kartu onboarding utuh (merangkum ketiga baris).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduction. Point your watch at the sky to learn what you are looking at. If unsure, the engine will say so."
+          }
+        }
+      }
     }
   }
 }

@@ -256,6 +256,27 @@ public extension LocalizedText {
     static let linkKindAcknowledgement = LocalizedText(
         key: "link.kind.acknowledgement.label", id: "Tanda terima")
 
+    // MARK: Layar perkenalan (onboarding value-first)
+
+    /// Judul kartu perkenalan: ajakan menunjuk ke langit.
+    static let onboardingTitle = LocalizedText(key: "onboarding.title",
+                                               id: "Arahkan jam ke langit")
+    /// Subjudul: apa yang didapat setelah menunjuk.
+    static let onboardingSubtitle = LocalizedText(
+        key: "onboarding.subtitle",
+        id: "Tunjuk sebuah benda, dan ketahui apa yang sedang kamu lihat — bersama seberapa yakin engine mengenalinya.")
+    /// Janji produk: ketidak-pastian ditampilkan apa adanya, bukan disembunyi.
+    static let onboardingHonesty = LocalizedText(
+        key: "onboarding.honesty",
+        id: "Jika ragu, engine akan mengatakannya. Tidak ada yang diklaim sebagai pasti bila belum.")
+    /// Label tombol penutup kartu.
+    static let onboardingStart = LocalizedText(key: "onboarding.start.label",
+                                               id: "Mulai")
+    /// Label VoiceOver kartu utuh: merangkum ketiga baris teks.
+    static let onboardingLabel = LocalizedText(
+        key: "onboarding.label",
+        id: "Perkenalan. Arahkan jam ke langit untuk mengetahui benda yang kamu lihat. Jika ragu, engine akan mengatakannya.")
+
     /// Setiap kunci yang dideklarasikan di sini.
     ///
     /// Satu sumber untuk gerbang paritas dan untuk uji — supaya "kunci yang
@@ -459,5 +480,7 @@ public extension LocalizedText {
         // objek bisa membeku di pergelangan dan tetap tampil seolah hasil
         // pengukuran yang sedang berjalan. Lihat `ComplicationDigest.isStale`.
         .complicationStaleMarker,
+        .onboardingTitle, .onboardingSubtitle, .onboardingHonesty,
+        .onboardingStart, .onboardingLabel,
     ]
 }
