@@ -1373,6 +1373,111 @@ else
   echo "Bersih: setiap izin punya terjemahan di setiap bahasa."
 fi
 
+# ── Aturan 15: warna prosedural harus lewat penjaga mode malam ─────────────
+# PRD: "Semua warna (termasuk visual) ikut mode ini." Alasannya fisiologis,
+# bukan selera: sel batang paling sensitif di ~498-530nm, cahaya >620nm tidak
+# memicu rhodopsin. Jadi `Color(red:...)` yang **tidak** membaca
+# `NightMode.isOn` bukan pelanggaran gaya -- ia memancarkan cahaya yang
+# mematikan adaptasi gelap 20-40 menit, di layar yang justru dipakai untuk
+# melihat bintang redup.
+#
+# Kenapa perlu aturan sendiri: cacatnya **pernah terjadi di berkas ini**,
+# pada 10 dari 13 warna gambar. Masing-masing ditulis tangan sebagai
+# "merah-ish" pilihan sendiri dan semuanya terlihat "cukup merah" di mata.
+# Setelah luminansinya dihitung -- satu-satunya cara mengetahuinya -- dua
+# pertiga cahaya pita terang Bulan berada di kanal hijau/biru. Perbaikannya
+# kini satu aturan (`NightVisual`) dengan uji di Linux, tapi tidak ada yang
+# mencegah warna baru ditulis sendiri besok: `Color(red:)` adalah API biasa
+# dan compiler tidak peduli.
+#
+# Yang diperiksa: setiap `Color(red:`/`Color(hue:` di `Apps/` harus berada di
+# bawah `guard NightMode.isOn else` / `if NightMode.isOn` dalam rentang
+# fungsi yang sama. Pemeriksanya **menghitung**, bukan menebak dari nama.
+echo
+echo "== Aturan 15: warna prosedural wajib lewat penjaga mode malam =="
+color_guard=$(python3 - <<'PY' 2>&1
+import os, re
+
+# Konstruksi warna yang memancarkan cahaya. `Color(white:)` netral dan
+# `Color(gray:)`/`Color(black:)` tidak memancarkan apa pun ke arah
+# rhodopsin, jadi keduanya tidak masuk.
+MAKING = re.compile(r'\bColor\s*\(\s*(?:red|hue|green|blue|orange|purple|pink|cyan|teal|mint|indigo|brown|yellow)\s*:')
+GUARD = re.compile(r'\b(?:guard\s+NightMode\.isOn\s+else|if\s+NightMode\.isOn|NightMode\.isOn\s*\?|guard\s+!NightMode\.isOn)')
+# Deklarasi fungsi, **dengan** kata kunci akses di depannya (`private static
+# func`). Tanpa awalan itu, `rfind("\nfunc")` tidak pernah cocok dan rentang
+# fungsi jatuh ke seluruh berkas.
+DECL = re.compile(r'^\s*(?:public\s+|private\s+|internal\s+|fileprivate\s+|static\s+|mutating\s+)*func\s', re.M)
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        src = open(path, encoding="utf-8").read()
+        # Komentar dibuang: berkas ini mendokumentasikan "kenapa" panjang
+        # lebar dan beberapa menyebut `Color(red:` sebagai contoh cacat.
+        code = []
+        in_str = False
+        for raw in src.split("\n"):
+            out, esc, i = [], False, 0
+            while i < len(raw):
+                ch = raw[i]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == "\\":
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                else:
+                    if ch == '"':
+                        in_str = True
+                    elif ch == "/" and i + 1 < len(raw) and raw[i + 1] == "/":
+                        break
+                out.append(ch)
+                i += 1
+            code.append("".join(out))
+        src = "\n".join(code)
+
+        # Batas fungsi: deklarasi `func` terdekat **sebelum** konstruksi
+        # warna, sampai deklarasi `func` berikutnya.
+        #
+        # Kenapa bukan `rfind("\\nfunc")`: bentuk itu tidak pernah cocok
+        # dengan `private static func warnaUji()` -- ada kata kunci akses di
+        # depannya. `rfind` mengembalikan -1, rentangnya jatuh ke seluruh
+        # berkas, dan penjaga `NightMode.isOn` di fungsi *lain* membuat
+        # warna tanpa penjaga dilaporkan bersih. Gerbang ini pernah hijau
+        # pada cacat yang disuntik persis seperti yang pernah nyata -- jadi
+        # cacat pada gerbangnya ditemukan dengan menyuntik, bukan dibayangkan.
+        decls = [d.start() for d in DECL.finditer(src)]
+        for m in MAKING.finditer(src):
+            before = [s for s in decls if s <= m.start()]
+            start = before[-1] if before else 0
+            after = [s for s in decls if s > m.start()]
+            end = after[0] if after else len(src)
+            body = src[start:end]
+            if not GUARD.search(body):
+                line = src[:m.start()].count("\n") + 1
+                problems.append(
+                    f"  {path}:{line}: {m.group(0)!r} tanpa penjaga "
+                    f"NightMode.isOn di fungsi yang sama")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Pakai NightVisual.mapped(...) supaya warna malam dihitung,")
+    print("   bukan ditulis tangan (rincian di NightVisual.swift).")
+PY
+)
+if [ -n "$color_guard" ]; then
+  echo "$color_guard"
+  echo "   Sebab: sel batang ~498-530nm; merah >620nm aman. Warna yang"
+  echo "   melewati penjaga memancarkan hijau/biru di mode malam."
+  status=1
+else
+  echo "Bersih: setiap warna prosedural melewati penjaga mode malam."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

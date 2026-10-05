@@ -7146,3 +7146,66 @@ Empat aturan yang tersisa (1, 2, 3, dan sebagian 12/13) memang murni shell,
 jadi mereka **tetap** berjalan di CI. Yang no-op adalah yang berbasis
 Python — dan itu justru aturan-aturan yang paling banyak menangkap cacat
 nyata.
+
+---
+
+## Siklus: Gerbang Aturan 4 buta pada literal di kedalaman >1
+
+Dua kata tampilan di `Experiment1View.swift:219` hidup sebagai literal
+selama berbulan-bulan sementara gerbang lokalisasi hijau:
+
+    Text(analysis.isFalseLock ? "FALSE LOCK"
+         : (analysis.isCorrect ? "benar" : "salah"))
+
+`FALSE LOCK` kebetulan lolos karena kebetulan ada di katalog. `benar` dan
+`salah` tidak punya padanan bahasa Inggris — padahal
+`ExperimentText.verdictCorrect` / `.verdictWrong` sudah ada dan
+terlokalisasi. Jadi layar Experiment 1 berbahasa Indonesia keras, tak
+terjemahkan, dan tak ada yang melihatnya.
+
+### Kenapa gerbangnya tidak berbunyi
+
+`direct_arguments()` mengumpulkan literal hanya pada `depth == 1`. Literal
+di dalam kurung ternary berada di kedalaman 2 dan 3, sehingga tidak pernah
+terkumpul. Ini cacat yang sama seperti tiga siklus sebelumnya — gerbang
+yang lulus karena ia tidak melihat, bukan karena kodenya benar.
+
+Kedalaman bukanlah cara membedakan teks tampilan dari bukan-teks:
+peritelnya (`Text`, `row`, ...) yang menentukan itu, dan pemanggilnya sudah
+disaring `POS`. Syarat dilonggarkan menjadi `depth >= 1`, artinya "di dalam
+tanda kurung peritel ini".
+
+### Kenapa dikerjakan begini
+
+Sapuan manual berkedalaman tak terbatas dijalankan atas `Apps/` **sebelum**
+kode disentuh. Gerbang diperlebar dulu dan sengaja dibiarkan MERAH untuk
+membuktikan ia menangkap cacat yang nyata — bukan cacat yang dikarang:
+
+    Aturan 4: 'benar'  Apps/PointAndKnowiOS/Sources/Experiment1View.swift:219
+    Aturan 4: 'salah'  Apps/PointAndKnowiOS/Sources/Experiment1View.swift:219
+
+Baru setelah itu kodenya diperbaiki, dan gerbang kembali hijau. Urutan ini
+yang membedakan "gerbang berbunyi" dari "saya mengira ia berbunyi".
+
+### Yang diubah
+- **`swift-ui-lint.sh`:** `direct_arguments()` memindai semua kedalaman
+  (`depth >= 1`), dengan komentar "kenapa" yang menyebut bentuk konkret
+  yang lolos.
+- **`Experiment1View.swift`:** tiga kata putusan kini lewat
+  `ExperimentText`. Cabang else (`"tak dianalisis"`) disamakan ke
+  `verdictNotAnalyzed`, supaya satu kata tidak punya dua sumber.
+  Perbaikan memakai sumber teks yang **sudah ada** — bukan menambah kunci
+  katalog baru.
+
+### Dibuktikan
+- Gerbang MERAH pada dua literal itu sebelum perbaikan, hijau sesudahnya.
+- `./swift-test.sh`: 487 uji hijau, 0 gagal.
+- CI: Engine Tests (Linux) + Apple Build, keduanya `success`.
+
+### Catatan jujur
+Sapuan kedalaman tak terbatas menemukan 4 literal interpolasi bermemiliki
+kata (`"Status: "`, `"acuan tercatat"`, `"Lokasi: "`, `"gagal"`).
+Keempatnya sudah terpetakan di `FORMATS`, jadi gerbang **bersih**, bukan
+lolos. Sisa 15 temuan adalah nama merek (`Point & Know`, `Experiment 1`,
+masuk `NOT_LOCALIZED`) dan angka murni tanpa kata — keduanya bukan teks
+tampilan yang perlu diterjemahkan.

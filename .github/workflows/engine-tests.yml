@@ -43,5 +43,26 @@ jobs:
       - name: Gerbang sapu UI (font tetap)
         run: ./swift-ui-lint.sh
 
+      # Buktikan gerbang di atas **berbunyi**, bukan sekadar mencetak
+      # "Bersih".
+      #
+      # Aturan 15 (warna mode malam) pertama kali ditulis dan langsung hijau
+      # — lalu tetap hijau ketika cacat yang persis seperti yang pernah
+      # nyata disuntikkan. Sebabnya: batas fungsinya memakai
+      # `rfind("\nfunc")`, yang tidak pernah cocok dengan
+      # `private static func`, sehingga rentangnya jatuh ke seluruh berkas.
+      # Gerbang itu lulus pada kode benar **dan** pada kode salah.
+      #
+      # `./red-lint.sh` menyuntik cacat itu, mewajibkan gerbang keluar
+      # bukan-nol, lalu memulihkan berkasnya. Tanpa langkah ini, cacat pada
+      # gerbang hanya akan ketahuan kalau kebetulan ada yang mengujinya.
+      - name: Buktikan gerbang warna mode malam berbunyi
+        run: |
+          ./red-lint.sh Apps/Shared/CelestialVisualView.swift \
+            '    private static func warnaUji() -> Color {
+                  Color(red: 0.62, green: 0.30, blue: 0.16)
+              }
+          ' 'Aturan 15'
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
