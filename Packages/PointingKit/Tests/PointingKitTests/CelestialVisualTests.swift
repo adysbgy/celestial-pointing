@@ -1525,13 +1525,13 @@ final class CelestialVisualTests: XCTestCase {
                                                    magnitude: 0.1))
         // Rigel B−V −0,03 → still in the white-blue band (biru murni hanya
         // kelas B paling awal, B−V ≤ −0,10). Ucapan sesuai warna yang digambar.
-        XCTAssertEqual(rigel.spokenStarColor, LocalizedText.starColorWhiteBlue.indonesian)
+        XCTAssertEqual(rigel.spokenStarColor(isConfirmed: true), LocalizedText.starColorWhiteBlue.indonesian)
         let sirius = CelestialVisual(object: object(id: "sirius", kind: .star,
                                                     magnitude: -1.5))
-        XCTAssertEqual(sirius.spokenStarColor, LocalizedText.starColorWhiteBlue.indonesian)
+        XCTAssertEqual(sirius.spokenStarColor(isConfirmed: true), LocalizedText.starColorWhiteBlue.indonesian)
         let betelgeuse = CelestialVisual(object: object(id: "betelgeuse", kind: .star,
                                                        magnitude: 0.5))
-        XCTAssertEqual(betelgeuse.spokenStarColor, LocalizedText.starColorRed.indonesian)
+        XCTAssertEqual(betelgeuse.spokenStarColor(isConfirmed: true), LocalizedText.starColorRed.indonesian)
     }
 
     /// Hanya bintang yang diucapkan warnanya. Planet, Bulan, Matahari, dan
@@ -1540,15 +1540,15 @@ final class CelestialVisualTests: XCTestCase {
     /// bintang.
     func testOnlyStarsSpeakASpectralColor() {
         XCTAssertNil(CelestialVisual(object: object(id: "jupiter", kind: .planet))
-            .spokenStarColor)
+            .spokenStarColor(isConfirmed: true))
         XCTAssertNil(CelestialVisual(object: object(id: "moon", kind: .moon))
-            .spokenStarColor)
+            .spokenStarColor(isConfirmed: true))
         XCTAssertNil(CelestialVisual(object: object(id: "sun", kind: .sun))
-            .spokenStarColor)
+            .spokenStarColor(isConfirmed: true))
         XCTAssertNil(CelestialVisual(object: object(id: "m42", kind: .deepSky))
-            .spokenStarColor)
+            .spokenStarColor(isConfirmed: true))
         XCTAssertNotNil(CelestialVisual(object: object(id: "sirius", kind: .star))
-            .spokenStarColor)
+            .spokenStarColor(isConfirmed: true))
     }
 
     // MARK: - Warna bintang adalah ciri pengenal
@@ -1608,5 +1608,27 @@ final class CelestialVisualTests: XCTestCase {
             CelestialVisual.drawableStarColorIndex(1.85, isConfirmed: false),
             unknown,
             "warna saat ragu harus sama dengan warna bintang tak dikenal")
+    }
+
+    /// Pengumuman warna bintang juga tidak boleh mengklaim saat engine ragu.
+    ///
+    /// Gambar sudah dijaga `drawableStarColorIndex`; suara belum. Padahal
+    /// keduanya menggambarkan hal yang sama, dan `spokenDeepSkyMorphology`
+    /// tepat di sebelahnya sudah menerima `isConfirmed` untuk alasan yang
+    /// sama persis. Tanpa ini, pengguna VoiceOver mendengar "merah" di
+    /// sebelah badge "Ragu" yang di layar justru tidak berwarna merah —
+    /// pengumuman dan gambar jadi tidak lagi cocok.
+    func testSpokenStarColourIsSilentWhenUncertain() {
+        let betelgeuse = CelestialVisual(object: object(id: "betelgeuse", kind: .star,
+                                                       magnitude: 0.5))
+        XCTAssertEqual(betelgeuse.spokenStarColor(isConfirmed: true),
+                       LocalizedText.starColorRed.indonesian)
+        XCTAssertNil(betelgeuse.spokenStarColor(isConfirmed: false),
+                     "warna tidak boleh diucapkan saat engine ragu")
+
+        // Bukan-bintang tetap `nil` di kedua keadaan.
+        let jupiter = CelestialVisual(object: object(id: "jupiter", kind: .planet))
+        XCTAssertNil(jupiter.spokenStarColor(isConfirmed: true))
+        XCTAssertNil(jupiter.spokenStarColor(isConfirmed: false))
     }
 }

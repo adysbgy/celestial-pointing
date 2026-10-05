@@ -39,17 +39,29 @@ public extension CelestialVisual {
 
     /// Warna spektral untuk diucapkan, atau `nil` bila tidak berlaku.
     ///
-    /// `nil` dalam satu keadaan, dan itu sengaja: **bukan bintang.** Planet,
-    /// Bulan, Matahari, dan objek langit dalam punya warna di gambar, tapi
-    /// warna itu adalah sifat *render*, bukan klaim spektral — dan tidak ada
-    /// satu pun yang boleh diucapkan sebagai "warna spektral bintang".
+    /// `nil` dalam dua keadaan, dan keduanya sengaja:
     ///
-    /// Untuk bintang, warna selalu ada (indeks B−V-nya, yang sudah dipakai
-    /// UI untuk mewarnai titiknya), jadi pengembaliannya tidak pernah `nil`
-    /// di sini — persis seperti `spokenPhase` yang tidak pernah `nil` untuk
-    /// Bulan yang tahu fraksinya.
-    var spokenStarColor: String? {
-        guard kind == .star else { return nil }
+    /// 1. **Bukan bintang.** Planet, Bulan, Matahari, dan objek langit dalam
+    ///    punya warna di gambar, tapi warna itu adalah sifat *render*, bukan
+    ///    klaim spektral — dan tidak ada satu pun yang boleh diucapkan sebagai
+    ///    "warna spektral bintang".
+    /// 2. **Engine belum yakin.** Warna adalah ciri pengenal, jadi ia hanya
+    ///    boleh diklaim saat `isConfirmed` — sama seperti
+    ///    `spokenDeepSkyMorphology(isConfirmed:)` tepat di sebelahnya.
+    ///    Parameter itu diteruskan dari pemanggil karena `CelestialVisual`
+    ///    sendiri tidak menyimpan keyakinan; ia hanya tahu objeknya apa.
+    ///
+    /// Keadaan 2 membuat pengucapannya **cocok dengan gambarnya**: gambar
+    /// memakai warna "tidak mengklaim" saat engine ragu
+    /// (`drawableStarColorIndex`), dan pengumuman tidak menyebut warna apa
+    /// pun. Tanpa keadaan 2, pengguna VoiceOver akan mendengar "merah" di
+    /// sebelah badge "Ragu" yang di layar justru tidak berwarna merah.
+    ///
+    /// Untuk bintang yang sudah dikunci, warna selalu ada (indeks B−V-nya,
+    /// yang sudah dipakai UI untuk mewarnai titiknya) — persis seperti
+    /// `spokenPhase` yang tidak pernah `nil` untuk Bulan yang tahu fraksinya.
+    func spokenStarColor(isConfirmed: Bool) -> String? {
+        guard kind == .star, isConfirmed else { return nil }
         return TextLocalization.text(Self.starColorText(colorIndexBV))
     }
 

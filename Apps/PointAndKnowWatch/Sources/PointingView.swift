@@ -598,9 +598,13 @@ struct ObjectDetailView: View {
         // (Betelgeuse), putih-biru (Sirius) dari indeks B−V, dan `spokenName`
         // ("bintang") tidak membedakan satu pun dari yang lain. Tanpa ini
         // kedua bintang di atas terdengar sama padahal di layar warnanya
-        // bertolak belakang. `spokenStarColor` mengembalikan `nil` untuk
+        // bertolak belakang.
+        //
+        // `isConfirmed` diteruskan karena warna **adalah ciri pengenal**:
+        // saat engine ragu, gambar memakai warna "tidak mengklaim" dan
+        // ucapan tidak boleh menyebut warna apa pun. `nil` juga untuk
         // bukan-bintang, jadi tidak ada warna yang ditebak.
-        if let color = visual?.spokenStarColor {
+        if let color = visual?.spokenStarColor(isConfirmed: isConfirmed) {
             parts.append(color)
         }
         parts.append(ObjectSpeech.magnitude(object.magnitude))

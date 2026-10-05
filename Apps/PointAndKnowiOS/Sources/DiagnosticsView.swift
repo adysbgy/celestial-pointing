@@ -998,9 +998,10 @@ struct DiagnosticsView: View {
         // dan jenisnya ("bintang") tidak membedakan satu pun bintang dari
         // yang lain. Tanpa ini, "Rigel" dan "Betelgeuse" terdengar sama
         // persis padahal di layar keduanya digambar biru vs merah.
-        // `spokenStarColor` mengembalikan `nil` untuk bukan-bintang, jadi tidak
+        // `spokenStarColor` mengembalikan `nil` untuk bukan-bintang **dan**
+        // saat engine belum yakin — warna adalah ciri pengenal, jadi tidak
         // ada warna yang ditebak di sini.
-        if let color = visual?.spokenStarColor {
+        if let color = visual?.spokenStarColor(isConfirmed: isConfirmed) {
             parts.append(color)
         }
         if includeTechnicalDetails {
