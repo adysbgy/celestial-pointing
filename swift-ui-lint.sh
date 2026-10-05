@@ -25,6 +25,29 @@ cd "$(dirname "$0")"
 
 status=0
 
+# ── Pra-syarat: `python3` harus ada ─────────────────────────────────────────
+# Sebelas aturan di bawah dijalankan lewat `python3 - <<'PY'`. Kalau
+# interpreter itu tidak ada, shell mencetak "command not found" ke stderr dan
+# `$(...)` mengembalikan **string kosong** — maka setiap aturan itu jatuh ke
+# cabang `else`-nya dan mencetak "Bersih". Gerbang keluar 0 dan seluruh CI
+# hijau, sementara tidak ada satu pun yang diperiksa.
+#
+# Itu bukan kekhawatiran teoretis: image CI (`swift:6.0`, Ubuntu 24.04)
+# **tidak memuat Python sama sekali**, jadi selama ini kesebelas aturan itu
+# no-op di Linux — persis "hijau yang tidak hijau" yang seluruh berkas ini
+# dibuat untuk menutup, terjadi pada gerbangnya sendiri.
+#
+# Karena itu kegagalan ini dianggap GAGAL, bukan peringatan: pemeriksaan yang
+# tidak bisa dijalankan tidak boleh dilaporkan sebagai lulus.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "== GERBANG UI GAGAL: python3 tidak ditemukan =="
+  echo "Sebelas aturan di berkas ini memakai python3; tanpanya masing-masing"
+  echo "mengembalikan string kosong lalu dilaporkan 'Bersih' tanpa memeriksa"
+  echo "apa pun. Pasang python3, atau jalankan gerbang ini di image yang"
+  echo "memuatnya (CI menjalankannya di dalam container swift:6.0)."
+  exit 1
+fi
+
 # ── Aturan 1: tidak ada ukuran font tetap ──────────────────────────────────
 # Sapu `.system(size:` dan `Font.system(size:` pada **kode**, bukan komentar.
 # `grep -v '^\s*//'` saja tidak cukup: komentar bisa muncul setelah kode pada

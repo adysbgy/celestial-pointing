@@ -8,6 +8,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `swift:6.0` (Ubuntu 24.04) **tidak memuat Python**. Sebelas aturan di
+      # `swift-ui-lint.sh` dijalankan lewat `python3 - <<'PY'`; tanpanya
+      # masing-masing mengembalikan string kosong dan dilaporkan "Bersih"
+      # tanpa memeriksa apa pun — gerbang keluar 0, seluruh CI hijau.
+      #
+      # Ini pernah benar-benar terjadi dan tidak terlihat berbulan-bulan:
+      # yang menyingkapnya adalah satu aturan yang baru ditambahkan dan
+      # kebetulan berbunyi. `swift-ui-lint.sh` kini berhenti keras bila
+      # python3 tidak ada (supaya ia tidak bisa lagi diam-diam lulus), dan
+      # langkah ini yang memastikannya tersedia.
+      - name: Pasang python3 (gerbang sapu UI)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3
+
       # Dua paket, bukan satu.
       #
       # Kriteria "ENGINE SIAP" di ROADMAP.md menyatakan suite hijau di Linux

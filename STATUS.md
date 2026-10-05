@@ -7098,3 +7098,51 @@ jadi celahnya tidak akan pernah tertutup oleh gerbang yang sudah ada.
 - Gerbang **merah** saat `en.lproj` disembunyikan ("2 izin belum
   diterjemahkan untuk 'en'"), lalu hijau setelah dikembalikan.
 - Uji: CelestialEngine 172 + PointingKit 487. 13 → 14 aturan bersih.
+
+## Progres terakhir (5 Okt 2026 — 11 aturan gerbang tak pernah berjalan di CI)
+
+### Cacat terbesar yang ditemukan sejauh ini
+`swift-ui-lint.sh` memiliki 14 aturan; **11 di antaranya** dijalankan lewat
+`python3 - <<'PY'`. Image CI Linux (`swift:6.0`, Ubuntu 24.04) **tidak
+memuat Python sama sekali**.
+
+Akibatnya, setiap kali CI Linux menjalankan gerbang ini: shell mencetak
+"python3: command not found" ke stderr, `$(...)` mengembalikan string
+kosong, dan tiap aturan jatuh ke cabang `else`-nya — mencetak **"Bersih"**.
+Gerbang keluar 0. CI hijau. Tidak ada satu pun yang diperiksa.
+
+Jadi sebelas aturan yang menutup kelas cacat "hijau yang tidak hijau"
+sendiri tidak pernah berjalan di satu-satunya tempat yang terus-menerus
+memeriksanya. Aturan 4 (teks tanpa padanan bahasa), Aturan 6 (paritas
+kunci), Aturan 11 (specifier yang bisa menjatuhkan app) — semuanya no-op
+di Linux selama ini.
+
+### Yang menyingkapnya
+Aturan 14, yang baru ditambahkan pada siklus sebelumnya. Ia kebetulan
+berbunyi — bukan karena ia lebih baik, melainkan karena ia baru. Itu
+pelajaran utamanya: gerbang yang selalu hijau tidak akan pernah
+memeriksa dirinya sendiri; yang menyingkapnya hanyalah kebetulan.
+
+### Yang diubah
+- **`swift-ui-lint.sh`:** pra-syarat keras di awal — bila `python3` tidak
+  ada, gerbang **berhenti dengan exit 1**, bukan mencetak "Bersih".
+  Pemeriksaan yang tidak bisa dijalankan tidak boleh dilaporkan lulus.
+- **`.github/workflows/engine-tests.yml`:** langkah `apt-get install python3`
+  sebelum gerbang dijalankan.
+- Aturan 14 diperbaiki: pemeriksaan Python yang error kini dianggap GAGAL
+  (sebelumnya ia melaporkan "Bersih" — cacat yang sama, satu tingkat lebih
+  kecil).
+
+### Dibuktikan
+- Di dalam container `swift:6.0` **tanpa** python3: gerbang berhenti,
+  exit 1, menyebut sebabnya.
+- Di container yang sama **dengan** python3 terpasang: 14 aturan dijalankan
+  sungguhan, semuanya bersih — termasuk 10 aturan yang belum pernah
+  benar-benar berjalan di CI.
+- Uji tetap: CelestialEngine 172 + PointingKit 487.
+
+### Catatan jujur
+Empat aturan yang tersisa (1, 2, 3, dan sebagian 12/13) memang murni shell,
+jadi mereka **tetap** berjalan di CI. Yang no-op adalah yang berbasis
+Python — dan itu justru aturan-aturan yang paling banyak menangkap cacat
+nyata.
