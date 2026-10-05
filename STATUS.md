@@ -7349,3 +7349,143 @@ cocok dengan kenyataan. Diperbaiki di commit berikutnya; CI hijau.
 - `./swift-test.sh`: 489 uji hijau, 0 gagal.
 - `./swift-ui-lint.sh`: 15 aturan lulus.
 - CI: Engine Tests (Linux) + Apple Build, keduanya `success`.
+
+
+---
+
+## Siklus: kalimat "kenapa engine ragu" berubah-ubah antar peluncuran
+
+### Premis: keputusan yang diambil dalam keadaan yang tidak punya jawaban tunggal
+
+`ConfidenceTrace.diagnosis` mencari penyebab keraguan yang "teratas" seperti
+ini:
+
+```swift
+let dominant = reasons.max { $0.value < $1.value }?.key ?? .none
+```
+
+Terbaca benar, dan memang benar ketika satu sebab benar-benar mendominasi.
+Masalahnya ada pada keadaan **seri**. `max` mengembalikan elemen **pertama** yang
+ditemukannya, sedangkan urutan iterasi `Dictionary` **tidak ditentukan** di
+Swift — hash di-seed acak per proses. Jadi ketika dua sebab sama sering,
+kalimatnya ditentukan oleh **proses**, bukan oleh data.
+
+### Diukur, bukan ditebak
+
+Delapan kali `swift test` pada data yang sama persis (1 sampel `tooFar`,
+1 sampel `ambiguous`) — kalimat yang keluar berbeda:
+
+```
+Semua jawaban ragu karena kandidat terlalu jauh dari arah tunjuk. Perbaiki kalibrasi dulu.
+Semua jawaban ragu karena ada dua kandidat berdekatan. Ini keterbatasan akurasi, bukan kesalahan kalibrasi.
+...  (5x yang pertama, 3x yang kedua)
+```
+
+### Kenapa ini bukan "kalimat varies sedikit"
+
+Kedua kalimat itu adalah **petunjuk perbaikan yang saling meniadakan**, dan
+hanya salah satu yang benar:
+
+- "Perbaiki kalibrasi dulu" -&gt; masalahnya bisa diperbaiki.
+- "Ini keterbatasan akurasi, bukan kesalahan kalibrasi" -&gt; masalahnya
+  **tidak** bisa diperbaiki; jangan bother.
+
+Dan yang gegenüber adalah alat ukur repo ini sendiri, layar Keyakinan di
+`DiagnosticsView`. Penguji yang membaca satu petunjuk lalu **`reset()` dan
+mengulang seluruh Experiment 1** akan mengambil keputusan yang salah: ia bisa
+membuat kalibrasi yang tidak diperlukan, atau — lebih buruk — menerima batas
+akurasi yang sebenarnya bisa dibenahi lalu berhenti mengukur.
+
+PRD v0.4 meminta uncertainty &gt; false confidence. Ini adalah kebalikannya
+yang lebih halus: **ketidakpastian yang dipresentasikan sebagai keputusan.**
+
+### Perbaikannya: menghapus pilihannya, bukan membuatnya deterministik
+
+Bisa saja `max` diganti urutan enum, dan kalimatnya jadi stabil. Tapi itu
+menyembunyikan masalah aslinya: **ada dua sebab yang sama saingnya**, dan satu
+kalimat hanya bisa melaporkan satu.
+
+Jadi kalimat seri sekarang menyebut **keduanya**:
+
+> Penyebab keraguan berbagi: Semua jawaban ragu karena kandidat terlalu jauh
+> dari arah tunjuk. Perbaiki kalibrasi dulu.; Semua jawaban ragu karena ada dua
+> kandidat berdekatan. Ini keterbatasan akurasi, bukan kesalahan kalibrasi.
+
+Satu sebab hanya boleh tampil sendiri bila benar-benar mendCharsets -&gt;
+tidak -&gt; bila benar-benar mendominasi, yaitu **lebih dari separuh** sampel
+ragu. Ambang itu dipilih karena "paling banyak" bisa tetap seri (2 dari 2),
+dan itu justru kasus yang tidak boleh memilih satu. Efek sampingnya bagus:
+kalimat untuk 9 dari 10 sampel yang sama sebabnya masih Ringkas seperti
+sebelumnya — perbaikan ini tidak membuat semua diagnosis jadi panjang.
+
+### Dua keputusan kecil
+
+1. **`tiedUncertainReasons`filtersabet order enum, bukan dictionary** — supaya
+   kalimatnya sama setelah perbaikan. Urutan acak yang kebetulan sama dalam
+   satu proses akan terlihat "hijau" sekali lalu berubah besok.
+2. **Pemisah antarsebab punya kunci sendiri**
+   (`experiment.diagnosis.mixedSeparator`), bukan ditulis di kode. Kata
+   penghubung adalah bagian tata bahasa tiap bahasa; menuliskannya di kode
+   memaksa satu tata bahasa pada semua bahasa. Aturan 11 tidak bisa melihat
+   ini, karena ia hanya menjaga **tipe specifier**, bukan isi kalimat.
+
+Diformat sebagai satu slot `%@` + pemisah katalog, bukan tiga slot `%@`:
+slot kosong akan tampil sebagai butir kosong di layar, dan `%#@` (daftar)
+berperilaku berbeda antara CoreFoundation dan Swift Foundation — jebakan yang
+sudah pernah menjatuhkan app di CI macOS.
+
+### Bukti merah: mutasi yang sama menghasilkan tiga kalimat berbeda
+
+Blok `diagnosis` dikembalikan ke bentuk **semula** (`Dictionary.max`, satu
+pemenang), lalu suite dijalankan tiga kali:
+
+| Jalankan | Kalimat yang muncul di uji yang gagal |
+|---|---|
+| 1 | "...karena ada dua kandidat berdekatan. Ini keterbatasan akurasi..." |
+| 2 | "Jawaban ragu tanpa sebab terukur..." |
+| 3 | "...karena kandidat terlalu jauh dari arah tunjuk. Perbaiki kalibrasi dulu." |
+
+Ketiga-tiganya **MERAH**, dan ketiganya kalimat berbeda dari **kode yang
+sama**. Inilah bukti yang tidak bisa diberikan mutasi lain: kalau cause of
+faktanya "kode salah", kegagalan harus bisa direproduksi persis. Yang
+direproduksi di sini justru ketidakpastiannya — dan itulah yang membuat
+perbaikannya perlu, bukan sekadar satu kalimat yang berbeda.
+
+Catatan: mutasi harus **berekspresi ulang** kode lama, bukan sekadar menonaktifkan
+satu cabang. Versi pertama hanya mengubah `tied.count > 1` menjadi `> 99`, dan
+kode lama yang masih ada membuat kompilator menolak lebih dulu
+(`initializer for conditional binding must have Optional type`) — jadi
+"Tidak ada yang bisa disimpulkan" bukan "hijau".
+
+### Gerbang yang menangkap kesalahan saya sendiri
+
+- **Aturan 10** (hitungan uji di README): `489` vs berkas berisi `495`. README
+  diperbarui.
+- **`testDeclaredKeysAreUniqueNonEmptyAndComplete`**: `181` vs `183`. Itu
+  gerbang yang dirancang untuk jumlah kunci berubah — dua kunci baru tanpa
+  penyesuaian akan lolos tanpa ada yang melihat. Angka dinaikkan **bersama
+  penjelasan** Interim,
+
+### Batas yang jujur
+
+- **Stabilitas antar peluncuran tidak bisa diuji dari dalam satu proses.**
+  Yang bisa dijaga di sini adalah *isi* kalimatnya (semua sebab seri disebut),
+  dan itulah yang membuat verifikasi antar peluncuran tidak perlu melihat dua
+  kalimat berbeda lagi. Uji `testDiagnosisIsRepeatableWithinOneProcess`
+  menjaga hal yang lebih lemah dan **secara eksplisit menyatakan batasnya** —
+  menyebut bahwa stabilitas lintas proses adalah soal hash seed, bukan
+  sesuatu yang bisa diuji di sini.
+- **Kalimat seri itu panjang.** Tiga sebab menghasilkan tiga kalimat penuh.
+  Itu biaya yang sengaja dibayar: menginformasikan penguji bahwa ada tiga
+  masalah lebih berharga daripada kalimat ringkas yang hanya menyebutkan satu.
+  Belum pernah dilihat di perangkat; barisnya melingkar di `Text(.footnote)`.
+- **Terjemahan `en` untuk dua kunci baru belum pernah dibaca penutur asli.**
+  Yang terbukti: bentuk specifier sama (`%@`), dan Aturan 11 mengunci itu.
+
+### Gerbang
+
+- `./swift-test.sh` -&gt; **172 CelestialEngine + 495 PointingKit**, 0 gagal
+  (489 -&gt; 495, +6 uji).
+- `./swift-ui-lint.sh` -&gt; **15 aturan hijau**.
+- `./swift-typecheck.sh` -&gt; SEMUA GERBANG LULUS.
+- CI: Apple Build + Engine Tests (Linux).
