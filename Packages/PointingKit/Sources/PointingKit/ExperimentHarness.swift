@@ -290,9 +290,32 @@ public final class ExperimentHarness {
     ///   sudah cukup untuk memaksa sigma turun, sehingga lebih sedikit kasus
     ///   yang boleh berlabel HIGH.
     /// - **Tanpa false lock** → pakai sigma hasil kalibrasi bila ada (itu
-    ///   ketidakpastian yang benar-benar terukur). Kalau belum ada, kembali ke
-    ///   sigma konservatif bawaan — jangan mengarang angka yang lebih baik.
+    ///   ketidakpastian yang benar-benar terukur). Kalau belum ada, kembalilagi
+    ///   ke sigma konservatif bawaan — jangan mengarang angka yang lebih baik.
     /// - **Tidak ada percobaan** → `nil`; engine tetap memakai bawaannya.
+    ///
+    /// **Gerbangnya adalah `summary.safetyVerdict`, bukan hitungan sendiri.**
+    /// Versi lama memakai `guard !analyzable.isEmpty`, yaitu "ada satu
+    /// percobaan" sebagai syarat yang cukup. Itu membuat layar Experiment 1
+    /// menampilkan dua jawaban yang saling meniadakan untuk rekaman yang
+    /// **sama**:
+    ///
+    ///     "Belum bisa disimpulkan"      <- dari `safetyVerdict`
+    ///     [Kirim ambang terukur]        <- dari fungsi ini
+    ///
+    /// Dan yang dikirim bukan angka laporan: tombol itu menuliskan
+    /// `ConfidencePolicy` itu ke resolver **jam**, jadi engine memakai sigma
+    /// terukur untuk menyatakan "Yakin" setelah **satu** rekaman. Satu
+    /// rekaman bersih adalah satu data point, bukan bukti -- PRD menetapkan
+    /// ketidakpastian menang atas keyakinan, dan di sini yang menang justru
+    /// sebaliknya.
+    ///
+    /// `safetyVerdict` sebagai satu-satunya sumber juga menutup kelas bug
+    /// yang lebih luas daripada yang diperbaiki di sini: kalau ambang 20 atau
+    /// bentuk keadaan pada `SafetyVerdict` berubah, kedua tempat ikut berubah.
+    /// Dua gerbang terpisah di dua berkas pasti akan berbeda pendapat pada
+    /// penyuntingan berikutnya -- bukan karena ada yang keliru, melainkan
+    /// karena tidak ada yang mengikatnya.
     public func suggestedConfidencePolicy(calibration: PointingCalibration,
                                           baseSigmaDeg: Double = 10.0) -> ConfidencePolicy? {
         let analyzable = trials.compactMap(\.analysis)
@@ -301,12 +324,26 @@ public final class ExperimentHarness {
         let summary = ObservationLog.summarize(analyzable)
         let measured = calibration.suggestedPointingSigmaDeg
 
-        if summary.falseLockCount > 0 {
+        // **Asimetri yang disengaja dan wajib dijaga.** Gagal hanya butuh
+        // satu saksi, jadi keadaan `failed` diperiksa lebih dulu dan berlaku
+        // pada sampel sekecil apa pun. Menunggu 20 percobaan sebelum merespons
+        // false lock berarti satu kegagalan baru baru bisa menaikkan ambang
+        // setelah sembilan belas percobaan bersih -- itu membalikkan aturan
+        // yang justru paling penting: bukti buruk cepat, bukti baik pelan.
+        if summary.safetyVerdict == .failed {
             // Perketat: pakai sigma terukur kalau ada, kalau tidak separuh bawaannya.
             let tightened = min(measured ?? baseSigmaDeg, baseSigmaDeg) / 2.0
             return ConfidencePolicy(pointingSigmaDeg: max(0.5, tightened))
         }
-        guard let sigma = measured, sigma > 0 else { return nil }
+
+        // `.insufficientEvidence` jatuh ke sini bersama `.passed`: nol false
+        // lock dari sampel yang belum cukup besar **tidak** menghasilkan
+        // usulan apa pun. Bukan karena tidak ada yang bisa dicatat -- sigma
+        // terukur tetap tampil sebagai angka di layar kalibrasi -- tapi
+        // karena orang yang belum punya bukti tidak boleh memindahkan ambang
+        // engine milik orang lain.
+        guard summary.safetyVerdict.isPassedClaim,
+              let sigma = measured, sigma > 0 else { return nil }
         return ConfidencePolicy(pointingSigmaDeg: sigma)
     }
 

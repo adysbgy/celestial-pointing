@@ -204,18 +204,14 @@ final class ExperimentHarnessTests: XCTestCase {
 
     // MARK: - Kebijakan keyakinan dari hasil
 
-    /// Tanpa false lock, sigma terukur dari kalibrasi yang dipakai.
+    /// Tanpa false lock dan sampel cukup besar, sigma terukur dipakai.
+    ///
+    /// Uji ini dulu hanya merekam satu percobaan lalu tetap
+    /// mengharapkan kebijakan; itulah cacat yang diperbaiki.
     func testPolicyUsesMeasuredSigmaWhenSafe() {
         let h = harness()
-        let t = truth("sirius")
-        h.record(targetObjectID: "sirius",
-                 rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
-                 calibratedPointing: nil,
-                 intent: intent(level: .high, object: star("sirius")),
-                 state: .lock,
-                 angularRateDegPerSec: 0.1,
-                 calibration: .none,
-                 timestamp: date)
+        recordCleanTrials(ExperimentSummary.minimumTrialsForSafetyClaim, on: h)
+        XCTAssertEqual(h.summary.safetyVerdict, .passed)
 
         let calibration = PointingCalibration(yawOffsetDeg: 3, residualSpreadDeg: 2.5, sampleCount: 4)
         let policy = try! XCTUnwrap(h.suggestedConfidencePolicy(calibration: calibration))
@@ -247,6 +243,129 @@ final class ExperimentHarnessTests: XCTestCase {
     func testNoTrialsYieldsNoPolicy() {
         let h = harness()
         XCTAssertNil(h.suggestedConfidencePolicy(calibration: .none))
+    }
+
+    /// Rekam `count` percobaan bersih ke satu objek.
+    ///
+    /// Helper ini ada karena ada ambang **20** percobaan yang harus diuji di
+    /// kedua sisinya, dan menyalin blok `record` dua puluh kali hanya menambah
+    /// peluang salah ketik tanpa menambah bukti.
+    private func recordCleanTrials(_ count: Int,
+                                   on h: ExperimentHarness,
+                                   objectID: String = "sirius") {
+        let t = truth(objectID)
+        for _ in 0..<count {
+            h.record(targetObjectID: objectID,
+                     rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
+                                                  azimuthDeg: t.azimuthDeg),
+                     calibratedPointing: nil,
+                     intent: intent(level: .high, object: star(objectID)),
+                     state: .lock,
+                     angularRateDegPerSec: 0.1,
+                     calibration: .none,
+                     timestamp: date)
+        }
+    }
+
+    /// Sigma terukur, dipakai oleh hampir semua uji di bawah.
+    private let measuredCalibration = PointingCalibration(yawOffsetDeg: 3,
+                                                          residualSpreadDeg: 2.5,
+                                                          sampleCount: 4)
+
+    /// **Regresi: satu percobaan bersih bukan bukti, jadi tidak boleh ada
+    /// ambang yang diusulkan.**
+    ///
+    /// `safetyVerdict` sudah menjawab pertanyaan ini di layar: nol false lock
+    /// baru bermakna setelah 20 percobaan (`minimumTrialsForSafetyClaim`).
+    /// Tapi `suggestedConfidencePolicy` punya gerbang sendiri, dan gerbang itu
+    /// cuma `!analyzable.isEmpty`. Akibatnya satu baris di layar Experiment 1
+    /// berkata "belum bisa disimpulkan" sementara baris di bawahnya
+    /// menawarkan tombol yang **memindahkan ambang keyakinan engine** —
+    /// dari bawaan konservatif 10° ke sigma terukur.
+    ///
+    /// Yang rusak bukan angkanya, tapi **arahnya**: 1 percobaan membuat
+    /// engine jauh lebih mudah bilang "Yakin". Itu persis kebalikan dari
+    /// PRD (*uncertainty > false confidence*), dan yang memperkenalkannya
+    /// adalah tombol, bukan teks -- jadi yang paling berbahaya justru bagian
+    /// yang paling terlihat sepertiribut Jahren.
+    func testInsufficientEvidenceYieldsNoThresholdProposal() {
+        let h = harness()
+        recordCleanTrials(1, on: h)
+
+        XCTAssertEqual(h.summary.safetyVerdict, .insufficientEvidence,
+                       "prasyarat: satu percobaan memang belum cukup bukti")
+        XCTAssertNil(h.suggestedConfidencePolicy(calibration: measuredCalibration),
+                     "satu percobaan bersih tidak boleh menjadi alasan "
+                     + "untuk melonggarkan ambang keyakinan engine")
+    }
+
+    /// Arah sebaliknya: perbaikan yang terlalu paranoid (menolak usulan
+    /// **selalu**) akan lolos uji pertama. Yang harus dijaga adalah bahwa
+    /// jalur yang sah tetap hidup setelah ambang 20 terlampaui.
+    func testEnoughEvidenceYieldsTheMeasuredThreshold() {
+        let h = harness()
+        recordCleanTrials(ExperimentSummary.minimumTrialsForSafetyClaim, on: h)
+
+        XCTAssertEqual(h.summary.safetyVerdict, .passed,
+                       "prasyarat: sampel sudah cukup besar")
+        let policy = try! XCTUnwrap(
+            h.suggestedConfidencePolicy(calibration: measuredCalibration),
+            "cukup bukti → sigma terukur boleh dipakai")
+        XCTAssertEqual(policy.pointingSigmaDeg, 2.5, accuracy: 1e-12)
+    }
+
+    /// **Asimetri yang harus tetap ada.** Gagal butuh satu saksi; lulus
+    /// butuh sampel besar. Maka satu false lock dari sampel kecil **tetap**
+    /// harus mengusulkan pengetatan — dan tidak boleh ikut hilang bersama
+    /// gerbang "belum cukup bukti" yang baru.
+    ///
+    /// Tanpa uji ini, perbaikan yang terlalu longgar (menolak semua usulan
+    /// sehingga penguji tidak pernah bisa melihat apa pun) lolos dua uji
+    /// di atas dan baru terlihat di sini.
+    func testOneFalseLockStillTightensOnATinySample() {
+        let h = harness()
+        let t = truth("vega")
+        h.record(targetObjectID: "vega",
+                 rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
+                                              azimuthDeg: t.azimuthDeg),
+                 calibratedPointing: nil,
+                 intent: intent(level: .high, object: star("sirius")),  // salah
+                 state: .lock,
+                 angularRateDegPerSec: 0.1,
+                 calibration: .none,
+                 timestamp: date)
+
+        XCTAssertEqual(h.summary.safetyVerdict, .failed)
+        let policy = try! XCTUnwrap(
+            h.suggestedConfidencePolicy(calibration: measuredCalibration),
+            "satu false lock tetap cukup untuk mengusulkan pengetatan")
+        XCTAssertLessThan(policy.pointingSigmaDeg, measuredCalibration.residualSpreadDeg!,
+                          "pengetatan wajib lebih ketat daripada sigma terukur")
+    }
+
+    /// Gerbang usulan harus persis **batas yang sama** dengan yang dipakai
+    /// kalimat putusan — bukan batas yang mirip.
+    ///
+    /// Yang diuji di sini adalah batasnya dari dua sisi (19 dan 20), karena
+    /// `@discardableResult` pada `record` membuat rekaman ke-20 tidak selalu
+    /// menghasilkan trial baru, dan satu uji di satu sisi saja tidak bisa
+    /// membedakan "tepat di ambang" dari "satu di bawah ambang".
+    func testTheProposalGateIsExactlyTheSafetyClaimBoundary() {
+        let justUnder = harness()
+        recordCleanTrials(ExperimentSummary.minimumTrialsForSafetyClaim - 1,
+                          on: justUnder)
+        XCTAssertEqual(justUnder.summary.trialCount,
+                       ExperimentSummary.minimumTrialsForSafetyClaim - 1)
+        XCTAssertNil(justUnder.suggestedConfidencePolicy(calibration: measuredCalibration),
+                     "satu percobaan di bawah ambang tidak cukup")
+
+        let atTheLine = harness()
+        recordCleanTrials(ExperimentSummary.minimumTrialsForSafetyClaim, on: atTheLine)
+        XCTAssertEqual(atTheLine.summary.trialCount,
+                       ExperimentSummary.minimumTrialsForSafetyClaim)
+        XCTAssertNotNil(atTheLine.suggestedConfidencePolicy(calibration: measuredCalibration),
+                        "tepat di ambang sudah cukup — ambangnya inklusif, "
+                        + "sama seperti penolakan di titik yang persis sama")
     }
 
     func testRemoveLastAndReset() {

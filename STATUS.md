@@ -8878,3 +8878,89 @@ Siklus ini juga menambah satu jenis cacat yang berbeda: bukan teks yang salah,
 tapi **argumen yang salah urutan**, yang tidak menghasilkan teks salah --
 menghasilkan **crash**. Diperbaiki oleh uji yang memanggil jalurnya; menjaga
 jalur itu tetap hidup berarti memanggilnya pada setiap percobaan.
+
+## Siklus: ambang keyakinan engine bisa bergerak setelah SATU rekaman (2026-10-05)
+
+### Premis: dua tempat memutuskan "cukup bukti?", dan keduanya salah arah
+
+Di layar Experiment 1 ada dua hal yang menilai apakah rekaman sudah
+layak dipakai: kalimat putusan dan tombol "kirim ambang".
+
+- `ExperimentSummary.safetyVerdict` memakai `minimumTrialsForSafetyClaim`
+  (20 percobaan). 1 rekaman bersih -> `.insufficientEvidence`.
+- `ExperimentHarness.suggestedConfidencePolicy` -- yang keluarannya
+  **ditulis ke resolver jam** -- hanya memakai satu syarat: `guard !analyzable.isEmpty`.
+
+Jadi dari 1 rekaman, layar menampilkan dua jawaban yang saling meniadakan
+untuk data yang sama:
+
+    "Belum bisa disimpulkan"   <- dari safetyVerdict
+    [Kirim ambang yang diukur] <- dari suggestedConfidencePolicy
+
+Yang dikirim bukan angka laporan. `Experiment1View` meneruskan `policy` itu
+ke `link.send(policy:)`, lalu jam memakai `pointingSigmaDeg` sebagai ambang
+ke classifier: dari bawaan konservatif 10° ke sigma terukur -- sehingga **satu**
+rekaman bisa membuat engine jauh lebih mudah bilang "Yakin".
+
+Yang rusak bukan angkanya, tapi **arahnya**. PRD menetapkan ketidakpastian
+menang atas keyakinan; di sini yang menang justru sebaliknya. Dan yang
+memperkenalkannya adalah tombol, bukan teks -- jadi bagian yang paling
+berbahaya adalah yang paling terlihat seperti fitur biasa.
+
+Bukti bahwa ini bukan karangan saya: komentar di `Experiment1View:195-198`
+sudah tahu `passesSafetyCriterion` bernilai `true` bahkan untuk satu
+percobaan bersih, tapi layar tetap memakai `safetyVerdict` untuk warna.
+Artinya: satu definisi sudah dibetulkan, yang kedua tertinggal.
+
+### Yang diubah
+
+`suggestedConfidencePolicy` kini membaca `summary.safetyVerdict` sebagai
+satu-satunya sumber kebenaran, bukan hitungan sendiri:
+
+- `.failed` -> perketat (sigma terukur atau separuh bawaan).
+- `.passed` -> sigma terukur.
+- `.insufficientEvidence` -> `nil`. Tidak ada tombol yang dikirim.
+
+Asimetri "gagal cepat, lulus pelan" **dijaga** dan diberi uji sendiri, jadi
+satu false lock dari sampel kecil tetap mengusulkan pengetatan.
+
+### Uji yang ditulis lebih dulu
+
+`ExperimentHarnessTests` (+4 uji):
+
+| Kondisi | Hasil |
+|---|---|
+| 1 rekaman bersih -> safetyVerdict `.insufficientEvidence` | sudah ada |
+| 1 rekaman bersih -> `suggestedConfidencePolicy` | **JATUH** (ada policy 2.5°) |
+| 19 rekaman bersih -> policy | **JATUH** (ada policy 2.5°) |
+| 19 rekaman bersih -> `trialCount` 19 | sudah benar |
+| 20 rekaman bersih -> policy 2.5° | hijau |
+| 1 false lock dari sampel kecil -> pengetatan | hijau (asimetri terjaga) |
+
+Batas 20 diuji **dari dua sisi** (19 dan 20): `@discardableResult` pada
+`record` membuat rekaman ke-20 tidak selalu menambah trial, jadi uji satu
+sisi tidak bisa membedakan "tepat di ambang" dari "satu di bawah ambang".
+
+Satu uji lama ikut diperbarui: `testPolicyUsesMeasuredSigmaWhenSafe` pernah
+merekam 1 percobaan lalu mengharapkan policy -- itu **mengkodekan cacat
+yang sama**. Namanya masih benar, prasyaratnya yang diperbaiki.
+
+### Gerbang
+
+- `./swift-test.sh` -> **174 CelestialEngine + 570 PointingKit**, 0 gagal.
+- `./swift-ui-lint.sh` -> **19 aturan** hijau (Aturan 10 menangkap 566->570).
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+
+### Cacat pada alat saya sendiri
+
+Menuliskan komentar lewat `patch` beberapa kali menghasilkan teks katak
+(CJK/Sikud) yang menyatu ke kata Indonesia -- `ambang yangania`,
+`sepertiZWIAAN`, `bisa.samplekan`. Kompilasi tetap hijau (komentar!), jadi
+tidak ada gerbang yang menangkapnya. Dua hal yang perlu diingat:
+
+1. `write_file`/`patch` pada teks panjang Bahasa Indonesia perlu
+   pemindaian ulang; verifikasi bukan "patches applied" tapi isi barisnya.
+2. Skrip `red-test.sh` dan `swift-ui-lint.sh` menangkap cacat semantik, bukan
+   teks rusak. Untuk yang terakhir ini tidak ada gerbangnya sama sekali.
+
+Yang tersisa tanpa penjaga: karakter non-Latin tak terduga di dalam komentar.
