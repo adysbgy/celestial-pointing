@@ -425,28 +425,40 @@ struct CelestialVisualView: View {
     }
 
     /// Kutub Mars: kapsul es di utara dan selatan.
+    ///
+    /// **Bentuknya elips yang diiris piringan, bukan elips datar.** Versi
+    /// sebelumnya menggambar elips dengan lebar tetap 0.55 R yang tepinya
+    /// ditempelkan di tepi bola — hasilnya bukan kutub di permukaan bola,
+    /// melainkan **elips yang mengambang di dalam piringan**: selalu ada rim
+    /// merah di atas dan di sisi kiri-kanan kutubnya (terukur 25 px pada
+    /// render 400 px). Kutub adalah ciri pengenal Mars, jadi bentuk yang
+    /// salah di sini adalah **klaim yang salah** — persis yang PRD larang.
+    ///
+    /// Geometri (pusat, tinggi, **dan lebar**) datang dari
+    /// `CelestialVisual.polarCaps()`, yang teruji di Linux. Di sini tidak ada
+    /// rumus kutub lagi: lebarnya sudah diturunkan dari tepi bola di model.
+    ///
+    /// **Kenapa `clip` ke piringan wajib, bukan hiasan.** Elips selebar tepi
+    /// bola pada `centerY` tetap **menjulur keluar** bola di baris lain —
+    /// pada y = −0.9 R lebarnya 0.530 R sementara bola hanya 0.436 R. Tanpa
+    /// klip, kutubnya justru meluber ke latar: cacat yang sama, hanya
+    /// berpindah arah. Irisan itulah yang membuat tepi luar kutub mengikuti
+    /// lengkung bola, seperti kap es yang menempel.
     private func drawPolarCaps(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         let capColor = Self.accent(CelestialVisual.accents.marsPolarCap)
-        // Geometri kutub datang dari `CelestialVisual.polarCaps`, yang teruji
-        // di Linux — **di sini tidak ada rumus kutub lagi**.
-        //
-        // Versi lama menghitung kutub utara `y - radius` tapi kutub selatan
-        // `y + radius - capHeight`, dengan tinggi elips `2 · capHeight`.
-        // Akibatnya kutub selatan berakhir di y = 1.26: **0.26R di luar
-        // bola**, menggantung di ruang kosong, dan tidak simetris dengan
-        // kutub utara (yang hanya meleset 0.004R). Kutub adalah ciri
-        // pengenal Mars, jadi bentuk yang salah bukan soal rasa — ia lewat
-        // apa yang PRD larang: gambar yang mengklaim identitas.
-        // Sekarang kutub selatan adalah cermin kutub utara secara
-        // konstruktif, jadi ketidak-simetrisan seperti itu tidak bisa
-        // ditulis ulang tanpa mengubah bentuknya di sini juga.
         let caps = CelestialVisual.polarCaps()
+        // Piringan: batas irisan untuk kedua kutub.
+        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                          width: radius * 2, height: radius * 2))
         for cap in [caps.north, caps.south] {
-            let rect = CGRect(x: center.x - CGFloat(cap.halfWidth) * radius,
-                              y: center.y + CGFloat(cap.topY) * radius,
-                              width: CGFloat(cap.halfWidth) * radius * 2,
-                              height: CGFloat(cap.height) * radius)
-            context.fill(Path(ellipseIn: rect), with: .color(capColor.opacity(0.85)))
+            var inner = context
+            inner.clip(to: disc)
+            let rect = CGRect(
+                x: center.x - CGFloat(cap.halfWidth) * radius,
+                y: center.y + CGFloat(cap.centerY - cap.halfHeight) * radius,
+                width: CGFloat(cap.halfWidth) * radius * 2,
+                height: CGFloat(cap.halfHeight) * radius * 2)
+            inner.fill(Path(ellipseIn: rect), with: .color(capColor.opacity(0.85)))
         }
     }
 

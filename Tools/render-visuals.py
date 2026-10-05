@@ -184,13 +184,30 @@ def planet_phase_fraction(planet, illumination):
     return illumination
 
 
-def polar_caps(cap_height_fraction=0.26, half_width_fraction=0.55):
-    """`CelestialVisual.polarCaps` — kutub selatan adalah cermin kutub utara."""
-    height = 2 * cap_height_fraction
-    return dict(height=height,
-                half_width=half_width_fraction,
-                north_top=-1.0,
-                south_top=1.0 - height)
+# Kutub Mars. **Lebarnya sengaja tidak ada di sini**: ia diturunkan dari tepi
+# bola (`sqrt(1 - y^2)`) di `polar_caps()`, jadi menyalinnya sebagai konstanta
+# justru akan mengembalikan cacat yang baru saja ditutup. Yang dijaga
+# `check-visuals.py` karena itu **rumusnya** (`POLAR_CAP_WIDTH_RULE`), bukan
+# angkanya. MODEL: `CelestialVisual.polarCaps(pinchY:depthFraction:)`
+POLAR_CAP_PINCH_Y = -0.74
+POLAR_CAP_DEPTH_FRACTION = 0.26
+POLAR_CAP_WIDTH_RULE = "sqrt"
+
+
+def polar_caps(pinch_y=POLAR_CAP_PINCH_Y, depth_fraction=POLAR_CAP_DEPTH_FRACTION):
+    """`CelestialVisual.polarCaps` — kutub selatan adalah cermin kutub utara.
+
+    Lebarnya **diturunkan** dari tepi bola (`sqrt(1 - y^2)`), bukan ditulis
+    sebagai konstanta: itulah yang membuat kutub menyentuh tepi, bukan
+    mengambang di dalam piringan. Lihat `_draw_polar_caps` untuk irisan
+    piringannya — elips selebar ini tetap menjulur keluar bola di baris lain,
+    jadi ia harus dipotong.
+    """
+    half_width = math.sqrt(max(0.0, 1 - pinch_y * pinch_y))
+    return dict(half_width=half_width,
+                half_height=depth_fraction,
+                north_center=pinch_y,
+                south_center=-pinch_y)
 
 
 def saturn_ring(frame_half_extent=1.0, axial_ratio=1.0 / 3.2):
@@ -917,14 +934,26 @@ def _draw_rings(canvas, cx, cy, radius, palette, night_mode):
 
 
 def _draw_polar_caps(canvas, cx, cy, radius, night_mode):
+    """Kutub = elips selebar tepi bola, **diiris dengan piringan**.
+
+    Irisan itu bukan hiasan: elips selebar tepi bola pada `north_center`
+    tetap menjulur keluar bola di baris lain (pada y = -0.9 R lebarnya
+    0.530 R, bola hanya 0.436 R). Tanpa irisan, kutubnya meluber ke latar.
+    """
     caps = polar_caps()
     cap = accent_fn(ACCENTS["marsPolarCap"], night_mode, POLAR_CAP_OPACITY)
-    for top_y in (caps["north_top"], caps["south_top"]):
-        canvas.ellipse(cx,
-                       cy + (top_y + caps["height"] / 2.0) * radius,
-                       caps["half_width"] * radius,
-                       caps["height"] * radius / 2.0,
-                       cap)
+    erx = caps["half_width"] * radius
+    ery = caps["half_height"] * radius
+    for center in (caps["north_center"], caps["south_center"]):
+        ecy = cy + center * radius
+
+        def inside(x, y, ecy=ecy):
+            if (x - cx) ** 2 + (y - cy) ** 2 > radius * radius:
+                return False
+            dx, dy = (x - cx) / erx, (y - ecy) / ery
+            return dx * dx + dy * dy <= 1.0
+
+        canvas.fill(inside, cap)
 
 
 def _draw_craters(canvas, cx, cy, radius, night_mode):

@@ -785,6 +785,29 @@ def check_port_matches_swift_constants(results):
          "center.x + CGFloat(spot.centerX - spot.width / 2) * radius", view),
         ("opasitas kutub Mars", R.POLAR_CAP_OPACITY, 0.85,
          "capColor.opacity(0.85)", view),
+        # Geometri kutub Mars. **Tiga** hal dijaga, karena angkanya saja tidak
+        # cukup: nilai `pinchY`/`depth` yang benar dengan rumus lebar yang
+        # dikembalikan ke konstanta akan menghasilkan cacat lama tanpa suara —
+        # gambarnya memang masih "elips putih di kutub".
+        ("kutub Mars: ketinggian pinch (Swift)",
+         R.POLAR_CAP_PINCH_Y, -0.74, "pinchY: Double = -0.74", model),
+        ("kutub Mars: kedalaman (Swift)",
+         R.POLAR_CAP_DEPTH_FRACTION, 0.26, "depthFraction: Double = 0.26", model),
+        ("kutub Mars: lebar diturunkan dari tepi bola (Swift)",
+         R.POLAR_CAP_WIDTH_RULE, "sqrt",
+         "(1 - pinchY * pinchY).squareRoot()", model),
+        ("kutub Mars: lebar diturunkan dari tepi bola (Python)",
+         R.POLAR_CAP_WIDTH_RULE, "sqrt",
+         "math.sqrt(max(0.0, 1 - pinch_y * pinch_y))", port),
+        # Arah kedua: view harus benar-benar **mengiris** elipsnya dengan
+        # piringan. Tanpa klip, lebar yang baru (sengaja lebih lebar dari bola
+        # di dekat kutub) meluber ke latar — cacat yang sama, arah berlawanan.
+        ("kutub Mars: view mengiris dengan piringan",
+         "inner.clip(to: disc)" in view, True,
+         "var inner = context\n            inner.clip(to: disc)", view),
+        ("kutub Mars: view memakai pusat (bukan tepi)",
+         "cap.centerY - cap.halfHeight" in view, True,
+         "y: center.y + CGFloat(cap.centerY - cap.halfHeight) * radius", view),
         ("opasitas kawah", R.CRATER_OPACITY, 0.18,
          "Color.black.opacity(0.18)", view),
         ("kawah pertama Merkurius", tuple(R.CRATERS[0]), (-0.30, -0.22, 0.20),
@@ -1415,6 +1438,93 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
         f"{diff_unknown} piksel berbeda dari bintang tak dikenal (inti saja)"))
 
 
+def check_mars_caps_touch_the_limb(results, size=400, ss=2):
+    """Kutub Mars harus **menyentuh tepi bola**, bukan mengambang di dalamnya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Kutub digambar sebagai elips
+    dengan lebar tetap 0.55 R, tepinya ditempelkan di tepi bola. Karena lebar
+    itu lebih sempit dari bola pada baris mana pun di sekitar kutub, yang
+    tergambar bukan kap es di permukaan bola melainkan elips yang ditempel
+    agak ke dalam: selalu ada rim merah di atas dan di sisi kiri-kanan
+    kutubnya. Diukur pada render 400 px: pada baris terlebar kutub, tepi bola
+    0.675 R sementara tepi kutub 0.550 R — selisih 0.125 R, 25 px.
+
+    **Kenapa harus dari piksel.** Uji model mengunci rumus lebarnya, dan itu
+    benar. Tapi yang dikirim ke layar adalah gambar: kalau view lupa
+    mengalikan lebar model dengan radius, atau memakai `topY` lama, modelnya
+    tetap benar sementara gambarnya tidak. Yang membuktikan kutub benar-benar
+    menempel adalah mengukur baris kutubnya sendiri.
+
+    **Dua arah sekaligus**, karena keduanya bisa salah sendiri-sendiri:
+    kutub yang terlalu sempit mengambang di dalam (rim merah), dan kutub yang
+    terlalu lebar meluber ke latar di dekat kutub. Yang pertama diukur di
+    baris terlebar; yang kedua di baris dekat ujung.
+    """
+    _, (w, h, rows) = render_case("planet-mars-confirmed", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    cx = cy = w / 2.0
+    radius = min(w, h) / 2.0
+
+    def pixel(x, y):
+        return rows[y][x * 4:x * 4 + 3]
+
+    def is_cap(c):
+        # Kutub 0.97/0.95/0.93 × 255 = 247/242/237; bola Mars jauh lebih
+        # merah (0.88/0.42/0.26). Ambang di antara keduanya, bukan di tepi.
+        return c[0] > 215 and c[1] > 200 and c[2] > 190
+
+    def half_width_of(predicate, y):
+        n = 0
+        for x in range(int(cx), w):
+            c = pixel(x, y)
+            if c == background or not predicate(c):
+                break
+            n += 1
+        return n
+
+    caps = R.polar_caps()
+    # Baris pusat kutub: di sinilah tepi kutub harus bertemu tepi bola.
+    y_center = int(round(cy + caps["north_center"] * radius))
+    disc = half_width_of(lambda c: True, y_center)
+    cap = half_width_of(is_cap, y_center)
+    results.append(Result(
+        "kutub Mars menyentuh tepi bola di baris pusatnya",
+        disc - cap <= 0.02 * radius,
+        f"bola {disc / radius:.3f} R, kutub {cap / radius:.3f} R, "
+        f"rim {disc - cap} px ({(disc - cap) / radius * 100:.1f}% R)"))
+
+    # Arah kedua: dekat ujung kutub, tidak boleh ada piksel kutub di luar bola.
+    outside = 0
+    for y in range(h):
+        for x in range(w):
+            if not is_cap(pixel(x, y)):
+                continue
+            if math.hypot(x + 0.5 - cx, y + 0.5 - cy) > radius + 0.5:
+                outside += 1
+    results.append(Result(
+        "kutub Mars tidak meluber keluar bola",
+        outside == 0,
+        f"{outside} piksel kutub di luar piringan"))
+
+    # Ketiga: kutubnya benar-benar ada **dan** hilang saat ragu — dua arah
+    # sekaligus. Tanpa yang pertama, view yang berhenti menggambar kutub lolos
+    # dua pemeriksaan di atas dengan sempurna; tanpa yang kedua, ciri pengenal
+    # tergambar pada kandidat yang belum dipastikan.
+    _, (w2, h2, rows2) = render_case("planet-mars-uncertain", size=size, ss=ss)
+    cap_pixels = sum(1 for y in range(h) for x in range(w)
+                     if is_cap(pixel(x, y)))
+    results.append(Result(
+        "kutub Mars benar-benar tergambar",
+        cap_pixels > 100,
+        f"{cap_pixels} piksel kutub (cukup > 100)"))
+    uncertain_caps = sum(1 for y in range(h2) for x in range(w2)
+                         if is_cap(rows2[y][x * 4:x * 4 + 3]))
+    results.append(Result(
+        "kutub Mars hilang saat engine ragu",
+        uncertain_caps == 0,
+        f"{uncertain_caps} piksel kutub pada kandidat (harus 0)"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -1436,6 +1546,7 @@ def main():
     check_feature_arrays_match_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
+    check_mars_caps_touch_the_limb(results)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)

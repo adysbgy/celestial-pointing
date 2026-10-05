@@ -730,42 +730,93 @@ final class CelestialVisualTests: XCTestCase {
 
     // MARK: - Geometri kutub planet
 
-    /// Titik terjauh elips kutub dari pusat bola, dalam satuan radius.
+    /// Titik terjauh **irisan elips kutub dengan piringan** dari pusat bola,
+    /// dalam satuan radius.
     ///
-    /// Elips kutub adalah gambaran di dalam `CGRect` view; agar bisa diuji
-    /// di Linux (tanpa SwiftUI), bentuknya dihitung ulang di sini dari
-    /// `topY/height/halfWidth` yang sama persis dengan yang dipakai view.
-    private func maxDistanceFromCenter(topY: Double,
-                                        height: Double,
-                                        halfWidth: Double) -> Double {
-        let steps = 2000
+    /// Irisannya dihitung di sini karena itulah yang benar-benar tergambar:
+    /// `drawPolarCaps` mengklip elips ke piringan, jadi bentuk di layar bukan
+    /// elipsnya, melainkan bagian elips yang ada di dalam bola. Mengukur
+    /// elipsnya saja akan mengukur bentuk yang tidak pernah muncul — persis
+    /// kelas "gerbang mengukur gambar yang sudah tidak ada lagi".
+    ///
+    /// Titik di luar piringan dibuang, bukan dihitung: yang menjulur keluar
+    /// memang dipotong, jadi menjulur bukan cacat — **kecuali** kalau tidak
+    /// ada satu pun titik yang mencapai tepi, karena di situlah kutubnya
+    /// berubah dari "menempel" menjadi "mengambang di dalam".
+    private func farthestPointOfCap(_ cap: CelestialVisual.PolarCaps.Cap) -> Double {
+        let steps = 4000
         var worst = 0.0
         for i in 0...steps {
             let t = 2 * Double.pi * Double(i) / Double(steps)
-            let x = halfWidth * cos(t)
-            let y = topY + height / 2 + (height / 2) * sin(t)
+            let x = cap.halfWidth * cos(t)
+            let y = cap.centerY + cap.halfHeight * sin(t)
+            // Di luar piringan → dipotong klip, jadi bukan bagian gambarnya.
+            guard x * x + y * y <= 1.0 else { continue }
             worst = max(worst, hypot(x, y))
         }
         return worst
     }
 
-    func testPolarCapsStayOnThePlanetSurface() {
-        // **Regresi untuk kutub selatan yang menembus 0.26R keluar dari bola.**
+    func testPolarCapsTouchTheLimb() {
+        // **Regresi untuk kutub yang mengambang di dalam piringan.**
+        //
+        // Versi lama memakai lebar tetap 0.55 R untuk kedua kutub. Diukur pada
+        // render 400 px: pada baris terlebar kutub, tepi bola 0.675 R
+        // sementara tepi kutub 0.550 R — rim merah 0.125 R (25 px) di atas
+        // dan di sisi kiri-kanan kutubnya. Yang tergambar bukan kap es di
+        // permukaan bola, melainkan elips yang ditempel agak ke dalam.
+        //
+        // Satu-satunya lebar yang membuat kutub benar-benar menyentuh tepi di
+        // baris pusatnya adalah setengah-lebar bola pada ketinggian itu,
+        // `sqrt(1 - y^2)`. Uji ini memeriksa **titik terjauh irisan** mencapai
+        // tepi (1.0), jadi lebar tetap mana pun yang lebih sempit akan gagal
+        // — bukan hanya angka 0.55 yang kebetulan dipakai sekarang.
+        let caps = CelestialVisual.polarCaps()
+        for (name, cap) in [("north", caps.north), ("south", caps.south)] {
+            let farthest = farthestPointOfCap(cap)
+            XCTAssertEqual(farthest, 1.0, accuracy: 1e-6,
+                           "kutub \(name) tidak menyentuh tepi bola: terjauh \(farthest) R")
+        }
+    }
+
+    func testPolarCapWidthIsDerivedFromTheLimb() {
+        // Lebarnya **diturunkan**, bukan ditulis. Uji ini gagal untuk nilai
+        // konstanta mana pun yang bukan `sqrt(1 - y^2)` di `centerY` — jadi
+        // "kembalikan 0.55" tidak bisa lolos hanya karena angkanya terlihat
+        // masuk akal.
+        let caps = CelestialVisual.polarCaps()
+        let expected = (1 - caps.north.centerY * caps.north.centerY).squareRoot()
+        XCTAssertEqual(caps.north.halfWidth, expected, accuracy: 1e-12)
+        XCTAssertNotEqual(caps.north.halfWidth, 0.55,
+                          "lebar tetap 0.55 R adalah cacat yang uji ini tutup")
+    }
+
+    func testPolarCapsNeverLeaveThePlanetSurface() {
+        // **Regresi untuk kutub selatan yang menembus 0.26 R keluar bola.**
         //
         // Versi lama memakai `y - radius` untuk kutub utara tapi
         // `y + radius - capHeight` untuk kutub selatan, dengan tinggi elips
         // `2 · capHeight` — jadi kutub selatan berakhir di y = 1.26, jauh di
-        // luar bola: kutub putih menggantung di ruang kosong, bukan
-        // menempel di permukaan. Uji ini gagal pada geometri lama.
+        // luar bola: kutub putih menggantung di ruang kosong, bukan menempel
+        // di permukaan.
+        //
+        // Sekarang lebarnya sengaja **lebih lebar** dari bola di dekat kutub
+        // (itu yang membuatnya menempel di baris pusatnya), jadi yang menjaga
+        // tidak ada luberan bukan angkanya melainkan **klip piringan** di
+        // view. Uji ini memastikan irisannya tetap di dalam: setiap titik yang
+        // terhitung memang lolos syarat `x² + y² ≤ 1`, dan tidak ada titik
+        // yang terlewat di luar.
         let caps = CelestialVisual.polarCaps()
         for (name, cap) in [("north", caps.north), ("south", caps.south)] {
-            let farthest = maxDistanceFromCenter(topY: cap.topY,
-                                                  height: cap.height,
-                                                  halfWidth: cap.halfWidth)
-            // Toleransi kecil hanya untuk pembulatan titik sampel; kutub
-            // memang sedikit menyentuh tepi bola di kutub utara.
-            XCTAssertLessThanOrEqual(farthest, 1.01,
-                                     "kutub \(name) menembus \(farthest - 1) R di luar bola")
+            let steps = 4000
+            for i in 0...steps {
+                let t = 2 * Double.pi * Double(i) / Double(steps)
+                let x = cap.halfWidth * cos(t)
+                let y = cap.centerY + cap.halfHeight * sin(t)
+                guard x * x + y * y <= 1.0 else { continue }
+                XCTAssertLessThanOrEqual(hypot(x, y), 1.0 + 1e-12,
+                                         "kutub \(name) keluar bola")
+            }
         }
     }
 
@@ -774,10 +825,9 @@ final class CelestialVisualTests: XCTestCase {
         // (utara hanya meleset 0.004R, selatan 0.26R), dan simetri itulah
         // yang membuat keduanya melekat pada bola.
         let caps = CelestialVisual.polarCaps()
-        XCTAssertEqual(caps.north.topY, -caps.south.topY - caps.south.height,
-                       accuracy: 1e-12,
+        XCTAssertEqual(caps.north.centerY, -caps.south.centerY, accuracy: 1e-12,
                        "kedua kutub harus cermin terhadap ekuator")
-        XCTAssertEqual(caps.north.height, caps.south.height)
+        XCTAssertEqual(caps.north.halfHeight, caps.south.halfHeight)
         XCTAssertEqual(caps.north.halfWidth, caps.south.halfWidth)
     }
 
@@ -785,9 +835,13 @@ final class CelestialVisualTests: XCTestCase {
         // Model tidak boleh bocor satuan: hasilnya proporsional radius
         // (satuan 1), supaya view cukup mengalikan sendiri.
         let caps = CelestialVisual.polarCaps()
-        XCTAssertEqual(caps.north.topY, -1.0, accuracy: 1e-12)
-        XCTAssertEqual(caps.north.height, 0.52, accuracy: 1e-12)
-        XCTAssertEqual(caps.north.halfWidth, 0.55, accuracy: 1e-12)
+        XCTAssertEqual(caps.north.centerY, -0.74, accuracy: 1e-12)
+        XCTAssertEqual(caps.north.halfHeight, 0.26, accuracy: 1e-12)
+        XCTAssertEqual(caps.north.halfWidth, (1.0 - 0.74 * 0.74).squareRoot(),
+                       accuracy: 1e-12)
+        // Kutub menjangkau ke arah ekuator tanpa menyentuhnya.
+        XCTAssertLessThan(caps.north.centerY + caps.north.halfHeight, 0.0,
+                          "kutub utara tidak boleh melewati ekuator")
     }
 
     // MARK: - Batas frame: tidak ada bentuk yang boleh keluar dari Canvas

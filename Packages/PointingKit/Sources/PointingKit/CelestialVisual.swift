@@ -1395,28 +1395,68 @@ public extension CelestialVisual {
 
     /// Kutub es planet, dalam satuan radius dan relatif terhadap pusat bola.
     ///
-    /// Satu tipe untuk **kedua** kutub, bukan satu angka per kutub.
+    /// **Kenapa bentuknya elips beririsan, bukan persegi panjang.** Versi
+    /// pertama menggambarkan satu kutub sebagai **elips datar** yang tepi
+    /// atasnya ditempelkan di tepi bola (`topY = -1`), dengan lebar tetap
+    /// 0.55 R dan tinggi 0.52 R. Yang tergambar bukan kutub di permukaan
+    /// bola, melainkan **elips yang mengambang di dalam piringan**: karena
+    /// lebar tetapnya lebih sempit dari bola pada baris mana pun di sekitar
+    /// kutub, selalu ada **rim merah** di atas dan di sisi kiri-kanan
+    /// kutubnya. Diukur pada render 400 px: pada baris terlebar kutub,
+    /// tepi bola 0.675 R sementara tepi kutub 0.550 R — selisih 0.125 R,
+    /// 25 px, terlihat mata telanjang sebagai "stiker yang ditempel agak ke
+    /// dalam". Kutub adalah **ciri pengenal Mars**, jadi ini bukan soal rasa:
+    /// gambar yang salah adalah **klaim yang salah**, persis yang PRD larang.
+    ///
+    /// Perbaikannya dua bagian, dan keduanya perlu:
+    ///
+    ///   1. **Lebar diturunkan dari tepi bola**, bukan ditulis sebagai angka.
+    ///      Satu-satunya lebar yang membuat kutub benar-benar menyentuh tepi
+    ///      di baris `centerY` adalah setengah-lebar bola pada ketinggian itu
+    ///      — `√(1 − y²)`, rumus proyeksi yang sama dengan `jupiterBands`.
+    ///      Menulisnya sebagai konstanta berarti angka itu hanya benar untuk
+    ///      satu ukuran/posisi, dan salah tanpa suara saat posisinya bergeser.
+    ///   2. **Irisan dengan piringan.** Elips dengan lebar di atas tetap
+    ///      menjulur keluar bola di dekat kutub (pada y = −0.9 R, elipsnya
+    ///      0.530 R sementara bola 0.436 R), jadi ia harus dipotong oleh
+    ///      piringan — kalau tidak, kutubnya justru **keluar** dari planet.
+    ///      Itu sebabnya `CelestialVisualView` menggambar lewat klip piringan,
+    ///      dan kenapa uji di Linux memeriksa dua arah sekaligus: menyentuh
+    ///      tepi **dan** tidak melewatinya.
+    ///
+    /// Satu tipe untuk **kedua** kutub, bukan satu angka per kutub: kutub
+    /// selatan dihitung sebagai cermin kutub utara, bukan dari rumus kedua.
     struct PolarCaps: Equatable, Sendable {
-        /// Sisi atas (utara): tepi elipsnya tepat di tepi bola.
-        public var north: Rect
-        /// Sisi bawah (selatan): cermin dari utara terhadap ekuator.
-        public var south: Rect
-        /// Satu kutub: posisi & ukuran elipsnya.
-        public struct Rect: Equatable, Sendable {
-            /// Tepi atas elips, relatif terhadap pusat bola.
-            public var topY: Double
-            public var height: Double
+        /// Sisi utara: `centerY` negatif (ingat: di `Canvas` y bertambah ke
+        /// bawah).
+        public var north: Cap
+        /// Sisi selatan: cermin utara terhadap ekuator.
+        public var south: Cap
+        /// Satu kutub: elips batasnya, sebelum diiris dengan piringan.
+        public struct Cap: Equatable, Sendable {
+            /// Pusat elips, sumbu y, relatif terhadap pusat bola.
+            public var centerY: Double
+            /// Separuh tinggi elips, satuan radius.
+            public var halfHeight: Double
+            /// Separuh lebar elips, satuan radius. **Selalu** setengah-lebar
+            /// bola pada `centerY`; lihat `polarCaps(pinchY:depthFraction:)`.
             public var halfWidth: Double
+
+            public init(centerY: Double, halfHeight: Double, halfWidth: Double) {
+                self.centerY = centerY
+                self.halfHeight = halfHeight
+                self.halfWidth = halfWidth
+            }
         }
 
-        public init(north: Rect, south: Rect) {
+        public init(north: Cap, south: Cap) {
             self.north = north
             self.south = south
         }
     }
 
-    /// Geometri kutub yang **benar secara konstruktif**: kutub selatan
-    /// dihitung sebagai cermin kutub utara, bukan dari rumus kedua.
+    /// Geometri kutub yang **benar secara konstruktif**: lebarnya diturunkan
+    /// dari tepi bola, dan kutub selatan adalah cermin kutub utara.
     ///
     /// **Kenapa ini di model, bukan di view.** Kutub adalah ciri pengenal
     /// Mars, dan PRD melarang visual yang mengklaim identitas — jadi bentuk
@@ -1424,37 +1464,28 @@ public extension CelestialVisual {
     /// bentuk yang salah mustahil dibaca dari teks mana pun di layar, jadi
     /// ia hanya bisa dijaga di tempat yang bisa diuji di Linux.
     ///
-    /// **Bug yang ditutup oleh bentuk kacau ini.** Versi sebelumnya memakai
-    /// `y - radius` untuk kutub utara tapi `y + radius - capHeight` untuk
-    /// kutub selatan, dengan tinggi elips `2 · capHeight`. Kutub selatan
-    /// berakhir di y = 1.26 — yaitu **0.26R di luar bola**, menggantung di
-    /// ruang kosong — sementara kutub utara hanya meleset 0.004R. Jadi Mars
-    /// tampil dengan kutub putih yang tidak simetris dan tidak menempel,
-    /// persis di tanda yang paling mudah dibaca mata telanjang. Satu tipe
-    /// dengan dua kutub yang dicerminkan membuat ketidak-simetrisan seperti
-    /// ini tidak bisa ditulis ulang tanpa mengubah bentuk yang benar.
-    ///
     /// - Parameters:
-    ///   - capHeightFraction: setengah tinggi kutub, dalam satuan radius.
-    ///   - halfWidthFraction: setengah lebar kutub, dalam satuan radius.
+    ///   - pinchY: ketinggian tempat kutub menyentuh tepi bola, sekaligus
+    ///     pusat elipsnya. Negatif = belahan utara.
+    ///   - depthFraction: separuh tinggi elips, satuan radius — seberapa
+    ///     dalam kutub menjangkau ke arah ekuator.
     ///
     /// Hasil dalam **satuan radius** (bukan poin): view yang sudah punya
-    /// radius cukup mengalikan sendiri, jadi model ini tidak perlu tahu
+    /// radius cukup mengalikannya sendiri, jadi model ini tidak perlu tahu
     /// satuan apa yang sedang digambar.
-    static func polarCaps(capHeightFraction: Double = 0.26,
-                          halfWidthFraction: Double = 0.55) -> PolarCaps {
-        let height = 2 * capHeightFraction
-        // Kutub utara mulai tepat di tepi bola; kutub selatan cerminnya
-        // mulai `2 · capHeight` di dalam tepi bawah — jadi keduanya berakhir
-        // pada jarak yang sama dari ekuator.
-        let northTop = -1.0
-        let southTop = 1.0 - height
-        func rect(_ topY: Double) -> PolarCaps.Rect {
-            PolarCaps.Rect(topY: topY,
-                           height: height,
-                           halfWidth: halfWidthFraction)
+    static func polarCaps(pinchY: Double = -0.74,
+                          depthFraction: Double = 0.26) -> PolarCaps {
+        // Setengah-lebar bola pada ketinggian itu — rumus proyeksi, bukan
+        // pilihan. Inilah yang membuat kutub **menyentuh** tepi, bukan
+        // mengambang di dalamnya.
+        let halfWidth = (1 - pinchY * pinchY).squareRoot()
+        func cap(_ centerY: Double) -> PolarCaps.Cap {
+            PolarCaps.Cap(centerY: centerY,
+                          halfHeight: depthFraction,
+                          halfWidth: halfWidth)
         }
-        return PolarCaps(north: rect(northTop), south: rect(southTop))
+        // Selatan = cermin utara: satu tanda, bukan rumus kedua.
+        return PolarCaps(north: cap(pinchY), south: cap(-pinchY))
     }
 
     /// Bintik Merah Besar Jupiter: elipsnya di mana, selebar apa.
