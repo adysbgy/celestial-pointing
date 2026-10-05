@@ -284,9 +284,13 @@ final class TextLocalizationTests: XCTestCase {
     /// di app dan sampai saat itu tidak punya pengumuman apa pun, sementara
     /// setiap elemen data lain di layar itu punya. Lihat
     /// `ConfidenceChartSpeech.swift`.
+    /// 303 → 306 pada siklus "acuan kalibrasi tidak boleh dihitung dua kali":
+    /// tiga kunci `calibration.*.repeatedReference*` (pesan layar, catatan
+    /// kecil, dan bentuk yang diucapkan). Lihat
+    /// `CalibrationReferenceIndependenceTests`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 303, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 306, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

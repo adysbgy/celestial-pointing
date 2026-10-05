@@ -1530,6 +1530,28 @@
         }
       }
     },
+    "calibration.message.repeatedReference": {
+      "comment": "Acuan yang sama diketuk berulang; sigma hanya bermakna dari beberapa arah berbeda.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is already recorded \u2014 point at a different star so its error can be measured. (%lld of %lld)"
+          }
+        }
+      }
+    },
+    "calibration.message.repeatedReferenceHint": {
+      "comment": "Catatan layar kecil: ketukan berulang tidak menambah pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld taps on the same reference do not add a measurement."
+          }
+        }
+      }
+    },
     "calibration.message.sensorUnavailable": {
       "comment": "Sensor gerak mati saat mencatat acuan.",
       "localizations": {
@@ -1713,6 +1735,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Phase: %@."
+          }
+        }
+      }
+    },
+    "calibration.speech.repeatedReference": {
+      "comment": "Pengulangan acuan, diucapkan; menyebut akibatnya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is already recorded, so it does not add a measurement."
           }
         }
       }

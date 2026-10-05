@@ -134,10 +134,24 @@ struct CalibrationView: View {
                     .foregroundStyle(phaseTone.color)
             }
             if let flow = session?.flow {
+            // **Jumlah acuan berbeda, bukan jumlah ketukan.** Ini bukan
+            // kerapian: kalau kartu menampilkan "3 acuan" sementara tahapnya
+            // masih "Mengumpulkan acuan", pengguna menyimpulkan tombolnya
+            // rusak — padahal pengukurannya memang tidak bertambah, karena
+            // satu arah yang sama diukur berulang.
             Text(TextLocalization.text(.calibrationSamplesRecorded,
-                                      Int64(flow.samples.count)))
+                                      Int64(flow.distinctReferenceCount)))
                 .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
+            // Pengulangan tidak pernah disembunyikan. Jumlahnya tampil sebagai
+            // catatan kecil di bawah hitungan, supaya tampilan layar dan
+            // pengumuman suara tidak jadi bertentangan dengan prioritas berbeda.
+            if !flow.repeatedReferenceIDs.isEmpty {
+                Text(CalibrationText.repeatedReferenceHint(
+                        repeatedCount: flow.repeatedReferenceIDs.count))
+                    .font(.caption2)
+                    .foregroundStyle(PointingTone.warning.color)
+            }
             if let calibration = flow.calibration {
                 Text(CalibrationText.offsetDisplay(degrees: calibration.yawOffsetDeg))
                     .font(.caption.monospacedDigit())

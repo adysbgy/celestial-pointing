@@ -90,6 +90,65 @@ public struct CalibrationFlow {
     public private(set) var calibration: PointingCalibration?
     public private(set) var phase: CalibrationPhase = .idle
 
+    /// Jumlah **acuan berbeda** yang sudah tercatat — bukan jumlah ketukan.
+    ///
+    /// **Kenapa ini bukan `samples.count`.** Sigma pointing bermakna "seberapa
+    /// galat arah tunjuk kita *di langit mana pun*", dan itu hanya bisa diukur
+    /// dari beberapa arah yang berbeda. Dua ketukan pada Sirius mengukur satu
+    /// arah dua kali: sebarannya jadi ~1e-6 derajat yang **tidak mengukur
+    /// apa pun**, tapi tetap `> 0` dan berhingga sehingga semua penjaganya
+    /// meloloskannya. Akibatnya alur menyatakan "Siap" dan `confidencePolicy()`
+    /// mengarang ambang keyakinan dari noise — sigma ~0 membuat
+    /// `maxSeparationDeg` ~0, jadi engine tidak pernah lagi boleh menjawab HIGH.
+    ///
+    /// Pengulangan tidak dihapus: `samples` tetap menyimpan semuanya, `removeLast`
+    /// tetap berarti "buang ketukan terakhir", dan tidak ada satu pun pengukuran
+    /// yang dibuang diam-diam. Yang dihitung ulang dari bagian independen
+    /// hanyalah **klaim** — readiness dan sigma.
+    ///
+    /// Bisa dieduplikasi tanpa mengubah urutan: hanya perlu menghitung himpunan
+    /// id, jadi tidak ada biaya yang terasa di layar.
+    public var distinctReferenceCount: Int {
+        Set(samples.map(\.objectID)).count
+    }
+
+    /// Acuan yang sudah tercatat lebih dari sekali.
+    ///
+    /// Kosong berarti tidak ada pengulangan — keadaan yang biasa.
+    ///
+    /// Yang dikembalikan **bukan** teks: nama bintangnya dari
+    /// katalog/pemanggil, dan kalimatnya lahir di `CalibrationText` supaya
+    /// bisa dilokalkan dan diuji di Linux.
+    ///
+    /// Dipakai untuk **menjelaskan** kenapa pengulangan tidak menambah bukti,
+    /// bukan untuk membuang pengukurannya.
+    public var repeatedReferenceIDs: [String] {
+        var counts: [String: Int] = [:]
+        for sample in samples { counts[sample.objectID, default: 0] += 1 }
+        // `samples` urut pencatatan, jadi urutan keluaran ikut urutan itu —
+        // stabil antar peluncuran, tidak seperti urutan `Dictionary`.
+        var seen = Set<String>()
+        return samples.compactMap { counts[$0.objectID, default: 0] > 1 && seen.insert($0.objectID).inserted
+            ? $0.objectID : nil }
+    }
+
+    /// Ketukan yang **tidak menambah** pengukuran baru.
+    ///
+    /// Berbeda dengan `repeatedReferenceIDs`, yang menghitung **bintang**
+    /// yang diulang: yang terbuang adalah **ketukan**. Ketukan pertama pada
+    /// Sirius memang menambah bukti; ketukan kedua dan ketiga tidak. Untuk
+    /// tiga ketukan pada satu bintang, angkanya 2 — bukan 3, karena ikut
+    /// menghitung ketukan pertama akan menyalahkan pengguna atas sesuatu
+    /// yang memang benar.
+    ///
+    /// Hubungannya dengan dua angka lain selalu tepat:
+    /// `samples.count == distinctReferenceCount + redundantTapCount`, jadi
+    /// catatan di layar bisa dibaca sebagai "sebagian ketukan saya terbuang"
+    /// tanpa perlu menebak.
+    public var redundantTapCount: Int {
+        samples.count - distinctReferenceCount
+    }
+
     public init(referenceObjects: [CelestialObject] = CalibrationFlow.defaultReferences,
                 maxResidualSpreadDeg: Double = 3.0,
                 minimumSamples: Int = 2) {
@@ -181,16 +240,27 @@ public struct CalibrationFlow {
     // MARK: - Bantu
 
     private mutating func recompute() {
-        guard samples.count >= minimumSamples else {
-            calibration = samples.count == 1
-                ? CalibrationSolver.solve(measured: samples.map(\.measured),
-                                          truth: samples.map(\.trueDirection))
+        // **Klaim dihitung dari acuan BERBEDA, bukan dari jumlah ketukan.**
+        // Dua sampel untuk benda yang sama mengukur satu arah dua kali, jadi
+        // keduanya tidak menambah informasi apa pun tentang galat arah tunjuk
+        // di langit. `independentSamples` hanya memilih satu sampel per id —
+        // bukan membuang pengukurannya: semuanya tetap tersimpan, dan yang
+        // pertama menang supaya hasilnya tidak bergantung pada urutan acak
+        // `Dictionary`.
+        let independent = independentSamples
+        guard independent.count >= minimumSamples else {
+            // Satu acuan tetap dihitung: satu titik **tidak** bisa memberi tahu
+            // seberapa konsisten kalibrasi, jadi `residualSpreadDeg` nil dan
+            // tidak ada kebijakan yang bisa lahir darinya.
+            calibration = independent.count == 1
+                ? CalibrationSolver.solve(measured: independent.map(\.measured),
+                                          truth: independent.map(\.trueDirection))
                 : nil
             phase = samples.isEmpty ? .idle : .collecting
             return
         }
-        calibration = CalibrationSolver.solve(measured: samples.map(\.measured),
-                                              truth: samples.map(\.trueDirection))
+        calibration = CalibrationSolver.solve(measured: independent.map(\.measured),
+                                              truth: independent.map(\.trueDirection))
         guard let spread = calibration?.residualSpreadDeg else {
             phase = .collecting
             return
@@ -198,14 +268,35 @@ public struct CalibrationFlow {
         phase = spread <= maxResidualSpreadDeg ? .ready : .collecting
     }
 
+    /// Satu sampel per id acuan, sesuai urutan pencatatan.
+    ///
+    /// "Satu per id" bukan satu per *posisi*: bila pengulangan terjadi,
+    /// ketukan pertama yang dipakai karena itulah yang paling dekat dengan
+    /// waktu pengguna benar-benar menunjuk ke arah itu.
+    private var independentSamples: [CalibrationSample] {
+        var seen = Set<String>()
+        return samples.filter { seen.insert($0.objectID).inserted }
+    }
+
     private var message: String {
+        // Pengulangan didahulukan: pertanyaan "kenapa tidak bertambah?" lebih
+        // berguna dijawab sebelum pengguna menyadarinya, dan kalau dijawab
+        // setelah "terlalu lebar" membingungkan karena sebarannya belum
+        // bermakna sama sekali.
+        if let repeated = repeatedReferenceIDs.first,
+           distinctReferenceCount < minimumSamples {
+            return CalibrationText.repeatedReferenceMessage(
+                name: name(ofObjectID: repeated),
+                distinctCount: distinctReferenceCount,
+                minimum: minimumSamples)
+        }
         switch phase {
         case .idle:
             return CalibrationText.idleMessage
         case .collecting:
-            if samples.count < minimumSamples {
+            if distinctReferenceCount < minimumSamples {
                 return CalibrationText.needMoreMessage(minimum: minimumSamples,
-                                                       recorded: samples.count)
+                                                       recorded: distinctReferenceCount)
             }
             let spread = calibration?.residualSpreadDeg ?? .nan
             return CalibrationText.spreadTooWideMessage(spreadDeg: spread,
@@ -213,9 +304,19 @@ public struct CalibrationFlow {
         case .ready:
             let spread = calibration?.residualSpreadDeg ?? .nan
             return CalibrationText.readyMessage(spreadDeg: spread,
-                                                sampleCount: samples.count)
+                                                sampleCount: distinctReferenceCount)
         case .applied:
             return CalibrationText.appliedMessage
         }
+    }
+
+    /// Nama tampilan untuk id acuan, dari katalog acuan alur ini.
+    ///
+    /// Sengaja memakai `referenceObjects` dan bukan katalog seluruh aplikasi:
+    /// satu nama untuk satu fakta, supaya tidak ada daftar kedua yang bisa
+    /// berbeda pendapat. Id yang tidak ada di daftar itu jatuh kembali ke
+    /// id-nya sendiri — lebih jujur daripada menebak nama yang salah.
+    private func name(ofObjectID id: String) -> String {
+        referenceObjects.first { $0.id == id }?.name ?? id
     }
 }

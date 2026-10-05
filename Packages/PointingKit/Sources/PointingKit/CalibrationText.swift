@@ -90,7 +90,38 @@ public enum CalibrationText {
         TextLocalization.text(.calibrationMessageNoNearbyStar)
     }
 
+    /// Acuan yang sama diketuk lebih dari sekali.
+    ///
+    /// **Kenapa kalimat ini harus ada, bukan sekadar memblokir.** Dua ketukan
+    /// pada Sirius memang **dua pengukuran yang benar** — tangan memang bisa
+    /// bergoyang. Yang tidak benar adalah membacanya sebagai dua arah yang
+    /// berbeda, karena itulah yang membuat sigma pointing kehilangan makna.
+    /// Menolaknya tanpa penjelasan akan membuat pengguna mengira tombolnya
+    /// rusak, lalu mencoba lagi ke arah yang sama — dan hasilnya tetap tidak
+    /// bertambah. Kalimat ini menyebut **bintang mana** yang sudah tercatat dan
+    /// **berapa** yang masih dibutuhkan, jadi tindakan berikutnya jelas.
+    ///
+    /// Tiga `%lld`/`%@`: nama bintang, jumlah acuan berbeda sejauh ini, dan
+    /// minimum yang dibutuhkan.
+    public static func repeatedReferenceMessage(name: String,
+                                                distinctCount: Int,
+                                                minimum: Int) -> String {
+        TextLocalization.text(.calibrationMessageRepeatedReference,
+               name, Int64(distinctCount), Int64(minimum))
+    }
+
     // MARK: - Teks yang diucapkan (`CalibrationSpeech`)
+
+    /// Catatan layar kecil untuk pengulangan yang tidak menambah pengukuran.
+    ///
+    /// Bentuk layar **boleh** menyebut apa yang terjadi; bentuk suara tidak
+    /// (lihat `spokenRepeatedReference`). Karena itu ada dua versi, bukan
+    /// satu kalimat dipakai dua kali: di layar ada ruang untuk menyebut
+    /// jumlahnya, di suara ada ruang hanya untuk akibatnya.
+    public static func repeatedReferenceHint(repeatedCount: Int) -> String {
+        TextLocalization.text(.calibrationMessageRepeatedReferenceHint,
+               Int64(repeatedCount))
+    }
 
     /// "Tahap: Siap dipakai."
     public static func spokenPhasePrefix(_ phase: String) -> String {
@@ -101,6 +132,16 @@ public enum CalibrationText {
     public static func spokenSamplesRecorded(_ count: Int) -> String {
         TextLocalization.text(.calibrationSpeechSamplesRecorded,
                Int64(count))
+    }
+
+    /// Pengulangan acuan, untuk diucapkan.
+    ///
+    /// Bentuk suara **menyatakan akibatnya** ("tidak menambah"), bukan
+    /// sekadar mengulang keadaan. Untuk layar, kalimat bisa menunjuk bintang
+    /// dan hitungan; untuk suara, dua kalimat pendek lebih cepat dipahami
+    /// daripada satu kalimat yang memuat tiga angka.
+    public static func spokenRepeatedReference(name: String) -> String {
+        TextLocalization.text(.calibrationSpeechRepeatedReference, name)
     }
 
     /// "Offset 4.2 derajat."
@@ -230,11 +271,24 @@ public extension LocalizedText {
     static let calibrationMessageNoNearbyStar = LocalizedText(
         key: "calibration.message.noNearbyStar",
         id: "Tidak ada bintang acuan yang jelas di arah itu — dekatkan tunjuk ke bintang terang.")
+    /// Acuan yang sama diketuk berulang. Nama bintang (`%@`) disisipkan
+    /// pertama, lalu jumlah acuan **berbeda** (`%lld`), lalu minimum (`%lld`) —
+    /// urutan itu adalah urutan yang dibaca pengguna: mana yang sudah ada, lalu
+    /// berapa yang kurang.
+    static let calibrationMessageRepeatedReference = LocalizedText(
+        key: "calibration.message.repeatedReference",
+        id: "%@ sudah tercatat — acuan lain diperlukan agar galatnya terukur. (%lld dari %lld)")
 
     static let calibrationSpeechPhasePrefix = LocalizedText(
         key: "calibration.speech.phasePrefix", id: "Tahap: %@.")
     static let calibrationSpeechSamplesRecorded = LocalizedText(
         key: "calibration.speech.samplesRecorded", id: "%lld acuan tercatat.")
+    static let calibrationSpeechRepeatedReference = LocalizedText(
+        key: "calibration.speech.repeatedReference",
+        id: "%@ sudah tercatat, jadi tidak menambah pengukuran.")
+    static let calibrationMessageRepeatedReferenceHint = LocalizedText(
+        key: "calibration.message.repeatedReferenceHint",
+        id: "%lld ketukan di acuan yang sama tidak menambah pengukuran.")
     static let calibrationSpeechOffset = LocalizedText(
         key: "calibration.speech.offset", id: "Offset %.1f derajat.")
     static let calibrationSpeechSpread = LocalizedText(

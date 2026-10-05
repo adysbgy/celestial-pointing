@@ -26,11 +26,29 @@ public extension CalibrationFlow {
     /// apakah tombol "Pakai" boleh ditekan — pengguna tidak bisa menebak itu
     /// dari angka sebaran saja.
     ///
+    /// **Hitungan yang diucapkan adalah jumlah acuan BERBEDA**, bukan jumlah
+    /// ketukan — sama seperti yang tampil di layar, dan untuk alasan yang lebih
+    /// penting di sini: pengumuman inilah satu-satunya umpan balik pengguna
+    /// yang tidak melihat layar. Kalau kartu tahap masih "Mengumpulkan acuan"
+    /// sementara pengumuman tetap berbunyi "3 acuan tercatat", yang
+    /// tidak melihat layar diberi tahu bahwa pengukurannya **tidak**
+    /// bertambah — persis cacat yang paling sulit diperbaiki karena tidak ada
+    /// yang salah secara terpisah.
+    ///
     /// Angka diucapkan lengkap ("2.4 derajat"), bukan "2.4°": derajat adalah
     /// singkatan visual yang tidak terbaca sebagai kata.
     var spokenPhaseSummary: String {
         var parts = [CalibrationText.spokenPhasePrefix(phase.spokenName)]
-        parts.append(CalibrationText.spokenSamplesRecorded(samples.count))
+        parts.append(CalibrationText.spokenSamplesRecorded(distinctReferenceCount))
+        // Pengulangan ikut diucapkan **beserta artinya**: tanpa ini,
+        // pengumuman tetap terasa tidak bertambah tanpa alasan yang bisa
+        // didengar. `spokenRepeatedReference` menyatakan akibatnya, bukan
+        // sekadar mengulang kata "sudah tercatat".
+        if let repeated = repeatedReferenceIDs.first,
+           distinctReferenceCount < minimumSamples {
+            parts.append(CalibrationText.spokenRepeatedReference(
+                name: repeatedDisplayName(ofObjectID: repeated)))
+        }
         if let offset = calibration?.yawOffsetDeg {
             parts.append(CalibrationText.spokenOffset(degrees: offset))
         }
@@ -39,6 +57,12 @@ public extension CalibrationFlow {
                                                       maxDeg: maxResidualSpreadDeg))
         }
         return parts.joined(separator: " ")
+    }
+
+    /// Nama tampilan acuan untuk pengumuman — sumber yang sama dengan pesan
+    /// di layar, supaya suara dan layar tidak bisa menyebut bintang berbeda.
+    private func repeatedDisplayName(ofObjectID id: String) -> String {
+        referenceObjects.first { $0.id == id }?.name ?? id
     }
 
     /// Label tombol "Pakai" — **menyertakan keadaan tombolnya**.
