@@ -508,6 +508,45 @@ def check_port_matches_swift_constants(results):
          "Color.black.opacity(0.12)", view),
         ("langkah jalur Bulan", R.MOON_PATH_STEPS, 72,
          "let steps = 72", view),
+        # Sisa angka lapisan gambar. Sampai di sini hanya lima dari sekitar
+        # delapan belas konstanta port yang dijaga — jadi mengubah pita
+        # Jupiter, cincin Saturnus, kutub Mars, kawah, atau spike bintang di
+        # view akan **membiarkan setiap pemeriksaan di atas hijau** sambil
+        # mengukur gambar yang sudah tidak ada lagi. Itu persis cacat yang
+        # berkas ini ada untuk mencegah, hanya saja lubangnya di gerbangnya
+        # sendiri.
+        ("jumlah pita Jupiter", R.BAND_COUNT, 7,
+         "let bandCount = 7", view),
+        ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 0.11,
+         "radius * 0.11", view),
+        ("busur separuh-lebar pita", R.BAND_HALF_WIDTH_ARC, 0.92,
+         "cos((t - 0.5) * .pi * 0.92)", view),
+        ("opasitas pita Jupiter", R.BAND_OPACITY, 0.55,
+         "opacity(0.55)", view),
+        ("Bintik Merah Besar x", R.SPOT_RECT[0], -0.36,
+         "center.x - radius * 0.36", view),
+        ("Bintik Merah Besar y", R.SPOT_RECT[1], 0.18,
+         "center.y + radius * 0.18", view),
+        ("Bintik Merah Besar lebar", R.SPOT_RECT[2], 0.52,
+         "width: radius * 0.52", view),
+        ("Bintik Merah Besar tinggi", R.SPOT_RECT[3], 0.26,
+         "height: radius * 0.26", view),
+        ("opasitas cincin belakang", R.RING_BACK_OPACITY, 0.45,
+         "ringColor.opacity(0.45)", view),
+        ("opasitas cincin depan", R.RING_FRONT_OPACITY, 0.8,
+         "ringColor.opacity(0.8)", view),
+        ("opasitas celah Cassini", R.RING_GAP_OPACITY, 0.28,
+         "Color.black.opacity(0.28)", view),
+        ("opasitas kutub Mars", R.POLAR_CAP_OPACITY, 0.85,
+         "capColor.opacity(0.85)", view),
+        ("opasitas kawah", R.CRATER_OPACITY, 0.18,
+         "Color.black.opacity(0.18)", view),
+        ("kawah pertama Merkurius", tuple(R.CRATERS[0]), (-0.30, -0.22, 0.20),
+         "(-0.30, -0.22, 0.20)", view),
+        ("maria pertama Bulan", tuple(R.MARIA[0]), (-0.28, -0.30, 0.26),
+         "(-0.28, -0.30, 0.26)", view),
+        ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
+         "color.opacity(0.45)", view),
     ]
     for label, port_value, expected, source_text, source in checks:
         results.append(Result(
