@@ -7020,3 +7020,34 @@ punya terjemahan. Dua cacat sekaligus, keduanya tak terlihat:
 Percobaan pertama menyisipkan aksara CJK ke dalam komentar giliran saya
 sendiri — dan **Aturan 3 menangkapnya**. Gerbang yang diuji sendiri bekerja;
 itu bukti sampingan yang berguna.
+
+### Lanjutan siklus yang sama: `"sisa"` di layar Always-On diterjemahkan `"left"`
+
+Setelah celah Aturan 4 ditutup, sapuan ulang atas literal interpolasi yang
+tersisa menemukan cacat kedua di kelas yang sama — kali ini bukan soal
+gerbang, melainkan soal **kata yang salah tempat**.
+
+`ReducedLuminanceView` (layar redup / Always-On) menulis `Text("sisa")`
+sebagai penanda bahwa objek yang tampil berasal dari pandangan sebelumnya.
+Katalog menerjemahkan kunci itu sebagai **`"left"`**. Dalam Bahasa Inggris
+"left" terbaca sebagai arah atau sisa jumlah — bukan sebagai "dari pandangan
+sebelumnya". Ini persis permukaan yang paling berbahaya untuk salah: layar
+redup tidak punya panel peringatan, jadi satu kata itu sendirian yang
+memberi tahu pengguna bahwa yang dilihatnya bukan hasil sekarang.
+
+Yang membuat ini cacat, bukan sekadar gaya: `ObjectSpeech.staleShortNote`
+sudah ada, sudah punya kunci (`object.speech.staleShort` → "from an earlier
+view"), dan sudah dipakai oleh **VoiceOver di layar yang sama** — jadi
+selama ini layar itu menampilkan satu kata dan mengucapkan kalimat lain
+untuk fakta yang sama.
+
+Diperbaiki: keduanya kini membaca satu kunci. Tidak ada kunci baru, tidak
+ada perubahan hitungan uji.
+
+Catatan kejujuran: dua kecurigaan lain pada siklus ini **tidak** terbukti
+dan ditinggalkan apa adanya — 13 accessor `LinkStatusText` yang sempat
+terbaca "nol konsumen" (ternyata benar-benar terpasang di
+`WatchLinkService`/`PhoneLinkService`; sapuan saya yang keliru karena tidak
+menghitung akses `X.foo`), dan `ObservationLog.analyze` (gerbang
+`displayedAnswer` sudah benar meniadakan false lock saat keadaan tanpa
+jawaban). Keduanya dicek langsung, bukan diasumsikan.

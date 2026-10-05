@@ -44,7 +44,20 @@ struct ReducedLuminanceView: View {
                     // yang dilarang PRD tidak boleh lebih lemah hanya karena
                     // layarnya lebih sederhana.
                     if engine.isDisplayingStaleObject {
-                        Text("sisa")
+                        // Bukan literal `"sisa"`, dan bukan kebetulan:
+                        // katalog menerjemahkan satu kata itu sebagai
+                        // `"left"` — yang dalam Bahasa Inggris terbaca
+                        // sebagai arah atau sisa jumlah, bukan sebagai
+                        // "dari pandangan sebelumnya". Di layar redup
+                        // tidak ada panel peringatan yang memberi konteks,
+                        // jadi kata itu sendirian memberi tahu pengguna
+                        // bahwa yang tampil adalah hasil lama.
+                        //
+                        // Bentuk **pendek** dipakai karena ruangnya satu
+                        // baris; kalimat penuh `staleNote` tidak muat.
+                        // Yang diucapkan memakai kunci yang sama persis —
+                        // satu kunci, dua panjang, bukan dua terjemahan.
+                        Text(ObjectSpeech.staleShortNote)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                     }
