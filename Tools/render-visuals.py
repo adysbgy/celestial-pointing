@@ -241,6 +241,85 @@ def candidate_marker(frame_half_extent=1.0, corner_fraction=0.34, inset=0.06,
     return dict(center_x=d, center_y=-d, radius=radius, glyph_fraction=glyph_fraction)
 
 
+def candidate_marker_glyph(marker=None):
+    """Geometri glif tanda tanya + tetesnya, dalam satuan radius frame.
+
+    **Satu sumber untuk menggambar dan untuk mengukur.** Pemeriksa butuh tahu
+    seberapa jauh lencana menjulur, dan cara termurah untuk mendapat angka itu
+    adalah menanyakan fungsi yang menggambarnya. Kalau dua tempat menghitung
+    sendiri-sendiri, keduanya bisa sepakat salah — pola yang sudah nyata di
+    berkas ini.
+
+    Konvensi satuannya yang pernah salah: `glyph_fraction` adalah pecahan dari
+    radius **lencana**, bukan radius frame (lihat `CandidateMarker.glyphRadius`
+    di model, dan `CGFloat(marker.glyphRadius) * radius` di view).
+    """
+    marker = candidate_marker() if marker is None else marker
+    badge_radius = marker["radius"]
+    r = badge_radius * marker["glyph_fraction"]
+    cx, cy = marker["center_x"], marker["center_y"]
+    top = cy - r * 0.55
+    points = [(cx - r, top)]
+    for i in range(1, 13):
+        t = i / 12.0
+        u = 1 - t
+        x = (u ** 3 * (cx - r) + 3 * u * u * t * (cx - r * 0.1)
+             + 3 * u * t * t * (cx + r * 0.55) + t ** 3 * cx)
+        y = (u ** 3 * top + 3 * u * u * t * (top - r * 0.35)
+             + 3 * u * t * t * (top + r * 0.05) + t ** 3 * (top + r * 0.55))
+        points.append((x, y))
+    points.append((cx, cy + r * 0.05))
+    # **Satuan: radius frame (ternormalisasi), bukan piksel.**
+    #
+    # Versi pertama menulis `max(1.0, badge_radius * 0.28)`. Lantai 1.0 itu
+    # masuk akal dalam **piksel** — view memakai `max(1, badgeRadius * 0.28)`
+    # dan di sana `badgeRadius` memang piksel. Di sini `badge_radius` adalah
+    # pecahan radius frame, jadi lantai 1.0 berarti "lebar garis selebar
+    # radius frame": 6x lipat, dan `candidate_marker_footprint()` mewarisi
+    # luberan itu sehingga kotak pengecualiannya menelan hampir seluruh
+    # gambar. Penerjemahan satuan milik **pemanggil**, bukan fungsi geometri:
+    # penggambar memakai `max(1.0, badgeRadiusPiksel * 0.28)`.
+    stroke_width = badge_radius * 0.28
+    # Tetes glif, sebagai **pergeseran dari pusat lencana** — bukan posisi
+    # mutlak. Versi pertama menyimpannya mutlak (`cy + r*0.42`) lalu
+    # menambahkannya ke pusat lagi di penggambar, sehingga tetesnya tergeser
+    # dua kali. Bentuk yang menyebut perannya tidak bisa salah pakai.
+    dot_offset = (0.0, r * 0.42)
+    dot_radius = badge_radius * 0.13
+    return (points, stroke_width, dot_offset, dot_radius,
+            badge_radius, (cx, cy))
+
+
+def candidate_marker_footprint(frame_half_extent=1.0):
+    """Kotak yang ditempati lencana "?", sebagai pecahan setengah-sisi frame.
+
+    Mengembalikan `(x0, y0, x1, y1)` dengan 0 = pusat dan 1 = tepi frame.
+    Dipakai pemeriksa untuk mengabaikan lencana saat mengukur **ciri
+    pengenal** — supaya "ciri hilang saat ragu" mengukur cirinya, bukan
+    lencananya.
+
+    Isinya **gabungan** dari segala yang digambar lencana: cakram lencana,
+    glif tanda tanya beserta lebar garisnya, dan tetesnya. Versi pertama
+    hanya mengembalikan cakramnya, dan itu tidak cukup: glif yang salah
+    satuan menjulur **keluar** cakram, jadi kotak yang hanya menutup cakram
+    tidak mengecualikan luberannya — persis cacat yang pengecualian ini ada
+    untuk menutup.
+    """
+    marker = candidate_marker(frame_half_extent)
+    points, stroke_width, dot_offset, dot_radius, badge_radius, center = \
+        candidate_marker_glyph(marker)
+    half_stroke = stroke_width / 2.0
+    xs = [center[0] - badge_radius, center[0] + badge_radius]
+    ys = [center[1] - badge_radius, center[1] + badge_radius]
+    for x, y in points:
+        xs += [x - half_stroke, x + half_stroke]
+        ys += [y - half_stroke, y + half_stroke]
+    dot_dx, dot_dy = dot_offset
+    xs += [center[0] + dot_dx - dot_radius, center[0] + dot_dx + dot_radius]
+    ys += [center[1] + dot_dy - dot_radius, center[1] + dot_dy + dot_radius]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
 def draw_rotation_radians(bright_limb_angle_radians):
     """`CelestialVisual.drawRotationRadians` — pembalikan tanda konvensi layar."""
     return -bright_limb_angle_radians
@@ -421,6 +500,13 @@ BAND_OPACITY = 0.55                         # VIEW: `drawBands`
 # bahasa agar memakai rumus bola yang sama. Kalau salah satu sisi kembali
 # memakai aproksimasi kosinus, nama ini tidak akan ditemukan di sumbernya.
 BAND_HALF_WIDTH_RULE = "sqrt"
+# Lencana "?" — dipakai `check_features_disappear_when_uncertain` untuk
+# **mengecualikan** daerah lencana dari pengukuran ciri. Lihat catatan di
+# sana: tanpa pengecualian, selisih "terkunci vs ragu" selalu > 0 karena
+# lencananya sendiri, sehingga ciri yang **tidak pernah digambar** pun lulus.
+CANDIDATE_CORNER_FRACTION = 0.34                # MODEL: `VisualFrame.candidateMarker`
+CANDIDATE_INSET = 0.06                          # MODEL: `VisualFrame.candidateMarker`
+CANDIDATE_GLYPH_FRACTION = 0.52                 # MODEL: `VisualFrame.candidateMarker`
 SPOT_RECT = (-0.36, 0.18, 0.52, 0.26)       # VIEW: `drawBands` (Bintik Merah Besar)
 CRATERS = [(-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
            (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)]      # VIEW: `drawCraters`
@@ -566,14 +652,31 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         _draw_sphere(canvas, cx, cy, radius, NEUTRAL_BODY, NEUTRAL_SHADOW, night_mode)
         return
     palette = PLANET_PALETTE[planet]
-    if palette["feature"] == "rings":
-        _draw_rings(canvas, cx, cy, radius, palette, night_mode)
-    else:
-        _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"], night_mode)
+    # **Bola dulu, dengan radius penuh — sama di kedua keadaan keyakinan.**
+    #
+    # Versi lama menggambar cincin Saturnus (dan bola kecil di dalamnya)
+    # **sebelum** memeriksa `is_confirmed`, jadi cincin tetap tergambar pada
+    # gambar "ragu". Itu dua cacat sekaligus:
+    #
+    # 1. Aturan PRD — ciri pengenal tidak boleh tampil saat engine ragu —
+    #    dilanggar di port, yaitu gambar yang dipakai pemeriksa untuk
+    #    membuktikan aturan itu ditegakkan.
+    # 2. Bola Saturnus jadi lebih kecil (0,53 R) hanya pada gambar "ragu",
+    #    sehingga selisih "terkunci vs ragu" terukur ~3900 piksel di seluruh
+    #    piringan. Selisih itu membuat pemeriksaan "cincin hilang saat ragu"
+    #    lulus **walaupun cincinnya tidak pernah digambar** — dibuktikan
+    #    dengan menghapus cincinnya: tetap "OK, 3904 piksel berbeda".
+    #
+    # Urutan view Swift adalah sumber kebenarannya: `drawPlanet` menggambar
+    # bola radius penuh lebih dulu, lalu `guard isConfirmed` **sebelum**
+    # cabang ciri — jadi saat ragu yang tersisa memang hanya bola.
+    _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"], night_mode)
     if kw.get("is_confirmed") is False:
         return
     feature = palette["feature"]
-    if feature == "bands":
+    if feature == "rings":
+        _draw_rings(canvas, cx, cy, radius, palette, night_mode)
+    elif feature == "bands":
         _draw_bands(canvas, cx, cy, radius, night_mode)
     elif feature == "polarCaps":
         _draw_polar_caps(canvas, cx, cy, radius, night_mode)
@@ -849,21 +952,21 @@ def _draw_candidate_marker(canvas, size, night_mode):
     warning = _warning_color(night_mode)
     canvas.stroke_circle(center[0], center[1], badge_radius, 1.5, solid(warning))
     # Glif tanda tanya — Path, bukan teks (lihat `drawCandidateMarker`).
-    r = marker["glyph_fraction"] * radius
-    top = center[1] - r * 0.55
-    glyph = [(center[0] - r, top)]
-    for i in range(1, 13):
-        t = i / 12.0
-        # Aproksimasi kurva Bézier kubik dua segmen dari kode view.
-        u = 1 - t
-        x = (u ** 3 * (center[0] - r) + 3 * u * u * t * (center[0] - r * 0.1)
-             + 3 * u * t * t * (center[0] + r * 0.55) + t ** 3 * center[0])
-        y = (u ** 3 * top + 3 * u * u * t * (top - r * 0.35)
-             + 3 * u * t * t * (top + r * 0.05) + t ** 3 * (top + r * 0.55))
-        glyph.append((x, y))
-    glyph.append((center[0], center[1] + r * 0.05))
-    canvas.stroke_polyline(glyph, max(1.0, badge_radius * 0.28), solid(warning))
-    canvas.disc(center[0], center[1] + r * 0.42, badge_radius * 0.13, solid(warning))
+    #
+    # **Geometrinya dari `candidate_marker_glyph`, bukan dihitung di sini.**
+    # Versi lama menulis `r = marker["glyph_fraction"] * radius`, yaitu pecahan
+    # dari radius **frame**; view memakai pecahan dari radius **lencana**
+    # (`marker.glyphRadius * radius`). Selisihnya 3.1x, dan glifnya menjulur
+    # keluar lencana lalu terpotong tepi frame. Pemeriksa butuh bentuk yang
+    # sama untuk mengukur, jadi bentuknya hanya boleh hidup di satu tempat.
+    glyph = candidate_marker_glyph(marker)
+    points, _, dot_offset, dot_radius, _, _ = glyph
+    points = [(center[0] + gx * radius, center[1] + gy * radius)
+              for gx, gy in points]
+    canvas.stroke_polyline(points, max(1.0, badge_radius * 0.28), solid(warning))
+    dot_dx, dot_dy = dot_offset
+    canvas.disc(center[0] + dot_dx * radius, center[1] + dot_dy * radius,
+                dot_radius * radius, solid(warning))
 
 
 def _warning_color(night_mode):
@@ -885,12 +988,18 @@ def build_cases():
         cases.append(VisualCase(f"planet-{planet}-confirmed",
                                 f"{planet} — terkunci, ciri pengenal boleh tampil",
                                 "planet", planet=planet, is_confirmed=True))
-    cases.append(VisualCase("planet-jupiter-uncertain",
-                            "jupiter saat engine RAGU — ciri harus hilang",
-                            "planet", planet="jupiter", is_confirmed=False))
-    cases.append(VisualCase("planet-saturn-uncertain",
-                            "saturnus saat engine RAGU — cincin harus hilang",
-                            "planet", planet="saturn", is_confirmed=False))
+    # Pasangan "terkunci / ragu" untuk **setiap** planet berciri, bukan hanya
+    # dua. Aturan "ciri pengenal hilang saat ragu" berlaku untuk semua planet
+    # (satu `guard isConfirmed` di view menutup kelimanya), tapi hanya dua
+    # yang pernah diukur — jadi Mars, Merkurius, dan Venus bisa kehilangan
+    # gerbangnya tanpa ada yang tahu. Menambah pasangannya di sini membuat
+    # aturan yang sama terukur di kelimanya.
+    for planet, feature in (("jupiter", "pita"), ("saturn", "cincin"),
+                            ("mars", "kutub"), ("mercury", "kawah"),
+                            ("venus", "kabut")):
+        cases.append(VisualCase(f"planet-{planet}-uncertain",
+                                f"{planet} saat engine RAGU — {feature} harus hilang",
+                                "planet", planet=planet, is_confirmed=False))
     cases.append(VisualCase("planet-unknown-confirmed",
                             "planet yang id-nya tak dikenal — bola netral",
                             "planet", planet=None, is_confirmed=True))

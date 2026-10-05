@@ -383,24 +383,63 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
     menggambar** ciri itu. Di sini dua render dibandingkan piksel demi piksel.
     """
     pairs = [
-        ("planet-jupiter-confirmed", "planet-jupiter-uncertain",
-         "Bintik Merah Besar Jupiter"),
+        ("planet-jupiter-confirmed", "planet-jupiter-uncertain", "Bintik Merah Besar Jupiter"),
         ("planet-saturn-confirmed", "planet-saturn-uncertain", "cincin Saturnus"),
+        # Kelima planet berciri, bukan hanya dua yang kebetulan punya kasus
+        # render. Satu `guard isConfirmed` di view menutup kelimanya, tapi
+        # aturan yang tidak diukur adalah aturan yang bisa hilang tanpa suara.
+        ("planet-mars-confirmed", "planet-mars-uncertain", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-uncertain", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-uncertain", "kabut Venus"),
     ]
+    # **Lencana "?" dikecualikan.** Ia digambar hanya pada gambar "ragu", jadi
+    # ia ikut terhitung di setiap selisih dan membuat `diff > 0` selalu benar
+    # — termasuk ketika cirinya tidak pernah digambar sama sekali. Dibuktikan:
+    # cincin Saturnus dihapus seluruhnya dari port (bola tetap), dan
+    # pemeriksaan ini **tetap hijau** dengan "3904 piksel berbeda", yang
+    # seluruhnya lencana. Gerbang yang lulus pada gambar yang jelas salah.
+    #
+    # Jadi yang diukur hanya piksel di luar kotak lencana. Kotak itu dihitung
+    # dari model yang sama dengan yang menggambar lencana, dan konstanta
+    # modelnya dijaga pemeriksa drift di bawah — kalau lencananya membesar di
+    # view dan kotak ini tidak, pengecualiannya berhenti menutupi lencana dan
+    # pemeriksaan ini mulai gagal, bukan diam-diam salah.
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    # Margin beberapa piksel. Kotak dari model adalah kotak **isi** lencana;
+    # lencana digambar dengan garis tepi dan anti-aliasing yang menonjol
+    # sedikit di luarnya. Tanpa margin, tepi itu ikut terhitung sebagai
+    # "ciri" — dan memang terukur: 93 piksel sisa saat cincin Saturnus
+    # dihapus seluruhnya, yang membuat pemeriksaan ini tetap hijau pada
+    # gambar yang jelas salah. Marginnya dinyatakan dalam piksel lalu
+    # dibagi radius di dalam loop, karena radiusnya baru diketahui setelah
+    # gambar pertama dirender.
+    margin_px = 4.0
     for confirmed_name, uncertain_name, label in pairs:
         _, confirmed = render_case(confirmed_name, size=size, ss=ss)
         _, uncertain = render_case(uncertain_name, size=size, ss=ss)
         w, h, rows_a = confirmed
         _, _, rows_b = uncertain
+        radius = min(w, h) / 2.0
+        cx, cy = w / 2.0, h / 2.0
+        margin = margin_px / radius
+        ex0, ey0, ex1, ey1 = (fx0 - margin, fy0 - margin,
+                              fx1 + margin, fy1 + margin)
         diff = 0
         for y in range(h):
+            # Baris yang seluruhnya di dalam pita lencana dilewati.
+            uy = (y + 0.5 - cy) / radius
+            if ey0 <= uy <= ey1:
+                continue
             ra, rb = rows_a[y], rows_b[y]
             for x in range(w):
+                ux = (x + 0.5 - cx) / radius
+                if ex0 <= ux <= ex1:
+                    continue
                 if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
                     diff += 1
         results.append(Result(
             f"{label} hilang saat ragu", diff > 0,
-            f"{diff} piksel berbeda antara terkunci & ragu"))
+            f"{diff} piksel berbeda di luar lencana (terkunci vs ragu)"))
 
     # Dan arah sebaliknya: kabut netral pada objek langit dalam harus berbeda
     # dari bentuk galaksinya, bukan kebetulan sama.
@@ -597,6 +636,17 @@ def check_port_matches_swift_constants(results):
          "(-0.28, -0.30, 0.26)", view),
         ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
          "color.opacity(0.45)", view),
+        # Lencana "?" — angkanya dipakai untuk **mengecualikan** daerah lencana
+        # dari pengukuran ciri di atas. Kalau lencananya berubah di view tanpa
+        # port ini ikut berubah, kotak pengecualiannya tidak lagi menutupi
+        # lencana, dan selisih "terkunci vs ragu" mulai dihitung dari piksel
+        # lencana lagi — persis cacat yang pengecualian ini tutup.
+        ("lencana: fraksi sudut", R.CANDIDATE_CORNER_FRACTION, 0.34,
+         "cornerFraction: Double = 0.34", model),
+        ("lencana: jarak tepi", R.CANDIDATE_INSET, 0.06,
+         "inset: Double = 0.06", model),
+        ("lencana: fraksi glif", R.CANDIDATE_GLYPH_FRACTION, 0.52,
+         "glyphFraction: Double = 0.52", model),
     ]
     for check in checks:
         label, port_value, expected, source_text, source = check[:5]
@@ -671,6 +721,108 @@ def check_planet_features_present(results, size=200, ss=2):
         "kutub Mars di kedua sisi", top is not None and bottom is not None
         and sum(top[0]) > 500 and sum(bottom[0]) > 500,
         f"utara={top[0] if top else None}, selatan={bottom[0] if bottom else None}"))
+
+
+def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
+    """Glif tanda tanya harus berada **di dalam** lencananya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Port menghitung radius glif dari
+    **radius frame**, sedangkan view menghitungnya dari **radius lencana**:
+
+        view :  let r = CGFloat(marker.glyphRadius) * radius   // radius = frame
+        port :  r = marker["glyph_fraction"] * radius          // radius = frame
+
+    `marker.glyphRadius` adalah `radius * glyphFraction` — radius **lencana**
+    dikali 0.52. Jadi bentuk yang benar adalah `0.52 · badgeRadius`, dan port
+    yang menulis `0.52 · frameRadius` membuat glifnya 3.1x terlalu besar
+    (0.52 R lawan 0.166 R). Akibatnya glif menjulur keluar lencana di
+    kiri-atas dan **terpotong tepi frame** — lencana "?" yang justru
+    satu-satunya penanda "engine ragu" di layar, tergambar sebagai busur yang
+    berhenti mendadak.
+
+    **Kenapa tak satu pun gerbang lama melihatnya.** Yang salah adalah
+    **konvensi satuan**, dan tidak ada yang membacanya:
+
+    | Gerbang | Kenapa hijau |
+    |---|---|
+    | `check_port_matches_swift_constants` | tidak ada yang membandingkan `glyph_fraction`; konstanta itu memang sama di kedua sisi (0.52) |
+    | uji model `VisualFrame` | menguji `glyphRadius` di model — dan modelnya benar |
+    | Aturan 24 / lint UI | tidak melihat aritmetika gambar |
+    | `check_features_disappear_when_uncertain` | baru saja **mengecualikan** kotak lencana, jadi luberan glif justru disaring keluar dari pengukuran itu |
+
+    Dua pengukuran, keduanya dari piksel **gambar "ragu" saja**:
+
+    1. **Tidak ada piksel peringatan di luar lencana.** Setiap piksel yang
+       berwarna dekat warna peringatan — garis tepi lencana, glif, dan
+       tetesnya — harus berada di dalam kotak lencana. Glif yang 3.1x terlalu
+       besar meninggalkan garis-garis jauh di luar kotak itu.
+    2. **Glif ada.** Tanpa ini, menghapus glifnya seluruhnya akan lolos
+       pengukuran pertama dengan sempurna.
+
+    **Kenapa tidak membandingkan "terkunci" dengan "ragu" seperti pemeriksaan
+    ciri di atas.** Versi pertama melakukan itu dan gagal dengan 12.470 piksel
+    "di luar lencana" — yang ternyata **cincin Saturnus**, bukan glif. Cincin
+    memang menjulur ke seluruh lebar frame (sampai 1.003 R) dan memang harus
+    hilang saat ragu, jadi ia sah berada di luar kotak lencana. Membandingkan
+    dua gambar mengukur *segala* yang berubah; yang ingin dijaga di sini hanya
+    **glif terhadap lencananya**, dan itu bisa diukur langsung pada satu
+    gambar. Pemeriksaan yang mengukur lebih banyak daripada yang diklaimnya
+    akan gagal karena alasan yang bukan cacatnya.
+    """
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    # Margin untuk garis tepi + anti-aliasing, dalam satuan radius.
+    margin = 4.0 / (size / 2.0)
+    ex0, ey0, ex1, ey1 = (fx0 - margin, fy0 - margin, fx1 + margin, fy1 + margin)
+
+    warning = R._warning_color(False)
+    for planet in ("saturn", "jupiter", "mars"):
+        _, uncertain = render_case(f"planet-{planet}-uncertain", size=size, ss=ss)
+        w, h, rows = uncertain
+        radius = min(w, h) / 2.0
+        cx, cy = w / 2.0, h / 2.0
+        outside = 0
+        far = None
+        for y in range(h):
+            uy = (y + 0.5 - cy) / radius
+            row = rows[y]
+            for x in range(w):
+                px = row[x * 4:x * 4 + 3]
+                # Warna peringatan adalah oranye pekat; toleransi lebar supaya
+                # tepi anti-aliasing tidak dihitung sebagai "keluar".
+                if not all(abs(px[k] - warning[k] * 255) < 40 for k in range(3)):
+                    continue
+                ux = (x + 0.5 - cx) / radius
+                if not (ex0 <= ux <= ex1 and ey0 <= uy <= ey1):
+                    outside += 1
+                    if far is None or ux < far[0]:
+                        far = (ux, uy)
+        results.append(Result(
+            f"lencana {planet}: glif tidak keluar lencana", outside == 0,
+            f"{outside} piksel peringatan di luar kotak lencana "
+            f"(x {ex0:.3f}..{ex1:.3f}, y {ey0:.3f}..{ey1:.3f})"
+            + (f", terjauh ({far[0]:.3f}, {far[1]:.3f})" if far else "")))
+
+    # Arah sebaliknya: glifnya harus benar-benar ada di dalam lencana.
+    _, uncertain = render_case("planet-saturn-uncertain", size=size, ss=ss)
+    w, h, rows = uncertain
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    glyph_pixels = 0
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        row = rows[y]
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if not (ex0 <= ux <= ex1 and ey0 <= uy <= ey1):
+                continue
+            px = row[x * 4:x * 4 + 3]
+            if all(abs(px[k] - warning[k] * 255) < 40 for k in range(3)):
+                glyph_pixels += 1
+    # Ambang lebar: garis glif dengan lebar `badgeRadius * 0.28` pada 200 px
+    # adalah ~9 px. Yang dijaga adalah **keberadaannya**, bukan ketebalannya.
+    results.append(Result(
+        "lencana: glif tanda tanya tergambar", glyph_pixels > 40,
+        f"{glyph_pixels} piksel glif di dalam lencana"))
 
 
 def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
@@ -821,6 +973,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
