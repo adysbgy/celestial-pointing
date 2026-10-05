@@ -7975,3 +7975,90 @@ kode lama yang masih ada membuat kompilator menolak lebih dulu
 - `./swift-ui-lint.sh` -&gt; **15 aturan hijau**.
 - `./swift-typecheck.sh` -&gt; SEMUA GERBANG LULUS.
 - CI: Apple Build + Engine Tests (Linux).
+
+
+---
+
+## Siklus: baris "Asal lokasi" menampilkan pengenal mesin (`corelocation`)
+
+### Premis: kelas cacat ketiga yang sama, kali ini pada nilai yang datang dari properti
+
+Dua layar menulis `engine.location.source` **apa adanya** ke baris berjudul
+"Asal lokasi": `PointingView` di jam dan `DiagnosticsView` di iPhone. Yang
+terbaca pengguna adalah `corelocation`, `fallback`, `manual` — pengenal mesin
+pada baris yang justru ditulis untuk menjawab "langit ini dihitung untuk mana?".
+
+Ini cacat yang sama persis dengan dua yang sudah ditutup di repo ini: `sirius`
+di headline Experiment 1 (`DisplayLabel`) dan `stateRequest` di layar Tautan
+(`LinkMessageKind.displayName`). **Yang membuatnya bertahan lama juga sama:
+tidak ada gerbang yang melihatnya.**
+
+| Gerbang | Mengapa tidak berbunyi |
+|---|---|
+| Aturan 4 | menyapu literal di dalam argumen `Text(...)`; nilai ini datang dari **properti**, bukan literal |
+| Aturan 6 | memeriksa paritas kunci yang dideklarasikan; kuncinya belum ada |
+| Aturan 12 | menyapu penugasan ke variabel berakhiran Note/Label; ini argumen `row(...)`, bukan penugasan |
+
+Yang pertama **dibuktikan**, bukan diklaim: saya kembalikan `PointingView` ke
+`source` mentah dan jalankan gerbangnya — Aturan 4 melaporkan "Bersih". Jadi
+satu-satunya penjaga adalah uji di Linux, dan itulah yang ditulis lebih dulu.
+
+### Yang diubah
+
+- `ObserverLocation.sourceDisplayName` + `sourceText` — lima kunci baru
+  (`location.source.*`), nilai bawaan Indonesia: "GPS perangkat",
+  "Bawaan (bukan lokasimu)", "Dimasukkan sendiri", "Simulator",
+  "Tidak diketahui (%@)".
+- **Sengaja bukan enum.** `source` dibaca dari arsip JSON yang sudah tersimpan
+  dan dibandingkan dengan `==` (`isFallback`). Mengubahnya jadi enum berarti
+  nilai asing membuat lokasi **gagal didekode** — kegagalan yang jauh lebih
+  buruk daripada baris yang jelek. Karena itu yang tak dikenal jatuh ke satu
+  kunci, bukan ke `nil`.
+- Yang tak dikenal **tetap menyebut namanya** ("Tidak diketahui (%@)").
+  Menyembunyikannya di balik satu kata akan membuat dua sumber berbeda tampak
+  identik persis pada baris yang dipakai untuk memutuskan apakah langitnya
+  bisa dipercaya — pengujian arsip lama vs nilai baru akan terbaca sama.
+
+### Uji pertama yang saya tulis SALAH, dan uji itu yang memberi tahu
+
+Perbandingan pertama memakai `lowercased()` di kedua sisi, dengan alasan yang
+terdengar benar: "huruf besar-kecil tidak mengubah bahwa ia terbaca mesin".
+Uji langsung merah pada `simulator`: nilai bakunya "Simulator", dan
+**satu-satunya** yang membedakan label itu dari pengenalnya adalah huruf
+kapitalnya. Kapitalisasi justru *cara* pengenal menjadi label — jadi
+case-insensitive akan menuntut kata yang berbeda untuk setiap kasus, termasuk
+yang memang sudah benar.
+
+Dilonggarkan ke perbandingan persis, dengan batasnya **dicatat di dalam uji**:
+bila suatu hari ada sumber yang nilainya memang satu kata yang sama dengan
+pengenalnya, itu keputusan yang harus diambil sadar, bukan dengan melonggarkan
+perbandingan.
+
+### Dibuktikan berbunyi, bukan dipercaya
+
+`ObserverLocationSourceLabelTests` (6 uji). Mutasi: kembalikan accessor ke
+`return source`.
+
+| Kondisi | Hasil |
+|---|---|
+| Kode benar | 534 hijau, 0 gagal |
+| `sourceDisplayName` dikembalikan ke `source` | **MERAH, 6 kegagalan** menyebut nilainya (`"corelocation" is equal to "corelocation"`) |
+
+Baris terakhir yang penting: kegagalannya menyebut **nilai yang salah**, bukan
+sekadar "uji gagal" — jadi kalau ia berbunyi di masa depan, penyebabnya
+langsung terbaca.
+
+### Catatan: Aturan 10 merah lebih dulu, dan itu tepat
+
+README bilang PointingKit 529, berkas uji berisi 534. Gerbang itu bekerja
+persis seperti yang dirancang — ia menolak dokumentasi yang tidak lagi cocok
+dengan kenyataan. Diperbaiki di commit yang sama.
+
+### Gerbang
+
+- `./swift-test.sh` -> **172 CelestialEngine + 534 PointingKit**, 0 gagal
+  (529 -> 534, +5 uji).
+- `./swift-ui-lint.sh` -> **15 aturan hijau**.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- CI: Apple Build run `37271571126` + Engine Tests (Linux) run `37271571132`,
+  keduanya `success`.
