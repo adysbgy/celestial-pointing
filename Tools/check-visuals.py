@@ -375,6 +375,94 @@ def check_crescent_direction(results, size=200, ss=2):
         os.remove(path)
 
 
+def check_moon_phase_survives_uncertainty(results, size=200, ss=2):
+    """Fase Bulan harus **tetap tampil** saat engine ragu — dan itu keputusan.
+
+    **Aturan ini dulu hanya prosa.** `STATUS.md` mencatatnya panjang: fase
+    Bulan **bukan** ciri yang dicari dari id, jadi ia satu-satunya ciri
+    pengenal yang sengaja **tidak** disembunyikan saat ragu. Tapi aturan yang
+    tidak diukur adalah aturan yang bisa hilang tanpa suara — dan yang paling
+    mungkin menghapusnya justru pembaca yang teliti: tabelnya terlihat seperti
+    daftar ciri yang *seharusnya* hilang, dan baris "fase Bulan" di dalamnya
+    mudah terbaca sebagai kelalaian.
+
+    Bahayanya konkret dan berlawanan arah dengan semua pemeriksaan lain di
+    berkas ini. Semua gerbang lain menuntut **lebih sedikit** yang tampil saat
+    ragu; yang ini menuntut satu hal tetap tampil. Kalau `drawMoon` suatu saat
+    "diperbaiki" agar menghormati `isConfirmed` seperti planet, tidak ada
+    pemeriksaan mana pun yang akan berbunyi — dan yang hilang adalah satu-
+    satunya bagian gambar yang **masih benar** saat engine ragu: pengguna
+    melihat Bulan sabit dengan mata kepalanya sendiri, dan fase itu fakta
+    tentang tanggal, bukan hasil pencarian id.
+
+    Tiga pengukuran, semuanya dari piksel:
+
+    1. **Fase tetap tampil saat ragu.** Bulan sabit yang ragu harus **identik**
+       dengan Bulan sabit yang sama saat yakin, di luar kotak lencana. Kalau
+       pita fasenya ikut disembunyikan, gambar "ragu" akan menyusut jadi
+       piringan gelap dan selisihnya besar.
+    2. **Dan itu bukan karena fase tidak pernah digambar.** Bulan sabit harus
+       benar-benar berbeda dari Bulan purnama dan dari Bulan cembung — kalau
+       pita fasenya hilang di **semua** keadaan, pengukuran 1 akan lolos
+       dengan sempurna.
+    3. **Arahnya ikut bertahan.** Sabit yang ragu harus tetap menghadap ke
+       arah yang sama seperti saat yakin; fase yang tampil tapi terbalik
+       lebih buruk daripada fase yang tidak tampil.
+    """
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    margin = 4.0 / (size / 2.0)
+    ex0, ey0, ex1, ey1 = (fx0 - margin, fy0 - margin, fx1 + margin, fy1 + margin)
+
+    def outside_badge_diff(a, b):
+        """Piksel berbeda di luar kotak lencana antara dua render."""
+        w, h, rows_a = a
+        _, _, rows_b = b
+        radius = min(w, h) / 2.0
+        cx, cy = w / 2.0, h / 2.0
+        count = 0
+        for y in range(h):
+            uy = (y + 0.5 - cy) / radius
+            if ey0 <= uy <= ey1:
+                continue
+            ra, rb = rows_a[y], rows_b[y]
+            for x in range(w):
+                if ra[x * 4:x * 4 + 3] == rb[x * 4:x * 4 + 3]:
+                    continue
+                ux = (x + 0.5 - cx) / radius
+                if not (ex0 <= ux <= ex1):
+                    count += 1
+        return count
+
+    _, crescent = render_case("moon-crescent-jakarta", size=size, ss=ss)
+    _, crescent_uncertain = render_case("moon-crescent-uncertain", size=size, ss=ss)
+    diff = outside_badge_diff(crescent, crescent_uncertain)
+    results.append(Result(
+        "fase Bulan tetap tampil saat ragu", diff == 0,
+        f"{diff} piksel berbeda di luar lencana antara sabit yakin & ragu"))
+
+    # Arah sebaliknya: fase memang digambar, dan bentuknya berbeda per fase.
+    # Tanpa ini, membuang pita fase di **semua** keadaan akan lolos di atas.
+    _, full = render_case("moon-full", size=size, ss=ss)
+    _, gibbous = render_case("moon-gibbous", size=size, ss=ss)
+    vs_full = outside_badge_diff(crescent_uncertain, full)
+    vs_gibbous = outside_badge_diff(crescent_uncertain, gibbous)
+    results.append(Result(
+        "fase Bulan bukan piringan seragam", vs_full > 0 and vs_gibbous > 0,
+        f"sabit vs purnama {vs_full} piksel, sabit vs cembung {vs_gibbous} piksel"))
+
+    # Arah: sabit yang ragu harus menghadap sisi yang sama dengan yang yakin.
+    # Diukur lewat selisih terhadap versi yang **tidak diputar**
+    # (`moon-crescent-jakarta-unrotated`), bukan lewat centroid: centroid
+    # sabit bisa jatuh di sisi mana saja tergantung lebar pita, sedangkan
+    # "identik dengan yang yakin" adalah pernyataan yang tepat.
+    _, unrotated = render_case("moon-crescent-jakarta-unrotated", size=size, ss=ss)
+    turned_away = outside_badge_diff(crescent_uncertain, unrotated)
+    results.append(Result(
+        "arah sabit bertahan saat ragu", turned_away > 0,
+        f"{turned_away} piksel berbeda dari sabit tanpa putaran "
+        f"(kalau 0, sudutnya hilang)"))
+
+
 def check_features_disappear_when_uncertain(results, size=200, ss=2):
     """Ciri pengenal wajib hilang saat engine ragu — diukur dari piksel.
 
@@ -973,6 +1061,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_png_is_well_formed(results)
