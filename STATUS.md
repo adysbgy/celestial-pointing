@@ -1,3 +1,94 @@
+## Progres terakhir (5 Okt 2026 — "Percobaan" melaporkan lebih sedikit dari yang benar-benar ditekan)
+
+### Dua kelas "berhenti di tengah jalan", keduanya soal angka yang hilang
+
+Repo ini punya pola berulang: nilai dihitung dengan benar, diuji dengan
+benar, lalu tidak pernah sampai ke layar. `uncertainReasonCounts` adalah
+contohnya, sudah ditangani pada siklus sebelumnya. Kali ini yang
+ketemu adalah lebih serius, karena yang hilang bukan penjelasan — tapi
+**penghitungnya sendiri**.
+
+### Temuan: "Percobaan" menyusut diam-diam
+
+`ExperimentHarness.record(...)` menolak menyimpan rekaman yang arah
+kebenarannya tak bisa dihitung (ExperimentHarness.swift:180). Tapi
+`AnalyzedTrial.analysis` tetap bertipe opsional, dan
+`ObservationLog.analyze` mengembalikan `nil` begitu `groundTruthObjectID`
+kosong (ObservationLog.swift:99). Jadi rekaman tanpa analisis bisa masuk,
+dan `unanalyzableCount` (ExperimentHarness.swift:62) sudah menghitungnya —
+dengan **nol konsumen di `Apps/`**.
+
+Yang membuat ini bukan sekadar kosmetik: `summary` dibangun dari
+`trials.compactMap(\.analysis)` (ExperimentHarness.swift:259), jadi
+`trialCount` hanya menghitung yang teranalisis. Tapi `trialCount` itu yang
+menentukan `hasEnoughEvidenceForSafetyClaim`, yaitu ambang 20 percobaan
+untuk boleh berkata "lulus". Konsekuensinya:
+
+> Penguji merekam 19 percobaan yang teranalisis dan 3 yang tidak. Layar
+> menampilkan "Percobaan 19" tanpa penjelasan — dan dia melontarkan 3
+> percobaan lagi sambil mengira sampelnya sudah hampir cukup.
+
+Yang hilang bukan angka (−3 dari 22 masih terbaca sebagai −3). Yang hilang
+adalah **akibatnya**: 3 percobaan itu tidak menambah bukti apa pun, dan itu
+justru yang perlu diketahui.
+
+### Yang diperbaiki
+
+Aturan hitungnya tetap di paket, karena Aturan 1 repo ini: satu definisi
+per konsep.
+
+- `ExperimentDataset.recordedCount` — semua rekaman, termasuk yang tak
+  teranalisis. Inilah angka yang jujur untuk baris "Percobaan".
+- `analyzedCount` — yang masuk vonis, supaya kedua angka bisa dibandingkan
+  di tempat yang sama tanpa menghitung ulang di view.
+- `hasUnanalyzableTrials` — penanda, karena "belum cukup bukti" punya dua
+  sebab yang butuh tindakan berbeda: sampel memang sedikit, atau sampelnya
+  ada tapi separuhnya tak bisa dinilai.
+
+Layar: baris "Percobaan" memakai `recordedCount`; jumlah yang tak
+teranalisis tampil sebagai baris sendiri, plus peringatan berbahasa
+"…tidak menambah bukti" — sebab akibatnya tidak terlihat dari angka.
+Recorder **membaca** angka dari paket, tidak menghitung ulang.
+
+### Satu uji hijau yang tidak membuktikan apa pun
+
+Regresi yang paling penting
+(`testUnanalyzableTrialsDoNotPushTheSampleOverTheThreshold`) pertama kali
+saya tulis **hijau pada kode yang rusak**. Bentuk pertamanya:
+
+```swift
+XCTAssertEqual(withExtra.safetyVerdict, withoutExtra.safetyVerdict)
+```
+
+Hanya membandingkan dua vonis satu sama lain — jadi mutasi apa pun yang
+membuat keduanya berubah **bersama-sama** tetap lolos.
+
+Bentuk yang benar menguji nilai mutlak: 19 teranalisis + 3 tak
+teranalisis → `trialCount` tetap 19, vonis tetap
+`insufficientEvidence`. Dengan begitu mutasi "`summary` menghitung semua
+trial" (pelaku yang paling mungkin salah dan paling menggoda —
+karena ia "memperbaiki" ambang 20 agar lebih cepat tercapai) langsung
+merah. Diverifikasi lewat `red-test.sh`.
+
+Pelajaran yang sama seperti dua mutasi pada siklus sebelumnya: **hijau
+dari uji yang tidak bisa dibatalkan bukan bukti apa pun.** Yang membuat
+itu ketahuan adalah `red-test.sh`, bukan `./swift-test.sh` — keduanya hijau.
+
+### Bentuk label yang ditolak gerbang
+
+Baris pertama sempat dirakit dari `Text("Percobaan") + " " +
+countNotAnalyzed`. Aturan 4 di `swift-ui-lint.sh` menolaknya, dan gerbang
+itu benar: dua string yang disambung di view menghasilkan urutan yang salah
+di bahasa lain. Sekarang satu kunci penuh. Jumlahnya **tidak** ikut di
+kunci itu karena sudah jadi kolom kanan baris — menyebutkannya lagi akan
+mencetak angka yang sama dua kali.
+
+### Gerbang
+
+172 CelestialEngine + 513 PointingKit (507 → 513, 7 uji baru), ui-lint 15
+aturan, typecheck. Engine tidak disentuh. Tiga mutasi `red-test.sh` merah
+dan sumber pulih bersih.
+
 # STATUS — Celestial Pointing Engine
 
 ## Progres terakhir (5 Okt 2026 — hitungan sebab keraguan sudah ada, tapi tidak pernah masuk layar)
