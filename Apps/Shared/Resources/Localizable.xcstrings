@@ -4829,6 +4829,17 @@
           }
         }
       }
+    },
+    "chart.speech.nothingMeasured": {
+      "comment": "Cadangan pengumuman grafik saat belum ada jarak kandidat terukur; kalimat sama juga tampil di layar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No measured candidate distance yet."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

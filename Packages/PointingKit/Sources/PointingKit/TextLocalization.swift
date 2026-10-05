@@ -439,6 +439,20 @@ public extension LocalizedText {
     static let chartSpeechUnmeasuredCount = LocalizedText(
         key: "chart.speech.unmeasured", id: "%lld tanpa jarak terukur.")
 
+    /// Tidak ada yang bisa dikatakan dari grafik.
+    ///
+    /// **Bukan string kosong, dan itu penting.** `.accessibilityLabel(_:)` hanya
+    /// menerima `String` non-opsional, jadi ketiadaan harus diterjemahkan
+    /// menjadi sesuatu. Memakai `""` berarti pembaca layar menemukan satu
+    /// elemen yang sudah "terbaca" tapi tidak bermakna — lebih buruk daripada
+    /// tidak ada pengumuman, karena keduanya berbeda rasa. Kalimat ini
+    /// sekaligus mengulang pesan yang sudah terlihat di layar pada cabang
+    /// "sampel ada, tapi belum ada jarak terukur", jadi suara dan mata
+    /// menyebut hal yang sama.
+    static let chartSpeechNothingMeasured = LocalizedText(
+        key: "chart.speech.nothingMeasured",
+        id: "Belum ada jarak kandidat yang terukur.")
+
     /// Setiap kunci yang dideklarasikan di sini.
     ///
     /// Satu sumber untuk gerbang paritas dan untuk uji — supaya "kunci yang
@@ -708,6 +722,6 @@ public extension LocalizedText {
         // pernah punya pengumuman sebelum unit ini.
         .chartSpeechMeasuredCount, .chartSpeechBandConfident,
         .chartSpeechBandMiddle, .chartSpeechBandTooFar,
-        .chartSpeechUnmeasuredCount,
+        .chartSpeechUnmeasuredCount, .chartSpeechNothingMeasured,
     ]
 }

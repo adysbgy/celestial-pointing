@@ -279,14 +279,14 @@ final class TextLocalizationTests: XCTestCase {
     /// bahasa tiap bahasa — memangkasnya di kode akan memaksa satu tata bahasa ke
     /// semua bahasa.
     ///
-    /// 297 → 302 pada siklus "grafik keyakinan bisu untuk VoiceOver": lima
+    /// 297 → 303 pada siklus "grafik keyakinan bisu untuk VoiceOver": enam
     /// kunci `chart.speech.*`. Grafik confidence adalah satu-satunya `Chart`
     /// di app dan sampai saat itu tidak punya pengumuman apa pun, sementara
     /// setiap elemen data lain di layar itu punya. Lihat
     /// `ConfidenceChartSpeech.swift`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 302, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 303, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

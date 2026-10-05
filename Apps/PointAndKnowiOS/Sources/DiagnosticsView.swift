@@ -589,9 +589,10 @@ struct DiagnosticsView: View {
                 // menyimpulkan "terlalu jauh" untuk titik yang jelas masih di
                 // bawah garis yang sedang dilihat pengguna.
                 //
-                // `nil` saat tidak ada satu pun jarak terukur: lalu **tidak ada
-                // yang diucapkan**, karena kalimat berisi nol-nol akan terbaca
-                // sebagai elemen yang sudah dibaca tapi tidak bermakna.
+                // Saat tidak ada satu pun jarak terukur, yang diucapkan
+                // bukan kalimat berisi nol-nol (yang akan terbaca sebagai elemen
+                // yang sudah dibaca tapi tidak bermakna), melainkan kalimat dari
+                // katalog yang mengulang pesan yang sudah terlihat di layar.
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(spokenChartSummary)
             }
@@ -617,22 +618,25 @@ struct DiagnosticsView: View {
                               policy: engine.controller.resolver.confidencePolicy)
     }
 
-    /// Pengumuman grafik, atau `nil` saat tidak ada yang bisa dikatakan.
+    /// Pengumuman grafik.
     ///
-    /// Sengaja opsional dan bukan `?? ""`. Dua alasan, dan keduanya nyata:
+    /// Cadangannya **kalimat dari katalog**, bukan `""`. Dua alasan:
     ///
-    /// 1. `""` adalah literal di view, jadi Aturan 4 akan menandainya sebagai
-    ///    teks UI tanpa padanan bahasa Inggris — yang benar, karena string
-    ///    kosong memang tidak punya padanan apa pun.
-    /// 2. Pengumuman kosong bukan "tidak ada pengumuman". Pembaca layar akan
-    ///    tetap menemukan elemen itu dan membacanya sebagai satu hal yang sudah
-    ///    terucap tapi tidak bermakna. Ketiadaan pengumuman dan pengumuman
-    ///    kosong harus tetap dua hal yang berbeda.
+    /// 1. `.accessibilityLabel(_:)` hanya menerima `String`, jadi ketiadaan
+    ///    harus diterjemahkan menjadi sesuatu. `""` berarti pembaca layar
+    ///    menemukan satu elemen yang sudah "terbaca" tapi tidak bermakna —
+    ///    lebih buruk daripada tidak ada pengumuman, karena keduanya berbeda
+    ///    rasa.
+    /// 2. Isinya mengulang pesan yang sudah terlihat di layar pada cabang
+    ///    "sampel ada, tapi belum ada jarak terukur", jadi suara dan mata
+    ///    menyebut hal yang sama.
     ///
-    /// `accessibilityLabel(_:)` menerima `String?`, jadi ketiadaan bisa
-    /// diteruskan apa adanya tanpa harus dikarang menjadi teks.
-    private var spokenChartSummary: String? {
+    /// Bentuk ini mengikuti pola yang sudah dipakai `CalibrationView`
+    /// (`session?.flow.spokenPhaseSummary ?? TextLocalization.text(…)`):
+    /// opsional dijawab dengan kunci katalog, bukan dengan literal.
+    private var spokenChartSummary: String {
         chartSpeech?.spokenSummary
+            ?? TextLocalization.text(.chartSpeechNothingMeasured)
     }
 
     private func legend(_ label: String, _ tone: PointingTone) -> some View {
