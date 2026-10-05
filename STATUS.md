@@ -8062,3 +8062,79 @@ dengan kenyataan. Diperbaiki di commit yang sama.
 - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
 - CI: Apple Build run `37271571126` + Engine Tests (Linux) run `37271571132`,
   keduanya `success`.
+
+---
+
+## Siklus: pesan sistem sensor gerak tampil apa adanya di layar
+
+### Premis: satu-satunya baris di layar yang tidak bisa diterjemahkan
+
+`MotionLogger.handleFailure` menyimpan `error.localizedDescription` **langsung**
+ke `unavailableReason`, dan properti itu dirender `Text(reason)` di dua layar.
+Teks itu milik **sistem**: ia mengikuti bahasa perangkat, bukan bahasa yang
+sedang membaca katalog.
+
+Ini beda kelas dari kegagalan **lokasi** yang sudah ditutup sebelumnya, dan
+bedanya justru yang membuat cacat ini lolos. Kegagalan lokasi disusun di
+`LocationProvider`, yang memanggil accessor katalog — jadi jalurnya terbaca
+dari berkas `Apps/`. Yang gerak tidak.
+
+| Gerbang | Mengapa tidak berbunyi |
+|---|---|
+| Aturan 4 | menyapu literal di dalam argumen `Text(...)` — ini argumen **fungsi** |
+| Aturan 12 | menyapu penugasan ke properti berakhiran Note — nilainya dari ekspresi |
+| Aturan 13 | menyapu literal di dalam `String(format:)`/`append` — tidak ada |
+
+Dibuktikan: mengembalikan `MotionLogger` ke bentuk lama tidak membuat satupun
+dari 15 gerbang merah.
+
+### Yang diubah
+
+- `SensorStatusText.motionFailed(_:)` + kunci `sensor.motion.failed`
+  ("Sensor gerak berhenti: %@").
+- Pesan sistemnya **tetap ditampilkan** lewat `%@`. Menyembunyikannya di balik
+  kalimat generik akan membuat dua kegagalan berbeda terbaca sama pada baris
+  yang dipakai untuk memutuskan apakah jam masih bisa dipakai — alasan yang
+  sama dengan `location.source.unknown` pada siklus sebelumnya.
+
+### Cacat pada gerbangnya sendiri, ketemu sebelum push
+
+Menambah uji yang memasang bahasa Inggris membuat **tiga uji merah di berkas
+lain** (`TextLocalizationTests`), dengan pesan `"Sebaran 2.4°"` vs
+`"Sebaran 2,4°"`.
+
+Penyebabnya persis kebocoran yang sudah didokumentasikan di
+`EnglishTranslation.swift`: `SensorStatusTextTests` hanya melepas
+`TextLocalization`, tidak `NumberFormat`. Pemisah desimal `en_US` bocor ke uji
+berikutnya, dan kebocoran itu **tidak muncul sebagai kegagalan yang jujur** —
+ia muncul sebagai angka yang tiba-tiba berbahasa lain di berkas yang tidak
+ada hubungannya.
+
+Kelas ujinya kini `BridgedTextTestCase` (melepas keduanya). Basis itu sudah
+ada sejak siklus `TextLocalization`; yang kurang adalah memakainya.
+
+### Dibuktikan berbunyi
+
+3 uji baru. Mutasi: accessor mengembalikan `message` apa adanya.
+
+| Kondisi | Hasil |
+|---|---|
+| Kode benar | 537 hijau, 0 gagal |
+| `motionFailed` dikembalikan ke pesan mentah | **MERAH, 3 kegagalan** |
+
+### Gerbang
+
+- `./swift-test.sh` -> **172 CelestialEngine + 537 PointingKit**, 0 gagal.
+- `./swift-ui-lint.sh` -> 15 aturan hijau.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- CI: Apple Build `37272373882` + Engine Tests `37272374080`, keduanya success.
+
+### Pola yang mulai terlihat
+
+Tiga siklus terakhir menutup cacat yang **sama** — nilai untuk mesin yang
+tersaji sebagai teks untuk orang — di tiga lapisan berbeda: `DisplayLabel`
+(nama objek), `ObserverLocation.source` (asal lokasi), dan kini pesan sistem
+sensor. Yang membuatnya bertahan lama bukanlah nilainya, melainkan bahwa
+setiap lapisan punya **satu** jalur yang tidak dijangkau gerbang: argumen
+fungsi, properti dari ekspresi, nilai dari sistem. Gerbang menyapu bentuk;
+cacatnya hidup di jalur yang tidak punya bentuk literal.
