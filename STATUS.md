@@ -1,3 +1,91 @@
+## Progres terakhir (5 Okt 2026 - "di atas cakrawala" memakai ambang yang berkasnya sendiri sebut salah)
+
+### Satu berkas, dua jawaban, dan yang salah punya nama paling netral
+
+`PointingTarget.isAboveHorizon` mengembalikan `altitudeDeg > 0` - cakrawala
+geometris. Tiga puluh tiga baris di bawahnya di berkas yang **sama**,
+`availableTargets` membawa dokumen panjang yang menyebut ambang itu persis
+sebagai cacat yang sudah diperbaiki:
+
+> Versi lama memakai `altitudeDeg <= 0` yang terlihat wajar tapi salah: engine
+> hanya mengunci lewat `VisibilityFilter`, yang menyaring di 5 derajat pada
+> policy bawaan.
+
+Yang membuat ini bertahan bukan kelalaian penulisan, tapi **kelebihan uji**:
+
+- **Accessornya tidak punya konsumen.** Sapuan menemukannya `app=0`; satu-
+  satunya pemakai adalah sebuah uji.
+- **Uji itu memakainya sebagai pengganti yang LEBIH LEMAH.** Namanya
+  `testOfferedTargetsStayAboveTheGeometricHorizon` - nama yang jujur, dan
+  justru itu masalahnya: ia sengaja mengecek batas yang lebih longgar, dan
+  hijau. Uji di atasnya (`...CanActuallyBeLocked`) mengecek ambang yang benar.
+  Jadi cacatnya tertutup **dua kali**, dan tidak ada yang perlu berubah.
+
+Bentuknya beda dari siklus-siklus sebelumnya: bukan nilai yang dibuang, dan
+bukan pula langkah yang terlewat. Yang terjadi adalah **nama yang tepat untuk
+pertanyaan yang salah**, dipakai sebagai bukti bahwa pertanyaan yang benar
+sudah dijawab.
+
+### Kenapa bukan "`> 0` diganti `> 5`"
+
+Angka 5 itu `policy.minAltitudeDeg`, dan policy bisa berbeda (bawaan 5,
+permissive -90, dan putusan slew memakai 10). Menuliskannya di accessor berarti
+menulis ambang yang sama untuk **kedua kalinya** - kelas cacat yang dokumen
+`availableTargets` justru sedang menutup ("kalau `minAltitudeDeg` berubah,
+daftar ikut berubah, karena tidak ada lagi angka yang ditulis dua kali").
+
+Jadi accessornya menerima `VisibilityPolicy`:
+
+```swift
+public func isAboveHorizon(_ policy: VisibilityPolicy) -> Bool
+```
+
+Tidak ada nilai bawaan. Kalau `policy` bisa lupa diteruskan, pemanggilnya
+kembali menebak - dan menebak ambang adalah kesalahan yang paling mahal di
+repo ini.
+
+Operatornya `>` dan bukan `>=`, sengaja sama dengan `availableTargets` yang
+menyingkirkan `altitudeDeg <= policy.minAltitudeDeg`. Titik yang tepat di
+ambang adalah satu-satunya tempat kedua bentuk itu berbeda jawabannya, jadi
+satu uji khusus menahan operator itu.
+
+### Bukti merah: tiga mutasi, ketiganya MERAH
+
+| Mutasi | Uji | Hasil |
+|---|---|---|
+| `> policy.minAltitudeDeg` -> `> 0` | `testIsAboveHorizonUsesTheEngineAltitudeGateNotTheGeometricOne` | **MERAH**: Sirius di 0,6 derajat dijawab "ya" sementara engine menolaknya |
+| hal yang sama, policy permisif | `testIsAboveHorizonHonoursAPermissivePolicy` | **MERAH**: -45 derajat dijawab "ya" |
+| `>` -> `>=` | `testAltitudeExactlyOnTheGateIsRejected` | **MERAH**: titik tepat di ambang lolos, padahal daftar membuangnya |
+
+Pita 0-5 derajat dipakai sebagai fixture di **dua** uji, dan sekarang
+didefinisikan sekali (`bandObserver` / `bandDate`): kalau tiap uji menghitung
+sendiri, mereka bisa mengacu ke langit yang berbeda tanpa ada yang melihat, dan
+salah satunya bisa hijau karena langitnya kebetulan kosong.
+
+### Gerbang
+
+- `swift-test.sh` -> **174 CelestialEngine + 589 PointingKit** (587 -> 589, +2).
+  **Engine tidak disentuh.** Satu uji lama yang lebih lemah diganti tiga yang
+  lebih tajam, jadi kenaikannya +2, bukan +4.
+- `swift-ui-lint.sh` -> **19 aturan hijau** (Aturan 10 menangkap README 587 -> 589).
+- `swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- `red-test.sh` -> tiga mutasi merah.
+- CI: `37325552132` (Engine Tests Linux) + `37325552075` (Apple Build macos-15)
+  - **dua-duanya hijau**.
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat**, dan kali ini konsekuensinya kecil:
+  accessor ini tidak punya konsumen di layar, jadi yang berubah adalah jawaban
+  untuk kode yang belum ditulis.
+- **Tidak ada layar yang berubah.** Kalau ada pemanggil di masa depan yang
+  butuh "apakah benda ini di atas cakrawala" alih-alih "cukup tinggi untuk
+  dikunci", ia harus memakai `direction.altitudeDeg > 0` langsung - pertanyaan
+  itu memang berbeda, dan accessor ini sengaja tidak menjawabnya.
+- **Pita fixture bergantung pada satu tanggal dan satu tempat.** Kalau katalog
+  bintang berubah, prasyaratnya (`0 < siriusAlt < 5`) akan pecah dan uji
+  memberi tahu - itu memang tujuannya, bukan fragility tersembunyi.
+
 ## Progres terakhir (5 Okt 2026 - catatan ketukan yang terbuang menghitung bintang, bukan ketukan)
 
 ### Dua hitungan yang sama-sama `Int`, dan tidak ada yang bisa memilih
