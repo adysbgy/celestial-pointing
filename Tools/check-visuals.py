@@ -797,6 +797,15 @@ def check_feature_arrays_match_the_view(results):
             ("kawah Merkurius", R.CRATERS,
              "let craters: [(CGFloat, CGFloat, CGFloat)] = ["),
             ("maria Bulan", R.MARIA, "for (dx, dy, size) in [")):
+        # Jangkar yang hilang adalah **kegagalan**, bukan pengecualian. Gerbang
+        # yang melempar traceback saat view-nya dirapikan akan dihapus orang,
+        # dan aturan yang dihapus tidak menjaga apa pun. Pesannya menyebut
+        # jangkarnya supaya yang membacanya tahu apa yang harus diperbarui.
+        if anchor not in view:
+            results.append(Result(
+                f"larik {label}: jangkar masih ada di view", False,
+                f"'{anchor}' TIDAK ditemukan di CelestialVisualView.swift"))
+            continue
         swift_array = swift_tuple_triples(view, anchor)
         results.append(Result(
             f"larik {label}: jumlah sama dengan view",
