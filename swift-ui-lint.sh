@@ -336,20 +336,35 @@ def read_literal(src, start):
 
 
 def direct_arguments(src, open_index):
-    """Literal pada **kedalaman argumen 1**, beserta label parameternya.
+    """Literal pada **semua kedalaman** argumen, beserta label parameternya.
 
-    Kedalaman dipakai sebagai pengganti daftar nama parameter yang akan selalu
-    usang. Hasilnya diperiksa terhadap repo: satu-satunya label yang pernah
-    muncul di sana adalah `systemImage`, dan literal di bawahnya memang nama
-    SF Symbol (`"square.and.arrow.up"`), bukan teks tampilan. Jadi label itu
-    disaring **karena data**, bukan karena tebakan.
+    Kenapa semua kedalaman, bukan hanya 1 — dan ini cacat yang sama dengan
+    tiga siklus sebelumnya, kini pada gerbangnya sendiri.
+
+    Bentuk lama memeriksa `if depth == 1`. Konsekuensinya terukur:
+    `Text("benar")` terbaca, sementara
+
+        Text(analysis.isFalseLock ? "FALSE LOCK"
+             : (analysis.isCorrect ? "benar" : "salah"))
+
+    **tidak terbaca sama sekali** — kedua literal itu berada di kedalaman 2
+    dan 3, di dalam tanda kurung ternary. Padahal keduanya teks yang tampil
+    di layar, keduanya tanpa padanan Inggris, dan keduanya nyata ada di
+    `Experiment1View.swift` selama berbulan-bulan sementara gerbang ini
+    hijau. `FALSE LOCK` kebetulan lolos karena kebetulan ada di katalog;
+    `benar` dan `salah` tidak, dan tidak pernah dilaporkan.
+
+    Batas kedalaman bukan cara membedakan teks tampilan dari bukan-teks —
+    peritelnya (`Text`, `row`, ...) yang menentukan itu, dan pemanggilnya
+    sudah disaring oleh `POS`. Jadi syaratnya dilonggarkan menjadi
+    `depth >= 1`, yang berarti "di dalam tanda kurung peritel ini".
     """
     depth, i, found = 0, open_index, []
     while i < len(src):
         ch = src[i]
         if ch == '"':
             end, text, interpolated = read_literal(src, i)
-            if depth == 1:
+            if depth >= 1:
                 before = src[max(0, i - 60):i]
                 label = re.search(r'([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$', before)
                 found.append((i, text, interpolated,

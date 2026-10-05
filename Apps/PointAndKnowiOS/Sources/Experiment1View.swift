@@ -216,14 +216,15 @@ struct Experiment1View: View {
                     .font(.subheadline.weight(.medium))
                 Spacer()
                 if let analysis = trial.analysis {
-                    Text(analysis.isFalseLock ? "FALSE LOCK"
-                         : (analysis.isCorrect ? "benar" : "salah"))
+                    Text(analysis.isFalseLock ? ExperimentText.verdictFalseLock
+                         : (analysis.isCorrect ? ExperimentText.verdictCorrect
+                                               : ExperimentText.verdictWrong))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(analysis.isFalseLock ? PointingTone.danger.color
                                          : (analysis.isCorrect ? PointingTone.success.color
                                             : PointingTone.warning.color))
                 } else {
-                    Text("tak dianalisis")
+                    Text(ExperimentText.verdictNotAnalyzed)
                         .font(.caption)
                         .foregroundStyle(Color.nightAwareSecondary)
                 }
