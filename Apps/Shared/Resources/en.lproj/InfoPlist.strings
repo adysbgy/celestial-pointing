@@ -1,0 +1,6 @@
+/* System permission strings — shown in iOS/watchOS dialogs, outside
+   the app string catalog's reach. Without this file the dialog is
+   Indonesian for every user. */
+
+NSLocationWhenInUseUsageDescription = "Location is used to compute where sky objects appear in your sky. Without it the app falls back to a clearly labelled default location, and results are marked as possibly invalid.";
+NSMotionUsageDescription = "Motion data is used to measure where you are pointing. Sensor accuracy is not assumed — that is exactly what Experiment 1 measures.";

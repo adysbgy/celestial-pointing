@@ -118,6 +118,12 @@ targets:
     sources:
       - path: Apps/PointAndKnowiOS/Sources
       - path: Apps/Shared
+      # Teks izin (`NS*UsageDescription`) dibaca **sistem** dari bundel, bukan
+      # lewat `Localizable.xcstrings` — jadi ia butuh `InfoPlist.strings` per
+      # bahasa, dan berkas itu harus ikut ke dalam bundel. Ikut lewat glob
+      # `Apps/Shared` di atas; dicatat di sini karena Aturan 14 di
+      # `swift-ui-lint.sh` membaca path ini dan akan merah bila direktori
+      # `.lproj`-nya dihapus dari repo.
       - path: Apps/PointAndKnowiOS/Resources
       # Katalog string ikut lewat glob `Apps/Shared` di atas: file
       # `Localizable.xcstrings` ada di dalam direktori itu. Dulu ada entri
@@ -228,6 +234,9 @@ targets:
     sources:
       - path: Apps/PointAndKnowWatch/Sources
       - path: Apps/Shared
+      # Teks izin ikut lewat glob `Apps/Shared` di atas — sama dengan app
+      # iPhone: satu berkas `InfoPlist.strings`, dua perangkat. Aturan 14
+      # memeriksa keberadaannya per bahasa.
       - path: Apps/PointAndKnowWatch/Resources
       # Katalog string ikut lewat glob `Apps/Shared` di atas — sama dengan
       # app iPhone: satu teks, dua perangkat. Kalau katalognya terpisah per
@@ -259,8 +268,8 @@ targets:
         # validasi App Store menolak bundelnya.
         INFOPLIST_KEY_WKApplication: YES
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: dev.celestial.pointandknow
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda."
-        INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel, dan hasilnya ditandai belum tentu sah."
+        INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
         # App Group agar app jam & complication berbagi berkas snapshot.
         # Sama dengan target complication; tanpa ini complication hanya membaca
         # cache-nya sendiri (fallback store), bukan tulisan app.

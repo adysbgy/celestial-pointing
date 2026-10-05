@@ -7051,3 +7051,50 @@ terbaca "nol konsumen" (ternyata benar-benar terpasang di
 menghitung akses `X.foo`), dan `ObservationLog.analyze` (gerbang
 `displayedAnswer` sudah benar meniadakan false lock saat keadaan tanpa
 jawaban). Keduanya dicek langsung, bukan diasumsikan.
+
+## Progres terakhir (5 Okt 2026 — Aturan 14: teks izin sistem tak pernah diterjemahkan)
+
+### Premis: teks yang dibaca sistem, bukan oleh app
+Aturan 4 menyapu literal di `Apps/`; Aturan 6 memeriksa paritas kunci yang
+dihasilkan `PointingKit`. Keduanya hijau — dan keduanya **tidak punya apa
+pun untuk dilihat** pada teks izin.
+
+`NSLocationWhenInUseUsageDescription` dan `NSMotionUsageDescription` dibaca
+**sistem operasi** dari bundel, hidup sebagai `INFOPLIST_KEY_*` di
+`project.yml`, dan tidak pernah melewati `Text(...)` maupun katalog string.
+Satu-satunya jalurnya adalah `InfoPlist.strings` per bahasa — dan tidak ada
+satu pun gerbang yang memperingatkan bila berkas itu tidak ada. Hasilnya:
+dialog izin berbahasa Indonesia untuk semua pengguna, seluruh CI hijau.
+
+Ini kelas cacat yang sama dengan Aturan 4 (yang diukur bukan bagian yang
+bermasalah), tapi lebih buruk: teksnya tidak bisa diperbaiki lewat katalog,
+jadi celahnya tidak akan pernah tertutup oleh gerbang yang sudah ada.
+
+### Yang diubah
+- **Aturan 14 (baru, `swift-ui-lint.sh`):** setiap
+  `INFOPLIST_KEY_NS*UsageDescription` di `project.yml` harus punya kunci
+  yang sama di `Apps/Shared/Resources/<bahasa>.lproj/InfoPlist.strings`,
+  untuk **setiap** bahasa yang katalog dukung. Daftar izin dan daftar bahasa
+  keduanya diturunkan dari berkas, bukan ditulis mati — izin baru dan bahasa
+  baru sama-sama merah bila tidak dilengkapi.
+- **`InfoPlist.strings` (id + en):** empat teks izin, dengan alasan
+  "kenapa" yang sama dengan yang dipakai di dalam app (lokasi bawaan yang
+  jelas berlabel; akurasi sensor tidak diasumsikan).
+- **Ketidak-konsistenan nyata ikut diperbaiki:** versi jam tidak menyebut
+  bahwa tanpa lokasi hasilnya **ditandai belum tentu sah**, sedangkan versi
+  iPhone menyebutnya. Pengguna jam — layar yang paling sedikit ruang —
+  justru yang tidak diberi tahu. Keduanya kini sama.
+
+### Dua cacat pada gerbangnya sendiri, ketemu sebelum push
+1. Variabel tak terdefinisi membuat pemeriksaan Python **error**, dan karena
+   `$(...)` mengembalikan string kosong, aturan itu melaporkan **"Bersih"** —
+   hijau untuk sesuatu yang tidak pernah dijalankan. Persis kelas
+   "hijau yang tidak hijau" yang seluruh berkas ini dibuat untuk menutup.
+   Diperbaiki: kegagalan internal kini dianggap GAGAL, bukan bersih.
+2. `sourceLanguage: id` tidak punya entri `localizations` sendiri, jadi
+   bahasa sumbernya harus ditambahkan secara eksplisit.
+
+### Dibuktikan
+- Gerbang **merah** saat `en.lproj` disembunyikan ("2 izin belum
+  diterjemahkan untuk 'en'"), lalu hijau setelah dikembalikan.
+- Uji: CelestialEngine 172 + PointingKit 487. 13 → 14 aturan bersih.

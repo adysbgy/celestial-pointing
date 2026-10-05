@@ -1239,6 +1239,102 @@ else
   echo "Bersih: tak ada kalimat yang dirakit sebagai argumen."
 fi
 
+# ── Aturan 14: setiap izin sistem harus punya InfoPlist.strings ────────────
+# Teks izin (`NS*UsageDescription`) tidak tampil lewat `Text(...)`, dan tidak
+# dihasilkan di `PointingKit` — ia dibaca **sistem operasi** dari bundel, di
+# luar jangkauan `Localizable.xcstrings`. Karena itu Aturan 4 (literal di
+# `Apps/`) dan Aturan 6 (paritas kunci paket) berdua tidak punya apa pun
+# untuk dilihat: teksnya hidup di `project.yml` sebagai `INFOPLIST_KEY_*`,
+# dan seluruh gerbang hijau sementara dialog izin berbahasa Indonesia untuk
+# semua pengguna.
+#
+# Ini persis kelas cacat yang sama dengan Aturan 4: yang diukur bukan bagian
+# yang bermasalah. Bedanya di sini lebih buruk, karena teks ini tidak bisa
+# diperbaiki lewat katalog — satu-satunya jalurnya adalah `InfoPlist.strings`
+# per bahasa, dan tidak ada gerbang Xcode yang memperingatkan bila berkas itu
+# tidak ada.
+#
+# Yang diperiksa: setiap `INFOPLIST_KEY_NS*UsageDescription` di `project.yml`
+# harus punya kunci yang sama di `Apps/Shared/Resources/<bahasa>.lproj/
+# InfoPlist.strings`, untuk setiap bahasa yang katalog string dukung.
+# Keduanya diambil dari berkas, bukan ditulis mati — supaya izin baru dan
+# bahasa baru keduanya merah bila tidak dilengkapi.
+echo
+echo "== Aturan 14: izin sistem punya terjemahan InfoPlist.strings =="
+# `status_crash` ditangkap terpisah: kalau pemeriksanya sendiri error,
+# `$(...)` mengembalikan string kosong dan aturan ini akan melaporkan
+# **bersih** — padahal tidak ada yang diperiksa. Itu persis "hijau yang
+# tidak hijau" yang seluruh berkas ini dibuat untuk menutup, jadi
+# kegagalan internal diperlakukan sebagai kegagalan gerbang.
+permission=$(python3 - <<'PY' 2>&1
+import glob, json, os, re
+
+SPEC = "project.yml"
+RES = "Apps/Shared/Resources"
+
+if not os.path.exists(SPEC):
+    print("PERINGATAN: project.yml tidak ada.")
+    raise SystemExit
+
+spec = open(SPEC, encoding="utf-8").read()
+# Hanya kunci **izin** — `CFBundleDisplayName` memang tidak diterjemahkan
+# ("Point & Know" adalah nama produk di semua bahasa).
+perms = sorted(set(re.findall(r'INFOPLIST_KEY_(NS\w*UsageDescription)\s*:', spec)))
+
+catalog = os.path.join(RES, "Localizable.xcstrings")
+if not os.path.exists(catalog):
+    print("PERINGATAN: katalog tidak ada, bahasa tidak bisa diturunkan.")
+    raise SystemExit
+
+# Bahasa yang didukung = bahasa katalog + bahasa sumbernya sendiri.
+# `sourceLanguage: id` tidak punya entri `localizations`, jadi tanpa
+# menyebutnya secara eksplisit berkas `id.lproj` akan dianggap tidak ada.
+catalog_data = json.load(open(catalog, encoding="utf-8"))
+strings = catalog_data["strings"]
+# `sourceLanguage: id` tidak punya entri `localizations` sendiri, jadi tanpa
+# menyebutnya secara eksplisit berkas `id.lproj` akan dianggap tidak ada.
+langs = {catalog_data.get("sourceLanguage", "id")}
+for unit in strings.values():
+    langs.update(unit.get("localizations", {}).keys())
+langs.discard(None)
+
+problems = []
+if not perms:
+    print("PERINGATAN: tidak ada kunci izin yang ditemukan di project.yml.")
+
+for lang in sorted(langs):
+    path = os.path.join(RES, f"{lang}.lproj", "InfoPlist.strings")
+    if not os.path.exists(path):
+        problems.append(
+            f"  {path} tidak ada — {len(perms)} izin belum diterjemahkan "
+            f"untuk '{lang}'")
+        continue
+    text = open(path, encoding="utf-8").read()
+    for perm in perms:
+        # Kunci harus ada **dan** punya nilai, bukan hanya disebut.
+        if not re.search(rf'^\s*{re.escape(perm)}\s*=\s*"[^"]+"\s*;',
+                         text, re.M):
+            problems.append(f"  {path}: tidak memuat {perm}")
+
+print("\n".join(problems) if problems else "")
+PY
+)
+if printf '%s' "$permission" | grep -q "Traceback\\|Error\\|error:"; then
+  echo "Pemeriksaan Aturan 14 gagal dijalankan:"
+  echo "$permission"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$permission" ]; then
+  echo "Izin sistem berikut belum punya terjemahan:"
+  echo "$permission"
+  echo "-> Tambahkan Apps/Shared/Resources/<bahasa>.lproj/InfoPlist.strings."
+  echo "   Teks izin dibaca sistem dari bundel, bukan lewat Localizable."
+  echo "   xcstrings, jadi Aturan 4 & 6 tidak bisa melihatnya."
+  status=1
+else
+  echo "Bersih: setiap izin punya terjemahan di setiap bahasa."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
