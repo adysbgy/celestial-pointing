@@ -51,6 +51,30 @@ public enum LinkStatusText {
         TextLocalization.text(.linkStatusSendFailed, reason)
     }
 
+    /// Sesi tautan gagal aktif, dengan pesan sistemnya.
+    ///
+    /// **Kenapa perlu accessor sendiri, padahal `sendFailed` sudah ada.**
+    /// Keduanya dipanggil dari tempat yang berbeda, dan bedanya persis yang
+    /// membuat cacat ini lolos. `sendFailed` dipanggil di dua `LinkService`
+    /// untuk kegagalan **pengiriman**. Kegagalan **aktivasi sesi** —
+    /// `session(_:activationDidCompleteWith:error:)` — menyimpan
+    /// `error.localizedDescription` **mentah** ke `lastNote`/`lastMessageNote`,
+    /// dan kedua properti itu dirender di layar Tautan.
+    ///
+    /// Jadi pesan sistemnya sampai ke layar tanpa kalimat pengantar apa pun:
+    /// baris yang seharusnya berbunyi "Sesi gagal aktif: …" hanya berisi
+    /// teks bahasa perangkat, di tengah layar berbahasa Indonesia. Tidak ada
+    /// gerbang yang melihatnya — ia bukan literal di `Apps/` (Aturan 4),
+    /// bukan penugasan berakhiran Note dengan literal (Aturan 12), dan bukan
+    /// argumen `String(format:)` (Aturan 13).
+    ///
+    /// Pesan sistemnya **tetap ditampilkan** lewat `%@`: dua kegagalan
+    /// aktivasi yang berbeda tidak boleh terbaca sama pada baris yang dipakai
+    /// untuk memutuskan apakah jam dan iPhone benar-benar terhubung.
+    public static func activationFailed(_ reason: String) -> String {
+        TextLocalization.text(.linkStatusActivationFailed, reason)
+    }
+
     /// Pengiriman berhasil; `kindName` adalah nama jenis pesan untuk manusia.
     public static func sent(_ kindName: String) -> String {
         TextLocalization.text(.linkStatusSent, kindName)
@@ -144,6 +168,18 @@ public extension LocalizedText {
     static let linkStatusSendFailed = LocalizedText(
         key: "link.status.sendFailed",
         id: "Gagal mengirim: %@")
+
+    /// Aktivasi sesi tautan gagal; `%@` pesan sistemnya.
+    ///
+    /// Masuk daftar karena dua `LinkService` menyimpan
+    /// `error.localizedDescription` **apa adanya** ke `lastNote` /
+    /// `lastMessageNote` saat `activationDidCompleteWith` membawa galat, dan
+    /// kedua properti itu dirender di layar Tautan. Tanpa kunci ini barisnya
+    /// hanya berisi teks bahasa perangkat. Lihat
+    /// `LinkStatusText.activationFailed`.
+    static let linkStatusActivationFailed = LocalizedText(
+        key: "link.status.activationFailed",
+        id: "Sesi gagal aktif: %@")
 
     static let linkStatusSent = LocalizedText(
         key: "link.status.sent",

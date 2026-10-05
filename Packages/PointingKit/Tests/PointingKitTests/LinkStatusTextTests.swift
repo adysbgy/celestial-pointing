@@ -9,7 +9,7 @@ import XCTest
 /// Aturan 4 (yang menyapu argumen `Text(...)`) dan Aturan 6 (yang memeriksa
 /// paritas kunci) sama-sama buta. Uji di berkas ini menahan kalimatnya di
 /// tempat yang bisa dilihat kedua gerbang.
-final class LinkStatusTextTests: XCTestCase {
+final class LinkStatusTextTests: BridgedTextTestCase {
 
     /// Setiap kalimat berasal dari katalog, bukan literal di kode.
     ///
@@ -86,5 +86,42 @@ final class LinkStatusTextTests: XCTestCase {
         let reason = "The operation could not be completed."
         XCTAssertTrue(LinkStatusText.sendFailed(reason).contains(reason),
                       "alasan sistem dirusak oleh terjemahan")
+    }
+
+    // MARK: - Aktivasi sesi
+
+    /// Kegagalan **aktivasi** sesi tidak boleh sampai ke layar apa adanya.
+    ///
+    /// **Kenapa uji ini terpisah dari `sendFailed` di atas.** Keduanya beda
+    /// jalur, dan bedanya persis yang membuat cacat ini lolos berbulan-bulan.
+    /// `sendFailed` dipanggil dari kedua `LinkService` untuk kegagalan
+    /// pengiriman, dan jalurnya **terlihat** dari berkas `Apps/`. Kegagalan
+    /// aktivasi menyimpan `error.localizedDescription` **mentah** ke
+    /// `lastNote` / `lastMessageNote` — dua properti yang dirender di layar
+    /// Tautan — tanpa accessor apa pun.
+    ///
+    /// Yang membuatnya tak terlihat gerbang, sekaligus:
+    ///   - bukan literal di argumen `Text(...)` (Aturan 4),
+    ///   - bukan penugasan berakhiran Note dengan **literal** (Aturan 12) —
+    ///     nilainya ekspresi `error.localizedDescription`,
+    ///   - bukan argumen `String(format:)`/`append` (Aturan 13).
+    ///
+    /// Akibatnya: baris yang seharusnya berbunyi "Sesi gagal aktif: …" hanya
+    /// berisi teks bahasa perangkat, di tengah layar berbahasa Indonesia.
+    func testActivationFailureIsWrappedNotBare() {
+        let reason = "The operation could not be completed."
+        let shown = LinkStatusText.activationFailed(reason)
+        XCTAssertNotEqual(shown, reason,
+                          "pesan sistem tampil apa adanya, tanpa kalimat katalog")
+        XCTAssertTrue(shown.contains(reason),
+                      "pesan sistem hilang — dua kegagalan berbeda terbaca sama")
+    }
+
+    /// Katalog yang mengendalikan katanya, dan specifier-nya satu `%@`.
+    func testActivationFailureFollowsTheCatalog() {
+        EnglishTranslation.install(
+            ["link.status.activationFailed": "Session failed: %@"])
+        XCTAssertEqual(LinkStatusText.activationFailed("timeout"),
+                       "Session failed: timeout")
     }
 }

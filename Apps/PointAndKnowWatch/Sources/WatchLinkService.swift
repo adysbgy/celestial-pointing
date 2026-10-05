@@ -218,7 +218,15 @@ extension WatchLinkService: WCSessionDelegate {
         let reachable = session.isReachable
         Task { @MainActor in
             self.isReachable = reachable
-            if let error { self.lastMessageNote = error.localizedDescription }
+            if let error {
+                // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
+                // perangkat, bukan bahasa katalog, jadi menampilkannya apa
+                // adanya menyisipkan satu baris berbahasa lain di layar
+                // Tautan. Namanya tetap ikut (`%@`) supaya dua kegagalan
+                // berbeda tidak terbaca sama.
+                self.lastMessageNote = LinkStatusText.activationFailed(
+                    error.localizedDescription)
+            }
         }
     }
 

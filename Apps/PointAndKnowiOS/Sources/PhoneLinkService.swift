@@ -130,7 +130,12 @@ extension PhoneLinkService: WCSessionDelegate {
         Task { @MainActor in
             self.isReachable = reachable
             self.isActivated = activated
-            if let message { self.lastNote = message }
+            if let message {
+                // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
+                // perangkat, bukan bahasa katalog. Namanya tetap ikut (`%@`)
+                // supaya dua kegagalan berbeda tidak terbaca sama.
+                self.lastNote = LinkStatusText.activationFailed(message)
+            }
         }
     }
 

@@ -644,6 +644,9 @@ public extension LocalizedText {
         // dalam `PhoneLinkService`/`WatchLinkService` — lihat `LinkStatusText`.
         .linkStatusCalibrationNotSent, .linkStatusMessageNotSent,
         .linkStatusSendFailed, .linkStatusSent, .linkStatusWatchSaw,
+        // Aktivasi sesi tautan gagal: dua `LinkService` dulu menyimpan
+        // `error.localizedDescription` apa adanya ke `lastNote`.
+        .linkStatusActivationFailed,
         .linkStatusStateFromWatch, .linkStatusCalibrationFromWatch,
         .linkStatusPolicyFromWatch, .linkStatusAcknowledgement,
         .linkStatusInvalidPolicy, .linkStatusStateRequestTooEarly,

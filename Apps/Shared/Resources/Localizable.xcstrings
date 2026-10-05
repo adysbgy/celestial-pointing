@@ -4719,6 +4719,17 @@
           }
         }
       }
+    },
+    "link.status.activationFailed": {
+      "comment": "Sesi tautan gagal aktif; %@ adalah pesan sistemnya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session failed to activate: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
