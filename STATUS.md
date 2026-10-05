@@ -1,3 +1,121 @@
+## Progres terakhir (5 Okt 2026 — layar redup menampilkan kandidat seolah temuan)
+
+### Empat permukaan dari satu jawaban, tiga sudah jujur
+
+Cacat siklus ini tidak berupa layar yang salah bentuk. Yang terjadi adalah
+**permukaan keempat dari empat lupa** — dan lupa dengan cara yang paling
+meyakinkan, karena di layar itu memang tidak ada tempat untuk penanda.
+
+Di `.uncertain`, `displayedObject` mengembalikan `intent.best` dan `hasAnswer`
+benar, jadi **nama kandidat tampil sebagai `title2.bold()`** — huruf
+terbesar, tebal — dengan `shortLabel` polos di bawahnya. Label keadaan itu
+memang berbeda dari `lock` ("Belum pasti" vs "Terkunci"), jadi tidak ada layar
+yang salah secara harfiah.
+
+Tapi proporsi hierarkinya yang jadi masalah: mata membaca nama lebih dulu dan
+lebih besar, lalu membaca kata status yang tidak menempel pada nama itu.
+Kandidat tampil sebagai **temuan**. Dan ini terjadi di layar yang paling
+sering dibaca sekilas (Always-On), yang justru **tidak punya** panel
+peringatan, badge, maupun gambar — satu-satunya tempat di app yang benar-benar
+tidak punya tempat untuk menandai apa pun.
+
+| Permukaan | Penanda ragu | Bentuk |
+|---|---|---|
+| complication | `Subline.uncertaintyMarker` | kata |
+| jam (layar penuh) | badge keyakinan + gambar disamar | badge |
+| iPhone | badge keyakinan + gambar disamar | badge |
+| **layar redup** | **tidak ada** | — |
+
+Yang membuatnya bertahan adalah brief itu sendiri. Layar redup memang
+sengaja dibuat miskin ("hanya dua hal yang harus terbaca sekilas"), jadi
+hilangnya penanda terlihat seperti keputusan sadar. Penandanya
+dibuat berupa **frasa pendek yang menempel pada nama**, memakai
+kunci `confidence.uncertain.marker` — **kunci yang sama** dengan yang dipakai
+complication. Dua permukaan, satu kunci: katalog kedua hanya akan menghasilkan
+dua ejaan untuk fakta yang sama.
+
+### Kenapa butuh ambang baru, bukan `!confirmsIdentity`
+
+Dua-duanya `false` pada `.uncertain`, jadi pertanyaannya menyesatkan: kenapa
+tidak pakai `!confirmsIdentity` saja?
+
+Jawabannya ada di keadaan yang **tidak** punya jawaban. Pada `.pointing`,
+`displayedObject` mengembalikan `lastLocked` — jadi ada nama yang tampil, dan
+`confirmsIdentity` sudah `false` karena keadaan tidak `looksConfident`. Kalau
+ambangnya `!confirmsIdentity`, objek **sisa** itu ikut diberi penanda **ragu**
+— padahal yang perlu dinyatakan adalah "ini **basi**". Dua keadaan berbeda
+berbagi satu penanda, dan penanda yang begitu berhenti jadi informasi.
+
+Jadi syaratnya `hasAnswer && !looksConfident`: hanya menyala pada keadaan di
+mana ada kandidat yang ditampilkan *sebagai hasil*. Persis
+`displayedObject`-nya complication (`hasAnswer && !isConfirmed`), tapi di
+hitung dari sumber yang sama dengan `PointingSnapshot`, bukan dari digest —
+supaya ambangnya bisa diuji di Linux tanpa WidgetKit.
+
+### VoiceOver: penandanya diucapkan **sebelum** nama
+
+`"Vega. Belum pasti"` dan `"Belum pasti. Vega."` bukan kalimat yang sama.
+Yang kedua terdengar lebih dulu sebagai **syarat**; yang pertama
+mendengar koreksi sesudah fakta — dan koreksi terdengar seperti hal yang
+sudah terjadi. Karena nama kandidat adalah kata yang paling mungkin
+diartikan sebagai temuan, penandanya harus terdengar lebih dulu.
+
+### Bukti merah: tiga mutasi, dua arah
+
+`red-test.sh`. Dua mutasi pertama menjaga **keberadaan** penanda (`.uncertain`
+wajib ditandai), yang ketiga menjaga **pembedanya** dari basi.
+
+| Mutasi | Uji yang menangkap | Hasil |
+|---|---|---|
+| `!looksConfident` → `looksConfident` | `testUncertainCandidateMustCarryTheUncertaintyMarker` | **MERAH** |
+| buang `!looksConfident` (terlalu gurau) | `testALockedNameNeverCarriesTheUncertaintyMarker` | **MERAH** |
+| buang `hasAnswer` (basi ikut ditandai) | `testStaleObjectCarriesNoUncertaintyMarker` | **MERAH** |
+
+Arah kedua adalah yang menentukan. Perbaikan yang terlalu luas — menandai
+**semua** nama yang tampil — loloskan uji pertama (`.uncertain` tetap
+ditandai) tapi merah pada yang kedua. Perbaikan yang terlalu longgar — memakai
+`!confirmsIdentity` — loloskan dua uji pertama dan merah pada yang ketiga.
+
+Dua mutasi pertama sempat gagal **salah alasan** di tengah pengerjaan: keduanya
+ditulis dengan typo (`displayObject` alih-alih `displayedObject`), jadi build
+gagal dan tidak ada yang dibuktikan. `red-test.sh` menolak melaporkan itu
+sebagai bukti — dan itu benar. Pelajaran yang berulang: mutasi yang tidak
+bisa dikompilasi bukan bukti, dan `red-test.sh` sudah menjaga itu sejak
+siklus "Cacat alat yang ketemu di tengah".
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat.** Yang dibuktikan: ambangnya benar di
+  kedua arah, kunci katalognya sudah ada dengan terjemahan Inggris, dan
+  gerbang kompilasi/build macOS hijau. Yang belum: apakah "Belum pasti"
+  tepat secara visual di `.caption2` di atas `title2.bold()` pada 41mm, dan
+  apakah VoiceOver mengucapkannya dengan jeda yang enak.
+- **Layar utama jam masih pakai badge, tidak jadi frasa.** Dua bentuk
+  penanda untuk keadaan yang sama sengaja dibiarkan berbeda: badge punya
+  warna `level.tone`, frasa tidak. Menyamakan keduanya berarti jam kehilangan
+  warna keyakinan yang sudah jadi bagian dari Bahasa visualnya.
+- **`confidence.uncertain.marker` sudah dipakai dua permukaan.** Itu pilihan,
+  bukan kebetulan: bentuknya frasa pendek yang muat di dua tempat sempit
+  (`.accessoryRectangular` dan layar redup). Menambah kunci ketiga hanya
+  akan menghasilkan tiga ejaan untuk satu fakta.
+- **Aturan baru tidak ditambah.** Aturan ini adalah cacat **logika**, bukan
+  bentuk: tanpa ambangnya di `PointingKit`, koreksi hanya bisa dilakukan di
+  view yang tidak bisa diuji di Linux. `swift-ui-lint.sh` tidak pernah
+  menyapu ketiadaan aturan; ia menyapu bentuk yang salah. Menambah aturan
+  untuk "setiap layar redup harus menandai ragu" akan jadi daftar periksa manual
+  harus dijaga MANUAL — persis yang membuat gerbang ini rapuh sejak awal.
+
+### Gerbang
+
+- `swift-test.sh` → **174 CelestialEngine + 555 PointingKit** (549 → 555,
+  +6). **Engine tidak disentuh.**
+- `swift-ui-lint.sh` → **17 aturan hijau**. Aturan 10 menangkap README yang
+  masih mengklaim 549 (sudah diperbarui ke 555).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-test.sh` → tiga mutasi merah, dan dua di antaranya sempat gagal
+  kompilasi lebih dulu (bukan bukti).
+- CI: Engine Tests (Linux) + Apple Build (macos-15) — hijau pada `4a3fd35`.
+
 ## Progres terakhir (5 Okt 2026 — README membusuk, baru diperbaiki)
 
 ### Siklus: README ikut dijaga Aturan 10, tapi tertinggal
