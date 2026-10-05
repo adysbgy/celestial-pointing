@@ -28,6 +28,25 @@ struct ReducedLuminanceView: View {
                 // Nama objek: satu-satunya informasi yang paling mungkin dicari
                 // pengamat saat layar redup.
                 if let object = engine.displayedObject {
+                    // **Penanda ragu menempel pada nama, bukan di bawahnya.**
+                    //
+                    // Layar ini tidak punya badge keyakinan seperti layar
+                    // penuh, jadi tanpa penanda eksplisit nama kandidat
+                    // tampil sebagai huruf terbesar di layar -- dan itu
+                    // terbaca sebagai temuan, bukan sebagai kandidat.
+                    // `shortLabel` di bawah memang berbeda dari `lock`,
+                    // tetapi ukurannya lebih kecil dan tidak menempel pada
+                    // nama, sehingga tidak menundo proporsi hierarki.
+                    //
+                    // Bentuknya `confidence.uncertain.marker` -- frasa yang
+                    // **sama** dengan yang dipakai complication. Dua
+                    // permukaan, satu kunci: katalog kedua hanya akan
+                    // menghasilkan dua ejaan untuk fakta yang sama.
+                    if engine.carriesUncertaintyMarker {
+                        Text(TextLocalization.text(.confidenceUncertainMarker))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SurfacePalette.active.textPrimaryColor)
+                    }
                     Text(object.name)
                         // Nama = informasi utama, jadi `title2` (besar & tebal).
                         // Bukan `.system(size: 20)`: angka tetap mengabaikan
@@ -136,6 +155,18 @@ struct ReducedLuminanceView: View {
     /// kunci, dua panjang: `staleShort` untuk suara, `stale` untuk layar penuh.
     private var reducedAccessibilityLabel: String {
         var parts: [String] = []
+        // Penanda ragu ikut diucapkan **sebelum** nama, bukan sesudahnya.
+        //
+        // Urutannya penting: nama kandidat adalah kata yang paling mungkin
+        // diartikan sebagai temuan, jadi penandanya harus terdengar lebih dulu.
+        // Meletakkannya sesudah nama menghasilkan "Vega. Belum pasti" — di
+        // mana klausa kedua terdengar seperti koreksi, bukan syarat.
+        //
+        // Frasa yang diucapkan sama persis dengan yang ditampilkan: satu
+        // kunci untuk dua medianya.
+        if engine.carriesUncertaintyMarker {
+            parts.append(TextLocalization.text(.confidenceUncertainMarker))
+        }
         if let object = engine.displayedObject {
             parts.append(object.name)
         }

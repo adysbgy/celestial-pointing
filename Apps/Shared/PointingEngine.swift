@@ -420,6 +420,23 @@ public final class PointingEngine: ObservableObject {
         snapshot.confirmsIdentity(lastLocked: lastLockedObject)
     }
 
+    /// Apakah nama yang ditampilkan **wajib** membawa penanda ragu.
+    ///
+    /// **Kenapa surface keempat ini butuh aturan sendiri.** Tiga permukaan
+    /// lain sudah menandai ragu (complication lewat `Subline`, jam dan iPhone
+    /// lewat badge keyakinan). Layar redup tidak punya ruang untuk badge,
+    /// sehingga penandanya harus berupa frasa yang menempel pada nama —
+    /// kalau tidak, nama kandidat tampil sebagai huruf terbesar di layar dan
+    /// terbaca sebagai temuan, bukan kandidat.
+    ///
+    /// Aturannya sendiri ada di `PointingKit`
+    /// (`PointingSnapshot.carriesUncertaintyMarker(lastLocked:)`) supaya
+    /// ambangnya bisa diuji di Linux, bukan jadi syarat `if` di view yang
+    /// tidak pernah dieksekusi di sini.
+    public var carriesUncertaintyMarker: Bool {
+        snapshot.carriesUncertaintyMarker(lastLocked: lastLockedObject)
+    }
+
     /// Arah tunjuk terkalibrasi, untuk ditampilkan sebagai angka.
     ///
     /// `nil` saat sensor tidak hidup: angka yang tersisa di cuplikan adalah
