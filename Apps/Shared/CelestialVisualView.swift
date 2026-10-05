@@ -434,8 +434,18 @@ struct CelestialVisualView: View {
             if let angle = visual.brightLimbAngleRadians {
                 // `rotate` berputar terhadap titik asal, jadi titik pusat
                 // piringan harus dibawa ke asal dulu lalu dikembalikan.
+                //
+                // Sudutnya **dibalik** lewat `drawRotationRadians`, bukan
+                // diteruskan apa adanya: `brightLimbAngle` memakai konvensi
+                // matematis (positif = sisi terang ke atas), sedangkan
+                // `GraphicsContext` berkoordinat layar (y ke bawah), tempat
+                // sudut positif berputar searah jarum jam. Tanpa pembalikan
+                // itu sabit tercermin vertikal — sisi terang menghadap ke
+                // arah yang salah, tanpa ada teks di layar yang bisa
+                // membuktikannya. Konversinya diuji di Linux.
                 layer.translateBy(x: center.x, y: center.y)
-                layer.rotate(by: .radians(angle))
+                layer.rotate(by: .radians(CelestialVisual.drawRotationRadians(
+                    brightLimbAngleRadians: angle)))
                 layer.translateBy(x: -center.x, y: -center.y)
             }
             layer.clip(to: disc)

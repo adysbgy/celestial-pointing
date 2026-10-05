@@ -408,6 +408,37 @@ public struct CelestialVisual: Equatable, Sendable {
         return atan2(up, right)
     }
 
+    /// Sudut yang harus diteruskan ke `GraphicsContext.rotate(by:)` untuk
+    /// memutar pita terang ke arah `brightLimbAngle`.
+    ///
+    /// **Kenapa ada, dan kenapa tandanya dibalik.** `brightLimbAngle`
+    /// memakai konvensi **matematis**: sudut positif berarti sisi terang
+    /// menghadap **atas**, diukur berlawanan arah jarum jam dari arah kanan.
+    /// Konvensi itu yang diuji (`testPolarCrescentFacesUpWhenSunIsHigher`).
+    ///
+    /// `GraphicsContext` SwiftUI memakai koordinat **layar** (y ke bawah),
+    /// dan di sana sudut positif berputar **searah jarum jam** — Apple
+    /// mendokumentasikannya di `CGContext.rotate(by:)`: pada konteks yang
+    /// sudah dibalik, "positive values appear to rotate the coordinate
+    /// system in the clockwise direction". Jadi meneruskan sudut model apa
+    /// adanya mencerminkan sabit secara **vertikal**: sisi terang yang
+    /// seharusnya menghadap bawah tampil menghadap atas.
+    ///
+    /// Cacat itu **tidak bisa ditangkap uji model** (modelnya benar) dan
+    /// **tidak terlihat di layar**, karena sabitnya tetap berbentuk sabit.
+    /// Ia juga paling sering muncul tepat di tempat aplikasi ini dipakai:
+    /// di lintang rendah (Jakarta) sisi terang justru menghadap bawah atau
+    /// atas, bukan ke samping — jadi kesalahan tanda di sini bukan
+    /// perbedaan kosmetik di sana. Karena itu konversinya tinggal di sini,
+    /// di tempat ia bisa diuji, bukan sebagai satu tanda minus di view yang
+    /// tidak pernah dieksekusi di Linux.
+    ///
+    /// - Parameter angle: sudut dari `brightLimbAngle(moon:sun:)`.
+    /// - Returns: argumen untuk `rotate(by: .radians(_:))`.
+    public static func drawRotationRadians(brightLimbAngleRadians angle: Double) -> Double {
+        return -angle
+    }
+
     /// Indeks warna B−V untuk bintang yang ada di katalog.
     ///
     /// Nilainya dari katalog warna bintang terang yang sudah mapan. Yang

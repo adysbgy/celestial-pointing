@@ -1,3 +1,101 @@
+## Progres terakhir (5 Okt 2026 — sabit Bulan yang tercermin, dan kenapa tak ada uji yang bisa melihatnya)
+
+### Cacatnya: gambar yang benar di model, salah di layar
+
+`CelestialVisual.brightLimbAngle` menghitung arah sisi terang Bulan dan
+**sudah diuji dengan baik** — termasuk kasus Jakarta yang menuntut sisi
+terang menghadap **bawah** (`testCrescentInJakartaFacesDownNotRight`).
+Sudut itu memakai konvensi **matematis**: positif = sisi terang ke **atas**,
+diukur berlawanan arah jarum jam dari arah kanan.
+
+View lalu meneruskannya **apa adanya** ke `GraphicsContext.rotate(by:)`:
+
+```swift
+layer.rotate(by: .radians(angle))   // sudut model, konvensi matematis
+```
+
+`GraphicsContext` SwiftUI berkoordinat **layar** (y ke bawah). Di konteks
+yang sudah dibalik itu, sudut positif berputar **searah jarum jam** — Apple
+mendokumentasikannya sendiri di `CGContext.rotate(by:)`: *"Rotating the user
+coordinate system on coordinate system that was previously flipped results in
+a rotation in the opposite direction (that is, positive values appear to
+rotate the coordinate system in the clockwise direction)."*
+
+Akibatnya sabit tercermin **vertikal**: sisi terang yang dihitung menghadap
+bawah digambar menghadap atas, dan sebaliknya.
+
+### Kenapa ini tidak terlihat oleh apa pun yang kita punya
+
+Ini kelas cacat yang paling sulit di repo ini, karena **empat** gerbang
+sekaligus hijau:
+
+| Yang tersedia | Kenapa tidak menangkapnya |
+|---|---|
+| Uji model (`brightLimbAngle`) | hijau — sudutnya memang benar; yang salah penerapannya |
+| `swift-typecheck.sh` | hijau — `Angle` bertipe sama untuk kedua tanda |
+| 22 aturan `swift-ui-lint.sh` | hijau — tidak ada aturan yang tahu arah putaran |
+| CI macOS | hijau — kode **mengompilasi**, bukan **tampil** |
+
+Dan yang membuatnya lolos dari mata manusia: **sabitnya tetap berbentuk
+sabit**. Sisi terang yang terbalik tetap terlihat seperti bulan muda yang
+masuk akal. View-nya sendiri sudah menulis peringatan ini:
+
+> "Tanpa putaran ini gambar akan benar untuk pengamat di lintang tinggi dan
+> salah untuk pengamat di tempat aplikasi ini dipakai -- dan salahnya tidak
+> terlihat, karena sabitnya tetap berbentuk sabit."
+
+Kalimat itu benar soal putaran, tapi berhenti satu langkah terlalu cepat:
+**arah** putarannya juga tidak terlihat, dan justru di lintang rendah
+(Jakarta, lintang −6,2°) sisi terang sering menghadap bawah/atas — bukan ke
+samping — sehingga kesalahan tanda di situ bukan perbedaan kosmetik.
+
+### Cara menemukannya: gambar modelnya, lalu lihat
+
+Tidak ada uji yang bisa menutup ini dari dalam Swift. Jadi yang dilakukan
+adalah **memindahkan geometrinya ke luar**: rumus fase yang sudah teruji
+(`PhaseGeometry`) dan matriks putarannya diport ke Python sebaris demi
+sebaris, lalu dirender menjadi PNG dan **diperiksa dengan mata**.
+
+Render empat panel — Jakarta & kutub, sebelum & sesudah:
+
+| Panel | Sisi terang | Seharusnya | Benar? |
+|---|---|---|---|
+| Jakarta, `angle` apa adanya | **atas** | bawah | tidak |
+| Jakarta, `−angle` | **bawah** | bawah | ya |
+| Kutub, `angle` apa adanya | **bawah** | atas | tidak |
+| Kutub, `−angle` | **atas** | atas | ya |
+
+Jadi dugaan itu terkonfirmasi secara visual, bukan dari membaca ulang rumus.
+
+### Yang diubah
+
+- `CelestialVisual.drawRotationRadians(brightLimbAngleRadians:)` — pembalikan
+  tanda, **satu fungsi**, dengan alasannya lengkap di doc-comment. Bukan
+  tanda minus yang ditulis langsung di view: di sana ia tidak bisa diuji.
+- View memakainya: `layer.rotate(by: .radians(CelestialVisual.drawRotationRadians(...)))`.
+- Tiga uji baru mengunci konvensinya: pembalikan murni, kasus Jakarta
+  (model negatif → argumen `rotate` **positif**), dan `+π/2` model → `−π/2`
+  argumen.
+
+### Batas yang jujur
+
+- **Yang dibuktikan: arah putarannya.** Yang **tidak** dibuktikan adalah
+  keseluruhan komposisi di perangkat — render Python memverifikasi matriks
+  putaran dan pita fase, bukan `Canvas` SwiftUI yang sesungguhnya. Yang
+  menghubungkan keduanya adalah konvensi `CGContext` yang terdokumentasi.
+- **Belum pernah dilihat di perangkat.** Kalau kelak ada kesempatan menjalankan
+  di jam sungguhan, yang harus diperiksa pertama adalah satu bulan sabit di
+  lintang rendah: sisi terangnya harus menghadap Matahari, yang biasanya
+  berarti ke bawah pada sore hari.
+
+### Gerbang
+
+- `./swift-test.sh` → **174 CelestialEngine + 597 PointingKit**, 0 gagal
+  (594 → 597, +3). Engine tidak disentuh.
+- `./swift-ui-lint.sh` → **22 aturan** hijau (Aturan 10 menangkap README
+  594 → 597 lebih dulu, seperti seharusnya).
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+
 ## Progres terakhir (5 Okt 2026 — judul baris yang memakai kunci nilainya)
 
 ### Cacatnya: baris yang benar hanya karena kebetulan

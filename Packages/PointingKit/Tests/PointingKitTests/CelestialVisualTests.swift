@@ -373,6 +373,53 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertNil(CelestialVisual.brightLimbAngle(moon: same, sun: same))
     }
 
+    // MARK: - Konversi sudut untuk `rotate(by:)`
+
+    /// Tanda sudut **dibalik** saat diteruskan ke `GraphicsContext.rotate`.
+    ///
+    /// Model memakai konvensi matematis (positif = sisi terang ke atas);
+    /// `GraphicsContext` SwiftUI berkoordinat layar (y ke bawah), tempat
+    /// sudut positif berputar searah jarum jam. Kalau tanda itu tidak
+    /// dibalik, sabit tercermin **vertikal** — sisi terang menghadap ke
+    /// arah yang berlawanan — dan cacat itu tidak bisa ditangkap uji model
+    /// mana pun, karena modelnya benar.
+    func testDrawRotationMirrorsTheModelConvention() {
+        let up = CelestialVisual.drawRotationRadians(brightLimbAngleRadians: .pi / 2)
+        // Sisi terang menghadap ATAS di model → di layar (y ke bawah) itu
+        // berarti putaran searah jarum jam seperempat, yaitu +90°, bukan
+        // -90°. Diteruskan apa adanya (-90°) akan menghadap BAWAH.
+        XCTAssertEqual(up, -.pi / 2, accuracy: 1e-12)
+    }
+
+    /// Kasus Jakarta dari `testCrescentInJakartaFacesDownNotRight`, dilihat
+    /// dari sisi argumen `rotate`.
+    ///
+    /// Sisi terang menghadap **bawah** (model −90°). Di koordinat layar
+    /// (y ke bawah), "bawah" adalah +90° — jadi argumennya harus **positif**.
+    /// Kalau tandanya tidak dibalik, sabit Jakarta menghadap ke atas, dan
+    /// itu persis kebalikan dari yang dihitung.
+    func testJakartaCrescentIsRotatedDownwardNotUpward() {
+        let model = CelestialVisual.brightLimbAngle(
+            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
+        guard let angle = model else { return XCTFail("sudut harus terdefinisi") }
+        let draw = CelestialVisual.drawRotationRadians(brightLimbAngleRadians: angle)
+        XCTAssertGreaterThan(draw, 0,
+                             "sisi terang di bawah (model negatif) harus jadi putaran positif di layar")
+    }
+
+    /// Konversinya pembalikan murni: dua sudut yang berlawanan menghasilkan
+    /// argumen yang berlawanan pula, dan nol tetap nol (sisi terang ke
+    /// kanan tidak butuh putaran).
+    func testDrawRotationIsAPureSignFlip() {
+        XCTAssertEqual(CelestialVisual.drawRotationRadians(brightLimbAngleRadians: 0), 0)
+        for angle in stride(from: -3.0, through: 3.0, by: 0.25) {
+            XCTAssertEqual(
+                CelestialVisual.drawRotationRadians(brightLimbAngleRadians: angle),
+                -angle, accuracy: 1e-12)
+        }
+    }
+
     // MARK: - Warna bintang
 
     func testRedGiantsAreRedAndHotStarsAreBlue() {
