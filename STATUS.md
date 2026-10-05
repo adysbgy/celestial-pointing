@@ -1,4 +1,88 @@
-## Progres terakhir (5 Okt 2026 — Venus berfase, dan gerbang lokal yang buta terhadap Apps/)
+## Progres terakhir (5 Okt 2026 — kutub Mars mengambang di dalam piringan)
+
+### Cacatnya: elips yang ditempel, bukan kap es di permukaan bola
+
+Kutub Mars digambar sebagai elips dengan lebar **tetap** 0.55 R, tepi atasnya
+ditempelkan di tepi bola. Karena 0.55 R selalu lebih sempit dari bola pada
+baris mana pun di sekitar kutub, yang tergambar bukan kutub di permukaan bola
+melainkan **elips yang mengambang di dalam piringan** — selalu ada rim merah di
+atas dan di sisi kiri-kanan kutubnya.
+
+Terukur pada render 400 px, di baris terlebar kutub: tepi bola 0.675 R, tepi
+kutub 0.550 R — selisih 0.125 R (25 px). Kutub adalah **ciri pengenal** Mars,
+jadi ini bukan soal rasa: gambar yang salah adalah **klaim yang salah**, persis
+yang PRD v0.4 larang.
+
+Catatan proses: vision (model) menilai crop-nya "tidak apa-apa" dan bahkan
+mengklaim "ada sliver merah di atas putih" — **dua kali salah, ke arah
+berbeda**. Yang menyelesaikannya adalah pengukuran piksel langsung, bukan
+mata. Sama seperti `polish` sebelumnya: kalau bisa diukur, ukur.
+
+### Kenapa lebarnya tidak bisa sekadar diperbesar
+
+Satu-satunya lebar yang membuat kutub **menyentuh** tepi di baris `centerY`-nya
+adalah setengah-lebar bola pada ketinggian itu: `√(1 − y²)` — rumus proyeksi
+yang sama dengan `jupiterBands`. Angka tetap hanya benar untuk satu ketinggian
+dan salah **tanpa suara** begitu posisinya bergeser.
+
+Konsekuensi kedua: elips selebar tepi bola tetap **menjulur keluar** bola di
+dekat kutub (pada y = −0.9 R elipsnya 0.530 R sementara bola 0.436 R). Jadi
+view harus **mengirisnya dengan piringan** — tanpa klip, cacatnya cuma
+berpindah arah: kutubnya meluber ke latar.
+
+### Perbaikan
+
+| Bagian | Keputusan | Kenapa |
+|---|---|---|
+| `polarCaps(pinchY:depthFraction:)` | lebar = `√(1 − pinchY²)`, **diturunkan** | angka tetap tidak bisa benar di dua ketinggian sekaligus |
+| `PolarCaps.Cap` | pusat + separuh-tinggi + separuh-lebar | `topY`+`height` membuat tepi luar kutub tak punya definisi, jadi tidak bisa diuji |
+| kutub selatan | `cap(-pinchY)` | satu tanda, bukan rumus kedua — ketidak-simetrisan tak bisa ditulis ulang |
+| `drawPolarCaps` | `inner.clip(to: disc)` | irisan inilah yang membuat tepi luar kutub mengikuti lengkung bola |
+| port Python | `polar_caps()` ikut berubah | tanpa itu, **setiap pemeriksaan gambar Mars mengukur gambar yang tidak pernah ada** — kelas cacat yang sama untuk kelima kalinya |
+| uji lama | **diganti**, bukan ditambahi | ia mengukur bentuk lama; menambah uji di sebelahnya hanya menutupi |
+
+### Gerbang: rumus, bukan angka
+
+`check_mars_caps_touch_the_limb` mengukur langsung dari piksel, dua arah
+sekaligus karena keduanya bisa gagal terpisah:
+
+| Pemeriksaan | Ambang | Kenapa ada |
+|---|---|---|
+| kutub menyentuh tepi bola | rim ≤ 0.02 R di baris pusat kutub | cacat aslinya: rim 0.125 R |
+| kutub tidak meluber keluar | 0 piksel di luar piringan | arah berlawanan — tanpa klip, lebar baru justru keluar |
+| kutub benar-benar tergambar | > 100 piksel | view yang berhenti menggambar lolos dua di atas dengan sempurna |
+| kutub hilang saat ragu | 0 piksel pada kandidat | ciri pengenal tidak boleh tergambar pada objek yang belum dipastikan |
+
+Ditambah di gerbang pergeseran port: `POLAR_CAP_WIDTH_RULE = "sqrt"` menjaga
+**rumusnya** di kedua bahasa, bukan angkanya — karena angkanya sudah tidak ada
+di port, dan menyalinnya kembali sebagai konstanta justru mengembalikan cacat
+yang baru ditutup.
+
+### Dibuktikan menggigit
+
+Bukan sekadar bertambah. Dengan geometri lama dipasang ulang:
+
+```
+GAGAL  kutub Mars menyentuh tepi bola di baris pusatnya
+       -> bola 0.680 R, kutub 0.550 R, rim 26 px (13.0% R)
+OK     kutub Mars tidak meluber keluar bola
+OK     kutub Mars benar-benar tergambar
+OK     kutub Mars hilang saat engine ragu
+```
+
+Dengan geometri baru: `rim 2 px (1.0% R)`, 0 piksel di luar piringan, puncak
+kutub terukur di **0.998 R** dari pusat — menempel, tidak mencuat.
+
+### Hasil
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| CelestialEngine | 174 | **174** |
+| PointingKit | 617 | **619** (+2) |
+| Pemeriksaan visual | 148 | **153** (+5) |
+| Gerbang pergeseran port | 74 | **78** (+4) |
+
+## Progres sebelumnya (5 Okt 2026 — Venus berfase, dan gerbang lokal yang buta terhadap Apps/)
 
 ### Cacatnya: bola penuh yang menyatakan sesuatu yang tidak ada
 
