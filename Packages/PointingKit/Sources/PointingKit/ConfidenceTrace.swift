@@ -222,7 +222,53 @@ public final class ConfidenceTrace {
         return counts
     }
 
-    /// Kalimat diagnostik untuk ditampilkan — apa yang harus diperbaiki.
+    /// Sebab keraguan yang **berbagi hitungan tertinggi**, atau kosong bila
+    /// ada satu sebab yang jelas mendominasi.
+    ///
+    /// **Kenapa ini harus jadi predikat, bukan `counts.max { $0.value < $1.value }`
+    /// di dalam `diagnosis`.** Versi lama mengambil penyebab "teratas" dengan
+    /// `max { $0.value < $1.value }` pada dictionary. Saat hitungannya **sama**,
+    /// `max` mengembalikan elemen pertama yang ditemukan — dan urutan iterasi
+    /// `Dictionary` **tidak ditentukan** di Swift (hash di-seed per proses).
+    /// Akibatnya kalimat diagnosis yang sama, untuk data yang sama, berubah
+    /// antara dua kali peluncuran app:
+    ///
+    /// | Hitungan | Kalimat yang bisa muncul |
+    /// |---|---|
+    /// | tooFar 1, ambiguous 1 | "Perbaiki kalibrasi dulu." **atau** "Ini keterbatasan akurasi." |
+    ///
+    /// Yang berubah bukan sekadar kalimat yang "varias sedikit": keduanya
+    /// adalah **petunjuk perbaikan yang saling meniadakan**, dan hanya salah
+    /// satu yang benar. Pada alat ukur repo ini sendiri, itu bukan cacat yang
+    /// bisa diterima: penguji yang mengikuti satu petunjuk bisa membuat
+    /// kalibrasi yang tidak diperlukan, atau menerima batas akurasi yang
+    /// sebenarnya bisa diperbaiki.
+    ///
+    /// Urutan hasilnya mengikuti urutan deklarasi enum, jadi **stabil** — bukan
+    /// stabil karena hash kebetulan sama, tapi karena urutan yang ditulis.
+    public func tiedUncertainReasons(policy: ConfidencePolicy = ConfidencePolicy()) -> [UncertainReason] {
+        let counts = uncertainReasonCounts(policy: policy)
+        guard let top = counts.values.max(), top > 0 else { return [] }
+        return UncertainReason.allCases.filter { counts[$0] == top }
+    }
+
+    /// Kalimat diagnostik untuk ditampilkan - apa yang harus diperbaiki.
+    ///
+    /// **Keputusan saat hitungan seri.** Kalau dua sebab berbagi hitungan
+    /// tertinggi, kalimatnya harus menyatakan keduanya - bukan memilih satu
+    /// secara diam-diam. Alasannya bukan sekadar agar kelihatan tegas:
+    ///
+    /// - Memilih satu berarti menyembunyikan sebab yang sama saingnya. Kalau
+    ///   yang tampil hanya "perbaiki kalibrasi", penguji tidak tahu ada
+    ///   ambiguitas katalog yang juga harus dibenahi.
+    /// - Dan kalau pilihan itu berubah-ubah antar peluncuran (lihat
+    ///   `tiedUncertainReasons`), diagnosis yang sama memberi petunjuk yang
+    ///   saling meniadakan untuk data yang sama - persis cacat yang
+    ///   ditutup di sini.
+    ///
+    /// Karena itu kalimat seri menyebut semua sebab yang berbagi hitungan
+    /// tertinggi, dan hanya sebab yang benar-benar mendominasi (> separuh
+    /// sampel ragu) boleh tampil sendiri tanpa menyebut yang lain.
     public func diagnosis(policy: ConfidencePolicy = ConfidencePolicy()) -> String {
         guard !samples.isEmpty else { return ExperimentText.diagnosisNoSamples }
         let counts = stateCounts
@@ -234,15 +280,47 @@ public final class ConfidenceTrace {
             return ExperimentText.diagnosisNoAnswers
         }
         if locks == 0 {
-            let dominant = reasons.max { $0.value < $1.value }?.key ?? .none
-            switch dominant {
-            case .tooFar:
-                return ExperimentText.diagnosisTooFar
-            case .ambiguous:
-                return ExperimentText.diagnosisAmbiguous
-            case .none:
+            // Satu sebab yang benar-benar mendominasi boleh tampil sendiri.
+            // Ambangnya lebih dari separuh sampel ragu, bukan sekadar paling
+            // banyak: "paling banyak" bisa tetap seri (2 dari 2), dan itu
+            // justru kasus yang tidak boleh memilih satu.
+            let uncertainTotal = uncertain
+            let dominant = reasons
+                .filter { $0.key != .none
+                    && Double($0.value) * 2 > Double(uncertainTotal) }
+                .max { $0.value < $1.value }?.key
+            if let dominant, dominant != .none {
+                switch dominant {
+                case .tooFar:
+                    return ExperimentText.diagnosisTooFar
+                case .ambiguous:
+                    return ExperimentText.diagnosisAmbiguous
+                case .none:
+                    break
+                }
+            }
+
+            // Tidak ada yang mendominasi: sebut semua sebab yang seri di
+            // puncak. `.none` ikut disebut karena "tanpa sebab terukur"
+            // adalah informasi berbeda dari dua sebab lain, dan diam-diam
+            // membuangnya akan membuat kalimatnyabzclaimed satu penyebab.
+            let tied = tiedUncertainReasons(policy: policy)
+            guard tied.count > 1 else {
+                // Tidak ada yang seri: sebab tunggal sudah tertangani di atas
+                // sebagai `dominant`, jadi sisanya benar-benar "tanpa sebab
+                // terukur".
                 return ExperimentText.diagnosisNoMeasurableCause
             }
+            // Map ordered by declaration order, not by dictionary order: that is
+            // what makes this sentence stable across launches.
+            let sentences = tied.map { reason -> String in
+                switch reason {
+                case .tooFar: return ExperimentText.diagnosisTooFar
+                case .ambiguous: return ExperimentText.diagnosisAmbiguous
+                case .none: return ExperimentText.diagnosisNoMeasurableCause
+                }
+            }
+            return ExperimentText.diagnosisMixed(reasons: sentences)
         }
         return ExperimentText.diagnosisRatio(locks: locks, uncertain: uncertain)
     }

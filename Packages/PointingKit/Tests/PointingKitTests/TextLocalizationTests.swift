@@ -243,6 +243,12 @@ final class TextLocalizationTests: XCTestCase {
     /// "tingkat keyakinan" di sampingnya), jadi kata yang sama akan punya dua
     /// arti — "kandidat belum pasti" versus "sedang mencari".
     ///
+    /// Riwayat angkanya adalah daftar **siklus** yang menambah kunci, dan itu
+    /// disengaja: angka ini bukan formalitas, melainkan satu-satunya tempat
+    /// yang memberi tahu bahwa daftar kunci berubah. Setiap kali naik, itu
+    /// berarti ada teks baru yang wajib punya padanan bahasa — dan teks baru
+    /// tanpa padanan adalah cacat yang tidak terlihat dari layar manapun.
+    ///
     /// 180 → 181 pada siklus "celah Aturan 4": satu kunci
     /// `object.display.staleName` ("%@ — bukan hasil sekarang"). Kalimat ini
     /// dulu dirakit sebagai literal berinterpolasi di dalam `DiagnosticsView`,
@@ -250,9 +256,19 @@ final class TextLocalizationTests: XCTestCase {
     /// `interpolated`-nya `continue` tanpa syarat. Celah gerbangnya sendiri
     /// ikut diperbaiki (kini gagal bawaan), dan kunci ini adalah bukti
     /// sisinya: penanda "bukan hasil sekarang" kini punya padanan Inggris.
+    ///
+    /// 181 → 183 pada siklus "diagnosis tak stabil": `experiment.diagnosis.mixed`
+    /// (kalimat saat dua sebab keraguan seri) dan
+    /// `experiment.diagnosis.mixedSeparator` (pemisah antarsebab). Keduanya
+    /// lahir dari satu keputusan: memilih satu penyebab secara diam-diam memberi
+    /// petunjuk perbaikan yang saling meniadakan. Pemisah dibuat kunci
+    /// tersendiri karena kata penghubung adalah bagian tata bahasa tiap
+    /// bahasa, dan menuliskannya di kode akan memaksa satu tata bahasa pada
+    /// semua bahasa — cacat yang Aturan 11 tidak bisa lihat, karena ia hanya
+    /// menjaga tipe specifier.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 181, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 183, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

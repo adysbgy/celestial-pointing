@@ -231,6 +231,31 @@ public enum ExperimentText {
     ///
     /// `%lld` untuk dua jumlah bulat: `%d` di Linux Swift membaca 32-bit dan
     /// memotong nilai `Int` 64-bit.
+    /// Diagnosis untuk beberapa sebab yang seri.
+    ///
+    /// Urutan sebab **ditentukan pemanggil** (urutan deklarasi enum), bukan
+    /// katalog: yang perlu dilokalkan adalah kalimatnya dan pemisahnya, dan
+    /// menaruh urutan di katalog hanya menambah satu cara untuk melompati
+    /// aturan "sebab yang disebut pertama adalah yang dihitung lebih dulu".
+    ///
+    /// - Parameter reasons: kalimat sebab yang **benar-benar** seri, dalam
+    ///   urutan yang sudah ditentukan. Daftar kosong menghasilkan kalimat
+    ///   "tanpa sebab terukur" dari pemanggil, bukan kalimat kosong di layar.
+    /// Pemisah antarsebab pada diagnosis seri, ikut berkey katalog.
+    ///
+    /// Bahasa Inggris memakai koma + "and"; Bahasa Indonesia cukup titik koma.
+    /// Pemisah yang ditulis di kode memaksa satu tata bahasa pada semua
+    /// bahasa, dan Aturan 11 tidak bisa melihatnya (ia hanya menjaga tipe
+    /// specifier, bukan kata penghubung).
+    public static var diagnosisMixedSeparator: String {
+        TextLocalization.text(.experimentDiagnosisMixedSeparator)
+    }
+
+    public static func diagnosisMixed(reasons: [String]) -> String {
+        TextLocalization.text(.experimentDiagnosisMixed,
+                              reasons.joined(separator: diagnosisMixedSeparator))
+    }
+
     public static func diagnosisRatio(locks: Int, uncertain: Int) -> String {
         let total = locks + uncertain
         let ratio = total > 0 ? Double(locks) / Double(total) : 0
@@ -359,6 +384,33 @@ public extension LocalizedText {
     static let experimentDiagnosisRatio = LocalizedText(
         key: "experiment.diagnosis.ratio",
         id: "%.0f%% jawaban yakin (%lld yakin, %lld ragu).")
+
+    /// Diagnosis saat dua sebab (atau lebih) **berbagi** hitungan tertinggi.
+    ///
+    /// Formatnya satu slot `%@` yang menerima daftar sebab yang sudah
+    /// disambung. Alasannya tiga, dan ketiganya struktural:
+    ///
+    /// - **Slot per sebab** (`%@\n- %@\n- %@`) memaksa pemanggil mengirim
+    ///   kalimat kosong untuk sebab yang tidak berlaku, jadi kosongnya ikut
+    ///   tampil sebagai butir kosong di layar.
+    /// - **Menempelkan dua kalimat yang sudah ada** (`"%@ dan %@"`) mengunci
+    ///   urutannya di kode: penerjemah tidak bisa menyusun ulang, dan kata
+    ///   penghubung ikut ikut ikut diterjemahkan padahal itu bagian tata
+    ///   bahasa tiap bahasa.
+    /// - **Daftar berisi `%#@`** berperilaku berbeda antara CoreFoundation dan
+    ///   Swift Foundation -- persis jebakan yang sudah pernah menjatuhkan app
+    ///   di CI macOS dan hanya bisa ditutup lewat Aturan 11.
+    ///
+    /// Jadi pemisah kalimat juga berkey katalog: urutannya milik penerjemah.
+    static let experimentDiagnosisMixed = LocalizedText(
+        key: "experiment.diagnosis.mixed",
+        id: "Penyebab keraguan berbagi: %@")
+
+    /// Pemisah di antara sebab-sebab pada diagnosis seri.
+    static let experimentDiagnosisMixedSeparator = LocalizedText(
+        key: "experiment.diagnosis.mixedSeparator",
+        id: "; ")
+
 
     static let experimentSuggestedThreshold = LocalizedText(
         key: "experiment.suggestedThreshold",

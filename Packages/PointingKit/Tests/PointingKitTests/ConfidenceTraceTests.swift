@@ -90,6 +90,145 @@ final class ConfidenceTraceTests: XCTestCase {
         XCTAssertTrue(ConfidenceTrace().diagnosis().contains("Belum ada sampel"))
     }
 
+    /// MARK: - Diagnosis saat hitungan seri
+    //
+    // Yang diuji di sini bukan kalimatnya, tapi **keputusan**nya: dua sebab
+    // yang sama saingnya tidak boleh dipilih satu secara diam-diam.
+    //
+    // Bentuk cacatnya diukur, bukan Migration: `diagnosis` lama memakai
+    // `counts.max { $0.value < $1.value }`, dan saat hitungan seri `max`
+    // mengembalikan elemen pertama yang ditemukan — urutan iterasi
+    // `Dictionary` tidak ditentukan di Swift (hash di-seed per proses).
+    // Delapan kali peluncuran `swift test` pada data yang sama menghasilkan
+    // "Perbaiki kalibrasi dulu." 5 kali dan "Ini keterbatasan akurasi." 3 kali.
+
+    /// Dua sebab yang sama saingnya harus disebut **berdua**.
+    ///
+    /// Kalimat yang tampil harus memuat **kedua** petunjuk perbaikan. Kalau
+    /// hanya satu, penguji tidak tahu ada masalah kedua yang juga perlu
+    /// dibenahi — dan pada alat ukur repo ini sendiri, itu berarti
+    /// memperbaiki separuh masalah lalu menyimpulkan alatnya selesai.
+    func testTiedReasonsMustBeReportedTogether() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        // 1 sampel tooFar (2.5 sigma, di atas maxSeparationSigma).
+        trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                     separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+        // 1 sampel ambiguous (tetangga 1 sigma, di bawah ambiguitySigma).
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+
+        XCTAssertEqual(trace.tiedUncertainReasons(policy: policy).count, 2,
+                       "dua sebab harus terdeteksi seri")
+
+        let sentence = trace.diagnosis(policy: policy)
+        XCTAssertTrue(sentence.contains("kalibrasi"),
+                      "petunjuk kalibrasi harus ikut disebut: \(sentence)")
+        XCTAssertTrue(sentence.contains("keterbatasan akurasi"),
+                      "petunjuk akurasi harus ikut disebut: \(sentence)")
+    }
+
+    /// Kalimat yang sama harus **stabil** dalam satu proses, dan hanya itu yang
+    /// bisa dijaga di sini.
+    ///
+    /// Batasnya jujur: stabilitas *antar* peluncuran tidak bisa diuji dari
+    /// dalam satu proses, karena itu justru soal urutan iterasi Dictionary
+    /// yang di-seed per proses. Yang bisa dijaga di sini adalah isi kalimatnya
+    /// (test di atas), dan itulah yang membuat verifikasi antar peluncuran
+    /// tidak perlu melihat dua kalimat berbeda lagi.
+    func testDiagnosisIsRepeatableWithinOneProcess() {
+        func build() -> ConfidenceTrace {
+            let trace = ConfidenceTrace()
+            trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                         separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+            trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                         separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+            return trace
+        }
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        let first = build().diagnosis(policy: policy)
+        for _ in 0..<20 {
+            XCTAssertEqual(build().diagnosis(policy: policy), first,
+                           "data identik harus menghasilkan kalimat identik")
+        }
+    }
+
+    /// Urutan sebab pada kalimat seri harus mengikuti **urutan enum**, bukan
+    /// urutan acak dictionary.
+    ///
+    /// Ini yang menjaga kalimatnya sama setelah perbaikan: `allCases` punya
+    /// urutan yang ditulis, sementara `Dictionary` tidak. Uji ini mengunci
+    /// arahnya (terlalu jauh lebih dulu), karena urutan yang tidak ditulis
+    /// akan menggantung pada apa yang kebetulan ditemukan lebih dulu.
+    func testTiedReasonOrderFollowsTheEnumNotTheHash() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+        trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                     separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+
+        XCTAssertEqual(trace.tiedUncertainReasons(policy: policy), [.tooFar, .ambiguous])
+    }
+
+    /// Tiga sebab seri harus menyebut **ketiganya**, bukan dua.
+    ///
+    /// "Tanpa sebab terukur" sering dilupakan justru karena ia bukan penyebab,
+    /// tapi catatan bahwa penyebabnya tidak terukur — dan itulah informasi yang
+    /// paling sering dibutuhkan untuk deciding apakah menambah rekaman.
+    func testAllThreeTiedReasonsAreNamed() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                     separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+        // Tidak ada sebab terukur: kandidat dekat, tapi tetra juga dekat.
+        trace.record(state: .uncertain, level: .low, objectID: "c", objectName: "C",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 60)
+
+        XCTAssertEqual(trace.tiedUncertainReasons(policy: policy).count, 3)
+
+        let sentence = trace.diagnosis(policy: policy)
+        XCTAssertTrue(sentence.contains("kalibrasi"), sentence)
+        XCTAssertTrue(sentence.contains("keterbatasan akurasi"), sentence)
+        XCTAssertTrue(sentence.contains("tanpa sebab terukur"), sentence)
+    }
+
+    /// Satu sebab yang **benar-benar mendominasi** boleh tampil sendiri.
+    ///
+    /// Tanpa ini, perbaikan di atas akan membuat kalimat selalu panjang —
+    /// termasuk saat 9 dari 10 sampel ragu karena satu sebab, yang jauh lebih
+    /// berguna dijawab langsung.
+    func testADominatingReasonStillReportsAlone() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        for _ in 0..<3 {
+            trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                         separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+        }
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+
+        XCTAssertEqual(trace.tiedUncertainReasons(policy: policy), [.tooFar])
+        let sentence = trace.diagnosis(policy: policy)
+        XCTAssertTrue(sentence.contains("kalibrasi"), sentence)
+        XCTAssertFalse(sentence.contains("Penyebab keraguan berbagi"),
+                       "sebab tunggal tidak perlu kalimat seri: \(sentence)")
+    }
+
+    ///-Series tanpa ada yang seri berarti memang tidak ada yang bisa
+    /// dituduhkan — itu kalimat "tanpa sebab terukur", bukan kalimat kosong.
+    func testSingleUnmeasuredReasonIsNotASeries() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        trace.record(state: .uncertain, level: .low, objectID: "c", objectName: "C",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 60)
+
+        XCTAssertEqual(trace.tiedUncertainReasons(policy: policy), [.none])
+        XCTAssertTrue(trace.diagnosis(policy: policy).contains("tanpa sebab terukur"))
+    }
+
     // MARK: - Pesan dari jam
 
     /// Sampel dari jam tidak membawa jarak kandidat; itu harus tetap kosong,

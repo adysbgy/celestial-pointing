@@ -404,6 +404,7 @@ public extension LocalizedText {
         .experimentDiagnosisNoSamples, .experimentDiagnosisNoAnswers,
         .experimentDiagnosisTooFar, .experimentDiagnosisAmbiguous,
         .experimentDiagnosisNoMeasurableCause, .experimentDiagnosisRatio,
+        .experimentDiagnosisMixed, .experimentDiagnosisMixedSeparator,
         .experimentSuggestedThreshold,
         .experimentLocationFallback, .experimentLocationComputed,
         // Frasa yang diucapkan untuk baris "judul … nilai" dan nilai bertanda

@@ -387,7 +387,29 @@
         }
       }
     },
-    "experiment.suggestedThreshold": {
+"experiment.diagnosis.mixed": {
+      "comment": "Diagnosis saat dua sebab atau lebih berbagi hitungan tertinggi. Satu slot %@ menerima daftar sebab yang sudah disambung; pemisahnya punya kunci sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasons for uncertainty are shared: %@"
+          }
+        }
+      }
+    },
+    "experiment.diagnosis.mixedSeparator": {
+      "comment": "Pemisah antarsebab pada kalimat diagnosis seri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "; and "
+          }
+        }
+      }
+    },
+        "experiment.suggestedThreshold": {
       "comment": "Usulan ambang keyakinan dari sigma terukur.",
       "localizations": {
         "en": {
