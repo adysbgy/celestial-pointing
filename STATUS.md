@@ -1,3 +1,113 @@
+## Progres terakhir (5 Okt 2026 — grafik keyakinan bisu untuk VoiceOver)
+
+### Satu-satunya `Chart` di app, dan satu-satunya bagian layar itu yang diam
+
+Layar diagnostik iPhone memenuhi syarat untuk "sudah aksesibel": setiap
+baris `row` punya pengumuman, panel gambar punya `visualPanelLabel`, rincian
+sebab keraguan punya `RowSpeech`. Semua dicek, semua ada.
+
+Dan ada satu hal yang luput: **grafik keyakinan**. Ia satu-satunya
+`Chart` di seluruh app (`grep -rn 'Chart {'` → satu hasil), dan sampai unit ini
+tidak punya `.accessibilityLabel` sama sekali.
+
+Yang membuat ini terasa sebagai celah, bukan pilihan: grafik itu adalah
+**paling kaya secara visual** di layar itu (dua garis ambang, garis putus,
+sumbu berlabel, legenda) dan **paling sunyi**. Setiap elemen data lain
+diny Agatha agar bisa dibaca; grafik satu-satunya yang hanya boleh dilihat.
+
+### Kenapa "tanpa jaraknya terukur" bukan "sejak 12 sampel"
+
+Nomor yang bisa dikeluarkan Swift Charts untuk grafik ini adalah setiap titik
+satu per satu, dan tidak ada pembaca layar yang menarik garis dari sana. Yang
+juga tidak berguna: "3.2, 3.1, 3.4, …" — daftar angka bukan informasi.
+
+Yang dibutuhkan adalah **kesimpulan**: berapa sampel jatuh di tiap pita
+ambang. Empat belas titik menjadi satu kalimat yang bisa ditindaklanjuti
+penguji lapangan: kalibrasi perlu diperbaiki (terlalu jauh) atau katalognya
+yang perlu diperluas (terlalu dekat tapi ambigu).
+
+### Batas kedua pita = `ambiguitySigma`, dan versi pertamaku salah
+
+Ini bagian yang paling layak dicatat, karena ambang yang tidak ada di layar
+hampir sempat ikut terkirim.
+
+Versi pertama memakai `maxSeparationSigma * 2` sebagai batas "jauh". Alasan yang
+saya tulis di sumber: `ambiguitySigma` membandingkan kandidat ke **tetangganya**,
+maknanya berbeda dari jarak ke kandidat terbaik, jadi tidak bisa dipakai.
+
+Alasan itu benar, dan **tidak relevan** — karena yang diplot di grafik ini
+cuma jarak ke kandidat terbaik, dan grafik menggambar **dua garis horizontal**
+di `maxSeparationSigma` dan `policy.ambiguitySigma`. Jadi untuk pembaca layar,
+"2 sampel terlalu jauh" yang dihitung dari `× 2` berarti **tidak ada satu pun
+titik pun melewati garis yang sedang dia lihat**. Yang lebih buruk, kalimat itu
+menyuruh menghitung batas yang tidak ada di layar.
+
+Banding yang benar: pita di sini **meniru garis yang tergambar**. Beda
+maknanya dengan `uncertainReason` dicatat di sumber, bukan disembunyikan:
+
+| | batas | pertanyaan |
+|---|---|---|
+| `uncertainReason.tooFar` | `maxSeparationSigma` | kenapa engine menolak? |
+| `ConfidenceChartSpeech.tooFar` | `policy.ambiguitySigma` | di mana titikku di layar? |
+
+Keduanya `true`/`false` berbeda untuk titik yang sama, dan **keduanya benar**
+untuk pertanyaan yang berbeda. Kalau ini ditulis ulang sekali lagi di view,
+mata dan telinga akan menghitung dari dua garis berbeda tanpa ada yang melihat.
+
+### `total` menghitung semuanya, pita tidak
+
+`ratioToSigma == nil` berarti sigma-nya nol atau tidak ada kandidat. Kurucut
+grafik memang tidak bisa menggambarnya, jadi `points.isEmpty` menyingkirkan
+titiknya — dan versi pertama ikut menyingkirkan **jumlahnya** dari pembicaraan.
+
+Akibatnya "3 dari 5" terbaca "3 dari 3": jumlah yang terlihat lengkap padahal
+ada rekaman yang tidak terhitung. `total` kini menghitung semua sampel,
+`measured` hanya yang punya jarak, dan `unmeasured` diucapkan kalau bukan nol.
+Uji: `testUnmeasuredSamplesAreNotSilentlyDroppedFromTheTotal`.
+
+### Bukti merah
+
+`red-test.sh`, dua mutasi, keduanya MERAH:
+
+| Mutasi | Uji | Hasil |
+|---|---|---|
+| `total` ikut menghitung sampel tanpa jarak | `testUnmeasuredSamplesAreNotSilentlyDroppedFromTheTotal` | **MERAH** — `("3") is not equal to ("4")` |
+| `>` → `>=` pada kedua ambang | `testARatioExactlyOnTheFirstThresholdStillCountsAsConfident` | **MERAH** — `("0") is not equal to ("1")` |
+
+Yang kedua menjaga **operator** yang sama dengan `uncertainReason`. Titik tepat
+di ambang adalah batas **tolak**, jadi engine menerimanya; kalau ambang pita
+memakai `>=`, ringkasan suara menyimpulkan "tidak yakin" untuk sampel yang
+diterima — dan selisihnya cuma satu sampel, jadi tak akan pernah terlihat mata.
+
+### Yang menangkap saya: CI, bukan gerbang Linux
+
+`swift-ui-lint.sh` dan `swift-test.sh` hijau semua pada versi yang **tidak akan
+terkompilasi**. `.accessibilityLabel(_:)` hanya menerima `String` non-opsional,
+dan `spokenChartSummary` masih `String?` — jadi ini baru ketahuan di
+`Apple Build (macos-15)`.
+
+Ini batas gerbang Linux yang belum tertutup dan **saya catat, bukan tutup**:
+`syntax check` (parse) tidak menangkap salah tipe, dan typecheck repo hanya
+menjalankan modul yang memang bisa dibuild di Linux. Yang menangkap adalah
+build macOS asli — satu-satunya alat yang benar di sini. Salah untuk delusional
+bahwa gerbang lokal sudah cukup;ia belum.
+
+Perbaikannya mengikuti pola yang sudah ada di repo, bukan improvisasi:
+`session?.flow.spokenPhaseSummary ?? TextLocalization.text(…)` di
+`CalibrationView`. Opsional dijawab dengan **kunci katalog**, bukan `""`.
+
+### Gerbang
+
+- `swift-test.sh` → **174 CelestialEngine + 566 PointingKit** (555 → 566,
+  +11). **Engine tidak disentuh.**
+- Kunci katalog 297 → 303 (`chart.speech.*`), dijaga `TextLocalizationTests`
+  (yang sempat merah saat sudah 302 → 303, memang begitu fungsinya) dan
+  Aturan 6.
+- `swift-ui-lint.sh` → **17 aturan hijau**. Aturan 10 menangkap README yang
+  masih 555.
+- `red-test.sh` → dua mutasi merah.
+- CI: Engine Tests (Linux) + Apple Build (macos-15) hijau pada `f3c80fb`.
+
 ## Progres terakhir (5 Okt 2026 — layar redup menampilkan kandidat seolah temuan)
 
 ### Empat permukaan dari satu jawaban, tiga sudah jujur
