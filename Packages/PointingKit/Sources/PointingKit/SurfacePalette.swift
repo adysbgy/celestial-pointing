@@ -38,7 +38,7 @@ public struct SurfaceColor: Equatable, Sendable {
     /// WCAG tidak memakai rata-rata linier kanal; ia mensyaratkan kanal
     /// sRGB dilewatkan transfer non-linier dulu. Menghilangkan transfer itu membuat
     /// abu gelap tampak jauh lebih terang daripada yang sebenarnya, dan teks
-    /// yang "terang" di kalkulasi bisaReader hampir tidak terlihat di layar.
+    /// yang "terang" di kalkulasi bisa jadi hampir tidak terlihat di layar.
     public var relativeLuminance: Double {
         func channel(_ c: Double) -> Double {
             c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)

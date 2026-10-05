@@ -32,7 +32,21 @@ struct CelestialVisualView: View {
     /// yang mungkin saja Jupiter adalah klaim itu — dan ia lebih berbahaya
     /// daripada teks, karena gambar tidak pernah mengajak pengguna membacalah
     /// huruf kecilnya.
-    var isConfirmed: Bool = true
+    ///
+    /// **Kenapa nilai bawaan `false`, bukan `true`.** Nilai bawaan adalah
+    /// jawaban untuk pemanggil yang **lupa** — dan pemanggil yang lupa
+    /// persis yang tidak pernah dieksekusi oleh mata, karena tidak ada
+    /// argumen untuk dibaca. Dengan `true`, layar baru yang dibuat tanpa
+    /// meneruskan keyakinan akan langsung menggambar seluruh ciri pengenal
+    /// sementara badge di sebelahnya bertuliskan "Ragu". Dengan `false`,
+    /// kelalaian yang sama berujung pada gambar yang disamar: terlalu hati-
+    /// hati, bukan terlalu yakin. Arah yang salah dari dua-duanya sudah
+    /// ditetapkan PRD ("uncertainty > false confidence"), jadi nilai bawaan
+    /// harus memihak ke arah itu.
+    ///
+    /// Dijaga `Aturan 18` di `swift-ui-lint.sh`: nilai bawaan `true` pada
+    /// nama seperti ini tidak bisa dikompilasi ulang tanpa gerbang merah.
+    var isConfirmed: Bool = false
 
     /// Fase denyut glow, dalam radian.
     ///

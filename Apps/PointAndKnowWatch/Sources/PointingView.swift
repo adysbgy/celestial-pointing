@@ -389,7 +389,12 @@ struct ObjectDetailView: View {
     /// menyatakan diri kurang yakin — dan pada keadaan itulah ciri pengenal
     /// (cincin Saturnus, pita Jupiter) paling berbahaya tampil, karena badge
     /// di sebelahnya justru bertuliskan "Ragu".
-    var isConfirmed: Bool = true
+    ///
+    /// **Nilai bawaan `false`, bukan `true`** — alasan yang sama dengan
+    /// `CelestialVisualView.isConfirmed`: nilai bawaan adalah jawaban untuk
+    /// pemanggil yang lupa meneruskan keyakinan, dan arah kelalaian yang
+    /// salah harus memihak ke "terlalu hati-hati". Dijaga `Aturan 18`.
+    var isConfirmed: Bool = false
     /// Diameter gambar dalam poin. Berbeda antara jam dan iPhone: kartu jam
     /// sempit, panel iPhone lega.
     var visualDiameter: CGFloat = WatchMetrics.visualDiameter

@@ -1,3 +1,122 @@
+## Progres terakhir (5 Okt 2026 — nilai bawaan yang mengklaim identitas saat engine ragu)
+
+### Tiga tempat membawa baku `= true` untuk pertanyaan yang harusnya `false`
+
+`CelestialVisualView` punya satu properti yang menentukan apakah gambar boleh
+menampilkan **ciri pengenal** — cincin Saturnus, pita Jupiter, kutub Mars,
+bentuk galaksi. Semua komentar di sekitarnya panjang dan benar tentang
+betapa berbahayanya ciri itu tampil saat ragu. Dan propertinya ditulis:
+
+```swift
+var isConfirmed: Bool = true
+```
+
+Nilai bawaan adalah satu-satunya nilai di Swift yang **tidak pernah muncul
+di pemanggil**. Pemanggil yang meneruskan
+`isConfirmed: engine.confirmsDisplayedIdentity` menulis keyakinannya di
+layar dan bisa dibaca ulang; pemanggil yang lupa tidak menulis apa pun, dan
+yang berjalan adalah nilai bawaan. Jadi kelalaian di sini tidak punya baris
+untuk diperiksa — persis kelas "dihitung lalu dibuang" yang berulang di repo
+ini, dalam bentuk yang paling sukar dilihat.
+
+Tiga tempat membawanya: gambar jam (`PointingView`), gambar iPhone
+(`DiagnosticsView`), dan **label suara** panel iPhone
+(`visualPanelLabel`). Yang ketiga paling licin: yang dipengaruhinya adalah
+bentuk yang **diucapkan** ("galaksi", "gugus bola"), jadi dengan `true`
+VoiceOver mengucapkan bentuk yang persis sedang disembunyikan gambarnya.
+
+### Kenapa arahnya `false`, bukan sekadar "hapus saja baku-nya"
+
+Dua-duanya menghapus cacat hari ini, karena ketiga pemanggil memang
+meneruskan argumennya secara eksplisit. Yang membedakan adalah jawaban
+untuk layar yang ditulis besok, dan PRD sudah menetapkan arahnya:
+**uncertainty > false confidence**. Terlalu hati-hati (gambar disamar untuk
+objek yang sebenarnya pasti) mengecewakan; terlalu yakin (cincin Saturnus
+di bawah badge "Ragu") adalah kebohongan. Nilai bawaan harus memihak ke
+arah yang salah-yang-bisa-diterima.
+
+Membuang baku-nya sama saja tidak bisa: Swift mewajibkan nilai untuk
+properti tersimpan, jadi `var isConfirmed: Bool` tanpa `= ...` tidak
+kompilasi. Satu-satunya pilihan lain adalah menjadikannya `let` tanpa baku
+dan mewajibkan `init` — itu benar, tapi ia mengubah **setiap** pemanggil
+hari ini menjadi perubahan besar pada kode yang sedang berjalan benar,
+demi memperbaiki cacat yang belum terjadi. `false` menutup arahnya tanpa
+menyentuh satu pemanggil pun.
+
+### Gerbang baru: Aturan 18
+
+Aturan 18 menyapu deklarasi `Bool = true` yang **namanya** menyatakan klaim
+identitas (`isConfirmed`, `confirmsIdentity`, `confirmsDisplayed`,
+`*claim`). Dua keputusan penyaringnya sengaja sempit:
+
+- **`isStale` tidak masuk.** Ia menyatakan umur, dan `true` di sana berarti
+  "tampilkan peringatan" — arah yang justru lebih aman. Memasukkannya
+  membuat gerbang berisik pada deklarasi yang benar.
+- **Komentar dibuang sebelum pencocokan.** Berkas-berkas ini
+  mendokumentasikan cacatnya dengan menyebut `isConfirmed: Bool = true`
+  sebagai contoh yang dilarang; tanpa itu gerbang memerah pada
+  dokumentasinya sendiri — persis kegagalan yang membuat Aturan 3 pernah
+  memerah pada skripnya.
+
+Dibuktikan lewat `red-lint.sh` di **dua arah**, karena gerbang yang hanya
+pernah merah sama berbahayanya dengan yang hanya pernah hijau:
+
+| Suntikan | Hasil |
+|---|---|
+| `var isConfirmed: Bool = true` | **MERAH** pada Aturan 18 |
+| `var isStale: Bool = true` + `var showsDetail: Bool = true` | **hijau** — bukan klaim identitas |
+
+Baris kedua yang menentukan: tanpa uji negatif, gerbang yang menandai
+**setiap** `Bool = true` akan lolos sebagai "bisa merah".
+
+### Dua artefak alat yang sempat terkomit
+
+Sapuan menemukan dua hal yang bukan cacat produk, tapi cacat **proses**,
+dan keduanya sudah terdorong ke `origin/main`:
+
+1. **`⟪HERMES-CONTEXT-COMPRESSION …⟫` di STATUS.md** (dua komit: `e85769d`,
+   `f66f782`). Penanda kompresi konteks alat penyunting menggantikan 1.431
+   dan 1.547 karakter isi yang sebenarnya. Isinya **tidak ada di objek git
+   mana pun** — dicek lewat seluruh `git rev-list --all --objects` dan
+   komit mengambang — jadi dua paragraf itu **direkonstruksi** dari konteks
+   sekitarnya dan ditandai sebagai rekonstruksi, bukan dipulihkan. Menulis
+   ulangnya tanpa menandai akan menghasilkan sejarah yang lebih rapi
+   daripada kenyataannya.
+2. **`bisaReader` di `SurfacePalette.swift:41`.** Dua kata menyatu di dalam
+   komentar dokumen (`bisa` + `Reader`). Aturan 3 menangkap aksara non-Latin,
+   bukan kata majemuk yang salah, dan memang seharusnya begitu — ia tidak
+   bisa menilai bahasa.
+
+Keduanya lolos gerbang karena `*.md` **sengaja dikecualikan** Aturan 3:
+STATUS.md memuat aksara CJK sebagai **bukti** cacat yang pernah nyata, dan
+memasukkannya akan membuat gerbang memerah pada dokumentasinya sendiri.
+Pengecualian itu tepat untuk aksara, dan menjadi lubang untuk artefak:
+berkas `.md` ternyata tidak hanya memuat bukti, ia juga memuat sisa alat.
+Asumsi yang mendasari pengecualian itu — bahwa isi `.md` selalu ditulis
+manusia — sudah tidak benar, dan dicatat di STATUS, bukan ditambal dengan
+menghapus pengecualiannya.
+
+### Gerbang
+
+- `swift-test.sh` → **174 CelestialEngine + 566 PointingKit**, 0 gagal.
+  **Engine tidak disentuh.** Perubahan tidak menambah uji karena yang
+  diubah adalah nilai bawaan yang sudah tak terjangkau pemanggil mana pun
+  hari ini — uji baru untuknya akan hijau di atas kode lama.
+- `swift-ui-lint.sh` → **18 aturan hijau** (17 → 18).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-lint.sh` → Aturan 18 merah pada suntikan, hijau pada non-klaim.
+
+### Batas yang jujur
+
+- **Tidak ada satu piksel pun yang berubah.** Ketiga pemanggil sudah
+  meneruskan argumennya secara eksplisit; yang diubah adalah jawaban untuk
+  kode yang belum ditulis. Ini perbaikan yang nilainya nol hari ini dan
+  baru terasa pada layar keempat.
+- **Aturan 18 membaca nama, bukan makna.** Deklarasi klaim identitas yang
+  tidak memakai salah satu nama di atas akan lolos. Itu batas pemeriksa
+  teks, dan lebih baik daripada tidak ada — tapi bukan bukti bahwa kelasnya
+  tertutup.
+
 ## Progres terakhir (5 Okt 2026 — grafik keyakinan bisu untuk VoiceOver)
 
 ### Satu-satunya `Chart` di app, dan satu-satunya bagian layar itu yang diam
@@ -434,11 +553,40 @@ bukan tipe argumen, jadi kelas ini masih bisa masuk lewat sisi yang satu.
 
 ### Lanjutan Fase C #2
 
-`LinkView` adalah layar pengujian lapangan:⟪HERMES-CONTEXT-COMPRESSION: 1,431 of 1,631 chars omitted here by Hermes's context compressor. This is NOT part of the original tool call and must never be reproduced in new output — always write full, untruncated content.⟫
+`LinkView` adalah layar pengujian lapangan: tempat status tautan jam↔iPhone
+dibaca, dan karena itu tempat dua perangkat harus sepakat soal kata.
+Sebelas kunci `link.*` ditambahkan untuk baris-barisnya (keadaan, objek,
+keyakinan, waktu, kalibrasi, dan penanda kegagalan kirim), semuanya dengan
+padanan EN.
+
+> **Catatan jujur — dua paragraf di bawah ini adalah rekonstruksi.** Teks
+> asli siklus ini hilang: dua komit (`e85769d`, `f66f782`) menyimpan
+> penanda kompresi konteks **`⟪HERMES-CONTEXT-COMPRESSION …⟫`** ke dalam
+> berkas ini, menggantikan 1.431 dan 1.547 karakter isi yang sebenarnya.
+> Penanda itu bukan documentation — ia sisa alat yang bocor ke artefak, dan
+> ia sempat **terkomit dan terdorong ke `origin/main`**. Isinya tidak ada di
+> objek git mana pun (dicek: seluruh `git rev-list --all --objects` dan
+> komit mengambang), jadi yang tertulis di sini ditulis ulang dari konteks
+> sekitarnya, bukan dipulihkan. Angka dan fakta di paragraf lain pada
+> siklus yang sama tidak ikut hilang dan tidak disentuh.
 
 ### Lanjutan Fase C #2: iOS ikut
 
-`Experiment1View` adalah tempat pembuktian Experiment 1 (kesalahan pengenalan ⟪HERMES-CONTEXT-COMPRESSION: 1,547 of 1,747 chars omitted here by Hermes's context compressor. This is NOT part of the original tool call and must never be reproduced in new output — always write full, untruncated content.⟫
+`Experiment1View` adalah tempat pembuktian Experiment 1 (kesalahan
+pengenalan diukur, bukan ditebak), dan layar itu punya literal untuk
+seluruh baris hasil: jumlah percobaan, benar, false lock, galat median,
+galat P90, vonis, dan usulan ambang. Kunci `experiment.*` yang sudah ada
+ditambah yang belum tercakup, lengkap dengan padanan EN.
+
+**Kenapa pembersihan ini layak dicatat, bukan sekadar dibuang.** Penanda
+kompresi itu lolos **dua** gerbang yang justru dibuat untuk kelas ini:
+Aturan 3 (aksara non-Latin) menyapu `*.swift`, `*.sh`, `*.yml`, dan
+`project.yml` — dan `*.md` sengaja dikecualikan karena STATUS.md memuat
+aksara CJK sebagai **bukti** cacat yang pernah nyata. Pengecualian itu
+tepat untuk aksara, dan menjadi lubang untuk penanda: berkas `.md`
+ternyata tidak hanya memuat bukti, ia juga memuat **artefak alat**.
+Pembersihannya sekaligus menguji asumsi yang mendasari pengecualian itu —
+bahwa isi `.md` selalu ditulis manusia.
 
 ### `PointingView` + `SkyContextView`: layar yang paling banyak literal
 

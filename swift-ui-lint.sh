@@ -1781,6 +1781,74 @@ else
   echo "Bersih: view memakai pembungkus kuncinya."
 fi
 
+# ── Aturan 18: klaim identitas tidak boleh berbaku `true` ──────────────────
+# PRD: "JANGAN pernah menampilkan visual yang mengklaim identitas saat engine
+# RAGU" dan "uncertainty > false confidence". Keduanya menetapkan **arah** dari
+# kegagalan yang bisa diterima: terlalu hati-hati boleh, terlalu yakin tidak.
+#
+# Kenapa perlu aturan sendiri. Nilai bawaan parameter adalah satu-satunya
+# nilai di Swift yang **tidak pernah muncul di pemanggil**. Pemanggil yang
+# meneruskan `isConfirmed: engine.confirmsDisplayedIdentity` menulis
+# keyakinannya di layar dan bisa dibaca; pemanggil yang lupa tidak menulis
+# apa-apa, dan yang berjalan adalah nilai bawaan — persis kelas "dihitung lalu
+# dibuang" yang berulang di repo ini, dalam bentuk yang tidak punya baris
+# untuk diperiksa.
+#
+# Tiga tempat di `Apps/` membawa baku `= true` untuk nama ini (gambar jam,
+# gambar iPhone, dan label suara panel iPhone). Semuanya sudah diperbaiki ke
+# `false`, dan semuanya memang dipanggil dengan argumen eksplisit hari ini —
+# jadi perbaikannya **tidak mengubah satu piksel pun**. Yang diubah adalah
+# jawaban untuk layar yang ditulis besok.
+#
+# Yang diperiksa: deklarasi `Bool = true` yang namanya menyatakan klaim
+# identitas (`isConfirmed` dan turunannya). Pemeriksanya membaca **kode**,
+# bukan komentar, karena berkas-berkas ini mendokumentasikan cacatnya dengan
+# menyebut `isConfirmed: Bool = true` sebagai contoh.
+echo
+echo "== Aturan 18: klaim identitas tidak boleh berbaku true =="
+claim_default=$(python3 - <<'PY' 2>&1
+import os, re
+
+# Nama yang menyatakan "bolehkah gambar/suara mengklaim identitas ini".
+# `isStale` sengaja tidak masuk: ia menyatakan umur, dan `true` di sana
+# berarti "tampilkan peringatan" -- arah yang justru lebih aman.
+CLAIM = re.compile(
+    r'^\s*(?:var|let)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Bool\s*=\s*true\s*$')
+NAMES = re.compile(r'(?i)(isconfirmed|confirmsidentity|confirmsdisplayed'
+                   r'|identityconfirmed|claim)')
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        for i, line in enumerate(open(path, encoding="utf-8"), 1):
+            # Komentar dibuang: berkas ini menyebut bentuk cacatnya sebagai
+            # contoh, dan `//` bisa muncul setelah kode pada baris yang sama --
+            # jadi yang diperiksa hanya bagian sebelum `//`.
+            code = line.split("//", 1)[0]
+            m = CLAIM.match(code)
+            if m and NAMES.search(m.group(1)):
+                problems.append(
+                    f"  {path}:{i}: {m.group(1)}: Bool = true "
+                    f"-> nilai bawaan harus false")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Nilai bawaan adalah jawaban untuk pemanggil yang LUPA")
+    print("   meneruskan keyakinan; ia harus memihak ke 'terlalu hati-hati'.")
+PY
+)
+if [ -n "$claim_default" ]; then
+  echo "$claim_default"
+  echo "   Sebab: PRD melarang visual yang mengklaim identitas saat ragu."
+  echo "   Baku true menggambar cincin Saturnus di bawah badge \"Ragu\"."
+  status=1
+else
+  echo "Bersih: klaim identitas tidak ada yang berbaku true."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

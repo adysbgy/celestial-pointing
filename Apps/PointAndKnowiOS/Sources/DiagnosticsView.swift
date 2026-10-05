@@ -939,7 +939,15 @@ struct DiagnosticsView: View {
                                   stale: Bool,
                                   includeTechnicalDetails: Bool = true,
                                   visual: CelestialVisual? = nil,
-                                  isConfirmed: Bool = true,
+                                  // Nilai bawaan `false`, bukan `true` — sama
+                                  // seperti `CelestialVisualView.isConfirmed`.
+                                  // Yang dipengaruhi parameter ini adalah
+                                  // **bentuk yang diucapkan** (galaksi vs
+                                  // gugus bola): dengan `true`, pemanggil
+                                  // yang lupa akan mengucapkan bentuk yang
+                                  // persis sedang disembunyikan gambarnya.
+                                  // Dijaga `Aturan 18`.
+                                  isConfirmed: Bool = false,
                                   level: ConfidenceLevel? = nil) -> String {
         var parts = [object.name]
         // Tingkat keyakinan ikut diucapkan, sama seperti badge-nya ikut
