@@ -115,14 +115,109 @@ final class TargetsTests: XCTestCase {
                           .joined(separator: ", "))
     }
 
-    /// Melonggarnya daftar tidak boleh membuat daftar lebih longgar dari
-    /// engine: target yang di bawah horizon tidak boleh muncul sama sekali.
-    func testOfferedTargetsStayAboveTheGeometricHorizon() {
+    /// "Di atas cakrawala" harus berarti ambang yang **sama dengan** ambang
+    /// engine, bukan cakrawala geometris.
+    ///
+    /// `isAboveHorizon` adalah accessor yang **tidak pernah dipakai** di luar
+    /// satu uji ini, dan angka lamanya (`altitudeDeg > 0`) persis ambang yang
+    /// 33 baris di bawahnya didokumentasikan sebagai cacat yang **sudah
+    /// diperbaiki** di `availableTargets`. Jadi berkas ini menyimpan dua
+    /// jawaban untuk pertanyaan yang sama, dan yang salah justru punya nama
+    /// yang terdengar paling netral.
+    ///
+    /// Uji ini menyatakannya sebagai accessor yang harus menerima policy,
+    /// sehingga tidak ada lagi cara memperoleh "ya" dari ambang yang keliru.
+    func testIsAboveHorizonUsesTheEngineAltitudeGateNotTheGeometricOne() {
         let r = PointingResolver(catalogue: Catalogue.brightStars)
-        let offered = r.availableTargets(observer: observer, date: date)
-        XCTAssertTrue(offered.allSatisfy { $0.isAboveHorizon },
-                      "tidak boleh ada target di bawah horizon")
+        let bandDate = Self.bandDate
+        let bandObserver = Self.bandObserver
+
+        // Sirius di pita 0-5 derajat: di atas cakrawala geometris, di bawah
+        // ambang engine. Inilah satu-satunya pita di mana kedua ambang itu
+        /// berbeda, jadi seluruh pengujian harus terjadi di sini.
+        let siriusAlt = r.horizontal(ofObjectID: "sirius",
+                                     observer: bandObserver,
+                                     date: bandDate)!.altitudeDeg
+        XCTAssertTrue(siriusAlt > 0 && siriusAlt < 5.0,
+                      "prasyarat: Sirius harus ada di pita 0-5 derajat")
+
+        let target = PointingTarget(id: "sirius", name: "Sirius", kind: .star,
+                                    magnitude: -1.46,
+                                    direction: HorizontalCoord(altitudeDeg: siriusAlt,
+                                                               azimuthDeg: 0),
+                                    isMoving: false)
+
+        // Pernyataan inti: target yang secara geometris "di atas cakrawala"
+        // TIDAK boleh dijawab ya oleh ambang engine.
+        XCTAssertFalse(target.isAboveHorizon(r.policy),
+                       "ketinggian \(NumberFormat.degrees(siriusAlt)) ada di atas "
+                       + "cakrawala tapi di bawah ambang engine "
+                       + "\(NumberFormat.degrees(r.policy.minAltitudeDeg))")
+
+        // Dan arah sebaliknya, supaya penjaga tidak bisa diperbaiki dengan
+        // selalu menjawab "tidak" (atau selalu "ya").
+        XCTAssertTrue(PointingTarget(id: "vega", name: "Vega", kind: .star,
+                                     magnitude: 0.03,
+                                     direction: HorizontalCoord(altitudeDeg: 45,
+                                                                azimuthDeg: 0),
+                                     isMoving: false).isAboveHorizon(r.policy))
+        XCTAssertFalse(PointingTarget(id: "antares", name: "Antares", kind: .star,
+                                      magnitude: 1.06,
+                                      direction: HorizontalCoord(altitudeDeg: -3,
+                                                                 azimuthDeg: 0),
+                                      isMoving: false).isAboveHorizon(r.policy))
     }
+
+    /// Policy permisif harus tetap longgar: ambangnya -90, jadi semuanya lolos.
+    ///
+    /// Tanpa ini, accessor bisa "benar" untuk policy bawaan dan diam-diam
+    /// menyaring daftar acuan pada policy permisif -- tempat uji lama membiarkan
+    /// kedua ambang kebetulan sama-sama meloloskan apa pun.
+    func testIsAboveHorizonHonoursAPermissivePolicy() {
+        let permissive = VisibilityPolicy.permissive
+        let wellBelowTheGeometricHorizon = PointingTarget(
+            id: "tucana", name: "Tucana", kind: .deepSky, magnitude: 11,
+            direction: HorizontalCoord(altitudeDeg: -45, azimuthDeg: 0),
+            isMoving: false)
+        XCTAssertTrue(wellBelowTheGeometricHorizon.isAboveHorizon(permissive),
+                      "policy permisif ambangnya -90; accessor tidak boleh menggantikan "
+                      + "itu dengan cakrawala geometris")
+    }
+
+    /// Titik yang **tepat** di ambang harus disingkirkan, sama seperti di
+    /// `availableTargets`.
+    ///
+    /// Diuji terpisah karena ini satu-satunya titik di mana `>` dan `>=` berbeda
+    /// jawabannya, dan perbedaannya cuma satu titik -- tak akan pernah terlihat
+    /// mata. Kalau operatornya melonggar di sini sementara daftar tetap
+    /// menyingkirkannya, accessor ini akan menjawab "ya" untuk objek yang daftar
+    /// baru saja buang: dua jawaban berbeda untuk satu titik, dan yang salah
+    /// dipakai untuk memutuskan.
+    func testAltitudeExactlyOnTheGateIsRejected() {
+        let r = PointingResolver(catalogue: Catalogue.brightStars)
+        let onGate = PointingTarget(id: "onGate", name: "On Gate", kind: .star,
+                                    magnitude: 1.0,
+                                    direction: HorizontalCoord(
+                                        altitudeDeg: r.policy.minAltitudeDeg,
+                                        azimuthDeg: 0),
+                                    isMoving: false)
+        XCTAssertFalse(onGate.isAboveHorizon(r.policy),
+                       "titik tepat di ambang harus disingkirkan, sama seperti "
+                       + "availableTargets yang menyingkirkan altitudeDeg <= ambang")
+    }
+
+    /// Fixture pita 0-5 derajat, dipakai bersama oleh dua uji.
+    ///
+    /// Dipisah ke sini supaya "di mana pita itu ada" punya **satu** jawaban:
+    /// kalau tiap uji menghitung sendiri, mereka bisa mengacu ke langit yang
+    /// berbeda tanpa ada yang melihat, dan salah satunya bisa hijau karena
+    /// langitnya kebetulan kosong.
+    private static let bandObserver = Observer(latitudeDeg: -33.0, longitudeDeg: 100.0)
+    private static let bandDate: Date = {
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 2; comps.day = 1; comps.hour = 22
+        return Calendar(identifier: .gregorian).date(from: comps)!
+    }()
 
     // MARK: - Target terdekat
 

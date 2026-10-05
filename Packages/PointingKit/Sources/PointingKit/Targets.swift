@@ -27,8 +27,30 @@ public struct PointingTarget: Equatable, Sendable, Identifiable {
         self.isMoving = isMoving
     }
 
-    /// Apakah objek ini sedang cukup tinggi untuk ditunjuk.
-    public var isAboveHorizon: Bool { direction.altitudeDeg > 0 }
+    /// Apakah objek ini cukup tinggi untuk **dikunci oleh engine** pada
+    /// policy tertentu.
+    ///
+    /// **Kenapa ia menerima policy, dan tidak memakai `altitudeDeg > 0`.**
+    /// Cakrawala geometris (`> 0`) terlihat wajar tapi **salah**: engine hanya
+    /// mengunci lewat `VisibilityFilter`, yang menyaring di
+    /// `policy.minAltitudeDeg` — 5 derajat pada policy bawaan. Cakrawala
+    /// geometris **bukan** ambang itu; alasannya sudah lengkap ditulis di
+    /// `availableTargets`, dan aksesor yang tidak ikut menerimanya
+    /// menghasilkan **dua jawaban berbeda untuk pertanyaan yang sama** di
+    /// berkas yang sama.
+    ///
+    /// Terima policy sebagai parameter supaya ambang itu **tidak pernah ditulis
+    /// dua kali**. Tidak ada nilai bawaan: kalau `policy` bisa lupa diteruskan,
+    /// pemanggilnya kembali menebak — dan menebak ambang adalah kesalahan yang
+    /// paling mahal di repo ini.
+    ///
+    /// Bandingkan `>` (bukan `>=`) dengan `availableTargets` yang menyingkirkan
+    /// `altitudeDeg <= policy.minAltitudeDeg`: keduanya menyingkirkan titik yang
+    /// tepat di ambang, jadi batas inklusif/exklusif harus sama supaya daftar
+    /// dan accessor ini tidak pernah berbeda pendapat pada satu titik.
+    public func isAboveHorizon(_ policy: VisibilityPolicy) -> Bool {
+        direction.altitudeDeg > policy.minAltitudeDeg
+    }
 
     /// Jarak sudut dari sebuah arah tunjuk (derajat).
     public func separation(from pointing: HorizontalCoord) -> Double {
