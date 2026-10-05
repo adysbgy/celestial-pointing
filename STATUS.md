@@ -8138,3 +8138,103 @@ sensor. Yang membuatnya bertahan lama bukanlah nilainya, melainkan bahwa
 setiap lapisan punya **satu** jalur yang tidak dijangkau gerbang: argumen
 fungsi, properti dari ekspresi, nilai dari sistem. Gerbang menyapu bentuk;
 cacatnya hidup di jalur yang tidak punya bentuk literal.
+
+## Siklus "kalimat tautan untuk VoiceOver" (2026-10-05)
+
+Unit terkecil siklus ini bukan tampilan: satu kalimat yang **dibacakan**.
+
+### Temuan
+
+`.accessibilityLabel` baris tautan jam di `PointingView` merakit kalimatnya
+sendiri dari literal:
+
+```swift
+var text = link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau"
+text += ...                              // bagian jumlah
+```
+
+Dua cacat, dan keduanya lolos ke produksi.
+
+**Yang pertama: literalnya tidak pernah melewati katalog.** Dan tiga gerbang
+buta di sini sekaligus -- bukan argumen `Text(...)` (Aturan 4), bukan penugasan
+ke properti berakhiran Note/Label (Aturan 12), dan bukan literal peritel
+aksesibilitas mana pun.
+
+Yang membuatnya bertahan lama adalah **bentuknya**, bukan nilainya: baris yang
+**ditampilkan** di layar memakai `TextLocalization.text(.pointingLinkConnected)`,
+yaitu teks yang sama persis, punya kunci, dan Bahasa Inggrinya ada. Jadi
+komponennya terlihat benar, tidak ada layar yang tampak keliru, dan yang salah
+hanya kalimat yang dibacakan -- persis bagian yang tidak pernah dilihat mata.
+
+**Yang kedua: `text += ...` memaku urutan di kode.** Pemisah dan urutan jumlah
+terkunci di Swift, sehingga bahasa yang ingin meletakkan jumlah sebelum kata
+"gagal" tidak bisa mengatakannya.
+
+### Cacat jatuh: urutan argumen terbalik
+
+Menuliskan uji untuk kalimat itu memanggil `sendFailures(_:)` dengan jumlah
+> 0 untuk pertama kalinya -- dan proses **jatuh**. Bukan kegagalan assertion:
+`Fatal error`, seluruh proses mati.
+
+Penyebabnya: katalog berbunyi `. %lld %@.` (jumlah dulu, baru kata), tapi
+fungsi mengirim `(word, count)`. `String(format:)` memetakan argumen ke
+specifier **sesuai posisi, bukan tipe**, jadi `String` masuk ke `%lld` dan
+`Int64` masuk ke `%@`.
+
+Kenapa bisa lama tidak noticed: jalur itu **tidak pernah dipanggil di produksi**
+dengan jumlah > 0. `sendFailureCount` di `.accessibilityLabel` nol selama
+tautan sehat, dan `linkSpeech` melewati cabang itu tanpa menyentuh format.
+Jadi bukan ketelitian yang menyelamatkan -- tidak adanya pemanggil.
+
+### Gerbang baru: Aturan 16
+
+Menyapu literal peritel aksesibilitas (`accessibilityLabel/Value/Hint`) dan
+properti `...Label`/`...Note`/`...Speech...` yang diiwa ekspresi apa pun.
+Dibuktikan **gigit pada kode hari ini** sebelum diperbaiki (bukan gate yang
+dibuat lalu langsung hijau), dan hijau sesudahnya.
+
+### Kunci katalog: 293 -> 296
+
+`link.speech.reachable`, `link.speech.unreachable`, dan
+`link.status.sendFailuresClause`.
+
+Yang ketiga lahir dari cacat yang saya buat sendiri: nilai lama diawali
+pemisah titik karena asalnya untuk disambung ke baris **belum selesai**, jadi
+menempel di belakang kalimat utuh menghasilkan "terhubung.. 3 kiriman gagal."
+Memangkas pemisah di kode akan memaksa satu tata bahasa ke semua bahasa, dan
+pemisah adalah milik katalog. Jadi dua peran, dua kunci.
+
+### Dibuktikan berbunyi
+
+4 uji di `LinkStatusTextTests`, semuanya mengunci nilai **mutlak** -- bukan
+perbandingan dua bentuk, supaya mutasi "literal" tetap merah.
+
+| Kondisi | Hasil |
+|---|---|
+| Kode benar | 543 hijau, 0 gagal |
+| `sendFailures` mengembalikan argumen dalam urutan lama | **JATUH**, `Fatal error` |
+| `linkSpeech` memakai `sendFailures` (pemisah ganda) | **MERAH**, "terhubung.. 3" |
+
+### Gerbang
+
+- `./swift-test.sh` -> **172 CelestialEngine + 543 PointingKit**, 0 gagal.
+- `./swift-ui-lint.sh` -> **16 aturan** hijau (Aturan 10 menangkap 539->543).
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- CI: Apple Build `37277323365` + Engine Tests `37277323206`, keduanya success.
+
+### Pola yang makin jelas
+
+Empat siklus terakhir menutup cacat yang **sama** -- nilai untuk mesin yang
+tersaji sebagai teks untuk orang, di lapisan berbeda: `DisplayLabel`,
+`ObserverLocation.source`, pesan sistem sensor, kini kalimat VoiceOver.
+
+Yang memungkinkannya lolos bukan nilai literalnya, melainkan **tempatnya**.
+Gerbang menyapu *bentuk*: argumen `Text(...)`, properti berakhiran `Note`,
+pemanggil `String(format:)`. Cacat ini hidup di jalur yang **tidak punya
+bentuk literal sama sekali** -- ekspresi ternary di dalam accessor yang
+dipanggil peritel aksesibilitas.
+
+Siklus ini juga menambah satu jenis cacat yang berbeda: bukan teks yang salah,
+tapi **argumen yang salah urutan**, yang tidak menghasilkan teks salah --
+menghasilkan **crash**. Diperbaiki oleh uji yang memanggil jalurnya; menjaga
+jalur itu tetap hidup berarti memanggilnya pada setiap percobaan.
