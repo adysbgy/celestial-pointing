@@ -701,14 +701,38 @@ def check_port_matches_swift_constants(results):
          "math.sqrt(max(0.0, 1 - y * y))", port, "render-visuals.py"),
         ("opasitas pita Jupiter", R.BAND_OPACITY, 0.55,
          "opacity(0.55)", view),
-        ("Bintik Merah Besar x", R.SPOT_RECT[0], -0.36,
-         "center.x - radius * 0.36", view),
-        ("Bintik Merah Besar y", R.SPOT_RECT[1], 0.18,
-         "center.y + radius * 0.18", view),
-        ("Bintik Merah Besar lebar", R.SPOT_RECT[2], 0.52,
-         "width: radius * 0.52", view),
-        ("Bintik Merah Besar tinggi", R.SPOT_RECT[3], 0.26,
-         "height: radius * 0.26", view),
+        # Bintik Merah Besar. **Empat** angka ini dijaga, dan gerbang yang
+        # menjaganya cuma satu angka: sampai siklus ini yang diperiksa hanya
+        # `SPOT_RECT[0]` (-0.36) — nilai yang **kebetulan sama** di kedua
+        # tafsir. Lariknya diperlakukan sebagai **pusat** di port Python,
+        # sementara view Swift menulisnya ke `CGRect` sehingga angkanya
+        # menjadi **sudut**; jadi gambar yang diukur seluruh gerbang visual
+        # menaruh bintiknya 0.26 R (setengah lebarnya sendiri) di sebelah kiri
+        # tempat bintik itu benar-benar tergambar di jam. Kedua tafsir
+        # menggambar elips yang sama besarnya, jadi tidak ada pemeriksaan
+        # bentuk yang bisa membedakannya: yang salah adalah **letaknya**.
+        #
+        # Karena itu yang dijaga sekarang bukan hanya angkanya, melainkan
+        # **konvensinya**: view harus benar-benar menghitung pusat dari
+        # `spot.centerX - spot.width / 2`, bukan meneruskan `spot.centerX`
+        # apa adanya ke `CGRect`. Rumus yang sama diuji di Linux
+        # (`testJupiterSpotIsCenteredNotCornered`), jadi tiga sisi — model,
+        # view, port — tidak bisa lagi menyimpang tanpa gerbang berbunyi.
+        ("Bintik Merah Besar pusat x", R.SPOT_CENTER[0], -0.10,
+         "centerX: Double = -0.10", model),
+        ("Bintik Merah Besar pusat y", R.SPOT_CENTER[1], 0.31,
+         "centerY: Double = 0.31", model),
+        ("Bintik Merah Besar lebar", R.SPOT_SIZE[0], 0.52,
+         "width: Double = 0.52", model),
+        ("Bintik Merah Besar tinggi", R.SPOT_SIZE[1], 0.26,
+         "height: Double = 0.26", model),
+        # Arah kedua, dan yang benar-benar menutup cacatnya: **view memakai
+        # pusat, bukan sudut**. Tanpa pemeriksaan ini, view bisa kembali ke
+        # `CGRect(x: center.x - radius * 0.10, …)` — memakai angka yang benar
+        # dengan tafsir yang salah — dan seluruh gerbang di atas tetap hijau.
+        ("Bintik Merah Besar: view menghitung pusat (bukan sudut)",
+         "spot.centerX - spot.width / 2" in view, True,
+         "center.x + CGFloat(spot.centerX - spot.width / 2) * radius", view),
         ("opasitas cincin belakang", R.RING_BACK_OPACITY, 0.45,
          "ringColor.opacity(0.45)", view),
         ("opasitas cincin depan", R.RING_FRONT_OPACITY, 0.8,

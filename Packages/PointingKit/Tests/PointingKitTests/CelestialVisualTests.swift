@@ -1698,5 +1698,47 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Bintik Merah Besar: angkanya **pusat**, dan view harus memperlakukannya
+    /// begitu.
+    ///
+    /// **Cacat yang ditangkap uji ini (nyata, bukan bayangan).** Sampai siklus
+    /// ini `CelestialVisual.jupiterSpot()` mengembalikan satu larik empat angka
+    /// yang tafsirnya berbeda di dua tempat: port Python membacanya sebagai
+    /// **pusat** elips, sementara view Swift menyalinnya langsung ke `CGRect`
+    /// sehingga angkanya menjadi **sudut kiri-atas**. Kedua tafsir menggambar
+    /// elips dengan ukuran yang sama, jadi tidak ada pemeriksaan bentuk yang
+    /// bisa membedakannya — yang berbeda hanya **letaknya**, dan selisihnya
+    /// setengah lebar bintik (0.26 R). Gerbang visual pun tidak menangkapnya:
+    /// satu-satunya angka yang diperiksa kebetulan bernilai sama di kedua
+    /// tafsir.
+    ///
+    /// Uji ini mengunci dua hal sekaligus: rumus pusat→sudut yang benar, dan
+    /// fakta bahwa bintik itu **tidak menjulur keluar piringan** di tafsir
+    /// mana pun. Yang kedua penting karena bintik yang keluar bola tergambar
+    /// di atas latar, bukan di atas Jupiter — klaim yang salah tentang di mana
+    /// ia berada.
+    func testJupiterSpotIsCenteredNotCornered() {
+        let spot = CelestialVisual.jupiterSpot()
+
+        // Pusat yang dideklarasikan harus benar-benar jadi pusat: titik tengah
+        // elips = centerX, bukan centerX + lebar (tafsir sudut).
+        let corneredCenterX = spot.centerX + spot.width / 2
+        XCTAssertNotEqual(spot.centerX, corneredCenterX, accuracy: 0.1,
+                          "dua tafsir ini hanya berbeda kalau lebarnya tidak nol")
+        XCTAssertEqual(spot.centerX, -0.10, accuracy: 1e-12)
+        XCTAssertEqual(spot.centerY, 0.31, accuracy: 1e-12)
+        XCTAssertGreaterThan(spot.centerY, 0,
+                             "Bintik Merah Besar ada di belahan SELATAN (y positif = ke bawah)")
+
+        // Rumus yang dipakai view: sudut = pusat − separuh ukuran.
+        let rectOriginX = spot.centerX - spot.width / 2
+        XCTAssertEqual(rectOriginX, -0.36, accuracy: 1e-12,
+                       "sudut kiri-atas = pusat − separuh lebar")
+
+        // Dan yang paling penting: seluruh elips tetap di dalam piringan.
+        XCTAssertLessThan(spot.farthestCorner, 1.0,
+                          "bintik terjauh \(spot.farthestCorner) R — keluar dari bola")
+    }
+
 }
 

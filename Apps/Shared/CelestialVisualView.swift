@@ -249,11 +249,23 @@ struct CelestialVisualView: View {
         }
         // Bintik Merah Besar: elips merah di belahan selatan, sedikit di bawah
         // ekuator — posisinya memang di sana secara nyata.
-        let spot = CGRect(x: center.x - radius * 0.36,
-                          y: center.y + radius * 0.18,
-                          width: radius * 0.52,
-                          height: radius * 0.26)
-        context.fill(Path(ellipseIn: spot),
+        //
+        // **Pusatnya datang dari `CelestialVisual.jupiterSpot()`, bukan dari
+        // angka di sini.** Versi sebelumnya menulis
+        // `CGRect(x: center.x - radius * 0.36, y: center.y + radius * 0.18, …)`
+        // — dan itu `CGRect`, jadi angkanya adalah **sudut**, bukan pusat.
+        // Port Python membacanya sebagai pusat, sehingga gambar yang diukur
+        // seluruh gerbang visual menaruh bintiknya 0.26 R (setengah lebarnya
+        // sendiri) di sebelah kiri tempat bintik ini benar-benar tergambar.
+        // Kedua tafsir sama-sama menggambar elips yang sama besarnya, jadi
+        // tidak ada pemeriksaan bentuk yang bisa membedakannya — persis kelas
+        // "gerbang mengukur sebagian klaimnya" yang berulang di repo ini.
+        let spot = CelestialVisual.jupiterSpot()
+        let spotRect = CGRect(x: center.x + CGFloat(spot.centerX - spot.width / 2) * radius,
+                              y: center.y + CGFloat(spot.centerY - spot.height / 2) * radius,
+                              width: radius * CGFloat(spot.width),
+                              height: radius * CGFloat(spot.height))
+        context.fill(Path(ellipseIn: spotRect),
                      with: .color(Self.accent(CelestialVisual.accents.jupiterSpot)))
     }
 

@@ -1208,6 +1208,91 @@ public extension CelestialVisual {
         return PolarCaps(north: rect(northTop), south: rect(southTop))
     }
 
+    /// Bintik Merah Besar Jupiter: elipsnya di mana, selebar apa.
+    ///
+    /// **Kenapa geometrinya pindah ke model.** Sampai siklus ini posisinya
+    /// hidup **dua kali dengan dua tafsir yang berbeda**, dan tidak ada satu
+    /// pun gerbang yang bisa melihatnya:
+    ///
+    /// ```swift
+    /// // Apps/Shared/CelestialVisualView.swift — CGRect, jadi ini SUDUT
+    /// let spot = CGRect(x: center.x - radius * 0.36,
+    ///                   y: center.y + radius * 0.18,
+    ///                   width: radius * 0.52, height: radius * 0.26)
+    /// ```
+    /// ```python
+    /// # Tools/render-visuals.py — diperlakukan sebagai PUSAT
+    /// SPOT_RECT = (-0.36, 0.18, 0.52, 0.26)
+    /// canvas.ellipse(cx + dx * radius, cy + dy * radius, w * radius / 2, h * radius / 2, …)
+    /// ```
+    ///
+    /// Jadi bintik yang **benar-benar terlihat di jam** berpusat di
+    /// (−0.10, +0.31) R, sementara gambar yang diukur seluruh gerbang visual
+    /// berpusat di (−0.36, +0.18) R — selisih 0.26 R di sumbu x, yaitu
+    /// **setengah lebar bintiknya sendiri**. Semua pemeriksaan tetap hijau
+    /// karena keduanya menggambar elips yang sama besarnya; yang berbeda
+    /// hanya di mana. Ini persis pola yang sudah tiga kali tercatat di
+    /// `STATUS.md`: gerbang yang mengukur sebagian dari klaimnya — di sini
+    /// mengukur **bentuk** bintik, bukan **letaknya**.
+    ///
+    /// Dan letaknya bukan detail kosmetik: Bintik Merah Besar ada di belahan
+    /// **selatan** Jupiter. Satu tanda yang terbalik memindahkannya ke utara
+    /// tanpa satu pun teks di layar yang bisa membuktikannya.
+    ///
+    /// Angka di sini adalah **pusat**, dalam satuan radius bola, relatif
+    /// terhadap pusat bola (y positif = ke bawah, seperti `Canvas`). Satu
+    /// konvensi, satu tempat — view dan port Python sama-sama membacanya dari
+    /// sini, jadi tidak ada lagi dua tafsir untuk satu larik angka.
+    ///
+    /// Ukurannya sengaja jauh lebih besar dari kenyataan (Bintik Merah Besar
+    /// sungguhan hanya ≈0.11 R): di kartu jam 38 pt, ukuran yang benar adalah
+    /// 4 pt dan hilang sama sekali. Yang dikorbankan ukuran, bukan posisi.
+    public struct Spot: Equatable, Sendable {
+        /// Pusat elips, sumbu x, satuan radius bola.
+        public var centerX: Double
+        /// Pusat elips, sumbu y, satuan radius bola (positif = ke bawah).
+        public var centerY: Double
+        /// Lebar penuh elips.
+        public var width: Double
+        /// Tinggi penuh elips.
+        public var height: Double
+
+        public init(centerX: Double, centerY: Double, width: Double, height: Double) {
+            self.centerX = centerX
+            self.centerY = centerY
+            self.width = width
+            self.height = height
+        }
+
+        /// Jarak pusat bintik dari pusat bola, satuan radius.
+        public var distanceFromCenter: Double {
+            (centerX * centerX + centerY * centerY).squareRoot()
+        }
+
+        /// Titik terjauh elips dari pusat bola.
+        ///
+        /// Dipakai uji untuk memastikan bintik tidak menjulur keluar piringan:
+        /// bintik yang keluar bola akan tergambar di atas latar, bukan di atas
+        /// Jupiter — dan itu klaim yang salah tentang di mana ia berada.
+        public var farthestCorner: Double {
+            let dx = abs(centerX) + width / 2
+            let dy = abs(centerY) + height / 2
+            return (dx * dx + dy * dy).squareRoot()
+        }
+    }
+
+    /// Geometri Bintik Merah Besar. Lihat `Spot` untuk kenapa ia di model.
+    ///
+    /// `centerY` positif: belahan selatan. Bukan pilihan rasa — Bintik Merah
+    /// Besar memang di selatan, dan tanda itu yang paling mudah terbalik tanpa
+    /// terlihat.
+    public static func jupiterSpot(centerX: Double = -0.10,
+                                   centerY: Double = 0.31,
+                                   width: Double = 0.52,
+                                   height: Double = 0.26) -> Spot {
+        Spot(centerX: centerX, centerY: centerY, width: width, height: height)
+    }
+
     // MARK: - Pita Jupiter
 
     /// Satu pita Jupiter: di ketinggian berapa, selebar apa.

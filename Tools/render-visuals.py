@@ -507,7 +507,15 @@ BAND_HALF_WIDTH_RULE = "sqrt"
 CANDIDATE_CORNER_FRACTION = 0.34                # MODEL: `VisualFrame.candidateMarker`
 CANDIDATE_INSET = 0.06                          # MODEL: `VisualFrame.candidateMarker`
 CANDIDATE_GLYPH_FRACTION = 0.52                 # MODEL: `VisualFrame.candidateMarker`
-SPOT_RECT = (-0.36, 0.18, 0.52, 0.26)       # VIEW: `drawBands` (Bintik Merah Besar)
+# Bintik Merah Besar: **pusat**, bukan sudut — satuan radius bola, relatif
+# terhadap pusat bola. Model yang memilikinya (`CelestialVisual.jupiterSpot`),
+# dan `check-visuals.py` menjaga keempat angkanya tetap sama dengan sumber
+# Swift-nya. Sebelumnya larik ini diperlakukan sebagai **pusat** di sini
+# sementara view Swift menulisnya ke `CGRect` (jadi **sudut**), sehingga
+# gambar yang diukur semua gerbang menaruh bintiknya 0.26 R di sebelah kiri
+# tempat bintik itu benar-benar tergambar di jam.
+SPOT_CENTER = (-0.10, 0.31)                  # MODEL: `CelestialVisual.jupiterSpot`
+SPOT_SIZE = (0.52, 0.26)                     # MODEL: `CelestialVisual.jupiterSpot`
 CRATERS = [(-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
            (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)]      # VIEW: `drawCraters`
 MARIA = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
@@ -720,7 +728,8 @@ def _draw_bands(canvas, cx, cy, radius, night_mode):
         name = ("jupiterBandTan", "jupiterBandRust", "jupiterBandCream")[index % 3]
         canvas.ellipse(cx, y, rx, ry,
                        accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
-    dx, dy, w, h = SPOT_RECT
+    dx, dy = SPOT_CENTER
+    w, h = SPOT_SIZE
     canvas.ellipse(cx + dx * radius, cy + dy * radius,
                    w * radius / 2.0, h * radius / 2.0,
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))
