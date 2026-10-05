@@ -6777,6 +6777,47 @@ pernah diproduksi engine. Memperluas katalog planet butuh perubahan engine
 (di luar ruang lingkup "hanya Apps/ + logika murni PointingKit"), jadi
 ditunda.
 
+## Siklus 2026-10-04 (10) — uji regresi resolusi objek langit dalam (Fase C #5/#6)
+
+### Cacat yang ditemukan (dibaca dari kode, bukan ditebak)
+
+`DeepSkyCatalogue.objects` baru masuk ke `productionCatalogue` (EngineFactory)
+pada siklus (9). Tapi **tidak ada satu pun uji engine** yang meresolusi objek
+ber-`kind: .deepSky` lewat jalur utuh `PointingResolver.diagnose` — semua
+uji resolver memakai `Catalogue.brightStars` saja. Artinya regresi yang
+melewatkan `kind == .deepSky` di `diagnose`/`VisibilityFilter` akan lolos:
+objek langit dalam diam-diam tak pernah jadi kandidat, dan tak ada teks
+layar yang memberitahu pengguna bahwa Nebula Orion seharusnya muncul.
+
+### Yang ditambahkan
+
+`ResolverEphemerisTests.testDeepSkyObjectResolvesAndRejectsBelowHorizon`:
+- (1) M42 (Nebula Orion) di atas horizon & ditunjuk -> tebakan terbaik,
+  `kind` tetap `.deepSky`, **tidak** jatuh ke `.low`.
+- (2) objek langit dalam di bawah horizon -> bukan kandidat & dilaporkan
+  `.belowHorizon`, sama seperti bintang.
+
+Bagian (1) **sengaja tidak** menuntut `.high`. Saat dijalankan, M42 duduk
+dekat Rigel (~10°) di Orion, jadi aturan ambiguitas menahannya di `.medium`
+— itu anti-false-lock yang benar, bukan cacat. Yang diuji sungguhan: engine
+tetap **mengidentifikasi** objek langit dalam (bukan menjatuhkannya ke `.low`
+atau mengklaimnya pasti). Cek di bawah-horizon dibuat deterministik dengan
+mencerminkan koordinat bintang yang terbukti di bawah horizon pada saat uji
+(sama seperti `testBelowHorizonBodiesAreReportedAsSuch`), bukan sekadar
+menunjuk ke alt -80° (yang tak menjamin objek ikut turun).
+
+Pakai `CelestialObject(kind: .deepSky)` minimal, **bukan** `DeepSkyCatalogue`
+(PointingKit), agar uji tetap di paket CelestialEngine tanpa gandeng silang
+ke PointingKit.
+
+### Verifikasi
+
+- CelestialEngine **171 → 172** hijau (Docker swift:6.0). PointingKit tetap
+  485 (tidak disentuh).
+- CI: Engine Tests (Linux) `37245795702` = success; Apple Build `37245795699`
+  = success (gerbang "Peringatan kode sendiri" lolos — tak ada warning kode
+  kita).
+
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
     ./swift-test.sh          # docker swift:6.0 — CelestialEngine + PointingKit
