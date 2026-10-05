@@ -384,8 +384,19 @@ class Canvas:
 
 
 def _png(width, height, pixels):
-    """Bungkus RGBA mentah jadi PNG — sama seperti `Tools/make_app_icons.py`."""
-    raw = b"".join(pixels[y * width * 4:(y + 1) * width * 4] for y in range(height))
+    """Bungkus RGBA mentah jadi PNG — sama seperti `Tools/make_app_icons.py`.
+
+    Byte filter 0 **wajib** ada di awal setiap baris: itu bagian dari
+    spesifikasi PNG, bukan pilihan. Tanpa byte itu arus IDAT berukuran
+    `h * w * 4`, sedangkan pembaca mana pun menuntut `h * (w * 4 + 1)` dan
+    membaca byte pertama baris sebagai tipe filter — nilainya di luar 0…4,
+    jadi berkasnya ditolak (`ffmpeg`, Preview, browser). `decode_png` di
+    `check-visuals.py` dulu mentoleransi bentuk yang salah itu, sehingga
+    pembaca dan penulis repo ini sepakat satu sama lain sementara dunia luar
+    tidak; lihat `check_png_is_well_formed`.
+    """
+    raw = b"".join(b"\x00" + pixels[y * width * 4:(y + 1) * width * 4]
+                   for y in range(height))
 
     def chunk(tag, data):
         return (struct.pack(">I", len(data)) + tag + data

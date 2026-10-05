@@ -79,9 +79,10 @@ def decode_png(path):
         pos += 12 + length
     raw = zlib.decompress(bytes(idat))
     stride = width * 4
-    # Alat ini menulis baris tanpa byte filter (filter 0 implisit). Tetapi PNG
-    # yang sah boleh punya byte filter per baris, jadi kedua bentuk diterima:
-    # kalau panjangnya pas tanpa filter, jangan menyisipkan pembacaan filter.
+    # Toleransi ini **tidak** boleh dianggap izin: bentuk tanpa byte filter
+    # bukan PNG yang sah, dan `check_png_is_well_formed` yang menegakkannya.
+    # Cabang "tanpa filter" tinggal untuk membaca berkas lama yang sudah
+    # tersimpan di `out/` sebelum cacatnya diperbaiki.
     filtered = len(raw) == height * (stride + 1)
     out, prev = [], bytearray(stride)
     p = 0
@@ -380,6 +381,65 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
                           f"{diff} piksel berbeda dari kabut netral"))
 
 
+def check_png_is_well_formed(results, size=64, ss=2):
+    """PNG yang ditulis alat render harus **sah menurut spesifikasi PNG**.
+
+    Ini cacat yang sudah nyata, dan yang membuatnya bertahan justru alat
+    pemeriksa di sebelahnya. `Canvas.to_png` menulis barisnya **tanpa** byte
+    filter per baris, sementara `_png()` — menurut komentarnya sendiri di
+    `render-visuals.py` — "menyisipkan satu byte filter 0 per baris". Ia tidak
+    melakukannya: `_png()` hanya menggabungkan baris apa adanya. Hasilnya
+    arus IDAT berukuran `h * w * 4`, sedangkan spesifikasi PNG menuntut
+    `h * (w * 4 + 1)`.
+
+    `check_png_roundtrip` di bawah **lulus** untuk berkas itu, karena
+    `decode_png` sengaja dibuat toleran: ia mengukur panjang arus, lalu
+    memilih "tidak ada byte filter" kalau panjangnya kurang. Jadi pembaca
+    repo ini dan penulis repo ini sepakat satu sama lain, sementara setiap
+    pembaca PNG di dunia — Preview, browser, `ffmpeg`, `sips` — menolak
+    berkasnya. Persis kelas cacat yang dijaga berkas ini: gerbang yang
+    diam-diam mengukur hal lain, dan gambarnya "kelihatan seperti planet"
+    sehingga tidak ada yang mencurigainya.
+
+    Pemeriksaan ini karena itu **tidak** memakai `decode_png`. Ia membaca
+    arus IDAT dan menguji invarian spesifikasinya secara langsung: panjang
+    arus harus `h * (w * 4 + 1)`, dan setiap byte filter di awal baris harus
+    0…4. Itu definisi yang akan dipakai pembaca mana pun.
+    """
+    for name in ("planet-jupiter-confirmed", "moon-crescent-jakarta",
+                 "star-betelgeuse", "deepsky-nebula"):
+        case = next(c for c in R.build_cases() if c.name == name)
+        canvas = R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+        png = canvas.to_png()
+
+        pos, idat, width, height = 8, bytearray(), 0, 0
+        while pos < len(png):
+            length = struct.unpack(">I", png[pos:pos + 4])[0]
+            tag = png[pos + 4:pos + 8]
+            body = png[pos + 8:pos + 8 + length]
+            if tag == b"IHDR":
+                width, height = struct.unpack(">II", body[:8])
+            elif tag == b"IDAT":
+                idat += body
+            elif tag == b"IEND":
+                break
+            pos += 12 + length
+        raw = zlib.decompress(bytes(idat))
+        stride = width * 4
+        expected = height * (stride + 1)
+        if len(raw) != expected:
+            results.append(Result(
+                f"PNG sah: {name}", False,
+                f"arus IDAT {len(raw)} byte, spesifikasi menuntut {expected} "
+                f"(byte filter per baris hilang)"))
+            continue
+        bad = [y for y in range(height) if raw[y * (stride + 1)] > 4]
+        results.append(Result(
+            f"PNG sah: {name}", not bad,
+            f"{len(bad)} baris dengan byte filter di luar 0…4" if bad
+            else f"{height} baris, filter 0…4"))
+
+
 def check_png_roundtrip(results, size=64, ss=2):
     """PNG yang ditulis alat render harus terbaca kembali **persis** sama.
 
@@ -616,6 +676,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)
     check_night_mode_purity(results, args.size, args.ss)
