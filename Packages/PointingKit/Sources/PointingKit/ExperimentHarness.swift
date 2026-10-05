@@ -41,7 +41,29 @@ public struct ExperimentDataset: Codable, Equatable, Sendable {
     /// Sumbu badan yang dianggap arah tunjuk.
     public var aim: String
     public var trials: [AnalyzedTrial]
-    public var summary: ExperimentSummary
+    /// Hasil hitungan atas `trials`.
+    ///
+    /// **Kenapa ini computed, bukan property yang disimpan.** Sebelumnya
+    /// `summary` diisi sekali di `init` lalu ikut disalin ke arsip JSON
+    /// sebagai field biasa. Itu berarti arsip punya **dua** bentuk kebenaran
+    /// yang tidak saling mengikat: `trials` (rekaman) dan `summary` (hasil
+    /// hitungannya). `DatasetArchive.decode` menerima keduanya apa adanya,
+    /// jadi berkas yang `summary`-nya sudah diubah akan menghasilkan
+    /// `falseLockCount` yang tidak pernah dihitung — dan dari situ
+    /// `safetyVerdict` bisa keluar "aman".
+    ///
+    /// Bentuk sekarang menjadikan `trials` satu-satunya sumber. `trials`
+    /// tetap ikut di arsip supaya berkas ekspor tetap bisa dibaca sebagai
+    /// bukti yang berdiri sendiri; yang hilang adalah **ukuran**
+    /// ringkasannya, yang sebelumnya berarti data kedua yang harus dipercaya
+    /// tanpa pernah diverifikasi.
+    ///
+    /// Batas yang jujur: ini menutup pemalsuan lewat arsip, bukan
+    /// `trials` itu sendiri. Rekaman yang salah masih salah — tetapi sekarang
+    /// ia salah **terlihat**, karena ringkasan selalu menyertainya.
+    public var summary: ExperimentSummary {
+        ObservationLog.summarize(trials.compactMap(\.analysis))
+    }
 
     public init(createdAt: Date,
                 location: ObserverLocation,
@@ -55,7 +77,6 @@ public struct ExperimentDataset: Codable, Equatable, Sendable {
         self.confidenceSigmaDeg = confidenceSigmaDeg
         self.aim = aim
         self.trials = trials
-        self.summary = ObservationLog.summarize(trials.compactMap(\.analysis))
     }
 
     /// Percobaan yang belum bisa dianalisis (label atau arah kebenaran hilang).
