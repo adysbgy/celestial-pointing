@@ -9831,3 +9831,121 @@ ingat menjalankannya. Gerbang yang harus diingat untuk dijalankan adalah
 gerbang yang akan dilewati. Karena itu ia masuk `engine-tests.yml` — job
 Linux, tempat ia memang bisa berjalan.
 
+## Siklus: "identitas yang diklaim gambar" — aturan yang belum pernah ditulis (2026-10-05)
+
+### Premis: PRD melarang sesuatu, tapi tidak pernah bilang apa "sesuatu" itu
+
+Aturan kerasnya berbunyi: *"JANGAN pernah menampilkan visual yang mengklaim
+identitas saat engine RAGU."* Kalimat itu jelas sebagai larangan, tapi tidak
+menjawab pertanyaan yang menentukan apakah sebuah visual melanggarnya atau
+tidak: **ciri apa yang termasuk "identitas"?**
+
+Ternyata repo sudah menjawabnya berkali-kali, tapi selalu di dalam satu
+fungsi, sebagai catatan lokal — cincin Saturnus di `drawPlanet`, bentuk
+galaksi di `drawableMorphology`, pita Jupiter di `palette.feature`. Tidak
+ada satu tempat yang menuliskan aturannya. Karena itu setiap kali jenis
+visual baru ditambahkan, pertanyaannya dibuka lagi dari nol, dan peluang
+terlewatnya bergantung pada apakah orang yang menulis fitur berikutnya ingat
+pada aturan yang tidak tertulis itu.
+
+### Temuan: bintang tertinggal, dan itu bukan kebetulan
+
+Pita Jupiter dijaga. Bentuk galaksi dijaga. Warna bintang **tidak dijaga apa
+pun** — indeks B−V-nya diteruskan apa adanya ke `starRGB`, jadi Betelgeuse
+tetap merah dan Rigel tetap biru walaupun badge di sebelahnya bertuliskan
+"Ragu". Bukan karena ada yang lupa menambahkan `isConfirmed` di satu tempat:
+memang tidak pernah ada tempatnya, karena `spokenStarColor` dan `starColor`
+tidak menerima parameter itu sama sekali.
+
+Sisi **suara** lebih jauh tertinggal lagi: `spokenDeepSkyMorphology(isConfirmed:)`
+sudah menerima keyakinan sejak awal, dan tepat di atasnya di berkas yang sama
+`spokenStarColor` masih properti tanpa parameter. Dua hal yang sama-sama
+"atribut yang hanya bisa dilihat", dua perlakuan yang berbeda.
+
+### Aturan yang sekarang dituliskan
+
+Yang menentukan bukan jenis objeknya, dan bukan "apakah ini terlihat seperti
+ciri khas". Yang menentukan **dari mana ciri itu berasal**:
+
+> Ciri yang **dicari berdasarkan identitas yang sudah dikunci** tidak boleh
+> tampil saat engine ragu, karena pada kandidat yang salah ia akan
+> menampilkan ciri milik objek lain — dan itu bukan sekadar ragu, itu salah.
+> Ciri yang **tidak bergantung pada identitas** boleh tetap tampil.
+
+Konsekuensinya jadi terpisah dengan sendirinya, dan tiap baris bisa diperiksa:
+
+| Ciri | Sumbernya | Saat ragu |
+|---|---|---|
+| Pita, cincin, kutub, kawah Jupiter/Saturnus/Mars | dicari dari id yang dikunci | disembunyikan |
+| Bentuk nebula/galaksi/gugus | dicari dari id yang dikunci | netral (kabut) |
+| Warna spektral bintang (B−V) | dicari dari id yang dikunci | netral (tak mengklaim) |
+| Terang bintang (magnitudo) | dicari dari id — tapi menyebut **terang**, bukan **bintang mana** | tetap tampil |
+| Nama kandidat | dari engine | tetap tampil |
+| **Fase Bulan** | **efemeris**, dihitung dari waktu — bukan hasil pencarian id | **tetap tampil** |
+| Piringan gelap Bulan | geometri | tetap tampil |
+
+Baris "fase Bulan" itu yang paling mudah salah dibaca, jadi alasannya
+ditulis di sini. Fase Bulan **bukan** hasil identifikasi. `isWaxing` dan
+`illuminationFraction` datang dari efemeris — perhitungan posisi Matahari dan
+Bulan pada waktu tertentu — bukan dari tabel yang diindeks oleh id objek.
+Fase itu fakta tentang Bulan sebagai benda langit pada tanggal itu, dan tetap
+benar berapa pun yakinnya engine soal *apakah ini Bulan*. Tidak ada
+identitas yang bisa salah diklaim oleh sebuah fase.
+
+Menahannya saat ragu akan **menurunkan** kejujuran, bukan menaikkannya:
+pengguna yang melihat Bulan sabit telanjang mata lalu membaca "Ragu" masih
+mendapat fase yang benar; kalau fasenya disembunyikan, satu-satunya bagian
+yang benar dari gambar itu ikut hilang. Karena itu `phaseGeometry` sengaja
+tetap dijaga oleh **ketersediaan data** (`nil` bila fraksi atau arah tidak
+dihitung) dan bukan oleh `isConfirmed` — dan perbedaan dua penjaga itu
+sekarang jadi punya alasan tertulis.
+
+### Kenapa ini dicatat sebagai aturan, bukan diperbaiki sekali
+
+Memperbaiki bintang itu satu perubahan. Yang membuatnya tidak terulang
+adalah aturannya: ciri yang dicari dari id yang dikunci tidak boleh tampil
+saat ragu. Setiap visual baru sesudah ini bisa diuji terhadap satu kalimat
+itu, tanpa perlu menebak maksud PRD lagi.
+
+### Uji yang ditulis lebih dulu
+
+Kedua sisi ditulis merah dulu sebelum fungsinya ada:
+
+  - **gambar** — `drawableStarColorIndex(_:isConfirmed:)`: merah karena
+    fungsinya belum ada; sesudahnya, Betelgeuse dan Rigel menghasilkan warna
+    yang sama saat ragu, dan warna itu sama persis dengan warna bintang tak
+    dikenal (bukan angka netral karangan baru).
+  - **suara** — `spokenStarColor(isConfirmed:)`: merah karena pemanggilannya
+    gagal (masih properti). Saat yakin tetap "merah"; saat ragu `nil`;
+    bukan-bintang `nil` di kedua keadaan.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 174, PointingKit **600**, 0 gagal.
+  - `./swift-ui-lint.sh` -> 22 aturan hijau (Aturan 10 menangkap dua kali
+    hitungan uji README yang basi, 597 lalu 599 -> 600).
+  - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+  - `python3 Tools/check-visuals.py --check` -> **45** pemeriksaan hijau
+    (naik dari 42), termasuk tiga yang baru khusus untuk warna bintang.
+  - CI: Engine Tests `37343194154` + Apple Build `37343194146`, keduanya
+    success.
+
+### Gerbangnya dibuktikan berbunyi, bukan sekadar mencetak "OK"
+
+Memakai `check-visuals.py` untuk menguji dirinya sendiri — mengubah perilaku
+lalu memastikan pemeriksaannya gagal:
+
+  - kembalikan `drawableStarColorIndex` ke bentuk lama (warna diteruskan apa
+    adanya) -> 2 dari 3 pemeriksaan warna bintang gagal;
+  - buang warnanya **selalu** (termasuk saat yakin) -> pemeriksaan arah
+    sebaliknya yang gagal.
+
+Tanpa arah kedua itu, view yang membuang warna akan selalu lolos — gerbang
+yang hanya bisa lulus bukan gerbang.
+
+### Yang TIDAK diklaim
+
+  - Fase Bulan saat ragu **tidak** diubah, dan itu keputusan, bukan
+    kelalaian. Lihat tabel di atas untuk alasannya.
+  - Siklus ini tidak memeriksa apakah warna netral "terlihat enak" — hanya
+    bahwa ia sama untuk semua bintang dan berbeda dari warna terkunci.
