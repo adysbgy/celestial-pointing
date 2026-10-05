@@ -64,11 +64,12 @@ struct CalibrationView: View {
                         .font(.footnote)
                         .foregroundStyle(Color.nightAwareSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Status: \(statusMessage)")
+                        .accessibilityLabel(TextLocalization.text(.calibrationStatusPrefix,
+                                                                  statusMessage))
                 }
                 .padding(.horizontal, 2)
             }
-            .navigationTitle("Kalibrasi")
+            .navigationTitle(TextLocalization.text(.calibrationTitle))
             .onAppear { ensureSession() }
             // Daftar acuan bergantung pada lokasi: lokasi sungguhan tiba beberapa
             // detik setelah layar ini dibuka, dan bintang yang tampak "di atas
@@ -133,7 +134,8 @@ struct CalibrationView: View {
                     .foregroundStyle(phaseTone.color)
             }
             if let flow = session?.flow {
-            Text("\(flow.samples.count) acuan tercatat")
+            Text(TextLocalization.text(.calibrationSamplesRecorded,
+                                      Int64(flow.samples.count)))
                 .font(.caption)
                 .foregroundStyle(Color.nightAwareSecondary)
             if let calibration = flow.calibration {
@@ -161,14 +163,15 @@ struct CalibrationView: View {
         // `PointingKit` (teruji di Linux), bukan ditulis di sini — kalau
         // kalimatnya salah, ujinya yang merah, bukan layar.
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(session?.flow.spokenPhaseSummary ?? "Kalibrasi belum dimulai.")
+        .accessibilityLabel(session?.flow.spokenPhaseSummary
+                            ?? TextLocalization.text(.calibrationNotStarted))
     }
 
     // MARK: - Daftar acuan
 
     private var referenceList: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Acuan di atas horizon")
+            Text(TextLocalization.text(.calibrationReferenceHeading))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.nightAwareSecondary)
 
@@ -209,7 +212,7 @@ struct CalibrationView: View {
                     .accessibilityLabel(target.spokenCaptureLabel)
                 }
             } else {
-                Text("Tidak ada acuan yang terlihat sekarang. Acuan bawaan adalah bintang terang; tunggu sampai salah satunya terbit.")
+                Text(TextLocalization.text(.calibrationNoVisibleReference))
                     .font(.footnote)
                     .foregroundStyle(PointingTone.warning.color)
             }
@@ -223,7 +226,8 @@ struct CalibrationView: View {
             Button {
                 captureNearest()
             } label: {
-                Label("Catat yang ditunjuk", systemImage: "dot.scope")
+                Label(TextLocalization.text(.calibrationCaptureNearestLabel),
+                      systemImage: "dot.scope")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.borderedProminent)
@@ -233,10 +237,10 @@ struct CalibrationView: View {
             // ikut terlihat di nama tombolnya sendiri. Label juga menyebut
             // bahwa ia memakai arah yang sedang ditunjuk, karena ada
             // tombol lain di layar ini yang juga mencatat acuan.
-            .accessibilityLabel("Catat yang sedang ditunjuk sebagai acuan")
+            .accessibilityLabel(TextLocalization.text(.calibrationCaptureNearestHint))
 
             HStack(spacing: 4) {
-                Button("Pakai") { apply() }
+                Button(TextLocalization.text(.calibrationApplyLabel)) { apply() }
                     .font(.caption.weight(.semibold))
                     .disabled(!(session?.flow.isReady ?? false))
                     // Keadaan tombol ikut diucapkan. Tanpa ini tombol yang
@@ -244,11 +248,11 @@ struct CalibrationView: View {
                     // "Pakai" yang ditolak karena sebaran terlalu lebar
                     // adalah hasil yang paling mudah disalahartikan.
                     .accessibilityLabel(session?.flow.spokenApplyButtonLabel
-                                        ?? "Pakai kalibrasi, belum bisa dipakai")
-                Button("Ulang") { reset() }
+                                        ?? TextLocalization.text(.calibrationApplyNotReadyHint))
+                Button(TextLocalization.text(.calibrationResetLabel)) { reset() }
                     .font(.caption.weight(.semibold))
                     .disabled((session?.flow.samples.isEmpty ?? true))
-                    .accessibilityLabel("Ulangi kalibrasi dari awal")
+                    .accessibilityLabel(TextLocalization.text(.calibrationResetHint))
             }
 
             if let policy = session?.suggestedConfidencePolicy {

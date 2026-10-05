@@ -277,6 +277,36 @@ public extension LocalizedText {
         key: "onboarding.label",
         id: "Perkenalan. Arahkan jam ke langit untuk mengetahui benda yang kamu lihat. Jika ragu, engine akan mengatakannya.")
 
+    // MARK: Layar kalibrasi (label layar & tombol)
+
+    static let calibrationTitle = LocalizedText(key: "calibration.title",
+                                                 id: "Kalibrasi")
+    static let calibrationSamplesRecorded = LocalizedText(
+        key: "calibration.samplesRecorded", id: "%lld acuan tercatat")
+    static let calibrationNotStarted = LocalizedText(
+        key: "calibration.notStarted", id: "Kalibrasi belum dimulai.")
+    static let calibrationReferenceHeading = LocalizedText(
+        key: "calibration.referenceHeading", id: "Acuan di atas horizon")
+    static let calibrationNoVisibleReference = LocalizedText(
+        key: "calibration.noVisibleReference",
+        id: "Tidak ada acuan yang terlihat sekarang. Acuan bawaan adalah bintang terang; tunggu sampai salah satunya terbit.")
+    static let calibrationCaptureNearestLabel = LocalizedText(
+        key: "calibration.captureNearest.label", id: "Catat yang ditunjuk")
+    static let calibrationCaptureNearestHint = LocalizedText(
+        key: "calibration.captureNearest.hint",
+        id: "Catat yang sedang ditunjuk sebagai acuan")
+    static let calibrationApplyLabel = LocalizedText(key: "calibration.apply.label",
+                                                      id: "Pakai")
+    static let calibrationApplyNotReadyHint = LocalizedText(
+        key: "calibration.apply.notReadyHint",
+        id: "Pakai kalibrasi, belum bisa dipakai")
+    static let calibrationResetLabel = LocalizedText(key: "calibration.reset.label",
+                                                      id: "Ulang")
+    static let calibrationResetHint = LocalizedText(
+        key: "calibration.reset.hint", id: "Ulangi kalibrasi dari awal")
+    static let calibrationStatusPrefix = LocalizedText(
+        key: "calibration.statusPrefix", id: "Status: %@")
+
     /// Setiap kunci yang dideklarasikan di sini.
     ///
     /// Satu sumber untuk gerbang paritas dan untuk uji — supaya "kunci yang
@@ -397,6 +427,17 @@ public extension LocalizedText {
         .calibrationStatusStaleBanner, .calibrationStatusStaleBannerHint,
         .calibrationDisplayOffset, .calibrationDisplaySpread,
         .calibrationDisplayCaptureAltitude, .calibrationDisplaySuggestedSigma,
+        // Label layar & tombol kalibrasi yang masih literal di `CalibrationView`.
+        // Sama seperti `captureAltitude` di atas: literal Bahasa Indonesia di
+        // dalam view lolos dari Aturan 4 (bukan argumen `Text` berbentuk kunci)
+        // dan Aturan 6 (tanpa kunci), jadi English speaker membaca Indonesia.
+        // Lihat siklus lokalisasi Fase C #2.
+        .calibrationTitle, .calibrationSamplesRecorded,
+        .calibrationNotStarted, .calibrationReferenceHeading,
+        .calibrationNoVisibleReference, .calibrationCaptureNearestLabel,
+        .calibrationCaptureNearestHint, .calibrationApplyLabel,
+        .calibrationApplyNotReadyHint, .calibrationResetLabel,
+        .calibrationResetHint, .calibrationStatusPrefix,
         .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,
         .calibrationPhaseReadyLabel, .calibrationPhaseAppliedLabel,
         // Experiment 1. Masuk daftar karena inilah satu-satunya jalur pesan

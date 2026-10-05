@@ -3686,6 +3686,138 @@
           }
         }
       }
+    },
+    "calibration.title": {
+      "comment": "Judul layar kalibrasi (navigationTitle).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibrate"
+          }
+        }
+      }
+    },
+    "calibration.samplesRecorded": {
+      "comment": "Jumlah acuan yang sudah tercatat di kartu tahap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references recorded"
+          }
+        }
+      }
+    },
+    "calibration.notStarted": {
+      "comment": "Label VoiceOver saat alur kalibrasi belum dimulai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration not started."
+          }
+        }
+      }
+    },
+    "calibration.referenceHeading": {
+      "comment": "Judul daftar acuan (hanya bintang di atas horizon).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "References above the horizon"
+          }
+        }
+      }
+    },
+    "calibration.noVisibleReference": {
+      "comment": "Pesan saat tidak ada acuan terlihat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reference visible right now. The default references are bright stars; wait until one of them rises."
+          }
+        }
+      }
+    },
+    "calibration.captureNearest.label": {
+      "comment": "Label tombol Catat yang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture what is pointed at"
+          }
+        }
+      }
+    },
+    "calibration.captureNearest.hint": {
+      "comment": "Label VoiceOver tombol Catat yang ditunjuk.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record what is currently pointed at as a reference"
+          }
+        }
+      }
+    },
+    "calibration.apply.label": {
+      "comment": "Label tombol Pakai (pasang kalibrasi).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply"
+          }
+        }
+      }
+    },
+    "calibration.apply.notReadyHint": {
+      "comment": "Label VoiceOver tombol Pakai saat belum siap.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply calibration, not ready yet"
+          }
+        }
+      }
+    },
+    "calibration.reset.label": {
+      "comment": "Label tombol Ulang (buang kalibrasi).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "calibration.reset.hint": {
+      "comment": "Label VoiceOver tombol Ulang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart calibration from the beginning"
+          }
+        }
+      }
+    },
+    "calibration.statusPrefix": {
+      "comment": "Awalan baris status kalibrasi (Status: …).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status: %@"
+          }
+        }
+      }
     }
   }
 }
