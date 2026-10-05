@@ -8965,3 +8965,78 @@ tidak ada gerbang yang menangkapnya. Dua hal yang perlu diingat:
    teks rusak. Untuk yang terakhir ini tidak ada gerbangnya sama sekali.
 
 Yang tersisa tanpa penjaga: karakter non-Latin tak terduga di dalam komentar.
+
+## Siklus: daftar target menawarkan objek yang engine tidak akan pernah kunci (2026-10-05)
+
+### Temuan: angka "di atas horizon" ditulis dua kali, dan tidak sama
+
+`availableTargets` menyaring dengan `altitudeDeg <= 0`. Itu terlihat wajar,
+dan itu salah. Engine hanya mengunci lewat `VisibilityFilter`, yang menolak
+`altitude < policy.minAltitudeDeg` -- **5 derajat** pada policy bawaan.
+
+Pada policy produksi, Experiment 1 karena itu menawarkan objek setinggi
+0-5 derajat yang `diagnose` akan tolak sebagai `belowHorizon` setiap kali.
+
+Diperiksa dengan sapuan 1.440 kombinasi (5 lokasi x 12 bulan x 3 hari x
+4 jam): **499** di antaranya punya minimal satu target di pita 0-5 derajat,
+termasuk Sirius di 0,6 derajat dan Canopus di 2,8 derajat. Ini kondisi
+umum, bukan kasus tepi.
+
+Yang rusak bukan angkanya, tapi kebohongannya. Daftar menyatakan sebuah
+objek "tersedia untuk ditunjuk" padahal persis tidak akan pernah bisa
+dikunci. Penguji memilih dari daftar itu, misses semuanya, lalu rekaman
+yang gagal diperlakukan sebagai bukti tentang engine -- dan rekaman itu
+tidak berbohong soal apa yang diukur, tapi berbohong soal apa yang bisa
+diukur.
+
+### Dua tanda baca yang hampir keliru
+
+Perbaikan pertama menulis `< policy.minAltitudeDeg`. Itu **salah**, dan
+19 uji langsung jatuh: policy permisif punya `minAltitudeDeg: -90`, jadi
+saringan `<` justru **meloloskan** benda di -60 derajat.
+
+Yang benar adalah `<=`, karena `VisibilityFilter` menolak dengan `<`:
+daftar harus membuang `<=` agar batasnya identik dengan gerbang engine.
+Tanda baca di sini menentukan arah seluruh daftar.
+
+### Dua uji lama ikut mengkodekan definisi yang salah
+
+`testAvailableTargetsAreAllComputableAndAboveHorizon` (harness) dan
+`testReferenceTargetsComeFromFlowNotWholeCatalogue` (kalibrasi) sama-sama
+mengassert `altitudeDeg > 0`, padahal resolver uji keduanya memakai
+`VisibilityPolicy.permissive` dengan `minAltitudeDeg: -90`.
+
+Jadi assertion itu **tidak mungkin** benar sebagai pernyataan tentang
+engine; ia hanya hijau karena daftar mematok angka 0 sendiri.
+Keduanya kini mengassert ambang engine. Nama satu juga diganti karena
+"above horizon" bukan lagi istilah yang tepat untuk apa yang dijamin.
+
+### Cacat pada uji regresi saya sendiri
+
+Uji regresi pertama saya **hijau** pada tanggal dan lokasi bawaan
+(Jakarta, 2023-11). Bukan karena cacatnya hilang, tapi karena langit
+pada saat itu kebetulan tidak punya apa pun di pita 0-5 derajat --
+persis kelas cacat yang paling berbahaya: uji yang hijau karena
+keberetulan.
+
+Uji sekarang memakai 1 Februari 2026 pukul 22:00 di lat -33, di mana
+Sirius terbukti 0,57 derajat, dan **memeriksa ulang prasyaratnya sendiri**
+supaya tidak bisa lolos diam-diam lagi. Fix-nya juga diverifikasi
+dengan mengembalikan saringan ke angka 0 sementara dan memastikan
+ujinya benar-benar jatuh.
+
+### Gerbang
+
+- `./swift-test.sh` -> **174 CelestialEngine + 572 PointingKit**, 0 gagal.
+- `./swift-ui-lint.sh` -> **19 aturan** hijau (Aturan 10 menangkap 570->572).
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+
+### Yang belum kerjakan
+
+`SlewSafetyPolicy.minAltitudeDeg` (10 derajat) adalah angka ketiga untuk
+"cukup tinggi". Yang itu **sengaja berbeda** -- itu batas mekanis
+teleskop, bukan batas penglihatan, jadi tidak boleh disamakan dengan
+policy visibilitas. Yang baru diperbaiki adalah kasus di mana dua hal
+yang mestinya identik -- ambang engine dengan ambang daftar yang
+menganggap engine pasti mengizinkan -- memang berbeda. Batas mekanis
+bukan kasus itu.
