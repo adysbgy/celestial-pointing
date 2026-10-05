@@ -11,12 +11,7 @@ import XCTest
 /// tidak satu pun ada di katalog. Yang bisa dijaga di Linux: bentuk kunci,
 /// nilai bawaan Bahasa Indonesia yang tidak kosong, dan bahwa nilai yang
 /// disisipkan benar-benar masuk ke kalimatnya.
-final class SensorStatusTextTests: XCTestCase {
-
-    override func tearDown() {
-        TextLocalization.reset()
-        super.tearDown()
-    }
+final class SensorStatusTextTests: BridgedTextTestCase {
 
     func testDefaultIsIndonesianAndNotEmpty() {
         for text in LocalizedText.allKeys where text.rawValue.hasPrefix("sensor.") {
@@ -24,6 +19,52 @@ final class SensorStatusTextTests: XCTestCase {
                            "\(text.rawValue) tidak punya nilai bawaan")
             XCTAssertFalse(TextLocalization.text(text).isEmpty)
         }
+    }
+
+    /// Pesan sistem **tidak boleh** sampai ke layar apa adanya.
+    ///
+    /// **Kenapa uji ini ada, padahal `locationFailed*` sudah diuji di bawah.**
+    /// Keduanya beda kelas, dan bedanya yang membuat cacat ini lolos.
+    /// Kegagalan lokasi disusun di `LocationProvider`, yang sudah memanggil
+    /// accessor katalog sejak siklus `SensorStatusText` — jadi jalurnya
+    /// terlihat dari berkas `Apps/`. Kegagalan **gerak** disusun di
+    /// `MotionLogger.handleFailure`, yang menyimpan
+    /// `error.localizedDescription` **langsung** ke `unavailableReason`;
+    /// properti itu dirender `Text(reason)` di dua layar.
+    ///
+    /// Yang membuatnya tak terlihat oleh semua gerbang, sekaligus:
+    ///   - Aturan 4 menyapu literal di dalam argumen `Text(...)` — ini
+    ///     argumen **fungsi**, bukan literal.
+    ///   - Aturan 12 menyapu penugasan ke properti berakhiran Note — ini
+    ///     `unavailableReason`, dan nilainya datang dari ekspresi.
+    ///   - Aturan 13 menyapu literal di dalam `String(format:)`/`append` —
+    ///     tidak ada satupun di sini.
+    ///
+    /// Akibatnya nyata: teks `localizedDescription` mengikuti bahasa
+    /// **perangkat**, bukan bahasa katalog, jadi barisnya adalah satu-satunya
+    /// yang tidak bisa diterjemahkan — dan tidak ada yang memberitahu.
+    func testMotionFailureWrapsTheSystemMessage() {
+        let wrapped = SensorStatusText.motionFailed("timeout")
+        XCTAssertNotEqual(wrapped, "timeout",
+                          "pesan sistem tampil apa adanya, tanpa kalimat katalog")
+        XCTAssertTrue(wrapped.contains("timeout"),
+                      "pesan sistem hilang — dua kegagalan berbeda akan terbaca sama")
+    }
+
+    /// Terjemahan mengendalikan katanya, dan specifier-nya satu.
+    func testMotionFailureFollowsTheCatalog() {
+        EnglishTranslation.install(["sensor.motion.failed": "Motion stopped: %@"])
+        XCTAssertEqual(SensorStatusText.motionFailed("timeout"), "Motion stopped: timeout")
+    }
+
+    /// Bentuk kabel: pesan sistemnya harus **tetap ada** di dalam kalimatnya.
+    ///
+    /// Ini penjaga arah sebaliknya dari uji di atas: "merapikan" kalimatnya
+    /// dengan membuang `%@` akan membuat dua kegagalan berbeda tampak identik
+    /// pada baris yang dipakai untuk memutuskan apakah jam masih bisa dipakai.
+    func testMotionFailureKeepsTheSystemMessageUnderTranslation() {
+        EnglishTranslation.install(["sensor.motion.failed": "Motion stopped"])
+        XCTAssertEqual(SensorStatusText.motionFailed("timeout"), "Motion stopped")
     }
 
     func testMotionMessagesAreDistinct() {

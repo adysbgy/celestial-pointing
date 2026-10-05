@@ -512,6 +512,10 @@ public extension LocalizedText {
         // properti (`note = "…"`) di tiga berkas `Apps/Shared/`, tempat katalog
         // tidak bisa menjangkaunya. Lihat `SensorStatusText.swift`.
         .sensorMotionMissing, .sensorMotionUnavailable,
+        // Kegagalan sensor gerak di tengah pemakaian: `MotionLogger` dulu
+        // menampilkan `error.localizedDescription` apa adanya. Lihat
+        // `SensorStatusText.motionFailed`.
+        .sensorMotionFailed,
         .sensorLocationNotRequested, .sensorLocationSearching,
         .sensorLocationWaiting, .sensorLocationDeniedStatus,
         .sensorLocationUnknownStatus, .sensorLocationDeniedNote,

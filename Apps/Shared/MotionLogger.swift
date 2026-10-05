@@ -74,7 +74,13 @@ public final class MotionLogger: ObservableObject {
         ) { [weak self] motion, error in
             guard let self else { return }
             if let error {
-                self.handleFailure(error.localizedDescription)
+                // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
+                // perangkat, bukan bahasa yang sedang membaca katalog, jadi
+                // menampilkannya apa adanya akan menyisipkan satu baris
+                // berbahasa lain di tengah layar. Namanya tetap ikut
+                // ditampilkan (`%@`) supaya dua kegagalan berbeda tidak
+                // terbaca sama.
+                self.handleFailure(SensorStatusText.motionFailed(error.localizedDescription))
                 return
             }
             guard let motion else { return }

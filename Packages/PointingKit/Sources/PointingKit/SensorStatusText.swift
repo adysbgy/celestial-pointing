@@ -37,6 +37,26 @@ public enum SensorStatusText {
         TextLocalization.text(.sensorMotionUnavailable)
     }
 
+    /// Sensor gerak berhenti di tengah pemakaian, dengan pesan sistemnya.
+    ///
+    /// **Kenapa pesan sistemnya harus dibungkus, tidak ditampilkan apa adanya.**
+    /// `CMMotionManager` menyerahkan `error.localizedDescription`, dan itu
+    /// teks **sistem** — ia mengikuti bahasa perangkat, bukan bahasa yang
+    /// sedang membaca katalog. Menampilkannya langsung berarti satu baris di
+    /// layar berbahasa Inggris di tengah layar yang serba Indonesia, dan
+    /// tidak ada gerbang yang melihatnya: ia bukan literal di `Apps/`
+    /// (Aturan 4), bukan penugasan berakhiran Note (Aturan 12), dan bukan
+    /// argumen `String(format:)` (Aturan 13) — ia argumen fungsi.
+    ///
+    /// Nama sumbernya tetap **ditampilkan**, bukan disembunyikan di balik
+    /// kalimat generik: dua kegagalan yang berbeda tidak boleh terbaca sama
+    /// pada baris yang dipakai untuk memutuskan apakah jamnya masih bisa
+    /// dipakai. Alasan yang sama dengan
+    /// `ObserverLocation.sourceDisplayName` untuk sumber tak dikenal.
+    public static func motionFailed(_ message: String) -> String {
+        TextLocalization.text(.sensorMotionFailed, message)
+    }
+
     // MARK: - Lokasi
 
     /// Status awal sebelum izin diminta.
@@ -99,6 +119,17 @@ public extension LocalizedText {
     static let sensorMotionUnavailable = LocalizedText(
         key: "sensor.motion.unavailable",
         id: "Data gerak tidak tersedia.")
+    /// Kegagalan sensor gerak di tengah pemakaian; `%@` pesan sistemnya.
+    ///
+    /// Masuk daftar karena `MotionLogger.handleFailure` menyimpan
+    /// `error.localizedDescription` **apa adanya** ke `unavailableReason`,
+    /// dan properti itu dirender `Text(reason)` di dua layar. Teks sistem
+    /// mengikuti bahasa perangkat, bukan bahasa katalog — jadi barisnya
+    /// satu-satunya yang tidak bisa diterjemahkan. Lihat
+    /// `SensorStatusText.motionFailed`.
+    static let sensorMotionFailed = LocalizedText(
+        key: "sensor.motion.failed",
+        id: "Sensor gerak berhenti: %@")
 
     static let sensorLocationNotRequested = LocalizedText(
         key: "sensor.location.notRequested",

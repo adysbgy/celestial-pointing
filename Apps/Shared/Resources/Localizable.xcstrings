@@ -4708,6 +4708,17 @@
           }
         }
       }
+    },
+    "sensor.motion.failed": {
+      "comment": "Sensor gerak berhenti di tengah pemakaian; %@ adalah pesan sistemnya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor stopped: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
