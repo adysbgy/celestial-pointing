@@ -377,6 +377,88 @@ final class ResolverEphemerisTests: XCTestCase {
             $0.object.id == "faint" && $0.visibility == .tooFaint
         }, "penolakan bintang redup di bawah purnama harus dilaporkan sebagai .tooFaint")
     }
+
+    /// **Objek langit dalam (brief Fase C #5/#6): resolver harus bisa
+    /// mengunci nebula/gugus/galaksi lewat jalur yang sama dengan bintang —
+    /// dan menolaknya saat di bawah horizon.**
+    ///
+    /// `DeepSkyCatalogue.objects` baru baru ini masuk ke `productionCatalogue`
+    /// (EngineFactory), jadi jalur resolusi objek langit dalam belum pernah
+    /// dikunci di level engine. Tanpa uji ini, regresi yang melewatkan
+    /// `kind == .deepSky` di `PointingResolver.diagnose` (atau di
+    /// `VisibilityFilter`) akan lolos: benda langit dalam akan diam-diam
+    /// tidak pernah jadi kandidat, dan tidak ada satu teks pun di layar yang
+    /// memberitahu pengguna bahwa Nebula Orion sudah seharusnya muncul.
+    ///
+    /// Kita pakai `CelestialObject(kind: .deepSky)` minimal (bukan
+    /// `DeepSkyCatalogue` dari PointingKit) supaya uji ini tetap di dalam
+    /// paket CelestialEngine dan tidak menggandengkan engine ke PointingKit.
+    func testDeepSkyObjectResolvesAndRejectsBelowHorizon() throws {
+        // M42 (Nebula Orion) — koordinat J2000, magnitudo terintegrasi.
+        let nebula = CelestialObject(id: "m42", name: "Nebula Orion", kind: .deepSky,
+                                     raDeg: 83.82208333, decDeg: -5.39111111,
+                                     magnitude: 4.0)
+        let resolver = PointingResolver(
+            catalogue: [nebula] + Catalogue.brightStars,
+            policy: VisibilityPolicy(),
+            ephemeris: AstronomyKitEphemeris())
+
+        // 1) Di atas horizon & ditunjuk tepat -> harus jadi tebakan terbaik,
+        //    dengan jenis tetap .deepSky (bukan bintang).
+        let above = try XCTUnwrap(
+            resolver.horizontal(of: nebula, observer: jakarta, date: date),
+            "arah Nebula Orion harus bisa dihitung")
+        XCTAssertGreaterThan(above.altitudeDeg, resolver.policy.minAltitudeDeg,
+                             "Nebula Orion harus di atas horizon pada saat uji")
+        let resolved = resolver.diagnose(
+            pointing: above, observer: jakarta, date: date, coneDeg: 10)
+        XCTAssertEqual(resolved.intent.best?.id, "m42",
+                       "Nebula Orion harus jadi tebakan terbaik saat ditunjuk")
+        XCTAssertEqual(resolved.intent.best?.kind, .deepSky,
+                       "jenisnya harus tetap .deepSky, bukan bintang")
+        // Bukan `.low`: engine tidak boleh diam-diam menjatuhkan benda langit
+        // dalam. (Hasilnya `.medium`, bukan `.high`, adalah benar: M42 duduk
+        // di tengah Orion dekat bintang terang seperti Rigel ~10°, jadi aturan
+        // anti-false-lock ambiguitas menahannya dari HIGH — persis yang
+        // diinginkan PRD. Yang diuji di sini adalah bahwa ia *tetap
+        // teridentifikasi*, bukan bahwa ia diklaim pasti.)
+        XCTAssertNotEqual(resolved.intent.level, .low,
+                          "Nebula Orion di atas horizon tidak boleh jatuh ke .low")
+
+        // 2) Di bawah horizon -> tidak boleh jadi kandidat, dan alasannya
+        //    harus .belowHorizon (sama seperti bintang). Agar deterministik,
+        //    kita cerminkan koordinat sebuah bintang yang *terbukti* di bawah
+        //    horizon pada saat uji ini (teknik yang sama dengan
+        //    `testBelowHorizonBodiesAreReportedAsSuch`): objek langit dalam
+        //    harus mengikuti aturan visibilitas yang sama dengan bintang.
+        let jd = SkyMath.julianDate(from: date)
+        func altitude(of object: CelestialObject) -> Double {
+            resolver.horizontal(of: object, observer: jakarta, date: date)?.altitudeDeg
+                ?? -90
+        }
+        let belowStar = try XCTUnwrap(
+            Catalogue.brightStars.first { altitude(of: $0) < -20 },
+            "butuh satu bintang yang benar-benar di bawah horizon untuk cermin")
+        let buriedNebula = CelestialObject(
+            id: "buried", name: "Nebula Terkubur", kind: .deepSky,
+            raDeg: belowStar.raDeg, decDeg: belowStar.decDeg, magnitude: 4.0)
+        let hiddenResolver = PointingResolver(
+            catalogue: [buriedNebula] + Catalogue.brightStars,
+            policy: VisibilityPolicy(), ephemeris: AstronomyKitEphemeris())
+        let hor: HorizontalCoord = try XCTUnwrap(
+            hiddenResolver.horizontal(of: buriedNebula, observer: jakarta, date: date))
+        let hidden = hiddenResolver.diagnose(
+            pointing: hor, observer: jakarta, date: date, coneDeg: 5)
+        XCTAssertNotEqual(hidden.intent.best?.id, "buried",
+                          "objek langit dalam di bawah horizon tidak boleh dikunci")
+        XCTAssertFalse(hidden.intent.candidates.contains { $0.object.id == "buried" },
+                       "objek langit dalam di bawah horizon tidak boleh jadi kandidat")
+        XCTAssertTrue(hidden.rejected.contains {
+            $0.object.id == "buried" && $0.visibility == Visibility.belowHorizon
+        }, "penolakan objek langit dalam di bawah horizon harus .belowHorizon (sama seperti bintang)")
+        XCTAssertLessThan(hor.altitudeDeg, hiddenResolver.policy.minAltitudeDeg,
+                          "prasyarat uji: objek cermin benar-benar di bawah horizon")
+    }
 }
 
 #endif
