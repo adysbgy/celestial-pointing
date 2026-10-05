@@ -1,4 +1,68 @@
-## Progres terakhir (5 Okt 2026 — aturan "fase Bulan tetap tampil saat ragu" jadi terukur)
+## Progres terakhir (5 Okt 2026 — larik ciri dijaga seluruhnya, bukan elemen pertamanya)
+
+### Pola yang muncul tiga kali: gerbang yang mengukur sebagian dari klaimnya
+
+Gerbang pergeseran (`check_port_matches_swift_constants`) menjaga
+`CRATERS[0]` dan `MARIA[0]` — **satu** elemen dari lima dan **satu** dari
+empat. Tujuh angka sisanya tidak dijaga siapa pun. Mengubah kawah kelima
+Merkurius di view akan membiarkan **setiap** pemeriksaan hijau sambil
+mengukur gambar yang sudah tidak ada lagi — persis cacat yang berkas itu ada
+untuk mencegah.
+
+Ini pola ketiga dalam beberapa siklus, dan bentuknya selalu sama:
+
+| Siklus | Gerbang mengklaim | Kenyataannya mengukur |
+|---|---|---|
+| lencana "?" | glif di dalam lencana | glif di dalam **frame** (3.1x) |
+| fase Bulan | ciri hilang saat ragu | ciri hilang **kecuali Bulan** |
+| larik ciri | kawah & maria cocok | elemen **pertama** saja |
+
+Yang ketiga kemungkinan besar terjadi karena menulis sepuluh pemeriksaan satu
+per satu terasa berlebihan — dan itu tepat alasan yang membuat lubangnya
+tidak terlihat. Menambah pemeriksaan satu-satu juga tidak menyelesaikannya:
+daftar tangan adalah daftar yang bisa tertinggal separuh.
+
+### Solusinya: kedua sisi dibaca dari sumbernya
+
+`swift_tuple_triples` mengekstrak **semua** `(a, b, c)` dari teks Swift
+setelah jangkarnya; larik port dibaca dari berkas port. Tidak ada daftar yang
+harus diperbarui dengan tangan, jadi tidak ada daftar yang bisa tertinggal.
+
+Perbandingannya elemen per elemen supaya pesannya menyebut **indeks** —
+"lariknya tidak sama" tidak memberi tahu apakah ada yang salah tempat,
+hilang, atau bertambah di akhir.
+
+Arahnya dua bahasa, dan yang kedua tidak bisa dilihat pemeriksaan gambar mana
+pun: merah kalau port menyimpang, **atau** kalau view berubah tanpa port-nya
+ikut — sebab gambar acuannya sendiri yang ikut berubah.
+
+### Jangkar hilang = gagal bersih, bukan traceback
+
+Gerbang yang melempar pengecualian saat view-nya dirapikan akan dihapus
+orang, dan aturan yang dihapus tidak menjaga apa pun. Jangkar yang tidak
+ditemukan sekarang jadi kegagalan biasa yang **menyebut jangkarnya**.
+
+### Dibuktikan menggigit
+
+| Simulasi | Hasil |
+|---|---|
+| kawah ke-5 di view: `0.13 -> 0.99` | GAGAL "beda di indeks [4]" |
+| jangkar kawah dipindah baris | GAGAL bersih, bukan crash |
+
+Kode apa adanya: **110 pemeriksaan, 0 gagal**; 603 uji Swift hijau.
+
+### Catatan untuk siklus berikutnya
+
+- Sebelum mempercayai gerbang, tanyakan **berapa dari N** yang benar-benar
+  diperiksa. Tiga cacat berturut-turut semuanya bentuk itu.
+- Larik `CRATERS`/`MARIA` masih hidup di **view** sebagai angka keras;
+  memindahkannya ke model (seperti `jupiterBands`, `saturnRing`) akan
+  menghapus kebutuhan gerbang pergeseran ini sekaligus — satu angka yang
+  hidup di dua tempat adalah dua angka yang akan berbeda.
+
+---
+
+## Progres sebelumnya (5 Okt 2026 — aturan "fase Bulan tetap tampil saat ragu" jadi terukur)
 
 ### Yang dikerjakan: aturan yang hanya hidup sebagai prosa
 
