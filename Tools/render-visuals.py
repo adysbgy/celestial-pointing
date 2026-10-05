@@ -610,21 +610,52 @@ def shadow_fn(day_rgb, night_mode, opacity=1.0):
 
 
 def radial_gradient(colors, center, start_radius, end_radius):
-    """Port dari `.radialGradient(Gradient(colors:), center:startRadius:endRadius:)`."""
+    """Port dari `.radialGradient(Gradient(stops:), center:startRadius:endRadius:)`.
+
+    Menerima dua bentuk entri, supaya **kedua** varian SwiftUI bisa dinyatakan:
+
+      - `(rgb, alpha)` — `Gradient(colors:)`, stop tersebar **merata**
+        sepanjang rentang radius.
+      - `(location, rgb, alpha)` — `Gradient(stops:)`, stop di lokasi yang
+        **ditentukan** (0…1, seperti `Gradient.Stop.location`).
+
+    **Kenapa bentuk kedua ada.** Versi sebelumnya hanya menerima bentuk
+    pertama dan menyebarkan stop secara merata. Untuk gradient yang stopnya
+    memang berjarak sama itu kebetulan benar — dan itulah sebabnya cacat ini
+    tidak pernah terlihat sampai ada gradient pertama di proyek ini yang
+    stopnya **tidak** merata: profil Matahari, yang punya batas fotosfer tegas
+    di 0.72 R. Dengan penyebaran merata, port menggambar profil itu dengan
+    alpha 0.13 di 0.72 R sementara SwiftUI menggambarnya 0.94 — jadi gerbang
+    piksel mengukur Matahari yang **tidak pernah tampil di jam**, dan
+    perbaikannya akan dilaporkan sebagai "tidak berpengaruh" apa pun hasilnya.
+    """
     cx, cy = center
-    stops = list(colors)
+    span = end_radius - start_radius
+
+    if colors and len(colors[0]) == 3:
+        stops = sorted(((float(loc), rgb, float(a)) for loc, rgb, a in colors),
+                       key=lambda s: s[0])
+    else:
+        pairs = list(colors)
+        n = len(pairs) - 1
+        stops = [(0.0 if n <= 0 else i / n, rgb, a)
+                 for i, (rgb, a) in enumerate(pairs)]
 
     def at(x, y):
         d = math.hypot(x - cx, y - cy)
-        span = end_radius - start_radius
         t = 0.0 if span <= 0 else min(1.0, max(0.0, (d - start_radius) / span))
-        pos = t * (len(stops) - 1)
-        i = min(int(pos), len(stops) - 2)
-        frac = pos - i
-        c0, a0 = stops[i]
-        c1, a1 = stops[i + 1]
-        rgb = tuple(c0[k] + (c1[k] - c0[k]) * frac for k in range(3))
-        return rgb, a0 + (a1 - a0) * frac
+        if t <= stops[0][0]:
+            return stops[0][1], stops[0][2]
+        if t >= stops[-1][0]:
+            return stops[-1][1], stops[-1][2]
+        for i in range(len(stops) - 1):
+            l0, c0, a0 = stops[i]
+            l1, c1, a1 = stops[i + 1]
+            if t <= l1:
+                frac = 0.0 if l1 <= l0 else (t - l0) / (l1 - l0)
+                rgb = tuple(c0[k] + (c1[k] - c0[k]) * frac for k in range(3))
+                return rgb, a0 + (a1 - a0) * frac
+        return stops[-1][1], stops[-1][2]
     return at
 
 
@@ -1088,18 +1119,47 @@ def _draw_star(canvas, cx, cy, radius, kw, night_mode):
     canvas.stroke_line(cx, cy - spike, cx, cy + spike, width, line)
 
 
+def sun_profile(core, photosphere):
+    """`VisualFrame.sunProfile(core:photosphere:)` — **satu** gradient, bukan
+    dua piringan.
+
+    Mengembalikan larik (radius_fraction, rgb, opacity). Opasitasnya turun
+    monoton, dan batas fotosfer di 0.72 R **bukan** tempat kelegapan terjun:
+    stop 0.72 R hanya turun 0.05 dari stop sebelumnya, supaya tepi keras yang
+    lama (1.0 -> 0.42 dalam satu piksel) tidak kembali; lihat catatan cacatnya
+    di sumber Swift.
+
+    **Angka-angka ini bukan pilihan bebas.** Ia harus sama dengan
+    `VisualFrame.sunProfile` di `CelestialVisual.swift`; kalau tidak, seluruh
+    gerbang piksel di bawahnya mengukur Matahari yang tidak pernah tampil di
+    jam. Kesamaannya tidak dijaga komentar melainkan
+    `check_sun_profile_matches_the_model`, karena versi pertama port ini
+    memang menyimpang (0.94/0.62/0.30/0.10 lawan 0.95/0.66/0.34/0.13) dan
+    tidak ada satu pun pemeriksaan yang berbunyi.
+    """
+    return [(0.00, core, 1.00),
+            (0.55, core, 1.00),
+            (0.72, core, 0.95),
+            (0.80, core, 0.66),
+            (0.88, photosphere, 0.34),
+            (0.94, photosphere, 0.13),
+            (1.00, photosphere, 0.00)]
+
+
 def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
     core = ACCENTS["sunCore"]
     photo = ACCENTS["sunPhotosphere"]
     core_rgb = night_surface(core) if night_mode else core
     photo_rgb = night_surface(photo) if night_mode else photo
+    # Inti putih hanya di mode terang — sama dengan `drawSun` di view.
     inner = core_rgb if night_mode else (1.0, 1.0, 1.0)
-    canvas.disc(cx, cy, radius * 0.72,
-                radial_gradient([(inner, 1.0), (core_rgb, 1.0), (photo_rgb, 1.0)],
-                                center=(cx, cy), start_radius=0, end_radius=radius * 0.72))
+    stops = sun_profile(core_rgb, photo_rgb)
+    # Lokasi stop ikut dikirim: `radial_gradient` menerima bentuk
+    # `(location, rgb, alpha)` untuk `Gradient(stops:)`. Tanpa lokasi, port
+    # menyebarkan stop merata dan batas fotosfer 0.72 R hilang.
+    stops = [(r, (inner if r == 0.0 else c), a) for (r, c, a) in stops]
     canvas.disc(cx, cy, radius,
-                radial_gradient([(core_rgb, 0.42), (core_rgb, 0.0)],
-                                center=(cx, cy), start_radius=radius * 0.6,
+                radial_gradient(stops, center=(cx, cy), start_radius=0,
                                 end_radius=radius))
 
 

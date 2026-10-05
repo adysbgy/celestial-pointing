@@ -768,21 +768,34 @@ struct CelestialVisualView: View {
     // MARK: - Matahari
 
     private func drawSun(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        let core = Self.accent(CelestialVisual.accents.sunCore)
-        let photosphere = Self.accent(CelestialVisual.accents.sunPhotosphere)
-        context.fill(Path(ellipseIn: CGRect(x: center.x - radius * 0.72,
-                                           y: center.y - radius * 0.72,
-                                           width: radius * 1.44, height: radius * 1.44)),
-                     with: .radialGradient(
-                        Gradient(colors: [NightMode.isOn ? core : .white, core, photosphere]),
-                        center: center, startRadius: 0, endRadius: radius * 0.72))
-        // Corona: cincin luar yang memudar, digambar **di luar** disk supaya
-        // tidak menutupi fotosfer.
+        // **Satu** gradient, bukan dua piringan bertumpuk.
+        //
+        // Versi lama menggambar fotosfer penuh selebar 0.72 R lalu corona
+        // selebar 1.0 R yang dimulai di 0.6 R dengan kelegapan 0.42. Di tepi
+        // fotosfer kelegapannya karena itu melompat 1.0 -> 0.42 dalam satu
+        // piksel: terukur 175/255, dan yang terlihat bukan tepi Matahari
+        // melainkan dua benda bertumpuk. Profil radialnya sekarang tinggal di
+        // model (`VisualFrame.sunProfile`, teruji di Linux), dan di sini tidak
+        // ada satu angka radius pun — hanya pemetaan model ke gradient.
+        //
+        // Inti putih hanya di mode terang: di mode malam ia harus merah,
+        // karena putih justru warna yang dilarang mode ini. Pemetaannya tetap
+        // lewat `accent`/`color`, satu-satunya tempat mode malam diterapkan.
+        let profile = CelestialVisual.VisualFrame.sunProfile(
+            core: CelestialVisual.accents.sunCore,
+            photosphere: CelestialVisual.accents.sunPhotosphere)
+        let stops = profile.map { stop -> Gradient.Stop in
+            let raw = stop.radiusFraction == 0 && !NightMode.isOn
+                ? CelestialVisual.RGBComponents(red: 1, green: 1, blue: 1)
+                : stop.color
+            return Gradient.Stop(color: Self.accent(raw).opacity(stop.opacity),
+                                 location: stop.radiusFraction)
+        }
         context.fill(Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                            width: radius * 2, height: radius * 2)),
-                     with: .radialGradient(
-                        Gradient(colors: [core.opacity(0.42), core.opacity(0)]),
-                        center: center, startRadius: radius * 0.6, endRadius: radius))
+                     with: .radialGradient(Gradient(stops: stops),
+                                           center: center,
+                                           startRadius: 0, endRadius: radius))
     }
 
     // MARK: - Objek langit dalam

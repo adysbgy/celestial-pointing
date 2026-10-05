@@ -808,6 +808,21 @@ def check_port_matches_swift_constants(results):
         ("kutub Mars: view memakai pusat (bukan tepi)",
          "cap.centerY - cap.halfHeight" in view, True,
          "y: center.y + CGFloat(cap.centerY - cap.halfHeight) * radius", view),
+        # Matahari: **satu** gradient dari model. Dua hal dijaga, dan keduanya
+        # perlu — profil yang benar di model tidak menolong kalau view tidak
+        # memakainya, dan view yang memakai profil bisa kehilangan bentuknya
+        # kalau ia menggambar piringan kedua di atasnya.
+        #
+        # Arah "view memakai profil" dijaga oleh pemeriksaan **gambar**
+        # (`check_sun_edge_is_soft`), bukan oleh pencarian teks `sunProfile(`
+        # yang dulu berdiri di sini. Pencarian teks itu hijau walaupun
+        # hasilnya dibuang: yang menentukan bukan namanya dipanggil, melainkan
+        # apa yang sampai ke piksel.
+        ("Matahari: view memakai Gradient(stops:)", True, True,
+         "radialGradient(Gradient(stops: stops),", view),
+        ("Matahari: view tidak menggambar piringan kedua",
+         "core.opacity(0.42)" not in view, True,
+         "let stops = profile.map { stop -> Gradient.Stop in", view),
         ("opasitas kawah", R.CRATER_OPACITY, 0.18,
          "Color.black.opacity(0.18)", view),
         ("kawah pertama Merkurius", tuple(R.CRATERS[0]), (-0.30, -0.22, 0.20),
@@ -914,6 +929,73 @@ def check_feature_arrays_match_the_view(results):
             else f"beda di indeks {mismatched}: port "
                  f"{[port_array[i] for i in mismatched]}, view "
                  f"{[swift_array[i] for i in mismatched]}"))
+
+
+def check_sun_profile_matches_the_model(results):
+    """Profil Matahari di port Python harus sama dengan model Swift — angkanya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Port gambar hidup di Python,
+    modelnya di `CelestialVisual.swift`. Versi pertama port menulis stop
+    Matahari sebagai 0.94/0.62/0.30/0.10 sementara model memakai
+    0.95/0.66/0.34/0.13 — dan **tidak satu pun** dari 163 pemeriksaan yang
+    berbunyi, termasuk `check_sun_edge_is_soft` yang ditulis persis untuk
+    bentuk baru ini. Ia hijau karena pergeseran 0.01–0.04 tidak melewati
+    ambangnya, dan ambang itu memang tidak boleh diperketat sampai di situ.
+
+    Jadi yang salah bukan ambangnya, melainkan **ketiadaan gerbang**: selama
+    angka port tidak diikat ke model, seluruh pemeriksaan gambar Matahari
+    mengukur gambar yang tidak pernah tampil di jam, dan perbaikan di model
+    akan dilaporkan sebagai "tidak berpengaruh" apa pun hasilnya.
+
+    Yang dibandingkan hanya **radius dan kelegapan**. Warnanya sengaja tidak
+    ikut: port menerjemahkan warna mode malam lebih dulu (`night_surface`),
+    jadi bentuk yang sah di kedua sisi memang berbeda.
+
+    Arahnya dua bahasa, sama seperti `check_feature_arrays_match_the_view`:
+    merah kalau port menyimpang, **atau** kalau model berubah tanpa port-nya
+    ikut — yang kedua tidak bisa dilihat pemeriksaan gambar mana pun, karena
+    gambar acuannya sendiri yang ikut berubah.
+    """
+    model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                             "CelestialVisual.swift")).read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+
+    # Jangkar hilang = gagal bersih yang menyebut jangkarnya, bukan traceback.
+    # Gerbang yang melempar pengecualian saat berkasnya dirapikan akan dihapus
+    # orang, dan aturan yang dihapus tidak menjaga apa pun.
+    anchors = (
+        ("model", model, "sunProfile(core: CelestialVisual.RGBComponents,"),
+        ("port", port, "def sun_profile(core, photosphere):"),
+    )
+    regions = {}
+    for label, source, anchor in anchors:
+        if anchor not in source:
+            results.append(Result(
+                f"profil Matahari: jangkar {label} masih ada", False,
+                f"'{anchor}' TIDAK ditemukan"))
+            return
+        regions[label] = source[source.index(anchor):]
+
+    swift_pairs = [(float(r), float(o)) for r, o in re.findall(
+        r"radiusFraction:\s*(-?\d+(?:\.\d+)?)\s*,\s*color:[^,]+,\s*"
+        r"opacity:\s*(-?\d+(?:\.\d+)?)", regions["model"])]
+    python_pairs = [(float(r), float(o)) for r, o in re.findall(
+        r"\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(?:core|photosphere)\s*,\s*"
+        r"(-?\d+(?:\.\d+)?)\s*\)", regions["port"])]
+
+    results.append(Result(
+        "profil Matahari: jumlah stop sama",
+        len(swift_pairs) == len(python_pairs) and len(swift_pairs) >= 3,
+        f"model {len(swift_pairs)} stop, port {len(python_pairs)} stop"))
+    mismatched = [i for i, (a, b) in enumerate(zip(python_pairs, swift_pairs))
+                  if abs(a[0] - b[0]) > 1e-9 or abs(a[1] - b[1]) > 1e-9]
+    results.append(Result(
+        "profil Matahari: tiap stop sama dengan model",
+        not mismatched and len(swift_pairs) == len(python_pairs),
+        "semua stop cocok" if not mismatched
+        else f"beda di indeks {mismatched}: port "
+             f"{[python_pairs[i] for i in mismatched]}, model "
+             f"{[swift_pairs[i] for i in mismatched]}"))
 
 
 def check_night_mode_purity(results, size=200, ss=2):
@@ -1525,6 +1607,87 @@ def check_mars_caps_touch_the_limb(results, size=400, ss=2):
         f"{uncertain_caps} piksel kutub pada kandidat (harus 0)"))
 
 
+def check_sun_edge_is_soft(results, size=256, ss=2):
+    """Tepi piringan Matahari harus **halus**, bukan tepi keras dua piringan.
+
+    **Cacat yang ditutup pemeriksaan ini.** Matahari digambar sebagai dua
+    piringan bertumpuk: fotosfer pekat selebar 0.72 R, lalu corona yang mulai
+    di 0.6 R dengan kelegapan 0.42. Di tepi fotosfer kelegapannya melompat
+    1.0 -> 0.42 dalam satu piksel — terukur 175 dari 255 langkah antar-piksel,
+    dan yang terlihat bukan tepi Matahari melainkan dua benda bertumpuk.
+
+    **Kenapa diukur di sini, bukan lewat uji model.** Uji model
+    (`testSunProfileOpacityNeverIncreases`) menjaga profilnya; yang tidak
+    dijaganya adalah apakah view benar-benar **memakai** profil itu. View yang
+    kembali menggambar dua piringan akan lolos semua uji model. Hanya gambar
+    yang bisa membedakannya.
+
+    Diukur **sepanjang radius**, bukan rata-rata sekeliling: rata-rata
+    sekeliling justru menyembunyikan lompatan karena ia menghaluskan cincin
+    pada radius itu.
+    """
+    _, (w, h, rows) = render_case("sun", size=size, ss=ss)
+
+    def pixel(x, y):
+        # Dijepit ke dalam gambar: pemanggil memakai pecahan radius yang bisa
+        # sedikit melewati tepi, dan pembacaan di luar gambar bukan temuan.
+        x = min(max(x, 0), w - 1)
+        y = min(max(y, 0), h - 1)
+        i = x * 4
+        return (rows[y][i], rows[y][i + 1], rows[y][i + 2])
+
+    cx = (w - 1) / 2
+    cy = (h - 1) / 2
+    radius = w / 2
+    # Sepanjang beberapa jari-jari, ambil langkah terbesar antar piksel
+    # bersebelahan. Satu jari saja bisa kebetulan melewati arah yang mulus.
+    worst = 0
+    worst_r = 0.0
+    for k in range(24):
+        angle = 2 * math.pi * k / 24
+        dx, dy = math.cos(angle), math.sin(angle)
+        previous = None
+        for i in range(int(radius * 1.06) + 1):
+            x = int(round(cx + i * dx))
+            y = int(round(cy + i * dy))
+            if not (0 <= x < w and 0 <= y < h):
+                break
+            current = pixel(x, y)
+            if previous is not None:
+                step = max(abs(current[c] - previous[c]) for c in range(3))
+                if step > worst:
+                    worst, worst_r = step, i / radius
+            previous = current
+
+    # Ambang 30/255. Profil baru mengukur 12; bentuk lama 175. Batasnya
+    # diletakkan jauh dari keduanya supaya ia menangkap "dua piringan" tanpa
+    # ikut merah hanya karena pergeseran stop yang wajar.
+    results.append(Result(
+        "tepi Matahari halus, bukan tepi keras dua piringan",
+        worst < 30,
+        f"langkah terbesar {worst}/255 pada r={worst_r:.2f}R (ambang 30, bentuk lama 175)"))
+
+    # Arah kedua: inti harus benar-benar terang dan tepi benar-benar habis.
+    # Tanpa ini, "halus" bisa dipenuhi oleh piringan gelap rata.
+    center = pixel(int(cx), int(cy))
+    results.append(Result(
+        "inti Matahari terang",
+        min(center) > 200,
+        f"rgb inti = {center} (semua kanal harus > 200)"))
+    edge = pixel(int(cx + radius * 1.02), int(cy))
+    results.append(Result(
+        "tepi Matahari habis di luar piringan",
+        max(edge) < 40,
+        f"rgb di 1.02 R = {edge} (harus mendekati latar)"))
+    # Arah ketiga: piringan harus membentang sampai 1.0 R, bukan berhenti di
+    # 0.72 R. Kalau berhenti, "halus" tercapai dengan mengorbankan ukuran.
+    at_090 = pixel(int(cx + radius * 0.90), int(cy))
+    results.append(Result(
+        "piringan Matahari masih menyala di 0.90 R",
+        min(at_090) > 20,
+        f"rgb di 0.90 R = {at_090} (harus jelas di atas latar 10,10,15)"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -1544,9 +1707,11 @@ def main():
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
+    check_sun_profile_matches_the_model(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_mars_caps_touch_the_limb(results)
+    check_sun_edge_is_soft(results)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)

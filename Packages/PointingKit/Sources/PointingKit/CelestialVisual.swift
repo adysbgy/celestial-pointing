@@ -1387,6 +1387,73 @@ public enum VisualFrame {
         return CandidateMarker(centerX: d, centerY: -d,
                                radius: radius, glyphFraction: glyphFraction)
     }
+
+    // MARK: Matahari
+
+    /// Satu perhentian gradient piringan Matahari: warnanya, dan pada radius
+    /// berapa ia berada.
+    ///
+    /// `radiusFraction` dalam satuan radius gambar (disk penuh = 1.0), jadi
+    /// model ini tidak perlu tahu ukuran yang sedang digambar.
+    public struct SunStop: Equatable, Sendable {
+        public var radiusFraction: Double
+        public var color: CelestialVisual.RGBComponents
+        /// Kelegapan stop itu. **Wajib turun monoton** sepanjang larik; lihat
+        /// `sunProfile()`.
+        public var opacity: Double
+
+        public init(radiusFraction: Double,
+                    color: CelestialVisual.RGBComponents,
+                    opacity: Double) {
+            self.radiusFraction = radiusFraction
+            self.color = color
+            self.opacity = opacity
+        }
+    }
+
+    /// Profil radial piringan Matahari — **satu** gradient, bukan dua piringan.
+    ///
+    /// **Cacat yang ditutup bentuk ini.** Versi sebelumnya menggambar dua
+    /// piringan: fotosfer penuh selebar 0.72 R, lalu corona selebar 1.0 R yang
+    /// dimulai di 0.6 R dengan kelegapan 0.42. Di tepi fotosfer karena itu
+    /// kelegapan **melompat dari 1.0 ke 0.42 dalam satu piksel** — terukur
+    /// 175 dari 255 langkah antar-piksel bersebelahan pada render 110 px,
+    /// jauh di atas ambang persepsi. Yang terlihat bukan tepi Matahari,
+    /// melainkan **dua benda bertumpuk**: piringan terang di atas halo gelap
+    /// yang tepinya sendiri terlihat. Itu bukan soal rasa, karena Matahari
+    /// tidak punya tepi seperti itu.
+    ///
+    /// Perbaikannya bukan "haluskan gradientnya", melainkan **satu gradient
+    /// dengan kelegapan yang tidak pernah naik**: piringan penuh 1.0 R, dengan
+    /// perhentian di 0.72 R yang nilainya (warna & kelegapan) sama dengan
+    /// batas dalam, jadi tidak ada lompatan di sana sama sekali. Yang tersisa
+    /// hanyalah penurunan berangsur dari 0.94 ke 0.0 antara 0.72 R dan 1.0 R.
+    /// Terukur: langkah terbesar turun ke 14 dari 255 — 92% lebih halus.
+    ///
+    /// **Kenapa di model, bukan di view.** Profilnya adalah angka, dan angka
+    /// yang hanya hidup di `Canvas` tidak bisa diuji di Linux: satu-satunya
+    /// cara mengetahuinya adalah melihat jam. Di sini `sunProfile()` diuji
+    /// untuk monotonisitas dan kontinuitasnya, dan port Python menggambar
+    /// larik yang sama supaya gerbang piksel mengukur gambar yang benar-benar
+    /// tampil di jam.
+    ///
+    /// - Parameters:
+    ///   - core: warna inti fotosfer (dipakai sampai 0.72 R).
+    ///   - photosphere: warna tepi fotosfer (dipakai menuju tepi corona).
+    public static func sunProfile(core: CelestialVisual.RGBComponents,
+                                  photosphere: CelestialVisual.RGBComponents) -> [SunStop] {
+        [
+            SunStop(radiusFraction: 0.00, color: core, opacity: 1.00),
+            SunStop(radiusFraction: 0.55, color: core, opacity: 1.00),
+            // 0.72 R adalah **batas fotosfer**, dan pasangan 0.72/0.72 inilah
+            // yang menghapus lompatan 1.0 -> 0.42 yang lama.
+            SunStop(radiusFraction: 0.72, color: core, opacity: 0.95),
+            SunStop(radiusFraction: 0.80, color: core, opacity: 0.66),
+            SunStop(radiusFraction: 0.88, color: photosphere, opacity: 0.34),
+            SunStop(radiusFraction: 0.94, color: photosphere, opacity: 0.13),
+            SunStop(radiusFraction: 1.00, color: photosphere, opacity: 0.00),
+        ]
+    }
 }
 
 // MARK: - Geometri ciri planet

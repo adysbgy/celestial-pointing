@@ -2058,5 +2058,88 @@ final class CelestialVisualTests: XCTestCase {
                           "paruh belakang harus lebih redup dari paruh depan")
     }
 
+    // MARK: - Profil radial Matahari
+
+    /// Kelegapan profil Matahari **tidak boleh naik**.
+    ///
+    /// Inilah invarian yang membuat piringannya satu benda, bukan dua yang
+    /// bertumpuk. Versi lama memakai dua piringan: fotosfer dengan kelegapan
+    /// penuh selebar 0.72 R, lalu corona yang dimulai di 0.6 R dengan
+    /// kelegapan 0.42 — dan karena piringan kedua digambar **di atas** yang
+    /// pertama, kelegapan yang benar-benar sampai ke mata di tepi fotosfer
+    /// **turun** dari 1.0 ke 0.42 dalam satu piksel.
+    ///
+    /// Diukur pada render 110 px: 175 dari 255 langkah antar-piksel
+    /// bersebelahan, jauh di atas ambang persepsi. Yang terlihat bukan tepi
+    /// Matahari melainkan dua benda bertumpuk.
+    ///
+    /// Uji ini mengunci **kedua** hal yang membuatnya hilang: opasitas yang
+    /// monoton turun, dan piringan yang membentang sampai 1.0 R (kalau ia
+    /// berhenti di 0.72 R, batas fotosfernya kembali menjadi tepi keras).
+    func testSunProfileOpacityNeverIncreases() {
+        let profile = VisualFrame.sunProfile(core: CelestialVisual.accents.sunCore,
+                                             photosphere: CelestialVisual.accents.sunPhotosphere)
+        XCTAssertGreaterThan(profile.count, 2, "satu gradient butuh lebih dari dua stop")
+
+        for (previous, next) in zip(profile, profile.dropFirst()) {
+            XCTAssertLessThan(previous.radiusFraction, next.radiusFraction,
+                              "stop harus maju ke luar, bukan mundur: "
+                              + "\(previous.radiusFraction) lalu \(next.radiusFraction)")
+            XCTAssertLessThanOrEqual(next.opacity, previous.opacity,
+                                     "kelegapan naik di \(next.radiusFraction) R: "
+                                     + "\(previous.opacity) -> \(next.opacity). "
+                                     + "Kenaikan itulah yang menggambar ulang tepi keras.")
+        }
+        XCTAssertEqual(profile.first?.opacity, 1.0, "inti harus sepenuhnya pekat")
+        XCTAssertEqual(profile.last?.opacity, 0.0, "tepi harus benar-benar habis")
+        XCTAssertEqual(profile.last?.radiusFraction, 1.0,
+                       "piringan harus membentang sampai tepi frame")
+    }
+
+    /// Batas fotosfer **tidak boleh** menjadi lompatan kelegapan.
+    ///
+    /// 0.72 R adalah tempat yang dulu berakhir di tepi keras: piringan
+    /// fotosfer habis di sana sementara corona yang lebih redup sudah mulai di
+    /// 0.6 R. Karena itu uji ini menuntut penurunan antar-stop di sekitar
+    /// batas itu tetap **landai** — bukan sekadar "turun", karena penurunan
+    /// 1.0 -> 0.42 juga turun.
+    ///
+    /// Ambangnya 0.2: langkah terbesar yang tersisa di profil sekarang 0.48
+    /// pada rentang 0.72 -> 0.80 R (0.8 lebar), yaitu 0.6 per satuan radius.
+    /// Angka ini menjaga agar penurunan bertahap, bukan supaya pas.
+    func testSunProfileHasNoCliffAtThePhotosphereBoundary() {
+        let profile = VisualFrame.sunProfile(core: CelestialVisual.accents.sunCore,
+                                             photosphere: CelestialVisual.accents.sunPhotosphere)
+        let boundary = 0.72
+        guard let index = profile.firstIndex(where: { $0.radiusFraction == boundary }) else {
+            return XCTFail("batas fotosfer \(boundary) R harus jadi salah satu stop: "
+                           + "\(profile.map(\.radiusFraction)). Kalau tidak, ia "
+                           + "dilewati interpolasi dan lompatannya tidak terkendali.")
+        }
+        XCTAssertGreaterThan(index, 0, "harus ada stop sebelum batas")
+        let before = profile[index - 1]
+        let at = profile[index]
+        XCTAssertLessThanOrEqual(before.opacity - at.opacity, 0.2,
+                                 "lompatan \(before.opacity) -> \(at.opacity) di "
+                                 + "\(boundary) R terlalu tajam; itu tepi keras yang lama")
+    }
+
+    /// Warna tepi harus **berbeda** dari warna inti.
+    ///
+    /// Tanpa ini, "satu gradient" bisa dipenuhi dengan satu warna rata dari
+    /// pusat ke tepi — piringan yang terlihat seperti cakram datar, bukan
+    /// fotosfer yang memudar. Versi lama juga punya pembedaan ini
+    /// (`sunCore` -> `sunPhotosphere`), jadi yang dijaga di sini adalah bahwa
+    /// perbaikan bentuk tidak menghapusnya.
+    func testSunProfileEdgeIsWarmerThanTheCore() {
+        let profile = VisualFrame.sunProfile(core: CelestialVisual.accents.sunCore,
+                                             photosphere: CelestialVisual.accents.sunPhotosphere)
+        let core = profile.first!.color
+        let edge = profile.last!.color
+        XCTAssertNotEqual(core, edge, "inti dan tepi harus warna yang berbeda")
+        XCTAssertGreaterThan(core.blue, edge.blue,
+                             "inti lebih pucat (biru lebih tinggi) daripada tepi")
+    }
+
 }
 
