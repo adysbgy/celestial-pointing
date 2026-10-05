@@ -183,6 +183,10 @@ struct Experiment1View: View {
                 if let median = summary.medianRawPointingErrorDeg {
                     row(ExperimentText.medianErrorLabel, NumberFormat.degrees(median))
                 }
+                if let medianCalibrated = summary.medianCalibratedPointingErrorDeg {
+                    row(ExperimentText.medianCalibratedErrorLabel,
+                        NumberFormat.degrees(medianCalibrated))
+                }
                 if let p90 = summary.p90RawPointingErrorDeg {
                     row(ExperimentText.p90ErrorLabel, NumberFormat.degrees(p90))
                 }

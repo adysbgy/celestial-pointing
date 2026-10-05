@@ -617,6 +617,7 @@ public extension LocalizedText {
         .experimentNoAnalyzable, .experimentTrialsCountLabel,
         .experimentCorrectLabel, .experimentFalseLockLabel,
         .experimentMedianErrorLabel, .experimentP90ErrorLabel,
+        .experimentMedianCalibratedErrorLabel,
         .experimentSendThresholdLabel, .experimentInsufficientForThreshold,
         .experimentTrialsSection, .experimentNoTrials,
         .experimentDatasetSharePreview, .experimentExportLabel,

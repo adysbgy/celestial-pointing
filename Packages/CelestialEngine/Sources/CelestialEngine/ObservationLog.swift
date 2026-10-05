@@ -138,6 +138,23 @@ public struct ExperimentSummary: Codable, Equatable, Sendable {
     public var medianRawPointingErrorDeg: Double?
     /// Persentil ke-90 galat tunjuk — "seberapa buruk di kasus terburuk".
     public var p90RawPointingErrorDeg: Double?
+    /// Median galat **setelah kalibrasi** — bila ada yang terekam.
+    ///
+    /// **Kenapa ini ada, padahal `ExperimentRecorder` merekam
+    /// `calibratedPointingErrorDeg` per percobaan.** Angka itu memang ikut
+    /// ke arsip JSON tiap `AnalyzedTrial`, tapi **tidak satu pun layar yang
+    /// membacanya**: `Experiment1View.resultSection` hanya menampilkan
+    /// `medianRawPointingErrorDeg` (galat mentah). Akibatnya penguji melihat
+    /// "median 4.2°" dan tidak pernah tahu apakah kalibrasi yang baru saja
+    /// dipasang memperbaiki, atau malah memperburuk, akurasi — padahal itulah
+    /// satu-satunya alasan kalibrasi dilakukan. Ini persis kelas "dihitung
+    /// lalu dibuang": data ada, ringkasan buta terhadapnya.
+    ///
+    /// Sengaja `nil` bila tidak ada percobaan yang punya galat terkalibrasi
+    /// (mis. kalibrasi belum dipasang). `nil` ini yang menyuruh layar
+    /// menyembunyikan barisnya — bukan menampilkan "0.0°" yang akan berbohong
+    /// bahwa kalibrasi sudah bekerja.
+    public var medianCalibratedPointingErrorDeg: Double?
 
     public init(analyses: [TrialAnalysis]) {
         self.trialCount = analyses.count
@@ -147,6 +164,10 @@ public struct ExperimentSummary: Codable, Equatable, Sendable {
         let errors = analyses.map(\.rawPointingErrorDeg).sorted()
         self.medianRawPointingErrorDeg = Self.percentile(errors, 0.5)
         self.p90RawPointingErrorDeg = Self.percentile(errors, 0.9)
+
+        let calibrated = analyses.compactMap(\.calibratedPointingErrorDeg).sorted()
+        self.medianCalibratedPointingErrorDeg = calibrated.isEmpty
+            ? nil : Self.percentile(calibrated, 0.5)
     }
 
     /// Persentil dengan interpolasi linear. Mengembalikan `nil` bila kosong.

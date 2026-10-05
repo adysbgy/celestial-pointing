@@ -333,6 +333,16 @@ public enum ExperimentText {
     public static var falseLockLabel: String { TextLocalization.text(.experimentFalseLockLabel) }
     public static var medianErrorLabel: String { TextLocalization.text(.experimentMedianErrorLabel) }
     public static var p90ErrorLabel: String { TextLocalization.text(.experimentP90ErrorLabel) }
+    /// Label baris galat **setelah kalibrasi** di layar hasil.
+    ///
+    /// **Kenapa baris ini perlu, padahal layar sudah punya "Galat median".**
+    /// `medianCalibratedPointingErrorDeg` baru ada di `ExperimentSummary`;
+    /// tanpa label ini nilainya tidak bisa tampil, dan data yang sudah
+    /// diukur per percobaan (lihat `TrialAnalysis.calibratedPointingErrorDeg`)
+    /// tetap terkubur di arsip JSON tanpa satu pun layar yang membacanya.
+    public static var medianCalibratedErrorLabel: String {
+        TextLocalization.text(.experimentMedianCalibratedErrorLabel)
+    }
     public static var sendThresholdLabel: String { TextLocalization.text(.experimentSendThresholdLabel) }
     public static var insufficientForThreshold: String {
         TextLocalization.text(.experimentInsufficientForThreshold)
@@ -534,6 +544,9 @@ public extension LocalizedText {
         key: "experiment.medianError.label", id: "Galat median")
     static let experimentP90ErrorLabel = LocalizedText(
         key: "experiment.p90Error.label", id: "Galat P90")
+    /// Label baris galat terkalibrasi di layar hasil.
+    static let experimentMedianCalibratedErrorLabel = LocalizedText(
+        key: "experiment.medianCalibratedError.label", id: "Galat median (terkalibrasi)")
     static let experimentSendThresholdLabel = LocalizedText(
         key: "experiment.sendThreshold.label", id: "Kirim ambang ke jam")
     static let experimentInsufficientForThreshold = LocalizedText(

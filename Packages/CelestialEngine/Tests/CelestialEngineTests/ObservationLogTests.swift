@@ -201,6 +201,60 @@ final class ObservationLogTests: XCTestCase {
         XCTAssertEqual(summary.trialCount, 0)
         XCTAssertNil(summary.accuracy)
         XCTAssertNil(summary.medianRawPointingErrorDeg)
+        XCTAssertNil(summary.medianCalibratedPointingErrorDeg,
+                     "tanpa galat terkalibrasi, ringkasan tidak boleh berbohong 0.0°")
+    }
+
+    /// Galat terkalibrasi harus dihitung dari `calibratedPointingErrorDeg` per
+    /// percobaan — bukan diabaikan. Ini yang tertutup: angka itu memang ikut
+    /// arsip JSON, tapi tidak satu pun layar yang membacanya, jadi ringkasan
+    /// buta terhadapnya.
+    func testSummaryReportsMedianCalibratedError() throws {
+        // Kebenaran di alt 0 agar selisih azimuth = jarak sudut di langit
+        // (cos 0° = 1), sehingga galat terkalibrasi persis = nilai yang diberi.
+        // Mentah 10°/20° -> median 15°; terkalibrasi 1°/3° -> median 2°.
+        let trials: [(Double, Double?, String?)] = [
+            (10, 1.0, "sirius"),
+            (20, 3.0, "sirius"),
+        ]
+        let truth = HorizontalCoord(altitudeDeg: 0, azimuthDeg: 180)
+        let analyses = trials.compactMap { raw, cal, truthID in
+            ObservationLog.analyze(
+                trial(pointingAlt: raw, pointingAz: 180, bestID: "sirius",
+                      level: .high, truthID: truthID, calibrated: cal.map {
+                          HorizontalCoord(altitudeDeg: 0, azimuthDeg: 180 + $0)
+                      }),
+                truthDirection: truth)
+        }
+        XCTAssertEqual(analyses.count, 2)
+        let summary = ObservationLog.summarize(analyses)
+        // Median mentah = 15°, median terkalibrasi = 2°.
+        XCTAssertEqual(try XCTUnwrap(summary.medianRawPointingErrorDeg),
+                       15.0, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(summary.medianCalibratedPointingErrorDeg),
+                       2.0, accuracy: 1e-9)
+    }
+
+    /// Bila sebagian percobaan tidak punya galat terkalibrasi, hanya yang punya
+    /// yang dihitung — bukan seluruhnya dianggap nol.
+    func testSummaryMedianCalibratedIgnoresMissing() throws {
+        let truth = HorizontalCoord(altitudeDeg: 0, azimuthDeg: 180)
+        let trials: [(Double, Double?, String?)] = [
+            (10, 1.0, "sirius"),   // punya terkalibrasi 1°
+            (20, nil, "sirius"),    // tidak punya
+        ]
+        let analyses = trials.compactMap { raw, cal, truthID in
+            ObservationLog.analyze(
+                trial(pointingAlt: raw, pointingAz: 180, bestID: "sirius",
+                      level: .high, truthID: truthID, calibrated: cal.map {
+                          HorizontalCoord(altitudeDeg: 0, azimuthDeg: 180 + $0)
+                      }),
+                truthDirection: truth)
+        }
+        let summary = ObservationLog.summarize(analyses)
+        XCTAssertEqual(try XCTUnwrap(summary.medianCalibratedPointingErrorDeg),
+                       1.0, accuracy: 1e-9,
+                       "hanya percobaan berkalibrasi yang dihitung")
     }
 
     // MARK: - Arsip JSON

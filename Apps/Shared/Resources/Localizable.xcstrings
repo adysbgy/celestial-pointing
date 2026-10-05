@@ -2245,6 +2245,17 @@
         }
       }
     },
+    "experiment.medianCalibratedError.label": {
+      "comment": "Judul baris galat median setelah kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error (calibrated)"
+          }
+        }
+      }
+    },
     "experiment.noAnalyzable": {
       "comment": "Pesan saat belum ada percobaan yang bisa dianalisis.",
       "localizations": {
