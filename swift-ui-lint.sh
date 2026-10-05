@@ -2066,6 +2066,114 @@ else
   echo "Bersih: setiap denyut gambar digerbangi hasPulse."
 fi
 
+# ── Aturan 22: judul & nilai satu baris tidak boleh kunci yang sama ─────────
+# Aturan 4 menuntut teks tampilan punya **kunci**; Aturan 6 menuntut kunci itu
+# **ada di katalog**. Keduanya hijau untuk baris yang judulnya memakai kunci
+# *nilainya* — dan baris seperti itu tidak pernah menyebut apa yang diukur.
+#
+# Cacat nyata yang menutup siklus ini: `SkyContextView` menulis
+#
+#     row(TextLocalization.text(.skyContextDark),      // judul → "Gelap"
+#         context.isDark ? ... .skyContextDark         // nilai → "Gelap"
+#                        : ... .skyContextLight)       // nilai → "Terang"
+#
+# sehingga barisnya tampil **"Gelap: Gelap"** (atau "Gelap: Terang"). Katalog
+# bahkan sudah menyebut peran yang benar di komentarnya sendiri ("Nilai baris
+# kegelapan langit"), tapi view memakai kunci yang salah, dan tidak ada gerbang
+# yang bisa melihatnya: yang salah bukan keberadaan kunci, bukan paritas, dan
+# bukan kosakata — melainkan **peran**. Judul harus menamai barisnya, nilai
+# harus mengisi barisnya; keduanya tidak boleh benda yang sama.
+#
+# Yang diperiksa: pada setiap `row`/`detailRow`, himpunan kunci katalog di
+# argumen **judul** dan di argumen **nilai** tidak boleh beririsan. `detailRow`
+# ikut karena ia peritel label-lebar yang sama (lihat POS_NAMES).
+echo
+echo "== Aturan 22: judul baris tidak memakai kunci nilainya =="
+row_key_reuse=$(python3 - <<'PY' 2>&1
+import os, re
+
+CALLS = ("row(", "detailRow(")
+# Kunci katalog **yang benar-benar dipakai lewat `TextLocalization.text`**.
+# Sengaja sempit: `\.([a-z]\w*)` polos akan menangkap `text`, `isDark`, dan
+# setengah repo, dan gerbang yang selalu merah akan dimatikan orang lain saat
+# ia berbunyi.
+KEY = re.compile(r"TextLocalization\s*\.\s*text\s*\(\s*\.([A-Za-z][A-Za-z0-9]*)")
+
+def split_args(src, open_index):
+    """Argumen tingkat atas sebuah panggilan, menghormati kurung & string."""
+    args, depth, i, start, in_str, esc = [], 0, open_index, open_index + 1, False, False
+    while i < len(src):
+        ch = src[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                args.append(src[start:i])
+                return args
+        elif ch == "," and depth == 1:
+            args.append(src[start:i])
+            start = i + 1
+        i += 1
+    args.append(src[start:])
+    return args
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        for call in CALLS:
+            start = 0
+            while True:
+                i = code.find(call, start)
+                if i < 0:
+                    break
+                start = i + len(call)
+                # `detailRow(` sudah tercakup oleh `row(`; jangan dihitung dua.
+                if call == "row(" and code[max(0, i - 6):i].endswith("detail"):
+                    continue
+                if i > 0 and (code[i - 1].isalnum() or code[i - 1] in "._"):
+                    continue
+                args = split_args(code, i + len(call) - 1)
+                if len(args) < 2:
+                    continue
+                title_keys = set(KEY.findall(args[0]))
+                value_keys = set(KEY.findall(args[1]))
+                shared = title_keys & value_keys
+                if shared:
+                    line_no = code[:i].count("\n") + 1
+                    problems.append(
+                        f"  {path}:{line_no}: judul & nilai memakai kunci "
+                        f"yang sama: {', '.join(sorted(shared))}")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Judul harus menamai barisnya (mis. `skyContext.skyLabel` = "
+          "\"Langit\"), bukan mengulang nilainya.")
+    print("   Tanpa itu barisnya terbaca \"Gelap: Gelap\" dan tidak pernah "
+          "menyebut apa yang diukur.")
+PY
+)
+if [ -n "$row_key_reuse" ]; then
+  echo "$row_key_reuse"
+  status=1
+else
+  echo "Bersih: tidak ada judul baris yang memakai kunci nilainya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

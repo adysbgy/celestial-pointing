@@ -288,9 +288,15 @@ final class TextLocalizationTests: XCTestCase {
     /// tiga kunci `calibration.*.repeatedReference*` (pesan layar, catatan
     /// kecil, dan bentuk yang diucapkan). Lihat
     /// `CalibrationReferenceIndependenceTests`.
+    ///
+    /// 306 → 307 pada siklus "judul baris memakai kunci nilainya":
+    /// `skyContext.skyLabel` ("Langit") — nama baris kegelapan langit, yang
+    /// selama ini tidak ada karena judulnya memakai kunci **nilai**
+    /// (`skyContext.dark`), sehingga barisnya terbaca "Gelap: Gelap" dan tidak
+    /// pernah menyebut apa yang diukur. Dijaga Aturan 22 di `swift-ui-lint.sh`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 306, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 307, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

@@ -1,3 +1,85 @@
+## Progres terakhir (5 Okt 2026 — judul baris yang memakai kunci nilainya)
+
+### Cacatnya: baris yang benar hanya karena kebetulan
+
+`SkyContextView` punya baris "kegelapan langit" yang menyatakan apakah langit
+cukup gelap untuk melihat bintang. Isinya begini:
+
+```swift
+row(TextLocalization.text(.skyContextDark),      // judul → "Gelap"
+    context.isDark ? TextLocalization.text(.skyContextDark)   // nilai → "Gelap"
+                   : TextLocalization.text(.skyContextLight)) // nilai → "Terang"
+```
+
+Judul barisnya memakai **kunci nilainya**, bukan nama barisnya. Di langit
+gelap baris itu karena itu terbaca:
+
+    Gelap: Gelap
+
+Di langit terang: `Gelap: Terang`. Yang pertama benar hanya karena kebetulan —
+dan yang kedua, yang seharusnya menyatakan "langit belum gelap, bintang
+belum bisa dipakai", justru berbunyi seperti kontradiksi. Tidak ada satu pun
+dari kedua bentuk itu yang menyebut **apa yang sedang diukur**: baris ini
+tentang keadaan langit, dan kata "Langit" tidak pernah ada di layar.
+
+Ironisnya katalognya sudah tahu. Komentar kunci `skyContext.dark` berbunyi
+"Nilai baris kegelapan langit (gelap)" — perannya disebut tepat, *nilai*. Yang
+salah adalah view yang memakainya sebagai judul.
+
+### Kenapa tidak ada gerbang yang menangkapnya
+
+Tiga gerbang menyentuh teks tampilan, dan ketiganya hijau:
+
+| Gerbang | Yang dituntut | Status di baris ini |
+|---|---|---|
+| Aturan 4 | teks punya kunci katalog | hijau — `.skyContextDark` memang kunci |
+| Aturan 6 | kunci ada di katalog, paritas dua arah | hijau — ada, dan sebanding |
+| Aturan 19 | setiap kunci dipakai kode | hijau — dipakai, malah dua kali |
+
+Yang salah bukan **keberadaan** kunci, bukan **paritas**, dan bukan
+**kosakata** — melainkan **peran**: judul harus menamai barisnya, nilai harus
+mengisi barisnya, dan keduanya tidak boleh benda yang sama. Tidak ada gerbang
+yang menguji peran.
+
+### Yang diubah
+
+- Kunci baru `skyContext.skyLabel` ("Langit" / "Sky") — nama barisnya, yang
+  selama ini tidak pernah ada.
+- `SkyContextView` memakai kunci itu sebagai judul; nilainya tetap
+  `skyContextDark`/`skyContextLight`.
+- `LocalizedText.allKeys` + katalog + tripwire jumlah kunci (306 → 307).
+
+### Gerbang baru: Aturan 22
+
+`swift-ui-lint.sh` kini memeriksa setiap `row`/`detailRow`: himpunan kunci
+katalog di argumen **judul** dan di argumen **nilai** tidak boleh beririsan.
+Sapuan dijalankan lebih dulu ke seluruh `Apps/` untuk memastikan baris ini
+satu-satunya pelanggar; empat pemanggilan `row` lain yang terlihat mencurigakan
+diperiksa satu per satu dan terbukti bukan:
+
+| Pemanggilan | Kenapa bukan pelanggaran |
+|---|---|
+| `LinkView.swift:20` | judul `linkRowStatus`, nilai `linkValueActive`/`linkValueInactive` — beda kunci |
+| `LinkView.swift:24` | judul `linkRowReachable`, nilai `linkValueYes`/`linkValueNo` |
+| `PointingView.swift:750` | judul `skyContextCalibration`, nilai `calibrationStatusAppliedShort` |
+| `DiagnosticsView.swift:329` | judul literal `"Objek (sisa)"`, nilai `object.name` — bukan kunci |
+
+Regex kuncinya sengaja sempit (`TextLocalization.text(.nama)`) supaya tidak
+menangkap `text`, `isDark`, dan setengah repo: gerbang yang selalu merah akan
+dimatikan orang lain saat ia berbunyi.
+
+Aturannya diverifikasi **dua arah** — cacatnya disuntikkan kembali, gerbang
+merah di baris yang tepat (`PointingView.swift:739`), lalu dipulihkan dan
+gerbang hijau. Gerbang yang hanya pernah dilihat hijau tidak membuktikan apa pun.
+
+### Gerbang
+
+- `./swift-test.sh` -> **174 CelestialEngine + 594 PointingKit**, 0 gagal.
+  (Tripwire jumlah kunci bekerja: 306 → 307 ditolak lebih dulu, seperti
+  seharusnya.)
+- `./swift-ui-lint.sh` -> **22 aturan** hijau.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+
 ## Progres terakhir (5 Okt 2026 — bintang yang berdenyut di iPhone dan diam di jam)
 
 ### Cacatnya: gerak yang sudah dihitung, sudah diuji, dan tidak pernah tersambung

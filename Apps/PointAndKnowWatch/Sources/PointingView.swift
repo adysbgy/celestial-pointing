@@ -730,7 +730,13 @@ struct SkyContextView: View {
     var body: some View {
         List {
             if let context = engine.skyContext {
-                row(TextLocalization.text(.skyContextDark),
+                // Judul baris ini adalah **nama barisnya** ("Langit"), bukan
+                // nilainya. Dulu di sini `skyContextDark` ("Gelap") dipakai
+                // sebagai judul *dan* sebagai salah satu nilai, sehingga
+                // barisnya terbaca "Gelap: Gelap" — benar hanya karena
+                // kebetulan, dan tidak pernah menyebut apa yang diukur.
+                // `skyContextSkyLabel` memisahkan keduanya; dijaga Aturan 22.
+                row(TextLocalization.text(.skyContextSkyLabel),
                     context.isDark ? TextLocalization.text(.skyContextDark)
                                    : TextLocalization.text(.skyContextLight))
                 row(TextLocalization.text(.skyContextSun),

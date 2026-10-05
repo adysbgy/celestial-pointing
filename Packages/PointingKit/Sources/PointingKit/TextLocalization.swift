@@ -385,6 +385,20 @@ public extension LocalizedText {
         key: "pointing.locationFallback", id: "Lokasi: %@")
     static let skyContextDark = LocalizedText(key: "skyContext.dark", id: "Gelap")
     static let skyContextLight = LocalizedText(key: "skyContext.light", id: "Terang")
+    /// Judul baris **kegelapan langit** — nama barisnya, bukan nilainya.
+    ///
+    /// **Kenapa ini ada.** Judul baris ini dulu memakai `skyContextDark`
+    /// ("Gelap") — yang jelas adalah *nilai*-nya, bukan namanya. Baris itu
+    /// karena itu terbaca **"Gelap: Gelap"** (atau "Gelap: Terang"), dan tidak
+    /// pernah menyebut apa yang sedang diukur. Ironisnya katalognya sudah
+    /// menyebut peran yang benar di komentar kunci itu sendiri ("Nilai baris
+    /// kegelapan langit"), tapi view memakai kunci yang salah — dan tidak ada
+    /// gerbang yang bisa melihatnya: Aturan 4 hanya menuntut **adanya** kunci,
+    /// Aturan 6 hanya menuntut **paritas**, keduanya hijau. Yang menutup kelas
+    /// ini adalah Aturan 22: judul dan nilai satu baris `row` tidak boleh
+    /// berasal dari kunci yang sama.
+    static let skyContextSkyLabel = LocalizedText(
+        key: "skyContext.skyLabel", id: "Langit")
     static let skyContextSun = LocalizedText(key: "skyContext.sun", id: "Matahari")
     static let skyContextMoon = LocalizedText(key: "skyContext.moon", id: "Bulan")
     static let skyContextMoonPhase = LocalizedText(
@@ -606,7 +620,8 @@ public extension LocalizedText {
         .pointingAudioCueOn, .pointingAudioCueOff,
         .pointingLinkConnected, .pointingLinkDisconnected, .pointingLinkFailures,
         .objectDetailStaleNoteDisplay, .pointingLocationFallbackPrefix,
-        .skyContextDark, .skyContextLight, .skyContextSun, .skyContextMoon,
+        .skyContextDark, .skyContextLight, .skyContextSkyLabel,
+        .skyContextSun, .skyContextMoon,
         .skyContextMoonPhase, .skyContextSection, .skyContextCalibration,
         .skyContextAzimuth, .skyContextAltitude, .skyContextLocation,
         .skyContextLocationSource, .skyContextNotComputed,

@@ -4467,6 +4467,17 @@
         }
       }
     },
+    "skyContext.skyLabel": {
+      "comment": "Judul baris kegelapan langit — nama barisnya, bukan nilainya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
+    },
     "skyContext.sun": {
       "comment": "Judul baris altitude Matahari.",
       "localizations": {
