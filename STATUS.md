@@ -7209,3 +7209,79 @@ Keempatnya sudah terpetakan di `FORMATS`, jadi gerbang **bersih**, bukan
 lolos. Sisa 15 temuan adalah nama merek (`Point & Know`, `Experiment 1`,
 masuk `NOT_LOCALIZED`) dan angka murni tanpa kata — keduanya bukan teks
 tampilan yang perlu diterjemahkan.
+
+---
+
+## Siklus: Aturan 15 (warna mode malam) + pembukti bahwa gerbang berbunyi
+
+PRD: **"Semua warna (termasuk visual) ikut mode ini."** Alasannya
+fisiologis, bukan selera — sel batang paling sensitif di ~498-530nm,
+cahaya >620nm tidak memicu rhodopsin. Jadi konstruksi warna yang melewati
+penjaga `NightMode.isOn` bukan pelanggaran gaya: ia memancarkan cahaya
+yang mematikan adaptasi gelap 20-40 menit, di layar yang justru dipakai
+untuk melihat bintang redup.
+
+Cacatnya sudah pernah nyata: 10 dari 13 warna gambar ditulis tangan sebagai
+"merah-ish", semuanya terlihat "cukup merah" di mata, dan dua pertiga
+cahaya pita terang Bulan berada di kanal hijau/biru. Perbaikannya kini satu
+aturan (`NightVisual`, teruji di Linux), tapi tidak ada yang mencegah warna
+baru ditulis sendiri besok — `Color(red:)` API biasa, compiler tidak peduli.
+
+### Temuan utama: gerbang baru ini HIJAU PALSU
+
+Aturan 15 ditulis, dijalankan, hijau. Lalu saya suntik cacat yang **persis
+seperti yang pernah nyata**:
+
+    private static func warnaUji() -> Color {
+        Color(red: 0.62, green: 0.30, blue: 0.16)
+    }
+
+Gerbang **tetap hijau**. Sebabnya: batas fungsinya memakai
+`rfind("\nfunc")`, yang tidak pernah cocok dengan `private static func` —
+ada kata kunci akses di depannya. `rfind` mengembalikan -1, rentangnya
+jatuh ke seluruh berkas, dan penjaga `NightMode.isOn` di fungsi *lain*
+membuat warna tak berpenjaga dilaporkan bersih.
+
+Gerbang itu lulus pada kode benar **dan** pada kode salah — sama saja
+dengan tidak ada. Diperbaiki: batas fungsi dihitung dari deklarasi `func`
+berawalan kata kunci akses, bukan dari `rfind("\nfunc")`.
+
+### Penjaganya: `red-lint.sh`
+
+Cacat di atas tidak terlihat dari membaca kode, jadi ia butuh penjaga.
+`red-lint.sh` menyuntik cacat, **mewajibkan gerbang keluar bukan-nol**,
+lalu memulihkan berkasnya. Dua arah terbukti:
+
+| Kondisi gerbang | Hasil `red-lint.sh` |
+|---|---|
+| Sehat | MERAH — exit 1, menyebut barisnya |
+| Buta (mutasi `rfind`) | "HIJAU PALSU" tertolak — exit 1 |
+
+**Catatan jujur:** coba pertama `red-lint.sh` sendiri hijau palsu. Ia
+memeriksa `grep` pada judul aturan (`== Aturan 15: ...`), padahal judul
+selalu tercetak entah ada temuan atau tidak. Diperbaiki dengan
+mensyaratkan exit code GAGAL lebih dulu, baru kecocokan teks.
+
+Langkah ini terhubung ke CI, supaya pembuktian berjalan otomatis — bukan
+hanya saat seseorang ingat mengujinya.
+
+### Yang diubah
+- **`swift-ui-lint.sh`:** Aturan 15 — setiap `Color(red:`/`Color(hue:)` di
+  `Apps/` wajib berada di bawah penjaga `NightMode.isOn` di fungsi sama.
+  `Color(white:)`/`Color(gray:)` sengaja tidak masuk (netral/tidak
+  memancarkan).
+- **`red-lint.sh`** (baru): pembukti suntik-&-pulihkan untuk gerbang sapu.
+- **`.github/workflows/engine-tests.yml`:** langkah pembuktian.
+
+### Dibuktikan
+- Gerbang MERAH pada cacat suntikan, hijau setelah berkas dipulihkan.
+- `red-lint.sh` menolak gerbang yang dibuat buta lewat mutasi.
+- `./swift-test.sh`: 487 uji hijau, 0 gagal.
+- CI: Engine Tests (Linux) + Apple Build, keduanya `success`.
+
+### Yang diperiksa dan ternyata BERSIH
+Tiga `Color(red:` di `CelestialVisualView.swift` (baris 109, 119, 534)
+semuanya sudah di bawah penjaga. Baris 546 memakai `.white`, tapi hanya di
+cabang `else` (siang) — saat malam ia memakai `core` yang merah murni.
+Jadi klaim di komentar berkas ("Semua warna membaca NightMode.isOn")
+terbukti, bukan sekadar tertulis.

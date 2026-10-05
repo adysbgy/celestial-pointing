@@ -136,6 +136,130 @@ final class ExperimentTextTests: XCTestCase {
                           ExperimentText.verdictCorrectSentence)
     }
 
+    /// **Empat putusan yang dipakai layar, diuji satu per satu.**
+    ///
+    /// Kenapa uji ini ada: `Experiment1View` menampilkan
+    /// `verdictFalseLock` / `verdictCorrect` / `verdictWrong` /
+    /// `verdictNotAnalyzed` sebagai badge di baris percobaan. Uji terjemahan
+    /// di bawah hanya memeriksa **dua** yang pertama, jadi dua sisinya
+    /// tidak pernah dibuktikan punya padanan bahasa. Kalau kunci katalog
+    /// untuk `wrong` atau `notAnalyzed` hilang besok, `text()` jatuh diam-
+    /// diam ke bawaan Bahasa Indonesia: badge berbahasa Indonesia di tengah
+    /// layar yang serba Inggris, tanpa satu pun uji berbunyi.
+    ///
+    /// Ini bukan cacat yang dikarang. Sapuan atas `public` API PointingKit
+    /// yang tidak disebut di berkas uji menemukan keempatnya sekaligus —
+    /// persis kelas "teruji" yang hanya berarti "kebetulan dipakai".
+    func testEveryVerdictShownOnScreenHasAnEnglishForm() {
+        let english: [String: String] = [
+            "experiment.verdict.falseLock": "FALSE LOCK-en",
+            "experiment.verdict.correct": "correct-en",
+            "experiment.verdict.wrong": "wrong-en",
+            "experiment.verdict.notAnalyzed": "not analyzed-en",
+            "experiment.verdict.falseLock.sentence": "False lock sentence-en",
+            "experiment.verdict.correct.sentence": "Correct sentence-en",
+            "experiment.verdict.wrong.sentence": "Wrong sentence-en",
+            "experiment.verdict.notAnalyzed.sentence": "Not analyzed sentence-en",
+        ]
+        EnglishTranslation.install(english)
+        // Bentuk pendek — yang tampil sebagai badge.
+        XCTAssertEqual(ExperimentText.verdictFalseLock, "FALSE LOCK-en")
+        XCTAssertEqual(ExperimentText.verdictCorrect, "correct-en")
+        XCTAssertEqual(ExperimentText.verdictWrong, "wrong-en")
+        XCTAssertEqual(ExperimentText.verdictNotAnalyzed, "not analyzed-en")
+        // Bentuk kalimat — yang diucapkan. Keempatnya harus berbeda dari
+        // bentuk pendeknya, kalau tidak satu permukaan kehilangan bentuk
+        // yang benar untuknya.
+        XCTAssertEqual(ExperimentText.verdictFalseLockSentence,
+                       "False lock sentence-en")
+        XCTAssertEqual(ExperimentText.verdictCorrectSentence,
+                       "Correct sentence-en")
+        XCTAssertEqual(ExperimentText.verdictWrongSentence,
+                       "Wrong sentence-en")
+        XCTAssertEqual(ExperimentText.verdictNotAnalyzedSentence,
+                       "Not analyzed sentence-en")
+    }
+
+    /// **Katalog asli wajib memuat terjemahan `en` untuk setiap putusan.**
+    ///
+    /// Kenapa uji kedua, kalau yang di atas sudah memeriksa keempatnya:
+    /// uji di atas **memasang kamusnya sendiri** lewat
+    /// `EnglishTranslation.install`, jadi ia membuktikan *mekanisme*
+    /// penerjemahan bekerja — bukan bahwa katalognya lengkap. Ini terukur:
+    /// saya hapus entri `en` untuk `experiment.verdict.wrong` dari
+    /// `Localizable.xcstrings`, dan **488 uji tetap hijau**. Yang di atas
+    /// tidak berbunyi sama sekali.
+    ///
+    /// Akibatnya nyata. Kunci ini tidak punya `stringUnit` sendiri —
+    /// `sourceLanguage` katalog adalah `id`, jadi tanpa `en` teksnya jatuh
+    /// ke bawaan Bahasa Indonesia. Pengguna berbahasa Inggris melihat badge
+    /// "salah" di tengah layar yang serba Inggris, dan tidak ada uji yang
+    /// tahu. Tanpa uji ini, katalog yang membusuk tidak ketahuan sampai
+    /// seseorang melihat layarnya.
+    ///
+    /// Jadi yang diperiksa di sini adalah **berkas katalognya**, bukan
+    /// accessor-nya.
+    func testCatalogueShipsAnEnglishFormForEveryVerdict() {
+        // `Bundle.module` tidak ada: PointingKit tidak membawa resource
+        // bundle, jadi katalog dicari di pohon sumber. Uji ini sengaja
+        // **gagal** bila katalog tidak ditemukan, bukan dilewati —
+        // pemeriksaan yang dilewati akan berhenti berlaku tanpa ada yang
+        // melihatnya.
+        guard let url = catalogueURLBySearching() else {
+            XCTFail("Katalog Localizable.xcstrings tidak ditemukan; "
+                    + "ujian terjemahan tidak bisa dijalankan.")
+            return
+        }
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let strings = json["strings"] as? [String: Any] else {
+            XCTFail("Katalog tidak bisa dibaca sebagai JSON.")
+            return
+        }
+        // **Seluruh** kunci katalog, bukan hanya yang dipakai `Experiment1View`.
+        //
+        // Kenapa diperluas: cacatnya bukan pada delapan putusan itu,
+        // melainkan pada **siapa pun yang menambah kunci dan lupa
+        // menerjemahkannya**. Sapuan membuktikan saat ini 312 kunci semuanya
+        // punya `en` — jadi memeriksa keseluruhan katalog tidak membuat uji
+        // merah sekarang, dan justru membuat kunci baru yang tidak
+        // diterjemahkan langsung tertolak. Pemeriksaan yang hanya mencakup
+        // delapan kunci akan membiarkan 304 sisinya membusuk tanpa suara.
+        //
+        // `NOT_LOCALIZED` di `swift-ui-lint.sh` mengecualikan nama merek
+        // ("Point & Know", "Experiment 1") dari Aturan 4. Di sini tidak ada
+        // pengecualian: katalog boleh memuat nama merek dengan `en` yang
+        // sama, dan kalau tidak, itu memang perlu dilihat.
+        let needed = strings.keys.sorted()
+        for key in needed {
+            guard let unit = strings[key] as? [String: Any] else {
+                XCTFail("Kunci katalog hilang: \(key)")
+                continue
+            }
+            let localizations = unit["localizations"] as? [String: Any] ?? [:]
+            let english = (localizations["en"] as? [String: Any])?["stringUnit"] as? [String: Any]
+            XCTAssertNotNil(english?["value"] as? String,
+                            "\(key) tidak punya terjemahan 'en'; "
+                            + "tanpanya teksnya jatuh ke bawaan Bahasa Indonesia.")
+        }
+    }
+
+    /// Cari katalog di pohon sumber bila `Bundle.module` kosong (uji Linux
+    /// tanpa resource bundle).
+    private func catalogueURLBySearching() -> URL? {
+        var dir = URL(fileURLWithPath: #filePath)
+        // Naik dari `.../Tests/PointingKitTests/` ke akar repo.
+        for _ in 0..<6 {
+            dir.deleteLastPathComponent()
+            let candidate = dir.appendingPathComponent(
+                "Apps/Shared/Resources/Localizable.xcstrings")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
     /// Terjemahan memasang kata yang menggantikan bawaan.
     ///
     /// Kalau sebuah kalimat tidak punya entri katalog, `text()` jatuh ke
