@@ -6814,9 +6814,33 @@ ke PointingKit.
 
 - CelestialEngine **171 → 172** hijau (Docker swift:6.0). PointingKit tetap
   485 (tidak disentuh).
-- CI: Engine Tests (Linux) `37245795702` = success; Apple Build `37245795699`
-  = success (gerbang "Peringatan kode sendiri" lolos — tak ada warning kode
-  kita).
+- CI: Engine Tests (Linux) `37245795702` = success; Apple Build **= failure**
+  (lihat koreksi di bawah), lalu hijau di `a103cd2`.
+
+### Koreksi proses: "✓ Complete job" bukan berarti run hijau
+
+Apple Build pada dua push pertama (`2076f8c`, `ed423aa`) **gagal**, dan saya
+melaporkannya sebagai hijau. Alasannya: `gh run watch` mencetak
+`✓ Complete job` — itu berarti **job-nya selesai**, bukan run-nya sukses.
+`gh run view --json conclusion` satu push kemudian menunjukkan `failure`
+pada job `App (iPhone + Watch)`.
+
+Penyebabnya **bukan** kode: Aturan 10 ("hitungan uji di README cocok dengan
+berkas uji") memerah karena uji baru menambah CelestialEngine ke 172 sementara
+README masih menulis 171. Log yang membenarkan:
+
+    README bilang CelestialEngine 171, berkas uji berisi 172.
+
+Diperbaiki di `a103cd2` (`README.md` 171 → 172), dan ketiga gerbang lokal
+(`swift-test.sh`, `swift-typecheck.sh`, `swift-ui-lint.sh`) hijau lagi
+serta Apple Build `a103cd2` = success.
+
+**Pelajaran yang dipakai seterusnya.** Gerbang Aturan 10 justru menangkap
+kekurangan yang tidak terlihat dari layar atau diff — dan kegagalannya saya
+salah baca. Dua hal yang harus dibedakan:
+- "✓ Complete job" (job selesai) ≠ `conclusion: success` (run hijau).
+- Semua job harus dicek lewat `gh run view --json conclusion,jobs`, bukan
+  dari baris `✓` terakhir pada `gh run watch`.
 
 ## Cara test
     cd /home/ubuntu/projects/celestial-pointing
