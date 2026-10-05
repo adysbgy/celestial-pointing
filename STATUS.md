@@ -1,3 +1,89 @@
+## Progres terakhir (5 Okt 2026 — aksesor display didokumentasikan sebagai dipakai, lalu disalin)
+
+### Premis siklus ini: "dipakai view" yang tidak pernah dipakai
+
+Sapuan `Tools/sweep-unconsumed.sh` (baru, hasil akhir siklus sebelumnya)
+menemukan anggota `public` di `PointingKit` yang namanya tidak muncul di
+`Apps/`. Di antaranya ada lima yang **dokumentasinya menyatakan akan dipakai
+view**:
+
+| Aksesor | Yang diklaim | Kenyataan |
+|---|---|---|
+| `ObjectSpeech.magnitudeDisplay` | dipakai view | 0 pemanggil di `Apps/` |
+| `ObjectSpeech.coordinatesDisplay` | dipakai view | 0 pemanggil |
+| `ObjectSpeech.staleShortNote` | dipakai view | 0 pemanggil |
+| `CalibrationText.captureAltitudeDisplay` | dipakai view | 0 pemanggil |
+| `RowSpeech.spokenWristRate` | dipakai baris status jam | 0 pemanggil |
+
+Dan tiga view memang menulis ulang pemanggilan kuncinya **persis**, baris demi
+baris: `PointingView.kindLine`, `PointingView.statusParts`,
+`ReducedLuminanceView`, `CalibrationView`.
+
+### Kenapa gerbang lama tidak menyala
+
+Isi kuncinya **sama persis** — itu sebabnya. Aturan 4 (kunci ada di katalog) dan
+Aturan 6 (paritas) keduanya tetap hijau sepanjang salinan itu ada, karena
+memang tidak ada yang salah secara harfiah. Yang hilang bukan tampilan: yang
+hilang adalah **alasan aksesor itu ada** — teks layar jadi tidak bisa diuji di
+Linux, karena yang teruji tinggal salinannya yang tidak pernah dirender.
+
+Bentuk paling licin dari kelas yang berulang di repo ini: dokumentasinya benar,
+uji-ujinya benar, dan perubahan katalog berikutnya tidak akan mengubah apa pun
+di layar.
+
+### Yang diperbaiki
+
+- Lima aksesor sekarang benar-benar dipakai. Kalimat yang tampil di layar
+ identsik dengan yang sudah ada — perbaikannya tidak mengubah apa yang dilihat
+  pengguna, hanya membuat jalur ke teks itu **satu** dan bisa diuji.
+- **`DisplayWrapperTests`** (3 uji) mengunci dua sisi: paritas aksesor dengan
+  pemanggilan langsung (menangkap salinan), dan nilai Indonesianya sebagai nilai
+  mutlak (menangkap cacat yang sama-sama dibagi kedua jalur — bentuk "hijau
+  bersama-sama" yang sudah pernah dipakai siklus "Percobaan menyusut").
+- **Aturan 17** (baru) menyapu pemanggilan kunci dari pembungkus murni yang ada
+  di `Apps/`. Syarat "murni" itu yang menjaga gerbang dari positif palsu:
+  `spokenRate` menghitung satuan lebih dulu lalu meneruskan ke kunci, jadi ia
+  bukan pembungkus murni dan pemanggilan kuncinya di dalam paket tidak dihitung.
+
+### Cara gerbang ini dibuktikan bisa merah
+
+Aturan 17 sempat **hijau di atas kode yang rusak**. Penyebabnya bukan logikanya:
+uji "murni" membuang `return { } ;` dan spasi, tapi **tidak** membuang baris
+komentar — dan setiap aksesor di repo ini punya komentar. Jadi tak satu pun
+terkenal sebagai pembungkus murni, `owned` kosong, dan gerbang tidak punya
+apa pun untuk ditangkap.
+
+Diperbaiki dengan membuang komentar **sebelum** whitespace. Urutannya penting:
+kalau whitespace lebih dulu dihapus, `// x` dan `/* */` menyatu jadi `/.../`
+dan sisa `//` ikut hilang — satu baris komentar masih lolos sebagai "murni".
+Setelah itu: reintroduksi keempat cacat → Aturan 17 merah di keempatnya; kode
+yang benar → hijau.
+
+### Satu kelas crash yang masih nyata
+
+Uji pertama ikut crash (signal 7 di `CFStringCreateWithFormat`) karena
+`spokenWristRate` meneruskan `Int` ke template `%.0f`. Bukan bug produksi —
+pemanggil aslinya sudah benar — tapi Aturan 11 menjaga **tipe** specifier,
+bukan tipe argumen, jadi kelas ini masih bisa masuk lewat sisi yang satu.
+
+### Gerbang
+
+- `swift-test.sh` → **172 CelestialEngine + 547 PointingKit**, 0 gagal
+  (543 → 547, +4). **Engine tidak disentuh.**
+- `swift-ui-lint.sh` → **17 aturan hijau** (Aturan 10 menangkap README 543 → 547).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- CI: `37280209774` (Engine Tests Linux) + `37280209912` (Apple Build macos-15)
+  — **dua-duanya hijau**.
+
+### Batas yang jujur
+
+- **Gerbang ini tidak bisa melihat semua salinan.** Ia hanya memahami kunci
+  yang punya pembungkus murni. Kunci yang dirakit sendiri (mis. dari
+  `parts.joined`) di luar cakupannya — dan itu memang bentuk yang berbeda.
+- **`spokenWristRate` kini dipakai, tapi `RowSpeech` masih punya anggota lain
+  yang belum dipastikan terpakai.** Sapuan ketat akan menjadi unit berikutnya;
+  ia sengaja belum digabung ke sini supaya unit siklusnya tetap kecil.
+
 ## Progres terakhir (5 Okt 2026 — LinkView dilokalkan; EN masuk sebagai terjemahan)
 
 ### Lanjutan Fase C #2
