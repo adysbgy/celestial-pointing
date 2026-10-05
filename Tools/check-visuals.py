@@ -701,8 +701,39 @@ def check_port_matches_swift_constants(results):
          "math.sqrt(max(0.0, 1 - y * y))", port, "render-visuals.py"),
         ("opasitas pita Jupiter", R.BAND_OPACITY, 0.55,
          "opacity(0.55)", view),
+        # Pita cincin Saturnus. **Kelas cacat yang sama** dengan Bintik Merah
+        # Besar di bawah: struktur yang punya nama di data nyata hidup di
+        # dalam view, jadi tidak ada uji Linux yang bisa memeriksanya. Yang
+        # dijaga di sini karena itu bukan angkanya saja, melainkan **dari mana
+        # view membacanya**: batas pita dan opasitasnya harus datang dari
+        # `saturnRingBands()`, bukan ditulis ulang sebagai elips pekat.
+        ("pita cincin: batas nyata", R.SATURN_RING_REAL_EDGES,
+         [1.11, 1.236, 1.525, 1.95, 2.025, 2.269],
+         "let realEdges = [1.11, 1.236, 1.525, 1.95, 2.025, 2.269]", model),
+        ("pita cincin: opasitas per pita", R.SATURN_RING_BAND_OPACITIES,
+         [0.14, 0.34, 0.78, 0.04, 0.62],
+         "let opacities = [0.14, 0.34, 0.78, 0.04, 0.62]", model),
+        ("pita cincin: lebar celah Cassini", R.SATURN_CASSINI_WIDTH, 0.06,
+         "cassiniWidth: Double = 0.06", model),
+        ("pita cincin: skala paruh belakang", R.RING_BACK_HALF_OPACITY_SCALE,
+         0.55, "ringBackHalfOpacityScale: Double = 0.55", model),
+        # Arah kedua: view harus benar-benar memakai pita, dan menggambarnya
+        # **di kedua paruh**. Tanpa pemeriksaan ini, view bisa kembali ke satu
+        # elips pekat dengan celah hanya di paruh bawah — bentuk yang sudah
+        # terbukti salah — sementara seluruh angka di atas tetap benar.
+        ("pita cincin: view memakai saturnRingBands()",
+         "VisualFrame.saturnRingBands()" in view, True,
+         "let bands = VisualFrame.saturnRingBands()", view),
+        ("pita cincin: view menggambar paruh belakang",
+         view.count("back.fill(ringPath(") >= 1, True,
+         "back.fill(ringPath(CGFloat(band.outerRadius) * fullWidth,", view),
+        ("pita cincin: view menggambar paruh depan",
+         view.count("front.fill(ringPath(") >= 1, True,
+         "front.fill(ringPath(CGFloat(band.outerRadius) * fullWidth,", view),
+        ("pita cincin: view tidak lagi memakai elips hitam sebagai celah",
+         "Color.black.opacity(0.28)" not in view, True,
+         "style: FillStyle(eoFill: true)", view),
         # Bintik Merah Besar. **Empat** angka ini dijaga, dan gerbang yang
-        # menjaganya cuma satu angka: sampai siklus ini yang diperiksa hanya
         # `SPOT_RECT[0]` (-0.36) — nilai yang **kebetulan sama** di kedua
         # tafsir. Lariknya diperlakukan sebagai **pusat** di port Python,
         # sementara view Swift menulisnya ke `CGRect` sehingga angkanya
@@ -733,12 +764,6 @@ def check_port_matches_swift_constants(results):
         ("Bintik Merah Besar: view menghitung pusat (bukan sudut)",
          "spot.centerX - spot.width / 2" in view, True,
          "center.x + CGFloat(spot.centerX - spot.width / 2) * radius", view),
-        ("opasitas cincin belakang", R.RING_BACK_OPACITY, 0.45,
-         "ringColor.opacity(0.45)", view),
-        ("opasitas cincin depan", R.RING_FRONT_OPACITY, 0.8,
-         "ringColor.opacity(0.8)", view),
-        ("opasitas celah Cassini", R.RING_GAP_OPACITY, 0.28,
-         "Color.black.opacity(0.28)", view),
         ("opasitas kutub Mars", R.POLAR_CAP_OPACITY, 0.85,
          "capColor.opacity(0.85)", view),
         ("opasitas kawah", R.CRATER_OPACITY, 0.18,
@@ -906,6 +931,97 @@ def check_planet_features_present(results, size=200, ss=2):
         "kutub Mars di kedua sisi", top is not None and bottom is not None
         and sum(top[0]) > 500 and sum(bottom[0]) > 500,
         f"utara={top[0] if top else None}, selatan={bottom[0] if bottom else None}"))
+
+
+def check_saturn_ring_bands_render(results, size=200, ss=2):
+    """Cincin Saturnus harus tergambar sebagai **pita**, dan di kedua paruh.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini cincin digambar
+    sebagai satu elips pekat (opasitas 0.45 belakang, 0.8 depan) dengan
+    sebuah elips hitam 0.28 sebagai "pembelah Cassini". Pemeriksaan lama
+    menjaga **angkanya** (`RING_BACK_OPACITY == 0.45`) dan itu hijau — jadi
+    tiga hal salah sekaligus tidak terlihat:
+
+      - tidak ada pita D/C/B/A sama sekali;
+      - celahnya diletakkan 0.34 x radius bola dari tepi luar (≈0.75 R
+        cincin), sedangkan pembelah Cassini nyata di 0.886 R — jadi ia
+        memotong pita A, bukan memisahkan B dari A;
+      - celahnya digambar hanya di dalam klip paruh bawah, jadi paruh
+        belakang tidak punya celah sama sekali.
+
+    **Cara mengukurnya, dan kenapa bukan cara yang lebih sederhana.** Cincin
+    adalah elips, jadi memindai **baris** atau **kolom** menembusnya pada
+    lintasan diagonal: nilainya berubah karena elipsnya menyempit, bukan
+    karena pitanya berganti. Versi pertama pemeriksaan ini melakukan itu dan
+    melaporkan celahnya di 0.57 R (belakang) dan 0.94 R (depan) — dua angka
+    yang keduanya artefak lintasan, bukan celahnya. Yang benar adalah
+    mencuplik **sepanjang elips cincin itu sendiri** pada radius tertentu,
+    lalu mengambil nilai tengahnya (median, bukan maksimum — maksimum
+    tertarik oleh tepi yang di-antialias).
+
+    Cuplikan di dalam proyeksi bola dibuang: di sana yang terlihat adalah
+    permukaan planet, bukan cincin. Ambangnya **relatif** terhadap pita
+    terang di paruh yang sama, bukan angka mutlak, karena opasitas cincin
+    bergantung mode malam.
+    """
+    _, (w, h, rows) = render_case("planet-saturn-confirmed", size=size, ss=ss)
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    ring = R.saturn_ring()
+    axial = ring["half_height"] / ring["half_width"]
+    body = R.saturn_body_radius(ring)
+    bands = R.saturn_ring_bands()
+
+    def ring_value(r, half):
+        """Median kanal merah sepanjang elips cincin pada radius `r`."""
+        samples = []
+        for degree in range(2, 89, 2):
+            angle = math.radians(degree)
+            xr = r * math.cos(angle)
+            yr = r * axial * math.sin(angle)
+            # Lewati bagian yang terhalang bola: di sana bukan cincin.
+            if abs(xr) <= body + 0.02:
+                continue
+            x = int(round(cx + xr * radius))
+            y = int(round(cy + half * yr * radius))
+            if 0 <= x < w and 0 <= y < h:
+                samples.append(rows[y][x * 4])
+        if len(samples) < 4:
+            return None
+        samples.sort()
+        return samples[len(samples) // 2]
+
+    def band_radius(index):
+        band = bands[index]
+        return (band[0] + band[1]) / 2.0
+
+    for label, half in (("belakang", -1.0), ("depan", 1.0)):
+        gap = ring_value(band_radius(3), half)      # celah Cassini
+        bright_b = ring_value(band_radius(2), half)  # pita B
+        outer_a = ring_value(band_radius(4), half)   # pita A
+        if gap is None or bright_b is None or outer_a is None:
+            results.append(Result(f"cincin: celah Cassini paruh {label}", False,
+                                  "tidak cukup piksel cincin di luar bola"))
+            continue
+        # Celah harus **lebih gelap dari pita di kedua sisinya**. Itu yang
+        # membuatnya terbaca sebagai pemisah, bukan sebagai tepi cincin.
+        results.append(Result(
+            f"cincin: celah Cassini paruh {label}",
+            gap < bright_b - 12 and gap < outer_a - 12,
+            f"celah {gap}, pita B {bright_b}, pita A {outer_a}"))
+
+    # Paruh belakang lebih redup: diukur pada pita B, pita terpekat, supaya
+    # yang dibandingkan cincin dengan cincin (bukan cincin dengan latar).
+    back_b = ring_value(band_radius(2), -1.0)
+    front_b = ring_value(band_radius(2), 1.0)
+    if back_b is not None and front_b is not None:
+        results.append(Result(
+            "cincin: paruh belakang lebih redup dari depan",
+            back_b < front_b,
+            f"belakang {back_b} < depan {front_b}"))
+    else:
+        results.append(Result("cincin: paruh belakang lebih redup dari depan",
+                              False, "pita B tidak terukur di salah satu paruh"))
 
 
 def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
@@ -1158,6 +1274,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_saturn_ring_bands_render(results, args.size, args.ss)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)

@@ -1740,5 +1740,87 @@ final class CelestialVisualTests: XCTestCase {
                           "bintik terjauh \(spot.farthestCorner) R — keluar dari bola")
     }
 
+    /// Pita cincin Saturnus: urut, tidak tumpang tindih, dan celahnya di
+    /// tempat yang benar.
+    ///
+    /// **Kenapa ini diuji, padahal angkanya konstanta.** Cincin digambar dari
+    /// larik batas, dan larik yang salah urut atau tumpang tindih tetap
+    /// menghasilkan gambar — hanya gambar yang salah, tanpa satu pun galat.
+    /// Tiga invarian di bawah adalah yang paling mudah rusak saat seseorang
+    /// menyetel ulang angkanya:
+    ///
+    ///   1. **Urut naik.** Pita yang batasnya terbalik tergambar sebagai
+    ///      cincin dengan lubang negatif — yaitu tidak tergambar sama sekali.
+    ///   2. **Tidak tumpang tindih.** Pita yang saling menimpa membuat
+    ///      opasitasnya bertambah, jadi pita B yang pekat bisa berubah
+    ///      menjadi bidang putih rata di bagian yang menimpa.
+    ///   3. **Celah Cassini ada di antara pita B dan A**, bukan di tepi luar.
+    ///      Cacat lama menaruh celahnya di 0.34 R dari tepi luar, yang
+    ///      memotong pita A dan bukan memisahkan B dari A.
+    func testSaturnRingBandsAreOrderedAndLeaveACassiniGap() {
+        let bands = VisualFrame.saturnRingBands()
+        XCTAssertEqual(bands.count, 5, "D, C, B, celah Cassini, A")
+
+        for band in bands {
+            XCTAssertLessThan(band.innerRadius, band.outerRadius,
+                              "pita terbalik: \(band.innerRadius)…\(band.outerRadius)")
+            XCTAssertGreaterThan(band.width, 0, "pita tanpa lebar")
+            XCTAssertGreaterThanOrEqual(band.opacity, 0)
+            XCTAssertLessThanOrEqual(band.opacity, 1)
+        }
+        for (inner, outer) in zip(bands, bands.dropFirst()) {
+            XCTAssertEqual(inner.outerRadius, outer.innerRadius, accuracy: 1e-12,
+                           "pita tumpang tindih atau berlubang")
+        }
+
+        // Cincin mulai di tepi bola dan berakhir di tepi frame.
+        XCTAssertEqual(bands.first!.innerRadius,
+                       VisualFrame.saturnBodyRadius(for: VisualFrame.saturnRing()),
+                       accuracy: 1e-12,
+                       "tepi dalam cincin harus bertemu tepi bola")
+        XCTAssertEqual(bands.last!.outerRadius, VisualFrame.halfExtent, accuracy: 1e-12,
+                       "tepi luar cincin harus menyentuh tepi frame")
+
+        // Celah Cassini: pita ke-4 (indeks 3), dan ia yang paling kosong.
+        let gap = bands[3]
+        XCTAssertEqual(gap.opacity, bands.map(\.opacity).min()!,
+                       "celah Cassini harus pita paling kosong")
+        XCTAssertLessThan(gap.opacity, 0.10, "celah harus hampir kosong")
+        XCTAssertGreaterThan(gap.innerRadius, 0.8,
+                             "celah Cassini ada di ≈0.886 R cincin, bukan di tepi luar")
+        XCTAssertLessThan(gap.outerRadius, 0.98,
+                          "celah Cassini bukan tepi luar cincin")
+    }
+
+    /// Cincin harus **punya struktur**, bukan bidang rata.
+    ///
+    /// Cacat lama menggambar satu elips pekat: tidak ada pita, jadi tidak ada
+    /// yang bisa membedakan Saturnus dari piring. Uji ini mengunci bahwa
+    /// opasitasnya benar-benar berbeda antar-pita, sehingga "meratakan"
+    /// seluruh pita menjadi satu nilai tidak bisa ditulis ulang diam-diam.
+    func testSaturnRingBandsHaveDistinctDensities() {
+        let bands = VisualFrame.saturnRingBands()
+        let opacities = bands.map(\.opacity)
+        XCTAssertEqual(Set(opacities).count, opacities.count,
+                       "setiap pita punya kepadatan sendiri: \(opacities)")
+
+        // Pita B harus yang paling pekat, dan celah Cassini yang paling tipis
+        // — bukan sebaliknya. Urutan itu yang membuat cincin terbaca sebagai
+        // cincin Saturnus, bukan sebagai cincin bergaris acak.
+        let brightest = bands.max(by: { $0.opacity < $1.opacity })!
+        XCTAssertEqual(brightest.innerRadius, bands[2].innerRadius,
+                       "pita B (indeks 2) harus yang paling pekat")
+    }
+
+    /// Paruh belakang cincin harus **lebih redup**, bukan sama.
+    ///
+    /// Kalau skalanya 1.0, cincin belakang sama terang dengan depan dan tidak
+    /// ada lagi yang menunjukkan mana yang di belakang planet.
+    func testRingBackHalfIsDimmerThanTheFront() {
+        XCTAssertGreaterThan(VisualFrame.ringBackHalfOpacityScale, 0)
+        XCTAssertLessThan(VisualFrame.ringBackHalfOpacityScale, 1,
+                          "paruh belakang harus lebih redup dari paruh depan")
+    }
+
 }
 

@@ -522,9 +522,17 @@ MARIA = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
          (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]        # VIEW: `drawMoon`
 MOON_PATH_STEPS = 72                                     # VIEW: `drawMoon`
 SPIKE_OPACITY = 0.45                                     # VIEW: `drawStar`
-RING_BACK_OPACITY = 0.45                                 # VIEW: `drawRings`
-RING_FRONT_OPACITY = 0.80                                # VIEW: `drawRings`
-RING_GAP_OPACITY = 0.28                                  # VIEW: `drawRings`
+# Pita cincin Saturnus. Batasnya **radius cincin nyata** dalam satuan radius
+# Saturnus, dipetakan ke frame oleh `saturn_ring_bands()`; opasitas mengikuti
+# kepadatan pita sebenarnya (D sangat tipis, B paling pekat, celah hampir
+# kosong). MODEL: `VisualFrame.saturnRingBands`
+SATURN_RING_REAL_EDGES = [1.11, 1.236, 1.525, 1.95, 2.025, 2.269]
+SATURN_RING_BAND_OPACITIES = [0.14, 0.34, 0.78, 0.04, 0.62]
+# MODEL: `VisualFrame.saturnRingBands(cassiniWidth:)` — sengaja lebih lebar
+# dari kenyataan supaya masih terbaca di kartu jam.
+SATURN_CASSINI_WIDTH = 0.06
+# MODEL: `CelestialVisual.ringBackHalfOpacityScale`
+RING_BACK_HALF_OPACITY_SCALE = 0.55
 POLAR_CAP_OPACITY = 0.85                                 # VIEW: `drawPolarCaps`
 CRATER_OPACITY = 0.18                                    # VIEW: `drawCraters`
 MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
@@ -735,39 +743,82 @@ def _draw_bands(canvas, cx, cy, radius, night_mode):
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))
 
 
+def saturn_ring_bands(body_fraction=0.53, cassini_width=0.06):
+    """Pita cincin Saturnus — port `VisualFrame.saturnRingBands()`.
+
+    Batas pita nyata (D 1.11-1.236, C 1.236-1.525, B 1.525-1.95, celah
+    Cassini 1.95-2.025, A 2.025-2.269) dipetakan ke rentang yang tersedia:
+    tepi dalam = tepi bola, tepi luar = 1.0. Rasio antar-pita dipertahankan.
+
+    Celah Cassini dilebarkan (bukan angka nyata) dengan pusat tetap, karena
+    lebar sebenarnya hanya 0.6 pt di kartu jam 38 pt dan akan hilang.
+    """
+    edges = list(SATURN_RING_REAL_EDGES)
+    inner, outer = edges[0], edges[-1]
+
+    def mapped(r):
+        return body_fraction + (r - inner) / (outer - inner) * (1 - body_fraction)
+
+    edges = [mapped(r) for r in edges]
+    center = (edges[3] + edges[4]) / 2.0
+    half = cassini_width / 2.0
+    edges[3] = center - half
+    edges[4] = center + half
+    return [(edges[i], edges[i + 1], SATURN_RING_BAND_OPACITIES[i])
+            for i in range(len(SATURN_RING_BAND_OPACITIES))]
+
+
 def _draw_rings(canvas, cx, cy, radius, palette, night_mode):
+    """Cincin sebagai pita, bukan satu elips pekat.
+
+    Urutannya penting dan sama dengan view: pita **belakang** dulu (paruh
+    atas), lalu bola, lalu pita **depan** (paruh bawah) di atas bola. Itu
+    yang membuat cincin benar-benar melintas di muka ekuator bola, bukan
+    mengapung di atasnya.
+
+    Tiap pita adalah **cincin** (elips luar dikurangi elips dalam), bukan
+    elips lalu elips hitam di atasnya — elips hitam akan menghapus bola yang
+    ada di bawahnya di paruh depan.
+    """
     ring = saturn_ring()
     body_radius = saturn_body_radius(ring)
-    outer = dict(cx=cx, cy=cy,
-                 rx=ring["half_width"] * radius, ry=ring["half_height"] * radius)
     ring_color = ACCENTS["saturnRing"]
-    canvas.ellipse(outer["cx"], outer["cy"], outer["rx"], outer["ry"],
-                   accent_fn(ring_color, night_mode, RING_BACK_OPACITY))
+    full_width = ring["half_width"] * radius
+    axial = ring["half_height"] / ring["half_width"]
+    bands = saturn_ring_bands()
+
+    def annulus(outer_r, inner_r, color, half):
+        """Isi cincin antara outer_r dan inner_r, dibatasi paruh atas/bawah."""
+        orx, ory = outer_r, outer_r * axial
+        irx, iry = inner_r, inner_r * axial
+
+        def inside(x, y):
+            if half == "back" and y > cy:
+                return False
+            if half == "front" and y < cy:
+                return False
+            dx, dy = (x - cx) / orx, (y - cy) / ory
+            if dx * dx + dy * dy > 1.0:
+                return False
+            if inner_r <= 0:
+                return True
+            ix, iy = (x - cx) / irx, (y - cy) / iry
+            return ix * ix + iy * iy > 1.0
+        canvas.fill(inside, color)
+
+    # Paruh belakang: seluruhnya di bawah bola yang digambar sesudahnya.
+    for inner_r, outer_r, opacity in bands:
+        annulus(outer_r * full_width, inner_r * full_width,
+                accent_fn(ring_color, night_mode,
+                          opacity * RING_BACK_HALF_OPACITY_SCALE), "back")
+
     _draw_sphere(canvas, cx, cy, body_radius * radius,
                  palette["light"], palette["dark"], night_mode)
-    # Cincin depan: dipotong ke setengah bawah frame — port `front.clip(to:)`.
-    x0, x1 = 0.0, cx + outer["rx"]
-    y0, y1 = cy, cy + outer["ry"]
-    front = accent_fn(ring_color, night_mode, RING_FRONT_OPACITY)
 
-    def inside_front(x, y):
-        if not (x0 <= x <= x1 and y0 <= y <= y1):
-            return False
-        dx, dy = (x - outer["cx"]) / outer["rx"], (y - outer["cy"]) / outer["ry"]
-        return dx * dx + dy * dy <= 1.0
-    canvas.fill(inside_front, front)
-    # Pembelah Cassini.
-    inset_x = body_radius * radius * 0.34
-    inset_y = (outer["ry"] * 2) * 0.09
-    gap_rx, gap_ry = outer["rx"] - inset_x, outer["ry"] - inset_y
-    gap = solid((0.0, 0.0, 0.0), RING_GAP_OPACITY)
-
-    def inside_gap(x, y):
-        if not (x0 <= x <= x1 and y0 <= y <= y1):
-            return False
-        dx, dy = (x - cx) / gap_rx, (y - cy) / gap_ry
-        return dx * dx + dy * dy <= 1.0
-    canvas.fill(inside_gap, gap)
+    # Paruh depan: di atas bola.
+    for inner_r, outer_r, opacity in bands:
+        annulus(outer_r * full_width, inner_r * full_width,
+                accent_fn(ring_color, night_mode, opacity), "front")
 
 
 def _draw_polar_caps(canvas, cx, cy, radius, night_mode):

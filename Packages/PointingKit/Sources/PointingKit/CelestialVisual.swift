@@ -742,6 +742,104 @@ public enum VisualFrame {
                             halfHeight: halfWidth * axialRatio)
     }
 
+    /// Satu pita cincin Saturnus: dari radius mana ke radius mana, dan
+    /// seberapa pekat.
+    ///
+    /// Radius dalam satuan **setengah lebar cincin** (jadi `1.0` = tepi luar
+    /// cincin, `bodyFraction` = tepi bola). Opasitas adalah nilai untuk
+    /// **paruh depan**; paruh belakang memakai `backHalfOpacityScale`.
+    public struct RingBand: Equatable, Sendable {
+        /// Radius dalam tepi pita, satuan setengah lebar cincin.
+        public var innerRadius: Double
+        /// Radius luar tepi pita, satuan setengah lebar cincin.
+        public var outerRadius: Double
+        /// Opasitas pita di paruh depan, 0…1.
+        public var opacity: Double
+
+        public init(innerRadius: Double, outerRadius: Double, opacity: Double) {
+            self.innerRadius = innerRadius
+            self.outerRadius = outerRadius
+            self.opacity = opacity
+        }
+
+        /// Lebar pita.
+        public var width: Double { outerRadius - innerRadius }
+    }
+
+    /// Pita cincin Saturnus — **dari data cincin nyata**, bukan dari rasa.
+    ///
+    /// **Cacat yang ditutup fungsi ini.** Sampai siklus ini cincin digambar
+    /// sebagai **satu elips pekat** untuk paruh belakang dan satu untuk paruh
+    /// depan, lalu sebuah elips hitam disisipkan untuk "pembelah Cassini".
+    /// Tiga hal salah sekaligus:
+    ///
+    ///   1. Strukturnya **dikarang di view**. Cincin Saturnus punya pita yang
+    ///      punya nama (D, C, B, celah Cassini, A); view menggambar satu
+    ///      bidang rata. Karena angkanya hidup di view, tidak ada uji Linux
+    ///      yang bisa memeriksanya — persis pola yang sudah tiga kali
+    ///      dilaporkan di repo ini.
+    ///   2. Celahnya **tidak di tepi luar**. Pembelah Cassini nyata berada di
+    ///      antara pita B dan A (≈0.89 R cincin), sedangkan elips hitam itu
+    ///      diletakkan 0.34 x radius bola dari tepi luar — jauh di luar
+    ///      tempatnya, sehingga ia memotong pita A, bukan memisahkan B dari A.
+    ///   3. Celahnya **tidak simetris**: elips itu digambar hanya di dalam
+    ///      klip paruh bawah, jadi paruh belakang tidak punya celah sama
+    ///      sekali. Cincin yang pembelahnya hanya ada di separuh depannya
+    ///      bukan cincin yang sama dipandang dari dua sisi.
+    ///
+    /// Angka di bawah adalah radius cincin Saturnus nyata dalam satuan radius
+    /// Saturnus (D 1.11–1.236, C 1.236–1.525, B 1.525–1.95, celah Cassini
+    /// 1.95–2.025, A 2.025–2.269), dipetakan ke rentang yang tersedia di
+    /// frame: tepi dalam cincin = tepi bola (`bodyFraction`), tepi luar =
+    /// `1.0`. **Rasio antar-pita dipertahankan**; yang dipetakan hanya
+    /// rentangnya.
+    ///
+    /// **Satu angka sengaja dilebihkan.** Lebar celah Cassini yang sebenarnya
+    /// (0.031 R cincin) hanya 0.6 pt di kartu jam 38 pt — tidak terlihat,
+    /// sehingga pita B dan A akan menyatu kembali dan pembelahnya hilang lagi.
+    /// Celahnya karena itu dilebarkan menjadi `cassiniWidth` dengan
+    /// **pusatnya tetap** (0.886 R), mengambil sedikit dari pita B dan A.
+    /// Ini pengorbanan yang sama yang sudah tercatat untuk Bintik Merah Besar:
+    /// ukuran boleh dikorbankan demi keterbacaan, **posisi tidak**.
+    ///
+    /// - Parameters:
+    ///   - bodyFraction: radius bola sebagai pecahan setengah lebar cincin.
+    ///   - cassiniWidth: lebar celah Cassini yang dipakai (lihat catatan di
+    ///     atas — bukan angka nyata, dan itu disengaja).
+    public static func saturnRingBands(bodyFraction: Double = 0.53,
+                                       cassiniWidth: Double = 0.06) -> [RingBand] {
+        // Batas pita nyata dalam radius Saturnus.
+        let realEdges = [1.11, 1.236, 1.525, 1.95, 2.025, 2.269]
+        let inner = realEdges[0], outer = realEdges[realEdges.count - 1]
+        // Petakan [inner, outer] -> [bodyFraction, 1.0], rasio dipertahankan.
+        func mapped(_ r: Double) -> Double {
+            bodyFraction + (r - inner) / (outer - inner) * (1 - bodyFraction)
+        }
+        var edges = realEdges.map(mapped)
+
+        // Lebarkan celah Cassini (indeks 3 -> 4) dengan pusat tetap.
+        let cassiniCenter = (edges[3] + edges[4]) / 2
+        let half = cassiniWidth / 2
+        edges[3] = cassiniCenter - half
+        edges[4] = cassiniCenter + half
+
+        // Opasitas mengikuti kepadatan pita yang sebenarnya: D sangat tipis,
+        // C tipis, B paling pekat, celah Cassini hampir kosong, A pekat.
+        let opacities = [0.14, 0.34, 0.78, 0.04, 0.62]
+        return (0..<opacities.count).map { index in
+            RingBand(innerRadius: edges[index],
+                     outerRadius: edges[index + 1],
+                     opacity: opacities[index])
+        }
+    }
+
+    /// Seberapa pekat paruh belakang cincin dibanding paruh depan.
+    ///
+    /// Bukan efek cahaya: cincin belakang memang lebih redup karena dilihat
+    /// dari sisi yang tidak tersinari. Nilainya di model supaya view dan port
+    /// tidak bisa berbeda pendapat tentang seberapa gelap "belakang".
+    public static let ringBackHalfOpacityScale: Double = 0.55
+
     /// Jari-jari bola di dalam cincin Saturnus, dalam satuan radius frame.
     ///
     /// **Dipisah dari `saturnRing` dengan alasan yang bisa diuji.** Jari-jari

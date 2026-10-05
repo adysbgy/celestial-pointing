@@ -292,33 +292,86 @@ struct CelestialVisualView: View {
         // frame penuh sementara cincin mengisi frame, bola menutupi cincin dan
         // hasilnya piring, bukan Saturnus.
         let bodyRadius = VisualFrame.saturnBodyRadius(for: ring)
-
-        let outer = CGRect(x: center.x - CGFloat(ring.halfWidth) * radius,
-                           y: center.y - CGFloat(ring.halfHeight) * radius,
-                           width: CGFloat(ring.fullWidth) * radius,
-                           height: CGFloat(ring.fullHeight) * radius)
         let ringColor = Self.accent(CelestialVisual.accents.saturnRing)
-
-        // Belakang cincin (paruh atas).
-        context.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.45)))
-
         let palette = CelestialVisual.Planet.saturn.palette
+        let axialRatio = CGFloat(ring.halfHeight / ring.halfWidth)
+
+        // **Cincin digambar sebagai pita, bukan satu elips pekat.**
+        //
+        // Versi lama menggambar satu elips opasitas 0.45 untuk paruh belakang,
+        // satu elips 0.8 untuk paruh depan, lalu sebuah elips hitam 0.28
+        // sebagai "pembelah Cassini". Tiga hal salah sekaligus:
+        //
+        //   1. Pita D/C/B/A yang punya nama di data nyata tidak ada — yang
+        //      tergambar satu bidang rata.
+        //   2. Elips hitam itu diletakkan 0.34 x radius bola dari tepi luar,
+        //      sedangkan pembelah Cassini nyata berada di 0.886 R cincin:
+        //      jadi ia memotong pita A, bukan memisahkan B dari A.
+        //   3. Elips itu hanya digambar di dalam klip paruh **bawah**, jadi
+        //      paruh belakang tidak punya celah sama sekali — padahal satu
+        //      cincin yang sama harus terlihat punya celah dari kedua sisi.
+        //
+        // Sekarang strukturnya datang dari `VisualFrame.saturnRingBands()`
+        // (teruji di Linux), dan **setiap pita digambar di kedua paruh**
+        // dengan skala opasitas belakang dari model. Dengan begitu
+        // ketidak-simetrisan seperti di atas tidak bisa ditulis ulang tanpa
+        // mengubah modelnya juga.
+        //
+        // Tiap pita digambar sebagai **satu path cincin** (elips luar + elips
+        // dalam dengan arah berlawanan, `evenOdd`), bukan elips lalu elips
+        // hitam di atasnya. Dua alasan: elips hitam akan menghapus bola yang
+        // ada di bawahnya di paruh depan, dan lubang yang dihasilkan
+        // `destinationOut` bekerja pada seluruh konteks — bukan pada pita itu
+        // saja — sehingga pita berikutnya ikut terpotong.
+        func ringPath(_ outerRadius: CGFloat, _ innerRadius: CGFloat) -> Path {
+            var path = Path()
+            let outerRect = CGRect(x: center.x - outerRadius,
+                                   y: center.y - outerRadius * axialRatio,
+                                   width: outerRadius * 2,
+                                   height: outerRadius * 2 * axialRatio)
+            path.addEllipse(in: outerRect)
+            if innerRadius > 0 {
+                let innerRect = CGRect(x: center.x - innerRadius,
+                                       y: center.y - innerRadius * axialRatio,
+                                       width: innerRadius * 2,
+                                       height: innerRadius * 2 * axialRatio)
+                path.addEllipse(in: innerRect)
+            }
+            return path
+        }
+
+        let bands = VisualFrame.saturnRingBands()
+        let fullWidth = CGFloat(ring.halfWidth) * radius
+
+        // Paruh BELAKANG dulu: seluruhnya di atas bola, sehingga bola yang
+        // digambar sesudahnya menutupi bagian yang memang di belakang.
+        var back = context
+        back.clip(to: Path(CGRect(x: 0, y: 0,
+                                  width: center.x * 2, height: center.y)))
+        for band in bands {
+            back.fill(ringPath(CGFloat(band.outerRadius) * fullWidth,
+                               CGFloat(band.innerRadius) * fullWidth),
+                      with: .color(ringColor.opacity(
+                        band.opacity * CelestialVisual.ringBackHalfOpacityScale)),
+                      style: FillStyle(eoFill: true))
+        }
+
+        // Bola Saturnus, di antara paruh belakang dan paruh depan.
         drawSphere(context: context, center: center, radius: CGFloat(bodyRadius) * radius,
                    from: palette.light, to: palette.dark)
 
-        // Depan cincin (paruh bawah) -- digambar di atas bola. Batas bawahnya
-        // adalah **setengah bawah frame** (`CGRect` penuh, bukan
-        // `Path(ellipseIn:)`), jadi cincin tepat melewati ekuator bola --
-        // yang persis seperti yang terlihat pada Saturnus.
+        // Paruh DEPAN: paruh bawah elips, di atas bola. Karena pita digambar
+        // sebagai path cincin, ia benar-benar melintas di muka bola pada
+        // ekuator — yang persis seperti yang terlihat pada Saturnus.
         var front = context
         front.clip(to: Path(CGRect(x: 0, y: center.y,
-                                  width: outer.maxX,
-                                  height: outer.maxY - center.y)))
-        front.fill(Path(ellipseIn: outer), with: .color(ringColor.opacity(0.8)))
-        // Pembelah cincin (Cassini): cincin tidak pekat seragam.
-        let gap = outer.insetBy(dx: CGFloat(bodyRadius) * radius * 0.34,
-                                dy: outer.height * 0.09)
-        front.fill(Path(ellipseIn: gap), with: .color(Color.black.opacity(0.28)))
+                                   width: center.x * 2, height: center.y)))
+        for band in bands {
+            front.fill(ringPath(CGFloat(band.outerRadius) * fullWidth,
+                                CGFloat(band.innerRadius) * fullWidth),
+                       with: .color(ringColor.opacity(band.opacity)),
+                       style: FillStyle(eoFill: true))
+        }
     }
 
     /// Kutub Mars: kapsul es di utara dan selatan.
