@@ -1,3 +1,36 @@
+## Progres terakhir (5 Okt 2026 — literal onboarding dipindah ke katalog, EN ikut tersedia)
+
+### Cacat: Fase C #2 belum selesai — masih ada literal Bahasa Indonesia di view
+
+Audit siklus ini menemukan bahwa `Localizable.xcstrings` + `SWIFT_EMIT_LOC_STRINGS`
+memang sudah ada, tapi ~60 literal Bahasa Indonesia masih tertanam langsung di
+view (`OnboardingView`, `CalibrationView`, `PointingView`, `Experiment1View`,
+`ComplicationWidget`). Pengguna bahasa Inggris membaca Indonesia — Fase C #2
+("pastikan tak ada string keras di view") belum terpenuhi, bukan sekadar
+"katalog sudah ada".
+
+### Siklus ini: unit terkecil — `OnboardingView`
+
+Layar perkenalan value-first (Bagian 2) paling kecil dan paling terlihat, jadi
+jadi unit pertama yang dilokalkan:
+- 5 kunci baru di `TextLocalization` (`onboarding.title/subtitle/honesty/
+  start.label/label`), terdaftar di `allKeys` (gerbang 193 → 198).
+- Padanan EN di `Localizable.xcstrings` (termasuk label VoiceOver kartu utuh).
+- `OnboardingView` konsumsi `TextLocalization.text(...)` — nol literal keras.
+
+### Kenapa ini dikerjakan sekarang, bukan Bagian 1
+
+Bagian 1–4 + Fase A/B **sudah** terbangun dan teruji (visual prosedural semua
+jenis benda, mode malam, AOD, VoiceOver, animasi, audio, Dynamic Type). Repo
+lebih lengkap daripada yang diisyaratkan brief. Satu-satunya item brief yang
+benar-benar masih terbuka adalah Fase C #2 (kelengkapan lokalisasi). Maka unit
+berikutnya adalah melokalkan sisa view satu per satu, bukan menulis ulang
+visual yang sudah ada.
+
+Verifikasi: `./swift-test.sh` 529/0 hijau; `./swift-ui-lint.sh` semua gerbang
+lulus (Aturan 4 menyapu literal `Text`/`Button`/`Label`/`navigationTitle`);
+CI `Engine Tests (Linux)` + `Apple Build` hijau pada 37266521843 / 37266521875.
+
 ## Progres terakhir (5 Okt 2026 — penjaga horizon kalibrasi menilai waktu yang salah)
 
 ### Cacat: `capture` menilai horizon di jam dinding, bukan saat arah dicatat
