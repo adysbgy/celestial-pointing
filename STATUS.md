@@ -1,3 +1,79 @@
+## Progres terakhir (5 Okt 2026 — complication menampilkan lock basi sebagai centang hijau)
+
+### Cacat yang hanya hidup di kanal yang tidak bisa diuji compiler
+
+Siklus sebelumnya menutup "Percobaan menyusut diam-diam": angka yang
+terhitung benar tapi tidak pernah sampai ke layar. Kali ini kelasnya sama,
+tapi korbannya bukan angka — melainkan identitas.
+
+`ComplicationDigest` punya **dua** kanal: satu ikon, satu baris teks. Seluruh
+lapisan basi yang sudah dibangun dan diuji — `isStale(at:)`,
+`confirmsIdentityNow`, `sublineContent(at:)` — hanya menjangkau kanal
+**teks**. Di `.accessoryCircular` tidak ada baris kedua, jadi ikon adalah
+satu-satunya penanda yang tersedia. Dan ikon dibaca lewat
+`presentedSymbolName`, yang mengembalikan `stateRaw` mentah:
+
+```swift
+state?.symbolName ?? "scope"
+```
+
+Cuplikan yang basi 90 menit masih `stateRaw == "lock"`. `stateRaw` memang
+tidak pernah berubah sendiri — justru itu inti konsep "basi": teksnya
+menjadiAggregator usianya sementara keadaan tetap. Akibatnya ikonnya tetap
+`checkmark.circle.fill`.
+
+> Di pergelangan tangan: centang hijau + nama objek, tanpa satu penanda
+> pun. Terlihat persis seperti lock yang baru saja terjadi.
+
+### Kenapa ia bertahan meski ada uji staleness
+
+Ini bukan bug pemetaan. Bentuk dokumentasinya justru benar, dan itu yang
+menipu: `presentedSymbolName` punya dokumen panjang yang **benar** — ia
+memindahkan ikon supaya `.uncertain` (tanda seru) tidak terbaca seperti
+`.lock` (centang). greener itu memang alasan terbaik bentuknya ada.
+
+Dokumen itu berhenti **satu kalimat sebelum pertanyaan yang lebih besar**:
+keadaan YANG? `stateRaw` tidak pernah berubah sendiri, jadi tidak ada yang
+pernah melihatnya berubah. Bentuknya sama seperti `unanalyzableCount` dan
+`updatedAt` pada siklus sebelumnya: nilai dihitung, disimpan, lalu tidak
+dipakai untuk keputusan yang seharusnya ia ambil.
+
+### Yang diperbaiki
+
+- `presentedSymbolName(at:)` di PointingKit — keputusan "ikon ini sudah
+  basi?" tetap di paket dan teruji di Linux, bukan di view.
+- Guard `hasAnswer`: pada `searching` tidak ada nama yang bisa basi, jadi
+  "kunci ini sudah lama" merujuk ke tidak ada. Tanpa guard itu keadaan
+  tanpa jawaban tampil seolah punya jawaban yang sudah lama.
+- Bentuk **tanpa waktu** dipertahankan untuk pemanggil yang menampilkan
+  cuplikan itu sendiri. Keputusan soal waktu tidak boleh pindah ke view.
+- Kedua keluarga yang punya ikon (lingkaran, persegi panjang) memakai satu
+  aksesor, supaya tidak ada daftar ikon kedua yang bisa berbeda pendapat.
+
+Ikon basi memakai keluarga `clock.badge` (iOS 16 / watchOS 9); ambang di
+`project.yml` sudah 18.0/11.0, jadi tidak perlu disentuh.
+
+### Bukti: tiga mutasi, merah di kedua arah
+
+`red-test.sh`, tiga mutasi pada `guard` yang sama:
+
+| Mutasi | Uji yang merah |
+|---|---|
+| buang `isStale` | `testStaleDigestDoesNotPresentTheFreshLockSymbol` |
+| buang `hasAnswer` | `testStaleSearchingKeepsItsOwnSymbol` |
+| `isStale` -> selalu `true` | `testFreshDigestKeepsItsFreshLockSymbol` |
+
+Arah kedua itu yang menentukan. Dua mutasi pertama bisa lolos bersama-sama
+oleh perbaikan yang terlalu=gurau — ia membuat **semua** lock jadi "basi".
+Yang menangkapnya hanya uji ketiga, karena hanya itu yang menyatakan nilai
+mutlak untuk cuplikan yang baru saja terjadi. Perbaikan yang mematikan
+semua lock akan lolos dua uji pertama.
+
+### Gerbang
+
+172 CelestialEngine + **527** PointingKit (+6), ui-lint 15 aturan,
+typecheck, CI macOS hijau. Engine tidak disentuh.
+
 ## Progres terakhir (5 Okt 2026 — "Percobaan" melaporkan lebih sedikit dari yang benar-benar ditekan)
 
 ### Dua kelas "berhenti di tengah jalan", keduanya soal angka yang hilang
