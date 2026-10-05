@@ -402,7 +402,7 @@ struct CelestialVisualView: View {
             back.fill(ringPath(CGFloat(band.outerRadius) * fullWidth,
                                CGFloat(band.innerRadius) * fullWidth),
                       with: .color(ringColor.opacity(
-                        band.opacity * CelestialVisual.ringBackHalfOpacityScale)),
+                        band.opacity * VisualFrame.ringBackHalfOpacityScale)),
                       style: FillStyle(eoFill: true))
         }
 
