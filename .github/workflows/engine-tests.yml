@@ -64,5 +64,23 @@ jobs:
               }
           ' 'Aturan 15'
 
+      # Gambar objek tidak bisa diperiksa di sini: `CelestialVisualView` hanya
+      # terbangun di macOS, dan job ini berjalan di Linux. Karena itu lapisan
+      # menggambarnya **diport ke Python** (`Tools/render-visuals.py`) dan
+      # hasilnya diukur (`Tools/check-visuals.py`).
+      #
+      # Yang diukur bukan "gambarnya bagus" — itu tetap perlu mata manusia.
+      # Yang diukur adalah hal-hal yang punya jawaban benar/salah dan selama
+      # ini tidak dijaga oleh apa pun: apakah luas sabit yang tergambar
+      # mengikuti fraksi iluminasi, apakah sisi terangnya menghadap arah yang
+      # benar, dan apakah ciri pengenal planet benar-benar **hilang** saat
+      # engine ragu. Ketiganya pernah salah di repo ini.
+      #
+      # Tanpa langkah ini, `Tools/check-visuals.py` hanya alat yang dipakai
+      # kalau ada yang ingat menjalankannya. Gerbang yang harus diingat adalah
+      # gerbang yang akan dilewati.
+      - name: Gerbang gambar objek (port Python)
+        run: python3 Tools/check-visuals.py --check
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

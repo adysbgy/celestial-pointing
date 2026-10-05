@@ -5,3 +5,10 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 .swiftpm/
+
+# Keluaran alat bantu gambar (Tools/render-visuals.py, Tools/check-visuals.py).
+# Isinya PNG render + index.html yang dihasilkan ulang tiap kali dijalankan —
+# tidak ada yang perlu disimpan, dan tidak ada yang boleh ikut ke repo.
+out/
+__pycache__/
+*.pyc
