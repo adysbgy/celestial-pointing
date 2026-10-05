@@ -110,6 +110,32 @@ final class UncertainReasonBreakdownTests: XCTestCase {
         XCTAssertEqual(expected, [.tooFar, .ambiguous, .none])
     }
 
+    /// Urutan **tidak boleh** ikut besar-kecilnya hitungan.
+    ///
+    /// Ini mutasi yang paling mungkin terjadi tanpa disengaja: "`sorted`
+    /// supaya yang utama tampil dulu" terdengar seperti peningkatan UX. Tapi ia
+    /// membuat urutan daftar ikut berubah setiap kali hitungan berubah — jadi
+    /// rekaman yang sama menampilkan daftar berbeda, dan pengguna yang
+    /// membandingkan dua tangkapan layar tidak bisa mencocokkan barisnya.
+    ///
+    /// Plus ia bertabrakan dengan `.none`: `.none` tidak pernah boleh jadi
+    /// "penyebab utama", dan mengurutkan menurut hitungan membuatnya paling
+    /// atas justru membuatnya terlihat paling penting.
+    func testRowOrderDoesNotFollowMagnitude() {
+        // `ambiguous` paling banyak, tapi `tooFar` yang ditulis pertama.
+        let breakdown = self.breakdown(trace(uncertainTooFar: 1,
+                                             uncertainAmbiguous: 4))
+        XCTAssertEqual(breakdown.rows.map(\.reason), [.tooFar, .ambiguous])
+        XCTAssertEqual(breakdown.rows.map(\.count), [1, 4])
+
+        // `.none` paling banyak — dan tetap tidak boleh mendahului yang lain
+        // hanya karena jumlahnya.
+        let withNone = self.breakdown(trace(uncertainTooFar: 1,
+                                            uncertainAmbiguous: 0,
+                                            uncertainNone: 9))
+        XCTAssertEqual(withNone.rows.map(\.reason), [.tooFar, .none])
+    }
+
     /// Baris dengan hitungan nol **tidak boleh tampil**.
     ///
     /// "0× ambiguitas katalog" menyatakan ada kategori yang diperiksa dan
@@ -221,8 +247,29 @@ final class UncertainReasonBreakdownTests: XCTestCase {
     /// Dua kunci terpisah (jumlah + kata "dari") akan memungkinkan
     /// terjemahan menyusun "2 of 4" atau "4 dari 2" — urutan harus
     /// dikendalikan satu tempat, bukan oleh dua string yang disambung view.
-    func testRowTextUsesOneFormatKey() {
-        XCTAssertEqual(UncertainReasonBreakdown.Row(2, of: 7).text, "2 dari 7")
-        XCTAssertEqual(UncertainReasonBreakdown.Row(1, of: 3).text, "1 dari 3")
+    func testCountTextUsesOneFormatKey() {
+        XCTAssertEqual(RowCountText(2, of: 7).text, "2 dari 7")
+        XCTAssertEqual(RowCountText(1, of: 3).text, "1 dari 3")
+    }
+
+    /// Baris rincian harus membawa jumlah **dan** penyebut, dan keduanya
+    /// harus lewat `RowCountText` yang sama.
+    ///
+    /// Ini yang dipakai view: kalau baris hanya mengekspos `count`,
+    /// pemanggil akan menyusun "2" tanpa penyebut — dan penyebut itu yang
+    /// membuat "2" terbaca sebagai minoritas, bukan sebab utama.
+    func testRowCarriesBothTheCountAndItsTotal() {
+        let breakdown = UncertainReasonBreakdown(
+            counts: [.tooFar: 2, .ambiguous: 5], policy: ConfidencePolicy())
+        // Baris pertama adalah `tooFar` (urutan deklarasi), bukan yang
+        // terbesarnya — dan itu justru hal yang harus terlihat di sini.
+        // Kalau baris diurutkan menurut besar-kecilnya, urutannya ikut
+        // berubah tiap kali hitungan berubah, dan rekaman yang sama
+        // menampilkan daftar berbeda.
+        XCTAssertEqual(breakdown.rows.map(\.count), [2, 5])
+        let first = breakdown.rows[0]
+        XCTAssertEqual(first.count, 2)
+        XCTAssertEqual(first.total, 7)
+        XCTAssertEqual(first.countText.text, "2 dari 7")
     }
 }

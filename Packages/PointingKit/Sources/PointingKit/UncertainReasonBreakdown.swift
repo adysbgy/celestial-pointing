@@ -64,35 +64,20 @@ public struct UncertainReasonBreakdown: Equatable, Sendable {
             self.total = total
         }
 
-        /// Baris ringkas untuk layar: "Kandidat terlalu jauh · 2 dari 7".
-        ///
-        /// Penyebut ikut tampil karena **tidak ada angka lain yang
-        /// menyiapakannya**: `diagnosis` tidak pernah menyebut jumlah. Tanpa
-        /// total, "2" berdiri sendiri dan pembaca harus menghitungnya sendiri
-        /// dari grafik — dan jumlah tanpa total bisa dibaca sebagai "sebab
-        /// utama" ketika sebenarnya minority.
-        public var text: String { countText.text }
-
         /// Bentuk "%lld dari %lld" — satu kunci, bukan jumlah + kata yang
-        /// disambung.
-        public var countText: RowCountText { RowCountText(count, of: total) }
-
-        /// Bentuk "%lld dari %lld" untuk dipakai pemanggil yang sudah punya
-        /// hitungan sendiri (mis. baris ringkas tanpa alasan).
-        public init(_ count: Int, of total: Int) {
-            self.init(reason: .none, count: count, total: total)
-        }
-
-        /// Frasa pengucapan: nama sebab lalu jumlahnya.
+        /// disambung di view.
         ///
-        /// Bentuknya **dua bagian** karena tujuannya navigasi VoiceOver:
-        /// pengguna yang menunjuk baris ini akan mendengar "Kandidat terlalu
-        /// jauh, 2 dari 7" — nama Reasons lebih dulu karena itu yang dicari,
-        /// lalu jumlahnya sebagai konteks. Menumpuknya dalam satu string
-        /// berarti pemanggil tidak bisa memilih mengucapkan bagian mana.
-        public var spokenLabel: String {
-            "\(reason.label), \(countText.text)"
-        }
+        /// **Kenapa penyebut ikut tampil.** Tidak ada angka lain yang
+        /// menyiapkannya: `diagnosis` tidak pernah menyebut jumlah. Dan "2"
+        /// yang berdiri sendiri bisa dibaca sebagai "sebab utama" padahal
+        /// minoritas — penyebutlah yang membuatnya kelihatan.
+        ///
+        /// **Kenapa `RowCountText`, bukan `String` langsung.** Aksesor yang
+        /// mengembalikan `String` bisa ikut dipakai sebagai kunci katalog,
+        /// sehingga setiap nilai baru ikut menambah kunci. Bentuk `RowCountText`
+        /// menjaga bahwa yang di-*call* adalah **format**, bukan teks —
+        /// pemisahan yang sama seperti `LocalizedText` vs `String`.
+        public var countText: RowCountText { RowCountText(count, of: total) }
     }
 
     /// Baris rincian, dalam **urutan deklarasi enum**.
