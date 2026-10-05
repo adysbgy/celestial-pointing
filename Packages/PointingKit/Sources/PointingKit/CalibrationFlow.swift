@@ -31,7 +31,12 @@ public struct CalibrationSample: Codable, Equatable, Sendable {
 }
 
 /// Tahap alur kalibrasi.
-public enum CalibrationPhase: String, Equatable, Sendable {
+///
+/// `CaseIterable` supaya uji bisa menyisir **seluruh** tahap tanpa ada yang
+/// luput karena tidak disebut satu per satu — persis alasan `PointingTone`
+/// punya daftar kasus lengkap. Tahap baru yang lupa diberi nada atau label
+/// akan ketahuan dari sini, bukan dari layar 41mm.
+public enum CalibrationPhase: String, CaseIterable, Equatable, Sendable {
     /// Belum mulai; belum ada sampel.
     case idle
     /// Sudah ada sampel, tapi sebarannya masih terlalu lebar untuk dipercaya.

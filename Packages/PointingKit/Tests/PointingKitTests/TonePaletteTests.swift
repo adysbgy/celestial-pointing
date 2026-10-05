@@ -153,4 +153,44 @@ final class TonePaletteTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Nada tahap kalibrasi
+
+    /// **Nada setiap tahap kalibrasi, disisir seluruhnya.**
+    ///
+    /// Peta ini dulu hidup di `CalibrationView` sebagai `phaseTone`, jadi
+    /// tahap baru bisa mendapat `.neutral` di layar tanpa satu uji pun
+    /// menyentuhnya. Sekarang ia milik model, dan uji ini menyisir
+    /// `CalibrationPhase.allCases` supaya penambahan tahap tidak bisa lolos
+    /// dengan warna yang tidak diuji.
+    func testEveryCalibrationPhaseCarriesALegibleTone() {
+        // Tahap yang belum mulai harus netral, yang sedang mengumpulkan aktif,
+        // dan yang siap/dipakai sukses — nilai absolut, bukan sekadar
+        // "berbeda satu sama lain".
+        XCTAssertEqual(CalibrationPhase.idle.tone, .neutral)
+        XCTAssertEqual(CalibrationPhase.collecting.tone, .active)
+        XCTAssertEqual(CalibrationPhase.ready.tone, .success)
+        XCTAssertEqual(CalibrationPhase.applied.tone, .success)
+
+        // Dan setiap nada itu benar-benar terbaca di atas kartu, di kedua mode.
+        for mode in [SurfacePalette.day, SurfacePalette.night] {
+            for phase in CalibrationPhase.allCases {
+                let ratio = mode.tones.color(for: phase.tone)
+                    .contrastRatio(against: mode.surface1)
+                XCTAssertGreaterThanOrEqual(ratio, 4.5,
+                    "\(mode.isNight ? "malam" : "siang") \(phase): \(ratio):1 di atas kartu < 4.5")
+            }
+        }
+    }
+
+    /// **Nada `ready` dan `applied` harus sama.**
+    ///
+    /// Keduanya berarti "kalibrasi sudah boleh dipakai", dan pengguna melihat
+    /// kartu yang sama sebelum dan sesudah menekan "Pakai". Kalau nadanya
+    /// berbeda, satu-satunya perubahan di layar adalah warna — dan warna
+    /// bukan informasi, terutama di mode malam di mana semua nada menyempit
+    /// ke satu merah. Uji ini menjaga bahwa keduanya tetap satu arti.
+    func testReadyAndAppliedShareTheSameTone() {
+        XCTAssertEqual(CalibrationPhase.ready.tone, CalibrationPhase.applied.tone)
+    }
 }

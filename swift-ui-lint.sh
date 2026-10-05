@@ -1918,6 +1918,71 @@ else
   echo "Bersih: setiap kunci katalog dirujuk oleh kode."
 fi
 
+# ── Aturan 20: permukaan kartu harus dari token, bukan campuran warna ====
+# Aturan 15 menjaga **warna prosedural** (planet, bintang, bulan) supaya
+# tidak memancarkan hijau/biru di mode malam. Ia tidak melihat permukaan.
+#
+# Yang dilihatnya: kartu yang membangun latarnya sendiri dengan
+# `warna.opacity(alpha)` di atas apa pun yang ada di belakangnya. Operasi itu
+# menghasilkan warna yang **tidak pernah dihitung siapa pun**, jadi kontras
+# teks di atasnya tidak dijamin.
+#
+# Cacat nyatanya, dan kenapa hanya mode malam yang menunjukkannya: kartu tahap
+# kalibrasi memakai `phaseTone.color.opacity(0.12)`. Di mode malam nada paling
+# redup yang benar-benar dipakai (`.neutral`, merah 0.94) di atas latar malam
+# menghasilkan merah ~0.154, sementara teksnya berwarna nada yang sama -> 4.32:1,
+# di bawah ambang 4.5 yang brief nyatakan sebagai syarat. Di mode siang cacat
+# yang sama ada tapi tidak terlihat sebagai kesalahan: kartunya hanya jadi ~2x
+# lebih terang dari kartu tetangganya, dan tidak ada teks yang gagal.
+#
+# Kenapa gerbang lama hijau: kontras bergantung pada **campuran**, dan tidak
+# ada satu pun uji yang menghitung campuran itu — `TonePaletteTests` menguji
+# teks di atas permukaan token, bukan di atas latar yang dirakit view.
+#
+# Perbaikannya bukan "alpha lebih kecil": itu menyembunyikan cacat yang sama
+# sampai nada berikutnya ditambahkan. Permukaan kartu harus datang dari
+# `SurfacePalette` (`surfaceCard`), yang kontrasnya sudah diuji terhadap semua
+# nada. Yang diperiksa karena itu: `.background(`/`.fill(` yang argumennya
+# berakhir `.color.opacity(`, di berkas `Apps/`.
+echo
+echo "== Aturan 20: permukaan kartu tidak dirakit dari warna yang tidak diuji =="
+ad_hoc_surface=$(python3 - <<'PY' 2>&1
+import os, re
+
+# Bentuk yang dilarang: sebuah warna bertoken (`.color`) diredupkan dengan
+# `.opacity(...)` dan dipakai sebagai latar/isi. `.color` sengaja disyaratkan
+# supaya `Color.black.opacity(...)` (bayangan di dalam gambar prosedural) dan
+# `palette.surface2.color.opacity(...)` (bagian dari definisi token itu
+# sendiri) tidak ikut tertangkap.
+AD_HOC = re.compile(r'\.(?:background|fill)\s*\([^)]*\.color\s*\.\s*opacity\s*\(')
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        for i, line in enumerate(open(path, encoding="utf-8"), 1):
+            code = line.split("//", 1)[0]
+            if AD_HOC.search(code):
+                problems.append(
+                    f"  {path}:{i}: {code.strip()}")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Pakai `.surfaceCard(level:)` / `SurfacePalette` supaya kontrasnya")
+    print("   dihitung, bukan dirakit di view (rincian di SurfacePalette.swift).")
+PY
+)
+if [ -n "$ad_hoc_surface" ]; then
+  echo "$ad_hoc_surface"
+  echo "   Sebab: warna hasil campuran tidak ada di palet, jadi kontras teks"
+  echo "   di atasnya tidak pernah diuji — dan di mode malam itulah yang gagal."
+  status=1
+else
+  echo "Bersih: setiap permukaan kartu datang dari token yang diuji."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

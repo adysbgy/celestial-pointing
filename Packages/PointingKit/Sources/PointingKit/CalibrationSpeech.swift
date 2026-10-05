@@ -99,6 +99,31 @@ public extension CalibrationPhase {
     /// Untuk suara, kalimat penuh lebih jelas tanpa simbol; nilainya kini
     /// sama dengan label layar karena keduanya membaca katalog yang sama.
     var spokenName: String { displayName }
+
+    /// Nada visual tahap ini.
+    ///
+    /// **Kenapa peta ini pindah ke paket, padahal ia "cuma warna".** Sebelumnya
+    /// ia hidup sebagai `phaseTone` di `CalibrationView` — dan justru karena itu
+    /// cacat berikutnya tidak terlihat: kartu tahap membangun latarnya sendiri
+    /// dari nada ini (`phaseTone.color.opacity(0.12)`), bukan dari token
+    /// permukaan. Di mode malam campuran itu menaikkan latar kartu ke merah
+    /// ~0.154, sementara teksnya berwarna nada yang sama, dan nada paling redup
+    /// (`.neutral`, merah 0.94) jatuh ke **4.32:1** — di bawah ambang WCAG 4.5
+    /// yang brief nyatakan sebagai syarat. Tiga nada tahap, dua di antaranya
+    /// tidak terbaca, di layar kalibrasi, di mode yang justru dipilih supaya
+    /// penglihatan malam terjaga.
+    ///
+    /// Peta ini tidak bisa diuji selama ia ada di berkas view: WidgetKit/SwiftUI
+    /// tidak ada di Linux, jadi uji kontras terhadap `surface2` tidak akan
+    /// pernah berjalan. Di paket, ia jadi satu definisi yang bisa ditahan
+    /// `TonePaletteTests`.
+    var tone: PointingTone {
+        switch self {
+        case .idle:       return .neutral
+        case .collecting: return .active
+        case .ready, .applied: return .success
+        }
+    }
 }
 
 public extension PointingTarget {

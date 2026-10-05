@@ -56,6 +56,28 @@ extension SurfaceColor {
         let darker = Swift.min(a, b)
         return (lighter + 0.05) / (darker + 0.05)
     }
+
+    /// Warna ini pada sebagian kepekatan (`alpha`) di atas sebuah latar —
+    /// **operasi yang sama** dengan `.opacity(alpha)` SwiftUI, tapi bisa
+    /// dihitung dan diuji di Linux.
+    ///
+    /// **Kenapa ini perlu ada di model, bukan cukup ditulis di view.** Inilah
+    /// operasi yang menghasilkan cacat nyata: `tone.color.opacity(0.12)` di
+    /// atas latar gelap menghasilkan warna yang **tidak pernah dihitung
+    /// siapa pun**. Kontras teks di atasnya jadi tidak diketahui — dan karena
+    /// teksnya berwarna nada yang sama dengan latarnya, jarak keduanya
+    /// menyusut sampai di bawah ambang, tanpa satu pun gerbang yang menyala.
+    ///
+    /// Komposisi `alpha` di atas latar **bukan** warna yang sama dengan
+    /// `alpha` di atas latar lain. Selama operasi ini tidak punya nama di
+    /// model, setiap view yang memakainya mengarang aturan kontrasnya sendiri
+    /// di berkas yang tidak diuji. Di sini ia jadi satu fungsi yang bisa
+    /// ditahan `TonePaletteTests`.
+    public func composited(over backdrop: SurfaceColor, alpha: Double) -> SurfaceColor {
+        SurfaceColor(red: alpha * red + (1 - alpha) * backdrop.red,
+                     green: alpha * green + (1 - alpha) * backdrop.green,
+                     blue: alpha * blue + (1 - alpha) * backdrop.blue)
+    }
 }
 
 /// Satu set token permukaan untuk satu mode tampilan.

@@ -172,7 +172,20 @@ struct CalibrationView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(WatchMetrics.cardPadding)
-        .background(phaseTone.color.opacity(0.12), in: .rect(cornerRadius: WatchMetrics.cornerRadius))
+        // **Permukaan dari token, bukan campuran nada.** Dulu baris ini
+        // `.background(phaseTone.color.opacity(0.12))`: warna nada dicampur ke
+        // latar di view, dan hasilnya tidak pernah dihitung siapa pun. Di mode
+        // malam campuran itu menaikkan latar ke merah ~0.154 sementara teksnya
+        // berwarna nada yang sama — `.neutral` (merah 0.94) jatuh ke 4.32:1,
+        // di bawah ambang 4.5 yang brief nyatakan. Karena teksnya juga warna
+        // nada, tidak ada gerbang yang menyala: katalog benar, `shortLabel`
+        // benar, dan yang redup hanya warnanya.
+        //
+        // `surfaceCard` memakai `surface1` yang sudah diuji kontrasnya terhadap
+        // semua nada (`TonePaletteTests`), jadi kartu ini tidak bisa lagi
+        // membangun latarnya sendiri. Identitas tahap tetap dibawa ikon dan
+        // label di atasnya, yang memakai warna nada teruji — bukan latar.
+        .surfaceCard(level: .card, radius: WatchMetrics.cornerRadius)
         // Satu elemen: tahap, jumlah acuan, offset, dan sebaran adalah satu
         // pengumuman. Tanpa penggabungan, VoiceOver membaca empat item
         // terpisah yang harus diusap satu per satu. Teksnya dari
@@ -355,10 +368,9 @@ struct CalibrationView: View {
     }
 
     private var phaseTone: PointingTone {
-        switch session?.flow.phase ?? .idle {
-        case .idle: return .neutral
-        case .collecting: return .active
-        case .ready, .applied: return .success
-        }
+        // Nada tahap adalah milik model, bukan view: ia dipakai untuk teks dan
+        // ikon kartu, dan peta itu harus bisa diuji di Linux. Lihat
+        // `CalibrationPhase.tone` untuk alasan lengkapnya.
+        (session?.flow.phase ?? .idle).tone
     }
 }

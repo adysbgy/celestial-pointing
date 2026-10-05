@@ -98,6 +98,86 @@ final class SurfacePaletteTests: XCTestCase {
         }
     }
 
+    /// **Komposisi alpha benar-benar dihitung, bukan dikira-kira.**
+    ///
+    /// Operasi ini punya satu bentuk yang paling mudah salah: menganggap
+    /// `alpha` di atas latar **terang** sama dengan `alpha` di atas latar
+    /// **gelap**. Yang benar adalah campuran linier, dan karena kontras
+    /// bergantung pada latar, dua hasilnya bisa berbeda jauh.
+    ///
+    /// Uji ini menahan bentuk salah itu di sumbernya, karena `composited` akan
+    /// dipakai untuk membuktikan cacat nyata di bawah — kalau operasinya
+    /// sendiri salah, bukti itu tidak berarti apa-apa.
+    func testCompositingIsLinearAndDependsOnTheBackdrop() {
+        let tone = SurfaceColor(red: 0.94, green: 0.47, blue: 0.27)
+        let dark = SurfaceColor(red: 0.039, green: 0.039, blue: 0.059)
+        let light = SurfaceColor(red: 0.9, green: 0.9, blue: 0.9)
+
+        let overDark = tone.composited(over: dark, alpha: 0.12)
+        XCTAssertEqual(overDark.red, 0.12 * 0.94 + 0.88 * 0.039, accuracy: 1e-12)
+        XCTAssertEqual(overDark.green, 0.12 * 0.47 + 0.88 * 0.039, accuracy: 1e-12)
+
+        // Latar mengubah hasilnya — inilah kenapa warna ini tidak boleh
+        // "dikira" tanpa menghitung latarnya.
+        let overLight = tone.composited(over: light, alpha: 0.12)
+        XCTAssertGreaterThan(overLight.red, overDark.red)
+        XCTAssertNotEqual(overLight, overDark)
+
+        // Alpha penuh = warnanya sendiri; alpha nol = latarnya sendiri.
+        XCTAssertEqual(tone.composited(over: dark, alpha: 1), tone)
+        XCTAssertEqual(tone.composited(over: dark, alpha: 0), dark)
+    }
+
+    /// **Regresi: kartu yang membangun latarnya sendiri dari warna nada.**
+    ///
+    /// Kartu tahap kalibrasi pernah menggambar dirinya dengan
+    /// `tone.color.opacity(0.12)` di atas latar, bukan dari token permukaan.
+    /// Di mode malam, nada paling redup yang benar-benar dipakai tahap
+    /// (`.neutral`, merah 0.94) di atas latar malam menghasilkan merah ~0.152 —
+    /// **di atas plafon kontras** mode malam (`surface2 * 1.12` ≈ 0.101), jadi
+    /// teksnya yang berwarna nada yang sama jatuh ke **4.32:1**, di bawah
+    /// ambang 4.5 yang brief nyatakan.
+    ///
+    /// Yang diuji di sini bukan angka satu warna, melainkan bahwa **konvensi
+    /// itu sendiri keluar dari token**: nada apa pun, di atas latar mode malam,
+    /// menghasilkan warna yang tidak ada di palet — sehingga kontrasnya tidak
+    /// pernah dijamin. Itu sebabnya perbaikannya mengarah ke `surfaceCard`,
+    /// bukan ke nilai alpha yang lebih kecil (yang hanya akan menyembunyikan
+    /// cacat yang sama sampai nada berikutnya ditambahkan).
+    func testAToneTintedCardBackgroundCannotBeTrustedForContrast() {
+        let night = SurfacePalette.night
+        let tone = TonePalette.night.neutral
+        let tinted = tone.composited(over: night.background, alpha: 0.12)
+
+        // Warnanya bukan permukaan mana pun yang kontrasnya sudah diuji.
+        XCTAssertNotEqual(tinted, night.surface1)
+        XCTAssertNotEqual(tinted, night.surface2)
+        // Dan ia lebih terang dari lapisan terdalam, jadi hierarki permukaan
+        // terbalik: kartu paling tidak penting justru paling menyala.
+        XCTAssertGreaterThan(tinted.red, night.surface2.red,
+            "kartu bernada lebih terang dari lapisan terdalam — hierarki permukaan terbalik")
+
+        // Akibat yang sebenarnya: teks nada itu di atas latarnya sendiri.
+        let ratio = tone.contrastRatio(against: tinted)
+        XCTAssertLessThan(ratio, SurfacePalette.minimumTextContrast,
+            "kalau ini tidak lagi merah, cacatnya sudah tertutup — dan uji ini "
+            + "harus diganti, bukan dihapus")
+    }
+
+    /// Dan konvensi yang **benar** — `surfaceCard` — memang menahan kontras
+    /// untuk seluruh nada, di kedua mode. Ini pasangan positif dari uji di
+    /// atas: bukan cuma "yang salah itu salah", tapi "yang benar itu benar".
+    func testTheSurfaceTokenPathHoldsContrastForEveryTone() {
+        for (name, palette) in [("siang", SurfacePalette.day), ("malam", SurfacePalette.night)] {
+            for tone in PointingTone.allCases {
+                let card = palette.surface1
+                let ratio = palette.tones.color(for: tone).contrastRatio(against: card)
+                XCTAssertGreaterThanOrEqual(ratio, SurfacePalette.minimumTextContrast,
+                    "\(name) \(tone): \(ratio):1 di atas kartu surface1 < 4.5")
+            }
+        }
+    }
+
     /// Latar **bukan** pure black, dan hari selalu **sejuk** (biru > merah).
     ///
     /// Di OLED, hitam pekat = piksel mati, dan tidak ada gradasi yang bisa
