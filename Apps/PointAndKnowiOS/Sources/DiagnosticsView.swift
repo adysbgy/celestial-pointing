@@ -328,7 +328,15 @@ struct DiagnosticsView: View {
                         // sekarang.
                         row(engine.isDisplayingStaleObject ? "Objek (sisa)" : "Objek",
                             engine.isDisplayingStaleObject
-                                ? "\(object.name) — bukan hasil sekarang"
+                                // Kalimatnya lahir dari katalog, bukan
+                                // dirakit di sini. Bentuk lama menyisipkan
+                                // nama ke dalam literal berinterpolasi, dan
+                                // itu mematikan dua hal sekaligus: Aturan 4
+                                // melewatinya tanpa laporan (penyebabnya kini
+                                // diperbaiki di `swift-ui-lint.sh`), dan
+                                // urutan kata terkunci di kode — bahasa lain
+                                // tidak bisa menaruh penanda di depan nama.
+                                ? ObjectSpeech.staleDisplayName(object.name)
                                 : object.name)
                         // Panel besar: di iPhone ada ruang untuk gambar penuh,
                         // dan justru di tempat pengguna memeriksa "apakah ini

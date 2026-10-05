@@ -88,6 +88,29 @@ public enum ObjectSpeech {
         TextLocalization.text(.objectDisplayMagnitude, value)
     }
 
+    /// Penanda sisa **di layar**, dengan nama objeknya: `"Sirius — bukan hasil
+    /// sekarang"`.
+    ///
+    /// **Kenapa ini ada padahal `staleNote` sudah ada.** `staleNote` adalah
+    /// bentuk **suara**: kalimat utuh, tanpa nama, diucapkan sesudah nama
+    /// objek. Di layar iPhone nama dan penandanya harus jadi **satu baris**,
+    /// dan baris itu dulu dirakit di dalam view sebagai
+    /// `"\(object.name) — bukan hasil sekarang"` — literal berinterpolasi.
+    /// Aturan 4 melewatinya begitu saja (lihat komentar di
+    /// `swift-ui-lint.sh`), jadi kalimat "bukan hasil sekarang" tampil dalam
+    /// Bahasa Indonesia di semua bahasa tanpa satu pun gerbang merah.
+    ///
+    /// **Kenapa namanya ikut sebagai `%@`, bukan digabung di pemanggil.**
+    /// Urutan bahasa: dalam bahasa lain penanda bisa harus di **depan** nama
+    /// ("not a current result — Sirius"). Kalau penggabungnya di pemanggil,
+    /// urutannya terkunci di kode dan terjemahan tidak bisa mengaturnya.
+    ///
+    /// Ini persis kalimat yang paling tidak boleh salah tempat: tanpa dia,
+    /// objek basi terbaca sebagai hasil pengukuran sekarang.
+    public static func staleDisplayName(_ name: String) -> String {
+        TextLocalization.text(.objectDisplayStaleName, name)
+    }
+
     /// Penanda sisa yang **pendek**, untuk layar yang sengaja miskin.
     ///
     /// Layar redup (Always-On) tidak punya ruang untuk kalimat penuh
@@ -134,6 +157,21 @@ public extension LocalizedText {
     static let objectDisplayMagnitude = LocalizedText(
         key: "object.display.magnitude",
         id: "mag %.2f")
+
+    /// Penanda sisa **di layar**, menggabung nama objek dengan penanda bahwa
+    /// itu bukan hasil pengukuran sekarang.
+    ///
+    /// Nama dimasukkan sebagai `%@`, bukan digabung di pemanggil: urutan
+    /// kata adalah milik bahasa, bukan milik kode. Dalam bahasa lain penanda
+    /// mungkin harus mendahului nama ("not a current result — Sirius").
+    ///
+    /// Kunci ini lahir karena bentuknya dulu dirakit sebagai literal
+    /// berinterpolasi di dalam view — bentuk yang dilewati Aturan 4 tanpa
+    /// laporan, sehingga kalimat ini tidak punya padanan bahasa Inggris
+    /// sementara seluruh gerbang hijau.
+    static let objectDisplayStaleName = LocalizedText(
+        key: "object.display.staleName",
+        id: "%@ — bukan hasil sekarang")
 
     /// Penanda sisa versi pendek untuk layar redup (Always-On).
     ///

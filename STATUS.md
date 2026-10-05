@@ -6961,3 +6961,62 @@ pemetaan. Itu persis bentuk "tes menangkap asumsi salah" yang diminta Fase C #10
 - `./swift-ui-lint.sh`: 13 aturan bersih (Aturan 6 paritas & Aturan 10 hitungan
   README diperbarui; README 481 → 485, `allKeys` 175 → 180).
 
+## Progres terakhir (5 Okt 2026 — celah Aturan 4: penanda "bukan hasil sekarang" tak pernah punya padanan Inggris)
+
+### Premis: gerbangnya hijau karena cabangnya `continue` tanpa syarat
+Aturan 4 menyapu literal teks di dalam argumen `Text(...)`/`row(...)`, dan
+melaporkan yang tidak ada di katalog. Tapi cabang `interpolated`-nya
+melakukan `continue` **tanpa syarat**: setiap literal yang mengandung
+`\(...)` dilewati begitu saja, apa pun isinya.
+
+Asumsinya ("interpolasi murni tidak punya bentuk katalog") salah untuk satu
+kelas: literal **campuran** — sebagian interpolasi, sebagian kalimat nyata.
+Dan kelas itu persis yang memuat kalimat paling sensitif di app ini.
+
+### Cacatnya: penanda objek basi tidak punya terjemahan
+`DiagnosticsView` menulis:
+
+    row(engine.isDisplayingStaleObject ? "Objek (sisa)" : "Objek",
+        engine.isDisplayingStaleObject
+            ? "\(object.name) — bukan hasil sekarang"
+            : object.name)
+
+Kata-kata "bukan hasil sekarang" adalah kalimat yang tampil di layar, dan
+tidak punya entri katalog — penutur Bahasa Inggris melihat kalimat
+Indonesia di baris yang menyatakan **bahwa ini bukan hasil pengukuran
+sekarang**. Kalimat yang paling tidak boleh salah tempat, justru yang tidak
+punya terjemahan. Dua cacat sekaligus, keduanya tak terlihat:
+
+1. Aturan 4 melewatinya tanpa laporan (`continue` tanpa syarat).
+2. Urutan kata terkunci di kode: bahasa lain tidak bisa menaruh penanda di
+   depan nama ("not a current result — Sirius").
+
+### Yang diubah
+- **`swift-ui-lint.sh` (Aturan 4):** cabang `interpolated` dibuat **gagal
+  bawaan (fail-closed)** — literal interpolasi yang masih mengandung kata
+  dilaporkan; yang tidak punya kata sama sekali tetap lolos karena memang
+  bukan teks tampilan. Pengenal kurung dihitung **berimbang**, bukan dengan
+  `[^()]` — tanpa itu `\(NumberFormat.degrees(x))` berhenti di kurung buka
+  `degrees(` dan `NumberFormat` terbaca sebagai kata tampilan (3 positif
+  palsu pada percobaan pertama).
+- **`ObjectSpeech.staleDisplayName(_:)`** (PointingKit): kalimatnya lahir
+  dari kunci `object.display.staleName` (`"%@ — bukan hasil sekarang"`),
+  nama masuk sebagai `%@` supaya **urutan milik katalog**, bukan milik kode.
+- **Katalog:** 1 kunci baru + terjemahan `en` + komentar konteks untuk
+  penerjemah. `allKeys` 180 → 181 (Aturan 6 paritas dua arah).
+- **README:** 485 → 487 (Aturan 10).
+
+### Dibuktikan, bukan dipercaya
+- Gerbang **merah dulu** pada cacat aslinya, menyebut barisnya:
+  `DiagnosticsView.swift:329`. Setelah diperbaiki: bersih.
+- `./red-test.sh` pada dua uji baru — keduanya **merah** terhadap regresi:
+  - menghapus slot `%@` -> "nama objeknya harus tetap tampil di baris yang
+    sama";
+  - menggabung string di pemanggil -> urutan katalog tidak lagi dihormati
+    (`"Sirius — bukan hasil sekarang"` vs `"not a current result — Sirius"`).
+- Uji hijau: CelestialEngine 172 + PointingKit 487 (naik 2 dari 485).
+
+### Satu hal yang hampir terlewat
+Percobaan pertama menyisipkan aksara CJK ke dalam komentar giliran saya
+sendiri — dan **Aturan 3 menangkapnya**. Gerbang yang diuji sendiri bekerja;
+itu bukti sampingan yang berguna.

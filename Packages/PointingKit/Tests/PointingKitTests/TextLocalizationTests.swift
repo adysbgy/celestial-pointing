@@ -242,9 +242,17 @@ final class TextLocalizationTests: XCTestCase {
     /// diuji di tempat lain: di complication konteksnya hilang (tidak ada teks
     /// "tingkat keyakinan" di sampingnya), jadi kata yang sama akan punya dua
     /// arti — "kandidat belum pasti" versus "sedang mencari".
+    ///
+    /// 180 → 181 pada siklus "celah Aturan 4": satu kunci
+    /// `object.display.staleName` ("%@ — bukan hasil sekarang"). Kalimat ini
+    /// dulu dirakit sebagai literal berinterpolasi di dalam `DiagnosticsView`,
+    /// dan Aturan 4 **melewatinya tanpa laporan** karena cabang
+    /// `interpolated`-nya `continue` tanpa syarat. Celah gerbangnya sendiri
+    /// ikut diperbaiki (kini gagal bawaan), dan kunci ini adalah bukti
+    /// sisinya: penanda "bukan hasil sekarang" kini punya padanan Inggris.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 180, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 181, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

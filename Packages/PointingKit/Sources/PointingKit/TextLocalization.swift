@@ -333,6 +333,13 @@ public extension LocalizedText {
         // `Text`) maupun Aturan 6 (tanpa kunci), dan yang tidak terlihat salah
         // karena angka dan derajat sama di semua bahasa.
         .objectDisplayCoordinates, .objectDisplayMagnitude,
+        // Penanda sisa **di layar** yang mengandung nama objek. Masuk daftar
+        // karena ia adalah bentuk yang paling mudah lolos dari semua gerbang:
+        // literal berinterpolasi di dalam argumen `row(…)`, yang dilewati
+        // Aturan 4 tanpa laporan (siklus ini memperbaiki celah itu juga).
+        // Tanpa kunci, penanda "bukan hasil sekarang" — kalimat yang paling
+        // tidak boleh salah tempat — tidak punya padanan bahasa Inggris.
+        .objectDisplayStaleName,
         .objectSpeechStaleShort,
         // Status sensor & izin. Masuk daftar karena inilah satu-satunya jalur
         // pesan "izin ditolak" dan "sensor tidak tersedia" sampai ke layar —

@@ -97,6 +97,46 @@ final class ObjectSpeechTests: XCTestCase {
         }
     }
 
+    /// Penanda sisa **di layar** membawa nama objeknya, dan namanya masuk
+    /// lewat slot — bukan digabung di pemanggil.
+    ///
+    /// **Kenapa uji ini ada.** Bentuk lama dirakit di dalam view sebagai
+    /// `"\(object.name) — bukan hasil sekarang"`. Dua hal salah sekaligus,
+    /// dan keduanya tidak terlihat dari mana pun:
+    ///   1. Aturan 4 melewati literal berinterpolasi tanpa laporan, jadi
+    ///      kalimatnya tidak punya padanan bahasa Inggris sementara seluruh
+    ///      gerbang hijau.
+    ///   2. Urutan kata terkunci di kode, jadi bahasa lain tidak bisa
+    ///      menaruh penanda di depan nama.
+    /// Uji ini menjaga keduanya: penanda ada, nama ada, dan keduanya
+    /// berasal dari satu kunci — bukan dari penggabungan di pemanggil.
+    func testStaleDisplayNameCarriesTheNameAndTheMarker() {
+        let display = ObjectSpeech.staleDisplayName("Sirius")
+        XCTAssertTrue(display.contains("Sirius"),
+                      "nama objeknya harus tetap tampil di baris yang sama")
+        XCTAssertTrue(display.contains("bukan hasil sekarang"),
+                      "penanda bahwa ini bukan hasil sekarang tidak boleh hilang")
+        XCTAssertFalse(display.contains("object.display"),
+                       "kunci katalog bocor ke layar")
+    }
+
+    /// Bahasa lain boleh menaruh penanda di **depan** nama — urutan adalah
+    /// milik katalog, bukan milik kode.
+    ///
+    /// Ini uji yang akan gagal duluan kalau suatu saat ada yang
+    /// "menyederhanakan" ini menjadi penggabungan string di pemanggil.
+    func testStaleDisplayNameOrderIsControlledByTheCatalog() {
+        TextLocalization.install { key in
+            switch key {
+            case "object.display.staleName": return "not a current result — %@"
+            default: return nil
+            }
+        }
+        defer { TextLocalization.reset() }
+        XCTAssertEqual(ObjectSpeech.staleDisplayName("Sirius"),
+                       "not a current result — Sirius")
+    }
+
     /// Terjemahan Inggris mengendalikan kata dan posisi sisipannya.
     func testEnglishTranslationControlsTheWordsAndInsertion() {
         TextLocalization.install { key in

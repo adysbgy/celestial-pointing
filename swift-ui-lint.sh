@@ -364,8 +364,52 @@ for root, _, files in os.walk("Apps"):
                 if text in FORMATS:
                     key = FORMATS[text]
                 elif interpolated:
-                    # Interpolasi murni tidak punya bentuk katalog; yang
-                    # punya bentuk dipetakan lewat FORMATS di atas.
+                    # Interpolasi **tidak** otomatis berarti "bukan teks
+                    # tampilan" — dan itulah yang dulu diasumsikan di sini
+                    # (`continue` tanpa syarat). Buktinya cacat yang
+                    # ditemukan pada siklus ini: `DiagnosticsView`
+                    # menulis `"\(object.name) — bukan hasil sekarang"`
+                    # sebagai penanda objek basi. Kata-katanya
+                    # ("bukan hasil sekarang") adalah kalimat yang tampil
+                    # di layar dan tidak punya padanan bahasa Inggris,
+                    # sementara Aturan 4 melintasinya tanpa laporan apa pun.
+                    #
+                    # Yang **benar** tidak bisa diuji adalah bentuk
+                    # katalognya: `"%@ — bukan hasil sekarang"` memang
+                    # punya bentuk, tapi tidak bisa ditulis sebagai kunci
+                    # katalog — ia harus melewati `FORMATS` di atas supaya
+                    # pemetaannya tercatat. Jadi aturannya dibuat gagal
+                    # bawaan (fail-closed): literal interpolasi yang masih
+                    # punya kata dilaporkan, dan yang **tidak** punya kata
+                    # sama sekali (mis. `"54.2° / 121.0°"`, yang kata-katanya
+                    # hanyalah pengenal Swift di dalam kurung) tetap lolos
+                    # karena memang bukan teks tampilan.
+                    #
+                    # Tanda kurung dihitung berimbang, bukan dengan
+                    # `[^()]` — tanpa itu `\(NumberFormat.degrees(x))`
+                    # berhenti di kurung buka `degrees(` dan pengenalnya
+                    # ("NumberFormat") terbaca sebagai kata tampilan.
+                    words, depth, i = [], 0, 0
+                    while i < len(text):
+                        if text.startswith("\\(", i):
+                            j, depth = i, 0
+                            while j < len(text):
+                                if text[j] == "(":
+                                    depth += 1
+                                elif text[j] == ")":
+                                    depth -= 1
+                                    if depth == 0:
+                                        break
+                                j += 1
+                            i = j + 1
+                            continue
+                        words.append(text[i])
+                        i += 1
+                    if not re.search(r"[A-Za-z]", "".join(words)):
+                        continue
+                    found.append(
+                        f"  {path}:{line}: {text!r} "
+                        f"(interpolasi: butuh kunci lewat FORMATS)")
                     continue
                 elif CONV.search(text) and not re.search(
                         r"[A-Za-z]", CONV.sub("", text)):
