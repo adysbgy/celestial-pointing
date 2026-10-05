@@ -1,5 +1,163 @@
 # STATUS — Celestial Pointing Engine
 
+## Progres terakhir (5 Okt 2026 — hitungan sebab keraguan sudah ada, tapi tidak pernah masuk layar)
+
+### Premis siklus ini: dipotong dengan sengaja, lalu hilang dengan tidak sengaja
+
+`ConfidenceTrace` menghitung `uncertainReasonCounts` — berapa kali tiap sebab
+keraguan muncul — dan setelah sapuan seluruh `Apps/` hasilnya **nol**. Bukan
+satu pun view yang memakainya.
+
+Yang tampil di layar Diagnostik iPhone cuma **satu kalimat**:
+`trace.trace.diagnosis(…)`. Dan kalimat itu **memang** sengaja meringkas —
+bukan kelalaian, bukan bug. `diagnosis` hanya menyebut:
+
+1. sebab yang **mendominasi** (> separuh sampel ragu), atau
+2. semua sebab yang **seri** di puncak, kalau tidak ada yang mendominasi.
+
+Jadi yang dibuang **disengaja**: setiap sebab yang kalah dari dominasi, dan
+**seluruh hitungannya**. `diagnosis` tidak pernah menyebut angka.
+
+### Kenapa yang dibuang itu yang berbahaya
+
+Dua-duanya bukan sekadar "kurang lengkap": keduanya membuang informasi yang
+berlawanan arah.
+
+- **`tooFar` mendominasi → `ambiguous` hilang begitu saja.** Penguji membaca
+  "Perbaiki kalibrasi dulu." lalu menyimpulkan **semua** keraguan berasal dari
+  kalibrasi, padahal ambiguitas katalog muncul pada sebagian sampel. Dua
+  petunjuk perbaikan yang saling meniadakan: satu terlihat, satu tidak. Dan
+  yang tidak terlihat adalah yang **tidak** bisa diperbaiki dengan kalibrasi.
+- **`diagnosisNoMeasurableCause` ("belum ada sebab yang terukur") tampil
+  saat tidak ada dominan dan tidak ada seri.** Kalimat itu menyebut
+  **ketiadaan** sebab, sementara layar punya `tooFar`/`ambiguous` dengan
+  hitungan kecil. Akibatnya kalimat yang paling lemah dasar buktinya
+  justru yang paling mudah disalah baca.
+
+Yang membuat ini bertahan adalah bentuknya: **tidak ada layar yang salah**.
+`diagnosis` benar, uji-ujinya benar, katalog lengkap, 15 gerbang hijau.
+Yang hilang bukan ~~bagian yang bermasalah~~ — yang hilang adalah
+**pertanyaan yang belum pernah diajukan**: "sebab mana yang muncul?"
+
+Ini kelas yang sudah berulang di repo ini, tapi biasanya berupa nilai yang
+dibuang. Yang dibuang di sini adalah **hitungan**, dan pembuangannya memang
+wajar sampai batas tertentu — sehingga tidak ada yang menyadarinya.
+
+### Yang ditambahkan
+
+`UncertainReasonBreakdown` (PointingKit, **teruji Linux**) + 4 kunci katalog
+(`uncertain.reason.tooFar` / `.ambiguous` / `.none`, `row.count.of`).
+Barisnya tampil di bawah kalimat diagnosis di layar Keyakinan.
+
+Tiga aturan yang **harus** hidup di paket, bukan di view, karena tidak bisa
+ditegakkan di view manapun:
+
+1. **Urutan baris mengikuti deklarasi enum**, bukan urutan `Dictionary` —
+   yang di-seed per proses. Bukti nyatanya sudah ada di repo ini:
+   `tiedUncertainReasons` lahir justru karena urutan `Dictionary` tidak
+   ditentukan, dan diagnosis yang sama pernah berubah-ubah **antar
+   peluncuran** untuk data yang sama. Menarik `allCases` ke view akan
+   mengulang cacat itu di bentuk baru: rincian yang sama, urutan berbeda,
+   tiap kali app dibuka ulang.
+2. **Baris dengan hitungan nol tidak pernah tampil.** "0× ambiguitas katalog"
+   menyatakan ada kategori yang **diperiksa dan kosong** — padahal tidak ada
+   bukti kategori itu pernah terjadi. Ini kebohongan yang berlawanan dengan
+   arah yang benar.
+3. **Ambang dominasi sama persis dengan `diagnosis`** (> separuh, bukan
+   "paling banyak"). 2 dari 2 adalah "paling banyak" **tapi seri**, dan seri
+   justru keadaan yang tidak boleh menampilkan satu sebab sendirian. Kalau
+   ambangnya melonggar jadi `>=`, rincian menunjuk satu sebab sementara
+   `diagnosis` menyebut dua — dua jawaban berbeda untuk rekaman yang sama.
+
+`.none` dikecualikan dari dominasi karena ia **bukan sebab**: ia adalah
+ketiadaan sebab yang terukur. Mengizinkan `.none` mendomini membuat layar
+menampilkan "tanpa sebab terukur: 3 dari 3" seolah-olah itu penyebab
+terbesar, sementara `diagnosis` sengaja tidak pernah menyebutnya sebagai
+sebab.
+
+### Kenapa penyebut ikut tampil ("2 dari 7", bukan "2")
+
+Tidak ada angka lain yang menyiapkannya: `diagnosis` tidak pernah menyebut
+jumlah. Dan **"2" tanpa total bisa dibaca salah** — pembaca tidak tahu itu
+sebab utama atau minoritas, dan itu justru pertanyaan yang membuat rincian
+ini bernilai. Bentuknya satu kunci `"%lld dari %lld"`, bukan jumlah +
+kata yang disambung view, karena urutan kata berbeda antar bahasa.
+
+### Bukti merah: 4 mutasi, keempatnya MERAH
+
+`red-test.sh` dipakai untuk memastikan uji baru benar-benar **menanggung
+beban** — uji yang hijau di atas kode rusak sama dengan tidak ada uji.
+
+| Mutasi | Uji yang menangkap | Hasil |
+|---|---|---|
+| `allCases` -> `counts.keys.sorted` (urutan dictionary) | `testRowOrderFollowsEnumDeclarationNotDictionaryOrder` | **MERAH**: `ambiguous, none, tooFar` ≠ `tooFar, ambiguous, none` |
+| `count > 0` -> `count >= 0` (baris nol tampil) | `testZeroCountReasonsAreNotListed` | **MERAH** |
+| `* 2 >` -> `* 2 >=` (seri jadi dominan) | `testDominanceUsesTheSameMoreThanHalfThresholdAsDiagnosis` | **MERAH** |
+| filter `reason != .none` -> `true` (`.none` boleh dominan) | `testNoneIsNeverTheDominantReason` | **MERAH** |
+
+Dua mutasi terakhir menjaga **arah**, dan keduanya punya pasangan: ambang
+`>` punya bukti bawah (`2 dari 2` seri) **dan** bukti atas (`1 dari 1`
+dominan), jadi `>` maupun `>=` sama-sama tidak bisa lolos.
+
+### Bukti bahwa klasifikasinya benar, bukan cuma hitungannya
+
+`testAmbiguityNeedsANeighbour` menjaga bahwa `ambiguous` hanya berlaku bila
+ada tetangga di dalam `ambiguitySigma` σ — kandidat terbaik **dekat** saja
+tidak cukup. Tanpa itu, `nearestNeighbourDeg` bisa diabaikan dan setiap ragu
+jadi `tooFar`/`none`: `ambiguous` tidak pernah muncul, dan rincian
+menampilkan penyebab yang tidak pernah terjadi. Uji ini juga menjaga arah
+sebaliknya — membuang tetangga, baris berubah dari `ambiguous` ke `none`.
+
+### Kesalahan yang dibuat di tengah, dan bagaimana ketahuan
+
+- **Sapuan awal salah.** Pencarian `UncertainReason` di `Apps/` benar
+  (nol), tapi pemeriksaan lanjutan "adakah string ini di katalog" sempat
+  melaporkan dua literal `Text("…")` di `PointingView` dan `DiagnosticsView`
+  sebagai tidak terlokalisasi. Keduanya **sudah** punya entri katalog dengan
+  terjemahan Inggris. Semuanya karena tes substring dicocokkan ke
+  `json.dumps` seluruh kamus, yang menyatukan nilai dari beberapa kunci
+  berbeda. **Tidak ada cacat di sana** — diverifikasi per-kunci sebelum
+  sempat "diperbaiki", karena memperbaiki yang benar akan jadi kerusakan.
+- **Kebiasaan lama: CJK + kata asing sempat masuk** ke beberapa berkas yang
+  ditulis cepat, dan tertangkap **sebelum commit** oleh pemindaian karakter
+  sendiri + Aturan 3/8. Semua dibersihkan; `git status` bersih.
+
+### Gerbang
+
+- `swift-test.sh` → **172 CelestialEngine + 505 PointingKit**, 0 gagal
+  (495 → 505, +10 uji baru). **Engine tidak disentuh.**
+- `swift-ui-lint.sh` → **15 aturan hijau**. Aturan 6 (paritas katalog)
+  memverifikasi keempat kunci baru di kedua sisi; Aturan 4 (literal `Text`
+  tanpa katalog) tetap hijau **setelah** baris baru dipasang.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-test.sh` → 4 mutasi, keempatnya merah.
+- Sapuan aksara non-Latin pada semua berkas yang diubah → **0**.
+- CI: `37255615557` (Apple Build, macos-15) + `37255615574` (Engine Linux) —
+  **dua-duanya hijau**. Apple Build termasuk gerbang peringatan (kode sendiri)
+  dan job Paket (Apple SDK).
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat.** Yang dibuktikan: hitungan benar,
+  urutan stabil, ambang sama dengan `diagnosis`, katalog lengkap, dan
+  view benar-benar merender barisnya (build macOS + gerbang kompilasi). Yang
+  belum: apakah barisnya **membantu** penguji, atau hanya menambah kepadatan
+  di layar yang sudah padat.
+- **Hanya iPhone.** Rincian ini tidak muncul di app jam. Itu **disengaja** —
+  layar jam 41mm dibaca sekilas dan `diagnosis` saja sudah padat — tapi
+  berarti jam dan iPhone tetap berbeda kedalaman, seperti `row("Arah")`
+  yang juga hanya di iPhone.
+- **`policy` disimpan, bukan dipakai.** `dominantReason` dihitung dari
+  `counts` yang sudah jadi, jadi parameter `policy` tidak memengaruhi
+  keputusan apa pun saat ini. Ia disimpan supaya penambahan baris di
+  kemudian hari tidak bisa diam-diam memakai policy berbeda dari yang
+  dipakai menghitungnya. Sampai ada pemanggil yang butuh kebijakan, ia
+  adalah field yang belum dipakai.
+- **Terjemahan Inggris belum pernah dibaca penutur asli.** `row.count.of`
+  memakai "%lld of %lld" — Aturan 11 menjaga **tipe specifier**-nya sama
+  dengan template kode, bukan tata bahasanya. Bahasa yang menuntut
+  bentuk lain harus lewat kode, bukan lewat berkas terjemahan.
+
 ## Progres terakhir (4 Okt 2026 — angka di layar berbicara bahasa berbeda dari teksnya)
 
 ### Premis: unit `NumberFormat` sudah di tengah jalan, dan jalur yang penting masih buta
