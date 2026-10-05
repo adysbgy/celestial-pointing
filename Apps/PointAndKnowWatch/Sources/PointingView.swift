@@ -136,7 +136,8 @@ struct PointingView: View {
                     // dan perbandingan mentah akan **membalik** peringatan ini
                     // diam-diam — memperingatkan justru saat lokasi sungguhan.
                     if engine.location.isFallback {
-                        Text("Lokasi: \(engine.location.label)")
+                        Text(TextLocalization.text(.pointingLocationFallbackPrefix,
+                                                  engine.location.label))
                             .font(.caption2)
                             .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     }
@@ -144,7 +145,7 @@ struct PointingView: View {
                 }
                 .padding(.horizontal, 2)
             }
-            .navigationTitle("Point & Know")
+            .navigationTitle(TextLocalization.text(.pointingTitle))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
@@ -155,7 +156,7 @@ struct PointingView: View {
                     // Tombol berbasis ikon tidak punya teks, jadi tanpa label
                     // VoiceOver mengucapkan nama SF Symbol-nya ("info dot
                     // circle"), bukan maksud tombolnya.
-                    .accessibilityLabel("Konteks langit dan ketelitian")
+                    .accessibilityLabel(TextLocalization.text(.pointingSkyContextLabel))
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     NavigationLink {
@@ -175,8 +176,8 @@ struct PointingView: View {
                     // terkalibrasi adalah yang paling berbahaya untuk
                     // dipercaya.
                     .accessibilityLabel(engine.snapshot.isCalibrated
-                                        ? "Kalibrasi, sudah terpasang"
-                                        : "Kalibrasi, belum terpasang")
+                                        ? TextLocalization.text(.pointingCalibrationInstalled)
+                                        : TextLocalization.text(.pointingCalibrationNotInstalled))
                 }
                 // Mode Malam: 1 ketuk. Ikon bulan berubah jadi bulan-terselubung
                 // saat aktif supaya keadaannya terbaca tanpa warna.
@@ -186,7 +187,9 @@ struct PointingView: View {
                     } label: {
                         Image(systemName: nightMode ? "moon.fill" : "moon")
                     }
-                    .accessibilityLabel(nightMode ? "Nonaktifkan Mode Malam" : "Aktifkan Mode Malam")
+                    .accessibilityLabel(nightMode
+                                        ? TextLocalization.text(.pointingNightModeOn)
+                                        : TextLocalization.text(.pointingNightModeOff))
                 }
                 // Bunyi saat kunci: 1 ketuk. Default nyala (aksesibilitas
                 // multi-modal), bisa dimatikan bila mengganggu.
@@ -196,7 +199,9 @@ struct PointingView: View {
                     } label: {
                         Image(systemName: audioCueEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     }
-                    .accessibilityLabel(audioCueEnabled ? "Nonaktifkan bunyi saat kunci" : "Aktifkan bunyi saat kunci")
+                    .accessibilityLabel(audioCueEnabled
+                                        ? TextLocalization.text(.pointingAudioCueOn)
+                                        : TextLocalization.text(.pointingAudioCueOff))
                 }
             }
         }
@@ -311,10 +316,13 @@ struct PointingView: View {
             Image(systemName: link.isReachable ? "iphone.gen3.radiowaves.left.and.right" : "iphone.slash")
                 .font(.caption2)
                 .accessibilityHidden(true)
-            Text(link.isReachable ? "iPhone terhubung" : "iPhone tidak terjangkau")
+            Text(TextLocalization.text(link.isReachable
+                                      ? .pointingLinkConnected
+                                      : .pointingLinkDisconnected))
                 .font(.caption2)
             if link.sendFailureCount > 0 {
-                Text("· \(link.sendFailureCount) gagal")
+                Text(TextLocalization.text(.pointingLinkFailures,
+                                           Int64(link.sendFailureCount)))
                     .font(.caption2)
                     .foregroundStyle(PointingTone.warning.color)
             }
@@ -460,7 +468,7 @@ struct ObjectDetailView: View {
                     .font(.caption)
                     .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                 if isStale {
-                    Text("Sisa pandangan sebelumnya — bukan hasil sekarang")
+                    Text(TextLocalization.text(.objectDetailStaleNoteDisplay))
                         .font(.caption2)
                         .foregroundStyle(PointingTone.warning.color)
                 }
@@ -605,25 +613,35 @@ struct SkyContextView: View {
     var body: some View {
         List {
             if let context = engine.skyContext {
-                row("Langit", context.isDark ? "Gelap" : "Terang")
-                row("Matahari", NumberFormat.degrees(context.sunAltitudeDeg, fractionDigits: 0))
+                row(TextLocalization.text(.skyContextDark),
+                    context.isDark ? TextLocalization.text(.skyContextDark)
+                                   : TextLocalization.text(.skyContextLight))
+                row(TextLocalization.text(.skyContextSun),
+                    NumberFormat.degrees(context.sunAltitudeDeg, fractionDigits: 0))
                 if let moonAlt = context.moonAltitudeDeg {
-                    row("Bulan", NumberFormat.degrees(moonAlt, fractionDigits: 0))
+                    row(TextLocalization.text(.skyContextMoon),
+                        NumberFormat.degrees(moonAlt, fractionDigits: 0))
                 }
                 if let fraction = context.moonIlluminationFraction {
-                    row("Fase Bulan", NumberFormat.percent(fraction, fractionDigits: 0))
+                    row(TextLocalization.text(.skyContextMoonPhase),
+                        NumberFormat.percent(fraction, fractionDigits: 0))
                 }
             } else {
-                Text("Konteks langit belum dihitung.")
+                Text(TextLocalization.text(.skyContextNotComputed))
             }
-            Section("Ketelitian") {
-                row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
+            Section(TextLocalization.text(.skyContextSection)) {
+                row(TextLocalization.text(.skyContextCalibration),
+                    engine.snapshot.isCalibrated
+                        ? TextLocalization.text(.calibrationStatusAppliedShort)
+                        : TextLocalization.text(.calibrationStatusNotAppliedShort))
                 if let pointing = engine.pointing {
-                    row("Azimut", NumberFormat.degrees(pointing.azimuthDeg))
-                    row("Ketinggian", NumberFormat.degrees(pointing.altitudeDeg))
+                    row(TextLocalization.text(.skyContextAzimuth),
+                        NumberFormat.degrees(pointing.azimuthDeg))
+                    row(TextLocalization.text(.skyContextAltitude),
+                        NumberFormat.degrees(pointing.altitudeDeg))
                 }
-                row("Lokasi", engine.location.label)
-                row("Asal lokasi", engine.location.source)
+                row(TextLocalization.text(.skyContextLocation), engine.location.label)
+                row(TextLocalization.text(.skyContextLocationSource), engine.location.source)
             }
         }
     }

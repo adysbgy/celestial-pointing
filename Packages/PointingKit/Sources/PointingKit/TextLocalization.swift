@@ -306,6 +306,60 @@ public extension LocalizedText {
         key: "calibration.reset.hint", id: "Ulangi kalibrasi dari awal")
     static let calibrationStatusPrefix = LocalizedText(
         key: "calibration.statusPrefix", id: "Status: %@")
+    static let calibrationStatusAppliedShort = LocalizedText(
+        key: "calibration.status.appliedShort", id: "Sudah")
+    static let calibrationStatusNotAppliedShort = LocalizedText(
+        key: "calibration.status.notAppliedShort", id: "Belum")
+
+    // MARK: Layar utama (PointingView) & konteks langit
+
+    static let pointingTitle = LocalizedText(key: "pointing.title",
+                                             id: "Point & Know")
+    static let pointingSkyContextLabel = LocalizedText(
+        key: "pointing.skyContext.label", id: "Konteks langit dan ketelitian")
+    static let pointingCalibrationInstalled = LocalizedText(
+        key: "pointing.calibration.installed", id: "Kalibrasi, sudah terpasang")
+    static let pointingCalibrationNotInstalled = LocalizedText(
+        key: "pointing.calibration.notInstalled", id: "Kalibrasi, belum terpasang")
+    static let pointingNightModeOn = LocalizedText(
+        key: "pointing.nightMode.on", id: "Nonaktifkan Mode Malam")
+    static let pointingNightModeOff = LocalizedText(
+        key: "pointing.nightMode.off", id: "Aktifkan Mode Malam")
+    static let pointingAudioCueOn = LocalizedText(
+        key: "pointing.audioCue.on", id: "Nonaktifkan bunyi saat kunci")
+    static let pointingAudioCueOff = LocalizedText(
+        key: "pointing.audioCue.off", id: "Aktifkan bunyi saat kunci")
+    static let pointingLinkConnected = LocalizedText(
+        key: "pointing.link.connected", id: "iPhone terhubung")
+    static let pointingLinkDisconnected = LocalizedText(
+        key: "pointing.link.disconnected", id: "iPhone tidak terjangkau")
+    static let pointingLinkFailures = LocalizedText(
+        key: "pointing.link.failures", id: "· %lld gagal")
+    static let objectDetailStaleNoteDisplay = LocalizedText(
+        key: "objectDetail.staleNote.display",
+        id: "Sisa pandangan sebelumnya — bukan hasil sekarang")
+    static let pointingLocationFallbackPrefix = LocalizedText(
+        key: "pointing.locationFallback", id: "Lokasi: %@")
+    static let skyContextDark = LocalizedText(key: "skyContext.dark", id: "Gelap")
+    static let skyContextLight = LocalizedText(key: "skyContext.light", id: "Terang")
+    static let skyContextSun = LocalizedText(key: "skyContext.sun", id: "Matahari")
+    static let skyContextMoon = LocalizedText(key: "skyContext.moon", id: "Bulan")
+    static let skyContextMoonPhase = LocalizedText(
+        key: "skyContext.moonPhase", id: "Fase Bulan")
+    static let skyContextSection = LocalizedText(
+        key: "skyContext.section", id: "Ketelitian")
+    static let skyContextCalibration = LocalizedText(
+        key: "skyContext.calibration", id: "Kalibrasi")
+    static let skyContextAzimuth = LocalizedText(
+        key: "skyContext.azimuth", id: "Azimut")
+    static let skyContextAltitude = LocalizedText(
+        key: "skyContext.altitude", id: "Ketinggian")
+    static let skyContextLocation = LocalizedText(
+        key: "skyContext.location", id: "Lokasi")
+    static let skyContextLocationSource = LocalizedText(
+        key: "skyContext.locationSource", id: "Asal lokasi")
+    static let skyContextNotComputed = LocalizedText(
+        key: "skyContext.notComputed", id: "Konteks langit belum dihitung.")
 
     /// Setiap kunci yang dideklarasikan di sini.
     ///
@@ -438,6 +492,17 @@ public extension LocalizedText {
         .calibrationCaptureNearestHint, .calibrationApplyLabel,
         .calibrationApplyNotReadyHint, .calibrationResetLabel,
         .calibrationResetHint, .calibrationStatusPrefix,
+        .calibrationStatusAppliedShort, .calibrationStatusNotAppliedShort,
+        .pointingTitle, .pointingSkyContextLabel,
+        .pointingCalibrationInstalled, .pointingCalibrationNotInstalled,
+        .pointingNightModeOn, .pointingNightModeOff,
+        .pointingAudioCueOn, .pointingAudioCueOff,
+        .pointingLinkConnected, .pointingLinkDisconnected, .pointingLinkFailures,
+        .objectDetailStaleNoteDisplay, .pointingLocationFallbackPrefix,
+        .skyContextDark, .skyContextLight, .skyContextSun, .skyContextMoon,
+        .skyContextMoonPhase, .skyContextSection, .skyContextCalibration,
+        .skyContextAzimuth, .skyContextAltitude, .skyContextLocation,
+        .skyContextLocationSource, .skyContextNotComputed,
         .calibrationPhaseIdleLabel, .calibrationPhaseCollectingLabel,
         .calibrationPhaseReadyLabel, .calibrationPhaseAppliedLabel,
         // Experiment 1. Masuk daftar karena inilah satu-satunya jalur pesan

@@ -3818,6 +3818,303 @@
           }
         }
       }
+    },
+    "pointing.title": {
+      "comment": "Judul layar utama (navigationTitle).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point & Know"
+          }
+        }
+      }
+    },
+    "pointing.skyContext.label": {
+      "comment": "Label VoiceOver tombol info konteks langit.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky context and accuracy"
+          }
+        }
+      }
+    },
+    "pointing.calibration.installed": {
+      "comment": "Label VoiceOver ikon kalibrasi saat terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, installed"
+          }
+        }
+      }
+    },
+    "pointing.calibration.notInstalled": {
+      "comment": "Label VoiceOver ikon kalibrasi saat belum terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration, not installed"
+          }
+        }
+      }
+    },
+    "pointing.nightMode.on": {
+      "comment": "Label VoiceOver tombol mode malam saat aktif.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off Night Mode"
+          }
+        }
+      }
+    },
+    "pointing.nightMode.off": {
+      "comment": "Label VoiceOver tombol mode malam saat mati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Night Mode"
+          }
+        }
+      }
+    },
+    "pointing.audioCue.on": {
+      "comment": "Label VoiceOver tombol bunyi kunci saat nyala.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off sound on lock"
+          }
+        }
+      }
+    },
+    "pointing.audioCue.off": {
+      "comment": "Label VoiceOver tombol bunyi kunci saat mati.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on sound on lock"
+          }
+        }
+      }
+    },
+    "pointing.link.connected": {
+      "comment": "Baris status tautan iPhone terhubung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connected"
+          }
+        }
+      }
+    },
+    "pointing.link.disconnected": {
+      "comment": "Baris status tautan iPhone tidak terjangkau.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone unreachable"
+          }
+        }
+      }
+    },
+    "pointing.link.failures": {
+      "comment": "Penanda jumlah kegagalan kirim di baris tautan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %lld failed"
+          }
+        }
+      }
+    },
+    "objectDetail.staleNote.display": {
+      "comment": "Peringatan visual objek sisa di kartu detail.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leftover from a previous view — not the current result"
+          }
+        }
+      }
+    },
+    "pointing.locationFallback": {
+      "comment": "Baris lokasi darurat (Lokasi: …). %@ adalah label lokasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location: %@"
+          }
+        }
+      }
+    },
+    "skyContext.dark": {
+      "comment": "Nilai baris kegelapan langit (gelap).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        }
+      }
+    },
+    "skyContext.light": {
+      "comment": "Nilai baris kegelapan langit (terang).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        }
+      }
+    },
+    "skyContext.sun": {
+      "comment": "Judul baris altitude Matahari.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        }
+      }
+    },
+    "skyContext.moon": {
+      "comment": "Judul baris altitude Bulan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        }
+      }
+    },
+    "skyContext.moonPhase": {
+      "comment": "Judul baris fase Bulan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon phase"
+          }
+        }
+      }
+    },
+    "skyContext.section": {
+      "comment": "Judul bagian ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accuracy"
+          }
+        }
+      }
+    },
+    "skyContext.calibration": {
+      "comment": "Judul baris kalibrasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration"
+          }
+        }
+      }
+    },
+    "skyContext.azimuth": {
+      "comment": "Judul baris azimut.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azimuth"
+          }
+        }
+      }
+    },
+    "skyContext.altitude": {
+      "comment": "Judul baris ketinggian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altitude"
+          }
+        }
+      }
+    },
+    "skyContext.location": {
+      "comment": "Judul baris lokasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        }
+      }
+    },
+    "skyContext.locationSource": {
+      "comment": "Judul baris asal lokasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
+          }
+        }
+      }
+    },
+    "skyContext.notComputed": {
+      "comment": "Pesan saat konteks langit belum dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky context not computed yet."
+          }
+        }
+      }
+    },
+    "calibration.status.appliedShort": {
+      "comment": "Bentuk pendek 'Sudah' di baris ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "calibration.status.notAppliedShort": {
+      "comment": "Bentuk pendek 'Belum' di baris ketelitian.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
     }
   }
 }
