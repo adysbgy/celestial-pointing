@@ -1,4 +1,110 @@
-## Progres terakhir (5 Okt 2026 — pita Jupiter berhenti 19% radius di dalam piringan)
+## Progres terakhir (5 Okt 2026 — lencana "?" port 3.1x terlalu besar)
+
+### Cacatnya: satuan yang salah, dan tak ada yang membacanya
+
+Port Python menghitung radius glif tanda tanya dari radius **frame**; view
+Swift menghitungnya dari radius **lencana**:
+
+```swift
+// Apps/Shared/CelestialVisualView.swift — benar
+let r = CGFloat(marker.glyphRadius) * radius   // glyphRadius = 0.52 * badgeRadius
+```
+```python
+# Tools/render-visuals.py — salah
+r = marker["glyph_fraction"] * radius          # radius = frame
+```
+
+Selisihnya **3.1x** (0.166 R lawan 0.52 R). Glifnya menjulur keluar
+lencananya di kiri-atas dan **terpotong tepi frame** — jadi lencana "?",
+satu-satunya penanda "engine ragu" di layar, tergambar sebagai busur yang
+berhenti mendadak.
+
+### Kenapa tak satu pun gerbang lama melihatnya
+
+Yang salah adalah **konvensi satuan**, dan tidak ada yang membacanya:
+
+| Gerbang | Kenapa hijau |
+|---|---|
+| `check_port_matches_swift_constants` | konstanta `glyphFraction` memang sama di kedua sisi (0.52); tidak ada yang membandingkan cara **memakainya** |
+| uji model `VisualFrame` | menguji `glyphRadius` di model — dan modelnya benar |
+| Aturan 24 / lint UI | tidak melihat aritmetika gambar |
+| `check_features_disappear_when_uncertain` | baru saja **mengecualikan** kotak lencana, jadi luberan glif justru disaring keluar dari pengukuran itu |
+
+Pola ini persis yang sudah dua kali tercatat di repo: penulis dan pembaca
+yang sepakat satu sama lain.
+
+### Perbaikan, dengan satu sumber kebenaran
+
+- `candidate_marker_glyph()` baru di port: satu-satunya tempat geometri glif
+  hidup. Penggambar dan pemeriksa memakai fungsi yang sama, jadi keduanya
+  tidak bisa lagi sepakat salah.
+- `candidate_marker_footprint()` kini mengembalikan kotak **gabungan**
+  (cakram + glif + lebar garis + tetes), bukan cakram saja. Kotak yang hanya
+  menutup cakram tidak mengecualikan luberan glif — persis cacat yang
+  pengecualian itu ada untuk menutup.
+- Lantai piksel `max(1.0, …)` dibuang dari fungsi geometri. Lantai itu benar
+  dalam **piksel** (view memakainya), tapi di sana satuannya pecahan radius
+  frame — jadi artinya "lebar garis selebar radius frame", 6x lipat, dan
+  `candidate_marker_footprint()` mewarisi luberan itu sampai kotak
+  pengecualiannya menelan hampir seluruh gambar. Penerjemahan satuan milik
+  pemanggil, bukan fungsi geometri.
+
+### Gerbangnya, dan bukti ia menggigit
+
+`check_candidate_marker_stays_inside_its_badge`: setiap piksel berwarna
+peringatan harus berada di dalam kotak lencana (dari model yang sama dengan
+yang menggambar), dan glifnya harus benar-benar ada.
+
+**Dibuktikan menggigit**: dengan rumus lama dikembalikan, gerbang GAGAL
+dengan 254 piksel peringatan di luar kotak, terjauh **(0.055, -0.915)** —
+ujung glif yang terpotong, persis seperti yang diprediksi. Dengan perbaikan:
+0 piksel.
+
+**Versi pertama gerbang itu sendiri salah.** Ia membandingkan "terkunci"
+dengan "ragu" dan gagal dengan 12.470 piksel "di luar lencana" — yang
+ternyata **cincin Saturnus**. Cincin memang menjulur ke seluruh lebar frame
+(sampai 1.003 R) dan memang harus hilang saat ragu, jadi ia sah di luar
+kotak lencana. Pemeriksaan yang mengukur lebih banyak daripada yang
+diklaimnya akan gagal karena alasan yang bukan cacatnya; sekarang ia mengukur warna
+peringatan pada satu gambar saja, tanpa pembanding.
+
+### Ciri lima planet, bukan dua
+
+`check_features_disappear_when_uncertain` dulu menjaga Jupiter dan Saturnus —
+dua yang kebetulan punya kasus render. Satu `guard isConfirmed` di view
+menutup kelimanya, tapi aturan yang tidak diukur adalah aturan yang bisa
+hilang tanpa suara. Mars (kutub), Merkurius (kawah), dan Venus (kabut) kini
+ikut diukur: 1818–3448 piksel berbeda, semuanya di luar lencana.
+
+### Gerbang lain
+
+603 uji Swift hijau, lint UI hijau, typecheck hijau, check-visuals **103
+pemeriksaan 0 gagal**.
+
+### Yang diperiksa dan ternyata sudah beres
+
+Tiga item misi diperiksa dan **tidak** butuh perubahan — dicatat supaya tidak
+dikerjakan ulang:
+
+- **VoiceOver untuk visual objek.** `CelestialVisualView` memang
+  `.accessibilityHidden(true)`, tapi itu **bukan** celah: induknya
+  (`detailAccessibilityLabel` di jam, `visualPanelLabel` di iPhone) sudah
+  mengumumkan nama, jenis, tingkat keyakinan, dan penanda sisa. Dan yang
+  **hanya bisa dilihat dari gambar** sudah diucapkan sendiri: fase Bulan
+  (`spokenPhase`), bentuk objek langit dalam (`spokenDeepSkyMorphology`),
+  warna bintang (`StarColorSpeech`). Alasan "tidak pernah menyebut visualnya"
+  tertulis di kode: "Gambar Jupiter dengan pita oranye" tidak menambah
+  informasi yang tidak sudah ada di nama dan jenis benda. Menambahkan label
+  visual akan **mengulang** pengumuman yang sudah ada dan memanjangkan setiap
+  sapuan VoiceOver — regresi, bukan perbaikan.
+- **Dynamic Type.** Empat kemunculan `.system(size:` semuanya **di dalam
+  komentar** yang menjelaskan kenapa ia tidak dipakai.
+- **README.** Sudah memuat `xcodegen generate`, arsitektur, dan cara
+  menjalankan Experiment 1.
+
+---
+
+## Progres sebelumnya (5 Okt 2026 — pita Jupiter berhenti 19% radius di dalam piringan)
 
 ### Cacatnya: komentar yang benar, rumus yang lain
 
