@@ -1,4 +1,38 @@
-## Progres terakhir (5 Okt 2026 — arsip eksperimen bisa berbohong soal keselamatan)
+## Progres terakhir (5 Okt 2026 — README membusuk, baru diperbaiki)
+
+### Siklus: README ikut dijaga Aturan 10, tapi tertinggal
+
+README menyebut **"CelestialEngine 172, PointingKit 549"** padahal suite
+sudah **174 / 549**. Aturan 10 gerbang UI (`swift-ui-lint.sh`) membandingkan
+klaim README dengan hitungan `func test` di berkas uji — dan README gagal
+aturan itu sampai diperbarui. Juga tertinggal: gerbang UI sudah **17 aturan**
+(teks bilang "10"), dan fitur Fase A/B/C (mode malam, AOD, complication,
+lokalisasi, izin) **sama sekali tidak tercatat** di README.
+
+### Yang diubah
+
+- `README.md`: hitungan uji → **174 / 549**; "10 aturan" → **17 aturan**.
+- Tambah dua bagian: **"Mode malam, Always-On, & aksesibilitas"** dan
+  **"Complication & lokalisasi"** yang merangkum fitur yang sudah dibangun &
+  diuji (bukan cuma di STATUS.md), plus entri daftar isi.
+
+### Kenapa ini unit bernilai, bukan dokumentasi kosong
+
+Dokumentasi yang bilang angka salah adalah **janji yang salah** kepada
+pembaca tentang tebalnya jaring pengaman — persis yang Aturan 10 dibuat
+tutup. Dan fitur aksesibilitas/malam yang tidak tercatat di README berarti
+pemeriksa Final Challenge membaca kode, bukan ringkasan. Catatan ini juga
+mengunci: kalau suatu saat hitungan bergeser lagi, Aturan 10 akan merah di CI.
+
+### Verifikasi
+
+- `./swift-test.sh` → CelestialEngine 174 + PointingKit 549 hijau.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (17 aturan, hitungan README cocok).
+- CI: Engine Tests (Linux) ✓; Apple Build (warnings-as-errors) ✓.
+- Tidak ada kode diubah — hanya dokumentasi, jadi tidak ada risiko merusak
+  engine teruji.
+
+## Progres terakhir (5 Okt 2026 — arsip eksperimen bisa berbohong soat keselamatan)
 
 ### Dua bentuk kebenaran yang tidak saling mengikat
 
