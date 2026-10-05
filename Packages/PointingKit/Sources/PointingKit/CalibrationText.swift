@@ -79,6 +79,12 @@ public enum CalibrationText {
                objectID)
     }
 
+    /// Objek acuan sudah di bawah cakrawala — mencatatnya hanya menghasilkan
+    /// sampel hantu yang membalik offset kalibrasi.
+    public static func belowHorizonMessage(objectID: String) -> String {
+        TextLocalization.text(.calibrationMessageBelowHorizon, objectID)
+    }
+
     /// Tidak ada bintang acuan yang jelas di arah tunjuk.
     public static var noNearbyStarMessage: String {
         TextLocalization.text(.calibrationMessageNoNearbyStar)
@@ -207,6 +213,9 @@ public extension LocalizedText {
     static let calibrationMessageDirectionUncomputable = LocalizedText(
         key: "calibration.message.directionUncomputable",
         id: "Arah objek %@ tidak bisa dihitung — tidak dicatat.")
+    static let calibrationMessageBelowHorizon = LocalizedText(
+        key: "calibration.message.belowHorizon",
+        id: "%@ sudah terbenam — tidak dicatat sebagai acuan.")
     static let calibrationMessageNoNearbyStar = LocalizedText(
         key: "calibration.message.noNearbyStar",
         id: "Tidak ada bintang acuan yang jelas di arah itu — dekatkan tunjuk ke bintang terang.")

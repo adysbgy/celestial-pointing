@@ -365,7 +365,7 @@ public extension LocalizedText {
         .calibrationMessageSpreadTooWide, .calibrationMessageReady,
         .calibrationMessageApplied, .calibrationMessageSensorUnavailable,
         .calibrationMessageNoPointing, .calibrationMessageDirectionUncomputable,
-        .calibrationMessageNoNearbyStar,
+        .calibrationMessageBelowHorizon, .calibrationMessageNoNearbyStar,
         .calibrationSpeechPhasePrefix, .calibrationSpeechSamplesRecorded,
         .calibrationSpeechOffset, .calibrationSpeechSpread,
         .calibrationSpeechApplyReady, .calibrationSpeechApplyNotReady,

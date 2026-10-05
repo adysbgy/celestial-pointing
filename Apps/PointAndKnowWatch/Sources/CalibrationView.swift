@@ -40,47 +40,85 @@ struct CalibrationView: View {
     }
 
     private var calibrationContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
-                phaseCard
-                referenceList
-                actions
-                Text(statusMessage)
-                    // Semantic, bukan `.system(size: 11)`. Angka tetap
-                    // mengabaikan Dynamic Type, jadi di layar 42mm teks
-                    // 11pt ini tidak bisa membesar sama sekali — dan kalibrasi
-                    // justru layar yang paling sering dipakai pengguna yang
-                    // perlu glasses di lapangan.
-                    .font(.footnote)
-                    .foregroundStyle(Color.nightAwareSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("Status: \(statusMessage)")
+        // `TimelineView` menyegarkan layar tiap 30 detik — bukan untuk
+        // menggambar, tapi supaya daftar acuan dihitung ulang saat sudah
+        // basi karena **waktu**. Bintang bergerak ~15°/jam, jadi daftar yang
+        // dibiarkan sepuluh menit meleset ~2,5° dan bisa menawarkan bintang
+        // yang sudah terbenam; tanpa penyegaran berkala, pengguna mencatat
+        // sampel hantu yang membalik offset kalibrasi tanpa terlihat.
+        TimelineView(.periodic(from: .now, by: 30)) { timeline in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    if session?.isReferenceListStale == true {
+                        staleBanner
+                    }
+                    phaseCard
+                    referenceList
+                    actions
+                    Text(statusMessage)
+                        // Semantic, bukan `.system(size: 11)`. Angka tetap
+                        // mengabaikan Dynamic Type, jadi di layar 42mm teks
+                        // 11pt ini tidak bisa membesar sama sekali — dan kalibrasi
+                        // justru layar yang paling sering dipakai pengguna yang
+                        // perlu glasses di lapangan.
+                        .font(.footnote)
+                        .foregroundStyle(Color.nightAwareSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Status: \(statusMessage)")
+                }
+                .padding(.horizontal, 2)
             }
-            .padding(.horizontal, 2)
+            .navigationTitle("Kalibrasi")
+            .onAppear { ensureSession() }
+            // Daftar acuan bergantung pada lokasi: lokasi sungguhan tiba beberapa
+            // detik setelah layar ini dibuka, dan bintang yang tampak "di atas
+            // horizon" di tempat lama bisa sudah terbenam di tempat sebenarnya.
+            // Daftar yang salah tempat tampak sama normalnya dengan yang benar,
+            // jadi perhitungan ulang dipaksa setiap lokasi berubah.
+            .onChange(of: engine.location) { _, _ in
+                session?.refreshReferenceTargets()
+            }
+            // Penyegaran berkala: tiap tik, kalau daftar sudah basi (lokasi
+            // berubah *atau* waktunya lewat), hitung ulang sebelum pengguna
+            // memilih acuan.
+            .onChange(of: timeline.date) { _, _ in
+                if session?.isReferenceListStale == true {
+                    session?.refreshReferenceTargets()
+                }
+            }
+            // Umumkan **hasil setiap aksi**, bukan hanya perubahan keadaan engine.
+            //
+            // Layar ini tidak punya `.onChange(of: engine.snapshot.state)` seperti
+            // `PointingView`, jadi tanpa baris ini tidak ada satu pun umpan balik
+            // yang sampai ke VoiceOver sama sekali. `announcedStatus` menjaga
+            // pengumuman tetap pada perubahan: `onChange` sudah tidak memicu saat
+            // nilai sama, tapi pesan "Belum siap dipakai" bisa muncul berkali-kali
+            // untuk satu masalah yang sama.
+            .onChange(of: statusMessage) { _, newMessage in
+                guard announcedStatus != newMessage else { return }
+                announcedStatus = newMessage
+                AccessibilityNotification.Announcement(newMessage).post()
+            }
         }
-        .navigationTitle("Kalibrasi")
-        .onAppear { ensureSession() }
-        // Daftar acuan bergantung pada lokasi: lokasi sungguhan tiba beberapa
-        // detik setelah layar ini dibuka, dan bintang yang tampak "di atas
-        // horizon" di tempat lama bisa sudah terbenam di tempat sebenarnya.
-        // Daftar yang salah tempat tampak sama normalnya dengan yang benar,
-        // jadi perhitungan ulang dipaksa setiap lokasi berubah.
-        .onChange(of: engine.location) { _, _ in
-            session?.refreshReferenceTargets()
+    }
+
+    /// Peringatan bahwa daftar acuan dihitung untuk langit yang sudah lewat.
+    ///
+    /// Daftar memang disegarkan otomatis tiap 30 detik, tapi saat layar baru
+    /// dibuka lokasi sungguhan belum tiba — jadi ada jendela singkat di mana
+    /// daftar masih dari tempat/langit lama. Banner ini memberi tahu, bukan
+    /// diam, supaya pengguna tahu daftarnya belum boleh dipakai mentah.
+    private var staleBanner: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .accessibilityHidden(true)
+            Text("Daftar acuan belum segar — menyegarkan…")
+                .font(.caption2)
         }
-        // Umumkan **hasil setiap aksi**, bukan hanya perubahan keadaan engine.
-        //
-        // Layar ini tidak punya `.onChange(of: engine.snapshot.state)` seperti
-        // `PointingView`, jadi tanpa baris ini tidak ada satu pun umpan balik
-        // yang sampai ke VoiceOver sama sekali. `announcedStatus` menjaga
-        // pengumuman tetap pada perubahan: `onChange` sudah tidak memicu saat
-        // nilai sama, tapi pesan "Belum siap dipakai" bisa muncul berkali-kali
-        // untuk satu masalah yang sama.
-        .onChange(of: statusMessage) { _, newMessage in
-            guard announcedStatus != newMessage else { return }
-            announcedStatus = newMessage
-            AccessibilityNotification.Announcement(newMessage).post()
-        }
+        .foregroundStyle(PointingTone.warning.color)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Daftar acuan belum segar, menunggu perhitungan ulang.")
     }
 
     // MARK: - Kartu tahap

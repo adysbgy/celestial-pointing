@@ -47,6 +47,22 @@ public final class CalibrationSession {
     /// sebenarnya tidak ada di langitnya — lalu `capture` memakai arah bintang
     /// itu sebagai kebenaran dan offset kalibrasinya salah tanpa terlihat.
     public private(set) var referenceObserver: Observer?
+    /// Waktu (UTC) saat `referenceTargets` terakhir dihitung.
+    ///
+    /// Sengaja disimpan, bukan cuma lokasi: bintang bergerak ~15°/jam, jadi
+    /// daftar yang dihitung sekali meleset ~2,5° dalam sepuluh menit. Daftar
+    /// yang dibiarkan dari detik lalu menawarkan bintang yang sudah terbenam —
+    /// dan `capture` memakai arah itu sebagai kebenaran, menghasilkan sampel
+    /// hantu yang membalik offset kalibrasi tanpa terlihat. Waktu ikut
+    /// menentukan kebasian, bukan lokasi saja.
+    public private(set) var referenceDate: Date?
+    /// Batas usia daftar acuan (detik) sebelum dianggap basi.
+    ///
+    /// 120 s: drift maksimum dalam jendela ini masih ~0,5° (di bawah sebaran
+    /// siap 3°), sehingga daftar tetap bisa dipakai sebagai kebenaran sementara
+    /// UI menyegarkannya berkala. Di luar jendela ini, `isReferenceListStale`
+    /// memaksa perhitungan ulang sebelum pengguna memilih acuan.
+    public var referenceMaxAge: TimeInterval = 120
     /// Target yang sedang dipilih pengguna (kalau UI memakai daftar).
     public var selectedTargetID: String?
 
@@ -78,16 +94,28 @@ public final class CalibrationSession {
             .availableTargets(observer: controller.observer, date: date)
             .filter { $0.kind == .star && wanted.contains($0.id) }
         referenceObserver = controller.observer
+        referenceDate = date
     }
 
     /// Apakah daftar acuan dihitung untuk langit yang berbeda dari sekarang.
     ///
-    /// Dipakai UI untuk memaksa perhitungan ulang saat lokasi pengamat berubah.
-    /// Lokasi sungguhan tiba beberapa detik setelah layar kalibrasi dibuka, jadi
-    /// tanpa sinyal ini daftar acuan tetap berisi bintang tempat lama — dan
-    /// daftar yang salah tempat tampak sama normalnya dengan yang benar.
+    /// Dipakai UI untuk memaksa perhitungan ulang saat lokasi pengamat berubah
+    /// **atau** saat daftar sudah terlalu tua. Lokasi sungguhan tiba beberapa
+    /// detik setelah layar kalibrasi dibuka, jadi tanpa sinyal ini daftar acuan
+    /// tetap berisi bintang tempat lama — dan daftar yang salah tempat tampak
+    /// sama normalnya dengan yang benar. Waktu juga dihitung: bintang bergerak
+    /// ~15°/jam, jadi daftar yang dibiarkan sepuluh menit meleset ~2,5° dan
+    /// bisa menawarkan bintang yang sudah terbenam.
     public var isReferenceListStale: Bool {
-        referenceObserver != controller.observer
+        isReferenceListStale(asOf: Date())
+    }
+
+    /// Varian yang bisa diuji: kebasian dihitung terhadap `now` yang diberikan,
+    /// bukan jam dinding, supaya uji tidak bergantung pada kecepatan eksekusi.
+    public func isReferenceListStale(asOf now: Date) -> Bool {
+        if referenceObserver != controller.observer { return true }
+        guard let referenceDate else { return true }
+        return now.timeIntervalSince(referenceDate) > referenceMaxAge
     }
 
     /// Langkah yang dilaporkan saat sensor mati.
@@ -136,6 +164,29 @@ public final class CalibrationSession {
                                           selectedTarget: nil,
                                           applied: false,
                                           message: CalibrationText.noPointingMessage)
+        }
+        // Kebenaran diambil dari katalog, bukan dari apa yang ditunjuk
+        // pengguna. Dua kegagalan berbeda harus dijaga terpisah: objek tak
+        // dikenal (arah tak bisa dihitung sama sekali) dan objek yang memang
+        // sudah di bawah cakrawala. Yang kedua berbahaya: arahnya tetap bisa
+        // dihitung, tapi memakainya sebagai acuan hanya menghasilkan sampel
+        // hantu — pengguna menunjuk ke langit kosong, dan offset kalibrasi
+        // terbalik tanpa terlihat. Daftar acuan memang menyaring horizon,
+        // tapi daftar bisa basi (waktu), jadi penjagaan ini harus ada di sini,
+        // di jalur pencatatan, bukan hanya di daftar.
+        guard let truth = controller.resolver.horizontal(ofObjectID: objectID,
+                                                        observer: controller.observer,
+                                                        date: date) else {
+            return CalibrationSessionStep(flow: flow.currentUpdate,
+                                          selectedTarget: nil,
+                                          applied: false,
+                                          message: CalibrationText.directionUncomputableMessage(objectID: objectID))
+        }
+        guard truth.altitudeDeg > 0 else {
+            return CalibrationSessionStep(flow: flow.currentUpdate,
+                                          selectedTarget: nil,
+                                          applied: false,
+                                          message: CalibrationText.belowHorizonMessage(objectID: objectID))
         }
         guard let update = flow.add(objectID: objectID,
                                     measured: measured,

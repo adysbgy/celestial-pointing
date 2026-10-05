@@ -3598,6 +3598,17 @@
           }
         }
       }
+    },
+    "calibration.message.belowHorizon": {
+      "comment": "Objek acuan sudah di bawah cakrawala; mencatatnya hanya menghasilkan sampel hantu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ has set — not recorded as a reference."
+          }
+        }
+      }
     }
   }
 }

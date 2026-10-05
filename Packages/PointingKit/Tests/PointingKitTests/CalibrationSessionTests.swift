@@ -79,6 +79,83 @@ final class CalibrationSessionTests: XCTestCase {
         XCTAssertFalse(session.isReferenceListStale)
     }
 
+    // MARK: - Cacat: daftar acuan bisa basi karena **waktu**, bukan cuma tempat
+
+    /// Daftar acuan dihitung untuk langit pada suatu detik, lalu dibiarkan.
+    /// Bintang bergerak ~15°/jam, jadi sepuluh menit kemudian daftar itu
+    /// sudah meleset hingga ~2,5° (terbukti lewat pengukuran drift) — tapi
+    /// `isReferenceListStale` lama hanya membandingkan **lokasi**, sehingga
+    /// tetap `false`. Pengguna lalu memilih bintang yang sebenarnya sudah
+    /// terbenam, dan `capture` memakai arah bintang itu sebagai kebenaran.
+    ///
+    /// Test ini mengunci bahwa waktu ikut dihitung: daftar yang berumur lebih
+    /// dari batasnya harus dianggap basi meskipun lokasinya sama.
+    func testReferenceListBecomesStaleAfterMaxAge() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        // Hitung daftar "pada detik ini".
+        session.refreshReferenceTargets(date: date)
+        XCTAssertFalse(session.isReferenceListStale(asOf: date),
+                       "baru dihitung: belum basi")
+
+        // Maju melewati batas usia daftar.
+        let later = date.addingTimeInterval(session.referenceMaxAge + 1)
+        XCTAssertTrue(session.isReferenceListStale(asOf: later),
+                      "daftar berumur lebih dari batas harus basi")
+
+        // Hitung ulang pada waktu itu → segar lagi.
+        session.refreshReferenceTargets(date: later)
+        XCTAssertFalse(session.isReferenceListStale(asOf: later),
+                       "sudah dihitung ulang: segar")
+    }
+
+    /// Bintang yang sudah terbenam tidak boleh dipakai sebagai acuan —
+    /// arahnya di bawah cakrawala, jadi memakainya sebagai kebenaran hanya
+    /// menghasilkan sampel hantu yang membalik offset kalibrasi tanpa
+    /// terlihat.
+    ///
+    /// Reproduksi cacat: ambil bintang yang masih di atas horizon saat
+    /// daftar dihitung, lalu tunjuk ke arah itu beberapa jam kemudian saat
+    /// bintang sudah terbenam. `capture` lama tetap menambah sampel
+    /// (terbukti: sampel fiktif 13,2° muncul), padahal kebenarannya sudah
+    /// di bawah horizon.
+    func testCaptureRejectsObjectBelowHorizon() throws {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+
+        // Cari bintang acuan yang sedang di atas horizon, dan waktu saat ia
+        // sudah terbenam.
+        let refs = visibleReferences()
+        try XCTSkipIf(refs.isEmpty, "tidak ada acuan di atas horizon saat uji")
+        let id = refs[0]
+        let truthNow = c.resolver.horizontal(ofObjectID: id,
+                                            observer: observer,
+                                            date: date)!
+        XCTAssertGreaterThan(truthNow.altitudeDeg, 0, "prasyarat: acuan di atas horizon sekarang")
+
+        // Cari waktu nanti saat bintang itu di bawah horizon.
+        var setTime: Date?
+        for minutes in stride(from: 5.0, through: 600.0, by: 5.0) {
+            let d = date.addingTimeInterval(minutes * 60)
+            if (c.resolver.horizontal(ofObjectID: id, observer: observer, date: d)?
+                .altitudeDeg ?? 90) <= 0 {
+                setTime = d
+                break
+            }
+        }
+        try XCTSkipIf(setTime == nil, "bintang tidak terbenam dalam jendela uji")
+
+        // Pengguna menunjuk ke arah lama (di atas horizon saat daftar dihitung).
+        let phantom = HorizontalCoord(altitudeDeg: truthNow.altitudeDeg,
+                                     azimuthDeg: truthNow.azimuthDeg)
+        let step = session.capture(objectID: id, measured: phantom, date: setTime!)
+        XCTAssertTrue(session.flow.samples.isEmpty,
+                      "sampel bintang yang sudah terbenam tidak boleh tercatat")
+        XCTAssertEqual(step.selectedTarget, nil)
+        XCTAssertTrue(step.message.contains("terbenam"),
+                      "pengguna harus diberi tahu bintang sudah terbenam, bukan diam")
+    }
+
     // MARK: - Pencatatan
 
     func testCaptureWithoutPointingRecordsNothing() {
