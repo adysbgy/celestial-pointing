@@ -9041,3 +9041,53 @@ policy visibilitas. Yang baru diperbaiki adalah kasus di mana dua hal
 yang mestinya identik -- ambang engine dengan ambang daftar yang
 menganggap engine pasti mengizinkan -- memang berbeda. Batas mekanis
 bukan kasus itu.
+
+## Siklus: satu member mati, dan arti tanda "MATI" di sweep (2026-10-05)
+
+### Yang dihapus
+
+`SurfaceColor.isGrey` — nol konsumen di app, nol di uji. Awalnya ia
+terdengar seperti kontrak yang layak dijaga ("abu kelabu asli"), tapi
+janji yang mungkin ia nyatakan sudah diuji lebih ketat di
+`SurfacePaletteTests.testNightPaletteContainsNoGreenOrBlueAtAll`: hijau
+dan biru harus **nol**, bukan sekadar sama dengan merah.
+
+Menyisakan pembantu yang tidak dipanggil hanya menambah permukaan yang
+harus dipelihara tanpa menambah jaminan apa pun.
+
+### Yang ternyata TIDAK mati: arti tanda `test=0`
+
+Sweep menandai beberapa member lain dengan `test=0`, dan itu terlihat
+menakutkan kalau dibaca sekilas. Diperiksa satu per satu:
+
+| Member | Sepadan | Kesimpulan |
+|---|---|---|
+| `smootherBlend` | dipakai `PointingController` | hidup |
+| `minimumSamples` | dipakai `CalibrationFlow` | hidup |
+| `trueDirection` | dipakai `CalibrationFlow` | hidup |
+| `stateLabel` | dipakai `PointingPresentation` | hidup |
+| `maximumClaimedAge` | dipakai penjaga claim | hidup |
+| `isGrey` | tidak ada | **mati** |
+
+Jadi `test=0` berarti **"tidak disebut langsung oleh nama itu di uji"**,
+bukan "tidak terpakai". Yang membedakan keduanya adalah apakah ada jalur
+produksi yang memanggilnya -- bukan apakah ada uji yang menyebutnya.
+
+Kalau tidak dibedakan, respons yang wajar kelihatan tapi salah: menghapus
+lima member yang sedang menopang logika inti hanya karena tidak ada satu
+uji yang menyalin nama variabelnya.
+
+### Satu yang dicek dan dinyatakan benar
+
+`stateLabel` mengembalikan `"Point & Know"` sebagai literal mentah, dan itu
+terlihat melanggar Aturan 4. Tapi string itu sudah terdaftar sebagai kunci
+katalog di `TextLocalization.swift:360`, jadi yang di sini sudah
+diterjemahkan sebelumnya -- pola yang sama dipakai `headline`. Bukan
+string UI yang lolos dari katalog.
+
+### Gerbang
+
+- `./swift-test.sh` -> **174 CelestialEngine + 572 PointingKit**, 0 gagal.
+- `./swift-ui-lint.sh` -> **19 aturan** hijau.
+- `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+- CI: Apple Build `37307694866` + Engine Tests `37307694628`, keduanya success.
