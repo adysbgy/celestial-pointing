@@ -1,3 +1,32 @@
+## Progres terakhir (5 Okt 2026 — CalibrationView dilokalkan, nol literal keras)
+
+### Lanjutan Fase C #2 (kelengkapan lokalisasi)
+
+Siklus lalu melokalkan `OnboardingView`. Siklus ini melanjutkan ke layar
+kalibrasi di jam — layar yang paling sering dipakai di lapangan, dan yang
+punya Literal Bahasa Indonesia terbanyak setelah `PointingView`.
+
+12 kunci baru di `TextLocalization` (`calibration.*`): judul layar, jumlah
+acuan tercatat, awalan baris status, heading daftar acuan, pesan "tidak ada
+acuan terlihat", label + hint VoiceOver tombol `Catat yang ditunjuk` /
+`Pakai` / `Ulang`. Semua terdaftar di `allKeys` (gerbang 198 → 210) dan punya
+padanan EN di `Localizable.xcstrings`. `CalibrationView` kini **nol** literal
+Bahasa Indonesia keras (Aturan 4 menyapu `Text`/`Label`/`Button`/
+`navigationTitle`/`accessibilityLabel`).
+
+### Kenapa per-view, bukan sekali jalan
+
+Brief meminta "satu unit terkecil" per siklus, dan gerbang (`TextLocalizationTests`
+hitungan kunci + `swift-ui-lint.sh` Aturan 4/6) memaksa setiap kunci
+didaftarkan pasangan katalognya sebelum hijau. Memaksa semua view sekaligus
+melanggar disiplin itu dan menunda verifikasi. Maka dilokalkan per layar:
+`onboarding` → `calibration` → `pointing` (berikutnya) → `experiment1` →
+`complication`.
+
+Verifikasi: `./swift-test.sh` 529/0 hijau; `./swift-ui-lint.sh` semua gerbang
+lulus; CI `Engine Tests (Linux)` + `Apple Build` hijau pada 37266977160 /
+37266977071.
+
 ## Progres terakhir (5 Okt 2026 — literal onboarding dipindah ke katalog, EN ikut tersedia)
 
 ### Cacat: Fase C #2 belum selesai — masih ada literal Bahasa Indonesia di view
