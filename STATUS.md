@@ -1,3 +1,76 @@
+## Progres terakhir (5 Okt 2026 — bintang yang berdenyut di iPhone dan diam di jam)
+
+### Cacatnya: gerak yang sudah dihitung, sudah diuji, dan tidak pernah tersambung
+
+`MotionPolicy.allowsContinuousMotion` ada di `PointingKit`, teruji di Linux,
+dan memutuskan apakah denyut glow bintang boleh berjalan. `CelestialVisualView`
+menerima fase denyut lewat parameter `pulse` — dan komentarnya menjelaskan
+kenapa denyut itu **tidak** dihitung di dalam view:
+
+> "Diberi dari luar, bukan dihitung sendiri di sini: supaya jam bisa
+> menghentikan denyut saat layar redup, dan iPhone bisa menghentikannya saat
+> layar tidak aktif."
+
+Kalimat itu menunjuk jalur yang **tidak ada**. Kartu jam
+(`ObjectDetailView`) memanggil `CelestialVisualView` tanpa `pulse` sama sekali,
+jadi `pulse` selalu bernilai bawaan nol di sana. Akibatnya:
+
+- Bintang di iPhone berdenyut halus; bintang di **jam** diam total — padahal
+  jam adalah permukaan utamanya, dan jam yang berjalan 20×/detik selama
+  mengarahkan.
+- `isSceneActive: true` di kartu jam adalah nilai yang **tidak pernah
+  dihitung**, karena `MotionPolicy` di situ juga tidak dibaca siapa pun.
+  Konstanta yang terdokumentasi rapi di sebelah nilai yang benar-benar
+  berubah — persis kelas "dihitung lalu dibuang" yang berulang di repo ini.
+
+Ini bukan cacat yang bisa ditangkap uji: view tidak bisa dijalankan di Linux,
+dan yang hilang bukan sebuah perhitungan, melainkan sebuah **argumen**.
+
+### Kenapa jam tidak butuh `TimelineView`
+
+iPhone memakai `TimelineView(.animation(minimumInterval: 1/30))` untuk
+menyegarkan denyut, karena kontainer panelnya bukan render-loop. Kartu jam
+berbeda: selama mengarahkan, setiap sampel sensor adalah perubahan
+`@Published` di `engine`, jadi kartu sudah dirender ulang 20×/detik. Fase
+denyut karena itu bisa dihitung langsung dari waktu (`Date().timeIntervalSince(pulseStart)`)
+tanpa `TimelineView` sama sekali — view tidak perlu membangunkan dirinya
+sendiri, ia memang sudah bangun.
+
+`pulseStart` diset ulang **sekali** saat scene kembali aktif, dengan alasan
+yang sama seperti `resyncPulse` di iPhone: tanpa itu fase melompat maju
+beberapa detik dalam satu frame, dan lompatan itu terbaca sebagai kedipan,
+bukan denyut.
+
+### Gerbang `hasPulse`: ongkos yang nyata di layar yang paling peduli baterai
+
+`Canvas` digambar ulang setiap kali nilai yang ditangkapnya berubah. `pulse`
+yang bergerak 20×/detik karena itu memaksa **planet, Bulan, dan Matahari**
+digambar ulang 20×/detik untuk piksel yang identik — denyut hanya dibaca
+`drawStar`. Di jam, ongkos itu nyata: baterai. Maka `pulse` digerbangi
+`visual.hasPulse` di kedua app (properti itu sudah teruji di Linux), sehingga
+`Canvas` planet **tidak pernah** digambar ulang karena denyut.
+
+Di iPhone gerbangnya juga dipindah ke pemanggilan, bukan hanya tinggal di
+kondisi cabang `TimelineView` di atasnya. Kondisi itu menjaga agar
+`TimelineView` tidak dibangun untuk planet; gerbang di pemanggilan menjaga
+agar `Canvas` tidak digambar ulang. Invariannya jadi menempel pada
+pemanggilan dan tidak bisa hilang diam-diam saat cabang itu direfaktor.
+
+### Aturan 21 menutup kelasnya
+
+Aturan 7 memastikan API gerak **punya penjaga** di berkasnya; ia tidak bisa
+melihat apakah denyut sampai ke gambar, dan tidak bisa melihat apakah ia
+sampai ke gambar yang tidak seharusnya berdenyut. Aturan 21 memeriksa
+`CelestialVisualView(...)` yang meneruskan `pulse` bukan-nol wajib menyebut
+`hasPulse` di daftar argumen yang sama. Dibuktikan **merah** pada kedua app
+(gerbang dilepas → Aturan 21 menyala) dan **hijau** pada `pulse: 0` yang sah
+(gerbang tidak terlalu ketat).
+
+Test: CelestialEngine **174** + PointingKit **594** hijau. Lint, typecheck,
+dan CI macOS hijau. README disinkronkan ke **21 aturan**.
+
+---
+
 ## Progres terakhir (5 Okt 2026 — kartu tahap merakit latarnya sendiri, dan mode malam yang membongkarnya)
 
 ### Dua premis uji yang sudah ada di pohon kerja, dan keduanya tidak menguji apa pun
