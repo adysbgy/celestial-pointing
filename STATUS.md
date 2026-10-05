@@ -1,3 +1,150 @@
+## Progres terakhir (5 Okt 2026 — kartu tahap merakit latarnya sendiri, dan mode malam yang membongkarnya)
+
+### Dua premis uji yang sudah ada di pohon kerja, dan keduanya tidak menguji apa pun
+
+Siklus ini dimulai dari pohon kerja yang membawa dua uji setengah jadi di
+`SurfacePaletteTests`. Keduanya menulis cacat yang benar: kartu tahap
+kalibrasi menggambar latarnya dengan `phaseTone.color.opacity(0.12)`, bukan
+dari token permukaan. Keduanya juga **hijau**.
+
+Dan keduanya tidak membuktikan apa pun, karena alasan yang berbeda dari yang
+biasa:
+
+- **Warnanya dikarang.** Fixture-nya `(0.94, 0.47, 0.27)` — merah-oranye
+  hangat yang **tidak ada di `TonePalette`**, di mode mana pun. Jadi uji itu
+  menghitung selisih sebuah warna imajiner terhadap `surface1`, dan hijau.
+  Tidak ada satu pun warna yang benar-benar dirender layar yang tersentuh.
+- **Yang diuji bukan yang berbahaya.** Keduanya membandingkan warna campuran
+  dengan `surface1`/`surface2` dan menyimpulkan "konvensinya berbeda". Itu
+  benar, dan bukan cacatnya. Yang berbahaya adalah **akibat** dari berbeda:
+  kontras teks di atas latar yang dirakit sendiri.
+
+### Cacat sebenarnya: teks yang berwarna sama dengan latarnya
+
+Kartu tahap memakai nada yang sama untuk **teks** (`phaseTone.color`) dan
+**latarnya** (`phaseTone.color.opacity(0.12)`). Jarak keduanya karena itu
+ditentukan oleh alpha dan oleh latar di belakangnya — dan tidak ada satu pun
+uji yang menghitung campuran itu.
+
+Di mode malam hasilnya:
+
+| Tahap | Nada | Kontras teks di atas kartunya | Ambang |
+|---|---|---|---|
+| idle | `.neutral` (merah 0.94) | **4.32:1** | 4.5 — gagal |
+| collecting | `.active` (merah 0.955) | **4.44:1** | 4.5 — gagal |
+| ready/applied | `.success` (merah 0.968) | 4.54:1 | 4.5 — lolos, tipis |
+
+Plafon kontras mode malam adalah 5.25:1 (merah murni di atas hitam), dan
+merah murni **tidak bisa** lebih terang dari itu. Campuran itu menaikkan
+latar kartu ke merah ~0.154, sementara ruang yang tersedia sebelum nada
+paling redup jatuh di bawah 4.5:1 berhenti di ~0.101. Jadi cacatnya bukan
+"alpha terlalu besar" — latarnya memang keluar dari plafon yang fisikanya
+sudah diketahui repo ini.
+
+Di mode siang cacat yang sama ada dan **tidak terlihat sebagai kesalahan**:
+kartunya hanya jadi ~2x lebih terang dari kartu tetangganya, dan tidak ada
+teks yang gagal. Itu sebabnya mode malam yang membongkarnya.
+
+### Kenapa gerbang lama hijau
+
+Tiga lapis, dan ketiganya bentuk yang sudah berulang di repo ini:
+
+1. **`TonePaletteTests` menguji teks di atas permukaan token.** Ia menyisir
+   setiap nada terhadap `surface1`/`surface2` dan semuanya lolos — karena
+   token permukaan memang benar. Yang tidak diuji adalah latar yang dirakit
+   view, dan itu bukan token.
+2. **Peta `phaseTone` hidup di `CalibrationView`.** SwiftUI tidak ada di
+   Linux, jadi tidak ada uji yang bisa menyentuh peta itu sama sekali.
+3. **Aturan 15 menjaga warna prosedural, bukan permukaan.** Ia menyapu
+   `Color(red:…)` di gambar planet/bulan/bintang supaya tidak memancarkan
+   hijau-biru di mode malam. Kartu bukan gambar, jadi tidak terlihat.
+
+### Yang diperbaiki, dan kenapa bukan "alpha lebih kecil"
+
+Menurunkan alpha akan membuat uji hijau hari ini dan mengembalikan cacat yang
+sama begitu nada berikutnya ditambahkan — persis kelas "menyembunyikan, bukan
+menutup". Tiga perubahan mengarah ke sumbernya:
+
+- **Kartu memakai `.surfaceCard(level: .card)`.** `surface1` sudah diuji
+  kontrasnya terhadap kelima nada di kedua mode (`TonePaletteTests`), jadi
+  kartu ini tidak bisa lagi merakit latarnya sendiri. Identitas tahap tetap
+  dibawa ikon dan label di atasnya — yang memakai warna nada teruji, bukan
+  latar.
+- **`CalibrationPhase.tone` pindah ke PointingKit**, plus `CaseIterable`.
+  Peta nada yang hidup di berkas view tidak bisa diuji di Linux; di paket ia
+  jadi satu definisi, dan `allCases` memastikan tahap baru tidak bisa lolos
+  tanpa nada yang diuji.
+- **`SurfaceColor.composited(over:alpha:)`** — operasi yang selama ini hanya
+  ada sebagai `.opacity()` di view. Ia punya nama, bisa dihitung, dan bisa
+  ditahan uji. Ini operasi yang **menghasilkan** cacatnya, dan selama ia tidak
+  punya nama di model, setiap view yang memakainya mengarang aturan
+  kontrasnya sendiri di berkas yang tidak diuji.
+
+### Gerbang baru: Aturan 20
+
+Menyapu `Apps/` untuk `.background(`/`.fill(` yang argumennya berakhir
+`.color.opacity(`. Satu-satunya situs yang ada sudah diperbaiki, jadi
+gerbangnya hijau di atas kode yang benar — dan itu baru berarti kalau ia juga
+merah di atas kode yang salah.
+
+Dibuktikan dua arah lewat `red-lint.sh`:
+
+| Suntikan | Hasil |
+|---|---|
+| `.background(phaseTone.color.opacity(0.12), …)` | **MERAH** pada Aturan 20 |
+| `Color.black.opacity(0.18)` + gradien dari `surface2.color.opacity(0.55)` | **hijau** — bayangan di gambar prosedural & definisi token, bukan kartu |
+
+Baris kedua yang menentukan: tanpa uji negatif, gerbang yang menandai
+**setiap** `.opacity` akan lolos sebagai "bisa merah" sambil memerahkan
+`SurfaceTokens.swift` sendiri.
+
+### Bukti merah uji baru
+
+| Mutasi | Uji | Hasil |
+|---|---|---|
+| `.collecting` → `.neutral` | `testEveryCalibrationPhaseCarriesALegibleTone` | **MERAH**: `("neutral") is not equal to ("active")` |
+| alpha dipasang terbalik di `composited` | `testCompositingIsLinearAndDependsOnTheBackdrop` | **MERAH**: 0.83 ≠ 0.147 |
+
+Mutasi pertama menjaga peta nadanya; yang kedua menjaga **operasi** yang
+dipakai untuk membuktikan cacatnya — kalau komposisinya sendiri salah, bukti
+di atasnya tidak berarti apa-apa.
+
+### Gerbang
+
+- `swift-test.sh` → **174 CelestialEngine + 594 PointingKit** (589 → 594, +5).
+  **Engine tidak disentuh.** Dua uji setengah jadi yang tidak menanggung beban
+  diganti tiga yang lebih tajam, jadi kenaikannya +5, bukan +7.
+- `swift-ui-lint.sh` → **20 aturan hijau** (19 → 20). Aturan 10 menangkap
+  README yang masih 589.
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `red-lint.sh` → Aturan 20 merah pada suntikan, hijau pada non-kartu.
+- `red-test.sh` → dua mutasi merah.
+- CI: `37330275051` (Engine Tests Linux) + `37330275112` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `5975e80`.
+
+### Batas yang jujur
+
+- **Belum pernah dilihat di perangkat.** Yang dibuktikan: kontras dihitung,
+  ambangnya benar di kedua mode, peta nada disisir seluruhnya, dan build
+  macOS hijau. Yang belum: apakah `surface1` **terlihat** sebagai kartu di
+  layar 41mm mode malam — langkah `background`→`surface1` di mode malam
+  hanya 0.023, di atas ambang 0.02 tapi tidak lebih.
+- **Kartu kehilangan warna latar sebagai penanda tahap.** Sebelumnya kartu
+  itu "berwarna" sesuai tahap; sekarang latarnya seragam dan yang membedakan
+  hanya ikon + label. Itu pertukaran yang disengaja: warna latar yang tidak
+  teruji tidak boleh jadi satu-satunya pembeda. Di mode malam tidak ada yang
+  hilang (kelima nada menyempit ke satu merah); di mode siang ini mengurangi
+  aksen — dan itu sesuai brief "aksen vibrant **secukupnya**".
+- **Aturan 20 membaca bentuk, bukan makna.** `.background(someColor.opacity(0.1))`
+  yang *sah* (mis. nanti ada alasan produk untuk kartu bernada yang
+  kontrasnya dihitung terpisah) akan tertangkap dan harus lewat
+  `SurfaceColor.composited` — yang memang tujuannya. Tapi `.opacity(` yang
+  dirakit lewat variabel perantara (`let c = tone.color; … .background(c.opacity(0.1))`)
+  tidak terlihat, dan itu batas pemeriksa teks.
+- **`composited` belum punya konsumen produksi.** Ia dipakai uji dan
+  dokumentasi hari ini; nilainya adalah jawaban untuk kartu ke-3 yang
+  menulisnya besok.
+
 ## Progres terakhir (5 Okt 2026 - "di atas cakrawala" memakai ambang yang berkasnya sendiri sebut salah)
 
 ### Satu berkas, dua jawaban, dan yang salah punya nama paling netral
