@@ -4653,6 +4653,61 @@
           }
         }
       }
+    },
+    "location.source.corelocation": {
+      "comment": "Asal koordinat yang tampil di baris 'Asal lokasi'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device GPS"
+          }
+        }
+      }
+    },
+    "location.source.fallback": {
+      "comment": "Asal koordinat darurat: langit dihitung untuk tempat lain.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default (not your location)"
+          }
+        }
+      }
+    },
+    "location.source.manual": {
+      "comment": "Koordinat yang diketik pengguna sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entered manually"
+          }
+        }
+      }
+    },
+    "location.source.simulator": {
+      "comment": "Koordinat dari simulator, bukan pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simulator"
+          }
+        }
+      }
+    },
+    "location.source.unknown": {
+      "comment": "Asal koordinat yang tidak dikenal; %@ adalah nama sumbernya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown (%@)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -401,6 +401,23 @@ public extension LocalizedText {
         key: "skyContext.location", id: "Lokasi")
     static let skyContextLocationSource = LocalizedText(
         key: "skyContext.locationSource", id: "Asal lokasi")
+    // Label asal lokasi. Masuk daftar karena baris "Asal lokasi" menampilkan
+    // `ObserverLocation.source` **apa adanya** — pengenal mesin
+    // (`corelocation`, `fallback`) di baris yang ditulis untuk menjawab
+    // "langit ini dihitung untuk mana?". Kelas cacat yang sama dengan `sirius`
+    // di headline Experiment 1: nilai untuk mesin tersaji sebagai teks untuk
+    // orang, dan Aturan 4 tidak melihatnya karena ia bukan argumen `Text`.
+    // Lihat `ObserverLocation.sourceDisplayName`.
+    static let locationSourceCoreLocation = LocalizedText(
+        key: "location.source.corelocation", id: "GPS perangkat")
+    static let locationSourceFallback = LocalizedText(
+        key: "location.source.fallback", id: "Bawaan (bukan lokasimu)")
+    static let locationSourceManual = LocalizedText(
+        key: "location.source.manual", id: "Dimasukkan sendiri")
+    static let locationSourceSimulator = LocalizedText(
+        key: "location.source.simulator", id: "Simulator")
+    static let locationSourceUnknown = LocalizedText(
+        key: "location.source.unknown", id: "Tidak diketahui (%@)")
     static let skyContextNotComputed = LocalizedText(
         key: "skyContext.notComputed", id: "Konteks langit belum dihitung.")
 
@@ -631,6 +648,11 @@ public extension LocalizedText {
         // Label lokasi darurat yang tampil di layar utama jam & rincian.
         // Dulu literal di `ObserverLocation.fallback` — lihat berkas itu.
         .locationFallbackLabel,
+        // Label asal lokasi. Baris "Asal lokasi" dulu menampilkan
+        // `ObserverLocation.source` apa adanya (`corelocation`).
+        .locationSourceCoreLocation, .locationSourceFallback,
+        .locationSourceManual, .locationSourceSimulator,
+        .locationSourceUnknown,
         // Rincian sebab keraguan + bentuk hitungan "n dari total".
         // Masuk daftar karena `uncertainReasonCounts` sudah dihitung dan
         // sudah diuji, tapi **nol konsumen di `Apps/`**: satu-satunya yang

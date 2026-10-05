@@ -454,7 +454,7 @@ struct DiagnosticsView: View {
                     row("Device motion", motion.isAvailable ? "Ada" : "Tidak ada")
                     row("Sampel", "\(motion.sampleCount)")
                     row("Lokasi", location.effectiveLocation.label)
-                    row("Asal lokasi", location.effectiveLocation.source)
+                    row("Asal lokasi", location.effectiveLocation.sourceDisplayName)
                     if let reason = motion.unavailableReason {
                         Text(reason).foregroundStyle(PointingTone.danger.color)
                     }

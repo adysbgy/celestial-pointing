@@ -641,7 +641,8 @@ struct SkyContextView: View {
                         NumberFormat.degrees(pointing.altitudeDeg))
                 }
                 row(TextLocalization.text(.skyContextLocation), engine.location.label)
-                row(TextLocalization.text(.skyContextLocationSource), engine.location.source)
+                row(TextLocalization.text(.skyContextLocationSource),
+                    engine.location.sourceDisplayName)
             }
         }
     }

@@ -50,6 +50,53 @@ public struct ObserverLocation: Codable, Equatable, Sendable {
     /// target yang salah tempat akan tampak sama normalnya dengan yang benar.
     public var isFallback: Bool { source == ObserverLocation.fallbackSource }
 
+    /// Label **untuk dibaca orang** bagi `source`.
+    ///
+    /// **Kenapa accessor ini harus ada, padahal `source` sudah ada.**
+    /// `source` adalah bentuk kabel: ia diserialisasi ke JSON arsip
+    /// (`ConfidenceTraceArchive`) dan dibandingkan dengan `==`. Menampilkannya
+    /// apa adanya berarti pengguna membaca `corelocation` — pengenal mesin di
+    /// baris yang justru ditulis untuk menjawab "langit ini dihitung untuk
+    /// mana?". Itu cacat yang sama dengan `sirius` di headline Experiment 1 dan
+    /// `stateRequest` di layar Tautan: nilai untuk mesin yang tersaji sebagai
+    /// teks untuk orang.
+    ///
+    /// Sengaja **bukan** enum: `source` dibaca dari berkas ekspor yang sudah
+    /// tersimpan, dan nilai yang tidak dikenal tidak boleh membuat lokasi gagal
+    /// didekode. Karena itu yang tidak dikenal jatuh ke label "tidak
+    /// diketahui", bukan ke `nil` dan bukan ke tebakan.
+    ///
+    /// Dihitung saat dibaca, bukan disimpan: `TextLocalization` bisa berganti
+    /// bahasa setelah lokasi ini dibuat (alasan yang sama dengan
+    /// `ObserverLocation.fallback` di bawah).
+    public var sourceDisplayName: String {
+        switch sourceText {
+        case .locationSourceUnknown:
+            // Satu-satunya bentuk berspecifier: nama sumbernya ikut ditampilkan
+            // supaya dua sumber tak dikenal tidak tampak identik.
+            return TextLocalization.text(sourceText, source)
+        default:
+            return TextLocalization.text(sourceText)
+        }
+    }
+
+    /// Kunci katalog untuk label asal lokasi ini.
+    ///
+    /// Nilai bawaan sengaja memuat **nama sumbernya** untuk yang tak dikenal
+    /// (`location.source.unknown` berisi `%@`): menyembunyikan sumber yang
+    /// tidak dikenal di balik kata "Tidak diketahui" saja akan membuat dua
+    /// sumber berbeda tampak identik persis pada baris yang dipakai untuk
+    /// memutuskan apakah langitnya bisa dipercaya.
+    public var sourceText: LocalizedText {
+        switch source {
+        case "corelocation":           return .locationSourceCoreLocation
+        case ObserverLocation.fallbackSource: return .locationSourceFallback
+        case "manual":                 return .locationSourceManual
+        case "simulator":              return .locationSourceSimulator
+        default:                       return .locationSourceUnknown
+        }
+    }
+
     /// Nilai `source` untuk lokasi darurat.
     public static let fallbackSource = "fallback"
 
