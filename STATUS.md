@@ -1,3 +1,91 @@
+## Progres terakhir (5 Okt 2026 — `CelestialVisual.VisualFrame` tidak ada, dan gerbang yang akhirnya melihatnya di Linux)
+
+### Kelas cacat yang sama untuk kedua kalinya: nama yang benar, tempat yang salah
+
+CI Apple Build merah pada `bf28783`:
+
+```
+Apps/Shared/CelestialVisualView.swift:784:39: error:
+  type 'CelestialVisual' has no member 'VisualFrame'
+```
+
+`VisualFrame` adalah tipe **top-level** (`public enum VisualFrame {`), bukan
+tipe bersarang di dalam `CelestialVisual`. Kualifikasinya salah — dan yang
+membuatnya mahal bukan kesalahannya, melainkan bahwa **tidak satu pun gerbang
+Linux bisa melihatnya**:
+
+| Gerbang | Kenapa hijau |
+|---|---|
+| `swift-test.sh` | membangun **paket**, bukan `Apps/` |
+| `swift-typecheck.sh` | hanya `-parse` berkas `Apps/` — sintaks, bukan tipe |
+| `swift-ui-lint.sh` | 24 aturan teks, tak satu pun tahu keanggotaan tipe |
+| CI macOS | **merah** — satu siklus penuh (~2 menit) terlambat |
+
+Berkas `swift-typecheck.sh` sudah menulis batas ini jujur di kepalanya, jadi
+ini bukan kelalaian: memang tidak bisa ditutup sepenuhnya di Linux (SDK
+SwiftUI tidak ada). Yang bisa ditutup adalah **irisan** yang benar-benar
+terjadi — dan irisan ini sudah terjadi dua kali (`ringBackHalfOpacityScale`
+di `CelestialVisual` alih-alih `VisualFrame`, tercatat di STATUS.md).
+
+### Yang ditambahkan bukan perbaikan satu baris, melainkan gerbangnya
+
+Aturan 25 membaca daftar anggota `CelestialVisual` **dari sumber paketnya**
+(badan tipe + setiap extension, sampai kedalaman satu) lalu memastikan setiap
+`CelestialVisual.X` di `Apps/` benar-benar ada. Dua keputusan sengaja:
+
+- **Kedalaman satu, bukan seluruh pohon tipe.** Gerbang yang menebak lebih
+  jauh akan memerah pada kode yang sah (`CelestialVisual.Planet.jupiter`
+  adalah dua tingkat), dan gerbang yang memerah pada kode benar akan
+  dimatikan orang. Batasnya ditulis di aturannya, bukan disembunyikan.
+- **Kasus "tipe top-level" dilaporkan dengan saran yang benar** ("pakai tanpa
+  kualifikasi"), bukan sekadar "tidak ada" — karena itulah bentuk cacat yang
+  nyata, dan pesan yang salah mengirim orang ke tempat yang tidak berisi
+  apa-apa.
+
+### Bukti menggigit, lewat dua suntikan yang berbeda
+
+`red-lint.sh` (exit 1, menunjuk baris 784, berkas dipulihkan), plus suntikan
+kedua untuk cabang lain:
+
+```
+`CelestialVisual.VisualFrame` — VisualFrame adalah tipe top-level di
+  PointingKit, bukan anggota CelestialVisual; pakai VisualFrame tanpa kualifikasi
+`CelestialVisual.NoSuchThing` — bukan anggota CelestialVisual dan tidak ada di PointingKit
+```
+
+### Yang diperbaiki sambil lewat, dan kenapa itu bagian dari cacatnya
+
+Dua entri gerbang Matahari yang baru ternyata **selalu merah**: entrinya
+menaruh ekspresi Python (`"opacity(0.42)" in view`) di posisi **nilai
+harapan**, sehingga yang dibandingkan adalah `False == "opacity(0.42)"`. Ia
+merah di kode benar maupun kode salah — sama tidak bergunanya dengan gerbang
+yang selalu hijau, hanya lebih berisik. Keduanya kini menguji bentuk yang
+benar-benar diklaimnya, dan arah "view memakai profil" dipindahkan ke
+pemeriksaan **gambar**: pencarian teks `sunProfile(` hijau walaupun hasilnya
+dibuang, dan yang menentukan bukan namanya dipanggil melainkan apa yang
+sampai ke piksel.
+
+### Gerbang
+
+- `swift-test.sh` → **174 CelestialEngine + 622 PointingKit**, 0 gagal.
+  **Engine tidak disentuh.**
+- `swift-ui-lint.sh` → **25 aturan hijau** (Aturan 10 menangkap README yang
+  masih 24 lebih dulu, seperti seharusnya).
+- `swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `check-visuals.py` → **163 pemeriksaan, 0 gagal**.
+- CI: `37390117194` (Engine Tests Linux) + `37390117532` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `fee0ecc`.
+
+### Batas yang jujur
+
+- **Aturan 25 bukan typechecker.** Ia tahu anggota langsung `CelestialVisual`
+  dan tipe top-level paket; anggota yang salah di tipe lain, atau argumen yang
+  salah tipe, tetap hanya ketahuan dari CI macOS.
+- **Kelas cacat ini masih bisa terulang.** Yang tertutup adalah kualifikasi
+  `CelestialVisual.`, bukan "setiap anggota yang tidak ada". Memperluasnya ke
+  seluruh tipe PointingKit adalah unit berikutnya yang jelas — dan lebih besar,
+  jadi sengaja tidak digabung ke siklus ini.
+
 ## Progres terakhir (5 Okt 2026 — kutub Mars mengambang di dalam piringan)
 
 ### Cacatnya: elips yang ditempel, bukan kap es di permukaan bola
