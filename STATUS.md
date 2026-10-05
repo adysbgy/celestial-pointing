@@ -1,3 +1,89 @@
+## Progres terakhir (5 Okt 2026 — Venus berfase, dan gerbang lokal yang buta terhadap Apps/)
+
+### Cacatnya: bola penuh yang menyatakan sesuatu yang tidak ada
+
+`drawPlanet` menggambar **setiap** planet sebagai bola penuh yang menyala.
+Itu benar untuk Mars sampai Saturnus, tapi salah untuk dua planet dalam: dari
+Bumi Venus berayun dari sabit ~1% ke cakram ~99%, dan di langit nyata ia
+**tidak pernah** tampak bulat saat berada dekat Matahari. Sabit itulah ciri
+paling khasnya.
+
+Yang penting: ini **bukan** mesin yang salah hitung. `Ephemeris.apparent`
+sudah menghitung `illuminationFraction` untuk semua benda. Yang hilang adalah
+jalur dari angka itu ke gambar:
+
+- `phaseGeometry` menolak apa pun yang bukan Bulan.
+- `PointingEngine` hanya memasok fraksi untuk Bulan.
+
+Jadi angkanya ada, dan gambarnya menyangkalnya. Itu tepat yang dilarang aturan
+"kejujuran > rasa percaya diri": bukan karena hitungannya salah, tapi karena
+**gambar menyampaikan lebih dari yang dihitung**.
+
+### Perbaikan
+
+| Bagian | Keputusan | Kenapa |
+|---|---|---|
+| `Planet.showsPhase` | Merkurius & Venus `true`; Mars–Saturnus `false` | planet luar nyaris bulat sepanjang waktu — angka fase yang sampai ke view harus **diabaikan**, bukan dipakai |
+| `fractionForPhase` | satu tempat memutuskan angka mana yang boleh dipakai | memisahkan "punya angka" dari "boleh menggambar fase" |
+| `brightLimbAngle(body:sun:)` | generalisasi dari `(moon:sun:)` | sudut sisi terang tidak ada urusannya dengan Bulan; dua salinan rumus = dua tempat yang bisa berbeda diam-diam |
+| `drawLitBand` | dipakai bersama Bulan & planet | kalau tidak, sabit Venus dan sabit Bulan digambar dua salinan kode |
+| ciri ikut terpotong | kawah Merkurius & kabut Venus `clip` ke pita menyala | supaya tidak menonjol keluar sabit dan membuatnya tampak lebih lebar dari fraksi engine |
+| gradien limb | berpusat di pusat piringan, bukan digeser kiri-atas | gradien yang digeser **ikut berputar** bersama pita, jadi "cahaya dari kiri-atas" menghadap arah salah saat sisi terang ke bawah — dan planetnya tetap tampak seperti bola, jadi tak ada yang bisa menangkapnya dari layar |
+| fase hanya saat terkunci | `isConfirmed` | aturan yang sudah berlaku untuk pita Jupiter & cincin Saturnus: warna boleh pada kandidat, **bentuk** tidak. Sabit adalah bentuk |
+| `planetUnlit` | token baru, terpisah dari `moonUnlit` | sisi gelap Bulan disinari cahaya bumi (earthshine), sisi gelap planet tidak |
+
+### Gerbang: port Python harus menggambar cabang yang sama
+
+Tanpa cabang fase di port, port menggambar bola penuh sementara aplikasi
+menggambar sabit — dan **setiap pemeriksaan gambar planet dalam mengukur
+gambar yang tidak pernah ada**. Kelas cacat yang sama dengan gerbang yang
+mengukur sebagian klaimnya, tiga kali sebelumnya.
+
+`check_inner_planet_phase` (5 pemeriksaan, semua dari piksel):
+
+| Pemeriksaan | Ambang | Kenapa ada |
+|---|---|---|
+| sabit Venus benar-benar sempit | luas < 0.45 (f=0.22) | bola penuh ≈ 1.0 — tanpa ini, "fase" bisa berarti apa saja |
+| sisi terang menghadap sudut | harus "bawah" pada −π/2 | jalur sama dengan Bulan, jadi kesalahan koordinat layar tertangkap di sini juga |
+| cembung > setengah | luas > 0.55 (f=0.78) | tanpa ini, "sabit tipis untuk semua fraksi" lolos |
+| planet luar abaikan angka fase | luas > 0.85 | Mars tetap bulat walau diberi angka fase |
+| Venus tanpa arah fase | luas > 0.85 | **arah tak diketahui ≠ izin menebak arah** |
+
+### Celah gerbang yang baru ketahuan: `swift-typecheck.sh` tidak mengompilasi Apps/
+
+Apple Build di CI sudah **merah sejak commit sebelumnya** — dan setiap gerbang
+lokal hijau:
+
+```
+Apps/Shared/CelestialVisualView.swift:405:56: error:
+  type 'CelestialVisual' has no member 'ringBackHalfOpacityScale'
+```
+
+Konstantanya milik `VisualFrame`, bukan `CelestialVisual`. `swift-typecheck.sh`
+membangun **paket**, bukan `Apps/`. Jadi kesalahan "tipe X tidak punya anggota
+Y" di dalam `Apps/` hanya bisa muncul saat `Apps/` benar-benar dikompilasi
+terhadap paket — dan yang melakukannya hanya macOS.
+
+| Gerbang | Hasil | Cakupan |
+|---|---|---|
+| `swift-test.sh` | hijau | paket saja |
+| `swift-ui-lint.sh` | hijau | teks, bukan tipe |
+| `swift-typecheck.sh` | hijau | **paket** saja — bukan Apps/ |
+| CI Apple Build | **merah** | Apps/ terhadap paket |
+
+Ini pola yang sama untuk keempat kalinya, dengan bentuk yang berbeda: **gerbang
+yang mengklaim lebih dari yang diukurnya.** Yang pertama menutup lubangnya
+adalah CI, dan CI merah sementara semuanya bilang hijau.
+
+### Hasil
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| CelestialEngine | 174 | **174** |
+| PointingKit | 607 | **615** (+8) |
+| Pemeriksaan visual | 125 | **130** (+5) |
+| Apple Build | merah | **hijau** |
+
 ## Progres terakhir (5 Okt 2026 — larik ciri dijaga seluruhnya, bukan elemen pertamanya)
 
 ### Pola yang muncul tiga kali: gerbang yang mengukur sebagian dari klaimnya
