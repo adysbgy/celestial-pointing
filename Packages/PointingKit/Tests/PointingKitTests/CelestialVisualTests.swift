@@ -1550,4 +1550,63 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertNotNil(CelestialVisual(object: object(id: "sirius", kind: .star))
             .spokenStarColor)
     }
+
+    // MARK: - Warna bintang adalah ciri pengenal
+
+    /// Warna spektral bintang tidak boleh tampil saat engine belum pasti.
+    ///
+    /// **Kenapa ini kelas yang sama dengan cincin Saturnus.** Biru pada Rigel
+    /// dan merah pada Betelgeuse adalah penanda yang sama meyakinkannya
+    /// dengan cincin Saturnus atau bentuk galaksi berpalung — dan aturan itu
+    /// sudah berlaku untuk keduanya. Bintang sempat tertinggal: pita planet
+    /// dijaga `palette.feature`, bentuk objek langit dalam dijaga
+    /// `drawableMorphology`, sementara warna bintang **tidak dijaga apa pun**.
+    ///
+    /// Yang membuatnya layak diuji, bukan sekadar diperbaiki: kesalahannya
+    /// tidak terlihat. Badge di sebelah gambar bisa bertuliskan "Ragu"
+    /// sementara titik di sebelahnya berwarna merah khas Betelgeuse, dan
+    /// mata membaca gambar lebih dulu daripada badge. Tidak ada teks di layar
+    /// yang bisa membuktikan titik merah itu tidak diklaim.
+    func testStarColourIsNotAClaimWhenUncertain() {
+        let betelgeuse = CelestialVisual.colorIndex(forStarID: "betelgeuse")
+        let rigel = CelestialVisual.colorIndex(forStarID: "rigel")
+        XCTAssertGreaterThan(betelgeuse, rigel, "prasyarat: keduanya warna berbeda")
+
+        // Saat yakin: warnanya diteruskan apa adanya.
+        XCTAssertEqual(
+            CelestialVisual.drawableStarColorIndex(betelgeuse, isConfirmed: true),
+            betelgeuse)
+        XCTAssertEqual(
+            CelestialVisual.drawableStarColorIndex(rigel, isConfirmed: true),
+            rigel)
+
+        // Saat ragu: **satu** warna untuk semua bintang, dan warna itu harus
+        // netral — bukan warna salah satu kandidatnya.
+        let uncertainBetelgeuse =
+            CelestialVisual.drawableStarColorIndex(betelgeuse, isConfirmed: false)
+        let uncertainRigel =
+            CelestialVisual.drawableStarColorIndex(rigel, isConfirmed: false)
+        XCTAssertEqual(uncertainBetelgeuse, uncertainRigel,
+                       "dua bintang berbeda tidak boleh tetap berbeda saat ragu")
+        XCTAssertNotEqual(uncertainBetelgeuse, betelgeuse,
+                          "warna Betelgeuse tidak boleh tetap tampil saat ragu")
+        XCTAssertNotEqual(uncertainRigel, rigel,
+                          "warna Rigel tidak boleh tetap tampil saat ragu")
+    }
+
+    /// Nilai "tidak mengklaim" harus sama dengan yang sudah dipakai untuk
+    /// bintang yang **tidak ada di katalog**.
+    ///
+    /// Bukan detail gaya: kalau warna ragu adalah nilai karangan baru, ia
+    /// masih bisa berupa warna spektral yang khas. Memakai nilai yang sudah
+    /// ada berarti "warna ragu" dan "warna bintang tak dikenal" adalah warna
+    /// yang sama persis — dan bintang tak dikenal sudah lama dianggap tidak
+    /// mengklaim apa pun.
+    func testUncertainStarColourMatchesTheUnknownStarColour() {
+        let unknown = CelestialVisual.colorIndex(forStarID: "bintang-yang-tidak-ada")
+        XCTAssertEqual(
+            CelestialVisual.drawableStarColorIndex(1.85, isConfirmed: false),
+            unknown,
+            "warna saat ragu harus sama dengan warna bintang tak dikenal")
+    }
 }

@@ -705,10 +705,25 @@ def _point_in_polygon(x, y, points):
     return c
 
 
+def drawable_star_color_index(color_index, is_confirmed):
+    """`CelestialVisual.drawableStarColorIndex` — warna hanya saat yakin.
+
+    Warna spektral bintang adalah ciri pengenal (biru Rigel vs merah
+    Betelgeuse), jadi saat engine ragu ia tidak boleh tampil. Nilai "tidak
+    mengklaim" adalah indeks bintang yang tidak ada di tabel — sama dengan
+    yang sudah dipakai `colorIndex(forStarID:)` untuk id tak dikenal.
+    """
+    if not is_confirmed:
+        return STAR_COLOR_INDEX.get("", 0.0)
+    return color_index
+
+
 def _draw_star(canvas, cx, cy, radius, kw, night_mode):
     geometry = star_geometry(kw.get("relative_size", 0.5))
     core_radius = radius * geometry["core_radius"]
-    color_index = kw.get("color_index", 0.0)
+    # VIEW: `starColor` memakai `drawableStarColorIndex` lebih dulu.
+    color_index = drawable_star_color_index(kw.get("color_index", 0.0),
+                                            kw.get("is_confirmed", True))
     base = star_rgb(color_index)
     if night_mode:
         relative = kw.get("relative_size", 0.5)
@@ -874,6 +889,24 @@ def build_cases():
                             "star", color_index=0.0,
                             relative_size=size_from_magnitude(-1.4),
                             pulse=math.pi / 2, is_confirmed=True))
+    # Saat engine ragu, warna spektral tidak boleh lagi tampil: Betelgeuse
+    # (B−V +1.85, merah) dan Rigel (−0.03, biru) harus jadi titik yang sama.
+    # Kalau keduanya masih berbeda di sini, artinya identitas masih diklaim.
+    cases.append(VisualCase(
+        "star-betelgeuse-uncertain",
+        "Betelgeuse saat engine RAGU — warna spektral harus hilang",
+        "star", color_index=STAR_COLOR_INDEX["betelgeuse"],
+        relative_size=size_from_magnitude(0.0), is_confirmed=False))
+    cases.append(VisualCase(
+        "star-rigel-uncertain",
+        "Rigel saat engine RAGU — harus sama persis dengan Betelgeuse di atas",
+        "star", color_index=STAR_COLOR_INDEX["rigel"],
+        relative_size=size_from_magnitude(0.0), is_confirmed=False))
+    cases.append(VisualCase(
+        "star-unknown-id",
+        "bintang yang tidak ada di katalog — warna netral, tidak mengklaim",
+        "star", color_index=STAR_COLOR_INDEX.get("", 0.0),
+        relative_size=size_from_magnitude(0.0), is_confirmed=True))
 
     # ── Matahari ──────────────────────────────────────────────────────
     cases.append(VisualCase("sun", "Matahari — fotosfer + corona", "sun",

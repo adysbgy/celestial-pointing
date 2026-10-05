@@ -543,7 +543,16 @@ struct CelestialVisualView: View {
         // Warna siang dihitung dari indeks B−V di `PointingKit`
         // (`CelestialVisual.starRGB`) -- rumus warna tidak lagi tinggal di
         // view, jadi urutannya bisa diuji di Linux.
-        let base = Self.color(CelestialVisual.starRGB(forColorIndex: visual.colorIndexBV))
+        //
+        // Indeksnya lewat `drawableStarColorIndex` dulu, **bukan** dipakai
+        // mentah: warna spektral adalah ciri pengenal (biru Rigel vs merah
+        // Betelgeuse), jadi saat engine belum pasti ia tidak boleh tampil --
+        // aturan yang sudah berlaku untuk pita planet (`palette.feature`) dan
+        // bentuk objek langit dalam (`drawableMorphology`). Yang tetap tampil
+        // saat ragu hanyalah terang, dan terang tidak menyebut bintang mana.
+        let index = CelestialVisual.drawableStarColorIndex(
+            visual.colorIndexBV, isConfirmed: isConfirmed)
+        let base = Self.color(CelestialVisual.starRGB(forColorIndex: index))
         guard NightMode.isOn else { return base }
         // Kecerahan diambil dari ukuran relatif (bintang paling terang tetap
         // paling terang), lalu warnanya dipaksakan ke merah. Kecerahan tetap

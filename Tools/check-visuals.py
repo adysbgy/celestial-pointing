@@ -538,6 +538,70 @@ def check_star_colour_order(results, size=200, ss=2):
             f"R−B {star}={a_warmth}, {warmer_than}={b_warmth}"))
 
 
+def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
+    """Warna bintang harus hilang saat engine ragu — diukur dari piksel.
+
+    Warna spektral adalah **ciri pengenal**: biru pada Rigel dan merah pada
+    Betelgeuse adalah penanda yang sama meyakinkannya dengan cincin Saturnus.
+    Aturan "ciri hilang saat ragu" sudah berlaku untuk pita planet dan bentuk
+    objek langit dalam; bintang sempat tertinggal, dan kesalahannya tidak
+    terlihat — badge "Ragu" bisa berada persis di sebelah titik yang masih
+    berwarna merah khas Betelgeuse, dan mata membaca gambar lebih dulu.
+
+    Diukur dari piksel, bukan dari fungsi: yang diperiksa adalah gambar yang
+    benar-benar jadi. Bintang yang ragu harus **identik** dengan bintang lain
+    yang ragu — kalau warnanya masih ikut, keduanya akan berbeda.
+    """
+    _, (w1, _, rows_betelgeuse) = render_case("star-betelgeuse-uncertain",
+                                              size=size, ss=ss)
+    _, (w2, _, rows_rigel) = render_case("star-rigel-uncertain",
+                                         size=size, ss=ss)
+    diff = sum(1 for y in range(len(rows_betelgeuse))
+               for x in range(w1)
+               if rows_betelgeuse[y][x * 4:x * 4 + 3]
+               != rows_rigel[y][x * 4:x * 4 + 3])
+    results.append(Result(
+        "dua bintang berbeda tampil sama saat ragu", diff == 0,
+        f"{diff} piksel berbeda antara Betelgeuse & Rigel saat ragu"))
+
+    # Dan arah sebaliknya: saat yakin, keduanya memang berbeda. Tanpa ini,
+    # view yang membuang warna bintang **selalu** akan lolos uji di atas.
+    _, (w3, _, rows_betelgeuse_ok) = render_case("star-betelgeuse", size=size, ss=ss)
+    _, (w4, _, rows_rigel_ok) = render_case("star-rigel", size=size, ss=ss)
+    diff_ok = sum(1 for y in range(len(rows_betelgeuse_ok))
+                  for x in range(w3)
+                  if rows_betelgeuse_ok[y][x * 4:x * 4 + 3]
+                  != rows_rigel_ok[y][x * 4:x * 4 + 3])
+    results.append(Result(
+        "dua bintang berbeda tetap berbeda saat yakin", diff_ok > 0,
+        f"{diff_ok} piksel berbeda antara Betelgeuse & Rigel saat yakin"))
+
+    # Warna saat ragu harus warna "tidak mengklaim" yang sama dengan bintang
+    # tak dikenal di katalog -- bukan warna spektral yang kebetulan netral.
+    #
+    # Dibandingkan **di sekitar inti saja** (masker radial), bukan seluruh
+    # frame: bintang yang ragu juga membawa lencana tanda tanya di sudut,
+    # sedangkan bintang tak dikenal -- yang sudah lama dianggap tidak
+    # mengklaim apa pun -- tidak. Lencana itu memang perbedaan yang
+    # disengaja, dan membandingkan seluruh frame akan mengukur lencananya,
+    # bukan warnanya. Radiusnya dipilih di luar glow inti tapi di dalam
+    # jangkauan lencana.
+    _, (w5, h5, rows_unknown) = render_case("star-unknown-id", size=size, ss=ss)
+    _, (w6, h6, rows_rigel2) = render_case("star-rigel-uncertain", size=size, ss=ss)
+    cx5, cy5 = w5 / 2.0, h5 / 2.0
+    mask_radius = 0.25 * w5
+    diff_unknown = 0
+    for y in range(h5):
+        for x in range(w5):
+            if math.hypot(x + 0.5 - cx5, y + 0.5 - cy5) > mask_radius:
+                continue
+            if rows_unknown[y][x * 4:x * 4 + 3] != rows_rigel2[y][x * 4:x * 4 + 3]:
+                diff_unknown += 1
+    results.append(Result(
+        "warna ragu = warna bintang tak dikenal", diff_unknown == 0,
+        f"{diff_unknown} piksel berbeda dari bintang tak dikenal (inti saja)"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -556,6 +620,7 @@ def main():
     check_port_matches_swift_constants(results)
     check_night_mode_purity(results, args.size, args.ss)
     check_star_colour_order(results, args.size, args.ss)
+    check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

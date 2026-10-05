@@ -453,6 +453,38 @@ public struct CelestialVisual: Equatable, Sendable {
         Self.starColorIndex[id] ?? 0
     }
 
+    /// Indeks warna yang boleh **digambar**, mengingat keyakinan engine.
+    ///
+    /// **Kenapa ini ada.** Warna spektral adalah ciri pengenal: biru pada
+    /// Rigel dan merah pada Betelgeuse adalah penanda yang sama meyakinkannya
+    /// dengan cincin Saturnus atau bentuk galaksi berpalung. Aturan untuk dua
+    /// yang terakhir sudah lama berlaku — saat engine belum pasti, hanya warna
+    /// netral yang boleh tampil, cirinya tidak. Bintang tertinggal: pita
+    /// planet dijaga `palette.feature`, bentuk objek langit dalam dijaga
+    /// `drawableMorphology`, sementara warna bintang diteruskan apa adanya.
+    ///
+    /// Kesalahannya tidak terlihat, dan itu yang membuatnya bertahan. Badge di
+    /// sebelah gambar bisa bertuliskan "Ragu" sementara titik di sebelahnya
+    /// berwarna merah khas Betelgeuse; mata membaca gambar lebih dulu daripada
+    /// badge, dan tidak ada teks di layar yang bisa membuktikan titik merah
+    /// itu tidak diklaim.
+    ///
+    /// Saat `isConfirmed == false` hasilnya adalah nilai yang **sudah** dipakai
+    /// untuk bintang yang tidak ada di katalog — bukan angka netral baru.
+    /// Bedanya penting: nilai baru masih bisa kebetulan berupa warna spektral
+    /// yang khas, sedangkan nilai ini sudah lama dianggap tidak mengklaim
+    /// apa pun. Yang tetap tampil saat ragu hanyalah **terang** (ukuran dari
+    /// magnitudo), dan terang bukan identitas: ia tidak menyebut bintang mana.
+    ///
+    /// - Parameters:
+    ///   - colorIndexBV: indeks B−V bintang, dari `colorIndex(forStarID:)`.
+    ///   - isConfirmed: apakah engine sudah mengunci identitasnya.
+    public static func drawableStarColorIndex(_ colorIndexBV: Double,
+                                              isConfirmed: Bool) -> Double {
+        guard isConfirmed else { return colorIndex(forStarID: "") }
+        return colorIndexBV
+    }
+
     /// Tabel B−V per id bintang di `Catalogue.brightStars`.
     ///
     /// Sengaja `internal` (bukan `private`) supaya uji bisa menegakkan bahwa
