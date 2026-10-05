@@ -1,3 +1,145 @@
+## Progres terakhir (5 Okt 2026 — pita Jupiter berhenti 19% radius di dalam piringan)
+
+### Cacatnya: komentar yang benar, rumus yang lain
+
+`drawBands` di `CelestialVisualView.swift` menggambar pita Jupiter dengan
+satu baris dan satu komentar:
+
+```swift
+// Pita mengikuti keliling bola: makin dekat kutub, makin pendek.
+let halfWidth = radius * CGFloat(cos((t - 0.5) * .pi * 0.92))
+```
+
+Komentarnya benar sebagai **niat**. Kosinusnya bukan keliling bola. Keduanya
+kebetulan bertemu di ekuator (1.0 vs 1.0) lalu menyimpang makin jauh ke
+kutub: di pita teratas, tepi pita berhenti **19% radius** di dalam
+piringan — diukur pada render 200 px, itu 24 px; di kartu jam 38 pt, itu
+**3.6 pt**. Bola tampil polos di kedua kutub dengan pita mengambang di
+tengahnya, seperti tekstur yang tidak melingkar penuh. Kelas cacat yang
+sama pernah tercatat di berkas ini untuk Saturnus dan Mars; keduanya sudah
+pindah ke model, Jupiter terlewat.
+
+### Kenapa tak ada uji yang bisa melihatnya
+
+Rumusnya hidup **hanya di dalam view**, dan view tidak bisa dijalankan di
+Linux. Satu-satunya gerbang yang bisa melihatnya adalah
+`check_port_matches_swift_constants` — dan gerbang itu membandingkan port
+Python dengan view. Port-nya memakai kosinus yang **sama persis**, jadi
+keduanya sepakat satu sama lain sementara tepi bola yang sesungguhnya tidak
+pernah disebut oleh keduanya. Ini persis cacat yang sudah tercatat untuk
+alat PNG di entri sebelumnya: penulis dan pembaca yang sepakat.
+
+### Perbaikan
+
+Geometrinya pindah ke `CelestialVisual.jupiterBands()` — bentuk bola yang
+benar, `sqrt(1 - y^2)`, bukan aproksimasi. View memakainya, port Python
+mem-port-nya, dan `check_port_matches_swift_constants` menahan keduanya.
+Rumus yang hidup di dua tempat harus diperbaiki di dua tempat; rumus yang
+hidup di model cukup diperbaiki sekali dan **diuji**.
+
+### Gerbang pikselnya, dan dua versi yang hijau tanpa alasan
+
+`check_jupiter_bands_reach_the_limb` (7 pemeriksaan) mengukur
+**seberapa jauh pita menjangkau ke kiri** di tiap baris pita, dari piksel
+PNG, lalu membandingkannya dengan tepi bola. Dua versi pertamanya hijau
+pada gambar yang cacat:
+
+1. **Versi 1** mengambil nilai pembanding dari `R.jupiter_bands()` —
+   fungsi yang **menggambar** pita itu. Kalau port kembali memakai kosinus,
+   gambar mengecil dan angka pembandingnya ikut mengecil: selalu hijau.
+   Ditulis ulang agar tepi bola dihitung sendiri di pemeriksa
+   (`math.sqrt(1 - band_y**2)`), jadi satu-satunya parameter bebas adalah
+   gambar yang sedang diukur.
+2. **Versi 2** mengukur "piksel menyala" pada baris pita. Yang terukur
+   adalah **piringan bola**, yang memang selalu sampai tepi. Diperbaiki
+   dengan mengurangkan `planet-jupiter-uncertain` — bola Jupiter yang sama
+   persis tanpa pita (aturan "ciri pengenal hilang saat ragu" sudah ada),
+   jadi selisih dua gambar itu **hanya** pita. Sisi kiri yang diukur karena
+   lencana tanda-tanya di kanan atas akan terhitung sebagai pita.
+
+### Bukti gerbangnya menggigit
+
+Bukan dengan menambah pemeriksaan, tapi dengan **mengembalikan cacatnya ke
+kedua sisi sekaligus** (model dan port sama-sama kembali ke kosinus), supaya
+gerbang drift buta dan hanya gerbang piksel yang bisa melihatnya:
+
+```
+GAGAL pita Jupiter 0 menjangkau tepi bola   jangkauan 0.325 R, bola 0.515 R, selisih 19.0% R
+GAGAL pita Jupiter 1 menjangkau tepi bola   jangkauan 0.675 R, bola 0.821 R, selisih 14.6% R
+GAGAL pita Jupiter 2 menjangkau tepi bola   jangkauan 0.915 R, bola 0.958 R, selisih  4.3% R
+...  (pita 3 di ekuator: 0% — persis titik di mana kedua rumus bertemu)
+90 pemeriksaan, 8 gagal
+```
+
+Angka 19.0 / 14.6 / 4.3 / 0.0 itu cocok dengan perhitungan analitik sebelum
+perbaikan, dan pita ekuator lulus di kedua versi — seperti yang seharusnya,
+karena di situlah kedua rumus kebetulan sama.
+
+### Verifikasi
+
+- `testJupiterBandsReachTheLimb` (3 uji baru) mengunci bentuk bolanya di
+  Linux; PointingKit **603** tes hijau, CelestialEngine **174** hijau.
+- 90 pemeriksaan visual hijau (dari 81); lint UI 24 aturan hijau.
+- Diperiksa dengan mata juga: render lama vs baru disandingkan, pita baru
+  menjangkau sampai tepi kiri-kanan piringan, yang lama menyisakan jalur
+  polos di kedua sisi.
+
+## Progres terakhir (5 Okt 2026 — gerbang pergeseran port menjaga 18 angka, bukan 5)
+
+### Cacatnya: gerbang yang menjaga gambar dari pergeseran, hanya menjaga seperempatnya
+
+`check_port_matches_swift_constants` ada untuk satu alasan yang sudah
+ditulisnya sendiri: port gambar hidup di Python (`render-visuals.py`) dan
+view-nya di Swift (`CelestialVisualView.swift`). Kalau seseorang mengubah
+view dan lupa port-nya, **seluruh pemeriksaan visual di atasnya tetap
+hijau** sambil mengukur gambar yang sudah tidak ada lagi. Gerbang yang
+paling berbahaya justru yang diam-diam mengukur hal lain.
+
+Tapi gerbang itu hanya menjaga **5** dari sekitar 18 konstanta port:
+opasitas glow, rasio cincin Saturnus, fraksi bola, opasitas maria, dan
+langkah jalur Bulan. Yang tidak dijaga justru ciri-ciri pengenal yang
+paling menentukan identitas:
+
+| Tidak dijaga | Akibat kalau view berubah tanpa port |
+|---|---|
+| jumlah & tinggi pita Jupiter | Jupiter berubah bentuk, pengukuran pita mengukur bentuk lama |
+| posisi/ukuran Bintik Merah Besar | ciri pengenal Jupiter |
+| opasitas cincin belakang/depan, celah Cassini | Saturnus berubah, ukuran "cincin" tetap lulus |
+| opasitas & posisi kutub Mars | ciri pengenal Mars |
+| kawah Merkurius, maria Bulan | detail permukaan |
+| opasitas spike bintang | bentuk bintang |
+
+Jadi mengubah pita Jupiter atau cincin Saturnus di view akan melewati
+setiap pemeriksaan. Lubangnya ada **di gerbangnya sendiri** — kelas cacat
+yang sama yang berkas ini ada untuk mencegah.
+
+### Perbaikan
+
+16 pemeriksaan baru ditambahkan (5 → 21 konstanta; 49 → 81 pemeriksaan),
+masing-masing dua arah seperti yang sudah ada: nilai port == nilai yang
+diharapkan, **dan** teks sumbernya masih tertulis di sumber Swift-nya.
+Arah kedua itu yang penting — tanpa itu, seseorang bisa mengubah kedua
+sisi menjadi salah bersama-sama.
+
+### Bukti gerbangnya menggigit, bukan sekadar bertambah
+
+Menambah pemeriksaan tidak bernilai kalau tidak ada yang pernah gagal
+karenanya. Diuji dengan meniru cacatnya: `let bandCount = 7` diubah jadi
+`9` di view (persis "orang yang mengubah view dan lupa port-nya") →
+
+```
+GAGAL sumber Swift memuat: jumlah pita Jupiter   'let bandCount = 7' TIDAK ditemukan
+81 pemeriksaan, 1 gagal   (keluar 1)
+```
+
+Lalu view dikembalikan, dan hijau lagi.
+
+### Verifikasi
+
+- 81 pemeriksaan visual hijau (dari 49).
+- Lint UI 24 aturan hijau; 600 tes Swift tetap hijau.
+- Tidak ada berkas Swift yang tersentuh — perubahan hanya di alat uji.
+
 ## Progres terakhir (5 Okt 2026 — PNG alat render tak sah, dan pembaca yang menutupinya)
 
 ### Cacatnya: penulis dan pembaca repo ini sepakat satu sama lain, dunia luar tidak

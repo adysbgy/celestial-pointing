@@ -1631,4 +1631,72 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertNil(jupiter.spokenStarColor(isConfirmed: true))
         XCTAssertNil(jupiter.spokenStarColor(isConfirmed: false))
     }
+    // MARK: - Geometri pita Jupiter
+
+    /// Pita Jupiter harus **berhenti tepat di tepi bola**, bukan di dalamnya.
+    ///
+    /// **Cacat yang ditutup uji ini.** View memakai
+    /// `cos((t - 0.5) * .pi * 0.92)` sebagai separuh lebar pita, dan
+    /// komentarnya sendiri menjanjikan bentuk yang lain: "pita mengikuti
+    /// keliling bola: makin dekat kutub, makin pendek". Bola yang
+    /// diproyeksikan berjari-jari `sqrt(1 - y^2)`; kosinus itu bukan
+    /// aproksimasi yang baik untuknya. Diukur di kartu jam (radius 19 pt):
+    ///
+    ///     pita teratas (y = -0.857R)  tepi 0.326R, bola 0.515R  ->  3.6 pt pendek
+    ///
+    /// Yaitu **19% radius** — pita terluar berhenti jauh di dalam piringan,
+    /// dan yang terlihat adalah bola berwarna polos di kedua kutub dengan
+    /// pita mengambang di tengahnya. Tidak ada teks di layar yang bisa
+    /// membuktikannya, dan "bola dengan pita" tetap terbaca sebagai Jupiter.
+    ///
+    /// Uji ini mengunci **satu** invarian yang tidak bisa dibaca dari kode:
+    /// pita harus menyentuh tepi bola. Ambangnya longgar (tepi pita tidak
+    /// boleh lebih dari 0.01R di dalam tepi bola) karena yang salah bukan
+    /// pembulatan, melainkan bentuk yang berbeda.
+    func testJupiterBandsReachTheLimb() {
+        let geometry = CelestialVisual.jupiterBands()
+        XCTAssertEqual(geometry.count, 7, "tujuh pita: lihat `bandCount` di view")
+        for band in geometry {
+            let y = band.centerY
+            let sphere = (1 - y * y).squareRoot()
+            // Tepi pita = separuh lebar; bola pada ketinggian itu = `sphere`.
+            XCTAssertLessThanOrEqual(
+                band.halfWidth - sphere, 0.01,
+                "pita di y=\(y) berhenti \(sphere - band.halfWidth) R di dalam bola")
+            XCTAssertGreaterThan(band.halfWidth, 0.05,
+                                 "pita di y=\(y) tidak boleh menghilang")
+        }
+    }
+
+    /// Pita harus **simetris** terhadap ekuator.
+    ///
+    /// Bukan kerapian: Jupiter yang pitanya lebih banyak di satu belahan
+    /// terbaca sebagai planet yang berbeda, dan ketidak-simetrisan adalah
+    /// bentuk cacat yang sudah pernah nyata di berkas ini (kutub Mars).
+    func testJupiterBandsAreSymmetricAboutTheEquator() {
+        let geometry = CelestialVisual.jupiterBands()
+        for (upper, lower) in zip(geometry, geometry.reversed()) {
+            XCTAssertEqual(upper.centerY, -lower.centerY, accuracy: 1e-12)
+            XCTAssertEqual(upper.halfWidth, lower.halfWidth, accuracy: 1e-12)
+        }
+    }
+
+    /// Pita teratas harus **lebih pendek** dari pita ekuator.
+    ///
+    /// Invarian arah: kalau pita teratas lebih lebar, gambarnya adalah bola
+    /// dengan pita yang melebar ke kutub — bukan bola. Ini menjaga agar
+    /// perbaikan "sampai ke tepi" tidak dilakukan dengan menyamakan semua
+    /// pita menjadi satu lebar.
+    func testJupiterBandWidthsShrinkTowardsThePoles() {
+        let geometry = CelestialVisual.jupiterBands()
+        guard let equator = geometry.min(by: { abs($0.centerY) < abs($1.centerY) }) else {
+            return XCTFail("tidak ada pita")
+        }
+        for band in geometry where abs(band.centerY) > abs(equator.centerY) {
+            XCTAssertLessThan(band.halfWidth, equator.halfWidth,
+                              "pita di y=\(band.centerY) tidak lebih pendek dari ekuator")
+        }
+    }
+
 }
+

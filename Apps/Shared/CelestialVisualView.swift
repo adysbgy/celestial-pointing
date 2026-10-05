@@ -205,20 +205,32 @@ struct CelestialVisualView: View {
     ///
     /// Pita digambar sebagai **pita horizontal tersusun**, bukan elips penuh,
     /// karena elips penuh akan menutupi bola dan terlihat seperti cincin.
+    ///
+    /// **Geometri pita datang dari `CelestialVisual.jupiterBands()`, bukan
+    /// dari rumus di sini.** Versi lama memakai
+    /// `cos((t - 0.5) * .pi * 0.92)` sambil berkomentar "pita mengikuti
+    /// keliling bola: makin dekat kutub, makin pendek" — dan kosinus itu
+    /// bukan keliling bola. Di kartu jam, pita teratas berhenti 3.6 pt
+    /// (19% radius) di dalam piringan, jadi kedua kutub tampil sebagai bola
+    /// polos dengan pita mengambang di tengahnya. Bentuk bola yang benar
+    /// (`sqrt(1 - y^2)`) sekarang diuji di Linux
+    /// (`testJupiterBandsReachTheLimb`), jadi view tidak lagi bisa
+    /// menyimpang diam-diam — persis alasan cincin Saturnus dan kutub Mars
+    /// sudah lebih dulu pindah ke `VisualFrame`/`CelestialVisual`.
     private func drawBands(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         // Lebar pita dikalibrasi untuk kontras tinggi di layar kecil: pita
-        // yang terlalu tipis hilang di layar jam.
-        let bandCount = 7
-        for index in 0..<bandCount {
-            let t = (Double(index) + 0.5) / Double(bandCount)
-            let y = center.y - radius + 2 * radius * CGFloat(t)
-            // Pita mengikuti keliling bola: makin dekat kutub, makin pendek.
-            let halfWidth = radius * CGFloat(cos((t - 0.5) * .pi * 0.92))
+        // yang terlalu tipis hilang di layar jam. Angkanya milik model
+        // (`jupiterBands`), dan `check-visuals.py` menjaga agar port Python
+        // tidak tertinggal saat nilainya berubah.
+        let bands = CelestialVisual.jupiterBands()
+        for (index, band) in bands.enumerated() {
+            let y = center.y + CGFloat(band.centerY) * radius
+            let halfWidth = radius * CGFloat(band.halfWidth)
             guard halfWidth > 1 else { continue }
             let rect = CGRect(x: center.x - halfWidth,
-                              y: y - radius * 0.055,
+                              y: y - radius * CGFloat(band.halfHeight),
                               width: halfWidth * 2,
-                              height: radius * 0.11)
+                              height: radius * CGFloat(band.halfHeight) * 2)
             // Warna pita dibaca dari model, mode malam dihitung dari kanal
             // merahnya. Versi lama menulis angka malam sendiri
             // (`0.34 + 0.18 * shade / 2`), dan urutan hasilnya **terbalik**:

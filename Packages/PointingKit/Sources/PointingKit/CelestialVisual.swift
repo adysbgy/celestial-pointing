@@ -1207,6 +1207,76 @@ public extension CelestialVisual {
         }
         return PolarCaps(north: rect(northTop), south: rect(southTop))
     }
+
+    // MARK: - Pita Jupiter
+
+    /// Satu pita Jupiter: di ketinggian berapa, selebar apa.
+    ///
+    /// Dalam satuan radius bola, relatif terhadap pusatnya. `centerY` negatif
+    /// = belahan utara (ingat: di `Canvas` y bertambah ke bawah).
+    public struct Band: Equatable, Sendable {
+        /// Ketinggian pusat pita, −1…+1 (satuan radius bola).
+        public var centerY: Double
+        /// Separuh lebar pita di ketinggian itu (satuan radius bola).
+        public var halfWidth: Double
+        /// Separuh tinggi pita.
+        public var halfHeight: Double
+
+        public init(centerY: Double, halfWidth: Double, halfHeight: Double) {
+            self.centerY = centerY
+            self.halfWidth = halfWidth
+            self.halfHeight = halfHeight
+        }
+    }
+
+    /// Geometri pita Jupiter — **dihitung dari bola, bukan dari kosinus**.
+    ///
+    /// **Kenapa ini pindah dari view ke model.** View dulu memakai
+    /// `cos((t - 0.5) * .pi * 0.92)` sebagai separuh lebar pita, dan
+    /// komentarnya sendiri menjanjikan bentuk yang lain: *"pita mengikuti
+    /// keliling bola: makin dekat kutub, makin pendek"*. Bola yang
+    /// diproyeksikan berjari-jari `sqrt(1 − y²)`; kosinus dengan busur 0.92π
+    /// bukan aproksimasi yang baik untuknya — ia kebetulan sama di ekuator
+    /// (keduanya 1.0) dan menyimpang makin jauh ke kutub.
+    ///
+    /// Diukur pada kartu jam (radius 19 pt):
+    ///
+    /// | Pita | y | Tepi pita | Tepi bola | Selisih |
+    /// |---|---|---|---|---|
+    /// | teratas | −0.857R | 0.326R | 0.515R | **3.6 pt (19% R)** |
+    /// | kedua | −0.571R | 0.678R | 0.821R | 2.7 pt |
+    /// | ekuator | 0.000R | 1.000R | 1.000R | 0 pt |
+    ///
+    /// Jadi pita terluar berhenti jauh di dalam piringan, dan yang terlihat
+    /// adalah bola berwarna polos di kedua kutub dengan pita mengambang di
+    /// tengahnya. Cacat ini tidak bisa dibaca dari layar mana pun — "bola
+    /// dengan pita" tetap terbaca sebagai Jupiter — dan tidak ada teks yang
+    /// bisa dibaca pengguna untuk memeriksanya.
+    ///
+    /// **Kenapa `sqrt` dan bukan konstanta yang dikalibrasi.** Angka yang
+    /// dipilih agar "kelihatan benar" hanya benar pada satu ukuran frame;
+    /// pita yang sama digambar di kartu jam 38 pt dan di panel iPhone 132 pt.
+    /// Bentuk bola adalah satu-satunya nilai yang benar di keduanya, dan ia
+    /// bisa diuji di Linux (lihat `CelestialVisualTests`).
+    ///
+    /// - Parameters:
+    ///   - count: jumlah pita, dari kutub ke kutub. Ganjil supaya ada pita
+    ///     yang tepat di ekuator — itu yang membuat susunannya simetris.
+    ///   - heightFraction: tinggi tiap pita (2 × separuh tinggi), satuan
+    ///     radius bola.
+    public static func jupiterBands(count: Int = 7,
+                                    heightFraction: Double = 0.11) -> [Band] {
+        guard count > 0 else { return [] }
+        let halfHeight = heightFraction / 2
+        return (0..<count).map { index in
+            let t = (Double(index) + 0.5) / Double(count)
+            // −1 … +1, dari kutub utara ke selatan.
+            let y = -1 + 2 * t
+            // Tepi bola pada ketinggian itu — rumus proyeksi, bukan pilihan.
+            let halfWidth = (1 - y * y).squareRoot()
+            return Band(centerY: y, halfWidth: halfWidth, halfHeight: halfHeight)
+        }
+    }
 }
 
 public extension CelestialVisual.Planet {

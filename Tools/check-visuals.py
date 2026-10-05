@@ -230,6 +230,39 @@ def max_radius_of_bright(width, height, rows, background):
     return best
 
 
+def band_left_reach(confirmed, sphere_only, band_center_y):
+    """Seberapa jauh **pita** menjangkau ke kiri, pada satu ketinggian.
+
+    Mengembalikan `(reach, row)` — jarak dari pusat ke tepi kiri pita, dalam
+    satuan radius frame.
+
+    **Kenapa dua gambar, bukan satu.** Versi pertama mengukur "jauh piksel
+    menyala" pada baris pita di `planet-jupiter-confirmed` saja, dan hasilnya
+    selalu hijau: yang terukur adalah **piringan bola**, yang memang selalu
+    sampai tepi di ketinggian mana pun. Cacat yang sebenarnya ada di pita,
+    dan pita itu hanya terlihat kalau bolanya dikurangkan.
+
+    `planet-jupiter-uncertain` menggambar bola Jupiter yang **persis sama**
+    tanpa pita (ciri pengenal wajib hilang saat ragu — itu aturan yang sudah
+    ada), jadi selisih dua gambar itu **hanya** pita. Sisi kiri dipakai
+    karena lencana tanda-tanya berada di sudut kanan atas dan akan ikut
+    terhitung sebagai pita kalau sisi itu yang diukur.
+    """
+    w, h, rows_c = confirmed
+    _, _, rows_s = sphere_only
+    y = min(h - 1, max(0, int(round(band_center_y))))
+    row_c, row_s = rows_c[y], rows_s[y]
+    cx = w / 2.0
+    radius = min(w, h) / 2.0
+    for x in range(int(cx)):
+        a = row_c[x * 4:x * 4 + 3]
+        b = row_s[x * 4:x * 4 + 3]
+        # Piksel pita: gambar ber-pita berbeda dari gambar tanpa pita.
+        if sum(abs(a[k] - b[k]) for k in range(3)) > 8:
+            return (cx - (x + 0.5)) / radius, y
+    return 0.0, y
+
+
 def count_reddish(width, height, rows, x0, y0, x1, y1):
     """Berapa piksel di kotak itu yang kanal merahnya jelas di atas hijau/biru.
 
@@ -491,6 +524,11 @@ def check_port_matches_swift_constants(results):
     tertangkap di sini alih-alih menunggu ada yang menyadarinya.
     """
     view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    # Isi berkas port-nya sendiri, bukan path-nya: `source_text in source`
+    # terhadap sebuah path selalu salah, dan pemeriksaan yang selalu salah
+    # adalah gerbang yang selalu merah — sama tidak bergunanya dengan gerbang
+    # yang selalu hijau, hanya lebih berisik.
+    port = open(R.SOURCE, encoding="utf-8").read()
     model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
                              "CelestialVisual.swift")).read()
     # `source_text` adalah potongan yang **harus** masih tertulis di sumber
@@ -515,12 +553,24 @@ def check_port_matches_swift_constants(results):
         # mengukur gambar yang sudah tidak ada lagi. Itu persis cacat yang
         # berkas ini ada untuk mencegah, hanya saja lubangnya di gerbangnya
         # sendiri.
+        # Dua angka ini pindah bersama rumusnya ke model: `jupiterBands`
+        # yang memilikinya, view hanya memakainya. Sumber yang dibaca karena
+        # itu `model`, bukan `view` — dan kalau seseorang mengembalikannya ke
+        # view, pemeriksaan ini merah, yang memang benar: satu angka yang
+        # hidup di dua tempat adalah dua angka yang akan berbeda.
         ("jumlah pita Jupiter", R.BAND_COUNT, 7,
-         "let bandCount = 7", view),
+         "count: Int = 7", model),
         ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 0.11,
-         "radius * 0.11", view),
-        ("busur separuh-lebar pita", R.BAND_HALF_WIDTH_ARC, 0.92,
-         "cos((t - 0.5) * .pi * 0.92)", view),
+         "heightFraction: Double = 0.11", model),
+        # Rumus separuh-lebar pita pindah dari view ke model: satu rumus bola
+        # (`sqrt(1 - y^2)`) dipakai bersama oleh view, port Python, dan uji
+        # Linux. Yang dijaga di sini karena itu **rumusnya**, bukan angkanya —
+        # dan arahnya dua bahasa, supaya perbaikan yang dikerjakan di satu
+        # tempat tidak bisa diam-diam tidak dikerjakan di tempat lain.
+        ("rumus separuh-lebar pita (Swift)", R.BAND_HALF_WIDTH_RULE, "sqrt",
+         "(1 - y * y).squareRoot()", model, "CelestialVisual.swift"),
+        ("rumus separuh-lebar pita (Python)", R.BAND_HALF_WIDTH_RULE, "sqrt",
+         "math.sqrt(max(0.0, 1 - y * y))", port, "render-visuals.py"),
         ("opasitas pita Jupiter", R.BAND_OPACITY, 0.55,
          "opacity(0.55)", view),
         ("Bintik Merah Besar x", R.SPOT_RECT[0], -0.36,
@@ -548,14 +598,20 @@ def check_port_matches_swift_constants(results):
         ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
          "color.opacity(0.45)", view),
     ]
-    for label, port_value, expected, source_text, source in checks:
+    for check in checks:
+        label, port_value, expected, source_text, source = check[:5]
+        # Nama berkas sumber ikut, bukan "sumber Swift" yang dipaku: dua
+        # pemeriksaan di bawah menjaga **dua** berkas (view/model Swift dan
+        # port Python), dan pesan yang menyebut berkas yang salah adalah
+        # pesan yang mengirim orang ke tempat yang tidak berisi apa-apa.
+        where = check[5] if len(check) > 5 else "sumber Swift"
         results.append(Result(
             f"port sejalan: {label}", port_value == expected,
             f"port={port_value}, seharusnya {expected}"))
         results.append(Result(
-            f"sumber Swift memuat: {label}", source_text in source,
+            f"sumber memuat: {label}", source_text in source,
             f"'{source_text}' {'ditemukan' if source_text in source else 'TIDAK ditemukan'}"
-            f" di sumber Swift"))
+            f" di {where}"))
 
 
 def check_night_mode_purity(results, size=200, ss=2):
@@ -615,6 +671,56 @@ def check_planet_features_present(results, size=200, ss=2):
         "kutub Mars di kedua sisi", top is not None and bottom is not None
         and sum(top[0]) > 500 and sum(bottom[0]) > 500,
         f"utara={top[0] if top else None}, selatan={bottom[0] if bottom else None}"))
+
+
+def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
+    """Pita Jupiter harus menjangkau **sampai tepi bola** — diukur dari piksel.
+
+    **Cacat yang ditutup pemeriksaan ini.** View memakai
+    `cos((t - 0.5) * .pi * 0.92)` sebagai separuh lebar pita sambil
+    berkomentar "pita mengikuti keliling bola: makin dekat kutub, makin
+    pendek". Kosinus itu bukan keliling bola: di ekuator keduanya sama
+    (1.0), dan di pita teratas tepi pita berhenti 19% radius di dalam
+    piringan. Di kartu jam 38 pt itu 3.6 pt — bola berwarna polos di kedua
+    kutub, dengan pita mengambang di tengahnya.
+
+    **Kenapa harus dari piksel.** Uji model (`testJupiterBandsReachTheLimb`)
+    mengunci rumusnya, dan itu benar. Tapi yang dikirim ke layar adalah
+    gambar, dan gambar itu bisa salah walaupun rumusnya benar — misalnya
+    kalau view lupa memakai model, atau memakai separuh lebar sebagai lebar
+    penuh. Yang membuktikan pita benar-benar sampai tepi adalah mengukur
+    baris pita itu sendiri.
+
+    Ambangnya 0.02 R: pita berhenti karena **anti-aliasing** boleh sedikit di
+    dalam tepi, tapi cacat yang nyata (0.19 R) jauh di atas itu.
+    """
+    _, confirmed = render_case("planet-jupiter-confirmed", size=size, ss=ss)
+    # Bola tanpa pita, dari kasus "ragu" — gambar bola yang sama persis.
+    _, sphere_only = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    w, h, _ = confirmed
+    radius = min(w, h) / 2.0
+    for index, (band_y, _, _) in enumerate(R.jupiter_bands()):
+        # Baris pusat pita, di koordinat piksel (y ke bawah, seperti `Canvas`).
+        py = h / 2.0 + band_y * radius
+        reach, row = band_left_reach(confirmed, sphere_only, py)
+        # **Tepi bola dihitung di sini, bukan dibaca dari port.**
+        #
+        # Versi pertama pemeriksaan ini mengambil `half_width` dari
+        # `R.jupiter_bands()` — yaitu fungsi yang **menggambar** pita itu.
+        # Akibatnya pemeriksaan selalu hijau: kalau port kembali memakai
+        # kosinus, gambar mengecil dan angka pembandingnya ikut mengecil,
+        # sehingga keduanya sepakat satu sama lain sementara tepi bola yang
+        # sesungguhnya tidak pernah disebut. Persis kelas cacat yang sudah
+        # pernah nyata di berkas ini (PNG yang penulis dan pembacanya
+        # sama-sama salah). Yang tidak boleh jadi parameter bebas adalah
+        # **proyeksi bola** — ia satu-satunya nilai yang benar, dan ia
+        # dihitung dari rumusnya langsung.
+        sphere = math.sqrt(max(0.0, 1 - band_y * band_y))
+        results.append(Result(
+            f"pita Jupiter {index} menjangkau tepi bola",
+            sphere - reach <= 0.02,
+            f"jangkauan {reach:.3f} R, bola {sphere:.3f} R, "
+            f"selisih {(sphere - reach) * 100:.1f}% R (baris {row})"))
 
 
 def check_star_colour_order(results, size=200, ss=2):
@@ -715,6 +821,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)

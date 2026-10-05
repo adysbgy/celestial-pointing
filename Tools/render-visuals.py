@@ -53,6 +53,9 @@ import zlib
 
 OUT_DIR = "out/visuals"
 
+# Path berkas ini, supaya pemeriksa drift bisa membaca sumbernya sendiri.
+SOURCE = os.path.abspath(__file__)
+
 # ══════════════════════════════════════════════════════════════════════════
 # Port dari `PointingKit/NightVisual.swift`
 # ══════════════════════════════════════════════════════════════════════════
@@ -411,10 +414,13 @@ def _png(width, height, pixels):
 # ══════════════════════════════════════════════════════════════════════════
 
 GLOW_OPACITIES = [0.10, 0.22, 1.0]          # VIEW: `CelestialVisualView.glowOpacities`
-BAND_COUNT = 7                              # VIEW: `drawBands`
-BAND_HEIGHT_FRACTION = 0.11                 # VIEW: `drawBands`
-BAND_HALF_WIDTH_ARC = 0.92                  # VIEW: `drawBands`
+BAND_COUNT = 7                              # MODEL: `CelestialVisual.jupiterBands(count:)`
+BAND_HEIGHT_FRACTION = 0.11                 # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
 BAND_OPACITY = 0.55                         # VIEW: `drawBands`
+# Nama aturan geometri pita, dipakai `check-visuals.py` untuk menahan kedua
+# bahasa agar memakai rumus bola yang sama. Kalau salah satu sisi kembali
+# memakai aproksimasi kosinus, nama ini tidak akan ditemukan di sumbernya.
+BAND_HALF_WIDTH_RULE = "sqrt"
 SPOT_RECT = (-0.36, 0.18, 0.52, 0.26)       # VIEW: `drawBands` (Bintik Merah Besar)
 CRATERS = [(-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
            (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)]      # VIEW: `drawCraters`
@@ -577,15 +583,37 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         _draw_haze(canvas, cx, cy, radius, night_mode)
 
 
+def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
+    """Port dari `CelestialVisual.jupiterBands()` — geometri pita dari bola.
+
+    **Kenapa rumusnya ada di sini, bukan di `_draw_bands`.** Versi lama
+    memakai `cos((t - 0.5) * pi * 0.92)` sambil berkomentar "pita mengikuti
+    keliling bola". Kosinus itu bukan keliling bola: ia kebetulan sama di
+    ekuator dan menyimpang makin jauh ke kutub, sehingga pita teratas
+    berhenti 19% radius di dalam piringan. Kalau rumusnya hidup di dua
+    tempat, perbaikannya juga harus dikerjakan dua kali — dan yang di Python
+    adalah yang dipakai `check-visuals.py` untuk mengukur gambar. Sekarang
+    satu rumus (`sqrt(1 - y^2)`), ditulis di kedua bahasa, dan
+    `check_port_matches_swift_constants` yang menahan keduanya agar sama.
+    """
+    half_height = height_fraction / 2.0
+    bands = []
+    for index in range(count):
+        t = (index + 0.5) / count
+        y = -1 + 2 * t
+        half_width = math.sqrt(max(0.0, 1 - y * y))
+        bands.append((y, half_width, half_height))
+    return bands
+
+
 def _draw_bands(canvas, cx, cy, radius, night_mode):
-    for index in range(BAND_COUNT):
-        t = (index + 0.5) / BAND_COUNT
-        y = cy - radius + 2 * radius * t
-        half_width = radius * math.cos((t - 0.5) * math.pi * BAND_HALF_WIDTH_ARC)
+    for index, (band_y, half_width, half_height) in enumerate(jupiter_bands()):
+        y = cy + band_y * radius
+        half_width *= radius
         if half_width <= 1:
             continue
         rx = half_width
-        ry = radius * BAND_HEIGHT_FRACTION / 2.0
+        ry = radius * half_height
         name = ("jupiterBandTan", "jupiterBandRust", "jupiterBandCream")[index % 3]
         canvas.ellipse(cx, y, rx, ry,
                        accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))

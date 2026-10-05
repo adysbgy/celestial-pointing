@@ -172,7 +172,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 174**, **PointingKit 600**.
+Hitungan uji saat ini: **CelestialEngine 174**, **PointingKit 603**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
