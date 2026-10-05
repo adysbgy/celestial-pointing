@@ -296,15 +296,19 @@ struct PointingView: View {
         let state = engine.snapshot.state
         var parts = [RowSpeech.stateLine(state), engine.snapshot.guidanceText]
         if let rate = engine.snapshot.angularRateDegPerSec {
-            // Bentuk kalimat utuh dari katalog, bukan `String(format:)` literal.
-            // Alasannya bukan cuma terjemahan: menyisipkan kata "derajat"
-            // sebagai literal memaksa Bahasa Inggris mengucapkan "derajat",
-            // dan "%0.f derajat" adalah kehendak Bahasa Indonesia yang tidak
-            // bisa dinyatakan sebagai angka polos.
-            parts.append(TextLocalization.text(.rowSpeechWristRate,
-                                              TextLocalization.text(.rowSpeechWristRateWord),
-                                              rate,
-                                              TextLocalization.text(.rowSpeechDegrees)))
+            // Bentuk kalimat utuh dari katalog, lewat aksesornya — bukan
+            // pemanggilan kunci yang ditulis ulang di sini. Alasannya bukan
+            // cuma terjemahan: menyisipkan kata "derajat" sebagai literal
+            // memaksa Bahasa Inggris mengucapkan "derajat", dan "%0.f derajat"
+            // adalah kehendak Bahasa Indonesia yang tidak bisa dinyatakan
+            // sebagai angka polos.
+            //
+            // Dan `spokenWristRate` ada justru supaya **kalimat ini bisa
+            // diuji di Linux**. Versi sebelumnya merakitnya sendiri di view,
+            // jadi tidak ada satu pun uji yang bisa memverifikasi apa pun
+            // tentang kalimat yang diucapkan ini. Yang tersisa di view hanya
+            // keputusan "kapan parts.append" — keputusan yang memang milik view.
+            parts.append(RowSpeech.spokenWristRate(rate))
         }
         return parts.joined(separator: " ")
     }
@@ -598,10 +602,18 @@ struct ObjectDetailView: View {
     /// terlihat salah karena angka dan derajat sama di semua bahasa.
     private var kindLine: String {
         var parts = [kindLabel]
-        parts.append(TextLocalization.text(.objectDisplayMagnitude, object.magnitude))
+        // Lewat aksesor `ObjectSpeech`, bukan pemanggilan kunci langsung.
+        //
+        // Aksesor itu dipindahkan ke paket **karena baris ini tidak bisa
+        // diuji di Linux** — selama masih dirakit di view, tidak ada satu
+        // pun uji yang bisa menyatakan bentuk yang benar. Kalau baris ini
+        // menulis kuncinya sendiri, pemindahan itu jadi sia-sia: isi kunci
+        // sama persis, semua gerbang hijau, dan tidak ada yang berubah —
+        // persis kelas "terang tapi tidak hijau" yang repo ini hunts.
+        parts.append(ObjectSpeech.magnitudeDisplay(object.magnitude))
         if object.kind == .star {
-            parts.append(TextLocalization.text(.objectDisplayCoordinates,
-                                              object.raDeg, object.decDeg))
+            parts.append(ObjectSpeech.coordinatesDisplay(raDeg: object.raDeg,
+                                                         decDeg: object.decDeg))
         }
         return parts.joined(separator: " · ")
     }

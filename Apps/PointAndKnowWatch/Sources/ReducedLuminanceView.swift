@@ -147,7 +147,9 @@ struct ReducedLuminanceView: View {
             parts.append(warning)
         }
         if engine.isDisplayingStaleObject {
-            parts.append(TextLocalization.text(.objectSpeechStaleShort))
+            // Aksesor yang sama dengan baris di atasnya (line 60), supaya
+            // dua pemanggilan ke kunci yang sama tidak bisa berbeda bentuk.
+            parts.append(ObjectSpeech.staleShortNote)
         }
         return parts.joined(separator: ". ")
     }

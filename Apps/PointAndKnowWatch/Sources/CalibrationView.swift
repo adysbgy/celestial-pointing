@@ -188,8 +188,8 @@ struct CalibrationView: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(target.name)
                                     .font(.subheadline.weight(.medium))
-                                Text(TextLocalization.text(.calibrationDisplayCaptureAltitude,
-                                                target.direction.altitudeDeg))
+                                Text(CalibrationText.captureAltitudeDisplay(
+                                                altitudeDeg: target.direction.altitudeDeg))
                                     .font(.caption2)
                                     .foregroundStyle(Color.nightAwareSecondary)
                             }

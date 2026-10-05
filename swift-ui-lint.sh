@@ -1650,6 +1650,137 @@ else
   echo "Bersih: kalimat aksesibilitas berasal dari katalog."
 fi
 
+# ── Aturan 17: view harus memakai aksesor, bukan meniru kuncinya ────────────
+# Aksesor di `PointingKit` yang bentuknya **murni wraps** satu kunci katalog
+# dibuat dengan satu alasan: supaya teks yang tampil/diucapkan itu bisa
+# **diuji di Linux**. Selama view masih memanggil
+# `TextLocalization.text(.objectDisplayCoordinates, …)` secara langsung,
+# alasan itu batal — teksnya tetap tidak bisa diuji, dan yang tersisa cuma
+# salinan.
+#
+# Bentuk cacatnya unik di repo ini: tidak ada layar yang salah dan tidak ada
+# gerbang yang merah. Isi kuncinya sama persis, jadi Aturan 4 (kunci ada di
+# katalog) dan Aturan 6 (paritas) tetap hijau. Aksesornya yang mati
+# terdokumentasi seolah dipakai — jadi orang berikutnya yang mengubah
+# katalog akan mengubah aksesor yang layar tidak pernah baca.
+echo
+echo "== Aturan 17: view memakai pembungkus kunci dari PointingKit =="
+wrapped=$(python3 - <<'PY'
+import os, re
+
+PKG = "Packages/PointingKit/Sources/PointingKit"
+CALL = "TextLocalization.text("
+KEYHEAD = re.compile(r'TextLocalization\.text\(\s*\.([A-Za-z_][A-Za-z0-9_]*)')
+
+
+def strip_calls(body, fname):
+    """Hapus `fname(...)` beserta argumennya, kurung seimbang.
+
+    Kenapa argumen harus ikut dibuang: kalau hanya nama fungsinya yang
+    dihapus, sisa `(.objectDisplayCoordinates, 101.287, -16.716)` masih
+    tersisa dan setiap aksesor akan ternilai "tidak murni" — gerbang
+    yang selalu hijau kembali.
+    """
+    out, i, n = [], 0, len(body)
+    while i < n:
+        if body.startswith(fname, i) and (i == 0 or not body[i - 1].isalnum()):
+            j = body.find("(", i)
+            if j < 0:
+                out.append(body[i])
+                i += 1
+                continue
+            depth, k = 0, j
+            while k < n:
+                if body[k] == "(":
+                    depth += 1
+                elif body[k] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                k += 1
+            i = k + 1
+            continue
+        out.append(body[i])
+        i += 1
+    return "".join(out)
+
+
+def bodies(src):
+    for m in re.finditer(r'public static (?:var|func) ([A-Za-z_][A-Za-z0-9_]*)',
+                         src):
+        i = src.find("{", m.end())
+        if i < 0:
+            continue
+        depth, j = 0, i
+        while j < len(src):
+            if src[j] == "{":
+                depth += 1
+            elif src[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        yield m.group(1), src[i + 1:j]
+
+
+# Kunci -> aksesor yang **membungkusnya tanpa logika lain**.
+#
+# Syarat "murni" itu yang menjaga gerbang ini dari positif palsu: `spokenRate`
+# menghitung satuan lebih dulu lalu meneruskan ke kunci, jadi ia bukan
+# pembungkus murni dan pemanggilan kuncinya di dalam paket tidak dihitung.
+# Yang dinilai hanya pemanggilan **di `Apps/`** — satu-satunya lapisan yang
+# tidak bisa diuji di Linux.
+owned = {}
+for name in sorted(os.listdir(PKG)):
+    if not name.endswith(".swift"):
+        continue
+    src = open(os.path.join(PKG, name), encoding="utf-8").read()
+    for accessor, body in bodies(src):
+        keys = KEYHEAD.findall(body)
+        if not keys:
+            continue
+        residue = strip_calls(body, CALL)
+        # Komentar dulu, lalu whitespace. Kenapa urutan itu penting: kalau
+        # whitespace lebih dulu dihapus, `// x` dan `/* */` menyatu jadi
+        # `/.../` dan sisa "//"-nya ikut hilang dengan sendirinya --
+        # satu baris komentar masih akan lolos sebagai "murni".
+        residue = re.sub(r'//[^\n]*', '', residue)
+        residue = re.sub(r'/\*.*?\*/', '', residue, flags=re.S)
+        residue = "".join(residue.split())
+        for junk in ("return", "{", "}", ";"):
+            residue = residue.replace(junk, "")
+        if residue:
+            continue          # bukan pembungkus murni: di luar cakupan
+        for k in keys:
+            owned.setdefault(k, []).append(f"{name}:{accessor}")
+
+hits = []
+for root, _, files in os.walk("Apps"):
+    for fname in sorted(files):
+        if not fname.endswith(".swift"):
+            continue
+        path = os.path.join(root, fname)
+        src = open(path, encoding="utf-8").read()
+        for i, line in enumerate(src.split("\n"), 1):
+            if line.lstrip().startswith("//"):
+                continue
+            for k in KEYHEAD.findall(line):
+                if k in owned:
+                    hits.append(f"  {path}:{i}: .{k} -> {owned[k]}")
+
+print("\n".join(hits))
+PY
+)
+if [ -n "$wrapped" ]; then
+  echo "$wrapped"
+  echo "-> Panggil aksesornya (mis. ObjectSpeech.magnitudeDisplay(...)),"
+  echo "   jangan tulis ulang pemanggilan kuncinya. Aksesor itulah yang"
+  echo "   membuat baris ini bisa diuji di Linux."
+  status=1
+else
+  echo "Bersih: view memakai pembungkus kuncinya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
