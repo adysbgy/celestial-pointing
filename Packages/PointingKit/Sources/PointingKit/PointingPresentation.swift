@@ -178,43 +178,43 @@ public extension PointingSnapshot {
     }
 
     /// Apakah nama yang sedang ditampilkan **wajib** membawa penanda ragu.
-        ///
-        /// **Kenapa ini bukan `!confirmsIdentity`, padahal keduanya `false` pada
-        /// `.uncertain`.** Keduanya menjawab **dua pertanyaan berbeda**, dan
-        /// menyangkut dua media yang berbeda:
-        ///
-        /// - `confirmsIdentity` -> *gambar*: ciri pengenal apa yang boleh
-        ///   digambar (cincin Saturnus, pita Jupiter).
-        /// - yang ini -> *teks*: bolehkah nama kandidat berdiri sendiri sebagai
-        ///   temuan, atau harus ada catatan yang menyebut dia kandidat.
-        ///
-        /// Yang membedakan keduanya adalah keadaan **tanpa jawaban** seperti
-        /// `.pointing`: `displayedObject` di sana mengembalikan `lastLocked`, jadi
-        /// ada nama yang tampil, dan `confirmsIdentity` sudah `false` karena
-        /// keadaan tidak `looksConfident`. Kalau ambangnya `!confirmsIdentity`,
-        /// objek sisa itu akan diberi penanda **ragu** -- padahal yang perlu
-        /// dinyatakan adalah "ini **basi**", bukan "ini ragu". Penanda ragu harus
-        /// punya satu arti; kalau dua keadaan berbagi penandanya, penanda itu
-        /// berhenti jadi informasi.
-        ///
-        /// Karena itu syaratnya `hasAnswer` (ada jawaban sekarang) **dan** keadaan
-        /// belum pasti: persis keadaan di mana ada kandidat yang ditampilkan
-        /// sebagai hasil.
-        ///
-        /// **Kenapa ia butuh bentuk sendiri, bukan tempelan per-view.** Tiga
-        /// permukaan lain sudah menandai ragu dengan tiga cara berbeda (complication
-        /// lewat `Subline`, jam dan iPhone lewat badge keyakinan). Layar redup
-        /// tidak punya ruang untuk badge, dan pada keadaan itulah nama kandidat
-        /// justru jadi **huruf terbesar di layar** -- proporsi hierarki yang
-        /// mengatakan "ini temuannya". Bentuk ini ditaruh di sini supaya keempat
-        /// permukaan membaca satu ambang yang sama, dan supaya aturan yang harus
-        /// diuji di Linux tidak tinggal jadi syarat `if` di dalam view yang
-        /// tidak pernah dieksekusi di sini.
-        func carriesUncertaintyMarker(lastLocked: CelestialObject?) -> Bool {
-            displayedObject(lastLocked: lastLocked) != nil
-                && state.hasAnswer
-                && !state.looksConfident
-        }
+    ///
+    /// **Kenapa ini bukan `!confirmsIdentity`, padahal keduanya `false` pada
+    /// `.uncertain`.** Keduanya menjawab **dua pertanyaan berbeda**, dan
+    /// menyangkut dua media yang berbeda:
+    ///
+    /// - `confirmsIdentity` -> *gambar*: ciri pengenal apa yang boleh
+    ///   digambar (cincin Saturnus, pita Jupiter).
+    /// - yang ini -> *teks*: bolehkah nama kandidat berdiri sendiri sebagai
+    ///   temuan, atau harus ada catatan yang menyebut dia kandidat.
+    ///
+    /// Yang membedakan keduanya adalah keadaan **tanpa jawaban** seperti
+    /// `.pointing`: `displayedObject` di sana mengembalikan `lastLocked`, jadi
+    /// ada nama yang tampil, dan `confirmsIdentity` sudah `false` karena
+    /// keadaan tidak `looksConfident`. Kalau ambangnya `!confirmsIdentity`,
+    /// objek sisa itu akan diberi penanda **ragu** -- padahal yang perlu
+    /// dinyatakan adalah "ini **basi**", bukan "ini ragu". Penanda ragu harus
+    /// punya satu arti; kalau dua keadaan berbagi penandanya, penanda itu
+    /// berhenti jadi informasi.
+    ///
+    /// Karena itu syaratnya `hasAnswer` (ada jawaban sekarang) **dan** keadaan
+    /// belum pasti: persis keadaan di mana ada kandidat yang ditampilkan
+    /// sebagai hasil.
+    ///
+    /// **Kenapa ia butuh bentuk sendiri, bukan tempelan per-view.** Tiga
+    /// permukaan lain sudah menandai ragu dengan tiga cara berbeda (complication
+    /// lewat `Subline`, jam dan iPhone lewat badge keyakinan). Layar redup
+    /// tidak punya ruang untuk badge, dan pada keadaan itulah nama kandidat
+    /// justru jadi **huruf terbesar di layar** -- proporsi hierarki yang
+    /// mengatakan "ini temuannya". Bentuk ini ditaruh di sini supaya keempat
+    /// permukaan membaca satu ambang yang sama, dan supaya aturan yang harus
+    /// diuji di Linux tidak tinggal jadi syarat `if` di dalam view yang
+    /// tidak pernah dieksekusi di sini.
+    func carriesUncertaintyMarker(lastLocked: CelestialObject?) -> Bool {
+        displayedObject(lastLocked: lastLocked) != nil
+            && state.hasAnswer
+            && !state.looksConfident
+    }
 
     /// Objek yang berlaku **untuk arah tunjuk sekarang**.
     ///
