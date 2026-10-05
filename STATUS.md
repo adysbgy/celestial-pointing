@@ -1,3 +1,39 @@
+## Progres terakhir (5 Okt 2026 — layar utama & konteks langit dilokalkan)
+
+### `PointingView` + `SkyContextView`: layar yang paling banyak literal
+
+Layar utama adalah tempat paling sering dilihat dan **paling** banyak literal
+Bahasa Indonesia tersisa: judul, label enam tombol toolbar (konteks langit,
+kalibrasi, mode malam, bunyi kunci — masing-masing dua keadaan), baris status
+tautan iPhone beserta penanda kegagalan kirim, peringatan objek sisa, baris
+lokasi darurat, lalu seluruh baris `SkyContextView` (Langit/Matahari/Bulan/
+Fase Bulan/Ketelitian/Azimut/Ketinggian/Lokasi/Asal lokasi).
+
+27 kunci baru + 2 kunci bentuk pendek (`Sudah`/`Belum`) untuk baris
+ketelitian → gerbang 210 → 237. Semua punya padanan EN.
+
+### Dua cacat yang ketahuan di tengah pengerjaan
+
+1. **`calibrationStatusApplied` tidak pernah ada.** Baris "Kalibrasi: Sudah"
+   dulunya literal, dan saat saya tulis ulang ia dari salah tulis kunci yang
+   tidak pernah dideklarasikan — bukan bug yang akan ketahuan tanpa gerbang
+   paritas, tapi akan menggagalkan *build*, jadi tertangkap cepat. Yang benar
+   adalah bentuk **pendek** (tanpa offset/sebaran), bukan `calibration.status.installed`
+   yang butuh dua argumen. Jauh lebih baik gagal di compiler daripada tampil
+   dengan kalimat yang salah.
+
+2. **Baris tautan punya dua bentuk yang berbeda.** Yang sudah ada
+   `linkStatusSendFailures` untuk VoiceOver ("3 pesan gagal"), sementara yang
+   **ditampilkan** adalah literal ringkas "· 3 gagal". Keduanya sengaja
+   dipisah: bentuk layar boleh sepadat mungkin, bentuk suara tidak boleh
+   (angka tanpa satuan tidak bermakna saat diucapkan). Kalau dipaksa
+   menyatu, salah satu bentuknya jadi buruk — dan yang buruk itu tidak akan
+   ketahuan dari kode.
+
+Verifikasi: `./swift-test.sh` 529/0 hijau; `./swift-ui-lint.sh` semua gerbang
+lulus; CI `Engine Tests (Linux)` + `Apple Build` hijau pada 37267579382 /
+37267579359.
+
 ## Progres terakhir (5 Okt 2026 — CalibrationView dilokalkan, nol literal keras)
 
 ### Lanjutan Fase C #2 (kelengkapan lokalisasi)
