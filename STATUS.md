@@ -1,4 +1,76 @@
-## Progres terakhir (5 Okt 2026 — lencana "?" port 3.1x terlalu besar)
+## Progres terakhir (5 Okt 2026 — aturan "fase Bulan tetap tampil saat ragu" jadi terukur)
+
+### Yang dikerjakan: aturan yang hanya hidup sebagai prosa
+
+Fase Bulan adalah **satu-satunya** ciri pengenal yang sengaja tidak
+disembunyikan saat engine ragu. Alasannya sudah tercatat panjang di STATUS.md:
+`isWaxing` dan `illuminationFraction` datang dari **efemeris** — fakta tentang
+Bulan pada tanggal itu — bukan dari tabel yang diindeks oleh id. Tidak ada
+identitas yang bisa salah diklaim oleh sebuah fase, dan menahannya saat ragu
+justru **menurunkan** kejujuran.
+
+Siklus ini awalnya mencurigainya sebagai cacat: `drawMoon` tidak pernah
+menerima `isConfirmed` seperti `drawPlanet`, dan Bulan sabit yang ragu
+tergambar **identik** dengan yang yakin (3434 piksel selisih = lencananya
+saja). Sempat akan "diperbaiki" agar menghormati `isConfirmed`. **Salah** —
+`STATUS.md` baris 10267 mencatatnya sebagai keputusan, bukan kelalaian, dan
+tidak ada satu pun uji yang meneruskan `isConfirmed` ke `phaseGeometry`.
+Membacanya dulu mencegah regresi yang justru menurunkan kejujuran.
+
+### Tapi aturan yang tidak diukur adalah aturan yang bisa hilang
+
+Yang benar-benar kurang bukan kodenya, melainkan **gerbangnya**. Dan yang
+paling mungkin menghapus aturan ini justru pembaca yang teliti: tabel di
+STATUS.md terlihat seperti daftar ciri yang *seharusnya* hilang, dan baris
+"fase Bulan" di dalamnya mudah terbaca sebagai kelalaian. Kalau `drawMoon`
+suatu saat "diperbaiki" agar menghormati `isConfirmed`, tidak ada satu pun
+gerbang yang akan berbunyi — dan yang hilang adalah satu-satunya bagian gambar
+yang **masih benar** saat engine ragu.
+
+Bahayanya **berlawanan arah** dengan semua pemeriksaan lain di berkas itu:
+semua menuntut *lebih sedikit* yang tampil saat ragu, yang ini menuntut satu
+hal tetap tampil. Itu sebabnya ia perlu gerbangnya sendiri.
+
+### Tiga pengukuran, semuanya dari piksel
+
+`check_moon_phase_survives_uncertainty`, ketiganya di luar kotak lencana:
+
+| Pengukuran | Hasil |
+|---|---|
+| sabit "ragu" identik dengan sabit "yakin" | 0 piksel berbeda |
+| sabit ≠ purnama, dan sabit ≠ cembung | 10144 dan 8197 piksel |
+| arah sabit bertahan (≠ sabit tanpa putaran) | 3885 piksel berbeda |
+
+Pengukuran 2 dan 3 adalah **arah sebaliknya** yang wajib: tanpa keduanya,
+membuang pita fase di *semua* keadaan akan lolos pengukuran 1 dengan
+sempurna.
+
+### Dibuktikan menggigit
+
+Dengan `_draw_moon` disimulasikan menghormati `isConfirmed` — persis
+"perbaikan" yang dikhawatirkan pembaca teliti itu:
+
+```
+GAGAL fase Bulan tetap tampil saat ragu   3851 piksel berbeda di luar lencana
+```
+
+Dengan kode apa adanya: **106 pemeriksaan, 0 gagal**.
+
+### Gerbang lain
+
+603 uji Swift hijau, lint UI 24 aturan hijau, typecheck hijau.
+
+### Catatan untuk siklus berikutnya
+
+- Rantai penjaga `confirmsIdentity` → `isConfirmed` → ciri gambar sudah
+  lengkap untuk planet, langit dalam, dan warna bintang; fase Bulan adalah
+  pengecualian yang beralasan dan sekarang **dijaga**.
+- Tabel ciri-vs-ragu di STATUS.md kini punya padanan gerbang untuk barisnya
+  yang paling mudah salah dibaca.
+
+---
+
+## Progres sebelumnya (5 Okt 2026 — lencana "?" port 3.1x terlalu besar)
 
 ### Cacatnya: satuan yang salah, dan tak ada yang membacanya
 
