@@ -397,6 +397,56 @@ struct DiagnosticsView: View {
                         Text(trace.trace.diagnosis(
                             policy: engine.controller.resolver.confidencePolicy))
                             .font(.footnote)
+                        // Rincian **sebab** keraguan per penyebab.
+                        //
+                        // `diagnosis` di atas sengaja meringkas jadi satu
+                        // kalimat: ia hanya menyebut sebab yang mendominasi
+                        // (> separuh sampel ragu) atau sebab-sebab yang seri
+                        // di puncak. Yang tidak bisa ia lakukan dalam satu
+                        // kalimat adalah menyebut **berapa kali** tiap sebab
+                        // muncul — dan itu justru yang hilang tanpa tanda.
+                        //
+                        // Akibatnya penguji bisa membaca "Perbaiki kalibrasi
+                        // dulu." lalu menyimpulkan semua keraguan berasal dari
+                        // kalibrasi, sementara ambiguitas katalog muncul pada
+                        // sebagian sampel dan hilang begitu saja. Dua petunjuk
+                        // perbaikan yang saling meniadakan, satu terlihat dan
+                        // satu tidak — persis kelas yang
+                        // `tiedUncertainReasons` tutup untuk kalimat
+                        // diagnosisnya.
+                        //
+                        // Barisnya dibangun di `PointingKit`
+                        // (`UncertainReasonBreakdown`) karena tiga aturan
+                        // yang tidak bisa dijaga di view: urutan baris mengikuti
+                        // deklarasi enum (bukan urutan `Dictionary` yang
+                        // di-seed per proses), baris dengan hitungan nol tidak
+                        // pernah tampil, dan ambang dominasi **sama** dengan
+                        // yang dipakai `diagnosis`. Kalau salah satu ditulis
+                        // ulang di sini, layar dan kalimat akan memberi
+                        // jawaban berbeda untuk rekaman yang sama.
+                        //
+                        // `isEmpty` membuat seluruh blok hilang saat tidak ada
+                        // sampel ragu — bukan daftar kosong di bawah
+                        // kalimat, yang terbaca sebagai "ada sesuatu yang
+                        // belum bisa ditampilkan".
+                        //
+                        // Barisnya memakai `RowSpeech.label` langsung, bukan
+                        // helper `row` lokal: judulnya **sudah** berbahasa
+                        // dari katalog, jadi melewati `row` berarti merakit
+                        // kalimat yang sama dua kali — dan `row` sendiri
+                        // sudah yelled lewat `RowSpeech`.
+                        ForEach(uncertainBreakdown.rows, id: \.reason) { entry in
+                            HStack {
+                                Text(entry.reason.label)
+                                Spacer()
+                                Text(entry.countText.text)
+                                    .foregroundStyle(Color.nightAwareSecondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(RowSpeech.label(
+                                title: entry.reason.label,
+                                value: entry.countText.text))
+                        }
                     }
                 }
 
@@ -460,6 +510,30 @@ struct DiagnosticsView: View {
         }
         .appBackground()
         .forceDarkScheme()
+    }
+
+    /// Rincian sebab keraguan — baris "sebab: n dari total".
+    ///
+    /// **Kenapa ini dihitung di paket, bukan di view.** Tiga aturan yang
+    /// menentukan apakah rincian ini jujur tidak bisa ditegakkan di dalam
+    /// `View`: urutan baris harus mengikuti deklarasi enum (`Dictionary` di-
+    /// seed per proses, jadi urutan `dictionary.keys` berubah antar
+    /// peluncuran), baris dengan hitungan nol harus **tidak** tampil, dan
+    /// ambang dominasi harus sama dengan yang dipakai `diagnosis`. Lihat
+    /// `UncertainReasonBreakdown` di `PointingKit` untuk alasannya.
+    ///
+    /// Policy-nya dibaca dari **sumber yang sama** dengan `confidenceChart`
+    /// dan `diagnosis` di atas (`engine.controller.resolver.
+    /// confidencePolicy`) — bukan nilai bawaan — supaya klasifikasi sebab dan
+    /// ambang di grafik berasal dari satu keputusan yang sama. Kalau ini
+    /// memakai `ConfidencePolicy()` bawaan sementara yang lain memakai policy
+    /// yang berlaku, rincian bisa mengelompokkan sampel berbeda dari
+    /// kalimat yang menjelaskan itu.
+    private var uncertainBreakdown: UncertainReasonBreakdown {
+        let policy = engine.controller.resolver.confidencePolicy
+        return UncertainReasonBreakdown(
+            counts: trace.trace.uncertainReasonCounts(policy: policy),
+            policy: policy)
     }
 
     /// Rasio terhadap sigma. Garis ambang digambar dari kebijakan yang **sedang

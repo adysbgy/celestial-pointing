@@ -387,7 +387,7 @@
         }
       }
     },
-"experiment.diagnosis.mixed": {
+    "experiment.diagnosis.mixed": {
       "comment": "Diagnosis saat dua sebab atau lebih berbagi hitungan tertinggi. Satu slot %@ menerima daftar sebab yang sudah disambung; pemisahnya punya kunci sendiri.",
       "localizations": {
         "en": {
@@ -409,7 +409,7 @@
         }
       }
     },
-        "experiment.suggestedThreshold": {
+    "experiment.suggestedThreshold": {
       "comment": "Usulan ambang keyakinan dari sigma terukur.",
       "localizations": {
         "en": {
@@ -3518,6 +3518,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ — not a current result"
+          }
+        }
+      }
+    },
+    "uncertain.reason.tooFar": {
+      "comment": "",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Candidate too far"
+          }
+        }
+      }
+    },
+    "uncertain.reason.ambiguous": {
+      "comment": "",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neighbour too close"
+          }
+        }
+      }
+    },
+    "uncertain.reason.none": {
+      "comment": "",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No measured cause"
+          }
+        }
+      }
+    },
+    "row.count.of": {
+      "comment": "",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld"
           }
         }
       }

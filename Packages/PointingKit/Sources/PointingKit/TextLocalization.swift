@@ -438,5 +438,14 @@ public extension LocalizedText {
         // Label lokasi darurat yang tampil di layar utama jam & rincian.
         // Dulu literal di `ObserverLocation.fallback` — lihat berkas itu.
         .locationFallbackLabel,
+        // Rincian sebab keraguan + bentuk hitungan "n dari total".
+        // Masuk daftar karena `uncertainReasonCounts` sudah dihitung dan
+        // sudah diuji, tapi **nol konsumen di `Apps/`**: satu-satunya yang
+        // tampil adalah `diagnosis(...)`, yang sengaja meringkas ke satu
+        // kalimat dan karena itu membuang hitungan per sebab serta setiap
+        // sebab yang kalah dari dominasi. Kunci ini yang membuat rinciannya
+        // bisa tampil. Lihat `UncertainReasonBreakdown.swift`.
+        .uncertainReasonTooFar, .uncertainReasonAmbiguous,
+        .uncertainReasonNone, .rowCountOf,
     ]
 }
