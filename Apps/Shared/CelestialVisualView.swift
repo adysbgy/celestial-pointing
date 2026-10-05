@@ -487,6 +487,27 @@ struct CelestialVisualView: View {
     private func drawMoon(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                           width: radius * 2, height: radius * 2))
+
+        // **Fase tidak diketahui: piringan abu netral, bukan piringan gelap.**
+        //
+        // Sampai siklus ini cabang ini menggambar warna *tidak menyala* dan
+        // berhenti, dan hasilnya **identik piksel demi piksel** dengan bulan
+        // baru (diukur: 0 dari 40.000 piksel berbeda). Bulan baru adalah
+        // fakta tentang langit — f = 0, dan pengguna bisa memeriksanya dengan
+        // mata sendiri. "Fase tidak dihitung" bukan fakta tentang apa pun;
+        // ia berarti efemeris gagal atau arahnya tidak tersedia. Menggambar
+        // yang kedua sebagai yang pertama berarti gambar itu **menyatakan**
+        // bulan baru setiap kali perhitungan gagal, dan jam tidak punya teks
+        // lain di kartunya untuk membantah.
+        //
+        // Aturan yang sama dengan `moon-unknown-phase` pada port Python, jadi
+        // gerbang piksel bisa mengukur keduanya.
+        guard let phase = visual.phaseGeometry(waxing: visual.isWaxing) else {
+            context.fill(disc,
+                         with: .color(Self.accent(CelestialVisual.accents.moonPhaseUnknown)))
+            return
+        }
+
         // Piringan gelap dulu (bagian yang tidak menyala) — tanpa ini sabit
         // akan tampak seperti bulan sabit berdiri sendiri di ruang kosong.
         // Piringan gelap memakai aturan `shadow`, bukan `surface`: ia tidak
@@ -497,13 +518,6 @@ struct CelestialVisualView: View {
         context.fill(disc,
                      with: .color(Self.shadowAccent(CelestialVisual.accents.moonUnlit)))
 
-        guard let phase = visual.phaseGeometry(waxing: visual.isWaxing) else {
-            // Fase tidak diketahui: gambar piringan polos redup. Piringan penuh
-            // **tidak** mengklaim "purnama" (itu butuh f = 1), ia hanya
-            // mengakui arah fase tidak dihitung — dan tidak pernah memihak ke
-            // satu sisi.
-            return
-        }
         drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
                     litColor: Self.accent(CelestialVisual.accents.moonLit),
                     decorate: { inner in

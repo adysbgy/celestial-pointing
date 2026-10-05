@@ -107,6 +107,7 @@ ACCENTS = dict(
     planetUnlit=(0.06, 0.06, 0.08),
     moonLit=(0.97, 0.95, 0.90),
     moonUnlit=(0.13, 0.13, 0.16),
+    moonPhaseUnknown=(0.52, 0.52, 0.55),
     sunCore=(1.00, 0.93, 0.62),
     sunPhotosphere=(1.00, 0.72, 0.24),
     deepSky=(0.72, 0.78, 0.95),
@@ -975,10 +976,17 @@ def _lit_band_polygon(cx, cy, radius, phase, bright_limb_angle):
 
 def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     unlit = ACCENTS["moonUnlit"]
-    canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
     phase = phase_geometry(kw.get("illumination"), kw.get("is_waxing"))
     if phase is None:
+        # **Fase tidak diketahui: piringan abu netral, bukan piringan gelap.**
+        # Versi lama menggambar `moonUnlit` lalu berhenti, dan hasilnya
+        # identik piksel demi piksel dengan bulan baru -- gambar yang
+        # menyatakan "bulan baru" setiap kali efemeris gagal. Lihat
+        # `moonPhaseUnknown` di `NightVisual.swift`.
+        unknown = ACCENTS["moonPhaseUnknown"]
+        canvas.disc(cx, cy, radius, solid(night_surface(unknown) if night_mode else unknown))
         return
+    canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
     points, to_screen = _lit_band_polygon(cx, cy, radius, phase,
                                           kw.get("bright_limb_angle"))
 

@@ -659,6 +659,12 @@ def check_port_matches_swift_constants(results):
     port = open(R.SOURCE, encoding="utf-8").read()
     model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
                              "CelestialVisual.swift")).read()
+    # Berkas aksen warna, terpisah dari `model`: token mode malam & palet
+    # aksen tinggal di sini, dan membaca berkas yang salah akan membuat
+    # pemeriksaan "sumber memuat" selalu merah — sama tidak bergunanya dengan
+    # yang selalu hijau, hanya lebih berisik.
+    night = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "NightVisual.swift")).read()
     # `source_text` adalah potongan yang **harus** masih tertulis di sumber
     # Swift-nya, ditulis seperti aslinya (`1.0 / 3.2`, bukan `0.3125`) — kalau
     # ditulis sebagai hasil hitungannya, pemeriksaan ini hanya akan lulus
@@ -717,6 +723,19 @@ def check_port_matches_swift_constants(results):
          "cassiniWidth: Double = 0.06", model),
         ("pita cincin: skala paruh belakang", R.RING_BACK_HALF_OPACITY_SCALE,
          0.55, "ringBackHalfOpacityScale: Double = 0.55", model),
+        # Piringan "fase tidak diketahui". Dijaga **di kedua berkas** dengan
+        # alasan yang sama seperti pita cincin: nilainya hidup di dua bahasa,
+        # dan perbaikan yang dikerjakan di satu tempat tidak boleh bisa
+        # diam-diam tidak dikerjakan di tempat lain. Yang lebih penting lagi:
+        # kalau angkanya bergeser sampai menempel ke `moonUnlit`, cacat lama
+        # (fase tak diketahui = bulan baru) kembali tanpa suara — karena
+        # gambarnya memang masih "piringan polos".
+        ("piringan fase tak diketahui (Swift)", R.ACCENTS["moonPhaseUnknown"],
+         (0.52, 0.52, 0.55), "moonPhaseUnknown: .init(red: 0.52, green: 0.52, blue: 0.55)",
+         night, "NightVisual.swift"),
+        ("piringan fase tak diketahui (view memakainya)",
+         "CelestialVisual.accents.moonPhaseUnknown" in view, True,
+         "Self.accent(CelestialVisual.accents.moonPhaseUnknown)", view),
         # Arah kedua: view harus benar-benar memakai pita, dan menggambarnya
         # **di kedua paruh**. Tanpa pemeriksaan ini, view bisa kembali ke satu
         # elips pekat dengan celah hanya di paruh bawah — bentuk yang sudah
@@ -1001,6 +1020,72 @@ def check_inner_planet_phase(results, size=200, ss=2):
     results.append(Result(
         "Venus tanpa arah fase tidak memihak sisi", undirected > 0.85,
         f"luas menyala {undirected:.3f} — piringan penuh, bukan sabit karangan"))
+
+
+def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
+    """Fase tak diketahui **bukan** bulan baru — diukur dari piksel.
+
+    **Cacat yang dijaga di sini.** `drawMoon` menggambar piringan *tidak
+    menyala* saat fasenya tidak diketahui, lalu berhenti. Hasilnya **identik
+    piksel demi piksel** dengan bulan baru — diukur sebelum perbaikan: 0 dari
+    40.000 piksel berbeda. Bulan baru adalah fakta tentang langit (f = 0, dan
+    pengguna bisa memeriksanya dengan mata sendiri); "fase tidak dihitung"
+    bukan fakta tentang apa pun. Menggambar yang kedua sebagai yang pertama
+    berarti gambar itu **menyatakan** bulan baru setiap kali efemeris gagal
+    atau arahnya tidak tersedia — dan kartu jam tidak punya teks lain untuk
+    membantahnya.
+
+    Dua pengukuran, keduanya dari piksel:
+
+    1. **Berbeda dari bulan baru.** Tanpa ini, "piringan polos" yang sama
+       dengan piringan gelap akan lolos sempurna — dan itu justru cacatnya.
+    2. **Dan tidak menyamar jadi purnama.** Sisi lain: piringan yang terlalu
+       terang akan terbaca sebagai bulan penuh, klaim yang sama-sama salah.
+       Warnanya harus di **antara** keduanya, dan diukur sebagai jarak — bukan
+       tanda, karena selisih 0.01 lolos pertidaksamaan sambil tetap identik
+       di layar.
+    """
+    _, new_moon = render_case("moon-new", size=size, ss=ss)
+    _, unknown = render_case("moon-unknown-phase", size=size, ss=ss)
+    _, full = render_case("moon-full", size=size, ss=ss)
+
+    def pixel_diff(a, b):
+        w, h, rows_a = a
+        _, _, rows_b = b
+        count = 0
+        for y in range(h):
+            ra, rb = rows_a[y], rows_b[y]
+            for x in range(w):
+                if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
+                    count += 1
+        return count
+
+    vs_new = pixel_diff(unknown, new_moon)
+    results.append(Result(
+        "fase tak diketahui bukan bulan baru", vs_new > 0,
+        f"{vs_new} piksel berbeda dari moon-new (kalau 0, keduanya gambar "
+        f"yang sama: klaim bulan baru saat fase tidak dihitung)"))
+
+    vs_full = pixel_diff(unknown, full)
+    results.append(Result(
+        "fase tak diketahui bukan purnama", vs_full > 0,
+        f"{vs_full} piksel berbeda dari moon-full"))
+
+    # Jarak yang berarti, bukan sekadar "tidak sama": kanal merah piringan
+    # tak-diketahui harus terletak di antara gelap dan terang, dengan margin
+    # yang terlihat.
+    w, h, rows = unknown
+    cx, cy = w // 2, h // 2
+    unknown_red = rows[cy][cx * 4]
+    _, _, rows_new = new_moon
+    _, _, rows_full = full
+    new_red = rows_new[cy][cx * 4]
+    full_red = rows_full[cy][cx * 4]
+    margin = 25  # dari 255
+    results.append(Result(
+        "piringan tak-diketahui di antara gelap & terang",
+        unknown_red > new_red + margin and unknown_red < full_red - margin,
+        f"kanal merah {unknown_red} (bulan baru {new_red}, purnama {full_red})"))
 
 
 def check_saturn_ring_bands_render(results, size=200, ss=2):
@@ -1347,6 +1432,7 @@ def main():
     check_inner_planet_phase(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
+    check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)

@@ -166,6 +166,25 @@ public extension CelestialVisual {
         public var moonLit: RGBComponents
         /// Piringan yang **tidak** menyala -- bagian gelap.
         public var moonUnlit: RGBComponents
+        /// Piringan saat **fase tidak diketahui** (efemeris gagal / arah tak
+        /// dihitung) — bukan piringan gelap.
+        ///
+        /// **Kenapa ini token sendiri, bukan `moonUnlit`.** Sampai siklus ini
+        /// fase yang tidak diketahui digambar dengan warna *tidak menyala*,
+        /// dan hasilnya **identik piksel demi piksel** dengan bulan baru:
+        /// diukur, 0 dari 40.000 piksel berbeda. Bulan baru adalah fakta
+        /// tentang langit (f = 0); "tidak tahu" bukan fakta tentang apa pun.
+        /// Menggambar yang kedua sebagai yang pertama berarti gambar itu
+        /// **menyatakan** bulan baru setiap kali efemeris gagal — dan tidak
+        /// ada teks di layar yang membedakannya, karena jam hanya menampilkan
+        /// gambar ini di kartu.
+        ///
+        /// Nilainya harus berada **tegas di antara** `moonUnlit` dan
+        /// `moonLit`: cukup terang untuk tidak terbaca sebagai "gelap", cukup
+        /// redup untuk tidak terbaca sebagai "menyala". Dijaga
+        /// `testPhaseUnknownDiscIsNeitherLitNorUnlit`, jadi ia tidak bisa
+        /// diam-diam menempel ke salah satu ujung.
+        public var moonPhaseUnknown: RGBComponents
 
         // MARK: Matahari
         /// Inti fotosfer.
@@ -189,6 +208,7 @@ public extension CelestialVisual {
                     planetUnlit: RGBComponents,
                     moonLit: RGBComponents,
                     moonUnlit: RGBComponents,
+                    moonPhaseUnknown: RGBComponents,
                     sunCore: RGBComponents,
                     sunPhotosphere: RGBComponents,
                     deepSky: RGBComponents,
@@ -203,6 +223,7 @@ public extension CelestialVisual {
             self.planetUnlit = planetUnlit
             self.moonLit = moonLit
             self.moonUnlit = moonUnlit
+            self.moonPhaseUnknown = moonPhaseUnknown
             self.sunCore = sunCore
             self.sunPhotosphere = sunPhotosphere
             self.deepSky = deepSky
@@ -226,6 +247,10 @@ public extension CelestialVisual {
         planetUnlit: .init(red: 0.06, green: 0.06, blue: 0.08),
         moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
         moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
+        // Abu-abu tengah, dan sengaja **bukan** warna bulan yang menyala
+        // maupun yang gelap: piringan ini tidak boleh terbaca sebagai salah
+        // satu fase. Dijaga `testPhaseUnknownDiscIsNeitherLitNorUnlit`.
+        moonPhaseUnknown: .init(red: 0.52, green: 0.52, blue: 0.55),
         sunCore: .init(red: 1.00, green: 0.93, blue: 0.62),
         sunPhotosphere: .init(red: 1.00, green: 0.72, blue: 0.24),
         deepSky: .init(red: 0.72, green: 0.78, blue: 0.95),

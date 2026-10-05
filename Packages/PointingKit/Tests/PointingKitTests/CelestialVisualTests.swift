@@ -269,6 +269,51 @@ final class CelestialVisualTests: XCTestCase {
                         .phaseGeometry(waxing: true))
     }
 
+    /// Piringan "fase tidak diketahui" harus **terbaca berbeda** dari kedua
+    /// keadaan yang menyatakan sesuatu: bulan baru (gelap) dan bulan purnama
+    /// (menyala).
+    ///
+    /// **Cacat yang dijaga di sini.** Sampai siklus ini `drawMoon` menggambar
+    /// piringan *tidak menyala* saat fasenya tidak diketahui, lalu berhenti.
+    /// Hasilnya **identik piksel demi piksel** dengan bulan baru — diukur di
+    /// `check-visuals.py`: 0 dari 40.000 piksel berbeda. Bulan baru adalah
+    /// fakta tentang langit (f = 0); "fase tidak dihitung" bukan fakta tentang
+    /// apa pun. Menggambar yang kedua sebagai yang pertama berarti gambar itu
+    /// **menyatakan** bulan baru setiap kali efemeris gagal atau arahnya tidak
+    /// tersedia — dan tidak ada teks di kartu jam yang bisa membantahnya.
+    ///
+    /// Nilainya harus berada **tegas di antara** `moonUnlit` dan `moonLit`:
+    /// cukup terang untuk tidak terbaca sebagai "gelap", cukup redup untuk
+    /// tidak terbaca sebagai "menyala". Uji ini mengunci posisi itu, jadi
+    /// tokennya tidak bisa diam-diam menempel ke salah satu ujung.
+    func testPhaseUnknownDiscIsNeitherLitNorUnlit() {
+        let accents = CelestialVisual.accents
+        let unknown = accents.moonPhaseUnknown
+        let unlit = accents.moonUnlit
+        let lit = accents.moonLit
+
+        XCTAssertGreaterThan(unknown.nightModeBrightness, unlit.nightModeBrightness,
+                             "piringan 'tidak diketahui' tidak boleh segelap bulan baru")
+        XCTAssertLessThan(unknown.nightModeBrightness, lit.nightModeBrightness,
+                          "piringan 'tidak diketahui' tidak boleh seterang bulan purnama")
+        // Jarak yang berarti, bukan sekadar tanda yang benar: selisih 0.01
+        // secara teknis lolos kedua pertidaksamaan di atas sambil tetap
+        // tampak identik di layar.
+        XCTAssertGreaterThan(unknown.nightModeBrightness - unlit.nightModeBrightness, 0.1,
+                             "harus terbaca jelas berbeda dari bulan baru")
+        XCTAssertGreaterThan(lit.nightModeBrightness - unknown.nightModeBrightness, 0.1,
+                             "harus terbaca jelas berbeda dari bulan purnama")
+    }
+
+    /// Dan token itu benar-benar dipakai: fase yang tidak diketahui harus
+    /// menghasilkan piringan **tanpa pita terang**, apa pun fraksinya.
+    func testPhaseUnknownDrawsNoLitBandEvenWithAFraction() {
+        // Fraksi ada, tapi arahnya tidak: tanpa arah, sabitnya akan memihak
+        // satu sisi — jadi tidak digambar sama sekali.
+        let unknown = CelestialVisual(kind: .moon, illuminationFraction: 0.25, isWaxing: nil)
+        XCTAssertNil(unknown.phaseGeometry(waxing: unknown.isWaxing))
+    }
+
     // MARK: - Luas pita terang: kurva yang benar-benar digambar
 
     /// Luas pita terang sebagai pecahan piringan, dihitung dengan rumus
