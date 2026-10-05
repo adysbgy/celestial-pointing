@@ -781,7 +781,7 @@ struct CelestialVisualView: View {
         // Inti putih hanya di mode terang: di mode malam ia harus merah,
         // karena putih justru warna yang dilarang mode ini. Pemetaannya tetap
         // lewat `accent`/`color`, satu-satunya tempat mode malam diterapkan.
-        let profile = CelestialVisual.VisualFrame.sunProfile(
+        let profile = VisualFrame.sunProfile(
             core: CelestialVisual.accents.sunCore,
             photosphere: CelestialVisual.accents.sunPhotosphere)
         let stops = profile.map { stop -> Gradient.Stop in

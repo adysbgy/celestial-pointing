@@ -2328,6 +2328,133 @@ else
   echo "Bersih: indeks warna bintang selalu lewat drawableStarColorIndex."
 fi
 
+# ── Aturan 25: `CelestialVisual.X` harus benar-benar anggota CelestialVisual ──
+# Cacat yang melahirkan aturan ini sudah dua kali sampai ke `origin/main` dan
+# baru ketahuan dari CI macOS, masing-masing satu siklus penuh (~2 menit) dan
+# sebuah build merah:
+#
+#   CelestialVisualView.swift:784: error: type 'CelestialVisual' has no member 'VisualFrame'
+#
+# `VisualFrame` adalah tipe **top-level** (`public enum VisualFrame {`), bukan
+# tipe bersarang di dalam `CelestialVisual` — jadi `CelestialVisual.VisualFrame`
+# tidak ada. Dan tak satu pun gerbang Linux bisa melihatnya:
+#
+#   - `swift-test.sh` membangun **paket**, bukan `Apps/`;
+#   - `swift-typecheck.sh` hanya **`-parse`** berkas `Apps/` (sintaks, bukan
+#     tipe) — batas yang sudah ditulis jujur di berkasnya sendiri;
+#   - CI macOS memang menangkapnya, tapi satu siklus penuh terlambat.
+#
+# Yang bisa dilihat di Linux adalah **keanggotaannya**: daftar anggota
+# `CelestialVisual` bisa dibaca dari sumber paketnya, dan nama yang dipakai
+# view bisa dibaca dari `Apps/`. Itulah yang diperiksa di sini.
+#
+# Batas yang jujur: aturan ini tahu anggota yang **langsung** dimiliki
+# `CelestialVisual` (dibaca sampai kedalaman satu), bukan seluruh pohon
+# tipe bersarangnya. Ia menangkap "anggota yang tidak ada sama sekali" —
+# bentuk cacat yang benar-benar terjadi — dan sengaja tidak menebak lebih
+# jauh: gerbang yang menebak akan memerah pada kode yang sah.
+echo
+echo "== Aturan 25: CelestialVisual.X harus anggota CelestialVisual =="
+unknown_member=$(python3 - <<'PY' 2>&1
+import os, re
+
+SRC = "Packages/PointingKit/Sources/PointingKit"
+TYPE = "CelestialVisual"
+
+# Tipe yang dideklarasikan **top-level** di paket. Ini bukan pengecualian:
+# justru inilah cacatnya. `VisualFrame` ada, tapi bukan anggota
+# `CelestialVisual` — jadi `CelestialVisual.VisualFrame` tetap salah, dan
+# pesannya menyebutkan bahwa ia harus dipakai tanpa kualifikasi.
+top_level = set()
+for root, _, files in os.walk(SRC):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        text = open(os.path.join(root, name), encoding="utf-8").read()
+        top_level |= set(re.findall(
+            r"^(?:public |internal |final |open )*"
+            r"(?:struct|enum|class|protocol|typealias)\s+([A-Za-z_][A-Za-z0-9_]*)",
+            text, re.M))
+
+def body_of_extension(text, start):
+    """Isi `{ ... }` yang dimulai di `start`, dengan pencocokan kurung."""
+    depth = 0
+    for j in range(start, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:j]
+    return ""
+
+def direct_members(body):
+    """Deklarasi pada kedalaman satu saja — anggota **langsung** tipe ini."""
+    found, depth = set(), 0
+    for k, ch in enumerate(body):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 1:
+            m = re.match(
+                r"(?:public |internal |private |fileprivate )?"
+                r"(?:static |indirect )?"
+                r"(?:func|var|let|struct|enum|class|typealias|case)\s+"
+                r"([A-Za-z_][A-Za-z0-9_]*)", body[k:])
+            if m:
+                found.add(m.group(1))
+    return found
+
+members = set()
+for root, _, files in os.walk(SRC):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        text = open(os.path.join(root, name), encoding="utf-8").read()
+        # Anggota yang dideklarasikan di dalam badan tipe itu sendiri.
+        for m in re.finditer(rf"^(?:public |internal |final |open )*struct {TYPE}[^\n]*\{{",
+                             text, re.M):
+            members |= direct_members(body_of_extension(text, m.end() - 1))
+        # Anggota yang ditambahkan lewat extension.
+        for m in re.finditer(rf"^(?:public )?extension {TYPE}\s*\{{", text, re.M):
+            members |= direct_members(body_of_extension(text, m.end() - 1))
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        lines = open(path, encoding="utf-8").read().split("\n")
+        for i, raw in enumerate(lines):
+            line = raw.split("//", 1)[0]
+            for used in re.findall(rf"\b{TYPE}\.([A-Za-z_][A-Za-z0-9_]*)", line):
+                if used in members:
+                    continue
+                if used in top_level:
+                    problems.append(
+                        f"  {path}:{i + 1}: `{TYPE}.{used}` — `{used}` adalah tipe "
+                        f"top-level di PointingKit, bukan anggota `{TYPE}`; "
+                        f"pakai `{used}` tanpa kualifikasi")
+                    continue
+                problems.append(
+                    f"  {path}:{i + 1}: `{TYPE}.{used}` — `{used}` bukan anggota "
+                    f"`{TYPE}` dan tidak ada di PointingKit")
+
+if problems:
+    print("\n".join(problems))
+    print(f"-> Buang kualifikasi `{TYPE}.` kalau `X`-nya tipe top-level, "
+          "atau tambahkan anggotanya ke paket.")
+PY
+)
+if [ -n "$unknown_member" ]; then
+  echo "$unknown_member"
+  status=1
+else
+  echo "Bersih: setiap CelestialVisual.X ada di paket."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
