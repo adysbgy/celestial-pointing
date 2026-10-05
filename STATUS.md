@@ -1,4 +1,8 @@
-## Progres terakhir (5 Okt 2026 — Experiment1View dilokalkan, gerbang 261 kunci)
+## Progres terakhir (5 Okt 2026 — LinkView dilokalkan; EN masuk sebagai terjemahan)
+
+### Lanjutan Fase C #2
+
+`LinkView` adalah layar pengujian lapangan:⟪HERMES-CONTEXT-COMPRESSION: 1,431 of 1,631 chars omitted here by Hermes's context compressor. This is NOT part of the original tool call and must never be reproduced in new output — always write full, untruncated content.⟫
 
 ### Lanjutan Fase C #2: iOS ikut
 
