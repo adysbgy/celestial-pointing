@@ -116,10 +116,24 @@ struct ComplicationView: View {
     private func content(for digest: ComplicationDigest) -> AnyView {
         switch family {
         case .accessoryInline:
-            // Teks pendek di sebelah waktu. Slot satu baris, jadi tidak ada
-            // ruang untuk kata tambahan — penanda ragu masuk lewat ikon di
-            // keluarga lain.
-            AnyView(Text(digest.headline))
+            // Teks pendek di sebelah waktu. Slot satu baris, jadi **tidak ada
+            // ruang untuk kata tambahan** — penanda ragu karena itu masuk
+            // lewat **ikon**, persis seperti keluarga lain.
+            //
+            // Dulu cabang ini mengembalikan `Text(digest.headline)` saja, dan
+            // itu membuat satu-satunya keluarga yang tidak punya baris kedua
+            // juga jadi satu-satunya yang tidak punya penanda: nama kandidat
+            // `.uncertain` tampil persis seperti nama yang sudah terkunci.
+            // Ikonnya diambil dari `presentedSymbolName(at:)` yang **sama**
+            // dengan keluarga lain — bukan daftar ikon kedua — supaya ragu
+            // (`questionmark.circle`) dan basi (`clock.badge.exclamationmark`)
+            // ikut terbaca di sini tanpa aturan terpisah.
+            //
+            // `accessoryInline` memang menerima gambar: bentuknya "satu baris
+            // teks dan gambar opsional", dan gambar disisipkan lewat
+            // interpolasi `Image` di dalam `Text` (didukung watchOS 9+, sama
+            // dengan ambang deployment target di `project.yml`).
+            AnyView(Text("\(Image(systemName: digest.presentedSymbolName(at: Date()))) \(digest.headline)"))
         case .accessoryCircular:
             // Lingkaran: simbol keadaan + nama objek (jika ada).
             //
@@ -176,7 +190,12 @@ struct ComplicationView: View {
         default:
             // Keluarga lain (corner, container, dll.) belum didesain; menampilkan
             // baris utama apa adanya lebih baik daripada widget kosong.
-            AnyView(Text(digest.headline))
+            //
+            // Ikonnya tetap disertakan karena alasan yang sama dengan inline:
+            // keluarga yang tidak punya baris kedua tidak punya kanal lain
+            // untuk penanda ragu, dan nama kandidat tanpa penanda terbaca
+            // sebagai identitas yang pasti.
+            AnyView(Text("\(Image(systemName: digest.presentedSymbolName(at: Date()))) \(digest.headline)"))
         }
     }
 

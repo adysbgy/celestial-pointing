@@ -905,6 +905,17 @@ fi
 # dijaga adalah **kelas** drift (angka vs kenyataan), bukan angka tepatnya.
 # Kalau suatu saat uji dihasilkan dinamis sehingga hitungan statis tidak lagi
 # sama dengan yang dijalankan, aturan ini yang pertama akan memberi tahu.
+#
+# Klaim **jumlah aturan** di README juga diperiksa di sini, karena ia kelas
+# drift yang sama persis: "berkasnya tumbuh jadi **21 aturan**" juga janji ke
+# pembaca, juga tidak bisa dijaga compiler, dan juga membusuk tanpa gerbang
+# merah. Terbukti: aturan ke-22 dan ke-23 ditambahkan tanpa ada yang menyentuh
+# kalimat itu, dan README tetap bilang 21 sampai aturan ini diperluas.
+#
+# Sumber angkanya adalah **aturan yang benar-benar mencetak**, bukan nomor
+# tertinggi: kalau `Aturan 12` pernah dihapus, menghitung nomor maksimum akan
+# tetap bilang 23. Yang dijaga nomor terkecil yang hilang, supaya celah
+# penomoran pun ketahuan.
 echo
 echo "== Aturan 10: hitungan uji di README cocok dengan berkas uji =="
 readme=$(python3 - <<'PY'
@@ -919,6 +930,10 @@ def count(glob_pat):
 
 engine = count("Packages/CelestialEngine/Tests/**/*.swift")
 kit = count("Packages/PointingKit/Tests/**/*.swift")
+
+lint = open("swift-ui-lint.sh", encoding="utf-8").read()
+numbers = [int(n) for n in re.findall(r'^echo "== Aturan (\d+)', lint, re.M)]
+rule_count = len(numbers)
 
 if not os.path.exists("README.md"):
     print("PERINGATAN: README.md tidak ada.")
@@ -939,10 +954,20 @@ for label, actual in (("CelestialEngine", engine), ("PointingKit", kit)):
             problems.append(
                 f"README bilang {label} {number}, berkas uji berisi {actual}.")
 
+# Klaim jumlah aturan lint.
+found_rules = re.findall(r"(\d+)\s+aturan", text)
+if not found_rules:
+    problems.append("README tidak menyebut jumlah aturan lint sama sekali.")
+for number in found_rules:
+    if int(number) != rule_count:
+        problems.append(
+            f"README bilang {number} aturan, swift-ui-lint.sh punya {rule_count}.")
+
 if problems:
     for p in problems:
         print(p)
-    print("-> Perbarui angka di README.md, atau perbaiki kalau uji terhapus.")
+    print("-> Perbarui angka di README.md, atau perbaiki kalau uji/aturan "
+          "terhapus.")
 else:
     # Sengaja tidak mencetak apa pun saat bersih: blok ini memakai konvensi
     # yang sama dengan aturan lain di berkas ini — python hanya bicara saat
@@ -2172,6 +2197,72 @@ if [ -n "$row_key_reuse" ]; then
   status=1
 else
   echo "Bersih: tidak ada judul baris yang memakai kunci nilainya."
+fi
+
+# ── Aturan 23: complication inline wajib menandai keraguan lewat ikon ───────
+# Complication punya dua kanal: satu ikon dan satu baris teks. Model sudah
+# menyediakan keduanya (`presentedSymbolName(at:)`, `sublineContent(at:)`), dan
+# dokumentasi `presentedSymbolName` sendiri menulis alasannya: "satu kata
+# tambahan sudah memenuhi ruang di `.accessoryInline` — jadi ikon yang jadi
+# kanal penanda".
+#
+# Tiga keluarga lain memakai ikon itu. `.accessoryInline` tidak: ia
+# mengembalikan `Text(digest.headline)` saja. Akibatnya keluarga yang paling
+# sempit — dan karena itu paling bergantung pada ikon — justru satu-satunya
+# yang menampilkan nama kandidat `.uncertain` persis seperti nama yang sudah
+# terkunci. Di pergelangan, tanpa membuka app, tidak ada cara membedakannya.
+#
+# Yang diperiksa: di dalam **satu cabang keluarga** complication, kalau
+# `digest.headline` dirender, `presentedSymbolName` harus ikut dirender di
+# cabang yang sama. Diperiksa per cabang, bukan per ekspresi: keluarga
+# lingkaran dan persegi panjang merender ikon sebagai view **sebelah** teksnya,
+# jadi menuntut ikon di `Text` yang sama akan melaporkan dua tempat yang
+# sebenarnya benar. Dua nama itu teruji di Linux
+# (`PointingPresentationTests`), jadi aturannya tidak bergantung pada daftar
+# keluarga lokal yang bisa basi.
+echo
+echo "== Aturan 23: setiap cabang complication memakai kanal ikon =="
+inline_claim=$(python3 - <<'PY' 2>&1
+import os, re
+
+BRANCH = re.compile(r"^\s*(case\s+\.accessory\w+|default)\s*:", re.M)
+
+problems = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        # Komentar dibuang: dokumentasi aturan ini menyebut kedua nama itu.
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        if "digest.headline" not in code:
+            continue
+        marks = list(BRANCH.finditer(code))
+        for idx, m in enumerate(marks):
+            end = marks[idx + 1].start() if idx + 1 < len(marks) else len(code)
+            branch = code[m.end():end]
+            if "digest.headline" not in branch:
+                continue
+            if "presentedSymbolName" in branch:
+                continue
+            line_no = code[:m.start()].count("\n") + 1
+            problems.append(
+                f"  {path}:{line_no}: cabang `{m.group(1)}` menampilkan "
+                f"`digest.headline` tanpa `presentedSymbolName` — "
+                f"keraguan tidak terlihat")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Nama kandidat akan terbaca persis seperti nama yang terkunci. "
+          "Render ikon keadaan di cabang keluarga yang sama.")
+PY
+)
+if [ -n "$inline_claim" ]; then
+  echo "$inline_claim"
+  status=1
+else
+  echo "Bersih: nama objek di complication selalu tampil bersama ikon keadaan."
 fi
 
 if [ "$status" -eq 0 ]; then
