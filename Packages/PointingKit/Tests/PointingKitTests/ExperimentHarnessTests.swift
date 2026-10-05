@@ -445,12 +445,21 @@ final class ExperimentHarnessTests: XCTestCase {
 
     /// Target tanpa arah yang bisa dihitung tidak boleh ditawarkan: percobaan
     /// seperti itu tidak bisa dianalisis.
-    func testAvailableTargetsAreAllComputableAndAboveHorizon() {
+    ///
+    /// **Yang dijamin di sini adalah ambang engine, bukan cakrawala.** Resolver
+    /// uji ini memakai `VisibilityPolicy.permissive` dengan
+    /// `minAltitudeDeg: -90`, jadi daftar *harus* memuat benda yang jauh di
+    /// bawah horizon -- itulah arti "permisif". Assert `> 0` di sini pernah
+    /// hijau hanya karena `availableTargets` masih memakai angka 0 yang
+    /// dipatok sendiri, bukan karena engine mengizinkannya.
+    func testAvailableTargetsAreAllComputableAndAboveTheEngineGate() {
         let h = harness()
         let targets = h.availableTargets
         XCTAssertFalse(targets.isEmpty)
         for target in targets {
-            XCTAssertGreaterThan(target.direction.altitudeDeg, 0, "\(target.id) di bawah horizon")
+            XCTAssertGreaterThan(target.direction.altitudeDeg,
+                                 resolver.policy.minAltitudeDeg,
+                                 "\(target.id) di bawah ambang engine")
             XCTAssertNotEqual(target.id, "sun")
         }
     }

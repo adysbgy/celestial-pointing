@@ -22,11 +22,15 @@ final class TargetsTests: XCTestCase {
 
     // MARK: - Daftar target
 
-    func testTargetsAboveHorizonOnlyByDefault() {
+    /// Nama dan isi uji ini ikut diperbarui: "above horizon" bukan lagi
+    /// istilah yang tepat untuk apa yang dijamin. Yang dijamin adalah
+    /// "setinggi ambang engine", dan pada policy permisif ambang itu -90
+    /// sehingga daftar boleh memuat apa pun -- persis seperti niatnya.
+    func testTargetsUseTheEngineAltitudeGateByDefault() {
         let r = PointingResolver(catalogue: Catalogue.brightStars, policy: .permissive)
         let targets = r.availableTargets(observer: observer, date: date)
         XCTAssertFalse(targets.isEmpty)
-        XCTAssertTrue(targets.allSatisfy { $0.direction.altitudeDeg > 0 })
+        XCTAssertTrue(targets.allSatisfy { $0.direction.altitudeDeg >= r.policy.minAltitudeDeg })
         XCTAssertTrue(targets.allSatisfy { !$0.isMoving }, "tanpa efemeris semua target adalah bintang")
     }
 
@@ -56,6 +60,68 @@ final class TargetsTests: XCTestCase {
         XCTAssertEqual(target.separation(from: other),
                        SkyMath.angularSeparationHorizontalDeg(other, target.direction),
                        accuracy: 1e-12)
+    }
+
+    // MARK: - Daftar target vs gerbang lock engine
+
+    /// **Regresi: daftar target harus memakai ambang yang sama dengan engine.**
+    ///
+    /// `availableTargets` memfilter dengan `altitudeDeg <= 0`, tapi engine
+    /// hanya mengunci lewat `VisibilityFilter`, yang memakai
+    /// `policy.minAltitudeDeg` (bawaan 5 derajat). Pada policy produksi,
+    /// objek setinggi 1-4 derajat muncul di daftar Experiment 1 lalu
+    /// **selalu** ditolak sebagai `belowHorizon` -- jadi tidak akan pernah
+    /// lock.
+    ///
+    /// Dampaknya bukan objek basi yang diam-diam gagal. Penguji memilih
+    /// target dari daftar itu, misses semuanya, lalu rekaman yang gagal
+    /// dianggap sebagai bukti tentang engine. Rekaman itu tidak berbohong
+    /// soal apa yang diukur, tapi berbohong soal apa yang bisa diukur.
+    ///
+    /// Cacat ini luput karena setiap uji daftar target memakai
+    /// `VisibilityPolicy.permissive` (`minAltitudeDeg: -90`), di mana kedua
+    /// ambang itu kebetulan sama-sama meloloskan apa pun. Uji di bawah
+    /// memakai policy bawaan supaya ketidaksamaan itu terlihat.
+    func testOfferedTargetsCanActuallyBeLocked() {
+        let r = PointingResolver(catalogue: Catalogue.brightStars)
+        XCTAssertEqual(r.policy.minAltitudeDeg, 5.0,
+                       "prasyarat: policy bawaan memang menyaring di 5 derajat")
+
+        // Tanggal dan tempat ini dipilih karena Sirius benar-benar ada di
+        // pita 0-5 derajat: di atas horizon geometris, di bawah ambang
+        // engine. Tanpa itu, cacat yang sama bisa lolos karena langit
+        // kebetulan tidak punya apa pun di pita itu.
+        var comps = DateComponents()
+        comps.year = 2026; comps.month = 2; comps.day = 1; comps.hour = 22
+        let bandDate = Calendar(identifier: .gregorian).date(from: comps)!
+        let bandObserver = Observer(latitudeDeg: -33.0, longitudeDeg: 100.0)
+
+        let siriusAlt = r.horizontal(ofObjectID: "sirius",
+                                     observer: bandObserver,
+                                     date: bandDate)!.altitudeDeg
+        XCTAssertTrue(siriusAlt > 0 && siriusAlt < 5.0,
+                      "prasyarat: Sirius harus ada di pita 0-5 derajat, "
+                      + "tapi kelihatan \(NumberFormat.degrees(siriusAlt))")
+
+        let offered = r.availableTargets(observer: bandObserver, date: bandDate)
+        XCTAssertFalse(offered.isEmpty, "prasyarat: harus ada target untuk diuji")
+
+        let tooLow = offered.filter { $0.direction.altitudeDeg < r.policy.minAltitudeDeg }
+        XCTAssertTrue(tooLow.isEmpty,
+                      "daftar menawarkan \(tooLow.count) target yang engine "
+                      + "akan tolak sebagai belowHorizon: "
+                      + tooLow.prefix(5).map { "\($0.id) "
+                          + NumberFormat.degrees($0.direction.altitudeDeg) }
+                          .joined(separator: ", "))
+    }
+
+    /// Melonggarnya daftar tidak boleh membuat daftar lebih longgar dari
+    /// engine: target yang di bawah horizon tidak boleh muncul sama sekali.
+    func testOfferedTargetsStayAboveTheGeometricHorizon() {
+        let r = PointingResolver(catalogue: Catalogue.brightStars)
+        let offered = r.availableTargets(observer: observer, date: date)
+        XCTAssertTrue(offered.allSatisfy { $0.isAboveHorizon },
+                      "tidak boleh ada target di bawah horizon")
     }
 
     // MARK: - Target terdekat

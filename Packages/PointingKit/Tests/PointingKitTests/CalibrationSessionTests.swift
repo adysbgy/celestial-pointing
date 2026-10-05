@@ -44,7 +44,9 @@ final class CalibrationSessionTests: XCTestCase {
         let allowed = Set(CalibrationFlow.defaultReferences.map(\.id))
         for target in session.referenceTargets {
             XCTAssertTrue(allowed.contains(target.id), "\(target.id) bukan acuan bawaan")
-            XCTAssertGreaterThan(target.direction.altitudeDeg, 0)
+            XCTAssertGreaterThan(target.direction.altitudeDeg,
+                                 controller().resolver.policy.minAltitudeDeg,
+                                 "\(target.id) di bawah ambang engine")
         }
     }
 

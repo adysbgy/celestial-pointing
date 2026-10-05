@@ -44,9 +44,23 @@ public extension PointingResolver {
     /// tersedia dan perhitungannya berhasil. Matahari tidak pernah muncul:
     /// `horizontal(ofBody:)` menolaknya.
     ///
-    /// - Parameter aboveHorizonOnly: buang objek di bawah cakrawala. Untuk
-    ///   kalibrasi dan Experiment 1 ini penting — menunjuk objek yang tidak
-    ///   ada di langit hanya menghasilkan rekaman yang menyesatkan.
+    /// - Parameter aboveHorizonOnly: buang objek yang tidak akan bisa
+    ///   dikunci engine. Untuk kalibrasi dan Experiment 1 ini penting --
+    ///   menunjuk objek yang tidak ada di langit hanya menghasilkan rekaman
+    ///   yang menyesatkan.
+    ///
+    ///   **Ambangnya bukan cakrawala geometris, melainkan `policy.minAltitudeDeg`
+    ///   milik resolver itu sendiri.** Versi lama memakai `altitudeDeg <= 0`
+    ///   yang terlihat wajar tapi salah: engine hanya mengunci lewat
+    ///   `VisibilityFilter`, yang menyaring di 5 derajat pada policy bawaan.
+    ///   Akibatnya daftar menampilkan Sirius di 0,6 derajat, lalu `diagnose`
+    ///   menolaknya sebagai `belowHorizon` -- setiap kali.
+    ///
+    ///   Yang rusak bukan angkanya, tapi kebohongannya: daftar itu menyatakan
+    ///   sebuah objek "tersedia untuk ditunjuk" padahal persis tidak akan
+    ///   pernah bisa dikunci. Membaca ambang dari `policy` juga menutup kelas
+    ///   bug yang lebih luas: kalau `minAltitudeDeg` berubah, daftar ikut
+    ///   berubah, karena tidak ada lagi angka yang ditulis dua kali.
     func availableTargets(observer: Observer,
                           date: Date,
                           aboveHorizonOnly: Bool = true) -> [PointingTarget] {
@@ -54,7 +68,7 @@ public extension PointingResolver {
 
         for object in catalogue where object.kind == .star || object.kind == .deepSky {
             guard let direction = horizontal(of: object, observer: observer, date: date) else { continue }
-            if aboveHorizonOnly && direction.altitudeDeg <= 0 { continue }
+            if aboveHorizonOnly && direction.altitudeDeg <= policy.minAltitudeDeg { continue }
             targets.append(PointingTarget(id: object.id,
                                           name: object.name,
                                           kind: object.kind,
@@ -66,7 +80,7 @@ public extension PointingResolver {
         if considersSolarSystem {
             for body in EphemerisBody.pointableBodies {
                 guard let direction = horizontal(ofBody: body, observer: observer, date: date) else { continue }
-                if aboveHorizonOnly && direction.altitudeDeg <= 0 { continue }
+                if aboveHorizonOnly && direction.altitudeDeg <= policy.minAltitudeDeg { continue }
                 targets.append(PointingTarget(id: body.rawValue,
                                               name: body.displayName,
                                               kind: body == .moon ? .moon : .planet,
