@@ -13,6 +13,8 @@ objek langit**, lalu mengantarkan objek itu ke teleskop lewat alur
 - [Ide inti](#ide-inti)
 - [Arsitektur](#arsitektur)
 - [Menjalankan di Mac](#menjalankan-di-mac)
+- [Mode malam, Always-On, & aksesibilitas](#mode-malam-always-on--aksesibilitas)
+- [Complication & lokalisasi](#complication--lokalisasi)
 - [Menjalankan uji di Linux](#menjalankan-uji-di-linux)
 - [Experiment 1](#experiment-1)
 - [Aturan yang tidak bisa ditawar](#aturan-yang-tidak-bisa-ditawar)
@@ -83,6 +85,57 @@ bergantung pada Mac. Konsekuensinya:
 
 ---
 
+## Mode malam, Always-On, & aksesibilitas
+
+Fitur ini bukan hiasan — masing-masing mematuhi aturan "akurasi adalah
+hipotesis" dan "ragu lebih baik daripada yakin yang salah".
+
+- **Mode malam (merah).** Toggle satu ketuk (ikon bulan) menyimpan
+  `@AppStorage`. Seluruh palet dipaksa ke merah murni (>620 nm) supaya
+  rhodopsin tidak rusak — **termasuk** warna prosedural pada gambar objek.
+  Satu penjaga (`NightVisual`) mengubah setiap warna gambar dari kanal
+  merahnya, dan diuji di Linux (aturan 15 gerbang UI): versi lama menulis
+  angka malam sendiri per warna, dan 10 dari 13 di antaranya bukan merah
+  murni, jadi "merah" itu hanya terlihat merah, bukan benar-benar aman.
+- **Always-On Display.** Saat `isLuminanceReduced` menyala, app menukar
+  tampilan dengan `ReducedLuminanceView` — hanya nama objek + status, kontras
+  tinggi, dan **seluruh animasi dihentikan** (hemat baterai + tak ada denyut
+  di layar redup).
+- **VoiceOver.** Status, panel detail, tombol kalibrasi, dan "Catat" punya
+  `accessibilityLabel`. Yang diucapkan hanya info yang **hanya bisa dilihat**:
+  fase Bulan, bentuk objek langit dalam (galaksi/gugus/nebula), dan warna
+  spektral bintang dari indeks B−V. Planet **tidak** dideskripsikan gambarnya
+  karena namanya sudah mengidentifikasi; pernyataan bentuk ikut **dibungkam
+  saat engine ragu** (`isConfirmed == false`) supaya suara tak lebih yakin
+  daripada gambarnya. Kalimat terucap hidup di `PointingKit`, bukan di view,
+  supaya bisa diuji (aturan 4 & 16).
+- **Reduced Motion.** Preferensi pengguna (`accessibilityReduceMotion`) dan
+  layar redup mematikan animasi lewat satu keputusan bersama (`MotionPolicy`,
+  teruji di Linux) — jam dan iPhone tidak bisa berbeda pendapat (aturan 7).
+
+---
+
+## Complication & lokalisasi
+
+- **Complication watchOS.** `PointAndKnow Watch Complication` (WidgetKit,
+  terbenam di dalam app jam) menampilkan ringkasan objek terkunci terakhir
+  (`ComplicationDigest.headline`) tanpa membuka app. Katedral diuji:
+  `ComplicationDigestStalenessTests` memastikan ringkasan objek basi tidak
+  terdengar seperti hasil sekarang, dan `ComplicationStaleSymbolTests`
+  menjaga simbol lamanya.
+- **Lokalisasi.** Teks UI ada di `Localizable.xcstrings` (Bahasa Indonesia +
+  Inggris). `SWIFT_EMIT_LOC_STRINGS` **sengaja dimatikan** karena katalog
+  ditulis tangan dan di-commit — flag itu hanya untuk ekstraksi otomatis, dan
+  menyalakannya akan menduplikasi kunci yang sudah ada. Aturan 4 & 11 gerbang
+  UI menjaga setiap teks UI punya padanan bahasa Inggris, dan specifier
+  katalog cocok dengan template kode.
+- **Izin sensor.** `NSMotionUsageDescription` dan
+  `NSLocationWhenInUseUsageDescription` di `Info.plist` menjelaskan **kenapa**
+  (Bahasa Indonesia, lewat `InfoPlist.strings`) — penolakan izin ditangani
+  dengan pesan yang jelas, bukan crash atau senyap (aturan 14).
+
+---
+
 ## Menjalankan di Mac
 
 Butuh Xcode 16+ (diuji di macOS 15) dan XcodeGen.
@@ -119,7 +172,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 172**, **PointingKit 549**.
+Hitungan uji saat ini: **CelestialEngine 174**, **PointingKit 549**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
@@ -135,7 +188,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **10 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **17 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
