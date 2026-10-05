@@ -933,6 +933,76 @@ def check_planet_features_present(results, size=200, ss=2):
         f"utara={top[0] if top else None}, selatan={bottom[0] if bottom else None}"))
 
 
+def check_inner_planet_phase(results, size=200, ss=2):
+    """Venus & Merkurius harus **berfase**, dan planet luar tidak boleh ikut.
+
+    **Cacat yang dijaga di sini.** Sampai siklus ini `drawPlanet` menggambar
+    setiap planet sebagai bola penuh yang menyala, dan itu benar untuk Mars
+    sampai Saturnus — tapi salah untuk dua planet dalam. Dari Bumi, Venus
+    berayun dari sabit ~1% ke cakram ~99%; bentuk sabit itu justru ciri paling
+    khasnya, dan di langit nyata ia **tidak pernah** tampak bulat saat berada
+    di dekat Matahari. Sebuah Venus yang tergambar penuh adalah gambar yang
+    menyatakan hal yang tidak ada, persis yang dilarang aturan "kejujuran >
+    rasa percaya diri": bukan karena mesinnya salah hitung, tapi karena
+    gambarnya menyampaikan lebih dari yang dihitung.
+
+    Empat pengukuran, semuanya dari piksel:
+
+    1. **Sabit benar-benar sempit.** Luas piksel menyala pada f=0.22 harus
+       mendekati 0.22 — bukan mendekati 1.0 seperti bola penuh.
+    2. **Arah sisi terang benar.** Sabit Venus pada sudut `-pi/2` harus
+       menghadap **bawah**; ini mengukur jalur yang sama dengan Bulan, jadi
+       kesalahan koordinat layar di satu tempat akan tertangkap di sini juga.
+    3. **Cembung tetap cembung.** Pada f=0.78 luasnya harus **di atas**
+       setengah. Tanpa ini, "sabut tipis untuk semua fraksi" akan lolos.
+    4. **Yang seharusnya bulat tetap bulat.** Dua kasus: Mars yang diberi
+       angka fase (planet luar tidak pernah berfase dari Bumi — angkanya harus
+       diabaikan), dan Venus tanpa arah fase (arah tak diketahui ≠ izin
+       menebak arah). Keduanya harus tetap piringan penuh.
+    """
+    _, (w, h, rows) = render_case("planet-venus-crescent", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    _, _, thin = lit_centroid(w, h, rows, background)
+    results.append(Result(
+        "sabit Venus benar-benar sempit", thin < 0.45,
+        f"luas menyala {thin:.3f} dari piringan (f=0.22, bola penuh ≈ 1.0)"))
+
+    lit, unlit = (tuple(round(c * 255) for c in R.PLANET_PALETTE["venus"][k])
+                  for k in ("light", "dark"))
+    dx, dy, _ = classify_centroid(w, h, rows, lit, unlit)
+    measured = ("bawah" if dy > abs(dx) else
+                "atas" if -dy > abs(dx) else
+                "kanan" if dx > 0 else "kiri")
+    results.append(Result(
+        "sisi terang sabit Venus menghadap sudut yang diminta",
+        measured == "bawah",
+        f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}), seharusnya bawah"))
+
+    _, (w, h, rows) = render_case("planet-venus-gibbous", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    _, _, wide = lit_centroid(w, h, rows, background)
+    results.append(Result(
+        "cembung Venus lebih dari setengah", wide > 0.55,
+        f"luas menyala {wide:.3f} dari piringan (f=0.78)"))
+
+    # Planet **luar** tidak berfase dari Bumi: Mars nyaris bulat sepanjang
+    # waktu, dan angka fase yang sampai ke view harus diabaikan, bukan dipakai.
+    _, (w, h, rows) = render_case("planet-mars-with-a-phase-number", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    _, _, outer = lit_centroid(w, h, rows, background)
+    results.append(Result(
+        "angka fase pada planet luar diabaikan", outer > 0.85,
+        f"luas menyala {outer:.3f} — Mars tetap piringan penuh"))
+
+    # Arah tak diketahui bukan izin menebak: piringan penuh, tanpa memihak sisi.
+    _, (w, h, rows) = render_case("planet-venus-no-direction", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    _, _, undirected = lit_centroid(w, h, rows, background)
+    results.append(Result(
+        "Venus tanpa arah fase tidak memihak sisi", undirected > 0.85,
+        f"luas menyala {undirected:.3f} — piringan penuh, bukan sabit karangan"))
+
+
 def check_saturn_ring_bands_render(results, size=200, ss=2):
     """Cincin Saturnus harus tergambar sebagai **pita**, dan di kedua paruh.
 
@@ -1274,6 +1344,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_inner_planet_phase(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)

@@ -44,6 +44,32 @@ public struct CelestialVisual: Equatable, Sendable {
         case mars
         case jupiter
         case saturn
+
+        /// Apakah planet ini menampakkan **fase** dari Bumi.
+        ///
+        /// Hanya planet **dalam** — Merkurius dan Venus, yang orbitnya di
+        /// dalam orbit Bumi. Dari Bumi keduanya terlihat berayun dari sabit
+        /// tipis ke cakram hampir penuh, dan itulah ciri paling khas mereka
+        /// di teleskop: Venus pada elongasi timur tampak seperti bulan
+        /// setengah, bukan bola penuh.
+        ///
+        /// Planet luar (Mars…Saturnus) **tidak pernah** tampak berfase: sudut
+        /// fasenya, dilihat dari Bumi, tidak pernah cukup jauh dari purnama
+        /// untuk terlihat — Mars paling ekstrem hanya ~85% iluminasi, dan itu
+        /// pun nyaris tak terbedakan dari bola penuh pada ukuran yang
+        /// digambar aplikasi ini.
+        ///
+        /// **Kenapa ini properti, bukan daftar di view.** View yang memutuskan
+        /// planet mana yang berfase berarti aturan itu hidup di berkas yang
+        /// tidak bisa diuji di Linux — dan kalau salah, Mars akan tampil
+        /// sebagai sabit, gambar yang menyatakan sesuatu yang tidak pernah
+        /// terjadi di langit. Di sini ia bisa dikunci uji.
+        public var showsPhase: Bool {
+            switch self {
+            case .mercury, .venus: return true
+            case .mars, .jupiter, .saturn: return false
+            }
+        }
     }
 
     public var kind: Kind
@@ -109,12 +135,37 @@ public struct CelestialVisual: Equatable, Sendable {
 
     // MARK: - Objek langit dalam
 
-    /// Seberapa "menyebar" objeknya (0 = titik, 1 = kabut lebar).
+    /// Objek langit dalam: seberapa menyebar objeknya (0 = titik, 1 = kabut lebar).
     ///
     /// Nebula dan galaksi tidak punya tepi, jadi ukurannya tidak bisa
     /// diturunkan dari magnitudo seperti bintang. Angka ini yang membedakan
     /// "titik kabur" dari "kabut lebar".
     public var fuzziness: Double
+
+    /// Fraksi piringan yang menyala untuk **Venus dan Merkurius**.
+    ///
+    /// **Kenapa planet butuh fase sama seperti Bulan.** Venus dan Merkurius
+    /// adalah planet dalam: dari Bumi, piringannya sebagian besar waktu
+    /// **tidak** menyala penuh. Venus berayun dari sabit 1% (saat di antara
+    /// Bumi dan Matahari) sampai cakram 99% (di sisi jauh) — bentuk yang
+    /// berubah drastis dan itulah ciri yang paling dikenal orang tentang
+    /// Venus di teleskop. Merkurius bahkan lebih ekstrem: fase terbesarnya
+    /// hanya ~30% iluminasi.
+    ///
+    /// **Cacat yang ditutup medan ini.** Sebelumnya `phaseGeometry` menolak
+    /// setiap benda yang bukan Bulan, dan `PointingEngine` hanya meneruskan
+    /// fraksi untuk Bulan. Akibatnya Venus digambar sebagai **bola penuh yang
+    /// menyala** pada setiap keadaan — termasuk saat engine menghitung
+    /// iluminasinya 2%. Gambar itu menyatakan sesuatu yang engine justru
+    /// sedang menyangkal, dan tidak ada satu teks di layar yang bisa dibaca
+    /// pengguna untuk memeriksanya. Ini kelas cacat yang sama dengan pita
+    /// Jupiter pada Saturnus, hanya dalam arah sebaliknya: bukan ciri yang
+    /// ditambahkan, melainkan fakta yang dihilangkan.
+    ///
+    /// Nilainya `nil` untuk benda selain Venus/Merkurius — fase planet luar
+    /// (Mars…Saturnus) memang tidak pernah terlihat dari Bumi, jadi tidak ada
+    /// yang hilang dengan membiarkannya `nil`.
+    public var planetPhaseFraction: Double?
 
     /// Id objek dari engine, bila ada.
     ///
@@ -155,6 +206,7 @@ public struct CelestialVisual: Equatable, Sendable {
                 colorIndexBV: Double = 0,
                 relativeSize: Double = 0.5,
                 fuzziness: Double = 0,
+                planetPhaseFraction: Double? = nil,
                 objectID: String? = nil) {
         self.kind = kind
         self.planet = planet
@@ -164,6 +216,7 @@ public struct CelestialVisual: Equatable, Sendable {
         self.colorIndexBV = colorIndexBV
         self.relativeSize = relativeSize
         self.fuzziness = fuzziness
+        self.planetPhaseFraction = planetPhaseFraction
         self.objectID = objectID
     }
 
@@ -175,25 +228,43 @@ public struct CelestialVisual: Equatable, Sendable {
     ///   - object: objek yang dijawab engine.
     ///   - moonIlluminationFraction: fraksi fase Bulan dari `SkyContext`.
     ///     Hanya dipakai bila objeknya benar-benar Bulan — meneruskannya ke
-    ///     benda lain akan menggambar fase pada Venus.
+    ///     benda lain akan menggambar fase Bulan pada planet.
     ///   - isWaxing: arah fase Bulan, bila diketahui.
-    ///   - brightLimbAngleRadians: sudut sisi terang Bulan di langit, bila
-    ///     diketahui. Hanya dipakai bila objeknya Bulan.
+    ///   - brightLimbAngleRadians: sudut sisi terang **di langit pengamat**,
+    ///     bila diketahui — berlaku untuk Bulan dan planet dalam, karena
+    ///     aturannya satu (sisi terang menghadap Matahari).
+    ///   - planetIlluminationFraction: fraksi piringan yang menyala untuk
+    ///     planet **dalam** (Venus, Merkurius), dari efemeris. Hanya dipakai
+    ///     bila planetnya memang punya fase yang terlihat dari Bumi
+    ///     (`Planet.showsPhase`) — Mars dan planet luar tidak pernah tampak
+    ///     berfase, jadi meneruskan angkanya ke sana akan menggambar sabit
+    ///     yang tidak pernah ada.
     public init(object: CelestialObject,
                 moonIlluminationFraction: Double? = nil,
                 isWaxing: Bool? = nil,
-                moonBrightLimbAngleRadians: Double? = nil) {
+                brightLimbAngleRadians: Double? = nil,
+                planetIlluminationFraction: Double? = nil) {
         switch object.kind {
         case .moon:
             self.init(kind: .moon,
                       illuminationFraction: moonIlluminationFraction,
                       isWaxing: isWaxing,
-                      brightLimbAngleRadians: moonBrightLimbAngleRadians,
+                      brightLimbAngleRadians: brightLimbAngleRadians,
                       relativeSize: 1.0)
         case .planet:
+            let planet = Planet(objectID: object.id)
             self.init(kind: .planet,
-                      planet: Planet(objectID: object.id),
-                      relativeSize: Self.sizeFromMagnitude(object.magnitude))
+                      planet: planet,
+                      isWaxing: isWaxing,
+                      brightLimbAngleRadians: brightLimbAngleRadians,
+                      relativeSize: Self.sizeFromMagnitude(object.magnitude),
+                      // Fase planet hanya diteruskan bila planetnya memang
+                      // menampakkan fase dari Bumi. Planet luar (Mars…
+                      // Saturnus) tidak pernah — jadi angkanya dibuang di
+                      // sini, bukan di view, supaya view tidak perlu tahu
+                      // planet mana yang berfase.
+                      planetPhaseFraction: planet?.showsPhase == true
+                          ? planetIlluminationFraction : nil)
         case .star:
             self.init(kind: .star,
                       colorIndexBV: Self.colorIndex(forStarID: object.id),
@@ -314,15 +385,50 @@ public struct CelestialVisual: Equatable, Sendable {
     /// yaitu `|litSide − terminatorOffset| = 2f`, sehingga
     /// `terminatorOffset = litSide · (1 − 2f)`.
     ///
+    /// **Kenapa planet dalam ikut di sini.** Venus dan Merkurius berfase
+    /// persis seperti Bulan, dan gambarnya memakai kurva yang sama — jadi
+    /// rumusnya pun satu, bukan dua. Yang berbeda hanya **sumber fraksinya**
+    /// (`planetPhaseFraction`, dari efemeris, vs `illuminationFraction`,
+    /// dari `SkyContext`) dan **arah sisi terangnya** (lihat
+    /// `phaseGeometryForPlanet`). Planet luar sengaja tidak ikut: fase
+    /// mereka tidak pernah terlihat dari Bumi, jadi menggambarnya berarti
+    /// mengarang bentuk yang tidak ada.
+    ///
     /// - Parameter waxing: arah fase. **`nil` menghasilkan `nil`**: tanpa arah,
     ///   gambar apa pun yang digambar akan memihak ke satu sisi, dan itu
     ///   pernyataan yang tidak dihitung engine.
-    /// - Returns: `nil` bila fase tidak bisa digambar (bukan Bulan, fraksi
-    ///   tidak tersedia, atau arah tidak diketahui). UI lalu menggambar
-    ///   piringan tanpa fase — bukan sabit yang memilih sisi.
+    /// - Returns: `nil` bila fase tidak bisa digambar (benda yang tidak
+    ///   berfase, fraksi tidak tersedia, atau arah tidak diketahui). UI lalu
+    ///   menggambar piringan tanpa fase — bukan sabit yang memilih sisi.
     public func phaseGeometry(waxing: Bool?) -> PhaseGeometry? {
-        guard kind == .moon, let f = illuminationFraction, let waxing else { return nil }
-        let clamped = min(1, max(0, f))
+        guard let f = fractionForPhase, let waxing else { return nil }
+        return Self.phaseGeometry(fraction: f, waxing: waxing)
+    }
+
+    /// Fraksi iluminasi yang dipakai menggambar fase benda ini.
+    ///
+    /// Bulan mengambilnya dari `illuminationFraction`; planet dalam dari
+    /// `planetPhaseFraction`. Satu aksesor supaya `phaseGeometry` tidak
+    /// memilih cabang berdasarkan `kind` — dan supaya menambah benda
+    /// berfase berikutnya hanya berarti satu baris di sini.
+    public var fractionForPhase: Double? {
+        switch kind {
+        case .moon: return illuminationFraction
+        case .planet: return planetPhaseFraction
+        case .star, .sun, .deepSky: return nil
+        }
+    }
+
+    /// Geometri fase dari fraksi — fungsi murni, tanpa membaca properti.
+    ///
+    /// Dipisah supaya planet bisa memakainya dengan arah sisi terang yang
+    /// **berbeda**: untuk Bulan arahnya dihitung dari efemeris
+    /// (`brightLimbAngle`), sedangkan untuk planet dalam belum ada sumber
+    /// sudut yang teruji — jadi planet memakai konvensi `isWaxing` yang
+    /// sama dengan Bulan, bukan sudut yang dikarang. Pemisahan ini membuat
+    /// rumus kurvanya tetap **satu** untuk kedua jenis benda.
+    public static func phaseGeometry(fraction: Double, waxing: Bool) -> PhaseGeometry {
+        let clamped = min(1, max(0, fraction))
         let litSide: Double = waxing ? 1 : -1
         let offset = litSide * (1 - 2 * clamped)
         return PhaseGeometry(terminatorOffset: offset,
@@ -370,7 +476,20 @@ public struct CelestialVisual: Equatable, Sendable {
     ///   atau bila vektor Bulan→Matahari tepat sepanjang garis pandang
     ///   (tidak ada sudut di bidang gambar). UI lalu **tidak memutar**
     ///   gambar, bukan menebak sudutnya.
-    public static func brightLimbAngle(moon: HorizontalCoord,
+    ///
+    /// **Kenapa parameternya `body:` dan bukan `moon:`.** Aturannya satu dan tidak
+    /// menyebut Bulan sama sekali: **sisi terang selalu menghadap Matahari.**
+    /// Itu berlaku untuk Bulan, untuk Venus yang berfase, dan untuk Merkurius.
+    /// Menamai parameternya `moon` membuat fungsi ini tampak hanya sah untuk
+    /// satu benda, dan versi berikutnya akan menyalinnya untuk planet —
+    /// dua salinan rumus yang sama, yang cepat atau lambat akan berbeda.
+    /// (Fungsi ini dulu memang bernama begitu; yang berubah hanya namanya,
+    /// perhitungannya tidak.)
+    ///
+    /// - Parameters:
+    ///   - body: benda yang piringannya digambar (posisi horizontal).
+    ///   - sun: posisi Matahari dari pengamat yang sama.
+    public static func brightLimbAngle(body: HorizontalCoord,
                                        sun: HorizontalCoord) -> Double? {
         func enu(_ h: HorizontalCoord) -> (e: Double, n: Double, u: Double) {
             let alt = SkyMath.deg2rad(h.altitudeDeg)
@@ -378,7 +497,7 @@ public struct CelestialVisual: Equatable, Sendable {
             return (cos(alt) * sin(az), cos(alt) * cos(az), sin(alt))
         }
 
-        let m = enu(moon)
+        let m = enu(body)
         let s = enu(sun)
         let delta = (e: s.e - m.e, n: s.n - m.n, u: s.u - m.u)
         let length = (delta.e * delta.e + delta.n * delta.n
@@ -408,6 +527,38 @@ public struct CelestialVisual: Equatable, Sendable {
         return atan2(up, right)
     }
 
+    /// Sudut putaran untuk **terminator** sebuah benda berfase, dalam radian
+    /// (konvensi model; lihat `drawRotationRadians` untuk argumen `rotate`).
+    ///
+    /// **Kenapa tidak boleh memakai `brightLimbAngleRadians` langsung.**
+    /// `brightLimbAngle` menunjuk arah **Matahari** dari benda itu: vektor
+    /// keluar dari piringan menuju sumber cahaya. Sementara `PhaseGeometry`
+    /// menggambar pita terang yang, pada sudut nol, berada di **kanan** untuk
+    /// sabit (`litSide = +1`) tetapi di **kiri** untuk gibbous
+    /// (`litSide = −1`) — lihat `phaseGeometry(fraction:waxing:)`. Jadi
+    /// meneruskan sudut Matahari apa adanya memasang sabit dan gibbous ke
+    /// sisi yang berlawanan: satu dari keduanya selalu salah.
+    ///
+    /// Yang benar: pita terang membentang dari **terminator** ke **limb yang
+    /// menyala**, dan garis tengahnya menghadap Matahari. Karena `litSide`
+    /// sudah memberi tahu sisi mana yang menyala, sudut putarannya adalah
+    /// sudut Matahari, **dibalik ketika sisi yang menyala justru kiri** —
+    /// sehingga sisi kiri dibawa ke kanan dulu sebelum diputar.
+    ///
+    /// Kenapa ini di sini, bukan di view: view tidak diuji di Linux, dan
+    /// kesalahannya tidak terlihat di layar — sabit yang terbalik tetap
+    /// berbentuk sabit. Uji model yang menguncinya:
+    /// `testTerminatorRotationPutsLitSideTowardTheSun`.
+    ///
+    /// - Returns: `nil` bila sudut Matahari tidak diketahui, atau bila benda
+    ///   ini tidak punya fase. UI lalu menggambar tanpa putaran.
+    public var terminatorRotationRadians: Double? {
+        guard let sunAngle = brightLimbAngleRadians,
+              let phase = phaseGeometry(waxing: isWaxing) else { return nil }
+        // `litSide = −1` (pita ada di kiri pada sudut nol) → balik dulu.
+        return phase.litSide < 0 ? sunAngle + .pi : sunAngle
+    }
+
     /// Sudut yang harus diteruskan ke `GraphicsContext.rotate(by:)` untuk
     /// memutar pita terang ke arah `brightLimbAngle`.
     ///
@@ -433,7 +584,7 @@ public struct CelestialVisual: Equatable, Sendable {
     /// di tempat ia bisa diuji, bukan sebagai satu tanda minus di view yang
     /// tidak pernah dieksekusi di Linux.
     ///
-    /// - Parameter angle: sudut dari `brightLimbAngle(moon:sun:)`.
+    /// - Parameter angle: sudut dari `brightLimbAngle(body:sun:)`.
     /// - Returns: argumen untuk `rotate(by: .radians(_:))`.
     public static func drawRotationRadians(brightLimbAngleRadians angle: Double) -> Double {
         return -angle
@@ -1552,6 +1703,73 @@ public extension PointingResolver {
         return min(1, max(0, moon.illuminationFraction))
     }
 
+    /// Fraksi piringan **planet** yang menyala, dari efemeris yang sama.
+    ///
+    /// **Kenapa planet dalam perlu ini.** Venus mengayun dari sabit 1% ke
+    /// cakram 99% dalam satu siklus sinodik, dan Merkurius lebih ekstrem lagi.
+    /// Itu bukan detail hiasan: bagi pengamat, Venus yang "salah bulan" adalah
+    /// salah satu pemandangan paling dikenal di langit — dan menggambarnya
+    /// sebagai bola penuh berarti UI menyatakan fase yang tidak ada.
+    ///
+    /// **Kenapa hanya planet dalam.** Mars sampai Saturnus tidak pernah
+    /// tampak berfase dari Bumi; `Planet.showsPhase` yang memutuskan, dan
+    /// fungsi ini mengembalikan `nil` untuk mereka — **bukan** angkanya.
+    /// Mengembalikan angka untuk Mars akan membuat pemanggil berikutnya bisa
+    /// menggambar sabit Mars, dan kesalahan itu tidak terlihat di layar.
+    ///
+    /// **Kenapa `nil` juga saat fraksinya tidak masuk akal.** Efemeris bisa
+    /// mengembalikan nilai di luar 0…1 pada geometri tepi (mis. elongasi
+    /// ekstrem). Nilai seperti itu digambar menjadi pita terang dengan lebar
+    /// negatif, jadi ia ditolak di sini alih-alih dijepit diam-diam di view.
+    ///
+    /// - Parameter planet: planet yang ditanyakan.
+    /// - Returns: fraksi 0…1, atau `nil` bila planet tidak berfase,
+    ///   efemeris tidak tersedia, atau fraksinya di luar rentang.
+    func planetIlluminationFraction(for planet: CelestialVisual.Planet,
+                                    at date: Date = Date()) -> Double? {
+        guard planet.showsPhase else { return nil }
+        guard let ephemeris,
+              let body = EphemerisBody(rawValue: planet.rawValue),
+              let sample = try? ephemeris.apparent(body, at: date)
+        else { return nil }
+        let fraction = sample.illuminationFraction
+        guard fraction.isFinite, (0...1).contains(fraction) else { return nil }
+        return fraction
+    }
+
+    /// Sudut sisi terang sebuah **planet** di langit pengamat, dalam radian.
+    ///
+    /// Planet berfase punya masalah orientasi yang sama dengan Bulan: sabit
+    /// Venus bisa menghadap ke kanan, ke bawah, atau ke atas, tergantung di
+    /// mana Matahari berada relatif terhadapnya di langit pengamat. Karena
+    /// aturannya satu (**sisi terang menghadap Matahari**), perhitungannya
+    /// memakai fungsi yang sama dengan Bulan — bukan rumus kedua yang harus
+    /// dijaga agar tetap cocok.
+    ///
+    /// - Returns: `nil` bila planetnya tidak berfase, efemeris tidak
+    ///   tersedia, atau sudutnya tidak bisa ditentukan. UI lalu menggambar
+    ///   fase **tanpa putaran** — sabit yang belum berorientasi, bukan sabit
+    ///   yang menghadap arah karangan.
+    func planetBrightLimbAngle(for planet: CelestialVisual.Planet,
+                               at date: Date = Date(),
+                               observer: Observer) -> Double? {
+        guard planet.showsPhase else { return nil }
+        guard let ephemeris,
+              let body = EphemerisBody(rawValue: planet.rawValue),
+              let sample = try? ephemeris.apparent(body, at: date, from: observer),
+              let sun = try? ephemeris.apparent(.sun, at: date, from: observer)
+        else { return nil }
+
+        let jd = SkyMath.julianDate(from: date)
+        let planetHorizontal = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sample.raDeg, decDeg: sample.decDeg),
+            observer: observer, jd: jd)
+        let sunHorizontal = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sun.raDeg, decDeg: sun.decDeg),
+            observer: observer, jd: jd)
+        return CelestialVisual.brightLimbAngle(body: planetHorizontal, sun: sunHorizontal)
+    }
+
     /// Sudut sisi terang Bulan **di langit pengamat**, dalam radian.
     ///
     /// **Kenapa ini ada, padahal `isWaxing` sudah ada.** `isWaxing` hanya
@@ -1586,7 +1804,7 @@ public extension PointingResolver {
         let sunHorizontal = SkyMath.equatorialToHorizontal(
             EquatorialCoord(raDeg: sun.raDeg, decDeg: sun.decDeg),
             observer: observer, jd: jd)
-        return CelestialVisual.brightLimbAngle(moon: moonHorizontal, sun: sunHorizontal)
+        return CelestialVisual.brightLimbAngle(body: moonHorizontal, sun: sunHorizontal)
     }
 
     /// Bungkus sudut ke rentang 0…360.

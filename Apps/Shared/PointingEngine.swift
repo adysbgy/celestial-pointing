@@ -237,6 +237,29 @@ public final class PointingEngine: ObservableObject {
         // lintang -- itulah cacat yang diperbaiki siklus ini.
         moonBrightLimbAngle = controller.resolver.moonBrightLimbAngle(
             at: date, observer: location.observer)
+        // Fase planet dalam (Venus/Merkurius) juga di sini, dengan alasan
+        // yang sama persis: efemeris tidak boleh dipanggil dari `body`.
+        // Disimpan sebagai kamus kecil supaya tidak perlu lima properti
+        // terpisah — hanya planet yang **berfase** yang pernah masuk.
+        //
+        // Sudut sisi terangnya dihitung **berpasangan** dengan fraksinya.
+        // Kalau keduanya datang dari waktu yang berbeda, sabit Venus bisa
+        // tergambar dengan lebar dari satu sampel dan arah dari sampel lain —
+        // gambar yang tidak cocok dengan langit mana pun.
+        var phases: [CelestialVisual.Planet: Double] = [:]
+        var limbAngles: [CelestialVisual.Planet: Double] = [:]
+        for planet in CelestialVisual.Planet.allCases where planet.showsPhase {
+            if let fraction = controller.resolver.planetIlluminationFraction(
+                for: planet, at: date) {
+                phases[planet] = fraction
+            }
+            if let angle = controller.resolver.planetBrightLimbAngle(
+                for: planet, at: date, observer: location.observer) {
+                limbAngles[planet] = angle
+            }
+        }
+        planetPhases = phases
+        planetBrightLimbAngles = limbAngles
     }
 
     /// Arah fase Bulan hasil perhitungan terakhir.
@@ -252,6 +275,22 @@ public final class PointingEngine: ObservableObject {
     /// keduanya bisa berbeda ketersediaannya (sudut butuh lokasi pengamat,
     /// `isWaxing` tidak).
     private var moonBrightLimbAngle: Double?
+
+    /// Fraksi iluminasi planet dalam hasil perhitungan terakhir.
+    ///
+    /// Kamus, bukan lima properti: hanya planet yang **berfase**
+    /// (`Planet.showsPhase`) yang bisa masuk, dan ketiadaannya di sini berarti
+    /// "tidak diketahui" — sama artinya dengan `nil` pada properti lain.
+    /// Menyimpannya sebagai satu nilai berarti menambah planet berfase di
+    /// masa depan tidak perlu menyentuh berkas ini lagi.
+    private var planetPhases: [CelestialVisual.Planet: Double] = [:]
+
+    /// Sudut sisi terang planet dalam hasil perhitungan terakhir, radian.
+    ///
+    /// Sejajar dengan `planetPhases`, dan dihitung dari sampel efemeris yang
+    /// sama. Ketidakcocokan keduanya menghasilkan sabit dengan lebar dan arah
+    /// dari dua menit berbeda — karena itu keduanya selalu diisi bersamaan.
+    private var planetBrightLimbAngles: [CelestialVisual.Planet: Double] = [:]
 
     /// Jarak waktu minimum antar perhitungan konteks langit (detik).
     static let skyContextInterval: TimeInterval = 30
@@ -472,7 +511,13 @@ public final class PointingEngine: ObservableObject {
     /// ditentukan engine, dan itu klaim yang dilarang PRD.
     ///
     /// Fraksi & arah fase `nil` untuk benda selain Bulan: meneruskannya ke
-    /// planet lain akan menggambar fase pada Venus.
+    /// planet lain akan menggambar fase Bulan pada planet.
+    ///
+    /// **Fase planet dalam diteruskan terpisah.** Venus dan Merkurius berfase
+    /// sungguhan, dan fraksinya datang dari `planetPhases` — bukan dari
+    /// `moonIlluminationFraction`. Model yang memutuskan planet mana yang
+    /// boleh memakainya (`Planet.showsPhase`), jadi planet luar tidak akan
+    /// pernah mendapat sabit walau kamusnya keliru.
     public var visualForDisplayedObject: CelestialVisual? {
         guard let object = displayedObject else { return nil }
         let isMoon = object.kind == .moon
@@ -484,9 +529,17 @@ public final class PointingEngine: ObservableObject {
         // Saat nil, model tidak berputar -- lebih baik sabit yang belum
         // berorientasi daripada sabit yang salah arah.
         let limbAngle = isMoon ? moonBrightLimbAngle : nil
+        let planet = CelestialVisual.Planet(objectID: object.id)
+        let planetPhase = planet.flatMap { planetPhases[$0] }
+        // Sudut sisi terang planet: hanya planet berfase yang punya, dan
+        // `nil` berarti gambar tidak diputar -- bukan diputar ke sudut
+        // karangan. Bulan tetap memakai sudutnya sendiri; keduanya tidak
+        // pernah terisi bersamaan karena `object.kind` hanya satu.
+        let planetLimbAngle = planet.flatMap { planetBrightLimbAngles[$0] }
         return CelestialVisual(object: object,
                               moonIlluminationFraction: fraction,
                               isWaxing: waxing,
-                              moonBrightLimbAngleRadians: limbAngle)
+                              brightLimbAngleRadians: isMoon ? limbAngle : planetLimbAngle,
+                              planetIlluminationFraction: planetPhase)
     }
 }

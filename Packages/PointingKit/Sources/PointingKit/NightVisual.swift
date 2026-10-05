@@ -150,6 +150,16 @@ public extension CelestialVisual {
         public var marsPolarCap: RGBComponents
         /// Kabut Venus.
         public var venusHaze: RGBComponents
+        /// Piringan planet yang **tidak** menyala.
+        ///
+        /// Terpisah dari `moonUnlit` dengan alasan fisis: sisi gelap Bulan
+        /// masih diterangi **earthshine** (cahaya yang dipantulkan Bumi), dan
+        /// karena itu cukup terang untuk digambar. Sisi gelap Venus atau
+        /// Merkurius tidak punya sumber seperti itu — yang terlihat di
+        /// teleskop praktis hitam. Memakai satu nilai untuk keduanya berarti
+        /// salah menggambarkan salah satunya, dan tidak ada teks di layar yang
+        /// bisa membedakannya.
+        public var planetUnlit: RGBComponents
 
         // MARK: Bulan
         /// Pita yang menyala.
@@ -176,6 +186,7 @@ public extension CelestialVisual {
                     saturnRing: RGBComponents,
                     marsPolarCap: RGBComponents,
                     venusHaze: RGBComponents,
+                    planetUnlit: RGBComponents,
                     moonLit: RGBComponents,
                     moonUnlit: RGBComponents,
                     sunCore: RGBComponents,
@@ -189,6 +200,7 @@ public extension CelestialVisual {
             self.saturnRing = saturnRing
             self.marsPolarCap = marsPolarCap
             self.venusHaze = venusHaze
+            self.planetUnlit = planetUnlit
             self.moonLit = moonLit
             self.moonUnlit = moonUnlit
             self.sunCore = sunCore
@@ -211,6 +223,7 @@ public extension CelestialVisual {
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
+        planetUnlit: .init(red: 0.06, green: 0.06, blue: 0.08),
         moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
         moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
         sunCore: .init(red: 1.00, green: 0.93, blue: 0.62),

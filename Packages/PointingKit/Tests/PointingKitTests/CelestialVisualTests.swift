@@ -69,6 +69,143 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertNil(venus.phaseGeometry(waxing: true))
     }
 
+    // MARK: - Fase planet dalam
+
+    /// Hanya planet **dalam** yang menampakkan fase dari Bumi.
+    ///
+    /// Mars sampai Saturnus tidak pernah tampak berfase. Kalau salah satunya
+    /// dinyatakan berfase, ia akan digambar sebagai sabit — gambar yang
+    /// menyatakan pemandangan yang tidak pernah ada di langit, dan tidak ada
+    /// teks di layar yang bisa membantahnya.
+    func testOnlyInnerPlanetsShowPhase() {
+        XCTAssertTrue(CelestialVisual.Planet.mercury.showsPhase)
+        XCTAssertTrue(CelestialVisual.Planet.venus.showsPhase)
+        XCTAssertFalse(CelestialVisual.Planet.mars.showsPhase)
+        XCTAssertFalse(CelestialVisual.Planet.jupiter.showsPhase)
+        XCTAssertFalse(CelestialVisual.Planet.saturn.showsPhase)
+    }
+
+    /// Venus menerima fraksi fasenya sendiri, dan menggambarnya seperti Bulan.
+    func testInnerPlanetDrawsAPhaseFromItsOwnFraction() {
+        let venus = CelestialVisual(object: object(id: "venus", kind: .planet),
+                                    isWaxing: true,
+                                    planetIlluminationFraction: 0.25)
+        XCTAssertNil(venus.illuminationFraction, "fase Bulan tidak boleh dipakai Venus")
+        XCTAssertEqual(venus.fractionForPhase ?? -1, 0.25, accuracy: 1e-9)
+        let phase = venus.phaseGeometry(waxing: true)
+        XCTAssertNotNil(phase, "Venus berfase harus menghasilkan geometri")
+        XCTAssertEqual(phase?.litBandWidth ?? -1, 0.5, accuracy: 1e-9,
+                       "sabit Venus 25 persen harus selebar 0,5 radius")
+    }
+
+    /// Planet luar **menolak** fraksi fase walau angkanya diberikan.
+    ///
+    /// Ini penjaga cacat yang paling mudah terjadi: satu baris `?` yang
+    /// keliru meneruskan `planetIlluminationFraction` ke semua planet akan
+    /// menggambar sabit Mars. Tidak ada pengguna yang akan melaporkannya,
+    /// karena sabitnya tampak wajar.
+    func testOuterPlanetsRefuseAPhaseFractionEvenWhenGiven() {
+        for planet in ["mars", "jupiter", "saturn"] {
+            let visual = CelestialVisual(object: object(id: planet, kind: .planet),
+                                         isWaxing: true,
+                                         planetIlluminationFraction: 0.3)
+            XCTAssertNil(visual.planetPhaseFraction,
+                         "\(planet) tidak boleh menyimpan fraksi fase")
+            XCTAssertNil(visual.phaseGeometry(waxing: true),
+                         "\(planet) tidak boleh digambar berfase")
+        }
+    }
+
+    /// Tanpa arah (`isWaxing` nil), planet berfase **tidak** digambar berfase.
+    ///
+    /// Sama dengan aturan Bulan: fase tanpa arah berarti sabit yang memihak ke
+    /// satu sisi — pernyataan yang tidak dihitung engine.
+    func testInnerPlanetWithoutDirectionDrawsNoPhase() {
+        let venus = CelestialVisual(object: object(id: "venus", kind: .planet),
+                                    isWaxing: nil,
+                                    planetIlluminationFraction: 0.4)
+        XCTAssertNil(venus.phaseGeometry(waxing: nil))
+    }
+
+    /// Geometri fase planet sama persis dengan geometri Bulan untuk fraksi dan
+    /// arah yang sama.
+    ///
+    /// **Kenapa ini diuji.** Venus dan Bulan digambar oleh kurva yang sama;
+    /// kalau rumusnya bercabang per jenis benda, cepat atau lambat keduanya
+    /// berbeda — dan yang salah tetap tampak seperti sabit yang meyakinkan.
+    /// Uji ini mengunci "satu rumus", bukan "dua rumus yang kebetulan cocok".
+    func testPlanetAndMoonPhasesShareTheSameGeometry() {
+        for fraction in [0.1, 0.25, 0.5, 0.75, 0.9] {
+            for waxing in [true, false] {
+                let moon = CelestialVisual(kind: .moon, illuminationFraction: fraction)
+                    .phaseGeometry(waxing: waxing)
+                let venus = CelestialVisual(kind: .planet, planet: .venus,
+                                            planetPhaseFraction: fraction)
+                    .phaseGeometry(waxing: waxing)
+                XCTAssertEqual(moon?.terminatorOffset, venus?.terminatorOffset,
+                               "fase \(fraction) (\(waxing ? "membesar" : "mengecil")) "
+                               + "harus memakai geometri yang sama")
+                XCTAssertEqual(moon?.litSide, venus?.litSide)
+                XCTAssertEqual(moon?.isGibbous, venus?.isGibbous)
+            }
+        }
+    }
+
+    // MARK: - Orientasi terminator
+
+    /// Sisi yang menyala harus menghadap **Matahari** setelah diputar.
+    ///
+    /// Ini penjaga cacat orientasi yang tidak bisa dilihat di layar: sabit
+    /// yang terbalik tetap berbentuk sabit. Untuk setiap fraksi, titik tengah
+    /// pita terang setelah putaran harus berada di sisi yang sama dengan arah
+    /// Matahari.
+    func testTerminatorRotationPutsLitSideTowardTheSun() {
+        // Sudut Matahari = 0 (Matahari tepat di kanan benda).
+        for fraction in [0.15, 0.4, 0.6, 0.85] {
+            for waxing in [true, false] {
+                let visual = CelestialVisual(kind: .moon,
+                                             illuminationFraction: fraction,
+                                             isWaxing: waxing,
+                                             brightLimbAngleRadians: 0)
+                guard let rotation = visual.terminatorRotationRadians,
+                      let phase = visual.phaseGeometry(waxing: waxing) else {
+                    return XCTFail("fase \(fraction) harus punya sudut & geometri")
+                }
+                // Titik tengah pita terang di ekuator pada gambar dasar.
+                let mid = (phase.limbX(atNormalizedHeight: 0)
+                           + phase.terminatorX(atNormalizedHeight: 0)) / 2
+                // Diputar sebesar `rotation`: x' = mid·cos(rotation).
+                let rotatedX = mid * cos(rotation)
+                XCTAssertGreaterThan(rotatedX, 0,
+                                     "fase \(fraction) (\(waxing ? "membesar" : "mengecil")): "
+                                     + "sisi terang harus menghadap Matahari (kanan), "
+                                     + "bukan ke arah sebaliknya")
+            }
+        }
+    }
+
+    /// Sudut putaran adalah sudut Matahari, dibalik hanya saat pita dasar ada
+    /// di kiri (gibbous waning).
+    func testTerminatorRotationFlipsOnlyForLeftSidedBands() {
+        let crescentWaxing = CelestialVisual(kind: .moon, illuminationFraction: 0.2,
+                                             isWaxing: true, brightLimbAngleRadians: 0.5)
+        XCTAssertEqual(crescentWaxing.terminatorRotationRadians ?? .nan, 0.5, accuracy: 1e-12,
+                       "sabit membesar: pita dasar di kanan, tidak dibalik")
+
+        let gibbousWaning = CelestialVisual(kind: .moon, illuminationFraction: 0.8,
+                                            isWaxing: false, brightLimbAngleRadians: 0.5)
+        XCTAssertEqual(gibbousWaning.terminatorRotationRadians ?? .nan, 0.5 + .pi,
+                       accuracy: 1e-12,
+                       "cembung mengecil: pita dasar di kiri, harus dibalik dulu")
+    }
+
+    /// Tanpa sudut sisi terang, **tidak ada** putaran — bukan putaran nol yang
+    /// diam-diam dipakai.
+    func testTerminatorRotationIsNilWithoutALimbAngle() {
+        let visual = CelestialVisual(kind: .moon, illuminationFraction: 0.3, isWaxing: true)
+        XCTAssertNil(visual.terminatorRotationRadians)
+    }
+
     // MARK: - Geometri fase Bulan
 
     func testCrescentSignFollowsWaxingDirection() {
@@ -304,7 +441,7 @@ final class CelestialVisualTests: XCTestCase {
     /// lintangnya harus dipakai, bukan diasumsikan.
     func testCrescentInJakartaFacesDownNotRight() {
         let angle = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            body: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
             sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
         guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
         XCTAssertEqual(value, -.pi / 2, accuracy: SkyMath.deg2rad(10),
@@ -328,7 +465,7 @@ final class CelestialVisualTests: XCTestCase {
     /// dimiliki masukan yang ditulis tangan ini.
     func testMidLatitudeCrescentFacesRightAndDown() {
         let angle = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
+            body: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
             sun: HorizontalCoord(altitudeDeg: -1, azimuthDeg: 285))
         guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
         XCTAssertLessThan(value, 0, "harus condong ke bawah")
@@ -339,7 +476,7 @@ final class CelestialVisualTests: XCTestCase {
     /// azimut yang sama. Ini yang tidak bisa dijawab `isWaxing` sama sekali.
     func testPolarCrescentFacesUpWhenSunIsHigher() {
         let angle = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 10, azimuthDeg: 90),
+            body: HorizontalCoord(altitudeDeg: 10, azimuthDeg: 90),
             sun: HorizontalCoord(altitudeDeg: 25, azimuthDeg: 90))
         guard let value = angle else { return XCTFail("sudut harus terdefinisi") }
         XCTAssertEqual(value, .pi / 2, accuracy: SkyMath.deg2rad(1),
@@ -354,10 +491,10 @@ final class CelestialVisualTests: XCTestCase {
     /// ini kembali menjadi boolean kanan/kiri, uji ini akan gagal.
     func testWaxingAloneCannotExpressTheLimbAngle() {
         let jakarta = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            body: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
             sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
         let midLatitude = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
+            body: HorizontalCoord(altitudeDeg: 30, azimuthDeg: 250),
             sun: HorizontalCoord(altitudeDeg: -1, azimuthDeg: 285))
         guard let a = jakarta, let b = midLatitude else {
             return XCTFail("kedua sudut harus terdefinisi")
@@ -370,7 +507,7 @@ final class CelestialVisualTests: XCTestCase {
     func testUnknownGeometryYieldsNoAngle() {
         // Bulan dan Matahari berimpit: tidak ada arah yang bisa ditentukan.
         let same = HorizontalCoord(altitudeDeg: 10, azimuthDeg: 100)
-        XCTAssertNil(CelestialVisual.brightLimbAngle(moon: same, sun: same))
+        XCTAssertNil(CelestialVisual.brightLimbAngle(body: same, sun: same))
     }
 
     // MARK: - Konversi sudut untuk `rotate(by:)`
@@ -400,7 +537,7 @@ final class CelestialVisualTests: XCTestCase {
     /// itu persis kebalikan dari yang dihitung.
     func testJakartaCrescentIsRotatedDownwardNotUpward() {
         let model = CelestialVisual.brightLimbAngle(
-            moon: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
+            body: HorizontalCoord(altitudeDeg: 20, azimuthDeg: 283),
             sun: HorizontalCoord(altitudeDeg: -2, azimuthDeg: 285))
         guard let angle = model else { return XCTFail("sudut harus terdefinisi") }
         let draw = CelestialVisual.drawRotationRadians(brightLimbAngleRadians: angle)

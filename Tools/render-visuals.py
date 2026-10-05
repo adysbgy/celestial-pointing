@@ -104,6 +104,7 @@ ACCENTS = dict(
     saturnRing=(0.86, 0.78, 0.60),
     marsPolarCap=(0.97, 0.95, 0.93),
     venusHaze=(0.99, 0.96, 0.82),
+    planetUnlit=(0.06, 0.06, 0.08),
     moonLit=(0.97, 0.95, 0.90),
     moonUnlit=(0.13, 0.13, 0.16),
     sunCore=(1.00, 0.93, 0.62),
@@ -143,12 +144,43 @@ def size_from_magnitude(m):
 
 
 def phase_geometry(fraction, waxing):
-    """`CelestialVisual.phaseGeometry(waxing:)`."""
+    """`CelestialVisual.phaseGeometry(fraction:waxing:)`."""
     if fraction is None or waxing is None:
         return None
     f = min(1.0, max(0.0, fraction))
     lit_side = 1.0 if waxing else -1.0
     return dict(terminator_offset=lit_side * (1 - 2 * f), lit_side=lit_side, is_gibbous=f > 0.5)
+
+
+def terminator_rotation_radians(bright_limb_angle, phase):
+    """`CelestialVisual.terminatorRotationRadians`.
+
+    **Kenapa port ini wajib ada.** Sampai siklus ini, gambar Bulan Python
+    memakai sudut Matahari mentah sebagai putaran. Itu **salah** untuk pita
+    yang dasarnya ada di kiri (cembung mengecil): sisi terang lalu menghadap
+    menjauhi Matahari. Selama `check-visuals.py` memakai rumus yang berbeda
+    dari view, seluruh pemeriksaan arah di berkas itu mengukur gambar yang
+    tidak pernah digambar aplikasi.
+    """
+    if bright_limb_angle is None or phase is None:
+        return 0.0
+    if phase["lit_side"] < 0:
+        return bright_limb_angle + math.pi
+    return bright_limb_angle
+
+
+def planet_shows_phase(planet):
+    """`CelestialVisual.Planet.showsPhase` — hanya planet dalam."""
+    return planet in ("mercury", "venus")
+
+
+def planet_phase_fraction(planet, illumination):
+    """`planetIlluminationFraction` — planet luar tidak pernah berfase."""
+    if not planet_shows_phase(planet):
+        return None
+    if illumination is None or not (0.0 <= illumination <= 1.0):
+        return None
+    return illumination
 
 
 def polar_caps(cap_height_fraction=0.26, half_width_fraction=0.55):
@@ -668,6 +700,68 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         _draw_sphere(canvas, cx, cy, radius, NEUTRAL_BODY, NEUTRAL_SHADOW, night_mode)
         return
     palette = PLANET_PALETTE[planet]
+
+    # **Fase planet dalam (Venus, Merkurius).** Sama dengan view Swift: bila
+    # fase-nya diketahui dan objeknya sudah terkunci, piringan digambar
+    # sebagai bagian yang menyala + bagian gelap, bukan bola penuh. Tanpa
+    # cabang ini, port menggambar bola penuh sementara aplikasi menggambar
+    # sabit — dan setiap pemeriksaan yang mengukur gambar planet dalam akan
+    # mengukur gambar yang tidak pernah ada.
+    phase = None
+    if planet_shows_phase(planet) and kw.get("is_confirmed") is not False:
+        phase = phase_geometry(planet_phase_fraction(planet, kw.get("illumination")),
+                               kw.get("is_waxing"))
+    if phase is not None:
+        unlit = ACCENTS["planetUnlit"]
+        canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
+        points, to_screen = _lit_band_polygon(cx, cy, radius, phase,
+                                              kw.get("bright_limb_angle"))
+
+        def inside_lit(x, y):
+            if math.hypot(x - cx, y - cy) > radius:
+                return False
+            return _point_in_polygon(x, y, points)
+
+        # Gradien peredupan limb **berpusat di pusat piringan**, bukan digeser
+        # ke kiri-atas seperti bola penuh: gradien yang digeser ikut berputar
+        # bersama pita, sehingga "cahaya dari kiri-atas" menghadap arah yang
+        # salah begitu sisi terangnya ke bawah.
+        light = palette["light"] if not night_mode else night_surface(palette["light"])
+        dark = palette["dark"] if not night_mode else night_surface(palette["dark"])
+        gradient = radial_gradient([(light, 1.0), (dark, 1.0)],
+                                   center=(cx, cy),
+                                   start_radius=0.0, end_radius=radius * 1.15)
+
+        def limb_shaded(x, y):
+            return inside_lit(x, y)
+        canvas.fill(limb_shaded, gradient)
+
+        feature = palette["feature"]
+        if feature == "craters":
+            crater = solid((0.0, 0.0, 0.0), CRATER_OPACITY)
+            for dx, dy, size in CRATERS:
+                mx, my = cx + dx * radius, cy + dy * radius
+                canvas.disc(mx, my, size * radius,
+                            lambda x, y: crater(x, y) if _point_in_polygon(x, y, points)
+                            else ((0.0, 0.0, 0.0), 0.0))
+        elif feature == "haze":
+            haze = ACCENTS["venusHaze"]
+            rgb = night_surface(haze) if night_mode else haze
+            gradient = linear_gradient([(rgb, 0.0), (rgb, 0.7)],
+                                       start_point=(cx, cy - radius),
+                                       end_point=(cx, cy))
+
+            def haze_clipped(x, y):
+                # Di luar pita yang menyala: alfa nol, bukan warna yang
+                # berbeda — supaya kabutnya tidak pernah menonjol keluar dari
+                # sabit dan membuatnya tampak lebih lebar daripada fraksi yang
+                # dihitung engine.
+                if not _point_in_polygon(x, y, points):
+                    return (rgb, 0.0)
+                return gradient(x, y)
+            canvas.ellipse(cx, cy + radius * 0.14, radius * 0.55, radius * 0.72, haze_clipped)
+        return
+
     # **Bola dulu, dengan radius penuh — sama di kedua keadaan keyakinan.**
     #
     # Versi lama menggambar cincin Saturnus (dan bola kecil di dalamnya)
@@ -847,17 +941,16 @@ def _draw_haze(canvas, cx, cy, radius, night_mode):
     canvas.ellipse(cx, cy + radius * 0.14, radius * 0.55, radius * 0.72, gradient)
 
 
-def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
-    unlit = ACCENTS["moonUnlit"]
-    canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
-    phase = phase_geometry(kw.get("illumination"), kw.get("is_waxing"))
-    if phase is None:
-        return
-    # Bangun pita terang di ruang gambar (sisi terang ke kanan), lalu putar.
+def _lit_band_polygon(cx, cy, radius, phase, bright_limb_angle):
+    """Poligon pita terang, sudah diputar — port dari `drawLitBand`.
+
+    Dipakai bersama Bulan dan planet berfase supaya keduanya digambar oleh
+    rumus yang sama; kalau tidak, dua salinan kurva akan cepat atau lambat
+    berbeda, dan yang salah tetap tampak seperti sabit yang meyakinkan.
+    """
     lit_side = phase["lit_side"]
     offset = phase["terminator_offset"]
-    angle = kw.get("bright_limb_angle")
-    rotate = draw_rotation_radians(angle) if angle is not None else 0.0
+    rotate = draw_rotation_radians(terminator_rotation_radians(bright_limb_angle, phase))
     cos_r, sin_r = math.cos(rotate), math.sin(rotate)
 
     def to_screen(x_model, y_model):
@@ -877,6 +970,17 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
         t = step / steps
         h = -1 + 2 * t
         points.append(to_screen(offset * math.sqrt(max(0.0, 1 - h * h)), h))
+    return points, to_screen
+
+
+def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
+    unlit = ACCENTS["moonUnlit"]
+    canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
+    phase = phase_geometry(kw.get("illumination"), kw.get("is_waxing"))
+    if phase is None:
+        return
+    points, to_screen = _lit_band_polygon(cx, cy, radius, phase,
+                                          kw.get("bright_limb_angle"))
 
     lit_color = ACCENTS["moonLit"]
     lit_rgb = night_surface(lit_color) if night_mode else lit_color
@@ -1063,6 +1167,28 @@ def build_cases():
     cases.append(VisualCase("planet-unknown-confirmed",
                             "planet yang id-nya tak dikenal — bola netral",
                             "planet", planet=None, is_confirmed=True))
+
+    # Fase planet dalam. Venus dan Merkurius berfase sungguhan, dan sampai
+    # siklus ini keduanya digambar sebagai bola penuh — gambar yang menyatakan
+    # sesuatu yang tidak ada di langit. Kasus-kasus ini yang membuat
+    # perbaikannya terukur, bukan hanya diklaim: satu sabit tipis, satu
+    # cembung, satu tanpa arah, dan satu **planet luar dengan angka fase**
+    # yang harus diabaikan (Mars tidak pernah tampak berfase).
+    for label, planet, fraction, waxing, angle, note in (
+        ("venus-crescent", "venus", 0.22, True, -math.pi / 2,
+         "Venus sabit — sisi terang ke BAWAH, seperti sabit muda"),
+        ("venus-gibbous", "venus", 0.78, True, 0.0,
+         "Venus cembung — pita lebar, terminator lewat pusat"),
+        ("venus-no-direction", "venus", 0.4, None, 0.0,
+         "Venus tanpa arah fase — piringan polos, TIDAK memihak sisi"),
+        ("mercury-crescent", "mercury", 0.3, True, 0.0,
+         "Merkurius sabit — kawah terpotong ke bagian yang menyala"),
+        ("mars-with-a-phase-number", "mars", 0.3, True, 0.0,
+         "Mars dengan angka fase — harus DIABAIKAN (planet luar tak berfase)"),
+    ):
+        cases.append(VisualCase(f"planet-{label}", note, "planet", planet=planet,
+                                illumination=fraction, is_waxing=waxing,
+                                bright_limb_angle=angle, is_confirmed=True))
 
     # ── Bulan ─────────────────────────────────────────────────────────
     for label, fraction, waxing, angle, note in (

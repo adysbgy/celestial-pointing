@@ -161,6 +161,56 @@ struct CelestialVisualView: View {
             return
         }
         let palette = planet.palette
+
+        // **Fase planet dalam (Venus, Merkurius).** Bila fase-nya diketahui,
+        // piringan digambar sebagai bagian yang menyala + bagian gelap, bukan
+        // bola penuh. Venus yang tergambar bulat adalah gambar yang menyatakan
+        // sesuatu yang tidak ada: dari Bumi ia berayun dari sabit tipis ke
+        // cakram hampir penuh, dan bentuk itulah ciri paling dikenalnya.
+        //
+        // Hanya saat **terkunci** (`isConfirmed`). Aturan yang sudah berlaku
+        // untuk pita Jupiter dan cincin Saturnus berlaku sama di sini: warna
+        // boleh tampil pada kandidat, **bentuk** tidak. Sabit adalah bentuk —
+        // menggambarnya pada objek yang belum dipastikan berarti menyampaikan
+        // identitas yang belum dimiliki engine.
+        if isConfirmed, let phase = visual.phaseGeometry(waxing: visual.isWaxing) {
+            let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                              width: radius * 2, height: radius * 2))
+            // Sisi gelap planet: praktis hitam, tanpa earthshine seperti Bulan
+            // (lihat `planetUnlit`). Aturan `shadow`, sama dengan piringan
+            // gelap Bulan: bagian ini tidak memancarkan cahaya.
+            context.fill(disc,
+                         with: .color(Self.shadowAccent(CelestialVisual.accents.planetUnlit)))
+            drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
+                        litColor: Self.color(palette.light),
+                        decorate: { inner in
+                            // Peredupan limb di dalam pita: gradien radial
+                            // **berpusat di pusat piringan**, bukan digeser
+                            // ke kiri-atas seperti bola penuh. Gradien yang
+                            // digeser ikut berputar bersama pita, sehingga
+                            // "cahaya dari kiri-atas" akan menghadap arah yang
+                            // salah begitu sisi terangnya ke bawah — dan
+                            // planetnya tetap tampak seperti bola, jadi
+                            // tidak ada yang bisa menangkapnya dari layar.
+                            inner.fill(disc, with: .radialGradient(
+                                Gradient(colors: [Self.color(palette.light),
+                                                  Self.color(palette.dark)]),
+                                center: center, startRadius: 0, endRadius: radius * 1.15))
+                            // Ciri pengenal (kawah Merkurius, kabut Venus) ikut
+                            // terpotong ke bagian yang menyala, jadi tidak
+                            // pernah menonjol keluar dari sabit.
+                            switch palette.feature {
+                            case .craters:
+                                self.drawCraters(context: inner, center: center, radius: radius)
+                            case .haze:
+                                self.drawHaze(context: inner, center: center, radius: radius)
+                            case .bands, .rings, .polarCaps, .none:
+                                break
+                            }
+                        })
+            return
+        }
+
         drawSphere(context: context, center: center, radius: radius,
                    from: palette.light, to: palette.dark)
         // Saat identitas belum pasti, hanya **warnanya** yang boleh tampil —
@@ -433,6 +483,7 @@ struct CelestialVisualView: View {
 
     // MARK: - Bulan
 
+    /// Bulan: piringan gelap + pita terang berfase.
     private func drawMoon(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                           width: radius * 2, height: radius * 2))
@@ -453,7 +504,53 @@ struct CelestialVisualView: View {
             // satu sisi.
             return
         }
+        drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
+                    litColor: Self.accent(CelestialVisual.accents.moonLit),
+                    decorate: { inner in
+                        Self.drawMoonSurfaceShading(inner, center: center, radius: radius)
+                    })
+    }
 
+    /// Bercak gelap (maria) di permukaan Bulan.
+    ///
+    /// Konstanta milik view, bukan model: ini tekstur hias, bukan pernyataan
+    /// tentang langit. Yang **tidak** boleh di sini adalah hal yang menyatakan
+    /// identitas atau geometri (fase, sisi terang) — semuanya datang dari
+    /// model supaya bisa diuji.
+    private static func drawMoonSurfaceShading(_ context: GraphicsContext,
+                                               center: CGPoint, radius: CGFloat) {
+        for (dx, dy, size) in [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
+                               (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)] {
+            let rect = CGRect(x: center.x + dx * radius - size * radius,
+                              y: center.y + dy * radius - size * radius,
+                              width: size * radius * 2,
+                              height: size * radius * 2)
+            context.fill(Path(ellipseIn: rect), with: .color(Color.black.opacity(0.12)))
+        }
+    }
+
+    /// Pita terang sebuah benda berfase (Bulan **dan** planet dalam).
+    ///
+    /// Dipakai bersama supaya sabit Venus dan sabit Bulan digambar oleh kode
+    /// yang sama — kalau tidak, dua salinan rumus kurva akan cepat atau lambat
+    /// berbeda, dan yang salah tetap tampak seperti sabit yang meyakinkan.
+    /// Geometri kurvanya sendiri datang dari `PhaseGeometry` (diuji di Linux);
+    /// di sini hanya penempatan dan warna.
+    ///
+    /// - Parameters:
+    ///   - phase: geometri dari `visual.phaseGeometry(waxing:)`.
+    ///   - disc: piringan penuh, dipakai sebagai daerah klip.
+    ///   - litColor: warna pita yang menyala (aturan `surface`).
+    ///   - decorate: gambar tambahan di permukaan yang menyala (maria Bulan,
+    ///     kawah Merkurius, kabut Venus). Dijalankan **di dalam** klip pita
+    ///     yang sudah diputar, jadi hiasannya tidak pernah menonjol keluar dari
+    ///     bagian yang menyala — kalau tidak, bercak gelap di sisi gelap akan
+    ///     membuat sabit tampak lebih lebar daripada fraksi yang dihitung
+    ///     engine.
+    private func drawLitBand(context: GraphicsContext, center: CGPoint, radius: CGFloat,
+                             phase: CelestialVisual.PhaseGeometry, disc: Path,
+                             litColor: Color,
+                             decorate: ((GraphicsContext) -> Void)? = nil) {
         // Pita terang = daerah antara limb dan terminator, dari kutub atas ke
         // kutub bawah. Bentuknya dibangun dari dua kurva, jadi digambar sebagai
         // Path tertutup.
@@ -505,10 +602,15 @@ struct CelestialVisualView: View {
         // dipakai -- dan salahnya tidak terlihat, karena sabitnya tetap
         // berbentuk sabit.
         //
+        // Sudutnya datang dari `terminatorRotationRadians` (model), yang sudah
+        // memperhitungkan sisi mana yang menyala pada fase ini. Memakai sudut
+        // Matahari mentah akan memasang sabit dan gibbous di sisi yang
+        // berlawanan.
+        //
         // `angle == nil` berarti sudutnya tidak diketahui: pita digambar apa
         // adanya (tanpa putaran), bukan diputar ke sudut karangan.
         context.drawLayer { layer in
-            if let angle = visual.brightLimbAngleRadians {
+            if let angle = visual.terminatorRotationRadians {
                 // `rotate` berputar terhadap titik asal, jadi titik pusat
                 // piringan harus dibawa ke asal dulu lalu dikembalikan.
                 //
@@ -530,20 +632,13 @@ struct CelestialVisualView: View {
             // Versi lama menulis (0.95, 0.85, 0.80) untuk malam -- 77%
             // luminansinya ada di hijau dan biru, kanal yang paling merusak
             // penglihatan malam. Angka itu justru terlihat "merah" di layar.
-            layer.fill(lit, with: .color(Self.accent(CelestialVisual.accents.moonLit)))
-            // Maria: bercak gelap **di dalam** bagian yang menyala saja, jadi
-            // Maria digambar **hanya** di dalam bagian yang menyala, jadi
+            layer.fill(lit, with: .color(litColor))
+            // Hiasan permukaan: **di dalam** bagian yang menyala saja, jadi
             // bercak ini tidak pernah mengubah lebar sabit yang terlihat.
-            for (dx, dy, size) in [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
-                                   (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)] {
-                let rect = CGRect(x: center.x + dx * radius - size * radius,
-                                  y: center.y + dy * radius - size * radius,
-                                  width: size * radius * 2,
-                                  height: size * radius * 2)
+            if let decorate {
                 layer.drawLayer { inner in
                     inner.clip(to: lit)
-                    inner.fill(Path(ellipseIn: rect),
-                               with: .color(Color.black.opacity(0.12)))
+                    decorate(inner)
                 }
             }
         }
