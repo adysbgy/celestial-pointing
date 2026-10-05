@@ -1,4 +1,8 @@
-## Progres terakhir (5 Okt 2026 — layar utama & konteks langit dilokalkan)
+## Progres terakhir (5 Okt 2026 — Experiment1View dilokalkan, gerbang 261 kunci)
+
+### Lanjutan Fase C #2: iOS ikut
+
+`Experiment1View` adalah tempat pembuktian Experiment 1 (kesalahan pengenalan ⟪HERMES-CONTEXT-COMPRESSION: 1,547 of 1,747 chars omitted here by Hermes's context compressor. This is NOT part of the original tool call and must never be reproduced in new output — always write full, untruncated content.⟫
 
 ### `PointingView` + `SkyContextView`: layar yang paling banyak literal
 
