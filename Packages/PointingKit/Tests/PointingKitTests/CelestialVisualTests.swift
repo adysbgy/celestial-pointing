@@ -1065,12 +1065,24 @@ final class CelestialVisualTests: XCTestCase {
     /// pada dua objek yang gasnya justru sudah ditiup keluar. Yang membuat
     /// cacat itu tak terlihat: kedua bentuk tetap "kabut", dan tidak ada satu
     /// teks di layar yang menyebut bedanya.
+    ///
+    /// **Kenapa diuji pada `fuzziness` sebenarnya, bukan hanya 1.0.**
+    /// `buildDeepSky` memperbesar setiap blob sebesar `0.62 + 0.38 · fuzziness`,
+    /// dan cangkang ini lebarnya hanya 0.30 — delapan blob yang masing-masing
+    /// membesar ke arah pusat bisa saja menutup lubang yang menjadi alasan
+    /// bentuk ini ada. Nilai 1.0 adalah yang paling besar, jadi kalau ada
+    /// yang salah justru di situlah ia tampak; M27 memakai 0.68 dan M57 0.40,
+    /// dan kedua angka itulah yang sungguhan sampai ke layar. Uji yang hanya
+    /// memakai nilai ekstrem bisa hijau sementara objeknya tampil salah.
     func testPlanetaryNebulaIsHollowAtTheCentre() {
-        let geometry = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 1.0)
-        XCTAssertFalse(geometry.blobs.isEmpty, "nebula planetari harus punya cangkang")
-        let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
-        XCTAssertGreaterThan(nearest, 0.3,
-                             "cangkang tidak boleh punya blob di pusat — itu ciri nebula emisi")
+        for fuzziness in [0.0, 0.40, 0.68, 1.0] {
+            let geometry = VisualFrame.deepSky(morphology: .planetaryNebula,
+                                               fuzziness: fuzziness)
+            XCTAssertFalse(geometry.blobs.isEmpty, "nebula planetari harus punya cangkang")
+            let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
+            XCTAssertGreaterThan(nearest, 0.3,
+                                 "cangkang tidak boleh punya blob di pusat pada fuzziness \(fuzziness) — itu ciri nebula emisi")
+        }
     }
 
     /// Cangkangnya harus duduk pada **satu radius**.
@@ -1198,8 +1210,16 @@ final class CelestialVisualTests: XCTestCase {
     ///
     /// Ini uji paling langsung terhadap kelas cacatnya: kalau dua morfologi
     /// menghasilkan blob yang sama, layar menampilkan bentuk yang sama.
+    ///
+    /// **Kenapa daftarnya dari `allCases`, bukan ditulis di sini.** Sampai
+    /// siklus ini daftarnya ditulis tangan (empat nama), jadi `.planetaryNebula`
+    /// lahir tanpa ikut teruji oleh uji yang paling langsung mengawasi kelas
+    /// cacat ini — persis drift yang `testEveryMorphologyIsUsedByTheCatalogue`
+    /// ada untuk mencegah di sisi katalog. Daftar yang ditulis tangan di uji
+    /// adalah daftar yang berhenti tumbuh tanpa ada yang diberitahu.
     func testDifferentMorphologiesProduceDifferentGeometry() {
-        let shapes: [DeepSkyCatalogue.Morphology] = [.nebula, .galaxy, .openCluster, .globularCluster]
+        let shapes: [DeepSkyCatalogue.Morphology] = DeepSkyCatalogue.Morphology.allCases
+        XCTAssertGreaterThan(shapes.count, 1, "uji ini tidak berguna tanpa minimal dua bentuk")
         let geometries = shapes.map { VisualFrame.deepSky(morphology: $0, fuzziness: 0.7) }
         for i in geometries.indices {
             for j in geometries.indices where j > i {
