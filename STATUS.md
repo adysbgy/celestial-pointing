@@ -1,3 +1,46 @@
+## Progres terakhir (6 Okt 2026 — jalur `tooFaint` dibuktikan lewat controller)
+
+- **Yang ditutup.** `tooFaint` adalah satu-satunya alasan `VisibilityFilter` yang
+  belum pernah terbukti sampai ke `.lock` lewat controller sungguhan. Sekarang
+  sudah: `TooFaintLockHonestyTests` (3 tes).
+- **Temuan yang mengubah cara pandang.** `tooFaint` **tidak mungkin** terjadi
+  pada katalog produksi. Bintang paling redup di `Catalogue.brightStars` 1.98,
+  sedangkan batas magnitudo paling sempit yang bisa diukur — bulan purnama di
+  atas cakrawala — hanya turun ke 4.40. Jadi untuk setiap benda di katalog,
+  `magnitude > limit` mustahil secara aritmetika, bukan cuma jarang.
+  Sapu 660 jam langit malam mengonfirmasi: **0** penolakan `tooFaint`.
+  Jadi alasan ini benar dan bekerja, tapi di produksi ia **kode mati**.
+- **Kenapa ini tetap penting, bukan cuma catatan.** Kalau katalog nanti
+  diperluas dengan bintang samar (batas sekitar 6.0, wajar untuk langit gelap
+  tanpa bulan), jalur ini langsung hidup untuk pengguna — dan jalur yang belum
+  pernah dieksekusi data nyata adalah tempat paling rawan muncul alasan
+  penolakan yang keliru. Tes menutupnya **sebelum** itu terjadi.
+- **Cara membuktikannya.** Tes memakai bintang tiruan pada posisi Sirius dengan
+  magnitudo 6.5: hanya magnitudo yang diubah, geometri dan cuaca langit tetap
+  sama, jadi satu-satunya variabel yang diuji memang penyaring magnitudo.
+  Ini menyalakan jalur yang belum pernah hidup tanpa menyalin katalog.
+- **Tiga tes.** (1) bintang redup tidak pernah `.lock`, `searchHint` =
+  `.allTooFaint`, dan tanpa haptic sukses; (2) **bukti positif** — benda yang
+  sama persis dengan magnitudo terang **harus** `.lock` (tanpa ini, tes pertama
+  bisa hijau karena alasan yang salah); (3) katalog produksi tidak punya benda
+  yang bisa memicu `tooFaint`, dengan angka batas dan magnitudo ikut laporan
+  supaya kalau katalog berubah, yang gagal pertama adalah angka itu — bukan
+ ArchaeType perilaku yang menyesatkan.
+- **Bukti mutasi.** Menyisipkan `+ 6.0` ke ambang `tooFaint` di `Visibility.swift`
+  → ketiga assertion-nya merah sekaligus (`.lock` bocor, hint jadi `nil`, haptic sukses
+  muncul). Menambah bintang mag 6.5 ke katalog simulasi pada tes (3) → merah
+  dengan `775` penolakan. Catatan jujur soal satu mutasi yang **tidak** menggigit:
+  menggeser ambang di sisi tes (+5.0) tetap hijau. Itu memang alat ukurnya
+  katalog, bukan ambangnya — jadi tes itu mengukur katalog sungguhan dan
+  tidak bisa dibuat hijau oleh angka rekaan.
+- **Yang TIDAK diubah.** `Visibility.swift` dan `Catalogue.swift` kembali
+  identik dengan `main` — mutasi hanya untuk pembuktian. Semua perubahan di
+  `Packages/PointingKit/Tests/` saja.
+- **Hitungan.** 182 + 650 hijau (dari 647). README diperbarui karena gerbang UI
+  yang menjaga angka itu ikut menggigit.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — "semua di bawah horizon" tidak pernah benar, 2469 dari 2469)
 
 ### Cacatnya: hint membaca seluruh langit, lalu mengklaim soal arah yang ditunjuk
@@ -143,9 +186,6 @@ benar**:
 - **Bukan pengganti pengujian manual.** Gerbang ini membuktikan bahwa klaim yang
   ditampilkan tidak bertentangan dengan apa yang bisa dilihat; ia tidak
   menilai apakah kalimatnya enak dibaca.
-
----
-
 ## Progres terakhir (6 Okt 2026 — jalur bawah-horizon sampai .lock, dan audit ulang status brief)
 
 ### Temuan siklus ini: brief di misi sudah LENGKAP, bukan awal dari nol
