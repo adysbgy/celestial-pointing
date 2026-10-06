@@ -639,6 +639,86 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertNotEqual(c.snapshot.bestObject?.id, "sun")
     }
 
+    // MARK: - Objek langit dalam lewat controller penuh
+
+    /// Objek langit dalam harus bisa mencapai `.lock` lewat **controller
+    /// sungguhan**, bukan hanya lewat resolver.
+    ///
+    /// Katalog, resolver, visual, dan label untuk objek langit dalam sudah
+    /// diuji masing-masing — tapi tidak satu pun uji yang menembaknya lewat
+    /// `PointingController` sampai ke `.lock` dan rencana GoTo. Ini kelas
+    /// cacat yang berulang di repo ini: bagian-bagiannya benar, jalur yang
+    /// menghubungkannya tidak pernah disambungkan. Kalau suatu hari jalur
+    /// controller membuang objek ber-`kind: .deepSky` (misal lewat filter
+    /// jenis di tempat lain), seluruh rangkaian uji di atas tetap hijau
+    /// sementara aplikasi tidak pernah mengunci satu nebula pun.
+    func testDeepSkyObjectLocksThroughTheFullController() throws {
+        // Nebula Orion: satu-satunya objek di kerucut, kebijakan permisif →
+        // HIGH deterministik, tanpa ambiguitas bintang tetangga.
+        let ephemeris = AstronomyKitEphemeris()
+        let nebula = CelestialObject(id: "m42", name: "Nebula Orion", kind: .deepSky,
+                                     raDeg: 83.82208333, decDeg: -5.39111111, magnitude: 4.0)
+        // Resolver pakai efemeris supaya rencana GoTo bisa menghitung posisi
+        // Matahari (aman), bukan menolak dengan `sunPositionUnknown`.
+        let resolver = PointingResolver(catalogue: [nebula], policy: .permissive,
+                                       ephemeris: ephemeris)
+        let c = controller(resolver)
+
+        // Cari waktu malam ketika nebulanya benar-benar di atas horizon, supaya
+        // uji ini tidak vacuous: kalau tidak pernah naik, kegagalan "tidak
+        // terkunci" bisa datang dari horizon, bukan dari jalur controller.
+        // Malam dipilih agar gerbang pengaman Matahari tidak membatalkan arah
+        // tunjuk, dan rencana GoTo tidak menghadapi hazard dekat-Matahari.
+        var when: Date?
+        for hour in 0..<48 {
+            let candidate = date.addingTimeInterval(Double(hour) * 3600)
+            let aboveHorizon = (resolver.horizontal(of: nebula, observer: observer,
+                                                   date: candidate)?.altitudeDeg ?? -90) > 20
+            // Malam dipilih dengan ambang tetap (Matahari jauh di bawah
+            // horizon), bukan `policy.minAltitudeDeg`: kebijakan `.permissive`
+            // memang memakai ambang −90, jadi memakainya akan membuat cek
+            // "malam" tidak pernah benar. Ambang −10° cukup sebagai bukti malam
+            // sungguhan; siang bukanlah keadaan yang ingin diuji di sini.
+            let sunDown = (resolver.skyContext(observer: observer, date: candidate)
+                .sunAltitudeDeg) < -10
+            if aboveHorizon && sunDown {
+                when = candidate
+                break
+            }
+        }
+        guard let targetDate = when else {
+            return XCTFail("M42 tidak pernah di atas horizon pada malam hari dalam 48 jam — uji tidak bisa membuktikan apa pun")
+        }
+        let dir = resolver.horizontal(of: nebula, observer: observer, date: targetDate)!
+
+        // Tahan arah tunjuk ke nebula cukup lama untuk melewati ambang
+        // "pergelangan diam" dan memicu resolusi berulang.
+        let q = quaternion(viewPointingAt: dir)
+        for step in 0..<12 {
+            c.feed(quaternion: q, timestamp: targetDate.addingTimeInterval(Double(step) * 0.1))
+        }
+
+        XCTAssertEqual(c.snapshot.state, .lock, "objek langit dalam harus bisa dikunci lewat controller")
+        XCTAssertEqual(c.snapshot.bestObject?.id, "m42")
+        XCTAssertEqual(c.snapshot.bestObject?.kind, .deepSky)
+        XCTAssertTrue(c.hapticLog.contains { $0.event == .lockSucceeded },
+                      "lock berhasil harus berbunyi haptic")
+
+        // GoTo harus aman dan menarget posisi objek, bukan arah pergelangan.
+        let policy = SlewSafetyPolicy(minSunSeparationDeg: 0,
+                                      minAltitudeDeg: -90,
+                                      maxAltitudeDeg: 90,
+                                      limitingMagnitude: 30,
+                                      requiredConfidence: .high)
+        let decision = try XCTUnwrap(c.slewDecision(date: targetDate, policy: policy))
+        guard case .allowed(let command) = decision else {
+            return XCTFail("GoTo untuk objek langit dalam seharusnya diizinkan, dapat \(decision)")
+        }
+        XCTAssertEqual(command.object.id, "m42")
+        let truth = resolver.horizontal(ofObjectID: "m42", observer: observer, date: targetDate)!
+        XCTAssertEqual(command.target.altitudeDeg, truth.altitudeDeg, accuracy: 1e-9)
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat

@@ -1,3 +1,78 @@
+## Progres terakhir (6 Okt 2026 — objek langit dalam tidak pernah dikunci lewat controller sungguhan)
+
+### Cacatnya: jalur deep-sky teruji di tiap bagian, tidak pernah di satu jalurnya
+
+Katalog objek langit dalam sudah diuji dari katalog → resolver → visual
+(`DeepSkyCatalogueTests`), dan resolver produksi sudah dituntut memuatnya
+(`testProductionResolverOffersDeepSkyTargets`). Tapi tidak ada satu pun uji
+yang menembaknya lewat **`PointingController`** — lapisan yang sebenarnya
+menjalankan jam: pergelangan diam → resolusi → `.lock` → haptic → rencana GoTo.
+
+Ini kelas cacat yang sama yang berkas ini catat berulang kali: bagian-bagiannya
+benar secara terpisah, dan yang tidak pernah disambungkan adalah jalurnya.
+Bedanya di sini: celahnya bukan di kode, melainkan di **bukti**. Kalau besok
+ada filter jenis yang membuang `kind: .deepSky` di jalur controller (misal di
+`availableTargets` atau di konfigurasi app), ketiga belas uji katalog tetap
+hijau sementara pengguna tidak pernah mengunci satu nebula pun — dan tidak ada
+layar yang berubah, karena tidak ada yang tampil.
+
+### Yang diuji, dan kenapa ujinya tidak boleh vacuous
+
+`testDeepSkyObjectLocksThroughTheFullController` menuntut empat hal sekaligus,
+semuanya diukur dari controller nyata bukan dari resolver:
+
+| Syarat | Kenapa wajib |
+|---|---|
+| `.lock` tercapai | yang mau dibuktikan persis ini |
+| `bestObject` ber-`kind: .deepSky` | kalau yang terkunci bintang, uji tidak menyentuh jalurnya |
+| haptic `.lockSucceeded` muncul | `.lock` yang tidak berbunyi bukan `.lock` produk |
+| GoTo **diizinkan** dan menarget **posisi objek** | aturan keras PRD: POINT → OBJECT ID → SAFE GOTO |
+
+Waktu ujinya **dicari**, bukan ditulis: nebula harus di atas 20° **dan** malam
+(Matahari di bawah −10°). Tanpa dua-duanya, kegagalan "tidak terkunci" bisa
+datang dari horizon atau dari gerbang pengaman Matahari — bukan dari jalur
+controller, persis cacat Sirius di `DaylightLockTests`.
+
+### Dua kegagalan pertama uji ini, dan yang diajarkan masing-masing
+
+**1. GoTo ditolak `sunPositionUnknown`.** Percobaan pertama memakai resolver
+**tanpa efemeris** (mengikuti `singleStarResolver()` di berkas yang sama).
+Rupanya `slewDecision` memakai `self.resolver`, jadi tanpa efemeris posisi
+Matahari tidak bisa dihitung dan rencana ditolak — **perilaku yang benar**,
+dan sudah dikunci `testSlewDecisionFlagsSunPositionUnknown`. Diperbaiki dengan
+memberi resolver efemeris, bukan dengan melonggarkan policy.
+
+**2. Pencarian malam tidak pernah cocok.** Percobaan kedua menulis
+`sun < resolver.policy.minAltitudeDeg` — ambang yang terlihat tepat, tapi
+`VisibilityPolicy.permissive` memakai `minAltitudeDeg = -90`, jadi syaratnya
+mustahil. Ini persis kelas "nilai tetap yang terlihat masuk akal" yang sudah
+berulang di repo ini, dan kali ini **di dalam uji**. Dibuktikan dulu lewat
+uitji sementara (`alt=40.5, sun=-3.7` pada jam ke-0) sebelum memperbaiki, lalu
+ambang malamnya ditulis tetap `-10` dengan alasannya di komentar — bukan
+diambil dari policy yang bisa berubah.
+
+### Gerbang
+
+- `./swift-test.sh` → **CelestialEngine 182** (tak berubah), **PointingKit 637**
+  (+1), 0 gagal. **Engine tidak disentuh** — berkas uji ini hanya di PointingKit.
+- `./swift-ui-lint.sh` → **25 aturan hijau**. Aturan 10 menangkap README yang
+  masih 636 lebih dulu, seperti fungsinya; diperbarui ke 637.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `python3 Tools/check-visuals.py --check` → **230 pemeriksaan**, 0 gagal.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** satu objek langit dalam (M42) benar-benar mencapai
+  `.lock` lewat controller sungguhan, dengan haptic dan GoTo aman ke posisi
+  objek. **Yang belum:** hanya **satu** objek dan **satu** pasang waktu/tempat
+  yang diuji, bukan seluruh 17 objek — sapuan penuh akan jauh lebih lambat dan
+  tidak menambah bukti tentang jalurnya, yang sudah sama untuk semua objek
+  ber-`kind: .deepSky`.
+- **Tidak ada kode produksi yang berubah.** Ini murni penambahan bukti; kalau
+  jalurnya memang sudah benar, uji ini hijau dan tetap menjaganya besok.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — palet planet menyimpang antara Swift & port tanpa gerbang yang melihat)
 
 ### Cacatnya: port Python memuat warna planet yang tidak dijaga sama sekali
