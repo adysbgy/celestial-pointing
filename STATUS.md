@@ -1,4 +1,171 @@
-## Progres terakhir (6 Okt 2026 — tes siang hari yang hijau tanpa pernah menguji penyaringan siang)
+## Progres terakhir (6 Okt 2026 — penyaringan siang yang hijau tanpa pernah mengujinya, sampai ke `.lock`)
+
+### Alasan siklus ini masih ada
+
+STATUS.md sebelumnya menutup dengan "sisa yang paling bernilai": menyambungkan
+pemeriksaan langit terang **sampai ke `.lock`**. Tapi `.lock` bukan satu lapis.
+Ada tiga lapis yang masing-masing bisa salah, dan hanya lapis pertama yang punya
+penjaga:
+
+| Lapis | Yang menentukan | Penjaga |
+|---|---|---|
+| `VisibilityFilter.classify` | `.daylight` | `DaylightStarVisibilityTests` (engine) |
+| `PointingResolver.diagnose` | keyakinan `high`/`medium` | `ResolverTests` |
+| `PointingStateMachine.update` | `.lock` hanya kalau `high` | `PointingControllerTests` |
+
+Yang ditambahkan siklus ini adalah **uji terhadap jalur controller**, bukan
+lapis baru. Hasilnya: berkas uji pertamanya hijau, sementara gerbang yang
+diklaim di dalamnya **tidak ada sama sekali**.
+
+### Bukti: mutasi yang tidak membuat satu pun tes merah
+
+Suntingan yang diuji adalah `if false` di `VisibilityFilter.classify` — artinya
+penyaringan siang dimatikan total, dan resolver tidak lagi punya alasan untuk
+menolak apa pun karena terang:
+
+```
+== UJI HIJAU pada kode yang rusak — uji ini tidak menangkap mutasi ==
+```
+
+Jadi keempat tesnya hijau di atas kode yang **tidak bisa menolak siang**. Ini
+bukan "hijau yang belum tegak" — ini hijau yang tidak pernah menguji apa yang
+tertulis di namanya.
+
+### Akarnya arah tunjuk, dan kenapa tidak terlihat dari STATUS.md sebelumnya
+
+Tes lama menunjuk **bintang paling terang** (Sirius) tepat pada tengah hari
+Jakarta, lalu menyimpulkan "tidak terkunci di siang". Pada 15 Januari Sirius
+ada di bawah horizon. Resolver menolaknya lebih dulu karena `belowHorizon`,
+**bukan** karena terang. Kesimpulannya tetap benar, dan tetap benar saat
+penyaringan siang dihapus total — karena tidak pernah menyentuh gerbang yang
+diujinya.
+
+Pengukuran yang mengarahkan pilihan ini:
+
+| Bintang | Ketinggian 12.00 WIB | Alasan penolakan sebenarnya |
+|---|---|---|
+| Sirius | di bawah horizon | `belowHorizon` |
+| Vega | 42,3° | `daylight` |
+| Altair | 74,8° | `daylight` (mag 0,77) |
+| Antares | 39,4° | `daylight` |
+| Fomalhaut | 39,0° | `daylight` |
+| Deneb | 36,9° | `daylight` |
+
+Jadi prosesnya tidak butuh tes baru sama sekali — cukup memilih bintang yang
+benar, dan **bukti positifnya** bahwa bintang itu memang akan terkunci kalau
+langit gelap.
+
+### Dua cacat yang muncul di tes itu sendiri, keduanya tidak terlihat
+
+**1. Cap waktu kontrol malam ditulis tangan.** Versi lama memakai
+`noon + 10 jam` dengan alasan "22:00 WIB, Sirius masih di atas horizon Jakarta".
+Untuk Jakarta pada **21 Juni** itu salah: tengah malam memang gelap, tapi
+pada tanggal itu Sirius adalah benda **pagi** — ia baru terbit sekitar pukul
+02.00, dan sepanjang malam ia di bawah horizon atau rendah sekali. Kontrol gagal
+bukan karena menguji hal yang salah, tapi karena tidak pernah menguji apa pun.
+
+Yang membuatnya bertahan adalah bentuknya: cap waktu yang **terlihat benar**.
+Di dalam tabel apa pun ia persis "10 jam setelah tengah hari = malam". Tidak
+ada yang perlu berubah di lingkungan untuk membuatnya benar — dan tidak ada yang
+memberi tahu kalau ia salah.
+
+Perbaikannya: jam kontrol **dicari dari resolver** dengan dua syarat yang
+tertulis eksplisit (langit gelap **dan** bintang di atas 30°), dan "tidak ada"
+mengembalikan `nil` supaya pemilik bisa lanjut ke bintang berikutnya.
+
+**2. Syarat "hanya ditolak karena terang" diuji dengan nilai karangan.** Saat
+saya menulis ulang pemeriksaan itu, saya mengoper `separationFromSunDeg: 0` —
+angka tetap yang saya karang, bukan jarak sebenarnya ke Matahari. `classify`
+menguji **urutan**: bawah horizon → magnitudo → dekat Matahari → terang.
+Dengan jarak karang, `tooCloseToSun` menyala lebih dulu, jadi pemeriksaan
+"alasannya harus `daylight`" jadi **hijau tanpa pernah mencoba gerbang
+terang**.
+
+Dua-duanya adalah kelas yang sama: nilai tetap yang terlihat masuk akal. Yang
+membedanya dari kelas lain di repo ini adalah keduanya **ada di tes**, bukan di
+kode produksi — jadi tidak ada satu pun pihak lain yang mengetahuinya.
+
+### Bentuk akhir: arah tunjuk dihitung, bukan ditulis
+
+Empat syarat, semuanya harus benar, semuanya dihitung dari resolver:
+
+| Syarat | Kenapa wajib |
+|---|---|
+| tinggi > 30° saat tengah hari | kalau tidak, penolakan datang dari `belowHorizon` |
+| `classify` mengembalikan `.daylight` **dengan jarak Matahari nyata** | kalau tidak, alasan yang menyala bisa `tooCloseToSun` |
+| terkunci kalau `sunAltitudeForDarknessDeg` dilonggarkan ke 91 | bukti positif: tanpa ini "tidak terkunci" bisa salah alasan |
+| ada jam malam saat ia > 30° | kontrol positif harus benar-benar ada |
+
+Syarat ketiga sengaja **sempit**: hanya `sunAltitudeForDarknessDeg` yang
+dilonggarkan; `minAltitudeDeg`, `limitingMagnitude`, dan `minSunSeparationDeg`
+tetap. Dan longgarannya lewat **policy**, bukan lewat `SkyContext(isDark: true)`
+— `classify` membaca `context.sunAltitudeDeg`, jadi konteks gelap yang dipalsukan
+tanpa mengubah policy terlihat benar sambil tidak menguji apa pun. Itu percobaan
+saya yang pertama, dan ia juga hijau.
+
+Kegagalan mencari **gagal keras** dengan pesan yang menyebut berapa bintang yang
+diperiksa — lebih baik merah daripada hijau karena langit yang keliru.
+
+### Bukti gerbangnya menggigit
+
+Dengan mutasi `if false` di `classify`:
+
+```
+GAGAL tidak ada bintang yang memenuhi keempat syarat; diperiksa 5 bintang di atas 30 derajat
+```
+
+Empat dari empat tes merah, dan pesannya **menyebut jumlah yang diperiksa** —
+jadi kegagalan "fixture berubah" bisa dibedakan dari kegagalan "kode rusak".
+
+### Yang sudah dijaga di tempat lain (dicek, bukan diasumsikan)
+
+Mutasi `state = .lock` di `PointingFlow.update` (MEDIUM ikut mengunci) diuji
+terhadap **dua** berkas:
+
+| Mutasi | `DaylightLockTests` | `PointingControllerTests` |
+|---|---|---|
+| penyaringan siang dimatikan | **MERAH (4)** | tidak terkait |
+| MEDIUM ikut `.lock` | hijau | **MERAH (3)** |
+
+Jadi jalur yang lebih dalam sudah punya penjaganya. Yang siklus ini tambahkan
+adalah lapis yang belum punya penjaga sama sekali.
+
+### Gerbang
+
+- `./swift-test.sh` → CelestialEngine **179** (tak berubah), PointingKit **633**
+  (628 +5), 0 gagal. **Engine tidak disentuh** — berkas uji ini hanya di
+  `PointingKit`.
+- `./swift-ui-lint.sh` → 25 aturan hijau. Aturan 10 menangkap README yang masih
+  628 lebih dulu, seperti fungsinya.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `python3 Tools/check-visuals.py --check` → **195 pemeriksaan**, 0 gagal.
+- CI: `37412346943` (Engine Tests Linux) + `37412347030` (Apple Build macos-15)
+  — **dua-duanya hijau** pada `66da06f`.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** jalur `attitude → controller → state` merasa terang sampai
+  `.lock` benar-benar ditolak, dan penolakan itu blamed pada terang.
+  **Yang belum:** `hapticLog` diperiksa di berkas ini, tapi pemicunya bukan
+  sensor — itu `hapticEvents(from:to:)` yang sudah punya penjaganya sendiri.
+- **Kontrol malam masih satu titik.** Kalau katalog bintang berubah dan tidak ada
+  lagi yang memenuhi keempat syarat pada tanggal itu, berkas ini **gagal keras**,
+  dan pesannya menyebut jumlah yang diperiksa. Tapi ia belum menguji **lebih dari
+  satu** pasang siang/malam.
+- Tanggal 15 Januari dipilih lewat pengukuran, bukan tebakan, dan dua prasyarat
+  mengunci hasilnya: `testFixtureSkyIsBrightAndComesFromTheEphemeris` dan
+  `testDaylightTargetIsRejectedForDaylightAndNothingElse`.
+
+### Sisa yang paling bernilai
+
+Fase C sudah lengkap (complication, `.xcstrings`, izin sensor, penanganan
+penolakan izin). Yang tersisa bukan fitur, tapi **kelas** yang berulang sepanjang
+rekap ini: gerbang yang mengklaim lebih dari yang diukurnya. Kandidat berikutnya
+adalah `check_port_matches_swift_constants` — port Python masih hidup untuk
+gambar, dan beberapa bentuk yang sudah pindah ke model masih bisa disimpang
+tanpa apa pun yang melihat.
+
+---## Progres terakhir (6 Okt 2026 — tes siang hari yang hijau tanpa pernah menguji penyaringan siang)
 
 ### Yang dicari siklus ini: bagian yang hijau tapi tidak menjaga apa pun
 
