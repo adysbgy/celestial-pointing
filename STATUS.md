@@ -1,4 +1,110 @@
-## Progres terakhir (6 Okt 2026 — 12 warna aksen yang tidak pernah dibandingkan, dan urutan kecerahan yang hanya hidup sebagai komentar)
+## Progres terakhir (6 Okt 2026 — label argumen: jalur pemanggilan yang tidak pernah diindeks, sementara Aturan 26 menjaga jalur nama)
+
+### Cacatnya: `Tipe(Label:)` bukan `Tipe.anggota`
+
+STATUS.md sebelumnya menutup dengan "sisa yang paling bernilai" yang sangat
+spesifik:
+
+> `Apps/` memanggil **fungsi bebas** dan **inisialisasi** paket selain
+> `TextLocalization.text(` — Aturan 26 hanya melihat `Tipe.anggota`.
+
+Fungsi bebas diukur lebih dulu dan hasilnya nol: di `Packages/` hanya ada
+**dua** fungsi top-level, dan `Apps/` tidak memanggil keduanya. Jadi separuh
+sisa itu tidak ada — dan separuh lainnya yang diukur siklus ini.
+
+Inisialisasi berbeda. `CelestialVisual.RGBComponents(red:green:blue:)` adalah
+pemanggilan yang benar apartemen: receiver-nya adalah *tipe*, bukan
+anggota, jadi **tidak ada `Tipe.anggota` yang bisa dibaca darinya**. Aturan 26
+melihat `Tipe.anggota`; ia tidak bisa melihat pemanggilan. Pengukurannya:
+**73** tipe paket punya `init` tertulis tangan, dan `Apps/` memanggilnya
+**26 kali** — semuanya di berkas yang `swift-typecheck.sh` tidak pernah
+kompilasi.
+
+| Gerbang | Cakupan | Status |
+|---|---|---|
+| `swift-test.sh` | paket saja | tidak pernah melihat pemanggilan ini |
+| `swift-typecheck.sh` | **dua** berkas Foundation | 24 dari 26 panggilan ada di berkas SwiftUI |
+| Aturan 26 | `Tipe.anggota` | tidak mengindeks inisialisasi |
+| CI macOS | `Apps/` terhadap paket | merah, ~2 menit/siklus terlambat |
+
+Bentuk cacatnya persis bentuk yang berulang di rekap ini: kode yang **benar**
+dipanggil dengan nama yang hampir benar, dan yang salah hanya karena satu
+huruf.
+
+### Dua bug di gerbangnya sendiri, keduanya ditemukan sebelum ditulis
+
+**1. Perbandingan label yang salah.** `g[0] == d[0]` membandingkan
+**elemen pertama dari tuple** dengan karakter pertama dari string. Hasilnya
+`"controller" == "c"` → salah, jadi **22 dari 22** panggilan dilaporkan
+tidak cocok pada kode yang benar. Versi pertama gerbang tidak hanya salah —
+ia merah total, sama tidak bergunanya dengan gerbang yang selalu hijau.
+
+Yang membuatnya lolos begitu lama tanpa terlihat: pesannya menyebut
+"tidak cocok" untuk **seluruh** repo, dan orang cenderung mengira itu memang
+betul. Gerbang yang merah pada semua kode terlihat seperti *"barangkah memang
+belum ada?"* — dan di repo ini jawabannya memang iya. Itu sebabnya kelas
+cacat yang sama perlu dua arah pembuktian.
+
+**2. `==` terbaca sebagai nilai bawaan.** `MotionPolicy(isSceneActive: scenePhase == .active)`
+mempUNYAI nilai bawaan menurut pembaca `=` pertama, sehingga argumen wajib
+yang dihapus dari pemanggilan lolos. Perbaikannya bukan "cari `=` terakhir" —
+melalui menyelesaikan `==`, `!=`, `<=`, `>=`, `=~`.
+
+### Bukti gerbangnya menggigit, tiga arah
+
+| Suntikan | Hasil |
+|---|---|
+| `latitudeDeg:` → `latDeg:` di `LocationProvider` | **MERAH** di baris yang tepat |
+| `init(reduceMotion:)` → `init(redMotion:)` di paket MotionPolicy | **MERAH di 3 lokasi sekaligus** — pemanggil jadi salah dari sisi yang tidak disentuh |
+| `haptics: events` dibuang dari `PointingUpdate(...)` | **MERAH**: argumen wajib hilang |
+
+Arah kedua yang menentukan: mutasi di paket tidak menyentuh `Apps/` sama
+sekali, dan tetap membuat gerbang berbunyi. Gerbang yang hanya bisa menangkap
+suntikan di `Apps/` tidak akan menangkap refactor yang mengganti nama label
+di paket.
+
+### Batas yang jujur
+
+- **Hanya label.** Tipe argumen, kelebihan beban, `init?`, dan `throws`
+  tetap hanya ketahuan dari CI macOS.
+- **Label eksternal.** Swift punya dua nama untuk satu argumen
+  (`func text(for state:)` dipanggil `text(for:)`). Yang dibandingkan adalah
+  yang dipakai pemanggil — kalau tidak, gerbang merah pada kode yang benar
+  (persis bug pertama).
+- **Inisialisasi bawaan** Swift (yang mengisi semua stored property) menerima
+  apa pun dalam urutan apa pun, jadi tidak dihitung.
+- **Pemanggilan posisional dilewati** — 4 dari 30. Menebak urutan akan membuat
+  gerbang merah pada kode yang benar.
+- **Fungsi bebas sudah nol**, jadi tidak ada gerbang untuk mereka: di
+  `Packages/` hanya ada dua (`main`-like entry yang tidak dipanggil, dan satu
+  lagi), dan `Apps/` tidak memanggil satupun.
+
+### Gerbang
+
+- `./swift-ui-lint.sh` → **27 aturan hijau** (26 → 27). Aturan 10 menangkap
+  README yang masih bilang 26 lebih dulu, seperti fungsinya.
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
+  **tidak ada kode Swift yang berubah**; yang masuk hanya gerbang + README.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `python3 Tools/check-visuals.py --check` → **287 pemeriksaan**, 0 gagal.
+- CI: `37441056037` (Engine Tests Linux) + `37441055971` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `715dee7`.
+
+### Sisa yang paling bernilai
+
+Permukaan yang tersisa dari kelas yang sama: **metode paket yang dipanggil
+berkualifikasi** (`TextLocalization.text(.someKey)`). Aturan 26 melihat
+`Tipe.anggota` **ada**, Aturan 27 melihat label inisialisasi, tapi
+`Tipe.metode(label:)` belum dijaga — dan di repo ini `PointingLinkMessage.plist(…)`
+sudah memakai label eksternal (`for:`-gaya), jadi pembaca label yang salah
+akan membuat gerbang merah pada kode yang benar. Cara yang sudah diuji di
+siklus ini (dump badan tipe, baca label dari token pertama) hasilnya: 44
+panggilan berlabel diperiksa, 9 salah baca sebelum label eksternal diperbaiki,
+0 setelah — jadi permukaannya nyata dan alatnya sudah ada.
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — 12 warna aksen yang tidak pernah dibandingkan, dan urutan kecerahan yang hanya hidup sebagai komentar)
 
 ### Cacatnya: palet gambar 17 warna, yang dijaga lima
 
