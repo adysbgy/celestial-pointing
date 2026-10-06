@@ -1,3 +1,53 @@
+## Progres terakhir (6 Okt 2026 — palet planet menyimpang antara Swift & port tanpa gerbang yang melihat)
+
+### Cacatnya: port Python memuat warna planet yang tidak dijaga sama sekali
+
+Pemetaan planet → warna + ciri hidup di **dua bahasa**: `Planet.palette` di
+`CelestialVisual.swift` (Swift) dan `PLANET_PALETTE` di `render-visuals.py`
+(Python). Sampai siklus ini `check_port_matches_swift_constants` hanya
+menjaga sekitar 5 dari ~18 konstanta port; warna kelima planet termasuk yang
+tidak dijaga. Mengubah warna Mars di salah satu sisi membiarkan seluruh
+`check-visuals` hijau sambil mengukur gambar yang sudah tidak ada lagi — cacat
+persis yang berkas ini ada untuk mencegah, hanya lubangnya ada di gerbangnya
+sendiri. STATUS.md (entri "sisa yang paling bernilai") sudah menandainya.
+
+### Perbaikannya, dan kenapa dibaca dari sumber
+
+Tambah `read_planet_palettes_from_swift` yang mengekstrak **tiap** `case` di
+dalam `switch palette` (light/dark/feature) lewat regex yang mengikuti bentuk
+sumber yang sudah tertulis, lalu membandingkan ke-lima planet ke port Python
+plus arah sebaliknya (planet di port harus ada di model). Membaca dari sumber
+— bukan menulis 15 pemeriksaan tangan — berarti tidak ada daftar yang bisa
+tertinggal separuh saat planet baru ditambah.
+
+### Bukti gerbangnya menggigit
+
+Mutasi warna Mars di `CelestialVisual.swift` (`0.88` → `0.10` pada saluran
+merah) langsung membuat parser melaporkan drift pada `palet planet: mars
+terang`, dan pemeriksaan merah. Tanpa penjaga ini, mutasi yang sama tidak
+membuat satu pun dari 215 pemeriksaan lama merah.
+
+### Gerbang
+- `python3 Tools/check-visuals.py --check` → **230 pemeriksaan (215 + 15
+  baru), 0 gagal**. 15 baru = 5 planet × (terang + gelap + ciri).
+- `./swift-test.sh` → **PointingKit 636, CelestialEngine 182**, 0 gagal
+  (engine tak disentuh — hanya `Tools/check-visuals.py`).
+- `./swift-ui-lint.sh` → 25 aturan hijau.
+- `./swift-typecheck.sh` → bersih.
+- CI: `37423198197` (Engine Tests Linux) + `37423198137` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `4aa6e9d`.
+
+### Batas yang jujur
+- **Yang dibuktikan:** warna + ciri kelima planet tidak bisa menyimpang antara
+  Swift dan port tanpa gerbang berbunyi. **Yang belum:** `feature` hanya
+  dibandingkan sebagai nama (`bands`/`rings`/...); ia tidak mengecek bahwa
+  view benar-benar *menggambar* ciri itu — itu sudah dijaga terpisah oleh
+  `check_planet_features_present`.
+- **Tidak ada layar/app yang berubah.** Murni penjagaan alat; UI tidak
+  menyentuh `Planet.palette` langsung.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — Menunjuk jam ke Matahari diam-diam mengunci "Mars (medium)")
 
 ### Cacatnya: gerbang pengaman Matahari hanya mengecek jarak *kandidat*, bukan arah tunjuk
