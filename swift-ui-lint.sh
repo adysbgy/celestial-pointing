@@ -2648,6 +2648,227 @@ else
   echo "Bersih: setiap TipePaket.anggota di Apps/ ada di paket."
 fi
 
+# ── Aturan 27: label argumen inisialisasi paket harus benar ─────────────────
+# Aturan 26 menjaga **keanggotaan**: `Tipe.anggota` benar-benar ada di paket.
+# Yang dijaganya nama anggota — dan inisialisasi tidak punya nama anggota sama
+# sekali. `CelestialVisual.RGBComponents(red:green:blue:)` adalah pemanggilan
+# yang benar apartemen: receiver-nya adalah *tipe*, dan tidak ada
+# `Tipe.anggota` yang bisa dibaca darinya.
+#
+# Kenapa ini harus gerbang Linux, bukan CI macOS saja:
+#
+#   `swift-test.sh`       membangun paket, bukan `Apps/` — pemanggilan ini
+#                         tidak pernah dilihatnya sama sekali.
+#   `swift-typecheck.sh`  mengompilasi **dua** berkas Foundation; berkas
+#                         SwiftUI (Canvas/WidgetKit) mustahil di Linux.
+#   Aturan 26             melihat `Tipe.anggota`, jadi `Tipe(Label:)` tak
+#                         pernah diindeks.
+#
+# Bentuk cacatnya persis bentuk yang sudah muncul berulang di berkas ini: kode
+# yang **benar** dipanggil dengan nama yang hampir benar, dan yang salah hanya
+# karena satu huruf. `ObserverLocation(latDeg:…)` adalah merah di CI macOS satu
+# siklus penuh (~2 menit) terlambat, seperti `VisualFrame` yang lolos dua kali.
+#
+# Yang bisa dan tidak bisa dijamin — batasnya ditulis karena inilah yang
+# menentukan kapan aturan ini boleh dipercaya:
+#
+#  - Label **eksternal** yang dibandingkan. Swift punya dua nama untuk satu
+#    argumen: `func text(for state: …)` dipanggil `text(for: …)`, sedangkan
+#    `func text(state: …)` dipanggil `text(state: …)`. Membaca label yang
+#    salah membuat gerbang merah pada kode yang benar.
+#  - Inisialisasi **bawaan** Swift (yang mengisi semua stored property)
+#    menerima apa pun dalam urutan apa pun, jadi tidak dihitung. Kalau sebuah
+#    tipe hanya punya inisialisasi bawaan, panggilannya dilewati.
+#  - Panggilan **posisional** dilewati: tanpa label tidak ada yang bisa
+#    dijamin tanpa menebak urutan, dan menebak urutan akan membuat gerbang
+#    merah pada kode yang benar.
+#  - Yang diperiksa: label yang ditulis harus sama dengan label deklarasi, dan
+#    argumen wajib tidak boleh hilang. Tipe argumen, kelebihan beban, dan
+#    `init?` tetap hanya ketahuan dari CI macOS.
+echo
+echo "== Aturan 27: label argumen TipePaket(Label:) di Apps/ harus benar =="
+wrong_labels=$(python3 - <<'PY' 2>&1
+import os, re, collections
+
+PKG, APPS = "Packages", "Apps"
+
+
+def strip(text):
+    """Buang komentar tanpa menyentuh string literal."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            out.append(c); i += 1
+            while i < n:
+                out.append(text[i])
+                if text[i] == "\\":
+                    i += 2; continue
+                if text[i] == '"':
+                    i += 1; break
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2; continue
+        out.append(c); i += 1
+    return "".join(out)
+
+
+def balanced(text, i):
+    """text[i] adalah '(' atau '[' atau '{'; kembalikan isinya."""
+    depth = 0
+    j = i
+    while j < len(text):
+        c = text[j]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1:j]
+        j += 1
+    return text[i + 1:]
+
+
+def split_top(inside):
+    parts, depth, cur = [], 0, ""
+    for c in inside:
+        if c in "([{<":
+            depth += 1
+        elif c in ")]}>":
+            depth -= 1
+        if c == "," and depth == 0:
+            parts.append(cur); cur = ""
+        else:
+            cur += c
+    if cur.strip():
+        parts.append(cur)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def has_default(param):
+    """True kalau `label: T = nilai` — bukan `==`, `<=`, `!=`, `>=`, `=~`."""
+    depth, i, n = 0, 0, len(param)
+    while i < n:
+        c = param[i]
+        if c in "([{<":
+            depth += 1
+        elif c in ")]}>":
+            depth -= 1
+        elif c == "=" and depth == 0:
+            prev = param[i - 1] if i else ""
+            nxt = param[i + 1] if i + 1 < n else ""
+            if not (nxt == "=" or prev in ("!", "<", ">", "=") or nxt == "~"):
+                return True
+        i += 1
+    return False
+
+
+LABEL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)")
+
+
+def call_params(inside):
+    """[(label, ada nilai)] untuk sisi PEMANGGILAN."""
+    out = []
+    for p in split_top(inside):
+        m = LABEL.match(p)
+        out.append((m.group(1) if m else None, has_default(p)))
+    return out
+
+
+def decl_params(inside):
+    """[(label EKSTERNAL, ada nilai)] untuk sisi DEKLARASI.
+
+    Swift mengizinkan dua nama untuk satu argumen: `func text(for state:)`
+    dipanggil `text(for:)`, sedangkan `func text(state:)` dipanggil
+    `text(state:)`. Yang diperiksa adalah nama yang dipakai pemanggil.
+    """
+    out = []
+    for p in split_top(inside):
+        head = p.split(":", 1)[0].strip()
+        tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", head)
+        out.append((tokens[0] if tokens else None, has_default(p)))
+    return out
+
+
+DECL = re.compile(r"\b(?:struct|enum|class|actor)\s+([A-Za-z_][A-Za-z0-9_]*)")
+INIT = re.compile(r"\b(?:convenience |required |override )*init\s*(\?|\!)?\s*\(")
+
+inits = collections.defaultdict(list)
+for root, _, files in os.walk(PKG):
+    if ".build" in root:
+        continue
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = strip(open(path, encoding="utf-8").read())
+        decls = [(m.start(), m.group(1)) for m in DECL.finditer(text)]
+        for m in INIT.finditer(text):
+            owner = None
+            for pos, t in decls:
+                if pos < m.start():
+                    owner = t
+                else:
+                    break
+            if owner:
+                inits[owner].append(
+                    (decl_params(balanced(text, m.end() - 1)), path))
+
+
+def matches(given, decl):
+    if len(given) > len(decl):
+        return False
+    for (gl, _gd), (dl, ddef) in zip(given, decl):
+        if not ddef and gl != dl:
+            return False
+    return all(ddef for _l, ddef in decl[len(given):])
+
+
+CALL = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\s*\(")
+problems = []
+for root, _, files in os.walk(APPS):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = strip(open(path, encoding="utf-8").read())
+        for m in CALL.finditer(text):
+            t = m.group(1)
+            if t not in inits:
+                continue
+            given = call_params(balanced(text, m.end() - 1))
+            # Tanpa label tidak ada yang bisa dijamin tanpa menebak urutan.
+            if not given or any(l is None for l, _ in given):
+                continue
+            if not any(matches(given, decl) for decl, _ in inits[t]):
+                problems.append(
+                    f"  {path}: {t}("
+                    + ", ".join(f"{l}:" for l, _ in given) + ")\n"
+                    f"      deklarasi di {inits[t][0][1]} punya: "
+                    + ", ".join(l + (" (bawaan)" if d else "")
+                                for l, d in inits[t][0][0]))
+
+if problems:
+    print("\n".join(problems))
+    print("-> Label yang salah hanya ketahuan dari CI macOS hari ini. "
+          "Perbaiki pemanggilnya, atau kembalikan label di paket.")
+PY
+)
+if [ -n "$wrong_labels" ]; then
+  echo "$wrong_labels"
+  status=1
+else
+  echo "Bersih: setiap TipePaket(Label:) di Apps/ cocok dengan deklarasinya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

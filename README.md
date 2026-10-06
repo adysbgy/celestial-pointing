@@ -188,7 +188,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **26 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **27 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -198,12 +198,18 @@ permukaan kartu yang harus datang dari token yang kontrasnya dihitung
 `Canvas` planet tidak digambar ulang 20×/detik untuk piksel yang sama
 (aturan 21), setiap cabang complication yang wajib merender ikon
 keadaan bersama nama objeknya, supaya kandidat yang belum pasti tidak
-terbaca sebagai identitas yang terkunci (aturan 23), dan indeks warna
+terbaca sebagai identitas yang terkunci (aturan 23), indeks warna
 bintang yang hanya boleh sampai ke gambar lewat `drawableStarColorIndex`
-supaya warna tidak diklaim saat engine ragu (aturan 24), dan setiap
-`TipePaket.anggota` di `Apps/` yang harus benar-benar ada di paket — karena
-hanya CI macOS yang tahu keanggotaan tipe, dan itu satu siklus penuh
-terlambat (aturan 26).
+supaya warna tidak diklaim saat engine ragu (aturan 24), setiap
+`TipePaket.anggota` di `Apps/` yang harus benar-benar ada di paket (aturan
+26), dan **label argumen** `TipePaket(Label:)` yang harus sama dengan
+deklarasinya (aturan 27).
+
+Dua aturan terakhir lahir dari kelas cacat yang sama: pemakaian API paket
+dari view hanya ketahuan saat `Apps/` benar-benar dikompilasi terhadap
+paket, dan di Linux hanya `swift-typecheck.sh` yang bisa melakukannya —
+untuk **dua** berkas Foundation. Aturan 26 menutup jalur keanggotaan,
+aturan 27 menutup jalur pemanggilan.
 
 ### Uji harus pernah merah
 
