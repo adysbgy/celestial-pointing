@@ -1,3 +1,160 @@
+## Progres terakhir (6 Okt 2026 — dua lebar garis yang hidup di dua bahasa)
+
+### Temuan: audit mutasi ketiga — "cuma tebal garis", padahal yang hilang adalah penanda ragu
+
+Setelah kawah terikat, sapuan literal di `Apps/Shared/CelestialVisualView.swift`
+menyisakan `0.18` (tebal spike bintang) dan `0.28` (tebal glif `?`) yang
+**tidak disebut gerbang mana pun**. Keduanya ditulis di Swift **dan** di port
+Python, jadi jelas "satu kelas, tiga tempat" yang biasa — tapi lebih dari
+sekadar tidak dijaga: kodenya sendiri sudah benar, jadi tidak ada yang
+perlu diperbaiki. Yang perlu dijaga adalah agar tetap benar.
+
+Bukti, tiap angka dua arah:
+
+```
+VIEW  0.28 -> 0.60   315 pemeriksaan, 0 gagal
+VIEW  0.18 -> 0.55   315 pemeriksaan, 0 gagal
+PORT  0.28 -> 0.12   315 pemeriksaan, 0 gagal
+PORT  0.18 -> 0.60   315 pemeriksaan, 0 gagal
+```
+
+### Kenapa `0.28` bukan Kosmetik
+
+Glif `?` adalah **penanda ketidakpastian**: satu-satunya sinyal visual bahwa
+engine sedang ragu. PRD v0.4 melarang visual yang mengklaim identitas saat
+engine ragu. Glif yang menipis sampai tak terlihat **menghapus penanda itu**,
+dan supaya tidak terlihat ia harus diubah **di kedua bahasa** supaya port
+masih cocok — persis bentuk perubahan yang tidak pernah lolos review mata.
+
+### Tiga cacat di gerbang, semuanya ditemukan mutasi (bukan dibaca)
+
+1. **Pembaca singular** — `badge_radius * N` pertama selalu ada di geometri,
+   jadi mutasi di `_draw_candidate_marker` **tidak terlihat sama sekali**.
+   Diganti pembaca himpunan; `0.28` muncul di dua satuan berbeda (radius
+   frame di geometri, piksel di penggambar) dan keduanya wajib dijaga.
+
+2. **Pembaca plural terlalu longgar** — versi kedua menelan
+   `dot_radius = badge_radius * 0.13` (tetes glif, bukan lebar garis) dan
+   membuat gerbang **merah pada kode yang benar**. Diganti pembaca yang
+   hanya menerima konteks stroking (`stroke_width =` / `stroke_polyline(`).
+   Pelajaran: pembaca yang terlalu longgar lebih berbahaya dari tidak ada
+   pembaca — ia menghasilkan gerbang yang merah pada код yang benar, dan
+   orang belajar bahwa gerbang ini Frequently salah lalu mematikannya.
+
+3. **Perbandingan himpunan salah bentuk** — jumlah situs memang berbeda
+   (port dua, view satu), jadi himpunan tidak boleh sama; yang wajib sama
+   adalah **nilai** di dalamnya.
+
+Ditambah: pola harus menutup dua ejaan assignment (`lineWidth: max(...)`
+Swift, `width = max(...)` Python) — menebak yang mana akan membuat gerbang
+gagal membaca sumber yang benar. Pembaca juga tidak lagi melempar
+`ValueError`; daftar `checks` dibangun saat fungsi berjalan, jadi exception
+menggagalkan seluruh gerbang dengan traceback yang tidak menyebut apa yang
+harus diperbaiki. Jangkar hilang kini jadi **pemeriksaan merah yang menyebut
+situsnya**.
+
+### Pesan hasil yang salah mengarahkan
+
+Entri baru sempat melaporkan sumber port sebagai "sumber Swift", dan
+`port=True, seharusnya True` tidak mengatakan apa pun. Dua-duanya persis
+cacat yang dicatat tiga entri lalu tentang pesan yang menyuruh orang
+membaca tempat yang kosong. Diperbaiki: nama berkas ikut dibawa ke tiap
+pemeriksaan, dan nilai boolean ditampilkan sebagai "terpenuhi" /
+"TIDAK terpenuhi" daripada `True`/`False`.
+
+check-visuals 315 -> **323**. 182 engine + 650 PointingKit hijau — tidak ada
+kode Swift yang berubah.
+
+## Progres terakhir (6 Okt 2026 — satu angka kawah dalam dua satuan, dan tidak ada yang mengikatnya)
+
+### Temuan: audit mutasi kedua, setelah tiga celah pertama ditutup
+
+Siklus sebelumnya menutup skala magnitudo, geometri bintang, dan koefisien
+bayangan kawah. Audit berikutnya memakai cara yang sama pada angka yang
+**tidak terlihat sebagai celah saat dibaca**: `check_crater_drawing_constants`
+sudah menjaga `CRATER_RIM_OFFSET` (0,45) dan `CRATER_INNER_SCALE` (0,5), dan
+memang menjaga keduanya sama — port memakai konstantanya, view memakai diskret
+yang sama. Jadi gerbang itu benar, dan jelas kelihatan utuh.
+
+### Yang tidak dijaga: angka yang sama, satuan berbeda
+
+Cakram bibir kawah digambar di kedua bahasa dari **satu** faktor, tapi
+dengan **notasi yang berbeda**:
+
+| sisi | bentuk | satuan |
+|---|---|---|
+| view | `Path(ellipseIn: CGRect(… width: size * 1.84 …))` | **diameter** |
+| port | `canvas.disc(…, mr * 0.92, …)` | **radius** |
+
+`1.84 = 2 × 0.92`, jadi **kodenya benar**. Dan justru itu sebabnya tidak
+terlihat: dua konstanta yang dijaga di atas bisa dibaca tanpa menyentuh
+satuan, jadi gerbang yang menjaga keduanya tidak punya alasan untuk melihat
+satu yang terakhir ini — dan `1.84` maupun `0.92` **tidak disebut gerbang
+mana pun** di repo.
+
+Bukti, dua arah terpisah:
+
+```
+VIEW  1.84 -> 1.60   313 pemeriksaan, 0 gagal
+PORT  0.92 -> 0.70   313 pemeriksaan, 0 gagal
+```
+
+Keduanya mengubah **lebar sabit bibir kawah** — kontur yang menentukan apakah
+kawah terbaca sebagai cekung bergerigi atau sebagai stiker rata. Geserannya
+harus cukup lebar supaya sabitnya terlihat di ukuran jam 76 px; kalau terlalu
+sempit, ia tertelan dasar cakram. Menggeser `0.92` di port membuat gambar
+kawah di PNG menyimpang dari gambar kawah di jam tanpa satu pun pemeriksaan
+yang menyebutnya.
+
+### Dua cacat yang hanya muncul karena gerbangnya benar-benar dijalankan
+
+**1. Regex gerbang merah pada kode yang benar.** Versi pertama membaca
+`"diameter 2"` dari `size * 1.84` — pola `\*\s*([\d.]+)` menangkap digit
+terakhir dari pengenal. Efeknya gerbang merah total, dan karena itu akan
+dimatikan orang dalam sehari. Terperbaiki dengan `(?<![\w.])`.
+
+Yang membuat bug ini bertahan: **baseline tidak pernah dijalankan sendiri.**
+Harness selalu memasang mutasi lebih dulu, jadi mutasi pertama yang "merah"
+terlihat seperti bukti berhasil — padahal baseline-nya pun merah. Probe
+terpisah (baseline, tinggi saja, lebar saja) yang memunculkannya.
+
+**2. Dua pemeriksaan tumpang tindih, dan hanya satu yang bisa menyala.**
+Kasus "lebar != tinggi" menyalakan cek **rasio**, bukan cek lingkaran —
+artinya cek lingkaran tidak pernah terbukti hidup. Setelah regex diperbaiki,
+probe memisahkan keduanya:
+
+| mutasi | cek lingkaran | cek rasio |
+|---|---|---|
+| baseline | hijau | hijau |
+| tinggi saja (1.84 × 1.50) | **MERAH** | hijau |
+| lebar saja (1.60 × 1.84) | **MERAH** | **MERAH** |
+
+Baris kedua yang menentukan: mutasi yang **tidak** merusak rasio hanya
+menyalakan pemeriksaannya sendiri — jadi keduanya benar-benar hidup dan tidak
+saling menutupi.
+
+### Batas gerbang yang dinyatakan, bukan disembunyikan
+
+Gerbang ini mengikat **rasio**, bukan nilai absolut. Mengubah kedua sisi
+bersama (`view 1.60 + port 0.80`) tetap hijau, dan itu **benar**: `1.84`
+tidak punya model di `PointingKit`, jadi tidak ada sumber kebenaran ketiga
+selain kedua sisi itu sendiri. Mengikat nilai absolut berarti menulis
+"1.84 adalah angka yang benar" ke dalam gerbang — dan daftar seperti itu
+menjadi **entri yang tidak pernah dibandingkan**, persis lubang yang
+gerbang-gerbang tetangganya tutup. Kasus ini dikunci eksplisit di harness
+sebagai "harus tetap hijau" supaya batasnya tercatat di tempat yang
+dieksekusi, bukan hanya di komentar.
+
+### Gerbang
+- `python3 Tools/check-visuals.py --check` → **315 pemeriksaan** (313 → 315,
+  +2 = rasio diameter/radius + simetris width/height), 0 gagal.
+- `./swift-test.sh` → **182 engine + 650 PointingKit**, 0 gagal — tidak ada
+  kode Swift yang berubah.
+- `./swift-ui-lint.sh` → 28 aturan hijau. `./swift-typecheck.sh` → LULUS.
+- CI: `37477614542` + `37477615500`.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — tiga gerbang yang mengukur model, port, atau port melawan dirinya sendiri)
 
 ### Cara membuka siklus ini: mutasi satu per satu, bukan membaca kode
