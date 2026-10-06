@@ -1981,6 +1981,17 @@
         }
       }
     },
+    "deepSky.morphology.planetaryNebula.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: nebula planetari — cangkang gas berongga, kebalikan nebula emisi yang memusat. Kata sendiri supaya pengguna VoiceOver tahu bedanya, karena gambarnya tidak bisa mereka lihat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "planetary nebula"
+          }
+        }
+      }
+    },
     "deepSky.morphology.openCluster.spoken.label": {
       "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
       "localizations": {

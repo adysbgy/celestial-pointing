@@ -242,6 +242,20 @@ DEEP_SKY_LAYOUT = {
     "nebula": [(-0.18, 0.12, 1.00, 1.0, 0.0, 0.42),
                (0.22, -0.16, 0.68, 1.0, 0.0, 0.30),
                (0.05, -0.04, 0.40, 1.0, 0.0, 0.55)],
+    # MODEL: `VisualFrame.deepSky(.planetaryNebula)` — cangkang berongga.
+    # Semua blob pada radius yang sama, dan **tidak ada yang di tengah**:
+    # kebalikan dari nebula emisi di atas, yang blobnya justru paling besar &
+    # paling terang di pusat. Dua bentuk bertolak belakang, jadi port yang
+    # tidak menggambar cabang ini akan membuat setiap pemeriksaan gambar
+    # mengukur bentuk yang tidak pernah tampil.
+    "planetaryNebula": [(0.4200000000000000, 0.0000000000000000, 0.30, 1.0, 0.0, 0.54),
+                        (0.2969848483038187, 0.2969848483038187, 0.30, 1.0, 0.0, 0.48),
+                        (0.0000000000000000, 0.4200000000000000, 0.30, 1.0, 0.0, 0.52),
+                        (-0.2969848483038187, 0.2969848483038187, 0.30, 1.0, 0.0, 0.46),
+                        (-0.4200000000000000, 0.0000000000000000, 0.30, 1.0, 0.0, 0.50),
+                        (-0.2969848483038187, -0.2969848483038187, 0.30, 1.0, 0.0, 0.44),
+                        (0.0000000000000000, -0.4200000000000000, 0.30, 1.0, 0.0, 0.53),
+                        (0.2969848483038187, -0.2969848483038187, 0.30, 1.0, 0.0, 0.47)],
     "galaxy": [(0.0, 0.0, 1.00, 0.34, -18.0, 0.30),
                (0.0, 0.0, 0.66, 0.30, -18.0, 0.26),
                (0.0, 0.0, 0.26, 0.42, -18.0, 0.60)],
@@ -1440,6 +1454,7 @@ def build_cases():
 
     # ── Objek langit dalam ────────────────────────────────────────────
     for morph, note in (("nebula", "nebula emisi (M42)"),
+                        ("planetaryNebula", "nebula planetari (M27/M57)"),
                         ("galaxy", "galaksi (M31/M51)"),
                         ("openCluster", "gugus terbuka (Pleiades)"),
                         ("globularCluster", "gugus bola (M13)")):

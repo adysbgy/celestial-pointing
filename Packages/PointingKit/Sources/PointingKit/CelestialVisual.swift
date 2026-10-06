@@ -1205,6 +1205,47 @@ public enum VisualFrame {
         case .nebula:
             return nebula(fuzziness: fuzziness, frameHalfExtent: frameHalfExtent)
 
+        case .planetaryNebula:
+            // Cangkang gas **berongga**: cincin blob pada satu radius, dan
+            // **tidak ada blob di tengah**. Ketiadaan pusat inilah intinya —
+            // nebula emisi memusat, nebula planetari justru kosong di situ
+            // karena bintang pusatnya sudah meniup gasnya keluar.
+            //
+            // Yang membedakannya dari `openCluster` (yang juga tanpa inti)
+            // bukan ketiadaan pusat, melainkan **keteraturannya**: semua blob
+            // duduk pada radius yang sama, karena cangkangnya memang sebuah
+            // kulit bola. Gugus terbuka tersebar pada radius yang berbeda-
+            // beda. Jadi `.planetaryNebula` boleh punya blob rapat tanpa
+            // tampak sebagai "kerumunan bintang", dan perbedaan itu terukur
+            // (`testPlanetaryNebulaShellSitsOnOneRadius`).
+            // Radius dan komponennya **dihitung**, bukan ditulis: 45° pada
+            // radius `r` adalah `r/√2`, dan angka yang dibulatkan ke enam
+            // desimal membuat cangkangnya menyimpang 2e-7 dari satu radius —
+            // cukup untuk membuat uji "satu radius" merah tanpa ada yang
+            // salah. Satu angka (`shellRadius`) yang dipakai kedua sumbu.
+            let shellRadius = 0.42
+            let diagonal = shellRadius / 2.0.squareRoot()
+            let ring: [(Double, Double)] = [
+                ( shellRadius,  0.0),
+                ( diagonal,  diagonal),
+                ( 0.0,  shellRadius),
+                (-diagonal,  diagonal),
+                (-shellRadius,  0.0),
+                (-diagonal, -diagonal),
+                ( 0.0, -shellRadius),
+                ( diagonal, -diagonal)
+            ]
+            // Opasitasnya tidak seragam: cangkang yang rata sempurna tampak
+            // seperti donat yang digambar. Bedanya kecil dan sengaja
+            // asimetris (sisi atas-sedikit lebih tebal).
+            let shellOpacity = [0.54, 0.48, 0.52, 0.46, 0.50, 0.44, 0.53, 0.47]
+            let layout: [(Double, Double, Double, Double, Double, Double)] =
+                zip(ring, shellOpacity).map { offset, opacity in
+                    (offset.0, offset.1, 0.30, 1.0, 0.0, opacity)
+                }
+            return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
+
         case .galaxy:
             // Cakram miring + tonjolan inti. Dua hal yang membuatnya terbaca
             // sebagai galaksi, bukan nebula lonjong: rasio sumbu tiap lapisan

@@ -511,7 +511,8 @@ public extension LocalizedText {
         // menampilkan cakram galaksi vs inti padat gugus bola, dan tanpa kunci
         // ini "Gugus Ptolemy" dan "Gugus Hercules" terdengar sama persis.
         // Lihat `DeepSkySpeech.swift`.
-        .deepSkyMorphologyNebula, .deepSkyMorphologyGalaxy,
+        .deepSkyMorphologyNebula, .deepSkyMorphologyPlanetaryNebula,
+        .deepSkyMorphologyGalaxy,
         .deepSkyMorphologyOpenCluster, .deepSkyMorphologyGlobularCluster,
         // Putusan GoTo. Masuk daftar karena inilah satu-satunya jalur putusan
         // keselamatan sampai ke layar: `SlewPlanner` sudah menghitungnya sejak

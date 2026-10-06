@@ -168,6 +168,23 @@ public enum DeepSkyCatalogue {
     public enum Morphology: String, Equatable, Sendable, CaseIterable {
         /// Nebula emisi/pantulan: kabut asimetris yang menyebar.
         case nebula
+        /// Nebula planetari: cangkang gas yang **berongga di tengah** —
+        /// kebalikan dari nebula emisi, yang justru paling terang di tengah.
+        ///
+        /// **Kenapa ini kasus sendiri, bukan `.nebula`.** M27 (Dumbel) dan
+        /// M57 (Cincin) sampai siklus ini dipetakan ke `.nebula`, padahal
+        /// komentar katalognya sendiri menyebutnya "nebula planetari". Dua
+        /// bentuk itu berlawanan arah: nebula emisi memusat, nebula planetari
+        /// berlubang. Menggambar yang kedua sebagai yang pertama bukan
+        /// sekadar kurang mirip — ia menyatakan "gas mengumpul di sini" pada
+        /// objek yang gasnya justru sudah ditiup keluar oleh bintang
+        /// pusatnya. Nama morfologinya juga dipakai pengumuman VoiceOver,
+        /// jadi yang terdengar ikut salah.
+        ///
+        /// Ciri yang membedakannya di layar adalah **lubang tengah**, bukan
+        /// ukuran keseluruhan: cangkangnya berupa cincin, dan bagian
+        /// dalamnya kosong.
+        case planetaryNebula
         /// Galaksi: cakram miring dengan tonjolan inti — terlihat dari rasio
         /// sumbu elipsnya, bukan cuma dari lebarnya.
         case galaxy
@@ -196,8 +213,8 @@ public enum DeepSkyCatalogue {
         "m22": .globularCluster,  // Sagitarius — gugus bola
         "m6":  .openCluster,      // Kupu-kupu — gugus terbuka
         "m17": .nebula,           // Omega — nebula emisi
-        "m27": .nebula,           // Dumbel — nebula planetari
-        "m57": .nebula,           // Cincin — nebula planetari
+        "m27": .planetaryNebula,  // Dumbel — nebula planetari (cangkang lonjong)
+        "m57": .planetaryNebula,  // Cincin — nebula planetari (cangkang bulat)
         "m51": .galaxy,           // Pusaran — galaksi spiral
         "m11": .openCluster,      // Bebek Liar — gugus terbuka padat
         "m2":  .globularCluster,  // M2 — gugus bola padat

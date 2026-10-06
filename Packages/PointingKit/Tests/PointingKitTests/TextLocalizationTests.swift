@@ -294,9 +294,15 @@ final class TextLocalizationTests: XCTestCase {
     /// selama ini tidak ada karena judulnya memakai kunci **nilai**
     /// (`skyContext.dark`), sehingga barisnya terbaca "Gelap: Gelap" dan tidak
     /// pernah menyebut apa yang diukur. Dijaga Aturan 22 di `swift-ui-lint.sh`.
+    ///
+    /// 307 → 308 pada siklus "nebula planetari bukan nebula":
+    /// `deepSky.morphology.planetaryNebula.spoken.label`. Bentuknya berlawanan
+    /// dengan nebula emisi (berongga vs memusat), jadi kata yang sama untuk
+    /// dua gambar bertolak belakang akan memindahkan cacat dari mata ke telinga
+    /// — terutama bagi pengguna VoiceOver, yang tidak melihat gambarnya.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 307, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 308, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

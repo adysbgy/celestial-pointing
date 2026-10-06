@@ -81,6 +81,7 @@ public extension CelestialVisual {
     static func deepSkyMorphologyText(_ morphology: DeepSkyCatalogue.Morphology) -> LocalizedText {
         switch morphology {
         case .nebula:          return .deepSkyMorphologyNebula
+        case .planetaryNebula: return .deepSkyMorphologyPlanetaryNebula
         case .galaxy:          return .deepSkyMorphologyGalaxy
         case .openCluster:     return .deepSkyMorphologyOpenCluster
         case .globularCluster: return .deepSkyMorphologyGlobularCluster
@@ -94,6 +95,14 @@ public extension LocalizedText {
 
     static let deepSkyMorphologyNebula = LocalizedText(
         key: "deepSky.morphology.nebula.spoken.label", id: "nebula")
+    /// **Kenapa kata ini bukan sekadar "nebula".** Nebula planetari memakai
+    /// kata sendiri karena bentuknya berlawanan: nebula emisi memusat,
+    /// nebula planetari berongga. Dua objek yang berbagi satu kata untuk dua
+    /// gambar yang bertolak belakang adalah cacat yang sama dengan yang
+    /// berkas ini ada untuk menutup — bedanya kali ini ada di telinga, bukan
+    /// di mata.
+    static let deepSkyMorphologyPlanetaryNebula = LocalizedText(
+        key: "deepSky.morphology.planetaryNebula.spoken.label", id: "nebula planetari")
     static let deepSkyMorphologyGalaxy = LocalizedText(
         key: "deepSky.morphology.galaxy.spoken.label", id: "galaksi")
     static let deepSkyMorphologyOpenCluster = LocalizedText(

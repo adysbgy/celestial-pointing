@@ -1057,6 +1057,54 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Nebula planetari harus **berongga**: tidak ada blob di pusat.
+    ///
+    /// Ini kebalikan dari nebula emisi, yang blobnya paling besar dan paling
+    /// terang di tengah. Sampai siklus ini M27 (Dumbel) dan M57 (Cincin)
+    /// dipetakan ke `.nebula`, jadi layar menyatakan "gas mengumpul di sini"
+    /// pada dua objek yang gasnya justru sudah ditiup keluar. Yang membuat
+    /// cacat itu tak terlihat: kedua bentuk tetap "kabut", dan tidak ada satu
+    /// teks di layar yang menyebut bedanya.
+    func testPlanetaryNebulaIsHollowAtTheCentre() {
+        let geometry = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 1.0)
+        XCTAssertFalse(geometry.blobs.isEmpty, "nebula planetari harus punya cangkang")
+        let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
+        XCTAssertGreaterThan(nearest, 0.3,
+                             "cangkang tidak boleh punya blob di pusat — itu ciri nebula emisi")
+    }
+
+    /// Cangkangnya harus duduk pada **satu radius**.
+    ///
+    /// Ini yang membedakannya dari `openCluster`, yang juga tanpa inti tapi
+    /// tersebar pada radius yang berbeda-beda: nebula planetari adalah sebuah
+    /// kulit bola, jadi semua bagian cangkangnya sejauh dari pusat. Tanpa uji
+    /// ini, `.planetaryNebula` yang menyebar tak beraturan akan lolos semua
+    /// pemeriksaan "tidak punya inti" sambil tampil sebagai gugus terbuka.
+    func testPlanetaryNebulaShellSitsOnOneRadius() {
+        let geometry = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 1.0)
+        let radii = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }
+        guard let smallest = radii.min(), let largest = radii.max() else {
+            return XCTFail("nebula planetari harus punya cangkang")
+        }
+        XCTAssertLessThan(largest - smallest, 1e-9,
+                          "cangkang harus satu radius (terkecil \(smallest) vs terbesar \(largest)) — kalau menyebar, ia tampil sebagai gugus terbuka")
+    }
+
+    /// Nebula planetari harus **berbeda** dari nebula emisi dan dari gugus
+    /// terbuka — dua bentuk yang paling mirip dengannya di layar.
+    ///
+    /// Arah ketiga yang tak kalah penting ada di
+    /// `testEveryMorphologyHasItsOwnSpokenWord`: gambar berbeda tapi kata
+    /// sama berarti cacatnya cuma pindah ke telinga.
+    func testPlanetaryNebulaDiffersFromItsNearestNeighbours() {
+        let planetary = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 0.8)
+        for other in [DeepSkyCatalogue.Morphology.nebula, .openCluster] {
+            let geometry = VisualFrame.deepSky(morphology: other, fuzziness: 0.8)
+            XCTAssertNotEqual(planetary.blobs, geometry.blobs,
+                              "nebula planetari identik dengan \(other) — keduanya akan tampil sama")
+        }
+    }
+
     /// Galaksi harus benar-benar **elips**, bukan lingkaran.
     ///
     /// Kalau semua rasio sumbu mendekati 1, "galaksi" hanya nama untuk kabut
