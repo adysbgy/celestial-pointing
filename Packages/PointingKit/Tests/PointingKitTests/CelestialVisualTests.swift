@@ -1220,6 +1220,79 @@ final class CelestialVisualTests: XCTestCase {
                        "inti gugus bola harus blob terbesar — kalau tidak, bentuknya tidak memusat")
     }
 
+    /// Gugus bola harus **redup ke luar**, seperti yang ditulis di layout.
+    ///
+    /// Layout-nya menyebut inti "paling terang" dan dua cincin "makin redup
+    /// ke luar". Tapi **tidak ada satu pun uji yang menjaga itu**, dan
+    /// `testGlobularClusterHasADenseCentre` memang tidak bisa menjaganya:
+    /// ia hanya membandingkan inti dengan blob **terbesar**, bukan yang paling
+    /// terang — jadi soal warna sama sekali tidak tersentuh.
+    ///
+    /// **Mutasi yang dulu lolos** (dibuktikan, bukan diklaim): opasitas inti
+    /// `0.55 -> 0.22` membuat inti sama redupnya dengan cincin **terluar** —
+    /// gradien kecerahannya jadi rata — dan **634/634 uji tetap hijau**.
+    ///
+    /// **Kenapa dibandingkan per pita radius, bukan per blob.** Versi pertama
+    /// uji ini mengambil `byRadius[1]` dan `byRadius[count-1]`, yaitu **satu**
+    /// anggota tiap cincin. Karena `sorted` tidak menentukan urutan anggota
+    /// yang radiusnya sama, mutasi **satu** blob cincin luar lolos tanpa
+    /// terlihat: indeks terakhir bisa jatuh ke blob lain yang belum dirusak.
+    /// Yang benar dijaga ada dua, dan keduanya di sini:
+    ///
+    ///  1. **Seragam dalam satu pita** — semua anggota cincin sama redupnya.
+    ///     Tanpa ini, satu blob yang lebih terangeredup di dalam cincin yang
+    ///     sama lolos begitu saja.
+    ///  2. **Menurun antar pita** — inti > cincin dalam > cincin luar.
+    ///
+    /// Mutasi yang dibuktikan merah pada versi ini: inti `0.55 -> 0.22`
+    /// (gradien rata), **dan** satu anggota cincin luar `0.22 -> 0.38`
+    /// (pita jadi tidak seragam).
+    func testGlobularClusterDimsWithRadius() {
+        for fuzziness in [0.0, 0.6, 1.0] {
+            let blobs = VisualFrame.deepSky(morphology: .globularCluster,
+                                            fuzziness: fuzziness).blobs
+            // Kelompokkan ke pita radius: inti di 0, lalu dua cincin. Kunci
+            // dibulatkan ke 2 desimal karena radius layout (0.30, 0.46) dan
+            // `room`-nya tidak pernah persis bulat.
+            var bands: [Double: [Double]] = [:]
+            for blob in blobs {
+                let radius = (hypot(blob.offsetX, blob.offsetY) * 100).rounded() / 100
+                bands[radius, default: []].append(blob.opacity)
+            }
+            let ordered = bands.keys.sorted()
+            guard ordered.count >= 3 else {
+                return XCTFail("gugus bola harus punya inti + beberapa cincin "
+                               + "(hanya \(ordered.count) pita pada fuzziness \(fuzziness))")
+            }
+            let core = bands[ordered[0]] ?? []
+            let innerRing = bands[ordered[1]] ?? []
+            let outerRing = bands[ordered[ordered.count - 1]] ?? []
+
+            // 1. Seragam dalam tiap pita — semua anggota satu cincin sama redup.
+            for (name, band) in [("inti", core), ("cincin dalam", innerRing),
+                                 ("cincin luar", outerRing)] {
+                guard let lo = band.min(), let hi = band.max() else {
+                    return XCTFail("pita \(name) kosong pada fuzziness \(fuzziness)")
+                }
+                XCTAssertEqual(lo, hi, accuracy: 1e-9,
+                               "\(name) gugus bola harus sama redupnya semua anggota "
+                               + "(terang \(hi) vs redup \(lo)) pada fuzziness \(fuzziness)")
+            }
+            // 2. Menurun ke luar — bandingkan **paling redup** di pita dalam
+            //    dengan **paling terang** di pita luar, supaya selisih
+            //    terkecil pun tidak bisa lolos.
+            let (coreLo, coreHi) = (core.min() ?? 0, core.max() ?? 0)
+            let (innerLo, innerHi) = (innerRing.min() ?? 0, innerRing.max() ?? 0)
+            let (outerLo, outerHi) = (outerRing.min() ?? 0, outerRing.max() ?? 0)
+            XCTAssertGreaterThan(coreLo, innerHi,
+                                 "inti gugus bola harus lebih terang daripada cincin dalam "
+                                 + "pada fuzziness \(fuzziness)")
+            XCTAssertGreaterThan(innerLo, outerHi,
+                                 "cincin dalam harus lebih terang daripada cincin luar "
+                                 + "pada fuzziness \(fuzziness)")
+        }
+    }
+
     /// Gugus terbuka harus **tersebar**: tidak ada inti di pusat.
     ///
     /// Ketiadaan pusat inilah yang membedakannya dari gugus bola, bukan
