@@ -134,6 +134,56 @@ final class VisibilityTests: XCTestCase {
                        "purnama menerangi langit, jadi ambang magnitudo harus mengetat")
     }
 
+    /// **Bulan yang sudah terbenam tidak boleh menerangi langit.**
+    ///
+    /// Ini kelas cacat yang dikejar terus di repo ini: penyaring menuntut
+    /// "ada cahaya Bulan" tapi hanya memeriksa fraksi iluminasi, bukan apakah
+    /// Bulan benar-benar masih di atas horizon. `moonAltitudeDeg` sudah ada di
+    /// `SkyContext` — saat Bulan terbenam ia bernilai negatif, sementara
+    /// `moonIlluminationFraction` tetap tidak `nil`. Akibatnya engine membuang
+    /// bintang redup untuk Bulan yang pengguna sama sekali tidak bisa lihat:
+    /// penolakan palsu, persis yang dilarang PRD v0.4.
+    ///
+    /// Semua uji cahaya Bulan lain di berkas ini memakai `moonAltitudeDeg: 30`
+    /// (Bulan di atas horizon), jadi celah ini tidak pernah tersentuh. Uji ini
+    /// yang menyetelnya: purnama tapi **terbenam** → ambang kembali ke dasar,
+    /// dan bintang redup lolos seolah langit gelap.
+    func testSetMoonDoesNotBrightenTheSky() {
+        // Purnama, tapi Bulan sudah di -20° (di bawah horizon).
+        let setFullMoon = SkyContext(sunAltitudeDeg: -40,
+                                     moonAltitudeDeg: -20,
+                                     moonIlluminationFraction: 1.0,
+                                     isDark: true)
+
+        // Di bawah purnama yang masih di atas, mag 4.5 ditolak. Di bawah purnama
+        // yang sudah terbenam, mag 4.5 harus lolos seperti langit benar-benar gelap.
+        let limit = VisibilityFilter.effectiveLimitingMagnitude(context: setFullMoon,
+                                                                policy: policy)
+        XCTAssertEqual(limit, policy.limitingMagnitude,
+                       "Bulan terbenam tidak boleh mengetatkan ambang magnitudo")
+
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 4.5, separationFromSunDeg: 120,
+            context: setFullMoon, policy: policy
+        )
+        XCTAssertEqual(result, .visible,
+                       "bintang redup harus terlihat saat Bulan sudah terbenam")
+    }
+
+    /// `moonAltitudeDeg` yang `nil` (Bulan tak diketahui letaknya) juga tidak
+    /// boleh mengetatkan — sejalan dengan prinsip "tidak tahu = jangan anggap
+    /// lebih buruk" yang sudah dipakai untuk fraksi `nil`.
+    func testUnknownMoonAltitudeDoesNotBrighten() {
+        let unknown = SkyContext(sunAltitudeDeg: -40,
+                                 moonIlluminationFraction: 1.0,
+                                 isDark: true)
+        XCTAssertNil(unknown.moonAltitudeDeg)
+        XCTAssertEqual(VisibilityFilter.effectiveLimitingMagnitude(context: unknown,
+                                                                    policy: policy),
+                       policy.limitingMagnitude,
+                       "altitude Bulan tak diketahui = jangan anggap langit lebih terang")
+    }
+
     // MARK: - Batas senja
 
     func testDarknessBoundary() {

@@ -1,3 +1,74 @@
+## Progres terakhir (6 Okt 2026 — Bulan terbenam masih memberi tahu langit "terang", bintang redup ditolak salah)
+
+### Cacatnya: penyaring menuntut "ada cahaya Bulan" tapi tidak mengecek Bulan masih di atas horizon
+
+`VisibilityFilter.effectiveLimitingMagnitude` mengetatkan ambang magnitudo murni
+dari `moonIlluminationFraction`. `SkyContext` sudah memegang `moonAltitudeDeg`
+— saat Bulan terbenam nilainya negatif, sementara `moonIlluminationFraction`
+tetap tidak `nil`. Akibatnya engine membuang bintang redup **seolah ada
+purnama di langit**, padahal Bulan justru sudah di bawah horizon dan pengguna
+tidak bisa melihatnya. Itu penolakan palsu (false negative), persis arah yang
+dilarang PRD v0.4: engine berbohong ke arah "lebih buruk" karena asumsi cahaya
+yang tidak ada.
+
+### Kenapa tidak ada gerbang yang melihatnya
+
+Setiap uji cahaya Bulan yang sudah ada memakai `moonAltitudeDeg: 30` (Bulan di
+atas horizon), jadi celah ini sama sekali tidak tersentuh:
+
+| Uji | `moonAltitudeDeg` | Status |
+|---|---|---|
+| `testMoonlightTightensTheLimitingMagnitude` | 30 | hijau, tapi Bulan di atas |
+| `testPermissivePolicyIgnoresMoonlight` | 30 | hijau, Bulan di atas |
+| `testBrighterMoonNeverLoosensTheLimit` | 30 | hijau, Bulan di atas |
+| `testSetMoonDoesNotBrightenTheSky` (baru) | **−20** | **merah sebelum perbaikan** |
+
+Kelas yang sama dengan yang sudah berulang di repo ini: penyaring menuntut
+sesuatu tapi hanya memeriksa sebagian dari syaratnya.
+
+### Yang diperbaiki, dan kenapa bukan "naikkan saja threshold"
+
+Menurunkan `moonBrighteningMagnitudes` akan membuat uji hijau hari ini dan
+mengembalikan cacatnya begitu fraksi berubah — menyembunyikan, bukan menutup.
+Satu-satunya tempat cacatnya lahir adalah `effectiveLimitingMagnitude`, jadi di
+situlah perbaikannya: cahaya Bulan hanya dihitung kalau Bulan benar-benar masih
+di atas horizon (`moonAltitudeDeg > 0`). Altitude `nil` (Bulan tak diketahui
+letaknya) diperlakukan sama dengan "di bawah horizon": "tidak tahu" berarti
+**jangan menebak lebih buruk**, bukan "asumsikan paling terang". Itu juga
+menyelaraskan dengan prinsip yang sudah dipakai untuk fraksi `nil`.
+
+### Gerbang: tulis tes yang gagal dulu, baru perbaiki
+
+Dua tes baru ditulis **sebelum** perbaikan dan benar-benar merah:
+
+```
+error: Bulan terbenam tidak boleh mengetatkan ambang magnitudo  ("4.4") is not equal to ("6.0")
+error: bintang redup harus terlihat saat Bulan sudah terbenam    ("tooFaint") is not equal to ("visible")
+error: altitude Bulan tak diketahui = jangan anggap langit lebih terang ("4.4") is not equal to ("6.0")
+```
+
+Setelah perbaikan: 0 gagal. Tidak ada tes lama yang bergantung pada perilaku
+rusak itu (CelestialEngine **179 → 181**, PointingKit tetap **635**).
+
+### Gerbang lokal
+- `./swift-test.sh` → **CelestialEngine 181 (+2), PointingKit 635**, 0 gagal.
+- `./swift-ui-lint.sh` → **25 aturan hijau** (Aturan 10 menangkap README yang
+  masih 179, seperti seharusnya — diperbarui ke 181/635).
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `python3 Tools/check-visuals.py --check` → **215 pemeriksaan, 0 gagal**.
+- Engine teruji tidak disentuh; perubahan hanya di `Visibility.swift` + 2 tes.
+
+### Batas yang jujur
+- **Yang dibuktikan:** saat Bulan terbenam atau letaknya tak diketahui, ambang
+  magnitudo kembali ke dasar dan bintang redup lolos. Yang **belum**: efek
+  sudut Bulan (seberapa jauh dari pengamat) belum ikut dihitung — ini sengaja
+  tidak ditambah karena belum ada sumbernya di engine (aturan repo: jangan
+  menambah presisi yang belum ada sumbernya).
+- **Tidak ada layar yang berubah.** Ini murni logika penyaring; UI tidak
+  menyentuh `effectiveLimitingMagnitude` langsung.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — penyaringan siang yang hijau tanpa pernah mengujinya, sampai ke `.lock`)
 
 ### Alasan siklus ini masih ada

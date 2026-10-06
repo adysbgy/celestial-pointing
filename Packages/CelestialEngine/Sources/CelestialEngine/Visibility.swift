@@ -148,13 +148,24 @@ public enum VisibilityFilter {
     /// butuh plumbing efemeris baru untuk pengaruh orde dua. Aturan repo:
     /// jangan menambah presisi yang belum ada sumbernya.
     ///
-    /// Mengembalikan batas dasar saat fraksi `nil` (Bulan tidak diketahui):
-    /// "tidak tahu" berarti **jangan menebak lebih buruk**, bukan "asumsikan
-    /// paling gelap". Asumsi terbaik tanpa bukti adalah batas paling longgar,
-    /// dan itu juga yang paling tidak berbohong tentang apa yang bisa dilihat.
+    /// **Cahaya hanya dihitung kalau Bulan benar-benar masih di atas horizon.**
+    /// `SkyContext.moonAltitudeDeg` memegang ketinggiannya; saat Bulan sudah
+    /// terbenam nilainya negatif, sedangkan `moonIlluminationFraction` tetap
+    /// tidak `nil` — jadi menyaring hanya dari fraksi akan menghukum bintang
+    /// redup untuk Bulan yang pengguna sama sekali tidak bisa lihat. Itu
+    /// penolakan palsu, persis yang dilarang PRD v0.4. Altitude `nil` (Bulan
+    /// tak diketahui letaknya) diperlakukan sama: "tidak tahu" berarti **jangan
+    /// menebak lebih buruk**, bukan "asumsikan paling terang".
+    ///
+    /// Mengembalikan batas dasar saat fraksi `nil` (Bulan tidak diketahui),
+    /// saat Bulan di bawah horizon, atau saat altitudenya tak diketahui: asumsi
+    /// terbaik tanpa bukti adalah batas paling longgar, dan itu juga yang paling
+    /// tidak berbohong tentang apa yang bisa dilihat.
     public static func effectiveLimitingMagnitude(context: SkyContext,
                                                   policy: VisibilityPolicy) -> Double {
-        let fraction = context.moonIlluminationFraction ?? 0
+        // Cahaya Bulan hanya relevan kalau Bulan memang masih di atas horizon.
+        let moonIsUp = (context.moonAltitudeDeg ?? -90) > 0
+        let fraction = moonIsUp ? (context.moonIlluminationFraction ?? 0) : 0
         guard fraction > 0 else { return policy.limitingMagnitude }
         return policy.limitingMagnitude - policy.moonBrighteningMagnitudes * fraction
     }
