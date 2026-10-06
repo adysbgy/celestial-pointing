@@ -81,6 +81,15 @@ public struct PointingResolver {
     /// Sumber efemeris. `nil` berarti benda tata surya tidak dipertimbangkan.
     public let ephemeris: SolarSystemEphemeris?
 
+    /// Kerucut keamanan Matahari yang **tetap** (tidak mengikuti kebijakan
+    /// visibilitas). Jika arah tunjuk berada dalam sudut ini dari Matahari
+    /// (saat Matahari di atas horizon), resolver menolak mengklaim apa pun,
+    /// berlaku sekalipun kebijakan paling permisif. Aturan keras PRD:
+    /// menunjuk Matahari tidak boleh pernah menghasilkan kunci/identitas.
+    /// Diameter sudut Matahari ~0,5°; 13° memberi ruang "kamu menunjuk ke
+    /// Matahari" yang aman tanpa menolak objek yang sah di dekatnya.
+    public static let sunSafeConeDeg: Double = 13.0
+
     public init(catalogue: [CelestialObject],
                 policy: VisibilityPolicy = VisibilityPolicy(),
                 confidencePolicy: ConfidencePolicy = ConfidencePolicy(),
@@ -172,6 +181,33 @@ public struct PointingResolver {
         var rejected: [RejectedObject] = []
         var failures: [EphemerisBody] = []
         var considered = 0
+
+        // Gerbang pengaman Matahari: arah tunjuk **itu sendiri** tidak boleh
+        // menunjuk ke Matahari. `tooCloseToSun` di `VisibilityFilter` hanya
+        // memeriksa jarak tiap *kandidat* ke Matahari; ia tidak pernah
+        // memeriksa apakah arah tunjuknya sendiri adalah Matahari. Tanpa ini,
+        // menunjuk jam langsung ke Matahari menghasilkan kunci "Mars (medium)"
+        // karena Mars kebetulan terdekat — klaim identitas palsu (false
+        // confidence), persis yang dilarang PRD. Pengaman teleskop juga bergantung
+        // pada ini: status `.lock` membuka izin GoTo, jadi arah pergelangan
+        // tidak boleh pernah menjadi perintah motor. Cek ini sebelum kandidat
+        // dihitung, dan kalau menyala, langsung kembalikan niat kosong (low,
+        // tanpa best) — tidak ada kandidat yang boleh diklaim.
+        //
+        // Ambang tetap (`sunSafeConeDeg`), **bukan** `policy.minSunSeparationDeg`:
+        // aturan "jangan pernah mengklaim identitas saat menunjuk Matahari"
+        // adalah aturan keras PRD yang berlaku sekalipun kebijakan visibilitas
+        // paling permisif (yang mematikan pemisahan Matahari lewat `minSunSeparationDeg: 0`).
+        if let sunHorizontal, sunHorizontal.altitudeDeg > policy.minAltitudeDeg,
+           SkyMath.angularSeparationHorizontalDeg(pointing, sunHorizontal) < Self.sunSafeConeDeg {
+            return Resolution(intent: CelestialIntent(level: .low, best: nil, candidates: []),
+                             context: context,
+                             rejected: rejected,
+                             ephemerisFailures: failures,
+                             consideredCount: considered,
+                             sunHorizontal: sunHorizontal,
+                             nearestNeighbourDeg: nil)
+        }
 
         func consider(_ object: CelestialObject,
                       horizontal: HorizontalCoord,

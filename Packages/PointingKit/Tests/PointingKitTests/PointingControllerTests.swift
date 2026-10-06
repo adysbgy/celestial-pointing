@@ -581,6 +581,64 @@ final class PointingControllerTests: XCTestCase {
                      "GoTo tidak boleh dihitung dari resolusi arah tunjuk sebelumnya")
     }
 
+    // MARK: - Matahari: jangan pernah terkunci
+
+    /// Mengarahkan jam **langsung ke Matahari** tidak boleh menghasilkan
+    /// `.lock`, haptic sukses, atau izin GoTo — lewat alur controller nyata,
+    /// bukan cuma resolver.
+    ///
+    /// `testSunIsNeverACandidate` di paket engine membuktikan resolver menolak
+    /// Matahari. Tapi antara resolver dan `.lock` ada perata, mesin keadaan,
+    /// dan `hapticEvents` — satu-satunya lapisan yang memicu haptic **dan**
+    /// membuka izin GoTo. Kalau salah satu lapisan itu bocor, pengguna
+    /// mendapat getaran "berhasil" sambil menunjuk Matahari, dan status
+    /// `.lock` membuka jalur ke rencana GoTo. Ini aturan keras PRD:
+    /// POINT → OBJECT ID → SAFE GOTO, dan pergelangan **tidak pernah** boleh
+    /// menjadi gerak motor.
+    ///
+    /// Resolver dibangun **dengan efemeris penuh** tapi tanpa katalog bintang,
+    /// jadi satu-satunya benda tata surya yang dipertimbangkan adalah Bulan,
+    /// planet, dan Matahari — dan Matahari sudah disingkirkan dari
+    /// `pointableBodies`. Menunjuk Matahari jatuh ke `low`/`searching`, bukan
+    /// ke `.lock`.
+    func testAimingAtTheSunNeverLocksOrFiresSuccessHaptic() throws {
+        let ephemeris = AstronomyKitEphemeris()
+        let resolver = PointingResolver(catalogue: [],
+                                       policy: .permissive,
+                                       ephemeris: ephemeris)
+        // Posisi Matahari diambil langsung dari efemeris (resolver sengaja
+        // menolak menghitung arahnya — `isPointable` salah untuk `.sun`), lalu
+        // diubah ke horizontal seperti yang dilakukan resolver untuk benda lain.
+        //
+        // Dipakai **tengah hari** Jakarta (Matahari tinggi) agar gerbang
+        // pengaman benar-benar tersentuh: saat Matahari di bawah horizon, jarak
+        // arah tunjuk ke Matahari tidak relevan dan uji jadi vacuous.
+        let noon = Date(timeIntervalSince1970: 1_768_453_200)
+        let sunSample = try ephemeris.apparent(.sun, at: noon, from: observer)
+        let jd = SkyMath.julianDate(from: noon)
+        let sunHor = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sunSample.raDeg, decDeg: sunSample.decDeg),
+            observer: observer, jd: jd)
+        let c = controller(resolver)
+
+
+        // Tahan arah tunjuk ke Matahari cukup lama untuk melewati ambang
+        // "pergelangan diam" dan memicu resolusi lengkap berulang kali.
+        let q = quaternion(viewPointingAt: sunHor)
+        for step in 0..<12 {
+            c.feed(quaternion: q, timestamp: at(Double(step) * 0.1))
+        }
+
+        XCTAssertNotEqual(c.snapshot.state, .lock,
+                         "menunjuk Matahari tidak boleh mengunci")
+        XCTAssertFalse(c.hapticLog.contains { $0.event == .lockSucceeded },
+                       "tidak boleh ada haptic sukses saat menunjuk Matahari")
+        XCTAssertNil(c.slewDecision(date: at(1.5)),
+                     "tidak boleh ada rencana GoTo untuk Matahari")
+        // Dan Matahari benar-benar tidak pernah muncul sebagai jawaban.
+        XCTAssertNotEqual(c.snapshot.bestObject?.id, "sun")
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat

@@ -210,6 +210,36 @@ final class ResolverEphemerisTests: XCTestCase {
                        "Matahari seharusnya tidak pernah masuk proses sama sekali")
     }
 
+    /// Menunjuk jam **langsung ke Matahari saat Matahari tinggi di atas
+    /// horizon** tidak boleh menghasilkan kunci apa pun, meski ada planet
+    /// lain yang kebetulan dekat dengan arah tunjuk. Ini menutup celah false
+    /// confidence: `tooCloseToSun` di `VisibilityFilter` hanya memeriksa jarak
+    /// tiap *kandidat* ke Matahari, bukan apakah arah tunjuknya sendiri adalah
+    /// Matahari — tanpa gerbang ini, menunjuk ke Matahari bisa mengunci "Mars
+    /// (medium)" karena Mars terdekat. Dibuktikan pula di tingkat controller
+    /// (`PointingControllerTests`).
+    func testAimingAtTheSunWhileUpNeverLocks() throws {
+        let ephemeris = AstronomyKitEphemeris()
+        // Tengah hari Jakarta: Matahari tinggi (~ +75°).
+        let noon = Date(timeIntervalSince1970: 1_768_453_200)
+        let jd = SkyMath.julianDate(from: noon)
+        let sun = try ephemeris.apparent(.sun, at: noon, from: jakarta)
+        let sunHor = SkyMath.equatorialToHorizontal(
+            EquatorialCoord(raDeg: sun.raDeg, decDeg: sun.decDeg), observer: jakarta, jd: jd
+        )
+
+        let resolver = PointingResolver(catalogue: Catalogue.brightStars,
+                                       policy: .permissive,
+                                       ephemeris: ephemeris)
+        let resolution = resolver.diagnose(pointing: sunHor, observer: jakarta,
+                                           date: noon, coneDeg: 90)
+        XCTAssertEqual(resolution.intent.level, .low,
+                       "menunjuk Matahari tidak boleh mengunci")
+        XCTAssertNil(resolution.intent.best,
+                     "tidak boleh ada objek yang diklaim saat menunjuk Matahari")
+        XCTAssertNotEqual(resolution.intent.best?.id, "sun")
+    }
+
     /// Konteks langit harus realistis: malam di Jakarta pada tanggal ini.
     func testSkyContextIsNightInJakarta() {
         let context = resolver().skyContext(observer: jakarta, date: date)

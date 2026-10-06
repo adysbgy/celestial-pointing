@@ -1,3 +1,42 @@
+## Progres terakhir (6 Okt 2026 — Menunjuk jam ke Matahari diam-diam mengunci "Mars (medium)")
+
+### Cacatnya: gerbang pengaman Matahari hanya mengecek jarak *kandidat*, bukan arah tunjuk
+
+`PointingResolver.diagnose` mengandalkan `tooCloseToSun` di `VisibilityFilter`
+untuk membuang kandidat yang terlalu dekat Matahari. Tapi `tooCloseToSun`
+hanya menilai **setiap kandidat** terhadap Matahari — ia tidak pernah mengecek
+apakah **arah tunjuk itu sendiri** adalah Matahari. Bukti: menunjuk jam tepat ke
+Matahari saat Matahari tinggi (+75° di Jakarta tengah hari) menghasilkan
+`best = mars, level = medium`, tanpa satu pun penolakan, lewat resolver *dan*
+controller (haptic sukses + upaya GoTo).
+
+Itu pelanggaran langsung aturan keras PRD: menunjuk Matahari tidak boleh pernah
+menghasilkan kunci/identitas (false confidence), dan arah pergelangan tidak boleh
+menjadi perintah motor (POINT → OBJECT ID → SAFE GOTO).
+
+### Perbaikan
+
+Tambah gerbang pengaman di awal `diagnose`: jika arah tunjuk berada dalam
+`PointingResolver.sunSafeConeDeg` (13°, tetap — tidak mengikuti kebijakan
+visibilitas yang bisa mematikan pemisahan Matahari lewat `minSunSeparationDeg: 0`)
+dari Matahari **saat Matahari di atas horizon**, resolver langsung mengembalikan
+niat kosong (`level: .low`, `best: nil`). Ambang tetap dipilih supaya aturan
+berlaku sekalipun kebijakan paling permisif. 13° jauh di atas diameter sudut
+Matahari (~0,5°) sehingga objek sah di dekat Matahari tidak ikut ditolak.
+
+### Regresi yang dikunci
+- `ResolverTests.testAimingAtTheSunWhileUpNeverLocks` — di level engine (Matahari
+  tinggi), niat `.low`, `best == nil`.
+- `PointingControllerTests.testAimingAtTheSunNeverLocksOrFiresSuccessHaptic` —
+  di level controller nyata: `.lock` tidak pernah tercapai, tidak ada haptic
+  sukses, tidak ada rencana GoTo, id bukan "sun".
+
+### Gerbang
+`./swift-test.sh` → CelestialEngine 182 (+1), PointingKit 636 (+1), nol gagal.
+UI-lint 25 aturan lulus, check-visuals 215/215, typecheck bersih.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — Bulan terbenam masih memberi tahu langit "terang", bintang redup ditolak salah)
 
 ### Cacatnya: penyaring menuntut "ada cahaya Bulan" tapi tidak mengecek Bulan masih di atas horizon
