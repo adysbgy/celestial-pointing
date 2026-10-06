@@ -203,4 +203,85 @@ final class BelowHorizonHonestyTests: XCTestCase {
                        + "penolakan bawah-horizon tadi karena alasan lain")
         XCTAssertTrue(controller.hapticLog.contains { $0.event == .lockSucceeded })
     }
+
+    // MARK: - Bulan di bawah horizon
+
+    /// Jam malam saat Bulan benar-benar **di bawah horizon** (−30°), dicari
+    /// dari resolver.
+    ///
+    /// **Kenapa tidak ada bukti positif untuk Bulan, padahal bintang punya.**
+    /// Untuk benda tata surya, uji "harus terkunci saat di atas horizon" tidak
+    /// bisa ditulis dengan jujur: keyakinannya turun ke MEDIUM (bukan HIGH)
+    /// begitu ada benda terang lain di dekat arahnya, dan pengukuran di repo
+    /// ini menunjukkan Bulan maupun Jupiter sering `.uncertain` meski arahnya
+    /// sudah benar-benar diarahkan. Itu **perilaku yang benar** (PRD:
+    /// uncertainty > false confidence) — bukan cacat. Memaksa `.lock` di sini
+    /// berarti mengarang isolasi, dan tes seperti itu akan rapuh: ia hijau
+    /// karena kebetulan astronomi, bukan karena aturan yang diujinya benar.
+    /// Jadi untuk Bulan yang dijaga adalah sisi **penolakan yang jujur** —
+    /// bukan jam ketika ia terkunci.
+    private func moonBelowHorizonTime(resolver: PointingResolver) -> Date? {
+        for day in 0..<120 {
+            for hour in stride(from: 0.0, through: 23.5, by: 0.5) {
+                let candidate = epoch.addingTimeInterval(Double(day) * 86400 + hour * 3600)
+                guard resolver.skyContext(observer: observer, date: candidate).isDark,
+                      let direction = try? resolver.horizontal(ofBody: .moon,
+                                                              observer: observer,
+                                                              date: candidate),
+                      direction.altitudeDeg < -30
+                else { continue }
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// Bulan yang sedang **di bawah horizon** tidak boleh menghasilkan `.lock`
+    /// — bagaimanapun keadaan langit di sekelilingnya.
+    ///
+    /// Ini melengkapi tiga uji bintang di atas: benda tata surya punya jalur
+    /// hitung yang berbeda (berasal dari efemeris, bukan tabel J2000), jadi
+    /// "di bawah horizon" bagi mereka dihitung dari sumber yang berbeda pula.
+    func testMoonBelowHorizonNeverLocks() throws {
+        let resolver = makeResolver()
+        let when = try XCTUnwrap(moonBelowHorizonTime(resolver: resolver),
+                                 "Bulan tidak pernah di bawah −30° pada malam dalam 120 hari")
+        let direction = try XCTUnwrap(
+            resolver.horizontal(ofBody: .moon, observer: observer, date: when))
+        XCTAssertLessThan(direction.altitudeDeg, -30)
+
+        let controller = self.controller(resolver: resolver)
+        hold(controller, quaternion: quaternion(viewPointingAt: direction), since: when)
+
+        XCTAssertNotEqual(controller.snapshot.state, .lock,
+                          "Bulan di bawah horizon tidak boleh terkunci")
+        XCTAssertFalse(controller.hapticLog.contains { $0.event == .lockSucceeded },
+                       "tidak boleh ada haptic sukses untuk Bulan di bawah horizon")
+    }
+
+    /// Penolakan Bulannya harus jujur: resolver harus **menyebut Bulannya**
+    /// sebagai ditolak karena `belowHorizon`, bukan membuangnya diam-diam.
+    ///
+    /// Inilah bedanya "tidak terkunci" dengan "tidak terlihat karena memang di
+    /// bawah horizon". Kalau pelindung horizon diperlebar kelak, Bulan hilang
+    /// dari daftar `rejected` dan test ini merah — persis saat penyaringan itu
+    /// berubah tanpa ada yang mengetahuinya.
+    func testMoonBelowHorizonIsRejectedForThatExactReason() throws {
+        let resolver = makeResolver()
+        let when = try XCTUnwrap(moonBelowHorizonTime(resolver: resolver))
+        let direction = try XCTUnwrap(
+            resolver.horizontal(ofBody: .moon, observer: observer, date: when))
+
+        let resolution = resolver.diagnose(pointing: direction,
+                                           observer: observer,
+                                           date: when,
+                                           coneDeg: 20.0)
+
+        let moonRejection = try XCTUnwrap(
+            resolution.rejected.first { $0.object.id == "moon" },
+            "Bulan di bawah horizon harus muncul di daftar penolakan, "
+            + "bukan hilang tanpa jejak")
+        XCTAssertEqual(moonRejection.visibility, .belowHorizon,
+                       "Bulan harus ditolak karena bawah horizon, bukan alasan lain")
+    }
 }
