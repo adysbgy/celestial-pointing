@@ -1,3 +1,105 @@
+## Progres terakhir (6 Okt 2026 — warna bintang: 25 indeks yang tidak pernah dibandingkan dengan portnya)
+
+### Cacatnya: tabel identitas warna hidup di dua bahasa tanpa satu pemeriksaan pun di antaranya
+
+`CelestialVisual.starColorIndex` memetakan 25 bintang ke indeks warna B−V.
+Tabel yang sama hidup lagi sebagai `STAR_COLOR_INDEX` di `render-visuals.py`.
+Sampai siklus ini **tidak ada satu angka pun** dari keduanya yang dibandingkan —
+dan setiap pemeriksaan warna bintang yang ada mengukur **gambar port**, jadi
+mengubah salah satu nilai di Swift membiarkan semuanya hijau sambil mengukur
+warna yang tidak pernah ada.
+
+Ini kelas cacat yang berkas ini catat untuk keenam kalinya (palet planet,
+kawah, maria, profil Matahari, relief kawah, tata letak langit dalam):
+**model diubah, port tidak, gerbang gambar mengukur gambar yang tidak pernah
+ada.** Yang membuat yang satu ini lebih dari sekadar daftar yang panjang
+adalah **apa** yang ada di dalamnya.
+
+### Kenapa warna bintang bukan sekadar 25 angka
+
+Warna bintang di layar ini adalah **identitas**, bukan hiasan: Betelgeuse
++1.85 harus merah, Rigel −0.03 biru, Sirius +0.00 putih-biru. Bintang yang
+salah warna tetap tampak sebagai titik bercahaya — tidak ada yang akan
+melaporkannya, karena dari kejauhan ia masih "sebuah bintang".
+
+Jadi cacatnya dua arah dan keduanya sunyi:
+
+| Arah | Kenapa tidak terlihat |
+|---|---|
+| nilai menyimpang (1.85 → 1.10) | warnanya cuma bergeser sedikit; titiknya tetap titik |
+| **tanda terbalik** (1.85 → −1.85) | Betelgeuse jadi biru. Tetap sebuah titik bercahaya. |
+
+Yang kedua itu sebabnya gerbang ini memeriksa **tanda** secara eksplisit,
+bukan hanya kesamaan nilai. Pemeriksaan tanda bukan pengganti pemeriksaan
+nilai — ia menutup arah yang tidak pernah dilaporkan pengguna.
+
+### Yang ditambahkan: dibaca dari sumber, dua arah, per bintang
+
+`swift_star_colour_index` mengekstrak tabel dari **teks sumber Swift**, bukan
+dari daftar yang ditulis ulang di gerbang. Ini keputusan yang sama dengan
+gerbang tetangganya dan alasannya sama: tabel tangan di gerbang akan menjadi
+**entri ke-26 yang tidak pernah dibandingkan** — persis lubang yang sedang
+ditutup.
+
+Tiga pemeriksaan arah, seperti gerbang palet planet:
+
+| Pemeriksaan | Yang ditutup |
+|---|---|
+| setiap bintang model ada di port | bintang baru ditambah di Swift, port tidak pernah menggambarnya |
+| tidak ada bintang sisa di port | port menggambar bintang yang sudah dihapus dari model |
+| per bintang, dengan **nama** di pesannya | "tabel tidak sama" mengharuskan pembaca membedakan 25 angka sendiri |
+
+### Bukti gerbangnya berbunyi
+
+Mutasi pada model Swift, dikembalikan setelahnya:
+
+```
+"betelgeuse":  1.85  →  -1.85
+
+GAGAL indeks warna betelgeuse              model -1.85, port +1.85
+GAGAL ... tanda hangat/dingin sama ...     tanda terbalik: ['betelgeuse']
+265 pemeriksaan, 2 gagal
+```
+
+Dua pemeriksaan merah sekaligus, dan pesannya menyebut **bintangnya** — jadi
+drift bisa dibedakan dari entri yang hilang. Sebelum gerbang ini ada, mutasi
+yang sama tidak membuat satu pun dari 237 pemeriksaan merah.
+
+### Kenapa port-nya tidak ikut diubah
+
+Tidak ada kode produksi yang berubah. Yang masuk hanya gerbang — persis
+siklus palet planet: kalau model dan port hari ini sepakat, gerbangnya hijau
+dan tetap menjaga besok. Mengubah keduanya sekaligus tidak akan membuktikan
+apa pun tentang gerbang ini.
+
+### Gerbang
+
+- `python3 Tools/check-visuals.py --check` → **265 pemeriksaan** (237 → 265,
+  +28 = 25 bintang + tanda + dua arah), 0 gagal.
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
+  tidak ada kode Swift yang berubah.
+- `./swift-ui-lint.sh` → 26 aturan hijau. `./swift-typecheck.sh` → LULUS.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** 25 indeks B−V tidak bisa menyimpang antara Swift dan
+  port tanpa gerbang berbunyi, termasuk arah tanda. **Yang belum:** gerbang
+  tidak tahu apakah indeks itu **benar secara astronomi** — ia tahu kedua
+  bahasa sepakat. Nilai B−V itu sendiri tidak ada sumbernya di repo ini.
+- **Warna bukan tata letak.** Yang dijaga di sini indeksnya; pemetaan
+  indeks → warna layar (`Color(red:green:blue:)`) tidak dibaca dari model,
+  sama seperti warna objek langit dalam.
+
+### Sisa yang paling bernilai
+
+Masih kelas yang sama: **gerbang yang mengklaim lebih dari yang diukurnya.**
+Permukaan berikutnya yang terukur: `Apps/` memanggil **fungsi bebas** dan
+**inisialisasi** paket selain `TextLocalization.text(` — Aturan 26 hanya
+melihat `Tipe.anggota`, jadi sebuah nama fungsi yang tidak ada di paket masih
+hanya ketahuan dari CI macOS.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — tata letak objek langit dalam dijaga per blob, bukan per bentuk)
 
 ### Cacatnya: gerbang bentuk langit dalam mengukur "berbeda", bukan "sama"

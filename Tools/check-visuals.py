@@ -1136,6 +1136,93 @@ def _shell_layout_from_swift(tail):
     return out
 
 
+def swift_star_colour_index(source):
+    """Tabel `starColorIndex` dari teks Swift → `{id: indeks B−V}`.
+
+    Dibaca dari sumber, bukan ditulis ulang: tabel ini 25 entri, dan tabel
+    tangan di gerbang akan menjadi **entri ke-26 yang tidak pernah
+    dibandingkan** — persis lubang yang sedang ditutup di sini.
+    """
+    anchor = "static let starColorIndex: [String: Double] = ["
+    if anchor not in source:
+        raise ValueError(
+            "'static let starColorIndex' tidak ditemukan di CelestialVisual.swift")
+    start = source.index(anchor) + len(anchor)
+    region = source[start:source.index("\n    ]", start)]
+    return {name: float(value) for name, value in re.findall(
+        r'"(\w+)":\s*(-?[\d.]+)', region)}
+
+
+def check_star_colour_index_matches_the_model(results):
+    """Tabel B−V per bintang tidak boleh menyimpang antar bahasa.
+
+    **Cacat yang ditutup pemeriksaan ini.** 25 indeks warna hidup di
+    `CelestialVisual.starColorIndex` dan lagi di `STAR_COLOR_INDEX` pada
+    port. Tidak ada yang membandingkan keduanya — dan setiap pemeriksaan
+    warna bintang yang ada sekarang mengukur **gambar port**, jadi
+    mengubah salah satu nilai di Swift membiarkan semuanya hijau sambil
+    mengukur warna yang tidak pernah ada. Itu kelas cacat yang sama
+    persis dengan palet planet, kawah, maria, profil Matahari, relief
+    kawah, dan tata letak langit dalam.
+
+    Yang membuatnya lebih dari sekadar daftar yang panjang: **tanda**-nya
+    adalah identitas. Betelgeuse +1.85 harus merah, Rigel −0.03 biru.
+    Tanda yang terbalik tidak akan pernah dilaporkan pengguna — bintang
+    tetap tampak sebagai titik bercahaya — karena itu ia diuji di sini,
+    bukan dibiarkan sampai ada yang melihatnya di layar.
+
+    Dua arah, seperti gerbang tetangganya: merah kalau port menyimpang,
+    kalau model kehilangan bintang yang masih ada di port, dan kalau
+    port punya bintang sisa. Tidak ada yang merah kalau keduanya diubah
+    bersama dengan nilai yang sama — dan itu memang bukan cacat.
+    """
+    source = open(os.path.join(
+        ROOT, "Packages/PointingKit/Sources/PointingKit/CelestialVisual.swift")).read()
+    try:
+        swift = swift_star_colour_index(source)
+    except ValueError as exc:
+        results.append(Result("indeks warna bintang: terbaca dari model",
+                              False, str(exc)))
+        return
+
+    port = R.STAR_COLOR_INDEX
+
+    missing = sorted(set(swift) - set(port))
+    results.append(Result(
+        "indeks warna bintang: setiap bintang model ada di port",
+        not missing,
+        f"semua {len(swift)} bintang ada" if not missing
+        else f"tidak ada di port: {missing}"))
+
+    extra = sorted(set(port) - set(swift))
+    results.append(Result(
+        "indeks warna bintang: tidak ada bintang sisa di port",
+        not extra,
+        "tidak ada" if not extra else f"hanya ada di port: {extra}"))
+
+    # Per bintang, bukan "tabel sama": kalau ada yang menyimpang, pesannya
+    # harus menyebut **bintang mana** — perbandingan satu kalimat akan
+    # mengharuskan pembaca membedakan 25 angka sendiri.
+    drifted = sorted(n for n in set(swift) & set(port)
+                     if abs(swift[n] - port[n]) > 1e-9)
+    for name in sorted(set(swift) & set(port)):
+        results.append(Result(
+            f"indeks warna {name}",
+            name not in drifted,
+            f"{swift[name]:+.2f}" if name not in drifted
+            else f"model {swift[name]:+.2f}, port {port[name]:+.2f}"))
+
+    # Tanda adalah identitas: bintang hangat harus positif, dingin negatif.
+    # Diperiksa di sisi **model**, karena port-lah yang akan mengikuti.
+    wrong_sign = sorted(n for n, v in swift.items()
+                        if n in port and ((v > 0) != (port[n] > 0)))
+    results.append(Result(
+        "indeks warna bintang: tanda hangat/dingin sama di kedua bahasa",
+        not wrong_sign,
+        "semua tanda cocok" if not wrong_sign
+        else f"tanda terbalik: {wrong_sign}"))
+
+
 def check_deep_sky_layouts_match_the_model(results):
     """Tata letak objek langit dalam tidak boleh menyimpang antar bahasa.
 
@@ -2228,6 +2315,7 @@ def main():
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_deep_sky_layouts_match_the_model(results)
+    check_star_colour_index_matches_the_model(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
