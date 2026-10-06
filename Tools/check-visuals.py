@@ -1386,6 +1386,352 @@ def check_star_rgb_conversion_matches_the_model(results):
         not mismatched, detail))
 
 
+def star_geometry_parameters(source, anchor, terminator, comment_marker, names):
+    """Parameter `VisualFrame.star` / `star_geometry` dari teks sumber.
+
+    Dibaca dari sumber di kedua bahasa, bukan ditulis ulang di gerbang:
+    daftar tangan di sini akan menjadi **entri yang tidak pernah
+    dibandingkan** — persis lubang yang gerbang-gerbang tetangganya tutup,
+    dan persis lubang yang ditemukan audit mutasi untuk kelompok ini.
+
+    `comment_marker` (`//` untuk Swift, `#` untuk Python) dibuang per baris
+    lebih dulu: dokumen fungsi ini memuat angka, dan pembacaan tanpa
+    membuangnya akan mengambil angka prosa sebagai parameter.
+
+    `names` memetakan kunci kanonik ke ejaan di bahasa itu (`glowScales`
+    vs `glow_scales`), supaya satu pembaca bisa dipakai dua arah tanpa
+    menebak konvensi penamaan.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor)
+    cut = source.index(terminator, start) if terminator in source[start:] else len(source)
+    region = source[start:cut]
+    body = "\n".join(line.split(comment_marker)[0] for line in region.split("\n"))
+
+    def default_of(name):
+        """Teks nilai bawaan `name`, sesudah tanda `=`.
+
+        Tipe Swift (`Double = 0.10`, `[Double] = [...]`) dilewati: yang
+        dicari adalah nilai **sesudah** `=`, bukan sesudah nama.
+        """
+        found = re.search(re.escape(name) + r"\s*(?::\s*[\w\[\]() :,]*?)?=\s*", body)
+        return body[found.end():] if found else None
+
+    def scalar(name):
+        tail = default_of(name)
+        if tail is None:
+            return None
+        found = re.match(r"(-?[\d.]+)", tail)
+        if found:
+            return float(found.group(1))
+        # Nilai bawaan bisa berupa **nama konstanta** (`frameHalfExtent:
+        # Double = halfExtent`). Diurai ke definisinya di berkas yang sama,
+        # bukan ditulis ulang di sini: `halfExtent` memang 1.0 di kedua
+        # bahasa hari ini, dan menyalinnya akan mengembalikan daftar tangan.
+        symbol = re.match(r"([A-Za-z_]\w*)", tail)
+        if not symbol:
+            return None
+        defined = re.search(
+            r"(?:static\s+)?let\s+" + re.escape(symbol.group(1))
+            + r"\s*:\s*\w+\s*=\s*(-?[\d.]+)", source)
+        return float(defined.group(1)) if defined else None
+
+    def group_of(name):
+        """Isi kurung `[...]` / `(...)` pada nilai bawaan `name`."""
+        tail = default_of(name)
+        if tail is None:
+            return None
+        found = re.match(r"[\[(]\s*([^\])]*)\s*[\])]", tail)
+        if not found:
+            return None
+        return [float(v) for v in found.group(1).split(",")]
+
+    glow = group_of(names["glowScales"])
+    outer = group_of(names["outerFraction"])
+    values = {
+        "pulseAmplitude": scalar(names["pulseAmplitude"]),
+        "spikeScale": scalar(names["spikeScale"]),
+        "frameHalfExtent": scalar(names["frameHalfExtent"]),
+        "glowScales": glow,
+        "outerFaint": outer[0] if outer and len(outer) == 2 else None,
+        "outerBright": outer[1] if outer and len(outer) == 2 else None,
+    }
+    missing = sorted(k for k, v in values.items() if v is None)
+    if missing:
+        raise ValueError(f"bentuk tidak dikenali di jangkar {anchor!r}: {missing}")
+    return values
+
+
+def magnitude_scale_parameters(source, anchor, comment_marker):
+    """Parameter `sizeFromMagnitude` / `size_from_magnitude` dari teks sumber.
+
+    Sama alasannya dengan pembaca tetangganya: dibaca dari sumber di kedua
+    bahasa, bukan ditulis ulang. Yang dijaga di sini **skala logaritmiknya**
+    — basis, koefisien, magnitudo terang, dan kedua penjepit — karena
+    keempatnya hidup terpisah di dua bahasa dan tidak satu pun yang
+    dibandingkan siapa pun.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor)
+    # Wilayah dibatasi seperti pembaca `star_rgb`: tanpa batas, wilayah
+    # Swift membentang sampai akhir berkas dan menelan fungsi berikutnya.
+    terminators = ["\ndef ", "\n    }", "\n}"]
+    cuts = [source.index(t, start) for t in terminators if t in source[start:]]
+    region = source[start:min(cuts)] if cuts else source[start:]
+    body = "\n".join(line.split(comment_marker)[0] for line in region.split("\n"))
+
+    # `magnitude - brightest` (Swift) dan `m - (-1.5)` (Python) harus berarti
+    # hal yang sama, dan begitu juga `pow(10.0, …)` lawan `10.0 ** …`. Jadi
+    # yang dibaca adalah bentuknya, dan konstanta terang yang ditulis sebagai
+    # **nama** (`let brightest: Double = -1.5`) diurai ke definisinya —
+    # menyalin `-1.5` ke gerbang akan mengembalikan daftar tangan yang tidak
+    # pernah dibandingkan.
+    raw = re.search(
+        r"(?:let\s+)?raw\s*=\s*(?:pow\(|math\.pow\()?\s*([\d.]+)\s*"
+        r"(?:,\s*\(?|\s*\*\*\s*\()\s*(-?[\d.]+)\s*\*\s*\(\s*\w+\s*-\s*"
+        r"\(?\s*([-\w.]+)\s*\)?\s*\)\s*\)?", body)
+    bounds = re.findall(r"\b(?:min|max)\(\s*([\d.]+)\s*,\s*(?:min|max)\("
+                        r"\s*([\d.]+)\s*,", body)
+    if raw is None or not bounds:
+        raise ValueError(
+            f"bentuk sizeFromMagnitude tidak dikenali di jangkar {anchor!r}: "
+            f"raw={'ada' if raw is not None else 'TIDAK'}, penjepit={len(bounds)}")
+
+    def resolve(text):
+        try:
+            return float(text)
+        except ValueError:
+            pass
+        defined = re.search(r"(?:static\s+)?let\s+" + re.escape(text)
+                            + r"\s*:\s*\w+\s*=\s*(-?[\d.]+)", source)
+        if defined is None:
+            raise ValueError(
+                f"konstanta terang {text!r} tidak berangka di jangkar {anchor!r}")
+        return float(defined.group(1))
+
+    return {
+        "base": float(raw.group(1)),
+        "coefficient": float(raw.group(2)),
+        "brightest": resolve(raw.group(3)),
+        # Urutan (min|max) ditulis terbalik di dua bahasa: Swift
+        # `min(1, max(0.15, raw))`, Python `min(1.0, max(0.15, raw))`. Yang
+        # dibandingkan karena itu himpunannya, bukan urutannya — kalau tidak,
+        # gerbang akan merah pada salah satu bahasa yang benar.
+        "bounds": tuple(sorted(float(v) for pair in bounds for v in pair)),
+    }
+
+
+def magnitude_scale_from_parameters(params, magnitude):
+    """Ukuran relatif dari parameter yang dibaca — salinan rumusnya.
+
+    Ditulis ulang, bukan dipanggil dari `R.size_from_magnitude`: gerbang
+    yang memakai fungsi yang sedang diukur akan membiarkan kesalahan di
+    fungsi itu lolos bersama pengukurannya.
+    """
+    raw = params["base"] ** (params["coefficient"]
+                             * (magnitude - params["brightest"]))
+    low, high = params["bounds"]
+    return min(high, max(low, raw))
+
+
+def check_magnitude_scale_matches_the_model(results):
+    """Skala magnitudo → ukuran tidak boleh menyimpang antara model & port.
+
+    **Cacat yang ditutup pemeriksaan ini — dan cara menemukannya.**
+    Audit mutasi mengganti isi `size_from_magnitude` di port dengan
+    `raw = 1.0` — setiap bintang jadi ukuran yang sama — dan **nol dari 296
+    pemeriksaan** berbunyi:
+
+    ```
+    hijau  size from magnitude
+    ```
+
+    Ini yang paling berbahaya dari ketiga celah yang ditemukan audit itu,
+    karena alasannya bukan "parameter tidak terpakai": uji Swift memang
+    menjaga `sizeFromMagnitude` (`testSizeScaleIsLogarithmicNotLinear`,
+    `testBrighterStarIsDrawnLarger`), dan gerbang gambar memang mengukur
+    bintang. Yang tidak ada adalah **pengikat antara keduanya** — jadi model
+    dan port bisa menyimpang, dan kedua lapis tetap hijau sambil mengukur
+    dua hal yang berbeda.
+
+    Kenapa ia sampai ke piksel: `relative_size` dipakai untuk warna mode
+    malam port (`NIGHT_FLOOR_BRIGHTNESS + range * relative`) **dan** untuk
+    geometri bintang. Skala yang menyimpang karena itu mengubah kecerahan
+    mode malam yang diukur `check_night_mode_purity` pada piksel yang tidak
+    pernah ada di jam.
+    """
+    swift = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "CelestialVisual.swift")).read()
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+
+    try:
+        model = magnitude_scale_parameters(
+            swift, "public static func sizeFromMagnitude(_ magnitude: Double)", "//")
+        port = magnitude_scale_parameters(
+            port_source, "def size_from_magnitude(m):", "#")
+    except ValueError as exc:
+        results.append(Result("skala magnitudo: bentuk terbaca", False, str(exc)))
+        return
+
+    results.append(Result(
+        "skala magnitudo: bentuk terbaca dari kedua bahasa", True,
+        f"{model['base']:g}^({model['coefficient']:g}·(m{model['brightest']:+.2g})), "
+        f"dijepit {model['bounds']}"))
+
+    for key in ("base", "coefficient", "brightest"):
+        same = abs(model[key] - port[key]) <= 1e-9
+        results.append(Result(
+            f"skala magnitudo: {key}", same,
+            f"{model[key]:g}" if same
+            else f"model {model[key]:g}, port {port[key]:g}"))
+    results.append(Result(
+        "skala magnitudo: penjepit",
+        model["bounds"] == port["bounds"],
+        f"{model['bounds']}" if model["bounds"] == port["bounds"]
+        else f"model {model['bounds']}, port {port['bounds']}"))
+
+    # Dan hasilnya, di seluruh rentang magnitudo katalog plus kedua ujung.
+    # Pemeriksaan bentuk di atas tidak akan melihat skala yang dipakai di
+    # tempat yang salah (mis. `-0.2` jadi `+0.2`).
+    probes = sorted(set(v for v in R.STAR_COLOR_INDEX.values())) + [-1.46, 0.0, 1.25, 6.0, 20.0, -30.0]
+    bad = [m for m in probes
+           if abs(magnitude_scale_from_parameters(model, m)
+                  - magnitude_scale_from_parameters(port, m)) > 1e-9]
+    results.append(Result(
+        "skala magnitudo: ukuran hasil sama di seluruh rentang katalog",
+        not bad,
+        f"{len(probes)} magnitudo diuji" if not bad
+        else f"beda di mag {[round(m, 2) for m in bad][:6]}"))
+
+    # Urutan terang: Sirius harus lebih besar dari Deneb. Diukur dari
+    # parameter **model**, bukan dari gambar, karena gambar itu port.
+    sirius = magnitude_scale_from_parameters(model, -1.46)
+    deneb = magnitude_scale_from_parameters(model, 1.25)
+    results.append(Result(
+        "skala magnitudo: bintang terang digambar lebih besar",
+        sirius > deneb, f"Sirius {sirius:.3f} > Deneb {deneb:.3f}"))
+
+
+def star_geometry_outer(params, relative_size):
+    """Ujung terluar bintang dari parameter yang dibaca — salinan rumusnya.
+
+    Rumusnya ditulis ulang di sini, **bukan** dipanggil dari
+    `R.star_geometry`: kalau gerbang memakai fungsi yang sedang diukur,
+    maka kesalahan di fungsi itu ikut lolos bersama pengukurannya. Yang
+    dibandingkan karena itu `VisualFrame.star` (model Swift) melawan
+    `star_geometry` (port), dengan pengekspresian ketiga yang independen.
+    """
+    clamped = min(1.0, max(0.0, relative_size))
+    return params["frameHalfExtent"] * (
+        params["outerFaint"]
+        + (params["outerBright"] - params["outerFaint"]) * clamped)
+
+
+def check_star_geometry_matches_the_model(results):
+    """Geometri bintang tidak boleh menyimpang antara model & port.
+
+    **Cacat yang ditutup pemeriksaan ini — dan cara menemukannya.**
+    Audit mutasi: setiap konstanta di port diubah satu per satu, lalu
+    seluruh gerbang dijalankan. Empat parameter bintang
+    (`glowScales`, `spikeScale`, `pulseAmplitude`, `outerFraction`)
+    menghasilkan **nol** pemeriksaan merah untuk **setiap** mutasi:
+
+    ```
+    hijau  star geometry glow scales
+    hijau  star geometry spike
+    hijau  star geometry pulse
+    hijau  star geometry outer frac
+    ```
+
+    Padahal uji Swift yang mengukur nilai yang sama ada
+    (`testEnlargingTheGlowCannotPushTheStarOutOfFrame`,
+    `testStarPulsePeakStaysInsideTheFrame`) — jadi ini bukan "sudah dijaga
+    di tempat lain", melainkan **celah antara dua lapis**: uji Swift
+    mengukur model, gerbang gambar mengukur port, dan tidak ada yang
+    mengukur apakah keduanya masih angka yang sama.
+
+    Kenapa ini lebih dari sekadar empat angka: seluruh gerbang gambar
+    bintang (`check_star_colour_order`,
+    `check_star_colour_not_a_claim_when_uncertain`) mengukur **gambar
+    port**. Kalau port menggambar bintang dengan glow yang berbeda dari
+    aplikasi, warna yang diukur berasal dari piksel yang tidak pernah
+    tampil di jam.
+
+    **Yang sengaja tidak dijaga: `MOON_PATH_STEPS`.** Konstanta itu sudah
+    digigit oleh mutasi (2 pemeriksaan merah), jadi ia tidak butuh gerbang
+    baru — membuatnya ikut di sini hanya menambah entri yang tidak bisa
+    memerah.
+    """
+    swift = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "CelestialVisual.swift")).read()
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+
+    # Nama parameter berbeda ejaan per bahasa (`glowScales` vs
+    # `glow_scales`). Pemetaannya diberikan ke pembaca, bukan ditebak di
+    # dalamnya: pembaca yang menebak "snake_case di Python" akan menelan
+    # `frame_half_extent` yang memang ada, tapi akan gagal diam-diam begitu
+    # ada parameter baru dengan ejaan lain.
+    swift_names = {"pulseAmplitude": "pulseAmplitude", "spikeScale": "spikeScale",
+                   "frameHalfExtent": "frameHalfExtent", "glowScales": "glowScales",
+                   "outerFraction": "outerFraction"}
+    port_names = {"pulseAmplitude": "pulse_amplitude", "spikeScale": "spike_scale",
+                  "frameHalfExtent": "frame_half_extent", "glowScales": "glow_scales",
+                  "outerFraction": "outer_fraction"}
+    try:
+        model = star_geometry_parameters(
+            swift, "public static func star(relativeSize: Double,", "\n    }", "//",
+            swift_names)
+        port = star_geometry_parameters(
+            port_source, "def star_geometry(relative_size,", "\ndef ", "#",
+            port_names)
+    except ValueError as exc:
+        results.append(Result("geometri bintang: bentuk terbaca", False, str(exc)))
+        return
+
+    results.append(Result(
+        "geometri bintang: bentuk terbaca dari kedua bahasa", True,
+        f"{len(model['glowScales'])} lapis glow, ujung "
+        f"{model['outerFaint']:.2f}…{model['outerBright']:.2f}"))
+
+    for key in ("pulseAmplitude", "spikeScale", "frameHalfExtent"):
+        same = abs(model[key] - port[key]) <= 1e-9
+        results.append(Result(
+            f"geometri bintang: {key}", same,
+            f"{model[key]:.2f}" if same
+            else f"model {model[key]:.2f}, port {port[key]:.2f}"))
+
+    glow_same = (len(model["glowScales"]) == len(port["glowScales"])
+                 and all(abs(a - b) <= 1e-9
+                         for a, b in zip(model["glowScales"], port["glowScales"])))
+    results.append(Result(
+        "geometri bintang: pengali tiap lapis glow", glow_same,
+        f"{model['glowScales']}" if glow_same
+        else f"model {model['glowScales']}, port {port['glowScales']}"))
+
+    for key in ("outerFaint", "outerBright"):
+        same = abs(model[key] - port[key]) <= 1e-9
+        results.append(Result(
+            f"geometri bintang: ujung terluar {key}", same,
+            f"{model[key]:.2f}" if same
+            else f"model {model[key]:.2f}, port {port[key]:.2f}"))
+
+    # Koefisien sama belum tentu cukup: yang diuji adalah **hasilnya**, di
+    # seluruh rentang 0…1. Ini menangkap perubahan bentuk (mis. salah satu
+    # parameter dipakai di tempat yang lain) yang daftar angka di atas tidak
+    # akan lihat.
+    probes = [i / 20.0 for i in range(21)]
+    bad = [i for i in probes
+           if abs(star_geometry_outer(model, i)
+                  - star_geometry_outer(port, i)) > 1e-9]
+    results.append(Result(
+        "geometri bintang: ujung terluar sama di seluruh rentang ukuran",
+        not bad,
+        f"{len(probes)} ukuran diuji" if not bad
+        else f"beda di {[round(i, 2) for i in bad][:6]}"))
+
+
 def swift_night_accents(source):
     """Palet aksen `NightVisual.Accents` dari teks Swift → `{nama: (r,g,b)}`.
 
@@ -1793,21 +2139,64 @@ def check_crater_relief_matches_the_model(results):
 
     # Rumus kekuatannya harus sama, bukan hanya arahnya: kawah di sisi gelap
     # kehilangan kontras, dan kawah di tepi piringan kehilangan lebih banyak.
+    #
+    # **Cacat di gerbang ini sendiri, ditemukan audit mutasi.** Sampai
+    # siklus ini `want_strength` dibangun dari `R.CRATER_RIM_STRENGTH` dan
+    # dibandingkan dengan `relief[i][5]`, yang dihitung oleh `crater_relief`
+    # dari **konstanta yang sama**. Jadi yang dibandingkan adalah port
+    # melawan port, dan tidak ada mutasi yang bisa membuatnya merah:
+    #
+    #     hijau  crater rim strength   (0.55 -> 0.05)
+    #     hijau  crater floor depth    (0.22 -> 0.02)
+    #
+    # Dua-duanya mengubah bayangan kawah yang benar-benar tergambar, dan
+    # dua-duanya sunyi. Karena itu kedua koefisien dibaca dari **model
+    # Swift** dan dibandingkan ke port — bukan dibaca dari port dan
+    # dibandingkan ke port.
+    crater_coefficients = re.search(
+        r"static func craterRelief\(craters:.*?"
+        r"strength:\s*Double\s*=\s*(-?[\d.]+)\s*,\s*"
+        r"depth:\s*Double\s*=\s*(-?[\d.]+)", model, re.S)
+    if not crater_coefficients:
+        results.append(Result(
+            "bayangan kawah: koefisien terbaca dari model", False,
+            "'static func craterRelief(... strength:depth:' tidak ditemukan "
+            "— kekuatan bibir & kedalaman dasar tidak lagi terbaca"))
+        return
+    model_strength = float(crater_coefficients.group(1))
+    model_depth = float(crater_coefficients.group(2))
+
+    results.append(Result(
+        "bayangan kawah: kekuatan bibir sama dengan model",
+        abs(model_strength - R.CRATER_RIM_STRENGTH) <= 1e-9,
+        f"{model_strength:.2f}" if abs(model_strength - R.CRATER_RIM_STRENGTH) <= 1e-9
+        else f"model {model_strength:.2f}, port {R.CRATER_RIM_STRENGTH:.2f}"))
+    results.append(Result(
+        "bayangan kawah: kedalaman dasar sama dengan model",
+        abs(model_depth - R.CRATER_FLOOR_DEPTH) <= 1e-9,
+        f"{model_depth:.2f}" if abs(model_depth - R.CRATER_FLOOR_DEPTH) <= 1e-9
+        else f"model {model_depth:.2f}, port {R.CRATER_FLOOR_DEPTH:.2f}"))
+
+    # Dan rumusnya sendiri: dihitung ulang dari koefisien **model**, lalu
+    # dibandingkan ke hasil port. Tanpa langkah ini, dua pemeriksaan di atas
+    # hanya menjaga dua angka, bukan bahwa keduanya dipakai di tempat yang
+    # benar (`fade` di kekuatan, `(1 - 0.5 * distance)` di kedalaman).
     mismatched = []
     for i, (dx, dy, size) in enumerate(R.CRATERS):
         distance = min(1.0, (dx * dx + dy * dy) ** 0.5)
         alignment = dx * (lx / length) + dy * (ly / length)
-        want_strength = R.CRATER_RIM_STRENGTH * (0.6 + 0.4 * alignment) * (1 - 0.6 * distance)
-        want_depth = R.CRATER_FLOOR_DEPTH * (1 - 0.5 * distance)
+        want_strength = model_strength * (0.6 + 0.4 * alignment) * (1 - 0.6 * distance)
+        want_depth = model_depth * (1 - 0.5 * distance)
         if (abs(relief[i][5] - want_strength) > 1e-9
                 or abs(relief[i][6] - want_depth) > 1e-9):
             mismatched.append(i)
     results.append(Result(
         "bayangan kawah: kekuatan bibir & kedalaman dasar mengikuti model",
         not mismatched,
-        "rumus sama di kedua bahasa" if not mismatched
+        f"rumus sama di kedua bahasa (model {model_strength:.2f}/{model_depth:.2f})"
+        if not mismatched
         else f"kawah {mismatched} menyimpang dari rumus "
-             f"(kekuatan {R.CRATER_RIM_STRENGTH}, kedalaman {R.CRATER_FLOOR_DEPTH})"))
+             f"(kekuatan {model_strength}, kedalaman {model_depth})"))
 
 
 def check_night_mode_purity(results, size=200, ss=2):
@@ -2590,6 +2979,8 @@ def main():
     check_star_colour_index_matches_the_model(results)
     check_star_rgb_conversion_matches_the_model(results)
     check_night_accents_match_the_model(results)
+    check_star_geometry_matches_the_model(results)
+    check_magnitude_scale_matches_the_model(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
