@@ -90,7 +90,16 @@ public enum DeepSkyCatalogue {
         CelestialObject(id: "m51", name: "Galaksi Pusaran", kind: .deepSky,
                         raDeg: 202.46957500, decDeg: 47.19525800, magnitude: 8.40),
         CelestialObject(id: "m11", name: "Gugus Bebek Liar", kind: .deepSky,
-                        raDeg: 277.77500000, decDeg:  -6.26666667, magnitude: 6.30)
+                        raDeg: 277.77500000, decDeg:  -6.26666667, magnitude: 6.30),
+        // Kelompok keempat: melengkapi wakil yang ada, bukan bentuk baru.
+        // M2 = gugus bola ketiga (bersama M13/M22), M35 = gugus terbuka keempat
+        // (bersama M7/M44/M6). Keduanya objek Messier terang yang naik tinggi
+        // di lintang Jakarta dan menambah kepadatan contoh tiap bentuk tanpa
+        // memperkenalkan bentuk yang butuh kode gambar baru.
+        CelestialObject(id: "m2",  name: "Gugus M2",  kind: .deepSky,
+                        raDeg: 323.36208333, decDeg:  -0.82333333, magnitude: 6.50),
+        CelestialObject(id: "m35", name: "Gugus M35", kind: .deepSky,
+                        raDeg:  92.37333333, decDeg:  24.10666667, magnitude: 5.30)
     ]
 
     /// Seberapa "menyebar" tiap objek (0 = titik, 1 = kabut paling lebar).
@@ -123,7 +132,9 @@ public enum DeepSkyCatalogue {
         "m27": 0.68,   // Dumbel — nebula planetari, kabut memanjang
         "m57": 0.40,   // Cincin — nebula planetari kecil & padat
         "m51": 0.92,   // Pusaran — galaksi spiral, kabut lebar
-        "m11": 0.42    // Bebek Liar — gugus terbuka padat (22′)
+        "m11": 0.42,   // Bebek Liar — gugus terbuka padat (22′)
+        "m2":  0.32,   // M2 — gugus bola, padat seperti Hercules
+        "m35": 0.52    // M35 — gugus terbuka longgar, lebih lebar dari Bebek Liar
     ]
 
     /// Seberapa menyebar sebuah objek langit dalam, dari id-nya.
@@ -188,7 +199,9 @@ public enum DeepSkyCatalogue {
         "m27": .nebula,           // Dumbel — nebula planetari
         "m57": .nebula,           // Cincin — nebula planetari
         "m51": .galaxy,           // Pusaran — galaksi spiral
-        "m11": .openCluster       // Bebek Liar — gugus terbuka padat
+        "m11": .openCluster,      // Bebek Liar — gugus terbuka padat
+        "m2":  .globularCluster,  // M2 — gugus bola padat
+        "m35": .openCluster       // M35 — gugus terbuka longgar
     ]
 
     /// Bentuk sebuah objek langit dalam, dari id-nya.
