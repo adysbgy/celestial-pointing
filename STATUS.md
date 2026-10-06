@@ -11470,3 +11470,54 @@ anggota cincin luar `0.22 -> 0.38` (pita tidak seragam).
   - `./swift-ui-lint.sh` -> 25 aturan hijau (Rule 10: README 634 -> 635).
   - `python3 Tools/check-visuals.py --check` -> 215 pemeriksaan, 0 gagal.
   - `./swift-typecheck.sh` -> LULUS.
+
+
+## Siklus: sapuan "ukur konstanta" ditutup di seluruh morfologi (2026-10-06)
+
+### Premis: kelas cacat ini berulang, dan sapuan harus diuji mutasi
+
+STATUS.md dua siklus lalu menutup dua uji serupa dengan mutasi, lalu jujur
+menulis: pola "ukur tempat yang tidak berubah" **belum disapu ke seluruh
+berkas uji**. Dua siklus berikutnya menyapu, dan sapuan itu sendiri
+menemukan cacat nyata.
+
+### Yang ditemukan dan diperbaiki
+
+  - **Galaksi**: inti bisa diperkecil jadi 0.2% cakram, 633/633 hijau.
+    Akar: `halfHeight = halfWidth · aspect` membuat rasio aspect invarian
+    sempurna — ketiga uji galaksi mengukur konstanta layout. Diperbaiki
+    `testGalaxyCoreBulgeIsVisibleNotJustRounder` (ukuran+opasitas pada 3
+    fuzziness).
+  - **Gugus bola**: gradien kecerahan bisa diratakan, 634/634 hijau.
+    `testGlobularClusterHasADenseCentre` cuma membandingkan blob terbesar,
+    bukan ter-terang. Diperbaiki `testGlobularClusterDimsWithRadius` (per
+    pita radius; versi per-blob lolos saat satu anggota cincin diubah).
+
+### Yang diuji mutasinya dan **lolos** (tidak perlu diperbaiki)
+
+  - `nebula`: `0.62 + 0.38·fuzziness` -> `1.0` membuat
+    `testNebulaGrowsWithFuzziness` **merah** — guarded.
+  - `openCluster`: semua offset -> 0 (mengerumun di pusat) membuat
+    `testOpenClusterHasNoCentralCore` **merah** — guarded.
+  - `planetaryNebula`: siklus lebih awal sudah guarded (cangkang berongga,
+    satu radius) lewat `testPlanetaryNebulaIsHollowAtTheCentre` +
+    `ShellSitsOnOneRadius`, dibuktikan mutasi lebar blob 0.30 -> 1.60
+    menghasilkan 28 kegagalan.
+
+### Kesimpulan sapuan
+
+Kelima morfologi (`nebula`, `planetaryNebula`, `galaxy`, `openCluster`,
+`globularCluster`) sekarang punya setidaknya satu uji yang dibuktikan merah
+oleh mutasi model. Dua celah nyata ditutup; tiga lainnya sudah benar.
+Pola "ukur tempat yang tidak berubah" kini tidak lagi ada di berkas uji
+deep-sky — setiap uji bentuk yang tersisa mengukur kuantitas yang
+benar-benar bergerak (ukuran, opasitas, atau tepi dalam).
+
+### Yang TIDAK diklaim
+
+  - Sapuan hanya menyentuh **geometri deep-sky** (`buildDeepSky`). Benda
+    titik (bintang, planet, bulan, matahari) punya jalur pengujian sendiri di
+    `CelestialVisualTests` dan belum disapu dengan cara yang sama — lihat
+    siklus berikutnya kalau ingin lanjut ke sana.
+  - `buildDeepSky` tidak diubah; semua perubahan murni penambahan uji.
+    Hitungan: 633 -> 634 (galaksi) -> 635 (gugus bola).
