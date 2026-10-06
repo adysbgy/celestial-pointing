@@ -794,6 +794,13 @@ def check_port_matches_swift_constants(results):
          "count: Int = 7", model),
         ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 0.11,
          "heightFraction: Double = 0.11", model),
+        # Kekuatan pemulihan peredupan limb di atas pita. Angka ini **bukan**
+        # hiasan: pada 0 pita menghapus lengkung bola (cacat terukur 20.8% vs
+        # 50.6%), pada 1 pitanya tertutup bola. Ia hidup di model supaya view,
+        # port Python, dan uji Linux membaca angka yang sama — dan supaya
+        # mengubahnya di satu tempat saja membuat pemeriksaan ini merah.
+        ("kekuatan pemulihan limb di atas pita", R.BAND_LIMB_SHADING_STRENGTH, 0.6,
+         "bandLimbShadingStrength: Double = 0.6", model),
         # Rumus separuh-lebar pita pindah dari view ke model: satu rumus bola
         # (`sqrt(1 - y^2)`) dipakai bersama oleh view, port Python, dan uji
         # Linux. Yang dijaga di sini karena itu **rumusnya**, bukan angkanya —
@@ -2997,6 +3004,155 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
             f"selisih {(sphere - reach) * 100:.1f}% R (baris {row})"))
 
 
+def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
+    """Piringan ber-pita harus **tetap melengkung**, bukan jadi stiker rata.
+
+    **Cacat yang ditutup pemeriksaan ini.** Pita Jupiter digambar sebagai elips
+    warna **rata** di atas bola yang sudah dinaungi gradien. Karena tiap pita
+    menutupi 55% piksel di bawahnya, ia menghapus lengkung bola di situ.
+    Diukur pada baris ekuator render 200 px: selisih terang pusat-ke-limb turun
+    dari **50.6%** (bola polos) ke **20.8%** (bola ber-pita), dan pada 0.96 R
+    pitanya justru **+62.6** lebih terang daripada bola tanpa pita di titik
+    yang sama. Yang terlihat karena itu bukan bola berpita, melainkan stiker
+    rata yang ditempel di piringan.
+
+    **Kenapa harus dari piksel.** Uji model mengunci bahwa kekuatannya
+    sebagian (`testBandLimbShadingIsPartial`), dan itu benar. Tapi yang dikirim
+    ke layar adalah gambar: kalau view lupa memanggil pemulihannya, atau
+    memanggilnya dengan kekuatan yang salah, modelnya tetap benar sementara
+    gambarnya rata. Yang membuktikan lengkungnya kembali adalah mengukur baris
+    ekuatornya sendiri.
+
+    **Bola pembanding diambil dari kasus "ragu"**, yang menggambar bola Jupiter
+    yang sama **tanpa** pita (ciri pengenal wajib hilang saat ragu). Jadi
+    selisih keduanya adalah pita, dan lengkung bola yang benar bisa diukur
+    tanpa menuliskan angka lengkung ke dalam pemeriksaan ini.
+
+    Ambangnya **70% dari lengkung bola**: pemulihan 0.6 memberi 75% pada
+    pengukuran ini, dan cacat aslinya 41%. Yang dijaga adalah bahwa pemulihan
+    itu **ada dan sebagian besar**, bukan nilai persisnya.
+
+    **Kenapa dua pemeriksaan terakhir memeriksa teks, bukan piksel.** Piksel
+    di atas membuktikan **port** menggambar lengkungnya. Yang dikirim ke jam
+    adalah **view**, dan view punya cara gagalnya sendiri: ia bisa berhenti
+    memanggil pemulihan itu (gambar di jam rata, PNG tetap melengkung), atau
+    memanggilnya dengan angka yang ditulis ulang alih-alih dibaca dari model.
+    Keduanya tidak bisa dilihat oleh pemeriksaan piksel mana pun, karena
+    piksel itu milik port. Kelas cacat yang sama berulang di repo ini —
+    \"satu angka, dua bahasa, tidak ada yang membandingkan\" — jadi yang diikat
+    di sini adalah **pemakaian** di kedua sisi, dengan nama konstanta yang
+    harus benar-benar disebut.
+    """
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    cy = h // 2
+    cx = w / 2.0
+    radius = min(w, h) / 2.0
+    x_limb = min(w - 1, int(round(cx + 0.96 * radius)))
+
+    def lum(rows, x, y):
+        px = rows[y][x * 4:x * 4 + 3]
+        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+    def curvature(rows):
+        centre = lum(rows, int(cx), cy)
+        limb = lum(rows, x_limb, cy)
+        return 100.0 * (centre - limb) / max(centre, 1e-9)
+
+    bare = curvature(rows_b)
+    banded = curvature(rows_c)
+    ratio = banded / max(bare, 1e-9)
+    results.append(Result(
+        "piringan ber-pita tetap melengkung (bukan stiker rata)",
+        ratio >= 0.70,
+        f"lengkung ber-pita {banded:.1f}% vs bola polos {bare:.1f}% "
+        f"(rasio {ratio * 100:.0f}%, ambang 70%)"))
+
+    # Arah kedua: pitanya sendiri **tidak boleh hilang**. Tanpa ini, pemulihan
+    # penuh (kekuatan 1.0) akan lulus pemeriksaan di atas dengan sempurna
+    # sambil menghapus seluruh pita Jupiter.
+    #
+    # **Metriknya diukur, bukan dipilih.** Versi pertama memakai kontras
+    # terang-gelap di sepanjang kolom tengah belahan utara, dan ia **tidak
+    # pernah menggigit**: nilainya 18.3% pada kekuatan 0.6 dan 17.0% pada 1.0,
+    # sedangkan ambangnya 15% — jadi pemulihan penuh lolos sambil menghapus
+    # seluruh pita. Penyebabnya metrik itu mengukur **gradien bola sendiri**
+    # (yang ada dengan atau tanpa pita), bukan pitanya. Diukur pada rentang
+    # penuh, kolom itu hampir tidak bergerak: 24.7 / 21.0 / 18.3 / 16.2 / 17.0.
+    #
+    # Yang benar adalah menyelisihkan terhadap **bola tanpa pita** pada kolom
+    # yang sama — selisih itu adalah pitanya sendiri, dan gradien bola saling
+    # menghapus di kedua gambar. Hasilnya monoton terhadap kekuatannya:
+    #
+    #     kekuatan   0.0   0.3   0.6   0.9   1.0
+    #     selisih   3.5%  2.5%  1.5%  0.4%  0.0%
+    #
+    # Pada 1.0 selisihnya **nol persis** — pemulihan dengan gradien yang sama
+    # memang meniadakan pitanya, jadi tidak ada lagi yang membedakan piringan
+    # ber-pita dari bola polos. Itulah cacat yang dijaga ambang 0.75%.
+    deviation = band_deviation_from_bare(rows_c, rows_b, cx, cy, radius)
+    results.append(Result(
+        "pita Jupiter masih terbaca setelah pemulihan lengkung",
+        deviation >= 0.75,
+        f"pita menyimpang {deviation:.2f}% dari bola polos (ambang 0.75%; "
+        f"kekuatan 1.0 memberi 0.00%)"))
+
+    # **Pemakaian di view dan di port.** Pemeriksaan piksel di atas mengukur
+    # port; ia tidak bisa melihat view berhenti memanggil pemulihannya, atau
+    # memanggilnya dengan angka yang ditulis ulang. Yang diikat di sini adalah
+    # bahwa **nama konstanta model** benar-benar muncul di kedua sisi, dan
+    # bahwa sisi port memakai konstanta port-nya sendiri — bukan `0.6` yang
+    # kebetulan sama hari ini.
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+    results.append(Result(
+        "pemulihan lengkung dipanggil di view (bukan ditulis ulang)",
+        "opacity: CelestialVisual.bandLimbShadingStrength" in view,
+        "view memanggil 'opacity: CelestialVisual.bandLimbShadingStrength' = "
+        f"{'ada' if 'opacity: CelestialVisual.bandLimbShadingStrength' in view else 'TIDAK'}"))
+    results.append(Result(
+        "port memakai konstanta BAND_LIMB_SHADING_STRENGTH-nya sendiri",
+        "opacity=BAND_LIMB_SHADING_STRENGTH" in port
+        and "BAND_LIMB_SHADING_STRENGTH = " in port,
+        "port memakai 'opacity=BAND_LIMB_SHADING_STRENGTH' = "
+        f"{'ada' if 'opacity=BAND_LIMB_SHADING_STRENGTH' in port else 'TIDAK'}"))
+
+
+def band_deviation_from_bare(rows_banded, rows_bare, cx, cy, radius):
+    """Seberapa jauh pita menyimpang dari **bola polos**, dalam persen terang.
+
+    **Kenapa bukan kontras terang-gelap di sepanjang kolom.** Versi pertama
+    fungsi ini memakai `max(vals) - min(vals)` di kolom tengah, dan itu
+    **tidak pernah menggigit**: nilainya 18.3% pada kekuatan 0.6 dan 17.0%
+    pada 1.0, sementara ambangnya 15%. Alasannya metrik itu mengukur
+    **gradien bola sendiri** — yang ada dengan atau tanpa pita, karena
+    `_draw_sphere` selalu menggambar lengkung dari kiri-atas. Pita jadi
+    bagian kecil dari angka itu, dan pemulihan penuh (yang menghapus seluruh
+    pita) tetap lolos.
+
+    Yang benar adalah **menyelisihkan kedua gambar pada kolom yang sama**:
+    gradien bola saling menghapus, dan yang tersisa adalah pitanya sendiri.
+    Diukur pada rentang penuh, hasilnya monoton — 3.5 / 2.5 / 1.5 / 0.4 / 0.0%
+    pada kekuatan 0.0 / 0.3 / 0.6 / 0.9 / 1.0 — dan nol persis pada 1.0.
+
+    Belahan **utara** dipakai karena Bintik Merah Besar ada di selatan
+    (`jupiterSpot().centerY = +0.31`): mengukur seluruh kolom akan mencampur
+    kontras pita dengan bintiknya, dan angka itu bergerak saat bintiknya
+    disetel — bukan saat pitanya berubah.
+    """
+    x = int(cx)
+    deviations = []
+    for y in range(int(cy - 0.85 * radius), int(cy - 0.05 * radius)):
+        px_a = rows_banded[y][x * 4:x * 4 + 3]
+        px_b = rows_bare[y][x * 4:x * 4 + 3]
+        lum_a = 0.2126 * px_a[0] + 0.7152 * px_a[1] + 0.0722 * px_a[2]
+        lum_b = 0.2126 * px_b[0] + 0.7152 * px_b[1] + 0.0722 * px_b[2]
+        deviations.append(abs(lum_a - lum_b))
+    px_c = rows_banded[int(cy)][x * 4:x * 4 + 3]
+    centre = 0.2126 * px_c[0] + 0.7152 * px_c[1] + 0.0722 * px_c[2]
+    return 100.0 * (sum(deviations) / len(deviations)) / max(centre, 1e-9)
+
+
 def check_star_colour_order(results, size=200, ss=2):
     """Betelgeuse harus lebih merah dari Rigel — diukur dari piksel.
 
@@ -3326,6 +3482,7 @@ def main():
     check_crater_relief_matches_the_model(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
+    check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
     check_png_is_well_formed(results)

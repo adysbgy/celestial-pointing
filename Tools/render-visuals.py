@@ -574,6 +574,10 @@ GLOW_OPACITIES = [0.10, 0.22, 1.0]          # VIEW: `CelestialVisualView.glowOpa
 BAND_COUNT = 7                              # MODEL: `CelestialVisual.jupiterBands(count:)`
 BAND_HEIGHT_FRACTION = 0.11                 # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
 BAND_OPACITY = 0.55                         # VIEW: `drawBands`
+# MODEL: `CelestialVisual.bandLimbShadingStrength` — pemulihan peredupan limb
+# di atas pita. Pita digambar rata, jadi ia menghapus lengkung bola; gradien
+# bola digambar ulang di atasnya dengan kekuatan ini.
+BAND_LIMB_SHADING_STRENGTH = 0.6
 # Nama aturan geometri pita, dipakai `check-visuals.py` untuk menahan kedua
 # bahasa agar memakai rumus bola yang sama. Kalau salah satu sisi kembali
 # memakai aproksimasi kosinus, nama ini tidak akan ditemukan di sumbernya.
@@ -775,11 +779,18 @@ def _draw_frame(canvas, size, radius):
     canvas.rect(size - 0.6, 0, size, size, solid((1.0, 0.25, 0.25)))
 
 
-def _draw_sphere(canvas, cx, cy, radius, light, dark, night_mode):
-    """`drawSphere` — gradien bola, cahaya dari kiri-atas."""
+def _draw_sphere(canvas, cx, cy, radius, light, dark, night_mode, opacity=1.0):
+    """`drawSphere` — gradien bola, cahaya dari kiri-atas.
+
+    `opacity` dipakai **dua** pemanggil dan keduanya harus memakai gradien yang
+    sama persis: `_draw_planet` menggambar bola, lalu `_draw_bands`
+    menggambarnya **lagi** di atas pita untuk memulihkan lengkung yang tadi
+    terhapus pita (lihat `_draw_bands`). Karena yang ditumpuk adalah gradien
+    yang sama, daerah di luar pita tidak berubah sama sekali.
+    """
     gradient = radial_gradient(
-        [(light if not night_mode else night_surface(light), 1.0),
-         (dark if not night_mode else night_surface(dark), 1.0)],
+        [(light if not night_mode else night_surface(light), 1.0 * opacity),
+         (dark if not night_mode else night_surface(dark), 1.0 * opacity)],
         center=(cx + radius * SPHERE_LIGHT_OFFSET[0],
                 cy + radius * SPHERE_LIGHT_OFFSET[1]),
         start_radius=radius * 0.1, end_radius=radius * 1.35)
@@ -877,7 +888,7 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
     if feature == "rings":
         _draw_rings(canvas, cx, cy, radius, palette, night_mode)
     elif feature == "bands":
-        _draw_bands(canvas, cx, cy, radius, night_mode)
+        _draw_bands(canvas, cx, cy, radius, night_mode, palette)
     elif feature == "polarCaps":
         _draw_polar_caps(canvas, cx, cy, radius, night_mode)
     elif feature == "craters":
@@ -909,7 +920,7 @@ def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
     return bands
 
 
-def _draw_bands(canvas, cx, cy, radius, night_mode):
+def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
     for index, (band_y, half_width, half_height) in enumerate(jupiter_bands()):
         y = cy + band_y * radius
         half_width *= radius
@@ -920,6 +931,29 @@ def _draw_bands(canvas, cx, cy, radius, night_mode):
         name = ("jupiterBandTan", "jupiterBandRust", "jupiterBandCream")[index % 3]
         canvas.ellipse(cx, y, rx, ry,
                        accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
+    # **Restorasi peredupan limb.** Pita di atas digambar sebagai elips warna
+    # rata, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur pada
+    # baris ekuator render 200 px: selisih terang pusat-ke-limb turun dari
+    # 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R pitanya
+    # justru +62.6 lebih terang daripada bola tanpa pita. Yang terlihat karena
+    # itu bukan bola berpita, melainkan **stiker rata** di atas piringan.
+    #
+    # Yang dipakai kembali adalah **gradien bola yang sama persis** — pusat,
+    # warna, dan radius yang sama seperti `_draw_planet` di atas. Dua akibat,
+    # dan keduanya yang membuat cara ini dipilih daripada \"gelapkan pita di
+    # tepi\": (1) di daerah yang tidak tertutup pita gradien ini menumpuk di
+    # atas dirinya sendiri, dan itu identitas — jadi piksel di luar pita tidak
+    # berubah sama sekali; (2) arah cahayanya tidak bisa berbeda pendapat
+    # dengan bolanya, karena keduanya membaca `SPHERE_LIGHT_OFFSET` yang sama.
+    # MODEL: `CelestialVisual.bandLimbShadingStrength`
+    if palette is not None:
+        # Tidak ada klip tambahan yang perlu: `_draw_sphere` mengisi cakram
+        # dengan radius yang sama persis, jadi bentuknya sudah terbatas pada
+        # piringan. Menambahkan klip di sini hanya akan menambah satu operasi
+        # yang tidak mengubah apa pun — dan satu lagi yang bisa berbeda dari
+        # sisi Swift-nya.
+        _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"],
+                     night_mode, opacity=BAND_LIMB_SHADING_STRENGTH)
     dx, dy = SPOT_CENTER
     w, h = SPOT_SIZE
     canvas.ellipse(cx + dx * radius, cy + dy * radius,

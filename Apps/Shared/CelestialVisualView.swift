@@ -221,7 +221,8 @@ struct CelestialVisualView: View {
         // pemetaan planet → ciri tidak bisa lagi diam-diam bergeser.
         guard isConfirmed else { return }
         switch palette.feature {
-        case .bands: drawBands(context: context, center: center, radius: radius)
+        case .bands: drawBands(context: context, center: center, radius: radius,
+                               palette: palette)
         case .rings: drawRings(context: context, center: center, radius: radius)
         case .polarCaps: drawPolarCaps(context: context, center: center, radius: radius)
         case .craters: drawCraters(context: context, center: center, radius: radius)
@@ -239,13 +240,26 @@ struct CelestialVisualView: View {
     private static let neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)
 
     /// Gradien bola: pencahayaan dari kiri-atas, bayangan di kanan-bawah.
+    ///
+    /// `opacity` dipakai **dua** pemanggil, dan keduanya harus memakai gradien
+    /// yang sama persis: `drawPlanet` menggambar bola, lalu `drawBands`
+    /// menggambarnya **lagi** di atas pita untuk memulihkan lengkung yang tadi
+    /// terhapus pita. Karena yang digambar ulang adalah gradien yang sama,
+    /// daerah yang tidak tertutup pita **tidak berubah sama sekali** — gradien
+    /// yang ditumpuk di atas dirinya sendiri menghasilkan dirinya sendiri.
+    /// Kalau pemulihan itu memakai gradien yang dihitung sendiri, lengkung
+    /// yang dipulihkan tidak akan sama dengan lengkung yang terhapus, dan
+    /// selisihnya justru muncul sebagai pita yang lebih terang di tempat yang
+    /// salah — cacat baru yang tidak bisa dibaca dari kode.
     private func drawSphere(context: GraphicsContext, center: CGPoint, radius: CGFloat,
                             from light: CelestialVisual.RGBComponents,
-                            to dark: CelestialVisual.RGBComponents) {
+                            to dark: CelestialVisual.RGBComponents,
+                            opacity: Double = 1) {
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                           width: radius * 2, height: radius * 2))
         context.fill(disc, with: .radialGradient(
-            Gradient(colors: [Self.color(light), Self.color(dark)]),
+            Gradient(colors: [Self.color(light).opacity(opacity),
+                              Self.color(dark).opacity(opacity)]),
             // Arah cahaya datang dari model, bukan angka yang ditulis ulang di
             // sini: `drawCraters` memakai arah yang sama untuk memutuskan sisi
             // mana bibir kawahnya yang terang. Kalau kedua angka ini berbeda,
@@ -274,7 +288,8 @@ struct CelestialVisualView: View {
     /// (`testJupiterBandsReachTheLimb`), jadi view tidak lagi bisa
     /// menyimpang diam-diam — persis alasan cincin Saturnus dan kutub Mars
     /// sudah lebih dulu pindah ke `VisualFrame`/`CelestialVisual`.
-    private func drawBands(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+    private func drawBands(context: GraphicsContext, center: CGPoint, radius: CGFloat,
+                           palette: CelestialVisual.Palette) {
         // Lebar pita dikalibrasi untuk kontras tinggi di layar kecil: pita
         // yang terlalu tipis hilang di layar jam. Angkanya milik model
         // (`jupiterBands`), dan `check-visuals.py` menjaga agar port Python
@@ -304,6 +319,36 @@ struct CelestialVisualView: View {
             context.fill(Path(ellipseIn: rect),
                          with: .color(Self.accent(bandColor).opacity(0.55)))
         }
+        // **Restorasi peredupan limb: kenapa ada, dan kenapa `drawSphere`
+        // dipanggil ulang, bukan diganti gradien baru.**
+        //
+        // Pita di atas digambar sebagai elips warna **rata** pada opasitas
+        // 0.55, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur
+        // pada baris ekuator render 200 px: selisih terang pusat-ke-limb turun
+        // dari 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R
+        // pitanya +62.6 lebih terang daripada bola tanpa pita di titik yang
+        // sama. Yang terlihat karena itu bukan bola berpita, melainkan stiker
+        // rata yang ditempel di piringan.
+        //
+        // Gradien yang dipakai di sini **persis gradien `drawSphere`** — pusat,
+        // warna, dan radius yang sama. Dua akibat yang keduanya penting:
+        //
+        //   1. Di daerah yang **tidak** tertutup pita, gradien ini menumpuk
+        //      di atas dirinya sendiri, dan itu identitas — jadi piksel di
+        //      luar pita tidak berubah sama sekali. Tidak ada cacat baru yang
+        //      bisa lahir di tempat yang tidak saya maksud.
+        //   2. Arah cahayanya tidak bisa berbeda pendapat dengan bola, karena
+        //      ia dibaca dari `sphereLightOffset` yang sama.
+        //
+        // Kekuatannya **sebagian** (`bandLimbShadingStrength`): pada 1.0
+        // pitanya hilang tertutup bola, pada 0 lengkungnya kembali rata.
+        //
+        // Tidak ada klip tambahan: `drawSphere` mengisi cakram dengan radius
+        // yang sama persis, jadi bentuknya sudah terbatas pada piringan.
+        drawSphere(context: context, center: center, radius: radius,
+                   from: palette.light, to: palette.dark,
+                   opacity: CelestialVisual.bandLimbShadingStrength)
+
         // Bintik Merah Besar: elips merah di belahan selatan, sedikit di bawah
         // ekuator — posisinya memang di sana secara nyata.
         //

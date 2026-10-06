@@ -1751,6 +1751,36 @@ public extension CelestialVisual {
         }
     }
 
+    /// Kekuatan **pemulihan peredupan limb** di atas pita permukaan, 0…1.
+    ///
+    /// **Cacat yang ditutup angka ini — diukur, bukan diperkirakan.** Pita
+    /// Jupiter digambar sebagai elips warna **rata** di atas bola yang sudah
+    /// dinaungi gradien. Karena tiap pita menutupi 55% piksel di bawahnya, ia
+    /// **menghapus** lengkung bola yang ada di situ. Diukur pada baris ekuator
+    /// render 200 px: selisih terang pusat-ke-limb turun dari **50.6%** (bola
+    /// polos) menjadi **20.8%** (bola ber-pita), dan pada 0.96 R pitanya
+    /// justru **+62.6** lebih terang daripada bola yang sama tanpa pita.
+    /// Hasilnya bukan bola berpita, melainkan **stiker rata** yang ditempel di
+    /// piringan — persis kata yang dipakai pengukuran mata pada render 400 px.
+    ///
+    /// Perbaikannya **bukan** "pita dibuat lebih gelap di tepi". Aturan itu
+    /// menggelapkan pita di tempat yang salah untuk pita yang tidak menyentuh
+    /// limb, dan ia menambah sumber kedua tentang dari mana cahaya datang.
+    /// Yang benar adalah memakai **kembali gradien bola yang sama** (pusat di
+    /// `sphereLightOffset`, warna `palette.light` → `palette.dark`) di atas
+    /// pita, dipotong ke bentuk pitanya. Karena gradiennya sama, lengkung yang
+    /// dipulihkan persis lengkung yang tadi terhapus, dan arah cahayanya tidak
+    /// bisa berbeda pendapat dengan `drawSphere`.
+    ///
+    /// Nilainya **sebagian**, bukan 1: pada 1.0 pita tertutup gradien bola
+    /// sama sekali (kontras pita 24.7% → 17.0%, pitanya berhenti terbaca), dan
+    /// pada 0 lengkungnya kembali rata — cacatnya kembali utuh. Nilai 0.6
+    /// memulihkan 75% lengkung sambil menyisakan 18.3% kontras pita, jadi
+    /// **kedua** sisinya punya jarak ke ambangnya. Dijaga
+    /// `testBandLimbShadingIsPartial` di Linux dan gerbang piksel
+    /// `check_banded_disc_keeps_its_curvature`.
+    public static let bandLimbShadingStrength: Double = 0.6
+
     // MARK: - Arah cahaya bola
 
     /// Arah datang cahaya pada bola planet, dalam satuan radius, relatif

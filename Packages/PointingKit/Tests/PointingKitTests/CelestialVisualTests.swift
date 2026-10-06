@@ -2147,6 +2147,61 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Kekuatan pemulihan peredupan limb harus **sebagian**, bukan 0 atau 1.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan diperkirakan.** Pita Jupiter
+    /// digambar sebagai elips warna **rata** di atas bola yang sudah dinaungi.
+    /// Karena tiap pita menutupi 55% piksel di bawahnya, ia menghapus lengkung
+    /// bola di situ: pada baris ekuator render 200 px, selisih terang
+    /// pusat-ke-limb turun dari **50.6%** (bola polos) ke **20.8%** (bola
+    /// ber-pita), dan di 0.96 R pitanya justru **+62.6** lebih terang daripada
+    /// bola tanpa pita. Yang terlihat karena itu bukan bola berpita melainkan
+    /// **stiker rata** yang ditempel di piringan.
+    ///
+    /// Kenapa batasnya bukan 0 dan bukan 1:
+    ///
+    ///   - **0** berarti tidak ada pemulihan — cacat di atas kembali utuh.
+    ///   - **1** berarti gradien bola menutup pitanya sepenuhnya, dan pita
+    ///     Jupiter hilang sama sekali. Diukur: kontras pita jatuh dari 24.7%
+    ///     (tanpa pemulihan) ke 17.0%, dan pita berhenti terbaca.
+    ///
+    /// Nilai 0.6 memulihkan 75% lengkung sambil menyisakan 18.3% kontras pita —
+    /// jadi **kedua** sisi diuji di sini, karena memperbaiki salah satu saja
+    /// bisa merusak yang lain tanpa satu pun galat kompilasi.
+    func testBandLimbShadingIsPartial() {
+        let strength = CelestialVisual.bandLimbShadingStrength
+        XCTAssertGreaterThan(strength, 0,
+                             "tanpa pemulihan, pita menghapus lengkung bola (cacat 20.8% vs 50.6%)")
+        XCTAssertLessThan(strength, 1,
+                          "pemulihan penuh menutup pitanya sendiri (kontras pita 17.0% vs 24.7%)")
+        XCTAssertEqual(strength, 0.6, accuracy: 1e-12,
+                       "nilai ini diukur terhadap render: 75% lengkung, 18.3% kontras pita")
+    }
+
+    /// Gradien yang memulihkan lengkung harus **gradien yang sama** dengan bola.
+    ///
+    /// **Kenapa ini diuji, padahal ia "cuma angka yang sama".** Pemulihan di
+    /// `drawBands` memanggil `drawSphere` yang sama, dan itu satu-satunya alasan
+    /// daerah **di luar** pita tidak berubah: gradien yang ditumpuk di atas
+    /// dirinya sendiri adalah identitas. Kalau pemulihan itu kelak diganti
+    /// gradien yang dihitung sendiri, lengkung yang dipulihkan tidak akan sama
+    /// dengan lengkung yang terhapus — dan selisihnya muncul sebagai pita yang
+    /// lebih terang di tempat yang salah, bukan sebagai galat.
+    ///
+    /// Arah cahayanya juga harus satu sumber: `sphereLightOffset` dibaca oleh
+    /// bola, oleh pemulihan, dan oleh bibir terang kawah.
+    func testBandShadingReusesTheSphereLightDirection() {
+        // Sumber cahaya harus punya arah: nol berarti setiap kawah mendapat
+        // bibir terang di arah yang sama secara acak (lihat `craterRelief`).
+        let light = CelestialVisual.sphereLightOffset
+        XCTAssertGreaterThan(light.x * light.x + light.y * light.y, 0,
+                             "arah cahaya nol: gradien bola & kawah jadi tak terdefinisi")
+        // Dan ia menunjuk ke kiri-atas dalam koordinat layar (y ke bawah),
+        // tempat gradien bola menaruh cahayanya.
+        XCTAssertLessThan(light.x, 0, "cahaya harus dari kiri")
+        XCTAssertLessThan(light.y, 0, "cahaya harus dari atas (y layar ke bawah)")
+    }
+
     /// Bintik Merah Besar: angkanya **pusat**, dan view harus memperlakukannya
     /// begitu.
     ///
