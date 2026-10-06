@@ -126,7 +126,8 @@ benar**:
   bilang 642; diperbarui ke 647.
 - `./swift-typecheck.sh` → LULUS. `python3 Tools/check-visuals.py --check` →
   **296 pemeriksaan**, 0 gagal (tak disentuh).
-- CI: lihat entri CI di bawah bila sudah hijau.
+- CI: `37456329575` (Engine Tests Linux) + `37456329375` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `5c59a21`.
 
 ### Batas yang jujur
 - **Yang dibuktikan:** 100% klaim `allBelowHorizon` yang muncul di langit
