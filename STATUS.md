@@ -1,3 +1,85 @@
+## Progres terakhir (6 Okt 2026 — koefisien warna bintang yang tidak pernah dibandingkan antar bahasa)
+
+### Cacatnya: indeks B−V dijaga, tapi konversinya tidak
+
+`check_star_colour_index_matches_the_model` menjaga 25 **indeks** B−V antara
+`CelestialVisual.starColorIndex` (Swift) dan `STAR_COLOR_INDEX` (port). Tapi
+indeks itu bukan warna — warna lahir dari tujuh koefisien di
+`CelestialVisual.starRGB`, dan itulah yang benar-benar sampai ke piksel. Tujuh
+koefisien itu hidup lagi di `star_rgb` pada `Tools/render-visuals.py`, dan
+**tidak satu pun** dibandingkan. Mengubah `0.38` → `0.20` di kanal merah
+`starRGB` membiarkan seluruh `check-visuals` hijau sambil mengukur warna yang
+sudah tidak pernah tampil di jam — kelas cacat yang sama untuk kesekian kalinya:
+**model diubah, port tidak, gerbang gambar mengukur gambar yang tidak pernah
+ada.**
+
+Buktinya diukur, bukan diasumsikan. Mutasi `red: unit(0.62 + 0.38 * warmth)` →
+`0.62 + 0.20 * warmth` di model: **287 pemeriksaan visual, 637 uji Swift, 28
+aturan lint, dan typecheck semuanya tetap hijau** sebelum gerbang ini ada.
+Alasannya bukan kebetulan: seluruh pemeriksaan warna bintang yang sudah ada
+mengukur **gambar port**, jadi mengubah model tidak mengubah satu piksel pun
+yang sedang diukur.
+
+### Yang ditambahkan: baca bentuknya dari sumber kedua bahasa
+
+`star_rgb_parameters` mengekstrak tujuh koefisien + dua batas penjepit +
+pengali `warmth` dari **teks sumber** kedua bahasa (Swift dan Python), lalu
+`check_star_rgb_conversion_matches_the_model` membandingkannya dua arah. Tidak
+ada daftar tangan yang bisa tertinggal separuh saat koefisien ditambah.
+
+Tiga keputusan sengaja di pembaca:
+- **`let` opsional** — Swift menulisnya, Python tidak. Tanpa itu pembaca gagal
+  tepat di sisi port, dan pemeriksaan yang gagal karena bacaan akan terlihat
+  seperti pemeriksaannya yang salah.
+- **Komentar `//` dibuang per baris** — badan `starRGB` punya komentar yang
+  **memuat angka** ("kanal merah 1,11", "B−V >= ~1.35"); pembacaan tanpa
+  membuangnya akan mengambil angka komentar sebagai koefisien. Tidak ada
+  string literal di badan fungsi ini, jadi `//` di baris yang sama selalu
+  berarti komentar.
+- **Wilayah dibatasi** — Swift diakhiri `\n    }`, Python `\ndef `. Tanpa
+  batas, wilayah Swift membentang sampai EOF dan menelan fungsi *berikutnya*
+  yang kebetulan memakai pola serupa. Dibuktikan: menyuntik fungsi `decoy`
+  setelah `starRGB` dengan koefisien lain sama sekali tidak membuat gerbang
+  merah.
+
+### Bukti gerbangnya menggigit, tiga arah
+
+| Mutasi | Yang merah |
+|---|---|
+| model merah `0.38` → `0.20` (saja) | **2**: koefisien kanal merah + hasil di 26 indeks |
+| port merah `0.38` → `0.10` (saja) | **2**: sama |
+| model *dan* port tanda biru terbalik bersama | **0** — bukan drift; dan `testStarColourIsMonotonicInColorIndex` menangkapnya (1 gagal) |
+
+Baris ketiga itu yang menentukan: mutasi di kedua bahasa sekaligus tidak boleh
+memerah (bukan penyimpangan), dan memang tidak — tapi ia **tetap** tertangkap
+oleh uji Swift yang mengukur *hasilnya*. Jadi dua lapis ini komplementer, bukan
+berlebihan: gerbang ini mengikat *angkanya*, `check_star_colour_order` + tes
+Swift mengukur *artinya* (urutannya, tanda, jangkauan).
+
+### Gerbang
+- `python3 Tools/check-visuals.py --check` → **296 pemeriksaan** (287 → 296,
+  +9 = 1 bentuk terbaca + 4 skalar + 3 kanal + 1 hasil di seluruh indeks),
+  0 gagal.
+- `./swift-test.sh` → **CelestialEngine 182 + PointingKit 637**, 0 gagal — tidak
+  ada kode Swift yang berubah; yang masuk hanya gerbang Python.
+- `./swift-ui-lint.sh` → 28 aturan hijau. `./swift-typecheck.sh` → LULUS.
+- CI: belum dikirim (siklus ini berhenti di gerbang lokal).
+
+### Batas yang jujur
+- **Yang dibuktikan:** tujuh koefisien + penjepit + hasil konversi di seluruh
+  indeks katalog tidak bisa menyimpang antara Swift dan port tanpa gerbang
+  berbunyi. **Yang belum:** gerbang ini tidak tahu apakah warna itu *benar*
+  secara astronomi — itu milik `check_star_colour_order` dan
+  `testStarColourIsMonotonicInColorIndex`. Ia juga tidak membandingkan warna
+  mode malam (port menerjemahkan palet merah lebih dulu, jadi bentuk yang sah
+  di kedua sisi memang berbeda di situ — sama seperti `check_sun_profile`).
+- **Bukan pengganti uji Swift.** Mutasi tanda yang diubah di kedua bahasa
+  lolos gerbang ini; yang menangkapnya adalah `testStarColourIsMonotonicInColorIndex`.
+  Menghapus uji itu akan membuka celah yang gerbang ini secara desain tidak bisa
+  tutup.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — Aturan 28: jalur metode paket yang dipanggil berkualifikasi, dan dua "hijau yang salah" yang ditemukan di dalam gerbang itu sendiri)
 
 ### Yang ditutup: `TipePaket.metode(Label:)`

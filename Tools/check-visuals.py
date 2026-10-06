@@ -1223,6 +1223,169 @@ def check_star_colour_index_matches_the_model(results):
         else f"tanda terbalik: {wrong_sign}"))
 
 
+def star_rgb_parameters(source, anchor):
+    """Koefisien `starRGB`/`star_rgb` dari teks sumber → dict.
+
+    Membaca **bentuknya**, bukan menulis ulang angkanya: tujuh koefisien
+    warna, dua batas penjepit B−V, dan pengali `warmth` hidup di **dua**
+    bahasa (`CelestialVisual.starRGB` dan `star_rgb` pada port). Daftar
+    tangan di gerbang akan menjadisalinan yang tidak pernah dibandingkan —
+    persis lubang yang ditutup di sini.
+
+    Komentari `//` dibuang lebih dulu. Fungsi ini punya komentar yang
+    **memuat angka** ("kanal merah 1,11", "B−V >= ~1.35"), dan pembacaan
+    tanpa membuangnya bisa mengambil angka komentar sebagai koefisien.
+    Tidak ada string literal di dalam badan fungsi ini, jadi `//` di
+    baris yang sama selalu berarti komentar.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor)
+    # Batas wilayah **harus** mengikuti gaya badan fungsi pada bahasa itu:
+    # `\ndef ` untuk Python, `\n    }` untuk Swift (badan fungsi diakhiri
+    # kurung penutup pada indentasi yang sama). Tanpa batas, wilayah Swift
+    # membentang sampai akhir berkas dan pembacaan akan ikut menelan fungsi
+    # **berikutnya** yang kebetulan memakai pola serupa — gerbang yang akan
+    # memerah pada model yang benar.
+    terminators = ["\ndef ", "\n    }", "\n}"]
+    cuts = [source.index(t, start) for t in terminators if t in source[start:]]
+    region = source[start:min(cuts)] if cuts else source[start:]
+    body = "\n".join(line.split("//")[0] for line in region.split("\n"))
+
+    # `let` opsional: Swift menuliskannya, Python tidak. Tanpa ini pembaca
+    # gagal tepat di sisi port — dan pemeriksaan yang gagal karena **bacaan**
+    # akan terlihat seperti pemeriksaannya yang salah.
+    clamp = re.search(
+        r"(?:let )?clamped = min\(\s*(-?[\d.]+)\s*,\s*max\(\s*(-?[\d.]+)\s*,"
+        r"\s*index\s*\)",
+        body)
+    warmth = re.search(
+        r"(?:let )?warmth = \(clamped ([-+]) ([\d.]+)\) / ([\d.]+)", body)
+    channels = re.findall(
+        r"unit\(\s*([\d.]+)\s*([-+])\s*([\d.]+)\s*\*\s*warmth\s*\)", body)
+    if not (clamp and warmth and len(channels) == 3):
+        raise ValueError(
+            f"bentuk starRGB tidak dikenali di jangkar {anchor!r}: "
+            f"clamp={bool(clamp)}, warmth={bool(warmth)}, "
+            f"kanal={len(channels)} (harus 3)")
+
+    def slope(sign, magnitude):
+        return -magnitude if sign == "-" else magnitude
+
+    return {
+        "clamp_low": float(clamp.group(2)),
+        "clamp_high": float(clamp.group(1)),
+        "warmth_offset": slope(warmth.group(1), float(warmth.group(2))),
+        "warmth_span": float(warmth.group(3)),
+        "channels": [
+            (float(base), slope(sign, float(magnitude)))
+            for base, sign, magnitude in channels],
+    }
+
+
+def star_rgb_from_parameters(params, index):
+    """Bentukkan RGB dari koefisien yang dibaca dari sumber.
+
+    `unit` ditulis ulang di sini, bukan diambil dari port: kalau gerbang
+    memakai penjepit milik port yang sedang diukur, maka penjepit yang
+    salah ikut lolos bersama rumusnya.
+    """
+    clamped = min(params["clamp_high"], max(params["clamp_low"], index))
+    warmth = (clamped + params["warmth_offset"]) / params["warmth_span"]
+    return tuple(
+        min(1.0, max(0.0, base + slope * warmth))
+        for base, slope in params["channels"])
+
+
+def check_star_rgb_conversion_matches_the_model(results):
+    """Konversi indeks B−V → RGB tidak boleh menyimpang antara model & port.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_star_colour_index_matches_the_model`
+    menjaga 25 **indeks** B−V. Tapi indeks itu bukan warna — warna lahir
+    dari tujuh koefisien di `starRGB`, dan itulah yang benar-benar sampai ke
+    piksel. Tujuh koefisien itu hidup lagi di `star_rgb` pada port Python,
+    dan **tidak satu pun** dibandingkan.
+
+    Buktinya diukur, bukan diasumsikan: `red: unit(0.62 + 0.38 * warmth)`
+    diubah jadi `0.20` di model, dan **287 pemeriksaan visual, 637 uji
+    Swift, 28 aturan lint, dan typecheck semuanya tetap hijau**. Alasannya
+    bukan kebetulan: seluruh pemeriksaan warna bintang yang ada mengukur
+    **gambar port**, jadi mengubah model tidak mengubah satu piksel pun
+    yang sedang diukur.
+
+    Dua arah, seperti gerbang tetangganya. Yang menentukan adalah arah
+    kedua: mutasi di **kedua** bahasa sekaligus tidak membuat gerbang ini
+    merah — dan memang seharusnya tidak, karena itu bukan penyimpangan.
+    Yang tidak bisa dilihat gerbang ini adalah apakah warna itu benar
+    secara astronomi; itu tetap milik `check_star_colour_order` dan
+    `testStarColourIsMonotonicInColorIndex`, yang mengukur **hasilnya**.
+    Gerbang ini mengikat angkanya; mereka mengukur artinya.
+    """
+    swift = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                               "CelestialVisual.swift")).read()
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+
+    try:
+        model = star_rgb_parameters(
+            swift, "static func starRGB(forColorIndex index: Double)")
+        port = star_rgb_parameters(port_source, "def star_rgb(index):")
+    except ValueError as exc:
+        results.append(Result("konversi warna bintang: bentuk terbaca", False,
+                              str(exc)))
+        return
+
+    results.append(Result(
+        "konversi warna bintang: bentuk terbaca dari kedua bahasa", True,
+        f"{len(model['channels'])} kanal, penjepit "
+        f"{model['clamp_low']:+.2f}…{model['clamp_high']:+.2f}, "
+        f"span {model['warmth_span']}"))
+
+    scalars = ("clamp_low", "clamp_high", "warmth_offset", "warmth_span")
+    for key in scalars:
+        results.append(Result(
+            f"konversi warna bintang: {key}",
+            abs(model[key] - port[key]) <= 1e-9,
+            f"{model[key]:+.2f}" if abs(model[key] - port[key]) <= 1e-9
+            else f"model {model[key]:+.2f}, port {port[key]:+.2f}"))
+
+    for i, name in enumerate(("merah", "hijau", "biru")):
+        (mb, ms), (pb, ps) = model["channels"][i], port["channels"][i]
+        same = abs(mb - pb) <= 1e-9 and abs(ms - ps) <= 1e-9
+        results.append(Result(
+            f"konversi warna bintang: koefisien kanal {name}", same,
+            f"{mb:.2f} {ms:+.2f}·warmth" if same
+            else f"model {mb:.2f} {ms:+.2f}, port {pb:.2f} {ps:+.2f}"))
+
+    # Koefisien sama belum tentu cukup: yang diuji adalah **hasilnya**, di
+    # seluruh indeks katalog plus kedua ujung penjepit. Ini menangkap
+    # perubahan bentuk (mis. penjepit hilang) yang daftar koefisien di atas
+    # tidak akan lihat.
+    #
+    # Pengekspresian pesan tetap eksplisit, bukan f-string multi-baris:
+    # gerbang ini berjalan di python3 distro Ubuntu (3.12) dan di runner
+    # yang lebih tua, dan PEP 701 hanya masuk di 3.12.
+    def rgb3(value):
+        return tuple(round(c, 3) for c in value)
+
+    probes = sorted(set(R.STAR_COLOR_INDEX.values())
+                    | {model["clamp_low"], model["clamp_high"],
+                       model["clamp_low"] - 5, model["clamp_high"] + 5, 0.0})
+    mismatched = [i for i in probes
+                  if max(abs(a - b) for a, b
+                         in zip(star_rgb_from_parameters(model, i),
+                                 R.star_rgb(i))) > 1e-6]
+    detail = "{} indeks diuji".format(len(probes))
+    if mismatched:
+        detail = ("beda di B−V {}: model {}, port {}"
+                  .format([round(i, 2) for i in mismatched][:6],
+                          [rgb3(star_rgb_from_parameters(model, i))
+                           for i in mismatched[:2]],
+                          [rgb3(R.star_rgb(i)) for i in mismatched[:2]]))
+    results.append(Result(
+        "konversi warna bintang: warna hasil sama di seluruh indeks katalog",
+        not mismatched, detail))
+
+
 def swift_night_accents(source):
     """Palet aksen `NightVisual.Accents` dari teks Swift → `{nama: (r,g,b)}`.
 
@@ -2425,6 +2588,7 @@ def main():
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_deep_sky_layouts_match_the_model(results)
     check_star_colour_index_matches_the_model(results)
+    check_star_rgb_conversion_matches_the_model(results)
     check_night_accents_match_the_model(results)
 
     width = max(len(r.name) for r in results)
