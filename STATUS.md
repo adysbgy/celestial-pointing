@@ -1,3 +1,120 @@
+## Progres terakhir (6 Okt 2026 — tes siang hari yang hijau tanpa pernah menguji penyaringan siang)
+
+### Yang dicari siklus ini: bagian yang hijau tapi tidak menjaga apa pun
+
+Alat untuk mengukur "apakah sebuah tes benar-benar menjaga sesuatu" sudah ada
+di repo (`red-test.sh`), tapi terlalu lambat untuk sapuan. Jadi mutasi diterapkan
+langsung ke sumber, lalu suite dijalankan penuh:
+
+| Mutasi | Uji yang merah |
+|---|---|
+| ambang ketinggian dilewati (`altitudeDeg < -90`) | **52** |
+| cahaya Bulan tidak lagi mengetat ambang | **4** |
+| penyaringan siang dimatikan (`if false`) | **1** |
+
+Dua yang pertama terlindungi rapat. Yang ketiga tidak: satu-satunya yang merah
+adalah `VisibilityTests.testDaylightRejectsEverything`, yaitu tes **unit**-nya.
+Semua tes integrasi tetap hijau.
+
+### Akarnya bukan cakupan yang kurang, tapi arah tunjuk yang salah
+
+`ResolverTests.testDaylightProducesNoHighConfidenceStar` menunjuk alt 60 /
+az 180 pada tengah hari Jakarta dengan kerucut 40 derajat. Di dalam kerucut itu
+**satu-satunya** bintang katalog berjarak **15,9 derajat** dari pusat,
+sedangkan ambang `maxSeparationDeg` pada `ConfidencePolicy()` bawaan adalah
+**10 derajat**.
+
+Jadi MEDIUM-nya datang dari **tidak mengenai bintang**, sama sekali bukan dari
+penyaringan siang. Tes itu hijau karena geometri, dan tetap hijau saat
+penyaringan siang dihapus total, karena ia tidak pernah mengujinya.
+
+Bukti positifnya dihitung, bukan dikira: dengan `isDark` dipaksa benar, bintang
+yang sama **lolos** pada jarak 0,0 derajat dengan tetangga terdekat 32,8 derajat
+(jauh di atas ambiguitas 20 derajat), yaitu **HIGH**. Jadi kalau penyaringan
+siang hilang, menunjuk tepat ke bintang terang saat siang berakhir dengan kunci
+`high` untuk langit yang terang.
+
+### Perbaikannya: arah tunjuk ke 0 derajat, bukan menambah assertion
+
+Tidak ada assertion baru pada kode yang sama; yang diganti adalah **arahnya**.
+Titik tuju sekarang Arcturus persis, sehingga satu-satunya alasan penolakan
+adalah terang.
+
+Tiga hal lain ikut dijaga, karena ketiganya adalah cara tes ini bisa hijau tanpa
+cacat:
+
+- **Prasyarat siang** (`testFixtureTimeIsActuallyDaylight`): kalau tanggalnya
+  berubah jadi malam, "tidak ada HIGH" tetap benar sementara pembuktiannya
+  hilang.
+- **Prasyarat "hanya terang"**: ketinggian, magnitudo, dan jarak dari Matahari
+  diperiksa satu per satu dengan nilai yang sama seperti resolver, ditambah
+  bukti positif bahwa bintang itu **lolos** saat langit dipaksa gelap.
+- **Efemeris benar-benar dipakai**: tanpa baris ini, penyaringan siang bisa lolos
+  bukan karena bekerja, melainkan karena `skyContext` jatuh ke asumsi "langit
+  gelap" (tanpa efemeris `sunAltitudeDeg = -90`) yang justru **meloloskan**
+  bintang.
+
+### Green yang menutupi compile gagal
+
+Mutasi kedua yang saya coba (`let sunAltitude = -90`) **tidak melaporkan satu pun
+kegagalan**. Penyebabnya: literal `-90` disimpulkan `Int`, jadi berkas tidak
+terkompilasi, dan pencarian baris "XCTAssert failed" tidak menemukan apa pun
+karena tidak ada satu pun baris yang dieksekusi.
+
+Jadi "0 kegagalan" itu **hijau palsuk**. Mutasi kedua diulang dengan tipe yang
+benar (`isDark` dihitung dari `-90.0`, bukan dari tinggi Matahari nyata) dan
+barulah ia menjadi bukti: **3 tes merah**, termasuk
+`ResolverEphemerisTests.testDaylightProducesNoHighConfidenceStar`.
+
+Pelajaran yang dicatat: **"nol kegagalan" belum berarti "mutasi tertangkap"**.
+Harus berarti "mutasi tertangkap *dan* suite benar-benar menjalankan hal yang
+bisa gagal". Dua mutasi pertama terlihat meyakinkan justru karena keduanya
+menampilkan hitungan `Executed N tests`; pencarian ASSERT yang sendirian sudah
+tidak cukup sebagai gerbang.
+
+Catatan lanjutan: mutasi kedua ternyata **juga** membuat tes lama itu merah, jadi
+ia memang hijau karena alasan yang benar, hanya tidak sendirian. Itulah yang
+justru membuatnya menetap: dengan satu penjaga, tes lama itu bisa ditembus satu
+mutasi dan tetap hijau karena alasan yang salah.
+
+### Yang tidak diklaim
+
+- Percakapan sunyi di `View`/UI **tidak** diuji dari sini; yang dikunci adalah
+  keputusan resolver. Jalur `attitude -> controller -> .lock -> haptic/slew` punya
+  penjaganya sendiri (`PointingControllerTests`, `LockArrivalTests`,
+  `SlewSafetyTests`), tapi belum ada satu tes yang menyambung pemeriksaan siang
+  itu sampai ke `.lock`.
+- `searchHint` sengaja **tidak** diuji di sini: ia tinggal di `PointingKit`, dan
+  aturannya sudah dikunci di
+  `SearchHintTests.testDaylightWinsOverPerObjectReasons`. Mengulangnya di paket
+  engine hanya membuat dua salinan aturan yang bisa berbeda pendapat.
+- Stub efemeris tabel tulis-tangan yang sempat ditulis **dibuang**: alasannya
+  ("jalur efemeris tidak pernah jalan di Linux") ternyata salah. `AstronomyKit`
+  adalah dependensi nyata yang ikut terbangun di Linux, jadi
+  `AstronomyKitEphemeris` sudah tersedia di gerbang cepat. Stub itu menambah
+  permukaan tanpa menutup celah apa pun.
+
+### Gerbang
+
+- `./swift-test.sh` -> CelestialEngine **179** (+5), PointingKit **628** (tak
+  berubah), 0 gagal.
+- `./swift-ui-lint.sh` -> 25 aturan hijau. Aturan 10 sempat merah dan itu benar:
+  README masih menyebut 174.
+- `./swift-typecheck.sh` -> LULUS. `python3 Tools/check-visuals.py --check` ->
+  **195 pemeriksaan**, 0 gagal.
+- Diff sumber setelah mutasi: kosong (`git diff --stat` -> 0 berkas). Yang masuk
+  repo hanya berkas tes baru.
+
+### Sisa yang paling bernilai
+
+Menyambungkan pemeriksaan "langit terang" itu **sampai ke `.lock`**, lewat
+controller dengan bukti di level `EphemerisBody`: pada siang hari, controller
+yang diberi arah tunjuk tepat ke bintang terang **tidak boleh** menghasilkan
+`.lock`, dan `.lock` itulah yang memicu haptic sukses, bunyi, pengumuman
+VoiceOver, visual pengenal, serta izin GoTo.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — blokir baseline CraterRelief + regresi arah bibir kawah)
 
 ### Siklus dibuka dengan repo yang TIDAK ter-compile
