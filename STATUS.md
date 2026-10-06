@@ -1,3 +1,73 @@
+## Progres terakhir (6 Okt 2026 — Aturan 28: jalur metode paket yang dipanggil berkualifikasi, dan dua "hijau yang salah" yang ditemukan di dalam gerbang itu sendiri)
+
+### Yang ditutup: `TipePaket.metode(Label:)`
+
+Aturan 26 membuktikan `TipePaket.anggota` ADA. Aturan 27 (siklus lalu)
+membuktikan label pada `TipePaket(Label:)`. Yang tersisa jalur paling jenuh:
+metode statis paket yang dipanggil **berkualifikasi** —
+`StateAnnouncement.text(for: engine.snapshot)`. Terukur **44 pemanggilan
+berlabel** di `Apps/`, dan nol yang terperiksa.
+
+Batasnya disengaja dan tercatat di gerbang: pemanggilan posisional
+(135 buah) **dilewati**, karena urutan argumen tidak bisa dipastikan tanpa
+compiler. Menebaknya lebih berbahaya daripada tidak memeriksa.
+
+### Cacat #1: pembaca sumber kehilangan isi berkas, dan ia tidak terlihat
+
+Ada **dua** salinan pembaca `strip` di `swift-ui-lint.sh`. Salinan kedua
+membuang kurung pembuka pada interpolasi string. `NumberFormat.swift` memuat
+
+```swift
+String(format: "\%.\(fractionDigits)f", ...)
+```
+
+maka badan `NumberFormat` terpotong tepat di string itu. Yang lenyap dari
+indeks: **`degrees`, `signedDegrees`, `degreesPerSecond`, `percent`** —
+empat metode yang semuanya dipanggil dari `Apps/`, dan semuanya lolos tanpa
+satu pun pemeriksaan.
+
+Inilah bentuk kegagalan yang paling merusak di sebuah gerbang statis: ia
+bukan menolak isi yang salah, ia **kehilangan isi**, lalu tetap melaporkan
+apa yang terdengar benar. Aturan 26 kebetulan tidak terpengaruh karena yang
+diindeksnya anggota bertipe, bukan badan.
+
+### Cacat #2: nol argumen dilewati, dan itu terlalu percaya diri, bukan kehati-hatian
+
+Kedua aturan (27 dan 28) melompati pemanggilan tanpa argumen. Contoh:
+`CalibrationSession()` padahal deklarasinya `init(controller:flow:)`
+adalah pemanggilan yang **lebih salah**, bukan lebih sedikit pemeriksaannya.
+Bukti suntikan:
+
+| Suntikan | Hasil |
+|---|---|
+| `StateAnnouncement.text(forState:)` | merah |
+| label paket di-rename `for:` → `forState:` | merah, 2 situs |
+| `CalibrationSession()` | merah (sebelumnya hijau) |
+| `StateAnnouncement.text()` | merah (sebelumnya hijau) |
+
+Dua baris terakhir itulah yang memunculkan cacat #2 — keduanya hijau di
+bawah aturan lama yang justru saya sebut sudah memverifikasi label.
+
+### Bug di perbaikan saya sendiri
+
+Perbaikan nol-argumen pertama kali saya tulis `if d and not any(x for _l, x in d)`
+— yang berarti "deklarasi dengan **semua** parameter tanpa bawaan". Setelah
+suntikan pertama gagal menyala, ternyata itu salah: yang saya maksud
+`any(not x ...)` — **satu** parameter wajib sudah cukup. Bite-test yang
+melempar IOException pada iterasi kedua adalah yang menangkapnya; membaca
+kode saya sendiri tidak akan menangkapnya.
+
+### Hasil
+
+- `swift-test.sh`: **182 engine + 637 PointingKit** hijau
+- `swift-typecheck.sh`, `Tools/check-visuals.py` (287) hijau
+- `swift-ui-lint.sh`: **28 aturan** hijau
+- CI: `engine-tests` + `ios-build` hijau
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — label argumen pada inisialisasi paket)
+
 ## Progres terakhir (6 Okt 2026 — label argumen: jalur pemanggilan yang tidak pernah diindeks, sementara Aturan 26 menjaga jalur nama)
 
 ### Cacatnya: `Tipe(Label:)` bukan `Tipe.anggota`
