@@ -11323,3 +11323,89 @@ ada pada kebiasaannya, bukan pada satu berkas.
     tempat yang tidak berubah" belum disapu ke seluruh berkas uji — sapuan
     itu sendiri belum punya penjaga otomatis.
 
+
+
+## Siklus: tonjolan inti galaksi yang tak terlihat lolos semua uji (2026-10-06)
+
+### Premis: mutasi yang mengukur konstanta tidak pernah merah
+
+STATUS.md sebelumnya menutup dua uji dengan mutasi dan mencatat pola yang
+jujur: pola "ukur tempat yang tidak berubah" **belum disapu ke seluruh
+berkas uji**. Sapuan berikutnya menemukan tiga yang belum tersapu, dan
+semuanya satu keluarga.
+
+Galaksi punya tiga uji. Ketiganya mengukur `aspect` — dan `aspect` adalah
+**konstanta yang ditulis di layout**:
+
+    (0.0, 0.0, 1.00, 0.34, -18.0, 0.30),   // cakram,  aspect 0.34
+    (0.0, 0.0, 0.66, 0.30, -18.0, 0.26),   // lapisan, aspect 0.30
+    (0.0, 0.0, 0.26, 0.42, -18.0, 0.60)    // inti,   aspect 0.42
+
+### Akar masalahnya: aspect tidak bisa bergerak sama sekali
+
+Bukan cuma "jarang bergerak" seperti kasus pusat-blob sebelumnya. Di sini
+`buildDeepSky` menghitung
+
+    halfWidth  = min(roomX, roomY) · growth · widthScale
+    halfHeight = halfWidth · aspect
+
+sehingga `halfHeight / halfWidth` kembali **persis** `aspect`, untuk
+setiap nilai `widthScale`, `growth`, dan `room`. Rasio aspect adalah
+**invarian sempurna** dari setiap mutasi yang bisa merusak bentuknya.
+
+Jadi `testGalaxyHasARounderCoreThanItsDisc` tidak mengukur bentuk. Ia
+menyatakan ulang bahwa 0.42 > 0.34 — membandingkan dua konstanta di
+baris yang sama.
+
+### Dibuktikan: inti jadi butiran, semua uji hijau
+
+Mutasi `widthScale` inti `0.26 -> 0.002`. Inti menyusut jadi **0.2%** dari
+cakram — butiran yang secara visual mustahil dibaca sebagai tonjolan inti.
+Hasilnya **633/633 hijau**, termasuk ketiga uji galaksi.
+
+Bandingkan dengan pola yang ditemukan dua siklus lalu: mutasi lebar blob
+cangkang `0.30 -> 1.60` menghasilkan 28 kegagalan. Yang ini menghasilkan
+**nol**. Itu selisihnya.
+
+### Dua axis yang benar-benar menentukan, dan keduanya bergerak
+
+Yang menentukan apakah tonjolan inti terlihat bukan bentuknya melainkan
+**ukuran** dan **kecerahan**. Keduanya `× halfWidth`, jadi keduanya ikut
+bergerak:
+
+  - rasio lebar inti/cakram = `widthScale`-nya persis, **0.254**
+  - rasio opasitas inti/cakram = **2.00** (0.60 vs 0.30)
+
+Uji baru `testGalaxyCoreBulgeIsVisibleNotJustRounder` mengukur keduanya,
+pada tiga nilai `fuzziness` (bukan satu titik, karena `growth` bergerak
+padanya). Ambang dipilih dengan margin: lebar 0.10 dari 0.254 (2.5×),
+opasitas "lebih terang" dari 2.00.
+
+Dua mutasi yang dibuktikan sekarang **merah**:
+
+  - `widthScale` 0.26 -> 0.002 -> rasio lebar 0.0020, di bawah ambang.
+  - `opacity` 0.60 -> 0.30 -> inti tidak lagi lebih terang dari cakram.
+
+Yang kedua penting justru karena ia **bukan** mutasi ukuran: versi lama
+tetap hijau padanya, karena opacity tidak masuk ke aspect sama sekali.
+
+### Yang TIDAK diklaim
+
+  - Ketiga uji lama **tidak dihapus**. `aspect` masih layak dijaga sebagai
+    bentuk — memverifikasi "cakram benar-benar elips, bukan lingkaran" itu
+    betul. Yang dikoreksi adalah tambahan: klaim "inti terlihat sebagai
+    tonjolan" harus diukur lewat ukuran dan kecerahan, bukan lewat
+    aspect. Uji baru menutup dua sumbu yang benar-benar bisa bergerak.
+  - Sapuan belum selesai. Yang diperiksa di siklus ini hanya **galaksi**.
+    Gugus bola dan nebula masih punya uji berbasis posisi/aspect yang belum
+    diuji mutasinya — lihat unit berikutnya.
+  - `visualFrame.deepSky` tidak diubah sama sekali; ini murni tambahan
+    uji. Komit `8d54ca7` (konstanta kawah) juga tidak mengubah model.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 179, PointingKit **634** (1 baru).
+  - `./swift-ui-lint.sh` -> 25 aturan hijau. Rule 10 menangkap README yang
+    tertinggal di 633; README diperbarui ke 634.
+  - `python3 Tools/check-visuals.py --check` -> 215 pemeriksaan, 0 gagal.
+  - `./swift-typecheck.sh` -> LULUS.
