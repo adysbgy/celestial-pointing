@@ -1709,6 +1709,164 @@ public extension CelestialVisual {
             return Band(centerY: y, halfWidth: halfWidth, halfHeight: halfHeight)
         }
     }
+
+    // MARK: - Arah cahaya bola
+
+    /// Arah datang cahaya pada bola planet, dalam satuan radius, relatif
+    /// terhadap pusat piringan. y **positif ke bawah** — konvensi layar,
+    /// sama dengan `Canvas`.
+    ///
+    /// **Kenapa ini ada di model, padahal ia "cuma titik gradien".** Dua
+    /// gambar memakainya: gradien bola (`drawSphere`) dan bayangan kawah
+    /// (`CraterRelief`). Keduanya **harus** sepakat dari mana cahaya datang,
+    /// karena kawah yang gelapnya menghadap sumber cahaya terbaca sebagai
+    /// **gundukan**, bukan cekungan. Versi sebelumnya menulis `-0.32` di
+    /// view dan di port Python sebagai dua angka yang kebetulan sama —
+    /// bentuk yang sudah berkali-kali tercatat di repo ini: satu angka di
+    /// dua tempat adalah dua angka yang akan berbeda.
+    ///
+    /// Arahnya juga **bukan** bebas: sumbu-y yang dibalik membuat seluruh
+    /// bayangan kawah terbalik, dan kawah terbalik tetap terlihat seperti
+    /// kawah — kelas cacat yang tidak bisa dilihat mata, hanya bisa dihitung.
+    public static let sphereLightOffset = (x: -0.32, y: -0.32)
+}
+
+public extension CelestialVisual {
+
+    /// Geometri bayangan **satu** kawah, relatif terhadap pusat kawah.
+    ///
+    /// **Cacat yang ditutup bentuk ini.** Kawah digambar sebagai satu cakram
+    /// gelap rata. Di ukuran sebenarnya di jam (38 pt, 76 px @2x) hasilnya
+    /// bukan "permukaan berkawah" melainkan **stiker abu-abu yang ditempel**
+    /// pada bola: pengukuran mata pada render itu menyebutnya persis begitu,
+    /// dan alasannya fisis — cekungan selalu punya sisi yang menghadap cahaya
+    /// dan sisi yang membelakanginya, sementara cakram rata tidak punya
+    /// keduanya. Merkurius adalah planet yang ciri pengenalnya justru kawah,
+    /// jadi gambar yang tidak membacanya sebagai kawah adalah gambar yang
+    /// gagal menyampaikan satu-satunya hal yang ia punya.
+    ///
+    /// Perbaikannya bukan "beri gradien": gradien yang sama untuk **semua**
+    /// kawah akan membuat yang di sisi gelap bola ikut terang di sisi yang
+    /// sama — menambah detail yang salah. Yang benar adalah bayangan yang
+    /// **bergantung pada posisi kawah terhadap sumber cahaya**.
+    ///
+    /// Bentuk yang dipakai adalah cekungan yang sesungguhnya: **dasar yang
+    /// lebih gelap** plus **bibir yang punya sisi terang dan sisi gelap**.
+    /// Arah bibir terangnya itulah yang disimpan di sini sebagai vektor
+    /// satuan, bukan sebagai satu angka kecerahan — karena satu angka tidak
+    /// bisa menyatakan "terang di kiri-atas" tanpa ikut menyatakan arahnya.
+    ///
+    /// Tanda yang membuatnya bekerja: bibir terang selalu menghadap **sumber
+    /// cahaya** (`-lightUnit`) — untuk **semua** kawah, bukan hanya yang di
+    /// sisi terang.
+    ///
+    /// **Kenapa arahnya tidak boleh berbalik di sisi gelap.** Intuisi pertama
+    /// di siklus ini adalah membalik arahnya untuk kawah yang berada di sisi
+    /// gelap bola ("di sana cahayanya dari arah lain"). Itu salah, dan
+    /// salahnya fisis: Matahari berjarak 0,39–1,5 AU sementara piringan
+    /// Merkurius di layar berdiameter beberapa puluh piksel, jadi vektor
+    /// cahaya di seluruh piringan **praktis sama**. Cekungan selalu
+    /// meninggikan dinding yang menghadap cahaya dan menaungi dinding yang
+    /// membelakanginya, di mana pun cekungan itu berada. Yang berubah di sisi
+    /// gelap bukan **arah** bibirnya, melainkan **kontrasnya** — di sana tidak
+    /// ada cahaya langsung yang bisa menerangi dinding mana pun.
+    ///
+    /// Kekeliruan ini tidak bisa ditangkap mata: kawah dengan bibir terbalik
+    /// tetap terbaca sebagai kawah, hanya terbaca sebagai kawah yang
+    /// **menonjol keluar** alih-alih cekung. Karena itu arahnya dihitung di
+    /// model dan diuji di Linux.
+    public struct CraterRelief: Equatable, Sendable {
+        /// Titik pusat kawah, satuan radius bola, relatif pusat piringan.
+        public var centerX: Double
+        public var centerY: Double
+        /// Jari-jari kawah, satuan radius bola.
+        public var radius: Double
+        /// Komponen-x arah **bibir yang lebih terang**, vektor satuan di
+        /// koordinat layar (y positif ke bawah). Disimpan sebagai dua
+        /// `Double` terpisah, bukan `(x: y:)` — tupel berlabel sebagai
+        /// *stored property* tidak bisa menyintesis `Equatable` di Swift 6,
+        /// dan sisi sebaliknya otomatis lebih gelap.
+        public var rimDirectionX: Double
+        /// Komponen-y arah bibir yang lebih terang (lihat `rimDirectionX`).
+        public var rimDirectionY: Double
+        /// Seberapa kuat bibir terang/gelapnya, pecahan kecerahan permukaan.
+        public var rimStrength: Double
+        /// Seberapa gelap dasar cekungannya terhadap permukaan sekitarnya.
+        /// Selalu positif — nilainya dipakai sebagai kelegapan lapisan hitam,
+        /// jadi "lebih dalam" berarti angka yang lebih besar.
+        public var floorDepth: Double
+
+        public init(centerX: Double, centerY: Double, radius: Double,
+                    rimDirectionX: Double, rimDirectionY: Double,
+                    rimStrength: Double,
+                    floorDepth: Double) {
+            self.centerX = centerX
+            self.centerY = centerY
+            self.radius = radius
+            self.rimDirectionX = rimDirectionX
+            self.rimDirectionY = rimDirectionY
+            self.rimStrength = rimStrength
+            self.floorDepth = floorDepth
+        }
+    }
+
+    /// Bayangan kawah untuk setiap kawah di `craters`.
+    ///
+    /// Lihat `CraterRelief` untuk alasannya. Fungsi ini yang memutuskan
+    /// **arah** bayangannya, jadi arah itu tidak bisa berbeda antara view
+    /// Swift dan port Python — dan tidak bisa berbeda antara satu kawah dan
+    /// kawah berikutnya, karena semuanya diturunkan dari `lightDirection`
+    /// yang sama.
+    ///
+    /// - Parameters:
+    ///   - craters: pusat & jari-jari kawah (satuan radius bola), urutan
+    ///     `(x, y, r)` — sama dengan yang sudah dipakai view.
+    ///   - lightDirection: arah sumber cahaya, satuan radius. Lihat
+    ///     `sphereLightOffset`.
+    ///   - strength: kekuatan bibir pada kawah yang paling menghadap cahaya,
+    ///     dalam pecahan kecerahan.
+    ///   - depth: kedalaman dasar cekungan yang paling menghadap cahaya.
+    static func craterRelief(craters: [(Double, Double, Double)],
+                                    lightDirection: (x: Double, y: Double)
+                                        = CelestialVisual.sphereLightOffset,
+                                    strength: Double = 0.55,
+                                    depth: Double = 0.22) -> [CraterRelief] {
+        // Panjang arah cahaya tidak boleh nol: kalau nol, arahnya tidak
+        // terdefinisi dan setiap kawah akan mendapat bibir terang di arah
+        // yang sama secara acak. Menolaknya di sini lebih baik daripada
+        // membiarkannya menghasilkan gambar yang "masuk akal".
+        let length = (lightDirection.x * lightDirection.x
+                      + lightDirection.y * lightDirection.y).squareRoot()
+        guard length > 1e-9 else { return [] }
+        let lightX = lightDirection.x / length
+        let lightY = lightDirection.y / length
+
+        return craters.map { dx, dy, size in
+            // Panjang vektor kawah dari pusat bola, dijepit ke 1: kawah di
+            // tepi piringan tidak punya arah yang lebih ekstrem dari tepi.
+            let distance = min(1, (dx * dx + dy * dy).squareRoot())
+            // Seberapa searah kawah dengan cahaya: +1 = kawah di sisi yang
+            // paling terang, −1 = di sisi tergelap.
+            let alignment = dx * lightX + dy * lightY
+            // Kawah di sisi tergelap kehilangan kontrasnya, bukan berbalik
+            // tanda: di sana tidak ada cahaya langsung yang bisa menerangi
+            // dinding mana pun. Faktor `0.6 + 0.4 · alignment` memberi
+            // kekuatan penuh di sisi terang dan 20% di sisi tergelap — tidak
+            // pernah nol, supaya kawah tidak pernah hilang sama sekali.
+            let fade = 0.6 + 0.4 * alignment
+            // Kawah di tepi piringan permukaannya sudah miring, jadi
+            // bibirnya tidak lagi punya dua sisi yang setara.
+            let limb = 1 - 0.6 * distance
+            return CraterRelief(centerX: dx, centerY: dy, radius: size,
+                                // Bibir terang **selalu** menghadap sumber
+                                // cahaya. Lihat `CraterRelief`: arahnya tidak
+                                // berbalik di sisi gelap, yang berubah hanya
+                                // `fade` di atas.
+                                rimDirectionX: -lightX, rimDirectionY: -lightY,
+                                rimStrength: strength * fade * limb,
+                                floorDepth: depth * (1 - 0.5 * distance))
+        }
+    }
 }
 
 public extension CelestialVisual.Planet {

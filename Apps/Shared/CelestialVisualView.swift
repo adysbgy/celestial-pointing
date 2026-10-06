@@ -246,7 +246,14 @@ struct CelestialVisualView: View {
                                           width: radius * 2, height: radius * 2))
         context.fill(disc, with: .radialGradient(
             Gradient(colors: [Self.color(light), Self.color(dark)]),
-            center: CGPoint(x: center.x - radius * 0.32, y: center.y - radius * 0.32),
+            // Arah cahaya datang dari model, bukan angka yang ditulis ulang di
+            // sini: `drawCraters` memakai arah yang sama untuk memutuskan sisi
+            // mana bibir kawahnya yang terang. Kalau kedua angka ini berbeda,
+            // kawahnya akan tampak **menonjol keluar** dari bola alih-alih
+            // cekung — kekeliruan yang tidak bisa ditangkap mata, hanya bisa
+            // dihitung (lihat `CelestialVisual.sphereLightOffset`).
+            center: CGPoint(x: center.x + radius * CelestialVisual.sphereLightOffset.x,
+                            y: center.y + radius * CelestialVisual.sphereLightOffset.y),
             startRadius: radius * 0.1,
             endRadius: radius * 1.35))
     }
@@ -466,17 +473,79 @@ struct CelestialVisualView: View {
     ///
     /// Posisi kawah ditulis relatif terhadap pusat & radius supaya proporsinya
     /// tetap sama pada kartu jam maupun panel besar di iPhone.
+    ///
+    /// **Kenapa tiga lapisan, bukan satu cakram gelap.** Versi pertama
+    /// menggambar tiap kawah sebagai satu cakram `Color.black.opacity(0.18)`.
+    /// Diukur pada ukuran sebenarnya di jam (38 pt, 76 px @2x), hasilnya
+    /// terbaca sebagai **stiker abu-abu yang ditempel** di bola — bukan
+    /// permukaan berkawah. Sebabnya fisis: cekungan selalu punya dinding yang
+    /// menghadap cahaya dan dinding yang membelakanginya, sementara cakram
+    /// rata tidak punya keduanya. Merkurius adalah planet yang ciri
+    /// pengenalnya justru kawah, jadi gambar yang tidak membacanya sebagai
+    /// kawah gagal menyampaikan satu-satunya hal yang ia punya.
+    ///
+    /// Urutannya penting dan tidak boleh ditukar:
+    ///
+    ///   1. **Bibir gelap** — cakram penuh seukuran kawah, warnanya
+    ///      `craterFloor`. Ini sisi yang membelakangi cahaya.
+    ///   2. **Bibir terang** — cakram yang sama, tapi digeser ke arah sumber
+    ///      cahaya dan dipotong oleh cakram kawah, jadi yang tersisa hanya
+    ///      **sabit** di sisi yang menghadap cahaya. Warna `craterRim`.
+    ///   3. **Dasar cekungan** — cakram lebih kecil di tengah, kembali ke
+    ///      `craterFloor`, supaya bagian tengahnya lebih gelap dari bibir
+    ///      yang menghadap cahaya dan kawahnya benar-benar terbaca cekung.
+    ///
+    /// Arah bibir terangnya **bukan** pilihan di sini: ia datang dari
+    /// `CelestialVisual.craterRelief`, yang menurunkannya dari
+    /// `CelestialVisual.sphereLightOffset` — arah yang sama dengan gradien
+    /// bola. Angka yang ditulis ulang di sini akan membuat kawah terang di
+    /// sisi yang salah, dan kawah yang terbalik tetap terlihat seperti kawah.
     private func drawCraters(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         let craters: [(CGFloat, CGFloat, CGFloat)] = [
             (-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
             (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)
         ]
-        for (dx, dy, size) in craters {
-            let rect = CGRect(x: center.x + dx * radius - size * radius,
-                              y: center.y + dy * radius - size * radius,
-                              width: size * radius * 2,
-                              height: size * radius * 2)
-            context.fill(Path(ellipseIn: rect), with: .color(Color.black.opacity(0.18)))
+        let relief = CelestialVisual.craterRelief(
+            craters: craters.map { (Double($0.0), Double($0.1), Double($0.2)) })
+        let floor = Self.accent(CelestialVisual.accents.craterFloor)
+        let rim = Self.accent(CelestialVisual.accents.craterRim)
+
+        for crater in relief {
+            let size = CGFloat(crater.radius) * radius
+            let cx = center.x + CGFloat(crater.centerX) * radius
+            let cy = center.y + CGFloat(crater.centerY) * radius
+            let disc = Path(ellipseIn: CGRect(x: cx - size, y: cy - size,
+                                              width: size * 2, height: size * 2))
+
+            // 1. Seluruh cekungan dalam keadaan dinaungi.
+            context.fill(disc, with: .color(floor.opacity(0.85)))
+
+            // 2. Bibir yang menghadap cahaya: cakram yang digeser ke arah
+            //    sumber cahaya, dipotong oleh cakram kawah. Sisanya sabit.
+            //    Geseran dibuat cukup besar (≈0,45·ukuran) supaya sabitnya
+            //    terlihat di ukuran jam 76 px; kalau terlalu kecil, ia tertelan
+            //    dasar cakram (bug yang dulu membuat kawah terbaca sebagai
+            //    stiker rata). Geseran ini **bukan** `rimStrength`: kekuatan
+            //    mengatur seberapa terang sabitnya, bukan seberapa jauh ia
+            //    bergeser — mencampurnya berarti kawah redup lenyap.
+            let offset = size * 0.45
+            let rimDisc = Path(ellipseIn: CGRect(
+                x: cx + CGFloat(crater.rimDirectionX) * offset - size,
+                y: cy + CGFloat(crater.rimDirectionY) * offset - size,
+                width: size * 1.84, height: size * 1.84))
+            var lit = context
+            lit.clip(to: disc)
+            // Kelegapan bibir mengikuti `rimStrength` dari model: kawah di sisi
+            // gelap (dan di tepi piringan) meredup, bukan menghilang, karena di
+            // sana cahaya langsung lebih sedikit. Geseran tetap 0,45·ukuran.
+            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * CGFloat(crater.rimStrength))))
+
+            // 3. Dasar yang lebih gelap di tengah, jelas di dalam sabit bibirnya.
+            let innerSize = size * 0.5
+            context.fill(Path(ellipseIn: CGRect(x: cx - innerSize, y: cy - innerSize,
+                                                width: innerSize * 2,
+                                                height: innerSize * 2)),
+                         with: .color(floor.opacity(0.75)))
         }
     }
 

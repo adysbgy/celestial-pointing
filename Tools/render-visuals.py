@@ -104,6 +104,12 @@ ACCENTS = dict(
     saturnRing=(0.86, 0.78, 0.60),
     marsPolarCap=(0.97, 0.95, 0.93),
     venusHaze=(0.99, 0.96, 0.82),
+    # Pasangan cekungan kawah Merkurius. Lihat `NightVisual.Accents.craterFloor`
+    # untuk kenapa bayangan ini **bukan** `planetUnlit`: dasar kawah adalah
+    # permukaan berdebu yang masih memantulkan cahaya sekeliling, dan hitam
+    # murni di atas abu-abu terbaca sebagai lubang, bukan cekungan.
+    craterFloor=(0.16, 0.155, 0.15),
+    craterRim=(0.86, 0.84, 0.81),
     planetUnlit=(0.06, 0.06, 0.08),
     moonLit=(0.97, 0.95, 0.90),
     moonUnlit=(0.13, 0.13, 0.16),
@@ -446,14 +452,22 @@ class Canvas:
 
     # -- bentuk --------------------------------------------------------
 
-    def ellipse(self, cx, cy, rx, ry, color_at, alpha=1.0):
+    def ellipse(self, cx, cy, rx, ry, color_at, alpha=1.0, clip_disc=None):
         def inside(x, y):
+            # `clip_disc` = potong ke cakram lain. Dipakai kawah: bibir yang
+            # menghadap cahaya digambar sebagai cakram yang digeser, lalu
+            # dipotong oleh cakram kawahnya sendiri supaya yang tersisa hanya
+            # sabitnya.
+            if clip_disc is not None:
+                ccx, ccy, cr = clip_disc
+                if (x - ccx) ** 2 + (y - ccy) ** 2 > cr * cr:
+                    return False
             dx, dy = (x - cx) / rx, (y - cy) / ry
             return dx * dx + dy * dy <= 1.0
         self.fill(inside, color_at, alpha)
 
-    def disc(self, cx, cy, r, color_at, alpha=1.0):
-        self.ellipse(cx, cy, r, r, color_at, alpha)
+    def disc(self, cx, cy, r, color_at, alpha=1.0, clip_disc=None):
+        self.ellipse(cx, cy, r, r, color_at, alpha, clip_disc)
 
     def polygon(self, points, color_at, alpha=1.0):
         n = len(points)
@@ -584,8 +598,22 @@ SATURN_CASSINI_WIDTH = 0.06
 # MODEL: `CelestialVisual.ringBackHalfOpacityScale`
 RING_BACK_HALF_OPACITY_SCALE = 0.55
 POLAR_CAP_OPACITY = 0.85                                 # VIEW: `drawPolarCaps`
-CRATER_OPACITY = 0.18                                    # VIEW: `drawCraters`
 MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
+# MODEL: `CelestialVisual.sphereLightOffset` — arah datang cahaya pada bola,
+# satuan radius, y positif ke bawah. Dipakai **dua** hal: titik pusat gradien
+# bola dan arah bibir terang kawah. Satu konstanta, karena dua salinan angka
+# ini berarti kawah yang terangnya menghadap arah yang salah — dan kawah
+# terbalik tetap terlihat seperti kawah.
+SPHERE_LIGHT_OFFSET = (-0.32, -0.32)                     # MODEL: `sphereLightOffset`
+# MODEL: `CelestialVisual.craterRelief` — kekuatan bibir & kedalaman dasar.
+CRATER_RIM_STRENGTH = 0.55                               # MODEL: `craterRelief`
+CRATER_FLOOR_DEPTH = 0.22                                # MODEL: `craterRelief`
+# VIEW: `drawCraters` — opasitas lapisan kawah, urut sesuai penggambarannya.
+CRATER_FLOOR_OPACITY = 0.85                              # VIEW: `drawCraters`
+CRATER_RIM_OPACITY = 0.90                                # VIEW: `drawCraters`
+CRATER_INNER_FLOOR_OPACITY = 0.75                        # VIEW: `drawCraters`
+CRATER_RIM_OFFSET = 0.55                                 # VIEW: `drawCraters`
+CRATER_INNER_SCALE = 0.62                                # VIEW: `drawCraters`
 
 
 class VisualCase:
@@ -738,7 +766,8 @@ def _draw_sphere(canvas, cx, cy, radius, light, dark, night_mode):
     gradient = radial_gradient(
         [(light if not night_mode else night_surface(light), 1.0),
          (dark if not night_mode else night_surface(dark), 1.0)],
-        center=(cx - radius * 0.32, cy - radius * 0.32),
+        center=(cx + radius * SPHERE_LIGHT_OFFSET[0],
+                cy + radius * SPHERE_LIGHT_OFFSET[1]),
         start_radius=radius * 0.1, end_radius=radius * 1.35)
     canvas.disc(cx, cy, radius, gradient)
 
@@ -787,12 +816,10 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
 
         feature = palette["feature"]
         if feature == "craters":
-            crater = solid((0.0, 0.0, 0.0), CRATER_OPACITY)
-            for dx, dy, size in CRATERS:
-                mx, my = cx + dx * radius, cy + dy * radius
-                canvas.disc(mx, my, size * radius,
-                            lambda x, y: crater(x, y) if _point_in_polygon(x, y, points)
-                            else ((0.0, 0.0, 0.0), 0.0))
+            # Ciri pengenal ikut terpotong ke bagian piringan yang menyala,
+            # jadi kawah tidak pernah menonjol keluar dari sabit.
+            _draw_craters(canvas, cx, cy, radius, night_mode,
+                          inside_lit=lambda x, y: _point_in_polygon(x, y, points))
         elif feature == "haze":
             haze = ACCENTS["venusHaze"]
             rgb = night_surface(haze) if night_mode else haze
@@ -987,10 +1014,78 @@ def _draw_polar_caps(canvas, cx, cy, radius, night_mode):
         canvas.fill(inside, cap)
 
 
-def _draw_craters(canvas, cx, cy, radius, night_mode):
-    crater = solid((0.0, 0.0, 0.0), CRATER_OPACITY)
-    for dx, dy, size in CRATERS:
-        canvas.disc(cx + dx * radius, cy + dy * radius, size * radius, crater)
+def crater_relief(craters, light_direction=SPHERE_LIGHT_OFFSET,
+                  strength=CRATER_RIM_STRENGTH, depth=CRATER_FLOOR_DEPTH):
+    """`CelestialVisual.craterRelief` — arah & kekuatan bayangan tiap kawah.
+
+    Mengembalikan `(cx, cy, radius, rim_x, rim_y, rim_strength, floor_depth)`
+    per kawah. Arah bibir terang **selalu** menghadap sumber cahaya
+    (`-light`), untuk semua kawah: Matahari praktis tak terhingga jauhnya
+    dibanding lebar piringan, jadi vektor cahayanya sama di seluruh
+    permukaan. Yang berkurang di sisi gelap adalah kontrasnya, bukan
+    arahnya — kawah dengan bibir terbalik tetap terbaca sebagai kawah,
+    hanya terbaca menonjol keluar, jadi ini dihitung, bukan dilihat.
+    """
+    length = math.hypot(light_direction[0], light_direction[1])
+    if length <= 1e-9:
+        return []
+    lx, ly = light_direction[0] / length, light_direction[1] / length
+    out = []
+    for dx, dy, size in craters:
+        distance = min(1.0, math.hypot(dx, dy))
+        alignment = dx * lx + dy * ly
+        fade = 0.6 + 0.4 * alignment
+        limb = 1 - 0.6 * distance
+        out.append((dx, dy, size, -lx, -ly,
+                    strength * fade * limb, depth * (1 - 0.5 * distance)))
+    return out
+
+
+def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
+    """`CelestialVisualView.drawCraters` — cekungan tiga lapisan.
+
+    Satu cakram gelap rata tidak cukup: di ukuran sebenarnya di jam (38 pt,
+    76 px @2x) hasilnya terbaca sebagai **stiker abu-abu yang ditempel**,
+    bukan permukaan berkawah. Cekungan terbaca sebagai cekungan karena ia
+    punya dua dinding yang berlawanan terang-gelap. Jadi: seluruh cakram
+    dinaungi, lalu **sabit** bibir yang menghadap cahaya di atasnya, lalu
+    dasar yang lebih gelap di tengah.
+
+    `inside_lit` dipakai oleh planet berfase: ciri pengenalnya harus ikut
+    terpotong ke bagian piringan yang menyala, jadi kawah tidak pernah
+    menonjol keluar dari sabit.
+    """
+    # `accent_fn` (bukan `color_fn` + `solid`): keduanya sudah mengembalikan
+    # fungsi `(x, y) -> (rgb, alpha)`, dan yang menentukan terangnya adalah
+    # aturan **permukaan** — sama dengan `Self.accent(...)` di view.
+    floor = accent_fn(ACCENTS["craterFloor"], night_mode, CRATER_FLOOR_OPACITY)
+
+    def clipped(fn):
+        # `color_at` selalu dipanggil sebagai fungsi `(x, y) -> (rgb, alpha)`;
+        # jadi pembungkusnya meneruskan panggilan itu, bukan mengembalikan
+        # `fn` yang belum dipanggil.
+        if inside_lit is None:
+            return fn
+        return lambda x, y: fn(x, y) if inside_lit(x, y) else ((0.0, 0.0, 0.0), 0.0)
+
+    for dx, dy, size, rim_x, rim_y, rim_strength, floor_depth in crater_relief(CRATERS):
+        mx, my = cx + dx * radius, cy + dy * radius
+        mr = size * radius
+        # 1. Seluruh cakram dinaungi (dasar cekungan).
+        canvas.disc(mx, my, mr, clipped(floor))
+        # 2. Bibir yang menghadap cahaya: cakram yang digeser ke arah sumber
+        #    cahaya, dipotong oleh cakram kawah — yang tersisa hanya sabit.
+        #    `offset` dibuat cukup besar (≈0.45·mr) supaya sabitnya terlihat
+        #    di ukuran jam 76 px; terlalu kecil ia tertelan dasar cakram.
+        offset = mr * 0.45
+        canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,
+                    clipped(accent_fn(ACCENTS["craterRim"], night_mode,
+                                      min(1.0, CRATER_RIM_OPACITY * max(rim_strength, 0.2)))),
+                    clip_disc=(mx, my, mr))
+        # 3. Dasar yang lebih gelap di tengah, jelas di dalam sabit bibirnya.
+        canvas.disc(mx, my, mr * 0.5,
+                    clipped(accent_fn(ACCENTS["craterFloor"], night_mode,
+                                      CRATER_INNER_FLOOR_OPACITY)))
 
 
 def _draw_haze(canvas, cx, cy, radius, night_mode):

@@ -823,8 +823,43 @@ def check_port_matches_swift_constants(results):
         ("Matahari: view tidak menggambar piringan kedua",
          "core.opacity(0.42)" not in view, True,
          "let stops = profile.map { stop -> Gradient.Stop in", view),
-        ("opasitas kawah", R.CRATER_OPACITY, 0.18,
-         "Color.black.opacity(0.18)", view),
+        # Kawah: warna & arah datangnya dari model. Entri lama di sini
+        # ("opasitas kawah" → `Color.black.opacity(0.18)`) sudah **dihapus**,
+        # bukan diperbarui: kawahnya memang tidak lagi digambar sebagai satu
+        # cakram hitam. Menggantinya dengan angka baru akan menjadikan gerbang
+        # ini penjaga bentuk yang sudah ditinggalkan. Bentuk barunya dijaga
+        # `check_crater_relief_matches_the_model`.
+        ("warna dasar kawah (Swift)", R.ACCENTS["craterFloor"], (0.16, 0.155, 0.15),
+         "craterFloor: .init(red: 0.16, green: 0.155, blue: 0.15)", night),
+        ("warna bibir kawah (Swift)", R.ACCENTS["craterRim"], (0.86, 0.84, 0.81),
+         "craterRim: .init(red: 0.86, green: 0.84, blue: 0.81)", night),
+        # Arah kedua, dan yang paling penting untuk kawah: view harus
+        # **memakai** kedua token itu dan menurunkan arah bibirnya dari model.
+        # Kalau tidak, warna yang benar di atas tetap menghasilkan cakram
+        # gelap rata — bentuk yang sudah terbukti salah di ukuran jam.
+        ("kawah: view memakai warna dasar dari model",
+         "Self.accent(CelestialVisual.accents.craterFloor)" in view, True,
+         "let floor = Self.accent(CelestialVisual.accents.craterFloor)", view),
+        ("kawah: view memakai warna bibir dari model",
+         "Self.accent(CelestialVisual.accents.craterRim)" in view, True,
+         "let rim = Self.accent(CelestialVisual.accents.craterRim)", view),
+        ("kawah: view menurunkan arah bibir dari model",
+         "CelestialVisual.craterRelief(" in view, True,
+         "let relief = CelestialVisual.craterRelief(", view),
+        ("kawah: view tidak lagi menggambar cakram hitam rata",
+         ".color(Color.black.opacity(0.18))" not in view, True,
+         "let relief = CelestialVisual.craterRelief(", view),
+        # Arah cahaya bola. Angka ini dulu ditulis **dua kali** — sekali
+        # sebagai pusat gradien di view, sekali lagi di port Python — dan
+        # keduanya harus sama supaya bibir kawah yang terang menghadap sisi
+        # yang benar. Sekarang satu konstanta di model; pemeriksaan ini yang
+        # memastikan tidak ada salinan ketiga yang muncul kembali.
+        ("arah cahaya bola: model punya konstantanya",
+         R.SPHERE_LIGHT_OFFSET, (-0.32, -0.32),
+         "sphereLightOffset = (x: -0.32, y: -0.32)", model),
+        ("arah cahaya bola: view memakainya, bukan menulis ulang",
+         view.count("0.32") == 1, True,
+         "CelestialVisual.sphereLightOffset.x", view),
         ("kawah pertama Merkurius", tuple(R.CRATERS[0]), (-0.30, -0.22, 0.20),
          "(-0.30, -0.22, 0.20)", view),
         ("maria pertama Bulan", tuple(R.MARIA[0]), (-0.28, -0.30, 0.26),
@@ -996,6 +1031,73 @@ def check_sun_profile_matches_the_model(results):
         else f"beda di indeks {mismatched}: port "
              f"{[python_pairs[i] for i in mismatched]}, model "
              f"{[swift_pairs[i] for i in mismatched]}"))
+
+
+def check_crater_relief_matches_the_model(results):
+    """Bayangan kawah di port Python harus sama dengan model Swift — arahnya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Bibir kawah yang terang harus
+    menghadap **sumber cahaya**, dan sisi itu ditentukan oleh
+    `CelestialVisual.sphereLightOffset`. Kalau arahnya terbalik — misalnya
+    karena sumbu y dikira positif ke atas, atau karena bibirnya dibalik untuk
+    kawah di sisi gelap bola — hasilnya tetap terbaca sebagai kawah oleh mata,
+    hanya terbaca sebagai kawah yang **menonjol keluar** alih-alih cekung.
+    Tidak ada pemeriksaan gambar yang bisa menangkapnya: gambar acuannya ikut
+    berubah, dan keduanya "terlihat seperti kawah".
+
+    Karena itu yang diuji di sini adalah **bilangannya**, bukan gambarnya:
+    setiap kawah harus punya arah bibir yang sama dengan `-light` yang
+    dinormalkan, dan kekuatannya harus mengikuti rumus yang sama di kedua
+    bahasa. Pemeriksaan ini merah kalau port menyimpang **atau** kalau model
+    berubah tanpa port-nya ikut.
+    """
+    model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                             "CelestialVisual.swift")).read()
+
+    # Jangkar hilang = gagal bersih yang menyebut jangkarnya, bukan traceback.
+    if "sphereLightOffset = (x: -0.32, y: -0.32)" not in model:
+        results.append(Result(
+            "bayangan kawah: jangkar model masih ada", False,
+            "'sphereLightOffset = (x: -0.32, y: -0.32)' TIDAK ditemukan di "
+            "CelestialVisual.swift — arah cahaya bola tidak lagi terbaca"))
+        return
+
+    relief = R.crater_relief(R.CRATERS)
+    results.append(Result(
+        "bayangan kawah: satu relief per kawah",
+        len(relief) == len(R.CRATERS),
+        f"{len(relief)} relief untuk {len(R.CRATERS)} kawah"))
+
+    lx, ly = R.SPHERE_LIGHT_OFFSET
+    length = (lx * lx + ly * ly) ** 0.5
+    want_x, want_y = -lx / length, -ly / length
+    wrong_direction = [i for i, r in enumerate(relief)
+                       if abs(r[3] - want_x) > 1e-9 or abs(r[4] - want_y) > 1e-9]
+    results.append(Result(
+        "bayangan kawah: bibir terang menghadap cahaya di semua kawah",
+        not wrong_direction,
+        f"semua {len(relief)} kawah memakai arah "
+        f"({want_x:.4f}, {want_y:.4f})" if not wrong_direction
+        else f"kawah {wrong_direction} memakai arah lain: "
+             f"{[(round(relief[i][3], 4), round(relief[i][4], 4)) for i in wrong_direction]}"))
+
+    # Rumus kekuatannya harus sama, bukan hanya arahnya: kawah di sisi gelap
+    # kehilangan kontras, dan kawah di tepi piringan kehilangan lebih banyak.
+    mismatched = []
+    for i, (dx, dy, size) in enumerate(R.CRATERS):
+        distance = min(1.0, (dx * dx + dy * dy) ** 0.5)
+        alignment = dx * (lx / length) + dy * (ly / length)
+        want_strength = R.CRATER_RIM_STRENGTH * (0.6 + 0.4 * alignment) * (1 - 0.6 * distance)
+        want_depth = R.CRATER_FLOOR_DEPTH * (1 - 0.5 * distance)
+        if (abs(relief[i][5] - want_strength) > 1e-9
+                or abs(relief[i][6] - want_depth) > 1e-9):
+            mismatched.append(i)
+    results.append(Result(
+        "bayangan kawah: kekuatan bibir & kedalaman dasar mengikuti model",
+        not mismatched,
+        "rumus sama di kedua bahasa" if not mismatched
+        else f"kawah {mismatched} menyimpang dari rumus "
+             f"(kekuatan {R.CRATER_RIM_STRENGTH}, kedalaman {R.CRATER_FLOOR_DEPTH})"))
 
 
 def check_night_mode_purity(results, size=200, ss=2):
@@ -1708,6 +1810,7 @@ def main():
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_sun_profile_matches_the_model(results)
+    check_crater_relief_matches_the_model(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_mars_caps_touch_the_limb(results)

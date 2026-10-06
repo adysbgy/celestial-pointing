@@ -150,6 +150,31 @@ public extension CelestialVisual {
         public var marsPolarCap: RGBComponents
         /// Kabut Venus.
         public var venusHaze: RGBComponents
+        /// Dinding kawah Merkurius yang **membelakangi cahaya**.
+        ///
+        /// **Kenapa ini token, bukan hitam.** Versi pertama menggambar kawah
+        /// sebagai satu cakram `Color.black.opacity(0.18)` yang rata. Di
+        /// ukuran sebenarnya di jam (38 pt, 76 px @2x) hasilnya terbaca
+        /// sebagai **stiker abu-abu yang ditempel** di bola, bukan sebagai
+        /// permukaan berkawah — dan Merkurius satu-satunya planet yang ciri
+        /// pengenalnya justru kawah.
+        ///
+        /// Yang membuat sebuah cekungan terbaca sebagai cekungan adalah
+        /// **dua sisi yang berlawanan terang-gelap**, bukan gelapnya sendiri.
+        /// Sisi yang menghadap cahaya diterangkan `craterRim`, sisi yang
+        /// membelakanginya dinaungi token ini. Warnanya sengaja tidak hitam
+        /// murni: bayangan di permukaan berdebu tetap memantulkan sedikit
+        /// cahaya sekeliling, dan hitam murni di atas abu-abu terbaca sebagai
+        /// **lubang**, bukan bayangan.
+        public var craterFloor: RGBComponents
+        /// Dinding kawah Merkurius yang **menghadap cahaya**.
+        ///
+        /// Pasangan `craterFloor`. Keduanya bersama-sama yang membuat kawah
+        /// terbaca sebagai cekungan; satu saja di antaranya menghasilkan
+        /// bercak gelap yang rata. Nilainya dijaga
+        /// `testCraterRimIsBrighterThanItsFloor` supaya tidak bisa diam-diam
+        /// bertukar atau menempel.
+        public var craterRim: RGBComponents
         /// Piringan planet yang **tidak** menyala.
         ///
         /// Terpisah dari `moonUnlit` dengan alasan fisis: sisi gelap Bulan
@@ -205,6 +230,8 @@ public extension CelestialVisual {
                     saturnRing: RGBComponents,
                     marsPolarCap: RGBComponents,
                     venusHaze: RGBComponents,
+                    craterFloor: RGBComponents,
+                    craterRim: RGBComponents,
                     planetUnlit: RGBComponents,
                     moonLit: RGBComponents,
                     moonUnlit: RGBComponents,
@@ -220,6 +247,8 @@ public extension CelestialVisual {
             self.saturnRing = saturnRing
             self.marsPolarCap = marsPolarCap
             self.venusHaze = venusHaze
+            self.craterFloor = craterFloor
+            self.craterRim = craterRim
             self.planetUnlit = planetUnlit
             self.moonLit = moonLit
             self.moonUnlit = moonUnlit
@@ -244,6 +273,15 @@ public extension CelestialVisual {
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
+        // Pasangan cekungan kawah Merkurius. Terangnya sengaja **tidak**
+        // memakai `planetUnlit` (0.06) walaupun keduanya sama-sama bayangan:
+        // dasar kawah bukan piringan yang tidak menyala, melainkan permukaan
+        // berdebu yang tetap memantulkan cahaya sekeliling. Terlalu gelap di
+        // sini membuat kawah terbaca sebagai lubang tembus, bukan cekungan.
+        craterFloor: .init(red: 0.16, green: 0.155, blue: 0.15),
+        // Lebih terang dari `light` Merkurius (0.72/0.70/0.68) supaya dinding
+        // yang menghadap cahaya benar-benar menonjol dari bola sekitarnya.
+        craterRim: .init(red: 0.86, green: 0.84, blue: 0.81),
         planetUnlit: .init(red: 0.06, green: 0.06, blue: 0.08),
         moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
         moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
