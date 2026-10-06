@@ -2650,5 +2650,50 @@ final class CelestialVisualTests: XCTestCase {
             + "dan yang benar menurut busur limb adalah 0 R")
     }
 
+
+    /// Kabut Venus harus **sepusat** dengan bola dan **di dalam** piringan.
+    ///
+    /// **Cacat yang dijaga uji ini — nyata, dan tidak terlihat gerbang mana
+    /// pun.** Port Python menggambar elips kabut di `cy + radius * 0.14`,
+    /// sementara view Swift menaruh sudut atas `CGRect`-nya di `center.y −
+    /// radius * 0.72` — yaitu **pusat** `center.y` dengan separuh tinggi
+    /// 0.72 R. Selisihnya **0.14 R ke bawah**: seluruh gambar Venus berfase
+    /// yang diukur gerbang piksel adalah gambar yang tidak pernah tampil di
+    /// jam. Kekeliruannya penulisan satuan, bukan rasa: `CGRect` memuat
+    /// **sudut**, `Canvas.ellipse` memuat **pusat**. Kesalahan yang sama
+    /// pernah terjadi pada Bintik Merah Besar.
+    ///
+    /// Kenapa tidak ada gerbang yang melihatnya: `grep haze
+    /// Tools/check-visuals.py` tidak menemukan apa pun. Kabut Venus
+    /// satu-satunya ciri planet yang tidak dijaga di sana, jadi ia juga
+    /// satu-satunya yang bisa bergeser tanpa suara.
+    func testVenusHazeIsCentredAndCoversTheDisc() {
+        let haze = CelestialVisual.venusHaze()
+        // Sepusat: pergeseran ke mana pun membuat kabutnya tidak lagi
+        // menyelubungi piringan, dan itu terlihat sebagai kabut yang
+        // menggantung di satu sisi.
+        XCTAssertEqual(haze.centerY, 0, accuracy: 1e-12,
+                       "kabut harus sepusat dengan bola; 0.14 R ke bawah adalah kekeliruan satuan")
+        XCTAssertEqual(haze.halfHeight, 0.72, accuracy: 1e-12,
+                       "separuh tinggi 0.72 R: sudut atas CGRect di center.y - 0.72 R")
+        XCTAssertEqual(haze.halfWidth, 0.55, accuracy: 1e-12,
+                       "separuh lebar 0.55 R: lebar penuh 1.10 R")
+        // **Di dalam piringan, bukan menutupinya.** Tinggi penuhnya 1.44 R
+        // sementara piringan 2 R, jadi kabutnya memang bertengger di tengah
+        // bola. Invarian ini yang benar, dan arahnya penting: kabut yang
+        // menjulur **keluar** piringan akan tergambar di atas latar hitam,
+        // bukan di atas Venus — klaim yang salah tentang di mana ia berada.
+        // (Versi pertama uji ini menuntut `> 1.0` dengan alasan "lebih tinggi
+        // dari piringan"; itu keliru satuan, dan ujinya merah pada kode yang
+        // benar.)
+        XCTAssertLessThan(haze.farthestCorner, 1.0,
+                          "kabut harus di dalam piringan; menjulur keluar berarti tergambar di atas latar")
+        // Dan ia harus **terlihat**, bukan titik tak berarti di tengah:
+        // separuh tingginya harus lebih besar dari separuh lebarnya, karena
+        // kabut Venus lonjong tegak.
+        XCTAssertGreaterThan(haze.halfHeight, haze.halfWidth,
+                             "kabut Venus lonjong tegak, bukan bulat")
+    }
+
 }
 

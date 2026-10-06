@@ -618,10 +618,16 @@ struct CelestialVisualView: View {
     /// Venus: kabut tebal yang menutupi detail permukaan.
     private func drawHaze(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         let haze = Self.accent(CelestialVisual.accents.venusHaze)
-        context.fill(Path(ellipseIn: CGRect(x: center.x - radius * 0.55,
-                                           y: center.y - radius * 0.72,
-                                           width: radius * 1.10,
-                                           height: radius * 1.44)),
+        // Geometri dari model, bukan angka di sini. Port Python pernah
+        // menggambar elips ini **0.14 R lebih ke bawah** karena menyalin sudut
+        // `CGRect` sebagai pusat; satu-satunya cara kelas cacat itu tertutup
+        // adalah kedua bahasa membaca rumus yang sama. Lihat
+        // `CelestialVisual.venusHaze`.
+        let geometry = CelestialVisual.venusHaze()
+        context.fill(Path(ellipseIn: CGRect(x: center.x - radius * CGFloat(geometry.halfWidth),
+                                           y: center.y + radius * CGFloat(geometry.centerY - geometry.halfHeight),
+                                           width: radius * CGFloat(geometry.halfWidth * 2),
+                                           height: radius * CGFloat(geometry.halfHeight * 2))),
                      with: .linearGradient(
                         Gradient(colors: [haze.opacity(0), haze.opacity(0.7)]),
                         startPoint: CGPoint(x: center.x, y: center.y - radius),

@@ -617,6 +617,15 @@ SATURN_CASSINI_WIDTH = 0.06
 RING_BACK_HALF_OPACITY_SCALE = 0.55
 POLAR_CAP_OPACITY = 0.85                                 # VIEW: `drawPolarCaps`
 MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
+# Kabut Venus: **pusat** elips, satuan radius. MODEL: `CelestialVisual.venusHaze`
+# Sebelumnya kedua situs di berkas ini memakai `cy + radius * 0.14` sementara
+# view Swift menaruh pusatnya di `center.y` — 0.14 R lebih tinggi. Port dan
+# view karena itu menggambar Venus yang berbeda, dan gerbang piksel mengukur
+# yang tidak pernah tampil di jam. `check-visuals.py` sekarang menahan
+# keduanya terhadap `CelestialVisual.venusHaze`.
+VENUS_HAZE_CENTER_Y = 0.0                    # MODEL: `CelestialVisual.venusHaze`
+VENUS_HAZE_HALF_WIDTH = 0.55                 # MODEL: `CelestialVisual.venusHaze`
+VENUS_HAZE_HALF_HEIGHT = 0.72                # MODEL: `CelestialVisual.venusHaze`
 # MODEL: `CelestialVisual.sphereLightOffset` — arah datang cahaya pada bola,
 # satuan radius, y positif ke bawah. Dipakai **dua** hal: titik pusat gradien
 # bola dan arah bibir terang kawah. Satu konstanta, karena dua salinan angka
@@ -860,7 +869,8 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
                 if not _point_in_polygon(x, y, points):
                     return (rgb, 0.0)
                 return gradient(x, y)
-            canvas.ellipse(cx, cy + radius * 0.14, radius * 0.55, radius * 0.72, haze_clipped)
+            center_y, half_w, half_h = venus_haze()
+            canvas.ellipse(cx, cy + radius * center_y, radius * half_w, radius * half_h, haze_clipped)
         return
 
     # **Bola dulu, dengan radius penuh — sama di kedua keadaan keyakinan.**
@@ -1161,13 +1171,30 @@ def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
                                       CRATER_INNER_FLOOR_OPACITY)))
 
 
+def venus_haze():
+    """Port dari `CelestialVisual.venusHaze()` — geometri kabut Venus.
+
+    Mengembalikan `(center_y, half_width, half_height)` dalam satuan radius.
+
+    **Kenapa fungsinya ada, bukan dua kali angka.** Kedua situs di berkas ini
+    pernah memakai `cy + radius * 0.14` sementara view Swift menaruh pusatnya
+    di `center.y`. Port dan view karena itu menggambar Venus yang **berbeda**,
+    dan seluruh gerbang piksel untuk Venus berfase mengukur gambar yang tidak
+    pernah tampil di jam. `check-visuals.py` menahan fungsi ini dan view
+    terhadap `CelestialVisual.venusHaze` supaya pergeserannya tidak bisa
+    terulang tanpa suara.
+    """
+    return VENUS_HAZE_CENTER_Y, VENUS_HAZE_HALF_WIDTH, VENUS_HAZE_HALF_HEIGHT
+
+
 def _draw_haze(canvas, cx, cy, radius, night_mode):
     haze = ACCENTS["venusHaze"]
     rgb = night_surface(haze) if night_mode else haze
     gradient = linear_gradient([(rgb, 0.0), (rgb, 0.7)],
                                start_point=(cx, cy - radius),
                                end_point=(cx, cy))
-    canvas.ellipse(cx, cy + radius * 0.14, radius * 0.55, radius * 0.72, gradient)
+    center_y, half_w, half_h = venus_haze()
+    canvas.ellipse(cx, cy + radius * center_y, radius * half_w, radius * half_h, gradient)
 
 
 def _lit_band_polygon(cx, cy, radius, phase, bright_limb_angle):

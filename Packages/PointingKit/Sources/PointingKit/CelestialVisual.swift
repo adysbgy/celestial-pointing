@@ -1501,6 +1501,76 @@ public enum VisualFrame {
 
 public extension CelestialVisual {
 
+    /// Geometri kabut Venus: elips kabut + arah gradiennya.
+    ///
+    /// **Cacat yang ditutup geometri ini — dan yang membuatnya akhirnya
+    /// ditemukan.** Di port Python, elips kabut digambar **0.14 R lebih ke
+    /// bawah** daripada di view Swift: port memakai `cy + radius * 0.14`,
+    /// sementara view menaruh sudut atas `CGRect` di `center.y − radius *
+    /// 0.72`, yaitu **pusat** `center.y` dengan separuh tinggi 0.72 R. Jadi
+    /// seluruh gambar Venus berfase yang diukur gerbang piksel adalah gambar
+    /// yang **tidak pernah tampil di jam** — dan tidak ada satu pun
+    /// pemeriksaan yang bisa melihatnya: `grep haze Tools/check-visuals.py`
+    /// tidak menemukan apa pun. Kabut Venus satu-satunya ciri planet yang
+    /// tidak dijaga di sana, jadi ia juga satu-satunya yang bisa bergeser
+    /// tanpa suara.
+    ///
+    /// Angkanya pindah ke model supaya kelas cacat ini tertutup: satu rumus,
+    /// dibaca kedua bahasa, dan `check-visuals.py` bisa menahan keduanya
+    /// terhadapnya.
+    ///
+    /// **Kenapa `centerY` bernilai 0 dan bukan angka lain.** Pusat elipsnya
+    /// memang pusat bola. Nilai 0.14 di port bukan pergeseran yang disengaja —
+    /// ia kekeliruan penulisan saat geometrinya disalin dari `CGRect`
+    /// (yang memuat **sudut**) ke `Canvas.ellipse` (yang memuat **pusat**).
+    /// Kesalahan yang sama pernah terjadi pada Bintik Merah Besar, dan itu
+    /// sebabnya `Spot` sudah menyebut satuannya sebagai pusat.
+    public struct HazeGeometry: Equatable, Sendable {
+        /// Pusat elips, satuan radius bola (positif = ke bawah).
+        public var centerY: Double
+        /// Setengah lebar elips, satuan radius.
+        public var halfWidth: Double
+        /// Setengah tinggi elips, satuan radius.
+        public var halfHeight: Double
+
+        public init(centerY: Double, halfWidth: Double, halfHeight: Double) {
+            self.centerY = centerY
+            self.halfWidth = halfWidth
+            self.halfHeight = halfHeight
+        }
+
+        /// Titik terjauh elips dari **pusatnya**, satuan radius.
+        ///
+        /// Dipakai uji supaya kabut tidak menjulur keluar piringan: kabut di
+        /// luar bola akan tergambar di atas latar, dan itu klaim yang salah
+        /// tentang di mana ia berada.
+        ///
+        /// **Kenapa sumbu mayor, bukan akar jumlah kuadrat.** Titik terjauh
+        /// sebuah elips dari pusatnya adalah puncak **sumbu mayor**-nya, bukan
+        /// sudut kotak pembatasnya — `max(halfWidth, halfHeight)`. Bentuk akar
+        /// jumlah kuadrat akan menghitung sudut kotak, yang justru **di luar**
+        /// elipsnya, jadi ia menuduh kabut menjulur keluar padahal tidak.
+        /// Untuk kabut Venus keduanya kebetulan sama (lebar < tinggi, jadi
+        /// sumbu mayornya tegak), dan kebetulan yang tidak dijelaskan adalah
+        /// cara paling mudah melahirkan cacat berikutnya.
+        public var farthestCorner: Double {
+            max(halfWidth, halfHeight)
+        }
+    }
+
+    /// Geometri kabut Venus. Lihat `HazeGeometry` untuk kenapa ia di model.
+    ///
+    /// Bentuknya **lonjong tegak** (0.72 R tinggi separuh, 0.55 R lebar
+    /// separuh) dan seluruhnya **di dalam** piringan: tinggi penuhnya 1.44 R
+    /// terhadap piringan 2 R. Yang membatasinya tetap klip ke bagian yang
+    /// menyala, supaya kabutnya tidak pernah menonjol keluar sabit dan
+    /// membuatnya tampak lebih lebar daripada fraksi yang dihitung engine.
+    public static func venusHaze(centerY: Double = 0.0,
+                                 halfWidth: Double = 0.55,
+                                 halfHeight: Double = 0.72) -> HazeGeometry {
+        HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
+    }
+
     /// Kutub es planet, dalam satuan radius dan relatif terhadap pusat bola.
     ///
     /// **Kenapa bentuknya elips beririsan, bukan persegi panjang.** Versi

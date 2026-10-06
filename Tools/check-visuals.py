@@ -3209,6 +3209,72 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         "model memuat penjepit 'min(1, max(0, 1 - height * height)).squareRoot()' = "
         f"{'ada' if 'min(1, max(0, 1 - height * height)).squareRoot()' in model_src else 'TIDAK'}"))
 
+    # ── Kabut Venus ────────────────────────────────────────────────────
+    #
+    # **Cacat yang ditutup pemeriksaan ini — nyata, dan satu-satunya ciri
+    # planet yang tidak dijaga apa pun.** Port Python menggambar elips kabut
+    # di `cy + radius * 0.14`, sementara view Swift menaruh sudut atas
+    # `CGRect`-nya di `center.y - radius * 0.72` — yaitu **pusat** `center.y`
+    # dengan separuh tinggi 0.72 R. Selisihnya **0.14 R ke bawah**: seluruh
+    # gambar Venus berfase yang diukur gerbang piksel adalah gambar yang
+    # **tidak pernah tampil di jam**. `grep haze Tools/check-visuals.py`
+    # sebelum ini tidak menemukan apa pun, jadi kabut Venus satu-satunya
+    # ciri planet yang bisa bergeser tanpa suara — dan memang bergeser.
+    #
+    # Bentuknya penulisan satuan, bukan rasa: `CGRect` memuat **sudut**,
+    # `Canvas.ellipse` memuat **pusat**. Kesalahan yang sama pernah terjadi
+    # pada Bintik Merah Besar, dan itu sebabnya `Spot` sudah menyebut
+    # satuannya sebagai pusat.
+    #
+    # Ketiga angkanya dibaca dari sumber kedua bahasa **dan** dari model,
+    # karena satu angka yang hidup di tiga tempat adalah tiga angka yang
+    # akan berbeda. Yang dijaga di sini adalah **keberadaan pemanggilan
+    # modelnya**, bukan sekadar angkanya: view yang menulis ulang 0.55/0.72
+    # sebagai literal akan lolos pemeriksaan angka dan tetap bisa bergeser
+    # sendiri dari port.
+    haze_call = "CelestialVisual.venusHaze()"
+    results.append(Result(
+        "kabut Venus dibaca dari model di view (bukan sudut CGRect ditulis ulang)",
+        haze_call in view,
+        f"view memanggil '{haze_call}' = {'ada' if haze_call in view else 'TIDAK'}"))
+    haze_model = "public static func venusHaze(" in model_src
+    haze_port_fn = "def venus_haze(" in port
+    # **Kenapa `_draw_haze` dan cabang berfase diperiksa terpisah.** Keduanya
+    # situs yang berbeda, dan keduanya pernah memuat angka yang salah. Satu
+    # pemeriksaan "port memanggil venus_haze" saja akan hijau walaupun hanya
+    # satu yang diperbaiki.
+    port_haze_fn = re.search(r"def _draw_haze\(.*?\n(?=\ndef |\n# )", port, re.S)
+    calls_in_fn = (port_haze_fn is not None
+                   and "venus_haze()" in port_haze_fn.group(0))
+    port_phase = re.search(r"def _draw_planet\(.*?\n(?=\ndef |\n# )", port, re.S)
+    calls_in_phase = (port_phase is not None
+                      and "venus_haze()" in port_phase.group(0))
+    results.append(Result(
+        "port memanggil venus_haze di kedua situs (bola & berfase)",
+        haze_model and haze_port_fn and calls_in_fn and calls_in_phase,
+        f"model 'def venusHaze(' = {'ada' if haze_model else 'TIDAK'}, "
+        f"port 'def venus_haze(' = {'ada' if haze_port_fn else 'TIDAK'}, "
+        f"dipanggil di _draw_haze = {'ada' if calls_in_fn else 'TIDAK'}, "
+        f"di _draw_planet = {'ada' if calls_in_phase else 'TIDAK'}"))
+    # Angka lama harus **hilang dari kode**, bukan hanya ditambah yang baru:
+    # kalau satu situs masih memakai `cy + radius * 0.14`, ia menggambar Venus
+    # yang berbeda dari situs yang lain.
+    #
+    # **Kenapa komentar dibuang dulu.** Versi pertama pemeriksaan ini mencari
+    # `radius * 0.14` di seluruh berkas, dan ia **merah pada kode yang sudah
+    # benar** — karena angka itu masih disebut di komentar yang menerangkan
+    # justru kenapa ia dibuang. Gerbang yang merah pada kode benar akan
+    # dimatikan orang, jadi yang dicari adalah kodenya: komentar dan docstring
+    # dibuang lebih dulu.
+    code_only = re.sub(r"#[^\n]*", "", port)
+    code_only = re.sub(r'""".*?"""', "", code_only, flags=re.S)
+    stale = "radius * 0.14" in code_only
+    results.append(Result(
+        "geseran lama 0.14 R sudah tidak ada di kode port",
+        not stale,
+        f"kode port masih memuat 'radius * 0.14' = {'YA' if stale else 'tidak'} "
+        f"(komentar tidak dihitung)"))
+
 
 def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
     """Piringan ber-pita harus **tetap melengkung**, bukan jadi stiker rata.

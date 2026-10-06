@@ -1,3 +1,106 @@
+## Progres terakhir (6 Okt 2026 — kabut Venus: satu ciri planet yang tidak dijaga apa pun)
+
+### Temuan: port menggambar Venus 0,14 R lebih rendah dari yang tampil di jam
+
+Menyapu berkas ini dengan aturan yang sudah dipakai di sini — *"cari angka di
+lapisan gambar yang tidak dibaca gerbang mana pun"* — menyisakan satu ciri
+planet yang benar-benar **nol** cakupan: `grep haze Tools/check-visuals.py`
+tidak menemukan apa pun. Kabut Venus satu-satunya ciri pengenal yang tidak
+dijaga di sana, jadi ia juga satu-satunya yang bisa bergeser tanpa suara.
+
+Dan ia memang sudah bergeser:
+
+| | geometri elips kabut |
+|---|---|
+| view Swift | pusat di `center.y`, separuh tinggi 0,72 R |
+| port Python | pusat di `cy + 0,14 R` |
+
+Selisih **0,14 R ke bawah**. Seluruh gambar Venus berfase yang diukur gerbang
+piksel — sabit, cembung, tanpa-arah — adalah gambar yang **tidak pernah tampil
+di jam**.
+
+### Kenapa itu terjadi, dan kenapa bentuknya penting
+
+Bukan rasa, bukan pilihan: **keliru satuan**. `CGRect` memuat **sudut**,
+`Canvas.ellipse` memuat **pusat**. Saat geometrinya disalin dari view ke port,
+sudut atas `center.y − 0,72 R` diperlakukan sebagai pusat, dan 0,72 R berubah
+jadi 0,14 R. Kesalahan yang **sama persis** pernah terjadi pada Bintik Merah
+Besar — dan itu sebabnya `Spot` di model sudah menyebut satuannya sebagai
+pusat. Pelajarannya sudah tertulis di repo ini; yang belum ada adalah gerbang
+yang menutup ciri **kedua**, jadi yang kedua bebas mengulanginya.
+
+Angka 0,14 R juga muncul di **dua** situs port (bola penuh dan cabang berfase),
+jadi memperbaiki satu tempat saja akan meninggalkan Venus yang berbeda di
+dalam aplikasi sendiri.
+
+### Perbaikannya: geometrinya pindah ke model
+
+`CelestialVisual.venusHaze()` sekarang memiliki geometrinya, dan **kedua**
+bahasa membacanya — view lewat `CelestialVisual.venusHaze()`, port lewat
+`venus_haze()` di `render-visuals.py`. Dua situs port memanggilnya, jadi tidak
+ada angka yang bisa berbeda di antara mereka.
+
+### Uji yang menangkapnya ditulis lebih dulu, dan uji itu sendiri sempat salah
+
+`testVenusHazeIsCentredAndCoversTheDisc` ditulis **sebelum** perbaikannya
+(aturan 10 di brief). Versi pertamanya menuntut `halfHeight > 1,0` dengan
+alasan "kabut harus lebih tinggi dari piringan" — dan ujinya **merah pada kode
+yang benar**: 0,72 adalah *separuh* tinggi, jadi tinggi penuhnya 1,44 R
+terhadap piringan 2 R. Kabutnya memang **di dalam** piringan. Asersinya
+dibalik ke `farthestCorner < 1,0`, dengan alasannya ditulis: kabut yang
+menjulur keluar akan tergambar di atas latar hitam, bukan di atas Venus.
+
+`farthestCorner` sendiri ikut diperbaiki: titik terjauh sebuah elips dari
+pusatnya adalah puncak **sumbu mayor**-nya, `max(halfWidth, halfHeight)`, bukan
+akar jumlah kuadrat — bentuk terakhir menghitung sudut kotak pembatas, yang
+justru **di luar** elipsnya. Untuk kabut Venus keduanya kebetulan sama, dan
+kebetulan yang tidak dijelaskan adalah cara termudah melahirkan cacat
+berikutnya.
+
+### Bukti mutasi — lima keadaan, semuanya menggigit
+
+```
+[baseline]                          14 pemeriksaan, 0 gagal
+port kehilangan fungsi venus_haze   14 pemeriksaan, 1 gagal
+port kembali menggeser 0.14 R       14 pemeriksaan, 2 gagal
+situs berfase kembali menggeser     14 pemeriksaan, 2 gagal
+view memakai centerY 0.14           14 pemeriksaan, 1 gagal
+model kehilangan venusHaze          14 pemeriksaan, 1 gagal
+[dipulihkan]                        14 pemeriksaan, 0 gagal
+```
+
+Pemeriksaan "geseran lama sudah tidak ada" dibaca dari kode **setelah komentar
+dibuang** — versi pertamanya merah pada kode yang sudah benar, karena 0,14 R
+masih disebut di komentar yang menerangkan justru kenapa ia dibuang.
+
+### Yang **tidak** diubah, dan kenapa
+
+Sapuan yang sama menandai enam angka lain di view tanpa gerbang: `1.15`
+(radius akhir gradien limb), `0.17`/`0.48` (kawah), `0.44` (maria), dan
+`1.10`/`1.44` (kabut — keduanya kini dibaca dari model). Empat yang pertama
+adalah **tekstur hias**: tidak menyatakan identitas maupun geometri, jadi
+angka yang bergeser di sana mengubah rasa, bukan kebenaran. Itu batas yang
+sengaja, bukan kelalaian.
+
+Satu kandidat lain diperiksa lalu **ditolak**: tinggi pita Jupiter konstan
+0,055 R untuk semua pita, padahal bola memendekkan tinggi tiap pita sebesar
+`sqrt(1 − y²)` — pita terluar jadi **2× terlalu tinggi** (0,0550 vs 0,0283).
+Terukur, tapi bukan cacat: pada radius kartu jam 19 pt pita terluar yang benar
+hanya **1,1 pt**, dan `drawBands` sudah membuang pita di bawah 1 pt. Yang
+membuat piringan terbaca Jupiter di jam adalah pita yang **terbaca**, dan
+pemendekan itu mengorbankannya. Batas ini sekarang tercatat di sini supaya ia
+tidak "ditemukan" lagi sebagai cacat baru oleh siklus berikutnya.
+
+### Keadaan sekarang
+
+| | |
+|---|---|
+| CelestialEngine | **182 uji hijau** |
+| PointingKit | **655 uji hijau** |
+| Gerbang visual | **348 pemeriksaan, 0 gagal** |
+| Berkas tersentuh | `CelestialVisual.swift`, `CelestialVisualView.swift`, `CelestialVisualTests.swift`, `check-visuals.py`, `render-visuals.py` |
+
+
 ## Progres terakhir (6 Okt 2026 — pita Jupiter: tali busur, dan gerbang yang akhirnya menggigit)
 
 ### Temuan: piringan terbaca sebagai stiker rata, bukan bola
