@@ -638,6 +638,104 @@ def check_png_roundtrip(results, size=64, ss=2):
         os.remove(path)
 
 
+def _stroke_width_factors(source, radius_name, patterns):
+    """Faktor **lebar garis** yang mengikuti radius — hanya yang stroking.
+
+    Kata kunci `patterns` bukan detail gaya. Badge kandidat punya **tiga**
+    besaran yang semuanya ditulis `badge_radius * N`, dan ketiganya berbeda:
+
+    | besaran | nilainya | lebar garis? |
+    |---|---|---|
+    | `stroke_width` (geometri) | 0.28 | ya |
+    | `dot_radius` (tetes glif) | 0.13 | bukan |
+    | lebar garis di penggambar | 0.28 | ya |
+
+    Dua pembacaan gagal, masing-masing sudah dicoba di siklus ini:
+
+    - **Singular** (`badge_radius * N` pertama saja) — mutasi di
+      `_draw_candidate_marker` tidak terlihat sama sekali, karena pembaca
+      selalu berhenti di yang geometri.
+    - **Plural tanpa konteks** (`semua badge_radius * N`) — menelan
+      `dot_radius` dan membuat perbandingan himpunan **merah pada kode yang
+      benar**. Gerbang yang lebih ketat daripada yang diklaimnya akan
+      dimatikan orang dalam sehari.
+
+    Jadi yang dicari adalah **konteks stroking**, dan tetes glif (0.13) tetap
+    dijaga lewat jalur yang sudah ada sebelumnya.
+
+    Komentar dibuang per baris lebih dulu: badan fungsi di repo ini memuat
+    angka di komentarnya, dan pembacaan tanpa membuangnya mengambil angka
+    prosa sebagai parameter.
+    """
+    body = "\n".join(line.split("//")[0] if "//" in line else line.split("#")[0]
+                     for line in source.split("\n"))
+    found = []
+    for pattern in patterns:
+        found += [float(v) for v in
+                  re.findall(pattern.format(r=re.escape(radius_name)), body)]
+    # **Tidak melempar.** Daftar `checks` di bawah dibangun **saat fungsi
+    # berjalan**, jadi pembaca yang melempar `ValueError` akan menggagalkan
+    # seluruh gerbang dengan traceback — dan traceback tidak menyebut apa yang
+    # harus diperbaiki. Pola yang dipakai berkas ini: jangkar hilang adalah
+    # **pemeriksaan yang gagal dan menyebut jangkarnya**, bukan exception.
+    # `None` yang membuat perbandingan di bawah salah dan pesannya menyebut
+    # kedua sisi, jadi sumber dan tujuannya masih terlihat.
+    return found or None
+
+
+def spike_width(source):
+    """Tebal spike bintang: `coreRadius * 0.18` / `core_radius * 0.18`.
+
+    Ejaan identifier ditentukan dari berkas mana pembacaan dilakukan, bukan
+    ditebak: kalau `core_radius` ada di sana, berkas itu Python.
+    """
+    return _stroke_width_factors(   # boleh None: jangkar hilang = merah, bukan exception
+        source, "core_radius" if "core_radius" in source else "coreRadius",
+        # Dua bentuk assignment, satu di setiap bahasa: Swift
+        # `lineWidth: max(0.5, coreRadius * 0.18)`, Python
+        # `width = max(0.5, core_radius * 0.18)`. Satu pola untuk keduanya
+        # lebih baik daripada menebak mana yang dipakai — tebakan yang
+        # salah membuat gerbang gagal membaca sumber yang benar.
+        [r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*"
+         r"(?<![\w.])(\d+\.\d+)"])
+
+
+def badge_stroke(source):
+    """Tebal glif kandidat "?" — dua tempat stroking, dua satuan.
+
+    Yang dijaga keduanya: assignment di fungsi geometri (satuan radius
+    frame) dan pemanggilan `stroke_polyline` di penggambar (satuan piksel).
+    Menggabungkan keduanya jadi satu daftar membuat mutasi di salah satunya
+    tidak terlihat kalau yang lain dibaca.
+    """
+    name = "badge_radius" if re.search(r"badge_radius", source) else "badgeRadius"
+    # Tiga tempat stroking, masing-masing satu di dua bahasa:
+    #   Swift view   `lineWidth: max(1, badgeRadius * 0.28)`
+    #   Python geometri `stroke_width = badge_radius * 0.28`
+    #   Python penggambar `stroke_polyline(…, max(1.0, badge_radius * 0.28), …)`
+    return _stroke_width_factors(source, name, [
+        r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
+        r"stroke_width\s*=\s*{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
+        r"stroke_polyline\([^)]*?{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
+    ])
+
+
+def _same_stroke_factors(view_factors, port_factors):
+    """Apakah kedua sisi punya **nilai** faktor yang sama.
+
+    `None` berarti salah satu sisi tidak punya faktor yang bisa dibaca, dan
+    itu harus merah — tapi **dengan bentuk yang bisa dibaca**, karena
+    pemeriksaan yang membandingkan `None` dengan `True` hanya menghasilkan
+    "port=None, seharusnya True" tanpa menyebut berkas mana.
+    Nilai yang dibandingkan adalah himpunan unik: jumlah situs memang
+    berbeda (port punya glif di dua satuan, view cuma satu), yang wajib sama
+    adalah **angka** yang dipakai di sana.
+    """
+    if view_factors is None or port_factors is None:
+        return False
+    return set(view_factors) == set(port_factors)
+
+
 def check_port_matches_swift_constants(results):
     """Konstanta port harus masih sama dengan yang ada di view Swift.
 
@@ -866,6 +964,48 @@ def check_port_matches_swift_constants(results):
          "(-0.28, -0.30, 0.26)", view),
         ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
          "color.opacity(0.45)", view),
+        # **Dua faktor lebar garis yang hidup di dua bahasa tanpa pengikat.**
+        #
+        # Bentuknya sama persis dengan kawah sabit yang baru ditutup, tapi
+        # lebih sederhana: satu faktor, satu satuan (**piksel**), satu notasi.
+        # `0.18` (tebal spike bintang) ditulis `coreRadius * 0.18` di view dan
+        # `core_radius * 0.18` di port; `0.28` (tebal garis glif "?" kandidat)
+        # ditulis `badgeRadius * 0.28` di view dan `badge_radius * 0.28` di
+        # port. Tidak ada gerbang yang menyebut keduanya.
+        #
+        # Bukti audit mutasi, masing-masing dua arah (view dan port):
+        #
+        #     VIEW  0.28 -> 0.60   313 pemeriksaan, 0 gagal
+        #     VIEW  0.18 -> 0.55   313 pemeriksaan, 0 gagal
+        #
+        # Kenapa ia penting meski keduanya "cuma" lebar garis: `0.28` mengatur
+        # menebalkan **tanda ketidakpastian**. Glif "?" yang terlalu tipis
+        # hilang di layar jam, dan itu menghapus satu-satunya penanda visual
+        # bahwa engine sedang **ragu** — PRD v0.4: jangan pernah menampilkan
+        # visual yang mengklaim identitas saat engine ragu. Menipiskan glif
+        # sampai tak terlihat menghapus penanda itu secara senyap.
+        # Spike: satu situs per bahasa, jadi himpunan pun boleh sama persis.
+        ("tebal spike bintang: port == view",
+         _same_stroke_factors(spike_width(view), spike_width(port)),
+         True, "core_radius * 0.18", port, "render-visuals.py"),
+        ("tebal spike bintang: view menulisnya", view.count("coreRadius * 0.18") == 1,
+         True, "lineWidth: max(0.5, coreRadius * 0.18))", view,
+         "CelestialVisualView.swift"),
+        # Badge: **himpunan**, bukan satu angka — dan bukan himpunan yang
+        # harus sama, karena jumlah situsnya memang berbeda (port punya dua:
+        # geometri bersatuan radius frame dan penggambar bersatuan piksel;
+        # view cuma satu). Bandingkan **nilai yang unik dari masing-masing**:
+        # `{0.28}` vs `{0.28}` benar, `{0.28}` vs `{0.28, 0.12}` salah.
+        # Membandingkan hanya yang pertama membuat mutasi di
+        # `_draw_candidate_marker` sunyi — dibuktikan sebelum himpunan dipakai:
+        # `0.28 -> 0.12` di sana tidak membuat satu pun pemeriksaan merah.
+        ("tebal glif kandidat: port == view",
+         _same_stroke_factors(badge_stroke(view), badge_stroke(port)),
+         True, "badge_radius * 0.28", port, "render-visuals.py"),
+        ("tebal glif kandidat: view menulisnya",
+         view.count("badgeRadius * 0.28") == 1, True,
+         "lineWidth: max(1, badgeRadius * 0.28))", view,
+         "CelestialVisualView.swift"),
         # Gambar kawah Merkurius. Kelima angka ini ada di **dua bahasa** dan
         # sampai sini **tidak dijaga siapa pun**: mutasi empat di antaranya di
         # view membuat seluruh 195 pemeriksaan tetap hijau (dibuktikan saat
@@ -968,9 +1108,16 @@ def check_port_matches_swift_constants(results):
         # port Python), dan pesan yang menyebut berkas yang salah adalah
         # pesan yang mengirim orang ke tempat yang tidak berisi apa-apa.
         where = check[5] if len(check) > 5 else "sumber Swift"
+        # Nilai boolean tidak ditampilkan sebagai `True`/`False`: pesannya
+        # jadi tidak mengatakan apa pun. Untuk pemeriksaan yang memang
+        # membandingkan nilai, tampilkan angkanya; untuk yang membandingkan
+        # syarat, tampilkan syaratnya.
+        shown = (f"port={port_value}, seharusnya {expected}"
+                 if not isinstance(port_value, bool)
+                 else "terpenuhi" if port_value else "TIDAK terpenuhi")
         results.append(Result(
             f"port sejalan: {label}", port_value == expected,
-            f"port={port_value}, seharusnya {expected}"))
+            f"{shown}, seharusnya {expected}"))
         results.append(Result(
             f"sumber memuat: {label}", source_text in source,
             f"'{source_text}' {'ditemukan' if source_text in source else 'TIDAK ditemukan'}"
