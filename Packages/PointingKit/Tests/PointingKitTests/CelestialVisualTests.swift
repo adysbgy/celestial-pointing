@@ -1070,18 +1070,26 @@ final class CelestialVisualTests: XCTestCase {
     /// `buildDeepSky` memperbesar setiap blob sebesar `0.62 + 0.38 · fuzziness`,
     /// dan cangkang ini lebarnya hanya 0.30 — delapan blob yang masing-masing
     /// membesar ke arah pusat bisa saja menutup lubang yang menjadi alasan
-    /// bentuk ini ada. Nilai 1.0 adalah yang paling besar, jadi kalau ada
-    /// yang salah justru di situlah ia tampak; M27 memakai 0.68 dan M57 0.40,
-    /// dan kedua angka itulah yang sungguhan sampai ke layar. Uji yang hanya
-    /// memakai nilai ekstrem bisa hijau sementara objeknya tampil salah.
+    /// bentuk ini ada. M27 memakai 0.68 dan M57 0.40, dan kedua angka itulah
+    /// yang sungguhan sampai ke layar.
+    ///
+    /// **Kenapa yang diukur tepi dalamnya, bukan pusat blobnya.** Versi
+    /// pertama uji ini mengukur jarak pusat blob, dan pusatnya tidak pernah
+    /// bergerak — 0.42 untuk semua fuzziness — jadi uji itu akan tetap hijau
+    /// berapa pun lebarnya blob membesar. Yang menentukan apakah lubangnya
+    /// terlihat adalah **tepi dalam**: `radius − halfWidth`, yang menyusut
+    /// dari 0.312 ke 0.246 pada rentang fuzziness ini. Uji pada pusat blob
+    /// mengukur tempat yang tidak berubah, bukan lubang yang bisa menutup.
     func testPlanetaryNebulaIsHollowAtTheCentre() {
         for fuzziness in [0.0, 0.40, 0.68, 1.0] {
             let geometry = VisualFrame.deepSky(morphology: .planetaryNebula,
                                                fuzziness: fuzziness)
             XCTAssertFalse(geometry.blobs.isEmpty, "nebula planetari harus punya cangkang")
-            let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
-            XCTAssertGreaterThan(nearest, 0.3,
-                                 "cangkang tidak boleh punya blob di pusat pada fuzziness \(fuzziness) — itu ciri nebula emisi")
+            let innerEdge = geometry.blobs.map { blob in
+                hypot(blob.offsetX, blob.offsetY) - max(blob.halfWidth, blob.halfHeight)
+            }.min() ?? -1
+            XCTAssertGreaterThan(innerEdge, 0.2,
+                                 "lubang cangkang menutup pada fuzziness \(fuzziness) (tepi dalam \(innerEdge)) — itu ciri nebula emisi")
         }
     }
 
