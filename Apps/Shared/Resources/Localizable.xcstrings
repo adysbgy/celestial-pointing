@@ -1536,7 +1536,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ is already recorded \u2014 point at a different star so its error can be measured. (%lld of %lld)"
+            "value": "%@ is already recorded — point at a different star so its error can be measured. (%lld of %lld)"
           }
         }
       }
@@ -4881,6 +4881,259 @@
           "stringUnit": {
             "state": "translated",
             "value": "No measured candidate distance yet."
+          }
+        }
+      }
+    },
+    "diagnostics.row.state": {
+      "comment": "Judul baris keadaan engine pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        }
+      }
+    },
+    "diagnostics.row.guidance": {
+      "comment": "Judul baris panduan berikutnya pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guidance"
+          }
+        }
+      }
+    },
+    "diagnostics.row.calibration": {
+      "comment": "Judul baris kalibrasi pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration"
+          }
+        }
+      }
+    },
+    "diagnostics.row.wristRate": {
+      "comment": "Judul baris laju pergelangan pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrist rate"
+          }
+        }
+      }
+    },
+    "diagnostics.row.object": {
+      "comment": "Judul baris objek yang sedang ditampilkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object"
+          }
+        }
+      }
+    },
+    "diagnostics.row.objectStale": {
+      "comment": "Judul baris saat objek yang ditampilkan adalah hasil kedaluwarsa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object (stale)"
+          }
+        }
+      }
+    },
+    "diagnostics.row.direction": {
+      "comment": "Judul baris arah tunjuk (tinggi / azimut).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction"
+          }
+        }
+      }
+    },
+    "diagnostics.row.sigmaInUse": {
+      "comment": "Judul baris sigma yang sedang dipakai kebijakan keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigma in use"
+          }
+        }
+      }
+    },
+    "diagnostics.row.deviceMotion": {
+      "comment": "Judul baris ketersediaan sensor gerak.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device motion"
+          }
+        }
+      }
+    },
+    "diagnostics.row.sample": {
+      "comment": "Judul baris jumlah sampel yang sudah terkumpul.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples"
+          }
+        }
+      }
+    },
+    "diagnostics.row.location": {
+      "comment": "Judul baris lokasi pengamat yang sedang dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        }
+      }
+    },
+    "diagnostics.row.locationSource": {
+      "comment": "Judul baris asal lokasi pengamat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
+          }
+        }
+      }
+    },
+    "diagnostics.row.magnitude": {
+      "comment": "Judul baris magnitudo objek pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnitude"
+          }
+        }
+      }
+    },
+    "diagnostics.row.rightAscension": {
+      "comment": "Judul baris asensio rekta pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA"
+          }
+        }
+      }
+    },
+    "diagnostics.row.declination": {
+      "comment": "Judul baris deklinasi pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        }
+      }
+    },
+    "diagnostics.row.catalogueId": {
+      "comment": "Judul baris pengenal katalog objek pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catalogue ID"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.confident": {
+      "comment": "Legenda grafik keyakinan untuk pita yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confident"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.uncertain": {
+      "comment": "Legenda grafik keyakinan untuk pita ragu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uncertain"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.unknown": {
+      "comment": "Legenda grafik keyakinan untuk pita tidak tahu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        }
+      }
+    },
+    "diagnostics.value.calibrated": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "diagnostics.value.notCalibrated": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi belum terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "diagnostics.value.motionAvailable": {
+      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        }
+      }
+    },
+    "diagnostics.value.motionUnavailable": {
+      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
           }
         }
       }

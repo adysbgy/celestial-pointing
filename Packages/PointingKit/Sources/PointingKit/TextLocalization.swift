@@ -742,5 +742,24 @@ public extension LocalizedText {
         .chartSpeechMeasuredCount, .chartSpeechBandConfident,
         .chartSpeechBandMiddle, .chartSpeechBandTooFar,
         .chartSpeechUnmeasuredCount, .chartSpeechNothingMeasured,
+        // Label, legenda, dan nilai layar Diagnostik. Masuk daftar karena
+        // inilah satu-satunya jalur teks itu sampai ke pengguna — dan karena
+        // versi sebelumnya berdiri sebagai literal kunci katalog di dalam
+        // parameter bertipe `String`, tempat `Text` mencetaknya apa adanya.
+        // Aturan 4 hijau (literal itu memang ada di katalog), Aturan 19 hijau
+        // (substring-nya terlihat sebagai rujukan), dan tidak satu pun kata
+        // Inggris pernah sampai ke layar. Lihat `DiagnosticsText.swift`.
+        .diagnosticsRowState, .diagnosticsRowGuidance,
+        .diagnosticsRowCalibration, .diagnosticsRowWristRate,
+        .diagnosticsRowObject, .diagnosticsRowObjectStale,
+        .diagnosticsRowDirection, .diagnosticsRowSigmaInUse,
+        .diagnosticsRowDeviceMotion, .diagnosticsRowSample,
+        .diagnosticsRowLocation, .diagnosticsRowLocationSource,
+        .diagnosticsRowMagnitude, .diagnosticsRowRightAscension,
+        .diagnosticsRowDeclination, .diagnosticsRowCatalogueId,
+        .diagnosticsLegendConfident, .diagnosticsLegendUncertain,
+        .diagnosticsLegendUnknown,
+        .diagnosticsValueCalibrated, .diagnosticsValueNotCalibrated,
+        .diagnosticsValueMotionAvailable, .diagnosticsValueMotionUnavailable,
     ]
 }

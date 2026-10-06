@@ -272,7 +272,7 @@ struct DiagnosticsView: View {
         NavigationStack {
             List {
                 Section("Sekarang") {
-                    row("Keadaan", engine.snapshot.state.shortLabel)
+                    row(DiagnosticsText.rowState, engine.snapshot.state.shortLabel)
                     // Panduan berikutnya. `shortLabel` menjawab **apa**
                     // keadaan itu ("Mencari"), yang tidak pernah memberi tahu
                     // pengguna harus melakukan apa — dan di iPhone tidak ada
@@ -288,7 +288,7 @@ struct DiagnosticsView: View {
                     // petunjuk berbeda adalah cacat yang paling buruk.
                     // `guidanceText` (bukan `state.guidance`) supaya alasan
                     // "mengapa tidak ada objek" dari engine ikut terbaca.
-                    row("Panduan", engine.snapshot.guidanceText)
+                    row(DiagnosticsText.rowGuidance, engine.snapshot.guidanceText)
                     // Putusan GoTo. Aturan keras PRD "POINT → OBJECT ID → SAFE
                     // GOTO" sudah dihitung `SlewPlanner` sejak FASE 3, tetapi
                     // `slewDecision` nol konsumen di `Apps/` — jadi penolakan
@@ -311,14 +311,18 @@ struct DiagnosticsView: View {
                     // GoTo aman), jadi ia tidak pernah berbunyi di sebelah GoTo
                     // yang justru berjalan.
                     SlewVerdictBanner(decision: engine.slewVerdict)
-                    row("Kalibrasi", engine.snapshot.isCalibrated ? "Sudah" : "Belum")
+                    row(DiagnosticsText.rowCalibration,
+                        engine.snapshot.isCalibrated
+                            ? DiagnosticsText.valueCalibrated
+                            : DiagnosticsText.valueNotCalibrated)
                     if let rate = engine.snapshot.angularRateDegPerSec {
-                        row("Laju pergelangan", NumberFormat.degreesPerSecond(rate))
+                        row(DiagnosticsText.rowWristRate,
+                            NumberFormat.degreesPerSecond(rate))
                             // "0.5°/dtk" terbaca oleh mata, tidak oleh suara.
                             // Yang diucapkan bentuk katanya — angkanya sama,
                             // jadi tidak ada versi kedua yang bisa menyimpang.
                             .accessibilityLabel(RowSpeech.spokenRow(
-                                title: "Laju pergelangan",
+                                title: DiagnosticsText.rowWristRate,
                                 spokenValue: RowSpeech.spokenRate(rate)))
                     }
                     if let object = engine.displayedObject {
@@ -326,7 +330,9 @@ struct DiagnosticsView: View {
                         // sisa. Baris ini berada di bagian "Sekarang", jadi
                         // tanpa penanda ia terbaca sebagai hasil pengukuran
                         // sekarang.
-                        row(engine.isDisplayingStaleObject ? "Objek (sisa)" : "Objek",
+                        row(engine.isDisplayingStaleObject
+                                ? DiagnosticsText.rowObjectStale
+                                : DiagnosticsText.rowObject,
                             engine.isDisplayingStaleObject
                                 // Kalimatnya lahir dari katalog, bukan
                                 // dirakit di sini. Bentuk lama menyisipkan
@@ -380,10 +386,11 @@ struct DiagnosticsView: View {
                         }
                     }
                     if let pointing = engine.pointing {
-                        row("Arah", "\(NumberFormat.degrees(pointing.altitudeDeg)) / "
+                        row(DiagnosticsText.rowDirection,
+                            "\(NumberFormat.degrees(pointing.altitudeDeg)) / "
                                  + "\(NumberFormat.degrees(pointing.azimuthDeg))")
                     }
-                    row("Sigma dipakai",
+                    row(DiagnosticsText.rowSigmaInUse,
                         NumberFormat.degrees(
                             engine.controller.resolver.confidencePolicy.pointingSigmaDeg))
                 }
@@ -451,10 +458,14 @@ struct DiagnosticsView: View {
                 }
 
                 Section("Sensor & lokasi") {
-                    row("Device motion", motion.isAvailable ? "Ada" : "Tidak ada")
-                    row("Sampel", "\(motion.sampleCount)")
-                    row("Lokasi", location.effectiveLocation.label)
-                    row("Asal lokasi", location.effectiveLocation.sourceDisplayName)
+                    row(DiagnosticsText.rowDeviceMotion,
+                        motion.isAvailable
+                            ? DiagnosticsText.valueMotionAvailable
+                            : DiagnosticsText.valueMotionUnavailable)
+                    row(DiagnosticsText.rowSample, "\(motion.sampleCount)")
+                    row(DiagnosticsText.rowLocation, location.effectiveLocation.label)
+                    row(DiagnosticsText.rowLocationSource,
+                        location.effectiveLocation.sourceDisplayName)
                     if let reason = motion.unavailableReason {
                         Text(reason).foregroundStyle(PointingTone.danger.color)
                     }
@@ -598,9 +609,9 @@ struct DiagnosticsView: View {
             }
 
             HStack(spacing: 12) {
-                legend("Yakin", .success)
-                legend("Ragu", .warning)
-                legend("Tidak tahu", .danger)
+                legend(DiagnosticsText.legendConfident, .success)
+                legend(DiagnosticsText.legendUncertain, .warning)
+                legend(DiagnosticsText.legendUnknown, .danger)
             }
             .font(.caption2)
         }
@@ -891,22 +902,23 @@ struct DiagnosticsView: View {
                             // pengenal. Presisinya mengikuti tampilan,
                             // supaya suara dan layar tidak menyebut dua
                             // angka berbeda untuk nilai yang sama.
-                            DiagnosticsView.detailRow("Magnitudo",
+                            DiagnosticsView.detailRow(DiagnosticsText.rowMagnitude,
                                                         NumberFormat.decimal(object.magnitude,
                                                                              fractionDigits: 2))
                             if object.kind == .star {
-                                DiagnosticsView.detailRow("RA", NumberFormat.degrees(object.raDeg,
-                                                                                   fractionDigits: 4))
+                                DiagnosticsView.detailRow(DiagnosticsText.rowRightAscension,
+                                                          NumberFormat.degrees(object.raDeg,
+                                                                               fractionDigits: 4))
                                     .accessibilityLabel(RowSpeech.label(
-                                        title: "RA",
+                                        title: DiagnosticsText.rowRightAscension,
                                         value: RowSpeech.spokenDegrees(object.raDeg, precision: 4)))
-                                DiagnosticsView.detailRow("Dec",
+                                DiagnosticsView.detailRow(DiagnosticsText.rowDeclination,
                                                             NumberFormat.signedDegrees(object.decDeg))
                                     .accessibilityLabel(RowSpeech.label(
-                                        title: "Dec",
+                                        title: DiagnosticsText.rowDeclination,
                                         value: RowSpeech.spokenDegrees(object.decDeg, precision: 4)))
                             }
-                            DiagnosticsView.detailRow("Id katalog", object.id)
+                            DiagnosticsView.detailRow(DiagnosticsText.rowCatalogueId, object.id)
                         }
                         .padding(.top, 4)
                     } label: {

@@ -300,9 +300,17 @@ final class TextLocalizationTests: XCTestCase {
     /// dengan nebula emisi (berongga vs memusat), jadi kata yang sama untuk
     /// dua gambar bertolak belakang akan memindahkan cacat dari mata ke telinga
     /// — terutama bagi pengguna VoiceOver, yang tidak melihat gambarnya.
+    ///
+    /// 308 → 331 pada siklus "kunci katalog yang tidak pernah sampai ke layar":
+    /// 23 kunci `diagnostics.*` (12 judul baris, 4 detail teknis, 3 legenda,
+    /// 4 nilai). Kelas cacatnya bukan kunci yang hilang, melainkan kunci yang
+    /// **ada dan tidak terbaca**: labelnya berdiri sebagai literal kunci
+    /// katalog di dalam parameter bertipe `String`, tempat `Text` mencetaknya
+    /// apa adanya. Aturan 4 hijau, Aturan 19 hijau, tidak satu pun kata
+    /// Inggris pernah tampil. Lihat `DiagnosticsText.swift`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 308, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 331, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

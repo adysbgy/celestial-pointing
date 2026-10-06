@@ -1,4 +1,127 @@
-## Progres terakhir (6 Okt 2026 — kabut Venus: satu ciri planet yang tidak dijaga apa pun)
+## Progres terakhir (6 Okt 2026 — kunci katalog yang tidak pernah sampai ke layar)
+
+### Temuan: 23 terjemahan yang sudah ditulis, dan tidak satu pun pernah tampil
+
+Layar Diagnostik sudah benar di permukaan. Setiap labelnya ada di
+`Localizable.xcstrings`, lengkap dengan padanan Bahasa Inggris. Aturan 4
+menyapu literal di argumen peritel teks dan menuntut setiap literal itu ada di
+katalog — dan semuanya ada. Aturan 19 mencari kunci yatim dan melaporkan
+bersih. Aturan 6 memeriksa paritas paket dan katalog, dan sebanding.
+
+Tiga gerbang hijau, dan tetap tidak satu pun kata Inggris sampai ke layar.
+
+Sebabnya bukan di katalognya, melainkan di **tipe parameternya**. `Text` punya
+dua inisialisator yang berperilaku berlawanan, dan yang mana yang terpakai
+ditentukan oleh tipe tempat literal itu berdiri:
+
+    Text("Terkunci")     // LocalizedStringKey -> dicari di katalog
+    Text(someString)     // StringProtocol      -> DICETAK APA ADANYA
+
+Apple mendokumentasikan yang kedua sebagai *"without localization"*. Helper
+baris di layar itu bertipe `String`:
+
+    private func row(_ title: String, _ value: String) -> some View
+
+Jadi `row("Keadaan", …)` menerima **kunci katalog** di dalam parameter bertipe
+`String`, dan yang tercetak ke layar adalah kata Indonesianya. Terjemahannya
+tidak pernah dibaca — di perangkat mana pun, di bahasa mana pun, tanpa satu pun
+peringatan build.
+
+### Kenapa tiga gerbang yang ada tidak melihatnya
+
+Aturan 19 yang paling dekat: niatnya memang "kunci ini dipakai atau tidak", dan
+ia menjawab ya. Jawabannya salah, karena kunci itu dipakai sebagai **teks
+Indonesia**, bukan sebagai kunci. Ia mencari teks kunci di seluruh sumber
+sebagai substring mentah, jadi kemunculannya di dalam `row("…")` **menghitung
+sebagai rujukan**.
+
+Aturan 4 hijau karena literalnya memang ada di katalog — ia memeriksa
+**keberadaan**, bukan **tipe tempat literal itu berdiri**. Aturan 6 tidak
+melihat `Apps/` sama sekali.
+
+### Yang diperbaiki: teksnya pindah ke lapisan yang punya kunci
+
+Literal Bahasa Indonesia berhenti menjadi identitas. Identitasnya kunci
+ber-namespace `diagnostics.*`, dan Bahasa Indonesia menjadi **nilai bawaan** —
+pola yang sama dengan `ExperimentText`, `SensorStatusText`, dan `ObjectSpeech`.
+
+23 kunci baru: 12 judul baris, 4 detail teknis, 3 legenda, 4 nilai.
+
+**Kenapa kunci baru, bukan kunci yang sudah ada.** Enam label sudah punya
+padanan kata di katalog — "Kalibrasi" (`skyContext.calibration`), "Lokasi",
+"Asal lokasi", "Sudah"/"Belum" (`calibration.status.*Short`), "Laju
+pergelangan" (`row.speech.wristRateWord`). Semuanya sengaja tidak dipakai ulang,
+dengan alasan yang sudah tertulis di repo ini: `"Kalibrasi"` adalah judul layar
+kalibrasi **dan** nama pesan tautan untuk hal berbeda; kalau teksnya yang jadi
+kunci, keduanya menyatu diam-diam. Layar Tautan dan layar Diagnostik boleh
+memilih kata Inggris yang berbeda untuk "Kalibrasi" tanpa saling mengunci. Itu
+sebabnya `link.row.*` ada meskipun `skyContext.*` sudah memuat kata yang sama.
+
+### Aturan 29: gerbangnya ditulis lebih dulu, dan versi pertamanya kurang luas
+
+Sesuai aturan 10 di brief, gerbangnya ditulis **sebelum** perbaikan — dan ia
+langsung menemukan **19** situs, bukan 13 yang ditemukan sapuan manual. Versi
+pertama hanya membaca helper yang dideklarasikan di `Apps/`, dan itu
+meninggalkan separuh kelas cacat yang sama: `RowSpeech.spokenRow(title:value:)`
+hidup di paket dengan dua parameter `String`, dan pemanggilnya menyerahkan
+`"Laju pergelangan"` — literal kunci katalog yang sama persis. Setelah
+helper dibaca dari kedua pohon, gerbang menemukan **26** situs, termasuk
+`detailRow("Magnitudo"|"RA"|"Dec"|"Id katalog")` yang tidak muncul di sapuan
+manual pertama.
+
+Gerbangnya diturunkan dari kode, bukan dari daftar nama helper yang ditulis
+tangan: helper mana pun yang parameternya `String` ikut diperiksa, jadi helper
+baru yang ditambahkan besok langsung dijangkau.
+
+Dua batasnya dinyatakan di berkasnya, bukan disembunyikan:
+
+  - Kunci yang isinya **hanya tanda baca** tidak diperiksa. Katalog memuat
+    `"—"` ("Penanda nilai kosong"), dan terjemahan `en`-nya juga `"—"`. Ia
+    memang berdiri di parameter `String`, tapi ia placeholder, bukan label —
+    dan karena kedua bahasanya identik, tidak ada terjemahan yang hilang.
+  - Versi pertama memakai `[ -n "$nonlocalized" ]` untuk menentukan status, dan
+    itu membuat gerbang **selalu merah** karena pesan "Bersih" juga non-kosong.
+    Diganti ke pola `case GAGAL:*` yang sudah dipakai Aturan 27/28.
+
+### Bukti mutasi — gerbang dan uji, keduanya menggigit
+
+  - `row(DiagnosticsText.rowState, …)` dikembalikan ke `row("Keadaan", …)`
+    -> Aturan 29 merah, `exit=1`, menyebut barisnya. Dipulihkan -> `exit=0`.
+  - Entri `en` untuk `diagnostics.row.guidance` dihapus dari katalog
+    -> `testCatalogueShipsAnEnglishFormForEveryDiagnosticsKey` merah dengan
+    pesan yang menyebut kuncinya. Dipulihkan -> hijau.
+
+Uji yang kedua sengaja memeriksa **berkas katalognya**, bukan accessor-nya:
+memasang kamus sendiri hanya membuktikan *mekanisme* penerjemahan bekerja,
+bukan bahwa katalognya lengkap.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| PointingKit | 655 | **662** |
+| CelestialEngine | 182 | 182 |
+| Aturan UI | 28 | **29** |
+| Kunci katalog | 438 | **461** |
+| Kunci `allKeys` | 308 | **331** |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 662), `swift-typecheck.sh`,
+`swift-ui-lint.sh` (29 aturan), `check-visuals.py` (351 pemeriksaan).
+
+### Yang TIDAK diklaim
+
+  - Yang diperbaiki adalah **jalur teks ke katalog** di layar Diagnostik.
+    `RowSpeech.label` masih bertipe `String` untuk judul, jadi ia bisa menerima
+    teks yang belum terlokalisasi dari pemanggil yang belum diperiksa. Yang
+    menutupnya sekarang adalah Aturan 29, bukan tipe yang lebih ketat.
+  - Sumbu grafik (`LineMark(x: .value("Sampel", …))`, `RuleMark(y: .value(
+    "Ambang yakin", …))`) belum diperiksa. `.value(_:_:)` mengambil `String`,
+    jadi ia sekelas — dan belum ada situsnya yang menerima kunci katalog.
+    Kalau nanti ada, Aturan 29 belum menjangkaunya.
+  - Perbaikan ini tidak menyentuh satu pun piksel. Ia mengubah **bahasa** yang
+    tampil, bukan tampilannya.
+
+## Progres sebelumnya (6 Okt 2026 — kabut Venus: satu ciri planet yang tidak dijaga apa pun)
 
 ### Temuan: port menggambar Venus 0,14 R lebih rendah dari yang tampil di jam
 

@@ -633,7 +633,7 @@ for key in sorted(declared - set(strings)):
 # lainnya. Tanpa ia, menghapus `kindStarLabel` dari `allKeys` tidak akan
 # terlihat oleh gerbang ini.
 namespace = re.compile(
-    r"^(pointing\.state|confidence\.level|link\.kind|object\.kind)\.")
+    r"^(pointing\.state|confidence\.level|link\.kind|object\.kind|diagnostics)\.")
 for key in sorted(set(strings) - declared):
     if namespace.match(key):
         problems.append(f"  kunci katalog tak dideklarasikan di paket: {key!r}")
@@ -3158,6 +3158,273 @@ if [ -n "$wrong_method_labels" ]; then
     GAGAL:*) status=1 ;;
   esac
   echo "$wrong_method_labels"
+fi
+
+# ── Aturan 29: terjemahan yang tidak akan pernah sampai ke layar ───────────
+# Aturan 4 menyapu literal di dalam argumen peritel teks (`Text`, `Label`,
+# `row`, `detailRow`, `legend`, …) dan menuntut setiap literal itu **ada** di
+# katalog. Ia hijau, dan ia benar.
+#
+# Yang tidak dilihat siapa pun: `Text` punya **dua** inisialisator yang
+# berperilaku berlawanan, dan yang mana yang terpakai ditentukan oleh **tipe
+# parameter** tempat literal itu berdiri — bukan oleh isinya.
+#
+#   Text("Terkunci")        // LocalizedStringKey -> dicari di katalog
+#   Text(someString)        // StringProtocol      -> DICETAK APA ADANYA
+#
+# Apple mendokumentasikan yang kedua sebagai *"without localization"*.
+# Jadi `row("Keadaan", …)` — di mana `row(_ title: String, _ value: String)`
+# — menerima kunci katalog di dalam parameter bertipe `String`, dan kata
+# **"Keadaan"** yang tercetak ke layar, bukan terjemahannya.
+#
+# Kenapa kelas ini tidak pernah terlihat. Tiga gerbang menyentuh permukaan ini
+# dan ketiganya hijau:
+#
+#   Aturan 4   literal itu memang **ada** di katalog -> hijau
+#   Aturan 6   paritas kunci paket <-> katalog -> tidak melihat `Apps/`
+#   Aturan 19  "kunci yatim" mencari teks kunci di **seluruh** sumber sebagai
+#              substring mentah, jadi kemunculannya di dalam argumen `row("…")`
+#              **menghitung sebagai rujukan** -> hijau
+#
+# Aturan 19 yang paling menentukan, karena ia satu-satunya gerbang yang
+# niatnya memang "kunci ini dipakai atau tidak". Ia menjawab ya — dan
+# jawabannya salah: kunci itu dipakai sebagai **teks Indonesia**, bukan
+# sebagai kunci.
+#
+# Akibatnya 18 terjemahan Bahasa Inggris yang sudah ditulis (`Keadaan` →
+# "State", `Laju pergelangan` → "Wrist rate", `Id katalog` → "Catalogue ID",
+# …) tidak akan pernah muncul di perangkat mana pun, di bahasa mana pun,
+# tanpa satu pun peringatan build. Persis "hijau yang tidak hijau" yang
+# menjadi alasan berkas ini ada.
+#
+# Pemeriksaannya sengaja **diturunkan dari kode**, bukan dari daftar nama
+# helper yang ditulis tangan: helper mana pun yang parameternya `: String`
+# ikut diperiksa, jadi helper baru yang ditambahkan besok langsung dijangkau.
+echo
+echo "== Aturan 29: literal katalog yang berdiri di parameter bertipe String =="
+nonlocalized=$(python3 - <<'PY'
+import json, os, re, sys
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+if not os.path.exists(CATALOG):
+    print("BELUM-ADA-KATALOG")
+    raise SystemExit(0)
+
+keys = set(json.load(open(CATALOG, encoding="utf-8"))["strings"])
+
+# Kunci yang isinya **hanya tanda baca/simbol** tidak diperiksa.
+#
+# Alasannya diukur, bukan ditebak: katalog memuat `"—"` ("Penanda nilai kosong
+# pada baris tabel"), dan terjemahan `en`-nya juga `"—"`. Sebagai argumen
+# `row(_:_:)` ia memang berdiri di parameter `String`, tapi ia **placeholder**,
+# bukan label — dan karena kedua bahasanya identik, tidak ada terjemahan yang
+# hilang karenanya.
+#
+# Tanpa pengecualian ini gerbang melaporkan enam situs yang tidak bisa
+# diperbaiki: menggantinya dengan `TextLocalization.text(…)` menuntut kunci
+# ber-namespace untuk sebuah tanda pisah, dan itu menambah katalog tanpa
+# menambah satu pun kata yang bisa diterjemahkan. Gerbang yang merah pada kode
+# yang benar akan dimatikan orang lain saat ia berbunyi — jadi batasnya
+# dinyatakan di sini, bukan disembunyikan.
+keys = {k for k in keys if any(ch.isalnum() for ch in k)}
+
+
+def strip_comments(src):
+    """Buang komentar `//` dan `/* */` yang berada **di luar** literal string.
+
+    Wajib, bukan kerapian: repo ini mendokumentasikan "kenapa" panjang lebar,
+    dan komentarnya memuat contoh kode beserta nama kuncinya. Mengindeks
+    komentar akan melaporkan situs yang tidak pernah dikompilasi — dan
+    gerbang yang merah pada kode yang benar akan dimatikan orang.
+    """
+    out = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '"':
+            out.append(c)
+            i += 1
+            while i < n:
+                if src[i] == "\\" and i + 1 < n:
+                    out.append(src[i:i + 2])
+                    i += 2
+                    continue
+                out.append(src[i])
+                if src[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if src.startswith("/*", i):
+            j = src.find("*/", i)
+            i = n if j < 0 else j + 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def balanced(text, open_idx):
+    """Isi kurung yang dibuka di `open_idx`, menghormati string dan nesting."""
+    depth = 0
+    i = open_idx
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                if text[i] == '"':
+                    break
+                i += 1
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_idx + 1:i]
+        i += 1
+    return ""
+
+
+def split_args(inner):
+    """Pisah argumen pada koma tingkat teratas."""
+    args, depth, cur = [], 0, []
+    i, n = 0, len(inner)
+    while i < n:
+        c = inner[i]
+        if c == '"':
+            cur.append(c)
+            i += 1
+            while i < n:
+                cur.append(inner[i])
+                if inner[i] == "\\" and i + 1 < n:
+                    cur.append(inner[i + 1])
+                    i += 2
+                    continue
+                if inner[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        if c == "," and depth == 0:
+            args.append("".join(cur))
+            cur = []
+            i += 1
+            continue
+        cur.append(c)
+        i += 1
+    if "".join(cur).strip():
+        args.append("".join(cur))
+    return args
+
+
+problems = []
+sites = 0
+checked_helpers = 0
+
+# Helper dibaca dari **kedua** pohon, bukan hanya `Apps/`.
+#
+# Versi pertama hanya membaca `Apps/`, dan itu meninggalkan separuh kelas cacat
+# yang sama: helper-nya hidup di paket. `RowSpeech.spokenRow(title:value:)`
+# misalnya bertipe `String` untuk keduanya, dan pemanggilnya di `Apps/`
+# menyerahkan `"Laju pergelangan"` — literal kunci katalog yang sama persis,
+# melewati katalog yang sama persis. Gerbang yang hanya melihat `Apps/` akan
+# melaporkan bersih sambil baris itu tetap berbahasa Indonesia di semua bahasa.
+#
+# Situs pemanggilnya tetap hanya dari `Apps/`: teks yang sampai ke layar
+# melewati helper dari sana, sedangkan panggilan di dalam paket mengirim
+# kalimat yang sudah jadi atau pengenal, bukan label.
+helper_signatures = {}
+for tree in ("Apps", "Packages"):
+    for dirpath, dirnames, filenames in os.walk(tree):
+        dirnames[:] = [d for d in dirnames if d != ".build"]
+        for name in sorted(filenames):
+            if not name.endswith(".swift"):
+                continue
+            src = strip_comments(open(os.path.join(dirpath, name), encoding="utf-8").read())
+            for m in re.finditer(r'\bfunc\s+(\w+)\s*\(', src):
+                fname = m.group(1)
+                inner = balanced(src, m.end() - 1)
+                if not inner:
+                    continue
+                idxs = set()
+                for pos, arg in enumerate(split_args(inner)):
+                    if re.search(r':\s*String\b', arg):
+                        idxs.add(pos)
+                if idxs:
+                    # Gabung, bukan timpa: dua tipe bisa punya `label(_:)`
+                    # dengan bentuk berbeda, dan posisi String dari keduanya
+                    # sama-sama perlu diperiksa.
+                    helper_signatures.setdefault(fname, set()).update(idxs)
+checked_helpers = len(helper_signatures)
+
+for dirpath, dirnames, filenames in os.walk("Apps"):
+    dirnames[:] = [d for d in dirnames if d != ".build"]
+    for name in sorted(filenames):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(dirpath, name)
+        src = strip_comments(open(path, encoding="utf-8").read())
+
+        for fname, idxs in helper_signatures.items():
+            # Dua bentuk panggilan: `row(` (fungsi lokal) dan `Tipe.row(`
+            # (helper paket). Keduanya adalah situs yang sama.
+            for pattern in (r'(?<![\w.])' + re.escape(fname) + r'\s*\(',
+                            r'\.' + re.escape(fname) + r'\s*\('):
+                for m in re.finditer(pattern, src):
+                    inner = balanced(src, src.index("(", m.start()))
+                    if not inner:
+                        continue
+                    for pos, arg in enumerate(split_args(inner)):
+                        if pos not in idxs:
+                            continue
+                        for lit in re.findall(r'"((?:[^"\\]|\\.)*)"', arg):
+                            if lit not in keys:
+                                continue
+                            sites += 1
+                            line = src[:m.start()].count("\n") + 1
+                            problems.append(
+                                f"  {path}:{line}: {fname}(…) argumen {pos + 1} "
+                                f"menerima kunci katalog {lit!r}\n"
+                                f"      parameternya bertipe `String`, jadi "
+                                f"`Text` mencetaknya apa adanya —\n"
+                                f"      terjemahan katalog untuk kunci ini tidak "
+                                f"akan pernah tampil.")
+
+if problems:
+    print(f"GAGAL: {len(problems)} literal katalog berdiri di parameter "
+          f"bertipe `String`.")
+    print("\n".join(problems))
+    print("-> Parameter `String` melewati katalog. Lewatkan `TextLocalization"
+          ".text(kunci)`\n   sebagai argumennya, atau ubah parameter helper "
+          "itu menjadi `LocalizedStringKey`.")
+else:
+    print(f"Bersih: {checked_helpers} helper berparameter `String` di Apps/ "
+          f"tidak menerima literal kunci katalog.")
+PY
+)
+if [ -n "$nonlocalized" ]; then
+  # Pola yang sama dengan Aturan 27/28: skrip Python mencetak pesannya sendiri
+  # ("Bersih: …" atau "GAGAL: …"), dan yang menentukan status hanyalah
+  # prefiksnya. Versi pertama memakai `-n` — dan itu membuat gerbang **selalu
+  # merah**, karena pesan "Bersih" juga non-kosong. Gerbang yang selalu merah
+  # akan dimatikan orang, jadi ia tidak menjaga apa pun.
+  case "$nonlocalized" in
+    GAGAL:*) status=1 ;;
+  esac
+  echo "$nonlocalized"
 fi
 
 if [ "$status" -eq 0 ]; then

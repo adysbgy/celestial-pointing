@@ -172,7 +172,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 182**, **PointingKit 655**.
+Hitungan uji saat ini: **CelestialEngine 182**, **PointingKit 662**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
@@ -188,7 +188,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **28 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **29 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
