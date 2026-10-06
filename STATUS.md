@@ -10972,3 +10972,70 @@ bukan kebenarannya.
     benar dan teruji adalah lubang tengahnya, yang membedakan keduanya dari
     nebula emisi.
 
+
+## Siklus: uji yang mengukur tempat yang tidak berubah (2026-10-06)
+
+### Premis: uji bisa hijau karena mengukur angka yang tidak pernah bergerak
+
+Setelah morfologi baru selesai, uji pembedanya diperiksa dengan mutasi —
+dan mutasi itu mengungkap cacat pada **cara mengukur**, bukan pada model.
+
+`buildDeepSky` menggeser **skala lebar** blob (`0.62 + 0.38 · fuzziness`),
+bukan letaknya. Jadi jarak **pusat** blob ke pusat frame adalah konstanta:
+0.42 untuk cangkang, berapa pun fuzzinessnya. Uji "cangkang berongga" versi
+pertama mengukur jarak itu, sehingga ia kebal terhadap satu-satunya hal
+yang bisa merusak bentuknya — blob yang membesar ke arah dalam sampai
+menutup lubang yang menjadi alasan morfologi itu ada.
+
+Yang menentukan apakah lubangnya terlihat adalah **tepi dalam**:
+`radius − halfWidth`, yang menyusut 0.312 -> 0.246 pada rentang fuzziness.
+
+### Dibuktikan dengan selisih kegagalan, bukan dengan argumen
+
+Mutasi yang sama (lebar blob 0.30 -> 1.60, lubang menutup sampai -0.57):
+
+  - uji baru -> **28** kegagalan, pada keempat fuzziness.
+  - uji lama -> **24** kegagalan.
+
+Selisih 4 itu persis empat iterasi yang lolos dari versi lama.
+
+### Cacat yang sama ditemukan di morfologi sebelahnya
+
+`testOpenClusterHasNoCentralCore` mengukur hal yang sama dengan cacat yang
+sama — ditemukan dengan memeriksa uji sebelahnya setelah memperbaiki yang
+pertama, bukan dengan mencari daftar. Tepi dalamnya menyusut 0.523 -> 0.463.
+
+Mutasi identik (lebar blob gugus terbuka -> 1.40):
+
+  - uji baru -> **23** kegagalan. Uji lama -> **21**.
+
+Pola ini yang dicatat, bukan perbaikannya: **kelas cacatnya ada pada cara
+mengukur**. Setiap uji yang mengukur posisi harus ditanya "bisakah angka
+ini berubah?", karena `buildDeepSky` mengubah ukuran, bukan letak — jadi
+setiap uji berbasis posisi rentan terhadap versi cacat yang tidak bergerak.
+
+### Drift kedua: daftar morfologi yang ditulis tangan di dalam uji
+
+`testDifferentMorphologiesProduceDifferentGeometry` menulis empat nama
+morfologi di badan ujinya, jadi `.planetaryNebula` lahir tanpa ikut teruji
+oleh uji yang paling langsung mengawasi kelas cacat ini. Sekarang dari
+`allCases`, plus penjaga bahwa daftarnya tidak boleh tinggal satu elemen
+(uji berpasangan tidak berarti untuk satu elemen).
+
+Arah ini sudah jadi teladan di `testEveryDeepSkyBlobStaysInsideTheFrame` —
+menemukannya di satu uji dan tidak di uji sebelahnya menunjukkan celahnya
+ada pada kebiasaannya, bukan pada satu berkas.
+
+### Gerbang
+
+  - `./swift-test.sh` -> 628, 0 gagal.
+  - `./swift-ui-lint.sh` -> 25 aturan hijau. `python3 Tools/check-visuals.py
+    --check` -> 195 pemeriksaan. `./swift-typecheck.sh` -> LULUS.
+  - CI: Engine Tests `37404777620` success.
+
+### Yang TIDAK diklaim
+
+  - Dua uji diperbaiki (cangkang planetari, gugus terbuka). Pola "ukur
+    tempat yang tidak berubah" belum disapu ke seluruh berkas uji — sapuan
+    itu sendiri belum punya penjaga otomatis.
+

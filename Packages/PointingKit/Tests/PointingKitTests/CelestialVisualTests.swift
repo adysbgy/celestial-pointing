@@ -1182,18 +1182,38 @@ final class CelestialVisualTests: XCTestCase {
     /// ukurannya. Dua hal diperiksa, dan keduanya mengukur "ketiadaan inti":
     /// tidak ada blob yang duduk di tengah, dan rata-rata jaraknya jauh dari
     /// pusat. Kalau bintangnya mengerumun di tengah, bentuknya jadi gugus bola.
+    ///
+    /// **Kenapa sekarang diukur pada tepi dalam, dan pada beberapa
+    /// `fuzziness`.** Sampai siklus ini uji ini mengukur jarak **pusat** blob
+    /// pada satu nilai fuzziness. Pusatnya tidak pernah bergerak — `buildDeepSky`
+    /// menggeser skala lebar blob, bukan letaknya — jadi ukuran itu kebal
+    /// terhadap satu-satunya hal yang bisa menutup pusat: blob yang membesar
+    /// ke arah dalam. Tepi dalamnya menyusut dari 0.523 (fuzziness 0) ke
+    /// 0.463 (fuzziness 1.0), dan nilai-nilai itulah yang menentukan apakah
+    /// bagian tengah benar-benar kosong di layar.
+    ///
+    /// Cacatnya identik dengan yang ditemukan lebih dulu pada
+    /// `testPlanetaryNebulaIsHollowAtTheCentre`, dan ditemukan dengan
+    /// memeriksa uji sebelahnya setelah memperbaiki yang itu — kelas cacatnya
+    /// ada pada **cara mengukur**, bukan pada morfologinya.
     func testOpenClusterHasNoCentralCore() {
-        let geometry = VisualFrame.deepSky(morphology: .openCluster, fuzziness: 1.0)
-        XCTAssertFalse(geometry.blobs.isEmpty, "gugus terbuka harus punya blob")
-        // Tidak ada blob yang menempel di pusat.
-        let nearest = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.min() ?? 0
-        XCTAssertGreaterThan(nearest, 0.3,
-                             "gugus terbuka tidak boleh punya blob di pusat — itu ciri gugus bola")
-        // Dan rata-rata blob harus jauh dari pusat.
-        let meanRadius = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.reduce(0, +)
-            / Double(geometry.blobs.count)
-        XCTAssertGreaterThan(meanRadius, 0.4,
-                             "bintang gugus terbuka harus tersebar, bukan mengerumun di pusat")
+        for fuzziness in [0.0, 0.5, 1.0] {
+            let geometry = VisualFrame.deepSky(morphology: .openCluster,
+                                               fuzziness: fuzziness)
+            XCTAssertFalse(geometry.blobs.isEmpty, "gugus terbuka harus punya blob")
+            // Tidak ada blob yang menempel di pusat: **tepi dalamnya**
+            // yang diukur, bukan pusat blobnya (lihat catatan di atas).
+            let innerEdge = geometry.blobs.map { blob in
+                hypot(blob.offsetX, blob.offsetY) - max(blob.halfWidth, blob.halfHeight)
+            }.min() ?? -1
+            XCTAssertGreaterThan(innerEdge, 0.2,
+                                 "gugus terbuka menutup pusatnya pada fuzziness \(fuzziness) (tepi dalam \(innerEdge)) — itu ciri gugus bola")
+            // Dan rata-rata blob harus jauh dari pusat.
+            let meanRadius = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.reduce(0, +)
+                / Double(geometry.blobs.count)
+            XCTAssertGreaterThan(meanRadius, 0.4,
+                                 "bintang gugus terbuka harus tersebar, bukan mengerumun di pusat")
+        }
     }
 
     /// **Pembeda langsung** gugus bola vs gugus terbuka: seberapa memusat.
