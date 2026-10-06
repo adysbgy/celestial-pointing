@@ -3004,6 +3004,212 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
             f"selisih {(sphere - reach) * 100:.1f}% R (baris {row})"))
 
 
+def check_bands_follow_the_limb_arc(results, size=200, ss=2):
+    """Pita harus berbentuk **tali busur** bola, bukan elips berlebar tetap.
+
+    **Cacat yang ditutup pemeriksaan ini.** Pita digambar sebagai elips: tepi
+    kirinya adalah dinding vertikal di `x = −sqrt(1 − yc²)`. Yang benar di bola
+    tidak begitu — lingkaran lintang pada lintang φ memproyeksi ke ruas garis
+    `y = sin φ`, `|x| ≤ sqrt(1 − y²)`, jadi tepi pita pada tiap ketinggian
+    mengikuti **busur limb**. Akibatnya dua sudut di dekat limb tetap polos
+    sementara pitanya sudah berhenti: diukur sebagai IoU pada render 200 px,
+    tiap elips hanya menutupi **79%** pita yang benar, dan yang hilang
+    20,5–22,1%. Bentuk itulah yang membuat piringan terbaca sebagai stiker
+    rata, dan pada pita bawah ia juga menggantung di luar tepi bola.
+
+    **Kenapa dari piksel.** Uji model mengunci rumusnya
+    (`testBandHalfWidthFollowsTheLimbArc`), tapi yang dikirim ke layar adalah
+    gambar: view bisa berhenti memakainya dan menggambar elips lagi, dan
+    rumusnya tetap benar. Yang membuktikan bentuknya adalah mengukur
+    piringannya sendiri terhadap bentuk yang benar.
+
+    **Kenapa dibandingkan dengan bentuk yang dihitung di sini.** Bentuk yang
+    benar adalah **proyeksi bola** — bukan pilihan, jadi tidak boleh diambil
+    dari fungsi yang sedang menggambar pita. Kalau diambil dari sana, elips
+    yang kembali muncul akan menyeret pembandingnya ikut mengecil dan
+    pemeriksaan ini akan selalu hijau. Itu persis cacat yang pernah nyata di
+    `check_jupiter_bands_reach_the_limb` (pembanding dibaca dari fungsi yang
+    diukur), dan alasan yang sama berlaku di sini.
+
+    Ambangnya **0.95**: bentuk yang benar secara analitik bertemu dirinya
+    sendiri (1.0), selisih yang tersisa hanya anti-aliasing; elips memberi
+    0.79. Kedua sisinya jauh dari ambangnya.
+
+    **Kenapa hanya x ≤ −0,40.** Dua benda lain juga berbeda antara gambar
+    "terkunci" dan "ragu", dan keduanya **bukan pita**: Bintik Merah Besar
+    (`centerX = −0,10`, lebar 0,52 → tepi kiri x = −0,36) dan lencana
+    tanda-tanya di sudut kanan atas. Versi pertama pemeriksaan ini mengukur
+    seluruh piringan, dan hasilnya **lebih buruk setelah perbaikannya**
+    (pita 4 turun ke 0,65) — bukan karena bentuknya salah, melainkan karena
+    yang terukur sebagian adalah bintiknya. Mengukur tepi kiri jauh
+    memisahkan pitanya dari keduanya, dan itu memang wilayah tempat cacat
+    "dinding vertikal vs busur" berada.
+    """
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
+    _, (_, _, rows_s) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    cx = w / 2.0
+    cy = h / 2.0
+    radius = min(w, h) / 2.0
+    x_limit = -0.40
+
+    def elliptical_half_width(band_centre):
+        """Setengah-lebar **elips**: lebar bola di pusat pita, dipakai di tepinya.
+
+        Ini bukan `CelestialVisual.bandHalfWidthAt`. Ia sengaja **salah** — ia
+        bentuk yang dipakai sebelum perbaikan (lebar konstan sepanjang tinggi
+        pita), dan ia ditulis ulang di sini justru supaya tidak bisa menyeret
+        pembandingnya ikut benar. Kalau diambil dari fungsi yang sedang
+        menggambar, elips yang kembali muncul akan selalu "cocok" dengan
+        dirinya sendiri.
+        """
+        return math.sqrt(max(0.0, 1 - band_centre * band_centre))
+
+    def differs(px, py):
+        a = rows_c[py][px * 4:px * 4 + 3]
+        b = rows_s[py][px * 4:px * 4 + 3]
+        return sum(abs(a[k] - b[k]) for k in range(3)) > 8
+
+    def band_edge(y_norm):
+        """x tepi kiri pita pada baris `y_norm`, atau `None` kalau tak ada."""
+        py = min(h - 1, max(0, int(round(cy + y_norm * radius))))
+        for px in range(w):
+            x = (px + 0.5 - cx) / radius
+            if x > x_limit:
+                break
+            if differs(px, py):
+                return x
+        return None
+
+    # **Kenapa diukur terhadap bentuk yang dihitung di sini, bukan terhadap
+    # rumus yang menggambar.** Bentuk yang benar adalah **proyeksi bola** —
+    # bukan pilihan, jadi tidak boleh diambil dari fungsi yang sedang
+    # menggambar pita. Kalau diambil dari sana, elips yang kembali muncul akan
+    # menyeret pembandingnya ikut mengecil dan pemeriksaan ini akan selalu
+    # hijau.
+    #
+    # **Kenapa dibandingkan pada ketinggian yang sama, bukan lebar pita.**
+    # Sampelnya digeser **dua piksel** ke dalam tepi. Alasannya pembulatan:
+    # tepi pita jatuh tepat di batas baris (mis. y = +0,055 → py = 105,5 pada
+    # render 200 px), jadi `round` menaruh baris sampelnya **di luar** pita —
+    # pita 3 dan 4 tidak ditemukan sama sekali walaupun bentuknya benar.
+    # Karena pembandingnya dihitung pada **ketinggian sampel yang sama**, yang
+    # diuji tetap bentuk tepinya, bukan lebarnya.
+    inset = 2.0 / radius
+    for index, (band_y, _, half_height) in enumerate(R.jupiter_bands()):
+        top = band_y - half_height + inset
+        bottom = band_y + half_height - inset
+        measured_top = band_edge(top)
+        measured_bottom = band_edge(bottom)
+        # Bentuk yang benar: tepi kiri busur bola di ketinggian sampel.
+        want_top = -math.sqrt(max(0.0, 1 - top * top))
+        want_bottom = -math.sqrt(max(0.0, 1 - bottom * bottom))
+        # Pita harus punya **dua** tepi, dan keduanya di dalam wilayah ukur.
+        # `None` berarti pita tidak tergambar di situ — itu kegagalan, bukan
+        # angka yang boleh dilewati.
+        if measured_top is None or measured_bottom is None:
+            results.append(Result(
+                f"pita Jupiter {index} mengikuti busur limb (tali busur, bukan elips)",
+                False,
+                f"tepi pita tidak ditemukan di x ≤ {x_limit} "
+                f"(atas {measured_top}, bawah {measured_bottom})"))
+            continue
+        error = max(abs(measured_top - want_top), abs(measured_bottom - want_bottom))
+        # **Angka pembanding dihitung, bukan dikutip.** Versi pertama pesannya
+        # berbunyi "elips 20% R" — angka yang tidak pernah muncul dari metrik
+        # ini. Galat yang **benar-benar** diukur di sini adalah jarak **tepi**
+        # pada ketinggian sampel (di dalam pita), dan di situ busur dan elips
+        # masih berdekatan: dihitung dari geometri produksi, elips memberi
+        # 0,1% R pada pita ekuator sampai 6,3% R pada pita terluar. Angka 20%
+        # itu milik **luas** (IoU 79%, selisih 20,6–21,3% union), bukan jarak
+        # tepi. Karena itu ia dihitung di sini dari geometri yang sama — pesan
+        # tidak boleh mengklaim beda yang tidak diukur pemeriksaannya sendiri.
+        #
+        # Dan batas itu dinyatakan, bukan disembunyikan: dengan ambang 3% R,
+        # pemeriksaan ini membedakan tali busur dari elips pada pita **0, 1, 5,
+        # 6** (2,6–6,3% R) dan **tidak** pada pita 2–4 (0,1–1,1% R), karena di
+        # dekat ekuator busurnya memang nyaris lurus. Yang menjaga pita tengah
+        # adalah gerbang pemakaian di bawah, bukan ambang ini.
+        elliptical_error = max(abs(elliptical_half_width(band_y) - abs(want_top)),
+                               abs(elliptical_half_width(band_y) - abs(want_bottom)))
+        results.append(Result(
+            f"pita Jupiter {index} mengikuti busur limb (tali busur, bukan elips)",
+            error <= 0.03,
+            f"tepi atas {measured_top:+.3f} (busur {want_top:+.3f}), "
+            f"bawah {measured_bottom:+.3f} (busur {want_bottom:+.3f}), "
+            f"galat {error * 100:.1f}% R (ambang 3% R; elips "
+            f"{elliptical_error * 100:.1f}% R di ketinggian sampel)"))
+
+    # **Pemakaian di view dan di port.** Pemeriksaan piksel di atas mengukur
+    # **port**; ia tidak bisa melihat view berhenti memakai busurnya dan
+    # kembali menggambar elips (gambar di jam rata, PNG tetap tali busur),
+    # atau memakainya dengan angka yang ditulis ulang alih-alih dibaca dari
+    # model. Keduanya persis kelas "satu rumus, dua bahasa, tidak ada yang
+    # membandingkan" yang sudah berkali-kali tercatat di repo ini.
+    #
+    # **Kenapa dua nama, bukan satu.** View menulis
+    # `CelestialVisual.bandHalfWidthAt(height:)` (nama berkualifikasi), port
+    # menulis `band_half_width(` (nama lokalnya). Menuntut satu ejaan yang sama
+    # berarti salah satu sisi merah pada kode yang benar — dan gerbang yang
+    # merah pada kode benar akan dimatikan orang.
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+    results.append(Result(
+        "tepi pita dibaca dari model di view (bukan elips ditulis ulang)",
+        "CelestialVisual.bandHalfWidthAt(height:" in view,
+        "view memanggil 'CelestialVisual.bandHalfWidthAt(height:' = "
+        f"{'ada' if 'CelestialVisual.bandHalfWidthAt(height:' in view else 'TIDAK'}"))
+    # **Kenapa pemanggilannya yang diperiksa, bukan keberadaan fungsinya.**
+    # Versi pertama menuntut `def band_half_width(` dan `band_half_width(`
+    # ada. Keduanya **benar** pada port yang kembali menggambar elips: nama
+    # fungsinya tetap ada di berkas, hanya tidak lagi dipanggil dari
+    # `_draw_bands`. Gerbang yang memeriksa keberadaan akan hijau di atas
+    # port yang menggambar bentuk lama — persis kelas "gerbang yang mengklaim
+    # lebih dari yang diukurnya" yang sudah berulang di repo ini. Yang
+    # dipanggil adalah baris `_draw_bands` sendiri, jadi itu yang dibaca.
+    port_bands = re.search(r"def _draw_bands\(.*?\n(?=\ndef |\n# )", port, re.S)
+    calls_model = (port_bands is not None
+                   and "band_half_width(" in port_bands.group(0))
+    results.append(Result(
+        "port memanggil band_half_width di _draw_bands (bukan elips)",
+        calls_model and "def band_half_width(" in port,
+        f"_draw_bands memanggil 'band_half_width(' = "
+        f"{'ada' if calls_model else 'TIDAK'}, "
+        f"fungsi 'def band_half_width(' = "
+        f"{'ada' if 'def band_half_width(' in port else 'TIDAK'}"))
+
+    # **Kenapa urutan tepinya juga diikat.** Tanda `height` hanya berpengaruh
+    # lewat **urutan** tepi atas vs tepi bawah. Versi pertama `bandHalfWidthAt`
+    # menerima jarak dari pusat pita dan memulihkan ketinggiannya dengan
+    # `sqrt(1 − hw²)`; akar itu kehilangan tanda, jadi untuk pita utara tepi
+    # **atas** dihitung dengan lebar tepi **bawah**-nya (0,597 alih-alih 0,410)
+    # dan piringannya terlihat miring. View yang menulis `abs(band.centerY)`
+    # untuk tepi atas menghasilkan bentuk yang **sama** salahnya — dan itu
+    # tidak terlihat oleh pemeriksaan piksel mana pun, karena piksel itu milik
+    # port. Terbukti: `abs(...)` dipasang di view, dan ke-9 pemeriksaan di
+    # fungsi ini **semuanya tetap hijau**. Yang mengikatnya adalah bentuk
+    # rumusnya sendiri, dibaca dari sumber.
+    top_arg = "height: band.centerY - band.halfHeight"
+    bottom_arg = "height: band.centerY + band.halfHeight"
+    results.append(Result(
+        "tepi atas memakai ketinggian bertanda (bukan nilai absolutnya)",
+        top_arg in view and bottom_arg in view,
+        f"view memakai '{top_arg}' = {'ada' if top_arg in view else 'TIDAK'}, "
+        f"'{bottom_arg}' = {'ada' if bottom_arg in view else 'TIDAK'}"))
+
+    # Dan fungsi modelnya sendiri harus **menjepit**, bukan hanya mengakar:
+    # `sqrt` dari bilangan negatif adalah NaN, dan NaN di `Canvas` menghapus
+    # piringannya alih-alih memberi galat. Pita yang ditambah melewati kutub
+    # adalah cara paling mudah mencapai itu, dan tidak ada teks di layar yang
+    # bisa membedakannya dari \"planetnya tidak digambar\".
+    model_src = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                          "CelestialVisual.swift")).read()
+    results.append(Result(
+        "bandHalfWidthAt menjepit ketinggian sebelum mengakar (anti-NaN)",
+        "min(1, max(0, 1 - height * height)).squareRoot()" in model_src,
+        "model memuat penjepit 'min(1, max(0, 1 - height * height)).squareRoot()' = "
+        f"{'ada' if 'min(1, max(0, 1 - height * height)).squareRoot()' in model_src else 'TIDAK'}"))
+
+
 def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
     """Piringan ber-pita harus **tetap melengkung**, bukan jadi stiker rata.
 
@@ -3482,6 +3688,7 @@ def main():
     check_crater_relief_matches_the_model(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
+    check_bands_follow_the_limb_arc(results, args.size, args.ss)
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)

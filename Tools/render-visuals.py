@@ -920,19 +920,39 @@ def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
     return bands
 
 
+def band_half_width(height):
+    """Port `CelestialVisual.bandHalfWidthAt(height:)` — tepi bola di ketinggian.
+
+    Satu rumus bola (`sqrt(1 - y^2)`), dipakai bersama view, port, dan uji
+    Linux. **Tandanya berarti**: `height` negatif = belahan utara layar, dan
+    itulah yang menentukan sisi mana yang lebih dalam. Lihat
+    `CelestialVisual.bandHalfWidthAt(height:)` untuk cacat yang ditutupnya.
+    """
+    return math.sqrt(max(0.0, 1 - height * height))
+
+
 def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
     for index, (band_y, half_width, half_height) in enumerate(jupiter_bands()):
         y = cy + band_y * radius
-        half_width *= radius
-        if half_width <= 1:
+        if half_width * radius <= 1:
             continue
-        rx = half_width
-        ry = radius * half_height
+        # **Pita digambar sebagai tali busur, bukan elips.** Tepi pita
+        # mengikuti busur limb: pada ketinggian `yc ± half_height` bola sudah
+        # menyempit, sementara elips mempertahankan lebarnya sampai ujung.
+        # Diukur sebagai IoU pada render 200 px, elips hanya menutupi 79%
+        # pita yang benar. Ketinggiannya **bertanda** — memulihkannya dengan
+        # `sqrt(1 - hw^2)` kehilangan sisi, dan pita utara jadi miring ke arah
+        # yang salah.
+        # MODEL: `CelestialVisual.bandHalfWidthAt(height:)`
+        top = cx + radius * band_half_width(band_y - half_height)
+        bottom = cx + radius * band_half_width(band_y + half_height)
+        half_h = radius * half_height
+        points = [(cx - (top - cx), y - half_h), (top, y - half_h),
+                  (bottom, y + half_h), (cx - (bottom - cx), y + half_h)]
         name = ("jupiterBandTan", "jupiterBandRust", "jupiterBandCream")[index % 3]
-        canvas.ellipse(cx, y, rx, ry,
-                       accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
-    # **Restorasi peredupan limb.** Pita di atas digambar sebagai elips warna
-    # rata, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur pada
+        canvas.polygon(points, accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
+    # **Restorasi peredupan limb.** Pita di atas digambar sebagai **tali
+    # busur** warna rata, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur pada
     # baris ekuator render 200 px: selisih terang pusat-ke-limb turun dari
     # 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R pitanya
     # justru +62.6 lebih terang daripada bola tanpa pita. Yang terlihat karena

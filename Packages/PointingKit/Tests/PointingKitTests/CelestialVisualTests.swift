@@ -2554,9 +2554,100 @@ final class CelestialVisualTests: XCTestCase {
             XCTAssertLessThan(relief[0].rimStrength, previous,
                               "kekuatan bibir harus turun monoton pada sudut \(step)")
             XCTAssertGreaterThan(relief[0].rimStrength, 0,
-                                 "tidak ada kawah yang boleh hilang (sudut \(step))")
+                                 "tidak ada kawah yang boleh hilang (sudut \\(step))")
             previous = relief[0].rimStrength
         }
+    }
+
+    /// Tepi pita mengikuti **busur limb**, dan tanda ketinggiannya yang
+    /// menentukan sisi mana yang lebih dalam.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan diperkirakan.** Pita
+    /// digambar sebagai elips: lebarnya konstan sepanjang tinggi pita, sama
+    /// dengan lebar bola di **pusat** pita. Yang benar di bola tidak begitu.
+    /// Lingkaran lintang pada lintang φ memproyeksi ke ruas garis `y = sin φ`,
+    /// `|x| ≤ cos φ = sqrt(1 − y²)`, jadi tepi pita pada tiap ketinggian
+    /// mengikuti busur limb. Diukur sebagai IoU terhadap bentuk yang benar pada
+    /// render 200 px, tiap elips hanya menutupi **79%** pita yang benar dan
+    /// yang hilang **20,5–22,1%** — dua sudut di dekat limb. Pada pita bawah
+    /// elipsnya juga **menggantung di luar** tepi bola yang sudah menyempit.
+    ///
+    /// **Kenapa arahnya diuji, bukan hanya nilainya.** Versi pertama
+    /// `bandHalfWidthAt` menerima jarak dari pusat pita plus setengah-lebar
+    /// pusatnya, lalu memulihkan ketinggiannya dengan `sqrt(1 − hw²)`. Akar itu
+    /// **kehilangan tandanya**, dan karena `bandHalfWidthAt` genap, nilainya
+    /// tetap "masuk akal" — yang rusak adalah **pasangan** tepi atas/bawah:
+    /// untuk pita utara, tepi atasnya dihitung dengan lebar tepi bawahnya.
+    /// Pada pita 0 itu 0,597 alih-alih 0,410, jadi pita utara lebih lebar di
+    /// atas — kebalikan dari yang seharusnya — dan piringannya terlihat
+    /// miring. Itu sebabnya yang diperiksa di sini urutannya, bukan angkanya:
+    /// implementasi yang kehilangan tanda tetap lolos setiap pemeriksaan nilai
+    /// tunggal.
+    func testBandHalfWidthFollowsTheLimbArc() {
+        // Fungsi bola: penuh di ekuator, nol di kutub, tidak pernah melewati
+        // tepi bola walau ketinggiannya di luar rentang (pita bisa ditambah
+        // melewati kutub, dan `sqrt` dari bilangan negatif menghasilkan NaN —
+        // yang di `Canvas` muncul sebagai piringan yang hilang, bukan galat).
+        XCTAssertEqual(CelestialVisual.bandHalfWidthAt(height: 0), 1, accuracy: 1e-12,
+                       "ekuator adalah titik terlebar bola")
+        XCTAssertEqual(CelestialVisual.bandHalfWidthAt(height: 1), 0, accuracy: 1e-12,
+                       "kutub adalah titik, bukan tepi")
+        XCTAssertEqual(CelestialVisual.bandHalfWidthAt(height: -1), 0, accuracy: 1e-12,
+                       "kutub selatan sama dengan kutub utara")
+        XCTAssertEqual(CelestialVisual.bandHalfWidthAt(height: 1.5), 0, accuracy: 1e-12,
+                       "di luar kutub harus dijepit, bukan NaN")
+        XCTAssertEqual(CelestialVisual.bandHalfWidthAt(height: -2), 0, accuracy: 1e-12,
+                       "di luar kutub selatan juga dijepit")
+        // Monoton: makin jauh dari ekuator, makin sempit. Tanpa ini fungsi
+        // konstan (lebar elips) juga lolos kedua ujung di atas.
+        var previous = CelestialVisual.bandHalfWidthAt(height: 0)
+        for step in stride(from: 0.05, through: 1.0, by: 0.05) {
+            let width = CelestialVisual.bandHalfWidthAt(height: step)
+            XCTAssertLessThan(width, previous, "lebar bola harus turun di |y| = \\(step)")
+            XCTAssertEqual(width, CelestialVisual.bandHalfWidthAt(height: -step), accuracy: 1e-12,
+                           "bola simetris: |y| menentukan lebar, bukan sisi")
+            previous = width
+        }
+
+        // Dan sekarang yang menentukan: tiap pita harus **sempit di tepi luar
+        // dan lebar di tepi dalam**. Elips memberi lebar yang sama di
+        // keduanya, jadi invarian ini merah untuk bentuk lama — dan merah juga
+        // untuk pemulihan ketinggian yang kehilangan tanda.
+        let bands = CelestialVisual.jupiterBands()
+        XCTAssertEqual(bands.count, 7, "tujuh pita: lihat `bandCount` di view")
+        var largestOverhang = 0.0
+        for band in bands {
+            let top = CelestialVisual.bandHalfWidthAt(height: band.centerY - band.halfHeight)
+            let bottom = CelestialVisual.bandHalfWidthAt(height: band.centerY + band.halfHeight)
+            XCTAssertGreaterThanOrEqual(top, 0)
+            XCTAssertLessThanOrEqual(top, 1)
+            XCTAssertGreaterThanOrEqual(bottom, 0)
+            XCTAssertLessThanOrEqual(bottom, 1)
+            guard abs(band.centerY) > band.halfHeight else { continue }
+            if band.centerY < 0 {
+                XCTAssertLessThan(top, bottom,
+                                  "pita utara di y=\\(band.centerY): tepi luar (atas) harus lebih sempit")
+                // Elips memakai lebar pusat di kedua tepi; di tepi luar itu
+                // berarti ia lebih lebar daripada bola — menggantung di luar
+                // piringan.
+                largestOverhang = max(largestOverhang, band.halfWidth - top)
+            } else {
+                XCTAssertGreaterThan(top, bottom,
+                                     "pita selatan di y=\\(band.centerY): tepi luar (bawah) harus lebih sempit")
+                largestOverhang = max(largestOverhang, band.halfWidth - bottom)
+            }
+        }
+        // Besarnya cacat yang ditutup, sebagai angka. Elips memakai lebar
+        // **pusat** pita di kedua tepinya, jadi tepi terluarnya menonjol
+        // keluar dari bola; bentuk busur limb menonjol 0. Diukur pada
+        // geometri produksi (7 pita, tinggi 0,11): pita terluar menonjol
+        // **10,5% radius**. Ambangnya 9% — di bawah nilai itu bentuknya
+        // sudah tidak bisa dibedakan dari elips, dan di atasnya perbaikannya
+        // masih punya jarak.
+        XCTAssertGreaterThanOrEqual(
+            largestOverhang, 0.09,
+            "elips memakai lebar pusat: tepi terluarnya menonjol \(largestOverhang) R di luar bola, "
+            + "dan yang benar menurut busur limb adalah 0 R")
     }
 
 }

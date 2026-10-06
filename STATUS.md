@@ -1,3 +1,89 @@
+## Progres terakhir (6 Okt 2026 — pita Jupiter: tali busur, dan gerbang yang akhirnya menggigit)
+
+### Temuan: piringan terbaca sebagai stiker rata, bukan bola
+
+Pita Jupiter digambar sebagai **elips**: lebarnya konstan sepanjang tinggi
+pita, jadi tepi kirinya adalah **dinding vertikal** di `x = −sqrt(1 − yc²)`.
+Di bola tidak begitu. Lingkaran lintang pada lintang φ memproyeksi ke ruas
+garis `y = sin φ`, `|x| ≤ sqrt(1 − y²)`, jadi tepi pita pada tiap ketinggian
+mengikuti **busur limb**.
+
+Diukur, bukan diperkirakan: sebagai IoU terhadap bentuk yang benar pada render
+200 px, tiap elips hanya menutupi **79%** pita yang benar dan yang hilang
+**20,5–22,1%** — dua sudut di dekat limb, tempat bola tetap polos sementara
+pitanya sudah berhenti. Pada pita bawah, yang terlebar, elipsnya juga
+**menggantung di luar** tepi bola yang sudah menyempit. Bentuk itulah yang
+membuat piringan terbaca sebagai stiker rata.
+
+Perbaikannya satu rumus, `CelestialVisual.bandHalfWidthAt(height:)`, dipakai
+**view** dan **port Python** — bukan ditulis dua kali.
+
+### Cacat kedua: tanda yang hilang, dan **tidak ada gerbang yang menangkapnya**
+
+Versi pertama fungsi itu menerima *jarak dari pusat pita* lalu memulihkan
+ketinggiannya dengan `sqrt(1 − hw²)`. Akar itu **membuang tanda**: pita di
+`y = −0,857` dan `y = +0,857` punya setengah-lebar sama, jadi tepi atas pita
+utara dihitung dengan lebar tepi **bawah**-nya. Pada pita 0 itu 0,597 alih-alih
+0,410 — pita utara jadi lebih lebar di atas, kebalikan dari yang benar, dan
+piringannya terlihat miring. Sama di view: `abs(band.centerY) - band.halfHeight`.
+
+Yang penting bukan cacatnya, melainkan ini: **sapuan mutasi sempat meninggalkan
+bentuk `abs(...)` di view dan 345 pemeriksaan tetap hijau.** Gerbang piksel
+mengukur **port**, bukan view — gambar di jam rata, PNG tetap tali busur. Itu
+kelas "satu rumus, dua bahasa, tidak ada yang membandingkan" yang sudah
+berkali-kali tercatat di repo ini, dan kali ini ia benar-benar meloloskan cacat.
+Karena itu ditambahkan gerbang **pemakaian**, bukan hanya gerbang bentuk.
+
+### Cacat ketiga: gerbang mengutip angka yang tidak pernah ia ukur
+
+Pesan pemeriksaan berbunyi "elips 20% R". Metriknya mengukur **jarak tepi** pada
+ketinggian sampel (di dalam pita), dan di situ busur dan elips masih
+berdekatan: **0,1% R** di pita ekuator sampai **6,3% R** di pita terluar. Angka
+20% itu milik **luas** (IoU 79%), bukan jarak tepi. Sekarang angkanya
+**dihitung** dari geometri yang sama.
+
+Dan batasnya dinyatakan, bukan disembunyikan: dengan ambang 3% R, pemeriksaan
+ini membedakan tali busur dari elips pada pita **0, 1, 5, 6** dan **tidak** pada
+pita 2–4 (0,1–1,1% R) — di dekat ekuator busurnya memang nyaris lurus. Yang
+menjaga pita tengah adalah gerbang pemakaian, bukan ambang ini.
+
+### Bukti mutasi — tiap keadaan, dua arah
+
+```
+[1] baseline                     11 pemeriksaan, 0 gagal
+[2] view menggambar elips lagi   11 pemeriksaan, 1 gagal
+    GAGAL tepi atas memakai ketinggian bertanda (bukan nilai absolutnya)
+[3] view kehilangan tanda        11 pemeriksaan, 1 gagal
+    GAGAL tepi atas memakai ketinggian bertanda (bukan nilai absolutnya)
+[4] port menggambar elips lagi   11 pemeriksaan, 2 gagal
+    GAGAL pita Jupiter 0 mengikuti busur limb (tali busur, bukan elips)
+    GAGAL pita Jupiter 6 mengikuti busur limb (tali busur, bukan elips)
+[5] port berhenti memanggil       gerbang meledak: NameError
+[6] dipulihkan                   11 pemeriksaan, 0 gagal
+```
+
+Keadaan [3] adalah yang sebelumnya lolos. Keadaan [4] menggigit hanya di pita
+**0 dan 6** — persis batas yang dinyatakan di atas, dan itu sendiri bukti
+ambangnya jujur.
+
+### Satu angka lagi yang salah, dari arah sebaliknya
+
+Uji Swift `testBandHalfWidthFollowsTheLimbArc` mula-mula menuntut sisa **15% R**
+terhadap elips. Diukur ulang dari geometri produksi (7 pita, setengah-lebar
+0,11): yang benar **10,5% R**. Asersi dan komentarnya dikoreksi ke angka hasil
+ukur. Menuntut angka yang tidak pernah muncul sama berbahayanya dengan tidak
+menuntut apa pun — ia hijau karena kebetulan, bukan karena benar.
+
+### Keadaan sekarang
+
+| | |
+|---|---|
+| CelestialEngine | **182 uji hijau** |
+| PointingKit | **654 uji hijau** |
+| Gerbang visual | **345 pemeriksaan, 0 gagal** |
+| Berkas tersentuh | `CelestialVisual.swift`, `CelestialVisualView.swift`, `CelestialVisualTests.swift`, `check-visuals.py`, `render-visuals.py` |
+
+
 ## Progres terakhir (6 Okt 2026 — dua lebar garis yang hidup di dua bahasa)
 
 ### Temuan: audit mutasi ketiga — "cuma tebal garis", padahal yang hilang adalah penanda ragu

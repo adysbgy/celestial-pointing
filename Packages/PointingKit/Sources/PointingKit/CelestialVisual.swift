@@ -1751,6 +1751,37 @@ public extension CelestialVisual {
         }
     }
 
+    /// Setengah-lebar bola pada ketinggian `height` (satuan radius, 0 = ekuator),
+    /// dengan **tanda** yang berarti sisi: negatif = belahan utara layar.
+    ///
+    /// **Cacat yang ditutup fungsi ini — diukur, bukan diperkirakan.** Pita
+    /// digambar sebagai **elips**: lebarnya konstan sepanjang tinggi pita.
+    /// Yang benar di bola bukan begitu. Lingkaran lintang pada lintang φ
+    /// memproyeksi ke ruas garis `y = sin φ`, `|x| ≤ cos φ = sqrt(1 − y²)`,
+    /// jadi tepi pita pada tiap ketinggian mengikuti **busur limb**, bukan
+    /// dinding vertikal. Diukur sebagai IoU terhadap bentuk yang benar pada
+    /// render 200 px: tiap elips hanya menutupi **79%** pita yang benar, dan
+    /// yang hilang **20,5–22,1%** — dua sudut di dekat limb, di mana bola
+    /// tetap polos sementara pita sudah berhenti.
+    ///
+    /// Itu bukan sekadar angka kecil: bentuknya persis yang membuat piringan
+    /// terbaca sebagai **stiker rata**, dan pada pita bawah — yang terlebar —
+    /// ia juga menggantung di luar tepi bola yang sudah menyempit.
+    ///
+    /// **Kenapa `height`, bukan `offset` dari pusat pita.** Versi pertama
+    /// fungsi ini menerima jarak dari pusat pita plus setengah-lebar pusatnya,
+    /// lalu memulihkan ketinggiannya dengan `sqrt(1 − hw²)`. Akar itu
+    /// **kehilangan tandanya**: pita di `y = −0,857` dan pita di `y = +0,857`
+    /// punya setengah-lebar yang sama, jadi tepi atas pita utara dihitung
+    /// dengan lebar tepi **bawah**-nya. Pada pita 0 itu 0,597 alih-alih 0,410
+    /// — pita utara jadi lebih lebar di atas, persis kebalikan dari yang
+    /// seharusnya, dan piringannya terlihat miring. Tanda itu memang ada di
+    /// model: `Band.centerY` **adalah** ketinggian bola yang bertanda, jadi
+    /// pemanggil cukup meneruskannya.
+    public static func bandHalfWidthAt(height: Double) -> Double {
+        min(1, max(0, 1 - height * height)).squareRoot()
+    }
+
     /// Kekuatan **pemulihan peredupan limb** di atas pita permukaan, 0…1.
     ///
     /// **Cacat yang ditutup angka ini — diukur, bukan diperkirakan.** Pita

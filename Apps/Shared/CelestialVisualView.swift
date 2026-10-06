@@ -299,10 +299,31 @@ struct CelestialVisualView: View {
             let y = center.y + CGFloat(band.centerY) * radius
             let halfWidth = radius * CGFloat(band.halfWidth)
             guard halfWidth > 1 else { continue }
-            let rect = CGRect(x: center.x - halfWidth,
-                              y: y - radius * CGFloat(band.halfHeight),
-                              width: halfWidth * 2,
-                              height: radius * CGFloat(band.halfHeight) * 2)
+            let halfHeight = radius * CGFloat(band.halfHeight)
+            // **Pita digambar sebagai tali busur, bukan elips.** Tepi pita
+            // mengikuti busur limb: pada ketinggian `y ± halfHeight` bola
+            // sudah menyempit, sementara elips mempertahankan lebarnya sampai
+            // ujung. Diukur sebagai IoU pada render 200 px, elips hanya
+            // menutupi **79%** pita yang benar; yang hilang 20,5–22,1% — dua
+            // sudut di dekat limb, di mana bola tetap polos sementara pita
+            // sudah berhenti. Itu bentuk yang membuat piringan terbaca sebagai
+            // stiker rata, dan ia juga menggantung di luar tepi bola pada
+            // pita bawah.
+            //
+            // Yang dipakai adalah ketinggian **bertanda** tepi atas dan bawah
+            // (`band.centerY ∓ band.halfHeight`), karena tanda itulah yang
+            // menentukan sisi mana yang lebih dalam. Semuanya dari model, jadi
+            // `check-visuals` bisa menahannya di kedua bahasa.
+            let topHalfWidth = radius * CGFloat(
+                CelestialVisual.bandHalfWidthAt(height: band.centerY - band.halfHeight))
+            let bottomHalfWidth = radius * CGFloat(
+                CelestialVisual.bandHalfWidthAt(height: band.centerY + band.halfHeight))
+            var ribbon = Path()
+            ribbon.move(to: CGPoint(x: center.x - topHalfWidth, y: y - halfHeight))
+            ribbon.addLine(to: CGPoint(x: center.x + topHalfWidth, y: y - halfHeight))
+            ribbon.addLine(to: CGPoint(x: center.x + bottomHalfWidth, y: y + halfHeight))
+            ribbon.addLine(to: CGPoint(x: center.x - bottomHalfWidth, y: y + halfHeight))
+            ribbon.closeSubpath()
             // Warna pita dibaca dari model, mode malam dihitung dari kanal
             // merahnya. Versi lama menulis angka malam sendiri
             // (`0.34 + 0.18 * shade / 2`), dan urutan hasilnya **terbalik**:
@@ -316,14 +337,14 @@ struct CelestialVisualView: View {
             case 1: bandColor = CelestialVisual.accents.jupiterBandRust
             default: bandColor = CelestialVisual.accents.jupiterBandCream
             }
-            context.fill(Path(ellipseIn: rect),
+            context.fill(ribbon,
                          with: .color(Self.accent(bandColor).opacity(0.55)))
         }
         // **Restorasi peredupan limb: kenapa ada, dan kenapa `drawSphere`
         // dipanggil ulang, bukan diganti gradien baru.**
         //
-        // Pita di atas digambar sebagai elips warna **rata** pada opasitas
-        // 0.55, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur
+        // Pita di atas digambar sebagai **tali busur** warna rata (opasitas
+        // 0.55), jadi tiap pita menghapus lengkung bola di bawahnya. Diukur
         // pada baris ekuator render 200 px: selisih terang pusat-ke-limb turun
         // dari 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R
         // pitanya +62.6 lebih terang daripada bola tanpa pita di titik yang
