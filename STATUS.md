@@ -10846,3 +10846,60 @@ ketahuan.
     (`testAllStatesHaveSymbolsAndLabels`) — dua gerbang, dua pertanyaan.
   - Keluarga `accessoryCorner` belum didesain; ia jatuh ke `default`, yang
     sekarang punya penanda. Bukan desain final, hanya tidak lagi menyesatkan.
+
+## Siklus: gerbang morfologi objek langit dalam dari piksel (2026-10-06)
+
+### Premis: uji model mengunci modelnya, bukan gambarnya
+
+Model sudah mengunci bahwa tiap id objek langit dalam punya morfologi
+berbeda (`testDeepSkyMorphologyDistinguishesThreeTypes`), dan itu benar.
+Tapi yang sampai ke layar adalah **gambar**, dan gambarnya bisa salah
+walaupun modelnya benar: kalau view suatu saat memetakan seluruh
+`DeepSkyKind` ke satu bentuk, uji model tetap hijau sementara galaksi,
+gugus bola, gugus terbuka, dan nebula tampak sebagai gumpalan yang sama.
+
+Itu persis kelas cacat yang `check-visuals.py` ada untuk mencegah — gerbang
+yang mengukur hal yang bukan yang diklaimnya — dan ia berdiri di samping
+pemeriksaan yang **sudah** menutup arah berlawanan (`bentuk galaksi hilang
+saat ragu`), sehingga lubangnya tidak terlihat sebagai lubang.
+
+### Pemeriksaannya: dua arah, karena satu arah bisa lolos
+
+`check_deep_sky_morphologies_render_distinct` membandingkan tiap pasang
+morfologi piksel demi piksel (6 pasangan), lalu membandingkan tiap
+morfologi terkunci dengan kabut netral (4 pemeriksaan).
+
+Arah kedua bukan pengulangan: view yang menyoroti **semua** morfologi ke
+kabut netral akan lolos arah pertama dengan sempurna — keempatnya sama-sama
+netral, jadi tiap pasangan juga bertepatan. Tanpa arah kedua, gerbang itu
+hanya bisa lulus.
+
+### Dibuktikan berbunyi
+
+`DEEP_SKY_LAYOUT` dipatok ke `"nebula"` di port Python (semua morfologi
+jadi satu bentuk), dan pemeriksaan gagal pada **6 pasangan** dengan
+`--check` keluar 1. Port dikembalikan, gerban hijau lagi.
+
+Sebelumnya di siklus yang sama: `red-test.sh` dipakai untuk membuktikan
+`testCrescentSignFollowsWaxingDirection` benar-benar merah pada sabit yang
+dibalik arahnya (`litSide` ditukar) — uji itu menangkap cacatnya, bukan
+sekadar cocok dengan kode saat ini.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 174, PointingKit 625, 0 gagal.
+  - `./swift-ui-lint.sh` -> 25 aturan hijau.
+  - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+  - `python3 Tools/check-visuals.py --check` -> **190** pemeriksaan
+    (bertambah 10), 0 gagal.
+  - CI: Engine Tests `37399725431` + Apple Build `37399725757`, keduanya
+    success.
+
+### Yang TIDAK diklaim
+
+  - Pemeriksaan ini menjaga bahwa keempat bentuk **berbeda satu sama lain**,
+    bukan bahwa masing-masing benar secara astronomi. Kebenaran bentuknya
+    (galaksi berpalung, gugus memusat) diuji di Linux pada modelnya.
+  - Yang diukur adalah port Python, bukan `Canvas` SwiftUI di perangkat.
+    Port-nya diikat ke view lewat `check_port_matches_swift_constants`, tapi
+    kesamaan piksel di perangkat belum diverifikasi.
