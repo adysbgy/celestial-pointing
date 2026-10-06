@@ -11409,3 +11409,64 @@ tetap hijau padanya, karena opacity tidak masuk ke aspect sama sekali.
     tertinggal di 633; README diperbarui ke 634.
   - `python3 Tools/check-visuals.py --check` -> 215 pemeriksaan, 0 gagal.
   - `./swift-typecheck.sh` -> LULUS.
+
+
+## Siklus: gradien kecerahan gugus bola rata, semua uji hijau (2026-10-06)
+
+### Premis: klaim warna tidak dijaga oleh satu pun uji
+
+Siklus lalu menutup galaksi. Yang berikutnya menyapu gugus bola. Di sini
+cacatnya bukan di `aspect` (yang di galaksi invarian sempurna) melainkan di
+**opasitas**: layout menyebut inti "paling terang" dan dua cincin "makin
+redup ke luar", tapi tidak ada uji yang membaca satu opasitas pun.
+
+`testGlobularClusterHasADenseCentre` memang tidak bisa menjaganya: ia cuma
+membandingkan `core.halfWidth` dengan `blobs.map(\.halfWidth).max()` —
+inti harus blob **terbesar**, bukan yang **paling terang**. Soal warna
+sama sekali tidak tersentuh.
+
+### Dibuktikan: gradien rata, 634/634 hijau
+
+Mutasi opasitas inti `0.55 -> 0.22`. Inti jadi sama redupnya dengan cincin
+**terluar** — gradien kecerahannya rata — dan **634/634 uji tetap hijau**.
+
+### Jebakan kedua yang ditemukan saat menulis uji, bukan setelahnya
+
+Versi pertama uji baru mengambil `byRadius[1]` dan `byRadius[last]` —
+**satu** anggota tiap cincin. Karena `sorted` tidak menentukan urutan
+anggota yang radiusnya sama (tiap cincin punya 6 anggota pada radius
+persis 0.30 dan 0.46), mutasi **satu** blob cincin luar lolos begitu saja:
+indeks terakhir bisa jatuh ke anggota lain yang belum dirusak. Bukti:
+mutasi `0.22 -> 0.38` pada satu anggota cincin luar **lolos** versi
+pertama, padahal secara visual pita itu tidak seragam.
+
+Perbaikan: bagi blob ke **pita radius** (inti / cincin dalam / cincin luar)
+dan jaga dua hal terpisah:
+  1. **Seragam dalam satu pita** — `lo == hi` untuk semua anggota pita.
+  2. **Menurun antar pita** — bandingkan `paling redup` di pita dalam
+     dengan `paling terang` di pita luar, supaya selisih terkecil pun
+     tidak bisa lolos.
+
+Kedua mutasi sekarang merah: inti `0.55 -> 0.22` (gradien rata), dan satu
+anggota cincin luar `0.22 -> 0.38` (pita tidak seragam).
+
+### Yang TIDAK diklaim
+
+  - `testGlobularClusterHasADenseCentre` **tidak dihapus**: klaim "inti
+    paling besar di tengah" itu benar dan masih dijaga. Yang ditambahkan
+    adalah klaim "inti paling terang, redup ke luar" yang sebelumnya
+    menggantung tanpa saksi.
+  - Sapuan **masih belum selesai**. Yang sudah diuji mutasinya: galaksi
+    (size+opacity) dan gugus bola (opacity). Yang belum: **nebula** (emisi
+    — tidak punya inti, tapi punya bentuk blob yang belum diuji mutasinya)
+    dan `openCluster` (sudah diuji mutasi pada siklus sebelumnya untuk
+    "tidak ada inti", tapi tidak untuk ukuran/sebaran). Lihat siklus
+    berikutnya.
+  - Model `buildDeepSky` tidak diubah sama sekali; ini murni penambahan uji.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 179, PointingKit **635** (1 baru).
+  - `./swift-ui-lint.sh` -> 25 aturan hijau (Rule 10: README 634 -> 635).
+  - `python3 Tools/check-visuals.py --check` -> 215 pemeriksaan, 0 gagal.
+  - `./swift-typecheck.sh` -> LULUS.
