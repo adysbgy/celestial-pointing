@@ -2141,5 +2141,77 @@ final class CelestialVisualTests: XCTestCase {
                              "inti lebih pucat (biru lebih tinggi) daripada tepi")
     }
 
+    // MARK: - Regresi: `CraterRelief` harus tetap bisa di-compare
+
+    /// `CraterRelief` menyatakan model bibir kawah yang diuji di Linux. Ia
+    /// **harus** `Equatable` — kalau tidak, modul `PointingKit` gagal
+    /// dikompilasi (fatalError di emit-module), dan tidak ada satu pun uji
+    /// yang bisa berjalan.
+    ///
+    /// Cacat yang ditutup: field arah bibir pernah ditulis sebagai tupel
+    /// berlabel `(x: Double, y: Double)` sebagai *stored property*. Di Swift 6
+    /// tupel berlabel tidak menyintesis `Equatable`, sehingga `public struct
+    /// CraterRelief: Equatable` langsung menolak compile. Diperbaiki dengan
+    /// memecahnya jadi dua `Double` (`rimDirectionX`/`rimDirectionY`) — alat
+    /// Python membandingkan komponen secara langsung, jadi bentuk Swift murni
+    /// internal. Uji ini menahan bentuk itu: kalau suatu saat ada yang kembali
+    /// menulis tupel berlabel di sini (atau menurunkan visibilitas field
+    /// hingga tidak bisa dibanding), compile akan merah — bukan diam.
+    func testCraterReliefRemainsEquatableWithPlainDoubleFields() {
+        let a = CelestialVisual.CraterRelief(centerX: -0.30, centerY: -0.22, radius: 0.20,
+                                             rimDirectionX: -0.7071, rimDirectionY: -0.7071,
+                                             rimStrength: 0.55, floorDepth: 0.22)
+        let b = CelestialVisual.CraterRelief(centerX: -0.30, centerY: -0.22, radius: 0.20,
+                                             rimDirectionX: -0.7071, rimDirectionY: -0.7071,
+                                             rimStrength: 0.55, floorDepth: 0.22)
+        let c = CelestialVisual.CraterRelief(centerX: 0.28, centerY: -0.05, radius: 0.15,
+                                             rimDirectionX: 0.0, rimDirectionY: 1.0,
+                                             rimStrength: 0.30, floorDepth: 0.11)
+        XCTAssertEqual(a, b, "dua relief identik harus setara")
+        XCTAssertNotEqual(a, c, "relief berbeda harus tidak setara")
+    }
+
+    /// Bibir yang lebih terang **selalu** menghadap sumber cahaya, dan arahnya
+    /// diturunkan dari `sphereLightOffset` yang sama dengan gradien bola.
+    ///
+    /// Cacat yang ditutup: arahnya pernah ditulis dua kali — sekali sebagai
+    /// pusat gradien di view, sekali di port Python — dan keduanya harus sama
+    /// supaya bibir kawah yang terang menghadap sisi yang benar. Sekarang satu
+    /// konstanta di model. Uji ini mengunci bahwa `craterRelief` memang
+    /// memproduksi arah `-light` yang dinormalkan untuk **setiap** kawah, dan
+    /// bahwa `sphereLightOffset` memiliki panjang yang tidak nol (kalau nol,
+    /// arah tidak terdefinisi dan `craterRelief` harus mengembalikan kosong,
+    /// bukan bibir acak).
+    func testCraterReliefRimAlwaysFacesTheLight() {
+        let craters = [(0.0, 0.0, 0.20), (-0.30, -0.22, 0.20), (0.28, 0.34, 0.11)]
+        let relief = CelestialVisual.craterRelief(craters: craters)
+        XCTAssertEqual(relief.count, craters.count, "satu relief per kawah")
+
+        let light = CelestialVisual.sphereLightOffset
+        let length = (light.x * light.x + light.y * light.y).squareRoot()
+        XCTAssertGreaterThan(length, 1e-9, "arah cahaya bola tidak boleh nol panjangnya")
+        let wantX = -light.x / length
+        let wantY = -light.y / length
+
+        for r in relief {
+            XCTAssertEqual(r.rimDirectionX, wantX, accuracy: 1e-9,
+                           "bibir kawah harus menghadap sumber cahaya (x)")
+            XCTAssertEqual(r.rimDirectionY, wantY, accuracy: 1e-9,
+                           "bibir kawah harus menghadap sumber cahaya (y)")
+            XCTAssertGreaterThan(r.rimStrength, 0,
+                                 "kekuatan bibir harus positif (pernah 0 = kawah hilang)")
+        }
+    }
+
+    /// Cahaya nol panjangnya tidak boleh menghasilkan bibir yang arahnya
+    /// sembarang. `craterRelief` harus mengembalikan kosong, bukan relief
+    /// dengan arah yang tidak terdefinisi — itu yang membuat kawah tampak
+    /// menonjol keluar alih-alih cekung saat vektor cahaya rusak.
+    func testCraterReliefRefusesZeroLengthLight() {
+        let relief = CelestialVisual.craterRelief(craters: [(0.0, 0.0, 0.20)],
+                                                 lightDirection: (x: 0, y: 0))
+        XCTAssertTrue(relief.isEmpty, "cahaya nol panjangnya tidak boleh menghasilkan bibir")
+    }
+
 }
 
