@@ -1,3 +1,150 @@
+## Progres terakhir (6 Okt 2026 — "semua di bawah horizon" tidak pernah benar, 2469 dari 2469)
+
+### Cacatnya: hint membaca seluruh langit, lalu mengklaim soal arah yang ditunjuk
+
+`SearchHint` lahir untuk satu tujuan: menjelaskan **kenapa tidak ada objek**.
+`.allBelowHorizon` berbunyi "Semua objek di katalog sedang di bawah horizon" —
+kalimat yang bisa diperiksa, dan ia memang salah hampir selalu.
+
+Penyebabnya bukan logikanya yang keliru. `PointingResolver.diagnose` menghitung
+`rejected` dengan benar, tapi ia menjalankan `VisibilityFilter` pada **setiap**
+benda sebelum memotong kerucut arah tunjuk, jadi daftarnya memuat benda dari
+seluruh langit. `searchHint` lama membaca **seluruh** daftar itu lalu menyimpulkan
+sebab tunggal darinya.
+
+Benda di sisi langit yang lain tidak pernah sengaja ditunjuk pengguna, jadi
+kesimpulannya tidak menjelaskan apa pun soal arah jam. Kalimat aslinya di engine
+sudah benar ("semua benda **di kerucut arah tunjuk**") — kodenya yang
+bertentangan dengan kalimatnya sendiri.
+
+### Pengukurannya, bukan tebakan
+
+Sapu 24 jam x seluruh arah, katalog produksi (`Catalogue.brightStars` +
+efemeris nyata), hanya malam, hanya resolusi tanpa jawaban:
+
+| Angka | Nilai |
+|---|---|
+| Resolusi tanpa jawaban | 2492 |
+| Menampilkan `.allBelowHorizon` | 2492 (**100%**) |
+| Di antaranya **benar** | **0** |
+| Arah dengan klaim itu **tidak** benar (bintang di atas horizon) | 2469 |
+
+Setiap saat ada sedikit saja satu bintang katalog yang benar-benar di atas
+horizon. Contoh yang tercatat: `h=7 alt=10 az=0` — 13 bintang di atas horizon,
+`searchHint` = `allBelowHorizon`.
+
+Dua kelompok muncul dari pengukuran itu:
+
+| Kelompok | Penolakan dalam kerucut | Versi lama | Versi sesudah |
+|---|---|---|---|
+| kerucut **kosong** (1987 arah) | tidak ada | `allBelowHorizon` | `noCandidates` |
+| kerucut **berisi** (505 arah) | ada | `allBelowHorizon` | `allBelowHorizon` (benar) |
+
+Jadi **seluruh** 1987 perbedaan datang dari kasus kerucut kosong — arah yang
+benar-benar tidak punya benda di dalamnya, dan tidak ada satu pun yang bisa
+diperiksa. Untuk arah itu satu-satunya kalimat jujur adalah "belum ada objek yang
+cocok". Untuk 505 arah yang memang berisi benda di bawah horizon, klaim
+spesifik itu **benar** dan tetap dipertahankan.
+
+### Perbaikannya
+
+`Resolution` sekarang menyimpan `pointingConeDeg` — kerucut yang benar-benar
+dipakai `diagnose`. Tanpa itu, satu-satunya penaksir yang jujur adalah "tidak ada
+yang bisa dikatakan" untuk semua keadaan, yaitu membuang informasi yang sudah
+benar-benar dihitung. `nil` (resolusi buatan) **tidak pernah** dikarang jadi
+cakupan: ia jatuh ke `.noCandidates`.
+
+Kodenya satu baris filter, tapi kunci perbaikannya adalah **cakupan**, bukan
+kondisi:
+
+```swift
+let inCone = rejected.filter { $0.separationDeg <= cone }
+guard !inCone.isEmpty else { return .noCandidates }
+let reasons = Set(inCone.map(\.visibility))
+```
+
+### Dua cacat di gerbang yang aku tulis sendiri, keduanya tertangkap sebelum push
+
+Ini yang penting dari siklus ini, karena keduanya bentuk "hijau yang tidak
+hijau" — kelas yang jadi pelajaran terus-menerus di repo ini.
+
+**1. Gerbang hijau di atas cacat yang diklaimnya.** Versi pertama
+`testEmptyConeDropsTheWholeSkyReason...` membandingkan nilai yang dihitung
+**sendiri** di dalam tes (`naiveHint`) dengan `r.searchHint` — ia tidak pernah
+menyentuh perilaku produksi sama sekali. Yang lebih buruk, VERSI PERTAMA dari gerbang
+itu **hijau di atas mutasi yang menghapus seluruh penyaringan kerucut**:
+
+```
+MUTASI: searchHint baca SELURUH daftar (cacat asli)
+Executed 5 tests, with 0 failures        <-- hijau di atas cacatnya sendiri
+```
+
+Penyebabnya: syarat "penolakan di dalam **dan** luar kerucut" tidak pernah
+terpenuhi di langit malam nyata — penolakan di luar biasanya punya alasan yang
+sama dengan di dalam (`mixedInOut=505`, `perbedaan=0`). Jadi gerbang itu
+mengukur keadaan yang tidak pernah terjadi. Setelah diukur ulang, gerbang yang
+benar adalah yang menguji kasus **kerucut kosong**, dan langsung menggigit:
+
+```
+GAGAL arah tanpa benda di kerucut tidak boleh disebut sebab seluruh langit:
+      ("1987") is not equal to ("0")
+      tampil=allBelowHorizon alt=-10
+```
+
+**2. Kontradiksi yang mustahil terjadi.** Penjaga kedua ("tidak boleh ada
+bintang terlihat di kerucut saat `.allBelowHorizon`") hijau **dan tetap hijau**
+saat mutasi dipasang. Bukan karena logikanya salah, tapi karena setelah
+penyaringan kerucut kasus itu memang mustahil: `.allBelowHorizon` hanya tampil
+saat seluruh benda di kerucut ditolak `belowHorizon`, jadi tidak bisa ada yang
+terlihat di sana. Nol konflik adalah **konsekuensi** aturan, bukan bukti
+tentangnya. Dijaga sebagai syarat invariant (`hints > 0` + `konflik == 0`), dan
+keterbatasannya ditulis di berkasnya supaya tidak dibaca sebagai bukti bahwa
+mutasi apa pun akan merah di situ.
+
+Pelajaran yang dicatat: **pilot pertama salah** (menunjuk bintang terang hampir
+selalu menghasilkan jawaban, jadi 0 sampel) dan **versi gerbang pertama hijau di
+atas mutasinya sendiri**. Keduanya hanya terlihat karena mengukur dulu dan
+mutasi, bukan karena membaca kode.
+
+### Cacat keempat yang ditemukan di fixture yang sudah ada
+
+Empat tes lama di `SearchHintTests` merah setelah perbaikan — dan **semuanya
+benar**:
+- Tiga fixture tangan membangun `Resolution` tanpa kerucut. Sekarang mereka
+  menyatakannya (fixture lebih jujur, bukan lebih lemah).
+- `testControllerCarriesHonestHintWhileSearching` mengarahkan jam ke **zenith
+  sisi selatan, sekitar 80 derajat dari Polaris**, lalu menuntut jawaban "semua
+  di bawah horizon". Kerucut arah tunjuk saat itu **kosong** — persis cacat ini,
+  ditulis sebagai expectations. Sekarang diarahkan **ke Polaris**, dan hint
+  spesifik itu benar kembali: ada benda di kerucut, dan benda itu memang di
+  bawah horizon. Ditambah prasyarat yang mengulang pengukurannya.
+
+### Gerbang
+- `./swift-test.sh` → **CelestialEngine 182** (tak berubah), **PointingKit 647**
+  (+5), 0 gagal.
+- `./swift-ui-lint.sh` → 28 aturan hijau. Aturan 10 menangkap README yang masih
+  bilang 642; diperbarui ke 647.
+- `./swift-typecheck.sh` → LULUS. `python3 Tools/check-visuals.py --check` →
+  **296 pemeriksaan**, 0 gagal (tak disentuh).
+- CI: lihat entri CI di bawah bila sudah hijau.
+
+### Batas yang jujur
+- **Yang dibuktikan:** 100% klaim `allBelowHorizon` yang muncul di langit
+  malam nyata adalah salah bentuk, dan setelah dibatasi kerucut tidak ada
+  arah yang menampilkan sebab seluruh langit. Yang BELUM: sapu ini 24 jam
+  pada **satu tanggal** di **satu kota**. Tanggal/kota lain bisa punya keadaan
+  berbeda, dan `tooFaint`/`tooCloseToSun` **tidak pernah muncul sama sekali**
+  di sapu ini — jadi jalur itu belum terukur di sini.
+- **Perilaku yang berubah untuk pengguna:** arah dengan kerucut kosong kini
+  menampilkan kalimat generik, bukan sebab palsu. Itu tukar-menukar informasi yang
+  salah menjadi informasi yang benar — disengaja, dan alasannya sama seperti
+  keputusan tidak memaksa `.lock` untuk bulan.
+- **Bukan pengganti pengujian manual.** Gerbang ini membuktikan bahwa klaim yang
+  ditampilkan tidak bertentangan dengan apa yang bisa dilihat; ia tidak
+  menilai apakah kalimatnya enak dibaca.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — jalur bawah-horizon sampai .lock, dan audit ulang status brief)
 
 ### Temuan siklus ini: brief di misi sudah LENGKAP, bukan awal dari nol

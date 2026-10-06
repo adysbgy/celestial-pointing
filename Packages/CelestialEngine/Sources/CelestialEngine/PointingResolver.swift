@@ -48,13 +48,30 @@ public struct Resolution: Equatable {
     /// dipakai.
     public var nearestNeighbourDeg: Double?
 
+    /// Lebar kerucut arah tunjuk (derajat) yang dipakai pada resolusi ini.
+    ///
+    /// **Kenapa ini disimpan.** `rejected` memuat benda yang ditolak penyaring
+    /// dari **seluruh langit**, bukan hanya benda di dalam kerucut arah tunjuk.
+    /// Pemakai yang ingin menjelaskan "kenapa tidak ada objek **di arah itu**"
+    /// tidak bisa menimbang seluruh daftar itu: benda di sisi langit yang lain
+    /// tidak pernah sengaja ditunjuk pengguna. Tanpa kerucut yang dipakai, satu
+    ///-satunya penaksir yang jujur adalah "tidak ada yang bisa dikatakan", dan
+    /// itu membuang informasi yang sudah benar-benar dihitung.
+    ///
+    /// `nil` berarti tidak diketahui (resolusi yang dibuat tangan). Pemakai
+    /// **wajib** memperlakukannya sebagai tidak diketahui, bukan mengasumsikan
+    /// kerucut besar: mengarang cakupan akan mengubah alasan yang ditampilkan
+    /// menjadi klaim yang tidak bisa diperiksa.
+    public var pointingConeDeg: Double?
+
     public init(intent: CelestialIntent,
                 context: SkyContext,
                 rejected: [RejectedObject] = [],
                 ephemerisFailures: [EphemerisBody] = [],
                 consideredCount: Int = 0,
                 sunHorizontal: HorizontalCoord? = nil,
-                nearestNeighbourDeg: Double? = nil) {
+                nearestNeighbourDeg: Double? = nil,
+                pointingConeDeg: Double? = nil) {
         self.intent = intent
         self.context = context
         self.rejected = rejected
@@ -62,6 +79,7 @@ public struct Resolution: Equatable {
         self.consideredCount = consideredCount
         self.sunHorizontal = sunHorizontal
         self.nearestNeighbourDeg = nearestNeighbourDeg
+        self.pointingConeDeg = pointingConeDeg
     }
 }
 
@@ -206,7 +224,8 @@ public struct PointingResolver {
                              ephemerisFailures: failures,
                              consideredCount: considered,
                              sunHorizontal: sunHorizontal,
-                             nearestNeighbourDeg: nil)
+                             nearestNeighbourDeg: nil,
+                             pointingConeDeg: coneDeg)
         }
 
         func consider(_ object: CelestialObject,
@@ -280,7 +299,8 @@ public struct PointingResolver {
                           ephemerisFailures: failures,
                           consideredCount: considered,
                           sunHorizontal: sunHorizontal,
-                          nearestNeighbourDeg: nearestNeighbour)
+                          nearestNeighbourDeg: nearestNeighbour,
+                          pointingConeDeg: coneDeg)
     }
 
     /// Ubah sampel efemeris menjadi entri katalog agar bisa ikut diresolusi.

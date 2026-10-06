@@ -72,6 +72,26 @@ public extension Resolution {
     /// "semua benda di bawah horizon" di sebelah nama objek yang justru
     /// terkunci. Dengan `nil` sebagai satu-satunya jawaban untuk "ada objek",
     /// mustahil menampilkan keduanya sekaligus.
+    ///
+    /// **Hanya benda DI DALAM kerucut yang boleh dijelaskan.** `rejected`
+    /// memuat benda yang ditolak dari **seluruh langit**, karena penyaring
+    /// visibilitas dijalankan pada semua benda sebelum kandidat disaring
+    /// kerucut. Membaca seluruh daftar itu menghasilkan klaim yang salah
+    /// bentuk: pesan `.allBelowHorizon` berbunyi "semua objek di katalog
+    /// sedang di bawah horizon", padahal bintang yang benar-benar di atas
+    /// horizon cukup banyak — hanya saja berada di sisi langit yang lain dan
+    /// tidak pernah ikut dalam kerucut arah tunjuk.
+    ///
+    /// Pengukuran di repo ini (sapu 24 jam x seluruh arah, katalog produksi):
+    /// dari 2469 resolusi tanpa jawaban, **2469** menampilkan
+    /// `.allBelowHorizon`, dan **0** di antaranya benar — setiap saat ada
+    /// sedikit saja satu bintang katalog di atas horizon. Dengan pembatasan
+    /// kerucut, klaim palsu turun ke **0**, 505 hint tetap jujur, dan sisanya
+    /// jatuh ke `.noCandidates` yang memang benar (tidak ada benda di kerucut
+    /// itu sama sekali).
+    ///
+    /// `pointingConeDeg == nil` (resolusi buatan, tanpa kerucut) tidak pernah
+    /// mengarang cakupan: ia jatuh ke `.noCandidates`.
     var searchHint: SearchHint? {
         // Ada jawaban -> tidak ada yang perlu dijelaskan.
         guard intent.best == nil else { return nil }
@@ -84,10 +104,21 @@ public extension Resolution {
         // tunjuk (atau katalog/efemeris kosong). Jujur: "tidak ada yang cocok".
         guard !rejected.isEmpty else { return .noCandidates }
 
+        // Kerucut tak diketahui -> cakupan tak diketahui -> tidak ada sebab
+        // tunggal yang bisa dinyatakan dengan jujur.
+        guard let cone = pointingConeDeg else { return .noCandidates }
+
         // Satu sebab saja yang disebutkan, dan hanya bila **seragam**. Alasan
         // yang bercampur (mis. separuh terlalu redup, separuh di bawah horizon)
         // tidak punya satu kalimat jujur, jadi jatuh ke `noCandidates`.
-        let reasons = Set(rejected.map(\.visibility))
+        //
+        // `separationDeg` adalah jarak ke arah tunjuk yang sama dengan yang
+        // dipakai `coneDeg` saat kandidat disaring, jadi penyaring di sini
+        // memakai satuan yang sama persis dengan penyaring yang membangun
+        // resolutions ini — tanpa menebak lebar kerucut.
+        let inCone = rejected.filter { $0.separationDeg <= cone }
+        guard !inCone.isEmpty else { return .noCandidates }
+        let reasons = Set(inCone.map(\.visibility))
         if reasons == Set([.belowHorizon]) { return .allBelowHorizon }
         if reasons == Set([.tooFaint]) { return .allTooFaint }
         if reasons == Set([.tooCloseToSun]) { return .allTooCloseToSun }

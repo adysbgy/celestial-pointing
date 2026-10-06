@@ -22,12 +22,23 @@ final class SearchHintTests: XCTestCase {
 
     // MARK: - Helper murni
 
-    /// `Resolution` tanpa jawaban, dengan konteks & penolakan yang ditentukan.
+    /// **Kerucut 5 derajat** untuk seluruh fixture tangan di berkas ini.
+    ///
+    /// Tanpa kerucut berarti "cakupan tidak diketahui", dan
+    /// `searchHint` yang jujur lalu jatuh ke `.noCandidates` — jadi fixture
+    /// sekuat ini harus menyatakan kerucut yang dipakainya, seperti
+    /// `PointingResolver.diagnose` selalu lakukan. Nilai `5` dipilih karena
+    /// fixture di sini memakai jarak pisah `3`; memakai kerucut yang jauh
+    /// lebih besar tidak mengubah apa pun, dan memakai yang lebih kecil akan
+    /// membuat separator tidak ikut dan menguji hal yang berbeda.
+    private let fixtureCone: Double = 5
+
     private func resolution(context: SkyContext,
                             rejected: [RejectedObject] = []) -> Resolution {
         Resolution(intent: CelestialIntent(level: .low, best: nil, candidates: []),
                    context: context,
-                   rejected: rejected)
+                   rejected: rejected,
+                   pointingConeDeg: fixtureCone)
     }
 
     private func rejected(_ visibility: Visibility,
@@ -47,7 +58,8 @@ final class SearchHintTests: XCTestCase {
         let withAnswer = Resolution(
             intent: CelestialIntent(level: .high, best: sirius, candidates: []),
             context: SkyContext(sunAltitudeDeg: -40, isDark: true),
-            rejected: [rejected(.belowHorizon)]
+            rejected: [rejected(.belowHorizon)],
+            pointingConeDeg: fixtureCone
         )
         XCTAssertNil(withAnswer.searchHint)
     }
@@ -164,10 +176,24 @@ final class SearchHintTests: XCTestCase {
         let c = PointingController(resolver: resolver, observer: observer,
                                    config: PointingControllerConfig(coneDeg: 5.0))
 
-        // Arahkan ke zenith sisi selatan: jauh dari Polaris yang di bawah
-        // horizon, jadi ia ditolak — bukan menjadi kandidat.
-        let up = HorizontalCoord(altitudeDeg: 80, azimuthDeg: 180)
-        let q = quaternion(viewPointingAt: up)
+        // Arahkan **ke Polaris itu sendiri**, bukan ke zenith yang jauh dari
+        // sana. Alasannya bukan sekadar agar fixture menyalakan penyaringan:
+        // versi lama mengarahkan jam ke zenith sisi selatan — sekitar 80 derajat
+        // dari Polaris — lalu tetap menuntut jawaban "semua di bawah horizon".
+        //
+        // Itu persis cacat yang ditutup `SearchHintConeScopeTests`: kerucut arah
+        // tunjuk saat itu **kosong**, dan tidak ada benda di dalamnya yang bisa
+        // diperiksa. Yang jujur untuk arah kosong adalah "belum ada objek yang
+        // cocok", bukan "semua di bawah horizon". Jadi orientasi lama bukan
+        // sekadar fixture yang ceroboh — ia adalah cacat yang sama, ditulis
+        // sebagai expectations. Memakai arah Polaris membuat hint spesifik ini
+        // **benar** kembali: ada benda di kerucut, dan benda itu di bawah horizon.
+        let polarisDirection = resolver.horizontal(of: polaris, observer: observer,
+                                                   date: date)!
+        XCTAssertLessThan(polarisDirection.altitudeDeg, 5,
+                          "Polaris harus di bawah horizon agar fixture ini menguji "
+                          + "penolakan, bukan kandidat")
+        let q = quaternion(viewPointingAt: polarisDirection)
         for step in 0..<12 {
             c.feed(quaternion: q, timestamp: date.addingTimeInterval(Double(step) * 0.1))
         }
