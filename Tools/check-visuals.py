@@ -1790,6 +1790,59 @@ def check_sun_edge_is_soft(results, size=256, ss=2):
         f"rgb di 0.90 R = {at_090} (harus jelas di atas latar 10,10,15)"))
 
 
+def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
+    """Keempat morfologi objek langit dalam harus tergambar sebagai bentuk yang
+    berbeda — diukur dari piksel.
+
+    **Cacat yang ditutup pemeriksaan ini.** `testDeepSkyMorphologyDistinguishes
+    ThreeTypes` di Linux mengunci bahwa model mengembalikan morfologi berbeda
+    untuk berbagai id — dan itu benar. Tapi yang dikirim ke layar adalah
+    gambar, dan gambarnya bisa salah walaupun modelnya benar: kalau view suatu
+    saat memetakan seluruh `DeepSkyKind` ke satu bentuk (misal kabut bulat
+    tanpa pemusatan), uji model tetap hijau sementara keempat objek tampak
+    sebagai gumpalan yang sama di layar. Persis kelas cacat yang berkas ini
+    ada untuk mencegah: gerbang yang mengukur hal yang bukan yang diklaimnya.
+
+    Diukur dari piksel penuh. Kasus-kasus ini **terkunci** (tanpa lencana tanda
+    tanya), jadi seluruh frame adil untuk dibandingkan. Setiap pasang morfologi
+    harus berbeda paling tidak satu piksel; kalau view menyoroti semuanya ke
+    satu bentuk, seluruh pasangan bertepatan dan pemeriksaan ini merah.
+
+    **Dua arah sekaligus.** Tanpa arah sebaliknya (setiap morfologi terkunci
+    berbeda dari kabut netral), view yang menyoroti *semua* ke kabut netral
+    akan lolos pemeriksaan pasangan di atas — keempatnya sama-sama netral,
+    jadi pasangan mana pun juga bertepatan.
+    """
+    names = [c.name for c in R.build_cases()
+             if c.name.startswith("deepsky-")
+             and c.name not in ("deepsky-uncertain", "deepsky-unknown-id")]
+    rendered = {name: render_case(name, size=size, ss=ss) for name in names}
+
+    # Setiap pasang berbeda.
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            _, (w1, h1, rows_a) = rendered[names[i]]
+            _, (_, _, rows_b) = rendered[names[j]]
+            diff = sum(1 for y in range(h1)
+                       for x in range(w1)
+                       if rows_a[y][x * 4:x * 4 + 3] != rows_b[y][x * 4:x * 4 + 3])
+            results.append(Result(
+                f"morfologi berbeda: {names[i]} vs {names[j]}", diff > 0,
+                f"{diff} piksel berbeda (kalau 0, kedua bentuk sama di layar)"))
+
+    # Setiap morfologi terkunci berbeda dari kabut netral.
+    _, (w0, h0, rows_neutral) = render_case("deepsky-unknown-id",
+                                            size=size, ss=ss)
+    for name in names:
+        _, (_, _, rows_m) = rendered[name]
+        diff = sum(1 for y in range(h0)
+                   for x in range(w0)
+                   if rows_m[y][x * 4:x * 4 + 3] != rows_neutral[y][x * 4:x * 4 + 3])
+        results.append(Result(
+            f"{name} berbeda dari kabut netral", diff > 0,
+            f"{diff} piksel berbeda dari kabut netral"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -1821,6 +1874,7 @@ def main():
     check_night_mode_purity(results, args.size, args.ss)
     check_star_colour_order(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
+    check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
