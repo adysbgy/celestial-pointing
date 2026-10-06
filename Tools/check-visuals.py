@@ -1184,6 +1184,47 @@ def read_planet_palettes_from_swift(source):
     return out
 
 
+def read_venus_haze_from_swift(source):
+    """Baca **ketiga** bawaan `CelestialVisual.venusHaze()` dari teks Swift.
+
+    **Kenapa pembaca ini ada.** Geometri kabut Venus hidup di tiga tempat:
+    bawaan parameter `CelestialVisual.venusHaze` di Swift (dipakai view), tiga
+    konstanta `VENUS_HAZE_*` di port Python (dipakai `venus_haze()`), dan
+    pemanggilannya di kedua situs port. Sampai pembaca ini ditulis, hanya
+    **keberadaan pemanggilan** yang dijaga — `venus_haze()` memang dipanggil
+    di `_draw_haze` dan `_draw_planet`, jadi pemeriksaan itu hijau — sementara
+    **angkanya sendiri tidak dibandingkan siapa pun**. Mutasi terbukti:
+    `VENUS_HAZE_HALF_WIDTH 0.55 -> 0.70`, `HALF_HEIGHT 0.72 -> 0.45`, dan
+    `CENTER_Y 0.0 -> 0.30` masing-masing membiarkan seluruh 348 pemeriksaan
+    hijau, dan mutasi bawaannya di Swift (`0.55 -> 0.70`, `0.72 -> 0.50`)
+    membiarkan 348 pemeriksaan hijau sekaligus **tiga uji Swift merah** —
+    jadi sisi port benar-benar tanpa penjaga apa pun.
+
+    Yang hilang kalau angkanya bergeser: elips kabut Venus pindah atau
+    berubah bentuk di PNG, sementara gerbang piksel Venus berfase terus
+    mengukur gambar yang **tidak** tampil di jam — persis cacat 0.14 R yang
+    dulu ditutup, hanya dari arah lain.
+
+    Mengembalikan `(center_y, half_width, half_height)` sebagai `float`, atau
+    `None` bila bentuk fungsinya tidak dikenali (pemanggil yang memutuskan
+    apa artinya, bukan pengecualian tersembunyi).
+    """
+    match = re.search(
+        r"public static func venusHaze\([\s\S]{0,400}?\)\s*->\s*HazeGeometry",
+        source)
+    if match is None:
+        return None
+    signature = match.group(0)
+    values = {}
+    for name in ("centerY", "halfWidth", "halfHeight"):
+        found = re.search(
+            rf"{name}:\s*Double\s*=\s*(-?\d+(?:\.\d+)?)", signature)
+        if found is None:
+            return None
+        values[name] = float(found.group(1))
+    return values["centerY"], values["halfWidth"], values["halfHeight"]
+
+
 def swift_sextuples(source, anchor, terminator="]"):
     """Semua `(a, b, c, d, e, f)` dari sumber Swift, mulai setelah `anchor`.
 
@@ -3256,6 +3297,44 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         f"port 'def venus_haze(' = {'ada' if haze_port_fn else 'TIDAK'}, "
         f"dipanggil di _draw_haze = {'ada' if calls_in_fn else 'TIDAK'}, "
         f"di _draw_planet = {'ada' if calls_in_phase else 'TIDAK'}"))
+    # ── Kabut Venus: angkanya sendiri ──────────────────────────────────
+    #
+    # **Celah yang ditutup di sini — dan kenapa yang lama belum cukup.**
+    # Pemeriksaan di atas menjaga **keberadaan pemanggilan** `venus_haze()`
+    # di kedua situs port. Itu perlu, tapi tidak menyentuh satu angka pun:
+    # selama `venus_haze()` dipanggil, ia boleh mengembalikan apa saja.
+    # Dibuktikan sebelum gerbang ini ditulis — ketiga mutasi ini masing-masing
+    # membiarkan **348 dari 348** pemeriksaan hijau:
+    #
+    #     VENUS_HAZE_HALF_WIDTH  0.55 -> 0.70
+    #     VENUS_HAZE_HALF_HEIGHT 0.72 -> 0.45
+    #     VENUS_HAZE_CENTER_Y    0.0  -> 0.30
+    #
+    # Mutasi bawaannya di Swift (`halfWidth 0.55 -> 0.70`, `halfHeight
+    # 0.72 -> 0.50`) juga membiarkan 348 pemeriksaan hijau — tapi menyalakan
+    # **tiga uji Swift**. Jadi sisi model punya penjaga (uji itu), sisi port
+    # tidak punya sama sekali; gambar yang diukur gerbang piksel Venus berfase
+    # bisa bergeser tanpa satu pun pemeriksaan merah.
+    #
+    # Yang dijaga: **port == model**, ketiga angka, dua arah. Arah ketiga
+    # (view memakai model, bukan menulis ulang literalnya) sudah dijaga
+    # `haze_call` di atas.
+    haze_port_values = R.venus_haze()
+    haze_model_values = read_venus_haze_from_swift(model_src)
+    if haze_model_values is None:
+        results.append(Result(
+            "kabut Venus: bawaan model terbaca", False,
+            "tiga bawaan 'centerY/halfWidth/halfHeight: Double = ' di "
+            "CelestialVisual.venusHaze tidak terbaca — pembaca angkanya perlu "
+            "diselaraskan dengan bentuk fungsinya"))
+    else:
+        for label, port_value, model_value in zip(
+                ("pusat", "separuh lebar", "separuh tinggi"),
+                haze_port_values, haze_model_values):
+            results.append(Result(
+                f"kabut Venus: {label} (port == model)",
+                abs(port_value - model_value) < 1e-9,
+                f"port={port_value}, model={model_value}"))
     # Angka lama harus **hilang dari kode**, bukan hanya ditambah yang baru:
     # kalau satu situs masih memakai `cy + radius * 0.14`, ia menggambar Venus
     # yang berbeda dari situs yang lain.
