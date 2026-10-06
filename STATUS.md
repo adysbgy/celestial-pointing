@@ -1,3 +1,104 @@
+## Progres terakhir (6 Okt 2026 — Aturan 25 menjaga satu nama tipe dari 406, dan STATUS.md sudah menulisnya)
+
+### Cacatnya: gerbang keanggotaan tipe hanya berlaku untuk satu tipe
+
+Aturan 25 lahir setelah `CelestialVisual.VisualFrame` dua kali lolos sampai
+`origin/main` dan baru ketahuan dari CI macOS. Yang ditutupnya adalah
+**keanggotaan pada satu tipe**: `CelestialVisual`. Entri yang menambahkannya
+menulis batasnya sendiri dengan jujur, dan menyebut unit berikutnya:
+
+> "Memperluasnya ke seluruh tipe PointingKit adalah unit berikutnya yang
+>  jelas — dan lebih besar, jadi sengaja tidak digabung ke siklus ini."
+
+Ini unit itu. Pengukuran yang membukanya: `Apps/` memuat **308** akses
+berkualifikasi ke tipe paket (`Tipe.anggota`), dan Aturan 25 melihat
+persis yang berawalan `CelestialVisual.`. Sisanya — `TextLocalization.`,
+`VisualFrame.`, `DeepSkyCatalogue.`, `MotionPolicy.` — tidak dijaga apa pun
+di Linux. Kualifikasi yang salah di salah satu dari mereka hari ini
+diketahui **hanya** oleh CI macOS, satu siklus penuh (~2 menit) terlambat:
+persis ongkos yang melahirkan Aturan 25.
+
+### Kenapa tidak cukup menyalin Aturan 25 dengan `TYPE` jadi variabel
+
+Dua hal membuat perluasan ini bukan sekadar penggantian nama, dan keduanya
+diketahui dari percobaan, bukan dari membaca:
+
+| Percobaan | Hasil |
+|---|---|
+| indeks anggota-langsung saja | **17 temuan pada kode yang benar** |
+| + resolusi basis (pewarisan) | 0 temuan |
+
+**1. Tipe bersarang.** `CelestialVisual.Planet`, `CelestialVisual.RGBComponents`,
+`CelestialVisual.PhaseGeometry` adalah dua tingkat. Indeks anggota-langsung
+memerah pada **17 kemunculan kode yang dikompilasi hari ini** — 9 di antaranya
+`CelestialVisual.RGBComponents`. Gerbang yang memerah pada kode benar akan
+dimatikan orang, jadi ini bukan gangguan: ini syarat agar aturan bisa hidup.
+Pindainya karena itu memakai **nama berkualifikasi** dan mencatat tipe
+bersarang sebagai anggota induknya.
+
+**2. Anggota yang diwariskan.** `CelestialVisual.Planet.allCases` di
+`PointingEngine.swift:251` tidak dideklarasi di badan `Planet` — ia datang
+dari `CaseIterable`. Tanpa resolusi basis, aturan memerah pada baris yang
+benar-benar dikompilasi. Jadi basis (pewarisan + konformans + `typealias`)
+diikuti bertransitif.
+
+### Bukti gerbangnya menggigit, dua arah
+
+Dua suntikan, karena gerbang yang hanya pernah merah tidak membuktikan
+apa-apa sama seperti gerbang yang hanya pernah hijau:
+
+| Suntikan | Hasil |
+|---|---|
+| `CelestialVisual.ringBackHalfOpacityScale` (milik `VisualFrame`) + `TextLocalization.noSuchKeyLabel` | **MERAH**, dua-duanya, dengan nomor baris |
+| `CelestialVisual.Planet.jupiter`, `.Planet.allCases`, `DeepSkyCatalogue.Morphology.galaxy`, `VisualFrame.halfExtent`, `CelestialVisual.RGBComponents(...)` | **hijau** — aturan tidak terlalu ketat |
+
+Baris kedua yang menentukan: tanpa uji negatif, aturan yang menandai setiap
+`Tipe.anggota` akan lolos sebagai "bisa merah" sambil memerahkan repo.
+
+### Yang sengaja tidak dilakukan
+
+- **Aturan 25 tidak dihapus.** Ia tercakup oleh 26, tapi pesannya untuk
+  kasus "tipe top-level dipakai berkualifikasi" menyebut **solusinya**
+  ("pakai `X` tanpa kualifikasi"), sedang pesan 26 bersifat umum. Pesan yang
+  salah mengirim orang ke tempat yang tidak berisi apa pun — itu pelajaran
+  yang melahirkan 25.
+- **Komentar dibuang sebelum dipindai**, bukan setelah. Doc-comment di repo
+  ini panjang dan berisi contoh kode Swift; contoh itu bukan kode yang
+  dikompilasi, jadi mengindeksnya memasukkan anggota yang tidak pernah ada.
+
+### Gerbang
+
+- `./swift-ui-lint.sh` → **26 aturan hijau** (25 → 26). Aturan 10 menangkap
+  README yang masih bilang 25 lebih dulu, seperti fungsinya.
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
+  **tidak ada kode Swift yang berubah**; yang masuk hanya gerbang + README.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- `python3 Tools/check-visuals.py --check` → **230 pemeriksaan**, 0 gagal.
+
+### Batas yang jujur
+
+- **Indeksnya teks, bukan compiler.** Ia tahu "anggota dengan nama ini tidak
+  ada di tipe ini"; ia tidak tahu tipe argumen, kelebihan beban, atau nama
+  yang disintesis compiler. Kualifikasi yang **benar** dengan argumen yang
+  salah tetap hanya ketahuan dari CI macOS.
+- **Hanya akses berkualifikasi.** Fungsi bebas, `self.anggota`, dan ekstensi
+  yang dideklarasi di `Apps/` tidak terlihat — sama seperti Aturan 25.
+- **Tipe yang dideklarasi di `Apps/` dilewati.** Tujuannya menjaga pemakaian
+  API paket dari view, bukan kode antar-view.
+- **Nol temuan hari ini berarti tidak ada cacat yang tertinggal dari kelas
+  ini**, bukan bahwa kelas ini sudah mustahil: nama baru yang ditulis besok
+  di `Apps/` langsung dijangkau, karena daftarnya dibaca dari sumber.
+
+### Sisa yang paling bernilai
+
+Kelas yang berulang di rekap ini masih sama: **gerbang yang mengklaim lebih
+dari yang diukurnya**. Kandidat berikutnya yang terukur: `Apps/` juga
+memanggil **fungsi bebas** dan **inisialisasi** paket (`TextLocalization.text(`
+sudah dijaga Aturan 17, tapi bukan nama fungsi bebas lainnya) — kelas cacat
+yang sama, permukaan berikutnya.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — objek langit dalam tidak pernah dikunci lewat controller sungguhan)
 
 ### Cacatnya: jalur deep-sky teruji di tiap bagian, tidak pernah di satu jalurnya

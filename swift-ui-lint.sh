@@ -2455,6 +2455,199 @@ else
   echo "Bersih: setiap CelestialVisual.X ada di paket."
 fi
 
+# ── Aturan 26: `TipePaket.anggota` harus benar-benar ada ───────────────────
+# Aturan 25 lahir setelah `CelestialVisual.VisualFrame` dua kali lolos sampai
+# `origin/main` dan baru ketahuan dari CI macOS. Yang ditutupnya hanya **satu
+# nama tipe**. STATUS.md menulis batasnya sendiri dengan jujur:
+#
+#   "Memperluasnya ke seluruh tipe PointingKit adalah unit berikutnya yang
+#    jelas — dan lebih besar, jadi sengaja tidak digabung ke siklus ini."
+#
+# Ini unit itu. Bedanya bukan sekadar 1 → 406 tipe, melainkan dua hal yang
+# membuatnya tidak cukup disalin dari Aturan 25:
+#
+#  1. **Tipe bersarang.** `CelestialVisual.Planet` dua tingkat; indeks
+#     anggota-langsung saja akan memerah pada kode yang sah. Pindai pohon
+#     tipe memakai nama berkualifikasi, dan tipe bersarang dicatat sebagai
+#     anggota induknya.
+#  2. **Anggota yang diwariskan.** `CelestialVisual.Planet.allCases` tidak
+#     dideklarasi di badan `Planet` — ia datang dari `CaseIterable`. Tanpa
+#     resolusi basis, gerbang memerah pada baris yang benar-benar dikompilasi.
+#     Itu bukan cacat: gerbang yang memerah pada kode benar akan dimatikan.
+#
+# Batas yang jujur, dan harus tertulis karena ia yang menentukan kapan
+# aturan ini boleh dipercaya:
+#
+#  - Indeksnya **teks**, bukan compiler. Ia tahu "anggota dengan nama ini
+#    tidak ada di tipe ini"; ia tidak tahu tipe argumen, kelebihan beban,
+#    atau nama yang disediakan sintesis compiler.
+#  - Hanya akses **berkualifikasi** (`Tipe.anggota`). Pemanggilan fungsi
+#    bebas, anggota lewat `self`, dan ekstensi yang dideklarasi di `Apps/`
+#    tidak terlihat — sama seperti Aturan 25.
+#  - Tipe yang dideklarasi **di `Apps/`** dilewati: aturan ini menjaga
+#    pemakaian API paket dari view, bukan kode antar-view.
+echo
+echo "== Aturan 26: TipePaket.anggota harus benar-benar ada di paket =="
+unknown_any=$(python3 - <<'PY' 2>&1
+import os, re, collections
+
+PKG, APPS = "Packages", "Apps"
+
+
+def strip(text):
+    """Buang komentar tanpa menyentuh string literal."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            out.append(c); i += 1
+            while i < n:
+                out.append(text[i])
+                if text[i] == "\\":
+                    i += 2; continue
+                if text[i] == '"':
+                    i += 1; break
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(c); i += 1
+    return "".join(out)
+
+
+DECL = re.compile(
+    r"(?:public |internal |private |fileprivate |package |final |open )*"
+    r"(?:indirect )?"
+    r"(struct|enum|class|protocol|typealias|extension|actor)\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)")
+
+MEM = re.compile(
+    r"(?:public |internal |private |fileprivate |package )?"
+    r"(?:static |class |final |override |mutating |nonmutating |indirect )*"
+    r"(?:func|var|let|struct|enum|class|typealias|case|init|actor)\s+"
+    r"([A-Za-z_][A-Za-z0-9_]*)")
+
+# Akses berkualifikasi. Awalan negatif menolak `foo.Bar` di dalam string.
+PAIR = re.compile(r"(?<![A-Za-z0-9_.\"'])"
+                  r"(?P<t>[A-Z][A-Za-z0-9_]*)"
+                  r"\.(?P<m>[A-Za-z_][A-Za-z0-9_]*)")
+
+
+def index(root_dir):
+    """Pindai pohon tipe: nama berkualifikasi -> anggota langsung + basis."""
+    types = collections.defaultdict(set)
+    bases = collections.defaultdict(set)
+    for root, _, files in os.walk(root_dir):
+        for name in sorted(files):
+            if not name.endswith(".swift"):
+                continue
+            text = strip(open(os.path.join(root, name), encoding="utf-8").read())
+            events = []
+            for m in DECL.finditer(text):
+                events.append((m.start(), "decl", m))
+            for m in MEM.finditer(text):
+                events.append((m.start(), "mem", m))
+            for m in re.finditer(r"[{}]", text):
+                events.append((m.start(), "brace", m.group(0)))
+            events.sort(key=lambda e: (e[0], 0 if e[1] == "decl" else 1))
+
+            depth, stack = 0, []
+            for _pos, kind, payload in events:
+                if kind == "brace":
+                    if payload == "{":
+                        depth += 1
+                    else:
+                        depth -= 1
+                        while stack and depth < stack[-1][1]:
+                            stack.pop()
+                    continue
+                if kind == "decl":
+                    k, tname = payload.group(1), payload.group(2)
+                    j = payload.end()
+                    while j < len(text) and text[j] not in "{;=\n":
+                        j += 1
+                    rest = text[payload.end():j]
+                    prefix = stack[-1][0] if stack else ""
+                    qual = f"{prefix}.{tname}" if prefix else tname
+                    if j < len(text) and text[j] == "{":
+                        types[qual] |= set()
+                        # Tipe bersarang adalah anggota induknya.
+                        if prefix:
+                            types[prefix].add(tname)
+                        if k == "typealias":
+                            bases[qual] |= set(re.findall(
+                                r"[A-Za-z_][A-Za-z0-9_]*", rest.split("=")[0]))
+                        else:
+                            for b in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rest):
+                                if b not in ("where", "Self"):
+                                    bases[qual].add(b)
+                        stack.append((qual, depth + 1))
+                    continue
+                if stack and depth == stack[-1][1]:
+                    types[stack[-1][0]].add(payload.group(1))
+    return types, bases
+
+
+pkg_types, bases = index(PKG)
+apps_types = set(index(APPS)[0])
+
+# Anggota yang diwariskan/dikonformasi (`CaseIterable.allCases`, dll).
+resolved = {}
+for t in pkg_types:
+    seen, stack, acc = {t}, [t], set(pkg_types[t])
+    while stack:
+        cur = stack.pop()
+        for b in bases.get(cur, ()):
+            if b in seen or b not in pkg_types:
+                continue
+            seen.add(b); stack.append(b); acc |= pkg_types[b]
+    resolved[t] = acc
+
+problems = []
+for root, _, files in os.walk(APPS):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        for i, raw in enumerate(open(path, encoding="utf-8").read().split("\n")):
+            line = strip(raw)
+            for m in PAIR.finditer(line):
+                t, mem = m.group("t"), m.group("m")
+                if t not in pkg_types or t in apps_types:
+                    continue
+                # `Type.self` / `Type.Type` disediakan compiler.
+                if mem in ("self", "Type") or mem in resolved[t]:
+                    continue
+                nested = f"{t}.{mem}"
+                hint = ""
+                if nested in pkg_types:
+                    hint = (f" — `{nested}` ada sebagai tipe bersarang; "
+                            f"akses anggotanya lewat `{mem}.<anggota>`")
+                problems.append(
+                    f"  {path}:{i + 1}: `{t}.{mem}` — bukan anggota `{t}`"
+                    f"{hint}")
+
+if problems:
+    print("\n".join(problems))
+    print("-> Anggota yang hilang hanya ketahuan dari CI macOS hari ini; "
+          "tambahkan ke paket, atau perbaiki pemanggilnya.")
+PY
+)
+if [ -n "$unknown_any" ]; then
+  echo "$unknown_any"
+  status=1
+else
+  echo "Bersih: setiap TipePaket.anggota di Apps/ ada di paket."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

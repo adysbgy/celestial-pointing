@@ -188,7 +188,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **25 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **26 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -200,7 +200,10 @@ permukaan kartu yang harus datang dari token yang kontrasnya dihitung
 keadaan bersama nama objeknya, supaya kandidat yang belum pasti tidak
 terbaca sebagai identitas yang terkunci (aturan 23), dan indeks warna
 bintang yang hanya boleh sampai ke gambar lewat `drawableStarColorIndex`
-supaya warna tidak diklaim saat engine ragu (aturan 24).
+supaya warna tidak diklaim saat engine ragu (aturan 24), dan setiap
+`TipePaket.anggota` di `Apps/` yang harus benar-benar ada di paket — karena
+hanya CI macOS yang tahu keanggotaan tipe, dan itu satu siklus penuh
+terlambat (aturan 26).
 
 ### Uji harus pernah merah
 
