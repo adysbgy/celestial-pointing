@@ -59,13 +59,54 @@ belum disambung).
 Sasaran dipilih dari resolver (alt ≤ −30 pada `downTime`, > 30 pada `upTime`,
 keduanya malam), bukan ditulis tangan — fixture yang berubah gagal keras.
 
+### Dilanjut: Bulan di bawah horizon, dan kenapa tidak ada bukti positif
+
+Benda tata surya punya jalur hitung yang berbeda dari bintang katalog
+(efemeris, bukan tabel J2000), jadi "di bawah horizon" bagi mereka dihitung
+dari sumber lain. Dua tes tambahan menjaga sisi itu:
+
+4. `testMoonBelowHorizonNeverLocks` — arah tunjuk ke Bulan di bawah −30°
+   (malam) tidak boleh `.lock`, dan tidak boleh membakar haptic
+   `lockSucceeded`.
+5. `testMoonBelowHorizonIsRejectedForThatExactReason` — resolver harus
+   **menyebut Bulannya** di `rejected` dengan visibility `.belowHorizon`,
+   bukan membuangnya diam-diam. Inilah yang membedakan "tidak terkunci" dari
+   "tidak terlihat karena memang di bawah horizon".
+
+**Yang sengaja TIDAK diuji: ".lock saat di atas horizon" untuk Bulan.** Ini
+keputusan, bukan kelalaian — dan ditentukan oleh pengukuran, bukan tebakan.
+Sapuan 60 hari lewat controller menunjukkan Bulan maupun Jupiter sering
+`.uncertain` **meskipun arahnya sudah benar-benar diarahkan**, karena
+keyakinannya turun ke MEDIUM begitu ada benda terang lain di dekat arahnya.
+Itu **perilaku benar** (PRD: uncertainty > false confidence). Memaksa `.lock`
+berarti mengarang isolasi, dan tes yang begitu hijau karena kebetulan
+astronomi, bukan karena aturan yang diujinya benar — persis kelas "hijau yang
+merusak" yang jadi pelajaran terus-menerus di repo ini. Untuk bulan, sisi
+yang dijaga adalah **penolakan yang jujur**, bukan jam ketika ia terkunci.
+
+Sapuan yang sama (871 slot bulan di bawah horizon, 60 hari): tidak satu pun
+menghasilkan `.lock` — jadi perilaku kodenya memang sudah jujur, dan yang
+baru adalah buktinya.
+
+**Dinyatakan sebagai batas, bukan disembunyikan:** untuk bulan, `searchHint`
+yang muncul adalah `.noCandidates`, bukan `.allBelowHorizon`. Itu **benar**:
+alasan penolakan bercampur (sebagian `belowHorizon`, sebagian `tooFaint`),
+dan `searchHint` sengaja tidak mengklaim satu sebab yang tidak tunggal. Yang
+dijaga `allBelowHorizon` hanya pada kasus bintang yang seragam.
+
+### Bukti gerbangnya menggigit (mutasi, bukan sekadar bertambah)
+
+Mutasi: filter bawah horizon dilewati di `VisibilityFilter.classify`
+(`altitudeDeg < policy.minAltitudeDeg` → `- 3600`) → **5 dari 5 test merah**,
+termasuk kedua test bulan. Mutasi dikembalikan; `git diff` engine kosong.
+
 ### Gerbang
-- `./swift-test.sh` → **CelestialEngine 182, PointingKit 640** (+3), 0 gagal.
-  Engine tidak disentuh.
-- `./swift-ui-lint.sh` → 28 aturan hijau (Aturan 10 menangkap README 637→640).
+- `./swift-test.sh` → **CelestialEngine 182** (tak berubah), **PointingKit 642**
+  (+5 total), 0 gagal.
+- `./swift-ui-lint.sh` → 28 aturan hijau (Aturan 10 menangkap README 640→642).
 - `python3 Tools/check-visuals.py --check` → 296 pemeriksaan, 0 gagal.
-- CI: `37450238487` (Engine Tests Linux) + `37450238279` (Apple Build macos-15)
-  — **dua-duanya hijau** pada `185440d`.
+- CI: `37452384334` (Engine Tests Linux) + `37452384323` (Apple Build macos-15)
+  — **dua-duanya hijau** pada `923ff14`.
 
 ### Sisa penyempurnaan bernilai nyata (pilih kecil, verifikasi Linux)
 - Perluas katalog visual ke lebih banyak objek langit dalam (sudah 17: 4
