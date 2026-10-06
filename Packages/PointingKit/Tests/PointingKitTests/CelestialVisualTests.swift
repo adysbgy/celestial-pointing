@@ -2426,5 +2426,83 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertTrue(relief.isEmpty, "cahaya nol panjangnya tidak boleh menghasilkan bibir")
     }
 
+    /// Kontras kawah di sisi gelap tidak boleh hilang, dan **perbandingannya**
+    /// dengan sisi terang adalah pernyataan, bukan hiasan.
+    ///
+    /// `craterRelief` meredupkan bibir kawah yang membelakangi cahaya lewat
+    /// `fade = 0.6 + 0.4 · alignment` — kekuatan penuh di sisi terang, 20% di
+    /// sisi tergelap. Sampai siklus ini angka itu **hanya hidup sebagai
+    /// komentar**: `testCraterReliefRimAlwaysFacesTheLight` hanya menuntut
+    /// `rimStrength > 0`, jadi `0.6 + 0.4` bisa diganti apa saja selama
+    /// hasilnya masih positif, dan tidak ada uji yang berbunyi.
+    ///
+    /// Buktinya diukur, bukan dikira: mengganti `0.6 + 0.4` menjadi
+    /// `0.7 + 0.3` — tetap positif di semua kawah — membuat **seluruh** 124
+    /// uji `CelestialVisualTests` tetap hijau. Yang menangkap versi
+    /// `0.2 + 0.8` hanyalah akibat samping: kekuatannya jadi **negatif**, dan
+    /// itu ditangkap pemeriksaan tanda, bukan pemeriksaan rumus. Jadi kelas
+    /// cacat ini adalah kelas yang sama dengan urutan kecerahan palet dan fase
+    /// Bulan: **niat yang hanya tertulis sebagai prosa adalah niat yang hilang
+    /// saat angkanya disunting.**
+    ///
+    /// Yang diukur di sini bukan angkanya, melainkan artinya. Kawah di tepi
+    /// piringan yang tepat menghadap cahaya harus **5×** lebih kuat daripada
+    /// kawah yang tepat membelakanginya (1,0 lawan 0,2), dan tidak satu pun
+    /// boleh nol. Angka 5 itu tidak ditulis sebagai konstanta bebas — ia
+    /// lahir dari kedua ujungnya, jadi uji ini berbunyi kalau perbandingannya
+    /// bergeser, dan tetap diam kalau kedua ujungnya ditulis ulang bersama.
+    func testCraterShadingKeepsDarkSideCratersVisible() {
+        let light = CelestialVisual.sphereLightOffset
+        let length = (light.x * light.x + light.y * light.y).squareRoot()
+        let ux = light.x / length, uy = light.y / length
+
+        // Dua kawah di tepi piringan, satu tepat sejajar arah cahaya dan satu
+        // tepat berlawanan. `distance` keduanya 1,0, jadi `limb` ikut sama dan
+        // satu-satunya yang berbeda adalah `fade` — inilah yang membuat
+        // perbandingan di bawah mengukur peredupan sisi gelap, bukan geometri.
+        let facing = CelestialVisual.craterRelief(craters: [(ux, uy, 0.20)])
+        let away = CelestialVisual.craterRelief(craters: [(-ux, -uy, 0.20)])
+        XCTAssertEqual(facing.count, 1)
+        XCTAssertEqual(away.count, 1)
+
+        XCTAssertGreaterThan(away[0].rimStrength, 0,
+                             "kawah di sisi tergelap tidak boleh hilang sama sekali")
+        XCTAssertGreaterThan(facing[0].rimStrength, away[0].rimStrength,
+                             "kawah yang menghadap cahaya harus lebih kuat")
+        let ratio = facing[0].rimStrength / away[0].rimStrength
+        XCTAssertEqual(ratio, 5.0, accuracy: 1e-6,
+                       "sisi terang penuh (1,0) dan sisi tergelap 20% (0,2) — "
+                       + "rasio 5, bukan angka bebas")
+
+        // Dan arah peredupannya monoton: makin membelakangi cahaya, makin
+        // redup. Tanpa ini, `fade` yang bukan fungsi naik dari `alignment`
+        // (mis. memakai `abs`) bisa lolos dari kedua ujung di atas.
+        //
+        // **Jarak kawah harus dijaga tetap.** Versi pertama uji ini
+        // memindahkan kawah ke `step · u` — jadi `distance` ikut turun
+        // bersama `alignment`, dan `limb` (yang di tepi piringan bernilai
+        // 0,4) tumbuh lebih cepat daripada `fade` yang mengecil. Akibatnya
+        // kekuatannya **naik** saat `alignment` turun, pada kode yang benar
+        // sekalipun: uji yang merah pada kode benar. Yang diisolasi di sini
+        // adalah `fade`, jadi posisi kawah tetap di tepi piringan dan
+        // **arah cahaya** yang diputar.
+        let radius = 1.0
+        let crater = (radius * ux, radius * uy, 0.20)
+        var previous = Double.infinity
+        for step in stride(from: 0.0, through: Double.pi, by: Double.pi / 8) {
+            // Sudut `step` dari arah kawah: `alignment = cos(step)`, dan
+            // `distance` selalu 1,0 sehingga `limb` sama di semua langkah.
+            let light = (x: radius * cos(step) * ux - radius * sin(step) * uy,
+                         y: radius * sin(step) * ux + radius * cos(step) * uy)
+            let relief = CelestialVisual.craterRelief(craters: [crater],
+                                                      lightDirection: light)
+            XCTAssertLessThan(relief[0].rimStrength, previous,
+                              "kekuatan bibir harus turun monoton pada sudut \(step)")
+            XCTAssertGreaterThan(relief[0].rimStrength, 0,
+                                 "tidak ada kawah yang boleh hilang (sudut \(step))")
+            previous = relief[0].rimStrength
+        }
+    }
+
 }
 

@@ -2333,6 +2333,63 @@ def check_sun_profile_matches_the_model(results):
              f"{[swift_pairs[i] for i in mismatched]}"))
 
 
+def crater_shading_terms(source, anchor):
+    """Empat angka rumus peredupan kawah dari teks sumber → dict.
+
+    Membaca **bentuknya**, bukan menulis ulang angkanya. Rumus bayangan kawah
+    hidup di dua bahasa dengan ejaan yang berbeda:
+
+        Swift   let fade = 0.6 + 0.4 * alignment
+                let limb = 1 - 0.6 * distance
+                floorDepth: depth * (1 - 0.5 * distance)
+
+        Python  fade = 0.6 + 0.4 * alignment
+                limb = 1 - 0.6 * distance
+                depth * (1 - 0.5 * distance)
+
+    Ketiganya punya **arti**: `fade` menentukan berapa kontras yang tersisa di
+    sisi gelap bola (1,0 di sisi terang, 0,2 di sisi tergelap), `limb`
+    meredupkan kawah di tepi piringan, dan suku terakhir mendangkalkan dasar
+    cekungan di tepi. Angka-angka ini tidak punya sumber ketiga di model —
+    sama seperti `1.84` pada bibir kawah — jadi satu-satunya cara menjaganya
+    adalah membandingkan kedua bahasa yang memang memakainya.
+
+    Daftar tetap di gerbang tidak akan berhasil di sini: angka-angka ini
+    dulu memang hidup sebagai angka tetap di gerbang, dan itulah cacatnya —
+    gerbang mengukur rumusnya sendiri, bukan rumus yang dikompilasi.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor)
+    terminators = ["\ndef ", "\n    }", "\n}\n", "\n\n\n"]
+    cuts = [source.index(t, start) for t in terminators if t in source[start:]]
+    region = source[start:min(cuts)] if cuts else source[start:]
+    # Komentar dibuang: badan `craterRelief` memuat prosa yang **menyebut
+    # angka** ("kekuatan penuh di sisi terang dan 20% di sisi tergelap"), dan
+    # pembacaan tanpa membuangnya bisa mengambil angka komentar sebagai
+    # koefisien. Tidak ada string literal di badan fungsi ini, jadi `//` dan
+    # `#` di baris yang sama selalu berarti komentar.
+    body = "\n".join(line.split("//")[0].split("#")[0] for line in region.split("\n"))
+
+    fade = re.search(
+        r"(?:let )?fade\s*=\s*([\d.]+)\s*\+\s*([\d.]+)\s*\*\s*alignment", body)
+    limb = re.search(
+        r"(?:let )?limb\s*=\s*1\s*-\s*([\d.]+)\s*\*\s*distance", body)
+    floor = re.search(
+        r"depth\s*\*\s*\(\s*1\s*-\s*([\d.]+)\s*\*\s*distance\s*\)", body)
+    if not (fade and limb and floor):
+        raise ValueError(
+            f"bentuk rumus bayangan kawah tidak dikenali di jangkar {anchor!r}: "
+            f"fade={bool(fade)}, limb={bool(limb)}, dasar={bool(floor)}")
+
+    return {
+        "fade_base": float(fade.group(1)),
+        "fade_span": float(fade.group(2)),
+        "limb_slope": float(limb.group(1)),
+        "floor_slope": float(floor.group(1)),
+    }
+
+
 def check_crater_relief_matches_the_model(results):
     """Bayangan kawah di port Python harus sama dengan model Swift — arahnya.
 
@@ -2425,12 +2482,55 @@ def check_crater_relief_matches_the_model(results):
     # dibandingkan ke hasil port. Tanpa langkah ini, dua pemeriksaan di atas
     # hanya menjaga dua angka, bukan bahwa keduanya dipakai di tempat yang
     # benar (`fade` di kekuatan, `(1 - 0.5 * distance)` di kedalaman).
+    #
+    # **Cacat kedua di gerbang ini, ditemukan audit mutasi.** Rumus di bawah
+    # semula ditulis sebagai tiga angka tetap di dalam gerbang:
+    #
+    #     want_strength = model_strength * (0.6 + 0.4 * alignment) * (1 - 0.6 * distance)
+    #     want_depth    = model_depth * (1 - 0.5 * distance)
+    #
+    # Ketiga angka itu — `0.6 + 0.4`, `1 - 0.6`, `1 - 0.5` — **tidak dibaca
+    # dari mana pun**, jadi mengubahnya di model Swift tidak menyentuh rumus
+    # yang dipakai gerbang untuk mengukur, dan hasilnya hijau. Yang paling
+    # penting: keduanya juga tidak dijaga uji Swift mana pun. Mutasi
+    # `0.6 + 0.4` → `0.7 + 0.3` (tetap positif di semua kawah) membuat
+    # **seluruh** 124 uji `CelestialVisualTests` hijau *dan* gerbang ini hijau;
+    # yang menangkap `0.2 + 0.8` hanyalah pemeriksaan tanda `rimStrength > 0`,
+    # bukan pemeriksaan rumus. Jadi kontras kawah sisi gelap — satu-satunya
+    # yang membedakan kawah cekung dari kawah yang hilang — hidup hanya
+    # sebagai komentar di dua bahasa.
+    #
+    # Karena itu ketiga angka itu dibaca dari **teks kedua bahasa** dan
+    # dibandingkan, persis seperti koefisien di atas. Membaca dari sumber
+    # berarti tidak ada daftar yang bisa tertinggal separuh saat rumusnya
+    # disunting.
+    try:
+        model_terms = crater_shading_terms(model, "static func craterRelief(")
+        port_terms = crater_shading_terms(
+            open(R.SOURCE, encoding="utf-8").read(), "def crater_relief(")
+    except ValueError as exc:
+        results.append(Result("bayangan kawah: bentuk rumus terbaca", False, str(exc)))
+        return
+
+    for name, label in (("fade_base", "dasar peredupan sisi gelap"),
+                        ("fade_span", "rentang peredupan terang→gelap"),
+                        ("limb_slope", "kemiringan kawah di tepi piringan"),
+                        ("floor_slope", "kemiringan dasar cekungan")):
+        same = abs(model_terms[name] - port_terms[name]) <= 1e-9
+        results.append(Result(
+            f"bayangan kawah: {label}",
+            same,
+            f"{model_terms[name]:.2f}" if same
+            else f"model {model_terms[name]:.2f}, port {port_terms[name]:.2f}"))
+
     mismatched = []
     for i, (dx, dy, size) in enumerate(R.CRATERS):
         distance = min(1.0, (dx * dx + dy * dy) ** 0.5)
         alignment = dx * (lx / length) + dy * (ly / length)
-        want_strength = model_strength * (0.6 + 0.4 * alignment) * (1 - 0.6 * distance)
-        want_depth = model_depth * (1 - 0.5 * distance)
+        want_strength = model_strength * (
+            model_terms["fade_base"] + model_terms["fade_span"] * alignment) * (
+            1 - model_terms["limb_slope"] * distance)
+        want_depth = model_depth * (1 - model_terms["floor_slope"] * distance)
         if (abs(relief[i][5] - want_strength) > 1e-9
                 or abs(relief[i][6] - want_depth) > 1e-9):
             mismatched.append(i)
@@ -2441,6 +2541,22 @@ def check_crater_relief_matches_the_model(results):
         if not mismatched
         else f"kawah {mismatched} menyimpang dari rumus "
              f"(kekuatan {model_strength}, kedalaman {model_depth})"))
+
+    # Akhirnya: artinya, bukan angkanya. Ketiga angka di atas boleh saja
+    # ditulis ulang **bersama di kedua bahasa** — itu bukan penyimpangan, dan
+    # dua pemeriksaan sebelumnya memang tidak boleh memerah karenanya. Yang
+    # tidak boleh terjadi adalah kawah sisi gelap menghilang atau berbalik
+    # tanda, karena itu membuat kawah terbaca sebagai tonjolan alih-alih
+    # cekungan. Diukur dari **model**, bukan dari port, supaya gerbang ini
+    # tetap berbunyi walau kedua bahasa disunting bersama.
+    dark = model_terms["fade_base"] - model_terms["fade_span"]
+    bright = model_terms["fade_base"] + model_terms["fade_span"]
+    results.append(Result(
+        "bayangan kawah: sisi gelap tidak hilang, sisi terang tidak tenggelam",
+        dark > 0 and bright > dark,
+        f"terang {bright:.2f}× , gelap {dark:.2f}× (rasio {bright / dark:.2f})"
+        if dark > 0 and bright > dark
+        else f"peredupan terbalik atau nol: terang {bright:.2f}×, gelap {dark:.2f}×"))
 
 
 def check_night_mode_purity(results, size=200, ss=2):
