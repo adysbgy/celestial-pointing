@@ -1,4 +1,101 @@
-## Progres terakhir (5 Okt 2026 — `CelestialVisual.VisualFrame` tidak ada, dan gerbang yang akhirnya melihatnya di Linux)
+## Progres terakhir (6 Okt 2026 — blokir baseline CraterRelief + regresi arah bibir kawah)
+
+### Siklus dibuka dengan repo yang TIDAK ter-compile
+
+`git status` menunjukkan lima berkas terubah setengah jalan (kerja kawah
+Merkurius yang sedang berjalan). `./swift-test.sh` berhenti dengan
+`error: fatalError` di `emit-module` PointingKit — dan itu **bukan** uji yang
+gagal, melainkan modul yang tidak bisa dibangun sama sekali. Tanpa menyelesaikan
+ini, tidak ada satu pun gerbang yang bisa berjalan, jadi inilah unit pertama.
+
+### Akar: tupel berlabel sebagai stored property tidak menyintesis Equatable
+
+`CraterRelief` dideklarasikan `public struct CraterRelief: Equatable, Sendable`
+tetapi memakai field:
+
+```swift
+public var rimDirection: (x: Double, y: Double)
+```
+
+Di Swift 6, tupel **berlabel** sebagai *stored property* tidak memiliki
+konformans `Equatable` yang bisa disintesis, sehingga compiler menolak
+`Equatable` itu sendiri — dan karena `CraterRelief` ada di `PointingKit`, modul
+ikut gagal dikompilasi (`emit-module command failed with exit code 1`).
+
+Ini persis kelas "hijau yang tidak hijau": tugas menjalankan uji melaporkan
+`fatalError`, bukan "X gagal", dan tidak ada baris uji yang menunjuk ke
+`CraterRelief` karena uji tidak pernah sempat berjalan.
+
+### Perbaikan, dan kenapa bukan "buang saja Equatable"
+
+Dua-duanya menghilangkan galat compile, tapi arahnya berbeda:
+- Membuang `Equatable` → `craterRelief` tidak bisa lagi dibanding di uji Linux,
+  dan `check-visuals.py` yang membandingkan relief per kawah kehilangan alat
+  ukurnya. Itu menurunkan jaring pengaman.
+- Memecah tupel berlabel jadi dua `Double` (`rimDirectionX`/`rimDirectionY`) →
+  `Equatable` tersintesis, dan alat Python tetap membandingkan komponen secara
+  langsung (ia tidak butuh tupel). Bentuk Swift murni internal, jadi tidak ada
+  kontrak lintas-bahasa yang berubah. **Ini yang dipilih.**
+
+`craterRelief` sendiri diturunkan ke `internal` (bukan `public`) untuk
+menghilangkan peringatan "`public` modifier is redundant" yang mulai merah di CI
+macOS (warnings-as-errors) — anggota di dalam `public extension` sudah
+tersebar-luas, jadi fungsi ini tidak perlu `public`.
+
+### Tiga uji regresi yang mengunci bentuk itu
+
+Ditulis sesudah perbaikan, bukan sebelum — karena cacatnya berupa *compile
+failure*, bukan *assertion yang salah*. Yang dijaga:
+- `testCraterReliefRemainsEquatableWithPlainDoubleFields` — kalau ada yang
+  kembali menulis tupel berlabel di sini, compile merah, bukan diam.
+- `testCraterReliefRimAlwaysFacesTheLight` — bibir terang selalu `-light`
+  ternormalisasi (sama dengan gradien bola) untuk **setiap** kawah, dan
+  `sphereLightOffset` panjangnya tak nol.
+- `testCraterReliefRefusesZeroLengthLight` — cahaya nol panjangnya wajib `[]`,
+  bukan bibir dengan arah tak terdefinisi (yang membuat kawah tampak menonjol
+  keluar).
+
+### Aturan 10 sempat merah — dan itu benar
+
+Setelah menambah 3 uji, `swift-ui-lint.sh` melaporkan "README bilang 622,
+berkas uji 625". Bukan cacat gerbang, melainkan README yang tertinggal — tepat
+fungsi Aturan 10. Diperbarui ke **174 / 625**.
+
+### Hasil
+
+| | Sebelum | Sesudah |
+|---|---|---|
+| `./swift-test.sh` | **gagal compile** (fatalError) | CelestialEngine **174** + PointingKit **625** (+3) hijau |
+| typecheck | — | SEMUA GERBANG LULUS |
+| swift-ui-lint | — | 25 aturan hijau |
+| check-visuals (port Python) | — | **180 pemeriksaan, 0 gagal** |
+
+CI: Engine Tests (Linux) + Apple Build (macos-15, warnings-as-errors) — **dua-duanya hijau** pada `c9a8ad2`.
+
+### Catatan jujur
+
+- **Seluruh brief sudah terimplementasi dan teruji.** Setelah audit menyeluruh
+  (Bagian 1–4, Fase A/B/C, dan sebagian besar Penyempurnaan), fitur berikut
+  SUDAH ada: visual prosedural semua jenis objek; night mode murni (palet
+  merah, `@AppStorage`); AOD via `isLuminanceReduced` (tanpa animasi di cabang
+  redup); VoiceOver label + `Announcement` saat lock; audio cue opsional saat
+  `.lockSucceeded`; complication WidgetKit; katalog `.xcstrings` (437 kunci, 0
+  terjemahan Inggris kosong); `InfoPlist.strings` id+en untuk izin Motion &
+  Location; penanganan **penolakan izin** (`LocationProvider.note` ditampilkan
+  di UI); Dynamic Type lewat font semantik; reduced-motion via
+  `MotionPolicy.allowsTransitions`; glassmorphism **secara sengaja ditolak**
+  (`SurfaceTokens.swift:105` — material di atas latar tak bisa menjamin kontras).
+  Yang dikerjakan siklus ini adalah menambal blokir compile yang tertinggal dan
+  mengunci perbaikannya, bukan membangun ulang yang sudah jadi.
+- `SWIFT_EMIT_LOC_STRINGS: NO` adalah **keputusan disengaja** (Xcode akan
+  menimpa terjemahan Inggris), jadi flag itu TIDAK boleh dinyalakan.
+- Sisa kerja bernilai nyata: perluas katalog visual (sudah 11 objek langit
+  dalam, 4 morfologi), atau perkuat uji integrasi kejujuran ujung-ke-ujung
+  (di bawah-horizon / siang / bulan redup → tidak lock).
+
+---
+
+## Progres terakhir (5 Okt 2026 — `CelestialVisual.VisualFrame` tidak ada, dan gerbang yang melihatnya di Linux)
 
 ### Kelas cacat yang sama untuk kedua kalinya: nama yang benar, tempat yang salah
 
