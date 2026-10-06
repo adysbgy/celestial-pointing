@@ -1162,6 +1162,50 @@ final class CelestialVisualTests: XCTestCase {
                              "lapisan inti harus lebih bulat daripada cakram terluar")
     }
 
+    /// Tonjolan inti galaksi harus **terlihat**: inti bukan sekadar selembut
+    /// kabut di atas cakram, ia harus punya **ukuran** yang jelas lebih kecil dan
+    /// **kecerahan** yang jelas lebih tinggi.
+    ///
+    /// **Kenapa uji ini ada, dan bukan mengukur `aspectRatio`.** Ketiga uji
+    /// galaksi yang lama mengukur angka yang **tidak pernah bergerak**:
+    /// `buildDeepSky` menghitung `halfHeight = halfWidth · aspect`, jadi
+    /// `halfHeight / halfWidth` kembali persis `aspect` — berapapun lebar,
+    /// skala, atau ruang yang dihitung. `aspect` juga ditulis sebagai konstanta
+    /// di layout. Maka "lapisan inti lebih bulat" (`aspect` 0.42 > 0.34) adalah
+    /// **pembacaan ulang konstanta layout**, bukan pengukuran bentuk: ia hijau
+    /// meski intinya diperkecil 130× sehingga tidak terlihat sebagai tonjolan,
+    /// dan hijau meski urutannya dibalik sehingga yang bulat justru cakramnya.
+    ///
+    /// Yang benar-benar menentukan apakah tonjolan itu terlihat adalah ukuran
+    /// dan opasitas, dan keduanya **bergerak** bersama lebar:
+    /// `halfWidth = room · growth · widthScale`. Angka di bawah diukur pada
+    /// beberapa `fuzziness` supaya tidak bergantung pada satu titik.
+    ///
+    /// **Mutasi yang dulu lolos** (dibuktikan, bukan diklaim): `widthScale`
+    /// inti `0.26 -> 0.002` — inti menyusut jadi 0.2% dari cakram — tetap
+    /// **hijau di 633/633 uji**, karena rasio aspect-nya tidak berubah sama
+    /// sekali. Versi ini melihatnya merah.
+    func testGalaxyCoreBulgeIsVisibleNotJustRounder() {
+        for fuzziness in [0.0, 0.6, 1.0] {
+            let blobs = VisualFrame.deepSky(morphology: .galaxy,
+                                            fuzziness: fuzziness).blobs
+            // Cakram terluar = blob paling lebar; inti = blob paling kecil.
+            guard let widest = blobs.max(by: { $0.halfWidth < $1.halfWidth }),
+                  let core = blobs.min(by: { $0.halfWidth < $1.halfWidth }) else {
+                return XCTFail("galaksi harus punya blob")
+            }
+            let sizeRatio = core.halfWidth / widest.halfWidth
+            XCTAssertGreaterThan(sizeRatio, 0.10,
+                                 "inti galaksi jadi butiran pada fuzziness \(fuzziness) "
+                                 + "(rasio lebar \(sizeRatio)) — tonjolan inti tidak terlihat")
+            // Dan intinya harus **lebih terang**, bukan hanya lebih kecil:
+            // pada opasitas sama, blob kecil di atas cakram besar hilang.
+            XCTAssertGreaterThan(core.opacity, widest.opacity,
+                                 "inti galaksi harus lebih terang daripada cakramnya "
+                                 + "pada fuzziness \(fuzziness)")
+        }
+    }
+
     /// Gugus bola harus **memusat**: ada inti di tengah yang lebih besar
     /// daripada bintang di sekelilingnya.
     func testGlobularClusterHasADenseCentre() {
