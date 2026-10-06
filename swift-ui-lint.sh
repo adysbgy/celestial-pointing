@@ -2495,7 +2495,22 @@ PKG, APPS = "Packages", "Apps"
 
 
 def strip(text):
-    """Buang komentar tanpa menyentuh string literal."""
+    """Buang komentar tanpa menyentuh string literal.
+
+    Interpolasi string (`\\(fractionDigits)`) **wajib** menyimpan kurung
+    pembuka dan penutupnya. Tanpa itu hitungan brace setelah string pertama
+    berhenti, dan badan tipe terpotong di situ: `NumberFormat.swift` memuat
+    `String(format: "\\%.\\(fractionDigits)f", ...)`, jadi badan
+    `NumberFormat` habis tepat di string itu — metode `degrees`,
+    `signedDegrees`, `degreesPerSecond`, dan `percent` lenyap dari indeks,
+    dan pemanggilannya lewat tanpa diperiksa sama sekali.
+
+    Kegagalan ini tidak muncul sebagai "hijau": gerbang kehilangan isi
+    berkas, bukan menolak isi yang salah. Itu lebih berbahaya daripada gerbang
+    yang tidak ada, karena ia tetap melaporkan apa yang terdengar benar.
+    Aturan 26 memakai pembaca yang sama; ia hanya kebetulan tidak terpengaruh
+    karena yang diindeksnya anggota bertipe, bukan badan.
+    """
     out, i, n = [], 0, len(text)
     while i < n:
         c = text[i]
@@ -2504,6 +2519,8 @@ def strip(text):
             while i < n:
                 out.append(text[i])
                 if text[i] == "\\":
+                    if i + 1 < n:
+                        out.append(text[i + 1])
                     i += 2; continue
                 if text[i] == '"':
                     i += 1; break
@@ -2694,7 +2711,20 @@ PKG, APPS = "Packages", "Apps"
 
 
 def strip(text):
-    """Buang komentar tanpa menyentuh string literal."""
+    """Buang komentar tanpa menyentuh string literal.
+
+    Interpolasi string (`\\(fractionDigits)`) **wajib** menyimpan kurung
+    pembuka dan penutupnya. Tanpa itu hitungan brace setelah string pertama
+    berhenti, dan badan tipe terpotong di situ: `NumberFormat.swift` memuat
+    `String(format: "\\%.\\(fractionDigits)f", ...)`, jadi badan
+    `NumberFormat` habis tepat di string itu — metode `degrees`,
+    `signedDegrees`, `degreesPerSecond`, dan `percent` lenyap dari indeks,
+    dan pemanggilannya lewat tanpa diperiksa sama sekali.
+
+    Kegagalan ini tidak bisa dilihat sebagai "hijau": gerbang kehilangan isi
+    berkas, bukan menolak isi yang salah. Itu lebih berbahaya daripada gerbang
+    yang tidak ada, karena ia tetap melaporkan apa yang terdengar benar.
+    """
     out, i, n = [], 0, len(text)
     while i < n:
         c = text[i]
@@ -2703,6 +2733,8 @@ def strip(text):
             while i < n:
                 out.append(text[i])
                 if text[i] == "\\":
+                    if i + 1 < n:
+                        out.append(text[i + 1])
                     i += 2; continue
                 if text[i] == '"':
                     i += 1; break
@@ -2845,8 +2877,23 @@ for root, _, files in os.walk(APPS):
             if t not in inits:
                 continue
             given = call_params(balanced(text, m.end() - 1))
-            # Tanpa label tidak ada yang bisa dijamin tanpa menebak urutan.
-            if not given or any(l is None for l, _ in given):
+            # Tanpa label tidak ada yang bisa dijamin tanpa menebak urutan —
+            # TAPI nol argumen tetap harus merah kalau deklarasinya mewajibkan
+            # argumen. Inisialisasi tanpa `Tipe()` padahal deklarasinya
+            # `init(latitudeDeg:longitudeDeg:)` adalah pemanggilan yang lebih
+            # salah, bukan lebih sedikit pemeriksaannya.
+            if not given:
+                required = [(d, p) for d, p in inits[t]
+                            if any(not x for _l, x in d)]
+                if required:
+                    decl, dpath = required[0]
+                    problems.append(
+                        f"  {path}: {t}() tanpa argumen\n"
+                        f"      deklarasi di {dpath} mewajibkan: "
+                        + ", ".join(l + ":" for l, x in decl if not x))
+                continue
+            # Positional: urutan argumen tidak bisa dipastikan tanpa compiler.
+            if any(l is None for l, _ in given):
                 continue
             if not any(matches(given, decl) for decl, _ in inits[t]):
                 problems.append(
@@ -2857,16 +2904,260 @@ for root, _, files in os.walk(APPS):
                                 for l, d in inits[t][0][0]))
 
 if problems:
+    print("GAGAL: " + f"{len(problems)} pemanggilan inisialisasi paket "
+          "yang tidak cocok dengan deklarasinya.")
     print("\n".join(problems))
     print("-> Label yang salah hanya ketahuan dari CI macOS hari ini. "
           "Perbaiki pemanggilnya, atau kembalikan label di paket.")
 PY
 )
 if [ -n "$wrong_labels" ]; then
+  case "$wrong_labels" in
+    GAGAL:*) status=1 ;;
+  esac
   echo "$wrong_labels"
-  status=1
 else
   echo "Bersih: setiap TipePaket(Label:) di Apps/ cocok dengan deklarasinya."
+fi
+
+# ── Aturan 28: label argumen TipePaket.metode(label:) di Apps/ harus benar ─
+# ── Alasan: Aturan 26 membuktikan `TipePaket.metode` ADA. Aturan 27
+# ── membuktikan label pada `TipePaket(Label:)`. Yang tersisa adalah jalur
+# ── paling jenuh di repo ini: metode statis paket yang dipanggil
+# ── berkualifikasi (`StateAnnouncement.text(for: state)`), di mana label
+# ── argumen adalah contracts pemanggil dan derajat kompilasi, bukan sekadar
+# ── nama. Sekitar 44 pemanggilan seperti itu di Apps/ kehilangan seluruh
+# ── pemeriksaannya kalau hanya dua aturan sebelumnya yang bekerja.
+# ── Batasnya disengaja: pemanggilan tanpa label ATAU posisional dilewati
+# ── karena urutan argumen tidak bisa dipastikan tanpa compiler, dan
+# ── menebaknya lebih berbahaya daripada tidak memeriksa.
+echo "== Aturan 28: label argumen TipePaket.metode(Label:) di Apps/ harus benar =="
+wrong_method_labels=$(python3 - <<'PY' 2>&1
+import os, re, collections
+
+PKG, APPS = "Packages", "Apps"
+
+TYPE = re.compile(r"\b(?:struct|enum|class|actor|extension|protocol)\s+"
+                  r"([A-Za-z_][A-Za-z0-9_]*)")
+METHOD = re.compile(r"\b(?:public |internal |private |fileprivate |package |"
+                    r"static |class |final |override |mutating |nonmutating |"
+                    r"required |convenience |discardableResult )*"
+                    r"func\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def strip(text):
+    """Buang komentar tanpa menyentuh string literal.
+
+    Interpolasi string (`\\(fractionDigits)`) **wajib** menyimpan kurung
+    pembuka dan penutupnya. Tanpa itu hitungan brace setelah string pertama
+    berhenti, dan badan tipe terpotong di situ: `NumberFormat.swift` memuat
+    `String(format: "\\%.\\(fractionDigits)f", ...)`, jadi badan
+    `NumberFormat` habis tepat di string itu — metode `degrees`,
+    `signedDegrees`, `degreesPerSecond`, dan `percent` lenyap dari indeks.
+
+    Kegagalan ini tidak muncul sebagai "hijau": gerbang kehilangan isi
+    berkas, bukan menolak isi yang salah. Itu lebih berbahaya daripada gerbang
+    yang tidak ada, karena ia tetap melaporkan apa yang terdengar benar.
+    """
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            out.append(c); i += 1
+            while i < n:
+                out.append(text[i])
+                if text[i] == "\\":
+                    if i + 1 < n:
+                        out.append(text[i + 1])
+                    i += 2; continue
+                if text[i] == '"':
+                    i += 1; break
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2; continue
+        out.append(c); i += 1
+    return "".join(out)
+
+
+def balanced(text, i):
+    """text[i] adalah '(' atau '[' atau '{'; kembalikan isinya."""
+    depth, j = 0, i
+    while j < len(text):
+        c = text[j]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1:j]
+        j += 1
+    return text[i + 1:]
+
+
+def split_top(inside):
+    parts, depth, cur = [], 0, ""
+    for c in inside:
+        if c in "([{<":
+            depth += 1
+        elif c in ")]}>":
+            depth -= 1
+        if c == "," and depth == 0:
+            parts.append(cur); cur = ""
+        else:
+            cur += c
+    if cur.strip():
+        parts.append(cur)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def has_default(param):
+    """True kalau `label: T = nilai` — bukan `==`, `<=`, `!=`, `>=`, `=~`."""
+    depth, i, n = 0, 0, len(param)
+    while i < n:
+        c = param[i]
+        if c in "([{<":
+            depth += 1
+        elif c in ")]}>":
+            depth -= 1
+        elif c == "=" and depth == 0:
+            prev = param[i - 1] if i else ""
+            nxt = param[i + 1] if i + 1 < n else ""
+            if not (nxt == "=" or prev in ("!", "<", ">", "=") or nxt == "~"):
+                return True
+        i += 1
+    return False
+
+
+LABEL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)")
+
+
+def call_params(inside):
+    out = []
+    for p in split_top(inside):
+        m = LABEL.match(p)
+        out.append((m.group(1) if m else None, has_default(p)))
+    return out
+
+
+def decl_params(inside):
+    """[(label EKSTERNAL, ada nilai)] untuk sisi DEKLARASI."""
+    out = []
+    for p in split_top(inside):
+        head = p.split(":", 1)[0].strip()
+        tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", head)
+        out.append((tokens[0] if tokens else None, has_default(p)))
+    return out
+
+
+def matches(given, decl):
+    if len(given) > len(decl):
+        return False
+    for (gl, _gd), (dl, ddef) in zip(given, decl):
+        if not ddef and gl != dl:
+            return False
+    return all(ddef for _l, ddef in decl[len(given):])
+
+
+# Indeks metode per tipe. Badan dibaca per deklarasi tipe, jadi nama metode
+# yang sama pada tipe berbeda tidak tertukar.
+methods = collections.defaultdict(list)
+for root, _, files in os.walk(PKG):
+    if ".build" in root:
+        continue
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = strip(open(path, encoding="utf-8").read())
+        for tm in TYPE.finditer(text):
+            open_brace = text.find("{", tm.end())
+            if open_brace < 0:
+                continue
+            nxt = TYPE.search(text, tm.end())
+            if nxt is not None and nxt.start() < open_brace:
+                continue  # deklarasi tanpa badan
+            body = balanced(text, open_brace)
+            for mm in METHOD.finditer(body):
+                k = mm.end()
+                while k < len(body) and body[k] in " \t\n":
+                    k += 1
+                if k < len(body) and body[k] == "(":
+                    methods[tm.group(1)].append(
+                        (mm.group(1), decl_params(balanced(body, k)), path))
+
+QF = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+stats = collections.Counter()
+problems = []
+for root, _, files in os.walk(APPS):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = strip(open(path, encoding="utf-8").read())
+        for m in QF.finditer(text):
+            t, fn = m.group(1), m.group(2)
+            overloads = [(d, p) for f, d, p in methods.get(t, []) if f == fn]
+            if not overloads:
+                continue  # bukan metode paket: properti, enum case, alias tipe
+            given = call_params(balanced(text, m.end() - 1))
+            if not given:
+                # Nol argumen BUKAN hal yang aman untuk dilewati: pemanggilan
+                # tanpa argumen ke metode yang mewajibkan argumen adalah
+                # pemanggilan yang lebih salah, bukan lebih sedikit
+                # pemeriksaannya. Megetil `text()` padahal deklarasinya
+                # `text(for snapshot:)` harus merah di sini.
+                required = [(d, p) for d, p in overloads
+                            if any(not x for _l, x in d)]
+                if required:
+                    stats["nol argumen tapi wajib punya argumen"] += 1
+                    decl, dpath = required[0]
+                    problems.append(
+                        f"  {path}: {t}.{fn}() tanpa argumen\n"
+                        f"      deklarasi di {dpath} mewajibkan: "
+                        + ", ".join(l + ":" for l, x in decl if not x))
+                else:
+                    stats["tanpa argumen"] += 1
+                continue
+            if any(l is None for l, _ in given):
+                stats["posisional (dilewati)"] += 1
+                continue
+            stats["berlabel diperiksa"] += 1
+            if not any(matches(given, d) for d, _p in overloads):
+                stats["MISMATCH"] += 1
+                decl, dpath = overloads[0]
+                problems.append(
+                    f"  {path}: {t}.{fn}("
+                    + ", ".join(f"{l}:" for l, _ in given) + ")\n"
+                    f"      deklarasi di {dpath} punya: "
+                    + ", ".join(l + (" (bawaan)" if x else "") for l, x in decl))
+
+if problems:
+    print("GAGAL: " + f"{stats['MISMATCH'] + stats['nol argumen tapi wajib punya argumen']} "
+          "pemanggilan metode paket yang tidak cocok dengan deklarasinya.")
+    print("\n".join(problems))
+    print("-> Label yang salah hanya ketahuan dari CI macOS hari ini. "
+          "Perbaiki pemanggilnya, atau kembalikan label di paket.")
+elif stats["berlabel diperiksa"]:
+    print(f"Bersih: {stats['berlabel diperiksa']} pemanggilan "
+          f"TipePaket.metode(Label:) di Apps/ cocok dengan deklarasinya "
+          f"({stats['posisional (dilewati)']} positional dilewati).")
+else:
+    print("Bersih: tidak ada pemanggilan metode paket berlabel di Apps/.")
+PY
+)
+if [ -n "$wrong_method_labels" ]; then
+  case "$wrong_method_labels" in
+    GAGAL:*) status=1 ;;
+  esac
+  echo "$wrong_method_labels"
 fi
 
 if [ "$status" -eq 0 ]; then
