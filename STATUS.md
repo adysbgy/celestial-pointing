@@ -1,3 +1,94 @@
+## Progres terakhir (6 Okt 2026 — 12 warna aksen yang tidak pernah dibandingkan, dan urutan kecerahan yang hanya hidup sebagai komentar)
+
+### Cacatnya: palet gambar 17 warna, yang dijaga lima
+
+`NightVisual.Accents` memuat 17 warna yang dipakai view untuk menggambar
+pita Jupiter, cincin Saturnus, kutub Mars, kabut Venus, kawah Merkurius,
+inti Matahari, dan piringan Bulan. Palet yang sama hidup lagi sebagai
+`ACCENTS` di `render-visuals.py`. Sampai siklus ini yang dibandingkan hanya
+**lima**: `craterFloor`, `craterRim`, `moonLit`, `moonUnlit`,
+`moonPhaseUnknown`. Dua belas sisanya — termasuk **seluruh** warna planet
+dan Matahari — tidak dibandingkan siapa pun.
+
+Mengubah warna cincin Saturnus di Swift karena itu membiarkan setiap
+pemeriksaan gambar hijau sambil mengukur warna yang tidak pernah ada. Kelas
+cacat yang sama untuk ketujuh kalinya (palet planet, kawah, maria, profil
+Matahari, relief kawah, tata letak langit dalam, indeks warna bintang):
+**model diubah, port tidak, gerbang gambar mengukur gambar yang tidak
+pernah ada.**
+
+Siklus ini tidak akan menutupnya kalau yang diukur hanya kesamaan nilai.
+Ada cacat kedua di palet yang sama, dan ia tidak berbentuk drift.
+
+### Yang kedua: urutan kecerahan yang hanya hidup sebagai prosa
+
+Tiga hubungan antar warna itu hari ini **hanya tertulis sebagai komentar**
+di `NightVisual.swift`:
+
+| Hubungan | Kenapa ada |
+|---|---|
+| `moonUnlit` < `moonPhaseUnknown` < `moonLit` | kalau `moonPhaseUnknown` bergeser sampai menempel `moonUnlit`, cacat "fase tak diketahui = bulan baru" kembali tanpa suara — gambarnya masih piringan polos |
+| `craterRim` > `craterFloor` | bibir kawah harus menonjol dari dasarnya; kalau terbalik, kawah tampak menonjol keluar |
+| `sunCore` > `sunPhotosphere` | inti harus lebih terang dari fotosfer; kalau terbalik, Matahari tampak seperti cincin |
+
+Niat yang tidak diukur adalah niat yang bisa hilang saat warnanya disunting
+— persis kelas "aturan yang hanya hidup sebagai prosa" yang sudah tercatat
+di repo ini untuk fase Bulan. Dan untuk yang satu ini ada alasan tambahan:
+ia **kebal terhadap gerbang drift**. Kalau `sunCore` dan `sunPhotosphere`
+ditukar di **kedua** bahasa sekaligus, tidak ada satu pun pemeriksaan
+"port == model" yang bisa melihatnya.
+
+### Bukti gerbangnya berbunyi — tiga mutasi, tiga arah berbeda
+
+| Mutasi | Yang merah | Kenapa penting |
+|---|---|---|
+| `saturnRing` merah 0.86 → 0.20 di Swift | `aksen gambar saturnRing`, menyebut kedua nilai | drift biasa; yang 12 warna itu tidak punya penjaga |
+| `moonPhaseUnknown` 0.52 → 0.14 di Swift | pemeriksaan nilai **dan** pemeriksaan lama di `check_port_matches_swift_constants` | gerbang tidak menggandakan yang sudah ada secara vacuous — ia menambah yang belum ada |
+| jangkar `static let accents = Accents(` diganti nama | gagal **bersih** menyebut jangkarnya, bukan traceback | gerbang yang melempar pengecualian saat sumber dirapikan akan dihapus orang |
+
+Dan mutasi yang menentukan — **ditukar di kedua bahasa sekaligus**, jadi
+tidak ada drift sama sekali:
+
+```
+sunCore        1.00/0.93/0.62  →  1.00/0.72/0.24   (Swift + port)
+sunPhotosphere 1.00/0.72/0.24  →  1.00/0.93/0.62   (Swift + port)
+
+GAGAL aksen gambar: inti Matahari lebih terang dari fotosfernya  0.850 < 0.653
+287 pemeriksaan, 1 gagal
+```
+
+Satu-satunya pemeriksaan yang berbunyi adalah **urutan**-nya. Mutasi yang
+sama pada `craterFloor`/`craterRim` juga merah, walaupun di sana pemeriksaan
+lama ikut menyala karena nilai keduanya sudah dijaga.
+
+### Kenapa diukur dari model, bukan dari gambar
+
+Urutan kecerahan diukur dari **model Swift** (`NightVisual.swift`), bukan
+dari piksel port. Alasannya sama dengan gerbang tetangganya: gambar port
+adalah yang sedang diukur, jadi pembanding yang diambil dari gambar itu
+sendiri akan ikut berubah bersamanya dan selalu hijau.
+
+### Gerbang
+
+- `python3 Tools/check-visuals.py --check` → **287 pemeriksaan** (265 → 287,
+  +22 = 17 warna + 2 arah daftar + 3 urutan), 0 gagal.
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
+  tidak ada kode Swift yang berubah.
+- `./swift-ui-lint.sh` → 26 aturan hijau. `./swift-typecheck.sh` → LULUS.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** ke-17 warna tidak bisa menyimpang antar bahasa, dan
+  tiga hubungan kecerahan tidak bisa terbalik tanpa gerbang berbunyi.
+  **Yang belum:** gerbang tidak tahu apakah warna itu **benar secara
+  astronomi** — ia tahu kedua bahasa sepakat dan urutannya masuk akal.
+- **Tiga urutan, bukan semua.** Masih ada hubungan lain yang hanya hidup
+  sebagai komentar (mis. `venusHaze` lebih terang dari `planet.light`
+  Venus). Yang dipilih tiga yang **menjadi cacat visual yang tak terlihat**
+  kalau terbalik; sisanya akan tampak jelas di layar.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — warna bintang: 25 indeks yang tidak pernah dibandingkan dengan portnya)
 
 ### Cacatnya: tabel identitas warna hidup di dua bahasa tanpa satu pemeriksaan pun di antaranya
@@ -79,6 +170,8 @@ apa pun tentang gerbang ini.
 - `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
   tidak ada kode Swift yang berubah.
 - `./swift-ui-lint.sh` → 26 aturan hijau. `./swift-typecheck.sh` → LULUS.
+- CI: `37433582376` (Engine Tests Linux) + `37433582281` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `d3a2ce7`.
 
 ### Batas yang jujur
 

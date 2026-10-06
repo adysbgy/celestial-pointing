@@ -1223,6 +1223,115 @@ def check_star_colour_index_matches_the_model(results):
         else f"tanda terbalik: {wrong_sign}"))
 
 
+def swift_night_accents(source):
+    """Palet aksen `NightVisual.Accents` dari teks Swift → `{nama: (r,g,b)}`.
+
+    Dibaca dari sumber, bukan ditulis ulang: 17 warna, dan daftar tangan di
+    gerbang akan menjadi **warna ke-18 yang tidak pernah dibandingkan**.
+    """
+    anchor = "static let accents = Accents("
+    if anchor not in source:
+        raise ValueError(
+            "'static let accents = Accents(' tidak ditemukan di NightVisual.swift")
+    start = source.index(anchor) + len(anchor)
+    region = source[start:source.index("\n}", start)]
+    out = {}
+    for name, r, g, b in re.findall(
+            r"(\w+):\s*\.init\(red:\s*([\d.]+),\s*green:\s*([\d.]+),"
+            r"\s*blue:\s*([\d.]+)\)", region):
+        out[name] = (float(r), float(g), float(b))
+    return out
+
+
+def check_night_accents_match_the_model(results):
+    """Setiap warna aksen tidak boleh menyimpang antar bahasa, dan urutan
+    kecerahan yang hanya hidup sebagai komentar kini diukur.
+
+    **Cacat yang ditutup pemeriksaan ini.** `NightVisual.Accents` memuat 17
+    warna gambar (pita Jupiter, cincin Saturnus, kutub Mars, kabut Venus,
+    kawah Merkurius, inti Matahari, piringan Bulan, ...). Semuanya hidup
+    lagi di `ACCENTS` pada port Python. Sampai siklus ini yang dijaga hanya
+    **lima** di antaranya (`craterFloor`, `craterRim`, `moonLit`,
+    `moonUnlit`, `moonPhaseUnknown`) — dua belas sisanya, termasuk seluruh
+    warna planet dan Matahari, tidak dibandingkan siapa pun. Mengubah warna
+    cincin Saturnus di Swift membiarkan setiap pemeriksaan gambar hijau
+    sambil mengukur warna yang tidak pernah ada.
+
+    Yang kedua, dan yang lebih mudah hilang: **hubungan** antar warna itu
+    hari ini hanya hidup sebagai komentar di sumber Swiftnya.
+
+    | Hubungan | Kenapa ada |
+    |---|---|
+    | `moonUnlit` < `moonPhaseUnknown` < `moonLit` | kalau `moonPhaseUnknown` bergeser sampai menempel `moonUnlit`, cacat "fase tak diketahui = bulan baru" kembali tanpa suara — gambarnya masih piringan polos |
+    | `craterRim` > `craterFloor` | bibir kawah harus menonjol dari dasarnya; kalau terbalik, kawah tampak menonjol keluar |
+    | `sunCore` > `sunPhotosphere` | inti harus lebih terang dari fotosfer; kalau terbalik, Matahari tampak seperti cincin |
+
+    Ketiganya sudah tertulis sebagai niat di `NightVisual.swift`. Niat yang
+    tidak diukur adalah niat yang bisa hilang saat warnanya disunting —
+    persis kelas "aturan yang hanya hidup sebagai prosa" yang sudah
+    tercatat di repo ini. Diukur dari **model**, karena port-lah yang
+    mengikuti.
+
+    Arahnya dua bahasa seperti gerbang tetangganya: merah kalau port
+    menyimpang, kalau model kehilangan warna yang masih ada di port, dan
+    kalau port punya warna sisa.
+    """
+    night = open(os.path.join(
+        ROOT, "Packages/PointingKit/Sources/PointingKit/NightVisual.swift")).read()
+    try:
+        swift = swift_night_accents(night)
+    except ValueError as exc:
+        results.append(Result("aksen gambar: terbaca dari model", False, str(exc)))
+        return
+
+    port = R.ACCENTS
+
+    missing = sorted(set(swift) - set(port))
+    results.append(Result(
+        "aksen gambar: setiap warna model ada di port",
+        not missing,
+        f"semua {len(swift)} warna ada" if not missing
+        else f"tidak ada di port: {missing}"))
+    extra = sorted(set(port) - set(swift))
+    results.append(Result(
+        "aksen gambar: tidak ada warna sisa di port",
+        not extra,
+        "tidak ada" if not extra else f"hanya ada di port: {extra}"))
+
+    def brightness(rgb):
+        return sum(rgb) / 3.0
+
+    for name in sorted(set(swift) & set(port)):
+        same = all(abs(a - b) < 1e-9 for a, b in zip(swift[name], port[name]))
+        results.append(Result(
+            f"aksen gambar {name}",
+            same,
+            f"{swift[name]}" if same
+            else f"model {swift[name]}, port {port[name]}"))
+
+    ordering = [
+        ("piringan fase tak diketahui di antara gelap dan terang",
+         "moonUnlit", "moonPhaseUnknown", "moonLit"),
+        ("bibir kawah lebih terang dari dasarnya",
+         "craterFloor", "craterRim", None),
+        ("inti Matahari lebih terang dari fotosfernya",
+         "sunPhotosphere", "sunCore", None),
+    ]
+    for label, low, high, ceiling in ordering:
+        if low not in swift or high not in swift:
+            results.append(Result(f"aksen gambar: {label}", False,
+                                  f"{low}/{high} tidak ada di model"))
+            continue
+        ok = brightness(swift[low]) < brightness(swift[high])
+        if ceiling is not None:
+            ok = ok and (ceiling not in swift
+                         or brightness(swift[high]) < brightness(swift[ceiling]))
+        results.append(Result(
+            f"aksen gambar: {label}", ok,
+            f"{brightness(swift[low]):.3f} < {brightness(swift[high]):.3f}"
+            + (f" < {brightness(swift[ceiling]):.3f}" if ceiling in swift else "")))
+
+
 def check_deep_sky_layouts_match_the_model(results):
     """Tata letak objek langit dalam tidak boleh menyimpang antar bahasa.
 
@@ -2316,6 +2425,7 @@ def main():
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_deep_sky_layouts_match_the_model(results)
     check_star_colour_index_matches_the_model(results)
+    check_night_accents_match_the_model(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
