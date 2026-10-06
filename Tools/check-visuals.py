@@ -1030,6 +1030,180 @@ def read_planet_palettes_from_swift(source):
     return out
 
 
+def swift_sextuples(source, anchor, terminator="]"):
+    """Semua `(a, b, c, d, e, f)` dari sumber Swift, mulai setelah `anchor`.
+
+    Padanan `swift_tuple_triples` untuk layout objek langit dalam: enam
+    angka per blob (geser x, geser y, skala lebar, rasio sumbu, sudut,
+    opasitas). Alasannya sama persis — yang dibandingkan **seluruh** larik,
+    dan angkanya sebagai `float` supaya `0.30` sama dengan `0.3`.
+    """
+    start = source.index(anchor) + len(anchor)
+    end = source.index(terminator, start)
+    region = source[start:end]
+    number = r"\s*(-?\d+(?:\.\d+)?)\s*"
+    return [tuple(float(v) for v in match)
+            for match in re.findall(r"\(" + ",".join([number] * 6) + r"\)",
+                                    region)]
+
+
+def read_deep_sky_layouts_from_swift(source):
+    """Baca **tiap** layout objek langit dalam dari teks Swift.
+
+    Tata letak blob hidup di dua bahasa: `VisualFrame.nebula` / `.deepSky`
+    di Swift dan `DEEP_SKY_LAYOUT` di port Python. Sampai pemeriksaan ini
+    ada, **tidak satu pun** dari ~60 angka itu dijaga: menggeser satu blob
+    galaksi di model akan membiarkan setiap pemeriksaan gambar hijau sambil
+    mengukur bentuk yang sudah tidak ada lagi — cacat yang berkas ini ada
+    untuk mencegah, dan yang sudah muncul untuk palet planet, kawah, dan
+    maria.
+
+    Nama kuncinya sama dengan `Morphology.rawValue`, ditambah `"nebula"`
+    untuk bentuk netral (`VisualFrame.nebula`, yang dipakai saat morfologi
+    `nil`). Dibaca dari sumber, bukan ditulis sebagai daftar: daftar tangan
+    adalah daftar yang bisa tertinggal separuh saat bentuk baru ditambah.
+    """
+    out: dict[str, list[tuple[float, ...]]] = {}
+
+    # Bentuk netral: fungsi `nebula(fuzziness:...)`.
+    anchor = "public static func nebula(fuzziness: Double,"
+    if anchor not in source:
+        raise ValueError(
+            "'public static func nebula(' tidak ditemukan di CelestialVisual.swift")
+    region = source[source.index(anchor):]
+    out["nebula"] = swift_sextuples(region, "let layout: [(Double, Double, "
+                                            "Double, Double, Double, Double)] = [")
+
+    # Empat bentuk bermorfolgi di dalam `switch morphology`.
+    switch = "public static func deepSky(morphology:"
+    if switch not in source:
+        raise ValueError(
+            "'public static func deepSky(' tidak ditemukan di CelestialVisual.swift")
+    region = source[source.index(switch):]
+    for name in ("planetaryNebula", "galaxy", "openCluster", "globularCluster"):
+        marker = f"case .{name}:"
+        if marker not in region:
+            raise ValueError(f"'{marker}' tidak ditemukan di CelestialVisual.swift")
+        tail = region[region.index(marker):]
+        # `.planetaryNebula` menyusun layout lewat `zip` dari `ring`, jadi
+        # angkanya tidak berbentuk larik segi-enam — ia punya pembacaan
+        # sendiri, dan tanpa itu bentuk ini akan dilaporkan "hilang".
+        if "let ring:" in tail[:tail.index("return buildDeepSky")]:
+            out[name] = _shell_layout_from_swift(tail)
+            continue
+        out[name] = swift_sextuples(tail, "let layout: [(Double, Double, "
+                                          "Double, Double, Double, Double)] = [")
+    return out
+
+
+def _shell_layout_from_swift(tail):
+    """Layout cangkang `.planetaryNebula` dari `ring` + `shellOpacity`.
+
+    Modelnya **tidak** menulis enam angka per blob: ia menulis delapan posisi
+    (`ring`), lalu menggabungkannya dengan `shellOpacity` lewat `zip`, dengan
+    skala lebar `0.30`, rasio sumbu `1.0`, sudut `0.0`. Port Python menyimpan
+    hasilnya yang sudah di-`zip`. Jadi yang dibandingkan di sini adalah
+    **hasil** yang sama, dihitung dari bentuk sumbernya — bukan angka yang
+    disalin.
+    """
+    # Isi `ring` diambil **setelah** `[` pembuka: anotasinya sendiri
+    # (`[(Double, Double)]`) juga berbentuk pasangan, dan ikut terbaca
+    # kalau potongannya dimulai dari `let ring:` — `float("Double")`.
+    ring_start = tail.index("let ring:")
+    ring_open = tail.index("= [", ring_start) + len("= [")
+    ring_region = tail[ring_open:tail.index("]", ring_open)]
+    pairs = re.findall(r"\(\s*(-?[\w.]+)\s*,\s*(-?[\w.]+)\s*\)", ring_region)
+    shell_radius = float(re.search(r"let shellRadius = ([\d.]+)", tail).group(1))
+    diagonal = shell_radius / 2.0 ** 0.5
+    names = {"shellRadius": shell_radius, "diagonal": diagonal}
+    opacities = [float(v) for v in re.search(
+        r"let shellOpacity = \[([\d.,\s]+)\]", tail).group(1).split(",")]
+    width_scale = float(re.search(
+        r"\(offset\.0, offset\.1, ([\d.]+),", tail).group(1))
+    aspect = float(re.search(
+        r"\(offset\.0, offset\.1, [\d.]+, ([\d.]+),", tail).group(1))
+    angle = float(re.search(
+        r"\(offset\.0, offset\.1, [\d.]+, [\d.]+, (-?[\d.]+),", tail).group(1))
+    out = []
+    for (xs, ys), opacity in zip(pairs, opacities):
+        def value(token):
+            token = token.strip()
+            if token.lstrip("-") in names:
+                sign = -1 if token.startswith("-") else 1
+                return sign * names[token.lstrip("-")]
+            return float(token)
+        out.append((value(xs), value(ys), width_scale, aspect, angle, opacity))
+    return out
+
+
+def check_deep_sky_layouts_match_the_model(results):
+    """Tata letak objek langit dalam tidak boleh menyimpang antar bahasa.
+
+    **Cacat yang ditutup pemeriksaan ini.** Lima bentuk objek langit dalam
+    (nebula netral + empat morfologi) hidup sebagai ~60 angka di
+    `CelestialVisual.swift` dan lagi di `DEEP_SKY_LAYOUT` pada
+    `render-visuals.py`. `check_deep_sky_morphologies_render_distinct`
+    mengukur bahwa bentuk-bentuk itu **berbeda satu sama lain** — dan itu
+    tetap hijau meski seluruh 60 angkanya berubah, selama mereka tetap
+    berbeda. Jadi tidak ada satu pun yang menjaga bahwa port menggambar
+    bentuk yang sama dengan model.
+
+    Akibatnya persis yang sudah dua kali terjadi di repo ini: mengubah
+    model tanpa port membuat **setiap pemeriksaan gambar mengukur gambar
+    yang tidak pernah ada** — dan tidak ada layar yang berubah, karena
+    tidak ada yang tampil di Linux.
+
+    Dibaca dari sumber di kedua sisi, elemen per elemen, dua arah: merah
+    kalau port menyimpang **atau** kalau model berubah tanpa port-nya ikut,
+    dan merah juga kalau salah satu bentuk hilang dari salah satu sisi.
+    """
+    source = open(os.path.join(
+        ROOT, "Packages/PointingKit/Sources/PointingKit/CelestialVisual.swift")).read()
+    try:
+        swift = read_deep_sky_layouts_from_swift(source)
+    except ValueError as exc:
+        # Jangkar hilang = kegagalan bersih yang menyebut jangkarnya. Gerbang
+        # yang melempar traceback saat modelnya dirapikan akan dihapus orang.
+        results.append(Result("tata letak objek langit dalam: terbaca dari model",
+                              False, str(exc)))
+        return
+
+    port = R.DEEP_SKY_LAYOUT
+
+    missing_in_port = sorted(set(swift) - set(port))
+    results.append(Result(
+        "tata letak objek langit dalam: setiap bentuk model ada di port",
+        not missing_in_port,
+        "semua bentuk ada" if not missing_in_port
+        else f"tidak ada di port: {missing_in_port}"))
+
+    extra_in_port = sorted(set(port) - set(swift))
+    results.append(Result(
+        "tata letak objek langit dalam: tidak ada bentuk sisa di port",
+        not extra_in_port,
+        "tidak ada" if not extra_in_port
+        else f"hanya ada di port: {extra_in_port}"))
+
+    for name in sorted(set(swift) & set(port)):
+        a, b = swift[name], [tuple(float(v) for v in row) for row in port[name]]
+        if len(a) != len(b):
+            results.append(Result(
+                f"tata letak {name}: jumlah blob sama",
+                False, f"model {len(a)}, port {len(b)}"))
+            continue
+        # Dibandingkan per elemen supaya pesannya menyebut **indeks**: "tidak
+        # sama" tidak memberi tahu apakah ada blob yang hilang, salah tempat,
+        # atau bertambah di akhir.
+        bad = [i for i, (x, y) in enumerate(zip(a, b))
+               if any(abs(p - q) > 1e-9 for p, q in zip(x, y))]
+        results.append(Result(
+            f"tata letak {name}: tiap blob sama dengan model",
+            not bad,
+            f"semua {len(a)} blob cocok" if not bad
+            else f"beda di indeks {bad}: model {[a[i] for i in bad]}, "
+                 f"port {[b[i] for i in bad]}"))
+
+
 def check_feature_arrays_match_the_view(results):
     """Larik kawah & maria harus cocok **seluruhnya**, bukan elemen pertamanya.
 
@@ -2053,6 +2227,7 @@ def main():
     check_star_colour_order(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
+    check_deep_sky_layouts_match_the_model(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

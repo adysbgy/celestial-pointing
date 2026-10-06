@@ -1,4 +1,84 @@
-## Progres terakhir (6 Okt 2026 — Aturan 25 menjaga satu nama tipe dari 406, dan STATUS.md sudah menulisnya)
+## Progres terakhir (6 Okt 2026 — tata letak objek langit dalam dijaga per blob, bukan per bentuk)
+
+### Cacatnya: gerbang bentuk langit dalam mengukur "berbeda", bukan "sama"
+
+`check-visuals.py` sudah punya sepuluh pemeriksaan morfologi. Semuanya
+mengukur bahwa bentuk-bentuk itu **berbeda satu sama lain** — jumlah piksel
+yang tidak sama antara `deepsky-nebula` dan `deepsky-galaxy`, misalnya.
+Itu pemeriksaan yang berguna, dan cacat yang ditutupnya nyata.
+
+Tapi ia tidak menjaga apa yang paling perlu dijaga: bahwa port Python
+menggambar bentuk yang **sama** dengan model Swift. Modelnya hidup sebagai
+34 blob × 6 angka di `CelestialVisual.swift`, dan lagi di `DEEP_SKY_LAYOUT`
+pada `render-visuals.py`. Tidak satu angka pun dari keduanya dibandingkan.
+Menggeser semuanya sekaligus — atau satu blob saja — membiarkan **setiap**
+pemeriksaan gambar hijau, karena bentuk-bentuknya tetap berbeda satu sama
+lain setelah digeser. Yang diukur gambar itu hanyalah gambar port, jadi
+gambar yang ikut berubah tidak pernah bisa memerahkannya sendiri.
+
+Ini kelas cacat yang sudah muncul berulang di repo ini (palet planet, kawah,
+maria, profil Matahari, relief kawah): **model diubah, port tidak, gerbang
+gambar mengukur gambar yang tidak pernah ada.** Polanya selalu sama — yang
+dijaga sebagian dari apa yang gerbang klaim dijaganya.
+
+### Kenapa pembacaan cangkang nebula planetari perlu jalannya sendiri
+
+Empat dari lima bentuk menulis larik segi-enam biasa dan terbaca oleh
+pembaca tuple yang sama. `.planetaryNebula` tidak: ia menulis delapan posisi
+(`ring`) lalu menggabungkannya dengan `shellOpacity` lewat `zip`, dengan
+skala lebar `0.30`, rasio sumbu `1.0`, sudut `0.0`. Port menyimpan **hasil**
+`zip`-nya.
+
+Jadi pembacanya menghitung hasil yang sama dari bentuk sumbernya — bukan
+menyalin angka. Itu yang membuat `shellRadius` bisa diubah di satu tempat
+tanpa menduplikasi delapan posisi tangan. Tanpa pembacaan ini, satu-satunya
+jalan adalah menulis ulang 48 angka jadi daftar tetap, dan daftar tetap
+adalah daftar yang bisa tertinggal separuh saat bentuk baru ditambah.
+
+### Cacat yang ditemukan saat menulisnya
+
+Potongan `ring` yang dimulai dari `let ring:` ikut menyertakan anotasi tipenya
+sendiri — `[(Double, Double)]` — yang juga berbentuk pasangan. Hasilnya
+`float("Double")`: gerbang gagal dengan pesan yang tidak menyebut apa pun
+yang salah. Perbaikannya memotong **setelah** `[` pembuka, dan alasannya
+ditulis di komentar supaya yang merapikan model nanti tidak mengembalikannya.
+
+### Bukti gerbangnya berbunyi pada cacat yang diklaimnya
+
+Dua mutasi pada model Swift, dikembalikan setelahnya:
+
+| Mutasi | Gerbang gambar | Gerbang baru |
+|---|---|---|
+| blob 0 nebula `-0.18` → `-0.19` | hijau | **merah**, "beda di indeks [0]" |
+| `shellRadius` `0.42` → `0.45` | hijau, **angka pikselnya identik** (19506, 11965, …) | **merah** di indeks 0–7 |
+
+Baris kedua adalah intinya: sepuluh pemeriksaan morfologi mencetak jumlah
+piksel yang **sama persis** sebelum dan sesudah mutasi. Mereka tidak bisa
+melihat radius cangkang berubah, karena yang mereka bandingkan adalah
+bentuk-port lawan bentuk-port.
+
+### Gerbang
+
+- `python3 Tools/check-visuals.py --check` → **237 pemeriksaan** (230 → 237,
+  +7), 0 gagal.
+- `./swift-ui-lint.sh` → 26 aturan hijau.
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
+  tidak ada kode Swift yang berubah; yang masuk hanya gerbang Python.
+
+### Batas yang jujur
+
+- **Hanya tata letak.** Warna objek langit dalam (`ACCENTS["deepSky"]`, satu
+  warna untuk semua bentuk) tidak dibaca dari model — modelnya sengaja tidak
+  menyimpan warna, karena warna tidak bisa diuji di Linux.
+- **Bentuk baru butuh dua sisi.** Menambah morfologi di Swift tanpa
+  `DEEP_SKY_LAYOUT` merah di "setiap bentuk model ada di port"; sebaliknya
+  merah di "tidak ada bentuk sisa di port". Menambah di kedua sisi dengan
+  angka yang berbeda merah di per blob. Yang **tidak** merah: menghapus
+  bentuk dari kedua sisi sekaligus.
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — Aturan 25 menjaga satu nama tipe dari 406, dan STATUS.md sudah menulisnya)
 
 ### Cacatnya: gerbang keanggotaan tipe hanya berlaku untuk satu tipe
 
@@ -73,7 +153,7 @@ Baris kedua yang menentukan: tanpa uji negatif, aturan yang menandai setiap
 - `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
   **tidak ada kode Swift yang berubah**; yang masuk hanya gerbang + README.
 - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
-- `python3 Tools/check-visuals.py --check` → **230 pemeriksaan**, 0 gagal.
+- `python3 Tools/check-visuals.py --check` → **237 pemeriksaan**, 0 gagal.
 - CI: `37427513897` (Engine Tests Linux) + `37427513688` (Apple Build
   macos-15) — **dua-duanya hijau** pada `eae1dd7`.
 
