@@ -626,8 +626,8 @@ CRATER_FLOOR_DEPTH = 0.22                                # MODEL: `craterRelief`
 CRATER_FLOOR_OPACITY = 0.85                              # VIEW: `drawCraters`
 CRATER_RIM_OPACITY = 0.90                                # VIEW: `drawCraters`
 CRATER_INNER_FLOOR_OPACITY = 0.75                        # VIEW: `drawCraters`
-CRATER_RIM_OFFSET = 0.55                                 # VIEW: `drawCraters`
-CRATER_INNER_SCALE = 0.62                                # VIEW: `drawCraters`
+CRATER_RIM_OFFSET = 0.45                                 # VIEW: `drawCraters`
+CRATER_INNER_SCALE = 0.5                                 # VIEW: `drawCraters`
 
 
 class VisualCase:
@@ -1091,13 +1091,18 @@ def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
         #    cahaya, dipotong oleh cakram kawah — yang tersisa hanya sabit.
         #    `offset` dibuat cukup besar (≈0.45·mr) supaya sabitnya terlihat
         #    di ukuran jam 76 px; terlalu kecil ia tertelan dasar cakram.
-        offset = mr * 0.45
+        #
+        #    Faktor diambil dari konstanta, bukan ditulis ulang sebagai angka:
+        #    `CRATER_RIM_OFFSET` pernah bernilai 0,55 — menyimpang dari diskret
+        #    view — dan **tidak pernah dirujuk**, sehingga angka yang benar
+        #    (0,45) ditulis tangan di sini. Tidak ada yang bisa melihatnya.
+        offset = mr * CRATER_RIM_OFFSET
         canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,
                     clipped(accent_fn(ACCENTS["craterRim"], night_mode,
                                       min(1.0, CRATER_RIM_OPACITY * max(rim_strength, 0.2)))),
                     clip_disc=(mx, my, mr))
         # 3. Dasar yang lebih gelap di tengah, jelas di dalam sabit bibirnya.
-        canvas.disc(mx, my, mr * 0.5,
+        canvas.disc(mx, my, mr * CRATER_INNER_SCALE,
                     clipped(accent_fn(ACCENTS["craterFloor"], night_mode,
                                       CRATER_INNER_FLOOR_OPACITY)))
 

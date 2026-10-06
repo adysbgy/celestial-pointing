@@ -866,6 +866,25 @@ def check_port_matches_swift_constants(results):
          "(-0.28, -0.30, 0.26)", view),
         ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
          "color.opacity(0.45)", view),
+        # Gambar kawah Merkurius. Kelima angka ini ada di **dua bahasa** dan
+        # sampai sini **tidak dijaga siapa pun**: mutasi empat di antaranya di
+        # view membuat seluruh 195 pemeriksaan tetap hijau (dibuktikan saat
+        # penyuntingan). Yang hilang bukan cuma "kawah jadi lebih redup" —
+        # `check_mars_caps_touch_the_limb` dan pengukuran relief kawah yang
+        # membaca gambar ini ikut mengukur gambar yang tidak pernah tampil
+        # di jam.
+        #
+        # Dua di antaranya (**geseran** dan **skala dasar**) sengaja dihapus
+        # dari port: nilainya tidak pernah dipakai di sana, jadi mengunci
+        # "nilai port yang tidak dihitung" akan menjaga larik mati sebagai
+        # seolah-olah ia dihitung. Lihat `check_crater_drawing_constants` —
+        # pemeriksaan yang menghapus konstanta mati itu.
+        ("opasitas dasar kawah", R.CRATER_FLOOR_OPACITY, 0.85,
+         "floor.opacity(0.85)", view),
+        ("opasitas bibir kawah", R.CRATER_RIM_OPACITY, 0.90,
+         "rim.opacity(0.9 * CGFloat(crater.rimStrength))", view),
+        ("opasitas dasar dalam kawah", R.CRATER_INNER_FLOOR_OPACITY, 0.75,
+         "with: .color(floor.opacity(0.75)))", view),
         # Lencana "?" — angkanya dipakai untuk **mengecualikan** daerah lencana
         # dari pengukuran ciri di atas. Kalau lencananya berubah di view tanpa
         # port ini ikut berubah, kotak pengecualiannya tidak lagi menutupi
@@ -877,6 +896,35 @@ def check_port_matches_swift_constants(results):
          "inset: Double = 0.06", model),
         ("lencana: fraksi glif", R.CANDIDATE_GLYPH_FRACTION, 0.52,
          "glyphFraction: Double = 0.52", model),
+        # Palet mode malam. Tiga angka ini tinggal di `NightVisual.swift` dan
+        # **diport** Python untuk menggambar ulang mode malam pada PNG, dan
+        # sampai sini tidak dijaga. Yang hilang bukan cuma warnanya: seluruh
+        # `check_night_mode_purity` — yang menyapu mode malam untuk hijau/biru
+        # — tidak bisa melihat perubahan yang **bukan** hijau/biru. Menggeser
+        # `floorBrightness` tidak membuat satu pun pemeriksaan merah, padahal
+        # ia mengubah seluruh kecerahan mode malam.
+        #
+        # Arah kedua (port == model) yang dijaga; arah ketiga (view memakainya)
+        # dijaga oleh `SurfacePaletteTests` di Linux lewat kontras.
+        ("mode malam: batas bawah kecerahan", R.NIGHT_FLOOR_BRIGHTNESS, 0.35,
+         "floorBrightness: Double = 0.35", night),
+        ("mode malam: rentang kecerahan", R.NIGHT_RANGE_BRIGHTNESS, 0.65,
+         "rangeBrightness: Double = 0.65", night),
+        ("mode malam: fraksi bayangan", R.NIGHT_SHADOW_FRACTION, 0.5,
+         "shadowFraction: Double = 0.5", night),
+        # Bola netral untuk benda yang **tidak dikenali**. Dipakai view sebagai
+        # `neutralBody`/`neutralShadow` dan diport untuk gambar yang sama.
+        # Yang berbahaya di sini justru nilai warna: bola ungu atau ungu
+        # kebiruan akan terlihat seperti "planet tertentu", padahal yang
+        # diketahui hanya "planet yang tidak kita kenal" — persis klaim
+        # identitas yang dilarang PRD. Angka tuannya sudah menjaga netralitas;
+        # yang belum dijaga adalah **letaknya**, dan letaknya ada di view.
+        ("bola netral: terang", R.NEUTRAL_BODY, (0.74, 0.72, 0.68),
+         "neutralBody = CelestialVisual.RGBComponents(red: 0.74, green: 0.72, blue: 0.68)",
+         view),
+        ("bola netral: bayangan", R.NEUTRAL_SHADOW, (0.28, 0.27, 0.26),
+         "neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)",
+         view),
     ]
     for check in checks:
         label, port_value, expected, source_text, source = check[:5]
@@ -964,6 +1012,63 @@ def check_feature_arrays_match_the_view(results):
             else f"beda di indeks {mismatched}: port "
                  f"{[port_array[i] for i in mismatched]}, view "
                  f"{[swift_array[i] for i in mismatched]}"))
+
+
+def check_crater_drawing_constants(results):
+    """Konstanta gambar kawah di port harus **dipakai**, dan dalam view.
+
+    **Cacat yang ditutup pemeriksaan ini.** Port punya lima konstanta
+    `CRATER_*`. Dua di antaranya — `CRATER_RIM_OFFSET` (0.55) dan
+    `CRATER_INNER_SCALE` (0.62) — **tidak pernah dirujuk** di mana pun di
+    berkas port: nilainya ada di view sebagai `size * 0.45` dan
+    `size * 0.5`, jadi pada view diskretnya `0.45` dan `0.5`, bukan `0.55`
+    dan `0.62`.
+
+    Dua arah yang sama-sama salah, dan justru karena itu tidak terlihat:
+
+    - **Angkanya sudah menyimpang** dari view yang ia gambarkan (0.55 vs
+      0.45; 0.62 vs 0.5) — bukan hanya tidak terpakai. Kalau suatu saat ada yang
+      "mengaktifkan" konstanta itu di port, gambar kawah di PNG akan langsung
+      menyimpang dari gambar kawah di jam.
+    - **Menjaganya akan menjebak cacat.** Kalau konstanta mati ini ikut
+      dimasukkan ke gerbang pergeseran di atas, gerbang itu akan hijau
+      selama port dan view **saling menyimpang** — persis "penulis dan
+      pembaca repo ini sepakat satu sama lain".
+
+    Port harus memakai diskret yang sama dengan view, dan pemeriksaannya
+    memverifikasi **pemakaian**, bukan hanya keberadaannya: konstanta yang
+    ada tapi tidak dirujuk adalah nilai yang tidak diukur siapa pun.
+    """
+    port = open(R.SOURCE, encoding="utf-8").read()
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+
+    # (nama konstanta port, faktor yang dipakai view, baris pemakaian di port,
+    #  baris yang harus tetap hidup di view)
+    used = (
+        ("CRATER_RIM_OFFSET", 0.45,
+         "offset = mr * CRATER_RIM_OFFSET",
+         "let offset = size * 0.45"),
+        ("CRATER_INNER_SCALE", 0.5,
+         "mr * CRATER_INNER_SCALE,",
+         "let innerSize = size * 0.5"),
+    )
+    for name, view_value, port_use, view_text in used:
+        # 1. Angkanya harus sama dengan diskret view. Ini yang menangkap
+        #    keliruan "0.55 = 0.45 + 0,1 pengaman" yang terlihat masuk akal.
+        results.append(Result(
+            f"kawah: {name} sama dengan diskret view",
+            abs(R.__dict__[name] - view_value) < 1e-9,
+            f"port={R.__dict__[name]}, view memakai {view_value}"))
+        # 2. Dan pemakaiannya harus benar-benar **menyebut konstanta itu**,
+        #    bukan angka yang sama ditulis ulang. Tanpa baris ini, port dan view
+        #    bisa saling menyimpang di belakang gerbang — persis kelas cacat
+        #    yang pemeriksaan pergeseran lain ada untuk mencegah.
+        results.append(Result(
+            f"kawah: {name} dihitung dari konstantanya sendiri",
+            port_use in port and view_text in view,
+            f"port memakai '{port_use}' = "
+            f"{'ada' if port_use in port else 'TIDAK'}, view memakai '{view_text}' = "
+            f"{'ada' if view_text in view else 'TIDAK'}"))
 
 
 def check_sun_profile_matches_the_model(results):
@@ -1862,6 +1967,7 @@ def main():
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
+    check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
     check_crater_relief_matches_the_model(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
