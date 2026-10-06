@@ -1,3 +1,81 @@
+## Progres terakhir (6 Okt 2026 — jalur bawah-horizon sampai .lock, dan audit ulang status brief)
+
+### Temuan siklus ini: brief di misi sudah LENGKAP, bukan awal dari nol
+
+Mulai siklus ini dari STATUS.md paling atas berbunyi "Seluruh brief sudah
+terimplementasi dan teruji" (entri glassmorphism-ditolak). Dipastikan dengan
+membaca kode sungguhan, bukan cuma log:
+
+- **Visual objek prosedural**: `CelestialVisual.swift` (model, PointingKit,
+  2112 baris) + `CelestialVisualView.swift` (SwiftUI Canvas, 983 baris) sudah
+  menggambar planet (pita Jupiter, cincin Saturnus, kutub Mars, fase Venus/
+  Merkurius, kawah Merkurius), Bulan (fase dari `moonIlluminationFraction`),
+  bintang (glow sesuai kelas spektral + magnitudo), Matahari (corona), dan
+  objek langit dalam (4 morfologi: nebula, galaksi, gugus bola, gugus terbuka,
+  nebula planetari). Visual samar + "?" saat `isConfirmed == false`.
+- **Night mode murni**: `NightVisual.swift` memetakan semua warna ke merah
+  murni (hijau/biru = 0), diuji di `NightVisualTests`. `NightMode.swift` +
+  `@AppStorage`.
+- **AOD**: `ReducedLuminanceView.swift` + `isLuminanceReduced`; animasi
+  dihentikan saat redup (`ReducedLuminanceHonestyTests`).
+- **VoiceOver**: `accessibilityLabel` di kartu/panel; `StateAnnouncement`
+  saat lock; grafis `accessibilityHidden(true)` karena induknya sudah
+  mengumumkan nama+jenis+keyakinan+fase (alasan tertulis di kode).
+- **Audio**: `AudioCue.swift` saat `.lockSucceeded`, bisa dimatikan.
+- **Complication**: `ComplicationWidget.swift` + `ComplicationStore.swift`.
+- **Lokalisasi**: `Localizable.xcstrings` (438 kunci, `sourceLanguage: id`,
+  semua `en` `translated` — 0 kosong). `SWIFT_EMIT_LOC_STRINGS: NO` sengaja.
+- **Izin sensor**: `project.yml` sudah menyatakan
+  `NSLocationWhenInUseUsageDescription` + `NSMotionUsageDescription` (teks
+  Indonesia jelas "kenapa") untuk **kedua** target; `InfoPlist.strings` id+en.
+  Penolakan izin **ditangani**: `LocationProvider.note` + `MotionLogger`
+  (`unavailableReason`/`handleFailure`) menampilkan pesan jelas, bukan crash.
+- **Surface token**: `SurfaceTokens.swift` — latar `#0A0A0F`/`#121216`, surface
+  stepping 3 lapis, aksen gradient "ruang→nebula" hanya untuk elepas aktif,
+  hairline border. Glassmorphism **sengaja ditolak** (kontras tak terjamin).
+- **Dynamic Type**: empat `.system(size:` hanya ada di komentar; sisanya
+  font semantik + `@ScaledMetric`.
+- **Reduced motion**: `MotionPolicy.allowsTransitions`.
+
+Jadi "misinya" (Bagian 1–4, Fase A/B/C) sudah selesai; yang tersisa adalah
+penyempurnaan tanpa henti yang paling ber-nilai, bukan membangun ulang.
+
+### Yang ditambahkan: jalur bawah-horizon ke .lock (gap kejujuran nyata)
+
+`DaylightLockTests` menguji controller sampai `.lock` untuk siang, **tapi**
+ia sengaja memilih bintang DI ATAS horizon (alt > 30°) supaya penolakannya
+datang dari `daylight`, bukan `belowHorizon`. Jadi celah "arah tunjuk ke benda
+di bawah horizon tetap `.lock`" belum pernah diuji di level controller — persis
+kelas cacat yang diulang di repo ini (bagian benar sendiri, jalur ke `.lock`
+belum disambung).
+
+`BelowHorizonHonestyTests` (3 tes, memutar `PointingController` sungguhan):
+1. bintang di bawah horizon (malam, langit gelap) → tidak pernah `.lock`;
+2. `snapshot.searchHint == .allBelowHorizon` (jujur, bukan `.noCandidates`),
+   dan tidak ada haptic `lockSucceeded`;
+3. bintang SAMA saat di atas horizon (> 30°) → **harus** `.lock` (bukti
+   positif bahwa penolakan tadi spesifik ke horizon).
+
+Sasaran dipilih dari resolver (alt ≤ −30 pada `downTime`, > 30 pada `upTime`,
+keduanya malam), bukan ditulis tangan — fixture yang berubah gagal keras.
+
+### Gerbang
+- `./swift-test.sh` → **CelestialEngine 182, PointingKit 640** (+3), 0 gagal.
+  Engine tidak disentuh.
+- `./swift-ui-lint.sh` → 28 aturan hijau (Aturan 10 menangkap README 637→640).
+- `python3 Tools/check-visuals.py --check` → 296 pemeriksaan, 0 gagal.
+- CI: `37450238487` (Engine Tests Linux) + `37450238279` (Apple Build macos-15)
+  — **dua-duanya hijau** pada `185440d`.
+
+### Sisa penyempurnaan bernilai nyata (pilih kecil, verifikasi Linux)
+- Perluas katalog visual ke lebih banyak objek langit dalam (sudah 17: 4
+  morfologi).
+- Uji kejujuran ujung-ke-ujung lainnya: piringan Bulan redup / siang hari →
+  tidak lock (mirip pola di atas, filter lain yang belum tersambung controller).
+- QA berkelanjutan: tiap cacat → tes regresi dulu, baru perbaiki.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — koefisien warna bintang yang tidak pernah dibandingkan antar bahasa)
 
 ### Cacatnya: indeks B−V dijaga, tapi konversinya tidak
