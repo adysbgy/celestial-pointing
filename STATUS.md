@@ -74,6 +74,8 @@ Baris kedua yang menentukan: tanpa uji negatif, aturan yang menandai setiap
   **tidak ada kode Swift yang berubah**; yang masuk hanya gerbang + README.
 - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
 - `python3 Tools/check-visuals.py --check` → **230 pemeriksaan**, 0 gagal.
+- CI: `37427513897` (Engine Tests Linux) + `37427513688` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `eae1dd7`.
 
 ### Batas yang jujur
 
