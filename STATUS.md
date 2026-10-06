@@ -10903,3 +10903,72 @@ sekadar cocok dengan kode saat ini.
   - Yang diukur adalah port Python, bukan `Canvas` SwiftUI di perangkat.
     Port-nya diikat ke view lewat `check_port_matches_swift_constants`, tapi
     kesamaan piksel di perangkat belum diverifikasi.
+
+## Siklus: nebula planetari bukan nebula (2026-10-06)
+
+### Premis: bentuk yang berlawanan arah tidak boleh berbagi satu nama
+
+M27 (Dumbel) dan M57 (Cincin) dipetakan ke `.nebula`. Katalog sendiri
+menulis "nebula planetari" di komentarnya, tapi layar menggambar bentuk
+yang berlawanan dengan kata itu: nebula emisi paling terang dan paling
+padat di **pusat**, sedangkan nebula planetari adalah cangkang gas yang
+justru **berongga** di tengah — gasnya sudah ditiup keluar oleh bintang
+pusatnya yang sekarat.
+
+Bukan sekadar kurang mirip. Gambar itu menyatakan "gas mengumpul di sini"
+pada objek yang gasnya sudah pergi.
+
+### Kenapa cacatnya tidak terlihat
+
+Tiga hal sekaligus menutupinya, dan masing-masing tampak sehat:
+
+  - `Morphology` hanya punya 4 kasus, jadi tidak ada yang "hilang".
+  - `VisualFrame.deepSky` tidak punya cabang kelima — yang belum ada tidak
+    bisa dirindukan.
+  - `testEveryCatalogueDeepSkyObjectHasASpokenMorphology` tetap hijau: M27
+    memang punya bentuk dan memang punya kata. Keduanya saja salah.
+
+Inilah kelas cacat yang paling mahal di repo ini: **klaim yang tidak
+terlihat**. Tidak ada teks yang bisa dibaca pengguna untuk mengeceknya,
+dan tidak ada uji yang melihatnya, karena yang diuji keberadaan bentuk,
+bukan kebenarannya.
+
+### Perbaikannya: bentuk, kata, dan port gambar
+
+  - `Morphology.planetaryNebula` + pemetaan m27/m57.
+  - `VisualFrame.deepSky`: cangkang 8 blob pada **satu radius**, tanpa blob
+    di pusat. Komponen 45° dihitung (`r/√2`), bukan ditulis — angka yang
+    dibulatkan ke 6 desimal membuat cangkang menyimpang 2e-7 dari satu
+    radius dan menggagalkan uji pembedanya tanpa ada yang salah.
+  - `DeepSkySpeech`: kata "nebula planetari" sendiri. Gambar berbeda dengan
+    kata yang sama hanya memindahkan cacat dari mata ke telinga — dan
+    pengguna VoiceOver tidak melihat gambarnya sama sekali.
+  - Port Python: tanpa cabang ini, **setiap** pemeriksaan gambar mengukur
+    bentuk yang tidak pernah tampil.
+
+### Tiga uji, masing-masing menutup satu jalan lulus yang salah
+
+  - `testPlanetaryNebulaIsHollowAtTheCentre` — vs nebula emisi.
+  - `testPlanetaryNebulaShellSitsOnOneRadius` — vs gugus terbuka, yang juga
+    tanpa inti tapi tersebar pada radius berbeda-beda. Tanpa ini, cangkang
+    yang menyebar lolos semua pemeriksaan "tidak punya inti" sambil tampil
+    sebagai gugus.
+  - `testPlanetaryNebulaDiffersFromItsNearestNeighbours` — keduanya sekaligus.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine 174, PointingKit **628** (3 baru), 0 gagal.
+  - `./swift-ui-lint.sh` -> 25 aturan hijau (Aturan 10 menuntut README
+    diperbarui ke 628; README tertinggal di 625).
+  - `python3 Tools/check-visuals.py --check` -> **195** pemeriksaan (4 pasang
+    baru + kabut netral), 0 gagal.
+  - CI: Engine Tests `37403317250` + Apple Build `37403317180`, success.
+
+### Yang TIDAK diklaim
+
+  - Cangkangnya digambar sebagai cincin **bulat**. M27 sungguhan berbentuk
+    dumbel (dua lobus), M57 cincin. Keduanya sementara berbagi satu geometri
+    karena perbedaan lobus vs cincin belum punya pembeda terukur; yang sudah
+    benar dan teruji adalah lubang tengahnya, yang membedakan keduanya dari
+    nebula emisi.
+
