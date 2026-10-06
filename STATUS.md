@@ -38,6 +38,8 @@
   `Packages/PointingKit/Tests/` saja.
 - **Hitungan.** 182 + 650 hijau (dari 647). README diperbarui karena gerbang UI
   yang menjaga angka itu ikut menggigit.
+- CI: `37457789272` (Engine Tests Linux) + `37457789113` (Apple Build
+  macos-15) — dua-duanya hijau pada `d2b17a4`.
 
 ---
 
