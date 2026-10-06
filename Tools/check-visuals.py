@@ -926,6 +926,41 @@ def check_port_matches_swift_constants(results):
          "neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)",
          view),
     ]
+    # Palet planet. Hingga sini **tidak dijaga siapa pun**: `PLANET_PALETTE`
+    # di port Python dan `Planet.palette` di Swift memuat warna + pemetaan
+    # ciri yang sama untuk kelima planet, dan mengubah salah satu sisi
+    # membiarkan seluruh pemeriksaan di atas hijau sambil mengukur gambar
+    # yang sudah tidak ada lagi. (STATUS.md — "sisa yang paling bernilai".)
+    #
+    # Dua arah dijaga: (1) tiap planet di model harus cocok warnanya di port,
+    # (2) tiap planet di port harus ada di model — jadi penambahan planet
+    # baru ke satu sisi tanpa pasangannya ikut merah, bukan diam.
+    swift_planets = read_planet_palettes_from_swift(model)
+    for name, (light, dark, feature) in swift_planets.items():
+        if name not in R.PLANET_PALETTE:
+            results.append(Result(
+                f"palet planet: {name} ada di kedua sisi", False,
+                f"{name} hilang dari PLANET_PALETTE port"))
+            continue
+        port_entry = R.PLANET_PALETTE[name]
+        results.append(Result(
+            f"palet planet: {name} terang (port == model)",
+            all(abs(a - b) < 1e-6 for a, b in zip(light, port_entry["light"])),
+            f"port={port_entry['light']}, model={light}"))
+        results.append(Result(
+            f"palet planet: {name} gelap (port == model)",
+            all(abs(a - b) < 1e-6 for a, b in zip(dark, port_entry["dark"])),
+            f"port={port_entry['dark']}, model={dark}"))
+        results.append(Result(
+            f"palet planet: {name} ciri (port == model)",
+            feature == port_entry["feature"],
+            f"port={port_entry['feature']}, model={feature}"))
+    for name in R.PLANET_PALETTE:
+        if name not in swift_planets:
+            results.append(Result(
+                f"palet planet: {name} di port ada di model", False,
+                f"{name} tidak ada di Planet.palette Swift"))
+
     for check in checks:
         label, port_value, expected, source_text, source = check[:5]
         # Nama berkas sumber ikut, bukan "sumber Swift" yang dipaku: dua
@@ -956,6 +991,43 @@ def swift_tuple_triples(source, anchor, terminator="]"):
             for match in re.findall(
                 r"\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,"
                 r"\s*(-?\d+(?:\.\d+)?)\s*\)", region)]
+
+
+def read_planet_palettes_from_swift(source):
+    """Baca seluruh `Planet.palette` dari teks Swift, per planet.
+
+    Pemetaan planet → warna + ciri hidup di **dua bahasa** (`Planet.palette`
+    di Swift dan `PLANET_PALETTE` di port Python). Yang dijaga di sini bukan
+    satu angka, melainkan **tiap** `case` di dalam `switch` — sehingga
+    perubahan warna pada satu planet di salah satu sisi merah, bukan diam.
+
+    Pembacaan mengikuti bentuk yang sudah ditulis di `CelestialVisual.swift`:
+    tiap cabang `case .<nama>:` mengembalikan `.init(light: .init(red: r,
+    green: g, blue: b), dark: .init(red: r, green: g, blue: b), feature:
+    .<ciri>)`. Nama berkas yang salah akan membuat `source.index(...)` lempas
+    — itu kegagalan yang disengaja, bukan pengecualian tersembunyi: pesannya
+    menyebut `var palette` supaya pembaca tahu apa yang harus dikembalikan.
+    """
+    anchor = "var palette: CelestialVisual.Palette {"
+    if anchor not in source:
+        raise ValueError("'var palette' tidak ditemukan di CelestialVisual.swift")
+    region = source[source.index(anchor):]
+    out: dict[str, tuple[tuple[float, float, float],
+                          tuple[float, float, float], str]] = {}
+    for m in re.finditer(
+            r"case \.(\w+):\s*"
+            r"return \.init\(\s*"
+            r"light:\s*\.init\(red: ([\d.]+), green: ([\d.]+), blue: ([\d.]+)\)"
+            r"[\s\S]*?"
+            r"dark:\s*\.init\(red: ([\d.]+), green: ([\d.]+), blue: ([\d.]+)\)"
+            r"[\s\S]*?"
+            r"feature: \.(\w+)\)", region):
+        name = m.group(1)
+        light = (float(m.group(2)), float(m.group(3)), float(m.group(4)))
+        dark = (float(m.group(5)), float(m.group(6)), float(m.group(7)))
+        feature = m.group(8)
+        out[name] = (light, dark, feature)
+    return out
 
 
 def check_feature_arrays_match_the_view(results):
