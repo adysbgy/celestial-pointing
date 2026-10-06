@@ -2021,6 +2021,103 @@ def check_crater_drawing_constants(results):
             f"{'ada' if port_use in port else 'TIDAK'}, view memakai '{view_text}' = "
             f"{'ada' if view_text in view else 'TIDAK'}"))
 
+    # **Cacat keempat di berkas kawah ini — bentuk yang belum pernah ada.**
+    #
+    # Dua konstanta di atas dijaga karena keduanya **memakai notasi yang
+    # sama** di kedua bahasa: `0.45·ukuran` ditulis `size * 0.45` dan `mr *
+    # CRATER_RIM_OFFSET`. Cakram bibir kawah tidak seperti itu — bentuknya
+    # sama, tapi **notasinya berbeda**:
+    #
+    # | | sisi | apa yang ditulis |
+    # |---|---|---|
+    # | view | `Path(ellipseIn: CGRect(… width: size * 1.84 …))` | **diameter** |
+    # | port | `canvas.disc(…, mr * 0.92, …)` | **radius** |
+    #
+    # Satu angka (0,92) dalam dua satuan. `1.84 = 2 × 0.92`, jadi kodenya
+    # benar — dan karena itu **tidak ada yang bisa melihatnya**: gerbang
+    # `check_crater_drawing_constants` di atas hanya menguji dua konstanta
+    # yang notasinya sama, dan tidak ada gerbang lain yang menyebut `1.84`
+    # maupun `0.92` sama sekali.
+    #
+    # Bukti kedua yang menentukan (audit mutasi, dua arah terpisah):
+    #
+    #     VIEW  1.84 -> 1.60   313 pemeriksaan, 0 gagal
+    #     PORT  0.92 -> 0.70   313 pemeriksaan, 0 gagal
+    #
+    # Dua mutasi mengubah **lebar sabit bibir kawah** — kontur yang menentukan
+    # apakah kawah terbaca sebagai cekung bergerigi atau sebagai stiker rata
+    # — dan seluruh gerbang diam. Menggeser `0.92` di port membuat gambar
+    # kawah di PNG menyimpang dari gambar kawah di jam tanpa satu pun
+    # pemeriksaan yang menyebutnya.
+    #
+    # Perbaikannya **bukan** menyamakan angkanya secara harfiah, karena
+    # keduanya memang harus berbeda (diameter vs radius). Yang diikat
+    # adalah **rasio yang dihitung ulang**: diameter view harus persis dua
+    # kali radius port. Menulis ulang rumusnya di gerbang, bukan memanggil
+    # fungsi view yang sedang diukur.
+    #
+    # Dua arah tetap wajib: merah kalau view berubah tanpa port, **dan**
+    # merah kalau port berubah tanpa view. Sifat simetrisnya penting di
+    # sini — kalau hanya satu arah, `view 1.84 + port 0.70` (yang keduanya
+    # diperkecil) lolos sebagai "keseimbangan", padahal tidak ada yang
+    # mengatakannya sama.
+    #
+    # **Yang TIDAK ditutup, dan sengaja.** Kalau **kedua** sisi diubah
+    # bersama (`view 1.60 + port 0.80`), gerbang ini tetap hijau. Itu benar:
+    # ia mengikat **rasio** (satu angka dalam dua satuan), bukan nilai
+    # absolutnya. Mengikat nilai absolut berarti menulis "1.84 adalah angka
+    # yang benar" ke dalam gerbang, dan daftar seperti itu menjadi **entri
+    # yang tidak pernah dibandingkan** — persis lubang yang gerbang-gerbang
+    # tetangganya tutup. `1.84` juga tidak punya model di `PointingKit`, jadi
+    # tidak ada sumber kebenaran ketiga selain kedua sisi itu sendiri.
+    #
+    # Dinyatakan di sini supaya gerbang ini tidak dibaca lebih kuat dari yang
+    # diukurnya: ia menangkap **drift**, dan keputusan "kawah ini harus lebih
+    # lebar" tetap milik review manusia.
+    #
+    # `(?<![\w.])` dipakai supaya angka yang dimaksud tidak tertangkap sebagai
+    # digit terakhir pengenal — versi pertama regex ini membaca "diameter 2"
+    # dari `size * 1.84` dan membuat gerbang merah **pada kode yang benar**.
+    # Gerbang yang merah pada kode benar akan dimatikan orang, jadi ini bukan
+    # gangguan: ini syarat agar gerbang ini bisa hidup.
+    view_rim = re.search(r"width:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*,\s*"
+                         r"height:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*\)", view)
+    if not view_rim:
+        results.append(Result(
+            "kawah: diameter sabit bibir terbaca dari view", False,
+            "'width: size * N, height: size * N)' tidak ditemukan di "
+            "CelestialVisualView.drawCraters — faktor cakram sabit tidak "
+            "lagi terbaca"))
+        return
+
+    port_rim = re.search(r"canvas\.disc\(mx \+ rim_x \* offset, "
+                         r"my \+ rim_y \* offset, mr \s*\*\s*(?<![\w.])(\d+\.\d+),", port)
+    if not port_rim:
+        results.append(Result(
+            "kawah: radius sabit bibir terbaca dari port", False,
+            "'canvas.disc(…, mr * N,' tidak ditemukan di render-visuals — "
+            "faktor cakram sabit tidak lagi terbaca"))
+        return
+
+    view_diameter = float(view_rim.group(1))
+    view_height = float(view_rim.group(2))
+    # View menulis `width` dan `height` terpisah; dua angka itu harus sama,
+    # karena elips yang lebar != tinggi bukan cakram dan bukan lagi "bibir
+    # kawah" — ia jadi bentuk lain tanpa satu pun yang menyadarinya.
+    results.append(Result(
+        "kawah: sabit bibir digambar sebagai lingkaran (view)",
+        abs(view_diameter - view_height) < 1e-9,
+        f"diameter {view_diameter:g} × tinggi {view_height:g}"))
+
+    port_radius = float(port_rim.group(1))
+    same_disc = abs(view_diameter - 2 * port_radius) < 1e-9
+    results.append(Result(
+        "kawah: diameter view = dua kali radius port",
+        same_disc,
+        f"view {view_diameter:g} = 2 × port {port_radius:g}" if same_disc
+        else f"view {view_diameter:g} vs 2 × port {2 * port_radius:g}"))
+
+
 
 def check_sun_profile_matches_the_model(results):
     """Profil Matahari di port Python harus sama dengan model Swift — angkanya.
