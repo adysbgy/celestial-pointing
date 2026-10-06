@@ -1,4 +1,121 @@
-## Progres terakhir (6 Okt 2026 — jalur `tooFaint` dibuktikan lewat controller)
+## Progres terakhir (6 Okt 2026 — tiga gerbang yang mengukur model, port, atau port melawan dirinya sendiri)
+
+### Cara membuka siklus ini: mutasi satu per satu, bukan membaca kode
+
+Brief misi ini sudah selesai jauh sebelum hari ini (STATUS.md entri
+"audit ulang status brief" sudah memverifikasi Bagian 1–4 + Fase A/B/C satu
+per satu dari kode sungguhan, bukan dari log). Jadi yang tersisa bukan
+membangun, melainkan mencari **cacat yang tidak terlihat dari membaca**.
+Alat yang dipakai: **audit mutasi** — ubah satu konstanta di sumber, jalankan
+gerbang, lihat apakah ada yang merah. Tiga mutasi pertama langsung membuka
+tiga celah yang bentuknya sama.
+
+### Bentuk cacatnya: satu kelas, tiga tempat
+
+| Celah | Gejala saat mutasi | Pemeriksaan lama yang seharusnya menangkap |
+|---|---|---|
+| skala magnitudo → ukuran | `raw = 1.0` (semua bintang sama besar) | **nol** dari 296 |
+| geometri bintang | 4 parameter, masing-masing | **nol** per mutasi |
+| bayangan kawah | `0.55 → 0.05` | **hijau** |
+
+Semuanya satu kalimat: **model Swift diubah, port Python tidak, dan gerbang
+gambar tetap hijau sambil mengukur gambar yang tidak pernah tampil di jam.**
+Ini pola yang sudah tercatat di STATUS.md lima kali (palet planet, kawah,
+maria, profil Matahari, relief kawah, indeks warna bintang) — tapi untuk
+kelompok ini **belum pernah** dibuktikan secara sistematis, dan hasilnya
+mengevualifikasi: bukan enam daftar yang sama, tapi tiga **pengikat antar
+lapis** yang memang tidak pernah ada.
+
+Yang paling berbahaya dari tiga adalah **skala magnitudo**, karena dua
+lapis yang mengukurnya **sudah ada** dan hijau: `testSizeScaleIsLogarithmicNotLinear`
+mengukur modelnya, dan `check_star_colour_order` mengukur gambarnya. Keduanya
+benar, tapi tidak ada yang mengikat apakah keduanya masih hal yang sama.
+`relative_size` dipakai juga untuk warna mode malam port, jadi skala yang
+simpang diam-diam mengubah kecerahan yang diukur `check_night_mode_purity` —
+yaitu gerbang yang mengukur piksel yang tidak pernah digambar aplikasi.
+
+### Cacat ketiga beda sifatnya: gerbangnya sudah ada, dan ia membandingkan port dengan port
+
+Dua di atas adalah celah yang **tidak ada** penjaganya. Yang ketiga lebih
+jahat: `check_crater_relief_matches_the_model` sudah ada dan sudah hijau,
+dan mengklaim mengukur "rumus sama di kedua bahasa". Tapi `want_strength`
+dibangun dari `R.CRATER_RIM_STRENGTH` lalu dibandingkan dengan `relief[i][5]`
+yang dihitung oleh `crater_relief` dari **konstanta yang sama**. Port lawan
+port — jadi mengubah `0.55 → 0.05` mengubah bayangan kawah yang benar-benar
+tergambar, dan gerbang tetap hijau. Perbaikannya kedua koefisien dibaca dari
+**model Swift**, dan rumusnya ditulis ulang dari koefisien model.
+
+Pelajaran yang layak ditulis di repo ini: **"hijau" pada gerbang yang
+mengakui dua bahasa adalah bukti yang lebih lemah dari yang tampaknya.**
+
+### Tiga keputusan yang menjaga gerbang baru tidak menjadi daftar tangan
+
+- **Baca dari sumber, dua bahasa.** Parameter diambil dari teks `CelestialVisual.swift`
+  dan `render-visuals.py`, bukan disalin ke dalam gerbang. Daftar tangan di
+  gerbang akan menjadi **entri ke-N yang tidak pernah dibandingkan** — persis
+  lubang yang sedang ditutup.
+- **Tulis ulang rumusnya, jangan panggil.** `star_geometry_outer` dan
+  `magnitude_scale_from_parameters` menghitung ulang dari parameter yang
+  dibaca. Kalau gerbang memanggil `R.star_geometry` untuk mengukurnya,
+  kesalahan di fungsi itu ikut lolos bersama pengukurannya.
+- **Bandingkan hasilnya, bukan cuma angkanya.** Ujung terluar bintang dan
+  ukuran magnitudo diuji di seluruh rentang (21 ukuran, 28 magnitudo),
+  karena daftar angka tidak akan melihat parameter yang dipakai di tempat yang salah.
+
+### Bukti: 15 mutasi, dua arah
+
+Delapan mutasi di port, tujuh di model. Semuanya membuat satu atau lebih
+pemeriksaan merah — jadi gerbang ini menggigit di kedua bahasa, dan yang
+direvisi di model saja tertangkap.
+
+### Tiga mutasi sunyi pertama: cacat harness, bukan gerbang tuli
+
+Ini bagian yang paling perlu dicatat, karena "sunyi" yang ternyata
+menuduh gerbang yang benar hampir sama berbahaya dengan gerbang yang tuli.
+
+| Mutasi yang tampak sunyi | Penyebab sebenarnya |
+|---|---|
+| `frame_half_extent 1.0 → 0.7` | teks itu ada di **5** fungsi port; `replace(...,1)` menyasar yang pertama — `saturn_ring`, bukan `star_geometry` yang diukur |
+| `CRATER_RIM_STRENGTH 0.55 → 0.05` | **sama panjang** (`0.55`/`0.05`), jadi `__pycache__` port dipakai ulang |
+| `CRATER_FLOOR_DEPTH 0.22 → 0.02` | sama persis |
+
+Harness diperbaiki dengan tiga hal: mutasi menyebut **keberapa** occurrence
+dan memverifikasi ulang potongan target **di dalam** teks mutasi;
+`__pycache__` dihapus sebelum tiap muat; dan mutasi yang gagal disuntik
+dilaporkan sebagai **kelemahan bukti**, bukan sebagai hasil. Setelah itu
+kedua mutasi itu merah di baris yang tepat.
+
+Pelajaran yang lebih luas dari pada mutasinya: **"nol pemeriksaan merah"
+tidak berarti "mutasi tertangkap"**. Ia bisa berarti mutasi itu tidak pernah
+menyasar. Bukti yang benar menuntut dua hal sekaligus: mutasi **terpasang**
+dan gerbang **memang** melihatnya.
+
+### Gerbang
+- `python3 Tools/check-visuals.py --check` → **313 pemeriksaan** (296 → 313,
+  +17 = 7 skala magnitudo + 8 geometri bintang + 2 koefisien kawah),
+  0 gagal.
+- `./swift-test.sh` → **CelestialEngine 182** (tak berubah), **PointingKit 650**
+  (tak berubah) — **tidak ada kode Swift yang berubah**; yang masuk hanya
+  gerbang.
+- `./swift-ui-lint.sh` → 28 aturan hijau. `./swift-typecheck.sh` → LULUS.
+- CI: `37474127973` (Engine Tests Linux) + `37474127936` (Apple Build macos-15).
+
+### Batas yang jujur
+- **Yang dibuktikan:** skala magnitudo, geometri bintang, dan coefisien
+  bayangan kawah tidak bisa menyimpang antara model Swift dan port Python
+  tanpa gerbang berbunyi — di kedua arah. **Yang belum:** gerbang ini
+  mengikat **bentuknya**, bukan benar/tidaknya secara astronomi; dan
+  `check_crater_relief_matches_the_model` masih hanya menguji arah + rumus,
+  bukan apakah hasilnya terlihat benar di layar.
+- **Harness bukti ada di `out/` yang di-ignore**, jadi tidak ikut ter-commit.
+  Itu keputusan: harness berisi mutasi yang sengaja merusak sumber, jadi
+  ia tidak boleh ikut terbawa ke dalam repo.
+- Gerbang yang sudah ada **tidak dihapus atau ditulis ulang** — hanya
+  dua koefisien yang sumbernya dipindah dari port ke model.
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — jalur `tooFaint` dibuktikan lewat controller)
 
 - **Yang ditutup.** `tooFaint` adalah satu-satunya alasan `VisibilityFilter` yang
   belum pernah terbukti sampai ke `.lock` lewat controller sungguhan. Sekarang
