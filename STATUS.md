@@ -64,6 +64,8 @@ bentuk-port lawan bentuk-port.
 - `./swift-ui-lint.sh` → 26 aturan hijau.
 - `./swift-test.sh` → **CelestialEngine 182, PointingKit 637**, 0 gagal —
   tidak ada kode Swift yang berubah; yang masuk hanya gerbang Python.
+- CI: `37431024017` (Engine Tests Linux) + `37431024084` (Apple Build
+  macos-15) — **dua-duanya hijau** pada `06a8ff9`.
 
 ### Batas yang jujur
 
