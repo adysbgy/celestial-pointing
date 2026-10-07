@@ -42,6 +42,12 @@ public struct PointingSnapshot: Equatable, Sendable {
     public var nearestNeighbourDeg: Double?
     /// Sumbu badan yang dianggap "arah tunjuk".
     public var aim: DeviceAimAxis
+    /// Orientasi perangkat **mentah** dari sampel terakhir, sebelum perataan.
+    ///
+    /// Dipakai Experiment 1 untuk mengarsipkan attitude mentah tiap percobaan
+    /// (Lampiran A) — satu-satunya data yang membuat `rawPointing` bisa
+    /// dihitung ulang dari nol. `nil` bila belum ada sampel.
+    public var rawAttitudeQuaternion: Quaternion?
     /// Apakah sensor sedang tersedia.
     public var hasSensor: Bool
     /// Apakah kalibrasi sudah pernah diselesaikan.
@@ -65,6 +71,7 @@ public struct PointingSnapshot: Equatable, Sendable {
                 angularRateDegPerSec: Double? = nil,
                 nearestNeighbourDeg: Double? = nil,
                 aim: DeviceAimAxis = .view,
+                rawAttitudeQuaternion: Quaternion? = nil,
                 hasSensor: Bool = true,
                 isCalibrated: Bool = false,
                 searchHint: SearchHint? = nil) {
@@ -75,6 +82,7 @@ public struct PointingSnapshot: Equatable, Sendable {
         self.angularRateDegPerSec = angularRateDegPerSec
         self.nearestNeighbourDeg = nearestNeighbourDeg
         self.aim = aim
+        self.rawAttitudeQuaternion = rawAttitudeQuaternion
         self.hasSensor = hasSensor
         self.isCalibrated = isCalibrated
         self.searchHint = searchHint
@@ -387,6 +395,7 @@ public final class PointingController {
             angularRateDegPerSec: machine.angularRateDegPerSec,
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
+            rawAttitudeQuaternion: machine.lastRawQuaternion,
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0,
             // Alasan hanya jujur saat `.searching`: pergelangan sudah diam dan
@@ -478,6 +487,7 @@ public final class PointingController {
             angularRateDegPerSec: machine.angularRateDegPerSec,
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
+            rawAttitudeQuaternion: machine.lastRawQuaternion,
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0,
             searchHint: resolved == .searching ? lastResolution?.searchHint : nil

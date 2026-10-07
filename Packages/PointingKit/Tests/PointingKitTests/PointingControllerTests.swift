@@ -719,6 +719,61 @@ final class PointingControllerTests: XCTestCase {
         XCTAssertEqual(command.target.altitudeDeg, truth.altitudeDeg, accuracy: 1e-9)
     }
 
+    // MARK: - Bidang Lampiran A (attitude mentah mengalir ke cuplikan)
+
+    /// Attitude **mentah** yang baru masuk harus muncul apa adanya di
+    /// cuplikan — bukan hasil perataan (smoother), bukan hasil kalibrasi.
+    ///
+    /// Ini satu-satunya data yang membuat Experiment 1 bisa dianalisis ulang.
+    /// Kalau yang tersimpan adalah nilai sudah diolah, `rawPointing` tidak
+    /// lagi bisa dihitung ulang dari nol dan berkas eksperimen pertama jadi
+    /// tidak berguna untuk menguji ulang keputusan kalibrasi.
+    func testRawAttitudeReachesSnapshotUnsmoothed() {
+        let c = controller(singleStarResolver())
+        let q = quaternion(viewPointingAt: siriusDirection(singleStarResolver()))
+        // Sampel pertama tidak ada yang bisa dibandingkan: smoother
+        // mengembalikan nilai apa adanya, jadi mentah == teredam di sini.
+        c.feed(quaternion: q, timestamp: at(0))
+        XCTAssertEqual(c.snapshot.rawAttitudeQuaternion, q,
+                       "attitude mentah harus tersimpan apa adanya")
+    }
+
+    /// Setelah perataan menyala, cuplikan tetap harus menyimpan sampel mentah
+    /// terakhir — bukan nilai teredam. Inilah bedanya bidang arsip dengan
+    /// `rawPointing` yang sudah diolah.
+    func testRawAttitudeStaysRawAfterSmoothingEngages() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        let target = siriusDirection(resolver)
+        // Dua sampel berurutan supaya smoother benar-benar mencampur.
+        let first = quaternion(viewPointingAt: target)
+        c.feed(quaternion: first, timestamp: at(0))
+        let second = quaternion(viewPointingAt: HorizontalCoord(altitudeDeg: target.altitudeDeg + 5,
+                                                                azimuthDeg: target.azimuthDeg))
+        c.feed(quaternion: second, timestamp: at(0.5))
+
+        XCTAssertEqual(c.snapshot.rawAttitudeQuaternion, second,
+                       "yang tersimpan harus sampel terakhir, bukan nilai teredam")
+    }
+
+    /// Alur berhenti → attitude mentah ikut dibuang.
+    ///
+    /// Membiarkannya berarti percobaan yang direkam setelah alur dihentikan
+    /// akan membawa orientasi dari alur yang sudah tidak berlaku — persis
+    /// kelas "data lama bocor ke rekaman baru" yang sudah pernah terjadi pada
+    /// arah tunjuk.
+    func testStopClearsRawAttitude() {
+        let resolver = singleStarResolver()
+        let c = controller(resolver)
+        c.feed(quaternion: quaternion(viewPointingAt: siriusDirection(resolver)),
+               timestamp: at(0))
+        XCTAssertNotNil(c.snapshot.rawAttitudeQuaternion)
+
+        c.stop()
+        XCTAssertNil(c.snapshot.rawAttitudeQuaternion,
+                     "attitude mentah alur lama tidak boleh tersisa")
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat

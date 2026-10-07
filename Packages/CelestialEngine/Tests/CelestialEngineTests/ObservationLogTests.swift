@@ -270,4 +270,63 @@ final class ObservationLogTests: XCTestCase {
         let restored = try TrialArchive.decode(data)
         XCTAssertEqual(restored, original)
     }
+
+    // MARK: - Bidang Lampiran A (analisis ulang)
+
+    /// Bidang Lampiran A harus **selamat** melewati arsip JSON. Kalau
+    /// quaternion mentah hilang saat encode/decode, satu-satunya data yang
+    /// mengizinkan perhitungan ulang lenyap tanpa suara — rekaman tetap
+    /// "terbaca", tapi tidak lagi bisa dianalisis ulang.
+    func testAppendixAFieldsSurviveTheArchive() throws {
+        let raw = Quaternion(w: 0.5, x: -0.5, y: 0.5, z: -0.5)
+        var t = trial(pointingAlt: 30, pointingAz: 200, bestID: "sirius",
+                      level: .high, truthID: "sirius")
+        t.rawAttitudeQuaternion = raw
+        t.aimAxis = .view
+        t.source = "Apple Watch Seri 9 — unit uji 1"
+
+        let restored = try TrialArchive.decode(try TrialArchive.encode([t]))
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertEqual(restored[0].rawAttitudeQuaternion, raw)
+        XCTAssertEqual(restored[0].aimAxis, .view)
+        XCTAssertEqual(restored[0].source, "Apple Watch Seri 9 — unit uji 1")
+    }
+
+    /// **Kompatibilitas mundur.** Arsip yang ditulis sebelum bidang Lampiran A
+    /// ada (tanpa `rawAttitudeQuaternion`/`aimAxis`/`source`) harus tetap
+    /// terbaca, dan bidang yang hilang bernilai `nil` — bukan membuat seluruh
+    /// berkas gagal dibuka.
+    ///
+    /// Tanpa ini, satu berkas lama cukup untuk memblokir analisis: decoder
+    /// sintetis Swift menolak kunci yang hilang, jadi dataset lama tidak bisa
+    /// dibuka sama sekali.
+    func testLegacyArchiveWithoutAppendixAFieldsStillDecodes() throws {
+        // JSON apa adanya seperti yang ditulis skema lama — tanpa tiga bidang
+        // baru. `TrialArchive` menyimpan sebuah **array** percobaan, jadi
+        // bentuknya pun harus array.
+        let legacy = """
+        [
+          {
+            "timestamp": "2026-01-01T15:00:00Z",
+            "observer": { "latitudeDeg": -6.2, "longitudeDeg": 106.8 },
+            "rawPointing": { "altitudeDeg": 40, "azimuthDeg": 180 },
+            "intent": { "level": "high",
+                        "best": { "id": "sirius", "name": "Sirius", "kind": "star",
+                                  "raDeg": 101.28715533, "decDeg": -16.71611586,
+                                  "magnitude": -1.46 },
+                        "candidates": [] },
+            "groundTruthObjectID": "sirius",
+            "note": "arsip lama"
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let restored = try TrialArchive.decode(legacy)
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertNil(restored[0].rawAttitudeQuaternion,
+                     "arsip lama tidak punya attitude mentah — nil, bukan gagal")
+        XCTAssertNil(restored[0].aimAxis)
+        XCTAssertNil(restored[0].source)
+        XCTAssertEqual(restored[0].groundTruthObjectID, "sirius")
+    }
 }

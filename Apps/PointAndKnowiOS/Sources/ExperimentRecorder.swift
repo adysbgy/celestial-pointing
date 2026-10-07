@@ -69,10 +69,12 @@ public final class ExperimentRecorder: ObservableObject {
 
     /// Rekam satu percobaan untuk target yang dipilih.
     ///
+    /// - Parameter source: asal rekaman (mis. nama perangkat). Dipakai untuk
+    ///   memisahkan pengukuran dari perangkat/unit berbeda saat analisis.
     /// - Returns: `nil` bila tidak ada yang bisa direkam — pemanggil
     ///   menampilkan `statusMessage` apa adanya, bukan pesan sukses.
     @discardableResult
-    public func record(at date: Date = Date()) -> AnalyzedTrial? {
+    public func record(at date: Date = Date(), source: String? = nil) -> AnalyzedTrial? {
         guard let targetID = selectedTargetID else {
             statusMessage = ExperimentText.statusNoTarget
             return nil
@@ -108,7 +110,10 @@ public final class ExperimentRecorder: ObservableObject {
                                          angularRateDegPerSec: engine.snapshot.angularRateDegPerSec,
                                          calibration: engine.controller.calibration,
                                          timestamp: date,
-                                         note: note.isEmpty ? nil : note) else {
+                                         note: note.isEmpty ? nil : note,
+                                         rawAttitudeQuaternion: engine.snapshot.rawAttitudeQuaternion,
+                                         aimAxis: engine.snapshot.aim,
+                                         source: source) else {
             statusMessage = ExperimentText.statusTargetUncomputable(targetID: targetID)
             return nil
         }

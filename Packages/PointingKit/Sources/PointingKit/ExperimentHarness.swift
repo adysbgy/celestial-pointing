@@ -215,6 +215,11 @@ public final class ExperimentHarness {
     ///     menampilkan klaim apa pun.
     ///   - angularRateDegPerSec: laju pergelangan saat itu, untuk menafsirkan
     ///     apakah galat besar disebabkan gerakan yang belum tenang.
+    ///   - rawAttitudeQuaternion: orientasi perangkat mentah saat itu. Ini
+    ///     bidang Lampiran A: satu-satunya cara `rawPointing` bisa dihitung
+    ///     ulang nanti. `nil` bila sensor tidak memberi attitude.
+    ///   - aimAxis: sumbu badan yang dianggap arah tunjuk saat rekam.
+    ///   - source: asal rekaman (perangkat/tempat).
     ///   - timestamp: waktu percobaan.
     ///   - note: catatan bebas penguji.
     /// - Returns: percobaan yang tersimpan, atau `nil` bila target tidak
@@ -229,7 +234,10 @@ public final class ExperimentHarness {
                        angularRateDegPerSec: Double?,
                        calibration: PointingCalibration,
                        timestamp: Date,
-                       note: String? = nil) -> AnalyzedTrial? {
+                       note: String? = nil,
+                       rawAttitudeQuaternion: Quaternion? = nil,
+                       aimAxis: DeviceAimAxis? = nil,
+                       source: String? = nil) -> AnalyzedTrial? {
         guard let truth = resolver.horizontal(ofObjectID: targetObjectID,
                                               observer: location.observer,
                                               date: timestamp) else {
@@ -242,7 +250,10 @@ public final class ExperimentHarness {
                                   calibratedPointing: calibratedPointing,
                                   intent: intent,
                                   groundTruthObjectID: targetObjectID,
-                                  note: note)
+                                  note: note,
+                                  rawAttitudeQuaternion: rawAttitudeQuaternion,
+                                  aimAxis: aimAxis,
+                                  source: source)
         let analysis = ObservationLog.analyze(trial, truthDirection: truth, state: state)
 
         let analyzed = AnalyzedTrial(trial: trial,

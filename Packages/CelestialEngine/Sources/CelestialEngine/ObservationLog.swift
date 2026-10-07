@@ -24,9 +24,32 @@ public struct PointingTrial: Codable, Equatable, Sendable {
     /// Catatan bebas: kondisi langit, apa yang dipakai penguji, dsb.
     public var note: String?
 
+    // MARK: - Bidang Lampiran A (agar bisa dianalisis ulang)
+
+    /// Orientasi perangkat **mentah** saat tombol ditekan — sebelum perataan
+    /// dan sebelum kalibrasi.
+    ///
+    /// Ini satu-satunya data yang mengizinkan `rawPointing` dihitung ulang
+    /// dari nol: mis. dengan kalibrasi berbeda, konvensi sumbu lain, atau
+    /// setelah bug yang ditemukan belakangan. Rekaman yang hanya menyimpan
+    /// `rawPointing` sudah kehilangan informasi itu selamanya — dan itu
+    /// tidak bisa ditambal setelah percobaan pertama sungguhan terekam.
+    /// `nil` = arsip dibuat sebelum bidang ini ada, atau sensor tidak memberi
+    /// attitude saat itu.
+    public var rawAttitudeQuaternion: Quaternion?
+    /// Sumbu badan yang dianggap "arah tunjuk" saat rekam. Ikut menentukan
+    /// arti `rawPointing`, jadi harus ikut tersimpan.
+    public var aimAxis: DeviceAimAxis?
+    /// Asal rekaman (perangkat/tempat). Diisi lapisan app, bukan engine —
+    /// engine tidak tahu identitas perangkat. `nil` = tidak dicatat.
+    public var source: String?
+
     public init(timestamp: Date, observer: Observer, rawPointing: HorizontalCoord,
                 calibratedPointing: HorizontalCoord?, intent: CelestialIntent,
-                groundTruthObjectID: String? = nil, note: String? = nil) {
+                groundTruthObjectID: String? = nil, note: String? = nil,
+                rawAttitudeQuaternion: Quaternion? = nil,
+                aimAxis: DeviceAimAxis? = nil,
+                source: String? = nil) {
         self.timestamp = timestamp
         self.observer = observer
         self.rawPointing = rawPointing
@@ -34,6 +57,30 @@ public struct PointingTrial: Codable, Equatable, Sendable {
         self.intent = intent
         self.groundTruthObjectID = groundTruthObjectID
         self.note = note
+        self.rawAttitudeQuaternion = rawAttitudeQuaternion
+        self.aimAxis = aimAxis
+        self.source = source
+    }
+
+    /// Penyahkodean yang menerima arsip lama tanpa bidang Lampiran A.
+    ///
+    /// `Codable` sintetis menolak kunci yang hilang, sehingga satu baris arsip
+    /// lama cukup membuat seluruh berkas eksperimen gagal dibuka. Di sini
+    /// bidang baru di-`decodeIfPresent`: arsip lama tetap terbaca dan bidang
+    /// yang kurang bernilai `nil` — yang berarti "belum direkam dengan skema
+    /// baru", bukan "rusak".
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        observer = try c.decode(Observer.self, forKey: .observer)
+        rawPointing = try c.decode(HorizontalCoord.self, forKey: .rawPointing)
+        calibratedPointing = try c.decodeIfPresent(HorizontalCoord.self, forKey: .calibratedPointing)
+        intent = try c.decode(CelestialIntent.self, forKey: .intent)
+        groundTruthObjectID = try c.decodeIfPresent(String.self, forKey: .groundTruthObjectID)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+        rawAttitudeQuaternion = try c.decodeIfPresent(Quaternion.self, forKey: .rawAttitudeQuaternion)
+        aimAxis = try c.decodeIfPresent(DeviceAimAxis.self, forKey: .aimAxis)
+        source = try c.decodeIfPresent(String.self, forKey: .source)
     }
 }
 

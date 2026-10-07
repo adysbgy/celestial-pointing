@@ -55,6 +55,63 @@ final class ExperimentHarnessTests: XCTestCase {
         XCTAssertEqual(h.trials.count, 1)
     }
 
+    /// **Invarian Lampiran A.** Percobaan yang direkam harus membawa attitude
+    /// mentah, sumbu badan, dan sumber — kalau tidak, rekaman pertama yang
+    /// dihasilkan dari perangkat sungguhan sudah tidak bisa dianalisis ulang.
+    ///
+    /// Ini bukan sekadar uji field: `rawPointing` di sini sengaja dibuat
+    /// berbeda dari attitude, dan yang dikunci adalah bahwa **keduanya**
+    /// tersimpan, sehingga hubungan mentah→olahan bisa diperiksa belakangan.
+    func testRecordedTrialCarriesRawAttitudeAndProvenance() {
+        let h = harness()
+        let target = star("sirius")
+        let t = truth("sirius")
+        let raw = Quaternion(w: 0.7071, x: 0, y: 0.7071, z: 0)
+
+        let recorded = try! XCTUnwrap(h.record(targetObjectID: "sirius",
+                                               rawPointing: t,
+                                               calibratedPointing: nil,
+                                               intent: intent(level: .high, object: target),
+                                               state: .lock,
+                                               angularRateDegPerSec: 0.1,
+                                               calibration: .none,
+                                               timestamp: date,
+                                               note: "langit bersih",
+                                               rawAttitudeQuaternion: raw,
+                                               aimAxis: .view,
+                                               source: "unit uji 1"))
+        XCTAssertEqual(recorded.trial.rawAttitudeQuaternion, raw,
+                       "attitude mentah harus ikut tersimpan di rekaman")
+        XCTAssertEqual(recorded.trial.aimAxis, .view)
+        XCTAssertEqual(recorded.trial.source, "unit uji 1")
+    }
+
+    /// Attitude mentah harus **selamat** melewati arsip dataset, bukan hanya
+    /// bertahan di memori sampai app ditutup.
+    func testRawAttitudeSurvivesDatasetArchive() throws {
+        let h = harness()
+        let target = star("sirius")
+        let raw = Quaternion(w: 0.5, x: 0.5, y: 0.5, z: 0.5)
+        _ = h.record(targetObjectID: "sirius",
+                     rawPointing: truth("sirius"),
+                     calibratedPointing: nil,
+                     intent: intent(level: .high, object: target),
+                     state: .lock,
+                     angularRateDegPerSec: 0.1,
+                     calibration: .none,
+                     timestamp: date,
+                     rawAttitudeQuaternion: raw,
+                     aimAxis: .view,
+                     source: "unit uji 2")
+
+        let dataset = h.dataset(calibration: .none, confidenceSigmaDeg: 3, aim: "view")
+        let data = try JSONEncoder.pointingArchive().encode(dataset)
+        let restored = try JSONDecoder.pointingArchive().decode(ExperimentDataset.self, from: data)
+        XCTAssertEqual(restored.trials.first?.trial.rawAttitudeQuaternion, raw,
+                       "attitude mentah harus bertahan di arsip dataset")
+        XCTAssertEqual(restored.trials.first?.trial.source, "unit uji 2")
+    }
+
     /// Mode kegagalan paling berbahaya: yakin tinggi tapi salah.
     func testConfidentButWrongIsFlaggedAsFalseLock() {
         let h = harness()

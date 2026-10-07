@@ -60,6 +60,16 @@ public struct PointingStateMachine: Sendable {
     /// Kecepatan sudut terakhir (derajat/detik), `nil` bila belum terukur.
     public var angularRateDegPerSec: Double? { rateTracker.angularRateDegPerSec }
 
+    /// Orientasi perangkat **mentah** dari sampel terakhir, sebelum perataan.
+    ///
+    /// Disimpan supaya Experiment 1 bisa mengarsipkan attitude mentah tiap
+    /// percobaan (bidang Lampiran A). Tanpa ini, `rawPointing` yang sudah
+    /// diolah tidak bisa dibalik: satu-satunya cara menganalisis ulang rekaman
+    /// dengan kalibrasi/konvensi sumbu berbeda adalah dari quaternion aslinya.
+    /// Direset saat alur berhenti, karena itu orientasi dari alur yang sudah
+    /// tidak berlaku lagi.
+    public private(set) var lastRawQuaternion: Quaternion?
+
     private var rateTracker = AngularRateTracker()
     private var stableSince: Date?
     private var lastResolution: Date?
@@ -91,6 +101,10 @@ public struct PointingStateMachine: Sendable {
         }
 
         let rate = rateTracker.update(quaternion, at: timestamp)
+        // Simpan attitude mentah untuk arsip Experiment 1 (Lampiran A). Ditaruh
+        // sebelum penyaring apa pun supaya yang tersimpan benar-benar nilai
+        // sensor, bukan hasil olahan.
+        lastRawQuaternion = quaternion
         // Laju `nil` (sampel pertama atau ada jeda) diperlakukan sebagai
         // "masih bergerak" — arah aman: jangan mengunci tanpa bukti diam.
         let moving = rate.map { $0 > policy.maxAngularRateDegPerSec } ?? true
@@ -128,6 +142,7 @@ public struct PointingStateMachine: Sendable {
         stableSince = nil
         lastResolution = nil
         currentIntent = nil
+        lastRawQuaternion = nil
         state = .idle
     }
 }

@@ -41,7 +41,11 @@ public enum LocalFrame {
 /// `+X` ke kanan layar, `+Y` ke atas layar, `+Z` keluar dari layar.
 /// Sumbu mana yang dianggap "arah tunjuk" adalah keputusan UX — karena itu
 /// diserahkan sebagai parameter, bukan dipatri di dalam matematika.
-public enum DeviceAimAxis: String, CaseIterable, Equatable, Sendable {
+///
+/// `Codable` sejak bidang Lampiran A: `PointingTrial` menyimpan sumbu yang
+/// berlaku saat rekam, sebab arti `rawPointing` bergantung padanya — rekaman
+/// yang tidak menyebut sumbunya tidak bisa ditafsirkan ulang dengan benar.
+public enum DeviceAimAxis: String, CaseIterable, Codable, Equatable, Sendable {
     /// Keluar dari layar (normal permukaan jam).
     case view
     /// Ke atas layar (menuju punggung tangan saat lengan dijulurkan).
