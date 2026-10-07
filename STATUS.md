@@ -1,3 +1,52 @@
+## Progres terakhir (7 Okt 2026 — `tooCloseToSun` sampai .lock: celah kejujuran terakhir tertutup)
+
+### Cacatnya: berkas uji jujur ada di pohon kerja, lupa di-commit
+
+`TooCloseToSunLockHonestyTests.swift` (5 tes) sudah ditulis di sesi sebelumnya
+tapi tertinggal sebagai berkas tak-terlacak (`git status` = `??`). Isinya
+menutup celah kejujuran terakhir yang disebut STATUS.md entri bawah-horizon:
+jalur `VisibilityFilter.classify` menolak arah tunjuk yang **terlalu dekat
+dengan Matahari** (`tooCloseToSun`, ambang `minSunSeparationDeg` = 30°) — jalan
+pengaman teleskop paling berbahaya, karena `.lock` membuka izin GoTo.
+STATUS.md sendiri mencatat alasan ini "tidak pernah muncul sama sekali" di sapu
+mereka, dan pemindaian 365 hari di sini mengonfirmasi: nol bintang katalog
+pernah berada di (13°, 30°) dari Matahari saat keduanya di atas horizon.
+Jadi seperti `tooFaint`, jalur ini **kode mati di produksi** — dan tes ini
+menyalakannya **sebelum** suatu saat katalog diperluas (bintang konjungsi
+Matahari) membuatnya hidup untuk pengguna.
+
+### Yang dikerjakan: commit + perbaiki README yang tertinggal
+
+- Berkas uji di-commit (5 tes: fixture ada, tidak pernah `.lock`, resolver
+  menyebut `tooCloseToSun`, penolakan jujur di controller, **bukti positif**
+  bintang sama terkunci saat malam).
+- `README.md` masih bilang PointingKit **668**; `swift-test.sh` sebenarnya
+  menjalankan **673** (182 engine + 673 = selisih 5 = tepat isi berkas itu).
+  Aturan 10 `swift-ui-lint.sh` gagal karena angka itu. Diperbaiki ke 673.
+
+### Kenapa ini penting, bukan sekadar pembersihan
+
+Berkas itu sudah hijau sejak sesi lalu, tapi belum pernah masuk `main` — jadi
+ciptaan "jalur `tooCloseToSun` tidak bisa bocor ke `.lock`" belum punya
+perlindungan di cabang utama. Kalau penyaring Matahari kelak disunting tanpa
+sengaja, tidak ada teks layar yang memberitahu pengguna, dan tidak ada tes di
+`main` yang merah. Sekarang ada.
+
+### Hitungan (setelah commit)
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 668 (README) / 673 (aktual) | **673** |
+| Gerbang UI | Aturan 10 gagal | **29 lulus** |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 673), `swift-ui-lint.sh` (29 aturan,
+`exit=0`), `swift-typecheck.sh`, `check-visuals.py --check` (427 pemeriksaan, 0
+gagal). Berkas tersentuh: `TooCloseToSunLockHonestyTests.swift` (di-commit),
+`README.md`. Tidak ada kode produksi Swift yang berubah.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — Bulan di siang hari: celah `.lock` siang belum tersambung untuk benda tata surya)
 
 ### Cacatnya: `DaylightLockTests` hanya bintang, tidak menutup Bulan
