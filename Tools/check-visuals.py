@@ -502,30 +502,13 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
     # gambar yang jelas salah. Marginnya dinyatakan dalam piksel lalu
     # dibagi radius di dalam loop, karena radiusnya baru diketahui setelah
     # gambar pertama dirender.
-    margin_px = 4.0
     for confirmed_name, uncertain_name, label in pairs:
         _, confirmed = render_case(confirmed_name, size=size, ss=ss)
         _, uncertain = render_case(uncertain_name, size=size, ss=ss)
         w, h, rows_a = confirmed
         _, _, rows_b = uncertain
-        radius = min(w, h) / 2.0
-        cx, cy = w / 2.0, h / 2.0
-        margin = margin_px / radius
-        ex0, ey0, ex1, ey1 = (fx0 - margin, fy0 - margin,
-                              fx1 + margin, fy1 + margin)
-        diff = 0
-        for y in range(h):
-            # Baris yang seluruhnya di dalam pita lencana dilewati.
-            uy = (y + 0.5 - cy) / radius
-            if ey0 <= uy <= ey1:
-                continue
-            ra, rb = rows_a[y], rows_b[y]
-            for x in range(w):
-                ux = (x + 0.5 - cx) / radius
-                if ex0 <= ux <= ex1:
-                    continue
-                if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
-                    diff += 1
+        diff = badge_excluded_diff(rows_a, rows_b, w, h,
+                                   (fx0, fy0, fx1, fy1))
         results.append(Result(
             f"{label} hilang saat ragu", diff > 0,
             f"{diff} piksel berbeda di luar lencana (terkunci vs ragu)"))
@@ -540,6 +523,94 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
                if rows_a[y][x * 4:x * 4 + 3] != rows_b[y][x * 4:x * 4 + 3])
     results.append(Result("bentuk galaksi hilang saat ragu", diff > 0,
                           f"{diff} piksel berbeda dari kabut netral"))
+
+
+def badge_excluded_diff(rows_a, rows_b, w, h, footprint, margin_px=4.0):
+    """Piksel berbeda di **luar** kotak lencana "?".
+
+    Lencana digambar hanya pada gambar "ragu", jadi ia ikut terhitung di
+    setiap selisih dan membuat `diff > 0` selalu benar — termasuk ketika
+    cirinya tidak pernah digambar sama sekali. Kotak itu karena itu
+    dikecualikan, dengan margin untuk garis tepi + anti-aliasingnya.
+
+    Satu implementasi dipakai dua gerbang: `check_features_disappear_when_uncertain`
+    (pada ukuran render) dan `check_features_survive_the_watch_size` (pada
+    ukuran jam). Kalau keduanya menyalin aritmetika indeksnya sendiri, satu
+    koreksi di satu tempat akan membuat yang lain mengukur kotak yang berbeda.
+    """
+    fx0, fy0, fx1, fy1 = footprint
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    margin = margin_px / radius
+    ex0, ey0, ex1, ey1 = fx0 - margin, fy0 - margin, fx1 + margin, fy1 + margin
+    diff = 0
+    for y in range(h):
+        # Baris yang seluruhnya di dalam pita lencana dilewati.
+        uy = (y + 0.5 - cy) / radius
+        if ey0 <= uy <= ey1:
+            continue
+        ra, rb = rows_a[y], rows_b[y]
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if ex0 <= ux <= ex1:
+                continue
+            if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
+                diff += 1
+    return diff
+
+
+def check_features_survive_the_watch_size(results, ss=8):
+    """Ciri pengenal harus masih terukur pada ukuran yang **benar-benar tampil**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_features_disappear_when_uncertain`
+    membuktikan kelima ciri planet (Bintik Merah Jupiter, cincin Saturnus, kutub
+    Mars, kawah Merkurius, kabut Venus) hilang saat engine ragu — dan ia benar.
+    Tapi ia, dan **seluruh** gerbang gambar lain di berkas ini, hanya pernah
+    berjalan pada `--size 200` ke atas. Jam menggambar visualnya pada
+    `WatchMetrics.visualDiameter` = 38 poin, yaitu lebih dari **5x lebih kecil**.
+
+    Ciri yang masih terukur pada 200 px bisa menyusut jadi nol piksel pada
+    38 px, dan setiap gerbang di berkas ini tetap hijau — karena tidak satu pun
+    pernah melihat gambar seukuran jam. Itu kelas cacat yang sama dengan
+    "0.14 R Venus" yang dulu ditutup: gerbang yang mengukur gambar yang **tidak
+    tampil**. Bedanya di sini arahnya bukan "bentuk yang salah", melainkan
+    "ukuran yang salah".
+
+    **Ukurannya dibaca dari token, bukan diketik di sini.** 38 hidup di
+    `WatchMetrics.visualDiameter`; kalau kartu jam melebar, gerbang ini ikut
+    membesar. Kalau tokennya tidak terbaca, pemeriksaan ini **merah** — bukan
+    diam-diam jatuh ke angka bawaan, karena gerbang yang kehilangan ukurannya
+    adalah gerbang yang berhenti mengukur apa pun.
+    """
+    theme_path = os.path.join(
+        ROOT, "Apps/PointAndKnowWatch/Sources/WatchTheme.swift")
+    match = re.search(r"visualDiameter\s*:\s*CGFloat\s*=\s*(\d+(?:\.\d+)?)",
+                      open(theme_path, encoding="utf-8").read())
+    if match is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    watch = int(round(float(match.group(1))))
+
+    footprint = R.candidate_marker_footprint()
+    pairs = [
+        ("planet-jupiter-confirmed", "planet-jupiter-uncertain", "Bintik Merah Besar Jupiter"),
+        ("planet-saturn-confirmed", "planet-saturn-uncertain", "cincin Saturnus"),
+        ("planet-mars-confirmed", "planet-mars-uncertain", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-uncertain", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-uncertain", "kabut Venus"),
+    ]
+    for confirmed_name, uncertain_name, label in pairs:
+        _, confirmed = render_case(confirmed_name, size=watch, ss=ss)
+        _, uncertain = render_case(uncertain_name, size=watch, ss=ss)
+        w, h, rows_a = confirmed
+        _, _, rows_b = uncertain
+        diff = badge_excluded_diff(rows_a, rows_b, w, h, footprint)
+        results.append(Result(
+            f"{label} masih terukur pada {watch} pt (ukuran jam)", diff > 0,
+            f"{diff} piksel berbeda di luar lencana pada {watch}x{watch} px "
+            f"(nol berarti cirinya lenyap di ukuran yang tampil)"))
 
 
 def check_png_is_well_formed(results, size=64, ss=2):
@@ -4094,6 +4165,7 @@ def main():
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
+    check_features_survive_the_watch_size(results)
     check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
     check_crater_relief_matches_the_model(results)

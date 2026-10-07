@@ -1,4 +1,92 @@
-## Progres terakhir (6 Okt 2026 — dasar cekungan kawah dijaga, lalu angkanya sendiri ditertibkan)
+## Progres terakhir (6 Okt 2026 — ciri planet dibuktikan masih ada di ukuran jam)
+
+### Temuan: seluruh gerbang gambar hanya pernah melihat gambar 5x lebih besar
+
+`check_features_disappear_when_uncertain` membuktikan kelima ciri planet —
+Bintik Merah Besar Jupiter, cincin Saturnus, kutub Mars, kawah Merkurius,
+kabut Venus — hilang saat engine ragu. Ia benar, dan ia sudah benar sejak
+lama. Yang tidak pernah diperiksa siapa pun: **apakah ciri itu masih ada
+pada ukuran yang benar-benar tampil.**
+
+Setiap gerbang gambar di `Tools/check-visuals.py` berjalan pada `--size 200`
+ke atas. Jam menggambar visualnya pada `WatchMetrics.visualDiameter` = **38
+poin** — 5,3x lebih kecil. Sebuah ciri yang terukur pada 200 px bisa menyusut
+jadi nol piksel pada 38 px tanpa satu gerbang pun berubah warna, karena tidak
+ada gerbang yang pernah melihat gambar seukuran jam.
+
+Kelas cacatnya sama dengan "0.14 R Venus" yang dulu ditutup: gerbang yang
+mengukur gambar yang **tidak tampil**. Bedanya arahnya — di sana bentuknya
+yang salah, di sini ukurannya.
+
+### Yang diukur, bukan ditebak
+
+Diukur pada rentang ukuran, di luar lencana "?" (lencana itu membuat setiap
+selisih selalu > 0, jadi ia harus dikecualikan — pelajaran yang sudah dibayar
+mahal di gerbang `check_features_disappear_when_uncertain`):
+
+```
+size    jupiter   saturnus       mars  merkurius      venus
+  38        239        187        126         57        178
+  28        108         72         62         20         69
+  20         50         24         28          8         24
+  16         21          4         13          2          8
+  12         11          1          6          0          2
+   8          0          0          0          0          0
+```
+
+Pada 38 pt kelimanya masih terukur — jadi **tidak ada cacat yang hidup**.
+Merkurius yang paling tipis: 57 piksel di luar lencana pada 38 px, dan habis
+total pada 12 px. Ambangnya nyata dan dekat.
+
+### Gerbang baru: `check_features_survive_the_watch_size`
+
+Menjalankan kelima pasangan pada ukuran jam dan menuntut selisih di luar
+lencana tetap > 0. Tiga keputusan yang membuatnya bukan sekadar salinan
+gerbang lama:
+
+1. **Ukurannya dibaca dari token.** 38 hidup di `WatchMetrics.visualDiameter`;
+   gerbang membacanya dari `WatchTheme.swift` dengan regex. Kalau kartu jam
+   melebar, gerbangnya ikut. Kalau tokennya tidak terbaca, pemeriksaan ini
+   **merah** — bukan diam-diam jatuh ke angka bawaan, karena gerbang yang
+   kehilangan ukurannya adalah gerbang yang berhenti mengukur apa pun.
+2. **Satu implementasi pengecualian lencana.** Aritmetika indeksnya dulu
+   hidup di dalam gerbang lama; sekarang `badge_excluded_diff` dipakai
+   bersama. Kalau keduanya menyalin aritmetika sendiri, satu koreksi di satu
+   tempat membuat yang lain mengukur kotak yang berbeda.
+3. **`ss=8`, bukan `ss=2`.** Pada 38 px, satu piksel keluaran = 1/38 radius;
+   supersampling rendah membuat tepi ciri yang tipis jatuh di antara sampel.
+
+### Bukti mutasi — keempatnya menggigit
+
+Harness: `mutasi-ukuran-jam.py`. Tiap keadaan diverifikasi terpasang, lalu
+harus membuat >= 1 pemeriksaan merah:
+
+- Token `visualDiameter` dihapus dari `WatchTheme.swift` → **1 merah**
+  ("ukuran visual jam terbaca dari token"). Membuktikan ukurannya benar-benar
+  dibaca, bukan diketik.
+- Token diperkecil 38 → 8 pt → **5 merah**. Cocok dengan tabel: pada 8 px
+  kelima ciri terukur nol. Membuktikan gerbang mengikuti token.
+- `_draw_craters` tidak menggambar apa-apa (monkeypatch) → **1 merah**,
+  tepat pada "kawah Merkurius". Tiga ciri lain tetap hijau — gerbangnya
+  spesifik, bukan sekadar "ada bedanya".
+- `_draw_rings` tidak menggambar apa-apa → **1 merah**, tepat pada "cincin
+  Saturnus".
+
+Sesudah keempatnya, md5 ketiga berkas pulih persis
+(`WatchTheme.swift d847ecde…`, `check-visuals.py f6a57228…`,
+`render-visuals.py 172acf67…`).
+
+### Keadaan gerbang
+
+363 pemeriksaan gambar (dari 358), 0 gagal. 662 PointingKit + 182
+CelestialEngine tetap hijau. `swift-ui-lint.sh` (29 aturan) dan
+`swift-typecheck.sh` hijau. `render-visuals.py` dan
+`CelestialVisualView.swift` **tidak disentuh** — perubahan hanya di
+`Tools/check-visuals.py`.
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — dasar cekungan kawah dijaga, lalu angkanya sendiri ditertibkan)
 
 ### Temuan: `floorDepth` dihitung, didestrukturisasi, lalu dibuang
 
