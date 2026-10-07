@@ -30,6 +30,7 @@ Pakai:
 from __future__ import annotations
 
 import argparse
+import ast
 import math
 import os
 import re
@@ -559,6 +560,28 @@ def badge_excluded_diff(rows_a, rows_b, w, h, footprint, margin_px=4.0):
     return diff
 
 
+def watch_visual_diameter():
+    """`WatchMetrics.visualDiameter` (poin), dibaca dari token — atau `None`.
+
+    Dibaca dari token, bukan diketik di pemanggilnya: kalau kartu jam melebar,
+    setiap gerbang yang memakainya ikut. `None` (bukan angka bawaan) supaya
+    gerbang yang kehilangan ukurannya jadi **merah**, bukan diam-diam berhenti
+    mengukur apa pun. Satu pembaca, dua pemakai: `check_features_survive_the_watch_size`
+    dan `check_saturn_gap_reads_at_the_watch_size`.
+    """
+    theme_path = os.path.join(
+        ROOT, "Apps/PointAndKnowWatch/Sources/WatchTheme.swift")
+    try:
+        source = open(theme_path, encoding="utf-8").read()
+    except OSError:
+        return None
+    match = re.search(r"visualDiameter\s*:\s*CGFloat\s*=\s*(\d+(?:\.\d+)?)",
+                      source)
+    if match is None:
+        return None
+    return int(round(float(match.group(1))))
+
+
 def check_features_survive_the_watch_size(results, ss=8):
     """Ciri pengenal harus masih terukur pada ukuran yang **benar-benar tampil**.
 
@@ -582,16 +605,12 @@ def check_features_survive_the_watch_size(results, ss=8):
     diam-diam jatuh ke angka bawaan, karena gerbang yang kehilangan ukurannya
     adalah gerbang yang berhenti mengukur apa pun.
     """
-    theme_path = os.path.join(
-        ROOT, "Apps/PointAndKnowWatch/Sources/WatchTheme.swift")
-    match = re.search(r"visualDiameter\s*:\s*CGFloat\s*=\s*(\d+(?:\.\d+)?)",
-                      open(theme_path, encoding="utf-8").read())
-    if match is None:
+    watch = watch_visual_diameter()
+    if watch is None:
         results.append(Result(
             "ukuran visual jam terbaca dari token", False,
             "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
         return
-    watch = int(round(float(match.group(1))))
 
     footprint = R.candidate_marker_footprint()
     pairs = [
@@ -2900,36 +2919,25 @@ def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
         f"kanal merah {unknown_red} (bulan baru {new_red}, purnama {full_red})"))
 
 
-def check_saturn_ring_bands_render(results, size=200, ss=2):
-    """Cincin Saturnus harus tergambar sebagai **pita**, dan di kedua paruh.
+def saturn_ring_band_values(size, ss):
+    """Median kanal merah pita cincin Saturnus, per paruh: `(celah, B, A)`.
 
-    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini cincin digambar
-    sebagai satu elips pekat (opasitas 0.45 belakang, 0.8 depan) dengan
-    sebuah elips hitam 0.28 sebagai "pembelah Cassini". Pemeriksaan lama
-    menjaga **angkanya** (`RING_BACK_OPACITY == 0.45`) dan itu hijau — jadi
-    tiga hal salah sekaligus tidak terlihat:
+    **Kenapa ini fungsi, bukan badan pemeriksaan.** Ia dipakai oleh
+    `check_saturn_ring_bands_render` (yang memeriksa bentuknya di ukuran
+    render) **dan** oleh `check_saturn_gap_reads_at_the_watch_size` (yang
+    memeriksa apakah celahnya masih terbaca di ukuran yang benar-benar
+    tampil). Kalau yang kedua menyampel dengan caranya sendiri, ia hanya
+    membuktikan komentarnya cocok dengan alat ukur yang **berbeda** — persis
+    kelas cacat yang sudah pernah nyata di berkas ini (`crater_wall_contrast`
+    lahir dengan alasan yang sama).
 
-      - tidak ada pita D/C/B/A sama sekali;
-      - celahnya diletakkan 0.34 x radius bola dari tepi luar (≈0.75 R
-        cincin), sedangkan pembelah Cassini nyata di 0.886 R — jadi ia
-        memotong pita A, bukan memisahkan B dari A;
-      - celahnya digambar hanya di dalam klip paruh bawah, jadi paruh
-        belakang tidak punya celah sama sekali.
-
-    **Cara mengukurnya, dan kenapa bukan cara yang lebih sederhana.** Cincin
-    adalah elips, jadi memindai **baris** atau **kolom** menembusnya pada
-    lintasan diagonal: nilainya berubah karena elipsnya menyempit, bukan
-    karena pitanya berganti. Versi pertama pemeriksaan ini melakukan itu dan
-    melaporkan celahnya di 0.57 R (belakang) dan 0.94 R (depan) — dua angka
-    yang keduanya artefak lintasan, bukan celahnya. Yang benar adalah
-    mencuplik **sepanjang elips cincin itu sendiri** pada radius tertentu,
-    lalu mengambil nilai tengahnya (median, bukan maksimum — maksimum
-    tertarik oleh tepi yang di-antialias).
-
-    Cuplikan di dalam proyeksi bola dibuang: di sana yang terlihat adalah
-    permukaan planet, bukan cincin. Ambangnya **relatif** terhadap pita
-    terang di paruh yang sama, bukan angka mutlak, karena opasitas cincin
-    bergantung mode malam.
+    Cincin adalah elips, jadi memindai **baris** atau **kolom** menembusnya
+    pada lintasan diagonal: nilainya berubah karena elipsnya menyempit, bukan
+    karena pitanya berganti. Yang benar adalah mencuplik **sepanjang elips
+    cincin itu sendiri** pada radius tertentu, lalu mengambil nilai
+    tengahnya (median, bukan maksimum — maksimum tertarik oleh tepi yang
+    di-antialias). Cuplikan di dalam proyeksi bola dibuang: di sana yang
+    terlihat adalah permukaan planet, bukan cincin.
     """
     _, (w, h, rows) = render_case("planet-saturn-confirmed", size=size, ss=ss)
     radius = min(w, h) / 2.0
@@ -2962,10 +2970,49 @@ def check_saturn_ring_bands_render(results, size=200, ss=2):
         band = bands[index]
         return (band[0] + band[1]) / 2.0
 
+    out = {}
     for label, half in (("belakang", -1.0), ("depan", 1.0)):
-        gap = ring_value(band_radius(3), half)      # celah Cassini
-        bright_b = ring_value(band_radius(2), half)  # pita B
-        outer_a = ring_value(band_radius(4), half)   # pita A
+        out[label] = (ring_value(band_radius(3), half),   # celah Cassini
+                      ring_value(band_radius(2), half),   # pita B
+                      ring_value(band_radius(4), half))   # pita A
+    return out
+
+
+def check_saturn_ring_bands_render(results, size=200, ss=2):
+    """Cincin Saturnus harus tergambar sebagai **pita**, dan di kedua paruh.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini cincin digambar
+    sebagai satu elips pekat (opasitas 0.45 belakang, 0.8 depan) dengan
+    sebuah elips hitam 0.28 sebagai "pembelah Cassini". Pemeriksaan lama
+    menjaga **angkanya** (`RING_BACK_OPACITY == 0.45`) dan itu hijau — jadi
+    tiga hal salah sekaligus tidak terlihat:
+
+      - tidak ada pita D/C/B/A sama sekali;
+      - celahnya diletakkan 0.34 x radius bola dari tepi luar (≈0.75 R
+        cincin), sedangkan pembelah Cassini nyata di 0.886 R — jadi ia
+        memotong pita A, bukan memisahkan B dari A;
+      - celahnya digambar hanya di dalam klip paruh bawah, jadi paruh
+        belakang tidak punya celah sama sekali.
+
+    **Cara mengukurnya, dan kenapa bukan cara yang lebih sederhana.** Cincin
+    adalah elips, jadi memindai **baris** atau **kolom** menembusnya pada
+    lintasan diagonal: nilainya berubah karena elipsnya menyempit, bukan
+    karena pitanya berganti. Versi pertama pemeriksaan ini melakukan itu dan
+    melaporkan celahnya di 0.57 R (belakang) dan 0.94 R (depan) — dua angka
+    yang keduanya artefak lintasan, bukan celahnya. Yang benar adalah
+    mencuplik **sepanjang elips cincin itu sendiri** pada radius tertentu,
+    lalu mengambil nilai tengahnya (median, bukan maksimum — maksimum
+    tertarik oleh tepi yang di-antialias).
+
+    Cuplikan di dalam proyeksi bola dibuang: di sana yang terlihat adalah
+    permukaan planet, bukan cincin. Ambangnya **relatif** terhadap pita
+    terang di paruh yang sama, bukan angka mutlak, karena opasitas cincin
+    bergantung mode malam.
+    """
+    values = saturn_ring_band_values(size, ss)
+
+    for label in ("belakang", "depan"):
+        gap, bright_b, outer_a = values[label]
         if gap is None or bright_b is None or outer_a is None:
             results.append(Result(f"cincin: celah Cassini paruh {label}", False,
                                   "tidak cukup piksel cincin di luar bola"))
@@ -2979,8 +3026,8 @@ def check_saturn_ring_bands_render(results, size=200, ss=2):
 
     # Paruh belakang lebih redup: diukur pada pita B, pita terpekat, supaya
     # yang dibandingkan cincin dengan cincin (bukan cincin dengan latar).
-    back_b = ring_value(band_radius(2), -1.0)
-    front_b = ring_value(band_radius(2), 1.0)
+    back_b = values["belakang"][1]
+    front_b = values["depan"][1]
     if back_b is not None and front_b is not None:
         results.append(Result(
             "cincin: paruh belakang lebih redup dari depan",
@@ -2989,6 +3036,359 @@ def check_saturn_ring_bands_render(results, size=200, ss=2):
     else:
         results.append(Result("cincin: paruh belakang lebih redup dari depan",
                               False, "pita B tidak terukur di salah satu paruh"))
+
+
+def check_saturn_gap_reads_at_the_watch_size(results, ss=8):
+    """Celah Cassini harus terbaca pada ukuran yang **benar-benar tampil**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_saturn_ring_bands_render`
+    menjalankan ambang `celah < pita - 12` pada `--size 200`. Di ukuran itu
+    **kedua** lebar celah lulus: yang nyata (0.0304) dan yang dilebarkan
+    (0.06). Artinya gerbang itu tidak bisa membedakan keduanya, dan
+    `SATURN_CASSINI_WIDTH` boleh dikembalikan ke angka nyata tanpa satu pun
+    pemeriksaan berubah warna — padahal di kartu jam hasilnya cincin **tanpa
+    pemisah**.
+
+    Diukur, bukan diasumsikan (selisih median kanal merah terhadap pita di
+    kedua sisinya, pada 76 px = 38 pt @2x, `ss=8`):
+
+        lebar celah      paruh belakang   paruh depan
+        0.0304 (nyata)   +12              +5      <- gagal
+        0.0600 (dipakai) +22              +23     <- lulus
+
+    Ambangnya **sama** dengan gerbang bentuk di atas (`- 12`), bukan angka
+    baru: yang berbeda hanya ukurannya. Kalau ambangnya diketik ulang di sini,
+    dua gerbang bisa berhenti sepakat tanpa ada yang tahu.
+
+    **Ukurannya dari token, bukan dari sini.** `WatchMetrics.visualDiameter`
+    adalah 38 **poin**; yang dirender adalah 76 **piksel** karena jam Apple
+    Watch menggambar @2x. Dua dikalikan di sini, di satu tempat, dengan
+    alasan yang tertulis — bukan disebar sebagai `76` ke dalam pemeriksaan.
+    Kalau tokennya hilang, pemeriksaan ini **merah**, bukan hijau tanpa
+    mengukur apa pun.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (celah cincin)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    # Poin → piksel. Apple Watch menggambar @2x; 38 pt adalah 76 px di layar.
+    pixels = diameter * 2
+
+    values = saturn_ring_band_values(pixels, ss)
+    for label in ("belakang", "depan"):
+        gap, bright_b, outer_a = values[label]
+        if gap is None or bright_b is None or outer_a is None:
+            results.append(Result(
+                f"celah cincin terbaca pada {pixels} px (ukuran jam)", False,
+                "tidak cukup piksel cincin di luar bola"))
+            continue
+        # Ambang yang sama dengan `check_saturn_ring_bands_render`.
+        margin = min(bright_b - gap, outer_a - gap)
+        results.append(Result(
+            f"celah cincin terbaca pada {pixels} px (ukuran jam)", margin > 12,
+            f"selisih terkecil {margin:+d} terhadap pita B {bright_b} / "
+            f"pita A {outer_a} (celah {gap}); lebar nyata 0.0304 hanya "
+            f"menghasilkan +5…+12 di ukuran ini"))
+
+
+def drift_compared_constants(source):
+    """Konstanta port yang **nilainya dibandingkan** `check_port_matches_swift_constants`.
+
+    Dibaca dari **AST** fungsi itu, bukan dari daftar nama yang ditulis tangan
+    di sini: setiap `R.<NAMA>` di dalamnya adalah konstanta yang gerbang drift
+    sudah menjanjikan sejalan dengan model Swift. Menyalin daftar itu ke sini
+    akan melahirkan daftar kedua yang bisa tertinggal separuh — persis kelas
+    cacat yang gerbang ini tutup.
+
+    Nama yang bukan konstanta literal (fungsi seperti `saturn_ring()`, dan
+    penanda aturan berupa string seperti `"sqrt"`) disaring di pemanggilnya.
+    """
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.FunctionDef)
+                and node.name == "check_port_matches_swift_constants"):
+            return sorted({
+                sub.attr
+                for sub in ast.walk(node)
+                if isinstance(sub, ast.Attribute)
+                and isinstance(sub.value, ast.Name)
+                and sub.value.id == "R"
+            })
+    return None
+
+
+def name_loads_by_scope(source):
+    """`{nama: {"signature", "body", "module"}}` — **di mana** nama dibaca.
+
+    **Kenapa `tokenize` saja tidak cukup, dan ini cacat yang sudah nyata.**
+    Versi pertama gerbang ini (`name_tokens_by_line`) hanya menghitung
+    **kemunculan** nama di mana pun. Itu bisa dipuaskan oleh rujukan mati:
+    satu baris `_UNUSED = SATURN_CASSINI_WIDTH` di tingkat modul membuat nama
+    itu "dipakai" sambil penggambarnya tetap menulis `cassini_width=0.06`.
+    Terbukti di `out/probe-konstanta-mati.py`: gerbangnya **hijau** pada
+    keadaan itu.
+
+    Yang menentukan bukan "apakah namanya muncul", melainkan **apakah nilainya
+    bisa sampai ke gambar**. Dua jalan yang sah, dan hanya dua:
+
+      - dibaca sebagai **bawaan parameter** (`def f(x=NAMA)`) — jalan yang
+        dipakai `candidate_marker` dan `saturn_ring_bands`;
+      - dibaca di dalam **badan sebuah fungsi** — jalan yang dipakai
+        `_draw_bands`, `drawCraters`, dan seterusnya.
+
+    Rujukan di tingkat modul **tidak** dihitung, karena modul tidak
+    menggambar apa pun: nilai yang hanya lewat di sana adalah nilai yang
+    berhenti sebelum kertas. Itulah satu-satunya pembeda antara "dipakai"
+    dan "dipakai menggambar", dan pembeda itu yang membuat gerbangnya
+    menggigit.
+
+    Diukur dari AST, bukan token, supaya cakupannya struktural: komentar,
+    docstring, dan string tidak pernah bisa dihitung sebagai pemakaian — di
+    berkas yang penuh prosa ini, itu bukan kemewahan.
+    """
+    tree = ast.parse(source)
+    out = {}
+
+    # Bawaan parameter: dibaca saat fungsi **didefinisikan**, jadi ia jalan
+    # yang sah menuju gambar. Dihitung terpisah dari badan supaya pesan
+    # kegagalan bisa mengatakan jalan mana yang hilang.
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        arguments = node.args
+        defaults = list(arguments.defaults) + [
+            d for d in arguments.kw_defaults if d is not None]
+        for default in defaults:
+            for sub in ast.walk(default):
+                if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                    entry = out.setdefault(
+                        sub.id, {"signature": 0, "body": 0, "module": 0})
+                    entry["signature"] += 1
+
+    # Badan fungsi: pernyataan-pernyataan yang benar-benar menggambar.
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for statement in node.body:
+            for sub in ast.walk(statement):
+                if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                    entry = out.setdefault(
+                        sub.id, {"signature": 0, "body": 0, "module": 0})
+                    entry["body"] += 1
+
+    # Tingkat modul, di luar definisi apa pun. Dihitung **hanya untuk
+    # dilaporkan**, bukan untuk dianggap sampai ke gambar — rujukan di sini
+    # persis bentuk yang membuat versi lama hijau di atas cacatnya.
+    for statement in tree.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef)):
+            continue
+        for sub in ast.walk(statement):
+            if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                entry = out.setdefault(
+                    sub.id, {"signature": 0, "body": 0, "module": 0})
+                entry["module"] += 1
+
+    return out
+
+
+def check_port_constants_reach_the_drawing(results):
+    """Konstanta yang gerbang drift jaga harus **dipakai menggambar**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_port_matches_swift_constants`
+    membandingkan nilai konstanta port dengan sumber Swift, dan ia hijau. Tapi
+    nilai yang dibandingkannya belum tentu nilai yang **menggambar**: konstanta
+    bisa punya angka **kedua** yang ditulis langsung sebagai bawaan parameter
+    fungsi gambar, dan yang dipakai penggambar adalah yang kedua.
+
+    Empat konstanta hidup dalam keadaan itu:
+
+        CANDIDATE_CORNER_FRACTION = 0.34   vs  def candidate_marker(corner_fraction=0.34)
+        CANDIDATE_INSET           = 0.06   vs  def candidate_marker(inset=0.06)
+        CANDIDATE_GLYPH_FRACTION  = 0.52   vs  def candidate_marker(glyph_fraction=0.52)
+        SATURN_CASSINI_WIDTH      = 0.06   vs  def saturn_ring_bands(cassini_width=0.06)
+
+    Karena itu mengubah konstanta itu tidak mengubah satu piksel pun. Yang lebih
+    berbahaya: `check_saturn_gap_reads_at_the_watch_size` menuntut celah Cassini
+    masih terbaca di ukuran jam, dan ia mengukur **PNG yang menggambar celah
+    lebar** sementara jam menggambar celah yang konstanta itu janjikan. Dua
+    bahasa yang berbeda dipisahkan — dan pemisahnya di dalam **satu berkas**,
+    tempat yang paling tidak akan dicurigai siapa pun.
+
+    **Cakupannya dari gerbang drift, bukan dari daftar di sini.** Konstanta
+    yang diperiksa adalah yang nilainya sudah dibandingkan
+    `check_port_matches_swift_constants` (lewat `drift_compared_constants`),
+    jadi konstanta baru yang ditambahkan ke sana langsung ikut diperiksa, dan
+    tidak ada daftar kedua yang bisa tertinggal separuh. Versi pertama gerbang
+    ini membaca anotasi `# MODEL:` di komentar, dan itu **salah**: menghapus
+    anotasi mematikannya tanpa suara, karena katalog yang hidup di prosa adalah
+    katalog yang bisa menyusut sendiri. Bukti mutasinya ada di
+    `out/mutasi-konstanta-mati.py` — baris "anotasi MODEL dihapus" hijau pada
+    versi itu dan merah pada versi ini.
+
+    **Dua lapis, karena yang pertama saja bisa dipuaskan rujukan mati.**
+    Versi kedua gerbang ini menghitung kemunculan nama di mana pun, dan itu
+    **hijau** atas keadaan "bawaan kembali jadi literal + satu rujukan mati di
+    tingkat modul" (`out/probe-konstanta-mati.py`). Sekarang yang diuji
+    **jalannya**: nama harus dibaca di badan fungsi atau sebagai bawaan
+    parameter. Lapis kedua menjaga bentuk cacat yang tidak lewat nama sama
+    sekali: sebuah parameter menggambar yang bawaannya literal **dengan nilai
+    yang sama** seperti konstanta yang dijaga. Pada keadaan itu namanya tidak
+    hilang — angkanya yang berhenti dipakai, dan hanya nilai yang bisa
+    melihatnya.
+
+    Yang disaring: konstanta yang nilainya string. `BAND_HALF_WIDTH_RULE` dan
+    `POLAR_CAP_WIDTH_RULE` bernilai `"sqrt"` — penanda **rumus**, bukan angka
+    gambar; yang memeriksanya adalah gerbang "rumus dipakai di kedua bahasa".
+    Memeriksa mereka di sini akan memerah pada kode yang benar, dan gerbang yang
+    memerah pada kode benar akan dimatikan orang.
+    """
+    source = open(R.SOURCE, encoding="utf-8").read()
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        results.append(Result(
+            "konstanta port terbaca sebagai AST", False,
+            f"render-visuals.py tidak bisa di-parse: {error}"))
+        return
+    loads = name_loads_by_scope(source)
+
+    compared = drift_compared_constants(open(__file__, encoding="utf-8").read())
+    if not compared:
+        results.append(Result(
+            "konstanta yang dibandingkan gerbang drift terbaca", False,
+            "`check_port_matches_swift_constants` tidak ditemukan di check-visuals.py"))
+        return
+
+    # Nilai tiap konstanta dibaca dari **teksnya sendiri**, bukan dari modul
+    # yang sudah dimuat: konstanta yang didefinisikan setelah fungsi yang
+    # memakainya sebagai bawaan belum ada di modul saat berkas ini dimuat, dan
+    # pemeriksaan yang gagal karena bacaan akan terlihat seperti pemeriksaannya
+    # yang salah — persis kelas "gerbang merah pada kode benar" yang harus
+    # dihindari supaya gerbang ini tidak dimatikan orang.
+    definition_lines = {}
+    constant_values = {}
+    for index, line in enumerate(source.splitlines()):
+        match = re.match(r"^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$", line)
+        if match is None:
+            continue
+        definition_lines[match.group(1)] = index + 1
+        try:
+            constant_values[match.group(1)] = ast.literal_eval(
+                match.group(2).split("#")[0].strip())
+        except (ValueError, SyntaxError):
+            # Bukan literal (mis. hasil pemanggilan). Bukan konstanta angka.
+            constant_values[match.group(1)] = None
+
+    checked = []
+    for name in compared:
+        line_number = definition_lines.get(name)
+        if line_number is None:
+            # `R.saturn_ring()` dan sejenisnya: fungsi, bukan konstanta.
+            continue
+        if isinstance(constant_values.get(name), str):
+            # Penanda rumus (`"sqrt"`), bukan angka gambar.
+            continue
+        if constant_values.get(name) is None:
+            continue
+        checked.append((name, line_number))
+
+    if not checked:
+        results.append(Result(
+            "konstanta yang dibandingkan gerbang drift terbaca", False,
+            "tidak satu pun konstanta bernilai angka ditemukan di render-visuals.py"))
+        return
+
+    # Lapis 1: nilainya harus benar-benar bisa sampai ke gambar — dibaca di
+    # badan sebuah fungsi atau sebagai bawaan parameter. Rujukan di tingkat
+    # modul tidak dihitung; itu satu-satunya pembeda antara "dipakai" dan
+    # "dipakai menggambar", dan pembeda itulah yang membuat gerbang ini
+    # menggigit.
+    dead = []
+    for name, line_number in checked:
+        scopes = loads.get(name, {"signature": 0, "body": 0, "module": 0})
+        if scopes["signature"] + scopes["body"] > 0:
+            continue
+        # Bawaan penggambarnya ikut dilaporkan: tanpa itu, pembaca tahu
+        # konstanta ini mati tapi tidak tahu **angka mana** yang benar-benar
+        # menggambar, sehingga perbaikannya menebak.
+        drawn = re.search(
+            r"^\s*def \w+\([^)]*\b" + name.lower() + r"\w*\s*=\s*([^,)]+)",
+            source, re.MULTILINE | re.DOTALL)
+        hint = (f"; penggambarnya memakai bawaan {drawn.group(1).strip()}"
+                if drawn else "")
+        where = ("hanya dirujuk di tingkat modul"
+                 if scopes["module"] else "tidak pernah dipakai")
+        dead.append(Result(
+            f"konstanta `{name}` sampai ke penggambar", False,
+            f"nilainya dijaga gerbang drift, tapi {where} — tidak dibaca di "
+            f"badan fungsi mana pun dan bukan bawaan parameter "
+            f"(baris {line_number}){hint}"))
+
+    # Lapis 2: bentuk cacat yang **tidak lewat nama sama sekali**. Sebuah
+    # parameter penggambar bisa menulis bawaannya sebagai literal yang
+    # **nilainya sama** dengan konstanta yang dijaga. Namanya tidak hilang,
+    # jadi lapis 1 hijau — yang berhenti dipakai adalah angkanya, dan hanya
+    # nilai yang bisa melihatnya. Inilah sebabnya dua lapis ini komplementer,
+    # bukan berlebihan: lapis 2 hanya memeriksa konstanta yang lapis 1 sudah
+    # nyatakan sampai ke gambar.
+    #
+    # **Kenapa pasangannya lewat nama parameter, bukan lewat nilai saja.**
+    # Versi pertama lapis ini membandingkan nilai saja, dan ia **merah pada
+    # kode yang benar**: `saturn_ring_bands(cassini_width=0.06)` cocok dengan
+    # `CANDIDATE_INSET` yang kebetulan juga 0.06. Dua konstanta berbeda boleh
+    # bernilai sama; yang membuat sebuah bawaan literal itu cacat adalah kalau
+    # ada konstanta **untuk parameter itu** yang seharusnya dibaca. Jadi
+    # pasangannya dicari dari namanya — `cassini_width` ↔
+    # `SATURN_CASSINI_WIDTH`, `corner_fraction` ↔
+    # `CANDIDATE_CORNER_FRACTION` — dan itu cukup: nama parameter di berkas ini
+    # adalah akhiran nama konstantanya. Gerbang yang merah pada kode benar akan
+    # dimatikan orang, jadi kesempitan ini syarat hidupnya, bukan kemewahan.
+    alive = {name for name, _ in checked} - {r.name.split("`")[1]
+                                             for r in dead}
+    literal_shadows = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        arguments = node.args
+        named = list(zip(
+            arguments.args[len(arguments.args) - len(arguments.defaults):],
+            arguments.defaults))
+        named += list(zip(arguments.kwonlyargs, arguments.kw_defaults))
+        for argument, default in named:
+            if not isinstance(default, ast.Constant):
+                continue
+            if not isinstance(default.value, (int, float)) or isinstance(
+                    default.value, bool):
+                continue
+            for name in alive:
+                value = constant_values.get(name)
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    continue
+                lowered = name.lower()
+                if not (lowered == argument.arg
+                        or lowered.endswith("_" + argument.arg)):
+                    continue
+                if abs(default.value - value) > 1e-12:
+                    continue
+                literal_shadows.append(
+                    f"`{node.name}({argument.arg}={default.value})` menulis "
+                    f"angka yang sama dengan konstanta `{name}`")
+
+    for shadow in literal_shadows:
+        results.append(Result(
+            "bawaan penggambar memakai konstanta, bukan salinan angkanya",
+            False, f"{shadow} — dua angka yang sama akan berbeda begitu salah "
+                   f"satu disunting, dan yang menggambar adalah salinannya"))
+
+    results.extend(dead)
+    if not dead and not literal_shadows:
+        results.append(Result(
+            "setiap konstanta yang dijaga gerbang drift sampai ke penggambar",
+            True, f"{len(checked)} konstanta dibaca di badan fungsi atau "
+                  f"sebagai bawaan parameter"))
 
 
 def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
@@ -4179,6 +4579,7 @@ def main():
     check_planet_features_present(results, args.size, args.ss)
     check_inner_planet_phase(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
+    check_saturn_gap_reads_at_the_watch_size(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
@@ -4197,6 +4598,7 @@ def main():
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)
+    check_port_constants_reach_the_drawing(results)
     check_night_mode_purity(results, args.size, args.ss)
     check_star_colour_order(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)

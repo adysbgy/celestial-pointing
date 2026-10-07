@@ -302,8 +302,25 @@ def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0):
     return blobs
 
 
-def candidate_marker(frame_half_extent=1.0, corner_fraction=0.34, inset=0.06,
-                     glyph_fraction=0.52):
+# Geometri lencana "?" — candidateMarker.
+#
+# **Kenapa konstanta ini berdiri di sini, di atas pemakainya.** Python
+# mengevaluasi nilai bawaan parameter saat fungsi **didefinisikan**, jadi
+# `corner_fraction=CANDIDATE_CORNER_FRACTION` hanya sah kalau namanya sudah
+# ada. Sebelumnya angka yang sama ditulis dua kali — konstanta di bawah
+# berkas, dan bawaan literal di tanda tangan `candidate_marker` — dan yang
+# menggambar adalah yang kedua. Gerbang drift membandingkan yang pertama
+# dengan model Swift dan hijau, jadi mengubah konstanta itu tidak mengubah
+# satu piksel pun: satu angka hidup di dua tempat di dalam satu berkas, dan
+# gerbangnya menjaga yang salah. Sekarang hanya ada satu.
+CANDIDATE_CORNER_FRACTION = 0.34
+CANDIDATE_INSET = 0.06
+CANDIDATE_GLYPH_FRACTION = 0.52
+
+
+def candidate_marker(frame_half_extent=1.0, corner_fraction=CANDIDATE_CORNER_FRACTION,
+                     inset=CANDIDATE_INSET,
+                     glyph_fraction=CANDIDATE_GLYPH_FRACTION):
     """`VisualFrame.candidateMarker` — pusat + radius = sudut, jadi tidak bisa keluar."""
     corner = max(0.0, frame_half_extent * (1 - min(1.0, max(0.0, inset))))
     radius = corner * min(1.0, max(0.0, corner_fraction))
@@ -582,13 +599,12 @@ BAND_LIMB_SHADING_STRENGTH = 0.6
 # bahasa agar memakai rumus bola yang sama. Kalau salah satu sisi kembali
 # memakai aproksimasi kosinus, nama ini tidak akan ditemukan di sumbernya.
 BAND_HALF_WIDTH_RULE = "sqrt"
-# Lencana "?" — dipakai `check_features_disappear_when_uncertain` untuk
-# **mengecualikan** daerah lencana dari pengukuran ciri. Lihat catatan di
-# sana: tanpa pengecualian, selisih "terkunci vs ragu" selalu > 0 karena
-# lencananya sendiri, sehingga ciri yang **tidak pernah digambar** pun lulus.
-CANDIDATE_CORNER_FRACTION = 0.34                # MODEL: `VisualFrame.candidateMarker`
-CANDIDATE_INSET = 0.06                          # MODEL: `VisualFrame.candidateMarker`
-CANDIDATE_GLYPH_FRACTION = 0.52                 # MODEL: `VisualFrame.candidateMarker`
+# Lencana "?" — geometrinya (CANDIDATE_CORNER_FRACTION, CANDIDATE_INSET,
+# CANDIDATE_GLYPH_FRACTION) tinggal di atas `candidate_marker()`, satu-satunya
+# tempat yang menggambarnya. Dipakai `check_features_disappear_when_uncertain`
+# untuk **mengecualikan** daerah lencana dari pengukuran ciri: tanpa
+# pengecualian, selisih "terkunci vs ragu" selalu > 0 karena lencananya
+# sendiri, sehingga ciri yang **tidak pernah digambar** pun lulus.
 # Bintik Merah Besar: **pusat**, bukan sudut — satuan radius bola, relatif
 # terhadap pusat bola. Model yang memilikinya (`CelestialVisual.jupiterSpot`),
 # dan `check-visuals.py` menjaga keempat angkanya tetap sama dengan sumber
@@ -611,7 +627,10 @@ SPIKE_OPACITY = 0.45                                     # VIEW: `drawStar`
 SATURN_RING_REAL_EDGES = [1.11, 1.236, 1.525, 1.95, 2.025, 2.269]
 SATURN_RING_BAND_OPACITIES = [0.14, 0.34, 0.78, 0.04, 0.62]
 # MODEL: `VisualFrame.saturnRingBands(cassiniWidth:)` — sengaja lebih lebar
-# dari kenyataan supaya masih terbaca di kartu jam.
+# dari kenyataan supaya masih terbaca di kartu jam. Dibaca oleh
+# `saturn_ring_bands()` sebagai bawaan, bukan disalin ke tanda tangannya:
+# angka yang ditulis dua kali adalah dua angka yang akan berbeda, dan yang
+# menggambar adalah salinan yang tidak dijaga gerbang drift mana pun.
 SATURN_CASSINI_WIDTH = 0.06
 # MODEL: `CelestialVisual.ringBackHalfOpacityScale`
 RING_BACK_HALF_OPACITY_SCALE = 0.55
@@ -1000,7 +1019,7 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))
 
 
-def saturn_ring_bands(body_fraction=0.53, cassini_width=0.06):
+def saturn_ring_bands(body_fraction=0.53, cassini_width=SATURN_CASSINI_WIDTH):
     """Pita cincin Saturnus — port `VisualFrame.saturnRingBands()`.
 
     Batas pita nyata (D 1.11-1.236, C 1.236-1.525, B 1.525-1.95, celah

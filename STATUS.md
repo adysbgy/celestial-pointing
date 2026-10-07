@@ -1,3 +1,149 @@
+## Progres terakhir (7 Okt 2026 — gerbang yang mengukur keberadaan nama, bukan sampainya angka ke gambar)
+
+### Temuan: satu angka hidup dua kali di dalam satu berkas, dan gerbang drift menjaga yang salah
+
+Empat konstanta di `render-visuals.py` punya angka **kedua** yang ditulis
+langsung sebagai bawaan parameter penggambarnya:
+
+    CANDIDATE_CORNER_FRACTION = 0.34   vs  def candidate_marker(corner_fraction=0.34)
+    CANDIDATE_INSET           = 0.06   vs  def candidate_marker(inset=0.06)
+    CANDIDATE_GLYPH_FRACTION  = 0.52   vs  def candidate_marker(glyph_fraction=0.52)
+    SATURN_CASSINI_WIDTH      = 0.06   vs  def saturn_ring_bands(cassini_width=0.06)
+
+`check_port_matches_swift_constants` membandingkan **konstantanya** dengan
+model Swift dan hijau. Yang menggambar adalah **bawaannya**. Jadi mengubah
+konstanta itu tidak mengubah satu piksel pun — gerbang drift menjaga angka yang
+tidak sampai ke kertas.
+
+Ini bukan cacat kosmetik, karena siklus ini juga menambahkan gerbang yang
+mengukur celah Cassini **pada ukuran jam**: `check_saturn_gap_reads_at_the_watch_size`
+mengukur PNG yang menggambar celah lebar, sementara jam menggambar celah yang
+konstantanya janjikan. Dua bahasa yang berbeda dipisahkan — dan pemisahnya di
+dalam **satu berkas**, tempat yang paling tidak akan dicurigai siapa pun.
+
+### Perbaikannya: satu angka, satu tempat
+
+Konstantanya dinaikkan ke atas pemakainya (Python mengevaluasi bawaan saat
+fungsi **didefinisikan**, jadi namanya harus sudah ada) dan bawaannya membaca
+konstanta itu. Sekarang `render-visuals.py` tidak punya angka kedua untuk
+keempat konstanta itu.
+
+### Cacat kedua, di dalam gerbang yang menutupnya — dan ini yang paling penting
+
+Gerbangnya ditulis lebih dulu (aturan 10 di brief), lalu diuji dengan mutasi.
+Versi pertamanya menghitung **kemunculan nama** di sumber dengan `tokenize`.
+Pada cacat aslinya ia benar-benar merah. Lalu dicoba keadaan yang lebih licik:
+**bawaan dikembalikan jadi literal, dan satu rujukan mati ditambahkan di
+tingkat modul**:
+
+    SATURN_CASSINI_WIDTH = 0.06
+    _MIRROR = SATURN_CASSINI_WIDTH        <- nama tetap "dipakai"
+
+Gerbangnya **hijau** pada keadaan itu (`out/probe-konstanta-mati.py`). Ia
+mengukur *apakah namanya muncul*, bukan *apakah nilainya sampai ke gambar* —
+persis kelas cacat yang ia ada untuk menutup, hanya berpindah satu lapis ke
+dalam gerbangnya sendiri.
+
+Yang menentukan bukan "namanya ada di mana", melainkan **jalannya**. Dua jalan
+yang sah, dan hanya dua: dibaca sebagai **bawaan parameter**, atau dibaca di
+**badan sebuah fungsi**. Rujukan di tingkat modul tidak dihitung — modul tidak
+menggambar apa pun. Gerbangnya sekarang membaca AST dan menghitung load per
+cakupan, dan pesan kegagalannya membedakan "tidak pernah dipakai" dari "hanya
+dirujuk di tingkat modul".
+
+### Cacat ketiga: bentuk yang tidak lewat nama sama sekali
+
+Ada keadaan yang tidak bisa ditangkap oleh uji "jalannya" sekeras apa pun:
+bawaan penggambar ditulis literal **bernilai sama** dengan konstanta yang
+dijaga, sementara nama konstanta tetap dipakai di tempat lain. Namanya tidak
+hilang; yang berhenti dipakai adalah angkanya. Karena itu lapis kedua
+membandingkan **nilai** bawaan parameter dengan nilai konstanta.
+
+Lapis kedua itu, versi pertamanya, **merah pada kode yang benar**:
+`saturn_ring_bands(cassini_width=0.06)` cocok dengan `CANDIDATE_INSET` yang
+kebetulan juga 0.06. Dua konstanta berbeda boleh bernilai sama. Pasangannya
+karena itu dicari lewat **nama** parameter (`cassini_width` ↔
+`SATURN_CASSINI_WIDTH`), dan hanya untuk konstanta yang lapis pertama sudah
+nyatakan sampai ke gambar. Gerbang yang merah pada kode benar akan dimatikan
+orang, jadi kesempitan ini syarat hidupnya.
+
+### Bukti mutasi — tiga keadaan, tiga pesan berbeda
+
+Harness: `out/mutasi-konstanta-mati.py`.
+
+```
+baseline                                     1 pemeriksaan, 0 gagal
+1. bawaan lencana jadi literal               1 gagal  `CANDIDATE_CORNER_FRACTION`
+                                                        …tidak pernah dipakai
+2. bawaan literal + rujukan mati di modul    1 gagal  `SATURN_CASSINI_WIDTH`
+                                                        …hanya dirujuk di tingkat modul
+3. literal bernilai sama, nama tetap dipakai 1 gagal  `candidate_marker(corner_fraction=0.34)`
+                                                        …salinan angkanya
+[dipulihkan]                                 1 pemeriksaan, 0 gagal
+```
+
+Baris 2 adalah yang menentukan: ia **hijau** di bawah gerbang versi sebelumnya
+dan merah di bawah versi ini. Baris 3 hijau di bawah kedua versi "jalannya",
+dan hanya lapis kedua yang melihatnya. Ketiga pesannya menyebut tempat yang
+berbeda, jadi pembaca tahu ke mana harus melihat.
+
+`md5` kedua berkas pulih persis sesudahnya (`render-visuals.py aa8703f6…`,
+`check-visuals.py e735a1e7…`).
+
+### Tabel di docstring diukur ulang, bukan diwarisi
+
+`check_saturn_gap_reads_at_the_watch_size` mengutip tabel di docstringnya.
+Karena repo ini sudah beberapa kali menemukan gerbang yang **mengutip angka
+yang tidak pernah ia ukur**, tabelnya diukur ulang dari penyampel yang dipakai
+gerbang itu sendiri (`out/ukur-tabel-celah.py`), dengan lebar celah diubah di
+**kedua** tempat yang mengikatnya:
+
+```
+lebar celah      paruh belakang   paruh depan
+0.0304 (nyata)   +12              +5      <- gagal
+0.0600 (dipakai) +22              +23     <- lulus
+```
+
+Persis seperti yang tertulis. Ambang `- 12` yang sama dipakai di kedua gerbang
+celah, jadi keduanya tidak bisa berhenti sepakat tanpa ada yang tahu.
+
+### Batas yang jujur
+
+  - Gerbang baru menjaga **sampainya konstanta ke penggambar**, bukan bahwa
+    angkanya benar. `SATURN_CASSINI_WIDTH` sengaja 0.06 (bukan lebar nyata
+    0.0304) supaya celahnya masih terbaca di kartu jam 38 pt; yang membuktikan
+    pilihan itu masih sah adalah `check_saturn_gap_reads_at_the_watch_size`,
+    bukan gerbang ini.
+  - Pasangan nama parameter ↔ konstanta di lapis kedua adalah heuristik
+    akhiran. Parameter baru yang namanya tidak berakhir dengan nama
+    konstantanya tidak akan terjangkau lapis ini — lapis pertama tetap
+    menjangkaunya selama nilainya dibaca lewat nama.
+  - Cakupan konstanta diturunkan dari AST `check_port_matches_swift_constants`
+    (28 konstanta bernilai angka dari 37 entri; sisanya fungsi, penanda rumus,
+    dan konstanta string). Menambah entri ke gerbang drift langsung
+    memperluas gerbang ini.
+  - `check_saturn_gap_reads_at_the_watch_size` **hijau di bawah gerbang lama**
+    pada `--size 200`: di ukuran itu kedua lebar celah lulus ambangnya.
+    Kegunaannya sepenuhnya bergantung pada ukuran jam yang dibaca dari token
+    `WatchMetrics.visualDiameter`.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 662 | **662** |
+| Pemeriksaan visual | 396 | **399** |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 662), `swift-ui-lint.sh`
+(29 aturan), `check-visuals.py --check` (399 pemeriksaan, 0 gagal). Berkas
+tersentuh: `Tools/check-visuals.py`, `Tools/render-visuals.py`. **Tidak ada
+kode Swift yang berubah** — yang berubah dua bahasa yang sama-sama menggambar,
+dan gerbang yang menjaga keduanya.
+
+---
+
 ## Progres terakhir (6 Okt 2026 — mode malam akhirnya diuji di seluruh katalog)
 
 ### Temuan: janji "merah murni" hanya diukur pada 7 dari 40 kasus
