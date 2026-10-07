@@ -321,11 +321,19 @@ class Result:
 #: bentuk (yang menghasilkan ~0%) tanpa merah karena anti-aliasing.
 MIN_MORPHOLOGY_DIFF = 0.08
 
-#: Jarak kanal warna minimum antara dua kabut. Warna model dipisah ≥ 0.20
-#: sebelum digambar; setelah dicampur latar dan gradien tepi, pasangan
-#: terdekat menyusut ke ~0.07. Ambang 0.05 menangkap "satu warna untuk dua
-#: morfologi" (jarak ~0.00) tanpa bergantung pada rasa.
-MIN_DEEP_SKY_COLOUR_DIFF = 0.05
+#: Berapa piksel paling terang yang dirata-ratakan saat mengukur warna kabut.
+#: **Anggaran tetap, bukan proporsi**: gugus hanya menutupi sebagian kecil
+#: frame, jadi rata-rata seluruh frame didominasi latar gelap dan justru
+#: menyembunyikan warna yang membedakannya. Dengan anggaran tetap, gugus
+#: yang jarang dan nebula yang padat diukur pada skala yang sama.
+COLOUR_SAMPLE_PIXELS = 300
+
+#: Jarak kanal minimum antar warna kabut. Dikalibrasi terhadap gambar yang
+#: ada sekarang: pasangan terdekat (galaxy vs openCluster, keduanya hampir
+#: putih) berjarak 0.115 dan setiap morfologi ≥ 0.188 dari kabut netral.
+#: Ambang 0.08 menangkap "satu warna untuk semua morfologi" (jarak ~0.00)
+#: dengan margin, tanpa bergantung pada rasa.
+MIN_DEEP_SKY_COLOUR_DIFF = 0.08
 
 
 def _rgb_text(colour):
@@ -333,29 +341,25 @@ def _rgb_text(colour):
     return "/".join(f"{c:.2f}" for c in colour)
 
 
-def mean_visible_colour(rows, width, height, background=0.02):
-    """Warna rata-rata piksel yang benar-benar terlihat (bukan latar).
+def brightest_colour(rows, width, height, budget=COLOUR_SAMPLE_PIXELS):
+    """Warna rata-rata `budget` piksel paling terang — warna kabutnya sendiri.
 
-    Kabut digambar sebagai gradien tipis di atas latar gelap, jadi rata-rata
-    seluruh frame akan didominasi latar dan menyembunyikan perbedaan warna.
-    Yang dirata-ratakan hanya piksel di atas ambang `background` — piksel
-    yang memang membawa warna kabut.
+    Bukan rata-rata seluruh frame: kabut digambar sebagai gradien tipis di
+    atas latar gelap, dan sebagian morfologi hanya menutupi sudut kecil
+    frame. Rata-rata frame akan didominasi latar dan menyembunyikan warna
+    yang justru sedang diukur.
     """
-    total = [0.0, 0.0, 0.0]
-    count = 0
+    pixels = []
     for y in range(height):
         row = rows[y]
         for x in range(width):
             r, g, b = row[x * 4], row[x * 4 + 1], row[x * 4 + 2]
-            if (r + g + b) / 3.0 / 255.0 <= background:
-                continue
-            total[0] += r / 255.0
-            total[1] += g / 255.0
-            total[2] += b / 255.0
-            count += 1
-    if count == 0:
+            pixels.append((r + g + b, (r / 255.0, g / 255.0, b / 255.0)))
+    pixels.sort(reverse=True)
+    top = pixels[:budget]
+    if not top:
         return None
-    return tuple(c / count for c in total)
+    return tuple(sum(p[1][i] for p in top) / len(top) for i in range(3))
 
 
 def render_case(name, night=False, size=200, ss=2):
@@ -5420,14 +5424,14 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
             f"{MIN_MORPHOLOGY_DIFF:.0%}"))
 
     # Dan warnanya — arah yang tidak terlihat oleh perbandingan piksel di atas.
-    neutral_hue_rgb = mean_visible_colour(rows_neutral, w0, h0)
+    neutral_hue_rgb = brightest_colour(rows_neutral, w0, h0)
     if neutral_hue_rgb is None:
         results.append(Result("warna kabut netral terbaca", False,
                               "kabut netral tidak punya piksel terlihat"))
         return
     for name in names:
         _, (w, h, rows) = rendered[name]
-        colour = mean_visible_colour(rows, w, h)
+        colour = brightest_colour(rows, w, h)
         if colour is None:
             results.append(Result(f"warna {name} berbeda dari kabut netral",
                                   False, "tidak ada piksel terlihat"))
@@ -5444,7 +5448,7 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
     measured = {}
     for name in names:
         _, (w, h, rows) = rendered[name]
-        measured[name] = mean_visible_colour(rows, w, h)
+        measured[name] = brightest_colour(rows, w, h)
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
             a, b = measured[names[i]], measured[names[j]]
