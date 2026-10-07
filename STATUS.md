@@ -1,3 +1,119 @@
+## Progres terakhir (7 Okt 2026 — galaksi berlengan: M51/M101 kini berbeda dari M31/M33 di layar)
+
+### Temuan: janji "wakil berlengan" tidak punya wujud di layar
+
+Komentar katalog (`DeepSkyCatalogue.objects`, kelompok ketiga) lama menjanjikan
+"galaksi kini punya wakil **berlengan** (M51) selain cakram miring (M31/M33)".
+Janji itu **tidak punya wujud**: `.galaxy` adalah tiga blob yang **seluruhnya di
+titik pusat**, jadi tidak ada satu angka pun yang bisa menggeser sesuatu ke
+lengan.
+
+Diukur lewat jalur produksi (`out/ukur-lengan.log` + `out/bukti-lengan.py`),
+pada fuzziness yang sama, ukuran jam 38 pt, ss=8:
+
+```
+A. SEBELUM (M51 memakai tata letak cakram):
+   M31 (galaxy) vs M51 (spiralGalaxy) = 0 piksel berbeda
+B. SEKARANG (cakram vs lengan), parameter identik:
+   M31 (galaxy) vs M51 (spiralGalaxy) = 1064 piksel berbeda
+```
+
+Jadi, sebelum ini, dua objek katalog yang seharusnya berbeda bentuk digambar
+**identik** — dan tidak ada teks di layar yang membacanya (satu kata "galaksi"
+untuk keduanya). Itu kelas cacat yang sama dengan "gerbang mengukur gambar yang
+tidak pernah tampil": komentar menjanjikan sesuatu, model tidak mengirimkannya.
+
+### Perbaikannya: bentuk sendiri, bukan `.galaxy` yang diperlebar
+
+`.spiralGalaxy` (10 blob: tonjolan inti + kabut cakram sempit + dua lengan
+logaritmik pada θ = 0.35…3.35 rad) menaruh titik terjauh di **0.53 R** untuk
+lengan, bukan 0.00 R seperti cakram. M51 dan M101 keduanya dipetakan ke sana.
+
+Tiga keputusan yang dibuat lewat pengukuran, bukan tebakan:
+
+1. **Kabut cakram 0.45, bukan 0.95** (versi pertama). Pada fuzziness 0.9,
+   kabut 0.95 melebar ke 0.914 R sementara lengan terjauh hanya 0.546 R —
+   seluruh lengan tertimbun, yang tampil kembali gumpalan bulat. Diukur
+   (`out/ukur-lengan-baca.py`): ≤ 0.50 supaya lengan menonjol. Profil
+   kecerahannya turun 444 → 313 → 149 → 68 (pusat ke tepi) — cakram
+   berstruktur, bukan blob rata.
+2. **10 blob, bukan 4.** Pada 38 pt, 4 titik terpisah jatuh di bawah satu
+   piksel antar-titik; yang tersisa empat bintik acak. Delapan blob lengan
+   (empat per lengan) cukup supaya lengkung terbaca **dan** tetap terbedakan
+   dari cakram (`testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`).
+3. **Angka ditulis penuh, bukan lewat `cos`/`exp`** (seperti `.planetaryNebula`).
+   Port Python menyimpan hasilnya sebagai angka, dan
+   `check_deep_sky_layouts_match_the_model` membandingkan **nilai** di kedua
+   berkas — rumus yang dihitung dua kali di dua bahasa adalah tempat
+   pembulatan menyimpang.
+
+### Dua asersi yang sengaja DIBUANG (bukan ditambah)
+
+Uji baru `testCatalogueContainsArmedSpiralGalaxies` versi pertama menuntut
+`armed.count >= 2`. Dibuktikan dengan mutasi (`m101` dipetakan ke `.galaxy`):
+uji itu **merah bersamaan** dengan `testEveryMorphologyHasMoreThanOneRepresentative`
+yang sudah ada — jadi asersi itu **duplikat**, tidak menambah cakupan, dan
+pesannya menyuruh orang memperbaiki tempat yang sudah dijaga. Dibuang; yang
+tersisa hanya yang **tidak bisa** dilihat uji lain (objek benar-benar sampai ke
+geometri berlengan pada fuzziness katalognya).
+
+Satu asersi lain sengaja tidak ditulis: "lengan harus menjulur lebih jauh dari
+cakram". Cakram punya `discReach = 0`, jadi perbandingan `reach > 0` selalu
+benar begitu `reach > 0.3` benar — **cakupan palsu** yang hijau tanpa pernah
+bisa merah. Yang menjaga bedanya adalah `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`,
+yang mengukur **keduanya** pada fuzziness yang sama.
+
+### Bukti mutasi — semua menggigit, md5 pulih persis
+
+```
+[baseline]                             0 kegagalan
+M1: blob lengan ditarik ke pusat        6 gagal (testSpiralGalaxy… + testCatalogueContainsArmed…)
+M2: m101 -> .galaxy (1 wakil)           1 gagal (testEveryMorphologyHasMoreThanOneRepresentative)
+M3: m51+m101 -> .galaxy (0 wakil)       3 gagal (testCatalogueContainsArmed… + testEveryMorphology… + testEveryMorphologyIsUsedBy…)
+md5 CelestialVisual.swift  = 1767de63… (pulih)
+md5 DeepSkyCatalogue.swift = <asli>     (pulih)
+```
+
+Pelajaran yang berulang di repo ini muncul lagi di harness sendiri: tiga versi
+pertama `out/bukti-lengan.py` melaporkan klaim A "terbukti" padahal salah, karena
+(1) `R` yang diimpor harness adalah **modul berbeda** dari `CV.R` yang dipakai
+gerbang — mutasi menyentuh instance yang salah; (2) `decode_png` mengembalikan
+3 nilai, jadi `diff` menghitung *baris* bukan *piksel*; (3) `replace` menyasar
+daftar tangan di `check-visuals.py`, bukan di model. Ketiganya diselesaikan
+dengan memakai `CV.R`, `_w,_h,rows`, dan menyunting berkas gerbangnya sendiri.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** M51/M101 sekarang digambar berlengan, berbeda dari
+  cakram M31/M33 (1064 piksel pada 38 pt), dan tidak bisa kembali jadi cakram
+  tanpa uji merah. **Yang belum:** ini kebenaran *bentuk*, bukan kebenaran
+  astronomi sudut pandang — `celah` Cassini galaksi tidak diukur, dan apakah
+  lengan benar-benar 2 (bukan 1 tangan melengkung) diuji lewat simetri 180°,
+  bukan lewat efemeris.
+- Gerbang `check_every_morphology_in_the_model_has_render_cases` juga diukur
+  memerah saat nama baru dihapus dari daftar tangan di dalamnya (1 gagal) —
+  jadi gerbang ini berlaku untuk bentuk baru, bukan cuma membaca daftar lama.
+- Tidak ada kode `Apps/` yang berubah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 662 | **664** (+2: dua uji spiral) |
+| Pemeriksaan visual | 415 | **427** (+12: `spiralGalaxy` ikut seluruh gerbang langit dalam) |
+| Aturan UI | 29 | 29 |
+| Kunci katalog | 331 | **332** (+1 kata `galaksi spiral` untuk VoiceOver) |
+
+Semua gate hijau: `swift-test.sh` (182 + 664), `check-visuals.py --check`
+(427), `swift-ui-lint.sh` (29), `swift-typecheck.sh`. Berkas tersentuh:
+`CelestialVisual.swift`, `DeepSkyCatalogue.swift`, `DeepSkySpeech.swift`,
+`TextLocalization.swift`, `CelestialVisualTests.swift`,
+`TextLocalizationTests.swift`, `Localizable.xcstrings`, `check-visuals.py`,
+`render-visuals.py`.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — planet yang tidak pernah muncul di gambar mana pun, dan klaim docstring yang membantah dirinya sendiri)
 
 ### Temuan: tiga daftar planet, tidak ada satu pun yang diikat

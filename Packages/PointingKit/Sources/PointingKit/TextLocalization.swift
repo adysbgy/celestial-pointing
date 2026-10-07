@@ -512,7 +512,7 @@ public extension LocalizedText {
         // ini "Gugus Ptolemy" dan "Gugus Hercules" terdengar sama persis.
         // Lihat `DeepSkySpeech.swift`.
         .deepSkyMorphologyNebula, .deepSkyMorphologyPlanetaryNebula,
-        .deepSkyMorphologyGalaxy,
+        .deepSkyMorphologyGalaxy, .deepSkyMorphologySpiralGalaxy,
         .deepSkyMorphologyOpenCluster, .deepSkyMorphologyGlobularCluster,
         // Putusan GoTo. Masuk daftar karena inilah satu-satunya jalur putusan
         // keselamatan sampai ke layar: `SlewPlanner` sudah menghitungnya sejak

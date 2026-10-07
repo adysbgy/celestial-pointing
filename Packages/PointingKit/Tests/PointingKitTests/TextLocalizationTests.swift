@@ -308,9 +308,14 @@ final class TextLocalizationTests: XCTestCase {
     /// katalog di dalam parameter bertipe `String`, tempat `Text` mencetaknya
     /// apa adanya. Aturan 4 hijau, Aturan 19 hijau, tidak satu pun kata
     /// Inggris pernah tampil. Lihat `DiagnosticsText.swift`.
+    ///
+    /// 331 → 332 pada siklus "galaksi berlengan": satu kata untuk
+    /// `.spiralGalaxy`, karena M31 (cakram miring) dan M51 (lengan terbaca)
+    /// kini digambar berbeda dan tidak boleh terdengar sama. Lihat
+    /// `DeepSkySpeech.swift`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 331, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 332, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

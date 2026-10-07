@@ -1259,6 +1259,63 @@ public enum VisualFrame {
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
                                 frameHalfExtent: frameHalfExtent)
 
+        case .spiralGalaxy:
+            // Lengan yang benar-benar terbaca: dua lengan pada spiral
+            // logaritmik `r = 0.20·e^(0.30θ)`, dari θ = 0.35 rad sampai
+            // 3.35 rad. Sudut itu bukan pilihan bebas -- ia berhenti
+            // sebelum setengah putaran, sehingga **dua** lengan terpisah
+            // 180° membentuk huruf S, bukan cincin penuh. Cincin penuh
+            // akan terbaca sebagai nebula planetari, bukan galaksi.
+            //
+            // **Kenapa 10 blob, bukan 4.** Pada ukuran jam (38 pt), empat
+            // titik terpisah tidak lagi terbaca sebagai lengkung: jarak
+            // antar-titik jatuh di bawah satu piksel dan yang tersisa hanya
+            // empat bintik yang posisinya tampak acak. Delapan blob lengan
+            // (empat per lengan) cukup untuk membuat lengkungnya terbaca
+            // **dan** tetap terbedakan dari cakram — lihat
+            // `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`.
+            //
+            // Angka-angkanya ditulis penuh (bukan lewat `cos`/`exp` seperti
+            // `.planetaryNebula`) karena port Python menyimpan hasilnya
+            // sebagai angka, dan `check_deep_sky_layouts_match_the_model`
+            // membandingkan **nilai** di kedua berkas. Rumus yang dihitung
+            // dua kali di dua bahasa adalah tempat pembulatan menyimpang.
+            let layout: [(Double, Double, Double, Double, Double, Double)] = [
+                // Tonjolan inti: yang tersisa paling terang saat spiral
+                // dilihat dari jauh, dan yang membedakannya dari gugus bola
+                // (inti gugus tidak punya lengan sama sekali).
+                (0.000000, 0.000000, 0.32, 1.0, 0.0, 0.60),
+                // Kabut cakram yang menyatukan lengannya: **sempit**, sangat
+                // redup, dan di bawah lengan supaya tidak menenggelamkan
+                // kontrasnya.
+                //
+                // **Kenapa 0.45, bukan 0.95.** Versi pertama memakai 0.95 —
+                // "cakram lebar" seperti `.galaxy` — dan uji menolaknya
+                // dengan alasan yang benar: pada fuzziness 0.9 kabut itu
+                // melebar ke 0.914 R, sementara lengan terjauh hanya 0.546 R,
+                // jadi **seluruh lengan terkurung di dalam kabut** dan yang
+                // tampil kembali gumpalan bulat. Diukur (`out/ukur-lengan-
+                // baca.py`): kabut harus ≤ 0.50 supaya lengan menonjol keluar
+                // siluet. Pada 0.45 profil kecerahannya turun 444 → 313 → 149
+                // → 68 (pusat ke tepi, satuan 1/1000) — cakram berstruktur,
+                // bukan blob rata.
+                (0.000000, 0.000000, 0.45, 1.0, 0.0, 0.13),
+                // Lengan A (θ = 0.35, 1.35, 2.35, 3.35) — makin ke luar
+                // makin besar, makin lebar, dan makin redup.
+                (0.208674, 0.076172, 0.24, 1.0, 0.0, 0.34),
+                (0.065671, 0.292581, 0.22, 1.0, 0.0, 0.32),
+                (-0.284437, 0.287983, 0.19, 1.0, 0.0, 0.28),
+                (-0.534559, -0.113047, 0.16, 1.0, 0.0, 0.22),
+                // Lengan B — titik-ke-titik cermin lengan A (180°), jadi
+                // bentuknya simetris dan tidak tampak sebagai satu tangan.
+                (-0.208674, -0.076172, 0.24, 1.0, 0.0, 0.34),
+                (-0.065671, -0.292581, 0.22, 1.0, 0.0, 0.32),
+                (0.284437, -0.287983, 0.19, 1.0, 0.0, 0.28),
+                (0.534559, 0.113047, 0.16, 1.0, 0.0, 0.22)
+            ]
+            return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
+
         case .openCluster:
             // Bintang tersebar **jarang**, tanpa inti: blob-blobnya kecil,
             // tersebar sampai dekat tepi, dan **tidak ada yang di tengah**.

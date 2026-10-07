@@ -78,11 +78,19 @@ public enum DeepSkyCatalogue {
         CelestialObject(id: "m17", name: "Nebula Omega",   kind: .deepSky,
                         raDeg: 275.10833333, decDeg: -16.17666667, magnitude: 6.00),
         // Kelompok ketiga: memperluas cakupan bentuk & menambah wakil langka.
-        // M27/M57 = nebula planetari (cincin/belah ketupat), M51 = galaksi
-        // spiral berlengan, M11 = gugus terbuka padat. Keempatnya objek
-        // Messier terang yang masuk akal ditunjuk dengan binokuler, dan
-        // ketiganya menambah variasi yang bisa dibaca dari layar: galaksi
-        // kini punya wakil berlengan (M51) selain cakram miring (M31/M33).
+        // M27/M57 = nebula planetari (cincin/belah ketupat), M11 = gugus
+        // terbuka padat. Ketiganya objek Messier terang yang masuk akal
+        // ditunjuk dengan binokuler.
+        //
+        // **M51 ada di sini, tapi bentuknya pindah ke `.spiralGalaxy` di
+        // kelompok kelima.** Selama beberapa siklus komentar ini menjanjikan
+        // "galaksi kini punya wakil berlengan (M51) selain cakram miring
+        // (M31/M33)" — dan janji itu tidak pernah punya wujud: `.galaxy`
+        // seluruhnya blob di titik pusat, jadi M31 dan M51 digambar
+        // **identik** (diukur: 0 piksel berbeda pada fuzziness yang sama).
+        // Bentuk berlengan butuh kode gambar sendiri, dan itulah yang
+        // `.spiralGalaxy` tambahkan. Lihat
+        // `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`.
         CelestialObject(id: "m27", name: "Nebula Dumbel",   kind: .deepSky,
                         raDeg: 299.90166667, decDeg:  22.72175000, magnitude: 7.40),
         CelestialObject(id: "m57", name: "Nebula Cincin",   kind: .deepSky,
@@ -99,7 +107,20 @@ public enum DeepSkyCatalogue {
         CelestialObject(id: "m2",  name: "Gugus M2",  kind: .deepSky,
                         raDeg: 323.36208333, decDeg:  -0.82333333, magnitude: 6.50),
         CelestialObject(id: "m35", name: "Gugus M35", kind: .deepSky,
-                        raDeg:  92.37333333, decDeg:  24.10666667, magnitude: 5.30)
+                        raDeg:  92.37333333, decDeg:  24.10666667, magnitude: 5.30),
+        // Kelompok kelima: wakil kedua untuk galaksi berlengan.
+        //
+        // **Kenapa M101 ditambahkan padahal M51 sudah ada.** Bentuk
+        // `.spiralGalaxy` baru punya satu wakil, dan satu wakil bukan pola —
+        // pengguna yang hanya melihat satu galaksi berlengan tidak punya
+        // cara tahu mana ciri bentuk itu dan mana kebetulan objeknya.
+        // Itu alasan yang sama yang sudah mengunci aturan "minimal dua
+        // wakil per bentuk" di uji; menambah bentuk tanpa memenuhinya akan
+        // memerahkannya. M101 (Kincir Angin) adalah spiral menghadap penuh
+        // yang paling terkenal, jadi ia pasangan yang jujur untuk M51.
+        // Mag 7.86 — masih dalam jangkauan binokuler, sama seperti M51.
+        CelestialObject(id: "m101", name: "Galaksi Kincir Angin", kind: .deepSky,
+                        raDeg: 210.80254167, decDeg:  54.34916667, magnitude: 7.86)
     ]
 
     /// Seberapa "menyebar" tiap objek (0 = titik, 1 = kabut paling lebar).
@@ -131,10 +152,11 @@ public enum DeepSkyCatalogue {
         "m17": 0.72,   // Omega — nebula emisi, lebih sempit dari Orion
         "m27": 0.68,   // Dumbel — nebula planetari, kabut memanjang
         "m57": 0.40,   // Cincin — nebula planetari kecil & padat
-        "m51": 0.92,   // Pusaran — galaksi spiral, kabut lebar
+        "m51": 0.92,   // Pusaran — galaksi spiral berlengan, kabut lebar
         "m11": 0.42,   // Bebek Liar — gugus terbuka padat (22′)
         "m2":  0.32,   // M2 — gugus bola, padat seperti Hercules
-        "m35": 0.52    // M35 — gugus terbuka longgar, lebih lebar dari Bebek Liar
+        "m35": 0.52,   // M35 — gugus terbuka longgar, lebih lebar dari Bebek Liar
+        "m101": 0.88   // Kincir Angin — galaksi berlengan, lebar seperti Pusaran
     ]
 
     /// Seberapa menyebar sebuah objek langit dalam, dari id-nya.
@@ -187,7 +209,32 @@ public enum DeepSkyCatalogue {
         case planetaryNebula
         /// Galaksi: cakram miring dengan tonjolan inti — terlihat dari rasio
         /// sumbu elipsnya, bukan cuma dari lebarnya.
+        ///
+        /// **Yang ini galaksi tanpa lengan yang terbaca.** M31 dan M33
+        /// tampak dari Bumi nyaris miring (inklinasi besar), sehingga
+        /// lengannya memipih jadi cakram yang nyaris tak berlengan. Jadi
+        /// bentuk ini bukan penyederhanaan — ia memang yang terlihat.
+        /// Galaksi yang tampak dari atas (M51, M101) masuk `spiralGalaxy`.
         case galaxy
+        /// Galaksi spiral **menghadap penuh**: lengan yang benar-benar
+        /// terbaca, bukan cakram.
+        ///
+        /// **Kenapa ini kasus sendiri, bukan `.galaxy` yang diperlebar.**
+        /// Komentar katalog sudah lama menjanjikan "wakil berlengan" untuk
+        /// galaksi, dan `.galaxy` tidak pernah bisa memenuhinya: seluruh
+        /// tata letaknya adalah tiga blob yang **semuanya di titik pusat**,
+        /// jadi tidak ada satu angka pun yang bisa menggeser sesuatu ke
+        /// lengan. Diukur pada fuzziness yang sama, M31 dan M51 menghasilkan
+        /// **0 piksel berbeda** — dua objek katalog yang seharusnya berbeda
+        /// bentuk digambar identik, dan tidak ada teks di layar yang bisa
+        /// membacanya.
+        ///
+        /// Bedanya dari `.galaxy` **struktural, bukan skala**: jumlah blob
+        /// (sepuluh lawan tiga) dan sebarannya (blob terluar di 0.53 R
+        /// lawan 0.00 R). Memperlebar `.galaxy` tidak akan pernah
+        /// menghasilkannya, karena lebar hanya mengubah ukuran, bukan
+        /// bentuk.
+        case spiralGalaxy
         /// Gugus terbuka: bintang-bintang tersebar **jarang**, tanpa inti.
         case openCluster
         /// Gugus bola: inti padat dengan bintang yang mengerumun rapat.
@@ -215,10 +262,11 @@ public enum DeepSkyCatalogue {
         "m17": .nebula,           // Omega — nebula emisi
         "m27": .planetaryNebula,  // Dumbel — nebula planetari (cangkang lonjong)
         "m57": .planetaryNebula,  // Cincin — nebula planetari (cangkang bulat)
-        "m51": .galaxy,           // Pusaran — galaksi spiral
+        "m51": .spiralGalaxy,     // Pusaran — galaksi spiral berlengan (menghadap penuh)
         "m11": .openCluster,      // Bebek Liar — gugus terbuka padat
         "m2":  .globularCluster,  // M2 — gugus bola padat
-        "m35": .openCluster       // M35 — gugus terbuka longgar
+        "m35": .openCluster,      // M35 — gugus terbuka longgar
+        "m101": .spiralGalaxy     // Kincir Angin — galaksi spiral berlengan
     ]
 
     /// Bentuk sebuah objek langit dalam, dari id-nya.

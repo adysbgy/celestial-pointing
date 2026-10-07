@@ -83,6 +83,7 @@ public extension CelestialVisual {
         case .nebula:          return .deepSkyMorphologyNebula
         case .planetaryNebula: return .deepSkyMorphologyPlanetaryNebula
         case .galaxy:          return .deepSkyMorphologyGalaxy
+        case .spiralGalaxy:    return .deepSkyMorphologySpiralGalaxy
         case .openCluster:     return .deepSkyMorphologyOpenCluster
         case .globularCluster: return .deepSkyMorphologyGlobularCluster
         }
@@ -105,6 +106,20 @@ public extension LocalizedText {
         key: "deepSky.morphology.planetaryNebula.spoken.label", id: "nebula planetari")
     static let deepSkyMorphologyGalaxy = LocalizedText(
         key: "deepSky.morphology.galaxy.spoken.label", id: "galaksi")
+    /// **Kenapa galaksi berlengan butuh kata sendiri.** Sama persis dengan
+    /// alasan `planetaryNebula` di atas, dan kali ini yang bertolak belakang
+    /// bukan bentuk gas melainkan **sudut pandang**: `.galaxy` menggambar
+    /// cakram miring yang lengannya memipih, `.spiralGalaxy` menggambar
+    /// lengannya. Bagi pengguna VoiceOver, satu kata "galaksi" untuk
+    /// keduanya berarti M31 dan M51 diumumkan dengan kalimat yang sama —
+    /// padahal justru beda itu yang sekarang bisa dilihat.
+    ///
+    /// Kata generiknya ("galaksi") tetap dipakai `.galaxy`, bukan diganti
+    /// jadi "galaksi miring": untuk cakram yang lengannya tidak terbaca,
+    /// kata umumnya **benar** — dan memberi nama sudut pandang akan
+    /// mengklaim sesuatu yang gambarnya sendiri tidak tampilkan.
+    static let deepSkyMorphologySpiralGalaxy = LocalizedText(
+        key: "deepSky.morphology.spiralGalaxy.spoken.label", id: "galaksi spiral")
     static let deepSkyMorphologyOpenCluster = LocalizedText(
         key: "deepSky.morphology.openCluster.spoken.label", id: "gugus terbuka")
     static let deepSkyMorphologyGlobularCluster = LocalizedText(

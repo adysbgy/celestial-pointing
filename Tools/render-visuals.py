@@ -259,6 +259,22 @@ DEEP_SKY_LAYOUT = {
     "galaxy": [(0.0, 0.0, 1.00, 0.34, -18.0, 0.30),
                (0.0, 0.0, 0.66, 0.30, -18.0, 0.26),
                (0.0, 0.0, 0.26, 0.42, -18.0, 0.60)],
+    # MODEL: `VisualFrame.deepSky(.spiralGalaxy)` — dua lengan pada spiral
+    # logaritmik, ditambah tonjolan inti & kabut cakram. Kebalikan dari
+    # `galaxy` di atas, yang **seluruh** blobnya di titik pusat: di sini
+    # lengan adalah seluruh isinya, jadi port yang tidak menggambar cabang
+    # ini membuat setiap pemeriksaan gambar mengukur cakram yang tidak
+    # pernah tampil untuk M51/M101.
+    "spiralGalaxy": [(0.000000, 0.000000, 0.32, 1.0, 0.0, 0.60),
+                     (0.000000, 0.000000, 0.45, 1.0, 0.0, 0.13),
+                     (0.208674, 0.076172, 0.24, 1.0, 0.0, 0.34),
+                     (0.065671, 0.292581, 0.22, 1.0, 0.0, 0.32),
+                     (-0.284437, 0.287983, 0.19, 1.0, 0.0, 0.28),
+                     (-0.534559, -0.113047, 0.16, 1.0, 0.0, 0.22),
+                     (-0.208674, -0.076172, 0.24, 1.0, 0.0, 0.34),
+                     (-0.065671, -0.292581, 0.22, 1.0, 0.0, 0.32),
+                     (0.284437, -0.287983, 0.19, 1.0, 0.0, 0.28),
+                     (0.534559, 0.113047, 0.16, 1.0, 0.0, 0.22)],
     "openCluster": [(0.000000, -0.620000, 0.34, 1.0, 0.0, 0.55),
                     (-0.560000, -0.300000, 0.31, 1.0, 0.0, 0.50),
                     (0.520000, -0.340000, 0.33, 1.0, 0.0, 0.45),
@@ -1574,7 +1590,8 @@ def build_cases():
     # ── Objek langit dalam ────────────────────────────────────────────
     for morph, note in (("nebula", "nebula emisi (M42)"),
                         ("planetaryNebula", "nebula planetari (M27/M57)"),
-                        ("galaxy", "galaksi (M31/M51)"),
+                        ("galaxy", "galaksi (M31/M33) — cakram miring"),
+                        ("spiralGalaxy", "galaksi berlengan (M51/M101)"),
                         ("openCluster", "gugus terbuka (Pleiades)"),
                         ("globularCluster", "gugus bola (M13)")):
         cases.append(VisualCase(f"deepsky-{morph}", note, "deepSky",

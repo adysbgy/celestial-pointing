@@ -1406,6 +1406,107 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// **Pengunci pembeda galaksi: cakram tanpa lengan vs spiral berlengan.**
+    ///
+    /// Cacat yang ditutup uji ini nyata dan terukur. Komentar katalog
+    /// (`DeepSkyCatalogue.objects`, kelompok ketiga) menjanjikan "galaksi
+    /// kini punya wakil **berlengan** (M51) selain cakram miring (M31/M33)",
+    /// dan janji itu **tidak punya wujud di layar**: `.galaxy` hanya tiga
+    /// blob yang **semuanya di titik pusat**, jadi tidak ada satu angka pun
+    /// yang bisa menggeser sesuatu ke lengan. Diukur pada fuzziness yang
+    /// sama (0.92, ukuran jam 38 pt, supersampling 8×): M31 dan M51
+    /// menghasilkan **0 piksel berbeda** — dua objek katalog yang seharusnya
+    /// berbeda bentuk digambar identik.
+    ///
+    /// Yang dijaga karena itu bukan "ada morfologi bernama spiral", tapi
+    /// **sifat geometrinya**: cakram tidak punya bagian yang jauh dari
+    /// pusat, spiral punya. Uji yang hanya menuntut "dua nama berbeda"
+    /// akan hijau pada keadaan cacat itu.
+    func testSpiralGalaxyHasArmsThatThePlainDiscDoesNot() {
+        // Fuzziness yang sama untuk keduanya: kalau bedanya hanya karena
+        // lebar, uji ini tidak membuktikan apa pun.
+        let fuzziness = 0.9
+        let disc = VisualFrame.deepSky(morphology: .galaxy, fuzziness: fuzziness)
+        let spiral = VisualFrame.deepSky(morphology: .spiralGalaxy, fuzziness: fuzziness)
+
+        // Cakram: seluruh blob di pusat. Ini bukan kekurangan, ini yang
+        // terlihat dari Bumi untuk M31/M33 (inklinasi besar) — tapi
+        // artinya ia **tidak bisa** menjadi "wakil berlengan".
+        let discReach = disc.blobs.map { hypot($0.offsetX, $0.offsetY) }.max() ?? -1
+        XCTAssertEqual(discReach, 0, accuracy: 1e-9,
+                       "cakram galaksi tidak boleh punya bagian di luar pusat — itu definisinya")
+
+        // Spiral: ada lengan, dan lengannya benar-benar jauh dari inti.
+        let reach = spiral.blobs.map { hypot($0.offsetX, $0.offsetY) }
+        let spiralReach = reach.max() ?? -1
+        XCTAssertGreaterThan(spiralReach, 0.3,
+                             "spiral berlengan harus punya lengan yang jauh dari inti, bukan cakram yang diperlebar")
+
+        // Lengan itu harus **di luar** tonjolan inti, bukan tertimbun di
+        // dalamnya: kalau seluruh blob lengan duduk di dalam bulge, yang
+        // terlihat tetap satu gumpalan bulat.
+        let bulge = spiral.blobs.map { max($0.halfWidth, $0.halfHeight) }.max() ?? 0
+        XCTAssertGreaterThan(spiralReach, bulge,
+                             "lengan tertimbun di dalam tonjolan inti (lengan \(spiralReach), inti \(bulge)) — yang tampil tetap gumpalan")
+
+        // Dan bedanya **struktural**, bukan sekadar skala: memperlebar
+        // cakram tidak akan pernah menghasilkan jumlah blob ini.
+        XCTAssertNotEqual(spiral.blobs.count, disc.blobs.count,
+                          "jumlah blob sama: bedanya bisa hilang hanya dengan mengubah lebar")
+    }
+
+    /// Katalog harus benar-benar memuat galaksi berlengan — **dan geometri
+    /// yang dipetakannya harus punya lengan.**
+    ///
+    /// Uji geometri di atas menjaga **bentuknya bisa** berlengan; uji ini
+    /// menjaga **ada objeknya**, dan bahwa objek itu benar-benar sampai ke
+    /// bentuk yang berlengan. Keduanya perlu: bentuk yang benar tapi tidak
+    /// dipakai objek mana pun tidak akan pernah tampil, dan objek yang
+    /// dipetakan ke bentuk tanpa lengan membuat janji katalog itu kembali
+    /// kosong.
+    ///
+    /// **Yang sengaja TIDAK diperiksa di sini: jumlah wakilnya.** Versi
+    /// pertama uji ini menuntut `armed.count >= 2` — dan itu **duplikat**:
+    /// `DeepSkyCatalogueTests.testEveryMorphologyHasMoreThanOneRepresentative`
+    /// sudah menuntutnya untuk setiap morfologi. Dibuktikan dengan mutasi
+    /// (`m101` dipetakan ke `.galaxy`): kedua uji merah bersamaan, jadi
+    /// asersi ini tidak menambah cakupan apa pun. Ia dihapus supaya uji ini
+    /// hanya memuat yang **tidak bisa** dilihat uji lain, dan pesan
+    /// kegagalannya tidak pernah menyuruh orang memperbaiki tempat yang
+    /// sudah dijaga.
+    func testCatalogueContainsArmedSpiralGalaxies() {
+        let armed = DeepSkyCatalogue.objects.filter {
+            DeepSkyCatalogue.morphology(forObjectID: $0.id) == .spiralGalaxy
+        }
+        XCTAssertFalse(armed.isEmpty,
+                       "tidak ada objek yang dipetakan ke `.spiralGalaxy` — bentuknya tidak akan pernah tampil")
+
+        // Setiap objek yang dipetakan ke bentuk berlengan harus benar-benar
+        // sampai ke geometri berlengan, **pada fuzziness katalognya sendiri**.
+        // Diukur dari jalur produksi, bukan dari tata letak yang diketik di
+        // uji: mengubah tata letak `.spiralGalaxy` jadi cakram membuat
+        // kedua galaksi di bawah gagal (dibuktikan dengan mutasi).
+        //
+        // **Satu asersi yang sengaja TIDAK ada di sini:** "lengan harus
+        // menjulur lebih jauh dari cakram `.galaxy`". Cakram punya seluruh
+        // blob di pusat, jadi jaraknya selalu 0 — dan perbandingan terhadap
+        // nol selalu benar begitu `reach > 0.3` benar. Asersi itu akan
+        // hijau tanpa pernah bisa merah, yaitu cakupan palsu. Yang menjaga
+        // bedanya adalah `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`,
+        // yang mengukur **keduanya** pada fuzziness yang sama.
+        for object in armed {
+            let geometry = VisualFrame.deepSky(
+                morphology: DeepSkyCatalogue.morphology(forObjectID: object.id),
+                fuzziness: DeepSkyCatalogue.fuzziness(forObjectID: object.id))
+            let reach = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }.max() ?? -1
+            let bulge = geometry.blobs.map { max($0.halfWidth, $0.halfHeight) }.max() ?? 0
+            XCTAssertGreaterThan(reach, 0.3,
+                                 "\(object.name) dipetakan ke bentuk tanpa lengan — janji katalognya kosong lagi")
+            XCTAssertGreaterThan(reach, bulge,
+                                 "\(object.name): lengan tertimbun di dalam tonjolan inti (lengan \(reach), inti \(bulge))")
+        }
+    }
+
     /// Morfologi `nil` (id tak dikenal) harus jatuh ke kabut netral, **bukan**
     /// menebak salah satu bentuk.
     func testUnknownMorphologyFallsBackToNeutralNebula() {
@@ -1458,6 +1559,8 @@ final class CelestialVisualTests: XCTestCase {
                        LocalizedText.deepSkyMorphologyNebula.rawValue)
         XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.galaxy).rawValue,
                        LocalizedText.deepSkyMorphologyGalaxy.rawValue)
+        XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.spiralGalaxy).rawValue,
+                       LocalizedText.deepSkyMorphologySpiralGalaxy.rawValue)
         XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.openCluster).rawValue,
                        LocalizedText.deepSkyMorphologyOpenCluster.rawValue)
         XCTAssertEqual(CelestialVisual.deepSkyMorphologyText(.globularCluster).rawValue,

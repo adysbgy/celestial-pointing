@@ -1959,6 +1959,17 @@
         }
       }
     },
+    "deepSky.morphology.spiralGalaxy.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi spiral berlengan (M51/M101).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "spiral galaxy"
+          }
+        }
+      }
+    },
     "deepSky.morphology.globularCluster.spoken.label": {
       "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus bola.",
       "localizations": {

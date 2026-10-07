@@ -1533,7 +1533,8 @@ def read_deep_sky_layouts_from_swift(source):
         raise ValueError(
             "'public static func deepSky(' tidak ditemukan di CelestialVisual.swift")
     region = source[source.index(switch):]
-    for name in ("planetaryNebula", "galaxy", "openCluster", "globularCluster"):
+    for name in ("planetaryNebula", "galaxy", "spiralGalaxy", "openCluster",
+                 "globularCluster"):
         marker = f"case .{name}:"
         if marker not in region:
             raise ValueError(f"'{marker}' tidak ditemukan di CelestialVisual.swift")
