@@ -14324,3 +14324,75 @@ benar-benar bergerak (ukuran, opasitas, atau tepi dalam).
     siklus berikutnya kalau ingin lanjut ke sana.
   - `buildDeepSky` tidak diubah; semua perubahan murni penambahan uji.
     Hitungan: 633 -> 634 (galaksi) -> 635 (gugus bola).
+
+---
+
+## Siklus: menutup celah radius akhir gradien bola & limb
+
+audit mutasi sistematis (metode yang sudah menemukan cacat pita Jupiter,
+sphereLightOffset galaksi, warna aksen, dan 5 morfologi deep-sky) dipakai
+untuk mencari konstanta yang tidak dijaga gerbang mana pun.
+
+### Status akhir siklus ini (terverifikasi, bukan diklaim)
+
+  - `./swift-test.sh` -> **674 test hijau** (0 gagal). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> **437 pemeriksaan, 0 gagal**
+    (naik dari 430: 7 pemeriksaan baru).
+  - `out/mutasi-radius-gradasi.py` -> 7 keadaan; 6 di antaranya merah.
+
+### Cacat: dua radius akhir gradien tidak dijaga gerbang mana pun
+
+`1.35` (gradien bola, peredupan limb di `drawSphere`) dan `1.15` (peredupan
+limb pada piringan berfase) hidup sebagai **literal** di dua bahasa —
+`Apps/Shared/CelestialVisualView.swift` dan `Tools/render-visuals.py` — dan
+tidak disebut satu pun pemeriksaan. `check_port_matches_swift_constants`
+tidak bisa menjangkaunya: ia membandingkan konstanta **bernama**, dan dua
+angka ini tidak punya nama di port.
+
+Diukur, bukan diasumsikan (`out/ukur-radius-gradasi.py`): mutasi
+1.35 -> 1.60 mengubah **200 dari 200 baris piksel** pada ukuran 200. Jadi
+mutasinya benar-benar mengubah gambar, dan seluruh 22 pemeriksaan piksel
+tetap hijau — bukan karena gerbangnya tidak menyentuh kasusnya, melainkan
+karena gerbangnya tidak pernah melihat angkanya. Seluruh gerbang piksel di
+berkas itu mengukur **keberadaan** ciri (pita Jupiter tetap "ada" walau
+kecerahannya melenceng), bukan tingkat kecerahan.
+
+Bahayanya tidak terlihat dari layar: radius akhir gradien menentukan **berapa
+jauh peredupan limb menjalar ke dalam piringan**, yaitu apakah piringan
+terbaca sebagai **bola** atau sebagai cakram rata.
+
+### Kenapa gerbang baru, bukan entri di `checks`
+
+Menambah dua angka ke `checks` berarti menuliskannya **ketiga** kalinya di
+dalam gerbang, menjadi entri yang tidak pernah dibandingkan dengan apa pun —
+persis kelas lubang yang seluruh berkas ini tutup. `check_gradient_end_radii
+_match` membaca kedua angka dari **kedua sumber** dan membandingkannya
+sebagai pasangan.
+
+### Kenapa pembedanya `startRadius`, bukan urutan nilai
+
+Dua gradien memakai kata kunci yang sama (`endRadius: radius * N`), jadi
+tidak bisa dibedakan dari pola akhirnya. Versi pertama mengurutkan dua angka
+dan menganggap yang besar "bola" — itu **diuji dan gagal**: mutasi limb
+1.15 -> 1.45 membalik urutannya, dan gerbang melaporkan `bola=1.45,
+port=1.35`, menyalahkan gradien yang tidak diubah. Dua kegagalan lain (kedua
+gradien jadi sama; gradien hilang dari port) berbunyi lewat jalur "kurang
+dari dua gradien", yang tidak menyebut gradien mana pun.
+
+Pembedanya sekarang **struktural**: gradien bola mulai di `radius * 0.1`
+dengan pusat digeser mengikuti `sphereLightOffset`; gradien limb mulai di `0`
+dan berpusat di pusat piringan. Setelah itu keempat mutasi berbunyi dengan
+nama yang benar, dan kegagalan dilaporkan **per gradien**.
+
+### Yang TIDAK diklaim
+
+  - Mutasi 1.35 -> 1.60 yang dilakukan **serentak di kedua bahasa** (kasus 5)
+    tetap hijau: tidak ada model fisik untuk kedua angka ini, jadi
+    satu-satunya sumber kebenaran adalah kesepakatan kedua sisi — sama
+    seperti rasio diameter/radius cakram bibir kawah, yang batasnya sudah
+    dicatat jujur di berkas gerbang. Ini kesenjangan yang **diketahui**,
+    bukan yang tidak disadari; menutupnya butuh pembenaran fisik (berapa
+    jauh limb darkening seharusnya menjalar), bukan tambahan gerbang.
+  - Hanya lapisan gambar yang diubah. `CelestialVisual.swift`,
+    `render-visuals.py`, dan view Swift tidak disentuh selain gerbang baru.
+  - Belum dipush; CI belum dijalankan untuk siklus ini.

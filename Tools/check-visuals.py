@@ -5001,6 +5001,149 @@ def check_mars_caps_touch_the_limb(results, size=400, ss=2):
         f"{uncertain_caps} piksel kutub pada kandidat (harus 0)"))
 
 
+def _gradient_end_factors(source):
+    """Radius akhir dua gradien piringan, dibaca dari sumber.
+
+    Dua gradien yang dijaga, dan keduanya **tidak punya konstanta**: sampai
+    gerbang ini ada, `1.35` (gradien bola) dan `1.15` (peredupan limb pada
+    piringan berfase) ditulis sebagai literal di `Apps/Shared/CelestialVisual
+    View.swift` **dan** di port Python, dan tidak disebut satu pun pemeriksaan
+    di berkas ini.
+
+    Bukti mutasi yang membuka celah ini (`out/mutasi-radius-gradasi.py`,
+    diukur bukan diasumsikan): keempat mutasi — 1.35→1.60 dan 1.15→1.45, di
+    kedua bahasa — membiarkan **seluruh 22 pemeriksaan hijau**. Dan mutasinya
+    benar-benar mengubah gambar: 200 dari 200 baris piksel berbeda pada
+    ukuran 200 (`out/ukur-radius-gradasi.py`). Jadi bukan gerbang yang tidak
+    menyentuh kasusnya; gerbangnya memang tidak pernah melihat angkanya.
+
+    Kenapa ini bukan sekadar dua entri baru di `checks`:
+    radius akhir gradien menentukan **berapa jauh peredupan limb menjalar ke
+    dalam piringan**. Di situlah letak bahayanya yang tidak terlihat — ia
+    tidak mengubah bentuk apa pun, hanya tingkat kecerahan, dan seluruh
+    gerbang piksel di berkas ini mengukur **keberadaan** ciri dengan ambang
+    yang longgar terhadap kecerahan. Pita Jupiter tetap "ada" walau
+    kecerahannya melenceng; yang berubah adalah apakah piringan terbaca
+    sebagai **bola**.
+
+    Dua bahasa, dua ejaan, dan keduanya dibaca — bukan ditebak dari
+    ekstensi berkas, karena `render-visuals.py` dan `check-visuals.py` sama-
+    sama Python dan yang dicari hanya ada di yang pertama:
+
+    | gradien | Swift | Python |
+    |---|---|---|
+    | bola (drawSphere) | `endRadius: radius * 1.35` | `end_radius=radius * 1.35` |
+    | limb berfase | `endRadius: radius * 1.15` | `end_radius=radius * 1.15` |
+    """
+    # Komentar dibuang per baris: prosa di repo ini memuat angka, dan
+    # pembacaan tanpa membuangnya akan mengambil angka contoh sebagai
+    # parameter — cacat yang sudah dua kali terjadi di berkas ini.
+    body = "\n".join((line.split("//")[0] if "//" in line else line.split("#")[0])
+                     for line in source.split("\n"))
+    # Dua gradien memakai kata kunci yang sama (`endRadius: radius * N`),
+    # jadi keduanya tidak bisa dibedakan dari pola akhirnya. Pembeda yang
+    # dipakai di sini **struktural**, bukan urutan nilai:
+    #   - gradien bola  : `startRadius: radius * 0.1`, pusatnya digeser
+    #                     mengikuti `sphereLightOffset`
+    #   - gradien limb  : `startRadius: 0`, berpusat di pusat piringan
+    #
+    # Pembeda ini dipilih setelah pembeda yang lebih lemah **diuji dan
+    # gagal**: versi pertama mengurutkan dua angka dan menganggap yang besar
+    # "bola". Mutasi limb 1.15 -> 1.45 membuat urutan itu terbalik, dan
+    # gerbang melaporkan `bola=1.45, port=1.35` — merah, tapi menyalahkan
+    # gradien yang tidak diubah. Gerbang yang memberi nama yang salah pada
+    # kegagalan akan mengirim orang ke tempat yang salah; kegagalan kedua
+    # dalam bukti ini (kasus 6 dan 7) malah berbunyi lewat jalur "kurang
+    # dari dua gradien", yang tidak menyebut gradien mana pun.
+    found = {"bola": [], "limb": []}
+    for m in re.finditer(
+            r"[Ee]nd_?[Rr]adius\s*[:=]\s*radius\s*\*\s*(?<![\w.])(\d+\.\d+)", body):
+        # Jendela mundur dipakai karena di Swift `startRadius` dan
+        # `endRadius` bisa terpisah baris (lihat `drawSphere`), sementara di
+        # port Python keduanya sebaris. Jendela 260 karakter cukup untuk
+        # keduanya dan tidak menjangkau gradien sebelumnya.
+        window = body[max(0, m.start() - 260):m.start()]
+        starts = re.findall(r"[Ss]tart_?[Rr]adius\s*[:=]\s*([^,\n)]+)", window)
+        if not starts:
+            continue
+        start = starts[-1].strip()
+        if re.fullmatch(r"radius\s*\*\s*0\.1", start):
+            found["bola"].append(float(m.group(1)))
+        elif re.fullmatch(r"0(?:\.0)?", start):
+            found["limb"].append(float(m.group(1)))
+    # Tidak melempar: daftar `checks` dibangun saat fungsi berjalan, dan
+    # exception menggagalkan seluruh gerbang dengan traceback yang tidak
+    # menyebut apa yang harus diperbaiki. Pola berkas ini: jangkar hilang
+    # adalah **pemeriksaan merah yang menyebut jangkarnya**. Karena dua
+    # gradien sekarang dibedakan secara struktural, `None` juga bisa
+    # dilaporkan **per gradien**, bukan untuk seluruh sisi.
+    return {label: (values[0] if len(values) == 1 else None)
+            for label, values in found.items()}
+
+
+def check_gradient_end_radii_match(results):
+    """Radius akhir gradien piringan harus sama di view Swift dan di port.
+
+    **Kenapa gerbang ini, bukan daftar di `checks`.** Dua angka ini tidak
+    punya konstanta di port, jadi `check_port_matches_swift_constants`
+    tidak bisa menjangkaunya: ia membandingkan nilai konstanta bernama, dan
+    `1.35`/`1.15` hidup sebagai literal di badan penggambar kedua bahasa.
+    Menambahkannya ke `checks` berarti menulis ulang angkanya **ketiga**
+    kalinya di dalam gerbang — menjadi entri yang tidak pernah dibandingkan
+    dengan apa pun, persis kelas lubang yang seluruh berkas ini tutup.
+
+    Tiga hal yang dijaga, dan tiap pemeriksaan menggigit pada keadaan yang
+    berbeda:
+
+    1. **Kedua sisi terbaca.** Jumlah gradien yang ditemukan view dan port
+       harus sama. Kalau salah satu kehilangan satu gradien (mis. cabang
+       berfase dihapus dari port), perbandingan nilai di bawah akan
+       membandingkan dua hal yang bukan pasangannya.
+    2. **Pasangannya cocok.** Gradien bola lawan bola, limb lawan limb —
+       bukan "ada dua angka yang sama di kedua sisi".
+    3. **Keduanya berbeda satu sama lain.** Kalau keduanya menjadi sama
+       (`1.35` dan `1.35`, atau `1.15` dan `1.15`), salah satu dari dua
+       gradien sudah kehilangan perannya; perbandingan himpunan apa pun akan
+       tetap hijau pada keadaan itu, karena keduanya masih sama di kedua
+       bahasa.
+
+    Yang **tidak** diklaim: gerbang ini menjaga **kesamaan antar bahasa**,
+    bukan bahwa 1.35/1.15 adalah angka yang benar. Tidak ada model di
+    `PointingKit` untuk keduanya, jadi satu-satunya sumber kebenaran adalah
+    kesepakatan kedua sisi itu sendiri — sama seperti rasio diameter/radius
+    cakram bibir kawah yang batasnya sudah dicatat jujur di berkas ini.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift"),
+                encoding="utf-8").read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+    v = _gradient_end_factors(view)
+    p = _gradient_end_factors(port)
+    # Dilaporkan **per gradien**, bukan per sisi: kalau gradien limb hilang
+    # dari port, yang harus muncul adalah "limb tidak terbaca di port
+    # Python", bukan "kurang dari dua gradien". Nama yang salah pada
+    # kegagalan mengirim orang ke tempat yang salah.
+    for label in ("bola", "limb"):
+        for where, value in (("view Swift", v[label]), ("port Python", p[label])):
+            results.append(Result(
+                f"radius akhir gradien {label} terbaca di {where}",
+                value is not None,
+                f"ditemukan {value if value is not None else 'tidak ada'}"))
+    known = [label for label in ("bola", "limb")
+             if v[label] is not None and p[label] is not None]
+    for label in known:
+        results.append(Result(
+            f"radius akhir gradien {label} (view == port)", v[label] == p[label],
+            f"view={v[label]}, port={p[label]}"))
+    # Hanya berlaku kalau **kedua** gradien terbaca di kedua sisi: pembeda
+    # dua gradien sekarang struktural, jadi kalau salah satunya hilang
+    # pemeriksaan di atas sudah merah dan membandingkan yang tersisa dengan
+    # dirinya sendiri tidak menambah apa pun.
+    if len(known) == 2:
+        results.append(Result(
+            "dua gradien punya radius akhir yang berbeda", v["bola"] != v["limb"],
+            f"bola={v['bola']}, limb={v['limb']}"))
+
+
 def check_sun_edge_is_soft(results, size=256, ss=2):
     """Tepi piringan Matahari harus **halus**, bukan tepi keras dua piringan.
 
@@ -5210,6 +5353,7 @@ def main():
 
     os.makedirs(R.OUT_DIR, exist_ok=True)
     results = []
+    check_gradient_end_radii_match(results)
     check_moon_phase_fraction(results, args.size, args.ss)
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
