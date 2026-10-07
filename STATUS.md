@@ -1,3 +1,76 @@
+## Progres terakhir (7 Okt 2026 — Bulan di siang hari: celah `.lock` siang belum tersambung untuk benda tata surya)
+
+### Cacatnya: `DaylightLockTests` hanya bintang, tidak menutup Bulan
+
+`DaylightLockTests` (sudah ada, hijau) membuktikan controller sampai `.lock`
+menolak **bintang** saat terang — tapi ia sengaja memilih bintang katalog.
+Bulan ditangani lewat jalur efemeris yang berbeda (`EphemerisBody.moon`, bukan
+tabel J2000), dan pada siang hari Bulan acapkali justru **di atas horizon**
+(fase sabit pagi/sore, atau purnama yang baru terbit saat Matahari masih
+tinggi). Jadi celahnya spesifik dan belum pernah diuji di level controller:
+arah tunjuk ke Bulan yang benar-benar di atas horizon, saat Matahari juga di
+atas horizon, masih harus ditolak karena `daylight`.
+
+`BelowHorizonHonestyTests` juga tidak menutupnya: ia menolak benda di bawah
+horizon, bukan benda di atas horizon saat langit terang.
+
+### Yang ditambahkan: `MoonDaylightHonestyTests.swift` (4 tes, PointingKit)
+
+Memutar `PointingController` **sungguhan** (bukan resolver — `.lock` adalah
+satu-satunya keadaan yang memicu haptic sukses, bunyi, pengumuman VoiceOver,
+visual pengenal, izin GoTo). Empat tes:
+
+1. `testDaytimeMoonFixtureExists` — ada saat Bulan > 30° di atas horizon saat
+   siang dalam 120 hari (prasyarat; fixture dicari dari resolver, bukan tangan).
+2. `testMoonDaytimeNeverLocks` — arah tunjuk ke Bulan siang tidak pernah
+   `.lock`, dan tidak ada haptic `lockSucceeded`.
+3. `testMoonDaytimeRefusalIsHonest` — `searchHint == .daylight` (bukan diam /
+   `allBelowHorizon`), dan resolver **menyebut Bulannya** ditolak `.daylight`.
+4. `testMoonAtNightIsNotRejectedForDaylight` — **bukti positif**: Bulan > 30°
+   saat malam tidak lagi ditolak `.daylight`, sehingga penolakan di (3)
+   memang spesifik ke terangnya langit.
+
+### Bukti mutasi — gerbangnya menggigit, dan batasnya jujur
+
+Mematikan gerbang siang di `VisibilityFilter.classify` (`if !isDark(...)`
+dijadikan komentar) → **2 dari 4 tes merah**: tepat `testMoonDaytimeRefusalIsHonest`
+(assert `searchHint == .daylight` dan resolver menyebut `.daylight`).
+
+Yang penting: `testMoonDaytimeNeverLocks` **tetap hijau** saat mutasi. Tanpa
+gerbang siang, Bulan menjadi kandidat, tapi keyakinannya turun ke `.uncertain`
+/ `.low`, bukan `.lock` — dan itu **perilaku benar** (PRD: uncertainty >
+false confidence). Jadi tes ini menangkap *penolakan jujur*, bukan memaksa
+`.lock`. Sama seperti `BelowHorizonHonestyTests` untuk Bulan, sisi yang dijaga
+adalah penolakan yang jujur, bukan keadaan ketika ia terkunci. md5
+`Visibility.swift` pulih persis.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 664 | **668** (+4 tes siang Bulan) |
+| Pemeriksaan visual | 427 | 427 |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 668), `check-visuals.py --check`
+(427, 0 gagal), `swift-ui-lint.sh` (29, "SEMUA GERBANG UI LULUS" — Aturan 10
+memaksa README 664→668), `swift-typecheck.sh`. Berkas tersentuh:
+`MoonDaylightHonestyTests.swift` (baru), `README.md`. **Tidak ada kode
+produksi Swift yang berubah.**
+
+### Batas yang jujur
+- Yang dibuktikan: Bulan di atas horizon saat siang tidak pernah `.lock` lewat
+  controller sungguhan, dan penolakannya menyebut `daylight`. **Yang belum:**
+  ini kebenaran *jalur penolakan*, bukan pengujian visual — apakah Bulan
+  redup benar-benar tampak redup di layar adalah tanggung jawab gerbang visual
+  yang sudah ada, bukan tes ini.
+- Fixture dicari dalam 120 hari dari epok 15 Jan 2026; kalau kelak efemeris
+  berubah dan tidak ada saat Bulan > 30° siang, tes (1) merah — dan itu benar,
+  karena prasyaratnya hilang. Bukan tes yang hijau karena kebetulan.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — galaksi berlengan: M51/M101 kini berbeda dari M31/M33 di layar)
 
 ### Temuan: janji "wakil berlengan" tidak punya wujud di layar
