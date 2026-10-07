@@ -698,7 +698,19 @@ VENUS_HAZE_HALF_HEIGHT = 0.72                # MODEL: `CelestialVisual.venusHaze
 # bola dan arah bibir terang kawah. Satu konstanta, karena dua salinan angka
 # ini berarti kawah yang terangnya menghadap arah yang salah — dan kawah
 # terbalik tetap terlihat seperti kawah.
+MOON_LIMB_SHADING_STRENGTH = 0.40                    # MODEL: `moonLimbShadingStrength`
+# Radius akhir gradien bola Bulan — **bukan 1.35 seperti bola planet**.
+# Piringan Bulan diputar sebesar sudut sisi terangnya, jadi pada sabit seluruh
+# pita menyala jatuh dekat tepi. Terukur 200 px, kekuatan 0.40: purnama +33.5%
+# (1.15) vs +28.5% (1.35), sabit 24.1 vs 20.9. Lihat `moonSphereGradientEndRadius`.
+MOON_SPHERE_GRADIENT_END_RADIUS = 1.15               # MODEL: `moonSphereGradientEndRadius`
 SPHERE_LIGHT_OFFSET = (-0.32, -0.32)                     # MODEL: `sphereLightOffset`
+
+
+def moon_sphere_dark(base):
+    """`CelestialVisual.moonSphereDark` — ujung gelap gradien bola Bulan."""
+    k = 1.0 - min(1.0, max(0.0, MOON_LIMB_SHADING_STRENGTH))
+    return (base[0] * k, base[1] * k, base[2] * k)
 # MODEL: `CelestialVisual.craterRelief` — kekuatan bibir & kedalaman dasar.
 CRATER_RIM_STRENGTH = 0.55                               # MODEL: `craterRelief`
 CRATER_FLOOR_DEPTH = 0.22                                # MODEL: `craterRelief`
@@ -1310,6 +1322,35 @@ def _lit_band_polygon(cx, cy, radius, phase, bright_limb_angle):
     return points, to_screen
 
 
+def _moon_sphere_gradient(cx, cy, radius, base, night_mode, is_shadow=False):
+    """Gradien bola piringan Bulan — **berpusat di pusat piringan**.
+
+    Kenapa pusat, bukan digeser ke arah cahaya seperti `_draw_sphere`: piringan
+    berfase digambar di dalam `drawLayer` yang **diputar** sebesar sudut sisi
+    terang. Gradien yang digeser ikut berputar bersama pita, sehingga "cahaya
+    dari kiri-atas" menghadap arah yang salah begitu sisi terangnya ke bawah —
+    persis alasan yang sudah tertulis di `_draw_planet` untuk planet dalam.
+    Gradien terpusat tidak punya arah, jadi ia kebal terhadap putaran itu, dan
+    arah cahaya Bulan memang sudah dinyatakan oleh **terminatornya**.
+
+    Radius akhirnya dibaca dari `MOON_SPHERE_GRADIENT_END_RADIUS` (1.15), bukan
+    1.35 seperti bola planet: pada sabit, pita menyala jatuh dekat tepi
+    piringan, dan gradien yang lebih dalam membuatnya nyaris rata lagi.
+    """
+    dark = moon_sphere_dark(base)
+    color = (lambda c: night_shadow(c) if night_mode else c) if is_shadow \
+        else (lambda c: night_surface(c) if night_mode else c)
+    return radial_gradient([(color(base), 1.0), (color(dark), 1.0)],
+                           center=(cx, cy), start_radius=0.0,
+                           end_radius=radius * MOON_SPHERE_GRADIENT_END_RADIUS)
+
+
+def _fill_moon_sphere(canvas, cx, cy, radius, base, night_mode, is_shadow=False):
+    """Isi cakram Bulan sebagai bola. Lihat `moonLimbShadingStrength`."""
+    canvas.disc(cx, cy, radius,
+                _moon_sphere_gradient(cx, cy, radius, base, night_mode, is_shadow))
+
+
 def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     unlit = ACCENTS["moonUnlit"]
     phase = phase_geometry(kw.get("illumination"), kw.get("is_waxing"))
@@ -1320,9 +1361,28 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
         # menyatakan "bulan baru" setiap kali efemeris gagal. Lihat
         # `moonPhaseUnknown` di `NightVisual.swift`.
         unknown = ACCENTS["moonPhaseUnknown"]
-        canvas.disc(cx, cy, radius, solid(night_surface(unknown) if night_mode else unknown))
+        # **Bola, bukan cakram rata.** Lihat `moonLimbShadingStrength`: tanpa
+        # gradien ini seluruh piringan Bulan terukur rata 0.0% sementara planet
+        # di sebelahnya melengkung 55%.
+        _fill_moon_sphere(canvas, cx, cy, radius, unknown, night_mode)
         return
     canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
+    # **Piringan gelap sengaja tetap rata.** Percobaan memberi gradien bola di
+    # sini diukur dan dibuang, dengan dua alasan:
+    #
+    #   1. Earthshine dilukis di bawah sebagai cakram warna **rata** di atas
+    #      seluruh piringan, jadi gradiennya terhapus justru di fase tempat
+    #      sisi gelap paling terlihat. Terukur pada 200 px, ss=2: `moon-new`
+    #      tetap +0.0% pada **setiap** kekuatan 0…0.80.
+    #   2. Memperdalamnya mematikan gerbang `check_earthshine` pada kekuatan
+    #      0.20 (4/5 lulus, yang merah tepat "sisi gelap sabit lebih terang
+    #      dari piringan gelap") — karena gerbang itu memakai luminans rata
+    #      sliver terjauh kiri sebagai ukuran earthshine, dan peredupan limb
+    #      menurunkannya.
+    #
+    # Dan itu memang gambar yang benar: sisi gelap Bulan disinari Bumi, sumber
+    # yang **lebar**, jadi piringan rata di sana bukan kesalahan — sedangkan
+    # pita terangnya disinari sumber titik. Lihat `moonLimbShadingStrength`.
     # Earthshine: sisi gelap Bulan yang disinar Bumi. Kekuatan mengikuti
     # `1 - f` (sama seperti `CelestialVisual.earthshineStrength` di Swift),
     # jadi nol saat purnama (f = 1) dan paling kuat saat sabit tipis. Dilukis
@@ -1348,13 +1408,17 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
                                           kw.get("bright_limb_angle"))
 
     lit_color = ACCENTS["moonLit"]
+    # Warna "tidak menggambar apa-apa" untuk maria di luar pita (alfa 0).
     lit_rgb = night_surface(lit_color) if night_mode else lit_color
 
     def inside_lit(x, y):
         if math.hypot(x - cx, y - cy) > radius:
             return False
         return _point_in_polygon(x, y, points)
-    canvas.fill(inside_lit, solid(lit_rgb))
+    # Pita terang digambar sebagai **bola**, bukan warna rata: tanpa gradien
+    # ini piringan Bulan terukur rata 0.0% sementara planet melengkung 55%.
+    canvas.fill(inside_lit,
+                _moon_sphere_gradient(cx, cy, radius, lit_color, night_mode))
 
     maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)
     for dx, dy, size in MARIA:

@@ -1991,6 +1991,109 @@ public extension CelestialVisual {
     /// `check_banded_disc_keeps_its_curvature`.
     public static let bandLimbShadingStrength: Double = 0.6
 
+    // MARK: - Peredupan limb piringan Bulan
+
+    /// Kekuatan peredupan limb piringan Bulan, 0…1.
+    ///
+    /// **Cacat yang ditutup angka ini — diukur dari piksel, bukan diperkirakan.**
+    /// Pita terang Bulan digambar sebagai isian **warna rata**: satu warna
+    /// `moonLit` penuh dari pusat sampai limb. Planet tidak begitu —
+    /// `drawSphere` memberi mereka gradien bola. Diukur pada 200 px, ss=2,
+    /// kekuatan 0.40:
+    ///
+    ///     kasus               metrik                 rata (0)   dipakai (0.40)
+    ///     Bulan purnama       lengkung ekuator        +0.0%        +33.5%
+    ///     Fase tak diketahui  lengkung ekuator        +0.0%        +33.4%
+    ///     Bulan sabit         sebaran pita             0.0          24.1
+    ///     Mars (pembanding)   lengkung ekuator       +54.8%        +54.8%
+    ///
+    /// Artinya pita terang Bulan **rata sempurna** sementara planet di
+    /// sebelahnya melengkung 55%. Yang terlihat bukan bola yang disinari dari
+    /// satu sisi, melainkan **stiker rata** — kata yang sama dipakai
+    /// pengukuran mata atas render yang sama, dan kata yang sama sudah dipakai
+    /// untuk cacat pita Jupiter di atas.
+    ///
+    /// **Kenapa sabit butuh metrik lain.** Baris ekuator hanya menyampel pita
+    /// terang kalau pita itu **melintasi** ekuator. `moon-crescent-jakarta`
+    /// punya sisi terang ke **bawah**, jadi seluruh baris ekuatornya jatuh di
+    /// piringan gelap dan metrik lengkung mengembalikan **+0.0%** untuk gambar
+    /// yang benar — angka yang sempat dipakai sebagai bukti di sini dan
+    /// membuat gerbangnya merah pada kode yang benar. Untuk kasus itu yang
+    /// diukur adalah sebaran luminans (p95 − p5) piksel yang terklasifikasi
+    /// menyala: pita rata → 0.0, pita yang dinaungi bola → 24.1.
+    ///
+    /// **Kenapa Bulan, padahal ia yang paling terang.** Justru karena ia yang
+    /// paling sering muncul: fase adalah satu-satunya informasi **bentuk** yang
+    /// dimiliki Bulan, dan piringan rata membuat fase itu terbaca sebagai
+    /// guntingan kertas, bukan sebagai bola.
+    ///
+    /// **Batas atasnya diukur, bukan dipilih.** Pengklasifikasi yang dipakai
+    /// gerbang fase (`classify_centroid`) memutuskan "menyala" versus "gelap"
+    /// pada jarak-warna RGB, jadi pada gradien yang terlalu dalam piksel limb
+    /// jatuh ke sisi **gelap** dan luas pita yang terukur menyusut — bukan
+    /// karena gambarnya salah, melainkan karena alat ukurnya berganti
+    /// jawaban. Disapu pada 200 px, ss=2, toleransi gerbang 0.10:
+    ///
+    ///     kekuatan   luas pita merah   lengkung purnama
+    ///     0.45            0/9              +37.6%
+    ///     0.50            0/9              +41.6%
+    ///     0.60            7/9              +50.2%   <- gerbang merah
+    ///
+    /// 0.60 **merah**: `f=0.18` terukur 0.053, `f=0.35` terukur 0.198,
+    /// `f=0.50` terukur 0.335 — ketiganya melewati toleransi 0.10. Dijaga
+    /// `testMoonLimbShadingIsPartial` di Linux (batas atasnya) dan gerbang
+    /// piksel `check_moon_disc_keeps_its_curvature` (lengkungnya benar-benar
+    /// sampai ke gambar).
+    ///
+    /// **Piringan gelap Bulan sengaja tetap rata**, dan itu bukan kelalaian.
+    /// Percobaan pertama memberi gradien yang sama ke piringan gelap, dan
+    /// hasilnya menyingkap dua hal: (1) earthshine dilukis sebagai cakram
+    /// warna rata di atasnya, jadi gradiennya terhapus justru di fase tempat
+    /// sisi gelap paling terlihat — terukur, `moon-new` tetap **+0.0%** di
+    /// setiap kekuatan; dan (2) memperdalamnya mematikan gerbang
+    /// `check_earthshine` pada kekuatan **0.20** (4/5 lulus). Sisi gelap Bulan
+    /// memang disinari sumber yang **lebar** (Bumi, bukan Matahari), jadi
+    /// piringan rata di sana bukan gambar yang salah — sedangkan pita
+    /// terangnya disinari sumber titik, dan di situlah lengkungnya berarti.
+    public static let moonLimbShadingStrength: Double = 0.40
+
+    /// Radius akhir gradien bola Bulan, dalam satuan radius piringan.
+    ///
+    /// **Berbeda dari bola planet (1.35), dan angkanya diukur.** Piringan
+    /// Bulan digambar di dalam `drawLayer` yang **diputar** sebesar sudut sisi
+    /// terang (`terminatorRotationRadians`). Gradien yang berpusat di pusat
+    /// piringan tidak punya arah, jadi putaran itu tidak menggesernya — tetapi
+    /// ia menggeser **sisi terangnya**: pada sabit dengan sisi terang ke
+    /// bawah, seluruh pita yang menyala jatuh di dekat tepi piringan, tempat
+    /// gradien 1.35 sudah nyaris mencapai ujung gelapnya. Diukur pada 200 px,
+    /// ss=2, kekuatan 0.40 — metriknya **sebaran pita** untuk sabit (lihat
+    /// `moonLimbShadingStrength`: baris ekuator sabit jatuh di piringan gelap):
+    ///
+    ///     radius akhir   purnama (lengkung)   sabit (sebaran)
+    ///     1.15               +33.5%                24.1
+    ///     1.35               +28.5%                20.9
+    ///
+    /// Purnama **dan** sabit dua-duanya turun di 1.35 — jadi gradien yang
+    /// terlalu lebar melemahkan keduanya, dan 1.15 menjaga lengkung purnama
+    /// lebih dekat ke patokan Mars (+54.8%) sekaligus mempertahankan
+    /// kedalaman pita sabit. 1.15 dipakai di kedua bahasa; gerbang piksel
+    /// mengukurnya lewat **kedua** kasus, karena satu kasus saja tidak
+    /// menangkapnya.
+    public static let moonSphereGradientEndRadius: Double = 1.15
+
+    /// Ujung gelap gradien bola Bulan: warna yang sama, diredupkan sebagian.
+    ///
+    /// Ada sebagai fungsi supaya **satu** aturan peredupan dipakai kedua
+    /// tempat yang memakainya (pita terang dan piringan fase tak diketahui)
+    /// dan tidak ada yang menulis angka peredupannya sendiri di view. Port
+    /// Python memakai fungsi yang sama (`moon_sphere_dark`), jadi gambar yang
+    /// diukur gerbang piksel tidak bisa menyimpang dari gambar yang tampil di
+    /// jam.
+    public static func moonSphereDark(_ base: RGBComponents) -> RGBComponents {
+        let k = 1 - Swift.min(1, Swift.max(0, moonLimbShadingStrength))
+        return .init(red: base.red * k, green: base.green * k, blue: base.blue * k)
+    }
+
     // MARK: - Arah cahaya bola
 
     /// Arah datang cahaya pada bola planet, dalam satuan radius, relatif

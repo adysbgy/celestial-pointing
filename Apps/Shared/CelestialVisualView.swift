@@ -138,6 +138,46 @@ struct CelestialVisualView: View {
         color(raw)
     }
 
+    /// Shading bola untuk piringan Bulan: warna dasar → ujung gelapnya.
+    ///
+    /// Pusat dan radius awalnya sama dengan `drawSphere` untuk planet; yang
+    /// berbeda radius **akhirnya** — dibaca dari
+    /// `CelestialVisual.moonSphereGradientEndRadius` (1.15, bukan 1.35), karena
+    /// piringan Bulan diputar sebesar sudut sisi terangnya sehingga pada sabit
+    /// seluruh pita menyala jatuh dekat tepi piringan. Diukur pada 200 px:
+    /// purnama +33.5% (1.15) vs +28.5% (1.35), sabit 24.1 vs 20.9 — jadi
+    /// memakai 1.35 melemahkan keduanya, bukan hanya sabitnya.
+    ///
+    /// Arah cahaya tidak dipakai di sini, dan itu **bukan** kelalaian: gradien
+    /// yang berpusat di pusat piringan tidak punya arah, jadi ia kebal
+    /// terhadap putaran pita. Gradien yang digeser ikut berputar, sehingga
+    /// "cahaya dari kiri-atas" menghadap arah yang salah begitu sisi terangnya
+    /// ke bawah — dan arah cahaya Bulan memang sudah dinyatakan oleh
+    /// terminatornya, bukan oleh gradiennya.
+    ///
+    /// `isShadow: true` untuk piringan yang **tidak** memancarkan cahaya:
+    /// peredupannya ditempelkan di atas aturan `shadow`, bukan di atas aturan
+    /// `surface` — kalau tidak, kanal merahnya naik dan kontras sabit runtuh.
+    private static func sphereGradient(center: CGPoint, radius: CGFloat,
+                                       base: CelestialVisual.RGBComponents,
+                                       isShadow: Bool = false) -> GraphicsContext.Shading {
+        let dark = CelestialVisual.moonSphereDark(base)
+        return .radialGradient(
+            Gradient(colors: [isShadow ? shadowAccent(base) : accent(base),
+                              isShadow ? shadowAccent(dark) : accent(dark)]),
+            center: center,
+            startRadius: 0,
+            endRadius: radius * CGFloat(CelestialVisual.moonSphereGradientEndRadius))
+    }
+
+    /// Isi sebuah cakram sebagai **bola**, bukan cakram rata.
+    private static func fillSphere(context: GraphicsContext, disc: Path, center: CGPoint,
+                                   radius: CGFloat, base: CelestialVisual.RGBComponents,
+                                   isShadow: Bool = false) {
+        context.fill(disc, with: sphereGradient(center: center, radius: radius,
+                                                base: base, isShadow: isShadow))
+    }
+
     /// Aksen untuk bagian yang **tidak memancarkan cahaya**: piringan gelap
     /// bulan dan isi lencana ragu.
     ///
@@ -182,7 +222,7 @@ struct CelestialVisualView: View {
             context.fill(disc,
                          with: .color(Self.shadowAccent(CelestialVisual.accents.planetUnlit)))
             drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
-                        litColor: Self.color(palette.light),
+                        litFill: .color(Self.color(palette.light)),
                         decorate: { inner in
                             // Peredupan limb di dalam pita: gradien radial
                             // **berpusat di pusat piringan**, bukan digeser
@@ -664,8 +704,15 @@ struct CelestialVisualView: View {
         // Aturan yang sama dengan `moon-unknown-phase` pada port Python, jadi
         // gerbang piksel bisa mengukur keduanya.
         guard let phase = visual.phaseGeometry(waxing: visual.isWaxing) else {
-            context.fill(disc,
-                         with: .color(Self.accent(CelestialVisual.accents.moonPhaseUnknown)))
+            // Piringan polos — tapi **bola**, bukan cakram rata. Lihat
+            // `moonLimbShadingStrength`: tanpa ini piringan fase tak diketahui
+            // terukur rata 0.0% sementara planet di sebelahnya melengkung 55%,
+            // dan yang terlihat jadi guntingan kertas, bukan benda langit.
+            // Kasus inilah yang paling menuntut: `moon-new` (fase 0) tetap
+            // rata 0.0% pada setiap kekuatan, jadi fase **tak diketahui** satu-
+            // satunya kartu "Bulan tanpa sabit" yang bisa melengkung.
+            Self.fillSphere(context: context, disc: disc, center: center, radius: radius,
+                            base: CelestialVisual.accents.moonPhaseUnknown)
             return
         }
 
@@ -676,6 +723,16 @@ struct CelestialVisualView: View {
         // menaikkannya ke kanal merah 0.44 sehingga kontras sabit terhadap
         // gelap jatuh ke 2.99:1 -- tepat di layar yang paling dipakai untuk
         // melihat bulan, dan tepat saat mode malam dipilih.
+        //
+        // **Piringan ini sengaja tetap rata**, dan itu bukan kelalaian.
+        // Percobaan memberi gradien bola di sini diukur dan dibuang, karena
+        // dua hal: (1) earthshine dilukis sebagai cakram warna **rata** di
+        // atas seluruh piringan, jadi gradiennya terhapus justru di fase
+        // tempat sisi gelap paling terlihat — terukur, `moon-new` tetap +0.0%
+        // pada setiap kekuatan 0…0.80; dan (2) memperdalamnya mematikan
+        // gerbang earthshine pada kekuatan 0.20. Sisi gelap Bulan disinari
+        // Bumi, sumber yang **lebar**, jadi piringan rata di sana memang
+        // gambar yang benar — sedangkan pita terangnya disinari sumber titik.
         context.fill(disc,
                      with: .color(Self.shadowAccent(CelestialVisual.accents.moonUnlit)))
 
@@ -697,7 +754,8 @@ struct CelestialVisualView: View {
         }
 
         drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
-                    litColor: Self.accent(CelestialVisual.accents.moonLit),
+                    litFill: Self.sphereGradient(center: center, radius: radius,
+                                                 base: CelestialVisual.accents.moonLit),
                     decorate: { inner in
                         Self.drawMoonSurfaceShading(inner, center: center, radius: radius)
                     })
@@ -732,7 +790,10 @@ struct CelestialVisualView: View {
     /// - Parameters:
     ///   - phase: geometri dari `visual.phaseGeometry(waxing:)`.
     ///   - disc: piringan penuh, dipakai sebagai daerah klip.
-    ///   - litColor: warna pita yang menyala (aturan `surface`).
+    ///   - litFill: isian pita yang menyala. **Shading, bukan `Color`**, supaya
+    ///     Bulan bisa memberinya gradien bola (piringan rata terbaca sebagai
+    ///     guntingan kertas) sementara planet dalam tetap memakai warna rata
+    ///     yang sudah punya peredupan limbnya sendiri lewat `decorate`.
     ///   - decorate: gambar tambahan di permukaan yang menyala (maria Bulan,
     ///     kawah Merkurius, kabut Venus). Dijalankan **di dalam** klip pita
     ///     yang sudah diputar, jadi hiasannya tidak pernah menonjol keluar dari
@@ -741,7 +802,7 @@ struct CelestialVisualView: View {
     ///     engine.
     private func drawLitBand(context: GraphicsContext, center: CGPoint, radius: CGFloat,
                              phase: CelestialVisual.PhaseGeometry, disc: Path,
-                             litColor: Color,
+                             litFill: GraphicsContext.Shading,
                              decorate: ((GraphicsContext) -> Void)? = nil) {
         // Pita terang = daerah antara limb dan terminator, dari kutub atas ke
         // kutub bawah. Bentuknya dibangun dari dua kurva, jadi digambar sebagai
@@ -824,7 +885,7 @@ struct CelestialVisualView: View {
             // Versi lama menulis (0.95, 0.85, 0.80) untuk malam -- 77%
             // luminansinya ada di hijau dan biru, kanal yang paling merusak
             // penglihatan malam. Angka itu justru terlihat "merah" di layar.
-            layer.fill(lit, with: .color(litColor))
+            layer.fill(lit, with: litFill)
             // Hiasan permukaan: **di dalam** bagian yang menyala saja, jadi
             // bercak ini tidak pernah mengubah lebar sabit yang terlihat.
             if let decorate {

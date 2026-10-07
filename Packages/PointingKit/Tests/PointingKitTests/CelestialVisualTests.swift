@@ -2337,6 +2337,71 @@ final class CelestialVisualTests: XCTestCase {
                        "nilai ini diukur terhadap render: 75% lengkung, 18.3% kontras pita")
     }
 
+    /// Peredupan limb piringan Bulan: harus ada, tapi tidak boleh terdalam.
+    ///
+    /// **Dua sisi diuji, karena memperbaiki satu bisa merusak yang lain.** Di
+    /// bawah 0 pita terang Bulan rata sempurna (+0.0% lengkung pada 200 px,
+    /// sementara Mars +54.8%) — gambar yang terbaca sebagai guntingan kertas.
+    /// Di atas 0.50 gerbang fase mulai merah: pada 0.60 `classify_centroid`
+    /// mengukur `f=0.18` sebagai 0.053 dan `f=0.50` sebagai 0.335, keduanya di
+    /// luar toleransi 0.10, karena piksel limb jatuh ke sisi gelap dan alat
+    /// ukurnya berganti jawaban. 0.40 dan 0.50 sama-sama hijau.
+    func testMoonLimbShadingIsPartial() {
+        let strength = CelestialVisual.moonLimbShadingStrength
+        XCTAssertGreaterThan(strength, 0,
+                             "tanpa shading, pita terang Bulan rata 0.0% (Mars: +54.8%)")
+        XCTAssertLessThan(strength, 0.55,
+                          "di 0.60 gerbang fase merah: f=0.18 terukur 0.053, f=0.50 terukur 0.335")
+        XCTAssertEqual(strength, 0.40, accuracy: 1e-12,
+                       "nilai ini diukur terhadap render: +33.5% lengkung, gerbang fase 9/9")
+    }
+
+    /// Ujung gelap gradien Bulan harus **lebih gelap** dari warnanya, dan
+    /// peredupannya proporsional terhadap kekuatannya.
+    ///
+    /// Kalau `moonSphereDark` mengembalikan warnanya sendiri, gradiennya
+    /// lenyap dan cacat rata itu kembali tanpa satu pun galat kompilasi —
+    /// gambar tetap tergambar, hanya tidak melengkung.
+    func testMoonSphereDarkIsDarkerThanTheBase() {
+        let base = CelestialVisual.RGBComponents(red: 0.97, green: 0.95, blue: 0.90)
+        let dark = CelestialVisual.moonSphereDark(base)
+        for (name, pair) in [("merah", (dark.red, base.red)),
+                             ("hijau", (dark.green, base.green)),
+                             ("biru", (dark.blue, base.blue))] {
+            XCTAssertLessThan(pair.0, pair.1, "kanal \(name) tidak diredupkan")
+            XCTAssertGreaterThan(pair.0, 0, "kanal \(name) jadi nol: gradiennya penuh, bukan sebagian")
+        }
+        // Rasionya persis kekuatannya, bukan angka lain yang kebetulan mirip.
+        let k = 1 - CelestialVisual.moonLimbShadingStrength
+        XCTAssertEqual(dark.red, base.red * k, accuracy: 1e-12)
+    }
+
+    /// Gradien bola Bulan harus **lebih dangkal** dari gradien bola planet.
+    ///
+    /// **Kenapa ini bukan preferensi.** Piringan berfase digambar di dalam
+    /// `drawLayer` yang diputar sebesar sudut sisi terang. Gradien yang
+    /// berpusat di pusat piringan tidak punya arah, jadi putaran itu tidak
+    /// menggesernya — tetapi ia menggeser **sisi terangnya**: pada sabit
+    /// dengan sisi terang ke bawah, seluruh pita menyala jatuh dekat tepi
+    /// piringan. Diukur pada 200 px, ss=2, kekuatan 0.40:
+    ///
+    ///     radius akhir   purnama (lengkung)   sabit (sebaran)
+    ///     1.15               +33.5%                24.1
+    ///     1.35               +28.5%                20.9
+    ///
+    /// Purnama **dan** sabit dua-duanya turun di 1.35, sementara Mars sebagai
+    /// patokan lengkung tetap +54.8% — jadi gradien yang selebar bola planet
+    /// melemahkan Bulan di kedua fase, bukan hanya di satu.
+    func testMoonSphereGradientIsShallowerThanThePlanetSphere() {
+        let moon = CelestialVisual.moonSphereGradientEndRadius
+        XCTAssertEqual(moon, 1.15, accuracy: 1e-12,
+                       "1.15: purnama +33.5%, sabit 24.1; 1.35: +28.5% dan 20.9")
+        XCTAssertGreaterThan(moon, 1.0,
+                             "radius akhir <= 1.0 berarti gradien berhenti di dalam piringan")
+        XCTAssertLessThan(moon, 1.35,
+                          "1.35 adalah radius bola planet; di situ keduanya melemah")
+    }
+
     /// Gradien yang memulihkan lengkung harus **gradien yang sama** dengan bola.
     ///
     /// **Kenapa ini diuji, padahal ia "cuma angka yang sama".** Pemulihan di

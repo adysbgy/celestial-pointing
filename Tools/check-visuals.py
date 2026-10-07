@@ -997,6 +997,15 @@ def check_port_matches_swift_constants(results):
         # mengubahnya di satu tempat saja membuat pemeriksaan ini merah.
         ("kekuatan pemulihan limb di atas pita", R.BAND_LIMB_SHADING_STRENGTH, 0.6,
          "bandLimbShadingStrength: Double = 0.6", model),
+        # Peredupan limb piringan Bulan. Dua angka, keduanya diukur terhadap
+        # render: 0.40 adalah kekuatan yang dipakai (purnama +33.5% lengkung,
+        # gerbang fase 9/9), dan 1.15 adalah radius akhir gradiennya (purnama
+        # +33.5%, sabit 24.1; dengan 1.35 milik bola planet keduanya melemah
+        # jadi +28.5% dan 20.9).
+        ("kekuatan peredupan limb Bulan", R.MOON_LIMB_SHADING_STRENGTH, 0.40,
+         "moonLimbShadingStrength: Double = 0.40", model),
+        ("radius akhir gradien bola Bulan", R.MOON_SPHERE_GRADIENT_END_RADIUS, 1.15,
+         "moonSphereGradientEndRadius: Double = 1.15", model),
         # Rumus separuh-lebar pita pindah dari view ke model: satu rumus bola
         # (`sqrt(1 - y^2)`) dipakai bersama oleh view, port Python, dan uji
         # Linux. Yang dijaga di sini karena itu **rumusnya**, bukan angkanya —
@@ -5367,6 +5376,135 @@ def check_crater_contrast_numbers_come_from_the_sampler(results):
             + ("" if q_side == side_word else f" (sisi tertukar: {q_side})")))
 
 
+def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
+    """Pita terang Bulan harus **melengkung**, bukan isian warna rata.
+
+    **Cacat yang ditutup pemeriksaan ini.** Pita terang Bulan digambar sebagai
+    satu warna `moonLit` penuh dari pusat sampai limb, sementara `drawSphere`
+    memberi planet gradien bola. Diukur pada 200 px, ss=2, kekuatan 0.40:
+
+        kasus               metrik                 rata (0)   dipakai (0.40)
+        Bulan purnama       lengkung ekuator        +0.0%        +33.5%
+        Fase tak diketahui  lengkung ekuator        +0.0%        +33.4%
+        Bulan sabit         sebaran pita             0.0          24.1
+        Mars (pembanding)   lengkung ekuator       +54.8%        +54.8%
+
+    **Kenapa dua metrik, bukan satu.** Baris ekuator hanya menyampel pita
+    terang kalau pita itu **melintasi** ekuator. `moon-crescent-jakarta` punya
+    sisi terang ke bawah, jadi seluruh baris ekuatornya jatuh di piringan
+    gelap dan metrik itu mengembalikan **+0.0%** untuk gambar yang benar.
+    Angka itu sempat dipakai sebagai bukti di sini dan gerbangnya merah pada
+    kode yang benar — kelas cacat yang sudah tercatat berkali-kali di repo ini.
+    Untuk kasus itu metriknya diganti: sebaran luminans (p95 − p5) piksel yang
+    terklasifikasi **menyala** oleh cara yang sama yang dipakai
+    `classify_centroid`. Pita rata → sebaran 0.0; pita yang dinaungi bola →
+    24.1. Sebaran itu **tidak tercemar maria** di kasus sabit: pada kekuatan 0
+    ia terukur 0.0, jadi yang menggerakkannya memang gradiennya.
+
+    **Batas atas kekuatan diukur, bukan dipilih.** `classify_centroid`
+    memutuskan "menyala" versus "gelap" pada jarak-warna RGB, jadi pada gradien
+    yang terlalu dalam piksel limb jatuh ke sisi gelap dan luas pita yang
+    terukur menyusut. Disapu pada 200 px, ss=2, toleransi gerbang fase 0.10:
+
+        kekuatan   luas pita merah   lengkung purnama
+        0.45            0/9              +37.6%
+        0.50            0/9              +41.6%
+        0.60            7/9              +50.2%   <- gerbang merah
+
+    **Kenapa `moon-new` tidak diukur.** Piringan gelap Bulan sengaja tetap
+    rata — earthshine dilukis di atasnya sebagai cakram warna rata, jadi
+    gradiennya terhapus justru di fase tempat sisi gelap paling terlihat
+    (terukur: `moon-new` tetap +0.0% pada setiap kekuatan 0…0.80), dan
+    memperdalamnya mematikan `check_earthshine` pada kekuatan 0.20. Yang
+    melengkung adalah bagian yang **disinari sumber titik** — pita terangnya
+    dan piringan "fase tak diketahui" — bukan sisi gelap yang disinari Bumi.
+
+    **Ambang lengkung relatif terhadap Mars.** Mars adalah bola yang sudah
+    memakai `drawSphere`, jadi lengkungnya adalah patokan lengkung yang benar
+    di render yang sama. Yang dijaga adalah bahwa Bulan **mendekati** patokan
+    itu, bukan bahwa ia menyamainya.
+
+    Dua pemeriksaan terakhir memeriksa **teks, bukan piksel**: piksel di atas
+    membuktikan **port** menggambar lengkungnya, sedangkan yang dikirim ke jam
+    adalah **view**. View bisa berhenti memanggil shading itu (jam rata, PNG
+    tetap melengkung) atau memanggilnya dengan angka yang ditulis ulang.
+    """
+    _, (w, h, rows) = render_case("planet-mars-confirmed", size=size, ss=ss)
+    cx = w / 2.0
+    cy = h // 2          # indeks baris, bukan koordinat
+    radius = min(w, h) / 2.0
+    x_limb = min(w - 1, int(round(cx + 0.96 * radius)))
+
+    def lum(rows_, x, y):
+        px = rows_[y][x * 4:x * 4 + 3]
+        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+    def curvature(rows_):
+        centre = lum(rows_, int(cx), cy)
+        limb = lum(rows_, x_limb, cy)
+        return 100.0 * (centre - limb) / max(centre, 1e-9)
+
+    def lit_spread(rows_):
+        """Sebaran luminans piksel menyala — metrik yang tidak butuh ekuator."""
+        lit = tuple(round(c * 255) for c in R.ACCENTS["moonLit"])
+        unlit = tuple(round(c * 255) for c in R.ACCENTS["moonUnlit"])
+        values = []
+        for y in range(h):
+            for x in range(w):
+                if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > radius * radius:
+                    continue
+                p = rows_[y][x * 4:x * 4 + 3]
+                da = sum((p[k] - lit[k]) ** 2 for k in range(3))
+                db = sum((p[k] - unlit[k]) ** 2 for k in range(3))
+                if da < db:
+                    values.append(0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2])
+        if len(values) < 20:
+            return None, len(values)
+        values.sort()
+        return (values[int(0.95 * (len(values) - 1))] - values[int(0.05 * (len(values) - 1))],
+                len(values))
+
+    mars = curvature(rows)
+    # Ambang 30% lengkung Mars = 16.4: terukur 33.5 dan 33.4 versus 54.8, jadi
+    # ambangnya punya jarak di kedua sisi, dan ia menangkap keadaan rata
+    # (0.0%) dengan margin yang jauh lebih lebar dari noise rasterisasi.
+    threshold = 0.30 * mars
+    for name, label in (("moon-full", "purnama"),
+                        ("moon-unknown-phase", "fase tak diketahui")):
+        _, (_, _, rows_) = render_case(name, size=size, ss=ss)
+        value = curvature(rows_)
+        results.append(Result(
+            f"pita terang Bulan ({label}) melengkung, bukan warna rata",
+            value >= threshold,
+            f"lengkung {value:.1f}% vs Mars {mars:.1f}% "
+            f"(ambang {threshold:.1f}% = 30% lengkung Mars; rata = +0.0%)"))
+
+    # Sabit: sisi terang ke bawah, jadi baris ekuator **tidak** menyampel
+    # pitanya. Metriknya sebaran, bukan lengkung. Ambang 8.0 duduk di antara
+    # 0.0 (pita rata, kekuatan 0) dan 24.1 (kekuatan 0.40) — jaraknya lebar di
+    # kedua sisi.
+    _, (_, _, rows_c) = render_case("moon-crescent-jakarta", size=size, ss=ss)
+    spread, count = lit_spread(rows_c)
+    results.append(Result(
+        "pita terang Bulan sabit bernaung bola (sebaran, bukan warna rata)",
+        spread is not None and spread >= 8.0,
+        f"sebaran luminans pita {spread:.1f} dari {count} piksel "
+        f"(ambang 8.0; pita rata 0.0, kekuatan 0.40 memberi 24.1)"))
+
+    # Piksel membuktikan **port**. View bisa lupa memanggilnya sama sekali.
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    results.append(Result(
+        "view memanggil shading bola Bulan (bukan cakram rata)",
+        "Self.sphereGradient(center: center, radius: radius," in view,
+        "view memanggil 'Self.sphereGradient(center: center, radius: radius,' = "
+        f"{'ada' if 'Self.sphereGradient(center: center, radius: radius,' in view else 'TIDAK'}"))
+    results.append(Result(
+        "view membaca radius akhir gradien dari model, bukan menulis angkanya",
+        "CelestialVisual.moonSphereGradientEndRadius" in view,
+        "view menyebut 'CelestialVisual.moonSphereGradientEndRadius' = "
+        f"{'ada' if 'CelestialVisual.moonSphereGradientEndRadius' in view else 'TIDAK'}"))
+
+
 def check_mars_caps_touch_the_limb(results, size=400, ss=2):
     """Kutub Mars harus **menyentuh tepi bola**, bukan mengambang di dalamnya.
 
@@ -5996,6 +6134,7 @@ def main():
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
+    check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
     check_png_is_well_formed(results)
