@@ -2689,16 +2689,33 @@ def check_crater_relief_matches_the_model(results):
 
 
 def check_night_mode_purity(results, size=200, ss=2):
-    """Mode malam: hijau & biru harus **nol**, bukan "kecil".
+    """Mode malam: hijau & biru harus **nol**, bukan "kecil" — di **setiap** kasus.
 
     Ini janji produknya, dan satu-satunya cara mengetahuinya adalah mengukur
     kanal yang benar-benar sampai ke piksel. `NightVisualTests` menguji
     fungsinya; di sini yang diukur adalah gambar yang jadi.
+
+    **Kenapa daftar kasusnya tidak lagi ditulis tangan.** Versi sebelumnya
+    menguji **tujuh** nama yang dipilih dengan tangan, sementara katalognya
+    berisi 40 kasus. Tiga puluh tiga di antaranya — termasuk bahan paling
+    terang di seluruh katalog, `craterRim` di `(0.86, 0.84, 0.81)` dengan
+    kanal biru 0.81 — tidak pernah diukur dalam mode malam sama sekali.
+    Warnanya *kebetulan* lewat `NightVisual` hari ini, jadi tidak ada cacat
+    yang hidup; tapi "kebetulan benar" dan "dijaga" adalah dua hal berbeda,
+    dan yang pertama berhenti benar tanpa memberi tahu siapa pun.
+
+    Karena itu daftarnya **diturunkan dari `build_cases()`**: kasus render
+    baru ikut terukur pada hari ia ditambahkan, bukan pada hari seseorang
+    ingat menambahkannya ke sebuah daftar. Kalau katalognya kosong, gerbang
+    ini merah — bukan hijau karena tidak ada yang diperiksa.
     """
-    for name in ("planet-jupiter-confirmed", "planet-saturn-confirmed",
-                 "moon-crescent-jakarta", "star-betelgeuse", "sun",
-                 "deepsky-nebula", "moon-crescent-uncertain"):
-        case = next(c for c in R.build_cases() if c.name == name)
+    cases = R.build_cases()
+    if not cases:
+        results.append(Result("malam murni: katalog terbaca", False,
+                              "build_cases() mengembalikan nol kasus"))
+        return
+    for case in cases:
+        name = case.name
         canvas = R.render(case, size=size, night_mode=True, show_frame=False, ss=ss)
         path = os.path.join(R.OUT_DIR, f"__night-{name}.png")
         with open(path, "wb") as handle:

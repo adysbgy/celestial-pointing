@@ -1,4 +1,57 @@
-## Progres terakhir (6 Okt 2026 — ciri planet dibuktikan masih ada di ukuran jam)
+## Progres terakhir (6 Okt 2026 — mode malam akhirnya diuji di seluruh katalog)
+
+### Temuan: janji "merah murni" hanya diukur pada 7 dari 40 kasus
+
+`check_night_mode_purity` menegakkan janji paling fisiologis di produk ini:
+di mode malam kanal hijau dan biru harus **nol**, bukan "kecil", karena cahaya
+498–530 nm mematikan adaptasi gelap 20–40 menit. Gerbangnya benar.
+
+Tapi daftar kasusnya **ditulis tangan**: tujuh nama yang dipilih seseorang.
+Katalognya berisi 40 kasus. Tiga puluh tiga di antaranya tidak pernah diukur
+dalam mode malam sama sekali — termasuk `craterRim` di `(0.86, 0.84, 0.81)`,
+bahan paling terang di seluruh katalog, dengan kanal biru 0.81.
+
+Diukur lebih dulu, bukan diasumsikan: **tidak ada kebocoran yang hidup.**
+Keempat puluh kasus menghasilkan hijau/biru maksimum = 0. Warnanya memang
+lewat `NightVisual`. Tapi "kebetulan benar" dan "dijaga" adalah dua hal
+berbeda — dan yang pertama berhenti benar tanpa memberi tahu siapa pun.
+Kasus render baru bisa ditambahkan besok dengan `Color(red:)` yang tidak
+pernah dipetakan, dan ketiga puluh tiga kasus itu tetap hijau.
+
+### Gerbang: daftarnya diturunkan, bukan ditulis
+
+`check_night_mode_purity` sekarang mengambil kasus dari `R.build_cases()`
+dan menyapu **seluruh** katalog. Kasus baru ikut terukur pada hari ia
+ditambahkan, bukan pada hari seseorang ingat menambahkan namanya ke daftar.
+Kalau katalognya kosong, gerbangnya **merah** — bukan hijau karena tidak ada
+yang diperiksa.
+
+### Bukti mutasi — keempatnya menggigit
+
+Harness: `mutasi-malam-murni.py`.
+
+- Pemetaan mode malam dimatikan seluruhnya (`night_surface` jadi identitas)
+  → **32 dari 40 merah**. Nilai terburuk: Venus 242, Mars 221, Jupiter 202.
+- **Hanya warna terang** (kanal biru > 0.5) yang dibiarkan bocor — menyasar
+  `craterRim` → **29 dari 40 merah**. Ini keadaan yang membuktikan gunanya
+  memperluas cakupan: ketiga puluh tiga kasus yang dulu tidak diuji ikut
+  menangkapnya, sedangkan daftar tujuh nama lama akan membiarkannya lolos.
+- Katalog kosong → **1 merah** ("katalog terbaca").
+- Kasus baru disuntikkan ke `build_cases()` → **41 kasus diperiksa**, dan
+  kasus baru itu muncul di hasil tanpa ada yang menyunting daftar apa pun.
+  Kalau cakupannya kembali berdaftar tangan, pemeriksaan ini hilang.
+
+md5 `check-visuals.py` pulih persis sesudahnya (`0b37d3c9…`).
+
+### Keadaan gerbang
+
+396 pemeriksaan gambar (dari 363), 0 gagal. 662 PointingKit + 182
+CelestialEngine tetap hijau. `swift-ui-lint.sh` (29 aturan) dan
+`swift-typecheck.sh` hijau. Perubahan hanya di `Tools/check-visuals.py`.
+
+---
+
+## Progres sebelumnya (6 Okt 2026 — ciri planet dibuktikan masih ada di ukuran jam)
 
 ### Temuan: seluruh gerbang gambar hanya pernah melihat gambar 5x lebih besar
 
