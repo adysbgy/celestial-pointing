@@ -287,16 +287,26 @@ DEEP_SKY_LAYOUT = {
     # lengan adalah seluruh isinya, jadi port yang tidak menggambar cabang
     # ini membuat setiap pemeriksaan gambar mengukur cakram yang tidak
     # pernah tampil untuk M51/M101.
+    #
+    # **Kenapa 5 titik per lengan, bukan 4.** Jarak antar-titik **membesar**
+    # ke luar (Δr = 0.078 → 0.105 → 0.142) sementara lebar blob menyusut
+    # (0.24 → 0.16), jadi dengan 4 titik lengkungnya **bolong** tepat di
+    # antara dua titik terluar. Diukur pada 76 px: r=0.45 punya 38° di atas
+    # ambang, r=0.50 hanya 6°, r=0.55 kembali 12°. Titik sisipan (θ = 2.85)
+    # memakai lebar & opasitas yang diinterpolasi dari tetangganya.
+    # Dijaga `check_spiral_arms_stay_continuous`.
     "spiralGalaxy": [(0.000000, 0.000000, 0.32, 1.0, 0.0, 0.60),
                      (0.000000, 0.000000, 0.45, 1.0, 0.0, 0.13),
                      (0.208674, 0.076172, 0.24, 1.0, 0.0, 0.34),
                      (0.065671, 0.292581, 0.22, 1.0, 0.0, 0.32),
                      (-0.284437, 0.287983, 0.19, 1.0, 0.0, 0.28),
-                     (-0.534559, -0.113047, 0.16, 1.0, 0.0, 0.22),
+                     (-0.450423, 0.135194, 0.18, 1.0, 0.0, 0.26),
+                     (-0.534559, -0.113047, 0.17, 1.0, 0.0, 0.24),
                      (-0.208674, -0.076172, 0.24, 1.0, 0.0, 0.34),
                      (-0.065671, -0.292581, 0.22, 1.0, 0.0, 0.32),
                      (0.284437, -0.287983, 0.19, 1.0, 0.0, 0.28),
-                     (0.534559, 0.113047, 0.16, 1.0, 0.0, 0.22)],
+                     (0.450423, -0.135194, 0.18, 1.0, 0.0, 0.26),
+                     (0.534559, 0.113047, 0.17, 1.0, 0.0, 0.24)],
     "openCluster": [(0.000000, -0.620000, 0.34, 1.0, 0.0, 0.55),
                     (-0.560000, -0.300000, 0.31, 1.0, 0.0, 0.50),
                     (0.520000, -0.340000, 0.33, 1.0, 0.0, 0.45),

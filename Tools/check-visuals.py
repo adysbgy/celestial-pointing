@@ -335,6 +335,40 @@ COLOUR_SAMPLE_PIXELS = 300
 #: dengan margin, tanpa bergantung pada rasa.
 MIN_DEEP_SKY_COLOUR_DIFF = 0.08
 
+#: Selisih minimum dari latar sebelum sebuah piksel disebut "terbaca".
+#:
+#: Angka yang sama dengan yang dipakai gerbang celah cincin Saturnus (`- 12`)
+#: dan yang mendasari ambang di gerbang bentuk pita: 12 dari 255. Ditulis
+#: **sekali** di sini karena sekarang dipakai tiga tempat; tiga salinan angka
+#: yang sama adalah tiga angka yang akan berbeda.
+READABILITY_THRESHOLD = 12
+
+#: Berapa derajat pada satu jari-jari yang harus di atas ambang supaya sebuah
+#: **goresan** lengan spiral dinyatakan menyambung.
+#:
+#: Bukan "ada piksel terang": di ukuran jam satu titik anti-aliasing atau satu
+#: bintang latar sudah cukup untuk itu, dan lengan yang bolong tetap lolos.
+#: Diukur pada 76 px, `ss=8`, tata letak 4-titik yang lama: lengan yang
+#: menyambung memberi 38-59°, yang bolong memberi 6-12°. Ambang 12° duduk di
+#: antara keduanya — **tetapi dengan margin yang tipis**, dan itu sebabnya
+#: gerbangnya menyampel di 16 jari-jari, bukan di dua jari-jari yang kebetulan
+#: berbeda.
+MIN_ARM_DEGREES = 12
+
+#: Berapa derajat **sumbangan** tonjolan inti yang harus terbaca di ukuran jam.
+#:
+#: Sumbangan, bukan cakupan mutlak: yang diukur adalah selisih cakupan cincin
+#: dengan vs tanpa tonjolan inti (lihat `check_spiral_core_reads_as_one_body`).
+#: Cakupan mutlaknya bergantung pada seberapa dekat lingkarnya ke tepi piringan,
+#: jadi ambang mutlak akan merah pada kode yang benar — versi pertama gerbang
+#: itu menuntut 340° dan merah pada sampel tepi yang sehat (266°).
+#:
+#: Diukur pada 76 px, `ss=8`: sehat memberi +124°/+106°/+44°, tonjolan yang
+#: dihilangkan atau diperkecil memberi +0°, dan yang diredupkan (0.60 → 0.20)
+#: memberi paling banyak +12°. Ambang 30° duduk di antaranya dengan margin
+#: 2,5x ke bawah dan 1,5x ke atas.
+SPIRAL_CORE_MIN_DEGREES = 30
+
 
 def _rgb_text(colour):
     """(0.88, 0.44, 0.50) -> '0.88/0.44/0.50' untuk pesan kegagalan."""
@@ -3791,6 +3825,270 @@ def check_saturn_gap_reads_at_the_watch_size(results, ss=8):
             f"menghasilkan +5…+12 di ukuran ini"))
 
 
+def spiral_arm_radii_all():
+    """**Seluruh** cuplikan antar-titik lengan, termasuk yang jatuh di dalam inti.
+
+    Dipisahkan dari `spiral_arm_radii()` supaya batas inti tidak menghapus
+    sampel dari pengukuran mana pun: `check_spiral_arms_stay_continuous`
+    memakai yang di luar inti, `check_spiral_core_reads_as_one_body` memakai
+    yang di dalamnya.
+    """
+    arm = [(b[0], b[1]) for b in R.DEEP_SKY_LAYOUT["spiralGalaxy"][2:]]
+    half = len(arm) // 2                 # satu lengan; lengan B cerminnya
+    radii = sorted(math.hypot(x, y) for x, y in arm[:half])
+    # Lima cuplikan di tiap celah antar-titik, supaya lubang di tengah celah
+    # tidak bisa lolos di antara dua sampel.
+    samples = []
+    for inner, outer in zip(radii, radii[1:]):
+        samples.extend(inner + (outer - inner) * (i / 5.0) for i in range(1, 5))
+    return samples
+
+
+def spiral_core_bulge_index():
+    """Indeks blob **tonjolan inti** di tata letak `.spiralGalaxy`.
+
+    Inti galaksi disinari dua blob di titik pusat: tonjolan terang (opasitas
+    0.60) dan kabut cakram (0.13). Yang pertama itulah yang membuat pusatnya
+    terbaca sebagai inti — kabut cakram lebih **lebar** tapi lebih redup, jadi
+    memilih "yang terjauh di pusat" akan memilih kabut, dan pemeriksaannya lalu
+    mengukur blob yang salah (versi pertama melakukan itu: indeks 1, bukan 0).
+    Dipilih dari **opasitas tertinggi di pusat**, bukan dari urutan daftar.
+    """
+    centre = [(i, b) for i, b in enumerate(R.DEEP_SKY_LAYOUT["spiralGalaxy"])
+              if b[0] == 0.0 and b[1] == 0.0]
+    if not centre:
+        return None
+    return max(centre, key=lambda pair: pair[1][5])[0]
+
+
+def spiral_core_samples():
+    """Sampel di dalam jangkauan tonjolan inti yang **benar-benar terbaca**.
+
+    Batasnya bukan `halfWidth` blob inti, melainkan jari-jari tempat
+    sumbangannya turun ke bawah `READABILITY_THRESHOLD`. Diukur: `halfWidth`
+    tonjolan 0.2957 R, tapi pada r=0.2843 sumbangannya hanya
+    0.60·(1 − 0.2843/0.2957)·255 = **5.9** dari 255 — di bawah ambang 12, jadi
+    menghapus tonjolannya memang tidak mengubah gambar di sana (+0°, diukur di
+    `out/probe-inti-selisih.py`). Batas yang dipakai karena itu
+    `halfWidth · (1 − ambang / (opasitas · 255))` = 0.2725 R, dan ketiga sampel
+    yang tersisa memberi +124°/+106°/+44°.
+    """
+    index = spiral_core_bulge_index()
+    if index is None:
+        return []
+    case = next(c for c in R.build_cases() if c.name == "deepsky-spiralGalaxy")
+    blobs = R.deep_sky_blobs("spiralGalaxy", case.kw.get("fuzziness", 0.6))
+    blob = blobs[index]
+    opacity = blob["opacity"]
+    if opacity <= 0:
+        return []
+    reach = blob["half_width"] * (1 - READABILITY_THRESHOLD / (opacity * 255))
+    return [r for r in spiral_arm_radii_all() if r <= reach]
+
+
+def spiral_arm_radii():
+    """Jari-jari **di antara** titik lengan — tempat lengkungnya harus menyambung.
+
+    **Kenapa bukan jari-jari titik lengan itu sendiri.** Versi pertama gerbang
+    ini menyampel tepat di titik-titik lengan, dan hasilnya hijau pada tata
+    letak yang rusak: yang bolong justru **antar** titik, bukan di titiknya.
+    Titik lengan selalu punya piksel terang (di situlah blobnya), jadi mengukur
+    di sana membuktikan hal yang tidak pernah diragukan.
+
+    Jari-jari diambil dari model, bukan diketik di sini: kalau lengan
+    dipendekkan atau ditambah titik, sampelnya ikut menyesuaikan.
+
+    Sampel yang jatuh **di dalam inti** dibuang di sini; ia diukur oleh
+    `check_spiral_core_reads_as_one_body`, di bawah klaim yang benar untuknya.
+    """
+    core = set(spiral_core_samples())
+    return [r for r in spiral_arm_radii_all() if r not in core]
+
+
+def spiral_arm_degrees(size, ss, radius):
+    """Berapa derajat pada jari-jari itu yang di atas ambang terbaca."""
+    _, (w, h, rows) = render_case("deepsky-spiralGalaxy", size=size, ss=ss)
+    background = rows[0][0]
+    cx, cy = w / 2.0, h / 2.0
+    above = 0
+    for degree in range(360):
+        angle = math.radians(degree)
+        x = int(round(cx + radius * math.cos(angle) * min(w, h) / 2.0))
+        y = int(round(cy + radius * math.sin(angle) * min(w, h) / 2.0))
+        if 0 <= x < w and 0 <= y < h:
+            if rows[y][x * 4] - background > READABILITY_THRESHOLD:
+                above += 1
+    return above
+
+
+def check_spiral_arms_stay_continuous(results):
+    """Lengan `.spiralGalaxy` harus **menyambung** sepanjang jangkauannya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Tata letak lengan diuji sebagai
+    *titik*: `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot` menuntut lengan
+    terjauh > 0.3 R dan tidak tertimbun tonjolan inti — keduanya benar dan
+    keduanya tetap benar sekarang. Yang tidak dijaga siapa pun adalah apakah
+    titik-titik itu **bertemu di layar**.
+
+    Spiral logaritmik `r = 0.20·e^(0.30θ)` memberi jarak antar-titik yang
+    **membesar** ke luar (Δr = 0.078 → 0.105 → 0.142), sementara lebar blob
+    justru **menyusut** (0.24 → 0.22 → 0.19 → 0.16). Gradien radial tiap blob
+    sudah meredup sebelum bertemu tetangganya, jadi lengkungnya terputus tepat
+    di antara dua titik terluar. Diukur pada ukuran jam (76 px, `ss=8`),
+    tata letak 4-titik yang lama:
+
+        r      +di atas latar   derajat di atas ambang   (kolom diukur di
+                                                          out/probe-lengan-latar.py)
+        0.40   +28               59°   menyambung
+        0.45   +20               38°   menyambung
+        0.48   +16                8°   PUTUS
+        0.50   +16                6°   PUTUS
+        0.52   +16                6°   PUTUS
+        0.55   +20               12°   menyambung
+
+    Jadi lengan bukan "redup" — ia **bolong**: satu jari-jari penuh tanpa
+    goresan, di antara dua jari-jari yang bergoresan. Di layar itu terbaca
+    sebagai gumpalan yang bergerigi, bukan galaksi berlengan, dan itulah satu-
+    satunya hal yang membedakan M51 dari M31.
+
+    **Kenapa 16 jari-jari, bukan satu.** Ambang 12° sengaja duduk di tengah
+    antara 6-12° (bolong) dan 38-59° (menyambung), jadi ambangnya sendiri
+    **tidak** memisahkan keduanya di r=0.55. Yang memisahkan adalah bentuk
+    lengkungnya: dengan 4 titik, tiga jari-jari berurutan (0.48, 0.50, 0.52)
+    jatuh di bawah ambang sekaligus; dengan 5 titik, **tidak satu pun** dari
+    16 jari-jari itu turun di bawah 17°.
+
+    **Kenapa ukuran jam.** Bentuk yang lulus di 200 px bisa hilang di ukuran
+    yang benar-benar tampil — alasan yang sama dengan
+    `check_saturn_gap_reads_at_the_watch_size`.
+
+    **Kenapa "derajat di atas ambang", bukan "ada piksel terang".** Goresan
+    lengan di ukuran jam selebar beberapa piksel. Satu piksel terang bisa
+    datang dari anti-aliasing atau dari bintang latar; yang membuktikan ada
+    **goresan** adalah beberapa derajat berurutan yang di atas ambang.
+
+    **Batas yang dinyatakan.** Gerbang ini menggambar pada fuzziness kasus
+    render (`deepsky-spiralGalaxy`, 0.8), sementara katalog menggambar M51
+    pada 0.92 dan M101 pada 0.88. Diukur di ketiganya
+    (`out/probe-fuzz-lengan.py`): cacatnya ada di **ketiganya** (6-8° pada
+    0.48-0.52 untuk tata letak lama) dan perbaikannya juga di ketiganya
+    (>= 20°), jadi yang diukur bukan gambar yang tidak pernah tampil. Yang
+    **tidak** diklaim: gerbang ini tidak menyapu seluruh rentang fuzziness
+    katalog; fuzziness baru yang jauh berbeda tidak otomatis terukur.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "lengan spiral menyambung di ukuran jam", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2          # poin -> piksel, jam menggambar @2x
+
+    radii = spiral_arm_radii()
+    if len(radii) < 2:
+        results.append(Result(
+            "lengan spiral menyambung di ukuran jam", False,
+            "kurang dari dua titik lengan di model — tidak ada yang bisa diukur"))
+        return
+
+    for radius in radii:
+        degrees = spiral_arm_degrees(pixels, 8, radius)
+        results.append(Result(
+            f"lengan spiral menyambung pada r={radius:.2f} (ukuran jam)",
+            degrees >= MIN_ARM_DEGREES,
+            f"{degrees}° di atas ambang {READABILITY_THRESHOLD} pada {pixels} px; "
+            f"butuh >= {MIN_ARM_DEGREES}° — di bawah itu lengkungnya bolong "
+            f"dan yang tampil gumpalan bergerigi"))
+
+
+def check_spiral_core_reads_as_one_body(results):
+    """Tonjolan inti `.spiralGalaxy` harus **benar-benar menerangi pusatnya**.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampel gerbang lengan yang jatuh di
+    dalam inti selalu hijau — intinya memang menutupi sebagian besar cincin,
+    jadi derajatnya 266-360°. Tiga dari enam belas sampel dulu seperti itu
+    (r=0.2377 → 360°, r=0.2532 → 340°, r=0.2688 → 266°), dan **tidak satu pun
+    bisa merah untuk alasan yang ditulis di namanya**: yang diukur inti, bukan
+    lengan. Gerbang yang lulus karena mengukur bagian lain dari gambar adalah
+    kelas yang sama dengan "gerbang yang mengukur gambar yang tidak tampil",
+    hanya saja yang salah di sini **apa** yang diukur, bukan ukurannya.
+
+    **Kenapa selisih, bukan ambang mutlak.** Versi pertama pemeriksaan ini
+    menuntut cakupan cincin >= 340° pada setiap sampel inti. Itu **merah pada
+    kode yang benar**: sampel di tepi tonjolan (r=0.2688) sehat pada 266°,
+    karena di beberapa derajat lingkarnya sudah melewati piringan. Menaikkan
+    ambang sampai hijau berarti menebak satu angka dari luar gambar, dan angka
+    itu merah lagi begitu tata letaknya bergeser. Yang benar-benar penting
+    bukan cakupan mutlaknya, melainkan **apakah tonjolan inti menyumbang
+    sesuatu** — jadi yang diukur adalah selisih cakupan **dengan** vs **tanpa**
+    tonjolan, dan selisih itu tidak butuh ambang yang ditebak.
+
+    Diukur pada ukuran jam (76 px, `ss=8`) — `out/probe-inti-selisih.py`:
+
+        r        dengan tonjolan   tanpa tonjolan   selisih
+        0.2377   360°              236°             +124°
+        0.2532   340°              234°             +106°
+        0.2688   266°              222°              +44°
+        0.2843   200°              200°               +0°   <- bukan sampel inti
+
+    Baris terakhir itu yang menunjukkan batasnya: r=0.2843 masih di dalam
+    `halfWidth` tonjolan (0.2957 R), tapi sumbangannya sudah di bawah ambang
+    terbaca (+0°, diukur), jadi menghapus tonjolannya tidak mengubah gambar di
+    sana dan sampel itu **bukan** sampel inti. Sampelnya karena itu diambil
+    dari `spiral_core_samples()`, yang menghitung batas itu dari model
+    (0.2725 R) — bukan dari angka yang ditulis di sini.
+
+    Cacat yang ditangkapnya nyata: tonjolan yang dihilangkan dari tata letak
+    (+0° di ketiga sampel), diperkecil 0.32 → 0.10 (+0°), atau diredupkan
+    0.60 → 0.20 (<= +12°) membuat pusat galaksi hanya disinari kabut 0.13, dan
+    pada ukuran jam itu terbaca sebagai pusat yang berlubang — donat, bukan
+    galaksi.
+
+    **Kenapa bukan sekadar menghapus sampelnya dari gerbang lengan.**
+    Menghapus berarti cakupannya berkurang tanpa pengganti: inti menjadi
+    satu-satunya bagian galaksi yang tidak diukur apa pun.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "inti spiral padat di ukuran jam", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+
+    index = spiral_core_bulge_index()
+    samples = spiral_core_samples()
+    if index is None or not samples:
+        # Bukan merah: gerbang lengan yang menyapu seluruh celah antar-titik
+        # tetap mengukur bentuknya. Yang hilang hanya klaim tentang intinya,
+        # dan itu dinyatakan sebagai pemeriksaan yang tidak dijalankan —
+        # bukan dihitung sebagai lulus.
+        results.append(Result(
+            "tonjolan inti menyinari pusat (ukuran jam)", False,
+            f"tidak ada sampel di dalam tonjolan inti (indeks {index}, "
+            f"{len(samples)} sampel) — `spiral_core_bulge_index()` / "
+            f"`spiral_core_samples()` kehilangan blob intinya"))
+        return
+
+    layout = list(R.DEEP_SKY_LAYOUT["spiralGalaxy"])
+    for radius in samples:
+        with_bulge = spiral_arm_degrees(pixels, 8, radius)
+        R.DEEP_SKY_LAYOUT["spiralGalaxy"] = [
+            b for i, b in enumerate(layout) if i != index]
+        try:
+            without = spiral_arm_degrees(pixels, 8, radius)
+        finally:
+            R.DEEP_SKY_LAYOUT["spiralGalaxy"] = layout
+        delta = with_bulge - without
+        results.append(Result(
+            f"tonjolan inti menyinari pusat pada r={radius:.2f} (ukuran jam)",
+            delta >= SPIRAL_CORE_MIN_DEGREES,
+            f"cakupan cincin {with_bulge}° dengan tonjolan vs {without}° "
+            f"tanpanya — sumbangan {delta}°, butuh >= {SPIRAL_CORE_MIN_DEGREES}°; "
+            f"di bawah itu pusatnya hanya disinari kabut cakram dan pada ukuran "
+            f"jam terbaca sebagai donat"))
+
+
 def drift_compared_constants(source):
     """Konstanta port yang **nilainya dibandingkan** `check_port_matches_swift_constants`.
 
@@ -5652,6 +5950,8 @@ def main():
     check_inner_planet_phase(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
+    check_spiral_arms_stay_continuous(results)
+    check_spiral_core_reads_as_one_body(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)

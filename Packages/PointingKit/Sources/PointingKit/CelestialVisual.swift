@@ -1295,13 +1295,27 @@ public enum VisualFrame {
             // 180° membentuk huruf S, bukan cincin penuh. Cincin penuh
             // akan terbaca sebagai nebula planetari, bukan galaksi.
             //
-            // **Kenapa 10 blob, bukan 4.** Pada ukuran jam (38 pt), empat
+            // **Kenapa 12 blob, bukan 4.** Pada ukuran jam (38 pt), empat
             // titik terpisah tidak lagi terbaca sebagai lengkung: jarak
             // antar-titik jatuh di bawah satu piksel dan yang tersisa hanya
-            // empat bintik yang posisinya tampak acak. Delapan blob lengan
-            // (empat per lengan) cukup untuk membuat lengkungnya terbaca
-            // **dan** tetap terbedakan dari cakram — lihat
-            // `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`.
+            // empat bintik yang posisinya tampak acak.
+            //
+            // **Kenapa 5 titik per lengan, bukan 4.** Spiral logaritmik
+            // memberi jarak antar-titik yang **membesar** ke luar (Δr =
+            // 0.078 → 0.105 → 0.142) sementara lebar blob justru menyusut
+            // (0.24 → 0.16). Dengan 4 titik, gradien blob terluar sudah
+            // meredup sebelum bertemu tetangganya, dan lengkungnya **bolong**
+            // tepat di antara dua titik terluar. Diukur pada 76 px, `ss=8`:
+            //
+            //     r=0.45   38° di atas ambang    menyambung
+            //     r=0.50    6°                   BOLONG
+            //     r=0.55   12°                   menyambung
+            //
+            // Satu jari-jari penuh tanpa goresan di antara dua yang bergoresan
+            // — di layar itu gumpalan bergerigi, bukan galaksi berlengan.
+            // Titik sisipan (θ = 2.85) memakai lebar & opasitas yang
+            // **diinterpolasi** dari tetangganya, bukan dipilih supaya lulus.
+            // Dijaga `check_spiral_arms_stay_continuous`.
             //
             // Angka-angkanya ditulis penuh (bukan lewat `cos`/`exp` seperti
             // `.planetaryNebula`) karena port Python menyimpan hasilnya
@@ -1328,18 +1342,28 @@ public enum VisualFrame {
                 // → 68 (pusat ke tepi, satuan 1/1000) — cakram berstruktur,
                 // bukan blob rata.
                 (0.000000, 0.000000, 0.45, 1.0, 0.0, 0.13),
-                // Lengan A (θ = 0.35, 1.35, 2.35, 3.35) — makin ke luar
-                // makin besar, makin lebar, dan makin redup.
+                // Lengan A (θ = 0.35, 1.35, 2.35, 2.85, 3.35) — makin ke luar
+                // makin kecil dan makin redup. Lebarnya **menyusut**, jadi
+                // jarak antar-titik tidak boleh ikut melebar tanpa titik
+                // sisipan; lihat catatan di atas.
+                //
+                // Dua blob terluar sedikit lebih terang daripada interpolasi
+                // murni (0.175/0.25 dan 0.16/0.22) — dinaikkan supaya jari-jari
+                // terluar menyisakan 17° di atas ambang, bukan 12° yang pas di
+                // batas. Gerbang yang lulus dengan margin nol akan berkedip
+                // begitu ada perubahan kecil di tempat lain.
                 (0.208674, 0.076172, 0.24, 1.0, 0.0, 0.34),
                 (0.065671, 0.292581, 0.22, 1.0, 0.0, 0.32),
                 (-0.284437, 0.287983, 0.19, 1.0, 0.0, 0.28),
-                (-0.534559, -0.113047, 0.16, 1.0, 0.0, 0.22),
+                (-0.450423, 0.135194, 0.18, 1.0, 0.0, 0.26),
+                (-0.534559, -0.113047, 0.17, 1.0, 0.0, 0.24),
                 // Lengan B — titik-ke-titik cermin lengan A (180°), jadi
                 // bentuknya simetris dan tidak tampak sebagai satu tangan.
                 (-0.208674, -0.076172, 0.24, 1.0, 0.0, 0.34),
                 (-0.065671, -0.292581, 0.22, 1.0, 0.0, 0.32),
                 (0.284437, -0.287983, 0.19, 1.0, 0.0, 0.28),
-                (0.534559, 0.113047, 0.16, 1.0, 0.0, 0.22)
+                (0.450423, -0.135194, 0.18, 1.0, 0.0, 0.26),
+                (0.534559, 0.113047, 0.17, 1.0, 0.0, 0.24)
             ]
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
                                 frameHalfExtent: frameHalfExtent)
