@@ -1589,6 +1589,34 @@ def _shell_layout_from_swift(tail):
     return out
 
 
+def read_deep_sky_morphology_cases_from_swift(source):
+    """Nama kasus `Morphology` dari teks `DeepSkyCatalogue.swift`.
+
+    **Kenapa dari `case .nama:` di dalam enum, bukan dari `allCases`.**
+    Sama persis dengan `read_planet_switch_cases_from_swift`: nama kasus enum
+    tidak muncul sebagai teks di berkas sumber, jadi membaca `allCases` hanya
+    membuktikan bahwa *sesuatu* memakai `allCases`, bukan morfologi mana saja
+    yang ada. Yang benar-benar tertulis per morfologi adalah `case`-nya, dan
+    itulah daftar yang harus sepakat dengan daftar kasus render.
+
+    Wilayahnya dipotong di penutup enum — tanpa itu, `case .nama:` dari
+    `switch` mana pun di bawahnya ikut terbaca, dan berkas ini punya
+    beberapa.
+    """
+    anchor = "public enum Morphology: String, Equatable, Sendable, CaseIterable {"
+    if anchor not in source:
+        raise ValueError(
+            "'public enum Morphology' tidak ditemukan di DeepSkyCatalogue.swift")
+    region = source[source.index(anchor):]
+    closing = region.find("\n    }")
+    if closing != -1:
+        region = region[:closing]
+    names = re.findall(r"case (\w+)", region)
+    if not names:
+        raise ValueError("tidak ada 'case .nama' di dalam enum Morphology")
+    return names
+
+
 def swift_star_colour_index(source):
     """Tabel `starColorIndex` dari teks Swift → `{id: indeks B−V}`.
 
@@ -2360,6 +2388,122 @@ def check_deep_sky_layouts_match_the_model(results):
             f"semua {len(a)} blob cocok" if not bad
             else f"beda di indeks {bad}: model {[a[i] for i in bad]}, "
                  f"port {[b[i] for i in bad]}"))
+
+
+def check_every_morphology_in_the_model_has_render_cases(results):
+    """Setiap morfologi di model harus punya **kasus render** dan **pembacaan**.
+
+    **Cacat yang ditutup pemeriksaan ini — dan cara menemukannya.** Gerbang
+    tetangganya, `check_deep_sky_layouts_match_the_model`, membandingkan
+    model dengan port **per nama yang ia temukan di kedua sisi**. Jadi ia
+    benar, dan ia tidak bisa melihat bentuk yang **tidak ada di kedua sisi
+    sekaligus** — yang sunyi justru keadaan di mana model dan port sama-sama
+    tidak punya bentuk itu.
+
+    Diukur, bukan diasumsikan (`out/probe-morfologi-baru.py`). Menambahkan
+    satu morfologi baru (`.comet`) ke enum **dan** ke `switch` gambar:
+
+    ```
+    [baseline]                                  415 pemeriksaan, 0 gagal  <- hijau
+    A. enum + switch gambar                     415 pemeriksaan, 0 gagal  <- hijau
+    ```
+
+    Gerbang gambar tidak berbunyi sama sekali, karena yang dibacanya
+    (`read_deep_sky_layouts_from_swift`) memakai **daftar nama yang ditulis
+    tangan**: `("planetaryNebula", "galaxy", "openCluster", "globularCluster")`.
+    Nama kelima tidak ada di daftar itu, jadi bentuknya tidak pernah dibaca —
+    dan bentuk yang tidak dibaca tidak pernah bisa menyimpang.
+
+    Keadaan itu **tidak bertahan** sampai ke gambar: uji Swift
+    `testEveryMorphologyIsUsedByTheCatalogue` menolaknya lebih dulu, dan
+    probe membuktikannya (`switch must be exhaustive` di `DeepSkySpeech`).
+    Tapi yang menjaga jalur itu adalah uji Swift, dan uji Swift tidak tahu
+    apa pun soal **gambar**. Ia hijau pada keadaan yang tidak pernah
+    menggambar bentuk itu.
+
+    Yang hilang karena itu bukan gerbang baru untuk sebuah cacat yang hidup,
+    melainkan **gerbang yang berlaku untuk morfologi itu**: aturan "bentuknya
+    ada di port", "ada kasus render-nya", dan "bentuknya berbeda dari kabut
+    netral di layar" hanya berjalan pada nama yang ada di daftar tangan.
+
+    Empat hal diperiksa, semuanya **diturunkan dari model**:
+
+      1. Setiap `case` di enum `Morphology` **terbaca** oleh pembaca gerbang.
+         Pembaca yang kehilangan satu nama akan melaporkan bentuk itu
+         "hilang" — atau lebih buruk, tidak melaporkannya sama sekali.
+      2. Setiap `case` di enum punya **kasus render** `deepsky-<nama>`. Tanpa
+         itu, bentuknya tidak pernah muncul di satu pun PNG yang diukur.
+      3. Setiap `case` punya **layout di port** — kalau tidak, jam menggambar
+         bentuk yang tidak pernah diukur gerbang gambar mana pun.
+      4. **Tidak ada bentuk sisa di port** yang tidak ada di enum. Port yang
+         punya bentuk yang tidak bisa dipilih objek mana pun adalah kode mati
+         yang tampak seperti pekerjaan selesai: ia ada, ia tidak salah, dan
+         ia tidak pernah menggambar apa pun. Arah ini yang menutup "bentuk
+         ditambahkan ke port saja" — keadaan yang, tanpa pemeriksaan ini,
+         hanya terlihat oleh pembaca yang membandingkan dua berkas dengan
+         mata. `"nebula"` dikecualikan karena ia bentuk **netral** (dipakai
+         saat morfologi `nil`), bukan kasus enum.
+
+    Daftar `cases` dibaca dari `DeepSkyCatalogue.swift` (tempat enum-nya),
+    bukan dari `Planet`-style `allCases` — lihat
+    `read_deep_sky_morphology_cases_from_swift`.
+    """
+    catalogue_path = os.path.join(
+        ROOT, "Packages/PointingKit/Sources/PointingKit/DeepSkyCatalogue.swift")
+    model_path = os.path.join(
+        ROOT, "Packages/PointingKit/Sources/PointingKit/CelestialVisual.swift")
+    try:
+        declared = read_deep_sky_morphology_cases_from_swift(
+            open(catalogue_path, encoding="utf-8").read())
+    except ValueError as exc:
+        results.append(Result(
+            "kasus render morfologi: enum terbaca dari model", False, str(exc)))
+        return
+
+    # 1. Pembaca gerbang harus menjangkau setiap kasus enum. Daftarnya
+    #    ditulis tangan di dalam `read_deep_sky_layouts_from_swift`, jadi
+    #    inilah tempat nama yang ditambahkan belakangan tertinggal.
+    read_names = set(read_deep_sky_layouts_from_swift(
+        open(model_path, encoding="utf-8").read()))
+    unread = sorted(set(declared) - read_names)
+    results.append(Result(
+        "kasus render morfologi: setiap kasus enum terbaca pembaca gerbang",
+        not unread,
+        f"{len(declared)} morfologi terbaca" if not unread
+        else f"tidak pernah dibaca: {unread} — bentuknya tidak bisa menyimpang "
+             "karena tidak ada yang membandingkannya"))
+
+    # 2. Kasus render: bentuk yang tidak punya kasus tidak pernah muncul di
+    #    satu pun PNG yang diukur.
+    names = {case.name for case in R.build_cases()}
+    missing_cases = sorted(n for n in declared if f"deepsky-{n}" not in names)
+    results.append(Result(
+        "kasus render morfologi: setiap kasus enum punya kasus render",
+        not missing_cases,
+        f"{len(declared)} kasus render" if not missing_cases
+        else f"tidak ada kasus render: {missing_cases} — bentuk itu tidak pernah "
+             "muncul di satu pun gambar yang diukur"))
+
+    # 3. Layout di port: kalau tidak ada, jam menggambar bentuk yang tidak
+    #    pernah diukur.
+    port_names = set(R.DEEP_SKY_LAYOUT)
+    missing_port = sorted(n for n in declared if n not in port_names)
+    results.append(Result(
+        "kasus render morfologi: setiap kasus enum punya layout di port",
+        not missing_port,
+        f"{len(declared)} layout" if not missing_port
+        else f"tidak ada di port: {missing_port} — penggambar jatuh ke kabut "
+             "netral, dan gambar yang diukur bukan gambar yang tampil"))
+
+    # 4. Nama-nama yang **tidak** berasal dari model. Port yang punya bentuk
+    #    yang tidak ada di enum adalah bentuk yang tidak bisa dipilih objek
+    #    mana pun — kode mati yang tampak seperti pekerjaan selesai.
+    extra_port = sorted(port_names - set(declared) - {"nebula"})
+    results.append(Result(
+        "kasus render morfologi: tidak ada bentuk sisa di port",
+        not extra_port,
+        "tidak ada" if not extra_port
+        else f"hanya ada di port: {extra_port} — tidak bisa dipilih objek mana pun"))
 
 
 def check_feature_arrays_match_the_view(results):
@@ -5033,6 +5177,7 @@ def main():
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_deep_sky_catalogue_values_reach_the_picture(results)
     check_deep_sky_layouts_match_the_model(results)
+    check_every_morphology_in_the_model_has_render_cases(results)
     check_star_colour_index_matches_the_model(results)
     check_star_rgb_conversion_matches_the_model(results)
     check_night_accents_match_the_model(results)
