@@ -1,3 +1,147 @@
+## Progres terakhir (7 Okt 2026 — lengan spiral menyambung, dan angka yang dikutip gerbang baru ternyata tidak diukur)
+
+### Cacatnya: 508 pemeriksaan, dan tidak satu pun melihat lengkung yang bolong
+
+Gerbang spiral yang tercatat di HEAD mengukur satu hal: apakah M51/M101
+**berbeda** dari cakram M31/M33. Ia benar. Yang tidak diukur siapa pun:
+apakah lengkung lengan itu **menyambung** di ukuran yang benar-benar tampil.
+
+Tata letak 4-titik per lengan memberi jarak antar-titik yang **membesar** ke
+luar (Δr = 0.078 → 0.105 → 0.142) sementara lebar blob justru **menyusut**
+(0.24 → 0.16). Gradien blob terluar meredup sebelum bertemu tetangganya.
+Diukur pada 76 px, `ss=8`:
+
+```
+r=0.45   38° di atas ambang    menyambung
+r=0.50    6°                   BOLONG
+r=0.55   12°                   menyambung
+```
+
+Satu jari-jari penuh tanpa goresan di antara dua yang bergoresan — di layar itu
+gumpalan bergerigi, bukan galaksi berlengan. Dan seluruh 508 pemeriksaan buta
+terhadapnya, karena semuanya menyampel **titik** lengan, tempat blobnya memang
+selalu terang. Yang bolong justru **antar** titik.
+
+Perbaikannya satu titik sisipan per lengan (θ = 2.85) yang lebar & opasitasnya
+**diinterpolasi** dari tetangganya, bukan dipilih supaya lulus. Dua blob
+terluar dinaikkan tipis supaya jari-jari terluar menyisakan 17°, bukan 12°
+yang pas di batas — gerbang yang lulus dengan margin nol akan berkedip begitu
+ada perubahan kecil di tempat lain.
+
+### Cacat kedua: gerbang barunya sendiri mengukur bagian gambar yang lain
+
+Versi pertama gerbang lengan menyampel **seluruh** cuplikan antar-titik,
+termasuk yang jatuh di dalam tonjolan inti. Sampel di sana selalu hijau (inti
+menutupi sebagian besar cincin: 266–360°), jadi **tiga dari enam belas sampel
+tidak bisa merah untuk alasan yang ditulis di namanya** — yang diukur inti,
+bukan lengan. Kelas yang sama dengan "gerbang yang mengukur gambar yang tidak
+tampil", hanya saja yang salah di sini **apa** yang diukur.
+
+Sampelnya dipisah, dan yang diukur untuk inti adalah **selisih** cakupan cincin
+dengan vs tanpa tonjolan — bukan ambang mutlak. Versi pertama memakai ambang
+mutlak 340° dan **merah pada kode yang benar** (sampel di tepi tonjolan sehat
+pada 266°). Batas "sampel inti" dihitung dari model, bukan diketik:
+`halfWidth · (1 − ambang / (opasitas · 255))` = 0.2725 R untuk tonjolan
+0.2957 R pada opasitas 0.60.
+
+### Cacat ketiga: angka di docstring gerbang baru itu tidak pernah diukur
+
+Pesan commit sempat menulis "memperkecil tonjolan 0.32 → 0.10 atau
+meredupkannya 0.60 → 0.20 membuat gerbang merah pada baris yang tepat" —
+diwarisi dari siklus sebelumnya, **belum pernah dijalankan**. Probe
+`out/bukti-mutasi-spiral.py` mengukurnya, dan hasilnya:
+
+| keadaan | lengan merah | inti merah |
+|---|---|---|
+| `[baseline]` | 0/13 | 0/3 |
+| titik sisipan dihapus | 1/9 (r=0.49, 10°) | 0/3 |
+| tonjolan 0.32 → 0.10 | 0/16 | 1/1 |
+| tonjolan 0.60 → 0.20 | 0/16 | 1/1 |
+
+Baris 1 dan 4 benar. Baris 2 dan 3 merah, **tapi bukan lewat pemeriksaan
+selisih**: memperkecil atau meredupkan tonjolan memindahkan batas sampel ke
+bawah seluruh sampel, jadi yang berbunyi adalah "tidak ada sampel di dalam
+tonjolan inti" — bukan "sumbangannya terlalu kecil". Angka `+0°` / `+12°` yang
+dikutip docstring **tidak pernah terukur oleh gerbang itu**.
+
+Docstring-nya ditulis ulang dari tabel hasil ukur ini. Ini kelas yang sudah
+berulang di repo ini (`"elips 20% R"` milik luas sementara metriknya mengukur
+jarak tepi; `−5,1` di gerbang kontras kawah), dan yang membuatnya berbahaya
+bukan angkanya: **komentar adalah satu-satunya bukti yang dibaca orang yang
+menilai apakah gerbangnya layak dipercaya.**
+
+`r=0.2843` — sampel yang **bukan** sampel inti — tetap hijau di keempat
+keadaan. Itu bukti batasnya bekerja: kalau batasnya longgar, keempat sampel
+diukur sebagai inti dan gerbang lengan akan merah pada gambar yang benar.
+
+### Dua belas angka di docstring diukur ulang lewat jalur gerbangnya sendiri
+
+`out/ukur-tabel-inti.py`: keempat baris tabel delta cocok persis
+(360/236, 340/234, 266/222, 200/200), dan `halfWidth` 0.2957 R, batas 0.2725 R,
+sumbangan 5.9 di r=0.2843 juga cocok. Ketiga angka terakhir itu menentukan
+**apakah sampelnya sampel inti** — kalau salah, gerbangnya mengukur wilayah
+yang bukan wilayahnya.
+
+### Batas yang jujur
+
+- Gerbang ini menjaga bentuk **di satu ukuran** (76 px, dibaca dari token
+  `WatchMetrics.visualDiameter`). Pada ukuran lain pasangan yang berbeda bisa
+  bertumbukan; itu tidak diukur dan tidak diklaim.
+- Yang dijaga adalah **menyambungnya lengkung**, bukan kebenaran astronomi
+  jumlah lengan — itu diuji lewat simetri 180°, bukan lewat efemeris.
+- `MIN_ARM_DEGREES` = 12 duduk di antara 38–59° (menyambung) dan 6–12°
+  (bolong): **marginnya tipis**, dan itu ditulis di berkasnya. Karena itu
+  gerbangnya menyampel 16 jari-jari, bukan dua yang kebetulan berbeda.
+- **Belum dikerjakan:** gerbang paritas docstring (yang membaca tabel di
+  docstring dan menuntutnya sama dengan hasil ukur, seperti
+  `check_crater_contrast_numbers_come_from_the_sampler`). Biayanya terukur
+  ~30 s kalau hanya memakai `spiral_core_samples()` (gratis) + satu render
+  gerbang lengan; belum ditambahkan supaya tidak terburu-buru.
+
+### Dari mata, bukan dari gerbang: sisa terburuk ada di tempat lain
+
+`Tools/montage.py` (baru — alat, **bukan** gerbang: tidak menuntut apa pun)
+menyusun seluruh 41 kasus jadi satu lembar, karena tidak ada pemeriksaan
+otomatis di repo ini yang mengukur "bagus". Lembar itu dinilai dengan mata,
+dan yang terburuk **bukan** spiral:
+
+- `moon-new` (tengah 38,38,48 vs latar 10,10,15) dan `moon-unknown-phase`
+  terbaca sebagai kotak kosong di atas latar hitam. Bukan cacat kejujuran —
+  fase tak diketahui memang **tidak boleh** tampak seperti bulan baru, dan
+  gerbangnya mengukur itu — tapi cacat keterbacaan: kartu jam yang terlihat
+  kosong tidak menyampaikan apa pun.
+- `star-sirius` / `star-rigel` / `star-vega` nyaris tak terbedakan satu dari
+  lain pada ukuran kartu.
+
+Keduanya dicatat, belum dikerjakan.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 683 | **683** |
+| Pemeriksaan visual | 508 | **524** (+16: 13 lengan + 3 inti) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 683), `check-visuals.py --check`
+(524, 0 gagal), `swift-ui-lint.sh` (29), `swift-typecheck.sh`. CI: Engine Tests
++ Apple Build hijau pada `8a40148`. Berkas tersentuh: `CelestialVisual.swift`,
+`Tools/render-visuals.py` (kedua bahasa menggambar sama), `Tools/check-visuals.py`,
+`Tools/montage.py` (baru). **Tidak ada kode `Apps/` yang berubah.**
+
+### Yang sudah ada, diverifikasi ada (bukan dikerjakan ulang)
+
+Sapuan singkat atas sisa brief: Fase C no. 3 (Info.plist izin Motion & Lokasi,
+kedua bahasa) sudah ada di `project.yml` + `InfoPlist.strings`; no. 4
+(penolakan izin runtime) sudah menampilkan pesan lewat `SensorStatusText`
+alih-alih diam; AOD (`isLuminanceReduced` → `ReducedLuminanceView`) sudah
+dipusatkan di `NightAwareContainer` sehingga tidak ada layar yang bisa lupa;
+Aturan 7 `swift-ui-lint.sh` menjaga reduce-motion. No. 2 (`SWIFT_EMIT_LOC_STRINGS`)
+sengaja **NO** dengan alasan tertulis di `project.yml` — bukan celah.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — jembatan teleskop: putusan slew menjadi perintah motor, §17–§20)
 
 ### Cacatnya: langkah §18 yang tidak punya kode sama sekali

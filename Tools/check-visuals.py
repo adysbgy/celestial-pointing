@@ -4038,11 +4038,40 @@ def check_spiral_core_reads_as_one_body(results):
     dari `spiral_core_samples()`, yang menghitung batas itu dari model
     (0.2725 R) — bukan dari angka yang ditulis di sini.
 
-    Cacat yang ditangkapnya nyata: tonjolan yang dihilangkan dari tata letak
-    (+0° di ketiga sampel), diperkecil 0.32 → 0.10 (+0°), atau diredupkan
-    0.60 → 0.20 (<= +12°) membuat pusat galaksi hanya disinari kabut 0.13, dan
-    pada ukuran jam itu terbaca sebagai pusat yang berlubang — donat, bukan
-    galaksi.
+    **Cacat yang ditangkapnya nyata, tapi jalurnya perlu dinyatakan persis.**
+    Diukur ulang lewat gerbangnya sendiri (`out/bukti-mutasi-spiral.py`), dan
+    hasilnya **bukan** yang versi pertama docstring ini klaim:
+
+        mutasi                        yang berbunyi
+        tonjolan dihapus              +0° di ketiga sampel (delta)
+        tonjolan diperkecil 0.32→0.10 0 sampel — himpunan sampelnya runtuh
+        tonjolan diredupkan 0.60→0.20 0 sampel — himpunan sampelnya runtuh
+
+    Untuk dua mutasi terakhir yang berbunyi adalah pemeriksaan "sampel inti
+    ada", **bukan** pemeriksaan selisih: batas sampel dihitung dari
+    `halfWidth · (1 − ambang / (opasitas · 255))`, jadi memperkecil tonjolan
+    atau meredupkannya memindahkan batas itu ke bawah seluruh sampel, dan
+    gerbangnya berkata "tidak ada sampel di dalam tonjolan inti" — bukan
+    "sumbangannya terlalu kecil". Keduanya merah, dan itu memang yang harus
+    terjadi, tapi pesannya menunjuk tempat yang berbeda dari yang dikutip
+    (+0°/+12° adalah delta yang **tidak pernah** terukur oleh gerbang itu).
+
+    Ini kelas yang sama dengan angka-angka yang salah kutip di docstring
+    gerbang lain di berkas ini: komentar adalah satu-satunya bukti yang dibaca
+    orang yang menilai apakah gerbangnya layak dipercaya, jadi ia harus
+    berbentuk hasil ukur yang bisa dibantah — bukan penjelasan yang masuk akal.
+    Yang benar-benar dijaga gerbang ini diukur sebagai berikut:
+
+        keadaan                        lengan merah   inti merah
+        [baseline]                     0/13            0/3
+        titik sisipan dihapus          1/9  (r=0.49)   0/3
+        tonjolan 0.32 → 0.10           0/16            1/1
+        tonjolan 0.60 → 0.20           0/16            1/1
+
+    Dan `r=0.2843` — sampel yang bukan sampel inti — **tetap hijau di keempat
+    keadaan**, yang membuktikan batas "sampel inti" itu bekerja: kalau batasnya
+    longgar, keempat sampel akan diukur sebagai inti dan gerbang lengan akan
+    merah pada gambar yang benar.
 
     **Kenapa bukan sekadar menghapus sampelnya dari gerbang lengan.**
     Menghapus berarti cakupannya berkurang tanpa pengganti: inti menjadi
