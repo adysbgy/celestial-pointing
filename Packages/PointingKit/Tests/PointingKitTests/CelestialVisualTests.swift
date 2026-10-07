@@ -85,6 +85,31 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertFalse(CelestialVisual.Planet.saturn.showsPhase)
     }
 
+    /// Earthshine hanya ada bila ada sisi gelap untuk diterangi.
+    ///
+    /// `1 - f`: nol saat purnama (f = 1, tak ada sisi gelap → jangan gambar
+    /// cahaya yang tak ada), maksimum saat bulan baru (f → 0). Diuji karena
+    /// nilai ini yang menentukan apakah `drawMoon` melukis glow di sisi gelap;
+    /// kalau salah, bulan purnama akan tampak "piringan menyala penuh" atau
+    /// sabit kehilangan cahaya Bumi yang justru membedakannya dari planet.
+    func testEarthshineOnlyOnPartiallyLitMoon() {
+        XCTAssertEqual(CelestialVisual.earthshineStrength(illuminationFraction: 1.0), 0.0,
+                       "purnama: tak ada sisi gelap, earthshine nol")
+        XCTAssertEqual(CelestialVisual.earthshineStrength(illuminationFraction: 0.5), 0.5)
+        XCTAssertEqual(CelestialVisual.earthshineStrength(illuminationFraction: 0.0), 1.0,
+                       "bulan baru: earthshine paling kuat (sisi gelap paling luas)")
+        // Di luar rentang harus dijepit, bukan meledak atau membalik tanda.
+        XCTAssertEqual(CelestialVisual.earthshineStrength(illuminationFraction: 1.4), 0.0)
+        XCTAssertEqual(CelestialVisual.earthshineStrength(illuminationFraction: -0.2), 1.0)
+        // Monoton turun: makin purnama, makin redup.
+        var prev = 2.0
+        for f in stride(from: 0.0, through: 1.0, by: 0.1) {
+            let s = CelestialVisual.earthshineStrength(illuminationFraction: f)
+            XCTAssertLessThanOrEqual(s, prev, "earthshine harus meredup menuju purnama")
+            prev = s
+        }
+    }
+
     /// Venus menerima fraksi fasenya sendiri, dan menggambarnya seperti Bulan.
     func testInnerPlanetDrawsAPhaseFromItsOwnFraction() {
         let venus = CelestialVisual(object: object(id: "venus", kind: .planet),

@@ -191,6 +191,25 @@ public extension CelestialVisual {
         public var moonLit: RGBComponents
         /// Piringan yang **tidak** menyala -- bagian gelap.
         public var moonUnlit: RGBComponents
+        /// Earthshine: cahaya samar di sisi gelap Bulan yang dipantulkan Bumi.
+        ///
+        /// **Kenapa token sendiri, bukan sekadar `moonUnlit` yang dinaikkan.**
+        /// Di teleskop mata telanjang, sisi gelap Bulan saat sabit/celah
+        /// terlihat redup tapi **tidak hitam** — Bumi memantulkan sinar
+        /// Matahari ke sana. Sisi gelap Venus dan Merkurius (lihat
+        /// `planetUnlit`) tidak punya sumber seperti itu dan praktis hitam.
+        /// Menggambar bulan tanpa earthshine berarti sisi gelapnya hitam rata,
+        /// yang justru terbaca sebagai "lubang" dan bukan sebagai bulan yang
+        /// sedang sabit.
+        ///
+        /// Kelegapannya sengaja jauh di bawah `moonLit` (≈ 1/6) supaya tidak
+        /// pernah terbaca sebagai pita yang menyala — earthshine adalah
+        /// *sisi gelap yang sedikit bercahaya*, bukan fase kedua. Dan tidak
+        /// boleh muncul saat `moonUnlit` penuh (f = 1, tidak ada sisi gelap)
+        /// maupun saat fase tak diketahui (kartu ragu tidak menyatakan bulan
+        /// sabit). Aturan kehadirannya diuji di Linux
+        /// (`testEarthshineOnlyOnPartiallyLitMoon`).
+        public var moonEarthshine: RGBComponents
         /// Piringan saat **fase tidak diketahui** (efemeris gagal / arah tak
         /// dihitung) — bukan piringan gelap.
         ///
@@ -235,6 +254,7 @@ public extension CelestialVisual {
                     planetUnlit: RGBComponents,
                     moonLit: RGBComponents,
                     moonUnlit: RGBComponents,
+                    moonEarthshine: RGBComponents,
                     moonPhaseUnknown: RGBComponents,
                     sunCore: RGBComponents,
                     sunPhotosphere: RGBComponents,
@@ -252,6 +272,7 @@ public extension CelestialVisual {
             self.planetUnlit = planetUnlit
             self.moonLit = moonLit
             self.moonUnlit = moonUnlit
+            self.moonEarthshine = moonEarthshine
             self.moonPhaseUnknown = moonPhaseUnknown
             self.sunCore = sunCore
             self.sunPhotosphere = sunPhotosphere
@@ -285,6 +306,10 @@ public extension CelestialVisual {
         planetUnlit: .init(red: 0.06, green: 0.06, blue: 0.08),
         moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
         moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
+        // Earthshine: sisi gelap Bulan yang disinar Bumi. Jauh di bawah
+        // `moonLit` (~1/7) supaya tidak pernah terbaca sebagai pita yang
+        // menyala — sisi gelap yang sedikit bercahaya, bukan fase kedua.
+        moonEarthshine: .init(red: 0.15, green: 0.15, blue: 0.19),
         // Abu-abu tengah, dan sengaja **bukan** warna bulan yang menyala
         // maupun yang gelap: piringan ini tidak boleh terbaca sebagai salah
         // satu fase. Dijaga `testPhaseUnknownDiscIsNeitherLitNorUnlit`.

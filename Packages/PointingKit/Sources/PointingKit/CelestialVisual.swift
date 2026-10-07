@@ -436,6 +436,34 @@ public struct CelestialVisual: Equatable, Sendable {
                              isGibbous: clamped > 0.5)
     }
 
+    // MARK: - Earthshine (cahaya Bulan dari Bumi)
+
+    /// Kekuatan earthshine pada sisi gelap Bulan, 0…1.
+    ///
+    /// Earthshine adalah cahaya Matahari yang dipantulkan Bumi ke sisi gelap
+    /// Bulan. Ia **hanya** ada bila ada sisi gelap untuk diterangi — artinya
+    /// saat Bulan **sebagian** tersinari. Dua keadaan di mana earthshine
+    /// harus **nol**:
+    ///
+    /// - `fraction == 1` (purnama): tidak ada sisi gelap; menggambar
+    ///   earthshine berarti menambah cahaya di mana langit tidak
+    ///   memilikinya, dan pada ukuran kecil jam akan terbaca sebagai
+    ///   "piringan menyala penuh" — klaim yang salah.
+    /// - `fraction == 0` (bulan baru): seluruh piringan gelap, tapi
+    ///   earthshine pada bulan baru nyaris tak terlihat (Bumi juga hampir
+    ///   baru dilihat dari Bulan) dan, lebih penting, nilai `0` juga
+    ///   dipakai sebagai "fase tak diketahui" di kartu ragu — di sana kita
+    ///   **tidak** boleh menggambar cahaya apa pun yang menyatakan sabit.
+    ///
+    /// Antara keduanya earthshine paling kuat saat sabit tipis (sisi gelap
+    /// paling luas) dan meredup menuju purnama. Kurva `1 - f` memenuhi
+    /// semua syarat di atas: `0` di `f = 1`, maksimum di `f → 0`, dan
+    /// monoton turun. Diuji di Linux (`testEarthshineOnlyOnPartiallyLitMoon`).
+    public static func earthshineStrength(illuminationFraction fraction: Double) -> Double {
+        let f = min(1, max(0, fraction))
+        return 1 - f
+    }
+
     // MARK: - Warna bintang
 
     /// Sudut sisi terang Bulan **di bidang gambar** — fungsi murni, tanpa

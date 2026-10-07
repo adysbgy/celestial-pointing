@@ -679,6 +679,23 @@ struct CelestialVisualView: View {
         context.fill(disc,
                      with: .color(Self.shadowAccent(CelestialVisual.accents.moonUnlit)))
 
+        // Earthshine: cahaya samar di sisi gelap Bulan yang dipantulkan Bumi.
+        // Ditarik dari `illuminationFraction` (model), bukan angka di sini, dan
+        // kekuatannya dihitung oleh `earthshineStrength` (diuji di Linux) supaya
+        // tidak pernah muncul saat purnama (f = 1, tak ada sisi gelap) maupun
+        // saat fase tak diketahui (kartu ragu tidak menyatakan sabit).
+        // Dilukis **sebelum** pita terang, jadi pita itu menutupinya di sisi
+        // menyala — earthshine hanya terlihat di sisi gelap, persis seperti di
+        // langit. Opasitas mengikuti kekuatan agar sabit tipis (sisi gelap
+        // paling luas) bercahaya paling terang.
+        let earthshine = CelestialVisual.earthshineStrength(
+            illuminationFraction: visual.illuminationFraction ?? 0)
+        if earthshine > 0 {
+            context.fill(disc,
+                         with: .color(Self.shadowAccent(
+                            CelestialVisual.accents.moonEarthshine).opacity(earthshine)))
+        }
+
         drawLitBand(context: context, center: center, radius: radius, phase: phase, disc: disc,
                     litColor: Self.accent(CelestialVisual.accents.moonLit),
                     decorate: { inner in

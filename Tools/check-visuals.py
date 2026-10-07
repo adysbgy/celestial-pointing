@@ -5135,6 +5135,71 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
             f"{diff} piksel berbeda dari kabut netral"))
 
 
+def check_earthshine(results, size=200, ss=2):
+    """Sisi gelap Bulan sabit harus bercahaya samar (earthshine), bukan hitam.
+
+    Cahaya ini dipantulkan Bumi, jadi sisi gelap bulan sabit tampak redup tapi
+    tidak hitam — berbeda dengan planet dalam yang sisinya gelap praktis
+    hitam. Pemeriksaan ini mengukur luminans rata-rata sisi gelap sebuah sabit
+    dan membandingkannya dengan luminans token `moonUnlit` (piringan gelap
+    tanpa earthshine). Earthshine harus **menaikkan** sisi gelap sabit di atas
+    `moonUnlit`, dan harus **meredup** saat mendekati purnama.
+
+    Rasio yang dicari longgar: yang dicegah adalah cacat "earthshine tidak
+    pernah digambar" (sisi gelap sabit = hitam rata) maupun "earthshine
+    menyala penuh" (sabit terbaca sebagai piringan terang).
+    """
+    lit, unlit = moon_colors()
+    # Luminans piringan gelap Bulan (token `moonUnlit`), rujukan tanpa
+    # earthshine. Earthshine harus **menaikkan** sisi gelap sabit di atas ini.
+    unlit_lum = 0.2126 * unlit[0] + 0.7152 * unlit[1] + 0.0722 * unlit[2]
+
+    def dark_side_luminance(illumination, angle):
+        name = f"__es-{int(illumination * 100)}"
+        case = R.VisualCase(name, "sementara", "moon",
+                            illumination=illumination, is_waxing=True,
+                            bright_limb_angle=angle, is_confirmed=True)
+        canvas = R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+        path = os.path.join(R.OUT_DIR, f"{name}.png")
+        with open(path, "wb") as handle:
+            handle.write(canvas.to_png())
+        w, h, rows = decode_png(path)
+        # Sisi gelap = belahan yang **tidak** menghadap Matahari. Untuk sabit
+        # waxing sisi terang ada di kanan (angle=0). Sisi gelap selalu di
+        # kiri, dan tepinya paling kiri (dekat x=0) tetap gelap untuk **setiap**
+        # fase (0<f<1): sabit (f<0.5) gelapnya mayoritas kiri, cembung (f>0.5)
+        # gelapnya hanya sliver kiri tipis. Jadi hanya sampling sliver jauh
+        # kiri (x < cx - 0.75*radius) yang pasti gelap di semua fase, sehingga
+        # perbandingan "sabit tipis vs cembung" tidak tercemar piksel menyala.
+        cx = w / 2.0
+        threshold = cx - 0.75 * (w / 2.0)
+        tot, n = 0.0, 0
+        for y in range(0, h, 2):
+            for x in range(0, int(threshold), 2):
+                if math.hypot(x - cx, y - h / 2) > cx:
+                    continue
+                r, g, b = rows[y][x * 4:x * 4 + 3]
+                tot += (0.2126 * r + 0.7152 * g + 0.0722 * b)
+                n += 1
+        os.remove(path)
+        return tot / max(1, n)
+
+    crescent_dark = dark_side_luminance(0.15, 0.0)
+    results.append(Result(
+        "earthshine: sisi gelap sabit lebih terang dari piringan gelap",
+        crescent_dark > unlit_lum + 1.0,
+        f"sabit f=0.15: {crescent_dark:.1f}, moonUnlit: {unlit_lum:.1f} "
+        f"(0-255 luminans rata-rata sisi gelap)"))
+
+    # Earthshine meredup saat mendekati purnama: sabit tipis (f=0.15) punya
+    # sisi gelap lebih luas → earthshine lebih kuat daripada celah (f=0.85).
+    gibbous_dark = dark_side_luminance(0.85, 0.0)
+    results.append(Result(
+        "earthshine: lebih kuat pada sabit tipis daripada celah",
+        gibbous_dark < crescent_dark,
+        f"sabit f=0.15: {crescent_dark:.1f}, f=0.85: {gibbous_dark:.1f}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -5153,6 +5218,7 @@ def main():
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
+    check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_features_survive_the_watch_size(results)

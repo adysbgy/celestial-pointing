@@ -1,3 +1,54 @@
+## Progres terakhir (7 Okt 2026 — earthshine: sisi gelap Bulan tidak lagi hitam rata)
+
+### Cacatnya: sisi gelap Bulan digambar identik dengan planet yang gelap
+
+`drawMoon` mengisi seluruh piringan dengan `moonUnlit` lalu melukis pita
+terang di atasnya. Hasilnya: sisi gelap Bulan **identik** dengan sisi gelap
+Venus/Merkurius (`planetUnlit`) — padahal keduanya secara fisis berbeda dan
+`NightVisual.swift` sudah mencatat perbedaan itu di komentar selama ini. Sisi
+gelap Bulan disinari **earthshine** (cahaya Matahari yang dipantulkan Bumi),
+jadi ia redup tapi tidak hitam; planet dalam tidak punya sumber seperti itu.
+
+Komentar yang menjelaskan "kenapa `planetUnlit` terpisah dari `moonUnlit`"
+sudah benar, tetapi **kodenya tidak mewujudkannya**: yang dipakai Bulan
+adalah `moonUnlit` saja, tanpa earthshine. Ini kelas cacat yang sama dengan
+`moonPhaseUnknown` dulu — aturan yang hanya hidup sebagai prosa di komentar,
+dan karena itu tidak bisa diukur dan bisa hilang tanpa suara.
+
+### Perbaikan
+
+- Token baru `moonEarthshine` di `NightVisual.swift` (0.15/0.15/0.19), terpisah
+  dari `moonUnlit` (0.13/0.13/0.16) dan `planetUnlit` (0.06/0.06/0.08), dan
+  dipetakan lewat aturan `shadow` sehingga mode malam tetap merah murni.
+- Fungsi model `CelestialVisual.earthshineStrength(illuminationFraction:)`
+  = `1 - f`: nol saat purnama (tak ada sisi gelap → jangan gambar cahaya yang
+  tak ada di langit), maksimum saat bulan baru, monoton turun. Diuji di Linux
+  (`testEarthshineOnlyOnPartiallyLitMoon`), termasuk penjepitan di luar 0…1.
+- `drawMoon` melukis earthshine **sebelum** pita terang, jadi pita itu
+  menutupinya di sisi menyala — earthshine hanya tampil di sisi gelap.
+- Port Python (`render-visuals.py`) ikut, supaya gerbang piksel tidak
+  mengukur gambar yang sudah tidak ada lagi, plus dua pemeriksaan baru di
+  `check-visuals.py`.
+
+**Kenapa `1 - f`, bukan konstanta.** Earthshine paling terang saat sabit tipis
+(sisi gelap paling luas) dan lenyap saat purnama. Konstanta akan menyalakan
+cahaya di piringan yang seluruhnya sudah terang — klaim yang salah, dan
+satunya tempat yang bisa memeriksanya adalah layar Bulan yang paling sering
+dilihat pengguna.
+
+### Yang diukur, bukan diasumsikan
+
+- `testEarthshineOnlyOnPartiallyLitMoon`: 673 → **674** uji PointingKit hijau
+  (README diperbarui agar Aturan 10 tidak merah).
+- Gerbang piksel: sisi gelap sabit **37.7** vs `moonUnlit` **33.6** (naik), dan
+  cembung f=0.85 **34.6** < sabit f=0.15 **37.7** (meredup menuju purnama).
+  Pengukuran paling kiri (x < cx − 0.75R) dipilih karena sliver itu pasti
+  gelap di **setiap** fase — versi pertama mengambil setengah kiri dan
+  tercemar piksel menyala pada fase cembung (37.7 vs 121.9, gagal).
+- 430 pemeriksaan visual hijau, 0 gagal; UI lint & typecheck bersih.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — `tooCloseToSun` sampai .lock: celah kejujuran terakhir tertutup)
 
 ### Cacatnya: berkas uji jujur ada di pohon kerja, lupa di-commit

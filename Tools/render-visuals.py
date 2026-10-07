@@ -113,6 +113,7 @@ ACCENTS = dict(
     planetUnlit=(0.06, 0.06, 0.08),
     moonLit=(0.97, 0.95, 0.90),
     moonUnlit=(0.13, 0.13, 0.16),
+    moonEarthshine=(0.15, 0.15, 0.19),
     moonPhaseUnknown=(0.52, 0.52, 0.55),
     sunCore=(1.00, 0.93, 0.62),
     sunPhotosphere=(1.00, 0.72, 0.24),
@@ -1291,6 +1292,17 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
         canvas.disc(cx, cy, radius, solid(night_surface(unknown) if night_mode else unknown))
         return
     canvas.disc(cx, cy, radius, shadow_fn(unlit, night_mode))
+    # Earthshine: sisi gelap Bulan yang disinar Bumi. Kekuatan mengikuti
+    # `1 - f` (sama seperti `CelestialVisual.earthshineStrength` di Swift),
+    # jadi nol saat purnama (f = 1) dan paling kuat saat sabit tipis. Dilukis
+    # sebelum pita terang supaya hanya terlihat di sisi gelap.
+    f = kw.get("illumination")
+    if f is not None and f < 1.0:
+        strength = 1.0 - f
+        es = ACCENTS["moonEarthshine"]
+        es_rgb = night_surface(es) if night_mode else es
+        earth = lambda x, y, c=es_rgb, s=strength: (c, s)
+        canvas.disc(cx, cy, radius, earth)
     points, to_screen = _lit_band_polygon(cx, cy, radius, phase,
                                           kw.get("bright_limb_angle"))
 
