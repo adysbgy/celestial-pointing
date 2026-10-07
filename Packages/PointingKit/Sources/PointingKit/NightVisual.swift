@@ -237,10 +237,55 @@ public extension CelestialVisual {
         public var sunPhotosphere: RGBComponents
 
         // MARK: Objek langit dalam & penanda
-        /// Kabut nebula/galaksi.
+        /// Kabut **netral** — dipakai saat morfologinya tidak boleh diklaim.
+        ///
+        /// Bukan warna "nebula": ini warna untuk keadaan *tidak tahu*. Ia
+        /// dipakai ketika `drawableMorphology` mengembalikan `nil`, yaitu id
+        /// yang tidak ada di katalog **atau** engine yang belum pasti. Warna
+        /// per morfologi ada di token di bawah; yang ini sengaja tetap ada
+        /// supaya keadaan ragu punya warnanya sendiri dan tidak meminjam
+        /// warna salah satu jenis objek.
         public var deepSky: RGBComponents
         /// Isi lencana tanda tanya (kandidat).
         public var candidateFill: RGBComponents
+
+        // MARK: Warna kabut per morfologi objek langit dalam
+        //
+        // **Cacat yang ditutup token-token ini.** Sampai siklus ini seluruh
+        // objek langit dalam memakai **satu** warna (`deepSky`, abu-biru
+        // 0.72/0.78/0.95). Diukur pada render 200 px: keempat morfologi
+        // menghasilkan hue 0.636–0.642 — praktis satu angka. Bentuknya sudah
+        // berbeda sejak siklus lalu, tetapi warnanya menyatakan bahwa nebula
+        // emisi, nebula planetari, galaksi, dan gugus bola adalah benda yang
+        // sama. Dua tinjauan visual independen menyebut hasilnya "kabut yang
+        // bisa jadi apa saja" — persis akibat satu warna untuk enam benda.
+        //
+        // Warnanya **fisis, bukan hiasan**, dan itu yang membuatnya layak
+        // jadi token: nebula emisi bersinar dari Hα (merah muda), nebula
+        // planetari dari O III (hijau-biru), inti galaksi dan gugus bola
+        // didominasi bintang tua (kuning-oranye), sedangkan lengan spiral dan
+        // gugus terbuka didominasi bintang muda (biru-putih). Yang digambar
+        // karena itu bukan "warna yang bagus", melainkan warna yang dimiliki
+        // benda itu karena umur dan komposisi bintangnya.
+        //
+        // **Aturan keyakinannya sama dengan bentuk.** Warna ini adalah klaim
+        // jenis yang sama kuatnya dengan bentuknya: nebula merah muda di
+        // sebelah badge "Ragu" menyatakan "ini nebula emisi" sama kerasnya
+        // dengan menggambar cangkang berongga. Karena itu warnanya dipilih
+        // lewat fungsi yang sama dengan bentuknya (`deepSkyColour(for:)`),
+        // yang menerima `nil` saat engine ragu.
+        /// Nebula emisi/pantulan (M42, M8, M17) — Hα merah muda.
+        public var deepSkyNebula: RGBComponents
+        /// Nebula planetari (M27, M57) — O III hijau-biru.
+        public var deepSkyPlanetaryNebula: RGBComponents
+        /// Galaksi tampak miring (M31, M33) — cahaya bintang tua, krem.
+        public var deepSkyGalaxy: RGBComponents
+        /// Galaksi berlengan (M51, M101) — bintang muda di lengan, biru.
+        public var deepSkySpiralGalaxy: RGBComponents
+        /// Gugus terbuka (Pleiades) — bintang muda panas, putih-biru.
+        public var deepSkyOpenCluster: RGBComponents
+        /// Gugus bola (M13) — bintang tua, kuning-oranye.
+        public var deepSkyGlobularCluster: RGBComponents
 
         public init(jupiterBandCream: RGBComponents,
                     jupiterBandRust: RGBComponents,
@@ -259,6 +304,12 @@ public extension CelestialVisual {
                     sunCore: RGBComponents,
                     sunPhotosphere: RGBComponents,
                     deepSky: RGBComponents,
+                    deepSkyNebula: RGBComponents,
+                    deepSkyPlanetaryNebula: RGBComponents,
+                    deepSkyGalaxy: RGBComponents,
+                    deepSkySpiralGalaxy: RGBComponents,
+                    deepSkyOpenCluster: RGBComponents,
+                    deepSkyGlobularCluster: RGBComponents,
                     candidateFill: RGBComponents) {
             self.jupiterBandCream = jupiterBandCream
             self.jupiterBandRust = jupiterBandRust
@@ -277,6 +328,12 @@ public extension CelestialVisual {
             self.sunCore = sunCore
             self.sunPhotosphere = sunPhotosphere
             self.deepSky = deepSky
+            self.deepSkyNebula = deepSkyNebula
+            self.deepSkyPlanetaryNebula = deepSkyPlanetaryNebula
+            self.deepSkyGalaxy = deepSkyGalaxy
+            self.deepSkySpiralGalaxy = deepSkySpiralGalaxy
+            self.deepSkyOpenCluster = deepSkyOpenCluster
+            self.deepSkyGlobularCluster = deepSkyGlobularCluster
             self.candidateFill = candidateFill
         }
     }
@@ -317,6 +374,63 @@ public extension CelestialVisual {
         sunCore: .init(red: 1.00, green: 0.93, blue: 0.62),
         sunPhotosphere: .init(red: 1.00, green: 0.72, blue: 0.24),
         deepSky: .init(red: 0.72, green: 0.78, blue: 0.95),
+        // Warna kabut per morfologi. Kanan = kanal merah (yang menentukan
+        // kecerahan mode malam, lihat `nightModeBrightness`), dan urutan
+        // kecerahannya sengaja mengikuti objeknya: gugus bola (M13, bintang
+        // tua yang rapat) paling terang, nebula emisi menyusul karena gasnya
+        // memancar, lalu galaksi dan gugus terbuka.
+        //
+        // Hijau & biru tidak boleh nol di sini — warna siang yang netral
+        // (merah = hijau = biru) adalah definisi "tidak berwarna", dan
+        // seluruh siklus ini ada untuk berhenti memakai satu warna untuk
+        // enam benda. Yang menjaga mode malam tetap merah murni bukan angka
+        // di sini, melainkan `NightVisual.surface`, yang membuang kedua
+        // kanal itu.
+        //
+        // Satu makna per benda, dan **setiap** warna harus terpisah jelas dari
+        // kabut netral di atas — kalau tidak, "gugus terbuka" akan tampil
+        // sebagai "tidak tahu" dan cacatnya kembali dalam bentuk lain.
+        // Karena itu jaraknya bukan rasa: dijaga `check_deep_sky_colours`
+        // (port) dan `testDeepSkyColoursAreDistinct` (model).
+        //   nebula emisi      Hα   -> merah muda (merah jauh di atas hijau)
+        //   nebula planetari  O III-> cyan (biru & hijau di atas merah)
+        //   galaksi miring    tua  -> krem netral-hangat (biru paling rendah)
+        //   galaksi spiral    muda -> biru (biru jauh di atas merah)
+        //   gugus terbuka     muda -> putih-biru, paling terang
+        //   gugus bola        tua  -> kuning-oranye (biru paling rendah)
+        deepSkyNebula: .init(red: 0.88, green: 0.44, blue: 0.50),
+        deepSkyPlanetaryNebula: .init(red: 0.42, green: 0.78, blue: 0.86),
+        deepSkyGalaxy: .init(red: 0.82, green: 0.78, blue: 0.70),
+        deepSkySpiralGalaxy: .init(red: 0.48, green: 0.58, blue: 0.96),
+        deepSkyOpenCluster: .init(red: 0.95, green: 0.97, blue: 1.00),
+        deepSkyGlobularCluster: .init(red: 0.93, green: 0.74, blue: 0.42),
         candidateFill: .init(red: 0.10, green: 0.10, blue: 0.13)
     )
+
+    /// Warna kabut untuk sebuah morfologi, atau warna **netral** saat
+    /// morfologinya tidak boleh diklaim.
+    ///
+    /// **Kenapa ini fungsi, bukan `switch` di view.** Warna adalah klaim
+    /// jenis yang sama dengan bentuknya — nebula merah muda menyatakan
+    /// "nebula emisi" sama kerasnya dengan menggambar cangkang berongga.
+    /// Karena itu ia harus menerima `nil` yang sama dengan
+    /// `DeepSkyCatalogue.drawableMorphology`, dan lewat gerbang yang sama:
+    /// satu tempat, diuji di Linux.
+    ///
+    /// Versi yang menaruh pemetaan ini di view akan lolos setiap uji model
+    /// dan tetap bisa menampilkan warna morfologi di sebelah badge "Ragu" —
+    /// gambar yang lebih yakin daripada teksnya, persis yang dilarang PRD.
+    public static func deepSkyColour(for morphology: DeepSkyCatalogue.Morphology?)
+        -> CelestialVisual.RGBComponents {
+        let accents = CelestialVisual.accents
+        switch morphology {
+        case .nebula: return accents.deepSkyNebula
+        case .planetaryNebula: return accents.deepSkyPlanetaryNebula
+        case .galaxy: return accents.deepSkyGalaxy
+        case .spiralGalaxy: return accents.deepSkySpiralGalaxy
+        case .openCluster: return accents.deepSkyOpenCluster
+        case .globularCluster: return accents.deepSkyGlobularCluster
+        case nil: return accents.deepSky
+        }
+    }
 }

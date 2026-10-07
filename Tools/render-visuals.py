@@ -118,6 +118,15 @@ ACCENTS = dict(
     sunCore=(1.00, 0.93, 0.62),
     sunPhotosphere=(1.00, 0.72, 0.24),
     deepSky=(0.72, 0.78, 0.95),
+    # MODEL: `NightVisual.Accents.deepSky*` — warna kabut per morfologi.
+    # Satu warna untuk enam benda adalah cacat yang ditutup siklus ini; lihat
+    # komentar di `NightVisual.swift`.
+    deepSkyNebula=(0.88, 0.44, 0.50),
+    deepSkyPlanetaryNebula=(0.42, 0.78, 0.86),
+    deepSkyGalaxy=(0.82, 0.78, 0.70),
+    deepSkySpiralGalaxy=(0.48, 0.58, 0.96),
+    deepSkyOpenCluster=(0.95, 0.97, 1.00),
+    deepSkyGlobularCluster=(0.93, 0.74, 0.42),
     candidateFill=(0.10, 0.10, 0.13),
 )
 
@@ -238,6 +247,18 @@ def star_geometry(relative_size, pulse_amplitude=0.10, glow_scales=(3.0, 1.9, 1.
     return dict(core_radius=outer / growth, glow_scales=list(glow_scales),
                 spike_scale=spike_scale, pulse_amplitude=pulse_amplitude)
 
+
+# Warna kabut per morfologi — MODEL: `CelestialVisual.deepSkyColour(for:)`.
+# Kuncinya adalah nama `DeepSkyCatalogue.Morphology`; `None` (id tak dikenal
+# atau engine belum pasti) jatuh ke kabut netral.
+DEEP_SKY_COLOUR_KEY = {
+    "nebula": "deepSkyNebula",
+    "planetaryNebula": "deepSkyPlanetaryNebula",
+    "galaxy": "deepSkyGalaxy",
+    "spiralGalaxy": "deepSkySpiralGalaxy",
+    "openCluster": "deepSkyOpenCluster",
+    "globularCluster": "deepSkyGlobularCluster",
+}
 
 DEEP_SKY_LAYOUT = {
     "nebula": [(-0.18, 0.12, 1.00, 1.0, 0.0, 0.42),
@@ -1430,9 +1451,12 @@ def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
 
 
 def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):
-    core = ACCENTS["deepSky"]
-    core_rgb = night_surface(core) if night_mode else core
     morphology = kw.get("morphology") if kw.get("is_confirmed", True) else None
+    # MODEL: `CelestialVisual.deepSkyColour(for:)` — warna mengikuti morfologi
+    # yang **boleh diklaim**. `morphology` di sini sudah `None` saat belum
+    # terkunci, jadi warna morfologi tidak pernah muncul di kartu ragu.
+    core = ACCENTS[DEEP_SKY_COLOUR_KEY.get(morphology or "", "deepSky")]
+    core_rgb = night_surface(core) if night_mode else core
     blobs = deep_sky_blobs(morphology, kw.get("fuzziness", 0.6))
     for blob in blobs:
         half_w = blob["half_width"] * radius

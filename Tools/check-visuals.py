@@ -308,6 +308,56 @@ class Result:
         self.name, self.ok, self.detail = name, ok, detail
 
 
+# ── Ambang yang diukur, bukan dirasakan ───────────────────────────────────
+#
+# Keduanya dikalibrasi terhadap gambar yang ada sekarang, lalu diturunkan
+# sedikit. Gerbang "diff > 0" tidak bisa gagal (satu piksel pun lolos), jadi
+# ambangnya harus angka yang benar-benar bisa dilanggar oleh cacat yang
+# dimaksud — bukan angka yang membuat setiap gambar hijau.
+
+#: Proporsi piksel minimum yang harus berbeda antara dua morfologi.
+#: Pasangan termirip saat ini (galaxy vs spiralGalaxy, keduanya cakram
+#: miring) menghasilkan ~13%; ambang 8% masih menangkap penyorotan ke satu
+#: bentuk (yang menghasilkan ~0%) tanpa merah karena anti-aliasing.
+MIN_MORPHOLOGY_DIFF = 0.08
+
+#: Jarak kanal warna minimum antara dua kabut. Warna model dipisah ≥ 0.20
+#: sebelum digambar; setelah dicampur latar dan gradien tepi, pasangan
+#: terdekat menyusut ke ~0.07. Ambang 0.05 menangkap "satu warna untuk dua
+#: morfologi" (jarak ~0.00) tanpa bergantung pada rasa.
+MIN_DEEP_SKY_COLOUR_DIFF = 0.05
+
+
+def _rgb_text(colour):
+    """(0.88, 0.44, 0.50) -> '0.88/0.44/0.50' untuk pesan kegagalan."""
+    return "/".join(f"{c:.2f}" for c in colour)
+
+
+def mean_visible_colour(rows, width, height, background=0.02):
+    """Warna rata-rata piksel yang benar-benar terlihat (bukan latar).
+
+    Kabut digambar sebagai gradien tipis di atas latar gelap, jadi rata-rata
+    seluruh frame akan didominasi latar dan menyembunyikan perbedaan warna.
+    Yang dirata-ratakan hanya piksel di atas ambang `background` — piksel
+    yang memang membawa warna kabut.
+    """
+    total = [0.0, 0.0, 0.0]
+    count = 0
+    for y in range(height):
+        row = rows[y]
+        for x in range(width):
+            r, g, b = row[x * 4], row[x * 4 + 1], row[x * 4 + 2]
+            if (r + g + b) / 3.0 / 255.0 <= background:
+                continue
+            total[0] += r / 255.0
+            total[1] += g / 255.0
+            total[2] += b / 255.0
+            count += 1
+    if count == 0:
+        return None
+    return tuple(c / count for c in total)
+
+
 def render_case(name, night=False, size=200, ss=2):
     case = next(c for c in R.build_cases() if c.name == name)
     canvas = R.render(case, size=size, night_mode=night, show_frame=False, ss=ss)
@@ -5311,9 +5361,22 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
     ada untuk mencegah: gerbang yang mengukur hal yang bukan yang diklaimnya.
 
     Diukur dari piksel penuh. Kasus-kasus ini **terkunci** (tanpa lencana tanda
-    tanya), jadi seluruh frame adil untuk dibandingkan. Setiap pasang morfologi
-    harus berbeda paling tidak satu piksel; kalau view menyoroti semuanya ke
-    satu bentuk, seluruh pasangan bertepatan dan pemeriksaan ini merah.
+    tanya), jadi seluruh frame adil untuk dibandingkan.
+
+    **Ambang "berbeda" bukan nol.** Versi sebelumnya menuntut `diff > 0` —
+    satu piksel berbeda sudah hijau. Gerbang yang begitu tidak bisa gagal:
+    menggeser satu bentuk satu piksel pun lolos, jadi ia mengukur "ada
+    sesuatu di layar", bukan "bentuknya berbeda". Ambangnya sekarang proporsi
+    piksel yang benar-benar berbeda, dan angkanya dinaikkan sampai tepat di
+    bawah nilai yang dihasilkan gambar sekarang (lihat `MIN_MORPHOLOGY_DIFF`)
+    — cukup ketat untuk menangkap penyorotan ke satu bentuk, cukup longgar
+    untuk tidak merah karena anti-aliasing.
+
+    **Warna, bukan hanya bentuk.** Bentuk bisa berbeda sementara seluruh
+    kabut tetap satu warna — itu keadaan sebelum siklus ini: keenam morfologi
+    berhue 0.636-0.642. Karena itu warna rata-rata tiap morfologi
+    dibandingkan dengan kabut netral di kanal warna (bukan hue: hue tidak
+    terdefinisi untuk warna hampir netral).
 
     **Dua arah sekaligus.** Tanpa arah sebaliknya (setiap morfologi terkunci
     berbeda dari kabut netral), view yang menyoroti *semua* ke kabut netral
@@ -5325,7 +5388,8 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
              and c.name not in ("deepsky-uncertain", "deepsky-unknown-id")]
     rendered = {name: render_case(name, size=size, ss=ss) for name in names}
 
-    # Setiap pasang berbeda.
+    # Setiap pasang berbeda — diukur sebagai proporsi piksel, bukan > 0.
+    total = size * size
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
             _, (w1, h1, rows_a) = rendered[names[i]]
@@ -5333,9 +5397,12 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
             diff = sum(1 for y in range(h1)
                        for x in range(w1)
                        if rows_a[y][x * 4:x * 4 + 3] != rows_b[y][x * 4:x * 4 + 3])
+            fraction = diff / total
             results.append(Result(
-                f"morfologi berbeda: {names[i]} vs {names[j]}", diff > 0,
-                f"{diff} piksel berbeda (kalau 0, kedua bentuk sama di layar)"))
+                f"morfologi berbeda: {names[i]} vs {names[j]}",
+                fraction >= MIN_MORPHOLOGY_DIFF,
+                f"{diff} piksel ({fraction:.1%}) berbeda; ambang "
+                f"{MIN_MORPHOLOGY_DIFF:.0%} (kalau ~0, kedua bentuk sama di layar)"))
 
     # Setiap morfologi terkunci berbeda dari kabut netral.
     _, (w0, h0, rows_neutral) = render_case("deepsky-unknown-id",
@@ -5345,9 +5412,50 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
         diff = sum(1 for y in range(h0)
                    for x in range(w0)
                    if rows_m[y][x * 4:x * 4 + 3] != rows_neutral[y][x * 4:x * 4 + 3])
+        fraction = diff / total
         results.append(Result(
-            f"{name} berbeda dari kabut netral", diff > 0,
-            f"{diff} piksel berbeda dari kabut netral"))
+            f"{name} berbeda dari kabut netral",
+            fraction >= MIN_MORPHOLOGY_DIFF,
+            f"{diff} piksel ({fraction:.1%}) berbeda dari kabut netral; ambang "
+            f"{MIN_MORPHOLOGY_DIFF:.0%}"))
+
+    # Dan warnanya — arah yang tidak terlihat oleh perbandingan piksel di atas.
+    neutral_hue_rgb = mean_visible_colour(rows_neutral, w0, h0)
+    if neutral_hue_rgb is None:
+        results.append(Result("warna kabut netral terbaca", False,
+                              "kabut netral tidak punya piksel terlihat"))
+        return
+    for name in names:
+        _, (w, h, rows) = rendered[name]
+        colour = mean_visible_colour(rows, w, h)
+        if colour is None:
+            results.append(Result(f"warna {name} berbeda dari kabut netral",
+                                  False, "tidak ada piksel terlihat"))
+            continue
+        distance = max(abs(a - b) for a, b in zip(colour, neutral_hue_rgb))
+        results.append(Result(
+            f"warna {name} berbeda dari kabut netral",
+            distance >= MIN_DEEP_SKY_COLOUR_DIFF,
+            f"jarak kanal {distance:.3f} (rata-rata {_rgb_text(colour)} vs "
+            f"netral {_rgb_text(neutral_hue_rgb)}); ambang "
+            f"{MIN_DEEP_SKY_COLOUR_DIFF:.2f}"))
+
+    # Dan antar morfologi — supaya tidak ada dua yang bertabrakan.
+    measured = {}
+    for name in names:
+        _, (w, h, rows) = rendered[name]
+        measured[name] = mean_visible_colour(rows, w, h)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = measured[names[i]], measured[names[j]]
+            if a is None or b is None:
+                continue
+            distance = max(abs(x - y) for x, y in zip(a, b))
+            results.append(Result(
+                f"warna berbeda: {names[i]} vs {names[j]}",
+                distance >= MIN_DEEP_SKY_COLOUR_DIFF,
+                f"jarak kanal {distance:.3f} (ambang "
+                f"{MIN_DEEP_SKY_COLOUR_DIFF:.2f})"))
 
 
 def check_earthshine(results, size=200, ss=2):

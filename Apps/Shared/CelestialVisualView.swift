@@ -990,10 +990,22 @@ struct CelestialVisualView: View {
         // belum pasti, dan kabut netral yang tersisa tidak mengklaim jenis
         // apa pun. Sebelum ini, galaksi berpalung digambar penuh di sebelah
         // badge "Ragu", sehingga gambar lebih yakin daripada teksnya.
-        let core = Self.accent(CelestialVisual.accents.deepSky)
         let morphology = visual.objectID.flatMap {
             DeepSkyCatalogue.drawableMorphology(forObjectID: $0, isConfirmed: isConfirmed)
         }
+        // Warna kabut mengikuti **morfologi yang boleh diklaim**, lewat
+        // fungsi yang sama yang memutuskan bentuknya — bukan satu warna untuk
+        // semua benda. Sebelum ini seluruh objek langit dalam memakai
+        // `accents.deepSky`, jadi nebula emisi, nebula planetari, galaksi,
+        // dan gugus bola digambar dengan warna yang sama; diukur, hue-nya
+        // 0.636–0.642, yaitu satu angka.
+        //
+        // Warnanya diambil lewat `deepSkyColour(for:)` dengan `morphology`
+        // yang **sama** dengan yang dipakai menggambar bentuk. Karena
+        // `drawableMorphology` sudah mengembalikan `nil` saat engine ragu,
+        // warna morfologi tidak bisa muncul di sebelah badge "Ragu" — gambar
+        // yang lebih yakin daripada teksnya justru dilarang PRD.
+        let core = Self.accent(CelestialVisual.deepSkyColour(for: morphology))
         let geometry = VisualFrame.deepSky(morphology: morphology,
                                            fuzziness: visual.fuzziness)
         for blob in geometry.blobs {

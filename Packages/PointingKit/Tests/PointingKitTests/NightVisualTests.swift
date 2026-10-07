@@ -290,6 +290,111 @@ private extension CelestialVisual.RGBComponents {
     var luminance: Double { 0.2126 * red + 0.7152 * green + 0.0722 * blue }
 }
 
+// MARK: - Warna kabut objek langit dalam
+
+/// Gerbang warna kabut per morfologi objek langit dalam.
+///
+/// **Kelas cacat yang dijaga di sini.** Sampai siklus ini seluruh objek
+/// langit dalam memakai satu warna (`accents.deepSky`), jadi nebula emisi,
+/// nebula planetari, galaksi, dan gugus bola digambar dengan warna yang
+/// **sama**. Bentuknya sudah berbeda sejak siklus sebelumnya, tetapi warnanya
+/// tetap menyatakan bahwa keenam benda itu satu jenis. Diukur pada render
+/// 200 px: hue keenamnya 0.636-0.642 -- praktis satu angka.
+///
+/// Yang tidak bisa dilihat dengan membaca kode: warna-warna ini bisa
+/// **bertabrakan** tanpa ada yang menyadarinya. Versi pertama palet ini
+/// membuat `openCluster` (putih-biru) berjarak 0.002 hue dari kabut netral
+/// dan `spiralGalaxy` 0.018 dari kabut netral -- artinya "gugus terbuka"
+/// dan "galaksi berlengan" tampil nyaris persis sebagai "tidak tahu",
+/// sehingga cacatnya kembali dalam bentuk lain: satu warna untuk dua makna
+/// yang berlawanan.
+///
+/// Karena itu jaraknya diukur, bukan dirasakan: setiap warna morfologi
+/// harus terpisah jelas dari kabut netral **dan** dari setiap warna
+/// morfologi lain. Ambangnya di kanal warna (bukan hue), karena hue tidak
+/// terdefinisi untuk warna yang hampir netral -- dan justru di sekitar
+/// netral itulah tabrakan yang nyata terjadi.
+final class DeepSkyColourTests: XCTestCase {
+
+    private var neutral: CelestialVisual.RGBComponents { CelestialVisual.accents.deepSky }
+
+    /// Jarak terbesar antar kanal -- ukuran "seberapa beda warnanya".
+    ///
+    /// Sengaja bukan jarak Euclidean dan bukan selisih hue: yang menentukan
+    /// apakah dua kabut terbaca berbeda di layar kecil adalah kanal yang
+    /// paling berbeda, bukan rata-rata ketiganya.
+    private func distance(_ a: CelestialVisual.RGBComponents,
+                          _ b: CelestialVisual.RGBComponents) -> Double {
+        max(abs(a.red - b.red), max(abs(a.green - b.green), abs(a.blue - b.blue)))
+    }
+
+    /// Setiap morfologi punya warnanya sendiri, dan semuanya ada di katalog.
+    func testEveryMorphologyHasItsOwnColour() {
+        var seen: [DeepSkyCatalogue.Morphology: CelestialVisual.RGBComponents] = [:]
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            let colour = CelestialVisual.deepSkyColour(for: morphology)
+            XCTAssertNotEqual(colour, neutral,
+                              "\(morphology) memakai warna kabut netral — "
+                              + "morfolologi tanpa warna sendiri kembali jadi 'tidak tahu'")
+            for (other, otherColour) in seen {
+                XCTAssertGreaterThanOrEqual(distance(colour, otherColour), 0.15,
+                                            "\(morphology) dan \(other) terlalu mirip "
+                                            + "(jarak \(distance(colour, otherColour)))")
+            }
+            seen[morphology] = colour
+        }
+        // Keenam kasus harus ikut teruji; kalau enum bertambah, uji ini
+        // menangkapnya lewat `allCases` -- angka ini hanya pengunci bahwa
+        // daftar yang diuji benar-benar seluruhnya.
+        XCTAssertEqual(seen.count, DeepSkyCatalogue.Morphology.allCases.count)
+    }
+
+    /// Setiap warna morfologi harus terpisah dari kabut netral.
+    ///
+    /// Ini arah yang paling mudah hilang: morfologi yang warnanya kebetulan
+    /// mirip netral akan tampil sebagai "tidak tahu" di layar, dan tidak ada
+    /// teks yang bisa membedakannya -- kecuali nama objeknya, yang justru
+    /// sedang tidak boleh diklaim.
+    func testEveryMorphologyColourIsDistinctFromTheNeutralFog() {
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            let colour = CelestialVisual.deepSkyColour(for: morphology)
+            XCTAssertGreaterThanOrEqual(distance(colour, neutral), 0.15,
+                                        "\(morphology) terlalu dekat dengan kabut netral "
+                                        + "(jarak \(distance(colour, neutral)))")
+        }
+    }
+
+    /// Morfologi yang **tidak boleh diklaim** harus jatuh ke kabut netral.
+    ///
+    /// Warna adalah klaim jenis yang sama dengan bentuk: nebula merah muda di
+    /// sebelah badge "Ragu" menyatakan "ini nebula emisi" sama kerasnya
+    /// dengan menggambar cangkang berongga. Karena itu `nil` -- yang berarti
+    /// id tak dikenal **atau** engine belum pasti -- harus menghasilkan
+    /// kabut netral, bukan warna salah satu jenis.
+    func testUnknownMorphologyFallsBackToTheNeutralFog() {
+        XCTAssertEqual(CelestialVisual.deepSkyColour(for: nil), neutral)
+    }
+
+    /// Warna kabut tetap merah murni di mode malam.
+    ///
+    /// Diuji di sini juga, bukan hanya di `testEveryAccentColourBecomesPureRedAtNight`:
+    /// warna baru yang tidak masuk daftar uji itu akan lolos tanpa ada yang
+    /// menghitungnya -- dan daftar tangan itulah yang membuat warna ke-14
+    /// bisa sunyi.
+    func testDeepSkyColoursStayPureRedAtNight() {
+        var colours = DeepSkyCatalogue.Morphology.allCases.map {
+            CelestialVisual.deepSkyColour(for: $0)
+        }
+        colours.append(CelestialVisual.deepSkyColour(for: nil))
+        for (index, day) in colours.enumerated() {
+            let night = NightVisual.surface(day)
+            XCTAssertEqual(night.green, 0, "warna kabut #\(index): hijau harus nol")
+            XCTAssertEqual(night.blue, 0, "warna kabut #\(index): biru harus nol")
+            XCTAssertGreaterThan(night.red, 0, "warna kabut #\(index): harus tetap merah")
+        }
+    }
+}
+
 /// Rasio kontras WCAG antara dua warna.
 private func contrast(_ a: CelestialVisual.RGBComponents,
                       _ b: CelestialVisual.RGBComponents) -> Double {

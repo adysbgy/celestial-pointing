@@ -1,3 +1,96 @@
+## Progres terakhir (7 Okt 2026 — jembatan teleskop: putusan slew menjadi perintah motor, §17–§20)
+
+### Cacatnya: langkah §18 yang tidak punya kode sama sekali
+
+`SlewPlanner` sudah memutuskan boleh/tidak bergerak, dan `SlewCommand` sudah
+membawa objek + arah horizontalnya. Yang belum ada adalah langkah berikutnya
+yang diminta dokumen kelayakan §18: *"resolve confirmed celestial target into
+the coordinate representation required by the chosen control path."* Mount
+ekuatorial tidak bisa menerima arah horizontal, dan mount alt-az tidak butuh
+RA/Dec — dan tidak satu pun dari itu boleh disimpulkan diam-diam. Di repo ini
+sebelumnya: nol.
+
+### `TelescopeBridge.swift` — yang menerjemahkan, bukan yang memutuskan
+
+- **Lapisan kemampuan berorientasi-protokol (§17).** Yang dikenal hanya
+  **jenis sumbu** (`MountAxis.altitudeAzimuth`/`.equatorial`), bukan merek.
+  Transport (Seestar, Alpaca, simulator) hidup di lapisan app lewat protokol
+  `TelescopeTransport`.
+- **Kerangka koordinat DINYATAKAN, tidak disimpulkan.** Ini keputusan yang
+  paling mudah salah: katalog repo ini **J2000**, sementara benda tata surya
+  datang dari efemeris dalam **of-date** (`EphemerisSample`). Mengirim
+  koordinat ke mount tanpa menyebut kerangkanya berarti mount menafsirkan
+  salah satunya dengan kerangka yang salah — selisih ~0,3° pada 2026, dan
+  **tidak ada layar mana pun yang bisa memperlihatkannya**. `MountTarget`
+  membawa kerangkanya; mount yang tidak mendukung kerangka yang diminta
+  ditolak (`.unsupportedFrame`), bukan dikonversi diam-diam.
+- **Posisi benda tata surya diambil ULANG saat perintah dibuat**, bukan
+  dipakai ulang dari resolusi: Bulan bergerak ~0,5°/jam, jadi koordinat yang
+  berumur beberapa menit sudah bergeser. Diuji: dua perintah berjarak 3 jam
+  menghasilkan RA yang berbeda > 0,5°.
+- **`TelescopeCommand` tetap tanpa inisialisator publik** — sama seperti
+  `SlewCommand`. Satu-satunya jalan membuatnya adalah jembatan yang menolak
+  apa pun yang bukan `SlewDecision.allowed`.
+- **Matahari ditolak di lapis kedua**, kalaupun sebuah `SlewCommand` memuatnya.
+- **Mount tanpa Abort ditolak SEBELUM perintah dibuat** (§20), bukan sesudah
+  perintah pertama terkirim. Dan `abort()` tidak bergantung pada keadaan apa
+  pun — tombol darurat yang bisa mati sendiri bukan tombol darurat.
+- **`TelescopeAttempt`** mencatat yang diminta §18: versi firmware, command
+  path, balasan, galat, hasil akhir. `Codable`, jadi bisa diekspor seperti
+  arsip eksperimen yang sudah ada.
+- **`TelescopeNetworkRequirements`** menyimpan kunci Info.plist §19
+  (`NSLocalNetworkUsageDescription`, `NSBonjourServices`) sebagai data yang
+  bisa dibaca lapisan app. Kegagalan kunci ini bukan galat yang terbaca —
+  aplikasinya hanya diam-diam tidak menemukan teleskop.
+
+### 19 uji baru: yang dijaga bukan "apakah perintahnya jalan"
+
+Yang diuji adalah **apa yang tidak boleh pernah lolos**: penolakan tidak
+pernah menjadi izin, penolakan **tidak pernah memanggil transport sama
+sekali** (transport palsu mencatat nol panggilan), kerangka yang tidak
+didukung ditolak, dan jalur alt-az benar-benar mempresesi — diuji terhadap
+jalur engine sendiri (`horizontal(ofObjectID:)`) plus satu uji yang
+membuktikan hasilnya **berbeda** dari koordinat J2000 mentah.
+
+### Satu uji pertama salah asumsi, bukan salah kode
+
+Uji `testAltAzMountGetsHorizontalTargetNotEquatorial` versi pertama menuntut
+Vega di atas horizon dari Bandung pada 15 Jan 2026 15:00 UTC. Terukur:
+**−56,4°**. Asumsinya salah, bukan kodenya. Diganti menjadi perbandingan
+terhadap jalur engine sendiri, plus uji presesi terpisah.
+
+### Batas yang jujur
+
+- **Yang dibuktikan:** urutan langkah POC §18 tidak bisa dilewati — penolakan
+  tidak menyentuh perangkat, bentuk target mengikuti sumbu, kerangka
+  dinyatakan, dan Abort selalu sampai. **Yang belum:** `TelescopeTransport`
+  nyata untuk Seestar. Jalur kontrolnya masih community/reverse-engineered
+  (§18), sensitif firmware, dan menguji connect/GoTo/Slewing/Abort pada
+  perangkat fisik tetap butuh perangkat.
+- "Monitor state until complete or failed" (§18) **tidak** ada di sini:
+  menunggu perangkat butuh `await`, jadi itu tugas lapisan app. Yang dicatat
+  `TelescopeAttempt` adalah perintah **terkirim**, bukan **selesai**.
+- `NSLocalNetworkUsageDescription` belum ditulis ke `Info.plist` mana pun —
+  yang ada baru data yang bisa dibacanya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 187 | **206** (+19 jembatan teleskop) |
+| PointingKit | 679 | 679 |
+| Pemeriksaan visual | 481 | 481 |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 679), `swift-ui-lint.sh` (29,
+Aturan 10 menangkap README 187 lebih dulu dan itu memang tugasnya),
+`swift-typecheck.sh`, `check-visuals.py --check` (481, 0 gagal). Berkas
+tersentuh: `TelescopeBridge.swift` (baru), `TelescopeBridgeTests.swift`
+(baru), `README.md`, `ROADMAP.md`. CI: Apple Build + Engine Tests hijau
+pada `58b085e`.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — earthshine: sisi gelap Bulan tidak lagi hitam rata)
 
 ### Cacatnya: sisi gelap Bulan digambar identik dengan planet yang gelap
