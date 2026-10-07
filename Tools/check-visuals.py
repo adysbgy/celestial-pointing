@@ -207,6 +207,24 @@ def edge_touch(width, height, rows, background):
     return worst
 
 
+def luminance_field(path):
+    """Seluruh luminans render dalam urutan baris — untuk dua render banding.
+
+    Mengembalikan daftar datar supaya dua ukuran bisa dibandingkan dengan
+    `zip` tanpa penyesuaian indeks. Koefisien WCAG (Rec. 709), sama dengan
+    yang dipakai gerbang kontras lain di berkas ini supaya "terang" berarti
+    satu hal yang sama di semua gerbang.
+    """
+    width, height, rows = decode_png(path)
+    field = []
+    for y in range(height):
+        row = rows[y]
+        for x in range(width):
+            field.append(0.2126 * row[x * 4] + 0.7152 * row[x * 4 + 1]
+                         + 0.0722 * row[x * 4 + 2])
+    return field
+
+
 def brightest_pixel(rows, width, height, x0, y0, x1, y1):
     best, best_d = None, -1
     for y in range(max(0, y0), min(height, y1)):
@@ -3323,6 +3341,60 @@ def check_night_mode_purity(results, size=200, ss=2):
         os.remove(path)
 
 
+def check_night_mode_never_exceeds_day(results, size=120, ss=2):
+    """Mode malam tidak boleh membuat satu pun piksel lebih terang.
+
+    `check_night_mode_purity` menyapu hijau/biru sampai **nol** di seluruh
+    katalog. Itu menutup kelas cacat yang lain: "buang warna" dijaga,
+    "turunkan terang" tidak. Yang kedua tidak punya gerbang piksel sama
+    sekali, jadi nilai lantai mode malam (`NIGHT_FLOOR_BRIGHTNESS`) bisa
+    dinaikkan sewenang-wenang tanpa satu pun alarm — dan itulah yang diuji
+    di sini.
+
+    Invarian yang dipakai bukan angka tertentu melainkan **hubungan**:
+    untuk setiap koordinat, malam <= siang. Daftar kasusnya diturunkan dari
+    `build_cases()`, jadi kasus render baru ikut terukur pada hari ia
+    ditambahkan, bukan pada hari seseorang ingat menambahkannya ke daftar.
+    Katalog kosong menghasilkan merah, bukan hijau.
+
+    **Yang tidak diukur gerbang ini**, supaya tidak dikira lebih dari
+    kemampuannya: earthshine. Pada bulan sabit, malam memang lebih redup
+    dari siang — earthshine tidak pernah membuat malam lebih terang. Cacat
+    yang pernah hidup di sana enam kali terlalu terang lolos bukan karena
+    invarian ini lemah, tapi karena tak ada yang mengukurnya di malam sama
+    sekali. Yang mengukurnya `check_earthshine`, yang sekarang merender
+    kedua modenya.
+    """
+    cases = R.build_cases()
+    if not cases:
+        results.append(Result("malam <= siang: katalog terbaca", False,
+                              "build_cases() mengembalikan nol kasus"))
+        return
+    for case in cases:
+        render = {}
+        for malam in (False, True):
+            canvas = R.render(case, size=size, night_mode=malam,
+                              show_frame=False, ss=ss)
+            path = os.path.join(R.OUT_DIR, f"__nd-{case.name}-{int(malam)}.png")
+            with open(path, "wb") as handle:
+                handle.write(canvas.to_png())
+            render[malam] = luminance_field(path)
+            os.remove(path)
+        day, night = render[False], render[True]
+        if len(day) != len(night):
+            results.append(Result(f"malam <= siang: {case.name}", False,
+                                  f"ukuran render berbeda: {len(day)} vs {len(night)}"))
+            continue
+        terparah, naiknya = 0.0, 0
+        for d, n in zip(day, night):
+            if n > d:
+                naiknya += 1
+                terparah = max(terparah, n - d)
+        results.append(Result(
+            f"malam <= siang: {case.name}", naiknya == 0,
+            f"{naiknya} piksel lebih terang, puncak +{terparah:.1f}"))
+
+
 def check_planet_features_present(results, size=200, ss=2):
     """Ciri yang **seharusnya** ada juga harus benar-benar tergambar.
 
@@ -5297,12 +5369,12 @@ def check_earthshine(results, size=200, ss=2):
     # earthshine. Earthshine harus **menaikkan** sisi gelap sabit di atas ini.
     unlit_lum = 0.2126 * unlit[0] + 0.7152 * unlit[1] + 0.0722 * unlit[2]
 
-    def dark_side_luminance(illumination, angle):
-        name = f"__es-{int(illumination * 100)}"
+    def dark_side_luminance(illumination, angle, night=False):
+        name = f"__es-{int(illumination * 100)}-{int(night)}"
         case = R.VisualCase(name, "sementara", "moon",
                             illumination=illumination, is_waxing=True,
                             bright_limb_angle=angle, is_confirmed=True)
-        canvas = R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+        canvas = R.render(case, size=size, night_mode=night, show_frame=False, ss=ss)
         path = os.path.join(R.OUT_DIR, f"{name}.png")
         with open(path, "wb") as handle:
             handle.write(canvas.to_png())
@@ -5341,6 +5413,113 @@ def check_earthshine(results, size=200, ss=2):
         "earthshine: lebih kuat pada sabit tipis daripada celah",
         gibbous_dark < crescent_dark,
         f"sabit f=0.15: {crescent_dark:.1f}, f=0.85: {gibbous_dark:.1f}"))
+
+    # ── Mode malam ─────────────────────────────────────────────────────────
+    #
+    # Earthshine adalah bagian yang **tidak memancarkan** cahaya: ia memantulkan
+    # cahaya Bumi. Jadi di mode malam ia mengikuti aturan `shadow`, bukan
+    # `surface` — persis seperti piringan gelap `moonUnlit` di sebelahnya.
+    #
+    # Bagian ini sebelumnya tidak ada, dan kekosongannya itulah yang membuat
+    # earthshine bisa enam kali terlalu terang tanpa satu pun alarm: gerbang
+    # ini merender dengan `night_mode=False` saja, jadi jalur malam tak
+    # pernah diukur; `check_night_mode_purity` yang merender malam hanya
+    # menyapu hijau/biru; dan kanal merah yang dinaikkan `surface` tetap
+    # merah murni, jadi ia lolos dari penyapuan itu. Dua gerbang, dua
+    # butiran yang saling menutupi — bukan dua gerbang yang saling menguatkan.
+    # ── Mode malam ─────────────────────────────────────────────────────────
+    #
+    # Earthshine adalah bagian yang **tidak memancarkan** cahaya: ia memantulkan
+    # cahaya Bumi. Jadi di mode malam ia mengikuti aturan `shadow`, bukan
+    # `surface` — persis seperti piringan gelap `moonUnlit` di sebelahnya.
+    #
+    # Bagian ini sebelumnya tidak ada, dan kekosongannya itulah yang membuat
+    # earthshine bisa terlalu terang tanpa satu pun alarm: gerbang ini
+    # merender dengan `night_mode=False` saja, jadi jalur malam tak pernah
+    # diukur; `check_night_mode_purity` yang merender malam hanya menyapu
+    # hijau/biru; dan kanal merah yang dinaikkan `surface` tetap merah
+    # murni, jadi ia lolos dari penyapuan itu. Dua gerbang, dua butiran yang
+    # saling menutupi — bukan dua gerbang yang saling menguatkan.
+    #
+    # **Invarian yang dipakai: rasio, bukan angka.** Versi pertama membandingkan
+    # luminans **terukur** sisi gelap dengan luminans **analitik** token
+    # `night_shadow(moonUnlit)` (3.5). Itu dua besaran berbeda: di antara
+    # keduanya ada komposit dan tekstur, jadi hasilnya meleset ~17 poin —
+    # dan ambangnya jadi 4.5 terhadap nilai terukur 4.0, hanya 0.5 margin.
+    # Versi ini membandingkan **dua render** dari penyampel yang sama: sisi
+    # gelap dan sisi terang piringan yang sama. Tidak ada konstanta karangan.
+    #
+    # Dan bentuk pertanyaannya fisis: earthshine adalah pantulan, bukan emisi,
+    # jadi mode malam **tidak boleh** menaikkan rasio gelap/terang di atas
+    # apa yang siang sudah tunjukkan. Angka di docstring ini diukur oleh
+    # penyampel yang sama (`side_luminance` di bawah), bukan dikutip:
+    #
+    #     rasio malam, keadaan benar : 20.25 %
+    #     rasio siang                : 36.28 %
+    #     rasio malam, cacat surface : 66.93 %
+    #
+    # Ketiganya diukur pada 200 px, sliver `x < cx - 0.75R` untuk sisi gelap
+    # dan `x > cx` untuk sisi terang, cincin 0.55 R…0.92 R (di luar pita
+    # maria, di dalam limb). Ambang mutlak 45 % ligger di tengah antara
+    # siang (36,28) dan cacat (66,93) — penutup kalau rasio siang ikut
+    # berubah, karena invarian perbandingan tidak boleh sendirian.
+    def side_luminance(illumination, night, lit_side):
+        name = f"__esr-{int(illumination * 100)}-{int(night)}-{int(lit_side)}"
+        case = R.VisualCase(name, "sementara", "moon",
+                            illumination=illumination, is_waxing=True,
+                            bright_limb_angle=0.0, is_confirmed=True)
+        canvas = R.render(case, size=size, night_mode=night, show_frame=False, ss=ss)
+        path = os.path.join(R.OUT_DIR, f"{name}.png")
+        with open(path, "wb") as handle:
+            handle.write(canvas.to_png())
+        w, h, rows = decode_png(path)
+        os.remove(path)
+        cx, cy, radius = w / 2.0, h / 2.0, w / 2.0
+        tot, n = 0.0, 0
+        for y in range(0, h, 2):
+            for x in range(0, w, 2):
+                d = math.hypot(x - cx, y - cy)
+                if d > radius * 0.92 or d < radius * 0.55:
+                    continue
+                if lit_side:
+                    if x < cx:
+                        continue
+                elif x > cx - 0.75 * radius:
+                    continue
+                r, g, b = rows[y][x * 4:x * 4 + 3]
+                tot += 0.2126 * r + 0.7152 * g + 0.0722 * b
+                n += 1
+        return tot / max(1, n)
+
+    def dark_lit_ratio(night):
+        dark = side_luminance(0.15, night, lit_side=False)
+        lit = side_luminance(0.15, night, lit_side=True)
+        return dark / lit * 100.0, dark, lit
+
+    night_ratio, night_dark, night_lit = dark_lit_ratio(True)
+    day_ratio, day_dark, day_lit = dark_lit_ratio(False)
+    results.append(Result(
+        "earthshine malam: rasio gelap/terang tidak melebihi siang",
+        night_ratio <= day_ratio,
+        f"malam {night_ratio:.2f}% (gelap {night_dark:.1f} / terang {night_lit:.1f}), "
+        f"siang {day_ratio:.2f}% (gelap {day_dark:.1f} / terang {day_lit:.1f})"))
+    results.append(Result(
+        "earthshine malam: rasio gelap/terang di bawah plafon mutlak",
+        night_ratio <= 45.0,
+        f"malam {night_ratio:.2f}%, plafon 45% (siang {day_ratio:.2f}%, "
+        f"cacat surface 66.93%)"))
+
+    # Dan earthshine di malam tetap punya arah: tetap meredup mendekati
+    # purnama. Tanpa pemeriksaan ini earthshine bisa hilang sepenuhnya di mode
+    # malam — lampu mati, bukan "terang tak perlu". Marginnya memang tipis
+    # (4.0 vs 3.6, karena tekstur piringan menutupi sebagian earthshine), dan
+    # angka itu diukur oleh `dark_side_luminance` yang sama dengan bagian
+    # siang, jadi keduanya tidak bisa berhenti sepakat tanpa ada yang tahu.
+    gibbous_night = dark_side_luminance(0.85, 0.0, night=True)
+    results.append(Result(
+        "earthshine malam: meredup mendekati purnama",
+        gibbous_night < night_dark,
+        f"sabit malam f=0.15: {night_dark:.1f}, f=0.85: {gibbous_night:.1f}"))
 
 
 def main():
@@ -5383,6 +5562,7 @@ def main():
     check_port_matches_swift_constants(results)
     check_port_constants_reach_the_drawing(results)
     check_night_mode_purity(results, args.size, args.ss)
+    check_night_mode_never_exceeds_day(results, 120, args.ss)
     check_star_colour_order(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)

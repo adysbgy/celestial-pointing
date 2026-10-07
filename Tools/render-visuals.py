@@ -1300,7 +1300,17 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     if f is not None and f < 1.0:
         strength = 1.0 - f
         es = ACCENTS["moonEarthshine"]
-        es_rgb = night_surface(es) if night_mode else es
+        # Aturan `shadow`, sama seperti piringan gelap `moonUnlit` di atas:
+        # earthshine memantulkan cahaya yang **tidak memancar sendiri**, jadi
+        # ia mengikuti aturan bayangan, bukan aturan permukaan. Versi lama
+        # memakai `night_surface`, yang menaikkan kanal merah ke 0.4475 —
+        # enam kali `night_shadow` yang 0.075. Cacatnya tidak terlihat di
+        # layar siang (jalur itu dikunci `if night_mode`), dan tidak terlihat
+        # di gerbang mana pun: `check_earthshine` merender dengan
+        # `night_mode=False`, sementara `check_night_mode_purity` hanya menyapu
+        # hijau/biru — sedangkan 0.4475 di kanal merah adalah merah murni,
+        # murni.
+        es_rgb = night_shadow(es) if night_mode else es
         earth = lambda x, y, c=es_rgb, s=strength: (c, s)
         canvas.disc(cx, cy, radius, earth)
     points, to_screen = _lit_band_polygon(cx, cy, radius, phase,
