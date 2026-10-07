@@ -879,23 +879,6 @@ def _stroke_width_factors(source, radius_name, patterns):
     return found or None
 
 
-def spike_width(source):
-    """Tebal spike bintang: `coreRadius * 0.18` / `core_radius * 0.18`.
-
-    Ejaan identifier ditentukan dari berkas mana pembacaan dilakukan, bukan
-    ditebak: kalau `core_radius` ada di sana, berkas itu Python.
-    """
-    return _stroke_width_factors(   # boleh None: jangkar hilang = merah, bukan exception
-        source, "core_radius" if "core_radius" in source else "coreRadius",
-        # Dua bentuk assignment, satu di setiap bahasa: Swift
-        # `lineWidth: max(0.5, coreRadius * 0.18)`, Python
-        # `width = max(0.5, core_radius * 0.18)`. Satu pola untuk keduanya
-        # lebih baik daripada menebak mana yang dipakai — tebakan yang
-        # salah membuat gerbang gagal membaca sumber yang benar.
-        [r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*"
-         r"(?<![\w.])(\d+\.\d+)"])
-
-
 def badge_stroke(source):
     """Tebal glif kandidat "?" — dua tempat stroking, dua satuan.
 
@@ -1174,35 +1157,42 @@ def check_port_matches_swift_constants(results):
          "(-0.30, -0.22, 0.20)", view),
         ("maria pertama Bulan", tuple(R.MARIA[0]), (-0.28, -0.30, 0.26),
          "(-0.28, -0.30, 0.26)", view),
-        ("opasitas spike bintang", R.SPIKE_OPACITY, 0.45,
-         "color.opacity(0.45)", view),
-        # **Dua faktor lebar garis yang hidup di dua bahasa tanpa pengikat.**
+        # Opasitas spike: **pangkal**-nya, karena ujungnya selalu nol. Ujung
+        # yang berhenti dengan opasitas sisa tampak terpotong, bukan memudar.
+        ("opasitas spike bintang: port == model", R.SPIKE_OPACITY, 0.45,
+         "spikeOpacity: Double = 0.45", model),
+        # **Baji, bukan batang.** Versi lama menggambar keempat spike sebagai
+        # satu `Path` yang di-stroke dengan `lineWidth` tetap: batang sama
+        # tebal dari pangkal ke ujung, berujung rata. Pada ukuran kartu jam
+        # (38 pt) bentuk itu terbaca sebagai penanda bidik, bukan cahaya.
         #
-        # Bentuknya sama persis dengan kawah sabit yang baru ditutup, tapi
-        # lebih sederhana: satu faktor, satu satuan (**piksel**), satu notasi.
-        # `0.18` (tebal spike bintang) ditulis `coreRadius * 0.18` di view dan
-        # `core_radius * 0.18` di port; `0.28` (tebal garis glif "?" kandidat)
-        # ditulis `badgeRadius * 0.28` di view dan `badge_radius * 0.28` di
-        # port. Tidak ada gerbang yang menyebut keduanya.
-        #
-        # Bukti audit mutasi, masing-masing dua arah (view dan port):
-        #
-        #     VIEW  0.28 -> 0.60   313 pemeriksaan, 0 gagal
-        #     VIEW  0.18 -> 0.55   313 pemeriksaan, 0 gagal
-        #
-        # Kenapa ia penting meski keduanya "cuma" lebar garis: `0.28` mengatur
-        # menebalkan **tanda ketidakpastian**. Glif "?" yang terlalu tipis
-        # hilang di layar jam, dan itu menghapus satu-satunya penanda visual
-        # bahwa engine sedang **ragu** — PRD v0.4: jangan pernah menampilkan
-        # visual yang mengklaim identitas saat engine ragu. Menipiskan glif
-        # sampai tak terlihat menghapus penanda itu secara senyap.
-        # Spike: satu situs per bahasa, jadi himpunan pun boleh sama persis.
-        ("tebal spike bintang: port == view",
-         _same_stroke_factors(spike_width(view), spike_width(port)),
-         True, "core_radius * 0.18", port, "render-visuals.py"),
-        ("tebal spike bintang: view menulisnya", view.count("coreRadius * 0.18") == 1,
-         True, "lineWidth: max(0.5, coreRadius * 0.18))", view,
-         "CelestialVisualView.swift"),
+        # Dua entri lama di sini (`tebal spike bintang: port == view` dan
+        # `...: view menulisnya`) **dihapus, bukan diperbarui**: keduanya
+        # menjaga sebuah angka lebar dengan mencari ejaan `coreRadius * 0.18`,
+        # dan bentuk yang dijaganya sudah tidak digambar lagi. Yang
+        # menggantikannya mengukur fakta yang menentukan — ujung spike harus
+        # lebih tipis daripada pangkalnya — karena satu angka lebar tidak bisa
+        # lagi menyatakan bentuk ini. Sisi Linux-nya dijaga
+        # `testStarSpikesTaperTowardsTheirTips`.
+        ("spike bintang: ujung lebih tipis dari pangkal (model)",
+         "spikeRootWidthFactor: Double = 0.18" in model
+         and "spikeTipWidthFactor: Double = 0.035" in model, True,
+         "spikeTipWidthFactor: Double = 0.035", model),
+        ("spike bintang: ujung lebih tipis dari pangkal (port)",
+         R.SPIKE_TIP_WIDTH_FACTOR < R.SPIKE_ROOT_WIDTH_FACTOR
+         and abs(R.SPIKE_ROOT_WIDTH_FACTOR - 0.18) < 1e-9
+         and abs(R.SPIKE_TIP_WIDTH_FACTOR - 0.035) < 1e-9, True,
+         "SPIKE_TIP_WIDTH_FACTOR = 0.035", port),
+        ("spike bintang: view mengisi baji, bukan men-stroke garis",
+         "context.fill(wedge, with: .linearGradient(" in view, True,
+         "context.fill(wedge, with: .linearGradient(", view),
+        # Glif "?" kandidat tetap satu faktor lebar garis. `0.28` mengatur
+        # menebalkan **tanda ketidakpastian**: glif yang terlalu tipis hilang
+        # di layar jam, dan itu menghapus satu-satunya penanda visual bahwa
+        # engine sedang **ragu** — PRD v0.4: jangan pernah menampilkan visual
+        # yang mengklaim identitas saat engine ragu. Menipiskan glif sampai
+        # tak terlihat menghapus penanda itu secara senyap.
+        # Bukti audit mutasi: VIEW 0.28 -> 0.60 → 313 pemeriksaan, 0 gagal.
         # Badge: **himpunan**, bukan satu angka — dan bukan himpunan yang
         # harus sama, karena jumlah situsnya memang berbeda (port punya dua:
         # geometri bersatuan radius frame dan penggambar bersatuan piksel;

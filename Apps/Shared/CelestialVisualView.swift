@@ -937,14 +937,52 @@ struct CelestialVisualView: View {
         }
         // Empat diffraction spike tipis — ciri mata telanjang, sekaligus
         // membuat bintang terasa besar tanpa memperbesar disk intinya.
+        //
+        // **Bukan satu `Path` yang di-stroke.** Versi lama menggambar keempat
+        // spike sebagai garis dengan `lineWidth` tetap dan opasitas rata:
+        // batang sama tebal dari pangkal ke ujung, berujung rata. Pada ukuran
+        // kartu jam ia terbaca sebagai **penanda bidik**, bukan cahaya —
+        // batang seragam tidak pernah terjadi pada cahaya yang terdifraksi.
+        //
+        // Sekarang tiap spike adalah baji yang **menyempit** (pangkal
+        // `spikeRootWidthFactor` → ujung `spikeTipWidthFactor`) dan
+        // **memudar** ke nol di ujungnya, diisi gradien linier yang arahnya
+        // keluar. Kedua nisbahnya tinggal di model (`VisualFrame.star`), jadi
+        // uji Linux bisa menegakkan bahwa ujungnya memang lebih tipis
+        // daripada pangkalnya — sifat yang tidak bisa dibaca dari closure
+        // `Canvas`, dan karena itu sebelumnya tidak ada yang menjaganya.
         let spikeLength = coreRadius * CGFloat(geometry.spikeScale) * pulseFactor
-        var spikes = Path()
-        spikes.move(to: CGPoint(x: center.x - spikeLength, y: center.y))
-        spikes.addLine(to: CGPoint(x: center.x + spikeLength, y: center.y))
-        spikes.move(to: CGPoint(x: center.x, y: center.y - spikeLength))
-        spikes.addLine(to: CGPoint(x: center.x, y: center.y + spikeLength))
-        context.stroke(spikes, with: .color(color.opacity(0.45)),
-                       lineWidth: max(0.5, coreRadius * 0.18))
+        // **Setengah** lebar: `spikeRootWidthFactor` adalah lebar **penuh**
+        // (angka yang sama dengan `lineWidth` lama), jadi jangan dipakai
+        // mentah sebagai setengah lebar — itu membuat spike dua kali lebih
+        // berat daripada sebelumnya, dan perubahannya jadi mengubah tebal
+        // sekaligus bentuk. Yang diubah di sini hanya bentuknya.
+        let rootHalf = coreRadius * CGFloat(geometry.spikeRootWidthFactor) * 0.5 * pulseFactor
+        let tipHalf = coreRadius * CGFloat(geometry.spikeTipWidthFactor) * 0.5 * pulseFactor
+        for (dx, dy) in [(CGFloat(1), CGFloat(0)), (CGFloat(-1), CGFloat(0)),
+                         (CGFloat(0), CGFloat(1)), (CGFloat(0), CGFloat(-1))] {
+            let tip = CGPoint(x: center.x + dx * spikeLength,
+                              y: center.y + dy * spikeLength)
+            // Setengah lebar digeser tegak lurus arah spike.
+            let px = -dy
+            let py = dx
+            var wedge = Path()
+            wedge.move(to: CGPoint(x: center.x + px * rootHalf,
+                                   y: center.y + py * rootHalf))
+            wedge.addLine(to: CGPoint(x: tip.x + px * tipHalf,
+                                      y: tip.y + py * tipHalf))
+            wedge.addLine(to: CGPoint(x: tip.x - px * tipHalf,
+                                      y: tip.y - py * tipHalf))
+            wedge.addLine(to: CGPoint(x: center.x - px * rootHalf,
+                                      y: center.y - py * rootHalf))
+            wedge.closeSubpath()
+            context.fill(wedge, with: .linearGradient(
+                Gradient(stops: [
+                    .init(color: color.opacity(geometry.spikeOpacity), location: 0),
+                    .init(color: color.opacity(0), location: 1)
+                ]),
+                startPoint: center, endPoint: tip))
+        }
     }
 
     /// Opasitas tiap lapis glow, dari terluar ke terdalam.

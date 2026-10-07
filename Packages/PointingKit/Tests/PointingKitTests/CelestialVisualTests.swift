@@ -1785,6 +1785,38 @@ final class CelestialVisualTests: XCTestCase {
                              "inti bintang paling redup tidak boleh menghilang")
     }
 
+    func testStarSpikesTaperTowardsTheirTips() {
+        // **Bentuk, bukan angka.** Versi lama menggambar keempat spike sebagai
+        // satu `Path` yang di-stroke dengan lebar tetap: batang sama tebal dari
+        // pangkal ke ujung, berujung rata. Diukur pada render 38 pt (ukuran
+        // kartu jam, lihat `WatchMetrics.visualDiameter`), bentuk itu terbaca
+        // sebagai **penanda bidik**, bukan cahaya.
+        //
+        // Yang membuat cacat ini bertahan lama: **tidak ada satu angka pun
+        // yang salah.** `coreRadius * 0.18` benar untuk apa yang diklaimnya,
+        // jadi setiap uji yang memeriksa nilai tetap hijau sementara gambar di
+        // layar salah. Yang tidak bisa ditangkap oleh satu angka adalah
+        // **hubungan** antar dua lebar, dan itulah yang diuji di sini.
+        //
+        // Diuji di seluruh rentang ukuran, bukan pada satu titik: inti bintang
+        // mengecil mengikuti magnitudo, jadi nisbah yang benar di bintang
+        // terang bisa hilang di bintang redup kalau salah satu sisi dipatok ke
+        // nilai minimum tetap.
+        for step in 0...20 {
+            let relativeSize = Double(step) / 20.0
+            let geometry = VisualFrame.star(relativeSize: relativeSize)
+            XCTAssertLessThan(
+                geometry.spikeTipWidth, geometry.spikeRootWidth,
+                "ujung spike harus lebih tipis dari pangkalnya (r=\(relativeSize))")
+            XCTAssertLessThan(
+                geometry.spikeTipWidthFactor, geometry.spikeRootWidthFactor * 0.5,
+                "penyempitan harus terbaca, bukan selisih pembulatan (r=\(relativeSize))")
+            XCTAssertGreaterThan(
+                geometry.spikeTipWidth, 0,
+                "ujung spike tidak boleh menyempit sampai hilang (r=\(relativeSize))")
+        }
+    }
+
     // MARK: - Penanda kandidat: penanda keraguan tidak boleh ikut terpotong
 
     /// Geometri lencana versi lama: radius `0.22 · lebar`, pusat di

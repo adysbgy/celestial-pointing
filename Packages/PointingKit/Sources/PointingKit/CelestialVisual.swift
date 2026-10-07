@@ -1108,14 +1108,52 @@ public enum VisualFrame {
         /// Amplitudo denyut: ujung terluar mengembang `1 + amplitude` kali.
         public var pulseAmplitude: Double
 
+        /// Tebal diffraction spike di **pangkal** (dekat inti), dari radius inti.
+        public var spikeRootWidthFactor: Double
+        /// Tebal diffraction spike di **ujung luar**, dari radius inti.
+        ///
+        /// **Kenapa spike harus menyempit, dan kenapa angkanya tinggal di
+        /// model.** Versi sebelumnya menggambar keempat spike sebagai satu
+        /// `Path` yang di-stroke dengan `lineWidth` tetap. Hasilnya bukan
+        /// cahaya melainkan **garis silang**: batang sama tebal dari pangkal
+        /// ke ujung, berujung rata, dan opasitasnya rata di sepanjang batang.
+        /// Pada ukuran kartu jam (38 pt) ia terbaca sebagai penanda bidik.
+        ///
+        /// Cahaya yang terdifraksi menyempit dan memudar ke luar. Yang
+        /// menentukan seberapa tajam penyempitannya adalah **nisbah** antara
+        /// lebar pangkal dan lebar ujung — jadi nisbah itulah yang harus bisa
+        /// diuji, dan karena itu ia hidup di sini, bukan sebagai dua angka
+        /// lepas di dalam closure `Canvas` yang tidak bisa dibaca uji Linux
+        /// maupun gerbang gambar.
+        public var spikeTipWidthFactor: Double
+        /// Opasitas spike di pangkal. Ujung luarnya selalu `0`: spike yang
+        /// berhenti dengan opasitas sisa tampak terpotong, bukan memudar.
+        public var spikeOpacity: Double
+
         public init(coreRadius: Double,
                     glowScales: [Double],
                     spikeScale: Double,
-                    pulseAmplitude: Double) {
+                    pulseAmplitude: Double,
+                    spikeRootWidthFactor: Double = 0.18,
+                    spikeTipWidthFactor: Double = 0.035,
+                    spikeOpacity: Double = 0.45) {
             self.coreRadius = coreRadius
             self.glowScales = glowScales
             self.spikeScale = spikeScale
             self.pulseAmplitude = pulseAmplitude
+            self.spikeRootWidthFactor = spikeRootWidthFactor
+            self.spikeTipWidthFactor = spikeTipWidthFactor
+            self.spikeOpacity = spikeOpacity
+        }
+
+        /// Tebal pangkal spike dalam radius frame.
+        public var spikeRootWidth: Double {
+            coreRadius * spikeRootWidthFactor
+        }
+
+        /// Tebal ujung spike dalam radius frame.
+        public var spikeTipWidth: Double {
+            coreRadius * spikeTipWidthFactor
         }
 
         /// Pengali terbesar dari inti ke ujung terluar yang digambar.

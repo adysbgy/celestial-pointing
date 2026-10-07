@@ -668,6 +668,15 @@ MARIA = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
          (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]        # VIEW: `drawMoon`
 MOON_PATH_STEPS = 72                                     # VIEW: `drawMoon`
 SPIKE_OPACITY = 0.45                                     # VIEW: `drawStar`
+# Tebal diffraction spike: **pangkal dan ujung**, bukan satu lebar.
+#
+# Versi sebelumnya punya satu angka (`coreRadius * 0.18`) yang di-stroke
+# sebagai `lineWidth` tetap — batang sama tebal dari pangkal ke ujung, yang
+# pada ukuran kartu jam terbaca sebagai penanda bidik, bukan cahaya. Sekarang
+# tiap spike adalah baji yang menyempit ke ujung; yang dijaga karena itu
+# **nisbahnya** (`ujung < pangkal`), bukan satu angka.
+SPIKE_ROOT_WIDTH_FACTOR = 0.18    # MODEL: `StarGeometry.spikeRootWidthFactor`
+SPIKE_TIP_WIDTH_FACTOR = 0.035    # MODEL: `StarGeometry.spikeTipWidthFactor`
 # Pita cincin Saturnus. Batasnya **radius cincin nyata** dalam satuan radius
 # Saturnus, dipetakan ke frame oleh `saturn_ring_bands()`; opasitas mengikuti
 # kepadatan pita sebenarnya (D sangat tipis, B paling pekat, celah hampir
@@ -1474,10 +1483,23 @@ def _draw_star(canvas, cx, cy, radius, kw, night_mode):
                     radial_gradient([(color, opacity), (color, 0.0)],
                                     center=(cx, cy), start_radius=0, end_radius=r))
     spike = core_radius * geometry["spike_scale"] * pulse_factor
-    width = max(0.5, core_radius * 0.18)
-    line = solid(color, SPIKE_OPACITY)
-    canvas.stroke_line(cx - spike, cy, cx + spike, cy, width, line)
-    canvas.stroke_line(cx, cy - spike, cx, cy + spike, width, line)
+    # Lebar **penuh** dibagi dua: `SPIKE_ROOT_WIDTH_FACTOR` memakai angka yang
+    # sama dengan `lineWidth` lama, jadi ia lebar penuh — bukan setengah.
+    root_half = core_radius * SPIKE_ROOT_WIDTH_FACTOR * 0.5 * pulse_factor
+    tip_half = core_radius * SPIKE_TIP_WIDTH_FACTOR * 0.5 * pulse_factor
+    # VIEW: `drawStar` menggambar **baji** per spike (menyempit + memudar),
+    # bukan satu `Path` yang di-stroke. Dijaga sama supaya gerbang piksel di
+    # bawahnya mengukur bentuk yang benar-benar tampil di jam.
+    for dx, dy in ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)):
+        tip = (cx + dx * spike, cy + dy * spike)
+        px, py = -dy, dx
+        canvas.polygon([(cx + px * root_half, cy + py * root_half),
+                        (tip[0] + px * tip_half, tip[1] + py * tip_half),
+                        (tip[0] - px * tip_half, tip[1] - py * tip_half),
+                        (cx - px * root_half, cy - py * root_half)],
+                       radial_gradient([(color, SPIKE_OPACITY), (color, 0.0)],
+                                       center=(cx, cy), start_radius=0,
+                                       end_radius=spike))
 
 
 def sun_profile(core, photosphere):
