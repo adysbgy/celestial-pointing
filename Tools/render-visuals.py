@@ -636,7 +636,16 @@ SPHERE_LIGHT_OFFSET = (-0.32, -0.32)                     # MODEL: `sphereLightOf
 CRATER_RIM_STRENGTH = 0.55                               # MODEL: `craterRelief`
 CRATER_FLOOR_DEPTH = 0.22                                # MODEL: `craterRelief`
 # VIEW: `drawCraters` — opasitas lapisan kawah, urut sesuai penggambarannya.
-CRATER_FLOOR_OPACITY = 0.85                              # VIEW: `drawCraters`
+#
+# **Kenapa tidak ada `CRATER_FLOOR_OPACITY` di sini.** Dulu ada, bernilai 0.85,
+# dan dipakai sebagai kelegapan cakram dasar kawah — padahal model sudah
+# menghitung `floor_depth` per kawah dan mendokumentasikan dirinya sendiri
+# sebagai "dipakai sebagai kelegapan lapisan hitam". Konstanta itu menutupi
+# nilai model (0.85 adalah 3,9× kedalaman maksimum 0.22), sehingga sabit bibir
+# yang membuat kawah terbaca **cekung** tenggelam di bawahnya: kawahnya
+# tergambar sebagai cakram gelap rata, bukan cekungan. Sekarang kelegapan
+# dasar diambil langsung dari `floor_depth`, dan tidak ada konstanta tetap
+# yang bisa menyimpang dari model lagi.
 CRATER_RIM_OPACITY = 0.90                                # VIEW: `drawCraters`
 CRATER_INNER_FLOOR_OPACITY = 0.75                        # VIEW: `drawCraters`
 CRATER_RIM_OFFSET = 0.45                                 # VIEW: `drawCraters`
@@ -1136,8 +1145,6 @@ def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
     # `accent_fn` (bukan `color_fn` + `solid`): keduanya sudah mengembalikan
     # fungsi `(x, y) -> (rgb, alpha)`, dan yang menentukan terangnya adalah
     # aturan **permukaan** — sama dengan `Self.accent(...)` di view.
-    floor = accent_fn(ACCENTS["craterFloor"], night_mode, CRATER_FLOOR_OPACITY)
-
     def clipped(fn):
         # `color_at` selalu dipanggil sebagai fungsi `(x, y) -> (rgb, alpha)`;
         # jadi pembungkusnya meneruskan panggilan itu, bukan mengembalikan
@@ -1149,8 +1156,15 @@ def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
     for dx, dy, size, rim_x, rim_y, rim_strength, floor_depth in crater_relief(CRATERS):
         mx, my = cx + dx * radius, cy + dy * radius
         mr = size * radius
-        # 1. Seluruh cakram dinaungi (dasar cekungan).
-        canvas.disc(mx, my, mr, clipped(floor))
+        # 1. Seluruh cakram dinaungi (dasar cekungan). Kelegapannya **bukan**
+        #    angka tetap: `floor_depth` dari model adalah kedalaman cekungan
+        #    ini, dan model mendokumentasikan dirinya sendiri sebagai "dipakai
+        #    sebagai kelegapan lapisan hitam" (`CraterRelief.floorDepth`).
+        #    Selama baris ini menulis konstanta tetap, nilai model itu
+        #    dihitung lalu dibuang — dan kawahnya tergambar sebagai cakram
+        #    gelap rata, bukan cekungan.
+        canvas.disc(mx, my, mr,
+                    clipped(accent_fn(ACCENTS["craterFloor"], night_mode, floor_depth)))
         # 2. Bibir yang menghadap cahaya: cakram yang digeser ke arah sumber
         #    cahaya, dipotong oleh cakram kawah — yang tersisa hanya sabit.
         #    `offset` dibuat cukup besar (≈0.45·mr) supaya sabitnya terlihat

@@ -1,4 +1,148 @@
-## Progres terakhir (6 Okt 2026 — kunci katalog yang tidak pernah sampai ke layar)
+## Progres terakhir (6 Okt 2026 — dasar cekungan kawah dijaga, lalu angkanya sendiri ditertibkan)
+
+### Temuan: `floorDepth` dihitung, didestrukturisasi, lalu dibuang
+
+`CelestialVisual.craterRelief` menghitung `floorDepth` untuk tiap kawah dan
+mendokumentasikan field itu di tipe `CraterRelief` sebagai *"dipakai sebagai
+kelegapan lapisan hitam"*. Kedua penggambar — `drawCraters` di view Swift dan
+`_draw_craters` di port Python — **mendestrukturisasi field itu lalu
+membuangnya**: keduanya menulis angka tetap `0.85`.
+
+Angka itu bukan sekadar tidak terpakai. Kedalaman maksimum model adalah 0,22,
+jadi `0.85` adalah **3,9× lipatnya**. Sabit bibir yang menghadap cahaya
+digambar dengan kelegapan `0,9 · rimStrength` (≈0,3–0,5) **di atas** dasar
+yang kelegapannya 0,85: dasar itu praktis menutupi seluruh piringan. Hasilnya,
+**setiap** bagian setiap kawah lebih gelap daripada permukaan sekitarnya:
+
+    dinding sisi cahaya   − permukaan   −46,6 … −21,7
+    dinding sisi bayangan − permukaan   −91,3 … −47,6
+
+Itu tanda tangan **stiker gelap yang ditempel**, bukan cekungan. Cekungan butuh
+dua dinding berlawanan tanda: satu lebih terang dari permukaan, satu lebih
+gelap. Setelah dasar memakai `floorDepth` dari model:
+
+    dinding sisi cahaya   − permukaan    +0,8 … +9,6
+    dinding sisi bayangan − permukaan   −35,6 … −14,2
+
+### Kenapa gerbang yang sudah ada justru **mengunci** cacatnya
+
+`check_port_matches_swift_constants` punya entri `("opasitas dasar kawah",
+R.CRATER_FLOOR_OPACITY, 0.85, "floor.opacity(0.85)", view)`. Ia membandingkan
+`0.85` di port dengan `0.85` di view — dua bahasa yang **sepakat pada angka
+yang sama-sama salah**. Gerbang hijau, gambar cacat, dan tidak ada satu pun
+dari 348 pemeriksaan yang bisa melihatnya. Ini kelas yang berulang di repo
+ini, dengan bentuk paling keras: bukan gerbang yang tidak ada, melainkan
+gerbang yang **menjaga** nilainya.
+
+Karena itu yang diperiksa sekarang bukan keberadaan konstanta, melainkan (1)
+bahwa kelegapan itu **dibaca dari model** di kedua bahasa, dan (2) bahwa
+**pikselnya benar-benar cekung** — dua dinding berlawanan tanda. Yang pertama
+menangkap penyimpangan teks; yang kedua menangkap bentuk gambar apa pun
+sebabnya, termasuk sebab yang belum terpikirkan.
+
+### Cacat kedua, di dalam gerbang baru itu sendiri: angka yang tidak pernah diukur
+
+Versi pertama docstring gerbang baru mengutip empat rentang kontras sebagai
+bukti. **Tidak satu pun keluar dari penyampel yang dipakai gerbang di
+bawahnya** — dan saya ukur ulang di 76/100/152/200/240/300/400/500 px untuk
+memastikan:
+
+| | dikutip | terukur |
+|---|---|---|
+| sebelum, sisi cahaya | −45,2 … **−5,1** | −46,6 … −21,7 |
+| sebelum, sisi bayangan | −93,1 … −49,7 | −91,3 … −47,6 |
+| sesudah, sisi cahaya | **+3,4** … +10,3 | +0,8 … +9,6 |
+| sesudah, sisi bayangan | −81,5 … −20,9 | −35,6 … −14,2 |
+
+Yang paling menyesatkan adalah `−5,1`: ia menyatakan hampir tidak ada dinding
+terang yang hilang, padahal **seluruh lima kawah** menjadi lebih gelap dari
+permukaannya (−21,7). Argumen yang menjadi alasan gerbang itu ada jadi
+terdengar lemah oleh angkanya sendiri.
+
+Ini persis kelas "gerbang mengutip angka yang tidak pernah ia ukur" yang sudah
+tercatat di repo ini — `"elips 20% R"` yang ternyata milik **luas**, sementara
+metriknya mengukur jarak tepi. Bahayanya bukan angka salah di komentar:
+komentar itu **satu-satunya bukti** yang dibaca orang yang menilai apakah
+gerbangnya layak dipercaya.
+
+Perbaikannya bukan sekadar menulis ulang angkanya — itu akan kembali menyimpang
+begitu geometrinya disunting. `check_crater_contrast_numbers_come_from_the_sampler`
+membaca keempat rentang dari docstring dan **menuntutnya sama dengan hasil
+ukur**. Keadaan "sebelum" tidak dikutip dari riwayat git: `crater_relief`
+dibungkus sementara supaya `floor_depth` dipaksa `0.85`, lalu scene yang sama
+digambar ulang lewat jalur produksi — jadi kedua keadaan diukur oleh **satu**
+penyampel yang sama (`crater_wall_contrast`, dipakai kedua gerbang; kalau yang
+kedua menyampel sendiri, ia hanya membuktikan komentarnya cocok dengan alat
+ukur yang berbeda).
+
+### Bukti mutasi — 11 keadaan, semuanya menggigit
+
+Gerbang opasitas dasar (5 keadaan):
+
+```
+[baseline]                                5 pemeriksaan, 0 gagal
+view: dasar kembali ke 0.85 tetap          5 pemeriksaan, 1 gagal
+view: dasar memakai 0.0                    5 pemeriksaan, 1 gagal
+port: dasar kembali ke 0.85 tetap          5 pemeriksaan, 2 gagal   (struktur + piksel)
+port: konstanta mati dihidupkan lagi       5 pemeriksaan, 1 gagal
+[dipulihkan]                               5 pemeriksaan, 0 gagal
+```
+
+Gerbang angka docstring (6 keadaan):
+
+```
+[baseline]                                    4 pemeriksaan, 0 gagal
+angka lama di sisi cahaya                     1 gagal  (−45,2 vs −46,6)
+angka lama di sisi bayangan                   1 gagal  (−93,1 vs −91,3)
+angka lama di keadaan sesudah                 1 gagal  (+3,4 vs +0,8)
+sisi cahaya<->bayangan tertukar               1 gagal  (angka sama, sisi salah)
+satu kutipan dihapus                          1 gagal  ("3 kutipan … butuh 4")
+dibulatkan 0,5 px lebih longgar (+9,6 → +9,1) 1 gagal
+[dipulihkan]                                  4 pemeriksaan, 0 gagal
+```
+
+Baris "sisi tertukar" itu yang menentukan: angkanya **identik**, jadi
+pemeriksaan yang hanya membandingkan nilai akan hijau — yang berbunyi adalah
+pemeriksaan namanya. Baris "dibulatkan" menunjukkan toleransinya 0,05, cukup
+ketat untuk menangkap angka yang "hampir benar".
+
+Dua bug di gerbang baru ditemukan dengan menjalankannya, bukan dengan membaca:
+(1) `q_side` dari regex hanya menangkap kata terakhir sementara `expected`
+memegang frasa penuhnya, jadi keempat pemeriksaan merah pada kode yang benar
+(`"sisi tertukar: cahaya"` untuk sisi cahaya) — bug yang sudah dua kali
+tercatat di repo ini; (2) `R.crater_relief = forced` ditandai type-checker,
+diganti `setattr`.
+
+### Yang **tidak** diklaim
+
+  - Gerbang baru menjaga **komentar cocok dengan pengukuran**, bukan bahwa
+    komentarnya bagus. Angka jelek tapi benar tetap lolos — dan memang harus,
+    karena memperbaikinya berarti mengubah geometri kawah, bukan prosa.
+  - Rentang "sesudah" sisi cahaya **+0,8** masih tipis: pada 76 px dinding
+    terang satu kawah hanya 0,8 luminansi di atas permukaannya. Itu angka
+    sebenarnya, dan ia batas yang belum ditutup — memperbaikinya berarti
+    menaikkan `CRATER_RIM_OPACITY` atau menggeser `CRATER_RIM_OFFSET`, dan
+    keduanya mengubah penampilan kawah di jam. Belum dilakukan.
+  - `CRATER_RIM_OPACITY` (0.90) dan `CRATER_INNER_FLOOR_OPACITY` (0.75) masih
+    angka tetap di kedua bahasa yang tidak dibaca dari model — sama kelasnya,
+    tapi keduanya **tidak** menyatakan identitas atau geometri, jadi gerbang
+    piksel di atas yang menjaganya, bukan gerbang nilai.
+  - Tidak ada satu piksel pun di **view Swift** yang berubah pada siklus ini
+    selain `floor.opacity(crater.floorDepth)`; sisanya gerbang.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 662 | **662** |
+| Pemeriksaan visual | 348 | **358** |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 662), `swift-typecheck.sh`,
+`swift-ui-lint.sh` (29 aturan), `check-visuals.py --check` (358 pemeriksaan).
+
+## Progres sebelumnya (6 Okt 2026 — kunci katalog yang tidak pernah sampai ke layar)
 
 ### Temuan: 23 terjemahan yang sudah ditulis, dan tidak satu pun pernah tampil
 

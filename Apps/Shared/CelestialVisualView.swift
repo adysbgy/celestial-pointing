@@ -583,8 +583,16 @@ struct CelestialVisualView: View {
             let disc = Path(ellipseIn: CGRect(x: cx - size, y: cy - size,
                                               width: size * 2, height: size * 2))
 
-            // 1. Seluruh cekungan dalam keadaan dinaungi.
-            context.fill(disc, with: .color(floor.opacity(0.85)))
+            // 1. Seluruh cekungan dalam keadaan dinaungi. Kelegapannya
+            //    **bukan** angka tetap di sini: `floorDepth` dari model
+            //    adalah kedalaman cekungan ini, dan model mendokumentasikan
+            //    dirinya sendiri sebagai "dipakai sebagai kelegapan lapisan
+            //    hitam". Selama view menulis 0.85 tetap, nilai model itu
+            //    dihitung lalu dibuang — dan kawahnya tergambar sebagai
+            //    cakram gelap rata, bukan cekungan. Angka 0.85 juga 3,9×
+            //    kedalaman maksimum model (0.22), jadi ia menenggelamkan
+            //    sabit bibir yang justru membuat kawah terbaca cekung.
+            context.fill(disc, with: .color(floor.opacity(crater.floorDepth)))
 
             // 2. Bibir yang menghadap cahaya: cakram yang digeser ke arah
             //    sumber cahaya, dipotong oleh cakram kawah. Sisanya sabit.

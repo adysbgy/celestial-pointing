@@ -1026,8 +1026,18 @@ def check_port_matches_swift_constants(results):
         # "nilai port yang tidak dihitung" akan menjaga larik mati sebagai
         # seolah-olah ia dihitung. Lihat `check_crater_drawing_constants` —
         # pemeriksaan yang menghapus konstanta mati itu.
-        ("opasitas dasar kawah", R.CRATER_FLOOR_OPACITY, 0.85,
-         "floor.opacity(0.85)", view),
+        #
+        # **Opasitas dasar kawah: entri ini dulu berbunyi `0.85` di kedua
+        # sisi**, dan justru itu cacatnya. Ia menjaga sebuah konstanta tetap
+        # (`CRATER_FLOOR_OPACITY = 0.85`) yang **menutupi** nilai model: view
+        # dan port sama-sama menulis 0.85, sementara `craterRelief` sudah
+        # menghitung `floorDepth` per kawah (maksimum 0.22) dan
+        # mendokumentasikannya sebagai "kelegapan lapisan hitam". Karena kedua
+        # bahasa sepakat pada angka yang salah, gerbang ini hijau sambil
+        # mengunci gambar yang cacat — kawah tergambar sebagai cakram gelap
+        # rata, bukan cekungan. Sekarang yang dijaga adalah **pemakaian** nilai
+        # model itu, bukan keberadaan konstanta tetap. Lihat
+        # `check_crater_floor_opacity_comes_from_the_model`.
         ("opasitas bibir kawah", R.CRATER_RIM_OPACITY, 0.90,
          "rim.opacity(0.9 * CGFloat(crater.rimStrength))", view),
         ("opasitas dasar dalam kawah", R.CRATER_INNER_FLOOR_OPACITY, 0.75,
@@ -3588,6 +3598,262 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
         f"{diff_unknown} piksel berbeda dari bintang tak dikenal (inti saja)"))
 
 
+def check_crater_floor_opacity_comes_from_the_model(results, size=76, ss=6):
+    """Kelegapan dasar kawah harus **nilai model**, bukan angka tetap.
+
+    **Cacat yang ditutup pemeriksaan ini.** `CelestialVisual.craterRelief`
+    menghitung `floorDepth` untuk tiap kawah dan mendokumentasikan field itu
+    sebagai *"dipakai sebagai kelegapan lapisan hitam"*. Kedua penggambar —
+    `drawCraters` di view Swift dan `_draw_craters` di port Python —
+    **mendestrukturisasi `floorDepth` lalu membuangnya**: keduanya menulis
+    angka tetap `0.85`.
+
+    Angka itu bukan sekadar tidak terpakai, ia **menenggelamkan** tanda yang
+    membuat kawah terbaca cekung. Kedalaman maksimum model adalah 0.22, jadi
+    0.85 adalah 3,9× lipatnya. Sabit bibir yang menghadap cahaya digambar
+    dengan kelegapan 0.9·rimStrength (≈0.3–0.5) **di atas** dasar yang
+    kelegapannya 0.85: dasar itu praktis menutupi seluruh piringan, dan sabit
+    terangnya tinggal samar. Hasilnya — **setiap** bagian setiap kawah lebih
+    gelap daripada permukaan sekitarnya:
+
+        dinding sisi cahaya − permukaan   −46,6 … −21,7
+        dinding sisi bayangan − permukaan −91,3 … −47,6
+
+    Itu tanda tangan **stiker gelap yang ditempel**, bukan cekungan. Cekungan
+    butuh dua dinding yang berlawanan tanda: satu lebih terang dari permukaan,
+    satu lebih gelap. Setelah dasar memakai `floorDepth`:
+
+        dinding sisi cahaya − permukaan    +0,8 … +9,6
+        dinding sisi bayangan − permukaan −35,6 … −14,2
+
+    **Angka di atas diukur, bukan diperkirakan** — dengan penyampel yang sama
+    persis yang dipakai pemeriksaan di bawah (`_sample`, `size=76`, `ss=6`),
+    pada keadaan sumber sebelum dan sesudah perbaikan. Versi pertama komentar
+    ini menulis −45,2 … −5,1 / −93,1 … −49,7, dan **tidak satu pun angka itu
+    pernah keluar dari penyampel ini**: rentangnya tidak muncul di ukuran
+    mana pun (diukur 76/100/152/200/240/300/400/500 px). Itu kelas cacat yang
+    sudah berulang di repo ini — gerbang mengutip angka yang tidak pernah ia
+    ukur, persis seperti "elips 20% R" yang ternyata milik luas, bukan jarak
+    tepi. Karena itu angka di sini ditulis apa adanya dari hasil ukur, dan
+    batas atas dinding sisi cahaya (−21,7) sengaja dibiarkan **tidak** enak
+    dilihat: itu angka sebenarnya, dan memperbaikinya berarti mengubah
+    geometri kawah, bukan komentarnya.
+
+    **Kenapa dua sisi diperiksa.** Gerbang ini dulu tidak ada, dan yang ada
+    (`check_port_matches_swift_constants`) justru **mengunci cacatnya**: ia
+    membandingkan `R.CRATER_FLOOR_OPACITY` dengan `0.85` **dan** mencari
+    string `floor.opacity(0.85)` di view. Dua bahasa yang sepakat pada angka
+    yang sama-sama salah adalah gerbang yang hijau sambil menjaga gambar yang
+    tidak pernah benar. Karena itu di sini yang diperiksa bukan keberadaan
+    konstanta, melainkan (1) bahwa kelegapan itu **dibaca dari model** di
+    kedua bahasa, dan (2) bahwa **pikselnya benar-benar cekung**. Yang pertama
+    menangkap penyimpangan teks, yang kedua menangkap bentuk gambar apa pun
+    sebabnya — termasuk sebab yang belum terpikirkan.
+
+    Diukur di 76 px, bukan 200 px: inilah ukuran piringan di kartu jam, dan
+    inilah satu-satunya ukuran yang penting bagi pengguna. Di 200 px cacat
+    yang sama terlihat jauh lebih ringan.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+
+    # (1) Struktur: kedua penggambar harus menyebut `floorDepth` di tempat
+    #     kelegapan dasar ditentukan. Dibandingkan sebagai teks karena
+    #     inilah yang membedakan "memakai nilai model" dari "kebetulan
+    #     angkanya sama".
+    results.append(Result(
+        "kawah: view memakai floorDepth dari model untuk dasar cekungan",
+        "floor.opacity(crater.floorDepth)" in view,
+        "mencari 'floor.opacity(crater.floorDepth)' di CelestialVisualView.swift"))
+    results.append(Result(
+        "kawah: port memakai floor_depth dari model untuk dasar cekungan",
+        'night_mode, floor_depth))' in port,
+        "mencari 'night_mode, floor_depth))' di render-visuals.py"))
+    # Dan konstanta tetap itu harus **hilang** sebagai nilai, bukan sekadar
+    # tidak dipakai: nilai mati yang masih ada akan dipakai lagi oleh orang
+    # berikutnya. Yang dicari adalah **penetapan** nilainya (`NAME = ...`),
+    # bukan penyebutan namanya — nama itu memang masih disebut di komentar
+    # yang menjelaskan kenapa ia dihapus, dan gerbang yang merah karena
+    # dokumentasinya sendiri adalah gerbang yang akan dihapus orang.
+    floor_constant = re.search(r"^\s*CRATER_FLOOR_OPACITY\s*=", port, re.M)
+    results.append(Result(
+        "kawah: tidak ada lagi konstanta opasitas dasar tetap di port",
+        floor_constant is None,
+        "mencari penetapan 'CRATER_FLOOR_OPACITY =' di render-visuals.py "
+        "(harus tidak ada)"))
+
+    # (2) Gambar: ukur tanda kontras dinding kawah terhadap permukaannya.
+    lit_side, shadow_side, names = crater_wall_contrast(size, ss)
+
+    # Setiap kawah harus punya dinding yang lebih terang dari permukaan.
+    # Inilah yang hilang saat dasar cekungan ditutup opasitas 0.85.
+    dim = [names[i] for i, v in enumerate(lit_side) if v <= 0]
+    results.append(Result(
+        "kawah: dinding sisi cahaya lebih terang dari permukaan",
+        not dim,
+        f"selisih {min(lit_side):+.1f} … {max(lit_side):+.1f} luminansi "
+        f"pada {len(R.CRATERS)} kawah @{size}px"
+        + (f"; gelap di {dim}" if dim else "")))
+    # Dan setiap kawah harus punya dinding yang lebih gelap dari permukaan:
+    # tanpa sisi gelap, yang tergambar cembung (menonjol), bukan cekung.
+    bright = [names[i] for i, v in enumerate(shadow_side) if v >= 0]
+    results.append(Result(
+        "kawah: dinding sisi bayangan lebih gelap dari permukaan",
+        not bright,
+        f"selisih {min(shadow_side):+.1f} … {max(shadow_side):+.1f} luminansi "
+        f"pada {len(R.CRATERS)} kawah @{size}px"
+        + (f"; terang di {bright}" if bright else "")))
+
+
+def crater_wall_contrast(size=76, ss=6):
+    """Selisih luminansi dinding tiap kawah terhadap permukaan sekitarnya.
+
+    **Kenapa ini fungsi, bukan badan pemeriksaan.** Ia dipakai oleh
+    `check_crater_floor_opacity_comes_from_the_model` **dan** oleh
+    `check_crater_contrast_numbers_come_from_the_sampler`. Kalau yang kedua
+    menyampel dengan caranya sendiri, ia hanya membuktikan komentarnya cocok
+    dengan alat ukur yang **berbeda** dari yang dipakai yang pertama — persis
+    cacat yang ia ada untuk menutup. Satu penyampel, dua pembaca.
+
+    Mengembalikan `(lit_side, shadow_side, names)`: selisih luminansi
+    (piksel 0…255) dinding yang menghadap cahaya dan dinding yang
+    membelakanginya, satu angka per kawah.
+
+    Permukaan acuan diambil dari cincin di **luar** kawah (1,45–1,95×
+    jari-jarinya), supaya yang dibandingkan bukan kawah melawan dirinya
+    sendiri. Dinding menghadap cahaya ada di sisi **jauh** dari sumber cahaya,
+    karena bibirnya digeser ke arah cahaya dan yang tersisa di dalam adalah
+    dinding seberangnya.
+    """
+    _, (w, h, rows) = render_case("planet-mercury-confirmed", size=size, ss=ss)
+    radius = min(w, h) / 2.0
+    light_x, light_y = R.SPHERE_LIGHT_OFFSET
+    length = math.hypot(light_x, light_y)
+    ux, uy = light_x / length, light_y / length
+
+    def lum_at(x, y):
+        xi = max(0, min(w - 1, int(round(x))))
+        yi = max(0, min(h - 1, int(round(y))))
+        r, g, b = rows[yi][xi * 4:xi * 4 + 3]
+        return 0.299 * r + 0.587 * g + 0.114 * b
+
+    def sample(points):
+        return sum(lum_at(x, y) for x, y in points) / len(points)
+
+    lit_side, shadow_side, names = [], [], []
+    for dx, dy, crater_r in R.CRATERS:
+        cx, cy = w / 2.0 + dx * radius, h / 2.0 + dy * radius
+        rp = crater_r * radius
+        ring = [(cx + math.cos(a) * rp * f, cy + math.sin(a) * rp * f)
+                for a in [i * math.pi / 24 for i in range(48)]
+                for f in (1.45, 1.7, 1.95)]
+        surface = sample(ring)
+        lit_side.append(sample([(cx - ux * rp * t, cy - uy * rp * t)
+                                for t in (0.55, 0.7, 0.85)]) - surface)
+        shadow_side.append(sample([(cx + ux * rp * t, cy + uy * rp * t)
+                                   for t in (0.55, 0.7, 0.85)]) - surface)
+        names.append(f"({dx:+.2f},{dy:+.2f})")
+    return lit_side, shadow_side, names
+
+
+def check_crater_contrast_numbers_come_from_the_sampler(results):
+    """Angka di dokumentasi kawah harus **keluar dari penyampelnya sendiri**.
+
+    **Cacat yang ditutup pemeriksaan ini.** Versi pertama docstring
+    `check_crater_floor_opacity_comes_from_the_model` mengutip empat rentang
+    kontras sebagai bukti, dan **tidak satu pun** keluar dari penyampel yang
+    dipakai pemeriksaan di bawahnya:
+
+        dikutip   dinding sisi cahaya   −45,2 …  −5,1   →  +3,4 … +10,3
+        sebenarnya                     −46,6 … −21,7   →  +0,8 …  +9,6
+
+    Dua-duanya salah di **kedua** ujung, dan yang paling menyesatkan adalah
+    `−5,1`: ia menyatakan hampir tidak ada dinding terang yang hilang,
+    padahal seluruh lima kawah menjadi **lebih gelap** dari permukaannya
+    (−21,7). Argumen yang justru menjadi alasan pemeriksaan itu ada jadi
+    terdengar lemah oleh angkanya sendiri. Rentang itu juga tidak muncul di
+    ukuran mana pun (diukur 76/100/152/200/240/300/400/500 px).
+
+    Ini kelas yang sudah berulang di repo ini — gerbang mengutip angka yang
+    tidak pernah ia ukur, persis "elips 20% R" yang ternyata milik **luas**
+    sementara metriknya mengukur jarak tepi. Bahayanya bukan angka salah di
+    komentar: komentar itu **satu-satunya bukti** yang dibaca orang yang
+    menilai apakah pemeriksaan ini layak dipercaya.
+
+    **Kenapa "sebelum" tidak perlu dikutip dari riwayat git.** Keadaan
+    "sebelum" direproduksi dari **kode port itu sendiri**: `crater_relief`
+    dibungkus sementara supaya `floor_depth` tiap kawah dipaksa ke `0.85`,
+    lalu scene yang sama digambar ulang lewat jalur produksi. Jadi kedua
+    keadaan diukur oleh satu penyampel yang sama (`crater_wall_contrast`),
+    dan tidak ada angka yang datang dari luar pengukuran.
+
+    Batas yang jujur: pemeriksaan ini menjaga **komentar cocok dengan
+    pengukuran**, bukan bahwa komentarnya bagus. Angka yang jelek tapi benar
+    tetap lolos — dan memang harus lolos, karena memperbaikinya berarti
+    mengubah geometri kawah, bukan prosa.
+    """
+    doc = check_crater_floor_opacity_comes_from_the_model.__doc__ or ""
+    pattern = (r"dinding sisi (cahaya|bayangan)\s+[−-]\s*permukaan\s+"
+               r"([+−-]?[\d,]+)\s*…\s*([+−-]?[\d,]+)")
+    quoted = re.findall(pattern, doc)
+
+    def number(text):
+        return float(text.replace("−", "-").replace(",", "."))
+
+    # Empat kutipan = dua sisi × dua keadaan (sebelum & sesudah). Kurang dari
+    # itu berarti salah satu keadaan berhenti didokumentasikan, dan itu
+    # kehilangan bukti, bukan penyederhanaan.
+    if len(quoted) != 4:
+        results.append(Result(
+            "kawah: docstring mengutip empat rentang kontras (sebelum & sesudah)",
+            False,
+            f"{len(quoted)} kutipan terbaca dari docstring "
+            f"check_crater_floor_opacity_comes_from_the_model — butuh 4 "
+            f"(dinding cahaya & bayangan, untuk keadaan sebelum dan sesudah)"))
+
+    measured_after = crater_wall_contrast()
+    original = R.crater_relief
+
+    def forced(craters, *args, **kwargs):
+        # `floor_depth` adalah elemen terakhir tupel `crater_relief`. Memaksa
+        # ke 0.85 mereproduksi keadaan sebelum perbaikan **lewat jalur
+        # menggambar yang sama**, bukan lewat salinan angka.
+        return [t[:6] + (0.85,) for t in original(craters, *args, **kwargs)]
+
+    try:
+        setattr(R, "crater_relief", forced)
+        measured_before = crater_wall_contrast()
+    finally:
+        setattr(R, "crater_relief", original)
+
+    # Urutan kutipan di docstring: sebelum (cahaya, bayangan), lalu sesudah.
+    expected = [
+        ("sebelum", "dinding sisi cahaya", measured_before[0]),
+        ("sebelum", "dinding sisi bayangan", measured_before[1]),
+        ("sesudah", "dinding sisi cahaya", measured_after[0]),
+        ("sesudah", "dinding sisi bayangan", measured_after[1]),
+    ]
+    if len(quoted) != len(expected):
+        return
+    for (state, side, values), (q_side, low, high) in zip(expected, quoted):
+        want_low, want_high = min(values), max(values)
+        got_low, got_high = number(low), number(high)
+        # `q_side` hanya menangkap kata terakhir ("cahaya"/"bayangan"),
+        # sedangkan `side` adalah frasa penuhnya — dibandingkan sebagai kata
+        # terakhir, bukan sebagai string utuh, supaya tidak merah pada kode
+        # yang benar (bug yang sudah dua kali tercatat di repo ini).
+        side_word = side.split()[-1]
+        same = (abs(got_low - want_low) <= 0.05
+                and abs(got_high - want_high) <= 0.05
+                and q_side == side_word)
+        results.append(Result(
+            f"kawah: angka {state} (dinding {side_word}) sama dengan hasil ukur",
+            same,
+            f"docstring {got_low:+.1f} … {got_high:+.1f}, "
+            f"terukur {want_low:+.1f} … {want_high:+.1f} @76px"
+            + ("" if q_side == side_word else f" (sisi tertukar: {q_side})")))
+
+
 def check_mars_caps_touch_the_limb(results, size=400, ss=2):
     """Kutub Mars harus **menyentuh tepi bola**, bukan mengambang di dalamnya.
 
@@ -3831,6 +4097,8 @@ def main():
     check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
     check_crater_relief_matches_the_model(results)
+    check_crater_floor_opacity_comes_from_the_model(results)
+    check_crater_contrast_numbers_come_from_the_sampler(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
