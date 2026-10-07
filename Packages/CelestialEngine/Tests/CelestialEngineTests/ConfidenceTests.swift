@@ -123,6 +123,45 @@ final class ConfidenceTests: XCTestCase {
         XCTAssertEqual(policy.ambiguityDeg, 8)
     }
 
+    // MARK: - Cadangan vs terukur (dokumen §12)
+
+    /// **Aturan dokumen §12.** Kerucut keyakinan harus berasal dari distribusi
+    /// galat pointing yang empiris — "bukan ambang '5°' yang dikarang".
+    ///
+    /// Kebijakan bawaan adalah nilai cadangan, jadi harus **tidak** mengaku
+    /// terukur. Kalau ini merah, artinya engine sedang mempresentasikan
+    /// tebakan sebagai hasil pengukuran.
+    func testDefaultPolicyIsNotMeasured() {
+        XCTAssertFalse(ConfidencePolicy().isMeasured,
+                       "kebijakan bawaan adalah cadangan, bukan hasil ukur")
+    }
+
+    /// Sigma yang sama, dua asal yang berbeda: 10° hasil ukur dan 10° cadangan
+    /// harus bisa dibedakan. Nilainya kebetulan sama, artinya tidak.
+    ///
+    /// Ini yang mencegah layar menampilkan "akurasi ±10°" seolah terukur
+    /// padahal itu tebakan yang dilarang dokumen.
+    func testSameSigmaCanBeDistinguishedByProvenance() {
+        let placeholder = ConfidencePolicy(pointingSigmaDeg: 10)
+        let measured = ConfidencePolicy.measured(pointingSigmaDeg: 10)
+
+        XCTAssertEqual(placeholder.pointingSigmaDeg, measured.pointingSigmaDeg,
+                       "nilainya memang sama — justru itu intinya")
+        XCTAssertNotEqual(placeholder, measured,
+                          "yang berbeda adalah asalnya, dan itu harus terlihat")
+        XCTAssertTrue(measured.isMeasured)
+        XCTAssertFalse(placeholder.isMeasured)
+    }
+
+    /// `.measured` tidak boleh mengubah perilaku keyakinan — ia hanya menandai
+    /// asal angka. Ambang turunannya harus identik dengan pembangunan biasa.
+    func testMeasuredFactoryDoesNotChangeThresholds() {
+        let plain = ConfidencePolicy(pointingSigmaDeg: 3.5)
+        let measured = ConfidencePolicy.measured(pointingSigmaDeg: 3.5)
+        XCTAssertEqual(measured.maxSeparationDeg, plain.maxSeparationDeg)
+        XCTAssertEqual(measured.ambiguityDeg, plain.ambiguityDeg)
+    }
+
     // MARK: - Kebetulan pemanggilan
 
     /// Kandidat yang datang tidak terurut tidak boleh mengubah keputusan.

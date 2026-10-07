@@ -219,9 +219,14 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
     ///
     /// Ambang `nil` atau tidak berhingga ditolak: menerapkannya akan membuat
     /// engine tidak pernah (atau selalu) yakin.
+    ///
+    /// Ditandai **terukur**: sigma yang sampai lewat saluran ini berasal dari
+    /// `CalibrationFlow`/Experiment 1 di iPhone, bukan dari nilai cadangan.
+    /// Menandainya belum-terukur akan membuat layar menolak menampilkan angka
+    /// yang justru hasil pengukuran.
     public var confidencePolicy: ConfidencePolicy? {
         guard let sigma = pointingSigmaDeg, sigma.isFinite, sigma > 0 else { return nil }
-        return ConfidencePolicy(pointingSigmaDeg: sigma)
+        return .measured(pointingSigmaDeg: sigma)
     }
 
     /// Kalibrasi dari pesan ini, bila memang membawa hasil kalibrasi.

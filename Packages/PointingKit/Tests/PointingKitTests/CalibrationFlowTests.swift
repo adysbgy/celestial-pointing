@@ -161,6 +161,8 @@ final class CalibrationFlowTests: XCTestCase {
                        accuracy: 1e-12)
         XCTAssertLessThan(policy.pointingSigmaDeg, 10.0,
                           "kalibrasi bagus harus membuat engine lebih berani dari bawaan konservatif")
+        XCTAssertTrue(policy.isMeasured,
+                      "sigma dari kalibrasi nyata adalah hasil ukur, bukan cadangan")
     }
 
     /// Kalibrasi tanpa sebaran terukur tidak boleh mengarang kebijakan.

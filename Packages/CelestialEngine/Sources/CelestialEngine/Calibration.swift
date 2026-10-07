@@ -60,9 +60,9 @@ public struct PointingCalibration: Equatable, Codable, Sendable {
     public func confidencePolicy(ambiguitySigma: Double = 2.0,
                                  maxSeparationSigma: Double = 1.0) -> ConfidencePolicy? {
         guard let sigma = residualSpreadDeg, sigma > 0, sigma.isFinite else { return nil }
-        return ConfidencePolicy(pointingSigmaDeg: sigma,
-                                ambiguitySigma: ambiguitySigma,
-                                maxSeparationSigma: maxSeparationSigma)
+        return .measured(pointingSigmaDeg: sigma,
+                         ambiguitySigma: ambiguitySigma,
+                         maxSeparationSigma: maxSeparationSigma)
     }
 }
 

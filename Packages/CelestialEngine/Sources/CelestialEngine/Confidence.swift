@@ -10,13 +10,30 @@ import Foundation
 /// Konsekuensinya: kalau Experiment 1 nanti mengukur sigma yang lebih besar,
 /// engine otomatis lebih pelit memberi HIGH — tanpa mengubah satu baris pun
 /// logika keputusan.
-public struct ConfidencePolicy: Equatable {
+public struct ConfidencePolicy: Equatable, Sendable {
     /// Perkiraan galat pointing 1σ, derajat.
     ///
-    /// Nilai awal 10° adalah **placeholder yang sengaja longgar**, bukan hasil
-    /// pengukuran. Angka ini harus diganti dengan hasil Experiment 1. Selama
-    /// belum diukur, lebih baik engine terlalu pelit memberi HIGH.
+    /// **Nilainya harus berasal dari pengukuran, bukan tebakan.** Dokumen
+    /// kelayakan §12 menutup jalan itu secara eksplisit: kerucut keyakinan
+    /// harus dipakai dari *distribusi galat pointing yang empiris*, "bukan
+    /// ambang '5°' yang dikarang". Sigma 10° di bawah adalah **nilai cadangan
+    /// yang sengaja longgar** — bukan hasil ukur. Selama `isMeasured == false`,
+    /// angka itu hanya berarti "kita belum tahu, jadi jangan berani-berani
+    /// memberi HIGH".
+    ///
+    /// Angka ini harus diganti dengan hasil Experiment 1 (lihat
+    /// `CalibrationFlow`/`ExperimentHarness.suggestedConfidencePolicy`).
     public var pointingSigmaDeg: Double
+
+    /// Apakah `pointingSigmaDeg` berasal dari pengukuran.
+    ///
+    /// **Kenapa ini ada, terpisah dari nilainya.** Tanpa penanda ini, sigma
+    /// cadangan 10° dan sigma hasil ukur 10° terlihat identik bagi seluruh
+    /// kode di hilir — layar bisa menampilkan "akurasi ±10°" seolah itu hasil
+    /// pengukuran, padahal itu justru tebakan yang dilarang dokumen §12.
+    /// Pembeda ini yang membuat kejujuran itu bisa diuji, bukan hanya
+    /// dijanjikan di komentar.
+    public var isMeasured: Bool
 
     /// Dua kandidat yang berjarak kurang dari ini dianggap tidak terpisahkan
     /// oleh akurasi kita, sehingga tidak boleh diklaim pasti.
@@ -25,12 +42,29 @@ public struct ConfidencePolicy: Equatable {
     /// Kandidat terbaik harus sedekat ini dari arah tunjuk agar boleh HIGH.
     public var maxSeparationSigma: Double
 
+    /// Kebijakan cadangan yang belum terukur.
     public init(pointingSigmaDeg: Double = 10.0,
                 ambiguitySigma: Double = 2.0,
-                maxSeparationSigma: Double = 1.0) {
+                maxSeparationSigma: Double = 1.0,
+                isMeasured: Bool = false) {
         self.pointingSigmaDeg = pointingSigmaDeg
         self.ambiguitySigma = ambiguitySigma
         self.maxSeparationSigma = maxSeparationSigma
+        self.isMeasured = isMeasured
+    }
+
+    /// Kebijakan dari sigma yang **sudah diukur**.
+    ///
+    /// Satu-satunya jalan membangun kebijakan terukur, supaya `isMeasured`
+    /// tidak bisa lupa dipasang. Pembuat kebijakan cadangan tetap `init`
+    /// bawaannya, dan itu sendirinya sudah menandai "belum terukur".
+    public static func measured(pointingSigmaDeg: Double,
+                                ambiguitySigma: Double = 2.0,
+                                maxSeparationSigma: Double = 1.0) -> ConfidencePolicy {
+        ConfidencePolicy(pointingSigmaDeg: pointingSigmaDeg,
+                         ambiguitySigma: ambiguitySigma,
+                         maxSeparationSigma: maxSeparationSigma,
+                         isMeasured: true)
     }
 
     /// Ambang jarak kandidat terbaik ke arah tunjuk untuk boleh HIGH, derajat.
