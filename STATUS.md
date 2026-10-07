@@ -1,3 +1,214 @@
+## Progres terakhir (7 Okt 2026 — gerbang menuntut ejaan yang sudah dibuang, dan `main` merah dua commit)
+
+### Cacatnya: gerbang merah pada kode yang benar
+
+`main` merah di CI **dua commit** berturut-turut (`7ae4845`, `ed16cd1`), dan
+yang merah bukan kode menggambarnya melainkan gerbangnya:
+
+```
+GAGAL sumber memuat: piringan fase tak diketahui (view memakainya)
+      'Self.accent(CelestialVisual.accents.moonPhaseUnknown)' TIDAK ditemukan
+```
+
+`7ae4845` mengganti `Self.accent(CelestialVisual.accents.moonPhaseUnknown)`
+dengan `Self.fillSphere(…, base: CelestialVisual.accents.moonPhaseUnknown)`.
+Faktanya tetap — tokennya masih yang menggambar — dan gambarnya malah lebih
+benar (bola dengan peredupan limb, bukan cakram rata). Gerbangnya menuntut
+**ejaan** yang sudah dibuang, jadi ia merah pada kode yang benar. Kelas cacat
+ini sudah berulang di repo ini: gerbang yang mengukur **cara menulis**
+sesuatu, bukan **hal yang ditulisnya**.
+
+### Penggantinya: tiga pemeriksaan yang mengukur fakta
+
+  - `check_unknown_moon_disc_uses_the_token` — (1) `moonPhaseUnknown` muncul
+    di **kode** view, bukan di komentar atau string; (2) `drawMoon` tidak
+    menulis `Color(red:…)` sendiri. Dua keadaan yang tidak bisa dipenuhi
+    bersama oleh warna tetap.
+  - `check_night_accents_reach_the_view` — **himpunan** token yang sampai ke
+    gambar. Arah yang tidak diukur apa pun sebelumnya: warna yang ada di
+    `Accents`, sama di port Python, dan **tidak pernah dibaca view** adalah
+    hijau di dua gerbang sekaligus sambil tidak menggambar apa pun. Ini kelas
+    paling sunyi, karena setiap gerbang lain tetap lulus.
+  - Arah sebaliknya: nama yang view pakai tetapi tidak ada di model → warna
+    jatuh ke nilai bawaan tanpa ada yang tahu.
+
+### Dua cacat di gerbang baru, ditemukan oleh harness-nya sendiri
+
+`out/bukti-gerbang-aksen.py` menjalankan **fungsi pemeriksaan yang sama**
+lewat parameter `view_source`/`night_source` (gerbang penuh ~6 menit; memanggil
+langsung <1 detik), atas 13 keadaan. Ia memeriksa **nama pemeriksaan mana yang
+berbunyi**, bukan berapa yang merah — menghitung jumlah menyembunyikan keadaan
+yang berbunyi karena alasan yang salah.
+
+  1. **Gerbang buta komentar.** `"nama" in view` atas sumber mentah menghitung
+     `// TODO kembalikan CelestialVisual.accents.moonPhaseUnknown` sebagai
+     pemakaian. Diperbaiki: `swift_code_only` membuang komentar dan string
+     dulu. Ini juga menutup lubang `print("…moonPhaseUnknown")`.
+  2. **Gerbang buta alias.** `let aksen = CelestialVisual.accents` lalu
+     `aksen.moonPhaseUnknown` adalah kode yang benar, dan pola
+     `accents\.(\w+)` tidak melihatnya — terukur merah. Diperbaiki:
+     `accent_names_in_view_code` membaca alias dari sumber (`<nama> = …accents`
+     menambahkan `<nama>` sebagai jalan masuk yang sah).
+
+Dua keadaan di harness sengaja diharapkan **hijau** (ejaan berbeda; alias).
+Gerbang yang merah di sana akan dimatikan orang, dan itu bentuk kegagalan yang
+paling sulit terlihat karena tampak seperti ketaatan.
+
+### Satu harapan harness yang saya perbaiki, bukan gerbangnya
+
+Keadaan "token hanya hidup di komentar" saya harapkan memicu **tiga**
+pemeriksaan; terukur **dua**. Yang ketiga (`drawMoon` tidak menulis warnanya
+sendiri) memang **tidak boleh** berbunyi: mutasi itu menggantinya dengan token
+lain (`moonUnlit`), jadi `drawMoon` tidak menulis warna tetap. Harapan yang
+menuntut ia merah akan menuntut gerbang berbunyi karena alasan yang salah.
+
+### Yang TIDAK diklaim
+
+  - `accents_reaching_the_view` mengukur **jangkauan nama**, bukan apakah
+    pikselnya benar. Fungsi yang mengembalikan warna lalu dibuang pemanggilnya
+    tetap terhitung "sampai". Yang menutup itu gerbang piksel
+    (`check_night_mode_purity`, `check_deep_sky_layouts_match_the_model`).
+  - Penutupan lewat alias membaca `<nama> = …accents`; penugasan yang lebih
+    jauh (`let b = aksen` lalu `b.moonPhaseUnknown`) tidak terjangkau. Batas
+    ini dicatat, bukan disembunyikan.
+  - Hanya `Tools/check-visuals.py` yang diubah. View, model, port, dan mesin
+    teruji tidak disentuh — yang diperbaiki gerbangnya, bukan gambarnya.
+
+### Hasil
+
+  - **206 + 687 uji hijau** (CelestialEngine + PointingKit), 0 gagal.
+  - `python3 Tools/check-visuals.py --check` -> **537 pemeriksaan, 0 gagal**.
+  - `out/bukti-gerbang-aksen.py` -> **13 keadaan, 0 tidak sesuai harapan**.
+  - `./swift-ui-lint.sh` hijau (30 aturan), `./swift-typecheck.sh` hijau.
+
+## Progres terakhir (7 Okt 2026 — pita terang Bulan melengkung, dan dua angka yang beredar ternyata milik gambar yang sudah dibuang)
+
+### Cacatnya: planet melengkung 55%, Bulan 0%
+
+`drawSphere` memberi setiap planet gradien bola — pusat terang, limb gelap.
+Pita terang Bulan tidak: satu warna `moonLit` penuh dari pusat sampai limb.
+Diukur pada baris ekuator render 200 px, ss=2, metrik yang sama yang dipakai
+`check_banded_disc_keeps_its_curvature` (`100·(pusat − limb)/pusat`, limb di
+0.96 R):
+
+```
+kasus               kekuatan 0 (cacat)   kekuatan 0.40
+Bulan purnama             +0.0%              +33.5%
+Fase tak diketahui        +0.0%              +33.4%
+Bulan sabit         (lihat di bawah)           24.1
+Mars (pembanding)        +54.8%              +54.8%
+```
+
+Pita terang Bulan **rata sempurna** sementara planet di sebelahnya melengkung
+55%. Yang terlihat bukan bola yang disinari dari satu sisi, melainkan
+**stiker rata** — dan Bulan adalah objek yang paling sering muncul, jadi cacat
+ini yang paling sering dilihat.
+
+### Perbaikan
+
+  - `CelestialVisual.moonLimbShadingStrength = 0.40` — satu angka di model,
+    dibaca view dan port Python, tidak ditulis ulang di dua tempat.
+  - `CelestialVisual.moonSphereGradientEndRadius = 1.15` — **bukan 1.35**
+    milik bola planet. Piringan Bulan digambar di dalam `drawLayer` yang
+    diputar sebesar sudut sisi terangnya, jadi pada sabit seluruh pita menyala
+    jatuh dekat tepi piringan, tempat gradien 1.35 sudah nyaris mencapai ujung
+    gelapnya.
+  - `CelestialVisual.moonSphereDark(_:)` — satu aturan peredupan, dipakai
+    pita terang **dan** piringan fase-tak-diketahui, dan port Python memanggil
+    fungsi yang sama.
+  - Uji Linux: `testMoonSphereGradientIsShallowerThanThePlanetSphere` (batas
+    atas 1.35) dan `testMoonLimbShadingIsPartial` (batas atas kekuatan).
+  - Gerbang piksel `check_moon_disc_keeps_its_curvature`, plus dua pemeriksaan
+    **teks**: piksel membuktikan **port** menggambar lengkungnya, sedangkan
+    yang dikirim ke jam adalah **view**, dan view bisa berhenti memanggilnya
+    (jam rata, PNG tetap melengkung) atau memanggilnya dengan angka yang
+    ditulis ulang.
+
+### Koreksi pertama: gradien piringan **gelap** dibuang, bukan dipertahankan
+
+Percobaan pertama memberi gradien yang sama ke piringan gelap. Hasilnya
+menyingkap dua hal, dan keduanya menunjuk arah yang berlawanan dari dugaan:
+
+  1. Earthshine dilukis sebagai **cakram warna rata** di atas piringan gelap,
+     jadi gradiennya terhapus justru di fase tempat sisi gelap paling terlihat
+     — terukur, `moon-new` tetap **+0.0%** di setiap kekuatan 0…0.80.
+  2. Memperdalamnya mematikan `check_earthshine` pada kekuatan **0.20** (4/5
+     lulus). Gerbang earthshine adalah **binding constraint**.
+
+Sisi gelap Bulan memang disinari sumber yang **lebar** (Bumi), bukan sumber
+titik seperti sisi terangnya. Piringan rata di sana bukan gambar yang salah.
+Yang melengkung adalah bagian yang disinari sumber titik — pita terangnya dan
+piringan "fase tak diketahui". Jadi gradien piringan gelap **dibuang**, dan
+perubahan di-scope hanya ke dua tempat itu.
+
+### Koreksi kedua: gerbangnya merah pada kode yang benar
+
+Versi pertama gerbang ini mengukur sabit dengan metrik baris ekuator yang
+sama. `moon-crescent-jakarta` punya sisi terang ke **bawah**, jadi seluruh
+baris ekuatornya jatuh di **piringan gelap** dan metrik itu mengembalikan
+**+0.0%** untuk gambar yang benar. Gerbangnya merah (`4/5`) pada kode yang
+sudah diperbaiki — kelas cacat yang sudah tercatat berkali-kali di repo ini:
+**gerbang yang mengukur bagian gambar yang tidak berisi yang diperiksa.**
+
+Metrik untuk kasus itu diganti: sebaran luminans (p95 − p5) piksel yang
+terklasifikasi **menyala** dengan cara yang sama yang dipakai
+`classify_centroid`. Pita rata → 0.0; pita yang dinaungi bola → 24.1. Sebaran
+itu tidak tercemar maria: pada kekuatan 0 ia terukur 0.0, jadi yang
+menggerakkannya memang gradiennya.
+
+Konsekuensinya angka **+5.3% / +24.6%** yang beredar di docstring model, uji
+Linux, view, dan port Python **tidak sah** — keduanya berasal dari gradien
+piringan gelap yang sudah dibuang, dan bukan hasil ukur ulang. Seluruh tabel di
+empat berkas itu diganti dengan hasil ukur ulang pada 200 px, ss=2:
+
+```
+radius akhir   purnama (lengkung)   sabit (sebaran)
+1.15               +33.5%                24.1
+1.35               +28.5%                20.9
+```
+
+### Batas atas kekuatan, diukur bukan dipilih
+
+`classify_centroid` memutuskan "menyala" versus "gelap" pada jarak-warna RGB,
+jadi pada gradien yang terlalu dalam piksel limb jatuh ke sisi gelap dan luas
+pita yang terukur menyusut — bukan karena gambarnya salah, melainkan karena
+alat ukurnya berganti jawaban. Disapu pada 200 px, ss=2, toleransi gerbang
+fase 0.10:
+
+```
+kekuatan   luas pita merah   lengkung purnama
+0.45            0/9              +37.6%
+0.50            0/9              +41.6%
+0.60            7/9              +50.2%   <- gerbang merah
+```
+
+0.40 dipakai, dan 0.60 **merah**. Dijaga `testMoonLimbShadingIsPartial` di
+Linux (batas atasnya) dan gerbang piksel (lengkungnya benar-benar sampai ke
+gambar).
+
+### Hasil
+
+  - **206 + 686 uji hijau** (CelestialEngine + PointingKit), 0 gagal.
+  - **112 pemeriksaan gerbang visual hijau**, 0 gagal — termasuk 5 pemeriksaan
+    baru untuk piringan Bulan.
+  - `./swift-ui-lint.sh` hijau (30 aturan), `./swift-typecheck.sh` hijau.
+  - README: hitungan PointingKit 683 → 686.
+
+### Yang TIDAK diklaim
+
+  - Gerbang `check_moon_disc_keeps_its_curvature` hanya mengukur **empat kasus
+    Bulan** (`moon-full`, `moon-unknown-phase`, `moon-crescent-jakarta`, plus
+    Mars sebagai patokan). Fase lain yang belum ada kasus rendernya tidak
+    terjaga oleh gerbang ini.
+  - Ambang lengkung 30% lengkung Mars adalah **pilihan** yang diberi jarak di
+    kedua sisi (33.4–33.5 versus 54.8), bukan angka yang punya dasar fisik.
+  - Angka 1.15 belum punya pembenaran fisik — sama seperti rasio kawah yang
+    sudah dicatat jujur di berkas gerbang. Yang menjaganya adalah kesepakatan
+    dua bahasa plus hasil ukur di atas.
+  - Perubahan hanya di `Apps/Shared/CelestialVisualView.swift`,
+    `Packages/PointingKit/…/CelestialVisual.swift`, uji Linux, dan dua berkas
+    `Tools/`. Mesin teruji tidak disentuh.
+
 ## Progres terakhir (7 Okt 2026 — lengan spiral menyambung, dan angka yang dikutip gerbang baru ternyata tidak diukur)
 
 ### Cacatnya: 508 pemeriksaan, dan tidak satu pun melihat lengkung yang bolong

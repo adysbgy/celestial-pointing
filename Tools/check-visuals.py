@@ -915,6 +915,270 @@ def _same_stroke_factors(view_factors, port_factors):
     return set(view_factors) == set(port_factors)
 
 
+def _function_body(source, anchor):
+    """Isi sebuah fungsi Swift, dibatasi penutup kurawalnya sendiri.
+
+    **Kenapa tidak `split` sampai akhir berkas.** Sudah dua kali di repo ini
+    pembaca yang membaca melewati batas fungsinya meloloskan token dari fungsi
+    lain di bawahnya (`read_deep_sky_drawing_from_swift`, dan
+    `read_planet_switch_cases_from_swift` yang harus memotong di penutup
+    pertama). Pemeriksaan "view tidak menulis warnanya sendiri" yang membaca
+    seluruh berkas akan menemukan `Color(red:…)` milik cabang lain dan merah
+    pada kode yang benar.
+
+    Jangkar yang tidak ditemukan mengembalikan string kosong — bukan
+    exception: pemanggilnya membandingkan dengan `not`, dan exception akan
+    menggagalkan seluruh gerbang dengan traceback yang tidak menyebut apa
+    yang harus diperbaiki.
+    """
+    if anchor not in source:
+        return ""
+    start = source.index(anchor) + len(anchor)
+    # Kurung buka **pertama** sesudah jangkar adalah pembuka tubuhnya; depth
+    # dimulai dari situ, bukan dari 1 — menghitungnya dua kali membuat
+    # penutup pertama hanya menurunkan depth kembali ke 1, dan wilayahnya
+    # melebar ke fungsi berikutnya.
+    opening = source.find("{", start)
+    if opening < 0:
+        return ""
+    depth, i = 1, opening + 1
+    while i < len(source) and depth:
+        if source[i] == "{":
+            depth += 1
+        elif source[i] == "}":
+            depth -= 1
+        i += 1
+    return source[opening + 1:i]
+
+
+def swift_code_only(source):
+    """Buang komentar dari sumber Swift — dipakai pemeriksaan "dipakai kode".
+
+    **Kenapa ini harus ada.** Gerbang pemakaian yang membaca sumber **mentah**
+    akan menghitung sebuah nama yang hanya muncul di dalam komentar sebagai
+    "dipakai". Token yang tidak menggambar apa pun lalu hijau, dan bentuknya
+    yang paling berbahaya adalah yang paling wajar: `// TODO kembalikan
+    CelestialVisual.accents.moonPhaseUnknown` di atas baris yang sudah
+    diganti. Diukur di repo ini: dengan pembaca mentah, keadaan itu **hijau**.
+
+    Isi tanda kutip ikut dibuang, karena string tidak menggambar apa pun juga.
+    Ini menutup lubang yang sama satu lapis lebih dalam — dan sekaligus
+    membuat pemeriksaan di bawah tidak bisa ditipu oleh `"nama token"` yang
+    ditulis di pesan galat atau di nama kasus render.
+
+    Bukan pemindai Swift sungguhan: komentar di dalam string (mis. `"http://"`)
+    tidak dikenali, dan di berkas ini tidak ada.
+    """
+    out, i, n = [], 0, len(source)
+    while i < n:
+        if source.startswith("//", i):
+            j = source.find("\n", i)
+            i = n if j < 0 else j
+        elif source.startswith("/*", i):
+            j = source.find("*/", i)
+            i = n if j < 0 else j + 2
+        elif source[i] == '"':
+            # String literal: buang isinya, sisakan pembatasnya supaya batas
+            # antar-token tetap terjaga.
+            out.append('"')
+            i += 1
+            while i < n and source[i] != '"':
+                i += 2 if source[i] == "\\" else 1
+            out.append('"')
+            i += 1
+        else:
+            out.append(source[i])
+            i += 1
+    return "".join(out)
+
+
+def accent_names_in_view_code(view_code):
+    """Nama aksen yang benar-benar dirujuk di kode view, termasuk lewat alias.
+
+    **Kenapa alias ikut.** `let aksen = CelestialVisual.accents` lalu
+    `aksen.moonPhaseUnknown` adalah kode yang benar, dan gerbang yang merah
+    padanya akan dimatikan orang. Pola `accents\\.(\\w+)` saja tidak melihatnya —
+    diukur, dan itu satu-satunya keadaan "kode benar" yang merah di harness
+    (`out/bukti-gerbang-aksen.py`). Yang dijaga adalah **tokennya sampai ke
+    gambar**, bukan ejaan jalan yang ditempuh.
+
+    Aliasnya dibaca dari sumber, bukan dari daftar: `<nama> = …accents` di
+    mana pun menambahkan `<nama>` sebagai jalan masuk yang sah.
+    """
+    names = set(re.findall(r"accents\.(\w+)", view_code))
+    aliases = re.findall(r"\b(\w+)\s*=\s*[\w.]*accents\b", view_code)
+    for alias in aliases:
+        names |= set(re.findall(re.escape(alias) + r"\.(\w+)", view_code))
+    return names
+
+
+def accents_reaching_the_view(model_source, view_code):
+    """Nama aksen yang sampai ke gambar di `CelestialVisualView.swift`.
+
+    **Cacat yang ditutup fungsi ini, dan kenapa daftar tangan tidak cukup.**
+    `NightVisual.Accents` memuat 24 warna. Dua puluh tiga di antaranya dipakai
+    view lewat namanya, jadi pemeriksaan `"<nama>" in view` biasa menangkapnya.
+    Tujuh sisanya — warna langit dalam per morfologi — **tidak pernah** ditulis
+    di view: ia dibaca lewat `deepSkyColour(for:)`, satu fungsi yang memetakan
+    morfologi ke warnanya. Memakai daftar tangan berisi tujuh nama itu berarti
+    gerbang ini menjadi **salinan ke-25** dari peta yang sudah ada, dan
+    mengubah peta itu tidak membuat apa pun berbunyi.
+
+    Jadi yang dipakai adalah **penutupan**: nama aksen yang benar-benar
+    menggambar adalah yang muncul di view (termasuk lewat alias), **ditambah**
+    yang muncul di dalam tubuh fungsi yang view panggil. Diturunkan dari
+    sumber, bukan diketik — fungsi baru yang ditambahkan besok langsung
+    terjangkau.
+
+    Batas yang jujur: yang diukur adalah **jangkauan nama**, bukan apakah
+    pikselnya benar. Fungsi yang mengembalikan warna lalu dibuang pemanggilnya
+    tetap terhitung "sampai". Yang menutup itu adalah gerbang piksel
+    (`check_night_mode_purity`, `check_deep_sky_layouts_match_the_model`),
+    bukan fungsi ini.
+    """
+    reached = accent_names_in_view_code(view_code)
+    # Fungsi di model yang mengembalikan aksen: nama + nama aksen di tubuhnya.
+    for match in re.finditer(
+            r"func\s+(\w+)\s*\([^)]*\)\s*(?:->[^{]*)?\{", model_source):
+        body_start = match.end()
+        depth, i = 1, body_start
+        while i < len(model_source) and depth:
+            if model_source[i] == "{":
+                depth += 1
+            elif model_source[i] == "}":
+                depth -= 1
+            i += 1
+        body = model_source[body_start:i]
+        body_accents = set(re.findall(r"accents\.(\w+)", body))
+        if not body_accents:
+            continue
+        # Dipakai view bila **namanya** disebut di kode view.
+        if re.search(r"\b" + re.escape(match.group(1)) + r"\b", view_code):
+            reached |= body_accents
+    return reached
+
+
+def check_night_accents_reach_the_view(results, view_source=None, night_source=None):
+    """Setiap warna aksen di model harus benar-benar **menggambar** di view.
+
+    **Cacat yang ditutup.** Sampai siklus ini yang dijaga
+    `check_night_accents_match_the_model` adalah **paritas nilai** antara
+    `NightVisual.Accents` dan `ACCENTS` di port Python — 24 warna, dua bahasa,
+    angka yang sama. Itu benar, dan ia tidak mengatakan apa pun tentang apakah
+    warnanya **sampai ke layar**. Aksen yang ada di model, sama di port, dan
+    tidak pernah dibaca view adalah warna yang hijau di dua gerbang sekaligus
+    dan tidak menggambar apa pun.
+
+    **Kenapa tidak `"<nama>" in view` saja.** Tujuh dari dua puluh empat warna
+    (langit dalam per morfologi) memang **tidak pernah** ditulis di view: ia
+    dibaca lewat `deepSkyColour(for:)`. Pemeriksaan keanggotaan biasa akan
+    melaporkan tujuh warna sehat sebagai tidak terpakai, dan gerbang yang merah
+    pada kode benar akan dimatikan orang. Yang dipakai karena itu penutupan
+    dari sumber (`accents_reaching_the_view`), bukan daftar nama.
+
+    **Kenapa ini bukan pemeriksaan teks biasa.** Ia mengukur satu arah yang
+    tidak diukur apa pun: **himpunan** token yang sampai ke gambar. Aksen baru
+    yang ditambahkan ke `Accents` tetapi tidak pernah dipakai view langsung
+    berbunyi di sini — dan itu tepat kelas yang paling sunyi, karena setiap
+    gerbang lain tetap hijau sementara warna itu tidak pernah tampil.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    night = night_source if night_source is not None else open(
+        os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                          "NightVisual.swift")).read()
+    try:
+        in_model = set(swift_night_accents(night))
+    except ValueError as error:
+        results.append(Result(
+            "aksen gambar: blok `accents` terbaca dari model", False, str(error)))
+        return
+    if not in_model:
+        results.append(Result(
+            "aksen gambar: blok `accents` terbaca dari model", False,
+            "blok `static let accents = Accents(` terbaca tetapi nol warna "
+            "terurai — gerbang yang tidak menemukan apa pun tidak boleh lulus"))
+        return
+    # Sumber penutupan: **NightVisual.swift**, tempat `Accents` dan
+    # `deepSkyColour(for:)` sama-sama tinggal. Membacanya dari CelestialVisual
+    # melewatkan pemetaan morfologinya, dan tujuh warna langit dalam akan
+    # dilaporkan tidak terpakai.
+    reached = accents_reaching_the_view(night, swift_code_only(view))
+    missing = sorted(in_model - reached)
+    results.append(Result(
+        "aksen gambar: setiap warna model sampai ke view", not missing,
+        f"{len(reached)} dari {len(in_model)} terjangkau"
+        + (f", tidak dipakai: {missing}" if missing else "")))
+    # Arah sebaliknya: nama yang view pakai tetapi tidak ada di model berarti
+    # view membaca aksen yang tidak pernah didefinisikan — warna yang jatuh ke
+    # nilai bawaan tanpa ada yang tahu.
+    unknown = sorted(reached - in_model)
+    results.append(Result(
+        "aksen gambar: view tidak memakai nama di luar model", not unknown,
+        f"{unknown} dipakai view tetapi tidak ada di NightVisual.Accents"
+        if unknown else "semua nama yang dipakai view ada di model"))
+
+
+def check_unknown_moon_disc_uses_the_token(results, view_source=None):
+    """Piringan "fase tidak diketahui" harus menggambar lewat token model.
+
+    **Cacat yang ditutup, dan kenapa ia tidak boleh menjadi pemeriksaan teks
+    biasa.** Piringan ini dulu digambar `Self.accent(CelestialVisual.accents.
+    moonPhaseUnknown)`. Sampai commit `7ae4845` ada entri gerbang yang menuntut
+    potongan itu **tertulis di view** — dan commit berikutnya menggantinya
+    dengan `Self.fillSphere(…, base: CelestialVisual.accents.moonPhaseUnknown)`.
+    Faktanya tetap, gambarnya malah lebih benar (bola, bukan cakram), dan
+    **`main` merah di CI selama dua commit**. Yang merah bukan pemakaiannya,
+    melainkan ejaan yang sudah dibuang.
+
+    Kelas cacatnya sudah berulang di repo ini: gerbang yang mengukur **cara
+    menulis** sesuatu, bukan **hal yang ditulisnya**. Ia lulus selama bentuknya
+    tidak berubah, dan menghukum setiap perbaikan bentuk sesudahnya — jadi
+    biaya menjaganya lebih besar dari yang dijaganya.
+
+    Penggantinya dua keadaan yang tidak bisa dipenuhi bersama oleh warna tetap:
+
+      1. `accents.moonPhaseUnknown` muncul di **kode** view — komentar dan
+         string dibuang lebih dulu (`swift_code_only`). Tanpa itu,
+         `// TODO kembalikan CelestialVisual.accents.moonPhaseUnknown` di atas
+         baris yang sudah diganti akan hijau.
+      2. Tidak ada `Color(red:…)` di dalam `drawMoon` — warna tetap yang
+         menyerupai token adalah bentuk paling sunyi dari cacat ini: tokennya
+         masih "dipakai" di tempat lain, dan piringannya kembali kelabu tetap.
+
+    Batas yang jujur: yang diukur adalah **token sampai ke fungsi menggambar**,
+    bukan bahwa piringannya kelabu 0.52. Yang menutup itu gerbang piksel
+    (`check_unknown_phase_is_not_a_new_moon`), yang mengukur PNG-nya.
+
+    `view_source` hanya dipakai harness mutasi supaya ia bisa menjalankan
+    pemeriksaan yang **sama** tanpa merender seluruh katalog (gerbang penuh
+    ~6 menit; memanggil langsung <1 detik). Bukan jalur kedua yang bisa
+    berbeda: nilai bawaannya membaca berkas yang sama.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    in_code = "moonPhaseUnknown" in accent_names_in_view_code(swift_code_only(view))
+    results.append(Result(
+        "piringan fase tak diketahui: dipakai di kode view", in_code,
+        "'CelestialVisual.accents.moonPhaseUnknown' "
+        f"{'ditemukan' if in_code else 'TIDAK ditemukan'} di kode "
+        "CelestialVisualView.swift (komentar & string dibuang)"))
+    body = _function_body(view, "func drawMoon(")
+    if not body:
+        results.append(Result(
+            "piringan fase tak diketahui: view tidak menulis warnanya sendiri", False,
+            "'func drawMoon(' TIDAK ditemukan di CelestialVisualView.swift — "
+            "pemeriksaan ini tidak bisa dijalankan, dan itu merah, bukan lulus"))
+        return
+    literal = re.search(r"Color\(\s*red:", body)
+    results.append(Result(
+        "piringan fase tak diketahui: view tidak menulis warnanya sendiri",
+        literal is None,
+        "drawMoon memuat `Color(red:…)` yang ditulis langsung: "
+        f"{body[literal.start():literal.start() + 40]!r}" if literal else
+        "drawMoon menggambar lewat token model, tanpa warna tetap"))
+
+
 def check_port_matches_swift_constants(results):
     """Konstanta port harus masih sama dengan yang ada di view Swift.
 
@@ -1026,9 +1290,25 @@ def check_port_matches_swift_constants(results):
         ("piringan fase tak diketahui (Swift)", R.ACCENTS["moonPhaseUnknown"],
          (0.52, 0.52, 0.55), "moonPhaseUnknown: .init(red: 0.52, green: 0.52, blue: 0.55)",
          night, "NightVisual.swift"),
-        ("piringan fase tak diketahui (view memakainya)",
-         "CelestialVisual.accents.moonPhaseUnknown" in view, True,
-         "Self.accent(CelestialVisual.accents.moonPhaseUnknown)", view),
+        # Arah kedua: piringan "fase tidak diketahui" harus benar-benar
+        # menggambar lewat token model, bukan warna tetap di view.
+        #
+        # **Entri ini dulu menuntut sebuah ejaan, dan `main` merah karenanya.**
+        # Bunyinya `"Self.accent(CelestialVisual.accents.moonPhaseUnknown)" in
+        # view` — potongan yang dipakai view *sebelum* piringan itu menjadi
+        # bola. Commit berikutnya menggantinya dengan `Self.fillSphere(…, base:
+        # CelestialVisual.accents.moonPhaseUnknown)`: **faktanya tetap**, dan
+        # justru lebih kuat (bola, bukan cakram). Yang merah bukan pemakaiannya,
+        # melainkan ejaan yang sudah dibuang — dan gerbang yang menuntut ejaan
+        # akan menghukum setiap perbaikan bentuk sesudahnya.
+        #
+        # Pemeriksaannya pindah ke `check_unknown_moon_disc_uses_the_token()`,
+        # di luar tabel `checks`, karena tabel itu membandingkan satu potongan
+        # teks di **dua** tempat: di sini (potongan harus tertulis di view) dan
+        # di `check_port_matches_swift_constants` (potongan yang sama harus
+        # tertulis di model). Penggantinya bukan satu potongan melainkan
+        # **predikat atas kode view**, jadi ia tidak bisa dibentuk sebagai
+        # pasangan `port_value`/`source_text` tanpa mengarang salah satunya.
         # Arah kedua: view harus benar-benar memakai pita, dan menggambarnya
         # **di kedua paruh**. Tanpa pemeriksaan ini, view bisa kembali ke satu
         # elips pekat dengan celah hanya di paruh bawah — bentuk yang sudah
@@ -6120,6 +6400,7 @@ def main():
     check_crater_relief_matches_the_model(results)
     check_crater_floor_opacity_comes_from_the_model(results)
     check_crater_contrast_numbers_come_from_the_sampler(results)
+    check_unknown_moon_disc_uses_the_token(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
@@ -6142,6 +6423,7 @@ def main():
     check_star_colour_index_matches_the_model(results)
     check_star_rgb_conversion_matches_the_model(results)
     check_night_accents_match_the_model(results)
+    check_night_accents_reach_the_view(results)
     check_star_geometry_matches_the_model(results)
     check_magnitude_scale_matches_the_model(results)
 
