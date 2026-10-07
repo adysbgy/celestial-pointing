@@ -66,7 +66,7 @@ memegang UI dan pembungkus sensor.
 ├─────────────────────────────────────────────────────┤
 │  Packages/CelestialEngine  mesin inti                │
 │    katalog, efemeris, resolver, keyakinan,           │
-│    pengaman slew                                     │
+│    pengaman slew, jembatan teleskop                  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -172,7 +172,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 187**, **PointingKit 679**.
+Hitungan uji saat ini: **CelestialEngine 206**, **PointingKit 679**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 

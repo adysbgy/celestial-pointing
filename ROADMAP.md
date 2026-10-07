@@ -30,7 +30,7 @@ jangan pernah wrist-angle → motor.
 - [x] Pengaman slew (`SlewSafety.swift`): POINT → OBJECT ID → SAFE GOTO. Aturan "wrist angle TIDAK PERNAH → motor" ditegakkan di tipe: `SlewCommand` hanya bisa dibuat oleh `SlewPlanner`, dan perintah diturunkan dari objek teridentifikasi (arah target = posisi objek, bukan arah tunjuk). Gagal-tertutup: tanpa target/keyakinan cukup/Matahari tak diketahui → tolak.
 - [x] iOS diagnostik (grafik confidence `DiagnosticsView`, ekspor dataset `ConfidenceTraceArchive`)
 - [x] Experiment 1 harness: tunjuk target diketahui → rekam → ekspor (`ExperimentRecorder`/`Experiment1View`)
-- [ ] Point & Slew POC 1 teleskop (setelah engine terbukti) — perencana aman sudah ada (`SlewSafety`), perangkat keras belum
+- [ ] Point & Slew POC 1 teleskop (setelah engine terbukti) — perencana aman (`SlewSafety`) **dan jembatan teleskop** (`TelescopeBridge`: putusan → perintah motor, kerangka koordinat, Abort, log POC §18) sudah ada dan teruji di Linux; yang belum: perangkat keras, transport Seestar nyata, `NSLocalNetworkUsageDescription` di Info.plist
 
 ## Kriteria "ENGINE SIAP"
 - [x] swift test hijau (166/166 engine + 143/143 PointingKit di Linux, tanpa Mac)
