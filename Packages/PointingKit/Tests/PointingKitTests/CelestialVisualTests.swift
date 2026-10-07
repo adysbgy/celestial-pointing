@@ -1070,18 +1070,49 @@ final class CelestialVisualTests: XCTestCase {
     /// `buildDeepSky` memperbesar setiap blob sebesar `0.62 + 0.38 · fuzziness`,
     /// dan cangkang ini lebarnya hanya 0.30 — delapan blob yang masing-masing
     /// membesar ke arah pusat bisa saja menutup lubang yang menjadi alasan
-    /// bentuk ini ada. M27 memakai 0.68 dan M57 0.40, dan kedua angka itulah
-    /// yang sungguhan sampai ke layar.
+    /// bentuk ini ada. Karena itu yang diiterasi adalah **angka yang benar-benar
+    /// dipakai nebula planetari di katalog** (M27 dan M57), dibaca lewat
+    /// `DeepSkyCatalogue`, bukan ditulis sebagai literal di sini.
+    ///
+    /// Versi pertama uji ini menulis rentangnya sebagai literal
+    /// `[0.0, 0.40, 0.68, 1.0]` sambil docstring-nya mengklaim kedua angka itu
+    /// "sungguhan sampai ke layar". Klaim itu tidak pernah diperiksa: mengubah
+    /// M57 menjadi 0.20 di katalog meninggalkan uji ini hijau, dan kalimat di
+    /// atasnya ikut berbohong. Pelajaran yang sama dengan gerbang gambar —
+    /// angka yang ditulis ulang di tempat lain adalah angka yang berhenti
+    /// terbanding. Dua ujung 0.0 dan 1.0 tetap diuji karena keduanya batas
+    /// penjepitan `nebula(fuzziness:)`, bukan karena ada objek yang memakainya.
     ///
     /// **Kenapa yang diukur tepi dalamnya, bukan pusat blobnya.** Versi
     /// pertama uji ini mengukur jarak pusat blob, dan pusatnya tidak pernah
     /// bergerak — 0.42 untuk semua fuzziness — jadi uji itu akan tetap hijau
     /// berapa pun lebarnya blob membesar. Yang menentukan apakah lubangnya
     /// terlihat adalah **tepi dalam**: `radius − halfWidth`, yang menyusut
-    /// dari 0.312 ke 0.246 pada rentang fuzziness ini. Uji pada pusat blob
+    /// dari 0.289 ke 0.209 pada rentang fuzziness ini. Uji pada pusat blob
     /// mengukur tempat yang tidak berubah, bukan lubang yang bisa menutup.
+    ///
+    /// **Angka yang dikutip di sini dulu salah blob.** Versi sebelumnya
+    /// menyebut "0.312 ke 0.246", yaitu tepi dalam blob **sumbu** (`radius`
+    /// 0.42, `halfWidth` 0.30·growth). Yang benar-benar menentukan adalah blob
+    /// **diagonal** — kedelapan blob duduk pada satu radius 0.42, dan yang
+    /// paling dekat menutup pusat adalah yang `max(halfWidth, halfHeight)`-nya
+    /// paling besar, yaitu blob sumbu. Diukur pada 38 pt: 0.289 → 0.209.
+    /// Bedanya bukan hiasan kalimat: sisa ruang pada fuzziness 1.0 hanya
+    /// **0.009** di atas ambang 0.2, bukan 0.046 seperti yang tampak dari
+    /// angka lama. Uji ini nyaris merah pada keadaan sekarang — dan itulah
+    /// alasan ia ada: menaikkan `span` rumus growth dari 0.38 ke 0.45 sudah
+    /// menutup lubangnya.
     func testPlanetaryNebulaIsHollowAtTheCentre() {
-        for fuzziness in [0.0, 0.40, 0.68, 1.0] {
+        let shells = DeepSkyCatalogue.objects.filter {
+            DeepSkyCatalogue.morphology(forObjectID: $0.id) == .planetaryNebula
+        }
+        XCTAssertFalse(shells.isEmpty,
+                       "katalog harus punya nebula planetari — kalau tidak, uji ini tidak menguji apa pun")
+        let catalogueValues = shells.map { DeepSkyCatalogue.fuzziness(forObjectID: $0.id) }
+        let tested = Set([0.0, 1.0] + catalogueValues).sorted()
+        XCTAssertTrue(catalogueValues.allSatisfy(tested.contains),
+                      "angka katalog nebula planetari harus ikut diuji: \(catalogueValues)")
+        for fuzziness in tested {
             let geometry = VisualFrame.deepSky(morphology: .planetaryNebula,
                                                fuzziness: fuzziness)
             XCTAssertFalse(geometry.blobs.isEmpty, "nebula planetari harus punya cangkang")

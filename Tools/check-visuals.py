@@ -2707,6 +2707,275 @@ def check_crater_relief_matches_the_model(results):
         else f"peredupan terbalik atau nol: terang {bright:.2f}×, gelap {dark:.2f}×"))
 
 
+def read_deep_sky_catalogue_from_swift(source):
+    """Katalog objek langit dalam dari teks Swift: id → (fuzziness, morfologi).
+
+    Dibaca dari sumber, bukan ditulis sebagai daftar di gerbang. Daftar
+    tangan di sini akan menjadi **salinan ke-18 yang tidak pernah
+    dibandingkan** — persis lubang yang gerbang ini ada untuk menutup, dan
+    yang sudah berulang di repo ini untuk palet planet, warna bintang,
+    maria, dan tata letak langit dalam.
+
+    Tiga hal dibaca sekaligus karena ketiganya harus sepakat soal **himpunan
+    id yang sama**: daftar objek (`CelestialObject(id:)`), tabel `fuzziness`,
+    dan tabel `morphology`. Objek yang punya entri di satu tabel tapi tidak
+    di tabel lain akan tampil dengan nilai bawaan yang **tampak sah**.
+    """
+    ids = re.findall(r'CelestialObject\(id:\s*"(\w+)"', source)
+    if not ids:
+        raise ValueError("tidak ada 'CelestialObject(id: \"…\")' di DeepSkyCatalogue.swift")
+
+    anchors = (("fuzzinessByID: [String: Double] = [", r'"(\w+)":\s*([\d.]+)'),
+               ("morphologyByID: [String: Morphology] = [", r'"(\w+)":\s*\.(\w+)'))
+    tables = []
+    for anchor, pattern in anchors:
+        if anchor not in source:
+            raise ValueError(f"jangkar tidak ditemukan di DeepSkyCatalogue.swift: {anchor!r}")
+        block = source.split(anchor, 1)[1].split("]", 1)[0]
+        table = dict(re.findall(pattern, block))
+        if not table:
+            raise ValueError(f"tabel kosong di jangkar {anchor!r}")
+        tables.append(table)
+
+    fuzziness = {k: float(v) for k, v in tables[0].items()}
+    morphology = tables[1]
+    return ids, fuzziness, morphology
+
+
+def deep_sky_growth_parameters(source, anchor):
+    """Dua angka rumus `growth` dari teks sumber: `(base, span)`.
+
+    `buildDeepSky` memperbesar setiap blob sebesar `base + span · fuzziness`.
+    Rumus itu hidup **dua kali** — `CelestialVisual.swift` dan
+    `render-visuals.py` — dan sampai gerbang ini tidak satu pun dari kedua
+    angkanya dibandingkan. Yang menggambar di jam adalah yang pertama; yang
+    diukur setiap gerbang gambar adalah yang kedua.
+
+    Wilayahnya dipotong **dulu** pada fungsi yang memilikinya. Tanpa itu
+    `re.search` mengambil kecocokan pertama di seluruh berkas, dan
+    `CelestialVisual.swift` sudah punya `let growth = max(...)` di
+    `starGeometry` — rumus yang sah tapi bukan rumus ini. Pencarian yang
+    bergantung pada "yang pertama kebetulan benar" adalah gerbang yang
+    berhenti benar begitu ada fungsi baru di atasnya.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor)
+    match = re.search(r"\bgrowth\s*=\s*([\d.]+)\s*\+\s*([\d.]+)\s*\*", source[start:])
+    if match is None:
+        raise ValueError(f"bentuk rumus growth tidak ditemukan di dalam {anchor!r}")
+    return float(match.group(1)), float(match.group(2))
+
+
+def deep_sky_growth(params, fuzziness):
+    """Ukuran relatif blob dari parameter yang dibaca — salinan rumusnya.
+
+    Ditulis ulang, bukan dipanggil dari `R.deep_sky_blobs`: gerbang yang
+    memakai fungsi yang sedang diukur akan membiarkan kesalahan di fungsi
+    itu lolos bersama pengukurannya.
+    """
+    clamped = min(1.0, max(0.0, fuzziness))
+    return params[0] + params[1] * clamped
+
+
+def read_deep_sky_drawing_from_swift(source):
+    """Dua argumen `_draw_deep_sky` di port: nama kunci morfologi & fuzziness.
+
+    Yang dibaca adalah **kunci kamus yang benar-benar diambil penggambar**,
+    bukan nama argumennya. Port memanggil
+    `deep_sky_blobs(morphology, kw.get("fuzziness", 0.6))`; kalau kuncinya
+    berubah (`"fuzziness"` → `"spread"`) sementara kasus render masih mengisi
+    `fuzziness`, setiap gambar akan jatuh ke nilai bawaan 0.6 dan **seluruh**
+    tabel katalog berhenti sampai ke kertas tanpa satu pun pemeriksaan lain
+    menyala — kelas cacat yang sama dengan `row("Keadaan", …)` di layar
+    Diagnostik, hanya di lapisan gambar.
+
+    Karena itu yang diuji bukan "fungsi ini ada", melainkan bahwa kunci yang
+    diambil sama dengan kunci yang diisi.
+    """
+    if "def _draw_deep_sky(" not in source:
+        raise ValueError("'def _draw_deep_sky(' tidak ditemukan di render-visuals.py")
+    region = source[source.index("def _draw_deep_sky("):]
+    # Wilayahnya dipotong pada `def` berikutnya supaya pembaca ini benar-benar
+    # membaca fungsi yang ia sebut namanya. **Efeknya diukur, dan lebih kecil
+    # dari yang tampak.** Pada mutasi "penggambar berhenti membaca fuzziness,
+    # `kw.get("fuzziness")` hidup di fungsi lain" (out/bukti-pembaca-lama-ds.py):
+    # pembaca lama sampai EOF → 2 gagal, pembaca ini → 3 gagal. Dua pemeriksaan
+    # piksel di bawah tetap menggigit apa pun isi pembaca ini, jadi yang
+    # ditambahkan di sini adalah **sebab yang disebut namanya**, bukan cakupan
+    # baru. Tetap diperbaiki karena pembaca yang membaca melewati batas
+    # fungsinya adalah jebakan yang menganggur — bukan karena ia menutup lubang.
+    following = region.find("\ndef ", 1)
+    if following != -1:
+        region = region[:following]
+    keys = re.findall(r"kw\.get\(\s*\"(\w+)\"", region)
+    if not keys:
+        raise ValueError("_draw_deep_sky tidak membaca kw.get(\"…\") sama sekali")
+    return keys
+
+
+def check_deep_sky_catalogue_values_reach_the_picture(results, size=38, ss=8):
+    """Setiap objek langit dalam digambar dengan **angkanya sendiri**, di ukuran jam.
+
+    **Cacat yang ditutup pemeriksaan ini — dan cara menemukannya.** Seluruh
+    gerbang gambar yang ada merender kasus langit dalam dengan `fuzziness=0.8`
+    yang **sama untuk semua** (`build_cases()`), sementara katalog produksi
+    membawa 17 angka pilihan — 0.30 untuk M22 sampai 1.00 untuk M31. Diukur:
+    gambar yang diukur gerbang menyimpang dari gambar yang tampil di jam
+    sebesar **312 piksel rata-rata (21,7% dari frame)** pada 38 pt, dan
+    **819 piksel (56,7%)** untuk M42. Jadi tidak satu pun dari 399
+    pemeriksaan itu pernah melihat gambar objek langit dalam yang benar-benar
+    muncul.
+
+    Dua akibat, keduanya sunyi. (1) Mengubah satu nilai di `fuzzinessByID`
+    tidak membuat apa pun merah — dibuktikan: `"m13": 0.35` → `1.00`
+    meninggalkan 399 pemeriksaan dan 29 aturan lint hijau. (2) Rumus
+    `growth` yang mengubah angka itu menjadi ukuran blob hidup dua kali dan
+    **tidak dibandingkan sama sekali**: `0.38` → `0.10` di port, dan di
+    model Swift, keduanya hijau di seluruh 399 pemeriksaan **dan** 662 uji
+    Swift — termasuk `testNebulaGrowsWithFuzziness`, yang hanya menuntut
+    "lebar lebih besar dari sempit" sehingga tetap benar berapa pun
+    span-nya.
+
+    Yang diukur karena itu bukan "nilai sama di dua tabel" (keduanya memang
+    satu tabel), melainkan **empat jalur yang berbeda**:
+
+      1. `growth` model == `growth` port, dan span-nya **tidak nol** —
+         kalau span nol, `fuzziness` tidak lagi mengubah apa pun dan seluruh
+         tabel katalog menjadi hiasan.
+      2. Kunci kamus yang diambil penggambar == kunci yang diisi kasus
+         render. Kalau tidak, seluruh tabel jatuh ke nilai bawaan 0.6.
+      3. Nilai katalog benar-benar punya **efek pada gambar**: untuk setiap
+         objek, gambar pada nilai katalognya harus berbeda dari gambar pada
+         nilai bawaan netral (0.6). Ini yang menangkap penggambar yang
+         mengabaikan argumennya.
+      4. Di dalam satu morfologi, nilai katalog yang berbeda harus
+         menghasilkan gambar yang **berbeda di ukuran jam** — bukan cuma
+         berbeda secara aritmetika. Klaim "seberapa menyebar" di katalog
+         hanya berarti kalau bedanya terlihat.
+
+    **Ukurannya 38 pt, dibaca dari token** lewat `watch_visual_diameter()`,
+    sama seperti gerbang ciri planet: sebuah beda yang terukur pada 200 px
+    bisa habis total pada ukuran yang benar-benar tampil.
+    """
+    swift = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                               "DeepSkyCatalogue.swift")).read()
+    model_source = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                     "CelestialVisual.swift")).read()
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+
+    try:
+        ids, fuzziness, morphology = read_deep_sky_catalogue_from_swift(swift)
+        model_growth = deep_sky_growth_parameters(
+            model_source, "private static func buildDeepSky(")
+        port_growth = deep_sky_growth_parameters(port_source, "def deep_sky_blobs(")
+        drawn_keys = read_deep_sky_drawing_from_swift(port_source)
+    except ValueError as exc:
+        results.append(Result("katalog langit dalam: terbaca dari sumber", False, str(exc)))
+        return
+
+    # Katalog yang tidak lengkap dilaporkan **di sini**, bukan dibiarkan
+    # meledak sebagai `KeyError` saat menggambar. Gerbang yang melempar
+    # traceback saat tabelnya disunting akan dihapus orang.
+    missing = {label: sorted(set(ids) - set(table))
+               for label, table in (("fuzziness", fuzziness), ("morfologi", morphology))}
+    incomplete = any(missing.values())
+    for label, absent in missing.items():
+        results.append(Result(
+            f"katalog langit dalam: setiap objek punya entri {label}",
+            not absent,
+            f"{len(ids)} objek" if not absent else f"tanpa entri {label}: {absent}"))
+
+    orphan = sorted(set(fuzziness) - set(ids))
+    results.append(Result(
+        "katalog langit dalam: tidak ada entri tanpa objeknya",
+        not orphan, "tidak ada" if not orphan else f"entri tanpa objek: {orphan}"))
+
+    results.append(Result(
+        "katalog langit dalam: angka fuzziness-nya tidak seragam",
+        len(set(fuzziness.values())) > 1,
+        f"{len(set(fuzziness.values()))} nilai berbeda dari {len(fuzziness)} objek"
+        if len(set(fuzziness.values())) > 1
+        else "seluruh objek memakai satu angka: 'seberapa menyebar' tidak lagi per objek"))
+
+    # ── 1. Rumus yang mengubah angka itu menjadi ukuran blob ──────────────
+    same_growth = model_growth == port_growth
+    results.append(Result(
+        "katalog langit dalam: rumus growth sama di kedua bahasa",
+        same_growth,
+        f"{model_growth[0]:g} + {model_growth[1]:g}·fuzziness" if same_growth
+        else f"model {model_growth}, port {port_growth}"))
+
+    results.append(Result(
+        "katalog langit dalam: fuzziness benar-benar memperlebar kabut",
+        model_growth[1] != 0,
+        f"span {model_growth[1]:g} (0 = angka katalog tidak mengubah apa pun)"
+        if model_growth[1] != 0 else f"span 0: growth tetap {model_growth[0]:g}"))
+
+    steps = [i / 10 for i in range(11)]
+    widths = [deep_sky_growth(model_growth, f) for f in steps]
+    results.append(Result(
+        "katalog langit dalam: growth naik seiring fuzziness",
+        all(a < b for a, b in zip(widths, widths[1:])),
+        f"{widths[0]:.3f} … {widths[-1]:.3f} pada fuzziness 0…1"))
+
+    # ── 2. Kunci yang diambil penggambar == kunci yang diisi kasus render ──
+    results.append(Result(
+        "katalog langit dalam: penggambar membaca kunci fuzziness yang benar",
+        "fuzziness" in drawn_keys,
+        f"kw.get: {drawn_keys}" if "fuzziness" in drawn_keys
+        else f"_draw_deep_sky mengambil {drawn_keys}, bukan \"fuzziness\" — "
+             "seluruh tabel katalog jatuh ke nilai bawaan"))
+
+    if incomplete:
+        return
+
+    watch = watch_visual_diameter()
+    if watch is None:
+        results.append(Result(
+            "katalog langit dalam: ukuran visual jam terbaca dari token", False,
+            "WatchMetrics.visualDiameter tidak terbaca di WatchTheme.swift — "
+            "tanpa itu gerbang ini tidak mengukur ukuran yang tampil"))
+        return
+
+    # ── 3 & 4. Angkanya sampai ke gambar, dan bedanya terlihat ────────────
+    def picture(morph, fuzz):
+        canvas = R.render(R.VisualCase("probe", "", "deepSky", morphology=morph,
+                                       fuzziness=fuzz, is_confirmed=True),
+                          size=watch, ss=ss)
+        return [tuple(px) for px in canvas.buf]
+
+    # Kabut netral: satu render per morfologi, bukan per objek — port
+    # menggambar dari (morfologi, fuzziness) saja, jadi hasilnya sama.
+    neutral = {morph: picture(morph, 0.6) for morph in set(morphology.values())}
+
+    ineffective = [oid for oid in ids
+                   if picture(morphology[oid], fuzziness[oid]) == neutral[morphology[oid]]]
+    results.append(Result(
+        "katalog langit dalam: angka katalog punya efek pada gambar jam",
+        not ineffective,
+        f"{len(ids)} objek di {watch} pt" if not ineffective
+        else f"gambar identik dengan kabut netral 0.6: {ineffective}"))
+
+    # Di dalam satu morfologi, nilai yang berbeda harus terlihat berbeda.
+    # Kalau tidak, tabel per objek hanya berbeda di atas kertas.
+    collisions = []
+    by_morph = {}
+    for object_id in ids:
+        by_morph.setdefault(morphology[object_id], []).append(object_id)
+    for morph, group in sorted(by_morph.items()):
+        rendered = {oid: picture(morph, fuzziness[oid]) for oid in group}
+        for i, first in enumerate(group):
+            for second in group[i + 1:]:
+                if fuzziness[first] != fuzziness[second] and rendered[first] == rendered[second]:
+                    collisions.append(f"{first}/{second} ({morph})")
+    results.append(Result(
+        "katalog langit dalam: nilai berbeda terlihat berbeda di ukuran jam",
+        not collisions,
+        "semua pasangan terbedakan" if not collisions
+        else f"nilai berbeda, gambar identik: {collisions}"))
+
+
 def check_night_mode_purity(results, size=200, ss=2):
     """Mode malam: hijau & biru harus **nol**, bukan "kecil" — di **setiap** kasus.
 
@@ -4603,6 +4872,7 @@ def main():
     check_star_colour_order(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
+    check_deep_sky_catalogue_values_reach_the_picture(results)
     check_deep_sky_layouts_match_the_model(results)
     check_star_colour_index_matches_the_model(results)
     check_star_rgb_conversion_matches_the_model(results)

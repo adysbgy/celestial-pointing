@@ -1,4 +1,165 @@
-## Progres terakhir (7 Okt 2026 — gerbang yang mengukur keberadaan nama, bukan sampainya angka ke gambar)
+## Progres terakhir (7 Okt 2026 — gambar yang diukur gerbang bukan gambar yang tampil di jam: 17 objek langit dalam)
+
+### Temuan: seluruh gerbang gambar langit dalam merender satu angka yang tidak dipakai objek mana pun
+
+`build_cases()` merender **setiap** kasus `deepSky` dengan `fuzziness=0.8`.
+Katalog produksi membawa 17 angka pilihan — 0.30 (M22) sampai 1.00 (M31) —
+dan tidak satu pun dari angka itu pernah masuk ke gambar yang diukur.
+
+Diukur, bukan diasumsikan (`out/ukur-langit-dalam.py`), pada ukuran jam 38 pt
+(frame 38×38 = 1444 piksel):
+
+```
+objek   fuzz  morph            beda piksel  % frame
+m42     0.90  nebula                   819    56.7%
+m17     0.72  nebula                   766    53.0%
+m31     1.00  galaxy                   384    26.6%
+...
+m8      0.80  nebula                     0     0.0%
+
+rata-rata = 312.8 piksel (21.7% dari frame)
+```
+
+Jadi gambar yang menjadi dasar **399 pemeriksaan** itu menyimpang dari gambar
+yang benar-benar tampil di jam sebesar **312 piksel rata-rata — 21,7% dari
+seluruh frame**. Untuk Nebula Orion, 819 piksel: **56,7%** gambar yang diuji
+adalah gambar yang tidak pernah muncul di layar mana pun. M8 kebetulan 0.0%
+karena 0.80 adalah satu-satunya nilai katalog yang sama dengan nilai gerbang.
+
+Ini kelas cacat yang sama dengan "gerbang ciri planet hanya pernah melihat
+gambar 5× lebih besar" — **gerbang yang mengukur gambar yang tidak tampil** —
+hanya saja kali ini yang salah bukan ukurannya, melainkan **angkanya**.
+
+### Dua akibat, keduanya sunyi
+
+1. Mengubah satu nilai di `fuzzinessByID` tidak membuat apa pun merah.
+2. Rumus `growth` yang mengubah angka itu menjadi ukuran blob hidup **dua
+   kali** (`CelestialVisual.swift` dan `render-visuals.py`) dan **tidak
+   dibandingkan sama sekali** — persis kelas "satu rumus, dua bahasa, tidak
+   ada yang membandingkan" yang sudah tercatat di repo ini untuk pita
+   Jupiter dan kabut Venus.
+
+### Gerbangnya: empat jalur, bukan satu perbandingan tabel
+
+`check_deep_sky_catalogue_values_reach_the_picture` mengukur, di ukuran jam
+yang dibaca dari token:
+
+  1. `growth` model == `growth` port, dan span-nya **tidak nol** — kalau nol,
+     `fuzziness` berhenti mengubah apa pun dan seluruh tabel katalog menjadi
+     hiasan.
+  2. Kunci kamus yang **diambil** penggambar (`kw.get("fuzziness")`) == kunci
+     yang **diisi** kasus render. Kalau tidak, seluruh tabel jatuh ke nilai
+     bawaan 0.6 tanpa satu pun gambar berubah warna yang salah.
+  3. Angka katalog benar-benar punya **efek pada gambar**: untuk setiap objek,
+     gambar pada nilai katalognya harus berbeda dari gambar pada nilai netral.
+  4. Di dalam satu morfologi, nilai yang berbeda harus menghasilkan gambar
+     yang **berbeda di 38 pt** — bukan cuma berbeda secara aritmetika.
+
+Daftar objeknya **dibaca dari `DeepSkyCatalogue.swift`**, bukan ditulis ulang
+di gerbang. Daftar tangan akan menjadi salinan ke-18 yang tidak pernah
+dibandingkan — lubang yang sama, satu lapis lebih dalam.
+
+### Bukti mutasi — 10 keadaan, semuanya diukur
+
+Harness: `out/mutasi-katalog-langit-dalam.py`.
+
+```
+[baseline]                                               10 pemeriksaan, 0 gagal
+1. katalog: m27 0.68 -> 0.60 (jadi kabut netral)         10 pemeriksaan, 1 gagal
+1b. katalog: m13 0.35 -> 1.00 (tetap terbedakan)         10 pemeriksaan, 0 gagal  <- sengaja
+2. port: growth span 0.38 -> 0.10 (drift antar bahasa)   10 pemeriksaan, 1 gagal
+3. model: growth span 0.38 -> 0.10 (drift antar bahasa)  10 pemeriksaan, 1 gagal
+4. kedua bahasa: span -> 0 (fuzziness jadi hiasan)       10 pemeriksaan, 4 gagal
+5. port: penggambar mengabaikan fuzziness (konstan)      10 pemeriksaan, 2 gagal
+6. port: jangkar rumus growth dihapus                     1 pemeriksaan, 1 gagal
+7. katalog: entri fuzziness m22 hilang                    8 pemeriksaan, 2 gagal
+8. port: penggambar membaca kunci lain (spread)          10 pemeriksaan, 3 gagal
+9. model: rumus growth dipindah ke fungsi lain            1 pemeriksaan, 1 gagal
+```
+
+Baris **1b** adalah yang menentukan dan sengaja diharapkan **nol** merah:
+mengubah `m13` tetap menghasilkan gambar yang terbedakan dari objek lain di
+morfologinya, jadi gerbangnya benar diam. Yang diperiksa di situ bukan
+"apakah gerbang berbunyi" melainkan "apakah gerbang berbunyi **hanya** saat
+ada alasan". Gerbang yang menyala pada setiap suntingan katalog akan dimatikan
+orang, dan itu bentuk kegagalan yang paling sulit terlihat karena ia tampak
+seperti ketaatan.
+
+### Tiga angka di docstring-nya diukur, bukan dikutip
+
+Karena repo ini sudah beberapa kali menemukan gerbang yang **mengutip angka
+yang tidak pernah ia ukur**, ketiga klaim di docstring gerbang itu diuji:
+
+| Klaim | Cara diukur | Hasil |
+|---|---|---|
+| 312 piksel rata-rata (21,7%) | `out/ukur-langit-dalam.py` | 312,8 — cocok |
+| 819 piksel (56,7%) untuk M42 | sama | 819 — cocok |
+| `m13` 0.35→1.00 meninggalkan 399 pemeriksaan hijau | `out/bukti-klaim-gerbang-ds.py`: gerbang baru **dikeluarkan** dari `main()`, sumber dimutasi, seluruh gerbang lain dijalankan | 399/0 hijau, juga pada kedua mutasi `growth` |
+| "dan 662 uji Swift" untuk mutasi model | `out/ukur-klaim-662.sh`: mutasi span model, `swift-test.sh` penuh | 662/0 hijau, md5 pulih persis |
+
+Yang ketiga dan keempat penting karena keduanya klaim tentang **keadaan
+sebelum gerbang ini ada**. Kalau salah satunya merah, docstring-nya berbohong
+dan gerbangnya tidak menutup apa pun.
+
+### Dua cacat yang ditemukan di harness-nya sendiri
+
+1. **Timeout meninggalkan sumber termutasi.** `SIGKILL` melewati `finally`,
+   jadi kasus 2a (`growth = 0.62 + 0.10 * clamped` di port) **bertahan hidup**
+   di `render-visuals.py` — ditemukan lewat `git status`, bukan lewat harness.
+   Harness yang menulis ke sumber produksi tidak boleh bergantung pada satu
+   jalur `finally`; sekarang ada handler `SIGINT`/`SIGTERM` juga. Pelajarannya
+   umum: harness mutasi adalah alat yang **merusak sumber produksi dengan
+   sengaja**, jadi keandalannya sendiri adalah bagian dari kebenaran
+   pengukurannya.
+
+2. **Pembaca yang membaca melewati batas fungsinya.** `read_deep_sky_drawing_
+   from_swift` mula-mula membaca sampai EOF, jadi `kw.get("fuzziness")` di
+   fungsi **mana pun** di bawahnya akan meloloskannya. Versi kedua memotong
+   pada `def` berikutnya. **Efeknya diukur dan lebih kecil dari yang
+   tampak** (`out/bukti-pembaca-lama-ds.py`): pada mutasi "penggambar berhenti
+   membaca fuzziness, nama tetap hidup di fungsi lain", pembaca lama → 2 gagal,
+   pembaca baru → 3 gagal. Dua pemeriksaan piksel tetap menggigit apa pun isi
+   pembaca itu, jadi yang ditambahkan adalah **sebab yang disebut namanya**,
+   bukan cakupan baru. Tetap diperbaiki — tapi dicatat sebagai jebakan yang
+   menganggur, bukan sebagai lubang yang tertutup. Percobaan pertama decoy-nya
+   sendiri salah: ia menaruh `kw.get` di fungsi yang tidak punya `kw`, dan
+   render meledak `NameError` — bukti bahwa harness-nya salah, bukan bukti
+   tentang pembacanya.
+
+### Batas yang jujur
+
+  - Gerbang ini menjaga **angkanya sampai ke gambar**, bukan bahwa angka itu
+    benar secara astronomi. `fuzziness` tetap pilihan kurator; yang dijamin
+    sekarang adalah pilihan itu tidak bisa hilang diam-diam.
+  - Pemeriksaan 4 mengikat gambar pada **satu ukuran** (38 pt, dibaca dari
+    token). Pada ukuran lain pasangan yang berbeda bisa bertumbukan; itu tidak
+    diukur, dan tidak diklaim.
+  - Uji Swift `testPlanetaryNebulaIsHollowAtTheCentre` sekarang mengiterasi
+    **angka katalog** lewat `DeepSkyCatalogue`, bukan literal `[0.0, 0.40,
+    0.68, 1.0]`. Dua ujung 0.0/1.0 tetap diuji karena keduanya batas
+    penjepitan. Sisa ruang lubangnya pada fuzziness 1.0 hanya **0.009** di
+    atas ambang 0.2 — uji itu nyaris merah pada keadaan sekarang, dan menaikkan
+    span rumus growth dari 0.38 ke 0.45 sudah menutup lubangnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 662 | **662** |
+| Pemeriksaan visual | 399 | **409** |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 662), `swift-typecheck.sh`,
+`swift-ui-lint.sh` (29 aturan), `check-visuals.py --check` (409 pemeriksaan,
+0 gagal). Berkas tersentuh: `Tools/check-visuals.py`,
+`CelestialVisualTests.swift`. **Tidak ada kode Swift produksi yang berubah** —
+yang berubah adalah gerbang, dan satu uji yang berhenti menulis ulang angka
+katalognya sendiri.
+
+---
+
+## Progres sebelumnya (7 Okt 2026 — gerbang yang mengukur keberadaan nama, bukan sampainya angka ke gambar)
 
 ### Temuan: satu angka hidup dua kali di dalam satu berkas, dan gerbang drift menjaga yang salah
 
