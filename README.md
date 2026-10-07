@@ -284,3 +284,14 @@ menimbulkan cacat nyata.
 ## Lisensi
 
 Proyek pendidikan — Apple Developer Academy Final Challenge.
+
+Data dan pustaka pihak ketiga yang ikut didistribusikan dicatat di
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Yang paling perlu
+diketahui: `Catalogue.swift` memuat koordinat dari HYG Database, dan
+data itu berlisensi **CC BY-SA 4.0** — copyleft. Berkas itu adalah karya
+turunan, jadi ia tunduk pada CC BY-SA 4.0 terpisah dari sisa kode di
+repo ini.
+
+Lisensi untuk kode proyek ini sendiri **belum ditetapkan** (belum ada
+berkas `LICENSE`). Selama belum ada, default hukumnya adalah hak cipta
+penuh — orang lain tidak otomatis boleh memakai ulang kode ini.
