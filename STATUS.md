@@ -1,3 +1,155 @@
+## Progres terakhir (7 Okt 2026 — planet yang tidak pernah muncul di gambar mana pun, dan klaim docstring yang membantah dirinya sendiri)
+
+### Temuan: tiga daftar planet, tidak ada satu pun yang diikat
+
+Sumber kebenaran planet adalah `switch` di `CelestialVisual.Planet.palette`.
+Dua daftar lain ditulis dengan tangan dan hidup terpisah:
+
+| Daftar | Tempat | Isi |
+|---|---|---|
+| `switch` palet | `CelestialVisual.swift` | 5 planet, ciri per planet |
+| kasus render | `render-visuals.py::build_cases()` | 5 nama, ditulis ulang |
+| pasangan gerbang ciri | `check-visuals.py` | 5 pasangan, ditulis ulang **dua kali** |
+
+Menambah planet ke model tidak membuat satu pun pemeriksaan gambar berbunyi,
+dan planet itu tidak pernah muncul di satu pun PNG yang diukur. Yang hilang
+bukan gerbang baru, melainkan **gerbang yang berlaku untuk planet itu**:
+aturan "ciri pengenal hilang saat ragu" dan aturan "ciri pengenal masih
+terukur pada 38 pt" hanya berjalan pada pasangan kasus yang ada. Planet baru
+tampil di jam dengan ciri yang **tidak pernah diukur hilang** saat engine ragu
+— klaim identitas di layar, dan pelanggaran PRD yang paling sulit terlihat
+karena tidak ada yang salah untuk dilihat.
+
+### Docstring-nya sempat berbohong, dan harness yang membuktikannya
+
+Versi pertama docstring gerbang itu mengklaim: menambahkan `case .uranus:`
+berciri `.bands` ke model "membiarkan **seluruh 409 pemeriksaan hijau**".
+Diukur lewat `main()` penuh dengan gerbangnya **dikeluarkan** dari daftar
+jalannya (`out/bukti-planet-uranus.py` bagian B), bukan dikutip:
+
+```
+[baseline]                          409 pemeriksaan, 0 gagal  <- hijau
+uranus di model saja                410 pemeriksaan, 1 gagal  <- MERAH
+  GAGAL palet planet: uranus ada di kedua sisi
+uranus di model + port              412 pemeriksaan, 0 gagal  <- hijau
+```
+
+Baris kedua membantah klaim itu. Menambah `.uranus` di **model saja** memang
+merah — tapi oleh gerbang drift yang sudah ada (`palet planet: uranus ada di
+kedua sisi`), bukan oleh gerbang baru ini. Klaimnya salah, dan yang benar
+lebih sempit sekaligus lebih berbahaya: keadaan sunyinya adalah ketika **kedua
+bahasa sepakat**. Di sana tidak ada drift untuk diberitakan, seluruh 412
+pemeriksaan hijau, dan `uranus` tidak pernah muncul di satu pun gambar yang
+diukur. Docstring-nya sudah ditulis ulang dari angka hasil ukur itu.
+
+Ini kelas yang sama dengan `-5,1` di gerbang kontras kawah dan `elips 20% R`
+di gerbang pita Jupiter: **komentar di docstring adalah satu-satunya bukti
+yang dibaca orang yang menilai apakah gerbangnya layak dipercaya.** Yang
+diperbaiki bukan angkanya saja, melainkan bahwa klaimnya kini berbentuk
+tabel hasil ukur yang bisa dibantah ulang.
+
+### Gerbangnya: daftarnya diturunkan dari model, bukan dari tabel tangan
+
+`check_every_planet_in_the_model_has_render_cases` (6 pemeriksaan) membaca
+`switch` palet dari **sumber Swift** dan memeriksa empat hal:
+
+  1. `switch` palet dan tabel palet pembaca sepakat — planet yang tertulis di
+     satu tapi tidak di lain tidak bisa lolos diam.
+  2. Setiap planet di model punya kasus `planet-<nama>-confirmed`.
+  3. Setiap planet berciri punya `planet-<nama>-uncertain`.
+  4. Kedua gerbang ciri memuat **pasangan yang sama** dengan yang diturunkan —
+     termasuk sisi **tertukar** (`planet-jupiter` dipasangkan dengan
+     `planet-saturn-uncertain`), yang tidak terlihat oleh perbandingan
+     himpunan apa pun.
+
+Ditambah satu pemeriksaan kelima: ciri yang tidak dipakai planet mana pun
+adalah ciri mati — ia ada di enum, tidak digambar siapa pun, dan menambahkannya
+ke planet baru akan tampak seperti pekerjaan yang sudah selesai.
+
+Nama-namanya dibaca dari `case .nama:` di dalam `switch`, **bukan** dari
+`Planet.allCases`: nama kasus enum tidak muncul sebagai teks di berkas sumber,
+jadi membaca `allCases` hanya membuktikan bahwa *sesuatu* memakai `allCases`,
+bukan planet mana saja yang ada. Wilayahnya dipotong di penutup fungsi —
+tanpa itu, `case .nama:` dari `switch` mana pun di bawahnya ikut terbaca, dan
+`CelestialVisual.swift` punya beberapa.
+
+### Bukti mutasi — 7 keadaan, semuanya menggigit
+
+Harness: `out/bukti-planet-uranus.py` bagian A.
+
+```
+[baseline]                                           6 pemeriksaan, 0 gagal
+1. model: case .uranus (bands) ditambahkan           6 pemeriksaan, 4 gagal
+2. model + port: uranus di kedua bahasa              6 pemeriksaan, 4 gagal
+3. model: jupiter .bands -> .none                    6 pemeriksaan, 3 gagal
+4. model: case .mars -> case .marsX                  6 pemeriksaan, 4 gagal
+5. gerbang: pasangan mars hilang dari 'hilang saat ragu'  1 gagal
+6. gerbang: pasangan venus hilang dari 'ukuran jam'       1 gagal
+7. gerbang: pasangan jupiter memakai nama saturn          1 gagal
+      GAGAL ... hilang: [], berlebih: [], tertukar: ['jupiter']
+```
+
+Baris 7 yang menentukan: kedua sisi pasangan **ada** di dalam himpunan, jadi
+pemeriksaan keanggotaan apa pun akan hijau. Yang berbunyi adalah pemeriksaan
+yang membandingkan **pasangannya**, dan pesannya menyebut kata "tertukar".
+
+Baris 2 juga menentukan dengan cara yang berbeda: planet baru ditambahkan ke
+**kedua** bahasa sekaligus, jadi tidak ada drift antar bahasa yang bisa
+berbunyi. Hanya gerbang baru ini yang bisa melihatnya.
+
+### Dua cacat di harness-nya sendiri, keduanya ditemukan dengan menjalankannya
+
+1. **`continue` yang tidak memulihkan.** Versi pertama memulihkan berkas di
+   akhir loop dan `continue` saat suntikan gagal. Jadi keadaan yang gagal di
+   suntikan **kedua** meninggalkan suntikan **pertama** hidup di sumber
+   produksi. Gejalanya muncul sebagai `KELEMAHAN BUKTI: 'case .saturn' muncul
+   0x` pada keadaan berikutnya — pesan yang **menuduh anchor-nya salah**,
+   padahal penyebabnya adalah keadaan sebelumnya. Pemulihan sekarang di
+   `finally` **per keadaan**.
+
+2. **Dua instance bersamaan.** Percobaan pertama menjalankan dua harness
+   sekaligus; keduanya memutasi berkas yang sama dan `check-visuals.py`
+   rusak di tengah tulisan. Yang paling berbahaya bukan kerusakannya,
+   melainkan **bentuk gejalanya**: ia muncul sebagai "anchor tidak ditemukan",
+   bukan sebagai keluhan tentang dua proses. Sekarang ada kunci
+   `out/.bukti-planet.lock` yang memeriksa `/proc/<pid>`, jadi instance kedua
+   berhenti dengan pesan yang menyebut prosesnya.
+
+Keduanya kelas yang sama dengan yang sudah tercatat di repo ini: **harness
+mutasi adalah alat yang merusak sumber produksi dengan sengaja**, jadi
+keandalannya sendiri bagian dari kebenaran pengukurannya.
+
+### Batas yang jujur
+
+  - Gerbang ini menjaga **pasangan kasus ada dan cocok**, bukan bahwa planet
+    baru itu digambar dengan benar. Menambahkan `uranus` ke model **dan** ke
+    kedua gerbang ciri **dan** ke `build_cases()` akan hijau — dan memang
+    harus, karena saat itu Uranus benar-benar terukur oleh kedua gerbang.
+  - Yang diperiksa adalah daftar `pairs` **di dalam teks** dua gerbang ciri,
+    dibaca dari sumber berkasnya sendiri. Gerbang yang menurunkan pasangannya
+    dengan cara lain (mis. dari variabel) tidak akan terbaca — pemeriksaan
+    "terbaca" akan merah dan menyebut nama fungsinya.
+  - `read_planet_switch_cases_from_swift` memotong wilayah di `"\n    }"`
+    pertama sesudah anchor. `switch` yang ditulis dengan indentasi lain tidak
+    akan terpotong, dan `case .nama:` dari fungsi berikutnya bisa ikut
+    terbaca. Tidak ada `switch` seperti itu di berkas ini sekarang.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 182 | **182** |
+| PointingKit | 662 | **662** |
+| Pemeriksaan visual | 409 | **415** |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (182 + 662), `swift-typecheck.sh`,
+`swift-ui-lint.sh` (29 aturan), `check-visuals.py --check` (415 pemeriksaan,
+0 gagal). Berkas tersentuh: `Tools/check-visuals.py`. **Tidak ada kode Swift
+produksi yang berubah.**
+
+---
+
 ## Progres terakhir (7 Okt 2026 — gambar yang diukur gerbang bukan gambar yang tampil di jam: 17 objek langit dalam)
 
 ### Temuan: seluruh gerbang gambar langit dalam merender satu angka yang tidak dipakai objek mana pun

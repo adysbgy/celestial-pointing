@@ -1231,6 +1231,164 @@ def check_port_matches_swift_constants(results):
             f" di {where}"))
 
 
+def read_planet_switch_cases_from_swift(source):
+    """Nama planet dari `case .nama:` di dalam `switch` `var palette`.
+
+    **Kenapa dari `switch`, bukan dari `Planet.allCases`.** Nama kasus enum
+    tidak muncul sebagai teks di berkas sumber: `Planet.allCases` adalah
+    ekspresi, jadi membaca teksnya hanya membuktikan bahwa *sesuatu* memakai
+    `allCases`, bukan planet mana saja yang ada. Yang benar-benar tertulis
+    per planet adalah cabang `switch`-nya, dan itulah daftar yang harus
+    sepakat dengan daftar kasus render.
+    """
+    anchor = "var palette: CelestialVisual.Palette {"
+    if anchor not in source:
+        raise ValueError("'var palette' tidak ditemukan di CelestialVisual.swift")
+    region = source[source.index(anchor):]
+    # Wilayahnya berhenti di penutup fungsi, bukan di EOF. Tanpa batas ini,
+    # `case .nama:` dari **switch mana pun** di bawahnya ikut terbaca — dan
+    # `CelestialVisual.swift` punya beberapa. Membaca melewati batas fungsi
+    # adalah jebakan yang sama yang baru saja ditemukan di pembaca kunci
+    # penggambar langit dalam.
+    closing = region.find("\n    }")
+    if closing != -1:
+        region = region[:closing]
+    names = re.findall(r"case \.(\w+):", region)
+    if not names:
+        raise ValueError("tidak ada 'case .nama:' di dalam switch palet")
+    return names
+
+
+def check_every_planet_in_the_model_has_render_cases(results):
+    """Setiap planet di model harus punya **pasangan kasus render**-nya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Dua daftar planet ditulis dengan
+    tangan di `render-visuals.py` — lima nama di `build_cases()`, dan lima
+    pasangan lagi di `check_features_disappear_when_uncertain` — sementara
+    sumber kebenarannya adalah `switch` di `CelestialVisual.Planet.palette`.
+    Tidak ada satu pun pemeriksaan yang mengikat ketiganya.
+
+    **Keadaan yang benar-benar sunyi — diukur, bukan ditebak.** Harness
+    `out/bukti-planet-uranus.py` bagian B menjalankan `main()` penuh dengan
+    gerbang ini dikeluarkan, di atas sumber yang dimutasi:
+
+    ```
+    [baseline]                          409 pemeriksaan, 0 gagal  <- hijau
+    uranus di model saja                410 pemeriksaan, 1 gagal  <- MERAH
+      GAGAL palet planet: uranus ada di kedua sisi
+    uranus di model + port              412 pemeriksaan, 0 gagal  <- hijau
+    ```
+
+    Baris kedua penting karena ia **membantah versi pertama docstring ini**,
+    yang mengklaim planet baru "membiarkan seluruh 409 pemeriksaan hijau".
+    Menambah `.uranus` di model saja memang **merah** — tapi oleh gerbang drift
+    yang sudah ada (`palet planet: uranus ada di kedua sisi`), bukan oleh
+    gerbang ini. Jadi klaim itu salah, dan yang benar justru lebih sempit
+    sekaligus lebih berbahaya: keadaan sunyinya adalah ketika **kedua bahasa
+    sepakat**. Di sana drift tidak ada untuk diberitakan, seluruh 412
+    pemeriksaan hijau, dan `uranus` tidak pernah muncul di satu pun gambar
+    yang diukur.
+
+    Yang hilang di keadaan itu bukan gerbang baru, melainkan **gerbang yang
+    berlaku untuk planet itu**: aturan "ciri pengenal hilang saat ragu" dan
+    aturan "ciri pengenal masih terukur pada 38 pt" keduanya hanya berjalan
+    pada pasangan kasus yang ada. Planet baru tampil di jam dengan pita
+    Uranus yang **tidak pernah diukur hilang** saat engine ragu — klaim
+    identitas di layar, dan pelanggaran PRD yang paling sulit terlihat karena
+    tidak ada yang salah untuk dilihat.
+
+    Tiga hal diperiksa, semuanya diturunkan dari model:
+
+      1. Setiap planet di `switch` palet punya kasus `planet-<nama>-confirmed`.
+      2. Setiap planet dengan ciri **bukan** `.none` punya pasangan
+         `planet-<nama>-uncertain` — tanpa itu, aturan kejujuran tidak
+         berlaku untuk planet itu.
+      3. Kedua gerbang ciri (`check_features_disappear_when_uncertain` dan
+         `check_features_survive_the_watch_size`) memuat **pasangan yang
+         sama** dengan yang diturunkan. Gerbang yang kehilangan satu pasangan
+         akan tetap hijau untuk empat planet sisanya.
+
+    Daftar `pairs` dibaca dari **sumber berkas ini sendiri**, bukan dari
+    variabel lokal — variabel lokal sudah hilang saat gerbang lain selesai.
+    """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                   "CelestialVisual.swift")
+    try:
+        planets = read_planet_palettes_from_swift(open(model_path, encoding="utf-8").read())
+        switch_names = read_planet_switch_cases_from_swift(
+            open(model_path, encoding="utf-8").read())
+    except ValueError as exc:
+        results.append(Result("kasus render planet: terbaca dari model", False, str(exc)))
+        return
+
+    if set(planets) != set(switch_names):
+        results.append(Result(
+            "kasus render planet: switch palet & tabel palet sepakat",
+            False,
+            f"hanya di tabel: {sorted(set(planets) - set(switch_names))}, "
+            f"hanya di switch: {sorted(set(switch_names) - set(planets))}"))
+    else:
+        results.append(Result(
+            "kasus render planet: switch palet & tabel palet sepakat",
+            True, f"{len(planets)} planet"))
+
+    names = {case.name for case in R.build_cases()}
+    missing_confirmed = sorted(n for n in planets if f"planet-{n}-confirmed" not in names)
+    results.append(Result(
+        "kasus render planet: setiap planet di model punya kasus terkunci",
+        not missing_confirmed,
+        f"{len(planets)} planet" if not missing_confirmed
+        else f"tidak ada kasus render: {missing_confirmed} — planet itu tampil di jam "
+             "tanpa satu pun gerbang gambar"))
+
+    featured = sorted(n for n, (_, _, feature) in planets.items() if feature != "none")
+    missing_uncertain = sorted(n for n in featured if f"planet-{n}-uncertain" not in names)
+    results.append(Result(
+        "kasus render planet: setiap planet berciri punya kasus ragu",
+        not missing_uncertain,
+        f"{len(featured)} planet berciri: {featured}" if not missing_uncertain
+        else f"tidak ada kasus 'ragu': {missing_uncertain} — aturan 'ciri hilang saat ragu' "
+             "tidak berlaku untuk planet itu"))
+
+    # Ciri yang tidak dimiliki planet mana pun adalah ciri mati: ia ada di
+    # enum, tidak digambar siapa pun, dan menambahkannya ke planet baru akan
+    # tampak seperti pekerjaan yang sudah selesai.
+    used = {feature for _, _, feature in planets.values()}
+    dead = sorted({"bands", "rings", "polarCaps", "craters", "haze"} - used)
+    results.append(Result(
+        "kasus render planet: tidak ada ciri yang tidak dipakai planet mana pun",
+        not dead, "kelimanya dipakai" if not dead else f"ciri tanpa planet: {dead}"))
+
+    # Kedua gerbang ciri harus memuat pasangan yang sama dengan model.
+    self_source = open(os.path.abspath(__file__), encoding="utf-8").read()
+    expected = {(f"planet-{n}-confirmed", f"planet-{n}-uncertain") for n in featured}
+    for fn, label in (("check_features_disappear_when_uncertain", "gerbang ciri hilang saat ragu"),
+                      ("check_features_survive_the_watch_size", "gerbang ciri pada ukuran jam")):
+        if f"def {fn}(" not in self_source:
+            results.append(Result(f"kasus render planet: {label} terbaca", False,
+                                  f"'def {fn}(' tidak ditemukan"))
+            continue
+        region = self_source[self_source.index(f"def {fn}("):]
+        following = region.find("\ndef ", 1)
+        if following != -1:
+            region = region[:following]
+        found = set(re.findall(
+            r'\("planet-(\w+)-confirmed",\s*"planet-\w+-uncertain"', region))
+        pairs = {(f"planet-{n}-confirmed", f"planet-{n}-uncertain") for n in found}
+        # Nama pasangan yang tertukar (mis. `-confirmed` dipasangkan dengan
+        # planet lain) juga harus tertangkap, jadi kedua sisi diperiksa.
+        found_uncertain = set(re.findall(
+            r'\("planet-(\w+)-confirmed",\s*"planet-(\w+)-uncertain"', region))
+        swapped = sorted(a for a, b in found_uncertain if a != b)
+        results.append(Result(
+            f"kasus render planet: {label} memuat semua pasangan model",
+            pairs == expected and not swapped,
+            f"{len(pairs)} pasangan" if pairs == expected and not swapped
+            else (f"hilang: {sorted(expected - pairs)}, "
+                  f"berlebih: {sorted(pairs - expected)}"
+                  + (f", tertukar: {swapped}" if swapped else ""))))
+
+
 def swift_tuple_triples(source, anchor, terminator="]"):
     """Semua `(a, b, c)` dari sumber Swift, mulai setelah `anchor`.
 
@@ -4853,6 +5011,7 @@ def main():
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_features_survive_the_watch_size(results)
+    check_every_planet_in_the_model_has_render_cases(results)
     check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
     check_crater_relief_matches_the_model(results)
