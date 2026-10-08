@@ -58,6 +58,30 @@ sekilas justru yang paling tidak didesain.
     dijelaskan sebagai alasan setiap cabang merender ikon (Aturan 10: hitungan
     uji tidak berubah, jadi tidak ada sinkronisasi angka yang perlu).
 
+### Catatan CI: satu langkah merah karena flake, bukan karena commit ini
+
+Push pertama (SHA `584e550`) menjatuhkan langkah *"Buktikan gerbang radius
+akhir gradien berbunyi"* (`Tools/bukti-mutasi-radius-akhir.py`) — harness yang
+**tidak disentuh commit ini sama sekali** (diff commit: hanya
+`ComplicationWidget.swift`, `README.md`, `STATUS.md`).
+
+Keadaan 4 dilaporkan merah dengan lima pemeriksaan planet yang sama persis
+dengan keadaan 1. Bukti bahwa itu flake, bukan cacat yang dibawa commit:
+
+  - Checkout bersih pada SHA `584e550` di worktree terpisah: **12/12** jalan
+    hijau, `5 keadaan, 0 tidak sesuai harapan`.
+  - `gh run rerun --failed` pada run yang sama: **hijau**.
+
+Akarnya adalah tulis-biasa (`open(path, "w")`) di harness itu atas berkas
+produksi yang sama, sementara `probe()` membaca dari proses baru: pembaca bisa
+melihat berkas setengah jadi. Agent yang bekerja paralel di `Tools/` sudah
+menyiapkan perbaikan `os.replace` + verifikasi pemulihan di working tree-nya
+(diff belum di-commit) — saya **tidak** menyentuhnya, karena itu wilayahnya.
+
+Pelajaran yang sudah ditulis di diff mereka, dan pantas diingat: **harness
+yang gagal memulihkan berkas akan menyalahkan kode yang benar.** Keadaan 4
+merah dengan pemeriksaan keadaan 1 itu gejalanya.
+
 ---
 
 
