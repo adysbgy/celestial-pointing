@@ -34,7 +34,7 @@ sesuatu, bukan **hal yang ditulisnya**.
 
 ### Dua cacat di gerbang baru, ditemukan oleh harness-nya sendiri
 
-`out/bukti-gerbang-aksen.py` menjalankan **fungsi pemeriksaan yang sama**
+`Tools/bukti-mutasi-aksen.py` menjalankan **fungsi pemeriksaan yang sama**
 lewat parameter `view_source`/`night_source` (gerbang penuh ~6 menit; memanggil
 langsung <1 detik), atas 13 keadaan. Ia memeriksa **nama pemeriksaan mana yang
 berbunyi**, bukan berapa yang merah — menghitung jumlah menyembunyikan keadaan
@@ -53,6 +53,22 @@ yang berbunyi karena alasan yang salah.
 Dua keadaan di harness sengaja diharapkan **hijau** (ejaan berbeda; alias).
 Gerbang yang merah di sana akan dimatikan orang, dan itu bentuk kegagalan yang
 paling sulit terlihat karena tampak seperti ketaatan.
+
+Harness ini juga **menangkap gerbang versi lama**: dengan pemeriksaan ejaan
+`"Self.accent(CelestialVisual.accents.moonPhaseUnknown)" in view` dipulihkan,
+harness merah pada **9 dari 13** keadaan — termasuk **setiap** keadaan "kode
+benar", yaitu persis cacat yang membuat `main` merah dua commit. Diuji, lalu
+gerbangnya dikembalikan.
+
+### Kenapa harness ini di-track, bukan di `out/`
+
+Sampai siklus ini seluruh pembuktian mutasi repo ini hidup di `out/` — dan
+`out/` di-gitignore. Dua puluh harness pernah ditulis di sana dan **tidak satu
+pun** masih ada bagi siapa pun yang membaca repo ini. Pembuktian yang hilang
+sama dengan tidak ada: yang tersisa hanya gerbangnya, tanpa alasan untuk
+mempercayainya. Karena itu `Tools/bukti-mutasi-aksen.py` di-track dan
+dijalankan CI (langkah "Buktikan gerbang aksen gambar berbunyi"), sejajar
+dengan `red-lint.sh` untuk gerbang sapu UI.
 
 ### Satu harapan harness yang saya perbaiki, bukan gerbangnya
 
@@ -78,8 +94,11 @@ menuntut ia merah akan menuntut gerbang berbunyi karena alasan yang salah.
 
   - **206 + 687 uji hijau** (CelestialEngine + PointingKit), 0 gagal.
   - `python3 Tools/check-visuals.py --check` -> **537 pemeriksaan, 0 gagal**.
-  - `out/bukti-gerbang-aksen.py` -> **13 keadaan, 0 tidak sesuai harapan**.
+  - `python3 Tools/bukti-mutasi-aksen.py` -> **13 keadaan, 0 tidak sesuai
+    harapan**.
   - `./swift-ui-lint.sh` hijau (30 aturan), `./swift-typecheck.sh` hijau.
+  - CI `37705066565` (Engine Tests Linux) + `37705066502` (Apple Build
+    macos-15) **hijau** — `main` pulih dari dua commit merah.
 
 ## Progres terakhir (7 Okt 2026 — pita terang Bulan melengkung, dan dua angka yang beredar ternyata milik gambar yang sudah dibuang)
 

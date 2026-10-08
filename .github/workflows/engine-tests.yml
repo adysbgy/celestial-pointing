@@ -82,5 +82,28 @@ jobs:
       - name: Gerbang gambar objek (port Python)
         run: python3 Tools/check-visuals.py --check
 
+      # Buktikan gerbang gambar di atas **berbunyi**, bukan sekadar mencetak
+      # "0 gagal".
+      #
+      # `red-lint.sh` (langkah di atas) melakukan ini untuk `swift-ui-lint.sh`,
+      # tapi belum ada yang setara untuk gerbang gambar — dan justru di sana
+      # buktinya paling dibutuhkan: gerbang gambar membaca **teks** sumber lalu
+      # menyimpulkan sesuatu tentang gambar, jadi gerbang teks yang salah
+      # membaca akan hijau selamanya tanpa ada yang tahu.
+      #
+      # Ini bukan upacara. Harness ini **menemukan dua cacat nyata** di
+      # gerbangnya sendiri saat ditulis: (1) `"nama" in view` menghitung
+      # komentar `// TODO …moonPhaseUnknown` sebagai pemakaian, dan (2)
+      # `let aksen = CelestialVisual.accents` lalu `aksen.moonPhaseUnknown`
+      # — kode yang benar — merah. Ia juga menangkap gerbang versi lama
+      # (pemeriksaan ejaan) pada 9 dari 13 keadaan, termasuk setiap keadaan
+      # "kode benar" — persis cacat yang membuat `main` merah dua commit.
+      #
+      # Ia memanggil fungsi pemeriksaan yang **sama** lewat parameter sumber,
+      # bukan jalur kedua: gerbang penuh ~6 menit, ini <1 detik. Gerbang yang
+      # terlalu lambat untuk dijalankan adalah gerbang yang dilewati.
+      - name: Buktikan gerbang aksen gambar berbunyi
+        run: python3 Tools/bukti-mutasi-aksen.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
