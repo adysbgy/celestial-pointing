@@ -5936,6 +5936,105 @@
           }
         }
       }
+    },
+    "telescope.section": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope (experimental)"
+          }
+        }
+      }
+    },
+    "telescope.enableAlpaca": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Alpaca telescope"
+          }
+        }
+      }
+    },
+    "telescope.address": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address (host:port)"
+          }
+        }
+      }
+    },
+    "telescope.connect": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
+    "telescope.state.mock": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mock — no motor will move"
+          }
+        }
+      }
+    },
+    "telescope.state.connecting": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "telescope.state.connected": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected (%@)"
+          }
+        }
+      }
+    },
+    "telescope.state.unsupported": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mount doesn't support this app's GoTo"
+          }
+        }
+      }
+    },
+    "telescope.state.failed": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't connect"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

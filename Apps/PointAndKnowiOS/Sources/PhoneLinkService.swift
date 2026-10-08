@@ -85,17 +85,69 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     public override init() {
         let resolver = EngineFactory.makeResolver()
         let transport = MockTelescopeTransport()
-        let box = observerBox
         telescopeTransport = transport
-        let bridge = TelescopeBridge(
-            resolver: resolver,
-            capability: TelescopeCapability(axes: .equatorial, supportedFrames: [.j2000],
-                                            firmwareVersion: transport.firmwareVersion, canAbort: true))
-        let session = TelescopeSession(bridge: bridge, transport: transport, commandPath: "mock")
-        liveServer = LiveChannelServer(executor: BridgeTelescopeExecutor(
-            resolver: resolver, session: session, transport: transport,
-            observer: { box.value }))
+        self.resolver = resolver
+        let switchable = SwitchableTelescopeExecutor()
+        telescopeExecutor = switchable
+        liveServer = LiveChannelServer(executor: switchable)
         super.init()
+        useMockTelescope()
+    }
+
+    // MARK: Teleskop (ADR-008)
+
+    private let resolver: PointingResolver
+    private nonisolated let telescopeExecutor: SwitchableTelescopeExecutor
+
+    public enum TelescopeLink: Equatable {
+        /// Fitur Alpaca mati: transport tiruan, tidak ada motor.
+        case mock
+        case connecting
+        case connected(AlpacaMountInfo)
+        /// Tersambung, tapi dudukan tidak bisa dipakai GoTo app ini.
+        case unsupported(AlpacaMountInfo)
+        case failed(String)
+    }
+
+    @Published public private(set) var telescopeLink: TelescopeLink = .mock
+
+    private func executor(for transport: TelescopeTransport,
+                          capability: TelescopeCapability,
+                          path: String) -> BridgeTelescopeExecutor {
+        let preferred = capability.supportedFrames.contains(.j2000) ? CoordinateFrame.j2000 : .ofDate
+        let bridge = TelescopeBridge(resolver: resolver, capability: capability, preferredFrame: preferred)
+        let session = TelescopeSession(bridge: bridge, transport: transport, commandPath: path)
+        let box = observerBox
+        return BridgeTelescopeExecutor(resolver: resolver, session: session, transport: transport,
+                                       observer: { box.value })
+    }
+
+    public func useMockTelescope() {
+        let capability = TelescopeCapability(axes: .equatorial, supportedFrames: [.j2000],
+                                             firmwareVersion: telescopeTransport.firmwareVersion, canAbort: true)
+        telescopeExecutor.use(executor(for: telescopeTransport, capability: capability, path: "mock"))
+        telescopeLink = .mock
+    }
+
+    /// Sambungkan ke teleskop Alpaca di `address` ("host:port"). Sampai
+    /// tersambung dan dudukannya didukung, tidak ada pelaksana: GoTo ditolak
+    /// sebagai `telescopeUnavailable`.
+    public func connectAlpaca(address: String) async {
+        telescopeExecutor.use(nil)
+        telescopeLink = .connecting
+        do {
+            let telescope = AlpacaTelescope(client: try AlpacaClient(address: address))
+            let mount = try await telescope.connect()
+            guard let capability = mount.capability(firmware: "alpaca") else {
+                telescopeLink = .unsupported(mount)
+                return
+            }
+            let transport = AlpacaTelescopeTransport(telescope: telescope, mount: mount)
+            telescopeExecutor.use(executor(for: transport, capability: capability, path: "alpaca:\(address)"))
+            telescopeLink = .connected(mount)
+        } catch {
+            telescopeLink = .failed(String(describing: error))
+        }
     }
 
     /// Aktifkan sesi. Aman dipanggil berkali-kali selama sesinya memang aktif.

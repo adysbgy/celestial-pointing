@@ -90,6 +90,33 @@ catalog list in the Lab picker. Same 10 × per arm.
 
 _No device data yet._
 
+## Live channel latency (device session, before any telescope test)
+
+The 3 s GoTo staleness window (ADR-006) and the 4 s watch reply timeout are
+**provisional**. In the simulator a watch→iPhone `sendMessage` round trip took
+about 3.5 s.
+
+**Procedure.**
+
+1. Pair the iPhone and Watch (Debug build). Keep the iPhone app in the
+   foreground, unlocked, within 1 m of the watch.
+2. Run 20 confirms: Point → Confirm → note the result → Point again. For each
+   one, record the watch-side delay from tap to "Sent to iPhone" (screen
+   recording, or the device log timestamps for `sendMessage` and
+   `handleResponse` in the WatchConnectivity log).
+3. Repeat 10 confirms with the iPhone **locked** in a pocket, and 10 with the
+   iPhone about 10 m away.
+
+**Record.** p50 and p95 round trip, the number of `.noReply` timeouts, and
+the number of "Saved — iPhone not reachable" results.
+
+**Decide.**
+
+- If p95 is over 2 s with the phone awake, raise the GoTo window and the
+  reply timeout together, keeping timeout > window.
+- If p95 is over 3 s, GoTo from the watch needs a different interaction, for
+  example confirming the GoTo on the iPhone, before any motion test.
+
 ## Analysis
 
 ```sh

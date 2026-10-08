@@ -13,6 +13,11 @@ struct LinkView: View {
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
 
+    /// Fitur Alpaca mati secara bawaan (ADR-008): tanpa dinyalakan, app tidak
+    /// pernah menyentuh jaringan lokal.
+    @AppStorage("telescope.alpaca.enabled") private var alpacaEnabled = false
+    @AppStorage("telescope.alpaca.address") private var alpacaAddress = String()
+
     var body: some View {
         NavigationStack {
             List {
@@ -34,6 +39,26 @@ struct LinkView: View {
                         Text(IdentificationText.phoneNothingConfirmed)
                             .foregroundStyle(Color.nightAwareSecondary)
                     }
+                }
+
+                Section(TelescopeText.section) {
+                    Toggle(TelescopeText.enableAlpaca, isOn: $alpacaEnabled)
+                        .onChange(of: alpacaEnabled) { _, on in
+                            if !on { link.useMockTelescope() }
+                        }
+                    if alpacaEnabled {
+                        TextField(TelescopeText.address, text: $alpacaAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                        Button(TelescopeText.connect) {
+                            Task { await link.connectAlpaca(address: alpacaAddress) }
+                        }
+                        .disabled(alpacaAddress.isEmpty || link.telescopeLink == .connecting)
+                    }
+                    Text(telescopeStatus)
+                        .font(.footnote)
+                        .foregroundStyle(Color.nightAwareSecondary)
                 }
 
                 Section(TextLocalization.text(.linkSectionTitle)) {
@@ -130,5 +155,15 @@ struct LinkView: View {
         // tiga versi aturan pengumuman. Lihat juga `SkyContextView.row`.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(RowSpeech.label(title: title, value: value))
+    }
+
+    private var telescopeStatus: String {
+        switch link.telescopeLink {
+        case .mock: return TelescopeText.stateMock
+        case .connecting: return TelescopeText.stateConnecting
+        case .connected(let mount): return TelescopeText.stateConnected(mount.equatorialSystem)
+        case .unsupported: return TelescopeText.stateUnsupported
+        case .failed: return TelescopeText.stateFailed
+        }
     }
 }

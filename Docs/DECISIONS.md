@@ -345,3 +345,79 @@ a fake clock).
   `PointingEngine.onIngest`, so debug poses and sensors report alike.
 - *Reduce Motion.* Already gated through `MotionPolicy` for the pulse and the
   arrival pop. The new panel has no animation.
+
+---
+
+## ADR-008 — Telescope: standard ASCOM Alpaca first, Seestar-native later and POC-only (2026-10-08)
+
+**Context.** Two facts drive this.
+
+- **No official third-party API.** ZWO publishes no third-party control API for
+  the Seestar.
+- **The native path needs a vendor credential.** The community path through
+  seestar_alp changed in **v3.2.2 (released 2026-05-06)**. Its release notes
+  list *"Add interop PEM-based client authentication for firmware 7.18+"* and
+  say this applies to "a subset of users", with an "interoperability PEM"
+  extracted from the Seestar APK (bguthro/seestar-tool → "Extract PEM").
+
+So talking natively to a Seestar on current firmware means extracting a key
+from ZWO's own app. We won't ship that, and it can't be a stable product
+dependency.
+
+**Decision.**
+
+- **Standard first.** The app talks **standard ASCOM Alpaca Telescope v1**
+  (`PointingKit/AlpacaTelescope.swift`). seestar_alp, or any Alpaca driver, can
+  bridge a Seestar to it, and any other Alpaca mount works unchanged.
+- **Seestar-native later.** Seestar-native control stays a **later, POC-only**
+  option, after Ady's exact firmware version is known.
+- **Endpoints implemented:** `connected` (GET/PUT), `canslewasync`,
+  `equatorialsystem`, `tracking` (NotImplemented is tolerated),
+  `slewtocoordinatesasync` (RA in hours, Dec in degrees), `slewing`,
+  `abortslew`.
+- **Request tagging and errors.** Every request carries `ClientID` and an
+  increasing `ClientTransactionID`. `ErrorNumber ≠ 0` becomes
+  `AlpacaError.device`. Each blocking transport call is capped at 2.5 s, so
+  the phone still answers the watch inside its 4 s reply timeout (ADR-006).
+- **Coordinate frame comes from the mount.**
+  - `equatorialsystem` 1 (topocentric/JNow) maps to `.ofDate`.
+  - 2 maps to `.j2000`.
+  - Anything else disables GoTo; we never guess.
+  - A command whose frame differs from the mount's is refused before any
+    network call.
+- **Precession.** Of-date uses `SkyMath.precessJ2000ToDate`, which
+  `PrecessionTests` already validates against AstronomyKit (worst case
+  15.9″). `MountFrameTests` shows that Sirius J2000 versus of-date differs by
+  ~0.29° in RA in 2026, matching the annual-rate formula. That is more than a
+  fifth of the Seestar S50 field, so choosing the frame matters.
+- **No async slew means no GoTo.** A mount without `CanSlewAsync` gets no
+  capability, so GoTo is disabled.
+- **Off by default.** The feature flag `telescope.alpaca.enabled` and the
+  address (`host:port`) live in the iPhone Link tab.
+- **Executor swap.** `SwitchableTelescopeExecutor` swaps the mock for Alpaca at
+  runtime. While connecting, or on failure, there is no executor and GoTo is
+  rejected as `telescopeUnavailable`.
+- **iPhone permissions.**
+  - `NSLocalNetworkUsageDescription` (id in `project.yml`, en and id in
+    `InfoPlist.strings`).
+  - `NSAppTransportSecurity.NSAllowsLocalNetworking = true` in a partial
+    `Apps/PointAndKnowiOS/Info.plist`, so plain-HTTP Alpaca works on the local
+    network only.
+
+**Verified.**
+
+- **Fake-server tests.** 12 tests run against an in-process URLProtocol fake
+  server:
+  - connect and request tagging
+  - GoTo → slewing ×3 → ready, with RA in hours
+  - abort mid-slew
+  - a device error mid-slew
+  - a disconnected device
+  - no async slew, or an unsupported frame
+  - frame mismatch
+  - tracking NotImplemented
+- **Simulator.** The iPhone simulator connected to a stand-in Alpaca server
+  over real HTTP and showed "Connected (J2000)".
+
+**Not verified.** Any real mount. seestar_alp's exact Alpaca behaviour
+(EquatorialSystem, tracking). Stop latency on hardware.

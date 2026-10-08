@@ -316,10 +316,10 @@ final class TextLocalizationTests: XCTestCase {
     ///
     /// 332 → 344: dua belas kunci `identify.*` untuk layar Identify → Confirm
     /// (ADR-007, `IdentificationOutcome.swift`). 344 → 345: `unit.perSecondSuffix`
-    /// ("/dtk" → "/s" di Inggris); 347: dua kalimat sigma terucap.
+    /// ("/dtk" → "/s" di Inggris); 347: dua kalimat sigma terucap. 356: sembilan kunci `telescope.*` (ADR-008).
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 347, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 356, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
