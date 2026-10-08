@@ -70,7 +70,7 @@ public struct PointingSnapshot: Equatable, Sendable {
                 calibratedPointing: HorizontalCoord? = nil,
                 angularRateDegPerSec: Double? = nil,
                 nearestNeighbourDeg: Double? = nil,
-                aim: DeviceAimAxis = .view,
+                aim: DeviceAimAxis = .defaultForearm,
                 rawAttitudeQuaternion: Quaternion? = nil,
                 hasSensor: Bool = true,
                 isCalibrated: Bool = false,
@@ -119,8 +119,14 @@ public struct PointingUpdate: Equatable, Sendable {
 
 /// Parameter alur yang bisa diubah dari UI/pengaturan.
 public struct PointingControllerConfig: Equatable, Sendable {
-    /// Sumbu badan yang dianggap arah tunjuk.
+    /// Sumbu badan yang dianggap arah tunjuk. Bawaan: lengan bawah pada
+    /// pemakaian bawaan watchOS (ADR-002). App jam menggantinya dari
+    /// `WearConfiguration`; app iPhone memakai tepi atas (`.screenUp`).
     public var aim: DeviceAimAxis
+    /// Kerangka acuan CoreMotion yang dipakai `MotionLogger`. Harus sama
+    /// dengan kerangka sensor sungguhan, karena arti quaternion bergantung
+    /// padanya.
+    public var frame: AttitudeReferenceFrame
     /// Ambang "pergelangan diam" dan laju resolusi.
     public var policy: PointingPolicy
     /// Setengah sudut kerucut pencarian kandidat (derajat).
@@ -128,11 +134,13 @@ public struct PointingControllerConfig: Equatable, Sendable {
     /// Bobot perata orientasi: kecil = halus, besar = gesit.
     public var smootherBlend: Double
 
-    public init(aim: DeviceAimAxis = .view,
+    public init(aim: DeviceAimAxis = .defaultForearm,
+                frame: AttitudeReferenceFrame = .xArbitraryZVertical,
                 policy: PointingPolicy = PointingPolicy(),
                 coneDeg: Double = 20.0,
                 smootherBlend: Double = 0.3) {
         self.aim = aim
+        self.frame = frame
         self.policy = policy
         self.coneDeg = coneDeg
         self.smootherBlend = smootherBlend
@@ -323,9 +331,10 @@ public final class PointingController {
     @discardableResult
     public func feed(cmX: Double, cmY: Double, cmZ: Double, cmW: Double,
                      timestamp: Date) -> PointingUpdate {
-        // Tanpa `rollAboutViewDeg`: arah tunjuk mentah harus murni dari sensor.
-        // Lihat `feed(quaternion:timestamp:)` untuk alasan lengkapnya.
-        guard let attitude = DeviceAttitude(cmX: cmX, cmY: cmY, cmZ: cmZ, cmW: cmW)
+        // Arah tunjuk mentah harus murni dari sensor; kalibrasi diterapkan
+        // sekali, di `feed(quaternion:timestamp:)`.
+        guard let attitude = DeviceAttitude(cmX: cmX, cmY: cmY, cmZ: cmZ, cmW: cmW,
+                                            frame: config.frame)
         else {
             // Quaternion tidak sah: sensor rusak/nol. Jangan menebak arah.
             // Ini juga menandai sensor tidak tersedia, karena satu-satunya
@@ -354,13 +363,9 @@ public final class PointingController {
         // 1. Perata: meredam gemetar tanpa menunda gerakan besar.
         let smoothed = smoother.update(raw) ?? raw
 
-        // 2. Arah tunjuk dari attitude teredam.
-        //
-        //    `rollAboutViewDeg` sengaja TIDAK diberikan di sini. Kalibrasi
-        //    yaw sudah diterapkan sekali sebagai koreksi azimut di langkah 3;
-        //    memasukkannya lagi sebagai roll akan memutar kerangka perangkat
-        //    dan menambahkan offset yang sama untuk kedua kalinya.
-        let attitude = DeviceAttitude(quaternion: smoothed)
+        // 2. Arah tunjuk dari attitude teredam, dalam kerangka acuan yang
+        //    eksplisit (ADR-002). Kalibrasi diterapkan sekali, di langkah 3.
+        let attitude = DeviceAttitude(quaternion: smoothed, frame: config.frame)
         guard let rawPointing = attitude.horizontalPointing(aim: config.aim) else {
             // Attitude tidak terdefinisi (mis. sensor memberi vektor nol).
             refreshSnapshot(state: .unavailable)

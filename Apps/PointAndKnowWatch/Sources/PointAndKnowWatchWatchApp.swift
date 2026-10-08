@@ -1,6 +1,7 @@
 import SwiftUI
 import WidgetKit
 import PointingKit
+import CelestialEngine
 
 /// Titik masuk app jam.
 ///
@@ -21,7 +22,10 @@ struct PointAndKnowWatchApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
-    @StateObject private var engine = PointingEngine()
+    // Sumbu tunjuk = lengan bawah, dari cara jam dipakai (ADR-002).
+    @StateObject private var engine = PointingEngine(
+        config: PointingControllerConfig(aim: WearConfiguration.current.forearmAim)
+    )
     @StateObject private var motion = MotionLogger()
     @StateObject private var link = WatchLinkService()
     @StateObject private var location = LocationProvider()

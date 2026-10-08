@@ -11,7 +11,11 @@ import PointingKit
 @main
 struct PointAndKnowiOSApp: App {
 
-    @StateObject private var engine = PointingEngine()
+    // iPhone ditunjukkan dengan tepi atasnya (+Y), bukan dengan sumbu lengan
+    // bawah jam (ADR-002).
+    @StateObject private var engine = PointingEngine(
+        config: PointingControllerConfig(aim: .screenUp)
+    )
     @StateObject private var motion = MotionLogger()
     @StateObject private var location = LocationProvider()
     @StateObject private var link = PhoneLinkService()
