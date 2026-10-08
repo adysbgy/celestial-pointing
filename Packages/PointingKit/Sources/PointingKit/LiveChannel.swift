@@ -73,6 +73,10 @@ public enum LiveRejection: String, Codable, Equatable, Sendable {
     case transportFailed
     /// Pesan tidak bisa dibaca.
     case badMessage
+    /// Terkirim, tapi tidak ada jawaban dalam `replyTimeout`. Untuk GoTo,
+    /// hasilnya **tidak diketahui** — UI harus menyuruh memeriksa iPhone,
+    /// bukan menganggapnya gagal atau berhasil.
+    case noReply
 }
 
 public struct LiveReply: Equatable, Codable, Sendable {
@@ -154,15 +158,43 @@ public enum LiveSendResult: Equatable, Sendable {
 public final class LiveChannelClient {
     private let session: LiveSession
     private let now: () -> Date
+    /// Penjadwal tenggat (bisa diganti di uji).
+    private let schedule: (TimeInterval, @escaping () -> Void) -> Void
+
+    /// Batas menunggu jawaban `sendMessage`. Di atas 3 dtk jendela basi GoTo
+    /// di iPhone, supaya GoTo yang dianggap "tanpa jawaban" di jam sudah
+    /// pasti tidak bisa lagi dijalankan iPhone. Terbukti perlu: simulator jam
+    /// melaporkan iPhone terjangkau padahal mati, dan `sendMessage` tidak
+    /// pernah memanggil balasan maupun galat.
+    public var replyTimeout: TimeInterval = 4
     public private(set) var sequence: LiveIDSequence
     /// Dipanggil setiap id baru dipakai, supaya app bisa menyimpannya.
     public var onSequenceAdvanced: ((UInt64) -> Void)?
 
     public init(session: LiveSession, sequence: LiveIDSequence = LiveIDSequence(),
-                now: @escaping () -> Date = Date.init) {
+                now: @escaping () -> Date = Date.init,
+                schedule: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, work in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: work)
+                }) {
         self.session = session
         self.sequence = sequence
         self.now = now
+        self.schedule = schedule
+    }
+
+    /// Kirim dengan balasan; tepat satu dari balasan / galat / tenggat yang
+    /// menyelesaikan, sisanya diabaikan.
+    private func send(_ message: LiveMessage,
+                      onReply: @escaping (LiveReply?) -> Void,
+                      onError: @escaping () -> Void,
+                      onTimeout: @escaping () -> Void) {
+        let once = Once()
+        session.sendMessage(message.plist, replyHandler: { reply in
+            once.run { onReply(LiveReply(plist: reply)) }
+        }, errorHandler: { _ in
+            once.run(onError)
+        })
+        schedule(replyTimeout) { once.run(onTimeout) }
     }
 
     private func make(_ kind: LiveKind, objectID: String? = nil, name: String? = nil) -> LiveMessage {
@@ -183,9 +215,9 @@ public final class LiveChannelClient {
             completion(.recordedOnly)
         }
         guard session.isReachable else { record(); return }
-        session.sendMessage(message.plist, replyHandler: { reply in
-            if let r = LiveReply(plist: reply) { completion(.replied(r)) } else { completion(.failed(.badMessage)) }
-        }, errorHandler: { _ in record() })
+        send(message, onReply: { r in
+            completion(r.map(LiveSendResult.replied) ?? .failed(.badMessage))
+        }, onError: record, onTimeout: record)
     }
 
     public func requestTelescopeStatus(completion: @escaping (LiveSendResult) -> Void) {
@@ -208,9 +240,10 @@ public final class LiveChannelClient {
             completion(.failed(.unreachable))
             return
         }
-        session.sendMessage(message.plist, replyHandler: { reply in
-            if let r = LiveReply(plist: reply) { completion(.replied(r)) } else { completion(.failed(.badMessage)) }
-        }, errorHandler: { _ in completion(.failed(.transportFailed)) })
+        send(message, onReply: { r in
+            completion(r.map(LiveSendResult.replied) ?? .failed(.badMessage))
+        }, onError: { completion(.failed(.transportFailed)) },
+           onTimeout: { completion(.failed(.noReply)) })
     }
 }
 
@@ -406,5 +439,19 @@ public final class MockTelescopeTransport: TelescopeTransport {
     public func abort() throws {
         abortCount += 1
         state = .ready
+    }
+}
+
+/// Menjalankan blok paling banyak sekali, aman dari banyak antrean.
+final class Once: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    func run(_ block: () -> Void) {
+        lock.lock()
+        let first = !done
+        done = true
+        lock.unlock()
+        if first { block() }
     }
 }

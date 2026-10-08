@@ -12,6 +12,8 @@ final class LiveChannelTests: XCTestCase {
     final class FakeSession: LiveSession {
         var isReachable = true
         var failSend = false
+        /// Simulator jam: "terjangkau", tapi pesan tidak pernah dijawab.
+        var swallow = false
         var latency: TimeInterval = 0
         var server: LiveChannelServer?
         var clock: Clock?
@@ -22,6 +24,7 @@ final class LiveChannelTests: XCTestCase {
                          replyHandler: @escaping ([String: Any]) -> Void,
                          errorHandler: @escaping (Error) -> Void) {
             sent.append(message)
+            if swallow { return }
             if failSend { errorHandler(NSError(domain: "fake", code: 1)); return }
             clock?.advance(latency)
             replyHandler(server!.handle(message))
@@ -180,6 +183,52 @@ final class LiveChannelTests: XCTestCase {
                                         now: { [unowned self] in clock.now })
         _ = result { resumed.requestTelescopeStatus(completion: $0) }
         XCTAssertEqual(server.lastSeenID, 3)
+    }
+
+    // MARK: Tanpa jawaban
+
+    /// Penjadwal manual: tenggat hanya berjalan saat uji memintanya.
+    private func clientWithManualTimeout() -> (LiveChannelClient, () -> Void) {
+        var pending: [() -> Void] = []
+        let c = LiveChannelClient(session: session, now: { [unowned self] in clock.now },
+                                  schedule: { _, work in pending.append(work) })
+        return (c, { pending.forEach { $0() }; pending.removeAll() })
+    }
+
+    func testConfirmWithoutReplyFallsBackToRecordAfterTimeout() {
+        let (c, fire) = clientWithManualTimeout()
+        session.swallow = true
+        var out: LiveSendResult?
+        c.confirm(objectID: "sirius", name: "Sirius") { out = $0 }
+        XCTAssertNil(out, "belum ada jawaban, belum ada hasil")
+        fire()
+        XCTAssertEqual(out, .recordedOnly)
+        XCTAssertEqual(session.queued.count, 1)
+    }
+
+    func testGoToWithoutReplyIsNoReplyAndNeverQueued() {
+        let (c, fire) = clientWithManualTimeout()
+        session.swallow = true
+        var out: LiveSendResult?
+        c.goTo(objectID: "sirius", name: "Sirius") { out = $0 }
+        fire()
+        XCTAssertEqual(out, .failed(.noReply))
+        XCTAssertTrue(session.queued.isEmpty)
+    }
+
+    /// Tenggat setelah jawaban tidak boleh menyelesaikan dua kali.
+    func testTimeoutAfterReplyIsIgnored() {
+        let (c, fire) = clientWithManualTimeout()
+        var results: [LiveSendResult] = []
+        c.confirm(objectID: "sirius", name: "Sirius") { results.append($0) }
+        fire()
+        XCTAssertEqual(results.count, 1)
+        if case .replied(let r) = results[0] { XCTAssertTrue(r.accepted) } else { XCTFail() }
+    }
+
+    /// Tenggat harus melewati jendela basi GoTo di iPhone.
+    func testReplyTimeoutExceedsServerStaleWindow() {
+        XCTAssertGreaterThan(client.replyTimeout, server.maxGoToAge)
     }
 
     // MARK: Stop

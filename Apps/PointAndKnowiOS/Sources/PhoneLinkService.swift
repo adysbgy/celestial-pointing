@@ -44,6 +44,11 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Peristiwa kanal langsung terakhir, untuk ditampilkan.
     @Published public private(set) var lastLiveReply: LiveReply?
 
+    /// Objek terakhir yang dikonfirmasi di jam (ADR-007). `live` = lewat
+    /// kanal langsung (membuka GoTo); `false` = catatan antrean yang tiba
+    /// belakangan (riwayat saja).
+    @Published public private(set) var lastConfirmed: (message: LiveMessage, live: Bool)?
+
     /// Berkas Pointing Lab yang sudah diterima (ADR-004).
     @Published public private(set) var labFiles: [URL] = PhoneLinkService.listLabFiles()
 
@@ -264,7 +269,13 @@ extension PhoneLinkService: WCSessionDelegate {
         let reply = liveServer.handle(message)
         replyHandler(reply)
         let decoded = LiveReply(plist: reply)
-        Task { @MainActor in self.lastLiveReply = decoded }
+        let incoming = LiveMessage(plist: message)
+        Task { @MainActor in
+            self.lastLiveReply = decoded
+            if let incoming, incoming.kind == .confirmTarget, decoded?.accepted == true {
+                self.lastConfirmed = (incoming, true)
+            }
+        }
     }
 
     /// Pesan antre dari jam. Kalibrasi dan permintaan keadaan dikirim jam
@@ -273,8 +284,16 @@ extension PhoneLinkService: WCSessionDelegate {
     nonisolated public func session(_ session: WCSession,
                                     didReceiveUserInfo userInfo: [String: Any]) {
         // Catatan konfirmasi dari antrean: riwayat saja (ADR-006).
-        if LiveMessage(plist: userInfo) != nil {
+        if let record = LiveMessage(plist: userInfo) {
             liveServer.record(userInfo)
+            Task { @MainActor in
+                // Catatan yang lebih tua dari konfirmasi langsung terakhir
+                // tidak menimpanya.
+                if record.kind == .confirmRecord,
+                   (self.lastConfirmed?.message.id ?? 0) < record.id {
+                    self.lastConfirmed = (record, false)
+                }
+            }
             return
         }
         guard let decoded = PointingLinkMessage(plist: userInfo) else { return }

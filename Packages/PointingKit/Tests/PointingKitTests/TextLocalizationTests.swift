@@ -313,9 +313,12 @@ final class TextLocalizationTests: XCTestCase {
     /// `.spiralGalaxy`, karena M31 (cakram miring) dan M51 (lengan terbaca)
     /// kini digambar berbeda dan tidak boleh terdengar sama. Lihat
     /// `DeepSkySpeech.swift`.
+    ///
+    /// 332 → 344: dua belas kunci `identify.*` untuk layar Identify → Confirm
+    /// (ADR-007, `IdentificationOutcome.swift`).
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 332, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 344, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

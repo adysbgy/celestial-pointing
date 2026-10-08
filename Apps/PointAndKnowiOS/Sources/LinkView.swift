@@ -16,6 +16,26 @@ struct LinkView: View {
     var body: some View {
         NavigationStack {
             List {
+                // Objek yang dikonfirmasi di jam (ADR-007). Nama dibentuk ulang
+                // dari id dengan bahasa iPhone, bukan nama kiriman jam.
+                Section(IdentificationText.phoneConfirmedTitle) {
+                    if let confirmed = link.lastConfirmed {
+                        let id = confirmed.message.objectID ?? "—"
+                        Text(verbatim: DisplayLabel.objectName(
+                            forObjectID: id,
+                            catalogue: Catalogue.brightStars + DeepSkyCatalogue.objects)
+                             ?? confirmed.message.objectName ?? id)
+                            .font(.title2.bold())
+                        Text(verbatim: IdentificationText.phoneConfirmedTime(confirmed.message.sentAt,
+                                                                             live: confirmed.live))
+                            .font(.footnote)
+                            .foregroundStyle(Color.nightAwareSecondary)
+                    } else {
+                        Text(IdentificationText.phoneNothingConfirmed)
+                            .foregroundStyle(Color.nightAwareSecondary)
+                    }
+                }
+
                 Section(TextLocalization.text(.linkSectionTitle)) {
                     row(TextLocalization.text(.linkRowStatus),
                         link.isActivated

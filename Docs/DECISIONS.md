@@ -270,3 +270,58 @@ a fake clock).
 
 **Unverified.** Real `sendMessage` latency and clock skew between devices. The
 3 s window may need tuning from device logs.
+
+---
+
+## ADR-007 — Watch Identify → Confirm loop on the provisional σ (2026-10-08)
+
+**Decision.**
+
+- **Outcome mapping.** `IdentificationOutcome` (PointingKit, pure, tested)
+  maps the existing state machine and `CelestialIntent` onto the three
+  product answers, with no new thresholds:
+  - `idle` / `pointing` → *Hold steady*
+  - `lock` → one answer
+  - `uncertain` → *Possible matches* (best plus up to 3 candidates)
+  - `searching` → *Not sure yet*
+- **Watch panel.** `IdentificationPanel` sits under the status card. Confirm
+  (button, or Double Tap on the single answer) plays a success haptic
+  immediately, because matching and confirmation are complete on the watch,
+  offline. It then sends `confirmTarget` over the live channel (ADR-006). The
+  card says "Sent to iPhone", "Saved — iPhone not reachable", or "Couldn't
+  send".
+- **Provisional σ.** The σ in use is always shown as `σ 10.0° PROVISIONAL`
+  until `ConfidencePolicy.isMeasured`.
+- **iPhone.** The Link tab shows "Confirmed on Watch" with the name rebuilt
+  from the object id in the phone's language. Queued records are labelled as
+  such.
+- **Reply timeout.** `LiveChannelClient.replyTimeout` is 4 s, longer than the
+  phone's 3 s GoTo window. The watch simulator reported the shut-down iPhone
+  as reachable, and `sendMessage` then never called back. Now a confirm falls
+  back to a record, and status/GoTo/Stop return `.noReply` ("outcome
+  unknown"), never a queue.
+- **Object names.** `ObjectNameLocalization` with keys `object.name.<id>`.
+  English shows "Saturn" and "Andromeda Galaxy"; Indonesian is unchanged.
+- **Debug pose injector** (DEBUG only). Launch with
+  `-debugPose single|ambiguous|empty|moving|object:<id>` and
+  `-onboardingSeen YES` to drive every state on simulators. It uses one base
+  attitude plus small yaw rotations; rebuilding the shortest arc each sample
+  made roll jump and read as 9–46°/s of motion.
+
+**Verified on simulators** (watchOS/iOS 26.5, SE 40 mm, Ultra 3, iPhone 17):
+
+- all four outcomes render
+- tapping Confirm on the Ultra 3 → "Saturn confirmed · Sent to iPhone"
+- the iPhone Link tab shows "Confirmed on Watch — Saturn"
+- the watch→phone round trip took ~3.5 s in the simulator; to be measured on
+  devices against the 3 s GoTo window
+
+**Known UX debt for the M6 pass.**
+
+- The Confirm button sits below the fold on 40 mm, under the large status
+  card.
+- The prominent button is grey.
+- "°/dtk" is untranslated in the English UI.
+- The iPhone shows "10,0°" (comma) in English UI.
+- The extended runtime session is rejected on unsigned simulator builds
+  ("client is not entitled"); expected, to recheck on a signed device build.

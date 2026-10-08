@@ -5771,6 +5771,138 @@
           }
         }
       }
+    },
+    "identify.holdSteady": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold steady"
+          }
+        }
+      }
+    },
+    "identify.possibleMatches": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Possible matches"
+          }
+        }
+      }
+    },
+    "identify.notSure": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure yet — point again"
+          }
+        }
+      }
+    },
+    "identify.confirm": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm %@"
+          }
+        }
+      }
+    },
+    "identify.confirmed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ confirmed"
+          }
+        }
+      }
+    },
+    "identify.sending": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending to iPhone…"
+          }
+        }
+      }
+    },
+    "identify.delivered.live": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to iPhone"
+          }
+        }
+      }
+    },
+    "identify.delivered.recorded": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved — iPhone not reachable"
+          }
+        }
+      }
+    },
+    "identify.delivered.failed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send"
+          }
+        }
+      }
+    },
+    "identify.pointAgain": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point again"
+          }
+        }
+      }
+    },
+    "identify.phone.confirmedTitle": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmed on Watch"
+          }
+        }
+      }
+    },
+    "identify.phone.nothingConfirmed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object confirmed yet"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

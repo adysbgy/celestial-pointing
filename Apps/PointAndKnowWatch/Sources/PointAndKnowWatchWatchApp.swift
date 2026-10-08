@@ -120,9 +120,17 @@ struct PointAndKnowWatchApp: App {
         }
 
         link.activate()
+
+        #if DEBUG
+        // Simulator: pose sintetis dari argumen peluncuran `-debugPose …`.
+        DebugPoseInjector.shared.startIfRequested(engine: engine)
+        #endif
     }
 
     private func stop() {
+        #if DEBUG
+        DebugPoseInjector.shared.stop()
+        #endif
         motion.stop()
         engine.stop()
         location.stop()

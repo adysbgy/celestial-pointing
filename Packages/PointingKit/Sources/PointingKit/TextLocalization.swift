@@ -765,5 +765,5 @@ public extension LocalizedText {
         .diagnosticsLegendUnknown,
         .diagnosticsValueCalibrated, .diagnosticsValueNotCalibrated,
         .diagnosticsValueMotionAvailable, .diagnosticsValueMotionUnavailable,
-    ]
+    ] + identifyKeys
 }
