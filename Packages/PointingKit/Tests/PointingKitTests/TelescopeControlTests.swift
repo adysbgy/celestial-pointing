@@ -61,9 +61,41 @@ final class TelescopeControlTests: XCTestCase {
         XCTAssertFalse(m.canGoTo(now: t0.addingTimeInterval(15)))
     }
 
-    func testNoStopWhenNothingWasIssuedAndTelescopeIdle() {
+    /// Laporan segar "siap / mati / terputus" tanpa apa pun yang tertunda:
+    /// satu-satunya keadaan tanpa Stop.
+    func testNoStopOnlyWhenFreshReportSaysIdle() {
         XCTAssertFalse(model(.ready).showsStop(now: t0))
-        XCTAssertFalse(model(.ready, age: 30).showsStop(now: t0), "tidak diketahui tapi tidak pernah GoTo")
+        XCTAssertFalse(model(.disabled).showsStop(now: t0))
+        XCTAssertFalse(model(.disconnected).showsStop(now: t0))
+        XCTAssertTrue(model(.error).showsStop(now: t0), "galat: mungkin masih bergerak")
+    }
+
+    /// Probe pemeriksaan independen: slew dimulai dari iPhone, laporan
+    /// berhenti; setelah 10 dtk keadaan "tidak diketahui" — Stop tetap ada.
+    func testStopWhenStateUnknownAfterSlewing() {
+        let m = model(.slewing, age: 0, confirmed: false)
+        XCTAssertTrue(m.showsStop(now: t0))
+        XCTAssertEqual(m.effectiveState(now: t0.addingTimeInterval(15)), .unknown)
+        XCTAssertTrue(m.showsStop(now: t0.addingTimeInterval(15)))
+    }
+
+    /// Slew dimulai di iPhone, jam tidak pernah mengirim GoTo: laporan basi
+    /// setelah "siap" pun bisa menyembunyikan slew baru → Stop tampil.
+    func testStaleAfterAnyNonDisabledReportShowsStop() {
+        for s: TelescopeStatusState in [.ready, .disconnected, .error, .slewing] {
+            XCTAssertTrue(model(s, age: 30, confirmed: false).showsStop(now: t0), "\(s)")
+        }
+        XCTAssertFalse(model(.disabled, age: 30, confirmed: false).showsStop(now: t0),
+                       "basi setelah 'mati' boleh disembunyikan")
+    }
+
+    /// Belum pernah ada laporan: Stop tampil, kecuali fitur diketahui mati.
+    func testStopWhenNoStatusAtAll() {
+        var m = TelescopeControlModel()
+        XCTAssertTrue(m.showsStop(now: t0))
+        m.featureKnownOff = true
+        XCTAssertFalse(m.showsStop(now: t0))
+        XCTAssertFalse(m.canGoTo(now: t0))
     }
 
     // MARK: Hasil kiriman
@@ -123,7 +155,9 @@ final class TelescopeControlTests: XCTestCase {
         XCTAssertTrue(m.showsStop(now: t0.addingTimeInterval(15)))
         m.beginStop()
         m.finishStop(.replied(LiveReply(id: 2, accepted: true)))
-        XCTAssertFalse(m.showsStop(now: t0.addingTimeInterval(15)))
+        XCTAssertFalse(m.showsStop(now: t0), "Stop diterima + laporan segar 'siap'")
+        XCTAssertTrue(m.showsStop(now: t0.addingTimeInterval(15)),
+                      "laporan menjadi basi: mungkin bergerak lagi (aturan baru)")
     }
 
     // MARK: Selesai

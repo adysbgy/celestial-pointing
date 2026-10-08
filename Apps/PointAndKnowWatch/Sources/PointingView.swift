@@ -16,6 +16,7 @@ struct PointingView: View {
     /// Pemasok lokasi: dibutuhkan supaya penolakan izinnya bisa ditampilkan
     /// (lihat `location.note`), bukan diam.
     @ObservedObject var location: LocationProvider
+    @ObservedObject var telescope: TelescopeControlStore
 
     /// Preferensi mode malam, disimpan ke `UserDefaults` lewat `NightMode`.
     /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
@@ -62,7 +63,10 @@ struct PointingView: View {
                     // Identify → Confirm (ADR-007) **di atas**: jawaban dan
                     // tombol Konfirmasi harus terlihat tanpa menggulir di
                     // 40 mm; kartu keadaan yang lebih panjang turun ke bawah.
-                    IdentificationPanel(engine: engine, link: link)
+                    // Stop selalu paling atas bila slew mungkin berjalan
+                    // (juga slew yang dimulai dari iPhone) — ADR-009.
+                    TelescopeStopBar(store: telescope)
+                    IdentificationPanel(engine: engine, link: link, telescope: telescope)
                     statusCard
                     // Ditampilkan selama ada objek — termasuk saat keadaannya
                     // sudah tidak punya jawaban lagi. Di situlah

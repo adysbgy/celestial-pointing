@@ -12,6 +12,7 @@ import PointingKit
 struct IdentificationPanel: View {
     @ObservedObject var engine: PointingEngine
     @ObservedObject var link: WatchLinkService
+    @ObservedObject var telescope: TelescopeControlStore
 
     enum Delivery: Equatable { case sending, live, recordedOnly, failed }
 
@@ -21,9 +22,6 @@ struct IdentificationPanel: View {
     }
 
     @State private var confirmation: Confirmation?
-    /// Kontrol teleskop hidup lebih lama dari kartu konfirmasi: Stop harus
-    /// tetap ada setelah "Tunjuk lagi" selama teleskop mungkin bergerak.
-    @State private var telescope = TelescopeControlModel()
 
     private var outcome: IdentificationOutcome { .from(engine.snapshot) }
 
@@ -34,8 +32,7 @@ struct IdentificationPanel: View {
             } else {
                 outcomeView
             }
-            TelescopeControlSection(link: link, control: $telescope,
-                                    objectName: confirmation?.object.name)
+            TelescopeControlSection(store: telescope, objectName: confirmation?.object.name)
             // Ambang belum terukur: selalu terlihat, supaya tidak ada demo
             // yang menyiratkan akurasi yang sudah divalidasi.
             Text(verbatim: IdentificationText.sigmaLine(engine.controller.resolver.confidencePolicy))

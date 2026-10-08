@@ -29,6 +29,7 @@ struct PointAndKnowWatchApp: App {
     @StateObject private var motion = MotionLogger()
     @StateObject private var link = WatchLinkService()
     @StateObject private var location = LocationProvider()
+    @StateObject private var telescope = TelescopeControlStore()
 
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
     @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
@@ -43,7 +44,8 @@ struct PointAndKnowWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PointingView(engine: engine, motion: motion, link: link, location: location)
+            PointingView(engine: engine, motion: motion, link: link, location: location,
+                         telescope: telescope)
                 .onAppear(perform: start)
                 .onDisappear { stop() }
                 .sheet(isPresented: .init(
@@ -120,6 +122,7 @@ struct PointAndKnowWatchApp: App {
         }
 
         link.activate()
+        telescope.bind(link)
 
         #if DEBUG
         // Simulator: pose sintetis dari argumen peluncuran `-debugPose …`.

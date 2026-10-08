@@ -131,16 +131,40 @@ public struct TelescopeControlModel: Equatable, Sendable {
     /// Stop terlihat setiap kali teleskop sedang atau **mungkin** bergerak:
     /// dilaporkan slewing, atau GoTo sudah diminta dan keadaannya kini tidak
     /// diketahui / galat, atau GoTo sedang dikirim / baru diterima.
+    /// Stop tampil setiap kali slew **mungkin** sedang berjalan — siapa pun
+    /// yang memulainya (jam ini, iPhone, atau app lain).
+    ///
+    /// Disembunyikan hanya bila laporan **segar** terakhir menyatakan siap,
+    /// mati, atau terputus, dan tidak ada yang tertunda dari jam ini. Laporan
+    /// basi setelah keadaan apa pun selain "mati" = mungkin bergerak (versi
+    /// lama menyembunyikan Stop bila slew dimulai dari iPhone lalu laporannya
+    /// berhenti — ditemukan pemeriksaan independen). Belum pernah ada laporan
+    /// sama sekali = tampil, kecuali fitur teleskop diketahui mati.
     public func showsStop(now: Date) -> Bool {
-        if effectiveState(now: now) == .slewing { return true }
-        // GoTo diminta dan belum terbukti selesai atau dihentikan: mungkin
-        // bergerak, apa pun laporan terakhirnya (termasuk "siap" yang belum
-        // menyusul, atau tidak ada jawaban sama sekali).
         if goToIssued { return true }
         switch lastAction {
         case .sendingStop, .stopFailed: return true
-        default: return false
+        default: break
         }
+        guard let status else { return !featureKnownOff }
+        if isFresh(status, now: now) {
+            switch status.state {
+            case .slewing, .error: return true
+            case .ready, .disabled, .disconnected: return false
+            }
+        }
+        // Basi: aman disembunyikan hanya bila laporan terakhir "mati".
+        return status.state != .disabled
+    }
+
+    /// Fitur teleskop diketahui mati (laporan "disabled" terakhir yang
+    /// diingat app, juga lintas peluncuran). Satu-satunya alasan menyembunyikan
+    /// Stop sebelum ada laporan pertama.
+    public var featureKnownOff = false
+
+    private func isFresh(_ status: TelescopeStatus, now: Date) -> Bool {
+        let age = now.timeIntervalSince(status.at)
+        return age <= Self.staleAfter && age >= -Self.staleAfter
     }
 
     private mutating func observeProgress() {

@@ -60,6 +60,14 @@ public final class WatchLinkService: NSObject, ObservableObject {
 
     public func startDebugTelescopeIfRequested() {
         guard let mode = UserDefaults.standard.string(forKey: "debugTelescope") else { return }
+        // `slewing-silent`: satu laporan "bergerak" (seolah slew dimulai dari
+        // iPhone), lalu laporan berhenti dan iPhone tidak terjangkau — untuk
+        // memeriksa bahwa Stop tetap ada setelah keadaan menjadi basi.
+        if mode == "slewing-silent" {
+            telescopeStatus = TelescopeStatus(state: .slewing, at: Date(), detail: "debug-silent")
+            debugTelescopeTimer = Timer(timeInterval: 3600, repeats: false) { _ in }
+            return
+        }
         let state: TelescopeStatusState = mode == "ready" ? .ready : mode == "slewing" ? .slewing : .disabled
         debugForcesReachable = true
         let tick = { [weak self] in self?.telescopeStatus = TelescopeStatus(state: state, at: Date(), detail: "debug") }
