@@ -240,5 +240,29 @@ jobs:
       - name: Buktikan gerbang cangkang nebula planetari berbunyi
         run: python3 Tools/bukti-mutasi-cangkang.py
 
+      # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
+      #
+      # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
+      # produksi yang akan dimutasi sudah menyimpang dari HEAD. Tanpa itu,
+      # harness yang gagal pulih — mis. karena `timeout` di tengah langkah —
+      # membuat harness **berikutnya** mengadopsi berkas yang sudah termutasi
+      # sebagai «aslinya», lalu melaporkan «pulih persis» untuk perbandingan
+      # dengan dirinya sendiri. Seluruh laporan hijau, dan tidak satu pun
+      # angkanya berarti.
+      #
+      # Itu sudah terjadi pada 8 Okt: sebuah harness yang di-`timeout` di
+      # tengah langkah meninggalkan satu baris mutasi hidup di
+      # `render-visuals.py`, dan `bukti-mutasi-langit-dalam.py` berikutnya
+      # melaporkan 15 kelemahan bukti **sekaligus** «pulih persis» atas berkas
+      # yang tidak pernah pulih.
+      #
+      # Harness ini mengukur penjaganya sendiri, dan tiga keadaannya penting:
+      # yang pertama **diharapkan lulus** (penjaga yang menyalak pada sumber
+      # bersih akan dimatikan orang), yang kedua menuntut pesannya menyebut
+      # **hanya** berkas yang kotor, dan yang ketiga menuntut penjaganya
+      # **tidak lulus-terbuka** ketika `git diff` sendiri gagal.
+      - name: Buktikan penjaga sumber-bersih harness mutasi berbunyi
+        run: python3 Tools/bukti-penjaga-bersih.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -57,6 +57,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
 RENDER = os.path.join(ROOT, "Tools", "render-visuals.py")
 VIEW = os.path.join(ROOT, "Apps", "Shared", "CelestialVisualView.swift")
 
@@ -168,10 +170,14 @@ _originals = {}
 
 
 def restore(*_):
-    """Pulihkan sumber produksi — juga saat dihentikan sinyal."""
+    """Pulihkan sumber produksi — juga saat dihentikan sinyal.
+
+    Lewat `mutasi_sumber` (tulis atomik + verifikasi pemulihan): harness ini
+    dan enam saudaranya memutasi berkas produksi yang sama di CI yang sama,
+    dan setiap prob membacanya dari proses baru.
+    """
     for path, content in _originals.items():
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(content)
+        mutasi_sumber.restore_verified(path, content)
 
 
 def probe():
@@ -187,6 +193,7 @@ def probe():
 
 
 def main():
+    mutasi_sumber.require_clean_sources([RENDER, VIEW, MODEL])
     signal.signal(signal.SIGINT, lambda *a: (restore(), sys.exit(130)))
     signal.signal(signal.SIGTERM, lambda *a: (restore(), sys.exit(143)))
 
@@ -209,8 +216,7 @@ def main():
             # Setiap berkas dimutasi dari **aslinya**, bukan dari berkas yang
             # sudah dimutasi keadaan sebelumnya.
             for path in (RENDER, VIEW, MODEL):
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(_originals[path])
+                mutasi_sumber.restore_verified(path, _originals[path])
             # **Satu berkas, banyak suntingan.** Mutasi kedua pada berkas yang
             # sama harus diterapkan di atas **hasil** mutasi pertama —
             # membacanya lagi dari `_originals` akan menghapus suntingan
@@ -226,8 +232,7 @@ def main():
                            else content.replace(old, new, count))
                 pending[path] = content
             for path, content in pending.items():
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(content)
+                mutasi_sumber.write_source(path, content)
 
             red, lines = probe()
             if red is None:
@@ -246,8 +251,7 @@ def main():
                 print(f"       diharapkan: {sorted(want) or '—'}")
 
             for path, _, _, _ in mutations:
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(_originals[path])
+                mutasi_sumber.restore_verified(path, _originals[path])
     finally:
         restore()
 

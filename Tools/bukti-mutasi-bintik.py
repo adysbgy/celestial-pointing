@@ -68,6 +68,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
 RENDER = os.path.join(ROOT, "Tools", "render-visuals.py")
 VIEW = os.path.join(ROOT, "Apps", "Shared", "CelestialVisualView.swift")
 MODEL = os.path.join(ROOT, "Packages", "PointingKit", "Sources", "PointingKit",
@@ -146,10 +148,14 @@ _original = {}
 
 
 def restore(*_):
-    """Pulihkan sumber produksi — juga saat dihentikan sinyal."""
+    """Pulihkan sumber produksi — juga saat dihentikan sinyal.
+
+    Lewat `mutasi_sumber` (tulis atomik + verifikasi pemulihan), bukan
+    `open(path, "w")`: harness ini dan enam saudaranya memutasi berkas
+    produksi yang sama dan setiap prob membacanya dari proses baru.
+    """
     for path, content in _original.items():
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(content)
+        mutasi_sumber.restore_verified(path, content)
 
 
 def probe():
@@ -164,6 +170,7 @@ def probe():
 
 
 def main():
+    mutasi_sumber.require_clean_sources([RENDER, VIEW, MODEL])
     signal.signal(signal.SIGINT, lambda *a: (restore(), sys.exit(130)))
     signal.signal(signal.SIGTERM, lambda *a: (restore(), sys.exit(143)))
 
@@ -177,8 +184,7 @@ def main():
             # Selalu mulai dari sumber asli: keadaan sebelumnya tidak boleh
             # menumpuk di keadaan berikutnya.
             for path, content in _original.items():
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(content)
+                mutasi_sumber.restore_verified(path, content)
 
             if mutations is not None:
                 missing = []
@@ -187,8 +193,7 @@ def main():
                     if old not in _original[path]:
                         missing.append(f"{os.path.basename(path)}: {old[:50]!r}")
                         continue
-                    with open(path, "w", encoding="utf-8") as handle:
-                        handle.write(content)
+                    mutasi_sumber.write_source(path, content)
                 if missing:
                     print(f"{label:52s} ANCHOR TIDAK DITEMUKAN: {'; '.join(missing)}")
                     unexpected += 1

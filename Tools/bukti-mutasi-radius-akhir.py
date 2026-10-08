@@ -43,6 +43,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (tulis atomik + penjaga sumber bersih)
 RENDER = os.path.join(ROOT, "Tools", "render-visuals.py")
 VIEW = os.path.join(ROOT, "Apps", "Shared", "CelestialVisualView.swift")
 
@@ -121,47 +123,31 @@ _originals = {}
 
 
 def _atomic_write(path, content):
-    """Tulis `path` secara atomik, di filesystem yang sama.
+    """Tulis `path` secara atomik — lihat `Tools/mutasi_sumber.py`.
 
-    Kenapa tidak `open(path, "w")` biasa. Harness ini dan lima harness
-    saudaranya memutasi berkas produksi yang **sama**, dan setiap prob
-    membacanya dari **proses baru**. Penulisan biasa bukan operasi atomik:
-    pembaca bisa melihat berkas setengah jadi, dan bila tulisan terputus di
-    tengah, berkas produksi tetap termutasi tanpa ada yang tahu.
-    `os.replace` dalam satu direktori itu atomik, jadi prob hanya pernah
-    melihat versi lama atau versi baru — tidak pernah yang di antaranya.
+    Sebelumnya salinan lokal; sekarang satu implementasi bersama tujuh
+    harness, karena perbaikan yang disalin enam kali akan hilang di salinan
+    ketujuh.
     """
-    tmp = path + ".tmp-mutasi"
-    with open(tmp, "w", encoding="utf-8") as handle:
-        handle.write(content)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    mutasi_sumber.write_source(path, content)
 
 
 def _verify(path):
     """Pulihkan `path` ke isi aslinya, lalu **buktikan** ia pulih.
 
-    Kenapa pemulihan harus diverifikasi, bukan sekadar dilakukan. Kegagalan
-    pemulihan itu **diam**, dan ia mencemari keadaan berikutnya dengan cara
-    yang menipu: keadaan 4 pernah merah dengan lima pemeriksaan planet yang
-    sama persis dengan keadaan 1, seolah gerbangnya yang salah cakupannya —
-    padahal berkas yang diukur masih membawa mutasi keadaan sebelumnya.
-    Membiarkan itu terjadi berarti harness bisa menyalahkan kode yang benar.
+    Kegagalan pemulihan itu **diam**, dan ia mencemari keadaan berikutnya
+    dengan cara yang menipu: keadaan 4 pernah merah dengan lima pemeriksaan
+    planet yang sama persis dengan keadaan 1, seolah gerbangnya yang salah
+    cakupannya — padahal berkas yang diukur masih membawa mutasi keadaan
+    sebelumnya.
     """
-    _atomic_write(path, _originals[path])
-    with open(path, encoding="utf-8") as handle:
-        if handle.read() != _originals[path]:
-            raise RuntimeError(
-                f"pemulihan {os.path.basename(path)} tidak cocok dengan isi "
-                "aslinya — berkas produksi masih termutasi; perbaiki sebelum "
-                "mempercayai hasil harness ini")
+    mutasi_sumber.restore_verified(path, _originals[path])
 
 
 def restore(*_):
     """Pulihkan sumber produksi — juga saat dihentikan sinyal."""
     for path in _originals:
-        _atomic_write(path, _originals[path])
+        mutasi_sumber.restore_verified(path, _originals[path])
 
 
 def probe():
@@ -177,6 +163,7 @@ def probe():
 
 
 def main():
+    mutasi_sumber.require_clean_sources([RENDER, VIEW])
     signal.signal(signal.SIGINT, lambda *a: (restore(), sys.exit(130)))
     signal.signal(signal.SIGTERM, lambda *a: (restore(), sys.exit(143)))
 

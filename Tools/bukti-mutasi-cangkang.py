@@ -56,6 +56,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
 RENDER = os.path.join(ROOT, "Tools", "render-visuals.py")
 
 # Dijalankan di proses baru: mengimpor ulang `check-visuals` (dan `R` di
@@ -166,13 +168,16 @@ def run_probe():
 
 
 def main():
+    mutasi_sumber.require_clean_sources([RENDER])
     original = open(RENDER, "rb").read()
     baseline_md5 = hashlib.md5(original).hexdigest()
     failures = []
 
     def restore():
-        with open(RENDER, "wb") as handle:
-            handle.write(original)
+        # Tulis atomik + verifikasi (`mutasi_sumber`): harness ini dan enam
+        # saudaranya memutasi berkas produksi yang sama, dan setiap prob
+        # membacanya dari proses baru.
+        mutasi_sumber.restore_verified(RENDER, original)
 
     def on_signal(signum, _frame):
         restore()
@@ -194,8 +199,7 @@ def main():
                         break
                     source = source.replace(find, replace)
                 else:
-                    with open(RENDER, "w") as handle:
-                        handle.write(source)
+                    mutasi_sumber.write_source(RENDER, source)
 
             verdicts, error = run_probe()
             if verdicts is None:

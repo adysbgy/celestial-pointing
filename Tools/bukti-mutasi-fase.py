@@ -46,6 +46,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
 RENDER = os.path.join(ROOT, "Tools", "render-visuals.py")
 
 # Dijalankan di proses baru: mengimpor ulang `check-visuals` (dan `R` di
@@ -125,10 +127,14 @@ _original = None
 
 
 def restore(*_):
-    """Pulihkan sumber produksi — juga saat dihentikan sinyal."""
+    """Pulihkan sumber produksi — juga saat dihentikan sinyal.
+
+    Lewat `mutasi_sumber` (tulis atomik + verifikasi pemulihan): harness ini
+    dan enam saudaranya memutasi berkas produksi yang sama di CI yang sama,
+    dan setiap prob membacanya dari proses baru.
+    """
     if _original is not None:
-        with open(RENDER, "w", encoding="utf-8") as handle:
-            handle.write(_original)
+        mutasi_sumber.restore_verified(RENDER, _original)
 
 
 def probe():
@@ -146,6 +152,7 @@ def probe():
 
 
 def main():
+    mutasi_sumber.require_clean_sources([RENDER])
     global _original
     signal.signal(signal.SIGINT, lambda *a: (restore(), sys.exit(130)))
     signal.signal(signal.SIGTERM, lambda *a: (restore(), sys.exit(143)))
@@ -165,8 +172,7 @@ def main():
                     unexpected += 1
                     continue
                 content = _original.replace(old, new, 1)
-            with open(RENDER, "w", encoding="utf-8") as handle:
-                handle.write(content)
+            mutasi_sumber.write_source(RENDER, content)
 
             red, lines = probe()
             if red is None:
