@@ -1,3 +1,43 @@
+## Progres terakhir (8 Okt 2026 — survei celah sisa: brief lengkap & "sweep" palsu)
+
+### Kesimpulan survei: brief sudah tuntas, tidak ada cacat nyata yang tersisa
+
+Setelah siklus `minimumSamples` (di atas), dilanjutkan survei celah yang
+dijanjikan brief:
+
+- **Bagian 1–4, Fase A/B/C, Penyempurnaan** — seluruhnya sudah
+  diimplementasi DAN di-gate (pixel parity Python, mutation harness,
+  `swift-ui-lint` 29 aturan, `check-visuals.py` 585 pemeriksaan). README
+  sudah menutupi build Mac (`xcodegen generate`), arsitektur, Experiment 1,
+  dan Aturan 10 (hitungan uji sinkron).
+- **`sweep-unconsumed.sh`** dilarikan penuh. Flag `test=0` yang tersisa
+  semuanya **false positive** atau helper ber-skala-rendah:
+  - `stateLabel`/`headline` (`ComplicationDigest`) — sebenarnya tertutup
+    tidak langsung lewat `shortLabel`/`stateLabelText` + 9 uji digest di
+    `PointingPresentationTests`. Penambahan uji langsung hanya mengulang yang
+    sudah hijau (melanggar disiplin "uji yang langsung hijau tak membuktikan
+    apa-apa").
+  - `invalidateTargets`, `targetListValidity`, `repeatedReferenceMessage`,
+    `belowHorizonMessage`, dsb. — helper pesan/kache yang perilakunya tersirat
+    oleh uji pemanggilnya; bukan cacat kelas "threshold/identitas tak tergate".
+  - `distanceFromCenter` — properti turunan `Spot` yang saudaranya
+    (`farthestCorner`) sudah di-gate; probe menunjukkan nilainya 0.354, aman
+    di dalam piringan, tak ada bug hidup.
+- **Honesti tepi kasus** (bawah horizon, siang hari, bulan redup) — sudah
+  tertutup `MoonDaylightHonestyTests`, `TooFaintLockHonestyTests`, dan
+  gerbang Matahari tetap (`sunSafeConeDeg`) di `PointingResolver`.
+
+Satu-satunya nilai nyata yang ditemukan dan dikirim adalah `minimumSamples`
+(threshold keamanan kalibrasi sungguh-sungguh tak teruji). Tidak ada kode
+produksi lagi yang layak diubah tanpa mengarang cacat.
+
+### Hitungan tetap
+
+CelestialEngine 206, PointingKit 693 (690 + 3), Aturan UI 29, visual 585 —
+semua hijau. CI (Linux + Apple Build) hijau pada commit `4069b16`.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — ambang minimumSamples akhirnya diuji: cacat kelas "threshold tak tergate")
 
 ### Cacatnya: ambang keamanan kalibrasi yang tidak punya satu pun uji
