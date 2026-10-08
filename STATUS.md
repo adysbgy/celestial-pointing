@@ -90,6 +90,29 @@ Semua gerbang hijau: `swift-test.sh` (206 + 687), `check-visuals.py --check`
 `Apps/` atau paket Swift yang berubah** — yang salah adalah perlengkapan ukur,
 bukan jamnya.
 
+### Kecurigaan yang diperiksa lalu dibuang
+
+Gerbang baru ini mengukur **arah** pita terang pada fase mengecil, bukan
+**luasnya**. `check_moon_phase_fraction` hanya merender `is_waxing=True`, jadi
+luas pita mengecil tidak dijaga gerbang mana pun. Diukur lebih dulu, langsung
+lewat jalur produksi, pada lima fraksi:
+
+```
+f=0.18  waxing 0.176  waning 0.176   |Δ|=0.000
+f=0.35  waxing 0.345  waning 0.345   |Δ|=0.000
+f=0.50  waxing 0.496  waning 0.496   |Δ|=0.000
+f=0.72  waxing 0.714  waning 0.714   |Δ|=0.000
+f=0.85  waxing 0.844  waning 0.844   |Δ|=0.000
+```
+
+Luasnya **sudah benar** — simetris dengan yang membesar dan cocok dengan fraksi
+iluminasi di kelimanya. Jadi tidak ada cacat yang hidup, dan **tidak ada uji
+yang ditulis**: uji yang tidak bisa merah karena alasan yang benar adalah
+cakupan palsu, persis kelas yang sudah berkali-kali ditolak di repo ini. Kalau
+kelak `terminatorRotationRadians` berhenti dibalik untuk mengecil, yang berbunyi
+lebih dulu adalah `check_phase_direction_on_the_waning_half`; yang tidak terjaga
+dan dicatat di sini adalah **luas** pita mengecil pada saat itu.
+
 ### Yang TIDAK diklaim
 
 - Gerbang ini menjaga **arah** pita terang pada sudut yang diuji (0 dan −π/2),
