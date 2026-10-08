@@ -21,8 +21,13 @@ public enum EphemerisBody: String, CaseIterable, Equatable {
     /// Apakah benda ini aman dijadikan target pointing.
     public var isPointable: Bool { self != .sun }
 
-    /// Nama tampilan untuk UI.
+    /// Nama tampilan untuk UI, dalam bahasa aktif (`ObjectNameLocalization`).
     public var displayName: String {
+        ObjectNameLocalization.name(forObjectID: rawValue, indonesian: indonesianName)
+    }
+
+    /// Nama Bahasa Indonesia (bahasa sumber).
+    public var indonesianName: String {
         switch self {
         case .sun: return "Matahari"
         case .moon: return "Bulan"

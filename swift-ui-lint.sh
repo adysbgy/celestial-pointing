@@ -1927,7 +1927,24 @@ for root in ("Apps", "Packages"):
                     continue
 source = "\n".join(blob)
 
-orphans = sorted(k for k in strings if k not in source)
+import re
+
+# Ruang nama dinamis `object.name.<id>` (ADR-007): kuncinya dibentuk
+# `ObjectNameLocalization.key(forObjectID:)`, jadi tidak pernah muncul utuh di
+# kode. Ia dihitung dirujuk hanya bila id-nya **masih ada** di kode sebagai
+# id katalog (`id: "m31"`) atau kasus `EphemerisBody` (`case saturn`) —
+# objek yang dihapus tetap membuat kuncinya yatim, persis seperti seharusnya.
+def referenced(k):
+    if k in source:
+        return True
+    prefix = "object.name."
+    if k.startswith(prefix) and "ObjectNameLocalization" in source:
+        oid = k[len(prefix):]
+        return (f'id: "{oid}"' in source
+                or re.search(r"\bcase\s+(?:[a-z]+\s*,\s*)*" + re.escape(oid) + r"\b", source) is not None)
+    return False
+
+orphans = sorted(k for k in strings if not referenced(k))
 print("\n".join(f"  {k!r}" for k in orphans))
 PY
 )

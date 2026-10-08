@@ -5346,6 +5346,431 @@
           }
         }
       }
+    },
+    "object.name.sun": {
+      "comment": "Nama tampilan objek 'sun' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matahari"
+          }
+        }
+      }
+    },
+    "object.name.moon": {
+      "comment": "Nama tampilan objek 'moon' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulan"
+          }
+        }
+      }
+    },
+    "object.name.mercury": {
+      "comment": "Nama tampilan objek 'mercury' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mercury"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merkurius"
+          }
+        }
+      }
+    },
+    "object.name.venus": {
+      "comment": "Nama tampilan objek 'venus' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        }
+      }
+    },
+    "object.name.mars": {
+      "comment": "Nama tampilan objek 'mars' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        }
+      }
+    },
+    "object.name.jupiter": {
+      "comment": "Nama tampilan objek 'jupiter' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        }
+      }
+    },
+    "object.name.saturn": {
+      "comment": "Nama tampilan objek 'saturn' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturn"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturnus"
+          }
+        }
+      }
+    },
+    "object.name.m45": {
+      "comment": "Nama tampilan objek 'm45' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        }
+      }
+    },
+    "object.name.m31": {
+      "comment": "Nama tampilan objek 'm31' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Andromeda Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Andromeda"
+          }
+        }
+      }
+    },
+    "object.name.m7": {
+      "comment": "Nama tampilan objek 'm7' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ptolemy Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Ptolemy"
+          }
+        }
+      }
+    },
+    "object.name.m42": {
+      "comment": "Nama tampilan objek 'm42' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orion Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Orion"
+          }
+        }
+      }
+    },
+    "object.name.m13": {
+      "comment": "Nama tampilan objek 'm13' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hercules Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Hercules"
+          }
+        }
+      }
+    },
+    "object.name.m8": {
+      "comment": "Nama tampilan objek 'm8' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagoon Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Laguna"
+          }
+        }
+      }
+    },
+    "object.name.m44": {
+      "comment": "Nama tampilan objek 'm44' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beehive Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sarang Lebah"
+          }
+        }
+      }
+    },
+    "object.name.m33": {
+      "comment": "Nama tampilan objek 'm33' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triangulum Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Triangulum"
+          }
+        }
+      }
+    },
+    "object.name.m22": {
+      "comment": "Nama tampilan objek 'm22' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagittarius Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sagitarius"
+          }
+        }
+      }
+    },
+    "object.name.m6": {
+      "comment": "Nama tampilan objek 'm6' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butterfly Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Kupu-kupu"
+          }
+        }
+      }
+    },
+    "object.name.m17": {
+      "comment": "Nama tampilan objek 'm17' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omega Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Omega"
+          }
+        }
+      }
+    },
+    "object.name.m27": {
+      "comment": "Nama tampilan objek 'm27' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dumbbell Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Dumbel"
+          }
+        }
+      }
+    },
+    "object.name.m57": {
+      "comment": "Nama tampilan objek 'm57' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ring Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Cincin"
+          }
+        }
+      }
+    },
+    "object.name.m51": {
+      "comment": "Nama tampilan objek 'm51' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whirlpool Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Pusaran"
+          }
+        }
+      }
+    },
+    "object.name.m11": {
+      "comment": "Nama tampilan objek 'm11' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wild Duck Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Bebek Liar"
+          }
+        }
+      }
+    },
+    "object.name.m2": {
+      "comment": "Nama tampilan objek 'm2' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M2 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M2"
+          }
+        }
+      }
+    },
+    "object.name.m35": {
+      "comment": "Nama tampilan objek 'm35' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M35 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M35"
+          }
+        }
+      }
+    },
+    "object.name.m101": {
+      "comment": "Nama tampilan objek 'm101' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinwheel Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Kincir Angin"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

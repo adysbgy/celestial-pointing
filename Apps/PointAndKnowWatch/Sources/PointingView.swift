@@ -154,7 +154,9 @@ struct PointingView: View {
                 }
                 .padding(.horizontal, 2)
             }
-            .navigationTitle(TextLocalization.text(.pointingTitle))
+            // Tanpa judul di layar akar jam: empat ikon toolbar sudah memenuhi
+            // baris atas, dan judulnya terpotong jadi "Point & K…" (SE 40 mm,
+            // Ultra 3). Nama app sudah tampil di peluncur dan di VoiceOver.
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {

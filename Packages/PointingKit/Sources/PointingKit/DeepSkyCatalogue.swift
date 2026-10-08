@@ -54,28 +54,28 @@ public enum DeepSkyCatalogue {
     /// di tempat yang keliru — `testEveryObjectRisesAboveTheHorizonForTheTargetLatitude`
     /// yang menutupnya, bukan mata.
     public static let objects: [CelestialObject] = [
-        CelestialObject(id: "m45", name: "Pleiades",       kind: .deepSky,
+        CelestialObject(id: "m45", name: ObjectNameLocalization.name(forObjectID: "m45", indonesian: "Pleiades"),       kind: .deepSky,
                         raDeg:  56.75000000, decDeg:  24.11670000, magnitude: 1.60),
-        CelestialObject(id: "m31", name: "Galaksi Andromeda", kind: .deepSky,
+        CelestialObject(id: "m31", name: ObjectNameLocalization.name(forObjectID: "m31", indonesian: "Galaksi Andromeda"), kind: .deepSky,
                         raDeg:  10.68470833, decDeg:  41.26875000, magnitude: 3.44),
-        CelestialObject(id: "m7",  name: "Gugus Ptolemy",  kind: .deepSky,
+        CelestialObject(id: "m7", name: ObjectNameLocalization.name(forObjectID: "m7", indonesian: "Gugus Ptolemy"),  kind: .deepSky,
                         raDeg: 268.45000000, decDeg: -34.81670000, magnitude: 3.30),
-        CelestialObject(id: "m42", name: "Nebula Orion",   kind: .deepSky,
+        CelestialObject(id: "m42", name: ObjectNameLocalization.name(forObjectID: "m42", indonesian: "Nebula Orion"),   kind: .deepSky,
                         raDeg:  83.82208333, decDeg:  -5.39111111, magnitude: 4.00),
-        CelestialObject(id: "m13", name: "Gugus Hercules", kind: .deepSky,
+        CelestialObject(id: "m13", name: ObjectNameLocalization.name(forObjectID: "m13", indonesian: "Gugus Hercules"), kind: .deepSky,
                         raDeg: 250.42329167, decDeg:  36.46130556, magnitude: 5.80),
-        CelestialObject(id: "m8",  name: "Nebula Laguna",  kind: .deepSky,
+        CelestialObject(id: "m8", name: ObjectNameLocalization.name(forObjectID: "m8", indonesian: "Nebula Laguna"),  kind: .deepSky,
                         raDeg: 270.90000000, decDeg: -24.38330000, magnitude: 6.00),
         // Kelompok kedua: satu wakil lagi untuk tiap bentuk.
-        CelestialObject(id: "m44", name: "Gugus Sarang Lebah", kind: .deepSky,
+        CelestialObject(id: "m44", name: ObjectNameLocalization.name(forObjectID: "m44", indonesian: "Gugus Sarang Lebah"), kind: .deepSky,
                         raDeg: 130.10000000, decDeg:  19.98333333, magnitude: 3.70),
-        CelestialObject(id: "m33", name: "Galaksi Triangulum", kind: .deepSky,
+        CelestialObject(id: "m33", name: ObjectNameLocalization.name(forObjectID: "m33", indonesian: "Galaksi Triangulum"), kind: .deepSky,
                         raDeg:  23.45841667, decDeg:  30.66019444, magnitude: 5.72),
-        CelestialObject(id: "m22", name: "Gugus Sagitarius", kind: .deepSky,
+        CelestialObject(id: "m22", name: ObjectNameLocalization.name(forObjectID: "m22", indonesian: "Gugus Sagitarius"), kind: .deepSky,
                         raDeg: 279.09975000, decDeg: -23.90475000, magnitude: 5.10),
-        CelestialObject(id: "m6",  name: "Gugus Kupu-kupu", kind: .deepSky,
+        CelestialObject(id: "m6", name: ObjectNameLocalization.name(forObjectID: "m6", indonesian: "Gugus Kupu-kupu"), kind: .deepSky,
                         raDeg: 265.02500000, decDeg: -32.21666667, magnitude: 4.20),
-        CelestialObject(id: "m17", name: "Nebula Omega",   kind: .deepSky,
+        CelestialObject(id: "m17", name: ObjectNameLocalization.name(forObjectID: "m17", indonesian: "Nebula Omega"),   kind: .deepSky,
                         raDeg: 275.10833333, decDeg: -16.17666667, magnitude: 6.00),
         // Kelompok ketiga: memperluas cakupan bentuk & menambah wakil langka.
         // M27/M57 = nebula planetari (cincin/belah ketupat), M11 = gugus
@@ -91,22 +91,22 @@ public enum DeepSkyCatalogue {
         // Bentuk berlengan butuh kode gambar sendiri, dan itulah yang
         // `.spiralGalaxy` tambahkan. Lihat
         // `testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`.
-        CelestialObject(id: "m27", name: "Nebula Dumbel",   kind: .deepSky,
+        CelestialObject(id: "m27", name: ObjectNameLocalization.name(forObjectID: "m27", indonesian: "Nebula Dumbel"),   kind: .deepSky,
                         raDeg: 299.90166667, decDeg:  22.72175000, magnitude: 7.40),
-        CelestialObject(id: "m57", name: "Nebula Cincin",   kind: .deepSky,
+        CelestialObject(id: "m57", name: ObjectNameLocalization.name(forObjectID: "m57", indonesian: "Nebula Cincin"),   kind: .deepSky,
                         raDeg: 283.39620000, decDeg:  33.02910000, magnitude: 8.80),
-        CelestialObject(id: "m51", name: "Galaksi Pusaran", kind: .deepSky,
+        CelestialObject(id: "m51", name: ObjectNameLocalization.name(forObjectID: "m51", indonesian: "Galaksi Pusaran"), kind: .deepSky,
                         raDeg: 202.46957500, decDeg: 47.19525800, magnitude: 8.40),
-        CelestialObject(id: "m11", name: "Gugus Bebek Liar", kind: .deepSky,
+        CelestialObject(id: "m11", name: ObjectNameLocalization.name(forObjectID: "m11", indonesian: "Gugus Bebek Liar"), kind: .deepSky,
                         raDeg: 277.77500000, decDeg:  -6.26666667, magnitude: 6.30),
         // Kelompok keempat: melengkapi wakil yang ada, bukan bentuk baru.
         // M2 = gugus bola ketiga (bersama M13/M22), M35 = gugus terbuka keempat
         // (bersama M7/M44/M6). Keduanya objek Messier terang yang naik tinggi
         // di lintang Jakarta dan menambah kepadatan contoh tiap bentuk tanpa
         // memperkenalkan bentuk yang butuh kode gambar baru.
-        CelestialObject(id: "m2",  name: "Gugus M2",  kind: .deepSky,
+        CelestialObject(id: "m2", name: ObjectNameLocalization.name(forObjectID: "m2", indonesian: "Gugus M2"),  kind: .deepSky,
                         raDeg: 323.36208333, decDeg:  -0.82333333, magnitude: 6.50),
-        CelestialObject(id: "m35", name: "Gugus M35", kind: .deepSky,
+        CelestialObject(id: "m35", name: ObjectNameLocalization.name(forObjectID: "m35", indonesian: "Gugus M35"), kind: .deepSky,
                         raDeg:  92.37333333, decDeg:  24.10666667, magnitude: 5.30),
         // Kelompok kelima: wakil kedua untuk galaksi berlengan.
         //
@@ -119,7 +119,7 @@ public enum DeepSkyCatalogue {
         // memerahkannya. M101 (Kincir Angin) adalah spiral menghadap penuh
         // yang paling terkenal, jadi ia pasangan yang jujur untuk M51.
         // Mag 7.86 — masih dalam jangkauan binokuler, sama seperti M51.
-        CelestialObject(id: "m101", name: "Galaksi Kincir Angin", kind: .deepSky,
+        CelestialObject(id: "m101", name: ObjectNameLocalization.name(forObjectID: "m101", indonesian: "Galaksi Kincir Angin"), kind: .deepSky,
                         raDeg: 210.80254167, decDeg:  54.34916667, magnitude: 7.86)
     ]
 
