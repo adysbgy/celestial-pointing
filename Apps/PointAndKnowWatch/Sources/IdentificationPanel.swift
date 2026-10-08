@@ -21,6 +21,9 @@ struct IdentificationPanel: View {
     }
 
     @State private var confirmation: Confirmation?
+    /// Kontrol teleskop hidup lebih lama dari kartu konfirmasi: Stop harus
+    /// tetap ada setelah "Tunjuk lagi" selama teleskop mungkin bergerak.
+    @State private var telescope = TelescopeControlModel()
 
     private var outcome: IdentificationOutcome { .from(engine.snapshot) }
 
@@ -31,6 +34,8 @@ struct IdentificationPanel: View {
             } else {
                 outcomeView
             }
+            TelescopeControlSection(link: link, control: $telescope,
+                                    objectName: confirmation?.object.name)
             // Ambang belum terukur: selalu terlihat, supaya tidak ada demo
             // yang menyiratkan akurasi yang sudah divalidasi.
             Text(verbatim: IdentificationText.sigmaLine(engine.controller.resolver.confidencePolicy))
@@ -100,7 +105,10 @@ struct IdentificationPanel: View {
                 .font(.footnote)
                 .foregroundStyle(c.delivery == .failed ? PointingTone.danger.color : .secondary)
                 .multilineTextAlignment(.center)
-            Button(IdentificationText.pointAgain) { confirmation = nil }
+            Button(IdentificationText.pointAgain) {
+                confirmation = nil
+                telescope.clearConfirmation()
+            }
                 .buttonStyle(.bordered)
         }
         .accessibilityElement(children: .combine)
@@ -130,6 +138,9 @@ struct IdentificationPanel: View {
             DispatchQueue.main.async {
                 guard confirmation?.object == object else { return }
                 confirmation?.delivery = delivery
+                // GoTo hanya untuk objek yang **diterima** iPhone lewat kanal
+                // langsung — aturan yang sama dengan server iPhone (ADR-006).
+                if delivery == .live { telescope.confirm(objectID: object.id) }
                 if delivery == .failed { WKInterfaceDevice.current().play(.failure) }
             }
         }

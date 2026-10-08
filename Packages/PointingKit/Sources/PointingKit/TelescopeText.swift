@@ -8,6 +8,7 @@ public enum TelescopeText {
     public static var address: String { TextLocalization.text(.telescopeAddress) }
     public static var connect: String { TextLocalization.text(.telescopeConnect) }
     public static var stateMock: String { TextLocalization.text(.telescopeStateMock) }
+    public static var stateNotConnected: String { TextLocalization.text(.telescopeStateNotConnected) }
     public static var stateConnecting: String { TextLocalization.text(.telescopeStateConnecting) }
     public static func stateConnected(_ system: AlpacaEquatorialSystem) -> String {
         TextLocalization.text(.telescopeStateConnected, frameName(system))
@@ -35,6 +36,8 @@ public extension LocalizedText {
     static let telescopeConnect = LocalizedText(key: "telescope.connect", id: "Sambungkan")
     static let telescopeStateMock = LocalizedText(key: "telescope.state.mock",
                                                   id: "Tiruan — tidak ada motor yang bergerak")
+    static let telescopeStateNotConnected = LocalizedText(key: "telescope.state.notConnected",
+                                                          id: "Belum tersambung — GoTo tidak tersedia")
     static let telescopeStateConnecting = LocalizedText(key: "telescope.state.connecting", id: "Menyambung…")
     static let telescopeStateConnected = LocalizedText(key: "telescope.state.connected", id: "Tersambung (%@)")
     static let telescopeStateUnsupported = LocalizedText(key: "telescope.state.unsupported",
@@ -43,7 +46,7 @@ public extension LocalizedText {
 
     static let telescopeKeys: [LocalizedText] = [
         .telescopeSection, .telescopeEnableAlpaca, .telescopeAddress, .telescopeConnect,
-        .telescopeStateMock, .telescopeStateConnecting, .telescopeStateConnected,
+        .telescopeStateMock, .telescopeStateNotConnected, .telescopeStateConnecting, .telescopeStateConnected,
         .telescopeStateUnsupported, .telescopeStateFailed,
     ]
 }

@@ -85,6 +85,12 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     public override init() {
         let resolver = EngineFactory.makeResolver()
         let transport = MockTelescopeTransport()
+        #if DEBUG
+        // Simulator: `-debugMockSlewSeconds 60` memperpanjang slew tiruan
+        // supaya Stop di tengah gerakan bisa dicoba.
+        let debugSlew = UserDefaults.standard.double(forKey: "debugMockSlewSeconds")
+        if debugSlew > 0 { transport.slewDuration = debugSlew }
+        #endif
         telescopeTransport = transport
         self.resolver = resolver
         let switchable = SwitchableTelescopeExecutor()
@@ -102,6 +108,9 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     public enum TelescopeLink: Equatable {
         /// Fitur Alpaca mati: transport tiruan, tidak ada motor.
         case mock
+        /// Fitur Alpaca hidup tapi belum tersambung: **tidak ada** teleskop
+        /// (bukan tiruan — tiruan melaporkan "siap" dan memunculkan GoTo).
+        case notConnected
         case connecting
         case connected(AlpacaMountInfo)
         /// Tersambung, tapi dudukan tidak bisa dipakai GoTo app ini.
@@ -122,11 +131,32 @@ public final class PhoneLinkService: NSObject, ObservableObject {
                                        observer: { box.value })
     }
 
+    /// Fitur Alpaca mati. Di build Debug: teleskop tiruan (alur GoTo/Stop bisa
+    /// dicoba di simulator). Di build Release: **tidak ada** pelaksana —
+    /// tiruan yang melaporkan "siap" akan memunculkan GoTo palsu di jam.
     public func useMockTelescope() {
+        #if DEBUG
         let capability = TelescopeCapability(axes: .equatorial, supportedFrames: [.j2000],
                                              firmwareVersion: telescopeTransport.firmwareVersion, canAbort: true)
         telescopeExecutor.use(executor(for: telescopeTransport, capability: capability, path: "mock"))
+        #else
+        telescopeExecutor.use(nil)
+        #endif
         telescopeLink = .mock
+    }
+
+    /// Terapkan pengaturan dari Link tab: mati → tiruan (Debug) / tidak ada
+    /// (Release); hidup → sambung bila ada alamat, kalau tidak "belum
+    /// tersambung" tanpa pelaksana.
+    public func applyTelescopeSettings(alpacaEnabled: Bool, address: String) async {
+        guard alpacaEnabled else { useMockTelescope(); return }
+        let trimmed = address.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            telescopeExecutor.use(nil)
+            telescopeLink = .notConnected
+            return
+        }
+        await connectAlpaca(address: trimmed)
     }
 
     /// Sambungkan ke teleskop Alpaca di `address` ("host:port"). Sampai
@@ -197,11 +227,73 @@ public final class PhoneLinkService: NSObject, ObservableObject {
             return
         }
         do {
-            try session.updateApplicationContext(message.plist)
+            try pushContext(pointing: message.plist)
             lastNote = LinkStatusText.sent(message.kind.displayName)
         } catch {
             lastNote = LinkStatusText.sendFailed(error.localizedDescription)
         }
+    }
+
+    /// `updateApplicationContext` menyimpan **satu** kamus; pesan keadaan dan
+    /// laporan teleskop (ADR-009) masing-masing punya kunci sendiri, jadi
+    /// keduanya digabung di sini — kalau tidak, yang satu menghapus yang lain.
+    /// Dua bagian disimpan terpisah: pesan keadaan baru **mengganti** bagian
+    /// pesan seluruhnya (kunci basi pesan lama tidak boleh menempel), laporan
+    /// teleskop hanya mengganti kuncinya sendiri.
+    private var pointingPart: [String: Any] = [:]
+    private var telescopePart: [String: Any] = [:]
+
+    private func pushContext(pointing: [String: Any]? = nil, telescope: [String: Any]? = nil) throws {
+        guard let session, session.activationState == .activated else { return }
+        if let pointing { pointingPart = pointing }
+        if let telescope { telescopePart = telescope }
+        try session.updateApplicationContext(pointingPart.merging(telescopePart) { _, t in t })
+    }
+
+    // MARK: Laporan keadaan teleskop ke jam (ADR-009)
+
+    private var statusTimer: Timer?
+    @Published public private(set) var lastTelescopeStatus: TelescopeStatus?
+
+    /// Laporkan keadaan teleskop ke jam setiap 2 dtk (jam menganggap laporan
+    /// > 10 dtk basi). Membaca keadaan Alpaca bisa memblok hingga 2,5 dtk, jadi
+    /// dijalankan di luar main thread.
+    public func startTelescopeStatusReports() {
+        guard statusTimer == nil else { return }
+        statusTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reportTelescopeStatus() }
+        }
+        reportTelescopeStatus()
+    }
+
+    private func reportTelescopeStatus() {
+        let link = telescopeLink
+        let executor = telescopeExecutor
+        Task.detached {
+            let status: TelescopeStatus
+            switch link {
+            case .mock:
+                #if DEBUG
+                // Tiruan dihitung "aktif" hanya di build Debug, supaya alur
+                // GoTo/Stop bisa dicoba di simulator tanpa teleskop.
+                status = TelescopeStatus(readiness: executor.readiness(), at: Date(), detail: "mock")
+                #else
+                status = TelescopeStatus(state: .disabled, at: Date())
+                #endif
+            case .notConnected, .connecting, .unsupported:
+                status = TelescopeStatus(state: .disconnected, at: Date())
+            case .failed(let why):
+                status = TelescopeStatus(state: .error, at: Date(), detail: why)
+            case .connected:
+                status = TelescopeStatus(readiness: executor.readiness(), at: Date(), detail: "alpaca")
+            }
+            await self.publish(telescopeStatus: status)
+        }
+    }
+
+    private func publish(telescopeStatus status: TelescopeStatus) {
+        lastTelescopeStatus = status
+        try? pushContext(telescope: status.plist)
     }
 
     private func handle(_ message: PointingLinkMessage) {

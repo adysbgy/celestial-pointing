@@ -44,7 +44,7 @@ struct LinkView: View {
                 Section(TelescopeText.section) {
                     Toggle(TelescopeText.enableAlpaca, isOn: $alpacaEnabled)
                         .onChange(of: alpacaEnabled) { _, on in
-                            if !on { link.useMockTelescope() }
+                            Task { await link.applyTelescopeSettings(alpacaEnabled: on, address: alpacaAddress) }
                         }
                     if alpacaEnabled {
                         TextField(TelescopeText.address, text: $alpacaAddress)
@@ -160,6 +160,7 @@ struct LinkView: View {
     private var telescopeStatus: String {
         switch link.telescopeLink {
         case .mock: return TelescopeText.stateMock
+        case .notConnected: return TelescopeText.stateNotConnected
         case .connecting: return TelescopeText.stateConnecting
         case .connected(let mount): return TelescopeText.stateConnected(mount.equatorialSystem)
         case .unsupported: return TelescopeText.stateUnsupported

@@ -38,6 +38,46 @@ public final class WatchLinkService: NSObject, ObservableObject {
     @Published public private(set) var labTransfersInFlight = 0
     private static let labTargetsKey = "pointingLab.targets"
 
+    // MARK: Keadaan teleskop dari iPhone (ADR-009)
+
+    @Published public private(set) var telescopeStatus: TelescopeStatus?
+    private var lastContextMessageSentAt: Date?
+
+    func receiveTelescope(_ status: TelescopeStatus) {
+        #if DEBUG
+        if debugTelescopeTimer != nil { return }   // pose/teleskop debug menang
+        #endif
+        telescopeStatus = status
+    }
+
+    #if DEBUG
+    private var debugTelescopeTimer: Timer?
+    /// `-debugTelescope ready|slewing|off`: laporan teleskop sintetis untuk
+    /// simulator. Juga memaksa "iPhone terjangkau" supaya tombol GoTo/Stop
+    /// bisa dilihat; mengetuk GoTo tetap lewat kanal sungguhan (dan berakhir
+    /// `.noReply` bila tidak ada iPhone).
+    @Published public private(set) var debugForcesReachable = false
+
+    public func startDebugTelescopeIfRequested() {
+        guard let mode = UserDefaults.standard.string(forKey: "debugTelescope") else { return }
+        let state: TelescopeStatusState = mode == "ready" ? .ready : mode == "slewing" ? .slewing : .disabled
+        debugForcesReachable = true
+        let tick = { [weak self] in self?.telescopeStatus = TelescopeStatus(state: state, at: Date(), detail: "debug") }
+        tick()
+        debugTelescopeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            MainActor.assumeIsolated { tick() }
+        }
+    }
+    #endif
+
+    /// Terjangkau menurut sesi (atau dipaksa oleh mode debug).
+    public var isPhoneReachable: Bool {
+        #if DEBUG
+        if debugForcesReachable { return true }
+        #endif
+        return isReachable
+    }
+
     // MARK: Kanal langsung (ADR-006)
 
     private static let liveIDKey = "live.lastID"
@@ -283,8 +323,17 @@ extension WatchLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveApplicationContext applicationContext: [String: Any]) {
-        guard let message = PointingLinkMessage(plist: applicationContext) else { return }
-        Task { @MainActor in self.handle(message) }
+        let status = TelescopeStatus(plist: applicationContext)
+        let message = PointingLinkMessage(plist: applicationContext)
+        Task { @MainActor in
+            if let status { self.receiveTelescope(status) }
+            // Konteks yang sama dikirim ulang setiap laporan teleskop (2 dtk);
+            // pesan keadaan yang sudah ditangani tidak boleh dijalankan lagi.
+            if let message, message.sentAt != self.lastContextMessageSentAt {
+                self.lastContextMessageSentAt = message.sentAt
+                self.handle(message)
+            }
+        }
     }
 
     nonisolated public func session(_ session: WCSession,

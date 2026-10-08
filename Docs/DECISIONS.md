@@ -421,3 +421,63 @@ dependency.
 
 **Not verified.** Any real mount. seestar_alp's exact Alpaca behaviour
 (EquatorialSystem, tracking). Stop latency on hardware.
+
+---
+
+## ADR-009 — GoTo / Stop from the watch (2026-10-09)
+
+**Decision.**
+
+- **Pure rules.** `TelescopeControlModel` (PointingKit, pure, 20 tests) owns
+  every rule, and the views only render it.
+  - **GoTo:**
+    - It appears only for an object that the iPhone accepted over the live
+      channel.
+    - It needs a reachable iPhone and a fresh (≤ 10 s) "ready" report.
+    - It is hidden whenever Stop is shown.
+    - It is never bound to Double Tap.
+  - **Stop:** it appears whenever the telescope is or might be moving:
+    - reported slewing
+    - a GoTo was sent and isn't proven finished: accepted, no reply, or the
+      state became unknown or error
+    - a failed Stop
+    
+    It survives "Point again".
+  - **A GoTo counts as finished** when a fresh report shows slewing then ready,
+    or ready persists 20 s after acceptance.
+  - **A rejected GoTo** (iPhone said no) means "not moving".
+  - **Older reports never overwrite newer ones.**
+- **Status transport, two paths.**
+  - The iPhone reports `TelescopeStatus` in the application context every 2 s.
+    The context is now built from separate pointing and telescope parts, so
+    neither erases the other, and the watch skips a pointing message it has
+    already handled.
+  - While the iPhone is reachable, the watch also asks over the live channel
+    every 3 s, because the simulator showed a 17 s stall in context delivery.
+- **No queue, no retry.** Unreachable shows "Phone not reachable". A failed
+  Stop says to stop it on the iPhone.
+- **Telescope selection on the iPhone.**
+  - Debug builds use the mock telescope when Alpaca is off. Release builds have
+    **no** telescope then: a mock reporting "ready" would show a false GoTo.
+  - Alpaca on but not yet connected → no telescope ("Not connected — GoTo
+    unavailable"), never the mock.
+- **Simulator tools.**
+  - The mock slews for a fixed time (default 8 s; DEBUG
+    `-debugMockSlewSeconds`).
+  - DEBUG `-debugTelescope ready|slewing|off` fakes reports on the watch for
+    screenshots.
+
+**Verified on simulators** (iPhone 17 + Ultra 3, 26.5):
+
+- *With the mock:*
+  - Confirm → "Telescope ready" → GoTo → Stop with "Telescope moving" →
+    "Telescope reached the target".
+  - GoTo → Stop mid-slew → "Telescope stopped".
+- *With the Python stand-in Alpaca server over HTTP:* the watch GoTo produced
+  `PUT tracking`, then `PUT slewtocoordinatesasync RightAscension=6.752477
+  Declination=-16.716116` (Sirius J2000), and the watch Stop produced
+  `PUT abortslew`.
+
+**Not verified.** Real mount behaviour. Real WatchConnectivity latency and
+context delivery. The 10 s / 3 s / 20 s constants are provisional (see
+VALIDATION.md).

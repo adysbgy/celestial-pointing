@@ -117,6 +117,107 @@ the number of "Saved — iPhone not reachable" results.
 - If p95 is over 3 s, GoTo from the watch needs a different interaction, for
   example confirming the GoTo on the iPhone, before any motion test.
 
+## GoTo / Stop latency (device session, after the live-channel step)
+
+Do this only outdoors with clearance, after the live-channel latency step.
+Use the Alpaca bridge or the Debug mock telescope.
+
+**GoTo.** Run 10 GoTos to a confirmed bright object and time:
+
+- watch tap → "GoTo accepted"
+- tap → the watch shows "Telescope moving"
+- tap → the mount physically starts moving
+
+**Stop.** Run 10 Stops mid-slew and time:
+
+- watch tap → "Telescope stopped"
+- tap → the mount physically stops (video both)
+
+**Failure cases.** Repeat 3 of each with the iPhone locked and 10 m away. GoTo
+must show "Phone not reachable" and send nothing. Stop must show its failure
+and the "stop it on the iPhone" instruction.
+
+**Pass.**
+
+- Stop takes effect within ≤ 2 s at p95.
+- No GoTo ever executes after the watch has shown a failure.
+
+Record p50/p95 for each.
+
+**Known simulator finding.** `applicationContext` delivery stalled for about
+17 s, which is longer than the 10 s staleness limit, so the watch also asks for
+telescope state over the live channel every 3 s. Check on device how often each
+path actually delivers.
+
+## Threshold hypotheses (to be replaced by field data)
+
+The confidence policy is provisional:
+
+- σ = 10°
+- best-candidate limit 1σ = 10°
+- ambiguity margin 2σ = 20°
+- search cone 20°
+
+These numbers decide how often the watch can give **one** answer. The
+statements below are hypotheses that field protocol v1 and v2 test. None of
+them is a measurement.
+
+**H1 — The error budget is dominated by the wrist-to-intent offset, not by the
+sensor.** The expected contributors, not measured:
+
+| Contributor | Expected | Notes |
+|---|---|---|
+| Tilt / altitude from gravity | ~1–2° | Watch still |
+| Heading, true/magnetic-north frame | several degrees in open field, much larger near metal or the telescope | Depends on magnetometer calibration state, which is logged per sample |
+| Heading drift, arbitrary-corrected frame after yaw calibration | grows with time since calibration | |
+| Forearm axis vs. intended ray | systematic, likely 5–15° and pose-dependent | |
+| Human pointing repeatability | a few degrees | |
+
+*Test:* compare raw error, error after one-point yaw calibration and error
+after Wahba (analysis script, leave one target out), and the
+`magneticAccuracy` / `near-telescope` splits.
+
+**H2 — With σ = 10°, about half the stars can never be a single answer.**
+Computed from the bundled catalog (25 bright stars + 18 DSOs) on
+2026-10-08:
+
+- The nearest-neighbour separation has a median of 13.8° for all objects and
+  22.8° for stars only. The closest pairs are Alnitak–M42 (3.7°), M6–M7
+  (3.9°) and Castor–Pollux (4.5°).
+- How many of the 25 stars have no neighbour inside the ambiguity margin, and
+  so can ever produce *one answer*:
+
+  | σ | ambiguity margin | stars that can be one answer |
+  |---|---|---|
+  | 10° | 20° | 14/25 |
+  | 7° | 14° | 17/25 |
+  | 5° | 10° | 19/25 |
+  | 3° | 6° | 23/25 |
+
+  The rest will always end in *Possible matches*. That's honest, but it's the
+  dominant UX outcome if σ stays at 10°.
+- **Implication:** a measured σ of about 5° after calibration is the
+  difference between "usually one answer" and "usually a list".
+
+*Test:* replay the field trials through the resolver (analysis replay) and
+count single / possible / not-sure per target.
+
+**H3 — Visibility filtering, not geometry, separates most DSOs.** Most DSOs
+are filtered out by twilight, the Moon and the magnitude limit, so near pairs
+such as Alnitak–M42 rarely compete in practice. *Test:* log the candidate
+count per trial at night (v2).
+
+**H4 — 20° is too wide a search cone once σ is known.** The cone should be
+about 2.5–3σ, so that "Not sure" happens when nothing is near rather than
+matching something 18° away. *Test:* false-confident rate versus cone in the
+replay.
+
+**Decision rule.** After protocol v1 + v2, set σ to the P68 of
+post-calibration error, keep ambiguity = 2σ and cone ≈ 3σ, then mark the
+policy `measured`. The UI line changes from PROVISIONAL automatically. If P68
+stays above about 8°, consider shrinking the catalog to well-separated objects
+rather than showing lists most of the time.
+
 ## Analysis
 
 ```sh

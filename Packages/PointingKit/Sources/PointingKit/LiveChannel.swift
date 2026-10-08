@@ -425,7 +425,20 @@ public final class MockTelescopeTransport: TelescopeTransport {
 
     public init() {}
 
-    public func readState() throws -> TelescopeReadiness { state }
+    /// Lama slew tiruan. Berdasarkan waktu, bukan jumlah polling: laporan ke
+    /// jam (2 dtk) dan tanya-langsung jam (3 dtk) sama-sama membaca keadaan,
+    /// dan slew berbasis hitungan polling habis dalam satu detik.
+    public var slewDuration: TimeInterval = 8
+    public var now: () -> Date = Date.init
+    private var slewUntil: Date?
+
+    public func readState() throws -> TelescopeReadiness {
+        if state == .slewing, let until = slewUntil, now() >= until {
+            state = .ready
+            slewUntil = nil
+        }
+        return state
+    }
 
     public func goTo(_ command: TelescopeCommand) throws {
         if failNextGoTo {
@@ -434,11 +447,13 @@ public final class MockTelescopeTransport: TelescopeTransport {
         }
         commands.append(command)
         state = .slewing
+        slewUntil = now().addingTimeInterval(slewDuration)
     }
 
     public func abort() throws {
         abortCount += 1
         state = .ready
+        slewUntil = nil
     }
 }
 

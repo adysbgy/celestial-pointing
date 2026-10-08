@@ -6035,6 +6035,259 @@
           }
         }
       }
+    },
+    "telescopeCtl.state.disabled": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope off"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.disconnected": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope disconnected"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.ready": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope ready"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.slewing": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope moving"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.error": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope error"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.unknown": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope state unknown"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goTo": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point telescope at %@"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stop": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "telescopeCtl.phoneUnreachable": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phone not reachable"
+          }
+        }
+      }
+    },
+    "telescopeCtl.sendingGoTo": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending GoTo…"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToAccepted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo accepted"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToFailed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo failed: %@"
+          }
+        }
+      }
+    },
+    "telescopeCtl.sendingStop": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending Stop…"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stopAccepted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope stopped"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stopFailed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop failed: %@ — stop it on the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.noReply": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no reply, check the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.stale": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "command expired"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.notConfirmed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "object not confirmed on the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.unavailable": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "telescope not ready"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.unsafe": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "blocked by safety (Sun/altitude)"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.other": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "error"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToCompleted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope reached the target"
+          }
+        }
+      }
+    },
+    "telescope.state.notConnected": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected — GoTo unavailable"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

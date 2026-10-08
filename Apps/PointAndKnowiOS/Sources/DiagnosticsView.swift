@@ -148,6 +148,16 @@ struct RootView: View {
         link.activate()
         // Koordinat GoTo dihitung dari lokasi engine iPhone (ADR-006).
         link.updateObserver(engine.location.observer)
+        // Keadaan teleskop dilaporkan ke jam terus-menerus (ADR-009).
+        // Pengaturan teleskop yang tersimpan berlaku sejak awal: fitur Alpaca
+        // yang hidup tidak boleh diam-diam memakai tiruan sampai ada ketukan.
+        let defaults = UserDefaults.standard
+        Task {
+            await link.applyTelescopeSettings(
+                alpacaEnabled: defaults.bool(forKey: "telescope.alpaca.enabled"),
+                address: defaults.string(forKey: "telescope.alpaca.address") ?? String())
+        }
+        link.startTelescopeStatusReports()
 
         // Setiap sampel masuk ke engine **dan** ke riwayat keyakinan.
         // Penyambungannya ada di sini, bukan di tiap tab, karena hanya ada

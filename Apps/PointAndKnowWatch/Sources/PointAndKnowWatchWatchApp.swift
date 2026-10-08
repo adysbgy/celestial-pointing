@@ -124,6 +124,7 @@ struct PointAndKnowWatchApp: App {
         #if DEBUG
         // Simulator: pose sintetis dari argumen peluncuran `-debugPose …`.
         DebugPoseInjector.shared.startIfRequested(engine: engine)
+        link.startDebugTelescopeIfRequested()
         #endif
     }
 
