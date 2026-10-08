@@ -1,3 +1,53 @@
+## Progres terakhir (8 Okt 2026 — ambang minimumSamples akhirnya diuji: cacat kelas "threshold tak tergate")
+
+### Cacatnya: ambang keamanan kalibrasi yang tidak punya satu pun uji
+
+`CalibrationFlow.minimumSamples` menentukan berapa banyak acuan **berbeda**
+yang wajib tercatat sebelum kalibrasi boleh dinyatakan `.ready` (dan lewat
+`applicableCalibration` dipasang ke controller). Ini ambang keamanan:
+kalibrasi setengah matang bisa membalik jawaban engine tanpa terlihat — itu
+justru alasan `applicableCalibration` mengembalikan `nil` saat belum siap.
+
+Sampai siklus ini ambangnya **tidak diuji sama sekali**. `Tools/sweep-unconsumed.sh`
+melaporkan `minimumSamples app=0 test=0 paket=1` — sementara `referenceMaxAge`
+di berkas yang sama punya 7 uji. Ambang yang tidak diuji adalah kelas cacat
+yang persis dicari repo ini: nilainya (`max(2, …)`) bisa berubah, atau guard
+`independent.count >= minimumSamples` bisa diam-diam di-hardcode ke 2, tanpa
+satu pun uji yang merah. `testSingleSampleIsNotReady` yang sudah ada hanya
+menutupi batas bawaan 2, bukan sifat ambangnya.
+
+### Perbaikannya: tiga uji yang mengunci sifat ambang, bukan kebetulan
+
+Ditambah di `CalestialFlowTests.swift`:
+- `testMinimumSamplesDefaultsToTwo` — bawaan memang 2.
+- `testMinimumSamplesIsClampedToAtLeastTwo` — `max(2, …)` benar-benar menolak
+  1/0/negatif; kalau `max` dicabut, kalibrasi bisa lahir dari satu ketukan.
+- `testHigherMinimumSamplesBlocksUntilMet` — ambang 3 **menahan** dua acuan
+  konsisten (yang cukup untuk bawaan 2) dan baru meloloskan saat acuan ketiga
+  masuk. Ini yang membuktikan guard membaca `minimumSamples`, bukan angka 2
+  yang disembunyikan.
+
+### Yang diukur, bukan dikira-kira
+
+`minimumSamples(app=0 test=0 paket=1)` turun menjadi `app=0 test=3 paket=1`
+setelah tiga uji di atas. Tidak ada satu baris pun kode produksi yang berubah
+— hanya tambahan uji, seperti siklus "QA berkelanjutan" (Penyempurnaan #10).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 690 | **693** (+3 uji ambang) |
+| Aturan UI | 29 | 29 (Aturan 10 memaksa README 690→693) |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 693, 0 gagal), `swift-ui-lint.sh`
+(29/29, Aturan 10 sinkron), `check-visuals.py --check` (585, 0 gagal),
+`swift-typecheck.sh`. Tidak ada kode mesin teruji yang berubah. Berkas
+tersentuh: `CalibrationFlowTests.swift`, `README.md`.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — dua pemanggil, satu konstanta: radius akhir gradien limb akhirnya dibaca kedua jalur)
 
 ### Cacatnya: konstanta yang ada, dinamai, diuji — dan tidak mengatur apa pun di separuh pemanggilnya

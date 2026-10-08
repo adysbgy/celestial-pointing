@@ -53,6 +53,55 @@ final class CalibrationFlowTests: XCTestCase {
                      "satu acuan tidak boleh dipasang — sebarannya belum terukur")
     }
 
+    // MARK: - Ambang minimum acuan (threshold keamanan)
+
+    /// `minimumSamples` menentukan berapa banyak acuan **berbeda** yang wajib
+    /// tercatat sebelum kalibrasi boleh dinyatakan siap. Ini ambang
+    /// keamanan: kalibrasi setengah matang bisa membalik jawaban engine tanpa
+    /// terlihat (lihat `applicableCalibration`). Sampai siklus ini nilainya
+    /// tidak diuji sama sekali — `sweep-unconsumed.sh` melaporkan
+    /// `minimumSamples app=0 test=0 paket=1`, sementara `referenceMaxAge` di
+    /// berkas yang sama punya 7 uji. Threshold yang tidak diuji adalah kelas
+    /// cacat: angkanya bisa berubah tanpa satu pun uji yang merah.
+    func testMinimumSamplesDefaultsToTwo() {
+        let flow = CalibrationFlow()
+        XCTAssertEqual(flow.minimumSamples, 2,
+                       "bawaan 2 acuan: satu acuan tidak bisa mengukur konsistensi")
+    }
+
+    /// Ambang tidak boleh pernah di bawah 2, karena satu acuan tidak memberi
+    /// sigma sebaran sama sekali (lihat `recompute`). Kalau `max(2, …)`
+    /// dicabut, nilai 1/0/negatif lolos dan kalibrasi bisa lahir dari satu
+    /// ketukan.
+    func testMinimumSamplesIsClampedToAtLeastTwo() {
+        XCTAssertEqual(CalibrationFlow(minimumSamples: 1).minimumSamples, 2)
+        XCTAssertEqual(CalibrationFlow(minimumSamples: 0).minimumSamples, 2)
+        XCTAssertEqual(CalibrationFlow(minimumSamples: -5).minimumSamples, 2)
+    }
+
+    /// Ambang yang lebih tinggi harus **menahan** kalibrasi sampai terpenuhi.
+    /// Dua acuan cukup untuk bawaan 2, tapi tidak untuk ambang 3 — dan ini
+    /// yang memastikan guard `independent.count >= minimumSamples` benar-
+    /// benar membaca `minimumSamples`, bukan angka yang di-hardcode ke 2.
+    func testHigherMinimumSamplesBlocksUntilMet() {
+        var flow = CalibrationFlow(minimumSamples: 3)
+        XCTAssertEqual(flow.minimumSamples, 3)
+
+        for id in ["sirius", "vega"] {
+            flow.add(objectID: id, measured: measured(id, yawError: 6),
+                     resolver: resolver, observer: observer, date: date)
+        }
+        XCTAssertFalse(flow.isReady, "dua acuan tidak cukup untuk ambang 3")
+        XCTAssertNil(flow.applicableCalibration,
+                     "kalibrasi tidak boleh lahir di bawah ambang")
+
+        flow.add(objectID: "arcturus",
+                 measured: measured("arcturus", yawError: 6),
+                 resolver: resolver, observer: observer, date: date)
+        XCTAssertTrue(flow.isReady,
+                      "tiga acuan konsisten harus memenuhi ambang 3")
+    }
+
     // MARK: - Kalibrasi yang baik
 
     func testConsistentSamplesBecomeReadyAndRecoverYaw() {
