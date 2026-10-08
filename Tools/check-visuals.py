@@ -410,6 +410,41 @@ MIN_ARM_DEGREES = 12
 #: angka 0.18 dari tata letak lama tidak boleh pernah dianggap lulus.
 MIN_SHELL_CONTINUITY = 0.50
 
+#: Seberapa pipih siluet M27 boleh, sebagai rasio tinggi:lebar kotak pembatasnya.
+#:
+#: M27 dilihat dari samping: 8.0′ × 5.7′, rasio 0.71. Yang benar-benar terukur
+#: pada gambar yang digambar kode sekarang adalah 0.673 (200 px) dan 0.650
+#: (76 px), karena tepi gradien tidak setajam kotak yang dijanjikan angkanya.
+#: Ambang 0.80 duduk di antara 0.67 dan 1.0 (M57) dengan margin ~0.13 ke arah
+#: cacatnya. Yang dijaga "jelas memanjang, bukan bulat" — bukan nilai ketiga
+#: desimal yang tidak ada artinya di layar jam.
+MAX_DUMBBELL_ASPECT = 0.80
+
+#: Seberapa **pipih** siluet M27 boleh — batas bawahnya.
+#:
+#: Gerbang satu sisi membiarkan cacat yang lain lolos: mengecilkan elongasi
+#: sampai 0.20 menghasilkan siluet rasio ~0.22, yang tetap "<= 0.80" dan
+#: karena itu hijau — padahal bentuknya sudah lensa tipis, bukan Dumbel.
+#: Batas bawah 0.45 duduk di antara 0.22 (terlalu pipih) dan 0.673 (sekarang)
+#: dengan margin ~0.22 ke arah cacatnya. Rasio nyata M27 (0.71) ada di atasnya.
+MIN_DUMBBELL_ASPECT = 0.45
+
+#: Seberapa bulat siluet M57 harus tetap, rasio tinggi:lebar.
+#:
+#: M57 dilihat hampir tepat dari kutubnya: 1.4′ × 1.0′. Terukur 1.000 pada
+#: kedua ukuran. Ambang 0.92 menjaga sisi sebaliknya — memperlebar pemipihan
+#: sampai kena ke semua objek `.planetaryNebula` akan memerahkannya.
+MIN_RING_ASPECT = 0.92
+
+#: Seberapa penuh pusat cangkang M27 boleh, sebagai bagian dari terang cangkang.
+#:
+#: Ini bukan formalitas: memipihkan **posisi** blob tanpa memipihkan
+#: **tingginya** memenuhi syarat siluet sambil menutup lubangnya. Diukur pada
+#: keadaan itu (`Tools/bukti-mutasi-dumbel.py`, keadaan 3): pusat terisi **0.780** dari
+#: terang cangkang — cangkang berongga berubah jadi gumpalan pipih. Kode
+#: sekarang **0.000**. Ambang 0.25 duduk di antaranya dengan margin lebar.
+MAX_CENTRE_FILL = 0.25
+
 #: Berapa derajat **sumbangan** tonjolan inti yang harus terbaca di ukuran jam.
 #:
 #: Sumbangan, bukan cakupan mutlak: yang diukur adalah selisih cakupan cincin
@@ -2116,6 +2151,17 @@ def read_deep_sky_layouts_from_swift(source):
         raise ValueError(
             "'public static func deepSky(' tidak ditemukan di CelestialVisual.swift")
     region = source[source.index(switch):]
+    # Nilai **bawaan** parameter `elongation`, dibaca dari tanda tangannya.
+    # Port menyimpan cangkang `.planetaryNebula` **sebelum** dipetkan, jadi
+    # pembandingnya adalah cabang model pada bawaan itu — bukan 1.0 yang
+    # ditulis ulang di sini (itu akan jadi salinan yang tidak pernah
+    # dibandingkan, persis kelas cacat yang sedang ditutup gerbang ini).
+    default_elongation = re.search(r"elongation: Double = ([\d.]+)", region)
+    if default_elongation is None:
+        raise ValueError(
+            "'elongation: Double = <angka>' tidak ditemukan di "
+            "CelestialVisual.swift — pembanding cangkang butuh bawaannya")
+    default_elongation = float(default_elongation.group(1))
     for name in ("planetaryNebula", "galaxy", "spiralGalaxy", "openCluster",
                  "globularCluster"):
         marker = f"case .{name}:"
@@ -2126,22 +2172,38 @@ def read_deep_sky_layouts_from_swift(source):
         # angkanya tidak berbentuk larik segi-enam — ia punya pembacaan
         # sendiri, dan tanpa itu bentuk ini akan dilaporkan "hilang".
         if "let ring:" in tail[:tail.index("return buildDeepSky")]:
-            out[name] = _shell_layout_from_swift(tail)
+            out[name] = _shell_layout_from_swift(tail, default_elongation)
             continue
         out[name] = swift_sextuples(tail, "let layout: [(Double, Double, "
                                           "Double, Double, Double, Double)] = [")
     return out
 
 
-def _shell_layout_from_swift(tail):
+def _shell_layout_from_swift(tail, default_elongation):
     """Layout cangkang `.planetaryNebula` dari `ring` + `shellOpacity`.
 
     Modelnya **tidak** menulis enam angka per blob: ia menulis delapan posisi
     (`ring`), lalu menggabungkannya dengan `shellOpacity` lewat `zip`, dengan
-    skala lebar `0.30`, rasio sumbu `1.0`, sudut `0.0`. Port Python menyimpan
+    skala lebar `0.26`, rasio sumbu `1.0`, sudut `0.0`. Port Python menyimpan
     hasilnya yang sudah di-`zip`. Jadi yang dibandingkan di sini adalah
     **hasil** yang sama, dihitung dari bentuk sumbernya — bukan angka yang
     disalin.
+
+    **Kenapa `default_elongation`, dan kenapa dua faktor terakhir dibaca
+    dari sumbernya.** Sejak M27 (Dumbel) dan M57 (Cincin) berbagi morfologi
+    `.planetaryNebula` tetapi berbeda bentuk di layar, kedua komponen y tiap
+    blob dikalikan `elongation` **saat menggambar**. Port menyimpan
+    cangkangnya **bulat** (itulah bentuknya sebelum dipetkan) dan menerapkan
+    pemetaan yang sama di `deep_sky_blobs` lewat `DEEP_SKY_ELONGATION`. Jadi
+    yang setara dengan tabel port adalah cabang model pada **bawaan**
+    `elongation`, bukan pada nilai M27. Kalau faktornya tidak dibaca dari
+    sumber, gerbang ini akan merah pada kode yang benar begitu modelnya
+    dirapikan — dan gerbang yang berisik seperti itu dihapus orang.
+
+    Dua faktor itu sendiri **tidak dibandingkan nilainya** di sini (keduanya
+    sama-sama `elongation`); yang dijaga tetap ada dan berbentuk `* <nama>`,
+    supaya tidak ada satu pun komponen y yang diam-diam berhenti dipetkan
+    tanpa membuat pembacaan ini gagal bersih.
     """
     # Isi `ring` diambil **setelah** `[` pembuka: anotasinya sendiri
     # (`[(Double, Double)]`) juga berbentuk pasangan, dan ikut terbaca
@@ -2179,12 +2241,20 @@ def _shell_layout_from_swift(tail):
              "innerMinor": shell_radius * math.sin(math.radians(inner_minor))}
     opacities = [float(v) for v in re.search(
         r"let shellOpacity = \[([\d.,\s]+)\]", tail).group(1).split(",")]
-    width_scale = float(re.search(
-        r"\(offset\.0, offset\.1, ([\d.]+),", tail).group(1))
-    aspect = float(re.search(
-        r"\(offset\.0, offset\.1, [\d.]+, ([\d.]+),", tail).group(1))
-    angle = float(re.search(
-        r"\(offset\.0, offset\.1, [\d.]+, [\d.]+, (-?[\d.]+),", tail).group(1))
+    # `aspect` dan `angle` masih ditulis apa adanya (angka), tetapi `offset.1`
+    # dan `aspect` kini dikalikan `elongation` — jadi keduanya dibaca dari
+    # sumbernya, dengan nilai bawaannya disubstitusi supaya hasilnya setara
+    # dengan tabel port yang belum dipetkan.
+    width_scale = _required(r"\(offset\.0, offset\.1 \* elongation, ([\d.]+),",
+                            "skala lebar blob cangkang")
+    rest = re.search(
+        r"([\d.]+) \* elongation,\s*(-?[\d.]+),\s*opacity", tail)
+    if rest is None:
+        raise ValueError(
+            "'<aspect> * elongation, <sudut>, opacity' tidak ditemukan di "
+            "cabang .planetaryNebula — kedua komponen y harus tetap dipetkan "
+            "elongasi supaya tabel ini setara dengan port")
+    aspect, angle = float(rest.group(1)), float(rest.group(2))
     out = []
     for (xs, ys), opacity in zip(pairs, opacities):
         def value(token):
@@ -2193,7 +2263,8 @@ def _shell_layout_from_swift(tail):
                 sign = -1 if token.startswith("-") else 1
                 return sign * names[token.lstrip("-")]
             return float(token)
-        out.append((value(xs), value(ys), width_scale, aspect, angle, opacity))
+        out.append((value(xs), value(ys) * default_elongation, width_scale,
+                    aspect, angle, opacity))
     return out
 
 
@@ -4741,6 +4812,179 @@ def shell_angular_profile(size, ss, radius=0.42):
             samples[int(0.98 * len(samples))])
 
 
+def check_dumbbell_nebula_is_an_elongated_shell(results):
+    """M27 harus benar-benar tampil **memanjang** — dan lubangnya tetap terbuka.
+
+    **Cacat yang ditutup pemeriksaan ini.** Katalog memetakan M27 (Dumbel) dan
+    M57 (Cincin) ke morfologi yang sama, `.planetaryNebula`, dan sampai siklus
+    ini keduanya digambar **identik**: siluet 1.000 (bulat sempurna) pada
+    setiap fuzziness. Ukuran nyatanya berbeda jauh — M27 8.0′ × 5.7′ (rasio
+    sumbu 0.71, dilihat dari samping), M57 1.4′ × 1.0′ (hampir tepat dari
+    kutubnya). Dua objek katalog yang seharusnya berbeda bentuk digambar sama:
+    kelas cacat yang sama dengan yang pernah ditutup untuk M31/M51.
+
+    Uji model (`testDumbbellNebulaIsAnElongatedShellNotARoundOne`) mengunci
+    **geometrinya**; gerbang ini mengukur **gambarnya**, karena geometri yang
+    benar bisa hilang di jalur gambar — persis alasan berkas ini ada.
+
+    **Dua sifat sekaligus, karena satu saja menghasilkan cacat lain.**
+
+    1. *Siluet memipih pada sumbu yang benar.* Diukur sebagai kotak pembatas
+       piksel di atas `READABILITY_THRESHOLD`. Diukur di **dua** ukuran — 200 px
+       (panel iPhone) dan 76 px (ukuran jam, tempat ia paling sering dilihat):
+       yang lulus di satu ukuran belum tentu lulus di ukuran lain.
+
+           kasus                   200 px          76 px
+           M27 (elongasi 0.60)     104×70 (0.673)   40×26 (0.650)
+           M57 (elongasi 1.0)      102×102 (1.000)  38×38 (1.000)
+
+       Ambang 0.80 dan 0.92 sengaja duduk di antara keduanya dengan margin,
+       bukan tepat di angkanya: yang dijaga "jelas memanjang vs jelas bulat",
+       bukan nilai ketiga desimal yang tidak ada artinya di layar.
+
+    2. *Lubangnya tetap terbuka.* Ini bukan formalitas: memipihkan **posisi**
+       blob tanpa memipihkan **tingginya** memenuhi sifat (1) sambil menutup
+       pusatnya. Diukur pada keadaan itu (`Tools/bukti-mutasi-dumbel.py`,
+       keadaan 3 — harness yang di-track dan dijalankan CI, bukan prob di
+       `out/` yang di-gitignore): pusat
+       naik dari latar ke **0.780** dari terang cangkang — cangkang berongga
+       berubah jadi gumpalan pipih. Kode sekarang **0.000**. Ambang 0.25 duduk
+       di antara keduanya.
+
+    **Batas yang dinyatakan.** Gerbang ini tidak menyapu seluruh rentang
+    fuzziness katalog: ia menggambar M27 pada fuzziness katalognya (0.68) dan
+    M57 pada 0.40. Fuzziness lain tidak otomatis terukur.
+    """
+    for size, ss in ((200, 2), (76, 8)):
+        measured = {}
+        for case_name, label in (("deepsky-m27", "M27 (Dumbel, dari samping)"),
+                                 ("deepsky-m57", "M57 (Cincin, dari kutub)")):
+            extent = bright_extent(case_name, size=size, ss=ss)
+            if extent is None:
+                results.append(Result(
+                    f"{label} punya siluet terukur ({size}px)", False,
+                    "tidak ada piksel di atas ambang — tidak ada yang bisa diukur"))
+                return
+            width, height = extent
+            measured[case_name] = height / width
+
+        ratio27 = measured["deepsky-m27"]
+        ratio57 = measured["deepsky-m57"]
+        results.append(Result(
+            f"M27 memanjang, bukan bulat ({size}px)",
+            MIN_DUMBBELL_ASPECT <= ratio27 <= MAX_DUMBBELL_ASPECT,
+            f"siluet M27 {ratio27:.3f} (butuh {MIN_DUMBBELL_ASPECT}…"
+            f"{MAX_DUMBBELL_ASPECT}); rasio nyatanya 0.71 (8.0′ : 5.7′) — di "
+            f"atas ambang atas ia tampil bulat seperti M57, di bawah ambang "
+            f"bawah ia lensa tipis"))
+        results.append(Result(
+            f"M57 tetap bulat ({size}px)",
+            ratio57 >= MIN_RING_ASPECT,
+            f"siluet M57 {ratio57:.3f} (butuh >= {MIN_RING_ASPECT}) — "
+            f"memipihkannya berarti sudut pandangnya salah"))
+
+        # Lubang tengah: terang pusat dibagi terang cangkang.
+        background, centre, shell = nebula_centre_and_shell(case_name,
+                                                            size=size, ss=ss)
+        if shell - background <= READABILITY_THRESHOLD:
+            results.append(Result(
+                f"cangkang M27 berongga ({size}px)", False,
+                f"cangkangnya tidak terbaca (pusat {centre}, cangkang {shell})"))
+            return
+        fill = (centre - background) / (shell - background)
+        results.append(Result(
+            f"cangkang M27 tetap berongga di tengah ({size}px)",
+            fill <= MAX_CENTRE_FILL,
+            f"pusat terisi {fill:.3f} dari terang cangkang (butuh <= "
+            f"{MAX_CENTRE_FILL}) — di atas itu cangkang berongga sudah jadi "
+            f"gumpalan pipih"))
+
+    # Port-parity: angka yang digambar harus sama di kedua sumber.
+    swift = swift_elongation("m27")
+    port = R.DEEP_SKY_ELONGATION.get("m27")
+    results.append(Result(
+        "elongasi M27 sama di model dan di port",
+        swift is not None and port is not None and abs(swift - port) < 1e-9,
+        f"Swift elongationByID[\"m27\"]={swift}, port DEEP_SKY_ELONGATION[\"m27\"]={port}"))
+
+
+def swift_elongation(object_id):
+    """`DeepSkyCatalogue.elongationByID["m27"]` dibaca dari berkas Swift.
+
+    **Kenapa dicari di dalam blok `elongationByID`, bukan `"m27":` begitu saja.**
+    Id yang sama muncul di **tiga** tabel (`morphologyByID`, `fuzzinessByID`,
+    `elongationByID`). `source.index('"m27":')` mengembalikan yang **pertama**
+    ditemukan — `morphologyByID` — dan pembaca angka di bawahnya akan menerima
+    `.planetaryNebula`, bukan angka. Gerbang yang membandingkan hal itu dengan
+    port akan merah pada kode yang benar, atau (lebih buruk) hijau karena kedua
+    sisinya kebetulan sama-sama salah.
+    """
+    path = os.path.join(ROOT, "Packages", "PointingKit", "Sources",
+                        "PointingKit", "DeepSkyCatalogue.swift")
+    with open(path, encoding="utf-8") as handle:
+        source = handle.read()
+    table = "elongationByID"
+    if table not in source:
+        return None
+    block = source[source.index(table):]
+    marker = f'"{object_id}":'
+    if marker not in block:
+        return None
+    tail = block[block.index(marker) + len(marker):]
+    number = ""
+    for char in tail.strip():
+        if char.isdigit() or (char == "." and number):
+            number += char
+        else:
+            break
+    return float(number) if number else None
+
+
+def bright_extent(case_name, size, ss):
+    """Kotak pembatas piksel di atas ambang, sebagai `(lebar, tinggi)`."""
+    _, (w, h, rows) = render_case(case_name, size=size, ss=ss)
+    background = rows[0][0]
+    xs, ys = [], []
+    for y in range(h):
+        row = rows[y]
+        for x in range(w):
+            if row[x * 4] - background > READABILITY_THRESHOLD:
+                xs.append(x)
+                ys.append(y)
+    if not xs:
+        return None
+    return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
+def nebula_centre_and_shell(case_name, size, ss, radius=0.36):
+    """Terang di pusat vs terang rata-rata pada cincin cangkang.
+
+    **Kenapa `max` di pusat, bukan rata-rata.** Versi pertama memakai rata-rata
+    di dalam radius kecil dan **buta pada cacat yang diklaimnya**: begitu
+    pusatnya mulai terisi, yang terang hanya sebagian kecil dari lingkaran
+    sampelnya, jadi rata-ratanya masih ditarik ke bawah oleh sisanya yang
+    kosong. Nilai terburuk (`max`) tidak punya tempat untuk bersembunyi.
+    """
+    _, (w, h, rows) = render_case(case_name, size=size, ss=ss)
+    background = rows[0][0]
+    cx, cy = w / 2.0, h / 2.0
+
+    def channel(px, py):
+        x, y = int(round(px)), int(round(py))
+        if 0 <= x < w and 0 <= y < h:
+            return rows[y][x * 4]
+        return background
+
+    centre = max(channel(cx + dx, cy + dy)
+                 for dy in range(-4, 5) for dx in range(-4, 5)
+                 if dx * dx + dy * dy <= 16)
+    ring = radius * min(w, h) / 2.0
+    samples = [channel(cx + ring * math.cos(2 * math.pi * step / 360.0),
+                       cy + ring * math.sin(2 * math.pi * step / 360.0))
+               for step in range(360)]
+    return background, centre, sum(samples) / len(samples)
+
+
 def check_spiral_core_reads_as_one_body(results):
     """Tonjolan inti `.spiralGalaxy` harus **benar-benar menerangi pusatnya**.
 
@@ -7201,21 +7445,46 @@ def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
             f"netral {_rgb_text(neutral_hue_rgb)}); ambang "
             f"{MIN_DEEP_SKY_COLOUR_DIFF:.2f}"))
 
-    # Dan antar morfologi — supaya tidak ada dua yang bertabrakan.
+    # Dan antar **morfologi** — supaya tidak ada dua yang bertabrakan.
+    #
+    # Yang dibandingkan adalah **satu wakil per morfologi**, bukan setiap
+    # kasus. Warna mengodekan **jenis** objek, dan sejak M27/M57 masuk sebagai
+    # kasus render sendiri (`deepsky-m27`, `deepsky-m57`) ketiganya sengaja
+    # berwarna sama: ketiganya nebula planetari. Yang membedakan M27 dari M57
+    # adalah **bentuk** (sudut pandang), bukan rona — dan itu diukur gerbang
+    # siluetnya (`check_dumbbell_nebula_is_an_elongated_shell`), bukan di sini.
+    # Membandingkan setiap kasus akan menuntut warna berbeda untuk objek yang
+    # **sama jenisnya**, dan satu-satunya cara memenuhinya adalah mengarang
+    # rona yang tidak ada di langit.
+    #
+    # Wakilnya diambil dari nama kasus `deepsky-<morfologi>` — kasus per
+    # morfologi yang sudah ada — bukan daftar tangan: morfologi baru yang
+    # ditambahkan ke `build_cases()` otomatis ikut diukur.
+    representative = {}
+    for case in R.build_cases():
+        if not case.name.startswith("deepsky-"):
+            continue
+        morph = case.kw.get("morphology")
+        if morph is None:
+            continue
+        if morph not in representative or case.name == f"deepsky-{morph}":
+            representative[morph] = case.name
+    morph_names = sorted(representative)
     measured = {}
-    for name in names:
-        _, (w, h, rows) = rendered[name]
-        measured[name] = brightest_colour(rows, w, h)
-    for i in range(len(names)):
-        for j in range(i + 1, len(names)):
-            a, b = measured[names[i]], measured[names[j]]
+    for morph in morph_names:
+        _, (w, h, rows) = rendered[representative[morph]]
+        measured[morph] = (representative[morph], brightest_colour(rows, w, h))
+    for i in range(len(morph_names)):
+        for j in range(i + 1, len(morph_names)):
+            name_a, a = measured[morph_names[i]]
+            name_b, b = measured[morph_names[j]]
             if a is None or b is None:
                 continue
             distance = max(abs(x - y) for x, y in zip(a, b))
             results.append(Result(
-                f"warna berbeda: {names[i]} vs {names[j]}",
+                f"warna berbeda: {morph_names[i]} vs {morph_names[j]}",
                 distance >= MIN_DEEP_SKY_COLOUR_DIFF,
-                f"jarak kanal {distance:.3f} (ambang "
+                f"jarak kanal {distance:.3f} ({name_a} vs {name_b}; ambang "
                 f"{MIN_DEEP_SKY_COLOUR_DIFF:.2f})"))
 
 
@@ -7412,6 +7681,7 @@ def main():
     check_saturn_gap_reads_at_the_watch_size(results)
     check_spiral_arms_stay_continuous(results)
     check_planetary_nebula_shell_is_continuous(results)
+    check_dumbbell_nebula_is_an_elongated_shell(results)
     check_spiral_core_reads_as_one_body(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)

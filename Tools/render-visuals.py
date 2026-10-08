@@ -332,6 +332,12 @@ DEEP_SKY_LAYOUT = {
                         (0.1607270415933377, -0.3880294036547404, 0.26, 1.0, 0.0, 0.46),
                         (0.2969848480983499, -0.2969848480983499, 0.26, 1.0, 0.0, 0.50),
                         (0.3880294036547404, -0.1607270415933377, 0.26, 1.0, 0.0, 0.45)],
+    # MODEL: `VisualFrame.deepSky(.planetaryNebula, elongation:)` — cangkang
+    # yang sama, dipetkan pada sumbu y. Port menyimpan cangkangnya **bulat**
+    # (di atas) karena itulah bentuknya sebelum dipetkan; pemetaannya di sini
+    # dilakukan lewat `DEEP_SKY_ELONGATION`, persis seperti model yang
+    # mengalikan `offset.1` dan `aspect` dengan `elongation` saat menggambar.
+    # Dijaga `check_dumbbell_nebula_is_an_elongated_shell`.
     "galaxy": [(0.0, 0.0, 1.00, 0.34, -18.0, 0.30),
                (0.0, 0.0, 0.66, 0.30, -18.0, 0.26),
                (0.0, 0.0, 0.26, 0.42, -18.0, 0.60)],
@@ -383,10 +389,29 @@ DEEP_SKY_LAYOUT = {
                         (0.444326, -0.119057, 0.17, 1.0, 0.0, 0.22)],
 }
 
+# MODEL: `DeepSkyCatalogue.elongationByID` — rasio sumbu minor:mayor siluet.
+# Bawaannya 1.0 (bulat): siluet yang lonjong adalah **klaim bentuk**, jadi
+# memberikannya sebagai bawaan berarti setiap objek yang belum ditinjau
+# tampil memanjang tanpa dasar. M27 (8.0′ × 5.7′) dipetakan ke 0.60 — angka
+# itu dipilih dengan mengukur: pada fuzziness katalognya (0.68) siluetnya
+# jadi 108×76 px, rasio 0.704, dan pada 76 px masih 20.5% berbeda dari M57.
+# Dijaga `check_dumbbell_nebula_is_an_elongated_shell`.
+DEEP_SKY_ELONGATION = {
+    "m27": 0.60,
+}
 
-def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0):
+
+def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None):
     """`VisualFrame.deepSky` / `buildDeepSky` — tidak pernah keluar frame."""
     layout = DEEP_SKY_LAYOUT.get(morphology or "nebula", DEEP_SKY_LAYOUT["nebula"])
+    # MODEL: `.planetaryNebula` mengalikan `offset.1` **dan** `aspect` dengan
+    # `elongation`; di sini hal yang sama dilakukan pada layoutnya. Kedua
+    # komponen y dipetkan sekaligus supaya lubang tengahnya ikut terskala —
+    # memetkan salah satu saja menutup lubangnya (lihat komentar di model).
+    if morphology == "planetaryNebula":
+        elongation = DEEP_SKY_ELONGATION.get(object_id or "", 1.0)
+        layout = [(ox, oy * elongation, w, a * elongation, ang, op)
+                  for (ox, oy, w, a, ang, op) in layout]
     clamped = min(1.0, max(0.0, fuzziness))
     growth = 0.62 + 0.38 * clamped
     blobs = []
@@ -1706,7 +1731,8 @@ def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):
     # terkunci, jadi warna morfologi tidak pernah muncul di kartu ragu.
     core = ACCENTS[DEEP_SKY_COLOUR_KEY.get(morphology or "", "deepSky")]
     core_rgb = night_surface(core) if night_mode else core
-    blobs = deep_sky_blobs(morphology, kw.get("fuzziness", 0.6))
+    blobs = deep_sky_blobs(morphology, kw.get("fuzziness", 0.6),
+                           object_id=kw.get("object_id"))
     for blob in blobs:
         half_w = blob["half_width"] * radius
         half_h = blob["half_height"] * radius
@@ -1924,13 +1950,26 @@ def build_cases():
 
     # ── Objek langit dalam ────────────────────────────────────────────
     for morph, note in (("nebula", "nebula emisi (M42)"),
-                        ("planetaryNebula", "nebula planetari (M27/M57)"),
+                        ("planetaryNebula", "nebula planetari bulat (M57) — cincin"),
                         ("galaxy", "galaksi (M31/M33) — cakram miring"),
                         ("spiralGalaxy", "galaksi berlengan (M51/M101)"),
                         ("openCluster", "gugus terbuka (Pleiades)"),
                         ("globularCluster", "gugus bola (M13)")):
         cases.append(VisualCase(f"deepsky-{morph}", note, "deepSky",
                                 morphology=morph, fuzziness=0.8, is_confirmed=True))
+    # M27 pada **fuzziness & elongasi katalognya sendiri** — bukan pada 0.8
+    # seperti bentuk lain. Cacat yang diperbaiki (M27 dan M57 tampil identik)
+    # hanya terlihat pada keadaan yang benar-benar dipakai app, jadi kasusnya
+    # harus menggambar keadaan itu; `deepsky-planetaryNebula` di atas menggambar
+    # cangkang bulat pada 0.8, dan itu memang M57.
+    cases.append(VisualCase("deepsky-m27",
+                            "M27 Dumbel — cangkang planetari dilihat dari samping",
+                            "deepSky", morphology="planetaryNebula",
+                            fuzziness=0.68, object_id="m27", is_confirmed=True))
+    cases.append(VisualCase("deepsky-m57",
+                            "M57 Cincin — cangkang planetari dilihat dari kutub",
+                            "deepSky", morphology="planetaryNebula",
+                            fuzziness=0.40, object_id="m57", is_confirmed=True))
     cases.append(VisualCase("deepsky-uncertain",
                             "objek langit dalam saat RAGU — kabut netral, bukan bentuknya",
                             "deepSky", morphology="galaxy", fuzziness=0.8,

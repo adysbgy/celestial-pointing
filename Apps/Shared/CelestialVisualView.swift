@@ -1180,8 +1180,16 @@ struct CelestialVisualView: View {
         // warna morfologi tidak bisa muncul di sebelah badge "Ragu" — gambar
         // yang lebih yakin daripada teksnya justru dilarang PRD.
         let core = Self.accent(CelestialVisual.deepSkyColour(for: morphology))
-        let geometry = VisualFrame.deepSky(morphology: morphology,
-                                           fuzziness: visual.fuzziness)
+        let geometry = VisualFrame.deepSky(
+            morphology: morphology,
+            fuzziness: visual.fuzziness,
+            // **Elongasi ikut `isConfirmed` lewat `morphology` di atas.**
+            // Saat engine ragu, `morphology` sudah `nil`, jadi cabangnya
+            // bukan `.planetaryNebula` dan elongasi tidak pernah dipakai —
+            // siluet lonjong adalah klaim bentuk, sama seperti cangkangnya.
+            elongation: visual.objectID.map {
+                DeepSkyCatalogue.elongation(forObjectID: $0)
+            } ?? 1.0)
         for blob in geometry.blobs {
             let halfWidth = CGFloat(blob.halfWidth) * radius
             let halfHeight = CGFloat(blob.halfHeight) * radius

@@ -1,3 +1,149 @@
+## Progres terakhir (8 Okt 2026 — M27 akhirnya bukan M57: satu morfologi, dua sudut pandang, dan gerbang drift yang belum ada)
+
+### Cacatnya: dua objek katalog yang bentuknya berbeda digambar identik
+
+Katalog memetakan **M27 (Dumbel)** dan **M57 (Cincin)** ke morfologi yang sama,
+`.planetaryNebula` — dan itu **fakta**, keduanya nebula planetari. Tetapi
+`.planetaryNebula` menggambar **cangkang berongga yang bulat**: enam belas blob
+pada satu radius, tiap blob rasio sumbu 1.0. Akibatnya M27 terukur **siluet
+1.000** pada setiap fuzziness — lingkaran sempurna, sama persis dengan M57.
+Yang berbeda hanya skalanya (108 px lawan 106 px), dan skala bukan bentuk.
+Komentar katalog sendiri menyebut M27 "kabut memanjang", sementara yang digambar
+bulat: kelas cacat yang sama dengan M31/M51 sebelum lengan spiral ditambahkan.
+
+### Perbaikannya: sudut pandang, bukan jenis baru
+
+M27 8.0′ × 5.7′ (dilihat dari samping), M57 1.4′ × 1.0′ (dilihat hampir dari
+kutubnya). Jadi yang berbeda **bukan jenisnya** — keduanya nebula planetari —
+melainkan **proyeksi** bola gas itu di langit. Karena itu bentuknya dinyatakan
+sebagai **parameter**, bukan `case` morfologi baru:
+`VisualFrame.deepSky(..., elongation:)` + tabel `DeepSkyCatalogue.elongationByID`.
+Menambah `case` baru berarti menyatakan dua *jenis* objek, dan tiap `case`
+morfologi dituntut repo ini punya warna sendiri serta dua wakil di katalog —
+jalan itu memaksa mengarang rona yang tidak ada di langit dan/atau menyisipkan
+objek katalog demi memuaskan uji. Tabel per id, seperti `fuzzinessByID`,
+mengukur hal yang benar tanpa keduanya.
+
+Yang dipetkan **kedua** komponen y tiap blob — posisi **dan** tinggi. Memetkan
+posisinya saja membuat cangkangnya jadi deretan lingkaran pada elips: makin
+pipih makin banyak celah gelap yang terbuka. Memetkan tingginya saja menaikkan
+tepi dalam dan **menutup lubangnya** — terukur, tepi dalam jatuh dari 0.237 R ke
+0.041 R, cangkang berongga jadi gumpalan pekat. Keduanya sekaligus membuat
+lubangnya ikut terskala.
+
+Nilai **0.60** dipilih dengan mengukur: pada fuzziness katalognya (0.68)
+siluetnya jadi 108×76 px, rasio **0.704** — mendekati rasio M27 yang sebenarnya
+(0.71) — dan pada 76 px masih **20.5%** berbeda dari M57.
+
+### Yang diukur, bukan dikira-kira
+
+Gerbang `check_dumbbell_nebula_is_an_elongated_shell` (7 pemeriksaan) di **dua**
+ukuran (200 px panel iPhone, 76 px jam):
+
+```
+kasus                 200 px            76 px
+M27 (elongasi 0.60)   104×70 (0.673)    40×26 (0.650)
+M57 (elongasi 1.0)    102×102 (1.000)   38×38 (1.000)
+pusat M27 terisi      0.000             0.000   (ambang 0.25)
+```
+
+Ambang 0.80 / 0.45 / 0.92 sengaja duduk di antara keduanya dengan margin — yang
+dijaga "jelas memanjang vs jelas bulat", bukan nilai ketiga desimal yang tidak
+ada artinya di layar jam.
+
+### Dua gerbang lama yang ternyata merah pada kode yang benar
+
+  - **`read_deep_sky_layouts_from_swift` melempar `AttributeError`.** Gerbang
+    drift antar-bahasa itu membaca cabang `.planetaryNebula` dari **teks**
+    sumbernya, dan setelah komponen y dikalikan `elongation` polanya tidak cocok
+    lagi — `NoneType.group`. Gerbang yang melempar traceback saat modelnya
+    dirapikan akan dihapus orang, jadi pembacanya diperbaiki: nilai **bawaan**
+    `elongation` dibaca dari tanda tangannya (`elongation: Double = 1.0`), bukan
+    ditulis `1.0` di gerbang (itu akan jadi salinan ketiga yang tidak pernah
+    dibandingkan), dan kedua faktor `* elongation` **diwajibkan ada** supaya
+    komponen y tidak bisa diam-diam berhenti dipetkan.
+
+  - **Pemeriksaan warna pasangan menyala pada objek yang sama jenisnya.** Ia
+    membandingkan **setiap** kasus `deepsky-*`; kasus baru `deepsky-m27` /
+    `deepsky-m57` berwarna sama dengan `deepsky-planetaryNebula` (ketiganya
+    planetari), jadi tiga pasangan merah. Yang diperbaiki **bukan** warna
+    objeknya: warna mengodekan **jenis**, bentuk mengodekan **sudut pandang**.
+    Gerbangnya sekarang membandingkan **satu wakil per morfologi** — diturunkan
+    dari `build_cases()`, bukan daftar tangan — jadi morfologi baru yang
+    ditambahkan otomatis ikut diukur.
+
+### Gerbang drift yang belum ada, dan bukti mutasinya
+
+Sampai siklus ini komponen y cangkang **tidak punya** gerbang drift sama sekali —
+cangkangnya belum pernah dipetkan, jadi tidak ada yang bisa menyimpang. Sekarang
+ada, dan `Tools/bukti-mutasi-dumbel.py` (di-track, dijalankan CI) membuktikannya
+lewat **6 keadaan**, termasuk dua yang menyentuh **model**:
+
+```
+[baseline]                                  hijau
+1. elongasi 1.0 (pemipihan dimatikan)       siluet merah
+2. elongasi 0.20 (terlalu pipih)            siluet merah
+3. pipihkan posisi saja (lubang menutup)    siluet HIJAU, lubang merah
+4. model: tinggi blob jadi konstanta 1.0    drift model<->port merah
+5. model: offset.1 berhenti dipetkan        "terbaca dari model" merah (gagal bersih)
+```
+
+Keadaan 3 yang menentukan: **ukuran dan pemipihan siluetnya sama persis** dengan
+kode sekarang, yang berbeda hanya sumbu yang dipetkan — kalau ia hijau di
+"lubang", berarti yang diukur gerbang itu siluet, bukan rongga. Keadaan 4 dan 5
+adalah satu-satunya yang bisa melihat **model** menyimpang: seluruh pemeriksaan
+siluet membaca **port**, jadi tanpa keduanya cacat "port memetkan, jam tidak"
+akan hijau di semua PNG.
+
+Harness memutasi **dua** berkas produksi (port **dan** model), memulihkan
+keduanya di `finally` per keadaan plus handler `SIGINT`/`SIGTERM`, dan md5
+keduanya diverifikasi pulih.
+
+### Satu uji kejujuran model yang ditambahkan
+
+`testElongationCannotClaimAShapeWhenMorphologyIsUnknown`: morfologi `nil`
+mengembalikan geometri **identik** untuk setiap elongasi (diuji atas seluruh
+nilai di tabel katalog plus 0.20), **dan** sisi sebaliknya — pada morfologi yang
+diketahui elongasi memang harus mengubah gambar. Tanpa sisi kedua itu,
+`deepSky` yang mengabaikan `elongation` sepenuhnya akan membuat perulangan
+pertama hijau. Ini aturan PRD §2 di lapis **model**: bentuk tidak boleh lebih
+yakin daripada teksnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 695 | **696** (+1 uji kejujuran elongasi) |
+| Pemeriksaan visual | 587 | **615** (+7 gerbang Dumbel + 34 dari dua kasus render baru, −13 pasangan warna yang kini per morfologi) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 696, 0 gagal), `check-visuals.py
+--check` (615, 0 gagal), `swift-ui-lint.sh` (29), `swift-typecheck.sh`. Berkas
+tersentuh: `CelestialVisual.swift`, `DeepSkyCatalogue.swift`,
+`CelestialVisualView.swift`, `CelestialVisualTests.swift`,
+`Tools/render-visuals.py`, `Tools/check-visuals.py`,
+`Tools/bukti-mutasi-dumbel.py` (baru, di-track), `engine-tests.yml`, `README.md`.
+
+### Batas yang jujur
+
+  - Gerbang ini **tidak** menyapu seluruh rentang fuzziness katalog: M27
+    digambar pada fuzziness katalognya (0.68) dan M57 pada 0.40. Fuzziness lain
+    tidak otomatis terukur.
+  - **0.60 adalah angka yang digambar; 0.71 adalah rasio yang terukur** pada
+    gambar hasilnya (108×76 → 0.704). Keduanya berbeda karena tepi blob gradien
+    tidak setajam kotak pembatasnya, dan yang dijaga gerbang adalah rentang,
+    bukan angka ketiga desimal.
+  - 0.60 belum punya pembenaran fisis selain "mendekati 0.71 dan terbedakan
+    pada 76 px" — sama seperti rasio kawah yang sudah dicatat jujur di berkas
+    gerbang.
+  - Yang dijaga adalah **bentuk proyeksinya**, bukan kebenaran astronomi
+    orientasi M27 di langit: sudut pandangnya tidak diambil dari efemeris, jadi
+    ia menggambarkan bentuk yang benar tanpa mengklaim *ke arah mana* sumbu
+    panjangnya menghadap di langit malam ini.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — cangkang nebula planetari bersambung, dan harness yang menyalahkan kode yang benar)
 
 ### Cacatnya: satu bentuk diuji sebagai *lingkaran*, tidak sebagai *kulit*

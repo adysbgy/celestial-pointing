@@ -240,6 +240,18 @@ jobs:
       - name: Buktikan gerbang cangkang nebula planetari berbunyi
         run: python3 Tools/bukti-mutasi-cangkang.py
 
+      # Dan bukti untuk **M27 sebagai cangkang yang dipetkan**, bukan cangkang
+      # bulat: siluet yang memipih, lubang yang tetap terbuka, dan — yang baru
+      # dan paling mudah hilang — **model yang berhenti memetkan sementara port
+      # tetap memetkan**. Yang terakhir itu tidak bisa dilihat pemeriksaan
+      # siluet mana pun, karena semuanya membaca port: port menggambar M27
+      # memanjang, jam menggambarnya bulat, dan tidak satu pun PNG berubah.
+      # Hanya gerbang drift antar-bahasa yang melihatnya, dan sampai siklus ini
+      # komponen y cangkang tidak punya gerbang drift sama sekali — cangkangnya
+      # belum pernah dipetkan.
+      - name: Buktikan gerbang Dumbel (M27) berbunyi
+        run: python3 Tools/bukti-mutasi-dumbel.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas

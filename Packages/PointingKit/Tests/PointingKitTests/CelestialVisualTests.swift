@@ -1562,6 +1562,146 @@ final class CelestialVisualTests: XCTestCase {
                           "jumlah blob sama: bedanya bisa hilang hanya dengan mengubah lebar")
     }
 
+    /// **Pengunci pembeda nebula planetari: cangkang dari kutub vs dari samping.**
+    ///
+    /// Cacat yang ditutup uji ini terukur dan nyata. Katalog memetakan **M27
+    /// (Dumbel)** dan **M57 (Cincin)** ke morfologi yang sama,
+    /// `.planetaryNebula`, dan sampai siklus ini keduanya digambar **persis
+    /// sama**: siluet 1.000 (bulat sempurna) pada setiap fuzziness. Padahal
+    /// komentar katalog sendiri menyebut M27 "cangkang lonjong" dan M57
+    /// "cangkang bulat", dan ukuran nyatanya memang berbeda — M27 8.0′ × 5.7′
+    /// (rasio sumbu **0.71**), M57 1.4′ × 1.0′ dilihat hampir tepat dari
+    /// kutubnya. Dua objek katalog yang seharusnya berbeda bentuk digambar
+    /// identik: kelas cacat yang sama dengan yang pernah ditutup untuk
+    /// M31/M51 (`testSpiralGalaxyHasArmsThatThePlainDiscDoesNot`).
+    ///
+    /// **Yang dijaga bukan "ada angka bernama elongation"**, melainkan sifat
+    /// geometrinya — dan ada **dua** sifat, karena memenuhi satu saja justru
+    /// menghasilkan cacat yang lain:
+    ///
+    /// 1. siluetnya benar-benar memipih, pada sumbu yang benar; dan
+    /// 2. lubang tengahnya **tetap terbuka**.
+    ///
+    /// Uji yang hanya menuntut (1) akan hijau walau pusatnya sudah tertutup —
+    /// dan itu bukan teori: memipihkan **posisi** blob tanpa memipihkan
+    /// **tingginya** menutup pusatnya, tepi dalam jatuh dari 0.237 R ke
+    /// 0.041 R, dan cangkang berongga berubah jadi gumpalan pekat. Uji yang
+    /// hanya menuntut "dua objek menghasilkan geometri berbeda" akan hijau
+    /// pada keadaan cacat yang salah (keduanya memanjang, atau keduanya bulat
+    /// dengan lebar berbeda).
+    func testDumbbellNebulaIsAnElongatedShellNotARoundOne() {
+        let fuzziness = DeepSkyCatalogue.fuzziness(forObjectID: "m27")
+        let elongation = DeepSkyCatalogue.elongation(forObjectID: "m27")
+
+        // Katalognya sendiri harus benar-benar memipih. Kalau seseorang
+        // mengembalikan nilainya ke 1.0, uji ini merah **dan menyebut
+        // sebabnya**, bukan sekadar "geometri tidak sama".
+        XCTAssertLessThan(elongation, 0.85,
+                          "M27 (8.0′ × 5.7′) tidak dipetakan ke siluet memanjang — ia akan tampil bulat seperti M57")
+
+        let m27 = VisualFrame.deepSky(morphology: .planetaryNebula,
+                                      fuzziness: fuzziness,
+                                      elongation: elongation)
+        let m57 = VisualFrame.deepSky(morphology: .planetaryNebula,
+                                      fuzziness: fuzziness,
+                                      elongation: 1.0)
+
+        // Siluet diukur dari **blob yang benar-benar digambar**, bukan dari
+        // parameter yang diketik: kalau pemipihannya tidak sampai ke geometri,
+        // uji ini harus merah.
+        func silhouette(_ geometry: VisualFrame.NebulaGeometry) -> (halfWidth: Double, halfHeight: Double) {
+            let halfWidth = geometry.blobs.map { abs($0.offsetX) + $0.halfWidth }.max() ?? 0
+            let halfHeight = geometry.blobs.map { abs($0.offsetY) + $0.halfHeight }.max() ?? 0
+            return (halfWidth, halfHeight)
+        }
+        let (width27, height27) = silhouette(m27)
+        let (width57, height57) = silhouette(m57)
+
+        XCTAssertGreaterThan(width27, height27,
+                             "siluet M27 tidak lebih lebar dari tingginya — pemipihannya tidak sampai ke geometri")
+        // 0.71 adalah rasio M27 yang sebenarnya (8.0′ : 5.7′). Toleransinya
+        // lebar dengan sengaja: yang dijaga "jelas memanjang, bukan bulat",
+        // bukan nilai ketiga desimal yang tidak ada artinya di layar.
+        XCTAssertEqual(height27 / width27, 0.71, accuracy: 0.12,
+                       "rasio siluet M27 (\(height27 / width27)) terlalu jauh dari 0.71 (8.0′ : 5.7′)")
+
+        // M57 dilihat dari kutub: tata letaknya simetris 90°, jadi siluetnya
+        // harus **tetap bulat**. Ini penjaga sisi lain — memperlebar
+        // pemipihan sampai kena ke semua objek akan memerahkannya.
+        XCTAssertEqual(height57 / width57, 1.0, accuracy: 0.02,
+                       "M57 dilihat dari kutub: siluetnya harus tetap bulat")
+
+        // **Lubangnya tetap terbuka.** Tidak ada satu blob pun yang menutupi
+        // pusat. Inilah yang membedakan cangkang pipih dari gumpalan pipih.
+        func centreIsEmpty(_ geometry: VisualFrame.NebulaGeometry) -> Bool {
+            geometry.blobs.allSatisfy { blob in
+                let dx = blob.offsetX / blob.halfWidth
+                let dy = blob.offsetY / blob.halfHeight
+                return (dx * dx + dy * dy).squareRoot() > 1.0
+            }
+        }
+        XCTAssertTrue(centreIsEmpty(m27),
+                      "pusat cangkang M27 tertutup — yang tampil gumpalan, bukan cangkang pipih")
+        XCTAssertTrue(centreIsEmpty(m57),
+                      "pusat cangkang M57 tertutup — bukan lagi cincin")
+
+        // Dan perbedaannya **struktural**, bukan sekadar skala: mengubah
+        // fuzziness tidak akan pernah memipihkan siluetnya.
+        XCTAssertNotEqual(m27.blobs, m57.blobs,
+                          "M27 dan M57 menghasilkan geometri identik — keduanya akan tampil sama")
+
+        // Katalog harus benar-benar memetakan M27 ke bentuk yang pipih ini,
+        // dan M57 ke yang bulat — bukan sekadar "ada angka di tabel".
+        XCTAssertEqual(DeepSkyCatalogue.morphology(forObjectID: "m27"), .planetaryNebula)
+        XCTAssertEqual(DeepSkyCatalogue.morphology(forObjectID: "m57"), .planetaryNebula)
+        XCTAssertEqual(DeepSkyCatalogue.elongation(forObjectID: "m57"), 1.0, accuracy: 1e-9,
+                       "M57 dilihat dari kutub — elongasinya harus 1.0, bukan ikut memipih")
+    }
+
+    /// **Elongasi tidak boleh mengklaim bentuk saat morfologinya tidak diketahui.**
+    ///
+    /// Ini aturan kejujuran PRD di lapis **model**, dan ia punya satu jalur
+    /// masuk yang mudah terlewat. `VisualFrame.deepSky` menjaga dirinya di
+    /// tingkat morfologi — `guard let morphology else { return nebula(...) }`,
+    /// jadi morfologi `nil` selalu jadi kabut netral. Tetapi `elongation`
+    /// adalah parameter **terpisah**: ia diteruskan dari id objek, dan id itu
+    /// bisa saja dikenal sementara morfologinya tidak. Kalau parameter itu
+    /// sampai ke jalur gambar tanpa melewati penjagaan yang sama, siluet
+    /// lonjong bisa muncul pada gambar yang **tidak** mengklaim jenis
+    /// objeknya — bentuk yang lebih yakin daripada teksnya, persis yang
+    /// dilarang PRD §2.
+    ///
+    /// Yang diukur di sini: morfologi `nil` mengembalikan geometri yang
+    /// **identik** untuk setiap elongasi, sepanjang rentang nilainya. Uji ini
+    /// merah kalau kelak `elongation` dipakai di luar cabang `.planetaryNebula`
+    /// — mis. kalau seseorang "menyederhanakan" dengan memetkannya di
+    /// `buildDeepSky`.
+    func testElongationCannotClaimAShapeWhenMorphologyIsUnknown() {
+        // Rentang nilainya dari tabel katalog, bukan angka yang diketik:
+        // elongasi baru yang lebih pipih ikut terukur tanpa uji ini disunting.
+        let values = Set(DeepSkyCatalogue.elongationByID.values).sorted() + [0.20, 1.0]
+        let unknown = VisualFrame.deepSky(morphology: nil, fuzziness: 0.6,
+                                          elongation: 1.0)
+        for elongation in values {
+            let candidate = VisualFrame.deepSky(morphology: nil, fuzziness: 0.6,
+                                                elongation: elongation)
+            XCTAssertEqual(candidate.blobs, unknown.blobs,
+                           "morfologi tidak diketahui tetapi elongasi \(elongation) "
+                           + "mengubah gambar — siluet lonjong adalah klaim bentuk")
+        }
+
+        // Dan sisi sebaliknya, supaya uji ini bukan cakupan palsu: pada
+        // morfologi yang **diketahui**, elongasi memang harus mengubah gambar.
+        // Tanpa ini, `deepSky` yang mengabaikan `elongation` sepenuhnya akan
+        // membuat seluruh perulangan di atas hijau.
+        let known = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 0.68,
+                                        elongation: 0.60)
+        let round = VisualFrame.deepSky(morphology: .planetaryNebula, fuzziness: 0.68,
+                                        elongation: 1.0)
+        XCTAssertNotEqual(known.blobs, round.blobs,
+                          "elongasi diabaikan bahkan pada morfologi yang diketahui")
+    }
+
     /// Katalog harus benar-benar memuat galaksi berlengan — **dan geometri
     /// yang dipetakannya harus punya lengan.**
     ///

@@ -169,6 +169,58 @@ public enum DeepSkyCatalogue {
         fuzzinessByID[id] ?? 0.6
     }
 
+    // MARK: - Seberapa memanjang siluetnya (bukan cuma seberapa lebar)
+
+    /// Rasio sumbu **mayor : minor** siluet sebuah objek, dari id-nya.
+    ///
+    /// **Cacat yang ditutup tabel ini.** M27 (Dumbel) dan M57 (Cincin) sama-
+    /// sama `Morphology.planetaryNebula`, dan morfologi itu menggambar
+    /// **cangkang berongga yang bulat**: enam belas blob pada satu radius,
+    /// tiap blob `aspect` 1.0. Akibatnya M27 — yang komentar katalognya
+    /// sendiri menyebut "kabut memanjang" — terukur **rasio siluet 1.000**,
+    /// lingkaran sempurna, sama persis dengan M57. Satu-satunya yang berbeda
+    /// di layar adalah **skala** (siluet 108 px lawan 106 px), dan skala bukan
+    /// bentuk. Dua objek katalog yang bentuknya berbeda di langit digambar
+    /// identik, tanpa satu pun teks di layar yang bisa membacanya.
+    ///
+    /// **Kenapa parameter, bukan `case` morfologi baru.** Morfologi adalah
+    /// **jenis** objek, dan M27 maupun M57 keduanya nebula planetari — itu
+    /// fakta, bukan pilihan. Yang membedakan keduanya adalah **sudut
+    /// pandang**: M57 dilihat hampir tepat dari arah kutubnya (1.4′ × 1.0′,
+    /// jadi bulat), M27 dari samping (8.0′ × 5.7′, jadi memanjang). Menambah
+    /// `case` baru berarti menyatakan dua *jenis* objek, dan tiap `case`
+    /// morfologi dituntut repo ini punya warna sendiri
+    /// (`testEveryMorphologyHasItsOwnColour`) serta dua wakil di katalog
+    /// (`testEveryMorphologyHasMoreThanOneRepresentative`) — jadi jalan itu
+    /// memaksa mengarang rona yang tidak ada di langit dan/atau menyisipkan
+    /// objek katalog demi memuaskan uji. Tabel per id, seperti
+    /// `fuzzinessByID`, mengukur hal yang benar tanpa keduanya.
+    ///
+    /// Nilai di tabel adalah **rasio yang dipakai untuk menggambar**, dan
+    /// untuk M27 ia **0.60**, bukan 0.71: 0.71 adalah rasio siluet yang
+    /// *terukur* pada gambar yang dihasilkan 0.60 (108 × 76 px → 0.704),
+    /// karena tepi blob gradien tidak pernah setajam kotak pembatasnya.
+    /// Nilai yang digambar dan nilai yang terukur karena itu berbeda, dan
+    /// yang disimpan di sini adalah yang **digambar** — angka yang sama
+    /// dengan yang ada di `Tools/render-visuals.py`, karena
+    /// `check_deep_sky_layouts_match_the_model` membandingkan keduanya.
+    ///
+    /// 1.0 = bulat. Yang tidak ada di tabel dianggap **1.0**, bukan nilai
+    /// tengah: siluet yang lonjong adalah **klaim bentuk**, dan
+    /// memberikannya sebagai bawaan berarti setiap objek baru yang belum
+    /// ditinjau tampil memanjang tanpa dasar. Kebalikan dari `fuzziness`,
+    /// yang bawaannya nilai tengah justru supaya tidak mengklaim "titik".
+    public static let elongationByID: [String: Double] = [
+        "m27": 0.60   // Dumbel — cangkang dilihat dari samping; 0.704 terukur
+    ]
+
+    /// Seberapa memanjang siluet sebuah objek, dari id-nya.
+    ///
+    /// Bawaannya **1.0** (bulat) — lihat alasannya di `elongationByID`.
+    public static func elongation(forObjectID id: String) -> Double {
+        elongationByID[id] ?? 1.0
+    }
+
     // MARK: - Bentuk: apa objeknya, bukan cuma seberapa lebar
 
     /// Morfologi — **jenis** objek langit dalam.
@@ -260,8 +312,8 @@ public enum DeepSkyCatalogue {
         "m22": .globularCluster,  // Sagitarius — gugus bola
         "m6":  .openCluster,      // Kupu-kupu — gugus terbuka
         "m17": .nebula,           // Omega — nebula emisi
-        "m27": .planetaryNebula,  // Dumbel — nebula planetari (cangkang lonjong)
-        "m57": .planetaryNebula,  // Cincin — nebula planetari (cangkang bulat)
+        "m27": .planetaryNebula,  // Dumbel — nebula planetari bipol (lihat elongasiByID)
+        "m57": .planetaryNebula,  // Cincin — nebula planetari, dilihat dari kutub
         "m51": .spiralGalaxy,     // Pusaran — galaksi spiral berlengan (menghadap penuh)
         "m11": .openCluster,      // Bebek Liar — gugus terbuka padat
         "m2":  .globularCluster,  // M2 — gugus bola padat

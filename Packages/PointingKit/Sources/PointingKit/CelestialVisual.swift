@@ -1258,9 +1258,13 @@ public enum VisualFrame {
     /// - Parameters:
     ///   - morphology: bentuk objek. `nil` = tidak diketahui → kabut netral.
     ///   - fuzziness: 0 = titik, 1 = paling lebar.
+    ///   - elongation: rasio sumbu **minor : mayor** siluet — 1.0 bulat,
+    ///     0.60 = memanjang seperti M27 dilihat dari samping. Lihat
+    ///     `DeepSkyCatalogue.elongationByID`.
     ///   - frameHalfExtent: setengah lebar frame.
     public static func deepSky(morphology: DeepSkyCatalogue.Morphology?,
                                fuzziness: Double,
+                               elongation: Double = 1.0,
                                frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
         guard let morphology else {
             // Tidak tahu bentuknya: gambar kabut netral, **jangan** menebak
@@ -1358,9 +1362,43 @@ public enum VisualFrame {
             // akan tampak sebagai cincin yang dicetak, bukan gas.
             let shellOpacity = [0.54, 0.48, 0.52, 0.46, 0.50, 0.44, 0.53, 0.47,
                                 0.51, 0.45, 0.49, 0.44, 0.52, 0.46, 0.50, 0.45]
+            // **`elongation` memepetkan cangkangnya, dan itu justru benar.**
+            // Cangkang planetari adalah **kulit bola**; objek yang sama
+            // dilihat dari kutub tampak bulat (M57), dari samping tampak
+            // lonjong (M27). Jadi yang berubah karena sudut pandang bukan
+            // jenisnya, melainkan **bentuk proyeksinya** — dan proyeksi bola
+            // yang miring memang elips.
+            //
+            // Yang dipetkan adalah **kedua** komponen y: posisi **dan** tinggi
+            // tiap blob. Kalau hanya posisinya yang dipetkan (blob tetap
+            // bulat), cangkangnya jadi deretan lingkaran pada elips, dan
+            // makin pipih makin banyak celah gelap yang terbuka di antara
+            // mereka. Kalau hanya tingginya yang dipetkan (posisi tetap
+            // lingkaran), tepi dalamnya justru **naik** dan lubangnya
+            // menutup — itu yang dulu diukur: pada rasio 0.71 tepi dalam
+            // jatuh dari 0.237 R ke 0.041 R, cangkang berongga berubah jadi
+            // gumpalan pekat. Memetkan keduanya sekaligus membuat lubangnya
+            // **ikut terskala**: tepi dalam diukur tetap terbuka (kekosongan
+            // tengah 1.000) pada setiap nilai elongation yang dicoba.
+            //
+            // Diukur pada kedua ukuran yang dipakai app, dengan fuzziness
+            // katalog M27 (0.68):
+            //
+            //     elongation   siluet      rasio    beda dari M57
+            //       1.000      108×108     1.000        —
+            //       0.750      108×92      0.852        —
+            //       0.600      108×76      0.704    19.7% (200 px)
+            //       0.558      108×70      0.648        —
+            //
+            // 0.60 dipakai karena **0.704 mendekati rasio M27 yang
+            // sebenarnya (8.0′ : 5.7′ = 0.71)**, dan pada 76 px siluetnya
+            // masih **20.5%** berbeda dari M57 — jauh di atas ambang 8%
+            // gerbangnya. Nilai 0.558 dulu dipilih untuk bentuk dua-cuping
+            // yang terpisah; untuk cangkang yang dipetkan, 0.60 yang jujur.
             let layout: [(Double, Double, Double, Double, Double, Double)] =
                 zip(ring, shellOpacity).map { offset, opacity in
-                    (offset.0, offset.1, 0.26, 1.0, 0.0, opacity)
+                    (offset.0, offset.1 * elongation, 0.26, 1.0 * elongation,
+                     0.0, opacity)
                 }
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
                                 frameHalfExtent: frameHalfExtent)
