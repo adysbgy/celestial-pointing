@@ -436,13 +436,24 @@ MIN_DUMBBELL_ASPECT = 0.45
 #: sampai kena ke semua objek `.planetaryNebula` akan memerahkannya.
 MIN_RING_ASPECT = 0.92
 
+#: Nama kasus M27, ditulis sekali.
+#:
+#: Dipakai di dua tempat di `check_dumbbell_nebula_is_an_elongated_shell`:
+#: siluet dan pusat cangkang. Sebelumnya tempat kedua memakai `case_name`,
+#: variabel gelung yang setelah gelung bernilai `deepsky-m57` — jadi
+#: pemeriksaan berlabel M27 mengukur pusat M57 dan hijau di setiap keadaan.
+#: Konstanta ini membuat kesalahan itu tidak bisa terulang tanpa terlihat.
+M27_CASE = "deepsky-m27"
+
 #: Seberapa penuh pusat cangkang M27 boleh, sebagai bagian dari terang cangkang.
 #:
 #: Ini bukan formalitas: memipihkan **posisi** blob tanpa memipihkan
 #: **tingginya** memenuhi syarat siluet sambil menutup lubangnya. Diukur pada
-#: keadaan itu (`Tools/bukti-mutasi-dumbel.py`, keadaan 3): pusat terisi **0.780** dari
-#: terang cangkang — cangkang berongga berubah jadi gumpalan pipih. Kode
-#: sekarang **0.000**. Ambang 0.25 duduk di antaranya dengan margin lebar.
+#: keadaan itu (`Tools/bukti-mutasi-dumbel.py`, keadaan 3) pada ukuran jam:
+#: pusat terisi **0.571** dari terang cangkang — cangkang berongga berubah jadi
+#: gumpalan pipih. Kode sekarang **0.081** (0.000 pada 200 px, tempat blobnya
+#: lebih rapat dari jaring sampel). Ambang 0.25 duduk di antaranya, dekat ke
+#: kode sehat supaya cacatnya tidak perlu jadi parah dulu untuk tertangkap.
 MAX_CENTRE_FILL = 0.25
 
 #: Berapa derajat **sumbangan** tonjolan inti yang harus terbaca di ukuran jam.
@@ -4846,10 +4857,19 @@ def check_dumbbell_nebula_is_an_elongated_shell(results):
        blob tanpa memipihkan **tingginya** memenuhi sifat (1) sambil menutup
        pusatnya. Diukur pada keadaan itu (`Tools/bukti-mutasi-dumbel.py`,
        keadaan 3 — harness yang di-track dan dijalankan CI, bukan prob di
-       `out/` yang di-gitignore): pusat
-       naik dari latar ke **0.780** dari terang cangkang — cangkang berongga
-       berubah jadi gumpalan pipih. Kode sekarang **0.000**. Ambang 0.25 duduk
-       di antara keduanya.
+       `out/` yang di-gitignore), pada ukuran jam: pusat terisi **0.571** dari
+       terang cangkang, dari **0.081** pada kode sekarang. Ambang 0.25 duduk di
+       antaranya. Ukuran 200 px tidak memisahkan keduanya (0.000 vs 0.078) —
+       blobnya lebih rapat dari jaring sampel pusat, jadi keadaan itu memang
+       dituntut merah hanya di 76 px.
+
+       **Cacat kedua di dalam pemeriksaan ini, ditemukan oleh harness itu.**
+       Sampai siklus ini baris pusat memakai `case_name`, sisa variabel gelung
+       yang setelah gelung bernilai `deepsky-m57`. Pemeriksaan berlabel M27
+       karena itu mengukur pusat **M57**, yang tetap berongga dalam setiap
+       keadaan — hijau pada kode benar dan pada cacat, yaitu lulus karena
+       alasan yang salah. Harness menunjukkannya: keadaan 3 "dapat hijau" untuk
+       pemeriksaan yang seharusnya merah. Sekarang namanya `M27_CASE`.
 
     **Batas yang dinyatakan.** Gerbang ini tidak menyapu seluruh rentang
     fuzziness katalog: ia menggambar M27 pada fuzziness katalognya (0.68) dan
@@ -4883,8 +4903,17 @@ def check_dumbbell_nebula_is_an_elongated_shell(results):
             f"siluet M57 {ratio57:.3f} (butuh >= {MIN_RING_ASPECT}) — "
             f"memipihkannya berarti sudut pandangnya salah"))
 
-        # Lubang tengah: terang pusat dibagi terang cangkang.
-        background, centre, shell = nebula_centre_and_shell(case_name,
+        # Lubang tengah: terang pusat dibagi terang cangkang — **M27**, bukan
+        # kasus terakhir dari gelung di atas.
+        #
+        # Kenapa ini ditulis dengan nama, bukan `case_name`: sampai siklus ini
+        # baris ini memakai `case_name`, yang setelah gelung bernilai
+        # `deepsky-m57`. Jadi pemeriksaan berlabel "cangkang M27 tetap berongga"
+        # mengukur **pusat M57** — dan hijau di setiap keadaan, termasuk pada
+        # cacat yang seharusnya ditangkapnya (pusat M27 terisi 0.571 pada 76 px,
+        # jauh di atas ambang 0.25). Pemeriksaan yang lulus karena alasan yang
+        # salah: kelas cacat yang sama dengan variabel bocor pada `_shell_layout`.
+        background, centre, shell = nebula_centre_and_shell(M27_CASE,
                                                             size=size, ss=ss)
         if shell - background <= READABILITY_THRESHOLD:
             results.append(Result(
@@ -7660,6 +7689,125 @@ def check_earthshine(results, size=200, ss=2):
         f"sabit malam f=0.15: {night_dark:.1f}, f=0.85: {gibbous_night:.1f}"))
 
 
+def _rebound_between(func, loop, call, name):
+    """Apakah `name` ditugaskan ulang antara akhir `loop` dan `call`."""
+    loop_end = loop.end_lineno or loop.lineno
+    for node in ast.walk(func):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign,
+                                 ast.For)):
+            continue
+        if not (loop_end < node.lineno < call.lineno):
+            continue
+        if isinstance(node, ast.Assign):
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        elif isinstance(node, ast.For):
+            names = [t.id for t in ast.walk(node.target)
+                     if isinstance(t, ast.Name)]
+        else:
+            names = [node.target.id] if isinstance(node.target, ast.Name) else []
+        if name in names:
+            return True
+    return False
+
+
+def _bound_by_comprehension(func, call, name):
+    """Apakah `call` berada di dalam pemahaman yang sendiri mengikat `name`.
+
+    `[i for i in probes]` memakai nama yang sama dengan gelung luar tanpa
+    mewarisi nilainya — pemahaman punya lingkupnya sendiri, jadi ini bukan
+    kebocoran. Dibedakan lewat AST, bukan lewat bentuk barisnya.
+    """
+    for node in ast.walk(func):
+        if not isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp,
+                                 ast.GeneratorExp)):
+            continue
+        inside = ((node.lineno, node.col_offset) <= (call.lineno, call.col_offset)
+                  and (call.end_lineno, call.end_col_offset)
+                  <= (node.end_lineno, node.end_col_offset))
+        if not inside:
+            continue
+        for gen in node.generators:
+            if name in {t.id for t in ast.walk(gen.target)
+                        if isinstance(t, ast.Name)}:
+                return True
+    return False
+
+
+#: Fungsi yang boleh memakai variabel gelung setelah gelungnya.
+#:
+#: Kosong, dan itu disengaja: satu-satunya cara menambah pengecualian adalah
+#: menulis alasannya di sini, tempat orang berikutnya bisa membacanya.
+LOOP_LEAK_ALLOWED = {}
+
+
+def check_no_loop_variable_leaks_into_a_call(results):
+    """Variabel gelung tidak boleh dipakai sebagai argumen setelah gelungnya.
+
+    **Cacat yang ditutup pemeriksaan ini.**
+    `check_dumbbell_nebula_is_an_elongated_shell` mengukur siluet M27 dan M57
+    di dalam satu gelung `for case_name, label in (...)`, lalu **setelah**
+    gelung memanggil `nebula_centre_and_shell(case_name, ...)` untuk memeriksa
+    rongga. Setelah gelung, `case_name` bernilai `deepsky-m57` — jadi
+    pemeriksaan berlabel "cangkang M27 tetap berongga di tengah" mengukur pusat
+    **M57**. Ia hijau pada kode yang benar *dan* pada cacat yang seharusnya
+    ditangkapnya (memipihkan posisi tanpa memipihkan tinggi: pusat M27 terisi
+    0.571 pada 76 px, ambang 0.25).
+
+    Itu bentuk kegagalan yang paling mahal di berkas ini: bukan merah pada kode
+    yang benar, melainkan **hijau pada kode yang salah** — dan namanya tetap
+    berbunyi seperti yang diperiksa.
+
+    **Yang dicari**: variabel target `for` yang muncul sebagai argumen sebuah
+    panggilan setelah gelungnya berakhir, tanpa penugasan ulang di antaranya.
+    Penugasan ulang dikecualikan karena itu memang cara yang benar memakai nama
+    yang sama dua kali — `check_deep_sky_shape_suppression` menugaskan ulang
+    `morphology` di gelung keduanya, dan tanpa pengecualian ini gerbangnya akan
+    merah pada kode yang benar.
+
+    **Batas yang dinyatakan.** Analisis ini tidak mengikuti aliran lewat
+    struktur data: `rows = {}` yang diisi di dalam gelung lalu dibaca sebagai
+    `rows[key]` **tidak** tertangkap, begitu pula variabel yang dikembalikan
+    dari sebuah fungsi. Yang dijaga adalah bentuk yang benar-benar terjadi di
+    berkas ini — dan setiap pengecualian di `LOOP_LEAK_ALLOWED` kosong.
+    """
+    with open(__file__) as handle:
+        source = handle.read()
+    tree = ast.parse(source)
+    leaks = []
+    for func in ast.walk(tree):
+        if not isinstance(func, ast.FunctionDef):
+            continue
+        if func.name in LOOP_LEAK_ALLOWED:
+            continue
+        for loop in ast.walk(func):
+            if not isinstance(loop, ast.For):
+                continue
+            targets = {t.id for t in ast.walk(loop.target)
+                       if isinstance(t, ast.Name)}
+            if not targets:
+                continue
+            for call in ast.walk(func):
+                if not isinstance(call, ast.Call):
+                    continue
+                if call.lineno <= (loop.end_lineno or loop.lineno):
+                    continue
+                for arg in call.args:
+                    if not (isinstance(arg, ast.Name) and arg.id in targets):
+                        continue
+                    if _bound_by_comprehension(func, call, arg.id):
+                        continue
+                    if _rebound_between(func, loop, call, arg.id):
+                        continue
+                    leaks.append(f"{func.name}: '{arg.id}' dari gelung baris "
+                                 f"{loop.lineno} dipakai lagi di baris "
+                                 f"{arg.lineno}")
+    results.append(Result(
+        "tidak ada variabel gelung yang bocor ke pemeriksaan lain",
+        not leaks,
+        "; ".join(leaks) if leaks
+        else f"{len(LOOP_LEAK_ALLOWED)} pengecualian, tidak ada yang bocor"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -7725,6 +7873,9 @@ def main():
     check_night_accents_reach_the_view(results)
     check_star_geometry_matches_the_model(results)
     check_magnitude_scale_matches_the_model(results)
+    # Terakhir, dan atas berkasnya sendiri: kelas cacat yang membuat pemeriksaan
+    # di atas bisa hijau karena alasan yang salah.
+    check_no_loop_variable_leaks_into_a_call(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

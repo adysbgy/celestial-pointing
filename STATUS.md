@@ -1,3 +1,75 @@
+## Progres terakhir (8 Okt 2026 — pemeriksaan yang hijau karena alasan yang salah: variabel gelung yang bocor)
+
+### Cacatnya: gerbang yang mengukur objek lain daripada yang tertulis di namanya
+`check_dumbbell_nebula_is_an_elongated_shell` mengukur siluet M27 dan M57 di
+dalam satu gelung `for case_name, label in (...)`, lalu **setelah** gelung
+memanggil `nebula_centre_and_shell(case_name, ...)` untuk memeriksa rongga
+tengah. Setelah gelung, `case_name` bernilai `deepsky-m57` — jadi pemeriksaan
+berlabel "cangkang M27 tetap berongga di tengah" mengukur pusat **M57**.
+
+Konsekuensinya bukan merah pada kode yang benar, melainkan **hijau pada kode
+yang salah**, dan namanya tetap berbunyi seperti yang diperiksa:
+
+```
+pusat-terisi M27 @76px   kode sehat 0.081   cacat 0.571   ambang 0.25
+```
+
+Pemeriksaan itu hijau di **kedua** keadaan. Ia tidak pernah bisa gagal.
+
+### Yang membongkarnya: harness mutasi, bukan gerbangnya sendiri
+`Tools/bukti-mutasi-dumbel.py` keadaan 3 memipihkan **posisi** blob tanpa
+memipihkan **tingginya** — memenuhi syarat siluet sambil menutup lubangnya.
+Harness menuntut pemeriksaan rongga merah; gerbangnya menjawab hijau. Justru
+tuntutan yang gagal itu yang menunjuk ke baris 4887.
+
+Diperbaiki dengan menulis nama kasusnya sekali (`M27_CASE`), bukan memakai
+sisa variabel gelung. Sekarang pemeriksaan itu membaca 0.000 (200 px) dan
+0.081 (76 px), cocok dengan yang diklaim docstring-nya.
+
+### Gerbang baru: seluruh kelasnya, bukan satu barisnya
+Cacat ini punya bentuk yang bisa dicari di seluruh berkas, jadi ditambahkan
+`check_no_loop_variable_leaks_into_a_call` — analisis AST atas
+`check-visuals.py` sendiri: variabel target `for` yang muncul sebagai argumen
+panggilan setelah gelungnya berakhir, tanpa penugasan ulang di antaranya.
+
+Dua pengecualian yang keduanya punya alasan:
+  - **penugasan ulang** — `check_deep_sky_shape_suppression` memang memakai
+    ulang nama `morphology` dan menugaskannya di gelung keduanya; tanpa
+    pengecualian ini gerbangnya merah pada kode yang benar;
+  - **pemahaman** — `[i for i in mismatched]` punya lingkup sendiri dan tidak
+    mewarisi nilai; dibedakan lewat AST, bukan lewat bentuk barisnya.
+
+Dibuktikan dua arah: disuntikkan ke berkas versi HEAD ia **merah** dan menunjuk
+tepat ke `'case_name' dari gelung baris 4860 dipakai lagi di baris 4887`; pada
+berkas sekarang hijau. Daftar pengecualian per fungsi kosong.
+
+### Dua cacat lain di harness yang sama, ketemu saat memakainya
+1. **Keadaan 2 tidak pernah sampai ke pemeriksaan rongga.** Elongasi 0.20
+   memipihkan cangkangnya sampai terangnya jatuh di bawah ambang keterbacaan,
+   jadi gerbang berhenti di cabang "cangkang M27 berongga" (nama berbeda) dan
+   harapan `HOLLOW: hijau` tidak pernah diuji — padahal keadaan itu memang
+   harus merah. Sekarang mengharapkan cabang yang benar-benar menyala.
+2. **Keadaan 3 hanya memisahkan kode sehat dari cacatnya pada 76 px.** Pada
+   200 px pusat-terisi 0.000 vs 0.078 — blobnya lebih rapat dari jaring sampel
+   pusat, jadi lubangnya tidak benar-benar tertutup di ukuran itu. Harapan
+   "merah di mana saja" akan merah pada kode yang benar; ditambahkan penanda
+   ukuran (`WATCH_SIZE`) supaya keadaan itu menyatakan ukuran mana yang
+   memisahkan, bukan menyembunyikannya.
+
+### Juga: docstring yang menunjuk bukti yang tidak ada
+Docstring gerbang menyitir `out/probe-mutasi-dumbel.py` untuk angka 0.780 —
+`out/` di-gitignore, jadi rujukannya menunjuk berkas yang tidak ada di repo
+("proof lost = no proof"). Angka itu juga tidak bisa direproduksi: 0.780 tidak
+muncul di ukuran mana pun (terukur 0.078 dan 0.571). Diganti dengan rujukan ke
+harness yang di-track dan dijalankan CI, beserta angka yang benar-benar terukur.
+
+### Verifikasi
+- `swift-test.sh`: CelestialEngine **206**, PointingKit **696** — hijau.
+- `check-visuals.py --check`: **616 pemeriksaan, 0 gagal** (615 + pemeriksaan
+  kebocoran yang baru).
+- `swift-ui-lint.sh` 29 aturan, `swift-typecheck.sh` — hijau.
+- `bukti-mutasi-dumbel.py`: 5 keadaan, semuanya sesuai harapan, kedua sumber
+  produksi (port + model) kembali ke md5 semula.
 ## Progres terakhir (8 Okt 2026 — M27 akhirnya bukan M57: satu morfologi, dua sudut pandang, dan gerbang drift yang belum ada)
 
 ### Cacatnya: dua objek katalog yang bentuknya berbeda digambar identik

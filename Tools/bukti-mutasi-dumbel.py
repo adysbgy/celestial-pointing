@@ -167,6 +167,21 @@ DRIFT = "tata letak planetaryNebula: tiap blob sama dengan model"
 #: Gerbang **pembacaan** — menyala ketika bentuk sumber model tidak lagi bisa
 #: diurai dengan bersih, alih-alih melempar `AttributeError`.
 READS = "tata letak objek langit dalam: terbaca dari model"
+#: Cabang **cangkang tak terbaca** — nama pemeriksaan yang berbeda dari
+#: `HOLLOW`, dan menyala ketika terang cangkang tidak lagi melewati ambang
+#: keterbacaan. Pada keadaan 2 (elongasi 0.20) cangkangnya memipih sampai
+#: hilang, jadi gerbang berhenti di cabang ini alih-alih mengukur rongga.
+UNREADABLE = "cangkang M27 berongga"
+
+
+#: Penanda harapan yang hanya berlaku pada ukuran jam.
+#:
+#: Keadaan 3 menutup lubang M27 pada 76 px (pusat terisi 0.571) tetapi **tidak**
+#: pada 200 px (0.078) — pada 200 px blobnya lebih rapat dari jaring sampel
+#: pusat, jadi lubangnya tidak benar-benar tertutup di ukuran itu. Harapan
+#: "merah di mana saja" akan merah pada kode yang benar; harapan ini menyatakan
+#: ukuran mana yang memisahkan kode sehat dari cacatnya.
+WATCH_SIZE = "(76px)"
 
 
 def _by_kind(verdicts, prefix):
@@ -175,19 +190,28 @@ def _by_kind(verdicts, prefix):
 
 
 STATES = [
-    # (nama, berkas, edit, harapan: "merah"/"hijau"/None untuk baseline)
-    # Setiap keadaan menyatakan harapannya **per jenis pemeriksaan**, karena
-    # keadaan 3 memang harus merah di satu jenis dan hijau di jenis lain.
+    # (nama, berkas, edit, harapan)
+    #
+    # Harapan bisa tiga bentuk:
+    #   "merah"/"hijau"  -> berlaku untuk **setiap** ukuran
+    #   WATCH_SIZE+":"+… -> hanya ukuran jam; ukuran lain tak diuji di keadaan ini
+    #   None             -> baseline, semuanya harus hijau
     ("[baseline]", None, None, None),
     ("1. elongasi 1.0 (pemipihan dimatikan)",
      "port", [(CURRENT_ELONGATION, NO_ELONGATION)],
      {SHAPE: "merah", HOLLOW: "hijau"}),
+    # Elongasi 0.20 memipihkan cangkangnya sampai hilang, jadi gerbang berhenti
+    # di cabang "cangkang tak terbaca" dan tidak pernah sampai ke pengukuran
+    # rongga — cabang itu sendiri yang harus berbunyi.
     ("2. elongasi 0.20 (terlalu pipih)",
      "port", [(CURRENT_ELONGATION, TOO_FLAT)],
-     {SHAPE: "merah", HOLLOW: "hijau"}),
+     {SHAPE: "merah", UNREADABLE: "merah"}),
+    # Lubangnya hanya benar-benar tertutup di ukuran jam — pada 200 px blobnya
+    # lebih rapat dari jaring sampel pusat, jadi cacatnya tidak muncul di sana.
+    # Siluetnya sendiri tetap sehat di kedua ukuran (0.700 / 0.696).
     ("3. pipihkan posisi saja (lubang menutup)",
      "port", [(CURRENT_FUNCTION_HEAD, POSITION_ONLY)],
-     {SHAPE: "hijau", HOLLOW: "merah"}),
+     {SHAPE: "hijau", HOLLOW: WATCH_SIZE + ":merah"}),
     # Keadaan 4 dan 5 menyentuh **model**, jadi yang menuntutnya merah adalah
     # gerbang drift antar-bahasa — dan justru itu buktinya: cacat "model
     # berhenti memetkan, port tetap memetkan" tidak bisa dilihat pemeriksaan
@@ -269,7 +293,7 @@ def main():
 
             shape = _by_kind(verdicts, SHAPE)
             hollow = _by_kind(verdicts, HOLLOW)
-            if not shape or not hollow:
+            if not shape and not hollow:
                 failures.append(f"{name}: tidak ada pemeriksaan '{SHAPE}' / "
                                 f"'{HOLLOW}' di keluaran gerbang")
                 print(f"{name}: TIDAK ADA PEMERIKSAAN")
@@ -285,8 +309,15 @@ def main():
                 continue
 
             wrong = []
+            untested = []
             for prefix, want in expected.items():
+                scoped = want.startswith(WATCH_SIZE + ":")
+                if scoped:
+                    want = want[len(WATCH_SIZE) + 1:]
                 for check, state in _by_kind(verdicts, prefix).items():
+                    if scoped and WATCH_SIZE not in check:
+                        untested.append(check)
+                        continue
                     if state != want:
                         wrong.append(f"'{check}' harus {want}, dapat {state}")
             if wrong:
@@ -294,8 +325,10 @@ def main():
                     failures.append(f"{name}: {item}")
                     print(f"{name}: {item}")
             else:
+                note = f" (ukuran lain tidak diuji: {len(untested)})" if untested else ""
                 print(f"{name}: sesuai harapan "
-                      f"({', '.join(f'{p} {w}' for p, w in expected.items())})")
+                      f"({', '.join(f'{p} {w}' for p, w in expected.items())})"
+                      f"{note}")
     finally:
         restore()
         if hashlib.md5(open(RENDER, "rb").read()).hexdigest() != baseline_md5:
