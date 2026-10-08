@@ -7,8 +7,10 @@ import CelestialEngine
 // MARK: - ASCOM Alpaca Telescope v1 (ADR-008)
 //
 // Transport teleskop standar pertama. Alasannya di ADR-008: Seestar dengan
-// firmware ≥ 7.18 butuh sertifikat klien dari app ZWO untuk jalur
-// native-nya, sedangkan seestar_alp bisa menjembatani Seestar ke Alpaca. Jadi
+// firmware ≥ 7.18 butuh **kunci privat RSA** (PEM "interop" yang diekstrak dari
+// APK ZWO) untuk tantangan-jawab (`get_verify_str` → tanda tangan SHA1withRSA
+// → `verify_client`) di jalur native-nya — bukan sertifikat klien. seestar_alp
+// bisa menjembatani Seestar ke Alpaca. Jadi
 // app berbicara Alpaca standar, dan jalur native menunggu.
 //
 // Hanya bagian Alpaca yang dibutuhkan alur GoTo yang diimplementasikan:

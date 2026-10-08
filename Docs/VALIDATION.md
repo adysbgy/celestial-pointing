@@ -177,25 +177,29 @@ sensor.** The expected contributors, not measured:
 after Wahba (analysis script, leave one target out), and the
 `magneticAccuracy` / `near-telescope` splits.
 
-**H2 — With σ = 10°, about half the stars can never be a single answer.**
-Computed from the bundled catalog (25 bright stars + 18 DSOs) on
-2026-10-08:
+**H2 — With σ = 10°, more than half the stars can never be a single
+answer.** Computed from the bundled catalog (25 bright stars + 18 DSOs = 43
+objects) on 2026-10-08:
 
 - The nearest-neighbour separation has a median of 13.8° for all objects and
   22.8° for stars only. The closest pairs are Alnitak–M42 (3.7°), M6–M7
   (3.9°) and Castor–Pollux (4.5°).
-- How many of the 25 stars have no neighbour inside the ambiguity margin, and
-  so can ever produce *one answer*:
+- How many of the 25 stars have no neighbour inside the ambiguity margin
+  (2σ), and so can ever produce *one answer*. Two bases:
 
-  | σ | ambiguity margin | stars that can be one answer |
-  |---|---|---|
-  | 10° | 20° | 14/25 |
-  | 7° | 14° | 17/25 |
-  | 5° | 10° | 19/25 |
-  | 3° | 6° | 23/25 |
+  | σ | margin | neighbours = **all 43 objects** | neighbours = stars only |
+  |---|---|---|---|
+  | 10° | 20° | **11/25** | 14/25 |
+  | 7° | 14° | **14/25** | 17/25 |
+  | 5° | 10° | **17/25** | 19/25 |
+  | 3° | 6° | **21/25** | 23/25 |
 
-  The rest will always end in *Possible matches*. That's honest, but it's the
-  dominant UX outcome if σ stays at 10°.
+  The all-objects column is the worst case: every DSO is visible and inside
+  the cone. The stars-only column is the best case: DSOs are filtered out by
+  twilight, the Moon or the magnitude limit (see H3). Planets and the Moon,
+  which move, are not in either column. The rest always end in *Possible
+  matches*. That's honest, but it's the dominant UX outcome if σ stays at
+  10°.
 - **Implication:** a measured σ of about 5° after calibration is the
   difference between "usually one answer" and "usually a list".
 

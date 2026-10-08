@@ -354,15 +354,22 @@ a fake clock).
 
 - **No official third-party API.** ZWO publishes no third-party control API for
   the Seestar.
-- **The native path needs a vendor credential.** The community path through
+- **The native path needs a vendor secret.** The community path through
   seestar_alp changed in **v3.2.2 (released 2026-05-06)**. Its release notes
-  list *"Add interop PEM-based client authentication for firmware 7.18+"* and
-  say this applies to "a subset of users", with an "interoperability PEM"
-  extracted from the Seestar APK (bguthro/seestar-tool → "Extract PEM").
+  list *"Add interop PEM-based client authentication for firmware 7.18+"*
+  (PR #735), and say this applies to "a subset of users". The PR explains the
+  mechanism. Firmware 7.18 removed the legacy `verify` parameter, and remote
+  clients must now run a **challenge-response** handshake:
+  `get_verify_str` → sign the challenge with an **RSA private key** (PEM,
+  SHA1withRSA / PKCS#1 v1.5) → `verify_client`. The key is the
+  "interoperability PEM" extracted from the Seestar APK
+  (bguthro/seestar-tool → "Extract PEM"). It is **not** a client certificate.
+  (An earlier draft of this ADR said "client certificate"; corrected
+  2026-10-09.)
 
-So talking natively to a Seestar on current firmware means extracting a key
-from ZWO's own app. We won't ship that, and it can't be a stable product
-dependency.
+So talking natively to a Seestar on current firmware means shipping or
+extracting a private key from ZWO's own app. We won't ship that, and it can't
+be a stable product dependency.
 
 **Decision.**
 
@@ -436,7 +443,21 @@ dependency.
     - It needs a reachable iPhone and a fresh (≤ 10 s) "ready" report.
     - It is hidden whenever Stop is shown.
     - It is never bound to Double Tap.
-  - **Stop:** it appears whenever the telescope is or might be moving:
+  - **Stop (revised 2026-10-09 after an independent check):** the first
+    version hid Stop once a report went stale, unless this watch had sent
+    the GoTo. A slew started from the iPhone whose reports then stopped
+    showed "state unknown" with **no Stop**. The rule now is:
+    - Stop shows whenever a slew *might* be in progress: latest state slewing
+      (fresh or stale), stale after any non-"off" report, error, a GoTo sent
+      from here and not proven finished, or a Stop pending or failed.
+    - It is hidden only when the latest **fresh** report is
+      ready/off/disconnected and nothing is pending.
+    - Before any report arrives it is shown unless the feature is known off
+      (the last "off" report is remembered across launches).
+    - Stop now lives in a persistent bar at the top of the main watch
+      screen (`TelescopeStopBar`), independent of the confirmation card.
+    
+    Original rule:
     - reported slewing
     - a GoTo was sent and isn't proven finished: accepted, no reply, or the
       state became unknown or error
