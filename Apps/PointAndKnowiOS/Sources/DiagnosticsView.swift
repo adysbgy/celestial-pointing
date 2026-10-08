@@ -80,7 +80,11 @@ struct RootView: View {
         // belakang — menutupnya tidak mereset alur.
         .sheet(isPresented: .init(
             get: { !onboardingSeen },
-            set: { seen in onboardingSeen = seen })) {
+            // Penulis `isPresented` menerima "masih tampil?", bukan
+            // "sudah dilihat?". Dulu nilainya disimpan apa adanya, jadi
+            // menutup sheet menulis `onboardingSeen = false` dan sheet
+            // langsung muncul lagi — kartu ini tidak pernah bisa ditutup.
+            set: { presented in onboardingSeen = !presented })) {
             OnboardingView(onDone: { onboardingSeen = true })
         }
         // Palet merah murni saat malam, berlaku untuk **seluruh** tab.

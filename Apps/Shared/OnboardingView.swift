@@ -23,12 +23,30 @@ struct OnboardingView: View {
     /// status "sudah dilihat" (bukan view ini), supaya view tetap murni UI.
     var onDone: () -> Void
 
+    // Jarak di jam lebih rapat: 40 pt inset tombol memakan hampir separuh
+    // layar 40 mm.
+    #if os(watchOS)
+    private static let spacing: CGFloat = 10
+    private static let buttonInset: CGFloat = 8
+    private static let outerPadding: CGFloat = 4
+    #else
+    private static let spacing: CGFloat = 18
+    private static let buttonInset: CGFloat = 40
+    private static let outerPadding: CGFloat = 16
+    #endif
+
     var body: some View {
         ZStack {
             SurfacePalette.appBackground
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
+            // Bergulir, bukan dipadatkan: di jam 40–49 mm tumpukan ini lebih
+            // tinggi dari layar, dan tanpa ScrollView SwiftUI memotong judul
+            // dan isi jadi "Point your w…" (terlihat di Ultra 3). Setiap teks
+            // juga diizinkan tumbuh vertikal (`fixedSize`) dan judul boleh
+            // mengecil sedikit sebelum membungkus.
+            ScrollView {
+            VStack(spacing: Self.spacing) {
                 // Pahlawan prosedural, bukan ikon SF Symbol: layar perkenalan
                 // adalah **pertama** yang dilihat pengguna, dan ia harus
                 // memperlihatkan benda yang sebenarnya ditampilkan app —
@@ -70,11 +88,16 @@ struct OnboardingView: View {
                     .font(.title2.bold())
                     .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                     .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(TextLocalization.text(.onboardingSubtitle))
                     .font(.subheadline)
                     .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 280)
 
                 // Janji produk, bukan instruksi teknis: ketidak-pastian ditampilkan
@@ -85,6 +108,8 @@ struct OnboardingView: View {
                     .font(.caption)
                     .foregroundStyle(PointingTone.warning.color)
                     .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 280)
 
                 Button(action: onDone) {
@@ -94,10 +119,11 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(PointingTone.active.color)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, Self.buttonInset)
                 .padding(.top, 6)
             }
-            .padding()
+            .padding(Self.outerPadding)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(TextLocalization.text(.onboardingLabel))
