@@ -1,3 +1,93 @@
+## Progres terakhir (8 Okt 2026 — dua pemanggil, satu konstanta: radius akhir gradien limb akhirnya dibaca kedua jalur)
+
+### Cacatnya: konstanta yang ada, dinamai, diuji — dan tidak mengatur apa pun di separuh pemanggilnya
+
+`CelestialVisual.moonSphereGradientEndRadius` (1.15) punya komentar yang
+menyatakan dipakai di **kedua** bahasa, dibandingkan gerbang drift, dan diuji
+di Linux (`testMoonSphereGradientIsShallowerThanThePlanetSphere`). Yang
+membaca konstantanya sampai siklus ini hanya satu pemanggil: piringan Bulan
+(`sphereGradient`). Jalur pita terang planet dalam — Venus dan Merkurius
+berfase, yang digambar oleh fungsi `drawLitBand` yang **sama** dengan Bulan —
+menulis `1.15` sebagai literal di `drawPlanet` (view) **dan** di `_draw_planet`
+(port).
+
+Akibatnya terukur: mengubah konstanta itu memindahkan **nol piksel** pada
+Venus dan Merkurius berfase, di kedua ukuran (200 px dan 38 px), sementara
+`moon-full` bergeser 31 532 piksel pada 200 px. Konstanta ini ada, dinamai,
+dibandingkan gerbang drift, diuji — dan tidak mengatur satu piksel pun di
+tempat yang dipakai separuh planet dalam. Tidak ada galat kompilasi: dua benda
+yang digambar fungsi yang sama lalu beredup berbeda tanpa satu pun yang tahu.
+
+### Perbaikannya: kedua jalur limb membaca konstanta model
+
+- `drawPlanet` (view) memakai
+  `radius * CGFloat(CelestialVisual.moonSphereGradientEndRadius)`.
+- `_draw_planet` (port) memakai `radius * MOON_SPHERE_GRADIENT_END_RADIUS`.
+- Sekarang kedua jalur limb — piringan Bulan **dan** pita terang planet dalam
+  — membaca angka yang sama dari sumber yang sama.
+
+### Yang diukur, bukan dikira-kira
+
+`check_planet_phase_limb_reads_the_model_constant` menguji **kepekaan gambar
+terhadap konstanta**, bukan bahwa gradiennya "ada" (gradien apa pun akan lolos
+itu). Konstanta diganti ke `1.45`, dan rerata pergeseran luminans piksel pita
+yang menyala dituntut ≥ 4,0/255. Terukur: konstanta yang diabaikan = 0,00 (cacat
+asal), render ulang identik = 0,00 (bukti ambang bebas noise rasterisasi),
+saat diubah = 8,90…15,56 pada 200 px dan 8,90…15,47 pada 38 px. Dua pemeriksaan
+teks tambahan memastikan `drawPlanet` menyebut konstanta dan tidak menulis
+`radius * 1.15` sendiri — keduanya lewat `swift_code_only` supaya komentar yang
+**menjelaskan** cacat ini tidak dihitung sebagai pemakaian.
+
+`_gradient_end_factors` diperluas dua arah: (1) mengenali pengali berupa
+**konstanta** (diselesaikan dari sumber model, bukan disalin jadi angka ketiga
+yang tidak pernah dibandingkan); (2) melaporkan dua pemanggil limb yang tidak
+sepakat sebagai `None` — satu-satunya cara menangkap "dua benda fungsi sama
+beredup berbeda" tanpa satu pun galat kompilasi.
+
+### Dua harness mutasi baru, di-track dan dijalankan CI
+
+- `bukti-mutasi-radius-akhir.py` (5 keadaan, 0 tidak sesuai harapan): termasuk
+  satu yang **diharapkan hijau** — jalur Bulan menulis literal `1.15` (gerbang
+  ini mengukur planet dalam, jadi batas cakupannya teruji, bukan tersirat).
+- `bukti-mutasi-radius-gradasi.py` (7 keadaan, 0 tidak sesuai harapan):
+  membuktikan pembacanya tetap menggigit setelah diperluas — termasuk satu
+  **diharapkan hijau** (kedua bahasa sepakat di 1.60 pada bola) dan satu yang
+  hanya terlihat pemeriksaan "para pemanggil sepakat" (dua pemanggil limb tidak
+  sepakat → `None`).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 688 | **688** |
+| Pemeriksaan visual | 567 | **582** (+1 gerbang baru) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 688, 0 gagal), `check-visuals.py
+--check` (582, 0 gagal), `bukti-mutasi-radius-akhir.py` (5 keadaan, 0 tidak
+sesuai harapan), `bukti-mutasi-radius-gradasi.py` (7 keadaan, 0 tidak sesuai
+harapan), `swift-ui-lint.sh` (29), `swift-typecheck.sh`. CI: Engine Tests
+(Linux) `37761380928` + Apple Build `37761380947` **hijau**. Berkas tersentuh:
+`CelestialVisual.swift`, `CelestialVisualView.swift`, `render-visuals.py`,
+`check-visuals.py`, `engine-tests.yml`, dua harness baru di `Tools/`. **Tidak
+ada satu baris pun di mesin teruji yang berubah.**
+
+### Batas yang jujur
+
+- Gerbang baru menjaga **kepekaan gambar terhadap konstanta**, bukan bahwa
+  nilai 1.15 itu benar secara fisis. 1.15 dipilih dengan alasan yang diukur di
+  siklus sabit Bulan; gerbang ini hanya menjamin Venus/Merkurius mengikutinya
+  begitu ia diukur ulang.
+- `check_planet_phase_limb_reads_the_model_constant` berjalan pada **satu
+  ukuran** (diambil dari token `WatchMetrics.visualDiameter`); pada ukuran lain
+  pasangan yang berbeda bisa bertumbukan, dan itu tidak diukur.
+- Pemeriksaan "para pemanggil sepakat" hanya melihat gradien limb; kalau suatu
+  saat `drawLitBand` memakai radius akhir yang berbeda untuk sabit vs purnama,
+  itu adalah cacat baru di luar cakupan entri ini.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — bulan mengecil: satu-satunya cabang gambar yang tidak pernah digambar, dan angka yang dikutip tanpa diukur)
 
 ### Cacatnya: separuh setiap bulan tidak pernah masuk ke satu pun PNG
