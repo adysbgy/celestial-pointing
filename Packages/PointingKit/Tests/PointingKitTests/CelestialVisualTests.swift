@@ -1166,6 +1166,88 @@ final class CelestialVisualTests: XCTestCase {
                           "cangkang harus satu radius (terkecil \(smallest) vs terbesar \(largest)) — kalau menyebar, ia tampil sebagai gugus terbuka")
     }
 
+    /// Cangkangnya harus **bersambung** — blob yang bertetangga harus
+    /// benar-benar beririsan di layar, bukan sekadar bersinggungan.
+    ///
+    /// **Cacat yang ditutup uji ini.** Dua uji di atas benar dan tetap benar
+    /// pada gambar yang rusak: **untaian delapan manik juga duduk pada satu
+    /// radius dan juga berongga di tengah.** Yang tidak dijaga keduanya
+    /// adalah apakah manik-manik itu bertemu.
+    ///
+    /// **Kenapa kasus terburuk, bukan tiap fuzziness sendiri-sendiri.** Tata
+    /// letak lama (8 blob @45°, lebar 0.30 R) **lulus** ambang apa pun pada
+    /// fuzziness 1.0 — di sana blobnya membesar 1.6× dan kebetulan
+    /// bertemu. Yang membuatnya rusak adalah bahwa ia **tepat
+    /// bersinggungan** di seluruh rentang yang benar-benar dipakai: rasio
+    /// jangkauan-terhadap-jaraknya 0.74 (fuzziness 0) sampai 1.20
+    /// (fuzziness 1), dan katalog menggambar M57 pada **0.40** — tepat di
+    /// 0.92, di bawah satu. Menguji satu fuzziness saja bisa memilih satu
+    /// titik yang kebetulan hijau; menguji minimumnya di seluruh rentang
+    /// tidak bisa.
+    ///
+    /// Rasio 1.0 berarti **tepat bersinggungan** — tepinya bertemu di satu
+    /// titik dan tidak ada cadangan sama sekali. Karena itu ambangnya bukan
+    /// 1.0 melainkan 1.1: irisan yang hanya selebar nol piksel hilang begitu
+    /// lebarnya bergeser sedikit, dan yang tersisa kembali manik. Diukur:
+    /// tata letak lama minimum **0.74**, tata letak sekarang minimum **1.17**.
+    ///
+    /// **Kenapa ini uji model, bukan hanya gerbang gambar.** Gerbang gambar
+    /// (`check_planetary_nebula_shell_is_continuous`) mengukur PNG dan karena
+    /// itu hanya berjalan di Linux lewat port Python. Uji ini mengukur
+    /// **geometrinya langsung**, jadi ia ikut hijau/merah di `swift test` —
+    /// dan invariannya terjaga bahkan bila port-nya tidak dijalankan.
+    ///
+    /// **Batas yang dinyatakan.** Uji ini menuntut blobnya **beririsan**; ia
+    /// tidak menuntut hasilnya *terbaca* sebagai cangkang. Irisan minimumnya
+    /// (1.17 pada fuzziness 0) adalah lantai geometris, bukan janji visual —
+    /// apakah celah yang tersisa masih terbaca sebagai gas diukur gerbang
+    /// gambar pada PNG-nya: **0.77** dari puncak pada kode sekarang melawan
+    /// **0.18** pada tata letak lama.
+    func testPlanetaryNebulaShellIsContinuousNotBeaded() {
+        /// Rasio terburuk di seluruh rentang yang dipakai katalog.
+        func worstOverlap(fuzziness: Double) -> (ratio: Double, gap: Double) {
+            let blobs = VisualFrame.deepSky(morphology: .planetaryNebula,
+                                            fuzziness: fuzziness).blobs
+            XCTAssertGreaterThan(blobs.count, 2,
+                                 "cangkang butuh setidaknya tiga blob")
+            // Blob terurut menurut sudutnya, lalu tiap pasangan bertetangga
+            // diperiksa. Diurutkan supaya tidak bergantung pada urutan
+            // penulisan `ring` di model — urutan itu boleh dirapikan tanpa
+            // membuat uji ini merah.
+            let ordered = blobs.sorted {
+                atan2($0.offsetY, $0.offsetX) < atan2($1.offsetY, $1.offsetX)
+            }
+            var worst = (ratio: Double.infinity, gap: 0.0)
+            for index in ordered.indices {
+                let a = ordered[index]
+                let b = ordered[(index + 1) % ordered.count]
+                let gap = hypot(a.offsetX - b.offsetX, a.offsetY - b.offsetY)
+                // Blob-nya bulat (`halfHeight == halfWidth`), jadi lebarnya
+                // sama di segala arah; yang menentukan bertemu atau tidak
+                // adalah **jumlah** dua tetangga, bukan salah satunya.
+                let reach = max(a.halfWidth, a.halfHeight)
+                    + max(b.halfWidth, b.halfHeight)
+                if reach / gap < worst.ratio {
+                    worst = (reach / gap, gap)
+                }
+            }
+            return worst
+        }
+
+        // Rentang ini mencakup kedua nilai katalog (M57 0.40, M27 0.68) dan
+        // kedua ujungnya, jadi tata letak yang hanya benar di tengah tidak
+        // bisa lolos.
+        for fuzziness in [0.0, 0.4, 0.68, 0.8, 1.0] {
+            let worst = worstOverlap(fuzziness: fuzziness)
+            XCTAssertGreaterThan(
+                worst.ratio, 1.1,
+                "blob bertetangga tidak beririsan di fuzziness \(fuzziness) "
+                + "(jangkauan dua tetangga \(worst.ratio)× jarak \(worst.gap)) — "
+                + "tepat bersinggungan, jadi cangkangnya terbaca sebagai "
+                + "untaian manik, bukan gas")
+        }
+    }
+
     /// Nebula planetari harus **berbeda** dari nebula emisi dan dari gugus
     /// terbuka — dua bentuk yang paling mirip dengannya di layar.
     ///

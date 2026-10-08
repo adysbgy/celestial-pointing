@@ -1284,30 +1284,83 @@ public enum VisualFrame {
             // beda. Jadi `.planetaryNebula` boleh punya blob rapat tanpa
             // tampak sebagai "kerumunan bintang", dan perbedaan itu terukur
             // (`testPlanetaryNebulaShellSitsOnOneRadius`).
-            // Radius dan komponennya **dihitung**, bukan ditulis: 45° pada
-            // radius `r` adalah `r/√2`, dan angka yang dibulatkan ke enam
-            // desimal membuat cangkangnya menyimpang 2e-7 dari satu radius —
-            // cukup untuk membuat uji "satu radius" merah tanpa ada yang
-            // salah. Satu angka (`shellRadius`) yang dipakai kedua sumbu.
+            // **Kenapa 16 titik pada 22.5°, bukan 8 pada 45°.** Delapan blob
+            // pada radius 0.42 R berjarak **0.3215 R** satu sama lain (tali
+            // busur 45°), dan tiap pasangan bertetangga menjangkau
+            // **0.239 R → 0.385 R** tergantung fuzziness. Terukur sebagai
+            // kelipatan tali busurnya: **0.74× (fuzziness 0), 0.92× (0.40),
+            // 1.05× (0.68), 1.20× (1.0)**.
+            //
+            // Dua nilai tengah itu bukan angka asing — itulah fuzziness yang
+            // benar-benar dipakai katalog: **M57 pada 0.40, M27 pada 0.68**.
+            // Pada 0.40 manik-maniknya **berjarak** (0.92×), dan pada 0.68
+            // baru **tepat bersinggungan** (1.05×) — nol cadangan. Bersinggungan
+            // berarti tidak ada ruang sama sekali: begitu lebarnya bergeser
+            // sedikit, sisanya gelap. Yang tampil di layar bukan cangkang gas
+            // melainkan **untaian manik** — delapan titik terpisah yang
+            // kebetulan melingkar. Terukur pada 132 pt: celah di antara blob
+            // turun ke **0.18** dari puncaknya (dihitung di atas latar), dan
+            // penilaian atas gambarnya menyebutnya persis begitu, "string of
+            // pearls". Cangkang nyata — cincin M57, cangkang M27 — adalah
+            // **satu** kulit yang bersambung; yang membedakannya dari gugus
+            // bintang justru kesinambungannya, bukan lingkarannya.
+            //
+            // Enam belas titik pada radius yang sama berjarak **0.1639 R**,
+            // sementara tiap pasangan bertetangga menjangkau **0.192 R →
+            // 0.342 R**: **1.17×** tali busurnya pada kasus terburuk
+            // (fuzziness 0), naik ke 2.09× pada fuzziness 1. Jadi pada
+            // **setiap** fuzziness tepinya beririsan — bukan hanya pada satu
+            // nilai yang kebetulan pas. Yang tersisa hanya riak halus di tepi
+            // dalam/luar: itu tekstur cangkang, bukan manik. Diukur pada lebar
+            // yang sama: celah **0.18 → 0.77** dari puncak.
+            //
+            // **Yang tidak boleh ikut berubah: lubangnya.** Tepi dalam
+            // cangkang tetap **0.307 R** (fuzziness 0) sampai **0.237 R**
+            // (fuzziness 1) — jauh di atas ambang 0.2 yang menjaga "berongga
+            // di tengah", dan lebar yang dikecilkan (0.30 → 0.26) justru
+            // **memperlebar** lubang itu, bukan menutupnya. Yang ditutup hanya
+            // celah antar-blob, bukan pusatnya.
+            //
+            // Radius dan komponennya **dihitung**, bukan ditulis: 22.5° pada
+            // radius `r` adalah `(r·cos 22.5°, r·sin 22.5°)`, dan 45° adalah
+            // `r/√2`. Angka yang dibulatkan ke enam desimal membuat cangkangnya
+            // menyimpang 2e-7 dari satu radius — cukup untuk membuat uji "satu
+            // radius" merah tanpa ada yang salah. Satu angka (`shellRadius`)
+            // yang dipakai kedua sumbu, dan dua komponen sisanya diturunkan
+            // darinya supaya tidak ada enam belas posisi tangan yang bisa
+            // tertinggal separuh saat cangkangnya dirapikan.
             let shellRadius = 0.42
             let diagonal = shellRadius / 2.0.squareRoot()
+            let innerMajor = shellRadius * cos(22.5 * .pi / 180)
+            let innerMinor = shellRadius * sin(22.5 * .pi / 180)
             let ring: [(Double, Double)] = [
                 ( shellRadius,  0.0),
+                ( innerMajor,  innerMinor),
                 ( diagonal,  diagonal),
+                ( innerMinor,  innerMajor),
                 ( 0.0,  shellRadius),
+                (-innerMinor,  innerMajor),
                 (-diagonal,  diagonal),
+                (-innerMajor,  innerMinor),
                 (-shellRadius,  0.0),
+                (-innerMajor, -innerMinor),
                 (-diagonal, -diagonal),
+                (-innerMinor, -innerMajor),
                 ( 0.0, -shellRadius),
-                ( diagonal, -diagonal)
+                ( innerMinor, -innerMajor),
+                ( diagonal, -diagonal),
+                ( innerMajor, -innerMinor)
             ]
             // Opasitasnya tidak seragam: cangkang yang rata sempurna tampak
             // seperti donat yang digambar. Bedanya kecil dan sengaja
-            // asimetris (sisi atas-sedikit lebih tebal).
-            let shellOpacity = [0.54, 0.48, 0.52, 0.46, 0.50, 0.44, 0.53, 0.47]
+            // asimetris (sisi atas sedikit lebih tebal). Enam belas nilai,
+            // bukan delapan — blob yang dirapatkan tanpa variasi opasitas
+            // akan tampak sebagai cincin yang dicetak, bukan gas.
+            let shellOpacity = [0.54, 0.48, 0.52, 0.46, 0.50, 0.44, 0.53, 0.47,
+                                0.51, 0.45, 0.49, 0.44, 0.52, 0.46, 0.50, 0.45]
             let layout: [(Double, Double, Double, Double, Double, Double)] =
                 zip(ring, shellOpacity).map { offset, opacity in
-                    (offset.0, offset.1, 0.30, 1.0, 0.0, opacity)
+                    (offset.0, offset.1, 0.26, 1.0, 0.0, opacity)
                 }
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
                                 frameHalfExtent: frameHalfExtent)

@@ -120,11 +120,48 @@ WANT_RED = {
 _originals = {}
 
 
+def _atomic_write(path, content):
+    """Tulis `path` secara atomik, di filesystem yang sama.
+
+    Kenapa tidak `open(path, "w")` biasa. Harness ini dan lima harness
+    saudaranya memutasi berkas produksi yang **sama**, dan setiap prob
+    membacanya dari **proses baru**. Penulisan biasa bukan operasi atomik:
+    pembaca bisa melihat berkas setengah jadi, dan bila tulisan terputus di
+    tengah, berkas produksi tetap termutasi tanpa ada yang tahu.
+    `os.replace` dalam satu direktori itu atomik, jadi prob hanya pernah
+    melihat versi lama atau versi baru — tidak pernah yang di antaranya.
+    """
+    tmp = path + ".tmp-mutasi"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp, path)
+
+
+def _verify(path):
+    """Pulihkan `path` ke isi aslinya, lalu **buktikan** ia pulih.
+
+    Kenapa pemulihan harus diverifikasi, bukan sekadar dilakukan. Kegagalan
+    pemulihan itu **diam**, dan ia mencemari keadaan berikutnya dengan cara
+    yang menipu: keadaan 4 pernah merah dengan lima pemeriksaan planet yang
+    sama persis dengan keadaan 1, seolah gerbangnya yang salah cakupannya —
+    padahal berkas yang diukur masih membawa mutasi keadaan sebelumnya.
+    Membiarkan itu terjadi berarti harness bisa menyalahkan kode yang benar.
+    """
+    _atomic_write(path, _originals[path])
+    with open(path, encoding="utf-8") as handle:
+        if handle.read() != _originals[path]:
+            raise RuntimeError(
+                f"pemulihan {os.path.basename(path)} tidak cocok dengan isi "
+                "aslinya — berkas produksi masih termutasi; perbaiki sebelum "
+                "mempercayai hasil harness ini")
+
+
 def restore(*_):
     """Pulihkan sumber produksi — juga saat dihentikan sinyal."""
-    for path, content in _originals.items():
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(content)
+    for path in _originals:
+        _atomic_write(path, _originals[path])
 
 
 def probe():
@@ -163,12 +200,10 @@ def main():
             # sudah dimutasi keadaan sebelumnya: mutasi dua berkas dalam satu
             # keadaan tidak boleh bergantung pada urutannya.
             for path in (RENDER, VIEW):
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(_originals[path])
+                _verify(path)
             for path, old, new in mutations:
                 content = _originals[path].replace(old, new, 1)
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(content)
+                _atomic_write(path, content)
 
             red, lines = probe()
             if red is None:
@@ -194,10 +229,18 @@ def main():
                 print(f"       diharapkan: {sorted(want) or '—'}")
 
             for path, _, _ in mutations:
-                with open(path, "w", encoding="utf-8") as handle:
-                    handle.write(_originals[path])
+                _verify(path)
     finally:
         restore()
+        # Berkas produksi **harus** bersih ketika harness selesai, dan itu
+        # dibuktikan, bukan diandaikan: lima harness saudara berjalan setelah
+        # yang ini di CI pada berkas yang sama, jadi mutasi yang tersisa di
+        # sini akan menjatuhkan langkah yang tidak bersalah.
+        for path in (RENDER, VIEW):
+            with open(path, encoding="utf-8") as handle:
+                if handle.read() != _originals[path]:
+                    print(f"BERKAS PRODUKSI MASIH TERMUTASI: {path}")
+                    sys.exit(1)
 
     print()
     if unexpected:

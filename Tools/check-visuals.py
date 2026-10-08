@@ -42,9 +42,47 @@ import importlib.util
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Jangan pernah menulis bytecode `.pyc`. Lihat `_load` untuk alasannya.
+sys.dont_write_bytecode = True
+
+
+def _purge_stale_bytecode(path):
+    """Buang `.pyc` untuk `path` supaya sumbernya dibaca ulang dari disk.
+
+    **Cacat yang ditutup ini, dan kenapa ia tidak terlihat.** CPython
+    memvalidasi cache bytecode lewat (ukuran berkas, mtime) — **bukan isi**.
+    Harness mutasi menulis versi yang dimutasi ke berkas produksi yang sama
+    berkali-kali dalam satu detik, dan dua keadaan berbeda bisa menghasilkan
+    **panjang berkas yang identik**: token `MOON_SPHERE_GRADIENT_END_RADIUS)`
+    (33 byte) diganti `1.15)` (4 byte) di dua tempat, jadi keadaan 3
+    ("keduanya") dan keadaan 4 ("jalur Bulan") menulis berkas sepanjang sama.
+    Bila keduanya jatuh pada detik yang sama, `.pyc` keadaan 3 dianggap masih
+    sah dan probe keadaan 4 membaca **kode keadaan 3** — gerbang lalu memerah
+    pada keadaan yang sebenarnya benar.
+
+    Itu pernah menjatuhkan `main`: keadaan 4 merah dengan lima pemeriksaan
+    piksel planet yang sama persis dengan keadaan 1, sementara pemeriksaan
+    teks `drawPlanet` hijau — tanda yang jelas bahwa yang dibaca adalah kode
+    keadaan sebelumnya, bukan kode di disk. Cacatnya **flaky** (bergantung
+    detik), jadi ia lolos berkali-kali sebelum menjatuhkan CI sekali.
+    """
+    base = os.path.basename(path).rsplit(".", 1)[0]
+    cache = os.path.join(os.path.dirname(path), "__pycache__")
+    try:
+        entries = os.listdir(cache)
+    except OSError:
+        return
+    for entry in entries:
+        if entry.startswith(base + ".") and entry.endswith(".pyc"):
+            try:
+                os.remove(os.path.join(cache, entry))
+            except OSError:
+                pass
+
 
 def _load(name, filename):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    _purge_stale_bytecode(path)
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -354,6 +392,23 @@ READABILITY_THRESHOLD = 12
 #: gerbangnya menyampel di 16 jari-jari, bukan di dua jari-jari yang kebetulan
 #: berbeda.
 MIN_ARM_DEGREES = 12
+
+#: Seberapa terang **celah terburuk** cangkang nebula planetari, sebagai
+#: pecahan puncaknya (0 = sama terang, 1 = turun sampai latar).
+#:
+#: Angka ini memisahkan **cangkang bersambung** dari **untaian manik**, dan
+#: itulah satu-satunya hal yang membedakan nebula planetari dari gugus
+#: bintang di layar. Diukur (`Tools/bukti-mutasi-cangkang.py`, fuzziness kasus
+#: render 0.8):
+#:
+#:   - 8 blob @45°, lebar 0.30 R (tata letak lama) — 0.18  MANIK
+#:   - 16 blob @22.5°, lebar 0.26 R (sekarang)       — 0.77  CANGKANG
+#:
+#: Ambang 0.50 duduk di antara keduanya dengan jarak yang lebar ke dua arah,
+#: jadi ia tidak merah karena perubahan kecil di tempat lain dan tidak hijau
+#: pada tata letak yang benar-benar terputus. Batas bawahnya yang penting:
+#: angka 0.18 dari tata letak lama tidak boleh pernah dianggap lulus.
+MIN_SHELL_CONTINUITY = 0.50
 
 #: Berapa derajat **sumbangan** tonjolan inti yang harus terbaca di ukuran jam.
 #:
@@ -2097,7 +2152,31 @@ def _shell_layout_from_swift(tail):
     pairs = re.findall(r"\(\s*(-?[\w.]+)\s*,\s*(-?[\w.]+)\s*\)", ring_region)
     shell_radius = float(re.search(r"let shellRadius = ([\d.]+)", tail).group(1))
     diagonal = shell_radius / 2.0 ** 0.5
-    names = {"shellRadius": shell_radius, "diagonal": diagonal}
+    # Komponen pada 22.5° dibaca dari model, bukan dihitung ulang di sini:
+    # `cos`/`sin` di dua bahasa adalah tempat pembulatan menyimpang, dan
+    # gerbang yang membandingkan **nilai** akan memerah karena 1e-16, bukan
+    # karena bentuknya berbeda. Kalau model mengganti sudutnya, nama yang
+    # hilang di sini membuat pembacaan gagal bersih — bukan diam-diam
+    # memakai sudut lama.
+    #
+    # `_required` bukan hiasan: tanpa itu `re.search(...).group(1)` melempar
+    # `AttributeError: 'NoneType'` — kegagalan yang tidak menyebut jangkar
+    # mana yang hilang, dan gerbang yang berisik seperti itu dihapus orang
+    # begitu ia berbunyi. Pola yang sama dengan `read_planet_switch_cases_from_swift`.
+    def _required(pattern, label):
+        match = re.search(pattern, tail)
+        if match is None:
+            raise ValueError(
+                f"'{label}' tidak ditemukan di cabang .planetaryNebula")
+        return float(match.group(1))
+
+    inner_major = _required(r"let innerMajor = shellRadius \* cos\(([\d.]+)",
+                            "let innerMajor = shellRadius * cos(22.5")
+    inner_minor = _required(r"let innerMinor = shellRadius \* sin\(([\d.]+)",
+                            "let innerMinor = shellRadius * sin(22.5")
+    names = {"shellRadius": shell_radius, "diagonal": diagonal,
+             "innerMajor": shell_radius * math.cos(math.radians(inner_major)),
+             "innerMinor": shell_radius * math.sin(math.radians(inner_minor))}
     opacities = [float(v) for v in re.search(
         r"let shellOpacity = \[([\d.,\s]+)\]", tail).group(1).split(",")]
     width_scale = float(re.search(
@@ -4547,6 +4626,119 @@ def check_spiral_arms_stay_continuous(results):
             f"{degrees}° di atas ambang {READABILITY_THRESHOLD} pada {pixels} px; "
             f"butuh >= {MIN_ARM_DEGREES}° — di bawah itu lengkungnya bolong "
             f"dan yang tampil gumpalan bergerigi"))
+
+
+def check_planetary_nebula_shell_is_continuous(results):
+    """Cangkang `.planetaryNebula` harus **bersambung**, bukan untaian manik.
+
+    **Cacat yang ditutup pemeriksaan ini.** Bentuk ini diuji sebagai
+    *lingkaran*: `testPlanetaryNebulaShellSitsOnOneRadius` menuntut semua
+    blobnya sejauh sama dari pusat, `testPlanetaryNebulaIsHollowAtTheCentre`
+    menuntut bagian tengahnya kosong. Keduanya benar, dan keduanya tetap benar
+    pada gambar yang rusak — **untaian delapan manik juga duduk pada satu
+    radius dan juga berongga di tengah.** Yang tidak dijaga siapa pun adalah
+    apakah manik-manik itu **bertemu**.
+
+    Delapan blob pada radius 0.42 R berjarak 0.3215 R (tali busur 45°),
+    sementara tiap pasangan bertetangga menjangkau 0.239…0.385 R tergantung
+    fuzziness. Sebagai kelipatan tali busurnya: **0.74x (fuzziness 0), 0.92x
+    (0.40), 1.05x (0.68), 1.20x (1.0)** — dan dua nilai tengah itu justru
+    fuzziness katalog (M57 0.40, M27 0.68). Pada 0.40 maniknya berjarak, pada
+    0.68 baru tepat bersinggungan: nol cadangan. Diukur pada 132 pt, celah di
+    antara blob turun ke **0.18** dari puncaknya di atas latar. Di layar itu
+    delapan titik terpisah yang kebetulan melingkar, dan penilaian atas
+    gambarnya menyebutnya persis begitu: "string of pearls". Cangkang nyata
+    (cincin M57) adalah **satu** kulit; yang membedakannya dari gugus bintang
+    justru kesinambungannya.
+
+    **Kenapa diukur sebagai profil angular, bukan min/max.** Versi pertama
+    gerbang ini membandingkan kecerahan **terang** dan **gelap** pada radius
+    cangkang, dan ia **buta justru pada cacat yang diklaimnya**: opasitas
+    blob terbesar 0.54, jadi jumlah blob yang tumpang tindih berhenti
+    menambah kecerahan begitu totalnya melewati 0.54 — puncaknya tersaturasi
+    sementara celahnya tidak. Versi 16-blob karena itu sempat terukur
+    **lebih buruk** daripada versi 8-blob (1.13 vs 0.15) oleh metrik itu,
+    padahal gambarnya jelas lebih bersambung. Yang benar-benar membedakan
+    cangkang dari manik adalah **bagian gelapnya**: pada manik, sudut di
+    antara blob turun hampir ke latar.
+
+    **Batas yang dinyatakan.** Gerbang ini menggambar pada fuzziness kasus
+    render (`deepsky-planetaryNebula`, 0.8), sementara katalog menggambar M57
+    pada 0.40 dan M27 pada 0.68. Dua keadaan itu diuji terpisah: uji model
+    `testPlanetaryNebulaShellIsContinuousNotBeaded` menyapu kelimanya
+    (0.0/0.4/0.68/0.8/1.0) pada geometrinya, dan harness
+    `Tools/bukti-mutasi-cangkang.py` membuktikan gerbang **berbunyi** pada
+    tata letak lama (merah) dan **diam** pada kode sekarang (hijau). Yang
+    **tidak** diklaim: gerbang ini sendiri tidak menyapu seluruh rentang
+    fuzziness katalog — itu tugas uji model.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "cangkang nebula planetari bersambung", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2          # poin -> piksel, jam menggambar @2x
+
+    # Diukur di dua ukuran: ukuran jam (tempat bentuk ini paling sering
+    # dilihat) dan ukuran panel iPhone (tempat ia paling besar). Yang lulus
+    # di satu ukuran belum tentu lulus di ukuran lain — itu pelajaran yang
+    # sudah dua kali dibayar di repo ini.
+    for size, ss in ((pixels, 8), (132, 4)):
+        background, tenth, top = shell_angular_profile(size, ss)
+        if top - background <= READABILITY_THRESHOLD:
+            results.append(Result(
+                f"cangkang nebula planetari bersambung ({size}px)", False,
+                f"cangkangnya tidak terbaca sama sekali (puncak {top}, "
+                f"latar {background})"))
+            continue
+        fraction = (tenth - background) / (top - background)
+        results.append(Result(
+            f"cangkang nebula planetari bersambung ({size}px)",
+            fraction >= MIN_SHELL_CONTINUITY,
+            f"celah terburuk {fraction:.2f} dari puncak (butuh "
+            f">= {MIN_SHELL_CONTINUITY}) — di bawah itu yang tampil untaian "
+            f"manik, bukan cangkang gas"))
+
+
+def shell_angular_profile(size, ss, radius=0.42):
+    """Profil kecerahan sepanjang radius cangkang, diringkas jadi tiga angka.
+
+    **Kenapa dirata-rata pada radius kecil (0.39…0.45 R), bukan satu piksel.**
+    Cangkangnya hanya beberapa piksel tebal pada ukuran jam. Satu piksel bisa
+    meleset ke dalam lubang atau ke luar tepi, dan hasilnya mengukur posisi
+    sampel, bukan bentuknya. Rata-rata tujuh radius membuat angkanya mewakili
+    **tebal cangkangnya**, bukan satu baris piksel yang kebetulan meleset.
+
+    **Kenapa persentil, bukan min/max.** Cangkangnya bergradien; yang
+    menentukan apakah ia terbaca sebagai kulit yang bersambung adalah
+    **lantai** kecerahannya di antara blob, dan lantai itu lebih jujur
+    diukur sebagai persentil ke-10 daripada sebagai piksel tergelap tunggal,
+    yang bisa saja satu piksel anti-aliasing di tepi lubang.
+    """
+    _, (w, h, rows) = render_case("deepsky-planetaryNebula", size=size, ss=ss)
+    background = rows[0][0]
+    cx, cy = w / 2.0, h / 2.0
+    samples = []
+    # Setengah derajat, bukan satu: pada ukuran jam satu derajat hanya
+    # beberapa piksel, jadi resolusi sudutnya terlalu kasar untuk melihat
+    # celah di antara blob yang berjarak 22.5°.
+    for step in range(720):
+        angle = math.radians(step * 0.5)
+        band = []
+        for fraction in (0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45):
+            x = int(round(cx + fraction * radius / 0.42 * math.cos(angle) * min(w, h) / 2.0))
+            y = int(round(cy + fraction * radius / 0.42 * math.sin(angle) * min(w, h) / 2.0))
+            if 0 <= x < w and 0 <= y < h:
+                band.append(rows[y][x * 4])
+        if band:
+            samples.append(sum(band) / len(band))
+    if not samples:
+        return background, background, background
+    samples.sort()
+    return (background,
+            samples[int(0.10 * len(samples))],
+            samples[int(0.98 * len(samples))])
 
 
 def check_spiral_core_reads_as_one_body(results):
@@ -7219,6 +7411,7 @@ def main():
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_spiral_arms_stay_continuous(results)
+    check_planetary_nebula_shell_is_continuous(results)
     check_spiral_core_reads_as_one_body(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)

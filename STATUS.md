@@ -1,3 +1,157 @@
+## Progres terakhir (8 Okt 2026 — cangkang nebula planetari bersambung, dan harness yang menyalahkan kode yang benar)
+
+### Cacatnya: satu bentuk diuji sebagai *lingkaran*, tidak sebagai *kulit*
+
+`.planetaryNebula` digambar sebagai delapan blob pada satu radius (0.42 R,
+tiap 45°). Dua uji yang sudah ada benar dan tetap benar pada gambar yang
+rusak: `testPlanetaryNebulaShellSitsOnOneRadius` menuntut semua blobnya
+sejauh sama dari pusat, `testPlanetaryNebulaIsHollowAtTheCentre` menuntut
+bagian tengahnya kosong. **Untaian delapan manik juga duduk pada satu radius
+dan juga berongga di tengah.** Yang tidak dijaga siapa pun adalah apakah
+manik-manik itu **bertemu** — dan justru kesinambungan itulah satu-satunya
+yang membedakan cangkang gas dari gugus bintang di layar.
+
+Delapan blob pada 45° berjarak tali busur **0.3215 R**, sementara dua
+tetangga menjangkau **0.244…0.394 R** tergantung fuzziness. Sebagai kelipatan
+tali busurnya:
+
+```
+fuzziness  0.00   0.40   0.68   0.80   1.00
+rasio      0.76   0.95   1.08   1.13   1.22
+```
+
+Dua nilai tengah itu justru fuzziness katalog — **M57 pada 0.40, M27 pada
+0.68**. Pada 0.40 maniknya berjarak (0.95×), pada 0.68 baru **tepat
+bersinggungan** (1.08×): nol cadangan. Irisan selebar nol piksel hilang
+begitu lebarnya bergeser sedikit.
+
+### Perbaikannya: 16 blob pada 22.5°
+
+Jarak antar-titik turun ke **0.1639 R** sementara jangkauan dua tetangga
+**0.192…0.310 R**, jadi tepinya beririsan **1.17×…1.89×** — pada **setiap**
+fuzziness, bukan hanya pada satu nilai yang kebetulan pas. Yang tersisa
+hanya riak halus di tepi: itu tekstur cangkang, bukan manik. Lebar blob
+dikecilkan 0.30 → 0.26 (bukan diperbesar) supaya lubangnya tidak tertutup;
+tepinya tetap 0.24…0.31 R, jauh di atas ambang 0.2 yang menjaga "berongga di
+tengah". Opasitasnya jadi enam belas nilai, bukan delapan — blob yang
+dirapatkan tanpa variasi opasitas akan tampak sebagai cincin yang dicetak.
+
+**Angka di atas saya ukur ulang sendiri**, bukan dikutip dari diff:
+`deep_sky_blobs("planetaryNebula", f)` dari port, dengan aritmetika yang
+sama persis dengan uji Swift-nya (jarak tali busur 0.1639 / 0.3215, rasio
+jangkauan-dibagi-jarak).
+
+### Yang diukur pada PNG-nya, di tiga ukuran
+
+Gerbang barunya, `check_planetary_nebula_shell_is_continuous`, mengukur
+**profil angular** cangkang — persentil ke-10 kecerahan pada radius cangkang
+dibagi puncaknya, jadi 1.0 berarti rata dan 0.0 berarti turun sampai latar.
+Bukan min/max, dan itu bukan pilihan gaya: versi pertamanya membandingkan
+terang/gelap dan **buta justru pada cacat yang diklaimnya** — opasitas blob
+terbesar 0.54 membuat puncaknya tersaturasi sementara celahnya tidak, jadi
+versi 16-blob terukur *lebih buruk* (1.13) daripada 8-blob (0.15), persis
+terbalik. Diukur ulang lewat jalur gerbangnya sendiri:
+
+```
+ukuran      76 px (jam)   132 px (panel)   200 px
+8 @45 w0.30      0.19          0.18           0.18   <- MANIK
+16 @22.5 w0.26   0.77          0.77           0.76   <- CANGKANG
+```
+
+Ambang 0.50 duduk di antaranya dengan jarak lebar ke dua arah. Diukur juga
+bahwa keadaan 8 @45° pada lebar **0.20** turun ke 0.00 dan pada lebar
+**0.40** naik ke 0.56 — yang menetapkan batas bawah dan atas ambangnya, dan
+membuktikan yang diukur gerbang itu **kesinambungan**, bukan sekadar
+kehadiran blob.
+
+### Dua penjaga, bukan satu
+
+  - `testPlanetaryNebulaShellIsContinuousNotBeaded` (Linux, `swift test`)
+    mengukur **geometrinya langsung** dan menyapu kelima fuzziness
+    (0.0/0.4/0.68/0.8/1.0) dengan ambang **1.1** — irisan selebar nol piksel
+    bukan irisan. Terukur: tata letak lama minimum **0.76**, sekarang
+    **1.17**. Uji ini ikut merah/hijau tanpa port Python, jadi invariannya
+    terjaga bahkan bila port-nya tidak dijalankan.
+  - Gerbang PNG-nya menjaga **yang terlihat** — irisan geometris adalah
+    lantai, bukan janji visual. Batas itu ditulis di kedua tempat, bukan
+    disembunyikan.
+
+### Harness: `Tools/bukti-mutasi-cangkang.py` (4 keadaan)
+
+```
+[baseline]                          hijau 2 pemeriksaan (benar)
+1. 8 @45°, lebar 0.30 (tata lama)   merah 2 (benar)   <- cacat aslinya
+2. 8 @45°, lebar 0.20 (blob kecil)  merah 2 (benar)
+3. 8 @45°, lebar 0.26 (sekarang)    merah 2 (benar)   <- paling tajam
+```
+
+Keadaan 3 yang menentukan: **ukuran blobnya sama persis** dengan kode
+sekarang, yang berbeda hanya **jaraknya**. Kalau ia hijau, berarti yang
+diukur gerbang itu ukuran blob, bukan kesinambungan. Keadaan 8 @45° lebar
+0.40 sengaja **tidak** dipakai: ia hijau, dan itu benar — delapan blob
+selebar itu saling menjangkau 1.48× tali busurnya. Menuntutnya merah akan
+menuntut gerbang menyalak pada kode yang benar. Dipasang di
+`engine-tests.yml` dan dipulihkan di `finally` **plus** handler
+`SIGINT`/`SIGTERM`.
+
+### Dua cacat keandalan harness yang ikut diperbaiki
+
+  - **`bukti-mutasi-radius-akhir.py`: tulis-biasa → `os.replace` + verifikasi
+    pemulihan.** Ini akar flake yang menjatuhkan langkah ini satu kali di
+    CI: enam harness memutasi berkas produksi yang **sama** dan setiap prob
+    membacanya dari proses baru, jadi penulisan biasa membuat pembaca bisa
+    melihat berkas setengah jadi. Pemulihan kini **diverifikasi**, bukan
+    diandaikan — dan itu tepat kelas cacatnya: kegagalan pemulihan bersifat
+    diam, lalu keadaan berikutnya merah dengan pemeriksaan milik keadaan
+    sebelumnya, **menyalahkan kode yang benar**.
+  - **`check-visuals.py`: `sys.dont_write_bytecode` + buang `.pyc` basi.**
+    CPython memvalidasi cache bytecode lewat (ukuran, mtime) — **bukan isi**
+    — dan `importlib.util.spec_from_file_location` **memakai** cache itu.
+    Direproduksi secara deterministik: dua sumber sepanjang sama yang
+    berbeda hanya **nilai** konstantanya, ditulis pada mtime yang sama,
+    membuat impor kedua mengembalikan nilai yang **lama** (`1.15` padahal
+    berkasnya sudah `1.45`); sama untuk impor biasa. Di CI (python3 dari
+    apt, caching bytecode **aktif** — berbeda dari shell ini yang
+    `PYTHONDONTWRITEBYTECODE=1`) dua keadaan harness bisa jatuh pada detik
+    yang sama dan menghasilkan berkas sepanjang sama, sehingga probe membaca
+    kode keadaan sebelumnya.
+
+### Batas yang jujur
+
+  - Yang dijaga adalah **kesinambungan bentuk**, bukan kebenaran astronomi
+    bentuk cincin M57. Lubangnya terjaga (uji lama) dan lebarnya menjauh dari
+    ambang, tetapi itu tidak diuji ulang di sini.
+  - Gerbang PNG mengukur pada **fuzziness kasus render** (0.8), sementara
+    katalog menggambar M57 pada 0.40 dan M27 pada 0.68. Rentang penuh itu
+    disapu oleh **uji model**, bukan oleh gerbang PNG — pembagian tugas yang
+    ditulis di docstring gerbangnya.
+  - Reproduksi bytecode membuktikan **kelasnya** (mtime+ukuran identik →
+    bytecode basi), bukan bahwa skenario panjang-sama itu benar-benar
+    terjadi di CI. Percobaan cepat saya tidak mereproduksi pasangan yang
+    mendarat di detik yang sama; perbaikan tetap dipakai karena biayanya nol
+    dan kegagalannya sudah pernah terlihat di `main`.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 693 | **694** (+1 uji kesinambungan cangkang) |
+| Pemeriksaan visual | 585 | **587** (+2: dua ukuran) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau di pohon kerja: `swift-test.sh` (206 + 694, 0 gagal),
+`check-visuals.py --check` (587, 0 gagal), `swift-ui-lint.sh` (29),
+`swift-typecheck.sh`, `bukti-mutasi-cangkang.py` (4 keadaan, 0 tidak sesuai
+harapan), `bukti-mutasi-radius-akhir.py` (5 keadaan, 0 tidak sesuai
+harapan, md5 pulih persis). Berkas tersentuh: `CelestialVisual.swift`,
+`CelestialVisualTests.swift`, `Tools/render-visuals.py`, `Tools/check-visuals.py`,
+`Tools/bukti-mutasi-radius-akhir.py`, `Tools/bukti-mutasi-cangkang.py` (baru),
+`.github/workflows/engine-tests.yml`, `README.md`. **Tidak ada kode `Apps/`
+yang berubah.**
+
+---
+
 ## Progres terakhir (8 Okt 2026 — complication sudut: kanal penanda yang hilang di slot paling menonjol)
 
 ### Celah yang ditutup: keluarga complication keempat jatuh ke `default`

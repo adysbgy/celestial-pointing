@@ -216,5 +216,29 @@ jobs:
       - name: Buktikan pembaca radius akhir gradien masih menggigit
         run: python3 Tools/bukti-mutasi-radius-gradasi.py
 
+      # Dan bukti yang sama untuk **kesinambungan cangkang nebula planetari** —
+      # gerbang yang lahir dari cacat yang dilihat mata lebih dulu daripada
+      # diukur alat.
+      #
+      # `testPlanetaryNebulaShellSitsOnOneRadius` menuntut semua blobnya sejauh
+      # sama dari pusat; `testPlanetaryNebulaIsHollowAtTheCentre` menuntut
+      # bagian tengahnya kosong. Keduanya benar, dan keduanya tetap benar pada
+      # gambar yang rusak — **untaian delapan manik juga duduk pada satu radius
+      # dan juga berongga di tengah.** Yang tidak dijaga siapa pun adalah apakah
+      # manik-manik itu **bertemu**. Terukur pada 132 pt: celah di antara blob
+      # turun ke 0.18 dari puncaknya, dan penilaian atas gambarnya menyebutnya
+      # persis begitu — "string of pearls". Pada tata letak 16-blob sekarang
+      # celah itu 0.77.
+      #
+      # Versi pertama gerbangnya memakai perbandingan terang/gelap dan **buta
+      # justru pada cacat yang diklaimnya**: opasitas blob terbesar 0.54, jadi
+      # puncaknya tersaturasi sementara celahnya tidak, dan versi 16-blob
+      # terukur *lebih buruk* (1.13) daripada 8-blob (0.15) — persis terbalik.
+      # Harness ini menuntut gerbangnya merah pada tata letak lama, dan tetap
+      # merah pada mutasi paling tajam: 8 titik @45° pada lebar **sekarang**,
+      # yang berbeda hanya jaraknya.
+      - name: Buktikan gerbang cangkang nebula planetari berbunyi
+        run: python3 Tools/bukti-mutasi-cangkang.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
