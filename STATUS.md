@@ -15710,3 +15710,50 @@ disk tepi keras.
 ### Hasil CI (ditunggu)
 
   - push -> tunggu Engine Tests (Linux) + Apple Build.
+
+═════════════════════════════════════════════════════════════════════════
+SIKLUS: Onboarding — pahlawan titik-cahaya prosedural (8d31ac1)
+═════════════════════════════════════════════════════════════════════════
+
+**Celah yang ditutup.** Layar perkenalan adalah layar PERTAMA yang dilihat
+pengguna, tapi ia masih menampilkan lambang pencarian SF Symbol generik
+(`magnifyingglass.circle.fill`) — sementara SETIAP layar lain di app sudah
+memakai `CelestialVisual` prosedural. Itu satu-satunya layar yang tidak
+konsisten dengan janji visual app ("lihat benda langit, bukan teks").
+
+**Kenapa ini bukan rework.** Seluruh Parts 1-4 + Fase A/B/C sudah
+diimplementasi dan gate-guarded (status awal siklus ini: 206+690 hijau,
+29 aturan UI-lint lulus, macOS build hijau). Yang lemah tinggal layar
+onboarding — ia outlier, bukan pekerjaan yang belum dimulai. Ini unit
+terkecil bernilai nyata, bukan menulis ulang yang sudah ada.
+
+**Perubahan** (`Apps/Shared/OnboardingView.swift`):
+  - Ganti `Image(systemName: "magnifyingglass.circle.fill")` dengan
+    `CelestialVisualView` bola cahaya bintang (diameter 64pt, `kind: .star`,
+    `relativeSize: 0.72`) — jalur gambar SAMA dengan layar utama.
+  - **Warna netral sengaja** (`colorIndexBV` tidak ditetapkan → baku 0 =
+    putih). Aturan 24 melarang `colorIndexBV` mentah di `Apps/` karena warna
+    spektral = ciri pengenal; di sini kita tidak menetapkan indeks sama
+    sekali, jadi netral. Ilustrasi, bukan klaim identitas (PRD: uncertainty >
+    false confidence). `isConfirmed: true` di view hanya menyembunyikan
+    lencana "?", bukan menyatakan objek terkunci.
+  - `accessibilityHidden(true)` pada gambar: VoiceOver tetap membacakan
+    teks janji produk (`onboardingTitle`/`onboardingSubtitle`) di bawahnya,
+    bukan mengumumkan "bintang" yang tidak diklaim.
+  - Ukuran tetap 64pt (bukan `@ScaledMetric`): ini citra, Dynamic Type tidak
+    mengubah ukuran gambar benda langit di app ini.
+
+**Pelajaran gerbang (Aturan 24).** Aturan memindai `Apps/` dan MENGUNCI
+pada token literal `colorIndexBV`: harus muncul HANYA di dalam argumen
+`drawableStarColorIndex(... isConfirmed: ...)`, bukan sebagai label field
+`colorIndexBV:` atau nama lokal. Semantik netral tidak cukup — pengenalnya
+sendiri yang dicek. Solusi patuh: biarkan baku (jangan tulis token sama
+sekali). Catatan ini penting: percobaan pertama (literal `0`) dan kedua
+(melalui `drawableStarColorIndex(0, isConfirmed: false)`) keduanya GAGAL
+karena token `colorIndexBV` tidak ada di argumen; baru lulus setelah token
+dihilangkan seluruhnya.
+
+**Hasil CI:** Apple Build (Paket + App iPhone+Watch) hijau; Engine Tests
+(Linux) — sama dengan kode yang sudah 206+690 hijau (OnboardingView di
+`Apps/`, tidak di-build runner Linux). Gerbang lokal: swift-typecheck,
+swift-ui-lint (29/29), swift-test 206+690 hijau.
