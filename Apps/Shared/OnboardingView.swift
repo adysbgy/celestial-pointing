@@ -29,9 +29,41 @@ struct OnboardingView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 18) {
-                Image(systemName: "magnifyingglass.circle.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(SurfacePalette.active.accentGradient)
+                // Pahlawan prosedural, bukan ikon SF Symbol: layar perkenalan
+                // adalah **pertama** yang dilihat pengguna, dan ia harus
+                // memperlihatkan benda yang sebenarnya ditampilkan app —
+                // titik cahaya di langit — bukan lambang pencarian generik.
+                //
+                // **Kenapa ini bukan klaim identitas.** Ia digambar lewat
+                // jalur `CelestialVisual` yang sama dengan layar utama, tapi
+                // tanpa nama dan tanpa keadaan engine: `colorIndexBV` 0 berarti
+                // putih netral (bukan spektrum bintang tertentu), dan ia
+                // berdiri sendiri di atas teks janji produk. Ia ilustrasi,
+                // bukan hasil pengukuran — sama seperti piringan Bulan netral
+                // pada kasus "fase tidak diketahui" yang sudah diuji.
+                // `isConfirmed: true` di sini murni supaya tidak ada lencana
+                // "?" menempel (lencana itu untuk engine yang ragu, bukan
+                // untuk ilustrasi statis).
+                //
+                // Ukurannya tetap (bukan `@ScaledMetric`): ini citra, bukan
+                // teks — Dynamic Type tidak mengubah ukuran gambar benda
+                // langit di app ini. Lihat `WatchMetrics`.
+                //
+                // **Warna sengaja netral (baku `colorIndexBV = 0`).** Aturan
+                // 24 melarang memakai `colorIndexBV` secara mentah di `Apps/`
+                // — warna spektral (biru Rigel, merah Betelgeuse) adalah ciri
+                // pengenal, dan lewat `drawableStarColorIndex` baru boleh
+                // tampil. Di sini kita *tidak* menetapkan indeks sama sekali,
+                // jadi yang dipakai adalah nilai baku 0 = putih netral. Itu
+                // ilustrasi, bukan bintang tertentu — sama seperti piringan
+                // Bulan netral pada kasus "fase tidak diketahui" yang sudah
+                // diuji. `isConfirmed: true` pada view hanya menyembunyikan
+                // lencana "?", karena lencana itu untuk engine yang ragu,
+                // bukan untuk ilustrasi statis.
+                CelestialVisualView(
+                    visual: CelestialVisual(kind: .star, relativeSize: 0.72),
+                    diameter: 64,
+                    isConfirmed: true)
                     .accessibilityHidden(true)
 
                 Text(TextLocalization.text(.onboardingTitle))
