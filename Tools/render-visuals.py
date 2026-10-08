@@ -998,9 +998,15 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         # salah begitu sisi terangnya ke bawah.
         light = palette["light"] if not night_mode else night_surface(palette["light"])
         dark = palette["dark"] if not night_mode else night_surface(palette["dark"])
+        # Radius akhir dibaca dari `MOON_SPHERE_GRADIENT_END_RADIUS`, **bukan**
+        # ditulis 1.15 di sini. Sampai siklus ini ia memang ditulis di sini,
+        # jadi mengubah konstantanya di model memindahkan **nol piksel** pada
+        # Venus dan Merkurius (terukur) — salinan kedua dari angka yang sama,
+        # dan tidak ada gerbang yang melihatnya.
         gradient = radial_gradient([(light, 1.0), (dark, 1.0)],
                                    center=(cx, cy),
-                                   start_radius=0.0, end_radius=radius * 1.15)
+                                   start_radius=0.0,
+                                   end_radius=radius * MOON_SPHERE_GRADIENT_END_RADIUS)
 
         def limb_shaded(x, y):
             return inside_lit(x, y)

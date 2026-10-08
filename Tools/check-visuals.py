@@ -6278,6 +6278,168 @@ def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
         f"{'ada' if 'CelestialVisual.moonSphereGradientEndRadius' in view else 'TIDAK'}"))
 
 
+def inner_planet_phase_cases():
+    """Kasus render planet dalam yang **benar-benar berfase**.
+
+    Diturunkan dari `R.build_cases()` lewat **fungsi port yang sama** yang
+    dipakai penggambar untuk memutuskan apakah ia menggambar fase
+    (`planet_shows_phase` + `phase_geometry`). Daftar yang ditulis tangan di
+    sini akan menjadi salinan yang bisa tertinggal separuh: menambah kasus
+    fase baru tidak akan membuat gerbang ini berlaku untuknya, padahal
+    menambah kasus adalah satu-satunya cara sebuah planet baru bisa diukur.
+    """
+    out = []
+    for case in R.build_cases():
+        if case.kind != "planet":
+            continue
+        planet = case.kw.get("planet")
+        if not R.planet_shows_phase(planet):
+            continue
+        fraction = R.planet_phase_fraction(planet, case.kw.get("illumination"))
+        if R.phase_geometry(fraction, case.kw.get("is_waxing")) is None:
+            continue
+        out.append((case, planet))
+    return out
+
+
+def check_planet_phase_limb_reads_the_model_constant(results, size=None, ss=2):
+    """Peredupan limb sabit planet dalam membaca radius akhirnya dari model.
+
+    **Cacat yang ditutup pemeriksaan ini.** `CelestialVisual.moonSphereGradient
+    EndRadius` (1.15) mengklaim dipakai di **kedua** bahasa, dan gerbang drift
+    memang membandingkannya dengan `MOON_SPHERE_GRADIENT_END_RADIUS` di port.
+    Kenyataannya, sampai siklus ini, jalur **planet dalam** menulis `1.15`
+    sebagai literal di dalam `drawPlanet` — di view — dan `1.15` sebagai
+    literal di dalam `_draw_planet` — di port. Yang membaca konstantanya
+    hanya `sphereGradient`, pemanggilnya **Bulan**.
+
+    Akibatnya terukur: mengubah konstanta itu memindahkan
+    **nol piksel** pada Venus dan Merkurius berfase, di kedua ukuran (200 px
+    dan 38 px), sementara `moon-full` bergeser 31 532 piksel pada 200 px.
+    Konstanta itu ada, dinamai, dibandingkan gerbang drift, diuji di Linux
+    (`testMoonSphereGradientIsShallowerThanThePlanetSphere`) — dan tidak
+    mengatur apa pun di tempat yang dipakai separuh planet dalam.
+
+    Kenapa ini lebih dari sekadar "angka kedua": nilai 1.15 **dipilih dengan
+    alasan yang diukur** (radius bola planet 1.35 melemahkan lengkung sabit
+    jadi +28,5% dan 20,9 berbanding +33,5% dan 24,1). Kalau 1.15 kelak
+    diukur ulang dan diubah, Bulan akan mengikuti dan Venus/Merkurius tidak —
+    dua benda yang digambar oleh **fungsi yang sama** (`drawLitBand`) lalu
+    berbeda tanpa satu pun galat kompilasi. Yang salah bukan angkanya,
+    melainkan bahwa hanya satu dari dua pemanggil yang membacanya.
+
+    **Kenapa diukur lewat konstanta, bukan lewat nilainya.** Pemeriksaan yang
+    menuntut "gradiennya ada" akan lolos oleh gradien **apa pun**, termasuk
+    yang radius akhirnya ditulis sendiri. Yang diuji di sini adalah
+    **kepekaan gambar terhadap konstanta**: nilainya diganti, dan piksel pita
+    yang menyala harus bergerak. Gradien yang menulis angkanya sendiri tidak
+    bergerak sama sekali — terukur 0,00 berbanding 8,9…15,6 pada 200 px.
+
+    Piksel membuktikan **port**. Yang dikirim ke jam adalah **view**, jadi dua
+    pemeriksaan terakhir memeriksa teks `drawPlanet`: konstantanya disebut,
+    dan `radius * 1.15` tidak ditulis sendiri. Keduanya memakai
+    `swift_code_only` — tanpa itu komentar yang **menjelaskan** cacat ini akan
+    dihitung sebagai pemakaian konstantanya.
+    """
+    cases = inner_planet_phase_cases()
+    if not cases:
+        results.append(Result(
+            "kasus fase planet dalam terbaca dari katalog render", False,
+            "tidak ada kasus planet dalam berfase di build_cases() — gerbang ini "
+            "tidak mengukur apa pun, dan itu merah, bukan lulus"))
+        return
+
+    if size is None:
+        size = watch_visual_diameter() or 38
+    original = R.MOON_SPHERE_GRADIENT_END_RADIUS
+    # 1.45, bukan nilai yang lebih dekat: selisih yang terlalu kecil
+    # mendekati noise rasterisasi dan membuat ambangnya sewenang-wenang.
+    # Nilai ini **bukan** usulan perbaikan — ia hanya pengubah yang cukup
+    # besar untuk terukur di 38 px, tempat seluruh frame cuma 1444 piksel.
+    probe = 1.45
+
+    def lit_pixels(canvas, light):
+        """Piksel pita yang menyala — klasifikasi yang sama dengan
+        `classify_centroid`, terhadap palet planetnya sendiri."""
+        unlit = R.ACCENTS["planetUnlit"]
+        w, h = canvas.w, canvas.h
+        cx = cy = size / 2.0
+        radius = size / 2.0
+        out = []
+        for y in range(h):
+            for x in range(w):
+                if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > radius * radius:
+                    continue
+                p = canvas.buf[y * w + x]
+                da = sum((p[k] - light[k]) ** 2 for k in range(3))
+                db = sum((p[k] - unlit[k]) ** 2 for k in range(3))
+                if da < db:
+                    out.append((x, y))
+        return out
+
+    def luminance(px):
+        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+    try:
+        for case, planet in cases:
+            light = R.PLANET_PALETTE[planet]["light"]
+            base = R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+            pixels = lit_pixels(base, light)
+            if not pixels:
+                results.append(Result(
+                    f"pita {case.name} punya piksel menyala untuk diukur", False,
+                    f"0 piksel terklasifikasi menyala pada {size} px — penyampel "
+                    "tidak melihat pitanya, dan gerbang ini akan lulus karena "
+                    "tidak ada yang diukur"))
+                continue
+            try:
+                R.MOON_SPHERE_GRADIENT_END_RADIUS = probe
+                moved = R.render(case, size=size, night_mode=False,
+                                 show_frame=False, ss=ss)
+            finally:
+                R.MOON_SPHERE_GRADIENT_END_RADIUS = original
+            deltas = [abs(luminance(base.buf[y * base.w + x])
+                          - luminance(moved.buf[y * base.w + x])) * 255
+                      for x, y in pixels]
+            mean = sum(deltas) / len(deltas)
+            # Ambang 4.0/255: terukur 0,00 (konstanta diabaikan — cacat
+            # aslinya) berbanding 8,90…15,56 pada 200 px dan 8,90…15,47 pada
+            # 38 px. Jaraknya lebar di kedua sisi, dan render ulang dengan
+            # nilai yang **sama** terukur 0,00 — jadi ambang ini tidak
+            # terpengaruh noise rasterisasi.
+            results.append(Result(
+                f"radius akhir gradien {case.name} bergerak saat konstanta diubah",
+                mean >= 4.0,
+                f"rerata pergeseran {mean:.2f}/255 atas {len(pixels)} piksel "
+                f"menyala pada {size} px (ambang 4.0; konstanta yang diabaikan "
+                f"= 0.00, render ulang identik = 0.00)"))
+    finally:
+        R.MOON_SPHERE_GRADIENT_END_RADIUS = original
+
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    view = open(view_path, encoding="utf-8").read()
+    body = _function_body(view, "func drawPlanet(")
+    if not body:
+        results.append(Result(
+            "drawPlanet terbaca di view", False,
+            "'func drawPlanet(' TIDAK ditemukan di CelestialVisualView.swift — "
+            "pemeriksaan ini tidak bisa dijalankan, dan itu merah, bukan lulus"))
+        return
+    code = swift_code_only(body)
+    named = "CelestialVisual.moonSphereGradientEndRadius" in code
+    results.append(Result(
+        "drawPlanet membaca radius akhir gradien dari model", named,
+        "'CelestialVisual.moonSphereGradientEndRadius' "
+        f"{'ada' if named else 'TIDAK ada'} di kode drawPlanet "
+        "(komentar & string dibuang)"))
+    literal = re.search(r"radius\s*\*\s*1\.15", code)
+    results.append(Result(
+        "drawPlanet tidak menulis radius akhirnya sendiri", literal is None,
+        "drawPlanet memuat `radius * 1.15` yang ditulis langsung"
+        if literal else
+        "drawPlanet tanpa literal `radius * 1.15` — angkanya satu, di model"))
+
+
 def check_mars_caps_touch_the_limb(results, size=400, ss=2):
     """Kutub Mars harus **menyentuh tepi bola**, bukan mengambang di dalamnya.
 
@@ -6397,7 +6559,22 @@ def _gradient_end_factors(source):
     | gradien | Swift | Python |
     |---|---|---|
     | bola (drawSphere) | `endRadius: radius * 1.35` | `end_radius=radius * 1.35` |
-    | limb berfase | `endRadius: radius * 1.15` | `end_radius=radius * 1.15` |
+    | limb berfase | `endRadius: radius * CGFloat(CelestialVisual.moonSphereGradientEndRadius)` | `end_radius=radius * MOON_SPHERE_GRADIENT_END_RADIUS` |
+
+    **Kenapa bentuk konstanta harus dikenali juga.** Kedua jalur limb
+    (`drawMoon` lewat `sphereGradient`, dan pita terang planet dalam) sampai
+    siklus ini menulis `1.15` sebagai literal; sekarang keduanya membaca
+    konstanta model. Pembaca yang hanya mengenali literal akan melaporkan
+    "limb tidak terbaca" pada kode yang **benar** — kelas cacat yang sudah
+    berulang di repo ini (gerbang yang menuntut ejaan yang sudah dibuang).
+    Karena itu nilainnya kini diselesaikan dari **sumber model**, bukan
+    ditulis ulang di sini: menyalin `1.15` ke dalam gerbang akan membuatnya
+    angka ketiga yang tidak pernah dibandingkan.
+
+    Pengali yang diselesaikan dari konstanta tidak membuat perbandingan ini
+    sia-sia. Kalau salah satu bahasa kembali menulis angkanya sendiri
+    (`radius * 1.35`, atau `radius * 1.10`), di situlah nilainya berbeda dan
+    gerbang ini merah — persis drift yang ia ada untuk menangkap.
     """
     # Komentar dibuang per baris: prosa di repo ini memuat angka, dan
     # pembacaan tanpa membuangnya akan mengambil angka contoh sebagai
@@ -6419,9 +6596,50 @@ def _gradient_end_factors(source):
     # kegagalan akan mengirim orang ke tempat yang salah; kegagalan kedua
     # dalam bukti ini (kasus 6 dan 7) malah berbunyi lewat jalur "kurang
     # dari dua gradien", yang tidak menyebut gradien mana pun.
+    # Pengali bisa berupa **literal** (`radius * 1.15`) atau **konstanta**
+    # (`radius * CelestialVisual.moonSphereGradientEndRadius` /
+    # `radius * MOON_SPHERE_GRADIENT_END_RADIUS`). Keduanya dikenali, karena
+    # setelah kedua jalur limb berhenti menulis literal, pembaca yang hanya
+    # mengenali literal akan melaporkan "tidak terbaca" pada kode yang benar.
+    #
+    # Nilai konstanta diselesaikan dari **sumber model**, bukan disalin ke
+    # sini: menyalin 1.15 ke gerbang menjadikannya angka ketiga yang tidak
+    # pernah dibandingkan. Bila konstantanya tidak terbaca (nama diubah),
+    # pemeriksaannya tetap merah dan menyebut namanya — bukan diam.
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit",
+                              "CelestialVisual.swift")
+    model_text = open(model_path, encoding="utf-8").read() if \
+        os.path.exists(model_path) else ""
+    constants = {"MOON_SPHERE_GRADIENT_END_RADIUS":
+                 R.MOON_SPHERE_GRADIENT_END_RADIUS}
+
+    def resolve(factor):
+        """Nilai sebuah pengali: literal dipakai apa adanya, konstanta
+        diselesaikan. `None` bila tidak bisa ditentukan.
+
+        **Konstanta diselesaikan dari sumber sisi masing-masing.** Nama Swift
+        (`CelestialVisual.…`) dibaca dari `CelestialVisual.swift`; nama port
+        dibaca dari nilai port. Ini yang membuat gerbang ini bukan sekadar
+        perbandingan dirinya sendiri: kalau kedua sisi diselesaikan dari nilai
+        port, model Swift bisa berubah tanpa ada yang melihatnya, dan
+        perbandingan view-lawan-port akan hijau selamanya.
+        """
+        factor = factor.strip()
+        if re.fullmatch(r"\d+\.\d+", factor):
+            return float(factor)
+        if factor in constants:
+            return constants[factor]
+        match = re.search(
+            r"moonSphereGradientEndRadius:\s*Double\s*=\s*(\d+\.\d+)",
+            model_text)
+        if match and "moonSphereGradientEndRadius" in factor:
+            return float(match.group(1))
+        return None
+
     found = {"bola": [], "limb": []}
     for m in re.finditer(
-            r"[Ee]nd_?[Rr]adius\s*[:=]\s*radius\s*\*\s*(?<![\w.])(\d+\.\d+)", body):
+            r"[Ee]nd_?[Rr]adius\s*[:=]\s*radius\s*\*\s*"
+            r"(?:CGFloat\(\s*)?(?<![\w.])((?:[\w.]+)|\d+\.\d+)", body):
         # Jendela mundur dipakai karena di Swift `startRadius` dan
         # `endRadius` bisa terpisah baris (lihat `drawSphere`), sementara di
         # port Python keduanya sebaris. Jendela 260 karakter cukup untuk
@@ -6432,17 +6650,34 @@ def _gradient_end_factors(source):
             continue
         start = starts[-1].strip()
         if re.fullmatch(r"radius\s*\*\s*0\.1", start):
-            found["bola"].append(float(m.group(1)))
+            label = "bola"
         elif re.fullmatch(r"0(?:\.0)?", start):
-            found["limb"].append(float(m.group(1)))
+            label = "limb"
+        else:
+            continue
+        value = resolve(m.group(1))
+        if value is not None:
+            found[label].append(value)
     # Tidak melempar: daftar `checks` dibangun saat fungsi berjalan, dan
     # exception menggagalkan seluruh gerbang dengan traceback yang tidak
     # menyebut apa yang harus diperbaiki. Pola berkas ini: jangkar hilang
     # adalah **pemeriksaan merah yang menyebut jangkarnya**. Karena dua
     # gradien sekarang dibedakan secara struktural, `None` juga bisa
     # dilaporkan **per gradien**, bukan untuk seluruh sisi.
-    return {label: (values[0] if len(values) == 1 else None)
-            for label, values in found.items()}
+    #
+    # Setiap label bisa punya **lebih dari satu** pemanggil: gradien limb
+    # dipakai piringan Bulan **dan** pita terang planet dalam. Keduanya harus
+    # sepakat — dua pemanggil dengan radius akhir yang berbeda adalah cacat
+    # yang tidak terlihat di layar mana pun (dua benda yang digambar fungsi
+    # yang sama lalu beredup berbeda). Karena itu yang dikembalikan bukan
+    # nilai pertamanya, melainkan nilai **tunggal**nya: bila para pemanggil
+    # berbeda pendapat, hasilnya `None` dan pemeriksaannya merah.
+    out = {}
+    for label, values in found.items():
+        distinct = {round(v, 6) for v in values}
+        out[label] = values[0] if len(distinct) == 1 else None
+        out[label + "_count"] = len(values)
+    return out
 
 
 def check_gradient_end_radii_match(results):
@@ -6487,11 +6722,22 @@ def check_gradient_end_radii_match(results):
     # Python", bukan "kurang dari dua gradien". Nama yang salah pada
     # kegagalan mengirim orang ke tempat yang salah.
     for label in ("bola", "limb"):
-        for where, value in (("view Swift", v[label]), ("port Python", p[label])):
+        for where, factors in (("view Swift", v), ("port Python", p)):
+            value = factors[label]
+            count = factors.get(label + "_count", 0)
+            # `None` bisa berarti dua hal, dan keduanya harus bisa dibedakan
+            # dari pesannya: tidak ada gradien yang terbaca sama sekali, atau
+            # ada **lebih dari satu** pemanggil yang tidak sepakat. Yang
+            # kedua adalah cacat yang tidak terlihat di layar mana pun.
+            if value is None and count > 1:
+                detail = (f"{count} pemanggil ditemukan tetapi tidak sepakat "
+                          "— gradien limb dipakai piringan Bulan **dan** pita "
+                          "terang planet dalam, dan keduanya harus sama")
+            else:
+                detail = f"ditemukan {value if value is not None else 'tidak ada'}"
             results.append(Result(
                 f"radius akhir gradien {label} terbaca di {where}",
-                value is not None,
-                f"ditemukan {value if value is not None else 'tidak ada'}"))
+                value is not None, detail))
     known = [label for label in ("bola", "limb")
              if v[label] is not None and p[label] is not None]
     for label in known:
@@ -6911,6 +7157,7 @@ def main():
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
     check_jupiter_spot_keeps_its_curvature(results, args.size, args.ss)
     check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
+    check_planet_phase_limb_reads_the_model_constant(results)
     check_moon_new_disc_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)

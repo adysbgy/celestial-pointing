@@ -188,5 +188,33 @@ jobs:
       - name: Buktikan gerbang bintik Jupiter berbunyi
         run: python3 Tools/bukti-mutasi-bintik.py
 
+      # `moonSphereGradientEndRadius` adalah konstanta yang **dipakai dua
+      # pemanggil** — piringan Bulan dan pita terang planet dalam — tetapi
+      # sampai siklus ini hanya Bulan yang membacanya. Jalur planet menulis
+      # `1.15` sendiri di view **dan** di port, jadi mengubah konstantanya
+      # memindahkan nol piksel pada Venus/Merkurius: konstanta yang ada,
+      # dinamai, dibandingkan gerbang drift, diuji di Linux, dan tidak
+      # mengatur apa pun di separuh pemanggilnya. Tidak ada galat kompilasi.
+      #
+      # Harness ini menguji kelima keadaan, termasuk satu yang **diharapkan
+      # hijau** (jalur Bulan memakai literal — gerbang ini mengukur planet
+      # dalam, jadi batas cakupannya teruji, bukan tersirat).
+      - name: Buktikan gerbang radius akhir gradien berbunyi
+        run: python3 Tools/bukti-mutasi-radius-akhir.py
+
+      # Pembaca gerbang di atas (`_gradient_end_factors`) ikut diubah oleh
+      # perbaikan itu: ia hanya mengenali `radius * 1.15`, sehingga pada kode
+      # yang sudah **benar** ia melaporkan "limb tidak terbaca" — gerbang yang
+      # merah pada kode benar, kelas cacat yang lebih berbahaya dari gerbang
+      # yang hijau pada kode salah, karena orang yang sedang terburu-buru akan
+      # mengembalikan kodenya ke bentuk salah supaya gerbangnya diam.
+      #
+      # Harness ini membuktikan perluasan pembacanya tidak membuatnya tumpul:
+      # tujuh keadaan, termasuk satu yang **diharapkan hijau** (kedua bahasa
+      # sepakat) dan satu yang hanya terlihat oleh pemeriksaan "para pemanggil
+      # sepakat" (dua pemanggil gradien limb tidak sepakat).
+      - name: Buktikan pembaca radius akhir gradien masih menggigit
+        run: python3 Tools/bukti-mutasi-radius-gradasi.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

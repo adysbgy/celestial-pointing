@@ -2152,6 +2152,16 @@ public extension CelestialVisual {
     /// kedalaman pita sabit. 1.15 dipakai di kedua bahasa; gerbang piksel
     /// mengukurnya lewat **kedua** kasus, karena satu kasus saja tidak
     /// menangkapnya.
+    ///
+    /// **Dua pemanggil, satu angka.** Piringan Bulan *dan* pita terang planet
+    /// dalam (Venus, Merkurius) memakai radius akhir yang sama, karena
+    /// keduanya digambar di dalam `drawLayer` yang diputar sebesar sudut sisi
+    /// terang. Sampai siklus ini jalur planet menulis `1.15` sendiri sebagai
+    /// literal, sehingga mengubah konstanta ini memindahkan **nol piksel** di
+    /// Venus dan Merkurius (terukur) — konstanta ini ada, dinamai, diuji di
+    /// Linux, dan tidak mengatur apa pun di sana. Dijaga
+    /// `check_planet_phase_limb_reads_the_model_constant`, yang sengaja
+    /// mengukur lewat **konstantanya**, bukan lewat literalnya.
     public static let moonSphereGradientEndRadius: Double = 1.15
 
     /// Ujung gelap gradien bola Bulan: warna yang sama, diredupkan sebagian.

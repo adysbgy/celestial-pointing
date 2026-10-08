@@ -232,10 +232,18 @@ struct CelestialVisualView: View {
                             // salah begitu sisi terangnya ke bawah — dan
                             // planetnya tetap tampak seperti bola, jadi
                             // tidak ada yang bisa menangkapnya dari layar.
+                            // Radius akhir dibaca dari model, **bukan** ditulis
+                            // 1.15 di sini: sampai siklus ini baris ini punya
+                            // salinan keduanya, jadi mengubah
+                            // `moonSphereGradientEndRadius` tidak pernah
+                            // menyentuh Venus dan Merkurius (terukur 0 piksel)
+                            // — padahal konstantanya mengklaim dipakai di
+                            // kedua bahasa.
                             inner.fill(disc, with: .radialGradient(
                                 Gradient(colors: [Self.color(palette.light),
                                                   Self.color(palette.dark)]),
-                                center: center, startRadius: 0, endRadius: radius * 1.15))
+                                center: center, startRadius: 0,
+                                endRadius: radius * CGFloat(CelestialVisual.moonSphereGradientEndRadius)))
                             // Ciri pengenal (kawah Merkurius, kabut Venus) ikut
                             // terpotong ke bagian yang menyala, jadi tidak
                             // pernah menonjol keluar dari sabit.
