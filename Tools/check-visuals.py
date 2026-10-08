@@ -3988,6 +3988,77 @@ def check_inner_planet_phase(results, size=200, ss=2):
         f"luas menyala {undirected:.3f} — piringan penuh, bukan sabit karangan"))
 
 
+def check_phase_direction_on_the_waning_half(results, size=200, ss=2):
+    """Bulan **mengecil** harus menghadap sudut yang diminta, bukan cerminnya.
+
+    **Cacat yang ditutup pemeriksaan ini.** `terminatorRotationRadians` punya
+    dua jalur: pita yang dasarnya ada di kanan (membesar) memakai sudut
+    Matahari apa adanya, dan pita yang dasarnya ada di **kiri** (mengecil)
+    membalikkannya dengan `+ pi`. **Sebelum** lima kasus `is_waxing=False`
+    ditambahkan bersama pemeriksaan ini, seluruh katalog render repo ini hanya
+    berisi `waxing=True` — dan di seluruh `check-visuals.py` tidak ada satu pun
+    `is_waxing=False`. Jadi jalur kedua tidak pernah digambar, tidak pernah
+    diukur, dan tidak ada gerbang yang berbunyi kalau ia hilang.
+
+    Terukur: dengan `+ pi` dihapus dari port, gerbang arah yang sudah ada
+    (`check_crescent_direction` 4 pemeriksaan, `check_inner_planet_phase` 5,
+    `check_moon_phase_fraction` 9, `check_moon_phase_survives_uncertainty` 3)
+    tetap **0 merah**. Yang terjadi bukan pemeriksaan merah, melainkan Bulan
+    yang mengecil menghadap **berlawanan arah** — sabit yang masih berbentuk
+    sabit, sehingga tidak ada teks di layar mana pun yang bisa membuktikannya.
+
+    **Kenapa sudutnya harus berasal dari satu kasus saja.** Pada sudut `0`
+    (kanan) pembalikan `pi` memindahkan pita dari kiri ke kanan, jadi ia
+    memang terukur. Tetapi justru di situlah penggantian `+ pi` dengan
+    `+ 0` **tidak** menimbulkan cacat — pita dasarnya sudah di kiri. Karena
+    itu kasus yang menentukan memakai sudut `-pi/2`: di sana satu-satunya
+    arah yang benar adalah "bawah" pada kedua jalur, dan pita yang tidak
+    dibalik menghadap **atas**. Pemeriksaan ini mengukur keduanya.
+
+    Bulan dan Venus diukur bersama karena keduanya melewati
+    `terminatorRotationRadians` yang sama: satu gerbang, dua pemanggil, jadi
+    kesalahan yang diperbaiki di satu tempat tidak bisa bertahan di tempat lain.
+    """
+    # (nama kasus, palet, sudut yang diminta, arah yang diharapkan)
+    lit_moon, unlit_moon = moon_colors()
+    venus = tuple(tuple(round(c * 255) for c in R.PLANET_PALETTE["venus"][k])
+                  for k in ("light", "dark"))
+
+    cases = [
+        ("moon-waning-crescent", lit_moon, unlit_moon, 0.0, "kanan"),
+        ("moon-waning-crescent-pointing-down", lit_moon, unlit_moon,
+         -math.pi / 2, "bawah"),
+        ("planet-venus-waning-crescent", venus[0], venus[1], 0.0, "kanan"),
+        ("planet-venus-waning-crescent-pointing-down", venus[0], venus[1],
+         -math.pi / 2, "bawah"),
+    ]
+    for name, lit, unlit, angle, expected in cases:
+        _, (w, h, rows) = render_case(name, size=size, ss=ss)
+        dx, dy, _ = classify_centroid(w, h, rows, lit, unlit)
+        measured = ("bawah" if dy > abs(dx) else
+                    "atas" if -dy > abs(dx) else
+                    "kanan" if dx > 0 else "kiri")
+        results.append(Result(
+            f"{name}: sisi terang menghadap {expected}",
+            measured == expected,
+            f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}) pada sudut "
+            f"{angle:+.2f} — salah arah berarti pembalikan `+ pi` untuk pita "
+            f"yang dasarnya di kiri hilang"))
+
+    # Dan arah sebaliknya: Bulan yang **membesar** tidak boleh ikut dibalik.
+    # Tanpa ini, pengganti yang membalikkan kedua jalur akan lolos keempat
+    # pemeriksaan di atas dengan sempurna.
+    _, (w, h, rows) = render_case("moon-crescent-jakarta", size=size, ss=ss)
+    dx, dy, _ = classify_centroid(w, h, rows, lit_moon, unlit_moon)
+    measured = ("bawah" if dy > abs(dx) else
+                "atas" if -dy > abs(dx) else
+                "kanan" if dx > 0 else "kiri")
+    results.append(Result(
+        "moon-crescent-jakarta (membesar) tidak ikut dibalik",
+        measured == "bawah",
+        f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}) pada sudut −pi/2"))
+
+
 def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
     """Fase tak diketahui **bukan** bulan baru — diukur dari piksel.
 
@@ -6659,6 +6730,7 @@ def main():
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_inner_planet_phase(results, args.size, args.ss)
+    check_phase_direction_on_the_waning_half(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_spiral_arms_stay_continuous(results)

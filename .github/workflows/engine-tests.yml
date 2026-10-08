@@ -143,5 +143,27 @@ jobs:
       - name: Buktikan gerbang penekanan bentuk langit dalam berbunyi
         run: python3 Tools/bukti-mutasi-langit-dalam.py
 
+      # Dan bukti yang sama untuk **arah fase saat benda mengecil** — gerbang
+      # yang lahir dari celah yang tidak dijaga satu pun gerbang lain.
+      #
+      # `terminatorRotationRadians` punya dua jalur: pita yang dasarnya di
+      # kanan (membesar) memakai sudut Matahari apa adanya, dan pita yang
+      # dasarnya di **kiri** (mengecil) membalikkannya dengan `+ pi`. Sebelum
+      # lima kasus `is_waxing=False` ditambahkan bersama gerbang baru, seluruh
+      # katalog render repo ini hanya berisi `waxing=True`, dan di seluruh
+      # `check-visuals.py` tidak ada satu pun `is_waxing=False` — jadi jalur
+      # kedua tidak pernah digambar dan tidak pernah diukur.
+      #
+      # Terukur: dengan `+ pi` dihapus, `check_crescent_direction` (4
+      # pemeriksaan), `check_inner_planet_phase` (5), `check_moon_phase_fraction`
+      # (9), dan `check_moon_phase_survives_uncertainty` (3) semuanya tetap
+      # **0 merah**. Yang terjadi bukan pemeriksaan merah, melainkan Bulan
+      # yang mengecil menghadap berlawanan arah — sabit yang masih berbentuk
+      # sabit, sehingga tidak ada teks di layar mana pun yang bisa
+      # membuktikannya. Harness ini menjalankan keempat gerbang itu **plus**
+      # yang baru, dan menuntut keadaan itu menyalakan **hanya** gerbang baru.
+      - name: Buktikan gerbang arah fase saat mengecil berbunyi
+        run: python3 Tools/bukti-mutasi-fase.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

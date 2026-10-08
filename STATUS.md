@@ -1,3 +1,110 @@
+## Progres terakhir (8 Okt 2026 — bulan mengecil: satu-satunya cabang gambar yang tidak pernah digambar, dan angka yang dikutip tanpa diukur)
+
+### Cacatnya: separuh setiap bulan tidak pernah masuk ke satu pun PNG
+
+`CelestialVisual.terminatorRotationRadians` punya **dua** jalur: pita terang
+yang dasarnya ada di kanan (membesar) memakai sudut Matahari apa adanya, dan
+pita yang dasarnya ada di **kiri** (mengecil) membalikkannya dengan `+ pi`.
+Seluruh katalog render repo ini — 41 kasus, dan setiap `render_case` di
+`Tools/check-visuals.py` — hanya berisi `waxing=True`. Tidak ada satu pun
+`is_waxing=False` di mana pun.
+
+Jadi cabang `lit_side = −1` tidak pernah digambar, tidak pernah diukur, dan
+tidak ada gerbang yang berbunyi kalau ia hilang. Yang paling tidak nyaman:
+bulan mengecil itulah yang dilihat pengguna **selama separuh setiap bulan**,
+dan sabit yang salah arah tetap berbentuk sabit — tidak ada teks di layar mana
+pun yang bisa membuktikannya.
+
+### Diukur lebih dulu, bukan diasumsikan
+
+Dengan `+ pi` dihapus dari port, gerbang arah yang sudah ada tetap hijau:
+`check_crescent_direction` 4 pemeriksaan, `check_inner_planet_phase` 5,
+`check_moon_phase_fraction` 9, `check_moon_phase_survives_uncertainty` 3 —
+seluruhnya **0 merah**. Yang berubah bukan angka pemeriksaan, melainkan Bulan
+yang mengecil menghadap **berlawanan arah**.
+
+### Kasusnya, dan kenapa sudutnya harus −π/2
+
+Lima kasus render baru: tiga Bulan (`waning-crescent`, `waning-crescent-pointing-down`,
+`waning-gibbous`) dan dua Venus (`venus-waning-crescent`, `venus-waning-crescent-pointing-down`).
+
+Pada sudut `0` pembalikan `pi` memang memindahkan pita dari kiri ke kanan, jadi
+ia terukur — tetapi justru di situ penggantian `+ pi` dengan `+ 0` **tidak**
+menimbulkan cacat, karena pita dasarnya sudah di kiri. Kasus yang menentukan
+memakai sudut `−π/2`: satu-satunya arah yang benar adalah "bawah" pada **kedua**
+jalur, dan pita yang tidak dibalik menghadap **atas**. Bulan dan Venus diukur
+bersama karena keduanya melewati fungsi yang sama — satu gerbang, dua pemanggil.
+
+### Gerbangnya mengukur dua arah
+
+`check_phase_direction_on_the_waning_half` (5 pemeriksaan) menuntut keempat
+kasus mengecil menghadap arah yang diminta, **dan** `moon-crescent-jakarta`
+(yang membesar) tidak ikut dibalik. Tanpa pemeriksaan kelima itu, pengganti
+yang membalikkan kedua jalur akan lolos keempat pemeriksaan sebelumnya dengan
+sempurna — dan memang itulah keadaan 3 di harness.
+
+### Angka yang dikutip gerbang baru ini diukur, bukan diwarisi
+
+Docstring-nya mengutip empat gerbang lama sebagai bukti celahnya ("tetap 0
+merah"). Dua di antaranya — `check_moon_phase_fraction` (9) dan
+`check_moon_phase_survives_uncertainty` (3) — **tidak pernah dijalankan** di
+harness; angkanya hanya ditulis. Itu kelas cacat yang sudah berulang di repo
+ini (gerbang mengutip angka yang tidak pernah ia ukur), jadi kelimanya
+sekarang dijalankan harness. Terukur: keempat kutipan itu cocok persis
+(4/5/9/3), dan pada keadaan `+ pi` dihapus keempatnya benar-benar 0 merah —
+klaimnya terbukti, bukan diasumsikan.
+
+### Harness: 4 keadaan, 0 tidak sesuai harapan
+
+```
+OK   [baseline]                              merah: —
+OK   1. `+ pi` dihapus (litSide diabaikan)   merah: [check_phase_direction_on_the_waning_half]
+OK   2. kondisi litSide dibalik              merah: [+, check_crescent_direction, check_inner_planet_phase]
+OK   3. kedua jalur dibalik (selalu + pi)    merah: [+, check_crescent_direction, check_inner_planet_phase]
+```
+
+Keadaan 1 adalah buktinya: **hanya** gerbang baru yang berbunyi, keempat
+gerbang lama 0 merah. Ia memanggil fungsi pemeriksaan yang **sama** lewat
+parameter sumber, dan mencetak **pemeriksaan mana** yang berbunyi — bukan
+berapa yang merah. Ia memulihkan `render-visuals.py` di `finally` per keadaan
+plus handler `SIGINT`/`SIGTERM`; `SIGKILL` tetap bisa melewatinya, dan itu
+batas yang ditulis di berkasnya, bukan klaim bahwa ia kebal.
+
+Harness ini hidup di `Tools/` (di-track, dijalankan CI) bukan di `out/`
+(di-gitignore): pembuktian yang hilang sama dengan tidak ada.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 687 | **687** |
+| Pemeriksaan visual | 552 | **567** (+15 dari 5 kasus render baru) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 687), `check-visuals.py --check`
+(567, 0 gagal), `bukti-mutasi-fase.py` (4 keadaan, 0 tidak sesuai harapan),
+`swift-ui-lint.sh` (29), `swift-typecheck.sh`. Berkas tersentuh:
+`Tools/render-visuals.py`, `Tools/check-visuals.py`, `Tools/bukti-mutasi-fase.py`
+(baru), `.github/workflows/engine-tests.yml`, `STATUS.md`. **Tidak ada kode
+`Apps/` atau paket Swift yang berubah** — yang salah adalah perlengkapan ukur,
+bukan jamnya.
+
+### Yang TIDAK diklaim
+
+- Gerbang ini menjaga **arah** pita terang pada sudut yang diuji (0 dan −π/2),
+  bukan kebenaran astronomi orientasi terminator pada setiap sudut. Orientasi
+  yang benar-benar dilihat pengguna berasal dari azimut Matahari di jam, dan
+  itu diuji terpisah.
+- Yang diuji hanya **Bulan dan Venus**, dua pemanggil `terminatorRotationRadians`.
+  Planet dalam lain (Merkurius) melewati jalur yang sama, jadi tertutup secara
+  struktur — tetapi tidak digambar pada kasus mengecil, dan itu tidak diklaim.
+- Ambang arah di `classify_centroid` bekerja pada ukuran gerbang (200 px,
+  ss=2); pada ukuran kartu jam pasangan yang berbeda bisa bertumbukan, dan itu
+  tidak diukur.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — gerbang "bentuk hilang saat ragu" ternyata mengukur warna)
 
 ### Cacatnya: dua versi berturut-turut, keduanya hijau pada kode yang salah

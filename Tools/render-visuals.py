@@ -1698,6 +1698,18 @@ def build_cases():
          "Venus tanpa arah fase — piringan polos, TIDAK memihak sisi"),
         ("mercury-crescent", "mercury", 0.3, True, 0.0,
          "Merkurius sabit — kawah terpotong ke bagian yang menyala"),
+        # Planet dalam **mengecil**: `is_waxing=False` menaruh pita terang
+        # pada basis yang ada di **kiri**, dan itu satu-satunya keadaan yang
+        # membuat `terminatorRotationRadians` benar-benar bekerja (lihat
+        # `check_phase_direction_on_the_waning_half`). Tanpa kasus ini,
+        # seluruh katalog hanya berisi `waxing=True` — jadi cabang `lit_side
+        # = −1` tidak pernah digambar, dan tidak pernah diperiksa.
+        ("venus-waning-crescent", "venus", 0.22, False, 0.0,
+         "Venus mengecil — pita dasar di KIRI, sudut Matahari ke kanan"),
+        ("venus-waning-crescent-pointing-down", "venus", 0.22, False,
+         -math.pi / 2,
+         "Venus mengecil + Matahari di bawah — satu-satunya keadaan yang "
+         "membuktikan pembalikan pi bekerja"),
         ("mars-with-a-phase-number", "mars", 0.3, True, 0.0,
          "Mars dengan angka fase — harus DIABAIKAN (planet luar tak berfase)"),
     ):
@@ -1712,6 +1724,15 @@ def build_cases():
         ("crescent-jakarta-unrotated", 0.18, True, None,
          "sabit yang sama tanpa sudut — pembanding arah"),
         ("gibbous", 0.72, True, 0.0, "gibbous — pita lebar, terminator lewat pusat"),
+        # Bulan **mengecil**. Seperti dua kasus Venus di atas: ini satu-satunya
+        # bentuk yang menaruh pita terang pada basis kiri, dan justru bulan
+        # itulah yang dilihat pengguna selama separuh setiap bulan.
+        ("waning-crescent", 0.18, False, 0.0,
+         "sabit tua — pita dasar di KIRI, sisi terang ke kanan"),
+        ("waning-crescent-pointing-down", 0.18, False, -math.pi / 2,
+         "sabit tua + Matahari di bawah — pembalikan pi bekerja"),
+        ("waning-gibbous", 0.72, False, 0.0,
+         "cembung mengecil — pita lebar pada basis kiri"),
         ("full", 1.0, True, 0.0, "purnama — piringan penuh"),
         ("new", 0.0, True, 0.0, "bulan baru — piringan gelap"),
         ("unknown-phase", None, None, None,
