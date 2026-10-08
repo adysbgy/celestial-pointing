@@ -89,3 +89,27 @@ catalog list in the Lab picker. Same 10 × per arm.
 ## Results
 
 _No device data yet._
+
+## Analysis
+
+```sh
+python3 Tools/analyze_pointing.py ResearchLogs/*.jsonl > ResearchLogs/report.md
+```
+
+**What the report contains.** Stdlib only; numpy is optional.
+
+- Error, repeatability and bias for every frame × axis × arm × target. Every
+  axis is recomputed from each trial's mean quaternion, so the wrong-axis rows
+  are there too: they're how question 2 is answered.
+- Gravity-convention mismatch and delivered Hz per stream mode.
+- Leave-one-target-out replays of one-point yaw, all-target yaw and Wahba
+  calibration.
+
+**Checks to read first.**
+
+- The first line cross-checks Python's recomputed pointing against the Swift
+  summary. A ❌ there means the two sides disagree on the frame convention.
+- `PointingLabAnalysisContractTests` writes a synthetic file with a known
+  bias (+2° alt, +3° az) through the app's own code path and runs this script
+  on it. Schema or convention drift between Swift and the script turns the
+  Swift test suite red. Set `CP_WRITE_LAB_FIXTURE=<path>` to keep that file.
