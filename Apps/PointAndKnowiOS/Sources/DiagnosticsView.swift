@@ -72,6 +72,8 @@ struct RootView: View {
                 .tabItem { Label("Experiment 1", systemImage: "target") }
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
+            PointingLabPhoneView(link: link)
+                .tabItem { Label("Lab", systemImage: "flask") }
         }
         // Perkenalan sekali pakai: satu kartu, bukan tur panjang. Dibungkus
         // sheet supaya layar utama (dan hasil pengukuran) tetap hidup di

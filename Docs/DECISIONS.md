@@ -128,3 +128,50 @@ physical watch (ADR-004, Docs/VALIDATION.md).
   device frame (mean of `R(q)ᵀ t`). It needs a north-referenced frame.
 
 Which model ships is decided from the field data, not here.
+
+---
+
+## ADR-004 — Pointing Lab: measure before tuning (2026-10-08)
+
+**Decision.** Add a research screen, separate from the product flow:
+
+- On the watch: "Lab Pointing", at the bottom of the main scroll.
+- On the iPhone: a "Lab" tab.
+
+**What it records.** Each **Mark** (button, or Double Tap via
+`handGestureShortcut(.primaryAction)`) captures a ±0.5 s window of raw
+`CMDeviceMotion` from up to two simultaneous streams: a north-referenced frame
+(true north if available, else magnetic) and arbitrary-corrected. Each sample
+has the quaternion, gravity, rotation rate, user acceleration, magnetic field
+and accuracy, and heading. Each trial also records:
+
+- wear configuration and the active aim axis
+- the target and its ground truth
+- observer location, rounded to 0.01°
+- environment
+- extended-runtime state
+- per-stream summaries: delivered Hz, mean pointing for every candidate axis,
+  aim spread, gravity-convention mismatch, and error against truth in the
+  north frame
+
+**Storage and transfer.** Trials are appended as JSONL on the watch
+(`Documents/PointingLab/`) and sent with `transferFile`. The iPhone moves the
+file into its own `Documents/PointingLab/` inside the delegate callback and
+offers a `ShareLink` export. Manual landmark targets go phone → watch with
+`transferUserInfo`, under a key separate from `PointingLinkMessage`, so the
+product protocol is untouched.
+
+**Why two `CMMotionManager`s.** Apple recommends one instance per app because
+extra instances can lower the delivered rate. The lab records the delivered
+rate per stream, and dual-stream can be switched off, so the cost is
+measured, not assumed. The product `MotionLogger` is stopped while the Lab is
+open.
+
+**`WKExtendedRuntimeSession`.** Uses `WKBackgroundModes = physical-therapy`
+(partial `Apps/PointAndKnowWatch/Info.plist` merged with the generated keys),
+so recording continues if the screen dims with the arm raised. Whether it
+actually runs is logged per trial.
+
+**Not verified.** The simulator has no device motion, and input injection
+into the watch simulator didn't work, so the Lab screen was compiled and
+launched but not exercised. First real run is on Ady's watch.

@@ -12,3 +12,7 @@ xcuserdata/
 out/
 __pycache__/
 *.pyc
+
+# Log riset Pointing Lab (lokasi & data peserta). Jangan pernah di-commit.
+ResearchLogs/
+*.jsonl

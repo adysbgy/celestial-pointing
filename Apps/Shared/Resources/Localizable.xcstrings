@@ -5148,6 +5148,204 @@
           }
         }
       }
+    },
+    "Lab Pointing": {
+      "comment": "Judul alat riset Pointing Lab (ADR-004).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pointing Lab"
+          }
+        }
+      }
+    },
+    "Lab": {
+      "comment": "Tab iPhone untuk Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lab"
+          }
+        }
+      }
+    },
+    "Merekam": {
+      "comment": "Tombol Tandai saat jendela percobaan sedang direkam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        }
+      }
+    },
+    "Tandai": {
+      "comment": "Tombol untuk merekam satu percobaan Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark"
+          }
+        }
+      }
+    },
+    "Peserta": {
+      "comment": "Pemilih ID peserta (pseudonim) Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Participant"
+          }
+        }
+      }
+    },
+    "Lingkungan": {
+      "comment": "Pemilih kelas lingkungan percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environment"
+          }
+        }
+      }
+    },
+    "Dua aliran sensor": {
+      "comment": "Sakelar: rekam kerangka berutara dan sembarang sekaligus.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two sensor streams"
+          }
+        }
+      }
+    },
+    "Kirim ke iPhone": {
+      "comment": "Kirim berkas percobaan Lab dari jam ke iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to iPhone"
+          }
+        }
+      }
+    },
+    "Terkirim": {
+      "comment": "Label aksesibilitas: pengiriman berhasil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent"
+          }
+        }
+      }
+    },
+    "Gagal terkirim": {
+      "comment": "Label aksesibilitas: pengiriman gagal.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent"
+          }
+        }
+      }
+    },
+    "Target manual": {
+      "comment": "Bagian daftar penanda darat dengan arah yang diketahui.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual targets"
+          }
+        }
+      }
+    },
+    "Nama penanda": {
+      "comment": "Bidang isian nama penanda darat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Landmark name"
+          }
+        }
+      }
+    },
+    "Bearing dari Utara sebenarnya (°)": {
+      "comment": "Bidang isian bearing penanda.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bearing from true north (°)"
+          }
+        }
+      }
+    },
+    "Elevasi (°)": {
+      "comment": "Bidang isian elevasi penanda.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elevation (°)"
+          }
+        }
+      }
+    },
+    "Tambah target": {
+      "comment": "Tombol menambah target manual.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add target"
+          }
+        }
+      }
+    },
+    "Kirim target ke jam": {
+      "comment": "Tombol mengirim daftar target ke jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send targets to Watch"
+          }
+        }
+      }
+    },
+    "Berkas dari jam": {
+      "comment": "Bagian berkas JSONL yang diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files from Watch"
+          }
+        }
+      }
+    },
+    "Belum ada berkas": {
+      "comment": "Keadaan kosong daftar berkas Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No files yet"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

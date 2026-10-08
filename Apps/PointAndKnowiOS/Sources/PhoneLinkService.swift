@@ -25,6 +25,35 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Setiap pesan yang masuk, untuk direkam ke riwayat keyakinan.
     public var onMessage: ((PointingLinkMessage) -> Void)?
 
+    /// Berkas Pointing Lab yang sudah diterima (ADR-004).
+    @Published public private(set) var labFiles: [URL] = PhoneLinkService.listLabFiles()
+
+    /// Folder penyimpanan berkas Lab di iPhone.
+    public nonisolated static var labDirectory: URL {
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PointingLab", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    public static func listLabFiles() -> [URL] {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: labDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        return urls.filter { $0.pathExtension == "jsonl" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+    }
+
+    public func refreshLabFiles() { labFiles = Self.listLabFiles() }
+
+    /// Kirim daftar target manual ke jam. Antre (`transferUserInfo`): target
+    /// adalah konfigurasi, bukan perintah, jadi boleh sampai belakangan.
+    @discardableResult
+    public func send(labTargets: [LabTarget]) -> Bool {
+        guard let session, session.activationState == .activated else { return false }
+        session.transferUserInfo(LabLinkKeys.encodeTargets(labTargets))
+        return true
+    }
+
     private var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
     }
@@ -120,6 +149,18 @@ public final class PhoneLinkService: NSObject, ObservableObject {
 /// depan diturunkan menjadi peringatan runtime; tanpanya ia menjadi galat
 /// kompilasi.
 extension PhoneLinkService: WCSessionDelegate {
+    /// Berkas harus dipindah **sebelum** metode ini kembali: sistem menghapus
+    /// berkas sementaranya setelah itu.
+    nonisolated public func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        guard file.metadata?[LabLinkKeys.fileMarker] as? Bool == true else { return }
+        let destination = PhoneLinkService.labDirectory
+            .appendingPathComponent(file.fileURL.lastPathComponent)
+        let fm = FileManager.default
+        try? fm.removeItem(at: destination)
+        try? fm.moveItem(at: file.fileURL, to: destination)
+        Task { @MainActor in self.refreshLabFiles() }
+    }
+
 
     nonisolated public func session(_ session: WCSession,
                                     activationDidCompleteWith activationState: WCSessionActivationState,

@@ -142,6 +142,15 @@ struct PointingView: View {
                             .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     }
                     linkRow
+                    // Alat riset (ADR-004). Sengaja di ujung gulir, bukan di
+                    // toolbar: ia bukan bagian alur produk, tapi harus bisa
+                    // dicapai di build perangkat tanpa flag khusus.
+                    NavigationLink {
+                        PointingLabView(engine: engine, motion: motion, link: link)
+                    } label: {
+                        Label("Lab Pointing", systemImage: "flask")
+                    }
+                    .font(.footnote)
                 }
                 .padding(.horizontal, 2)
             }

@@ -29,6 +29,15 @@ public final class WatchLinkService: NSObject, ObservableObject {
     /// Berapa pesan yang gagal dikirim (untuk terlihat saat pengujian).
     @Published public private(set) var sendFailureCount = 0
 
+    // MARK: Pointing Lab (alat riset, ADR-004)
+
+    /// Target manual dari iPhone. Disimpan supaya tetap ada saat iPhone jauh.
+    @Published public private(set) var labTargets: [LabTarget] = WatchLinkService.storedLabTargets
+    /// Hasil pengiriman berkas Lab terakhir (`nil` = belum ada).
+    @Published public private(set) var labTransferSucceeded: Bool?
+    @Published public private(set) var labTransfersInFlight = 0
+    private static let labTargetsKey = "pointingLab.targets"
+
     /// Dijalankan saat iPhone mengirim ambang keyakinan baru.
     ///
     /// Ambang dari Experiment 1 dipasang ke resolver jam supaya kedua perangkat
@@ -161,6 +170,35 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 
     /// Minta keadaan terakhir dari jam (dipakai iPhone saat dibuka).
+    /// Kirim berkas JSONL Lab ke iPhone. Antre di latar belakang dan sampai
+    /// walau iPhone sedang tidak terjangkau — berbeda dari perintah teleskop,
+    /// data riset memang boleh tertunda.
+    @discardableResult
+    public func transferLabFile(_ url: URL, sessionID: UUID, trialCount: Int) -> Bool {
+        guard let session, session.activationState == .activated else {
+            labTransferSucceeded = false
+            return false
+        }
+        session.transferFile(url, metadata: [LabLinkKeys.fileMarker: true,
+                                             LabLinkKeys.sessionID: sessionID.uuidString,
+                                             LabLinkKeys.trialCount: trialCount])
+        labTransfersInFlight = session.outstandingFileTransfers.count
+        labTransferSucceeded = nil
+        return true
+    }
+
+    private static var storedLabTargets: [LabTarget] {
+        guard let data = UserDefaults.standard.data(forKey: labTargetsKey) else { return [] }
+        return (try? JSONDecoder().decode([LabTarget].self, from: data)) ?? []
+    }
+
+    private func receiveLab(_ targets: [LabTarget]) {
+        labTargets = targets
+        if let data = try? JSONEncoder().encode(targets) {
+            UserDefaults.standard.set(data, forKey: Self.labTargetsKey)
+        }
+    }
+
     public func requestState() {
         send(PointingLinkMessage(kind: .stateRequest))
     }
@@ -247,8 +285,23 @@ extension WatchLinkService: WCSessionDelegate {
     /// `didReceiveApplicationContext`).
     nonisolated public func session(_ session: WCSession,
                                     didReceiveUserInfo userInfo: [String: Any]) {
+        if let targets = LabLinkKeys.decodeTargets(userInfo) {
+            Task { @MainActor in self.receiveLab(targets) }
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
         Task { @MainActor in self.handle(decoded) }
+    }
+
+    nonisolated public func session(_ session: WCSession,
+                                    didFinish fileTransfer: WCSessionFileTransfer,
+                                    error: Error?) {
+        let ok = error == nil
+        let remaining = session.outstandingFileTransfers.count
+        Task { @MainActor in
+            self.labTransferSucceeded = ok
+            self.labTransfersInFlight = remaining
+        }
     }
 
     nonisolated public func sessionReachabilityDidChange(_ session: WCSession) {

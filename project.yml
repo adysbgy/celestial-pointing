@@ -275,6 +275,16 @@ targets:
         # Sama dengan target complication; tanpa ini complication hanya membaca
         # cache-nya sendiri (fallback store), bukan tulisan app.
         entitlementsPath: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+    # Info.plist parsial; kunci `INFOPLIST_KEY_*` di atas tetap digabung
+    # karena `GENERATE_INFOPLIST_FILE: YES`. Satu-satunya isi yang tidak punya
+    # padanan `INFOPLIST_KEY_*`: mode latar untuk `WKExtendedRuntimeSession`
+    # Pointing Lab (ADR-004), supaya rekaman tidak berhenti saat layar meredup
+    # dengan lengan terangkat.
+    info:
+      path: Apps/PointAndKnowWatch/Info.plist
+      properties:
+        WKBackgroundModes:
+          - physical-therapy
 
 # Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
 # dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).
