@@ -93,6 +93,7 @@ final class TargetsTests: XCTestCase {
         // kebetulan tidak punya apa pun di pita itu.
         var comps = DateComponents()
         comps.year = 2026; comps.month = 2; comps.day = 1; comps.hour = 22
+        comps.timeZone = TimeZone(identifier: "UTC")  // tanpa ini tanggalnya ikut zona waktu lokal mesin
         let bandDate = Calendar(identifier: .gregorian).date(from: comps)!
         let bandObserver = Observer(latitudeDeg: -33.0, longitudeDeg: 100.0)
 
@@ -216,6 +217,7 @@ final class TargetsTests: XCTestCase {
     private static let bandDate: Date = {
         var comps = DateComponents()
         comps.year = 2026; comps.month = 2; comps.day = 1; comps.hour = 22
+        comps.timeZone = TimeZone(identifier: "UTC")  // tanpa ini tanggalnya ikut zona waktu lokal mesin
         return Calendar(identifier: .gregorian).date(from: comps)!
     }()
 
