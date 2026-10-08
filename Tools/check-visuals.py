@@ -3930,6 +3930,61 @@ def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
         f"kanal merah {unknown_red} (bulan baru {new_red}, purnama {full_red})"))
 
 
+def check_moon_new_disc_reads_on_the_watch(results, size=38, ss=8):
+    """Piringan bulan baru harus **terbaca** di ukuran kartu jam.
+
+    **Cacat yang ditutup pemeriksaan ini.** Diukur pada 38 px (token jam
+    `WatchMetrics.visualDiameter`), piringan `moon-new` dulu **1.32:1**
+    terhadap latar kartu #0A0A0F — di bawah ambang keterbacaan mana pun, dan
+    setara "kartu kosong": kartu jam yang tidak menyampaikan apa pun. Akarnya
+    satu token, `moonEarthshine` (0.15) — pada f = 0 kekuatan earthshine
+    `1 - f` = 1.0, jadi seluruh piringan bulan baru **adalah** warna itu.
+
+    **Kenapa gerbang ini perlu ada padahal piringan itu "sengaja rata".** Yang
+    tercatat di `check_moon_disc_keeps_its_curvature` adalah bahwa piringan
+    gelap Bulan sengaja **tidak** diberi gradien — keputusan tentang *bentuk*.
+    "Rata" bukan "tak terlihat", dan tidak ada gerbang mana pun yang mengukur
+    yang kedua: `check_unknown_phase_is_not_a_new_moon` hanya menuntut bulan
+    baru **berbeda** dari fase tak diketahui, jadi piringan yang sama-sama
+    hitam di kedua sisi lolos — selama selisihnya 1/255.
+
+    **Ambangnya dari WCAG, dan itu sebabnya 2.0.** Rasio kontras
+    `(L_terang + 0.05) / (L_gelap + 0.05)` adalah ukuran keterbacaan standar
+    yang sudah dipakai repo ini; 2.0 adalah titik di mana piringan berhenti
+    menjadi noda dan mulai terbaca sebagai bentuk pada 38 px. Kalibrasinya
+    diukur (`Tools/sapu-earthshine.py`): earthshine 0.30 → **2.39:1** (nilai
+    yang dipakai), 0.24 → 1.85:1 (di bawah ambang, ditolak), 0.15 → 1.32:1
+    (cacat asalnya). Ambang ini menahan nilainya **dan** menahan arah:
+    menurunkannya kembali ke 0.15 membuat gerbang ini merah lagi.
+    """
+    _, (w, h, rows) = render_case("moon-new", size=size, ss=ss)
+    cx, cy = w // 2, h // 2
+    background = background_of(w, h, rows)
+    # 3x3 pusat — penyampel yang sama dengan probe yang menemukan cacatnya.
+    acc = [0, 0, 0]
+    for y in range(cy - 1, cy + 2):
+        for x in range(cx - 1, cx + 2):
+            p = rows[y][x * 4:x * 4 + 3]
+            for k in range(3):
+                acc[k] += p[k]
+    disc = tuple(v // 9 for v in acc)
+
+    def relative_luminance(rgb):
+        def channel(value):
+            v = value / 255.0
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        return (0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1])
+                + 0.0722 * channel(rgb[2]))
+
+    la, lb = relative_luminance(disc), relative_luminance(background)
+    ratio = (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    results.append(Result(
+        "bulan baru terbaca di ukuran jam (kontras >= 2.0:1)",
+        ratio >= 2.0,
+        f"{ratio:.2f}:1 pada {size} px — piringan {tuple(disc)} vs latar "
+        f"{tuple(background)}"))
+
+
 def saturn_ring_band_values(size, ss):
     """Median kanal merah pita cincin Saturnus, per paruh: `(celah, B, A)`.
 
@@ -5688,6 +5743,8 @@ def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
     memperdalamnya mematikan `check_earthshine` pada kekuatan 0.20. Yang
     melengkung adalah bagian yang **disinari sumber titik** — pita terangnya
     dan piringan "fase tak diketahui" — bukan sisi gelap yang disinari Bumi.
+    Piringan rata itu sendiri diukur **keterbacaannya**, bukan lengkungnya:
+    lihat `check_moon_new_disc_reads_on_the_watch` (dulu 1.32:1 — tak terlihat).
 
     **Ambang lengkung relatif terhadap Mars.** Mars adalah bola yang sudah
     memakai `drawSphere`, jadi lengkungnya adalah patokan lengkung yang benar
@@ -6406,6 +6463,7 @@ def main():
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
     check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
+    check_moon_new_disc_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
     check_png_is_well_formed(results)

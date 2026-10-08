@@ -1,3 +1,120 @@
+## Progres terakhir (8 Okt 2026 — kartu bulan baru terbaca, dan plafon earthshine diukur)
+
+### Cacatnya: kartu jam yang terlihat kosong
+
+`Tools/montage.py` (alat, bukan gerbang) sudah mencatatnya dari mata sejak
+siklus lalu: "`moon-new` terbaca sebagai kotak kosong di atas latar hitam".
+Siklus ini cacat itu **diukur** alih-alih dikutip, dan angkanya lebih buruk
+dari kesan matanya:
+
+| kasus | piringan | latar kartu | kontras |
+|---|---|---|---|
+| `moon-new` | (38, 38, 48) | (10, 10, 15) | **1.32:1** |
+| `moon-crescent-jakarta` (sisi gelap) | (37, 37, 47) | (10, 10, 15) | **1.30:1** |
+| `moon-unknown-phase` | (127, 127, 135) | (10, 10, 15) | 4.97:1 |
+| `moon-full` | (237, 232, 220) | (10, 10, 15) | 16.16:1 |
+
+Dua hal yang penting di sini. Pertama: piringan **fase tak diketahui** — yang
+sengaja digambar sebagai "tidak mengklaim apa pun" — justru **4× lebih terbaca**
+dari bulan baru yang nyata. Kedua: sisi gelap sabit pun 1.30:1, jadi yang
+hilang bukan cuma satu kartu langka, melainkan **bagian gelap Bulan di setiap
+fase**, dan jam hanya menampilkan gambar ini di kartunya.
+
+### Akarnya satu token, dan mengubahnya bukan sekadar menaikkan angka
+
+`moonEarthshine` (0.15) dilukis sebagai cakram rata di atas seluruh piringan,
+dan pada f = 0 kekuatannya `1 - f` = 1.0 — jadi **piringan bulan baru adalah
+warna token itu apa adanya**. Percobaan pertama menaikkan `moonUnlit` tidak
+mengubah satu piksel pun (terukur: cakram tetap (38,38,48) di seluruh sapuan
+0.13…0.26), dan itu memperlihatkan bahwa knob yang dicari memang bukan itu.
+
+Kenaikannya juga **fisis, bukan kosmetik**: cahaya Bumi paling kuat justru saat
+bulan baru (Bumi nyaris purnama dilihat dari Bulan), dan "bulan tua dalam
+pelukan bulan muda" adalah pengamatan earthshine paling terkenal dengan mata
+telanjang. Nilai 0.15 dipilih sebagai "redup" umum — bukan diukur terhadap
+kasus bulan baru, yang justru kasus paling terang.
+
+### Plafonnya diukur, bukan dipilih
+
+Sapuan `0.15…0.44` (`Tools/sapu-earthshine.py` — alat, bukan gerbang; ia
+melaporkan kontras jam **dan** enam batas yang mengikat) atas **kelima gerbang
+earthshine yang sudah ada**:
+
+```
+earthshine   kontras jam   gerbang   malam (plafon 45%)   margin ke unknown
+0.15           1.32:1      6/6 OK        24.15%               94/255
+0.24           1.85:1      6/6 OK        33.04%               71/255
+0.30           2.39:1      6/6 OK        39.11%               55/255   <- dipakai
+0.34           2.80:1      6/6 OK        42.30%               45/255
+0.36           3.03:1      6/6 OK        44.58%               40/255
+0.37           3.13:1      5/6 GAGAL     45.32%               38/255   <- plafon
+0.44           4.11:1      5/6 GAGAL     50.19%               20/255
+```
+
+Jadi yang mengikat **bukan** gerbang earthshine (semuanya hijau sampai 0.36)
+melainkan plafon malam 45% yang tembus di **0.37**, dan — jauh lebih longgar —
+margin kejujuran ke `moonPhaseUnknown` (jarak kanal merah harus > 25) yang baru
+menggigit di **0.44**. Dua batas itu terpisah 0.07, dan sebelum disapu tidak ada
+yang tahu mana yang lebih dulu menyerah. 0.30 dipilih dengan satu langkah
+cadangan di bawah plafon.
+
+### Dua angka salah yang ditangkap alat ini sendiri
+
+Alat itu awalnya melaporkan margin `39/255` untuk 0.30, dan angka itu sempat
+masuk ke dua tabel di repo ini sebelum ada yang memeriksanya. Dua kesalahan
+sekaligus: (1) marginnya dihitung **analitik** dari token (`round(f * 255)`)
+alih-alih dari piksel yang diukur gerbang; dan (2) yang diambil kanal **biru**
+(0.37 di token) alih-alih **merah** (0.30) — selisih 18/255, cukup untuk membuat
+tabel yang salah tampak masuk akal. Versi keduanya menyampel kanal merah sendiri
+tapi di **38 px**, sedangkan gerbang mengukur di **200 px**; rasterisasi berbeda,
+angka masih meleset. Versi ketiga **memanggil gerbangnya langsung** dan mengurai
+detailnya, jadi angka yang dilaporkan alat ini adalah angka yang sama dengan
+yang dipakai gerbang untuk memutuskan — dan margin palsu itu tidak bisa lahir
+lagi.
+
+### Gerbang regresi (PRD §10: tulis tesnya dulu, baru perbaiki)
+
+`check_moon_new_disc_reads_on_the_watch` — kontras piringan `moon-new` di
+**38 px** (token `WatchMetrics.visualDiameter`) terhadap latar kartu, ambang
+**2.0:1** dari rasio WCAG yang sudah dipakai repo ini. Ambangnya menahan
+nilainya *dan* arah: menurunkannya kembali ke 0.15 membuat gerbang ini merah
+lagi. Dikalibrasi terhadap ketiga titik yang diukur (0.15 → 1.32 merah,
+0.24 → 1.85 merah, 0.30 → 2.39 hijau).
+
+Gerbang ini mengisi lubang yang tidak dijaga apa pun: `check_moon_disc_keeps_its_curvature`
+menjaga **bentuk** piringan gelap (sengaja rata), dan
+`check_unknown_phase_is_not_a_new_moon` hanya menuntut bulan baru **berbeda**
+dari fase tak diketahui — jadi dua piringan yang sama-sama tak terlihat lolos
+keduanya, selama selisihnya 1/255. "Rata" bukan "tak terlihat", dan hanya yang
+kedua yang diukur sekarang.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 687 | **687** |
+| Pemeriksaan visual | 537 | **538** (+1 gerbang baru) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 687), `check-visuals.py --check`
+(538, 0 gagal), `swift-ui-lint.sh`, `swift-typecheck.sh`. Berkas tersentuh:
+`NightVisual.swift`, `Tools/render-visuals.py` (kedua bahasa menggambar sama —
+dijaga `check_night_accents_match_the_model`), `Tools/check-visuals.py`,
+`Tools/sapu-earthshine.py` (baru — alat sapuan, di `Tools/` bukan `out/` supaya
+angkanya bisa direproduksi; `out/` di-gitignore), `STATUS.md`. **Tidak ada kode
+`Apps/` yang berubah** — view sudah memakai token ini, jadi memperbaiki
+tokennya memperbaiki kedua platform sekaligus.
+
+### Sisa yang tercatat, belum dikerjakan
+
+Dari lembar yang sama: `star-sirius` / `star-rigel` / `star-vega` **nyaris tak
+terbedakan** satu dari lain pada ukuran kartu (kelas spektral bintang-bintang
+itu memang dekat, dan ukurannya ditentukan magnitudo). Belum diukur, jadi belum
+disentuh.
+
+---
+
 ## Progres terakhir (7 Okt 2026 — gerbang menuntut ejaan yang sudah dibuang, dan `main` merah dua commit)
 
 ### Cacatnya: gerbang merah pada kode yang benar
@@ -487,6 +604,9 @@ dan karena itu tidak bisa diukur dan bisa hilang tanpa suara.
 - Token baru `moonEarthshine` di `NightVisual.swift` (0.15/0.15/0.19), terpisah
   dari `moonUnlit` (0.13/0.13/0.16) dan `planetUnlit` (0.06/0.06/0.08), dan
   dipetakan lewat aturan `shadow` sehingga mode malam tetap merah murni.
+  *(Nilainya dinaikkan ke 0.30/0.30/0.37 di siklus berikutnya — lihat entri
+  teratas — karena pada 0.15 piringan bulan baru terukur tak terlihat. Yang
+  tercatat di sini adalah keadaan saat siklus ini dikerjakan.)*
 - Fungsi model `CelestialVisual.earthshineStrength(illuminationFraction:)`
   = `1 - f`: nol saat purnama (tak ada sisi gelap → jangan gambar cahaya yang
   tak ada di langit), maksimum saat bulan baru, monoton turun. Diuji di Linux

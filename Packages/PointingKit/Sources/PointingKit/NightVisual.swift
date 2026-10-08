@@ -202,9 +202,39 @@ public extension CelestialVisual {
         /// yang justru terbaca sebagai "lubang" dan bukan sebagai bulan yang
         /// sedang sabit.
         ///
-        /// Kelegapannya sengaja jauh di bawah `moonLit` (≈ 1/6) supaya tidak
-        /// pernah terbaca sebagai pita yang menyala — earthshine adalah
-        /// *sisi gelap yang sedikit bercahaya*, bukan fase kedua. Dan tidak
+        /// **Kelegapannya dinaikkan dari 0.15 ke 0.30 setelah diukur, dan itu
+        /// bukan selera.** Pada f = 0 kekuatan earthshine `1 - f` = 1.0, jadi
+        /// piringan bulan baru **adalah** warna token ini apa adanya. Pada
+        /// 0.15 piringan itu terukur **1.32:1** terhadap latar kartu di ukuran
+        /// jam (38 px) — di bawah ambang keterbacaan mana pun, dan setara
+        /// "kotak kosong": kartu jam yang tidak menyampaikan apa pun. Sapuan
+        /// 0.15…0.36 (`Tools/sapu-earthshine.py`, kontras piringan `moon-new`
+        /// 38 px terhadap latar #0A0A0F, plus margin kanal merah ke
+        /// `moonPhaseUnknown` yang diukur gerbangnya sendiri di 200 px):
+        ///
+        ///     earthshine   kontras jam   gerbang   margin ke unknown
+        ///     0.15           1.32:1      6/6 OK        94/255
+        ///     0.24           1.85:1      6/6 OK        71/255
+        ///     0.30           2.39:1      6/6 OK        55/255
+        ///     0.34           2.80:1      6/6 OK        45/255
+        ///     0.36           3.03:1      6/6 OK        40/255
+        ///
+        /// Seluruh gerbang tetap hijau sampai 0.36, jadi yang mengikat bukan
+        /// gerbang melainkan **rasio malam terhadap siang**, yang punya plafon
+        /// mutlak 45% dan tembus di **0.37** (terukur 45.32%). Margin kejujuran
+        /// ke `moonPhaseUnknown` (jarak kanal merah harus > 25) baru menggigit
+        /// di **0.44** — jadi plafon sebenarnya 0.36, ditentukan gerbang malam.
+        /// 0.30 dipilih dengan satu langkah cadangan di bawahnya: 2.39:1.
+        ///
+        /// Sisi fisisnya: cahaya Bumi **paling kuat saat bulan baru** (Bumi
+        /// nyaris purnama dilihat dari Bulan), dan "bulan tua dalam pelukan
+        /// bulan muda" adalah pengamatan earthshine paling terkenal dengan
+        /// mata telanjang. Nilai 0.15 dipilih sebagai "redup" umum, bukan
+        /// diukur terhadap kasus bulan baru — yang justru kasus paling terang.
+        ///
+        /// Yang tetap berlaku: tidak pernah terbaca sebagai pita yang menyala
+        /// — earthshine adalah *sisi gelap yang sedikit bercahaya*, bukan fase
+        /// kedua (ia masih ≈ 1/3 `moonLit`, jauh di bawahnya). Dan tidak
         /// boleh muncul saat `moonUnlit` penuh (f = 1, tidak ada sisi gelap)
         /// maupun saat fase tak diketahui (kartu ragu tidak menyatakan bulan
         /// sabit). Aturan kehadirannya diuji di Linux
@@ -228,6 +258,17 @@ public extension CelestialVisual {
         /// redup untuk tidak terbaca sebagai "menyala". Dijaga
         /// `testPhaseUnknownDiscIsNeitherLitNorUnlit`, jadi ia tidak bisa
         /// diam-diam menempel ke salah satu ujung.
+        ///
+        /// **Batas bawahnya bergerak, dan itu disengaja.** Yang dijaga bukan
+        /// `moonUnlit < moonPhaseUnknown` (perbandingan penuh) melainkan
+        /// **jarak** kanal merah ke `moonUnlit` — dulu karena `moonPhaseUnknown`
+        /// bisa menempel `moonUnlit` tanpa suara, sekarang karena
+        /// `moonEarthshine` yang naik (0.15 → 0.30) memakan ruang di antaranya.
+        /// Pada 0.30 jaraknya 55/255 (kanal merah, diukur gerbangnya sendiri);
+        /// gerbang `check_unknown_phase_is_not_a_new_moon` (ambang 25) baru
+        /// menggigit di earthshine **0.44**. Jadi yang lebih dulu menyerah
+        /// bukan jarak ini melainkan plafon malam 45% di 0.37 — dua batas yang
+        /// jauh berbeda, dan dua-duanya diukur, bukan ditulis.
         public var moonPhaseUnknown: RGBComponents
 
         // MARK: Matahari
@@ -363,10 +404,15 @@ public extension CelestialVisual {
         planetUnlit: .init(red: 0.06, green: 0.06, blue: 0.08),
         moonLit: .init(red: 0.97, green: 0.95, blue: 0.90),
         moonUnlit: .init(red: 0.13, green: 0.13, blue: 0.16),
-        // Earthshine: sisi gelap Bulan yang disinar Bumi. Jauh di bawah
-        // `moonLit` (~1/7) supaya tidak pernah terbaca sebagai pita yang
-        // menyala — sisi gelap yang sedikit bercahaya, bukan fase kedua.
-        moonEarthshine: .init(red: 0.15, green: 0.15, blue: 0.19),
+        // Earthshine: sisi gelap Bulan yang disinar Bumi. **Ini token yang
+        // menentukan apakah bulan baru terlihat sama sekali** — pada f = 0
+        // kekuatannya 1.0, jadi piringan bulan baru adalah warna ini apa
+        // adanya. Nilainya dinaikkan dari 0.15 ke 0.30 setelah diukur: pada
+        // 0.15 piringan bulan baru terukur **1.32:1** terhadap latar kartu
+        // (38 px) — kotak kosong, bukan bulan. Pada 0.30 ia 2.39:1 dan
+        // bentuknya terbaca. Lihat `moonEarthshine` di `Accents` untuk
+        // sapuan lengkapnya dan kenapa plafonnya 0.36.
+        moonEarthshine: .init(red: 0.30, green: 0.30, blue: 0.37),
         // Abu-abu tengah, dan sengaja **bukan** warna bulan yang menyala
         // maupun yang gelap: piringan ini tidak boleh terbaca sebagai salah
         // satu fase. Dijaga `testPhaseUnknownDiscIsNeitherLitNorUnlit`.
