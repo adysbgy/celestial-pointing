@@ -15496,3 +15496,39 @@ di sana akan menuntut gerbang berbunyi tanpa alasan.
     perilakunya adalah port Python (gerbang piksel) + nama konstanta yang
     harus benar-benar disebut di view (gerbang teks). Kelas cacat "view
     berhenti memanggil" ditutup gerbang teks, bukan gerbang piksel.
+
+### Kecurigaan yang diperiksa lalu dibuang
+
+Setelah bintiknya diperbaiki, dua ciri permukaan lain yang **juga** digambar
+sebagai bentuk rata di atas bola diperiksa dengan cara yang sama — karena
+itulah pola yang baru saja terbukti cacat, dan menganggapnya kebetulan berarti
+menebak. Keduanya diukur lewat jalur render yang sama, dan **keduanya sudah
+benar**:
+
+  - **Kutub Mars** (`_draw_polar_caps`, elips `marsPolarCap` opasitas 0.85).
+    Diukur pada baris pusat kutub (200 px, ss=4, metrik lengkung baris yang
+    sama): dengan pita kutub **−0.1%**, tanpa pita kutub **−1.1%**. Selisihnya
+    ~1 poin persen — jauh di bawah yang membuat bola terbaca rata. Sebabnya
+    fisis: di `y = ±0.74 R` bola hanya setinggi `sqrt(1 − 0.74²) = 0.67 R`, dan
+    gradien bola di situ sudah nyaris di ujung gelapnya, jadi peredupan limb di
+    dalam kutub memang tipis.
+  - **Maria Bulan** (`MARIA`, cakram `black` opasitas **0.12**). Diukur per
+    mare dengan metrik lengkung yang sama: selisih dengan vs tanpa maria
+    +0.3 / +11.8 / +0.3 / −0.3 poin persen. Yang `+11.8` adalah artefak
+    metriknya — bola di baris itu hampir rata (−0.1%) sehingga rasionya
+    membengkak dari basis yang kecil; dalam **poin persen** selisihnya tetap
+    ~12. Yang menentukan bukan lengkungnya: maria digambar dengan opasitas 0.12
+    di **atas** pita, jadi ia **menskalakan** bola alih-alih menutupinya.
+    Bintik Jupiter digambar **opaque**, dan itulah bedanya — bukan tempatnya.
+
+Keduanya dicatat di sini **tanpa uji baru**: uji yang tidak bisa merah karena
+alasan yang benar adalah cakupan palsu, persis kelas yang sudah berkali-kali
+ditolak di repo ini. Alat ukurnya (`out/ukur-kutub.py`, `out/ukur-maria2.py`)
+tinggal di `out/` seperti alat ukur lain — angkanya bisa direproduksi, tapi ia
+bukan gerbang.
+
+### Hasil CI
+
+  - `609e32f` — Engine Tests (Linux) `37738993511`: **hijau**, termasuk langkah
+    baru "Buktikan gerbang bintik Jupiter berbunyi".
+  - `609e32f` — Apple Build `37738993518`: **hijau**.
