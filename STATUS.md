@@ -461,12 +461,36 @@ angkanya bisa direproduksi; `out/` di-gitignore), `STATUS.md`. **Tidak ada kode
 `Apps/` yang berubah** — view sudah memakai token ini, jadi memperbaiki
 tokennya memperbaiki kedua platform sekaligus.
 
-### Sisa yang tercatat, belum dikerjakan
+### Sisa yang tercatat — dan diukur di siklus ini: catatannya **basi**
 
-Dari lembar yang sama: `star-sirius` / `star-rigel` / `star-vega` **nyaris tak
-terbedakan** satu dari lain pada ukuran kartu (kelas spektral bintang-bintang
-itu memang dekat, dan ukurannya ditentukan magnitudo). Belum diukur, jadi belum
-disentuh.
+Catatan lama berbunyi: `star-sirius` / `star-rigel` / `star-vega` **nyaris tak
+terbedakan** satu dari lain pada ukuran kartu. Itu benar **sebelum** magnitudo
+dibaca dari katalog: waktu itu keempat kasus bintang memakai
+`size_from_magnitude(0.0)` yang sama, jadi yang membedakan hanyalah warna
+spektral — dan B−V Sirius (0.00) memang identik dengan Vega (0.00), sementara
+Rigel (−0.03) hanya berbeda 0.03.
+
+Diukur ulang sekarang (`out/ukur-bintang.py`, seluruh kasus, ss=4):
+
+| ukuran | sirius vs rigel | sirius vs vega | rigel vs vega |
+|---|---|---|---|
+| 38 px (kartu jam) | 648 px (44.9%) | 648 px (44.9%) | 256 px (17.7%) |
+| 76 px | 2648 px (45.8%) | 2648 px (45.8%) | 1084 px (18.8%) |
+| 200 px | 18272 px (45.7%) | 18268 px (45.7%) | 7000 px (17.5%) |
+
+Yang memisahkannya **bukan warna**, melainkan ukuran: m(Sirius) −1.46 → 0.982,
+m(Vega) +0.03 → 0.494, m(Rigel) +0.13 → 0.472. Sirius memakai 98% skala, Vega
+dan Rigel ~48%, jadi Sirius berbeda dari keduanya di **45%** piksel kartu —
+bukan "nyaris tak terbedakan".
+
+Yang **memang** tinggal: Rigel dan Vega terpisah **18%** dan itu seluruhnya
+ukuran (0.472 lawan 0.494, ~4% bedanya) — warnanya nyaris sama, dan memang
+harus: B−V −0.03 lawan 0.00. Itu bukan cacat, itu fisika: dua bintang B8/A0
+memang sebangsa warna. Tidak ada gerbang baru ditambahkan di sini; yang ada
+sudah menutupnya (`check_star_size_follows_magnitude`, dibuktikan berbunyi
+oleh `Tools/bukti-mutasi-bintang.py` 3 keadaan), dan menambah gerbang "Rigel
+harus berbeda dari Vega" akan menuntut visual membedakan dua bintang yang
+mata manusia pun tidak membedakan.
 
 ---
 
