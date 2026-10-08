@@ -312,9 +312,10 @@ schemes:
     build:
       targets:
         PointAndKnow: all
-      # Build paralel dimatikan: app jam adalah dependensi app iPhone, dan
-      # membangun keduanya sekaligus membuat pesan galatnya sulit dibaca.
-      parallelizeBuild: false
+      # Urutan dependensi (bukan manual): Xcode 16+ memperingatkan "Building
+      # targets in manual order is deprecated" untuk skema non-paralel, dan
+      # urutan app jam → app iPhone sudah dijamin oleh dependensi target.
+      parallelizeBuild: true
     run:
       config: Debug
     test:
@@ -325,7 +326,7 @@ schemes:
     build:
       targets:
         PointAndKnow Watch: all
-      parallelizeBuild: false
+      parallelizeBuild: true
     run:
       config: Debug
     archive:
