@@ -2029,6 +2029,41 @@ public extension CelestialVisual {
     /// `check_banded_disc_keeps_its_curvature`.
     public static let bandLimbShadingStrength: Double = 0.6
 
+    /// Kekuatan **pemulihan peredupan limb** di atas Bintik Merah Besar, 0…1.
+    ///
+    /// **Kelas cacat yang sama dengan pita di atas, dan gerbangnya punya lubang
+    /// yang sama.** Bintik digambar sebagai elips warna **rata** di atas bola
+    /// yang sudah dinaungi gradien, jadi ia menghapus lengkung bola di
+    /// dalamnya. Yang menjaganya, `check_banded_disc_keeps_its_curvature`,
+    /// mengukur **baris ekuator** saja — sementara bintiknya duduk di
+    /// `centerY = +0.31`, jauh dari baris itu. Jadi cacat ini tidak pernah
+    /// tersentuh pemeriksaan mana pun.
+    ///
+    /// Diukur pada baris pusat bintik (y = +0.31 R, render 200 px, ss=4):
+    ///
+    ///     bola di bawah bintik (tanpa ciri) : 0.580 → 0.532   lengkung **+8.4%**
+    ///     baris yang sama, dengan bintik    : 0.449 → 0.532   lengkung **−18.4%**
+    ///
+    /// Tandanya **terbalik**. Itu bukan cacat kosmetik: bintik yang rata
+    /// membuat barisnya lebih terang di sisi yang seharusnya gelap, jadi yang
+    /// terbaca bukan bola berbintik melainkan **stiker** yang ditempel — persis
+    /// kata yang dipakai pengukuran mata pada render 400 px, dan persis cacat
+    /// yang sudah diperbaiki untuk pitanya.
+    ///
+    /// Perbaikannya **sama**: pakai kembali gradien bola yang sama (pusat di
+    /// `sphereLightOffset`, warna `palette.light` → `palette.dark`), dipotong
+    /// ke elips bintiknya. Karena gradiennya sama, yang dipulihkan adalah
+    /// lengkung yang tadi terhapus, dan arah cahayanya tidak bisa berbeda
+    /// pendapat dengan `drawSphere`.
+    ///
+    /// Nilainya **sebagian**, bukan 1: pada 0 lengkungnya rata kembali
+    /// (cacatnya utuh), pada 1 bintiknya tertutup bola. Nilai 0.6 memulihkan
+    /// 84% lengkung sambil menyisakan warna bintik yang masih terbaca
+    /// (≥ 20 piksel merah di kotak bintiknya). Dijaga
+    /// `testJupiterSpotLimbShadingIsPartial` di Linux dan gerbang piksel
+    /// `check_jupiter_spot_keeps_its_curvature`.
+    public static let jupiterSpotLimbShadingStrength: Double = 0.6
+
     // MARK: - Peredupan limb piringan Bulan
 
     /// Kekuatan peredupan limb piringan Bulan, 0…1.

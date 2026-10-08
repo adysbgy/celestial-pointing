@@ -569,6 +569,14 @@ class Canvas:
             # menghadap cahaya digambar sebagai cakram yang digeser, lalu
             # dipotong oleh cakram kawahnya sendiri supaya yang tersisa hanya
             # sabitnya.
+            #
+            # **Tidak ada `clip_ellipse` di sini, dan itu disengaja.** Percobaan
+            # pertama pemulihan bintik Jupiter menambahkan parameter itu untuk
+            # "memotong gradien ke elips bintiknya" — padahal baris di bawah
+            # (`dx² + dy² <= 1`) **sudah** membatasi diri ke elips itu. Diukur
+            # (`out/ukur-klip.py`): menghapus klip kedua itu mengubah **0
+            # piksel**. Parameter yang tidak mengubah gambar tetap terlihat
+            # seperti bekerja, jadi ia dihapus alih-alih dibiarkan.
             if clip_disc is not None:
                 ccx, ccy, cr = clip_disc
                 if (x - ccx) ** 2 + (y - ccy) ** 2 > cr * cr:
@@ -675,6 +683,15 @@ BAND_OPACITY = 0.55                         # VIEW: `drawBands`
 # di atas pita. Pita digambar rata, jadi ia menghapus lengkung bola; gradien
 # bola digambar ulang di atasnya dengan kekuatan ini.
 BAND_LIMB_SHADING_STRENGTH = 0.6
+# MODEL: `CelestialVisual.jupiterSpotLimbShadingStrength` — pemulihan peredupan
+# limb di atas Bintik Merah Besar. **Kelas cacat yang sama** dengan pita di
+# atas: bintik digambar sebagai elips warna **rata**, jadi ia menghapus
+# lengkung bola di dalamnya. Diukur pada baris pusatnya (y = +0.31 R, 200 px):
+# bola di bawahnya meredup 0.580 -> 0.532 (lengkung +8.4%), sementara baris
+# yang sama **dengan** bintik justru menanjak 0.449 -> 0.532 (lengkung
+# **-18.4%**) — arahnya terbalik, karena bintiknya lebih terang daripada sisi
+# gelap di sekitarnya.
+JUPITER_SPOT_LIMB_SHADING_STRENGTH = 0.6
 # Nama aturan geometri pita, dipakai `check-visuals.py` untuk menahan kedua
 # bahasa agar memakai rumus bola yang sama. Kalau salah satu sisi kembali
 # memakai aproksimasi kosinus, nama ini tidak akan ditemukan di sumbernya.
@@ -917,6 +934,23 @@ def _draw_frame(canvas, size, radius):
     canvas.rect(size - 0.6, 0, size, size, solid((1.0, 0.25, 0.25)))
 
 
+def sphere_gradient(cx, cy, radius, light, dark, night_mode, opacity=1.0):
+    """Gradien bola — **satu-satunya** tempat ia dibangun.
+
+    Dipakai tiga pemanggil, dan harus sama persis di ketiganya: bola planet,
+    pemulihan lengkung di atas pita, dan pemulihan lengkung di atas Bintik
+    Merah Besar. Kalau salah satu membangun gradiennya sendiri, arah
+    cahayanya bisa berbeda pendapat — kekeliruan yang tidak bisa dilihat mata,
+    hanya bisa dihitung (lihat `CelestialVisual.sphereLightOffset`).
+    """
+    return radial_gradient(
+        [(light if not night_mode else night_surface(light), 1.0 * opacity),
+         (dark if not night_mode else night_surface(dark), 1.0 * opacity)],
+        center=(cx + radius * SPHERE_LIGHT_OFFSET[0],
+                cy + radius * SPHERE_LIGHT_OFFSET[1]),
+        start_radius=radius * 0.1, end_radius=radius * 1.35)
+
+
 def _draw_sphere(canvas, cx, cy, radius, light, dark, night_mode, opacity=1.0):
     """`drawSphere` — gradien bola, cahaya dari kiri-atas.
 
@@ -926,13 +960,8 @@ def _draw_sphere(canvas, cx, cy, radius, light, dark, night_mode, opacity=1.0):
     terhapus pita (lihat `_draw_bands`). Karena yang ditumpuk adalah gradien
     yang sama, daerah di luar pita tidak berubah sama sekali.
     """
-    gradient = radial_gradient(
-        [(light if not night_mode else night_surface(light), 1.0 * opacity),
-         (dark if not night_mode else night_surface(dark), 1.0 * opacity)],
-        center=(cx + radius * SPHERE_LIGHT_OFFSET[0],
-                cy + radius * SPHERE_LIGHT_OFFSET[1]),
-        start_radius=radius * 0.1, end_radius=radius * 1.35)
-    canvas.disc(cx, cy, radius, gradient)
+    canvas.disc(cx, cy, radius,
+                sphere_gradient(cx, cy, radius, light, dark, night_mode, opacity))
 
 
 def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
@@ -1115,9 +1144,49 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
                      night_mode, opacity=BAND_LIMB_SHADING_STRENGTH)
     dx, dy = SPOT_CENTER
     w, h = SPOT_SIZE
-    canvas.ellipse(cx + dx * radius, cy + dy * radius,
-                   w * radius / 2.0, h * radius / 2.0,
+    spot_cx, spot_cy = cx + dx * radius, cy + dy * radius
+    spot_rx, spot_ry = w * radius / 2.0, h * radius / 2.0
+    canvas.ellipse(spot_cx, spot_cy, spot_rx, spot_ry,
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))
+
+    # **Restorasi peredupan limb di atas Bintik Merah Besar.** Kelas cacat yang
+    # sama persis dengan pita di atas, dan gerbang piksel yang menjaganya pun
+    # punya lubang yang sama: `check_banded_disc_keeps_its_curvature` mengukur
+    # **baris ekuator** saja, sementara bintiknya duduk di +0.31 R.
+    #
+    # Diukur pada baris pusat bintik (y = +0.31 R, 200 px, ss=4):
+    #
+    #     bola di bawah bintik (tanpa ciri) : 0.580 -> 0.532   lengkung +8.38%
+    #     baris yang sama, dengan bintik    : 0.449 -> 0.532   lengkung -18.42%
+    #
+    # Tandanya **terbalik**, dan itu bukan cacat kosmetik: bintik yang digambar
+    # rata membuat barisnya lebih terang di sisi yang seharusnya gelap, jadi
+    # yang terbaca bukan bola berbintik melainkan **stiker** yang ditempel.
+    #
+    # Yang dipakai kembali adalah gradien bola yang sama (`sphere_gradient`),
+    # digambar ke **bentuk elips bintiknya sendiri**. Dua akibat, keduanya yang
+    # membuat cara ini dipilih: (1) di luar bintik gradien ini tidak pernah
+    # digambar, jadi piksel di sana identitas; (2) arah cahayanya tidak bisa
+    # berbeda pendapat dengan bola, karena keduanya membaca
+    # `SPHERE_LIGHT_OFFSET` yang sama.
+    #
+    # **`clip_ellipse` yang dipakai percobaan pertama dihapus, karena ia mati.**
+    # `Canvas.ellipse` sudah membatasi diri ke bentuk elipsnya
+    # (`dx² + dy² <= 1`), jadi memotongnya lagi ke elips yang **sama persis**
+    # tidak mengubah satu piksel pun. Diukur lewat jalur render yang sama
+    # (`out/ukur-klip.py`): 0 piksel berubah di dalam elips, 0 di luar, dengan
+    # maupun tanpa klip. Yang menyebabkannya bukan nilai klipnya salah — yang
+    # salah adalah **ada klip kedua untuk bentuk yang sama**, dan komentar yang
+    # menyebutnya "dipotong ke elips bintiknya" membuatnya tampak bekerja.
+    # (Di view Swift klipnya memang perlu: `GraphicsContext.clip` di sana
+    # memotong **gradien** ke elips, karena gradien tidak punya batas bentuk
+    # sendiri. Di port, `ellipse()` yang jadi batas itu.)
+    # MODEL: `CelestialVisual.jupiterSpotLimbShadingStrength`
+    if palette is not None:
+        canvas.ellipse(spot_cx, spot_cy, spot_rx, spot_ry,
+                       sphere_gradient(cx, cy, radius, palette["light"],
+                                       palette["dark"], night_mode,
+                                       opacity=JUPITER_SPOT_LIMB_SHADING_STRENGTH))
 
 
 def saturn_ring_bands(body_fraction=0.53, cassini_width=SATURN_CASSINI_WIDTH):

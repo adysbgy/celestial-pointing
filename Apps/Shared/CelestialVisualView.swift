@@ -428,8 +428,30 @@ struct CelestialVisualView: View {
                               y: center.y + CGFloat(spot.centerY - spot.height / 2) * radius,
                               width: radius * CGFloat(spot.width),
                               height: radius * CGFloat(spot.height))
-        context.fill(Path(ellipseIn: spotRect),
+        let spotPath = Path(ellipseIn: spotRect)
+        context.fill(spotPath,
                      with: .color(Self.accent(CelestialVisual.accents.jupiterSpot)))
+
+        // **Restorasi peredupan limb di atas bintik.** Kelas cacat yang sama
+        // dengan pita di atas: bintik digambar sebagai elips warna **rata**,
+        // jadi ia menghapus lengkung bola di dalamnya. Diukur pada baris
+        // pusatnya (y = +0.31 R, render 200 px): bola di bawahnya meredup
+        // 0.580 -> 0.532 (+8.4%), sementara baris yang sama **dengan** bintik
+        // menanjak 0.449 -> 0.532 (**-18.4%**) — arahnya terbalik.
+        //
+        // Gerbang piksel yang ada tidak menangkapnya: `check_banded_disc_keeps
+        // _its_curvature` mengukur **baris ekuator**, dan bintiknya duduk di
+        // +0.31 R. Karena itu gerbang barunya
+        // (`check_jupiter_spot_keeps_its_curvature`) mengukur baris ini.
+        //
+        // Yang dipakai kembali adalah gradien `drawSphere` yang sama, dipotong
+        // ke elips bintiknya — jadi arah cahayanya tidak bisa berbeda pendapat
+        // dengan bolanya, dan di luar bintik tidak ada piksel yang berubah.
+        var spotShaded = context
+        spotShaded.clip(to: spotPath)
+        drawSphere(context: spotShaded, center: center, radius: radius,
+                   from: palette.light, to: palette.dark,
+                   opacity: CelestialVisual.jupiterSpotLimbShadingStrength)
     }
 
     /// Cincin Saturnus: elips yang digambar **di belakang** bola dan **di

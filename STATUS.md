@@ -15338,3 +15338,161 @@ nama yang benar, dan kegagalan dilaporkan **per gradien**.
   - Hanya lapisan gambar yang diubah. `CelestialVisual.swift`,
     `render-visuals.py`, dan view Swift tidak disentuh selain gerbang baru.
   - Belum dipush; CI belum dijalankan untuk siklus ini.
+
+---
+
+## Siklus: bintik Jupiter — kelas cacat yang sama, gerbang dengan lubang yang sama
+
+Audit mutasi yang sama (metode yang sudah menemukan cacat pita Jupiter,
+`sphereLightOffset` galaksi, warna aksen, 5 morfologi deep-sky, dan radius
+akhir gradien) diarahkan ke satu-satunya ciri permukaan yang **belum pernah
+disapu**: Bintik Merah Besar.
+
+### Status akhir siklus ini (terverifikasi, bukan diklaim)
+
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 688 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> **575 pemeriksaan, 0 gagal**
+    (naik dari **567** di `HEAD`: 8 pemeriksaan baru).
+  - `./swift-ui-lint.sh` -> **SEMUA GERBANG UI LULUS** (29 aturan).
+  - Mutasi kekuatan 0.6 -> 0.0 dan -> 1.0: **kedua arah merah**, dengan nama
+    yang benar (lihat di bawah).
+
+### Cacat: bintik digambar rata, jadi lengkung bolanya terbalik
+
+Kelasnya **sama persis** dengan pita Jupiter, dan sudah diperbaiki untuk pita
+dua siklus lalu — tapi tidak pernah untuk bintiknya. Bintik digambar sebagai
+elips warna **rata** di atas bola yang sudah dinaungi gradien, jadi ia
+menghapus lengkung bola di dalamnya.
+
+Diukur pada baris pusat bintik (y = +0.31 R, render 200 px, ss=4):
+
+    bola di bawah bintik (tanpa ciri) : 0.580 -> 0.532   lengkung +8.4%
+    baris yang sama, dengan bintik    : 0.449 -> 0.532   lengkung -18.4%
+
+Tandanya **terbalik**. Bukan cacat kosmetik: bintik yang rata membuat barisnya
+lebih terang di sisi yang seharusnya gelap, jadi yang terbaca bukan bola
+berbintik melainkan **stiker** yang ditempel.
+
+### Kenapa gerbang lama tidak melihatnya
+
+`check_banded_disc_keeps_its_curvature` **sudah** mengukur lengkung baris —
+tapi hanya **baris ekuator** (`y = cy`). Bintiknya duduk di `centerY = +0.31`,
+jauh dari baris itu. Seluruh gerbang lain di berkas itu mengukur
+**keberadaan** ciri (`check_planet_features_present` menghitung piksel merah),
+bukan **lengkungnya**.
+
+Ini pola yang sudah tercatat di repo ini: gerbang yang mengukur sebagian
+klaimnya. Yang baru di sini bukan kelasnya, melainkan bahwa sapuan mutasi
+menemukan **satu ciri lagi** yang belum pernah disapu. STATUS.md dua siklus
+lalu menulis batasnya sendiri: sapuan hanya menyentuh geometri deep-sky.
+Siklus ini menyapu satu ciri permukaan; sisanya masih belum.
+
+### Perbaikan: gradien bola yang sama, dipotong ke elips bintiknya
+
+Bukan "bintik dibuat lebih gelap di tepi" — aturan itu menggelapkan tempat
+yang salah dan menambah sumber kedua tentang dari mana cahaya datang. Yang
+dipakai adalah **gradien bola yang sama** (`sphere_gradient` /
+`drawSphere`: pusat di `sphereLightOffset`, warna `palette.light` ->
+`palette.dark`), dipotong ke elips bintiknya. Dua akibat:
+
+  1. Di luar bintik gradien itu tidak pernah digambar, jadi piksel di sana
+     **identitas** — nol risiko cacat baru di tempat yang tidak dimaksud.
+  2. Arah cahayanya tidak bisa berbeda pendapat dengan bolanya, karena
+     keduanya membaca `sphereLightOffset` yang sama.
+
+Di port, gradien bola **diekstrak** ke `sphere_gradient()` supaya tiga
+pemanggil (bola, pemulihan pita, pemulihan bintik) membangunnya di satu
+tempat. `Canvas.ellipse` mendapat `clip_ellipse`, pasangan `clip_disc` yang
+sudah dipakai kawah. Di view, klipnya memakai idiom yang sama dengan
+`drawCraters` (`var lit = context; lit.clip(to:)`).
+
+### Kenapa angkanya 0.6, dan kenapa dua arah diuji
+
+Sama seperti pita, nilainya **sebagian**: 0 = lengkungnya rata kembali,
+1 = bintiknya tertutup bola. Diukur pada rentang penuh — rasio lengkung
+0 / 35 / 58 / **64** / 75 / 84 / 94 / 100% pada kekuatan
+0.0 / 0.3 / 0.5 / 0.6 / 0.7 / 0.8 / 0.9 / 1.0. 0.6 memulihkan 64% lengkung
+sambil menyisakan bintik yang masih terbaca (menyimpang 7.17% dari bola
+polos), jadi **kedua** sisinya punya jarak ke ambangnya (55% dan 2.0%).
+
+### Kenapa ambangnya rasio, dan kenapa sampelnya di dalam
+
+Sampel diambil pada `frac = 0.85` dari lebar bintik, **bukan** tepinya: pada
+`frac = 1.00` sampel terakhir jatuh tepat di tepi elips, tempat anti-aliasing
+mencampurnya dengan warna rata di luarnya — diukur, rasionya cuma 1.5%
+walaupun perbaikannya bekerja penuh (66% di dalam). Bola pembandingnya kasus
+"ragu", yang menggambar bola Jupiter yang sama **tanpa** ciri pengenal; jadi
+lengkung yang benar bisa diukur tanpa menuliskan angka lengkung ke dalam
+gerbangnya.
+
+### Metrik arah kedua diukur, bukan dipilih
+
+Versi pertama memakai hitungan piksel merah di kotak bintiknya. Ia **tidak
+pernah menggigit**: pada kekuatan 1.0 masih ada 64 piksel merah — di atas
+ambang 20 mana pun yang masih waras — jadi pemulihan penuh lolos sambil
+menghapus bintiknya. Yang benar adalah **menyelisihkan terhadap bola tanpa
+ciri** pada daerah bintiknya sendiri: 17.8 / 12.5 / 7.2 / 3.6 / 1.9 / 0.1%
+pada kekuatan 0.0 / 0.3 / 0.6 / 0.8 / 0.9 / 1.0, dan **nol** pada 1.0. Persis
+metrik `band_deviation_from_bare`, dengan alasan yang sama.
+
+### Mutasi yang dibuktikan — harness di `Tools/`, dijalankan CI
+
+`Tools/bukti-mutasi-bintik.py` (7 keadaan) memanggil **fungsi pemeriksaan yang
+sama** lewat proses baru, jadi ia berjalan dalam hitungan detik alih-alih ~6
+menit. Ia memeriksa **nama pemeriksaan mana yang berbunyi**, bukan berapa yang
+merah — dan atas **dua** gerbang sekaligus: yang piksel
+(`check_jupiter_spot_keeps_its_curvature`) dan yang teks
+(`check_port_matches_swift_constants`, tiga entri baru di dalamnya).
+
+    [baseline]                                 0 merah
+    A1. kekuatan 0.6 -> 0.0                    2 MERAH: lengkung 0.0% vs bola 9.2% (rasio 0%)
+                                                         + port sejalan: 0.0, seharusnya 0.6
+    A2. kekuatan 0.6 -> 1.0                    2 MERAH: bintik menyimpang 0.14% (ambang 2.0%)
+                                                         + port sejalan: 1.0, seharusnya 0.6
+    A3. bintiknya tidak digambar               1 MERAH: bintik menyimpang 0.20%
+    B1. port 0.6 -> 0.9 (drift)                2 MERAH: menyimpang 1.89% (ambang 2.0%)
+                                                         + port sejalan: 0.9, seharusnya 0.6
+    B2. view menulis 0.6 langsung              2 MERAH: view TIDAK memakai konstanta model
+                                                         (port sejalan + sumber memuat)
+    B3. model 0.6 -> 0.4 (drift)               1 MERAH: 'jupiterSpotLimbShadingStrength: Double = 0.6'
+                                                         TIDAK ditemukan di sumber Swift
+    7 keadaan, 0 tidak sesuai harapan; md5 ketiga berkas pulih persis
+
+Perhatikan B1: drift port 0.6 → 0.9 **hanya 0.1 di bawah ambang pikselnya**
+(1.89% vs 2.0%). Kalau ia lolos, yang menangkapnya tetap `port sejalan`. Itu
+sebabnya keadaan itu menguji dua gerbang, bukan satu.
+
+### Satu parameter yang ternyata **mati**, dan dihapus bukan dijaga
+
+Percobaan pertama siklus ini menambahkan `clip_ellipse` ke `Canvas.ellipse`
+untuk "memotong gradien ke elips bintiknya", dan harness diberi keadaan
+"`clip_ellipse` dihapus" yang diharapkan merah. Terukur lewat `out/ukur-klip.py`
+(render yang sama, 200 px, ss=4): menghapusnya mengubah **0 piksel** — di dalam
+elips 0, di luar elips 0, dan profil pita di baris ekuator identik. Sebabnya
+`Canvas.ellipse` **sudah** membatasi diri ke bentuk elipsnya
+(`dx² + dy² <= 1`), jadi klip kedua ke elips yang sama persis tidak melakukan
+apa pun.
+
+Yang salah bukan nilai klipnya, melainkan **adanya klip kedua untuk bentuk yang
+sama** — dan komentar yang menyebutnya "dipotong ke elips bintiknya" membuatnya
+tampak bekerja. Parameternya dihapus dari port. (Di view Swift klipnya **tetap
+ada** dan memang perlu: di sana `GraphicsContext.clip` yang memotong gradien ke
+elips, karena gradien tidak punya batas bentuk sendiri.)
+
+Keadaan itu **tidak** dimasukkan ke harness dengan harapan "hijau" juga:
+parameter yang sudah tidak ada tidak bisa diuji, dan harapan yang menuntut merah
+di sana akan menuntut gerbang berbunyi tanpa alasan.
+
+### Yang TIDAK diklaim
+
+  - Sapuan ini menyentuh **satu** ciri permukaan (bintik). Ciri lain yang
+    digambar rata di atas bola — kalau ada — belum disapu dengan cara ini.
+  - Angka 0.6 dijaga **dua sisi** (rasio lengkung dan penyimpangan dari bola
+    polos), tapi keduanya diukur pada **satu ukuran** (200 px). Perilakunya
+    di ukuran jam sudah diukur terpisah (rasio 66% pada 76 px) dan konsisten,
+    tapi tidak ada gerbang yang menjalankannya di 76 px.
+  - Sisi Swift-nya **tidak bisa dijalankan** di Linux; yang membuktikan
+    perilakunya adalah port Python (gerbang piksel) + nama konstanta yang
+    harus benar-benar disebut di view (gerbang teks). Kelas cacat "view
+    berhenti memanggil" ditutup gerbang teks, bukan gerbang piksel.

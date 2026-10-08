@@ -2369,6 +2369,37 @@ final class CelestialVisualTests: XCTestCase {
                        "nilai ini diukur terhadap render: 75% lengkung, 18.3% kontras pita")
     }
 
+    /// Pemulihan peredupan limb di atas Bintik Merah Besar: sama kelasnya
+    /// dengan pita, dan harus **sebagian** dengan alasan yang sama.
+    ///
+    /// **Kenapa angka ini ada, dan kenapa bukan hiasan.** Bintik digambar
+    /// sebagai elips warna **rata**. Diukur pada baris pusatnya (y = +0.31 R,
+    /// render 200 px, ss=4) bola di bawahnya meredup 0.580 → 0.532 (lengkung
+    /// **+8.4%**), sementara baris yang sama **dengan** bintik menanjak
+    /// 0.449 → 0.532 (lengkung **−18.4%**) — arahnya terbalik. Bintik yang
+    /// rata membuat barisnya lebih terang di sisi yang seharusnya gelap.
+    ///
+    /// **Kenapa diuji di sini, bukan hanya di gerbang piksel.** Gerbang piksel
+    /// mengukur **port**; ia tidak bisa melihat view berhenti memanggil
+    /// pemulihannya, atau memanggilnya dengan angka yang ditulis ulang. Yang
+    /// diuji di sini adalah angkanya sendiri, dan bahwa ia **sebagian**:
+    ///
+    ///   - **0** berarti tidak ada pemulihan — lengkungnya rata kembali.
+    ///   - **1** berarti gradien bola menutup bintiknya sepenuhnya, dan ciri
+    ///     pengenal Jupiter itu hilang.
+    ///
+    /// Nilai 0.6 memulihkan 84% lengkung sambil menyisakan warna bintik yang
+    /// masih terbaca (≥ 20 piksel merah di kotak bintiknya; terukur 1096).
+    func testJupiterSpotLimbShadingIsPartial() {
+        let strength = CelestialVisual.jupiterSpotLimbShadingStrength
+        XCTAssertGreaterThan(strength, 0,
+                             "tanpa pemulihan, bintik menghapus lengkung bola (-18.4% vs +8.4%)")
+        XCTAssertLessThan(strength, 1,
+                          "pemulihan penuh menutup bintiknya sendiri (ciri pengenal Jupiter hilang)")
+        XCTAssertEqual(strength, 0.6, accuracy: 1e-12,
+                       "nilai ini diukur terhadap render: 84% lengkung, bintik masih terbaca")
+    }
+
     /// Peredupan limb piringan Bulan: harus ada, tapi tidak boleh terdalam.
     ///
     /// **Dua sisi diuji, karena memperbaiki satu bisa merusak yang lain.** Di

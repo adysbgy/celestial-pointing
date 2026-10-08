@@ -165,5 +165,28 @@ jobs:
       - name: Buktikan gerbang arah fase saat mengecil berbunyi
         run: python3 Tools/bukti-mutasi-fase.py
 
+      # Dan bukti yang sama untuk **Bintik Merah Besar** — ciri permukaan
+      # terakhir yang belum pernah disapu, dan yang gerbangnya punya lubang
+      # yang sama dengan pita Jupiter: ciri digambar sebagai elips warna
+      # **rata** di atas bola yang sudah dinaungi gradien, jadi lengkung bola
+      # di dalamnya terhapus. Untuk pita itu sudah dijaga
+      # `check_banded_disc_keeps_its_curvature` — tetapi gerbang itu mengukur
+      # **baris ekuator**, sementara bintiknya duduk di `centerY = +0.31`.
+      # Diukur pada baris pusat bintik: bola di bawahnya meredup 0.580 → 0.532
+      # (lengkung +8.4%), baris yang sama **dengan** bintik menanjak
+      # 0.449 → 0.532 (lengkung −18.4%) — tandanya terbalik.
+      #
+      # Harness ini menguji **dua** gerbang sekaligus: yang piksel (lengkung
+      # + ciri masih terbaca) dan yang teks (tiga entri baru di
+      # `check_port_matches_swift_constants`, supaya view tidak bisa berhenti
+      # memanggil pemulihannya atau menulis angkanya sendiri).
+      #
+      # Keadaan "`clip_ellipse` dihapus" sengaja **tidak** ada di sini: percobaan
+      # pertama siklus ini menambah parameter itu ke `Canvas.ellipse`, dan
+      # terukur ia mengubah **0 piksel** (elipsnya sudah membatasi diri ke
+      # bentuknya sendiri). Ia dihapus dari port, bukan dijaga gerbang.
+      - name: Buktikan gerbang bintik Jupiter berbunyi
+        run: python3 Tools/bukti-mutasi-bintik.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

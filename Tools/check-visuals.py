@@ -1480,6 +1480,25 @@ def check_port_matches_swift_constants(results):
         ("Bintik Merah Besar: view menghitung pusat (bukan sudut)",
          "spot.centerX - spot.width / 2" in view, True,
          "center.x + CGFloat(spot.centerX - spot.width / 2) * radius", view),
+        # Pemulihan peredupan limb di atas bintik. **Kelas cacat yang sama
+        # dengan pita**, dan gerbang piksel yang menjaganya punya lubang yang
+        # sama: `check_banded_disc_keeps_its_curvature` mengukur baris ekuator,
+        # sementara bintiknya duduk di +0.31 R. Angka ini hidup di model supaya
+        # view, port Python, dan uji Linux membaca angka yang sama — dan supaya
+        # mengubahnya di satu tempat saja membuat pemeriksaan ini merah.
+        ("kekuatan pemulihan limb di atas bintik", R.JUPITER_SPOT_LIMB_SHADING_STRENGTH,
+         0.6, "jupiterSpotLimbShadingStrength: Double = 0.6", model),
+        # Arah kedua: pemulihan itu harus benar-benar **dipanggil** di view dan
+        # di port. Pemeriksaan piksel di atas mengukur port; ia tidak bisa
+        # melihat view berhenti memanggilnya, atau memanggilnya dengan angka
+        # yang ditulis ulang alih-alih dibaca dari model.
+        ("pemulihan limb bintik dipanggil di view (bukan ditulis ulang)",
+         "opacity: CelestialVisual.jupiterSpotLimbShadingStrength" in view, True,
+         "opacity: CelestialVisual.jupiterSpotLimbShadingStrength", view),
+        ("port memakai konstanta JUPITER_SPOT_LIMB_SHADING_STRENGTH-nya sendiri",
+         "opacity=JUPITER_SPOT_LIMB_SHADING_STRENGTH" in port
+         and "JUPITER_SPOT_LIMB_SHADING_STRENGTH = " in port, True,
+         "opacity=JUPITER_SPOT_LIMB_SHADING_STRENGTH", port),
         ("opasitas kutub Mars", R.POLAR_CAP_OPACITY, 0.85,
          "capColor.opacity(0.85)", view),
         # Geometri kutub Mars. **Tiga** hal dijaga, karena angkanya saja tidak
@@ -5407,6 +5426,145 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         f"(komentar tidak dihitung)"))
 
 
+def check_jupiter_spot_keeps_its_curvature(results, size=200, ss=2):
+    """Bintik Merah Besar harus **ikut melengkung**, bukan stiker rata.
+
+    **Cacat yang ditutup pemeriksaan ini, dan kenapa gerbang lama tidak
+    melihatnya.** Kelasnya sama persis dengan pita Jupiter: ciri digambar
+    sebagai elips warna **rata** di atas bola yang sudah dinaungi gradien, jadi
+    ia menghapus lengkung bola di dalamnya. Untuk pita, cacat itu sudah dijaga
+    `check_banded_disc_keeps_its_curvature` — tapi gerbang itu mengukur
+    **baris ekuator** (`y = cy`), sementara bintiknya duduk di
+    `centerY = +0.31`. Diukur pada baris pusat bintik (200 px, ss=4):
+
+        bola di bawah bintik (tanpa ciri) : 0.580 → 0.532   lengkung **+8.4%**
+        baris yang sama, dengan bintik    : 0.449 → 0.532   lengkung **−18.4%**
+
+    Tandanya **terbalik**: barisnya lebih terang di sisi yang seharusnya
+    gelap. Yang terbaca karena itu bukan bola berbintik melainkan **stiker**
+    yang ditempel — dan tidak ada satu pun gerbang di berkas ini yang
+    mengukurnya, karena semuanya mengukur **keberadaan** ciri
+    (`check_planet_features_present` menghitung piksel merah), bukan
+    **lengkungnya**.
+
+    **Kenapa sampelnya `frac = 0.85`, bukan tepi elipsnya.** Pada `frac = 1.00`
+    sampel terakhir jatuh **tepat di tepi** elips, tempat anti-aliasing
+    mencampurnya dengan warna rata di luarnya — diukur, rasionya hanya 1.5%
+    walaupun perbaikannya bekerja penuh (66% di dalam). Yang diukur karena itu
+    **bagian dalam** bintik, yang memang miliknya.
+
+    **Kenapa bola pembandingnya kasus "ragu".** Kasus itu menggambar bola
+    Jupiter yang sama **tanpa** ciri pengenal (aturan PRD: ciri hilang saat
+    engine ragu), jadi selisihnya adalah bintiknya sendiri — dan lengkung bola
+    yang benar bisa diukur tanpa menuliskan angka lengkung ke dalam gerbang
+    ini. Itu sebabnya ambangnya **rasio**, bukan nilai absolut.
+
+    Ambangnya **55% dari lengkung bola**: perbaikan ini memberi 66%, cacat
+    aslinya 0% (rata sempurna) sampai −18% (tanda terbalik). Yang dijaga adalah
+    bahwa pemulihannya **ada dan sebagian besar**, bukan nilai persisnya.
+    """
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    spot_w, spot_h = R.SPOT_SIZE
+    y = int(round(cy + spot_y * radius))
+
+    def lum(rows, x):
+        px = rows[y][x * 4:x * 4 + 3]
+        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+    def curvature(rows):
+        # `frac = 0.85`: di dalam elips bintik, jauh dari tepinya.
+        xa = spot_x - 0.85 * spot_w / 2
+        xb = spot_x + 0.85 * spot_w / 2
+        samples = [lum(rows, int(round(cx + (xa + (xb - xa) * i / 20) * radius)))
+                   for i in range(21)]
+        return 100.0 * (samples[0] - samples[-1]) / max(samples[0], 1e-9)
+
+    bare = curvature(rows_b)
+    spot = curvature(rows_c)
+    ratio = spot / max(bare, 1e-9)
+    results.append(Result(
+        "Bintik Merah Besar tetap melengkung (bukan stiker rata)",
+        ratio >= 0.55,
+        f"lengkung bintik {spot:.1f}% vs bola di bawahnya {bare:.1f}% "
+        f"(rasio {ratio * 100:.0f}%, ambang 55%)"))
+
+    # Arah kedua: bintiknya **tidak boleh hilang**. Tanpa ini, pemulihan penuh
+    # (kekuatan 1.0) akan lulus pemeriksaan di atas dengan sempurna sambil
+    # menghapus ciri pengenal Jupiter itu sendiri — bola polos juga melengkung
+    # sempurna.
+    #
+    # **Metriknya diukur, bukan dipilih.** Versi pertama memakai hitungan
+    # piksel merah di kotak bintiknya (`count_reddish`), dan ia **tidak pernah
+    # menggigit**: pada kekuatan 1.0 masih ada 64 piksel merah — di atas ambang
+    # 20 mana pun yang masih waras — jadi pemulihan penuh lolos sambil
+    # menghapus bintiknya. Penyebabnya bintiknya cukup besar, dan warnanya
+    # masih menyisakan selisih merah-biru yang terukur di piksel tepinya.
+    #
+    # Yang benar adalah **menyelisihkan terhadap bola tanpa ciri** pada daerah
+    # bintiknya sendiri: gradien bola saling menghapus, dan yang tersisa adalah
+    # bintiknya. Monoton terhadap kekuatannya — 17.8 / 12.5 / 7.2 / 3.6 / 0.1%
+    # pada kekuatan 0.0 / 0.3 / 0.6 / 0.8 / 1.0 — dan **nol** pada 1.0, karena
+    # gradien yang sama memang meniadakan bintiknya. Persis metrik yang dipakai
+    # `band_deviation_from_bare` untuk pita, dengan alasan yang sama.
+    deviation = spot_deviation_from_bare(rows_c, rows_b, w, h)
+    results.append(Result(
+        "bintik Jupiter masih terbaca setelah pemulihan lengkung",
+        deviation >= 2.0,
+        f"bintik menyimpang {deviation:.2f}% dari bola polos (ambang 2.0%; "
+        f"kekuatan 1.0 memberi 0.14%)"))
+
+
+def spot_deviation_from_bare(rows_spot, rows_bare, w, h):
+    """Seberapa jauh bintik menyimpang dari **bola polos**, dalam persen terang.
+
+    **Kenapa bukan hitungan piksel merah.** Versi pertama memakai
+    `count_reddish` di kotak bintiknya, dan itu **tidak pernah menggigit**:
+    pada pemulihan penuh (kekuatan 1.0) masih ada 64 piksel merah, sementara
+    ambangnya 20 — jadi bintik yang sudah tertutup bola sepenuhnya tetap lolos.
+
+    **Kenapa hanya daerah bintiknya, dan kenapa dipotong ke piringan.** Di
+    luar bintik tidak ada yang berubah antara kedua gambar, jadi menyertakannya
+    hanya mengencerkan angka dengan nol. Pemotongan ke piringan perlu karena
+    elips bintiknya menjulur keluar bola: `centerX = -0.10`, `width = 0.52`
+    berarti tepi kirinya di −0.36 R, sedangkan pada `centerY = +0.31` bola
+    hanya selebar 0.95 R — jadi sebagian elipsnya ada di latar, dan latar
+    memang sama di kedua gambar (nol), bukan bagian dari klaimnya.
+
+    Rata-rata `|Lum(spot) − Lum(bare)|` dibagi terang pusat piringan, supaya
+    angkanya tidak bergantung pada skala warna paletnya.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    spot_w, spot_h = R.SPOT_SIZE
+    half_w, half_h = spot_w * radius / 2.0, spot_h * radius / 2.0
+
+    deviations = []
+    for y in range(h):
+        for x in range(w):
+            px, py = x + 0.5, y + 0.5
+            if (px - cx) ** 2 + (py - cy) ** 2 > radius * radius:
+                continue
+            ex, ey = (px - cx - spot_x * radius) / half_w, \
+                     (py - cy - spot_y * radius) / half_h
+            if ex * ex + ey * ey > 1.0:
+                continue
+            pa = rows_spot[y][x * 4:x * 4 + 3]
+            pb = rows_bare[y][x * 4:x * 4 + 3]
+            lum_a = 0.2126 * pa[0] + 0.7152 * pa[1] + 0.0722 * pa[2]
+            lum_b = 0.2126 * pb[0] + 0.7152 * pb[1] + 0.0722 * pb[2]
+            deviations.append(abs(lum_a - lum_b))
+    if not deviations:
+        return 0.0
+    centre_px = rows_spot[int(cy)][int(cx) * 4:int(cx) * 4 + 3]
+    centre = 0.2126 * centre_px[0] + 0.7152 * centre_px[1] + 0.0722 * centre_px[2]
+    return 100.0 * (sum(deviations) / len(deviations)) / max(centre, 1e-9)
+
+
 def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
     """Piringan ber-pita harus **tetap melengkung**, bukan jadi stiker rata.
 
@@ -6751,6 +6909,7 @@ def main():
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
+    check_jupiter_spot_keeps_its_curvature(results, args.size, args.ss)
     check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
     check_moon_new_disc_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
