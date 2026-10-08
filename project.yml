@@ -54,18 +54,13 @@ options:
   # `xcodegen generate`, jadi kunci yang keliru di `project.yml` lolos tanpa
   # suara. Gerbang yang bisa menangkapnya bukan Xcode, melainkan pemeriksaan
   # `project.yml` di `./swift-ui-lint.sh`.
-  # Proyek ini dibangun CI di macOS 15 / Xcode 16. XcodeGen sebelum perbaikan
-  # #1613 masih menaruh app jam di <Host>.app/Watch/; Xcode 16 ke atas
-  # mewajibkannya di <Host>.app/PlugIns/. postGenCommand di bawah menambal
-  # keduanya setelah proyek dibuat, jadi CI tidak bergantung pada versi
-  # XcodeGen yang kebetulan terpasang.
-  postGenCommand: |
-    set -e
-    f=PointAndKnow.xcodeproj/project.pbxproj
-    sed -i.bak -e 's|dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";|dstPath = "";|' \
-               -e 's|dstSubfolderSpec = 16;|dstSubfolderSpec = 13;|' "$f"
-    rm -f "$f.bak"
-    echo "postGen: app jam ditanam di PlugIns/ (Xcode 16+)"
+  # Tidak ada postGenCommand. Dulu ada sed yang memindahkan app jam dari
+  # <Host>.app/Watch/ ke <Host>.app/PlugIns/ dengan alasan "Xcode 16+
+  # mewajibkannya". Itu keliru: Watch/ adalah lokasi standar Xcode untuk app
+  # watchOS pendamping (fase "Embed Watch Content", dstSubfolderSpec 16,
+  # $(CONTENTS_FOLDER_PATH)/Watch), dan XcodeGen 2.46 menghasilkannya sendiri.
+  # Di PlugIns/, installd memasang app iPhone tapi diam-diam mengabaikan app
+  # jam — terbukti di simulator berpasangan (lihat Docs/DECISIONS.md, ADR-001).
 
 packages:
   # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
@@ -100,6 +95,12 @@ settings:
     # teks tak terlokalisasi, tanpa peringatan. `./swift-ui-lint.sh` yang
     # menjaga itu (aturan 4), karena tidak ada gerbang lain yang bisa.
     SWIFT_EMIT_LOC_STRINGS: NO
+    # Versi ditulis sekali di sini supaya ketiga target (app iPhone, app jam,
+    # complication) mewarisi angka yang sama. Complication dulu tidak punya
+    # CURRENT_PROJECT_VERSION sama sekali, jadi CFBundleVersion-nya kosong dan
+    # installd menolak memasang app jam begitu ia ditanam di lokasi yang benar.
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
   configs:
     Debug:
       SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
@@ -145,8 +146,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow
         PRODUCT_NAME: PointAndKnow
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -205,6 +204,10 @@ targets:
     info:
       path: Apps/PointAndKnowWatch/Complications/Info.plist
       properties:
+        # Ditulis di sini, bukan hanya di berkas plist: `xcodegen generate`
+        # menulis ulang plist dari daftar ini, jadi kunci yang tidak ada di
+        # sini hilang setiap kali proyek dibuat.
+        CFBundleDisplayName: Point & Know Complication
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -252,8 +255,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp
         PRODUCT_NAME: PointAndKnowWatch
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
