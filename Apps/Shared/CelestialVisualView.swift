@@ -74,7 +74,15 @@ struct CelestialVisualView: View {
         case .planet: drawPlanet(context: context, center: center, radius: radius)
         case .moon: drawMoon(context: context, center: center, radius: radius)
         case .star: drawStar(context: context, center: center, radius: radius)
-        case .sun: drawSun(context: context, center: center, radius: radius)
+        case .sun:
+            // Corona menjangkau `sunCoronaReach` × radius, jadi piringan
+            // Matahari **harus** menyusut agar halo muat di frame. Kalau
+            // piringan memenuhi frame, `Canvas` memotong corona dan yang
+            // tampak kembali jadi disk terang tanpa glow — cacat yang siklus
+            // ini tutup. Konstanta dibaca dari model (sama seperti port
+            // Python), bukan diketik di sini.
+            drawSun(context: context, center: center,
+                    radius: radius / CGFloat(VisualFrame.sunCoronaReach))
         case .deepSky:
             // Keyakinan diteruskan: bentuk adalah ciri pengenal, sama seperti
             // cincin Saturnus. Lihat `DeepSkyCatalogue.drawableMorphology`.
@@ -1063,7 +1071,7 @@ struct CelestialVisualView: View {
     // MARK: - Matahari
 
     private func drawSun(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
-        // **Satu** gradient, bukan dua piringan bertumpuk.
+        // **Satu** gradient piringan, bukan dua piringan bertumpuk.
         //
         // Versi lama menggambar fotosfer penuh selebar 0.72 R lalu corona
         // selebar 1.0 R yang dimulai di 0.6 R dengan kelegapan 0.42. Di tepi
@@ -1086,11 +1094,48 @@ struct CelestialVisualView: View {
             return Gradient.Stop(color: Self.accent(raw).opacity(stop.opacity),
                                  location: stop.radiusFraction)
         }
+        // Piringan fotosfer dipotong tepat di lingkaran 1.0 R. Kelegapannya
+        // di tepi (0.05) sengaja tidak nol — ia menyambung dengan halo corona
+        // di bawah tanpa celah.
         context.fill(Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                            width: radius * 2, height: radius * 2)),
                      with: .radialGradient(Gradient(stops: stops),
                                            center: center,
                                            startRadius: 0, endRadius: radius))
+
+        // Corona: halo lembut yang **paling terang di tepi piringan** lalu
+        // memudar ke luar, menjangkau `sunCoronaReach` × radius. Dilukis
+        // sebagai gradient kedua yang **ditumpangkan** di atas piringan.
+        //
+        // Bentuknya sengaja **pita**, bukan piringan: titik 0.0 transparan
+        // (pusat), lalu mencapai puncak di tepi piringan (1.0 / reach), lalu
+        // 0 di ujung. Kalau gradient dimulai dari `startRadius = radius` dengan
+        // warna puncak di titik 0, seluruh lingkaran *dalam* piringan akan
+        // tertutup warna puncak yang rata — corona menelan piringan. Pita
+        // (transparan→puncak→transparan) membiarkan piringan terlihat di
+        // dalamnya dan memberikan glow yang paling terang tepat di limb,
+        // seperti corona nyata.
+        //
+        // Kelegapan puncaknya (`coronaOpacity`) adalah **satu-satunya** angka
+        // yang hidup di view untuk Matahari; ia bukan nilai model, jadi
+        // ditandai `VIEW:` dan dijaga oleh gerbang piksel
+        // `check_sun_corona_reaches_beyond_the_disk` (kalau terlalu redup,
+        // corona tidak terbaca; kalau terlalu pekat, ia menutupi piringan).
+        let reach = CGFloat(VisualFrame.sunCoronaReach) * radius
+        let coronaOpacity: Double = 0.40 // VIEW:
+        let coronaColor = Self.accent(CelestialVisual.accents.sunPhotosphere)
+        let coronaGradient = Gradient(stops: [
+            Gradient.Stop(color: coronaColor.opacity(0), location: 0.0),
+            Gradient.Stop(color: coronaColor.opacity(coronaOpacity),
+                          location: 1.0 / VisualFrame.sunCoronaReach),
+            Gradient.Stop(color: coronaColor.opacity(0), location: 1.0),
+        ])
+        context.fill(Path(ellipseIn: CGRect(x: center.x - reach, y: center.y - reach,
+                                           width: reach * 2, height: reach * 2)),
+                     with: .radialGradient(coronaGradient,
+                                           center: center,
+                                           startRadius: 0,
+                                           endRadius: reach))
     }
 
     // MARK: - Objek langit dalam

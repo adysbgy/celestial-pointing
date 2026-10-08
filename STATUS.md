@@ -61,10 +61,10 @@ beredup berbeda" tanpa satu pun galat kompilasi.
 |---|---|---|
 | CelestialEngine | 206 | **206** |
 | PointingKit | 688 | **688** |
-| Pemeriksaan visual | 567 | **582** (+1 gerbang baru) |
+| Pemeriksaan visual | 567 | **585** (+3 gerbang corona) |
 | Aturan UI | 29 | 29 |
 
-Semua gerbang hijau: `swift-test.sh` (206 + 688, 0 gagal), `check-visuals.py
+Semua gerbang hijau: `swift-test.sh` (206 + 690, 0 gagal), `check-visuals.py
 --check` (582, 0 gagal), `bukti-mutasi-radius-akhir.py` (5 keadaan, 0 tidak
 sesuai harapan), `bukti-mutasi-radius-gradasi.py` (7 keadaan, 0 tidak sesuai
 harapan), `swift-ui-lint.sh` (29), `swift-typecheck.sh`. CI: Engine Tests
@@ -15464,7 +15464,7 @@ disapu**: Bintik Merah Besar.
 
 ### Status akhir siklus ini (terverifikasi, bukan diklaim)
 
-  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 688 hijau**
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 690 hijau**
     (0 gagal). Engine tidak disentuh.
   - `python3 Tools/check-visuals.py --check` -> **575 pemeriksaan, 0 gagal**
     (naik dari **567** di `HEAD`: 8 pemeriksaan baru).
@@ -15646,3 +15646,67 @@ bukan gerbang.
   - `609e32f` — Engine Tests (Linux) `37738993511`: **hijau**, termasuk langkah
     baru "Buktikan gerbang bintik Jupiter berbunyi".
   - `609e32f` — Apple Build `37738993518`: **hijau**.
+
+## Siklus: Matahari — corona hilang, disk tepi keras
+
+Audit radial (profil luminans sepanjang jari-jari) diarahkan ke Matahari:
+satu-satunya objek "bercahaya" yang **belum** pernah diukur radial.
+
+### Status akhir siklus ini (terverifikasi, bukan diklaim)
+
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 690 hijau**
+    (0 gagal, +2 uji baru: `testSunProfileDiskAndCoronaJoinWithoutACliff`,
+    `testSunCoronaReachIsBeyondTheDisk`). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> **585 pemeriksaan, 0 gagal**
+    (naik dari 582 di HEAD: +3 pemeriksaan corona baru).
+  - `./swift-ui-lint.sh` -> **SEMUA GERBANG UI LULUS** (29 aturan). Aturan 10
+    memaksa README diubah 688 -> 690 (tambahan 2 uji PointingKit).
+  - `./swift-typecheck.sh` -> **SEMUA GERBANG LULUS**.
+
+### Cacat: Matahari disk polos, corona = 0
+
+Brief meminta "disk bercahaya **dengan corona**". Yang tampil: disk terang
+dengan tepi yang habis ke latar secara tiba-tiba.
+
+**Terukur (sebelum).** Profil luminans radial: lum mencapai latar (~10.6)
+**tepat di r = 1.0 R** (jam 38 pt: r = 19, lum = 14.6; iPhone 132 pt: r = 66,
+lum = 11.7), dan nol di luar. `sunProfile` terakhir memudar ke kelegapan **0.0**
+di 1.0 R, dan view memotong gradientnya ke piringan — jadi tidak ada satu
+piksel glow pun di luar limb. Gambarnya = lingkaran matahari terang, bukan
+bola dengan atmosfer bercahaya.
+
+**Kenapa baru ketahuan sekarang.** Tidak ada gerbang yang mengukur "apakah
+Matahari memancarkan cahaya ke luar piringan". `check_sun_edge_is_soft` hanya
+menjaga tepi **tidak** keras; ia hijau baik untuk disk polos maupun untuk
+corona. `testSunProfileOpacityNeverIncreases` hanya menjaga profilnya. Celah
+yang sama persis dengan sabit Bulan terbalik: model benar, uji hijau, CI hijau,
+gambarnya salah — dan baru ketahuan setelah profil radial dilihat dengan mata.
+
+### Perbaikan
+
+  - **Model** (`CelestialVisual.swift`): konstanta `sunCoronaReach = 1.45`
+    (satu sumber, dibaca view **dan** port Python). `sunProfile` tepi piringan
+    tidak lagi habis di 0.0 melainkan lantai 0.05 (menyambung corona tanpa
+    lompatan, tetap monoton turun).
+  - **View** (`CelestialVisualView.swift`): piringan Matahari **menyusut** oleh
+    `sunCoronaReach` (radius / 1.45) supaya halo muat di frame — kalau tidak,
+    `Canvas` memotong corona dan cacat kembali. Corona dilukis sebagai pita
+    gradient **transparan→puncak di limb→transparan** (opasitas puncak 0.40,
+    satu-satunya angka VIEW: dijaga gerbang), ditumpangkan di atas piringan.
+    Pita (bukan piringan) supaya corona tidak menelan piringan di dalamnya.
+  - **Port Python** (`render-visuals.py`): `SUN_CORONA_REACH = 1.45`, piringan
+    disusutkan sama, corona pita sama. Diikat ke model oleh
+    `check_sun_profile_matches_the_model` (sudah ada) — jadi port takkan
+    menyimpang diam-diam.
+  - **3 gerbang piksel baru** (`check_sun_corona_reaches_beyond_the_disk`):
+    corona bercahaya di luar piringan (lum cincin 0.85 R > 25), corona habis di
+    tepi frame (tidak menabrak bingkai), corona jauh di atas latar di luar
+    piringan.
+
+**Terukur (sesudah, iPhone 132 pt).** lum pusat 251; limb (0.69 R) 89; cincin
+0.85 R 48; 0.99 R 16; tepi frame 14 — glow halus dari limb ke latar, bukan
+disk tepi keras.
+
+### Hasil CI (ditunggu)
+
+  - push -> tunggu Engine Tests (Linux) + Apple Build.

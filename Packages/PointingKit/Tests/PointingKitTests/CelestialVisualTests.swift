@@ -2646,9 +2646,50 @@ final class CelestialVisualTests: XCTestCase {
                                      + "Kenaikan itulah yang menggambar ulang tepi keras.")
         }
         XCTAssertEqual(profile.first?.opacity, 1.0, "inti harus sepenuhnya pekat")
-        XCTAssertEqual(profile.last?.opacity, 0.0, "tepi harus benar-benar habis")
+        // Tepi piringan **tidak** boleh menghabis persis di 0.0: ia harus
+        // menyambung dengan halo corona yang dilukis view lewat `sunCoronaReach`.
+        // Lantai kelegapan kecil (>0, <0.15) adalah tepi yang "essentially habis"
+        // tapi tidak memotong halo. Kalau lantainya 0.0 kembali, tepi keras
+        // (disk terang lalu latar mendadak) kembali — cacat yang sudah ditutup.
+        XCTAssertGreaterThan(profile.last?.opacity ?? 0, 0.0,
+                             "tepi piringan harus menyambung corona, bukan habis 0")
+        XCTAssertLessThan(profile.last?.opacity ?? 1, 0.15,
+                          "lantai tepi terlalu pekat: corona tidak akan terbaca")
         XCTAssertEqual(profile.last?.radiusFraction, 1.0,
                        "piringan harus membentang sampai tepi frame")
+    }
+
+    /// Tepi piringan dan awal corona menyambung **tanpa lompatan**.
+    ///
+    /// `sunProfile` berhenti di 1.0 R dengan lantai kelegapan kecil; view
+    /// melukis halo corona mulai dari titik itu. Kalau lantainya tiba-tiba
+    /// melompat dari 0.13 (0.94 R) ke 0.0 (1.0 R) lalu corona mulai dari 0.0,
+    /// yang tampil adalah disk terang lalu celah lalu halo — persis tepi keras
+    /// dua piringan yang sudah dilarang. Uji ini mengunci bahwa langkah terakhir
+    /// profilnya tetap landai.
+    func testSunProfileDiskAndCoronaJoinWithoutACliff() {
+        let profile = VisualFrame.sunProfile(core: CelestialVisual.accents.sunCore,
+                                             photosphere: CelestialVisual.accents.sunPhotosphere)
+        guard let last = profile.last, last.radiusFraction == 1.0 else {
+            return XCTFail("piringan harus berhenti di 1.0 R")
+        }
+        let before = profile[profile.count - 2]
+        XCTAssertLessThanOrEqual(before.opacity - last.opacity, 0.2,
+                                 "lompatan \(before.opacity) -> \(last.opacity) di tepi " +
+                                 "terlalu tajam; corona tidak akan menyambung mulus")
+    }
+
+    /// Corona harus menjangkau **di luar** piringan.
+    ///
+    /// Tanpa ini, konstanta `sunCoronaReach` bisa saja ≤ 1.0 — dan Matahari
+    /// kembali jadi disk tanpa glow, persis cacat yang siklus ini tutup. Yang
+    /// dijaga di sini adalah arah, bukan angkanya: corona lebih lebar dari
+    /// piringan.
+    func testSunCoronaReachIsBeyondTheDisk() {
+        XCTAssertGreaterThan(VisualFrame.sunCoronaReach, 1.0,
+                             "corona harus menjangkau di luar piringan (1.0 R)")
+        XCTAssertLessThanOrEqual(VisualFrame.sunCoronaReach, 2.0,
+                                 "corona terlalu lebar akan menabrak bingkai kartu")
     }
 
     /// Batas fotosfer **tidak boleh** menjadi lompatan kelegapan.

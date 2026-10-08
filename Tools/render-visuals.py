@@ -907,7 +907,10 @@ def render(case, size=256, night_mode=False, show_frame=False, ss=3):
     elif kind == "star":
         _draw_star(canvas, cx, cy, radius, kw, night_mode)
     elif kind == "sun":
-        _draw_sun(canvas, cx, cy, radius, kw, night_mode)
+        # View menyusutkan piringan Matahari dengan `sunCoronaReach` supaya
+        # halo muat di frame (kalau tidak, `Canvas` memotong corona). Port
+        # harus sama: piringan = radius/sunCoronaReach, lalu corona ke radius.
+        _draw_sun(canvas, cx, cy, radius / SUN_CORONA_REACH, kw, night_mode)
     elif kind == "deepSky":
         _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode)
     else:
@@ -1610,14 +1613,13 @@ def _draw_star(canvas, cx, cy, radius, kw, night_mode):
 
 
 def sun_profile(core, photosphere):
-    """`VisualFrame.sunProfile(core:photosphere:)` — **satu** gradient, bukan
-    dua piringan.
+    """`VisualFrame.sunProfile(core:photosphere:)` — **satu** gradient piringan,
+    bukan dua piringan.
 
-    Mengembalikan larik (radius_fraction, rgb, opacity). Opasitasnya turun
-    monoton, dan batas fotosfer di 0.72 R **bukan** tempat kelegapan terjun:
-    stop 0.72 R hanya turun 0.05 dari stop sebelumnya, supaya tepi keras yang
-    lama (1.0 -> 0.42 dalam satu piksel) tidak kembali; lihat catatan cacatnya
-    di sumber Swift.
+    Mengembalikan larik (radius_fraction, rgb, opacity) untuk **piringan
+    fotosfer** saja (berhenti di 1.0 R dengan lantai kelegapan 0.05, bukan
+    0.0, supaya menyambung dengan halo corona yang dilukis terpisah). Opasitas
+    turun monoton; batas fotosfer di 0.72 R **bukan** tempat kelegapan terjun.
 
     **Angka-angka ini bukan pilihan bebas.** Ia harus sama dengan
     `VisualFrame.sunProfile` di `CelestialVisual.swift`; kalau tidak, seluruh
@@ -1633,7 +1635,12 @@ def sun_profile(core, photosphere):
             (0.80, core, 0.66),
             (0.88, photosphere, 0.34),
             (0.94, photosphere, 0.13),
-            (1.00, photosphere, 0.00)]
+            (1.00, photosphere, 0.05)]
+
+
+# Corona menjangkau ini × radius gambar — **sama dengan** `VisualFrame.sunCoronaReach`
+# di model Swift. Satu angka, satu sumber, supaya dua bahasa tidak menyimpang.
+SUN_CORONA_REACH = 1.45
 
 
 def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
@@ -1651,6 +1658,23 @@ def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
     canvas.disc(cx, cy, radius,
                 radial_gradient(stops, center=(cx, cy), start_radius=0,
                                 end_radius=radius))
+
+    # Corona: halo lembut yang paling terang di tepi piringan lalu memudar ke
+    # luar, menjangkau SUN_CORONA_REACH × radius, ditumpangkan di atas piringan.
+    # Bentuknya **pita** (transparan→puncak→transparan) — sama seperti `drawSun`
+    # di view. Kalau dimulai dari puncak di tepi, seluruh piringan tertutup
+    # warna rata. `corona_alpha` = 0.40 adalah angka VIEW: dijaga gerbang piksel.
+    reach = SUN_CORONA_REACH * radius
+    corona_color = photo_rgb
+    corona_alpha = 0.40  # VIEW:
+    corona_stops = [
+        (0.0, corona_color, 0.0),
+        (1.0 / SUN_CORONA_REACH, corona_color, corona_alpha),
+        (1.0, corona_color, 0.0),
+    ]
+    canvas.disc(cx, cy, reach,
+                radial_gradient(corona_stops, center=(cx, cy),
+                                start_radius=0, end_radius=reach))
 
 
 def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):

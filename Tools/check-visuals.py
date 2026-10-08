@@ -6835,6 +6835,87 @@ def check_sun_edge_is_soft(results, size=256, ss=2):
         f"rgb di 0.90 R = {at_090} (harus jelas di atas latar 10,10,15)"))
 
 
+def check_sun_corona_reaches_beyond_the_disk(results, size=256, ss=2):
+    """Corona Matahari harus **bercahaya di luar** piringan, bukan disk tepi keras.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sebelum siklus ini, `sunProfile`
+    memudar ke kelegapan 0.0 tepat di 1.0 R dan view memotong gradientnya ke
+    piringan — jadi Matahari adalah disk terang dengan tepi yang habis ke
+    latar secara tiba-tiba. Tidak ada glow sama sekali: diukur sepanjang
+    radius, luminans mencapai latar persis di r = 1.0 R (r = 0.69 R setelah
+    piringan menyusut untuk memberi ruang corona), dan nol di luar. Brief
+    meminta "disk bercahaya **dengan corona**"; yang tampil malah disk polos.
+
+    **Kenapa diukur di sini, bukan lewat uji model.** Model memang sudah punya
+    `sunCoronaReach` (teruji di `testSunCoronaReachIsBeyondTheDisk`), tapi
+    yang bisa mengunci bahwa view **benar-benar melukis halo itu** hanyalah
+    piksel. View yang lupa menyusutkan piringan akan memotong corona oleh
+    `Canvas` dan lolos semua uji model — persis cacat di atas.
+
+    Diukur sebagai luminans rata-rata sepanjang cincin di luar piringan:
+    antara tepi piringan (~0.72 R setelah penyusutan) dan tepi frame (1.0 R),
+    gambar harus tetap lebih terang dari latar, lalu habis di ujungnya.
+    """
+    _, (w, h, rows) = render_case("sun", size=size, ss=ss)
+
+    def lum(x, y):
+        x = min(max(x, 0), w - 1)
+        y = min(max(y, 0), h - 1)
+        i = x * 4
+        r, g, b = rows[y][i], rows[y][i + 1], rows[y][i + 2]
+        return 0.299 * r + 0.587 * g + 0.114 * b
+
+    cx = (w - 1) / 2
+    cy = (h - 1) / 2
+    radius = w / 2
+    # Piringan menyusut oleh `sunCoronaReach` (1.45), jadi tepinya di
+    # r_disk = radius / 1.45 ≈ 0.69 R. Corona berjalan dari situ ke radius.
+    reach = R.SUN_CORONA_REACH
+    r_disk = radius / reach
+
+    def ring_lum(frac):
+        f = frac * radius
+        tot = 0.0
+        n = 0
+        for k in range(48):
+            a = 2 * math.pi * k / 48
+            x = int(round(cx + f * math.cos(a)))
+            y = int(round(cy + f * math.sin(a)))
+            if 0 <= x < w and 0 <= y < h:
+                tot += lum(x, y)
+                n += 1
+        return tot / n if n else 0.0
+
+    # Latar (10,10,15) ≈ 10.6 luminans. Ambang corona di tengah jangkauan:
+    # harus jelas di atas latar, kalau tidak "corona" hanyalah sisa pudar
+    # piringan yang tidak terbaca sebagai cahaya.
+    mid = ring_lum(0.85)
+    results.append(Result(
+        "corona Matahari bercahaya di luar piringan",
+        mid > 25,
+        f"luminans cincin di 0.85 R = {mid:.1f} (harus > 25; latar ≈ 10.6)"))
+
+    # Dan corona harus benar-benar habis di tepi luar (1.0 R) — bukan
+    # membanjiri frame. Kalau > latar di sini, piringan tidak menyusut dan
+    # `Canvas` memotongnya; itu cacat penyusutan, bukan corona.
+    outer = ring_lum(0.99)
+    results.append(Result(
+        "corona Matahari habis di tepi frame (tidak menabrak bingkai)",
+        outer < 30,
+        f"luminans di 0.99 R = {outer:.1f} (harus kembali mendekati latar)"))
+
+    # Jangkauan corona harus melewati piringan: cincin di luar piringan
+    # (0.85 R) harus jelas lebih terang dari latar — ia bercahaya, bukan
+    # sekadar sisa pudar yang tak terbaca. (Puncak corona ada di limb 0.69 R,
+    # jadi 0.85 R wajar lebih redup dari limb; yang diuji di sini adalah
+    # "masih bercahaya di luar piringan", bukan "lebih terang dari limb".)
+    bg = ring_lum(0.99)
+    results.append(Result(
+        "corona lebih lebar dari piringan (masih bercahaya di luar)",
+        mid > bg + 20,
+        f"0.85R={mid:.1f} jauh di atas latar 0.99R={bg:.1f}"))
+
+
 def check_deep_sky_morphologies_render_distinct(results, size=200, ss=2):
     """Keempat morfologi objek langit dalam harus tergambar sebagai bentuk yang
     berbeda — diukur dari piksel.
@@ -7161,6 +7242,7 @@ def main():
     check_moon_new_disc_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
+    check_sun_corona_reaches_beyond_the_disk(results)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)

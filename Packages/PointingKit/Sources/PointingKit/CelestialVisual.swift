@@ -1578,6 +1578,22 @@ public enum VisualFrame {
 
     // MARK: Matahari
 
+    /// Corona Matahari menjangkau ini kali radius gambar (disk penuh = 1.0),
+    /// diukur dari pusat.
+    ///
+    /// **Satu angka, satu sumber.** Baik view SwiftUI (`drawSun` melukis
+    /// halo tambahan selebar ini) maupun port Python (`_draw_sun`) membaca
+    /// konstanta ini, bukan menulis ulang angkanya — sama seperti
+    /// `moonSphereGradientEndRadius`, supaya dua bahasa tidak pernah menyimpang
+    /// diam-diam.
+    ///
+    /// **Kenapa 1.45, bukan lebih lebar.** Corona nyata membengkak beberapa
+    /// juta kilometer, tapi di kartu jam 38 pt jangkauan >1.6 R sudah menabrak
+    /// bingkai kartu (dan menutupi teks di sebelahnya), sementara <1.3 R hampir
+    /// tidak terlihat sebagai glow. 1.45 memberi halo yang terbaca sebagai
+    /// cahaya tanpa membanjiri kartu. Lihat `testSunCoronaReachesBeyondTheDisk`.
+    public static let sunCoronaReach: Double = 1.45
+
     /// Satu perhentian gradient piringan Matahari: warnanya, dan pada radius
     /// berapa ia berada.
     ///
@@ -1615,8 +1631,16 @@ public enum VisualFrame {
     /// dengan kelegapan yang tidak pernah naik**: piringan penuh 1.0 R, dengan
     /// perhentian di 0.72 R yang nilainya (warna & kelegapan) sama dengan
     /// batas dalam, jadi tidak ada lompatan di sana sama sekali. Yang tersisa
-    /// hanyalah penurunan berangsur dari 0.94 ke 0.0 antara 0.72 R dan 1.0 R.
+    /// hanyalah penurunan berangsur dari 0.94 ke 0.05 antara 0.72 R dan 1.0 R.
     /// Terukur: langkah terbesar turun ke 14 dari 255 — 92% lebih halus.
+    ///
+    /// **Corona, bukan tepi keras.** Larik ini **hanya** piringan fotosfer
+    /// (berhenti di 1.0 R, tapi dengan kelegapan lantai 0.05 — bukan 0.0 —
+    /// supaya ia menyambung tanpa lompatan dengan halo corona yang dilukis
+    /// terpisah oleh view lewat `sunCoronaReach`). Tanpa lantai itu, tepi
+    /// piringan kembali menjadi tepi keras: gambarnya disk terang lalu latar
+    /// mendadak, persis yang dilarang cacat di atas. Lihat
+    /// `testSunProfileDiskAndCoronaJoinWithoutACliff`.
     ///
     /// **Kenapa di model, bukan di view.** Profilnya adalah angka, dan angka
     /// yang hanya hidup di `Canvas` tidak bisa diuji di Linux: satu-satunya
@@ -1639,7 +1663,10 @@ public enum VisualFrame {
             SunStop(radiusFraction: 0.80, color: core, opacity: 0.66),
             SunStop(radiusFraction: 0.88, color: photosphere, opacity: 0.34),
             SunStop(radiusFraction: 0.94, color: photosphere, opacity: 0.13),
-            SunStop(radiusFraction: 1.00, color: photosphere, opacity: 0.00),
+            // Tepi piringan memudar ke **lantai 0.05**, bukan 0.0: ia harus
+            // menyambung dengan halo corona yang dimulai di sini. Kelegapan
+            // tetap turun monoton, jadi gerbang monoton tetap hijau.
+            SunStop(radiusFraction: 1.00, color: photosphere, opacity: 0.05),
         ]
     }
 }
