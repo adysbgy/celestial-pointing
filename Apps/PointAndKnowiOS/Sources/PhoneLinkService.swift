@@ -25,6 +25,25 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Setiap pesan yang masuk, untuk direkam ke riwayat keyakinan.
     public var onMessage: ((PointingLinkMessage) -> Void)?
 
+    // MARK: Kanal langsung (ADR-006)
+
+    /// Lokasi pengamat untuk menghitung koordinat GoTo, dibaca dari antrean
+    /// delegate. Diperbarui view akar dari engine iPhone lewat
+    /// `updateObserver`; sampai itu, lokasi cadangan yang berlabel.
+    private nonisolated let observerBox = LockedObserver(ObserverLocation.fallback.observer)
+
+    public func updateObserver(_ observer: Observer) { observerBox.value = observer }
+
+    /// Transport teleskop: **tiruan** sampai POC Seestar (ADR-006). Tidak ada
+    /// motor yang bisa bergerak lewat jalur ini.
+    public let telescopeTransport: MockTelescopeTransport
+
+    /// Server kanal langsung; aman dipanggil dari antrean delegate.
+    public nonisolated let liveServer: LiveChannelServer
+
+    /// Peristiwa kanal langsung terakhir, untuk ditampilkan.
+    @Published public private(set) var lastLiveReply: LiveReply?
+
     /// Berkas Pointing Lab yang sudah diterima (ADR-004).
     @Published public private(set) var labFiles: [URL] = PhoneLinkService.listLabFiles()
 
@@ -58,7 +77,21 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         WCSession.isSupported() ? WCSession.default : nil
     }
 
-    public override init() { super.init() }
+    public override init() {
+        let resolver = EngineFactory.makeResolver()
+        let transport = MockTelescopeTransport()
+        let box = observerBox
+        telescopeTransport = transport
+        let bridge = TelescopeBridge(
+            resolver: resolver,
+            capability: TelescopeCapability(axes: .equatorial, supportedFrames: [.j2000],
+                                            firmwareVersion: transport.firmwareVersion, canAbort: true))
+        let session = TelescopeSession(bridge: bridge, transport: transport, commandPath: "mock")
+        liveServer = LiveChannelServer(executor: BridgeTelescopeExecutor(
+            resolver: resolver, session: session, transport: transport,
+            observer: { box.value }))
+        super.init()
+    }
 
     /// Aktifkan sesi. Aman dipanggil berkali-kali selama sesinya memang aktif.
     ///
@@ -216,12 +249,48 @@ extension PhoneLinkService: WCSessionDelegate {
         Task { @MainActor in self.handle(decoded) }
     }
 
+    /// Kanal langsung: dijawab **di sini**, sinkron, supaya jam tahu hasilnya
+    /// selagi pengguna masih menunggu (ADR-006).
+    nonisolated public func session(_ session: WCSession,
+                                    didReceiveMessage message: [String: Any],
+                                    replyHandler: @escaping ([String: Any]) -> Void) {
+        guard LiveMessage(plist: message) != nil else {
+            replyHandler([:])
+            if let decoded = PointingLinkMessage(plist: message) {
+                Task { @MainActor in self.handle(decoded) }
+            }
+            return
+        }
+        let reply = liveServer.handle(message)
+        replyHandler(reply)
+        let decoded = LiveReply(plist: reply)
+        Task { @MainActor in self.lastLiveReply = decoded }
+    }
+
     /// Pesan antre dari jam. Kalibrasi dan permintaan keadaan dikirim jam
     /// dengan `transferUserInfo`, jadi keduanya tiba di sini — bukan di
     /// `didReceiveApplicationContext`.
     nonisolated public func session(_ session: WCSession,
                                     didReceiveUserInfo userInfo: [String: Any]) {
+        // Catatan konfirmasi dari antrean: riwayat saja (ADR-006).
+        if LiveMessage(plist: userInfo) != nil {
+            liveServer.record(userInfo)
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
         Task { @MainActor in self.handle(decoded) }
+    }
+}
+
+/// Kotak `Observer` yang aman dibaca dari antrean mana pun.
+final class LockedObserver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Observer
+
+    init(_ value: Observer) { stored = value }
+
+    var value: Observer {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }

@@ -215,3 +215,58 @@ launched but not exercised. First real run is on Ady's watch.
 runs XcodeGen, and builds both schemes for `generic/platform=iOS` and
 `generic/platform=watchOS` with `-allowProvisioningUpdates`, so provisioning
 errors surface before anything is installed. Not yet run with a real team.
+
+---
+
+## ADR-006 — Live Watch↔iPhone channel for confirm, status, GoTo and Stop (2026-10-08)
+
+**Context.** Every Watch↔iPhone path used `updateApplicationContext` (latest
+state) or `transferUserInfo` (a queue). That's right for state but dangerous
+for actions: a queued GoTo can execute minutes later, after the user has
+walked away from the telescope.
+
+**Decision** (`PointingKit/LiveChannel.swift`, tested with a fake session and
+a fake clock).
+
+- `sendMessage` with a reply for:
+  - confirmed target
+  - telescope status
+  - GoTo
+  - Stop
+- **GoTo, Stop and status** fail immediately with `.unreachable` when the
+  iPhone isn't reachable, and with `.transportFailed` on error. The client has
+  no queueing path for them.
+- **Confirm** goes live when reachable. Otherwise, or on error, it's sent as
+  `confirmRecord` through `transferUserInfo`. The phone stores that as
+  history only, and it never unlocks GoTo.
+- **Ordering.** Every message carries a monotonic `id`, persisted on the watch
+  so it survives a relaunch, plus `sentAt`. The phone rejects:
+  - an `id` not newer than the last one (`replayed`)
+  - a GoTo whose age is over 3 s in either direction (`stale`)
+  - a GoTo for an object other than the last live-confirmed one
+    (`notConfirmed`)
+  - a GoTo when the telescope isn't `ready` (`telescopeUnavailable`)
+- **Stop always executes,** even out of order. Stopping is the safe direction.
+- **Execution.** `BridgeTelescopeExecutor` resolves the confirmed object
+  through `PointingResolver` and runs `SlewPlanner` with
+  `intent.level = .high`: the user's confirmation stands in for pointing
+  confidence. All geometric gates (Sun, altitude, magnitude, unknown Sun
+  position) still apply. `TelescopeSession` then sends catalog coordinates,
+  never wrist direction.
+- **Transport.** `MockTelescopeTransport` only, for now. No motor can move
+  through this path until the Seestar adapter exists.
+
+**Wiring.**
+
+- On the watch: `WatchLinkService.live`, a `LiveChannelClient` over
+  `WCLiveSession`.
+- On the iPhone: `PhoneLinkService.liveServer` (lock-protected, since the
+  delegate runs on a background queue) replies inside
+  `session(_:didReceiveMessage:replyHandler:)`.
+- The observer location is pushed from the iPhone engine into a lock-protected
+  box.
+- Not yet driven from the watch UI: that comes with the identification loop
+  (M5).
+
+**Unverified.** Real `sendMessage` latency and clock skew between devices. The
+3 s window may need tuning from device logs.

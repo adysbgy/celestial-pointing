@@ -38,6 +38,19 @@ public final class WatchLinkService: NSObject, ObservableObject {
     @Published public private(set) var labTransfersInFlight = 0
     private static let labTargetsKey = "pointingLab.targets"
 
+    // MARK: Kanal langsung (ADR-006)
+
+    private static let liveIDKey = "live.lastID"
+    /// Konfirmasi / status / GoTo / Stop lewat `sendMessage`. Penyelesaiannya
+    /// bisa dipanggil di antrean latar; pemanggil UI pindah ke main sendiri.
+    public private(set) lazy var live: LiveChannelClient = {
+        let client = LiveChannelClient(
+            session: WCLiveSession(),
+            sequence: LiveIDSequence(last: UInt64(UserDefaults.standard.integer(forKey: Self.liveIDKey))))
+        client.onSequenceAdvanced = { UserDefaults.standard.set(Int($0), forKey: WatchLinkService.liveIDKey) }
+        return client
+    }()
+
     /// Dijalankan saat iPhone mengirim ambang keyakinan baru.
     ///
     /// Ambang dari Experiment 1 dipasang ke resolver jam supaya kedua perangkat
@@ -307,5 +320,28 @@ extension WatchLinkService: WCSessionDelegate {
     nonisolated public func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor in self.isReachable = reachable }
+    }
+}
+
+/// `WCSession` sebagai `LiveSession`. Tanpa sesi aktif, tidak terjangkau.
+final class WCLiveSession: LiveSession {
+    private var session: WCSession? {
+        WCSession.isSupported() && WCSession.default.activationState == .activated ? WCSession.default : nil
+    }
+
+    var isReachable: Bool { session?.isReachable ?? false }
+
+    func sendMessage(_ message: [String: Any],
+                     replyHandler: @escaping ([String: Any]) -> Void,
+                     errorHandler: @escaping (Error) -> Void) {
+        guard let session else {
+            errorHandler(NSError(domain: "WCLiveSession", code: 1))
+            return
+        }
+        session.sendMessage(message, replyHandler: replyHandler, errorHandler: errorHandler)
+    }
+
+    func transferUserInfo(_ userInfo: [String: Any]) {
+        session?.transferUserInfo(userInfo)
     }
 }

@@ -113,6 +113,10 @@ struct RootView: View {
             AccessibilityNotification.Announcement(
                 StateAnnouncement.text(for: engine.snapshot)).post()
         }
+        // Lokasi sungguhan datang belakangan; GoTo harus memakainya (ADR-006).
+        .onChange(of: engine.location) { _, location in
+            link.updateObserver(location.observer)
+        }
     }
 
     /// Sensor, lokasi, dan alur adalah milik **app**, bukan milik satu tab.
@@ -138,6 +142,8 @@ struct RootView: View {
         // adanya, bukan diisi angka karangan.
         link.onMessage = { message in trace.record(message: message) }
         link.activate()
+        // Koordinat GoTo dihitung dari lokasi engine iPhone (ADR-006).
+        link.updateObserver(engine.location.observer)
 
         // Setiap sampel masuk ke engine **dan** ke riwayat keyakinan.
         // Penyambungannya ada di sini, bukan di tiap tab, karena hanya ada
