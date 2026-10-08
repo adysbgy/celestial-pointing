@@ -620,16 +620,140 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
             f"{label} hilang saat ragu", diff > 0,
             f"{diff} piksel berbeda di luar lencana (terkunci vs ragu)"))
 
-    # Dan arah sebaliknya: kabut netral pada objek langit dalam harus berbeda
-    # dari bentuk galaksinya, bukan kebetulan sama.
-    _, galaxy = render_case("deepsky-galaxy", size=size, ss=ss)
-    _, neutral = render_case("deepsky-uncertain", size=size, ss=ss)
-    w, h, rows_a = galaxy
-    _, _, rows_b = neutral
-    diff = sum(1 for y in range(h) for x in range(w)
-               if rows_a[y][x * 4:x * 4 + 3] != rows_b[y][x * 4:x * 4 + 3])
-    results.append(Result("bentuk galaksi hilang saat ragu", diff > 0,
-                          f"{diff} piksel berbeda dari kabut netral"))
+    # Dan arah sebaliknya: saat engine **ragu**, bentuk objek langit dalam tidak
+    # boleh sampai ke gambar sama sekali. Dipisah ke fungsinya sendiri supaya
+    # harness mutasi bisa memanggilnya tanpa merender seluruh katalog —
+    # gerbang penuh ~6 menit, satu pemeriksaan ini ~30 detik.
+    check_deep_sky_shape_suppression(results, size, ss)
+
+
+def check_deep_sky_shape_suppression(results, size=200, ss=2):
+    """Saat engine ragu, bentuk objek langit dalam tidak boleh terlihat.
+
+    **Kenapa pemeriksaan ini ada, dan kenapa dua versi sebelumnya gagal.**
+
+    Versi pertama memakai `diff > 0` mentah antara `deepsky-galaxy` (terkunci,
+    tanpa lencana) dan `deepsky-uncertain` (ragu, berlencana). Karena hanya
+    yang ragu memakai lencana, seluruh selisihnya bisa **hanya** lencana —
+    diukur: dengan penekanan bentuk saat ragu dihapus seluruhnya dari port,
+    pemeriksaan itu tetap hijau (`raw_diff` 3434, semuanya lencana) sementara
+    bentuknya jelas masih tergambar.
+
+    Versi kedua memperbaiki lencananya (`badge_excluded_diff`) dan memperluas
+    ke keenam morfologi — tapi membandingkan semuanya terhadap **satu** kabut
+    netral ber-morfologi `galaxy`. Diukur lewat mutasi (penekanan bentuk
+    dihapus dari port): hanya `galaxy` yang memerah, dengan 0 piksel berbeda
+    karena ia memang dibandingkan dengan **dirinya sendiri**. Kelima morfologi
+    lain tetap hijau pada 6073…6881 piksel — dan selisih itu seluruhnya
+    **warna**, bukan bentuk. Gerbang yang menamai dirinya "bentuk … hilang
+    saat ragu" sedang mengukur warna.
+
+    Versi ini mengukur aturannya langsung, dari dua sisi:
+
+      1. **Saat ragu, morfologi tidak mengubah gambar sama sekali.** Keenam
+         render `.uncertain` harus identik dengan render ragu ber-morfologi
+         `None`. Ini menangkap kedua bentuk cacat sekaligus: penekanan yang
+         hilang seluruhnya, dan penekanan yang hanya menutup warna sementara
+         bentuknya bocor.
+
+         **Kenapa referensinya `None`, bukan salah satu dari keenamnya.**
+         Versi pertama fungsi ini memakai `galaxy` sebagai acuan, dan `galaxy`
+         lalu dibandingkan dengan **dirinya sendiri** — nol piksel selamanya,
+         hijau bahkan ketika penekanannya hilang. Keadaan itu ditemukan
+         `Tools/bukti-mutasi-langit-dalam.py`, bukan dibaca: di bawah mutasi
+         "penekanan dihapus seluruhnya", kelima morfologi lain memerah sementara
+         `galaxy` tetap hijau. Referensi `None` membuat keenam perbandingan
+         sama-sama bermakna. Lencana identik di semua render ragu (ia hanya
+         bergantung pada ukuran), jadi perbandingan penuh di sini sah.
+      2. **Saat terkunci, bentuk morfologi itu benar-benar sampai ke gambar** —
+         dibandingkan **bentuk-saja**: warna dipaksa netral supaya perbandingan
+         ini tidak bisa dipenuhi oleh warna. Ini arah yang menangkap
+         kebalikannya — penggambar yang mengabaikan morfologi untuk **bentuk**
+         (terkunci maupun ragu) akan hijau di keenam pemeriksaan (1) **dan**
+         hijau di seluruh 42 pemeriksaan `check_deep_sky_morphologies_render_
+         distinct`, karena keenam morfologi tetap berbeda warna. Diukur: pada
+         mutasi itu, kedua gerbang tersebut hijau sementara bentuknya jelas
+         sama. Hanya pemeriksaan ini yang memerah.
+
+         **`nebula` dikecualikan, dan itu fakta model, bukan kelonggaran.**
+         `CelestialVisual.deepSky(morphology:)` memetakan `.nebula` ke
+         `nebula(fuzziness:)` — fungsi yang **sama** dengan yang dipanggil
+         untuk morfologi `nil`. Jadi kabut emisi memang berbentuk identik
+         dengan kabut netral; yang membedakan keduanya hanya warna. Diukur:
+         bentuk-saja `nebula` = 0 piksel di semua keadaan, dan itu benar.
+         Menuntutnya bukan-nol berarti menuntut model diubah.
+    """
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    morphologies = ("nebula", "planetaryNebula", "galaxy",
+                    "spiralGalaxy", "openCluster", "globularCluster")
+    # `nebula` berbentuk sama dengan netral (lihat docstring) — perbandingan
+    # bentuk-saja tidak bisa dan tidak boleh menuntut apa pun darinya.
+    shape_morphologies = tuple(m for m in morphologies if m != "nebula")
+
+    def render_case_for(morphology, confirmed, colour_neutral=False):
+        """Render satu morfologi lewat PNG yang sama dengan `render_case`.
+
+        Lewat `to_png()` + `decode_png`, bukan buffer float mentah: semua
+        perbandingan di bawah membandingkan byte 8-bit, dan representasi yang
+        berbeda akan mengukur selisih pembulatan, bukan bentuknya.
+
+        `colour_neutral` memaksa setiap morfologi memakai warna kabut netral,
+        sehingga yang tersisa di gambar hanya **bentuknya**. Pemaksaan itu
+        dikembalikan di `finally` — kalau tidak, ia bocor ke gerbang lain yang
+        berjalan sesudahnya dan seluruh sisa berkas ini mengukur gambar yang
+        salah.
+        """
+        case = R.VisualCase(f"probe-{'locked' if confirmed else 'uncertain'}"
+                            f"-{morphology}", "probe", "deepSky",
+                            morphology=morphology, fuzziness=0.8,
+                            is_confirmed=confirmed)
+        saved = dict(R.DEEP_SKY_COLOUR_KEY) if colour_neutral else None
+        if colour_neutral:
+            for key in R.DEEP_SKY_COLOUR_KEY:
+                R.DEEP_SKY_COLOUR_KEY[key] = "deepSky"
+        try:
+            canvas = R.render(case, size=size, night_mode=False,
+                              show_frame=False, ss=ss)
+        finally:
+            if saved is not None:
+                R.DEEP_SKY_COLOUR_KEY.clear()
+                R.DEEP_SKY_COLOUR_KEY.update(saved)
+        os.makedirs(R.OUT_DIR, exist_ok=True)
+        path = os.path.join(R.OUT_DIR, f"{case.name}.png")
+        with open(path, "wb") as handle:
+            handle.write(canvas.to_png())
+        return decode_png(path)
+
+    uncertain_rows = {}
+    for morphology in morphologies:
+        w0, h0, uncertain_rows[morphology] = render_case_for(morphology, False)
+    # Acuan netral: morfologi `None`. Bukan salah satu dari keenam di atas,
+    # justru supaya tidak ada perbandingan yang membandingkan diri sendiri.
+    _, _, rows_neutral = render_case_for(None, False)
+
+    # (1) Aturan itu sendiri: ragu → morfologi tidak mengubah apa pun.
+    for morphology in morphologies:
+        rows_u = uncertain_rows[morphology]
+        diff = sum(1 for y in range(h0) for x in range(w0)
+                   if rows_u[y][x * 4:x * 4 + 3] != rows_neutral[y][x * 4:x * 4 + 3])
+        results.append(Result(
+            f"saat ragu, morfologi {morphology} tidak mengubah gambar",
+            diff == 0,
+            f"{diff} piksel berbeda dari kabut ragu bermorfologi None "
+            f"(harus 0 — bentuk tidak boleh bocor saat engine ragu)"))
+
+    # (2) Arah sebaliknya, bentuk-saja: saat terkunci, bentuk morfologi itu
+    # benar-benar sampai ke gambar.
+    _, _, rows_locked_neutral = render_case_for(None, True, colour_neutral=True)
+    for morphology in shape_morphologies:
+        _, _, rows_shape = render_case_for(morphology, True, colour_neutral=True)
+        diff = badge_excluded_diff(rows_shape, rows_locked_neutral,
+                                   w0, h0, (fx0, fy0, fx1, fy1))
+        results.append(Result(
+            f"bentuk {morphology} sampai ke gambar saat terkunci", diff > 0,
+            f"{diff} piksel berbeda di luar lencana terhadap netral, "
+            f"warna dipaksa sama (harus > 0 — kalau 0, bentuk morfologinya "
+            f"tidak pernah digambar)"))
 
 
 def badge_excluded_diff(rows_a, rows_b, w, h, footprint, margin_px=4.0):

@@ -122,5 +122,26 @@ jobs:
       - name: Buktikan gerbang ukuran bintang berbunyi
         run: python3 Tools/bukti-mutasi-bintang.py
 
+      # Dan bukti yang sama untuk pemeriksaan **penekanan bentuk saat ragu** —
+      # satu pemeriksaan yang dipisah keluar dari `check_features_disappear_when_uncertain`
+      # justru karena dua versi pertamanya hijau pada kode yang jelas salah.
+      #
+      # Versi pertama memakai `diff > 0` mentah, dan karena hanya gambar "ragu"
+      # yang memakai lencana "?", seluruh selisihnya bisa **hanya** lencana:
+      # terukur, penekanan bentuk dihapus seluruhnya dari port dan pemeriksaan
+      # itu tetap hijau (3434 piksel, semuanya lencana). Versi kedua
+      # membandingkan keenam morfologi terhadap **satu** kabut netral
+      # ber-morfologi `galaxy`, jadi `galaxy` dibandingkan dengan dirinya
+      # sendiri — nol piksel selamanya — sementara kelima yang lain "lulus"
+      # pada 6073…6881 piksel yang seluruhnya **warna**, bukan bentuk.
+      #
+      # Harness ini menjalankan pemeriksaan yang sama atas empat keadaan dan
+      # menuntut pemeriksaan mana yang berbunyi, bukan berapa yang merah.
+      # Keadaan ketiga ("bentuk diabaikan selamanya, warna tetap benar") hijau
+      # di **seluruh** 42 pemeriksaan morfologi lain — hanya arah "bentuk
+      # sampai ke gambar saat terkunci" yang melihatnya.
+      - name: Buktikan gerbang penekanan bentuk langit dalam berbunyi
+        run: python3 Tools/bukti-mutasi-langit-dalam.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

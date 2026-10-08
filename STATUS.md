@@ -1,3 +1,122 @@
+## Progres terakhir (8 Okt 2026 — gerbang "bentuk hilang saat ragu" ternyata mengukur warna)
+
+### Cacatnya: dua versi berturut-turut, keduanya hijau pada kode yang salah
+
+`check_features_disappear_when_uncertain` menyatakan bahwa saat engine ragu,
+bentuk objek langit dalam **tidak sampai ke gambar**. Ia benar sejak lama, dan
+ia tidak pernah membuktikannya.
+
+Versi pertamanya memakai `diff > 0` mentah antara render terkunci dan render
+ragu. Hanya render ragu yang memakai lencana "?", jadi **seluruh** selisihnya
+bisa hanya lencana. Diukur: dengan penekanan bentuk dihapus seluruhnya dari
+port, pemeriksaan itu tetap hijau (`raw_diff` 3434, semuanya lencana).
+
+Versi keduanya memperbaiki lencananya dan memperluas ke keenam morfologi —
+tetapi membandingkan semuanya terhadap **satu** kabut netral ber-morfologi
+`galaxy`. Akibatnya `galaxy` dibandingkan dengan **dirinya sendiri**: nol
+piksel, hijau selamanya. Kelima morfologi lain "lulus" pada 6073…6881 piksel,
+dan selisih itu **seluruhnya warna**, bukan bentuk. Gerbang yang menamai
+dirinya "bentuk … hilang saat ragu" sedang mengukur warna.
+
+### Yang diukur, bukan dikira-kira
+
+Mutasi "bentuk diabaikan **selamanya**, warna tetap benar"
+(`blobs = deep_sky_blobs(None, …)` di port, jadi morfologi tidak pernah dipakai
+untuk bentuk — terkunci maupun ragu):
+
+```
+seluruh check_deep_sky_morphologies_render_distinct   42 hijau / 0 merah
+seluruh arah (1) penekanan saat ragu                   6 hijau / 0 merah
+arah (2) bentuk sampai ke gambar saat terkunci          5 MERAH
+```
+
+Empat puluh dua pemeriksaan hijau, dan tidak satu pun dari mereka bisa
+memerah untuk keadaan itu: keenam morfologi tetap berbeda **warna**, jadi
+setiap perbandingan piksel antar-morfologi tetap terpenuhi. Yang berbunyi
+hanya arah yang membandingkan **bentuk-saja** — warna dipaksa netral, sehingga
+yang tersisa di gambar cuma geometrinya.
+
+### Perbaikannya: aturannya diukur dari dua sisi
+
+`check_deep_sky_shape_suppression` dipisah ke fungsinya sendiri (gerbang penuh
+~6 menit; satu pemeriksaan ini ~30 detik — gerbang yang terlalu lambat untuk
+dijalankan adalah gerbang yang dilewati, pelajaran yang sudah dibayar di repo
+ini), lalu mengukur:
+
+1. **Saat ragu, morfologi tidak mengubah gambar sama sekali** — keenam render
+   `.uncertain` harus identik dengan render ragu ber-morfologi `None`.
+   Referensinya `None`, **bukan** salah satu dari keenamnya: acuan yang berasal
+   dari daftar itu membuat satu anggotanya membandingkan dirinya sendiri, dan
+   itulah cacat versi kedua. Ini juga menangkap dua bentuk cacat sekaligus —
+   penekanan yang hilang seluruhnya, dan penekanan yang menutup warna sementara
+   bentuknya bocor.
+2. **Saat terkunci, bentuk morfologi itu benar-benar sampai ke gambar** —
+   dibandingkan **bentuk-saja**, warna dipaksa netral supaya perbandingan ini
+   tidak bisa dipenuhi oleh warna. Ini satu-satunya pemeriksaan di repo ini
+   yang melihat penggambar yang mengabaikan morfologi untuk bentuk.
+
+### `nebula` dikecualikan — dan itu fakta model, bukan kelonggaran
+
+`CelestialVisual.deepSky(morphology:)` memetakan `.nebula` ke fungsi **yang
+sama** dengan morfologi `nil`. Diukur di lima fuzziness (0.0, 0.3, 0.6, 0.8,
+1.0): `deep_sky_blobs("nebula", f)` **sama persis** dengan
+`deep_sky_blobs(None, f)` di kelimanya, sementara kelima morfologi lain
+berbeda di setiap fuzziness. Jadi kabut emisi memang berbentuk identik dengan
+kabut netral; yang membedakan keduanya hanya warna. Menuntut arah (2) dari
+`nebula` berarti menuntut model diubah, bukan menuntut gambar diperbaiki.
+
+### Kecurigaan yang diperiksa lalu dibuang
+
+Dari mata, lewat lembar `Tools/montage.py`, glow bintang di panel iPhone
+(132 pt) tampak berhenti mendadak di tepi kartu. Diukur profil radialnya pada
+30° (menghindari paku difraksi): 193 → 12,7 → 11,7 (= latar) mulus tanpa satu
+pun lompatan, dan pada 38 pt ia sampai latar di r≈15 dari 19. Yang terlihat di
+lembar itu adalah artefak penyusutan, bukan tepi keras — jadi tidak ada yang
+diubah.
+
+### Harness-nya di-track dan dijalankan CI
+
+`Tools/bukti-mutasi-langit-dalam.py` (4 keadaan) memanggil fungsi pemeriksaan
+yang **sama**, dan memeriksa **nama pemeriksaan mana yang berbunyi**, bukan
+berapa yang merah — menghitung jumlah menyembunyikan keadaan yang berbunyi
+karena alasan yang salah. Keadaan 2 sengaja diharapkan **hijau** untuk
+`nebula`: mutasi itu memang tidak mengubah gambar nebula (lihat di atas), dan
+harapan yang menuntutnya merah akan menuntut gerbang berbunyi tanpa alasan.
+Harness memulihkan sumber produksi di `finally` per keadaan **plus** handler
+`SIGINT`/`SIGTERM`.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 687 | **687** |
+| Pemeriksaan visual | 542 | **552** (+10: 11 arah baru − 1 pemeriksaan lama yang salah) |
+| Aturan UI | 29 | 29 |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 687), `check-visuals.py --check`
+(552, 0 gagal), `bukti-mutasi-langit-dalam.py` (4 keadaan, 0 tidak sesuai
+harapan, md5 pulih persis), `swift-ui-lint.sh` (29), `swift-typecheck.sh`.
+Berkas tersentuh: `Tools/check-visuals.py`, `Tools/bukti-mutasi-langit-dalam.py`
+(baru), `.github/workflows/engine-tests.yml`. **Tidak ada satu berkas Swift pun
+yang berubah** — yang salah adalah gerbangnya, bukan gambarnya; memperbaiki
+gambarnya akan menutupi cacat aslinya.
+
+### Yang TIDAK diklaim
+
+- Gerbang ini menjaga **bentuknya sampai ke gambar**, bukan bahwa bentuk itu
+  benar secara astronomi (jumlah lengan M51 diuji lewat simetri 180°, bukan
+  lewat efemeris — lihat entri spiral di bawah).
+- Kedua arah diukur pada **satu ukuran** (200 px). Pada ukuran kartu jam,
+  pasangan yang berbeda bisa bertumbukan; itu tidak diukur dan tidak diklaim.
+- Pemeriksaan arah (1) membandingkan seluruh frame, jadi ia sah hanya karena
+  lencana identik di semua render ragu (lencana hanya bergantung pada ukuran).
+  Kalau suatu saat lencananya ikut berubah menurut morfologi, perbandingan ini
+  harus dipindah ke `badge_excluded_diff` — batas itu ditulis di fungsi
+  pemanggilnya, bukan disembunyikan.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — Sirius dan Rigel tergambar sama, dan yang berbohong ternyata perlengkapannya)
 
 ### Cacatnya: dua bintang yang terangnya berbeda 4,3× tergambar sama persis
