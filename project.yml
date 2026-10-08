@@ -62,6 +62,12 @@ options:
   # Di PlugIns/, installd memasang app iPhone tapi diam-diam mengabaikan app
   # jam — terbukti di simulator berpasangan (lihat Docs/DECISIONS.md, ADR-001).
 
+# Tanda tangan & awalan bundle ID dari xcconfig (ADR-005): satu-satunya yang
+# diisi pengembang adalah DEVELOPMENT_TEAM di Config/Local.xcconfig.
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
 packages:
   # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
   # format pesan Watch<->iPhone, model visual, palet. Semuanya teruji di
@@ -144,7 +150,7 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow
         PRODUCT_NAME: PointAndKnow
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
@@ -208,6 +214,7 @@ targets:
         # menulis ulang plist dari daftar ini, jadi kunci yang tidak ada di
         # sini hilang setiap kali proyek dibuat.
         CFBundleDisplayName: Point & Know Complication
+        CPAppGroupID: group.$(BUNDLE_ID_PREFIX).pointandknow
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -216,16 +223,15 @@ targets:
     # Di CI (tanpa tanda tangan) container ini `nil` → store pakai fallback
     # cache, jadi build tetap hijau; di perangkat nyata dengan profil yang
     # mengaktifkan group ini, complication benar-benar membaca tulisan app.
-    entitlementsPath: Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow.watchkitapp.widgets
         PRODUCT_NAME: PointAndKnowWatchComplication
         TARGETED_DEVICE_FAMILY: "4"
         SKIP_INSTALL: YES
-      configs:
-        Debug:
-          CODE_SIGNING_ALLOWED: NO
+        # Lewat variabel xcconfig, bukan `entitlementsPath`, supaya tim tanpa
+        # App Group bisa mengosongkannya di Config/Local.xcconfig.
+        CODE_SIGN_ENTITLEMENTS: $(CP_COMPLICATION_ENTITLEMENTS)
 
   # ─────────────────────────────────────────────────────────────────────────
   # App jam: pointing, kalibrasi, haptic
@@ -253,7 +259,7 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow.watchkitapp
         PRODUCT_NAME: PointAndKnowWatch
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: YES
@@ -268,13 +274,13 @@ targets:
         # Wajib untuk app jam mandiri berbasis SwiftUI: tanpa `WKApplication`,
         # validasi App Store menolak bundelnya.
         INFOPLIST_KEY_WKApplication: YES
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: dev.celestial.pointandknow
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: $(BUNDLE_ID_PREFIX).pointandknow
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel, dan hasilnya ditandai belum tentu sah."
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
         # App Group agar app jam & complication berbagi berkas snapshot.
         # Sama dengan target complication; tanpa ini complication hanya membaca
         # cache-nya sendiri (fallback store), bukan tulisan app.
-        entitlementsPath: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(CP_WATCH_ENTITLEMENTS)
     # Info.plist parsial; kunci `INFOPLIST_KEY_*` di atas tetap digabung
     # karena `GENERATE_INFOPLIST_FILE: YES`. Satu-satunya isi yang tidak punya
     # padanan `INFOPLIST_KEY_*`: mode latar untuk `WKExtendedRuntimeSession`
@@ -285,6 +291,8 @@ targets:
       properties:
         WKBackgroundModes:
           - physical-therapy
+        # Dibaca `ComplicationStore`: ID App Group mengikuti BUNDLE_ID_PREFIX.
+        CPAppGroupID: group.$(BUNDLE_ID_PREFIX).pointandknow
 
 # Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
 # dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).

@@ -175,3 +175,43 @@ actually runs is logged per trial.
 **Not verified.** The simulator has no device motion, and input injection
 into the watch simulator didn't work, so the Lab screen was compiled and
 launched but not exercised. First real run is on Ady's watch.
+
+---
+
+## ADR-005 — Signing through xcconfig; the developer only types a team ID (2026-10-08)
+
+**Setup.**
+
+- `Config/Base.xcconfig` (checked in) sets these for every target:
+  - `CODE_SIGN_STYLE = Automatic`
+  - an empty `DEVELOPMENT_TEAM`
+  - `BUNDLE_ID_PREFIX = dev.celestial`
+  - the two App Group entitlement paths
+- It then optionally includes the git-ignored `Config/Local.xcconfig`.
+  `Config/Local.xcconfig.example` documents what can go there.
+- `project.yml` uses it as the project `configFiles`.
+
+**Changes.**
+
+- Bundle IDs, `WKCompanionAppBundleIdentifier`, the App Group in both
+  entitlements files, and a new `CPAppGroupID` Info.plist key (read by
+  `ComplicationStore`) all derive from `$(BUNDLE_ID_PREFIX)`.
+- `CODE_SIGN_ENTITLEMENTS` goes through `$(CP_WATCH_ENTITLEMENTS)` and
+  `$(CP_COMPLICATION_ENTITLEMENTS)`, so a team that can't use App Groups can
+  blank them. The complication store already falls back to a private cache.
+- The complication's `Debug: CODE_SIGNING_ALLOWED: NO` is removed. Signed
+  builds embed the complication, and an unsigned appex inside a signed app
+  fails device install.
+
+**Verification.**
+
+- With an override of `BUNDLE_ID_PREFIX = com.example.test`, the complication
+  resolves to `com.example.test.pointandknow.watchkitapp.widgets` with
+  entitlements cleared.
+- Simulator builds are unchanged (`CODE_SIGNING_ALLOWED=NO` passed on the
+  command line).
+
+**Tooling.** `Tools/device-run.sh <TEAMID> [prefix]` writes `Local.xcconfig`,
+runs XcodeGen, and builds both schemes for `generic/platform=iOS` and
+`generic/platform=watchOS` with `-allowProvisioningUpdates`, so provisioning
+errors surface before anything is installed. Not yet run with a real team.

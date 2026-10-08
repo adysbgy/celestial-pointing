@@ -18,6 +18,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CPAppGroupID</key>
+	<string>group.$(BUNDLE_ID_PREFIX).pointandknow</string>
 	<key>WKBackgroundModes</key>
 	<array>
 		<string>physical-therapy</string>
