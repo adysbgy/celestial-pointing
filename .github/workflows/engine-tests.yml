@@ -105,5 +105,22 @@ jobs:
       - name: Buktikan gerbang aksen gambar berbunyi
         run: python3 Tools/bukti-mutasi-aksen.py
 
+      # Dan bukti yang sama untuk pemeriksaan ukuran bintang — cacat yang
+      # ditemukan siklus ini: **setiap** kasus bintang bernama digambar dengan
+      # `relative_size=size_from_magnitude(0.0)`, satu magnitudo untuk Sirius
+      # (−1.46) dan Vega (+0.03). Sirius 4,3× lebih terang dari Rigel, dan pada
+      # ukuran kartu jam keduanya terukur **0 piksel berbeda**: tidak ada satu
+      # pun gambar di repo ini yang pernah membuktikan ukuran mengikuti
+      # magnitudo. Yang berbohong bukan jamnya, melainkan perlengkapan
+      # render — dan perlengkapan itulah yang diukur gerbang gambar.
+      #
+      # Harness ini menempuh jalur gerbang yang sama, atas tiga keadaan yang
+      # memang salah: fixture kembali ke satu magnitudo, penggambar mengabaikan
+      # `relative_size`, dan pembaca magnitudo bergeser. Keadaan ketiga itulah
+      # yang memperlihatkan pemeriksaan pertama saya masih membandingkan
+      # pembaca dengan dirinya sendiri.
+      - name: Buktikan gerbang ukuran bintang berbunyi
+        run: python3 Tools/bukti-mutasi-bintang.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -5361,6 +5361,99 @@ def band_deviation_from_bare(rows_banded, rows_bare, cx, cy, radius):
     return 100.0 * (sum(deviations) / len(deviations)) / max(centre, 1e-9)
 
 
+def check_star_size_follows_magnitude(results, size=38, ss=8):
+    """Ukuran bintang harus mengikuti magnitudo katalog — diukur dari piksel.
+
+    **Cacat yang ditutup pemeriksaan ini.** Kasus bintang di `build_cases()`
+    ditulis dengan `relative_size=size_from_magnitude(0.0)` untuk **setiap**
+    bintang bernama — satu magnitudo yang sama untuk Sirius (−1.46) dan Vega
+    (+0.03). Sirius 4,3× lebih terang dari Rigel, dan pada ukuran kartu jam
+    (38 pt) keduanya terukur **0 piksel berbeda**: tidak ada satu pun gambar
+    di repo ini yang pernah membuktikan ukuran mengikuti magnitudo. Yang
+    berbohong bukan jamnya — `CelestialVisual(object:)` memakai
+    `object.magnitude` sungguhan — melainkan perlengkapan render inilah yang
+    diukur gerbang gambar. Kelas yang sudah berulang di repo ini: gerbang
+    yang mengukur gambar yang tidak pernah tampil.
+
+    Ukuran dibaca dari `Catalogue.swift`, bukan dari daftar tangan di sini:
+    daftar tangan akan menjadi salinan ke-26 yang tidak pernah dibandingkan,
+    dan bintang yang ditambahkan besok akan tampil dengan ukuran lama yang
+    **tampak sah**.
+    """
+    magnitudes = R.catalogue_magnitudes()
+    cases = {c.name: c for c in R.build_cases()}
+
+    # (0) Pembaca magnitudo diuji terhadap **angkanya**, bukan terhadap dirinya
+    #     sendiri. Tiga pemeriksaan di bawah semuanya membandingkan pembaca
+    #     dengan dirinya sendiri: kalau `catalogue_magnitudes()` mengembalikan
+    #     angka yang sama-sama bergeser, fixture tetap "cocok" dengan katalog
+    #     versi salah, ukuran tetap mengikuti urutannya, dan seluruh
+    #     pemeriksaan hijau sambil bintang tergambar dengan ukuran yang keliru.
+    #     Ini beda jenis dari "daftar tangan" yang dikritik di atas: daftar
+    #     tangan di sana **menyalin** katalog; angka di sini adalah **fakta
+    #     langit** yang tidak berasal dari kode mana pun — satu-satunya jalan
+    #     sebuah pemeriksaan bisa tahu pembacanya melenceng.
+    anchored = {"sirius": -1.46, "vega": 0.03, "rigel": 0.13, "betelgeuse": 0.50}
+    drifted = [f"{star}: {magnitudes.get(star)} ≠ {want:+.2f}"
+               for star, want in anchored.items()
+               if magnitudes.get(star) is None
+               or abs(magnitudes[star] - want) > 0.005]
+    results.append(Result(
+        "magnitudo terbaca cocok dengan fakta langit", not drifted,
+        "; ".join(drifted) if drifted else "Sirius −1.46 … Betelgeuse +0.50"))
+
+    # (1) Perlengkapan tidak boleh menyimpang dari katalog: tiap kasus
+    #     `star-<id>` memakai `relative_size` dari magnitudo katalognya.
+    mismatched = []
+    for star in ("sirius", "vega", "rigel", "betelgeuse"):
+        name = f"star-{star}"
+        case = cases.get(name)
+        if case is None:
+            mismatched.append(f"{name} tidak ada")
+            continue
+        want = R.size_from_magnitude(magnitudes[star])
+        got = case.kw.get("relative_size")
+        if got is None or abs(got - want) > 1e-9:
+            mismatched.append(f"{star}: {got} ≠ {want:.4f}")
+    results.append(Result(
+        "ukuran kasus bintang dari magnitudo katalog", not mismatched,
+        "; ".join(mismatched) if mismatched
+        else f"4 bintang, m {magnitudes['sirius']:+.2f}…{magnitudes['betelgeuse']:+.2f}"))
+
+    # (2) Efeknya sampai ke gambar: Sirius harus menutupi lebih banyak piksel
+    #     daripada Rigel. Yang dijaga **arah**, bukan angka absolut —
+    #     `relative_size` yang benar tapi dibuang penggambar lolos (1).
+    def footprint(star):
+        case = cases[f"star-{star}"]
+        buf = R.render(case, size=size, night_mode=False,
+                       show_frame=False, ss=ss).buf
+        return sum(1 for p in buf if sum(p) > 0.3)
+
+    sirius, rigel = footprint("sirius"), footprint("rigel")
+    results.append(Result(
+        "Sirius menutupi lebih banyak piksel dari Rigel", sirius > rigel,
+        f"piksel menyala @38pt: sirius={sirius}, rigel={rigel}"))
+
+    # (3) Arah sebaliknya, pada rentang penuh: gambar berbeda di tiap ukuran.
+    #     `sizeFromMagnitude` boleh benar sementara penggambar mengabaikannya;
+    #     tanpa pemeriksaan ini, satu gambar untuk semua ukuran bisa lolos
+    #     (1) dan (2) sekaligus kalau kebetulan cocok.
+    seen = {}
+    for relative in (0.2, 0.5, 0.8, 1.0):
+        case = R.VisualCase("probe", "probe", "star", color_index=0.0,
+                            relative_size=relative, is_confirmed=True)
+        buf = R.render(case, size=size, night_mode=False,
+                       show_frame=False, ss=ss).buf
+        seen[relative] = tuple(round(c, 6) for p in buf for c in p)
+    keys = list(seen)
+    duplicates = [f"{a}&{b}" for i, a in enumerate(keys)
+                  for b in keys[i + 1:] if seen[a] == seen[b]]
+    results.append(Result(
+        "empat ukuran bintang menghasilkan empat gambar", not duplicates,
+        f"ukuran kembar: {', '.join(duplicates)}" if duplicates
+        else "0.2/0.5/0.8/1.0 semuanya berbeda"))
+
+
 def check_star_colour_order(results, size=200, ss=2):
     """Betelgeuse harus lebih merah dari Rigel — diukur dari piksel.
 
@@ -6473,6 +6566,7 @@ def main():
     check_night_mode_purity(results, args.size, args.ss)
     check_night_mode_never_exceeds_day(results, 120, args.ss)
     check_star_colour_order(results, args.size, args.ss)
+    check_star_size_follows_magnitude(results)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_deep_sky_catalogue_values_reach_the_picture(results)

@@ -1,3 +1,109 @@
+## Progres terakhir (8 Okt 2026 — Sirius dan Rigel tergambar sama, dan yang berbohong ternyata perlengkapannya)
+
+### Cacatnya: dua bintang yang terangnya berbeda 4,3× tergambar sama persis
+
+Bagian 1 misi ini meminta bintang digambar "ukuran sesuai magnitudo". Ukuran
+**sudah** mengikuti magnitudo di jamnya: `CelestialVisual(object:)` memakai
+`object.magnitude` sungguhan dari katalog. Yang tidak pernah mengikuti
+magnitudo adalah **gambar yang diukur gerbang gambar**.
+
+Diukur, bukan dikira-kira. `Tools/render-visuals.py` menggambar 41 kasus;
+empat bintang bernama di dalamnya digambar dengan `relative_size` yang
+**identik**, karena semuanya memakai satu angka:
+
+    relative_size=size_from_magnitude(0.0)      # untuk setiap bintang
+
+Akibatnya, pada ukuran kartu jam (38 pt):
+
+| pasangan | magnitudo | nisbah terang | piksel berbeda @38 pt |
+|---|---|---|---|
+| Sirius vs Vega | −1.46 vs +0.03 | 4,0× | **0** |
+| Sirius vs Rigel | −1.46 vs +0.13 | 4,3× | **0** |
+
+Nol. Bukan "mirip" — **tidak ada satu piksel pun yang berbeda**. Dan karena
+gambar inilah yang diukur gerbang, tidak ada satu pun pemeriksaan di repo ini
+yang pernah membuktikan ukuran bintang mengikuti magnitudo. Warna tidak bisa
+menyelamatkan: B−V Sirius 0,00, Vega 0,00, Rigel −0,03 — praktis sama. Pemisah
+yang benar memang **ukuran**, dan ukuran itulah yang tidak pernah diuji.
+
+Ini kelas cacat yang sudah berulang di repo ini: **gerbang yang mengukur
+gambar yang tidak pernah tampil**. Gerbang hijau, jamnya benar, dan tidak ada
+yang tahu perlengkapannya berbohong.
+
+### Perbaikannya: magnitudo dibaca dari katalog, bukan disalin
+
+Kasus bintang sekarang mengambil magnitudonya dari `Catalogue.swift` lewat
+`catalogue_magnitudes()` — pembaca yang mengurai sumber katalog langsung.
+Daftar tangan di sini akan menjadi salinan ke-26 yang tidak pernah
+dibandingkan, dan bintang yang ditambahkan besok akan tampil dengan ukuran
+lama yang **tampak sah**.
+
+Empat pemeriksaan baru (538 → 542):
+
+- **magnitudo terbaca cocok dengan fakta langit** — pembaca diuji terhadap
+  angkanya, bukan terhadap dirinya sendiri;
+- **ukuran kasus bintang dari magnitudo katalog** — fixture tidak menyimpang;
+- **Sirius menutupi lebih banyak piksel dari Rigel** — efeknya sampai ke
+  gambar, bukan cuma ke variabel;
+- **empat ukuran bintang menghasilkan empat gambar** — penggambar tidak
+  membuang `relative_size`.
+
+Tiga yang terakhir sengaja memeriksa **arah**, bukan angka absolut: angka
+absolut akan mengunci ambang yang tidak punya arti fisis.
+
+### Pemeriksaan pertama saya masih membandingkan pembaca dengan dirinya sendiri
+
+Pemeriksaan (0) di atas tidak ada di rancangan pertama. Harness mutasi
+(`Tools/bukti-mutasi-bintang.py`) yang menemukannya: keadaan ketiganya
+menggeser `catalogue_magnitudes()` seragam +1,0, dan seluruh pemeriksaan tetap
+**hijau**. Tiga pemeriksaan itu semuanya membandingkan pembaca dengan dirinya
+sendiri — fixture "cocok" dengan katalog versi salah, ukuran tetap mengikuti
+urutannya. Pemeriksaan (0) menambatkan empat magnitudo ke **fakta langit**,
+satu-satunya angka yang tidak berasal dari kode mana pun.
+
+Ini beda jenis dari "daftar tangan" yang dikritik di atas: daftar tangan
+**menyalin** katalog; tambatan ini adalah fakta langit yang tidak bergantung
+pada kode mana pun.
+
+### Harness-nya di-track dan dijalankan CI
+
+`Tools/bukti-mutasi-bintang.py` memanggil fungsi pemeriksaan yang **sama**,
+tetapi hanya atas satu pemeriksaan itu, jadi ia berjalan ~1 detik alih-alih
+~6 menit. Tiga keadaan yang diuji: fixture kembali ke satu magnitudo,
+penggambar mengabaikan `relative_size`, dan pembaca magnitudo bergeser. Ia
+dipasang di `engine-tests.yml` tepat setelah harness aksen, dengan alasan yang
+sama: gerbang yang terlalu lambat untuk dijalankan adalah gerbang yang
+dilewati, dan gerbang baru selalu hijau pada hari ia ditulis — itu bukan bukti
+apa pun.
+
+Harness memulihkan sumber produksi di `finally` **dan** lewat handler
+`SIGINT`/`SIGTERM`: pelajaran yang sudah dibayar di repo ini, `SIGKILL`
+melewati `finally` dan meninggalkan mutasi hidup.
+
+### Hasil
+
+- Gerbang gambar: **542 pemeriksaan, 0 gagal** (dari 538).
+- Harness mutasi bintang: **4 keadaan, 0 tidak sesuai harapan**.
+- `swift-test.sh`: **CelestialEngine 206 + PointingKit 687, 0 gagal**.
+- `swift-ui-lint.sh`, `swift-typecheck.sh`: lulus.
+- Dari mata, lewat `out/visuals/stars_200.png`: Sirius kini terukur **224
+  piksel menyala** vs Rigel **156** @38 pt (dulu 156 vs 156), dan dua kartu
+  `*-uncertain` tetap identik satu sama lain — warna spektral memang tidak
+  boleh tampil saat engine ragu.
+
+### Yang TIDAK diklaim
+
+- Tidak ada perubahan pada **satu berkas Swift pun**. Yang salah adalah
+  perlengkapan ukur, bukan jamnya; memperbaiki jamnya akan menutupi cacat
+  aslinya.
+- Ambang piksel (224/156) adalah hasil pengukuran pada 38 pt dan dapat
+  bergeser bila skala magnitudo diubah; karena itu gerbang menjaga **arah**,
+  bukan angkanya.
+- Keempat pemeriksaan baru ini tidak menyentuh akurasi astronomi. Ia menjaga
+  gambar agar konsisten dengan katalog, bukan agar katalog benar.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — kartu bulan baru terbaca, dan plafon earthshine diukur)
 
 ### Cacatnya: kartu jam yang terlihat kosong

@@ -48,6 +48,7 @@ import argparse
 import json
 import math
 import os
+import re
 import struct
 import zlib
 
@@ -139,6 +140,37 @@ STAR_COLOR_INDEX = {
     "bellatrix": -0.22, "alioth": -0.02, "alnitak": -0.21, "dubhe": 1.07,
     "polaris": 0.60,
 }
+
+#: Magnitudo tiap bintang katalog, **dibaca dari katalog**, bukan disalin.
+#:
+#: Sampai siklus ini kasus bintang di `build_cases()` ditulis dengan
+#: `relative_size=size_from_magnitude(0.0)` untuk **setiap** bintang bernama —
+#: satu magnitudo yang sama untuk Sirius (−1.46) dan Vega (+0.03). Akibatnya
+#: tidak ada satu pun gambar yang pernah menguji bahwa ukuran bintang
+#: mengikuti magnitudo, dan lembar `Tools/montage.py` menampilkan Sirius,
+#: Rigel, dan Vega sebagai titik yang **sama persis** (terukur: 0 piksel
+#: berbeda pada 38 pt). Jam sendiri benar — ia memakai `object.magnitude`
+#: sungguhan lewat `CelestialVisual(object:)` — jadi yang berbohong adalah
+#: perlengkapannya, dan justru perlengkapan itulah yang dipakai gerbang
+#: gambar untuk memutuskan. Ini kelas yang sudah berulang di repo ini:
+#: gerbang yang mengukur gambar yang tidak pernah tampil.
+_CATALOGUE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "Packages", "CelestialEngine", "Sources", "CelestialEngine", "Catalogue.swift")
+
+
+def catalogue_magnitudes(path=_CATALOGUE_PATH):
+    """`{id: magnitudo}` dari `Catalogue.swift`.
+
+    Dibaca dari sumbernya supaya menambah bintang ke katalog tidak
+    meninggalkan kasus render dengan magnitudo lama yang **tampak sah**.
+    """
+    with open(path, encoding="utf-8") as handle:
+        source = handle.read()
+    found = re.findall(r'id:\s*"(\w+)".*?magnitude:\s*(-?[\d.]+)', source, re.S)
+    if not found:
+        raise ValueError(f"tidak ada 'CelestialObject(id: …)' di {path}")
+    return {name: float(value) for name, value in found}
 
 
 def unit(v):
@@ -1694,11 +1726,23 @@ def build_cases():
                             bright_limb_angle=-math.pi / 2, is_confirmed=False))
 
     # ── Bintang ───────────────────────────────────────────────────────
+    #
+    # **Ukurannya magnitudo sungguhan, bukan satu angka untuk semua.**
+    # Sampai siklus ini keempat kasus di bawah memakai
+    # `relative_size=size_from_magnitude(0.0)` — magnitudo yang sama untuk
+    # Sirius (−1.46), Rigel (+0.13), dan Vega (+0.03). Sirius 4,3× lebih
+    # terang dari Rigel, dan pada ukuran kartu jam (38 pt) keduanya terukur
+    # **0 piksel berbeda**: tidak ada satu pun gambar di repo ini yang pernah
+    # membuktikan ukuran mengikuti magnitudo. Yang berbohong bukan jamnya —
+    # `CelestialVisual(object:)` memakai `object.magnitude` sungguhan — tapi
+    # perlengkapan render ini, dan justru perlengkapan inilah yang diukur
+    # gerbang gambar. Magnitudonya sekarang dibaca dari `Catalogue.swift`.
+    _MAG = catalogue_magnitudes()
     for star in ("sirius", "betelgeuse", "rigel", "vega"):
         cases.append(VisualCase(
-            f"star-{star}", f"{star} — B−V {STAR_COLOR_INDEX[star]:+.2f}",
+            f"star-{star}", f"{star} — m {_MAG[star]:+.2f}, B−V {STAR_COLOR_INDEX[star]:+.2f}",
             "star", color_index=STAR_COLOR_INDEX[star],
-            relative_size=size_from_magnitude(0.0), is_confirmed=True))
+            relative_size=size_from_magnitude(_MAG[star]), is_confirmed=True))
     cases.append(VisualCase("star-faint", "bintang redup — ukuran mengikuti magnitudo",
                             "star", color_index=0.0,
                             relative_size=size_from_magnitude(3.5), is_confirmed=True))
@@ -1709,6 +1753,13 @@ def build_cases():
     # Saat engine ragu, warna spektral tidak boleh lagi tampil: Betelgeuse
     # (B−V +1.85, merah) dan Rigel (−0.03, biru) harus jadi titik yang sama.
     # Kalau keduanya masih berbeda di sini, artinya identitas masih diklaim.
+    #
+    # Ukurannya sengaja **disamakan** di sini (magnitudo yang sama), supaya
+    # yang diukur benar-benar warnanya: dua bintang yang ragu tidak boleh
+    # berbeda karena apa pun, termasuk terangnya. Dengan magnitudo masing-
+    # masing, perbedaan ukuran Betelgeuse (m 0.50) dan Rigel (m 0.13) akan
+    # membuat kedua gambar berbeda **selalu** — dan gerbang warna di atasnya
+    # akan hijau tanpa pernah memeriksa warnanya.
     cases.append(VisualCase(
         "star-betelgeuse-uncertain",
         "Betelgeuse saat engine RAGU — warna spektral harus hilang",
