@@ -112,25 +112,62 @@ public struct LabFrameSummary: Equatable, Codable, Sendable {
     public var errorVsTruthDeg: [String: Double]?
 }
 
+/// Aliran CoreMotion yang dijalankan Lab. Apple menyarankan satu
+/// `CMMotionManager` per app; mode tunggal ada supaya biaya mode ganda
+/// (laju yang turun, aliran yang macet) bisa diukur, bukan diasumsikan.
+public enum LabStreamMode: String, CaseIterable, Codable, Equatable, Sendable {
+    case dual
+    case singleNorth
+    case singleArbitrary
+
+    /// Urutan pilihan di layar. (Ditulis eksplisit: aturan 26
+    /// `swift-ui-lint.sh` tidak mengenal `allCases` hasil sintesis.)
+    public static let pickerOrder: [LabStreamMode] = [.dual, .singleNorth, .singleArbitrary]
+
+    /// Kerangka yang diminta, urut: aliran pertama menggerakkan tampilan.
+    public func frames(available: [AttitudeReferenceFrame]) -> [AttitudeReferenceFrame] {
+        let north = [AttitudeReferenceFrame.xTrueNorthZVertical, .xMagneticNorthZVertical]
+            .first(where: available.contains)
+        let arbitrary = [AttitudeReferenceFrame.xArbitraryCorrectedZVertical, .xArbitraryZVertical]
+            .first(where: available.contains)
+        switch self {
+        case .dual: return [north, arbitrary].compactMap { $0 }
+        case .singleNorth: return [north ?? arbitrary].compactMap { $0 }
+        case .singleArbitrary: return [arbitrary].compactMap { $0 }
+        }
+    }
+}
+
 /// Rekaman satu kerangka: sampel mentah + ringkasannya.
 public struct LabFrameRecord: Equatable, Codable, Sendable {
     public var frame: AttitudeReferenceFrame
     public var requestedIntervalS: Double
     public var samples: [LabMotionSample]
     public var summary: LabFrameSummary
+    /// Apakah aliran ini benar-benar mengirim sampel di dalam jendela.
+    /// Opsional supaya berkas skema 1 tetap terbaca.
+    public var deliveredInWindow: Bool?
+    /// Laju yang diterima aliran ini dalam ~1 dtk terakhir sebelum penanda
+    /// (lebih stabil daripada laju di dalam jendela 1 dtk itu sendiri).
+    public var deliveredHzBeforeMark: Double?
 
     public init(frame: AttitudeReferenceFrame, requestedIntervalS: Double,
-                samples: [LabMotionSample], summary: LabFrameSummary) {
+                samples: [LabMotionSample], summary: LabFrameSummary,
+                deliveredHzBeforeMark: Double? = nil) {
         self.frame = frame
         self.requestedIntervalS = requestedIntervalS
         self.samples = samples
         self.summary = summary
+        self.deliveredInWindow = !samples.isEmpty
+        self.deliveredHzBeforeMark = deliveredHzBeforeMark
     }
 }
 
 /// Satu percobaan Pointing Lab. Satu baris JSONL.
 public struct LabTrial: Equatable, Codable, Sendable, Identifiable {
-    public static let schemaVersion = 1
+    /// 2: `streamMode`, `deliveredInWindow`, `deliveredHzBeforeMark`
+    /// (semuanya opsional; skema 1 tetap terbaca).
+    public static let schemaVersion = 2
 
     public var schema: Int = LabTrial.schemaVersion
     public var id: UUID
@@ -154,6 +191,7 @@ public struct LabTrial: Equatable, Codable, Sendable, Identifiable {
     public var observerLonDeg: Double?
     public var locationIsFallback: Bool
     public var frames: [LabFrameRecord]
+    public var streamMode: LabStreamMode?
     public var extendedRuntime: String
     public var luminanceReduced: Bool?
     public var environment: String
@@ -164,7 +202,9 @@ public struct LabTrial: Equatable, Codable, Sendable, Identifiable {
                 wear: WearConfiguration, aim: DeviceAimAxis, target: LabTarget,
                 truth: HorizontalCoord?, observer: Observer?, locationIsFallback: Bool,
                 frames: [LabFrameRecord], extendedRuntime: String, luminanceReduced: Bool?,
-                environment: String, note: String, id: UUID = UUID()) {
+                environment: String, note: String, streamMode: LabStreamMode? = nil,
+                id: UUID = UUID()) {
+        self.streamMode = streamMode
         self.id = id
         self.sessionID = sessionID
         self.participant = participant

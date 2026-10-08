@@ -5215,17 +5215,6 @@
         }
       }
     },
-    "Dua aliran sensor": {
-      "comment": "Sakelar: rekam kerangka berutara dan sembarang sekaligus.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Two sensor streams"
-          }
-        }
-      }
-    },
     "Kirim ke iPhone": {
       "comment": "Kirim berkas percobaan Lab dari jam ke iPhone.",
       "localizations": {
@@ -5343,6 +5332,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "No files yet"
+          }
+        }
+      }
+    },
+    "Aliran sensor": {
+      "comment": "Pemilih mode aliran CoreMotion Lab (ganda / utara saja / sembarang saja).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor streams"
           }
         }
       }

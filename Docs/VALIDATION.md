@@ -48,6 +48,21 @@ Goal: a first error distribution without needing night sky or the telescope.
 - iPhone → Lab tab: enter each target (name, bearing, elevation) → **Send
   targets to Watch**. Allow location on both devices.
 
+**Step 0 — 30-second sensor-stream check (always first)**
+
+Apple recommends a single `CMMotionManager` per app, and the Lab can run two.
+Before any pointing trial:
+
+- In the Lab, for each **Sensor streams** mode (`dual`, `singleNorth`,
+  `singleArbitrary`): rest the watch arm still for about 30 s, watching the
+  per-frame Hz lines, then Mark 3 trials at any target.
+- **Pass:** every active stream shows a steady rate near the request (50 Hz),
+  and each trial's frames have `deliveredInWindow = true`.
+- **If `dual` drops either stream's rate by more than 20 %, or a stream stops
+  delivering:** run the rest of the protocol in `singleNorth` and note it.
+- `Tools/analyze_pointing.py` reports delivered Hz per mode, so this check is
+  in the data too.
+
 **Trials**
 
 - Watch → scroll to the bottom → **Lab Pointing**. Pick participant (P01…)
@@ -60,7 +75,7 @@ Goal: a first error distribution without needing night sky or the telescope.
   watchOS wrist setting accordingly (Settings → General → Orientation) and
   repeat. Then, if possible, repeat one arm with the crown setting flipped
   (question 2).
-- Repeat one target block with **"Two sensor streams" off** (question 4).
+- Repeat one target block in `singleArbitrary` mode (question 4).
 - Repeat one target block standing about 1 m from the telescope or tripod
   (environment = `near-telescope`).
 - At the end, **Send to iPhone**. On the iPhone Lab tab, check the file shows

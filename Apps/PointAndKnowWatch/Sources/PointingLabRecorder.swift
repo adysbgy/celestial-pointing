@@ -36,7 +36,8 @@ final class PointingLabRecorder: NSObject, ObservableObject {
     @Published private(set) var lastResult: LabFrameSummary?
     @Published private(set) var runtimeState = "none"
     @Published private(set) var isMarking = false
-    @Published var dualStream = true
+    /// Mode aliran; perubahan berlaku lewat `restart()`.
+    @Published var streamMode: LabStreamMode = .dual
 
     let wear = WearConfiguration.current
     var aim: DeviceAimAxis { wear.forearmAim }
@@ -71,17 +72,7 @@ final class PointingLabRecorder: NSObject, ObservableObject {
             mask.contains(CMAttitudeReferenceFrame($0))
         }
 
-        var wanted: [AttitudeReferenceFrame] = []
-        if let north = [AttitudeReferenceFrame.xTrueNorthZVertical, .xMagneticNorthZVertical]
-            .first(where: availableFrames.contains) {
-            wanted.append(north)
-        }
-        if dualStream || wanted.isEmpty,
-           let arbitrary = [AttitudeReferenceFrame.xArbitraryCorrectedZVertical, .xArbitraryZVertical]
-            .first(where: availableFrames.contains) {
-            wanted.append(arbitrary)
-        }
-
+        let wanted = streamMode.frames(available: availableFrames)
         streams = wanted.map { Stream(frame: $0, manager: CMMotionManager()) }
         for index in streams.indices {
             let manager = streams[index].manager
@@ -171,10 +162,12 @@ final class PointingLabRecorder: NSObject, ObservableObject {
             try? await Task.sleep(nanoseconds: UInt64((PointingLab.windowHalfWidthS + 0.1) * 1e9))
             let frames = streams.map { s -> LabFrameRecord in
                 let window = PointingLab.window(s.buffer, aroundUptime: uptime)
+                let before = PointingLab.observedHz(s.buffer.filter { $0.t >= uptime - 1 && $0.t <= uptime })
                 return LabFrameRecord(frame: s.frame, requestedIntervalS: requestedInterval,
                                       samples: window,
                                       summary: PointingLab.summarize(window, frame: s.frame,
-                                                                     aim: aim, truth: truth))
+                                                                     aim: aim, truth: truth),
+                                      deliveredHzBeforeMark: before)
             }
             let device = WKInterfaceDevice.current()
             let trial = LabTrial(sessionID: sessionID, participant: participant, markedAt: date,
@@ -183,7 +176,7 @@ final class PointingLabRecorder: NSObject, ObservableObject {
                                  truth: truth, observer: observer,
                                  locationIsFallback: locationIsFallback, frames: frames,
                                  extendedRuntime: runtimeState, luminanceReduced: luminanceReduced,
-                                 environment: environment, note: note)
+                                 environment: environment, note: note, streamMode: streamMode)
             append(trial)
             lastResult = frames.first?.summary
             isMarking = false

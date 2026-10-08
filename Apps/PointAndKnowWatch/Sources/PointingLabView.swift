@@ -118,8 +118,10 @@ struct PointingLabView: View {
             Picker("Lingkungan", selection: $environment) {
                 ForEach(Self.environments, id: \.self) { Text(verbatim: $0).tag($0) }
             }
-            Toggle("Dua aliran sensor", isOn: $recorder.dualStream)
-                .onChange(of: recorder.dualStream) { _, _ in recorder.restart() }
+            Picker("Aliran sensor", selection: $recorder.streamMode) {
+                ForEach(LabStreamMode.pickerOrder, id: \.self) { Text(verbatim: $0.rawValue).tag($0) }
+            }
+            .onChange(of: recorder.streamMode) { _, _ in recorder.restart() }
         }
     }
 

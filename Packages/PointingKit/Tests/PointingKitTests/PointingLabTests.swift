@@ -106,6 +106,43 @@ final class PointingLabTests: XCTestCase {
         XCTAssertNil(LabLinkKeys.decodeTargets(["other": 1]))
     }
 
+    func testStreamModesPickFrames() {
+        let all = AttitudeReferenceFrame.allCases
+        XCTAssertEqual(LabStreamMode.dual.frames(available: all),
+                       [.xTrueNorthZVertical, .xArbitraryCorrectedZVertical])
+        XCTAssertEqual(LabStreamMode.singleNorth.frames(available: all), [.xTrueNorthZVertical])
+        XCTAssertEqual(LabStreamMode.singleArbitrary.frames(available: all),
+                       [.xArbitraryCorrectedZVertical])
+        // Tanpa magnetometer/lokasi: "utara" jatuh ke sembarang, dan mode
+        // ganda tidak menggandakan aliran yang sama.
+        let noNorth: [AttitudeReferenceFrame] = [.xArbitraryZVertical]
+        XCTAssertEqual(LabStreamMode.dual.frames(available: noNorth), [.xArbitraryZVertical])
+        XCTAssertEqual(LabStreamMode.singleNorth.frames(available: noNorth), [.xArbitraryZVertical])
+        XCTAssertEqual(LabStreamMode.dual.frames(available: [.xMagneticNorthZVertical]),
+                       [.xMagneticNorthZVertical])
+    }
+
+    func testFrameRecordFlagsAStreamThatDeliveredNothing() {
+        let empty = LabFrameRecord(frame: .xTrueNorthZVertical, requestedIntervalS: 0.02, samples: [],
+                                   summary: PointingLab.summarize([], frame: .xTrueNorthZVertical,
+                                                                  aim: .screenRight, truth: truth),
+                                   deliveredHzBeforeMark: 0)
+        XCTAssertEqual(empty.deliveredInWindow, false)
+        XCTAssertNil(empty.summary.observedHz)
+    }
+
+    /// Baris skema 1 (tanpa field baru) harus tetap terbaca.
+    func testSchema1LineStillDecodes() throws {
+        var t = trial([])
+        t.schema = 1
+        var json = try JSONSerialization.jsonObject(with: PointingLab.encoder().encode(t)) as! [String: Any]
+        json.removeValue(forKey: "streamMode")
+        let line = try JSONSerialization.data(withJSONObject: json) + Data([0x0A])
+        let decoded = PointingLab.decodeLines(line)
+        XCTAssertEqual(decoded.trials.count, 1)
+        XCTAssertNil(decoded.trials[0].streamMode)
+    }
+
     func testPercentilesNearestRank() {
         let p = PointingLab.percentiles((1...20).map(Double.init))!
         XCTAssertEqual(p.median, 10)
