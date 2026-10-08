@@ -1,4 +1,66 @@
-## Progres terakhir (8 Okt 2026 — survei celah sisa: brief lengkap & "sweep" palsu)
+## Progres terakhir (8 Okt 2026 — complication sudut: kanal penanda yang hilang di slot paling menonjol)
+
+### Celah yang ditutup: keluarga complication keempat jatuh ke `default`
+
+STATUS.md sendiri sudah mencatatnya sebagai batas jujur: *"Keluarga
+`accessoryCorner` belum didesain; ia jatuh ke `default`"*. Kalimat itu benar,
+dan justru itu masalahnya — `default` **tampak wajar**. Ia tidak crash, ia
+tidak menampilkan apa pun yang kosong; ia hanya diam-diam kehilangan satu
+kanal.
+
+Yang hilang di `default` bukan gaya, melainkan **penanda keraguan**. Empat
+keluarga complication punya dua kanal: satu ikon dan satu baris teks. Di
+`.accessoryCircular` dan `.accessoryCorner` tidak ada baris kedua, jadi ikon
+adalah **satu-satunya** penanda yang tersedia. `default` merender ikon keadaan
+(`presentedSymbolName(at:)` memang dipanggil di sana), tetapi tanpa label
+melengkung dan tanpa desain sudut yang benar. Sudut adalah slot complication
+paling menonjol di wajah jam — jadi permukaan yang paling sering dilihat
+sekilas justru yang paling tidak didesain.
+
+### Perbaikannya: `.accessoryCorner` jadi keluarga yang benar-benar didukung
+
+`Apps/PointAndKnowWatch/Complications/ComplicationWidget.swift`:
+  - `.accessoryCorner` masuk ke `supportedFamilies` — bukan lagi jatuh ke
+    `default`.
+  - Cabang eksplisit `case .accessoryCorner` memakai `Gauge` +
+    `.gaugeStyle(.accessoryCircular)` sebagai isi tengah, dengan
+    `.widgetLabel { Text(digest.stateLabel) }` untuk teks melengkung.
+  - Ikon memakai versi `at:` (`presentedSymbolName(at: Date())`), **sama
+    seperti lingkaran dan persegi panjang**. Tanpa itu cuplikan yang sudah
+    tua tetap menampilkan `checkmark.circle.fill` di sudut wajah, persis
+    seperti kunci yang baru saja terjadi — kelas cacat yang sudah ditutup
+    `ComplicationStaleSymbolTests` untuk keluarga lain.
+  - Label melengkung diisi **label keadaan**, bukan nama objek: teks
+    melengkung di sudut ruangnya paling sempit, dan nama objek yang panjang
+    (mis. "Galaksi Andromeda") akan terpotong di tengah. Yang paling penting
+    dibaca sekilas — nama + ikon — tetap di tengah.
+  - `#Preview(as: .accessoryCorner)` ditambahkan supaya keluarga ini bisa
+    dilihat di Xcode, bukan hanya dipercaya.
+
+### Yang TIDAK diklaim
+
+  - Kebenaran ikon dan label sudah diuji di Linux
+    (`ComplicationStaleSymbolTests`, `PointingPresentationTests`); siklus ini
+    hanya menghubungkan keluarga keempat ke model yang sudah ada. Tidak ada
+    model baru, tidak ada uji baru — karena itu tidak ada angka uji yang
+    berubah (206 + 693 tetap).
+  - `default` masih ada untuk keluarga yang belum ada (mis. yang akan datang
+    di watchOS berikutnya); ia tetap jujur dengan ikonnya.
+
+### Gerbang
+
+  - `./swift-test.sh` -> CelestialEngine **206**, PointingKit **693**, 0 gagal.
+  - `./swift-ui-lint.sh` -> **29** aturan hijau (Aturan 23 mencakup cabang
+    sudut yang baru: ia merender `digest.headline` bersama
+    `presentedSymbolName`).
+  - `./swift-typecheck.sh` -> SEMUA GERBANG LULUS.
+  - `README.md` diperbarui: empat keluarga complication disebut, dan Aturan 23
+    dijelaskan sebagai alasan setiap cabang merender ikon (Aturan 10: hitungan
+    uji tidak berubah, jadi tidak ada sinkronisasi angka yang perlu).
+
+---
+
+
 
 ### Kesimpulan survei: brief sudah tuntas, tidak ada cacat nyata yang tersisa
 

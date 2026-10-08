@@ -34,11 +34,26 @@ struct PointAndKnowComplication: Widget {
         .configurationDisplayName("Point & Know")
         .description("Objek terakhir yang dikenali, tanpa membuka app.")
         // Keluarga yang didukung jam tangan: lingkaran (wajah utama),
-        // persegi panjang (modular), dan inline (teks pendek).
+        // persegi panjang (modular), inline (teks pendek), dan **sudut**.
+        //
+        // **Kenapa `.accessoryCorner` ikut, padahal ia sempat tidak didesain.**
+        // Sampai siklus ini keluarga ini sengaja dibiarkan jatuh ke `default`
+        // — yang menampilkan satu baris teks datar tanpa label melengkung dan
+        // **tanpa ikon**. Akibatnya persis kelas cacat yang sudah berulang di
+        // repo ini: nama kandidat `.uncertain` terbaca sama dengan nama yang
+        // sudah terkunci, karena di sudut tidak ada baris kedua dan ikon
+        // adalah satu-satunya penanda yang tersedia. Yang membuatnya bertahan
+        // adalah bahwa `default` **tampak** wajar — ia tidak crash, ia hanya
+        // diam-diam kehilangan satu kanal.
+        //
+        // Sudut adalah slot complication paling menonjol di wajah jam, jadi
+        // membiarkannya tanpa desain berarti permukaan yang paling sering
+        // dilihat justru yang paling tidak jujur.
         .supportedFamilies([
             .accessoryCircular,
             .accessoryRectangular,
             .accessoryInline,
+            .accessoryCorner,
         ])
     }
 }
@@ -187,8 +202,34 @@ struct ComplicationView: View {
                 }
             }
             .widgetCurvesContent())
+        case .accessoryCorner:
+            // Sudut: label melengkung mengelilingi kurva sudut + satu baris
+            // isi. Ikon keadaan **ikut** — di sudut tidak ada baris kedua,
+            // jadi ikon satu-satunya kanal penanda keraguan (Aturan 23).
+            //
+            // Versi `at:` dipakai, sama seperti lingkaran dan persegi panjang:
+            // cuplikan yang sudah tua harus berubah ikonnya, bukan tetap
+            // menampilkan centang hijau. Tanpa itu nama objek dari jam lalu
+            // tampil di sudut wajah seolah hasil pengukuran sekarang.
+            //
+            // `widgetLabel` diisi label **keadaan**, bukan nama objek: teks
+            // melengkung di sudut ruangnya paling sempit, dan nama objek yang
+            // panjang akan terpotong di tengah. Yang paling penting dibaca
+            // sekilas (nama + ikon) tetap di tengah; label melengkung hanya
+            // memberi konteks keadaannya.
+            AnyView(Gauge(value: 1) {
+                Image(systemName: digest.presentedSymbolName(at: Date()))
+            } currentValueLabel: {
+                Text(digest.headline)
+                    .font(.caption2.weight(.semibold))
+                    .minimumScaleFactor(0.6)
+            }
+            .gaugeStyle(.accessoryCircular)
+            .widgetLabel {
+                Text(digest.stateLabel)
+            })
         default:
-            // Keluarga lain (corner, container, dll.) belum didesain; menampilkan
+            // Keluarga lain (container, dsb.) belum didesain; menampilkan
             // baris utama apa adanya lebih baik daripada widget kosong.
             //
             // Ikonnya tetap disertakan karena alasan yang sama dengan inline:
@@ -266,4 +307,12 @@ struct ComplicationView: View {
     ComplicationEntry(date: .now, digest: ComplicationDigest(
         stateRaw: "searching", objectName: nil,
         objectKindRaw: nil, isConfirmed: false, updatedAt: .now))
+}
+
+#Preview(as: .accessoryCorner) {
+    PointAndKnowComplication()
+} timeline: {
+    ComplicationEntry(date: .now, digest: ComplicationDigest(
+        stateRaw: "lock", objectName: "Saturnus",
+        objectKindRaw: "planet", isConfirmed: true, updatedAt: .now))
 }
