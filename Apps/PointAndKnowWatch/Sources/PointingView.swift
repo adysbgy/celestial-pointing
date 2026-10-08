@@ -59,10 +59,11 @@ struct PointingView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 6) {
-                    statusCard
-                    // Identify → Confirm (ADR-007): satu jawaban, beberapa
-                    // kemungkinan, atau belum yakin — lalu konfirmasi.
+                    // Identify → Confirm (ADR-007) **di atas**: jawaban dan
+                    // tombol Konfirmasi harus terlihat tanpa menggulir di
+                    // 40 mm; kartu keadaan yang lebih panjang turun ke bawah.
                     IdentificationPanel(engine: engine, link: link)
+                    statusCard
                     // Ditampilkan selama ada objek — termasuk saat keadaannya
                     // sudah tidak punya jawaban lagi. Di situlah
                     // `isDisplayingStaleObject` berbunyi: objek dari pandangan

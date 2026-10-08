@@ -75,6 +75,12 @@ public enum IdentificationText {
     public static var phoneConfirmedTitle: String { TextLocalization.text(.identifyPhoneConfirmedTitle) }
     public static var phoneNothingConfirmed: String { TextLocalization.text(.identifyPhoneNothingConfirmed) }
 
+    /// Bentuk terucap baris sigma untuk VoiceOver.
+    public static func sigmaAccessibility(_ policy: ConfidencePolicy) -> String {
+        TextLocalization.text(policy.isProvisional ? .identifySigmaProvisionalSpoken : .identifySigmaMeasuredSpoken,
+                              NumberFormat.decimal(policy.pointingSigmaDeg, fractionDigits: 0))
+    }
+
     /// Waktu konfirmasi di iPhone, ditambah catatan bila ia hanya tiba lewat
     /// antrean (riwayat, tidak membuka GoTo).
     public static func phoneConfirmedTime(_ date: Date, live: Bool) -> String {
@@ -108,7 +114,17 @@ public extension LocalizedText {
     static let identifyPhoneNothingConfirmed = LocalizedText(key: "identify.phone.nothingConfirmed",
                                                              id: "Belum ada objek yang dikonfirmasi")
 
+    static let identifySigmaProvisionalSpoken = LocalizedText(
+        key: "identify.sigma.provisional.spoken",
+        id: "Ambang ketelitian sementara, %@ derajat, belum diukur")
+    static let identifySigmaMeasuredSpoken = LocalizedText(
+        key: "identify.sigma.measured.spoken", id: "Ambang ketelitian terukur, %@ derajat")
+
+    /// Akhiran satuan "per detik" untuk `NumberFormat.degreesPerSecond`.
+    static let unitPerSecondSuffix = LocalizedText(key: "unit.perSecondSuffix", id: "/dtk")
+
     static let identifyKeys: [LocalizedText] = [
+        .unitPerSecondSuffix, .identifySigmaProvisionalSpoken, .identifySigmaMeasuredSpoken,
         .identifyHoldSteady, .identifyPossibleMatches, .identifyNotSure, .identifyConfirm,
         .identifyConfirmed, .identifySending, .identifyDeliveredLive, .identifyDeliveredRecorded,
         .identifyDeliveryFailed, .identifyPointAgain, .identifyPhoneConfirmedTitle,

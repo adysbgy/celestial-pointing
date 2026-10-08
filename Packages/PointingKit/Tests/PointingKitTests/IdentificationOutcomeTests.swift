@@ -57,4 +57,22 @@ final class IdentificationOutcomeTests: XCTestCase {
         XCTAssertFalse(ConfidencePolicy.measured(pointingSigmaDeg: 4, ambiguitySigma: 2,
                                                  maxSeparationSigma: 1).isProvisional)
     }
+
+    /// "°/dtk" hanya untuk Bahasa Indonesia; katalog Inggris memberi "°/s".
+    func testDegreesPerSecondUnitFollowsCatalog() {
+        defer { TextLocalization.reset() }
+        XCTAssertEqual(NumberFormat.degreesPerSecond(9, fractionDigits: 0, localeId: "id"), "9°/dtk")
+        TextLocalization.install { $0 == "unit.perSecondSuffix" ? "/s" : nil }
+        XCTAssertEqual(NumberFormat.degreesPerSecond(9.5, fractionDigits: 1, localeId: "en"), "9.5°/s")
+    }
+
+    /// Bahasa app tanpa wilayah: "en" memakai titik, bukan koma wilayah ID.
+    func testEnglishAppLanguageUsesPointDecimal() {
+        XCTAssertEqual(NumberFormat.degrees(10, fractionDigits: 1, localeId: "en"), "10.0°")
+        XCTAssertEqual(NumberFormat.degrees(10, fractionDigits: 1, localeId: "id"), "10,0°")
+    }
+
+    func testSigmaLineMarksProvisional() {
+        XCTAssertTrue(IdentificationText.sigmaLine(ConfidencePolicy()).hasSuffix("PROVISIONAL"))
+    }
 }

@@ -315,10 +315,11 @@ final class TextLocalizationTests: XCTestCase {
     /// `DeepSkySpeech.swift`.
     ///
     /// 332 → 344: dua belas kunci `identify.*` untuk layar Identify → Confirm
-    /// (ADR-007, `IdentificationOutcome.swift`).
+    /// (ADR-007, `IdentificationOutcome.swift`). 344 → 345: `unit.perSecondSuffix`
+    /// ("/dtk" → "/s" di Inggris); 347: dua kalimat sigma terucap.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 344, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 347, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

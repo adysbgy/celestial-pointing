@@ -325,3 +325,23 @@ a fake clock).
 - The iPhone shows "10,0°" (comma) in English UI.
 - The extended runtime session is rejected on unsigned simulator builds
   ("client is not entitled"); expected, to recheck on a signed device build.
+
+**Update (M6 UX pass, same day).**
+
+- *Layout.* The identify panel now sits **above** the status card, so Confirm
+  is visible without scrolling on 40 mm.
+- *Button.* The prominent Confirm button is green with **black** text. White
+  measured about 1.8:1; black is about 11:1.
+- *Every state pairs an icon with text.* A grayscale pass on SE 40 and
+  Ultra 3 shows each state is identifiable without colour.
+- *VoiceOver.* The σ line is read as a sentence ("Provisional accuracy
+  threshold, 10 degrees, not yet measured"). Possible matches is a header,
+  and Hold steady updates frequently.
+- *Units and numbers.*
+  - "°/dtk" is now catalog-driven (`unit.perSecondSuffix`, "/s" in English).
+  - Numbers follow the **app** language (`Bundle.main.preferredLocalizations`),
+    not the device language-region ("en-ID" printed "10,0°").
+- *State reporting.* Watch → iPhone state reports hang off
+  `PointingEngine.onIngest`, so debug poses and sensors report alike.
+- *Reduce Motion.* Already gated through `MotionPolicy` for the pulse and the
+  arrival pop. The new panel has no animation.

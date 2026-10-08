@@ -90,8 +90,8 @@ struct PointAndKnowWatchApp: App {
         engine.bind(location: location)
         engine.refreshSkyContext()
 
-        motion.onUpdate = { update in
-            engine.ingest(update)
+        motion.onUpdate = { update in engine.ingest(update) }
+        engine.onIngest = { snapshot in
             // Kirim **saat keputusan berubah** — bukan tiap sampel 20 Hz, dan
             // bukan hanya saat ada jawaban. Menyaring dengan "ada jawaban"
             // membuat jam mengirim 20×/detik selama terkunci (jawabannya terus
@@ -99,7 +99,7 @@ struct PointAndKnowWatchApp: App {
             // sehingga iPhone membeku di objek terakhir seolah masih berlaku.
             // Aturan perpindahannya ada di `LinkReportGate` (teruji di Linux).
             link.sendIfDecisionChanged(
-                state: update.snapshot,
+                state: snapshot,
                 sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
         }
         // Sumber keadaan untuk menjawab permintaan iPhone. Dibaca saat diminta,

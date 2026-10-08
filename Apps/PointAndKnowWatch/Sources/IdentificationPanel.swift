@@ -36,6 +36,9 @@ struct IdentificationPanel: View {
             Text(verbatim: IdentificationText.sigmaLine(engine.controller.resolver.confidencePolicy))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                // Dibaca VoiceOver sebagai kalimat, bukan "sigma 10 titik 0".
+                .accessibilityLabel(IdentificationText.sigmaAccessibility(
+                    engine.controller.resolver.confidencePolicy))
         }
     }
 
@@ -45,8 +48,10 @@ struct IdentificationPanel: View {
         case .unavailable:
             EmptyView()
         case .holdSteady:
+            // Ikon + teks: keadaan tidak pernah hanya dibedakan warna.
             Label(IdentificationText.holdSteady, systemImage: "hand.raised")
                 .font(.headline)
+                .accessibilityAddTraits(.updatesFrequently)
         case .notSure:
             Label(IdentificationText.notSure, systemImage: "questionmark.circle")
                 .font(.footnote)
@@ -54,9 +59,10 @@ struct IdentificationPanel: View {
         case .single(let object):
             confirmButton(object, prominent: true)
         case .possibleMatches(let objects):
-            Text(IdentificationText.possibleMatches)
+            Label(IdentificationText.possibleMatches, systemImage: "list.bullet")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
             ForEach(objects, id: \.id) { confirmButton($0, prominent: false) }
         }
     }
@@ -71,8 +77,12 @@ struct IdentificationPanel: View {
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
         }
+        // VoiceOver membaca label tombol apa adanya: "Konfirmasi Saturnus".
         if prominent {
             button.buttonStyle(.borderedProminent)
+                .tint(PointingTone.success.color)
+                // Teks hitam di atas hijau terang: putih hanya ~1,8:1, hitam ~11:1.
+                .foregroundStyle(.black)
                 // Ketuk dua kali (Double Tap) mengonfirmasi tanpa menurunkan
                 // lengan dari arah tunjuk.
                 .handGestureShortcut(.primaryAction)

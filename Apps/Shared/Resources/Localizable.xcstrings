@@ -5903,6 +5903,39 @@
           }
         }
       }
+    },
+    "unit.perSecondSuffix": {
+      "comment": "Akhiran satuan laju sudut setelah derajat (°/dtk).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/s"
+          }
+        }
+      }
+    },
+    "identify.sigma.provisional.spoken": {
+      "comment": "VoiceOver: baris sigma di layar identifikasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provisional accuracy threshold, %@ degrees, not yet measured"
+          }
+        }
+      }
+    },
+    "identify.sigma.measured.spoken": {
+      "comment": "VoiceOver: baris sigma di layar identifikasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measured accuracy threshold, %@ degrees"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
