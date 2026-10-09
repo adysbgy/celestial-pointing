@@ -559,12 +559,15 @@ public final class PointingEngine: ObservableObject {
         // (`testInnerPlanetDrawsAPhaseFromItsOwnFraction`), bukan
         // **pengawat**-nya. Uji yang ditambahkan siklus ini mengunci
         // pengawatnya.
+        // `planet` dideklarasikan di sini karena `waxing` di bawah butuh
+        // menanyakannya; menunda deklarasinya ke bawah akan membaca variabel
+        // lokal sebelum deklarasinya (galat kompilasi).
+        let planet = CelestialVisual.Planet(objectID: object.id)
         let waxing = isMoon ? moonIsWaxing : planet.flatMap { planetWaxing[$0] }
         // Sudut sisi terang: hanya untuk Bulan, dan nil bila tidak diketahui.
         // Saat nil, model tidak berputar -- lebih baik sabit yang belum
         // berorientasi daripada sabit yang salah arah.
         let limbAngle = isMoon ? moonBrightLimbAngle : nil
-        let planet = CelestialVisual.Planet(objectID: object.id)
         let planetPhase = planet.flatMap { planetPhases[$0] }
         // Sudut sisi terang planet: hanya planet berfase yang punya, dan
         // `nil` berarti gambar tidak diputar -- bukan diputar ke sudut
