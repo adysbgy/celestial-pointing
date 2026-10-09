@@ -115,12 +115,62 @@ SHAPE_ANCHOR = ('    morphology = kw.get("morphology") if kw.get("is_confirmed",
 SHAPE_CALL = 'blobs = deep_sky_blobs(morphology,'
 SHAPE_CALL_NONE = 'blobs = deep_sky_blobs(None,'
 
-# Penjaga: jangkar harus muncul **tepat sekali**. Kalau muncul dua kali,
-# `str.replace` memutasi keduanya, dan harness mengukur berkas yang bukan
-# yang dimaksudkannya — kelas cacat yang sama dengan pemeriksaan yang hijau
-# karena alasan yang salah.
-def _anchor_count_ok(source, anchor):
-    return source.count(anchor) == 1
+# Pemanggilan **kedua** yang memakai morfologi untuk bentuk, di dalam fungsi
+# yang sama: inti bintang di dalam gugus (`cluster_cores`) menggambar titik
+# yang bisa dipisahkan mata, dan ia diturunkan dari blob yang sama.
+#
+# Kenapa ia harus ikut dinetralkan di keadaan 3. Keadaan 3 membuktikan "bentuk
+# morfologi tidak pernah sampai ke gambar". Kalau hanya `deep_sky_blobs` yang
+# dinetralkan, inti gugus **masih** memakai morfologi — jadi untuk
+# `openCluster` dan `globularCluster` bentuknya tetap sampai ke gambar, arah
+# (2) tetap hijau untuk keduanya, dan harness melaporkan keadaan yang tidak
+# pernah ia buat. Yang dibuktikan harus seluruh jalur bentuk, bukan satu
+# pemanggilan yang kebetulan mudah dijangkau.
+CLUSTER_CORES_CALL = 'for star in cluster_cores(morphology,'
+CLUSTER_CORES_CALL_NONE = 'for star in cluster_cores(None,'
+
+# Penjaga: jangkar harus muncul **tepat sekali** — tetapi di dalam **fungsi
+# penggambarnya**, bukan di seluruh berkas.
+#
+# Kenapa cakupannya fungsi, bukan berkas. `blobs = deep_sky_blobs(morphology,`
+# adalah bentuk panggilan yang wajar, dan berkas ini kini memanggilnya dari
+# **dua** tempat: penggambar langit dalam (`_draw_deep_sky`) dan pengukur inti
+# gugus (`cluster_cores`, ditambahkan untuk lantai keterbacaan inti). Penjaga
+# "tepat sekali di seluruh berkas" lalu memerahkan job — dan penjaga itu
+# **benar**: `str.replace` akan memutasi kedua panggilan sekaligus, sehingga
+# yang diukur bukan gambar yang dimaksudkannya.
+#
+# Memperpendek jangkarnya lagi tidak bisa menyelesaikan ini: yang membedakan
+# kedua panggilan adalah nama variabel argumen pertamanya (`kw.get(…)` versus
+# `fuzziness`) — dan argumen pertama itu justru hal yang **dimutasi**. Jangkar
+# yang membedakan keadaan benar dari keadaan termutasi tidak boleh ikut
+# berubah saat dimutasi.
+#
+# Jadi yang dijaga bukan "muncul sekali di berkas", melainkan "muncul sekali
+# di dalam fungsi yang menggambar". Batas fungsi dibaca dari baris `def`
+# sampai baris berikutnya yang **tidak menjorok** — cukup untuk berkas ini,
+# dan bila `_draw_deep_sky` diganti nama, harness memerah (yang memang benar:
+# ia tidak lagi tahu gambar mana yang dimutasi).
+DRAW_HEADER = "def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):"
+
+
+def _scope_span(source, header):
+    """Potong `source` jadi (sebelum, badan, sesudah) untuk fungsi `header`.
+
+    `None` bila `header` tidak ada — pemanggil memperlakukannya sebagai
+    kegagalan jangkar, bukan sebagai "tidak ada yang perlu di-scope".
+    """
+    lines = source.splitlines(keepends=True)
+    start = next((i for i, line in enumerate(lines) if header in line), None)
+    if start is None:
+        return None
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        line = lines[j]
+        if line.strip() and not line[:1].isspace():
+            end = j
+            break
+    return "".join(lines[:start + 1]), "".join(lines[start + 1:end]), "".join(lines[end:])
 
 # Mutasi 1: bentuk **dan** warna sama-sama tidak ditekan.
 M1_SHAPE = '    morphology = kw.get("morphology")'
@@ -178,8 +228,18 @@ STATES = [
     # keenam morfologi pun tetap berbeda warna, jadi 42 pemeriksaan
     # `check_deep_sky_morphologies_render_distinct` juga hijau. Hanya arah (2)
     # yang melihat bentuknya tidak pernah digambar.
+    #
+    # **Dua jangkar, bukan satu.** Sejak inti bintang gugus ada, morfologi
+    # masuk ke gambar lewat **dua** pemanggilan di fungsi yang sama:
+    # `deep_sky_blobs` (kabut) dan `cluster_cores` (titik yang bisa
+    # dipisahkan mata). Menetralkan yang pertama saja meninggalkan yang kedua
+    # hidup, jadi untuk `openCluster`/`globularCluster` bentuknya masih sampai
+    # ke gambar — arah (2) tetap hijau untuk keduanya, dan harness akan
+    # melaporkan keadaan yang tidak pernah ia buat. Keadaan ini membuktikan
+    # "tidak ada jalur bentuk", jadi kedua jalurnya harus ditutup.
     ("3. bentuk diabaikan selalu (warna tetap benar)",
-     [(SHAPE_CALL, SHAPE_CALL_NONE)],
+     [(SHAPE_CALL, SHAPE_CALL_NONE),
+      (CLUSTER_CORES_CALL, CLUSTER_CORES_CALL_NONE)],
      {**_hijau(SUPPRESSED), **{n: "merah" for n in VISIBLE}}),
 ]
 
@@ -226,18 +286,35 @@ def main():
                 restore()
             else:
                 source = original.decode()
+                span = _scope_span(source, DRAW_HEADER)
+                if span is None:
+                    failures.append(
+                        f"{name}: fungsi penggambar tidak ditemukan: "
+                        f"{DRAW_HEADER!r} — harness tidak tahu gambar mana "
+                        f"yang dimutasi, jadi ia berhenti")
+                    # Pulihkan dulu: tanpa ini keadaan berikutnya membaca
+                    # berkas yang masih membawa mutasi keadaan sebelumnya —
+                    # kelas cacat "mengadopsi kerusakannya sendiri" yang
+                    # sudah dibayar di repo ini.
+                    restore()
+                    continue
+                before, body, after = span
                 for find, replace in edits:
-                    if find not in source:
-                        failures.append(f"{name}: jangkar tidak ditemukan: {find!r}")
-                        break
-                    if not _anchor_count_ok(source, find):
+                    hits = body.count(find)
+                    if hits == 0:
                         failures.append(
-                            f"{name}: jangkar muncul {source.count(find)}×, "
-                            f"butuh 1 (replace akan memutasi yang lain): {find!r}")
+                            f"{name}: jangkar tidak ditemukan di dalam "
+                            f"{DRAW_HEADER!r}: {find!r}")
                         break
-                    source = source.replace(find, replace)
+                    if hits > 1:
+                        failures.append(
+                            f"{name}: jangkar muncul {hits}× di dalam "
+                            f"{DRAW_HEADER!r}, butuh 1 (replace akan "
+                            f"memutasi yang lain): {find!r}")
+                        break
+                    body = body.replace(find, replace)
                 else:
-                    mutasi_sumber.write_source(RENDER, source)
+                    mutasi_sumber.write_source(RENDER, before + body + after)
 
             verdicts, error = run_probe()
             if verdicts is None:
