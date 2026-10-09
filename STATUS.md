@@ -1,3 +1,134 @@
+## Progres terakhir (9 Okt 2026 — inti bintang di dalam gugus: gerbang yang versi pertamanya hijau pada gugus tanpa satu pun bintang)
+
+### Cacatnya: sebuah gugus digambar sebagai noda
+
+Gugus terbuka dan gugus bola digambar sebagai **kabut lembut saja** — sama
+seperti nebula, hanya susunan blob-nya yang berbeda. Diukur pada render: tujuh
+blob kabur tanpa satu pun titik tajam. Bentuk itu terbaca sebagai **noda**,
+bukan sebagai gugus.
+
+Sebuah gugus bintang *adalah* bintang-bintangnya: yang membuat Pleiades
+terbaca sebagai Pleiades adalah titik-titik cahaya yang terpisah di dalamnya,
+bukan kabut di sekelilingnya. Tanpa satu pun titik tajam, gugus bola Hercules
+dan gugus kupu-kupu M6 tampil sebagai dua noda dengan lebar berbeda — dan
+lebar adalah satu-satunya yang membedakan mereka.
+
+### Perbaikannya: inti diturunkan dari blob yang sama, bukan ditulis sendiri
+
+Geometrinya diambil dari `deepSky(...)` — blob yang sama yang sudah menggambar
+kabutnya — supaya inti **tidak bisa** menyimpang dari kabut di bawahnya. Tiga
+penahan, ketiganya **diukur**, bukan diperkirakan:
+
+```
+clusterCoreRadiusFraction   0.30   inti = 0.30 dari blob gugus
+readableCorePointRadius     0.8 pt lantai dalam POIN, bukan pecahan radius
+clusterCoreReferenceExtent  median setengah-bentang blob (plafon)
+```
+
+  - **0.30, bukan 0.20.** Pada kartu jam (38 pt, radius frame 19 pt) inti 0.30
+    dari blob gugus ≈ 0.55 pt. Pada 0.20 gugus bola jatuh ke 0.17 dan kembali
+    tampil sebagai noda — angka yang sama yang memperbaiki satu kasus merusak
+    yang lain, jadi keduanya diukur pada ukuran kartu yang sesungguhnya.
+  - **Lantai dalam POIN, bukan pecahan radius.** Tanpa `readableCorePointRadius`
+    inti di kartu jam adalah 0.67–0.99 pt: di bawah satu piksel pada @1x, jadi
+    tidak punya piksel sendiri. Pecahan radius menskalakan inti ikut objeknya;
+    yang dibutuhkan adalah lantai yang tidak ikut mengecil.
+  - **Plafon dari tata letak, bukan angka tetap.** Blob pusat gugus bola
+    (0.46 R) kalau diberi inti 30% menjadi cakram 0.138 R dan terbaca "bokeh".
+    Angka tetap **dicoba dan gagal terukur**: pada f=0 rasio inti pusat :
+    bintang cincin jadi 1.71, pada f=1.0 hanya 1.06 — intinya menelan cincinnya
+    di satu ujung rentang. Diturunkan dari tata letak, rasionya **1.0 di
+    setiap fuzziness**.
+
+### Yang lebih penting: gerbangnya sendiri hijau pada gambar yang jelas salah
+
+Versi pertama gerbang ini hanya mengukur **puncak inti di atas lengkungan
+sekitarnya**, pada **satu** render. Diukur dengan inti dihapus seluruhnya dari
+port (`for star in []:`): keempat pemeriksaannya **tetap hijau** — gugus bola
+38 pt pada **0.2035** terhadap ambang 0.20.
+
+Lengkungan yang diukurnya memang milik **kabut** yang menaungi inti, bukan
+intinya. Jadi gerbang itu mengesahkan gugus **tanpa satu pun bintang**, dan
+melaporkannya sebagai "inti bintang gugus terbaca". Ini kelas cacat yang paling
+sulit dilihat di repo ini: bukan gerbang yang mati, melainkan gerbang yang
+**berbunyi tentang hal lain**.
+
+Sekarang ia mengukur **dua nisbah**, dan masing-masing menjaga kelas yang
+berbeda:
+
+```
+cluster_core_contrast    terang pusat inti DENGAN inti / TANPA inti
+                         menjaga KEBERADAAN — 1.000 = inti tidak ditambahkan
+                         terlemah 1.67 (gugus terbuka 38 pt); tanpa inti tepat 1.000
+cluster_core_sharpness   puncak di atas lengkungan, proporsi puncaknya
+                         menjaga BENTUK — inti yang menyatu dengan halonya
+                         terlemah 0.77 / 0.82 / 0.53 / 0.53
+```
+
+`MIN_CLUSTER_CORE_CONTRAST` = 1.10 duduk di antara 1.000 (kebisingan
+rasterisasi tidak bisa menaikkan kabut tanpa inti sampai 1.10) dan 1.67
+(inti yang benar tidak bisa dituduh hilang). `MIN_CLUSTER_CORE_SHARPNESS` = 0.20
+**tetap dipertahankan** justru karena ia menjaga satu arah yang tidak dijaga
+kontras: inti yang digambar tetapi menyatu dengan kabutnya masih punya kontras
+(ia memang menambah terang) sementara puncaknya rata.
+
+`Tools/bukti-mutasi-inti-gugus.py` (baru, dipanggil `engine-tests.yml`)
+menuntut masing-masing berbunyi pada kelasnya sendiri:
+
+```
+[baseline]              hijau di kedelapan pemeriksaan
+1. for star in []:      keempat KONTRAS merah; keempat KETAJAMAN tetap hijau
+2. halo inti 40x        kontras tetap hijau; ketajaman runtuh 0.53 -> 0.06
+```
+
+Keadaan #1 yang menuntut ketajaman **tetap hijau** itu bukan kelonggaran: itu
+**rekaman cacatnya**. Kalau suatu saat keempatnya ikut merah, yang berubah
+bukan gerbangnya melainkan salah satu metriknya. Keadaan #2 wajib ada — tanpa
+dia `MIN_CLUSTER_CORE_SHARPNESS` tidak dijaga siapa pun, dan satu-satunya
+alasan ambang itu masih dipertahankan adalah kelas cacat ini.
+
+Empat angka di komentar `MIN_CLUSTER_CORE_SHARPNESS` (0.77/0.82/0.53/0.53)
+**dibaca kembali dan diukur ulang** oleh
+`check_cluster_core_docstring_quotes_measured_values`. Versi pertama komentar
+itu mengutip 0.80/0.44/0.58/0.34 — angka yang tidak pernah keluar dari
+penyampelnya, persis kelas cacat "komentar mengutip angka yang tidak pernah ia
+ukur" yang sudah berulang di repo ini.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 702 | **706** (+4 uji inti gugus) |
+| Pemeriksaan visual | 624 | **646** (+22) |
+| Aturan UI | 29 | 29 |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 706 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **646 pemeriksaan, 0 gagal**.
+  - `./swift-ui-lint.sh` → **29 aturan bersih** (Aturan 10 memaksa README
+    702→706; sudah disinkronkan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - CI: `37981319678` (Apple Build) + `37981319724` (Engine Linux) — dipantau
+    setelah push.
+
+### Yang TIDAK diklaim
+
+  - Angka 0.30, 0.8 pt, dan plafon median itu **keputusan yang diukur**, bukan
+    nilai astronomis. Yang bisa diklaim hanyalah bahwa pada ukuran kartu jam
+    (38 pt) dan 200 pt, tiap nilai memisahkan "inti terbaca" dari "noda" —
+    bukan bahwa 0.30 adalah fraksi yang benar secara fisik.
+  - Gerbang ini mengukur **keberadaan** dan **bentuk** inti di dalam blob
+    gugus. Ia **tidak** mengukur apakah jumlah bintang yang digambar cocok
+    dengan magnitudo gugusnya, dan tidak mengukur tampilan sesungguhnya di
+    layar OLED — hanya modelnya pada dua ukuran render.
+  - "Bokeh" pada blob pusat 0.46 R adalah penilaian **mata** yang dipakai
+    untuk memilih plafon, bukan ambang yang diuji; yang diuji adalah rasionya
+    tetap 1.0 di setiap fuzziness.
+
+---
+
 ## Progres terakhir (9 Okt 2026 — kontras diuji terhadap warna yang tidak pernah muncul di layar: kartu jam tenggelam ke atmosfernya sendiri)
 
 ### Cacatnya: latar yang diuji bukan latar yang digambar
