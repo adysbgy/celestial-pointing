@@ -123,18 +123,31 @@ CURRENT_FUNCTION_HEAD = '''def deep_sky_blobs(morphology, fuzziness, frame_half_
     clamped = min(1.0, max(0.0, fuzziness))
     growth = 0.62 + 0.38 * clamped'''
 
-# 4. **Sisi model**: `offset.1` cangkang diganti dengan **1.0 * elongation** —
-#    sebuah *konstanta*, bukan `offset.1`. Pembaca gerbang **tidak** gagal
-#    mengurai ini (polanya masih cocok: `1.0 * elongation`), jadi yang
-#    berbunyi adalah perbandingan **nilainya**: tiap blob jadi `elongation`
-#    kali tinggi aslinya, dan tabel port tidak menyimpang. Cacat yang dijaga:
-#    cangkang berhenti mengikuti posisi `ring` dan mengecil jadi cakram pipih
-#    seragam — gerbang siluet tetap hijau (port tidak disentuh), hanya gerbang
-#    drift antar-bahasa yang melihatnya.
-CONSTANT_HEIGHT = '''            let layout: [(Double, Double, Double, Double, Double, Double)] =
-                zip(ring, shellOpacity).map { offset, opacity in
-                    (offset.0, 1.0 * elongation, 0.26, 1.0 * elongation,
-                     0.0, opacity)
+# 4. **Sisi model**: skala **lebar** blob cangkang diubah dari `0.26` menjadi
+#    `0.10`, dan hanya itu. Pembaca gerbang **tetap berhasil mengurai**
+#    (`(offset.0, offset.1 * elongation, <skala>,` masih cocok), jadi yang
+#    berbunyi adalah perbandingan **nilainya**: tabel yang dihitung model kini
+#    tidak sama dengan tabel port. Cacat yang dijaga: cangkang masih mengikuti
+#    `ring` dan masih dipetakan elongasi, tetapi tiap blob jadi ramping —
+#    gerbang siluet tetap hijau (port tidak disentuh), hanya gerbang drift
+#    antar-bahasa yang melihatnya.
+#
+#    **Kenapa angkanya `0.10`, dan kenapa bukan `1.0 * elongation`.** Versi
+#    pertama keadaan ini mengganti **tinggi** (`offset.1`) dengan konstanta, dan
+#    itu bertahan benar sampai model dirapikan. Pemapian cangkang lalu berubah
+#    bentuk: `zip(ring, shellOpacity)` diganti `ring.enumerated()` dengan
+#    opasitas berputar, supaya 24 posisi tidak lagi terpotong jadi 16 blob oleh
+#    `zip`. Setelah perubahan itu, mengganti `offset.1` **tidak lagi** membuat
+#    tabel menyimpang diam-diam — ia membuat pembaca gagal mengurai
+#    `(offset.0, offset.1 * elongation, …)`, jadi keadaan ini dan keadaan 5
+#    jatuh ke **gerbang yang sama** dan tidak ada lagi yang membedakan
+#    "nilai salah" dari "bentuk salah". Keadaan ini karena itu dipindahkan ke
+#    komponen yang **dibaca sebagai angka**: ia tetap terurai, dan gerbang yang
+#    menyalakannya adalah gerbang nilai (drift), bukan gerbang pembacaan.
+CONSTANT_WIDTH = '''            let layout: [(Double, Double, Double, Double, Double, Double)] =
+                ring.enumerated().map { index, offset in
+                    (offset.0, offset.1 * elongation, 0.10, 1.0 * elongation,
+                     0.0, shellOpacity[index % shellOpacity.count])
                 }'''
 
 # 5. **Sisi model**: `offset.1` berhenti dipetkan sama sekali — pembaca gerbang
@@ -145,15 +158,28 @@ CONSTANT_HEIGHT = '''            let layout: [(Double, Double, Double, Double, D
 #    jam menggambarnya bulat, dan tidak satu pun pemeriksaan siluet di sini
 #    bisa melihatnya karena keduanya membaca **port**.
 NO_MODEL_MAPPING = '''            let layout: [(Double, Double, Double, Double, Double, Double)] =
-                zip(ring, shellOpacity).map { offset, opacity in
+                ring.enumerated().map { index, offset in
                     (offset.0, offset.1, 0.26, 1.0 * elongation,
-                     0.0, opacity)
+                     0.0, shellOpacity[index % shellOpacity.count])
                 }'''
 
+# Cuplikan **persis** branch `.planetaryNebula` model pada saat harness ini
+# ditulis. Indentasi ikut apa adanya karena yang diganti adalah teks sumbernya.
+#
+# **Jangkar ini boleh SENSITIF.** Harness membandingkan string ini dengan isi
+# model untuk memutuskan apakah mutasi benar-benar mendarat; kalau model
+# dirapikan dan jangkar ini tidak lagi cocok, yang terjadi bukan mutasi gagal
+# diam-diam — `for find, replace in edits` menambah
+# `"jangkar tidak ditemukan"` ke `failures` dan harness **merah**. Itu
+# persis yang terjadi pada keadaan 4 dan 5 di commit `1e28591`: keduanya
+# masih mengutip `zip(ring, shellOpacity).map { offset, opacity in`, jadi
+# tidak ada yang berubah di disk dan gerbang drift **hijau tanpa alasan**.
+# Batas ini sengaja dibiarkan keras: harness yang jangkarnya basi harus
+# gagal, bukan-evaluation kosong yang terlihat lulus.
 CURRENT_MODEL_MAPPING = '''            let layout: [(Double, Double, Double, Double, Double, Double)] =
-                zip(ring, shellOpacity).map { offset, opacity in
+                ring.enumerated().map { index, offset in
                     (offset.0, offset.1 * elongation, 0.26, 1.0 * elongation,
-                     0.0, opacity)
+                     0.0, shellOpacity[index % shellOpacity.count])
                 }'''
 
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
@@ -216,8 +242,8 @@ STATES = [
     # gerbang drift antar-bahasa — dan justru itu buktinya: cacat "model
     # berhenti memetkan, port tetap memetkan" tidak bisa dilihat pemeriksaan
     # siluet, karena keduanya membaca port.
-    ("4. model: tinggi blob jadi konstanta 1.0 (bukan offset.1)",
-     "model", [(CURRENT_MODEL_MAPPING, CONSTANT_HEIGHT)],
+    ("4. model: skala lebar blob jadi 0.10 (bukan 0.26)",
+     "model", [(CURRENT_MODEL_MAPPING, CONSTANT_WIDTH)],
      {DRIFT: "merah"}),
     ("5. model: offset.1 berhenti dipetkan (pembaca gagal bersih)",
      "model", [(CURRENT_MODEL_MAPPING, NO_MODEL_MAPPING)],
