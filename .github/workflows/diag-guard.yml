@@ -1,7 +1,8 @@
-name: Diagnostik guard berkas (sementara)
+name: Diagnostik guard berkas v2 (sementara)
 
-# Sementara: mengukur kenapa penjaga «sumber bersih» menyalak di CI padahal
-# pohon kerjanya bersih. Tidak untuk di-merge ke main.
+# Sementara: menunjuk langkah MANA yang membuat `Tools/render-visuals.py`
+# menyimpang dari HEAD di CI, padahal pohon kerjanya bersih di dev.
+# Tidak untuk di-merge ke main.
 on: [push, workflow_dispatch]
 
 jobs:
@@ -17,74 +18,67 @@ jobs:
           apt-get update -qq
           apt-get install -y -qq python3
 
-      - name: Keadaan awal (TANPA safe.directory — seperti harness)
+      - name: Cara checkout menandai safe.directory
+        run: |
+          echo "== config core =="; git config --list --show-origin | grep -i core || echo "(kosong)"
+          echo "== owner =="; stat -c '%u %g %a %n' . Tools/render-visuals.py
+          echo "== dirty? =="; git status --porcelain; echo "porcelain_exit=$?"
+          echo "== diff mentah =="; git diff HEAD -- Tools/render-visuals.py | head -40
+          echo "== mode di index vs kerja =="; git ls-files -s Tools/render-visuals.py; stat -c '%a %s %Y' Tools/render-visuals.py
+          echo "== sha =="; sha256sum Tools/render-visuals.py; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
+
+      - name: Uji CelestialEngine (langkah 1 asli)
+        run: swift test --package-path Packages/CelestialEngine >/dev/null 2>&1; echo "swifttest=$?"
         continue-on-error: true
-        run: |
-          echo "== HOME =="; echo "$HOME"; id -u; id -un
-          echo "== repo owner =="; stat -c '%u %g %a %n' . Tools/render-visuals.py
-          echo "== /etc/gitconfig =="; cat /etc/gitconfig 2>/dev/null || echo "(tidak ada)"
-          echo "== global gitconfig =="; cat "$HOME/.gitconfig" 2>/dev/null || echo "(tidak ada)"
-          echo "== git rev-parse =="; git rev-parse HEAD; echo "exit=$?"
-          echo "== git log =="; git log --oneline -1; echo "exit=$?"
-          echo "== git diff --quiet HEAD -- file =="; git diff --quiet HEAD -- Tools/render-visuals.py; echo "exit=$?"
-          echo "== git diff --quiet (tanpa HEAD) =="; git diff --quiet -- Tools/render-visuals.py; echo "exit=$?"
-          echo "== git diff --stat HEAD =="; git diff --stat HEAD -- Tools/render-visuals.py; echo "exit=$?"
-          echo "== git status --porcelain =="; git status --porcelain | head; echo "exit=$?"
-          echo "== ls-files -s =="; git ls-files -s Tools/render-visuals.py
-          echo "== stat file =="; stat -c '%a %s %Y' Tools/render-visuals.py
-          echo "== sha256 file =="; sha256sum Tools/render-visuals.py
-          echo "== sha256 HEAD blob =="; git cat-file -p HEAD:Tools/render-visuals.py 2>/dev/null | sha256sum; echo "exit=$?"
-          echo "== config core =="; git config --list --show-origin 2>/dev/null | grep -i core || echo "(kosong)"
 
-      - name: Keadaan awal (DENGAN safe.directory — seperti harness di dev)
+      - name: Selepas swift test
         run: |
-          git config --global --add safe.directory '*'
-          echo "== git diff --quiet HEAD -- file =="; git diff --quiet HEAD -- Tools/render-visuals.py; echo "exit=$?"
-          echo "== git status --porcelain =="; git status --porcelain | head
-          echo "== sha256 file =="; sha256sum Tools/render-visuals.py
-          echo "== sha256 HEAD =="; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
+          echo "== dirty? =="; git status --porcelain | head; git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git diff HEAD -- Tools/render-visuals.py | head -20
 
-      - name: Jalankan gerbang seperti job asli, lalu lihat jejaknya
+      - name: Sapu UI (langkah 2 asli)
+        run: ./swift-ui-lint.sh >/dev/null 2>&1; echo "lint=$?"
+
+      - name: Selepas sapu UI
         run: |
-          git config --global --add safe.directory '*'
-          ./swift-ui-lint.sh >/dev/null 2>&1; echo "lint=$?"
-          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard_after_lint=$?"
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git diff HEAD -- Tools/render-visuals.py | head -20
+
+      - name: Red-lint (langkah 3 asli)
+        run: |
           ./red-lint.sh Apps/Shared/CelestialVisualView.swift \
             '    private static func warnaUji() -> Color {
                   Color(red: 0.62, green: 0.30, blue: 0.16)
               }
           ' 'Aturan 15' >/dev/null 2>&1; echo "redlint=$?"
-          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard_after_redlint=$?"
-          python3 Tools/check-visuals.py --check >/dev/null 2>&1; echo "gate=$?"
-          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard_after_gate=$?"
-          echo "== sha256 file =="; sha256sum Tools/render-visuals.py
-          echo "== sha256 HEAD =="; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
-          echo "== diff mentah =="; git diff HEAD -- Tools/render-visuals.py | head -30
-          python3 Tools/bukti-mutasi-aksen.py >/dev/null 2>&1; echo "aksen=$?"
-          echo "== guard sebelum bintang =="; git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
-          echo "== sha256 file =="; sha256sum Tools/render-visuals.py
-          echo "== sha256 HEAD =="; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
-          python3 Tools/bukti-mutasi-bintang.py 2>&1 | tail -8
 
-      - name: Panggil penjaganya langsung (dengan safe.directory)
+      - name: Selepas red-lint
         run: |
-          git config --global --add safe.directory '*'
-          python3 -c "
-          import sys, os
-          sys.path.insert(0, 'Tools')
-          import mutasi_sumber
-          mutasi_sumber.require_clean_sources(['Tools/render-visuals.py'])
-          print('LULUS')
-          "; echo "exit=$?"
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git status --porcelain | head
+          git diff HEAD -- Tools/render-visuals.py | head -20
 
-      - name: Panggil penjaganya langsung (TANPA safe.directory)
-        continue-on-error: true
+      - name: Gerbang gambar (langkah 4 asli)
+        run: python3 Tools/check-visuals.py --check >/dev/null 2>&1; echo "gate=$?"
+
+      - name: Selepas gerbang gambar
         run: |
-          git config --global --unset-all safe.directory || true
-          python3 -c "
-          import sys, os
-          sys.path.insert(0, 'Tools')
-          import mutasi_sumber
-          mutasi_sumber.require_clean_sources(['Tools/render-visuals.py'])
-          print('LULUS')
-          "; echo "exit=$?"
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git status --porcelain | head
+          echo "== diff mentah =="; git diff HEAD -- Tools/render-visuals.py | head -40
+          echo "== sha =="; sha256sum Tools/render-visuals.py; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
+
+      - name: Bukti aksen (langkah 5 asli)
+        run: python3 Tools/bukti-mutasi-aksen.py >/dev/null 2>&1; echo "aksen=$?"
+
+      - name: Selepas bukti aksen
+        run: |
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git status --porcelain | head
+          echo "== diff mentah =="; git diff HEAD -- Tools/render-visuals.py | head -40
+          echo "== sha =="; sha256sum Tools/render-visuals.py; git cat-file -p HEAD:Tools/render-visuals.py | sha256sum
+
+      - name: Bukti bintang (langkah 6 asli — yang menyalak)
+        run: |
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard_sebelum=$?"
+          python3 Tools/bukti-mutasi-bintang.py 2>&1 | tail -12; echo "bintang=${PIPESTATUS[0]}"
