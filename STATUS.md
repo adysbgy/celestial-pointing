@@ -1,3 +1,61 @@
+## Progres terakhir (9 Okt 2026 — fase Bulan dibungkam saat engine ragu: suara tidak boleh lebih yakin daripada gambar)
+
+### Cacatnya: VoiceOver mengumumkan fase Bulan saat engine ragu
+
+`CelestialVisual.spokenPhase` dipanggil **tanpa** ambang `isConfirmed` di kedua
+app (`PointingView.swift` kartu jam, `DiagnosticsView.swift` panel iPhone),
+sementara dua saudaranya yang juga ciri pengenal —
+`spokenDeepSkyMorphology(isConfirmed:)` dan `spokenStarColor(isConfirmed:)` — sudah
+memakainya. Akibatnya pada keadaan `.uncertain`: piringan Bulan digambar netral
+(tidak mengklaim fase), badge bertuliskan "Ragu", tapi VoiceOver tetap
+mengucapkan "Bulan sabit muda". Dua pengguna dengan cuplikan yang sama
+mendapat dua kebenaran berbeda — persis kelas false confidence yang dilarang
+PRD §2. Mata membaca gambar lebih dulu daripada badge, jadi saluran suara
+baru saja lebih yakin daripada gambarnya.
+
+Cacat ini lolos dari gerbang yang ada karena ia bukan di layar: pengguna yang
+melihat memang melihat piringan netral, dan tidak ada teks yang membantahnya.
+Hanya pengguna VoiceOver yang mendengar klaim yang tidak dimiliki gambarnya.
+
+### Perbaikannya: `spokenPhase` ikut dibungkam saat ragu
+
+`MoonPhaseSpeech.swift` — `spokenPhase` dari `var` tanpa argumen jadi
+`func spokenPhase(isConfirmed: Bool)` yang mengembalikan `nil` saat
+`!isConfirmed`, ditaruh paling depan sebelum pemeriksaan jenis/bulan. Ini
+menyamakan aturan ketiga fungsi ciri pengenal di satu tempat (model), bukan di
+view, supaya ambangnya tidak bisa hilang saat salah satu app merefaktor
+panggilannya. Dua pemanggil di `Apps/` diubah meneruskan `isConfirmed` yang
+sudah mereka punya (bukan `!isStale`: `.uncertain` punya jawaban tapi engine
+menyatakan diri kurang yakin — ambangnya lebih ketat dari "bukan sisa").
+
+### Yang diukur, bukan dikira-kira
+
+`testMoonPhaseIsSilentWhenUncertain` (baru) menuntut sabit muda **dan** purnama
+diucapkan saat `isConfirmed == true` tetapi `nil` saat `false`. Dua uji lama
+(`testOnlyTheMoonSpeaksAPhase`, `testUnknownDirectionNeverClaimsWaxingOrWaning`)
+disesuaikan ke argumen baru; keduanya tetap hijau, membuktikan ambang baru tidak
+menggeser perilaku fase yang dikonfirmasi.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 698 | **699** (+1 uji kejujuran fase ragu) |
+
+Gerbang hijau: `swift-test.sh` (206 + 699, 0 gagal), `swift-ui-lint.sh` (29/29 —
+Aturan 10 sinkron 698→699), `swift-typecheck.sh` (parse Apps/ lulus). Tidak ada
+kode mesin teruji yang berubah; perubahan hanya di `MoonPhaseSpeech.swift`,
+dua view, dan uji. README disesuaikan ke 699 (Aturan 10).
+
+### Yang TIDAK diklaim
+
+- Gerbang ini menjaga **keputusan membungkam**, bukan kebenaran astronomi nama
+  fase: ambang iluminasi di `moonPhaseText` sudah diuji terpisah. Yang baru di
+  sini hanya lapisan `isConfirmed`.
+- `spokenPhase` tetap mengembalikan `nil` untuk bukan-Bulan dan fase tak
+  diketahui (perilaku lama utuh); yang ditambah hanya keadaan keempat (ragu).
+
 ## Progres terakhir (9 Okt 2026 — jangkar harness mutasi Dumbel basi: gerbang drift hijau tanpa alasan)
 
 ### Audit: apakah brief-nya sudah benar-benar selesai?
@@ -16523,3 +16581,57 @@ dibuktikan **berbunyi pada fuzziness yang benar-benar tampil di layar**, bukan
 pada kasus rujukan yang kebetulan nyaman. Dan harness mutasi yang crash bukan
 "hijau" — ia diam. Keduanya sudah tertutup di sini: harness hidup (Cacat 1),
 dan state #4 membedakan cangkang jujur (0.84) dari manik (0.65) di M57.
+
+═════════════════════════════════════════════════════════════════════════
+SIKLUS: Audit menyeluruh — setiap klaim brief diverifikasi, tidak ada cacat nyata
+═════════════════════════════════════════════════════════════════════════
+
+**Mengapa siklus ini ada.** Pengguna meminta kerja tanpa henti sampai 6 Okt,
+tapi siklus sebelumnya (onboarding + harness cangkang) sudah menutup seluruh
+Bagian 1-4 + Fase A/B/C. Sebelum menulis apa pun, repo diaudit lapis demi lapis
+untuk mencari cacat **nyata** (bukan yang sudah ditutup gerbang), karena
+mengejar "tambah unit" di atas kode yang sudah hijau berisiko menyuntikkan
+regresi demi kegiatan.
+
+**Yang dijalankan (verifikasi, bukan asumsi).**
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 698 hijau** (0 gagal).
+  - `python3 Tools/check-visuals.py --check` → **618 pemeriksaan, 0 gagal**.
+  - `./swift-ui-lint.sh` → **29 aturan, semua Bersih**.
+  - Sembilan harness mutasi (`Tools/bukti-mutasi-*.py`) → **semua OK (0 tidak
+    sesuai harapan)** — termasuk yang punya penjaga "jangkar basi harus merah".
+  - `git status` → bersih (tidak ada perubahan yang ditinggalkan).
+
+**Yang diperiksa satu per satu, dan ternyata SUDAH tertutup.**
+  - *Visual objek* (Bagian 1): planet/bulan/bintang/matahari/langit-dalam
+    benar-benar digambar prosedural; diukur 618 gerbang piksel. Ketidakpastian
+    memang menelanjangi ciri (`guard isConfirmed else { return }` di
+    `CelestialVisualView.drawPlanet`, + gerbang `check_features_disappear_…` dan
+    `testStarColourIsNotAClaimWhenUncertain`).
+  - *Surface / glassmorphism* (Bagian 2): **ditolak dengan sengaja** di
+    `SurfaceTokens.surfaceCard` — `Material` membuat kontras WCAG 4.5:1 yang
+    diklaim tidak lagi terjamin. Itu keputusan benar, bukan celah; dicatat
+    alasannya di kode.
+  - *Night mode / AOD / VoiceOver* (Fase A #1-3): ada, diuji (Aturan 15, 23,
+    `StateAnnouncement`).
+  - *Animasi / Dynamic Type* (Fase A #4-6): ada (Aturan 1, Aturan 21 — denyut
+    digerbangi `hasPulse`).
+  - *Complication / lokalisasi / Info.plist / penolakan izin* (Fase C #1-4):
+    ada dan dijaga (Aturan 9, 14, `ComplicationProvider` memanggil reload;
+    `LocationProvider` + `MotionLogger` menampilkan `note` saat izin ditolak/
+    sensor gagal, bukan crash/senyap).
+  - *Tepi kasus kejujuran* (penyempurnaan #6): `BelowHorizonHonesty`,
+    `DaylightLock`, `MoonDaylightHonesty`, `TooCloseToSunLockHonesty`,
+    `TooFaintLockHonesty`, `ReducedLuminanceHonesty` — semua ada.
+
+**Satu item yang MASIH TERBUKA (bukan cacat, butuh perangkat keras).**
+  - ROADMAP Fase 3: "Point & Slew POC 1 teleskop" — `SlewSafety` + `TelescopeBridge`
+    sudah ada & teruji di Linux; yang belum: perangkat keras, transport Seestar
+    nyata, dan `NSLocalNetworkUsageDescription` di Info.plist. Di luar jangkauan
+    sesi ini (VPS Linux tanpa sensor/iOS), jadi tidak dikerjakan di sini.
+
+**Kesimpulan.** Tidak ada unit bernilai nyata yang bisa ditambahkan tanpa
+membikin ulang yang sudah ada atau menyuntikkan regresi. Maka tidak ada commit
+kode di siklus ini: mendorong perubahan ke `main` hanya untuk "terlihat bekerja"
+bertentangan dengan Aturan Keras ("jangan rusak engine teruji") dan praktik
+repo ("gerbang yang hijau tapi tidak hijau"). Laporan ini sendiri yang menjadi
+hasil siklus — audit tertutup, status terverifikasi.

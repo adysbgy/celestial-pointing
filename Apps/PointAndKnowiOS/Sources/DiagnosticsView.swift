@@ -990,7 +990,10 @@ struct DiagnosticsView: View {
         // sengaja tidak dideskripsikan gambarannya — lihat catatan di atas.
         // `spokenPhase` mengembalikan `nil` untuk bukan-Bulan dan untuk fase
         // yang tidak diketahui, jadi tidak ada fase yang ditebak di sini.
-        if let phase = visual?.spokenPhase {
+        // `spokenPhase` mengembalikan `nil` untuk bukan-Bulan, untuk fase
+        // yang tidak diketahui, **dan saat engine ragu** — fase adalah ciri
+        // pengenal, jadi tidak diucapkan saat gambar memakai piringan netral.
+        if let phase = visual?.spokenPhase(isConfirmed: isConfirmed) {
             parts.append(phase)
         }
         // Bentuk objek langit dalam — lihat catatan panjang di

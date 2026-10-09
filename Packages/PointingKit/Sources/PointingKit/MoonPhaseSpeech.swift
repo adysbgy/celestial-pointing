@@ -42,7 +42,43 @@ public extension CelestialVisual {
     ///    pada waxing/waning, jadi `isWaxing == nil` memaksa jawaban netral.
     ///    Fase purnama dan bulan baru tidak punya masalah itu: keduanya
     ///    simetris, jadi namanya sah tanpa arah.
-    var spokenPhase: String? {
+    /// Nama fase untuk diucapkan, atau `nil` bila tidak berlaku.
+    ///
+    /// `nil` dalam empat keadaan — tiga pertama diwarisi dari versi lama,
+    /// yang keempat yang baru ditambahkan di sini:
+    ///
+    /// 1. **Bukan Bulan.** Planet dan bintang tidak punya fase yang terlihat
+    ///    dari Bumi (Merkurius dan Venus punya, tapi tidak digambar di sini),
+    ///    jadi tidak ada yang boleh diucapkan.
+    /// 2. **Fraksi iluminasi tidak diketahui.** Tanpa angka, tidak ada fase
+    ///    yang bisa diklaim. Mengucapkan tebakan lebih buruk daripada diam.
+    /// 3. **Arah fase tidak diketahui** *dan* fasenya di antara sabit dan
+    ///    cembung — di situ nama yang tersedia ("sabit"/"cembung") bergantung
+    ///    pada waxing/waning, jadi `isWaxing == nil` memaksa jawaban netral.
+    ///    Fase purnama dan bulan baru tidak punya masalah itu: keduanya
+    ///    simetris, jadi namanya sah tanpa arah.
+    /// 4. **Engine ragu (`isConfirmed == false`).** Fase adalah **ciri
+    ///    pengenal**: bentuk sabit/cembung/purnama hanya tampil sebagai gambar,
+    ///    dan pada keadaan `.uncertain` gambar memakai piringan netral (tidak
+    ///    mengklaim fase) sementara badge di sebelahnya bertuliskan "Ragu".
+    ///    Mata membaca gambar lebih dulu daripada badge, jadi suara tidak boleh
+    ///    lebih yakin daripada gambarnya. Itulah sebabnya `spokenPhase` ikut
+    ///    dibungkam saat ragu — persis seperti `spokenDeepSkyMorphology` dan
+    ///    `spokenStarColor` di sebelahnya, yang sudah memakai ambang ini.
+    ///    Tanpa baris ini, pengguna VoiceOver mendengar "Bulan sabit muda"
+    ///    sementara pengguna yang melihat melihat piringan netral: dua keadaan
+    ///    yang sama tetapi dua kebenaran berbeda.
+    ///
+    /// Parameter `isConfirmed` diteruskan dari view (bukan `!isStale`):
+    /// ambangnya **lebih ketat** daripada "bukan sisa" — `.uncertain` punya
+    /// jawaban tapi engine menyatakan diri kurang yakin, dan pada keadaan itulah
+    /// pengumuman fase paling berbahaya tampil.
+    func spokenPhase(isConfirmed: Bool) -> String? {
+        // Ambang ini **sama** dengan `spokenDeepSkyMorphology` dan
+        // `spokenStarColor`: ciri pengenal tidak boleh diucapkan saat engine
+        // ragu. Ditaruh paling depan supaya tidak ada cabang di bawah yang bisa
+        // bocor mengklaim fase saat ragu.
+        guard isConfirmed else { return nil }
         guard kind == .moon, let fraction = illuminationFraction else { return nil }
         return TextLocalization.text(
             Self.moonPhaseText(illuminationFraction: fraction, isWaxing: isWaxing))

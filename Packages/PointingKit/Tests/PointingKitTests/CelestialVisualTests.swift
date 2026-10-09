@@ -2361,16 +2361,17 @@ final class CelestialVisualTests: XCTestCase {
     /// **tidak** dimiliki pengguna yang melihat — kebalikan dari aksesibilitas.
     func testOnlyTheMoonSpeaksAPhase() {
         XCTAssertNil(CelestialVisual(object: object(id: "jupiter", kind: .planet))
-            .spokenPhase)
+            .spokenPhase(isConfirmed: true))
         XCTAssertNil(CelestialVisual(object: object(id: "sirius", kind: .star))
-            .spokenPhase)
+            .spokenPhase(isConfirmed: true))
         XCTAssertNil(CelestialVisual(object: object(id: "m42", kind: .deepSky))
-            .spokenPhase)
+            .spokenPhase(isConfirmed: true))
         // Bulan tanpa fraksi iluminasi: tidak ada fase yang bisa diklaim.
         XCTAssertNil(CelestialVisual(object: object(id: "moon", kind: .moon))
-            .spokenPhase)
+            .spokenPhase(isConfirmed: true))
         // Bulan dengan fraksi: ada.
-        XCTAssertNotNil(moon(fraction: 0.5, waxing: true).spokenPhase)
+        XCTAssertNotNil(moon(fraction: 0.5, waxing: true)
+            .spokenPhase(isConfirmed: true))
     }
 
     /// Fase yang tidak diketahui tidak pernah menjadi tebakan yang pasti.
@@ -2380,13 +2381,38 @@ final class CelestialVisualTests: XCTestCase {
     /// bentuk netralnya.
     func testUnknownDirectionNeverClaimsWaxingOrWaning() {
         let crescent = moon(fraction: 0.2, waxing: nil)
-        XCTAssertEqual(crescent.spokenPhase, LocalizedText.moonPhaseCrescent.indonesian)
-        XCTAssertNotEqual(crescent.spokenPhase, LocalizedText.moonPhaseWaxingCrescent.indonesian)
-        XCTAssertNotEqual(crescent.spokenPhase, LocalizedText.moonPhaseWaningCrescent.indonesian)
+        XCTAssertEqual(crescent.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseCrescent.indonesian)
+        XCTAssertNotEqual(crescent.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseWaxingCrescent.indonesian)
+        XCTAssertNotEqual(crescent.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseWaningCrescent.indonesian)
         let gibbous = moon(fraction: 0.8, waxing: nil)
-        XCTAssertEqual(gibbous.spokenPhase, LocalizedText.moonPhaseGibbous.indonesian)
+        XCTAssertEqual(gibbous.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseGibbous.indonesian)
         let quarter = moon(fraction: 0.5, waxing: nil)
-        XCTAssertEqual(quarter.spokenPhase, LocalizedText.moonPhaseQuarter.indonesian)
+        XCTAssertEqual(quarter.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseQuarter.indonesian)
+    }
+
+    /// Fase **tidak** diucapkan saat engine ragu — suara tidak boleh lebih
+    /// yakin daripada gambarnya.
+    ///
+    /// Cacat yang ditutup: `spokenPhase` dulu dipanggil tanpa ambang
+    /// `isConfirmed` di kedua app, sementara dua saudaranya
+    /// (`spokenDeepSkyMorphology`, `spokenStarColor`) sudah memakainya. Akibatnya
+    /// pada keadaan `.uncertain` — piringan Bulan digambar netral (tidak
+    /// mengklaim fase), badge bertuliskan "Ragu" — VoiceOver tetap
+    /// mengumumkan "Bulan sabit muda". Dua pengguna dengan keadaan yang sama
+    /// mendapat dua kebenaran berbeda: itu persis kelas false confidence yang
+    /// dilarang PRD. Diuji di sini (bukan di view) supaya ambangnya tidak bisa
+    /// hilang saat salah satu app merefaktor panggilannya.
+    func testMoonPhaseIsSilentWhenUncertain() {
+        // Sabit muda yang jelas: diucapkan saat yakin, diam saat ragu.
+        let crescent = moon(fraction: 0.2, waxing: true)
+        XCTAssertNotNil(crescent.spokenPhase(isConfirmed: true),
+                        "fase diucapkan saat engine yakin")
+        XCTAssertNil(crescent.spokenPhase(isConfirmed: false),
+                     "fase dibungkam saat engine ragu (ciri pengenal)")
+        // Purnama: juga diam saat ragu, bukan cuma sabit.
+        let full = moon(fraction: 1.0, waxing: true)
+        XCTAssertNotNil(full.spokenPhase(isConfirmed: true))
+        XCTAssertNil(full.spokenPhase(isConfirmed: false))
     }
 
     // MARK: - Warna spektral bintang (VoiceOver)

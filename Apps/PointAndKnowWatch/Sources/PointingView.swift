@@ -579,7 +579,13 @@ struct ObjectDetailView: View {
         // tentang bentuknya. `spokenPhase` mengembalikan `nil` untuk bukan
         // Bulan dan untuk fase yang tidak diketahui, jadi tidak ada yang
         // ditebak di sini.
-        if let phase = visual?.spokenPhase {
+        // Fase Bulan: satu-satunya informasi di panel ini yang **hanya** bisa
+        // dilihat. Sama seperti warna bintang dan bentuk objek langit dalam di
+        // bawahnya, fase adalah **ciri pengenal** — dan saat engine ragu gambar
+        // memakai piringan netral, jadi suara tidak boleh mengucapkan fase.
+        // `isConfirmed` diteruskan supaya pengumuman cocok dengan gambar, bukan
+        // lebih yakin darinya. (Lihat `MoonPhaseSpeech`.)
+        if let phase = visual?.spokenPhase(isConfirmed: isConfirmed) {
             parts.append(phase)
         }
         // Bentuk objek langit dalam: galaksi, gugus bola, gugus terbuka,
