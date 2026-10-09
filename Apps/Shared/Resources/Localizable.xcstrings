@@ -6783,6 +6783,61 @@
           }
         }
       }
+    },
+    "home.notCertain": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain yet"
+          }
+        }
+      }
+    },
+    "home.hotColdHaptics": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hot–cold haptics"
+          }
+        }
+      }
+    },
+    "home.crownNext": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn the crown for the next one"
+          }
+        }
+      }
+    },
+    "home.alsoClose": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is also close (%2$@). Turn the crown."
+          }
+        }
+      }
+    },
+    "home.position": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of %2$@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

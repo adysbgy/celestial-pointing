@@ -627,3 +627,48 @@ the counterpart exposed an older bug: the root `TabView` set
 **Verified.** iPhone 17 simulator, light-mode device, Jakarta at midnight:
 dark rendering, Saturn card, visible-now list
 (`Docs/watch-ux/after-iphone-sky-tab.png`).
+
+## ADR-014 — One at a time + hot–cold (2026-10-10)
+
+**Context.** In Indonesian skies only 1–3 objects are visible. Ady wants to
+point at one and get one name, never a list, even when two objects are close
+together (Docs/PRODUCT_V2_IDEA.md §2 and §4). Ady approved all four of the
+document's recommendations:
+- one answer plus the crown;
+- solar eclipses stay blocked;
+- Stellarium is optional;
+- online data comes later.
+
+**Decision.**
+- **One answer instead of a list.** The "Could be one of these" list is gone.
+  - `OneAtATime` ranks candidates by distance from the pointing direction plus
+    a brightness penalty of 2° per magnitude below the brightest candidate. In a
+    city sky, of two equally close objects, the one you can see is the brighter
+    one.
+  - The top candidate is shown large with the **"Not certain yet"** label and a
+    hazy visual. The engine's uncertainty is never shown as certain.
+  - **The Digital Crown** steps to the next candidate, one at a time, wrapping
+    round. VoiceOver can do the same with adjustable actions.
+  - If another candidate is within the 20° cone, a label names it with its sky
+    distance, e.g. "Castor is also close (5°). Turn the crown."
+- **Hot–cold.** While the guide ring is showing, the watch taps (`.click`) at a
+  rate set by the angular distance, like a Geiger counter:
+  - 60° or more: no taps;
+  - in between, from ~1.2 s down to ~0.2 s apart;
+  - 3° or less: 0.2 s apart.
+
+  The ring goes from blue to orange. The taps stop when the screen dims, the
+  ring disappears, or the "Hot–cold haptics" setting is off.
+
+**Verified.**
+- `OneAtATimeTests` (7 tests):
+  - brightness tie-break, while pointing distance still dominates;
+  - crown wrapping;
+  - Castor–Pollux 4.5° named as a close neighbour, Procyon not;
+  - tap rate and heat;
+  - Indonesian texts.
+- 46 mm simulator: Alnitak with Rigel named as close
+  (`Docs/watch-ux/after-one-at-a-time-46mm.png`).
+
+**Not verified.** Turning the crown and the feel of the taps on a real wrist.
+The simulator tool can't turn the crown.

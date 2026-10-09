@@ -18,6 +18,11 @@ struct HomeView: View {
     @StateObject private var guide = SkyGuideModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSkyHome = false
+    @AppStorage(HotColdTicker.enabledKey) private var hotColdEnabled = true
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    @StateObject private var ticker = HotColdTicker()
+    /// Posisi Digital Crown di antara kandidat (ADR-014).
+    @State private var crown = 0.0
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
@@ -50,6 +55,9 @@ struct HomeView: View {
                     .padding(.horizontal, 2)
                     .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: heroKey)
                 }
+                .onChange(of: heroKey) { _, _ in crown = 0 }
+                .onChange(of: tickerSeparation) { _, sep in ticker.update(separationDeg: sep) }
+                .onDisappear { ticker.update(separationDeg: nil) }
                 .fontDesign(.rounded)
                 .task {
                     // Langit bergeser pelan; sekali per menit cukup.
@@ -106,16 +114,30 @@ struct HomeView: View {
 
     private var currentHint: GuideHint? { guide.hint(for: engine.snapshot.calibratedPointing) }
 
+    /// Jarak untuk getaran panas–dingin: hanya saat cincin petunjuk tampil,
+    /// layar menyala, dan pengguna tidak mematikannya. Dibulatkan ke derajat
+    /// supaya `onChange` tidak berbunyi 50 kali per detik.
+    private var tickerSeparation: Int? {
+        guard hotColdEnabled, !isLuminanceReduced, heroKey == "guide" || heroKey == "moving-guide"
+                || heroKey.hasPrefix("guide-one-"),
+              let hint = currentHint else { return nil }
+        return Int(hint.separationDeg.rounded())
+    }
+
     /// Identitas pahlawan untuk animasi peralihan (bukan per sampel sensor).
     private var heroKey: String {
         if showsDaylight { return "day" }
         switch outcome {
         case .unavailable: return "unavailable"
-        case .holdSteady: return engine.snapshot.state == .idle ? "idle" : "moving"
+        case .holdSteady:
+            if engine.snapshot.state == .idle { return "idle" }
+            if let hint = currentHint, hint.separationDeg > engine.controller.config.coneDeg { return "moving-guide" }
+            return "moving"
         case .notSure: return "guide"
         case .single(let o): return "single-" + o.id
         case .possibleMatches(let list):
-            return list.count == 1 ? "guide-one-" + list[0].id : "possible-" + list.map(\.id).joined(separator: ",")
+            return list.count == 1 ? "guide-one-" + list[0].id
+                : "possible-" + list.map(\.id).sorted().joined(separator: ",")
         }
     }
 
@@ -190,35 +212,72 @@ struct HomeView: View {
                         .buttonStyle(.bordered)
                     }
                 } else {
-                    possibleList(objects)
+                    oneAtATime(OneAtATime(candidates: engine.snapshot.intent?.candidates ?? []),
+                               fallback: objects)
                 }
             }
         }
     }
 
-    private func possibleList(_ objects: [CelestialObject]) -> some View {
-        VStack(spacing: 4) {
-            Text(WatchHomeText.possibleTitle)
-                .font(.headline)
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-            ForEach(objects, id: \.id) { object in
+    /// Satu jawaban besar; crown berpindah ke kandidat berikutnya (ADR-014).
+    /// Hasil `.uncertain` tetap berlabel "Belum pasti" dan visualnya samar.
+    @ViewBuilder
+    private func oneAtATime(_ list: OneAtATime, fallback: [CelestialObject]) -> some View {
+        let index = Int(crown.rounded())
+        if let entry = list.entry(at: index) {
+            let object = entry.object
+            VStack(spacing: 4) {
+                CelestialVisualView(visual: CelestialVisual(object: object), diameter: 56, isConfirmed: false)
+                    .accessibilityHidden(true)
+                Text(WatchHomeText.notCertain)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(PointingTone.warning.color)
+                    .textCase(.uppercase)
+                Text(object.name)
+                    .font(.title2.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.opacity)
+                if let n = list.closeNeighbour(of: index, withinDeg: engine.controller.config.coneDeg) {
+                    Text(WatchHomeText.alsoClose(n.object.name, distanceDeg: n.distanceDeg))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                } else if list.count > 1 {
+                    Text(WatchHomeText.crownNext)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Button {
                     confirm(object)
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: object.kind.guideSymbol)
-                            .foregroundStyle(PointingTone.active.color)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(object.name).font(.body.weight(.semibold)).lineLimit(1)
-                            Text(object.kind.displayName).font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(WatchHomeText.confirmShort)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.bordered)
+                .handGestureShortcut(.primaryAction)
                 .accessibilityLabel(IdentificationText.confirm(object.name))
+                if list.count > 1 {
+                    Text(WatchHomeText.position(((index % list.count) + list.count) % list.count, of: list.count))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
             }
+            .focusable()
+            .digitalCrownRotation($crown, from: -1000, through: 1000, by: 1,
+                                  sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+            .accessibilityElement(children: .contain)
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: crown += 1
+                case .decrement: crown -= 1
+                @unknown default: break
+                }
+            }
+        } else if let first = fallback.first {
+            StateHero(symbol: "questionmark.circle", title: first.name, hint: WatchHomeText.notCertain)
         }
     }
 
@@ -253,11 +312,15 @@ struct GuideHero: View {
     let hint: GuideHint
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// 0 = dingin (biru), 1 = panas (oranye) — ADR-014.
+    private var heat: Double { HotCold.heat(separationDeg: hint.separationDeg) }
+    private var ringColor: Color { PointingTone.active.color.mix(with: PointingTone.warning.color, by: heat) }
+
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
                 Circle()
-                    .stroke(PointingTone.active.color.opacity(0.25), lineWidth: 3)
+                    .stroke(ringColor.opacity(0.35 + 0.45 * heat), lineWidth: 3 + 2 * heat)
                 ForEach(0..<12) { i in
                     Capsule()
                         .fill(Color.secondary.opacity(0.5))
@@ -267,7 +330,7 @@ struct GuideHero: View {
                 }
                 Image(systemName: "location.north.fill")
                     .font(.title3)
-                    .foregroundStyle(PointingTone.active.color)
+                    .foregroundStyle(ringColor)
                     .offset(y: -42)
                     .rotationEffect(.degrees(hint.arrowDeg))
                     .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: hint.arrowDeg)
@@ -459,6 +522,7 @@ struct WatchSettingsView: View {
     @AppStorage(NightModeStorage.key) private var nightMode = false
     @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
+    @AppStorage(HotColdTicker.enabledKey) private var hotColdOn = true
     private var linkSymbol: String { link.isReachable ? Self.symbolPhone : Self.symbolPhoneSlash }
     private static let symbolPhone = "iphone"
     private static let symbolPhoneSlash = "iphone.slash"
@@ -472,6 +536,7 @@ struct WatchSettingsView: View {
             Section {
                 Toggle(WatchHomeText.nightMode, isOn: $nightMode)
                 Toggle(WatchHomeText.soundOnLock, isOn: $audioCueEnabled)
+                Toggle(WatchHomeText.hotColdHaptics, isOn: $hotColdOn)
                 Toggle(isOn: $darkSky) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(WatchHomeText.darkSky)

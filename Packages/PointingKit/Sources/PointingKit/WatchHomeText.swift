@@ -35,6 +35,19 @@ public enum WatchHomeText {
     public static var visibleNow: String { TextLocalization.text(.homeVisibleNow) }
     public static var skyTab: String { TextLocalization.text(.homeSkyTab) }
     public static var confirmHint: String { TextLocalization.text(.homeConfirmHint) }
+    public static var notCertain: String { TextLocalization.text(.homeNotCertain) }
+    public static var hotColdHaptics: String { TextLocalization.text(.homeHotColdHaptics) }
+    public static var crownNext: String { TextLocalization.text(.homeCrownNext) }
+
+    /// "Castor juga dekat (4°). Putar crown."
+    public static func alsoClose(_ name: String, distanceDeg: Double) -> String {
+        TextLocalization.text(.homeAlsoClose, name, degrees(distanceDeg))
+    }
+
+    /// "1 dari 3" — posisi crown.
+    public static func position(_ index: Int, of count: Int) -> String {
+        TextLocalization.text(.homePosition, String(index + 1), String(count))
+    }
 
     /// "Bintang muncul sekitar 18.12" — jam dalam format lokal perangkat.
     public static func darkAt(_ date: Date, timeZone: TimeZone = .current) -> String {
@@ -135,6 +148,11 @@ public extension LocalizedText {
     static let homeVisibleNow = LocalizedText(key: "home.visibleNow", id: "Terlihat sekarang")
     static let homeSkyTab = LocalizedText(key: "home.skyTab", id: "Langit")
     static let homeConfirmHint = LocalizedText(key: "home.confirmHint", id: "Tunjuk dengan jam, lalu tekan \"Ya, itu dia\".")
+    static let homeNotCertain = LocalizedText(key: "home.notCertain", id: "Belum pasti")
+    static let homeHotColdHaptics = LocalizedText(key: "home.hotColdHaptics", id: "Getaran panas–dingin")
+    static let homeCrownNext = LocalizedText(key: "home.crownNext", id: "Putar crown untuk yang lain")
+    static let homeAlsoClose = LocalizedText(key: "home.alsoClose", id: "%@ juga dekat (%@). Putar crown.")
+    static let homePosition = LocalizedText(key: "home.position", id: "%@ dari %@")
     static let compassN = LocalizedText(key: "compass.n", id: "utara")
     static let compassNE = LocalizedText(key: "compass.ne", id: "timur laut")
     static let compassE = LocalizedText(key: "compass.e", id: "timur")
@@ -158,5 +176,6 @@ public extension LocalizedText {
         .homeDayTitle, .homeDayDarkAt, .homeDayNoDark, .homeTonight, .homeGuideTitle,
         .homeGuideDistance, .homeCalibrateFirst, .homeWhyNotSure, .homeNothingHere,
         .homeDarkSky, .homeDarkSkyHint, .homeVisibleNow, .homeSkyTab, .homeConfirmHint,
+        .homeNotCertain, .homeHotColdHaptics, .homeCrownNext, .homeAlsoClose, .homePosition,
     ]
 }
