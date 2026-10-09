@@ -6288,6 +6288,347 @@
           }
         }
       }
+    },
+    "home.aim.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at the sky"
+          }
+        }
+      }
+    },
+    "home.aim.hint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raise your arm toward what you see"
+          }
+        }
+      }
+    },
+    "home.holdStill": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold still…"
+          }
+        }
+      }
+    },
+    "home.possible.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could be one of these"
+          }
+        }
+      }
+    },
+    "home.notSure.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure yet"
+          }
+        }
+      }
+    },
+    "home.notSure.hint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point more precisely, then hold still"
+          }
+        }
+      }
+    },
+    "home.unavailable": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor unavailable"
+          }
+        }
+      }
+    },
+    "home.approxLocation": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approximate location"
+          }
+        }
+      }
+    },
+    "home.settings": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "home.technicalDetails": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technical details"
+          }
+        }
+      }
+    },
+    "home.developerSection": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Developer"
+          }
+        }
+      }
+    },
+    "home.nightMode": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night mode (red)"
+          }
+        }
+      }
+    },
+    "home.soundOnLock": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound when found"
+          }
+        }
+      }
+    },
+    "home.skyAndLocation": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky & location"
+          }
+        }
+      }
+    },
+    "home.phoneLink": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connection"
+          }
+        }
+      }
+    },
+    "home.confirmShort": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, that's it"
+          }
+        }
+      }
+    },
+    "home.whatIsIt": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That is"
+          }
+        }
+      }
+    },
+    "home.altitude": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ above the horizon"
+          }
+        }
+      }
+    },
+    "home.direction": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toward the %@"
+          }
+        }
+      }
+    },
+    "compass.n": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "north"
+          }
+        }
+      }
+    },
+    "compass.ne": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "northeast"
+          }
+        }
+      }
+    },
+    "compass.e": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "east"
+          }
+        }
+      }
+    },
+    "compass.se": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "southeast"
+          }
+        }
+      }
+    },
+    "compass.s": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "south"
+          }
+        }
+      }
+    },
+    "compass.sw": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "southwest"
+          }
+        }
+      }
+    },
+    "compass.w": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "west"
+          }
+        }
+      }
+    },
+    "compass.nw": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "northwest"
+          }
+        }
+      }
+    },
+    "brightness.veryBright": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Very bright"
+          }
+        }
+      }
+    },
+    "brightness.bright": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bright"
+          }
+        }
+      }
+    },
+    "brightness.moderate": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moderately bright"
+          }
+        }
+      }
+    },
+    "brightness.faint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faint"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

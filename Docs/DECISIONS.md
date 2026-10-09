@@ -502,3 +502,33 @@ be a stable product dependency.
 **Not verified.** Real mount behaviour. Real WatchConnectivity latency and
 context delivery. The 10 s / 3 s / 20 s constants are provisional (see
 VALIDATION.md).
+
+---
+
+## ADR-010 — Watch redesign: one screen, one job (2026-10-09)
+
+**Problem.** Ady, on his own Series 10: "the UI/UX is a mess, I don't
+understand it". The review (`Docs/WATCH_UX_REVIEW.md`) found:
+
+- seven or more competing blocks
+- technical numbers in the main flow
+- four toolbar icons
+- duplicated status
+- daylight advice that was wrong
+- developer tools in the product flow
+
+**Decision.** A new `HomeView` replaces `PointingView` as the root:
+
+- point → big name → "Yes, that's it" (Double Tap)
+- a `ResultView` with two plain facts and the telescope section
+- a native `WatchSettingsView` for everything else
+
+The old screen remains under Settings → Developer → Technical details. No
+engine logic changed. New copy goes in `WatchHomeText` (31 catalog keys,
+tested), and the "not sure" hint now shows the engine's real search reason.
+Spec: `Docs/WATCH_UX_SPEC.md`.
+
+**Verified** on 40, 42 and 49 mm simulators (en and id), with screenshots in
+`Docs/watch-ux/after/`.
+
+**Not verified.** A night-sky test by Ady on the real Watch.

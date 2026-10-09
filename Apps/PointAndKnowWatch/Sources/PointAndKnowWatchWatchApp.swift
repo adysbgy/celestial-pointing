@@ -44,8 +44,10 @@ struct PointAndKnowWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PointingView(engine: engine, motion: motion, link: link, location: location,
-                         telescope: telescope)
+            // Layar utama baru (ADR-010). Layar lama yang lengkap ada di
+            // Pengaturan → Detail teknis.
+            HomeView(engine: engine, motion: motion, link: link, location: location,
+                     telescope: telescope)
                 .onAppear(perform: start)
                 .onDisappear { stop() }
                 .sheet(isPresented: .init(
