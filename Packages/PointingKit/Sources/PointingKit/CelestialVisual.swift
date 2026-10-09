@@ -2061,8 +2061,8 @@ public extension CelestialVisual {
     /// menyala, supaya kabutnya tidak pernah menonjol keluar sabit dan
     /// membuatnya tampak lebih lebar daripada fraksi yang dihitung engine.
     static func venusHaze(centerY: Double = 0.0,
-                                 halfWidth: Double = 0.55,
-                                 halfHeight: Double = 0.72) -> HazeGeometry {
+                          halfWidth: Double = 0.55,
+                          halfHeight: Double = 0.72) -> HazeGeometry {
         HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
     }
 

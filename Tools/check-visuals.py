@@ -2221,7 +2221,7 @@ def read_venus_haze_from_swift(source):
     apa artinya, bukan pengecualian tersembunyi).
     """
     match = re.search(
-        r"public static func venusHaze\([\s\S]{0,400}?\)\s*->\s*HazeGeometry",
+        r"(?:public )?static func venusHaze\([\s\S]{0,400}?\)\s*->\s*HazeGeometry",
         source)
     if match is None:
         return None
@@ -6750,7 +6750,8 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         "kabut Venus dibaca dari model di view (bukan sudut CGRect ditulis ulang)",
         haze_call in view,
         f"view memanggil '{haze_call}' = {'ada' if haze_call in view else 'TIDAK'}"))
-    haze_model = "public static func venusHaze(" in model_src
+    # `public` boleh tidak ada: di dalam `public extension` ia berlebihan.
+    haze_model = re.search(r"\b(?:public )?static func venusHaze\(", model_src) is not None
     haze_port_fn = "def venus_haze(" in port
     # **Kenapa `_draw_haze` dan cabang berfase diperiksa terpisah.** Keduanya
     # situs yang berbeda, dan keduanya pernah memuat angka yang salah. Satu
