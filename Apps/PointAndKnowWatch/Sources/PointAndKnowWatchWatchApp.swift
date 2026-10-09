@@ -36,6 +36,8 @@ struct PointAndKnowWatchApp: App {
 
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
     @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+    /// Langit kota (bawaan) atau gelap — menentukan batas magnitudo (ADR-012).
+    @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
 
     /// Pemutar getaran. Satu instance untuk seluruh umur app: membuatnya ulang
     /// tiap render tidak berbahaya, tapi menyimpannya membuat pemetaan
@@ -62,6 +64,9 @@ struct PointAndKnowWatchApp: App {
                     set: { presented in onboardingSeen = !presented })) {
                     OnboardingView(onDone: { onboardingSeen = true })
                 }
+        }
+        .onChange(of: darkSky) { _, dark in
+            engine.setSkyQuality(SkyQualityStorage.quality(darkSky: dark))
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -90,6 +95,8 @@ struct PointAndKnowWatchApp: App {
         // dipanggil saat app aktif; ia hanya menandai timeline perlu dihitung
         // ulang, bukan menggambar langsung.
         engine.complicationReload = { WidgetCenter.shared.reloadAllTimelines() }
+
+        engine.setSkyQuality(SkyQualityStorage.quality(darkSky: darkSky))
 
         location.start()
         // Lokasi sungguhan datang setelah `start()`, jadi engine disambungkan

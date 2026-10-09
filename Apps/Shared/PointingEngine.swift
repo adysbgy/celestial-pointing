@@ -122,6 +122,15 @@ public final class PointingEngine: ObservableObject {
         return changed
     }
 
+    /// Pasang kualitas langit (ADR-012). Jawaban lama dibatalkan bila
+    /// penyaringnya berubah — sama seperti `setConfidencePolicy(_:)`.
+    public func setSkyQuality(_ quality: SkyQuality) {
+        if controller.setVisibilityPolicy(quality.visibilityPolicy) {
+            lastLockedObject = nil
+        }
+        publish(controller.snapshot)
+    }
+
     /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi jawaban
     /// yang sudah dihitung untuk langit lama **dibatalkan** — bukan dipertahankan.
     ///

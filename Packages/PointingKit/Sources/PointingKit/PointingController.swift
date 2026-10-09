@@ -321,6 +321,23 @@ public final class PointingController {
         return true
     }
 
+    /// Ganti kebijakan visibilitas (mis. langit kota ↔ gelap, ADR-012).
+    ///
+    /// Alasannya sama dengan `setConfidencePolicy(_:)`: jawaban yang sudah
+    /// ada dihitung dengan penyaring **lama**, jadi alur dihentikan dan
+    /// resolusi terakhir dibuang.
+    ///
+    /// - Returns: `true` bila kebijakannya benar-benar berubah.
+    @discardableResult
+    public func setVisibilityPolicy(_ policy: VisibilityPolicy) -> Bool {
+        guard policy != resolver.policy else { return false }
+        resolver.policy = policy
+        machine.stop()
+        lastResolution = nil
+        refreshSnapshot()
+        return true
+    }
+
     // MARK: - Sampel sensor
 
     /// Masukkan satu sampel `CMDeviceMotion`.

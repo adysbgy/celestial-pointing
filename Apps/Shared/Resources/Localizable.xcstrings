@@ -6728,6 +6728,28 @@
           }
         }
       }
+    },
+    "home.darkSky": {
+      "comment": "Pengaturan jam: kualitas langit (ADR-012).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark sky"
+          }
+        }
+      }
+    },
+    "home.darkSky.hint": {
+      "comment": "Pengaturan jam: kualitas langit (ADR-012).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on outside the city: clusters & nebulae are included"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -17,6 +17,7 @@ struct HomeView: View {
 
     @StateObject private var guide = SkyGuideModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSkyHome = false
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
@@ -58,6 +59,7 @@ struct HomeView: View {
                     }
                 }
                 .onChange(of: engine.location) { _, _ in guide.refresh(engine: engine, force: true) }
+                .onChange(of: darkSkyHome) { _, _ in guide.refresh(engine: engine, force: true) }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         NavigationLink {
@@ -112,7 +114,8 @@ struct HomeView: View {
         case .holdSteady: return engine.snapshot.state == .idle ? "idle" : "moving"
         case .notSure: return "guide"
         case .single(let o): return "single-" + o.id
-        case .possibleMatches(let list): return "possible-" + list.map(\.id).joined(separator: ",")
+        case .possibleMatches(let list):
+            return list.count == 1 ? "guide-one-" + list[0].id : "possible-" + list.map(\.id).joined(separator: ",")
         }
     }
 
@@ -172,29 +175,49 @@ struct HomeView: View {
                 }
                 .accessibilityElement(children: .contain)
             case .possibleMatches(let objects):
-                VStack(spacing: 4) {
-                    Text(WatchHomeText.possibleTitle)
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
-                        .accessibilityAddTraits(.isHeader)
-                    ForEach(objects, id: \.id) { object in
+                if objects.count == 1, let only = objects.first,
+                   let hint = currentHint, hint.objectID == only.id {
+                    // Satu kandidat, tapi belum cukup dekat untuk yakin:
+                    // tunjukkan arahnya, bukan daftar berisi satu baris.
+                    VStack(spacing: 6) {
+                        GuideHero(hint: hint)
                         Button {
-                            confirm(object)
+                            confirm(only)
                         } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: object.kind.guideSymbol)
-                                    .foregroundStyle(PointingTone.active.color)
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text(object.name).font(.body.weight(.semibold)).lineLimit(1)
-                                    Text(object.kind.displayName).font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(IdentificationText.confirm(only.name))
+                                .frame(maxWidth: .infinity)
                         }
-                        .accessibilityLabel(IdentificationText.confirm(object.name))
+                        .buttonStyle(.bordered)
                     }
+                } else {
+                    possibleList(objects)
                 }
+            }
+        }
+    }
+
+    private func possibleList(_ objects: [CelestialObject]) -> some View {
+        VStack(spacing: 4) {
+            Text(WatchHomeText.possibleTitle)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(objects, id: \.id) { object in
+                Button {
+                    confirm(object)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: object.kind.guideSymbol)
+                            .foregroundStyle(PointingTone.active.color)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(object.name).font(.body.weight(.semibold)).lineLimit(1)
+                            Text(object.kind.displayName).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityLabel(IdentificationText.confirm(object.name))
             }
         }
     }
@@ -448,6 +471,7 @@ struct WatchSettingsView: View {
 
     @AppStorage(NightModeStorage.key) private var nightMode = false
     @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
+    @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
     private var linkSymbol: String { link.isReachable ? Self.symbolPhone : Self.symbolPhoneSlash }
     private static let symbolPhone = "iphone"
     private static let symbolPhoneSlash = "iphone.slash"
@@ -461,6 +485,14 @@ struct WatchSettingsView: View {
             Section {
                 Toggle(WatchHomeText.nightMode, isOn: $nightMode)
                 Toggle(WatchHomeText.soundOnLock, isOn: $audioCueEnabled)
+                Toggle(isOn: $darkSky) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(WatchHomeText.darkSky)
+                        Text(WatchHomeText.darkSkyHint)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 NavigationLink(TextLocalization.text(.calibrationTitle)) {
                     CalibrationView(engine: engine, motion: motion, link: link)
                 }

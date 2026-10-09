@@ -572,3 +572,28 @@ And at night 43% of the sky has no object within the 20° cone.
 
 **Not verified.** Which frames the real Series 10 reports, and how accurate its
 compass is near metal.
+
+## ADR-012 — City sky by default (2026-10-09)
+
+**Problem.** A rehearsal for Ady's first night test (Jakarta, 18:45, 19:30
+and 21:00 WIB) used the default naked-eye limit of mag 6.0, a dark-sky value.
+- Half the "visible" objects were deep-sky objects that can't be seen from a
+  city: Lagoon, Omega, Butterfly, the Sagittarius cluster.
+- Pointing exactly at Antares gave "Maybe Antares / Butterfly / Ptolemy".
+- The guide could send the user toward a nebula they can't see.
+
+**Decision.**
+- New `SkyQuality` setting: **city** (the default) or **dark**.
+  - City: limit mag **3.0**, moonlight tightening 0.5 mag.
+  - Dark: the old policy.
+- Watch Settings has a "Dark sky" toggle.
+- `PointingController.setVisibilityPolicy(_:)` applies the change live and
+  invalidates old answers, like `setConfidencePolicy(_:)`.
+- The iPhone app keeps the dark-sky policy for now.
+
+**Verified.** `TonightRehearsalTests`, with the city sky in Jakarta at all
+three times:
+- 7 or 8 visible objects, including Saturn.
+- **Every** visible object locks to itself when pointed at.
+- Saturn, Vega, Antares and Fomalhaut still lock with a 7° wrist error.
+- With the dark-sky policy, Antares is ambiguous (kept as a regression proof).

@@ -30,6 +30,8 @@ public enum WatchHomeText {
     public static var calibrateFirst: String { TextLocalization.text(.homeCalibrateFirst) }
     public static var whyNotSure: String { TextLocalization.text(.homeWhyNotSure) }
     public static var nothingHere: String { TextLocalization.text(.homeNothingHere) }
+    public static var darkSky: String { TextLocalization.text(.homeDarkSky) }
+    public static var darkSkyHint: String { TextLocalization.text(.homeDarkSkyHint) }
 
     /// "Bintang muncul sekitar 18.12" — jam dalam format lokal perangkat.
     public static func darkAt(_ date: Date, timeZone: TimeZone = .current) -> String {
@@ -125,6 +127,8 @@ public extension LocalizedText {
     static let homeCalibrateFirst = LocalizedText(key: "home.calibrateFirst", id: "Arah kompas belum ada. Kalibrasi dulu.")
     static let homeWhyNotSure = LocalizedText(key: "home.whyNotSure", id: "Kenapa belum yakin?")
     static let homeNothingHere = LocalizedText(key: "home.nothingHere", id: "Tidak ada benda terang di sini")
+    static let homeDarkSky = LocalizedText(key: "home.darkSky", id: "Langit gelap")
+    static let homeDarkSkyHint = LocalizedText(key: "home.darkSky.hint", id: "Nyalakan di luar kota: gugus & nebula ikut dicari")
     static let compassN = LocalizedText(key: "compass.n", id: "utara")
     static let compassNE = LocalizedText(key: "compass.ne", id: "timur laut")
     static let compassE = LocalizedText(key: "compass.e", id: "timur")
@@ -147,5 +151,6 @@ public extension LocalizedText {
         .brightnessVeryBright, .brightnessBright, .brightnessModerate, .brightnessFaint,
         .homeDayTitle, .homeDayDarkAt, .homeDayNoDark, .homeTonight, .homeGuideTitle,
         .homeGuideDistance, .homeCalibrateFirst, .homeWhyNotSure, .homeNothingHere,
+        .homeDarkSky, .homeDarkSkyHint,
     ]
 }

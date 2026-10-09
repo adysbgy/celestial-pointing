@@ -107,3 +107,33 @@ Ruled out:
   that rule.
 - **Catalog.** A larger catalog of ~150 stars brighter than mag 3 would cut
   the "nothing here" share well below 43%.
+
+## Rehearsal for the first night test (ADR-012)
+
+Setup: Jakarta, 9 Oct 2026, 18:45 / 19:30 / 21:00 WIB, production pipeline,
+north-referenced frame.
+
+### Dark-sky limit (mag 6.0)
+
+- About half the targets are invisible deep-sky objects.
+- Antares, and every cluster in the south-west, came out "possible matches".
+
+### City limit (mag 3.0), the new default
+
+| Time (WIB) | Visible | Locks on itself |
+|---|---|---|
+| 18:45 | 8 | 8 |
+| 19:30 | 7 | 7 |
+| 21:00 | 7 | 7 |
+
+The objects:
+- Saturn (east, 20°, rising to 53°)
+- Vega (north-west)
+- Altair (high, north to west)
+- Deneb (north, low)
+- Fomalhaut (south-east, high)
+- Antares (south-west, setting)
+- Achernar (south-east, low)
+- Hadar (south-west, very low, only early)
+
+With a 7° pointing error, Saturn, Vega, Antares and Fomalhaut still lock.
