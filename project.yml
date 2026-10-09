@@ -163,6 +163,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel dan hasil pengukurannya ditandai belum tentu sah."
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
         # Teleskop di jaringan lokal (ADR-008). Hanya dipakai bila fitur
