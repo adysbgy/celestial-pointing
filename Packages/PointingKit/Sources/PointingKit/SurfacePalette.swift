@@ -135,11 +135,21 @@ extension SurfacePalette {
     /// versus redup. Kehilangan ini sekarang tercatat dan diuji, bukan
     /// dikomodkan diam-diam oleh pilihan warna.
     ///
-    /// Permukaan dinaikkan (0.045 / 0.068 / 0.090) justru karena plafon itu:
-    /// semakin gelap permukaannya, semakin dekat ke 5.25:1 teksnya, dan langkah
-    /// antarpermukaan harus ≥ 5/255 agar kartu tidak menyatu dengan latar.
+    /// **Latar 0.032, bukan 0.045.** Ia dulu 0.045 supaya kartu (0.068) jelas
+    /// di atasnya, tetapi angka itu diukur terhadap latar **datar** — padahal
+    /// latar yang digambar adalah gradien `surface2` di atasnya
+    /// (`backdropAtmosphereAlpha`). Diukur: tangga 0.045 → 0.068 (0.023) tidak
+    /// cukup untuk menampung atmosfer **dan** menyisakan langkah kartu di atas
+    /// ambang — disapu dari 0.00 sampai 0.30, **tidak ada** alpha yang lolos
+    /// keduanya (pada alpha 0.05 atmosfernya sudah di bawah satu langkah
+    /// kuantisasi, sementara langkah kartunya baru 0.0202). Latar 0.032
+    /// memperlebar tangga jadi 0.036, dan di situ keduanya muat: atmosfer
+    /// 1.63/255, langkah kartu 0.0296.
+    ///
+    /// Ini juga lebih gelap, dan itu arah yang benar untuk mode malam: lebih
+    /// sedikit cahaya merah yang dipancarkan, dengan hierarki yang tetap utuh.
     public static let night = SurfacePalette(
-        background: SurfaceColor(red: 0.045, green: 0.000, blue: 0.000),
+        background: SurfaceColor(red: 0.032, green: 0.000, blue: 0.000),
         surface1: SurfaceColor(red: 0.068, green: 0.000, blue: 0.000),
         surface2: SurfaceColor(red: 0.090, green: 0.000, blue: 0.000),
         textPrimary: SurfaceColor(red: 1.000, green: 0.000, blue: 0.000),
@@ -194,8 +204,80 @@ extension SurfacePalette {
     /// hampir sempurna, dan kartu menyatu dengan latar.
     public static let minimumVisibleSurfaceStep = 0.02
 
-    private func largestChannelGap(from a: SurfaceColor, to b: SurfaceColor) -> Double {
+    /// Jarak minimum kartu ke **latar yang benar-benar digambar**.
+    ///
+    /// Sedikit di atas `minimumVisibleSurfaceStep`, dan sengaja: latar itu
+    /// gradien, jadi kartu di puncaknya punya jarak paling tipis, sementara
+    /// ambang yang dipakai bergantung pada warna yang tidak pernah berubah —
+    /// kalau jarak puncaknya duduk **tepat** di ambang, satu pembulatan sRGB
+    /// membuatnya jatuh di bawah tanpa ada yang sengaja mengubah apa pun.
+    ///
+    /// Mode malam yang mengikat nilainya: tangganya paling pendek
+    /// (0.045 → 0.068), jadi ia yang lebih dulu kehabisan ruang saat atmosfer
+    /// latar dinaikkan. Diukur: 0.55 → 0.0018 (cacat), 0.10 → 0.0185,
+    /// 0.06 → 0.0203. Margin yang dipakai (0.022) memberi 0.0016 di atas
+    /// ambang lantai, bukan nol.
+    public static let minimumCardLadderMargin = 0.022
+
+    /// Lantai "atmosfer latar terlihat": satu langkah kuantisasi sRGB.
+    ///
+    /// Sengaja **1/255**, bukan angka yang lebih ambisius. Gradien latar
+    /// dibeli untuk rasa, bukan untuk dibaca: yang bisa diklaim tanpa
+    /// mengarang ambang baru adalah bahwa puncaknya benar-benar jatuh di
+    /// kuantisasi yang berbeda dari latar. Kalau ia lebih kecil dari satu
+    /// langkah 8-bit, puncak itu secara literal adalah warna latar.
+    ///
+    /// Diukur di ambang ini: 0.55 → 0.0407/0.0248 (lolos dengan lebar),
+    /// 0.11 → 0.0081/0.0064 (≈2/255 dan 1,6/255, lolos dengan tipis), dan
+    /// turun ke ~0.05 akan membuat mode malam gagal — jadi lantai ini memang
+    /// mengikat, bukan hiasan.
+    public static let minimumBackdropAtmosphere = 1.0 / 255.0
+
+    /// Kepekatan atmosfer latar: `surface2` di atas `background`.
+    ///
+    /// **Kenapa angka ini pindah ke sini.** Sebelumnya `0.55` hidup di dalam
+    /// `appBackground` di `Apps/Shared/SurfaceTokens.swift` — lapisan yang
+    /// **tidak bisa dijalankan uji di Linux**. Akibatnya setiap klaim kontras
+    /// dan setiap ambang "langkah permukaan" diukur terhadap tiga warna token,
+    /// sementara latar yang sungguh-sungguh digambar adalah **campuran** yang
+    /// tidak ada di himpunan itu. Kartu jam yang seharusnya "jelas lebih terang
+    /// dari latar" tenggelam ke atmosfernya sendiri tanpa satu pun uji merah.
+    ///
+    /// 0.55 tidak pernah dipilih dengan mengukur langkah kartu-latar; ia
+    /// dipilih supaya gradiennya terasa. Diukur: pada 0.55 langkah kartu-latar
+    /// tinggal **0.0137** (siang) / **0.0018** (malam) terhadap ambang 0.02,
+    /// dan di **kedua** mode puncak gradiennya malah lebih terang dari kartu —
+    /// latar paling belakang jadi elemen paling menyala.
+    ///
+    /// 0.11 dipilih dengan menyapu rentangnya terhadap tiga syarat sekaligus:
+    /// langkah kartu > `minimumCardLadderMargin`, atmosfer ≥ 1/255 (satu
+    /// langkah kuantisasi, satu-satunya "terlihat" yang bisa diklaim), dan
+    /// kartu tetap lebih terang dari puncak latar. Terukur pada 0.11:
+    /// langkah 0.0246 (siang) / 0.0296 (malam), atmosfer 2.08/255 dan
+    /// 1.63/255, kartu lebih terang di keduanya.
+    public static let backdropAtmosphereAlpha = 0.11
+
+    /// Selisih kanal sRGB terbesar antara dua warna.
+    ///
+    /// Dipakai `surfaceSteps` **dan** pemeriksaan latar: satu definisi
+    /// "seberapa banyak lebih terang", supaya ambang yang sama benar-benar
+    /// berarti sama di kedua tempat.
+    public static func largestChannelGap(from a: SurfaceColor, to b: SurfaceColor) -> Double {
         Swift.max(Swift.abs(b.red - a.red),
                   Swift.max(Swift.abs(b.green - a.green), Swift.abs(b.blue - a.blue)))
+    }
+
+    /// Warna di puncak gradien latar — satu-satunya latar yang kartu pernah
+    /// bertemu, karena gradien itu digambar di balik segalanya.
+    ///
+    /// Ada di model, bukan di view, karena view tidak bisa dijalankan di Linux:
+    /// warna yang hanya dirakit di view adalah warna yang tidak bisa ditahan
+    /// uji apa pun, dan itulah bagaimana `0.55` lolos selama ini.
+    public func backdrop(atmosphereAlpha alpha: Double) -> SurfaceColor {
+        surface2.composited(over: background, alpha: alpha)
+    }
+
+    private func largestChannelGap(from a: SurfaceColor, to b: SurfaceColor) -> Double {
+        SurfacePalette.largestChannelGap(from: a, to: b)
     }
 }

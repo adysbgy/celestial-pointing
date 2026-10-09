@@ -249,6 +249,77 @@ final class SurfacePaletteTests: XCTestCase {
         XCTAssertGreaterThan(SurfacePalette.night.weakestTextContrast, 4.5)
     }
 
+    // MARK: - Latar yang benar-benar digambar
+
+    /// **Regresi: kontras diuji terhadap warna yang tidak pernah muncul di
+    /// layar.**
+    ///
+    /// Latar app bukan `background` datar. Ia gradien dari `surface2` yang
+    /// diredupkan di atas `background` — dan gradien itu digambar di balik
+    /// **segalanya**, termasuk di belakang kartu. Karena itu satu-satunya
+    /// latar yang kartu pernah bertemu bukan `background`, melainkan campuran
+    /// di puncak gradien itu.
+    ///
+    /// Seluruh klaim WCAG di berkas ini dihitung terhadap `background`,
+    /// `surface1`, dan `surface2` — tiga warna token. Campuran gradiennya
+    /// tidak pernah masuk ke himpunan itu, jadi langkah kartu-latar bisa
+    /// menyusut di bawah ambang "terlihat di gelap" tanpa satu pun uji yang
+    /// merah. Diukur pada alpha 0.55 (nilai lama): siang **0.0137**, malam
+    /// **0.0018**, terhadap ambang 0.02 — malam praktis satu bidang, dan itu
+    /// tepat mode yang dipakai di gelap, tempat ambang ini ada untuk bekerja.
+    ///
+    /// Uji ini menahan alpha atmosfer dari **model**, bukan dari view: view
+    /// tidak bisa dijalankan di Linux, jadi angka yang tidak punya nama di
+    /// model adalah angka yang tidak bisa dijaga siapa pun.
+    func testThePaintedBackdropStillLeavesTheCardAVisibleStep() {
+        for (name, palette) in [("siang", SurfacePalette.day), ("malam", SurfacePalette.night)] {
+            let backdrop = palette.backdrop(
+                atmosphereAlpha: SurfacePalette.backdropAtmosphereAlpha)
+            let step = SurfacePalette.largestChannelGap(from: backdrop, to: palette.surface1)
+            XCTAssertGreaterThan(step, SurfacePalette.minimumCardLadderMargin,
+                "\(name): kartu tenggelam ke latar gradien (\(step) ≤ "
+                + "\(SurfacePalette.minimumCardLadderMargin)) — kedalaman hilang tepat di "
+                + "mode yang dipakai di gelap")
+        }
+    }
+
+    /// Arah kedua dari uji di atas: gradien latar **tidak boleh mati**.
+    ///
+    /// Menurunkan alpha sampai nol akan membuat uji sebelumnya hijau tanpa
+    /// memperbaiki apa pun — kartunya memang lebih terang dari latar datar,
+    /// tapi atmosfernya hilang dan rasa premium yang dibeli brief ikut hilang.
+    /// Jadi lantainya diuji juga, bukan hanya langit-langitnya.
+    ///
+    /// Lantainya **satu langkah kuantisasi sRGB**, bukan ambang "langkah
+    /// permukaan" yang lebih besar: gradien latar tidak dimaksudkan untuk
+    /// dibaca sebagai lapisan, hanya untuk terasa. Yang bisa diklaim tanpa
+    /// mengarang ambang baru adalah bahwa puncaknya jatuh di kuantisasi yang
+    /// berbeda dari latar — di bawah itu, ia secara literal warna latar.
+    func testTheBackdropStillHasAtmosphere() {
+        for (name, palette) in [("siang", SurfacePalette.day), ("malam", SurfacePalette.night)] {
+            let backdrop = palette.backdrop(
+                atmosphereAlpha: SurfacePalette.backdropAtmosphereAlpha)
+            let atmosphere = SurfacePalette.largestChannelGap(
+                from: palette.background, to: backdrop)
+            XCTAssertGreaterThanOrEqual(atmosphere, SurfacePalette.minimumBackdropAtmosphere,
+                "\(name): gradien latar jatuh di bawah satu langkah kuantisasi "
+                + "(\(atmosphere) < \(SurfacePalette.minimumBackdropAtmosphere)) — menghapusnya "
+                + "adalah cara termudah membuat uji langkah kartu hijau")
+        }
+    }
+
+    /// Gradien latar bukan permukaan kartu: kalau puncaknya **lebih terang**
+    /// dari kartu, hierarki terbalik — latar paling belakang justru paling
+    /// menyala, dan "makin dekat ke pengguna makin terang" berhenti benar.
+    func testTheBackdropNeverOutshinesTheCards() {
+        for (name, palette) in [("siang", SurfacePalette.day), ("malam", SurfacePalette.night)] {
+            let backdrop = palette.backdrop(
+                atmosphereAlpha: SurfacePalette.backdropAtmosphereAlpha)
+            XCTAssertLessThan(backdrop.red, palette.surface1.red,
+                "\(name): puncak latar lebih terang dari kartu — hierarki permukaan terbalik")
+        }
+    }
+
     /// Aksen boleh lebih vibrant dari teks, tapi harus tetap bisa
     /// dibedakan dari permukaannya — kalau aksen kontrasnya sama dengan
     /// permukaan, elemen "aktif" jadi tidak terlihat aktif.

@@ -1,3 +1,129 @@
+## Progres terakhir (9 Okt 2026 — kontras diuji terhadap warna yang tidak pernah muncul di layar: kartu jam tenggelam ke atmosfernya sendiri)
+
+### Cacatnya: latar yang diuji bukan latar yang digambar
+
+`SurfacePaletteTests` menghitung seluruh klaim WCAG brief terhadap tiga warna
+token: `background`, `surface1`, `surface2`. Yang **benar-benar digambar** di
+balik segalanya adalah gradien keempat — `surface2` diredupkan di atas
+`background` — dan warna campuran itu tidak ada di himpunan mana pun yang
+diuji.
+
+Kepekatannya hidup sebagai literal `0.55` di dalam `appBackground` di
+`Apps/Shared/SurfaceTokens.swift`, lapisan yang **tidak bisa dijalankan uji di
+Linux**. Diukur lewat jalur model (bukan dikira-kira):
+
+```
+mode     langkah kartu↔latar (alpha 0.55)   ambang
+siang              0.0137                    0.02
+malam              0.0018                    0.02
+```
+
+Mode malam praktis **satu bidang**: 0.45/255 pada layar OLED yang merender
+kehitaman hampir sempurna. Itu tepat mode yang dipakai di gelap, tempat ambang
+"terlihat di gelap" ada untuk bekerja — dan yang menutupinya bukan cuma satu
+kartu, melainkan setiap kartu di kedua app.
+
+### Yang ditemukan saat memperbaikinya: mode malam tidak bisa menampung keduanya
+
+Percobaan pertama hanya menurunkan alpha. Diukur, dan jawabannya bukan alpha:
+tangga mode malam (latar 0.045 → kartu 0.068) hanya **0.023**, dan disapu dari
+alpha 0.00 sampai 0.30, **tidak ada satu pun** yang memenuhi ketiga syarat
+sekaligus — langkah kartu di atas ambang, atmosfer di atas satu langkah
+kuantisasi, dan kartu lebih terang dari puncak latar:
+
+```
+alpha   langkah kartu   atmosfer    kartu > latar
+0.55        0.0018        0.0248        TIDAK
+0.05        0.0202        0.0025        ya
+```
+
+Pada 0.05 atmosfernya sudah 0.6/255 (di bawah kuantisasi) sementara langkah
+kartunya masih di bawah ambang. **Ruangan fisiknya yang tidak cukup, bukan
+angkanya yang salah.**
+
+### Perbaikannya: latar malam diperdalam, alpha dipindah ke model dan diukur
+
+  - `SurfacePalette.night.background` 0.045 → **0.032** memperlebar tangga jadi
+    0.036, dan di situ keduanya muat. Lebih gelap juga arah yang benar untuk
+    mode malam: lebih sedikit cahaya merah, hierarki tetap utuh.
+  - `SurfacePalette.backdropAtmosphereAlpha = 0.11` — konstanta **model**, bukan
+    literal di view. 0.55 dipilih untuk rasa; 0.11 dipilih dengan menyapu
+    rentangnya terhadap tiga syarat sekaligus.
+  - `SurfacePalette.backdrop(atmosphereAlpha:)` dan `largestChannelGap(from:to:)`
+    jadi API publik: warna campuran dan definisi "seberapa banyak lebih terang"
+    sekarang punya nama di lapisan yang **bisa diuji**, supaya ambang yang sama
+    benar-benar berarti sama di kedua tempat.
+  - `minimumCardLadderMargin = 0.022` (sedikit di atas ambang lantai, karena
+    puncak gradien tidak boleh duduk tepat di ambang) dan
+    `minimumBackdropAtmosphere = 1/255` (satu langkah kuantisasi — satu-satunya
+    "terlihat" yang bisa diklaim tanpa mengarang ambang baru).
+
+Terukur pada nilai yang dipakai:
+
+```
+mode    langkah kartu   margin     atmosfer      kartu > latar
+siang      0.0246      +0.0026    2.08/255          ya
+malam      0.0296      +0.0076    1.63/255          ya
+```
+
+### Tiga uji, tiga kelas yang berbeda — dibuktikan berbunyi
+
+`Tools`-nya bukan harness baru: tiga uji langsung di `SurfacePaletteTests`,
+masing-masing menjaga satu arah. Disapu tiga nilai, dan **tiap nilai
+menyalakan pemeriksaan yang berbeda**:
+
+```
+alpha 0.55  (cacat asal)   ThePaintedBackdropStillLeavesTheCardAVisibleStep  MERAH
+                           TheBackdropNeverOutshinesTheCards                 MERAH
+alpha 0.00  (atmosfer mati) TheBackdropStillHasAtmosphere                     MERAH
+alpha 0.05  (terlalu redup) TheBackdropStillHasAtmosphere                     MERAH
+```
+
+Uji ketiga itu yang paling penting: **menurunkan alpha sampai nol** adalah cara
+termudah membuat uji langkah kartu hijau tanpa memperbaiki apa pun, jadi
+lantainya diuji juga — bukan hanya langit-langitnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 699 | **702** (+3 uji latar) |
+| Pemeriksaan visual | 624 | 624 |
+| Aturan UI | 29 | 29 (Aturan 10 memaksa README 699→702) |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 702 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → hijau (gerbang ini tidak
+    menyentuh `SurfacePalette`; warna gambar prosedural datang dari
+    `CelestialVisual`/`NightVisual`, bukan dari token permukaan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - `./swift-ui-lint.sh` → Aturan 10 bersih (README 702). Gerbang itu **masih
+    merah karena berkas lain** — `NumberFormatTests.swift` memuat aksara CJK
+    (英尺) di komentar WIP milik agent paralel, tertangkap Aturan 3. Berkas itu
+    **tidak disentuh** siklus ini; saya tidak menstage atau memperbaikinya.
+  - Mutasi: tiga nilai alpha disapu, masing-masing menyalakan pemeriksaan yang
+    berbeda (tabel di atas); sumber dipulihkan ke 0.11 dan diverifikasi.
+
+### Yang TIDAK diklaim
+
+  - Ambang `minimumBackdropAtmosphere` = 1/255 adalah **lantai kuantisasi**,
+    bukan ambang persepsi yang diukur terhadap mata. Gradien latar memang tidak
+    dimaksudkan untuk dibaca; yang bisa diklaim tanpa mengarang angka baru
+    hanyalah bahwa puncaknya jatuh di warna 8-bit yang berbeda dari latar.
+  - Gerbang ini menjaga langkah **kartu↔latar** dan **latar↔puncaknya**. Ia
+    tidak mengukur gradien di sepanjang sumbunya (posisi berhentinya puncak),
+    dan tidak mengukur tampilan sesungguhnya di layar OLED — hanya modelnya.
+  - Latar mode malam 0.032 adalah **keputusan yang diukur**, bukan nilai
+    astronomis: ia dipilih karena 0.045 membuat ketiga syarat mustahil
+    dipenuhi bersama, bukan karena 0.032 punya arti fisis.
+  - Warna gambar prosedural (planet, Bulan, bintang) tidak tersentuh: mereka
+    datang dari `CelestialVisual`, bukan dari token permukaan, jadi gerbang
+    visual tidak berubah sedikit pun.
+
+---
+
 ## Progres terakhir (9 Okt 2026 — gerbang paritas docstring inti spiral: menutup "Belum dikerjakan" yang tercatat sejak 8 Okt)
 
 ### Yang dikerjakan: mengukur ulang angka yang dikutip gerbang, bukan mengutipnya

@@ -51,12 +51,21 @@ extension SurfacePalette {
     /// `Color` polos, bukan `Material`: material di atas latar yang diketahui
     /// warnanya bisa menggeser kontras ke arah yang tidak diuji, dan
     /// kontras-lah yang sudah kita nyatakan.
+    ///
+    /// **Kepekatannya dibaca dari model, bukan ditulis di sini.** Angka ini
+    /// pernah hidup sebagai literal `0.55` di berkas ini — lapisan yang tidak
+    /// bisa dijalankan uji di Linux — sehingga langkah kartu-latar diukur
+    /// terhadap token yang bukan latar sebenarnya, dan kartu jam tenggelam ke
+    /// atmosfernya sendiri (malam 0.0018 terhadap ambang 0.02) tanpa satu pun
+    /// uji merah. Sekarang nilainya di `SurfacePalette.backdropAtmosphereAlpha`
+    /// dan dijaga `testThePaintedBackdropStillLeavesTheCardAVisibleStep`.
     static var appBackground: LinearGradient {
         let palette = active
         // Gradien sangat tipis pada latar: cukup untuk terasa seperti
         // atmosfer, tidak cukup untuk mengganggu pembacaan teks.
         return LinearGradient(
-            colors: [palette.surface2.color.opacity(0.55), palette.background.color],
+            colors: [palette.surface2.color.opacity(SurfacePalette.backdropAtmosphereAlpha),
+                     palette.background.color],
             startPoint: .top, endPoint: .bottom)
     }
 }
