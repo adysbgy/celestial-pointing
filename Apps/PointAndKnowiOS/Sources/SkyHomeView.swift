@@ -32,6 +32,11 @@ struct SkyHomeView: View {
                         Text(WatchHomeText.tonight)
                     }
                 }
+                if !guide.phenomena.isEmpty {
+                    Section(PhenomenonText.sectionTitle) {
+                        ForEach(guide.phenomena.prefix(8)) { phenomenonRow($0) }
+                    }
+                }
                 Section {
                     Toggle(isOn: $darkSky) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -128,6 +133,30 @@ struct SkyHomeView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func phenomenonRow(_ p: Phenomenon) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(PhenomenonText.title(p)).font(.body.weight(.semibold))
+            Text(PhenomenonText.when(p.date))
+                .font(.footnote)
+                .foregroundStyle(Color.nightAwareSecondary)
+            HStack(spacing: 6) {
+                Label(PhenomenonText.visibility(p), systemImage: p.visibilitySymbol)
+                if let detail = PhenomenonText.detail(p) {
+                    Text(detail)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(Color.nightAwareSecondary)
+            if p.requiresSolarFilter {
+                Label(PhenomenonText.solarFilter, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(PointingTone.warning.color)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 
     private func targetRow(_ target: PointingTarget) -> some View {

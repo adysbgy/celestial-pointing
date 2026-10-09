@@ -23,6 +23,7 @@ struct HomeView: View {
     @StateObject private var ticker = HotColdTicker()
     /// Posisi Digital Crown di antara kandidat (ADR-014).
     @State private var crown = 0.0
+    @State private var showPhenomena = false
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
@@ -37,6 +38,16 @@ struct HomeView: View {
                         hero
                             .id(heroKey)
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        if let pinned = guide.pinned {
+                            Button {
+                                guide.pin(nil)
+                            } label: {
+                                Label(PhenomenonText.guiding(PhenomenonText.title(pinned)), systemImage: "xmark.circle.fill")
+                                    .font(.footnote)
+                                    .lineLimit(2)
+                            }
+                            .accessibilityHint(PhenomenonText.stopGuiding)
+                        }
                         if needsCalibration {
                             NavigationLink {
                                 CalibrationView(engine: engine, motion: motion, link: link)
@@ -68,7 +79,14 @@ struct HomeView: View {
                 }
                 .onChange(of: engine.location) { _, _ in guide.refresh(engine: engine, force: true) }
                 .onChange(of: darkSkyHome) { _, _ in guide.refresh(engine: engine, force: true) }
+                .sheet(isPresented: $showPhenomena) { PhenomenaView(guide: guide) }
                 .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showPhenomena = true } label: {
+                            Image(systemName: "sparkles")
+                        }
+                        .accessibilityLabel(PhenomenonText.sectionTitle)
+                    }
                     ToolbarItem(placement: .topBarLeading) {
                         NavigationLink {
                             WatchSettingsView(engine: engine, motion: motion, link: link,
@@ -118,7 +136,7 @@ struct HomeView: View {
     /// layar menyala, dan pengguna tidak mematikannya. Dibulatkan ke derajat
     /// supaya `onChange` tidak berbunyi 50 kali per detik.
     private var tickerSeparation: Int? {
-        guard hotColdEnabled, !isLuminanceReduced, heroKey == "guide" || heroKey == "moving-guide"
+        guard hotColdEnabled, !isLuminanceReduced, heroKey == "guide" || heroKey == "moving-guide" || heroKey == "pinned"
                 || heroKey.hasPrefix("guide-one-"),
               let hint = currentHint else { return nil }
         return Int(hint.separationDeg.rounded())
@@ -126,6 +144,7 @@ struct HomeView: View {
 
     /// Identitas pahlawan untuk animasi peralihan (bukan per sampel sensor).
     private var heroKey: String {
+        if showsPinnedGuide { return "pinned" }
         if showsDaylight { return "day" }
         switch outcome {
         case .unavailable: return "unavailable"
@@ -141,9 +160,24 @@ struct HomeView: View {
         }
     }
 
+    /// Sedang memandu ke fenomena dan belum terkunci pada sasarannya.
+    private var showsPinnedGuide: Bool {
+        guard let pinned = guide.pinned else { return false }
+        if case .single(let o) = outcome, pinned.targetIDs.contains(o.id) { return false }
+        return outcome != .unavailable
+    }
+
     @ViewBuilder
     private var hero: some View {
-        if showsDaylight {
+        if showsPinnedGuide, let pinned = guide.pinned {
+            if let hint = currentHint {
+                GuideHero(hint: hint)
+            } else {
+                StateHero(symbol: pinned.kind.symbol,
+                          title: PhenomenonText.title(pinned),
+                          hint: PhenomenonText.notUpYet(PhenomenonText.targetName(pinned)))
+            }
+        } else if showsDaylight {
             DayHero(darkAt: guide.darkAt, tonight: guide.tonight)
         } else {
             switch outcome {
@@ -284,6 +318,8 @@ struct HomeView: View {
     // MARK: Konfirmasi
 
     private func confirm(_ object: CelestialObject) {
+        // Sasaran fenomena sudah ditemukan: pemandu selesai tugasnya.
+        if guide.pinned?.targetIDs.contains(object.id) == true { guide.pin(nil) }
         confirmation = WatchConfirmation(object: object, delivery: .sending)
         showResult = true
         // Konfirmasi sudah terjadi di jam (pencocokan lokal, luring): haptic
@@ -314,7 +350,9 @@ struct GuideHero: View {
 
     /// 0 = dingin (biru), 1 = panas (oranye) — ADR-014.
     private var heat: Double { HotCold.heat(separationDeg: hint.separationDeg) }
-    private var ringColor: Color { PointingTone.active.color.mix(with: PointingTone.warning.color, by: heat) }
+    /// Pita warna, bukan campuran: campuran biru–oranye di tengah jalan
+    /// menjadi abu-abu kehijauan yang kusam. Dingin = biru, hangat (≤30°) = oranye.
+    private var ringColor: Color { heat >= 0.5 ? PointingTone.warning.color : PointingTone.active.color }
 
     var body: some View {
         VStack(spacing: 6) {

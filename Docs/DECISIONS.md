@@ -672,3 +672,52 @@ document's recommendations:
 
 **Not verified.** Turning the crown and the feel of the taps on a real wrist.
 The simulator tool can't turn the crown.
+
+## ADR-015 — Offline sky-event calendar + guiding to an event (2026-10-10)
+
+**Context.** Phase 2 of `Docs/PRODUCT_V2_IDEA.md`: "Malam ini ada apa" ("What's
+up tonight"), with hot–cold guidance to an event. Ady's decisions:
+- no guiding to the Sun;
+- online data (ISS, comets) later.
+
+**Decision.**
+- **CelestialEngine `SkyEventSearch` + `AstronomyKitEvents`** (Astronomy
+  Engine, offline):
+  - lunar eclipses, with the kind derived from the durations, because the
+    wrapper maps penumbral to `.none`;
+  - local solar eclipses (Sun altitude, obscuration);
+  - Moon quarters;
+  - Venus/Mercury maximum elongation.
+- **PointingKit `PhenomenaCalendar.upcoming`** covers a 45-day window (eclipses:
+  2 years):
+  - Moon–planet conjunctions (≤ 6°) and planet–planet conjunctions (≤ 3°),
+    sampled every 2 h from a whole hour;
+  - meteor showers from an approximate IMO table, at the dark hour when the
+    radiant is highest and at least 20° up;
+  - eclipses, full Moon, and elongation.
+
+  "Visible from here" means everything is at least 10° up while the sky is
+  dark; for a solar eclipse, the Sun is above the horizon. A solar eclipse is
+  `requiresSolarFilter` and is **never** guidable.
+- **Watch:**
+  - a sparkles button opens the calendar: list → detail → "Guide me there";
+  - the ring and hot–cold taps then point to the event's target: the radiant,
+    or for a conjunction the first object already above the horizon;
+  - a "Guiding to …" chip with an ✕ stops it;
+  - confirming the target ends guiding.
+- **iPhone:** a "Sky events" section in the Sky tab.
+
+**Verified.**
+- `PhenomenaTests` (Jakarta, from 10 Oct 2026):
+  - Moon 0.15° from Jupiter before dawn on 3 Nov, visible;
+  - Orionids best before dawn, guidable;
+  - penumbral lunar eclipse on 18 Jul 2027 visible, the Feb 2027 one not;
+  - partial solar eclipse on 22 Jul 2028, 89% covered, visible but never
+    guided;
+  - with no event search, conjunctions and meteors still appear;
+  - the radiant moves over time.
+- 46 mm simulator: list, detail, guiding to the Orionid radiant
+  (`Docs/watch-ux/after-phenomena-list-46mm.png`,
+  `after-guide-orionid-46mm.png`).
+
+**Not verified.** Guiding outdoors on a real watch.

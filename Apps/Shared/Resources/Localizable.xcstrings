@@ -6838,6 +6838,259 @@
           }
         }
       }
+    },
+    "phen.title": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky events"
+          }
+        }
+      }
+    },
+    "phen.guide": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guide me there"
+          }
+        }
+      }
+    },
+    "phen.stopGuide": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop guiding"
+          }
+        }
+      }
+    },
+    "phen.solarFilter": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solar filter required. The app never guides you to the Sun."
+          }
+        }
+      }
+    },
+    "phen.conjunction": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ near %2$@"
+          }
+        }
+      }
+    },
+    "phen.lunar.total": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.lunar.partial": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.lunar.penumbral": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penumbral lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.total": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.annular": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annular solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.partial": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.meteor": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ meteor shower"
+          }
+        }
+      }
+    },
+    "phen.fullMoon": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Moon"
+          }
+        }
+      }
+    },
+    "phen.elongation.evening": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ in the evening sky"
+          }
+        }
+      }
+    },
+    "phen.elongation.morning": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ in the morning sky"
+          }
+        }
+      }
+    },
+    "phen.detail.apart": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ apart"
+          }
+        }
+      }
+    },
+    "phen.detail.covered": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ covered"
+          }
+        }
+      }
+    },
+    "phen.detail.zhr": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to ~%@ meteors/hour in a dark sky"
+          }
+        }
+      }
+    },
+    "phen.visibleHere": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible from here"
+          }
+        }
+      }
+    },
+    "phen.notVisibleHere": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not visible from here"
+          }
+        }
+      }
+    },
+    "phen.guiding": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guiding to %@"
+          }
+        }
+      }
+    },
+    "phen.notUpYet": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ isn't up yet from here"
+          }
+        }
+      }
+    },
+    "phen.radiant": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ radiant"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
