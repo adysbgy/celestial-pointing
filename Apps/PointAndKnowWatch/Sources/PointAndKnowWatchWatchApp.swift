@@ -23,8 +23,11 @@ struct PointAndKnowWatchApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     // Sumbu tunjuk = lengan bawah, dari cara jam dipakai (ADR-002).
+    // Kerangka berutara bila tersedia (ADR-011): kerangka sembarang membuat
+    // azimut acak tiap sesi, dan itu salah satu akar "Belum yakin" terus.
     @StateObject private var engine = PointingEngine(
-        config: PointingControllerConfig(aim: WearConfiguration.current.forearmAim)
+        config: PointingControllerConfig(aim: WearConfiguration.current.forearmAim,
+                                         frame: .preferredOnThisDevice)
     )
     @StateObject private var motion = MotionLogger()
     @StateObject private var link = WatchLinkService()

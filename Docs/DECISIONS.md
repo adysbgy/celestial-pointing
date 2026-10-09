@@ -532,3 +532,43 @@ Spec: `Docs/WATCH_UX_SPEC.md`.
 `Docs/watch-ux/after/`.
 
 **Not verified.** A night-sky test by Ady on the real Watch.
+
+## ADR-011 — North-referenced frame, daylight screen, live guide (2026-10-09)
+
+**Problem.** On his real Watch at 13:44 WIB, Ady saw "Not sure yet" every
+time. The evidence is in `Docs/WATCH_NOT_SURE_ANALYSIS.md`: it was daytime, so
+220 of 220 sampled directions had no candidate. The watch also used
+`xArbitraryZVertical`, whose azimuth is random each session until calibration.
+And at night 43% of the sky has no object within the 20° cone.
+
+**Decision.**
+- **Frame.** The watch prefers `xTrueNorthZVertical`, then
+  `xMagneticNorthZVertical`, then arbitrary.
+  - If true north is refused at runtime (`CMErrorTrueNorthNotAvailable`, e.g.
+    no location permission), `MotionLogger` drops to the next frame.
+  - Calibration still applies on top as an azimuth correction.
+  - On an arbitrary frame, Home shows "Calibrate first".
+- **Daylight.** When the sky is bright and nothing passes the filters, Home
+  shows "It's daytime", the time of civil dusk (Sun at −6°), and the three
+  brightest objects one hour after dark. It no longer shows a generic
+  "Not sure".
+- **Guide.** When not locked, Home shows a compass ring whose marker points
+  to the nearest *visible* object, with its distance. This covers both
+  searching and moving while far from every object.
+  - The guide never locks, never plays the success haptic, and never enables
+    GoTo.
+- **Unchanged.** The PRD rule that the Moon/Venus are rejected in daylight.
+  Allowing very bright objects (mag ≤ −3.5) by day is an open product decision.
+
+**Verified.**
+- Unit tests in `SkyGuideTests`:
+  - arrow geometry, including across north;
+  - nearest object;
+  - the report's afternoon has zero visible objects;
+  - Jakarta dusk falls at 18:0x WIB;
+  - tonight list;
+  - frame order and fallback.
+- 46 mm simulator screenshots: `Docs/watch-ux/after-*-46mm.png`.
+
+**Not verified.** Which frames the real Series 10 reports, and how accurate its
+compass is near metal.

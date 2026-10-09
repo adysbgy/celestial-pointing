@@ -6629,6 +6629,105 @@
           }
         }
       }
+    },
+    "home.day.title": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It's daytime"
+          }
+        }
+      }
+    },
+    "home.day.darkAt": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stars appear around %@"
+          }
+        }
+      }
+    },
+    "home.day.noDark": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No dark sky in the next 24 h"
+          }
+        }
+      }
+    },
+    "home.tonight": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonight"
+          }
+        }
+      }
+    },
+    "home.guide.title": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to %@"
+          }
+        }
+      }
+    },
+    "home.guide.distance": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ to go"
+          }
+        }
+      }
+    },
+    "home.calibrateFirst": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No compass heading yet. Calibrate first."
+          }
+        }
+      }
+    },
+    "home.whyNotSure": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why not sure?"
+          }
+        }
+      }
+    },
+    "home.nothingHere": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing bright here"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

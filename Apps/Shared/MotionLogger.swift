@@ -77,6 +77,7 @@ public final class MotionLogger: ObservableObject {
         ) { [weak self] motion, error in
             guard let self else { return }
             if let error {
+                if self.fallBackFrame(after: error, controller: controller) { return }
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa yang sedang membaca katalog, jadi
                 // menampilkannya apa adanya akan menyisipkan satu baris
@@ -150,6 +151,25 @@ public final class MotionLogger: ObservableObject {
         publishSensorLoss()
     }
 
+    /// Turun ke kerangka berikutnya bila kerangka ini ditolak saat berjalan.
+    ///
+    /// Utara sebenarnya butuh izin lokasi dan kompas; tanpa itu CoreMotion
+    /// menolak kerangkanya dengan `CMErrorTrueNorthNotAvailable`. Itu bukan
+    /// sensor mati — utara magnetis masih jauh lebih baik daripada menyerah,
+    /// dan jauh lebih baik daripada arah sembarang (ADR-011).
+    private func fallBackFrame(after error: Error, controller: PointingController) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == CMErrorDomain,
+              ns.code == Int(CMErrorTrueNorthNotAvailable.rawValue),
+              let next = controller.config.frame.fallback(within: AttitudeReferenceFrame.availableOnThisDevice)
+        else { return false }
+        if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }
+        controller.stop()
+        controller.config.frame = next
+        start(controller: controller)
+        return true
+    }
+
     /// Beritahu pemanggil bahwa sensor hilang, memakai saluran yang sama dengan
     /// sampel sensor — supaya cuplikan di UI tidak tertinggal di keadaan lama.
     private func publishSensorLoss() {
@@ -174,6 +194,11 @@ extension CMAttitudeReferenceFrame {
 
 extension AttitudeReferenceFrame {
     /// Kerangka yang dilaporkan tersedia oleh perangkat ini.
+    /// Kerangka terbaik di perangkat ini (ADR-011): berutara bila bisa.
+    public static var preferredOnThisDevice: AttitudeReferenceFrame {
+        preferred(from: availableOnThisDevice)
+    }
+
     static var availableOnThisDevice: [AttitudeReferenceFrame] {
         let mask = CMMotionManager.availableAttitudeReferenceFrames()
         return allCases.filter { mask.contains(CMAttitudeReferenceFrame($0)) }

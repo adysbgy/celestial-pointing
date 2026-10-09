@@ -24,6 +24,36 @@ public enum WatchHomeText {
     public static var phoneLink: String { TextLocalization.text(.homePhoneLink) }
     public static var confirmShort: String { TextLocalization.text(.homeConfirmShort) }
     public static var whatIsIt: String { TextLocalization.text(.homeWhatIsIt) }
+    public static var dayTitle: String { TextLocalization.text(.homeDayTitle) }
+    public static var dayNoDark: String { TextLocalization.text(.homeDayNoDark) }
+    public static var tonight: String { TextLocalization.text(.homeTonight) }
+    public static var calibrateFirst: String { TextLocalization.text(.homeCalibrateFirst) }
+    public static var whyNotSure: String { TextLocalization.text(.homeWhyNotSure) }
+    public static var nothingHere: String { TextLocalization.text(.homeNothingHere) }
+
+    /// "Bintang muncul sekitar 18.12" — jam dalam format lokal perangkat.
+    public static func darkAt(_ date: Date, timeZone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: NumberFormat.activeLocaleId)
+        f.timeZone = timeZone
+        f.setLocalizedDateFormatFromTemplate("Hm")
+        return TextLocalization.text(.homeDayDarkAt, f.string(from: date))
+    }
+
+    /// "Geser ke Jupiter".
+    public static func guideTitle(_ name: String) -> String {
+        TextLocalization.text(.homeGuideTitle, name)
+    }
+
+    /// "25° lagi".
+    public static func guideDistance(_ deg: Double) -> String {
+        TextLocalization.text(.homeGuideDistance, degrees(deg))
+    }
+
+    /// Sudut bulat tanpa tanda negatif: "25°".
+    public static func degrees(_ deg: Double) -> String {
+        NumberFormat.decimal(max(0, deg), fractionDigits: 0) + "°"
+    }
 
     public static func altitude(_ deg: Double) -> String {
         TextLocalization.text(.homeAltitude, NumberFormat.decimal(max(0, deg), fractionDigits: 0) + "°")
@@ -86,6 +116,15 @@ public extension LocalizedText {
     static let homeWhatIsIt = LocalizedText(key: "home.whatIsIt", id: "Itu adalah")
     static let homeAltitude = LocalizedText(key: "home.altitude", id: "%@ di atas cakrawala")
     static let homeDirection = LocalizedText(key: "home.direction", id: "Arah %@")
+    static let homeDayTitle = LocalizedText(key: "home.day.title", id: "Masih siang")
+    static let homeDayDarkAt = LocalizedText(key: "home.day.darkAt", id: "Bintang muncul sekitar %@")
+    static let homeDayNoDark = LocalizedText(key: "home.day.noDark", id: "Langit tidak gelap dalam 24 jam")
+    static let homeTonight = LocalizedText(key: "home.tonight", id: "Malam ini")
+    static let homeGuideTitle = LocalizedText(key: "home.guide.title", id: "Geser ke %@")
+    static let homeGuideDistance = LocalizedText(key: "home.guide.distance", id: "%@ lagi")
+    static let homeCalibrateFirst = LocalizedText(key: "home.calibrateFirst", id: "Arah kompas belum ada. Kalibrasi dulu.")
+    static let homeWhyNotSure = LocalizedText(key: "home.whyNotSure", id: "Kenapa belum yakin?")
+    static let homeNothingHere = LocalizedText(key: "home.nothingHere", id: "Tidak ada benda terang di sini")
     static let compassN = LocalizedText(key: "compass.n", id: "utara")
     static let compassNE = LocalizedText(key: "compass.ne", id: "timur laut")
     static let compassE = LocalizedText(key: "compass.e", id: "timur")
@@ -106,5 +145,7 @@ public extension LocalizedText {
         .homeConfirmShort, .homeWhatIsIt, .homeAltitude, .homeDirection,
         .compassN, .compassNE, .compassE, .compassSE, .compassS, .compassSW, .compassW, .compassNW,
         .brightnessVeryBright, .brightnessBright, .brightnessModerate, .brightnessFaint,
+        .homeDayTitle, .homeDayDarkAt, .homeDayNoDark, .homeTonight, .homeGuideTitle,
+        .homeGuideDistance, .homeCalibrateFirst, .homeWhyNotSure, .homeNothingHere,
     ]
 }

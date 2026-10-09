@@ -15,6 +15,8 @@ struct HomeView: View {
     @ObservedObject var location: LocationProvider
     @ObservedObject var telescope: TelescopeControlStore
 
+    @StateObject private var guide = SkyGuideModel()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
@@ -27,6 +29,17 @@ struct HomeView: View {
                     VStack(spacing: 8) {
                         TelescopeStopBar(store: telescope)
                         hero
+                            .id(heroKey)
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        if needsCalibration {
+                            NavigationLink {
+                                CalibrationView(engine: engine, motion: motion, link: link)
+                            } label: {
+                                Label(WatchHomeText.calibrateFirst, systemImage: "location.north.line")
+                                    .font(.footnote)
+                            }
+                            .tint(PointingTone.warning.color)
+                        }
                         if engine.location.isFallback {
                             Label(WatchHomeText.approxLocation, systemImage: "location.slash")
                                 .font(.caption2)
@@ -34,7 +47,17 @@ struct HomeView: View {
                         }
                     }
                     .padding(.horizontal, 2)
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: heroKey)
                 }
+                .fontDesign(.rounded)
+                .task {
+                    // Langit bergeser pelan; sekali per menit cukup.
+                    while !Task.isCancelled {
+                        guide.refresh(engine: engine)
+                        try? await Task.sleep(for: .seconds(30))
+                    }
+                }
+                .onChange(of: engine.location) { _, _ in guide.refresh(engine: engine, force: true) }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         NavigationLink {
@@ -62,68 +85,115 @@ struct HomeView: View {
 
     // MARK: Pahlawan per keadaan
 
+    /// Kerangka tanpa utara dan belum dikalibrasi: azimut acak (ADR-011).
+    private var needsCalibration: Bool {
+        engine.snapshot.hasSensor
+            && !engine.controller.config.frame.hasAbsoluteHeading
+            && !engine.snapshot.isCalibrated
+    }
+
+    /// Siang dan tidak ada yang bisa dikenali: tampilkan kapan gelap, bukan
+    /// "Belum yakin" tanpa ujung.
+    private var showsDaylight: Bool {
+        guard !guide.isDark else { return false }
+        switch outcome {
+        case .single, .possibleMatches, .unavailable: return false
+        case .holdSteady, .notSure: return guide.visible.isEmpty
+        }
+    }
+
+    private var currentHint: GuideHint? { guide.hint(for: engine.snapshot.calibratedPointing) }
+
+    /// Identitas pahlawan untuk animasi peralihan (bukan per sampel sensor).
+    private var heroKey: String {
+        if showsDaylight { return "day" }
+        switch outcome {
+        case .unavailable: return "unavailable"
+        case .holdSteady: return engine.snapshot.state == .idle ? "idle" : "moving"
+        case .notSure: return "guide"
+        case .single(let o): return "single-" + o.id
+        case .possibleMatches(let list): return "possible-" + list.map(\.id).joined(separator: ",")
+        }
+    }
+
     @ViewBuilder
     private var hero: some View {
-        switch outcome {
-        case .unavailable:
-            StateHero(symbol: "sensor.tag.radiowaves.forward", title: WatchHomeText.unavailable, hint: nil)
-        case .holdSteady:
-            if engine.snapshot.state == .idle {
-                StateHero(symbol: "scope", title: WatchHomeText.aimTitle, hint: WatchHomeText.aimHint)
-            } else {
-                StateHero(symbol: "hand.raised", title: WatchHomeText.holdStill, hint: nil)
-                    .accessibilityAddTraits(.updatesFrequently)
-            }
-        case .notSure:
-            // Alasan yang sebenarnya bila engine tahu (mis. langit masih
-            // terang), bukan saran umum "tunjuk lebih tepat".
-            StateHero(symbol: engine.snapshot.searchHint == .daylight ? "sun.max" : "questionmark.circle",
-                      title: WatchHomeText.notSureTitle,
-                      hint: engine.snapshot.searchHint?.message ?? WatchHomeText.notSureHint)
-        case .single(let object):
-            VStack(spacing: 4) {
-                if let visual = engine.visualForDisplayedObject {
-                    CelestialVisualView(visual: visual, diameter: 44, isConfirmed: true)
-                        .accessibilityHidden(true)
+        if showsDaylight {
+            DayHero(darkAt: guide.darkAt, tonight: guide.tonight)
+        } else {
+            switch outcome {
+            case .unavailable:
+                StateHero(symbol: "sensor.tag.radiowaves.forward", title: WatchHomeText.unavailable, hint: nil)
+            case .holdSteady:
+                if engine.snapshot.state == .idle {
+                    StateHero(symbol: "scope", title: WatchHomeText.aimTitle, hint: WatchHomeText.aimHint)
+                } else if let hint = currentHint, hint.separationDeg > engine.controller.config.coneDeg {
+                    // Bergerak dan jauh dari benda mana pun: tunjukkan arahnya
+                    // langsung, jangan hanya "tahan diam".
+                    GuideHero(hint: hint)
+                } else {
+                    StateHero(symbol: "hand.raised", title: WatchHomeText.holdStill, hint: nil)
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
-                Text(object.name)
-                    .font(.title2.bold())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(WatchHomeText.subtitle(object))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Button {
-                    confirm(object)
-                } label: {
-                    Text(WatchHomeText.confirmShort)
-                        .frame(maxWidth: .infinity)
+            case .notSure:
+                if let hint = currentHint {
+                    GuideHero(hint: hint)
+                } else {
+                    StateHero(symbol: "questionmark.circle",
+                              title: WatchHomeText.nothingHere,
+                              hint: engine.snapshot.searchHint?.message ?? WatchHomeText.notSureHint)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(PointingTone.success.color)
-                .foregroundStyle(.black)
-                // Ketuk dua kali mengonfirmasi tanpa menurunkan lengan.
-                .handGestureShortcut(.primaryAction)
-                .accessibilityLabel(IdentificationText.confirm(object.name))
-            }
-            .accessibilityElement(children: .contain)
-        case .possibleMatches(let objects):
-            VStack(spacing: 4) {
-                Text(WatchHomeText.possibleTitle)
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(objects, id: \.id) { object in
+            case .single(let object):
+                VStack(spacing: 4) {
+                    if let visual = engine.visualForDisplayedObject {
+                        CelestialVisualView(visual: visual, diameter: 64, isConfirmed: true)
+                            .accessibilityHidden(true)
+                    }
+                    Text(object.name)
+                        .font(.title2.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(WatchHomeText.subtitle(object))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Button {
                         confirm(object)
                     } label: {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(object.name).font(.body.bold()).lineLimit(1)
-                            Text(object.kind.displayName).font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(WatchHomeText.confirmShort)
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PointingTone.success.color)
+                    .foregroundStyle(.black)
+                    // Ketuk dua kali mengonfirmasi tanpa menurunkan lengan.
+                    .handGestureShortcut(.primaryAction)
                     .accessibilityLabel(IdentificationText.confirm(object.name))
+                }
+                .accessibilityElement(children: .contain)
+            case .possibleMatches(let objects):
+                VStack(spacing: 4) {
+                    Text(WatchHomeText.possibleTitle)
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(objects, id: \.id) { object in
+                        Button {
+                            confirm(object)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: object.kind.guideSymbol)
+                                    .foregroundStyle(PointingTone.active.color)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(object.name).font(.body.weight(.semibold)).lineLimit(1)
+                                    Text(object.kind.displayName).font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .accessibilityLabel(IdentificationText.confirm(object.name))
+                    }
                 }
             }
         }
@@ -150,6 +220,117 @@ struct HomeView: View {
                 // GoTo hanya untuk objek yang diterima iPhone lewat kanal langsung.
                 if delivery == .live { telescope.confirm(objectID: object.id) }
             }
+        }
+    }
+}
+
+/// Petunjuk arah hidup: cincin kompas dengan penanda yang berputar ke benda
+/// terlihat terdekat, jaraknya di tengah. Selalu memberi langkah berikutnya.
+struct GuideHero: View {
+    let hint: GuideHint
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .stroke(PointingTone.active.color.opacity(0.25), lineWidth: 3)
+                ForEach(0..<12) { i in
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.5))
+                        .frame(width: 2, height: i % 3 == 0 ? 8 : 4)
+                        .offset(y: -42)
+                        .rotationEffect(.degrees(Double(i) * 30))
+                }
+                Image(systemName: "location.north.fill")
+                    .font(.title3)
+                    .foregroundStyle(PointingTone.active.color)
+                    .offset(y: -42)
+                    .rotationEffect(.degrees(hint.arrowDeg))
+                    .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: hint.arrowDeg)
+                VStack(spacing: 0) {
+                    Image(systemName: hint.kind.guideSymbol)
+                        .font(.title3)
+                        .foregroundStyle(PointingTone.active.color)
+                    Text(verbatim: WatchHomeText.degrees(hint.separationDeg))
+                        .font(.title2.weight(.semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(reduceMotion ? nil : .smooth, value: Int(hint.separationDeg))
+                }
+            }
+            .frame(width: 96, height: 96)
+            .accessibilityHidden(true)
+            Text(WatchHomeText.guideTitle(hint.name))
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(WatchHomeText.guideTitle(hint.name))
+        .accessibilityValue(WatchHomeText.guideDistance(hint.separationDeg))
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+}
+
+/// Siang hari: jujur bahwa langit masih terang, kapan gelap, dan apa yang
+/// akan terlihat malam ini — bukan "Belum yakin" tanpa ujung.
+struct DayHero: View {
+    let darkAt: Date?
+    let tonight: [PointingTarget]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "sun.max.fill")
+                .font(.largeTitle)
+                .symbolRenderingMode(.multicolor)
+                .symbolEffect(.pulse, options: .repeating.speed(0.3), isActive: !reduceMotion)
+                .accessibilityHidden(true)
+            Text(WatchHomeText.dayTitle)
+                .font(.title3.weight(.bold))
+            Text(darkAt.map { WatchHomeText.darkAt($0) } ?? WatchHomeText.dayNoDark)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            if !tonight.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(WatchHomeText.tonight)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(tonight) { target in
+                        HStack(spacing: 6) {
+                            Image(systemName: target.kind.guideSymbol)
+                                .foregroundStyle(PointingTone.active.color)
+                                .frame(width: 18)
+                                .accessibilityHidden(true)
+                            Text(target.name).font(.body.weight(.medium))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+extension ObjectKind {
+    /// Simbol kecil per jenis benda untuk daftar dan petunjuk.
+    var guideSymbol: String {
+        switch self {
+        case .moon: return "moon.fill"
+        case .planet: return "circle.circle.fill"
+        case .star: return "sparkle"
+        case .deepSky: return "hurricane"
+        case .sun: return "sun.max.fill"
         }
     }
 }
@@ -294,6 +475,9 @@ struct WatchSettingsView: View {
                       systemImage: linkSymbol)
             }
             Section(WatchHomeText.developerSection) {
+                NavigationLink(WatchHomeText.whyNotSure) {
+                    WhyNotSureView(engine: engine)
+                }
                 Button(WatchHomeText.technicalDetails) { showTechnical = true }
                 NavigationLink {
                     PointingLabView(engine: engine, motion: motion, link: link)
@@ -310,5 +494,32 @@ struct WatchSettingsView: View {
             PointingView(engine: engine, motion: motion, link: link,
                          location: location, telescope: telescope)
         }
+    }
+}
+
+/// Pengembang: alasan mentah di balik "Belum yakin", untuk difoto dari jam
+/// sungguhan saat log perangkat tidak terjangkau (ADR-011).
+struct WhyNotSureView: View {
+    @ObservedObject var engine: PointingEngine
+    @StateObject private var guide = SkyGuideModel()
+
+    var body: some View {
+        let rows = WhyNotSureReport.rows(snapshot: engine.snapshot,
+                                         frame: engine.controller.config.frame,
+                                         locationIsFallback: engine.location.isFallback,
+                                         sunAltitudeDeg: guide.sunAltitudeDeg,
+                                         visibleCount: guide.visible.count,
+                                         nearest: guide.hint(for: engine.snapshot.calibratedPointing))
+        List(rows) { row in
+            HStack {
+                Text(verbatim: row.id).foregroundStyle(.secondary)
+                Spacer()
+                Text(verbatim: row.value).multilineTextAlignment(.trailing)
+            }
+        }
+        .font(.caption2)
+        .monospacedDigit()
+        .navigationTitle(WatchHomeText.whyNotSure)
+        .onAppear { guide.refresh(engine: engine, force: true) }
     }
 }
