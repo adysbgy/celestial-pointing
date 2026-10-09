@@ -398,17 +398,23 @@ MIN_ARM_DEGREES = 12
 #:
 #: Angka ini memisahkan **cangkang bersambung** dari **untaian manik**, dan
 #: itulah satu-satunya hal yang membedakan nebula planetari dari gugus
-#: bintang di layar. Diukur (`Tools/bukti-mutasi-cangkang.py`, fuzziness kasus
-#: render 0.8):
+#: bintang di layar. Diukur (`Tools/bukti-mutasi-cangkang.py`):
 #:
-#:   - 8 blob @45°, lebar 0.30 R (tata letak lama) — 0.18  MANIK
-#:   - 16 blob @22.5°, lebar 0.26 R (sekarang)       — 0.77  CANGKANG
+#:   - 8 blob @45°, lebar 0.30 R (tata letak lama) — 0.00…0.18  MANIK
+#:   - 16 blob @22.5°, lebar 0.26 R                 — 0.60…0.77  manik di M57
+#:   - 24 blob @15°,   lebar 0.26 R (sekarang)      — 0.84…0.85  CANGKANG
 #:
-#: Ambang 0.50 duduk di antara keduanya dengan jarak yang lebar ke dua arah,
-#: jadi ia tidak merah karena perubahan kecil di tempat lain dan tidak hijau
-#: pada tata letak yang benar-benar terputus. Batas bawahnya yang penting:
-#: angka 0.18 dari tata letak lama tidak boleh pernah dianggap lulus.
-MIN_SHELL_CONTINUITY = 0.50
+#: **Kenapa 0.75, bukan 0.50.** Ambang lama duduk di antara 0.18 dan 0.77,
+#: dan itu cukup selama **hanya kasus rujukan** (fuzziness 0.8) yang diukur —
+#: di sana angkanya 0.77. Begitu M57 ikut diukur pada fuzziness katalognya
+#: sendiri (0.40), angkanya jatuh ke **0.60** dan tetap dinyatakan lulus
+#: padahal di layar ia masih untaian manik. Selisih 0.60 vs 0.50 terlalu tipis
+#: untuk memisahkan keduanya. Angka-angka di atas menunjukkan pemisahan yang
+#: sesungguhnya ada di sekitar 0.7, bukan 0.5: yang rusak ≤ 0.60, yang benar
+#: ≥ 0.83. Ambang 0.75 duduk di tengah celah itu dengan margin ~0.08 ke dua
+#: arah — cukup lebar sehingga tidak merah karena perubahan kecil di tempat
+#: lain, dan cukup rendah sehingga tidak menuntut cangkang yang mustahil.
+MIN_SHELL_CONTINUITY = 0.75
 
 #: Seberapa pipih siluet M27 boleh, sebagai rasio tinggi:lebar kotak pembatasnya.
 #:
@@ -2193,12 +2199,24 @@ def read_deep_sky_layouts_from_swift(source):
 def _shell_layout_from_swift(tail, default_elongation):
     """Layout cangkang `.planetaryNebula` dari `ring` + `shellOpacity`.
 
-    Modelnya **tidak** menulis enam angka per blob: ia menulis delapan posisi
-    (`ring`), lalu menggabungkannya dengan `shellOpacity` lewat `zip`, dengan
+    Modelnya **tidak** menulis enam angka per blob: ia menulis posisi
+    (`ring`) dan opasitasnya (`shellOpacity`), lalu menggabungkannya dengan
     skala lebar `0.26`, rasio sumbu `1.0`, sudut `0.0`. Port Python menyimpan
-    hasilnya yang sudah di-`zip`. Jadi yang dibandingkan di sini adalah
-    **hasil** yang sama, dihitung dari bentuk sumbernya — bukan angka yang
-    disalin.
+    hasil gabungan itu. Jadi yang dibandingkan di sini adalah **hasil** yang
+    sama, dihitung dari bentuk sumbernya — bukan angka yang disalin.
+
+    **Kenapa `ring` tidak lagi dibaca sebagai daftar pasangan literal.**
+    Sejak cangkangnya dirapatkan (16 → 24 titik @15°), posisinya **dihitung**
+    dari satu radius dan satu langkah sudut, bukan ditulis satu per satu:
+    `(0..<24).map { ... cos(angle), sin(angle) }`. Yang bisa salah karena itu
+    berpindah — bukan lagi "apakah dua puluh empat pasangan angkanya sama",
+    melainkan "apakah radius, langkah sudut, dan jumlahnya sama". Pembacaan
+    pun mengikuti: ketiganya dibaca dari sumber, dan **rumusnya** ikut
+    dijaga. Jangkar `(shellRadius * cos(angle), shellRadius * sin(angle))`
+    sengaja dicari: tanpa itu, sebuah suntingan yang mengembalikan daftar
+    literal akan membuat pembacaan ini menghitung dua puluh empat posisi yang
+    **tidak** dipakai model — dan gerbangnya akan membandingkan tabel port
+    dengan angka karangan sendiri.
 
     **Kenapa `default_elongation`, dan kenapa dua faktor terakhir dibaca
     dari sumbernya.** Sejak M27 (Dumbel) dan M57 (Cincin) berbagi morfologi
@@ -2216,22 +2234,18 @@ def _shell_layout_from_swift(tail, default_elongation):
     supaya tidak ada satu pun komponen y yang diam-diam berhenti dipetkan
     tanpa membuat pembacaan ini gagal bersih.
     """
-    # Isi `ring` diambil **setelah** `[` pembuka: anotasinya sendiri
-    # (`[(Double, Double)]`) juga berbentuk pasangan, dan ikut terbaca
-    # kalau potongannya dimulai dari `let ring:` — `float("Double")`.
-    ring_start = tail.index("let ring:")
-    ring_open = tail.index("= [", ring_start) + len("= [")
-    ring_region = tail[ring_open:tail.index("]", ring_open)]
-    pairs = re.findall(r"\(\s*(-?[\w.]+)\s*,\s*(-?[\w.]+)\s*\)", ring_region)
-    shell_radius = float(re.search(r"let shellRadius = ([\d.]+)", tail).group(1))
-    diagonal = shell_radius / 2.0 ** 0.5
-    # Komponen pada 22.5° dibaca dari model, bukan dihitung ulang di sini:
-    # `cos`/`sin` di dua bahasa adalah tempat pembulatan menyimpang, dan
-    # gerbang yang membandingkan **nilai** akan memerah karena 1e-16, bukan
-    # karena bentuknya berbeda. Kalau model mengganti sudutnya, nama yang
-    # hilang di sini membuat pembacaan gagal bersih — bukan diam-diam
-    # memakai sudut lama.
-    #
+    # Posisi blob kini **dihitung**, bukan didaftar: satu radius, satu langkah
+    # sudut, satu jumlah. Ketiganya dibaca dari sumber, lalu posisinya
+    # dibangun ulang dengan rumus yang sama. Jangkar rumusnya
+    # (`(shellRadius * cos(angle), shellRadius * sin(angle))`) dicari lebih
+    # dulu supaya daftar literal yang kembali tidak diam-diam "dibaca" sebagai
+    # dua puluh empat posisi hasil hitungan sendiri.
+    formula = ("(shellRadius * cos(angle), shellRadius * sin(angle))")
+    if formula not in tail:
+        raise ValueError(
+            "'(shellRadius * cos(angle), shellRadius * sin(angle))' tidak "
+            "ditemukan di cabang .planetaryNebula — posisi blob cangkang harus "
+            "tetap dihitung dari satu radius dan satu langkah sudut")
     # `_required` bukan hiasan: tanpa itu `re.search(...).group(1)` melempar
     # `AttributeError: 'NoneType'` — kegagalan yang tidak menyebut jangkar
     # mana yang hilang, dan gerbang yang berisik seperti itu dihapus orang
@@ -2243,39 +2257,42 @@ def _shell_layout_from_swift(tail, default_elongation):
                 f"'{label}' tidak ditemukan di cabang .planetaryNebula")
         return float(match.group(1))
 
-    inner_major = _required(r"let innerMajor = shellRadius \* cos\(([\d.]+)",
-                            "let innerMajor = shellRadius * cos(22.5")
-    inner_minor = _required(r"let innerMinor = shellRadius \* sin\(([\d.]+)",
-                            "let innerMinor = shellRadius * sin(22.5")
-    names = {"shellRadius": shell_radius, "diagonal": diagonal,
-             "innerMajor": shell_radius * math.cos(math.radians(inner_major)),
-             "innerMinor": shell_radius * math.sin(math.radians(inner_minor))}
+    shell_radius = _required(r"let shellRadius = ([\d.]+)", "let shellRadius")
+    shell_step = _required(r"let shellStep = ([\d.]+)", "let shellStep")
+    ring_count = int(_required(r"\(0\.\.<(\d+)\)\.map", "(0..<N).map"))
+    pairs = [(shell_radius * math.cos(math.radians(shell_step * i)),
+              shell_radius * math.sin(math.radians(shell_step * i)))
+             for i in range(ring_count)]
+    # Opasitas diambil **berputar** lewat `index % shellOpacity.count`, jadi
+    # yang menentukan panjang gelombangnya adalah jumlah entri di
+    # `shellOpacity` — bukan `ring`. Dibaca dari sumbernya supaya menambah
+    # atau mengurangi entri di sana tidak membuat tabel ini diam-diam salah
+    # panjang.
     opacities = [float(v) for v in re.search(
         r"let shellOpacity = \[([\d.,\s]+)\]", tail).group(1).split(",")]
+    if not re.search(r"shellOpacity\[index % shellOpacity\.count\]", tail):
+        raise ValueError(
+            "'shellOpacity[index % shellOpacity.count]' tidak ditemukan di "
+            "cabang .planetaryNebula — opasitas harus diambil berputar, bukan "
+            "di-zip (zip memotong cangkangnya jadi 16 blob lagi)")
     # `aspect` dan `angle` masih ditulis apa adanya (angka), tetapi `offset.1`
     # dan `aspect` kini dikalikan `elongation` — jadi keduanya dibaca dari
     # sumbernya, dengan nilai bawaannya disubstitusi supaya hasilnya setara
-    # dengan tabel port yang belum dipetkan.
+    # dengan tabel port yang belum dipetakan.
     width_scale = _required(r"\(offset\.0, offset\.1 \* elongation, ([\d.]+),",
                             "skala lebar blob cangkang")
     rest = re.search(
-        r"([\d.]+) \* elongation,\s*(-?[\d.]+),\s*opacity", tail)
+        r"([\d.]+) \* elongation,\s*(-?[\d.]+),\s*shellOpacity", tail)
     if rest is None:
         raise ValueError(
-            "'<aspect> * elongation, <sudut>, opacity' tidak ditemukan di "
-            "cabang .planetaryNebula — kedua komponen y harus tetap dipetkan "
-            "elongasi supaya tabel ini setara dengan port")
+            "'<aspect> * elongation, <sudut>, shellOpacity[...]' tidak "
+            "ditemukan di cabang .planetaryNebula — kedua komponen y harus "
+            "tetap dipetakan elongasi supaya tabel ini setara dengan port")
     aspect, angle = float(rest.group(1)), float(rest.group(2))
     out = []
-    for (xs, ys), opacity in zip(pairs, opacities):
-        def value(token):
-            token = token.strip()
-            if token.lstrip("-") in names:
-                sign = -1 if token.startswith("-") else 1
-                return sign * names[token.lstrip("-")]
-            return float(token)
-        out.append((value(xs), value(ys) * default_elongation, width_scale,
-                    aspect, angle, opacity))
+    for index, (xs, ys) in enumerate(pairs):
+        out.append((float(xs), float(ys) * default_elongation, width_scale,
+                    aspect, angle, opacities[index % len(opacities)]))
     return out
 
 
@@ -4766,25 +4783,45 @@ def check_planetary_nebula_shell_is_continuous(results):
     # dilihat) dan ukuran panel iPhone (tempat ia paling besar). Yang lulus
     # di satu ukuran belum tentu lulus di ukuran lain — itu pelajaran yang
     # sudah dua kali dibayar di repo ini.
-    for size, ss in ((pixels, 8), (132, 4)):
-        background, tenth, top = shell_angular_profile(size, ss)
-        if top - background <= READABILITY_THRESHOLD:
+    #
+    # **Dan di dua fuzziness, bukan satu.** Sampai siklus ini pemeriksaan ini
+    # hanya pernah menggambar `deepsky-planetaryNebula` (fuzziness 0.8) —
+    # sementara katalog menggambar **M57 pada 0.40**. Itu bukan perbedaan
+    # kecil: 0.8 membuat blobnya 1.75× lebih lebar dari jaraknya, 0.40 hanya
+    # 1.46×. Gerbangnya hijau di kasus rujukan sementara objek yang
+    # **benar-benar tampil** di layar masih berupa untaian manik — kelas cacat
+    # yang sama dengan "0.14 R Venus" yang dulu ditutup: gerbang yang mengukur
+    # gambar yang **tidak tampil**. Sekarang keduanya diukur, jadi melonggarkan
+    # tata letak rujukan tidak bisa lagi menyembunyikan M57.
+    for case_name, label in (("deepsky-planetaryNebula", "rujukan f=0.8"),
+                             ("deepsky-m57", "M57 katalog f=0.40")):
+        for size, ss in ((pixels, 8), (132, 4)):
+            background, tenth, top = shell_angular_profile(size, ss,
+                                                           case_name=case_name)
+            if top - background <= READABILITY_THRESHOLD:
+                results.append(Result(
+                    f"cangkang nebula planetari bersambung ({size}px, {label})",
+                    False,
+                    f"cangkangnya tidak terbaca sama sekali (puncak {top}, "
+                    f"latar {background})"))
+                continue
+            fraction = (tenth - background) / (top - background)
             results.append(Result(
-                f"cangkang nebula planetari bersambung ({size}px)", False,
-                f"cangkangnya tidak terbaca sama sekali (puncak {top}, "
-                f"latar {background})"))
-            continue
-        fraction = (tenth - background) / (top - background)
-        results.append(Result(
-            f"cangkang nebula planetari bersambung ({size}px)",
-            fraction >= MIN_SHELL_CONTINUITY,
-            f"celah terburuk {fraction:.2f} dari puncak (butuh "
-            f">= {MIN_SHELL_CONTINUITY}) — di bawah itu yang tampil untaian "
-            f"manik, bukan cangkang gas"))
+                f"cangkang nebula planetari bersambung ({size}px, {label})",
+                fraction >= MIN_SHELL_CONTINUITY,
+                f"celah terburuk {fraction:.2f} dari puncak (butuh "
+                f">= {MIN_SHELL_CONTINUITY}) — di bawah itu yang tampil untaian "
+                f"manik, bukan cangkang gas"))
 
 
-def shell_angular_profile(size, ss, radius=0.42):
+def shell_angular_profile(size, ss, radius=0.42, case_name="deepsky-planetaryNebula"):
     """Profil kecerahan sepanjang radius cangkang, diringkas jadi tiga angka.
+
+    **Kenapa `case_name` bisa diganti.** Cangkang planetari punya dua kasus
+    render dengan fuzziness yang berbeda jauh — rujukan (0.8) dan **M57
+    katalog (0.40)**. Fuzziness menentukan seberapa lebar blobnya, jadi
+    kesinambungan yang terukur pada satu nilai tidak berlaku untuk yang lain.
+    Sebelum parameter ini ada, hanya kasus rujukan yang pernah diukur.
 
     **Kenapa dirata-rata pada radius kecil (0.39…0.45 R), bukan satu piksel.**
     Cangkangnya hanya beberapa piksel tebal pada ukuran jam. Satu piksel bisa
@@ -4798,13 +4835,13 @@ def shell_angular_profile(size, ss, radius=0.42):
     diukur sebagai persentil ke-10 daripada sebagai piksel tergelap tunggal,
     yang bisa saja satu piksel anti-aliasing di tepi lubang.
     """
-    _, (w, h, rows) = render_case("deepsky-planetaryNebula", size=size, ss=ss)
+    _, (w, h, rows) = render_case(case_name, size=size, ss=ss)
     background = rows[0][0]
     cx, cy = w / 2.0, h / 2.0
     samples = []
     # Setengah derajat, bukan satu: pada ukuran jam satu derajat hanya
     # beberapa piksel, jadi resolusi sudutnya terlalu kasar untuk melihat
-    # celah di antara blob yang berjarak 22.5°.
+    # celah di antara blob yang berjarak 15°.
     for step in range(720):
         angle = math.radians(step * 0.5)
         band = []

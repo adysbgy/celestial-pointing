@@ -31,6 +31,14 @@ Keadaan yang diuji:
                           **jaraknya**. Gerbang harus tetap merah — kalau
                           hijau, berarti yang diukurnya ukuran blob, bukan
                           kesinambungan cangkangnya.
+  4. 16 titik @22.5°      tata letak yang **benar-benar dipakai** sampai
+     lebar 0.26           cangkangnya dirapatkan. Ini keadaan terpenting di
+                          sini: blobnya **beririsan** (lolos uji geometri
+                          Swift), jadi hanya gerbang piksel yang bisa
+                          menangkapnya — dan hanya setelah gerbang itu
+                          mengukur fuzziness katalog M57 (0.40), bukan
+                          kasus rujukan (0.8). Kalau keadaan ini hijau lagi,
+                          gerbangnya sudah mundur ke lubang yang sama.
 
 Yang **tidak** dipakai sebagai keadaan: 8 titik @45° dengan lebar **0.40**.
 Sempat dicoba dan gerbangnya hijau — dan itu benar: delapan blob selebar itu
@@ -86,21 +94,29 @@ for r in results:
 # dan jangkar ini tidak lagi cocok, harness **berhenti** — bukan diam-diam
 # menguji himpunan kosong.
 CURRENT_LAYOUT = """    "planetaryNebula": [(0.4200000000000000, 0.0000000000000000, 0.26, 1.0, 0.0, 0.54),
-                        (0.3880294036547404, 0.1607270415933377, 0.26, 1.0, 0.0, 0.48),
-                        (0.2969848480983499, 0.2969848480983499, 0.26, 1.0, 0.0, 0.52),
-                        (0.1607270415933377, 0.3880294036547404, 0.26, 1.0, 0.0, 0.46),
-                        (0.0000000000000000, 0.4200000000000000, 0.26, 1.0, 0.0, 0.50),
-                        (-0.1607270415933377, 0.3880294036547404, 0.26, 1.0, 0.0, 0.44),
-                        (-0.2969848480983499, 0.2969848480983499, 0.26, 1.0, 0.0, 0.53),
-                        (-0.3880294036547404, 0.1607270415933377, 0.26, 1.0, 0.0, 0.47),
-                        (-0.4200000000000000, 0.0000000000000000, 0.26, 1.0, 0.0, 0.51),
-                        (-0.3880294036547404, -0.1607270415933377, 0.26, 1.0, 0.0, 0.45),
-                        (-0.2969848480983499, -0.2969848480983499, 0.26, 1.0, 0.0, 0.49),
-                        (-0.1607270415933377, -0.3880294036547404, 0.26, 1.0, 0.0, 0.44),
-                        (0.0000000000000000, -0.4200000000000000, 0.26, 1.0, 0.0, 0.52),
-                        (0.1607270415933377, -0.3880294036547404, 0.26, 1.0, 0.0, 0.46),
-                        (0.2969848480983499, -0.2969848480983499, 0.26, 1.0, 0.0, 0.50),
-                        (0.3880294036547404, -0.1607270415933377, 0.26, 1.0, 0.0, 0.45)]"""
+                        (0.4056888470414087, 0.1087039989430587, 0.26, 1.0, 0.0, 0.48),
+                        (0.3637306695894643, 0.2100000000000000, 0.26, 1.0, 0.0, 0.52),
+                        (0.2969848480983500, 0.2969848480983499, 0.26, 1.0, 0.0, 0.46),
+                        (0.2100000000000000, 0.3637306695894642, 0.26, 1.0, 0.0, 0.50),
+                        (0.1087039989430587, 0.4056888470414087, 0.26, 1.0, 0.0, 0.44),
+                        (0.0000000000000000, 0.4200000000000000, 0.26, 1.0, 0.0, 0.53),
+                        (-0.1087039989430588, 0.4056888470414087, 0.26, 1.0, 0.0, 0.47),
+                        (-0.2099999999999999, 0.3637306695894643, 0.26, 1.0, 0.0, 0.51),
+                        (-0.2969848480983499, 0.2969848480983500, 0.26, 1.0, 0.0, 0.45),
+                        (-0.3637306695894643, 0.2100000000000000, 0.26, 1.0, 0.0, 0.49),
+                        (-0.4056888470414086, 0.1087039989430588, 0.26, 1.0, 0.0, 0.44),
+                        (-0.4200000000000000, 0.0000000000000001, 0.26, 1.0, 0.0, 0.52),
+                        (-0.4056888470414087, -0.1087039989430587, 0.26, 1.0, 0.0, 0.46),
+                        (-0.3637306695894642, -0.2100000000000000, 0.26, 1.0, 0.0, 0.50),
+                        (-0.2969848480983500, -0.2969848480983499, 0.26, 1.0, 0.0, 0.45),
+                        (-0.2100000000000002, -0.3637306695894641, 0.26, 1.0, 0.0, 0.54),
+                        (-0.1087039989430587, -0.4056888470414087, 0.26, 1.0, 0.0, 0.48),
+                        (-0.0000000000000001, -0.4200000000000000, 0.26, 1.0, 0.0, 0.52),
+                        (0.1087039989430585, -0.4056888470414087, 0.26, 1.0, 0.0, 0.46),
+                        (0.2100000000000000, -0.3637306695894642, 0.26, 1.0, 0.0, 0.50),
+                        (0.2969848480983499, -0.2969848480983500, 0.26, 1.0, 0.0, 0.44),
+                        (0.3637306695894641, -0.2100000000000002, 0.26, 1.0, 0.0, 0.53),
+                        (0.4056888470414087, -0.1087039989430587, 0.26, 1.0, 0.0, 0.47)],"""
 
 # Tata letak **lama** (8 blob @45°, lebar 0.30) — cacat yang ditutup gerbang.
 OLD_LAYOUT = """    "planetaryNebula": [(0.4200000000000000, 0.0000000000000000, 0.30, 1.0, 0.0, 0.54),
@@ -129,6 +145,31 @@ NARROW = _with_width(OLD_LAYOUT, "0.20")
 # sekarang, yang berbeda hanya jaraknya. Ini mutasi paling tajam — kalau
 # gerbang hijau di sini, yang diukurnya ukuran blob, bukan kesinambungan.
 CURRENT_WIDTH_OLD_SPACING = _with_width(OLD_LAYOUT, "0.26")
+# Enam belas titik @22.5° pada lebar sekarang — **tata letak yang benar-benar
+# dipakai kode sampai cangkangnya dirapatkan**. Inilah keadaan yang paling
+# penting di berkas ini: ia bukan karangan, ia versi yang pernah tampil di
+# layar, dan ia **lolos** uji geometri Swift (`testPlanetaryNebulaShellIs
+# ContinuousNotBeaded`) karena blobnya memang beririsan. Yang menangkapnya
+# hanya ukuran piksel — dan hanya setelah gerbangnya diukur pada fuzziness
+# **katalog M57 (0.40)**, bukan pada kasus rujukan (0.8). Kalau keadaan ini
+# hijau lagi, gerbangnya sudah mundur ke lubang yang sama.
+SIXTEEN = """    "planetaryNebula": [
+                        (0.4200000000000000, 0.0000000000000000, 0.26, 1.0, 0.0, 0.54),
+                        (0.3880294036547404, 0.1607270415933377, 0.26, 1.0, 0.0, 0.48),
+                        (0.2969848480983500, 0.2969848480983499, 0.26, 1.0, 0.0, 0.52),
+                        (0.1607270415933377, 0.3880294036547404, 0.26, 1.0, 0.0, 0.46),
+                        (0.0000000000000000, 0.4200000000000000, 0.26, 1.0, 0.0, 0.50),
+                        (-0.1607270415933377, 0.3880294036547404, 0.26, 1.0, 0.0, 0.44),
+                        (-0.2969848480983499, 0.2969848480983500, 0.26, 1.0, 0.0, 0.53),
+                        (-0.3880294036547404, 0.1607270415933378, 0.26, 1.0, 0.0, 0.47),
+                        (-0.4200000000000000, 0.0000000000000001, 0.26, 1.0, 0.0, 0.51),
+                        (-0.3880294036547405, -0.1607270415933376, 0.26, 1.0, 0.0, 0.45),
+                        (-0.2969848480983500, -0.2969848480983499, 0.26, 1.0, 0.0, 0.49),
+                        (-0.1607270415933376, -0.3880294036547405, 0.26, 1.0, 0.0, 0.44),
+                        (-0.0000000000000001, -0.4200000000000000, 0.26, 1.0, 0.0, 0.52),
+                        (0.1607270415933378, -0.3880294036547404, 0.26, 1.0, 0.0, 0.46),
+                        (0.2969848480983499, -0.2969848480983500, 0.26, 1.0, 0.0, 0.50),
+                        (0.3880294036547405, -0.1607270415933376, 0.26, 1.0, 0.0, 0.45)]"""
 
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
@@ -148,6 +189,8 @@ STATES = [
      [(CURRENT_LAYOUT, NARROW)], "merah"),
     ("3. 8 titik @45° pada lebar sekarang (0.26)",
      [(CURRENT_LAYOUT, CURRENT_WIDTH_OLD_SPACING)], "merah"),
+    ("4. 16 titik @22.5° (tata letak lama yang benar-benar dipakai)",
+     [(CURRENT_LAYOUT, SIXTEEN)], "merah"),
 ]
 
 
