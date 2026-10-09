@@ -115,7 +115,7 @@ BALL_VIEW_WIDE = ("            startRadius: radius * 0.1,\n"
                   "            endRadius: radius * 1.60))")
 MODEL = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit",
                      "CelestialVisual.swift")
-MODEL_ANCHOR = "    public static let moonSphereGradientEndRadius: Double = 1.15"
+MODEL_ANCHOR = "    static let moonSphereGradientEndRadius: Double = 1.15"
 
 # (nama keadaan, [(berkas, cari, ganti, jumlah)]) — jumlah 0 = semua kemunculan.
 STATES = [
@@ -134,7 +134,7 @@ STATES = [
     # port, keadaan ini hijau dan satu-satunya sumber kebenaran jadi port.
     ("3. model: konstanta 1.15 -> 1.45",
      [(MODEL, MODEL_ANCHOR,
-       "    public static let moonSphereGradientEndRadius: Double = 1.45", 1)]),
+       "    static let moonSphereGradientEndRadius: Double = 1.45", 1)]),
     ("4. port: bola 1.35 -> 1.60",
      [(RENDER, BALL_PORT, BALL_PORT_WIDE, 1)]),
     # Sengaja **diharapkan hijau**: kedua bahasa sepakat, jadi tidak ada drift
