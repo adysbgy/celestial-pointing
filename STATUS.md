@@ -1,3 +1,109 @@
+## Progres terakhir (9 Okt 2026 — gerbang paritas docstring inti spiral: menutup "Belum dikerjakan" yang tercatat sejak 8 Okt)
+
+### Yang dikerjakan: mengukur ulang angka yang dikutip gerbang, bukan mengutipnya
+
+Entri 8 Okt 2026 di berkas ini menutup dengan kalimat yang jujur:
+
+> **Belum dikerjakan:** gerbang paritas docstring (yang membaca tabel di
+> docstring dan menuntutnya sama dengan hasil ukur, seperti
+> `check_crater_contrast_numbers_come_from_the_sampler`). Biayanya terukur
+> ~30 s kalau hanya memakai `spiral_core_samples()` (gratis) + satu render
+> gerbang lengan.
+
+Siklus ini mengerjakannya. `check_spiral_core_reads_as_one_body` mengutip
+tabel selisih (+124°/+106°/+44°) dan batas 0,2725 R, dan sejak ditulis
+belum ada satu pun pemeriksaan yang menuntut angka-angka itu keluar dari
+penyampelnya sendiri. Ini kelas cacat yang sudah berulang di repo ini
+(`check_crater_contrast_numbers_come_from_the_sampler` lahir untuk kelas
+yang sama): **komentar mengutip angka yang tidak pernah ia ukur**, dan
+komentar adalah satu-satunya bukti yang dibaca orang yang menilai apakah
+sebuah gerbang layak dipercaya.
+
+### Gerbangnya: enam pemeriksaan, diukur lewat jalur gerbangnya sendiri
+
+`check_spiral_core_docstring_quotes_measured_values` membaca tabel selisih
+langsung dari docstring fungsi yang dijaganya (jadi menyunting docstring
+tanpa menyunting angkanya membuat gerbang ini merah), lalu menghitung
+ulang tiap baris lewat `spiral_arm_degrees` — jalur menggambar yang sama
+yang dipakai gerbang aslinya, bukan penduaan. Toleransi 3°.
+
+Dua pemeriksaan lagi menutup batasnya, karena tanpa keduanya paritas
+selisih saja tidak membuktikan apa pun:
+
+  - **batas 0,2725 R dihitung ulang dari blob inti**, bukan dari
+    `max(spiral_core_samples())`. Keduanya berbeda: 0,2725 R adalah
+    *reach berkelanjutan* (`halfWidth · (1 − ambang / (opasitas · 255))`)
+    sementara sampel diskrit terbesar yang benar-benar dipakai adalah
+    0,2688 R. Memakai yang kedua sebagai patokan akan mengubah arti angka
+    di docstring itu, bukan memeriksanya.
+  - **r = 0,2843 harus tetap di luar sampel inti.** Baris itulah yang
+    menunjukkan batasnya tidak longgar: kalau batasnya melonggar, keempat
+    sampel akan diukur sebagai inti dan gerbang lengan akan merah pada
+    gambar yang benar.
+
+### Yang diukur, bukan dikira-kira
+
+```
+inti spiral: selisih docstring r=0.2377 cocok (124° vs 124°)   dengan 360° vs tanpa 236°
+inti spiral: selisih docstring r=0.2532 cocok (106° vs 106°)   dengan 340° vs tanpa 234°
+inti spiral: selisih docstring r=0.2688 cocok (44° vs 44°)     dengan 266° vs tanpa 222°
+inti spiral: selisih docstring r=0.2843 cocok (0° vs 0°)       dengan 200° vs tanpa 200°
+inti spiral: batas sampel inti = 0.2725 R (dari model)          reach 0.2725 R
+inti spiral: r=0.2843 di luar sampel inti (batas bekerja)      reach 0.2688 R
+```
+
+Keempat selisih cocok **persis** (bukan "dalam toleransi"): +124/+106/
++44/+0. Dua angka turunan di docstring `spiral_core_samples()` juga
+diverifikasi terhadap model lewat jalur yang sama — `halfWidth` 0,29568
+(docstring menulis 0,2957) dan sumbangan 5,9 di r=0,2843, yang memang di
+bawah ambang terbaca 12.
+
+### Kenapa gerbang ini tidak diukur lewat `--check` penuh
+
+Biayanya terukur **31 detik** (gerbang penuh ~6 menit). Ini alasan yang
+sama dengan seluruh harness mutasi di `Tools/`: gerbang yang terlalu
+lambat untuk dijalankan adalah gerbang yang dilewati. Enam pemeriksaan
+ini karena itu ditambahkan ke jalur `--check` biasa — bukan ke harness
+terpisah — karena ia memang murah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 699 | **699** |
+| Pemeriksaan visual | 618 | **624** (+6 gerbang paritas) |
+| Aturan UI | 29 | 29 |
+
+README tidak perlu disinkronkan (Aturan 10 hanya mengikat hitungan uji,
+dan keduanya tidak berubah).
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 699 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **624 pemeriksaan, 0 gagal**.
+  - CI: Engine Tests (Linux) `37937387596` **success** (log mencetak
+    `624 pemeriksaan, 0 gagal`), Apple Build `37937387647` **success**.
+
+### Yang TIDAK diklaim
+
+  - Gerbang ini menjaga **paritas angka**, bukan kebenaran astronomi tonjolan
+    inti. Kalau kelak `halfWidth`-nya diubah beserta seluruh angka turunan
+    di docstring dan di penyampel, gerbang ini hijau — yang dijaganya adalah
+    *kesepakatan ketiganya*, bukan nilainya.
+  - Toleransi 3° adalah pilihan, bukan ukuran fisis. Yang membuatnya tidak
+    berbahaya adalah fakta bahwa keempat selisih saat ini cocok pada 0°,
+    jadi toleransi itu tidak dipakai untuk menutupi penyimpangan apa pun.
+  - Paritas **belum** menyapu tabel mutasi di docstring yang sama (baris
+    "keadaan / lengan merah / inti merah" dari `out/bukti-mutasi-spiral.py`).
+    Itu berbeda kelas: angka-angka itu berasal dari `out/`, yang
+    di-gitignore, jadi membacanya berarti menuntut bukti yang tidak ada di
+    repo — dicatat di sini, tidak dikerjakan.
+  - Tidak ada satu baris pun kode produksi atau `Apps/` yang berubah. Yang
+    ditambahkan murni gerbang atas gerbang yang sudah ada.
+
+---
+
 ## Progres terakhir (9 Okt 2026 — fase Bulan dibungkam saat engine ragu: suara tidak boleh lebih yakin daripada gambar)
 
 ### Cacatnya: VoiceOver mengumumkan fase Bulan saat engine ragu
