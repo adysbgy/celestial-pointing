@@ -122,6 +122,31 @@ jobs:
       - name: Buktikan gerbang ukuran bintang berbunyi
         run: python3 Tools/bukti-mutasi-bintang.py
 
+      # Dan bukti yang sama untuk **denyut bintang** — gerbang yang menutup
+      # satu-satunya hal yang tidak bisa dilihat gerbang gambar mana pun yang
+      # sudah ada: **geraknya**. Setiap gerbang lain di repo ini menggambar
+      # pada satu fase, dan `star-pulse-peak` ada di `build_cases()` sejak
+      # siklus pertama tanpa pernah disebut satu gerbang pun. Terukur:
+      # `pulse_factor = 1.0` → 17 pemeriksaan bintang, **0 merah**; pada
+      # 200 px piksel menyala turun 7044 → 3724 dan tidak ada yang melihat.
+      #
+      # Gerbangnya mengukur **amplitudo yang dipulihkan dari gambar** (akar
+      # dari nisbah luas, karena yang dikalikan denyut adalah radius cakram),
+      # lalu membandingkannya dengan `pulseAmplitude` **dari model Swift**.
+      # Bentuk yang salah karena itu terbaca sebagai tanda yang salah:
+      # `cos` membalik puncaknya, `sin²` membalik palungnya — masing-masing
+      # berjarak 0.20 dari model, sementara kode benar terukur dalam 0.005.
+      #
+      # Harness ini menuntut pemeriksaan **mana** yang berbunyi, bukan
+      # berapa: keadaan 1 dan 2 harus menyalakan pemeriksaan amplitudo yang
+      # **berbeda** (puncak vs palung). Kalau keduanya menyalakan yang sama,
+      # separuh gerbangnya mubazir — dan tidak ada yang akan tahu.
+      # Keadaan 5 wajib **hijau**: sukunya dibalik tanpa mengubah hasil,
+      # jadi gerbang yang sebenarnya cuma mencocokkan tulisan akan tertangkap
+      # di sana, bukan di lima keadaan lainnya.
+      - name: Buktikan gerbang denyut bintang berbunyi
+        run: python3 Tools/bukti-mutasi-denyut.py
+
       # Dan bukti yang sama untuk pemeriksaan **penekanan bentuk saat ragu** —
       # satu pemeriksaan yang dipisah keluar dari `check_features_disappear_when_uncertain`
       # justru karena dua versi pertamanya hijau pada kode yang jelas salah.

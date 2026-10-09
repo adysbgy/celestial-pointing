@@ -1,3 +1,118 @@
+## Progres terakhir (9 Okt 2026 — denyut bintang: 17 gerbang bintang hijau pada bintang yang tidak berdenyut)
+
+### Cacatnya: satu-satunya hal yang tidak dilihat gerbang mana pun adalah geraknya
+
+`star-pulse-peak` ada di `build_cases()` sejak siklus pertama — bintang
+pada puncak denyut, `pulse=π/2` — dan **tidak satu pun** gerbang di
+`check-visuals.py` pernah menyebut namanya. Denyutnya bisa dihapus dari
+port, dan seluruh 17 pemeriksaan bintang tetap hijau:
+
+```
+pulse_factor = 1.0   (denyut diabaikan)
+17 pemeriksaan bintang → 0 merah
+piksel menyala @200px: 7044 → 3724   (tidak ada yang melihat)
+```
+
+Sebabnya struktural, bukan kelalaian satu gerbang: **setiap** gerbang
+gambar di repo ini menggambar pada satu fase, dan pada fase 0.0 denyutnya
+memang bernilai nol. Yang mengukur gambar diam tidak bisa melihat gerak.
+
+### Perbaikannya: amplitudo dipulihkan dari gambar, lalu dibandingkan dengan model
+
+Yang dikalikan denyut adalah **radius** cakram glow dan spike, jadi yang
+terukur dari piksel adalah **luas** — dan amplitudonya dipulihkan lewat akar:
+
+```
+a_puncak = √(luas_puncak / luas_diam) − 1      a_palung = 1 − √(luas_palung / luas_diam)
+```
+
+Kedua angka itu berdimensi amplitudo, jadi bisa dibandingkan **langsung**
+dengan `pulseAmplitude` dari model Swift. Tiga bentuk yang semuanya terlihat
+berdenyut jadi terpisah oleh **tandanya**, bukan oleh angka yang agak
+bergeser:
+
+```
+sin  : a_puncak +0.10 ✓   a_palung +0.10 ✓   → cocok model
+sin² : a_puncak +0.10 ✓   a_palung −0.10 ✗   → denyut hanya ke atas
+cos  : a_puncak −0.10 ✗   a_palung +0.10 ✓   → tidak berdenyut
+```
+
+Kode benar terukur dalam **0.005** dari model (200/400 px); setiap bentuk
+salah berjarak **0.20**. `PULSE_AMPLITUDE_TOLERANCE = 0.05` duduk di
+tengah — dan komentarnya mencatat bahwa ia **tidak boleh** dinaikkan ke
+0.10: 0.10 adalah persis amplitudonya, jadi pada 0.10 pembalikan tanda
+`cos`/`sin²` duduk tepat di batas dan gerbangnya berhenti memisahkan.
+
+`a_puncak` dan `a_palung` **keduanya** diperlukan, dan itu diukur, bukan
+diasumsikan: `sin²` memberi puncak yang **persis sama** dengan `sin`
+(+0.10), jadi amplitudo puncak buta terhadapnya — hanya palung yang
+melihatnya. Satu pemeriksaan tidak bisa menjaga kelas ini.
+
+### Dua kesalahan saya sendiri, tertangkap sebelum push
+
+  - **Pasangan argumen terbalik.** `phases()` mengembalikan `(palung, diam,
+    puncak)` tetapi hasilnya saya bongkar sebagai `(peak, rest, trough)`.
+    Gerbangnya lalu membandingkan **puncak sebagai palung** — merah pada
+    kode yang benar (`−0.1035` terhadap `+0.10`). Yang menemukannya adalah
+    `[baseline]` di harness, dan itu tepat alasan baseline wajib **nol
+    merah**: tanpa dia, gerbang yang merah pada kode benar akan "diperbaiki"
+    dengan mengembalikan kodenya ke bentuk salah.
+  - **Klaim docstring yang tidak pernah diukur.** Dari bacaan yang terbalik
+    itu saya menulis bahwa toleransi nisbah mentah ±0.02 "meloloskan `cos`
+    sebesar 0.016". Angkanya berasal dari `trough/rest` yang tertukar. Klaim
+    itu **dihapus**, bukan dilunakkan — komentar yang mengutip angka yang
+    tidak pernah keluar dari penyampelnya adalah kelas cacat yang sudah
+    berulang di repo ini.
+
+### Gerbangnya sendiri dibuktikan berbunyi, atas enam keadaan
+
+`Tools/bukti-mutasi-denyut.py` (baru, dipanggil `engine-tests.yml`) menuntut
+**pemeriksaan mana** yang berbunyi, bukan berapa — dan menuntut yang tidak
+disebut tetap hijau:
+
+```
+[baseline]                                0 merah
+1. sin -> cos                             puncak + urutan + kartu jam
+2. sin -> sin²                            palung + urutan + kartu jam
+3. denyut diabaikan (pulse_factor = 1.0)  ketujuhnya
+4. amplitudo port dinaikkan 2x            puncak + palung
+5. suku dibalik, hasil identik            WAJIB 0 merah
+```
+
+Keadaan 1 dan 2 berpasangan, dan **pasangan itulah buktinya**: keduanya
+menyalakan pemeriksaan amplitudo yang **berbeda**. Keadaan 5 wajib hijau
+karena ia mengubah sumber **tanpa mengubah perilaku** — gerbang yang
+sebenarnya cuma mencocokkan tulisan `1 + ... sin(` akan tertangkap di sana,
+bukan di lima keadaan lainnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 706 | **706** |
+| Pemeriksaan visual | 646 | **654** (+8 denyut bintang) |
+| Aturan UI | 29 | 29 |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 706 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **654 pemeriksaan, 0 gagal**.
+  - `python3 Tools/bukti-mutasi-denyut.py` → **6 keadaan, 0 tidak sesuai harapan**.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (29 aturan).
+
+### Yang TIDAK diklaim
+
+  - Gerbang ini mengukur **amplitudo** denyut, bukan lajunya.
+    `MotionPolicy.pulseRateRadiansPerSecond` (1.1 rad/s) dijaga uji Linux di
+    `PointingKit`, bukan di sini: pada fase yang diuji (`−π/2, 0, +π/2`)
+    lajunya tidak muncul sama sekali.
+  - Yang dijaga di kartu jam (38 pt) hanya **arahnya** (puncak > diam >
+    palung). Nisbahnya bergeser ke 1.18 pada ukuran itu karena tepi yang
+    dibulatkan mendominasi, dan ambang ketat di sana akan merah pada kode
+    yang benar.
+  - Amplitudo 0.10 itu **keputusan yang diukur**, bukan nilai astronomis.
+
 ## Progres terakhir (9 Okt 2026 — inti bintang di dalam gugus: gerbang yang versi pertamanya hijau pada gugus tanpa satu pun bintang)
 
 ### Cacatnya: sebuah gugus digambar sebagai noda

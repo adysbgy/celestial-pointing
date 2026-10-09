@@ -373,6 +373,22 @@ COLOUR_SAMPLE_PIXELS = 300
 #: dengan margin, tanpa bergantung pada rasa.
 MIN_DEEP_SKY_COLOUR_DIFF = 0.08
 
+#: Seberapa jauh amplitudo yang **dipulihkan dari gambar** boleh menyimpang
+#: dari `pulseAmplitude` di model.
+#:
+#: **Bukan toleransi "supaya hijau" — angkanya dipilih dari sebaran yang
+#: diukur.** Kode benar memberi 0.1025/0.1012 (puncak) dan 0.1035/0.1003
+#: (palung) pada 200/400 px, yaitu ≤ 0.005 dari model. Setiap bentuk denyut
+#: yang salah memberi jarak 0.20 dengan **tanda yang salah**: `cos` membalik
+#: puncaknya (−0.10), `sin²` membalik palungnya (−0.10). Ambang 0.05 duduk
+#: di tengah-tengah — 10× lebih longgar daripada galat terukur, 4× lebih
+#: ketat daripada penyimpangan terkecil yang harus ditangkap.
+#:
+#: Ambang ini **tidak boleh dinaikkan** ke 0.10 "supaya aman": 0.10 adalah
+#: persis amplitudonya, jadi pada 0.10 pembalikan tanda `cos`/`sin²` masih
+#: duduk tepat di batas dan gerbangnya berhenti memisahkan.
+PULSE_AMPLITUDE_TOLERANCE = 0.05
+
 #: Selisih minimum dari latar sebelum sebuah piksel disebut "terbaca".
 #:
 #: Angka yang sama dengan yang dipakai gerbang celah cincin Saturnus (`- 12`)
@@ -6855,6 +6871,157 @@ def check_star_size_follows_magnitude(results, size=38, ss=8):
         else "0.2/0.5/0.8/1.0 semuanya berbeda"))
 
 
+def check_star_pulse_reaches_the_picture(results, size=200, ss=2, watch=38, watch_ss=8):
+    """Denyut bintang harus benar-benar mengubah gambar, dengan amplitudo model.
+
+    **Cacat yang ditutup pemeriksaan ini.** `star-pulse-peak` ada di
+    `build_cases()` sejak siklus pertama, tetapi **tidak satu pun** gerbang
+    pernah menyebut namanya: 17 pemeriksaan bintang hijau seluruhnya, dan
+    denyutnya bisa dihapus dari port tanpa satu pun berbunyi. Terukur:
+    `pulse_factor = 1.0` (denyut diabaikan) → 17 pemeriksaan, **0 merah**;
+    pada 200 px piksel menyala turun 7044 → 3724 dan tidak ada yang melihat.
+
+    Yang membuatnya berbeda dari `check_star_geometry_matches_the_model`.
+    Gerbang itu membandingkan **angka** `pulseAmplitude` antara model dan
+    port — dan itu tetap hijau kalau port menyimpan amplitudonya lalu tidak
+    pernah memakainya. Kelas yang sama sudah nyata sekali di repo ini:
+    `moonSphereGradientEndRadius` yang «ada, dinamai, dibandingkan gerbang
+    drift, diuji di Linux, dan tidak mengatur apa pun». Gerbang ini menuntut
+    amplitudonya **sampai ke piksel**.
+
+    **Yang diukur adalah amplitudo yang bisa dipulihkan dari gambar, bukan
+    angkanya saja.** `pulse_factor` yang ditulis `1 + amplitude * sin(pulse)`
+    di kedua bahasa tetap bisa dipakai dengan fase yang salah: `sin` diganti
+    `cos` memindahkan puncak ke fase 0.0, dan pada fase yang diuji denyutnya
+    hilang. `sin²` justru melebarkan denyutnya — puncaknya tetap di π/2,
+    jadi puncaknya sama tinggi dan hanya arah bawahnya yang hilang.
+
+    Yang dihitung di sini bukan radius melainkan **luas**: glow dan spike
+    keduanya cakram yang radiusnya dikalikan `pulse_factor`, jadi luasnya
+    ikut `pulse_factor²`. Karena itu amplitudonya dipulihkan lewat akar:
+
+        a_puncak = √(luas_puncak / luas_diam) − 1 = a·sin(π/2)^k
+        a_palung = 1 − √(luas_palung / luas_diam) = −a·sin(−π/2)^k
+
+    Kedua angka itu **berdimensi amplitudo** — bukan nisbah — jadi keduanya
+    bisa langsung dibandingkan dengan `pulseAmplitude` dari model. Itu yang
+    membuat setiap bentuk salah terbaca sebagai **tanda yang salah**, bukan
+    sebagai angka yang agak bergeser:
+
+        sin  : a_puncak = +0.10 ✓   a_palung = +0.10 ✓   → cocok model
+        sin² : a_puncak = +0.10 ✓   a_palung = −0.10 ✗   → denyut hanya ke atas
+        cos  : a_puncak = −0.10 ✗   a_palung = +0.10 ✓   → tidak berdenyut
+
+    Diukur pada 400/200 px, `ss` 2 — termasuk panel iPhone (200 pt) dan
+    panel besar. Kode benar terukur dalam **0.005** dari model pada kedua
+    ukuran; setiap bentuk yang salah berjarak **0.20** — dua arah, dengan
+    ambang di tengah. Bukan pada kartu jam: pada 76/38 px hanya
+    ~850/~224 piksel yang menyala, tepi yang dibulatkan menggeser
+    amplitudonya ke 0.09, dan ambang ketat akan merah pada kode yang benar —
+    gerbang yang merah pada kode benar lebih berbahaya daripada gerbang yang
+    hijau pada kode salah. Di kartu jam yang dijaga hanya **arahnya**
+    (puncak > diam > palung), dan itu tetap perlu karena di sana denyutnya
+    dipakai sungguhan.
+
+    Amplitudonya **dibaca dari model Swift**, bukan dari port yang sedang
+    diukur: gerbang yang mengambil ambangnya dari berkas yang dimutasi akan
+    meloloskan mutasi bersama dirinya sendiri.
+    """
+    swift = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "CelestialVisual.swift")).read()
+    try:
+        amplitude = star_geometry_parameters(
+            swift, "public static func star(relativeSize: Double,", "\n    }", "//",
+            {"pulseAmplitude": "pulseAmplitude", "spikeScale": "spikeScale",
+             "frameHalfExtent": "frameHalfExtent", "glowScales": "glowScales",
+             "outerFraction": "outerFraction"})["pulseAmplitude"]
+    except ValueError as exc:
+        results.append(Result("denyut bintang: amplitudo terbaca dari model", False, str(exc)))
+        return
+
+    results.append(Result(
+        "denyut bintang: amplitudo terbaca dari model", True,
+        f"±{amplitude:.0%} (puncak/diam harusnya {1 + amplitude:.3f})"))
+
+    # Kasus bintang yang berdenyut: Sirius, magnitudo paling terang di
+    # katalog, jadi gambarnya paling besar dan denyutnya paling terukur.
+    # Fase diambil dari rumus yang sama dengan `MotionPolicy.pulsePhase`
+    # (sin pada π/2 = puncak, −π/2 = palung) — diuji terpisah di Linux.
+    magnitude = R.catalogue_magnitudes()["sirius"]
+    relative = R.size_from_magnitude(magnitude)
+
+    def lit(phase, pixels, samples):
+        case = R.VisualCase("__pulse-probe", "sementara", "star", color_index=0.0,
+                            relative_size=relative, pulse=phase, is_confirmed=True)
+        buf = R.render(case, size=pixels, night_mode=False,
+                       show_frame=False, ss=samples).buf
+        return sum(1 for pixel in buf if sum(pixel) > 0.3)
+
+    def phases(pixels, samples):
+        """(palung, diam, puncak) — piksel menyala pada ketiga fase.
+
+        Urutannya `palung, diam, puncak` karena begitulah fase dipakai di
+        sini: `−π/2` adalah palung `sin`, `0` titik diam, `+π/2` puncak.
+        Urutan yang terbalik **tidak akan terlihat** — ketiganya sama-sama
+        bilangan piksel — dan gerbang yang membandingkan puncak sebagai
+        palung akan merah pada kode yang benar. Itu sempat terjadi di sini.
+        """
+        return (lit(-math.pi / 2, pixels, samples),
+                lit(0.0, pixels, samples),
+                lit(math.pi / 2, pixels, samples))
+
+    trough, rest, peak = phases(size, ss)
+
+    # (1) Denyut benar-benar mengubah gambar: tiga fase, tiga gambar.
+    results.append(Result(
+        "denyut bintang: palung/diam/puncak menghasilkan tiga gambar",
+        not (trough == rest == peak),
+        f"piksel menyala @{size}px: palung={trough}, diam={rest}, puncak={peak}"))
+
+    # (2) Arahnya: puncak paling terang, palung paling redup.
+    results.append(Result(
+        "denyut bintang: puncak > diam > palung",
+        peak > rest > trough,
+        f"@{size}px: {trough} < {rest} < {peak}"))
+
+    # (3)+(4) Amplitudo yang dipulihkan dari gambar, pada dua ukuran.
+    #     Diukur pada 200 px (panel iPhone) **dan** 400 px: kode benar
+    #     terukur dalam 0.004 dari model di kedua ukuran, sementara setiap
+    #     bentuk denyut yang salah menyimpang 0.19–0.20. Dua ukuran lebih
+    #     kuat daripada satu, dan keduanya jauh dari kartu jam — di sana
+    #     hanya beberapa ratus piksel yang menyala dan tepi yang dibulatkan
+    #     mendominasi (amplitudonya bergeser ke 0.09).
+    for pixels in sorted({size, 400}):
+        t, r0, p = phases(pixels, ss)
+        # Akar: yang dihitung adalah **luas** cakram, jadi radiusnya —
+        # dan amplitudonya — dipulihkan lewat akar. Inilah yang membuat
+        # angkanya berdimensi amplitudo dan bisa dibandingkan langsung
+        # dengan `pulseAmplitude` model.
+        recovered_peak = math.sqrt(p / r0) - 1 if r0 else 0.0
+        recovered_trough = 1 - math.sqrt(t / r0) if r0 else 0.0
+        results.append(Result(
+            f"denyut bintang: amplitudo puncak = model (±{amplitude:.0%}) @{pixels}px",
+            abs(recovered_peak - amplitude) <= PULSE_AMPLITUDE_TOLERANCE,
+            f"terukur {recovered_peak:+.4f}, model {amplitude:+.4f} "
+            f"(cos memberi {-amplitude:+.3f} — tidak berdenyut)"))
+        # **Ini yang memisahkan sin² dari sin.** Pada `sin²` palungnya
+        # setinggi puncaknya, jadi amplitudo palungnya **negatif** —
+        # denyutnya hanya ke atas. Amplitudo puncak tidak melihatnya
+        # sama sekali (sin² memberinya persis sama dengan sin).
+        results.append(Result(
+            f"denyut bintang: amplitudo palung = model (±{amplitude:.0%}) @{pixels}px",
+            abs(recovered_trough - amplitude) <= PULSE_AMPLITUDE_TOLERANCE,
+            f"terukur {recovered_trough:+.4f}, model {amplitude:+.4f} "
+            f"(sin² memberi {-amplitude:+.3f} — denyut hanya ke atas)"))
+
+    # (5) Dan di kartu jam, tempat denyutnya dipakai sungguhan.
+    watch_trough, watch_rest, watch_peak = phases(watch, watch_ss)
+    results.append(Result(
+        f"denyut bintang: terbaca di kartu jam ({watch} pt)",
+        watch_peak > watch_rest > watch_trough,
+        f"@{watch}px: {watch_trough} < {watch_rest} < {watch_peak}"))
+
+
 def check_star_colour_order(results, size=200, ss=2):
     """Betelgeuse harus lebih merah dari Rigel — diukur dari piksel.
 
@@ -8446,6 +8613,7 @@ def main():
     check_night_mode_never_exceeds_day(results, 120, args.ss)
     check_star_colour_order(results, args.size, args.ss)
     check_star_size_follows_magnitude(results)
+    check_star_pulse_reaches_the_picture(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_cluster_cores_reach_the_picture(results, args.ss)
