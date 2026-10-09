@@ -422,6 +422,16 @@ extension PhoneLinkService: WCSessionDelegate {
         }
     }
 
+    #if DEBUG
+    /// Simulator: `-debugConfirmed saturn` mengisi kartu "Dikonfirmasi" tanpa
+    /// jam berpasangan, untuk tangkapan layar tab Langit (ADR-013).
+    func injectDebugConfirmationIfRequested() {
+        guard lastConfirmed == nil,
+              let id = UserDefaults.standard.string(forKey: "debugConfirmed"), !id.isEmpty else { return }
+        lastConfirmed = (LiveMessage(id: 1, sentAt: Date(), kind: .confirmTarget, objectID: id), true)
+    }
+    #endif
+
     /// Pesan antre dari jam. Kalibrasi dan permintaan keadaan dikirim jam
     /// dengan `transferUserInfo`, jadi keduanya tiba di sini — bukan di
     /// `didReceiveApplicationContext`.

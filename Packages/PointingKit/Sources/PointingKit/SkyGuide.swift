@@ -142,3 +142,29 @@ public extension PointingResolver {
                                               jd: SkyMath.julianDate(from: date))
     }
 }
+
+public extension PointingResolver {
+
+    /// Benda untuk sebuah id: dari katalog, atau dari efemeris untuk Bulan
+    /// dan planet (posisi saat `date`). `nil` bila id tidak dikenal, Matahari,
+    /// atau efemeris tidak tersedia.
+    ///
+    /// Dipakai iPhone untuk menggambar kartu "Dikonfirmasi" dari id kiriman
+    /// jam — nama dibentuk ulang dalam bahasa iPhone, bukan nama kiriman.
+    func object(forID id: String, observer: Observer, date: Date) -> CelestialObject? {
+        if let entry = catalogue.first(where: { $0.id == id }) { return entry }
+        guard let body = EphemerisBody(rawValue: id), body.isPointable, let ephemeris,
+              let sample = try? ephemeris.apparent(body, at: date, from: observer) else { return nil }
+        return CelestialObject(id: body.rawValue, name: body.displayName,
+                               kind: body == .moon ? .moon : .planet,
+                               raDeg: sample.raDeg, decDeg: sample.decDeg, magnitude: sample.magnitude)
+    }
+}
+
+/// Satu baris "Arah tenggara · 45° di atas cakrawala" untuk daftar langit.
+public enum SkyRowText {
+    public static func whereToLook(_ direction: HorizontalCoord) -> String {
+        WatchHomeText.direction(azimuthDeg: direction.azimuthDeg) + " · "
+            + WatchHomeText.altitude(direction.altitudeDeg)
+    }
+}

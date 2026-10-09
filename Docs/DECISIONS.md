@@ -597,3 +597,33 @@ three times:
 - **Every** visible object locks to itself when pointed at.
 - Saturn, Vega, Antares and Fomalhaut still lock with a 7° wrist error.
 - With the dark-sky policy, Antares is ambiguous (kept as a regression proof).
+
+## ADR-013 — iPhone "Sky" tab, and the iPhone was always rendered light (2026-10-10)
+
+**Problem.** The iPhone app was still a set of research tabs (Diagnostics,
+Experiment 1, Link, Lab), with no counterpart to the new watch flow. Building
+the counterpart exposed an older bug: the root `TabView` set
+`.preferredColorScheme(nightMode ? .dark : nil)`.
+- That root preference overrode every tab's `forceDarkScheme()`.
+- On an iPhone set to light mode, the whole app rendered white.
+- The colour tokens are computed for a dark background, so secondary text was
+  barely readable.
+
+**Decision.**
+- **New first tab, "Sky"** (`SkyHomeView`), which shows:
+  - the object last confirmed on the watch: artwork, name, kind and
+    brightness, its direction and height now, and the time;
+  - by day: "It's daytime", the dusk time, and "Tonight";
+  - by night: "Visible now", each object with direction and height in words;
+  - the same city/dark-sky switch as on the watch.
+- `SkyGuideModel` and `ObjectKind.guideSymbol` move to `Apps/Shared`, so both
+  apps use the same sky logic.
+- New helper `PointingResolver.object(forID:observer:date:)` turns the watch's
+  id into an object, with the name rebuilt in the iPhone's language.
+- The root view always forces the dark scheme. Night mode (red) stays a
+  palette choice.
+- DEBUG: `-debugConfirmed <id>` fills the card for screenshots.
+
+**Verified.** iPhone 17 simulator, light-mode device, Jakarta at midnight:
+dark rendering, Saturn card, visible-now list
+(`Docs/watch-ux/after-iphone-sky-tab.png`).

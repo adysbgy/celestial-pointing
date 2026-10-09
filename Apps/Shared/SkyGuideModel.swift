@@ -44,3 +44,16 @@ final class SkyGuideModel: ObservableObject {
         return SkyGuide.hint(from: pointing, to: visible)
     }
 }
+
+extension ObjectKind {
+    /// Simbol kecil per jenis benda untuk daftar dan petunjuk.
+    var guideSymbol: String {
+        switch self {
+        case .moon: return "moon.fill"
+        case .planet: return "circle.circle.fill"
+        case .star: return "sparkle"
+        case .deepSky: return "hurricane"
+        case .sun: return "sun.max.fill"
+        }
+    }
+}

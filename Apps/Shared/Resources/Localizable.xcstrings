@@ -6750,6 +6750,39 @@
           }
         }
       }
+    },
+    "home.visibleNow": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible now"
+          }
+        }
+      }
+    },
+    "home.skyTab": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
+    },
+    "home.confirmHint": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point with your watch, then tap “Yes, that's it”."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -66,6 +66,8 @@ struct RootView: View {
 
     var body: some View {
         TabView {
+            SkyHomeView(engine: engine, link: link)
+                .tabItem { Label(WatchHomeText.skyTab, systemImage: "sparkles") }
             DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
                 .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }
             Experiment1View(engine: engine, link: link)
@@ -87,8 +89,12 @@ struct RootView: View {
             set: { presented in onboardingSeen = !presented })) {
             OnboardingView(onDone: { onboardingSeen = true })
         }
-        // Palet merah murni saat malam, berlaku untuk **seluruh** tab.
-        .preferredColorScheme(nightMode ? .dark : nil)
+        // Skema gelap **selalu**, untuk seluruh tab. Dulu `nightMode ? .dark :
+        // nil`: preferensi akar ini menimpa `forceDarkScheme()` di tiap tab, jadi
+        // di iPhone bersetelan terang seluruh app tampil putih sementara token
+        // warnanya dihitung untuk latar gelap — teks sekunder nyaris tak
+        // terbaca. Mode malam (merah) tetap diatur palet, bukan skema.
+        .forceDarkScheme()
         .onAppear { start() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {

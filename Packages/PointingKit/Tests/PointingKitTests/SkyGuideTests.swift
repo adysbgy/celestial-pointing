@@ -134,4 +134,21 @@ final class SkyGuideTests: XCTestCase {
         XCTAssertEqual(byID["visible"], "0")
         XCTAssertEqual(byID["nearest"], "–")
     }
+
+    // MARK: iPhone (ADR-013)
+
+    func testObjectForIDCoversCatalogueAndPlanets() throws {
+        let resolver = EngineFactory.makeResolver()
+        XCTAssertEqual(resolver.object(forID: "vega", observer: jakarta, date: evening)?.name, "Vega")
+        let saturn = try XCTUnwrap(resolver.object(forID: "saturn", observer: jakarta, date: evening))
+        XCTAssertEqual(saturn.kind, .planet)
+        XCTAssertNil(resolver.object(forID: "sun", observer: jakarta, date: evening))
+        XCTAssertNil(resolver.object(forID: "nope", observer: jakarta, date: evening))
+    }
+
+    func testWhereToLookLine() {
+        XCTAssertEqual(SkyRowText.whereToLook(HorizontalCoord(altitudeDeg: 44.6, azimuthDeg: 95)),
+                       "Arah timur · 45° di atas cakrawala")
+    }
 }
+
