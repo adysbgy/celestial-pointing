@@ -71,8 +71,12 @@ public final class AlpacaClient: @unchecked Sendable {
     ///   - deviceNumber: nomor perangkat Alpaca (biasanya 0).
     public init(address: String, deviceNumber: Int = 0, clientID: UInt32 = 1,
                 session: URLSession = .shared) throws {
-        let raw = address.contains("://") ? address : "http://\(address)"
-        guard let root = URL(string: raw), root.host != nil else { throw AlpacaError.badAddress }
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = trimmed.contains("://") ? trimmed : "http://\(trimmed)"
+        // Host kosong, bukan hanya `nil`: Foundation di Linux mengembalikan
+        // `""` untuk "http://", sedangkan di Apple `nil`.
+        guard !trimmed.isEmpty, let root = URL(string: raw), let host = root.host, !host.isEmpty
+        else { throw AlpacaError.badAddress }
         baseURL = root.appendingPathComponent("api/v1/telescope/\(deviceNumber)")
         self.clientID = clientID
         self.session = session

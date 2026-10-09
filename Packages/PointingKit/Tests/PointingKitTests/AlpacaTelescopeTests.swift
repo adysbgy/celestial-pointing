@@ -227,7 +227,12 @@ final class AlpacaTelescopeTests: XCTestCase {
     }
 
     func testBadAddressIsRejected() {
-        XCTAssertThrowsError(try AlpacaClient(address: "")) { XCTAssertEqual($0 as? AlpacaError, .badAddress) }
+        for bad in ["", "   ", "http://"] {
+            XCTAssertThrowsError(try AlpacaClient(address: bad), "'\(bad)'") {
+                XCTAssertEqual($0 as? AlpacaError, .badAddress)
+            }
+        }
+        XCTAssertNoThrow(try AlpacaClient(address: " 192.168.1.20:11111 "))
     }
 
     /// Pelaksana yang bisa ditukar: tanpa teleskop, tidak ada GoTo.
