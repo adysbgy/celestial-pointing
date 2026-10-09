@@ -1,0 +1,86 @@
+name: Diagnostik guard berkas (sementara)
+
+# Sementara: mengukur kenapa penjaga «sumber bersih» menyalak di CI padahal
+# pohon kerjanya bersih. Tidak untuk di-merge ke main.
+on: [push, workflow_dispatch]
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pasang python3
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3
+
+      - name: Keadaan awal
+        run: |
+          echo "== HEAD =="; git log --oneline -1
+          echo "== core config =="; git config --list --show-origin | grep -i "core\.\|diff\." || true
+          echo "== /etc/gitconfig =="; cat /etc/gitconfig 2>/dev/null || echo "(tidak ada)"
+          echo "== global =="; cat ~/.gitconfig 2>/dev/null || echo "(tidak ada)"
+          echo "== ls-files -s =="; git ls-files -s Tools/render-visuals.py
+          echo "== stat =="; stat -c '%a %s %Y %n' Tools/render-visuals.py
+          echo "== guard =="; git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          echo "== porcelain =="; git status --porcelain | head -20
+          echo "== sha256 =="; sha256sum Tools/render-visuals.py
+          echo "== umask =="; umask
+
+      - name: Selepas swift-ui-lint
+        run: |
+          ./swift-ui-lint.sh >/dev/null 2>&1; echo "lint=$?"
+          echo "== porcelain =="; git status --porcelain | head -20
+          echo "== stat =="; stat -c '%a %s %Y' Tools/render-visuals.py
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git diff HEAD --stat -- Tools/render-visuals.py
+
+      - name: Selepas red-lint
+        run: |
+          ./red-lint.sh Apps/Shared/CelestialVisualView.swift \
+            '    private static func warnaUji() -> Color {
+                  Color(red: 0.62, green: 0.30, blue: 0.16)
+              }
+          ' 'Aturan 15' >/dev/null 2>&1; echo "redlint=$?"
+          echo "== porcelain =="; git status --porcelain | head -20
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+
+      - name: Selepas gerbang gambar
+        run: |
+          python3 Tools/check-visuals.py --check >/dev/null 2>&1; echo "gate=$?"
+          echo "== porcelain =="; git status --porcelain | head -20
+          echo "== stat =="; stat -c '%a %s %Y' Tools/render-visuals.py
+          echo "== sha256 =="; sha256sum Tools/render-visuals.py
+          echo "== diff HEAD =="; git diff HEAD --stat -- Tools/render-visuals.py
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          echo "== diff mentah (jika ada) =="; git diff HEAD -- Tools/render-visuals.py | head -20
+          echo "== index mtime =="; stat -c '%Y %n' .git/index
+
+      - name: Selepas aksen
+        run: |
+          python3 Tools/bukti-mutasi-aksen.py >/dev/null 2>&1; echo "aksen=$?"
+          echo "== porcelain =="; git status --porcelain | head -20
+          echo "== stat =="; stat -c '%a %s %Y' Tools/render-visuals.py
+          echo "== sha256 =="; sha256sum Tools/render-visuals.py
+          echo "== blok HEAD =="; git show HEAD:Tools/render-visuals.py | sha256sum
+          git diff --quiet HEAD -- Tools/render-visuals.py; echo "guard=$?"
+          git diff HEAD -- Tools/render-visuals.py | head -20
+
+      - name: Urutan penuh dalam satu shell (seperti job asli)
+        run: |
+          set -x
+          git checkout -- . 2>/dev/null || true
+          ./swift-ui-lint.sh >/dev/null 2>&1; echo "lint=$?"
+          ./red-lint.sh Apps/Shared/CelestialVisualView.swift \
+            '    private static func warnaUji() -> Color {
+                  Color(red: 0.62, green: 0.30, blue: 0.16)
+              }
+          ' 'Aturan 15' >/dev/null 2>&1; echo "redlint=$?"
+          python3 Tools/check-visuals.py --check >/dev/null 2>&1; echo "gate=$?"
+          python3 Tools/bukti-mutasi-aksen.py >/dev/null 2>&1; echo "aksen=$?"
+          echo "== porcelain sebelum bintang =="; git status --porcelain | head
+          echo "== diff sebelum bintang =="; git diff HEAD -- Tools/render-visuals.py | head -30
+          python3 Tools/bukti-mutasi-bintang.py 2>&1 | tail -8
