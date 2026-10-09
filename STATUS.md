@@ -16305,3 +16305,78 @@ dihilangkan seluruhnya.
 (Linux) — sama dengan kode yang sudah 206+690 hijau (OnboardingView di
 `Apps/`, tidak di-build runner Linux). Gerbang lokal: swift-typecheck,
 swift-ui-lint (29/29), swift-test 206+690 hijau.
+
+═════════════════════════════════════════════════════════════════════════
+SIKLUS: Harness mutasi cangkang — ia diam-diam mati, lalu berbohong hijau
+═════════════════════════════════════════════════════════════════════════
+
+**Dua cacat gerbang, ditemukan lewat audit berurutan (bukan sekali lihat).**
+
+### Cacat 1 — harness crash (sunyi) sejak 1e28591
+
+`Tools/bukti-mutasi-cangkang.py` memutasi `Tools/render-visuals.py` lalu
+memanggil gerbang di proses anak. Sejak `1e28591` (16→24 blob) jangkar
+`CURRENT_LAYOUT` diakhiri `)],` (koma tertinggal dari dalam port) tapi
+keempat tata letak pengganti diakhiri `)]` — menggantinya membuang koma itu,
+jadikan Python tidak sah (`SyntaxError` di `render-visuals.py:319`) pada
+**setiap** keadaan mutasi. Akibatnya harness **crash** alih-alih membuktikan
+apa pun — keempat keadaannya gagal sebelum menyentuh satu piksel. Gerbang
+`check_planetary_nebula_shell_is_continuous` sendiri tetap hijau, jadi tidak
+ada yang melihat pembuktiannya sudah mati. (Ini perbaikan yang sudah
+tertinggal di working tree dari sesi sebelumnya: `_same_terminator` menurunkan
+penutup dari jangkar, bukan diketik.)
+
+### Cacat 2 — state #4 salah hijau (setelah crash diperbaiki)
+
+Setelah harness bisa jalan lagi, keadaan #4 (16-blob murni, lebar 0.26)
+**survive** gerbang: hijau di keempat pemeriksaan. Terukur dengan
+`shell_angular_profile` pada dua ukuran:
+
+  keadaan            rujukan f=0.8   M57 f=0.40
+  24-blob (sekarang) 0.85            0.84
+  16-blob (mutan)    0.83            0.65   <- manik!
+  8-blob  (mutan)    0.00/0.04       0.00
+
+Pada rujukan (0.8) 16-blob memang **hampir** sebersambung (lantai 0.83,
+cangkang 0.85) — jadi di situ hijau itu BENAR, bukan cacat. Yang memisahkan
+cangkang jujur dari manik adalah **fuzziness katalog**: pada M57 (0.40) lantai
+16-blob jatuh ke **0.65** (manik terlihat) sementara 24-blob tetap 0.84. Jadi
+harness **salah** menuntut "16-blob merah di mana pun" — itu memaksa gerbang
+menyalak pada kode yang benar (rujukan), dan justru membiarkan regresi
+**nyata** (16-blob di M57 = manik) lolos.
+
+**Kenapa cacat ini penting (bukan kosmetik).** `1e28591` mengubah 16→24 blob
+khususnya untuk menutup "M57 tampil sebagai untaian manik". Mutan yang dia
+tutup — 16-blob — justru yang kini **survive** gerbang. Jadi sejak `1e28591`
+pembuktian bahwa perbaikan itu bertahan sudah mati (Cacat 1), dan begitu
+dihidupkan kembali ia **membenarkan** mutan (Cacat 2). Kelas cacat yang sama
+persis dengan sabit Bulan terbalik dulu: gerbang yang mengukur gambar yang
+tidak tampil, lalu hijau pada kode yang salah.
+
+### Perbaikan
+
+  - `Tools/bukti-mutasi-cangkang.py` (STATES #4): harapan diubah dari string
+    tunggal `"merah"` menjadi **dict per-pemeriksaan** —
+    `{rujukan f=0.8: hijau, M57 f=0.40: merah}`. Loop `main()` diberi cabang
+    `isinstance(expected, dict)` yang membandingkan tiap nama pemeriksaan ke
+    harapannya sendiri (keadaan 1-3 tetap pakai string tunggal). Docstring
+    keadaan #4 ditulis ulang supaya alasan (0.83 vs 0.65, bukan "harus merah
+    di mana pun") tercatat, bukan cuma "apa".
+  - `_same_terminator` (Cacat 1) tetap di working tree; dikonfirmasi HEAD
+    memang `SyntaxError` dan versi ini lulus.
+
+**Verifikasi (terukur, bukan diklaim):**
+  - `python3 Tools/bukti-mutasi-cangkang.py` -> **OK** (exit 0): baseline hijau,
+    #1/#2/#3 merah, #4 sesuai per-kasus (merah di M57, hijau di rujukan).
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 698 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> ditunggu (gerbang berat,
+    >420s; jalan di background). Gerbang yang dipakai
+    (`check_planetary_nebula_shell_is_continuous`) sudah hijau di 4 kasus
+    pada kode sekarang (lantai 0.84 ≥ ambang 0.75).
+
+**Pelajaran (catat, bukan ulang).** Mutan yang menutup sebuah perbaikan harus
+dibuktikan **berbunyi pada fuzziness yang benar-benar tampil di layar**, bukan
+pada kasus rujukan yang kebetulan nyaman. Dan harness mutasi yang crash bukan
+"hijau" — ia diam. Keduanya sudah tertutup di sini: harness hidup (Cacat 1),
+dan state #4 membedakan cangkang jujur (0.84) dari manik (0.65) di M57.

@@ -32,13 +32,18 @@ Keadaan yang diuji:
                           hijau, berarti yang diukurnya ukuran blob, bukan
                           kesinambungan cangkangnya.
   4. 16 titik @22.5°      tata letak yang **benar-benar dipakai** sampai
-     lebar 0.26           cangkangnya dirapatkan. Ini keadaan terpenting di
-                          sini: blobnya **beririsan** (lolos uji geometri
-                          Swift), jadi hanya gerbang piksel yang bisa
-                          menangkapnya — dan hanya setelah gerbang itu
-                          mengukur fuzziness katalog M57 (0.40), bukan
-                          kasus rujukan (0.8). Kalau keadaan ini hijau lagi,
-                          gerbangnya sudah mundur ke lubang yang sama.
+     lebar 0.26           cangkangnya dirapatkan. Pada kasus rujukan (f=0.8)
+                          lantainya **0.83** — cangkang ini nyaris sebersambung
+                          dengan 24-blob (0.85), jadi di situ ia BOLEH hijau:
+                          keadaan #4 bukan "16-blob harus merah di mana pun",
+                          melainkan "16-blob murni (tanpa elongasi) tidak boleh
+                          menyamar sebagai cangkang yang jujur". Tempat yang
+                          memisahkan keduanya adalah **fuzziness katalog** —
+                          pada M57 (0.40) lantai 16-blob jatuh ke **0.65**
+                          (manik), sementara 24-blob tetap 0.84. Jadi keadaan
+                          ini menuntut **merah pada M57**, hijau pada rujukan.
+                          Kalau baris M57-nya hijau, gerbangnya sudah mundur ke
+                          lubang lama (cangkang palsu tampil sebagai cangkang).
 
 Yang **tidak** dipakai sebagai keadaan: 8 titik @45° dengan lebar **0.40**.
 Sempat dicoba dan gerbangnya hijau — dan itu benar: delapan blob selebar itu
@@ -137,7 +142,34 @@ def _with_width(layout, width):
         fields = tail.split(",")
         fields[2] = f" {width}"
         out.append(head + "(" + ",".join(fields))
-    return "\n".join(out)
+    return _same_terminator("\n".join(out), CURRENT_LAYOUT)
+
+
+def _same_terminator(layout, anchor):
+    """Samakan penutup tata letak dengan penutup jangkar yang digantikannya.
+
+    **Kenapa ini perlu, dan kenapa ia cacat yang membunuh seluruh harness.**
+    Jangkar `CURRENT_LAYOUT` diakhiri `)],` — koma tertinggal, karena di
+    dalam port ia diikuti entri lain. Semua tata letak pengganti ditulis
+    tangan dan diakhiri `)]`. Mengganti yang pertama dengan yang kedua
+    karena itu membuang koma itu, dan hasilnya **bukan kode Python yang
+    sah**: `SyntaxError` di baris 319, di **setiap** keadaan mutasi.
+
+    Akibatnya bukan "satu keadaan merah", melainkan harness yang **crash
+    alih-alih membuktikan apa pun** — keempat keadaannya gagal sebelum
+    menyentuh satu piksel pun, sejak `1e28591` mengubah model 16 → 24 blob.
+    Gerbang `check_planetary_nebula_shell_is_continuous` tetap hijau
+    sendiri, jadi tidak ada yang melihat pembuktiannya sudah mati.
+
+    Menambahkan koma ke keempat tata letak satu per satu akan menyelesaikan
+    kejadian ini dan membiarkan **kelasnya** hidup: begitu jangkarnya
+    berhenti memakai koma tertinggal, keempat penggantinya menjadi salah
+    dengan arah yang berlawanan. Karena itu penutupnya **diturunkan dari
+    jangkar**, bukan diketik — jangkarnya yang menentukan, dan penyimpangan
+    tidak bisa lagi ditulis.
+    """
+    return layout[: -len(")]")] + anchor[-len(")],") :]
+
 
 
 NARROW = _with_width(OLD_LAYOUT, "0.20")
@@ -171,6 +203,14 @@ SIXTEEN = """    "planetaryNebula": [
                         (0.2969848480983499, -0.2969848480983500, 0.26, 1.0, 0.0, 0.50),
                         (0.3880294036547405, -0.1607270415933376, 0.26, 1.0, 0.0, 0.45)]"""
 
+# Keempat pengganti dipakai **langsung** sebagai pengganti jangkar, jadi
+# penutupnya harus disamakan dengan penutup jangkar — satu aturan untuk
+# semuanya, bukan empat koma yang ditulis tangan dan bisa basi sendiri.
+# (`NARROW` dan `CURRENT_WIDTH_OLD_SPACING` sudah lewat `_same_terminator`
+# di dalam `_with_width`; ketiga di bawah ini tidak.)
+OLD_LAYOUT = _same_terminator(OLD_LAYOUT, CURRENT_LAYOUT)
+SIXTEEN = _same_terminator(SIXTEEN, CURRENT_LAYOUT)
+
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
 CONTINUOUS = "cangkang nebula planetari bersambung"
@@ -190,7 +230,17 @@ STATES = [
     ("3. 8 titik @45° pada lebar sekarang (0.26)",
      [(CURRENT_LAYOUT, CURRENT_WIDTH_OLD_SPACING)], "merah"),
     ("4. 16 titik @22.5° (tata letak lama yang benar-benar dipakai)",
-     [(CURRENT_LAYOUT, SIXTEEN)], "merah"),
+     [(CURRENT_LAYOUT, SIXTEEN)],
+     # Bukan \"harus merah di mana pun\": pada fuzziness rujukan (0.8) lantai
+     # 16-blob memang **0.83** — cangkang yang hampir sebersambung dengan
+     # 24-blob (0.85), jadi di situ hijau itu BENAR. Yang memisahkan cangkang
+     # jujur dari manik adalah **fuzziness katalog**: pada M57 (0.40) lantai
+     # 16-blob jatuh ke 0.65 (manik) sementara 24-blob tetap 0.84. Jadi baris
+     # M57-nya harus MERAH; kalau hijau, gerbang mundur ke lubang lama.
+     {"cangkang nebula planetari bersambung (76px, rujukan f=0.8)": "hijau",
+      "cangkang nebula planetari bersambung (132px, rujukan f=0.8)": "hijau",
+      "cangkang nebula planetari bersambung (76px, M57 katalog f=0.40)": "merah",
+      "cangkang nebula planetari bersambung (132px, M57 katalog f=0.40)": "merah"}),
 ]
 
 
@@ -266,15 +316,34 @@ def main():
                     print(f"{name}: hijau di {len(checks)} pemeriksaan (benar)")
                 continue
 
-            wrong = [c for c in checks if verdicts[c] != expected]
-            if wrong:
-                for check in wrong:
-                    failures.append(f"{name}: '{check}' harus {expected}, "
-                                    f"dapat {verdicts[check]}")
-                    print(f"{name}: '{check}' harus {expected}, "
-                          f"dapat {verdicts[check]}")
+            # Harapan per-pemeriksaan (dict nama -> "hijau"/"merah") diperlukan
+            # bila satu keadaan harus merah di sebagian kasus dan hijau di
+            # sisanya (lihat keadaan #4: 16-blob merah pada M57, hijau pada
+            # rujukan). Harapan tunggal (string) dipakai keadaan lain.
+            if isinstance(expected, dict):
+                want = expected
+                wrong = [c for c in want if verdicts.get(c) != want[c]]
+                if wrong:
+                    for check in wrong:
+                        failures.append(
+                            f"{name}: '{check}' harus {want[check]}, "
+                            f"dapat {verdicts.get(check)}")
+                        print(f"{name}: '{check}' harus {want[check]}, "
+                              f"dapat {verdicts.get(check)}")
+                else:
+                    print(f"{name}: sesuai harapan per-kasus "
+                          f"({len(want)} pemeriksaan, benar)")
             else:
-                print(f"{name}: {expected} di {len(checks)} pemeriksaan (benar)")
+                wrong = [c for c in checks if verdicts[c] != expected]
+                if wrong:
+                    for check in wrong:
+                        failures.append(f"{name}: '{check}' harus {expected}, "
+                                        f"dapat {verdicts[check]}")
+                        print(f"{name}: '{check}' harus {expected}, "
+                              f"dapat {verdicts[check]}")
+                else:
+                    print(f"{name}: {expected} di {len(checks)} "
+                          f"pemeriksaan (benar)")
     finally:
         restore()
         if hashlib.md5(open(RENDER, "rb").read()).hexdigest() != baseline_md5:
