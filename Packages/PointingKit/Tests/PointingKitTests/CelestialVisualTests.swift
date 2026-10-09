@@ -3330,5 +3330,165 @@ final class CelestialVisualTests: XCTestCase {
                              "kabut Venus lonjong tegak, bukan bulat")
     }
 
+    // MARK: - Inti bintang di dalam gugus
+
+    /// Gugus harus punya **inti bintang**, dan hanya gugus.
+    ///
+    /// **Cacat yang ditutup uji ini.** Gugus terbuka dan gugus bola dulu
+    /// digambar sebagai kabut lembut saja — bentuk yang sama dengan nebula
+    /// emisi, hanya susunannya berbeda. Yang membuat sebuah gugus terbaca
+    /// sebagai gugus adalah titik cahaya yang bisa dipisahkan mata; tanpa itu
+    /// ia tampil sebagai noda (dinilai begitu pada render, lihat
+    /// `check_cluster_cores_reach_the_picture`).
+    ///
+    /// **Kenapa "hanya gugus" ikut diuji.** Nebula emisi memang kabut, dan
+    /// galaksi bintangnya tidak terpisah pada skala ini. Memberi inti ke
+    /// semuanya akan menghapus perbedaan yang justru sedang dibuat — dan itu
+    /// tidak akan terlihat sebagai kesalahan, hanya sebagai semua objek langit
+    /// dalam tampak sama lagi.
+    func testOnlyClustersGetStarCores() {
+        // Radius frame kartu jam (38 pt / 2); inti diuji pada perangkat terkecil.
+        let watchFrameHalfExtent = 19.0
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            let cores = VisualFrame.clusterCores(morphology: morphology,
+                                                 fuzziness: 0.6,
+                                                 frameHalfExtent: watchFrameHalfExtent)
+            let isCluster = morphology == .openCluster || morphology == .globularCluster
+            if isCluster {
+                XCTAssertFalse(cores.cores.isEmpty,
+                               "\(morphology) harus punya inti bintang")
+            } else {
+                XCTAssertTrue(cores.cores.isEmpty,
+                              "\(morphology) tidak boleh punya inti bintang — itu ciri gugus, "
+                              + "dan memberikannya menghapus pembeda antar morfologi")
+            }
+        }
+        // Morfologi tak diketahui = tidak ada bentuk yang boleh diklaim, jadi
+        // tidak ada inti. Aturan yang sama dengan `drawableMorphology`.
+        XCTAssertTrue(VisualFrame.clusterCores(morphology: nil, fuzziness: 0.6,
+                                               frameHalfExtent: watchFrameHalfExtent).cores.isEmpty,
+                      "morfologi nil tidak boleh mendapat inti — itu klaim bentuk saat ragu")
+    }
+
+    /// Inti bintang harus **satu posisi** dengan blob yang menaunginya.
+    ///
+    /// **Kenapa ini yang diuji, bukan "jumlahnya sama".** Jumlah yang sama bisa
+    /// dicapai oleh dua daftar yang tidak berhubungan sama sekali. Yang harus
+    /// dijaga adalah bahwa intinya **diturunkan** dari blob — kalau tidak,
+    /// menggeser sebuah blob akan meninggalkan bintangnya, dan hasilnya bukan
+    /// kesalahan yang terlihat, hanya bintang yang "agak meleset" dari kabutnya.
+    func testClusterCoresSitOnTheirBlobs() {
+        for morphology in [DeepSkyCatalogue.Morphology.openCluster, .globularCluster] {
+            for fuzziness in [0.0, 0.4, 0.8, 1.0] {
+                let blobs = VisualFrame.deepSky(morphology: morphology,
+                                                fuzziness: fuzziness).blobs
+                let cores = VisualFrame.clusterCores(morphology: morphology,
+                                                     fuzziness: fuzziness,
+                                                     frameHalfExtent: 19).cores
+                XCTAssertEqual(cores.count, blobs.count,
+                               "\(morphology) f=\(fuzziness): satu inti per blob")
+                for (core, blob) in zip(cores, blobs) {
+                    XCTAssertEqual(core.offsetX, blob.offsetX, accuracy: 1e-12)
+                    XCTAssertEqual(core.offsetY, blob.offsetY, accuracy: 1e-12)
+                    XCTAssertEqual(core.opacity, blob.opacity, accuracy: 1e-12,
+                                   "inti harus mewarisi opasitas blob-nya, kalau tidak "
+                                   + "gugus bola kehilangan inti padatnya di tengah")
+                    XCTAssertEqual(core.blobExtent, min(blob.halfWidth, blob.halfHeight),
+                                   accuracy: 1e-12,
+                                   "batas keras inti harus bentang blob itu sendiri")
+                }
+            }
+        }
+    }
+
+    /// Inti bintang **selalu di dalam blob-nya**, jadi tidak pernah keluar frame.
+    ///
+    /// **Kenapa uji ini ada padahal ada `testEveryDeepSkyBlobStaysInsideTheFrame`.**
+    /// Uji itu membuktikan blob muat. Inti yang lebih kecil dari blobnya di
+    /// pusat yang sama ikut muat — tetapi hanya **kalau** intinya memang lebih
+    /// kecil. Uji ini menegakkan syarat itu secara langsung, sehingga menaikkan
+    /// `clusterCoreRadiusFraction` sampai di atas 1.0 tidak bisa lolos dengan
+    /// mengandalkan pembuktian yang tidak lagi berlaku.
+    ///
+    /// Arah sebaliknya juga penting: inti harus **cukup besar untuk terlihat**.
+    /// Inti yang nol akan lolos syarat "tidak keluar frame" dengan mudah, dan
+    /// gugus kembali menjadi kabut.
+    ///
+    /// **Ambangnya piksel di layar, bukan pecahan radius.** Yang menentukan
+    /// apakah sebuah inti terbaca sebagai bintang adalah berapa **piksel** yang
+    /// ditempatinya, dan itu `frameHalfExtent (poin) × radius (fraksi) × skala
+    /// layar`. Karena itu uji ini mengukur `radius × 19 pt × 2` (kartu jam 38 pt
+    /// pada layar @2x seperti semua Apple Watch) dan menuntut **>= 1 piksel**.
+    /// Inilah uji yang menangkap bahwa lantai `readableCorePointRadius` memang
+    /// perlu: tanpa lantai, 24 inti di sini jatuh ke 0.67–0.99 px.
+    func testClusterCoresStayInsideTheirBlobsAndAreVisible() {
+        // Radius frame pada kartu jam: `WatchMetrics.visualDiameter` 38 pt / 2.
+        // Skala layar 2 karena seluruh Apple Watch memakai @2x.
+        let watchFrameHalfExtent = 19.0
+        let watchScale = 2.0
+        for morphology in [DeepSkyCatalogue.Morphology.openCluster, .globularCluster] {
+            for fuzziness in [0.0, 0.4, 0.8, 1.0] {
+                let blobs = VisualFrame.deepSky(morphology: morphology,
+                                                fuzziness: fuzziness).blobs
+                let cores = VisualFrame.clusterCores(morphology: morphology,
+                                                     fuzziness: fuzziness,
+                                                     frameHalfExtent: watchFrameHalfExtent).cores
+                for (index, (core, blob)) in zip(cores, blobs).enumerated() {
+                    XCTAssertLessThanOrEqual(
+                        core.radius, min(blob.halfWidth, blob.halfHeight) + 1e-12,
+                        "inti \(index) \(morphology) lebih besar dari blobnya — "
+                        + "pembuktian \"blob muat di frame\" tidak lagi menutupinya")
+                    XCTAssertGreaterThan(core.radius, 0,
+                                         "inti \(index) \(morphology) nol — gugusnya jadi kabut")
+                    let pixels = watchFrameHalfExtent * core.radius * watchScale
+                    XCTAssertGreaterThanOrEqual(
+                        pixels, 1.0 - 1e-12,
+                        "inti \(index) \(morphology) hanya \(pixels) px di kartu jam — "
+                        + "di bawah satu piksel ia tidak punya piksel sendiri, jadi "
+                        + "gugusnya tidak bisa digambar sebagai bintang")
+                }
+            }
+        }
+    }
+
+    /// Inti gugus bola **tidak boleh membesar mengikuti inti blob pusatnya**.
+    ///
+    /// **Cacat yang ditutup uji ini, dan cara menemukannya.** Inti diambil
+    /// sebagai fraksi dari blob yang menaunginya. Itu benar untuk gugus terbuka
+    /// — bintangnya kecil dan tersebar — tetapi **salah untuk blob pusat gugus
+    /// bola**, yang terbesar di seluruh katalog (0.46 R). Tanpa plafon, 30%
+    /// darinya menjadi cakram 0.138 R: satu bola cahaya raksasa di tengah, yang
+    /// pada penilaian gambar terbaca sebagai **bokeh**, bukan gugus bintang.
+    /// Secara fisis memang salah — inti gugus bola adalah ribuan bintang yang
+    /// **tidak terpisah**, bukan satu bintang sebesar intinya.
+    ///
+    /// Ukuran nyatanya yang diperiksa, bukan angkanya: pada kartu jam, inti
+    /// pusat gugus bola tidak boleh jauh lebih besar daripada bintang di
+    /// cincinnya. Itulah bedanya "banyak bintang serupa" dari "satu raksasa".
+    func testGlobularCoreStarsDoNotScaleWithTheCentralBlob() {
+        // Radius frame pada kartu jam: 38 pt / 2. Angka ini yang mengubah radius
+        // model menjadi poin di layar.
+        let watchFrameHalfExtent = 19.0
+        for fuzziness in [0.0, 0.4, 0.8, 1.0] {
+            let cores = VisualFrame.clusterCores(morphology: .globularCluster,
+                                                 fuzziness: fuzziness,
+                                                 frameHalfExtent: watchFrameHalfExtent).cores
+            guard let centre = cores.first else {
+                XCTFail("gugus bola harus punya inti pusat"); return
+            }
+            let ring = cores.dropFirst().map(\.radius)
+            guard let ringMax = ring.max() else {
+                XCTFail("gugus bola harus punya bintang cincin"); return
+            }
+            let centrePoints = watchFrameHalfExtent * centre.radius
+            let ringPoints = watchFrameHalfExtent * ringMax
+            XCTAssertLessThanOrEqual(
+                centrePoints, ringPoints * 1.5,
+                "inti pusat gugus bola \(centrePoints) pt vs bintang cincin \(ringPoints) pt "
+                + "pada f=\(fuzziness) — inti yang jauh lebih besar dari bintang lain "
+                + "terbaca sebagai satu bola cahaya, bukan sebagai gugus")
+        }
+    }
+
 }
 

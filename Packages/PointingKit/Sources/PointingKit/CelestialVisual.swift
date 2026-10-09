@@ -1558,6 +1558,218 @@ public enum VisualFrame {
         }
     }
 
+    // MARK: - Inti bintang di dalam gugus
+
+    /// Bintang-bintang **terbaca** di dalam gugus, siap digambar `Canvas`.
+    ///
+    /// **Kenapa ini ada, padahal gugus sudah punya blob.** Sebuah gugus
+    /// bintang *adalah* bintang-bintangnya: yang membuat Pleiades terbaca
+    /// sebagai Pleiades bukan kabut di sekelilingnya, melainkan **titik-titik
+    /// cahaya yang terpisah** di dalamnya. Sampai siklus ini gugus terbuka dan
+    /// gugus bola digambar sebagai kabut lembut saja — sama seperti nebula,
+    /// hanya susunannya berbeda. Diukur pada render: tujuh blob kabur tanpa
+    /// satu pun titik tajam, dan bentuk itu terbaca sebagai noda, bukan sebagai
+    /// gugus. Nebula emisi memang kabut; gugus justru sebaliknya — bagian
+    /// terpentingnya adalah bintang yang bisa dipisahkan mata.
+    ///
+    /// **Kenapa geometrinya diturunkan dari blob, bukan ditulis sendiri.**
+    /// Inti yang punya daftar posisi sendiri bisa menyimpang dari blob yang
+    /// digambar di bawahnya — dan penyimpangan itu tidak terlihat sebagai
+    /// kesalahan, hanya sebagai bintang yang "agak meleset". Menurunkannya dari
+    /// blob yang sama (`deepSky(morphology:fuzziness:)`) membuat keduanya
+    /// **tidak bisa** berpisah: menggeser sebuah blob menggeser bintangnya.
+    ///
+    /// **Kenapa jari-jarinya selalu aman di dalam frame.** Inti diambil
+    /// `min(halfWidth, halfHeight) * fraksi` dengan `fraksi <= 1`, jadi inti
+    /// selalu **lebih kecil** dari blob yang menaunginya di kedua sumbu. Karena
+    /// `testEveryDeepSkyBlobStaysInsideTheFrame` sudah membuktikan setiap blob
+    /// muat di frame, inti yang lebih kecil di pusat yang sama ikut muat —
+    /// tanpa satu pun perhitungan luberan baru yang bisa salah. Inilah alasan
+    /// `min` dipakai, bukan `halfWidth`: blob galaksi pipih punya
+    /// `halfHeight < halfWidth`, dan inti sebesar `halfWidth` akan menonjol
+    /// keluar dari cakramnya sendiri.
+    ///
+    /// **Hanya gugus, dan hanya saat terkunci.** Morfologi lain mengembalikan
+    /// daftar kosong: nebula emisi tidak punya bintang tajam, galaksi
+    /// bintangnya tidak terpisah pada skala ini. Dan karena pemanggilnya
+    /// membaca morfologi lewat `drawableMorphology` (yang `nil` saat engine
+    /// ragu), gugus yang belum pasti tidak pernah mendapat inti — gambar yang
+    /// lebih yakin daripada badge "Ragu" tetap dilarang.
+    public struct ClusterCoreGeometry: Equatable, Sendable {
+        public struct Core: Equatable, Sendable {
+            /// Geseran pusat inti dari tengah frame, sumbu x & y (satuan radius).
+            public var offsetX: Double
+            public var offsetY: Double
+            /// Jari-jari inti bintang (satuan radius frame).
+            public var radius: Double
+            /// Opasitas puncak inti.
+            public var opacity: Double
+            /// Setengah-bentang terkecil blob yang menaungi inti ini (satuan
+            /// radius frame) — **batas keras** ukuran inti.
+            ///
+            /// Ikut dibawa, bukan dihitung ulang oleh pemanggil: lantai
+            /// keterbacaan (`readableCorePointRadius`) harus dipotong pada
+            /// batas ini, dan pemanggil yang tidak tahu batasnya akan menaikkan
+            /// inti sampai keluar dari kabutnya sendiri.
+            public var blobExtent: Double
+        }
+
+        public var cores: [Core]
+
+        public init(cores: [Core]) { self.cores = cores }
+    }
+
+    /// Fraksi jari-jari blob yang dipakai sebagai jari-jari inti bintangnya.
+    ///
+    /// **Kenapa 0.30, dan kenapa angka ini di model.** Ia mengatur seberapa
+    /// "tajam" gugus terlihat: terlalu besar dan intinya menelan blobnya
+    /// (kembali jadi noda), terlalu kecil dan bintangnya hilang di ukuran
+    /// kartu jam. Pada kartu jam (38 pt, radius frame 19 pt) radius blob gugus
+    /// adalah 0.09–0.11 R, jadi inti 0.30 dari itu ≈ **0.55 pt** — di bawah
+    /// satu piksel pada layar @1x, tetapi 1.1 px pada @2x yang dipakai semua
+    /// Apple Watch. Diukur pada render 76 px (@2x): inti tetap menonjol 0.73
+    /// di atas kabutnya, jadi gugusnya terbaca sebagai bintang — dan angka ini
+    /// **tidak** boleh diturunkan, karena pada 0.20 gugus bola jatuh ke 0.17
+    /// dan kembali tampil sebagai noda.
+    ///
+    /// Angkanya hidup di sini, bukan sebagai literal di `Canvas`, supaya uji
+    /// Linux dan port Python membacanya dari sumber yang sama.
+    public static let clusterCoreRadiusFraction: Double = 0.30
+
+    /// Plafon jari-jari inti bintang gugus, **diturunkan dari tata letaknya**.
+    ///
+    /// **Kenapa plafon ini perlu.** Fraksi di atas diambil dari blob yang
+    /// menaungi bintang. Itu benar untuk gugus terbuka — bintangnya kecil dan
+    /// tersebar — tetapi **salah untuk blob pusat gugus bola**, yang terbesar
+    /// di seluruh katalog (0.46 R pada fuzziness 1.0): 30% darinya menjadi
+    /// cakram 0.138 R, dan diukur pada render 520 px inti itu tampil sebagai
+    /// **satu bola cahaya raksasa** yang dinilai "bokeh", bukan gugus bintang.
+    ///
+    /// **Kenapa plafonnya `median`, bukan angka tetap.** Secara fisis, inti
+    /// gugus bola lebih terang karena **lebih banyak bintang per satuan luas**,
+    /// bukan karena bintangnya lebih besar — dan kerapatan itu sudah dinyatakan
+    /// oleh blobnya (blob pusat memang paling besar & paling pekat). Memberi
+    /// inti yang ikut membesar berarti menghitung kerapatan itu **dua kali**.
+    /// Jadi yang benar: tidak ada bintang yang jauh lebih besar dari bintang
+    /// **biasa** di gugus itu. `median` (bukan `mean`) dipakai justru karena
+    /// yang harus dikecualikan adalah si pencilan itu sendiri — `mean` masih
+    /// tertarik ke atas olehnya, jadi plafonnya ikut membengkak.
+    ///
+    /// Angka tetap (percobaan pertama: 0.055 R) **gagal** dan itu terukur:
+    /// plafon absolut tidak bisa mengikuti `fuzziness`, jadi pada f=0 rasio
+    /// inti pusat terhadap bintang cincin menjadi **1.71** sementara pada f=1.0
+    /// hanya 1.06 — satu angka yang terlalu ketat di ujung yang satu dan terlalu
+    /// longgar di ujung yang lain. Diturunkan dari tata letak, rasionya **1.0
+    /// di setiap fuzziness**.
+    ///
+    /// - Parameter extents: setengah-bentang terkecil tiap blob.
+    /// - Returns: plafon dalam satuan radius frame; 0 kalau tidak ada blob.
+    public static func clusterCoreReferenceExtent(_ extents: [Double]) -> Double {
+        let sorted = extents.sorted()
+        guard !sorted.isEmpty else { return 0 }
+        let middle = sorted.count / 2
+        if sorted.count % 2 == 1 { return sorted[middle] }
+        return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+
+    /// Jari-jari inti bintang minimum agar masih terbaca sebagai **titik**, dalam
+    /// poin pada perangkat terkecil.
+    ///
+    /// **Kenapa lantai ini perlu, dan kenapa angkanya 0.8 — ini TERUKUR, bukan
+    /// diperkirakan.** Tanpa lantai, inti bintang gugus di kartu jam (38 pt,
+    /// radius frame 19 pt) berukuran **0.67–0.99 pt**. Diukur sebagai piksel
+    /// pada layar @2x yang dipakai seluruh Apple Watch, itu 1.34–1.98 px; pada
+    /// @1x — layar yang tidak dipakai perangkat ini — 0.67–0.99 px, **di bawah
+    /// satu piksel**, sehingga inti tidak punya piksel sendiri dan gugusnya
+    /// kembali tampil sebagai kabut. Percobaan pertama saya justru menyimpulkan
+    /// lantai ini tidak perlu, karena probe-nya membandingkan **nisbah
+    /// ketajaman** inti terhadap kabutnya (yang tetap tinggi) alih-alih
+    /// **ukuran** inti (yang sub-piksel). Uji Linux
+    /// `testClusterCoresStayInsideTheirBlobsAndAreVisible` menangkapnya: 24 inti
+    /// gagal ambang 1 px.
+    ///
+    /// **Kenapa dinyatakan dalam poin, bukan pecahan radius.** Keterbacaan
+    /// adalah sifat perangkat, bukan sifat bentuk: ambangnya harus tetap 0.8 pt
+    /// baik di kartu 38 pt maupun panel 200 pt. Kalau ia ditulis sebagai
+    /// pecahan, ia akan berarti ukuran berbeda di tiap layar dan gerbang piksel
+    /// harus mengukur ambang yang berbeda pula di tiap ukuran — persis jenis
+    /// ketergantungan yang membuat ambang gambar rapuh.
+    ///
+    /// **Lantai ini tidak boleh menang atas batas blob.** Pemanggil memotongnya
+    /// pada `blobExtent`, jadi di frame yang lebih kecil dari lantainya sendiri
+    /// yang menang adalah batas blob — dan pembuktian "blob muat di frame"
+    /// tetap menutupi intinya. Lantai yang boleh melebihi blob akan membuat
+    /// bintang menonjol keluar dari kabutnya sendiri, dan itu terlihat sebagai
+    /// bintang yang salah tempat, bukan sebagai gugus yang lebih tajam.
+    public static let readableCorePointRadius: Double = 0.8
+
+    /// Jari-jari inti yang benar-benar dipakai, setelah lantai keterbacaan
+    /// dan batas blob sama-sama diterapkan.
+    ///
+    /// Dipisah supaya invariannya bisa diuji langsung: hasilnya **selalu**
+    /// `<= blobExtent`, berapa pun lantai dan fraksinya.
+    public static func readableCoreRadius(fraction: Double,
+                                          extent: Double,
+                                          reference: Double,
+                                          frameHalfExtent: Double) -> Double {
+        let scaled = fraction * min(extent, reference)
+        guard frameHalfExtent > 0 else { return scaled }
+        let floor = readableCorePointRadius / frameHalfExtent
+        return min(extent, max(scaled, floor))
+    }
+
+    /// Inti bintang untuk sebuah morfologi gugus; kosong untuk yang lain.
+    ///
+    /// **Kenapa `frameHalfExtent` tidak punya nilai bawaan.** Ia dipakai
+    /// lantai keterbacaan, dan lantai itu dinyatakan dalam poin. Pemanggil
+    /// yang membiarkannya pada 1.0 akan membuat lantai 0.8 "poin" dibaca
+    /// sebagai 0.8 radius — dan karena 0.8 radius lebih besar dari setiap
+    /// blob, `min` akan mengembalikan **seluruh blob** sebagai inti: gugusnya
+    /// berubah menjadi kumpulan cakram pekat, bukan kabut berbintang. Nilai
+    /// bawaan yang salah lebih berbahaya daripada tidak ada nilai bawaan,
+    /// jadi parameter ini wajib — pemanggil harus tahu seberapa besar frame
+    /// yang sedang digambarnya.
+    ///
+    /// - Parameters:
+    ///   - morphology: bentuk objek. `nil` = tidak diketahui → tanpa inti.
+    ///   - fuzziness: 0 = titik, 1 = paling lebar (sama dengan blob-nya).
+    ///   - frameHalfExtent: setengah lebar frame **dalam poin**.
+    public static func clusterCores(morphology: DeepSkyCatalogue.Morphology?,
+                                    fuzziness: Double,
+                                    frameHalfExtent: Double) -> ClusterCoreGeometry {
+        guard morphology == .openCluster || morphology == .globularCluster else {
+            return ClusterCoreGeometry(cores: [])
+        }
+        let blobs = deepSky(morphology: morphology, fuzziness: fuzziness).blobs
+        let reference = clusterCoreReferenceExtent(
+            blobs.map { min($0.halfWidth, $0.halfHeight) })
+        // **Opasitas ikut blob-nya, dan itu yang membuat gugus bola terbaca
+        // memusat.** Inti yang sama terang di mana-mana akan membuat gugus bola
+        // tampak sebagai cincin bintang yang rata; memakai opasitas blob
+        // mempertahankan inti padat di tengah yang memang jadi pembedanya.
+        //
+        // **Jari-jari tidak pernah melebihi blobnya** (`min` dengan bentang
+        // blob itu sendiri, lihat `readableCoreRadius`), jadi setiap inti muat
+        // di dalam blob yang `testEveryDeepSkyBlobStaysInsideTheFrame` sudah
+        // buktikan muat — tanpa satu pun perhitungan luberan baru yang bisa
+        // salah. `min` atas `halfWidth` **dan** `halfHeight` dipakai karena blob
+        // galaksi yang pipih punya `halfHeight < halfWidth`; inti sebesar
+        // `halfWidth` akan menonjol keluar dari cakramnya sendiri.
+        let cores = blobs.map { blob in
+            let extent = min(blob.halfWidth, blob.halfHeight)
+            return ClusterCoreGeometry.Core(
+                offsetX: blob.offsetX,
+                offsetY: blob.offsetY,
+                radius: readableCoreRadius(fraction: clusterCoreRadiusFraction,
+                                           extent: extent,
+                                           reference: reference,
+                                           frameHalfExtent: frameHalfExtent),
+                opacity: blob.opacity,
+                blobExtent: extent)
+        }
+        return ClusterCoreGeometry(cores: cores)
+    }
+
     /// Menyusun blob dari layout, **tanpa pernah** membiarkannya keluar frame.
     ///
     /// Lebar & tinggi dikecilkan **bersama** (`room`), bukan tiap sumbu

@@ -437,6 +437,93 @@ def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None)
     return blobs
 
 
+# MODEL: `VisualFrame.clusterCoreRadiusFraction`. Bintang di dalam gugus:
+# titik yang bisa dipisahkan mata, diturunkan dari blob yang sama supaya
+# tidak pernah meleset dari kabutnya. Angka ini dibaca dari model oleh
+# `check_port_matches_swift_constants`; kalau ia berubah di Swift saja,
+# gerbang itu merah.
+CLUSTER_CORE_RADIUS_FRACTION = 0.30
+
+# MODEL: `VisualFrame.clusterCoreReferenceExtent`. Plafon jari-jari inti
+# diturunkan dari tata letaknya (median setengah-bentang terkecil), bukan dari
+# angka tetap: tanpa itu blob pusat gugus bola (0.46 R) menjadi cakram 0.138 R —
+# diukur terbaca "bokeh", bukan gugus. Angka tetap dicoba dan gagal: pada f=0
+# rasio inti pusat : bintang cincin menjadi 1.71 sementara pada f=1.0 hanya 1.06.
+def cluster_core_reference_extent(extents):
+    """`VisualFrame.clusterCoreReferenceExtent` — median, penahan pencilan."""
+    ordered = sorted(extents)
+    if not ordered:
+        return 0.0
+    middle = len(ordered) // 2
+    if len(ordered) % 2 == 1:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+# MODEL: `VisualFrame.readableCorePointRadius`. Lantai jari-jari inti **dalam
+# POIN**, bukan pecahan radius. Alasannya terukur: tanpa lantai, inti bintang
+# gugus di kartu jam (38 pt, radius frame 19 pt) adalah 0.67-0.99 pt — di bawah
+# satu piksel pada @1x, jadi tidak punya piksel sendiri dan gugusnya kembali
+# tampil sebagai kabut. Angka tetap dalam pecahan radius tidak bisa
+# memperbaikinya, karena artinya berbeda di tiap ukuran layar.
+READABLE_CORE_POINT_RADIUS = 0.8
+
+
+def readable_core_radius(fraction, extent, reference, frame_half_extent):
+    """`VisualFrame.readableCoreRadius` — lantai, tapi tidak pernah > blob."""
+    scaled = fraction * min(extent, reference)
+    if frame_half_extent <= 0:
+        return scaled
+    floor = READABLE_CORE_POINT_RADIUS / frame_half_extent
+    return min(extent, max(scaled, floor))
+
+
+# VIEW: `CelestialVisualView.clusterCoreHaloScale`. Halo lembut di sekeliling
+# inti bintang — hiasan, bukan pernyataan tentang langit (sama kelasnya dengan
+# bercak maria Bulan), jadi ia milik view dan **tidak** diklaim sebagai angka
+# model. Kalau ini berubah di view saja, gerbang gambar akan mengukur halo
+# yang tidak dipakai lagi; karena itu ia ikut dibaca `check_port_matches_swift_constants`.
+CLUSTER_CORE_HALO_SCALE = 2.4
+
+
+def cluster_cores(morphology, fuzziness, frame_half_extent=None):
+    """`VisualFrame.clusterCores` — inti bintang di dalam gugus, kosong untuk morfologi lain.
+
+    **Kenapa inti harus ada di port, bukan hanya di view.** Seluruh gerbang
+    piksel di berkas ini mengukur gambar **port ini**. Kalau inti bintang
+    hanya digambar oleh SwiftUI, setiap gerbang tetap hijau sambil mengukur
+    gugus tanpa bintang — dan tidak ada satu pun pemeriksaan yang bisa
+    memberi tahu bahwa layarnya berbeda. Persis kelas cacat yang berkas ini
+    ada untuk mencegah.
+
+    **Kenapa `frame_half_extent` wajib, tanpa nilai bawaan.** Lantai
+    keterbacaan inti (`READABLE_CORE_POINT_RADIUS`) dinyatakan dalam poin, jadi
+    ia hanya bisa diterapkan kalau pemanggil memberi tahu seberapa besar frame
+    ini. Nilai bawaan 1.0 — yang benar untuk satuan model blob — akan membuat
+    lantai 0.8 "poin" dibaca sebagai 0.8 radius, dan karena 0.8 radius lebih
+    besar dari setiap blob, `min` mengembalikan seluruh blob sebagai inti:
+    gugusnya jadi kumpulan cakram pekat. Nilai bawaan yang salah lebih
+    berbahaya daripada tidak ada nilai bawaan, jadi parameternya wajib.
+    """
+    if morphology not in ("openCluster", "globularCluster"):
+        return []
+    if frame_half_extent is None:
+        raise ValueError(
+            "frame_half_extent wajib: lantai keterbacaan inti dinyatakan dalam "
+            "poin, jadi pemanggil harus tahu seberapa besar frame-nya")
+    blobs = deep_sky_blobs(morphology, fuzziness)
+    extents = [min(b["half_width"], b["half_height"]) for b in blobs]
+    reference = cluster_core_reference_extent(extents)
+    cores = []
+    for blob, extent in zip(blobs, extents):
+        cores.append(dict(
+            offset_x=blob["offset_x"], offset_y=blob["offset_y"],
+            radius=readable_core_radius(CLUSTER_CORE_RADIUS_FRACTION, extent,
+                                        reference, frame_half_extent),
+            opacity=blob["opacity"], blob_extent=extent))
+    return cores
+
+
 # Geometri lencana "?" — candidateMarker.
 #
 # **Kenapa konstanta ini berdiri di sini, di atas pemakainya.** Python
@@ -1766,6 +1853,26 @@ def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):
                     cos_a=cos_a, sin_a=sin_a:
                     _inside_rotated_ellipse(x, y, bx, by, half_w, half_h, cos_a, sin_a),
                     at)
+
+    # VIEW: `drawDeepSky` — inti bintang di dalam gugus, digambar **setelah**
+    # kabutnya (kabut yang menutupi bintang menghapus ciri yang membedakan
+    # gugus dari nebula). Halo dulu, lalu inti pekat di atasnya.
+    for star in cluster_cores(morphology, kw.get("fuzziness", 0.6),
+                              frame_half_extent=radius):
+        star_r = star["radius"] * radius
+        if star_r <= 0:
+            continue
+        sx = cx + star["offset_x"] * radius
+        sy = cy + star["offset_y"] * radius
+        halo = star_r * CLUSTER_CORE_HALO_SCALE
+        canvas.fill(lambda x, y, sx=sx, sy=sy, halo=halo:
+                    (x - sx) ** 2 + (y - sy) ** 2 <= halo * halo,
+                    lambda x, y, sx=sx, sy=sy, halo=halo, op=star["opacity"]:
+                    (core_rgb, op * 0.5 * max(0.0, 1 - math.hypot(x - sx, y - sy) / halo)))
+        canvas.fill(lambda x, y, sx=sx, sy=sy, star_r=star_r:
+                    (x - sx) ** 2 + (y - sy) ** 2 <= star_r * star_r,
+                    lambda x, y, op=star["opacity"]:
+                    (core_rgb, min(1.0, op + 0.25)))
 
 
 def _inside_rotated_ellipse(x, y, bx, by, half_w, half_h, cos_a, sin_a):

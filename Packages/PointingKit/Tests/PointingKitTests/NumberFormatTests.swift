@@ -13,10 +13,17 @@ final class NumberFormatTests: XCTestCase {
     override func setUp() {
         super.setUp()
         NumberFormat.reset()
+        // Katalog ikut dilepas: sejak satuan laju diambil dari katalog
+        // (`RowSpeech.spokenRate` membaca `.rowSpeechDegreesPerSecond`), satu
+        // uji yang memasang terjemahan akan bocor ke berkas lain — dan
+        // kebocoran itu muncul sebagai angka dengan satuan yang salah, bukan
+        // sebagai kegagalan.
+        TextLocalization.reset()
     }
 
     override func tearDown() {
         NumberFormat.reset()
+        TextLocalization.reset()
         super.tearDown()
     }
 

@@ -1215,7 +1215,62 @@ struct CelestialVisualView: View {
                                       core.opacity(0)]),
                     center: .zero, startRadius: 0, endRadius: halfWidth))
         }
+
+        // **Bintang yang terbaca di dalam gugus.** Blob di atas adalah kabut;
+        // untuk gugus, yang membuatnya terbaca sebagai gugus adalah titik-titik
+        // cahaya yang bisa dipisahkan mata. Geometrinya datang dari model
+        // (`clusterCores`), yang menurunkannya dari blob yang **sama** — jadi
+        // bintang tidak bisa meleset dari kabutnya, dan tidak ada daftar posisi
+        // kedua yang bisa tertinggal saat bentuknya dirapikan.
+        //
+        // Inti digambar **setelah** blob, bukan sebelumnya: kabut yang menutupi
+        // bintang justru menghapus satu-satunya ciri yang membedakan gugus dari
+        // nebula.
+        //
+        // Warnanya memakai `core` yang sama dengan kabutnya — gugus terbuka
+        // putih-biru, gugus bola kuning-oranye — jadi bintang dan kabutnya satu
+        // warna, persis seperti di langit: warnanya datang dari bintangnya.
+        // Lewat `accent(...)`, jadi mode malam ikut memetakannya.
+        // **`frameHalfExtent` di sini adalah `radius` dalam poin, dan itu
+        // memang yang dibutuhkan model.** Lantai keterbacaan inti
+        // (`readableCorePointRadius`) dinyatakan dalam poin, jadi radius frame
+        // harus dalam satuan yang sama — bukan 1.0 (satuan model blob) yang
+        // akan membuat lantai 0.8 "poin" dibaca sebagai 0.8 radius.
+        let cores = VisualFrame.clusterCores(morphology: morphology,
+                                             fuzziness: visual.fuzziness,
+                                             frameHalfExtent: Double(radius))
+        for star in cores.cores {
+            let starRadius = CGFloat(star.radius) * radius
+            guard starRadius > 0 else { continue }
+            let starCenter = CGPoint(x: center.x + CGFloat(star.offsetX) * radius,
+                                     y: center.y + CGFloat(star.offsetY) * radius)
+            // Inti pekat + halo tipis. Halo sendirian akan kembali jadi kabut;
+            // inti sendirian akan jadi titik yang hilang di ukuran kartu jam.
+            // Opasitasnya mengikuti blob yang menaunginya, jadi gugus bola tetap
+            // terlihat lebih padat di tengah daripada gugus terbuka.
+            let halo = starRadius * Self.clusterCoreHaloScale
+            context.fill(Path(ellipseIn: CGRect(x: starCenter.x - halo,
+                                                y: starCenter.y - halo,
+                                                width: halo * 2, height: halo * 2)),
+                         with: .radialGradient(
+                            Gradient(colors: [core.opacity(star.opacity * 0.5),
+                                              core.opacity(0)]),
+                            center: starCenter, startRadius: 0, endRadius: halo))
+            context.fill(Path(ellipseIn: CGRect(x: starCenter.x - starRadius,
+                                                y: starCenter.y - starRadius,
+                                                width: starRadius * 2,
+                                                height: starRadius * 2)),
+                         with: .color(core.opacity(min(1, star.opacity + 0.25))))
+        }
     }
+
+    /// Pengali jari-jari halo di sekeliling inti bintang gugus.
+    ///
+    /// Konstanta milik view: ini hiasan lembut, bukan pernyataan tentang
+    /// langit — sama kelasnya dengan bercak maria Bulan. Yang **tidak** boleh
+    /// di sini adalah posisi atau ukuran intinya, dan keduanya datang dari
+    /// model.
+    private static let clusterCoreHaloScale: CGFloat = 2.4
 
     // MARK: - Penanda kandidat
 

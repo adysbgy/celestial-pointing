@@ -240,6 +240,25 @@ jobs:
       - name: Buktikan gerbang cangkang nebula planetari berbunyi
         run: python3 Tools/bukti-mutasi-cangkang.py
 
+      # Dan bukti untuk gerbang **inti bintang gugus** — gerbang yang versi
+      # pertamanya hijau pada gugus tanpa satu pun bintang.
+      #
+      # Versi pertama hanya mengukur puncak inti di atas lengkungan sekitarnya,
+      # pada **satu** render. Lengkungan itu milik **kabut** yang menaungi
+      # inti, bukan intinya, jadi dengan inti dihapus seluruhnya dari port
+      # (`for star in []:`) keempat pemeriksaannya tetap hijau — gugus bola
+      # 38 pt pada 0.2035 terhadap ambang 0.20. Gerbangnya mengesahkan gugus
+      # tanpa bintang dan menyebutnya "inti bintang gugus terbaca".
+      #
+      # Gerbangnya sekarang mengukur **dua** nisbah, dan harness ini menuntut
+      # masing-masing berbunyi pada kelasnya sendiri: kontras (dengan inti vs
+      # tanpa inti) menangkap inti yang hilang, ketajaman (puncak di atas
+      # lengkungan) menangkap inti yang menyatu dengan halonya. Keadaan #2
+      # penting justru karena ia hijau di seluruh pemeriksaan kontras — tanpa
+      # dia, `MIN_CLUSTER_CORE_SHARPNESS` tidak dijaga siapa pun.
+      - name: Buktikan gerbang inti bintang gugus berbunyi
+        run: python3 Tools/bukti-mutasi-inti-gugus.py
+
       # Dan bukti untuk **M27 sebagai cangkang yang dipetkan**, bukan cangkang
       # bulat: siluet yang memipih, lubang yang tetap terbuka, dan — yang baru
       # dan paling mudah hilang — **model yang berhenti memetkan sementara port

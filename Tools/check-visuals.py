@@ -442,6 +442,54 @@ MIN_DUMBBELL_ASPECT = 0.45
 #: sampai kena ke semua objek `.planetaryNebula` akan memerahkannya.
 MIN_RING_ASPECT = 0.92
 
+#: Ambang "inti bintang gugus terbaca", sebagai proporsi puncaknya sendiri.
+#:
+#: **Ambang ini bukan penjaga utama, dan pernah dikira begitu.** Ia warisan
+#: versi pertama gerbang ini, yang hanya mengukur puncak di atas lengkungannya
+#: (`cluster_core_sharpness`). Diukur, ternyata ia **buta terhadap cacat yang
+#: seharusnya ia tangkap**: dengan inti dihapus sama sekali dari port, gugus
+#: bola masih terbaca 0.2035 — hijau tipis di atas ambang 0.20 ini, padahal
+#: tidak ada satu pun bintang di gambar. Angka lengkungan itu memang datang
+#: dari kabut yang menaunginya, bukan dari intinya.
+#:
+#: Sekarang penjaga yang sebenarnya adalah `MIN_CLUSTER_CORE_CONTRAST`, yang
+#: membandingkan render **dengan** inti terhadap render **tanpa** inti; ambang
+#: ini tetap dipertahankan karena ia masih menjaga satu arah yang tidak dijaga
+#: kontras: inti yang digambar tetapi **menyatu** dengan kabutnya.
+#:
+#: Diukur pada kode sekarang (lihat `cluster_core_sharpness`): inti terlemah
+#: 0.77 (gugus terbuka 200 pt), 0.82 (gugus terbuka 38 pt), 0.53 (bola 200 pt),
+#: 0.53 (bola 38 pt).
+#:
+#: **Empat angka di atas bukan hiasan: `check_cluster_core_docstring_quotes_measured_values`
+#: membacanya kembali dari komentar ini dan mengukurnya ulang.** Versi pertama
+#: komentar ini mengutip 0.80/0.44/0.58/0.34 — angka yang tidak pernah keluar
+#: dari penyampelnya, persis kelas cacat yang sudah berulang di repo ini
+#: (komentar mengutip angka yang tidak pernah ia ukur).
+MIN_CLUSTER_CORE_SHARPNESS = 0.20
+
+#: Ambang "inti bintang benar-benar **ditambahkan** ke gambar", sebagai nisbah
+#: kecerahan pada pusat inti antara render **dengan** inti dan render **tanpa**
+#: inti.
+#:
+#: **Kenapa gerbang butuh ini, dan kenapa `MIN_CLUSTER_CORE_SHARPNESS` tidak
+#: cukup.** Diukur dengan inti dihapus seluruhnya dari port
+#: (`for star in []:`): keempat pemeriksaan lama tetap **HIJAU**, termasuk gugus
+#: bola 38 pt pada 0.2035 terhadap ambang 0.20. Nisbah puncak-terhadap-lengkungan
+#: diukur pada **satu** render, jadi kabut yang menaungi inti ikut memberi
+#: nilainya; yang mengukur apakah intinya **ada** harus membandingkan dua render,
+#: dan itu yang dilakukan nisbah ini.
+#:
+#: 1.0 berarti piksel di pusat inti sama terangnya dengan kabut saja — tidak ada
+#: inti. Diukur pada kode sekarang: terlemah **1.67** (gugus terbuka 38 pt),
+#: 1.69 (gugus terbuka 200 pt), 1.66 (bola 200 pt), 1.71 (bola 38 pt). Dengan
+#: inti dihapus ia tepat **1.000** di keempatnya.
+#:
+#: Ambang 1.10 duduk di antaranya dengan jarak lebar ke dua arah: jauh di atas
+#: 1.000 (kebisingan rasterisasi tidak bisa menaikkan kabut tanpa inti sampai
+#: 1.10) dan jauh di bawah 1.67 (inti yang benar tidak bisa dituduh hilang).
+MIN_CLUSTER_CORE_CONTRAST = 1.10
+
 #: Nama kasus M27, ditulis sekali.
 #:
 #: Dipakai di dua tempat di `check_dumbbell_nebula_is_an_elongated_shell`:
@@ -1807,6 +1855,35 @@ def check_port_matches_swift_constants(results):
         ("bola netral: bayangan", R.NEUTRAL_SHADOW, (0.28, 0.27, 0.26),
          "neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)",
          view),
+        # Inti bintang di dalam gugus. Dua angka, dua berkas — dan keduanya
+        # menentukan satu-satunya ciri yang membedakan gugus dari nebula di
+        # layar. Tanpa penjagaan ini, mengecilkan fraksi inti di model akan
+        # membiarkan **seluruh** gerbang di atas hijau sambil mengukur gugus
+        # yang bintangnya sudah hilang di ukuran kartu jam — dan tidak ada teks
+        # di layar yang bisa membedakannya dari nebula.
+        #
+        # Arah "view memakai intinya" tidak dijaga di sini: yang menentukannya
+        # adalah piksel, dan itu diukur `check_cluster_cores_reach_the_picture`.
+        ("inti gugus: fraksi jari-jari (port == model)",
+         R.CLUSTER_CORE_RADIUS_FRACTION, 0.30,
+         "clusterCoreRadiusFraction: Double = 0.30", model,
+         "CelestialVisual.swift"),
+        ("inti gugus: lantai keterbacaan (port == model)",
+         R.READABLE_CORE_POINT_RADIUS, 0.8,
+         "readableCorePointRadius: Double = 0.8", model,
+         "CelestialVisual.swift"),
+        ("inti gugus: plafon diturunkan dari tata letak (model)",
+         "clusterCoreReferenceExtent" in model, True,
+         "public static func clusterCoreReferenceExtent(", model,
+         "CelestialVisual.swift"),
+        ("inti gugus: plafon diturunkan dari tata letak (port)",
+         "cluster_core_reference_extent" in port, True,
+         "def cluster_core_reference_extent(extents):", port,
+         "render-visuals.py"),
+        ("inti gugus: skala halo (port == view)",
+         R.CLUSTER_CORE_HALO_SCALE, 2.4,
+         "clusterCoreHaloScale: CGFloat = 2.4", view,
+         "CelestialVisualView.swift"),
     ]
     # Palet planet. Hingga sini **tidak dijaga siapa pun**: `PLANET_PALETTE`
     # di port Python dan `Planet.palette` di Swift memuat warna + pemetaan
@@ -4858,6 +4935,388 @@ def shell_angular_profile(size, ss, radius=0.42, case_name="deepsky-planetaryNeb
     return (background,
             samples[int(0.10 * len(samples))],
             samples[int(0.98 * len(samples))])
+
+
+#: Ukuran tempat inti bintang gugus diuji: (piksel render, poin kartu).
+#:
+#: **Pasangan ini yang penting, bukan pikselnya saja.** Lantai keterbacaan inti
+#: dinyatakan dalam **poin** — 0.8 pt — jadi model harus diberi tahu seberapa
+#: besar kartunya agar bisa mengubah lantai itu menjadi radius. Menguji hanya
+#: pada 200 px berarti menguji satu perangkat yang tidak pernah dipakai: pada
+#: ukuran itu inti sebelum lantai pun sudah 3.58 px dan terbaca, sehingga
+#: gerbangnya hijau sementara **kartu jam** — perangkat yang justru paling
+#: sering dipakai — tidak punya satu pun inti yang sampai ke piksel.
+#: 200 pt = panel iPhone, 38 pt = `WatchMetrics.visualDiameter`.
+CLUSTER_CORE_SIZES = ((400, 200), (76, 38))
+
+
+def check_cluster_cores_reach_the_picture(results, ss=2):
+    """Gugus harus digambar sebagai **bintang yang terbaca**, bukan hanya kabut.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini gugus terbuka dan
+    gugus bola digambar sebagai kabut lembut saja — sama seperti nebula emisi,
+    hanya susunannya berbeda. Yang membuat sebuah gugus terbaca sebagai gugus
+    adalah **titik cahaya yang bisa dipisahkan mata**; tanpa itu ia tampil
+    sebagai noda. Diukur pada render 520 px dan dinilai: "tidak terbaca sebagai
+    gugus bintang", "seperti bokeh".
+
+    Gerbang ini tidak mengukur "ada bintang di daftar", melainkan **puncak di
+    atas lengkungannya** — satu properti piksel yang hanya bisa muncul kalau
+    intinya benar-benar digambar.
+
+    **Kenapa dua ukuran.** Panel iPhone (200 pt) dan kartu jam (38 pt) adalah
+    dua perangkat yang benar-benar dipakai, dan inti yang menonjol di 200 pt
+    belum tentu masih punya piksel sendiri di 38 pt. Keduanya diperiksa;
+    satu yang gagal sudah cukup menggagalkan.
+
+    **Apa yang TIDAK dijamin gerbang ini, dan itu batas yang jujur.** Ambang
+    bawahnya adalah lantai keterbacaan (`readableCorePointRadius`) dalam
+    piksel; di bawah itu tidak ada bentuk yang bisa diukur, hanya pembulatan
+    posisi. Lantai itulah yang membuat inti di kartu jam benar-benar punya
+    piksel; tanpanya gerbang ini mengukur **nol** inti di ukuran jam dan
+    gugusnya kembali tampil sebagai kabut.
+
+    **Kenapa puncaknya harus di atas nol, bukan di atas ambang tetap.** Inti
+    yang sama-sama terang dengan kabut di bawahnya tidak menambah satu pun
+    titik yang terbaca. Ambangnya proporsi terhadap kecerahan inti itu sendiri,
+    jadi ia tidak bergantung pada skala warna mode malam.
+
+    **Kenapa ada dua pengukuran, bukan satu.** Nisbah puncak-terhadap-lengkungan
+    (`cluster_core_sharpness`) diukur pada **satu** render, dan itu membuatnya
+    buta terhadap cacat yang paling sederhana: inti yang tidak digambar sama
+    sekali. Diukur, dengan `for star in []:` di port keempat pemeriksaan lama
+    tetap **HIJAU** (bola 38 pt pada 0.2035 terhadap ambang 0.20), karena
+    lengkungan di sekitar titik itu memang milik kabutnya. Karena itu nisbah
+    kedua — `cluster_core_contrast` — membandingkan render **dengan** inti
+    terhadap render **tanpa** inti, dan hanya bisa bernilai 1.0 kalau intinya
+    tidak menambahkan apa pun. Dua pengukuran itu menjaga dua kelas berbeda:
+    kontras menjaga "ada atau tidak", ketajaman menjaga "menonjol atau menyatu".
+
+    **Kenapa hanya gugus.** Nebula emisi memang kabut — menuntut puncak di
+    situ akan memaksa bentuk yang salah. Karena itu morfologinya diambil dari
+    daftar yang ditulis di sini dengan alasannya, bukan dari `allCases`.
+    """
+    for case_name, label in (("deepsky-openCluster", "gugus terbuka"),
+                             ("deepsky-globularCluster", "gugus bola")):
+        for pixels, points in CLUSTER_CORE_SIZES:
+            sharps = cluster_core_sharpness(case_name, pixels, points, ss)
+            if not sharps:
+                results.append(Result(
+                    f"inti bintang gugus terbaca ({label}, {points}pt)",
+                    False,
+                    f"tidak ada satu pun inti yang terukur pada {pixels}px "
+                    f"({points}pt) — intinya tidak sampai ke piksel, jadi gugusnya "
+                    f"tampil sebagai kabut tanpa bintang"))
+                continue
+            worst = min(sharps)
+            results.append(Result(
+                f"inti bintang gugus terbaca ({label}, {points}pt)",
+                worst >= MIN_CLUSTER_CORE_SHARPNESS,
+                f"puncak terlemah {worst:.2f} di atas lengkungannya, dari "
+                f"{len(sharps)} inti (butuh >= {MIN_CLUSTER_CORE_SHARPNESS}); "
+                f"di bawah itu intinya tidak menonjol dari kabutnya"))
+
+            contrasts = cluster_core_contrast(case_name, pixels, points, ss)
+            if not contrasts:
+                results.append(Result(
+                    f"inti bintang gugus ditambahkan ke gambar ({label}, {points}pt)",
+                    False,
+                    f"tidak ada satu pun inti yang bisa dibandingkan pada "
+                    f"{pixels}px ({points}pt) — pengukuran kontras tidak punya "
+                    f"piksel untuk dibandingkan"))
+                continue
+            weakest = min(contrasts)
+            results.append(Result(
+                f"inti bintang gugus ditambahkan ke gambar ({label}, {points}pt)",
+                weakest >= MIN_CLUSTER_CORE_CONTRAST,
+                f"inti terlemah {weakest:.3f}x lebih terang dari kabut saja, "
+                f"dari {len(contrasts)} inti (butuh >= "
+                f"{MIN_CLUSTER_CORE_CONTRAST}); 1.000 berarti intinya tidak "
+                f"ditambahkan sama sekali"))
+
+
+def cluster_core_sharpness(case_name, pixels, points, ss=2):
+    """Selisih puncak inti terhadap lengkungan sekitarnya, proporsi puncak.
+
+    `pixels` = lebar render, `points` = lebar kartu yang direpresentasikannya.
+    Keduanya dibutuhkan karena lantai keterbacaan inti dinyatakan dalam poin,
+    sementara yang diukur adalah piksel; rasionya (`pixels / points`) yang
+    mengubah lantai itu menjadi piksel.
+
+    Dipakai `check_cluster_cores_reach_the_picture`. Dipisah supaya probe
+    pembanding (dengan inti dimatikan) bisa memakai **pengukuran yang sama
+    persis** — kalau probe punya salinannya sendiri, ia bisa sepakat salah.
+    """
+    w, h, rows, cores, cx, cy, unit, floor_pixels = _cluster_core_frame(
+        case_name, pixels, points, ss)
+
+    def lum(x, y):
+        x, y = int(round(x)), int(round(y))
+        if 0 <= x < w and 0 <= y < h:
+            return rows[y][x * 4]
+        return None
+
+    out = []
+    for core in cores:
+        sx = cx + core["offset_x"] * unit
+        sy = cy + core["offset_y"] * unit
+        r = core["radius"] * unit       # radius inti, dalam PIKSEL render
+        # **Batasnya lantai dalam piksel, bukan angka 1.0 px yang tetap.**
+        # Inti yang dilantai `readableCorePointRadius` berada **tepat** di
+        # lantai itu, jadi ambang yang lebih tinggi dari lantai akan melewati
+        # justru inti-inti yang baru saja diperbaiki — dan gerbangnya kembali
+        # mengukur nol inti di ukuran jam. Epsilon dipakai karena radius yang
+        # dilantai sama dengan lantainya sendiri, dan pembulatan float bisa
+        # menaruhnya sepersekian di bawahnya.
+        if r + 1e-6 < floor_pixels:
+            continue
+        peak = lum(sx, sy)
+        if peak is None or peak <= 0:
+            continue
+        shoulder = []
+        for step in range(8):
+            angle = math.radians(45 * step)
+            value = lum(sx + math.cos(angle) * 2.5 * r,
+                        sy + math.sin(angle) * 2.5 * r)
+            if value is not None:
+                shoulder.append(value)
+        if not shoulder:
+            continue
+        out.append((peak - sum(shoulder) / len(shoulder)) / peak)
+    return out
+
+
+def _cluster_core_frame(case_name, pixels, points, ss=2):
+    """Geometri bersama untuk kedua nisbah: render, inti, pusat, lantai.
+
+    **Kenapa dipisah.** `cluster_core_sharpness` dan `cluster_core_contrast`
+    harus menyampel **inti yang sama di koordinat yang sama**; kalau masing-
+    masing menurunkan daftar intinya sendiri, keduanya bisa mengukur bintang
+    yang berbeda dan gerbangnya melaporkan dua angka yang tidak tentang hal
+    yang sama. Menyalin rumusnya dua kali adalah cara paling mudah membuat
+    keduanya menyimpang.
+
+    `cores` sengaja **tidak** difilter lantai di sini: yang memfilter adalah
+    pemanggilnya, supaya lantai itu terbaca di sebelah komentar alasannya
+    (dan supaya nisbah kontras bisa menyebut lantai yang sama).
+    """
+    _, (w, h, rows) = render_case(case_name, size=pixels, ss=ss)
+    morphology = "openCluster" if "openCluster" in case_name else "globularCluster"
+    case = next(c for c in R.build_cases() if c.name == case_name)
+    unit = w / 2.0                      # radius frame, dalam PIKSEL render
+    cores = R.cluster_cores(morphology, case.kw.get("fuzziness", 0.6),
+                            frame_half_extent=points / 2.0)
+    pixels_per_point = pixels / float(points)
+    floor_pixels = R.READABLE_CORE_POINT_RADIUS * pixels_per_point
+    return w, h, rows, cores, w / 2.0, h / 2.0, unit, floor_pixels
+
+
+def cluster_core_contrast(case_name, pixels, points, ss=2):
+    """Kecerahan di pusat inti **dengan** inti dibagi **tanpa** inti.
+
+    **Kenapa ini terpisah dari `cluster_core_sharpness`, dan kenapa ia ada.**
+    Nisbah ketajaman diukur pada satu render, jadi kabut yang menaungi inti
+    ikut menyumbang nilainya — dan itu membuatnya buta terhadap cacat yang
+    paling sederhana: inti yang tidak digambar sama sekali. Diukur, dengan
+    `for star in []:` di port, keempat pemeriksaan ketajaman tetap **HIJAU**
+    (bola 38 pt: 0.2035 terhadap ambang 0.20). Nisbah ini tidak bisa lolos
+    begitu, karena pembandingnya adalah render yang sama **tanpa** inti:
+    1.0 berarti intinya tidak menambahkan apa pun.
+
+    **Kenapa render pembanding, bukan lengkungan seperti saudaranya.** Yang
+    diukur di sini adalah *keberadaan*, bukan *bentuk*. Lengkungan di sekitar
+    inti tidak bisa membedakan "inti tidak digambar" dari "inti digambar rata
+    dengan kabut" — keduanya memberi lengkungan yang sama, karena yang
+    diukur lengkungan itu kabutnya sendiri. Render pembanding mengambil
+    kabut itu sebagai acuan, sehingga satu-satunya hal yang tersisa di
+    selisihnya adalah intinya.
+
+    **Kenapa `cluster_cores` dimatikan, bukan parameternya diubah.** Mematikan
+    fungsi itu di **port** yang menggambar membuat kedua render berbeda
+    **hanya** pada inti: kabut, posisi, warna, dan lencana tetap dihitung oleh
+    jalur yang sama. Menambah parameter `draw_cores=False` ke jalur menggambar
+    akan membuat dua jalur yang bisa berbeda pendapat — dan gerbang yang
+    membandingkan dua jalur bukan gerbang yang membandingkan gambar dengan
+    dirinya sendiri.
+
+    **Kenapa hanya pusat inti.** Di situlah inti dan kabut menumpuk paling
+    banyak, jadi selisihnya paling besar dan paling sedikit terpengaruh
+    pembulatan. Mengukur di tepinya akan mengukur gradien tepi, bukan intinya.
+
+    Dipakai `check_cluster_cores_reach_the_picture`. Dipisah supaya probe
+    pembanding bisa memakai **pengukuran yang sama persis**.
+    """
+    w, h, rows, cores, cx, cy, unit, floor_pixels = _cluster_core_frame(
+        case_name, pixels, points, ss)
+    fog_rows = _render_without_cluster_cores(case_name, pixels, ss)
+
+    def lum(source, x, y):
+        x, y = int(round(x)), int(round(y))
+        if 0 <= x < w and 0 <= y < h:
+            return source[y][x * 4]
+        return None
+
+    out = []
+    for core in cores:
+        sx = cx + core["offset_x"] * unit
+        sy = cy + core["offset_y"] * unit
+        r = core["radius"] * unit
+        # Lantai yang sama dengan `cluster_core_sharpness`: inti yang tidak
+        # punya piksel sendiri tidak bisa dibandingkan, dan menuntut kontras
+        # darinya akan menuntut sesuatu yang tidak ada di layar.
+        if r + 1e-6 < floor_pixels:
+            continue
+        with_core = lum(rows, sx, sy)
+        without_core = lum(fog_rows, sx, sy)
+        if with_core is None or without_core is None or without_core <= 0:
+            continue
+        out.append(with_core / without_core)
+    return out
+
+
+def _render_without_cluster_cores(case_name, pixels, ss=2):
+    """Render kasus yang sama dengan `cluster_cores` dimatikan di port.
+
+    Mengembalikan `(width, height, rows)` seperti `decode_png`.
+
+    **Kenapa lewat PNG, bukan buffer float mentah.** Seluruh gerbang di berkas
+    ini membandingkan byte 8-bit; representasi yang berbeda akan mengukur
+    selisih pembulatan, bukan gambar. Render pembanding ini dibandingkan
+    **piksel demi piksel** dengan render biasa, jadi keduanya harus melewati
+    jalur yang sama persis — termasuk kuantisasi ke 8 bit.
+
+    **Kenapa disimpan ke berkas, bukan langsung dari canvas.** Sama dengan
+    `render_case`: satu-satunya cara mendapat `rows` yang bisa disampel di
+    koordinat piksel adalah lewat `decode_png`.
+    """
+    case = next(c for c in R.build_cases() if c.name == case_name)
+    original = R.cluster_cores
+    R.cluster_cores = lambda morphology, fuzziness, frame_half_extent=None: []
+    try:
+        canvas = R.render(case, size=pixels, night_mode=False,
+                          show_frame=False, ss=ss)
+    finally:
+        # Dipulihkan di `finally`: kalau tidak, satu galat di sini membuat
+        # **seluruh** gerbang sesudahnya mengukur gugus tanpa bintang, dan
+        # yang terlihat hanya gerbang lain yang merah karena alasan yang
+        # salah.
+        R.cluster_cores = original
+    path = os.path.join(R.OUT_DIR, f"__nocore-{case_name}.png")
+    os.makedirs(R.OUT_DIR, exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(canvas.to_png())
+    return decode_png(path)[2]
+
+
+def cluster_core_sharpness_comment():
+    """Blok komentar di atas `MIN_CLUSTER_CORE_SHARPNESS`, dibaca dari berkasnya.
+
+    **Kenapa dibaca dari berkas, bukan disalin ke konstanta.** Menyalinnya
+    berarti ada dua salinan komentar: yang dibaca gerbang ini dan yang dibaca
+    orang. Menyunting yang asli tanpa menyunting salinannya akan membuat
+    gerbang ini hijau sambil mengukur teks yang sudah tidak ada — persis
+    "gerbang mengukur gambar yang tidak pernah tampil", di lapis komentar.
+
+    Cara membacanya sama dengan `check_spiral_core_docstring_quotes_measured_values`
+    (yang membaca docstring fungsi yang dijaganya): yang dijaga adalah teks
+    yang benar-benar ada di repo, bukan salinan yang bisa tertinggal.
+
+    Kalau blok komentarnya dihapus atau namanya berubah, fungsi ini
+    mengembalikan string kosong — dan gerbangnya **merah** dengan pesan yang
+    menyebut sebabnya, bukan lulus karena tidak menemukan apa pun.
+    """
+    try:
+        with open(__file__, encoding="utf-8") as handle:
+            source = handle.read()
+    except OSError:
+        return ""
+    lines = source.splitlines()
+    try:
+        anchor = next(i for i, line in enumerate(lines)
+                      if line.startswith("MIN_CLUSTER_CORE_SHARPNESS = "))
+    except StopIteration:
+        return ""
+    block = []
+    i = anchor - 1
+    while i >= 0 and lines[i].startswith("#"):
+        block.append(lines[i][1:].strip())
+        i -= 1
+    return "\n".join(reversed(block))
+
+
+def check_cluster_core_docstring_quotes_measured_values(results):
+    """Empat angka di komentar `MIN_CLUSTER_CORE_SHARPNESS` harus keluar dari
+    penyampelnya sendiri.
+
+    **Cacat yang ditutup.** Versi pertama komentar itu mengutip 0.80 (gugus
+    terbuka 200 px), 0.44 (38 px), 0.58 (bola 200 px), 0.34 (38 px) — dan
+    **tidak satu pun** dari keempatnya keluar dari `cluster_core_sharpness`.
+    Diukur ulang lewat fungsi yang sama: 0.77 / 0.82 / 0.53 / 0.53. Dua angka
+    di antaranya (0.44, 0.34) berbeda hampir setengah dari nilai sebenarnya.
+
+    Ini kelas yang sudah berulang di repo ini — `check_spiral_core_docstring_quotes_measured_values`
+    dan `check_crater_contrast_numbers_come_from_the_sampler` lahir untuk
+    kelas yang sama: **komentar mengutip angka yang tidak pernah ia ukur**, dan
+    komentar adalah satu-satunya bukti yang dibaca orang yang menilai apakah
+    sebuah ambang layak dipercaya. Angka yang salah di situ tidak membuat
+    gerbang merah — ia membuat orang yang membaca salah menilai marginnya.
+
+    **Kenapa ini murah.** Ia memanggil `cluster_core_sharpness` atas empat
+    pasangan yang sudah ada di `CLUSTER_CORE_SIZES`, jadi ia berjalan ~22 detik
+    alih-alih ~6 menit, dan karena itu masuk ke jalur `--check` biasa.
+
+    **Yang diukur, bukan dilarisasi dari teks.** `pixels` dan `points` diambil
+    dari `CLUSTER_CORE_SIZES` (tabel yang dipakai gerbangnya), bukan ditulis
+    ulang di sini — daftar tangan akan jadi salinan kedua yang tidak pernah
+    dibandingkan.
+
+    **Batas yang jujur.** Yang dijaga adalah **paritas angka**, bukan kebenaran
+    astronomi bentuk gugus. Kalau kelak fraksi inti dan seluruh angka di
+    komentar diubah bersama, gerbang ini hijau — yang dijaganya adalah
+    *kesepakatan* antara komentar dan penyampel, bukan nilainya. Toleransi
+    0.02 dipilih karena penyampel ini deterministik (render ulang byte-identik),
+    jadi toleransi longgar tidak dipakai untuk menutupi apa pun.
+    """
+    doc = cluster_core_sharpness_comment()
+    quoted = re.findall(r"([0-9.]+) \((gugus terbuka|bola) (\d+) pt\)", doc)
+    if len(quoted) != len(CLUSTER_CORE_SIZES) * 2:
+        results.append(Result(
+            "inti gugus: komentar mengutip 4 angka terukur",
+            False,
+            f"{len(quoted)} kutipan terbaca dari komentar MIN_CLUSTER_CORE_SHARPNESS "
+            f"— butuh {len(CLUSTER_CORE_SIZES) * 2} (label, ukuran, nilai)"))
+        return
+
+    by_label = {"gugus terbuka": "deepsky-openCluster",
+                "bola": "deepsky-globularCluster"}
+    # Peta poin → piksel dari tabel yang dipakai gerbangnya sendiri.
+    pixels_for_points = {points: pixels for pixels, points in CLUSTER_CORE_SIZES}
+
+    for value_s, label, points_s in quoted:
+        expected = float(value_s)
+        points = int(points_s)
+        pixels = pixels_for_points.get(points)
+        if pixels is None:
+            results.append(Result(
+                f"inti gugus: ukuran {points} pt ada di tabel gerbangnya",
+                False,
+                f"komentar mengutip {points} pt, CLUSTER_CORE_SIZES hanya punya "
+                f"{sorted(pixels_for_points)} — kutipan untuk ukuran yang tidak diuji"))
+            continue
+        sharps = cluster_core_sharpness(by_label[label], pixels, points, 2)
+        if not sharps:
+            results.append(Result(
+                f"inti gugus: kutipan {label} {points} pt terukur ulang",
+                False,
+                "tidak ada inti terukur — angka di komentar tidak bisa diverifikasi"))
+            continue
+        measured = min(sharps)
+        ok = abs(measured - expected) <= 0.02
+        results.append(Result(
+            f"inti gugus: kutipan {label} {points} pt cocok ({expected:.2f} vs {measured:.2f})",
+            ok,
+            f"komentar {expected:.2f}, diukur ulang {measured:.2f} dari "
+            f"{len(sharps)} inti (toleransi 0.02)"))
 
 
 def check_dumbbell_nebula_is_an_elongated_shell(results):
@@ -7989,6 +8448,8 @@ def main():
     check_star_size_follows_magnitude(results)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
+    check_cluster_cores_reach_the_picture(results, args.ss)
+    check_cluster_core_docstring_quotes_measured_values(results)
     check_deep_sky_catalogue_values_reach_the_picture(results)
     check_deep_sky_layouts_match_the_model(results)
     check_every_morphology_in_the_model_has_render_cases(results)
