@@ -31,6 +31,10 @@ Keadaan yang diuji:
                              orang memulihkan yang salah
   3. `git diff` gagal        penjaga **tidak** lulus-terbuka; kegagalan git
                              diperlakukan sebagai berhenti, bukan lulus
+  4. HEAD tak terbaca        penjaga berhenti **tanpa menuduh berkas bersih**:
+                             `git diff --quiet` memakai exit 1 untuk «berkas
+                             menyimpang» **dan** untuk «HEAD tidak terbaca»,
+                             dan yang kedua pernah menjatuhkan `main`
 
 Berkas yang dimutasi: **dua berkas terlacak yang bersih**, satu di antaranya
 disunting sementara lalu dipulihkan di `finally` plus handler
@@ -42,9 +46,11 @@ perlu — dan tidak boleh — menyentuh produksi.
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "Tools"))
@@ -78,11 +84,17 @@ def restore(*_):
         print(f"\n[sinyal/pemulihan] {os.path.relpath(DIRTY)} dipulihkan.")
 
 
-def run_probe(paths):
-    """Panggil penjaganya di proses baru → (stdout, stderr, exit)."""
+def run_probe(paths, env=None, cwd=None):
+    """Panggil penjaganya di proses baru → (stdout, stderr, exit).
+
+    `env` dan `cwd` bisa ditimpa supaya harness ini dapat menirukan lingkungan
+    yang rusak (mis. `GIT_DIR` yang tidak memuat HEAD) tanpa perlu mengubah
+    berkas atau pemiliknya.
+    """
     code = PROBE % {"tools": os.path.join(ROOT, "Tools"), "paths": paths}
     proc = subprocess.run([sys.executable, "-c", code],
-                          capture_output=True, text=True, cwd=ROOT)
+                          capture_output=True, text=True,
+                          cwd=cwd or ROOT, env=env)
     return proc.stdout.strip(), proc.stderr.strip(), proc.returncode
 
 
@@ -144,6 +156,42 @@ def main():
                             f"out={proc.stdout.strip()!r}")
         print(f"{'OK  ' if ok3 else 'SALAH'} 3. `git diff` gagal → berhenti, "
               f"tidak lulus-terbuka (exit {proc.returncode})")
+
+        # --- 4. HEAD tidak terbaca tapi jalurnya sah → JANGAN menyalahkan berkas ---
+        #
+        # Ini cacat yang menjatuhkan `main` dua kali (9 Okt), dan bentuknya
+        # tidak terlihat dari luar: `git diff --quiet HEAD -- <berkas>` memakai
+        # **exit 1 untuk dua hal yang berbeda** —
+        #
+        #     berkas memang menyimpang  → exit 1, stderr kosong
+        #     HEAD tidak terbaca        → exit 1, stderr "Could not access 'HEAD'"
+        #
+        # Penjaga versi pertama hanya membaca exit code-nya, jadi yang kedua
+        # terbaca sebagai «berkas kotor». Itu terjadi sungguhan di job Linux:
+        # `actions/checkout` menulis `safe.directory` ke HOME **sementara**
+        # yang tidak bertahan ke langkah-langkah berikutnya, sehingga `git`
+        # menolak repo (dubious ownership) — dan setiap harness mutasi mati
+        # dengan pesan yang menuduh `Tools/render-visuals.py` menyimpang,
+        # padahal berkasnya byte-identik dengan HEAD. Pesan itu mengirim orang
+        # memulihkan berkas yang **sudah** benar.
+        #
+        # `GIT_DIR` ke direktori kosong menirukan keadaan itu tanpa menyentuh
+        # berkas atau pemiliknya: jalurnya tetap sah dan relatif, jadi `rel`
+        # benar, tetapi HEAD tidak bisa dibaca.
+        bogus = tempfile.mkdtemp(prefix="gIT_DIR-kosong-uji-")
+        try:
+            env = dict(os.environ, GIT_DIR=bogus)
+            out, err, code = run_probe([CLEAN, DIRTY], env=env)
+        finally:
+            shutil.rmtree(bogus, ignore_errors=True)
+        accused = os.path.relpath(DIRTY) in err or os.path.relpath(CLEAN) in err
+        ok4 = code == 2 and not accused and "LULUS" not in out
+        if not ok4:
+            failures.append(
+                f"4. HEAD tak terbaca: exit={code} (butuh 2), "
+                f"menuduh berkas bersih={accused}, out={out!r}")
+        print(f"{'OK  ' if ok4 else 'SALAH'} 4. HEAD tak terbaca → berhenti "
+              f"tanpa menuduh berkas bersih (exit {code})")
     finally:
         restore()
         _original = None
@@ -154,7 +202,7 @@ def main():
         for item in failures:
             print(f"  - {item}")
         return 1
-    print("3 keadaan, 0 tidak sesuai harapan")
+    print("4 keadaan, 0 tidak sesuai harapan")
     return 0
 
 

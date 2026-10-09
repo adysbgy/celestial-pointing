@@ -58,6 +58,23 @@ sys.dont_write_bytecode = True
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 
+def _git(args):
+    """Jalankan `git` atas repo ini, dengan pemilik repo diakui aman.
+
+    `-c safe.directory=<akar repo>` bukan kelonggaran: tanpa itu `git`
+    menolak repo yang pemiliknya berbeda dari pengguna yang menjalankannya,
+    dan itu **persis** keadaan job CI (berkas di-checkout sebagai uid lain,
+    sementara langkah-langkahnya berjalan sebagai root). Penolakan itu
+    dilaporkan sebagai exit 1 — kode yang sama dengan «berkas menyimpang» —
+    sehingga penjaga menuduh berkas yang byte-identik dengan HEAD.
+
+    Cakupannya sengaja hanya akar repo ini, bukan `*`.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return subprocess.run(["git", "-c", f"safe.directory={root}", *args],
+                          capture_output=True, text=True)
+
+
 def require_clean_sources(paths):
     """Hentikan harness kalau berkas produksi yang akan dimutasi sudah kotor.
 
@@ -71,18 +88,38 @@ def require_clean_sources(paths):
     berkas: nol perbedaan berarti bersih. Kegagalan `git` sendiri (bukan
     repo, `git` tidak ada) diperlakukan sebagai **berhenti**, bukan lulus —
     penjaga yang gagal-terbuka lebih buruk daripada tidak ada penjaga.
+
+    **Kenapa ada preflight `rev-parse`.** `git diff --quiet HEAD` memakai
+    exit 1 untuk **dua** hal yang berbeda: berkas memang menyimpang, dan HEAD
+    tidak terbaca. Versi pertama hanya membaca exit code-nya, jadi yang kedua
+    terbaca sebagai «berkas kotor» dan pesannya menyalahkan berkas yang
+    sebenarnya bersih — itu menjatuhkan `main` dua kali pada 9 Okt, dengan
+    tuduhan atas `Tools/render-visuals.py` yang byte-identik dengan HEAD.
+    Preflight memisahkan keduanya: HEAD yang tidak terbaca berhenti **tanpa**
+    menyebut berkas apa pun, karena yang rusak adalah lingkungannya, bukan
+    sumbernya.
     """
+    head = _git(["rev-parse", "--verify", "--quiet", "HEAD"])
+    if head.returncode != 0:
+        print("GERBANG: `git` tidak bisa membaca HEAD di repo ini "
+              f"(exit {head.returncode}): "
+              f"{head.stderr.strip() or head.stdout.strip()}\n"
+              "        Ini masalah lingkungan, bukan berkas sumber — jadi "
+              "tidak ada berkas yang disalahkan.\n"
+              "        Periksa kepemilikan repo (`git config --global --add "
+              "safe.directory <akar repo>`).", file=sys.stderr)
+        sys.exit(2)
+
     dirty = []
     for path in paths:
         rel = os.path.relpath(path)
-        proc = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD", "--", rel],
-            capture_output=True, text=True)
-        if proc.returncode == 1:
+        proc = _git(["diff", "--quiet", "HEAD", "--", rel])
+        if proc.returncode == 1 and not proc.stderr.strip():
             dirty.append(rel)
         elif proc.returncode != 0:
+            # Termasuk exit 1 ber-stderr: HEAD ada tapi tidak terbaca.
             print(f"GERBANG: `git diff` gagal atas {rel} "
-                  f"(exit {proc.returncode}): {proc.stderr.strip()}",
+                  f"(exit {proc.returncode}): {proc.stderr.strip() or '(tanpa stderr)'}",
                   file=sys.stderr)
             sys.exit(2)
     if dirty:

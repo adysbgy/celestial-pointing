@@ -95,15 +95,39 @@ for r in results:
 # Baris yang menekan **bentuk** saat engine ragu.
 SHAPE_ANCHOR = ('    morphology = kw.get("morphology") if kw.get("is_confirmed", True)'
                 ' else None')
-# Panggilan penggambar yang memakai `morphology` itu.
-SHAPE_CALL = 'blobs = deep_sky_blobs(morphology, kw.get("fuzziness", 0.6))'
+# Argumen yang menentukan bentuk, di dalam panggilan penggambarnya.
+#
+# **Kenapa hanya potongan ini, bukan seluruh panggilan.** Versi pertama
+# menjangkarkan diri pada panggilan utuh —
+# `blobs = deep_sky_blobs(morphology, kw.get("fuzziness", 0.6))`. Itu benar
+# sampai `deep_sky_blobs` **mendapat argumen baru**: pekerjaan elongasi M27
+# menambahkan `object_id=…`, dan sejak itu jangkarnya tidak ditemukan lagi.
+# Harness berhenti dengan "jangkar tidak ditemukan" dan **seluruh job CI
+# merah** — bukan karena gerbangnya salah, melainkan karena harness-nya
+# mematok bentuk panggilan yang tidak dijanjikannya.
+#
+# Yang dimutasi selalu **satu argumen**, jadi jangkarnya pun satu argumen —
+# ditambah awalan `blobs = ` supaya ia tidak cocok dengan **definisi**
+# fungsinya (`def deep_sky_blobs(morphology, …)`), yang akan membuat
+# `str.replace` merusak tanda tangannya. Menambah argumen lain di belakang
+# pemanggilan tidak lagi merusak harness; mengganti nama fungsinya tetap
+# memerahkan — yang memang benar.
+SHAPE_CALL = 'blobs = deep_sky_blobs(morphology,'
+SHAPE_CALL_NONE = 'blobs = deep_sky_blobs(None,'
+
+# Penjaga: jangkar harus muncul **tepat sekali**. Kalau muncul dua kali,
+# `str.replace` memutasi keduanya, dan harness mengukur berkas yang bukan
+# yang dimaksudkannya — kelas cacat yang sama dengan pemeriksaan yang hijau
+# karena alasan yang salah.
+def _anchor_count_ok(source, anchor):
+    return source.count(anchor) == 1
 
 # Mutasi 1: bentuk **dan** warna sama-sama tidak ditekan.
 M1_SHAPE = '    morphology = kw.get("morphology")'
 # Mutasi 2: bentuk tidak ditekan, warna tetap ditekan. Ini keadaan yang
 # membedakan gerbang versi kedua (hijau untuk 5 dari 6) dari versi ini.
 M2_SHAPE = SHAPE_ANCHOR + '\n    _shape_morphology = kw.get("morphology")'
-M2_CALL = 'blobs = deep_sky_blobs(_shape_morphology, kw.get("fuzziness", 0.6))'
+M2_CALL = 'blobs = deep_sky_blobs(_shape_morphology,'
 
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
@@ -155,7 +179,7 @@ STATES = [
     # `check_deep_sky_morphologies_render_distinct` juga hijau. Hanya arah (2)
     # yang melihat bentuknya tidak pernah digambar.
     ("3. bentuk diabaikan selalu (warna tetap benar)",
-     [(SHAPE_CALL, 'blobs = deep_sky_blobs(None, kw.get("fuzziness", 0.6))')],
+     [(SHAPE_CALL, SHAPE_CALL_NONE)],
      {**_hijau(SUPPRESSED), **{n: "merah" for n in VISIBLE}}),
 ]
 
@@ -205,6 +229,11 @@ def main():
                 for find, replace in edits:
                     if find not in source:
                         failures.append(f"{name}: jangkar tidak ditemukan: {find!r}")
+                        break
+                    if not _anchor_count_ok(source, find):
+                        failures.append(
+                            f"{name}: jangkar muncul {source.count(find)}×, "
+                            f"butuh 1 (replace akan memutasi yang lain): {find!r}")
                         break
                     source = source.replace(find, replace)
                 else:
