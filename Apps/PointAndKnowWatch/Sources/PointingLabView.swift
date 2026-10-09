@@ -33,14 +33,25 @@ struct PointingLabView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
+        // List, bukan ScrollView: di jam nyata Picker di dalam ScrollView
+        // runtuh menjadi roda setinggi ~10 pt dan teksnya terpotong. Gaya
+        // `.navigationLink` memberi baris "Label  nilai" yang terbaca di
+        // semua ukuran (40–49 mm) dan membuka daftar pilihan layar penuh.
+        List {
+            Section {
                 liveReadout
                 markButton
                 if let result = recorder.lastResult { resultRow(result) }
+            }
+            Section {
                 targetPicker
                 sessionSettings
+            }
+            .pickerStyle(.navigationLink)
+            Section {
                 sendRow
+            }
+            Section {
                 diagnostics
             }
         }
