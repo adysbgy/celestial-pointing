@@ -1,3 +1,146 @@
+## Progres terakhir (9 Okt 2026 — jangkar harness mutasi Dumbel basi: gerbang drift hijau tanpa alasan)
+
+### Audit: apakah brief-nya sudah benar-benar selesai?
+
+Sesi ini dimulai dengan verifikasi, bukan dengan menulis kode — karena
+`STATUS.md` (16.382 baris) mengklaim seluruh brief selesai, dan klaim itu
+tidak boleh dipercaya tanpa diperiksa. Hasilnya: **klaimnya benar.**
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 698 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` → **29 gerbang lulus**.
+  - `./swift-typecheck.sh` → lulus.
+  - Katalog string: **462 kunci, 0 tanpa padanan Inggris** — lokalisasi Fase C #2
+    benar-benar tuntas, bukan setengah jadi.
+  - Bagian 1 (visual objek) sudah lengkap di `PointingKit/CelestialVisual.swift`
+    (2.704 baris): pita Jupiter dari `sqrt(1−y²)`, Bintik Merah Besar di
+    belahan **selatan**, cincin Saturnus, kutub Mars yang menyentuh limb, kawah
+    Merkurius dengan relief, fase Bulan dari fraksi iluminasi, deniesa
+    spektral bintang, enam morfologi langit dalam.
+  - Fase A #1–3 sudah ada: mode malam merah (`SurfacePalette`), AOD lewat
+    `isLuminanceReduced`, VoiceOver + pengumuman perubahan keadaan lewat
+    `StateAnnouncement` (satu sumber untuk jam dan iPhone).
+  - Fase A #4–6: denyut `TimelineView` terpisah dari kartu, semantik font +
+    `@ScaledMetric`, bunyi lock opsional.
+  - Fase C #1 (complication), #3 (`NSMotionUsageDescription` +
+    `NSLocationWhenInUseUsageDescription` di `project.yml`), #4 (penolakan izin di
+    `LocationProvider`) — semuanya ada.
+  - Kejujuran ketidakpastian **terbukti**, bukan sekadar diklaim: 27 uji
+    `isConfirmed` di `CelestialVisualTests` (warna bintang, morfologi langit
+    dalam, fase), plus `StateAnnouncement` membaca `answeredObject`
+    (bukan `intent`) supaya suara tidak mengumumkan objek lama sebagai hasil
+    sekarang.
+
+Jadi tidak ada unit UI yang perlu ditulis ulang. Yang merah adalah **CI**,
+dan itulah yang dikerjakan siklus ini.
+
+### Yang ditemukan: CI merah di `main`, bukan di kode
+
+`gh run list` menunjukkan commit HEAD sendiri (`f16925b`) **gagal** di
+Engine Tests (Linux) — sementara `./swift-test.sh` lokal hijau. Kegagalannya
+bukan engine: `Buktikan gerbang Dumbel (M27) berbunyi` keluar dengan
+
+```
+GAGAL (3):
+  - 4. model: tinggi blob jadi konstanta 1.0 (bukan offset.1): jangkar tidak ditemukan
+  - 5. model: offset.1 berhenti dipetkan: jangkar tidak ditemukan
+```
+
+### Akar masalahnya: jangkar harness yang tertinggal, bukan model yang salah
+
+`Tools/bukti-mutasi-dumbel.py` mutate **model Swift** dengan menyalin blok
+`.planetaryNebula` secara literal. Commit `1e28591` merapikan pemetaan
+cangkang itu:
+
+```swift
+// sebelum — diam-diam memotong 24 posisi jadi 16 blob
+zip(ring, shellOpacity).map { offset, opacity in … }
+// sesudah — opasitas berputar, 24 blob utuh
+ring.enumerated().map { index, offset in
+    (offset.0, offset.1 * elongation, 0.26, 1.0 * elongation,
+     0.0, shellOpacity[index % shellOpacity.count])
+}
+```
+
+`CURRENT_MODEL_MAPPING` di harness masih mengutip bentuk **lama**. Jadi untuk
+keadaan 4 dan 5, `find not in source` → tidak ada yang ditulis ke disk → probe
+dijalankan terhadap **model yang tidak berubah** → gerbang drift melihat tabel
+yang benar dan membalas **hijau**.
+
+Kelas cacatnya persis yang sudah tercatat di `STATUS.md`: **harness yang gagal
+diam bukan hijau** — dan di sini lebih halus lagi, karena harness *melaporkan*
+jangkar basi sebagai `failures` (itulah sebabnya CI merah, bukan cacat
+tersembunyi). Yang hijau tanpa alasan adalah **gerbang drift**, yang selama ini
+dibuktikan menyala oleh keadaan #4 yang sebenarnya tidak pernah memutasi
+apa pun.
+
+### Cacat kedua di dalam perbaikan yang sama: #4 dan #5 bertabrakan
+
+Setelah jangkar disesuaikan, keadaan #4 **langsung bertabrakan** dengan #5.
+Dulu #5 memutasi `offset.1` supaya pembaca gagal mengurai; #4 mengganti
+`offset.1` dengan konstanta — dan setelah `ring.enumerated()` menjadi jangkar
+yang dibaca pembaca melalui pola
+`\(offset\.0, offset\.1 \* elongation, ([\d.]+),`, **kedua keadaan** membuat
+pembaca gagal. Akibatnya tidak ada lagi yang membedakan:
+
+  - **nilai salah** (tabel model tidak sama dengan port) — seharusnya gerbang
+    **drift** (`DRIFT`) yang menyala, dan
+  - **bentuk salah** (model berhenti memetkan, port tetap) — seharusnya gerbang
+    **pembacaan** (`READS`) yang menyala.
+
+Dua gerbang berbeda untuk dua kelas cacat berbeda, sekarang jadi satu gerbang
+untuk keduanya. Itu regression pada bukti, bukan pada kode.
+
+### Perbaikannya: pindahkan #4 ke komponen yang **dibaca sebagai angka**
+
+Keadaan #4 kini mengubah **skala lebar** `0.26 → 0.10`, bukan `offset.1`:
+
+```swift
+(offset.0, offset.1 * elongation, 0.10, 1.0 * elongation, …)
+```
+
+Pembaca **tetap berhasil mengurai** (pola `(offset.0, offset.1 * elongation,
+<skala>,` masih cocok), jadi tabel yang dihitung berubah **nilainya** dan
+tidak berubah **bentuknya**. Yang berbunyi adalah gerbang nilai:
+
+  - #4 → `tata letak planetaryNebula: tiap blob sama dengan model` **merah**
+  - #5 → `tata letak objek langit dalam: terbaca dari model` **merah**
+
+Keduanya kembali menyalak gerbang **berbeda**, dan masing-masing kembali
+menjaga cacat yang berbeda: #4 menjaga cangkang yang melenceng dari `ring`,
+#5 menjaga model yang berhenti memetkan sementara port tidak. Cacat yang
+paling berbahaya dari pasangan ini — model dan port menghitung ulang
+elongation secara tidak konsisten — tetap tertutup: kalau salah satu faktor
+`elongation` hilang, pola `offset.1 * elongation` tidak cocok dan pembaca gagal
+dengan bersih, persis seperti yang keadaan #5 buktikan.
+
+### Pelajaran: harness yang jangkarnya basi harus MERAH
+
+Dulu jangkar basi membuat harness diam. Sekarang `find not in source` menambah
+`"jangkar tidak ditemukan"` ke `failures` (sudah begitu di kode sekarang, dan
+itulah yang membuat CI merah alih-alih hijau). Batas itu **dibiarkan keras**
+secara sadar: model dirapikan → jangkar basi → harness merah dengan pesan yang
+menyebut jangkarnya. Itu persis kebalikan dari "hijau karena tidak ada yang
+diuji", dan menambah satu cacat pada harness (menyebut jangkar) jauh lebih
+murah daripada membiarkan dua gerbang kehilangan bukti perlindungannya.
+
+### Verifikasi (terukur, bukan diklaim)
+
+  - `python3 Tools/bukti-mutasi-dumbel.py` → **OK** (exit 0), 6 keadaan sesuai
+    harapan; #4 dan #5 menyalak gerbang berbeda.
+  - `python3 Tools/bukti-mutasi-cangkang.py` → **OK** (tidak tersentuh).
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 698 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` (29 gerbang) + `./swift-typecheck.sh` → lulus.
+  - Sumber produksi dipulihkan setelah mutasi: `git status` bersih selain
+    berkas harness itu sendiri.
+  - CI: **Engine Tests (Linux) `37917754203` success** dan **Apple Build
+    `37917754115` success**. Log CI mengonfirmasi #4 dan #5 merah di gerbang
+    yang **berbeda**.
+
+Engine tidak disentuh. Tidak ada kode produksi yang berubah siklus ini — hanya
+harness yang menjaga agar gerbangnya terus bernilai.
+
+---
+
 ## Progres terakhir (8 Okt 2026 — pemeriksaan yang hijau karena alasan yang salah: variabel gelung yang bocor)
 
 ### Cacatnya: gerbang yang mengukur objek lain daripada yang tertulis di namanya
