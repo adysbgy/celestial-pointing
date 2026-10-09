@@ -618,6 +618,39 @@ public struct CelestialVisual: Equatable, Sendable {
         return -angle
     }
 
+    /// Apakah sebuah piringan **membesar**, dari elongasinya terhadap Matahari.
+    ///
+    /// **Kenapa fungsi ini ada, padahal `isMoonWaxing` sudah menghitungnya.**
+    /// `isMoonWaxing` membaca efemeris sendiri, jadi ia hanya bisa dipakai di
+    /// tempat efemeris tersedia — dan aturannya karena itu tidak pernah diuji.
+    /// Planet dalam butuh aturan yang **sama** (Venus membesar pada elongasi
+    /// 0°–180°, persis seperti Bulan), tetapi menulis ambang 180° untuk kedua
+    /// kalinya berarti dua konstanta yang cepat atau lambat berbeda: sabit
+    /// Venus dan sabit Bulan lalu membesar ke arah yang berlawanan pada malam
+    /// yang sama, dan tidak ada teks di layar yang bisa membantah keduanya.
+    ///
+    /// Fungsi murni ini membuat **satu** ambang yang dipakai kedua benda, dan
+    /// satu-satunya hal yang tersisa di lapisan efemeris adalah menghitung
+    /// selisih bujurnya — bukan memutuskan arahnya.
+    ///
+    /// - Parameter elongationDegrees: selisih bujur ekliptika benda terhadap
+    ///   Matahari, sudah dinormalisasi ke 0…360 (lihat `normalizedDegrees`).
+    public static func isWaxing(elongationDegrees: Double) -> Bool {
+        normalizedDegrees(elongationDegrees) < 180
+    }
+
+    /// Bungkus sudut ke rentang 0…360.
+    ///
+    /// **Kenapa pindah ke `CelestialVisual`, padahal dulu ada di
+    /// `PointingResolver`.** Ia sekarang hanya dipakai oleh aturan elongasi
+    /// bersama (`isWaxing`), dan aturan itu harus bisa diuji di Linux tanpa
+    /// efemeris — jadi pembungkusnya harus hidup di tempat yang sama dengan
+    /// ambangnya, bukan di ekstensi yang hanya punya akses ke efemeris.
+    static func normalizedDegrees(_ degrees: Double) -> Double {
+        let wrapped = degrees.truncatingRemainder(dividingBy: 360)
+        return wrapped < 0 ? wrapped + 360 : wrapped
+    }
+
     /// Indeks warna B−V untuk bintang yang ada di katalog.
     ///
     /// Nilainya dari katalog warna bintang terang yang sudah mapan. Yang
@@ -2513,8 +2546,43 @@ public extension PointingResolver {
         guard let ephemeris else { return nil }
         guard let moon = try? ephemeris.apparent(.moon, at: date),
               let sun = try? ephemeris.apparent(.sun, at: date) else { return nil }
-        let difference = Self.normalizedDegrees(moon.raDeg - sun.raDeg)
-        return difference < 180
+        // Ambangnya **bukan** di sini: `CelestialVisual.isWaxing` dipakai
+        // bersama planet dalam supaya dua benda tidak bisa membesar ke arah
+        // yang berlawanan. Yang tersisa di sini hanya menghitung elongasinya.
+        return CelestialVisual.isWaxing(elongationDegrees: moon.raDeg - sun.raDeg)
+    }
+
+    /// Arah fase sebuah **planet dalam** saat ini: apakah sabitnya membesar.
+    ///
+    /// **Kenapa ini ada, padahal `planetIlluminationFraction` sudah memberi
+    /// besarnya.** Besar tanpa arah menghasilkan `phaseGeometry(waxing: nil)`
+    /// = `nil`, jadi fraksi yang dihitung tidak pernah digambar: Venus tampil
+    /// sebagai bola penuh di setiap keadaan, termasuk saat engine menghitung
+    /// iluminasinya 2%. Itu bukan gambar yang "kurang rinci" — ia menyatakan
+    /// kebalikan dari apa yang sedang dihitung engine, dan tidak ada teks di
+    /// layar yang bisa membantahnya.
+    ///
+    /// **Kenapa pakai elongasi, bukan sudut sisi terang.** Sudut sisi terang
+    /// (`planetBrightLimbAngle`) menentukan **ke mana** sabit diputar; arah
+    /// membesar/mengecil menentukan **sisi piringan mana yang menyala** pada
+    /// gambar dasar. Dua hal yang berbeda, dan `phaseGeometry` butuh keduanya.
+    /// Mengisi yang satu dari yang lain akan memutar sabit ke arah yang benar
+    /// sambil menyalakan sisi yang salah pada sebagian fase.
+    ///
+    /// - Returns: `nil` bila planetnya tidak berfase atau efemeris tidak
+    ///   tersedia. UI lalu menggambar piringan **tanpa fase**, bukan sabit
+    ///   yang memihak ke satu sisi.
+    func isPlanetWaxing(_ planet: CelestialVisual.Planet,
+                        at date: Date = Date()) -> Bool? {
+        guard planet.showsPhase else { return nil }
+        guard let ephemeris,
+              let body = EphemerisBody(rawValue: planet.rawValue),
+              let planetSample = try? ephemeris.apparent(body, at: date),
+              let sun = try? ephemeris.apparent(.sun, at: date)
+        else { return nil }
+        // Ambangnya satu, dipakai bersama Bulan (lihat `isMoonWaxing`).
+        return CelestialVisual.isWaxing(
+            elongationDegrees: planetSample.raDeg - sun.raDeg)
     }
 
     /// Fraksi piringan Bulan yang menyala, dari efemeris yang sama.
@@ -2633,9 +2701,4 @@ public extension PointingResolver {
         return CelestialVisual.brightLimbAngle(body: moonHorizontal, sun: sunHorizontal)
     }
 
-    /// Bungkus sudut ke rentang 0…360.
-    static func normalizedDegrees(_ degrees: Double) -> Double {
-        let wrapped = degrees.truncatingRemainder(dividingBy: 360)
-        return wrapped < 0 ? wrapped + 360 : wrapped
-    }
 }

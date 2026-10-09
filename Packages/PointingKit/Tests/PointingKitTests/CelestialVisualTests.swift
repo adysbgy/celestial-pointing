@@ -152,6 +152,65 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertNil(venus.phaseGeometry(waxing: nil))
     }
 
+    /// Arah fase planet dalam harus **bisa ditanyakan**, bukan selalu `nil`.
+    ///
+    /// **Cacat yang dikunci uji ini.** `phaseGeometry(waxing:)` mengembalikan
+    /// `nil` bila arahnya `nil`, dan `PointingEngine` meneruskan `nil` untuk
+    /// **semua** planet (`waxing = isMoon ? moonIsWaxing : nil`). Akibatnya
+    /// seluruh jalur fase planet dalam mati: fraksi dan sudut sisi terang
+    /// Venus dihitung 30 detik sekali, lalu tidak pernah dipakai gambar
+    /// apa pun — Venus tampil sebagai bola penuh di setiap keadaan.
+    ///
+    /// Cacatnya tidak terlihat di mana pun: uji model hijau (ia menguji
+    /// rumusnya, bukan pengawatnya), `swiftc -parse` hijau, dan bola Venus
+    /// memang tampak seperti Venus bagi siapa pun yang tidak menghitung
+    /// elongasinya malam itu. Yang melaporkannya hanya uji yang menanyakan
+    /// **arah untuk planet**, jadi itu yang ditulis di sini.
+    ///
+    /// Arahnya harus datang dari efemeris dengan aturan yang **sama** dengan
+    /// Bulan (elongasi 0°–180° = membesar), bukan dari konstanta: sabit Venus
+    /// yang menghadap ke arah yang salah adalah klaim yang sama kelirunya
+    /// dengan sabit Bulan terbalik.
+    func testInnerPlanetPhaseDirectionIsAnswerable() {
+        // Model: arah untuk planet harus bisa diisi dan terbaca, sama seperti
+        // Bulan. Ini yang menjamin `fractionForPhase` punya pasangan arahnya.
+        let venus = CelestialVisual(object: object(id: "venus", kind: .planet),
+                                    isWaxing: false,
+                                    planetIlluminationFraction: 0.4)
+        XCTAssertNotNil(venus.planetPhaseFraction,
+                        "Venus harus menyimpan fraksi fasenya sendiri")
+        XCTAssertEqual(venus.isWaxing, false,
+                       "arah fase planet harus tersimpan, bukan dibuang")
+        let phase = venus.phaseGeometry(waxing: venus.isWaxing)
+        XCTAssertNotNil(phase,
+                        "planet berfase dengan arah harus menghasilkan geometri")
+        // `isWaxing == false` → sisi terang di kiri.
+        XCTAssertEqual(phase?.litSide ?? 0, -1, accuracy: 1e-9,
+                       "Venus mengecil: sisi terang harus di kiri")
+    }
+
+    /// Arah fase planet dalam **diturunkan dari elongasi**, bukan dikarang.
+    ///
+    /// Aturannya satu untuk Bulan dan planet dalam: piringan membesar selama
+    /// selisih bujur ekliptika terhadap Matahari berada di 0°–180°. Uji ini
+    /// mengunci bahwa fungsi untuk planet memakai ambang yang sama dengan
+    /// `isMoonWaxing`, bukan 180° yang ditulis kedua kali — dua ambang yang
+    /// cepat atau lambat berbeda akan membuat sabit Venus dan sabit Bulan
+    /// membesar ke arah yang berlawanan pada malam yang sama.
+    func testInnerPlanetWaxingUsesTheSameElongationRule() {
+        // Tanda elongasi: planet di timur Matahari (0°–180°) membesar.
+        // Diuji lewat fungsi murni yang dipakai bersama kedua benda, supaya
+        // tidak ada ambang kedua yang bisa menyimpang.
+        XCTAssertTrue(CelestialVisual.isWaxing(elongationDegrees: 45),
+                      "elongasi 45° (timur Matahari) = membesar")
+        XCTAssertTrue(CelestialVisual.isWaxing(elongationDegrees: 179),
+                      "elongasi menjelang oposisi masih membesar")
+        XCTAssertFalse(CelestialVisual.isWaxing(elongationDegrees: 200),
+                       "elongasi 200° (barat Matahari) = mengecil")
+        XCTAssertFalse(CelestialVisual.isWaxing(elongationDegrees: 315),
+                       "elongasi 315° = mengecil")
+    }
+
     /// Geometri fase planet sama persis dengan geometri Bulan untuk fraksi dan
     /// arah yang sama.
     ///

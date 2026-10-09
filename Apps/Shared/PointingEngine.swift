@@ -257,6 +257,15 @@ public final class PointingEngine: ObservableObject {
                 for: planet, at: date, observer: location.observer) {
                 limbAngles[planet] = angle
             }
+            // Arah membesar/mengecil dihitung **berpasangan** dengan fraksinya,
+            // dan dari sampel efemeris yang sama. Tanpa arah, `phaseGeometry`
+            // mengembalikan `nil` dan seluruh jalur fase planet dalam mati:
+            // Venus tampil sebagai bola penuh di setiap keadaan, termasuk saat
+            // iluminasinya baru saja dihitung 2%. Gambar itu menyatakan
+            // kebalikan dari apa yang sedang dihitung engine.
+            if let waxing = controller.resolver.isPlanetWaxing(planet, at: date) {
+                planetWaxing[planet] = waxing
+            }
         }
         planetPhases = phases
         planetBrightLimbAngles = limbAngles
@@ -284,6 +293,17 @@ public final class PointingEngine: ObservableObject {
     /// Menyimpannya sebagai satu nilai berarti menambah planet berfase di
     /// masa depan tidak perlu menyentuh berkas ini lagi.
     private var planetPhases: [CelestialVisual.Planet: Double] = [:]
+
+    /// Arah fase planet dalam (membesar/mengecil) hasil perhitungan terakhir.
+    ///
+    /// Sejajar dengan `planetPhases`, dan diisi dari sampel efemeris yang sama.
+    /// **Kenapa ia harus ada di sini, bukan diturunkan di `body`.** `isWaxing`
+    /// menentukan **sisi piringan mana yang menyala** pada gambar dasar,
+    /// sedangkan `planetBrightLimbAngles` menentukan **ke mana** gambar itu
+    /// diputar. Dua hal yang berbeda, dan `phaseGeometry` menolak menggambar
+    /// tanpa yang pertama — jadi menyimpulkan arah dari sudutnya bukan
+    /// penyederhanaan, melainkan jalan yang mematikan seluruh fase planet.
+    private var planetWaxing: [CelestialVisual.Planet: Bool] = [:]
 
     /// Sudut sisi terang planet dalam hasil perhitungan terakhir, radian.
     ///
@@ -522,9 +542,24 @@ public final class PointingEngine: ObservableObject {
         guard let object = displayedObject else { return nil }
         let isMoon = object.kind == .moon
         let fraction = isMoon ? skyContext?.moonIlluminationFraction : nil
-        // Arah fase (waxing/waning) hanya bermakna untuk Bulan; untuk benda
-        // lain nil → model tidak menggambar fase sama sekali.
-        let waxing = isMoon ? moonIsWaxing : nil
+        // Arah fase (waxing/waning) diambil untuk **setiap benda yang
+        // berfase**, bukan hanya Bulan.
+        //
+        // **Kenapa baris ini dulunya `isMoon ? moonIsWaxing : nil`, dan itu
+        // cacat.** `phaseGeometry(waxing:)` mengembalikan `nil` bila arahnya
+        // `nil`, jadi meneruskan `nil` untuk planet membuat seluruh jalur fase
+        // planet dalam mati: `planetPhases` dan `planetBrightLimbAngles`
+        // dihitung 30 detik sekali, lalu tidak pernah dipakai gambar apa pun.
+        // Venus tampil sebagai bola penuh di setiap keadaan — termasuk saat
+        // engine baru saja menghitung iluminasinya 2 persen. Gambar itu
+        // menyatakan kebalikan dari apa yang dihitung engine, dan tidak ada
+        // satu teks pun di layar yang bisa dibaca pengguna untuk memeriksanya.
+        //
+        // Tidak ada uji yang menangkapnya karena uji menguji **rumus**-nya
+        // (`testInnerPlanetDrawsAPhaseFromItsOwnFraction`), bukan
+        // **pengawat**-nya. Uji yang ditambahkan siklus ini mengunci
+        // pengawatnya.
+        let waxing = isMoon ? moonIsWaxing : planet.flatMap { planetWaxing[$0] }
         // Sudut sisi terang: hanya untuk Bulan, dan nil bila tidak diketahui.
         // Saat nil, model tidak berputar -- lebih baik sabit yang belum
         // berorientasi daripada sabit yang salah arah.
