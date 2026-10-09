@@ -5168,6 +5168,93 @@ def check_spiral_core_reads_as_one_body(results):
             f"jam terbaca sebagai donat"))
 
 
+def check_spiral_core_docstring_quotes_measured_values(results):
+    """Angka di docstring check_spiral_core_reads_as_one_body harus keluar
+    dari penyampelnya sendiri.
+
+    Cacat yang ditutup: STATUS.md (entri 8 Okt 2026, baris ~1660) mencatatnya
+    sebagai "Belum dikerjakan". Docstring gerbang inti spiral mengutip tabel
+    selisih (+124/+106/+44 derajat) dan batas 0.2725 R yang tidak pernah
+    diverifikasi ulang. Kelas yang sama dengan
+    check_crater_contrast_numbers_come_from_the_sampler: komentar mengutip
+    angka yang tidak keluar dari penyampel. Komentar adalah satu-satunya bukti
+    yang dibaca orang yang menilai gerbangnya, jadi harus berbentuk hasil ukur.
+
+    Diukur ulang lewat jalur menggambar yang sama (spiral_arm_degrees,
+    spiral_core_samples), bukan dilarisasi dari teks.
+    """
+    fn = check_spiral_core_reads_as_one_body
+    doc = fn.__doc__ or ""
+
+    quoted = re.findall(
+        r"([0-9.]+)\s+(\d+)°\s+(\d+)°\s+\+(\d+)°", doc)
+    if len(quoted) < 3:
+        results.append(Result(
+            'inti spiral: docstring mengutip tabel selisih (3 baris)',
+            False,
+            f'{len(quoted)} baris selisih terbaca dari docstring '
+            f'check_spiral_core_reads_as_one_body — butuh >= 3 '
+            f'(r, dengan, tanpa, delta)'))
+
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            'inti spiral: parity docstring butuh ukuran jam', False,
+            'WatchMetrics.visualDiameter tidak ditemukan'))
+        return
+    pixels = diameter * 2
+
+    index = spiral_core_bulge_index()
+    layout = list(R.DEEP_SKY_LAYOUT['spiralGalaxy'])
+    for r_str, with_s, without_s, delta_s in quoted:
+        r = float(r_str)
+        expected_delta = int(delta_s)
+        with_bulge = spiral_arm_degrees(pixels, 8, r)
+        R.DEEP_SKY_LAYOUT['spiralGalaxy'] = [
+            b for i, b in enumerate(layout) if i != index]
+        try:
+            without = spiral_arm_degrees(pixels, 8, r)
+        finally:
+            R.DEEP_SKY_LAYOUT['spiralGalaxy'] = layout
+        recomputed = with_bulge - without
+        ok = abs(recomputed - expected_delta) <= 3
+        results.append(Result(
+            f'inti spiral: selisih docstring r={r:.4f} cocok ({expected_delta}° vs {recomputed}°)',
+            ok,
+            f'docstring +{expected_delta}°, dihitung ulang +{recomputed}° '
+            f'(dengan {with_bulge}° vs tanpa {without}°) — toleransi 3°'))
+
+    samples = spiral_core_samples()
+    # `0.2725 R` di docstring adalah **reach** berkelanjutan (batas tempat
+    # sumbangan inti turun ke ambang terbaca), dihitung dari blob inti dengan
+    # rumus yang sama persis dengan `spiral_core_samples()` (half_width · (1 −
+    # READABILITY_THRESHOLD / (opacity·255))). Ia bukan jari-jari sampel
+    # diskrit terbesar, jadi dihitung ulang langsung dari blob, bukan dari
+    # `max(samples)`.
+    index = spiral_core_bulge_index()
+    case = next(c for c in R.build_cases() if c.name == 'deepsky-spiralGalaxy')
+    blobs = R.deep_sky_blobs('spiralGalaxy', case.kw.get('fuzziness', 0.6))
+    blob = blobs[index]
+    opacity = blob['opacity']
+    continuous_reach = blob['half_width'] * (1 - READABILITY_THRESHOLD / (opacity * 255))
+    boundary_ok = 0.27 <= continuous_reach <= 0.28
+    results.append(Result(
+        'inti spiral: batas sampel inti = 0.2725 R (dari model)',
+        boundary_ok,
+        f'reach berkelanjutan = {continuous_reach:.4f} R — docstring '
+        f'mengutip 0.2725 R; di luar 0.27…0.28 berarti batasnya melenceng'))
+
+    reach = max(samples) if samples else 0.0
+    r_out = 0.2843
+    not_core = r_out not in samples and r_out > reach
+    results.append(Result(
+        'inti spiral: r=0.2843 di luar sampel inti (batas bekerja)',
+        not_core,
+        f'r=0.2843 {"ada" if r_out in samples else "tidak ada"} di '
+        f'samples (reach {reach:.4f} R) — harus di luar supaya batasnya '
+        f'tidak longgar'))
+
+
 def drift_compared_constants(source):
     """Konstanta port yang **nilainya dibandingkan** `check_port_matches_swift_constants`.
 
@@ -7868,6 +7955,7 @@ def main():
     check_planetary_nebula_shell_is_continuous(results)
     check_dumbbell_nebula_is_an_elongated_shell(results)
     check_spiral_core_reads_as_one_body(results)
+    check_spiral_core_docstring_quotes_measured_values(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
