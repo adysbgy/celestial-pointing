@@ -52,12 +52,12 @@ dipulihkan dan md5-nya diverifikasi identik (`e81aaea6…`).
 | | sebelum | sesudah |
 |---|---|---|
 | CelestialEngine | 206 | **206** |
-| PointingKit | 706 | **707** (+1 uji urutan terang) |
-| Aturan UI | 29 | 29 (Aturan 10 memaksa README 706→707) |
+| PointingKit | 707 | **709** (+2 uji kontrak inti gugus) |
+| Aturan UI | 29 | 29 (Aturan 10 memaksa README 707→709) |
 
 ### Verifikasi
 
-  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 707 hijau**, 0 gagal.
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 709 hijau**, 0 gagal.
   - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (29 aturan).
   - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
   - Mutasi dibuktikan merah, lalu sumber dipulihkan (md5 identik).
@@ -1537,6 +1537,68 @@ produksi lagi yang layak diubah tanpa mengarang cacat.
 
 CelestialEngine 206, PointingKit 693 (690 + 3), Aturan UI 29, visual 585 —
 semua hijau. CI (Linux + Apple Build) hijau pada commit `4069b16`.
+
+---
+
+## Progres terakhir (10 Okt 2026 — kontrak inti gugus akhirnya diuji: cacat kelas "helper statis tak tergate")
+
+### Cacatnya: dua helper statis yang mengatur bentuk inti gugus, tanpa satu pun uji langsung
+
+`Tools/sweep-unconsumed.sh` (dilarikan penuh) melaporkan `readableCoreRadius`
+dan `clusterCoreReferenceExtent` **app=0 test=0** — artinya tidak dipakai di
+`Apps/` (betul: visual dihitung di `clusterCores`) dan **tidak punya uji
+langsung**. Padahal docstring `readableCoreRadius` menyatakan invariannya
+("selalu ≤ extent, lantai dihormati") "bisa diuji langsung".
+
+Ini kelas cacat persis yang dicari repo ini: kedua fungsi mengatur
+**ukuran inti bintang gugus** (Bagian 1, visual "gugus" kabur-berbintang).
+Uji agregat yang ada (`testClusterCoresSitOnTheirBlobs`,
+`testClusterCoresStayInsideTheirBlobsAndAreVisible`,
+`testGlobularCoreStarsDoNotScaleWithTheCentralBlob`) hanya mengecek hasil lewat
+`clusterCores`, yang menyembunyikan `readableCoreRadius` di balik
+`min(extent, reference)` + perulangan blob. Kalau suatu hari fungsi ini
+ditulis ulang — misal argumen `frameHalfExtent` dilupakan sehingga lantai
+`readableCorePointRadius` (0.8 pt) dibaca sebagai 0.8 *radius* — agregat masih
+bisa hijau untuk frame besar tapi berdarah di kartu jam: `min` akan mengembalikan
+**seluruh blob** sebagai inti, gugus jadi tumpukan cakram pekat, bukan kabut
+berbintang.
+
+### Perbaikannya: dua uji yang memukul fungsi murni dengan batasnya
+
+Ditambah di `CelestialVisualTests.swift`:
+- `testClusterCoreReferenceExtentUsesMedianNotMean` — plafon memotong pencilan
+  atas via **median** (bukan mean). Kasus kunci: blob pusat gugus bola 0.46 R
+  di tengah, bintang cincin ~0.10 R → median 0.10, jauh di bawah mean (~0.151).
+  Ini sumber cacat "bokeh raksasa" yang ditutup uji agregat, tapi dijalur yang
+  tidak dicek uji itu (ia hanya membanding inti pusat vs cincin, tidak
+  memverifikasi *sumber* plafonnya). Juga menutup daftar genap (rata-rata dua
+  tengah) dan kosong (→ 0, bukan NaN).
+- `testReadableCoreRadiusContract` — (1) tak pernah > `extent`; (2) menghormati
+  lantai 0.8 pt di frame kecil (kartu jam 19 pt → ≥1 px); (3) lantai tak menang
+  atas batas blob (extent 0.01 → inti dikapit pada 0.01, bintang tak menonjol
+  keluar kabutnya); (4) `frameHalfExtent 0` tak bikin NaN/inf.
+
+### Yang diukur, bukan dikira-kira
+
+`readableCoreRadius app=0 test=0` dan `clusterCoreReferenceExtent app=0 test=0`
+turun menjadi `test=2` (dua uji baru) tanpa menyentuh satu baris pun kode
+produksi — murni "QA berkelanjutan" (Penyempurnaan #10). README di-sinkron ke
+709 supaya Aturan 10 (`swift-ui-lint`) tetap hijau; kelalaian sinkron itu justru
+yang membuat CI Engine Tests merah pada commit pertama, diperbaiki di commit
+berikutnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 707 | **709** (+2 uji kontrak inti gugus) |
+| Aturan UI | 29 | 29 (Aturan 10 memaksa README 707→709) |
+
+Semua gerbang hijau: `swift-test.sh` (206 + 709, 0 gagal), `swift-ui-lint.sh`
+(29/29, Aturan 10 sinkron), `swift-typecheck.sh`. CI: Engine Tests (Linux) +
+Apple Build sukses pada commit `f4fcd50`. Berkas tersentuh:
+`CelestialVisualTests.swift`, `README.md`, `STATUS.md`.
 
 ---
 
