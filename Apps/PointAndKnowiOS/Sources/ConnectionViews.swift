@@ -172,8 +172,10 @@ struct LiveWatchCard: View {
                         .offset(y: -28)
                         .rotationEffect(.degrees(hint?.arrowDeg ?? 0))
                         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: hint?.arrowDeg)
-                    Text(verbatim: hint.map { WatchHomeText.degrees($0.separationDeg) } ?? "–")
-                        .font(.footnote.weight(.semibold).monospacedDigit())
+                    if let hint {
+                        Text(verbatim: WatchHomeText.degrees(hint.separationDeg))
+                            .font(.footnote.weight(.semibold).monospacedDigit())
+                    }
                 }
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
