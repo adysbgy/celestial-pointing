@@ -8483,6 +8483,210 @@ def _bound_by_comprehension(func, call, name):
     return False
 
 
+#: Seberapa besar bola "planet tak dikenal" boleh menyimpang dari token netral.
+#:
+#: **Bukan toleransi "supaya hijau" — angkanya jatuh di tengah celah yang
+#: diukur.** Dua batas mengapitnya:
+#:
+#:   - Batas bawah: pembulatan rasterisasi. Kanal dibulatkan ke 8 bit, jadi
+#:     galat per kanal ≤ 0.5/255 = 0.00196, dan jarak terburuk ketiga kanal
+#:     `√3 · 0.00196` = **0.0034**. Terukur pada gambar sekarang: 0.0025.
+#:   - Batas atas: planet terdekat. Merkurius — dunia abu yang memang nyaris
+#:     tak berwarna — berjarak **0.0435** dari token netral. Venus 0.356,
+#:     Mars 0.295, Jupiter 0.179, Saturnus 0.232.
+#:
+#: 0.010 duduk 2.9x di atas pembulatan dan 4.3x di bawah planet terdekat, jadi
+#: ia tidak merah pada gambar yang benar dan tidak hijau pada penggantian
+#: planet mana pun — Merkurius sekalipun.
+NEUTRAL_SPHERE_TOLERANCE = 0.010
+
+#: Jarak minimum warna puncak piringan sebuah planet nyata dari bola netral.
+#:
+#: **Dikalibrasi terhadap gambar yang ada, bukan dipilih.** Planet terdekat
+#: (Merkurius, abu berkawah — memang nyaris tak berwarna) berjarak 0.0435;
+#: Jupiter 0.179, Saturnus 0.232, Mars 0.295, Venus 0.356. Ambang 0.015
+#: memberi margin 2.9x di bawah yang terdekat, dan tetap menangkap 0.003 —
+#: yaitu keadaan yang harus ditangkap: planet nyata yang digambar sebagai bola
+#: netral.
+MIN_PLANET_FROM_NEUTRAL = 0.015
+
+
+def read_neutral_sphere_from_view(source):
+    """Token bola netral dari view Swift → (terang, bayangan), tiap (r,g,b).
+
+    Dibaca dari sumber, bukan ditulis ulang: nilai ini hidup di dua bahasa
+    (`neutralBody`/`neutralShadow` di view, `NEUTRAL_BODY`/`NEUTRAL_SHADOW` di
+    port) dan `check_port_matches_swift_constants` sudah membandingkan
+    keduanya. Yang belum dijaga siapa pun adalah bahwa **piksel yang benar-
+    benar digambar** sama dengan token itu.
+    """
+    out = []
+    for name in ("neutralBody", "neutralShadow"):
+        match = re.search(
+            r"static let " + name + r"\s*=\s*CelestialVisual\.RGBComponents\("
+            r"red:\s*([\d.]+),\s*green:\s*([\d.]+),\s*blue:\s*([\d.]+)\)",
+            source)
+        if match is None:
+            raise ValueError(
+                f"'static let {name}' tidak terbaca di CelestialVisualView.swift")
+        out.append(tuple(float(match.group(i)) for i in (1, 2, 3)))
+    return out[0], out[1]
+
+
+def brightest_disc_pixel(rows, width, height):
+    """Piksel paling terang di frame — puncak gradien bola yang digambar.
+
+    Tanpa ambang "menyala": puncak gradien bola selalu jauh di atas latar
+    (terukur 0.74 lawan 0.14), jadi maksimum frame **adalah** warna puncak
+    piringan. Ambang justru menambah angka yang harus dirawat tanpa menambah
+    apa yang diketahui.
+    """
+    best = None
+    for y in range(height):
+        row = rows[y]
+        for x in range(width):
+            pixel = (row[x * 4] / 255.0, row[x * 4 + 1] / 255.0, row[x * 4 + 2] / 255.0)
+            if best is None or sum(pixel) > sum(best):
+                best = pixel
+    return best
+
+
+def _channel_distance(a, b):
+    """Jarak Euclidean antar dua warna — metrik yang sama dengan gerbang kabut."""
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
+def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=200):
+    """Bola "planet tak dikenal" harus bola netral — bukan planet mana pun.
+
+    **Cacat yang ditutup pemeriksaan ini, dan cara menemukannya.** Seluruh
+    `build_cases()` disaring terhadap nama yang pernah disebut
+    `check-visuals.py`: dua kasus tidak pernah disebut siapa pun, dan
+    `planet-unknown-confirmed` adalah salah satunya. Ia satu-satunya gambar
+    yang mewakili **jalur jujur** PRD di kelas planet — `CelestialVisual.
+    Planet(objectID:)` mengembalikan `nil` untuk id yang tidak dikenal, dan
+    view lalu menggambar bola tanpa ciri.
+
+    Dibuktikan dengan mutasi, bukan disimpulkan: `_draw_planet` di port
+    diubah supaya `planet is None` jatuh ke palet Mars, dan `drawPlanet` di
+    view diubah supaya cabang `guard let planet = visual.planet else` memakai
+    palet Mars. Keduanya **menghasilkan 0 piksel berbeda dari gambar Mars**
+    pada seluruh ukuran (0 dari 40000 pada 200 pt) — dan
+    `python3 Tools/check-visuals.py --check` tetap melaporkan **654
+    pemeriksaan, 0 gagal**. Jadi engine bisa menampilkan bola Mars untuk
+    planet yang tidak dikenali, menyatakan identitas yang tidak dimilikinya,
+    tanpa satu pun gerbang berbunyi.
+
+    **Kenapa warna tidak cukup, dan mengapa jaraknya diukur.** Bola netral
+    (0.74/0.72/0.68) memang dekat dengan Merkurius (0.72/0.70/0.68) — dan itu
+    benar: Merkurius adalah dunia abu yang nyaris tak berwarna. Karena itu
+    yang diukur bukan "kromanya rendah" melainkan **jarak ke token netral**,
+    dan arahnya dua:
+
+      1. Bola tak dikenal harus **sama** dengan token netral (galat ≤ 0.010).
+         Ini yang menangkap penggantian oleh planet mana pun — Merkurius
+         sekalipun, karena jaraknya 0.0435, empat kali ambangnya.
+      2. Setiap planet nyata harus **berbeda** dari token netral (≥ 0.015).
+         Tanpa arah ini, port yang menggambar bola netral untuk **semua**
+         planet — termasuk yang terkunci — akan lolos pemeriksaan pertama.
+         Terukur: keadaan itu menyalakan pemeriksaan ini dengan kelima planet
+         berjarak 0.003.
+
+    **Dan sisi view-nya diperiksa terpisah.** Piksel hanya membuktikan port;
+    yang dikirim ke jam adalah view. Cabang `guard let planet = visual.planet
+    else` karena itu dibaca dari teksnya: ia harus memanggil `drawSphere`
+    dengan `Self.neutralBody`/`Self.neutralShadow`, dan tidak boleh menyebut
+    palet planet mana pun. Tanpa pemeriksaan ini, view bisa menyimpang dari
+    port tanpa satu pun piksel berubah — kelas cacat yang sudah berulang.
+    """
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    view_source = open(view_path, encoding="utf-8").read()
+    try:
+        neutral_body, neutral_shadow = read_neutral_sphere_from_view(view_source)
+    except ValueError as exc:
+        results.append(Result("bola tak dikenal: token netral terbaca dari view",
+                              False, str(exc)))
+        return
+
+    results.append(Result(
+        "bola tak dikenal: token netral terbaca dari view", True,
+        f"terang {_rgb_text(neutral_body)}, bayangan {_rgb_text(neutral_shadow)}"))
+
+    names = {case.name for case in R.build_cases()}
+    if "planet-unknown-confirmed" not in names:
+        results.append(Result(
+            "bola tak dikenal: kasus render-nya ada", False,
+            "'planet-unknown-confirmed' tidak ada di build_cases() — gerbang ini "
+            "tidak mengukur apa pun, dan itu merah, bukan lulus"))
+        return
+
+    planets = sorted(read_planet_palettes_from_swift(
+        open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                "CelestialVisual.swift"), encoding="utf-8").read()))
+    missing = sorted(f"planet-{name}-confirmed" for name in planets
+                     if f"planet-{name}-confirmed" not in names)
+    if missing:
+        results.append(Result(
+            "bola tak dikenal: setiap planet punya gambar pembanding", False,
+            f"tidak ada kasus render: {missing}"))
+        return
+
+    sizes = [size if size is not None else (watch_visual_diameter() or 38), detail]
+    for probe in sizes:
+        _, (width, height, rows) = render_case("planet-unknown-confirmed",
+                                               size=probe, ss=ss)
+        drawn = brightest_disc_pixel(rows, width, height)
+        drift = _channel_distance(drawn, neutral_body)
+        results.append(Result(
+            f"bola tak dikenal == token netral @{probe}pt",
+            drift <= NEUTRAL_SPHERE_TOLERANCE,
+            f"piksel {_rgb_text(drawn)} lawan token {_rgb_text(neutral_body)}, "
+            f"jarak {drift:.3f} (ambang {NEUTRAL_SPHERE_TOLERANCE:.3f})"))
+
+    # Arah sebaliknya: planet nyata tidak boleh jadi bola netral. Diukur pada
+    # ukuran jam — tempat piringannya paling kecil, jadi perbedaan warna yang
+    # bertahan di situ bertahan di mana-mana.
+    watch = watch_visual_diameter() or 38
+    identical = []
+    for planet in planets:
+        _, (width, height, rows) = render_case(f"planet-{planet}-confirmed",
+                                               size=watch, ss=ss)
+        drawn = brightest_disc_pixel(rows, width, height)
+        distance = _channel_distance(drawn, neutral_body)
+        if distance < MIN_PLANET_FROM_NEUTRAL:
+            identical.append(f"{planet} ({distance:.3f})")
+    results.append(Result(
+        f"planet nyata bukan bola netral @{watch}pt",
+        not identical,
+        f"{len(planets)} planet berjarak ≥ {MIN_PLANET_FROM_NEUTRAL:.3f} dari netral"
+        if not identical
+        else f"terlalu dekat ke netral: {', '.join(identical)} — bola netral "
+             "dipakai untuk planet yang dikenal"))
+
+    # Sisi view: cabang "planet tak dikenal" harus memakai token, bukan palet.
+    branch = _function_body(view_source, "guard let planet = visual.planet else")
+    if not branch:
+        results.append(Result(
+            "bola tak dikenal: cabangnya terbaca di view", False,
+            "'guard let planet = visual.planet else' tidak ditemukan di "
+            "CelestialVisualView.swift — pemeriksaan ini tidak bisa dijalankan, "
+            "dan itu merah, bukan lulus"))
+        return
+    code = swift_code_only(branch)
+    uses_token = "neutralBody" in code and "neutralShadow" in code
+    results.append(Result(
+        "bola tak dikenal: view memakai token netral", uses_token,
+        "'Self.neutralBody'/'Self.neutralShadow' "
+        f"{'ditemukan' if uses_token else 'TIDAK ditemukan'} di cabang planet tak dikenal"))
+
+    borrowed = sorted(re.findall(r"Planet\.(\w+)\.palette", code))
+    results.append(Result(
+        "bola tak dikenal: view tidak meminjam palet planet", not borrowed,
+        "tidak ada palet planet dipinjam" if not borrowed
+        else f"cabang ini memakai palet {borrowed} — identitas yang tidak dimiliki "
+             "objeknya"))
+
+
 #: Fungsi yang boleh memakai variabel gelung setelah gelungnya.
 #:
 #: Kosong, dan itu disengaja: satu-satunya cara menambah pengecualian adalah
@@ -8627,6 +8831,7 @@ def main():
     check_night_accents_reach_the_view(results)
     check_star_geometry_matches_the_model(results)
     check_magnitude_scale_matches_the_model(results)
+    check_unknown_planet_is_a_neutral_sphere(results)
     # Terakhir, dan atas berkasnya sendiri: kelas cacat yang membuat pemeriksaan
     # di atas bisa hijau karena alasan yang salah.
     check_no_loop_variable_leaks_into_a_call(results)

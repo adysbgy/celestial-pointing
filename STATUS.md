@@ -1,3 +1,101 @@
+## Progres terakhir (9 Okt 2026 — bola netral planet tak dikenal: satu-satunya gambar yang mewakili jalur jujur PRD, dan tak seorang pun menjaganya)
+
+### Cacatnya: kasus render yang tidak pernah disebut gerbang mana pun
+
+`planet-unknown-confirmed` ada di `build_cases()` sejak kelas planet ada. Ia
+mewakili **jalur jujur** PRD di kelas itu: `CelestialVisual.Planet(objectID:)`
+mengembalikan `nil` untuk id yang tidak dikenal, dan view lalu menggambar bola
+netral tanpa pita, tanpa cincin, tanpa bintik — bola yang tidak mengklaim
+identitas apa pun.
+
+Cara menemukannya bukan dengan mata: seluruh `build_cases()` disaring terhadap
+nama yang pernah disebut `check-visuals.py`. Dua kasus tidak pernah disebut,
+dan `planet-unknown-confirmed` salah satunya. Lalu mutasi dijalankan — cabang
+`planet is None` di port **dan** di view diganti palet Mars:
+
+```
+planet is None -> palet Mars (port)   → 0 dari 40000 piksel berbeda dari Mars
+planet is None -> palet Mars (view)   → 0 piksel berbeda
+check-visuals.py --check              → 654 pemeriksaan, 0 gagal
+```
+
+Jadi engine bisa menampilkan **bola Mars** untuk planet yang tidak dikenali,
+menyatakan identitas yang tidak dimilikinya, tanpa satu pun gerbang berbunyi.
+Ini kelas cacat yang sama yang sudah berulang di repo: semuanya benar secara
+terpisah, yang hilang adalah gerbang yang menghubungkannya.
+
+### Perbaikannya: jarak ke token netral, dua arah
+
+Yang diukur bukan "kromanya rendah" — Merkurius memang dunia abu yang nyaris
+tak berwarna (jarak 0.0435 dari netral), jadi ambang kroma akan merah pada
+gambar yang benar. Yang diukur adalah **jarak Euclidean ke token netral**, dan
+arahnya dua:
+
+  1. Bola tak dikenal harus **sama** dengan token netral (galat ≤ 0.010).
+     Ini yang menangkap penggantian oleh planet mana pun — Merkurius sekalipun.
+  2. Setiap planet nyata harus **berbeda** dari token netral (≥ 0.015).
+     Tanpa arah ini, port yang menggambar bola netral untuk **semua** planet
+     akan lolos pemeriksaan pertama.
+
+Ambangnya **dikalibrasi, bukan dipilih**: pembulatan rasterisasi 8-bit memberi
+galat terburuk 0.0034 (terukur 0.003); planet terdekat (Merkurius) berjarak
+0.0435. `0.010` duduk 2.9x di atas pembulatan dan 4.3x di bawah planet
+terdekat.
+
+### Sisi view diperiksa terpisah, karena piksel hanya membuktikan port
+
+Yang dikirim ke jam adalah view, bukan port. Karena itu cabang `guard let
+planet = visual.planet else` dibaca dari teksnya: ia harus memanggil token
+netral, dan **tidak boleh** meminjam palet planet mana pun. Dua keadaan di
+harness membuktikan sisi ini — dan keduanya **tidak menggerakkan satu piksel
+pun**, karena yang diukur gerbang piksel adalah port.
+
+### Gerbangnya sendiri dibuktikan berbunyi, atas tujuh keadaan
+
+`Tools/bukti-mutasi-bola-netral.py` (baru, dipanggil `engine-tests.yml`)
+menuntut **pemeriksaan mana** yang berbunyi:
+
+```
+[baseline]                                 0 merah
+1. port: tak dikenal -> palet Mars         bola tak dikenal == netral @38pt + @200pt
+2. view: tak dikenal -> palet Mars         view memakai token + view tidak meminjam palet
+3. port: `if True:` — semua planet netral  planet nyata bukan bola netral @38pt
+4. port: palet Merkurius -> bola netral    planet nyata bukan bola netral @38pt
+5. port: token netral -> palet Mars        bola tak dikenal == netral @38pt + @200pt
+6. view: token netral -> palet Mars        bola tak dikenal == netral @38pt + @200pt
+```
+
+Keadaan 1 dan 2 berpasangan dan **pasangan itulah buktinya**: keduanya
+menyalakan pemeriksaan yang berbeda (piksel vs teks). Keadaan 3 membuktikan
+arah kedua gerbang itu menggigit — Merkurius, planet terdekat ke netral,
+tetap tertangkap.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 706 | **706** |
+| Pemeriksaan visual | 654 | **660** (+6 bola netral) |
+| Aturan UI | 29 | 29 |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 706 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **660 pemeriksaan, 0 gagal**.
+  - `python3 Tools/bukti-mutasi-bola-netral.py` → **7 keadaan, 0 tidak sesuai harapan**.
+  - Seluruh 12 harness mutasi di `Tools/` → **semua OK**.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (29 aturan).
+
+### Yang TIDAK diklaim
+
+  - Gerbang ini mengukur warna **puncak piringan** (piksel paling terang),
+    bukan seluruh bola. Bola netral yang benar tetapi dengan bayangan yang
+    tiba-tiba berwarna akan lolos; itu di luar cakupannya, dan tidak diklaim
+    sebaliknya.
+  - Ambang 0.010 dan 0.015 adalah **keputusan yang dikalibrasi** terhadap
+    gambar yang ada, bukan nilai astronomis.
+
 ## Progres terakhir (9 Okt 2026 — denyut bintang: 17 gerbang bintang hijau pada bintang yang tidak berdenyut)
 
 ### Cacatnya: satu-satunya hal yang tidak dilihat gerbang mana pun adalah geraknya
