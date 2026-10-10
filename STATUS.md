@@ -18123,7 +18123,7 @@ deklarasinya memang berlebih.
   - `--tulis` pada mutasi yang sama → menghapus, `0 sisa`, lalu hijau.
   - `python3 Tools/bersihkan-public-berlebih.py` → **0 `public` berlebih di 58
     berkas**.
-  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 726 hijau**
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 728 hijau**
     (0 gagal). Engine tidak disentuh.
   - `./swift-ui-lint.sh` → 30 aturan, semua Bersih.
   - `./swift-typecheck.sh` → semua gerbang LULUS.
@@ -18149,3 +18149,95 @@ bukan-nol pada keadaan yang memang salah, dan **sisi mahalnya** (yang tidak
 memperingatkan tapi mematikan build) harus diuji lebih dulu daripada sisi
 murahnya. Dan: daftar "kind yang diperingatkan compiler" adalah klaim tentang
 perilaku compiler — ia harus **diukur** dengan probe, bukan diingat.
+
+
+---
+
+## Siklus: izin **dibatasi perangkat** bukan izin **ditolak** (+ kunci yang hilang dari `allKeys`)
+
+Dua cacat, satu kelas: **teks yang mengaku lebih tahu daripada kenyataannya.**
+
+### 1. `.restricted` disuruh membuka Pengaturan
+
+`CLAuthorizationStatus` memisahkan `.denied` dari `.restricted`, dan
+pemisahan itu ada bukan tanpa alasan:
+
+| status | artinya | bisa diperbaiki pengguna? |
+|---|---|---|
+| `.denied` | pengguna menolak | **ya** — Pengaturan → Privasi → Lokasi |
+| `.restricted` | perangkat tidak mengizinkan (Pembatasan Orang Tua / profil MDM) | **tidak** — tidak ada layar yang bisa mengubahnya |
+
+`LocationProvider` memetakan **keduanya** ke satu kalimat: *"Buka Pengaturan
+untuk mengizinkan"*. Untuk pengguna `.restricted` itu petunjuk yang **tidak
+bisa berhasil** — ia mencari layar yang tidak ada, gagal, lalu menyimpulkan
+aplikasinya rusak. Bentuk kebohongannya sama dengan visual yang mengklaim
+identitas saat engine ragu: menuntun ke kepastian yang tidak dimiliki
+aplikasi. PRD menuntut penolakan izin terlihat dan **jelas**; "jelas" di sini
+berarti sebabnya benar.
+
+Diperbaiki dengan memisahkan kasusnya di **dua** tempat (`.denied` dan
+`.restricted` pada `start()` dan pada `locationManagerDidChangeAuthorization`),
+dua kunci katalog baru (`sensor.location.restricted.status|note`), dan
+kalimat `.restricted` yang **tidak** menyuruh membuka Pengaturan — melainkan
+menyatakan bahwa bukan aplikasi ini yang memblokir, supaya pengguna berhenti
+mencari kesalahan di tempat yang salah.
+
+### 2. Satu kunci tidak pernah masuk `LocalizedText.allKeys`
+
+`allKeys` mengaku sebagai "setiap kunci yang dideklarasikan di sini". Ternyata
+**8 bahaya** ada di `SlewHazard.allCases`, tetapi hanya **7** di `allKeys`:
+`.slewHazardAboveAltitudeLimit` (batas meridian) tidak pernah masuk daftar
+sejak ditambahkan, dan **seluruh suite tetap hijau**.
+
+Yang membuatnya bertahan lama adalah **angkanya**: satu-satunya penjaga ukuran
+daftar adalah literal (`XCTAssertEqual(keys.count, 332)`), dan angka itu ikut
+terkunci pada nilai yang salah. Kunci di luar daftar tidak diperiksa
+kesatuannya, tidak disapu uji ber-prefix (`calibration.`/`experiment.`/
+`sensor.` semuanya membaca `allKeys`), dan tidak dibandingkan dengan apa pun.
+
+Gerbang paritas Aturan 6 **tidak** menutupnya — ia membaca deklarasi dari
+**sumber**, bukan dari daftar. Jadi kelas cacatnya bukan "kunci hilang dari
+katalog", melainkan **"daftar yang mengaku lengkap padahal tidak, dan tidak ada
+yang membandingkannya dengan kenyataan."**
+
+Diperbaiki dua arah:
+  - Kuncinya masuk daftar (332 → 335 bersama dua kunci di atas).
+  - Uji baru `testAllKeysListsEveryDeclaredKey` membaca deklarasi
+    `static let … = LocalizedText(key: "…")` dari **sumber** dan
+    membandingkannya dengan daftar, **dua arah** (ada di sumber tapi tidak di
+    daftar; ada di daftar tapi tidak di sumber). Angka literal tetap ada —
+    ia memberi tahu daftar berubah — tetapi ia bukan lagi satu-satunya penjaga.
+  - Batas yang disengaja: kunci yang dibangun **dinamis**
+    (`BodyName.declaration` → tujuh `object.body.*`) tidak terlihat sapuan, dan
+    itu dibiarkan; kekosongan itu sudah dijaga `LocalizedObjectNameTests`.
+    Yang ditegakkan: kalau deklarasinya **ada** sebagai `static let`, ia wajib
+    ada di daftar.
+
+### Verifikasi (terukur, bukan diklaim)
+
+  - **Mutasi 1** — hapus `.slewHazardAboveAltitudeLimit,` dari `allKeys`:
+    gerbang **merah, exit 1**, dan **dua** gerbang berbeda berbunyi —
+    `testAllKeysListsEveryDeclaredKey` (menyebut kuncinya) dan
+    `testDeclaredKeysAreUniqueNonEmptyAndComplete` (`"334" is not equal to
+    "335"`). Dua nama berbeda = dua kelas berbeda, bukan satu gerbang yang
+    kebetulan merah.
+  - **Mutasi 2** — tambah `static let` baru yang **tidak** didaftarkan:
+    gerbang **merah**, hanya uji baru yang berbunyi (hitungannya belum
+    berubah). Jadi uji baru ini benar-benar menangkap **penambahan yang lupa
+    didaftarkan**, bukan hanya penghapusan. Sumber dipulihkan byte-identik.
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 730 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `./swift-ui-lint.sh` → 30 aturan. Aturan 2 tetap peringatan (bukan
+    kegagalan) seperti rancangannya.
+  - Pohon bersih (`git archive HEAD` + hanya berkas siklus ini) → hanya
+    Aturan 10 yang berbunyi, dan itu memang janji README yang harus ikut naik.
+
+### Pelajaran (catat, bukan ulang)
+
+  - **Daftar yang mengaku "semua" harus dibandingkan dengan kenyataan, bukan
+    dengan angkanya.** Angka yang dikunci sebagai literal akan ikut mengunci
+    kelalaiannya — dan setiap uji yang menyapu daftar itu akan ikut buta.
+  - **Status izin yang berbeda menuntut kalimat yang berbeda, bukan kalimat
+    yang lebih umum.** Menggabungkan `.denied` dan `.restricted` terlihat
+    seperti menyederhanakan; sebenarnya ia menghapus satu-satunya informasi
+    yang menentukan apakah pengguna bisa berbuat sesuatu.

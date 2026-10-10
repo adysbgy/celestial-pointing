@@ -92,6 +92,34 @@ public enum SensorStatusText {
         TextLocalization.text(.sensorLocationDeniedNote)
     }
 
+    /// Status saat izin lokasi **dibatasi** perangkat (versi pendek).
+    ///
+    /// Terpisah dari `locationDeniedStatus` karena penyebabnya berbeda dan
+    /// tindakannya berbeda. Lihat `locationRestrictedNote`.
+    public static var locationRestrictedStatus: String {
+        TextLocalization.text(.sensorLocationRestrictedStatus)
+    }
+
+    /// Penjelasan saat izin lokasi **dibatasi** perangkat, bukan ditolak.
+    ///
+    /// **Kenapa ini kunci sendiri, bukan varian dari `locationDeniedNote`.**
+    /// `CLAuthorizationStatus` memisahkan `.denied` dari `.restricted`, dan
+    /// pemisahan itu ada bukan tanpa alasan: `.denied` berarti pengguna
+    /// menolak dan **bisa** mengubahnya di Pengaturan; `.restricted` berarti
+    /// perangkatnya tidak mengizinkan — Pembatasan Orang Tua atau profil MDM —
+    /// dan **tidak ada satu pun layar Pengaturan** yang bisa mengubahnya.
+    ///
+    /// Versi sebelumnya memetakan keduanya ke satu kalimat: "Buka Pengaturan
+    /// untuk mengizinkan". Untuk pengguna `.restricted` itu petunjuk yang
+    /// **tidak bisa berhasil** — ia akan mencari layar yang tidak ada, gagal,
+    /// dan menyimpulkan aplikasinya rusak. Itu kebohongan yang sama bentuknya
+    /// dengan visual yang mengklaim identitas saat engine ragu: menuntun ke
+    /// kepastian yang tidak dimiliki aplikasi. PRD menuntut penolakan izin
+    /// terlihat dan **jelas**; "jelas" di sini berarti sebabnya benar.
+    public static var locationRestrictedNote: String {
+        TextLocalization.text(.sensorLocationRestrictedNote)
+    }
+
     /// Status akurasi lokasi yang diterima.
     public static func locationAccuracy(meters: Double) -> String {
         TextLocalization.text(.sensorLocationAccuracy, meters)
@@ -149,6 +177,19 @@ public extension LocalizedText {
     static let sensorLocationDeniedNote = LocalizedText(
         key: "sensor.location.denied.note",
         id: "Izin lokasi ditolak. Buka Pengaturan untuk mengizinkan, atau pakai lokasi bawaan (Jakarta).")
+    /// Status singkat saat izin lokasi **dibatasi** perangkat, bukan ditolak
+    /// pengguna. Terpisah dari `sensor.location.denied.status` karena
+    /// tindakannya berbeda — lihat `sensor.location.restricted.note`.
+    static let sensorLocationRestrictedStatus = LocalizedText(
+        key: "sensor.location.restricted.status",
+        id: "Izin lokasi dibatasi perangkat — memakai lokasi bawaan")
+    /// Penjelasan saat izin lokasi dibatasi perangkat (Pembatasan Orang Tua /
+    /// MDM). **Sengaja tidak menyuruh membuka Pengaturan**, karena tidak ada
+    /// layar Pengaturan yang bisa mengubahnya — petunjuk yang tidak bisa
+    /// berhasil membuat pengguna menyimpulkan aplikasinya rusak.
+    static let sensorLocationRestrictedNote = LocalizedText(
+        key: "sensor.location.restricted.note",
+        id: "Izin lokasi dibatasi perangkat (mis. Pembatasan Orang Tua atau profil sekolah). Bukan aplikasi ini yang memblokirnya, jadi tidak ada pengaturan di sini yang bisa mengubahnya. Aplikasi tetap berjalan dengan lokasi bawaan (Jakarta).")
     static let sensorLocationAccuracy = LocalizedText(
         key: "sensor.location.accuracy",
         id: "Lokasi ±%.0f m")

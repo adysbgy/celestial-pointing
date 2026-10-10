@@ -313,9 +313,25 @@ final class TextLocalizationTests: XCTestCase {
     /// `.spiralGalaxy`, karena M31 (cakram miring) dan M51 (lengan terbaca)
     /// kini digambar berbeda dan tidak boleh terdengar sama. Lihat
     /// `DeepSkySpeech.swift`.
+    ///
+    /// 332 → 335 pada siklus "izin dibatasi bukan ditolak": dua kunci
+    /// `sensor.location.restricted.*`. `CLAuthorizationStatus` memisahkan
+    /// `.denied` dari `.restricted`, dan pemisahan itu berarti: hanya `.denied`
+    /// yang bisa diperbaiki di Pengaturan. Satu kalimat untuk keduanya
+    /// mengirim pengguna `.restricted` (Pembatasan Orang Tua / MDM) mencari
+    /// layar yang tidak ada.
+    ///
+    /// Angka 332 → 335 juga menutup satu **kunci yang hilang dari daftar
+    /// ini**: `.slewHazardAboveAltitudeLimit` sudah dideklarasikan dan ada di
+    /// katalog, tetapi tidak pernah masuk `allKeys` sejak ditambahkan. Selama
+    /// itu, angkanya dikunci sebagai literal 332 — jadi kunci yang hilang ikut
+    /// terkunci, dan setiap uji yang menyapu `allKeys` (semua uji ber-prefix di
+    /// berkas ini) tidak akan pernah melihatnya. Lihat
+    /// `testAllKeysListsEveryDeclaredKey`, yang membandingkan daftar dengan
+    /// kenyataan alih-alih mempercayai angkanya.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 332, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 335, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
@@ -323,6 +339,101 @@ final class TextLocalizationTests: XCTestCase {
             XCTAssertFalse(key.rawValue.contains(" "),
                            "kunci \(key.rawValue) mengandung spasi — itu teks, bukan kunci")
         }
+    }
+
+    /// Setiap kunci yang **dideklarasikan** di paket harus benar-benar ada di
+    /// `allKeys`.
+    ///
+    /// **Cacat yang ditangkap uji ini.** `allKeys` mengaku sebagai "setiap
+    /// kunci yang dideklarasikan di sini", dan seluruh uji lain di berkas ini
+    /// mempercayainya: uji ber-prefix menyapu `allKeys` untuk mencari kunci
+    /// `calibration.`/`experiment.`/`sensor.`, dan gerbang paritas Aturan 6
+    /// membaca kunci dari **sumber**. Jadi kunci yang tidak pernah masuk
+    /// daftar tidak terlihat oleh siapa pun: ia tidak diperiksa kesatuannya,
+    /// tidak disapu uji ber-prefix, dan tidak dibandingkan dengan apa pun.
+    ///
+    /// Yang membuatnya bertahan lama adalah **angkanya**: satu-satunya penjaga
+    /// ukuran daftar adalah literal (`XCTAssertEqual(keys.count, 332)`), dan
+    /// angka itu ikut terkunci pada nilai yang salah. Terukur: 8 bahaya ada di
+    /// `SlewHazard.allCases`, tetapi hanya 7 di `allKeys` —
+    /// `.slewHazardAboveAltitudeLimit` hilang sejak ditambahkan, dan
+    /// **seluruh suite tetap hijau**.
+    ///
+    /// Jadi uji ini tidak mempercayai angkanya: ia membaca deklarasi dari
+    /// sumber dan membandingkannya dengan daftar. Angka literal tetap ada
+    /// (ia memberi tahu bahwa daftar berubah), tetapi ia bukan lagi
+    /// satu-satunya penjaga.
+    ///
+    /// **Batasnya, dan kenapa dibiarkan.** Sapuan ini mengenali deklarasi
+    /// berbentuk `static let nama = LocalizedText(key: "…")` — bentuk yang
+    /// dipakai 335 kunci. Kunci yang dibangun **dinamis** tidak terlihat
+    /// (`BodyName.declaration` memakai `catalogKey(for:)` dan menghasilkan
+    /// tujuh kunci `object.body.*`), dan itu disengaja: memaksanya masuk akan
+    /// berarti menuntut `allKeys` memuat kunci yang tidak punya `static let`
+    /// untuk ditunjuk, sementara kekosongan itu sudah dijaga uji lain
+    /// (`LocalizedObjectNameTests` menguji `BodyName.catalogKey` langsung).
+    /// Yang penting di sini: kalau deklarasinya **ada** sebagai `static let`,
+    /// ia wajib ada di daftar.
+    func testAllKeysListsEveryDeclaredKey() throws {
+        let directory = try XCTUnwrap(sourceDirectory(),
+                                     "direktori sumber PointingKit tidak ditemukan")
+        let pattern = try NSRegularExpression(
+            pattern: #"static let \w+\s*=\s*LocalizedText\(\s*key:\s*"([^"]+)""#)
+        var declared: Set<String> = []
+        let files = try FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil)
+        for file in files where file.pathExtension == "swift" {
+            let source = try String(contentsOf: file, encoding: .utf8)
+            let range = NSRange(source.startIndex..., in: source)
+            for match in pattern.matches(in: source, range: range) {
+                guard let captured = Range(match.range(at: 1), in: source) else { continue }
+                declared.insert(String(source[captured]))
+            }
+        }
+        // Prasyarat: sapuan harus benar-benar menemukan sesuatu. Tanpa ini,
+        // path yang salah membuat himpunan kosong, dan uji "lulus" karena
+        // tidak ada yang dibandingkan — persis kelas hijau-palsu yang uji ini
+        // tutup.
+        XCTAssertGreaterThan(declared.count, 300,
+                             "sapuan hanya menemukan \(declared.count) kunci — "
+                             + "kemungkinan direktori sumbernya salah")
+
+        let listed = Set(LocalizedText.allKeys.map(\.rawValue))
+        let missing = declared.subtracting(listed).sorted()
+        XCTAssertTrue(missing.isEmpty,
+                      "kunci ini dideklarasikan di paket tetapi tidak ada di "
+                      + "LocalizedText.allKeys: \(missing). Kunci di luar daftar "
+                      + "tidak diperiksa uji ber-prefix maupun gerbang paritas.")
+
+        // Arah sebaliknya: daftar tidak boleh menunjuk kunci yang tidak
+        // dideklarasikan di mana pun. `LocalizedText` yang tidak punya
+        // deklarasi berarti salah ketik yang tidak akan pernah ketahuan
+        // sampai ada yang membaca layarnya.
+        let stray = listed.subtracting(declared).sorted()
+        XCTAssertTrue(stray.isEmpty,
+                      "allKeys memuat kunci yang tidak dideklarasikan di paket: "
+                      + "\(stray)")
+    }
+
+    /// Cari direktori sumber PointingKit dari lokasi berkas uji ini.
+    ///
+    /// Sama seperti `catalogueURLBySearching()` di `ExperimentTextTests`:
+    /// uji Linux berjalan dari pohon sumber, jadi jalan relatif dari
+    /// `#filePath` adalah satu-satunya cara yang tidak bergantung `Bundle`.
+    private func sourceDirectory() -> URL? {
+        var dir = URL(fileURLWithPath: #filePath)
+        // .../Tests/PointingKitTests/<berkas> → naik ke akar paket.
+        for _ in 0..<6 {
+            dir.deleteLastPathComponent()
+            let candidate = dir.appendingPathComponent("Sources/PointingKit")
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: candidate.path,
+                                              isDirectory: &isDirectory),
+               isDirectory.boolValue {
+                return candidate
+            }
+        }
+        return nil
     }
 
     /// Setiap keadaan harus punya kunci, dan kuncinya harus **namespace**.

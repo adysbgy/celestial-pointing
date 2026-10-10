@@ -81,6 +81,63 @@ final class SensorStatusTextTests: BridgedTextTestCase {
                       "angka meter tidak masuk ke kalimat: \(spoken)")
     }
 
+    /// **Ditolak** dan **dibatasi perangkat** tidak boleh berbunyi sama.
+    ///
+    /// **Cacat yang ditangkap uji ini.** `CLAuthorizationStatus` memisahkan
+    /// `.denied` dari `.restricted`, dan `LocationProvider` memetakan keduanya
+    /// ke satu kalimat: "Buka Pengaturan untuk mengizinkan". Pemisahan itu ada
+    /// bukan tanpa alasan — `.denied` berarti pengguna menolak dan **bisa**
+    /// mengubahnya di Pengaturan, sedangkan `.restricted` berarti perangkatnya
+    /// tidak mengizinkan (Pembatasan Orang Tua atau profil MDM) dan **tidak
+    /// ada satu pun layar Pengaturan** yang bisa mengubahnya.
+    ///
+    /// Jadi untuk pengguna `.restricted`, kalimat itu petunjuk yang **tidak
+    /// bisa berhasil**: ia mencari layar yang tidak ada, gagal, lalu
+    /// menyimpulkan aplikasinya rusak. Itu kebohongan yang bentuknya sama
+    /// dengan visual yang mengklaim identitas saat engine ragu — menuntun ke
+    /// kepastian yang tidak dimiliki aplikasi.
+    ///
+    /// Uji ini mengunci tiga hal sekaligus: kalimatnya **berbeda**, kalimat
+    /// `.restricted` **tidak** menyuruh membuka Pengaturan, dan kalimat
+    /// `.denied` **tetap** menyuruhnya (kalau keduanya berhenti menyebut
+    /// Pengaturan, pengguna `.denied` kehilangan satu-satunya jalan keluar).
+    func testRestrictedPermissionIsNotToldToOpenSettings() {
+        let denied = SensorStatusText.locationDeniedNote
+        let restricted = SensorStatusText.locationRestrictedNote
+
+        XCTAssertNotEqual(denied, restricted,
+                          "ditolak dan dibatasi perangkat berbunyi sama — "
+                          + "hanya satu dari keduanya yang bisa diperbaiki di Pengaturan")
+        XCTAssertNotEqual(SensorStatusText.locationDeniedStatus,
+                          SensorStatusText.locationRestrictedStatus,
+                          "status singkat keduanya sama")
+
+        XCTAssertFalse(restricted.lowercased().contains("buka pengaturan"),
+                       "izin yang dibatasi perangkat disuruh membuka Pengaturan, "
+                       + "padahal tidak ada layar di sana yang bisa mengubahnya: \(restricted)")
+        XCTAssertTrue(denied.lowercased().contains("buka pengaturan"),
+                      "izin yang ditolak pengguna kehilangan jalan keluarnya "
+                      + "(Pengaturan): \(denied)")
+
+        // Menyebut "Pengaturan" saja tidak cukup untuk gagal: kalimat
+        // `.restricted` justru **harus** menyebutnya untuk menjelaskan bahwa
+        // tidak ada pengaturan yang bisa menolong. Yang dilarang adalah
+        // **menyuruh** ke sana, dan itu dibedakan oleh "buka".
+        //
+        // Sebaliknya, kalimat itu harus menyatakan dengan jelas bahwa aplikasi
+        // ini bukan yang memblokir — kalau tidak, pengguna tetap akan mencari
+        // kesalahan di dalam aplikasi.
+        XCTAssertTrue(restricted.lowercased().contains("bukan aplikasi"),
+                      "tidak menjelaskan bahwa bukan aplikasi ini yang memblokir: \(restricted)")
+
+        // Keduanya harus menyebut lokasi bawaan: app tetap jalan, dan
+        // pengguna berhak tahu angka apa yang sedang dipakai.
+        for text in [denied, restricted] {
+            XCTAssertTrue(text.lowercased().contains("bawaan"),
+                          "tidak menyebut lokasi bawaan yang sedang dipakai: \(text)")
+        }
+    }
+
     func testFailureMessagesInsertSystemMessage() {
         let status = SensorStatusText.locationFailedStatus("timeout")
         let note = SensorStatusText.locationFailedNote("timeout")
@@ -101,6 +158,8 @@ final class SensorStatusTextTests: BridgedTextTestCase {
             "sensor.motion.unavailable": "Motion off.",
             "sensor.location.denied.status": "Location denied.",
             "sensor.location.denied.note": "Denied. Open Settings.",
+            "sensor.location.restricted.status": "Restricted by device.",
+            "sensor.location.restricted.note": "Restricted by device. Using default.",
             "sensor.location.accuracy": "Accuracy %.0f m",
             "sensor.location.failed.status": "Failed: %@",
             "sensor.location.failed.note": "Failed: %@. Using default.",
@@ -111,6 +170,9 @@ final class SensorStatusTextTests: BridgedTextTestCase {
         XCTAssertEqual(SensorStatusText.motionUnavailable, "Motion off.")
         XCTAssertEqual(SensorStatusText.locationDeniedStatus, "Location denied.")
         XCTAssertEqual(SensorStatusText.locationDeniedNote, "Denied. Open Settings.")
+        XCTAssertEqual(SensorStatusText.locationRestrictedStatus, "Restricted by device.")
+        XCTAssertEqual(SensorStatusText.locationRestrictedNote,
+                       "Restricted by device. Using default.")
         XCTAssertEqual(SensorStatusText.locationAccuracy(meters: 3), "Accuracy 3 m")
         XCTAssertEqual(SensorStatusText.locationFailedStatus("x"), "Failed: x")
         XCTAssertEqual(SensorStatusText.locationFailedNote("x"),

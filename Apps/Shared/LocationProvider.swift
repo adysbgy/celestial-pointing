@@ -92,13 +92,23 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         switch manager.authorizationStatus {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
-        case .denied, .restricted:
+        case .denied:
             // Mesin tetap jalan dengan lokasi darurat — tapi penolakan izin
             // **harus terlihat**, bukan diam (PRD: jangan diam saat izin
             // ditolak). `note` yang menampilkannya ada di `PointingView` &
             // `DiagnosticsView`; `statusText` sendirian tidak pernah dibaca UI.
             statusText = SensorStatusText.locationDeniedStatus
             note = SensorStatusText.locationDeniedNote
+        case .restricted:
+            // Dipisah dari `.denied` sejak siklus "izin dibatasi bukan
+            // ditolak": keduanya tampak sama di layar, tetapi hanya satu yang
+            // bisa diperbaiki pengguna. `.denied` → ada di Pengaturan;
+            // `.restricted` → Pembatasan Orang Tua / MDM, **tidak ada** layar
+            // yang bisa mengubahnya. Kalimat yang sama untuk keduanya
+            // mengirim pengguna `.restricted` mencari pengaturan yang tidak
+            // ada, lalu menyimpulkan aplikasinya rusak.
+            statusText = SensorStatusText.locationRestrictedStatus
+            note = SensorStatusText.locationRestrictedNote
         default:
             manager.startUpdatingLocation()
             statusText = SensorStatusText.locationSearching
@@ -120,9 +130,15 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
                 manager.startUpdatingLocation()
                 self.statusText = SensorStatusText.locationSearching
                 self.note = nil
-            case .denied, .restricted:
+            case .denied:
                 self.statusText = SensorStatusText.locationDeniedStatus
                 self.note = SensorStatusText.locationDeniedNote
+            case .restricted:
+                // Sama seperti `start()`: dibatasi perangkat bukan ditolak
+                // pengguna, jadi petunjuknya pun berbeda. Lihat catatan di
+                // sana.
+                self.statusText = SensorStatusText.locationRestrictedStatus
+                self.note = SensorStatusText.locationRestrictedNote
             case .notDetermined:
                 self.statusText = SensorStatusText.locationWaiting
             @unknown default:

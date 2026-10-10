@@ -521,7 +521,21 @@ public extension LocalizedText {
         // dibedakan dari penolakan karena keyakinan rendah. Lihat
         // `SlewVerdict.swift`.
         .slewVerdictRejectedPrefix,
+        // Delapan bahaya, bukan tujuh: `.aboveAltitudeLimit` (batas meridian)
+        // sempat tertinggal dari daftar ini.
+        //
+        // Yang membuatnya penting bukan terjemahannya — kunci itu ada di
+        // katalog, dan Aturan 6 membaca deklarasinya dari **sumber**, jadi
+        // paritas katalog tetap hijau. Yang rusak adalah **arti daftar ini
+        // sendiri**: ia mengaku "setiap kunci yang dideklarasikan di sini",
+        // dan uji yang menyapu `allKeys` (mis. semua kunci ber-prefix) tidak
+        // akan pernah melihat kunci yang tidak ada di daftar. Sebelum ini
+        // tidak ada satu pun gerbang yang membandingkan `allKeys` dengan
+        // kenyataan — angkanya dikunci sebagai literal 332, jadi kunci yang
+        // hilang justru ikut terkunci. Lihat
+        // `testAllKeysListsEveryDeclaredKey` yang menutup kelas itu.
         .slewHazardSunProximity, .slewHazardBelowAltitudeLimit,
+        .slewHazardAboveAltitudeLimit,
         .slewHazardBelowHorizon, .slewHazardTooFaint, .slewHazardNoTarget,
         .slewHazardLowConfidence, .slewHazardSunPositionUnknown,
         // Kalimat pengumuman VoiceOver saat keadaan berubah. Masuk daftar
@@ -566,6 +580,11 @@ public extension LocalizedText {
         .sensorLocationNotRequested, .sensorLocationSearching,
         .sensorLocationWaiting, .sensorLocationDeniedStatus,
         .sensorLocationUnknownStatus, .sensorLocationDeniedNote,
+        // Izin **dibatasi perangkat** (Pembatasan Orang Tua / MDM). Kunci
+        // terpisah karena `.restricted` tidak bisa diperbaiki di Pengaturan,
+        // sedangkan `.denied` bisa — menyatukan keduanya membuat aplikasi
+        // menuntun pengguna ke layar yang tidak akan pernah mengubah apa pun.
+        .sensorLocationRestrictedStatus, .sensorLocationRestrictedNote,
         .sensorLocationAccuracy, .sensorLocationFailedStatus,
         .sensorLocationFailedNote,
         // Alur kalibrasi. Masuk daftar karena inilah satu-satunya jalur

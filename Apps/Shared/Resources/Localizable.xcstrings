@@ -4281,6 +4281,40 @@
         }
       }
     },
+    "sensor.location.restricted.status": {
+      "comment": "Status singkat saat izin lokasi dibatasi perangkat (bukan ditolak pengguna).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location permission restricted by the device — using the default location"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin lokasi dibatasi perangkat — memakai lokasi bawaan"
+          }
+        }
+      }
+    },
+    "sensor.location.restricted.note": {
+      "comment": "Penjelasan saat izin lokasi dibatasi perangkat (Pembatasan Orang Tua / MDM). Sengaja tidak menyuruh membuka Pengaturan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location permission is restricted by the device (e.g. Parental Controls or a school profile). This app is not what is blocking it, so no setting here can change it. The app keeps running with the default location (Jakarta)."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin lokasi dibatasi perangkat (mis. Pembatasan Orang Tua atau profil sekolah). Bukan aplikasi ini yang memblokirnya, jadi tidak ada pengaturan di sini yang bisa mengubahnya. Aplikasi tetap berjalan dengan lokasi bawaan (Jakarta)."
+          }
+        }
+      }
+    },
     "sensor.location.denied.status": {
       "comment": "Status singkat saat izin lokasi ditolak.",
       "localizations": {
