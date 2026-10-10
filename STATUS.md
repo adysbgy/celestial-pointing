@@ -1,3 +1,100 @@
+## Progres terakhir (10 Okt 2026 — ambang pengaman Matahari `sunSafeConeDeg` diikat langsung: gerbang prilakunya tetap hijau saat ambangnya dimatikan)
+
+### Cacatnya: uji yang menguji prilaku ambang ini tidak bisa melihat angkanya
+
+`PointingResolver.sunSafeConeDeg` (13°) adalah **satu-satunya** gerbang yang
+menolak **arah tunjuk itu sendiri** saat menunjuk ke Matahari
+(`PointingResolver.swift:219–220`). Ia berbeda dari lapis keduanya
+(`VisibilityFilter.classify` → `.tooCloseToSun`, lewat
+`policy.minSunSeparationDeg` = 30°): yang kedua menyaring **kandidat**, yang
+pertama menyaring **niat** — dan ia berlaku sekalipun kebijakan paling permisif,
+karena `minSunSeparationDeg: 0` mematikan lapis kedua tetapi tidak menyentuh
+yang pertama. Alasannya keras: `.lock` membuka izin GoTo, jadi arah pergelangan
+tidak boleh pernah menjadi perintah motor yang diarahkan ke Matahari.
+
+Uji prilakunya ada (`testAimingAtTheSunNeverLocksOrFiresSuccessHaptic`,
+`PointingControllerTests.swift:604`), dan ia **benar**. Tetapi ia dibangun
+dengan `catalogue: []` — katalog kosong. Konsekuensinya terukur: dengan
+ambang diubah `13.0 → 0.0`, uji itu **tetap hijau**. Kerucut kosong
+menghasilkan `low`, tanpa `lock`, tanpa haptic sukses, tanpa rencana GoTo —
+**persis hasil yang sama** dengan kode yang aman. Tidak ada satu pun bintang
+di fixture itu yang bisa mengubah hasilnya, karena tidak ada bintang sama
+sekali.
+
+Jadi ambangnya bisa dimatikan tanpa satu uji pun merah, dan cacatnya baru
+muncul di produksi pada saat yang paling berbahaya: **ketika katalog
+diperluas** dan ada benda nyata di dekat Matahari (konjungsi pagi/sore).
+`TooCloseToSunLockHonestyTests` sendiri mencatat bahwa nol bintang katalog
+pernah berada di celah (13°, 30°) saat keduanya di atas horizon — jadi
+kelas cacat ini memang menunggu katalog yang lebih besar.
+
+### Perbaikannya: satu uji yang mengikat nilainya
+
+`testSunSafeConeStaysThirteenDegrees` di `TooCloseToSunLockHonestyTests.swift`
+menegaskan `sunSafeConeDeg == 13.0`. Pola yang sama dengan
+`testMaximumClaimedAgeIsFifteenMinutes` dan `testShadowFractionIsExactlyHalf`:
+yang dijaga adalah bahwa angka itu tidak bisa diam-diam berubah tanpa uji
+merah — bukan bahwa 13° adalah nilai astronomis yang benar.
+
+### Gerbangnya dibuktikan berbunyi
+
+`./red-test.sh` dengan mutasi `13.0 → 0.0` pada
+`PointingResolver.swift` menghasilkan:
+
+```
+TooCloseToSunLockHonestyTests.testSunSafeConeStaysThirteenDegrees :
+XCTAssertEqual failed: ("0.0") is not equal to ("13.0")
+  - ambang pengaman Matahari harus tetap 13° (aturan keras PRD)
+```
+
+Sumber dipulihkan oleh `red-test.sh` sendiri (handler `trap ... EXIT`), dan
+`git status` berikutnya bersih selain berkas uji + README.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 210 | **210** (tak disentuh) |
+| PointingKit | 716 | **717** (+1 gerbang nilai ambang Matahari) |
+| Aturan UI | 30 | 30 (Aturan 10 memaksa README 716→717) |
+
+### Verifikasi
+
+- `./swift-test.sh` → **CelestialEngine 210 + PointingKit 717 hijau**, 0 gagal.
+  Uji baru berjalan di Docker dan `passed`.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (30 aturan; Aturan 10
+  sinkron 717).
+- Mutasi `13.0 → 0.0` → uji baru **merah**; sumber dipulihkan.
+- CI: **Apple Build `38054759871` success** + **Engine Tests (Linux)
+  `38054759827` success**.
+- Tidak ada satu baris pun kode produksi yang berubah — hanya uji + README.
+
+### Yang TIDAK diklaim
+
+- Uji ini menjaga **nilai** 13°, bukan kebenaran fisisnya. Kalau kelak ambang
+  itu diubah **beserta** uji ini dan docstring konstantanya, gerbang hijau —
+  yang dijaga adalah ketiganya tidak boleh bercerai.
+- Uji ini **tidak** menggantikan uji prilakunya. Yang ditambah hanya ikatan
+  angkanya; `testAimingAtTheSunNeverLocksOrFiresSuccessHaptic` tetap
+  menjaga akibatnya di level controller, dan tetap hijau (katalog kosong
+  memang tidak punya benda yang bisa dikunci).
+- Tidak menambah uji untuk lapis **kedua** (`minSunSeparationDeg`): ia sudah
+  diikat perilakunya oleh `testStarCloseToSunRejectedByVisibility` dengan
+  bintang tiruan sungguhan di celah (13°, 30°), jadi cacatnya bukan
+  "angkanya tidak diikat" melainkan sudah tertutup.
+
+### Catatan konkurensi
+
+Sama seperti siklus sebelumnya: agent kedua (`xcode-dev-runner.sh`) punya WIP
+tak ter-commit di `.github/workflows/engine-tests.yml`, `Tools/check-visuals.py`,
+dan untracked `Tools/bukti-mutasi-maria.py`. Ketiganya saya `git stash`
+sebelum commit dan `git stash pop` setelah push; berkas untracked itu
+dikembalikan ke keadaan **untracked** (`git rm --cached`) supaya pohon kerja
+mereka persis seperti saya temukan. Commit hanya berisi
+`TooCloseToSunLockHonestyTests.swift` + `README.md` (explicit add).
+
+---
+
 ## Progres terakhir (10 Okt 2026 — ambang magnitudo objek langit dalam: 6 DSO terredup tak pernah jadi kandidat, kode gambar dua morfologi mati di produksi)
 
 ### Cacatnya: `classify` cuma punya satu ambang magnitudo, padahal bintang dan objek langit dalam beda batas
