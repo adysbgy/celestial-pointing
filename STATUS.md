@@ -1,3 +1,71 @@
+## Progres terakhir (10 Okt 2026 — ambang magnitudo objek langit dalam: 6 DSO terredup tak pernah jadi kandidat, kode gambar dua morfologi mati di produksi)
+
+### Cacatnya: `classify` cuma punya satu ambang magnitudo, padahal bintang dan objek langit dalam beda batas
+
+`VisibilityFilter.classify` (Visibility.swift) hanya memakai `limitingMagnitude`
+(6.0) untuk **segala** benda. Katalog produksi (`EngineFactory.productionCatalogue
+= Catalogue.brightStars + DeepSkyCatalogue.objects`) memuat 18 objek langit
+dalam, enam di antaranya melebihi 6.0:
+
+- M27 (7.40, `.planetaryNebula`), M57 (8.80, `.planetaryNebula`)
+- M51 (8.40, `.spiralGalaxy`), M101 (7.86, `.spiralGalaxy`)
+- M2 (6.50, `.globularCluster`), M11 (6.30, `.openCluster`)
+
+Keenam diklasifikasi `.tooFaint` → `consider` menolaknya → resolver tidak
+pernah menghasilkan mereka. Padahal seluruh jalur visualnya sudah ada dan
+teruji: `CelestialVisual.Kind.deepSky`, `VisualFrame` (bentuk per-morfologi),
+label, pengucapan, dan `DeepSkyCatalogue.drawableMorphology`. Akibatnya **seluruh
+wakil `.planetaryNebula` dan `.spiralGalaxy` tidak pernah digambar di app** —
+kode gambar yang mahal mati diam-diam, tanpa satu pun teks layar yang salah.
+Ini kelas cacat yang sama persis dengan yang sudah ditutup
+`DeepSkyCatalogueTests`: tiap bagian benar sendiri, yang hilang adalah ambang
+yang membedakan bintang dari objek langit dalam.
+
+Katalog itu sendiri menambah cacat: komentarnya menjanjikan "mag ≤ 6 terlihat
+mata telanjang/binokuler", tapi enam anggotanya (termasuk M57 8.80) jelas di
+atasnya. Klaim itu kini tidak lagi benar sejak ambang dipisah — tapi objek
+mag 8.8 memang target binokuler, bukan mata telanjang, jadi ambang terpisah
+adalah perbaikannya, bukan mengubah komentar.
+
+### Perbaikannya: `deepSkyLimitingMagnitude` (9.0) khusus `kind == .deepSky`
+
+- `VisibilityPolicy` dapat field `deepSkyLimitingMagnitude` (bawaan 9.0, di
+  atas mag terredup katalog 8.80) dan `permissive` ikut diset 30.
+- `classify` dan `effectiveLimitingMagnitude` dapat parameter `kind:
+  ObjectKind = .star`; bila `.deepSky` dipakai batas dasarnya `deepSkyLimitingMagnitude`,
+  bukan `limitingMagnitude`. Bawaan `.star` menjaga semua pemanggil lama tetap
+  benar tanpa perubahan — `DaylightLockTests` dan seluruh uji bintang tidak
+  bergeser.
+- `PointingResolver.consider` meneruskan `object.kind` ke `classify`, jadi
+  resolver produksi sekarang benar-benar menghasilkan keenam DSO terredup saat
+  langit gelap.
+
+Cahaya Bulan **tetap** mengketatkan ambang DSO (lewat `moonBrighteningMagnitudes`),
+jadi M57 (8.80) masih ditolak saat purnama tinggi — itu jujur: nebula mag 8.8
+memang tidak terlihat di langit terang Bulan. `effectiveLimitingMagnitude`
+pakai `base` yang sama untuk kedua jalur ketatnya.
+
+Dua uji baru di `VisibilityTests.swift`:
+- `testDeepSkyUsesItsOwnLimitingMagnitude` — M57 (8.8) `.visible` sebagai DSO,
+  bintang 8.5 tetap `.tooFaint`, dan tanpa `kind` mag 8.8 tetap ditolak (supaya
+  keliru memanggil tanpa `kind` tidak membocorkan ambang DSO).
+- `testMoonlightAlsoTightensTheDeepSkyLimit` — M57 `.visible` di langit gelap,
+  `.tooFaint` di bawah purnama.
+
+Berkas tersentuh: `Visibility.swift`, `PointingResolver.swift`,
+`VisibilityTests.swift`, `README.md` (hitungan 208→210), `STATUS.md`.
+Engine 210 hijau, PointingKit 716 hijau, Apple Build (macOS, warning-free) hijau.
+
+### Yang TIDAK diklaim
+
+- Tidak menaikkan `limitingMagnitude` ke 9.0. Itu akan mengklaim bintang redup
+  mag 7–8 terlihat mata telanjang — false confidence, dilarang PRD. Ambang
+  terpisah menyelesaikan tanpa mengubah batas bintang.
+- Tidak mengubah batas bintang sama sekali, jadi tidak ada uji `VisibilityTests`
+  lama yang berubah arah.
+
+---
+
 ## Progres terakhir (10 Okt 2026 — identitas fisik warna kabut malam akhirnya diuji: klaim jenis yang hanya di docstring)
 
 ### Cacatnya: enam warna kabut malam punya identitas fisik yang tak satu pun uji menyebutnya
