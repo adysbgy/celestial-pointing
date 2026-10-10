@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import os
 import CelestialEngine
 import PointingKit
 
@@ -28,6 +29,16 @@ public final class WatchLinkService: NSObject, ObservableObject {
     @Published public private(set) var isReachable = false
     /// Berapa pesan yang gagal dikirim (untuk terlihat saat pengujian).
     @Published public private(set) var sendFailureCount = 0
+    /// iPhone meminta aliran arah tunjuk untuk cermin Stellarium (ADR-016).
+    @Published public private(set) var mirrorRequested = false {
+        didSet {
+            if mirrorRequested != oldValue {
+                Self.mirrorLog.info("mirror requested \(self.mirrorRequested)")
+            }
+        }
+    }
+    private static let mirrorLog = Logger(subsystem: "dev.celestial.pointandknow", category: "stellarium")
+    private var mirrorThrottle = MirrorThrottle()
 
     // MARK: Pointing Lab (alat riset, ADR-004)
 
@@ -121,6 +132,16 @@ public final class WatchLinkService: NSObject, ObservableObject {
     private var reportGate = LinkReportGate()
 
     public override init() { super.init() }
+
+    /// Kirim arah tunjuk ke iPhone untuk Stellarium — hanya bila diminta dan
+    /// terjangkau, paling sering 4×/dtk. Tanpa antre: arah lama tidak berguna.
+    public func mirror(_ snapshot: PointingSnapshot) {
+        guard mirrorRequested, isReachable, let session, let pointing = snapshot.calibratedPointing else { return }
+        let locked = snapshot.state == .lock ? snapshot.intent?.best?.id : nil
+        let sample = MirrorSample(pointing: pointing, lockedObjectID: locked)
+        guard mirrorThrottle.shouldSend(sample) else { return }
+        session.sendMessage(sample.plist, replyHandler: nil, errorHandler: nil)
+    }
 
     public func activate() {
         guard let session else { return }
@@ -315,8 +336,11 @@ extension WatchLinkService: WCSessionDelegate {
                                     activationDidCompleteWith activationState: WCSessionActivationState,
                                     error: Error?) {
         let reachable = session.isReachable
+        // Konteks terakhir dari iPhone tetap ada setelah app jam dibuka ulang.
+        let mirror = MirrorSample.isRequest(session.receivedApplicationContext)
         Task { @MainActor in
             self.isReachable = reachable
+            if let mirror { self.mirrorRequested = mirror }
             if let error {
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa katalog, jadi menampilkannya apa
@@ -333,7 +357,9 @@ extension WatchLinkService: WCSessionDelegate {
                                     didReceiveApplicationContext applicationContext: [String: Any]) {
         let status = TelescopeStatus(plist: applicationContext)
         let message = PointingLinkMessage(plist: applicationContext)
+        let mirror = MirrorSample.isRequest(applicationContext)
         Task { @MainActor in
+            if let mirror { self.mirrorRequested = mirror }
             if let status { self.receiveTelescope(status) }
             // Konteks yang sama dikirim ulang setiap laporan teleskop (2 dtk);
             // pesan keadaan yang sudah ditangani tidak boleh dijalankan lagi.
@@ -346,6 +372,10 @@ extension WatchLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
+        if let on = MirrorSample.isRequest(message) {
+            Task { @MainActor in self.mirrorRequested = on }
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: message) else { return }
         Task { @MainActor in self.handle(decoded) }
     }

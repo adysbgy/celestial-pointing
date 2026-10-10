@@ -115,6 +115,8 @@ struct PointAndKnowWatchApp: App {
             link.sendIfDecisionChanged(
                 state: snapshot,
                 sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+            // Cermin Stellarium (ADR-016): hanya saat iPhone memintanya.
+            link.mirror(snapshot)
         }
         // Sumber keadaan untuk menjawab permintaan iPhone. Dibaca saat diminta,
         // bukan disalin — supaya yang dikirim selalu keadaan yang berlaku.

@@ -24,6 +24,17 @@ public final class PhoneLinkService: NSObject, ObservableObject {
 
     /// Setiap pesan yang masuk, untuk direkam ke riwayat keyakinan.
     public var onMessage: ((PointingLinkMessage) -> Void)?
+    /// Sampel arah tunjuk untuk cermin Stellarium (ADR-016).
+    public var onMirrorSample: ((MirrorSample) -> Void)?
+    /// Dipanggil saat jam menjadi terjangkau (mis. untuk meminta ulang cermin).
+    public var onReachable: (() -> Void)?
+
+    /// Minta jam memulai/menghentikan aliran arah tunjuk (ADR-016).
+    public func requestMirror(_ on: Bool) {
+        try? pushContext(mirror: MirrorSample.request(on))
+        guard let session, session.activationState == .activated, session.isReachable else { return }
+        session.sendMessage(MirrorSample.request(on), replyHandler: nil, errorHandler: nil)
+    }
 
     // MARK: Kanal langsung (ADR-006)
 
@@ -242,12 +253,21 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// teleskop hanya mengganti kuncinya sendiri.
     private var pointingPart: [String: Any] = [:]
     private var telescopePart: [String: Any] = [:]
+    /// Permintaan cermin Stellarium (ADR-016). Ikut konteks supaya jam yang
+    /// baru dibuka ulang tetap tahu, tidak hanya pesan sekali kirim.
+    private var mirrorPart: [String: Any] = [:]
 
-    private func pushContext(pointing: [String: Any]? = nil, telescope: [String: Any]? = nil) throws {
-        guard let session, session.activationState == .activated else { return }
+    private func pushContext(pointing: [String: Any]? = nil, telescope: [String: Any]? = nil,
+                             mirror: [String: Any]? = nil) throws {
+        // Simpan bagiannya **dulu**, baru periksa sesi: permintaan yang datang
+        // sebelum WCSession aktif (jembatan Stellarium tersambung ~150 ms
+        // setelah app dibuka) tidak boleh hilang — ia ikut kiriman berikutnya.
         if let pointing { pointingPart = pointing }
         if let telescope { telescopePart = telescope }
-        try session.updateApplicationContext(pointingPart.merging(telescopePart) { _, t in t })
+        if let mirror { mirrorPart = mirror }
+        guard let session, session.activationState == .activated else { return }
+        try session.updateApplicationContext(
+            pointingPart.merging(telescopePart) { _, t in t }.merging(mirrorPart) { _, m in m })
     }
 
     // MARK: Laporan keadaan teleskop ke jam (ADR-009)
@@ -353,6 +373,12 @@ extension PhoneLinkService: WCSessionDelegate {
         Task { @MainActor in
             self.isReachable = reachable
             self.isActivated = activated
+            // Bagian konteks yang tertahan sebelum sesi aktif ikut terkirim
+            // sekarang, dan pemakai "terjangkau" (cermin Stellarium) diberi tahu
+            // — `sessionReachabilityDidChange` tidak terpanggil bila sudah
+            // terjangkau sejak awal.
+            if activated { try? self.pushContext() }
+            if reachable { self.onReachable?() }
             if let message {
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa katalog. Namanya tetap ikut (`%@`)
@@ -383,7 +409,10 @@ extension PhoneLinkService: WCSessionDelegate {
 
     nonisolated public func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
-        Task { @MainActor in self.isReachable = reachable }
+        Task { @MainActor in
+            self.isReachable = reachable
+            if reachable { self.onReachable?() }
+        }
     }
 
     nonisolated public func session(_ session: WCSession,
@@ -394,6 +423,10 @@ extension PhoneLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
+        if let sample = MirrorSample(plist: message) {
+            Task { @MainActor in self.onMirrorSample?(sample) }
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: message) else { return }
         Task { @MainActor in self.handle(decoded) }
     }

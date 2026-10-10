@@ -12,9 +12,12 @@ import PointingKit
 struct SkyHomeView: View {
     @ObservedObject var engine: PointingEngine
     @ObservedObject var link: PhoneLinkService
+    @ObservedObject var stellarium: StellariumBridge
 
     @StateObject private var guide = SkyGuideModel()
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
+    @AppStorage(StellariumBridge.enabledKey) private var stellariumOn = false
+    @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
 
     var body: some View {
         NavigationStack {
@@ -36,6 +39,24 @@ struct SkyHomeView: View {
                     Section(PhenomenonText.sectionTitle) {
                         ForEach(guide.phenomena.prefix(8)) { phenomenonRow($0) }
                     }
+                }
+                Section {
+                    Toggle(StellariumText.toggle, isOn: $stellariumOn)
+                    if stellariumOn {
+                        TextField(StellariumText.address, text: $stellariumAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .onSubmit(applyStellarium)
+                        Text(stellariumStatus)
+                            .font(.footnote)
+                            .foregroundStyle(stellarium.status == .connected
+                                             ? PointingTone.success.color : Color.nightAwareSecondary)
+                    }
+                } header: {
+                    Text(StellariumText.title)
+                } footer: {
+                    Text(StellariumText.hint)
                 }
                 Section {
                     Toggle(isOn: $darkSky) {
@@ -61,9 +82,15 @@ struct SkyHomeView: View {
                 engine.setSkyQuality(SkyQualityStorage.quality(darkSky: dark))
                 guide.refresh(engine: engine, force: true)
             }
-            .onChange(of: engine.location) { _, _ in guide.refresh(engine: engine, force: true) }
+            .onChange(of: engine.location) { _, _ in
+                guide.refresh(engine: engine, force: true)
+                // Lokasi sungguhan datang belakangan: Stellarium harus ikut.
+                stellarium.updateLocation(engine.controller.observer)
+            }
+            .onChange(of: stellariumOn) { _, _ in applyStellarium() }
             .onAppear {
                 engine.setSkyQuality(SkyQualityStorage.quality(darkSky: darkSky))
+                applyStellarium()
                 #if DEBUG
                 link.injectDebugConfirmationIfRequested()
                 #endif
@@ -71,6 +98,21 @@ struct SkyHomeView: View {
         }
         .appBackground()
         .forceDarkScheme()
+    }
+
+    // MARK: Stellarium
+
+    private func applyStellarium() {
+        stellarium.apply(enabled: stellariumOn, address: stellariumAddress, engine: engine)
+    }
+
+    private var stellariumStatus: String {
+        switch stellarium.status {
+        case .off: return StellariumText.hint
+        case .connecting: return StellariumText.connecting
+        case .connected: return StellariumText.connected
+        case .failed(let reason): return StellariumText.failed(reason)
+        }
     }
 
     // MARK: Kartu dikonfirmasi

@@ -18,17 +18,26 @@ struct PointAndKnowiOSApp: App {
     )
     @StateObject private var motion = MotionLogger()
     @StateObject private var location = LocationProvider()
-    @StateObject private var link = PhoneLinkService()
+    @StateObject private var link: PhoneLinkService
     @StateObject private var trace = ConfidenceTraceStore()
+    /// Jembatan ke Stellarium desktop (ADR-016). Dibuat sekali bersama
+    /// tautannya, karena ia memasang penerima sampel di tautan itu.
+    @StateObject private var stellarium: StellariumBridge
 
     /// Sama seperti app jam: label keadaan dan keyakinan berasal dari
     /// `PointingKit`, jadi bridge harus terpasang sebelum layar pertama
     /// dirender — bukan saat tab pertama dibuka.
-    init() { LocalizationBridge.install() }
+    init() {
+        LocalizationBridge.install()
+        let link = PhoneLinkService()
+        _link = StateObject(wrappedValue: link)
+        _stellarium = StateObject(wrappedValue: StellariumBridge(link: link))
+    }
 
     var body: some Scene {
         WindowGroup {
-            RootView(engine: engine, motion: motion, location: location, link: link, trace: trace)
+            RootView(engine: engine, motion: motion, location: location, link: link, trace: trace,
+                     stellarium: stellarium)
         }
     }
 }
@@ -40,6 +49,7 @@ struct RootView: View {
     @ObservedObject var location: LocationProvider
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
+    @ObservedObject var stellarium: StellariumBridge
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -66,7 +76,7 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            SkyHomeView(engine: engine, link: link)
+            SkyHomeView(engine: engine, link: link, stellarium: stellarium)
                 .tabItem { Label(WatchHomeText.skyTab, systemImage: "sparkles") }
             DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
                 .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }

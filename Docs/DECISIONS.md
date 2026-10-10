@@ -721,3 +721,62 @@ up tonight"), with hot–cold guidance to an event. Ady's decisions:
   `after-guide-orionid-46mm.png`).
 
 **Not verified.** Guiding outdoors on a real watch.
+
+## ADR-016 — Stellarium companion: watch → iPhone → Stellarium (2026-10-10)
+
+**Context.** Phase 3 of `Docs/PRODUCT_V2_IDEA.md`. At Ady's request, I installed
+Stellarium 26.3 (open source) on the Mac:
+- the official GitHub release `Stellarium-26.3-qt6-macOS.zip`;
+- signed by Developer ID "Alexander Wolf (3WW8XR23DF)";
+- notarized and accepted by Gatekeeper.
+
+**Stellarium setup.**
+- **Remote Control plugin:** `[plugins_load_at_startup] RemoteControl = true`,
+  port 8090, no password, CORS off.
+- **Auto-start:** `autoStart = true` does **not** start the server on 26.3
+  (no listener). I start it instead from the user `startup.ssc` script
+  (`RemoteControl.setFlagEnabled(true);`), in
+  `~/Library/Application Support/Stellarium/scripts/`.
+- **Backup:** the old config is in `config.ini.bak-before-remotecontrol`.
+
+**Direction convention (measured, not assumed).** Stellarium's alt-az frame is
+x = **South**, y = East, z = zenith, and the `az` of `/api/main/view` is measured
+from South towards East. So `az_st = 180° − az_ours`. Evidence:
+- `az=0` → vector (+x) = South;
+- Saturn at az 269.36° read back as (0.0104, −0.922, −0.387);
+- a live test (`testLiveStellariumIfRunning`) reads back within 0.5°.
+
+**Data flow.**
+- **iPhone (Sky tab → Stellarium):** a toggle plus the Mac's IP address.
+  `StellariumBridge` then:
+  - checks `/api/main/status`;
+  - sends the location (and again when the real location arrives later);
+  - clears any selection;
+  - asks the watch to start streaming.
+- **The request reaches the watch two ways:** a one-off `sendMessage`, and a
+  part of the merged application context.
+  - Parts are stored **before** the session-active check, so a request made
+    ~150 ms after launch, before WCSession activates, is not lost.
+  - On activation the context is pushed, and `onReachable` fires.
+  - The watch reads `receivedApplicationContext` when it activates, so the
+    request survives a watch-app restart.
+- **Watch → iPhone:** `MirrorSample` via `sendMessage` (no queue). The
+  `MirrorThrottle` limits it to at most 4 Hz and ≥ 0.3° movement, plus a
+  keepalive every 2 s. Without the keepalive, a steady lock sent only one
+  sample, and if that sample was lost Stellarium never knew.
+- **iPhone → Stellarium:** while not locked, `POST /api/main/view` (one request
+  in flight at a time). When locked or confirmed, `POST /api/main/focus
+  target=<Stellarium name>` (Messier → "M42", others capitalised). When the lock
+  ends, focus is cleared.
+
+**Verified.**
+- `StellariumMirrorTests` (8 tests), including the live test against Stellarium
+  on the Mac.
+- End to end on a paired simulator pair (Ultra 3 watch ↔ iPhone 17):
+  - a moving pose turned Stellarium's view (altitude matched at 62.7°);
+  - a lock on Saturn (pointing alt 64.0° / az 73.7°) made Stellarium select
+    and follow Saturn (alt 63.4° / az 74.2°).
+- Logging uses `Logger` category `stellarium` on both apps.
+
+**Not verified.** The real iPhone ↔ Mac path over Wi-Fi: the iOS Local Network
+permission prompt, and the Mac firewall for port 8090.

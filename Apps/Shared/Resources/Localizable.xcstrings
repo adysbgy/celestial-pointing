@@ -7091,6 +7091,83 @@
           }
         }
       }
+    },
+    "stell.title": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stellarium"
+          }
+        }
+      }
+    },
+    "stell.toggle": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show pointing in Stellarium"
+          }
+        }
+      }
+    },
+    "stell.address": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac address (IP)"
+          }
+        }
+      }
+    },
+    "stell.hint": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Stellarium on a Mac on the same Wi‑Fi with the Remote Control plugin on (port 8090)."
+          }
+        }
+      }
+    },
+    "stell.connected": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected to Stellarium"
+          }
+        }
+      }
+    },
+    "stell.connecting": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "stell.failed": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
