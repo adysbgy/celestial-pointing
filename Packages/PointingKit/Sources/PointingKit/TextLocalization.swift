@@ -765,5 +765,5 @@ public extension LocalizedText {
         .diagnosticsLegendUnknown,
         .diagnosticsValueCalibrated, .diagnosticsValueNotCalibrated,
         .diagnosticsValueMotionAvailable, .diagnosticsValueMotionUnavailable,
-    ] + identifyKeys + telescopeKeys + telescopeControlKeys + watchHomeKeys + phenomenaKeys + stellariumKeys + scene3DKeys + designKeys + connectionKeys
+    ] + identifyKeys + telescopeKeys + telescopeControlKeys + watchHomeKeys + phenomenaKeys + stellariumKeys + scene3DKeys + designKeys + connectionKeys + guideDirectionKeys
 }

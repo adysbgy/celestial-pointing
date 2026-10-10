@@ -152,7 +152,7 @@ public struct MirrorThrottle: Sendable {
     public var keepAlive: TimeInterval
     private var last: MirrorSample?
 
-    public init(minInterval: TimeInterval = 0.25, minMoveDeg: Double = 0.3, keepAlive: TimeInterval = 2) {
+    public init(minInterval: TimeInterval = 0.25, minMoveDeg: Double = 0.3, keepAlive: TimeInterval = 1) {
         self.minInterval = minInterval
         self.minMoveDeg = minMoveDeg
         self.keepAlive = keepAlive

@@ -19,6 +19,10 @@ struct SkyHomeView: View {
     @State private var scene3D: Scene3DSheet?
     @State private var discovery: Ident?
     @State private var showConnection = false
+    /// Mode menunjuk layar penuh (ADR-022).
+    @State private var showLive = false
+    /// Setelah ditutup pengguna, jangan dibuka otomatis lagi untuk sementara.
+    @State private var liveDismissedAt: Date?
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
     @AppStorage(StellariumBridge.enabledKey) private var stellariumOn = false
     @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
@@ -33,9 +37,12 @@ struct SkyHomeView: View {
                 }
                 if link.connectionState.isReady {
                     Section {
-                        LiveWatchCard(link: link, engine: engine, guide: guide)
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
+                        Button { showLive = true } label: {
+                            LiveWatchCard(link: link, engine: engine, guide: guide)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                     }
                 }
                 Section {
@@ -64,6 +71,20 @@ struct SkyHomeView: View {
             .fontDesign(.rounded)
             .navigationTitle(WatchHomeText.skyTab)
             .sheet(item: $scene3D) { sheet in Sky3DView(content: sheet.content, title: sheet.title) }
+            .fullScreenCover(isPresented: $showLive, onDismiss: { liveDismissedAt = Date() }) {
+                LivePointingView(link: link, engine: engine, guide: guide, journal: journal) { id in
+                    discovery = Ident(id: id)
+                }
+            }
+            // Jam mulai menunjuk → iPhone membuka mode menunjuk sendiri, supaya
+            // pengguna tidak perlu melirik jam dengan lengan terangkat.
+            .onChange(of: link.liveSample?.sentAt) { _, _ in
+                guard !showLive, discovery == nil, scene3D == nil, !showConnection,
+                      let sample = link.liveSample, Date().timeIntervalSince(sample.sentAt) < 2,
+                      sample.state != PointingState.idle.rawValue,
+                      liveDismissedAt.map({ Date().timeIntervalSince($0) > 120 }) ?? true else { return }
+                showLive = true
+            }
             .sheet(isPresented: $showConnection) { ConnectionSheet(link: link).presentationDetents([.medium, .large]) }
             .sheet(item: $discovery) { item in
                 DiscoveryView(objectID: item.id, engine: engine, journal: journal,
@@ -117,14 +138,7 @@ struct SkyHomeView: View {
                                                          date: Date()) {
             Button { discovery = Ident(id: id) } label: {
                 VStack(alignment: .leading, spacing: 0) {
-                    ZStack {
-                        StarfieldBackground(seed: 5, count: 90)
-                        if let content = Sky3DFactory.object(id, engine: engine) {
-                            Sky3DCanvas(content: content, interactive: false)
-                        } else {
-                            CelestialVisualView(visual: CelestialVisual(object: object), diameter: 110, isConfirmed: true)
-                        }
-                    }
+                    ObjectHeroVisual(object: object, engine: engine, diameter: 110)
                     .frame(height: 220)
                     VStack(alignment: .leading, spacing: 6) {
                         StatusChip(text: journal.contains(objectID: id) ? DesignText.discAgain : DesignText.discFirst)

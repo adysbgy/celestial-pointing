@@ -254,3 +254,25 @@ struct WatchMockup<Content: View>: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// Visual utama sebuah benda (ADR-022): 3D untuk Bulan & planet, bintang
+/// bercahaya 2D (seperti di jam) untuk bintang dan objek langit dalam —
+/// bola 3D untuk bintang terbaca sebagai kelereng abu-abu.
+struct ObjectHeroVisual: View {
+    let object: CelestialObject
+    @ObservedObject var engine: PointingEngine
+    var interactive = false
+    var diameter: CGFloat = 150
+
+    var body: some View {
+        ZStack {
+            StarfieldBackground(seed: 5, count: 90)
+            if object.kind == .moon || object.kind == .planet,
+               let content = Sky3DFactory.object(object.id, engine: engine) {
+                Sky3DCanvas(content: content, interactive: interactive)
+            } else {
+                CelestialVisualView(visual: CelestialVisual(object: object), diameter: diameter, isConfirmed: true)
+            }
+        }
+    }
+}

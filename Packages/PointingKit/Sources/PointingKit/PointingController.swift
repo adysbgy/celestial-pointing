@@ -194,6 +194,7 @@ public final class PointingController {
     public private(set) var lastResolution: Resolution?
 
     private var machine: PointingStateMachine
+    private var hapticDebouncer = HapticDebouncer()
     private var smoother: PointingSmoother
     private var isSensorAvailable: Bool
 
@@ -426,7 +427,9 @@ public final class PointingController {
             searchHint: state == .searching ? lastResolution?.searchHint : nil
         )
 
-        let events = hapticEvents(from: previous, to: state)
+        // Diredam: kunci yang goyah pada benda yang sama tidak bergetar lagi (ADR-022).
+        let events = hapticDebouncer.filter(hapticEvents(from: previous, to: state), state: state,
+                                            objectID: machine.currentIntent?.best?.id, at: timestamp)
         record(events, at: timestamp)
         return PointingUpdate(snapshot: snapshot, haptics: events)
     }
@@ -435,6 +438,7 @@ public final class PointingController {
     @discardableResult
     public func stop() -> [HapticEvent] {
         let previous = machine.state
+        hapticDebouncer.reset()
         machine.stop()
         smoother.reset()
         lastResolution = nil

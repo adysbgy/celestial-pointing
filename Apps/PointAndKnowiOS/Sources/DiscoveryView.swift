@@ -74,21 +74,9 @@ struct DiscoveryView: View {
 
     @ViewBuilder
     private var hero: some View {
-        if let content = Sky3DFactory.object(objectID, engine: engine) {
-            ZStack {
-                StarfieldBackground(seed: 5, count: 120)
-                Sky3DCanvas(content: content, interactive: true)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        } else {
-            // Objek langit dalam: tidak ada model 3D, pakai ikon 2D yang sama dengan jam.
-            ZStack {
-                StarfieldBackground(seed: 5, count: 160)
-                if let object {
-                    CelestialVisualView(visual: CelestialVisual(object: object), diameter: 160, isConfirmed: true)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        if let object {
+            ObjectHeroVisual(object: object, engine: engine, interactive: true, diameter: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
     }
 

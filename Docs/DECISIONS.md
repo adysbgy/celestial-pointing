@@ -967,3 +967,60 @@ when the watch moved.
 - a watch locked on Saturn makes the iPhone show "Saturn ● LOCKED".
 
 Screenshots: `Docs/design/sync-live-*.png`.
+
+## ADR-022 — The iPhone as the screen while pointing; quiet haptics; confirm without scrolling (2026-10-10)
+
+**Field report.**
+- "My hand is up, why do I have to look at the watch? Can I see it on the
+  phone?"
+- "To confirm I have to scroll the watch first."
+- "Once Deneb is locked, why does the watch keep vibrating as if it's still
+  looking for another star?"
+
+**Root causes.**
+1. **Haptics.** A haptic plays every time the state *enters* `lock` or
+   `uncertain`. With the arm raised, small movements bounce lock → pointing →
+   lock, so the "found" haptic repeats for the **same** star, and lock ↔
+   uncertain alternate.
+2. **Pinned guide.** If a "Guide me there" target is pinned and you lock a
+   **different** star, the guide stays on with its hot–cold taps.
+3. **Watch lock layout.** It was too tall (64 pt visual, title2 name,
+   subtitle, AZ/ALT, LOCKED), which pushed "Yes, that's it" below the fold.
+4. **No iPhone view.** Nothing on the iPhone showed the guide while the arm was
+   up.
+
+**Decision.**
+- **`HapticDebouncer` (PointingKit, tested).**
+  - "Found" plays only for a new object, or for the same object after the lock
+    has been lost for ≥ 8 s.
+  - "Uncertain" never plays right after a lock, and at most once every 6 s.
+  - It resets when the flow stops.
+- **Watch.**
+  - A lock on any object beats the pinned guide (the taps stop).
+  - A **sticky lock** of 1.5 s covers small movements or uncertainty on the
+    same object.
+  - The lock layout is compact: a 44 pt visual next to the name and
+    "● LOCKED", then AZ/ALT, then the button. No scrolling is needed, and
+    Double Tap still confirms.
+- **iPhone `LivePointingView` (full screen).**
+  - It opens by itself when the watch starts pointing (not within 2 minutes of
+    the user closing it), or when the live card is tapped.
+  - It shows a large ring, an arrow, the remaining degrees, "Move to X", the
+    direction in words ("Up · Right", "Almost — hold still";
+    `GuideDirections`, tested), and AZ/ALT.
+  - When the watch locks: the visual, "● LOCKED", and a large **"Yes, that's
+    it" button on the iPhone**, which saves to the Journal and opens Discovery.
+  - The screen stays on while it's open.
+- **Stars use a glowing 2D star, not a 3D ball.**
+- **Live stream:** keepalive every 1 s, and "fresh" for 5 s, so a steady lock
+  doesn't flicker to "Waiting…".
+
+**Verified** on paired simulators:
+- the watch points → the iPhone opens pointing mode by itself ("Move to …
+  37°, Down · Right");
+- the watch locks Deneb → the iPhone shows "Deneb ● LOCKED" with "Yes, that's
+  it", stable across consecutive captures;
+- the watch lock screen shows the button without scrolling.
+
+Screenshots: `Docs/design/pointing-mode-*.png`,
+`Docs/design/watch-lock-compact.png`.

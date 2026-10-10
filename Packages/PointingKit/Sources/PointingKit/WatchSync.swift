@@ -115,7 +115,7 @@ public enum ConnectionText {
     public static var livePointingAt: String { TextLocalization.text(.livePointingAt) }
 
     /// Data langsung dianggap segar selama ini (detik).
-    public static let liveFreshSeconds: TimeInterval = 3
+    public static let liveFreshSeconds: TimeInterval = 5
 }
 
 public extension LocalizedText {

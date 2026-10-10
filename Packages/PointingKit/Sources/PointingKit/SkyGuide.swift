@@ -168,3 +168,41 @@ public enum SkyRowText {
             + WatchHomeText.altitude(direction.altitudeDeg)
     }
 }
+
+/// Arah gerak dalam kata, untuk dibaca sekilas di iPhone saat lengan
+/// terangkat (ADR-022): "Naik · Ke kanan", atau "Hampir — tahan diam".
+public enum GuideDirections {
+    /// Di bawah jarak ini (derajat, per sumbu) komponen itu tidak disebut.
+    public static let componentThresholdDeg = 3.0
+    /// Di bawah jarak ini benda dianggap sudah hampir di bidikan.
+    public static let almostDeg = 4.0
+
+    public static func words(_ hint: GuideHint) -> String {
+        if hint.separationDeg < almostDeg { return TextLocalization.text(.guideAlmost) }
+        let a = hint.arrowDeg * .pi / 180
+        let up = cos(a) * hint.separationDeg
+        let right = sin(a) * hint.separationDeg
+        var parts: [String] = []
+        if abs(up) >= componentThresholdDeg { parts.append(TextLocalization.text(up > 0 ? .guideUp : .guideDown)) }
+        if abs(right) >= componentThresholdDeg { parts.append(TextLocalization.text(right > 0 ? .guideRight : .guideLeft)) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+public extension LocalizedText {
+    static let guideUp = LocalizedText(key: "guide.dir.up", id: "Naik")
+    static let guideDown = LocalizedText(key: "guide.dir.down", id: "Turun")
+    static let guideLeft = LocalizedText(key: "guide.dir.left", id: "Ke kiri")
+    static let guideRight = LocalizedText(key: "guide.dir.right", id: "Ke kanan")
+    static let guideAlmost = LocalizedText(key: "guide.dir.almost", id: "Hampir — tahan diam")
+    static let livePointingTitle = LocalizedText(key: "live.mode.title", id: "Mode menunjuk")
+    static let liveWaitingWatch = LocalizedText(key: "live.mode.waiting", id: "Menunggu jam… Angkat tangan dan tunjuk ke langit.")
+    static let liveConfirmOnPhone = LocalizedText(key: "live.mode.confirm", id: "Ya, itu dia")
+    static let liveKeepLooking = LocalizedText(key: "live.mode.keepLooking", id: "Bukan? Tunjuk benda lain")
+    static let liveClose = LocalizedText(key: "live.mode.close", id: "Tutup")
+
+    static let guideDirectionKeys: [LocalizedText] = [
+        .guideUp, .guideDown, .guideLeft, .guideRight, .guideAlmost,
+        .livePointingTitle, .liveWaitingWatch, .liveConfirmOnPhone, .liveKeepLooking, .liveClose,
+    ]
+}

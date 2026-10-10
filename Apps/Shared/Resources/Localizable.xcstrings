@@ -8554,6 +8554,116 @@
           }
         }
       }
+    },
+    "guide.dir.up": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up"
+          }
+        }
+      }
+    },
+    "guide.dir.down": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Down"
+          }
+        }
+      }
+    },
+    "guide.dir.left": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left"
+          }
+        }
+      }
+    },
+    "guide.dir.right": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right"
+          }
+        }
+      }
+    },
+    "guide.dir.almost": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Almost — hold still"
+          }
+        }
+      }
+    },
+    "live.mode.title": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pointing mode"
+          }
+        }
+      }
+    },
+    "live.mode.waiting": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for your Watch… Raise your arm and point at the sky."
+          }
+        }
+      }
+    },
+    "live.mode.confirm": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, that's it"
+          }
+        }
+      }
+    },
+    "live.mode.keepLooking": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not it? Point at another one"
+          }
+        }
+      }
+    },
+    "live.mode.close": {
+      "comment": "Mode menunjuk di iPhone (ADR-022).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -29,7 +29,28 @@ struct HomeView: View {
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
-    private var outcome: IdentificationOutcome { .from(engine.snapshot) }
+    /// Hasil engine apa adanya.
+    private var liveOutcome: IdentificationOutcome { .from(engine.snapshot) }
+
+    /// Kunci terakhir, ditahan sebentar (ADR-022): lengan yang goyah sedikit
+    /// tidak boleh membuat nama benda berkedip hilang-muncul.
+    @State private var stickyLock: (object: CelestialObject, until: Date)?
+
+    /// Yang ditampilkan: kunci sungguhan, atau kunci yang baru saja lepas
+    /// karena gerak kecil / ragu pada benda yang **sama** (≤ 1,5 dtk).
+    private var outcome: IdentificationOutcome {
+        let live = liveOutcome
+        if case .single = live { return live }
+        guard let sticky = stickyLock, Date() < sticky.until else { return live }
+        switch live {
+        case .holdSteady where engine.snapshot.state == .pointing:
+            return .single(sticky.object)
+        case .possibleMatches(let list) where list.first == sticky.object:
+            return .single(sticky.object)
+        default:
+            return live
+        }
+    }
 
     var body: some View {
         NightAwareContainer {
@@ -75,6 +96,11 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 2)
                     .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: heroKey)
+                }
+                .onChange(of: engine.snapshot.state) { _, _ in
+                    if case .single(let object) = liveOutcome {
+                        stickyLock = (object, Date().addingTimeInterval(1.5))
+                    }
                 }
                 .onChange(of: heroKey) { _, key in
                     crown = 0
@@ -191,8 +217,10 @@ struct HomeView: View {
 
     /// Sedang memandu ke fenomena dan belum terkunci pada sasarannya.
     private var showsPinnedGuide: Bool {
-        guard let pinned = guide.pinned else { return false }
-        if case .single(let o) = outcome, pinned.targetIDs.contains(o.id) { return false }
+        guard guide.pinned != nil else { return false }
+        // Benda apa pun yang terkunci menang atas pemandu (ADR-022): pengguna
+        // sudah menemukan sesuatu — jangan terus bergetar mencari yang lain.
+        if case .single = outcome { return false }
         return outcome != .unavailable
     }
 
@@ -232,30 +260,36 @@ struct HomeView: View {
                               hint: engine.snapshot.searchHint?.message ?? WatchHomeText.notSureHint)
                 }
             case .single(let object):
-                VStack(spacing: 4) {
-                    if let visual = engine.visualForDisplayedObject {
-                        CelestialVisualView(visual: visual, diameter: 64, isConfirmed: true)
-                            .accessibilityHidden(true)
+                // Ringkas supaya "Ya, itu dia" terlihat tanpa menggulir (ADR-022).
+                VStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        if let visual = engine.visualForDisplayedObject {
+                            CelestialVisualView(visual: visual, diameter: 44, isConfirmed: true)
+                                .accessibilityHidden(true)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(object.name)
+                                .font(.title3.weight(.bold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                            HStack(spacing: 4) {
+                                Circle().fill(PointingTone.success.color).frame(width: 5, height: 5)
+                                Text(DesignText.obLocked)
+                                    .font(.caption2.monospaced().weight(.semibold))
+                                    .foregroundStyle(PointingTone.success.color)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Text(object.name)
-                        .font(.title2.weight(.bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    // Seperti mockup jam di Figma (ADR-019): data arah + tanda terkunci.
                     if let h = engine.controller.resolver.horizontal(ofObjectID: object.id,
                                                                      observer: engine.controller.observer,
                                                                      date: Date()) {
                         Text(verbatim: WatchHomeText.altAz(h))
                             .font(.caption2.monospaced())
                             .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    HStack(spacing: 4) {
-                        Circle().fill(PointingTone.success.color).frame(width: 5, height: 5)
-                        Text(DesignText.obLocked)
-                            .font(.caption2.monospaced().weight(.semibold))
-                            .foregroundStyle(PointingTone.success.color)
-                    }
-                    .accessibilityElement(children: .combine)
                     Button {
                         confirm(object)
                     } label: {
@@ -266,7 +300,7 @@ struct HomeView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(PointingTone.success.color)
                     .foregroundStyle(.black)
-                    // Ketuk dua kali mengonfirmasi tanpa menurunkan lengan.
+                    // Ketuk dua kali (Double Tap) mengonfirmasi tanpa menurunkan lengan.
                     .handGestureShortcut(.primaryAction)
                     .accessibilityLabel(IdentificationText.confirm(object.name))
                 }

@@ -71,7 +71,7 @@ final class StellariumMirrorTests: XCTestCase {
     }
 
     func testThrottle() {
-        var throttle = MirrorThrottle(minInterval: 0.25, minMoveDeg: 0.3)
+        var throttle = MirrorThrottle(minInterval: 0.25, minMoveDeg: 0.3, keepAlive: 2)
         let t0 = Date(timeIntervalSince1970: 0)
         func s(_ dt: Double, _ az: Double, _ obj: String? = nil) -> MirrorSample {
             MirrorSample(pointing: HorizontalCoord(altitudeDeg: 30, azimuthDeg: az),
