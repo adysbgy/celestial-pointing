@@ -1478,9 +1478,9 @@ final class CelestialVisualTests: XCTestCase {
             // 2. Menurun ke luar — bandingkan **paling redup** di pita dalam
             //    dengan **paling terang** di pita luar, supaya selisih
             //    terkecil pun tidak bisa lolos.
-            let (coreLo, coreHi) = (core.min() ?? 0, core.max() ?? 0)
+            let coreLo = core.min() ?? 0
             let (innerLo, innerHi) = (innerRing.min() ?? 0, innerRing.max() ?? 0)
-            let (outerLo, outerHi) = (outerRing.min() ?? 0, outerRing.max() ?? 0)
+            let outerHi = outerRing.max() ?? 0
             XCTAssertGreaterThan(coreLo, innerHi,
                                  "inti gugus bola harus lebih terang daripada cincin dalam "
                                  + "pada fuzziness \(fuzziness)")

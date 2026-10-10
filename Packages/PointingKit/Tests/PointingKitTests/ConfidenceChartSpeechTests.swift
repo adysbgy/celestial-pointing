@@ -37,8 +37,13 @@ final class ConfidenceChartSpeechTests: XCTestCase {
         return unwrap(speech)
     }
 
+    /// Bawaan `file` sengaja `#file`, bukan `#filePath`: `XCTFail` di bawah
+    /// memakai `#file` sebagai bawaannya, dan meneruskan `#filePath` ke
+    /// parameter berdefault `#file` memicu peringatan compiler (dua bentuk
+    /// lokasi yang berbeda). Menyamakannya menghilangkan peringatan **tanpa**
+    /// membuang lokasi pemanggil dari laporan kegagalan.
     private func unwrap<Value>(_ value: Value?,
-                               file: StaticString = #filePath,
+                               file: StaticString = #file,
                                line: UInt = #line) -> Value {
         guard let value else {
             XCTFail("diharapkan ada nilai, tapi dapat nil", file: file, line: line)

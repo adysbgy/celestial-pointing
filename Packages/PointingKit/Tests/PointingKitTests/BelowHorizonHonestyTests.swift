@@ -225,9 +225,9 @@ final class BelowHorizonHonestyTests: XCTestCase {
             for hour in stride(from: 0.0, through: 23.5, by: 0.5) {
                 let candidate = epoch.addingTimeInterval(Double(day) * 86400 + hour * 3600)
                 guard resolver.skyContext(observer: observer, date: candidate).isDark,
-                      let direction = try? resolver.horizontal(ofBody: .moon,
-                                                              observer: observer,
-                                                              date: candidate),
+                      let direction = resolver.horizontal(ofBody: .moon,
+                                                          observer: observer,
+                                                          date: candidate),
                       direction.altitudeDeg < -30
                 else { continue }
                 return candidate

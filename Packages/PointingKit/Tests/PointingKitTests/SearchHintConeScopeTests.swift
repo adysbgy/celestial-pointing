@@ -63,7 +63,7 @@ final class SearchHintConeScopeTests: XCTestCase {
         // Pesannya menyebut "objek", bukan "bintang", jadi benda tata surya
         // juga wajib ikut dihitung.
         for body in EphemerisBody.pointableBodies {
-            guard let d = try? resolver.horizontal(ofBody: body, observer: observer, date: date),
+            guard let d = resolver.horizontal(ofBody: body, observer: observer, date: date),
                   d.altitudeDeg >= policy.minAltitudeDeg,
                   SkyMath.angularSeparationHorizontalDeg(aim, d) <= cone
             else { continue }

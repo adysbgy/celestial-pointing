@@ -361,7 +361,7 @@ final class CalibrationSessionTests: XCTestCase {
         for id in references.prefix(3) {
             session.capture(objectID: id, measured: measured(id, yawError: 4, date: date), date: date)
         }
-        try XCTUnwrap(session.applyIfReady())
+        _ = try XCTUnwrap(session.applyIfReady())
         XCTAssertTrue(c.snapshot.isCalibrated, "kalibrasi yang dipasang harus terbaca di cuplikan")
 
         session.reset()

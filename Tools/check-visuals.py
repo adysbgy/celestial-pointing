@@ -409,6 +409,81 @@ READABILITY_THRESHOLD = 12
 #: berbeda.
 MIN_ARM_DEGREES = 12
 
+#: Berapa derajat **punggungan terang** lengan spiral harus bergeser dari
+#: jari-jari dalam ke luar supaya bentuknya terbaca sebagai spiral.
+#:
+#: `check_spiral_arms_stay_continuous` mengukur apakah lengan **menyambung**
+#: sepanjang jari-jari, dan itu tidak membedakan spiral dari **cincin**: tata
+#: letak cincin (jari-jari lengan sama, blob disebar merata ke segala arah)
+#: lolos seluruh 45 pemeriksaannya. Yang membedakan keduanya bukan "ada
+#: goresan terang di jari-jari ini" — cincin punya itu di **setiap** jari-jari —
+#: melainkan apakah sudut goresannya **bergeser**: lengan spiral adalah kurva,
+#: cincin bukan.
+#:
+#: Diukur pada 76 px, `ss=8` (`Tools/bukti-mutasi-lengan.py`), jari-jari
+#: 0.30…0.50 R. Kolom terakhir adalah punggungan terlemah di atas latar:
+#:
+#:   spiral asli (model)      sapuan  +88°   punggungan terlemah 12.4
+#:   cincin 8 arah            sapuan   +0°   punggungan terlemah 26.1
+#:   cincin 4 arah            sapuan   −2°   punggungan terlemah 16.0
+#:   cakram polos (.galaxy)   sapuan   −2°   punggungan terlemah  0.0
+#:   lengan dihapus           sapuan   −2°   punggungan terlemah  0.0
+#:
+#: **Angka-angka ini diukur ulang, bukan dikutip.** Versi pertama komentar ini
+#: menulis +111° untuk spiral asli, dan docstring gerbangnya menulis +88°:
+#: dua angka untuk pengukuran yang sama di berkas yang sama. Yang terukur
+#: adalah +88° (dan +0° untuk cincin, bukan +1°). Ketiga tempat yang mengutip
+#: angka ini — komentar ini, komentar `SPIRAL_ARM_RIDGE_FLOOR`, dan docstring
+#: `check_spiral_arms_actually_spiral` — kini dijaga
+#: `check_spiral_arm_docstring_quotes_measured_values`.
+#:
+#: Ambang 25° duduk di antara 2° (penipu terbesar) dan 88° (bentuk benar),
+#: jadi marginnya ~12× ke bawah dan ~3,5× ke atas — bukan ambang yang dipilih
+#: supaya lulus.
+SPIRAL_ARM_SWEEP_DEGREES = 25.0
+
+#: Kekuatan punggungan terlemah yang masih dianggap "ada lengan", pada skala
+#: 0…255 di atas latar.
+#:
+#: Tanpa lantai ini, gerbangnya bisa **hijau karena kebisingan**: pada gambar
+#: yang lengannya diredupkan sampai tak terlihat, profil lingkarannya nyaris
+#: rata, `argmax` melompat ke sudut acak, dan jumlah pergeserannya jadi besar
+#: — terukur +160° pada lengan yang diredupkan ke 10% (1.2 di atas latar),
+#: padahal tidak ada lengan yang bisa dilihat. Lantai ini memisahkan
+#: "punggungan lemah tapi nyata" dari "tidak ada punggungan":
+#:
+#:   spiral asli (model)        12.4   (punggungan terlemah, di r=0.50)
+#:   lengan diredupkan ke 70%    8.8
+#:   lengan diredupkan ke 40%    5.0
+#:   lengan diredupkan ke 10%    1.2   <- tidak terlihat
+#:   lengan dihapus              0.0
+#:
+#: 3.0 dipilih supaya **yang tidak terlihat** (1.2 dan 0.0) merah dengan margin
+#: ~2.5×, sementara lengan yang masih terbaca (5.0 ke atas) hijau. Ambang yang
+#: duduk persis di 5.0 akan membuat keadaan "redup 40%" bergantung pada satu
+#: angka yang sama dengan ambangnya — gerbang yang merah atau hijau karena
+#: pembulatan bukan gerbang yang mengukur bentuk.
+SPIRAL_ARM_RIDGE_FLOOR = 3.0
+
+#: Jari-jari (satuan R) tempat sapuan lengan diukur.
+#:
+#: **Kenapa dipatok di sini, bukan diturunkan dari model.** Versi pertama
+#: gerbang lengan menurunkan jari-jari sampelnya dari daftar blob lengan di
+#: model — model yang justru sedang diuji. Hapus lengannya dan daftarnya
+#: kosong, jadi tidak ada satu pun sampel yang diukur. Penjaga `len < 2` di
+#: dalam gerbang menangkap kasus itu, tapi jari-jari yang bergantung pada model
+#: tetap salah: ia mengukur bentuk yang **berubah** dengan mutasinya, bukan
+#: bentuk pada jari-jari yang tetap. Angka-angka di sini hanya bergantung pada
+#: jangkauan lengan yang diklaim model (> 0.3 R) dan pada jari-jari tempat
+#: tonjolan inti sudah tidak mendominasi.
+SPIRAL_ARM_SWEEP_RADII = (0.30, 0.34, 0.38, 0.42, 0.46, 0.50)
+
+#: Lebar penghalusan (derajat, tiap sisi) untuk profil kecerahan lingkaran.
+#:
+#: Goresan lengan di ukuran jam selebar beberapa piksel; tanpa penghalusan,
+#: satu piksel anti-aliasing menentukan sudut punggungannya.
+SPIRAL_RIDGE_SPAN = 10
+
 #: Seberapa terang **celah terburuk** cangkang nebula planetari, sebagai
 #: pecahan puncaknya (0 = sama terang, 1 = turun sampai latar).
 #:
@@ -2221,7 +2296,7 @@ def read_venus_haze_from_swift(source):
     apa artinya, bukan pengecualian tersembunyi).
     """
     match = re.search(
-        r"public static func venusHaze\([\s\S]{0,400}?\)\s*->\s*HazeGeometry",
+        r"(?:public\s+)?static func venusHaze\([\s\S]{0,400}?\)\s*->\s*HazeGeometry",
         source)
     if match is None:
         return None
@@ -5377,6 +5452,366 @@ def check_spiral_arms_stay_continuous(results):
             f"dan yang tampil gumpalan bergerigi"))
 
 
+def spiral_ridge_profile(rows, w, h, radius, span=SPIRAL_RIDGE_SPAN):
+    """Profil kecerahan (0…255 di atas latar) mengelilingi lingkaran, dihaluskan."""
+    background = rows[0][0]
+    cx, cy = w / 2.0, h / 2.0
+    raw = []
+    for degree in range(360):
+        angle = math.radians(degree)
+        x = int(round(cx + radius * math.cos(angle) * min(w, h) / 2.0))
+        y = int(round(cy + radius * math.sin(angle) * min(w, h) / 2.0))
+        raw.append(rows[y][x * 4] - background if (0 <= x < w and 0 <= y < h) else 0)
+    return [sum(raw[(d + k) % 360] for k in range(-span, span + 1))
+            / (2 * span + 1) for d in range(360)]
+
+
+def spiral_arm_sweep(size, ss, radii=SPIRAL_ARM_SWEEP_RADII):
+    """Berapa derajat punggungan terang bergeser, dan sekuat apa yang terlemah.
+
+    Mengembalikan `(sapuan, punggungan_terlemah)`. Sapuan dijumlahkan dari
+    pergeseran sudut antar jari-jari, dibungkus ke ±90° karena spiral dua lengan
+    setara di bawah putaran 180°: tanpa pembungkusan itu, dua lengan yang
+    identik terbaca sebagai sapuan 180° yang palsu.
+    """
+    _, (w, h, rows) = render_case("deepsky-spiralGalaxy", size=size, ss=ss)
+    angles = []
+    weakest = None
+    for radius in radii:
+        profile = spiral_ridge_profile(rows, w, h, radius)
+        angle = max(range(360), key=lambda d: profile[d])
+        strength = profile[angle]
+        if weakest is None or strength < weakest:
+            weakest = strength
+        angles.append(angle)
+    sweep = 0.0
+    for inner, outer in zip(angles, angles[1:]):
+        delta = outer - inner
+        while delta > 90:
+            delta -= 180
+        while delta <= -90:
+            delta += 180
+        sweep += delta
+    return sweep, weakest
+
+
+def check_spiral_arms_actually_spiral(results):
+    """Lengan `.spiralGalaxy` harus **melengkung**, bukan sekadar ada.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_spiral_arms_stay_continuous`
+    (di atas) mengukur apakah lengan **menyambung** sepanjang jari-jari. Itu
+    perlu, dan ia merah kalau lengannya dihapus dari model. Yang tidak bisa
+    dilihatnya adalah **bentuk**: ia mengganti tata letak `.spiralGalaxy`
+    dengan **cincin** — jari-jari blob lengan sama persis, tapi tiap jari-jari
+    disebar merata ke delapan arah — dan seluruh **45 pemeriksaannya hijau**.
+
+    Itu bukan kekurangan kecil. Cincin adalah kebalikan dari galaksi berlengan:
+    M51 dan M101 dikenali justru dari lengannya yang melengkung, dan "lingkaran
+    cahaya" adalah bentuk yang **salah** untuk keduanya. Tata letak cincin juga
+    yang dihasilkan oleh cacat yang paling mungkin terjadi saat menyunting
+    spiral: menyalin satu titik lengan dan memutarnya, bukan melanjutkan
+    kurvanya. Gerbang lama hijau di sana karena mengukur "ada goresan terang di
+    jari-jari ini" — dan cincin punya goresan terang di **setiap** jari-jari.
+
+    **Yang diukur: pergeseran sudut punggungannya.** Pada tiap jari-jari
+    (dipatok di `SPIRAL_ARM_SWEEP_RADII`, **bukan** diturunkan dari daftar blob
+    lengan — kalau diturunkan, sampelnya ikut hilang bersama mutasinya), cari
+    sudut dengan kecerahan tertinggi, lalu jumlahkan pergeserannya. Lengan
+    spiral adalah **kurva**, jadi punggungannya bergeser jauh dari inti ke tepi;
+    cincin dan cakram punya punggungan di sudut yang sama di semua jari-jari,
+    jadi sapuannya nol.
+
+    Diukur pada ukuran jam, `ss=8` (`Tools/bukti-mutasi-lengan.py`):
+
+        spiral asli (model)      sapuan +88°    punggungan terlemah 12.4
+        cincin 8 arah            sapuan  +0°    punggungan terlemah 26.1
+        cincin 4 arah            sapuan  −2°    punggungan terlemah 16.0
+        cakram polos (.galaxy)   sapuan  −2°    punggungan terlemah  0.0
+        lengan dihapus           sapuan  −2°    punggungan terlemah  0.0
+
+    **Kenapa ada lantai kekuatan punggungan.** Ukuran "sudut berpindah" saja
+    bisa hijau karena **kebisingan**: pada gambar yang lengannya diredupkan
+    sampai tak terlihat, profilnya nyaris rata, `argmax` melompat ke sudut
+    acak, dan jumlah pergeserannya jadi besar — terukur **+79°** pada lengan
+    yang diredupkan ke 10% (1.2 di atas latar), padahal tidak ada lengan yang
+    bisa dilihat. Lantai `SPIRAL_ARM_RIDGE_FLOOR` menutup jalur itu, dan itu
+    sebabnya gerbangnya merah pada lengan yang diredupkan ke 10%, bukan hijau.
+
+    **Kenapa lantainya 3.0, bukan 5.0.** Diukur: lengan diredupkan ke 40%
+    memberi punggungan terlemah **tepat 5.0**. Lantai yang duduk persis di
+    angka itu membuat keadaan tersebut hijau atau merah karena pembulatan,
+    bukan karena bentuknya — dan ambang yang dipertanyakan lewat pembulatan
+    akan diubah orang sampai ia hijau. 3.0 memberi jarak ~2.5× ke yang tidak
+    terlihat (1.2 dan 0.0) dan tetap menerima lengan yang masih terbaca.
+
+    **Kenapa ukuran jam.** Sama dengan gerbang di atas: bentuk yang lulus di
+    200 px bisa hilang di ukuran yang benar-benar tampil.
+
+    **Batas yang dinyatakan.** Gerbang ini mengukur **pergeseran**, bukan
+    arah putaran: spiral yang dicerminkan (lengan berputar ke arah sebaliknya)
+    tetap lulus, dan itu memang benar — tidak ada yang mengklaim arah putaran
+    M51 di kartu jam. Keadaan itu ada di harness (`8. dicerminkan, wajib
+    hijau`) justru supaya "lulus" di sana tidak pernah disalahartikan sebagai
+    kelalaian. Yang juga tidak diklaim: sapuan yang diukur tidak dibandingkan
+    dengan sudut yang diramalkan model (0.20·e^(0.30θ)), hanya dengan **ada
+    tidaknya** pergeseran yang berarti. Perbandingan dengan model akan lebih
+    tajam, tapi juga mengikat gerbang ini pada konstanta spiral yang justru
+    boleh diubah desainer; yang tidak boleh hilang adalah bentuknya.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "lengan spiral benar-benar melengkung (ukuran jam)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+
+    sweep, weakest = spiral_arm_sweep(pixels, 8)
+    span = f"{SPIRAL_ARM_SWEEP_RADII[0]:.2f}…{SPIRAL_ARM_SWEEP_RADII[-1]:.2f} R"
+
+    if weakest is None:
+        results.append(Result(
+            "lengan spiral benar-benar melengkung (ukuran jam)", False,
+            "tidak ada jari-jari yang disampel — gerbangnya tidak mengukur apa pun"))
+        return
+
+    results.append(Result(
+        f"lengan spiral benar-benar melengkung: punggungan bergeser >= "
+        f"{SPIRAL_ARM_SWEEP_DEGREES:.0f}° pada {span} (ukuran jam)",
+        abs(sweep) >= SPIRAL_ARM_SWEEP_DEGREES,
+        f"punggungan bergeser {sweep:+.0f}° pada {pixels} px; butuh "
+        f">= {SPIRAL_ARM_SWEEP_DEGREES:.0f}° — di bawah itu lengannya tidak "
+        f"melengkung dan bentuknya terbaca sebagai cincin atau cakram, bukan "
+        f"spiral"))
+
+    results.append(Result(
+        f"lengan spiral benar-benar melengkung: punggungan terang masih ada "
+        f"(> {SPIRAL_ARM_RIDGE_FLOOR:.0f} di atas latar)",
+        weakest > SPIRAL_ARM_RIDGE_FLOOR,
+        f"punggungan terlemah {weakest:.1f} di atas latar; kalau di bawah "
+        f"{SPIRAL_ARM_RIDGE_FLOOR:.0f} tidak ada lengan yang bisa dilihat dan "
+        f"pergeseran sudutnya cuma kebisingan"))
+
+
+def load_spiral_arm_harness():
+    """Modul `Tools/bukti-mutasi-lengan.py`, atau `None` bila tak bisa dimuat.
+
+    Dipakai supaya geometri mutasinya **tidak ditulis ulang** di gerbang ini.
+    Menyalin `ring()`/`dimmed()` ke sini akan melahirkan salinan kedua yang bisa
+    tertinggal separuh dari harness-nya — persis kelas cacat yang sudah dibayar
+    di repo ini (`drift_compared_constants` menulis alasan yang sama).
+    """
+    path = os.path.join(ROOT, "Tools", "bukti-mutasi-lengan.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("harness_lengan", path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def blobs_from_block(block):
+    """Blok tata letak yang dibangun harness → daftar blob 6-tuple port.
+
+    Harness membangun **teks** (karena ia memutasi berkas), sementara gerbang
+    ini memutasi `R.DEEP_SKY_LAYOUT` di memori seperti
+    `check_spiral_core_docstring_quotes_measured_values`. Bentuk blob-nya
+    identik — `(x, y, lebar, 1.0, 0.0, opasitas)` — jadi satu penguraian
+    sudah cukup, dan tidak ada daftar kedua yang perlu dijaga.
+    """
+    rows = re.findall(
+        r"\(([-0-9.]+), ([-0-9.]+), ([0-9.]+), 1\.0, 0\.0, ([0-9.]+)\)", block)
+    return [(float(x), float(y), float(width), 1.0, 0.0, float(opacity))
+            for x, y, width, opacity in rows]
+
+
+def spiral_arm_doc_rows(text):
+    """Baris tabel `sapuan …° punggungan terlemah …` yang dikutip `text`.
+
+    Mengembalikan `{label: (sapuan, punggungan)}`. Tanda minus disamakan dulu:
+    docstring memakai `−` (U+2212), sumber Python memakai `-`.
+    """
+    rows = {}
+    pattern = (r"^\s*#?:?\s{0,4}([A-Za-z].*?)\s{2,}sapuan\s+([+−-]?\d+)°"
+               r"\s+punggungan terlemah\s+([\d.]+)\s*$")
+    for line in text.replace("−", "-").splitlines():
+        match = re.match(pattern, line)
+        if match:
+            rows[match.group(1).strip()] = (float(match.group(2)),
+                                            float(match.group(3)))
+    return rows
+
+
+def check_spiral_arm_docstring_quotes_measured_values(results):
+    """Angka di docstring gerbang lengan harus keluar dari penyampelnya sendiri.
+
+    **Cacat yang ditutup.** Gerbang `check_spiral_arms_actually_spiral` lahir
+    dengan **dua** tabel angka di berkas yang sama — satu di komentar
+    `SPIRAL_ARM_SWEEP_DEGREES`, satu di docstring gerbangnya — dan keduanya
+    saling bertentangan: +111° lawan +88° untuk pengukuran yang sama, +22.5
+    lawan +26.1 untuk punggungan terlemah cincin 8 arah. Yang lebih buruk,
+    **keduanya juga tidak cocok dengan gambar**: diukur ulang lewat
+    `spiral_arm_sweep` pada tata letak aslinya, cincin 4 arah memberi 16.0
+    (bukan 13.1), cakram polos memberi punggungan 0.0 (bukan 14.0), dan lengan
+    yang diredupkan ke 10% memberi **+79°**, bukan +160° seperti yang diklaim
+    alasan keberadaan lantai punggungan.
+
+    Itu bukan salah tulis yang tidak berbahaya. Docstring itu satu-satunya
+    bukti yang dibaca orang yang menilai apakah ambang 25° dan lantai 3.0 layak
+    dipercaya, dan angka 0.0 untuk cakram polos justru **bertentangan** dengan
+    alasan lantai itu ada: kalau cakram polos memang 0.0, maka keadaan 3 di
+    harness menyalakan lantai karena cakramnya **tidak punya** punggungan, dan
+    kalimat "cincin punya goresan terang di setiap jari-jari" hanya berlaku
+    untuk cincin. Kelas cacatnya sama dengan
+    `check_spiral_core_docstring_quotes_measured_values` dan
+    `check_crater_contrast_numbers_come_from_the_sampler`: **komentar mengutip
+    angka yang tidak pernah ia ukur**.
+
+    **Yang diperiksa, dua arah.**
+
+      1. Kedua tabel itu harus **sepakat satu sama lain**. Ini yang menangkap
+         cacat aslinya langsung: dua tabel di berkas yang sama dengan angka
+         berbeda untuk pengukuran yang sama.
+      2. Tiap baris harus **sama dengan hasil ukur** lewat `spiral_arm_sweep`,
+         di jalur gambar yang sama dengan gerbangnya. Ini yang menangkap angka
+         yang sepakat tapi sama-sama salah.
+
+    Geometri mutasinya diambil dari `Tools/bukti-mutasi-lengan.py` (harness
+    yang membuktikan gerbangnya berbunyi), bukan ditulis ulang di sini.
+
+    **Batas yang dinyatakan.** Yang dijaga adalah **angka yang dikutip** pada
+    dua ukuran itu (76 px, `ss=8`). Sapuan di ukuran lain, dan arah putaran,
+    tidak diklaim — sama seperti gerbangnya sendiri.
+    """
+    harness = load_spiral_arm_harness()
+    if harness is None:
+        results.append(Result(
+            "lengan spiral: docstring dapat diukur ulang", False,
+            "Tools/bukti-mutasi-lengan.py tidak bisa dimuat — gerbang paritas "
+            "ini tidak bisa mengukur apa pun"))
+        return
+
+    gate_doc = check_spiral_arms_actually_spiral.__doc__ or ""
+    gate_rows = spiral_arm_doc_rows(gate_doc)
+
+    source = open(os.path.abspath(__file__), encoding="utf-8").read()
+    anchor = "SPIRAL_ARM_SWEEP_DEGREES = 25.0"
+    if anchor not in source:
+        results.append(Result(
+            "lengan spiral: docstring dapat diukur ulang", False,
+            f"'{anchor}' tidak ditemukan di sumber — gerbang paritas ini "
+            "mengukur berkas yang salah"))
+        return
+    constant_doc = source[:source.index(anchor)]
+    constant_rows = spiral_arm_doc_rows("\n".join(constant_doc.splitlines()[-40:]))
+
+    if len(gate_rows) < 4 or len(constant_rows) < 4:
+        results.append(Result(
+            "lengan spiral: docstring mengutip tabel ukur (>= 4 baris)", False,
+            f"{len(gate_rows)} baris terbaca dari docstring gerbang, "
+            f"{len(constant_rows)} dari komentar konstanta — butuh >= 4 "
+            "(label, sapuan, punggungan terlemah)"))
+        return
+
+    # Arah 1: kedua tabel di berkas yang sama harus sepakat.
+    disagree = sorted(label for label in set(gate_rows) | set(constant_rows)
+                      if gate_rows.get(label) != constant_rows.get(label))
+    results.append(Result(
+        "lengan spiral: dua tabel docstring di berkas ini sepakat", not disagree,
+        "kedua tabel sepakat" if not disagree else
+        "angka berbeda untuk pengukuran yang sama: "
+        + "; ".join(f"{label}: docstring gerbang {gate_rows.get(label)} vs "
+                    f"komentar konstanta {constant_rows.get(label)}"
+                    for label in disagree)))
+
+    # Arah 2: tiap baris harus sama dengan hasil ukur.
+    builders = {
+        "spiral asli (model)": None,
+        "cincin 8 arah": harness.ring(8),
+        "cincin 4 arah": harness.ring(4),
+        "cakram polos (.galaxy)": harness.block(
+            [(0.0, 0.0, 0.32, 0.60), (0.0, 0.0, 0.45, 0.13),
+             (0.0, 0.0, 0.20, 0.40)]),
+        "lengan dihapus": harness.block(harness.CORE_BLOBS),
+    }
+    unknown = sorted(label for label in gate_rows if label not in builders)
+    if unknown:
+        results.append(Result(
+            "lengan spiral: tiap baris tabel punya mutasinya", False,
+            f"tidak ada mutasi untuk {unknown} — baris itu tidak diukur, "
+            "jadi angkanya boleh apa saja"))
+        return
+
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "lengan spiral: docstring dapat diukur ulang", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+
+    layout = list(R.DEEP_SKY_LAYOUT["spiralGalaxy"])
+    try:
+        for label, (quoted_sweep, quoted_ridge) in sorted(gate_rows.items()):
+            replacement = builders[label]
+            R.DEEP_SKY_LAYOUT["spiralGalaxy"] = (
+                layout if replacement is None else blobs_from_block(replacement))
+            sweep, weakest = spiral_arm_sweep(pixels, 8)
+            sweep_ok = abs(sweep - quoted_sweep) <= 1
+            ridge_ok = abs(weakest - quoted_ridge) <= 0.05
+            results.append(Result(
+                f"lengan spiral: docstring '{label}' cocok dengan ukurannya",
+                sweep_ok and ridge_ok,
+                f"docstring {quoted_sweep:+.0f}° / punggungan {quoted_ridge:.1f}; "
+                f"terukur {sweep:+.0f}° / {weakest:.1f} pada {pixels} px "
+                f"(toleransi 1° dan 0.05)"))
+    finally:
+        R.DEEP_SKY_LAYOUT["spiralGalaxy"] = layout
+
+    # Lantai punggungan: lima angka di komentar `SPIRAL_ARM_RIDGE_FLOOR`
+    # (termasuk tiga kekuatan peredupan) harus keluar dari penyampelnya juga.
+    floor_doc = source[source.index("#: Kekuatan punggungan terlemah"):
+                       source.index("SPIRAL_ARM_RIDGE_FLOOR = 3.0")]
+    floor_rows = {}
+    for line in floor_doc.replace("−", "-").splitlines():
+        match = re.match(r"^#:\s{3}([A-Za-z].*?)\s{2,}([\d.]+)\s*(?:\(|<-|$)",
+                         line)
+        if match:
+            floor_rows[match.group(1).strip()] = float(match.group(2))
+
+    floor_builders = {
+        "spiral asli (model)": None,
+        "lengan diredupkan ke 70%": harness.dimmed(0.70),
+        "lengan diredupkan ke 40%": harness.dimmed(0.40),
+        "lengan diredupkan ke 10%": harness.dimmed(0.10),
+        "lengan dihapus": harness.block(harness.CORE_BLOBS),
+    }
+    if len(floor_rows) < 5 or set(floor_rows) != set(floor_builders):
+        results.append(Result(
+            "lengan spiral: komentar lantai mengutip 5 kekuatan punggungan",
+            False,
+            f"{sorted(floor_rows)} terbaca; harus persis "
+            f"{sorted(floor_builders)} — baris yang hilang berarti angkanya "
+            "tidak lagi diikat"))
+    else:
+        try:
+            for label, quoted in sorted(floor_rows.items()):
+                replacement = floor_builders[label]
+                R.DEEP_SKY_LAYOUT["spiralGalaxy"] = (
+                    layout if replacement is None
+                    else blobs_from_block(replacement))
+                _, weakest = spiral_arm_sweep(pixels, 8)
+                results.append(Result(
+                    f"lengan spiral: lantai '{label}' cocok dengan ukurannya",
+                    abs(weakest - quoted) <= 0.05,
+                    f"komentar {quoted:.1f}; terukur {weakest:.1f} pada "
+                    f"{pixels} px (toleransi 0.05)"))
+        finally:
+            R.DEEP_SKY_LAYOUT["spiralGalaxy"] = layout
+
+
 def check_planetary_nebula_shell_is_continuous(results):
     """Cangkang `.planetaryNebula` harus **bersambung**, bukan untaian manik.
 
@@ -6970,7 +7405,7 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         "kabut Venus dibaca dari model di view (bukan sudut CGRect ditulis ulang)",
         haze_call in view,
         f"view memanggil '{haze_call}' = {'ada' if haze_call in view else 'TIDAK'}"))
-    haze_model = "public static func venusHaze(" in model_src
+    haze_model = re.search(r"(?:public\s+)?static func venusHaze\(", model_src) is not None
     haze_port_fn = "def venus_haze(" in port
     # **Kenapa `_draw_haze` dan cabang berfase diperiksa terpisah.** Keduanya
     # situs yang berbeda, dan keduanya pernah memuat angka yang salah. Satu
@@ -9345,10 +9780,12 @@ def main():
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)
     check_spiral_arms_stay_continuous(results)
+    check_spiral_arms_actually_spiral(results)
     check_planetary_nebula_shell_is_continuous(results)
     check_dumbbell_nebula_is_an_elongated_shell(results)
     check_spiral_core_reads_as_one_body(results)
     check_spiral_core_docstring_quotes_measured_values(results)
+    check_spiral_arm_docstring_quotes_measured_values(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)

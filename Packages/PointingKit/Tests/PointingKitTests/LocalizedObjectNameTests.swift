@@ -115,7 +115,8 @@ final class LocalizedObjectNameTests: XCTestCase {
         for (body, name) in expected {
             byKey[BodyName.catalogKey(for: body)] = name
         }
-        TextLocalization.install { byKey[$0] }
+        let table = byKey
+        TextLocalization.install { table[$0] }
 
         for (body, name) in expected {
             XCTAssertEqual(
@@ -164,7 +165,8 @@ final class LocalizedObjectNameTests: XCTestCase {
         for (body, name) in Self.expectedEnglish {
             byKey[BodyName.catalogKey(for: body)] = name
         }
-        TextLocalization.install { byKey[$0] }
+        let table = byKey
+        TextLocalization.install { table[$0] }
 
         // `catalogue` sengaja kosong: ini persis jalur benda tata surya,
         // karena planet tidak ada di katalog bintang.

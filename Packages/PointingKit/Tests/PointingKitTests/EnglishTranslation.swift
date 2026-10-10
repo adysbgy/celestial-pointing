@@ -19,7 +19,6 @@ enum EnglishTranslation {
     /// pemisah desimal tetap Bahasa Indonesia dan kalimat yang diuji tidak
     /// pernah muncul — bukan karena katalog salah, tapi karena angka bicara
     /// bahasa lain.
-    @discardableResult
     static func install(_ english: [String: String]) {
         TextLocalization.install { english[$0] }
         NumberFormat.install(localeId: "en_US")

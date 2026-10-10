@@ -99,21 +99,34 @@ jobs:
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-watch.log
 
       # Gerbang peringatan: satu-satunya peringatan yang dianggap kegagalan
-      # adalah peringatan yang menunjuk berkas **kode kita sendiri**
-      # (`Apps/...`). Peringatan dari alat Xcode (urutan build manual, metadata
-      # AppIntents, swift-format) sengaja tidak dihitung — itu bukan kode ini,
-      # dan menjadikannya kegagalan hanya akan membuat gerbangnya dimatikan
-      # orang lain saat ia berbunyi.
+      # adalah peringatan yang menunjuk berkas **kode kita sendiri**.
+      #
+      # Cakupannya `Apps/` **dan** `Packages/`, dan itu perbaikan, bukan
+      # kelonggaran. Sampai siklus ini sapunya hanya `Apps/`, jadi seluruh
+      # lapisan visual — yang justru paling banyak berubah dan paling banyak
+      # ditulis tangan — berada di luar jangkauan: 15 peringatan produksi
+      # (`'public' modifier is redundant for … declared in a public extension`,
+      # dari `CelestialVisual.swift` dan `NightVisual.swift`) lolos hijau di
+      # setiap push. Peringatan yang tak pernah dibaca adalah cara paling
+      # halus untuk menutupi niat kode yang sudah tidak berlaku; gerbang yang
+      # tidak melihat berkasnya sama saja tidak ada.
+      #
+      # Peringatan dari alat Xcode (urutan build manual, metadata AppIntents,
+      # swift-format) dan dari toolchain SDK sengaja tidak dihitung — itu bukan
+      # kode ini, dan menjadikannya kegagalan hanya akan membuat gerbangnya
+      # dimatikan orang lain saat ia berbunyi. Karena itu polanya menyebut
+      # berkas **kita** secara eksplisit, bukan sekadar `warning:`.
       - name: Gerbang peringatan (kode sendiri)
         run: |
           set -e
-          hits=$(grep -hE '^/.*/Apps/.*: warning:' build-iphone.log build-watch.log || true)
+          hits=$(grep -hE '^/.*/celestial-pointing/(Apps|Packages)/.*: warning:' \
+                   build-iphone.log build-watch.log || true)
           if [ -n "$hits" ]; then
             echo "Peringatan compiler pada kode sendiri:"
             echo "$hits"
             exit 1
           fi
-          echo "Tidak ada peringatan compiler pada Apps/."
+          echo "Tidak ada peringatan compiler pada Apps/ atau Packages/."
 
       # Log diagnostik hanya berguna saat gagal, tapi menaruhnya di sini
       # membuat kegagalan pertama bisa langsung dibaca tanpa perlu mengulang

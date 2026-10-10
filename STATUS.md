@@ -18025,3 +18025,127 @@ kode di siklus ini: mendorong perubahan ke `main` hanya untuk "terlihat bekerja"
 bertentangan dengan Aturan Keras ("jangan rusak engine teruji") dan praktik
 repo ("gerbang yang hijau tapi tidak hijau"). Laporan ini sendiri yang menjadi
 hasil siklus — audit tertutup, status terverifikasi.
+
+═════════════════════════════════════════════════════════════════════════
+SIKLUS: Gerbang `public` berlebih — 15 peringatan produksi yang tak pernah dilihat siapa pun
+═════════════════════════════════════════════════════════════════════════
+
+**Cacatnya.** Seluruh lapisan visual — yang justru paling banyak berubah dan
+paling banyak ditulis tangan — berada di luar jangkauan gerbang peringatan.
+`ios-build.yml` menyapu `Apps/` saja, sementara `CelestialVisual.swift` dan
+`NightVisual.swift` ada di `Packages/`. Hasilnya terukur: **15 peringatan
+produksi** (`'public' modifier is redundant for … declared in a public
+extension`) duduk di setiap build dan lolos hijau di setiap push. Peringatan
+yang tak pernah dibaca adalah cara paling halus untuk menutupi niat kode yang
+sudah tidak berlaku.
+
+**Dua perbaikan, dan yang kedua yang membuatnya berarti.**
+
+  1. **Sapunya diperluas** (`ios-build.yml`): pola gerbang peringatan berubah
+     dari `Apps/` menjadi `(Apps|Packages)/`, jadi lapisan paket ikut dilihat.
+     Peringatan dari alat Xcode dan dari toolchain SDK tetap dikecualikan —
+     polanya menyebut berkas **kita** secara eksplisit, bukan sekadar
+     `warning:`.
+  2. **15 `public` berlebih dihapus** dari `CelestialVisual.swift` dan
+     `NightVisual.swift` (`public struct Band` → `struct Band`, dst).
+
+Perluasan sapu itu **bukan** kosmetik: pola `(Apps|Packages)/` ikut mencakup
+`Packages/PointingKit/Tests/`, dan ternyata ada tujuh berkas uji yang membawa
+peringatan sendiri — hasil `try XCTUnwrap` yang dibuang, binding `coreHi` /
+`outerLo` yang tidak dipakai, `@discardableResult` yang menutupi hasil tak
+terpakai, `#filePath` diteruskan ke parameter berdefault `#file` (dua bentuk
+lokasi yang berbeda), dan `byKey` yang ditangkap di dalam closure. Ketujuhnya
+diperbaiki **dengan maknanya dipertahankan** — mis. `#file` dipilih alih-alih
+`#filePath` justru supaya lokasi pemanggil tetap muncul di laporan kegagalan
+(`XCTFail` memakai `#file` sebagai bawaannya), dan `let table = byKey` sebelum
+closure ditulis dengan komentar kenapa: menangkap variabel yang di-`var`
+berulang adalah peringatan yang benar, dan yang salah adalah menangkapnya.
+
+**Yang paling berbahaya di sini, dan bagaimana ia ditutup.** Pencabutan
+`public` punya sisi yang **tidak** memicu peringatan apa pun tapi mematikan
+build: `Apps/` memakai simbol-simbol ini dari modul lain. `public extension`
+hanya memberi `public` ke anggota **langsungnya**, bukan ke anggota tipe yang
+dideklarasikan di dalamnya — jadi `public` pada `Band.centerY` (kedalaman 2)
+**diperlukan**, sementara `public` pada `struct Band` itu sendiri (kedalaman 1)
+berlebih. Pengurai yang salah di sini akan "membersihkan" yang diperlukan dan
+menukar peringatan menjadi galat kompilasi.
+
+Dibuktikan, bukan diasumsikan — dan dengan **dua** alat yang berbeda:
+
+  - **Probe lintas-modul.** Paket sementara `ReachProbe` bergantung pada
+    `PointingKit` dan memakai **setiap** simbol yang `public`-nya dicabut
+    (`CelestialVisual.jupiterBands()`, `.Spot`, `.HazeGeometry`,
+    `.CraterRelief`, `.moonSphereDark`, `.deepSkyColour`,
+    `.bandLimbShadingStrength`, `.sphereLightOffset`, `Band.centerY`, …).
+    `swift build` → **Build complete!** Jadi `Apps/` tetap bisa memakainya.
+  - **Probe `swiftc`.** Satu `public extension` yang memuat semua bentuk
+    anggota mengeluarkan tepat enam peringatan: instance method, static
+    property, property, struct, **initializer**, **subscript**.
+
+**Probe itu membongkar klaim yang salah di alat saya sendiri.** Versi pertama
+`Tools/bersihkan-public-berlebih.py` mengeluarkan `init`/`subscript` dari
+daftar dengan alasan "probe menunjukkan keduanya tidak berbunyi". Itu keliru:
+keduanya berbunyi. Kelalaian itu tidak terlihat hari ini hanya karena
+**kebetulan** — nol `public init`/`subscript` berada langsung di badan
+`public extension` di paket ini. Kebetulan bukan gerbang, jadi keduanya masuk
+daftar (aman, karena pemeriksaannya dibatasi kedalaman 1), dan keadaan uji di
+bawah menguncinya.
+
+**Gerbangnya dibuat berbunyi, bukan sekadar melaporkan.** Versi pertama alat
+itu **selalu keluar 0** — persis bentuk "gerbang yang tidak pernah merah" yang
+repo ini sudah bayar mahal. Sekarang ia keluar 1 saat ada temuan, dan ia
+membuktikan **dirinya sendiri** lewat `prove_itself()` dengan delapan keadaan:
+
+| keadaan | harap | kenapa ada |
+|---|---|---|
+| anggota langsung `public extension` | 2 ditemukan | arah dasar |
+| deklarasi tipe bersarang (kedalaman 1) | 1 ditemukan | yang memang dihapus |
+| anggota tipe bersarang (kedalaman 2) | 0 ditemukan | **yang mahal bila salah** |
+| `{` di dalam literal string | 1 ditemukan | pengurai kurung-mentah melewatkannya |
+| `init`/`subscript` langsung | 2 ditemukan | membongkar klaim keliru di atas |
+| `init` tipe bersarang (kedalaman 2) | 0 ditemukan | sisi mahal, lagi |
+| `extension` non-public | 0 ditemukan | cakupan |
+| berkas bersih | 0 ditemukan | arah hijau |
+
+Dua keadaan ditangkap **saat harness ini ditulis**, bukan oleh pembacaan:
+urutan hitung kurung yang salah membuat setiap anggota yang membuka kurung di
+barisnya sendiri (`public func bar() {}`) terbaca di kedalaman 2 dan **tidak
+pernah dilaporkan** — gejalanya "0 peringatan" pada berkas yang penuh
+peringatan. Dan keadaan "anggota tipe bersarang" awalnya saya tulis
+mengharapkan 0 untuk baris `public struct Nested` itu sendiri, padahal
+deklarasinya memang berlebih.
+
+**Verifikasi (terukur).**
+  - Mutasi nyata pada `CelestialVisual.swift`
+    (`static let bandLimbShadingStrength` → `public static let …`):
+    gerbang **merah, exit 1**, menyebut berkas dan jumlahnya; sumber dipulihkan
+    byte-identik (md5 `816431ea…`).
+  - `--tulis` pada mutasi yang sama → menghapus, `0 sisa`, lalu hijau.
+  - `python3 Tools/bersihkan-public-berlebih.py` → **0 `public` berlebih di 58
+    berkas**.
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 726 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `./swift-ui-lint.sh` → 30 aturan, semua Bersih.
+  - `./swift-typecheck.sh` → semua gerbang LULUS.
+  - `Tools/check-harness-terdaftar.py` → 16 harness, semuanya dirujuk.
+  - `python3 Tools/check-visuals.py --check` → **701 pemeriksaan, 0 gagal**.
+
+**Gerbang baru ini juga ikut disapu.** `Tools/check-harness-terdaftar.py`
+menjaga pola `bukti-mutasi-*.py`; `bersihkan-public-berlebih.py` bukan harness
+mutasi, jadi ia dijaga lewat langkah CI-nya sendiri di `engine-tests.yml` —
+tanpa itu ia hanya alat yang dipakai manual, dan alat yang dipakai manual
+adalah alat yang berhenti dipakai.
+
+**Kenapa di `engine-tests.yml`, bukan `swift-ui-lint.sh`.** Cacat ini hidup di
+**paket**, bukan di `Apps/`, dan sapuan UI itu khusus SwiftUI (ia membaca
+`Apps/` dan menegakkan aturan font/warna). Menaruhnya di sana akan
+memperluas cakupan sebuah gerbang UI ke wilayah yang bukan urusannya. Di
+`engine-tests.yml` ia berjalan dalam sekejap di Linux, jauh lebih murah
+daripada menunggu job macOS.
+
+**Pelajaran (catat, bukan ulang).** Gerbang yang selalu keluar 0 tidak bisa
+dibedakan dari gerbang yang bersih — jadi setiap gerbang baru harus keluar
+bukan-nol pada keadaan yang memang salah, dan **sisi mahalnya** (yang tidak
+memperingatkan tapi mematikan build) harus diuji lebih dulu daripada sisi
+murahnya. Dan: daftar "kind yang diperingatkan compiler" adalah klaim tentang
+perilaku compiler — ia harus **diukur** dengan probe, bukan diingat.

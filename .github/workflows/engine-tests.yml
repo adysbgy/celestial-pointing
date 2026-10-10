@@ -265,6 +265,61 @@ jobs:
       - name: Buktikan gerbang cangkang nebula planetari berbunyi
         run: python3 Tools/bukti-mutasi-cangkang.py
 
+      # Dan bukti yang sama untuk **bentuk lengan spiral** — gerbang yang
+      # lahir dari lubang yang paling sulit dilihat: gerbang lengan yang sudah
+      # ada (`check_spiral_arms_stay_continuous`) benar, dan ia merah kalau
+      # lengannya dihapus dari model. Yang tidak bisa dilihatnya adalah
+      # **bentuk**.
+      #
+      # Terukur: tata letak `.spiralGalaxy` diganti dengan **cincin** —
+      # jari-jari blob lengan sama persis, tiap jari-jari disebar merata ke
+      # delapan arah — dan seluruh **45 pemeriksaannya hijau**. Cincin adalah
+      # kebalikan dari galaksi berlengan: M51 dan M101 dikenali justru dari
+      # lengannya yang melengkung. Dan tata letak cincin bukan karangan — itu
+      # bentuk yang dihasilkan cacat yang paling mungkin terjadi saat
+      # menyunting spiral, menyalin satu titik lengan dan memutarnya alih-alih
+      # melanjutkan kurvanya.
+      #
+      # Gerbang lama buta di sana karena mengukur "ada goresan terang di
+      # jari-jari ini", dan cincin punya goresan terang di **setiap**
+      # jari-jari. Gerbang barunya mengukur yang membedakan keduanya:
+      # **pergeseran sudut punggungannya**. Diukur pada ukuran jam — spiral
+      # asli +88°, cincin 8 arah +0°, cincin 4 arah −2°, cakram polos −2°,
+      # lengan dihapus −2°.
+      #
+      # Keadaan 5 ("lengan diredupkan sampai tak terlihat") sengaja ada: ia
+      # **hijau** di pemeriksaan pergeseran (+79°, murni kebisingan karena
+      # profilnya nyaris rata) dan hanya merah di lantai kekuatan punggungan.
+      # Tanpa keadaan itu, lantai tersebut bisa dihapus dan tidak ada satu pun
+      # keadaan di sini yang akan tahu.
+      #
+      # Keadaan 7 ("dicerminkan") **wajib hijau**, dan itu batas yang
+      # dinyatakan: gerbangnya mengukur ada-tidaknya lengkungan, bukan arah
+      # putaran.
+      #
+      # Keadaan 8–11 memutasi **berkas gerbangnya sendiri**, bukan port render:
+      # yang diuji di sana bukan gambarnya melainkan **angka yang ditulis
+      # tentang gambar itu**. Gerbang ini lahir dengan dua tabel angka di
+      # berkas yang sama yang saling bertentangan (+111° lawan +88° untuk
+      # pengukuran yang sama) dan tidak satu pun cocok dengan render — cincin 4
+      # arah tertulis 13.1 padahal 16.0, cakram polos tertulis 14.0 padahal 0.0,
+      # dan "redup 10% memberi +160°" padahal +79°. Gerbang paritas
+      # `check_spiral_arm_docstring_quotes_measured_values` menutupnya, dan
+      # keempat keadaan ini membuktikan ia berbunyi:
+      #
+      #   8.  satu angka komentar digeser (gambar tak berubah) → merah
+      #   9.  satu dari dua tabel digeser                  → merah (kedua tabel
+      #                                                        tak lagi sepakat)
+      #   10. **kedua** tabel digeser bersama-sama         → merah (sepakat,
+      #        tapi sama-sama salah: arah 1 saja tidak cukup)
+      #   11. ambang lantai digeser, tak dikutip di tabel  → WAJIB HIJAU
+      #
+      # Keadaan 11 yang menjaga gerbangnya tetap berarti: tanpa dia, gerbang
+      # yang berbunyi pada **setiap** suntingan berkas ini akan terlihat sama
+      # dengan gerbang yang berbunyi pada angka yang melenceng.
+      - name: Buktikan gerbang bentuk lengan spiral berbunyi
+        run: python3 Tools/bukti-mutasi-lengan.py
+
       # Dan bukti untuk gerbang **inti bintang gugus** — gerbang yang versi
       # pertamanya hijau pada gugus tanpa satu pun bintang.
       #
@@ -407,6 +462,31 @@ jobs:
       # **tidak lulus-terbuka** ketika `git diff` sendiri gagal.
       - name: Buktikan penjaga sumber-bersih harness mutasi berbunyi
         run: python3 Tools/bukti-penjaga-bersih.py
+
+      # Gerbang `public` berlebih pada anggota `public extension`.
+      #
+      # Kenapa di sini, bukan di `swift-ui-lint.sh`: cacat ini hidup di
+      # **paket**, bukan di `Apps/`, dan sapuan UI itu khusus SwiftUI. Kenapa
+      # juga tidak cukup di `ios-build.yml`: job itu macOS dan butuh menit,
+      # sementara ini gerbang teks yang berjalan dalam sekejap di Linux — dan
+      # lebih cepat berbunyi, lebih murah diperbaiki.
+      #
+      # Cacat yang ditutupnya sudah pernah lolos ke `main`: 15 peringatan
+      # produksi (`'public' modifier is redundant for … declared in a public
+      # extension`) dari `CelestialVisual.swift` dan `NightVisual.swift`
+      # duduk di setiap build tanpa satu pun gerbang melihatnya, karena
+      # `ios-build.yml` hanya menyapu `Apps/`. Peringatan yang tak pernah
+      # dibaca adalah cara paling halus untuk menutupi niat kode yang sudah
+      # tidak berlaku.
+      #
+      # Dua arah, dan keduanya diuji di `prove_itself()` di dalam skripnya:
+      # menemukan `public` yang berlebih, dan **tidak** menyentuh `public`
+      # yang diperlukan pada anggota tipe bersarang — yang terakhir itu tidak
+      # memicu peringatan apa pun, tapi membuat `Apps/` gagal dikompilasi.
+      # Gerbang yang selalu keluar 0 terlihat persis sama dengan gerbang yang
+      # bersih, jadi laporan ini sengaja keluar 1 saat ada temuan.
+      - name: Gerbang `public` berlebih di public extension
+        run: python3 Tools/bersihkan-public-berlebih.py
 
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
