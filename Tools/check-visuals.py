@@ -4566,6 +4566,226 @@ def check_phase_feature_still_draws_on_the_lit_side(results, size=200, ss=2):
             f"dan gambar tanpa {drawer} (0 = ciri tidak pernah sampai ke layar)"))
 
 
+def _moon_phase_cases():
+    """Kasus Bulan yang punya fase nyata **dan** belahan gelap yang memadai.
+
+    Maria dipotong oleh pita terang, jadi gerbang kebocoran hanya bisa
+    berbunyi pada fase yang piringan gelapnya **benar-benar menaungi
+    bercak-bercak itu**. Geometrinya terukur, bukan diperkirakan (200 px):
+
+        purnama (f = 1.0)                     0 piksel maria di belahan gelap
+        purnama sebelah, mengecil (f = .72)   0 piksel
+        purnama sebelah, membesar (f = .72)   2 806 piksel (1 579 di 38 px)
+        sabit (f = .18)                      22 836 piksel (13 189 di 38 px)
+
+    Maria terletak di belahan **kiri** piringan (dx −0,34…+0,22). Pada
+    `moon-waning-gibbous` seluruh permukaan yang tersisa justru **menutupi**
+    bercak itu — nol piksel maria jatuh di belahan gelap — sementara
+    `moon-gibbous`, fraksi yang sama dengan sisi terang berlawanan, menaungi
+    2 806 pikselnya. Menuntut keduanya merah berarti menuntut gerbang
+    berbunyi pada gambar yang **benar**, dan gerbang yang merah pada gambar
+    benar akan dimatikan orang, bukan diperbaiki.
+    """
+    names = []
+    for case in R.build_cases():
+        if case.kind != "moon" or case.kw.get("illumination") is None:
+            continue
+        if _moon_dark_overlap(case, maria=MARIA_REFERENCE) > 0:
+            names.append(case.name)
+    return names
+
+
+#: Susunan bercak **seperti yang seharusnya ada di model**, dibekukan di sini
+#: supaya penyaringan kasus tidak dibaca dari `R.MARIA` yang hidup.
+#:
+#: Kenapa dibekukan, dan ini cacat yang sungguh terjadi: `_moon_dark_overlap`
+#: ikut memakai `R.MARIA`, dan keadaan "maria tidak digambar sama sekali" di
+#: harness mengosongkan larik itu. Nol bercak berarti nol piksel di belahan
+#: gelap untuk **setiap** kasus, daftar kasusnya jadi kosong, dan gerbang
+#: "masih tergambar" **lenyap tanpa suara** alih-alih merah — persis cacat
+#: yang ditulisnya untuk ditangkap. Syarat mampunya harus dihitung dari
+#: bentuk yang seharusnya, bukan dari bentuk yang sedang hidup.
+#:
+#: Dibekukan sebagai salinan berarti ia bisa menyimpang dari model seiring
+#: waktu; karena itu `check_moon_maria_reference_matches_the_model`
+#: membandingkannya dengan sumbernya, dan gerbang itu dibuktikan berbunyi
+#: oleh `Tools/bukti-mutasi-maria.py`.
+MARIA_REFERENCE = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
+                   (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]
+
+
+def check_moon_maria_reference_matches_the_model(results):
+    """MARIA_REFERENCE tidak boleh menyimpang dari larik maria yang hidup."""
+    live = list(R.MARIA)
+    results.append(Result(
+        "referensi maria sama dengan model",
+        live == MARIA_REFERENCE,
+        f"model {live} vs referensi {MARIA_REFERENCE} — referensi yang basi "
+        f"menyaring kasus memakai susunan bercak yang tidak pernah digambar"))
+
+
+def _moon_dark_overlap(case, size=200, ss=2, maria=None):
+    """Berapa piksel maria yang jatuh di belahan gelap — **sebelum** dipotong.
+
+    Ini syarat **mampu**, bukan ukuran cacat: ia menyatakan apakah fase ini
+    punya belahan gelap yang menaungi bercaknya sama sekali. Nol berarti
+    gerbang kebocoran tidak dapat berbunyi pada kasus ini betapapun rusak
+    potongannya, dan menuntutnya merah berarti menuntut kebohongan.
+    """
+    phase = R.phase_geometry(case.kw.get("illumination"),
+                             case.kw.get("is_waxing"))
+    if phase is None:
+        return 0
+    width = height = size * ss
+    points, to_screen = R._lit_band_polygon(
+        width / 2.0, height / 2.0, min(width, height) / 2.0, phase,
+        case.kw.get("bright_limb_angle"))
+    deep, _ = _lit_band_and_deep_dark(width, height, points)
+    radius = min(width, height) / 2.0
+    return sum(
+        1
+        for dx, dy, extent in (R.MARIA if maria is None else maria)
+        for (x, y) in deep
+        if math.hypot(x + 0.5 - to_screen(dx, dy)[0],
+                      y + 0.5 - to_screen(dx, dy)[1]) <= extent * radius)
+
+
+def _lit_band_and_deep_dark(width, height, lit_points):
+    """(piksel jauh di belahan gelap, piksel di dalam pita menyala).
+
+    Keduanya **digerosikan** satu piksel dari batas pita. Itu bukan hiasan:
+    tepi pita ber-antialias, dan bercak gelap yang berhenti tepat di
+    terminator punya tepi kabur yang menyentuh satu-dua piksel di luar
+    poligon. Tanpa erosi, gerbang ini merah pada gambar yang **benar** — dan
+    gerbang yang merah pada gambar yang benar akan dimatikan orang, bukan
+    diperbaiki.
+    """
+    cx, cy = width / 2.0, height / 2.0
+    radius = min(width, height) / 2.0
+    inside = set()
+    for y in range(height):
+        for x in range(width):
+            if math.hypot(x + 0.5 - cx, y + 0.5 - cy) > radius:
+                continue
+            if R._point_in_polygon(x + 0.5, y + 0.5, lit_points):
+                inside.add((x, y))
+    lit, deep = set(), set()
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            neighbours = [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+            if (x, y) in inside:
+                if all(p in inside for p in neighbours):
+                    lit.add((x, y))
+                continue
+            if not any(p in inside for p in neighbours):
+                deep.add((x, y))
+    return deep, lit
+
+
+def _feature_pixels_by_side(name, size, ss):
+    """(piksel maria jauh di belahan gelap, piksel maria di belahan menyala).
+
+    Ciri diukur sebagai **selisih terhadap gambar tanpa ciri itu** — maria
+    dimatikan lewat `R.MARIA = []` — bukan sebagai warna tertentu. Jadi ciri
+    apa pun yang kelak ditambahkan ke permukaan Bulan ikut terjaga tanpa
+    gerbang ini perlu tahu warnanya, dan pemisahan "maria" dari "earthshine"
+    tidak bergantung pada ambang terang.
+    """
+    case = next(c for c in R.build_cases() if c.name == name)
+    phase = R.phase_geometry(case.kw.get("illumination"), case.kw.get("is_waxing"))
+    if phase is None:
+        return None
+    _, (width, height, rows_a) = render_case(name, size=size, ss=ss)
+    points, _ = R._lit_band_polygon(width / 2.0, height / 2.0,
+                                    min(width, height) / 2.0, phase,
+                                    case.kw.get("bright_limb_angle"))
+    deep, lit = _lit_band_and_deep_dark(width, height, points)
+
+    original = R.MARIA
+    try:
+        R.MARIA = []
+        _, (_, _, rows_b) = render_case(name, size=size, ss=ss)
+    finally:
+        R.MARIA = original
+
+    def changed(x, y):
+        return rows_a[y][x * 4:x * 4 + 3] != rows_b[y][x * 4:x * 4 + 3]
+    return sum(1 for (x, y) in deep if changed(x, y)), \
+        sum(1 for (x, y) in lit if changed(x, y))
+
+
+def check_moon_feature_stays_inside_the_lit_band(results, size=200, ss=2,
+                                                 watch=38, watch_ss=8):
+    """Maria Bulan tidak boleh bocor ke belahan yang **tidak** disinari."""
+    names = _moon_phase_cases()
+    if not names:
+        results.append(Result(
+            "maria Bulan: kasus berfase ada", False,
+            "build_cases() tidak punya kasus Bulan berfase — gerbang ini "
+            "tidak mengukur apa pun"))
+        return
+    for name in names:
+        for label, side, sub in (("panel 200 px", size, ss),
+                                 ("kartu jam 38 px", watch, watch_ss)):
+            measured = _feature_pixels_by_side(name, side, sub)
+            if measured is None:
+                continue
+            dark, _ = measured
+            results.append(Result(
+                f"maria {name} tidak bocor ke belahan gelap ({label})",
+                dark == 0,
+                f"{dark} piksel maria di belahan gelap @{label} "
+                f"(harus 0 — bercak gelap di sisi gelap melebarkan sabit "
+                f"melebihi fraksi yang dihitung engine)"))
+
+
+#: Ambang fraksi iluminasi di mana maria **memang harus** terlihat.
+#:
+#: Maria berada di sekitar pusat piringan (dx −0.34…0.22, dy −0.44…0.26).
+#: Sabit tipis hanya menyinari sliver di tepi, jadi pusatnya jatuh di belahan
+#: gelap dan maria-nya **memang** terpotong habis — terukur: 0 piksel pada
+#: `moon-crescent-jakarta` (f = 0.18) dan `moon-new` (f = 0). Itu geometri
+#: yang benar, bukan cacat. Karena itu gerbang arah-sebaliknya hanya berlaku
+#: untuk piringan yang pita menyinarnya sudah menutupi pusat (f ≥ 0.5);
+#: menuntut maria di sabit tipis akan merah pada gambar yang **benar**, dan
+#: gerbang yang merah pada gambar benar dimatikan orang, bukan diperbaiki.
+MOON_FEATURE_VISIBLE_FROM_ILLUMINATION = 0.5
+
+
+def check_moon_feature_still_reaches_the_lit_side(results, size=200, ss=2):
+    """Arah sebaliknya: maria harus **masih tergambar** di belahan menyala.
+
+    Tanpa pasangan ini, cara termurah memenuhi "nol piksel di belahan gelap"
+    adalah **berhenti menggambar maria sama sekali** — `R.MARIA = []` membuat
+    gerbang kebocoran hijau sempurna. Yang berbunyi di sini harus "masih
+    tergambar", bukan "tidak bocor": keduanya dua perbaikan yang berlawanan
+    arah, dan satu keadaan yang menyalakan keduanya berarti gerbangnya tidak
+    memisahkan "dipotong" dari "dihapus".
+    """
+    names = [n for n in _moon_phase_cases()
+             if next(c for c in R.build_cases() if c.name == n
+                     ).kw.get("illumination", 0) >= MOON_FEATURE_VISIBLE_FROM_ILLUMINATION]
+    if not names:
+        results.append(Result(
+            "maria Bulan: kasus berfase cukup terang ada", False,
+            "tidak ada kasus Bulan dengan fraksi iluminasi ≥ "
+            f"{MOON_FEATURE_VISIBLE_FROM_ILLUMINATION} — gerbang ini tidak "
+            "mengukur apa pun"))
+        return
+    for name in names:
+        measured = _feature_pixels_by_side(name, size, ss)
+        if measured is None:
+            continue
+        _, lit = measured
+        results.append(Result(
+            f"maria {name} masih tergambar di belahan menyala",
+            lit > 0,
+            f"{lit} piksel maria di belahan menyala (0 = ciri tidak pernah "
+            f"sampai ke layar)"))
+
+
+
+
 def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
     """Fase tak diketahui **bukan** bulan baru — diukur dari piksel.
 
@@ -9118,6 +9338,9 @@ def main():
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
     check_phase_feature_stays_inside_the_lit_band(results, args.size, args.ss)
     check_phase_feature_still_draws_on_the_lit_side(results, args.size, args.ss)
+    check_moon_feature_stays_inside_the_lit_band(results, args.size, args.ss)
+    check_moon_feature_still_reaches_the_lit_side(results, args.size, args.ss)
+    check_moon_maria_reference_matches_the_model(results)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)

@@ -354,6 +354,29 @@ jobs:
       - name: Buktikan gerbang ciri planet berfase tidak bocor berbunyi
         run: python3 Tools/bukti-mutasi-fase-ciri.py
 
+      # Dan bukti untuk gerbang **maria Bulan tidak bocor ke belahan gelap**
+      # — kelas yang tidak bisa ditutup gerbang planet berfase.
+      #
+      # Gerbang itu mengukur piksel **menyala** di belahan gelap terhadap
+      # latar sudut frame. Piringan gelap Bulan (moonUnlit 0.13) lebih terang
+      # dari latar (0.058), jadi memasukkannya ke daftar kasus planet
+      # berfase akan melaporkan 14714 piksel "menyala" di belahan gelap pada
+      # berkas yang BERSIH — seluruh piringan gelapnya, bukan maria. Bercak
+      # gelap yang bocor karena itu butuh ukuran lain: selisih terhadap
+      # gambar tanpa ciri itu. Terukur dengan ukuran itu: melepas klip maria
+      # di port memunculkan 5516 piksel di belahan gelap pada 200 px dan 236
+      # di ukuran kartu jam, sementara `check-visuals.py --check` tetap
+      # 688 pemeriksaan, 0 gagal.
+      #
+      # Keadaan #2 adalah arah sebaliknya, dan justru yang paling penting:
+      # tanpa gerbang pasangannya, cara termurah memenuhi "nol piksel di
+      # belahan gelap" adalah berhenti menggambar maria sama sekali. Ia harus
+      # menyalakan **hanya** gerbang "masih tergambar", bukan gerbang
+      # kebocoran — kalau keduanya berbunyi, gerbangnya tidak memisahkan
+      # "dipotong" dari "dihapus".
+      - name: Buktikan gerbang maria Bulan tidak bocor berbunyi
+        run: python3 Tools/bukti-mutasi-maria.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di
