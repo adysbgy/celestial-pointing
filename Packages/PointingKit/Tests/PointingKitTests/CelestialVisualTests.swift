@@ -3490,5 +3490,102 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// `clusterCoreReferenceExtent` memotong pencilan atas lewat **median**,
+    /// bukan mean — jadi inti gugus bola tidak ikut membesar mengikuti blob
+    /// pusatnya yang raksasa.
+    ///
+    /// **Kenapa uji ini ada.** `readableCoreRadius` memakai nilai ini sebagai
+    /// plafon, dan ia diturunkan dari tata letak (bukan angka tetap). Kalau
+    /// pemotongan ini salah — misal memakai mean yang tertarik ke atas oleh
+    /// pencilan blob pusat — plafonnya ikut membengkak dan cacat yang ditutup
+    /// `testGlobularCoreStarsDoNotScaleWithTheCentralBlob` kembali terbuka,
+    /// tapi lewat jalur yang tidak dicek uji agregat itu (ia hanya membanding
+    /// inti pusat vs cincin, tidak memverifikasi *sumber* plafonnya). Uji ini
+    /// mengunci sumbernya secara langsung.
+    ///
+    /// Kasus kunci: satu blob 0.46 R di tengah, sisanya kecil (0.09–0.11 R).
+    /// Median harus mengambil salah satu nilai kecil, **bukan** tertarik ke
+    /// 0.46 oleh pencilan.
+    func testClusterCoreReferenceExtentUsesMedianNotMean() {
+        // Gugus bola nyata: blob pusat 0.46 R, bintang cincin ~0.10 R.
+        let extents = [0.46, 0.09, 0.10, 0.11, 0.10, 0.09, 0.11]
+        let reference = VisualFrame.clusterCoreReferenceExtent(extents)
+        // Median dari daftar ganjil (7 nilai) = nilai ke-4 setelah urut
+        // = 0.10, jauh di bawah mean (~0.151).
+        XCTAssertEqual(reference, 0.10, accuracy: 1e-12,
+                       "plafon harus median (0.10), bukan mean yang tertarik ke 0.46")
+        let mean = extents.reduce(0, +) / Double(extents.count)
+        XCTAssertLessThan(reference, mean,
+                          "median harus lebih kecil dari mean bila ada pencilan atas")
+
+        // Daftar genap: rata-rata dua tengah.
+        XCTAssertEqual(VisualFrame.clusterCoreReferenceExtent([0.20, 0.40]),
+                       0.30, accuracy: 1e-12)
+        // Kosong → 0, supaya pemanggil tidak membagi dengan nol.
+        XCTAssertEqual(VisualFrame.clusterCoreReferenceExtent([]), 0,
+                       "extent kosong harus 0, bukan NaN")
+    }
+
+    /// `readableCoreRadius` memenuhi kontrak gandanya secara langsung:
+    /// (1) **tidak pernah melebihi `extent`** — inti tak keluar dari blobnya;
+    /// (2) **menghormati lantai keterbacaan 0.8 pt** pada frame kecil;
+    /// (3) **tidak boleh melebihi blob** meski lantai menuntut lebih.
+    ///
+    /// **Kenapa uji ini, bukan cuma mengandalkan `testClusterCores…`.** Uji
+    /// agregat mengecek hasil lewat `clusterCores`, yang menyembunyikan
+    /// `readableCoreRadius` di balik `min(extent, reference)` dan perulangan
+    /// blob. Kalau suatu hari fungsi ini ditulis ulang (mis. argumen
+    /// `frameHalfExtent` dilupakan sehingga lantai 0.8 dibaca sebagai 0.8
+    /// *radius*), agregat masih bisa hijau untuk frame besar tapi berdarah
+    /// pada frame kecil. Uji ini memukul fungsi murni dengan batas-batasnya.
+    func testReadableCoreRadiusContract() {
+        let fraction = VisualFrame.clusterCoreRadiusFraction // 0.30
+        let extent = 0.10 // blob gugus tipikal (satuan radius)
+        let reference = 0.10 // median blob, selevel extent
+
+        // (1) Frame besar: lantai 0.8 pt jadi pecahan kecil, jadi hasil = fraksi.
+        let big = VisualFrame.readableCoreRadius(fraction: fraction,
+                                                 extent: extent,
+                                                 reference: reference,
+                                                 frameHalfExtent: 100)
+        XCTAssertEqual(big, fraction * min(extent, reference), accuracy: 1e-12,
+                       "pada frame besar hasil = fraksi × min(extent, reference)")
+        XCTAssertLessThanOrEqual(big, extent, "inti tidak boleh melebihi blognya")
+
+        // (2) Frame kecil (kartu jam 19 pt): lantai 0.8/19 ≈ 0.042 R < fraksi,
+        //     jadi inti tetap fraksinya — tapi tetap >= lantai (terbaca >=1px).
+        let watch = VisualFrame.readableCoreRadius(fraction: fraction,
+                                                   extent: extent,
+                                                   reference: reference,
+                                                   frameHalfExtent: 19)
+        let floor = VisualFrame.readableCorePointRadius / 19
+        XCTAssertGreaterThanOrEqual(watch, floor - 1e-12,
+                                    "inti harus menghormati lantai keterbacaan")
+        XCTAssertLessThanOrEqual(watch, extent + 1e-12,
+                                 "inti tetap di dalam blob walau di frame kecil")
+
+        // (3) Lantai menuntut lebih dari blob: hasil dikapit pada `extent`.
+        //     extent 0.01 pt di frame 19 → lantai 0.042 R jauh di atasnya.
+        let tinyExtent = 0.01
+        let capped = VisualFrame.readableCoreRadius(fraction: fraction,
+                                                    extent: tinyExtent,
+                                                    reference: tinyExtent,
+                                                    frameHalfExtent: 19)
+        XCTAssertLessThanOrEqual(capped, tinyExtent + 1e-12,
+                                 "lantai tidak boleh menang atas batas blob — "
+                                 + "kalau menang, bintang menonjol keluar kabutnya")
+
+        // (4) Frame nol/negatif tidak bikin NaN: lantai dibagi nol → hasil
+        //     kembali ke `scaled` (fraksi × min(extent, reference)).
+        let zero = VisualFrame.readableCoreRadius(fraction: fraction,
+                                                  extent: extent,
+                                                  reference: reference,
+                                                  frameHalfExtent: 0)
+        XCTAssertEqual(zero, fraction * min(extent, reference), accuracy: 1e-12,
+                       "frameHalfExtent 0 tidak boleh menghasilkan NaN/inf")
+        XCTAssertFalse(zero.isNaN || zero.isInfinite,
+                       "pembagi nol harus ditangani, bukan NaN")
+    }
+
 }
 
