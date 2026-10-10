@@ -1,3 +1,84 @@
+## Siklus: gerbang piringan kedua Saturnus tidak pernah dijalankan CI
+
+Siklus ini mulai dari pekerjaan yang belum di-commit yang ditinggalkan siklus
+sebelumnya (matang karena timeout). Isinya perbaikan nyata, dan ia membuka
+**tiga** cacat perkakas yang tidak terlihat selama perbaikannya belum
+di-commit.
+
+### Cacat gambarnya: dua piringan bersarang
+
+`drawPlanet` menggambar bola radius penuh 1.0 R lebih dulu, lalu pada cabang
+cincin `drawRings` menggambar bolanya **sendiri** pada
+`VisualFrame.saturnBodyRadius` (0.53 R). Yang sampai ke layar jadi dua piringan
+bersarang: cakram 1.0 R yang bocor ke seluruh frame di luar bidang cincin, di
+bawah bola 0.53 R milik cincinnya. Di kartu jam itu terbaca "dua bola
+bersarang", bukan Saturnus.
+
+Kenapa tidak ada gerbang yang menangkapnya: pemeriksaan terdekat, "cincin
+Saturnus lebih lebar dari bola" (`reach > 0.8`), **dilewati oleh cakram bocor
+itu sendiri** — ia menjangkau 1.0 R. Diukur lewat probe langsung pada port:
+
+```
+[baseline]                          piringan-kedua 0/14144 | gerbang lama HIJAU (0.996 R)
+bola penuh kembali di jalur cincin  piringan-kedua 14144/14144 | gerbang lama HIJAU (1.003 R)
+cincin dihapus, syarat dibatalkan   piringan-kedua 14144/14144 | gerbang lama HIJAU (1.003 R)
+cincin dihapus SAJA                 piringan-kedua 0/14144 | gerbang lama MERAH (0.000 R)
+cincin dikecilkan ke 0.55 R         piringan-kedua 0/14144 | gerbang lama MERAH (0.546 R)
+```
+
+Perbaikan: syarat `!(isConfirmed && palette.feature == .rings)` di view dan
+padanannya di port, supaya bola radius penuh dilewati pada jalur cincin. Kasus
+**ragu** tetap memakai bola radius penuh — di sana tidak ada cincin yang
+menggambar bolanya, dan yang harus tampil memang hanya warnanya.
+
+### Cacat 1: harnessnya mengukur keadaan yang bukan keadaannya
+
+`Tools/bukti-mutasi-piringan.py` keadaan 2 mengklaim "cincin dihapus, piringan
+bocor tetap (14 144 piksel)". Mutasinya hanya mengganti pemanggilan cincinnya
+dengan `pass`. Syaratnya masih utuh, jadi bola 1.0 R-nya **juga** tidak
+digambar: terukur 0/14 144, dan gerbang lama justru MERAH — persis kebalikan
+dari yang diklaim docstring-nya. Menghapus cincin sambil mempertahankan
+piringannya menuntut **dua** suntingan.
+
+Akar yang membuatnya tidak terlihat: pengulang mutasinya selalu menulis
+`content = _originals[path]`, jadi suntingan kedua pada berkas yang sama
+**menimpa** yang pertama. Sekarang dirantai per berkas (`pending[path]`).
+
+### Cacat 2: harness itu tidak pernah dijalankan CI
+
+Daftar `Tools/bukti-mutasi-*.py` di disk: **13**. Yang dirujuk
+`engine-tests.yml`: **12**. Berkasnya ada, isinya benar, dan tidak ada yang
+mengeksekusinya — gerbang yang tidak dijalankan selalu hijau, dan ia menutupi
+persis cacat yang ditulisnya untuk menangkap, tanpa satu pun jejak di laporan
+CI.
+
+Sekarang dirujuk, dan kelas cacatnya ditutup gerbang meta baru
+`Tools/check-harness-terdaftar.py` — dua arah (harness di disk tak dirujuk;
+langkah CI merujuk berkas hilang), plus bukti-diri bahwa auditnya memang bisa
+merah, plus penjaga bahwa pola globnya tidak diam-diam menemukan nol berkas.
+
+### Cacat 3: probe-nya tidak menjalankan pemeriksaan yang dituntut states
+
+`probe()` hanya memanggil gerbang piksel. Dua keadaan (1 dan 5) menuntut
+pemeriksaan `check_port_matches_swift_constants`, yang membaca sumber view dan
+port dari disk — jadi `must_fire` yang menyebut nama pemeriksaan itu **tidak
+mungkin** terpenuhi. Terukur: keadaan 1 dan 5 sama-sama dilaporkan SALAH, dan
+keadaan 5 (yang sengaja hanya mengubah view) melaporkan 0 merah sama sekali.
+
+Tiga cacat ini punya bentuk yang sama: **harness yang hijau tanpa pernah
+mengukur apa yang diklaimnya**. Itu sebabnya harness yang tidak dijalankan CI
+adalah cacat yang paling mahal dari ketiganya.
+
+### Status akhir siklus ini (terverifikasi, bukan diklaim)
+
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 706 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> **666 pemeriksaan, 0 gagal**.
+  - `python3 Tools/bukti-mutasi-piringan.py` -> **6 keadaan, 0 tidak sesuai
+    harapan** (sebelum perbaikan: 2 keadaan SALAH, exit 1).
+  - `python3 Tools/check-harness-terdaftar.py` -> **13 harness, semuanya
+    dirujuk alur kerja** + 3/3 bukti-diri lolos.
+
 ## Progres terakhir (9 Okt 2026 — bola netral planet tak dikenal: satu-satunya gambar yang mewakili jalur jujur PRD, dan tak seorang pun menjaganya)
 
 ### Cacatnya: kasus render yang tidak pernah disebut gerbang mana pun
