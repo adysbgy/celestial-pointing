@@ -422,9 +422,25 @@ public extension CelestialVisual {
         deepSky: .init(red: 0.72, green: 0.78, blue: 0.95),
         // Warna kabut per morfologi. Kanan = kanal merah (yang menentukan
         // kecerahan mode malam, lihat `nightModeBrightness`), dan urutan
-        // kecerahannya sengaja mengikuti objeknya: gugus bola (M13, bintang
-        // tua yang rapat) paling terang, nebula emisi menyusul karena gasnya
-        // memancar, lalu galaksi dan gugus terbuka.
+        // kecerahannya sengaja mengikuti objeknya.
+        //
+        // **Urutan di bawah diukur, bukan dikira-kira.** Komentar ini sampai
+        // siklus ini berbunyi "gugus bola paling terang ... lalu galaksi dan
+        // gugus terbuka" — dan separuhnya salah: terukur lewat
+        // `NightVisual.surface`, gugus terbuka justru yang **paling terang**
+        // (0.967), bukan salah satu dari dua yang paling redup. Ini kelas
+        // cacat yang sudah berulang di repo ini (komentar mengutip angka yang
+        // tidak pernah ia ukur), jadi sekarang urutannya dijaga uji
+        // `testDeepSkyNightBrightnessMatchesTheDocumentedOrdering`.
+        //
+        // Terukur (kanal merah mode malam, terang -> redup):
+        //   gugus terbuka 0.967 > gugus bola 0.955 > nebula emisi 0.922
+        //     > galaksi miring 0.883 > kabut netral 0.818
+        //     > galaksi spiral 0.662 > nebula planetari 0.623
+        //
+        // Kenapa urutan ini penting: mode malam membuang seluruh hue, jadi
+        // kecerahan adalah satu-satunya kanal tersisa untuk membedakan keenam
+        // jenis benda di layar.
         //
         // Hijau & biru tidak boleh nol di sini — warna siang yang netral
         // (merah = hijau = biru) adalah definisi "tidak berwarna", dan

@@ -375,6 +375,55 @@ final class DeepSkyColourTests: XCTestCase {
         XCTAssertEqual(CelestialVisual.deepSkyColour(for: nil), neutral)
     }
 
+    /// Urutan terang mode malam harus **cocok dengan yang diklaim komentar
+    /// paletnya**.
+    ///
+    /// Cacat yang ditutup uji ini: komentar di `NightVisual.accents` (baris
+    /// "urutan kecerahannya sengaja mengikuti objeknya") menyatakan
+    /// **gugus bola paling terang, nebula menyusul, lalu galaksi dan gugus
+    /// terbuka**. Tidak satu pun uji mengukur urutan itu — dan sebagian
+    /// klaimnya ternyata salah, diukur lewat `NightVisual.surface`:
+    ///
+    /// ```
+    /// gugus terbuka 0.967 > gugus bola 0.955 > nebula 0.922 > galaksi 0.883
+    /// ```
+    ///
+    /// Gugus terbuka justru yang **paling terang**, bukan salah satu dari dua
+    /// yang paling redup. Ini kelas cacat yang sudah berulang di repo ini:
+    /// komentar yang mengutip angka yang tidak pernah ia ukur. Komentar
+    /// adalah satu-satunya bukti yang dibaca orang saat menilai apakah sebuah
+    /// palet layak dipercaya.
+    ///
+    /// Kenapa urutan ini penting dan bukan sekadar kerapian: mode malam
+    /// membuang seluruh hue, jadi **kecerahan adalah satu-satunya kanal yang
+    /// tersisa** untuk membedakan enam jenis objek langit dalam. Urutan yang
+    /// melenceng dari yang didokumentasikan berarti dua benda bertukar
+    /// tempat di satu-satunya kanal yang masih terbaca.
+    ///
+    /// Yang diukur adalah klaim **eksplisit** komentarnya (tiga perbandingan
+    /// berpasangan), bukan seluruh urutan: mengunci seluruh tujuh nilai
+    /// berarti mengunci paletnya, dan itu bukan yang salah.
+    func testDeepSkyNightBrightnessMatchesTheDocumentedOrdering() {
+        func night(_ morphology: DeepSkyCatalogue.Morphology) -> Double {
+            NightVisual.surface(CelestialVisual.deepSkyColour(for: morphology)).red
+        }
+        // "gugus bola ... paling terang" — dari komentar palet.
+        XCTAssertGreaterThan(night(.globularCluster), night(.nebula),
+                             "komentar palet: gugus bola paling terang, nebula menyusul")
+        XCTAssertGreaterThan(night(.globularCluster), night(.galaxy),
+                             "komentar palet: gugus bola paling terang, galaksi di bawahnya")
+        // "nebula emisi menyusul" — nebula di atas galaksi.
+        XCTAssertGreaterThan(night(.nebula), night(.galaxy),
+                             "komentar palet: nebula emisi menyusul, galaksi di bawahnya")
+        // Arah yang salah dari klaimnya: gugus terbuka digolongkan "paling
+        // redup" bersama galaksi, padahal terukur ia yang paling terang.
+        // Tanpa baris ini, komentar yang menurunkan gugus terbuka ke dasar
+        // akan lolos tiga perbandingan di atas.
+        XCTAssertGreaterThan(night(.openCluster), night(.globularCluster),
+                             "gugus terbuka terukur lebih terang dari gugus bola — "
+                             + "komentar palet menggolongkannya sebagai yang paling redup")
+    }
+
     /// Warna kabut tetap merah murni di mode malam.
     ///
     /// Diuji di sini juga, bukan hanya di `testEveryAccentColourBecomesPureRedAtNight`:

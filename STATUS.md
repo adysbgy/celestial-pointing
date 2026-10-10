@@ -1,3 +1,80 @@
+## Siklus: urutan terang mode malam diklaim komentar yang tidak pernah mengukurnya
+
+Siklus ini mulai dari satu kalimat di komentar palet, bukan dari layar.
+`NightVisual.accents` menulis bahwa urutan kecerahannya "mengikuti objeknya:
+**gugus bola paling terang**, nebula emisi menyusul ... **lalu galaksi dan
+gugus terbuka**". Tidak ada satu pun uji yang mengukur urutan itu.
+
+### Cacatnya: separuh klaim komentar itu salah, terukur
+
+Mode malam membuang seluruh hue, jadi **kecerahan adalah satu-satunya kanal
+tersisa** untuk membedakan keenam jenis objek langit dalam di layar. Karena
+itu klaim urutannya bukan kerapian — ia menjawab "benda mana yang tampak
+paling terang saat semua warna hilang".
+
+Dihitung lewat `NightVisual.surface` (kanal merah, `nightModeBrightness = red`,
+`floor 0.35 + range 0.65`):
+
+```
+gugus terbuka 0.967 > gugus bola 0.955 > nebula emisi 0.922
+  > galaksi miring 0.883 > kabut netral 0.818
+  > galaksi spiral 0.662 > nebula planetari 0.623
+```
+
+Gugus terbuka justru yang **paling terang**, bukan salah satu dari dua yang
+paling redup seperti yang ditulis komentarnya. Jadi siapa pun yang membaca
+komentar itu untuk memahami paletnya mendapat urutan yang terbalik di ujung
+rentangnya — persis kelas cacat "komentar mengutip angka yang tidak pernah ia
+ukur" yang sudah berulang di repo ini.
+
+### Perbaikannya: uji dulu, komentar mengikuti ukurannya
+
+`testDeepSkyNightBrightnessMatchesTheDocumentedOrdering` (baru) mengunci
+**tiga perbandingan berpasangan** yang diklaim komentarnya, bukan seluruh
+urutan: mengunci ketujuh nilai berarti mengunci paletnya, padahal yang salah
+adalah catatannya. Perbandingan keempat menjaga arah yang **salah** dari
+klaimnya gugus terbuka berada di dasar — tanpanya, komentar yang menurunkan
+gugus terbuka akan lolos tiga perbandingan lainnya.
+
+Komentarnya lalu **dibetulkan ke angka yang terukur**, dan menyebut uji yang
+menjaganya. Bukan dilunakkan: kalimat yang menyatakan urutan kini menyertakan
+tabel hasil ukurnya.
+
+### Gerbangnya dibuktikan berbunyi
+
+Mutasi `deepSkyOpenCluster` kanal merah 0.95 → 0.50 (menurunkannya ke bawah
+gugus bola) membuat uji itu **merah**: `0.675` tidak lebih besar dari
+`0.9545`, dengan pesan yang menunjuk tepat ke klaim yang dilanggar. Sumber
+dipulihkan dan md5-nya diverifikasi identik (`e81aaea6…`).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 706 | **707** (+1 uji urutan terang) |
+| Aturan UI | 29 | 29 (Aturan 10 memaksa README 706→707) |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 206 + PointingKit 707 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (29 aturan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - Mutasi dibuktikan merah, lalu sumber dipulihkan (md5 identik).
+
+### Yang TIDAK diklaim
+
+  - Uji ini menjaga **kesepakatan komentar dengan ukurannya**, bukan kebenaran
+    astronomi kecerahan relatif keenam jenis benda. Kalau kelak paletnya
+    diubah **beserta** komentar dan ujinya, gerbang ini hijau — yang dijaga
+    adalah ketiganya tidak boleh bercerai.
+  - Yang diukur kanal **merah mode malam**. Urutan kecerahan siang (luminans
+    penuh, hijau/biru ikut terhitung) berbeda dan tidak diuji di sini.
+  - Tidak ada kode produksi yang berubah — hanya komentar, satu uji, dan
+    README. Tidak ada satu baris pun `Apps/` yang tersentuh.
+
+---
+
 ## Siklus: pemotongan ciri planet berfase — akibatnya tidak diukur siapa pun
 
 Siklus ini mulai dari audit "kasus tak terjaga", bukan dari fitur baru. Yang
