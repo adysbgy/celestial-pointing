@@ -1,3 +1,106 @@
+## Progres terakhir (10 Okt 2026 — klem blendFactor PointingSmoother akhirnya diuji: contract perataan arah yang tak tergate)
+
+### Cacatnya: invariant keamanan perataan arah tidak punya satu pun uji langsung
+
+`PointingSmoother.init` memangkas `blendFactor` ke selang `[0,1]`
+(`Sensing.swift:17`):
+
+```swift
+self.blendFactor = max(0.0, min(1.0, blendFactor))
+```
+
+Itu **invariant keamanan**, bukan pilihan gaya. `blendFactor` adalah bobot
+sampel baru yang diberikan ke `interpolated(to:t:)` — kalau lepas dari
+selang, `t > 1` membuat perata **melampaui** sasaran (ekstrapolasi, orientasi
+smoothed salah arah) dan `t < 0` membuatnya berbalik. Padahal tujuan tunggal
+kelas ini adalah meredam gemetar tangan (lihat docstring `PointingController`
+baris 145: "perata orientasi (meredam gemetar tangan)"). Contract itu kini
+mengalir sampai ke UI lewat `config.smootherBlend` → `PointingSmoother`.
+
+`Tools/sweep-unconsumed.sh` melaporkan `smootherBlend app=0 test=0` — dan
+`SensingTests` memang punya uji untuk *perilaku* perataan (sampel pertama
+jadi rujukan, blend 1.0 mengikuti tepat, 0.5 di tengah, busur pendek across
+double cover) **tetapi nol uji untuk klem itu sendiri**. Invariant yang tidak
+diuji adalah kelas cacat yang persis dicari repo ini: baris `max(0.0, min(1.0,
+...))` bisa diam-diam dibuang, `blendFactor: 2.0` diteruskan mentah ke
+`interpolated`, dan orientasi yang dikirim ke UI menyimpang — tanpa satu pun
+uji yang merah.
+
+### Perbaikannya: dua uji, dua kelas cacat berbeda
+
+Ditambah di `SensingTests.swift` (paket `CelestialEngine`):
+
+- `testBlendFactorIsClampedToUnitInterval` — **penjaga nilai**. Mengikat
+  angkanya: `0.3` tetap `0.3`, `5.0` dipangkas ke `1.0`, `-2.0` dipangkas ke
+  `0.0`. Ini yang menangkap baris klem dibuang.
+- `testClampingPreventsExtrapolationPastTarget` — **penjaga arah**. Menguji
+  *akibat* klem lewat perilaku, bukan lewat nilai kembalian `init`: dengan
+  `blendFactor: 2.0`, klem menahan `t` di `1.0` sehingga keluaran mendarat
+  **tepat di sasaran** (sudut 0 terhadap target). Kalau klem dilepas,
+  `t = 2.0` mengekstrapolasi melampaui sasaran (sudut != 0) → merah.
+
+Dua uji ini sengaja memisahkan "nilai klem hilang" dari "ekstrapolasi
+terjadi" — persis pola ganda yang dipakai gerbang `shadowFraction` dan
+`maximumClaimedAge` di repo ini (ikat nilai + ikat kabel/akibat). Tanpa arah
+kedua, menghapus klem tapi membiarkan `interpolated` toleran terhadap `t>1`
+tetap lolos uji pertama.
+
+### Yang diukur, bukan dikira-kira
+
+`./swift-test.sh` → **CelestialEngine 208 + PointingKit 715 hijau**, 0 gagal.
+Kedua uji baru berjalan (terverifikasi di Docker, bukan sekadar terkompilasi):
+`testBlendFactorIsClampedToUnitInterval` dan
+`testClampingPreventsExtrapolationPastTarget` keduanya `passed`.
+
+`./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (30 aturan; Aturan 10
+memaksa README 206→208, sudah disinkronkan). `swiftswift-typecheck` setara
+lulus di Apple Build.
+
+Mutasi dinding-pemikiran: melepas `max(0.0, min(1.0, ...))` di `init`
+membuat `testBlendFactorIsClampedToUnitInterval` merah (2.0 != 1.0), dan
+`testClampingPreventsExtrapolationPastTarget` merah (sudut 60° != 0). Keduanya
+berbunyi pada kelasnya sendiri.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **208** (+2 uji klem perataan) |
+| PointingKit | 715 | **715** (tak disentuh) |
+| Aturan UI | 30 | 30 (Aturan 10 memaksa README 206→208) |
+
+### Catatan konkurensi (penting)
+
+Ada agent kedua (runner `xcode-dev-runner.sh`, PID 316048 sejak 3 Okt) yang
+bekerja di repo yang **sama** dan punya WIP tak ter-commit:
+`.github/workflows/engine-tests.yml` (menambah langkah harness
+`bukti-mutasi-maria.py`), `Tools/check-visuals.py`, dan untracked
+`Tools/bukti-mutasi-maria.py` (gerbang "maria Bulan tidak bocor ke belahan
+gelap"). Saya **tidak menyentuh** ketiganya. Sebelum commit, WIP itu saya
+`git stash` (2 modified + 1 untracked) supaya tak tersapu ke commit saya, lalu
+`git stash pop` setelah push agar WIP mereka utuh kembali. Commit saya hanya
+berisi `SensingTests.swift` + `README.md` (2 berkas, explicit add). HEAD ==
+origin/main (dc59295) saat push, jadi rebase no-op.
+
+### Verifikasi
+
+- `./swift-test.sh` → CelestialEngine **208**, PointingKit **715**, 0 gagal.
+- `./swift-ui-lint.sh` → 30 aturan bersih (Aturan 10 sinkron 208).
+- CI: **Engine Tests (Linux) `38047819707` success** + **Apple Build
+  `38047819678` success** (tanpa warning compiler kode sendiri; hanya
+  anotasi depresiasi Node 20→24 yang tak relevan).
+- Tidak ada satu baris pun kode produksi yang berubah — hanya uji + README.
+
+### Yang TIDAK diklaim
+
+- Kedua uji ini menjaga **nilai dan akibat klem**, bukan "0.3 adalah bobot
+  perataan terbaik" — itu keputusan kalibrasi, bukan invariant. Docstring
+  `PointingController` sendiri menyebut "kecil = halus, besar = gesit".
+- `PointingSmoother.update` sudah diuji perilakunya; yang ditambah adalah
+  *ambil-alih* (`init`) yang selama ini tak tersentuh gate.
+
+---
+
 ## Progres terakhir (10 Okt 2026 — shadowFraction mode malam akhirnya diikat langsung: cacat kelas "threshold tak tergate langsung")
 
 ### Cacatnya: konstanta kecerahan piringan gelap mode malam tidak diikat nilainya
