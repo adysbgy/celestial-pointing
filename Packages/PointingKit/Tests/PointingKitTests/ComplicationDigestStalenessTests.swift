@@ -127,4 +127,56 @@ final class ComplicationDigestStalenessTests: XCTestCase {
         XCTAssertTrue(uncertainAndOld.carriesUncertaintyMarker(at: now()))
         XCTAssertEqual(uncertainAndOld.sublineContent(at: now()), .uncertaintyMarker)
     }
+
+    // MARK: - Konstanta umur maksimum (threshold tak tergate langsung)
+
+    /// `maximumClaimedAge` sendiri **harus** diikat, bukan cuma sifatnya.
+    ///
+    /// Seluruh uji basi di atas memakai helper `digest(updatedMinutesAgo:)`
+    /// dengan nilai 0/1/2/90/600 menit — tidak satu pun yang menyebut
+    /// `maximumClaimedAge`. Jadi kalau suatu hari angkanya diganti (mis.
+    /// `15 * 60` menjadi `5 * 60`, atau `max` dilepas jadi `0`), complication
+    /// akan membekukan nama objek jauh lebih cepat **tanpa satu uji pun yang
+    /// merah**: lima nilai uji itu semua masih di atas ambang baru. Ini tepat
+    /// kelas cacat yang dicari repo ini — ambang yang tidak diuji adalah
+    /// ambang yang bisa diam-diam berubah. Docstring konstanta itu sendiri
+    /// menulis \"klausa yang tidak bisa diuji adalah klausa yang tidak bisa
+    /// dipercaya\"; uji ini yang mewujudkannya.
+    func testMaximumClaimedAgeIsFifteenMinutes() {
+        XCTAssertEqual(ComplicationDigest.maximumClaimedAge, 15 * 60)
+    }
+
+    /// **Batasnya harus diuji di kedua sisi**, bukan cuma \"lama jadi basi\".
+    ///
+    /// `isStale` membandingkan `now.timeIntervalSince(updatedAt) >
+    /// maximumClaimedAge`. Satu detik di bawah ambang harus tetap segar, dan
+    /// satu detik di atasnya harus basi. Tanpa arah sebaliknya, seseorang
+    /// bisa menaikkan ambang ke tak-terhingga (complication tidak pernah basi)
+    /// atau menurunkannya ke nol (selalu basi) sambil tetap lolos uji
+    /// \"90 menit basi\". `now` dikunci supaya selisihnya persis `age` (dua
+    /// operasi `addingTimeInterval` berlawanan arah pada basis yang sama
+    /// menghasilkan selisih eksak, bebas galat pembulatan).
+    func testDigestOneSecondUnderTheLimitIsFresh() {
+        XCTAssertFalse(digestAged(ComplicationDigest.maximumClaimedAge - 1).isStale(at: fixedNow))
+    }
+
+    func testDigestOneSecondOverTheLimitIsStale() {
+        XCTAssertTrue(digestAged(ComplicationDigest.maximumClaimedAge + 1).isStale(at: fixedNow))
+    }
+
+    /// Batas persis: pada `age == maximumClaimedAge`, `>` bernilai salah, jadi
+    /// bukan basi. Ini yang menjaga arah \"tepat di ambang masih diklaim\".
+    func testDigestExactlyAtTheLimitIsNotStale() {
+        XCTAssertFalse(digestAged(ComplicationDigest.maximumClaimedAge).isStale(at: fixedNow))
+    }
+
+    private let fixedNow = Date()
+
+    private func digestAged(_ age: TimeInterval) -> ComplicationDigest {
+        ComplicationDigest(stateRaw: PointingState.lock.rawValue,
+                           objectName: "Sirius",
+                           objectKindRaw: ObjectKind.star.rawValue,
+                           isConfirmed: true,
+                           updatedAt: fixedNow.addingTimeInterval(-age))
+    }
 }
