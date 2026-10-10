@@ -1,3 +1,63 @@
+## Progres terakhir (10 Okt 2026 — ambang maximumClaimedAge akhirnya diikat: cacat kelas "threshold tak tergate langsung")
+
+### Cacatnya: konstanta umur basi complication tidak punya satu pun uji yang menyebutnya
+
+`ComplicationDigest.maximumClaimedAge` (15 × 60 detik) adalah ambang keamanan
+complication: tanpa dia, pergelangan yang berhenti bergerak akan membekukan
+nama objek di wajah jam sampai app dibuka lagi, dan kunci itu tampil seolah
+hasil pengukuran yang sedang berjalan — persis yang dikhawatirkan docstring
+konstanta itu sendiri ("klausa yang tidak bisa diuji adalah klausa yang tidak
+bisa dipercaya").
+
+Sampai siklus ini ambangnya **tidak diikat langsung**. Seluruh `ComplicationDigestStalenessTests`
+memakai helper `digest(updatedMinutesAgo:)` dengan nilai 0/1/2/90/600 menit —
+tidak satu pun yang menyebut `maximumClaimedAge`. `Tools/sweep-unconsumed.sh`
+melaporkan `maximumClaimedAge app=0 test=0 paket=2`: ambang yang tidak diuji
+adalah kelas cacat yang persis dicari repo ini. Kalau suatu hari angkanya
+diganti (mis. `15*60` → `5*60`, atau `max` dilepas jadi `0`), complication
+mulai membekukan nama jauh lebih cepat **tanpa satu uji pun yang merah** — kelima
+nilai uji itu semua tetap di atas ambang baru.
+
+### Perbaikannya: empat uji di `ComplicationDigestStalenessTests.swift`
+
+- `testMaximumClaimedAgeIsFifteenMinutes` — mengikat **konstanta itu sendiri**,
+  bukan cuma sifatnya. Ini yang menangkap angka diganti.
+- `testDigestOneSecondUnderTheLimitIsFresh` / `testDigestOneSecondOverTheLimitIsStale`
+  — batas diuji **kedua sisi**: 1 dtk di bawah tetap segar, 1 dtk di atas basi.
+  Tanpa arah sebaliknya, ambang bisa dinaikkan ke tak-terhingga (tidak pernah
+  basi) atau diturunkan ke nol (selalu basi) sambil tetap lolos uji "90 menit
+  basi".
+- `testDigestExactlyAtTheLimitIsNotStale` — pada `age == maximumClaimedAge`,
+  `>` salah, jadi bukan basi; menjaga arah "tepat di ambah masih diklaim".
+
+`now` dikunci ke `fixedNow` supaya selisihnya persis `age` (dua
+`addingTimeInterval` berlawanan arah pada basis yang sama bebas galat
+pembulatan) — uji batas tidak boleh goyah hanya karena detik berlalu antara
+dua baris.
+
+### Yang diukur, bukan dikira-kira
+
+`./swift-test.sh` → **CelestialEngine 206 + PointingKit 713 hijau** (709 + 4),
+0 gagal. Keempat uji baru berjalan (terverifikasi di Docker, bukan sekadar
+terkompilasi). `./swift-ui-lint.sh` → **30 aturan bersih** (Aturan 10 memaksa
+README 709→713). `./swift-typecheck.sh` → lulus. CI: Engine Tests (Linux)
+`38043599419` **success** + Apple Build `38043599400` **success**.
+
+Tidak ada kode produksi yang berubah — hanya uji + README. Berkas tersentuh:
+`ComplicationDigestStalenessTests.swift`, `README.md`, `STATUS.md`.
+
+### Yang TIDAK diklaim
+
+- Keempat uji ini menjaga **nilai dan batas ambang**, bukan kebenaran astronomis
+  angka 15 menit. Docstring konstanta itu sendiri menjelaskan asalnya ("langit
+  bergerak terlalu sedikit dalam 15 menit") — yang dijaga di sini adalah bahwa
+  angka itu tidak bisa diam-diam berubah tanpa uji merah.
+- `isStale` sudah diuji lewat `confirmsIdentityNow`/`sublineContent` di uji
+  lama; yang ditambah adalah ikatan langsung ke konstanta dan batas eksaknya,
+  bukan cabang logikanya.
+
+---
+
 ## Siklus: urutan terang mode malam diklaim komentar yang tidak pernah mengukurnya
 
 Siklus ini mulai dari satu kalimat di komentar palet, bukan dari layar.
