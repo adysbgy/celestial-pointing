@@ -225,7 +225,7 @@ targets:
         # Ditulis di sini, bukan hanya di berkas plist: `xcodegen generate`
         # menulis ulang plist dari daftar ini, jadi kunci yang tidak ada di
         # sini hilang setiap kali proyek dibuat.
-        CFBundleDisplayName: Point & Know Complication
+        CFBundleDisplayName: Point & Know
         CPAppGroupID: group.$(BUNDLE_ID_PREFIX).pointandknow
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
