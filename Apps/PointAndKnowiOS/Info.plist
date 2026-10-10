@@ -23,5 +23,9 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>dev.celestial.pointandknow.view-object</string>
+	</array>
 </dict>
 </plist>

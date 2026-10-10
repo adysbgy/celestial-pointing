@@ -36,8 +36,28 @@ struct PointAndKnowiOSApp: App {
 
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            // Simulator: `-debugShow3D saturn` menampilkan tampilan 3D sebagai
+            // akar, tanpa sheet — untuk tangkapan layar & verifikasi ADR-017.
+            if UserDefaults.standard.string(forKey: "debugShow3D") == "uvtest" {
+                Sky3DView(content: Sky3DFactory.uvTest(), title: "uvtest")
+            } else if UserDefaults.standard.string(forKey: "debugShow3D") == "conjunction",
+                      let p = PhenomenaCalendar.upcoming(after: Date(), observer: engine.controller.observer,
+                                                         resolver: engine.controller.resolver,
+                                                         events: nil).first(where: { $0.kind == .conjunction && $0.visibleHere }),
+                      let content = Sky3DFactory.content(for: p, engine: engine) {
+                Sky3DView(content: content, title: PhenomenonText.title(p))
+            } else if let id = UserDefaults.standard.string(forKey: "debugShow3D"),
+               let content = Sky3DFactory.object(id, engine: engine) {
+                Sky3DView(content: content, title: id)
+            } else {
+                RootView(engine: engine, motion: motion, location: location, link: link, trace: trace,
+                         stellarium: stellarium)
+            }
+            #else
             RootView(engine: engine, motion: motion, location: location, link: link, trace: trace,
                      stellarium: stellarium)
+            #endif
         }
     }
 }
@@ -70,6 +90,8 @@ struct RootView: View {
     /// pun satu sumber (`StateAnnouncement`), supaya kedua app tidak bisa
     /// mengucapkan dua hal berbeda untuk cuplikan yang sama.
     @State private var announcedState: PointingState?
+    /// Benda yang dibuka dari jam lewat Handoff ("Lihat 3D di iPhone", ADR-017).
+    @State private var handoff3D: Scene3DSheet?
     /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
     /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
     private let audioCue = AudioCueEngine()
@@ -106,6 +128,13 @@ struct RootView: View {
         // terbaca. Mode malam (merah) tetap diatur palet, bukan skema.
         .forceDarkScheme()
         .onAppear { start() }
+        .sheet(item: $handoff3D) { sheet in Sky3DView(content: sheet.content, title: sheet.title) }
+        .onContinueUserActivity(ViewObjectActivity.type) { activity in
+            guard let id = activity.userInfo?[ViewObjectActivity.objectIDKey] as? String,
+                  let content = Sky3DFactory.object(id, engine: engine),
+                  case .object(let spec) = content else { return }
+            handoff3D = Scene3DSheet(content: content, title: spec.name)
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active: start()

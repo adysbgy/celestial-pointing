@@ -177,6 +177,9 @@ targets:
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Handoff "Lihat 3D di iPhone" dari jam (ADR-017).
+        NSUserActivityTypes:
+          - dev.celestial.pointandknow.view-object
 
   # ─────────────────────────────────────────────────────────────────────────
   # Complication watchOS (WidgetKit) — terbenam di dalam app jam.

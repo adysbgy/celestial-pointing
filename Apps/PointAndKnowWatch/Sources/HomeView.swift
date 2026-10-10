@@ -528,6 +528,14 @@ struct ResultView: View {
             .padding(.horizontal, 2)
         }
         .navigationBarBackButtonHidden(true)
+        // "Lihat 3D di iPhone" lewat Handoff (ADR-017): iPhone menampilkan
+        // ikon app di layar kunci/dock; ketuk untuk membuka 3D benda ini.
+        .userActivity(ViewObjectActivity.type, isActive: confirmation.map { $0.object.kind != .deepSky } ?? false) { activity in
+            guard let c = confirmation else { return }
+            activity.title = Scene3DText.openOnPhone + ": " + c.object.name
+            activity.addUserInfoEntries(from: [ViewObjectActivity.objectIDKey: c.object.id])
+            activity.isEligibleForHandoff = true
+        }
     }
 
     private func deliveryText(_ d: WatchConfirmation.Delivery) -> String {

@@ -780,3 +780,64 @@ from South towards East. So `az_st = 180° − az_ours`. Evidence:
 
 **Not verified.** The real iPhone ↔ Mac path over Wi-Fi: the iOS Local Network
 permission prompt, and the Mac firewall for port 8090.
+
+## ADR-017 — 3D view on iPhone + "View in 3D on iPhone" from the watch (2026-10-10)
+
+**Context.** Phase 4 of `Docs/PRODUCT_V2_IDEA.md`: a 3D view of the confirmed
+object and of events. Principle: the picture must not lie.
+
+**Decision.**
+- **PointingKit `Scene3D` (pure, Linux-tested).**
+  - **Camera frame.** Looking at the object, celestial north is up and east is
+    on the left, as when looking at the sky.
+  - **Light from the Sun.** The light direction is cos(i) toward the camera
+    plus sin(i) toward the Sun's projection on the sky plane, with phase angle
+    i = acos(2k−1) from the ephemeris's illumination fraction k. Both the phase
+    and the terminator's orientation are therefore correct.
+  - **Saturn's rings.** IAU pole (40.589°, 83.537°) → sub-Earth latitude B.
+    On 10 Oct 2026 B = −7.4°: we see the southern face, consistent with the
+    edge-on crossing in March 2025.
+  - **Conjunction layout.** Gnomonic, so separation on screen equals angular
+    separation. The Moon is drawn at true size (angularRadiusDeg); planets are
+    enlarged, and the screen says so.
+  - **Baked lighting.** Lighting is baked into the texture and the material is
+    unlit. The night side is genuinely dark, independent of RealityKit's
+    environment lighting. Because the orbit controls move the camera and not
+    the object, baked lighting stays correct in world space.
+- **RealityKit UV convention, measured.** A four-colour calibration texture
+  showed:
+  - u = 0.75 faces the camera (+z);
+  - u = 0 is the right edge (+x);
+  - v = 0 is at the top.
+
+  The first guess drew the 7% Venus crescent on the wrong side. Now Venus 7%
+  shows a thin crescent at the upper right, exactly where L = (0.40, 0.32,
+  −0.86) points. A unit test locks the convention.
+- **iPhone (`Sky3DView`, `realityViewCameraControls(.orbit)`).** "View in 3D"
+  appears on:
+  - the Confirmed card;
+  - conjunctions (both objects);
+  - lunar eclipses (the Moon tinted copper by depth);
+  - full Moon and elongations.
+
+  Solar eclipses and meteor showers have no 3D view.
+- **Watch → iPhone via Handoff.** In `ResultView`,
+  `NSUserActivity("dev.celestial.pointandknow.view-object")` carries the
+  `objectID`. The iPhone (`onContinueUserActivity`) opens its 3D view.
+- **DEBUG:** `-debugShow3D <id|conjunction|uvtest>` for screenshots.
+
+**Verified.**
+- `Scene3DTests` (10 tests): basis, phase, half-Moon light side, ring tilt
+  2026, conjunction layout, baked sphere, ring texture, bands following the
+  planet's equator, the UV convention, and readable tight conjunction text.
+- Screenshots on the iPhone 17 simulator:
+  - `Docs/watch-ux/after-3d-venus-crescent.png`
+  - `Docs/watch-ux/after-3d-saturn.png`
+  - `Docs/watch-ux/after-3d-moon-saturn.png`
+
+**Not verified.**
+- Handoff between real devices (it needs the same iCloud account and
+  Bluetooth).
+- Performance on a real iPhone.
+- 3D on the watch: deliberately not done; the watch keeps its lightweight 2D
+  visuals.

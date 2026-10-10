@@ -15,6 +15,7 @@ struct SkyHomeView: View {
     @ObservedObject var stellarium: StellariumBridge
 
     @StateObject private var guide = SkyGuideModel()
+    @State private var scene3D: Scene3DSheet?
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
     @AppStorage(StellariumBridge.enabledKey) private var stellariumOn = false
     @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
@@ -71,6 +72,7 @@ struct SkyHomeView: View {
             }
             .fontDesign(.rounded)
             .navigationTitle(WatchHomeText.skyTab)
+            .sheet(item: $scene3D) { sheet in Sky3DView(content: sheet.content, title: sheet.title) }
             .scrollContentBackground(.hidden)
             .task {
                 while !Task.isCancelled {
@@ -93,11 +95,24 @@ struct SkyHomeView: View {
                 applyStellarium()
                 #if DEBUG
                 link.injectDebugConfirmationIfRequested()
+                if let id = UserDefaults.standard.string(forKey: "debugOpen3D"), scene3D == nil {
+                    // Setelah peluncuran selesai: sheet yang diminta saat
+                    // TabView baru tampil diabaikan diam-diam.
+                    Task { try? await Task.sleep(for: .seconds(1.5)); open3D(id) }
+                }
                 #endif
             }
         }
         .appBackground()
         .forceDarkScheme()
+    }
+
+    // MARK: 3D (ADR-017)
+
+    func open3D(_ id: String) {
+        guard let content = Sky3DFactory.object(id, engine: engine),
+              case .object(let spec) = content else { return }
+        scene3D = Scene3DSheet(content: content, title: spec.name)
     }
 
     // MARK: Stellarium
@@ -143,6 +158,12 @@ struct SkyHomeView: View {
                                                                          live: confirmed.live))
                         .font(.caption)
                         .foregroundStyle(Color.nightAwareSecondary)
+                    if object.kind != .deepSky {
+                        Button(Scene3DText.view3D, systemImage: "cube.transparent") { open3D(id) }
+                            .font(.footnote.weight(.semibold))
+                            .buttonStyle(.borderless)
+                            .padding(.top, 2)
+                    }
                 }
             }
             .padding(.vertical, 6)
@@ -196,9 +217,16 @@ struct SkyHomeView: View {
                     .font(.caption)
                     .foregroundStyle(PointingTone.warning.color)
             }
+            if let content = Sky3DFactory.content(for: p, engine: engine) {
+                Button(Scene3DText.view3D, systemImage: "cube.transparent") {
+                    scene3D = Scene3DSheet(content: content, title: PhenomenonText.title(p))
+                }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+            }
         }
         .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private func targetRow(_ target: PointingTarget) -> some View {
@@ -216,4 +244,11 @@ struct SkyHomeView: View {
         }
         .accessibilityElement(children: .combine)
     }
+}
+
+/// Isi lembar 3D (ADR-017).
+struct Scene3DSheet: Identifiable {
+    let id = UUID()
+    let content: Sky3DView.Content
+    let title: String
 }

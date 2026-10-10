@@ -7168,6 +7168,72 @@
           }
         }
       }
+    },
+    "scene3d.view": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View in 3D"
+          }
+        }
+      }
+    },
+    "scene3d.openOnPhone": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View in 3D on iPhone"
+          }
+        }
+      }
+    },
+    "scene3d.dragHint": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to rotate, pinch to zoom"
+          }
+        }
+      }
+    },
+    "scene3d.enlarged": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planets enlarged; distances and the Moon to scale"
+          }
+        }
+      }
+    },
+    "scene3d.lit": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of the disc lit"
+          }
+        }
+      }
+    },
+    "scene3d.ringTilt": {
+      "comment": "Tampilan 3D (ADR-017).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rings tilted %@ to our line of sight"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
