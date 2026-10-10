@@ -116,3 +116,20 @@ Konfirmasi harus tetap **eksplisit**. Teleskop yang bergerak sendiri karena tang
 2. Gerhana Matahari: blokir total, atau "mode filter" dengan peringatan? (Saran: **blokir dulu**.)
 3. Stellarium sebagai pendamping opsional, bukan syarat? (Saran: **ya**.)
 4. Data online (ISS/komet) boleh dipakai, dengan konsekuensi butuh internet? (Saran: **nanti**, setelah fase 2.)
+
+## Progres (10 Okt 2026)
+
+| Fase | Status | Rujukan |
+|---|---|---|
+| 1. Satu per satu + crown + panas–dingin | **selesai** (simulator; belum dirasakan di pergelangan) | ADR-014 |
+| 2. Kalender fenomena luring + "Pandu ke sana" | **selesai** | ADR-015 |
+| 3. Pendamping Stellarium | **selesai**, diuji ujung-ke-ujung di simulator dengan Stellarium 26.3 sungguhan | ADR-016 |
+| 4. 3D di iPhone + "Lihat 3D di iPhone" dari jam | **selesai** (iPhone); jam tetap visual 2D ringan | ADR-017 |
+| 5. GoTo dari fenomena | **tercakup alur yang ada**: pandu → kunci → "Ya, itu dia" → bagian teleskop (GoTo/Stop) di hasil. Radian meteor dan gerhana Matahari tidak bisa di-GoTo. Seestar masih butuh jembatan (ADR-008). | ADR-009 |
+
+**Yang belum bisa dibuktikan tanpa perangkat:**
+- akurasi tunjuk;
+- rasa getaran panas–dingin;
+- crown;
+- Handoff;
+- iPhone ↔ Stellarium lewat Wi-Fi (izin Local Network).
