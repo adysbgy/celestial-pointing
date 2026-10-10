@@ -40,18 +40,24 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                    bagi pengguna, dan cacat yang tidak
                                    terlihat di satu ukuran bisa dominan di
                                    ukuran lain.
-  2. port: maria dihapus total     `MARIA` dikosongkan, jadi bercaknya tidak
-                                   pernah digambar. Ini keadaan **arah
-                                   sebaliknya**, dan justru yang paling
-                                   penting: tanpa gerbang pasangannya, cara
-                                   termurah memenuhi "nol piksel di belahan
-                                   gelap" adalah berhenti menggambar cirinya
-                                   sama sekali. Yang berbunyi di sini harus
-                                   "masih tergambar di sisi menyala",
-                                   **bukan** "tidak bocor" — kalau keduanya
-                                   berbunyi, gerbangnya tidak memisahkan
-                                   "dipotong" dari "dihapus", dan itu dua
-                                   perbaikan yang berlawanan arah.
+  2. port: maria tidak digambar     gelung penggambarnya berhenti
+                                   beriterasi (`for dx, dy, size in []:`) —
+                                   lariknya **tidak** disentuh. Ini keadaan
+                                   **arah sebaliknya**, dan justru yang
+                                   paling penting: tanpa gerbang
+                                   pasangannya, cara termurah memenuhi "nol
+                                   piksel di belahan gelap" adalah berhenti
+                                   menggambar cirinya sama sekali. Yang
+                                   berbunyi di sini harus "masih tergambar di
+                                   sisi menyala", **bukan** "tidak bocor" —
+                                   kalau keduanya berbunyi, gerbangnya tidak
+                                   memisahkan "dipotong" dari "dihapus", dan
+                                   itu dua perbaikan yang berlawanan arah.
+                                   Lariknya sengaja dibiarkan utuh: versi
+                                   pertama mengosongkan `MARIA` dan itu
+                                   menyalakan gerbang paritas referensi juga
+                                   (mengubah **data**, bukan gambar) — dua
+                                   gerbang berbunyi untuk satu kelas.
 
 **Batas yang dinyatakan.** Keadaan 1–2 memutasi **port Python**, bukan view
 Swift: yang diukur kedua gerbang itu adalah piksel port, jadi hanya port yang
@@ -156,12 +162,23 @@ PORT_MARIA_CLIP = ('        canvas.disc(mx, my, size * radius,\n'
 PORT_MARIA_NOCLIP = ('        canvas.disc(mx, my, size * radius,\n'
                      '                    lambda x, y: maria(x, y))')
 
-#: Keadaan 2: maria tidak digambar sama sekali. Lariknya dikosongkan, jadi
-#: gelungnya tidak menggambar apa pun tanpa mengubah satu baris kode pun di
-#: fungsi penggambarnya.
-PORT_MARIA_ARRAY = ('MARIA = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),\n'
-                    '         (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]')
-PORT_MARIA_EMPTY = 'MARIA = []'
+#: Keadaan 2: maria tidak digambar sama sekali. **Gelungnya** yang
+#: dikosongkan, bukan lariknya.
+#:
+#: Versi pertama mengosongkan `MARIA` (`MARIA = []`) dan itu **salah**,
+#: terukur: ia menyalakan dua gerbang, bukan satu. `MARIA` adalah larik hidup
+#: yang dibandingkan `check_moon_maria_reference_matches_the_model` dengan
+#: `MARIA_REFERENCE` yang dibekukan di gerbang — mengosongkannya mengubah
+#: **data**, jadi gerbang paritas itu ikut merah, padahal keadaan ini
+#: mengklaim hanya kelas "masih tergambar". Dua gerbang berbunyi bersama
+#: berarti gerbangnya tidak memisahkan "tidak digambar" dari "referensi
+#: basi".
+#:
+#: Yang dimutasi sekarang adalah **penggambarnya**: gelungnya berhenti
+#: beriterasi sementara lariknya utuh, jadi data tidak tersentuh dan hanya
+#: gerbang "masih tergambar" yang berbunyi.
+PORT_MARIA_LOOP = '    for dx, dy, size in MARIA:'
+PORT_MARIA_NOLOOP = '    for dx, dy, size in []:'
 
 #: Keadaan 3: larik maria dihidupkan digeser, sementara `MARIA_REFERENCE` yang
 #: dibekukan di gerbang tidak ikut.
@@ -226,7 +243,7 @@ STATES = [
      [(RENDER, PORT_MARIA_CLIP, PORT_MARIA_NOCLIP)],
      [DARK_CLASS]),
     ("2. port: maria tidak digambar sama sekali",
-     [(RENDER, PORT_MARIA_ARRAY, PORT_MARIA_EMPTY)],
+     [(RENDER, PORT_MARIA_LOOP, PORT_MARIA_NOLOOP)],
      [LIT_CLASS]),
     ("3. gerbang: MARIA_REFERENCE menyimpang dari model",
      [(CHECK, PORT_MARIA_REFERENCE, PORT_MARIA_REFERENCE_DRIFT)],
@@ -287,7 +304,7 @@ def main():
             _originals[path] = handle.read()
     for path, anchor, label in (
             (RENDER, PORT_MARIA_CLIP, "penggambar maria berklip di port"),
-            (RENDER, PORT_MARIA_ARRAY, "larik `MARIA` di port"),
+            (RENDER, PORT_MARIA_LOOP, "gelung penggambar maria di port"),
             (CHECK, PORT_MARIA_REFERENCE, "`MARIA_REFERENCE` di gerbang")):
         count = _originals[path].count(anchor)
         if count != 1:
