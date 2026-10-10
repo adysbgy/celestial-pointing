@@ -62,6 +62,35 @@ final class SensingTests: XCTestCase {
         XCTAssertEqual(out.angleDegrees(to: .identity)!, 0, accuracy: 1e-9)
     }
 
+    /// Penjaga nilai: `init` memangkas `blendFactor` ke [0,1]. Tanpa ini,
+    /// faktor di luar selang akan diberikan mentah ke `interpolated(to:t:)` —
+    /// t>1 membuat perata **melampaui** sasaran (ekstrapolasi), t<0 membuatnya
+    /// berbalik arah. Uji ini mengikat angkanya, bukan sekadar sifatnya: kalau
+    /// klem dibuang, nilai di luar selang lolos apa adanya dan uji ini merah.
+    func testBlendFactorIsClampedToUnitInterval() {
+        XCTAssertEqual(PointingSmoother(blendFactor: 0.3).blendFactor, 0.3, accuracy: 1e-9)
+        // Di atas 1 -> dipangkas ke 1.0 (ikut sampel baru seutuhnya).
+        XCTAssertEqual(PointingSmoother(blendFactor: 5.0).blendFactor, 1.0, accuracy: 1e-9)
+        // Di bawah 0 -> dipangkas ke 0.0 (bekukan keadaan lama).
+        XCTAssertEqual(PointingSmoother(blendFactor: -2.0).blendFactor, 0.0, accuracy: 1e-9)
+    }
+
+    /// Penjaga arah: klem mencegah ekstrapolasi melewati sasaran. Diuji lewat
+    /// *perilaku* — bukan lewat nilai yang dikembalikan `init` — supaya gerbang
+    /// ini dan `testBlendFactorIsClampedToUnitInterval` menangkap dua kelas
+    /// cacat yang berbeda. Kalau klem dilepas, `blendFactor: 2.0` diberikan
+    /// sebagai `t` ke `interpolated`, hasilnya melampaui sasaran (sudut != 0),
+    /// dan yang dikirim ke UI adalah orientasi yang salah arah.
+    func testClampingPreventsExtrapolationPastTarget() {
+        // Tanpa klem, 2.0 akan sampai ke 2x busur -> ekstrapolasi.
+        var s = PointingSmoother(blendFactor: 2.0)
+        s.update(.identity)
+        let target = rotZ(60)
+        let out = s.update(target)!
+        // Klem menahan t di 1.0: keluaran mendarat tepat di sasaran.
+        XCTAssertEqual(out.angleDegrees(to: target)!, 0, accuracy: 1e-9)
+    }
+
     // MARK: - AngularRateTracker
 
     func testFirstSampleHasNoRate() {
