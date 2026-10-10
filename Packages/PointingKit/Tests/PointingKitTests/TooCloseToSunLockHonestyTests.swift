@@ -261,6 +261,25 @@ final class TooCloseToSunLockHonestyTests: XCTestCase {
                        "tidak boleh ada haptic sukses untuk bintang dekat Matahari")
     }
 
+    /// `sunSafeConeDeg` (13°) diikat **langsung**, bukan cuma lewat prilaku.
+    ///
+    /// Ini ambang keamanan keras PRD: arah tunjuk yang menunjuk ke Matahari
+    /// tidak boleh pernah menghasilkan `.lock` (yang membuka izin GoTo — dan
+    /// mengarahkan motor ke arah Matahari bisa merusak alat dan mata).
+    /// `testAimingAtTheSunNeverLocks` memang menguji prilakunya, **tetapi**
+    /// dengan katalog kosong: menunjuk tepat ke Matahari (separasi ≈ 0°)
+    /// saat tidak ada bintang tetap menghasilkan kerucut kosong → `low`,
+    /// tanpa `lock` dan tanpa haptic sukses — **meskipun gerbang ini dimatikan
+    /// sama sekali**. Jadi jika suatu hari angkanya diubah (mis. ke 0), uji
+    /// prilaku itu tetap hijau pada keadaan yang salah, dan keamanan teleskop
+    /// bocor diam-diam begitu ada bintang di dekat Matahari. Gerbang nilai ini
+    /// yang menangkap perubahan angka itu. Pola yang sama dengan
+    /// `testMaximumClaimedAgeIsFifteenMinutes` dan `testShadowFractionIsExactlyHalf`.
+    func testSunSafeConeStaysThirteenDegrees() {
+        XCTAssertEqual(PointingResolver.sunSafeConeDeg, 13.0,
+                       "ambang pengaman Matahari harus tetap 13° (aturan keras PRD)")
+    }
+
     /// Bukti positif: bintang yang **sama** saat malam (jauh dari Matahari,
     /// di atas horizon) **harus** `.lock`. Membuktikan penolakan di atas
     /// spesifik ke dekat-Matahari, bukan karena bintangnya tidak bisa
