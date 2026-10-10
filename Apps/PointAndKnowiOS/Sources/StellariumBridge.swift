@@ -36,7 +36,7 @@ final class StellariumBridge: ObservableObject {
         link.onMirrorSample = { [weak self] sample in self?.handle(sample) }
         link.onReachable = { [weak self] in
             guard let self, self.status != .off else { return }
-            self.link.requestMirror(true)
+            self.link.setMirrorDemand("stellarium", true)
         }
         // Objek yang dikonfirmasi di jam ikut disorot.
         link.$lastConfirmed
@@ -49,7 +49,7 @@ final class StellariumBridge: ObservableObject {
     func apply(enabled: Bool, address: String, engine: PointingEngine) {
         self.engine = engine
         guard enabled, let base = StellariumMirror.baseURL(from: address) else {
-            if status != .off { link.requestMirror(false) }
+            if status != .off { link.setMirrorDemand("stellarium", false) }
             status = .off
             self.base = nil
             return
@@ -64,7 +64,7 @@ final class StellariumBridge: ObservableObject {
                 _ = try await send(StellariumMirror.focusRequest(base: base, objectID: nil))
                 focusedID = nil
                 status = .connected
-                link.requestMirror(true)
+                link.setMirrorDemand("stellarium", true)
             } catch {
                 status = .failed(error.localizedDescription)
             }

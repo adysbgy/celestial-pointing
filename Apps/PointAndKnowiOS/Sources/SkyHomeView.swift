@@ -31,6 +31,13 @@ struct SkyHomeView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 }
+                if link.connectionState.isReady {
+                    Section {
+                        LiveWatchCard(link: link, engine: engine, guide: guide)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+                }
                 Section {
                     discoveryCard
                         .listRowInsets(EdgeInsets())
@@ -75,7 +82,10 @@ struct SkyHomeView: View {
                 // Lokasi sungguhan datang belakangan: Stellarium harus ikut.
                 stellarium.updateLocation(engine.controller.observer)
             }
+            // Kartu langsung butuh aliran arah tunjuk dari jam selama tab ini tampil.
+            .onDisappear { link.setMirrorDemand("live", false) }
             .onAppear {
+                link.setMirrorDemand("live", true)
                 engine.setSkyQuality(SkyQualityStorage.quality(darkSky: darkSky))
                 stellarium.apply(enabled: stellariumOn, address: stellariumAddress, engine: engine)
                 #if DEBUG

@@ -110,6 +110,12 @@ public enum ConnectionText {
     public static var phoneLive: String { TextLocalization.text(.connPhoneLive) }
     public static var phoneAway: String { TextLocalization.text(.connPhoneAway) }
     public static func neverYet() -> String { TextLocalization.text(.connNever) }
+    public static var liveTitle: String { TextLocalization.text(.liveTitle) }
+    public static var liveWaiting: String { TextLocalization.text(.liveWaiting) }
+    public static var livePointingAt: String { TextLocalization.text(.livePointingAt) }
+
+    /// Data langsung dianggap segar selama ini (detik).
+    public static let liveFreshSeconds: TimeInterval = 3
 }
 
 public extension LocalizedText {
@@ -138,12 +144,15 @@ public extension LocalizedText {
     static let connPhoneLive = LocalizedText(key: "conn.phoneLive", id: "iPhone tersambung")
     static let connPhoneAway = LocalizedText(key: "conn.phoneAway", id: "iPhone jauh: data dikirim nanti")
     static let connNever = LocalizedText(key: "conn.never", id: "belum pernah")
+    static let liveTitle = LocalizedText(key: "live.title", id: "Langsung dari jam")
+    static let liveWaiting = LocalizedText(key: "live.waiting", id: "Angkat tangan dan tunjuk dengan jam. Arahnya langsung muncul di sini.")
+    static let livePointingAt = LocalizedText(key: "live.pointingAt", id: "Jam mengarah ke")
 
     static let connectionKeys: [LocalizedText] = [
         .connTitle, .connLive, .connLiveDetail, .connStandby, .connStandbyDetail, .connLastContact,
         .connNotInstalled, .connNotInstalledDetail, .connNotPaired, .connNotPairedDetail, .connStepPaired,
         .connStepInstalled, .connStepOpen, .connStepData, .connWhatSyncs, .connSyncConfirmations,
         .connSyncSettings, .connSyncPointing, .connFromWatch, .connHowTo, .connHowToSteps,
-        .connOpenWatchApp, .connPhoneLive, .connPhoneAway, .connNever,
+        .connOpenWatchApp, .connPhoneLive, .connPhoneAway, .connNever, .liveTitle, .liveWaiting, .livePointingAt,
     ]
 }

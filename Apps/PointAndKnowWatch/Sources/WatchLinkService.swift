@@ -150,7 +150,7 @@ public final class WatchLinkService: NSObject, ObservableObject {
     public func mirror(_ snapshot: PointingSnapshot) {
         guard mirrorRequested, isReachable, let session, let pointing = snapshot.calibratedPointing else { return }
         let locked = snapshot.state == .lock ? snapshot.intent?.best?.id : nil
-        let sample = MirrorSample(pointing: pointing, lockedObjectID: locked)
+        let sample = MirrorSample(pointing: pointing, lockedObjectID: locked, state: snapshot.state.rawValue)
         guard mirrorThrottle.shouldSend(sample) else { return }
         session.sendMessage(sample.plist, replyHandler: nil, errorHandler: nil)
     }

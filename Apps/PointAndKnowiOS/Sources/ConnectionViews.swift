@@ -118,3 +118,73 @@ struct ConnectionSheet: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// "Langsung dari jam" (ADR-021): apa yang sedang dilakukan jam, saat itu
+/// juga — arah tunjuk, panah ke benda terdekat, atau benda yang terkunci.
+/// Inilah sinkron yang **terasa**: gerakkan tangan, iPhone ikut bergerak.
+struct LiveWatchCard: View {
+    @ObservedObject var link: PhoneLinkService
+    @ObservedObject var engine: PointingEngine
+    @ObservedObject var guide: SkyGuideModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let fresh = link.liveSample.map { context.date.timeIntervalSince($0.sentAt) < ConnectionText.liveFreshSeconds } ?? false
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    ConnectionGlyph(isLive: fresh, isReady: link.connectionState.isReady)
+                    Text(ConnectionText.liveTitle).font(.subheadline.weight(.semibold))
+                    Spacer()
+                }
+                if fresh, let sample = link.liveSample {
+                    content(sample)
+                } else {
+                    Text(link.connectionState.isLive ? ConnectionText.liveWaiting : link.connectionState.detail())
+                        .font(.subheadline)
+                        .foregroundStyle(DK.secondaryText)
+                }
+            }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(DK.card))
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ sample: MirrorSample) -> some View {
+        if let id = sample.lockedObjectID,
+           let object = engine.controller.resolver.object(forID: id, observer: engine.controller.observer, date: Date()) {
+            HStack(spacing: 14) {
+                CelestialVisualView(visual: CelestialVisual(object: object), diameter: 56, isConfirmed: true)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(object.name).font(.title2.bold())
+                    StatusChip(text: DesignText.obLocked)
+                }
+            }
+        } else {
+            let hint = guide.hint(for: sample.pointing)
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle().stroke(DK.hairline, lineWidth: 2).frame(width: 64, height: 64)
+                    Image(systemName: "location.north.fill")
+                        .foregroundStyle(DK.accent)
+                        .offset(y: -28)
+                        .rotationEffect(.degrees(hint?.arrowDeg ?? 0))
+                        .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: hint?.arrowDeg)
+                    Text(verbatim: hint.map { WatchHomeText.degrees($0.separationDeg) } ?? "–")
+                        .font(.footnote.weight(.semibold).monospacedDigit())
+                }
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let hint {
+                        Text(WatchHomeText.guideTitle(hint.name)).font(.headline)
+                    }
+                    Text(ConnectionText.livePointingAt).font(.caption).foregroundStyle(DK.secondaryText)
+                    MonoCaption(text: WatchHomeText.altAz(sample.pointing))
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+}

@@ -941,3 +941,29 @@ The full analysis is in `Docs/SYNC_ANALYSIS.md`. In short:
   a guarantee.
 
 All of it was verified end to end on paired simulators.
+
+## ADR-021 — "Live from your Watch" card on the iPhone (2026-10-10)
+
+**Field report.** "My phone and watch still aren't in sync, I'm confused."
+I checked both devices' data: the iPhone had received data from the watch
+seconds earlier (`link.lastContact` 18:22:11), and the watch had sent 264
+live messages. So the connection worked, but nothing on the iPhone moved
+when the watch moved.
+
+**Decision.**
+- `MirrorSample` now carries the flow state (`st`).
+- The watch stream used by Stellarium becomes demand-based (`setMirrorDemand`):
+  Stellarium and/or the Sky tab. The stream stays on while anyone needs it and
+  is requested again when the watch becomes reachable.
+- The Sky tab shows **"Live from your Watch"**:
+  - while pointing: an arrow to the nearest visible object, its distance, and
+    the watch's AZ/ALT;
+  - when the watch locks: the object's picture, its name and "● LOCKED";
+  - data older than 3 s counts as not live.
+
+**Verified** on paired simulators:
+- a pointing watch makes the iPhone show "Move to Achernar 37°, AZ 200° ·
+  ALT 20°" live;
+- a watch locked on Saturn makes the iPhone show "Saturn ● LOCKED".
+
+Screenshots: `Docs/design/sync-live-*.png`.

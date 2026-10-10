@@ -64,6 +64,25 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Dipanggil saat jam menjadi terjangkau (mis. untuk meminta ulang cermin).
     public var onReachable: (() -> Void)?
 
+    /// Sampel langsung terakhir dari jam (kartu "Langsung dari jam", ADR-021).
+    @Published public private(set) var liveSample: MirrorSample?
+    /// Siapa saja yang butuh aliran arah tunjuk (Stellarium, kartu langsung).
+    private var mirrorDemand: Set<String> = []
+
+    /// Satu pemakai menyalakan/mematikan kebutuhannya; aliran hidup selama
+    /// masih ada yang butuh.
+    public func setMirrorDemand(_ key: String, _ on: Bool) {
+        let before = !mirrorDemand.isEmpty
+        if on { mirrorDemand.insert(key) } else { mirrorDemand.remove(key) }
+        let after = !mirrorDemand.isEmpty
+        if after != before || on { requestMirror(after) }
+    }
+
+    /// Minta ulang aliran bila masih ada pemakai (mis. saat jam terjangkau lagi).
+    public func renewMirrorDemand() {
+        if !mirrorDemand.isEmpty { requestMirror(true) }
+    }
+
     /// Minta jam memulai/menghentikan aliran arah tunjuk (ADR-016).
     public func requestMirror(_ on: Bool) {
         try? pushContext(mirror: MirrorSample.request(on))
@@ -420,7 +439,7 @@ extension PhoneLinkService: WCSessionDelegate {
             // — `sessionReachabilityDidChange` tidak terpanggil bila sudah
             // terjangkau sejak awal.
             if activated { try? self.pushContext() }
-            if reachable { self.onReachable?() }
+            if reachable { self.onReachable?(); self.renewMirrorDemand() }
             if let message {
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa katalog. Namanya tetap ikut (`%@`)
@@ -462,7 +481,7 @@ extension PhoneLinkService: WCSessionDelegate {
         let reachable = session.isReachable
         Task { @MainActor in
             self.isReachable = reachable
-            if reachable { self.onReachable?() }
+            if reachable { self.onReachable?(); self.renewMirrorDemand() }
         }
     }
 
@@ -479,7 +498,11 @@ extension PhoneLinkService: WCSessionDelegate {
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
         if let sample = MirrorSample(plist: message) {
-            Task { @MainActor in self.touch(); self.onMirrorSample?(sample) }
+            Task { @MainActor in
+                self.touch()
+                self.liveSample = sample
+                self.onMirrorSample?(sample)
+            }
             return
         }
         let decoded = PointingLinkMessage(plist: message)

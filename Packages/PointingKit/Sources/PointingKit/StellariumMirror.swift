@@ -103,17 +103,23 @@ public struct MirrorSample: Equatable, Sendable {
     public var sentAt: Date
     /// Objek terkunci saat ini, bila ada.
     public var lockedObjectID: String?
+    /// Keadaan alur di jam (`PointingState.rawValue`) — untuk kartu
+    /// "Langsung dari jam" di iPhone (ADR-021). Opsional: versi lama tanpa ini.
+    public var state: String?
 
-    public init(pointing: HorizontalCoord, sentAt: Date = Date(), lockedObjectID: String? = nil) {
+    public init(pointing: HorizontalCoord, sentAt: Date = Date(), lockedObjectID: String? = nil,
+                state: String? = nil) {
         self.pointing = pointing
         self.sentAt = sentAt
         self.lockedObjectID = lockedObjectID
+        self.state = state
     }
 
     public var plist: [String: Any] {
         var inner: [String: Any] = ["alt": pointing.altitudeDeg, "az": pointing.azimuthDeg,
                                     "t": sentAt.timeIntervalSince1970]
         if let lockedObjectID { inner["obj"] = lockedObjectID }
+        if let state { inner["st"] = state }
         return [Self.plistKey: inner]
     }
 
@@ -123,7 +129,8 @@ public struct MirrorSample: Equatable, Sendable {
               let t = inner["t"] as? Double, alt.isFinite, az.isFinite else { return nil }
         self.init(pointing: HorizontalCoord(altitudeDeg: alt, azimuthDeg: az),
                   sentAt: Date(timeIntervalSince1970: t),
-                  lockedObjectID: inner["obj"] as? String)
+                  lockedObjectID: inner["obj"] as? String,
+                  state: inner["st"] as? String)
     }
 
     public static func request(_ on: Bool) -> [String: Any] { [requestKey: on] }
@@ -154,7 +161,10 @@ public struct MirrorThrottle: Sendable {
     public mutating func shouldSend(_ sample: MirrorSample) -> Bool {
         if let last {
             let elapsed = sample.sentAt.timeIntervalSince(last.sentAt)
-            if sample.lockedObjectID != last.lockedObjectID { self.last = sample; return true }
+            if sample.lockedObjectID != last.lockedObjectID || sample.state != last.state {
+                self.last = sample
+                return true
+            }
             guard elapsed >= minInterval else { return false }
             guard elapsed >= keepAlive
                     || SkyMath.angularSeparationHorizontalDeg(sample.pointing, last.pointing) >= minMoveDeg else {

@@ -8521,6 +8521,39 @@
           }
         }
       }
+    },
+    "live.title": {
+      "comment": "Kartu langsung dari jam (ADR-021).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live from your Watch"
+          }
+        }
+      }
+    },
+    "live.waiting": {
+      "comment": "Kartu langsung dari jam (ADR-021).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raise your arm and point with your Watch. Its direction shows up here right away."
+          }
+        }
+      }
+    },
+    "live.pointingAt": {
+      "comment": "Kartu langsung dari jam (ADR-021).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch pointing toward"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
