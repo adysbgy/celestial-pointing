@@ -70,6 +70,13 @@ struct RootView: View {
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
     @ObservedObject var stellarium: StellariumBridge
+    @StateObject private var journal = ObservationJournal()
+    #if DEBUG
+    /// Tangkapan layar: `-debugTab 2` membuka tab Pengaturan.
+    @State private var tab = UserDefaults.standard.integer(forKey: "debugTab")
+    #else
+    @State private var tab = 0
+    #endif
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -97,29 +104,33 @@ struct RootView: View {
     private let audioCue = AudioCueEngine()
 
     var body: some View {
-        TabView {
-            SkyHomeView(engine: engine, link: link, stellarium: stellarium)
+        // Tiga tab untuk tugas pengguna (HIG, ADR-019). Alat riset pindah ke
+        // Pengaturan → Pengembang.
+        TabView(selection: $tab) {
+            SkyHomeView(engine: engine, link: link, stellarium: stellarium, journal: journal)
                 .tabItem { Label(WatchHomeText.skyTab, systemImage: "sparkles") }
-            DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
-                .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }
-            Experiment1View(engine: engine, link: link)
-                .tabItem { Label("Experiment 1", systemImage: "target") }
-            LinkView(link: link, trace: trace)
-                .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
-            PointingLabPhoneView(link: link)
-                .tabItem { Label("Lab", systemImage: "flask") }
+                .tag(0)
+            JournalView(journal: journal, engine: engine)
+                .tabItem { Label(DesignText.tabJournal, systemImage: "book") }
+                .tag(1)
+            SettingsView(engine: engine, motion: motion, location: location, link: link, trace: trace,
+                         stellarium: stellarium)
+                .tabItem { Label(WatchHomeText.settings, systemImage: "gearshape") }
+                .tag(2)
         }
-        // Perkenalan sekali pakai: satu kartu, bukan tur panjang. Dibungkus
-        // sheet supaya layar utama (dan hasil pengukuran) tetap hidup di
-        // belakang — menutupnya tidak mereset alur.
-        .sheet(isPresented: .init(
+        .tint(DK.accent)
+        // Perkenalan sekali pakai (Figma, ADR-019), layar penuh; semua layar
+        // bisa dilewati, dan bisa diputar lagi dari Pengaturan.
+        .fullScreenCover(isPresented: .init(
             get: { !onboardingSeen },
-            // Penulis `isPresented` menerima "masih tampil?", bukan
-            // "sudah dilihat?". Dulu nilainya disimpan apa adanya, jadi
-            // menutup sheet menulis `onboardingSeen = false` dan sheet
-            // langsung muncul lagi — kartu ini tidak pernah bisa ditutup.
             set: { presented in onboardingSeen = !presented })) {
-            OnboardingView(onDone: { onboardingSeen = true })
+            // Onboarding sesuai Figma (ADR-019). Lokasi baru diminta di
+            // layar lokasinya, jadi `start()` tidak memintanya di depan.
+            OnboardingFlowView(engine: engine, link: link, location: location) {
+                onboardingSeen = true
+                location.start()
+                engine.bind(location: location)
+            }
         }
         // Skema gelap **selalu**, untuk seluruh tab. Dulu `nightMode ? .dark :
         // nil`: preferensi akar ini menimpa `forceDarkScheme()` di tiap tab, jadi
@@ -220,7 +231,8 @@ struct RootView: View {
         engine.audioCue = { events in cue.play(events) }
         motion.start(controller: engine.controller)
         engine.setSensorAvailable(motion.isAvailable)
-        location.start()
+        // Izin lokasi diminta oleh onboarding, saat alasannya dijelaskan (HIG).
+        if onboardingSeen { location.start() }
         engine.bind(location: location)
     }
 

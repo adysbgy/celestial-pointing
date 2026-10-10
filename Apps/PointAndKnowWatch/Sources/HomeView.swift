@@ -220,9 +220,21 @@ struct HomeView: View {
                         .font(.title2.weight(.bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
-                    Text(WatchHomeText.subtitle(object))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    // Seperti mockup jam di Figma (ADR-019): data arah + tanda terkunci.
+                    if let h = engine.controller.resolver.horizontal(ofObjectID: object.id,
+                                                                     observer: engine.controller.observer,
+                                                                     date: Date()) {
+                        Text(verbatim: WatchHomeText.altAz(h))
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 4) {
+                        Circle().fill(PointingTone.success.color).frame(width: 5, height: 5)
+                        Text(DesignText.obLocked)
+                            .font(.caption2.monospaced().weight(.semibold))
+                            .foregroundStyle(PointingTone.success.color)
+                    }
+                    .accessibilityElement(children: .combine)
                     Button {
                         confirm(object)
                     } label: {
@@ -521,6 +533,18 @@ struct ResultView: View {
                         .font(.footnote)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    // "Yang akan kamu lihat" versi jam (Figma: First Discovery, ADR-019).
+                    let guide = ObjectGuideContent.content(for: c.object)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(DesignText.discWhatYoullSee).font(.footnote.weight(.semibold))
+                        Label(guide.nakedEye, systemImage: "eye")
+                        Label(guide.binoculars, systemImage: "binoculars")
+                        Label(guide.telescope, systemImage: "scope")
+                    }
+                    .font(.caption2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.08)))
                     Label(deliveryText(c.delivery), systemImage: deliverySymbol(c.delivery))
                         .font(.caption2)
                         .foregroundStyle(.secondary)

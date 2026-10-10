@@ -201,3 +201,21 @@ enum Sky3DFactory {
         }
     }
 }
+
+/// Kanvas 3D tanpa navigasi, untuk disisipkan di kartu dan halaman Penemuan
+/// (ADR-019). `interactive` = kamera orbit dengan jari.
+struct Sky3DCanvas: View {
+    let content: Sky3DView.Content
+    var interactive = true
+
+    var body: some View {
+        let view = RealityView { scene in
+            scene.add(await Sky3DView.root(for: content))
+        }
+        if interactive {
+            view.realityViewCameraControls(.orbit)
+        } else {
+            view.allowsHitTesting(false)
+        }
+    }
+}

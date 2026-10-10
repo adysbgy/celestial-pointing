@@ -876,3 +876,56 @@ something like ready / aiming."
 - The Lab, which starts its own session: only one session can run per app,
   so the Lab's session may fail while the main one is running. The app keeps
   running either way.
+
+## ADR-019 — UI following Ady's Figma "Point&Know", tidied to HIG (2026-10-10)
+
+**Context.** Ady: "There are no visuals, the UI/UX is still really bad, make it
+like the Figma." I read all 7 Figma frames through the Figma desktop app (with
+Ady's permission):
+- **Onboarding:** Point to discover, From a point of light to a world, Your
+  Watch is ready, The sky depends on where you are, Point naturally, Look up.
+- **First Discovery:** the Jupiter screen.
+- **Style:** pure black, a large visual at the top, bold white headings, one
+  blue capsule button, monospace data labels, and a "● FIRST DISCOVERY" chip.
+
+**Decision (iPhone).**
+- **Three tabs (HIG): Sky, Journal, Settings.** The research tools
+  (Diagnostics, Experiment 1, Link, Lab) move to Settings → Developer, opened as
+  sheets.
+- **`OnboardingFlowView`: 6 Figma screens.**
+  - One idea per screen, one main button, everything skippable, a progress bar.
+  - Location permission is requested on the location screen, no longer when the
+    app opens.
+  - Data on screen is real:
+    - tonight's bright object with its direction;
+    - the watch's status from WatchConnectivity (`isPaired`,
+      `isWatchAppInstalled`, `isReachable`).
+- **Discovery card (Sky tab) and `DiscoveryView` (full page).**
+  - A 3D visual from the ephemeris (`Sky3DCanvas`).
+  - A "FIRST DISCOVERY" / "CONFIRMED" chip.
+  - A "Planet • Visible now" line.
+  - A description and "What you'll see" (naked eye / binoculars / telescope),
+    from `ObjectGuideContent`.
+  - "Save Observation" to the Journal (`ObservationJournal`, stored on the
+    device) and "Explore Sky".
+- **Visuals drawn by the app, not stock photos:** starfield, reticle, Earth's
+  horizon, pointing hand, watch mockup. Ady can send the original Figma photos
+  to replace them.
+- **Jupiter has more bands plus the Great Red Spot** at ~22°S.
+
+**Decision (watch).**
+- The lock screen follows the Figma watch mockup: "AZ · ALT" in monospace and
+  "● LOCKED".
+- `ResultView` adds "What you'll see".
+
+**Honesty.**
+- The Figma's "0.1° Precision" claim is **not** used, because accuracy hasn't
+  been measured. A test guards the design texts against it.
+- Negative altitudes are shown honestly (`WatchHomeText.altAz`); they are no
+  longer clamped to 0°.
+
+**Verified.**
+- Simulator screenshots of every page are in `Docs/design/`.
+- Tests: PointingKit 846 (including `DesignTextTests`), UI lint green.
+
+**Not verified.** The real devices.

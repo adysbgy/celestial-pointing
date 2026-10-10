@@ -13,9 +13,11 @@ struct SkyHomeView: View {
     @ObservedObject var engine: PointingEngine
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var stellarium: StellariumBridge
+    @ObservedObject var journal: ObservationJournal
 
     @StateObject private var guide = SkyGuideModel()
     @State private var scene3D: Scene3DSheet?
+    @State private var discovery: Ident?
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
     @AppStorage(StellariumBridge.enabledKey) private var stellariumOn = false
     @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
@@ -23,7 +25,11 @@ struct SkyHomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(IdentificationText.phoneConfirmedTitle) { confirmedCard }
+                Section {
+                    discoveryCard
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
                 if guide.isDark {
                     Section(WatchHomeText.visibleNow) {
                         ForEach(guide.visible) { targetRow($0) }
@@ -41,38 +47,14 @@ struct SkyHomeView: View {
                         ForEach(guide.phenomena.prefix(8)) { phenomenonRow($0) }
                     }
                 }
-                Section {
-                    Toggle(StellariumText.toggle, isOn: $stellariumOn)
-                    if stellariumOn {
-                        TextField(StellariumText.address, text: $stellariumAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                            .onSubmit(applyStellarium)
-                        Text(stellariumStatus)
-                            .font(.footnote)
-                            .foregroundStyle(stellarium.status == .connected
-                                             ? PointingTone.success.color : Color.nightAwareSecondary)
-                    }
-                } header: {
-                    Text(StellariumText.title)
-                } footer: {
-                    Text(StellariumText.hint)
-                }
-                Section {
-                    Toggle(isOn: $darkSky) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(WatchHomeText.darkSky)
-                            Text(WatchHomeText.darkSkyHint)
-                                .font(.footnote)
-                                .foregroundStyle(Color.nightAwareSecondary)
-                        }
-                    }
-                }
             }
             .fontDesign(.rounded)
             .navigationTitle(WatchHomeText.skyTab)
             .sheet(item: $scene3D) { sheet in Sky3DView(content: sheet.content, title: sheet.title) }
+            .sheet(item: $discovery) { item in
+                DiscoveryView(objectID: item.id, engine: engine, journal: journal,
+                              isVisibleNow: guide.visible.contains { $0.id == item.id }, onExplore: {})
+            }
             .scrollContentBackground(.hidden)
             .task {
                 while !Task.isCancelled {
@@ -80,25 +62,24 @@ struct SkyHomeView: View {
                     try? await Task.sleep(for: .seconds(30))
                 }
             }
-            .onChange(of: darkSky) { _, dark in
-                engine.setSkyQuality(SkyQualityStorage.quality(darkSky: dark))
-                guide.refresh(engine: engine, force: true)
-            }
+            .onChange(of: darkSky) { _, _ in guide.refresh(engine: engine, force: true) }
             .onChange(of: engine.location) { _, _ in
                 guide.refresh(engine: engine, force: true)
                 // Lokasi sungguhan datang belakangan: Stellarium harus ikut.
                 stellarium.updateLocation(engine.controller.observer)
             }
-            .onChange(of: stellariumOn) { _, _ in applyStellarium() }
             .onAppear {
                 engine.setSkyQuality(SkyQualityStorage.quality(darkSky: darkSky))
-                applyStellarium()
+                stellarium.apply(enabled: stellariumOn, address: stellariumAddress, engine: engine)
                 #if DEBUG
                 link.injectDebugConfirmationIfRequested()
                 if let id = UserDefaults.standard.string(forKey: "debugOpen3D"), scene3D == nil {
                     // Setelah peluncuran selesai: sheet yang diminta saat
                     // TabView baru tampil diabaikan diam-diam.
                     Task { try? await Task.sleep(for: .seconds(1.5)); open3D(id) }
+                }
+                if let id = UserDefaults.standard.string(forKey: "debugDiscovery"), discovery == nil {
+                    Task { try? await Task.sleep(for: .seconds(1.5)); discovery = Ident(id: id) }
                 }
                 #endif
             }
@@ -107,77 +88,75 @@ struct SkyHomeView: View {
         .forceDarkScheme()
     }
 
+    // MARK: Kartu penemuan (Figma: First Discovery, ADR-019)
+
+    @ViewBuilder
+    private var discoveryCard: some View {
+        if let confirmed = link.lastConfirmed, let id = confirmed.message.objectID,
+           let object = engine.controller.resolver.object(forID: id, observer: engine.controller.observer,
+                                                         date: Date()) {
+            Button { discovery = Ident(id: id) } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    ZStack {
+                        StarfieldBackground(seed: 5, count: 90)
+                        if let content = Sky3DFactory.object(id, engine: engine) {
+                            Sky3DCanvas(content: content, interactive: false)
+                        } else {
+                            CelestialVisualView(visual: CelestialVisual(object: object), diameter: 110, isConfirmed: true)
+                        }
+                    }
+                    .frame(height: 220)
+                    VStack(alignment: .leading, spacing: 6) {
+                        StatusChip(text: journal.contains(objectID: id) ? DesignText.discAgain : DesignText.discFirst)
+                        Text(object.name).font(.title.bold())
+                        Text(verbatim: DesignText.kindLine(object.kind,
+                             IdentificationText.phoneConfirmedTime(confirmed.message.sentAt, live: confirmed.live)))
+                            .font(.subheadline)
+                            .foregroundStyle(DK.secondaryText)
+                        if let h = engine.controller.resolver.horizontal(ofObjectID: id,
+                                                                         observer: engine.controller.observer,
+                                                                         date: Date()) {
+                            MonoCaption(text: WatchHomeText.altAz(h))
+                        }
+                        Label(DesignText.discDetails, systemImage: "chevron.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DK.accent)
+                            .padding(.top, 4)
+                    }
+                    .padding(16)
+                }
+                .background(DK.card)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        } else {
+            VStack(spacing: 10) {
+                ZStack {
+                    StarfieldBackground(seed: 17, count: 70)
+                    GlowingPoint(diameter: 16)
+                }
+                .frame(height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                Text(DesignText.discLookUpTitle).font(.title3.bold())
+                Text(DesignText.discLookUpBody)
+                    .font(.subheadline)
+                    .foregroundStyle(DK.secondaryText)
+                    .multilineTextAlignment(.center)
+                MonoCaption(text: DesignText.obLookupHint).padding(.bottom, 6)
+            }
+            .padding(12)
+            .background(DK.card)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+    }
+
     // MARK: 3D (ADR-017)
 
     func open3D(_ id: String) {
         guard let content = Sky3DFactory.object(id, engine: engine),
               case .object(let spec) = content else { return }
         scene3D = Scene3DSheet(content: content, title: spec.name)
-    }
-
-    // MARK: Stellarium
-
-    private func applyStellarium() {
-        stellarium.apply(enabled: stellariumOn, address: stellariumAddress, engine: engine)
-    }
-
-    private var stellariumStatus: String {
-        switch stellarium.status {
-        case .off: return StellariumText.hint
-        case .connecting: return StellariumText.connecting
-        case .connected: return StellariumText.connected
-        case .failed(let reason): return StellariumText.failed(reason)
-        }
-    }
-
-    // MARK: Kartu dikonfirmasi
-
-    @ViewBuilder
-    private var confirmedCard: some View {
-        if let confirmed = link.lastConfirmed, let id = confirmed.message.objectID,
-           let object = engine.controller.resolver.object(forID: id, observer: engine.controller.observer,
-                                                         date: Date()) {
-            HStack(spacing: 14) {
-                CelestialVisualView(visual: CelestialVisual(object: object), diameter: 72, isConfirmed: true)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(object.name)
-                        .font(.title.weight(.bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text(WatchHomeText.subtitle(object))
-                        .font(.subheadline)
-                        .foregroundStyle(Color.nightAwareSecondary)
-                    if let h = engine.controller.resolver.horizontal(ofObjectID: id,
-                                                                     observer: engine.controller.observer,
-                                                                     date: Date()) {
-                        Label(SkyRowText.whereToLook(h), systemImage: "safari")
-                            .font(.footnote)
-                    }
-                    Text(verbatim: IdentificationText.phoneConfirmedTime(confirmed.message.sentAt,
-                                                                         live: confirmed.live))
-                        .font(.caption)
-                        .foregroundStyle(Color.nightAwareSecondary)
-                    if object.kind != .deepSky {
-                        Button(Scene3DText.view3D, systemImage: "cube.transparent") { open3D(id) }
-                            .font(.footnote.weight(.semibold))
-                            .buttonStyle(.borderless)
-                            .padding(.top, 2)
-                    }
-                }
-            }
-            .padding(.vertical, 6)
-            .accessibilityElement(children: .combine)
-        } else {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(IdentificationText.phoneNothingConfirmed)
-                    .font(.headline)
-                Text(WatchHomeText.confirmHint)
-                    .font(.footnote)
-                    .foregroundStyle(Color.nightAwareSecondary)
-            }
-            .padding(.vertical, 4)
-        }
     }
 
     // MARK: Langit

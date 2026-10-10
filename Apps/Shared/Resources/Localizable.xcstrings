@@ -7234,6 +7234,1018 @@
           }
         }
       }
+    },
+    "ob.discover.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point to discover."
+          }
+        }
+      }
+    },
+    "ob.discover.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at something in the sky with your Apple Watch. Point & Know helps you find out what it is."
+          }
+        }
+      }
+    },
+    "ob.continue": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        }
+      }
+    },
+    "ob.howItWorks": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How Watch pointing works"
+          }
+        }
+      }
+    },
+    "ob.world.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From a point of light to a world."
+          }
+        }
+      }
+    },
+    "ob.world.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Watch turns a natural pointing gesture into discovery. Raise your wrist toward a star, a planet or the Moon."
+          }
+        }
+      }
+    },
+    "ob.world.tap": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtle tap"
+          }
+        }
+      }
+    },
+    "ob.world.offline": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Works offline"
+          }
+        }
+      }
+    },
+    "ob.world.sync": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone sync"
+          }
+        }
+      }
+    },
+    "ob.world.setup": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set Up Apple Watch"
+          }
+        }
+      }
+    },
+    "ob.world.skip": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue without Watch"
+          }
+        }
+      }
+    },
+    "ob.watch.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Watch is ready."
+          }
+        }
+      }
+    },
+    "ob.watch.notReady": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Watch isn't connected yet."
+          }
+        }
+      }
+    },
+    "ob.watch.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We'll use its motion sensors to understand where you're pointing."
+          }
+        }
+      }
+    },
+    "ob.watch.notReadyBody": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install Point & Know on your Watch from the iPhone's Watch app, then open it on the Watch."
+          }
+        }
+      }
+    },
+    "ob.watch.motion": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gyroscope & Accelerometer"
+          }
+        }
+      }
+    },
+    "ob.watch.motionDetail": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6-axis motion"
+          }
+        }
+      }
+    },
+    "ob.watch.compass": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compass & pointing direction"
+          }
+        }
+      }
+    },
+    "ob.watch.compassDetail": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computed on the Watch"
+          }
+        }
+      }
+    },
+    "ob.chip.watch": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch"
+          }
+        }
+      }
+    },
+    "ob.chip.connected": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        }
+      }
+    },
+    "ob.chip.appInstalled": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App installed"
+          }
+        }
+      }
+    },
+    "ob.chip.notPaired": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not paired"
+          }
+        }
+      }
+    },
+    "ob.chip.notInstalled": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App not installed"
+          }
+        }
+      }
+    },
+    "ob.onDevice": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PROCESSED ON-DEVICE"
+          }
+        }
+      }
+    },
+    "ob.location.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sky depends on where you are."
+          }
+        }
+      }
+    },
+    "ob.location.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your location helps Point & Know calculate which stars and planets are actually above your horizon."
+          }
+        }
+      }
+    },
+    "ob.location.privacy": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your location is processed on-device to calculate the local sky."
+          }
+        }
+      }
+    },
+    "ob.location.use": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use My Location"
+          }
+        }
+      }
+    },
+    "ob.notNow": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Now"
+          }
+        }
+      }
+    },
+    "ob.point.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point naturally."
+          }
+        }
+      }
+    },
+    "ob.point.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look at something in the sky and point toward it with your index finger. Keep your wrist relaxed."
+          }
+        }
+      }
+    },
+    "ob.point.left": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left Wrist"
+          }
+        }
+      }
+    },
+    "ob.point.right": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right Wrist"
+          }
+        }
+      }
+    },
+    "ob.point.wristNote": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Watch reads your wrist from Apple Watch settings."
+          }
+        }
+      }
+    },
+    "ob.point.try": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try It"
+          }
+        }
+      }
+    },
+    "ob.lookup.title": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look up."
+          }
+        }
+      }
+    },
+    "ob.lookup.body": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See something you're curious about?"
+          }
+        }
+      }
+    },
+    "ob.lookup.hint": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "POINT TO IDENTIFY"
+          }
+        }
+      }
+    },
+    "ob.ready": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "READY"
+          }
+        }
+      }
+    },
+    "ob.locked": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LOCKED"
+          }
+        }
+      }
+    },
+    "disc.first": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FIRST DISCOVERY"
+          }
+        }
+      }
+    },
+    "disc.again": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CONFIRMED"
+          }
+        }
+      }
+    },
+    "disc.visibleNow": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible now"
+          }
+        }
+      }
+    },
+    "disc.notVisibleNow": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not visible right now"
+          }
+        }
+      }
+    },
+    "disc.whatYoullSee": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you'll see"
+          }
+        }
+      }
+    },
+    "disc.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Naked eye"
+          }
+        }
+      }
+    },
+    "disc.binoculars": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Binoculars"
+          }
+        }
+      }
+    },
+    "disc.telescope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope"
+          }
+        }
+      }
+    },
+    "disc.save": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Observation"
+          }
+        }
+      }
+    },
+    "disc.saved": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
+          }
+        }
+      }
+    },
+    "disc.explore": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explore Sky"
+          }
+        }
+      }
+    },
+    "disc.journal": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved observations"
+          }
+        }
+      }
+    },
+    "guide.moon.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earth's only natural satellite, about 384,000 km away."
+          }
+        }
+      }
+    },
+    "guide.moon.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its phase and dark patches (maria)"
+          }
+        }
+      }
+    },
+    "guide.moon.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large craters along the terminator"
+          }
+        }
+      }
+    },
+    "guide.moon.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thousands of craters, mountains and rilles"
+          }
+        }
+      }
+    },
+    "guide.mercury.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The planet closest to the Sun, always low in the dusk or dawn sky."
+          }
+        }
+      }
+    },
+    "guide.mercury.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A bright point near the horizon"
+          }
+        }
+      }
+    },
+    "guide.mercury.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Easier to find in the twilight"
+          }
+        }
+      }
+    },
+    "guide.mercury.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A tiny Moon-like phase"
+          }
+        }
+      }
+    },
+    "guide.venus.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The brightest planet in the sky, wrapped in thick clouds."
+          }
+        }
+      }
+    },
+    "guide.venus.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A very bright point that doesn't twinkle"
+          }
+        }
+      }
+    },
+    "guide.venus.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A crescent or gibbous shape"
+          }
+        }
+      }
+    },
+    "guide.venus.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A clear phase, no surface detail"
+          }
+        }
+      }
+    },
+    "guide.mars.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The red planet, about half the size of Earth."
+          }
+        }
+      }
+    },
+    "guide.mars.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An orange-red point"
+          }
+        }
+      }
+    },
+    "guide.mars.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its colour stands out"
+          }
+        }
+      }
+    },
+    "guide.mars.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Polar ice caps when Mars is close"
+          }
+        }
+      }
+    },
+    "guide.jupiter.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The largest planet in our Solar System, seen as a bright, steady point of light."
+          }
+        }
+      }
+    },
+    "guide.jupiter.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A bright, steady point"
+          }
+        }
+      }
+    },
+    "guide.jupiter.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter and its four Galilean moons"
+          }
+        }
+      }
+    },
+    "guide.jupiter.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloud bands and the Great Red Spot"
+          }
+        }
+      }
+    },
+    "guide.saturn.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The ringed planet, almost ten times farther from the Sun than Earth."
+          }
+        }
+      }
+    },
+    "guide.saturn.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A steady yellowish point"
+          }
+        }
+      }
+    },
+    "guide.saturn.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An oval shape from its rings"
+          }
+        }
+      }
+    },
+    "guide.saturn.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rings and its moon Titan"
+          }
+        }
+      }
+    },
+    "guide.star.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A star: another sun, very far away."
+          }
+        }
+      }
+    },
+    "guide.star.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A twinkling point"
+          }
+        }
+      }
+    },
+    "guide.star.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its colour becomes clearer"
+          }
+        }
+      }
+    },
+    "guide.star.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still a point: it's too far away"
+          }
+        }
+      }
+    },
+    "guide.deep.desc": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A deep-sky object: a star cluster, nebula or galaxy."
+          }
+        }
+      }
+    },
+    "guide.deep.eye": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A faint smudge in a dark sky"
+          }
+        }
+      }
+    },
+    "guide.deep.bino": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its shape starts to show"
+          }
+        }
+      }
+    },
+    "guide.deep.scope": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its stars or its gas and dust"
+          }
+        }
+      }
+    },
+    "tab.journal": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Journal"
+          }
+        }
+      }
+    },
+    "ob.replay": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show introduction again"
+          }
+        }
+      }
+    },
+    "journal.empty": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No observations yet. Save one from a Discovery card."
+          }
+        }
+      }
+    },
+    "disc.lookUpTitle": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No discovery yet"
+          }
+        }
+      }
+    },
+    "disc.lookUpBody": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at something in the sky with your Watch, then tap “Yes, that's it”."
+          }
+        }
+      }
+    },
+    "disc.details": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View details"
+          }
+        }
+      }
+    },
+    "settings.sky": {
+      "comment": "Desain Figma Point&Know (ADR-019).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

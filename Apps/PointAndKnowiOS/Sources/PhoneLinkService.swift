@@ -18,6 +18,9 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Kalibrasi terakhir dari jam.
     @Published public private(set) var lastCalibration: PointingLinkMessage?
     @Published public private(set) var isReachable = false
+    /// Jam dipasangkan dengan iPhone ini / app jam terpasang (onboarding, ADR-019).
+    @Published public private(set) var isPaired = false
+    @Published public private(set) var isWatchAppInstalled = false
     @Published public private(set) var isActivated = false
     @Published public private(set) var lastNote: String?
     @Published public private(set) var receivedCount = 0
@@ -370,9 +373,13 @@ extension PhoneLinkService: WCSessionDelegate {
         let reachable = session.isReachable
         let activated = activationState == .activated
         let message = error?.localizedDescription
+        let paired = session.isPaired
+        let installed = session.isWatchAppInstalled
         Task { @MainActor in
             self.isReachable = reachable
             self.isActivated = activated
+            self.isPaired = paired
+            self.isWatchAppInstalled = installed
             // Bagian konteks yang tertahan sebelum sesi aktif ikut terkirim
             // sekarang, dan pemakai "terjangkau" (cermin Stellarium) diberi tahu
             // — `sessionReachabilityDidChange` tidak terpanggil bila sudah
@@ -404,6 +411,15 @@ extension PhoneLinkService: WCSessionDelegate {
             self.isActivated = false
             self.isReachable = false
             self.activate()
+        }
+    }
+
+    nonisolated public func sessionWatchStateDidChange(_ session: WCSession) {
+        let paired = session.isPaired
+        let installed = session.isWatchAppInstalled
+        Task { @MainActor in
+            self.isPaired = paired
+            self.isWatchAppInstalled = installed
         }
     }
 

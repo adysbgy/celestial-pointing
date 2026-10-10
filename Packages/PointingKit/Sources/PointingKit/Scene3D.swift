@@ -289,8 +289,27 @@ public extension Scene3D {
         let a = CelestialVisual.accents
         switch id {
         case "jupiter":
-            return bandedAlbedo(pole: pole, bands: [a.jupiterBandCream, a.jupiterBandRust,
-                                                    a.jupiterBandTan, a.jupiterBandCream])
+            // Pita dari kutub ke kutub: zona terang dan sabuk gelap bergantian,
+            // dengan Sabuk Ekuator Selatan tempat Bintik Merah Besar (~22°S).
+            let bands = bandedAlbedo(pole: pole, bands: [
+                a.jupiterBandTan, a.jupiterBandCream, a.jupiterBandRust, a.jupiterBandCream,
+                a.jupiterBandTan, a.jupiterBandCream, a.jupiterBandRust, a.jupiterBandCream,
+                a.jupiterBandTan,
+            ])
+            let p = pole.normalized ?? .unitY
+            // Bintik menghadap pengamat (+z) di lintang −22°.
+            let facing = (Vector3.unitZ - p * Vector3.unitZ.dot(p)).normalized ?? .unitZ
+            let lat = -22.0 * .pi / 180
+            let spot = (facing * cos(lat) + p * sin(lat)).normalized ?? facing
+            return { n in
+                let d = n.dot(spot)
+                let t = min(1, max(0, (d - 0.985) / 0.01))
+                guard t > 0 else { return bands(n) }
+                let base = bands(n), s = a.jupiterSpot
+                let k = t * t * (3 - 2 * t)
+                return .init(red: base.red * (1 - k) + s.red * k, green: base.green * (1 - k) + s.green * k,
+                             blue: base.blue * (1 - k) + s.blue * k)
+            }
         case "saturn":
             let base = CelestialVisual.Planet.saturn.palette.light
             let darker = CelestialVisual.RGBComponents(red: base.red * 0.88, green: base.green * 0.86, blue: base.blue * 0.82)

@@ -68,6 +68,13 @@ public enum WatchHomeText {
         TextLocalization.text(.homeGuideDistance, degrees(deg))
     }
 
+    /// Label data "AZ 287° · ALT −12°". Ketinggian **bertanda**: di bawah
+    /// cakrawala tidak boleh terbaca sebagai 0° (ADR-019).
+    public static func altAz(_ h: HorizontalCoord) -> String {
+        "AZ " + degrees(SkyMath.normalizeDeg(h.azimuthDeg)) + " · ALT "
+            + NumberFormat.decimal(h.altitudeDeg.rounded(), fractionDigits: 0).replacingOccurrences(of: "-", with: "−") + "°"
+    }
+
     /// Sudut bulat tanpa tanda negatif: "25°".
     public static func degrees(_ deg: Double) -> String {
         NumberFormat.decimal(max(0, deg), fractionDigits: 0) + "°"
