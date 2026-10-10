@@ -3427,6 +3427,94 @@ if [ -n "$nonlocalized" ]; then
   echo "$nonlocalized"
 fi
 
+# ── Aturan 30: kunci Info.plist yang dideklarasikan engine harus sampai ke proyek ──
+# Aturan 14 hanya menguji **satu arah**: kunci yang sudah ada di `project.yml`
+# harus punya terjemahan. Ia tidak bisa melihat arah sebaliknya — kunci yang
+# dideklarasikan **engine** dan tidak pernah ditulis ke `project.yml` sama
+# sekali. Untuk arah itu Aturan 14 persis "hijau karena tidak ada yang
+# diuji": himpunan `perms`-nya diambil dari `project.yml`, jadi kunci yang
+# absen tidak pernah masuk perbandingan.
+#
+# Itu bukan cacat hipotetis. `TelescopeNetworkRequirements.localNetworkUsageKey`
+# (`NSLocalNetworkUsageDescription`) sudah dideklarasikan dan diuji di
+# `CelestialEngine` sejak §19, tetapi tidak ada di `project.yml` maupun di
+# kedua `InfoPlist.strings` — seluruh 29 aturan hijau sementara aplikasi
+# diam-diam tidak akan pernah menemukan teleskop. Kegagalannya memang bukan
+# galat yang terbaca: tanpa kunci ini iOS menolak akses jaringan lokal tanpa
+# peringatan, dan layar hanya menunjukkan "teleskop tidak ditemukan".
+#
+# Yang diperiksa: setiap kunci `NS*UsageDescription` yang dideklarasikan di
+# sumber `Packages/` harus muncul di `project.yml`. Keduanya dibaca dari
+# berkas — gerbang yang menyalin daftar kuncinya sendiri akan tetap hijau
+# saat engine menambah kunci baru.
+#
+# **Batas yang dinyatakan.** `NSBonjourServices` sengaja TIDAK dituntut: ia
+# hanya wajib bila ada tipe layanan yang benar-benar di-browse
+# (`needsBonjourDeclaration`), dan tidak satu pun transport produksi yang
+# mendaftarkannya. Menuntutnya akan memaksa menulis kunci untuk layanan yang
+# tidak dipakai.
+echo
+echo "== Aturan 30: kunci izin engine harus sampai ke project.yml =="
+declared=$(python3 - <<'PY' 2>&1
+import os, re
+
+SPEC = "project.yml"
+SRC  = "Packages"
+
+# Kunci yang dideklarasikan engine: `public static let <nama> = "NS...UsageDescription"`.
+# Hanya yang berakhiran `UsageDescription` — `NSBonjourServices` bukan teks
+# izin dan hanya wajib bersyarat (lihat batas di atas).
+keys = {}
+pat_decl = re.compile(r'static\s+let\s+(\w+)\s*=\s*"(NS\w*UsageDescription)"')
+for root, _dirs, files in os.walk(SRC):
+    # `.build` berisi salinan artefak yang bisa ikut terhitung dua kali.
+    if ".build" in root.split(os.sep):
+        continue
+    for name in files:
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        try:
+            text = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        for m in pat_decl.finditer(text):
+            keys.setdefault(m.group(2), path)
+
+if not keys:
+    # Himpunan kosong berarti gerbang ini kehilangan giginya. Dilaporkan
+    # keras: aturan yang menemukan nol kunci akan selalu "Bersih", dan itu
+    # persis hijau yang tidak hijau.
+    print("PERINGATAN: tidak ada kunci izin yang dideklarasikan di Packages/.")
+    raise SystemExit
+
+if not os.path.exists(SPEC):
+    print("PERINGATAN: project.yml tidak ada.")
+    raise SystemExit
+
+spec = open(SPEC, encoding="utf-8").read()
+present = set(re.findall(r'INFOPLIST_KEY_(NS\w*UsageDescription)\s*:', spec))
+
+missing = [f"  {k} (dideklarasikan {v}) tidak ada di {SPEC}"
+           for k, v in sorted(keys.items()) if k not in present]
+print("\n".join(missing) if missing else "")
+PY
+)
+if printf '%s' "$declared" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 30 gagal dijalankan:"
+  echo "$declared"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$declared" ]; then
+  echo "Kunci izin yang dideklarasikan engine tapi absen di project.yml:"
+  echo "$declared"
+  echo "-> Tanpanya iOS menolak akses tanpa peringatan, dan Aturan 14 tidak"
+  echo "   bisa melihatnya (himpunannya diambil dari project.yml sendiri)."
+  status=1
+else
+  echo "Bersih: setiap kunci izin engine ada di project.yml."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

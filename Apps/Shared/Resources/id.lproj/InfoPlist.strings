@@ -4,3 +4,4 @@
 
 NSLocationWhenInUseUsageDescription = "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel, dan hasilnya ditandai belum tentu sah.";
 NSMotionUsageDescription = "Data gerak dipakai untuk mengukur arah tunjuk. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1.";
+NSLocalNetworkUsageDescription = "Jaringan lokal dipakai untuk mengirim perintah ke teleskop Anda setelah objek dikenali. Aplikasi hanya bicara ke perangkat yang Anda pilih, dan tidak pernah menggerakkan teleskop tanpa identifikasi objek yang lolos uji aman.";

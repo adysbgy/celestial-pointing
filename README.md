@@ -191,7 +191,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **29 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **30 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -213,6 +213,18 @@ dari view hanya ketahuan saat `Apps/` benar-benar dikompilasi terhadap
 paket, dan di Linux hanya `swift-typecheck.sh` yang bisa melakukannya —
 untuk **dua** berkas Foundation. Aturan 26 menutup jalur keanggotaan,
 aturan 27 menutup jalur pemanggilan.
+
+Aturan 30 lahir dari arah yang **tidak** dijaga aturan 14. Aturan 14
+menuntut setiap `INFOPLIST_KEY_NS*UsageDescription` di `project.yml` punya
+terjemahan per bahasa — tetapi himpunan kuncinya dibaca dari `project.yml`
+sendiri, jadi kunci yang dideklarasikan engine dan **tidak pernah ditulis
+ke sana** tidak pernah masuk perbandingan. Persis itu yang terjadi pada
+`NSLocalNetworkUsageDescription`: dideklarasikan dan diuji di
+`CelestialEngine`, absen dari `project.yml` maupun kedua
+`InfoPlist.strings`, dan seluruh aturan yang ada saat itu hijau sementara
+aplikasi diam-diam tidak akan pernah menemukan teleskop. Aturan 30 membaca
+deklarasi kuncinya dari `Packages/`, jadi kunci baru yang ditambah engine
+merah sampai ia benar-benar sampai ke proyek.
 
 ### Uji harus pernah merah
 
