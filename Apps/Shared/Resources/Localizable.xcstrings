@@ -4517,7 +4517,18 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Outside the telescope's altitude limit."
+            "value": "Below the telescope's altitude limit."
+          }
+        }
+      }
+    },
+    "slew.hazard.aboveAltitudeLimit": {
+      "comment": "Bahaya GoTo: target melewati batas maksimum ketinggian teleskop (batas meridian).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Above the telescope's altitude limit — past the meridian."
           }
         }
       }

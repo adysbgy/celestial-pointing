@@ -59,7 +59,7 @@ public extension SlewHazard {
     /// diverifikasi — persis keadaan yang paling tidak boleh diremehkan.
     var isSafety: Bool {
         switch self {
-        case .sunProximity, .belowAltitudeLimit, .sunPositionUnknown:
+        case .sunProximity, .belowAltitudeLimit, .aboveAltitudeLimit, .sunPositionUnknown:
             return true
         case .belowHorizon, .tooFaint, .noTarget, .lowConfidence:
             return false
@@ -79,6 +79,7 @@ public extension SlewHazard {
         switch self {
         case .sunProximity:      return .slewHazardSunProximity
         case .belowAltitudeLimit: return .slewHazardBelowAltitudeLimit
+        case .aboveAltitudeLimit: return .slewHazardAboveAltitudeLimit
         case .belowHorizon:      return .slewHazardBelowHorizon
         case .tooFaint:          return .slewHazardTooFaint
         case .noTarget:          return .slewHazardNoTarget
@@ -209,7 +210,19 @@ public extension LocalizedText {
 
     static let slewHazardBelowAltitudeLimit = LocalizedText(
         key: "slew.hazard.belowAltitudeLimit",
-        id: "Di luar batas ketinggian teleskop.")
+        id: "Di bawah batas ketinggian teleskop.")
+
+    /// Bahaya untuk target yang **melebihi** batas maksimum (batas meridian).
+    ///
+    /// Kalimatnya menyebut arahnya ("di atas"), bukan kalimat netral seperti
+    /// "di luar batas ketinggian". Netral itu yang dipakai sampai siklus ini
+    /// untuk **kedua** arah sekaligus, dan netral tidak bisa disalahkan —
+    /// tetapi juga tidak bisa ditindaklanjuti: pengguna tidak tahu apakah
+    /// target harus dinaikkan atau diturunkan. Bedanya menentukan tindakan
+    /// yang benar, jadi kalimatnya harus memilih.
+    static let slewHazardAboveAltitudeLimit = LocalizedText(
+        key: "slew.hazard.aboveAltitudeLimit",
+        id: "Di atas batas ketinggian teleskop — lewat batas meridian.")
 
     static let slewHazardBelowHorizon = LocalizedText(
         key: "slew.hazard.belowHorizon",

@@ -6,6 +6,20 @@ public enum SlewHazard: String, Equatable, Codable, Sendable, CaseIterable {
     case sunProximity
     /// Target di bawah batas ketinggian teleskop.
     case belowAltitudeLimit
+    /// Target **di atas** batas ketinggian maksimum teleskop (batas mekanis
+    /// meridian).
+    ///
+    /// **Kenapa case terpisah, bukan dipakai `belowAltitudeLimit` untuk kedua
+    /// arah.** Sampai siklus ini `SlewPlanner` melaporkan target yang
+    /// **melebihi** `maxAltitudeDeg` sebagai `.belowAltitudeLimit` — jadi
+    /// teleskop yang menolak bergerak karena targetnya **terlalu tinggi**
+    /// (lewat batas meridian) memberitahu pengguna "di luar batas ketinggian
+    /// teleskop" lewat cabang yang namanya sendiri berarti *di bawah*. Dua
+    /// arah yang berlawanan dilaporkan sebagai satu bahaya, dan pengguna
+    /// memperbaiki ke arah yang salah: menaikkan target yang sudah terlalu
+    /// tinggi. Padahal bedanya menentukan tindakan yang benar — turunkan,
+    /// bukan naikkan.
+    case aboveAltitudeLimit
     /// Target di bawah horizon (terbit belum terjadi).
     case belowHorizon
     /// Target terlalu redup untuk pengamatan.
@@ -121,7 +135,7 @@ public enum SlewPlanner {
 
         if target.altitudeDeg < policy.minAltitudeDeg { hazards.append(.belowAltitudeLimit) }
         if target.altitudeDeg < 0 { hazards.append(.belowHorizon) }
-        if target.altitudeDeg > policy.maxAltitudeDeg { hazards.append(.belowAltitudeLimit) }
+        if target.altitudeDeg > policy.maxAltitudeDeg { hazards.append(.aboveAltitudeLimit) }
         if object.magnitude > policy.limitingMagnitude { hazards.append(.tooFaint) }
 
         // Pengaman Matahari. Kalau posisi Matahari tidak diketahui, JANGAN

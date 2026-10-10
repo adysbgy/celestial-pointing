@@ -117,13 +117,62 @@ final class SlewSafetyTests: XCTestCase {
         XCTAssertTrue(decision.hazards.contains(.belowAltitudeLimit))
     }
 
+    /// Target **di atas** batas maksimum (batas meridian) dilaporkan sebagai
+    /// `.aboveAltitudeLimit` — bukan `.belowAltitudeLimit`.
+    ///
+    /// **Kenapa uji ini diubah, bukan ditambah.** Versi lamanya menegaskan
+    /// `decision.hazards.contains(.belowAltitudeLimit)` untuk target 89.5°,
+    /// padahal 89.5° berada **di atas** `maxAltitudeDeg` (89°). Jadi uji itu
+    /// bukan sekadar longgar: ia **mengunci** pelaporan yang salah sebagai
+    /// perilaku yang benar, dan akan merah kalau suatu hari `SlewPlanner`
+    /// diperbaiki melaporkan arah yang sebenarnya. Gerbang yang mengesahkan
+    /// cacat lebih mahal daripada tidak ada gerbang, karena ia mengubah
+    /// perbaikan menjadi regresi.
+    ///
+    /// Arah yang harus dibedakan bukan kosmetik: target terlalu **rendah**
+    /// harus dinaikkan, target terlalu **tinggi** harus diturunkan. Kalimat
+    /// yang menyebut "di luar batas" untuk keduanya tidak bisa ditindaklanjuti.
     func testAboveMeridianLimitIsRejected() {
         let tooHigh = HorizontalCoord(altitudeDeg: 89.5, azimuthDeg: 90)
         let decision = SlewPlanner.plan(
             resolution: resolution(level: .high, best: star, sun: sun),
             targetHorizontal: tooHigh
         )
+        XCTAssertTrue(decision.hazards.contains(.aboveAltitudeLimit))
+        XCTAssertFalse(decision.hazards.contains(.belowAltitudeLimit),
+                       "89.5° bukan di bawah batas minimum — dua arah tidak boleh disatukan")
+        XCTAssertFalse(decision.isAllowed)
+    }
+
+    /// Pasangannya: target terlalu **rendah** tetap `.belowAltitudeLimit`, dan
+    /// tidak dilaporkan sebagai `.aboveAltitudeLimit`.
+    ///
+    /// Tanpa arah ini, `SlewPlanner` yang menukar kedua cabangnya akan lolos
+    /// uji di atas: "89.5° bukan below" tetap benar kalau seluruh pelaporan
+    /// ketinggian dibalik. Dua arah, dua kelas cacat.
+    func testBelowLimitIsNotReportedAsAbove() {
+        let low = HorizontalCoord(altitudeDeg: 5, azimuthDeg: 90)
+        let decision = SlewPlanner.plan(
+            resolution: resolution(level: .high, best: star, sun: sun),
+            targetHorizontal: low
+        )
         XCTAssertTrue(decision.hazards.contains(.belowAltitudeLimit))
+        XCTAssertFalse(decision.hazards.contains(.aboveAltitudeLimit))
+    }
+
+    /// Target di dalam rentang yang sah tidak memicu bahaya ketinggian apa pun.
+    ///
+    /// Penjaga ketiga: tanpa dia, `SlewPlanner` yang melaporkan **kedua** arah
+    /// sekaligus untuk setiap target akan lolos kedua uji di atas (`contains`
+    /// tidak pernah menuntut ketiadaan pada target yang salah).
+    func testTargetInsideTheAltitudeRangeHasNoAltitudeHazard() {
+        let decision = SlewPlanner.plan(
+            resolution: resolution(level: .high, best: star, sun: sun),
+            targetHorizontal: goodTarget // 45°, jauh di dalam 10°…89°
+        )
+        XCTAssertFalse(decision.hazards.contains(.belowAltitudeLimit))
+        XCTAssertFalse(decision.hazards.contains(.aboveAltitudeLimit))
+        XCTAssertTrue(decision.isAllowed)
     }
 
     func testTooFaintIsRejected() {
