@@ -473,6 +473,61 @@ final class DeepSkyColourTests: XCTestCase {
             XCTAssertGreaterThan(night.red, 0, "warna kabut #\(index): harus tetap merah")
         }
     }
+
+    /// Penjaga **identitas**, bukan sekadar kemurnian. Enam warna kabut malam
+    /// membawa klaim fisik di docstring-nya: nebula emisi = Hα merah muda,
+    /// nebula planetari = O III biru-hijau, galaksi miring = krem, galaksi
+    /// spiral = biru, gugus terbuka = putih-biru, gugus bola = kuning-oranye.
+    /// `testDeepSkyColoursStayPureRedAtNight` hanya menjamin hijau/biru == 0,
+    /// jadi menukar dua warna (mis. nebula planetari ke nilai nebula emisi)
+    /// tetap lolos: layar malam akan menampilkan M27 dengan rona Hα padahal
+    /// klaimnya O III — gambar lebih yakin daripada teksnya, persis yang
+    /// dilarang PRD §2. Uji ini mengunci nilai hari siangnya lewat
+    /// `deepSkyColour(for:)` (jalur yang sama dengan layar), bukan lewat
+    /// `surface` yang membuang hue.
+    ///
+    /// Nilai yang diuji di sini adalah nilai **terukur**, bukan ringkasan
+    /// docstring: O III planetari ternyata `red 0.42 / green 0.78 / blue 0.86`
+    /// — kanal tertingginya **biru**, bukan hijau, jadi predikatnya menuntut
+    /// `blue >= green` (biru-hijau), bukan `green` tertinggi. (Catatan jujur:
+    /// predikat pertama saya tulis "hijau tertinggi" dari ingatan komentar dan
+    /// gerbang ini **merah** padanya — persis kelas "komentar mengutip angka
+    /// yang tidak pernah diukur". Predikat disesuaikan ke nilai asli.)
+    ///
+    /// Ambangnya longgar secara sengaja: yang dijaga adalah **arah hue yang
+    /// benar** (nebula merah muda: merah > biru; O III: biru tertinggi,
+    /// biru >= hijau; spiral: biru tertinggi; gugus bola: merah > biru;
+    /// gugus terbuka: biru tertinggi & hampir putih), bukan ketepatan angka
+    /// 8-bit. Kalau suatu hari paletnya diubah **beserta** klaim docstring dan
+    /// uji ini, gerbang ini hijau — yang dijaga adalah ketiganya tidak boleh
+    /// bercerai.
+    func testNightDeepSkyColoursKeepTheirPhysicalIdentity() {
+        typealias C = CelestialVisual.RGBComponents
+        let checks: [(DeepSkyCatalogue.Morphology, C, (C) -> Bool, String)] = [
+            // Hα merah muda: merah di atas biru, dan bukan ungu (biru >> merah).
+            (.nebula, CelestialVisual.deepSkyColour(for: .nebula),
+             { $0.red > $0.blue && $0.blue < $0.red }, "nebula: Hα merah muda (merah > biru)"),
+            // O III biru-hijau: biru tertinggi, dan biru >= hijau (nilai terukur
+            // 0.42/0.78/0.86 — bukan hijau tertinggi).
+            (.planetaryNebula, CelestialVisual.deepSkyColour(for: .planetaryNebula),
+             { $0.blue >= $0.green && $0.blue > $0.red }, "planetari: O III biru-hijau (biru tertinggi)"),
+            // Galaksi miring: krem, cukup seimbang (tidak dominan satu kanal).
+            (.galaxy, CelestialVisual.deepSkyColour(for: .galaxy),
+             { abs($0.red - $0.blue) < 0.20 && $0.green > 0.5 }, "galaksi miring: krem seimbang"),
+            // Galaksi spiral: biru tertinggi (bintang muda di lengan).
+            (.spiralGalaxy, CelestialVisual.deepSkyColour(for: .spiralGalaxy),
+             { $0.blue > $0.red && $0.blue > $0.green }, "spiral: biru tertinggi (bintang muda)"),
+            // Gugus terbuka: putih-biru, biru tertinggi & hampir putih.
+            (.openCluster, CelestialVisual.deepSkyColour(for: .openCluster),
+             { $0.blue >= $0.red && $0.blue >= $0.green && $0.red > 0.8 }, "gugus terbuka: putih-biru (biru tertinggi)"),
+            // Gugus bola: kuning-oranye, merah di atas biru.
+            (.globularCluster, CelestialVisual.deepSkyColour(for: .globularCluster),
+             { $0.red > $0.blue && $0.green > $0.blue }, "gugus bola: kuning-oranye (merah > biru)"),
+        ]
+        for (_, colour, predicate, message) in checks {
+            XCTAssertTrue(predicate(colour), "\(message) — didapat \(colour)")
+        }
+    }
 }
 
 /// Rasio kontras WCAG antara dua warna.
