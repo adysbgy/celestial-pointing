@@ -946,7 +946,11 @@ struct DiagnosticsView: View {
                     visual: visual,
                     isConfirmed: isConfirmed,
                     level: level,
-                    displayName: engine.displayedObjectName(object)))
+                    // `displayName` milik panel ini — accessor statis ini
+                    // tidak punya `engine`, dan mengambil nama dari sini
+                    // membuat pengumuman VoiceOver memakai nama yang sama
+                    // persis dengan yang tertulis di atasnya.
+                    displayName: displayName))
             }
         }
     }
