@@ -49,16 +49,49 @@ public struct VisibilityPolicy: Equatable {
     /// apa pun.
     public var moonBrighteningMagnitudes: Double
 
+    /// Ambang magnitudo **khusus objek langit dalam** (nebula, galaksi, gugus).
+    ///
+    /// **Kenapa batasnya terpisah dari `limitingMagnitude`.** Katalog produksi
+    /// memuat objek langit dalam sampai mag 8.8 (M57), dan seluruh jalur
+    /// visualnya — `CelestialVisual.Kind.deepSky`, `VisualFrame`, label,
+    /// pengucapan, dan bentuk per-morfologi — sudah ada dan teruji. Tapi
+    /// `classify` hanya memakai `limitingMagnitude` (6.0), jadi keenam objek
+    /// yang melebihi 6.0 (M27, M57, M51, M101, M2, M11) — termasuk seluruh
+    /// wakil `.planetaryNebula` dan `.spiralGalaxy` — diklasifikasi
+    /// `.tooFaint` dan resolver tidak pernah menghasilkannya. Hasilnya kode
+    /// gambar yang mahal untuk dua kelas objek tidak pernah berjalan di app.
+    /// Ini kelas cacat yang sama persis dengan yang sudah ditutup
+    /// `DeepSkyCatalogueTests`: setiap bagian benar sendiri, yang hilang
+    /// adalah ambang yang membedakan bintang dari objek langit dalam.
+    ///
+    /// Bintang dan objek langit dalam memang punya ambang beda: batas mata
+    /// telanjang (~6) adalah untuk bintang titik; objek langit dalam adalah
+    /// target binokuler/tele yang sengaja lebih redup. Memakai satu angka
+    /// untuk keduanya berarti atau binokuler DSO tidak pernah dikenali, atau
+    /// bintang redup palsu diklaim terlihat. Ambang terpisah menyelesaikannya
+    /// tanpa mengubah batas bintang (6.0) — sehingga tidak ada uji bintang
+    /// yang berubah.
+    ///
+    /// Nilai 9.0 berada di atas mag terredup katalog (M57 = 8.80) agar semua
+    /// anggota katalog benar-benar bisa jadi kandidat saat langit gelap.
+    /// Cahaya Bulan tetap mengketatkannya lewat `moonBrighteningMagnitudes`
+    /// (lihat `effectiveLimitingMagnitude`), jadi M57 tetap ditolak saat
+    /// purnama tinggi — itu jujur: nebula mag 8.8 memang tidak terlihat di
+    /// langit terang Bulan.
+    public var deepSkyLimitingMagnitude: Double
+
     public init(minAltitudeDeg: Double = 5.0,
                 limitingMagnitude: Double = 6.0,
                 sunAltitudeForDarknessDeg: Double = -6.0,
                 minSunSeparationDeg: Double = 30.0,
-                moonBrighteningMagnitudes: Double = 1.6) {
+                moonBrighteningMagnitudes: Double = 1.6,
+                deepSkyLimitingMagnitude: Double = 9.0) {
         self.minAltitudeDeg = minAltitudeDeg
         self.limitingMagnitude = limitingMagnitude
         self.sunAltitudeForDarknessDeg = sunAltitudeForDarknessDeg
         self.minSunSeparationDeg = minSunSeparationDeg
         self.moonBrighteningMagnitudes = moonBrighteningMagnitudes
+        self.deepSkyLimitingMagnitude = deepSkyLimitingMagnitude
     }
 
     /// Kebijakan santai untuk pengujian: tidak membuang apa pun.
@@ -75,7 +108,8 @@ public struct VisibilityPolicy: Equatable {
         limitingMagnitude: 30,
         sunAltitudeForDarknessDeg: 91,
         minSunSeparationDeg: 0,
-        moonBrighteningMagnitudes: 0
+        moonBrighteningMagnitudes: 0,
+        deepSkyLimitingMagnitude: 30
     )
 }
 
@@ -125,9 +159,10 @@ public enum VisibilityFilter {
                                 magnitude: Double,
                                 separationFromSunDeg: Double?,
                                 context: SkyContext,
-                                policy: VisibilityPolicy) -> Visibility {
+                                policy: VisibilityPolicy,
+                                kind: ObjectKind = .star) -> Visibility {
         if altitudeDeg < policy.minAltitudeDeg { return .belowHorizon }
-        if magnitude > effectiveLimitingMagnitude(context: context, policy: policy) {
+        if magnitude > effectiveLimitingMagnitude(context: context, policy: policy, kind: kind) {
             return .tooFaint
         }
         if let separation = separationFromSunDeg, separation < policy.minSunSeparationDeg {
@@ -161,13 +196,23 @@ public enum VisibilityFilter {
     /// saat Bulan di bawah horizon, atau saat altitudenya tak diketahui: asumsi
     /// terbaik tanpa bukti adalah batas paling longgar, dan itu juga yang paling
     /// tidak berbohong tentang apa yang bisa dilihat.
+    ///
+    /// **Kenapa `kind` ikut.** Bintang titik dan objek langit dalam punya ambang
+    /// beda (`limitingMagnitude` lawan `deepSkyLimitingMagnitude`); tanpa
+    /// `kind` di sini, ambang tunggal akan membuang keenam DSO terredup
+    /// (M27/M57/M51/M101/M2/M11) — termasuk seluruh wakil `.planetaryNebula`
+    /// dan `.spiralGalaxy` — padahal kode gambarnya sudah ada. `kind` dibawa
+    /// sebagai parameter, bukan dibaca dari katalog, supaya fungsi ini tetap
+    /// murni dan bisa diuji di Linux dengan benda buatan tangan.
     public static func effectiveLimitingMagnitude(context: SkyContext,
-                                                  policy: VisibilityPolicy) -> Double {
+                                                  policy: VisibilityPolicy,
+                                                  kind: ObjectKind = .star) -> Double {
+        let base = (kind == .deepSky) ? policy.deepSkyLimitingMagnitude : policy.limitingMagnitude
         // Cahaya Bulan hanya relevan kalau Bulan memang masih di atas horizon.
         let moonIsUp = (context.moonAltitudeDeg ?? -90) > 0
         let fraction = moonIsUp ? (context.moonIlluminationFraction ?? 0) : 0
-        guard fraction > 0 else { return policy.limitingMagnitude }
-        return policy.limitingMagnitude - policy.moonBrighteningMagnitudes * fraction
+        guard fraction > 0 else { return base }
+        return base - policy.moonBrighteningMagnitudes * fraction
     }
 
     /// Apakah langit dianggap gelap untuk konteks ini.

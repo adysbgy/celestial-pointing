@@ -240,7 +240,8 @@ public struct PointingResolver {
                 magnitude: magnitude,
                 separationFromSunDeg: object.kind == .sun ? nil : sunSeparation,
                 context: context,
-                policy: policy
+                policy: policy,
+                kind: object.kind
             )
             let separation = SkyMath.angularSeparationHorizontalDeg(pointing, horizontal)
 

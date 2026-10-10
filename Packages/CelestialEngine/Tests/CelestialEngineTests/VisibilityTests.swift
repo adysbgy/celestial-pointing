@@ -53,6 +53,72 @@ final class VisibilityTests: XCTestCase {
         XCTAssertEqual(result, .tooFaint)
     }
 
+    // MARK: - Objek langit dalam punya ambang sendiri
+
+    /// Bintang titik dan objek langit dalam punya ambang magnitudo beda.
+    ///
+    /// **Cacat yang ditutup uji ini.** `classify` dulu hanya memakai
+    /// `limitingMagnitude` (6.0) untuk segalanya. Katalog produksi memuat
+    /// objek langit dalam sampai mag 8.8 (M57), dan seluruh jalur visualnya
+    /// (bentuk per-morfologi, label, pengucapan) sudah ada — tapi keenam
+    /// anggota yang melebihi 6.0 diklasifikasi `.tooFaint`, jadi resolver
+    /// tidak pernah menghasilkan mereka dan kode gambarnya mati di produksi.
+    /// Ini kelas cacat yang sama persis dengan yang dikejar
+    /// `DeepSkyCatalogueTests`: tiap bagian benar sendiri, yang hilang adalah
+    /// ambang yang membedakan bintang dari objek langit dalam.
+    ///
+    /// Yang diuji: di langit gelap, M57 (mag 8.8, nebula planetari) harus
+    /// **terlihat** sebagai objek langit dalam, sementara bintang mag 8.5
+    /// tetap **terlalu redup**. Satu ambang tidak boleh memenangkan keduanya.
+    func testDeepSkyUsesItsOwnLimitingMagnitude() {
+        let m57 = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .deepSky
+        )
+        XCTAssertEqual(m57, .visible,
+                       "M57 (mag 8.8) harus terlihat sebagai objek langit dalam")
+
+        let faintStar = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.5, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .star
+        )
+        XCTAssertEqual(faintStar, .tooFaint,
+                       "bintang mag 8.5 tetap terlalu redup — ambang bintang tidak berubah")
+
+        // Tanpa `kind` (bawaan .star) objek mag 8.8 harus tetap ditolak,
+        // supaya keliru memanggil tanpa `kind` tidak membocorkan ambang DSO.
+        let defaultKind = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.8, separationFromSunDeg: 120,
+            context: night, policy: policy
+        )
+        XCTAssertEqual(defaultKind, .tooFaint,
+                       "tanpa kind, mag 8.8 tetap di bawah ambang bintang")
+    }
+
+    /// Cahaya Bulan tetap mengketatkan ambang objek langit dalam — M57 yang
+    /// lolos di langit gelap ditolak saat purnama tinggi.
+    ///
+    /// Ini yang menjaga ambang terpisah tetap jujur: nebula mag 8.8 memang
+    /// tidak terlihat di langit terang Bulan, jadi penolakannya harus tetap
+    /// berlaku, bukan dihapus oleh ambang DSO yang lebih longgar.
+    func testMoonlightAlsoTightensTheDeepSkyLimit() {
+        let fullMoon = SkyContext(sunAltitudeDeg: -40,
+                                  moonAltitudeDeg: 30,
+                                  moonIlluminationFraction: 1.0,
+                                  isDark: true)
+        let m57Dark = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .deepSky
+        )
+        let m57Moon = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.8, separationFromSunDeg: 120,
+            context: fullMoon, policy: policy, kind: .deepSky
+        )
+        XCTAssertEqual(m57Dark, .visible, "M57 terlihat di langit gelap")
+        XCTAssertEqual(m57Moon, .tooFaint,
+                       "purnama mengetatkan ambang DSO: M57 ditolak di langit terang Bulan")
+    }
+
     func testDaylightRejectsEverything() {
         let result = VisibilityFilter.classify(
             altitudeDeg: 45, magnitude: -1.0, separationFromSunDeg: 120,
