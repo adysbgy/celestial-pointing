@@ -18,6 +18,7 @@ struct SkyHomeView: View {
     @StateObject private var guide = SkyGuideModel()
     @State private var scene3D: Scene3DSheet?
     @State private var discovery: Ident?
+    @State private var showConnection = false
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSky = false
     @AppStorage(StellariumBridge.enabledKey) private var stellariumOn = false
     @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
@@ -25,6 +26,11 @@ struct SkyHomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    ConnectionPill(link: link) { showConnection = true }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
                 Section {
                     discoveryCard
                         .listRowInsets(EdgeInsets())
@@ -51,6 +57,7 @@ struct SkyHomeView: View {
             .fontDesign(.rounded)
             .navigationTitle(WatchHomeText.skyTab)
             .sheet(item: $scene3D) { sheet in Sky3DView(content: sheet.content, title: sheet.title) }
+            .sheet(isPresented: $showConnection) { ConnectionSheet(link: link).presentationDetents([.medium, .large]) }
             .sheet(item: $discovery) { item in
                 DiscoveryView(objectID: item.id, engine: engine, journal: journal,
                               isVisibleNow: guide.visible.contains { $0.id == item.id }, onExplore: {})
@@ -77,6 +84,9 @@ struct SkyHomeView: View {
                     // Setelah peluncuran selesai: sheet yang diminta saat
                     // TabView baru tampil diabaikan diam-diam.
                     Task { try? await Task.sleep(for: .seconds(1.5)); open3D(id) }
+                }
+                if UserDefaults.standard.bool(forKey: "debugConnectionSheet") {
+                    Task { try? await Task.sleep(for: .seconds(1.5)); showConnection = true }
                 }
                 if let id = UserDefaults.standard.string(forKey: "debugDiscovery"), discovery == nil {
                     Task { try? await Task.sleep(for: .seconds(1.5)); discovery = Ident(id: id) }

@@ -133,6 +133,18 @@ public final class WatchLinkService: NSObject, ObservableObject {
 
     public override init() { super.init() }
 
+    /// Kirim pengaturan bersama ke iPhone (ADR-020): langsung (`sendMessage`)
+    /// bila terjangkau supaya terasa seketika, **dan** antre
+    /// (`transferUserInfo`) sebagai jaminan bila iPhone jauh. Dobel tidak
+    /// masalah: iPhone hanya memakai yang terbaru.
+    public func push(settings: SyncedSettings) {
+        guard let session else { return }
+        if session.activationState == .activated, session.isReachable {
+            session.sendMessage(settings.plist, replyHandler: nil, errorHandler: nil)
+        }
+        session.transferUserInfo(settings.plist)
+    }
+
     /// Kirim arah tunjuk ke iPhone untuk Stellarium — hanya bila diminta dan
     /// terjangkau, paling sering 4×/dtk. Tanpa antre: arah lama tidak berguna.
     public func mirror(_ snapshot: PointingSnapshot) {
@@ -338,9 +350,14 @@ extension WatchLinkService: WCSessionDelegate {
         let reachable = session.isReachable
         // Konteks terakhir dari iPhone tetap ada setelah app jam dibuka ulang.
         let mirror = MirrorSample.isRequest(session.receivedApplicationContext)
+        let settings = SyncedSettings(plist: session.receivedApplicationContext)
         Task { @MainActor in
             self.isReachable = reachable
             if let mirror { self.mirrorRequested = mirror }
+            // Pengaturan: ambil yang terbaru dari iPhone, lalu kirim milik jam
+            // supaya kedua perangkat bertemu di versi yang sama (ADR-020).
+            if let settings { SettingsSyncStore.apply(settings) }
+            if activationState == .activated { self.push(settings: SettingsSyncStore.local()) }
             if let error {
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa katalog, jadi menampilkannya apa
@@ -358,7 +375,9 @@ extension WatchLinkService: WCSessionDelegate {
         let status = TelescopeStatus(plist: applicationContext)
         let message = PointingLinkMessage(plist: applicationContext)
         let mirror = MirrorSample.isRequest(applicationContext)
+        let settings = SyncedSettings(plist: applicationContext)
         Task { @MainActor in
+            if let settings { SettingsSyncStore.apply(settings) }
             if let mirror { self.mirrorRequested = mirror }
             if let status { self.receiveTelescope(status) }
             // Konteks yang sama dikirim ulang setiap laporan teleskop (2 dtk);
@@ -374,6 +393,10 @@ extension WatchLinkService: WCSessionDelegate {
                                     didReceiveMessage message: [String: Any]) {
         if let on = MirrorSample.isRequest(message) {
             Task { @MainActor in self.mirrorRequested = on }
+            return
+        }
+        if let settings = SyncedSettings(plist: message) {
+            Task { @MainActor in SettingsSyncStore.apply(settings) }
             return
         }
         guard let decoded = PointingLinkMessage(plist: message) else { return }

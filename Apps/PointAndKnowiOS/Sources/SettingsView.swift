@@ -18,14 +18,34 @@ struct SettingsView: View {
     @AppStorage(StellariumBridge.addressKey) private var stellariumAddress = String()
     @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
     @State private var tool: DeveloperTool?
+    @State private var showConnection = false
 
     enum DeveloperTool: String, Identifiable { case diagnostics, experiment, link, lab; var id: String { rawValue } }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button { showConnection = true } label: {
+                        HStack(spacing: 12) {
+                            ConnectionGlyph(isLive: link.connectionState.isLive, isReady: link.connectionState.isReady)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(link.connectionState.title).foregroundStyle(.primary)
+                                Text(link.connectionState.detail())
+                                    .font(.footnote)
+                                    .foregroundStyle(DK.secondaryText)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(ConnectionText.title)
+                }
                 Section(DesignText.settingsSky) {
-                    Toggle(isOn: $darkSky) {
+                    Toggle(isOn: Binding(get: { darkSky }, set: { value in
+                        darkSky = value
+                        // Ikut ke jam (ADR-020).
+                        link.push(settings: SettingsSyncStore.userChanged())
+                    })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(WatchHomeText.darkSky)
                             Text(WatchHomeText.darkSkyHint).font(.footnote).foregroundStyle(DK.secondaryText)
@@ -61,6 +81,7 @@ struct SettingsView: View {
             .navigationTitle(WatchHomeText.settings)
             .onChange(of: darkSky) { _, dark in engine.setSkyQuality(SkyQualityStorage.quality(darkSky: dark)) }
             .onChange(of: stellariumOn) { _, _ in applyStellarium() }
+            .sheet(isPresented: $showConnection) { ConnectionSheet(link: link).presentationDetents([.medium, .large]) }
             .sheet(item: $tool) { tool in
                 switch tool {
                 case .diagnostics:

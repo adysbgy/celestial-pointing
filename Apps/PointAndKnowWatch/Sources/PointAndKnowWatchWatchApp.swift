@@ -108,6 +108,18 @@ struct PointAndKnowWatchApp: App {
 
         engine.setSkyQuality(SkyQualityStorage.quality(darkSky: darkSky))
 
+        #if DEBUG
+        // Uji sinkron pengaturan jam → iPhone (ADR-020).
+        if UserDefaults.standard.object(forKey: "debugPushHotCold") != nil {
+            let v = UserDefaults.standard.bool(forKey: "debugPushHotCold")
+            let link = self.link
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                UserDefaults.standard.set(v, forKey: SettingsSyncStore.hotColdKey)
+                link.push(settings: SettingsSyncStore.userChanged())
+            }
+        }
+        #endif
         location.start()
         // Lokasi sungguhan datang setelah `start()`, jadi engine disambungkan
         // ke sumbernya — bukan diberi satu cuplikan lalu ditinggal.

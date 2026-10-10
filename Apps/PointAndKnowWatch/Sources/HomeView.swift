@@ -23,6 +23,9 @@ struct HomeView: View {
     /// Posisi Digital Crown di antara kandidat (ADR-014).
     @State private var crown = 0.0
     @State private var showPhenomena = false
+    private var phoneSymbol: String { link.isReachable ? Self.symbolPhone : Self.symbolPhoneAway }
+    private static let symbolPhone = "iphone"
+    private static let symbolPhoneAway = "iphone.slash"
     @State private var confirmation: WatchConfirmation?
     @State private var showResult = false
 
@@ -37,6 +40,14 @@ struct HomeView: View {
                         hero
                             .id(heroKey)
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        // Status iPhone, hanya di layar tenang (siap/siang) supaya
+                        // tidak mengganggu saat menunjuk (ADR-020).
+                        if heroKey == "idle" || heroKey == "day" {
+                            Label(link.isReachable ? ConnectionText.phoneLive : ConnectionText.phoneAway,
+                                  systemImage: phoneSymbol)
+                                .font(.caption2)
+                                .foregroundStyle(link.isReachable ? PointingTone.success.color : .secondary)
+                        }
                         if let pinned = guide.pinned {
                             Button {
                                 guide.pin(nil)
@@ -65,7 +76,17 @@ struct HomeView: View {
                     .padding(.horizontal, 2)
                     .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: heroKey)
                 }
-                .onChange(of: heroKey) { _, _ in crown = 0 }
+                .onChange(of: heroKey) { _, key in
+                    crown = 0
+                    #if DEBUG
+                    // Uji Jurnal (ADR-020): `-debugAutoConfirm YES` menekan
+                    // "Ya, itu dia" sendiri begitu terkunci.
+                    if key.hasPrefix("single-"), UserDefaults.standard.bool(forKey: "debugAutoConfirm"),
+                       case .single(let object) = outcome, confirmation == nil {
+                        confirm(object)
+                    }
+                    #endif
+                }
                 .fontDesign(.rounded)
                 .task {
                     // Langit bergeser pelan; sekali per menit cukup.
@@ -609,13 +630,22 @@ struct WatchSettingsView: View {
     /// dibuka sebagai sheet, bukan didorong ke tumpukan ini.
     @State private var showTechnical = false
 
+    /// Sakelar yang ikut tersinkron ke iPhone (ADR-020): perubahan oleh
+    /// pengguna diberi stempel waktu lalu dikirim.
+    private func synced(_ binding: Binding<Bool>) -> Binding<Bool> {
+        Binding(get: { binding.wrappedValue }, set: { value in
+            binding.wrappedValue = value
+            link.push(settings: SettingsSyncStore.userChanged())
+        })
+    }
+
     var body: some View {
         List {
             Section {
                 Toggle(WatchHomeText.nightMode, isOn: $nightMode)
                 Toggle(WatchHomeText.soundOnLock, isOn: $audioCueEnabled)
-                Toggle(WatchHomeText.hotColdHaptics, isOn: $hotColdOn)
-                Toggle(isOn: $darkSky) {
+                Toggle(WatchHomeText.hotColdHaptics, isOn: synced($hotColdOn))
+                Toggle(isOn: synced($darkSky)) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(WatchHomeText.darkSky)
                         Text(WatchHomeText.darkSkyHint)
@@ -630,11 +660,10 @@ struct WatchSettingsView: View {
                     SkyContextView(engine: engine)
                 }
             }
-            Section(WatchHomeText.phoneLink) {
-                Label(link.isReachable
-                      ? TextLocalization.text(.pointingLinkConnected)
-                      : TextLocalization.text(.pointingLinkDisconnected),
+            Section(ConnectionText.title) {
+                Label(link.isReachable ? ConnectionText.phoneLive : ConnectionText.phoneAway,
                       systemImage: linkSymbol)
+                    .foregroundStyle(link.isReachable ? PointingTone.success.color : .secondary)
             }
             Section(WatchHomeText.developerSection) {
                 NavigationLink(WatchHomeText.whyNotSure) {

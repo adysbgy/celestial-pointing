@@ -20,6 +20,38 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     @Published public private(set) var isReachable = false
     /// Jam dipasangkan dengan iPhone ini / app jam terpasang (onboarding, ADR-019).
     @Published public private(set) var isPaired = false
+    /// Kapan data apa pun terakhir diterima dari jam (ADR-020).
+    @Published public private(set) var lastContact: Date? =
+        UserDefaults.standard.object(forKey: "link.lastContact") as? Date
+    /// Setiap konfirmasi dari jam — langsung maupun dari antrean — untuk Jurnal.
+    public var onConfirmation: ((LiveMessage) -> Void)?
+
+    /// Keadaan sambungan untuk ditampilkan (pil, lembar detail, onboarding).
+    public var connectionState: WatchConnectionState {
+        WatchConnectionState(isPaired: isPaired, isAppInstalled: isWatchAppInstalled,
+                             isReachable: isReachable, lastContact: lastContact)
+    }
+
+    /// Kirim pengaturan bersama ke jam: lewat konteks (selalu sampai, versi
+    /// terbaru) dan langsung bila terjangkau.
+    public func push(settings: SyncedSettings) {
+        try? pushContext(settings: settings.plist)
+        guard let session, session.activationState == .activated, session.isReachable else { return }
+        session.sendMessage(settings.plist, replyHandler: nil, errorHandler: nil)
+    }
+
+    private func touch() {
+        let now = Date()
+        lastContact = now
+        UserDefaults.standard.set(now, forKey: "link.lastContact")
+    }
+
+    /// Pengaturan dari jam: terapkan bila lebih baru (ADR-020).
+    private func receive(settingsFrom plist: [String: Any]) -> Bool {
+        guard let incoming = SyncedSettings(plist: plist) else { return false }
+        SettingsSyncStore.apply(incoming)
+        return true
+    }
     @Published public private(set) var isWatchAppInstalled = false
     @Published public private(set) var isActivated = false
     @Published public private(set) var lastNote: String?
@@ -259,18 +291,21 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Permintaan cermin Stellarium (ADR-016). Ikut konteks supaya jam yang
     /// baru dibuka ulang tetap tahu, tidak hanya pesan sekali kirim.
     private var mirrorPart: [String: Any] = [:]
+    private var settingsPart: [String: Any] = SettingsSyncStore.local().plist
 
     private func pushContext(pointing: [String: Any]? = nil, telescope: [String: Any]? = nil,
-                             mirror: [String: Any]? = nil) throws {
+                             mirror: [String: Any]? = nil, settings: [String: Any]? = nil) throws {
         // Simpan bagiannya **dulu**, baru periksa sesi: permintaan yang datang
         // sebelum WCSession aktif (jembatan Stellarium tersambung ~150 ms
         // setelah app dibuka) tidak boleh hilang — ia ikut kiriman berikutnya.
         if let pointing { pointingPart = pointing }
         if let telescope { telescopePart = telescope }
         if let mirror { mirrorPart = mirror }
+        if let settings { settingsPart = settings }
         guard let session, session.activationState == .activated else { return }
         try session.updateApplicationContext(
-            pointingPart.merging(telescopePart) { _, t in t }.merging(mirrorPart) { _, m in m })
+            pointingPart.merging(telescopePart) { _, t in t }.merging(mirrorPart) { _, m in m }
+                .merging(settingsPart) { _, x in x })
     }
 
     // MARK: Laporan keadaan teleskop ke jam (ADR-009)
@@ -433,18 +468,26 @@ extension PhoneLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveApplicationContext applicationContext: [String: Any]) {
-        guard let message = PointingLinkMessage(plist: applicationContext) else { return }
-        Task { @MainActor in self.handle(message) }
+        let message = PointingLinkMessage(plist: applicationContext)
+        Task { @MainActor in
+            self.touch()
+            _ = self.receive(settingsFrom: applicationContext)
+            if let message { self.handle(message) }
+        }
     }
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
         if let sample = MirrorSample(plist: message) {
-            Task { @MainActor in self.onMirrorSample?(sample) }
+            Task { @MainActor in self.touch(); self.onMirrorSample?(sample) }
             return
         }
-        guard let decoded = PointingLinkMessage(plist: message) else { return }
-        Task { @MainActor in self.handle(decoded) }
+        let decoded = PointingLinkMessage(plist: message)
+        Task { @MainActor in
+            self.touch()
+            if self.receive(settingsFrom: message) { return }
+            if let decoded { self.handle(decoded) }
+        }
     }
 
     /// Kanal langsung: dijawab **di sini**, sinkron, supaya jam tahu hasilnya
@@ -464,9 +507,11 @@ extension PhoneLinkService: WCSessionDelegate {
         let decoded = LiveReply(plist: reply)
         let incoming = LiveMessage(plist: message)
         Task { @MainActor in
+            self.touch()
             self.lastLiveReply = decoded
             if let incoming, incoming.kind == .confirmTarget, decoded?.accepted == true {
                 self.lastConfirmed = (incoming, true)
+                self.onConfirmation?(incoming)
             }
         }
     }
@@ -490,6 +535,9 @@ extension PhoneLinkService: WCSessionDelegate {
         if let record = LiveMessage(plist: userInfo) {
             liveServer.record(userInfo)
             Task { @MainActor in
+                self.touch()
+                // Setiap catatan antre masuk Jurnal (dedup per id di Jurnal).
+                if record.kind == .confirmRecord { self.onConfirmation?(record) }
                 // Catatan yang lebih tua dari konfirmasi langsung terakhir
                 // tidak menimpanya.
                 if record.kind == .confirmRecord,
@@ -499,8 +547,12 @@ extension PhoneLinkService: WCSessionDelegate {
             }
             return
         }
-        guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
-        Task { @MainActor in self.handle(decoded) }
+        let decoded = PointingLinkMessage(plist: userInfo)
+        Task { @MainActor in
+            self.touch()
+            if self.receive(settingsFrom: userInfo) { return }
+            if let decoded { self.handle(decoded) }
+        }
     }
 }
 

@@ -929,3 +929,15 @@ Ady's permission):
 - Tests: PointingKit 846 (including `DesignTextTests`), UI lint green.
 
 **Not verified.** The real devices.
+
+## ADR-020 — Visible connection status + two-way sync
+
+The full analysis is in `Docs/SYNC_ANALYSIS.md`. In short:
+- **Connection status:** a pill with a detail sheet, driven by
+  `WatchConnectionState`.
+- **Journal:** filled automatically from every confirmation, deduplicated.
+- **Two-way settings:** `SyncedSettings`, last writer wins.
+- **Watch → iPhone:** `sendMessage` when reachable, plus `transferUserInfo` as
+  a guarantee.
+
+All of it was verified end to end on paired simulators.

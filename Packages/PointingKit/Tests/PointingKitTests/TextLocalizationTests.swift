@@ -316,10 +316,10 @@ final class TextLocalizationTests: XCTestCase {
     ///
     /// 332 → 344: dua belas kunci `identify.*` untuk layar Identify → Confirm
     /// (ADR-007, `IdentificationOutcome.swift`). 344 → 345: `unit.perSecondSuffix`
-    /// ("/dtk" → "/s" di Inggris); 347: dua kalimat sigma terucap. 356: sembilan kunci `telescope.*` (ADR-008). 378: 22 kunci `telescopeCtl.*` (ADR-009). 379: `telescope.state.notConnected`. 410: 31 kunci layar utama jam baru (ADR-010). 419: sembilan kunci siang & petunjuk arah (ADR-011). 421: dua kunci kualitas langit (ADR-012). 424: tiga kunci tab Langit iPhone (ADR-013). 429: lima kunci satu-per-satu & panas–dingin (ADR-014). 452: 23 kunci kalender fenomena (ADR-015). 459: tujuh kunci Stellarium (ADR-016). 465: enam kunci tampilan 3D (ADR-017). 557: 92 kunci desain Figma (ADR-019).
+    /// ("/dtk" → "/s" di Inggris); 347: dua kalimat sigma terucap. 356: sembilan kunci `telescope.*` (ADR-008). 378: 22 kunci `telescopeCtl.*` (ADR-009). 379: `telescope.state.notConnected`. 410: 31 kunci layar utama jam baru (ADR-010). 419: sembilan kunci siang & petunjuk arah (ADR-011). 421: dua kunci kualitas langit (ADR-012). 424: tiga kunci tab Langit iPhone (ADR-013). 429: lima kunci satu-per-satu & panas–dingin (ADR-014). 452: 23 kunci kalender fenomena (ADR-015). 459: tujuh kunci Stellarium (ADR-016). 465: enam kunci tampilan 3D (ADR-017). 557: 92 kunci desain Figma (ADR-019). 582: 25 kunci sambungan & sinkron (ADR-020).
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 557, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 582, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

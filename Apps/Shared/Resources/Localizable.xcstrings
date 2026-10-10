@@ -8246,6 +8246,281 @@
           }
         }
       }
+    },
+    "conn.title": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Watch connection"
+          }
+        }
+      }
+    },
+    "conn.live": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected · live"
+          }
+        }
+      }
+    },
+    "conn.liveDetail": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Watch and iPhone are exchanging data now."
+          }
+        }
+      }
+    },
+    "conn.standby": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        }
+      }
+    },
+    "conn.standbyDetail": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Point & Know on your Watch for live data. Confirmations are kept and sent later."
+          }
+        }
+      }
+    },
+    "conn.lastContact": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last data %@."
+          }
+        }
+      }
+    },
+    "conn.notInstalled": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch app not installed"
+          }
+        }
+      }
+    },
+    "conn.notInstalledDetail": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the Watch app on iPhone → Point & Know → Install."
+          }
+        }
+      }
+    },
+    "conn.notPaired": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Apple Watch yet"
+          }
+        }
+      }
+    },
+    "conn.notPairedDetail": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair an Apple Watch in the iPhone's Watch app."
+          }
+        }
+      }
+    },
+    "conn.stepPaired": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch paired"
+          }
+        }
+      }
+    },
+    "conn.stepInstalled": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App installed on Watch"
+          }
+        }
+      }
+    },
+    "conn.stepOpen": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App open on Watch"
+          }
+        }
+      }
+    },
+    "conn.stepData": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last data received"
+          }
+        }
+      }
+    },
+    "conn.whatSyncs": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What syncs"
+          }
+        }
+      }
+    },
+    "conn.syncConfirmations": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every “Yes, that's it” goes into the iPhone Journal, even when the iPhone is away"
+          }
+        }
+      }
+    },
+    "conn.syncSettings": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark sky and hot–cold haptics match on both devices"
+          }
+        }
+      }
+    },
+    "conn.syncPointing": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live pointing to iPhone and Stellarium while the Watch app is open"
+          }
+        }
+      }
+    },
+    "conn.fromWatch": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From Apple Watch"
+          }
+        }
+      }
+    },
+    "conn.howTo": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to connect"
+          }
+        }
+      }
+    },
+    "conn.howToSteps": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1. Wear your Watch and unlock it.\n2. Open Point & Know on the Watch.\n3. Keep your iPhone nearby with Bluetooth on."
+          }
+        }
+      }
+    },
+    "conn.openWatchApp": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Point & Know on your Watch"
+          }
+        }
+      }
+    },
+    "conn.phoneLive": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connected"
+          }
+        }
+      }
+    },
+    "conn.phoneAway": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone away: data sent later"
+          }
+        }
+      }
+    },
+    "conn.never": {
+      "comment": "Sambungan & sinkron (ADR-020).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "never"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

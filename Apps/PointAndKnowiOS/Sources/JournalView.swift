@@ -51,6 +51,11 @@ struct JournalView: View {
                 Text(entry.date.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline)
                     .foregroundStyle(DK.secondaryText)
+                if entry.fromWatch == true {
+                    Label(ConnectionText.fromWatch, systemImage: "applewatch")
+                        .font(.caption)
+                        .foregroundStyle(DK.accent)
+                }
             }
             Spacer()
             Image(systemName: "chevron.right").font(.footnote).foregroundStyle(DK.secondaryText)

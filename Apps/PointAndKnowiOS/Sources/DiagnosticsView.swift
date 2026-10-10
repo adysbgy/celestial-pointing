@@ -231,6 +231,24 @@ struct RootView: View {
         engine.audioCue = { events in cue.play(events) }
         motion.start(controller: engine.controller)
         engine.setSensorAvailable(motion.isAvailable)
+        // Setiap "Ya, itu dia" di jam masuk Jurnal — langsung maupun dari
+        // antrean saat iPhone jauh (ADR-020).
+        link.onConfirmation = { [weak journal, weak engine] message in
+            guard let journal, let engine else { return }
+            journal.saveFromWatch(message, resolver: engine.controller.resolver, observer: engine.controller.observer)
+        }
+        #if DEBUG
+        // Uji sinkron pengaturan (ADR-020): `-debugPushDarkSky YES` mengubah
+        // "Langit gelap" seolah oleh pengguna, lalu mengirimnya ke jam.
+        if UserDefaults.standard.object(forKey: "debugPushDarkSky") != nil {
+            let v = UserDefaults.standard.bool(forKey: "debugPushDarkSky")
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                UserDefaults.standard.set(v, forKey: SettingsSyncStore.darkSkyKey)
+                link.push(settings: SettingsSyncStore.userChanged())
+            }
+        }
+        #endif
         // Izin lokasi diminta oleh onboarding, saat alasannya dijelaskan (HIG).
         if onboardingSeen { location.start() }
         engine.bind(location: location)
