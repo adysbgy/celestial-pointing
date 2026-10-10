@@ -202,7 +202,10 @@ STATES = [
        '    _draw_sphere(canvas, cx, cy, radius, palette["light"], '
        'palette["dark"], night_mode)\n'),
       (RENDER, PORT_RING_CALL, '        pass  # CINCIN DIHAPUS\n')],
-     [NO_EXTRA_DISC],
+     # Kedua pemeriksaan teks port ikut berbunyi, dan memang harus: satu-satunya
+     # cara mempertahankan piringan 1.0 R sementara cincinnya dihapus adalah
+     # membatalkan syaratnya, dan syarat itulah yang dijaga keduanya.
+     [NO_EXTRA_DISC, PORT_GUARD_ANCHOR],
      # Inilah klaim "gerbang lama buta" — dan satu-satunya tempat ia diukur.
      [OLD_RING_GATE]),
     ("3. port: cincin digeser dari pusat bola",
