@@ -5148,6 +5148,2026 @@
           }
         }
       }
+    },
+    "Lab Pointing": {
+      "comment": "Judul alat riset Pointing Lab (ADR-004).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pointing Lab"
+          }
+        }
+      }
+    },
+    "Lab": {
+      "comment": "Tab iPhone untuk Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lab"
+          }
+        }
+      }
+    },
+    "Merekam": {
+      "comment": "Tombol Tandai saat jendela percobaan sedang direkam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        }
+      }
+    },
+    "Tandai": {
+      "comment": "Tombol untuk merekam satu percobaan Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark"
+          }
+        }
+      }
+    },
+    "Peserta": {
+      "comment": "Pemilih ID peserta (pseudonim) Pointing Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Participant"
+          }
+        }
+      }
+    },
+    "Lingkungan": {
+      "comment": "Pemilih kelas lingkungan percobaan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environment"
+          }
+        }
+      }
+    },
+    "Kirim ke iPhone": {
+      "comment": "Kirim berkas percobaan Lab dari jam ke iPhone.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to iPhone"
+          }
+        }
+      }
+    },
+    "Terkirim": {
+      "comment": "Label aksesibilitas: pengiriman berhasil.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent"
+          }
+        }
+      }
+    },
+    "Gagal terkirim": {
+      "comment": "Label aksesibilitas: pengiriman gagal.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent"
+          }
+        }
+      }
+    },
+    "Target manual": {
+      "comment": "Bagian daftar penanda darat dengan arah yang diketahui.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual targets"
+          }
+        }
+      }
+    },
+    "Nama penanda": {
+      "comment": "Bidang isian nama penanda darat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Landmark name"
+          }
+        }
+      }
+    },
+    "Bearing dari Utara sebenarnya (°)": {
+      "comment": "Bidang isian bearing penanda.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bearing from true north (°)"
+          }
+        }
+      }
+    },
+    "Elevasi (°)": {
+      "comment": "Bidang isian elevasi penanda.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elevation (°)"
+          }
+        }
+      }
+    },
+    "Tambah target": {
+      "comment": "Tombol menambah target manual.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add target"
+          }
+        }
+      }
+    },
+    "Kirim target ke jam": {
+      "comment": "Tombol mengirim daftar target ke jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send targets to Watch"
+          }
+        }
+      }
+    },
+    "Berkas dari jam": {
+      "comment": "Bagian berkas JSONL yang diterima dari jam.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files from Watch"
+          }
+        }
+      }
+    },
+    "Belum ada berkas": {
+      "comment": "Keadaan kosong daftar berkas Lab.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No files yet"
+          }
+        }
+      }
+    },
+    "Aliran sensor": {
+      "comment": "Pemilih mode aliran CoreMotion Lab (ganda / utara saja / sembarang saja).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor streams"
+          }
+        }
+      }
+    },
+    "object.name.sun": {
+      "comment": "Nama tampilan objek 'sun' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matahari"
+          }
+        }
+      }
+    },
+    "object.name.moon": {
+      "comment": "Nama tampilan objek 'moon' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulan"
+          }
+        }
+      }
+    },
+    "object.name.mercury": {
+      "comment": "Nama tampilan objek 'mercury' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mercury"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merkurius"
+          }
+        }
+      }
+    },
+    "object.name.venus": {
+      "comment": "Nama tampilan objek 'venus' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        }
+      }
+    },
+    "object.name.mars": {
+      "comment": "Nama tampilan objek 'mars' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        }
+      }
+    },
+    "object.name.jupiter": {
+      "comment": "Nama tampilan objek 'jupiter' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        }
+      }
+    },
+    "object.name.saturn": {
+      "comment": "Nama tampilan objek 'saturn' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturn"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturnus"
+          }
+        }
+      }
+    },
+    "object.name.m45": {
+      "comment": "Nama tampilan objek 'm45' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        }
+      }
+    },
+    "object.name.m31": {
+      "comment": "Nama tampilan objek 'm31' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Andromeda Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Andromeda"
+          }
+        }
+      }
+    },
+    "object.name.m7": {
+      "comment": "Nama tampilan objek 'm7' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ptolemy Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Ptolemy"
+          }
+        }
+      }
+    },
+    "object.name.m42": {
+      "comment": "Nama tampilan objek 'm42' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orion Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Orion"
+          }
+        }
+      }
+    },
+    "object.name.m13": {
+      "comment": "Nama tampilan objek 'm13' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hercules Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Hercules"
+          }
+        }
+      }
+    },
+    "object.name.m8": {
+      "comment": "Nama tampilan objek 'm8' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagoon Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Laguna"
+          }
+        }
+      }
+    },
+    "object.name.m44": {
+      "comment": "Nama tampilan objek 'm44' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beehive Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sarang Lebah"
+          }
+        }
+      }
+    },
+    "object.name.m33": {
+      "comment": "Nama tampilan objek 'm33' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triangulum Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Triangulum"
+          }
+        }
+      }
+    },
+    "object.name.m22": {
+      "comment": "Nama tampilan objek 'm22' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagittarius Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sagitarius"
+          }
+        }
+      }
+    },
+    "object.name.m6": {
+      "comment": "Nama tampilan objek 'm6' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butterfly Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Kupu-kupu"
+          }
+        }
+      }
+    },
+    "object.name.m17": {
+      "comment": "Nama tampilan objek 'm17' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omega Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Omega"
+          }
+        }
+      }
+    },
+    "object.name.m27": {
+      "comment": "Nama tampilan objek 'm27' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dumbbell Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Dumbel"
+          }
+        }
+      }
+    },
+    "object.name.m57": {
+      "comment": "Nama tampilan objek 'm57' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ring Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Cincin"
+          }
+        }
+      }
+    },
+    "object.name.m51": {
+      "comment": "Nama tampilan objek 'm51' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whirlpool Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Pusaran"
+          }
+        }
+      }
+    },
+    "object.name.m11": {
+      "comment": "Nama tampilan objek 'm11' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wild Duck Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Bebek Liar"
+          }
+        }
+      }
+    },
+    "object.name.m2": {
+      "comment": "Nama tampilan objek 'm2' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M2 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M2"
+          }
+        }
+      }
+    },
+    "object.name.m35": {
+      "comment": "Nama tampilan objek 'm35' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M35 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M35"
+          }
+        }
+      }
+    },
+    "object.name.m101": {
+      "comment": "Nama tampilan objek 'm101' (ObjectNameLocalization).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinwheel Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Kincir Angin"
+          }
+        }
+      }
+    },
+    "identify.holdSteady": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold steady"
+          }
+        }
+      }
+    },
+    "identify.possibleMatches": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Possible matches"
+          }
+        }
+      }
+    },
+    "identify.notSure": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure yet — point again"
+          }
+        }
+      }
+    },
+    "identify.confirm": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm %@"
+          }
+        }
+      }
+    },
+    "identify.confirmed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ confirmed"
+          }
+        }
+      }
+    },
+    "identify.sending": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending to iPhone…"
+          }
+        }
+      }
+    },
+    "identify.delivered.live": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to iPhone"
+          }
+        }
+      }
+    },
+    "identify.delivered.recorded": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved — iPhone not reachable"
+          }
+        }
+      }
+    },
+    "identify.delivered.failed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send"
+          }
+        }
+      }
+    },
+    "identify.pointAgain": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point again"
+          }
+        }
+      }
+    },
+    "identify.phone.confirmedTitle": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmed on Watch"
+          }
+        }
+      }
+    },
+    "identify.phone.nothingConfirmed": {
+      "comment": "Layar Identify → Confirm (ADR-007).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object confirmed yet"
+          }
+        }
+      }
+    },
+    "unit.perSecondSuffix": {
+      "comment": "Akhiran satuan laju sudut setelah derajat (°/dtk).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/s"
+          }
+        }
+      }
+    },
+    "identify.sigma.provisional.spoken": {
+      "comment": "VoiceOver: baris sigma di layar identifikasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provisional accuracy threshold, %@ degrees, not yet measured"
+          }
+        }
+      }
+    },
+    "identify.sigma.measured.spoken": {
+      "comment": "VoiceOver: baris sigma di layar identifikasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measured accuracy threshold, %@ degrees"
+          }
+        }
+      }
+    },
+    "telescope.section": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope (experimental)"
+          }
+        }
+      }
+    },
+    "telescope.enableAlpaca": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Alpaca telescope"
+          }
+        }
+      }
+    },
+    "telescope.address": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address (host:port)"
+          }
+        }
+      }
+    },
+    "telescope.connect": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
+    "telescope.state.mock": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mock — no motor will move"
+          }
+        }
+      }
+    },
+    "telescope.state.connecting": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "telescope.state.connected": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected (%@)"
+          }
+        }
+      }
+    },
+    "telescope.state.unsupported": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mount doesn't support this app's GoTo"
+          }
+        }
+      }
+    },
+    "telescope.state.failed": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't connect"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.disabled": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope off"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.disconnected": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope disconnected"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.ready": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope ready"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.slewing": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope moving"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.error": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope error"
+          }
+        }
+      }
+    },
+    "telescopeCtl.state.unknown": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope state unknown"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goTo": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point telescope at %@"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stop": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "telescopeCtl.phoneUnreachable": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phone not reachable"
+          }
+        }
+      }
+    },
+    "telescopeCtl.sendingGoTo": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending GoTo…"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToAccepted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo accepted"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToFailed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GoTo failed: %@"
+          }
+        }
+      }
+    },
+    "telescopeCtl.sendingStop": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending Stop…"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stopAccepted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope stopped"
+          }
+        }
+      }
+    },
+    "telescopeCtl.stopFailed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop failed: %@ — stop it on the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.noReply": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no reply, check the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.stale": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "command expired"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.notConfirmed": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "object not confirmed on the iPhone"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.unavailable": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "telescope not ready"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.unsafe": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "blocked by safety (Sun/altitude)"
+          }
+        }
+      }
+    },
+    "telescopeCtl.reason.other": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "error"
+          }
+        }
+      }
+    },
+    "telescopeCtl.goToCompleted": {
+      "comment": "Kontrol teleskop di jam (ADR-009).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope reached the target"
+          }
+        }
+      }
+    },
+    "telescope.state.notConnected": {
+      "comment": "Pengaturan teleskop iPhone (ADR-008).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected — GoTo unavailable"
+          }
+        }
+      }
+    },
+    "home.aim.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point at the sky"
+          }
+        }
+      }
+    },
+    "home.aim.hint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raise your arm toward what you see"
+          }
+        }
+      }
+    },
+    "home.holdStill": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold still…"
+          }
+        }
+      }
+    },
+    "home.possible.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could be one of these"
+          }
+        }
+      }
+    },
+    "home.notSure.title": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure yet"
+          }
+        }
+      }
+    },
+    "home.notSure.hint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point more precisely, then hold still"
+          }
+        }
+      }
+    },
+    "home.unavailable": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor unavailable"
+          }
+        }
+      }
+    },
+    "home.approxLocation": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approximate location"
+          }
+        }
+      }
+    },
+    "home.settings": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "home.technicalDetails": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Technical details"
+          }
+        }
+      }
+    },
+    "home.developerSection": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Developer"
+          }
+        }
+      }
+    },
+    "home.nightMode": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night mode (red)"
+          }
+        }
+      }
+    },
+    "home.soundOnLock": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound when found"
+          }
+        }
+      }
+    },
+    "home.skyAndLocation": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky & location"
+          }
+        }
+      }
+    },
+    "home.phoneLink": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone connection"
+          }
+        }
+      }
+    },
+    "home.confirmShort": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, that's it"
+          }
+        }
+      }
+    },
+    "home.whatIsIt": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That is"
+          }
+        }
+      }
+    },
+    "home.altitude": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ above the horizon"
+          }
+        }
+      }
+    },
+    "home.direction": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toward the %@"
+          }
+        }
+      }
+    },
+    "compass.n": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "north"
+          }
+        }
+      }
+    },
+    "compass.ne": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "northeast"
+          }
+        }
+      }
+    },
+    "compass.e": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "east"
+          }
+        }
+      }
+    },
+    "compass.se": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "southeast"
+          }
+        }
+      }
+    },
+    "compass.s": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "south"
+          }
+        }
+      }
+    },
+    "compass.sw": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "southwest"
+          }
+        }
+      }
+    },
+    "compass.w": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "west"
+          }
+        }
+      }
+    },
+    "compass.nw": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "northwest"
+          }
+        }
+      }
+    },
+    "brightness.veryBright": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Very bright"
+          }
+        }
+      }
+    },
+    "brightness.bright": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bright"
+          }
+        }
+      }
+    },
+    "brightness.moderate": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moderately bright"
+          }
+        }
+      }
+    },
+    "brightness.faint": {
+      "comment": "Layar utama jam baru (ADR-010).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faint"
+          }
+        }
+      }
+    },
+    "home.day.title": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It's daytime"
+          }
+        }
+      }
+    },
+    "home.day.darkAt": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stars appear around %@"
+          }
+        }
+      }
+    },
+    "home.day.noDark": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No dark sky in the next 24 h"
+          }
+        }
+      }
+    },
+    "home.tonight": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonight"
+          }
+        }
+      }
+    },
+    "home.guide.title": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to %@"
+          }
+        }
+      }
+    },
+    "home.guide.distance": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ to go"
+          }
+        }
+      }
+    },
+    "home.calibrateFirst": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No compass heading yet. Calibrate first."
+          }
+        }
+      }
+    },
+    "home.whyNotSure": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why not sure?"
+          }
+        }
+      }
+    },
+    "home.nothingHere": {
+      "comment": "Layar utama jam: siang & petunjuk arah (ADR-011).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing bright here"
+          }
+        }
+      }
+    },
+    "home.darkSky": {
+      "comment": "Pengaturan jam: kualitas langit (ADR-012).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark sky"
+          }
+        }
+      }
+    },
+    "home.darkSky.hint": {
+      "comment": "Pengaturan jam: kualitas langit (ADR-012).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on outside the city: clusters & nebulae are included"
+          }
+        }
+      }
+    },
+    "home.visibleNow": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible now"
+          }
+        }
+      }
+    },
+    "home.skyTab": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky"
+          }
+        }
+      }
+    },
+    "home.confirmHint": {
+      "comment": "Tab Langit di iPhone (ADR-013).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point with your watch, then tap “Yes, that's it”."
+          }
+        }
+      }
+    },
+    "home.notCertain": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not certain yet"
+          }
+        }
+      }
+    },
+    "home.hotColdHaptics": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hot–cold haptics"
+          }
+        }
+      }
+    },
+    "home.crownNext": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn the crown for the next one"
+          }
+        }
+      }
+    },
+    "home.alsoClose": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is also close (%2$@). Turn the crown."
+          }
+        }
+      }
+    },
+    "home.position": {
+      "comment": "Jam: satu per satu & panas–dingin (ADR-014).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "phen.title": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sky events"
+          }
+        }
+      }
+    },
+    "phen.guide": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guide me there"
+          }
+        }
+      }
+    },
+    "phen.stopGuide": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop guiding"
+          }
+        }
+      }
+    },
+    "phen.solarFilter": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solar filter required. The app never guides you to the Sun."
+          }
+        }
+      }
+    },
+    "phen.conjunction": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ near %2$@"
+          }
+        }
+      }
+    },
+    "phen.lunar.total": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.lunar.partial": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.lunar.penumbral": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penumbral lunar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.total": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.annular": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annular solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.solar.partial": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial solar eclipse"
+          }
+        }
+      }
+    },
+    "phen.meteor": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ meteor shower"
+          }
+        }
+      }
+    },
+    "phen.fullMoon": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Moon"
+          }
+        }
+      }
+    },
+    "phen.elongation.evening": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ in the evening sky"
+          }
+        }
+      }
+    },
+    "phen.elongation.morning": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ in the morning sky"
+          }
+        }
+      }
+    },
+    "phen.detail.apart": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ apart"
+          }
+        }
+      }
+    },
+    "phen.detail.covered": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ covered"
+          }
+        }
+      }
+    },
+    "phen.detail.zhr": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to ~%@ meteors/hour in a dark sky"
+          }
+        }
+      }
+    },
+    "phen.visibleHere": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visible from here"
+          }
+        }
+      }
+    },
+    "phen.notVisibleHere": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not visible from here"
+          }
+        }
+      }
+    },
+    "phen.guiding": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guiding to %@"
+          }
+        }
+      }
+    },
+    "phen.notUpYet": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ isn't up yet from here"
+          }
+        }
+      }
+    },
+    "phen.radiant": {
+      "comment": "Kalender fenomena (ADR-015).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ radiant"
+          }
+        }
+      }
+    },
+    "stell.title": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stellarium"
+          }
+        }
+      }
+    },
+    "stell.toggle": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show pointing in Stellarium"
+          }
+        }
+      }
+    },
+    "stell.address": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac address (IP)"
+          }
+        }
+      }
+    },
+    "stell.hint": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Stellarium on a Mac on the same Wi‑Fi with the Remote Control plugin on (port 8090)."
+          }
+        }
+      }
+    },
+    "stell.connected": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected to Stellarium"
+          }
+        }
+      }
+    },
+    "stell.connecting": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "stell.failed": {
+      "comment": "Pendamping Stellarium (ADR-016).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

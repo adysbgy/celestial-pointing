@@ -309,16 +309,53 @@ final class CalibrationSessionTests: XCTestCase {
         XCTAssertEqual(step.selectedTarget?.id, references[0])
     }
 
+    /// Setiap sampel yang dicatat dari sensor membawa attitude mentahnya, dan
+    /// dari situ sumbu yang benar-benar dipakai menunjuk bisa dikenali —
+    /// termasuk bila itu bukan sumbu yang sedang dipakai controller.
+    func testAxisEvaluationFindsTheAxisActuallyUsed() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        let references = visibleReferences()
+        XCTAssertGreaterThanOrEqual(references.count, 2, "prasyarat: dua acuan terlihat")
+        guard references.count >= 2 else { return }
+
+        // Pengguna menunjuk dengan −X (mis. jam dipakai terbalik), padahal
+        // controller memakai +X.
+        for (i, id) in references.prefix(2).enumerated() {
+            let t = date.addingTimeInterval(Double(i))
+            let truth = c.resolver.horizontal(ofObjectID: id, observer: observer, date: t)!
+            let q = DeviceAttitude.synthetic(aim: .screenLeft, pointingAt: truth).quaternion
+            c.feed(quaternion: q, timestamp: t)
+            session.capture(objectID: id, date: t)
+        }
+        XCTAssertEqual(session.rawAttitudes.count, 2)
+        XCTAssertEqual(session.axisEvaluation.first?.aim, .screenLeft)
+        XCTAssertLessThan(session.axisEvaluation.first!.rmsErrorDeg, 0.01)
+
+        session.removeLast()
+        XCTAssertEqual(session.rawAttitudes.count, session.flow.samples.count)
+        session.reset()
+        XCTAssertTrue(session.rawAttitudes.isEmpty)
+        XCTAssertTrue(session.axisEvaluation.isEmpty)
+    }
+
+    /// Sampel yang dimasukkan sebagai arah jadi tidak punya attitude, dan
+    /// tidak boleh ikut menilai sumbu.
+    func testManualSamplesCarryNoAttitude() {
+        let c = controller()
+        let session = CalibrationSession(controller: c)
+        guard let id = visibleReferences().first else { return }
+        session.capture(objectID: id, measured: measured(id, yawError: 3, date: date), date: date)
+        XCTAssertEqual(session.rawAttitudes.count, 1)
+        XCTAssertNil(session.rawAttitudes[0] ?? nil)
+        XCTAssertTrue(session.axisEvaluation.isEmpty)
+    }
+
     /// Sama seperti di `PointingControllerTests`: quaternion yang menunjuk ke
     /// arah horizontal tertentu (roll = 0).
     private func quaternion(viewPointingAt target: HorizontalCoord) -> Quaternion {
-        let v = LocalFrame.enuFromHorizontal(target)
-        let d = Vector3(x: v.y, y: v.z, z: v.x)
-        let from = Vector3.unitZ
-        let axis = from.cross(d)
-        if axis.magnitude < 1e-12 { return .identity }
-        let angle = acos(max(-1.0, min(1.0, from.dot(d))))
-        return Quaternion.axisAngle(axis: axis, radians: angle)!
+        // Sumbu bawaan controller (lengan bawah), konvensi CoreMotion — ADR-002.
+        DeviceAttitude.synthetic(aim: PointingControllerConfig().aim, pointingAt: target).quaternion
     }
 
     // MARK: - Siklus hidup

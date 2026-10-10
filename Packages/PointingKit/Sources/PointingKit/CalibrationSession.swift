@@ -66,6 +66,15 @@ public final class CalibrationSession {
     /// Target yang sedang dipilih pengguna (kalau UI memakai daftar).
     public var selectedTargetID: String?
 
+    /// Attitude mentah per sampel kalibrasi, sejajar dengan `flow.samples`.
+    /// `nil` untuk sampel yang dimasukkan sebagai arah jadi (tanpa sensor).
+    ///
+    /// Disimpan supaya sumbu tunjuk bisa **dipilih dari data** (ADR-002):
+    /// arah terukur di `flow.samples` sudah memakai satu sumbu, jadi tidak
+    /// bisa lagi dinilai ulang untuk sumbu lain.
+    public private(set) var rawAttitudes: [DeviceAttitude?] = []
+    private var pendingAttitude: DeviceAttitude?
+
     public init(controller: PointingController,
                 flow: CalibrationFlow = CalibrationFlow()) {
         self.controller = controller
@@ -149,6 +158,8 @@ public final class CalibrationSession {
         guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
         // Penjagaan horizon harus menilai ketinggian pada saat arah dicatat,
         // bukan saat tombol ditekan — pakai waktu feed terakhir bila ada.
+        pendingAttitude = currentRawAttitude
+        defer { pendingAttitude = nil }
         return capture(objectID: objectID,
                         measured: controller.snapshot.rawPointing,
                         date: controller.lastFeedTimestamp ?? date)
@@ -202,6 +213,7 @@ public final class CalibrationSession {
                                           applied: false,
                                           message: CalibrationText.directionUncomputableMessage(objectID: objectID))
         }
+        rawAttitudes.append(pendingAttitude)
         let target = target(forObjectID: objectID, date: date)
         return CalibrationSessionStep(flow: update,
                                       selectedTarget: target,
@@ -235,6 +247,8 @@ public final class CalibrationSession {
         guard controller.snapshot.hasSensor else { return sensorUnavailableStep }
         // Sama dengan `capture(objectID:)`: penjagaan horizon menilai ketinggian
         // pada saat arah dicatat, bukan saat tombol ditekan.
+        pendingAttitude = currentRawAttitude
+        defer { pendingAttitude = nil }
         return captureNearest(measured: controller.snapshot.rawPointing,
                               date: controller.lastFeedTimestamp ?? date)
     }
@@ -270,6 +284,7 @@ public final class CalibrationSession {
     @discardableResult
     public func removeLast() -> CalibrationSessionStep {
         let update = flow.removeLast()
+        if rawAttitudes.count > flow.samples.count { rawAttitudes.removeLast() }
         return CalibrationSessionStep(flow: update, selectedTarget: nil,
                                       applied: false, message: update.message)
     }
@@ -288,7 +303,27 @@ public final class CalibrationSession {
     /// Mulai ulang dari nol.
     public func reset() {
         flow.reset()
+        rawAttitudes.removeAll()
         controller.apply(calibration: .none)
+    }
+
+    /// Attitude mentah controller saat ini, dalam kerangka yang dipakainya.
+    private var currentRawAttitude: DeviceAttitude? {
+        controller.snapshot.rawAttitudeQuaternion.map {
+            DeviceAttitude(quaternion: $0, frame: controller.config.frame)
+        }
+    }
+
+    /// Penilaian setiap sumbu kandidat dari sampel kalibrasi yang punya
+    /// attitude mentah, urut dari galat terkecil. Kosong bila belum ada.
+    ///
+    /// Hanya **melaporkan**; tidak mengganti sumbu controller. Penggantian
+    /// sumbu otomatis menunggu data lapangan (lihat Docs/VALIDATION.md).
+    public var axisEvaluation: [AxisScore] {
+        let samples = zip(flow.samples, rawAttitudes).compactMap { sample, attitude in
+            attitude.map { AxisSample(attitude: $0, truth: sample.trueDirection) }
+        }
+        return AxisSelection.evaluate(samples)
     }
 
     /// Kebijakan keyakinan yang disarankan dari kalibrasi ini, bila terukur.

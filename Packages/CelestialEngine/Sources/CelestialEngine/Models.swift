@@ -72,3 +72,33 @@ public struct CelestialIntent: Equatable, Codable, Sendable {
         self.level = level; self.best = best; self.candidates = candidates
     }
 }
+
+/// Nama tampilan objek dalam bahasa aktif (ADR-007).
+///
+/// Nama di engine ditulis dalam Bahasa Indonesia ("Saturnus", "Galaksi
+/// Andromeda"). Engine tidak tahu katalog string app, jadi app memasang
+/// `lookup` (lewat `TextLocalization.install`) dan nama dibentuk saat objek
+/// dibuat. Kunci: `object.name.<id>`. Tanpa `lookup`, atau bila katalog tidak
+/// punya terjemahan, nama Indonesia dipakai — tidak pernah kunci mentah.
+public enum ObjectNameLocalization {
+    public typealias Lookup = @Sendable (String) -> String?
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var installed: Lookup?
+
+    public static func install(_ lookup: Lookup?) {
+        lock.lock(); defer { lock.unlock() }
+        installed = lookup
+    }
+
+    public static func key(forObjectID id: String) -> String { "object.name.\(id)" }
+
+    public static func name(forObjectID id: String, indonesian: String) -> String {
+        lock.lock()
+        let lookup = installed
+        lock.unlock()
+        let key = key(forObjectID: id)
+        if let found = lookup?(key), !found.isEmpty, found != key { return found }
+        return indonesian
+    }
+}

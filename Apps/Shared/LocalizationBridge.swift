@@ -52,6 +52,11 @@ enum LocalizationBridge {
         // locale proses, dan pemisah desimalnya ikut bahasa sistem — bukan
         // bahasa yang sedang membaca katalog. Keduanya bisa berbeda, dan kalau
         // berbeda, teksnya satu bahasa sementara angkanya bahasa lain.
-        NumberFormat.install(localeId: Locale.preferredLanguages.first ?? NumberFormat.defaultLocaleId)
+        //
+        // Bahasa **app** (`preferredLocalizations`: "en" / "id"), bukan
+        // `Locale.preferredLanguages`: yang terakhir membawa wilayah perangkat
+        // ("en-ID"), sehingga layar Inggris menulis "10,0°" dengan koma.
+        NumberFormat.install(localeId: Bundle.main.preferredLocalizations.first
+                             ?? NumberFormat.defaultLocaleId)
     }
 }

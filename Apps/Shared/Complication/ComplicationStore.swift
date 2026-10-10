@@ -38,7 +38,12 @@ public final class ComplicationStore {
     /// App Group bersama. Harus diaktifkan di profil provisi untuk benar-benar
     /// terbagi; tanpa itu, `containerURL` mengembalikan `nil` dan kita pakai
     /// fallback cache.
-    static let appGroupID = "group.dev.celestial.pointandknow"
+    ///
+    /// ID-nya dibaca dari Info.plist (`CPAppGroupID`, diturunkan dari
+    /// `BUNDLE_ID_PREFIX` di `Config/Base.xcconfig`) supaya awalan bundle bisa
+    /// diganti tanpa menyentuh kode (ADR-005). Nilai tetap hanya cadangan.
+    static let appGroupID = (Bundle.main.object(forInfoDictionaryKey: "CPAppGroupID") as? String)
+        ?? "group.dev.celestial.pointandknow"
 
     private let fileManager: FileManager
 

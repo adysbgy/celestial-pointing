@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import os
 import CelestialEngine
 import PointingKit
 
@@ -28,6 +29,86 @@ public final class WatchLinkService: NSObject, ObservableObject {
     @Published public private(set) var isReachable = false
     /// Berapa pesan yang gagal dikirim (untuk terlihat saat pengujian).
     @Published public private(set) var sendFailureCount = 0
+    /// iPhone meminta aliran arah tunjuk untuk cermin Stellarium (ADR-016).
+    @Published public private(set) var mirrorRequested = false {
+        didSet {
+            if mirrorRequested != oldValue {
+                Self.mirrorLog.info("mirror requested \(self.mirrorRequested)")
+            }
+        }
+    }
+    private static let mirrorLog = Logger(subsystem: "dev.celestial.pointandknow", category: "stellarium")
+    private var mirrorThrottle = MirrorThrottle()
+
+    // MARK: Pointing Lab (alat riset, ADR-004)
+
+    /// Target manual dari iPhone. Disimpan supaya tetap ada saat iPhone jauh.
+    @Published public private(set) var labTargets: [LabTarget] = WatchLinkService.storedLabTargets
+    /// Hasil pengiriman berkas Lab terakhir (`nil` = belum ada).
+    @Published public private(set) var labTransferSucceeded: Bool?
+    @Published public private(set) var labTransfersInFlight = 0
+    private static let labTargetsKey = "pointingLab.targets"
+
+    // MARK: Keadaan teleskop dari iPhone (ADR-009)
+
+    @Published public private(set) var telescopeStatus: TelescopeStatus?
+    private var lastContextMessageSentAt: Date?
+
+    func receiveTelescope(_ status: TelescopeStatus) {
+        #if DEBUG
+        if debugTelescopeTimer != nil { return }   // pose/teleskop debug menang
+        #endif
+        telescopeStatus = status
+    }
+
+    #if DEBUG
+    private var debugTelescopeTimer: Timer?
+    /// `-debugTelescope ready|slewing|off`: laporan teleskop sintetis untuk
+    /// simulator. Juga memaksa "iPhone terjangkau" supaya tombol GoTo/Stop
+    /// bisa dilihat; mengetuk GoTo tetap lewat kanal sungguhan (dan berakhir
+    /// `.noReply` bila tidak ada iPhone).
+    @Published public private(set) var debugForcesReachable = false
+
+    public func startDebugTelescopeIfRequested() {
+        guard let mode = UserDefaults.standard.string(forKey: "debugTelescope") else { return }
+        // `slewing-silent`: satu laporan "bergerak" (seolah slew dimulai dari
+        // iPhone), lalu laporan berhenti dan iPhone tidak terjangkau — untuk
+        // memeriksa bahwa Stop tetap ada setelah keadaan menjadi basi.
+        if mode == "slewing-silent" {
+            telescopeStatus = TelescopeStatus(state: .slewing, at: Date(), detail: "debug-silent")
+            debugTelescopeTimer = Timer(timeInterval: 3600, repeats: false) { _ in }
+            return
+        }
+        let state: TelescopeStatusState = mode == "ready" ? .ready : mode == "slewing" ? .slewing : .disabled
+        debugForcesReachable = true
+        let tick = { [weak self] in self?.telescopeStatus = TelescopeStatus(state: state, at: Date(), detail: "debug") }
+        tick()
+        debugTelescopeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            MainActor.assumeIsolated { tick() }
+        }
+    }
+    #endif
+
+    /// Terjangkau menurut sesi (atau dipaksa oleh mode debug).
+    public var isPhoneReachable: Bool {
+        #if DEBUG
+        if debugForcesReachable { return true }
+        #endif
+        return isReachable
+    }
+
+    // MARK: Kanal langsung (ADR-006)
+
+    private static let liveIDKey = "live.lastID"
+    /// Konfirmasi / status / GoTo / Stop lewat `sendMessage`. Penyelesaiannya
+    /// bisa dipanggil di antrean latar; pemanggil UI pindah ke main sendiri.
+    public private(set) lazy var live: LiveChannelClient = {
+        let client = LiveChannelClient(
+            session: WCLiveSession(),
+            sequence: LiveIDSequence(last: UInt64(UserDefaults.standard.integer(forKey: Self.liveIDKey))))
+        client.onSequenceAdvanced = { UserDefaults.standard.set(Int($0), forKey: WatchLinkService.liveIDKey) }
+        return client
+    }()
 
     /// Dijalankan saat iPhone mengirim ambang keyakinan baru.
     ///
@@ -51,6 +132,16 @@ public final class WatchLinkService: NSObject, ObservableObject {
     private var reportGate = LinkReportGate()
 
     public override init() { super.init() }
+
+    /// Kirim arah tunjuk ke iPhone untuk Stellarium — hanya bila diminta dan
+    /// terjangkau, paling sering 4×/dtk. Tanpa antre: arah lama tidak berguna.
+    public func mirror(_ snapshot: PointingSnapshot) {
+        guard mirrorRequested, isReachable, let session, let pointing = snapshot.calibratedPointing else { return }
+        let locked = snapshot.state == .lock ? snapshot.intent?.best?.id : nil
+        let sample = MirrorSample(pointing: pointing, lockedObjectID: locked)
+        guard mirrorThrottle.shouldSend(sample) else { return }
+        session.sendMessage(sample.plist, replyHandler: nil, errorHandler: nil)
+    }
 
     public func activate() {
         guard let session else { return }
@@ -161,6 +252,35 @@ public final class WatchLinkService: NSObject, ObservableObject {
     }
 
     /// Minta keadaan terakhir dari jam (dipakai iPhone saat dibuka).
+    /// Kirim berkas JSONL Lab ke iPhone. Antre di latar belakang dan sampai
+    /// walau iPhone sedang tidak terjangkau — berbeda dari perintah teleskop,
+    /// data riset memang boleh tertunda.
+    @discardableResult
+    public func transferLabFile(_ url: URL, sessionID: UUID, trialCount: Int) -> Bool {
+        guard let session, session.activationState == .activated else {
+            labTransferSucceeded = false
+            return false
+        }
+        session.transferFile(url, metadata: [LabLinkKeys.fileMarker: true,
+                                             LabLinkKeys.sessionID: sessionID.uuidString,
+                                             LabLinkKeys.trialCount: trialCount])
+        labTransfersInFlight = session.outstandingFileTransfers.count
+        labTransferSucceeded = nil
+        return true
+    }
+
+    private static var storedLabTargets: [LabTarget] {
+        guard let data = UserDefaults.standard.data(forKey: labTargetsKey) else { return [] }
+        return (try? JSONDecoder().decode([LabTarget].self, from: data)) ?? []
+    }
+
+    private func receiveLab(_ targets: [LabTarget]) {
+        labTargets = targets
+        if let data = try? JSONEncoder().encode(targets) {
+            UserDefaults.standard.set(data, forKey: Self.labTargetsKey)
+        }
+    }
+
     public func requestState() {
         send(PointingLinkMessage(kind: .stateRequest))
     }
@@ -216,8 +336,11 @@ extension WatchLinkService: WCSessionDelegate {
                                     activationDidCompleteWith activationState: WCSessionActivationState,
                                     error: Error?) {
         let reachable = session.isReachable
+        // Konteks terakhir dari iPhone tetap ada setelah app jam dibuka ulang.
+        let mirror = MirrorSample.isRequest(session.receivedApplicationContext)
         Task { @MainActor in
             self.isReachable = reachable
+            if let mirror { self.mirrorRequested = mirror }
             if let error {
                 // Pesan sistem dibungkus lewat katalog: ia mengikuti bahasa
                 // perangkat, bukan bahasa katalog, jadi menampilkannya apa
@@ -232,12 +355,27 @@ extension WatchLinkService: WCSessionDelegate {
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveApplicationContext applicationContext: [String: Any]) {
-        guard let message = PointingLinkMessage(plist: applicationContext) else { return }
-        Task { @MainActor in self.handle(message) }
+        let status = TelescopeStatus(plist: applicationContext)
+        let message = PointingLinkMessage(plist: applicationContext)
+        let mirror = MirrorSample.isRequest(applicationContext)
+        Task { @MainActor in
+            if let mirror { self.mirrorRequested = mirror }
+            if let status { self.receiveTelescope(status) }
+            // Konteks yang sama dikirim ulang setiap laporan teleskop (2 dtk);
+            // pesan keadaan yang sudah ditangani tidak boleh dijalankan lagi.
+            if let message, message.sentAt != self.lastContextMessageSentAt {
+                self.lastContextMessageSentAt = message.sentAt
+                self.handle(message)
+            }
+        }
     }
 
     nonisolated public func session(_ session: WCSession,
                                     didReceiveMessage message: [String: Any]) {
+        if let on = MirrorSample.isRequest(message) {
+            Task { @MainActor in self.mirrorRequested = on }
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: message) else { return }
         Task { @MainActor in self.handle(decoded) }
     }
@@ -247,12 +385,50 @@ extension WatchLinkService: WCSessionDelegate {
     /// `didReceiveApplicationContext`).
     nonisolated public func session(_ session: WCSession,
                                     didReceiveUserInfo userInfo: [String: Any]) {
+        if let targets = LabLinkKeys.decodeTargets(userInfo) {
+            Task { @MainActor in self.receiveLab(targets) }
+            return
+        }
         guard let decoded = PointingLinkMessage(plist: userInfo) else { return }
         Task { @MainActor in self.handle(decoded) }
+    }
+
+    nonisolated public func session(_ session: WCSession,
+                                    didFinish fileTransfer: WCSessionFileTransfer,
+                                    error: Error?) {
+        let ok = error == nil
+        let remaining = session.outstandingFileTransfers.count
+        Task { @MainActor in
+            self.labTransferSucceeded = ok
+            self.labTransfersInFlight = remaining
+        }
     }
 
     nonisolated public func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor in self.isReachable = reachable }
+    }
+}
+
+/// `WCSession` sebagai `LiveSession`. Tanpa sesi aktif, tidak terjangkau.
+final class WCLiveSession: LiveSession {
+    private var session: WCSession? {
+        WCSession.isSupported() && WCSession.default.activationState == .activated ? WCSession.default : nil
+    }
+
+    var isReachable: Bool { session?.isReachable ?? false }
+
+    func sendMessage(_ message: [String: Any],
+                     replyHandler: @escaping ([String: Any]) -> Void,
+                     errorHandler: @escaping (Error) -> Void) {
+        guard let session else {
+            errorHandler(NSError(domain: "WCLiveSession", code: 1))
+            return
+        }
+        session.sendMessage(message, replyHandler: replyHandler, errorHandler: errorHandler)
+    }
+
+    func transferUserInfo(_ userInfo: [String: Any]) {
+        session?.transferUserInfo(userInfo)
     }
 }

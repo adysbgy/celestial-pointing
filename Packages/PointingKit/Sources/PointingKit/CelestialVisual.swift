@@ -2020,7 +2020,7 @@ public extension CelestialVisual {
     /// (yang memuat **sudut**) ke `Canvas.ellipse` (yang memuat **pusat**).
     /// Kesalahan yang sama pernah terjadi pada Bintik Merah Besar, dan itu
     /// sebabnya `Spot` sudah menyebut satuannya sebagai pusat.
-    public struct HazeGeometry: Equatable, Sendable {
+    struct HazeGeometry: Equatable, Sendable {
         /// Pusat elips, satuan radius bola (positif = ke bawah).
         public var centerY: Double
         /// Setengah lebar elips, satuan radius.
@@ -2060,9 +2060,9 @@ public extension CelestialVisual {
     /// terhadap piringan 2 R. Yang membatasinya tetap klip ke bagian yang
     /// menyala, supaya kabutnya tidak pernah menonjol keluar sabit dan
     /// membuatnya tampak lebih lebar daripada fraksi yang dihitung engine.
-    public static func venusHaze(centerY: Double = 0.0,
-                                 halfWidth: Double = 0.55,
-                                 halfHeight: Double = 0.72) -> HazeGeometry {
+    static func venusHaze(centerY: Double = 0.0,
+                          halfWidth: Double = 0.55,
+                          halfHeight: Double = 0.72) -> HazeGeometry {
         HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
     }
 
@@ -2200,7 +2200,7 @@ public extension CelestialVisual {
     /// Ukurannya sengaja jauh lebih besar dari kenyataan (Bintik Merah Besar
     /// sungguhan hanya ≈0.11 R): di kartu jam 38 pt, ukuran yang benar adalah
     /// 4 pt dan hilang sama sekali. Yang dikorbankan ukuran, bukan posisi.
-    public struct Spot: Equatable, Sendable {
+    struct Spot: Equatable, Sendable {
         /// Pusat elips, sumbu x, satuan radius bola.
         public var centerX: Double
         /// Pusat elips, sumbu y, satuan radius bola (positif = ke bawah).
@@ -2239,7 +2239,7 @@ public extension CelestialVisual {
     /// `centerY` positif: belahan selatan. Bukan pilihan rasa — Bintik Merah
     /// Besar memang di selatan, dan tanda itu yang paling mudah terbalik tanpa
     /// terlihat.
-    public static func jupiterSpot(centerX: Double = -0.10,
+    static func jupiterSpot(centerX: Double = -0.10,
                                    centerY: Double = 0.31,
                                    width: Double = 0.52,
                                    height: Double = 0.26) -> Spot {
@@ -2252,7 +2252,7 @@ public extension CelestialVisual {
     ///
     /// Dalam satuan radius bola, relatif terhadap pusatnya. `centerY` negatif
     /// = belahan utara (ingat: di `Canvas` y bertambah ke bawah).
-    public struct Band: Equatable, Sendable {
+    struct Band: Equatable, Sendable {
         /// Ketinggian pusat pita, −1…+1 (satuan radius bola).
         public var centerY: Double
         /// Separuh lebar pita di ketinggian itu (satuan radius bola).
@@ -2302,7 +2302,7 @@ public extension CelestialVisual {
     ///     yang tepat di ekuator — itu yang membuat susunannya simetris.
     ///   - heightFraction: tinggi tiap pita (2 × separuh tinggi), satuan
     ///     radius bola.
-    public static func jupiterBands(count: Int = 7,
+    static func jupiterBands(count: Int = 7,
                                     heightFraction: Double = 0.11) -> [Band] {
         guard count > 0 else { return [] }
         let halfHeight = heightFraction / 2
@@ -2343,7 +2343,7 @@ public extension CelestialVisual {
     /// seharusnya, dan piringannya terlihat miring. Tanda itu memang ada di
     /// model: `Band.centerY` **adalah** ketinggian bola yang bertanda, jadi
     /// pemanggil cukup meneruskannya.
-    public static func bandHalfWidthAt(height: Double) -> Double {
+    static func bandHalfWidthAt(height: Double) -> Double {
         min(1, max(0, 1 - height * height)).squareRoot()
     }
 
@@ -2375,7 +2375,7 @@ public extension CelestialVisual {
     /// **kedua** sisinya punya jarak ke ambangnya. Dijaga
     /// `testBandLimbShadingIsPartial` di Linux dan gerbang piksel
     /// `check_banded_disc_keeps_its_curvature`.
-    public static let bandLimbShadingStrength: Double = 0.6
+    static let bandLimbShadingStrength: Double = 0.6
 
     /// Kekuatan **pemulihan peredupan limb** di atas Bintik Merah Besar, 0…1.
     ///
@@ -2410,7 +2410,7 @@ public extension CelestialVisual {
     /// (≥ 20 piksel merah di kotak bintiknya). Dijaga
     /// `testJupiterSpotLimbShadingIsPartial` di Linux dan gerbang piksel
     /// `check_jupiter_spot_keeps_its_curvature`.
-    public static let jupiterSpotLimbShadingStrength: Double = 0.6
+    static let jupiterSpotLimbShadingStrength: Double = 0.6
 
     // MARK: - Peredupan limb piringan Bulan
 
@@ -2476,7 +2476,7 @@ public extension CelestialVisual {
     /// memang disinari sumber yang **lebar** (Bumi, bukan Matahari), jadi
     /// piringan rata di sana bukan gambar yang salah — sedangkan pita
     /// terangnya disinari sumber titik, dan di situlah lengkungnya berarti.
-    public static let moonLimbShadingStrength: Double = 0.40
+    static let moonLimbShadingStrength: Double = 0.40
 
     /// Radius akhir gradien bola Bulan, dalam satuan radius piringan.
     ///
@@ -2510,7 +2510,7 @@ public extension CelestialVisual {
     /// Linux, dan tidak mengatur apa pun di sana. Dijaga
     /// `check_planet_phase_limb_reads_the_model_constant`, yang sengaja
     /// mengukur lewat **konstantanya**, bukan lewat literalnya.
-    public static let moonSphereGradientEndRadius: Double = 1.15
+    static let moonSphereGradientEndRadius: Double = 1.15
 
     /// Ujung gelap gradien bola Bulan: warna yang sama, diredupkan sebagian.
     ///
@@ -2520,7 +2520,7 @@ public extension CelestialVisual {
     /// Python memakai fungsi yang sama (`moon_sphere_dark`), jadi gambar yang
     /// diukur gerbang piksel tidak bisa menyimpang dari gambar yang tampil di
     /// jam.
-    public static func moonSphereDark(_ base: RGBComponents) -> RGBComponents {
+    static func moonSphereDark(_ base: RGBComponents) -> RGBComponents {
         let k = 1 - Swift.min(1, Swift.max(0, moonLimbShadingStrength))
         return .init(red: base.red * k, green: base.green * k, blue: base.blue * k)
     }
@@ -2543,7 +2543,7 @@ public extension CelestialVisual {
     /// Arahnya juga **bukan** bebas: sumbu-y yang dibalik membuat seluruh
     /// bayangan kawah terbalik, dan kawah terbalik tetap terlihat seperti
     /// kawah — kelas cacat yang tidak bisa dilihat mata, hanya bisa dihitung.
-    public static let sphereLightOffset = (x: -0.32, y: -0.32)
+    static let sphereLightOffset = (x: -0.32, y: -0.32)
 }
 
 public extension CelestialVisual {
@@ -2590,7 +2590,7 @@ public extension CelestialVisual {
     /// tetap terbaca sebagai kawah, hanya terbaca sebagai kawah yang
     /// **menonjol keluar** alih-alih cekung. Karena itu arahnya dihitung di
     /// model dan diuji di Linux.
-    public struct CraterRelief: Equatable, Sendable {
+    struct CraterRelief: Equatable, Sendable {
         /// Titik pusat kawah, satuan radius bola, relatif pusat piringan.
         public var centerX: Double
         public var centerY: Double

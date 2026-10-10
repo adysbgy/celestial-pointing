@@ -1,0 +1,13 @@
+// Salin ke Config/Local.xcconfig (tidak di-commit) dan isi Team ID Anda.
+// Team ID: Xcode → Settings → Accounts → tim → "Team ID", atau
+// developer.apple.com → Membership.
+
+DEVELOPMENT_TEAM = ABCDE12345
+
+// Opsional: awalan bundle ID sendiri bila dev.celestial.* sudah terpakai.
+// BUNDLE_ID_PREFIX = com.namaanda.celestial
+
+// Opsional: matikan App Group bila tim (mis. tim personal gratis) tidak
+// mendukungnya.
+// CP_WATCH_ENTITLEMENTS =
+// CP_COMPLICATION_ENTITLEMENTS =

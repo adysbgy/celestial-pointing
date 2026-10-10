@@ -1,3 +1,32 @@
+## Keadaan perangkat & pointing (9 Okt 2026, 23.58 WIB — cabang `claude/pointing-audit`)
+
+**Terpasang.**
+- iPhone 17 (iOS 27.0.1): build 77745a8.
+- Apple Watch Series 10 (watchOS 27.0.1): build 2fe99d6, dipasang langsung lewat devicectl. Untuk pointing, isinya setara dengan 77745a8; bedanya hanya perapian visual dari main.
+
+**Alur jam** (ADR-010–012):
+1. Layar utama dengan satu tugas.
+2. Siang: layar "Masih siang", jam mulai gelap, dan daftar "Malam ini".
+3. Malam: cincin petunjuk ke benda terlihat terdekat.
+4. Kunci: nama besar, lalu tombol "Ya, itu dia".
+
+Kerangka berutara; langit kota (batas magnitudo 3.0) sebagai bawaan.
+
+**Bukti** (`Docs/WATCH_NOT_SURE_ANALYSIS.md`):
+- "Belum yakin terus" di siang hari: 220/220 arah tanpa kandidat.
+- Gladi bersih Jakarta 18.45 / 19.30 / 21.00: semua benda terlihat (7–8) terkunci pada dirinya sendiri, juga dengan galat 7°.
+
+**Belum terverifikasi di perangkat.**
+- Tanda sumbu lengan bawah untuk cara pakai Ady.
+- Kerangka apa yang dilaporkan Series 10.
+- Akurasi kompas di dekat logam.
+- Uji malam pertama: belum ada data lapangan. Folder Documents/PointingLab di iPhone masih kosong.
+
+**CI PR #1.** Merah karena dua jangkar pemeriksa visual masih mencari teks `public static` yang sudah dirapikan. Sudah diperbaiki di 63e8b7b dan 77745a8. Semua langkah CI hijau di lokal:
+- CelestialEngine 222, PointingKit 805
+- lint UI
+- check-visuals 624/0
+- 10 bukti mutasi
 ## Siklus: pemotongan ciri planet berfase — akibatnya tidak diukur siapa pun
 
 Siklus ini mulai dari audit "kasus tak terjaga", bukan dari fitur baru. Yang

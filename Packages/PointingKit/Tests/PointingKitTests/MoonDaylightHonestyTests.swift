@@ -54,13 +54,8 @@ final class MoonDaylightHonestyTests: XCTestCase {
     /// Arah tunjuk persis ke target horizontal (roll=0, salinan dari
     /// `DaylightLockTests`).
     private func quaternion(viewPointingAt target: HorizontalCoord) -> Quaternion {
-        let v = LocalFrame.enuFromHorizontal(target)
-        let d = Vector3(x: v.y, y: v.z, z: v.x)
-        let from = Vector3.unitZ
-        let axis = from.cross(d)
-        if axis.magnitude < 1e-12 { return .identity }
-        let angle = acos(max(-1.0, min(1.0, from.dot(d))))
-        return Quaternion.axisAngle(axis: axis, radians: angle)!
+        // Sumbu bawaan controller (lengan bawah), konvensi CoreMotion — ADR-002.
+        DeviceAttitude.synthetic(aim: PointingControllerConfig().aim, pointingAt: target).quaternion
     }
 
     private func aim(at moon: EphemerisBody,

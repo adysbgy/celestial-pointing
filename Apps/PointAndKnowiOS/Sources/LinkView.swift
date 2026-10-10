@@ -13,9 +13,54 @@ struct LinkView: View {
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
 
+    /// Fitur Alpaca mati secara bawaan (ADR-008): tanpa dinyalakan, app tidak
+    /// pernah menyentuh jaringan lokal.
+    @AppStorage("telescope.alpaca.enabled") private var alpacaEnabled = false
+    @AppStorage("telescope.alpaca.address") private var alpacaAddress = String()
+
     var body: some View {
         NavigationStack {
             List {
+                // Objek yang dikonfirmasi di jam (ADR-007). Nama dibentuk ulang
+                // dari id dengan bahasa iPhone, bukan nama kiriman jam.
+                Section(IdentificationText.phoneConfirmedTitle) {
+                    if let confirmed = link.lastConfirmed {
+                        let id = confirmed.message.objectID ?? "—"
+                        Text(verbatim: DisplayLabel.objectName(
+                            forObjectID: id,
+                            catalogue: Catalogue.brightStars + DeepSkyCatalogue.objects)
+                             ?? confirmed.message.objectName ?? id)
+                            .font(.title2.bold())
+                        Text(verbatim: IdentificationText.phoneConfirmedTime(confirmed.message.sentAt,
+                                                                             live: confirmed.live))
+                            .font(.footnote)
+                            .foregroundStyle(Color.nightAwareSecondary)
+                    } else {
+                        Text(IdentificationText.phoneNothingConfirmed)
+                            .foregroundStyle(Color.nightAwareSecondary)
+                    }
+                }
+
+                Section(TelescopeText.section) {
+                    Toggle(TelescopeText.enableAlpaca, isOn: $alpacaEnabled)
+                        .onChange(of: alpacaEnabled) { _, on in
+                            Task { await link.applyTelescopeSettings(alpacaEnabled: on, address: alpacaAddress) }
+                        }
+                    if alpacaEnabled {
+                        TextField(TelescopeText.address, text: $alpacaAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                        Button(TelescopeText.connect) {
+                            Task { await link.connectAlpaca(address: alpacaAddress) }
+                        }
+                        .disabled(alpacaAddress.isEmpty || link.telescopeLink == .connecting)
+                    }
+                    Text(telescopeStatus)
+                        .font(.footnote)
+                        .foregroundStyle(Color.nightAwareSecondary)
+                }
+
                 Section(TextLocalization.text(.linkSectionTitle)) {
                     row(TextLocalization.text(.linkRowStatus),
                         link.isActivated
@@ -110,5 +155,16 @@ struct LinkView: View {
         // tiga versi aturan pengumuman. Lihat juga `SkyContextView.row`.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(RowSpeech.label(title: title, value: value))
+    }
+
+    private var telescopeStatus: String {
+        switch link.telescopeLink {
+        case .mock: return TelescopeText.stateMock
+        case .notConnected: return TelescopeText.stateNotConnected
+        case .connecting: return TelescopeText.stateConnecting
+        case .connected(let mount): return TelescopeText.stateConnected(mount.equatorialSystem)
+        case .unsupported: return TelescopeText.stateUnsupported
+        case .failed: return TelescopeText.stateFailed
+        }
     }
 }

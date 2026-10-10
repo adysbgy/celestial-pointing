@@ -122,6 +122,15 @@ public final class PointingEngine: ObservableObject {
         return changed
     }
 
+    /// Pasang kualitas langit (ADR-012). Jawaban lama dibatalkan bila
+    /// penyaringnya berubah — sama seperti `setConfidencePolicy(_:)`.
+    public func setSkyQuality(_ quality: SkyQuality) {
+        if controller.setVisibilityPolicy(quality.visibilityPolicy) {
+            lastLockedObject = nil
+        }
+        publish(controller.snapshot)
+    }
+
     /// Perbarui lokasi. Mengubah lokasi menggeser seluruh langit, jadi jawaban
     /// yang sudah dihitung untuk langit lama **dibatalkan** — bukan dipertahankan.
     ///
@@ -201,7 +210,13 @@ public final class PointingEngine: ObservableObject {
             lastLockedObject = update.snapshot.answeredObject
         }
         refreshSkyContext(at: date)
+        onIngest?(update.snapshot)
     }
+
+    /// Dipanggil setelah setiap `ingest`, dari sumber mana pun (sensor atau
+    /// pose debug). Laporan keadaan ke iPhone menggantung di sini, bukan di
+    /// `MotionLogger`, supaya semua jalur masuk ikut terlapor.
+    public var onIngest: ((PointingSnapshot) -> Void)?
 
     /// Perbarui konteks langit (Matahari/Bulan). Dipanggil jarang — konteks
     /// berubah lambat dan efemeris tidak murah.

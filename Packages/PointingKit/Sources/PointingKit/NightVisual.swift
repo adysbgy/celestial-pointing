@@ -466,7 +466,7 @@ public extension CelestialVisual {
     /// Versi yang menaruh pemetaan ini di view akan lolos setiap uji model
     /// dan tetap bisa menampilkan warna morfologi di sebelah badge "Ragu" —
     /// gambar yang lebih yakin daripada teksnya, persis yang dilarang PRD.
-    public static func deepSkyColour(for morphology: DeepSkyCatalogue.Morphology?)
+    static func deepSkyColour(for morphology: DeepSkyCatalogue.Morphology?)
         -> CelestialVisual.RGBComponents {
         let accents = CelestialVisual.accents
         switch morphology {

@@ -10,7 +10,7 @@ import AstronomyKit
 /// sudut aman teleskop). Matahari tidak pernah boleh menjadi kandidat target:
 /// menunjuk teleskop ke Matahari merusak peralatan dan mata. Lihat
 /// `EphemerisBody.pointableBodies`.
-public enum EphemerisBody: String, CaseIterable, Equatable {
+public enum EphemerisBody: String, CaseIterable, Equatable, Sendable {
     case sun, moon, mercury, venus, mars, jupiter, saturn
 
     /// Benda yang boleh menjadi target pointing. Matahari TIDAK termasuk.
@@ -21,8 +21,13 @@ public enum EphemerisBody: String, CaseIterable, Equatable {
     /// Apakah benda ini aman dijadikan target pointing.
     public var isPointable: Bool { self != .sun }
 
-    /// Nama tampilan untuk UI.
+    /// Nama tampilan untuk UI, dalam bahasa aktif (`ObjectNameLocalization`).
     public var displayName: String {
+        ObjectNameLocalization.name(forObjectID: rawValue, indonesian: indonesianName)
+    }
+
+    /// Nama Bahasa Indonesia (bahasa sumber).
+    public var indonesianName: String {
         switch self {
         case .sun: return "Matahari"
         case .moon: return "Bulan"

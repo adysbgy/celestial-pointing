@@ -1,0 +1,20 @@
+// Pengaturan tanda tangan bersama untuk semua target (ADR-005).
+//
+// Satu-satunya yang perlu diisi pengembang ada di Config/Local.xcconfig
+// (tidak di-commit): DEVELOPMENT_TEAM, dan bila perlu BUNDLE_ID_PREFIX.
+// Salin Config/Local.xcconfig.example, atau jalankan Tools/device-run.sh <team-id>.
+
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM =
+
+// Awalan semua bundle ID dan App Group. Ganti di Local.xcconfig bila
+// `dev.celestial.*` sudah dipakai akun lain (mis. tim personal).
+BUNDLE_ID_PREFIX = dev.celestial
+
+// Entitlements App Group (berbagi snapshot jam <-> complication). Kosongkan
+// keduanya di Local.xcconfig bila tim tidak bisa memakai App Group; store
+// complication otomatis memakai fallback cache.
+CP_WATCH_ENTITLEMENTS = Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+CP_COMPLICATION_ENTITLEMENTS = Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
+
+#include? "Local.xcconfig"

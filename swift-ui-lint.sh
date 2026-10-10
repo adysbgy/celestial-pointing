@@ -1927,7 +1927,24 @@ for root in ("Apps", "Packages"):
                     continue
 source = "\n".join(blob)
 
-orphans = sorted(k for k in strings if k not in source)
+import re
+
+# Ruang nama dinamis `object.name.<id>` (ADR-007): kuncinya dibentuk
+# `ObjectNameLocalization.key(forObjectID:)`, jadi tidak pernah muncul utuh di
+# kode. Ia dihitung dirujuk hanya bila id-nya **masih ada** di kode sebagai
+# id katalog (`id: "m31"`) atau kasus `EphemerisBody` (`case saturn`) —
+# objek yang dihapus tetap membuat kuncinya yatim, persis seperti seharusnya.
+def referenced(k):
+    if k in source:
+        return True
+    prefix = "object.name."
+    if k.startswith(prefix) and "ObjectNameLocalization" in source:
+        oid = k[len(prefix):]
+        return (f'id: "{oid}"' in source
+                or re.search(r"\bcase\s+(?:[a-z]+\s*,\s*)*" + re.escape(oid) + r"\b", source) is not None)
+    return False
+
+orphans = sorted(k for k in strings if not referenced(k))
 print("\n".join(f"  {k!r}" for k in orphans))
 PY
 )
@@ -2770,6 +2787,9 @@ def balanced(text, i):
 
 
 def split_top(inside):
+    # `->` pada tipe fungsi bukan kurung sudut. Tanpa ini `() -> Date = …`
+    # menurunkan depth ke −1, lalu koma dan `=` sesudahnya tak terlihat.
+    inside = inside.replace("->", "\u2192")
     parts, depth, cur = [], 0, ""
     for c in inside:
         if c in "([{<":
@@ -2787,6 +2807,7 @@ def split_top(inside):
 
 def has_default(param):
     """True kalau `label: T = nilai` — bukan `==`, `<=`, `!=`, `>=`, `=~`."""
+    param = param.replace("->", "\u2192")
     depth, i, n = 0, 0, len(param)
     while i < n:
         c = param[i]
@@ -2856,12 +2877,17 @@ for root, _, files in os.walk(PKG):
 
 
 def matches(given, decl):
-    if len(given) > len(decl):
-        return False
-    for (gl, _gd), (dl, ddef) in zip(given, decl):
-        if not ddef and gl != dl:
+    """Swift boleh melewati argumen berbawaan di posisi **mana pun**, bukan
+    hanya di ekor: `init(id: UUID = UUID(), name:)` dipanggil `T(name:)`.
+    Jadi deklarasi dijajarkan satu per satu: label yang cocok dipakai,
+    parameter berbawaan yang tidak disebut dilewati, sisanya gagal."""
+    gi = 0
+    for dl, ddef in decl:
+        if gi < len(given) and given[gi][0] == dl:
+            gi += 1
+        elif not ddef:
             return False
-    return all(ddef for _l, ddef in decl[len(given):])
+    return gi == len(given)
 
 
 CALL = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\s*\(")
@@ -2885,7 +2911,9 @@ for root, _, files in os.walk(APPS):
             if not given:
                 required = [(d, p) for d, p in inits[t]
                             if any(not x for _l, x in d)]
-                if required:
+                # Ada kelebihan beban yang seluruhnya berbawaan: nol argumen sah.
+                if required and not any(all(x for _l, x in d) for d, _p in
+                                        inits[t]):
                     decl, dpath = required[0]
                     problems.append(
                         f"  {path}: {t}() tanpa argumen\n"
@@ -3003,6 +3031,9 @@ def balanced(text, i):
 
 
 def split_top(inside):
+    # `->` pada tipe fungsi bukan kurung sudut. Tanpa ini `() -> Date = …`
+    # menurunkan depth ke −1, lalu koma dan `=` sesudahnya tak terlihat.
+    inside = inside.replace("->", "\u2192")
     parts, depth, cur = [], 0, ""
     for c in inside:
         if c in "([{<":
@@ -3020,6 +3051,7 @@ def split_top(inside):
 
 def has_default(param):
     """True kalau `label: T = nilai` — bukan `==`, `<=`, `!=`, `>=`, `=~`."""
+    param = param.replace("->", "\u2192")
     depth, i, n = 0, 0, len(param)
     while i < n:
         c = param[i]
@@ -3058,12 +3090,17 @@ def decl_params(inside):
 
 
 def matches(given, decl):
-    if len(given) > len(decl):
-        return False
-    for (gl, _gd), (dl, ddef) in zip(given, decl):
-        if not ddef and gl != dl:
+    """Swift boleh melewati argumen berbawaan di posisi **mana pun**, bukan
+    hanya di ekor: `init(id: UUID = UUID(), name:)` dipanggil `T(name:)`.
+    Jadi deklarasi dijajarkan satu per satu: label yang cocok dipakai,
+    parameter berbawaan yang tidak disebut dilewati, sisanya gagal."""
+    gi = 0
+    for dl, ddef in decl:
+        if gi < len(given) and given[gi][0] == dl:
+            gi += 1
+        elif not ddef:
             return False
-    return all(ddef for _l, ddef in decl[len(given):])
+    return gi == len(given)
 
 
 # Indeks metode per tipe. Badan dibaca per deklarasi tipe, jadi nama metode
@@ -3116,7 +3153,9 @@ for root, _, files in os.walk(APPS):
                 # `text(for snapshot:)` harus merah di sini.
                 required = [(d, p) for d, p in overloads
                             if any(not x for _l, x in d)]
-                if required:
+                # Ada kelebihan beban yang seluruhnya berbawaan: nol argumen sah.
+                if required and not any(all(x for _l, x in d) for d, _p in
+                                        overloads):
                     stats["nol argumen tapi wajib punya argumen"] += 1
                     decl, dpath = required[0]
                     problems.append(

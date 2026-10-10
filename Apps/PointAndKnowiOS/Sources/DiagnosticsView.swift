@@ -11,20 +11,33 @@ import PointingKit
 @main
 struct PointAndKnowiOSApp: App {
 
-    @StateObject private var engine = PointingEngine()
+    // iPhone ditunjukkan dengan tepi atasnya (+Y), bukan dengan sumbu lengan
+    // bawah jam (ADR-002).
+    @StateObject private var engine = PointingEngine(
+        config: PointingControllerConfig(aim: .screenUp)
+    )
     @StateObject private var motion = MotionLogger()
     @StateObject private var location = LocationProvider()
-    @StateObject private var link = PhoneLinkService()
+    @StateObject private var link: PhoneLinkService
     @StateObject private var trace = ConfidenceTraceStore()
+    /// Jembatan ke Stellarium desktop (ADR-016). Dibuat sekali bersama
+    /// tautannya, karena ia memasang penerima sampel di tautan itu.
+    @StateObject private var stellarium: StellariumBridge
 
     /// Sama seperti app jam: label keadaan dan keyakinan berasal dari
     /// `PointingKit`, jadi bridge harus terpasang sebelum layar pertama
     /// dirender — bukan saat tab pertama dibuka.
-    init() { LocalizationBridge.install() }
+    init() {
+        LocalizationBridge.install()
+        let link = PhoneLinkService()
+        _link = StateObject(wrappedValue: link)
+        _stellarium = StateObject(wrappedValue: StellariumBridge(link: link))
+    }
 
     var body: some Scene {
         WindowGroup {
-            RootView(engine: engine, motion: motion, location: location, link: link, trace: trace)
+            RootView(engine: engine, motion: motion, location: location, link: link, trace: trace,
+                     stellarium: stellarium)
         }
     }
 }
@@ -36,6 +49,7 @@ struct RootView: View {
     @ObservedObject var location: LocationProvider
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
+    @ObservedObject var stellarium: StellariumBridge
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -62,23 +76,35 @@ struct RootView: View {
 
     var body: some View {
         TabView {
+            SkyHomeView(engine: engine, link: link, stellarium: stellarium)
+                .tabItem { Label(WatchHomeText.skyTab, systemImage: "sparkles") }
             DiagnosticsView(engine: engine, motion: motion, location: location, link: link, trace: trace)
                 .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }
             Experiment1View(engine: engine, link: link)
                 .tabItem { Label("Experiment 1", systemImage: "target") }
             LinkView(link: link, trace: trace)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
+            PointingLabPhoneView(link: link)
+                .tabItem { Label("Lab", systemImage: "flask") }
         }
         // Perkenalan sekali pakai: satu kartu, bukan tur panjang. Dibungkus
         // sheet supaya layar utama (dan hasil pengukuran) tetap hidup di
         // belakang — menutupnya tidak mereset alur.
         .sheet(isPresented: .init(
             get: { !onboardingSeen },
-            set: { seen in onboardingSeen = seen })) {
+            // Penulis `isPresented` menerima "masih tampil?", bukan
+            // "sudah dilihat?". Dulu nilainya disimpan apa adanya, jadi
+            // menutup sheet menulis `onboardingSeen = false` dan sheet
+            // langsung muncul lagi — kartu ini tidak pernah bisa ditutup.
+            set: { presented in onboardingSeen = !presented })) {
             OnboardingView(onDone: { onboardingSeen = true })
         }
-        // Palet merah murni saat malam, berlaku untuk **seluruh** tab.
-        .preferredColorScheme(nightMode ? .dark : nil)
+        // Skema gelap **selalu**, untuk seluruh tab. Dulu `nightMode ? .dark :
+        // nil`: preferensi akar ini menimpa `forceDarkScheme()` di tiap tab, jadi
+        // di iPhone bersetelan terang seluruh app tampil putih sementara token
+        // warnanya dihitung untuk latar gelap — teks sekunder nyaris tak
+        // terbaca. Mode malam (merah) tetap diatur palet, bukan skema.
+        .forceDarkScheme()
         .onAppear { start() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -107,6 +133,10 @@ struct RootView: View {
             AccessibilityNotification.Announcement(
                 StateAnnouncement.text(for: engine.snapshot)).post()
         }
+        // Lokasi sungguhan datang belakangan; GoTo harus memakainya (ADR-006).
+        .onChange(of: engine.location) { _, location in
+            link.updateObserver(location.observer)
+        }
     }
 
     /// Sensor, lokasi, dan alur adalah milik **app**, bukan milik satu tab.
@@ -132,6 +162,18 @@ struct RootView: View {
         // adanya, bukan diisi angka karangan.
         link.onMessage = { message in trace.record(message: message) }
         link.activate()
+        // Koordinat GoTo dihitung dari lokasi engine iPhone (ADR-006).
+        link.updateObserver(engine.location.observer)
+        // Keadaan teleskop dilaporkan ke jam terus-menerus (ADR-009).
+        // Pengaturan teleskop yang tersimpan berlaku sejak awal: fitur Alpaca
+        // yang hidup tidak boleh diam-diam memakai tiruan sampai ada ketukan.
+        let defaults = UserDefaults.standard
+        Task {
+            await link.applyTelescopeSettings(
+                alpacaEnabled: defaults.bool(forKey: "telescope.alpaca.enabled"),
+                address: defaults.string(forKey: "telescope.alpaca.address") ?? String())
+        }
+        link.startTelescopeStatusReports()
 
         // Setiap sampel masuk ke engine **dan** ke riwayat keyakinan.
         // Penyambungannya ada di sini, bukan di tiap tab, karena hanya ada

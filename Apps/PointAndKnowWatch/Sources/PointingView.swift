@@ -16,6 +16,7 @@ struct PointingView: View {
     /// Pemasok lokasi: dibutuhkan supaya penolakan izinnya bisa ditampilkan
     /// (lihat `location.note`), bukan diam.
     @ObservedObject var location: LocationProvider
+    @ObservedObject var telescope: TelescopeControlStore
 
     /// Preferensi mode malam, disimpan ke `UserDefaults` lewat `NightMode`.
     /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
@@ -59,6 +60,13 @@ struct PointingView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 6) {
+                    // Identify → Confirm (ADR-007) **di atas**: jawaban dan
+                    // tombol Konfirmasi harus terlihat tanpa menggulir di
+                    // 40 mm; kartu keadaan yang lebih panjang turun ke bawah.
+                    // Stop selalu paling atas bila slew mungkin berjalan
+                    // (juga slew yang dimulai dari iPhone) — ADR-009.
+                    TelescopeStopBar(store: telescope)
+                    IdentificationPanel(engine: engine, link: link, telescope: telescope)
                     statusCard
                     // Ditampilkan selama ada objek — termasuk saat keadaannya
                     // sudah tidak punya jawaban lagi. Di situlah
@@ -142,10 +150,21 @@ struct PointingView: View {
                             .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     }
                     linkRow
+                    // Alat riset (ADR-004). Sengaja di ujung gulir, bukan di
+                    // toolbar: ia bukan bagian alur produk, tapi harus bisa
+                    // dicapai di build perangkat tanpa flag khusus.
+                    NavigationLink {
+                        PointingLabView(engine: engine, motion: motion, link: link)
+                    } label: {
+                        Label("Lab Pointing", systemImage: "flask")
+                    }
+                    .font(.footnote)
                 }
                 .padding(.horizontal, 2)
             }
-            .navigationTitle(TextLocalization.text(.pointingTitle))
+            // Tanpa judul di layar akar jam: empat ikon toolbar sudah memenuhi
+            // baris atas, dan judulnya terpotong jadi "Point & K…" (SE 40 mm,
+            // Ultra 3). Nama app sudah tampil di peluncur dan di VoiceOver.
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {

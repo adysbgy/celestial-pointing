@@ -1,4 +1,5 @@
 import Foundation
+import CelestialEngine
 
 /// Satu teks yang destined ke layar, bersama **kunci katalognya**.
 ///
@@ -79,6 +80,8 @@ public enum TextLocalization {
         lock.lock()
         defer { lock.unlock() }
         installed = lookup
+        // Nama objek (planet, Bulan, objek langit dalam) ikut katalog yang sama.
+        ObjectNameLocalization.install(lookup)
     }
 
     /// Melepas sumber terjemahan.
@@ -91,6 +94,7 @@ public enum TextLocalization {
         lock.lock()
         defer { lock.unlock() }
         installed = nil
+        ObjectNameLocalization.install(nil)
     }
 
     private static var lookup: Lookup? {
@@ -761,5 +765,5 @@ public extension LocalizedText {
         .diagnosticsLegendUnknown,
         .diagnosticsValueCalibrated, .diagnosticsValueNotCalibrated,
         .diagnosticsValueMotionAvailable, .diagnosticsValueMotionUnavailable,
-    ]
+    ] + identifyKeys + telescopeKeys + telescopeControlKeys + watchHomeKeys + phenomenaKeys + stellariumKeys
 }

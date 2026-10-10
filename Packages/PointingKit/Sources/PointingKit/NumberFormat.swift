@@ -78,7 +78,11 @@ public enum NumberFormat {
     public static func degreesPerSecond(_ value: Double,
                                         fractionDigits: Int = 1,
                                         localeId: String = activeLocaleId) -> String {
-        degrees(value, fractionDigits: fractionDigits, localeId: localeId) + "/dtk"
+        // Satuan waktu ikut katalog: "/dtk" (detik) di Bahasa Indonesia, "/s"
+        // di Inggris. Dulu ditulis tetap "/dtk", jadi layar Inggris membaca
+        // "9°/dtk".
+        degrees(value, fractionDigits: fractionDigits, localeId: localeId)
+            + TextLocalization.text(.unitPerSecondSuffix)
     }
 
     /// Persentase dari fraksi 0…1.

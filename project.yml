@@ -54,18 +54,19 @@ options:
   # `xcodegen generate`, jadi kunci yang keliru di `project.yml` lolos tanpa
   # suara. Gerbang yang bisa menangkapnya bukan Xcode, melainkan pemeriksaan
   # `project.yml` di `./swift-ui-lint.sh`.
-  # Proyek ini dibangun CI di macOS 15 / Xcode 16. XcodeGen sebelum perbaikan
-  # #1613 masih menaruh app jam di <Host>.app/Watch/; Xcode 16 ke atas
-  # mewajibkannya di <Host>.app/PlugIns/. postGenCommand di bawah menambal
-  # keduanya setelah proyek dibuat, jadi CI tidak bergantung pada versi
-  # XcodeGen yang kebetulan terpasang.
-  postGenCommand: |
-    set -e
-    f=PointAndKnow.xcodeproj/project.pbxproj
-    sed -i.bak -e 's|dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";|dstPath = "";|' \
-               -e 's|dstSubfolderSpec = 16;|dstSubfolderSpec = 13;|' "$f"
-    rm -f "$f.bak"
-    echo "postGen: app jam ditanam di PlugIns/ (Xcode 16+)"
+  # Tidak ada postGenCommand. Dulu ada sed yang memindahkan app jam dari
+  # <Host>.app/Watch/ ke <Host>.app/PlugIns/ dengan alasan "Xcode 16+
+  # mewajibkannya". Itu keliru: Watch/ adalah lokasi standar Xcode untuk app
+  # watchOS pendamping (fase "Embed Watch Content", dstSubfolderSpec 16,
+  # $(CONTENTS_FOLDER_PATH)/Watch), dan XcodeGen 2.46 menghasilkannya sendiri.
+  # Di PlugIns/, installd memasang app iPhone tapi diam-diam mengabaikan app
+  # jam — terbukti di simulator berpasangan (lihat Docs/DECISIONS.md, ADR-001).
+
+# Tanda tangan & awalan bundle ID dari xcconfig (ADR-005): satu-satunya yang
+# diisi pengembang adalah DEVELOPMENT_TEAM di Config/Local.xcconfig.
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
 
 packages:
   # Paket logika lapisan app: kalibrasi, alur kalibrasi, perekam Experiment 1,
@@ -100,6 +101,12 @@ settings:
     # teks tak terlokalisasi, tanpa peringatan. `./swift-ui-lint.sh` yang
     # menjaga itu (aturan 4), karena tidak ada gerbang lain yang bisa.
     SWIFT_EMIT_LOC_STRINGS: NO
+    # Versi ditulis sekali di sini supaya ketiga target (app iPhone, app jam,
+    # complication) mewarisi angka yang sama. Complication dulu tidak punya
+    # CURRENT_PROJECT_VERSION sama sekali, jadi CFBundleVersion-nya kosong dan
+    # installd menolak memasang app jam begitu ia ditanam di lokasi yang benar.
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
   configs:
     Debug:
       SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
@@ -143,10 +150,8 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow
         PRODUCT_NAME: PointAndKnow
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -158,8 +163,20 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "Point & Know"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel dan hasil pengukurannya ditandai belum tentu sah."
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
+        # Teleskop di jaringan lokal (ADR-008). Hanya dipakai bila fitur
+        # `telescope.alpaca.enabled` dinyalakan; tanpa itu app tidak pernah
+        # menyentuh jaringan lokal dan dialog izinnya tidak muncul.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "Point & Know terhubung langsung ke teleskop Anda di Wi‑Fi lokal untuk mengarahkannya ke objek yang sudah Anda konfirmasi."
+    # Info.plist parsial: ATS untuk HTTP Alpaca ke alamat lokal (192.168.x.x,
+    # *.local). Hanya jaringan lokal yang dibuka, bukan HTTP ke internet.
+    info:
+      path: Apps/PointAndKnowiOS/Info.plist
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
 
   # ─────────────────────────────────────────────────────────────────────────
   # Complication watchOS (WidgetKit) — terbenam di dalam app jam.
@@ -205,6 +222,11 @@ targets:
     info:
       path: Apps/PointAndKnowWatch/Complications/Info.plist
       properties:
+        # Ditulis di sini, bukan hanya di berkas plist: `xcodegen generate`
+        # menulis ulang plist dari daftar ini, jadi kunci yang tidak ada di
+        # sini hilang setiap kali proyek dibuat.
+        CFBundleDisplayName: Point & Know
+        CPAppGroupID: group.$(BUNDLE_ID_PREFIX).pointandknow
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -213,16 +235,15 @@ targets:
     # Di CI (tanpa tanda tangan) container ini `nil` → store pakai fallback
     # cache, jadi build tetap hijau; di perangkat nyata dengan profil yang
     # mengaktifkan group ini, complication benar-benar membaca tulisan app.
-    entitlementsPath: Apps/PointAndKnowWatch/Complications/PointAndKnowWatchComplication.entitlements
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow.watchkitapp.widgets
         PRODUCT_NAME: PointAndKnowWatchComplication
         TARGETED_DEVICE_FAMILY: "4"
         SKIP_INSTALL: YES
-      configs:
-        Debug:
-          CODE_SIGNING_ALLOWED: NO
+        # Lewat variabel xcconfig, bukan `entitlementsPath`, supaya tim tanpa
+        # App Group bisa mengosongkannya di Config/Local.xcconfig.
+        CODE_SIGN_ENTITLEMENTS: $(CP_COMPLICATION_ENTITLEMENTS)
 
   # ─────────────────────────────────────────────────────────────────────────
   # App jam: pointing, kalibrasi, haptic
@@ -250,10 +271,8 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.celestial.pointandknow.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).pointandknow.watchkitapp
         PRODUCT_NAME: PointAndKnowWatch
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "4"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -267,13 +286,25 @@ targets:
         # Wajib untuk app jam mandiri berbasis SwiftUI: tanpa `WKApplication`,
         # validasi App Store menolak bundelnya.
         INFOPLIST_KEY_WKApplication: YES
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: dev.celestial.pointandknow
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: $(BUNDLE_ID_PREFIX).pointandknow
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Lokasi dipakai untuk menghitung posisi benda langit di langit Anda. Tanpa lokasi, aplikasi memakai lokasi bawaan yang jelas berlabel, dan hasilnya ditandai belum tentu sah."
         INFOPLIST_KEY_NSMotionUsageDescription: "Data gerak dipakai untuk mengukur arah tunjuk jam. Akurasi sensor belum diasumsikan — justru itu yang diukur oleh Experiment 1."
         # App Group agar app jam & complication berbagi berkas snapshot.
         # Sama dengan target complication; tanpa ini complication hanya membaca
         # cache-nya sendiri (fallback store), bukan tulisan app.
-        entitlementsPath: Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(CP_WATCH_ENTITLEMENTS)
+    # Info.plist parsial; kunci `INFOPLIST_KEY_*` di atas tetap digabung
+    # karena `GENERATE_INFOPLIST_FILE: YES`. Satu-satunya isi yang tidak punya
+    # padanan `INFOPLIST_KEY_*`: mode latar untuk `WKExtendedRuntimeSession`
+    # Pointing Lab (ADR-004), supaya rekaman tidak berhenti saat layar meredup
+    # dengan lengan terangkat.
+    info:
+      path: Apps/PointAndKnowWatch/Info.plist
+      properties:
+        WKBackgroundModes:
+          - physical-therapy
+        # Dibaca `ComplicationStore`: ID App Group mengikuti BUNDLE_ID_PREFIX.
+        CPAppGroupID: group.$(BUNDLE_ID_PREFIX).pointandknow
 
 # Skema ditulis eksplisit supaya CI tidak bergantung pada skema yang
 # dihasilkan otomatis (dan supaya namanya stabil untuk `xcodebuild -scheme`).
@@ -282,9 +313,10 @@ schemes:
     build:
       targets:
         PointAndKnow: all
-      # Build paralel dimatikan: app jam adalah dependensi app iPhone, dan
-      # membangun keduanya sekaligus membuat pesan galatnya sulit dibaca.
-      parallelizeBuild: false
+      # Urutan dependensi (bukan manual): Xcode 16+ memperingatkan "Building
+      # targets in manual order is deprecated" untuk skema non-paralel, dan
+      # urutan app jam → app iPhone sudah dijamin oleh dependensi target.
+      parallelizeBuild: true
     run:
       config: Debug
     test:
@@ -295,7 +327,7 @@ schemes:
     build:
       targets:
         PointAndKnow Watch: all
-      parallelizeBuild: false
+      parallelizeBuild: true
     run:
       config: Debug
     archive:
