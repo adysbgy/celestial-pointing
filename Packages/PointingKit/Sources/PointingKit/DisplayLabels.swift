@@ -56,11 +56,14 @@ public enum DisplayLabel {
         if let match = catalogue.first(where: { $0.id == id }) {
             return match.name
         }
-        // Benda tata surya: id-nya `EphemerisBody.rawValue`, dan nama
-        // Bahasa Indonesianya sudah ada di sana (`displayName`) — bukan perlu
-        // karangan di sini.
+        // Benda tata surya: id-nya `EphemerisBody.rawValue`. Nama
+        // Bahasa Indonesianya sudah ada di engine (`displayName`), jadi
+        // bentuk defaultnya tidak dikarang di sini — dan bentuknya
+        // **dialokalkan** oleh `BodyName`, bukan dipakai apa adanya.
+        // `displayName` mentah akan membekukan `Saturnus` ke layar
+        // walau bahasa perangkat English; lihat `BodyName`.
         if let body = EphemerisBody(rawValue: id) {
-            return body.displayName
+            return BodyName.text(body)
         }
         // Tidak dikenal. `nil` — bukan id yang disamarkan jadi nama, dan
         // bukan nama yang ditebak dari id.

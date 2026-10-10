@@ -448,6 +448,26 @@ public final class PointingEngine: ObservableObject {
         snapshot.displayedObject(lastLocked: lastLockedObject)
     }
 
+    /// Nama objek yang ditampilkan, **dalam bahasa aktif**.
+    ///
+    /// **Kenapa accessor dan bukan `displayedObject?.name` di tiap view.**
+    /// `CelestialObject.name` adalah data engine, jadi ia memuat bentuk
+    /// Bahasa Indonesia yang dibekukan (`Saturnus`, `Bulan`, `Merkurius`,
+    /// `Matahari`). Lima tempat di `Apps/` membacanya langsung — kartu jam,
+    /// versi always-on, panel detail, Diagnostics, dan komplikasi — dan
+    /// kelima tempat itu akan menampilkan bentuk Indonesia walau bahasa
+    /// perangkat English.
+    ///
+    /// Bintang dan objek langit dalam **tidak** berubah: `Sirius` dan
+    /// `M42` memang nama bakunya. Aturan pengenalnya ada di `PointingKit`
+    /// (`DisplayLabel.objectName`) supaya bisa diuji di Linux; di sini
+    /// hanya meneruskan, sama seperti `displayedObject` di atas.
+    public func displayedObjectName(_ object: CelestialObject) -> String {
+        DisplayLabel.objectName(forObjectID: object.id,
+                                catalogue: controller.resolver.catalogue)
+            ?? object.name
+    }
+
     /// Apakah objek yang ditampilkan adalah sisa dari pandangan sebelumnya.
     ///
     /// **Kenapa bukan `snapshot.bestObject == nil`.** Mesin keadaan sengaja

@@ -47,7 +47,7 @@ struct ReducedLuminanceView: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                     }
-                    Text(object.name)
+                    Text(engine.displayedObjectName(object))
                         // Nama = informasi utama, jadi `title2` (besar & tebal).
                         // Bukan `.system(size: 20)`: angka tetap mengabaikan
                         // Dynamic Type, jadi pengguna yang memperbesar teks tetap
@@ -168,7 +168,7 @@ struct ReducedLuminanceView: View {
             parts.append(TextLocalization.text(.confidenceUncertainMarker))
         }
         if let object = engine.displayedObject {
-            parts.append(object.name)
+            parts.append(engine.displayedObjectName(object))
         }
         parts.append(engine.snapshot.state.shortLabel)
         // Peringatan keselamatan ikut diucapkan: ia alasan teleskop tidak

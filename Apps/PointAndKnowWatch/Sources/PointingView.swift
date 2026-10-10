@@ -78,6 +78,7 @@ struct PointingView: View {
                                          // gerbang tampilannya berubah.
                                          level: engine.snapshot.answeredLevel,
                                          isStale: engine.isDisplayingStaleObject,
+                                         displayName: engine.displayedObjectName(object),
                                          // **Bukan** `!isStale`: `.uncertain`
                                          // punya jawaban tapi engine menyatakan
                                          // diri kurang yakin, dan `hasAnswer`
@@ -374,6 +375,17 @@ struct ObjectDetailView: View {
     let object: CelestialObject
     let level: ConfidenceLevel?
     let isStale: Bool
+    /// Nama untuk ditampilkan, **dalam bahasa aktif**.
+    ///
+    /// Lewat parameter, sama seperti `object` di atas: nama yang tampil
+    /// harus melewati katalog, sedangkan `object.name` adalah data engine
+    /// yang memuat bentuk Indonesia (`Saturnus`, `Bulan`). Membacanya
+    /// langsung di dalam view membuat nama ikut berbahasa Indonesia walau
+    /// perangkat berbahasa English.
+    ///
+    /// Nilai bawaannya `object.name`, supaya panel yang memanggil tanpa
+    /// meneruskan tetap menampilkan **nama**, bukan string kosong.
+    var displayName: String?
     /// Model gambar untuk objek ini.
     ///
     /// Lewat parameter, bukan diambil dari engine di dalam view: panel ini
@@ -478,7 +490,7 @@ struct ObjectDetailView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
-                    Text(object.name)
+                    Text(objectDisplayName)
                         // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
                         // tebal di kartu, karena inilah yang dicari pengguna.
                         .font(.title3.bold())
@@ -552,12 +564,21 @@ struct ObjectDetailView: View {
         .accessibilityLabel(detailAccessibilityLabel)
     }
 
+    /// Nama untuk tampil dan diucapkan: `displayName` bila diteruskan,
+    /// kalau tidak `object.name`.
+    ///
+    /// Satu tempat, bukan dua baris `??` di view dan label — kalau hanya
+    /// teks yang dilokalkan tapi label tidak, VoiceOver akan membacakan
+    /// nama berbeda dari yang terlihat, dan itu cacat yang lebih buruk
+    /// daripada nama yang salah bahasa.
+    private var objectDisplayName: String { displayName ?? object.name }
+
     /// Label panel objek untuk VoiceOver.
     ///
     /// `mag`, `RA`, dan `Dec` diucapkan lengkap ("magnitudo", bukan "mag"):
     /// singkatan yang hanya masuk akal secara visual tidak terbaca.
     private var detailAccessibilityLabel: String {
-        var parts = [object.name]
+        var parts = [objectDisplayName]
         if let level, !isStale {
             parts.append(ObjectSpeech.confidence(level))
         }

@@ -342,8 +342,8 @@ struct DiagnosticsView: View {
                                 // diperbaiki di `swift-ui-lint.sh`), dan
                                 // urutan kata terkunci di kode — bahasa lain
                                 // tidak bisa menaruh penanda di depan nama.
-                                ? ObjectSpeech.staleDisplayName(object.name)
-                                : object.name)
+                                ? ObjectSpeech.staleDisplayName(engine.displayedObjectName(object))
+                                : engine.displayedObjectName(object))
                         // Panel besar: di iPhone ada ruang untuk gambar penuh,
                         // dan justru di tempat pengguna memeriksa "apakah ini
                         // benar?" picture lebih cepat dibaca daripada teks.
@@ -362,6 +362,7 @@ struct DiagnosticsView: View {
                         if let visual = engine.visualForDisplayedObject {
                             LockArrivalPanel(visual: visual,
                                              object: object,
+                                             displayName: engine.displayedObjectName(object),
                                              isStale: engine.isDisplayingStaleObject,
                                              // **Bukan** `!isStale`: selama
                                              // `.uncertain` engine punya
@@ -740,6 +741,13 @@ struct DiagnosticsView: View {
 
         let visual: CelestialVisual
         let object: CelestialObject
+        /// Nama dalam bahasa aktif, dari
+        /// `PointingEngine.displayedObjectName`.
+        ///
+        /// Lewat parameter, sama seperti `object`: `object.name` memuat
+        /// bentuk Bahasa Indonesia yang dibekukan, jadi membacanya langsung
+        /// membuat panel ini menampilkan `Saturnus` di perangkat English.
+        var displayName: String?
         let isStale: Bool
         /// Apakah gambar boleh mengklaim identitas — ambang **lebih ketat**
         /// daripada `!isStale` (lihat `PointingSnapshot.confirmsIdentity`).
@@ -868,7 +876,7 @@ struct DiagnosticsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         // Nama = informasi utama: paling besar.
-                        Text(object.name)
+                        Text(displayName ?? object.name)
                             .font(.title2.bold())
                         // Badge keyakinan — permukaan yang **sama** dengan app
                         // jam, memakai `level.tone` yang sama. Ia hanya muncul
@@ -937,7 +945,8 @@ struct DiagnosticsView: View {
                     includeTechnicalDetails: false,
                     visual: visual,
                     isConfirmed: isConfirmed,
-                    level: level))
+                    level: level,
+                    displayName: engine.displayedObjectName(object)))
             }
         }
     }
@@ -972,8 +981,17 @@ struct DiagnosticsView: View {
                                   // persis sedang disembunyikan gambarnya.
                                   // Dijaga `Aturan 18`.
                                   isConfirmed: Bool = false,
-                                  level: ConfidenceLevel? = nil) -> String {
-        var parts = [object.name]
+                                  level: ConfidenceLevel? = nil,
+                                  /// Nama dalam bahasa aktif, dari
+                                  /// `PointingEngine.displayedObjectName`.
+                                  ///
+                                  /// `nil` → `object.name`. Sengaja opsional
+                                  /// supaya pemanggil yang belum punya
+                                  /// engine tetap bisa memakai fungsi ini,
+                                  /// dan tidak ada baris yang tiba-tiba
+                                  /// berubah bunyinya.
+                                  displayName: String? = nil) -> String {
+        var parts = [displayName ?? object.name]
         // Tingkat keyakinan ikut diucapkan, sama seperti badge-nya ikut
         // digambar. Keduanya memakai ambang yang sama (`!stale`): pada objek
         // sisa, "Yakin" di sebelahnya terdengar sebagai klaim keyakinan atas

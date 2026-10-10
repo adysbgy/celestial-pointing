@@ -3433,6 +3433,83 @@
         }
       }
     },
+    "object.body.jupiter.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Jupiter).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        }
+      }
+    },
+    "object.body.mars.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Mars).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        }
+      }
+    },
+    "object.body.mercury.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Merkurius).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mercury"
+          }
+        }
+      }
+    },
+    "object.body.moon.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Bulan).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moon"
+          }
+        }
+      }
+    },
+    "object.body.saturn.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Saturnus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturn"
+          }
+        }
+      }
+    },
+    "object.body.sun.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Matahari).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
+          }
+        }
+      }
+    },
+    "object.body.venus.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Venus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        }
+      }
+    },
     "object.display.coordinates": {
       "comment": "Koordinat untuk baris jenis objek di kartu jam — bentuk LAYAR (pakai tanda derajat), bukan bentuk suara. Semula literal String(format:) di dalam view, yang tidak terlihat Aturan 4 maupun Aturan 6.",
       "localizations": {
