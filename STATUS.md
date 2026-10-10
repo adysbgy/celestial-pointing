@@ -1,3 +1,67 @@
+## Progres terakhir (10 Okt 2026 — shadowFraction mode malam akhirnya diikat langsung: cacat kelas "threshold tak tergate langsung")
+
+### Cacatnya: konstanta kecerahan piringan gelap mode malam tidak diikat nilainya
+
+`NightVisual.shadowFraction` (0.5) menentukan pecahan kanal merah siang yang
+dipertahankan untuk bagian gelap Bulan di mode malam (`NightVisual.shadow`
+mengalikan kanal merah siang dengan konstanta ini). Ia adalah satu-satunya
+pengatur seberapa gelap piringan gelap bulan saat mode malam menyala — dan
+docstring-nya sendiri mengakui ia hanya dijaga *tidak langsung* lewat uji
+kontras (`testNightShadowKeepsTheMoonPhaseReadable`), bukan lewat nilainya.
+
+Itu persis kelas cacat "threshold tak tergate langsung" yang dikejar repo ini:
+nilainya (0.5 → 0.6 agar "lebih terlihat", atau 0.2 agar "lebih hitam") bisa
+diam-diam diubah, seluruh kecerahan piringan gelap Bulan di mode malam bergeser,
+tanpa satu uji pun yang menyebut namanya. Uji kontras hanya menangkap kalau
+kontrasnya runtuh di bawah 4.5:1 — bukan kalau angkanya digeser ke arah yang
+masih lolos ambang.
+
+### Perbaikannya: dua uji di `NightVisualTests.swift`, nol baris produksi
+
+- `testShadowFractionIsExactlyHalf` — mengikat **konstanta itu sendiri**, bukan
+  cuma sifatnya. Ini yang menangkap angka diganti (0.5 → 0.6 atau 0.2).
+- `testShadowSurfaceIsDerivedFromShadowFraction` — arah sebaliknya: memastikan
+  `shadow` benar-benar mengalikan warna siang dengan `shadowFraction`, bukan
+  menulis `0.5` menyatu di dalamnya. Tanpa ini, konstanta boleh diganti jadi
+  `1.0` sementara `shadow` tetap menulis `0.5` — uji nilai merah, tapi gambar
+  yang sampai ke layar tidak berubah sedikit pun. Ini pola ganda yang sama
+  dengan `maximumClaimedAge` dan `clusterCoreReferenceExtent`.
+
+`accuracy: 0.004` mengizinkan galat pembulatan 8-bit (terburuk 0.003 terukur)
+tanpa melemahkan ikatan: nilai yang benar (`day.nightModeBrightness × 0.5`) duduk
+tepat di nol.
+
+### Yang TIDAK diklaim
+
+- Kedua uji ini menjaga **nilai dan kabel** konstanta, bukan kebenaran
+  astronomis pecahan 0.5 itu. Kalau kelak `shadowFraction` diubah **beserta**
+  uji ini dan kontras sabitnya, gerbang ini hijau — yang dijaga adalah ketiganya
+  tidak boleh bercerai.
+- `shadow` (di `NightVisual`) tidak disentuh; hanya `shadowFraction` yang
+  diikat nilainya. Tidak ada satu baris pun kode produksi yang berubah.
+
+### Hitungan (terukur, bukan diklaim)
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 206 | **206** |
+| PointingKit | 713 | **715** (+2 gerbang shadowFraction) |
+| Aturan UI | 30 | 30 (Aturan 10 memaksa README 713→715) |
+
+### Verifikasi
+
+  - `swift test --filter NightVisualTests` (Docker Swift 6.0) → **13 uji, 0 gagal**,
+    kedua uji baru lolos.
+  - `./swift-test.sh` PointingKit → **715 hijau** (713 + 2); CelestialEngine
+    **206 hijau** (tak disentuh).
+  - `./swift-ui-lint.sh` → **30 aturan bersih** (Aturan 10 memaksa README
+    713→715, sudah disinkronkan).
+  - `./swift-typecheck.sh` → lulus.
+  - CI: Apple Build `38045712691` **success**; Engine Tests (Linux) `38045712700`
+    masih berjalan saat entri ini ditulis (sweep harness mutasi berat).
+
+---
+
 ## Progres terakhir (10 Okt 2026 — ambang maximumClaimedAge akhirnya diikat: cacat kelas "threshold tak tergate langsung")
 
 ### Cacatnya: konstanta umur basi complication tidak punya satu pun uji yang menyebutnya
