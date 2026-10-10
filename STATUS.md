@@ -1,3 +1,96 @@
+## Progres terakhir (10 Okt 2026 — identitas fisik warna kabut malam akhirnya diuji: klaim jenis yang hanya di docstring)
+
+### Cacatnya: enam warna kabut malam punya identitas fisik yang tak satu pun uji menyebutnya
+
+`NightVisual.accents` mendefinisikan enam warna objek langit dalam untuk mode
+malam (`NightVisual.swift:319–329`), masing-masing dengan klaim fisik di
+docstring-nya:
+
+- `deepSkyNebula` (0.88/0.44/0.50) — Hα nebula emisi, **merah muda**
+- `deepSkyPlanetaryNebula` (0.42/0.78/0.86) — O III, **biru-hijau** (biru tertinggi!)
+- `deepSkyGalaxy` (0.82/0.78/0.70) — galaksi miring, **krem**
+- `deepSkySpiralGalaxy` (0.48/0.58/0.96) — galaksi spiral, **biru**
+- `deepSkyOpenCluster` (0.95/0.97/1.00) — gugus terbuka, **putih-biru**
+- `deepSkyGlobularCluster` (0.93/0.74/0.42) — gugus bola, **kuning-oranye**
+
+Docstring `deepSkyColour(for:)` (baris 482) menyatakan tegas: *"warna ini
+adalah klaim jenis yang sama kuatnya dengan bentuknya"* — rona malam yang
+salah menyatakan "ini nebula emisi" sama kerasnya dengan menggambar cangkang
+berongga. Artinya identitas warnanya punya bobot kejujuran PRD §2.
+
+`Tools/sweep-unconsumed.sh` melaporkan keenam `deepSky*` sebagai `test=0`
+(di `NightVisual.swift:319–329`). Memang ada `testDeepSkyColoursStayPureRedAtNight`
+yang memanggil `deepSkyColour(for:)` — **tetapi hanya** menegaskan `green == 0`
+dan `blue == 0` (kemurnian merah). Ia tidak menyentuh hue sama sekali.
+
+Akibatnya: menukar `deepSkyPlanetaryNebula` ke nilai nebula emisi (atau
+sebaliknya) tetap lolos **seluruh** uji malam yang ada. Layar malam akan
+menampilkan M27 (nebula planetari) dengan rona Hα merah muda padahal klaimnya
+O III — gambar lebih yakin daripada teksnya, persis kelas yang dilarang PRD §2,
+dan persis pola "warna hanya diuji kemurniannya, bukan identitasnya" yang
+dikejar repo ini.
+
+### Perbaikannya: satu uji yang mengunci hue, bukan cuma nol-hijau/biru
+
+`testNightDeepSkyColoursKeepTheirPhysicalIdentity` (baru) memanggil
+`CelestialVisual.deepSkyColour(for:)` — **jalur yang sama dengan layar**,
+bukan `surface` yang membuang hue — lalu menegaskan arah hue tiap morfologi:
+nebula merah > biru; O III biru tertinggi (`blue >= green`, karena nilai
+terukur 0.42/0.78/0.86 punya biru tertinggi, bukan hijau); galaksi krem
+seimbang; spiral biru tertinggi; gugus terbuka putih-biru (biru tertinggi &
+merah > 0.8); gugus bola merah > biru.
+
+Ambangnya **longgar secara sengaja**: yang dijaga adalah arah hue yang benar,
+bukan ketepatan 8-bit. Kalau suatu hari paletnya diganti **beserta** klaim
+docstring dan uji ini, gerbang ini hijau — yang dijaga adalah ketiganya tidak
+boleh bercerai.
+
+### Pelajaran: gerbang ini sempat merah pada kode yang benar (dan itu bagus)
+
+Predikat pertama saya tulis "O III: hijau tertinggi" **dari ingatan komentar**,
+bukan dari nilai. Gerbangnya **merah**: `RGBComponents(red: 0.42, green: 0.78,
+blue: 0.86)` punya biru tertinggi. Itu persis kelas cacat "komentar mengutip
+angka yang tidak pernah ia ukur" yang sudah berulang di repo ini — gerbang saya
+sendiri nyaris jadi contohnya. Predikat dan komentar disesuaikan ke nilai
+**terukur** (biru-hijau, `blue >= green`), dan kejadian itu dicatat jujur di
+docstring uji agar tidak terulang.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 208 | **208** (tak disentuh) |
+| PointingKit | 715 | **716** (+1 uji identitas warna kabut) |
+| Aturan UI | 30 | 30 (Aturan 10 memaksa README 715→716) |
+
+### Verifikasi
+
+- `./swift-test.sh` → **CelestialEngine 208 + PointingKit 716 hijau**, 0 gagal.
+  Uji baru berjalan (Docker, bukan sekadar terkompilasi) dan `passed`.
+- `./swift-ui-lint.sh` → **30 aturan bersih** (Aturan 10 sinkron 716).
+- CI: **Engine Tests (Linux) `38049453574` success** + **Apple Build
+  `38049453549` success** (tanpa warning compiler kode sendiri; hanya anotasi
+  depresiasi Node 20→24 yang tak relevan).
+- Tidak ada satu baris pun kode produksi yang berubah — hanya uji + README.
+
+### Catatan konkurensi
+
+Sama seperti siklus sebelumnya: agent kedua (`xcode-dev-runner.sh`) punya WIP
+tak ter-commit di `.github/workflows/engine-tests.yml`, `Tools/check-visuals.py`,
+dan untracked `Tools/bukti-mutasi-maria.py`. Saya `git stash` ketiganya sebelum
+commit, lalu `git stash pop` setelah push — commit saya hanya berisi
+`NightVisualTests.swift` + `README.md`.
+
+### Yang TIDAK diklaim
+
+- Uji ini menjaga **arah hue** tiap morfologi, bukan kebenaran astronomis angka
+  8-bit-nya. Kalau palet diubah beserta docstring dan uji ini, gerbang hijau.
+- Keenam warna sudah dipakai `deepSkyColour(for:)` yang bersifat `public
+  static` — saya tidak menambah jalur baru, hanya menutup celah pada jalur
+  yang sudah ada.
+
+---
+
 ## Progres terakhir (10 Okt 2026 — klem blendFactor PointingSmoother akhirnya diuji: contract perataan arah yang tak tergate)
 
 ### Cacatnya: invariant keamanan perataan arah tidak punya satu pun uji langsung
