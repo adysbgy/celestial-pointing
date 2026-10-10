@@ -204,6 +204,37 @@ final class NightVisualTests: XCTestCase {
                           "bagian gelap harus lebih redup dari permukaan yang sama")
     }
 
+    /// `shadowFraction` harus persis **0.5** — ikatan langsung ke konstanta.
+    ///
+    /// Docstring konstanta itu sendiri mengakui ia hanya dijaga *tidak
+    /// langsung* lewat uji kontras (`testNightShadowKeepsTheMoonPhaseReadable`),
+    /// bukan lewat nilainya. Kalau suatu hari angkanya diganti (0.5 → 0.6 agar
+    /// "lebih terlihat", atau 0.5 → 0.2 agar "lebih hitam"), seluruh kecerahan
+    /// piringan gelap Bulan di mode malam bergeser tanpa satu uji pun yang
+    /// menyebut namanya. Ini yang menangkap angka itu diam-diam berubah.
+    func testShadowFractionIsExactlyHalf() {
+        XCTAssertEqual(NightVisual.shadowFraction, 0.5,
+                       "pecahan kanal merah sisi gelap harus tetap 0.5; "
+                       + "ubah hanya bila kontras sabit ikut diukur ulang")
+    }
+
+    /// `shadow` harus benar-benar mengalikan warna siang dengan
+    /// `shadowFraction`, bukan menulis `0.5` menyatu di dalamnya.
+    ///
+    /// Arah sebaliknya dari ikatan nilai: tanpa ini, konstanta boleh diganti
+    /// menjadi `1.0` sementara `shadow` tetap menulis `0.5` di dalam — uji
+    /// nilai merah, tapi piringan gelap yang sampai ke layar tidak berubah
+    /// sedikit pun. Yang diukur di sini adalah hubungan
+    /// `shadow(day).red == day.nightModeBrightness * shadowFraction` (galat
+    /// pembulatan 8-bit).
+    func testShadowSurfaceIsDerivedFromShadowFraction() {
+        let day = CelestialVisual.accents.moonUnlit
+        let shadow = NightVisual.shadow(day)
+        let expected = min(1, max(0, day.nightModeBrightness)) * NightVisual.shadowFraction
+        XCTAssertEqual(shadow.red, expected, accuracy: 0.004,
+                       "shadow harus mengalikan kanal merah siang dengan shadowFraction")
+    }
+
     // MARK: - Bintang
 
     /// Konversi B−V → RGB tidak boleh membalik **terang** bintang.
