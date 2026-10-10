@@ -841,3 +841,38 @@ object and of events. Principle: the picture must not lie.
 - Performance on a real iPhone.
 - 3D on the watch: deliberately not done; the watch keeps its lightweight 2D
   visuals.
+
+## ADR-018 — Keep running when the screen turns away while pointing (2026-10-10)
+
+**Field report (Ady, real Series 10).** "When I follow the guide, it turns into
+something like ready / aiming."
+
+**Root cause.**
+1. Pointing at the sky with the forearm turns the screen away from the face, so
+   watchOS dims it and the scene becomes `.inactive`. The app called `stop()`
+   on `.inactive`: the sensors stopped and the flow reset to `idle`. Looking
+   back at the watch gave "Point at the sky".
+2. The dimmed screen (`ReducedLuminanceView`) only shows the state label
+   (`shortLabel`: "Ready" when idle, "Aiming" while moving), never the guide.
+   That is the "ready, aiming" in the report.
+3. The hot–cold taps had a `!isLuminanceReduced` condition and were wired
+   inside the content that is swapped out when dimmed. So they stopped exactly
+   while the arm was pointing at the sky.
+
+**Decision.**
+- **App lifecycle:** `.inactive` → keep running; `.background` → `stop()`.
+- **`PointingRuntimeSession`:** a `WKExtendedRuntimeSession` (physical therapy,
+  already declared for the Lab) starts when the app becomes active and ends at
+  background. It keeps motion and haptics running while the screen is dimmed,
+  for up to 1 hour per session.
+- **Dimmed screen:** while guiding, it shows the arrow, the degrees and
+  "Move to X".
+- **Hot–cold:** wired outside the dimmed-screen container, with no luminance
+  condition.
+
+**Not verified.**
+- Behaviour on a real wrist: does watchOS keep the app frontmost and keep
+  delivering motion at a reasonable rate while dimmed?
+- The Lab, which starts its own session: only one session can run per app,
+  so the Lab's session may fail while the main one is running. The app keeps
+  running either way.

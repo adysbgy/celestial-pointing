@@ -19,7 +19,6 @@ struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(SkyQualityStorage.darkSkyKey) private var darkSkyHome = false
     @AppStorage(HotColdTicker.enabledKey) private var hotColdEnabled = true
-    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @StateObject private var ticker = HotColdTicker()
     /// Posisi Digital Crown di antara kandidat (ADR-014).
     @State private var crown = 0.0
@@ -67,8 +66,6 @@ struct HomeView: View {
                     .animation(reduceMotion ? nil : .smooth(duration: 0.35), value: heroKey)
                 }
                 .onChange(of: heroKey) { _, _ in crown = 0 }
-                .onChange(of: tickerSeparation) { _, sep in ticker.update(separationDeg: sep) }
-                .onDisappear { ticker.update(separationDeg: nil) }
                 .fontDesign(.rounded)
                 .task {
                     // Langit bergeser pelan; sekali per menit cukup.
@@ -107,8 +104,13 @@ struct HomeView: View {
                 }
             }
         } reduced: {
-            ReducedLuminanceView(engine: engine)
+            ReducedLuminanceView(engine: engine, hint: activeGuideHint)
         }
+        // Di luar wadah layar redup: saat lengan menunjuk langit layar
+        // meredup dan isi utama diganti, tapi getaran panas–dingin justru
+        // harus terus berjalan (ADR-018).
+        .onChange(of: tickerSeparation) { _, sep in ticker.update(separationDeg: sep) }
+        .onDisappear { ticker.update(separationDeg: nil) }
     }
 
     // MARK: Pahlawan per keadaan
@@ -132,14 +134,20 @@ struct HomeView: View {
 
     private var currentHint: GuideHint? { guide.hint(for: engine.snapshot.calibratedPointing) }
 
-    /// Jarak untuk getaran panas–dingin: hanya saat cincin petunjuk tampil,
-    /// layar menyala, dan pengguna tidak mematikannya. Dibulatkan ke derajat
+    /// Jarak untuk getaran panas–dingin: saat cincin petunjuk berlaku dan
+    /// pengguna tidak mematikannya — **termasuk** saat layar redup karena
+    /// lengan menunjuk langit (ADR-018). Dibulatkan ke derajat
     /// supaya `onChange` tidak berbunyi 50 kali per detik.
     private var tickerSeparation: Int? {
-        guard hotColdEnabled, !isLuminanceReduced, heroKey == "guide" || heroKey == "moving-guide" || heroKey == "pinned"
-                || heroKey.hasPrefix("guide-one-"),
-              let hint = currentHint else { return nil }
+        guard hotColdEnabled, let hint = activeGuideHint else { return nil }
         return Int(hint.separationDeg.rounded())
+    }
+
+    /// Petunjuk yang sedang dipakai cincin (untuk layar redup dan getaran).
+    private var activeGuideHint: GuideHint? {
+        guard heroKey == "guide" || heroKey == "moving-guide" || heroKey == "pinned"
+                || heroKey.hasPrefix("guide-one-") else { return nil }
+        return currentHint
     }
 
     /// Identitas pahlawan untuk animasi peralihan (bukan per sampel sensor).

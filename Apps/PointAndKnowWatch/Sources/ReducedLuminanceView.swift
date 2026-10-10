@@ -21,10 +21,29 @@ import PointingKit
 struct ReducedLuminanceView: View {
 
     @ObservedObject var engine: PointingEngine
+    /// Petunjuk arah yang sedang berlaku (ADR-018). Saat lengan menunjuk
+    /// langit layar justru redup, jadi panah dan jaraknya harus ada di sini —
+    /// dulu layar ini hanya bertuliskan keadaan ("Siap", "Menunjuk").
+    var hint: GuideHint? = nil
 
     var body: some View {
         ScrollView {
             VStack(spacing: 4) {
+                if let hint, engine.displayedObject == nil {
+                    Image(systemName: "location.north.fill")
+                        .font(.largeTitle)
+                        .rotationEffect(.degrees(hint.arrowDeg))
+                        .foregroundStyle(SurfacePalette.active.textPrimaryColor)
+                        .accessibilityHidden(true)
+                    Text(verbatim: WatchHomeText.degrees(hint.separationDeg))
+                        .font(.title2.bold())
+                        .monospacedDigit()
+                        .foregroundStyle(SurfacePalette.active.textPrimaryColor)
+                    Text(WatchHomeText.guideTitle(hint.name))
+                        .font(.footnote)
+                        .foregroundStyle(SurfacePalette.active.textPrimaryColor)
+                        .multilineTextAlignment(.center)
+                }
                 // Nama objek: satu-satunya informasi yang paling mungkin dicari
                 // pengamat saat layar redup.
                 if let object = engine.displayedObject {

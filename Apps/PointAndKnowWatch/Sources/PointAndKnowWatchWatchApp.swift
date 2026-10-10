@@ -33,6 +33,8 @@ struct PointAndKnowWatchApp: App {
     @StateObject private var link = WatchLinkService()
     @StateObject private var location = LocationProvider()
     @StateObject private var telescope = TelescopeControlStore()
+    /// Tetap berjalan saat layar berpaling dari wajah (ADR-018).
+    @StateObject private var runtime = PointingRuntimeSession()
 
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
     @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
@@ -72,10 +74,18 @@ struct PointAndKnowWatchApp: App {
             switch phase {
             case .active:
                 start()
-            case .inactive, .background:
+                runtime.start()
+            case .inactive:
+                // Layar redup karena lengan menunjuk langit — justru saat itu
+                // pengguna sedang memakai app. Sensor dan alur tetap jalan
+                // (ADR-018); dulu di sini `stop()` dan alur kembali ke awal.
+                break
+            case .background:
                 stop()
+                runtime.stop()
             @unknown default:
                 stop()
+                runtime.stop()
             }
         }
     }
