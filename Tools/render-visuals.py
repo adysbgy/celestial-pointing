@@ -1198,9 +1198,28 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
     #    dengan menghapus cincinnya: tetap "OK, 3904 piksel berbeda".
     #
     # Urutan view Swift adalah sumber kebenarannya: `drawPlanet` menggambar
-    # bola radius penuh lebih dulu, lalu `guard isConfirmed` **sebelum**
-    # cabang ciri — jadi saat ragu yang tersisa memang hanya bola.
-    _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"], night_mode)
+    # bola lebih dulu (radius penuh, kecuali Saturnus terkunci — lihat di
+    # bawah), lalu `guard isConfirmed` **sebelum** cabang ciri — jadi saat ragu
+    # yang tersisa memang hanya bola.
+    # **Bola radius penuh — kecuali Saturnus yang sudah terkunci.**
+    #
+    # Sampai siklus ini baris ini menggambar bola 1.0 R **juga** pada kasus
+    # cincin, sementara `_draw_rings` menggambar bolanya sendiri pada
+    # `saturn_body_radius` (0.53 R). Yang sampai ke gambar jadi **dua**
+    # piringan bersarang: cakram 1.0 R yang bocor ke seluruh frame di luar
+    # bidang cincin, di bawah bola 0.53 R milik cincinnya. Terukur pada
+    # 200 px: **seluruh** 12 712 piksel di luar elips cincin menyala — di
+    # kutub atas dan bawah, di tempat yang seharusnya hanya latar.
+    #
+    # Gerbang yang mengklaim menjaga ini ("cincin Saturnus lebih lebar dari
+    # bola", ambang `reach > 0.8`) tetap hijau **walaupun cincinnya dihapus
+    # seluruhnya**, karena cakram bocor itu sendiri menjangkau 1.0 R. Jadi
+    # cacat ini tidak pernah bisa terlihat dari gerbang mana pun.
+    #
+    # Kasus **ragu** tetap memakai bola radius penuh — di sana tidak ada
+    # cincin yang menggambar bolanya.
+    if not (kw.get("is_confirmed") is not False and palette["feature"] == "rings"):
+        _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"], night_mode)
     if kw.get("is_confirmed") is False:
         return
     feature = palette["feature"]

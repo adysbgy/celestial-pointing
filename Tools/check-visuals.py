@@ -1620,6 +1620,31 @@ def check_port_matches_swift_constants(results):
         ("pita cincin: view tidak lagi memakai elips hitam sebagai celah",
          "Color.black.opacity(0.28)" not in view, True,
          "style: FillStyle(eoFill: true)", view),
+        # **Saturnus hanya boleh punya satu piringan bola.**
+        #
+        # `drawRings` menggambar bolanya **sendiri** pada
+        # `VisualFrame.saturnBodyRadius` (0.53 R) — lihat docstring-nya:
+        # "kalau bola tetap memakai radius frame penuh sementara cincin mengisi
+        # frame, bola menutupi cincin dan hasilnya piring, bukan Saturnus".
+        # `drawPlanet` tetap menggambar bola 1.0 R lebih dulu, jadi yang sampai
+        # ke layar adalah **dua** piringan bersarang: cakram 1.0 R yang bocor
+        # ke seluruh frame di luar bidang cincin, di bawah bola 0.53 R milik
+        # cincinnya.
+        #
+        # Gerbang gambar untuk ini (`check_saturn_has_no_extra_disc`) hanya
+        # mengukur **port**. Kalau view-nya yang menyimpang, port tetap hijau
+        # sambil mengukur gambar yang tidak pernah tampil di jam — cacat yang
+        # persis sama dengan yang berkas ini ada untuk mencegah. Karena itu
+        # syaratnya di view diikat di sini, **dalam bentuk yang sama** dengan
+        # syarat di port (`is_confirmed is not False and feature == "rings"`),
+        # supaya kedua bahasa tidak bisa menyimpang diam-diam.
+        ("Saturnus: view melewatkan bola penuh di jalur cincin",
+         "!(isConfirmed && palette.feature == .rings)" in view, True,
+         "if !(isConfirmed && palette.feature == .rings) {", view),
+        ("Saturnus: port melewatkan bola penuh di jalur cincin",
+         'not (kw.get("is_confirmed") is not False' in port, True,
+         'if not (kw.get("is_confirmed") is not False and palette["feature"] == "rings")',
+         port, "render-visuals.py"),
         # Bintik Merah Besar. **Empat** angka ini dijaga, dan gerbang yang
         # `SPOT_RECT[0]` (-0.36) — nilai yang **kebetulan sama** di kedua
         # tafsir. Lariknya diperlakukan sebagai **pusat** di port Python,
@@ -4642,6 +4667,126 @@ def check_saturn_gap_reads_at_the_watch_size(results, ss=8):
             f"selisih terkecil {margin:+d} terhadap pita B {bright_b} / "
             f"pita A {outer_a} (celah {gap}); lebar nyata 0.0304 hanya "
             f"menghasilkan +5…+12 di ukuran ini"))
+
+
+def saturn_globe_geometry():
+    """Cincin dan bola Saturnus dalam satuan radius frame, dari port.
+
+    Satu tempat, dipakai `check_saturn_has_no_extra_disc` (yang mengukur
+    gambar) — supaya geometri yang dipakai untuk **memutuskan mana piksel
+    yang seharusnya kosong** tidak bisa menyimpang dari geometri yang
+    **menggambar**.
+    """
+    ring = R.saturn_ring()
+    return {
+        "axial": ring["half_height"] / ring["half_width"],
+        "body": R.saturn_body_radius(ring),
+    }
+
+
+def saturn_pixels_outside_ring_and_globe(size, ss):
+    """Piksel menyala di luar (bidang cincin ∪ piringan bola) Saturnus.
+
+    Mengembalikan `(jumlah_menyala, jumlah_sampel, contoh_koordinat)`.
+
+    **Kenapa gabungan dua bentuk, bukan cincinnya saja.** Bola Saturnus yang
+    benar memang menjulur keluar bidang cincin di kutub atas dan bawah — ia
+    bola 0.53 R, sedangkan cincin hanya setinggi 0.31 R. Jadi "menyala di
+    luar cincin" bukan cacat; "menyala di luar cincin **dan** di luar bola"
+    yang cacat. Dua bentuk itu adalah satu-satunya yang boleh ada di gambar
+    Saturnus yang terkunci, dan keduanya dibaca dari model.
+    """
+    _, (w, h, rows) = render_case("planet-saturn-confirmed", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    geometry = saturn_globe_geometry()
+    axial, body = geometry["axial"], geometry["body"]
+
+    lit = samples = 0
+    first = None
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            # Luar frame dibuang: `Canvas` memotong di sana, jadi pikselnya
+            # bukan pernyataan tentang apa pun.
+            if ux * ux + uy * uy > 0.95 * 0.95:
+                continue
+            # Margin pada cincin: pita terluar di-antialias, dan tepinya
+            # memang berada tepat di radius 1.0 cincin.
+            if ux * ux + (uy * uy) / (axial * axial) <= 1.15:
+                continue
+            if ux * ux + uy * uy <= (body + 0.05) ** 2:
+                continue
+            samples += 1
+            if is_bright(rows[y][x * 4:x * 4 + 3], background):
+                lit += 1
+                if first is None:
+                    first = (round(ux, 3), round(uy, 3))
+    return lit, samples, first
+
+
+def check_saturn_has_no_extra_disc(results, size=200, ss=2):
+    """Saturnus yang terkunci hanya boleh punya **satu** piringan bola.
+
+    **Cacat yang ditutup pemeriksaan ini.** `drawPlanet` menggambar bola
+    radius penuh (1.0 R) lebih dulu, lalu — pada cabang cincin — `drawRings`
+    menggambar bolanya **sendiri** pada `VisualFrame.saturnBodyRadius`
+    (0.53 R). Yang sampai ke layar jadi **dua** piringan bersarang: cakram
+    1.0 R yang bocor ke seluruh frame di luar bidang cincin, di bawah bola
+    0.53 R milik cincinnya. Terukur pada 200 px, ss=2: **14 144 dari 14 144**
+    piksel di luar gabungan (bidang cincin ∪ piringan bola) menyala — di
+    kutub atas dan bawah, di tempat yang seharusnya hanya latar. Di kartu jam
+    itu terbaca sebagai "dua bola bersarang", bukan Saturnus.
+
+    **Kenapa tidak ada gerbang lain yang menangkapnya.** Yang paling dekat
+    adalah `check_planet_features_present`, yang menuntut
+    `max_radius_of_bright > 0.8 R` untuk membuktikan cincinnya lebih lebar
+    dari bola. Ambang itu **dilewati oleh cacat ini**: cakram bocor itu
+    sendiri menjangkau 1.0 R. Dibuktikan dengan menghapus cincin Saturnus
+    seluruhnya dari port — `check_features_disappear_when_uncertain` merah
+    (benar), tetapi `check_planet_features_present` **tetap hijau**. Jadi
+    gerbang itu tidak bisa membedakan "cincin tergambar" dari "ada bentuk
+    selebar cincin", dan selama itu benar, cacat dua piringan ini tidak
+    punya satu pun pengukur.
+
+    **Kenapa ambangnya nol, bukan "kecil".** Sisa yang sah di daerah itu
+    tidak ada: cincin berhenti di 1.0 R (dengan margin 1.15 di sini) dan bola
+    berhenti di 0.53 R. Sisa bukan nol berarti ada bentuk yang tidak
+    seharusnya ada, berapa pun kecilnya. Nol terukur pada kedua ukuran
+    (200 px dan ukuran kartu jam), jadi ambang yang lebih longgar hanya akan
+    menyembunyikan cacat yang sama dalam bentuk yang lebih tipis.
+
+    **Ukurannya dua, bukan satu.** Sama alasannya dengan
+    `check_saturn_gap_reads_at_the_watch_size`: bentuk yang lenyap di 38 pt
+    tetap hijau di 200 px. Ukuran jamnya dibaca dari token
+    (`WatchMetrics.visualDiameter`), dan kalau tokennya hilang pemeriksaan
+    ini **merah**, bukan hijau tanpa mengukur apa pun.
+    """
+    lit, samples, first = saturn_pixels_outside_ring_and_globe(size, ss)
+    results.append(Result(
+        f"Saturnus: tidak ada piringan kedua @{size}px",
+        samples > 0 and lit == 0,
+        f"{lit} dari {samples} piksel menyala di luar cincin dan bola"
+        + (f", pertama di ({first[0]:+.3f}, {first[1]:+.3f}) R" if first else "")
+        + ("" if samples else " — daerah ukurnya kosong, jadi gerbang ini "
+           "tidak mengukur apa pun")))
+
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "Saturnus: ukuran jam terbaca dari token (piringan kedua)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2          # poin → piksel; jam menggambar @2x
+    lit_w, samples_w, first_w = saturn_pixels_outside_ring_and_globe(pixels, ss)
+    results.append(Result(
+        f"Saturnus: tidak ada piringan kedua @{pixels}px (ukuran jam)",
+        samples_w > 0 and lit_w == 0,
+        f"{lit_w} dari {samples_w} piksel menyala di luar cincin dan bola"
+        + (f", pertama di ({first_w[0]:+.3f}, {first_w[1]:+.3f}) R"
+           if first_w else "")))
 
 
 def spiral_arm_radii_all():
@@ -8781,6 +8926,7 @@ def main():
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
+    check_saturn_has_no_extra_disc(results, args.size, args.ss)
     check_spiral_arms_stay_continuous(results)
     check_planetary_nebula_shell_is_continuous(results)
     check_dumbbell_nebula_is_an_elongated_shell(results)

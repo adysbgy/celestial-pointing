@@ -267,8 +267,37 @@ struct CelestialVisualView: View {
             return
         }
 
-        drawSphere(context: context, center: center, radius: radius,
-                   from: palette.light, to: palette.dark)
+        // **Bola radius penuh — kecuali Saturnus yang sudah terkunci.**
+        //
+        // Cincin Saturnus menggambar bolanya **sendiri**, pada
+        // `VisualFrame.saturnBodyRadius` (0.53 R). Lihat `drawRings`, dan
+        // lihat docstring `saturnBodyRadius`: "kalau bola tetap memakai radius
+        // frame penuh sementara cincin mengisi frame, bola menutupi cincin dan
+        // hasilnya piring, bukan Saturnus".
+        //
+        // Sampai siklus ini baris ini tetap menggambar bola 1.0 R **juga** pada
+        // kasus itu, jadi yang sampai ke layar adalah **dua** piringan: cakram
+        // 1.0 R yang bocor ke seluruh frame di luar bidang cincin, di bawah
+        // bola 0.53 R milik cincinnya. Terukur pada 200 px: **seluruh** 12 712
+        // piksel di luar elips cincin menyala — di kutub atas dan bawah
+        // piringan, di tempat yang seharusnya hanya latar. Di kartu jam itu
+        // terbaca sebagai "dua bola bersarang", bukan Saturnus.
+        //
+        // Tidak satu pun gerbang menangkapnya, dan alasannya khas repo ini:
+        // pemeriksaan "cincin Saturnus lebih lebar dari bola" hanya menuntut
+        // jangkauan > 0.8 R, sementara **cakram bocor itu sendiri** menjangkau
+        // 1.0 R. Dibuktikan dengan menghapus cincinnya seluruhnya dari view:
+        // gerbang itu tetap hijau. Cacat ini lolos justru karena ada bentuk
+        // lain yang kebetulan selebar cincin.
+        //
+        // Kasus **ragu** tetap memakai bola radius penuh: di sana tidak ada
+        // cincin yang menggambar bolanya, dan yang harus tampil memang hanya
+        // warnanya. Itu sebabnya syaratnya memuat `isConfirmed`, bukan hanya
+        // `palette.feature == .rings`.
+        if !(isConfirmed && palette.feature == .rings) {
+            drawSphere(context: context, center: center, radius: radius,
+                       from: palette.light, to: palette.dark)
+        }
         // Saat identitas belum pasti, hanya **warnanya** yang boleh tampil —
         // bentuknya tidak. Cincin Saturnus adalah penanda yang sama
         // meyakinkannya dengan pita Jupiter, jadi menampilkannya pada kandidat

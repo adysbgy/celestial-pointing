@@ -315,6 +315,31 @@ jobs:
       - name: Buktikan gerbang bola netral planet tak dikenal berbunyi
         run: python3 Tools/bukti-mutasi-bola-netral.py
 
+      # Dan bukti untuk gerbang **piringan kedua Saturnus** — gerbang yang
+      # menutup kelas cacat yang tidak bisa dilihat gerbang lain mana pun.
+      #
+      # `drawPlanet` menggambar bola 1.0 R, lalu `drawRings` menggambar
+      # bolanya sendiri pada 0.53 R; yang sampai ke layar dua piringan
+      # bersarang, dan cakram 1.0 R-nya bocor ke seluruh frame di luar bidang
+      # cincin. Gerbang terdekat ("cincin lebih lebar dari bola", ambang
+      # `reach > 0.8`) **buta** terhadapnya: cakram bocor itu sendiri
+      # menjangkau 1.0 R, jadi ambangnya dilewati — terukur, gerbang itu tetap
+      # hijau bahkan ketika cincinnya dihapus seluruhnya.
+      #
+      # **Harness ini sempat tidak berjalan di CI sama sekali**, dan itu
+      # bentuk kegagalan yang khas: berkasnya ada, isinya benar, dan tidak ada
+      # yang mengeksekusinya. Ia ditemukan karena daftar `Tools/bukti-mutasi-*`
+      # di disk (13) tidak sama dengan yang dirujuk alur kerja (12).
+      - name: Buktikan gerbang piringan kedua Saturnus berbunyi
+        run: python3 Tools/bukti-mutasi-piringan.py
+
+      # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
+      # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
+      # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di
+      # laporan CI. Diukur: 13 berkas di disk, 12 dirujuk.
+      - name: Setiap harness bukti-mutasi dijalankan CI
+        run: python3 Tools/check-harness-terdaftar.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
