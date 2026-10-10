@@ -333,6 +333,27 @@ jobs:
       - name: Buktikan gerbang piringan kedua Saturnus berbunyi
         run: python3 Tools/bukti-mutasi-piringan.py
 
+      # Dan bukti untuk gerbang **ciri planet berfase tidak bocor ke sisi
+      # gelap** — akibat dari pemotongan yang tidak diukur siapa pun.
+      #
+      # Kawah Merkurius dan kabut Venus digambar di dalam pita yang menyala di
+      # kedua bahasa, tapi sampai gerbang ini ada, tidak satu pun dari 666
+      # pemeriksaan mengukur **akibatnya**. Terukur: melepas `inside_lit` dari
+      # pemanggilan `_draw_craters` di port membuat kawah melompat keluar
+      # sabit — 2004 piksel menyala di belahan gelap pada 200 px, 71 di ukuran
+      # kartu jam — dan seluruh `check-visuals.py --check` tetap 0 gagal.
+      # Untuk Venus, melepas potongan kabutnya mengisi seluruh belahan gelap:
+      # 14714 piksel pada 200 px.
+      #
+      # Keadaan #3 adalah arah sebaliknya, dan justru yang paling penting:
+      # tanpa gerbang pasangannya, cara termurah memenuhi "nol piksel di
+      # belahan gelap" adalah berhenti menggambar cirinya sama sekali. Ia harus
+      # menyalakan **hanya** gerbang "masih tergambar", bukan gerbang
+      # pemotongan — kalau keduanya berbunyi, gerbangnya tidak memisahkan
+      # "dipotong" dari "dihapus", dan itu dua perbaikan yang berlawanan arah.
+      - name: Buktikan gerbang ciri planet berfase tidak bocor berbunyi
+        run: python3 Tools/bukti-mutasi-fase-ciri.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

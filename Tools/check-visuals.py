@@ -4374,6 +4374,198 @@ def check_phase_direction_on_the_waning_half(results, size=200, ss=2):
         f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}) pada sudut −pi/2"))
 
 
+#: Kasus planet berfase yang **punya ciri pengenal**, beserta fungsi yang
+#: menggambar ciri itu di port. Dipakai oleh pemeriksaan pemotongan di bawah.
+#:
+#: Ditulis sebagai pasangan (nama kasus, nama fungsi penggambar) dan **bukan**
+#: sebagai daftar sudut: sudutnya dibaca kembali dari `VisualCase` di
+#: `R.build_cases()`, supaya harness ini tidak bisa sepakat dengan dirinya
+#: sendiri saat sudut sisi terangnya berubah.
+PHASE_FEATURE_CASES = (("planet-mercury-crescent", "_draw_craters"),
+                       ("planet-venus-crescent", "venus_haze"))
+
+
+def _dark_side_bright_pixels(width, height, rows, angle, margin=0.05):
+    """Piksel **menyala** yang jatuh di belahan gelap pita berfase.
+
+    `angle` memakai konvensi `bright_limb_angle` (matematis, positif = sisi
+    terang ke atas), jadi proyeksinya lewat `R.draw_rotation_radians` — sama
+    persis dengan yang dipakai penggambar untuk memutar pitanya. Proyeksi
+    ternormalisasi `< -margin` berarti piksel ada di belahan yang
+    **berlawanan** dengan sisi terang.
+
+    Piksel "menyala" diukur terhadap latar sudut frame, dan hanya dihitung di
+    dalam piringan. Yang dicari bukan warna tertentu, melainkan **apa pun yang
+    tidak lagi latar** — supaya kawah, kabut, dan ciri apa pun yang ditambahkan
+    kelak ikut terjaga tanpa gerbang ini perlu tahu bentuknya.
+    """
+    background = background_of(width, height, rows)
+    rot = R.draw_rotation_radians(angle)
+    dx, dy = math.cos(rot), math.sin(rot)
+    cx, cy = width / 2.0, height / 2.0
+    radius = min(width, height) / 2.0
+    count = 0
+    for y in range(height):
+        row = rows[y]
+        for x in range(width):
+            px, py = x + 0.5 - cx, y + 0.5 - cy
+            if math.hypot(px, py) > radius:
+                continue
+            if not is_bright(row[x * 4:x * 4 + 3], background):
+                continue
+            if (px * dx + py * dy) / radius < -margin:
+                count += 1
+    return count
+
+
+def _lit_side_difference(width, height, rows_a, rows_b, angle, margin=0.05):
+    """Berapa piksel di belahan **menyala** yang berbeda antara dua gambar.
+
+    Dipakai untuk arah sebaliknya: membuktikan ciri masih **tergambar** di
+    sisi yang menyala, bukan dihapus. Mengukur di belahan menyala saja, karena
+    di situlah ciri itu memang harus terlihat.
+    """
+    rot = R.draw_rotation_radians(angle)
+    dx, dy = math.cos(rot), math.sin(rot)
+    cx, cy = width / 2.0, height / 2.0
+    radius = min(width, height) / 2.0
+    count = 0
+    for y in range(height):
+        row_a, row_b = rows_a[y], rows_b[y]
+        for x in range(width):
+            if row_a[x * 4:x * 4 + 3] == row_b[x * 4:x * 4 + 3]:
+                continue
+            px, py = x + 0.5 - cx, y + 0.5 - cy
+            if (px * dx + py * dy) / radius > margin:
+                count += 1
+    return count
+
+
+def check_phase_feature_stays_inside_the_lit_band(results, size=200, ss=2,
+                                                  watch=38, watch_ss=8):
+    """Ciri pengenal planet berfase tidak boleh **bocor ke sisi gelap**.
+
+    **Cacat yang ditutup pemeriksaan ini.** Kawah Merkurius dan kabut Venus
+    memang digambar **di dalam** pita yang menyala di kedua bahasa
+    (`_draw_craters(..., inside_lit=...)` di port, `inner.clip(to: lit)` di
+    view). Yang belum pernah ada adalah gerbang yang mengukur **akibatnya**:
+    bahwa tidak ada satu piksel pun dari ciri itu yang jatuh di belahan yang
+    tidak disinari. Terukur lewat `bukti-mutasi-fase-ciri.py`: dengan
+    `inside_lit` dilepas dari pemanggilan `_draw_craters` di port, gerbang
+    yang sudah ada (`check_inner_planet_phase` 5 pemeriksaan,
+    `check_planet_features_present` 3, `check_crater_drawing_constants`,
+    `check_crater_relief_matches_the_model`, `check_crater_floor_opacity_*`,
+    `check_features_survive_the_watch_size`) tetap **0 merah** — sementara
+    kawahnya kini melompat keluar sabit: **2004** piksel menyala di belahan
+    gelap pada 200 px, **71** di ukuran kartu jam. Untuk kabut Venus, melepas
+    potongannya mengisi seluruh belahan gelap: **14714** piksel pada 200 px.
+
+    Kenapa itu cacat dan bukan selera. Sabit Merkurius adalah **klaim
+    terukur**: fraksi iluminasi yang dihitung engine. Kawah yang menonjol
+    keluar dari sabit membuat bentuknya lebih lebar daripada fraksi itu — dan
+    tidak ada teks di kartu jam yang bisa membantahnya. Ini kelas yang sama
+    dengan Venus yang tergambar bulat (`check_inner_planet_phase`) dan fase
+    tak diketahui yang menyamar jadi bulan baru
+    (`check_unknown_phase_is_not_a_new_moon`): gambar yang **menyatakan lebih**
+    daripada yang dihitung.
+
+    **Kenapa dua ukuran.** 200 px adalah ukuran panel detail; 38 px adalah
+    piringan di kartu jam, satu-satunya ukuran yang penting bagi pengguna.
+    Cacat yang tidak terlihat di satu ukuran bisa dominan di ukuran lain —
+    sudah terjadi di repo ini, dan karena itu keduanya diukur di sini.
+
+    **Batas yang dinyatakan.** Yang diukur adalah piksel **jauh dari latar**,
+    bukan warna ciri tertentu. Jadi ciri apa pun yang kelak ditambahkan ke
+    pita berfase ikut terjaga tanpa gerbang ini perlu diubah — tapi
+    pemeriksaan ini juga tidak bisa membedakan "kawah" dari "kabut" di dalam
+    pita. Pemisahan itu dijaga pemeriksaan lain (`check_planet_features_present`,
+    `check_crater_relief_matches_the_model`).
+    """
+    cases = {c.name: c for c in R.build_cases()}
+    for case_name, drawer in PHASE_FEATURE_CASES:
+        case = cases.get(case_name)
+        # Sudutnya dibaca dari `case.kw`, bukan dari daftar di berkas ini:
+        # `VisualCase` menyimpan parameternya di `kw`, dan membaca ulang dari
+        # sana membuat gerbang ini ikut bergerak saat sudutnya diubah — bukan
+        # diam-diam mengukur sudut lama.
+        angle = None if case is None else case.kw.get("bright_limb_angle")
+        if angle is None:
+            # Gerbang yang tidak menemukan apa pun tidak boleh lulus: kasus
+            # yang hilang atau sudut yang `None` akan membuat kedua pengukuran
+            # di bawah hijau tanpa mengukur apa pun.
+            results.append(Result(
+                f"ciri {case_name}: kasus ada & punya sudut sisi terang",
+                False,
+                f"{case_name} {'tidak ada di build_cases()' if case is None else 'tidak punya bright_limb_angle'} "
+                f"— gerbang ini tidak mengukur apa pun tanpa keduanya"))
+            continue
+        planet = case_name.split("-")[1]
+        for label, side, sub in (("panel 200 px", size, ss),
+                                 ("kartu jam 38 px", watch, watch_ss)):
+            _, (w, h, rows) = render_case(case_name, size=side, ss=sub)
+            dark = _dark_side_bright_pixels(w, h, rows, angle)
+            results.append(Result(
+                f"ciri {planet} tidak bocor ke sisi gelap ({label})",
+                dark == 0,
+                f"{dark} piksel menyala di belahan gelap @{label} "
+                f"(sudut sisi terang {angle:+.2f} rad, "
+                f"penggambar {drawer})"))
+
+
+def check_phase_feature_still_draws_on_the_lit_side(results, size=200, ss=2):
+    """Arah sebaliknya: ciri harus **masih tergambar** di belahan menyala.
+
+    **Kenapa ini bukan kemewahan.** Pemeriksaan di atas menuntut nol piksel
+    menyala di belahan gelap. Tanpa pasangan ini, cara termurah memenuhinya
+    adalah **berhenti menggambar ciri itu sama sekali** — perbaikan yang
+    mematikan gambar, bukan memperbaikinya. Itu bukan kemungkinan teoretis di
+    berkas ini: `check_planet_features_present` sudah menulis alasannya sendiri
+    ("tanpa pemeriksaan ini, view yang berhenti menggambar **semua** ciri akan
+    lolos uji 'ciri hilang saat ragu' dengan sempurna"), dan kelasnya sama di
+    sini.
+
+    Yang diukur: selisih piksel di belahan menyala antara gambar apa adanya
+    dan gambar dengan penggambar cirinya **dimatikan** (lewat `setattr` di
+    port, dipulihkan di `finally`). Selisih nol berarti ciri itu tidak sampai
+    ke layar sama sekali pada planet berfase.
+
+    **Batas yang dinyatakan.** Penggambar dimatikan dengan mengganti fungsi di
+    modul port, jadi yang dibuktikan adalah "ciri itu digambar oleh fungsi
+    ini", bukan "ciri itu digambar dengan benar". Kebenaran bentuknya dijaga
+    `check_crater_relief_matches_the_model` dan
+    `check_crater_floor_opacity_comes_from_the_model`.
+    """
+    cases = {c.name: c for c in R.build_cases()}
+    for case_name, drawer in PHASE_FEATURE_CASES:
+        case = cases.get(case_name)
+        angle = None if case is None else case.kw.get("bright_limb_angle")
+        if angle is None:
+            continue  # sudah dilaporkan pemeriksaan di atas
+        planet = case_name.split("-")[1]
+        _, (w, h, baseline) = render_case(case_name, size=size, ss=ss)
+        original = getattr(R, drawer)
+
+        def muted(*args, **kwargs):
+            # `venus_haze()` mengembalikan geometri; cakramnya dibawa **jauh di
+            # luar frame**, bukan dijadikan nol. Nol akan membagi dengan nol di
+            # `Canvas.ellipse` (yang membagi dengan `rx`/`ry`) dan menggagalkan
+            # seluruh gerbang, bukan mematikan cirinya.
+            return (100.0, 1.0, 1.0) if drawer == "venus_haze" else None
+
+        try:
+            setattr(R, drawer, muted)
+            _, (_, _, without) = render_case(case_name, size=size, ss=ss)
+        finally:
+            setattr(R, drawer, original)
+
+        diff = _lit_side_difference(w, h, baseline, without, angle)
+        results.append(Result(
+            f"ciri {planet} masih tergambar di sisi menyala",
+            diff > 0,
+            f"{diff} piksel berbeda di belahan menyala antara gambar apa adanya "
+            f"dan gambar tanpa {drawer} (0 = ciri tidak pernah sampai ke layar)"))
+
+
 def check_unknown_phase_is_not_a_new_moon(results, size=200, ss=2):
     """Fase tak diketahui **bukan** bulan baru — diukur dari piksel.
 
@@ -8924,6 +9116,8 @@ def main():
     check_planet_features_present(results, args.size, args.ss)
     check_inner_planet_phase(results, args.size, args.ss)
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
+    check_phase_feature_stays_inside_the_lit_band(results, args.size, args.ss)
+    check_phase_feature_still_draws_on_the_lit_side(results, args.size, args.ss)
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)

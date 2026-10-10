@@ -1,3 +1,112 @@
+## Siklus: pemotongan ciri planet berfase — akibatnya tidak diukur siapa pun
+
+Siklus ini mulai dari audit "kasus tak terjaga", bukan dari fitur baru. Yang
+ditemukan adalah kelas cacat yang sudah berulang di repo ini: **aturan yang
+benar, dijalankan dengan benar, dan tidak satu pun gerbang mengukur
+akibatnya.**
+
+### Cacatnya: ciri pengenal bisa bocor keluar sabit tanpa satu gerbang berbunyi
+
+Kawah Merkurius dan kabut Venus memang digambar **di dalam** pita yang menyala
+di kedua bahasa — `_draw_craters(..., inside_lit=lambda x, y:
+_point_in_polygon(x, y, points))` di port, `inner.clip(to: lit)` di view.
+Aturannya benar. Yang tidak ada adalah gerbang yang mengukur **akibat**
+pemotongan itu: bahwa tidak ada satu piksel pun dari ciri itu yang jatuh di
+belahan yang tidak disinari.
+
+Diukur lewat probe langsung pada port (jalur `C.R`, instance yang benar-benar
+dipakai gerbang), pada 200 px dan pada ukuran piringan di kartu jam (38 px):
+
+```
+planet-mercury-crescent                        gelap=    0  menyala= 9484
+planet-mercury-crescent  [ciri TIDAK dipotong] gelap= 2004  menyala=10582
+planet-venus-crescent                          gelap=    0  menyala= 6986
+planet-venus-crescent    [ciri TIDAK dipotong] gelap=14714  menyala=14714
+planet-mercury-crescent @38px                  gelap=    0  menyala=  355
+planet-mercury-crescent @38px [tak dipotong]   gelap=   71  menyala=  389
+planet-venus-crescent   @38px [tak dipotong]   gelap=  524  menyala=  524
+```
+
+Lalu mutasinya dijalankan sungguhan: dengan `inside_lit` dilepas dari
+pemanggilan `_draw_craters`, gerbang yang sudah ada —
+`check_inner_planet_phase` (5 pemeriksaan), `check_planet_features_present`
+(3), `check_crater_drawing_constants`, `check_crater_relief_matches_the_model`,
+`check_crater_floor_opacity_*`, `check_features_survive_the_watch_size` —
+tetap **0 merah**, sementara kawahnya kini melompat keluar sabit. Untuk Venus,
+melepas potongan kabutnya mengisi **seluruh** belahan gelap: 14714 piksel pada
+200 px.
+
+Kenapa itu cacat dan bukan selera: sabit Merkurius adalah **klaim terukur** —
+fraksi iluminasi yang dihitung engine. Kawah yang menonjol keluar dari sabit
+membuat bentuknya lebih lebar daripada fraksi itu, dan tidak ada teks di kartu
+jam yang bisa membantahnya. Kelasnya sama dengan Venus yang tergambar bulat
+(`check_inner_planet_phase`) dan fase tak diketahui yang menyamar jadi bulan
+baru (`check_unknown_phase_is_not_a_new_moon`): gambar yang **menyatakan lebih**
+daripada yang dihitung.
+
+### Perbaikannya: enam pemeriksaan, dua arah
+
+Dua pemeriksaan baru di `Tools/check-visuals.py`, keduanya mengukur piksel:
+
+  - `check_phase_feature_stays_inside_the_lit_band` — nol piksel menyala di
+    belahan gelap, untuk **kedua** planet dan **kedua** ukuran. Sudut sisi
+    terangnya dibaca ulang dari `VisualCase.kw` di `R.build_cases()`, bukan
+    dari daftar di berkas gerbang: gerbang yang menyimpan sudutnya sendiri
+    akan tetap hijau saat sudutnya diubah, dan mengukur gambar yang tidak
+    pernah tampil.
+  - `check_phase_feature_still_draws_on_the_lit_side` — arah sebaliknya, dan
+    ini yang paling penting. Tanpa pasangannya, cara termurah memenuhi "nol
+    piksel di belahan gelap" adalah **berhenti menggambar cirinya sama
+    sekali** — perbaikan yang mematikan gambar, bukan memperbaikinya.
+    `check_planet_features_present` sudah menulis alasan yang sama untuk
+    dirinya sendiri ("tanpa pemeriksaan ini, view yang berhenti menggambar
+    **semua** ciri akan lolos uji 'ciri hilang saat ragu' dengan sempurna").
+
+Bentuk pasangan ini yang membuat keduanya berarti: `bukti-mutasi-fase-ciri.py`
+keadaan 3 membuktikan keduanya memang **memisahkan** "dipotong" dari "dihapus"
+— keadaan itu menyalakan **hanya** gerbang "masih tergambar" (172 piksel
+berbeda di belahan menyala untuk Merkurius, 894 untuk Venus pada kode benar),
+bukan gerbang pemotongan. Kalau keduanya berbunyi bersama, gerbangnya tidak
+memisahkan apa pun.
+
+### Buktinya: harness mutasi, tiga keadaan
+
+`Tools/bukti-mutasi-fase-ciri.py` (baru, dirujuk `engine-tests.yml`):
+
+```
+OK   [baseline]                                   0 merah
+OK   1. port: kawah Merkurius tak dipotong        2 merah
+       ciri mercury tidak bocor ke sisi gelap (panel 200 px) | (kartu jam 38 px)
+OK   2. port: kabut Venus tak dipotong            2 merah
+       ciri venus tidak bocor ke sisi gelap (panel 200 px) | (kartu jam 38 px)
+OK   3. port: kawah tidak digambar sama sekali    1 merah
+       ciri mercury masih tergambar di sisi menyala
+4 keadaan, 0 tidak sesuai harapan
+```
+
+Keadaan 1 dan 2 sengaja terpisah: kalau satu keadaan menyalakan kedua planet,
+gerbangnya tidak membedakan kawah dari kabut, dan laporan "ciri Mercury bocor"
+bisa datang dari kabut Venus. Keadaan 3 harus menyalakan **hanya** arah
+sebaliknya. Tiap keadaan juga menuntut pemeriksaan yang **tidak** disebut tetap
+hijau — satu keadaan yang menyalakan seluruh pemeriksaan terlihat "sesuai
+harapan" padahal artinya gerbangnya cuma berisik.
+
+**Batas yang dinyatakan.** Ketiga keadaan memutasi **port Python**, bukan view
+Swift: yang diukur kedua gerbang itu adalah piksel port, jadi hanya port yang
+bisa menggerakkannya. Sisi view (`.clip(to: lit)` di `CelestialVisualView.swift`)
+dijaga pemeriksaan teks lain, dan harness ini tidak mengklaim lebih dari itu.
+
+### Status akhir siklus ini (terverifikasi, bukan diklaim)
+
+  - `./swift-test.sh` -> **CelestialEngine 206 + PointingKit 706 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `python3 Tools/check-visuals.py --check` -> **672 pemeriksaan, 0 gagal**
+    (666 + 6 pemeriksaan baru).
+  - `python3 Tools/bukti-mutasi-fase-ciri.py` -> **4 keadaan, 0 tidak sesuai
+    harapan**.
+  - `python3 Tools/check-harness-terdaftar.py` -> **14 harness, semuanya
+    dirujuk alur kerja** + 3/3 bukti-diri lolos.
+
 ## Siklus: gerbang piringan kedua Saturnus tidak pernah dijalankan CI
 
 Siklus ini mulai dari pekerjaan yang belum di-commit yang ditinggalkan siklus
