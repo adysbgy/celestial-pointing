@@ -121,6 +121,15 @@ C.check_saturn_has_no_extra_disc(results, 200, 2)
 # Gerbang tetangga, dijalankan di keadaan yang sama: inilah bukti hidup
 # untuk klaim "gerbang lama tidak bisa melihat cacat ini".
 C.check_planet_features_present(results, 200, 2)
+# **Dan sisi teks.** Dua keadaan di `STATES` (1 dan 5) menuntut pemeriksaan
+# yang hanya hidup di sini — `check_port_matches_swift_constants` membaca
+# sumber view dan port dari disk, bukan dari piksel. Tanpa baris ini, `probe()`
+# tidak pernah menjalankannya, jadi `must_fire` yang menyebut nama
+# pemeriksaannya **tidak mungkin** terpenuhi: harness melaporkan "HARUSNYA
+# MERAH, TIDAK" untuk keadaan yang sebenarnya sudah benar. Terukur sebelum
+# perbaikan ini: keadaan 1 dan 5 sama-sama dilaporkan SALAH, dan keadaan 5
+# (yang sengaja hanya mengubah view) melaporkan 0 merah sama sekali.
+C.check_port_matches_swift_constants(results)
 for r in results:
     print(("OK  " if r.ok else "GAGAL") + " " + r.name + "  " + r.detail)
 """
