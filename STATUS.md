@@ -9,23 +9,43 @@ geometri fase ke gambar objek, dan ia hidup di `Apps/` — jadi `swift-test.sh`
 di Linux (yang hanya membangun `Packages/`) tidak menjangkaunya. Aturan 31
 dibuat untuk itu, dan komentarnya sendiri menyebut `planetBrightLimbAngles`
 sebagai "dihitung tiap 30 detik, lalu tidak pernah dipakai gambar apa pun".
-Yang diperiksa hanya kawat `waxing`. **Dua** kawat geometri fase planet tidak
-diukur siapa pun.
+Yang diperiksa hanya kawat `waxing`. **Empat** kawat geometri fase tidak
+diukur siapa pun: dua di cabang planet, dua di cabang Bulan.
 
 **Diukur.** Mematikan satu kawat per keadaan, lalu menjalankan seluruh 31
 aturan UI:
 
-| kawat -> `nil` | piksel Venus berubah | Aturan 31 |
+| kawat -> `nil` | piksel berubah | Aturan 31 |
 |---|---|---|
-| `brightLimbAngleRadians` | 10.254 / 40.000 (25,6%) | **hijau** |
+| `brightLimbAngleRadians` (planet, sudut -pi/2) | 10.254 / 40.000 (25,6%) | **hijau** |
 | `planetIlluminationFraction` | 31.604 / 40.000 (79,0%) | **hijau** |
+| `moonIlluminationFraction` (Bulan) | 31.604 / 40.000 (79,0%) | **hijau** |
+| sudut sisi terang Bulan (sudut -pi/2, waxing) | 8.686 / 40.000 (21,7%) | **hijau** |
+| `waxing` cabang Bulan | 31.604 / 40.000 (79,0%) | **hijau** |
+| `waxing` cabang planet | 31.604 / 40.000 (79,0%) | **hijau** |
 
-Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
-sebagai **bola penuh** di setiap keadaan — termasuk saat engine baru saja
-menghitung iluminasinya 0,22. Gambar itu menyatakan kebalikan dari yang
+Fraksi iluminasi paling parah: seluruh pita terang hilang dan benda berfase
+tergambar sebagai **bola penuh** di setiap keadaan — termasuk saat engine baru
+saja menghitung iluminasinya 0,22. Gambar itu menyatakan kebalikan dari yang
 dihitung engine, dan sabitnya tetap tergambar sebagai sabit yang meyakinkan,
 jadi tidak ada satu pun teks di layar yang bisa dibaca pengguna untuk
 membantahnya.
+
+**Cabang Bulan sama sekali tidak diperiksa versi pertama** — dan itu bukan
+kemalasan, itu bentuk yang memang mudah terjadi: sisi planet yang panjang
+(`planet.flatMap { … }`) menarik mata, sementara `nil` di sisi Bulan terlihat
+seperti "belum ada data". Yang mengungkapnya adalah saat Aturan 31 diperluas
+ke cabang Bulan: gerbangnya langsung **merah pada kode yang benar**, karena
+pola lamanya tidak mengikat ke daftar argumen, sehingga titik dua **ternary**
+(`let fraction = isMoon ? skyContext?.moonIlluminationFraction : nil`) terbaca
+sebagai label argumen. Diperbaiki dengan mengikat pola ke `(` atau `,` di
+depannya.
+
+**Kenapa arah merah itu justru penting.** Gerbang yang menuduh kode benar
+lebih berbahaya daripada gerbang yang hijau pada kode salah: orang yang
+terburu-buru akan mengembalikan kodenya ke bentuk yang salah supaya gerbangnya
+diam. Karena itu ia diperbaiki di gerbangnya, bukan dilonggarkan di harness —
+dan harness yang menangkapnya adalah harness yang sama yang mengukur lubangnya.
 
 Bentuk kedua lebih halus, dan ia yang paling mungkin terjadi saat menyunting:
 nilainya di-`nil`-kan di baris **penugasan** dengan argumen tetap utuh,
@@ -35,22 +55,35 @@ nilainya di-`nil`-kan di baris **penugasan** dengan argumen tetap utuh,
 
 sehingga pembaca yang hanya melihat argumennya (`: planetLimbAngle`,
 `: planetPhase`) tidak melihat apa pun. Karena itu gerbang barunya membaca
-**pemakaian dan penugasan bersama**: ia menelusuri nama di cabang planet
-(`else` dari `isMoon ? … : …`) ke nilai `let`-nya. Yang ditelusuri hanya
-cabang planet — `limbAngle` memang bernilai nil untuk planet
+**pemakaian dan penugasan bersama**: ia menelusuri nama di cabang yang berlaku
+(`else` untuk planet, `then` untuk Bulan) ke nilai `let`-nya. Yang ditelusuri
+hanya cabang yang berlaku — `limbAngle` memang bernilai nil untuk planet
 (`isMoon ? moonBrightLimbAngle : nil`), dan itu benar karena cabang itu tidak
 pernah dipakai planet; menelusuri seluruh ekspresi akan menuduh kode yang
 benar.
 
 **Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil` memutar 0
-rad, jadi cacat sudut **tak terlihat** pada benda yang sudutnya memang 0.
-Kasus katalog `planet-mercury-crescent` memakai sudut 0,0 — terukur **0 dari
-40.000 piksel** berubah. Gerbang yang mengukur benda itu akan hijau selamanya
-pada kawat yang mati: gerbang hampa. Angka Merkurius karena itu diukur dengan
-sudut -pi/2 (12.916 piksel, 32,3%), bukan pada sudut katalognya.
+rad, jadi cacat sudut **tak terlihat** pada benda yang sudutnya memang 0 —
+**asalkan fasenya waxing** (`lit_side > 0`). Kasus katalog
+`planet-mercury-crescent` memakai sudut 0,0 dan terukur **0 dari 40.000 piksel**
+berubah. Gerbang yang mengukur benda itu akan hijau selamanya pada kawat yang
+mati: gerbang hampa. Angka Merkurius karena itu diukur dengan sudut -pi/2
+(12.916 piksel, 32,3%), bukan pada sudut katalognya.
 
-**Tiga kesalahan pengukuran di harness ini sendiri, semuanya tertangkap
-sebelum push.**
+**Dan "sudut 0" saja tidak cukup untuk menyimpulkan "tak terlihat" — ini
+ditemukan saat mengukur ulang angka di tabel atas.** Untuk fase waning
+(`lit_side < 0`), `terminatorRotationRadians` menambahkan pi, jadi nil (0 rad)
+**tidak** sama dengan sudut 0. Terukur: `moon-waning-crescent` (sudut 0,0,
+waning) berubah **11.608 dari 40.000 piksel (29,0%)**, sementara
+`moon-crescent-jakarta` (sudut -pi/2, waxing) berubah 8.686 (21,7%). Versi
+pertama tabel ini menuliskan 11.608/29,0% sebagai angka kawat sudut Bulan,
+diambil dari kasus waning sambil menjelaskan perilaku waxing — dua benda
+berbeda dalam satu baris. Gerbang hampa hanya terjadi bila **sudut 0 dan
+waxing** bertemu; memilih benda contoh untuk gerbang piksel harus memeriksa
+keduanya.
+
+**Empat kesalahan pengukuran, semuanya tertangkap sebelum push.** Tiga di
+harness, satu di dokumen ini sendiri.
 
   1. Versi pertama menyalin seluruh pohon repo ke sandbox lalu menjalankan
      `swift-ui-lint.sh` di sana, dan menganggap **keluar != 0** sebagai
@@ -89,14 +122,14 @@ direktori sementara, jadi tidak ada pemulihan yang bisa gagal.
 | Baris `Apps/` berubah | — | **0** |
 | Baris `Packages/` berubah | — | **0** |
 
-Dibuktikan berbunyi: empat keadaan mutasi, keempatnya merah; baseline bersih.
-`python3 Tools/bukti-mutasi-aturan31-kawat.py` → `5 keadaan, 0 tidak sesuai
+Dibuktikan berbunyi: delapan keadaan mutasi, kedelapan merah; baseline bersih.
+`python3 Tools/bukti-mutasi-aturan31-kawat.py` → `9 keadaan, 0 tidak sesuai
 harapan`.
 
 ### Yang TIDAK diklaim
 
-- Angka 25,6%, 32,3%, dan 79,0% diukur pada **port Python**, bukan pada
-  perangkat Apple. Yang dibuktikan: kawat yang mati mengubah gambar yang
+- Angka 25,6%, 32,3%, 21,7%, 29,0%, dan 79,0% diukur pada **port Python**, bukan
+  pada perangkat Apple. Yang dibuktikan: kawat yang mati mengubah gambar yang
   digambar port secara terukur, dan gerbang teks menangkap kawat yang mati itu.
 - Gerbang ini adalah **sapu teks**, bukan pemeriksaan tipe. Ia membaca
   penugasan `let` satu tingkat; rantai penugasan yang lebih panjang dari itu

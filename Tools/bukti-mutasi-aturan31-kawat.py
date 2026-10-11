@@ -80,18 +80,38 @@ ANCHOR_BINDING = "let planetLimbAngle = planet.flatMap { planetBrightLimbAngles[
 #: tergambar sebagai bola penuh di setiap keadaan.
 ANCHOR_ILLUM_ARG = "planetIlluminationFraction: planetPhase)"
 ANCHOR_ILLUM_BINDING = "let planetPhase = planet.flatMap { planetPhases[$0] }"
+#: Kawat kelima dan keenam -- **cabang Bulan**, yang versi sebelumnya tidak
+#: periksa sama sekali. Diukur pada port: `moonIlluminationFraction` -> nil
+#: mengubah 31.604/40.000 piksel Bulan (79,0%), dan sudut Bulan -> nil
+#: mengubah 8.686/40.000 (21,7%) pada `moon-crescent-jakarta` (sudut -pi/2,
+#: waxing). Keduanya hijau di seluruh 31 aturan UI.
+ANCHOR_MOON_ARG = "moonIlluminationFraction: fraction,"
+ANCHOR_MOON_BINDING = "let limbAngle = isMoon ? moonBrightLimbAngle : nil"
+#: Kawat ketujuh dan kedelapan -- **kedua cabang `waxing`**. Versi pertama
+#: gerbang ini hanya memeriksa sisi bukan-Bulan. Diukur pada port: sisi Bulan
+#: -> nil mengubah 31.604/40.000 piksel (79,0%), sisi planet -> nil juga
+#: 31.604/40.000 (79,0%). Keduanya hijau di seluruh 31 aturan UI.
+ANCHOR_WAX = "let waxing = isMoon ? moonIsWaxing : planet.flatMap { planetWaxing[$0] }"
 
 #: Keadaan: (nama, (cari, ganti) atau None untuk baseline).
 STATES = [
     ("[baseline]", None),
-    ("1. argumen sudut -> nil",
+    ("1. argumen sudut planet -> nil",
      (ANCHOR_ARG, "brightLimbAngleRadians: isMoon ? limbAngle : nil")),
-    ("2. binding sudut -> nil (argumen utuh)",
+    ("2. binding sudut planet -> nil (argumen utuh)",
      (ANCHOR_BINDING, "let planetLimbAngle: Double? = nil")),
-    ("3. argumen fraksi iluminasi -> nil",
+    ("3. argumen fraksi planet -> nil",
      (ANCHOR_ILLUM_ARG, "planetIlluminationFraction: nil)")),
-    ("4. binding fraksi iluminasi -> nil (argumen utuh)",
+    ("4. binding fraksi planet -> nil (argumen utuh)",
      (ANCHOR_ILLUM_BINDING, "let planetPhase: Double? = nil")),
+    ("5. argumen fraksi Bulan -> nil",
+     (ANCHOR_MOON_ARG, "moonIlluminationFraction: nil,")),
+    ("6. binding sudut Bulan -> nil (argumen utuh)",
+     (ANCHOR_MOON_BINDING, "let limbAngle: Double? = nil")),
+    ("7. cabang Bulan dari waxing -> nil",
+     (ANCHOR_WAX, "let waxing = isMoon ? nil : planet.flatMap { planetWaxing[$0] }")),
+    ("8. cabang planet dari waxing -> nil",
+     (ANCHOR_WAX, "let waxing = isMoon ? moonIsWaxing : nil")),
 ]
 
 #: Pembuka blok program Aturan 31 di dalam `swift-ui-lint.sh`.
@@ -140,10 +160,13 @@ def run_rule(sandbox: str, program: str) -> tuple[bool, str]:
 def main() -> int:
     program = extract_rule_program()
     original = open(os.path.join(ROOT, WIRE), encoding="utf-8").read()
-    for anchor, label in ((ANCHOR_ARG, "argumen sudut"),
+    for anchor, label in ((ANCHOR_ARG, "argumen sudut planet"),
                           (ANCHOR_BINDING, "penugasan planetLimbAngle"),
-                          (ANCHOR_ILLUM_ARG, "argumen fraksi iluminasi"),
-                          (ANCHOR_ILLUM_BINDING, "penugasan planetPhase")):
+                          (ANCHOR_ILLUM_ARG, "argumen fraksi planet"),
+                          (ANCHOR_ILLUM_BINDING, "penugasan planetPhase"),
+                          (ANCHOR_MOON_ARG, "argumen fraksi Bulan"),
+                          (ANCHOR_MOON_BINDING, "penugasan limbAngle"),
+                          (ANCHOR_WAX, "penugasan waxing")):
         count = original.count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {label} muncul {count}x, harus tepat 1x "

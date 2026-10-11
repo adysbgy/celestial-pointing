@@ -3840,19 +3840,42 @@ code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
 
 problems = []
 
-# 1. Kawat `waxing` tidak boleh `nil` untuk benda bukan-Bulan.
-#    Dicari sebagai penugasan ke `waxing`, lalu ditolak bila sisi bukan-Bulan
-#    (`else`/`:`) berujung pada `nil`.
+# 1. Kawat `waxing` tidak boleh `nil` untuk benda berfase mana pun.
+#    Dicari sebagai penugasan ke `waxing`, lalu ditolak bila **salah satu**
+#    cabangnya berujung pada `nil`.
+#
+#    **Kenapa kedua cabang, bukan hanya `else`.** Versi pertama memeriksa
+#    `:\s*nil\s*$` saja -- sisi bukan-Bulan. Diukur: mengubah sisi **Bulan**
+#    menjadi nil (`isMoon ? nil : planet.flatMap { … }`) membuat seluruh 31
+#    aturan UI tetap hijau, sementara 31.604 dari 40.000 piksel (79,0%) sabit
+#    Bulan berubah -- Bulan kehilangan fasenya. Cacat yang sama bentuknya
+#    dengan yang gerbang ini tutup: satu cabang diperiksa, cabang lain
+#    dikutip. Bentuk itu mudah terjadi justru karena sisi planet yang panjang
+#    menarik mata, dan `nil` di sisi Bulan terlihat seperti "belum ada data".
 assigns = re.findall(r"\blet\s+waxing\s*=\s*([^\n]+)", code)
 if not assigns:
     problems.append("  tidak ditemukan penugasan `let waxing =` di %s; gerbang ini "
                     "kehilangan gigi" % WIRE)
 for expr in assigns:
-    # Bentuk cacat: `isMoon ? moonIsWaxing : nil` (atau `: nil` apa pun).
-    if re.search(r":\s*nil\s*$", expr.strip()):
+    stripped = expr.strip()
+    # Cabang Bulan (`isMoon ? X : …`) dan cabang planet (`… : Y`).
+    ternary = re.match(r".*?isMoon\s*\?\s*(.*?)\s*:\s*(.*)$", stripped)
+    if ternary:
+        moon_side, planet_side = ternary.group(1).strip(), ternary.group(2).strip()
+        if moon_side == "nil":
+            problems.append(
+                "  `let waxing = %s` mengembalikan nil untuk **Bulan**; Bulan "
+                "kehilangan fasenya dan tampil sebagai bola penuh di setiap "
+                "keadaan (terukur 79,0%% piksel berbeda)" % stripped)
+        if planet_side == "nil":
+            problems.append(
+                "  `let waxing = %s` mengembalikan nil untuk **planet dalam**; "
+                "arah fase planet mati total dan Venus tampil sebagai bola "
+                "penuh di setiap keadaan" % stripped)
+    elif re.search(r":\s*nil\s*$", stripped):
         problems.append("  `let waxing = %s` mengembalikan nil untuk benda bukan-Bulan; "
                         "arah fase planet dalam mati total dan Venus tampil sebagai "
-                        "bola penuh di setiap keadaan" % expr.strip())
+                        "bola penuh di setiap keadaan" % stripped)
 
 # 2. `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`.
 if "isWaxing:" not in code:
@@ -3869,13 +3892,24 @@ if "isWaxing:" not in code:
 # f=0,30 sudut -pi/2. Tidak ada teks di layar yang bisa membantahnya: yang
 # tampil tetap sabit.
 #
-# **Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil`
-# memutar 0 rad, jadi cacat ini **tak terlihat** pada benda yang sudutnya
-# memang 0: kasus katalog `planet-mercury-crescent` memakai sudut 0,0 dan
-# terukur 0 dari 40.000 piksel berubah. Gerbang yang mengukur benda itu akan
-# hijau selamanya pada kawat yang mati -- gerbang hampa, kelas cacat yang
-# sudah berulang di repo ini. Angka Merkurius di atas karena itu diukur
-# dengan sudut -pi/2, bukan pada sudut katalognya.
+# **Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil` memutar
+# 0 rad, jadi cacat ini **tak terlihat** pada benda yang sudutnya memang 0 --
+# **asalkan fasenya memakai pita dasar kiri** (`lit_side > 0`, yaitu waxing).
+# Kasus katalog `planet-mercury-crescent` memakai sudut 0,0 dan terukur 0 dari
+# 40.000 piksel berubah. Gerbang yang mengukur benda itu akan hijau selamanya
+# pada kawat yang mati -- gerbang hampa, kelas cacat yang sudah berulang di
+# repo ini. Angka Merkurius di atas karena itu diukur dengan sudut -pi/2, bukan
+# pada sudut katalognya.
+#
+# **Dan "sudut 0" saja tidak cukup untuk menyimpulkan "tak terlihat".** Untuk
+# fase yang dasarnya ada di kanan (`lit_side < 0`, waning),
+# `terminatorRotationRadians` menambahkan pi -- jadi nil (0 rad) **tidak**
+# sama dengan sudut 0. Terukur: `moon-waning-crescent` (sudut 0,0, waning)
+# berubah 11.608 dari 40.000 piksel (29,0%) saat kawat sudutnya dimatikan,
+# sementara `moon-crescent-jakarta` (sudut -pi/2, waxing) berubah 8.686
+# (21,7%). Gerbang hampa hanya terjadi bila **sudut 0 dan waxing** bertemu;
+# memilih benda contoh untuk gerbang piksel harus memeriksa keduanya, dan
+# angka yang dikutip harus menyebut sudutnya.
 #
 # **Kenapa pemakaian dan penugasan harus dibaca bersama.** Memeriksa
 # argumennya saja (`: planetLimbAngle`) tidak melihat bentuk cacat yang
@@ -3884,17 +3918,19 @@ if "isWaxing:" not in code:
 # dengan argumen utuh membuat Aturan 31 versi lama tetap hijau, sementara
 # gambarnya sudah kehilangan orientasinya.
 #
-# **Kenapa yang ditelusuri hanya cabang planet.** Ekspresi argumennya
+# **Kenapa yang ditelusuri hanya cabang yang berlaku.** Ekspresi argumennya
 # berbentuk `isMoon ? limbAngle : planetLimbAngle`, dan `limbAngle` **memang**
 # bernilai nil untuk planet (`isMoon ? moonBrightLimbAngle : nil`) -- itu
 # benar, karena cabang itu tidak pernah dipakai planet. Menelusuri seluruh
 # ekspresi akan menuduh kode yang benar. Yang ditelusuri karena itu hanya
-# sisi `else` (bagian yang berlaku untuk planet).
-def _planet_branch(expr):
-    """Bagian `expr` yang berlaku untuk planet: sisi `else` bila bercabang
-    `isMoon`, atau seluruhnya bila tidak."""
+# cabang yang berlaku untuk benda itu: sisi `else` untuk planet, sisi `then`
+# untuk Bulan.
+def _branch(expr, want_moon):
+    """Bagian `expr` yang berlaku untuk Bulan (`want_moon`) atau planet."""
     ternary = re.match(r".*?isMoon\s*\?\s*(.*?)\s*:\s*(.*)$", expr)
-    return ternary.group(2).strip() if ternary else expr.strip()
+    if not ternary:
+        return expr.strip()
+    return (ternary.group(1) if want_moon else ternary.group(2)).strip()
 
 
 def _bound_value(name):
@@ -3903,40 +3939,74 @@ def _bound_value(name):
     return match.group(1).strip() if match else None
 
 
-def _is_nil_for_planets(expr):
-    """True bila `expr` jelas bernilai nil untuk planet (bukan Bulan)."""
+def _is_nil_for(expr, want_moon):
+    """True bila `expr` jelas bernilai nil untuk benda itu (Bulan/planet)."""
     if expr is None:
         return False
-    value = _planet_branch(expr)
+    value = _branch(expr, want_moon)
     if value == "nil":
         return True
-    # Bentuk bersarang: cabang planetnya sendiri bercabang lagi.
-    return value != expr.strip() and _is_nil_for_planets(value)
+    # Bentuk bersarang: cabangnya sendiri bercabang lagi.
+    return value != expr.strip() and _is_nil_for(value, want_moon)
 
 
-#: Kawat-kawat fase yang wajib terisi untuk planet berfase.
+#: Kawat-kawat fase yang wajib terisi, per **cabang benda**.
 #:
-#: Keduanya kelas cacat yang **sama** -- `nil` berarti "jangan gambar fase",
-#: jadi gambar menyatakan kebalikan dari yang dihitung engine -- dan keduanya
-#: mati bersama-sama saat kawat `waxing` mengembalikan nil. Diukur pada port
-#: dengan mematikan satu per satu:
+#: Semuanya kelas cacat yang **sama** -- `nil` berarti "jangan gambar fase",
+#: jadi gambar menyatakan kebalikan dari yang dihitung engine. Diukur pada
+#: port dengan mematikan satu kawat per keadaan, lalu menjalankan seluruh 31
+#: aturan UI (semuanya tetap **hijau**):
 #:
-#:   `brightLimbAngleRadians` -> nil : 25,6% piksel Venus berubah
-#:   `planetIlluminationFraction` -> nil : 79,0% piksel Venus berubah
+#:   `planetIlluminationFraction` -> nil : 31.604/40.000 piksel Venus (79,0%)
+#:   `moonIlluminationFraction`   -> nil : 31.604/40.000 piksel Bulan (79,0%)
+#:   `brightLimbAngleRadians` (planet) -> nil : 10.254/40.000 Venus (25,6%)
+#:   `brightLimbAngleRadians` (Bulan)  -> nil : 8.686/40.000 (21,7%) pada
+#:                                              `moon-crescent-jakarta`
 #:
-#: Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
-#: sebagai **bola penuh** di setiap keadaan, termasuk saat engine baru saja
+#: Yang fraksi paling parah: seluruh pita terang hilang dan benda tergambar
+#: sebagai **bola penuh** di setiap keadaan, termasuk saat engine baru
 #: menghitung iluminasinya 0,22.
+#:
+#: **Cabang Bulan ditemukan belakangan, dan itu bukan kerapian.** Versi
+#: sebelumnya hanya memeriksa cabang planet, jadi `moonIlluminationFraction:
+#: nil` -- yang mematikan fase Bulan, benda yang justru paling sering
+#: ditunjuk -- hijau di seluruh 31 aturan. Kesalahan yang sama bentuknya
+#: dengan yang gerbang ini tutup: satu cabang diperiksa, cabang lain dikutip.
 PHASE_WIRES = (
-    ("brightLimbAngleRadians",
-     "sudut sisi terang yang dihitung tiap 30 detik tidak pernah sampai ke "
-     "gambar, jadi sabit Venus tergambar menghadap arah yang salah "
-     "(terukur 25,6% piksel berbeda)"),
-    ("planetIlluminationFraction",
+    ("brightLimbAngleRadians", False,
+     "sudut sisi terang planet tidak pernah sampai ke gambar, jadi sabit "
+     "Venus tergambar menghadap arah yang salah (terukur 25,6% piksel)"),
+    ("planetIlluminationFraction", False,
      "fraksi iluminasi planet tidak pernah sampai ke gambar, jadi Venus "
      "tampil sebagai bola penuh di setiap keadaan -- termasuk saat engine "
-     "baru menghitung iluminasinya 0,22 (terukur 79,0% piksel berbeda)"),
+     "baru menghitung iluminasinya 0,22 (terukur 79,0% piksel)"),
+    ("brightLimbAngleRadians", True,
+     "sudut sisi terang Bulan tidak pernah sampai ke gambar, jadi sabit "
+     "Bulan tergambar menghadap arah yang salah (terukur 21,7% piksel)"),
+    ("moonIlluminationFraction", True,
+     "fraksi iluminasi Bulan tidak pernah sampai ke gambar, jadi Bulan "
+     "tampil sebagai bola penuh di setiap keadaan -- termasuk saat engine "
+     "baru menghitung iluminasinya 0,18 (terukur 79,0% piksel)"),
 )
+
+
+#: Argumen bernama di dalam daftar argumen: `label: value`.
+#:
+#: **Kenapa harus didahului `(` atau `,`.** Tanpa itu, titik dua **ternary**
+#: ikut terbaca sebagai label argumen: `let fraction = isMoon ?
+#: skyContext?.moonIlluminationFraction : nil` menghasilkan kecocokan
+#: `moonIlluminationFraction : nil`, dan gerbangnya lalu menuduh kode yang
+#: benar. Itu kelas cacat yang lebih berbahaya daripada gerbang yang hijau
+#: pada kode salah — orang yang terburu-buru akan mengembalikan kodenya ke
+#: bentuk yang salah supaya gerbangnya diam. Ditemukan saat cabang Bulan
+#: ditambahkan; cabang planet tidak pernah kena karena `planetPhases` tidak
+#: muncul di ternary mana pun.
+_ARG = r"(?:[(,]\s*)%s\s*:\s*([^,\n]+)"
+
+
+def _phase_wire_args(wire):
+    """Ekspresi argumen untuk `wire` di `PointingEngine.swift`, sebagai daftar."""
+    return re.findall(_ARG % re.escape(wire), code)
 
 
 def _strip_unbalanced_close(expr):
@@ -3946,7 +4016,7 @@ def _strip_unbalanced_close(expr):
     ikut terbaca sebagai bagian ekspresi: `planetIlluminationFraction:
     planetPhase)` menghasilkan `planetPhase)`. Tanpa dibuang, pemeriksaannya
     tidak mengenali `nil` telanjang dan gerbangnya hijau pada kawat yang mati
-    -- diukur pada keadaan 3 harness `bukti-mutasi-aturan31-sudut.py`.
+    -- diukur pada keadaan 3 harness `bukti-mutasi-aturan31-kawat.py`.
 
     Yang dibuang hanya `)` yang **tidak berpasangan**: `foo()` tetap utuh,
     karena kurungnya berpasangan.
@@ -3959,28 +4029,31 @@ def _strip_unbalanced_close(expr):
     return value
 
 
-for wire, why in PHASE_WIRES:
-    args = re.findall(r"%s\s*:\s*([^,\n]+)" % re.escape(wire), code)
+_seen_wires = set()
+for wire, want_moon, why in PHASE_WIRES:
+    args = _phase_wire_args(wire)
     if not args:
-        problems.append("  `%s:` tidak ditemukan di %s; gerbang ini "
-                        "kehilangan gigi" % (wire, WIRE))
+        if wire not in _seen_wires:
+            _seen_wires.add(wire)
+            problems.append("  `%s:` tidak ditemukan di %s; gerbang ini "
+                            "kehilangan gigi" % (wire, WIRE))
         continue
     for raw in args:
         expr = _strip_unbalanced_close(raw)
-        planet_expr = _planet_branch(expr)
-        if _is_nil_for_planets(expr):
-            problems.append("  `%s: %s` bernilai nil untuk planet berfase; %s"
+        side_expr = _branch(expr, want_moon)
+        if _is_nil_for(expr, want_moon):
+            problems.append("  `%s: %s` bernilai nil untuk benda berfase; %s"
                             % (wire, expr, why))
             continue
-        # Telusuri nama yang dipakai **di cabang planet** ke nilai penugasan.
-        for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", planet_expr):
+        # Telusuri nama yang dipakai **di cabang itu** ke nilai penugasan.
+        for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", side_expr):
             if name in ("nil", "true", "false", "isMoon"):
                 continue
             value = _bound_value(name)
-            if _is_nil_for_planets(value):
+            if _is_nil_for(value, want_moon):
                 problems.append(
                     "  `%s` memakai `%s`, yang diikat ke `%s` -- nil untuk "
-                    "planet berfase; %s" % (wire, name, value, why))
+                    "benda berfase; %s" % (wire, name, value, why))
 
 print("\n".join(problems) if problems else "")
 PY
