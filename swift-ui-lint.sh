@@ -3801,7 +3801,19 @@ fi
 # akan membuat salinan kedua yang bisa berbeda diam-diam dari model.
 #
 # Yang diperiksa: kawatnya tidak boleh lagi mengembalikan `nil` untuk benda
-# bukan-Bulan, dan `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`.
+# bukan-Bulan, `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`,
+# **dan** `brightLimbAngleRadians` harus benar-benar terisi untuk planet
+# berfase.
+#
+# **Kawat ketiga itu kelas cacat yang sama, dan versi pertama aturan ini
+# melewatkannya sambil mengklaim sebaliknya.** Komentar di atas menyebut
+# `planetBrightLimbAngles` sebagai "dihitung tiap 30 detik, lalu tidak pernah
+# dipakai gambar apa pun" — tetapi yang diperiksa hanya kawat `waxing`.
+# Diukur: `brightLimbAngleRadians: isMoon ? limbAngle : nil` membuat Aturan 31
+# tetap **hijau** dan seluruh 31 aturan UI lulus, sementara 10.254 dari 40.000
+# piksel (25,6%) sabit Venus berubah — sisi terangnya berhenti menghadap
+# Matahari. Ini kelas cacat yang paling sering berulang di repo ini: gerbang
+# yang mengutip sebuah jalur di komentarnya tanpa mengukurnya.
 echo
 echo "== Aturan 31: arah fase harus sampai ke gambar untuk tiap benda berfase =="
 waxing=$(python3 - <<'PY' 2>&1
@@ -3840,6 +3852,86 @@ for expr in assigns:
 if "isWaxing:" not in code:
     problems.append("  `isWaxing:` tidak diteruskan ke CelestialVisual; arah fase "
                     "yang dihitung tidak pernah sampai ke gambar")
+
+# 3. Kawat **sudut** sisi terang (`brightLimbAngleRadians`) untuk planet berfase.
+#
+# Kawat kedua di fungsi yang sama, dan kelas cacatnya persis sama: `nil`
+# berarti "jangan putar" (`terminatorRotationRadians` mengembalikan nil), jadi
+# sabit Venus tergambar tegak -- sisi terang ke kanan -- sementara di langit
+# ia menghadap Matahari. Terukur pada port: 10.254 dari 40.000 piksel (25,6%)
+# berbeda pada Venus f=0,22 sudut -pi/2, dan 12.916 (32,3%) pada Merkurius
+# f=0,30 sudut -pi/2. Tidak ada teks di layar yang bisa membantahnya: yang
+# tampil tetap sabit.
+#
+# **Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil`
+# memutar 0 rad, jadi cacat ini **tak terlihat** pada benda yang sudutnya
+# memang 0: kasus katalog `planet-mercury-crescent` memakai sudut 0,0 dan
+# terukur 0 dari 40.000 piksel berubah. Gerbang yang mengukur benda itu akan
+# hijau selamanya pada kawat yang mati -- gerbang hampa, kelas cacat yang
+# sudah berulang di repo ini. Angka Merkurius di atas karena itu diukur
+# dengan sudut -pi/2, bukan pada sudut katalognya.
+#
+# **Kenapa pemakaian dan penugasan harus dibaca bersama.** Memeriksa
+# argumennya saja (`: planetLimbAngle`) tidak melihat bentuk cacat yang
+# paling mungkin: nilainya di-`nil`-kan di baris **penugasan**, dan argumennya
+# tetap menyebut nama yang sama. Diukur: `let planetLimbAngle: Double? = nil`
+# dengan argumen utuh membuat Aturan 31 versi lama tetap hijau, sementara
+# gambarnya sudah kehilangan orientasinya.
+#
+# **Kenapa yang ditelusuri hanya cabang planet.** Ekspresi argumennya
+# berbentuk `isMoon ? limbAngle : planetLimbAngle`, dan `limbAngle` **memang**
+# bernilai nil untuk planet (`isMoon ? moonBrightLimbAngle : nil`) -- itu
+# benar, karena cabang itu tidak pernah dipakai planet. Menelusuri seluruh
+# ekspresi akan menuduh kode yang benar. Yang ditelusuri karena itu hanya
+# sisi `else` (bagian yang berlaku untuk planet).
+def _planet_branch(expr):
+    """Bagian `expr` yang berlaku untuk planet: sisi `else` bila bercabang
+    `isMoon`, atau seluruhnya bila tidak."""
+    ternary = re.match(r".*?isMoon\s*\?\s*(.*?)\s*:\s*(.*)$", expr)
+    return ternary.group(2).strip() if ternary else expr.strip()
+
+
+def _bound_value(name):
+    """Ekspresi yang diikat ke `name` lewat `let`, atau None bila tak ada."""
+    match = re.search(r"\blet\s+%s\b[^=\n]*=\s*([^\n]+)" % re.escape(name), code)
+    return match.group(1).strip() if match else None
+
+
+def _is_nil_for_planets(expr):
+    """True bila `expr` jelas bernilai nil untuk planet (bukan Bulan)."""
+    if expr is None:
+        return False
+    value = _planet_branch(expr)
+    if value == "nil":
+        return True
+    # Bentuk bersarang: cabang planetnya sendiri bercabang lagi.
+    return value != expr.strip() and _is_nil_for_planets(value)
+
+
+angle_args = re.findall(r"brightLimbAngleRadians\s*:\s*([^,\n]+)", code)
+if not angle_args:
+    problems.append("  `brightLimbAngleRadians:` tidak ditemukan di %s; gerbang ini "
+                    "kehilangan gigi" % WIRE)
+for expr in angle_args:
+    planet_expr = _planet_branch(expr)
+    if _is_nil_for_planets(expr):
+        problems.append(
+            "  `brightLimbAngleRadians: %s` bernilai nil untuk planet berfase; "
+            "sudut sisi terang yang dihitung tiap 30 detik tidak pernah sampai "
+            "ke gambar, jadi sabit Venus tergambar menghadap arah yang salah "
+            "(terukur 25,6%% piksel berbeda)" % expr.strip())
+        continue
+    # Telusuri nama yang dipakai **di cabang planet** ke nilai penugasannya.
+    for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", planet_expr):
+        if name in ("nil", "true", "false", "isMoon"):
+            continue
+        value = _bound_value(name)
+        if _is_nil_for_planets(value):
+            problems.append(
+                "  `brightLimbAngleRadians` memakai `%s`, yang diikat ke `%s` -- "
+                "nil untuk planet berfase; sabit Venus kehilangan orientasinya "
+                "tanpa satu pun teks di layar yang bisa membantahnya"
+                % (name, value))
 
 print("\n".join(problems) if problems else "")
 PY

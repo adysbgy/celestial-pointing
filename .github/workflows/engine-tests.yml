@@ -541,6 +541,24 @@ jobs:
       - name: Buktikan gerbang warna identitas planet saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-warna-ragu.py
 
+      # Dan bukti untuk kawat **sudut sisi terang** di berkas yang sama —
+      # kawat ketiga dari kelas cacat yang sama, yang versi pertama Aturan 31
+      # lewatkan sambil mengutipnya di komentarnya.
+      #
+      # Diukur: `brightLimbAngleRadians: isMoon ? limbAngle : nil` membuat
+      # seluruh 31 aturan UI tetap hijau, sementara 10.254 dari 40.000 piksel
+      # (25,6%) sabit Venus berubah — sisi terangnya berhenti menghadap
+      # Matahari. Bentuk keduanya lebih halus lagi: nilainya di-`nil`-kan di
+      # baris penugasan (`let planetLimbAngle: Double? = nil`) dengan argumen
+      # tetap utuh, jadi pembaca yang hanya melihat argumennya tidak melihat
+      # apa pun.
+      #
+      # Harness ini **tidak** memutasi sumber produksi: ia mengekstrak program
+      # Aturan 31 dari `swift-ui-lint.sh` dan menjalankannya atas salinan
+      # kawat yang dimutasi di direktori sementara.
+      - name: Buktikan gerbang arah fase sudut sisi terang berbunyi
+        run: python3 Tools/bukti-mutasi-aturan31-sudut.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

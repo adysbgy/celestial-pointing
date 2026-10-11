@@ -1,3 +1,98 @@
+## Progres terakhir (11 Okt 2026 — Aturan 31 mengutip kawat sudut sisi terang tanpa mengukurnya)
+
+Siklus ini menutup kelas cacat yang sama dengan tiga entri di bawahnya, pada
+kawat yang paling baru: gerbang yang **mengutip** sebuah jalur di komentarnya,
+lalu tidak mengukurnya.
+
+`Apps/Shared/PointingEngine.swift` adalah satu-satunya kawat yang menghubungkan
+geometri fase ke gambar objek, dan ia hidup di `Apps/` — jadi `swift-test.sh`
+di Linux (yang hanya membangun `Packages/`) tidak menjangkaunya. Aturan 31
+dibuat untuk itu, dan komentarnya sendiri menyebut `planetBrightLimbAngles`
+sebagai "dihitung tiap 30 detik, lalu tidak pernah dipakai gambar apa pun".
+Yang diperiksa hanya kawat `waxing`. Kawat **sudut** sisi terang tidak diukur
+siapa pun.
+
+**Diukur.** Mematikan kawat sudut:
+
+    brightLimbAngleRadians: isMoon ? limbAngle : nil
+
+membuat **seluruh 31 aturan UI lulus** (`./swift-ui-lint.sh` keluar 0),
+sementara pada port: 10.254 dari 40.000 piksel (25,6%) sabit Venus berubah —
+sisi terangnya berhenti menghadap Matahari. Sabitnya tetap tergambar sebagai
+sabit yang meyakinkan; tidak ada satu pun teks di layar yang bisa dibaca
+pengguna untuk membantahnya.
+
+Bentuk kedua lebih halus, dan ia yang paling mungkin terjadi saat menyunting:
+nilainya di-`nil`-kan di baris **penugasan** dengan argumen tetap utuh,
+
+    let planetLimbAngle: Double? = nil
+
+sehingga pembaca yang hanya melihat argumennya (`: planetLimbAngle`) tidak
+melihat apa pun. Karena itu gerbang barunya membaca **pemakaian dan penugasan
+bersama**: ia menelusuri nama di cabang planet (`else` dari `isMoon ? … : …`)
+ke nilai `let`-nya. Yang ditelusuri hanya cabang planet — `limbAngle` memang
+bernilai nil untuk planet (`isMoon ? moonBrightLimbAngle : nil`), dan itu
+benar karena cabang itu tidak pernah dipakai planet; menelusuri seluruh
+ekspresi akan menuduh kode yang benar.
+
+**Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil` memutar 0
+rad, jadi cacat ini **tak terlihat** pada benda yang sudutnya memang 0. Kasus
+katalog `planet-mercury-crescent` memakai sudut 0,0 — terukur **0 dari 40.000
+piksel** berubah. Gerbang yang mengukur benda itu akan hijau selamanya pada
+kawat yang mati: gerbang hampa. Angka Merkurius di bawah karena itu diukur
+dengan sudut -pi/2, bukan pada sudut katalognya.
+
+**Dua kesalahan pengukuran di harness ini sendiri, keduanya tertangkap
+sebelum push.**
+
+  1. Versi pertama menyalin seluruh pohon repo ke sandbox lalu menjalankan
+     `swift-ui-lint.sh` di sana, dan menganggap **keluar != 0** sebagai
+     "gerbang berbunyi". Lint itu butuh `project.yml` yang tidak ikut
+     tersalin, jadi ia **crash** — dan crash itu terbaca sebagai "berbunyi"
+     untuk **kedua** keadaan mutasi. Keadaan 1 dan 2 tampak OK padahal yang
+     diukur adalah lint yang gagal start. Ini persis kelas cacat yang
+     ditutupnya: merah karena sebab lain daripada yang diklaimnya. Harness
+     sekarang **mengekstrak program Aturan 31 itu sendiri** dari
+     `swift-ui-lint.sh` dan menjalankannya langsung, sehingga tidak ada
+     pra-syarat lain yang bisa menggagalkannya — dan `returncode != 0`
+     berarti **galat**, bukan "berbunyi".
+  2. Keluaran bersih/kotor mulanya ditentukan dengan mencari string penanda
+     di keluaran lint. Program Aturan 31 mencetak daftar masalah atau string
+     kosong, jadi yang dibaca sekarang adalah stdout-nya langsung.
+
+Harness ini **tidak** memutasi sumber produksi (berbeda dari
+`bukti-mutasi-cembung-mengecil.py`): ia menulis salinan kawat yang dimutasi ke
+direktori sementara, jadi tidak ada pemulihan yang bisa gagal.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 742 | **742** (tak disentuh) |
+| Harness dirujuk CI | 18 | **19** |
+| Aturan UI | 31 | 31 (Aturan 31 diperluas, bukan ditambah) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+Dibuktikan berbunyi: dua keadaan mutasi, keduanya merah; baseline bersih.
+`python3 Tools/bukti-mutasi-aturan31-sudut.py` → `3 keadaan, 0 tidak sesuai
+harapan`.
+
+### Yang TIDAK diklaim
+
+- Angka 25,6% dan 32,3% diukur pada **port Python**, bukan pada perangkat
+  Apple. Yang dibuktikan: kawat yang mati mengubah gambar yang digambar port
+  secara terukur, dan gerbang teks menangkap kawat yang mati itu.
+- Gerbang ini adalah **sapu teks**, bukan pemeriksaan tipe. Ia membaca
+  penugasan `let` satu tingkat; rantai penugasan yang lebih panjang dari itu
+  tidak ditelusuri.
+- Tidak ada satu baris pun `Apps/` atau `Packages/` yang berubah siklus ini.
+  Yang berubah: `swift-ui-lint.sh` (Aturan 31 diperluas), harness baru,
+  langkah CI, dan STATUS.
+
+---
+
 ## Progres terakhir (11 Okt 2026 — dua gerbang yang mengukur gambar berbeda dari gambar yang tampil: kawah terlemah & cembung mengecil)
 
 Siklus ini menutup **dua** celah yang bentuknya sama: kodenya benar menurut
