@@ -499,10 +499,37 @@ jobs:
       - name: Buktikan gerbang maria Bulan tidak bocor berbunyi
         run: python3 Tools/bukti-mutasi-maria.py
 
+      # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
+      # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
+      #
+      # `drawPlanet` sudah lama menutup **ciri** planet saat ragu (`guard
+      # isConfirmed` sebelum pita/cincin/kutub), dan itu dijaga
+      # `check_features_disappear_when_uncertain`. Yang tidak pernah ditutup:
+      # **warna bolanya**, diteruskan apa adanya. Terukur dari piksel: Mars
+      # tampil (120, 55, 36) — merah khas Mars — di sebelah lencana "Ragu",
+      # dan jarak antar-kandidat tetap 62…112, jadi mata tetap bisa membaca
+      # "itu Mars" dari gambar yang seharusnya belum mengklaim apa pun.
+      #
+      # Gerbangnya sendiri hijau pada hari ia ditulis — itu bukan bukti apa
+      # pun. Harness ini yang membuktikannya **bisa merah**, dan merah pada
+      # keadaan yang memang salah: lima keadaan, termasuk satu yang **wajib
+      # hijau** (batas yang dinyatakan: gerbang membaca piksel paling terang,
+      # jadi menetralkan `light` saja sudah memenuhinya walaupun `dark` masih
+      # membawa palet planetnya — batas itu direkam, bukan diklaim tertutup).
+      #
+      # **Harness ini sempat tidak berjalan di CI sama sekali**, dan itu
+      # bentuk kegagalan yang persis sama dengan `bukti-mutasi-piringan.py`
+      # sebelumnya: berkasnya ada, isinya benar, dan tidak ada yang
+      # mengeksekusinya. Ditemukan dengan cara yang sama — membandingkan
+      # daftar `Tools/bukti-mutasi-*` di disk dengan yang dirujuk alur kerja.
+      - name: Buktikan gerbang warna identitas planet saat ragu berbunyi
+        run: python3 Tools/bukti-mutasi-warna-ragu.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di
-      # laporan CI. Diukur: 13 berkas di disk, 12 dirujuk.
+      # laporan CI. Diukur: 13 berkas di disk, 12 dirujuk (piringan), lalu 17
+      # di disk, 16 dirujuk (warna ragu) — dua kali kelas cacat yang sama.
       - name: Setiap harness bukti-mutasi dijalankan CI
         run: python3 Tools/check-harness-terdaftar.py
 
