@@ -75,15 +75,21 @@ jobs:
       # daftar lama, jadi menyuntiknya membuktikan apa yang sudah terbukti.
       # Yang perlu dibuktikan adalah abjad yang **tidak** ada di daftar itu.
       #
-      # Harfiahnya ditulis sebagai escape `printf`, bukan hurufnya langsung:
-      # berkas ini sendiri harus Latin, dan Aturan 3 kini menyapu `*.yml` —
-      # gerbang yang memuat huruf Arab sebagai contoh akan memerah pada
-      # dirinya sendiri. `$(printf …)` diperluas shell sebelum `red-lint.sh`
-      # menerimanya, jadi yang disuntik tetap huruf Arab sungguhan.
+      # Harfiahnya lahir dari `python3`, bukan `printf`: langkah ini berjalan
+      # di bawah `sh` (dash), dan `printf` dash **tidak** mengenal escape
+      # `\uXXXX` — ia mencetaknya apa adanya, jadi yang disuntik adalah teks
+      # "// \u0627…" dan gerbangnya benar-benar tetap hijau. Itu bukan
+      # hipotesis: langkah ini merah di CI karena sebab itu, sementara di
+      # shell lokal (bash, yang `printf`-nya mengenal `\u`) ia lulus. Uji
+      # yang lulus hanya di shell penulisnya bukan uji.
+      #
+      # Berkasnya sendiri juga harus Latin: Aturan 3 menyapu `*.yml`, jadi
+      # harfiah Arab yang ditulis langsung akan memerah pada gerbangnya
+      # sendiri.
       - name: Buktikan gerbang aksara non-Latin berbunyi
         run: |
           ./red-lint.sh Apps/PointAndKnowWatch/Sources/WatchTheme.swift \
-            "$(printf '// \u0627\u0644\u0633\u0645\u0627\u0621 selip\n')" \
+            "$(python3 -c 'print("// \u0627\u0644\u0633\u0645\u0627\u0621 selip")')" \
             'Aturan 3'
 
       # Aturan 1 (font tetap) punya cacat yang **sama lagi**, dan polanya
