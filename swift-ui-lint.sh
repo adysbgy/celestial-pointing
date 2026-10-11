@@ -3768,6 +3768,97 @@ else
   echo "Bersih: setiap kunci izin engine ada di project.yml."
 fi
 
+# ── Aturan 31: arah fase harus sampai ke gambar untuk SETIAP benda berfase ──
+# `PointingEngine.visualForDisplayedObject` (Apps/Shared/PointingEngine.swift)
+# adalah **satu-satunya** kawat yang menghubungkan arah fase (waxing/waning)
+# ke gambar objek. Kawat ini hidup di `Apps/`, jadi ia **tidak terjangkau**
+# `swift-test.sh` (Linux hanya membangun `Packages/`), dan sebelum aturan ini
+# ia juga tidak punya gerbang mana pun — satu-satunya penjaganya adalah
+# komentar.
+#
+# **Cacat yang ditutup aturan ini, dan kenapa komentar tidak cukup.** Kawat
+# itu dulunya berbunyi:
+#
+#     let waxing = isMoon ? moonIsWaxing : nil
+#
+# `phaseGeometry(waxing:)` mengembalikan `nil` bila arahnya `nil`, jadi baris
+# itu mematikan **seluruh** jalur fase planet dalam: `planetPhases` dan
+# `planetBrightLimbAngles` dihitung tiap 30 detik, lalu tidak pernah dipakai
+# gambar apa pun. Venus tampil sebagai bola penuh di setiap keadaan —
+# termasuk saat engine baru saja menghitung iluminasinya 2 persen. Gambar itu
+# menyatakan kebalikan dari apa yang dihitung engine, dan tidak ada satu teks
+# pun di layar yang bisa dibaca pengguna untuk memeriksanya.
+#
+# Perbaikannya sudah mendarat di sumber, tapi **tidak ada uji yang
+# menangkapnya** — karena uji menguji *rumus*-nya
+# (`testInnerPlanetDrawsAPhaseFromItsOwnFraction`), bukan *pengawat*-nya. Tanpa
+# gerbang, satu penyuntingan yang mengembalikan `nil` untuk planet akan hijau
+# di semua 30 aturan lain dan merah hanya di langit.
+#
+# **Kenapa polanya "benda berfase", bukan "planet".** Keduanya berfase karena
+# alasan yang sama (sisi terang menghadap Matahari) dan memakai kurva yang
+# sama — jadi aturannya satu, bukan dua. Menulis ulang daftar planet di sini
+# akan membuat salinan kedua yang bisa berbeda diam-diam dari model.
+#
+# Yang diperiksa: kawatnya tidak boleh lagi mengembalikan `nil` untuk benda
+# bukan-Bulan, dan `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`.
+echo
+echo "== Aturan 31: arah fase harus sampai ke gambar untuk tiap benda berfase =="
+waxing=$(python3 - <<'PY' 2>&1
+import os, re
+
+WIRE = "Apps/Shared/PointingEngine.swift"
+
+if not os.path.exists(WIRE):
+    print("PERINGATAN: %s tidak ada." % WIRE)
+    raise SystemExit
+
+text = open(WIRE, encoding="utf-8").read()
+
+# Kode saja: komentar di berkas ini menceritakan cacat lamanya, dan pola
+# `: nil` yang **dikomentari** tidak boleh terbaca sebagai kenyataan.
+code = re.sub(r"//[^\n]*", "", text)
+code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+
+problems = []
+
+# 1. Kawat `waxing` tidak boleh `nil` untuk benda bukan-Bulan.
+#    Dicari sebagai penugasan ke `waxing`, lalu ditolak bila sisi bukan-Bulan
+#    (`else`/`:`) berujung pada `nil`.
+assigns = re.findall(r"\blet\s+waxing\s*=\s*([^\n]+)", code)
+if not assigns:
+    problems.append("  tidak ditemukan penugasan `let waxing =` di %s; gerbang ini "
+                    "kehilangan gigi" % WIRE)
+for expr in assigns:
+    # Bentuk cacat: `isMoon ? moonIsWaxing : nil` (atau `: nil` apa pun).
+    if re.search(r":\s*nil\s*$", expr.strip()):
+        problems.append("  `let waxing = %s` mengembalikan nil untuk benda bukan-Bulan; "
+                        "arah fase planet dalam mati total dan Venus tampil sebagai "
+                        "bola penuh di setiap keadaan" % expr.strip())
+
+# 2. `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`.
+if "isWaxing:" not in code:
+    problems.append("  `isWaxing:` tidak diteruskan ke CelestialVisual; arah fase "
+                    "yang dihitung tidak pernah sampai ke gambar")
+
+print("\n".join(problems) if problems else "")
+PY
+)
+if printf '%s' "$waxing" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 31 gagal dijalankan:"
+  echo "$waxing"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$waxing" ]; then
+  echo "Kawat arah fase putus di Apps/Shared/PointingEngine.swift:"
+  echo "$waxing"
+  echo "-> Tanpa arah, phaseGeometry mengembalikan nil dan benda berfase"
+  echo "   kehilangan fasenya; cacatnya tidak terlihat di layar mana pun."
+  status=1
+else
+  echo "Bersih: arah fase diteruskan untuk setiap benda berfase."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

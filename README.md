@@ -191,7 +191,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **30 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **31 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -225,6 +225,17 @@ ke sana** tidak pernah masuk perbandingan. Persis itu yang terjadi pada
 aplikasi diam-diam tidak akan pernah menemukan teleskop. Aturan 30 membaca
 deklarasi kuncinya dari `Packages/`, jadi kunci baru yang ditambah engine
 merah sampai ia benar-benar sampai ke proyek.
+
+Aturan 31 menutup kelas yang berlawanan dari kebanyakan aturan di sini:
+bukan kunci yang hilang dari proyek, tapi **kawat yang hidup di `Apps/`**.
+`visualForDisplayedObject` adalah satu-satunya jalur yang menghubungkan arah
+fase ke gambar objek, dan karena ia berada di `Apps/` ia tidak terjangkau
+`swift-test.sh` (Linux hanya membangun `Packages/`) — jadi sebelum aturan
+ini, satu-satunya penjaganya adalah komentar. Kawat itu pernah berbunyi
+`isMoon ? moonIsWaxing : nil`, yang mematikan seluruh fase planet dalam:
+Venus tampil sebagai bola penuh persis saat engine baru saja menghitung
+iluminasinya 2 persen. Perbaikannya mendarat di sumber tanpa satu uji pun
+yang menangkapnya, karena uji menguji **rumus**-nya, bukan **pengawat**-nya.
 
 ### Uji harus pernah merah
 
