@@ -1,3 +1,55 @@
+## Progres terakhir (11 Okt 2026 — planet siang hari teruji tidak terkunci: celah jujur Fase C.6)
+
+Siklus ini menutup satu celah **kejujuran** yang belum dijaga, bukan cacat
+gambar. Buktinya datang dari **uji berjalan**, bukan dari membaca docstring.
+
+### Celahnya: siang hari menjaga bintang & Bulan, tetapi bukan planet
+
+Dua penjaga siang yang ada **sengaja** tidak mencakup planet:
+
+- `DaylightLockTests` memilih arah tunjuknya dari `Catalogue.brightStars`, jadi
+  yang dijaganya hanya **bintang**.
+- `MoonDaylightHonestyTests` menguji `.moon` saja, lewat jalur efemerisnya
+  sendiri.
+
+Planet (Merkurius, Venus, Mars, Jupiter, Saturnus) jatuh di celah keduanya:
+bukan bintang katalog, bukan Bulan, tapi masuk kandidat lewat cabang
+`EphemerisBody.pointableBodies` di dalam `resolve`/`diagnose` dengan magnitudo
+**sampel efemeris** (`sample.magnitude`). Jupiter/Saturnus lulus gerbang
+magnitudo + jarak-Matahari, sehingga `daylight` adalah satu-satunya alasan
+mereka tidak jadi kandidat — persis kelas false confidence yang dilarang PRD.
+
+### Yang ditambahkan: `PlanetDaylightHonestyTests` (4 tes)
+
+Memutar `PointingController` **sungguhan** (bukan resolver), karena `.lock`
+adalah satu-satunya keadaan yang memicu haptic sukses, bunyi, pengumuman
+VoiceOver, visual pengenal, dan izin GoTo:
+
+1. `testDaytimePlanetFixtureIsHighUnderABrightSky` — prasyarat fixture supaya
+   penolakan tidak datang dari bawah horizon.
+2. `testDaytimePlanetNeverLocks` — planet siang tidak `.lock`, tak ada haptic.
+3. `testDaytimePlanetRefusalIsHonest` — menyalahkan `daylight`, bukan diam /
+   `.uncertain`.
+4. `testRelaxingOnlyDarknessBringsThePlanetBack` — **bukti positif wajib**:
+   planet kembali jadi kandidat bila hanya `sunAltitudeForDarknessDeg`
+   dilonggarkan (lewat policy, bukan `SkyContext(isDark:)` karangan). Tanpa ini
+   berkas bisa hijau tanpa menguji apa pun. Terukur (probe): Saturnus
+   alt 43,3° / Matahari 69,5° → `low`/`best=nil` produksi, `high`/`saturn`
+   saat gerbang gelap dilonggarkan.
+
+Fixture dicari dari efemeris (tinggi + tertahan hanya karena terang + kembali
+saat gerbang gelap dilonggarkan) — posisi planet di suatu tanggal adalah hasil
+perhitungan; menebaknya membuat uji vacuous.
+
+### Verifikasi
+
+- `./swift-test.sh` → **CelestialEngine 212 + PointingKit 736 hijau**, 0 gagal
+  (732 + 4 tes baru).
+- CI gagal pertama kali **bukan** karena logika: Aturan 10 `swift-ui-lint.sh`
+  menolak README yang masih bilang "PointingKit 732". README & STATUS.md
+  diselaraskan ke 736. (Ini juga pelajaran: gerbang itu hidup — ia menangkap
+  dokumen yang tidak ikut hitungan tes, tepat seperti yang dirancang.)
+
 ## Progres terakhir (11 Okt 2026 — suara tidak lagi membungkam fase Bulan saat engine ragu: dua kebenaran untuk satu keadaan)
 
 Siklus ini menutup satu cacat aksesibilitas kejujuran, bukan cacat gambar.
@@ -80,7 +132,7 @@ Catatan konkurensi: perubahan ini hanya menyentuh 4 berkas milik siklus ini
 
 ### Verifikasi
 
-  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 732 hijau**, 0 gagal
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 736 hijau**, 0 gagal
     (76 suite, 0 kegagalan).
   - `python3 Tools/check-visuals.py --check` → **729 pemeriksaan, 0 gagal**
     (termasuk `check_moon_phase_survives_uncertainty`).
