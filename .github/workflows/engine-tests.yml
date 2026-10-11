@@ -64,6 +64,26 @@ jobs:
               }
           ' 'Aturan 15'
 
+      # Aturan 1 (font tetap) punya cacat yang **sama lagi**, dan polanya
+      # sudah jelas sekarang: setiap gerbang yang memotong komentar dengan
+      # `//` pertama pada baris akan buta pada baris yang memuat `//` di
+      # dalam literal. Disuntik dan diukur:
+      #
+      #   Text("https://example.com/x").font(.system(size: 11))
+      #   → "Bersih: tidak ada .system(size:) pada kode di Apps/"
+      #
+      # Baris dengan URL atau path di dalamnya justru bentuk yang paling
+      # mungkin dialam, dan itu satu-satunya yang tidak terlihat. Yang
+      # disuntik di sini sengaja memuat literal itu, bukan bentuk polos yang
+      # sudah tertangkap versi lama.
+      - name: Buktikan gerbang font tetap berbunyi
+        run: |
+          ./red-lint.sh Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift \
+            'private func mutasiUrl() -> some View {
+                 Text("https://example.com/x").font(.system(size: 11))
+             }
+          ' 'Aturan 1'
+
       # Aturan 7 punya bentuk cacat yang **sama**, dan itu bukan kebetulan:
       # batas cakupannya juga dulu diturunkan dari bentuk berkas, bukan dari
       # tempat API itu benar-benar dipanggil. Versi pertamanya menanyakan

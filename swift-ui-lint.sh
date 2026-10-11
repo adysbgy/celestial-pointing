@@ -50,23 +50,88 @@ fi
 
 # ── Aturan 1: tidak ada ukuran font tetap ──────────────────────────────────
 # Sapu `.system(size:` dan `Font.system(size:` pada **kode**, bukan komentar.
-# `grep -v '^\s*//'` saja tidak cukup: komentar bisa muncul setelah kode pada
-# baris yang sama, jadi potongan sebelum `//` yang diperiksa.
+#
+# Versi pertama memakai `awk` dengan `index(line, "//")` untuk membuang
+# komentar sebaris. Bentuk itu punya cacat yang sama dengan yang baru
+# ditemukan di Aturan 7: ia memotong di `//` pertama pada baris, termasuk
+# `//` yang ada **di dalam literal string**. Disuntik dan diukur:
+#
+#     Text("https://example.com/x").font(.system(size: 11))
+#
+# → "Bersih: tidak ada .system(size:) pada kode di Apps/." Pelanggaran
+# Dynamic Type yang paling mungkin dialam (baris dengan URL atau path di
+# dalamnya) justru satu-satunya yang tidak terlihat. Ia juga tidak mengenal
+# komentar blok `/* */` sama sekali, jadi komentar multi-baris tetap dibaca
+# sebagai kode.
+#
+# Karena itu pemotong komentar di sini sama dengan Aturan 7: sadar literal,
+# sadar escape, dan sadar komentar blok.
 echo "== Aturan 1: tidak ada ukuran font tetap di Apps/ =="
-hits=$(while IFS= read -r f; do
-  awk -v file="$f" '
-    {
-      line = $0
-      sub(/^/, "", line)
-      # Buang komentar sebaris: hanya bagian sebelum "//" yang bisa berupa kode.
-      # Awk tidak punya regex non-greedy portabel, jadi index() dipakai.
-      idx = index(line, "//")
-      if (idx > 0) line = substr(line, 1, idx - 1)
-      if (line ~ /\.system\(size:/ || line ~ /Font\.system\(size/) {
-        printf "%s:%d: %s\n", file, FNR, $0
-      }
-    }' "$f"
-done < <(find Apps -name '*.swift' | sort))
+hits=$(python3 - <<'PY'
+import os, re
+
+FONT_API = re.compile(r"\.system\(size:|Font\.system\(size")
+
+
+def strip_comments(src):
+    """Buang `//` dan `/* */` yang berada di **luar** literal string."""
+    out, i, n = [], 0, len(src)
+    in_str, esc = False, False
+    while i < n:
+        ch = src[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                # Baris baru di dalam komentar blok **dipertahankan**, supaya
+                # nomor baris temuan tetap cocok dengan berkas aslinya.
+                if src[i] == "\n":
+                    out.append("\n")
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+hits = []
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        raw = open(path, encoding="utf-8").read()
+        src = strip_comments(raw)
+        raw_lines = raw.split("\n")
+        for m in FONT_API.finditer(src):
+            line = src[:m.start()].count("\n") + 1
+            # Teks yang dilaporkan diambil dari baris **asli** supaya komentar
+            # di ujungnya tetap terbaca orang; nomor barisnya dari sumber
+            # bersih, yang jumlah barisnya sama karena baris baru dijaga.
+            shown = raw_lines[line - 1].strip() if line - 1 < len(raw_lines) else ""
+            hits.append(f"{path}:{line}: {shown}")
+print("\n".join(hits) if hits else "")
+PY
+)
 
 if [ -n "$hits" ]; then
   echo "Ukuran font tetap ditemukan (abaikan Dynamic Type):"
