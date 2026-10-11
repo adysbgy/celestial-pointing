@@ -2464,29 +2464,49 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(quarter.spokenPhase(isConfirmed: true), LocalizedText.moonPhaseQuarter.indonesian)
     }
 
-    /// Fase **tidak** diucapkan saat engine ragu — suara tidak boleh lebih
-    /// yakin daripada gambarnya.
+    /// Fase Bulan **tetap diucapkan** saat engine ragu — karena gambarnya pun
+    /// tetap menampilkannya.
     ///
-    /// Cacat yang ditutup: `spokenPhase` dulu dipanggil tanpa ambang
-    /// `isConfirmed` di kedua app, sementara dua saudaranya
-    /// (`spokenDeepSkyMorphology`, `spokenStarColor`) sudah memakainya. Akibatnya
-    /// pada keadaan `.uncertain` — piringan Bulan digambar netral (tidak
-    /// mengklaim fase), badge bertuliskan "Ragu" — VoiceOver tetap
-    /// mengumumkan "Bulan sabit muda". Dua pengguna dengan keadaan yang sama
-    /// mendapat dua kebenaran berbeda: itu persis kelas false confidence yang
-    /// dilarang PRD. Diuji di sini (bukan di view) supaya ambangnya tidak bisa
-    /// hilang saat salah satu app merefaktor panggilannya.
-    func testMoonPhaseIsSilentWhenUncertain() {
-        // Sabit muda yang jelas: diucapkan saat yakin, diam saat ragu.
+    /// Cacat yang ditutup: siklus 9 Okt membungkam `spokenPhase` saat ragu
+    /// dengan premis bahwa "piringan Bulan digambar netral" (tidak mengklaim
+    /// fase), sehingga suara tidak boleh lebih yakin daripada gambar. Premis
+    /// itu **salah, dan terukur salah**: `check_moon_phase_survives_uncertainty`
+    /// menuntut sabit "ragu" identik piksel demi piksel dengan sabit "yakin",
+    /// dan diukur ulang di sini — 0 piksel berbeda di luar lencana, sementara
+    /// sabit vs purnama 10.234 piksel. Jadi fase Bulan **memang** tergambar
+    /// saat ragu, dan itu keputusan yang disengaja sejak 5 Okt: fraksi &
+    /// arahnya datang dari **efemeris** (fakta tentang tanggal), bukan dari
+    /// tabel yang diindeks id, jadi tidak ada identitas yang bisa salah
+    /// diklaim oleh sebuah fase.
+    ///
+    /// Akibat pembungkaman itu justru kelas cacat yang ingin dicegahnya:
+    /// pengguna yang melihat mendapat sabit, pengguna VoiceOver tidak
+    /// mendapat apa-apa. Dua pengguna, keadaan sama, dua kebenaran berbeda —
+    /// dan kali ini yang dirugikan yang **tidak bisa melihat**. Membungkam
+    /// suara tidak menurunkan keyakinan gambar sedikit pun; ia hanya
+    /// menyembunyikan informasi yang sudah ada di layar.
+    ///
+    /// Penanda ragu tetap diucapkan **lebih dulu** (`Belum pasti. Bulan,
+    /// sabit muda`), jadi pengumumannya tidak pernah terdengar sebagai
+    /// temuan pasti: ragu tetap ragu, hanya tidak lagi buta fase.
+    ///
+    /// Diuji di sini (bukan di view) supaya ambangnya tidak bisa hilang saat
+    /// salah satu app merefaktor panggilannya.
+    func testMoonPhaseIsStillSpokenWhenUncertain() {
+        // Sabit muda: diucapkan saat yakin **dan** saat ragu, karena
+        // gambarnya menampilkannya di kedua keadaan.
         let crescent = moon(fraction: 0.2, waxing: true)
         XCTAssertNotNil(crescent.spokenPhase(isConfirmed: true),
                         "fase diucapkan saat engine yakin")
-        XCTAssertNil(crescent.spokenPhase(isConfirmed: false),
-                     "fase dibungkam saat engine ragu (ciri pengenal)")
-        // Purnama: juga diam saat ragu, bukan cuma sabit.
+        XCTAssertNotNil(crescent.spokenPhase(isConfirmed: false),
+                        "fase tetap diucapkan saat ragu: gambarnya pun tetap menampilkan sabit")
+        XCTAssertEqual(crescent.spokenPhase(isConfirmed: false),
+                       crescent.spokenPhase(isConfirmed: true),
+                       "suara tidak boleh berbeda dari gambar: sabit yang sama, kata yang sama")
+        // Purnama: juga tetap diucapkan, bukan cuma sabit.
         let full = moon(fraction: 1.0, waxing: true)
         XCTAssertNotNil(full.spokenPhase(isConfirmed: true))
-        XCTAssertNil(full.spokenPhase(isConfirmed: false))
+        XCTAssertNotNil(full.spokenPhase(isConfirmed: false))
     }
 
     // MARK: - Warna spektral bintang (VoiceOver)

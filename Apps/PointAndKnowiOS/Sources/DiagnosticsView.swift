@@ -1012,9 +1012,12 @@ struct DiagnosticsView: View {
         // sengaja tidak dideskripsikan gambarannya — lihat catatan di atas.
         // `spokenPhase` mengembalikan `nil` untuk bukan-Bulan dan untuk fase
         // yang tidak diketahui, jadi tidak ada fase yang ditebak di sini.
-        // `spokenPhase` mengembalikan `nil` untuk bukan-Bulan, untuk fase
-        // yang tidak diketahui, **dan saat engine ragu** — fase adalah ciri
-        // pengenal, jadi tidak diucapkan saat gambar memakai piringan netral.
+        // **Tetapi tidak untuk keadaan ragu**: fase Bulan tetap tergambar saat
+        // engine ragu (fraksi & arahnya dari efemeris, bukan dari tabel
+        // berindeks id — terukur identik piksel demi piksel dengan sabit
+        // "yakin"), jadi suara ikut menyebutnya. Membungkamnya tidak
+        // menurunkan keyakinan gambar; ia hanya membuat VoiceOver buta
+        // terhadap informasi yang sudah ada di layar.
         if let phase = visual?.spokenPhase(isConfirmed: isConfirmed) {
             parts.append(phase)
         }

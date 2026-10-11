@@ -619,10 +619,18 @@ struct ObjectDetailView: View {
         // ditebak di sini.
         // Fase Bulan: satu-satunya informasi di panel ini yang **hanya** bisa
         // dilihat. Sama seperti warna bintang dan bentuk objek langit dalam di
-        // bawahnya, fase adalah **ciri pengenal** — dan saat engine ragu gambar
-        // memakai piringan netral, jadi suara tidak boleh mengucapkan fase.
-        // `isConfirmed` diteruskan supaya pengumuman cocok dengan gambar, bukan
-        // lebih yakin darinya. (Lihat `MoonPhaseSpeech`.)
+        // bawahnya, fase adalah **ciri** — tetapi tidak seperti keduanya, ia
+        // **tetap tergambar** saat engine ragu: fraksi & arahnya datang dari
+        // efemeris (fakta tentang tanggal), bukan dari tabel berindeks id,
+        // jadi tidak ada identitas yang bisa salah diklaim oleh sebuah fase.
+        // Itu terukur: sabit "ragu" identik piksel demi piksel dengan sabit
+        // "yakin" (`check_moon_phase_survives_uncertainty`).
+        //
+        // Karena itu suara **ikut menyebutnya** saat ragu: membungkamnya
+        // tidak menurunkan keyakinan gambar sedikit pun, ia hanya membuat
+        // VoiceOver buta terhadap informasi yang sudah ada di layar. Penanda
+        // ragu tetap diucapkan lebih dulu, jadi pengumumannya tidak pernah
+        // terdengar sebagai temuan pasti. (Lihat `MoonPhaseSpeech`.)
         if let phase = visual?.spokenPhase(isConfirmed: isConfirmed) {
             parts.append(phase)
         }
