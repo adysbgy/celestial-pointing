@@ -18964,3 +18964,74 @@ shell: keduanya MERAH, exit 1, berkas dipulihkan.
     dash tidak mengenal `\uXXXX`, jadi suntikan yang lulus di bash tidak
     menyuntik apa pun di CI. Uji yang hanya dijalankan di shell penulisnya
     membuktikan sesuatu tentang mesin penulisnya, bukan tentang CI.
+
+---
+
+## Siklus 11 Okt (lanjutan) — audit celah Fase C.6 dan uji regresi yang DIBUANG
+
+**Yang diukur, bukan diwarisi.** STATUS terdahulu dan brief menyebut hitungan
+"166 + 143" dan "166 + 244". Realitas terukur hari ini:
+`./swift-test.sh` → **CelestialEngine 212 + PointingKit 736 hijau** (0 gagal),
+`./swift-ui-lint.sh` → **31 aturan lulus**, `./swift-typecheck.sh` lulus.
+Angka brief sudah basi; yang dipakai adalah hasil terukur.
+
+### Yang dicoba: celah "objek langit dalam di bawah horizon" (Fase C.6)
+
+  - Hipotesis: `BelowHorizonHonestyTests` hanya menguji **bintang** dan
+    **Bulan**, padahal `PointingResolver.diagnose` menjalankan cabang
+    `object.kind == .star || object.kind == .deepSky` pada loop yang sama,
+    dan `VisibilityFilter.classify` menerima `kind:` supaya ambang magnitudo
+    DSO bisa berbeda (9.0). Jadi DSO menempuh jalur kandidat yang berbeda.
+  - **Hasil: celah itu TIDAK ada.** Dua bukti:
+    1. `ResolverTests.testDeepSkyObjectResolvesAndRejectsBelowHorizon`
+       (ResolverTests.swift:426) sudah menuntut DSO sintetis di bawah horizon
+       ditolak dengan alasan `.belowHorizon`.
+    2. `Targets.availableTargets` (Targets.swift:92) sudah menyaring
+       `direction.altitudeDeg <= policy.minAltitudeDeg` untuk **bintang dan
+       DSO sekaligus** — bukan hanya bintang.
+
+### Uji yang ditulis lalu DIBUANG (dan kenapa itu yang benar)
+
+  - Dua uji ditambahkan ke `DeepSkyCatalogueTests` (`.neverLocks` dan
+    `.isRejectedForThatExactReason`), hijau di 738 uji.
+  - **Uji mutasi membuktikan keduanya hampa.** Mematikan gate horizon di
+    `Targets.swift:92` membuat keduanya **tetap lulus**; yang merah justru
+    uji yang sudah ada (`TargetsTests.testOfferedTargetsCanActuallyBeLocked`).
+    Artinya kedua uji baru tidak menangkap cacat apa pun — mereka menambah
+    angka, bukan jaminan.
+  - Mencoba mematikan `belowHorizon` di `Visibility.swift` justru
+    **meruntuhkan build PointingKit** (52 gagal di CelestialEngine), sehingga
+    uji PointingKit tidak pernah berjalan. Pelajaran: mutasi harus
+    menyasar jalur yang bisa dicapai paket tempat uji berada.
+  - **Keduanya dibuang, 736 dikembalikan.** Menambah uji yang lulus saat
+    kode rusak lebih buruk daripada tidak menambah uji: ia memberi rasa aman
+    tanpa keamanan.
+
+### Yang diperiksa dan ternyata sudah selesai (tidak dikerjakan ulang)
+
+  - Lokalisasi: 472 kunci, semua punya `en`; `id` adalah `sourceLanguage`
+    jadi nilainya ada di akar katalog. Onboarding punya 5 kunci lengkap.
+  - Izin: `id.lproj/InfoPlist.strings` + `en.lproj/...` berisi
+    Motion & Location; penolakan runtime ditangani (`.denied`/`.restricted`).
+  - `isGibbous` memang tidak pernah dibaca, tapi **tidak berbahaya**: Bulan
+    gibbous sudah tergambar benar lewat `terminatorOffset` bertanda, jadi
+    menyambungkannya akan jadi churn, bukan perbaikan.
+
+### Yang belum disentuh (milik agen paralel / butuh keputusan)
+
+  - `Tools/check-visuals.py` + `render-visuals.py` + `engine-tests.yml`:
+    267 baris WIP agen loop kedua. Gerbang visual saat ini justru **crash**
+    pada WIP mereka (`PHASE_FEATURE_CASES` belum terdefinisi) — jadi hasil
+    gerbang visual hari ini mencerminkan WIP yang setengah jadi, bukan
+    keadaan kirim. Sengaja tidak disentuh.
+  - Uranus/Neptune dan Experiment 1 tetap butuh keputusan/data nyata.
+
+### Pelajaran (catat, bukan ulang)
+
+  - **Uji baru harus dibuktikan berbunyi pada cacat yang ia klaim jaga.**
+    Uji yang hijau sebelum dan sesudah kode dilubangi bukan jaminan; ia
+    dekorasi. Uji mutasi yang menarget jalur yang bisa dicapai adalah satu
+    -satunya cara membedakan keduanya.
+  - **Sebelum menulis uji "celah", cari dulu uji yang sudah menutupnya.**
+    Dua uji hari ini lahir dari hipotesis yang benar secara analisis tapi
+    sudah ditutup oleh `ResolverTests.swift:426`.
