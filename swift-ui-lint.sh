@@ -679,15 +679,48 @@ fi
 # "hijau yang tidak hijau" — tidak ada gerbang yang merah karena tidak ada
 # gerbang yang tahu aturan itu **seharusnya** dibaca.
 #
-# Yang ditutup di sini adalah **kelas**-nya, bukan satu situs: berkas mana pun
-# yang memanggil API gerak wajib merujuk penjaga gerak. `withAnimation` pada
-# tombol baru akan tertangkap di commit yang sama, bukan bulan kemudian.
+# **Cakupan versi pertama terlalu lebar, dan itu terbukti dengan menyuntik.**
+# Ia menanyakan penjaganya ke **seluruh berkas** (`whole = "\n".join(lines)`)
+# dan berhenti setelah satu laporan per berkas (`break`). Terukur pada
+# `PointingView.swift`: satu `motion.allowsTransitions` di baris 546 membuat
+# ketiga API gerak di berkas itu lolos — termasuk `TimelineView(.animation)`
+# di `PulsingCelestialVisual`, yang penjaganya (`motion.allowsContinuousMotion`)
+# hidup di `if` pada baris berikutnya, bukan di pohon yang sama.
+#
+# Dua akibatnya, dan yang kedua jauh lebih mahal:
+#   1. `break` membuat API gerak **kedua** di satu berkas tidak pernah
+#      diperiksa sama sekali. Berkas yang sudah punya satu penjaga adalah
+#      berkas yang paling aman menurut gerbang ini — persis kebalikannya.
+#   2. `withAnimation` baru di fungsi baru di berkas yang sudah menyebut
+#      `motion` **hijau**, walau tidak ada penjaga di dekatnya. Disuntik dan
+#      diukur: `withAnimation(.linear(duration: 0.3))` di fungsi baru
+#      `PointingView.swift` → gerbang ini melaporkan "Bersih".
+#
+# Yang ditutup karena itu adalah **kelas**-nya dengan cakupan yang benar:
+# setiap API gerak harus berada di dalam blok `{...}` yang memuat rujukan
+# penjaga — blok itu sendiri, atau salah satu blok yang membungkusnya.
+#
+# **Kenapa blok, bukan "rentang fungsi".** Fungsi bukan satu-satunya pemilik
+# badan di berkas SwiftUI. `var body: some View` adalah **properti**; rentang
+# berbasis `func` membuat `body` tidak punya pemilik sama sekali dan
+# melaporkan seluruh 6 API gerak yang ada sebagai pelanggaran — gerbang yang
+# merah pada kode yang benar, dan gerbang seperti itu dimatikan orang.
+# Kurung kurawal menutup `func`, `var`, `if`, dan `else` sekaligus, tanpa
+# perlu tahu mana yang sedang dibaca. Terukur: 6/6 API gerak yang ada hijau,
+# dan suntikan di atas merah — satu-satunya selisihnya.
 #
 # Yang diperiksa adalah nama API **di kode**, sementara penjaga boleh disebut
-# di mana saja di berkas (kode atau komentar). Alasannya: dokumentasi aturan
-# ini sendiri menyebut `withAnimation`, jadi penyapu yang ikut menghitung
+# di mana saja di dalam bloknya (kode atau komentar). Alasannya: dokumentasi
+# aturan ini sendiri menyebut `withAnimation`, jadi penyapu yang ikut menghitung
 # komentar akan melaporkan dirinya sendiri -- persis gerbang yang selalu merah
 # dan akan dimatikan orang lain saat ia berbunyi.
+#
+# Batas yang dinyatakan: blok yang diuji adalah blok **terdekat yang memuat**,
+# bukan blok yang sebenarnya mengeksekusi API itu. Penjaga di `if` bersaudara
+# masih hijau. Batas itu dibiarkan karena versi yang lebih ketat menuntut
+# pelacakan alur yang tidak bisa dibuktikan benar oleh sapu teks — dan
+# `red-lint.sh` di CI menyuntik kasusnya sendiri untuk memastikan gerbang ini
+# tetap berbunyi, bukan hanya tetap tenang.
 echo
 echo "== Aturan 7: API gerak harus punya penjaga reduce-motion =="
 motion=$(python3 - <<'PY'
@@ -708,9 +741,77 @@ MOTION_API = re.compile(
 
 # Penjaga yang membuat gerak boleh atau tidak berjalan. `isLuminanceReduced`
 # ikut dihitung karena `NightAwareContainer` sudah memakainya sebelum aturan
-# ini ada; berkas yang hanyavíا Always-On itu tidak otomatis salah.
+# ini ada; berkas yang hanya mengurus Always-On itu tidak otomatis salah.
 GUARD = re.compile(
     r"\breduceMotion\b|\bMotionPolicy\b|\bisLuminanceReduced\b")
+
+
+def strip_comments(src):
+    """Buang `//` dan `/* */` yang berada di **luar** literal string.
+
+    Kenapa bukan `raw[:raw.find("//")]` seperti versi pertama: bentuk itu
+    memotong di `//` pertama pada baris, termasuk `//` yang ada **di dalam**
+    literal (URL, path, regex). Selain itu ia tidak mengenal komentar blok,
+    jadi komentar multi-baris yang menjelaskan aturan ini tetap terbaca
+    sebagai kode.
+    """
+    out, i, n = [], 0, len(src)
+    in_str, esc = False, False
+    while i < n:
+        ch = src[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def brace_blocks(src):
+    """Semua pasangan `{...}` yang berimbang, sebagai (buka, tutup)."""
+    stack, out = [], []
+    for i, ch in enumerate(src):
+        if ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            out.append((stack.pop(), i))
+    return out
+
+
+def is_guarded(src, pos, blocks):
+    """Apakah `pos` berada di blok yang memuat rujukan penjaga.
+
+    Blok yang diuji adalah blok terdekat yang memuat `pos`, lalu blok yang
+    membungkusnya, dan seterusnya ke luar. Penjaga di **saudara** blok tidak
+    dihitung — itu yang membedakan gerbang ini dari versi berkas-lebar.
+    """
+    for (open_at, close_at) in blocks:
+        if open_at < pos < close_at and GUARD.search(src[open_at:close_at + 1]):
+            return True
+    return False
+
 
 bad = []
 for root, _, files in os.walk("Apps"):
@@ -718,29 +819,28 @@ for root, _, files in os.walk("Apps"):
         if not name.endswith(".swift"):
             continue
         path = os.path.join(root, name)
-        lines = open(path, encoding="utf-8").read().split("\n")
-        for n, raw in enumerate(lines, 1):
-            # Komentar dibuang hanya dari sisi yang diperiksa (nama API):
-            # dokumentasi aturan ini menyebut `withAnimation`, jadi termasuk
-            # kalau tidak dibuang akan melaporkan dirinya sendiri.
-            code = raw[:raw.find("//")] if "//" in raw else raw
-            if MOTION_API.search(code):
-                whole = "\n".join(lines)
-                if not GUARD.search(whole):
-                    bad.append(f"  {path}:{n}: {raw.strip()[:70]}")
-                break  # satu laporan per berkas sudah cukup
+        src = strip_comments(open(path, encoding="utf-8").read())
+        blocks = brace_blocks(src)
+        # **Tanpa `break`.** Versi pertama berhenti setelah laporan pertama
+        # per berkas, jadi API gerak kedua di berkas yang sama tidak pernah
+        # diperiksa. Setiap kemunculan diperiksa sendiri.
+        for m in MOTION_API.finditer(src):
+            if is_guarded(src, m.start(), blocks):
+                continue
+            line = src[:m.start()].count("\n") + 1
+            bad.append(f"  {path}:{line}: {m.group(0)}")
 print("\n".join(bad) if bad else "")
 PY
 )
 if [ -n "$motion" ]; then
-  echo "Gerak dipanggil tanpa penjaga reduce-motion di berkas ini:"
+  echo "Gerak dipanggil di luar blok berpenjaga reduce-motion:"
   echo "$motion"
   echo "-> Baca MotionPolicy.allowsContinuousMotion / allowsTransitions"
-  echo "   dari PointingKit. Kalau memang boleh tanpa, itu satu kebetulan"
-  echo "   yang belum ditulis di mana pun."
+  echo "   dari PointingKit, di blok yang sama dengan pemanggilan geraknya."
+  echo "   Penjaga di fungsi/berkas lain tidak menutupi baris ini."
   status=1
 else
-  echo "Bersih: setiap API gerak punya penjaga reduce-motion."
+  echo "Bersih: setiap API gerak berada di blok berpenjaga reduce-motion."
 fi
 
 # ── Aturan 8: kata asing yang terselip di komentar/kode ───────────────────

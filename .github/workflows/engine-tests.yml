@@ -64,6 +64,25 @@ jobs:
               }
           ' 'Aturan 15'
 
+      # Aturan 7 punya bentuk cacat yang **sama**, dan itu bukan kebetulan:
+      # batas cakupannya juga dulu diturunkan dari bentuk berkas, bukan dari
+      # tempat API itu benar-benar dipanggil. Versi pertamanya menanyakan
+      # penjaganya ke seluruh berkas lalu `break` setelah satu laporan —
+      # sehingga `withAnimation` baru di fungsi baru di berkas yang sudah
+      # menyebut `motion` **hijau**, walau tidak ada penjaga di dekatnya.
+      #
+      # Yang disuntik di sini sengaja diletakkan di `PointingView.swift`,
+      # berkas yang **sudah** punya penjaga gerak yang sah. Berkas seperti
+      # itulah yang paling aman menurut versi lama, dan justru itu yang
+      # membuatnya paling mudah ditambahi gerak tanpa penjaga.
+      - name: Buktikan gerbang reduce-motion berbunyi
+        run: |
+          ./red-lint.sh Apps/PointAndKnowWatch/Sources/PointingView.swift \
+            'private func mutasiTanpaPenjaga() -> some View {
+                 Text("x").withAnimation(.linear(duration: 0.3)) { _ in }
+             }
+          ' 'Aturan 7'
+
       # Gambar objek tidak bisa diperiksa di sini: `CelestialVisualView` hanya
       # terbangun di macOS, dan job ini berjalan di Linux. Karena itu lapisan
       # menggambarnya **diport ke Python** (`Tools/render-visuals.py`) dan
