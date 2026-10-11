@@ -18440,10 +18440,29 @@ dihapus, bukan aturannya yang diberi pengecualian.** Hurufnya kini disebut
 sebagai `U+0627, ALEF`, bukan digambar.
 
 Jebakan itu berlanjut ke langkah CI: berkas `*.yml` juga disapu, jadi
-harfiah Arab di sana ditulis sebagai escape `printf`
-(`"$(printf '// \u0627\u0644…')"`), yang diperluas shell sebelum
-`red-lint.sh` menerimanya. Yang disuntik tetap huruf Arab sungguhan; yang
-tetap Latin adalah berkasnya.
+harfiah Arab di sana ditulis sebagai escape, bukan digambar.
+
+### Dan langkah pembuktinya sendiri sempat hijau karena **tidak menyuntik apa pun**
+
+Versi pertama harfiah itu memakai `printf`:
+
+    "$(printf '// \u0627\u0644\u0633\u0645\u0627\u0621 selip\n')"
+
+Langkah CI berjalan di bawah `sh` (**dash**), dan `printf` dash **tidak
+mengenal** escape `\uXXXX` — ia mencetaknya apa adanya. Yang disuntik adalah
+teks harfiah `// \u0627...` (ASCII biasa), bukan huruf Arab, jadi gerbangnya
+benar-benar tetap hijau. `red-lint.sh` lalu melaporkan `HIJAU PALSU` — dengan
+benar.
+
+Yang membuatnya bertahan sesaat: di shell lokal (**bash**, yang `printf`-nya
+mengenal `\u`) perintah yang sama **lulus**. Jadi langkah itu membuktikan
+sesuatu di mesin penulisnya dan tidak membuktikan apa pun di CI.
+
+Kelasnya sama dengan seluruh siklus ini — hijau karena tidak mengukur apa pun
+— hanya saja yang tidak mengukur di sini adalah **langkah pembuktinya
+sendiri**, bukan gerbangnya. Harfiahnya kini lahir dari
+`python3 -c 'print(...)'`, yang sama di dash dan bash; diukur di **kedua**
+shell: keduanya MERAH, exit 1, berkas dipulihkan.
 
 ### Verifikasi (terukur, bukan diklaim)
 
@@ -18474,3 +18493,7 @@ tetap Latin adalah berkasnya.
     sendiri.** Solusinya menghapus contoh harfiah, bukan melubangi aturan —
     dan itu berlaku dua kali di sini: di komentar skrip, dan di harfiah
     langkah CI.
+  - **Langkah pembuktian harus diuji di shell yang sama dengan CI.** `printf`
+    dash tidak mengenal `\uXXXX`, jadi suntikan yang lulus di bash tidak
+    menyuntik apa pun di CI. Uji yang hanya dijalankan di shell penulisnya
+    membuktikan sesuatu tentang mesin penulisnya, bukan tentang CI.
