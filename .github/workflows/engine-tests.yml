@@ -543,16 +543,22 @@ jobs:
 
       # Dan bukti untuk **dua kawat fase** di berkas yang sama — kawat yang
       # versi pertama Aturan 31 lewatkan sambil mengutipnya di komentarnya.
-      # Empat keadaan: tiap kawat diuji dalam dua bentuk, argumennya di-`nil`-kan
-      # dan nilainya di-`nil`-kan di baris penugasan.
+      # Delapan keadaan: dua kawat x dua bentuk (argumen di-`nil`-kan, dan
+      # nilainya di-`nil`-kan di baris penugasan) x dua cabang benda (planet,
+      # Bulan).
       #
-      # Diukur pada port, satu kawat dimatikan per keadaan:
-      #   `brightLimbAngleRadians` -> nil  : 10.254/40.000 piksel (25,6%)
-      #   `planetIlluminationFraction` -> nil : 31.604/40.000 piksel (79,0%)
-      # Yang kedua paling parah: seluruh pita terang hilang dan Venus
-      # tergambar sebagai **bola penuh** di setiap keadaan, termasuk saat
-      # engine baru menghitung iluminasinya 0,22 — gambar yang menyatakan
-      # kebalikan dari yang dihitung engine.
+      # Diukur pada port, satu kawat dimatikan per keadaan, lalu seluruh 31
+      # aturan UI dijalankan — semuanya tetap **hijau**:
+      #   `brightLimbAngleRadians` (planet) -> nil : 10.254/40.000 (25,6%)
+      #   `planetIlluminationFraction`       -> nil : 31.604/40.000 (79,0%)
+      #   `moonIlluminationFraction`         -> nil : 31.604/40.000 (79,0%)
+      #   `brightLimbAngleRadians` (Bulan)   -> nil :  8.686/40.000 (21,7%)
+      #   `waxing` cabang Bulan              -> nil : 31.604/40.000 (79,0%)
+      #   `waxing` cabang planet             -> nil : 31.604/40.000 (79,0%)
+      # Yang fraksi paling parah: seluruh pita terang hilang dan benda
+      # berfase tergambar sebagai **bola penuh** di setiap keadaan, termasuk
+      # saat engine baru menghitung iluminasinya 0,22 — gambar yang
+      # menyatakan kebalikan dari yang dihitung engine.
       #
       # Bentuk keduanya lebih halus: nilainya di-`nil`-kan di baris penugasan
       # dengan argumen tetap utuh, jadi pembaca yang hanya melihat argumennya
