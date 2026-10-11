@@ -1,3 +1,211 @@
+## Progres terakhir (11 Okt 2026 — dua gerbang yang mengukur gambar berbeda dari gambar yang tampil: kawah terlemah & cembung mengecil)
+
+Siklus ini menutup **dua** celah yang bentuknya sama: kodenya benar menurut
+semua uji yang ada, tapi yang diukur gerbang bukan yang digambar perangkat.
+Keduanya ditemukan dengan **mutasi yang dijalankan**, bukan dengan membaca
+docstring — dan keduanya berakhir sebagai gerbang yang **dibuktikan bisa merah**
+lewat harness yang CI jalankan.
+
+### Celah 1: klem opasitas bibir kawah hanya hidup di port Python
+
+Port menghitung opasitas bibir tiap kawah sebagai
+`min(1.0, CRATER_RIM_OPACITY * max(rim_strength, 0.2))`, sementara view Swift
+menulis `rim.opacity(0.9 * CGFloat(crater.rimStrength))` — tanpa klem. Klem
+yang hanya ada di satu bahasa berarti **seluruh gerbang PNG repo ini
+mengukur gambar kawah yang tidak pernah tampil di jam**.
+
+Terukur (lima kawah Merkurius, `crater_relief` yang sama untuk dua bahasa):
+
+| kawah | `rimStrength` | port (klem) | view (tanpa klem) |
+|---|---|---|---|
+| (+0,34,+0,34) | 0,1595 | 0,1800 | **0,1436** (+0,0364) |
+| empat lainnya | > 0,2 | = view | = view |
+
+Empat dari lima kawah membuat klemnya **dorman** (nilai `rimStrength`-nya sudah
+di atas 0,2). Yang mengaktifkannya justru **kawah paling lemah** — kawah yang
+mestinya paling redup karena berdiri terjauh dari cahaya, dan yang paling
+terancam ikut hilang justru saat layar redup (Always-On) atau mode malam
+aktif. Cacatnya tepat di tempat yang paling penting.
+
+**Kenapa gerbang lama tidak menangkapnya** — tiga, masing-masing mengukur
+benda yang berbeda:
+
+- `check_crater_relief_matches_the_model` membandingkan `crater_relief` port
+  terhadap model Swift — dan `crater_relief` memang benar. Klemnya ada di
+  **penggambar**, satu tingkat di bawah yang diukur.
+- `check_crater_drawing_constants` mengikat `CRATER_RIM_OPACITY` **nilainya**
+  (0,90), bukan **bentuk pakainya** — jadi pengali `max(rs, 0,2)` bebas masuk
+  tanpa menggigit.
+- `check_crater_contrast_numbers_come_from_the_sampler` menjaga docstring
+  agar cocok dengan hasil ukur — jadi klem itu justru **membuat** dokumennya
+  cocok. Menghapusnya membuat pemeriksaan itu ikut memerah, bukan karena
+  kodenya salah, tapi karena dokumen yang mengutipnya sudah usang.
+
+Perbaikan: klem dihapus dari port (`f07b2d6`), dan gerbang
+`check_crater_rim_opacity_is_not_clamped` (3 pemeriksaan) mengikat
+**kesamaan kedua bahasa** — bentuk teks (port tidak boleh punya `max(` yang
+tidak ada di view, dan view harus tetap bebas klem) **dan** nilai hasil
+hitungannya per kawah, dihitung ulang dari `crater_relief` yang sama.
+
+Gerbang menguji kawah yang **benar-benar mengaktifkannya**; kalau tidak,
+selisihnya selalu nol dan gerbang ini akan hijau pada klem dengan nilai berapa
+pun — gerbang yang tidak bisa membedakan apa pun, dan karena itu lebih
+berbahaya daripada tidak ada gerbang karena ia terlihat menjaga sesuatu.
+Lantai klem dibaca dari **teks port**, bukan ditulis ulang di gerbang: menulisnya
+terus (`max(strength, 0.2)`) membuat gerbang membandingkan port dengan versi
+port yang ada di kepala gerbang.
+
+Dibuktikan berbunyi: klem dikembalikan → 2 dari 3 pemeriksaan merah, termasuk
+`1 dari 5 kawah menyimpang: (+0,34,+0,34) view 0.1436 -> port 0.1800`.
+
+### Celah 2: cembung **mengecil** (f > 0.5, waning) di luar cakupan semua gerbang fase
+
+Jalur fase `waning` dibentuk dua besaran: sisi terang (`lit_side`) dan posisi
+terminator. `check_phase_direction_on_the_waning_half` menjaga jalur itu, tetapi
+**hanya pada kasus sabit**; `check_moon_phase_fraction` hanya menjalankan
+`is_waxing=True`. Kasus `moon-waning-gibbous` — justru bulan yang dilihat
+pengguna bagian akhir bulan — tidak pernah dibaca gerbang mana pun.
+
+Terukur dengan mutasi yang membalikkan tanda `terminator_offset` **hanya**
+untuk f > 0.5 dan waning:
+
+```
+13.944 piksel berubah dari 40.000
+luas tersinari 0,715 -> 0,275
+nol dari 14 pemeriksaan fase yang ada menjadi merah
+```
+
+**Dugaan pertama saya salah, dan diukur.** Saya menduga cacatnya membalik
+**arah** sabit; yang sebenarnya runtuh adalah **luasnya**. Pada sudut −π/2
+mutasi itu menghasilkan `dy = +0,613` — masih "bawah", sama seperti kode
+yang benar (`dy = +0,237`). Pusat massa tidak membalik karena geometri cermin
+(`lit_side` berlawanan) mengimbangi terminatornya. Jadi gerbang baru
+`check_waning_gibbous_lit_side` mengukur **keduanya**, dan yang menggigit
+kelas ini adalah luasnya.
+
+**Kenapa sudut −π/2, bukan 0.** Pada sudut 0 cembung membesar dan cembung
+mengecil menghasilkan **citra yang identik** (cermin + rotasi π) — sifat
+geometri yang benar, bukan cacat. Gerbang di sudut 0 karena itu tidak bisa
+membedakannya sama sekali. Lantai 0,60 dipilih dari ukuran: fase cembung
+terkecil yang pernah digambar (f = 0,65) terukur 0,644, mutasi cacat 0,275.
+
+### Harness-nya bukan formalitas, dan dua kesalahannya sendiri tercatat
+
+`Tools/bukti-mutasi-cembung-mengecil.py` menuntut **yang mana** pemeriksaan
+yang berbunyi, bukan berapa — dan menuntut yang tidak disebut tetap hijau:
+
+```
+OK  [baseline]                                    0 merah
+OK  1. terminator cembung mengecil dibalik        luasnya masih cembung  (0,275)
+OK  2. terminator ke kutub jauh (piringan penuh)  sisi terang menghadap bawah (kiri)
+3 keadaan, 0 tidak sesuai harapan
+```
+
+Keadaan 2 adalah arah sebaliknya, dan tanpa itu cara termurah memenuhi
+"luasnya cembung" adalah menggambar **piringan penuh** untuk setiap fase
+(luas 1,0 ≫ 0,60) sehingga gerbang luasnya hijau selamanya. **Mutasi
+pertamanya salah dan tertangkap harness ini sendiri**: `offset = lit_side * 1.0`
+menaruh terminator tepat di limb dan menghasilkan piringan **gelap**
+(terukur 0,000), bukan penuh — kebalikan dari maksudnya. Yang membuat piringan
+penuh adalah `offset = -lit_side`.
+
+Kesalahan kedua yang dicatat: percobaan pertama membuktikan "nol dari 14
+pemeriksaan merah" dengan **menimpa `R.phase_geometry` pada modul yang
+salah** — `check-visuals.py` memuat `render-visuals.py` lewat `_load()`-nya
+sendiri, jadi modul yang dimutasi bukan yang dibaca gerbang. Angkanya tampak
+sah padahal yang diukur berkas yang tidak tersentuh. Harness ini karena itu
+mutasi **berkas di disk** dan menjalankan gerbang di **proses baru** — dan
+`mutasi_sumber.require_clean_sources` menolak jalan di atas sumber yang sudah
+kotor, karena ia akan mengadopsi penyimpangan itu sebagai "aslinya" dan
+melaporkan "pulih persis" atas dirinya sendiri.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 742 | **742** (tak disentuh) |
+| Pemeriksaan visual | 723 | **729** (+6: 4 cek kawah + 2 cek cembung mengecil) |
+| Harness dirujuk CI | 17 | **18** |
+| Aturan UI | 31 | 31 |
+| Baris `Apps/` berubah | — | **0** |
+
+### Yang TIDAK diklaim
+
+- Lantai luas 0,60 dan ambang "terukur 0,714" adalah **keputusan yang
+  diukur**, bukan nilai astronomis. Yang dijaga: mutasi yang memakai kelas
+  ini berada di 0,275 dan fase benar di 0,644–0,714, jadi lantai itu
+  memisahkannya.
+- Gerbang ini mengukur **port**, bukan view Swift — sama seperti gerbang
+  gambar lain di repo ini. Sisi view dijaga gerbang teks terpisah.
+- Port **tidak** bisa mengukur kawah yang benar hilang di perangkat: yang
+  sudah diverifikasi hanya bahwa kedua bahasa menghitung opasitas yang sama.
+- Angka kawah 0,1595/0,1800/0,1436 diukur pada port; tidak ada klaim bahwa
+  perangkat Apple merender persis demikian.
+- Tidak ada satu baris pun `Apps/` atau `Packages/` yang berubah siklus ini.
+  Yang diperbaiki hanya port + gerbang + harness + STATUS.
+
+---
+
+## Progres terakhir (11 Okt 2026 — Experiment 1 tolak percobaan target terbenam: celah jujur Fase C.6)
+
+Siklus ini menutup celah **kejujuran** kedua di Experiment 1: instrumen
+validasi hipotesis akurasi PRD bisa menerima percobaan yang **kebenarannya
+sudah di bawah cakrawala** (mengukur ke arah tanah), lalu melaporkan
+"akurat". Buktinya dari **uji berjalan**, bukan dari membaca docstring.
+
+### Celahnya: `ExperimentHarness.record` tidak punya penjagaan cakrawala
+
+`CalibrationSession.record` (Kalibrasi:189) sudah menolak kebenaran di
+bawah cakrawala — "sampel hantu membalik offset kalibrasi". Tapi
+`ExperimentHarness.record` **tidak** punya penjagaan serupa. Target memang
+disaring saat daftar waktu (`Targets.swift`), tetapi antara daftar dan
+tombol ditekan target bisa tenggelam. Saat tombol ditekan, `record`
+menghitung ulang kebenaran **tanpa** menolak yang terbenam.
+
+Jalur: `Experiment1View` → `ExperimentRecorder.record` →
+`ExperimentHarness.record` → `resolver.horizontal(ofObjectID:)` → truth
+`altitudeDeg`.
+
+### Yang diukur (probe sementara, lalu dihapus)
+
+- `record` menerima Polaris alt −6,18° sebagai percobaan sah (galat 0,000,
+  masuk ringkasan).
+- Dari 25 bintang katalog, **15** lewat pita "terpilih tapi tenggelam".
+- **Menentukan**: 19 percobaan sah → `insufficientEvidence`; +1 hantu di
+  bawah cakrawala → `passed`. Instrumen validasi PRD bisa "lulus" karena
+  satu sampel tak terukur.
+
+### Yang ditambahkan
+
+- `ExperimentHarness`: ambang `truth.altitudeDeg > 0` (cakrawala geometris,
+  SAMA dengan Kalibrasi:189, bukan 5° engine) di `record`; `lastRefusal`
+  (enum `targetUnknown`/`targetBelowHorizon`/`targetUncomputable`) agar
+  pemanggil bisa bedakan pesan jujur.
+- `ExperimentText`: kunci `experiment.status.targetBelowHorizon` (ID+EN);
+  `Localizable.xcstrings` sinkron.
+- `ExperimentRecorder`: pesan jujur beda dari `targetUncomputable`.
+- `ExperimentGroundTruthHonestyTests` (6 uji, RED→GREEN) mengunci cacat
+  celah: 19 sah → `insufficientEvidence`; +1 hantu → `passed`.
+- Fixture uji: Vega (−44,95°) adalah kebenaran "tempat isi" di banyak tes —
+  karena memang di bawah cakrawala pada fixture itu, dipindah ke
+  Capella (+18,99°). Tiap tes hanya memakai Vega sebagai bintang di atas
+  cakrawala generik, tidak untuk sifat spesifik Vega, jadi pindah aman.
+- `TextLocalization`: `allKeys` + jumlah 335→336; `README` 736→742.
+
+### Kenapa ini bukan "magic"
+
+Penolakan **hanya** berlaku pada target terbenam. Tanpa arah ini,
+penjagaan bisa diselesaikan dengan membuang semua rekaman. Ambang >0° (bukan
+5°) sengaja dipilih: yang ditanya adalah "apakah arah ini ada di langit sama
+sekali" saat rekaman diambil, bukan "apakah cukup tinggi untuk pengamatan
+baik".
+
+Hitungan terukur: CelestialEngine **212** + PointingKit **742** hijau;
+gerbang UI **31/31** lulus; CI Apple Build + Engine Tests hijau.
+
+---
+
 ## Progres terakhir (11 Okt 2026 — planet siang hari teruji tidak terkunci: celah jujur Fase C.6)
 
 Siklus ini menutup satu celah **kejujuran** yang belum dijaga, bukan cacat

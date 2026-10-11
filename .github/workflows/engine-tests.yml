@@ -499,6 +499,22 @@ jobs:
       - name: Buktikan gerbang maria Bulan tidak bocor berbunyi
         run: python3 Tools/bukti-mutasi-maria.py
 
+      # Dan bukti untuk gerbang **cembung mengecil (f > 0.5, waning)** —
+      # satu-satunya cabang fase yang tidak dibaca gerbang mana pun.
+      #
+      # `check_phase_direction_on_the_waning_half` menjaga jalur `waning`,
+      # tetapi hanya pada kasus **sabit**; `check_moon_phase_fraction` hanya
+      # menjalankan `is_waxing=True`. Cembung mengecil jatuh di celah
+      # keduanya. Terukur: membalik tanda `terminator_offset` pada f > 0.5
+      # mengubah 13.944 piksel, meruntuhkan luas tersinari 0,715 -> 0,275,
+      # dan **nol** dari 14 pemeriksaan fase yang ada menjadi merah.
+      #
+      # Keadaan #2 menuntut pemeriksaan **arah** berbunyi sendiri: tanpa dia,
+      # menggambar piringan penuh untuk setiap fase akan memenuhi lantai
+      # luasnya (1,0) sementara gambarnya tidak lagi punya fase sama sekali.
+      - name: Buktikan gerbang cembung mengecil berbunyi
+        run: python3 Tools/bukti-mutasi-cembung-mengecil.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #

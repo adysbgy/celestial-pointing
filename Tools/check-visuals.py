@@ -3995,6 +3995,155 @@ def check_crater_relief_matches_the_model(results):
         else f"peredupan terbalik atau nol: terang {bright:.2f}×, gelap {dark:.2f}×"))
 
 
+def check_crater_rim_opacity_is_not_clamped(results):
+    """Opasitas bibir kawah di port harus sama dengan yang di view - tanpa
+    klem tersembunyi.
+
+    **Cacat yang ditutup pemeriksaan ini.** Port Python menghitung opasitas
+    bibir tiap kawah sebagai
+
+        min(1.0, CRATER_RIM_OPACITY * max(rim_strength, 0.2))
+
+    sementara view Swift menulis
+
+        rim.opacity(0.9 * CGFloat(crater.rimStrength))
+
+    - tanpa klem `max(..., 0.2)`. Klem itu hanya ada di satu bahasa, jadi
+    gambar kawah Merkurius yang diukur seluruh gerbang PNG di sini bukan
+    gambar yang tampil di jam. Untuk empat dari lima kawah klem itu tidak
+    melakukan apa pun (karena `rimStrength`-nya sudah di atas 0,2), jadi
+    perbedaannya dorman; pada kawah kelima ia aktif:
+
+        kawah         rimStrength   port 0,9*max(rs,0,2)   view 0,9*rs
+        (+0,34,+0,34)    0,1595              0,1800                0,1436
+                                                                    +0,0364
+
+    Artinya kawah paling lemah di port digambar lebih terang daripada di
+    perangkat - persis kawah yang mestinya paling redup karena berdiri
+    terjauh dari cahaya, dan yang paling terancam ikut hilang kalau layar
+    redup (Always-On) atau mode malam aktif.
+
+    **Kenapa gerbang lain tidak menangkapnya.** Tiga gerbang kawah yang ada
+    sudah mengukur gambar, tapi ketiganya melihat tempat yang berbeda:
+
+    - `check_crater_relief_matches_the_model` membandingkan `crater_relief`
+      port terhadap model Swift - dan `crater_relief` memang benar. Klemnya
+      ada di penggambar, satu tingkat di bawah yang diukur.
+    - `check_crater_drawing_constants` mengikat `CRATER_RIM_OFFSET` dan
+      `CRATER_INNER_SCALE`, dua konstanta yang **notasinya sama** di kedua
+      bahasa. `CRATER_RIM_OPACITY` hanya dijaga **nilainya** (0,90) oleh
+      `check_port_matches_swift_constants`, bukan bentuk pakainya - jadi
+      pengali `max(rs, 0,2)` bebas masuk tanpa menggigit.
+    - `check_crater_contrast_numbers_come_from_the_sampler` menjaga
+      **komentar** di docstring tetap cocok dengan hasil ukur. Jadi klem itu
+      justru membuat komentar itu cocok: begitu klemnya dihapus, pemeriksaan
+      itu ikut memerah - bukan karena kodenya salah, tapi karena dokumen
+      yang mengutipnya sudah usang.
+
+    Bukti audit, di sandbox sehingga berkas produksi tidak disentuh sama
+    sekali: menghapus klem membuat tiga dari empat pemeriksaan kontras kawah
+    memerah; menaikkan klem ke 0,35 membuat keempatnya memerah. Jadi klem
+    itu bukan kekosongan - ia benar-benar mengubah gambar yang diukur
+    gerbang. Angka-angka di docstring di atas ikut diukur lewat
+    `R.crater_relief(R.CRATERS)`, bukan disalin dari dokumen lama.
+
+    **Yang tidak ditutup, dan sengaja.** Gerbang ini mengikat **kesamaan**
+    kedua bahasa, bukan keputusan desain. Bila suatu saat klem itu memang
+    dibutuhkan, ia harus pindah ke model (`CelestialVisual.craterRelief`)
+    supaya view dan port membacanya dari tempat yang sama - bukan tetap
+    menempel pada satu bahasa saja.
+    """
+    port = open(R.SOURCE, encoding="utf-8").read()
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+
+    # Bentuk pakainya, bukan angkanya: angka 0,90 sudah dijaga
+    # `check_port_matches_swift_constants`. Yang tidak dijaga adalah faktor
+    # yang dikalikan - dan di situlah klem itu bersembunyi.
+    #
+    # Ekspresi di port **bersarang**: `min(1,0, X * max(rs, 0,2))`. Jadi
+    # ditangkap dari `CRATER_RIM_OPACITY *` sampai akhir baris, bukan dengan
+    # pola `…([^,)]+)\)` — pola itu berhenti di kurung `max(` dan kembali
+    # merah pada kode yang benar.
+    port_use = re.search(r"CRATER_RIM_OPACITY\s*\*\s*([^\n]+)", port)
+    if not port_use:
+        results.append(Result(
+            "kawah: opasitas bibir terbaca dari port", False,
+            "'CRATER_RIM_OPACITY * …' tidak ditemukan di render-visuals - "
+            "bentuk perhitungan opasitas tidak lagi terbaca"))
+        return
+
+    factor = port_use.group(1).rstrip(" )").rstrip()
+    floor = re.search(r"max\([^,]+,\s*([\d.]+)", factor)
+    results.append(Result(
+        "kawah: opasitas bibir port tidak memakai klem yang tidak ada di view",
+        floor is None,
+        f"port memakai '{factor.strip()}'"
+        + ("" if floor is None else
+           " - ada klem max(rim_strength, " + floor.group(1)
+           + ") yang TIDAK ada di view")))
+
+    # Dan view-nya sendiri harus tetap bebas klem. Kalau view yang memakai
+    # klem tanpa port, gerbang ini hijau karena kedua sisi sama-sama salah -
+    # untuk itu arah sebaliknya ikut dijaga di bawah.
+    view_line = re.search(r"rim\.opacity\(([^\n]+)\)", view)
+    if not view_line:
+        results.append(Result(
+            "kawah: opasitas bibir terbaca dari view", False,
+            "'rim.opacity(...)' TIDAK ditemukan di CelestialVisualView.swift"))
+        return
+    view_factor = view_line.group(1)
+    results.append(Result(
+        "kawah: opasitas bibir view tetap memakai rimStrength apa adanya",
+        "max(" not in view_factor,
+        f"view memakai '{view_factor.strip()}'"))
+
+    # **Bukti kedua, yang menentukan.** Dua pemeriksaan di atas membaca bentuk
+    # teks. Bentuk teks bisa hijau sementara gambarnya tetap menyimpang -
+    # kelas yang sudah beberapa kali tercatat di repo ini. Jadi yang diuji di
+    # sini juga nilai **hasilnya**: opasitas yang benar-benar dihitung untuk
+    # setiap kawah, dihitung ulang dari `crater_relief` yang sama untuk kedua
+    # bahasa.
+    #
+    # Klemnya sengaja diuji di kawah yang benar-benar mengaktifkannya. Kalau
+    # tidak, selisihnya selalu nol dan gerbang ini akan hijau pada klem
+    # dengan nilai berapa pun - persis gerbang yang tidak bisa membedakan apa
+    # pun, dan karena itu lebih berbahaya daripada tidak ada gerbang sama
+    # sekali karena ia terlihat menjaga sesuatu.
+    relief = R.crater_relief(R.CRATERS)
+    mismatched, detail = [], []
+    for i, crater in enumerate(R.CRATERS):
+        strength = relief[i][5]
+        # Lantai klem diambil dari **teks port**, bukan ditulis ulang di sini.
+        # Menuliskannya tetap (`max(strength, 0.2)`) membuat pemeriksaan ini
+        # membandingkan port dengan versi port yang ada di kepala gerbang:
+        # begitu klem dihapus di port, gerbang tetap melaporkan kawah itu
+        # menyimpang - persis kelas cacat yang pemeriksaan
+        # `check_crater_relief_matches_the_model` sudah pernah tercatat
+        # ("yang dibandingkan adalah port melawan port").
+        clamped = strength if floor is None else max(strength, float(floor.group(1)))
+        port_opacity = min(1.0, R.CRATER_RIM_OPACITY * clamped)
+        view_opacity = min(1.0, R.CRATER_RIM_OPACITY * strength)
+        if abs(port_opacity - view_opacity) > 1e-9:
+            mismatched.append(i)
+            detail.append("(%+.2f,%+.2f) view %.4f -> port %.4f"
+                          % (crater[0], crater[1], view_opacity, port_opacity))
+
+    if mismatched:
+        message = "%d dari %d kawah menyimpang: %s" % (
+            len(mismatched), len(R.CRATERS), ", ".join(detail))
+        # Klemnya dorman bila semua `rimStrength`-nya sudah di atas 0,2. Itu
+        # harus terlihat di pesan, karena "hijau" dalam keadaan itu bukan
+        # bukti apa pun.
+        if not detail:
+            message = "tidak ada kawah yang mengaktifkan klem 0,2"
+    else:
+        message = "lima kawah sama: opasitas tidak menyimpang"
+
+    results.append(Result(
+        "kawah: opasitas tiap kawah sama antara port dan view",
+        not mismatched, message))
+
+
 def read_deep_sky_catalogue_from_swift(source):
     """Katalog objek langit dalam dari teks Swift: id → (fuzziness, morfologi).
 
@@ -4533,7 +4682,77 @@ def check_phase_direction_on_the_waning_half(results, size=200, ss=2):
         "moon-crescent-jakarta (membesar) tidak ikut dibalik",
         measured == "bawah",
         f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}) pada sudut −pi/2"))
+def check_waning_gibbous_lit_side(results, size=200, ss=2):
+    """Cembung **mengecil** (f > 0.5) tidak punya satu pun gerbang yang membacanya.
 
+    **Cacat yang ditutup pemeriksaan ini.** Jalur fase `waning` dibentuk oleh
+    dua besaran: sisi terang (`lit_side`) dan posisi terminator. Untuk sabit
+    (f < 0.5) jalur itu dijaga `check_phase_direction_on_the_waning_half`.
+    Tetapi **cembung mengecil** berada di luar cakupannya: kasus
+    `moon-waning-gibbous` tidak pernah ia baca, dan `check_moon_phase_fraction`
+    hanya menjalankan kasus `is_waxing=True`.
+
+    Terukur dengan mutasi yang membalikkan `terminator_offset` pada fase
+    cembung mengecil **saja** (f > 0.5 dan `waxing is False`):
+
+        13.944 piksel berubah dari 40.000
+        luas tersinari 0,715 -> 0,275
+        nol dari 14 pemeriksaan fase yang ada menjadi merah
+
+    Jadi terminator bisa menyeberang ke sisi yang salah, cembung berubah jadi
+    sabit semu, dan seluruh gerbang fase tetap hijau. Tidak ada teks layar
+    yang membantahnya: yang tampil tetap piringan Bulan dengan fase.
+
+    **Kenapa yang menggigit cacat ini luasnya, bukan arahnya.** Dugaan
+    pertama saya adalah arah, dan itu **salah** - diukur, bukan dikira: pada
+    sudut -pi/2 mutasi itu menghasilkan dy = +0,613, masih "bawah", sama
+    seperti kode yang benar (dy = +0,237). Pusat massa tidak membalik karena
+    geometri cermin (`lit_side` berlawanan) mengimbangi terminatornya. Yang
+    runtuh adalah **luasnya**: 0,715 -> 0,275. Karena itu gerbang ini
+    mengukur keduanya, dan yang menggigit cacat ini adalah luasnya.
+
+    **Kenapa sudut -pi/2, bukan 0.** Pada sudut 0 cembung membesar dan cembung
+    mengecil menghasilkan **citra yang sama persis** (cermin + rotasi pi) -
+    sifat geometri yang benar, bukan cacat. Gerbang di sudut 0 karena itu
+    tidak bisa membedakan keduanya. Pada -pi/2 mutasi yang menyentuh hanya
+    jalur mengecil benar-benar mengubah piksel.
+
+    **Lantai 0,60 dipilih dari ukuran, bukan dirasa.** Fase cembung terkecil
+    yang pernah digambar repo ini (f = 0,65) terukur 0,644, dan mutasi cacat
+    terukur 0,275 - jadi 0,60 duduk di antara keduanya dengan ruang di kedua
+    sisi. Sabit sejati (f = 0,18 -> 0,176) memang jauh di bawahnya, dan itu
+    benar: gerbang ini hanya berlaku untuk fase cembung.
+    """
+    lit_moon, unlit_moon = moon_colors()
+    angle = -math.pi / 2.0
+    name = "moon-waning-gibbous"
+    case = R.VisualCase(name, "cembung mengecil - sisi terang ke bawah",
+                        "moon", illumination=0.72, is_waxing=False,
+                        bright_limb_angle=angle, is_confirmed=True)
+    # Dirender dari objek `case` yang dibangun di sini, **bukan** lewat
+    # `render_case(name, ...)`: kasus ber nama sama di `R.build_cases()` punya
+    # sudut 0 (cembung membesar & mengecil jadi citra yang identik), sehingga
+    # gerbang yang memakainya tidak bisa melihat jalur mengecil sama sekali.
+    canvas = R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+    path = os.path.join(R.OUT_DIR, f"__{name}.png")
+    with open(path, "wb") as handle:
+        handle.write(canvas.to_png())
+    w, h, rows = decode_png(path)
+    os.remove(path)
+    dx, dy, frac = classify_centroid(w, h, rows, lit_moon, unlit_moon)
+
+    measured = ("bawah" if dy > abs(dx) else
+                "atas" if -dy > abs(dx) else
+                "kanan" if dx > 0 else "kiri")
+    results.append(Result(
+        f"{name}: sisi terang menghadap bawah (-pi/2)",
+        measured == "bawah",
+        f"terukur {measured} (dx={dx:+.3f}, dy={dy:+.3f}) pada sudut {angle:+.2f}"))
+    results.append(Result(
+        f"{name}: luasnya masih cembung, bukan sabit semu",
+        frac > 0.60,
+        f"terukur {frac:.3f} dari piringan, seharusnya ~0.72 (di bawah 0.60 "
+        f"berarti terminatornya menyeberang ke sisi yang salah)"))
 
 #: Kasus planet berfase yang **punya ciri pengenal**, beserta fungsi yang
 #: menggambar ciri itu di port. Dipakai oleh pemeriksaan pemotongan di bawah.
@@ -4541,7 +4760,7 @@ def check_phase_direction_on_the_waning_half(results, size=200, ss=2):
 #: Ditulis sebagai pasangan (nama kasus, nama fungsi penggambar) dan **bukan**
 #: sebagai daftar sudut: sudutnya dibaca kembali dari `VisualCase` di
 #: `R.build_cases()`, supaya harness ini tidak bisa sepakat dengan dirinya
-#: sendiri saat sudut sisi terangnya berubah.
+#: sendiri saat sudut sisi terang berubah.
 PHASE_FEATURE_CASES = (("planet-mercury-crescent", "_draw_craters"),
                        ("planet-venus-crescent", "venus_haze"))
 
@@ -4913,7 +5132,8 @@ def check_moon_feature_stays_inside_the_lit_band(results, size=200, ss=2,
 MOON_FEATURE_VISIBLE_FROM_ILLUMINATION = 0.5
 
 
-def check_moon_feature_still_reaches_the_lit_side(results, size=200, ss=2):
+def check_moon_feature_still_reaches_the_lit_side(results, size=200, ss=2,
+                                                  watch=38, watch_ss=8):
     """Arah sebaliknya: maria harus **masih tergambar** di belahan menyala.
 
     Tanpa pasangan ini, cara termurah memenuhi "nol piksel di belahan gelap"
@@ -4922,6 +5142,17 @@ def check_moon_feature_still_reaches_the_lit_side(results, size=200, ss=2):
     tergambar", bukan "tidak bocor": keduanya dua perbaikan yang berlawanan
     arah, dan satu keadaan yang menyalakan keduanya berarti gerbangnya tidak
     memisahkan "dipotong" dari "dihapus".
+
+    Diukur pada **dua ukuran**, sama seperti gerbang kebocoran pasangannya.
+
+    Versi sebelumnya hanya mengukur panel 200 px, dan itu asimetri yang
+    menyembunyikan satu kelas: "maria tidak bocor ke belahan gelap" diukur di
+    ukuran yang benar-benar tampil di jam, sementara "maria memang tergambar"
+    tidak pernah diukur di sana. Ciri yang menyusut jadi nol piksel pada 38 pt
+    karena penurunan skala akan lolos **kedua** gerbang — kebocorannya nol
+    (hijau), dan gerbang ini hijau karena ia mengukur di 200 px. Justru
+    ukuran jam satu-satunya yang penting bagi pengguna; alasan itu sudah
+    tertulis di gerbang kebocoran, dan berlaku sama di sini.
     """
     names = [n for n in _moon_phase_cases()
              if next(c for c in R.build_cases() if c.name == n
@@ -4934,15 +5165,17 @@ def check_moon_feature_still_reaches_the_lit_side(results, size=200, ss=2):
             "mengukur apa pun"))
         return
     for name in names:
-        measured = _feature_pixels_by_side(name, size, ss)
-        if measured is None:
-            continue
-        _, lit = measured
-        results.append(Result(
-            f"maria {name} masih tergambar di belahan menyala",
-            lit > 0,
-            f"{lit} piksel maria di belahan menyala (0 = ciri tidak pernah "
-            f"sampai ke layar)"))
+        for label, side, sub in (("panel 200 px", size, ss),
+                                 ("kartu jam 38 px", watch, watch_ss)):
+            measured = _feature_pixels_by_side(name, side, sub)
+            if measured is None:
+                continue
+            _, lit = measured
+            results.append(Result(
+                f"maria {name} masih tergambar di belahan menyala ({label})",
+                lit > 0,
+                f"{lit} piksel maria di belahan menyala @{label} (0 = ciri "
+                f"tidak pernah sampai ke layar pada ukuran itu)"))
 
 
 
@@ -8208,15 +8441,15 @@ def check_crater_floor_opacity_comes_from_the_model(results, size=76, ss=6):
     terangnya tinggal samar. Hasilnya — **setiap** bagian setiap kawah lebih
     gelap daripada permukaan sekitarnya:
 
-        dinding sisi cahaya − permukaan   −46,6 … −21,7
-        dinding sisi bayangan − permukaan −91,3 … −47,6
+        dinding sisi cahaya − permukaan   −46,6 … −27,7
+        dinding sisi bayangan − permukaan −91,3 … −48,4
 
     Itu tanda tangan **stiker gelap yang ditempel**, bukan cekungan. Cekungan
     butuh dua dinding yang berlawanan tanda: satu lebih terang dari permukaan,
     satu lebih gelap. Setelah dasar memakai `floorDepth`:
 
         dinding sisi cahaya − permukaan    +0,8 … +9,6
-        dinding sisi bayangan − permukaan −35,6 … −14,2
+        dinding sisi bayangan − permukaan −35,6 … −14,9
 
     **Angka di atas diukur, bukan diperkirakan** — dengan penyampel yang sama
     persis yang dipakai pemeriksaan di bawah (`_sample`, `size=76`, `ss=6`),
@@ -8357,7 +8590,7 @@ def check_crater_contrast_numbers_come_from_the_sampler(results):
     dipakai pemeriksaan di bawahnya:
 
         dikutip   dinding sisi cahaya   −45,2 …  −5,1   →  +3,4 … +10,3
-        sebenarnya                     −46,6 … −21,7   →  +0,8 …  +9,6
+        sebenarnya                     −46,6 … −27,7   →  +0,8 …  +9,6
 
     Dua-duanya salah di **kedua** ujung, dan yang paling menyesatkan adalah
     `−5,1`: ia menyatakan hampir tidak ada dinding terang yang hilang,
@@ -10089,6 +10322,7 @@ def main():
     check_planet_features_present(results, args.size, args.ss)
     check_inner_planet_phase(results, args.size, args.ss)
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
+    check_waning_gibbous_lit_side(results, args.size, args.ss)
     check_phase_feature_stays_inside_the_lit_band(results, args.size, args.ss)
     check_phase_feature_still_draws_on_the_lit_side(results, args.size, args.ss)
     check_moon_feature_stays_inside_the_lit_band(results, args.size, args.ss)
@@ -10115,6 +10349,7 @@ def main():
     check_crater_relief_matches_the_model(results)
     check_crater_floor_opacity_comes_from_the_model(results)
     check_crater_contrast_numbers_come_from_the_sampler(results)
+    check_crater_rim_opacity_is_not_clamped(results)
     check_unknown_moon_disc_uses_the_token(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
