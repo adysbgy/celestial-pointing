@@ -19393,3 +19393,109 @@ Angka brief sudah basi; yang dipakai adalah hasil terukur.
   - **Sebelum menulis uji "celah", cari dulu uji yang sudah menutupnya.**
     Dua uji hari ini lahir dari hipotesis yang benar secara analisis tapi
     sudah ditutup oleh `ResolverTests.swift:426`.
+
+## Siklus 11 Okt — kelas "gerbang buta pada bentuk deklarasi", dua aturan sekaligus
+
+**Yang dikerjakan.** Bukan fitur baru: dua gerbang sapu UI (`swift-ui-lint.sh`)
+hijau **bukan karena kode benar**, melainkan karena mereka tidak mengenali
+bentuk deklarasi yang sedang dibacanya. Keduanya diperbaiki, dan keduanya
+dibuktikan berbunyi dengan harness mutasi.
+
+### Cacat 1 — Aturan 18 (klaim identitas tidak boleh berbaku `true`)
+
+Regex-nya menuntut `var`/`let` sebagai token **pertama** di baris. Bentuk yang
+dipakai **seluruh** properti SwiftUI karena itu lolos. Diukur satu per satu:
+
+    var isConfirmed: Bool = true            -> tertangkap
+    private var isConfirmed: Bool = true    -> LOLOS (versi lama)
+    static var isConfirmed: Bool = true     -> LOLOS
+    private(set) var isConfirmed: Bool = true -> LOLOS
+    @State private var isConfirmed: Bool = true -> LOLOS
+    @AppStorage("k") private var isConfirmed: Bool = true -> LOLOS
+
+Aturan 18 menegakkan aturan PRD paling keras — "JANGAN pernah menampilkan
+visual yang mengklaim identitas saat engine RAGU". Hijau-nya bukan bukti
+nilainya sudah `false`, melainkan bukti ia tidak pernah membaca barisnya.
+Perbaikan: `CLAIM` menerima atribut (`@State`, `@AppStorage("k")`) dan seluruh
+pengubah termasuk `private(set)`.
+
+### Cacat 2 — `red-lint.sh` membuktikan judulnya sendiri
+
+Syarat keduanya `grep -qF "$NEEDLE"` ke seluruh keluaran, dan setiap aturan
+**mencetak judulnya** entah ia menemukan sesuatu atau tidak. Jadi
+`./red-lint.sh WatchTheme.swift '<cacat font>' 'Aturan 31'` melaporkan "MERAH"
+dengan exit 0 — yang disuntik cacat font (Aturan 1), yang diminta Aturan 31
+(arah fase), dan keduanya tidak berhubungan. Seluruh empat langkah
+`red-lint.sh` di CI karena itu hanya membuktikan satu hal:
+`swift-ui-lint.sh` keluar bukan-nol. Perbaikan: dua syarat — judul aturan
+harus **ada**, dan di dalam bagiannya harus ada **temuan berbentuk**
+`berkas:baris:`.
+
+### Cacat 3 — Aturan 15 (warna wajib lewat penjaga mode malam), kelas yang sama
+
+`DECL` mengenali deklarasi fungsi hanya bila token pertama pengubah akses.
+`@ViewBuilder func` dan `override func` tidak dikenali sama sekali — jadi
+rentang "fungsi" yang mengurung temuan jatuh ke fungsi **sebelumnya**, dan
+penjaga `NightMode.isOn` milik fungsi itu membela cacat di fungsi berikutnya.
+Terukur, mengganti `func` di atas cacat warna yang sama:
+
+    private func warnaUji()              -> 1 temuan
+    @ViewBuilder private func warnaUji() -> 0 temuan (LOLOS)
+    override func warnaUji()             -> 0 temuan (LOLOS)
+    nonisolated private func warnaUji()  -> 0 temuan (LOLOS)
+
+`@ViewBuilder` justru bentuk **paling mungkin** dialam di berkas SwiftUI, jadi
+lubangnya tepat di tempat yang paling sering ditulis. Aturan 15 menjaga
+rasional mode malam (batang ~498-530nm, merah >620nm aman) — lubang di sini
+berarti janji produknya bisa hilang tanpa satu pun alarm.
+
+### Pembuktian: non-vakum, diukur dua arah
+
+`Tools/bukti-mutasi-aturan18-redlint.py` diperluas (`check_rule_15`, enam
+keadaan). Yang penting bukan jumlahnya, melainkan dua hal:
+
+  - **Arah cacat**: empat bentuk deklarasi yang versi lama lolos, semuanya
+    kini harus berbunyi.
+  - **Arah penjaga**: fungsi yang **berpenjaga sendiri** harus tetap **diam**.
+    Gerbang yang memerah pada kode benar akan dimatikan orang, dan itu
+    kerugian yang lebih besar daripada cacat yang ditutupnya.
+  - **Non-vakum**: dengan `DECL` versi LAMA, `check_rule_15` melaporkan **4
+    kegagalan**; dengan versi baru, bersih. Uji yang hijau sebelum dan sesudah
+    kode dilubangi bukan jaminan — ini yang membedakannya.
+
+Urutan keadaan sengaja penjaga-dulu-cacat-kemudian. Dengan cacat di fungsi
+**pertama**, rentangnya jatuh ke seluruh berkas dan aturannya tampak berbunyi
+walau deklarasinya buta — pengukuran akan salah menyimpulkan "sudah aman".
+
+### Yang diperiksa dan ternyata SUDAH tertutup (tidak dikerjakan ulang)
+
+Tiga hipotesis diuji ke gerbang yang sudah ada, dan ketiganya sudah dijaga:
+
+  - **Pita Jupiter "stiker rata"** (kritik visual: pita lurus, tidak
+    mengikuti lengkung bola). Diukur dari piksel, bukan dari kesan mata pada
+    gambar kecil: penurunan terang pusat→limb **49.4%** pada bola polos vs
+    **36.8%** pada bola berpita — 74.5% lengkung bertahan, persis yang
+    dijanjikan `bandLimbShadingStrength = 0.6`. Dijaga
+    `check_banded_disc_keeps_its_curvature` + `testBandLimbShadingIsPartial`.
+    Kritik itu **positif palsu** pada render 220 px.
+  - **Mode malam bocor warna**: `check_night_mode_purity` menyapu hijau/biru
+    sampai **nol** untuk **setiap** kasus dari `build_cases()` (40 kasus),
+    bukan daftar tangan — dan merah bila katalognya kosong.
+  - **Bentuk deklarasi di aturan katalog** (26/27/28): `DECL`-nya
+    (`struct|enum|class|protocol|extension|actor`) tidak punya masalah yang
+    sama, karena `struct` memang token pertama pada barisnya (atribut
+    `@MainActor` duduk di baris sendiri).
+
+### Pelajaran
+
+  - **Kelas cacatnya satu: gerbang hijau karena tidak mengukur apa pun.**
+    Ia sudah berulang di repo ini (Aturan 3, Aturan 4, gerbang morfologi) dan
+    kali ini muncul di **gerbang yang menjaga gerbangnya**. Karena itu setiap
+    perbaikan gerbang wajib disertai harness mutasi — bukan hanya diff.
+  - **`DECL`/`CLAIM` yang menuntut token pertama adalah pola berbahaya di
+    berkas ini.** Setiap regex deklarasi baru harus diuji terhadap
+    `@Atribut func`, `override func`, `private(set) var`, dan `@State private
+    var` sebelum dipercaya.
+  - **Kritik visual harus diukur sebelum dipercaya.** "Pita lurus" terdengar
+    benar pada montase 220 px dan salah pada piksel. Urutannya: lihat, ukur,
+    baru perbaiki — dan kalau ukurannya membantah, yang salah adalah kritiknya.
