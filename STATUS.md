@@ -18241,3 +18241,147 @@ Diperbaiki dua arah:
     yang lebih umum.** Menggabungkan `.denied` dan `.restricted` terlihat
     seperti menyederhanakan; sebenarnya ia menghapus satu-satunya informasi
     yang menentukan apakah pengguna bisa berbuat sesuatu.
+
+## Siklus: gerbang yang hijau karena **tidak mengukur apa pun**
+
+Tiga cacat, satu kelas, dan kelasnya adalah cacat yang paling mahal di repo
+ini: gerbang yang lulus pada kode benar **dan** pada kode salah. Tidak ada
+yang merah, tidak ada yang crash, tidak ada yang aneh di keluaran — gerbangnya
+hanya berhenti mengukur, dan hasilnya terlihat persis seperti ketaatan.
+
+Ketiganya ditemukan dengan **menyuntik cacat lalu mengukur**, bukan dengan
+membaca kode. Dua di antaranya adalah sapu teks yang menanyakan pertanyaannya
+ke cakupan yang salah; yang ketiga adalah harness mutasi yang mengukur sumber
+yang tidak pernah ia mutasi.
+
+### 1. Aturan 7 menanyakan penjaga ke **seluruh berkas**, lalu `break`
+
+Gerbang reduce-motion memakai `whole = "\n".join(lines)` — penjaga di **mana
+pun** di berkas membuat **semua** API gerak di berkas itu lolos — dan
+`break` setelah satu laporan per berkas, sehingga API gerak **kedua** di
+berkas yang sama tidak pernah diperiksa sama sekali.
+
+Terukur pada `PointingView.swift`: satu `motion.allowsTransitions` di baris
+546 menutupi ketiga API gerak di berkas itu, termasuk `TimelineView(.animation)`
+di `PulsingCelestialVisual` — yang penjaganya (`motion.allowsContinuousMotion`)
+hidup di `if` baris berikutnya, bukan di pohon yang sama. Injeksi
+`withAnimation(.linear(duration: 0.3))` di fungsi baru di berkas itu →
+**"Bersih"**.
+
+Yang membuatnya bertahan adalah arah kesalahannya: berkas yang **sudah** punya
+satu penjaga adalah berkas yang paling aman menurut gerbang ini — persis
+kebalikannya. Berkas seperti itu juga yang paling sering ditambahi kode baru.
+
+Diperbaiki dengan cakupan yang benar: setiap API gerak harus berada di dalam
+blok `{...}` yang memuat rujukan penjaga — blok itu sendiri atau salah satu
+pembungkusnya.
+
+**Kenapa blok, bukan "rentang fungsi".** `var body: some View` adalah
+**properti**, bukan `func`. Rentang berbasis `func` membuat `body` tidak punya
+pemilik dan melaporkan seluruh 6 API gerak yang ada sebagai pelanggaran —
+gerbang yang merah pada kode yang benar, dan gerbang seperti itu dimatikan
+orang. Kurung kurawal menutup `func`, `var`, `if`, dan `else` sekaligus.
+Terukur: 6/6 hijau, injeksi di atas merah, satu-satunya selisihnya.
+
+Batas yang dinyatakan: blok yang diuji adalah blok **terdekat yang memuat**,
+bukan blok yang benar-benar mengeksekusi API-nya. Penjaga di `if` bersaudara
+masih hijau. Versi yang lebih ketat menuntut pelacakan alur yang tidak bisa
+dibuktikan benar oleh sapu teks.
+
+### 2. Aturan 1 buta pada baris yang memuat `//` di dalam literal
+
+Aturan 1 memotong komentar dengan `index(line, "//")` pada `awk`: ia berhenti
+di `//` pertama pada baris, termasuk `//` yang ada **di dalam literal string**.
+Disuntik dan diukur:
+
+    Text("https://example.com/x").font(.system(size: 11))
+    → "Bersih: tidak ada .system(size:) pada kode di Apps/"
+
+Baris yang memuat URL atau path justru bentuk yang paling mungkin dialam, dan
+itu satu-satunya yang tidak terlihat. Bentuk itu juga tidak mengenal komentar
+blok `/* */`, jadi komentar multi-baris tetap dibaca sebagai kode — arah
+sebaliknya.
+
+Ini kelas yang sama dengan nomor 1: **gerbang yang mencari `//` pertama pada
+baris akan buta pada literal yang memuat `//`.** Setelah perbaikan ini tidak
+ada lagi pemotong komentar naif di `swift-ui-lint.sh`; Aturan 1 dan Aturan 7
+memakai pemotong yang sama — sadar literal, sadar escape, sadar komentar blok,
+dan baris baru di dalam komentar blok dipertahankan supaya nomor baris temuan
+tetap cocok dengan berkas aslinya.
+
+Diukur **dua arah**: pelanggaran di dalam komentar blok tidak lagi dilaporkan,
+dan pelanggaran setelah URL di baris yang sama sekarang dilaporkan.
+
+### 3. `bukti-mutasi-aksen.py`: jangkar basi = keadaan yang tidak menguji apa pun
+
+Sebelas keadaan di harness itu bekerja dengan `BASE_VIEW.replace(jangkar, …)`.
+Kalau jangkarnya sudah tidak ada — karena kode produksinya direfaktor, yang di
+repo ini terjadi terus — `str.replace` mengembalikan sumber **apa adanya**
+tanpa galat, dan harness mengukur sumber yang tidak termutasi.
+
+Akibatnya berbeda menurut arah harapannya, dan yang **hijau** yang berbahaya:
+
+| harapan keadaan | yang tercetak saat jangkar basi | berarti? |
+|---|---|---|
+| **merah** | `[SALAH]` (nol merah ≠ harapan) | ya — berisik, aman |
+| **hijau** | `[OK ]` (nol merah = harapan) | **tidak** — dan tanpa satu pun tanda |
+
+Empat keadaan di berkas itu mengharapkan hijau, termasuk tiga yang menjaga
+kode benar dari gerbang yang terlalu ketat dan satu yang menjaga keadaan
+`main` sekarang. Keempatnya bisa berhenti berarti tanpa suara.
+
+Diperbaiki di **kelas `str`-nya** (`Sumber`), bukan di sebelas tempat
+pemanggilan: satu tempat yang benar, dan pemanggilan baru tidak bisa lupa
+memakainya. `replace()` melempar `JangkarHilang` bila jangkarnya tidak ada.
+
+Sapuan yang sama dilakukan atas **15 harness saudaranya**, dan hasilnya bersih:
+semuanya sudah memeriksa jangkarnya (`if find not in source` atau
+`count(old) != 1`) sebelum menulis. Berkas ini satu-satunya yang belum — dan
+itu masuk akal, karena ia juga satu-satunya yang **tidak** memakai
+`mutasi_sumber.py` untuk memutasi berkas produksi; ia bekerja di memori.
+
+### Verifikasi (terukur, bukan diklaim)
+
+  - **Aturan 7** — baseline 6 API gerak, **0 merah**; suntikan
+    `withAnimation` tanpa penjaga di fungsi baru → **1 merah**, tepat pada
+    baris suntikan. `./red-lint.sh … 'Aturan 7'` → MERAH, exit 1, berkas
+    dipulihkan. **CI hijau** (run `38097663243`, 36m16s) — termasuk langkah
+    bukti yang baru ditambahkan.
+  - **Aturan 1** — baseline "Bersih"; suntikan baris ber-URL → **1 temuan**
+    pada baris yang benar; komentar blok yang menyebut `.system(size:)` →
+    **tidak** dilaporkan (dulu dilaporkan). `./red-lint.sh … 'Aturan 1'` →
+    MERAH, exit 1, berkas dipulihkan. Gerbangnya kini dibuktikan berbunyi di
+    CI, sejajar dengan Aturan 15.
+  - **Harness aksen** — 13 keadaan tetap **13/13 OK**; jangkar basi
+    **melempar**; jangkar hidup tetap bekerja; dan `str` biasa pada jangkar
+    yang sama tetap kembali **tidak berubah** — itu cacatnya, diukur
+    berdampingan supaya klaimnya bukan pendapat.
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 730 hijau**
+    (0 gagal). Engine tidak disentuh.
+  - `./swift-ui-lint.sh` → **30 aturan lulus**, `SEMUA GERBANG UI LULUS`.
+  - **Apple Build** (macos-15, gagal bila ada warning kode sendiri) hijau
+    untuk ketiga commit.
+
+### Pelajaran (catat, bukan ulang)
+
+  - **Gerbang yang hijau harus dicurigai lebih dulu daripada gerbang yang
+    merah.** Gerbang merah berisik dan akan diperbaiki; gerbang yang berhenti
+    mengukur tidak berbunyi sama sekali, dan keluarannya identik dengan
+    "semuanya benar". Ketiga cacat di siklus ini hijau di `main`.
+  - **Suntik cacatnya, jangan baca kodenya.** Ketiganya ditemukan dalam
+    hitungan menit setelah cacat nyata disuntikkan, dan tidak satu pun
+    terlihat dari membaca `swift-ui-lint.sh`. Membaca kode gerbang hanya
+    membuktikan bahwa ia *dimaksudkan* memeriksa sesuatu.
+  - **Cakupan yang diturunkan dari bentuk berkas akan salah.** Dua dari tiga
+    cacat ini berasal dari cakupan: "seluruh berkas" (Aturan 7) dan "baris
+    ini" (Aturan 1). Yang benar adalah cakupan yang diturunkan dari **tempat
+    kejadiannya** — blok kurung kurawal yang memuat API gerak, dan literal
+    yang memisahkan komentar dari kode.
+  - **Pemotong komentar naif adalah satu kelas, bukan satu bug.** Setelah
+    ditemukan di Aturan 7, pola `//` pertama pada baris dicari di seluruh
+    berkas — dan ketemu satu lagi di Aturan 1. Memperbaiki situs pertama saja
+    akan meninggalkan yang kedua.
+  - **Harness yang memutasi lewat `replace()` harus menolak jangkar yang
+    hilang, dan yang paling penting adalah keadaan yang mengharapkan hijau.**
+    Keadaan yang mengharapkan merah gagal berisik dengan sendirinya; keadaan
+    yang mengharapkan hijau berhenti berarti tanpa suara.
