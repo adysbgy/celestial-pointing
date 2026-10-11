@@ -1,3 +1,146 @@
+## Progres terakhir (11 Okt 2026 — dua jalur gambar yang dihitung, diuji, dan tidak pernah menggambar apa pun)
+
+Siklus ini **tidak mengubah satu baris pun kode produksi**. Yang dilakukan
+adalah mengukur dua jalur yang selama ini dianggap hidup, dan keduanya
+ternyata tidak sampai ke gambar. Keduanya ditemukan dengan mengukur, bukan
+dengan membaca daftar — dan justru itu yang layak dicatat.
+
+### Temuan 1: `isGibbous` dihitung di model, diuji 5×, dan tidak dibaca penggambar mana pun
+
+`CelestialVisual.phaseGeometry(waxing:)` menghitung `isGibbous` dari fraksi
+iluminasi, dan `CelestialVisual.swift:436` mengisinya dengan `clamped > 0.5`.
+Ada **lima** assertion Linux untuk field itu
+(`CelestialVisualTests.swift` baris 233, 327, 340, 537, 539).
+
+Yang tidak ada: satu pun pembacanya. Terukur, seluruh repo tanpa `.build/`:
+
+```
+$ grep -rn "isGibbous\|is_gibbous" --include=*.swift --include=*.py \
+      --include=*.sh --include=*.yml . | grep -v "/.build/"
+Tools/render-visuals.py:204        <- definisi (dict phase_geometry)
+Tests/.../CelestialVisualTests.swift:233,327,340,537,539   <- 5 uji
+Sources/.../CelestialVisual.swift:322                      <- deklarasi
+Sources/.../CelestialVisual.swift:436                      <- pengisian
+```
+
+Nol pemakaian di `Apps/Shared/CelestialVisualView.swift` dan nol di
+`Tools/render-visuals.py` di luar definisinya. Jadi bentuk gibbous
+**tidak dipakai untuk menggambar apa pun** — yang menggambar sabit adalah
+`lit_side` dan `terminator_offset` lewat `_lit_band_polygon`. Field ini
+persis kelas yang sudah berulang di repo ini (`moonSphereGradientEndRadius`:
+«ada, dinamai, dibandingkan gerbang drift, diuji di Linux, dan tidak
+mengatur apa pun»).
+
+**Yang belum saya tentukan, dan tidak saya klaim:** apakah ini API yang
+sengaja disimpan, atau ada gambar gibbous yang seharusnya memakainya. Lima
+uji itu membuktikan **nilainya** benar; tidak satu pun membuktikan bahwa
+nilainya **sampai ke layar**. Untuk memutuskan itu saya harus tahu niat
+aslinya, dan itu ada di git history yang belum saya baca. Karena itu temuan
+ini dicatat, **bukan** diperbaiki — menghapus field yang dipakai di luar
+repo ini, atau menambahkan penggambar atas dasar tebakan, sama-sama lebih
+buruk daripada mencatatnya.
+
+### Temuan 2: `star-faint` satu-satunya kasus yang menguji lantai 0.15, dan produksi tidak bisa mencapainya
+
+`CelestialVisual.sizeFromMagnitude` mengklemp ke `[0.15, 1.0]`. Lantai itu
+dipakai `star-faint` (`relative_size = sizeFromMagnitude(3.5)`). Terukur
+dari katalog (`Catalogue.swift`, 25 bintang) — tidak satu pun bintang
+mencapainya:
+
+```
+  sirius         m= -1.46  raw=0.9817  relative=0.9817
+  ...
+  polaris        m= +1.98  raw=0.2014  relative=0.2014   <- terredup
+```
+
+Lantai 0.15 baru tercapai pada m ≥ 4.75. Jadi `star-faint` — dan **hanya**
+kasus itu — yang menguji lantai yang menjamin bintang redup tetap terlihat,
+sementara tidak ada objek di katalog yang bisa masuk ke sana. Yang dijamin
+lantai itu, terukur di kartu jam 38 pt:
+
+```
+  relative_size=0.1500 -> 112 piksel menyala
+  relative_size=0.2014 -> 120 piksel menyala   (Polaris)
+  relative_size=1.0000 -> 224 piksel menyala   (Sirius)
+```
+
+Jadi lantai itu memang menjamin bintang terlihat (112 piksel, bukan nol).
+Yang tidak ada adalah **hubungan** antara kasus yang mengujinya dan objek
+yang mungkin tampil. Ini bukan cacat hari ini — ia menjadi cacat pada hari
+seseorang menambahkan bintang redup ke katalog, dan saat itu tidak ada
+gerbang yang akan berbunyi karena `star-faint` tetap hijau.
+
+### Cara temuan ini hampir terlewat: dua pengukuran yang salah
+
+Dua-duanya perlu dicatat, karena keduanya menghasilkan angka yang terlihat
+sah.
+
+**(a) `grep` literal atas nama kasus.** Pencarian pertama saya menghitung
+kasus yang namanya muncul sebagai teks, dan menyimpulkan 3 kasus tak
+terpakai. Itu **salah**: `star-sirius` dan `star-vega` dirujuk secara
+dinamis lewat `f"star-{star}"` di dalam loop `for star in ("sirius",
+"vega", ...)`, jadi namanya tidak pernah muncul utuh di berkas. Setelah
+f-string-nya ikut dilacak: 53 kasus, 4 kandidat
+(`deepsky-galaxy`, `moon-waning-gibbous`, `star-faint`, `star-pulse-peak`),
+dan setelah ketiga lainnya diperiksa satu per satu yang benar-benar tanpa
+pembaca tinggal **`star-faint`** dan **`moon-waning-gibbous`**.
+
+**(b) Mengukur "sisi gelap" untuk menentukan arah sabit.** Tiga percobaan
+saya mengukur arah fase dengan menghitung pusat massa piksel yang **dekat
+warna gelap**, dan ketiganya memberi jawaban yang saling bertentangan
+(`moon-gibbous` dan `moon-waning-gibbous` sama-sama `dx=−60.63`). Sebabnya
+baru ketahuan setelah dibalik: pada f=0.72 yang gelap justru **sabit**-nya,
+bukan sisi gelap piringan — jadi yang saya ukur adalah sabit gelap, dan
+sabit gelap di kiri dan piringan gelap di kanan bisa punya pusat massa yang
+kebetulan sama. Pada f=0.18 kesalahan yang sama memberi 2398/2398 (terlihat
+"seimbang padahal pusat") untuk sabit yang sebenarnya jelas ke kanan.
+Uji yang akhirnya memutuskan adalah **cermin**: `moon-waning-gibbous`
+berbeda 23.698 piksel dari cermin `moon-gibbous` tetapi hanya 7.126 piksel
+dari aslinya, jadi ia memang bukan cermin — tetapi juga tidak terbaca
+sebagai gibbous yang mengarah ke kanan lewat pusat massa sisi gelap.
+
+Pelajarannya sama di kedua kasus: angka yang keluar dari alat ukur yang
+tidak saya periksa lebih dulu tampak persis seperti angka yang benar.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 730 | **730** (tak disentuh) |
+| Pemeriksaan visual | 723 | **723** (tak disentuh) |
+| Harness dirujuk CI | 17 dari 17 | **17 dari 17** |
+| Baris kode produksi berubah | — | **0** |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 730 hijau**,
+    0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **723 pemeriksaan, 0 gagal**.
+  - `python3 Tools/check-harness-terdaftar.py` → 17 harness, semuanya
+    dirujuk alur kerja.
+  - `./swift-ui-lint.sh` → SEMUA GERBANG UI LULUS (30 aturan).
+  - `grep -rn "isGibbous\|is_gibbous"` di seluruh repo → hanya definisi,
+    pengisian, dan 5 uji; **nol** pemakaian di view dan port.
+
+### Yang TIDAK diklaim
+
+  - Siklus ini **tidak memperbaiki apa pun**. Kedua temuan dicatat sebagai
+    cacat yang belum ditutup, bukan sebagai pekerjaan yang selesai.
+  - `star-faint` **bukan** cacat hari ini: lantainya benar dan
+    terukur (112 piksel menyala). Yang tidak ada adalah objek di katalog
+    yang bisa mencapainya.
+  - `isGibbous` **belum** saya sebut mati sepenuhnya: ia mungkin API yang
+    sengaja disimpan. Yang terukur hanya bahwa tidak ada penggambar di repo
+    ini yang membacanya.
+  - Arah fase gibbous **belum** saya nyatakan salah. Tiga percobaan
+    pengukuran saya gagal menentukan arahnya, dan kegagalan itu milik alat
+    ukur saya, bukan bukti tentang gambarnya. Yang perlu ada sebelum ada
+    klaim: gerbang yang mengukur **sisi menyala** pada f>0.5 dengan metode
+    yang tidak bergantung pada asumsi mana sisi yang minoritas.
+
+---
+
 ## Progres terakhir (11 Okt 2026 — harness warna-ragu hanya hidup di SATU mesin: bukti bahwa gerbangnya bisa merah tidak pernah sampai ke CI)
 
 ### Cacatnya: berkas yang menentukan benar/salahnya gerbang meta tidak pernah dikomit
