@@ -35,6 +35,7 @@ Pakai:
 import importlib.util
 import os
 import sys
+from typing import SupportsIndex
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIEW = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
@@ -50,8 +51,49 @@ SPHERE_CALL = (
     "            Self.fillSphere(context: context, disc: disc, center: center, radius: radius,\n"
     "                            base: CelestialVisual.accents.moonPhaseUnknown)")
 
-BASE_VIEW = open(VIEW, encoding="utf-8").read()
-BASE_NIGHT = open(NIGHT, encoding="utf-8").read()
+
+class JangkarHilang(Exception):
+    """Jangkar mutasi tidak ada di sumber — mutasinya tidak jadi apa-apa."""
+
+
+class Sumber(str):
+    """`str` yang **menolak** `replace()` dengan jangkar yang tidak ada.
+
+    **Kenapa ini ada.** Seluruh keadaan di berkas ini bekerja dengan
+    `BASE_VIEW.replace(jangkar, pengganti)`. Kalau `jangkar` sudah tidak ada
+    lagi di sumber — karena kode produksinya direfaktor, yang di repo ini
+    terjadi terus — `str.replace` mengembalikan sumber **apa adanya**, tanpa
+    galat apa pun. Harness lalu mengukur sumber yang tidak termutasi.
+
+    Akibatnya berbeda menurut arah harapannya, dan yang **hijau** yang
+    berbahaya:
+
+      - Keadaan yang mengharapkan **merah**: pengukuran mengembalikan nol
+        merah, `got != expect`, jadi tercetak `[SALAH]`. Berisik, aman.
+      - Keadaan yang mengharapkan **hijau**: nol merah memang yang
+        diharapkan, jadi tercetak `[OK ]`. Keadaan itu **tidak lagi menguji
+        apa pun**, dan tidak ada satu pun tanda di keluarannya.
+
+    Empat keadaan di berkas ini mengharapkan hijau — termasuk tiga yang
+    menjaga kode benar dari gerbang yang terlalu ketat, dan satu yang
+    menjaga keadaan `main` sekarang. Keempatnya bisa berhenti berarti
+    tanpa suara.
+
+    Karena itu `replace()` di sini melempar bila jangkarnya tidak ada.
+    Dipasang di kelas `str`-nya, bukan di sebelas tempat pemanggilan: satu
+    tempat yang benar, dan pemanggilan baru tidak bisa lupa memakainya.
+    """
+
+    def replace(self, old: str, new: str,
+                count: SupportsIndex = -1) -> str:  # type: ignore[override]
+        if old not in self:
+            raise JangkarHilang(
+                f"jangkar tidak ditemukan, mutasi tidak jadi: {old[:80]!r}")
+        return super().replace(old, new, count)
+
+
+BASE_VIEW = Sumber(open(VIEW, encoding="utf-8").read())
+BASE_NIGHT = Sumber(open(NIGHT, encoding="utf-8").read())
 
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang membuat
 # berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
