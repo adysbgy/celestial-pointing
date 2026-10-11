@@ -300,11 +300,15 @@ def band_left_reach(confirmed, sphere_only, band_center_y):
     sampai tepi di ketinggian mana pun. Cacat yang sebenarnya ada di pita,
     dan pita itu hanya terlihat kalau bolanya dikurangkan.
 
-    `planet-jupiter-uncertain` menggambar bola Jupiter yang **persis sama**
-    tanpa pita (ciri pengenal wajib hilang saat ragu — itu aturan yang sudah
-    ada), jadi selisih dua gambar itu **hanya** pita. Sisi kiri dipakai
-    karena lencana tanda-tanya berada di sudut kanan atas dan akan ikut
-    terhitung sebagai pita kalau sisi itu yang diukur.
+    **Basis pembandingnya `planet-jupiter-bare`, bukan `planet-jupiter-uncertain`.**
+    Sampai siklus ini kasus "ragu" dipakai di sini karena ia menggambar bola
+    Jupiter yang **persis sama** tanpa ciri. Itu tidak lagi benar: warna planet
+    ikut hilang saat ragu (`Palette.drawable(isConfirmed:)`), jadi kasus itu
+    kini bola **netral** — dan selisihnya sebagian adalah warna, bukan pita.
+    Bola Jupiter berpalet tanpa ciri dinyatakan eksplisit sebagai kasus
+    `planet-jupiter-bare`. Sisi kiri dipakai karena lencana tanda-tanya berada
+    di sudut kanan atas dan akan ikut terhitung sebagai pita kalau sisi itu
+    yang diukur.
     """
     w, h, rows_c = confirmed
     _, _, rows_s = sphere_only
@@ -823,48 +827,93 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
     Aturan 18 menjaga **nilai bawaan**-nya, dan `palette.feature` diuji di
     Linux. Yang tidak pernah diperiksa: apakah view benar-benar **berhenti
     menggambar** ciri itu. Di sini dua render dibandingkan piksel demi piksel.
+
+    **Kenapa pembandingnya `planet-X-bare`, bukan `planet-X-uncertain`.**
+    Sampai siklus ini selisihnya diukur terhadap kasus "ragu". Itu berhenti
+    sah saat warna identitas planet ikut hilang ketika ragu
+    (`Palette.drawable(isConfirmed:)`): gambar "ragu" bukan lagi bola planet
+    yang sama tanpa ciri, melainkan bola **netral**. Terukur: kelima
+    `planet-X-uncertain` kini **identik byte demi byte** dengan bola netral,
+    dan selisihnya lawan `planet-X-confirmed` seluruhnya **warna** (13855
+    piksel untuk kelima planet, sama persis). Gerbang yang menuntut
+    `diff > 0` karena itu hijau walaupun cirinya bocor — persis kelas cacat
+    yang ditulis berkas ini untuk ditangkap, dan persis yang sudah pernah
+    nyata di `check_deep_sky_shape_suppression` ("gerbang yang menamai
+    dirinya 'bentuk … hilang saat ragu' sedang mengukur warna").
+
+    Yang benar-benar membuktikan ciri itu hilang: membandingkan
+    `planet-X-confirmed` dengan `planet-X-bare` — bola **berpalet yang sama
+    persis**, tanpa ciri. Paletnya sama, jadi warna tidak bisa memenuhi
+    selisihnya; yang tersisa hanya cirinya.
+
+    **Dan arah kedua, yang menjaga makna "hilang".** Ciri hilang saja belum
+    cukup: yang harus berlaku saat ragu adalah identitasnya **lenyap
+    seluruhnya**, bukan bertukar dengan ciri lain. Karena itu
+    `planet-X-uncertain` juga dibandingkan dengan bola tak dikenal
+    (`planet-unknown-confirmed`) dan harus **nol** piksel berbeda di luar
+    lencana. Dengan dua arah ini, mengganti ciri Jupiter dengan cincin
+    Saturnus saat ragu tidak bisa lolos.
+
+    **Lencana "?" dikecualikan.** Ia digambar hanya pada gambar "ragu", jadi
+    ia ikut terhitung di setiap selisih dan membuat `diff > 0` selalu benar
+    — termasuk ketika cirinya tidak pernah digambar sama sekali. Dibuktikan:
+    cincin Saturnus dihapus seluruhnya dari port (bola tetap), dan
+    pemeriksaan ini **tetap hijau** dengan "3904 piksel berbeda", yang
+    seluruhnya lencana. Gerbang yang lulus pada gambar yang jelas salah.
+
+    Jadi yang diukur hanya piksel di luar kotak lencana. Kotak itu dihitung
+    dari model yang sama dengan yang menggambar lencana, dan konstanta
+    modelnya dijaga pemeriksa drift di bawah — kalau lencananya membesar di
+    view dan kotak ini tidak, pengecualiannya berhenti menutupi lencana dan
+    pemeriksaan ini mulai gagal, bukan diam-diam salah.
+
+    Margin beberapa piksel. Kotak dari model adalah kotak **isi** lencana;
+    lencana digambar dengan garis tepi dan anti-aliasing yang menonjol
+    sedikit di luarnya. Tanpa margin, tepi itu ikut terhitung sebagai
+    "ciri" — dan memang terukur: 93 piksel sisa saat cincin Saturnus
+    dihapus seluruhnya, yang membuat pemeriksaan ini tetap hijau pada
+    gambar yang jelas salah. Marginnya dinyatakan dalam piksel lalu
+    dibagi radius di dalam loop, karena radiusnya baru diketahui setelah
+    gambar pertama dirender.
     """
     pairs = [
-        ("planet-jupiter-confirmed", "planet-jupiter-uncertain", "Bintik Merah Besar Jupiter"),
-        ("planet-saturn-confirmed", "planet-saturn-uncertain", "cincin Saturnus"),
+        ("planet-jupiter-confirmed", "planet-jupiter-uncertain",
+         "planet-jupiter-bare", "Bintik Merah Besar Jupiter"),
+        ("planet-saturn-confirmed", "planet-saturn-uncertain",
+         "planet-saturn-bare", "cincin Saturnus"),
         # Kelima planet berciri, bukan hanya dua yang kebetulan punya kasus
         # render. Satu `guard isConfirmed` di view menutup kelimanya, tapi
         # aturan yang tidak diukur adalah aturan yang bisa hilang tanpa suara.
-        ("planet-mars-confirmed", "planet-mars-uncertain", "kutub Mars"),
-        ("planet-mercury-confirmed", "planet-mercury-uncertain", "kawah Merkurius"),
-        ("planet-venus-confirmed", "planet-venus-uncertain", "kabut Venus"),
+        ("planet-mars-confirmed", "planet-mars-uncertain",
+         "planet-mars-bare", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-uncertain",
+         "planet-mercury-bare", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-uncertain",
+         "planet-venus-bare", "kabut Venus"),
     ]
-    # **Lencana "?" dikecualikan.** Ia digambar hanya pada gambar "ragu", jadi
-    # ia ikut terhitung di setiap selisih dan membuat `diff > 0` selalu benar
-    # — termasuk ketika cirinya tidak pernah digambar sama sekali. Dibuktikan:
-    # cincin Saturnus dihapus seluruhnya dari port (bola tetap), dan
-    # pemeriksaan ini **tetap hijau** dengan "3904 piksel berbeda", yang
-    # seluruhnya lencana. Gerbang yang lulus pada gambar yang jelas salah.
-    #
-    # Jadi yang diukur hanya piksel di luar kotak lencana. Kotak itu dihitung
-    # dari model yang sama dengan yang menggambar lencana, dan konstanta
-    # modelnya dijaga pemeriksa drift di bawah — kalau lencananya membesar di
-    # view dan kotak ini tidak, pengecualiannya berhenti menutupi lencana dan
-    # pemeriksaan ini mulai gagal, bukan diam-diam salah.
     fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
-    # Margin beberapa piksel. Kotak dari model adalah kotak **isi** lencana;
-    # lencana digambar dengan garis tepi dan anti-aliasing yang menonjol
-    # sedikit di luarnya. Tanpa margin, tepi itu ikut terhitung sebagai
-    # "ciri" — dan memang terukur: 93 piksel sisa saat cincin Saturnus
-    # dihapus seluruhnya, yang membuat pemeriksaan ini tetap hijau pada
-    # gambar yang jelas salah. Marginnya dinyatakan dalam piksel lalu
-    # dibagi radius di dalam loop, karena radiusnya baru diketahui setelah
-    # gambar pertama dirender.
-    for confirmed_name, uncertain_name, label in pairs:
+    _, (w, h, rows_neutral) = render_case("planet-unknown-confirmed",
+                                          size=size, ss=ss)
+    for confirmed_name, uncertain_name, bare_name, label in pairs:
         _, confirmed = render_case(confirmed_name, size=size, ss=ss)
         _, uncertain = render_case(uncertain_name, size=size, ss=ss)
-        w, h, rows_a = confirmed
+        _, bare = render_case(bare_name, size=size, ss=ss)
+        _, _, rows_a = confirmed
         _, _, rows_b = uncertain
-        diff = badge_excluded_diff(rows_a, rows_b, w, h,
-                                   (fx0, fy0, fx1, fy1))
+        _, _, rows_c = bare
+        feature = badge_excluded_diff(rows_a, rows_c, w, h, (fx0, fy0, fx1, fy1))
         results.append(Result(
-            f"{label} hilang saat ragu", diff > 0,
-            f"{diff} piksel berbeda di luar lencana (terkunci vs ragu)"))
+            f"{label} hilang saat ragu", feature > 0,
+            f"{feature} piksel berbeda di luar lencana (terkunci vs bola "
+            f"berpalet yang sama tanpa ciri; nol berarti cirinya tidak pernah "
+            f"tergambar)"))
+
+        identity = badge_excluded_diff(rows_b, rows_neutral, w, h,
+                                       (fx0, fy0, fx1, fy1))
+        results.append(Result(
+            f"{label} ragu == bola tak dikenal", identity == 0,
+            f"{identity} piksel berbeda dari bola netral di luar lencana "
+            f"(harus 0: saat ragu identitasnya lenyap, bukan bertukar ciri)"))
 
     # Dan arah sebaliknya: saat engine **ragu**, bentuk objek langit dalam tidak
     # boleh sampai ke gambar sama sekali. Dipisah ke fungsinya sendiri supaya
@@ -1090,17 +1139,23 @@ def check_features_survive_the_watch_size(results, ss=8):
 
     footprint = R.candidate_marker_footprint()
     pairs = [
-        ("planet-jupiter-confirmed", "planet-jupiter-uncertain", "Bintik Merah Besar Jupiter"),
-        ("planet-saturn-confirmed", "planet-saturn-uncertain", "cincin Saturnus"),
-        ("planet-mars-confirmed", "planet-mars-uncertain", "kutub Mars"),
-        ("planet-mercury-confirmed", "planet-mercury-uncertain", "kawah Merkurius"),
-        ("planet-venus-confirmed", "planet-venus-uncertain", "kabut Venus"),
+        ("planet-jupiter-confirmed", "planet-jupiter-bare",
+         "Bintik Merah Besar Jupiter"),
+        ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
+        ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-bare", "kabut Venus"),
     ]
-    for confirmed_name, uncertain_name, label in pairs:
+    # **Pembandingnya bola berpalet tanpa ciri, bukan kasus "ragu".** Sama
+    # seperti `check_features_disappear_when_uncertain`: sejak warna identitas
+    # hilang saat ragu, selisih lawan kasus "ragu" seluruhnya **warna**, jadi
+    # gerbang ini hijau walaupun cirinya lenyap di ukuran kartu jam — dan
+    # ukuran kartu jam justru satu-satunya yang penting bagi pengguna.
+    for confirmed_name, bare_name, label in pairs:
         _, confirmed = render_case(confirmed_name, size=watch, ss=ss)
-        _, uncertain = render_case(uncertain_name, size=watch, ss=ss)
+        _, bare = render_case(bare_name, size=watch, ss=ss)
         w, h, rows_a = confirmed
-        _, _, rows_b = uncertain
+        _, _, rows_b = bare
         diff = badge_excluded_diff(rows_a, rows_b, w, h, footprint)
         results.append(Result(
             f"{label} masih terukur pada {watch} pt (ukuran jam)", diff > 0,
@@ -1958,19 +2013,28 @@ def check_port_matches_swift_constants(results):
          "rangeBrightness: Double = 0.65", night),
         ("mode malam: fraksi bayangan", R.NIGHT_SHADOW_FRACTION, 0.5,
          "shadowFraction: Double = 0.5", night),
-        # Bola netral untuk benda yang **tidak dikenali**. Dipakai view sebagai
-        # `neutralBody`/`neutralShadow` dan diport untuk gambar yang sama.
+        # Bola netral untuk benda yang **tidak dikenali**, dan sejak
+        # `Palette.drawable(isConfirmed:)` juga satu-satunya palet untuk planet
+        # yang **ragu**. Diport Python untuk kedua jalur itu.
+        #
         # Yang berbahaya di sini justru nilai warna: bola ungu atau ungu
         # kebiruan akan terlihat seperti "planet tertentu", padahal yang
         # diketahui hanya "planet yang tidak kita kenal" — persis klaim
-        # identitas yang dilarang PRD. Angka tuannya sudah menjaga netralitas;
-        # yang belum dijaga adalah **letaknya**, dan letaknya ada di view.
+        # identitas yang dilarang PRD.
+        #
+        # Sumbernya **model**, bukan view. Angka ini dulu hidup di view dan
+        # hanya dipakai jalur "tak dikenal"; sekarang ia menentukan seluruh
+        # jalur "ragu" planet, dan jalur itu harus terukur di Linux — jadi ia
+        # pindah ke `CelestialVisual` dan pemeriksaan ini mengikatnya di sana.
+        # View masih diperiksa terpisah: ia harus **meneruskan**
+        # `CelestialVisual.neutralBody/neutralShadow`, bukan menulis ulang
+        # angkanya (lihat `check_unknown_planet_is_a_neutral_sphere`).
         ("bola netral: terang", R.NEUTRAL_BODY, (0.74, 0.72, 0.68),
-         "neutralBody = CelestialVisual.RGBComponents(red: 0.74, green: 0.72, blue: 0.68)",
-         view),
+         "neutralBody = RGBComponents(red: 0.74, green: 0.72, blue: 0.68)",
+         model, "CelestialVisual.swift"),
         ("bola netral: bayangan", R.NEUTRAL_SHADOW, (0.28, 0.27, 0.26),
-         "neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)",
-         view),
+         "neutralShadow = RGBComponents(red: 0.28, green: 0.27, blue: 0.26)",
+         model, "CelestialVisual.swift"),
         # Inti bintang di dalam gugus. Dua angka, dua berkas — dan keduanya
         # menentukan satu-satunya ciri yang membedakan gugus dari nebula di
         # layar. Tanpa penjagaan ini, mengecilkan fraksi inti di model akan
@@ -2187,11 +2251,31 @@ def check_every_planet_in_the_model_has_render_cases(results):
         "kasus render planet: tidak ada ciri yang tidak dipakai planet mana pun",
         not dead, "kelimanya dipakai" if not dead else f"ciri tanpa planet: {dead}"))
 
-    # Kedua gerbang ciri harus memuat pasangan yang sama dengan model.
+    # Kedua gerbang ciri harus memuat **setiap** planet berciri dari model.
+    #
+    # **Kenapa bentuknya tidak lagi diperiksa sebagai pasangan tetap.**
+    # Sampai siklus ini kedua gerbang membandingkan `planet-X-confirmed`
+    # dengan `planet-X-uncertain`, jadi "semua planet ada" bisa diperiksa
+    # dengan mencocokkan pasangan itu. Sejak pembandingnya menjadi
+    # `planet-X-bare` (lihat docstring `check_features_disappear_when_uncertain`:
+    # selisih lawan kasus "ragu" seluruhnya warna, jadi gerbangnya buta),
+    # mencocokkan bentuk lama berarti menuntut gerbang memakai kembali
+    # pembanding yang sudah terbukti tidak mengukur apa pun.
+    #
+    # Yang dijaga sekarang **cakupannya**, bukan tulisannya: setiap planet
+    # berciri harus muncul sebagai `planet-X-confirmed` bersama `planet-X-bare`
+    # miliknya sendiri di kedua gerbang — jadi pembanding yang tertukar
+    # (mis. `jupiter-confirmed` diukur terhadap `saturn-bare`) tetap
+    # tertangkap. Gerbang "hilang saat ragu" juga wajib menyebut
+    # `planet-X-uncertain`, karena hanya di sanalah arah "identitasnya lenyap
+    # seluruhnya" diukur; gerbang ukuran jam membandingkan terhadap bola
+    # berpalet, jadi ia memang tidak perlu kasus "ragu".
     self_source = open(os.path.abspath(__file__), encoding="utf-8").read()
-    expected = {(f"planet-{n}-confirmed", f"planet-{n}-uncertain") for n in featured}
-    for fn, label in (("check_features_disappear_when_uncertain", "gerbang ciri hilang saat ragu"),
-                      ("check_features_survive_the_watch_size", "gerbang ciri pada ukuran jam")):
+    for fn, label, needs_uncertain in (
+            ("check_features_disappear_when_uncertain",
+             "gerbang ciri hilang saat ragu", True),
+            ("check_features_survive_the_watch_size",
+             "gerbang ciri pada ukuran jam", False)):
         if f"def {fn}(" not in self_source:
             results.append(Result(f"kasus render planet: {label} terbaca", False,
                                   f"'def {fn}(' tidak ditemukan"))
@@ -2200,21 +2284,23 @@ def check_every_planet_in_the_model_has_render_cases(results):
         following = region.find("\ndef ", 1)
         if following != -1:
             region = region[:following]
-        found = set(re.findall(
-            r'\("planet-(\w+)-confirmed",\s*"planet-\w+-uncertain"', region))
-        pairs = {(f"planet-{n}-confirmed", f"planet-{n}-uncertain") for n in found}
-        # Nama pasangan yang tertukar (mis. `-confirmed` dipasangkan dengan
-        # planet lain) juga harus tertangkap, jadi kedua sisi diperiksa.
-        found_uncertain = set(re.findall(
-            r'\("planet-(\w+)-confirmed",\s*"planet-(\w+)-uncertain"', region))
-        swapped = sorted(a for a, b in found_uncertain if a != b)
+        # Hanya nama planet dari **model** yang dihitung: gerbang yang sama
+        # menyebut `planet-unknown-confirmed` sebagai rujukan netral, dan itu
+        # bukan planet berciri.
+        covered = {n for n in re.findall(r'"planet-(\w+)-confirmed"', region)
+                   if n in featured}
+        missing = sorted(set(featured) - covered)
+        wanted = ["bare"] + (["uncertain"] if needs_uncertain else [])
+        unpaired = sorted(
+            n for n in covered
+            if any(f'"planet-{n}-{kind}"' not in region for kind in wanted))
+        ok = not missing and not unpaired
         results.append(Result(
-            f"kasus render planet: {label} memuat semua pasangan model",
-            pairs == expected and not swapped,
-            f"{len(pairs)} pasangan" if pairs == expected and not swapped
-            else (f"hilang: {sorted(expected - pairs)}, "
-                  f"berlebih: {sorted(pairs - expected)}"
-                  + (f", tertukar: {swapped}" if swapped else ""))))
+            f"kasus render planet: {label} memuat semua planet berciri",
+            ok,
+            f"{len(covered)} planet" if ok
+            else (f"hilang: {missing}" if missing else "")
+                 + (f", tidak berpasangan: {unpaired}" if unpaired else "")))
 
 
 def swift_tuple_triples(source, anchor, terminator="]"):
@@ -7145,7 +7231,7 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
     """
     _, confirmed = render_case("planet-jupiter-confirmed", size=size, ss=ss)
     # Bola tanpa pita, dari kasus "ragu" — gambar bola yang sama persis.
-    _, sphere_only = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    _, sphere_only = render_case("planet-jupiter-bare", size=size, ss=ss)
     w, h, _ = confirmed
     radius = min(w, h) / 2.0
     for index, (band_y, _, _) in enumerate(R.jupiter_bands()):
@@ -7214,7 +7300,7 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
     "dinding vertikal vs busur" berada.
     """
     _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
-    _, (_, _, rows_s) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    _, (_, _, rows_s) = render_case("planet-jupiter-bare", size=size, ss=ss)
     cx = w / 2.0
     cy = h / 2.0
     radius = min(w, h) / 2.0
@@ -7509,18 +7595,24 @@ def check_jupiter_spot_keeps_its_curvature(results, size=200, ss=2):
     walaupun perbaikannya bekerja penuh (66% di dalam). Yang diukur karena itu
     **bagian dalam** bintik, yang memang miliknya.
 
-    **Kenapa bola pembandingnya kasus "ragu".** Kasus itu menggambar bola
-    Jupiter yang sama **tanpa** ciri pengenal (aturan PRD: ciri hilang saat
-    engine ragu), jadi selisihnya adalah bintiknya sendiri — dan lengkung bola
-    yang benar bisa diukur tanpa menuliskan angka lengkung ke dalam gerbang
-    ini. Itu sebabnya ambangnya **rasio**, bukan nilai absolut.
+    **Kenapa bola pembandingnya `planet-jupiter-bare`.** Kasus itu menggambar
+    bola Jupiter yang sama **tanpa** ciri pengenal, jadi selisihnya adalah
+    bintiknya sendiri — dan lengkung bola yang benar bisa diukur tanpa
+    menuliskan angka lengkung ke dalam gerbang ini. Itu sebabnya ambangnya
+    **rasio**, bukan nilai absolut.
+
+    Sampai siklus ini pembandingnya `planet-jupiter-uncertain`. Itu tidak lagi
+    bisa dipakai: warna planet ikut hilang saat ragu, jadi bola pembandingnya
+    kini **netral**, dan selisihnya sebagian adalah warna. Terukur: bintik
+    menyimpang 1.70% dari bola netral lawan 7.17% dari bola Jupiter berpalet,
+    terhadap ambang 2.0% — gerbangnya merah pada kode yang benar.
 
     Ambangnya **55% dari lengkung bola**: perbaikan ini memberi 66%, cacat
     aslinya 0% (rata sempurna) sampai −18% (tanda terbalik). Yang dijaga adalah
     bahwa pemulihannya **ada dan sebagian besar**, bukan nilai persisnya.
     """
     _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
-    _, (_, _, rows_b) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-bare", size=size, ss=ss)
     cx, cy = w / 2.0, h / 2.0
     radius = min(w, h) / 2.0
     spot_x, spot_y = R.SPOT_CENTER
@@ -7661,7 +7753,7 @@ def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
     harus benar-benar disebut.
     """
     _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=size, ss=ss)
-    _, (_, _, rows_b) = render_case("planet-jupiter-uncertain", size=size, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-bare", size=size, ss=ss)
     cy = h // 2
     cx = w / 2.0
     radius = min(w, h) / 2.0
@@ -9503,26 +9595,66 @@ NEUTRAL_SPHERE_TOLERANCE = 0.010
 MIN_PLANET_FROM_NEUTRAL = 0.015
 
 
-def read_neutral_sphere_from_view(source):
-    """Token bola netral dari view Swift → (terang, bayangan), tiap (r,g,b).
+def read_neutral_sphere_from_view(source, where):
+    """Token bola netral dari sumber Swift → (terang, bayangan), tiap (r,g,b).
 
     Dibaca dari sumber, bukan ditulis ulang: nilai ini hidup di dua bahasa
-    (`neutralBody`/`neutralShadow` di view, `NEUTRAL_BODY`/`NEUTRAL_SHADOW` di
+    (`neutralBody`/`neutralShadow` di Swift, `NEUTRAL_BODY`/`NEUTRAL_SHADOW` di
     port) dan `check_port_matches_swift_constants` sudah membandingkan
     keduanya. Yang belum dijaga siapa pun adalah bahwa **piksel yang benar-
     benar digambar** sama dengan token itu.
+
+    **Kenapa prefiks `CelestialVisual.` opsional.** Angka ini dulu hidup di
+    view (`CelestialVisual.RGBComponents(...)`), lalu pindah ke model tempat ia
+    ditulis `RGBComponents(...)` tanpa prefiks — karena di dalam
+    `CelestialVisual` prefiksnya berlebihan. Kedua ejaan dibaca di sini supaya
+    pembacanya tidak menjadi alasan menahan nilai itu di satu berkas.
+
+    **Kenapa `where` wajib, dan kenapa itu bukan kerapian.** Sejak token ini
+    pindah ke model, view hanya **meneruskan** (`static let neutralBody =
+    CelestialVisual.neutralBody`) — bentuk yang tidak cocok dengan pola di
+    bawah, jadi pembaca yang dipanggil atas view **melempar**. Versi pertama
+    fungsi ini menyebut "CelestialVisual.swift" sebagai berkasnya, apa pun
+    sumber yang dibaca; pesan galatnya karena itu menunjuk berkas yang **tidak
+    pernah dibaca** dan mengirim orang memperbaiki berkas yang salah. `where`
+    hanya dipakai untuk pesan itu.
     """
     out = []
     for name in ("neutralBody", "neutralShadow"):
         match = re.search(
-            r"static let " + name + r"\s*=\s*CelestialVisual\.RGBComponents\("
+            r"static let " + name + r"\s*=\s*(?:CelestialVisual\.)?RGBComponents\("
             r"red:\s*([\d.]+),\s*green:\s*([\d.]+),\s*blue:\s*([\d.]+)\)",
             source)
         if match is None:
             raise ValueError(
-                f"'static let {name}' tidak terbaca di CelestialVisualView.swift")
+                f"'static let {name}' tidak terbaca di {where}")
         out.append(tuple(float(match.group(i)) for i in (1, 2, 3)))
     return out[0], out[1]
+
+
+def read_forwarded_neutral_token(source, name, where):
+    """Token netral yang **diteruskan** view dari model → (r, g, b).
+
+    Bentuknya `static let neutralBody = CelestialVisual.neutralBody`. Ia
+    berbeda kelas dari `read_neutral_sphere_from_view`: yang dibaca di sini
+    **bukan angkanya**, melainkan fakta bahwa angkanya berasal dari model.
+
+    **Kenapa ini harus bisa dibaca, bukan dicari sebagai teks biasa.**
+    `check_unknown_planet_is_a_neutral_sphere` mengikat kedua sisi dengan dua
+    pertanyaan berbeda — "apakah view meneruskan token model?" dan "apakah
+    nilainya sama dengan model?". Versi pertama pemeriksaan itu menuntut
+    **keduanya** dari pembaca angka, sehingga ia merah pada kode yang **benar**
+    (view meneruskan, jadi tidak ada angka untuk dibaca). Pembaca yang
+    melempar pada kode benar akan dihapus orang, jadi bentuk yang benar
+    dikenali di sini dan angkanya diambil dari model.
+    """
+    match = re.search(
+        r"static let " + name + r"\s*=\s*CelestialVisual\." + name + r"\b",
+        source)
+    if match is None:
+        raise ValueError(
+            f"view tidak meneruskan 'CelestialVisual.{name}' (dibaca di {where})")
+    return match
 
 
 def brightest_disc_pixel(rows, width, height):
@@ -9546,6 +9678,162 @@ def brightest_disc_pixel(rows, width, height):
 def _channel_distance(a, b):
     """Jarak Euclidean antar dua warna — metrik yang sama dengan gerbang kabut."""
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
+def check_uncertain_planet_loses_its_identity_colour(results, size=None, ss=8,
+                                                     detail=200, detail_ss=2):
+    """Warna planet adalah ciri pengenal — ia harus hilang saat engine ragu.
+
+    **Cacat yang ditutup pemeriksaan ini, dan kenapa ia bertahan lama.**
+    `drawPlanet` sudah lama menutup **ciri** planet saat ragu (`guard
+    isConfirmed` sebelum pita/cincin/kutub), dan itu dijaga
+    `check_features_disappear_when_uncertain`. Yang tidak pernah ditutup:
+    **warna bolanya**, yang diteruskan apa adanya. Alasannya tertulis di view
+    dan sudah usang — "warna bola masih boleh tampil saat engine ragu (ia tidak
+    menunjuk planet tertentu)".
+
+    Kalimat itu benar untuk planet yang **tidak berwarna**, dan salah untuk
+    yang berwarna. Diukur dari piksel pada kasus `planet-*-uncertain` (300 px,
+    sebelum perbaikan):
+
+        mars     (120,  55,  36)   — merah khas Mars
+        jupiter  (129, 102,  76)   — cokelat pita Jupiter
+        venus    (153, 139, 102)   — kuning pucat Venus
+        saturn   (130, 114,  82)
+        mercury  ( 94,  91,  89)
+
+    Jarak antar-kandidat tetap 62…112, jadi mata tetap bisa membaca "itu Mars"
+    dari sebelah badge "Ragu" — persis yang dilarang PRD, dan persis yang sudah
+    ditutup untuk tiga permukaan lain: Bulan (`moonPhaseUnknown`), bintang
+    (`drawableStarColorIndex`), dan benda langit dalam (`drawableMorphology`).
+    Planet satu-satunya yang tertinggal.
+
+    **Kenapa gerbang lama buta di sini.** `check_features_disappear_when_uncertain`
+    menuntut `diff > 0` — "ada yang berubah" — bukan "identitasnya hilang".
+    Kedua keadaan itu berbeda persis pada cacat ini: mengganti warna bola Mars
+    dengan warna bola Jupiter mengubah ribuan piksel (jadi `diff > 0` hijau)
+    sambil tetap menyatakan sebuah identitas. Gerbang ini mengukur yang benar:
+    **jarak** warna kandidat ke token netral, di dua arah.
+
+    **Kenapa token netralnya dibaca dari model.** Sebelum siklus ini angka
+    netral hidup di view (`neutralBody`/`neutralShadow`), dan view tidak bisa
+    diuji di Linux. Ia sekarang pindah ke `CelestialVisual.neutralBody` supaya
+    gerbang ini bisa menahannya; kalau model menggeser tokennya, pemeriksaan
+    "kandidat == netral" di bawah yang berbunyi.
+    """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                    "CelestialVisual.swift")
+    model_source = open(model_path, encoding="utf-8").read()
+    try:
+        neutral_body, _ = read_neutral_sphere_from_view(model_source,
+                                                       "CelestialVisual.swift")
+    except ValueError as exc:
+        results.append(Result(
+            "kandidat planet: token netral terbaca dari model", False, str(exc)))
+        return
+    results.append(Result(
+        "kandidat planet: token netral terbaca dari model", True,
+        f"terang {_rgb_text(neutral_body)}"))
+
+    names = {case.name for case in R.build_cases()}
+    planets = sorted(read_planet_palettes_from_swift(model_source))
+    missing = [f"planet-{name}-uncertain" for name in planets
+               if f"planet-{name}-uncertain" not in names]
+    if missing:
+        results.append(Result(
+            "kandidat planet: setiap planet punya gambar \"ragu\"", False,
+            f"tidak ada kasus render: {missing} — gerbang ini tidak bisa "
+            "mengukur planet yang tidak punya gambarnya"))
+        return
+
+    # **Resolusi super-sample per ukuran, dan itu diukur.** Dua probe di
+    # sini punya alasan berbeda: yang pertama adalah ukuran yang
+    # benar-benar tampil di jam (38 pt, `ss=8`), yang kedua mewakili panel
+    # iPhone (200 pt, `ss=2`). Untuk 200 pt, `ss=2` adalah konvensi
+    # seluruh berkas ini — dan di sini ia **tidak kehilangan apa pun**:
+    # diukur pada ss=2/4/8, kelima kandidat tetap 0.003 dan kelima planet
+    # terkunci tetap 0.031…0.356 (persis sama). `ss=8` menaikkan biayanya
+    # 4x tanpa menggerakkan satu angka pun. Untuk 38 pt justru
+    # sebaliknya: `ss=8` yang dipakai, karena pada ukuran itu Merkurius —
+    # planet terdekat ke netral — bergerak 0.031 → 0.043 terhadap lantai
+    # 0.015, dan itu satu-satunya margin yang sempit di sini.
+    probes = [(size if size is not None else (watch_visual_diameter() or 38), ss),
+              (detail, detail_ss)]
+    for probe, probe_ss in probes:
+        # **Satu render per kasus, dipakai kedua arah.** Sebelumnya tiap arah
+        # merender kelima planetnya sendiri, jadi tiap planet dirender **dua
+        # kali** — dan itu bukan penghematan kecil: pada 200 pt, ss=8, satu
+        # render planet berbiaya ~30 detik (diukur), sehingga pemeriksaan ini
+        # sendirian menelan 227 detik dan mendorong `check-visuals.py --check`
+        # lewat 900 detik tanpa satu pun pemeriksaan tambahan. Yang diukur
+        # kedua arah berbeda (`*-uncertain` vs `*-confirmed`), jadi
+        # berbagi hasil render di sini tidak melemahkan apa pun: kasusnya
+        # memang berbeda, yang dihemat adalah render ulang atas kasus yang sama.
+        drawn_at = {}
+        for planet in planets:
+            for state in ("uncertain", "confirmed"):
+                name = f"planet-{planet}-{state}"
+                _, (width, height, rows) = render_case(name, size=probe,
+                                                       ss=probe_ss)
+                drawn_at[(planet, state)] = brightest_disc_pixel(rows, width, height)
+
+        # (1) Kandidat harus **jadi bola netral**: warna identitasnya hilang.
+        drifted = []
+        for planet in planets:
+            distance = _channel_distance(drawn_at[(planet, "uncertain")],
+                                         neutral_body)
+            if distance > NEUTRAL_SPHERE_TOLERANCE:
+                drifted.append(f"{planet} ({distance:.3f})")
+        results.append(Result(
+            f"kandidat planet == bola netral @{probe}pt", not drifted,
+            f"{len(planets)} kandidat berjarak ≤ {NEUTRAL_SPHERE_TOLERANCE:.3f} "
+            "dari netral" if not drifted
+            else f"masih membawa warna identitas: {', '.join(drifted)} — warna "
+                 "planet menunjuk planet tertentu, sama seperti cincin Saturnus"))
+
+        # (2) Dan arah sebaliknya: saat **terkunci**, warnanya harus kembali.
+        #     Tanpa ini, view yang membuang warna **selalu** akan lolos (1),
+        #     dan planet terkunci tampil sebagai bola abu-abu yang tidak bisa
+        #     dibedakan dari Merkurius.
+        flattened = []
+        for planet in planets:
+            distance = _channel_distance(drawn_at[(planet, "confirmed")],
+                                         neutral_body)
+            if distance < MIN_PLANET_FROM_NEUTRAL:
+                flattened.append(f"{planet} ({distance:.3f})")
+        results.append(Result(
+            f"planet terkunci membawa warnanya kembali @{probe}pt",
+            not flattened,
+            f"{len(planets)} planet berjarak ≥ {MIN_PLANET_FROM_NEUTRAL:.3f} "
+            "dari netral" if not flattened
+            else f"kehilangan warna identitasnya: {', '.join(flattened)} — "
+                 "kandidat dan objek terkunci jadi tak terbedakan"))
+
+    # (3) Sisi view: `drawPlanet` harus memakai palet yang **sadar keyakinan**,
+    #     bukan palet mentahnya. Piksel hanya membuktikan port; yang dikirim ke
+    #     jam adalah view — dan view bisa menyimpang dari port tanpa satu pun
+    #     piksel berubah, kelas cacat yang sudah berulang di repo ini.
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    view_source = open(view_path, encoding="utf-8").read()
+    body = _function_body(view_source, "private func drawPlanet(")
+    if not body:
+        results.append(Result(
+            "kandidat planet: drawPlanet terbaca di view", False,
+            "'private func drawPlanet(' tidak ditemukan di "
+            "CelestialVisualView.swift — pemeriksaan ini tidak bisa dijalankan, "
+            "dan itu merah, bukan lulus"))
+        return
+    code = swift_code_only(body)
+    aware = "palette.drawable(isConfirmed: isConfirmed)" in code
+    raw = re.search(r"let palette = planet\.palette\s*\n", code) is not None
+    results.append(Result(
+        "kandidat planet: view memakai palet sadar keyakinan", aware and not raw,
+        "palet dibaca lewat 'palette.drawable(isConfirmed: isConfirmed)'"
+        if aware and not raw
+        else ("view memakai 'planet.palette' mentah — warna identitas lolos "
+              "ke kandidat" if raw else
+              "'palette.drawable(isConfirmed: isConfirmed)' tidak ditemukan di "
+              "drawPlanet")))
 
 
 def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=200):
@@ -9590,18 +9878,48 @@ def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=20
     dengan `Self.neutralBody`/`Self.neutralShadow`, dan tidak boleh menyebut
     palet planet mana pun. Tanpa pemeriksaan ini, view bisa menyimpang dari
     port tanpa satu pun piksel berubah — kelas cacat yang sudah berulang.
+
+    **Dan tokennya harus berasal dari model.** Sejak `Palette.drawable(
+    isConfirmed:)` memakai token yang sama untuk jalur "ragu", dua salinan
+    angka itu akan berarti jalur "ragu" dan jalur "tak dikenal" bisa
+    menyimpang diam-diam — dan hanya satu di antaranya yang bisa diuji di
+    Linux. Yang diikat di sini karena itu **penerusannya** (view tidak
+    menulis ulang angkanya), sedangkan angkanya sendiri dibaca dari model.
     """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                    "CelestialVisual.swift")
+    model_source = open(model_path, encoding="utf-8").read()
     view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
     view_source = open(view_path, encoding="utf-8").read()
+
+    # Angkanya milik model — sumber yang sama yang dipakai `Palette.drawable`.
     try:
-        neutral_body, neutral_shadow = read_neutral_sphere_from_view(view_source)
+        neutral_body, neutral_shadow = read_neutral_sphere_from_view(
+            model_source, "CelestialVisual.swift")
     except ValueError as exc:
-        results.append(Result("bola tak dikenal: token netral terbaca dari view",
-                              False, str(exc)))
+        results.append(Result(
+            "bola tak dikenal: token netral terbaca dari model", False, str(exc)))
         return
 
+    # Dan view harus **meneruskan** token itu, bukan menulis ulang angkanya.
+    forwarded = []
+    for name in ("neutralBody", "neutralShadow"):
+        try:
+            read_forwarded_neutral_token(view_source, name,
+                                         "CelestialVisualView.swift")
+            forwarded.append(True)
+        except ValueError:
+            forwarded.append(False)
     results.append(Result(
-        "bola tak dikenal: token netral terbaca dari view", True,
+        "bola tak dikenal: view meneruskan token netral dari model",
+        all(forwarded),
+        "view memakai CelestialVisual.neutralBody/neutralShadow"
+        if all(forwarded) else
+        "view menulis ulang angka netralnya — salinan kedua dari nilai yang "
+        "menentukan jalur 'ragu' planet"))
+
+    results.append(Result(
+        "bola tak dikenal: token netral == model", True,
         f"terang {_rgb_text(neutral_body)}, bayangan {_rgb_text(neutral_shadow)}"))
 
     names = {case.name for case in R.build_cases()}
@@ -9668,7 +9986,7 @@ def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=20
     uses_token = "neutralBody" in code and "neutralShadow" in code
     results.append(Result(
         "bola tak dikenal: view memakai token netral", uses_token,
-        "'Self.neutralBody'/'Self.neutralShadow' "
+        "'neutralBody'/'neutralShadow' "
         f"{'ditemukan' if uses_token else 'TIDAK ditemukan'} di cabang planet tak dikenal"))
 
     borrowed = sorted(re.findall(r"Planet\.(\w+)\.palette", code))
@@ -9832,6 +10150,7 @@ def main():
     check_star_geometry_matches_the_model(results)
     check_magnitude_scale_matches_the_model(results)
     check_unknown_planet_is_a_neutral_sphere(results)
+    check_uncertain_planet_loses_its_identity_colour(results)
     # Terakhir, dan atas berkasnya sendiri: kelas cacat yang membuat pemeriksaan
     # di atas bisa hijau karena alasan yang salah.
     check_no_loop_variable_leaks_into_a_call(results)

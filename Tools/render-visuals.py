@@ -95,6 +95,9 @@ PLANET_PALETTE = {
 
 NEUTRAL_BODY = (0.74, 0.72, 0.68)
 NEUTRAL_SHADOW = (0.28, 0.27, 0.26)
+# Dipakai untuk **dua** hal: benda yang tidak dikenali, dan planet yang ragu
+# (`Palette.drawable(isConfirmed:)`). Yang kedua baru: warna planet adalah ciri
+# pengenal, jadi ia harus hilang saat engine belum mengunci identitasnya.
 
 # `CelestialVisual.accents` — satu konstanta di paket, disalin apa adanya.
 ACCENTS = dict(
@@ -1114,7 +1117,31 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
     if planet is None:
         _draw_sphere(canvas, cx, cy, radius, NEUTRAL_BODY, NEUTRAL_SHADOW, night_mode)
         return
-    palette = PLANET_PALETTE[planet]
+    # **Palet yang boleh digambar**, bukan palet mentahnya.
+    #
+    # MODEL: `CelestialVisual.Palette.drawable(isConfirmed:)` — saat engine
+    # ragu, warna identitas planet diganti bola netral + `feature: .none`.
+    # Sebelum ini port menggambar warna planet apa adanya pada kasus "ragu",
+    # jadi gambar yang dipakai gerbang untuk membuktikan aturan "ciri hilang
+    # saat ragu" justru **melanggar** aturannya sendiri untuk warna: Mars
+    # tampil (120, 55, 36) di sebelah badge "Ragu".
+    #
+    # `guard is_confirmed` di bawah tetap ada dan bukan duplikat: `drawable`
+    # mengembalikan `.none`, jadi tidak ada cabang ciri yang akan diambil;
+    # `return` itu yang memastikan urutan gambar (bola dulu) tetap sama
+    # seperti view, tempat `guard` yang sama juga berdiri.
+    palette = (PLANET_PALETTE[planet]
+               if (kw.get("is_confirmed") is not False
+                   or kw.get("bare_sphere"))
+               else dict(light=NEUTRAL_BODY, dark=NEUTRAL_SHADOW, feature="none"))
+    # **Pembanding eksplisit: bola berpalet, tanpa ciri.** Lihat
+    # `build_cases()` — `bare_sphere` adalah cara menyatakan "bola Jupiter yang
+    # sama, tanpa pita/bintik", yang tidak lagi bisa dinyatakan oleh kasus
+    # "ragu" sejak paletnya ikut hilang saat ragu.
+    if kw.get("bare_sphere"):
+        _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"],
+                     night_mode)
+        return
 
     # **Fase planet dalam (Venus, Merkurius).** Sama dengan view Swift: bila
     # fase-nya diketahui dan objeknya sudah terkunci, piringan digambar
@@ -1960,6 +1987,47 @@ def build_cases():
         cases.append(VisualCase(f"planet-{planet}-uncertain",
                                 f"{planet} saat engine RAGU — {feature} harus hilang",
                                 "planet", planet=planet, is_confirmed=False))
+    # **Bola pembanding yang tidak mengklaim identitas apa pun, satu per planet.**
+    #
+    # Sampai siklus ini seluruh kasus di atas memakai palet planetnya
+    # masing-masing walaupun `is_confirmed=False` — dan itu memang cacat yang
+    # ditutup siklus ini (warna planet **adalah** ciri pengenal). Tetapi
+    # konsekuensinya belum ditangani, dan ada **dua**:
+    #
+    #   1. Beberapa gerbang gambar memakai `planet-jupiter-uncertain` sebagai
+    #      "bola Jupiter yang sama, tanpa ciri". Sejak paletnya ikut hilang
+    #      saat ragu, ia bukan lagi bola Jupiter — ia bola **netral**.
+    #      Terukur: bintik Jupiter menyimpang 1.70% dari bola netral dan 7.17%
+    #      dari bola Jupiter (ambang 2.0%), jadi
+    #      `check_jupiter_spot_keeps_its_curvature` merah pada kode yang benar.
+    #   2. `check_features_disappear_when_uncertain` mengukur `diff > 0` antara
+    #      `planet-X-confirmed` dan `planet-X-uncertain`. Sejak yang ragu jadi
+    #      bola netral, **seluruh** selisihnya warna — terukur 13855 piksel
+    #      untuk kelima planet, dan `planet-X-uncertain` kini **identik byte
+    #      demi byte** dengan bola netral. Gerbang itu karena itu hijau
+    #      walaupun cirinya bocor, yaitu kelas cacat yang persis ditulis
+    #      berkas ini untuk ditangkap.
+    #
+    # Keduanya diperbaiki dengan kasus yang sama: bola planet **berpalet,
+    # tanpa ciri**. Itu yang selama ini dimaksud gerbang-gerbangnya, dan
+    # sampai sekarang tidak ada kasus render yang mewujudkannya.
+    #
+    # Kenapa bukan `planet-X-uncertain` yang dikembalikan ke paletnya: itu akan
+    # menghidupkan lagi persis cacat yang ditutup siklus ini, dan gambar itu
+    # dipakai `check_uncertain_planet_loses_its_identity_colour` untuk
+    # membuktikan warna identitasnya **hilang**.
+    #
+    # Kenapa bukan `planet-X-confirmed` yang dipakai sebagai pembanding:
+    # selisihnya lalu nol di mana-mana — gerbangnya berhenti mengukur apa pun.
+    #
+    # Ia bukan keadaan produksi — di app, bola tanpa ciri hanya muncul saat
+    # engine ragu, dan di sana warnanya netral.
+    for planet in ("jupiter", "saturn", "mars", "mercury", "venus"):
+        cases.append(VisualCase(f"planet-{planet}-bare",
+                                f"bola {planet} TANPA ciri — pembanding "
+                                "bentuk, bukan keadaan produksi",
+                                "planet", planet=planet, is_confirmed=False,
+                                bare_sphere=True))
     cases.append(VisualCase("planet-unknown-confirmed",
                             "planet yang id-nya tak dikenal — bola netral",
                             "planet", planet=None, is_confirmed=True))

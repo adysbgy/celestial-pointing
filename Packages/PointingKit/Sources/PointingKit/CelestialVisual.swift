@@ -857,7 +857,67 @@ public extension CelestialVisual {
             self.dark = dark
             self.feature = feature
         }
+
+        /// Palet yang boleh **digambar**, mengingat keyakinan engine.
+        ///
+        /// **Cacat yang ditutup ini.** Sampai siklus ini `drawPlanet` hanya
+        /// menutup **ciri**-nya saat engine ragu (`guard isConfirmed` sebelum
+        /// pita/cincin/kutub), sementara **warna bolanya** diteruskan apa
+        /// adanya. Alasannya tertulis di view dan sudah usang:
+        ///
+        /// > warna bola masih boleh tampil saat engine ragu (ia tidak menunjuk
+        /// > planet tertentu)
+        ///
+        /// Kalimat itu benar untuk kelas planet yang **tidak berwarna**, dan
+        /// salah untuk yang berwarna. Diukur dari piksel pada kasus
+        /// `planet-*-uncertain` (300 px): Mars tampil (120, 55, 36) — merah
+        /// khas Mars — dan Jupiter (129, 102, 76) — cokelat pita Jupiter.
+        /// Jarak warna antar-kandidat tetap 62…112, jadi mata tetap bisa
+        /// membaca "itu Mars" dari sebelah badge "Ragu". Persis cacat yang
+        /// dilarang PRD, dan persis yang sudah ditutup untuk tiga permukaan
+        /// lain: Bulan (`moonPhaseUnknown`), bintang
+        /// (`drawableStarColorIndex`), dan benda langit dalam
+        /// (`drawableMorphology`).
+        ///
+        /// **Kenapa warna planet memang ciri pengenal.** Aturannya sudah
+        /// dinyatakan repo ini untuk bintang — "warna spektral **adalah** ciri
+        /// pengenal … penanda yang sama meyakinkannya dengan cincin Saturnus"
+        /// — dan planet tidak berbeda: oker Mars dan cokelat Jupiter adalah
+        /// cara tercepat mengenalinya, lebih cepat daripada teks di bawahnya.
+        /// Yang tersisa saat ragu karena itu hanya **bentuk dan terang**:
+        /// piringan bola dengan gradien netral, tanpa satu pun warna yang
+        /// menunjuk planet tertentu.
+        ///
+        /// Palet netralnya **dipinjam dari token yang sudah ada** untuk planet
+        /// tak dikenal (`neutralBody`/`neutralShadow` di view,
+        /// `NEUTRAL_BODY`/`NEUTRAL_SHADOW` di port), bukan angka baru: nilai
+        /// itu sudah lama dianggap tidak mengklaim apa pun, dan
+        /// `check_unknown_planet_is_a_neutral_sphere` sudah menahannya tetap
+        /// netral. Angka baru masih bisa kebetulan berupa warna planet.
+        ///
+        /// - Parameter isConfirmed: apakah engine sudah mengunci identitasnya.
+        public func drawable(isConfirmed: Bool) -> Palette {
+            guard !isConfirmed else { return self }
+            return Palette(light: CelestialVisual.neutralBody,
+                           dark: CelestialVisual.neutralShadow,
+                           feature: .none)
+        }
     }
+
+    /// Warna bola netral — satu-satunya palet yang boleh tampil saat engine
+    /// ragu, dan palet untuk planet yang id-nya tidak dikenali.
+    ///
+    /// **Kenapa di model, bukan di view.** Sebelumnya angka ini hidup **dua
+    /// kali**: `neutralBody`/`neutralShadow` di `CelestialVisualView.swift`
+    /// dan `NEUTRAL_BODY`/`NEUTRAL_SHADOW` di `Tools/render-visuals.py`.
+    /// `check_port_matches_swift_constants` sudah membandingkan keduanya,
+    /// jadi nilainya tidak bisa diam-diam berbeda — tetapi **sumbernya tetap
+    /// view**, dan view tidak bisa diuji di Linux. Selama warna netral hanya
+    /// dipakai planet tak dikenal, itu cukup. Sekarang ia menentukan seluruh
+    /// jalur "ragu" planet, dan jalur itu harus terukur di Linux; karena itu
+    /// ia pindah ke model, dan view/port membacanya dari sini.
+    static let neutralBody = RGBComponents(red: 0.74, green: 0.72, blue: 0.68)
+    static let neutralShadow = RGBComponents(red: 0.28, green: 0.27, blue: 0.26)
 }
 
 // MARK: - Batas gambar: berapa jauh tiap bentuk keluar dari frame

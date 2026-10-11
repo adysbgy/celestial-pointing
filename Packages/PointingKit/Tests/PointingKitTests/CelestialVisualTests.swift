@@ -740,6 +740,80 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(CelestialVisual.Planet.venus.palette.feature, .haze)
     }
 
+    /// Warna planet adalah **ciri pengenal**: ia harus hilang saat engine ragu.
+    ///
+    /// **Cacat yang ditangkap uji ini.** `drawPlanet` sudah lama menutup
+    /// *ciri* planet saat ragu (`guard isConfirmed` sebelum pita/cincin/kutub),
+    /// sementara **warna bolanya** diteruskan apa adanya. Alasannya tertulis di
+    /// view dan sudah usang: "warna bola masih boleh tampil saat engine ragu
+    /// (ia tidak menunjuk planet tertentu)".
+    ///
+    /// Kalimat itu benar untuk planet yang **tidak berwarna**, dan salah untuk
+    /// yang berwarna. Diukur dari piksel pada gambar `planet-*-uncertain`:
+    /// Mars tampil (120, 55, 36) — merah khas Mars — di sebelah badge "Ragu",
+    /// dan jarak antar-kandidat tetap 62…112, jadi mata tetap bisa membaca
+    /// "itu Mars" dari gambar yang seharusnya belum mengklaim apa pun. Itu
+    /// persis yang dilarang PRD, dan persis yang sudah ditutup untuk tiga
+    /// permukaan lain: Bulan (`moonPhaseUnknown`), bintang
+    /// (`drawableStarColorIndex`), dan benda langit dalam
+    /// (`drawableMorphology`).
+    ///
+    /// Aturannya hidup di **model**, bukan di view, justru supaya uji ini bisa
+    /// menegakkannya di Linux — view tidak bisa dijalankan di sini.
+    func testUncertainPlanetLosesItsIdentityColour() {
+        for planet in CelestialVisual.Planet.allCases {
+            let locked = planet.palette.drawable(isConfirmed: true)
+            let candidate = planet.palette.drawable(isConfirmed: false)
+
+            // Saat terkunci: palet planet itu sendiri, tidak diubah.
+            XCTAssertEqual(locked, planet.palette,
+                           "\(planet) terkunci harus memakai paletnya sendiri")
+
+            // Saat ragu: bola netral, dan **tidak satu pun** warna planet.
+            XCTAssertEqual(candidate.light, CelestialVisual.neutralBody,
+                           "\(planet) ragu harus memakai bola netral terang")
+            XCTAssertEqual(candidate.dark, CelestialVisual.neutralShadow,
+                           "\(planet) ragu harus memakai bola netral gelap")
+            XCTAssertNotEqual(candidate.light, planet.palette.light,
+                              "\(planet) ragu tidak boleh membawa warna identitasnya")
+            // Ciri pengenal juga ikut hilang — dua arah, satu aturan.
+            XCTAssertEqual(candidate.feature, .none,
+                           "\(planet) ragu tidak boleh membawa ciri pengenalnya")
+        }
+    }
+
+    /// Kandidat planet harus **sama** satu sama lain, dan berbeda dari yang
+    /// terkunci.
+    ///
+    /// **Kenapa arah ini perlu, padahal uji di atas sudah memeriksa netral.**
+    /// Uji di atas membandingkan tiap palet dengan token netral; ia hijau juga
+    /// kalau view mengganti warna planet dengan warna planet **lain** — mis.
+    /// semua kandidat digambar sebagai Mars. Warna itu tetap "warna planet",
+    /// tetap menunjuk sebuah identitas, dan tetap berbeda dari netral. Yang
+    /// benar-benar harus berlaku: kandidat **tak terbedakan** satu dari yang
+    /// lain, karena yang diketahui engine hanyalah "ada objek di sini".
+    func testUncertainPlanetsAreIndistinguishableFromEachOther() {
+        let candidates = CelestialVisual.Planet.allCases.map {
+            $0.palette.drawable(isConfirmed: false)
+        }
+        let unique = Set(candidates.map {
+            "\($0.light.red),\($0.light.green),\($0.light.blue)"
+        })
+        XCTAssertEqual(unique.count, 1,
+                       "semua kandidat planet harus tampil sama; yang berbeda "
+                       + "berarti identitasnya masih terbaca")
+
+        // Dan arah sebaliknya: saat terkunci, kelimanya memang berbeda — kalau
+        // tidak, "sama saat ragu" akan benar untuk alasan yang salah (view
+        // yang membuang warna selalu).
+        let locked = CelestialVisual.Planet.allCases.map { $0.palette.light }
+        let lockedUnique = Set(locked.map {
+            "\($0.red),\($0.green),\($0.blue)"
+        })
+        XCTAssertEqual(lockedUnique.count, CelestialVisual.Planet.allCases.count,
+                       "planet terkunci harus tetap punya warna sendiri-sendiri")
+    }
+
     func testEveryPlanetHasAUniqueFeature() {
         // Kalau dua planet berbagi ciri, ciri itu berhenti menjadi penanda
         // identitas — dan UI lalu menggambar ciri yang salah tanpa bisa

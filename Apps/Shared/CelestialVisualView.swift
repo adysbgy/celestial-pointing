@@ -208,7 +208,18 @@ struct CelestialVisualView: View {
                        from: Self.neutralBody, to: Self.neutralShadow)
             return
         }
-        let palette = planet.palette
+        // **Palet yang boleh digambar**, bukan palet mentahnya. Saat engine
+        // ragu, ini mengembalikan bola netral + `feature: .none`, sehingga
+        // warna identitas planet (oker Mars, cokelat Jupiter) tidak ikut
+        // tampil di sebelah badge "Ragu". Aturannya hidup di model
+        // (`Palette.drawable(isConfirmed:)`) supaya terukur di Linux — lihat
+        // docstring-nya untuk cacat yang ditutupnya.
+        //
+        // `guard isConfirmed` di bawah **tetap ada** dan bukan duplikat: ia
+        // yang menutup `feature`, sedangkan `drawable` sudah mengembalikan
+        // `.none`. Keduanya menjaga hal yang sama dari dua arah, jadi satu
+        // kelalaian di salah satunya tidak cukup untuk meloloskan ciri.
+        let palette = planet.palette.drawable(isConfirmed: isConfirmed)
 
         // **Fase planet dalam (Venus, Merkurius).** Bila fase-nya diketahui,
         // piringan digambar sebagai bagian yang menyala + bagian gelap, bukan
@@ -316,13 +327,21 @@ struct CelestialVisualView: View {
         }
     }
 
-    /// Warna bola untuk planet yang id-nya tidak dikenali.
+    /// Warna bola untuk planet yang id-nya tidak dikenali, **dan** satu-satunya
+    /// warna yang boleh tampil saat engine ragu.
     ///
     /// Netral keabu-abuan, bukan warna planet mana pun: bola ungu akan
     /// menyiratkan "ini planet tertentu", padahal yang diketahui hanya "ini
     /// planet yang tidak kita kenali".
-    private static let neutralBody = CelestialVisual.RGBComponents(red: 0.74, green: 0.72, blue: 0.68)
-    private static let neutralShadow = CelestialVisual.RGBComponents(red: 0.28, green: 0.27, blue: 0.26)
+    ///
+    /// **Kenapa nilainya dibaca dari model, bukan ditulis di sini.** Angka ini
+    /// dulu hidup di view, dan view tidak bisa diuji di Linux. Sejak ia juga
+    /// menentukan seluruh jalur "ragu" planet (`Palette.drawable(isConfirmed:)`),
+    /// jalur itu harus terukur — jadi nilainya pindah ke `CelestialVisual` dan
+    /// di sini hanya diteruskan. Menulis ulang angkanya di sini akan
+    /// mengembalikan salinan kedua yang bisa berbeda diam-diam dari model.
+    private static let neutralBody = CelestialVisual.neutralBody
+    private static let neutralShadow = CelestialVisual.neutralShadow
 
     /// Gradien bola: pencahayaan dari kiri-atas, bayangan di kanan-bawah.
     ///

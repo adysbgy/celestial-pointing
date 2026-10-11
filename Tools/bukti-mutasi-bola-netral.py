@@ -55,12 +55,13 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                  view), jadi keadaan yang menggerakkan satu
                                  sisi memang hanya boleh menyalakan satu
                                  arah.
-  6. view: token -> palet Mars    `neutralBody` di view diganti palet Mars
-                                 (nilainya, bukan pemakaiannya). Piksel port
-                                 tetap 0.74, tokennya jadi 0.88 — jadi arah
-                                 pertama berbunyi, arah kedua tetap hijau.
-                                 Pasangan keadaan 2 pada sisi token, bukan
-                                 sisi cabang.
+  6. view: token -> palet Mars    `neutralBody` di view ditulis ulang sebagai
+                                 angka palet Mars alih-alih diteruskan dari
+                                 model. Piksel port tetap 0.74, jadi hanya
+                                 pemeriksaan teks "view meneruskan token
+                                 netral" yang bisa melihatnya — dan itu memang
+                                 satu-satunya yang melihatnya. Pasangan keadaan
+                                 2 pada sisi token, bukan sisi cabang.
 
 **Batas yang dinyatakan.** Arah kedua diukur pada **piksel paling terang**
 piringan, dan pada Merkurius piksel itu milik bibir kawah, bukan permukaan
@@ -130,8 +131,26 @@ PORT_NEUTRAL_BODY = 'NEUTRAL_BODY = (0.74, 0.72, 0.68)'
 #: Jangkar di view. Cabang "tak dikenal" dan tokennya, dua hal berbeda.
 VIEW_BRANCH = ('            drawSphere(context: context, center: center, radius: radius,\n'
                '                       from: Self.neutralBody, to: Self.neutralShadow)')
-VIEW_TOKEN = ('    private static let neutralBody = CelestialVisual.RGBComponents('
-              'red: 0.74, green: 0.72, blue: 0.68)')
+
+#: **Bentuk token di view berubah, dan jangkarnya ikut.** Dulu view **memegang
+#: angka** netralnya (`private static let neutralBody = CelestialVisual
+#: .RGBComponents(red: 0.74, ...)`) dan keadaan 6 mengganti angkanya dengan
+#: palet Mars. Sekarang view **meneruskan** token dari model, karena angka itu
+#: menentukan seluruh jalur "ragu" planet dan jalur itu harus terukur di
+#: Linux — jadi yang bisa disimpangkan di view bukan lagi angkanya melainkan
+#: **penerusannya**.
+#:
+#: Jangkar yang tidak diperbarui akan **menghentikan** harness (bukan
+#: meluluskannya): `main()` menuntut setiap jangkar muncul tepat sekali dan
+#: keluar dengan kode 2 kalau tidak. Itu penjaga yang benar — harness yang
+#: memutasi jangkar yang sudah tiada akan melaporkan "sesuai harapan" atas
+#: keadaan yang tidak pernah ia uji. Jadi penggantinya bukan sekadar teks baru,
+#: melainkan bentuk yang **memang bisa** disimpangkan: menulis ulang angka di
+#: view alih-alih meneruskannya.
+VIEW_TOKEN = '    private static let neutralBody = CelestialVisual.neutralBody'
+VIEW_TOKEN_MARS = ('    private static let neutralBody = '
+                   'CelestialVisual.RGBComponents('
+                   'red: 0.88, green: 0.42, blue: 0.26)')
 
 #: Nama pemeriksaan yang dikutip di `must_fire`. Ditulis sebagai potongan
 #: unik, bukan kalimat penuh: kalimatnya memuat angka yang berubah bersama
@@ -141,6 +160,12 @@ NEUTRAL_EQ = "== token netral"
 PLANET_NOT_NEUTRAL = "planet nyata bukan bola netral"
 VIEW_TOKEN_USED = "view memakai token netral"
 VIEW_NO_PALETTE = "view tidak meminjam palet planet"
+#: Nama pemeriksaan teks yang **baru**, dan karena itu satu-satunya yang bisa
+#: melihat keadaan 6: view menulis ulang angka netralnya berarti ia berhenti
+#: meneruskan token model. Piksel port tidak bergerak sama sekali (yang diukur
+#: gerbang adalah port), jadi tanpa pemeriksaan ini keadaan 6 tidak menyalakan
+#: apa pun.
+VIEW_FORWARDS = "view meneruskan token netral"
 
 #: Setiap keadaan: (nama, daftar (berkas, jangkar, pengganti), pemeriksaan
 #: yang **wajib** merah).
@@ -187,10 +212,8 @@ STATES = [
        'NEUTRAL_BODY = (0.88, 0.42, 0.26)')],
      [NEUTRAL_EQ]),
     ("6. view: token netral -> palet Mars",
-     [(VIEW, VIEW_TOKEN,
-       '    private static let neutralBody = CelestialVisual.RGBComponents('
-       'red: 0.88, green: 0.42, blue: 0.26)')],
-     [NEUTRAL_EQ]),
+     [(VIEW, VIEW_TOKEN, VIEW_TOKEN_MARS)],
+     [VIEW_FORWARDS]),
 ]
 
 _originals = {}
