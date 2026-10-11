@@ -541,23 +541,28 @@ jobs:
       - name: Buktikan gerbang warna identitas planet saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-warna-ragu.py
 
-      # Dan bukti untuk kawat **sudut sisi terang** di berkas yang sama —
-      # kawat ketiga dari kelas cacat yang sama, yang versi pertama Aturan 31
-      # lewatkan sambil mengutipnya di komentarnya.
+      # Dan bukti untuk **dua kawat fase** di berkas yang sama — kawat yang
+      # versi pertama Aturan 31 lewatkan sambil mengutipnya di komentarnya.
+      # Empat keadaan: tiap kawat diuji dalam dua bentuk, argumennya di-`nil`-kan
+      # dan nilainya di-`nil`-kan di baris penugasan.
       #
-      # Diukur: `brightLimbAngleRadians: isMoon ? limbAngle : nil` membuat
-      # seluruh 31 aturan UI tetap hijau, sementara 10.254 dari 40.000 piksel
-      # (25,6%) sabit Venus berubah — sisi terangnya berhenti menghadap
-      # Matahari. Bentuk keduanya lebih halus lagi: nilainya di-`nil`-kan di
-      # baris penugasan (`let planetLimbAngle: Double? = nil`) dengan argumen
-      # tetap utuh, jadi pembaca yang hanya melihat argumennya tidak melihat
-      # apa pun.
+      # Diukur pada port, satu kawat dimatikan per keadaan:
+      #   `brightLimbAngleRadians` -> nil  : 10.254/40.000 piksel (25,6%)
+      #   `planetIlluminationFraction` -> nil : 31.604/40.000 piksel (79,0%)
+      # Yang kedua paling parah: seluruh pita terang hilang dan Venus
+      # tergambar sebagai **bola penuh** di setiap keadaan, termasuk saat
+      # engine baru menghitung iluminasinya 0,22 — gambar yang menyatakan
+      # kebalikan dari yang dihitung engine.
+      #
+      # Bentuk keduanya lebih halus: nilainya di-`nil`-kan di baris penugasan
+      # dengan argumen tetap utuh, jadi pembaca yang hanya melihat argumennya
+      # tidak melihat apa pun.
       #
       # Harness ini **tidak** memutasi sumber produksi: ia mengekstrak program
       # Aturan 31 dari `swift-ui-lint.sh` dan menjalankannya atas salinan
       # kawat yang dimutasi di direktori sementara.
-      - name: Buktikan gerbang arah fase sudut sisi terang berbunyi
-        run: python3 Tools/bukti-mutasi-aturan31-sudut.py
+      - name: Buktikan gerbang kawat fase Aturan 31 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan31-kawat.py
 
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi

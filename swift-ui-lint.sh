@@ -3802,18 +3802,24 @@ fi
 #
 # Yang diperiksa: kawatnya tidak boleh lagi mengembalikan `nil` untuk benda
 # bukan-Bulan, `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`,
-# **dan** `brightLimbAngleRadians` harus benar-benar terisi untuk planet
-# berfase.
+# dan **kedua** kawat geometri fase planet (`brightLimbAngleRadians` dan
+# `planetIlluminationFraction`) harus benar-benar terisi untuk planet berfase.
 #
-# **Kawat ketiga itu kelas cacat yang sama, dan versi pertama aturan ini
+# **Kedua kawat itu kelas cacat yang sama, dan versi pertama aturan ini
 # melewatkannya sambil mengklaim sebaliknya.** Komentar di atas menyebut
 # `planetBrightLimbAngles` sebagai "dihitung tiap 30 detik, lalu tidak pernah
 # dipakai gambar apa pun" — tetapi yang diperiksa hanya kawat `waxing`.
-# Diukur: `brightLimbAngleRadians: isMoon ? limbAngle : nil` membuat Aturan 31
-# tetap **hijau** dan seluruh 31 aturan UI lulus, sementara 10.254 dari 40.000
-# piksel (25,6%) sabit Venus berubah — sisi terangnya berhenti menghadap
-# Matahari. Ini kelas cacat yang paling sering berulang di repo ini: gerbang
-# yang mengutip sebuah jalur di komentarnya tanpa mengukurnya.
+# Diukur pada port dengan mematikan satu kawat per keadaan:
+#
+#     brightLimbAngleRadians      -> nil : 10.254/40.000 piksel (25,6%)
+#     planetIlluminationFraction  -> nil : 31.604/40.000 piksel (79,0%)
+#
+# Keduanya membuat Aturan 31 tetap **hijau** dan seluruh 31 aturan UI lulus.
+# Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
+# sebagai **bola penuh** di setiap keadaan, termasuk saat engine baru
+# menghitung iluminasinya 0,22 — gambar yang menyatakan kebalikan dari yang
+# dihitung engine. Ini kelas cacat yang paling sering berulang di repo ini:
+# gerbang yang mengutip sebuah jalur di komentarnya tanpa mengukurnya.
 echo
 echo "== Aturan 31: arah fase harus sampai ke gambar untuk tiap benda berfase =="
 waxing=$(python3 - <<'PY' 2>&1
@@ -3908,30 +3914,73 @@ def _is_nil_for_planets(expr):
     return value != expr.strip() and _is_nil_for_planets(value)
 
 
-angle_args = re.findall(r"brightLimbAngleRadians\s*:\s*([^,\n]+)", code)
-if not angle_args:
-    problems.append("  `brightLimbAngleRadians:` tidak ditemukan di %s; gerbang ini "
-                    "kehilangan gigi" % WIRE)
-for expr in angle_args:
-    planet_expr = _planet_branch(expr)
-    if _is_nil_for_planets(expr):
-        problems.append(
-            "  `brightLimbAngleRadians: %s` bernilai nil untuk planet berfase; "
-            "sudut sisi terang yang dihitung tiap 30 detik tidak pernah sampai "
-            "ke gambar, jadi sabit Venus tergambar menghadap arah yang salah "
-            "(terukur 25,6%% piksel berbeda)" % expr.strip())
+#: Kawat-kawat fase yang wajib terisi untuk planet berfase.
+#:
+#: Keduanya kelas cacat yang **sama** -- `nil` berarti "jangan gambar fase",
+#: jadi gambar menyatakan kebalikan dari yang dihitung engine -- dan keduanya
+#: mati bersama-sama saat kawat `waxing` mengembalikan nil. Diukur pada port
+#: dengan mematikan satu per satu:
+#:
+#:   `brightLimbAngleRadians` -> nil : 25,6% piksel Venus berubah
+#:   `planetIlluminationFraction` -> nil : 79,0% piksel Venus berubah
+#:
+#: Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
+#: sebagai **bola penuh** di setiap keadaan, termasuk saat engine baru saja
+#: menghitung iluminasinya 0,22.
+PHASE_WIRES = (
+    ("brightLimbAngleRadians",
+     "sudut sisi terang yang dihitung tiap 30 detik tidak pernah sampai ke "
+     "gambar, jadi sabit Venus tergambar menghadap arah yang salah "
+     "(terukur 25,6% piksel berbeda)"),
+    ("planetIlluminationFraction",
+     "fraksi iluminasi planet tidak pernah sampai ke gambar, jadi Venus "
+     "tampil sebagai bola penuh di setiap keadaan -- termasuk saat engine "
+     "baru menghitung iluminasinya 0,22 (terukur 79,0% piksel berbeda)"),
+)
+
+
+def _strip_unbalanced_close(expr):
+    """Buang `)` penutup yang tidak berpasangan di ujung `expr`.
+
+    Argumennya dipotong dari teks panggilan, jadi `)` penutup panggilan itu
+    ikut terbaca sebagai bagian ekspresi: `planetIlluminationFraction:
+    planetPhase)` menghasilkan `planetPhase)`. Tanpa dibuang, pemeriksaannya
+    tidak mengenali `nil` telanjang dan gerbangnya hijau pada kawat yang mati
+    -- diukur pada keadaan 3 harness `bukti-mutasi-aturan31-sudut.py`.
+
+    Yang dibuang hanya `)` yang **tidak berpasangan**: `foo()` tetap utuh,
+    karena kurungnya berpasangan.
+    """
+    value = expr.strip()
+    while value.endswith(")"):
+        if value.count("(") >= value.count(")"):
+            break
+        value = value[:-1].strip()
+    return value
+
+
+for wire, why in PHASE_WIRES:
+    args = re.findall(r"%s\s*:\s*([^,\n]+)" % re.escape(wire), code)
+    if not args:
+        problems.append("  `%s:` tidak ditemukan di %s; gerbang ini "
+                        "kehilangan gigi" % (wire, WIRE))
         continue
-    # Telusuri nama yang dipakai **di cabang planet** ke nilai penugasannya.
-    for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", planet_expr):
-        if name in ("nil", "true", "false", "isMoon"):
+    for raw in args:
+        expr = _strip_unbalanced_close(raw)
+        planet_expr = _planet_branch(expr)
+        if _is_nil_for_planets(expr):
+            problems.append("  `%s: %s` bernilai nil untuk planet berfase; %s"
+                            % (wire, expr, why))
             continue
-        value = _bound_value(name)
-        if _is_nil_for_planets(value):
-            problems.append(
-                "  `brightLimbAngleRadians` memakai `%s`, yang diikat ke `%s` -- "
-                "nil untuk planet berfase; sabit Venus kehilangan orientasinya "
-                "tanpa satu pun teks di layar yang bisa membantahnya"
-                % (name, value))
+        # Telusuri nama yang dipakai **di cabang planet** ke nilai penugasan.
+        for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", planet_expr):
+            if name in ("nil", "true", "false", "isMoon"):
+                continue
+            value = _bound_value(name)
+            if _is_nil_for_planets(value):
+                problems.append(
+                    "  `%s` memakai `%s`, yang diikat ke `%s` -- nil untuk "
+                    "planet berfase; %s" % (wire, name, value, why))
 
 print("\n".join(problems) if problems else "")
 PY

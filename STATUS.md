@@ -1,4 +1,4 @@
-## Progres terakhir (11 Okt 2026 — Aturan 31 mengutip kawat sudut sisi terang tanpa mengukurnya)
+## Progres terakhir (11 Okt 2026 — Aturan 31 mengutip dua kawat fase tanpa mengukurnya)
 
 Siklus ini menutup kelas cacat yang sama dengan tiga entri di bawahnya, pada
 kawat yang paling baru: gerbang yang **mengutip** sebuah jalur di komentarnya,
@@ -9,40 +9,47 @@ geometri fase ke gambar objek, dan ia hidup di `Apps/` — jadi `swift-test.sh`
 di Linux (yang hanya membangun `Packages/`) tidak menjangkaunya. Aturan 31
 dibuat untuk itu, dan komentarnya sendiri menyebut `planetBrightLimbAngles`
 sebagai "dihitung tiap 30 detik, lalu tidak pernah dipakai gambar apa pun".
-Yang diperiksa hanya kawat `waxing`. Kawat **sudut** sisi terang tidak diukur
-siapa pun.
+Yang diperiksa hanya kawat `waxing`. **Dua** kawat geometri fase planet tidak
+diukur siapa pun.
 
-**Diukur.** Mematikan kawat sudut:
+**Diukur.** Mematikan satu kawat per keadaan, lalu menjalankan seluruh 31
+aturan UI:
 
-    brightLimbAngleRadians: isMoon ? limbAngle : nil
+| kawat -> `nil` | piksel Venus berubah | Aturan 31 |
+|---|---|---|
+| `brightLimbAngleRadians` | 10.254 / 40.000 (25,6%) | **hijau** |
+| `planetIlluminationFraction` | 31.604 / 40.000 (79,0%) | **hijau** |
 
-membuat **seluruh 31 aturan UI lulus** (`./swift-ui-lint.sh` keluar 0),
-sementara pada port: 10.254 dari 40.000 piksel (25,6%) sabit Venus berubah —
-sisi terangnya berhenti menghadap Matahari. Sabitnya tetap tergambar sebagai
-sabit yang meyakinkan; tidak ada satu pun teks di layar yang bisa dibaca
-pengguna untuk membantahnya.
+Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
+sebagai **bola penuh** di setiap keadaan — termasuk saat engine baru saja
+menghitung iluminasinya 0,22. Gambar itu menyatakan kebalikan dari yang
+dihitung engine, dan sabitnya tetap tergambar sebagai sabit yang meyakinkan,
+jadi tidak ada satu pun teks di layar yang bisa dibaca pengguna untuk
+membantahnya.
 
 Bentuk kedua lebih halus, dan ia yang paling mungkin terjadi saat menyunting:
 nilainya di-`nil`-kan di baris **penugasan** dengan argumen tetap utuh,
 
     let planetLimbAngle: Double? = nil
+    let planetPhase: Double? = nil
 
-sehingga pembaca yang hanya melihat argumennya (`: planetLimbAngle`) tidak
-melihat apa pun. Karena itu gerbang barunya membaca **pemakaian dan penugasan
-bersama**: ia menelusuri nama di cabang planet (`else` dari `isMoon ? … : …`)
-ke nilai `let`-nya. Yang ditelusuri hanya cabang planet — `limbAngle` memang
-bernilai nil untuk planet (`isMoon ? moonBrightLimbAngle : nil`), dan itu
-benar karena cabang itu tidak pernah dipakai planet; menelusuri seluruh
-ekspresi akan menuduh kode yang benar.
+sehingga pembaca yang hanya melihat argumennya (`: planetLimbAngle`,
+`: planetPhase`) tidak melihat apa pun. Karena itu gerbang barunya membaca
+**pemakaian dan penugasan bersama**: ia menelusuri nama di cabang planet
+(`else` dari `isMoon ? … : …`) ke nilai `let`-nya. Yang ditelusuri hanya
+cabang planet — `limbAngle` memang bernilai nil untuk planet
+(`isMoon ? moonBrightLimbAngle : nil`), dan itu benar karena cabang itu tidak
+pernah dipakai planet; menelusuri seluruh ekspresi akan menuduh kode yang
+benar.
 
 **Sudutnya wajib disebut, dan itu bukan kerapian penulisan.** `nil` memutar 0
-rad, jadi cacat ini **tak terlihat** pada benda yang sudutnya memang 0. Kasus
-katalog `planet-mercury-crescent` memakai sudut 0,0 — terukur **0 dari 40.000
-piksel** berubah. Gerbang yang mengukur benda itu akan hijau selamanya pada
-kawat yang mati: gerbang hampa. Angka Merkurius di bawah karena itu diukur
-dengan sudut -pi/2, bukan pada sudut katalognya.
+rad, jadi cacat sudut **tak terlihat** pada benda yang sudutnya memang 0.
+Kasus katalog `planet-mercury-crescent` memakai sudut 0,0 — terukur **0 dari
+40.000 piksel** berubah. Gerbang yang mengukur benda itu akan hijau selamanya
+pada kawat yang mati: gerbang hampa. Angka Merkurius karena itu diukur dengan
+sudut -pi/2 (12.916 piksel, 32,3%), bukan pada sudut katalognya.
 
-**Dua kesalahan pengukuran di harness ini sendiri, keduanya tertangkap
+**Tiga kesalahan pengukuran di harness ini sendiri, semuanya tertangkap
 sebelum push.**
 
   1. Versi pertama menyalin seluruh pohon repo ke sandbox lalu menjalankan
@@ -59,6 +66,13 @@ sebelum push.**
   2. Keluaran bersih/kotor mulanya ditentukan dengan mencari string penanda
      di keluaran lint. Program Aturan 31 mencetak daftar masalah atau string
      kosong, jadi yang dibaca sekarang adalah stdout-nya langsung.
+  3. Keadaan 3 (argumen fraksi iluminasi) awalnya **tidak berbunyi**, dan itu
+     menemukan cacat nyata di gerbangnya: argumennya dipotong dari teks
+     panggilan, jadi `)` penutup ikut terbaca sebagai bagian ekspresi
+     (`planetPhase)`), sehingga `nil` telanjang tidak dikenali. Keadaan yang
+     sama juga menemukan `%%` yang bocor ke pesan setelah gerbangnya berhenti
+     memakai format `%`. Keduanya diperbaiki di gerbangnya, bukan
+     dilonggarkan di harness.
 
 Harness ini **tidak** memutasi sumber produksi (berbeda dari
 `bukti-mutasi-cembung-mengecil.py`): ia menulis salinan kawat yang dimutasi ke
@@ -75,18 +89,19 @@ direktori sementara, jadi tidak ada pemulihan yang bisa gagal.
 | Baris `Apps/` berubah | — | **0** |
 | Baris `Packages/` berubah | — | **0** |
 
-Dibuktikan berbunyi: dua keadaan mutasi, keduanya merah; baseline bersih.
-`python3 Tools/bukti-mutasi-aturan31-sudut.py` → `3 keadaan, 0 tidak sesuai
+Dibuktikan berbunyi: empat keadaan mutasi, keempatnya merah; baseline bersih.
+`python3 Tools/bukti-mutasi-aturan31-kawat.py` → `5 keadaan, 0 tidak sesuai
 harapan`.
 
 ### Yang TIDAK diklaim
 
-- Angka 25,6% dan 32,3% diukur pada **port Python**, bukan pada perangkat
-  Apple. Yang dibuktikan: kawat yang mati mengubah gambar yang digambar port
-  secara terukur, dan gerbang teks menangkap kawat yang mati itu.
+- Angka 25,6%, 32,3%, dan 79,0% diukur pada **port Python**, bukan pada
+  perangkat Apple. Yang dibuktikan: kawat yang mati mengubah gambar yang
+  digambar port secara terukur, dan gerbang teks menangkap kawat yang mati itu.
 - Gerbang ini adalah **sapu teks**, bukan pemeriksaan tipe. Ia membaca
   penugasan `let` satu tingkat; rantai penugasan yang lebih panjang dari itu
-  tidak ditelusuri.
+  tidak ditelusuri, dan kawat yang mati lewat jalan lain (mis. kamusnya
+  dikosongkan) tidak terlihat olehnya.
 - Tidak ada satu baris pun `Apps/` atau `Packages/` yang berubah siklus ini.
   Yang berubah: `swift-ui-lint.sh` (Aturan 31 diperluas), harness baru,
   langkah CI, dan STATUS.

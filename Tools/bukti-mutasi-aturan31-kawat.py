@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""Buktikan gerbang Aturan 31 (kawat sudut sisi terang) **berbunyi**.
+"""Buktikan gerbang Aturan 31 (kawat-kawat fase) **berbunyi**.
 
-Kelas cacat yang ditutup: `brightLimbAngleRadians` di
-`Apps/Shared/PointingEngine.swift` -- kawat sudut sisi terang untuk planet
-berfase. Versi pertama Aturan 31 mengutip jalur ini di komentarnya
-(`planetBrightLimbAngles` "dihitung tiap 30 detik, lalu tidak pernah dipakai
-gambar apa pun") tetapi hanya mengukur kawat `waxing`. Diukur: mematikan
-kawat sudut membuat seluruh 31 aturan UI tetap hijau, sementara 10.254 dari
-40.000 piksel (25,6%) sabit Venus berubah -- sisi terangnya berhenti
-menghadap Matahari.
+Kelas cacat yang ditutup: dua kawat fase di `Apps/Shared/PointingEngine.swift`
+-- `brightLimbAngleRadians` (sudut sisi terang) dan
+`planetIlluminationFraction` (fraksi iluminasi) untuk planet berfase. Versi
+pertama Aturan 31 mengutip jalur ini di komentarnya (`planetBrightLimbAngles`
+"dihitung tiap 30 detik, lalu tidak pernah dipakai gambar apa pun") tetapi
+hanya mengukur kawat `waxing`.
 
-Dua bentuk cacat diuji, karena bentuk kedua yang paling mungkin terjadi saat
-menyunting: argumennya di-`nil`-kan, dan nilainya di-`nil`-kan di baris
-penugasan dengan argumen tetap utuh.
+Diukur pada port, satu kawat dimatikan per keadaan:
+
+    brightLimbAngleRadians       -> nil : 10.254/40.000 piksel (25,6%)
+    planetIlluminationFraction   -> nil : 31.604/40.000 piksel (79,0%)
+
+Yang kedua paling parah: seluruh pita terang hilang dan Venus tergambar
+sebagai **bola penuh** di setiap keadaan, termasuk saat engine baru menghitung
+iluminasinya 0,22. Keduanya membuat seluruh 31 aturan UI tetap hijau.
+
+Tiap kawat diuji dalam **dua bentuk**, karena bentuk kedua yang paling mungkin
+terjadi saat menyunting: argumennya di-`nil`-kan, dan nilainya di-`nil`-kan di
+baris penugasan dengan argumen tetap utuh.
 
 **Dua kesalahan pengukuran di harness ini sendiri, keduanya tertangkap
 sebelum push.**
@@ -34,6 +41,14 @@ sebelum push.**
      keluaran lint. Program Aturan 31 mencetak daftar masalah atau **string
      kosong**, jadi yang dibaca sekarang adalah stdout-nya langsung.
 
+  3. Keadaan 3 (argumen fraksi iluminasi) awalnya **tidak berbunyi**, dan itu
+     menemukan cacat nyata di gerbangnya: argumennya dipotong dari teks
+     panggilan, jadi `)` penutup ikut terbaca sebagai bagian ekspresi
+     (`planetPhase)`), sehingga `nil` telanjang tidak dikenali. Keadaan
+     itu juga yang menemukan `%%` yang bocor ke pesan setelah gerbangnya
+     berhenti memakai format `%`. Keduanya diperbaiki di gerbangnya, bukan
+     dilonggarkan di harness.
+
 Harness ini **tidak** memutasi sumber produksi (berbeda dari
 `bukti-mutasi-cembung-mengecil.py`): yang diuji adalah program pemeriksa di
 dalam `swift-ui-lint.sh`, dijalankan terhadap salinan `PointingEngine.swift`
@@ -41,7 +56,7 @@ yang dimutasi di **direktori sementara**. Sumber repo tidak pernah tersentuh,
 jadi tidak ada pemulihan yang bisa gagal.
 
 Pakai:
-    python3 Tools/bukti-mutasi-aturan31-sudut.py
+    python3 Tools/bukti-mutasi-aturan31-kawat.py
 """
 
 from __future__ import annotations
@@ -59,6 +74,12 @@ WIRE = os.path.join("Apps", "Shared", "PointingEngine.swift")
 #: Jangkar di kawat: satu baris yang menyalurkan sudut sisi terang ke gambar.
 ANCHOR_ARG = "brightLimbAngleRadians: isMoon ? limbAngle : planetLimbAngle"
 ANCHOR_BINDING = "let planetLimbAngle = planet.flatMap { planetBrightLimbAngles[$0] }"
+#: Kawat keempat, kelas cacat yang sama dan paling parah: fraksi iluminasi
+#: planet. Diukur pada port: `planetIlluminationFraction` -> nil mengubah
+#: 31.604 dari 40.000 piksel (79,0%) -- seluruh pita terang hilang dan Venus
+#: tergambar sebagai bola penuh di setiap keadaan.
+ANCHOR_ILLUM_ARG = "planetIlluminationFraction: planetPhase)"
+ANCHOR_ILLUM_BINDING = "let planetPhase = planet.flatMap { planetPhases[$0] }"
 
 #: Keadaan: (nama, (cari, ganti) atau None untuk baseline).
 STATES = [
@@ -67,6 +88,10 @@ STATES = [
      (ANCHOR_ARG, "brightLimbAngleRadians: isMoon ? limbAngle : nil")),
     ("2. binding sudut -> nil (argumen utuh)",
      (ANCHOR_BINDING, "let planetLimbAngle: Double? = nil")),
+    ("3. argumen fraksi iluminasi -> nil",
+     (ANCHOR_ILLUM_ARG, "planetIlluminationFraction: nil)")),
+    ("4. binding fraksi iluminasi -> nil (argumen utuh)",
+     (ANCHOR_ILLUM_BINDING, "let planetPhase: Double? = nil")),
 ]
 
 #: Pembuka blok program Aturan 31 di dalam `swift-ui-lint.sh`.
@@ -116,7 +141,9 @@ def main() -> int:
     program = extract_rule_program()
     original = open(os.path.join(ROOT, WIRE), encoding="utf-8").read()
     for anchor, label in ((ANCHOR_ARG, "argumen sudut"),
-                          (ANCHOR_BINDING, "penugasan planetLimbAngle")):
+                          (ANCHOR_BINDING, "penugasan planetLimbAngle"),
+                          (ANCHOR_ILLUM_ARG, "argumen fraksi iluminasi"),
+                          (ANCHOR_ILLUM_BINDING, "penugasan planetPhase")):
         count = original.count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {label} muncul {count}x, harus tepat 1x "
