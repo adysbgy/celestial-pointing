@@ -2531,6 +2531,17 @@
         }
       }
     },
+    "experiment.status.targetBelowHorizon": {
+      "comment": "Target kebenaran sudah terbenam saat tombol ditekan — percobaan tidak disimpan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ has already set — the trial was not saved."
+          }
+        }
+      }
+    },
     "experiment.suggestedThreshold": {
       "comment": "Usulan ambang keyakinan dari sigma terukur.",
       "localizations": {

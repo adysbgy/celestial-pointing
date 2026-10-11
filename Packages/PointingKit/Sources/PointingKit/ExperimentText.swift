@@ -59,6 +59,12 @@ public enum ExperimentText {
                targetID)
     }
 
+    /// Target kebenaran sudah di bawah cakrawala saat tombol ditekan.
+    public static func statusTargetBelowHorizon(targetID: String) -> String {
+        TextLocalization.text(.experimentStatusTargetBelowHorizon,
+               targetID)
+    }
+
     /// Satu percobaan tersimpan.
     ///
     /// - Parameter error: galat dalam bentuk tampilan (mis. `"1.2°"`, atau
@@ -375,6 +381,19 @@ public extension LocalizedText {
     static let experimentStatusTargetUncomputable = LocalizedText(
         key: "experiment.status.targetUncomputable",
         id: "Arah target %@ tidak bisa dihitung — percobaan tidak disimpan.")
+
+    /// Target kebenaran sudah di bawah cakrawala saat tombol ditekan.
+    ///
+    /// **Kenapa kalimat ini ada.** Percobaan yang dihitung untuk arah yang
+    /// tidak ada di langit tidak mengukur apa pun: penguji menunjuk ke langit
+    /// di atas cakrawala, tetapi kebenarannya (yang dihitung dari id target)
+    /// sudah terbenam. Mencatatnya menghasilkan galat palsu yang bahkan bisa
+    /// membalik arah putusan Experiment 1 — alat ukur yang justru ada untuk
+    /// menguji akurasi. Penolakan ini menyamai `CalibrationSession` yang sudah
+    /// menjaganya lebih dulu (lihat `ExperimentHarness.record`).
+    static let experimentStatusTargetBelowHorizon = LocalizedText(
+        key: "experiment.status.targetBelowHorizon",
+        id: "%@ sudah terbenam — percobaan tidak disimpan.")
     static let experimentStatusRecorded = LocalizedText(
         key: "experiment.status.recorded",
         id: "Tercatat: galat %@, %@. Jawaban engine: %@.")

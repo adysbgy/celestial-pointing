@@ -658,7 +658,8 @@ public extension LocalizedText {
         // Lihat `ExperimentText.swift`.
         .experimentStatusInitial, .experimentStatusNoTarget,
         .experimentStatusSensorOff, .experimentStatusNoPointing,
-        .experimentStatusTargetUncomputable, .experimentStatusRecorded,
+        .experimentStatusTargetUncomputable, .experimentStatusTargetBelowHorizon,
+        .experimentStatusRecorded,
         .experimentStatusRemoved, .experimentStatusNothingToRemove,
         .experimentStatusReset,
         .experimentVerdictFalseLock, .experimentVerdictCorrect,

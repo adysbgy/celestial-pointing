@@ -114,7 +114,15 @@ public final class ExperimentRecorder: ObservableObject {
                                          rawAttitudeQuaternion: engine.snapshot.rawAttitudeQuaternion,
                                          aimAxis: engine.snapshot.aim,
                                          source: source) else {
-            statusMessage = ExperimentText.statusTargetUncomputable(targetID: targetID)
+            // Sebab penolakan dibaca dari harness, bukan ditebak: "arah tidak
+            // bisa dihitung" benar untuk id yang tidak dikenal, tetapi ia
+            // berbohong untuk target yang sudah terbenam — itu bukan
+            // kegagalan perhitungan, melainkan langit yang sudah bergeser
+            // sejak target dipilih. Dua sebab itu menuntut tindakan berbeda,
+            // jadi kalimatnya harus berbeda.
+            statusMessage = harness.lastRefusal == .targetBelowHorizon
+                ? ExperimentText.statusTargetBelowHorizon(targetID: targetID)
+                : ExperimentText.statusTargetUncomputable(targetID: targetID)
             return nil
         }
 

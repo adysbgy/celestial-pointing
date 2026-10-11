@@ -115,8 +115,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// Mode kegagalan paling berbahaya: yakin tinggi tapi salah.
     func testConfidentButWrongIsFlaggedAsFalseLock() {
         let h = harness()
-        let t = truth("vega")
-        h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        h.record(targetObjectID: "capella",
                  rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
                  calibratedPointing: nil,
                  intent: intent(level: .high, object: star("sirius")),  // jawaban salah
@@ -134,8 +134,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// Ragu bukan kebohongan: MEDIUM + salah bukan false lock.
     func testUncertainAndWrongIsNotAFalseLock() {
         let h = harness()
-        let t = truth("vega")
-        h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        h.record(targetObjectID: "capella",
                  rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
                  calibratedPointing: nil,
                  intent: intent(level: .medium, object: star("sirius")),
@@ -169,9 +169,9 @@ final class ExperimentHarnessTests: XCTestCase {
     /// informasi paling berharga: seberapa sering engine gagal.
     func testWrongTrialsAreKeptNotFiltered() {
         let h = harness()
-        let t = truth("vega")
+        let t = truth("capella")
         for _ in 0..<5 {
-            h.record(targetObjectID: "vega",
+            h.record(targetObjectID: "capella",
                      rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg + 40,
                                                   azimuthDeg: t.azimuthDeg),
                      calibratedPointing: nil,
@@ -192,7 +192,7 @@ final class ExperimentHarnessTests: XCTestCase {
         let h = harness()
         // Galat: 1°, 2°, 3°, 4° (median 2.5, P90 3.7)
         for (index, error) in [1.0, 2.0, 3.0, 4.0].enumerated() {
-            let id = ["sirius", "vega", "arcturus", "capella"][index]
+            let id = ["sirius", "capella", "arcturus", "rigel"][index]
             let t = truth(id)
             h.record(targetObjectID: id,
                      rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg - error,
@@ -221,8 +221,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// Experiment 1.
     func testRecordWithoutDisplayedAnswerIsNotAFalseLock() {
         let h = harness()
-        let t = truth("vega")
-        let recorded = h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        let recorded = h.record(targetObjectID: "capella",
                                 rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
                                                              azimuthDeg: t.azimuthDeg),
                                 calibratedPointing: nil,
@@ -247,8 +247,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// Rekaman saat benar-benar terkunci tetap dihitung apa adanya.
     func testRecordWithDisplayedAnswerStillFlagsFalseLock() {
         let h = harness()
-        let t = truth("vega")
-        h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        h.record(targetObjectID: "capella",
                  rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
                  calibratedPointing: nil,
                  intent: intent(level: .high, object: star("sirius")),
@@ -279,8 +279,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// benar menurut PRD: uncertainty > false confidence.
     func testFalseLockTightensPolicy() {
         let h = harness()
-        let t = truth("vega")
-        h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        h.record(targetObjectID: "capella",
                  rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg, azimuthDeg: t.azimuthDeg),
                  calibratedPointing: nil,
                  intent: intent(level: .high, object: star("sirius")),
@@ -381,8 +381,8 @@ final class ExperimentHarnessTests: XCTestCase {
     /// di atas dan baru terlihat di sini.
     func testOneFalseLockStillTightensOnATinySample() {
         let h = harness()
-        let t = truth("vega")
-        h.record(targetObjectID: "vega",
+        let t = truth("capella")
+        h.record(targetObjectID: "capella",
                  rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
                                               azimuthDeg: t.azimuthDeg),
                  calibratedPointing: nil,

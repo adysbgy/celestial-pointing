@@ -44,8 +44,8 @@ final class DatasetSummaryIntegrityTests: XCTestCase {
     /// mutate arsip sungguhan, sehingga isinya benar-benar bertentangan.
     func testDecodedSummaryCannotContradictItsOwnTrials() throws {
         let h = ExperimentHarness(resolver: resolver, location: location)
-        let t = resolver.horizontal(ofObjectID: "vega", observer: observer, date: date)!
-        _ = h.record(targetObjectID: "vega",
+        let t = resolver.horizontal(ofObjectID: "capella", observer: observer, date: date)!
+        _ = h.record(targetObjectID: "capella",
                      rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
                                                   azimuthDeg: t.azimuthDeg),
                      calibratedPointing: nil,
@@ -88,8 +88,8 @@ final class DatasetSummaryIntegrityTests: XCTestCase {
     /// ekspor justru alat bukti yang dibawa keluar dari app.
     func testConsistentArchiveStillDecodesWithItsOwnSummary() throws {
         let h = ExperimentHarness(resolver: resolver, location: location)
-        let t = resolver.horizontal(ofObjectID: "vega", observer: observer, date: date)!
-        _ = h.record(targetObjectID: "vega",
+        let t = resolver.horizontal(ofObjectID: "capella", observer: observer, date: date)!
+        _ = h.record(targetObjectID: "capella",
                      rawPointing: HorizontalCoord(altitudeDeg: t.altitudeDeg,
                                                   azimuthDeg: t.azimuthDeg),
                      calibratedPointing: nil,

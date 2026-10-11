@@ -136,6 +136,27 @@ public struct ExperimentDataset: Codable, Equatable, Sendable {
 public final class ExperimentHarness {
 
     public private(set) var trials: [AnalyzedTrial] = []
+
+    /// Alasan penolakan terakhir dari `record`, atau `nil` bila percobaan
+    /// tersimpan.
+    ///
+    /// **Kenapa `record` perlu melaporkan sebabnya.** Fungsi ini hanya
+    /// mengembalikan `nil`, jadi pemanggilnya (`ExperimentRecorder`) selama ini
+    /// menampilkan "arah tidak bisa dihitung" untuk **semua** kegagalan. Itu
+    /// kalimat yang benar untuk id yang tidak dikenal, tapi **salah** untuk
+    /// target yang sudah terbenam — sebabnya bukan perhitungan yang gagal,
+    /// melainkan langit yang sudah bergeser. Dua sebab itu menuntut tindakan
+    /// berbeda dari pengguna, jadi satu kalimat untuk keduanya menyembunyikan
+    /// apa yang sebenarnya terjadi.
+    public private(set) var lastRefusal: RecordRefusal?
+
+    /// Alasan sebuah percobaan ditolak saat direkam.
+    public enum RecordRefusal: String, Equatable, Sendable {
+        /// Id target tidak dikenal / arahnya tidak bisa dihitung.
+        case targetUncomputable
+        /// Target benar sudah berada di bawah cakrawala saat rekaman diambil.
+        case targetBelowHorizon
+    }
     /// Lokasi yang dipakai saat merekam.
     ///
     /// Mengubahnya membatalkan cache daftar target: langit di tempat baru
@@ -223,8 +244,9 @@ public final class ExperimentHarness {
     ///   - timestamp: waktu percobaan.
     ///   - note: catatan bebas penguji.
     /// - Returns: percobaan yang tersimpan, atau `nil` bila target tidak
-    ///   dikenal / arahnya tidak bisa dihitung (rekaman seperti itu tidak
-    ///   berguna dan tidak boleh masuk dataset).
+    ///   dikenal / arahnya tidak bisa dihitung / target sudah di bawah
+    ///   cakrawala (rekaman seperti itu tidak berguna dan tidak boleh masuk
+    ///   dataset).
     @discardableResult
     public func record(targetObjectID: String,
                        rawPointing: HorizontalCoord,
@@ -241,8 +263,35 @@ public final class ExperimentHarness {
         guard let truth = resolver.horizontal(ofObjectID: targetObjectID,
                                               observer: location.observer,
                                               date: timestamp) else {
+            lastRefusal = .targetUncomputable
             return nil
         }
+
+        // **Target yang sudah terbenam tidak boleh jadi pengukuran.**
+        //
+        // Daftar target menyaring di `policy.minAltitudeDeg`, tetapi daftar itu
+        // di-cache 30 detik dan langit bergerak: penguji bisa memilih target
+        // saat masih di atas ambang, lalu beberapa menit kemudian menekan
+        // tombol — dan kebenaran yang dihitung di sini sudah di bawah
+        // cakrawala. Yang tercatat bukan sebuah pengukuran: penguji menunjuk
+        // langit yang sekarang kosong, sedangkan arah "kebenaran" menunjuk
+        // tempat yang tidak ada. Galatnya palsu, dan karena
+        // `safetyVerdict` hanya menghitung `trialCount`, satu rekaman seperti
+        // ini cukup untuk mendorong vonis dari "belum cukup bukti" menjadi
+        // "lulus" (diukur: 19 percobaan sah + 1 ghost = `passed`).
+        //
+        // Ambangnya cakrawala geometris (`> 0`), sama dengan
+        // `CalibrationSession.capture`, karena di sini yang dicari bukan
+        // "bisakah engine mengunci" melainkan "apakah arah ini ada di langit
+        // sama sekali". Ambang engine 5° sudah dijaga oleh daftar target;
+        // yang belum dijaga adalah bahwa kebenaran harus berada di langit
+        // pada saat rekaman diambil.
+        guard truth.altitudeDeg > 0 else {
+            lastRefusal = .targetBelowHorizon
+            return nil
+        }
+
+        lastRefusal = nil
 
         let trial = PointingTrial(timestamp: timestamp,
                                   observer: location.observer,
