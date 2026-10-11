@@ -31,6 +31,23 @@ public struct PointingSnapshot: Equatable, Sendable {
     public var calibratedPointing: HorizontalCoord?
     /// Kecepatan sudut pergelangan terakhir (derajat/detik).
     public var angularRateDegPerSec: Double?
+    /// Ambang laju yang dipakai mesin keadaan untuk menyatakan "pergelangan
+    /// masih bergerak" (derajat/detik).
+    ///
+    /// **Kenapa ambangnya ikut dalam cuplikan, bukan hanya lajunya.** Laju
+    /// tanpa ambang tidak bisa ditafsirkan: view yang ingin mewarnai angka
+    /// itu harus membandingkannya dengan sesuatu, dan satu-satunya sumber
+    /// yang benar adalah `PointingPolicy.maxAngularRateDegPerSec` — yang
+    /// menurut docstring-nya **bisa dikalibrasi lewat Experiment 1**. Selama
+    /// ambang itu tidak ada di cuplikan, view terpaksa menulis angkanya
+    /// sendiri; saat ambangnya dikalibrasi, warna di layar lalu berbeda
+    /// pendapat dengan keputusan engine tanpa ada yang berkedip.
+    ///
+    /// Ini kelas yang sama dengan `moonSphereGradientEndRadius`: konstanta
+    /// yang hidup di model, disalin ke view, lalu tidak pernah ikut berubah
+    /// saat modelnya berubah. Bedanya, di sini ambangnya ikut dikirim
+    /// bersama lajunya, jadi keduanya tidak bisa tidak sejalan.
+    public var maxAngularRateDegPerSec: Double
     /// Jarak sudut kandidat terbaik ke tetangga terdekatnya di langit (derajat).
     /// `nil` = tidak ada kandidat lain, atau belum ada resolusi.
     ///
@@ -69,6 +86,7 @@ public struct PointingSnapshot: Equatable, Sendable {
                 rawPointing: HorizontalCoord? = nil,
                 calibratedPointing: HorizontalCoord? = nil,
                 angularRateDegPerSec: Double? = nil,
+                maxAngularRateDegPerSec: Double = PointingPolicy().maxAngularRateDegPerSec,
                 nearestNeighbourDeg: Double? = nil,
                 aim: DeviceAimAxis = .view,
                 rawAttitudeQuaternion: Quaternion? = nil,
@@ -80,6 +98,7 @@ public struct PointingSnapshot: Equatable, Sendable {
         self.rawPointing = rawPointing
         self.calibratedPointing = calibratedPointing
         self.angularRateDegPerSec = angularRateDegPerSec
+        self.maxAngularRateDegPerSec = maxAngularRateDegPerSec
         self.nearestNeighbourDeg = nearestNeighbourDeg
         self.aim = aim
         self.rawAttitudeQuaternion = rawAttitudeQuaternion
@@ -209,6 +228,7 @@ public final class PointingController {
         self.smoother = PointingSmoother(blendFactor: config.smootherBlend)
         self.snapshot = PointingSnapshot(
             state: isSensorAvailable ? .idle : .unavailable,
+            maxAngularRateDegPerSec: config.policy.maxAngularRateDegPerSec,
             aim: config.aim,
             hasSensor: isSensorAvailable,
             isCalibrated: calibration.sampleCount > 0
@@ -393,6 +413,7 @@ public final class PointingController {
             rawPointing: rawPointing,
             calibratedPointing: pointing,
             angularRateDegPerSec: machine.angularRateDegPerSec,
+            maxAngularRateDegPerSec: config.policy.maxAngularRateDegPerSec,
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             rawAttitudeQuaternion: machine.lastRawQuaternion,
@@ -485,6 +506,7 @@ public final class PointingController {
             rawPointing: snapshot.rawPointing,
             calibratedPointing: snapshot.calibratedPointing,
             angularRateDegPerSec: machine.angularRateDegPerSec,
+            maxAngularRateDegPerSec: config.policy.maxAngularRateDegPerSec,
             nearestNeighbourDeg: lastResolution?.nearestNeighbourDeg,
             aim: config.aim,
             rawAttitudeQuaternion: machine.lastRawQuaternion,

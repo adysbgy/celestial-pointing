@@ -260,8 +260,25 @@ struct PointingView: View {
             if let rate = engine.snapshot.angularRateDegPerSec {
                 Text(NumberFormat.degreesPerSecond(rate, fractionDigits: 0))
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(rate > 8 ? PointingTone.warning.color
-                                               : SurfacePalette.active.textSecondaryColor)
+                    // **Ambangnya dibaca dari cuplikan, bukan ditulis `8` di
+                    // sini.** Ambang "pergelangan masih bergerak" hidup di
+                    // `PointingPolicy.maxAngularRateDegPerSec`, dan menurut
+                    // docstring-nya ia **bisa dikalibrasi lewat Experiment 1**.
+                    // Menulis angkanya sendiri di view berarti layar
+                    // mewarnai "terlalu cepat" memakai ambang yang bisa
+                    // berbeda dari ambang yang dipakai mesin keadaan untuk
+                    // menahan kunci — dua versi kebenaran yang tidak pernah
+                    // terlihat bertentangan, karena tidak ada teks di layar
+                    // yang menyebut ambangnya.
+                    //
+                    // Kelasnya sama dengan `moonSphereGradientEndRadius`:
+                    // konstanta model yang disalin ke view lalu tidak pernah
+                    // ikut berubah. Dijaga
+                    // `testSnapshotCarriesTheAngularRateThresholdFromThePolicy`
+                    // dan `testRateThresholdFollowsThePolicyAfterItChanges`.
+                    .foregroundStyle(rate > engine.snapshot.maxAngularRateDegPerSec
+                                     ? PointingTone.warning.color
+                                     : SurfacePalette.active.textSecondaryColor)
             }
         }
         .frame(maxWidth: .infinity)

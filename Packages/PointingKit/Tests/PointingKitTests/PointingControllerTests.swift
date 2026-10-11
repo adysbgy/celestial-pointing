@@ -774,6 +774,59 @@ final class PointingControllerTests: XCTestCase {
                      "attitude mentah alur lama tidak boleh tersisa")
     }
 
+    // MARK: - Ambang laju ikut dalam cuplikan
+
+    /// Ambang "pergelangan masih bergerak" harus ikut bersama lajunya.
+    ///
+    /// **Cacat yang ditutup uji ini.** `PointingView` mewarnai angka laju
+    /// dengan `rate > 8` — angka yang ditulis sendiri di view, padahal
+    /// ambangnya hidup di `PointingPolicy.maxAngularRateDegPerSec` dan menurut
+    /// docstring-nya **bisa dikalibrasi lewat Experiment 1**. Selama ambang
+    /// itu tidak ada di cuplikan, tidak ada cara bagi view memakai angka yang
+    /// benar, jadi hardcode itu bukan kelalaian — ia satu-satunya pilihan.
+    /// Akibatnya: begitu ambang dikalibrasi, warna di layar berbeda pendapat
+    /// dengan keputusan engine, tanpa satu uji pun yang merah.
+    ///
+    /// Uji ini menuntut cuplikan membawa ambangnya, dan menuntut ambang itu
+    /// **mengikuti kebijakan yang dipakai controller** — bukan nilai baku.
+    func testSnapshotCarriesTheAngularRateThresholdFromThePolicy() {
+        let resolver = singleStarResolver()
+        let custom = PointingPolicy(maxAngularRateDegPerSec: 3.5)
+        let c = PointingController(
+            resolver: resolver,
+            observer: observer,
+            config: PointingControllerConfig(policy: custom, coneDeg: 5.0))
+
+        // Nilai baku tetap yang baku — supaya perubahan bawaan tidak lolos.
+        XCTAssertEqual(PointingControllerConfig().policy.maxAngularRateDegPerSec,
+                       8.0, accuracy: 1e-9,
+                       "ambang baku PointingPolicy berubah; periksa uji ini")
+
+        XCTAssertEqual(c.snapshot.maxAngularRateDegPerSec, 3.5, accuracy: 1e-9,
+                       "cuplikan harus memakai ambang dari kebijakan controller, bukan angka baku")
+    }
+
+    /// Ambang di cuplikan harus mengikuti kebijakan yang **diganti**.
+    ///
+    /// Ini arah yang benar-benar memastikan keduanya tidak bisa menyimpang:
+    /// kalau cuplikan menyalin nilai baku sekali saat pembuatan, ia akan
+    /// tetap 8.0 setelah kebijakan diganti — dan hardcode di view menjadi
+    /// benar secara kebetulan, bukan karena terhubung.
+    func testRateThresholdFollowsThePolicyAfterItChanges() {
+        let resolver = singleStarResolver()
+        var config = PointingControllerConfig(coneDeg: 5.0)
+        config.policy.maxAngularRateDegPerSec = 15.0
+        let c = PointingController(resolver: resolver,
+                                   observer: observer,
+                                   config: config)
+
+        let target = siriusDirection(resolver)
+        c.feed(quaternion: quaternion(viewPointingAt: target), timestamp: at(0))
+
+        XCTAssertEqual(c.snapshot.maxAngularRateDegPerSec, 15.0, accuracy: 1e-9,
+                       "ambang harus ikut kebijakan yang berlaku, bukan nilai yang dibekukan")
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat
