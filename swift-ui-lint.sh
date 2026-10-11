@@ -2090,8 +2090,52 @@ import os, re
 # Nama yang menyatakan "bolehkah gambar/suara mengklaim identitas ini".
 # `isStale` sengaja tidak masuk: ia menyatakan umur, dan `true` di sana
 # berarti "tampilkan peringatan" -- arah yang justru lebih aman.
+#
+# **Versi pertama regex ini buta pada bentuk yang paling sering ditulis.**
+# Ia menuntut `var`/`let` sebagai token **pertama** di baris. Terukur dengan
+# menyuntikkan satu per satu ke `Apps/`:
+#
+#   `    private var isConfirmed: Bool = true`   -> HIJAU (lolos)
+#   `    static var isConfirmed: Bool = true`    -> HIJAU
+#   `    @State private var isConfirmed: Bool = true` -> HIJAU
+#   `    private let claimIdentity: Bool = true` -> HIJAU
+#   `    private(set) var isConfirmed: Bool = true` -> HIJAU
+#   `    var isConfirmed: Bool = true`           -> merah (satu-satunya)
+#
+# Artinya seluruh kode `Apps/` yang asli **tidak satu pun** diperiksa oleh
+# versi ini: `private`/`static`/`@State`/`private(set)` adalah bentuk normal
+# deklarasi properti di app SwiftUI. Aturan ini karena itu hijau bukan karena
+# nilainya sudah `false`, melainkan karena ia tidak pernah membaca baris yang
+# memuat nilai itu -- persis kelas "hijau karena tidak mengukur apa pun" yang
+# aturan ini ada untuk menutup, kali ini pada dirinya sendiri.
+#
+# Yang dijaga sekarang **bentuk deklarasinya**, bukan token pertamanya:
+# pengubah akses, `static`, atribut properti (`@State`, `@AppStorage("k")`,
+# dengan atau tanpa argumen), dan `private(set)`. Yang dicari adalah
+# `var`/`let` + nama + `: Bool = true` di mana pun setelah awalan itu.
+#
+# **Anotasi `: Bool` tetap wajib**, dan itu keputusan sadar: `var isConfirmed
+# = true` tanpa anotasi tipe juga lolos hari ini, tapi menutupnya menuntut
+# aturan mengenali tipe hasil inferensi. Anotasinya yang membuat baris ini
+# bisa dibaca tanpa menebak -- dan `Bool = true` adalah bentuk yang ditulis
+# orang yang sedang **mendeklarasikan nilai bawaan**, bukan kebetulan.
+#
+# **`static` sengaja TIDAK dikecualikan, walaupun satu anggota statis di
+# `Apps/` memakai baku `true` secara sah** (`LockArrivalPanel` tidak, tapi
+# `includeTechnicalDetails` di `DiagnosticsView.swift:977` memakai
+# `Bool = true` sebagai baku parameter *fungsi* -- bentuk yang berbeda dan
+# tidak ditangkap pola ini). Aturan yang mengecualikan `static` akan kembali
+# buta pada `static var isConfirmed` -- bentuk yang justru dipakai
+# `CelestialVisualView.isConfirmed` kalau kelak dipromosikan. Nilai bawaan
+# `true` untuk nama yang menyatakan klaim identitas salah di kedua konteks,
+# jadi tidak ada pengecualian yang bisa dibenarkan di sini.
 CLAIM = re.compile(
-    r'^\s*(?:var|let)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Bool\s*=\s*true\s*$')
+    r'^\s*'
+    r'(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s+)*'   # @State, @AppStorage("k")
+    r'(?:(?:public|internal|fileprivate|private|open|final|static|'
+    r'mutating|nonisolated|lazy|weak|unowned)(?:\(set\))?\s+)*'  # + private(set)
+    r'(?:var|let)\s+'
+    r'([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Bool\s*=\s*true\s*$')
 NAMES = re.compile(r'(?i)(isconfirmed|confirmsidentity|confirmsdisplayed'
                    r'|identityconfirmed|claim)')
 

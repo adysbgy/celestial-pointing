@@ -585,6 +585,36 @@ jobs:
       - name: Setiap harness bukti-mutasi dijalankan CI
         run: python3 Tools/check-harness-terdaftar.py
 
+      # Dan bukti bahwa **gerbang sapu UI sendiri** berbunyi pada hal yang
+      # mereka klaim -- dua cacat yang hidup di `main`, dan keduanya kelas yang
+      # sama: hijau karena tidak mengukur apa pun.
+      #
+      # 1. `Aturan 18` (klaim identitas tidak boleh berbaku `true` -- aturan
+      #    yang menegakkan larangan PRD paling keras) menuntut `var`/`let`
+      #    sebagai token **pertama** di baris. Terukur dengan menyuntik satu
+      #    per satu: `private var isConfirmed: Bool = true` HIJAU, begitu pula
+      #    `static`, `@State`, `private(set)`, dan `@AppStorage("k")`. Hanya
+      #    `var isConfirmed: Bool = true` polos yang tertangkap. Artinya
+      #    seluruh properti SwiftUI di `Apps/` -- bentuk yang normal --
+      #    tidak pernah dibaca aturan itu, jadi hijau-nya bukan bukti nilai
+      #    bawaannya `false`.
+      #
+      # 2. `red-lint.sh` membuktikan **judulnya sendiri**. Syarat keduanya dulu
+      #    `grep -qF "$NEEDLE"` ke seluruh keluaran, dan setiap aturan mencetak
+      #    judulnya entah ia menemukan sesuatu atau tidak. Terukur:
+      #    `./red-lint.sh WatchTheme.swift '<cacat font>' 'Aturan 31'`
+      #    melaporkan "MERAH: gagal pada 'Aturan 31'" dengan exit 0 -- yang
+      #    disuntik cacat **font** (Aturan 1), dan Aturan 31 soal arah fase
+      #    tidak berhubungan. Keempat langkah `red-lint.sh` di atas karena itu
+      #    hanya membuktikan satu hal: lint keluar bukan-nol.
+      #
+      # Harness ini menjalankan program aturannya **langsung** (bukan lewat
+      # `red-lint.sh`), supaya cacat di pembuktinya tidak dilaporkan sebagai
+      # cacat di aturannya. Ia mengukur dua arah untuk setiap keadaan: cacatnya
+      # harus berbunyi, dan kode yang benar harus diam.
+      - name: Buktikan Aturan 18 & red-lint.sh berbunyi pada hal yang diklaim
+        run: python3 Tools/bukti-mutasi-aturan18-redlint.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
