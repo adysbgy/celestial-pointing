@@ -1684,7 +1684,29 @@ GUARD = re.compile(r'\b(?:guard\s+NightMode\.isOn\s+else|if\s+NightMode\.isOn|Ni
 # Deklarasi fungsi, **dengan** kata kunci akses di depannya (`private static
 # func`). Tanpa awalan itu, `rfind("\nfunc")` tidak pernah cocok dan rentang
 # fungsi jatuh ke seluruh berkas.
-DECL = re.compile(r'^\s*(?:public\s+|private\s+|internal\s+|fileprivate\s+|static\s+|mutating\s+)*func\s', re.M)
+#
+# **Versi pertama masih buta pada atribut dan `override`.** Daftarnya
+# menutup pengubah akses dan `static`, tapi `@ViewBuilder func` dan
+# `override func` tidak dikenali sebagai deklarasi sama sekali — sehingga
+# cacat di dalamnya jatuh ke rentang **fungsi sebelumnya**, dan penjaga
+# `NightMode.isOn` milik fungsi itu membelanya. Terukur (mengganti `func` di
+# atas cacat yang sama):
+#
+#   private func warnaUji() -> Color     -> 1 temuan
+#   @ViewBuilder private func warnaUji() -> 0 temuan (LOLOS)
+#   override func warnaUji() -> Color    -> 0 temuan (LOLOS)
+#
+# Bentuknya persis kelas yang sama dengan Aturan 18: gerbang hijau karena ia
+# tidak mengenali bentuk yang sedang dibacanya. `@ViewBuilder` adalah bentuk
+# yang **paling mungkin** dialam di berkas SwiftUI, jadi lubangnya tepat di
+# tempat yang paling sering ditulis. `nonisolated`/`async` ikut dimasukkan
+# supaya daftar pengubahnya tidak perlu diperluas lagi.
+DECL = re.compile(
+    r'^\s*'
+    r'(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s+)*'      # @ViewBuilder, @MainActor
+    r'(?:(?:public|private|internal|fileprivate|open|static|final|mutating|'
+    r'nonisolated|override|class|dynamic|lazy|weak|unowned)\s+)*'
+    r'func\s', re.M)
 
 problems = []
 for root, _, files in os.walk("Apps"):

@@ -204,6 +204,74 @@ def check_rule_18(failures: list[str]) -> None:
         shutil.rmtree(workdir, ignore_errors=True)
 
 
+#: **Fungsi berpenjaga** yang menjadi umpan untuk Aturan 15. Ia memuat
+#: `NightMode.isOn` yang sah, dan itu bukan hiasan: ia yang membuat keadaan
+#: di bawah non-vakum. Kalau Aturan 15 tidak mengenali bentuk deklarasi
+#: berikutnya, cacat di fungsi berikutnya jatuh ke rentang fungsi **ini**, dan
+#: penjaganya membela cacat itu — persis cacat yang ditemukan.
+#:
+#: Karena itu urutannya penting: penjaga dulu, cacat sesudahnya. Dengan
+#: cacat di fungsi **pertama** dan penjaga di kedua, rentangnya jatuh ke
+#: seluruh berkas dan aturannya tampak berbunyi walau deklarasinya buta —
+#: gerbang hampa, dan pengukurannya akan salah menyimpulkan "sudah aman".
+ATURAN_15_GUARD = (
+    "private func warnaSah() -> Color {\n"
+    "    if NightMode.isOn { return Color(red: 0.9, green: 0.0, blue: 0.0) }\n"
+    "    return Color(white: 1)\n"
+    "}\n")
+
+#: Warna yang **tidak** lewat penjaga mode malam. Nilainya sengaja sama dengan
+#: contoh yang dipakai CI (`red-lint.sh`) untuk Aturan 15, supaya keadaan di
+#: sini dan keadaan di sana mengukur cacat yang sama.
+ATURAN_15_DEFECT = "Color(red: 0.62, green: 0.30, blue: 0.16)"
+
+#: Keadaan untuk **Aturan 15** (warna prosedural wajib lewat penjaga mode
+#: malam). Setiap baris: (nama, deklarasi fungsi yang memuat cacat, harus_berbunyi).
+#:
+#: **Empat bentuk pertama adalah cacat yang versi lama meloloskannya**, dan
+#: semuanya bentuk deklarasi yang normal di berkas SwiftUI. Yang terakhir
+#: adalah arah penjaga: fungsi yang **berpenjaga sendiri** tidak boleh
+#: memerah, karena aturan yang merah pada kode benar akan dimatikan orang.
+ATURAN_15_CASES = [
+    ("private func", "private func warnaUji() -> some View", True),
+    ("@ViewBuilder func", "@ViewBuilder private func warnaUji() -> some View", True),
+    ("override func", "override func warnaUji() -> Color", True),
+    ("nonisolated func", "nonisolated private func warnaUji() -> Color", True),
+    ("@MainActor static func",
+     "@MainActor static func warnaUji() -> Color", True),
+    ("fungsi berpenjaga sendiri (harus diam)",
+     "private func warnaUji() -> some View", False),
+]
+
+
+def check_rule_15(failures: list[str]) -> None:
+    """Aturan 15: cacat di fungsi kedua tidak boleh dibela penjaga fungsi pertama."""
+    program = extract_rule("15")
+    workdir = copy_repo()
+    try:
+        for name, decl, must_fire in ATURAN_15_CASES:
+            shutil.rmtree(os.path.join(workdir, "Apps"))
+            shutil.copytree(os.path.join(ROOT, "Apps"),
+                            os.path.join(workdir, "Apps"))
+            if must_fire:
+                body = f"    Circle().fill({ATURAN_15_DEFECT})"
+            else:
+                body = ("    if NightMode.isOn { return AnyView(Circle()"
+                        f".fill({ATURAN_15_DEFECT})) }}\n"
+                        "    return AnyView(Color(white: 1))")
+            inject(workdir, ATURAN_18_TARGET,
+                   ATURAN_15_GUARD + decl + " {\n" + body + "\n}")
+            _, out = run_rule("15", program, workdir)
+            fired = bool(out.strip())
+            if fired != must_fire:
+                failures.append(
+                    f"  Aturan 15 / {name}: {'hijau' if not fired else 'merah'}"
+                    f" pada bentuk yang seharusnya "
+                    f"{'berbunyi' if must_fire else 'diam'} — {decl}")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 #: Keadaan untuk **`red-lint.sh`**. Yang diukur bukan aturannya, melainkan
 #: pembuktinya: apakah ia menerima "gerbang gagal karena sebab lain" sebagai
 #: bukti. Tiga keadaan, dan yang ketiga adalah cacat yang ditemukan.
@@ -293,6 +361,7 @@ def main() -> int:
     require_clean()
     failures: list[str] = []
     check_rule_18(failures)
+    check_rule_15(failures)
     check_red_lint(failures)
     check_fake_acceptance(failures)
     if failures:
@@ -301,6 +370,8 @@ def main() -> int:
         return 1
     print(f"Bersih: Aturan 18 berbunyi pada {len(ATURAN_18_CASES)} bentuk "
           f"deklarasi (dan diam pada yang di luar cakupannya); "
+          f"Aturan 15 berbunyi pada {len(ATURAN_15_CASES) - 1} bentuk "
+          f"deklarasi (dan diam pada fungsi yang berpenjaga sendiri); "
           f"red-lint.sh menolak {len(RED_LINT_CASES) - 2} keadaan "
           f"'merah karena sebab lain'.")
     return 0
