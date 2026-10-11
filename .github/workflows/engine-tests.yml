@@ -541,11 +541,11 @@ jobs:
       - name: Buktikan gerbang warna identitas planet saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-warna-ragu.py
 
-      # Dan bukti untuk **dua kawat fase** di berkas yang sama — kawat yang
+      # Dan bukti untuk **tiga kawat fase** di berkas yang sama — kawat yang
       # versi pertama Aturan 31 lewatkan sambil mengutipnya di komentarnya.
-      # Delapan keadaan: dua kawat x dua bentuk (argumen di-`nil`-kan, dan
+      # Sembilan keadaan: tiga kawat x dua bentuk (argumen di-`nil`-kan, dan
       # nilainya di-`nil`-kan di baris penugasan) x dua cabang benda (planet,
-      # Bulan).
+      # Bulan), plus `isWaxing` yang diperiksa sebagai nilai.
       #
       # Diukur pada port, satu kawat dimatikan per keadaan, lalu seluruh 31
       # aturan UI dijalankan — semuanya tetap **hijau**:
@@ -555,6 +555,13 @@ jobs:
       #   `brightLimbAngleRadians` (Bulan)   -> nil :  8.686/40.000 (21,7%)
       #   `waxing` cabang Bulan              -> nil : 31.604/40.000 (79,0%)
       #   `waxing` cabang planet             -> nil : 31.604/40.000 (79,0%)
+      #   `isWaxing:` (argumen)              -> nil : 31.604/40.000 (79,0%)
+      #
+      # Yang terakhir paling memalukan dan pelajarannya umum: kawat itu
+      # diperiksa sebagai `"isWaxing:" in code`, yaitu **keberadaan namanya**,
+      # sehingga `isWaxing: nil` hijau. Pemeriksaan yang mencari nama tidak
+      # pernah bisa menangkap nilai yang salah.
+      #
       # Yang fraksi paling parah: seluruh pita terang hilang dan benda
       # berfase tergambar sebagai **bola penuh** di setiap keadaan, termasuk
       # saat engine baru menghitung iluminasinya 0,22 — gambar yang

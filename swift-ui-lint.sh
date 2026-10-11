@@ -3877,7 +3877,14 @@ for expr in assigns:
                         "arah fase planet dalam mati total dan Venus tampil sebagai "
                         "bola penuh di setiap keadaan" % stripped)
 
-# 2. `isWaxing` harus benar-benar diteruskan ke `CelestialVisual`.
+# 2. `isWaxing` harus benar-benar diteruskan **dan bernilai** ke `CelestialVisual`.
+#
+# Versi pertama hanya memeriksa `"isWaxing:" in code` -- keberadaan stringnya.
+# Diukur: `isWaxing: nil` membuat pemeriksaan itu hijau, padahal arah fase
+# mati di kedua cabang (Bulan dan planet), dan 31.604 dari 40.000 piksel
+# (79,0%) berubah. Pemeriksaan yang mencari **nama** tidak pernah bisa
+# menangkap nilai yang salah; karena itu kawat ini sekarang masuk
+# `PHASE_WIRES` dan diperiksa sebagai nilai, bukan sebagai string.
 if "isWaxing:" not in code:
     problems.append("  `isWaxing:` tidak diteruskan ke CelestialVisual; arah fase "
                     "yang dihitung tidak pernah sampai ke gambar")
@@ -3940,9 +3947,15 @@ def _bound_value(name):
 
 
 def _is_nil_for(expr, want_moon):
-    """True bila `expr` jelas bernilai nil untuk benda itu (Bulan/planet)."""
+    """True bila `expr` jelas bernilai nil untuk benda itu (Bulan/planet).
+
+    `want_moon=None` berarti "cabang mana pun": dipakai untuk kawat yang
+    nil-nya mematikan fase **kedua** jenis benda, seperti `isWaxing`.
+    """
     if expr is None:
         return False
+    if want_moon is None:
+        return _is_nil_for(expr, False) or _is_nil_for(expr, True)
     value = _branch(expr, want_moon)
     if value == "nil":
         return True
@@ -3973,6 +3986,10 @@ def _is_nil_for(expr, want_moon):
 #: ditunjuk -- hijau di seluruh 31 aturan. Kesalahan yang sama bentuknya
 #: dengan yang gerbang ini tutup: satu cabang diperiksa, cabang lain dikutip.
 PHASE_WIRES = (
+    ("isWaxing", None,
+     "arah fase tidak pernah sampai ke gambar, jadi pita terang tergambar "
+     "di sisi yang salah untuk kedua jenis benda berfase (terukur 79,0% "
+     "piksel)"),
     ("brightLimbAngleRadians", False,
      "sudut sisi terang planet tidak pernah sampai ke gambar, jadi sabit "
      "Venus tergambar menghadap arah yang salah (terukur 25,6% piksel)"),

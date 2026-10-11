@@ -9,8 +9,9 @@ geometri fase ke gambar objek, dan ia hidup di `Apps/` — jadi `swift-test.sh`
 di Linux (yang hanya membangun `Packages/`) tidak menjangkaunya. Aturan 31
 dibuat untuk itu, dan komentarnya sendiri menyebut `planetBrightLimbAngles`
 sebagai "dihitung tiap 30 detik, lalu tidak pernah dipakai gambar apa pun".
-Yang diperiksa hanya kawat `waxing`. **Empat** kawat geometri fase tidak
-diukur siapa pun: dua di cabang planet, dua di cabang Bulan.
+Yang diperiksa hanya kawat `waxing`. **Lima** kawat geometri fase tidak diukur
+siapa pun: dua di cabang planet, dua di cabang Bulan, dan `isWaxing` itu
+sendiri — yang diperiksa hanya **keberadaan** namanya di kode, bukan nilainya.
 
 **Diukur.** Mematikan satu kawat per keadaan, lalu menjalankan seluruh 31
 aturan UI:
@@ -23,6 +24,12 @@ aturan UI:
 | sudut sisi terang Bulan (sudut -pi/2, waxing) | 8.686 / 40.000 (21,7%) | **hijau** |
 | `waxing` cabang Bulan | 31.604 / 40.000 (79,0%) | **hijau** |
 | `waxing` cabang planet | 31.604 / 40.000 (79,0%) | **hijau** |
+| `isWaxing:` (argumen) | 31.604 / 40.000 (79,0%) | **hijau** |
+
+Baris terakhir yang paling memalukan, dan pelajarannya umum: pemeriksaan yang
+mencari **nama** (`"isWaxing:" in code`) tidak pernah bisa menangkap nilai yang
+salah. Gerbang itu hijau pada `isWaxing: nil` — argumen yang ditulis khusus
+untuk kawat itu, dimatikan tepat di depan matanya.
 
 Fraksi iluminasi paling parah: seluruh pita terang hilang dan benda berfase
 tergambar sebagai **bola penuh** di setiap keadaan — termasuk saat engine baru
@@ -122,9 +129,9 @@ direktori sementara, jadi tidak ada pemulihan yang bisa gagal.
 | Baris `Apps/` berubah | — | **0** |
 | Baris `Packages/` berubah | — | **0** |
 
-Dibuktikan berbunyi: delapan keadaan mutasi, kedelapan merah; baseline bersih.
-`python3 Tools/bukti-mutasi-aturan31-kawat.py` → `9 keadaan, 0 tidak sesuai
-harapan`.
+Dibuktikan berbunyi: sembilan keadaan mutasi, kesembilannya merah; baseline
+bersih. `python3 Tools/bukti-mutasi-aturan31-kawat.py` → `10 keadaan, 0 tidak
+sesuai harapan`.
 
 ### Yang TIDAK diklaim
 

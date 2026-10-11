@@ -92,6 +92,11 @@ ANCHOR_MOON_BINDING = "let limbAngle = isMoon ? moonBrightLimbAngle : nil"
 #: -> nil mengubah 31.604/40.000 piksel (79,0%), sisi planet -> nil juga
 #: 31.604/40.000 (79,0%). Keduanya hijau di seluruh 31 aturan UI.
 ANCHOR_WAX = "let waxing = isMoon ? moonIsWaxing : planet.flatMap { planetWaxing[$0] }"
+#: Kawat kesembilan -- `isWaxing` itu **sendiri**. Versi pertama Aturan 31
+#: hanya memeriksa keberadaan string `isWaxing:` di kode, jadi `isWaxing: nil`
+#: hijau di seluruh 31 aturan. Diukur pada port: 31.604/40.000 piksel (79,0%)
+#: berubah, di kedua cabang benda.
+ANCHOR_WAX_ARG = "isWaxing: waxing,"
 
 #: Keadaan: (nama, (cari, ganti) atau None untuk baseline).
 STATES = [
@@ -112,6 +117,8 @@ STATES = [
      (ANCHOR_WAX, "let waxing = isMoon ? nil : planet.flatMap { planetWaxing[$0] }")),
     ("8. cabang planet dari waxing -> nil",
      (ANCHOR_WAX, "let waxing = isMoon ? moonIsWaxing : nil")),
+    ("9. argumen isWaxing -> nil",
+     (ANCHOR_WAX_ARG, "isWaxing: nil,")),
 ]
 
 #: Pembuka blok program Aturan 31 di dalam `swift-ui-lint.sh`.
@@ -166,7 +173,8 @@ def main() -> int:
                           (ANCHOR_ILLUM_BINDING, "penugasan planetPhase"),
                           (ANCHOR_MOON_ARG, "argumen fraksi Bulan"),
                           (ANCHOR_MOON_BINDING, "penugasan limbAngle"),
-                          (ANCHOR_WAX, "penugasan waxing")):
+                          (ANCHOR_WAX, "penugasan waxing"),
+                          (ANCHOR_WAX_ARG, "argumen isWaxing")):
         count = original.count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {label} muncul {count}x, harus tepat 1x "
