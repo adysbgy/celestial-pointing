@@ -1,3 +1,108 @@
+## Progres terakhir (11 Okt 2026 — suara tidak lagi membungkam fase Bulan saat engine ragu: dua kebenaran untuk satu keadaan)
+
+Siklus ini menutup satu cacat aksesibilitas kejujuran, bukan cacat gambar.
+Buktinya datang dari **pengukuran piksel**, bukan dari membaca docstring.
+
+### Cacatnya: siklus 9 Okt membungkam suara fase Bulan saat ragu, di atas premis yang salah
+
+`spokenPhase` di `MoonPhaseSpeech.swift` punya `guard isConfirmed else { return nil }`.
+Penambahannya (11 Okt, revisi STATUS.md:1655) dibenarkan dengan premis:
+
+> "pada keadaan `.uncertain` gambar memakai **piringan netral** (tidak
+> mengklaim fase), sementara badge di sebelahnya bertuliskan 'Ragu'. Mata
+> membaca gambar lebih dulu daripada badge, jadi suara tidak boleh lebih
+> yakin daripada gambarnya."
+
+Premis itu **salah**, dan terukur salah. `check_moon_phase_survives_uncertainty`
+(`Tools/check-visuals.py:736`) membuktikan sabit "ragu" identik piksel demi
+piksel dengan sabit "yakin":
+
+```text
+moon-crescent (yakin)  vs  moon-crescent-uncertain  -> 0 piksel berbeda
+moon-crescent (yakin)  vs  moon-full                -> 10.234 piksel berbeda
+```
+
+Jadi fase Bulan **memang tergambar** saat ragu. Itu keputusan yang disengaja
+sejak 5 Okt (STATUS.md:7018): fraksi & arahnya datang dari **efemeris** (fakta
+tentang tanggal), bukan dari tabel berindeks id, sehingga sebuah fase tidak
+bisa salah mengklaim identitas. Cacatnya: siklus 9 Okt membungkam suara atas
+dasar gambar yang tidak ada.
+
+### Akibatnya: dua pengguna, satu keadaan, dua kebenaran
+
+Yang melihat kartu ragu tetap membaca sabit. Pengguna VoiceOver mendengar
+"Belum pasti. Bulan" tanpa fase — informasi yang ada di layar dihilangkan
+daripada dibagikan. Membungkam suara **tidak** menurunkan keyakinan gambar
+sedikit pun; ia hanya membutakan satu pihak. Persis kelas cacat yang hendak
+dicegah pembungkaman itu, hanya berpindah ke pihak yang tidak bisa melihat.
+
+### Perbaikannya: lepas `guard isConfirmed`, pertahankan argumennya
+
+`spokenPhase` sekarang mengembalikan nama fase di kedua keadaan (selama ini
+Bulan dan fraksinya ada). Penanda ragu tetap diucapkan lebih dulu oleh
+pemanggilnya (`Belum pasti. Bulan, sabit muda`), jadi pengumumannya tidak
+pernah terdengar sebagai temuan pasti.
+
+Parameter `isConfirmed` **dipertahankan** meski hasilnya kini sama — bukan
+sebagai hiasan. Tanpa argumen itu, uji regresinya berubah jadi
+`spokenPhase() == spokenPhase()`: perbandingan yang selalu benar, dan
+pembungkaman bisa dikembalikan kapan saja tanpa satu gerbang pun berbunyi.
+Argumen itu juga memaksa tiap pemanggil menyatakan keyakinannya, seperti
+`spokenStarColor` dan `spokenDeepSkyMorphology` di sebelahnya. (Swift tidak
+memperingatkan parameter tak terbaca, jadi "diabaikan karena tak dipakai"
+adalah jebakan sunyi — argumen dibiarkan hadir justru supaya perbandingan
+dua keadaan tetap bisa diuji.)
+
+Catatan konkurensi: perubahan ini hanya menyentuh 4 berkas milik siklus ini
+(`MoonPhaseSpeech.swift`, `CelestialVisualTests.swift`, `PointingView.swift`,
+`DiagnosticsView.swift`). Berkas WIP agen paralel (`engine-tests.yml`,
+`Tools/check-visuals.py`, `Tools/render-visuals.py`, `bukti-mutasi-*.py`)
+**tidak** disentuh; komit hanya jalur eksplisit, bukan `git add -A`.
+
+### Yang diukur, bukan dikira-kira
+
+  - `probe-moon-phase.py` merender sabit yakin, sabit ragu, dan purnama lewat
+    port Python (`Tools/render-visuals.py`), lalu membandingkan piksel: 0
+    berbeda antara yakin/ragu, 10.234 berbeda dari purnama. Itu yang
+    membuktikan premis 9 Okt salah sebelum satu baris diubah.
+  - `testMoonPhaseDoesNotMuteWhenTheEngineIsUnsure` gagal dulu (suara `nil`
+    saat ragu, padahal layar "sabit muda") → merah → lalu hijau setelah
+    perbaikan. RED-GREEN terverifikasi, bukan sekadar diubah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 732 | **732** (+1 uji, mengunci keadaan ragu) |
+| Pemeriksaan visual | 729 | **729** (tak disentuh) |
+| Aturan UI | 31 | **31** (lulus) |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 732 hijau**, 0 gagal
+    (76 suite, 0 kegagalan).
+  - `python3 Tools/check-visuals.py --check` → **729 pemeriksaan, 0 gagal**
+    (termasuk `check_moon_phase_survives_uncertainty`).
+  - `./swift-ui-lint.sh` → SEMUA GERBANG UI LULUS (31 aturan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - CI: `Apple Build` **success**, `Engine Tests (Linux)` **success**.
+
+### Yang TIDAK diklaim
+
+  - Fase **bukan** satu-satunya ciri yang "aman saat ragu". Bintang (warna
+    kelas spektral) dan objek langit dalam (morfologi) tetap dibungkam saat
+    ragu — dan itu benar, karena di sana ciri itu **mengklaim identitas**
+    spesifik (ini Rigel biru, ini M31), sedangkan fase Bulan tidak. Perbedaan
+    itulah yang membuat pembungkaman bulan salah: bulan sudah diidentifikasi
+    oleh penanda ragu, fase hanya menjelaskan tanggal.
+  - Pemeriksaan piksel di atas berlaku untuk **sabit** (f=0.18) pada port
+    Python. Saya mengandalkan `check_moon_phase_survives_uncertainty` (sudah
+    ada, hijau) untuk kasus purnama/gibbous; saya tidak mengulang ukur itu
+    untuk tiap fraksi.
+
+---
+
 ## Progres terakhir (11 Okt 2026 — dua jalur gambar yang dihitung, diuji, dan tidak pernah menggambar apa pun)
 
 Siklus ini **tidak mengubah satu baris pun kode produksi**. Yang dilakukan
