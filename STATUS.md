@@ -139,9 +139,13 @@ berubah hanya status berkas harness dan daftar langkah CI.
     dirujuk alur kerja** + 3/3 bukti-diri lolos (sebelum perbaikan, di
     pohon kerja ini: exit 1, satu masalah).
   - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (30 aturan).
-  - CI: Apple Build `38105319449` **success**. Engine Tests (Linux)
-    `38105319409` masih berjalan saat entri ini ditulis (langkah
-    pembuktian mutasi berat, ~36 menit).
+  - CI pada `de4eb06`: Apple Build `38105319449` **success**, Engine Tests
+    (Linux) `38105319409` **success**. Langkah baru `Buktikan gerbang warna
+    identitas planet saat ragu berbunyi` berjalan di sana dengan
+    conclusion **success** — jadi harnessnya benar-benar dieksekusi CI dan
+    lulus di sana, bukan hanya di mesin ini. Langkah gerbang meta
+    `Setiap harness bukti-mutasi dijalankan CI` juga **success** pada run
+    yang sama: 17 dari 17 terverifikasi di CI, bukan diklaim dari sini.
 
 ### Yang TIDAK diklaim
 
