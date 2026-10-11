@@ -171,7 +171,7 @@ fi
 # review. Kasus ini sudah terjadi di repo ini, dan hanya terlihat karena
 # sapuan karakter, bukan karena ada yang membaca ulang.
 echo
-echo "== Aturan 3: tidak ada aksara CJK/Cyrillic/fullwidth di kode =="
+echo "== Aturan 3: tidak ada huruf non-Latin (selain Yunani) di kode =="
 # Cakup **seluruh** kode, bukan hanya `Apps/`: selip yang sama bisa muncul
 # di `Packages/`, yang tidak akan pernah terjangkau sapuan `Apps/` saja.
 # Satu sapuan untuk satu aturan.
@@ -195,17 +195,105 @@ echo "== Aturan 3: tidak ada aksara CJK/Cyrillic/fullwidth di kode =="
 # memerah pada skrip yang memuatnya. Kutipannya dihapus, bukan dikecualikan —
 # lebih baik komentarnya kehilangan contoh harfiah daripada aturannya
 # mendapat lubang pengecualian.
-cjk=$(grep -rnP --include='*.swift' --include='*.sh' --include='*.yml' --include='*.yaml' \
-        '[\x{3000}-\x{303F}\x{3040}-\x{30FF}\x{4E00}-\x{9FFF}\x{AC00}-\x{D7AF}\x{FF00}-\x{FFEF}\x{0400}-\x{04FF}]' \
-        Apps Packages Tools project.yml \
-        swift-ui-lint.sh swift-test.sh swift-typecheck.sh red-test.sh 2>/dev/null || true)
+#
+# **Cakupan karakternya sendiri ternyata lubang, dan itu terbukti.** Versi
+# sebelumnya memakai daftar rentang **tangan** (CJK, Hiragana/Katakana,
+# Hangul, fullwidth, Cyrillic). Daftar tangan selalu ketinggalan abjad yang
+# tidak disebut: satu huruf Arab (U+0627, ALEF) pernah benar-benar masuk ke
+# berkas ini — menyelinap di dalam komentar Aturan 7 — dan aturan ini
+# melaporkan **"Bersih"**. Ia lolos bukan karena kebetulan yang langka:
+# daftar itu tidak pernah punya rentang Arabic sama sekali.
+#
+# Pemeriksaannya kini diturunkan dari **sifat** karakternya, bukan dari daftar
+# abjad yang harus diingat: setiap karakter berkategori huruf (Unicode `L*`)
+# yang bukan ASCII, bukan Latin, dan bukan Yunani. Arab, Ibrani, Devanagari,
+# Thai, Armenia, dan abjad apa pun yang belum ditemukan semuanya tertangkap
+# tanpa perlu ditambahkan satu per satu.
+#
+# **Kenapa Yunani dikecualikan, dan kenapa itu diukur bukan dikira-kira.**
+# Sapuan yang menandai **semua** huruf non-Latin langsung menemukan 99 temuan
+# di repo ini — semuanya sah: `σ`, `α`, `θ`, `φ`, `Δ` dipakai sebagai simbol
+# matematis di uji dan komentar (`σ` = simpangan baku, `Δ` = selisih). Gerbang
+# yang merah pada 99 baris kode yang benar adalah gerbang yang dimatikan
+# orang, jadi Yunani dikecualikan **secara eksplisit** — dulu ia lolos hanya
+# karena kebetulan tidak ada di daftar, dan kebetulan bukan pengecualian.
+#
+# Diukur dua arah setelah perluasan: **0 temuan** atas seluruh repo yang
+# bersih (jadi tidak ada satu pun kode benar yang jadi merah), sementara
+# huruf Arab **tertangkap** dan huruf Yunani tidak.
+#
+# Batas yang dinyatakan: yang diperiksa adalah **huruf** (`L*`). Simbol dan
+# tanda baca non-ASCII tidak ditandai, karena komentar repo ini memang
+# memakai `─ ▸ ° × ≥ •` sebagai tata letak. Dan `.build/` dilewati: ia hasil
+# build (termasuk salinan pustaka pihak ketiga), bukan sumber repo ini.
+cjk=$(python3 - <<'PY'
+import os
+import unicodedata
+
+DIRS = ["Apps", "Packages", "Tools"]
+FILES = ["project.yml", "swift-ui-lint.sh", "swift-test.sh",
+         "swift-typecheck.sh", "red-test.sh", "red-lint.sh"]
+EXTS = (".swift", ".sh", ".yml", ".yaml")
+
+# Diizinkan **secara eksplisit**: huruf Yunani dipakai sebagai simbol
+# matematis di repo ini (σ simpangan baku, Δ selisih, α/θ/φ di uji gambar).
+YUNANI = (0x0370, 0x03FF)
+
+
+def nama(ch):
+    try:
+        return unicodedata.name(ch)
+    except ValueError:
+        return "<tanpa nama>"
+
+
+def mencurigakan(ch):
+    """Huruf non-ASCII yang bukan Latin dan bukan Yunani."""
+    if ord(ch) < 0x80:
+        return False
+    if not unicodedata.category(ch).startswith("L"):
+        return False
+    if "LATIN" in nama(ch):
+        return False
+    if YUNANI[0] <= ord(ch) <= YUNANI[1]:
+        return False
+    return True
+
+
+def berkas():
+    for d in DIRS:
+        for root, dirs, files in os.walk(d):
+            dirs[:] = [x for x in dirs if x != ".build"]
+            for f in sorted(files):
+                if f.endswith(EXTS):
+                    yield os.path.join(root, f)
+    for f in FILES:
+        if os.path.exists(f):
+            yield f
+
+
+temuan = []
+for path in berkas():
+    try:
+        src = open(path, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    for i, line in enumerate(src.split("\n"), 1):
+        for ch in line:
+            if mencurigakan(ch):
+                temuan.append(f"{path}:{i}: {line.strip()} [{nama(ch)}]")
+                break
+print("\n".join(temuan))
+PY
+)
 if [ -n "$cjk" ]; then
   echo "Aksara non-Latin ditemukan — repo ini ditulis bahasa Indonesia:"
   echo "$cjk"
   echo "-> Hapus karakter tersebut; kemungkinan besar selip, bukan pilihan."
+  echo "   (Yunani dikecualikan: dipakai sebagai simbol matematis.)"
   status=1
 else
-  echo "Bersih: tidak ada aksara non-Latin."
+  echo "Bersih: tidak ada huruf non-Latin selain Yunani."
 fi
 
 # ── Aturan 4: setiap teks UI harus ada di katalog string ───────────────────
