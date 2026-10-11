@@ -18385,3 +18385,92 @@ itu masuk akal, karena ia juga satu-satunya yang **tidak** memakai
     hilang, dan yang paling penting adalah keadaan yang mengharapkan hijau.**
     Keadaan yang mengharapkan merah gagal berisik dengan sendirinya; keadaan
     yang mengharapkan hijau berhenti berarti tanpa suara.
+
+## Siklus: Aturan 3 memakai daftar abjad, jadi abjad di luar daftar lolos
+
+### Cacat: daftar rentang tangan tidak bisa lengkap
+
+Aturan 3 memeriksa aksara non-Latin dengan daftar rentang yang **ditulis
+tangan**: CJK, Hiragana/Katakana, Hangul, fullwidth, Cyrillic. Daftar seperti
+itu selalu ketinggalan abjad yang tidak disebut penulisnya.
+
+Di repo ini itu bukan kemungkinan teoretis. Satu huruf Arab (U+0627, ALEF)
+benar-benar pernah masuk ke **`swift-ui-lint.sh` sendiri** — menyelinap di
+dalam komentar Aturan 7 — dan Aturan 3 melaporkan **"Bersih"**. Ia lolos
+karena daftarnya tidak pernah punya rentang Arabic sama sekali, bukan karena
+selipnya langka.
+
+Yang membuat cacat ini sulit terlihat: keluaran Aturan 3 identik dengan
+keadaan "tidak ada selip". Tidak ada yang merah, tidak ada yang aneh.
+
+### Perbaikan: sifat karakter, bukan daftar abjad
+
+Pemeriksaannya diturunkan dari **sifat** karakternya: setiap karakter
+berkategori huruf (Unicode `L*`) yang bukan ASCII, bukan Latin, dan bukan
+Yunani. Arab, Ibrani, Devanagari, Thai, Armenia — dan abjad apa pun yang
+belum ditemukan — tertangkap tanpa perlu ditambahkan satu per satu.
+
+### Kenapa Yunani dikecualikan, dan kenapa itu **diukur** bukan dikira-kira
+
+Sapuan yang menandai **semua** huruf non-Latin langsung menemukan **99
+temuan** di repo ini, dan semuanya sah: `σ`, `α`, `θ`, `φ`, `Δ` dipakai
+sebagai simbol matematis di uji dan komentar (`σ` = simpangan baku,
+`Δ` = selisih). Gerbang yang merah pada 99 baris kode yang benar adalah
+gerbang yang akan dimatikan orang — persis kegagalan yang sudah tercatat di
+berkas itu sendiri.
+
+Jadi Yunani dikecualikan **secara eksplisit**. Sebelumnya Yunani lolos hanya
+karena **kebetulan** tidak ada di daftar; kebetulan bukan pengecualian, dan
+itu sebabnya ia sekarang ditulis sebagai keputusan.
+
+### Batas yang dinyatakan
+
+Yang diperiksa adalah **huruf** (`L*`). Simbol dan tanda baca non-ASCII
+**tidak** ditandai, karena komentar repo ini memang memakai `─ ▸ ° × ≥ •`
+sebagai tata letak. Dan `.build/` dilewati: ia hasil build (termasuk salinan
+pustaka pihak ketiga), bukan sumber repo ini.
+
+### Jebakan yang kena pada penulisnya sendiri
+
+Komentar yang menjelaskan perbaikan ini semula **mengutip huruf Arab itu
+apa adanya** — dan Aturan 3 yang baru diperluas langsung memerah pada
+`swift-ui-lint.sh`. Ini jebakan yang **sama** sudah pernah terjadi di aturan
+ini untuk aksara CJK, dan jawabannya sama: **kutipan harfiahnya yang
+dihapus, bukan aturannya yang diberi pengecualian.** Hurufnya kini disebut
+sebagai `U+0627, ALEF`, bukan digambar.
+
+Jebakan itu berlanjut ke langkah CI: berkas `*.yml` juga disapu, jadi
+harfiah Arab di sana ditulis sebagai escape `printf`
+(`"$(printf '// \u0627\u0644…')"`), yang diperluas shell sebelum
+`red-lint.sh` menerimanya. Yang disuntik tetap huruf Arab sungguhan; yang
+tetap Latin adalah berkasnya.
+
+### Verifikasi (terukur, bukan diklaim)
+
+  - **Baseline** — seluruh repo: **0 temuan**. Tidak ada satu pun kode benar
+    yang jadi merah karena perluasan ini.
+  - **Arah positif** — huruf Arab disuntik ke `WatchTheme.swift`:
+    **tertangkap**, dilaporkan pada berkas dan baris yang benar, lengkap
+    dengan nama karakter (`ARABIC LETTER ALEF`). `./red-lint.sh … 'Aturan 3'`
+    → MERAH, exit 1, berkas dipulihkan.
+  - **Arah negatif** — `σ`, `Δ`, `α` disuntik: **tetap Bersih**. Jadi
+    pengecualian Yunani benar-benar bekerja, bukan sekadar niat.
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 730 hijau**
+    (0 gagal).
+  - `./swift-ui-lint.sh` → **30 aturan lulus**.
+  - Gerbangnya kini dibuktikan berbunyi di CI, sejajar dengan Aturan 1, 7,
+    dan 15.
+
+### Pelajaran (catat, bukan ulang)
+
+  - **Daftar abjad tidak bisa dijaga ke lengkapannya; sifat karakter bisa.**
+    Setiap kali sebuah aturan menyebut abjad satu per satu, abjad berikutnya
+    yang belum terpikirkan adalah lubangnya — dan lubangnya tidak berbunyi.
+  - **Pengecualian harus diukur, bukan diwarisi.** Yunani dulu diizinkan
+    karena tidak ada di daftar. Kalau pengecualian itu dibiarkan implisit,
+    perluasan berikutnya akan menghapusnya tanpa ada yang tahu bahwa itu
+    keputusan.
+  - **Aturan yang menyapu berkasnya sendiri akan memerah pada contohnya
+    sendiri.** Solusinya menghapus contoh harfiah, bukan melubangi aturan —
+    dan itu berlaku dua kali di sini: di komentar skrip, dan di harfiah
+    langkah CI.
