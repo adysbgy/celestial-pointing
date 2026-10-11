@@ -1,4 +1,167 @@
-## Progres terakhir (11 Okt 2026 — harness warna-ragu tidak pernah dijalankan CI: gerbang yang menjaga cacat terbaru justru satu-satunya yang tak dieksekusi)
+## Progres terakhir (11 Okt 2026 — harness warna-ragu hanya hidup di SATU mesin: bukti bahwa gerbangnya bisa merah tidak pernah sampai ke CI)
+
+### Cacatnya: berkas yang menentukan benar/salahnya gerbang meta tidak pernah dikomit
+
+Commit `575026e` mengirim perbaikan nyata — warna identitas planet berhenti
+bocor ke kandidat saat engine ragu — bersama gerbang baru
+`check_uncertain_planet_loses_its_identity_colour`, **dan** harness yang
+membuktikan gerbang itu bisa merah, `Tools/bukti-mutasi-warna-ragu.py`.
+
+Harness itu **tidak ikut dikomit**. Ia tinggal sebagai berkas untracked di
+pohon kerja mesin ini. Konsekuensinya terukur, dan bentuknya khas repo ini:
+**verdict gerbang meta bergantung pada mesin mana yang ditanya.**
+
+Di pohon kerja ini — tempat berkasnya ada:
+
+```
+$ python3 Tools/check-harness-terdaftar.py
+harness di Tools/        : 17
+dirujuk engine-tests.yml : 16
+  TIDAK DIRUJUK  bukti-mutasi-warna-ragu.py
+1 masalah:
+  - bukti-mutasi-warna-ragu.py: ada di Tools/ tetapi tidak dirujuk
+    engine-tests.yml — gerbangnya tidak pernah dijalankan, dan gerbang
+    yang tidak dijalankan selalu hijau
+EXIT=1
+```
+
+Di checkout bersih — persis yang dilihat CI (`git archive 450af2d`,
+dijalankan sungguhan, bukan dibayangkan):
+
+```
+$ ls Tools/bukti-mutasi-*.py | wc -l
+16
+$ python3 Tools/check-harness-terdaftar.py
+16 harness, semuanya dirujuk alur kerja
+EXIT=0
+```
+
+Jadi CI **hijau**, dan bukan karena gerbangnya tumpul: gerbang itu
+membandingkan daftar berkas di disk dengan daftar langkah di alur kerja,
+dan di sana berkasnya memang tidak ada. Yang tidak ada tidak bisa jadi
+masalah. Gerbang meta itu benar di kedua mesin — yang berbeda adalah
+**bahan yang dinilainya**, dan satu-satunya mesin yang memegang bahannya
+adalah mesin yang tidak menilai.
+
+Yang hilang karena itu bukan warna CI, melainkan **bukti**: selama
+harness-nya untracked, satu-satunya alasan untuk mempercayai bahwa gerbang
+warna-ragu bisa merah adalah kalimat di pesan commit `575026e`. Kalimat itu
+tidak bisa dijalankan, tidak bisa diperiksa, dan tidak akan pernah merah.
+Kelas yang sama persis sudah pernah dibayar repo ini — docstring
+`check-harness-terdaftar.py` menuliskan `bukti-mutasi-piringan.py` sebagai
+asal-usulnya sendiri (13 berkas di disk, 12 dirujuk). Sekarang terulang
+pada harness yang menjaga cacat **paling baru**.
+
+**Catatan yang harus ada di sini, karena entri inilah tempatnya.** Draf
+pertama entri ini menulis bahwa `main` **merah** di `450af2d` dan
+`575026e`. Itu **salah**, dan tidak pernah saya ukur sebelum menulisnya.
+Yang terukur: `450af2d` hijau di kedua alur kerja, dan `575026e` **tidak
+punya run CI sama sekali** (run terakhir sebelum siklus ini adalah
+`38100565581`/`38100565675` pada `450af2d`, keduanya success). Klaim itu
+**dihapus, bukan dilunakkan** — komentar yang mengutip angka yang tidak
+pernah keluar dari pengukurannya adalah kelas cacat yang paling sering
+berulang di repo ini, dan kali ini yang menulisnya adalah saya, di berkas
+yang seharusnya jadi catatan kejujurannya.
+
+### Perbaikannya: komit harness-nya, lalu daftarkan
+
+Dua perubahan, dan yang pertama yang sebenarnya memperbaiki keadaan:
+
+  - `Tools/bukti-mutasi-warna-ragu.py` **dikomit**. Tanpa ini, langkah CI
+    apa pun yang merujuknya akan merah di checkout bersih karena berkas
+    hilang — bukan karena gerbangnya berbunyi.
+  - langkah baru `Buktikan gerbang warna identitas planet saat ragu
+    berbunyi` di `.github/workflows/engine-tests.yml` yang menjalankannya.
+
+Komentar langkah gerbang metanya kini mencatat bahwa ini **kali kedua**
+kelas cacat yang sama terjadi (13/12 lalu, 17/16 sekarang), supaya pembaca
+berikutnya tahu polanya berulang dan tahu angka apa yang harus
+dibandingkan.
+
+Yang **tidak** dilakukan: melonggarkan `check-harness-terdaftar.py` atau
+menambahkan berkasnya ke pengecualian. Gerbang yang berbunyi benar tidak
+boleh diperbaiki dengan membuatnya diam — itu kebalikan dari yang ditulis
+docstring-nya sendiri.
+
+### Harnessnya dijalankan sungguhan, bukan sekadar dikomit
+
+`python3 Tools/bukti-mutasi-warna-ragu.py` → **6 keadaan, 0 tidak sesuai
+harapan** (exit 0). Yang dituntutnya bukan «ada yang merah» melainkan
+**yang mana**:
+
+```
+OK   [baseline]                                       0 merah
+OK   1. port: ragu pakai palet planet (cacat aslinya) 2 merah
+       kandidat planet == bola netral @38pt | @200pt
+OK   2. port: semua planet jadi bola netral           2 merah
+       planet terkunci membawa warnanya kembali @38pt | @200pt
+OK   3. view: `drawable` dilepas                      1 merah
+       kandidat planet: view memakai palet sadar keyakinan
+OK   4. model: token netral digeser                   2 merah
+       kandidat planet == bola netral @38pt | @200pt
+OK   5. port: hanya `light` dinetralkan (batas)       0 merah
+```
+
+Keadaan 1 dan 2 berlawanan arah, dan **pasangan itulah buktinya**: 1 adalah
+"kandidat membawa identitas", 2 adalah "tidak ada identitas yang pernah
+dibawa". Gerbang yang hanya bisa melihat salah satunya akan hijau pada
+aplikasi yang tidak pernah membedakan planet mana pun. Keadaan 5 wajib
+hijau karena ia merekam **batas yang dinyatakan**: gerbangnya membaca
+piksel paling terang piringan, jadi menetralkan `light` saja sudah
+memenuhinya walaupun `dark` masih membawa palet planetnya. Batas itu
+direkam, bukan diklaim tertutup.
+
+Ketiga berkas produksi yang dimutasi (`render-visuals.py`,
+`CelestialVisualView.swift`, `CelestialVisual.swift`) dipulihkan lewat
+`mutasi_sumber` dan diverifikasi: `git status` sesudahnya bersih.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 730 | **730** (tak disentuh) |
+| Pemeriksaan visual | 723 | **723** |
+| Harness dirujuk CI | 16 dari 16 | **17 dari 17** |
+| Aturan UI | 30 | 30 |
+
+Tidak ada satu baris pun kode produksi yang berubah siklus ini. Yang
+berubah hanya status berkas harness dan daftar langkah CI.
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 730 hijau**,
+    0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **723 pemeriksaan, 0 gagal**.
+  - `python3 Tools/bukti-mutasi-warna-ragu.py` → **6 keadaan, 0 tidak
+    sesuai harapan**.
+  - `python3 Tools/check-harness-terdaftar.py` → **17 harness, semuanya
+    dirujuk alur kerja** + 3/3 bukti-diri lolos (sebelum perbaikan, di
+    pohon kerja ini: exit 1, satu masalah).
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (30 aturan).
+  - CI: Apple Build `38105319449` **success**. Engine Tests (Linux)
+    `38105319409` masih berjalan saat entri ini ditulis (langkah
+    pembuktian mutasi berat, ~36 menit).
+
+### Yang TIDAK diklaim
+
+  - Siklus ini **tidak** memperbaiki gerbangnya, tidak memperbaiki gambar,
+    dan tidak menyentuh model. Yang diperbaiki adalah **status berkas** dan
+    **daftar langkah**.
+  - `main` **tidak** pernah merah karena cacat ini — CI hijau di
+    `450af2d`, dan `575026e` tidak punya run CI. Yang hilang adalah bukti
+    yang bisa diperiksa orang lain, bukan warna laporan.
+  - Keadaan 1, 2, dan 5 memutasi **port Python**, bukan view Swift: yang
+    diukur gerbang piksel adalah port. Sisi view dijaga pemeriksaan teks
+    (keadaan 3), dan harness tidak mengklaim lebih dari itu.
+  - Label ukuran `@38pt`/`@200pt` di `must_fire` ditulis harfiah dengan
+    sengaja: kalau ukuran kartu jam bergeser, harness menjadi **merah
+    berisik**, dan itu disengaja — label yang tidak lagi cocok berarti
+    gerbangnya tidak lagi memeriksa ukuran yang diklaimnya.
+
+---
+
+## Progres terakhir (10 Okt 2026 — ambang pengaman Matahari `sunSafeConeDeg` diikat langsung: gerbang prilakunya tetap hijau saat ambangnya dimatikan)
 
 ### Cacatnya: `main` merah, dan penyebabnya bukan kode melainkan daftar
 
