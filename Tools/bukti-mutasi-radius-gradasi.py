@@ -113,6 +113,14 @@ BALL_PORT_WIDE = "        start_radius=radius * 0.1, end_radius=radius * 1.60)"
 BALL_VIEW = "            startRadius: radius * 0.1,\n            endRadius: radius * 1.35))"
 BALL_VIEW_WIDE = ("            startRadius: radius * 0.1,\n"
                   "            endRadius: radius * 1.60))")
+# Jangkar "radius awal bola dinamai ulang" (keadaan 7–8). Hanya **pengali**
+# radius awal yang berubah; radius akhirnya tidak. Itu sebabnya keadaan ini
+# harus hijau — dan itu juga sebabnya pembaca yang mencocokkan pengali akan
+# berbunyi palsu di sini.
+VIEW_START = "startRadius: radius * 0.1"
+VIEW_START_ALT = "startRadius: radius * 0.35"
+PORT_START = "start_radius=radius * 0.1"
+PORT_START_ALT = "start_radius=radius * 0.35"
 MODEL = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit",
                      "CelestialVisual.swift")
 MODEL_ANCHOR = "    static let moonSphereGradientEndRadius: Double = 1.15"
@@ -148,6 +156,28 @@ STATES = [
     # "terbaca" itulah yang berbunyi — dan pesannya menyebut ketidaksepakatan.
     ("6. view: dua pemanggil limb tidak sepakat",
      [(VIEW, BAND_VIEW, BAND_VIEW_DRIFT, 1)]),
+    # Keadaan 7–8: pembeda dua gradien dulu mencocokkan **pengali** radius
+    # awal (`radius * 0.1`), bukan bentuknya. Karena pengali itu adalah tag
+    # struktural untuk "ini gradien bola", menamainya ulang membuat gradien
+    # bola lenyap dari hasil pembacaan, dan gerbangnya berbunyi sebagai
+    # "radius **akhir** gradien bola terbaca di view Swift" — merah, tetapi
+    # menuduh parameter yang tidak diubah. Dua keadaan ini menjaga agar
+    # pembaca tetap mengenali gradien bola apa pun pengalinya. Keduanya
+    # **sengaja diharapkan hijau**: tidak ada radius akhir yang menyimpang,
+    # jadi tidak ada yang boleh diberitakan.
+    #
+    #   - Keadaan 7: kedua bahasa sepakat menamai ulang. Pembaca lama merah
+    #     di **kedua** sisi, dan menghapus perbandingan `bola (view == port)`
+    #     tanpa suara (hanya label yang terbaca di kedua sisi yang
+    #     dibandingkan).
+    #   - Keadaan 8: hanya view. Pembaca lama merah di view saja, dan
+    #     perbandingannya ikut hilang — jadi sisi yang menyimpang justru
+    #     berhenti dibandingkan, tepat saat perbandingan itu paling dibutuhkan.
+    ("7. kedua bahasa sepakat menamai ulang radius awal bola (0.1 -> 0.35)",
+     [(VIEW, VIEW_START, VIEW_START_ALT, 1),
+      (RENDER, PORT_START, PORT_START_ALT, 1)]),
+    ("8. hanya view menamai ulang radius awal bola (0.1 -> 0.35)",
+     [(VIEW, VIEW_START, VIEW_START_ALT, 1)]),
 ]
 
 WANT_RED = {
@@ -163,6 +193,11 @@ WANT_RED = {
     "5. kedua bahasa sepakat memakai 1.60 pada bola": set(),
     "6. view: dua pemanggil limb tidak sepakat": {
         "radius akhir gradien limb terbaca di view Swift"},
+    # Keduanya **hijau**: yang berubah hanya pengali radius awal, dan tidak
+    # ada radius akhir yang menyimpang. Inilah pembeda antara gerbang yang
+    # berbunyi karena cacat dan gerbang yang berbunyi karena ejaannya berubah.
+    "7. kedua bahasa sepakat menamai ulang radius awal bola (0.1 -> 0.35)": set(),
+    "8. hanya view menamai ulang radius awal bola (0.1 -> 0.35)": set(),
 }
 
 

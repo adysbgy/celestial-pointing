@@ -541,6 +541,58 @@ jobs:
       - name: Buktikan gerbang warna identitas planet saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-warna-ragu.py
 
+      # Dan bukti untuk gerbang **warna spektral bintang** — dua gerbang yang
+      # menamai diri mereka "warna" sementara salah satunya bisa hijau
+      # sepenuhnya tanpa satu pun warna sampai ke gambar.
+      #
+      # `check_star_colour_order` membandingkan `R − B` piksel paling terang
+      # antara Betelgeuse dan Rigel. Arah keduanya di dalam
+      # `check_star_colour_not_a_claim_when_uncertain` — "dua bintang berbeda
+      # tetap berbeda saat yakin" — membandingkan dua **kasus render**, dan
+      # kedua kasus itu membawa `relative_size` yang berbeda (0.398 lawan
+      # 0.472, karena ukuran memang mengikuti magnitudo). Terukur: dengan
+      # `star_rgb` dipaksa mengembalikan satu warna untuk **semua** indeks,
+      # arah itu tetap **hijau** — yang terukur adalah besarnya titik, bukan
+      # warnanya. Gerbang yang menamai dirinya "warna" sedang mengukur ukuran.
+      #
+      # Diperbaiki dengan menyamakan `relative_size` (dua probe, hanya
+      # `color_index` berbeda), lalu harness ini membuktikan **ketiga**
+      # keadaannya bisa merah:
+      #
+      #   1. warna spektral dibuang di sumber   -> 3 merah (urutan jarak nol,
+      #                                            arah "tetap berbeda", dan
+      #                                            warna-ragu lawan netral)
+      #   2. penjaga keraguan dilewati          -> 2 merah (bintang ragu tidak
+      #                                            lagi identik)
+      #   3. urutan warna dibalik (panas↔dingin) -> 2 merah di gerbang urutan
+      #                                            SAJA; gerbang keraguan tetap
+      #                                            hijau — itulah pembeda
+      #                                            "warna salah" dari "warna
+      #                                            hilang", dan alasan kedua
+      #                                            gerbang itu memang ada.
+      - name: Buktikan gerbang warna spektral bintang berbunyi
+        run: python3 Tools/bukti-mutasi-warna-bintang.py
+
+      # Dan bukti untuk **enam gerbang piksel yang tidak punya bukti sama
+      # sekali** — ditemukan dengan membandingkan daftar `def check_*` di
+      # `check-visuals.py` terhadap seluruh `check_*` yang dirujuk kedua
+      # puluh satu harness `bukti-mutasi-*.py`. Yang nirsaksi bukan gerbang
+      # pinggiran: mode malam (hijau/biru **nol**), "malam tak pernah lebih
+      # terang dari siang", pita Jupiter menjangkau tepi bola, kutub Mars
+      # menempel tepi, dan "fase tak dihitung bukan bulan baru".
+      #
+      # Harness ini menuntut **pemeriksaan bernama**, bukan sekadar "ada yang
+      # merah", dan itu menemukan satu hal yang tidak terlihat sebelumnya:
+      # pada keadaan 6 (fase tak diketahui kembali jadi piringan gelap rata),
+      # pemeriksaan yang berbunyi **bukan** yang menamai cacatnya. Yang
+      # menangkapnya adalah "piringan tak-diketahui di antara gelap &
+      # terang"; arah "bukan bulan baru" tetap hijau, karena piringan gelap
+      # itu masih membawa earthshine sehingga tetap berbeda dari `moon-new`.
+      # Tanpa menuntut nama, harness akan melaporkan bahwa arah itu yang
+      # menangkapnya — dan itu salah.
+      - name: Buktikan gerbang piksel tanpa-bukti berbunyi
+        run: python3 Tools/bukti-mutasi-gerbang-nirsaksi.py
+
       # Dan bukti untuk **tiga kawat fase** di berkas yang sama — kawat yang
       # versi pertama Aturan 31 lewatkan sambil mengutipnya di komentarnya.
       # Sembilan keadaan: tiga kawat x dua bentuk (argumen di-`nil`-kan, dan

@@ -8387,15 +8387,38 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
 
     # Dan arah sebaliknya: saat yakin, keduanya memang berbeda. Tanpa ini,
     # view yang membuang warna bintang **selalu** akan lolos uji di atas.
-    _, (w3, _, rows_betelgeuse_ok) = render_case("star-betelgeuse", size=size, ss=ss)
-    _, (w4, _, rows_rigel_ok) = render_case("star-rigel", size=size, ss=ss)
-    diff_ok = sum(1 for y in range(len(rows_betelgeuse_ok))
-                  for x in range(w3)
-                  if rows_betelgeuse_ok[y][x * 4:x * 4 + 3]
-                  != rows_rigel_ok[y][x * 4:x * 4 + 3])
+    #
+    # **Ukurannya disamakan, dan itu bukan kerapian.** Versi sebelumnya
+    # membandingkan dua **kasus render** (`star-betelgeuse` lawan
+    # `star-rigel`), dan kedua kasus itu membawa `relative_size` yang berbeda
+    # — 0.398 lawan 0.472, karena ukuran memang mengikuti magnitudo. Jadi
+    # keduanya berbeda walaupun **seluruh warna spektral dibuang**: yang
+    # terukur adalah besarnya titik, bukan warnanya. Diukur: dengan `star_rgb`
+    # dipaksa mengembalikan satu warna untuk semua indeks, pemeriksaan ini
+    # tetap **hijau**. Gerbang yang menamai dirinya "dua bintang berbeda tetap
+    # berbeda saat yakin" sedang mengukur ukuran.
+    #
+    # Yang benar-benar membuktikan warna: dua probe dengan `relative_size`
+    # **identik**, hanya `color_index` yang berbeda. Kalau warnanya hilang,
+    # dua probe itu menjadi gambar yang sama — dan itu tidak bisa dijelaskan
+    # oleh ukuran, karena ukurannya sama persis.
+    #
+    # Bukan lewat `render_case`, karena kasus render sengaja membawa ukuran
+    # dari magnitudo katalog; menyamakan ukurannya di sana akan menghapus
+    # fakta yang justru dijaga `check_star_size_follows_magnitude`.
+    def probe(color_index):
+        case = R.VisualCase("probe", "probe", "star", color_index=color_index,
+                            relative_size=0.5, is_confirmed=True)
+        buf = R.render(case, size=size, night_mode=False,
+                       show_frame=False, ss=ss).buf
+        return tuple(round(c, 6) for p in buf for c in p)
+
+    colour_only_diff = 0 if probe(1.85) != probe(-0.03) else 1
     results.append(Result(
-        "dua bintang berbeda tetap berbeda saat yakin", diff_ok > 0,
-        f"{diff_ok} piksel berbeda antara Betelgeuse & Rigel saat yakin"))
+        "dua bintang berbeda tetap berbeda saat yakin", colour_only_diff == 0,
+        "warna saja (ukuran disamakan 0.5): "
+        + ("identik — warnanya tidak sampai ke gambar"
+           if colour_only_diff else "berbeda (Betelgeuse 1.85 vs Rigel -0.03)")))
 
     # Warna saat ragu harus warna "tidak mengklaim" yang sama dengan bintang
     # tak dikenal di katalog -- bukan warna spektral yang kebetulan netral.
@@ -9128,6 +9151,20 @@ def _gradient_end_factors(source):
     # kegagalan akan mengirim orang ke tempat yang salah; kegagalan kedua
     # dalam bukti ini (kasus 6 dan 7) malah berbunyi lewat jalur "kurang
     # dari dua gradien", yang tidak menyebut gradien mana pun.
+    #
+    # **Yang dibaca adalah apakah `radius` disebut, bukan pengalinya.**
+    # Versi sebelumnya mencocokkan ejaan literal `radius * 0.1`; itu cacat
+    # yang sama kelasnya dengan dua di atas, dan terukur. Mengubah radius
+    # awal bola di **kedua** bahasa menjadi `radius * 0.35` membuat tag-nya
+    # hilang, sehingga gradien bola **lenyap dari hasil pembacaan**
+    # (`bola_count` 1 -> 0) dan gerbangnya berbunyi sebagai
+    # "radius **akhir** gradien bola terbaca di view Swift" — merah, tapi
+    # menamai parameter yang tidak diubah. Lebih buruk lagi, perbandingan
+    # `bola (view == port)` ikut hilang tanpa suara, karena ia hanya
+    # dijalankan untuk label yang terbaca di kedua sisi. Yang dijaga sekarang
+    # adalah **bentuk**-nya: gradien bola menggeser pusatnya mengikuti
+    # `radius`, gradien limb berpusat di nol. Pengali boleh berubah nilai
+    # tanpa membutakan gerbang.
     # Pengali bisa berupa **literal** (`radius * 1.15`) atau **konstanta**
     # (`radius * CelestialVisual.moonSphereGradientEndRadius` /
     # `radius * MOON_SPHERE_GRADIENT_END_RADIUS`). Keduanya dikenali, karena
@@ -9181,7 +9218,14 @@ def _gradient_end_factors(source):
         if not starts:
             continue
         start = starts[-1].strip()
-        if re.fullmatch(r"radius\s*\*\s*0\.1", start):
+        # **Bentuk**, bukan pengali. `radius * 0.1` dan `radius * 0.35`
+        # sama-sama gradien bola; yang membedakannya dari limb adalah bahwa
+        # ia menggeser pusatnya mengikuti `radius`, sementara limb berpusat
+        # di nol. Mengunci pengalinya ke `0.1` membuat perubahan radius awal
+        # yang **disepakati kedua bahasa** melaporkan dirinya sebagai
+        # "radius akhir tidak terbaca" — nama yang salah — dan menghapus
+        # perbandingan bola tanpa suara (terukur, lihat docstring di atas).
+        if re.fullmatch(r"radius\s*\*\s*[\w.()]+", start):
             label = "bola"
         elif re.fullmatch(r"0(?:\.0)?", start):
             label = "limb"
