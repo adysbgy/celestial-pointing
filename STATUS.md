@@ -1,3 +1,211 @@
+## Progres terakhir (12 Okt 2026 — uji regresi untuk klaim "Lulus" yang tak teruji)
+
+Siklus ini dimulai dari sapuan "anggota `public` tak terpakai" (`Tools/sweep-unconsumed.sh`).
+Satu temuan menonjol karena arah bahayanya: kalimat keselamatan yang paling
+penting justru yang **tidak punya satu pun pemanggil di berkas uji**.
+
+### Cacatnya: cabang `summaryPassed` terbang sendirian tanpa uji
+
+`ExperimentHarness.verdict` punya tiga cabang ringkasan, dan sampai siklus ini
+hanya dua yang diuji:
+
+- `testSummaryFailedInsertsCountAndNumbers` — cabang "GAGAL" (ada false lock).
+- `testSummaryInsufficientInsertsCountsAndMinimum` — cabang "sampel belum cukup".
+
+Yang ketiga — `ExperimentText.summaryPassed` — **nol pemanggil di uji mana pun**
+(terukur lewat sapuan anggota tak terpakai: `test=0`, saudaranya `test=1`).
+Padahal inilah **satu-satunya** cabang yang mencetak kata **"Lulus syarat
+keselamatan"**. Dua cabang lain menolak mengucapkannya (lihat
+`ExperimentSafetyVerdict.isPassedClaim`).
+
+Kenapa ini yang paling berbahaya: kalau keempat argumennya (jumlah percobaan,
+akurasi, galat median, P90) berhenti sampai, kalimat yang tersisa di layar
+tetaplah sebuah klaim **lulus** — tanpa satu angka pun yang mendasarinya.
+Penguji membaca "lulus" dan tidak punya cara memeriksa dari mana angka itu
+datang. Dan cabang ini baru bisa muncul setelah 20 percobaan
+(`minimumTrialsForSafetyClaim`), jadi ia paling jarang terlihat di layar mana
+pun selama pengembangan — dan karena itu paling lama bisa membusuk tak terlihat.
+
+### Perbaikannya: dua uji, dua arah
+
+Ditambah di `ExperimentTextTests.swift`:
+
+- `testSummaryPassedInsertsTrialCountAndNumbers` — keempat angka harus muncul
+  di kalimat `passed`.
+- `testOnlyThePassedBranchClaimsLulus` — kata "Lulus" **hanya** boleh di cabang
+  `passed`; `insufficient` dan `failed` dilarang mengucapkannya.
+
+Arah kedua penting: `summaryInsufficient` juga menerima `trialCount`, jadi
+menaruh "Lulus" di sana tetap lolos pemeriksaan "angkanya masuk" sambil
+mengklaim keselamatan atas sampel yang belum cukup — cacat yang sama persis
+dengan yang ditutup `ExperimentSafetyVerdict`, hanya pindah ke lapisan kata.
+
+### Gerbangnya dibuktikan berbunyi (mutasi, bukan hanya diff)
+
+- Mutasi 1: buang keempat argumen dari `summaryPassed` → keempat `XCTAssert`
+  gagal ("jumlah percobaan hilang", dst). MERAH. ✓
+- Mutasi 2: pindahkan kata "Lulus" ke cabang `insufficient` →
+  `testOnlyThePassedBranchClaimsLulus` gagal ("sampel kecil tidak boleh
+  mengucapkan Lulus"). MERAH. ✓
+- Kembalikan sumber → kedua uji hijau.
+
+### Hitungan
+
+- PointingKit: **750** hijau (748 dasar + 2 baru). CelestialEngine: **212**.
+- `./swift-test.sh`: engine 212 + PointingKit 750, nol kegagalan.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan kata di `summaryPassed` — ejaannya sudah benar; yang
+  kurang adalah **penjagaan**. Uji yang ditambah menutup celah "klaim lulus
+  tanpa angka", bukan mengubah teksnya.
+- Tidak menyentuh `ExperimentSafetyVerdict` atau `verdict()` sendiri; penjagaan
+  lapisan kata ini melengkapi, bukan mengganti, gerbang bool di
+  `ExperimentSafetyVerdict`.
+
+## Progres terakhir (12 Okt 2026 — setengah-lebar spike bintang: angka yang hidup di satu bahasa saja)
+
+Siklus ini mulai dari `Tools/sweep-unconsumed.sh`, dan menemukan **kelas
+cacat yang sudah berulang** di repo ini pada kawat yang paling sering dilihat
+mata: pembagi dua yang membuat spike bintang terbaca sebagai **cahaya**,
+bukan sebagai penanda bidik.
+
+### Cacatnya: `* 0.5` dijaga di port, tidak dijaga di view
+
+`spikeRootWidthFactor` (0.18) dan `spikeTipWidthFactor` (0.035) adalah lebar
+**penuh** — angka yang sama dengan `lineWidth` versi lama. Kedua bahasa
+mengalikannya dengan `0.5` sebelum dipakai sebagai setengah-lebar:
+
+```
+port  root_half = core_radius * SPIKE_ROOT_WIDTH_FACTOR * 0.5 * pulse_factor
+view  let rootHalf = coreRadius * CGFloat(geometry.spikeRootWidthFactor) * 0.5 * pulseFactor
+```
+
+Sampai siklus ini **hanya port** yang dijaga:
+`check_port_constants_reach_the_drawing` menuntut
+`SPIKE_ROOT_WIDTH_FACTOR * 0.5` di port. Sisi view tidak dijaga apa pun.
+
+**Terukur, bukan diklaim.** `* 0.5` dihapus dari **kedua** baris view —
+spike jadi dua kali lebih berat di app — lalu **22 pemeriksaan bintang
+dijalankan**: **0 merah**. Termasuk dua gerbang yang tampaknya paling dekat:
+
+| Gerbang | Yang diukur | Hasil |
+|---|---|---|
+| `check_star_geometry_matches_the_model` | nilai `spikeRootWidthFactor` (0.18) | hijau |
+| `check_star_pulse_reaches_the_picture` | denyut sampai ke piksel | hijau |
+| `check_star_size_follows_magnitude` | ukuran ikut magnitudo | hijau |
+| `check_star_colour_order` | warna per kelas spektral | hijau |
+| `check_saturn_ring_order_in_the_view` | **satu-satunya** gerbang yang membaca sumber view | tidak relevan |
+
+Kenapa tidak ada gerbang piksel yang bisa menangkapnya: port **tetap**
+membagi dua, jadi gambar port — yang diukur **seluruh** gerbang PNG repo ini —
+tidak berubah sedikit pun. Yang berubah adalah gambar **app**. Kelasnya persis
+sama dengan celah klem opasitas bibir kawah yang sudah ditutup siklus lalu:
+klem yang hidup di **satu bahasa** saja, sehingga gerbang gambar mengukur
+gambar yang tidak pernah tampil di jam.
+
+### Perbaikannya: lima pemeriksaan, kedua baris diukur terpisah
+
+`check_star_spike_halving_reaches_both_languages` (baru) mengukur **empat
+baris** (pangkal & ujung, view & port) plus **kesamaan kedua bahasa**. Pangkal
+dan ujung dipisah karena ditulis terpisah: perbaikan yang hanya mengembalikan
+salah satunya menghasilkan spike **asimetris**, dan itu tidak terbaca dari
+satu angka.
+
+Baris yang hilang seluruhnya (mis. penggambarnya diganti nama) juga **merah** —
+pemeriksaan yang kehilangan subjeknya tidak boleh hijau. Angka `0.5` dibaca
+dari **sumber**, bukan ditulis ulang di gerbang: gerbang yang menyimpan
+angkanya sendiri akan hijau saat angkanya diubah.
+
+### Gerbangnya dibuktikan berbunyi: lima keadaan, satu per jalan
+
+`Tools/bukti-mutasi-setengah-spike.py` (baru, dirujuk `engine-tests.yml`):
+
+```
+OK   [baseline]                                       0 merah
+OK   1. view: pembagi dua pangkal dihapus             2 merah
+       setengah-lebar root dibagi dua (view) | view == port
+OK   2. view: pembagi dua ujung dihapus               2 merah
+       setengah-lebar tip dibagi dua (view) | view == port
+OK   3. view: kedua pembagi dihapus (cacat penuh)     3 merah
+       root (view) | tip (view) | view == port
+OK   4. port: pembagi dua pangkal dihapus             2 merah
+       root (port) | view == port
+OK   5. view: baris `rootHalf` diganti nama           2 merah
+       root (view) | view == port
+6 keadaan, 0 tidak sesuai harapan
+```
+
+Keadaan 3 adalah yang membuktikan klaim "gerbang lama buta": dua gerbang
+tetangga (`check_star_geometry_matches_the_model`,
+`check_star_pulse_reaches_the_picture`) **dijalankan di keadaan itu** dan
+wajib tetap hijau. Keadaan 5 adalah kontrol negatif: baris yang tidak lagi
+terbaca harus merah, bukan hijau tanpa mengukur apa pun.
+
+**Satu kesalahan harness, tercatat.** Draf pertama tidak menyebut pemeriksaan
+"view == port" di `must_fire`, dan kelima keadaan dilaporkan "MERAH YANG
+TIDAK DIMINTA" — padahal gerbangnya benar: kalau satu bahasa berhenti membagi
+dua, kedua bahasa memang tidak lagi sama. Yang salah harapan harness-nya, dan
+itu diperbaiki di harness, bukan dengan melonggarkan gerbangnya.
+
+### Cacat kedua yang ditemukan sambil jalan: CI merah sejak siklus lalu
+
+`main` **merah** di `Engine Tests (Linux)` sejak `4340ff6`. Sebabnya:
+siklus lalu menambah langkah CI "Buktikan gerbang urutan cincin Saturnus
+berbunyi" (baris 479) yang memanggil `Tools/bukti-mutasi-urutan-cincin.py`,
+tetapi **berkas harness-nya tidak pernah dikomit** — tertinggal sebagai
+untracked. Terukur dari log CI:
+
+```
+python3: can't open file '.../Tools/bukti-mutasi-urutan-cincin.py':
+[Errno 2] No such file or directory
+```
+
+Ini **kelas yang sama persis** yang ditutup `check-harness-terdaftar.py`
+(13/12 lalu, 17/16 lalu): gerbang yang tidak pernah dieksekusi selalu hijau,
+dan di sini justru langkahnya merah karena sebab yang salah (berkas hilang,
+bukan gerbang berbunyi). Berkasnya dikomit di commit pertama siklus ini;
+`check-harness-terdaftar.py` kini **25 harness, semuanya dirujuk**.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 747 | **747** (tak disentuh) |
+| Pemeriksaan visual | 732 | **737** (+5 setengah-lebar spike) |
+| Harness dirujuk CI | 23 dikomit, 24 dirujuk (satu merujuk berkas hilang) | **25 dikomit, 25 dirujuk** |
+| Aturan UI | 31 | **31** (lulus) |
+| Baris `Apps/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 747 hijau**, 0 gagal.
+  - `python3 Tools/check-visuals.py --check` → **737 pemeriksaan, 0 gagal**.
+  - `python3 Tools/bukti-mutasi-setengah-spike.py` → **6 keadaan, 0 tidak sesuai harapan**.
+  - `python3 Tools/bukti-mutasi-urutan-cincin.py` → **5 keadaan, 0 tidak sesuai harapan**.
+  - `python3 Tools/check-harness-terdaftar.py` → **25 harness, semuanya dirujuk alur kerja**.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (31 aturan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - CI `0c47bf7`: Apple Build **success**.
+
+### Yang TIDAK diklaim
+
+- Gerbang ini mengukur **teks sumber view**, bukan piksel app. Yang
+  dibuktikan: barisnya ada dan angkanya `0.5`. Tidak ada klaim bahwa
+  perangkat Apple merender spike dengan lebar persis itu.
+- Tidak ada gerbang piksel baru. Gerbang ini menutup sisi yang **tidak bisa**
+  dilihat gerbang piksel mana pun, karena port (yang digambar) tidak berubah
+  saat sisi view rusak.
+- `0.5` dijaga sebagai **nilai**, bukan sebagai kebenaran optis: kalau kelak
+  lebarnya diubah **beserta** gerbang dan uji ini, gerbangnya hijau — yang
+  dijaga adalah ketiganya (nilai, gerbang, sumber) tidak boleh bercerai.
+- Tidak ada satu baris pun `Apps/` atau `Packages/` yang berubah siklus ini.
+  Yang berubah: `check-visuals.py` (gerbang + pembaca), harness baru, langkah
+  CI, dan berkas harness cincin yang tertinggal.
+
+---
+
 ## Progres terakhir (12 Okt 2026 — dua jalur mati: cache target tanpa jalan keluar, dan jarak bintik tanpa pembaca)
 
 Siklus ini mulai dari `Tools/sweep-unconsumed.sh` — sapuan yang menandai

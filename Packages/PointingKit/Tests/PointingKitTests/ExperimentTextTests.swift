@@ -75,6 +75,74 @@ final class ExperimentTextTests: XCTestCase {
         XCTAssertTrue(message.contains("20"), "sampel minimal hilang: \(message)")
     }
 
+    /// Kalimat "lulus" — satu-satunya yang mengucapkan kata itu.
+    ///
+    /// **Cacat yang ditutup uji ini.** `ExperimentHarness.verdict` punya tiga
+    /// cabang, dan sampai siklus ini hanya dua yang punya uji:
+    /// `testSummaryFailedInsertsCountAndNumbers` dan
+    /// `testSummaryInsufficientInsertsCountsAndMinimum`. Yang ketiga —
+    /// `ExperimentText.summaryPassed` — **nol pemanggil di berkas uji mana
+    /// pun** (terukur: sapuan anggota `public` tak terpakai melaporkannya
+    /// `test=0`, sementara kedua saudaranya `test=1`).
+    ///
+    /// Kenapa yang paling berbahaya justru yang tak teruji: inilah
+    /// **satu-satunya** cabang yang mencetak kata "Lulus syarat keselamatan".
+    /// Dua cabang lainnya menolak mengucapkannya (lihat
+    /// `ExperimentSafetyVerdict.isPassedClaim`). Jadi kalau keempat
+    /// argumennya — jumlah percobaan, akurasi, median, P90 — berhenti sampai,
+    /// kalimat yang tersisa di layar tetaplah sebuah **klaim lulus**, tetapi
+    /// tanpa satu angka pun yang mendasarinya. Penguji membaca "lulus" dan
+    /// tidak punya cara memeriksa dari mana angka itu datang.
+    ///
+    /// Dan klaim itu hidup: baru bisa muncul setelah 20 percobaan
+    /// (`minimumTrialsForSafetyClaim`), jadi ia persis cabang yang paling
+    /// jarang terlihat di layar mana pun selama pengembangan — dan karena itu
+    /// paling lama bisa membusuk tanpa ada yang melihat.
+    func testSummaryPassedInsertsTrialCountAndNumbers() {
+        let message = ExperimentText.summaryPassed(trialCount: 20,
+                                                   accuracy: "85%",
+                                                   median: "1.2°",
+                                                   p90: "3.4°")
+        XCTAssertTrue(message.contains("20"), "jumlah percobaan hilang: \(message)")
+        XCTAssertTrue(message.contains("85%"), "akurasi hilang: \(message)")
+        XCTAssertTrue(message.contains("1.2°"), "median hilang: \(message)")
+        XCTAssertTrue(message.contains("3.4°"), "P90 hilang: \(message)")
+    }
+
+    /// Kata "Lulus" **hanya** milik cabang `passed`.
+    ///
+    /// Arah yang berlawanan dari uji sebelumnya, dan tanpa itu uji pertama
+    /// bisa dipenuhi dengan cara yang salah: `summaryInsufficient` juga
+    /// menerima `trialCount`, jadi menaruh kata "Lulus" di sana tetap lolos
+    /// pemeriksaan "angkanya masuk" sambil mengucapkan klaim keselamatan atas
+    /// sampel yang belum cukup — persis cacat yang ditutup
+    /// `ExperimentSafetyVerdict`, hanya berpindah ke lapisan kata.
+    ///
+    /// Yang dijaga di sini adalah **pemisahan ketiga cabang**, bukan ejaan
+    /// katanya: kalau kelak katanya diubah beserta ketiga kunci katalognya,
+    /// gerbang ini mengikutinya. Yang tidak boleh terjadi adalah dua cabang
+    /// yang berbeda mengucapkan klaim yang sama.
+    func testOnlyThePassedBranchClaimsLulus() {
+        // Cabang yang seharusnya mengucapkannya.
+        XCTAssertTrue(ExperimentText.summaryPassed(trialCount: 20,
+                                                   accuracy: "85%",
+                                                   median: "1.2°",
+                                                   p90: "3.4°").contains("Lulus"),
+                      "cabang passed harus mengucapkan kata Lulus")
+        // Cabang yang tidak boleh mengucapkannya.
+        XCTAssertFalse(ExperimentText.summaryInsufficient(trialCount: 2,
+                                                         minimum: 20,
+                                                         accuracy: "—",
+                                                         median: "—",
+                                                         p90: "—").contains("Lulus"),
+                       "sampel kecil tidak boleh mengucapkan Lulus")
+        XCTAssertFalse(ExperimentText.summaryFailed(falseLockCount: 1,
+                                                    accuracy: "85%",
+                                                    median: "1.2°",
+                                                    p90: "3.4°").contains("Lulus"),
+                       "ada false lock tidak boleh mengucapkan Lulus")
+    }
+
     /// Diagnosis rasio memakai `%lld` untuk dua jumlah bulat.
     ///
     /// `%d` di Linux Swift membaca 32-bit dan memotong nilai `Int` 64-bit —
