@@ -1,3 +1,130 @@
+## Progres terakhir (12 Okt 2026 — Aturan 35: satu berkas yang bertentangan dengan dirinya sendiri)
+
+Siklus ini mulai dari sisa yang tertinggal di pohon kerja: `PointingView.swift`
+menyimpang dari HEAD satu kata — `linkSpeech(isReachable: link.isReachable,`
+menjadi `linkSpeech(isReachable: true,`. Sisa itu bukan sampah acak; ia
+**bukti hidup** dari kelas cacat yang belum dijaga siapa pun.
+
+### Cara menemukannya
+
+`git diff` menunjukkan tepat satu baris, dan baris itu tepat di kawat yang
+memutuskan apa yang dibacakan VoiceOver tentang status tautan ke iPhone:
+
+```swift
+// ikon  (baris 338)
+Image(systemName: link.isReachable ? "iphone.gen3.radiowaves…" : "iphone.slash")
+// suara (baris 381)
+LinkStatusText.linkSpeech(isReachable: link.isReachable, sendFailureCount: …)
+```
+
+Keduanya membaca **satu fakta yang sama**. Diganti jadi `true`, ikon bisa
+berkata "iPhone tidak terjangkau" sementara pembaca layar membacakan "iPhone
+terhubung" — dua kanal di satu layar yang sama saling membantah.
+
+### Diukur, bukan dikira-kira
+
+Dengan cacat itu **di pohon**:
+
+| gerbang | hasil |
+|---|---|
+| `./swift-ui-lint.sh` (34 aturan saat itu) | LULUS, exit 0 |
+| `./swift-typecheck.sh` | LULUS, exit 0 |
+| `./swift-test.sh` | 967 uji (212 + 755), 0 gagal |
+
+Jadi membuat layar dan suara berbeda tidak menghasilkan satu pun kegagalan.
+
+### Kenapa Aturan 34 tidak menangkapnya
+
+Aturan 34 membaca daftar aksesornya dari deklarasi ber-parameter
+`isConfirmed:` — dan `linkSpeech` menerima `isReachable`. Cacatnya juga bukan
+tentang keyakinan identitas: engine tidak sedang ragu apa pun di sini. Yang
+salah adalah **satu berkas yang bertentangan dengan dirinya sendiri** — satu
+kanal menyatakan fakta, kanal lain menulisnya sebagai tetapan.
+
+### Aturan 35: prinsip, bukan daftar nama
+
+Alih-alih menambahkan `isReachable` ke daftar, aturannya memakai prinsipnya:
+
+> berkas yang **membaca** `.p` dari sebuah penerima tidak boleh mengirim
+> literal `true`/`false` untuk parameter `p` di berkas itu.
+
+Daftar parameternya dicari dari model — setiap `func` di `Packages/PointingKit`
+yang punya parameter `Bool` (16 buah saat ini) — jadi aksesor yang lahir besok
+ikut terjaga tanpa menyunting aturan ini.
+
+### Dua lubang yang ditemukan justru oleh harnessnya sendiri
+
+Ini bagian yang paling berharga dari siklus ini, dan keduanya **tidak akan
+ditemukan** tanpa harness mutasi:
+
+1. **Keadaan 2 merah pada aturannya, bukan pada kode.** `phaseGeometry(waxing:)`
+   dipanggil dengan `visual.isWaxing` — label argumennya `waxing`, properti
+   yang dibaca `isWaxing`. Aturan versi pertama mencari `.waxing` dan
+   **melewatkannya sepenuhnya**. Perbaikannya: pembacaan diperiksa dalam tiga
+   bentuk (`.p`, `.isP`, `.hasP`), karena konvensi Swift memang membuang
+   awalan `is`/`has` dari label argumen. Tanpa perluasan itu, seluruh keluarga
+   aksesor `is`-berawalan lolos — dan itu mayoritas.
+
+2. **`waxing` bukan parameter terakhir yang hilang.** Keadaan 3 menambahkan
+   `record(...)` yang menerima `fromWatch:` dan dibaca di `LinkView.swift`.
+   Ia ada khusus supaya daftar parameternya **terbukti** dibaca dari model:
+   aturan yang menyalin `isReachable` sebagai satu-satunya nama yang dicari
+   akan hijau di sana.
+
+### Batas yang sengaja sempit
+
+Aturan 35 **tidak** melarang literal. Ada literal yang sah dan harus tetap
+hijau:
+
+- `setSensorAvailable(false)` di `MotionLogger` — sebuah **perintah**
+  ("hentikan sensor"), bukan klaim tentang keadaan, dan berkas itu tidak
+  membaca `.available` sama sekali.
+- `isConfirmed: true` pada `CelestialVisualView` di `OnboardingView` —
+  **struktur view**, bukan aksesor model; ilustrasi statis yang memang bukan
+  hasil pengukuran.
+
+Gerbang yang memerah pada kode yang benar akan dilonggarkan orang, dan gerbang
+yang dilonggarkan tidak menjaga apa pun. Karena itu kedua bentuk itu masuk
+sebagai **kontrol negatif** di harness — bukan hiasan, melainkan keadaan yang
+membuktikan aturannya tidak lebih luas daripada yang diklaimnya.
+
+### Yang TIDAK diklaim
+
+Aturan 35 adalah sapu **teks**: ia tidak tahu tipe, tidak tahu apakah `p`
+benar-benar parameter aksesor yang dipanggil (nama parameter yang kebetulan
+sama sudah cukup untuk memerah), dan ia tidak melihat blok komentar `/* */`
+(hanya `//`). Batas ini sama dengan Aturan 34 dan disebut di sini supaya
+"hijau" tidak dibaca lebih luas daripada yang benar-benar diukur.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-fakta-literal.py` — 6 keadaan, semuanya sesuai harapan:
+
+```
+OK   [baseline]                                               hijau
+OK   1. jalur suara tautan dipaksa "terhubung"                MERAH
+OK   2. arah fase planet dipilih untuk engine (dua situs)     MERAH
+OK   3. rekaman dipaksa "dari jam" di berkas iPhone           MERAH
+OK   4. kontrol negatif: literal sah di ilustrasi statis      hijau
+OK   5. kontrol negatif: perintah sensor, bukan klaim         hijau
+```
+
+Program aturannya **diekstrak** dari `swift-ui-lint.sh`, bukan disalin —
+menyalinnya membuat harness mengukur salinan yang tetap hijau walau aturan
+aslinya dilonggarkan.
+
+### Pelajaran
+
+- **Sisa di pohon kerja bisa jadi petunjuk, bukan sampah.** Baris itu
+  tertinggal dari harness yang di-`SIGKILL` sehingga `finally`-nya tidak
+  pernah jalan. Alih-alih membersihkannya, nilainya diukur dulu — dan
+  ternyata itulah cacatnya.
+- **Harness mutasi menemukan lubang di aturannya sendiri.** Keadaan 2 dan 3
+  masing-masing menunjuk satu kelas yang dilewatkan versi sebelumnya. Itu
+  bukan biaya tambahan; itu satu-satunya cara lubang seperti itu terlihat.
+- **Aturan 10 repo ini bekerja.** Setelah aturan ke-35 ditambahkan, gerbangnya
+  sendiri merah: "README bilang 34 aturan, swift-ui-lint.sh punya 35."
+
 ## Progres terakhir (12 Okt 2026 — Aturan 33 & 34: rumus yang benar dan pengawat yang tidak diperiksa siapa pun)
 
 Siklus ini mulai dari satu pertanyaan yang belum pernah diajukan ke repo ini:

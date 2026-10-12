@@ -738,6 +738,23 @@ jobs:
       - name: Buktikan gerbang penjaga identitas Aturan 34 berbunyi
         run: python3 Tools/bukti-mutasi-penjaga-identitas.py
 
+      # Aturan 35 (fakta vs literal): berkas yang **membaca** sebuah fakta Bool
+      # dari penerima tidak boleh mengirim literal `true`/`false` untuk
+      # parameter itu di berkas yang sama. Cacatnya diukur pada `PointingView`:
+      # ikon membaca `link.isReachable`, suara membaca
+      # `LinkStatusText.linkSpeech(isReachable:)` — argumen suara diganti
+      # `true`, dan lint lulus, typecheck lulus, 755 uji hijau. Ikon bisa
+      # berkata "iPhone tidak terjangkau" sementara VoiceOver membacakan
+      # "iPhone terhubung". Lima keadaan: tiga cacat di **tiga berkas berbeda**
+      # (jalur suara tautan, arah fase planet, rekaman "dari jam") plus dua
+      # kontrol negatif yang harus tetap hijau — literal sah pada ilustrasi
+      # statis, dan `setSensorAvailable(false)` yang merupakan **perintah**,
+      # bukan klaim. Keadaan 3 ada khusus supaya daftar parameternya terbukti
+      # dibaca dari model: aturan yang menyalin `isReachable` sebagai
+      # satu-satunya nama akan hijau di sana.
+      - name: Buktikan gerbang fakta-vs-literal Aturan 35 berbunyi
+        run: python3 Tools/bukti-mutasi-fakta-literal.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

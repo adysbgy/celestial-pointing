@@ -4605,6 +4605,195 @@ else
   echo "Bersih: penjaga identitas menerima keyakinan engine."
 fi
 
+# ── Aturan 35: fakta yang dibaca berkasnya tidak boleh ditulis sebagai literal ─
+#
+# Kelas cacat yang ditutupnya, dan ini **diukur**, bukan dikira-kira.
+#
+# `PointingView.swift` menampilkan status tautan ke iPhone di dua kanal
+# sekaligus, dan keduanya membaca satu fakta yang sama:
+#
+#     `link.isReachable ? "iphone.gen3.radiowaves…" : "iphone.slash"`  ikon
+#     `LinkStatusText.linkSpeech(isReachable: …)`                       suara
+#
+# Diukur: argumen `linkSpeech` diganti `link.isReachable` -> `true` (satu
+# kata, satu tempat). Lalu seluruh berkas ini dijalankan **dengan** cacat itu
+# di pohon: `swift-ui-lint.sh` LULUS (exit 0), `swift-typecheck.sh` LULUS
+# (exit 0), `./swift-test.sh` 755 uji hijau. Jadi membuat ikon berkata
+# "iPhone tidak terjangkau" sementara VoiceOver membacakan "iPhone terhubung"
+# tidak menghasilkan satu pun kegagalan.
+#
+# Kenapa Aturan 34 tidak menangkapnya: daftar aksesornya dibaca dari
+# deklarasi ber-parameter `isConfirmed:` — dan `linkSpeech` menerima
+# `isReachable`. Cacatnya bukan pada keyakinan identitas, melainkan pada
+# **satu berkas yang bertentangan dengan dirinya sendiri**: satu kanal
+# menyatakan fakta, kanal lain menulisnya sebagai tetapan. Karena itu aturan
+# ini tidak memakai daftar nama, melainkan prinsipnya:
+#
+#     berkas yang **membaca** `.p` dari sebuah penerima tidak boleh
+#     mengirim literal `true`/`false` untuk parameter `p` di berkas itu.
+#
+# Aksesornya dicari dari model (setiap `func` PointingKit yang punya
+# parameter Bool), bukan disalin ke sini — aksesor yang lahir besok ikut
+# terjaga tanpa menyunting aturan ini.
+#
+# **Kenapa "kontradiksi di berkas yang sama", bukan "literal dilarang".**
+# Ada literal yang sah dan tidak boleh memerah: `setSensorAvailable(false)`
+# di `MotionLogger` adalah **perintah** ("hentikan sensor"), bukan klaim
+# tentang keadaan, dan berkasnya tidak membaca `.available` sama sekali.
+# `color(raw, isShadow: true)` meminta cakram bayangan — bukan aksesor model.
+# Yang dilarang sempit: fakta yang **sudah dibaca** berkas itu lalu diganti
+# tetapan di kanal lain, karena di situlah layar dan suara bisa berbeda.
+#
+# **Yang TIDAK diklaim aturan ini.** Ia sapu teks: ia tidak tahu tipe, tidak
+# tahu apakah `p` benar-benar parameter aksesor yang dipanggil (nama
+# parameter yang kebetulan sama sudah cukup untuk memerah), dan ia tidak
+# melihat blok komentar `/* */` (hanya `//`). Batas itu sama dengan Aturan 34,
+# dan disebut di sini supaya "hijau" tidak dibaca lebih luas daripada yang
+# benar-benar diukur.
+echo
+echo "== Aturan 35: fakta Bool yang dibaca berkasnya tidak diganti literal =="
+kontradiksi_literal=$(python3 - <<'PY' 2>&1
+import os, re
+
+PK = os.path.join("Packages", "PointingKit", "Sources", "PointingKit")
+if not os.path.isdir(PK):
+    print("Tidak bisa membaca %s -- aturan ini tidak bisa memutuskan." % PK)
+    raise SystemExit(0)
+
+
+def kode_saja(teks):
+    """Buang komentar `//` dan isi string literal."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam_str, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam_str = False
+            else:
+                if ch == '"':
+                    dalam_str = True
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+            buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+def argumen(kode, buka):
+    """Daftar argumen dari kurung **berimbang** mulai di indeks `(`.
+
+    Mencari sampai `)` pertama akan memotong argumen yang isinya kurung
+    (mis. nilai bawaan atau pemanggilan bersarang).
+    """
+    i, depth = buka + 1, 1
+    while i < len(kode) and depth:
+        if kode[i] == "(":
+            depth += 1
+        elif kode[i] == ")":
+            depth -= 1
+        i += 1
+    return kode[buka + 1:i - 1]
+
+
+# 1. Deklarasi: setiap `func` PointingKit yang punya parameter Bool.
+aksesor = {}
+for root, _, files in os.walk(PK):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        kode = kode_saja(open(os.path.join(root, name), encoding="utf-8").read())
+        datar = re.sub(r"\s+", " ", kode)
+        for m in re.finditer(r"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", datar):
+            params = argumen(datar, m.end() - 1)
+            bools = re.findall(
+                r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Bool\??\b", params)
+            if bools:
+                aksesor.setdefault(m.group(1), set()).update(bools)
+
+if not aksesor:
+    print("Tidak ada aksesor model ber-parameter Bool yang ditemukan; "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+# 2. Per berkas `Apps/`: fakta Bool yang **dibaca** dari sebuah penerima,
+#    lalu pemanggilan aksesor yang mengirim literal untuk fakta itu.
+#
+#    Pembacaan diperiksa dalam **tiga** bentuk, dan yang ketiga bukan
+#    kelengkapan: konvensi Swift membuang awalan `is`/`has` dari label
+#    argumen, jadi `phaseGeometry(waxing:)` dipanggil dengan
+#    `visual.isWaxing`. Terukur: tanpa perluasan ini, argumen `waxing:`
+#    diganti literal **hijau** -- keadaan 2 `bukti-mutasi-fakta-literal.py`
+#    merah pada aturannya sendiri, dan aturan yang melewatkan seluruh
+#    keluarga aksesor `is`-berawalan akan menjaga jauh lebih sedikit daripada
+#    yang tampak dari namanya. Bentuk `.is<Param>`/`.has<Param>` juga yang
+#    menangkap `setSensorAvailable(available:)` lewat `motion.isAvailable`.
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+
+        dibaca = set()
+        for prm in {p for ps in aksesor.values() for p in ps}:
+            b = prm[0].upper() + prm[1:]
+            for bentuk in (".%s" % prm, ".is%s" % b, ".has%s" % b):
+                if re.search(re.escape(bentuk) + r"\b", kode):
+                    dibaca.add(prm)
+                    break
+        if not dibaca:
+            continue
+
+        for fn, params in sorted(aksesor.items()):
+            for m in re.finditer(
+                    r"(?<![A-Za-z0-9_])" + re.escape(fn) + r"\s*\(", kode):
+                args = argumen(kode, m.end() - 1)
+                for prm in sorted(params):
+                    if prm not in dibaca:
+                        continue
+                    nilai = re.search(r"\b" + prm + r"\s*:\s*([^,)]+)", args)
+                    if not nilai:
+                        continue
+                    diperiksa += 1
+                    if re.match(r"^\s*(true|false)\s*$", nilai.group(1)):
+                        baris = kode[:m.start()].count("\n") + 1
+                        masalah.append(
+                            "  %s:%d: `%s(%s: %s)` -- berkas ini juga membaca "
+                            "`.%s`, jadi faktanya tersedia dan diganti literal"
+                            % (path, baris, fn, prm,
+                               nilai.group(1).strip(), prm))
+
+if diperiksa == 0:
+    print("Tidak ada pemanggilan aksesor Bool di Apps/; aturan ini tidak "
+          "mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Salurkan fakta yang dibaca berkas itu (mis. `link.isReachable`), "
+          "bukan literal: literal membuat satu kanal mengklaim hal yang "
+          "dibantah kanal lain di layar yang sama.")
+PY
+)
+if printf '%s' "$kontradiksi_literal" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 35 gagal dijalankan:"
+  echo "$kontradiksi_literal"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$kontradiksi_literal" ]; then
+  echo "$kontradiksi_literal"
+  status=1
+else
+  echo "Bersih: fakta Bool yang dibaca berkasnya sampai apa adanya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

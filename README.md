@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **34 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **35 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -289,6 +289,28 @@ ke arah salah menyatakan "ini bulan sabit awal" saat engine hanya tahu "ada
 sabit" — dan brief memang menyebut "sabit harus benar arahnya". Gerbang yang
 hanya mencari `isConfirmed:` akan melewatkannya sepenuhnya, jadi bagian kedua
 Aturan 34 mengukur argumen `waxing:` secara terpisah, di **kedua** situs.
+
+Aturan 35 menutup kelas yang sama sekali berbeda, walaupun bentuknya mirip:
+**satu berkas yang bertentangan dengan dirinya sendiri.** `PointingView`
+menampilkan status tautan ke iPhone di dua kanal yang membaca satu fakta yang
+sama — ikon (`link.isReachable ? "iphone.gen3.radiowaves…" : "iphone.slash"`)
+dan suara (`LinkStatusText.linkSpeech(isReachable:)`). Diukur: argumen suara
+diganti `link.isReachable` → `true`, satu kata di satu tempat, lalu **lint
+lulus, typecheck lulus, 755 uji hijau**. Artinya ikon bisa berkata "iPhone
+tidak terjangkau" sementara VoiceOver membacakan "iPhone terhubung", dan tidak
+ada satu pun gerbang yang berbunyi. Aturan 34 tidak menangkapnya karena
+daftar aksesornya dibaca dari deklarasi ber-`isConfirmed:` — dan `linkSpeech`
+menerima `isReachable`.
+
+Karena itu Aturan 35 tidak memakai daftar nama, melainkan prinsipnya: berkas
+yang **membaca** `.p` dari sebuah penerima tidak boleh mengirim literal
+`true`/`false` untuk parameter `p` di berkas itu. Aksesornya dicari dari model
+(setiap `func` PointingKit ber-parameter `Bool` — 16 buah saat ini), bukan
+disalin. Batasnya sengaja sempit: `setSensorAvailable(false)` di `MotionLogger`
+adalah **perintah** ("hentikan sensor"), bukan klaim, dan berkas itu tidak
+membaca `.available` sama sekali — jadi ia tetap hijau. Yang dilarang adalah
+fakta yang sudah dibaca lalu diganti tetapan di kanal lain, karena di situlah
+layar dan suara bisa berbeda.
 
 ### Uji harus pernah merah
 
