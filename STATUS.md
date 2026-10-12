@@ -1,3 +1,92 @@
+## Progres terakhir (12 Okt 2026 — Aturan 33 & 34: rumus yang benar dan pengawat yang tidak diperiksa siapa pun)
+
+Siklus ini mulai dari satu pertanyaan yang belum pernah diajukan ke repo ini:
+**argumen mana yang ada hanya supaya engine boleh menolak menjawab, dan siapa
+yang memeriksa nilai yang dikirim ke sana?** Jawabannya dua kelas cacat, dan
+keduanya bertahan melewati seluruh gerbang yang ada.
+
+### Kelas cacatnya: `Apps/` di luar jangkauan kedua gerbang
+
+`swift-test.sh` hanya membangun `Packages/`, jadi seluruh berkas di `Apps/`
+tidak pernah dieksekusi uji Swift. `Tools/check-visuals.py` merender **port
+Python**-nya, bukan view Swift-nya. Akibatnya ada satu berkas yang tidak
+diperiksa keduanya — dan justru di situ pengawatnya tinggal. Modelnya sendiri
+sudah benar: `drawableStarColorIndex`, `drawableMorphology`, `Palette.drawable`,
+ketiga `spoken*`, dan `phaseGeometry(waxing:)` semuanya menerima penjaga
+keyakinan, masing-masing punya uji Swift, dan `SlewVerdictTests` bahkan
+menuntut `verdictTone`/`verdictSymbolName` berbeda. Yang tidak ada: satu pun
+pemeriksa yang menuntut **view membacanya**.
+
+### Cacat 1 — bobot putusan GoTo (Aturan 33)
+
+`SlewVerdictBanner` menggambar dua kelas bahaya: keselamatan (cahaya Matahari
+ke lensa) dan mutu (terlalu redup). Pembedanya hanya hidup kalau ikon diambil
+dari `decision.verdictSymbolName` dan warna dari `decision.verdictTone`, dan
+`SlewVerdict.verdictTone` menyebut versi literal itu sebagai cacatnya.
+
+Diukur: kedua baris dikembalikan ke bentuk tetap → **32 aturan UI lulus,
+typecheck lulus, 755 uji hijau**. Memundurkan pemisahan bobot tidak
+menghasilkan satu pun kegagalan. Di Mode Malam ini paling parah: seluruh palet
+nada menyempit jadi satu merah, jadi ikon satu-satunya pembeda yang tersisa.
+
+Aturan 33 membaca **tiga** hal: ikon dari putusannya, nada dari putusannya,
+dan nada itu benar-benar dipakai menggambar. Tanpa yang ketiga, cacatnya bisa
+"diperbaiki" dengan menghitung nada lalu tetap menggambar warna tetap.
+
+### Cacat 2 — argumen keyakinan dan arah fase (Aturan 34)
+
+`isConfirmed: isConfirmed` di `CelestialVisualView.swift` diganti
+`isConfirmed: true` — satu kata, tepat di kawat yang memutuskan apakah bentuk
+objek langit dalam boleh diklaim → **lint lulus, typecheck lulus, 755 uji
+hijau**. Memaksa **klaim identitas** tidak menghasilkan kegagalan apa pun,
+walaupun PRD menyebut larangan itu aturan paling keras.
+
+Satu lapis lebih dalam, dan ini yang tidak akan ditemukan oleh gerbang yang
+mencari `isConfirmed:` saja: `phaseGeometry(waxing:)` menerima **`Bool?`**.
+Modelnya menyebut alasannya sendiri — "`nil` menghasilkan `nil`: tanpa arah,
+gambar apa pun yang digambar akan memihak ke satu sisi". Kedua situs
+`waxing: visual.isWaxing` diganti `waxing: true` → **lint lulus, typecheck
+lulus**. Sabit yang menghadap ke arah salah menyatakan "ini bulan sabit awal"
+saat engine hanya tahu "ada sabit" — brief menyebutnya eksplisit ("sabit harus
+benar arahnya").
+
+### Perbaikan: dua aturan, keduanya membaca daftar dari model
+
+- **Aturan 33** membaca ikon, nada, dan pemakaian nada di `SlewVerdictBanner`.
+- **Aturan 34** mencari sendiri deklarasi ber-parameter `isConfirmed:` di
+  `Packages/PointingKit`, lalu menuntut setiap pemanggilan di `Apps/` mengirim
+  sesuatu selain literal `true`/`false`; bagian kedua mengukur argumen
+  `waxing:` secara terpisah, di **kedua** situs.
+
+Daftarnya dibaca dari model, bukan disalin ke skrip: salinan akan membuat
+aksesor ketujuh yang lahir besok lolos hanya karena namanya tidak ada di
+daftar. Aturan 34 juga sengaja **sempit** — literal yang sah tetap hijau
+(`OnboardingView` dan `#Preview` memakai `isConfirmed: true` pada
+`CelestialVisualView`, yaitu struktur view untuk ilustrasi statis, bukan
+aksesor model). Gerbang yang memerah pada kode yang benar akan dilonggarkan
+orang, dan gerbang yang dilonggarkan tidak menjaga apa pun.
+
+### Bukti bahwa keduanya bisa merah
+
+`Tools/bukti-mutasi-bobot-goto.py` (5 keadaan, 0 tidak sesuai harapan) dan
+`Tools/bukti-mutasi-penjaga-identitas.py` (10 keadaan, 0 tidak sesuai
+harapan). Keduanya **mengekstrak program aturannya dari `swift-ui-lint.sh`**,
+bukan menyalinnya — menyalin membuat harness mengukur salinan yang tetap hijau
+walau aturan aslinya dilonggarkan. Harness kedua bermutasi di **dua berkas
+berbeda** (termasuk jalur VoiceOver di `PointingView.swift`, yang paling mudah
+terlupakan karena tidak terlihat di layar) dan memuat **dua kontrol negatif**
+yang harus tetap hijau. Jangkar `phaseDirection` sengaja muncul 2x dan
+jumlahnya diperiksa sebagai angka, bukan dipaksa 1 — memaksa 1 akan membuat
+harness menolak jalan pada kode yang benar.
+
+Sekalian: dua `echo` di Aturan 33 memakai backtick, yang di shell adalah
+command substitution — nama medan di pesannya hilang tanpa jejak. Diganti
+teks polos.
+
+Status: `swift-ui-lint.sh` **34 aturan lulus**, `swift-typecheck.sh` lulus,
+`swift-test.sh` = CelestialEngine 212 + PointingKit **755** hijau, 29 harness
+semuanya dirujuk CI.
+
 ## Progres terakhir (12 Okt 2026 — cabang diagnosis "engine tidak pernah menjawab": kalimat yang tak pernah dicapai satu uji pun, dan yang salahnya menyalahkan pihak yang keliru)
 
 Siklus ini dimulai dari `Tools/sweep-unconsumed.sh`, sapuan anggota `public`
