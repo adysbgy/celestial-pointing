@@ -20524,3 +20524,125 @@ Tiga hipotesis diuji ke gerbang yang sudah ada, dan ketiganya sudah dijaga:
   - **Kritik visual harus diukur sebelum dipercaya.** "Pita lurus" terdengar
     benar pada montase 220 px dan salah pada piksel. Urutannya: lihat, ukur,
     baru perbaiki — dan kalau ukurannya membantah, yang salah adalah kritiknya.
+
+
+## Siklus 12 Okt — kandidat gerbang kekuatan ciri planet: DIUKUR, DITOLAK
+
+**Status: tidak ada perubahan kode.** Siklus ini menghasilkan pengukuran dan
+satu **hasil negatif** yang dicatat supaya tidak diulang. Pohon repo bersih
+(`git diff --quiet` hijau), `./swift-test.sh` 755 uji / 0 gagal.
+
+### Celah yang memang ada
+
+`check_features_survive_the_watch_size` mengukur lima ciri planet pada ukuran
+kartu jam (38 pt) — tetapi syaratnya `diff > 0`, dan **satu piksel berbeda pun
+lolos**. Untuk dua ciri ada gerbang kekuatan yang lebih tajam
+(`check_jupiter_spot_reads_on_the_watch`, `check_saturn_gap_reads_at_the_watch_size`).
+Untuk **tiga** sisanya — kutub Mars, kabut Venus, kawah Merkurius — tidak ada
+satu pun yang mengukur berapa kuat cirinya pada ukuran yang benar-benar tampil.
+Jadi celahnya nyata: ciri yang tinggal sepersepuluh kekuatannya tetap hijau.
+
+### Yang diukur (76 px = 38 pt @2x, `ss=8`)
+
+Simpangan rata-rata terhadap bola polos, dinormalkan ke terang pusat piringan,
+dengan terang mode malam = **kanal merah** (sama dengan definisi model
+`RGBComponents.nightModeBrightness`):
+
+    ciri              siang    malam
+    Bintik Merah       7.16     6.73
+    cincin Saturnus   47.94    46.36
+    kutub Mars        46.84    13.78
+    kawah Merkurius    6.05     6.51
+    kabut Venus        8.71     7.48
+
+Kutub Mars turun **3,4x**. Ditemukan juga sebabnya, dan sebabnya bukan gambar:
+kontras kap terhadap bola Mars dibawa oleh hijau+biru (kap 0,97/0,95/0,93
+melawan bola 0,88/0,42/0,26), dan mode malam membuang kedua kanal itu. Kontras
+ciri-terhadap-bola terukur 109,4 (siang) → 26,0 (malam) dari 255.
+
+### Kenapa TIDAK diperbaiki, dan ini keputusan yang disengaja
+
+Mode malam memetakan **semua** warna lewat `NightVisual.surface` — satu kanal,
+satu rumus, urutan terang dikunci `testNightModeKeepsBrightnessOrdering`.
+Menambah pengecualian per-planet di sana berarti satu warna berhenti mematuhi
+aturan yang berlaku untuk seluruh aplikasi, dan urutan terang yang sudah
+diuji bisa bergeser tanpa satu pun gerbang berbunyi. Yang tersisa hanya selisih
+kanal merah — dan itu memang satu-satunya kanal yang sampai ke mata pengamat
+malam. "Memperbaiki" kontras berarti memindahkannya ke kanal yang sudah
+dimatikan. Kapnya juga **sudah** lebih terang dari bolanya (arahnya benar);
+yang mengecil hanya jaraknya.
+
+### Kenapa gerbangnya DITOLAK — dan ini bagian yang penting
+
+Gerbang versi pertama lulus semua gambar yang benar (10 pemeriksaan, 0 gagal,
+nilai persis seperti tabel di atas). Lalu diuji mutasi:
+
+    mutasi                        siang    malam
+    kutub Mars dihapus             3.92     5.24     <- harus ~0
+    kabut Venus dihapus          ZeroDivisionError (geometri rusak)
+    kawah Merkurius dihapus        6.62     6.80     <- harus ~0
+    bintik Jupiter dihapus         6.42     6.55     <- harus ~0
+    cincin Saturnus dihapus       52.97    50.86     <- NAIK
+
+Dua cacat sekaligus, keduanya mematikan:
+
+1. **Metriknya tidak mengisolasi cirinya.** Menghapus cincin Saturnus justru
+   **menaikkan** skornya, dan menghapus bintik Jupiter hanya bergerak dari 7,16
+   ke 6,42. Sebabnya struktural: `planet-X-bare` adalah **bola tanpa pita**,
+   sedangkan `planet-X-confirmed` adalah bola **berpita**; keduanya sama-sama
+   menggambar bola penuh, jadi selisihnya didominasi perbedaan pita/geometri
+   bola, bukan cirinya. Untuk Merkurius dan Venus ditambah lagi: keduanya
+   berfase, sehingga selisihnya sebagian besar adalah **fase**, bukan kawah.
+2. **Ambangnya tidak memisahkan apa pun.** Sisa "kutub Mars dihapus" (3,92)
+   duduk **di atas** ambang yang dipilih (3,0) — jadi gerbangnya hijau pada
+   ciri yang sudah dihapus. Terukur, bukan dikira-kira.
+
+Dengan metrik seperti itu, ambang berapa pun akan merah pada gambar yang benar
+atau hijau pada ciri yang hilang — dan gerbang yang memerah pada kode benar
+akan dimatikan orang. Jadi ia **tidak dikirim**.
+
+### Yang menggantikannya, dan kenapa lebih kuat
+
+Pembanding yang benar adalah **bola & fase yang sama persis, dengan cirinya
+dimatikan** — bukan `-bare`, yang mengubah pita dan geometri sekaligus.
+Terukur dengan pembanding itu (mode malam, satu planet per baris):
+
+    planet     normal    ciri dimatikan
+    mars         8.75        0.00     <- metrik bekerja
+    venus        2.39        0.04
+    mercury      1.20        1.49     <- TERBALIK
+    jupiter      1.57        1.39
+    saturn      49.94       54.43
+
+Mars memisahkan sempurna. **Merkurius terbalik** — skornya lebih tinggi saat
+kawahnya dimatikan, jadi metrik ini pun belum bisa dipakai untuk semua ciri.
+Penyebab yang paling mungkin: kawah Merkurius kecil (radius 0,15–0,20 R) dan
+di 76 px hanya menempati beberapa piksel, sehingga rata-rata di dalam piringan
+didominasi riak anti-aliasing limb. Artinya metrik yang dipakai harus
+**lokal di daerah cirinya** (kotak/lingkaran ciri, seperti
+`spot_deviation_from_bare` untuk bintik), bukan rata-rata seluruh piringan.
+
+### Yang TIDAK diklaim
+
+  - Tidak ada klaim bahwa "tiga ciri lolos tanpa gerbang kekuatan" sudah
+    ditutup. Celahnya masih terbuka; yang ditutup siklus ini hanya
+    **pertanyaannya**, dan sekarang ada angka serta dua kegagalan metrik yang
+    terdokumentasi untuk melanjutkannya.
+  - Tidak ada klaim bahwa kutub Mars di mode malam **rusak**. Yang terukur ia
+    melemah 3,4x; arahnya tetap benar dan ia tidak pernah hilang. Kalimat
+    "rusak" akan menyatakan lebih dari yang diukur.
+  - Tidak ada perubahan pada `Apps/`, `Packages/`, maupun gerbang mana pun.
+
+### Pelajaran
+
+  - **Gerbang baru harus diuji mutasi SEBELUM ditulis ke berkas.** Gerbang yang
+    hijau di sepuluh keadaan benar bukan bukti apa-apa; yang membuktikan adalah
+    keadaan salah yang **bisa** memerahkannya. Dua kali di sini angkanya
+    membaik justru saat fiturnya dihapus.
+  - **Pembanding harus berbeda HANYA pada hal yang diukur.** `-bare` mengubah
+    pita, geometri, dan fase sekaligus; selisihnya lalu milik pita, bukan milik
+    cirinya. Ini kelas yang sama dengan "gerbang mengukur gambar yang tidak
+    tampil", hanya berpindah ke pembandingnya.
+  - **Ambang harus diuji terhadap keadaan salah yang nyata**, bukan hanya
+    terhadap gambar yang benar. Ambang 3,0 terlihat punya margin 2x terhadap
+    6,05; ia sebenarnya hijau pada 3,92 yang berarti cirinya sudah dihapus.
