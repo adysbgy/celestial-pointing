@@ -728,12 +728,13 @@ jobs:
       # Aturan 34 (penjaga identitas): enam aksesor model menerima
       # `isConfirmed:` supaya bisa menolak mengklaim identitas saat engine ragu
       # (warna bintang, morfologi kabut, palet planet, dan ketiga jalur
-      # suaranya). Sembilan keadaan — enam mutasi di dua berkas berbeda, plus
-      # dua kontrol negatif yang harus tetap hijau (literal sah di
-      # `OnboardingView`/`#Preview`, dan aksesor tanpa argumen keyakinan).
-      # Dua kontrol negatif itu bukan hiasan: gerbang yang memerah pada kode
-      # yang benar akan dilonggarkan orang, dan gerbang yang dilonggarkan tidak
-      # menjaga apa pun.
+      # suaranya), plus `phaseGeometry(waxing:)` yang menerima `Bool?` dengan
+      # alasan yang sama (`nil` = jangan pilih sisi). Sepuluh keadaan — tujuh
+      # mutasi di dua berkas berbeda, plus dua kontrol negatif yang harus tetap
+      # hijau (literal sah di `OnboardingView`/`#Preview`, dan aksesor tanpa
+      # argumen keyakinan). Dua kontrol negatif itu bukan hiasan: gerbang yang
+      # memerah pada kode yang benar akan dilonggarkan orang, dan gerbang yang
+      # dilonggarkan tidak menjaga apa pun.
       - name: Buktikan gerbang penjaga identitas Aturan 34 berbunyi
         run: python3 Tools/bukti-mutasi-penjaga-identitas.py
 

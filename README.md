@@ -278,6 +278,18 @@ pada literal yang sah (`OnboardingView`, `#Preview`), karena gerbang yang
 memerah pada kode yang benar akan dilonggarkan orang, dan gerbang yang
 dilonggarkan tidak menjaga apa pun.
 
+Satu lapis lebih dalam, dan itu ditemukan dengan bertanya "argumen apa lagi
+yang ada hanya supaya engine boleh menolak menjawab": `phaseGeometry(waxing:)`
+menerima **`Bool?`**, bukan `Bool`. Modelnya menyebut alasannya sendiri —
+"`nil` menghasilkan `nil`: tanpa arah, gambar apa pun yang digambar akan
+memihak ke satu sisi, dan itu pernyataan yang tidak dihitung engine". Diukur:
+kedua situs `waxing: visual.isWaxing` di `CelestialVisualView.swift` diganti
+`waxing: true`, lalu **lint lulus dan typecheck lulus**. Sabit yang menghadap
+ke arah salah menyatakan "ini bulan sabit awal" saat engine hanya tahu "ada
+sabit" — dan brief memang menyebut "sabit harus benar arahnya". Gerbang yang
+hanya mencari `isConfirmed:` akan melewatkannya sepenuhnya, jadi bagian kedua
+Aturan 34 mengukur argumen `waxing:` secara terpisah, di **kedua** situs.
+
 ### Uji harus pernah merah
 
 Uji yang langsung hijau belum membuktikan apa-apa selain bahwa kode saat ini

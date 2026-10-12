@@ -4530,14 +4530,67 @@ for root, _, files in os.walk("Apps"):
                         "diganti literal, jadi identitas diklaim saat ragu"
                         % (path, baris, fn, nilai.group(1).strip()))
 
-if diperiksa == 0:
+# 2. Arah fase: kelas yang sama, argumen yang berbeda.
+#
+#    `phaseGeometry(waxing:)` mengembalikan `nil` bila arahnya `nil`, dan
+#    `nil` berarti \"jangan menggambar fase\". Mengirim `true`/`false` di
+#    tempatnya berarti **memilih sisi** untuk benda yang arahnya tidak
+#    diketahui engine -- persis larangan PRD yang sama, karena sisi terang
+#    adalah ciri pengenal: sabit yang menghadap ke arah salah menyatakan
+#    \"ini bulan sabit awal\" saat engine hanya tahu \"ada sabit\".
+#    Modelnya sendiri menyebutnya: `waxing: Bool?` -- \"`nil` menghasilkan
+#    `nil`: tanpa arah, gambar apa pun yang digambar akan memihak ke satu
+#    sisi, dan itu pernyataan yang tidak dihitung engine\".
+#
+#    Diukur sebelum bagian ini ada: `waxing: visual.isWaxing` di
+#    CelestialVisualView.swift diganti `waxing: true` (dua situs), lalu
+#    lint LULUS (exit 0) dan typecheck LULUS (exit 0).
+#
+#    Kenapa tidak masuk bagian 1: daftar aksesornya dibaca dari deklarasi
+#    ber-`isConfirmed:`, dan `phaseGeometry` tidak punya parameter itu --
+#    aturan yang hanya mencari `isConfirmed:` akan melewatkannya sepenuhnya.
+masalah_fase = []
+diperiksa_fase = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for m in re.finditer(r"\bphaseGeometry\s*\(", kode):
+            i, depth, mulai = m.end(), 1, m.end()
+            while i < len(kode) and depth:
+                if kode[i] == "(":
+                    depth += 1
+                elif kode[i] == ")":
+                    depth -= 1
+                i += 1
+            args = kode[mulai:i - 1]
+            nilai = re.search(r"\bwaxing\s*:\s*([^,\)]+)", args)
+            if not nilai:
+                continue
+            diperiksa_fase += 1
+            if re.match(r"^\s*(true|false)\s*$", nilai.group(1)):
+                baris = kode[:m.start()].count("\n") + 1
+                masalah_fase.append(
+                    "  %s:%d: `phaseGeometry(waxing: %s)` -- arah fase "
+                    "diganti literal, jadi sisi terang dipilih untuk benda "
+                    "yang arahnya tidak diketahui engine"
+                    % (path, baris, nilai.group(1).strip()))
+
+if diperiksa == 0 and diperiksa_fase == 0:
     print("Tidak ada pemanggilan aksesor identitas di Apps/; aturan ini "
           "tidak mengukur apa pun.")
-elif masalah:
-    print("\n".join(masalah))
-    print("-> Salurkan `engine.confirmsDisplayedIdentity` (atau `isConfirmed` "
-          "yang sudah diturunkan darinya), bukan literal: `true` membuat "
-          "gambar lebih yakin daripada teksnya.")
+elif masalah or masalah_fase:
+    print("\n".join(masalah + masalah_fase))
+    if masalah:
+        print("-> Salurkan `engine.confirmsDisplayedIdentity` (atau "
+              "`isConfirmed` yang sudah diturunkan darinya), bukan literal: "
+              "`true` membuat gambar lebih yakin daripada teksnya.")
+    if masalah_fase:
+        print("-> Salurkan `visual.isWaxing` (opsional) apa adanya, bukan "
+              "literal: `nil` berarti \"jangan pilih sisi\", dan sisi terang "
+              "adalah ciri pengenal.")
 PY
 )
 if printf '%s' "$penjaga_identitas" | grep -q "Traceback\|Error\|error:"; then
