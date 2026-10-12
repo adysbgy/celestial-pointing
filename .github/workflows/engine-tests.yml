@@ -478,6 +478,32 @@ jobs:
       - name: Buktikan gerbang urutan cincin Saturnus berbunyi
         run: python3 Tools/bukti-mutasi-urutan-cincin.py
 
+      # Dan bukti untuk **angka di docstring** gerbang urutan cincin itu.
+      #
+      # Gerbangnya hijau pada hari ditulis, dan docstringnya memuat lima
+      # angka sebagai bukti mengapa ambangnya layak dipercaya. Empat di
+      # antaranya **tidak pernah dihasilkan alat ukurnya**:
+      #
+      #     49,7% (24 064 dari 48 400)      dikutip: 50% (110 dari 220)
+      #     36 hasil tetangga               dikutip: 35
+      #     margin 0 -> 14 px @200 / 6 @76  dikutip: "nol piksel"
+      #     cacat @76px -> 232 px           dikutip: 245 px
+      #
+      # Yang paling merusak bukan selisihnya, melainkan **arahnya** pada
+      # margin: kalimat aslinya menyatakan kode yang benar memberi nol piksel
+      # di dalam bola pada `margin 0`, sehingga ambangnya terbaca aman-saja.
+      # Kebalikannya yang benar — pada `margin 0` kode yang benar memberi 14
+      # dan 6 piksel (anti-aliasing di limb), dan ambang 0,02 R-lah yang
+      # membuatnya nol. Tanpa ambang itu gerbangnya merah pada gambar benar.
+      #
+      # Gerbang paritas `check_saturn_ring_order_docstring_quotes_measured_values`
+      # menutupnya dengan menghitung ulang keempat angka. Harness ini
+      # membuktikan ia **bisa merah**, satu keadaan per angka — karena
+      # keempatnya punya jalan berbeda menuju kesalahan, dan satu mutasi
+      # hanya membuktikan satu jalan.
+      - name: Buktikan gerbang angka docstring urutan cincin berbunyi
+        run: python3 Tools/bukti-mutasi-angka-urutan-cincin.py
+
       # Dan bukti untuk gerbang **ciri planet berfase tidak bocor ke sisi
       # gelap** — akibat dari pemotongan yang tidak diukur siapa pun.
       #

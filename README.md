@@ -123,8 +123,9 @@ hipotesis" dan "ragu lebih baik daripada yakin yang salah".
   lingkaran, persegi panjang, inline, dan **sudut** — dan setiap cabangnya
   merender ikon keadaan bersama nama objek (Aturan 23), supaya nama kandidat
   `.uncertain` tidak pernah terbaca sama dengan nama yang sudah terkunci.
-  Katedral diuji: `ComplicationDigestStalenessTests` memastikan ringkasan objek
-  basi tidak terdengar seperti hasil sekarang, dan `ComplicationStaleSymbolTests`
+  Kedaluwarsa diuji: `ComplicationDigestStalenessTests` memastikan ringkasan
+  objek basi tidak terdengar seperti hasil sekarang, dan
+  `ComplicationStaleSymbolTests`
   menjaga simbol lamanya.
 - **Lokalisasi.** Teks UI ada di `Localizable.xcstrings` (Bahasa Indonesia +
   Inggris). `SWIFT_EMIT_LOC_STRINGS` **sengaja dimatikan** karena katalog

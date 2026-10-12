@@ -1,3 +1,133 @@
+## Progres terakhir (12 Okt 2026 — dua jalur mati: cache target tanpa jalan keluar, dan jarak bintik tanpa pembaca)
+
+Siklus ini mulai dari `Tools/sweep-unconsumed.sh` — sapuan yang menandai
+anggota `public` di `PointingKit` dengan `app=0`. Dua baris teratasnya,
+`distanceFromCenter` dan `invalidateTargets`, sama-sama `app=0 test=0`,
+dan keduanya ternyata **dua wajah dari satu kelas cacat**: jalan yang
+dihitung, tidak pernah dipanggil, dan karena itu tidak punya cara untuk
+berbunyi saat ia rusak.
+
+### Cacat 1: penjagaan cakrawala yang benar, tanpa jalan keluar bagi pengguna
+
+`ExperimentHarness.invalidateTargets()` punya **nol** pemanggil di seluruh
+repo (terukur: `grep -rn invalidateTargets` → hanya barisnya sendiri).
+Docstring-nya menyebut situasinya dengan tepat — "dipakai saat penguji
+berpindah tempat" — tetapi yang dijaga `didSet` lokasi hanyalah
+**perpindahan**, bukan **langit yang bergerak**.
+
+Cache dikunci pada `(observer, bucket 30 detik)`. Tempat penguji tidak
+berpindah; yang berpindah adalah langitnya. Daftar yang masih segar saat
+target dipilih bisa memuat benda yang **sudah terbenam** saat tombol Catat
+ditekan beberapa menit kemudian. `record` menolaknya dengan
+`targetBelowHorizon` (penjagaan yang sudah benar, ditambahkan siklus
+`045ff18`) — dan sampai siklus ini penguji **tidak punya cara apa pun**
+untuk menyegarkan daftarnya selain menutup layar dan membukanya lagi.
+Percobaan yang sudah ia kerjakan hilang tanpa penjelasan tentang apa yang
+harus dilakukan berikutnya.
+
+Diukur: `grep -rn "invalidateTargets\|refreshTargets" Apps/` → kosong.
+Yang ada hanya `recorder.updateLocation(engine.location)`, dan itu tidak
+membatalkan cache bila tempatnya sama
+(`testTargetListIsNotRecomputedForSamePlace` menguncinya justru supaya
+tidak dihitung ulang).
+
+**Perbaikannya.** `ExperimentRecorder.refreshTargets()` +
+tombol ikon panah berputar di toolbar `Experiment1View`, yang sekaligus
+membuang pilihan target yang sudah tidak ada di daftar — pilihan yang
+tidak ada di daftar tampil seolah masih bisa direkam, dan itu kelas
+kejujuran yang sama dengan sisa layar itu.
+
+Tombolnya **selalu ada**, bukan hanya saat daftar tampak basi: yang
+menentukan basi adalah horizon, bukan jam — tidak ada `isStale` untuk
+daftar target seperti yang ada di calibrasi.
+
+### Cacat 2: angka yang menyatakan letak badai, tanpa satu pun pembaca
+
+`CelestialVisual.Spot.distanceFromCenter` — "jarak pusat bintik dari pusat
+bola, satuan radius" — juga nol pemanggil di mana pun (bukan hanya nol di
+`Apps/`: nol di seluruh repo di luar deklarasinya). Angka itu menyatakan
+hal yang **spesifik**: seberapa jauh Bintik Merah Besar dari pusat
+piringan, dan ke arah mana (`centerY = 0.31`, positif = belahan selatan).
+
+`farthestCorner` di sebelahnya **sudah** diuji (`testJupiterSpotIsCenteredNotCornered`) —
+jadi tepi terjauhnya dijaga, sementara pusatnya tidak. Persis pola yang
+sudah berulang di repo ini: separuh pasangan diuji, separuhnya dihitung
+lalu dibuang.
+
+### Keduanya dikunci uji yang GAGAL dulu, dan yang pertama dibuktikan merah
+
+Dua uji di `ExperimentHarnessTests` dan satu di `CelestialVisualTests`.
+
+Yang paling penting bentuknya: **uji tombol segarkan membaca berkas
+`Apps/PointAndKnowiOS/Sources/Experiment1View.swift` langsung**, lalu
+menuntut `recorder.refreshTargets()` ada di sana. Dibuktikan merah
+sungguhan, bukan diklaim: pemanggilnya diganti `refreshTargetsXXX()`, dan
+
+```
+error: ExperimentHarnessTests.testExperimentViewRefreshesTheTargetListBeforeTheTesterRecords :
+XCTAssertTrue failed - layar Experiment 1 harus memanggil refreshTargets() — kalau tidak,
+daftar target bisa memuat benda yang sudah terbenam dan penguji tidak punya cara menyegarkannya
+Executed 1 test, with 1 failure
+```
+
+Sumber lalu dipulihkan dan `git status` diverifikasi bersih. Uji itu
+**tidak** bisa menangkap semua bentuk pemanggilan — batasnya dinyatakan:
+yang diukur teks, bukan perilaku SwiftUI-nya. Yang bisa ia buktikan adalah
+bahwa jalurnya **bisa dijangkau dari layar**, dan itu memang bagian yang
+hilang.
+
+Uji jarak bintik mengikatnya di **dua sisi**: pusatnya harus benar-benar
+di luar pusat piringan (`> 0.2 R`, jadi bukan badai yang tergambar di
+tengah bola) dan seluruh elipsnya masih di dalam bola. Keduanya tetap
+benar kalau koordinat bintiknya kelak disetel ulang, dan merah kalau
+badainya pindah ke tempat yang tidak lagi menggambarkan Jupiter.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh; uji ini tidak menjalankannya) |
+| PointingKit | 743 | **745** (+2: tombol segarkan, jarak bintik) |
+| Kunci katalog | 336 | **337** (+1 label VoiceOver tombol segarkan) |
+| Pemeriksaan visual | 732 | **732** (tak disentuh, diverifikasi) |
+| Aturan UI | 31 | **31** (lulus) |
+| Harness dirujuk CI | 19 dari 19 | **19 dari 19** |
+
+Catatan pengukuran: `CelestialEngine` **212** dibaca dari keluaran
+lengkap `./swift-test.sh` (kedua paket), sedangkan README dan STATUS
+sebelumnya menulis 166 — angka README itu sudah usang sejak jauh sebelum
+siklus ini dan **tidak** saya ubah di sini, karena menyentuh dua dokumen
+sekaligus dalam satu siklus membuat perubahan yang bisa dituduhkan sulit
+dipisahkan. Yang dikoreksi siklus ini hanya `PointingKit` di README, karena
+Aturan 10 memaksanya.
+
+### Yang TIDAK diklaim
+
+- Kedua cacat ini **tidak menyesatkan hari ini**: penjagaan cakrawala
+  bekerja, dan bintiknya memang di tempat yang benar. Yang ditutup adalah
+  jalur yang **tidak bisa berbunyi saat rusak**.
+- Uji tombol segarkan mengukur **keberadaan pemanggilan**, bukan bahwa
+  segarkan itu menyelesaikan masalah pengguna. Daftar yang disegarkan bisa
+  saja tetap memuat target yang sama (kalau tidak ada yang terbenam) — dan
+  itu memang hasil yang benar.
+- Uji jarak bintik mengunci **letaknya**, bukan kebenaran astronomis
+  koordinatnya. Kalau koordinat bintik diubah **beserta** uji ini, gerbang
+  hijau; yang dijaga adalah ketiganya (koordinat, uji, komentar) tidak
+  boleh bercerai.
+- **Bukan visual.** Siklus ini tidak menyentuh satu baris pun lapisan
+  gambar; belum ada penilaian "kelihatan bagus atau tidak" di dalamnya.
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 745 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (31 aturan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - `python3 Tools/check-visuals.py --check` → **732 pemeriksaan, 0 gagal**.
+  - CI: Apple Build `38202365580` **success**; Engine Tests (Linux)
+    `38202365608` dijalankan di commit yang sama.
+
+---
+
 ## Progres terakhir (11 Okt 2026 — Bintik Merah Besar: ciri yang "ada", dihitung, dan tidak terbaca)
 
 Siklus ini menutup kelas cacat yang sama dengan celah Cassini
