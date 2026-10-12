@@ -716,6 +716,15 @@ jobs:
       - name: Buktikan gerbang lencana ragu Aturan 32 berbunyi
         run: python3 Tools/bukti-mutasi-lencana-ragu.py
 
+      # Aturan 33 (`SlewVerdictBanner`): ikon dan warna putusan GoTo harus
+      # diambil dari putusannya, bukan ditulis di view. Empat keadaan —
+      # ikon tetap, nada tetap, nada dihitung-lalu-dibuang, dan satu kontrol
+      # negatif (baris `Image` diganti nama). Keadaan 1-3 tidak bisa saling
+      # menggantikan: 1 menguji ikon, 2 warna, 3 bahwa warna itu benar-benar
+      # sampai ke gambar.
+      - name: Buktikan gerbang bobot putusan GoTo Aturan 33 berbunyi
+        run: python3 Tools/bukti-mutasi-bobot-goto.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

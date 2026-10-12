@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **32 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **33 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -237,6 +237,24 @@ ini, satu-satunya penjaganya adalah komentar. Kawat itu pernah berbunyi
 Venus tampil sebagai bola penuh persis saat engine baru saja menghitung
 iluminasinya 2 persen. Perbaikannya mendarat di sumber tanpa satu uji pun
 yang menangkapnya, karena uji menguji **rumus**-nya, bukan **pengawat**-nya.
+
+Aturan 33 menutup kelas yang sama pada lapisan yang berbeda: bukan kawat
+antara dua medan, melainkan **pengambilan bobot dari sebuah putusan**.
+`SlewVerdictBanner` menggambar dua kelas bahaya — keselamatan (cahaya
+Matahari ke lensa) dan mutu (terlalu redup) — dan pembedaannya hanya hidup
+kalau ikon diambil dari `decision.verdictSymbolName` dan warna dari
+`decision.verdictTone`. Versi pertamanya menulis keduanya langsung di view,
+dan `SlewVerdict.verdictTone` menyebut versi itu sebagai cacatnya. Diukur
+sebelum aturan ini ada: kedua baris dikembalikan ke bentuk tetap itu, lalu
+**seluruh aturan UI saat itu lulus, typecheck lulus, dan 755 uji hijau** —
+jadi memundurkan pemisahan bobot ke bentuk yang salah tidak menghasilkan
+satu pun kegagalan.
+`SlewVerdictTests` menguji **nilai** kedua aksesor itu, tetapi tidak ada uji
+yang menuntut **view membacanya**; rumus yang benar dan tidak pernah dipakai
+tetap hijau selamanya. Karena itu aturan ini membaca **tiga** hal sekaligus:
+ikon datang dari putusannya, nada datang dari putusannya, dan nada itu
+benar-benar dipakai menggambar — tanpa yang ketiga, cacatnya bisa
+"diperbaiki" dengan menghitung nada lalu tetap menggambar warna tetap.
 
 ### Uji harus pernah merah
 

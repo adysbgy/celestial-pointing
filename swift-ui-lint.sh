@@ -4269,6 +4269,126 @@ else
   echo "Bersih: lencana ragu digambar tepat saat engine belum pasti."
 fi
 
+# ── Aturan 33: bobot putusan GoTo harus datang dari putusannya ─────────────
+#
+# `SlewVerdictBanner` punya dua baris yang menentukan apakah dua kelas bahaya
+# **terlihat berbeda**:
+#
+#   `Image(systemName: decision.verdictSymbolName)`   ikon
+#   `let tone = decision.verdictTone`                 warna
+#
+# Keduanya ada karena versi pertama banner ini menulis ikon dan warna
+# **langsung di view**: `exclamationmark.triangle.fill` untuk semua penolakan,
+# warna peringatan untuk semua penolakan. Akibatnya `sunProximity` (melindungi
+# peralatan dan **mata** dari cahaya Matahari) dan `lowConfidence` (soal
+# ketelitian) tergambar dengan bobot yang sama, dan pengguna yang membaca
+# sekilas menyimpulkan keduanya sama mendesaknya. Docstring
+# `SlewVerdict.verdictTone` menyebut versi itu sebagai cacatnya.
+#
+# **Kenapa gerbang ini harus ada: cacat itu terbukti tak terlihat.** Kedua
+# baris dikembalikan ke bentuk lamanya (ikon tetap `exclamationmark.triangle
+# .fill`, nada tetap `PointingTone.warning`), lalu dijalankan: seluruh 32
+# aturan UI lulus, `./swift-typecheck.sh` lulus (exit 0), dan `./swift-test.sh`
+# melaporkan **755 uji, 0 gagal**. Jadi sampai aturan ini ada, memundurkan
+# pemisahan bobot itu ke bentuk yang docstring-nya sendiri sebut salah tidak
+# menghasilkan satu pun kegagalan.
+#
+# Kenapa uji Linux tidak bisa menolong: `SlewVerdictTests` menguji **nilai**
+# `verdictTone`/`verdictSymbolName` (dan `testDangerAndWarningUseDifferentSymbols`
+# memang menuntut keduanya berbeda), tetapi tidak ada satu pun uji yang
+# menuntut **view membacanya**. Rumus yang benar dan tidak pernah dipakai
+# tetap hijau selamanya -- kelas yang sama dengan setengah-lebar spike yang
+# hilang hanya di sisi view.
+#
+# **Batasnya, dinyatakan di sini supaya tidak salah tuduh.**
+# `ReducedLuminanceView` juga menulis `exclamationmark.triangle.fill` sebagai
+# literal, dan itu **bukan** cacat: layar redup hanya pernah menampilkan
+# `safetyWarningText`, yang `nil` untuk seluruh kelas mutu, jadi di sana hanya
+# ada satu kelas bahaya dan tidak ada yang perlu dibedakan. Aturan ini karena
+# itu membaca **satu berkas**, bukan menyapu semua `Image(systemName:)` di
+# `Apps/`.
+echo
+echo "== Aturan 33: bobot putusan GoTo datang dari putusannya =="
+putusan_goto=$(python3 - <<'PY' 2>&1
+import os, re
+
+VIEW = "Apps/Shared/SlewVerdictBanner.swift"
+
+if not os.path.exists(VIEW):
+    print("PERINGATAN: %s tidak ada." % VIEW)
+    raise SystemExit
+
+text = open(VIEW, encoding="utf-8").read()
+# Kode saja: docstring berkas ini menceritakan cacat lamanya, dan nama
+# `verdictSymbolName` yang **dikutip di komentar** tidak boleh terbaca
+# sebagai pemakaian.
+code = re.sub(r"//[^\n]*", "", text)
+code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+
+problems = []
+
+# 1. Ikon harus datang dari putusannya, bukan dari literal di view.
+#
+#    Diperiksa sebagai **argumen** `Image(systemName:)`, bukan sebagai
+#    keberadaan nama: `verdictSymbolName` yang disebut di tempat lain (mis.
+#    hanya dihitung lalu dibuang) tidak sampai ke layar.
+icon = re.search(r"Image\s*\(\s*systemName\s*:\s*([^)]*)\)", code)
+if not icon:
+    problems.append(
+        "  `Image(systemName:)` tidak ditemukan di %s; gerbang ini kehilangan "
+        "subjeknya, jadi ia tidak mengukur apa pun" % VIEW)
+else:
+    arg = icon.group(1).strip()
+    if not re.search(r"\bverdictSymbolName\b", arg):
+        problems.append(
+            "  ikon digambar dari `%s`, bukan `decision.verdictSymbolName`; "
+            "ikon tetap membuat kelas keselamatan dan kelas mutu terlihat "
+            "sama -- dan di Mode Malam ikon satu-satunya pembeda yang "
+            "tersisa, karena seluruh palet nada menyempit jadi satu merah"
+            % arg[:60])
+
+# 2. Nada harus datang dari putusannya.
+if not re.search(r"\bdecision\s*\.\s*verdictTone\b", code):
+    problems.append(
+        "  `decision.verdictTone` tidak dipakai di %s; warna peringatan yang "
+        "tetap menyamakan \"terlalu dekat Matahari\" dengan \"terlalu redup\""
+        % VIEW)
+
+# 3. Dan nada itu harus benar-benar **dipakai** untuk menggambar.
+#
+#    Arah ketiga, dan tanpa itu cacat nomor 2 bisa \"diselesaikan\" dengan
+#    menghitung nadanya lalu tetap menggambar warna tetap: nilainya ada,
+#    layarnya tidak berubah.
+paint = re.search(r"foregroundStyle\s*\(\s*([^)]*)\)", code)
+if not paint:
+    problems.append(
+        "  `foregroundStyle(...)` tidak ditemukan di %s; tidak ada yang "
+        "membuktikan nada putusan itu sampai ke warna yang digambar" % VIEW)
+elif not re.search(r"\btone\b", paint.group(1)):
+    problems.append(
+        "  warna digambar dari `%s`, bukan dari nada putusan yang sudah "
+        "dihitung; nadanya dihitung lalu dibuang"
+        % paint.group(1).strip()[:60])
+
+print("\n".join(problems) if problems else "")
+PY
+)
+if printf '%s' "$putusan_goto" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 33 gagal dijalankan:"
+  echo "$putusan_goto"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$putusan_goto" ]; then
+  echo "Bobot putusan GoTo tidak lagi datang dari putusannya:"
+  echo "$putusan_goto"
+  echo "-> Ambil ikon dari decision.verdictSymbolName dan warna dari"
+  echo "   decision.verdictTone; dua kelas bahaya harus terlihat berbeda,"
+  echo "   terutama di Mode Malam tempat warna berhenti membedakan."
+  status=1
+else
+  echo "Bersih: bobot putusan GoTo datang dari putusannya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
