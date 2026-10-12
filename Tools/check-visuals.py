@@ -8930,6 +8930,89 @@ def check_star_pulse_reaches_the_picture(results, size=200, ss=2, watch=38, watc
         f"@{watch}px: {watch_trough} < {watch_rest} < {watch_peak}"))
 
 
+def _spike_halving(source, language):
+    """Pembagi dua pada setengah-lebar spike di satu bahasa (`view`/`port`).
+
+    Mengembalikan `{"root": 0.5, "tip": 0.5}` untuk kode yang benar, dan
+    kamus yang **tidak lengkap** kalau barisnya tidak terbaca. Yang dibaca
+    adalah angka yang berdiri **di antara** nama faktornya dan `pulse` —
+    yaitu pembagi duanya sendiri, bukan nilai faktornya (0.18/0.035 sudah
+    dijaga pemeriksaan lain).
+    """
+    if language == "view":
+        patterns = {
+            "root": (r"rootHalf\s*=\s*coreRadius\s*\*\s*"
+                     r"CGFloat\(geometry\.spikeRootWidthFactor\)\s*\*\s*([\d.]+)\s*\*"),
+            "tip": (r"tipHalf\s*=\s*coreRadius\s*\*\s*"
+                    r"CGFloat\(geometry\.spikeTipWidthFactor\)\s*\*\s*([\d.]+)\s*\*"),
+        }
+    else:
+        patterns = {
+            "root": (r"root_half\s*=\s*core_radius\s*\*\s*"
+                     r"SPIKE_ROOT_WIDTH_FACTOR\s*\*\s*([\d.]+)\s*\*"),
+            "tip": (r"tip_half\s*=\s*core_radius\s*\*\s*"
+                    r"SPIKE_TIP_WIDTH_FACTOR\s*\*\s*([\d.]+)\s*\*"),
+        }
+    # Komentar dibuang per baris lebih dulu: badan `drawStar` memuat angka di
+    # komentarnya, dan pembacaan tanpa membuangnya mengambil angka prosa.
+    body = "\n".join(line.split("//")[0] if "//" in line else line.split("#")[0]
+                     for line in source.split("\n"))
+    return {key: float(match.group(1))
+            for key, pattern in patterns.items()
+            if (match := re.search(pattern, body))}
+
+
+def check_star_spike_halving_reaches_both_languages(results):
+    """Setengah-lebar spike bintang harus **benar-benar** dibagi dua, di kedua bahasa.
+
+    **Cacat yang ditutup pemeriksaan ini.** `spikeRootWidthFactor` (0.18) dan
+    `spikeTipWidthFactor` (0.035) adalah lebar **penuh**. Kedua bahasa
+    mengalikannya dengan `0.5` sebelum memakainya sebagai setengah-lebar —
+    angka itulah yang menjaga spike tetap terbaca sebagai **cahaya**, bukan
+    sebagai penanda bidik. Sampai siklus ini **hanya port** yang dijaga:
+    `check_port_constants_reach_the_drawing` menuntut
+    `SPIKE_ROOT_WIDTH_FACTOR * 0.5` di port, sementara sisi view —
+    `rootHalf = coreRadius * CGFloat(geometry.spikeRootWidthFactor) * 0.5` —
+    tidak dijaga apa pun.
+
+    Terukur, bukan diklaim: menghapus `* 0.5` dari **kedua** baris view
+    (spike jadi dua kali lebih berat di app) meninggalkan **22 pemeriksaan
+    bintang hijau, 0 merah** — termasuk `check_star_geometry_matches_the_model`
+    dan `check_star_pulse_reaches_the_picture`. Kelasnya persis sama dengan
+    celah klem opasitas bibir kawah: klem yang hidup di **satu bahasa** saja,
+    sehingga gerbang gambar mengukur gambar yang tidak pernah tampil.
+
+    Kenapa tidak ada gerbang piksel yang bisa menangkapnya: port **tetap**
+    membagi dua, jadi gambar port yang diukur seluruh gerbang PNG repo ini
+    tidak berubah sedikit pun. Yang berubah adalah gambar **app**, dan
+    satu-satunya sisi yang bisa dilihat gerbang di sini adalah teks view —
+    sama seperti `check_saturn_ring_order_in_the_view`.
+
+    Kedua baris (`root` & `tip`) diukur terpisah karena ditulis terpisah:
+    perbaikan yang hanya mengembalikan salah satunya menghasilkan spike yang
+    asimetris, dan itu tidak terbaca dari satu angka. Baris yang hilang
+    seluruhnya (mis. fungsi penggambarnya diganti nama) juga **merah** —
+    pemeriksaan yang kehilangan subjeknya tidak boleh hijau.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift"),
+                encoding="utf-8").read()
+    port = open(R.SOURCE, encoding="utf-8").read()
+    halves = {"view": _spike_halving(view, "view"),
+              "port": _spike_halving(port, "port")}
+    for language in ("view", "port"):
+        for part in ("root", "tip"):
+            value = halves[language].get(part)
+            results.append(Result(
+                f"spike bintang: setengah-lebar {part} dibagi dua ({language})",
+                value == 0.5,
+                f"{value}" if value is not None
+                else "baris setengah-lebar spike tidak ditemukan di sumber"))
+    results.append(Result(
+        "spike bintang: setengah-lebar view == port",
+        bool(halves["view"]) and halves["view"] == halves["port"],
+        f"view {halves['view']} vs port {halves['port']}"))
+
+
 def check_star_colour_order(results, size=200, ss=2):
     """Betelgeuse harus lebih merah dari Rigel — diukur dari piksel.
 
@@ -11022,6 +11105,7 @@ def main():
     check_night_accents_match_the_model(results)
     check_night_accents_reach_the_view(results)
     check_star_geometry_matches_the_model(results)
+    check_star_spike_halving_reaches_both_languages(results)
     check_magnitude_scale_matches_the_model(results)
     check_unknown_planet_is_a_neutral_sphere(results)
     check_uncertain_planet_loses_its_identity_colour(results)
