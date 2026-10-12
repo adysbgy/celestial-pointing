@@ -90,6 +90,80 @@ final class ConfidenceTraceTests: XCTestCase {
         XCTAssertTrue(ConfidenceTrace().diagnosis().contains("Belum ada sampel"))
     }
 
+    // MARK: - Diagnosis saat engine tidak pernah menjawab
+    //
+    // Celah yang ditutup di sini: cabang `diagnosisNoAnswers` di
+    // `ConfidenceTrace.diagnosis` (baris `if locks == 0 && uncertain == 0`)
+    // tidak punya satu pun uji yang **mencapainya**. Terukur: seluruh berkas
+    // uji yang menyentuh `diagnosis` membangun sampelnya dari `.lock` atau
+    // `.uncertain` — dua-satunya keadaan yang `hasAnswer`-nya benar — sehingga
+    // syarat `locks == 0 && uncertain == 0` tidak pernah terpenuhi.
+    //
+    // Kenapa cabang ini yang paling merugikan bila ia membusuk. Dua cabang
+    // di bawahnya (`diagnosisNoSamples`, `diagnosisNoMeasurableCause`)
+    // sama-sama mengucapkan "belum ada", dan keduanya **salah** untuk keadaan
+    // ini:
+    //
+    // - `diagnosisNoSamples` ("Belum ada sampel.") menyalahkan rekamannya.
+    //   Padahal rekamannya berjalan — mungkin 40 sampel terkumpul. Penguji
+    //   lalu memeriksa alat perekam, bukan kebiasaan tangannya.
+    // - `diagnosisNoMeasurableCause` ("tanpa sebab terukur") menyalahkan
+    //   arah tunjuk. Padahal engine tidak pernah sampai ke tahap menilai
+    //   sebuah kandidat pun.
+    //
+    // Keduanya adalah petunjuk perbaikan yang berbeda, dan hanya satu yang
+    // benar. Persis kelas cacat yang ditutup `tiedUncertainReasons`: dua
+    // keadaan yang berbeda jatuh ke kalimat yang sama, pada layar yang
+    // dipakai untuk memutuskan apa yang harus diperbaiki.
+
+    /// Keadaan "engine hidup tapi tidak pernah menjawab" harus berbeda dari
+    /// "belum ada rekaman".
+    ///
+    /// `.searching` adalah keadaannya: sensor hidup, pergelangan sudah diam,
+    /// tetapi tidak ada kandidat yang lahir. Dua arah diuji karena uji yang
+    /// hanya menuntut salah satunya akan hijau bila kedua kalimatnya
+    /// menyatu — dan menyatunya justru cacatnya.
+    func testDiagnosisDistinguishesNeverAnsweredFromNoSamples() {
+        let trace = ConfidenceTrace()
+        trace.record(state: .searching, level: nil, objectID: nil, objectName: nil,
+                     separationDeg: nil, sigmaDeg: 10, at: Date())
+        XCTAssertFalse(trace.samples.isEmpty, "prasyarat: rekamannya berjalan")
+
+        let unanswered = trace.diagnosis()
+        let empty = ConfidenceTrace().diagnosis()
+
+        XCTAssertTrue(unanswered.contains("Belum ada jawaban"),
+                      "engine tidak pernah menjawab harus dikatakan: \(unanswered)")
+        XCTAssertFalse(unanswered.contains("Belum ada sampel"),
+                       "rekaman berjalan, jadi bukan 'belum ada sampel': \(unanswered)")
+        XCTAssertFalse(empty.contains("Belum ada jawaban"),
+                      "tanpa rekaman sama sekali bukan 'belum ada jawaban': \(empty)")
+        XCTAssertNotEqual(unanswered, empty,
+                          "dua keadaan berbeda tidak boleh satu kalimat")
+    }
+
+    /// Kalimat "tidak pernah menjawab" **tidak boleh** menyalahkan satu sebab
+    /// pun.
+    ///
+    /// Yang membuat uji ini bukan hiasan: tanpa penjagaan `locks == 0 &&
+    /// uncertain == 0`, `diagnosis` jatuh ke `diagnosisNoMeasurableCause`
+    /// ("tanpa sebab terukur") — kalimat yang menyalahkan arah tunjuk padahal
+    /// tidak ada satu kandidat pun yang pernah dinilai. Uji di atas **tidak**
+    /// menangkapnya: ia hanya menuntut "Belum ada jawaban" hilang, dan
+    /// "tanpa sebab terukur" memang tidak memuat frasa itu.
+    func testUnansweredDiagnosisBlamesNoCause() {
+        let trace = ConfidenceTrace()
+        trace.record(state: .searching, level: nil, objectID: nil, objectName: nil,
+                     separationDeg: nil, sigmaDeg: 10, at: Date())
+
+        let sentence = trace.diagnosis()
+        for blamed in ["kalibrasi", "keterbatasan akurasi", "tanpa sebab terukur"] {
+            XCTAssertFalse(sentence.contains(blamed),
+                           "'\(blamed)' menyalahkan sesuatu yang tidak pernah "
+                           + "diukur: \(sentence)")
+        }
+    }
+
     /// MARK: - Diagnosis saat hitungan seri
     //
     // Yang diuji di sini bukan kalimatnya, tapi **keputusan**nya: dua sebab

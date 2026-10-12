@@ -1,3 +1,109 @@
+## Progres terakhir (12 Okt 2026 — cabang diagnosis "engine tidak pernah menjawab": kalimat yang tak pernah dicapai satu uji pun, dan yang salahnya menyalahkan pihak yang keliru)
+
+Siklus ini dimulai dari `Tools/sweep-unconsumed.sh`, sapuan anggota `public`
+yang pemanggilnya nol. Dari 23 baris `test=0`, satu menonjol karena **arah
+bahayanya**: `ExperimentText.diagnosisNoAnswers` — kalimat
+"Belum ada jawaban sama sekali." — tidak punya satu pun pemanggil di berkas uji
+mana pun.
+
+### Cacatnya: cabangnya ada, benar, dan tidak pernah tercapai
+
+`ConfidenceTrace.diagnosis` membuka dengan dua penjaga:
+
+```swift
+guard !samples.isEmpty else { return ExperimentText.diagnosisNoSamples }
+…
+if locks == 0 && uncertain == 0 {
+    return ExperimentText.diagnosisNoAnswers
+}
+```
+
+Cabang kedua mensyaratkan **rekaman berjalan tetapi nol jawaban** — engine
+hidup, sensor memberi arah, pergelangan sudah diam, dan tidak satu kandidat
+pun pernah lahir (`.searching`, `.pointing`, `.idle`).
+
+Terukur, bukan diklaim: seluruh uji yang menyentuh `diagnosis` —
+7 di `ConfidenceTraceTests`, plus `UncertainReasonBreakdownTests` — membangun
+sampelnya dari `.lock` atau `.uncertain`. Itu dua-satunya keadaan yang
+`hasAnswer`-nya benar. Jadi syarat `locks == 0 && uncertain == 0` **tidak
+pernah terpenuhi di satu uji pun**, dan cabangnya tidak pernah dieksekusi.
+
+### Kenapa cabang yang tak tercapai ini lebih berbahaya dari yang terlihat
+
+Kalau penjagaan `locks == 0 && uncertain == 0` hilang, aliran jatuh ke cabang
+`locks == 0` di bawahnya, lalu ke `diagnosisNoMeasurableCause`:
+
+> "Jawaban ragu tanpa sebab terukur — periksa apakah arah tunjuk masuk akal."
+
+Kalimat itu **menyalahkan arah tunjuk**. Padahal pada keadaan ini tidak ada
+satu kandidat pun yang pernah dinilai — tidak ada yang "ragu", tidak ada yang
+"tanpa sebab". Penguji disuruh memeriksa kebiasaan tangannya, padahal yang
+tidak pernah terjadi adalah jawaban apa pun.
+
+Arah yang berlawanan sama-sama salah: `diagnosisNoSamples`
+("Belum ada sampel.") menyalahkan **alat perekam**, padahal rekamannya
+berjalan — mungkin 40 sampel terkumpul.
+
+Keduanya adalah petunjuk perbaikan yang berbeda dan hanya satu yang benar.
+Persis kelas cacat yang ditutup `tiedUncertainReasons` di berkas yang sama:
+dua keadaan berbeda jatuh ke satu kalimat, pada layar yang dipakai untuk
+memutuskan apa yang harus diperbaiki berikutnya. Bedanya, `tiedUncertainReasons`
+ditemukan lewat kalimat yang **berubah-ubah antar peluncuran**; yang ini tidak
+pernah berubah, karena tidak pernah dijalankan.
+
+### Perbaikannya: dua uji, dua arah yang tidak saling menggantikan
+
+- `testDiagnosisDistinguishesNeverAnsweredFromNoSamples` — membangun satu
+  sampel `.searching`, lalu menuntut keadaan itu mengucapkan "Belum ada
+  jawaban" **dan** tidak mengucapkan "Belum ada sampel", serta bahwa kalimatnya
+  berbeda dari diagnosis atas riwayat kosong.
+- `testUnansweredDiagnosisBlamesNoCause` — kalimatnya **tidak boleh** memuat
+  "kalibrasi", "keterbatasan akurasi", atau "tanpa sebab terukur".
+
+Uji kedua bukan penguat: ia yang menangkap cacatnya. Uji pertama hanya menuntut
+"Belum ada jawaban" **hilang** — dan "tanpa sebab terukur" memang tidak memuat
+frasa itu, jadi uji pertama sendirian akan hijau pada kode yang rusak.
+
+### Gerbangnya dibuktikan berbunyi (mutasi, bukan sekadar diff)
+
+Dua mutasi, masing-masing dijalankan lewat `./red-test.sh` (yang memulihkan
+sumber sendiri):
+
+| mutasi | hasil |
+|---|---|
+| `diagnosisNoAnswers` → `diagnosisNoMeasurableCause` | MERAH: `engine tidak pernah menjawab harus dikatakan: Jawaban ragu tanpa sebab terukur — periksa apakah arah tunjuk masuk akal.` |
+| `if locks == 0 && uncertain == 0` → `if false` | MERAH: `'tanpa sebab terukur' menyalahkan sesuatu yang tidak pernah diukur: …` |
+
+Keduanya merah **dengan kalimat yang salahnya terlihat**, dan keduanya merah
+pada uji yang berbeda — bukti bahwa keduanya memang menahan dua hal yang
+berbeda. Sumber dipulihkan: `git status` sesudahnya hanya memuat berkas uji +
+README.
+
+### Yang diukur, bukan dikira-kira
+
+- `./swift-test.sh` → **CelestialEngine 212 + PointingKit 755 hijau**, 0 gagal
+  (753 + 2 baru).
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (32 aturan).
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+- README diselaraskan 753 → 755 (Aturan 10 memaksanya).
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan kalimat: `diagnosisNoAnswers` memang sudah benar dan
+  sudah dilokalkan (id + en ada di `Localizable.xcstrings`). Yang ditambah
+  hanya penjagaannya.
+- Kedua uji mengukur **kalimat yang dihasilkan**, bukan bahwa layar diagnostik
+  benar-benar memanggil `diagnosis` pada keadaan ini. Yang dibuktikan: kalimat
+  yang benar lahir untuk keadaan yang benar, dan kode yang salah ketahuan.
+- Uji ini **tidak** menentukan kapan engine pantas berada di keadaan
+  "tidak pernah menjawab" — itu keputusan `PointingFlow`, bukan milik
+  `ConfidenceTrace`. Yang dijaga hanya bahwa keadaan itu punya kalimatnya
+  sendiri.
+- Sapuan `test=0` masih menyisakan 22 baris lain yang belum diperiksa satu per
+  satu. Siklus ini mengerjakan satu.
+
+---
+
 ## Progres terakhir (12 Okt 2026 — `relativeSize` & `colorIndexBV` dihitung lalu diuji di tempat yang salah: dua medan yang dibaca view, nol uji pada pengikatannya)
 
 ### Cacatnya: rumusnya teruji, pengikatannya tidak
