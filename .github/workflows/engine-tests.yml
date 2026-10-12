@@ -725,6 +725,18 @@ jobs:
       - name: Buktikan gerbang bobot putusan GoTo Aturan 33 berbunyi
         run: python3 Tools/bukti-mutasi-bobot-goto.py
 
+      # Aturan 34 (penjaga identitas): enam aksesor model menerima
+      # `isConfirmed:` supaya bisa menolak mengklaim identitas saat engine ragu
+      # (warna bintang, morfologi kabut, palet planet, dan ketiga jalur
+      # suaranya). Sembilan keadaan — enam mutasi di dua berkas berbeda, plus
+      # dua kontrol negatif yang harus tetap hijau (literal sah di
+      # `OnboardingView`/`#Preview`, dan aksesor tanpa argumen keyakinan).
+      # Dua kontrol negatif itu bukan hiasan: gerbang yang memerah pada kode
+      # yang benar akan dilonggarkan orang, dan gerbang yang dilonggarkan tidak
+      # menjaga apa pun.
+      - name: Buktikan gerbang penjaga identitas Aturan 34 berbunyi
+        run: python3 Tools/bukti-mutasi-penjaga-identitas.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

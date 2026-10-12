@@ -4389,6 +4389,169 @@ else
   echo "Bersih: bobot putusan GoTo datang dari putusannya."
 fi
 
+# ── Aturan 34: penjaga identitas harus menerima keyakinan engine ─────────────
+#
+# Model `PointingKit` punya beberapa aksesor yang **sengaja** menerima
+# `isConfirmed:` supaya bisa menolak mengklaim identitas saat engine ragu:
+#
+#     CelestialVisual.drawableStarColorIndex(_:isConfirmed:)   warna bintang
+#     DeepSkyCatalogue.drawableMorphology(forObjectID:isConfirmed:)  bentuk kabut
+#     Palette.drawable(isConfirmed:)                           palet planet
+#     spokenStarColor(isConfirmed:)                            suara warna
+#     spokenPhase(isConfirmed:)                                suara fase
+#     spokenDeepSkyMorphology(isConfirmed:)                    suara morfologi
+#
+# Parameternya ada, rumusnya benar, dan **masing-masing punya uji Swift**.
+# Yang tidak dijaga siapa pun adalah **nilai yang dikirim dari `Apps/`**:
+# seluruh berkas di `Apps/` berada di luar jangkauan `swift-test.sh` (Linux
+# hanya membangun `Packages/`), dan `Tools/check-visuals.py` merender **port
+# Python**-nya, bukan view Swift-nya. Jadi satu-satunya berkas yang bisa
+# salah adalah berkas yang tidak diperiksa kedua-duanya.
+#
+# **Cacat yang ditutup aturan ini, dan itu diukur bukan dikira-kira.**
+# `isConfirmed: isConfirmed` di `CelestialVisualView.swift` diganti
+# `isConfirmed: true` — satu kata, satu tempat, tepat di kawat yang memutuskan
+# apakah bentuk/bentuk/warna objek langit dalam boleh diklaim:
+#
+#     isConfirmed: true   ->  swift-ui-lint.sh  LULUS (exit 0)
+#                             swift-typecheck.sh LULUS (exit 0)
+#                             755 uji PointingKit hijau
+#
+# Artinya memaksa **klaim identitas** pada jalur objek langit dalam tidak
+# menghasilkan satu pun kegagalan, walaupun PRD menyebut larangan itu sebagai
+# aturan paling keras ("JANGAN salah identifikasi demi magic", "uncertainty >
+# false confidence"). Ini kelas cacat yang sama dengan Aturan 24 dan 31:
+# rumus benar, pengawat salah, dan pengawatnya tidak diperiksa apa pun.
+#
+# **Kenapa daftar aksesornya dibaca dari model, bukan ditulis di sini.**
+# Menyalin keenam nama ke dalam aturan ini membuat salinan kedua yang bisa
+# berbeda diam-diam dari model: aksesor ketujuh yang lahir besok akan lolos
+# hanya karena namanya tidak ada di daftar. Aturan ini mencari sendiri
+# deklarasi yang punya parameter `isConfirmed:` di `Packages/PointingKit`,
+# lalu menuntut setiap pemanggilannya di `Apps/` mengirim **sesuatu selain
+# literal `true`/`false`**.
+#
+# **Kenapa literalnya dilarang, bukan "harus `isConfirmed:`".** Ada pemakaian
+# literal yang sah dan tidak boleh memerah: `OnboardingView` memakai
+# `isConfirmed: true` pada `CelestialVisualView` (struktur view, bukan
+# aksesor model) untuk ilustrasi statis yang memang bukan hasil pengukuran,
+# dan `#Preview` complication memakai literal untuk data contoh. Keduanya
+# **bukan** pemanggilan aksesor model, jadi keduanya tidak masuk daftar.
+# Yang dilarang sempit: mengirim literal ke aksesor yang parameternya ada
+# justru supaya keyakinan bisa ditolak.
+echo
+echo "== Aturan 34: penjaga identitas menerima keyakinan engine, bukan literal =="
+penjaga_identitas=$(python3 - <<'PY' 2>&1
+import os, re
+
+PK = os.path.join("Packages", "PointingKit", "Sources", "PointingKit")
+if not os.path.isdir(PK):
+    print("Tidak bisa membaca %s -- aturan ini tidak bisa memutuskan." % PK)
+    raise SystemExit(0)
+
+# 1. Aksesor model yang menerima `isConfirmed:`.
+aksesor = set()
+for root, _, files in os.walk(PK):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        text = open(os.path.join(root, name), encoding="utf-8").read()
+        # Komentar dibuang dulu: beberapa berkas mendokumentasikan bentuk
+        # `isConfirmed:` sebagai contoh, dan contoh tidak boleh terbaca
+        # sebagai deklarasi.
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        datar = re.sub(r"\s+", " ", code)
+        for m in re.finditer(
+                r"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)", datar):
+            if re.search(r"\bisConfirmed\s*:", m.group(2)):
+                aksesor.add(m.group(1))
+
+if not aksesor:
+    print("Tidak ada aksesor model ber-`isConfirmed:` yang ditemukan; "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+
+def kode_saja(teks):
+    """Buang komentar dan isi string literal."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam_str, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam_str = False
+            else:
+                if ch == '"':
+                    dalam_str = True
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+            buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for fn in sorted(aksesor):
+            for m in re.finditer(re.escape(fn) + r"\s*\(", kode):
+                # Ambil daftar argumen dengan kurung berimbang: panggilan bisa
+                # membungkus beberapa baris, jadi mencari sampai `)` pertama
+                # akan memotong argumennya.
+                i, depth = m.end(), 1
+                mulai = i
+                while i < len(kode) and depth:
+                    if kode[i] == "(":
+                        depth += 1
+                    elif kode[i] == ")":
+                        depth -= 1
+                    i += 1
+                args = kode[mulai:i - 1]
+                if not re.search(r"\bisConfirmed\s*:", args):
+                    continue
+                diperiksa += 1
+                nilai = re.search(r"\bisConfirmed\s*:\s*([^,\)]+)", args)
+                if nilai and re.match(r"^\s*(true|false)\s*$", nilai.group(1)):
+                    baris = kode[:m.start()].count("\n") + 1
+                    masalah.append(
+                        "  %s:%d: `%s(isConfirmed: %s)` -- keyakinan engine "
+                        "diganti literal, jadi identitas diklaim saat ragu"
+                        % (path, baris, fn, nilai.group(1).strip()))
+
+if diperiksa == 0:
+    print("Tidak ada pemanggilan aksesor identitas di Apps/; aturan ini "
+          "tidak mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Salurkan `engine.confirmsDisplayedIdentity` (atau `isConfirmed` "
+          "yang sudah diturunkan darinya), bukan literal: `true` membuat "
+          "gambar lebih yakin daripada teksnya.")
+PY
+)
+if printf '%s' "$penjaga_identitas" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 34 gagal dijalankan:"
+  echo "$penjaga_identitas"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$penjaga_identitas" ]; then
+  echo "$penjaga_identitas"
+  status=1
+else
+  echo "Bersih: penjaga identitas menerima keyakinan engine."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

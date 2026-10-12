@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **33 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **34 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -255,6 +255,28 @@ tetap hijau selamanya. Karena itu aturan ini membaca **tiga** hal sekaligus:
 ikon datang dari putusannya, nada datang dari putusannya, dan nada itu
 benar-benar dipakai menggambar — tanpa yang ketiga, cacatnya bisa
 "diperbaiki" dengan menghitung nada lalu tetap menggambar warna tetap.
+
+Aturan 34 menutupnya sekali lagi, kali ini pada **argumen keyakinan**.
+`PointingKit` punya enam aksesor yang sengaja menerima `isConfirmed:` supaya
+bisa menolak mengklaim identitas saat engine ragu — warna bintang
+(`drawableStarColorIndex`), bentuk kabut (`drawableMorphology`), palet planet
+(`Palette.drawable`), dan ketiga jalur suaranya (`spokenStarColor`,
+`spokenPhase`, `spokenDeepSkyMorphology`). Rumusnya benar dan masing-masing
+punya uji Swift. Yang tidak diperiksa siapa pun adalah **nilai yang dikirim
+dari `Apps/`**: `swift-test.sh` hanya membangun `Packages/`, dan
+`check-visuals.py` merender **port Python**-nya, bukan view Swift-nya. Jadi
+berkas yang bisa salah justru berkas yang tidak dilihat kedua gerbang itu.
+Diukur sebelum aturan ini ada: `isConfirmed: isConfirmed` di
+`CelestialVisualView.swift` diganti `isConfirmed: true` — satu kata, di kawat
+yang memutuskan apakah bentuk objek langit dalam boleh diklaim — dan
+**lint lulus, typecheck lulus, 755 uji hijau**. Memaksa klaim identitas tidak
+menghasilkan satu pun kegagalan, walaupun PRD menyebut larangan itu sebagai
+aturan paling keras. Aturan 34 membaca daftar aksesornya **dari model**, bukan
+dari salinan di dalam skrip, lalu menuntut setiap pemanggilan di `Apps/`
+mengirim sesuatu selain literal `true`/`false` — sambil **sengaja tetap hijau**
+pada literal yang sah (`OnboardingView`, `#Preview`), karena gerbang yang
+memerah pada kode yang benar akan dilonggarkan orang, dan gerbang yang
+dilonggarkan tidak menjaga apa pun.
 
 ### Uji harus pernah merah
 
