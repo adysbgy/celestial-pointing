@@ -370,6 +370,23 @@ MIN_MORPHOLOGY_DIFF = 0.08
 #: yang jarang dan nebula yang padat diukur pada skala yang sama.
 COLOUR_SAMPLE_PIXELS = 300
 
+#: Margin dari tepi bola Saturnus, satuan radius frame, saat gerbang
+#: memutuskan sebuah piksel berada "di dalam bola".
+#:
+#: **Dua piksel, dan angkanya diukur.** Kode yang benar menghasilkan nol
+#: piksel di dalam bola pada margin 0, tetapi piksel terdekatnya duduk di
+#: 0.5277 R sementara bola berakhir di 0.5300 R — 2.3 milipixel radius, yaitu
+#: anti-aliasing di limb. Ambang yang menempel persis di tepi akan merah
+#: karena pembulatan, bukan karena cacatnya. Diukur pada 200 px: margin 0.005
+#: dan 0.01 sudah memberi nol, dan cacat urutan terbalik masih terbaca 1 585
+#: piksel di margin itu. Jadi margin ini tidak menyembunyikan apa pun.
+#:
+#: Pada kartu jam (76 px) margin yang sama juga memberi nol, tetapi dibutuhkan
+#: 0.02 di sana (9 piksel pada 0.005, 5 pada 0.01) — karena satu piksel kartu
+#: jam sama dengan 5.26 piksel panel. Angka 0.02 dipakai untuk **kedua**
+#: ukuran: satu ambang, bukan dua yang bisa menyimpang.
+SATURN_LIMB_ANTIALIAS_MARGIN = 0.02
+
 #: Jarak kanal minimum antar warna kabut. Dikalibrasi terhadap gambar yang
 #: ada sekarang: pasangan terdekat (galaxy vs openCluster, keduanya hampir
 #: putih) berjarak 0.115 dan setiap morfologi ≥ 0.188 dari kabut netral.
@@ -1542,6 +1559,54 @@ def check_night_accents_reach_the_view(results, view_source=None, night_source=N
         "aksen gambar: view tidak memakai nama di luar model", not unknown,
         f"{unknown} dipakai view tetapi tidak ada di NightVisual.Accents"
         if unknown else "semua nama yang dipakai view ada di model"))
+
+
+def check_saturn_ring_order_in_the_view(results, view_source=None):
+    """Urutan menggambar cincin di **view Swift**: belakang → bola → depan.
+
+    **Kenapa ini bukan duplikat gerbang pikselnya.**
+    `check_saturn_ring_passes_behind_the_globe` mengukur **port Python**.
+    Cincin digambar dua kali di repo ini — sekali di port, sekali di
+    `CelestialVisualView.drawRings` — dan hanya port yang punya PNG untuk
+    diukur. Jadi urutan di view bisa dibalik sementara setiap gerbang gambar
+    tetap hijau, sambil mengukur gambar yang tidak pernah tampil di jam.
+    Itu cacat yang sama persis dengan yang sudah nyata di repo ini pada
+    jalur cincin (`check_saturn_has_no_extra_disc` lahir untuk versi
+    portnya), dan sisi view-nya diikat di tabel `checks` karena itu.
+
+    **Yang diukur urutannya, bukan keberadaannya.** Tabel `checks` sudah
+    menuntut `back.fill(ringPath(` **ada** dan `front.fill(ringPath(` **ada**.
+    Keduanya tetap benar kalau paruh belakang dipindah ke bawah panggilan
+    `drawSphere` — dan justru itu cacatnya. Di sini ketiga penanda
+    dibandingkan **posisinya** di dalam tubuh `drawRings`, sehingga urutan
+    yang tertukar berbunyi walaupun setiap barisnya masih ada.
+
+    Batas yang jujur: yang diukur **urutan teks** di dalam fungsi itu, bukan
+    hasil render SwiftUI-nya. Yang bisa dibuktikan di Linux adalah bahwa
+    urutannya tertulis benar; bahwa perangkat menggambarnya begitu tetap
+    tugas gerbang port + CI macOS.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    body = _function_body(view, "private func drawRings(")
+    if not body:
+        results.append(Result(
+            "Saturnus: urutan cincin di view (belakang → bola → depan)", False,
+            "fungsi `drawRings` tidak ditemukan di CelestialVisualView.swift"))
+        return
+
+    back = body.find("back.fill(ringPath(")
+    sphere = body.find("drawSphere(context: context, center: center, radius: CGFloat(bodyRadius) * radius")
+    front = body.find("front.fill(ringPath(")
+    ok = -1 < back < sphere < front
+    detail = (f"posisi teks: paruh belakang {back}, bola {sphere}, "
+              f"paruh depan {front}")
+    if back < 0 or sphere < 0 or front < 0:
+        detail += " — salah satu penanda tidak ditemukan, jadi urutannya " \
+                  "tidak bisa dibandingkan dan pemeriksaan ini tidak " \
+                  "mengukur apa pun"
+    results.append(Result(
+        "Saturnus: urutan cincin di view (belakang → bola → depan)", ok, detail))
 
 
 def check_unknown_moon_disc_uses_the_token(results, view_source=None):
@@ -5593,6 +5658,430 @@ def check_saturn_has_no_extra_disc(results, size=200, ss=2):
         f"{lit_w} dari {samples_w} piksel menyala di luar cincin dan bola"
         + (f", pertama di ({first_w[0]:+.3f}, {first_w[1]:+.3f}) R"
            if first_w else "")))
+
+
+def saturn_back_half_pixels(size, ss, flip=False):
+    """Piksel yang berubah bila paruh BELAKANG cincin dimatikan.
+
+    Dikembalikan sebagai `(di_dalam_bola, di_luar_bola, contoh_di_dalam)`,
+    semua dihitung dalam satuan radius frame.
+
+    **Kenapa paruh belakang dimatikan, bukan cincinnya dipindah.** Yang ingin
+    diukur adalah **urutan menggambarnya**: paruh belakang harus tergambar
+    SEBELUM bola, sehingga bola menutupinya. Cara mengukurnya adalah
+    diferensial — matikan satu paruh, lihat piksel mana yang berubah. Kalau
+    urutannya benar, paruh belakang hanya mengubah piksel **di luar** bola
+    (di situlah ia satu-satunya yang menggambar). Kalau urutannya terbalik,
+    ia juga mengubah piksel **di dalam** bola, karena ia menimpa bola.
+
+    Paruh belakang dimatikan lewat `RING_BACK_HALF_OPACITY_SCALE = 0`, bukan
+    dengan mengganti fungsinya: skala itu adalah **jalur produksi** yang
+    mengatur seberapa pekat paruh belakang, jadi mengukurnya berarti mengukur
+    gambar yang benar-benar tampil.
+
+    **Kenapa `flip=True` ada di sini, padahal gerbangnya tidak memakainya.**
+    Harness mutasi (`bukti-mutasi-urutan-cincin.py`) memakai fungsi ini
+    dengan `flip=True` untuk membuktikan gerbangnya **bisa merah**, dan
+    memakai jalur ukur yang **sama persis** dengan yang dipakai gerbang.
+    Kalau harness menyampel dengan caranya sendiri, ia hanya membuktikan
+    komentarnya cocok dengan alat ukur yang berbeda — kelas cacat yang sudah
+    nyata di berkas ini (`crater_wall_contrast` lahir dengan alasan yang
+    sama).
+    """
+    original = R._draw_rings
+    if flip:
+        R._draw_rings = _saturn_rings_back_half_last
+    try:
+        _, (w, h, base) = render_case("planet-saturn-confirmed", size=size, ss=ss)
+        scale = R.RING_BACK_HALF_OPACITY_SCALE
+        R.RING_BACK_HALF_OPACITY_SCALE = 0.0
+        try:
+            _, (_, _, gone) = render_case("planet-saturn-confirmed",
+                                          size=size, ss=ss)
+        finally:
+            R.RING_BACK_HALF_OPACITY_SCALE = scale
+    finally:
+        R._draw_rings = original
+
+    body = saturn_globe_geometry()["body"]
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    inside = outside = 0
+    first = None
+    for y in range(h):
+        row = base[y]
+        for x in range(w):
+            i = x * 4
+            if row[i:i + 3] == gone[y][i:i + 3]:
+                continue
+            ux = (x + 0.5 - cx) / radius
+            uy = (y + 0.5 - cy) / radius
+            if math.hypot(ux, uy) <= body - SATURN_LIMB_ANTIALIAS_MARGIN:
+                inside += 1
+                if first is None:
+                    first = (round(ux, 3), round(uy, 3))
+            else:
+                outside += 1
+    return inside, outside, first
+
+
+def _saturn_rings_back_half_last(canvas, cx, cy, radius, palette, night_mode):
+    """`_draw_rings` dengan paruh **belakang** digambar paling akhir.
+
+    Bukan kode produksi dan tidak pernah menggambar apa pun kecuali saat
+    gerbang/harness memintanya: ia ada **hanya** untuk membuktikan gerbang
+    `check_saturn_ring_passes_behind_the_globe` bisa berbunyi. Yang dibalik
+    satu hal saja — urutannya — supaya keadaan merahnya adalah cacat yang
+    memang dimaksud, bukan gambar karangan yang salah dengan cara lain.
+
+    Perhatikan yang **tidak** berubah: geometri cincin, opasitas tiap pita,
+    skala paruh belakang, dan bola Saturnus. Jadi gerbangnya tidak bisa
+    hijau karena "gambarnya beda", dan tidak bisa merah karena hal lain.
+    """
+    ring = R.saturn_ring()
+    body_radius = R.saturn_body_radius(ring)
+    ring_color = R.ACCENTS["saturnRing"]
+    full_width = ring["half_width"] * radius
+    axial = ring["half_height"] / ring["half_width"]
+    bands = R.saturn_ring_bands()
+
+    def annulus(outer_r, inner_r, color, half):
+        orx, ory = outer_r, outer_r * axial
+        irx, iry = inner_r, inner_r * axial
+
+        def inside(x, y):
+            if half == "back" and y > cy:
+                return False
+            if half == "front" and y < cy:
+                return False
+            dx, dy = (x - cx) / orx, (y - cy) / ory
+            if dx * dx + dy * dy > 1.0:
+                return False
+            if inner_r <= 0:
+                return True
+            ix, iy = (x - cx) / irx, (y - cy) / iry
+            return ix * ix + iy * iy > 1.0
+        canvas.fill(inside, color)
+
+    # Paruh DEPAN lebih dulu (jadi paling bawah), lalu bola, lalu paruh
+    # BELAKANG di atasnya — kebalikan dari urutan produksi.
+    for inner_r, outer_r, opacity in bands:
+        annulus(outer_r * full_width, inner_r * full_width,
+                R.accent_fn(ring_color, night_mode, opacity), "front")
+    R._draw_sphere(canvas, cx, cy, body_radius * radius,
+                   palette["light"], palette["dark"], night_mode)
+    for inner_r, outer_r, opacity in bands:
+        annulus(outer_r * full_width, inner_r * full_width,
+                R.accent_fn(ring_color, night_mode,
+                            opacity * R.RING_BACK_HALF_OPACITY_SCALE), "back")
+
+
+def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
+    """Cincin Saturnus harus melintas **di belakang** bola, bukan di atasnya.
+
+    **Cacat yang ditutup pemeriksaan ini.** `_draw_rings` menggambar paruh
+    belakang cincin, lalu bola Saturnus, lalu paruh depan. Urutan itulah yang
+    membuat cincin terbaca sebagai cincin: paruh belakang yang jatuh di
+    belahan atas **terhalang bola** di bagian tengahnya, dan hanya menonjol
+    di kiri-kanan tempat ia keluar dari piringan. Terukur: **49,7%** titik
+    sampel paruh belakang jatuh di dalam proyeksi bola (24 064 dari 48 400,
+    kisi 220×220 pada paruh atas).
+
+    Kalau urutan itu dibalik — paruh belakang digambar sesudah bola — paruh
+    itu **menimpa** bola di belahan atas. Yang sampai ke layar jadi cincin
+    yang mengambang di muka planet, bukan yang melingkupinya. Diukur pada
+    200 px: **1 533 piksel di dalam bola** berubah saat paruh belakang
+    dimatikan, padahal kode yang benar menghasilkan **nol** (margin tepi 0,02 R;
+    lihat paragraf margin di bawah).
+
+    **Kenapa tidak ada gerbang lain yang menangkapnya.** Dua pemeriksaan
+    cincin yang ada menyampel **hanya di luar bola** — `saturn_ring_band_values`
+    membuang tiap cuplikan dengan `abs(xr) <= body + 0.02`, dengan alasan yang
+    benar di sana ("di dalam proyeksi bola yang terlihat adalah permukaan
+    planet, bukan cincin"). Justru karena pembuangan itu, keduanya buta pada
+    urutannya. Dibuktikan, bukan diklaim: seluruh **36** hasil enam
+    pemeriksaan Saturnus dijalankan ulang dengan urutan dibalik, dan **nol**
+    di antaranya berubah warna — termasuk `check_saturn_has_no_extra_disc`
+    yang justru mengukur "tidak ada yang menyala di luar cincin dan bola".
+    Piringan bocor yang ditutupnya adalah bentuk yang **menonjol keluar**;
+    bentuk ini **menutupi ke dalam**, dan di situ tidak ada yang mengukur.
+
+    **Kenapa dua arah, dan kenapa yang kedua yang paling penting.** Arah
+    pertama menuntut nol piksel di dalam bola. Tanpa arah kedua, cara
+    termurah memenuhinya adalah **berhenti menggambar paruh belakang sama
+    sekali** — dan itu memang salah: paruh belakang yang sah terukur
+    **1 948 piksel** di luar bola pada 200 px. Jadi pasangan ini memisahkan
+    "terhalang" dari "tidak ada", persis pola `check_phase_feature_stays_inside_the_lit_band`
+    dan pasangannya.
+
+    **Margin 2 piksel dari tepi bola.** Pemeriksaan ini menuntut **nol**
+    piksel paruh belakang di dalam bola (di bawah `margin`). Diukur pada
+    `ss=2`:
+
+        ukuran    margin 0    cacat (margin 0,02)
+        200 px    14          1533
+        76 px     6           232
+
+    Tanpa margin, kode yang benar **tetap** menghasilkan piksel di dalam —
+    dan seluruhnya duduk **tepat di tepi** bola (jarak terjauh 0,5300 R pada
+    200 px, 0,5266 R pada 76 px, sementara bola berakhir di 0,53 R). Itu
+    anti-aliasing di limb, bukan oklusi: piksel itu menyala karena paruh
+    belakang dan bola berbagi tepian yang sama, bukan karena cincin menimpa
+    bola. `SATURN_LIMB_ANTIALIAS_MARGIN = 0,02` membuangnya. Jadi margin ini
+    **memang** menyembunyikan sesuatu, dan alasan keberadaannya ada di situ:
+    tanpa dia gerbang merah pada gambar yang benar. Ambang yang lebih kecil
+    juga cukup (0,003 pada 200 px, 0,0075 pada 76 px), tetapi satu ambang
+    untuk kedua ukuran lebih sulit menyimpang daripada dua.
+
+    **Ukurannya dua, bukan satu.** Sama alasannya dengan
+    `check_saturn_gap_reads_at_the_watch_size`: bentuk yang lenyap di 38 pt
+    tetap hijau di 200 px. Ukuran jamnya dibaca dari token
+    (`WatchMetrics.visualDiameter`), dan kalau tokennya hilang pemeriksaan
+    ini **merah**, bukan hijau tanpa mengukur apa pun.
+    """
+    inside, outside, first = saturn_back_half_pixels(size, ss)
+    results.append(Result(
+        f"Saturnus: cincin lewat di belakang bola @{size}px",
+        inside == 0 and outside > 0,
+        f"{inside} piksel paruh belakang berubah di dalam bola"
+        + (f" (pertama di ({first[0]:+.3f}, {first[1]:+.3f}) R)" if first else "")
+        + f", {outside} di luar bola"
+        + ("" if outside else " — paruh belakang tidak menggambar apa pun, "
+           "jadi gerbang ini tidak mengukur oklusi melainkan ketiadaan")))
+
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "Saturnus: ukuran jam terbaca dari token (urutan cincin)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2          # poin → piksel; jam menggambar @2x
+    inside_w, outside_w, first_w = saturn_back_half_pixels(pixels, ss)
+    results.append(Result(
+        f"Saturnus: cincin lewat di belakang bola @{pixels}px (ukuran jam)",
+        inside_w == 0 and outside_w > 0,
+        f"{inside_w} piksel paruh belakang berubah di dalam bola"
+        + (f" (pertama di ({first_w[0]:+.3f}, {first_w[1]:+.3f}) R)"
+           if first_w else "")
+        + f", {outside_w} di luar bola"))
+
+
+def saturn_back_half_inside_at_margin(margin, size=200, ss=2, flip=False):
+    """Piksel paruh belakang di dalam bola pada **margin yang diminta**.
+
+    `saturn_back_half_pixels` memakai ambang modulnya; docstring gerbang
+    mengutip bagaimana hitungannya **berubah terhadap margin**, dan tidak
+    ada cara mengukurnya lewat ambang yang sudah terkunci. Fungsi ini
+    mengulang penyampelnya persis — render, matikan paruh belakang lewat
+    `RING_BACK_HALF_OPACITY_SCALE = 0`, bandingkan — dan hanya marginnya yang
+    menjadi argumen.
+    """
+    original = R._draw_rings
+    if flip:
+        R._draw_rings = _saturn_rings_back_half_last
+    try:
+        _, (w, h, base) = render_case("planet-saturn-confirmed", size=size, ss=ss)
+        scale = R.RING_BACK_HALF_OPACITY_SCALE
+        R.RING_BACK_HALF_OPACITY_SCALE = 0.0
+        try:
+            _, (_, _, gone) = render_case("planet-saturn-confirmed",
+                                          size=size, ss=ss)
+        finally:
+            R.RING_BACK_HALF_OPACITY_SCALE = scale
+    finally:
+        R._draw_rings = original
+
+    body = saturn_globe_geometry()["body"]
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    inside = 0
+    farthest = None
+    for y in range(h):
+        row = base[y]
+        for x in range(w):
+            i = x * 4
+            if row[i:i + 3] == gone[y][i:i + 3]:
+                continue
+            ux = (x + 0.5 - cx) / radius
+            uy = (y + 0.5 - cy) / radius
+            distance = math.hypot(ux, uy)
+            if distance <= body - margin:
+                inside += 1
+                if farthest is None or distance > farthest:
+                    farthest = distance
+    return inside, farthest
+
+
+def check_saturn_ring_order_docstring_quotes_measured_values(results):
+    """Angka di docstring gerbang urutan cincin harus keluar dari ukurannya.
+
+    **Cacat yang ditutup, dan kenapa ia layak jadi gerbang tersendiri.**
+    Gerbang `check_saturn_ring_passes_behind_the_globe` lahir dengan lima
+    angka di docstringnya, dan **empat di antaranya tidak pernah dihasilkan
+    oleh alat ukur di bawahnya**. Diukur ulang pada siklus yang sama:
+
+        49,7% (24 064 dari 48 400)     dikutip: 50% (110 dari 220)
+        36 hasil tetangga              dikutip: 35
+        margin 0 -> 14 px @200 / 6 @76 dikutip: "nol piksel"
+        cacat @76px -> 232 px          dikutip: 245 px
+
+    Yang paling merusak bukan selisihnya, melainkan **arahnya** pada margin.
+    Kalimat aslinya berbunyi bahwa kode yang benar memberi nol piksel di
+    dalam bola pada `margin 0` dan karena itu margin itu tidak menyembunyikan
+    apa pun. Kebalikannya yang benar: pada `margin 0` kode yang benar memberi
+    **14** piksel (200 px) dan **6** (76 px), dan margin 0,02-lah yang
+    membuatnya nol. Jadi margin itu **memang** menyembunyikan sesuatu — anti-
+    aliasing di limb — dan alasan keberadaannya justru ada di situ. Kalimat
+    yang salah itu membuat pembaca menyimpulkan ambangnya aman-saja, padahal
+    tanpa ambang itu gerbangnya merah pada gambar yang benar.
+
+    Ini kelas cacat yang sudah tiga kali nyata di berkas ini
+    (`check_crater_contrast_numbers_come_from_the_sampler`,
+    `check_spiral_core_docstring_quotes_measured_values`,
+    `check_spiral_arm_docstring_quotes_measured_values`): **komentar mengutip
+    angka yang tidak pernah ia ukur**, padahal komentar itu satu-satunya
+    bukti yang dibaca orang saat menilai apakah ambangnya layak dipercaya.
+
+    **Kenapa diukur ulang, bukan dibandingkan dengan konstanta.** Keempat
+    angka ini adalah **hasil**, bukan parameter: tidak ada `SATURN_*_PIXELS`
+    untuk dibandingkan, karena nilainya turun dari geometri cincin, dari
+    rasterisasi, dan dari berapa banyak pemeriksaan tetangga yang ada.
+    Menuliskannya sebagai konstanta hanya memindahkan cacatnya — angka yang
+    dikutip lalu cocok dengan konstanta yang sama-sama salah.
+
+    **Batas yang dinyatakan.** Yang diikat adalah **jumlah hasil tetangga**,
+    **persentase geometri**, dan **kedua baris tabel margin** pada 200 px dan
+    76 px (`ss=2`). Persentase diukur pada kisi 220×220 atas paruh atas.
+    Angka di ukuran atau `ss` lain tidak diklaim.
+
+    **Kenapa gerbang ini tidak bisa hijau tanpa mengukur.** Keempat angka
+    dibandingkan terhadap hitungan yang **dihitung ulang saat itu juga** —
+    bukan terhadap konstanta, dan bukan terhadap dirinya sendiri. Masing-
+    masing punya keadaan gagal yang berbeda: salah ketik persentase, salah
+    hitung jumlah tetangga, dan salah kutip salah satu dari empat sel tabel.
+    """
+    doc = check_saturn_ring_passes_behind_the_globe.__doc__ or ""
+
+    def quoted_int(pattern):
+        match = re.search(pattern, doc)
+        return int(match.group(1).replace(" ", "").replace(" ", "")) if match else None
+
+    # 1. Hasil tetangga: dihitung dari enam pemeriksaan, bukan dikutip.
+    neighbours = []
+    check_saturn_ring_bands_render(neighbours, 200, 2)
+    check_saturn_gap_reads_at_the_watch_size(neighbours)
+    check_saturn_has_no_extra_disc(neighbours, 200, 2)
+    check_planet_features_present(neighbours, 200, 2)
+    check_features_survive_the_watch_size(neighbours)
+    check_features_disappear_when_uncertain(neighbours, 200, 2)
+    counted = len(neighbours)
+    claimed = quoted_int(r"\*{2}(\d+)\*{2} hasil enam")
+    results.append(Result(
+        "Saturnus: docstring urutan cincin mengutip jumlah hasil tetangga",
+        claimed == counted,
+        f"terhitung {counted} hasil dari enam pemeriksaan"
+        + ("" if claimed == counted else
+           f"; docstring mengutip {claimed} — angka yang tidak pernah diukur")))
+
+    # 2. Persentase geometri: titik sampel paruh belakang di dalam bola.
+    fraction = saturn_back_half_inside_fraction()
+    claimed_pct = re.search(r"\*{2}([\d,]+)%\*{2} titik", doc)
+    want = round(fraction * 100, 1)
+    got = (float(claimed_pct.group(1).replace(",", ".")) if claimed_pct else None)
+    results.append(Result(
+        "Saturnus: docstring urutan cincin mengutip persentase geometri",
+        got is not None and abs(got - want) <= 0.1,
+        f"kisi 220x220 atas paruh atas → {want}%"
+        + ("" if got is not None and abs(got - want) <= 0.1 else
+           f"; docstring mengutip {got}%")))
+
+    # 3 & 4. Tabel margin: kolom `margin 0` dan kolom `cacat`, dua ukuran.
+    # Dibaca dari tabel, bukan dari prosa: kalimatnya bisa disusun ulang
+    # tanpa mengubah angkanya, dan pembaca yang mencari frasa akan merah
+    # pada penulisan yang benar.
+    table = saturn_margin_doc_rows(doc)
+    if len(table) < 2:
+        results.append(Result(
+            "Saturnus: docstring urutan cincin memuat tabel margin",
+            False,
+            f"{len(table)} baris terbaca dari tabel docstring — butuh 2 "
+            "(200 px dan 76 px)"))
+        return
+
+    for label, size in (("200 px", 200), ("76 px", 76)):
+        quoted = table.get(label)
+        if quoted is None:
+            results.append(Result(
+                f"Saturnus: tabel margin memuat baris {label}", False,
+                f"baris '{label}' tidak terbaca; yang ada: {sorted(table)}"))
+            continue
+        healthy, _ = saturn_back_half_inside_at_margin(0.0, size, 2)
+        broken, _ = saturn_back_half_inside_at_margin(
+            SATURN_LIMB_ANTIALIAS_MARGIN, size, 2, flip=True)
+        want_healthy, want_broken = quoted
+        ok = healthy == want_healthy and broken == want_broken
+        results.append(Result(
+            f"Saturnus: tabel margin '{label}' cocok dengan ukurannya", ok,
+            f"terukur: margin 0 → {healthy}, cacat → {broken}; "
+            f"docstring: {want_healthy} / {want_broken} (ss=2)"
+            + ("" if ok else " — angka yang tidak pernah diukur")))
+
+    results.append(Result(
+        "Saturnus: cacatnya terbaca pada kedua ukuran",
+        all(v[1] > 0 for v in table.values()),
+        "; ".join(f"{label}: cacat {v[1]} piksel" for label, v in sorted(table.items()))))
+
+
+def saturn_margin_doc_rows(doc):
+    """Baris tabel margin dari docstring → `{label: (margin 0, cacat)}`.
+
+    Tabelnya berbentuk (labelnya dua token, jadi baris datanya empat kolom):
+
+        ukuran      margin-0   cacat-margin-0,02
+        200-px      14         1533
+        76-px       6          232
+
+    **Kenapa labelnya ukuran, bukan kata.** Baris header dilewati lewat
+    kolom pertama yang bukan angka-ukuran, sehingga penyusunan ulang baris
+    tidak mengubah hasil bacanya. Kalau pembacanya mencari "200 px" sebagai
+    posisi tetap, menambah satu ukuran ketiga akan mengubah maknanya.
+    """
+    rows = {}
+    for line in doc.splitlines():
+        columns = line.split()
+        # Labelnya dua token ("200 px"), jadi baris datanya empat kolom;
+        # baris header dilewati karena kolom pertamanya bukan angka.
+        if len(columns) != 4 or not columns[0][0].isdigit():
+            continue
+        try:
+            rows[columns[0] + " " + columns[1]] = (int(columns[2]),
+                                                   int(columns[3]))
+        except ValueError:
+            continue
+    return rows
+
+
+def saturn_back_half_inside_fraction(samples=220):
+    """Fraksi titik paruh belakang cincin yang jatuh di dalam proyeksi bola.
+
+    Kisi seragam `samples x samples` atas **paruh atas** (belahan `y >= 0`),
+    bukan sampel acak: angkanya harus bisa diulang oleh siapa pun dari
+    geometri yang sama. Satuannya radius frame, sama dengan
+    `saturn_globe_geometry()`.
+    """
+    ring = R.saturn_ring()
+    body = R.saturn_body_radius(ring)
+    axial = ring["half_height"] / ring["half_width"]
+    half_width = ring["half_width"]
+    inside = total = 0
+    for i in range(samples):
+        x = -half_width + 2 * half_width * (i + 0.5) / samples
+        for j in range(samples):
+            y = axial * (j + 0.5) / samples
+            total += 1
+            if math.hypot(x, y) <= body:
+                inside += 1
+    return inside / total
 
 
 def spiral_arm_radii_all():
@@ -10477,6 +10966,8 @@ def main():
     check_saturn_ring_bands_render(results, args.size, args.ss)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)
+    check_saturn_ring_passes_behind_the_globe(results, args.size, args.ss)
+    check_saturn_ring_order_docstring_quotes_measured_values(results)
     check_spiral_arms_stay_continuous(results)
     check_spiral_arms_actually_spiral(results)
     check_planetary_nebula_shell_is_continuous(results)
@@ -10497,6 +10988,7 @@ def main():
     check_crater_contrast_numbers_come_from_the_sampler(results)
     check_crater_rim_opacity_is_not_clamped(results)
     check_unknown_moon_disc_uses_the_token(results)
+    check_saturn_ring_order_in_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)

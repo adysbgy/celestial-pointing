@@ -455,6 +455,29 @@ jobs:
       - name: Buktikan gerbang piringan kedua Saturnus berbunyi
         run: python3 Tools/bukti-mutasi-piringan.py
 
+      # Dan bukti untuk gerbang **urutan cincin Saturnus** — paruh belakang
+      # harus tergambar sebelum bola, sehingga bola menutupinya.
+      #
+      # Kelas cacatnya adalah kebalikan dari piringan kedua di atas: yang itu
+      # **menonjol keluar**, yang ini **menutupi ke dalam**. Dua pemeriksaan
+      # cincin yang sudah ada menyampel hanya di luar bola
+      # (`saturn_ring_band_values` membuang `abs(xr) <= body + 0.02`), jadi
+      # keduanya buta pada urutannya. Terukur: seluruh enam pemeriksaan
+      # Saturnus dijalankan ulang dengan urutan dibalik, dan **nol** di
+      # antaranya berubah warna — sementara gerbang baru merah di 1 533
+      # piksel di dalam bola (@200px) dan 232 (@76px, ukuran kartu jam).
+      #
+      # Keadaan #2 adalah arah sebaliknya, dan justru yang paling penting:
+      # tanpa gerbang pasangannya, cara termurah memenuhi "nol piksel di dalam
+      # bola" adalah berhenti menggambar paruh belakang sama sekali. Ia harus
+      # menyalakan **hanya** gerbang urutan, bukan gerbang tetangganya.
+      #
+      # Keadaan #3 membuktikan sisi **view** diperiksa, bukan cuma diklaim:
+      # piksel port tidak berubah di sana (gerbang gambar mengukur port), jadi
+      # hanya pemeriksaan urutan teks yang bisa melihatnya.
+      - name: Buktikan gerbang urutan cincin Saturnus berbunyi
+        run: python3 Tools/bukti-mutasi-urutan-cincin.py
+
       # Dan bukti untuk gerbang **ciri planet berfase tidak bocor ke sisi
       # gelap** — akibat dari pemotongan yang tidak diukur siapa pun.
       #
