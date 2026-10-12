@@ -1,3 +1,76 @@
+## Progres terakhir (12 Okt 2026 — kabel `config.smootherBlend` → perata akhirnya digerbang: bobot yang benar tapi tak pernah diuji mengalir)
+
+### Cacatnya: bobot perata dikirim lewat satu baris yang tidak pernah diuji
+
+`PointingController.swift:228` merakit perata arah dari config:
+
+```swift
+self.smoother = PointingSmoother(blendFactor: config.smootherBlend)
+```
+
+Sebelum siklus ini, **nol** uji yang pernah memberi `smootherBlend` —
+`Tools/sweep-unconsumed.sh` melaporkannya `app=0 test=0`. Artinya kalau
+argumen itu dilepas menjadi `PointingSmoother()` (nilai baku `0.3`), **semua
+uji tetap hijau**: `SensingTests` memang sudah menguji *perilaku* perata
+(sampel pertama jadi rujukan, blend 1.0 mengikuti tepat, klem `blendFactor`
+ke `[0,1]`), tapi tidak ada satu pun yang menuntut controller **memberi**
+bobot yang diminta. Perata mampu meredam dengan benar — ia hanya tidak pernah
+diberi angkanya. Aplikasi lalu memakai bobot baku selamanya, dan tidak ada
+layar yang menampilkan bobot itu, jadi penyimpangannya tak terlihat.
+
+Ini kelas cacat yang persis dicari repo ini: **bagian-bagiannya benar,
+kabelnya tidak teruji.**
+
+### Kenapa tidak cukup menguji nilainya
+
+Godaan yang salah adalah menambah uji `PointingControllerConfig().smootherBlend
+== 0.3`. Itu menguji **struct config**, bukan kabelnya: kabel bisa putus dan
+uji itu tetap hijau. Yang dituntut di sini adalah **akibat yang terlihat dari
+luar**: `smoother` adalah `private`, jadi satu-satunya tempat bobotnya tampak
+adalah arah tunjuk yang sampai ke `snapshot.rawPointing` — dan itu pula yang
+dipakai UI dan direkam Experiment 1.
+
+### Perbaikannya: dua uji, dua kelas cacat berbeda
+
+Ditambah di `PointingControllerTests.swift` (paket `PointingKit`):
+
+- `testSmootherBlendFromConfigReachesThePointing` — **penjaga kabel**. Dua
+  controller dengan bobot yang sengaja dijauhkan (`1.0` dan `0.05`) diberi
+  dua sampel berurutan, lalu dibandingkan *jarak tempuh* menuju sampel kedua.
+  `blend = 1.0` harus mendarat tepat di sasaran (nlerp `t = 1`); `blend = 0.05`
+  harus nyaris tidak bergerak; dan selisih keduanya harus besar. Kalau kabelnya
+  putus, kedua controller memakai bobot baku yang sama dan menempuh jarak yang
+  **identik** — ketiga tuntutan gagal bersama.
+- `testDefaultSmootherBlendStaysTheDocumentedValue` — **penjaga nilai**.
+  Pelengkap, bukan pengganti: uji pertama membuktikan bobot *mengalir*, ini
+  mengunci *angka yang mengalir* bila tak ada yang mengaturnya.
+
+### Yang diukur, bukan dikira-kira
+
+- `./swift-test.sh` → **CelestialEngine 212 + PointingKit 751 hijau**, 0 gagal
+  (749 dasar + 2 baru).
+- **Mutasi (wajib, biar tidak jadi uji hijau palsu)**: ganti
+  `PointingSmoother(blendFactor: config.smootherBlend)` menjadi
+  `PointingSmoother()` → `testSmootherBlendFromConfigReachesThePointing` MERAH
+  di ketiga tuntutan, dengan angka yang membuktikan sebabnya: kedua bobot
+  menempuh **5.979572288402764°** — sama persis, karena keduanya kini memakai
+  bobot baku. Kembalikan sumber → hijau.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (32 aturan). Aturan 10
+  (paritas hitungan README) sempat GAGAL dengan `README bilang PointingKit 749,
+  berkas uji berisi 751` — gerbang itu bekerja; README diselaraskan ke 751.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan perilaku perata: kabelnya memang sudah benar, dan
+  aplikasi tidak berubah kelakukannya setelah siklus ini. Yang berubah adalah
+  kabel itu kini tidak bisa putus tanpa ada uji yang merah.
+- Uji ini **tidak** memilih bobot yang paling baik untuk pergelangan manusia.
+  `0.3` dan `0.05`/`1.0` di sini dipakai semata sebagai dua keadaan yang cukup
+  berjauhan untuk dibedakan; nilai yang tepat adalah pertanyaan Experiment 1
+  yang perlu data perangkat nyata, bukan tebakan.
+
+---
+
 ## Progres terakhir (12 Okt 2026 — Aturan 32: penanda "engine ragu" benar-benar digambar, bukan cuma ada)
 
 Siklus ini dimulai dari **audit jujur atas brief** yang ternyata sudah usang:

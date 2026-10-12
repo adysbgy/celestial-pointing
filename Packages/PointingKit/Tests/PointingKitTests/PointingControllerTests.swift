@@ -827,6 +827,95 @@ final class PointingControllerTests: XCTestCase {
                        "ambang harus ikut kebijakan yang berlaku, bukan nilai yang dibekukan")
     }
 
+    // MARK: - Perataan: bobot config benar-benar sampai ke smoother
+
+    /// `config.smootherBlend` harus benar-benar menjadi bobot perata yang
+    /// dipakai controller — bukan sekadar tersimpan di struct-nya.
+    ///
+    /// **Cacat yang ditutup uji ini.** Satu-satunya kabelnya ada di
+    /// `PointingController.swift:228`:
+    /// `self.smoother = PointingSmoother(blendFactor: config.smootherBlend)`.
+    /// Sebelum uji ini ada, **nol** uji yang pernah memberi `smootherBlend` —
+    /// `sweep-unconsumed.sh` melaporkannya `app=0 test=0`. Jadi kalau argumen
+    /// itu dilepas (smoother dibuat dengan nilai baku `0.3`), seluruh
+    /// `SensingTests` tetap hijau: perataan *bisa* meredam dengan benar, ia
+    /// hanya tidak pernah diberi bobot yang diminta. Aplikasi lalu memakai
+    /// bobot baku selamanya, dan tidak ada layar yang menampilkannya — kelas
+    /// cacat "bagian benar, kabelnya tidak teruji" yang persis dicari repo ini.
+    ///
+    /// **Kenapa uji ini tidak vacuous.** Yang dibandingkan adalah *jarak
+    /// tempuh* perata menuju sampel kedua, di dua controller yang bobotnya
+    /// sengaja dijauhkan:
+    ///
+    /// - `blend = 1.0` → nlerp memakai `t = 1`, hasilnya **tepat** sampel baru.
+    /// - `blend = 0.05` → `t = 0.05`, hasilnya masih **dekat** sampel pertama.
+    ///
+    /// Kalau kabelnya putus, kedua controller memakai bobot baku yang sama dan
+    /// menempuh jarak yang **sama** — kedua tuntutan di bawah gagal bersama.
+    /// Jadi uji ini baru hijau kalau bobotnya benar-benar dibedakan, bukan
+    /// kalau perataan sekadar berjalan.
+    ///
+    /// **Kenapa lewat `rawPointing`, bukan lewat bidang perata itu sendiri.**
+    /// Perata adalah `private`; satu-satunya tempat bobotnya terlihat dari
+    /// luar adalah arah tunjuk yang sampai ke cuplikan — dan itu juga yang
+    /// benar-benar dipakai UI dan direkam Experiment 1. Menguji lewat jalur
+    /// itulah yang membuat kabel ini, bukan sekadar nilainya, terjaga.
+    func testSmootherBlendFromConfigReachesThePointing() {
+        let resolver = singleStarResolver()
+        let base = siriusDirection(resolver)
+        // Dua arah yang cukup berjauhan supaya 5% dan 100% perjalanan jelas
+        // beda, tapi tidak nyaris 180° (yang akan membuat busur pendeknya
+        // ambigu).
+        let first = HorizontalCoord(altitudeDeg: base.altitudeDeg,
+                                    azimuthDeg: base.azimuthDeg)
+        let second = HorizontalCoord(altitudeDeg: base.altitudeDeg + 20,
+                                     azimuthDeg: base.azimuthDeg)
+
+        let firstQuaternion = quaternion(viewPointingAt: first)
+        let secondQuaternion = quaternion(viewPointingAt: second)
+
+        // Sampel pertama selalu jadi rujukan (smoother.update mengembalikan
+        // nil tanpa acuan), jadi jarak tempuh hanya bisa diukur di sampel dua.
+        func travelled(blend: Double) -> Double? {
+            let c = PointingController(
+                resolver: resolver,
+                observer: observer,
+                config: PointingControllerConfig(coneDeg: 5.0, smootherBlend: blend))
+            c.feed(quaternion: firstQuaternion, timestamp: at(0))
+            c.feed(quaternion: secondQuaternion, timestamp: at(0.1))
+            guard let pointing = c.snapshot.rawPointing else { return nil }
+            return abs(pointing.altitudeDeg - first.altitudeDeg)
+        }
+
+        let full = travelled(blend: 1.0)
+        let barely = travelled(blend: 0.05)
+
+        guard let full, let barely else {
+            return XCTFail("arah tunjuk kosong: perata tidak menghasilkan arah sama sekali")
+        }
+
+        // 1.0 = "ikut sampel baru sepenuhnya": harus mendarat di 20°.
+        XCTAssertEqual(full, 20.0, accuracy: 0.5,
+                       "blend 1.0 harus membuat arah tunjuk tiba di sampel baru")
+        // 0.05 = "hampir tidak bergerak": harus jauh di belakang.
+        XCTAssertLessThan(barely, full * 0.5,
+                          "blend 0.05 seharusnya nyaris tidak mengejar sampel baru")
+        // Dan keduanya benar-benar berbeda — ini yang menuntut kabelnya hidup.
+        XCTAssertGreaterThan(full - barely, 5.0,
+                             "dua bobot berbeda menghasilkan arah yang sama: config.smootherBlend tidak sampai ke perata")
+    }
+
+    /// Nilai baku `smootherBlend` harus tetap yang baku.
+    ///
+    /// Penjaga nilai, pelengkap uji kabel di atas: uji itu membuktikan bobot
+    /// **mengalir**, ini mengunci **angka yang mengalir** kalau tidak ada yang
+    /// mengaturnya. Tanpa ini, mengubah bawaan jadi 1.0 (perataan mati, arah
+    /// bergetar penuh) tidak akan terlihat oleh uji mana pun.
+    func testDefaultSmootherBlendStaysTheDocumentedValue() {
+        XCTAssertEqual(PointingControllerConfig().smootherBlend, 0.3, accuracy: 1e-9,
+                       "bobot perata baku berubah; periksa uji yang memakainya")
+    }
+
     // MARK: - Bantu
 
     /// Beri sampel sampai controller terkunci (atau gagal, yang akan membuat
