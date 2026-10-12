@@ -1,4 +1,73 @@
-## Progres terakhir (12 Okt 2026 — kabel `config.smootherBlend` → perata akhirnya digerbang: bobot yang benar tapi tak pernah diuji mengalir)
+## Progres terakhir (12 Okt 2026 — `relativeSize` & `colorIndexBV` dihitung lalu diuji di tempat yang salah: dua medan yang dibaca view, nol uji pada pengikatannya)
+
+### Cacatnya: rumusnya teruji, pengikatannya tidak
+
+`CelestialVisualView.swift` membaca dua medan model secara langsung:
+`visual.relativeSize` (baris 1002, untuk besar glow bintang) dan
+`visual.colorIndexBV` (baris 1103, untuk warna spektral). Keduanya **diisi**
+oleh `CelestialVisual.init(object:)` dari magnitudo dan tabel warna katalog.
+
+Tapi semua uji yang ada memanggil **fungsinya** langsung —
+`sizeFromMagnitude(-1.46)`, `colorIndex(forStarID:)` — atau membangun
+`CelestialVisual` dengan `relativeSize:` yang ditulis tangan. Akibatnya kalau
+`init(object:)` berhenti mengisi kedua medan itu (nilai bawaan `0.5` dan
+`0.0`), **seluruh bintang digambar sama besar dan putih netral, dan tidak ada
+satu pun uji yang merah.** Rumusnya tetap benar dan tetap teruji; yang rusak
+adalah kabel dari rumus ke medan yang benar-benar dibaca view.
+
+Persis kelas "dihitung lalu dibuang" yang dicari `sweep-unconsumed.sh` — hanya
+kali ini sapuannya tidak menangkapnya, karena medan ini `app>0` (terlihat
+terpakai): yang kosong bukan pemakaiannya, melainkan **ujinya**.
+
+### Kenapa ini lebih dari sekadar hiasan
+
+Besar glow hanya soal rasa, tapi warna spektral adalah **ciri pengenal** —
+merah Betelgeuse dan biru Rigel sama meyakinkannya dengan cincin Saturnus.
+Kehilangan ciri justru **lebih** menyesatkan daripada tidak punya warna:
+tidak ada teks di layar yang mengatakan warnanya tidak diklaim, jadi
+ketiadaannya terbaca sebagai "bintang biasa", bukan "warna tidak diketahui".
+
+### Perbaikannya: dua uji yang menahan **pengikatannya**
+
+Ditambah di `CelestialVisualTests.swift`:
+
+- `testStarRelativeSizeIsBoundFromMagnitudeNotLeftAtDefault` — Sirius vs
+  Deneb, masing-masing harus jatuh di sisi yang **berlawanan** dari nilai
+  bawaan 0.5. Dua sisi itu sengaja: kalau uji hanya menuntut
+  `sirius > deneb`, medan yang tidak pernah diisi pun (0.5 vs 0.5) akan
+  gagal, tapi uji yang hanya menuntut `> 0.5` untuk Sirius akan lolos untuk
+  medan yang dibekukan di 0.7.
+- `testStarColorIndexIsBoundFromCatalogueNotLeftAtNeutral` — Betelgeuse harus
+  `> 1.0`, Rigel `< 0.0`, dan keduanya tidak boleh sama.
+
+**Mutasi (wajib, biar tidak jadi uji hijau palsu)** — keduanya diuji merah:
+- hapus `relativeSize:` dari cabang `.star` → 3 tuntutan MERAH dengan angka
+  `0.5 vs 0.5`.
+- hapus `colorIndexBV:` dari cabang `.star` → 3 tuntutan MERAH (`0.0` vs `0.0`),
+  **ditambah** 2 uji lama (`testCatalogStarsGetConsistentSpokenColor`,
+  `testSpokenStarColourIsSilentWhenUncertain`) ikut merah.
+
+Sumber dikembalikan → hijau.
+
+### Yang diukur, bukan dikira-kira
+
+- `./swift-test.sh` → **CelestialEngine 212 + PointingKit 753 hijau**, 0 gagal
+  (751 + 2 baru).
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (32 aturan). Aturan 10
+  (paritas hitungan README) sempat GAGAL dengan `README bilang PointingKit
+  751, berkas uji berisi 753` — gerbang itu bekerja lagi; README diselaraskan
+  ke 753.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan rumus: `sizeFromMagnitude` dan `colorIndex` memang
+  sudah benar dan sudah teruji sebelumnya. Yang ditambah hanya pengikatannya.
+- Belum menyentuh `hasPulse` atau medan lain yang mungkin punya cacat kelas
+  yang sama — cuma dua medan ini yang diverifikasi punya nol uji pengikatan.
+
+---
+
+## Sebelumnya (12 Okt 2026 — kabel `config.smootherBlend` → perata akhirnya digerbang: bobot yang benar tapi tak pernah diuji mengalir)
 
 ### Cacatnya: bobot perata dikirim lewat satu baris yang tidak pernah diuji
 

@@ -886,6 +886,65 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertLessThanOrEqual(CelestialVisual.sizeFromMagnitude(-30), 1.0)
     }
 
+    // MARK: - Pengikatan medan yang dibaca view
+
+    /// **Regresi: `relativeSize` dihitung, lalu diuji di tempat yang salah.**
+    ///
+    /// View membaca `visual.relativeSize` untuk mengatur besar glow bintang
+    /// (`VisualFrame.star(relativeSize:)`). Tapi seluruh uji ukuran di atas
+    /// memanggil `sizeFromMagnitude` **langsung**, atau membangun
+    /// `CelestialVisual` dengan `relativeSize:` yang ditulis tangan. Akibatnya
+    /// kalau `init(object:)` berhenti menurunkan medan ini dari magnitudo —
+    /// misalnya tertinggal di nilai bawaan 0.5 — **setiap bintang digambar
+    /// sama besar dan tidak ada satu pun uji yang merah**. Rumusnya tetap
+    /// benar dan tetap teruji; yang rusak adalah pengikatannya ke medan yang
+    /// benar-benar dibaca view.
+    ///
+    /// Ini kelas "dihitung lalu dibuang" yang tidak bisa ditangkap dari uji
+    /// fungsi mana pun: yang diuji di sini adalah **pengikatannya**, bukan
+    /// rumusnya. Karena itu ujinya harus dua keadaan — nilai bawaan 0.5 harus
+    /// bisa dibedakan dari **kedua** ujungnya, kalau tidak uji ini lolos
+    /// untuk medan yang tidak pernah diisi sama sekali.
+    func testStarRelativeSizeIsBoundFromMagnitudeNotLeftAtDefault() {
+        let bright = CelestialVisual(object: object(id: "sirius", kind: .star, magnitude: -1.46))
+        let faint = CelestialVisual(object: object(id: "deneb", kind: .star, magnitude: 1.25))
+
+        XCTAssertGreaterThan(bright.relativeSize, faint.relativeSize,
+            "bintang terang harus digambar lebih besar "
+            + "(\(bright.relativeSize) vs \(faint.relativeSize))")
+        XCTAssertGreaterThan(bright.relativeSize, 0.5,
+            "Sirius harus di atas nilai bawaan — kalau tidak, medan ini tidak diikat")
+        XCTAssertLessThan(faint.relativeSize, 0.5,
+            "Deneb harus di bawah nilai bawaan — kalau tidak, medan ini tidak diikat")
+    }
+
+    /// **Regresi: `colorIndexBV` dihitung, lalu diuji di tempat yang salah.**
+    ///
+    /// Cacatnya sama dengan `relativeSize`, tapi akibatnya lebih dari sekadar
+    /// hiasan: view membaca `visual.colorIndexBV` (lewat
+    /// `drawableStarColorIndex`) untuk mewarnai titik bintang, dan warna
+    /// spektral adalah **ciri pengenal** — merah Betelgeuse dan biru Rigel
+    /// sama meyakinkannya dengan cincin Saturnus. Semua uji warna di atas
+    /// memanggil `colorIndex(forStarID:)` langsung, jadi kalau `init(object:)`
+    /// berhenti mengisi medan ini seluruh bintang digambar putih netral tanpa
+    /// satu pun uji yang merah.
+    ///
+    /// Gambar yang kehilangan cirinya justru **lebih** menyesatkan daripada
+    /// gambar tanpa warna: tidak ada teks di layar yang mengatakan warnanya
+    /// tidak diketahui, jadi ketiadaan ciri terbaca sebagai "bintang biasa",
+    /// bukan "warna tidak diklaim".
+    func testStarColorIndexIsBoundFromCatalogueNotLeftAtNeutral() {
+        let red = CelestialVisual(object: object(id: "betelgeuse", kind: .star))
+        let blue = CelestialVisual(object: object(id: "rigel", kind: .star))
+
+        XCTAssertGreaterThan(red.colorIndexBV, 1.0,
+            "Betelgeuse harus merah — medan warna tidak terikat dari katalog")
+        XCTAssertLessThan(blue.colorIndexBV, 0.0,
+            "Rigel harus biru — medan warna tidak terikat dari katalog")
+        XCTAssertGreaterThan(red.colorIndexBV, blue.colorIndexBV,
+            "dua bintang berbeda kelas tidak boleh berwarna sama")
+    }
+
     // MARK: - Geometri kutub planet
 
     /// Titik terjauh **irisan elips kutub dengan piringan** dari pusat bola,
