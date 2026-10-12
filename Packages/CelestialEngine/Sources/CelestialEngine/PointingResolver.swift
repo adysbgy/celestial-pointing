@@ -378,16 +378,43 @@ public struct PointingResolver {
     public func horizontal(ofBody body: EphemerisBody,
                            observer: Observer,
                            date: Date) -> HorizontalCoord? {
+        sample(ofBody: body, observer: observer, date: date)?.direction
+    }
+
+    /// Arah **dan** kecerahan sebuah benda tata surya malam ini.
+    ///
+    /// **Kenapa ini ada, bukan sekadar `horizontal(ofBody:)`.** Arah dan
+    /// magnitudo datang dari **satu** sampel efemeris yang sama. Memanggil
+    /// efemeris dua kali — sekali untuk arah, sekali untuk magnitudo — tidak
+    /// hanya dua kali lipat biayanya; ia juga bisa menghasilkan dua angka
+    /// dari perhitungan yang tidak identik, dan magnitudo yang tidak berasal
+    /// dari sampel yang sama dengan arahnya bukanlah magnitudo benda itu.
+    ///
+    /// Yang lebih penting: tanpanya, pemanggil yang butuh magnitudo **nyata**
+    /// terpaksa mengulang seluruh isi `horizontal(ofBody:)` — penjagaan
+    /// `isPointable`, penjagaan efemeris, konversi ke horizontal — dan setiap
+    /// salinan adalah kesempatan baru untuk penjagaan itu tidak ikut
+    /// tersalin. `availableTargets` dulunya tidak punya jalur ke sini, dan
+    /// karena itu memakai `typicalBrightestMagnitude`: sebuah konstanta
+    /// teoretis. Lihat `PlanetTargetMagnitudeHonestyTests`.
+    ///
+    /// - Returns: `nil` bila Matahari, efemeris tidak ada, atau hitungannya
+    ///   gagal — tidak pernah ditebak.
+    public func sample(ofBody body: EphemerisBody,
+                       observer: Observer,
+                       date: Date) -> (direction: HorizontalCoord,
+                                       magnitude: Double)? {
         guard body.isPointable else { return nil }
         guard let ephemeris else { return nil }
         guard let sample = try? ephemeris.apparent(body, at: date, from: observer) else {
             return nil
         }
-        return SkyMath.equatorialToHorizontal(
+        let direction = SkyMath.equatorialToHorizontal(
             EquatorialCoord(raDeg: sample.raDeg, decDeg: sample.decDeg),
             observer: observer,
             jd: SkyMath.julianDate(from: date)
         )
+        return (direction, sample.magnitude)
     }
 
     /// Jarak sudut terkecil antara kandidat terbaik dan kandidat lain,

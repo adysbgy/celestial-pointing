@@ -101,13 +101,30 @@ public extension PointingResolver {
 
         if considersSolarSystem {
             for body in EphemerisBody.pointableBodies {
-                guard let direction = horizontal(ofBody: body, observer: observer, date: date) else { continue }
-                if aboveHorizonOnly && direction.altitudeDeg <= policy.minAltitudeDeg { continue }
+                // Magnitudo dan arah diambil dari **satu** sampel efemeris
+                // yang sama (`sample(ofBody:)`), bukan dari konstanta.
+                //
+                // **Kenapa ini bukan sekadar perbaikan presisi.** Dulunya
+                // baris ini memakai `body.typicalBrightestMagnitude`:
+                // magnitudo paling terang yang pernah mungkin bagi planet
+                // itu, bukan magnitudo malam ini. Mars berayun -2.9…+1.8 dan
+                // Merkurius -1.9…+5, jadi daftar bisa menaruh Mars **di atas**
+                // bintang yang benar-benar lebih terang dan menyajikannya
+                // sebagai "paling mudah ditunjuk", sementara engine menolak
+                // menguncinya karena `tooFaint`. Terukur: pada 15 Juni 2026
+                // daftar mengatakan Mars -2.9 padahal efemeris menghitung
+                // +1.29 — selisih 4.2 magnitudo, arahnya selalu salah.
+                //
+                // Yang membuatnya berbahaya: angkanya **masuk akal**. Daftar
+                // tidak pernah tampak rusak; yang salah hanya urutannya, dan
+                // urutan tidak punya kolom tempat kesalahannya terbaca.
+                guard let reading = sample(ofBody: body, observer: observer, date: date) else { continue }
+                if aboveHorizonOnly && reading.direction.altitudeDeg <= policy.minAltitudeDeg { continue }
                 targets.append(PointingTarget(id: body.rawValue,
                                               name: body.displayName,
                                               kind: body == .moon ? .moon : .planet,
-                                              magnitude: body.typicalBrightestMagnitude,
-                                              direction: direction,
+                                              magnitude: reading.magnitude,
+                                              direction: reading.direction,
                                               isMoving: true))
             }
         }
