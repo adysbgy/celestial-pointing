@@ -1,3 +1,107 @@
+## Progres terakhir (12 Okt 2026 — Aturan 32: penanda "engine ragu" benar-benar digambar, bukan cuma ada)
+
+Siklus ini dimulai dari **audit jujur atas brief** yang ternyata sudah usang:
+FASE A (night mode, AOD, VoiceOver), FASE B (animasi, Dynamic Type, audio),
+dan FASE C (complication, katalog string id+en, izin sensor) **semua sudah ada
+dan tergerbang** di `main`. `./swift-test.sh` = PointingKit **749** hijau,
+`swift-ui-lint.sh` = 31 aturan lulus, `swift-typecheck.sh` lulus. Menulis ulang
+FASE A/B/C berarti merusak 749 uji untuk nol nilai — dilarang PRD ("JANGAN
+tulis ulang dari nol", "SEMUA KODE SUDAH ADA").
+
+Maka saya beralih ke metode repo ini: **cari baris yang benar tapi tidak
+digerbang**, buktikan dengan mutasi, lalu tutup.
+
+### Cacatnya: satu-satunya penanda keraguan di layar tidak dijaga pemanggilannya
+
+`Apps/Shared/CelestialVisualView.swift` punya dua baris yang menentukan apakah
+gambar **lebih yakin daripada teksnya** (yang dilarang PRD §2):
+
+- baris 63  `if !isConfirmed { drawCandidateMarker(context:size) }`
+- baris 308 `if !(isConfirmed && palette.feature == .rings)`
+
+Baris 63 adalah **satu-satunya** penanda di layar yang mengatakan "engine
+ragu" (lencana tanda tanya). `VisualFrame.candidateMarker()` memang diuji di
+Linux (`testLegacyCandidateMarkerOverflowedOnTwoSides`), tapi uji itu memeriksa
+**bentuknya**, bukan bahwa fungsinya **dipanggil**. Bentuk yang sempurna dan
+tidak pernah digambar tetap hijau selamanya — kelas cacat yang sama dengan
+setengah-lebar spike yang hilang hanya di sisi view.
+
+**Diukur, bukan diklaim:** baris 63 dihapus seluruhnya, lalu seluruh 31 aturan
+UI **dan** `swift-typecheck.sh` dijalankan → keduanya **lulus, exit 0**.
+`swift test` di Linux tidak bisa menolong karena ia hanya membangun
+`Packages/`, sedangkan berkas ini hidup di `Apps/`. Jadi menghapus satu-satunya
+penanda keraguan di layar tidak menghasilkan satu pun kegagalan.
+
+### Perbaikannya: Aturan 32 di `swift-ui-lint.sh` + harness bukti-mutasi
+
+Aturan 32 membaca `CelestialVisualView.swift` (kode saja, komentar dibuang)
+dan menuntut **dua** hal:
+
+1. `drawCandidateMarker(...)` dipanggil di bawah `if` yang syaratnya memuat
+   `!isConfirmed` — bukan cuma ada namanya. Tanpa ikatan syarat, lencana bisa
+   dipanggil dengan `if true` (tampil pada objek yang **sudah** terkunci:
+   kebohongan arah sebaliknya).
+2. `drawSphere` dipanggil di bawah `if` yang memuat **`isConfirmed` DAN
+   `feature`** — supaya cincin Saturnus tidak bocor ke kandidat yang belum
+   pasti (lencana ada, tapi ciri pengenalnya sudah telanjur tampil).
+
+`Tools/bukti-mutasi-lencana-ragu.py` (baru) membuktikan gerbangnya berbunyi
+dengan **mengekstrak program Aturan 32 dari `swift-ui-lint.sh`** (bukan
+menyalinnya — menyalin membuat harness mengukur salinan yang tetap hijau walau
+aturan aslinya dilonggarkan). Lima keadaan:
+
+    [baseline]                     0 merah (aturan sendiri hijau)
+    1. lencana ragu dihapus        MERAH — `drawCandidateMarker` tak dipanggil
+    2. lencana tanpa `!isConfirmed` MERAH — syarat salah (bocor ke objek terkunci)
+    3. cincin bocor (`isConfirmed`  MERAH — `drawSphere` tanpa `isConfirmed`
+       dihapus dari syarat)
+    4. syarat bola dihapus total    MERAH (kontrol negatif: subjek hilang)
+
+Keadaan 1, 2, 3 tidak bisa saling menggantikan: 1 = kehadiran bersyarat, 2 =
+syaratnya benar-benar `!isConfirmed`, 3 = ciri pengenal ikut dijaga.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** bagian baru dari FASE A/B/C: keempat fase itu sudah selesai dan
+  tergerbang. Aturan 32 hanya menutup celah **gerbang** pada kode yang sudah
+  benar — sama seperti siklus lalu menutup celah gerbang pada Bintik Merah
+  Besar dan setengah-lebar spike.
+- Aturan 32 membaca **sumber view** (teks Swift), bukan piksel app. Yang
+  dibuktikan: barisnya ada, dipanggil dengan syarat yang benar, dan gerbangnya
+  merah saat salah satu dilepas. Tidak ada klaim bahwa perangkat Apple merender
+  lencana persis di posisi itu — `VisualFrame.candidateMarker` (diuji di
+  Linux) yang menjamin geometrinya.
+- README (aturan 31→32) diselaraskan supaya Aturan 10 tidak merah; status
+  `1` di `engine-tests.yml` ikut memuat langkah baru (diverifikasi lewat
+  `check-harness-terdaftar.py` → 26 harness, semuanya dirujuk).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 749 | **749** (tak disentuh) |
+| Aturan UI | 31 | **32** (+1 penanda ragu) |
+| Harness bukti-mutasi | 25 | **26** (+1 lencana ragu) |
+| Pemeriksaan visual | 737 | **737** (tak disentuh) |
+| Baris `Packages/` berubah | — | **0** |
+| Baris `CelestialVisualView.swift` berubah | — | **0** (hanya digerbangi) |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 749 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS (32 aturan)**.
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - `python3 Tools/bukti-mutasi-lencana-ragu.py` → **5 keadaan, 0 tidak
+    sesuai harapan** (baseline hijau; 4 mutasi merah masing-masing dengan
+    pesan yang menunjuk ke klaim yang dilanggar).
+  - `python3 Tools/check-harness-terdaftar.py` → **26 harness, semuanya
+    dirujuk alur kerja** (termasuk yang baru).
+  - Baris `Apps/Shared/CelestialVisualView.swift` diverifikasi **tidak berubah**
+    (hanya dibaca gerbang): `git diff` atas berkas itu bersih.
+
+---
+
 ## Progres terakhir (12 Okt 2026 — uji regresi untuk klaim "Lulus" yang tak teruji)
 
 Siklus ini dimulai dari sapuan "anggota `public` tak terpakai" (`Tools/sweep-unconsumed.sh`).

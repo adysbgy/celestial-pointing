@@ -504,6 +504,28 @@ jobs:
       - name: Buktikan gerbang angka docstring urutan cincin berbunyi
         run: python3 Tools/bukti-mutasi-angka-urutan-cincin.py
 
+      # Dan bukti untuk gerbang **setengah-lebar spike bintang**.
+      #
+      # `spikeRootWidthFactor` (0.18) dan `spikeTipWidthFactor` (0.035)
+      # adalah lebar **penuh**; kedua bahasa mengalikannya `0.5` sebelum
+      # dipakai sebagai setengah-lebar. Angka itu yang menjaga spike terbaca
+      # sebagai cahaya, bukan penanda bidik.
+      #
+      # Sampai siklus ini **hanya port** yang dijaga
+      # (`check_port_constants_reach_the_drawing` menuntut `* 0.5` di sana),
+      # sedangkan sisi view tidak dijaga apa pun. Terukur: menghapus `* 0.5`
+      # dari kedua baris view meninggalkan **22 pemeriksaan bintang hijau,
+      # 0 merah** — termasuk `check_star_geometry_matches_the_model` dan
+      # `check_star_pulse_reaches_the_picture`. Kelasnya sama dengan celah
+      # klem opasitas bibir kawah: klem yang hidup di satu bahasa saja.
+      #
+      # Harness ini membuktikan gerbang barunya bisa merah, satu keadaan per
+      # baris (pangkal, ujung) plus sisi port dan satu kontrol negatif —
+      # karena kedua baris ditulis terpisah dan satu mutasi hanya membuktikan
+      # satu jalan.
+      - name: Buktikan gerbang setengah-lebar spike bintang berbunyi
+        run: python3 Tools/bukti-mutasi-setengah-spike.py
+
       # Dan bukti untuk gerbang **ciri planet berfase tidak bocor ke sisi
       # gelap** — akibat dari pemotongan yang tidak diukur siapa pun.
       #
@@ -677,6 +699,22 @@ jobs:
       # kawat yang dimutasi di direktori sementara.
       - name: Buktikan gerbang kawat fase Aturan 31 berbunyi
         run: python3 Tools/bukti-mutasi-aturan31-kawat.py
+
+      # Aturan 32 menutup celah yang **terbukti tak terlihat**: baris
+      # `if !isConfirmed { drawCandidateMarker(...) }` — satu-satunya penanda
+      # di layar bahwa engine ragu — dihapus seluruhnya, lalu seluruh 31
+      # aturan UI dan `./swift-typecheck.sh` dijalankan: keduanya lulus, exit
+      # 0. `swift test` tidak bisa menolong karena berkas ini hidup di
+      # `Apps/`, yang tidak dibangun runner Linux.
+      #
+      # Harness ini membuktikan aturan barunya berbunyi pada empat keadaan:
+      # lencana dihapus, lencana tanpa syarat `!isConfirmed` (kebohongan pada
+      # arah sebaliknya), cincin Saturnus bocor ke kandidat, dan satu kontrol
+      # negatif. Program aturannya **diekstrak** dari `swift-ui-lint.sh`, bukan
+      # disalin — menyalinnya membuat harness mengukur salinan yang tetap
+      # hijau walau aturan aslinya dilonggarkan.
+      - name: Buktikan gerbang lencana ragu Aturan 32 berbunyi
+        run: python3 Tools/bukti-mutasi-lencana-ragu.py
 
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi

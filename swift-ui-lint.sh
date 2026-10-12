@@ -4156,6 +4156,119 @@ else
   echo "Bersih: arah fase diteruskan untuk setiap benda berfase."
 fi
 
+# ── Aturan 32: penanda "engine ragu" harus benar-benar digambar ────────────
+#
+# Dua baris di `Apps/Shared/CelestialVisualView.swift` adalah satu-satunya
+# penanda di layar yang mengatakan "engine tidak yakin":
+#
+#   baris 63  `if !isConfirmed { drawCandidateMarker(...) }`
+#   baris 308 `if !(isConfirmed && palette.feature == .rings)`
+#
+# Tanpa baris 63, kandidat yang belum terkunci digambar **tanpa** lencana
+# tanda tanya, sehingga gambar terbaca sebagai identitas yang pasti di
+# sebelah badge teks "Ragu" -- persis kebalikan dari PRD §2 (gambar tidak
+# boleh lebih yakin daripada teksnya).
+#
+# **Kenapa gerbang ini harus ada: cacatnya terbukti tak terlihat.** Baris 63
+# dihapus (mutasi), lalu seluruh 31 aturan UI **dan** `swift-typecheck.sh`
+# dijalankan: keduanya tetap lulus, exit 0. `swift test` di Linux tidak bisa
+# menolong karena ia hanya membangun `Packages/` -- berkas ini hidup di
+# `Apps/`. Jadi sampai aturan ini ada, menghapus satu-satunya penanda
+# keraguan di layar tidak menghasilkan satu pun kegagalan.
+#
+# Kenapa geometrinya tidak cukup: `VisualFrame.candidateMarker()` memang
+# diuji di Linux (`testLegacyCandidateMarkerOverflowedOnTwoSides`), tetapi
+# uji itu memeriksa **bentuknya**, bukan bahwa fungsinya **dipanggil**.
+# Bentuk yang sempurna dan tidak pernah digambar tetap hijau selamanya --
+# kelas cacat yang sama dengan setengah-lebar spike yang hilang hanya di
+# sisi view.
+#
+# Yang diperiksa adalah **pemanggilan bersyarat**, bukan sekadar keberadaan
+# nama fungsi: `drawCandidateMarker(...)` tanpa `!isConfirmed` akan
+# menggambar lencana ragu pada objek yang **sudah** terkunci, yaitu
+# kebohongan pada arah sebaliknya. Karena itu syaratnya diikat.
+echo
+echo "== Aturan 32: lencana 'engine ragu' digambar tepat saat belum pasti =="
+ragu=$(python3 - <<'PY' 2>&1
+import os, re
+
+VIEW = "Apps/Shared/CelestialVisualView.swift"
+
+if not os.path.exists(VIEW):
+    print("PERINGATAN: %s tidak ada." % VIEW)
+    raise SystemExit
+
+text = open(VIEW, encoding="utf-8").read()
+# Kode saja: komentar di berkas ini menceritakan cacat lamanya, dan pola
+# `if !isConfirmed` yang **dikomentari** tidak boleh terbaca sebagai
+# kenyataan.
+code = re.sub(r"//[^\n]*", "", text)
+code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+
+problems = []
+
+# 1. Lencana harus dipanggil, dan **bersyarat** pada ketidakpastian.
+#
+#    Dicari sebagai `if <syarat> { … drawCandidateMarker( … ) }`, dengan
+#    tubuhnya digabung dulu supaya komentar di antaranya tidak memengaruhi
+#    pencocokan. Syaratnya harus memuat `isConfirmed` dalam bentuk negatif
+#    (`!isConfirmed`, `isConfirmed == false`), kalau tidak lencana akan
+#    tampil pada objek yang sudah terkunci.
+body = re.sub(r"\s+", " ", code)
+calls = re.findall(
+    r"if\s+([^{;]{0,120}?)\s*\{[^{}]*?drawCandidateMarker\s*\(", body)
+if not calls:
+    problems.append(
+        "  `drawCandidateMarker` tidak dipanggil di bawah `if` mana pun di %s; "
+        "kandidat yang belum terkunci digambar tanpa penanda keraguan" % VIEW)
+for cond in calls:
+    if not re.search(r"!\s*isConfirmed|isConfirmed\s*==\s*false", cond):
+        problems.append(
+            "  `drawCandidateMarker` dipanggil dengan syarat `%s`; lencana ragu "
+            "harus bergantung pada `!isConfirmed`, kalau tidak ia tampil pada "
+            "objek yang sudah terkunci" % cond.strip())
+
+# 2. Cincin Saturnus tidak boleh digambar pada kandidat yang belum pasti.
+#
+#    Ini arah sebaliknya dari pemeriksaan 1, dan tanpa itu cacatnya bisa
+#    diselesaikan dengan menggambar lencana ragu **di atas** cincin:
+#    penanda ada, tetapi ciri pengenalnya sudah telanjur tampil. Syaratnya
+#    harus memuat `isConfirmed` **dan** `feature == .rings` bersamaan --
+#    hanya salah satu membuat bola Saturnus hilang (atau cincin bocor ke
+#    kandidat) tanpa terdeteksi.
+sphere = re.search(
+    r"if\s+([^{;]{0,160}?)\s*\{\s*drawSphere\s*\(", body)
+if sphere:
+    cond = sphere.group(1)
+    if "isConfirmed" not in cond or "feature" not in cond:
+        problems.append(
+            "  `drawSphere` digambar dengan syarat `%s`; cincin Saturnus harus "
+            "dilewat saat `isConfirmed` salah **dan** cirinya `.rings`, kalau "
+            "tidak cincin (ciri pengenal) bocor ke kandidat yang belum pasti"
+            % cond.strip())
+else:
+    problems.append(
+        "  `drawSphere` tidak ditemukan di bawah `if` di %s; gerbang ini "
+        "kehilangan gigi pada sisi cincin" % VIEW)
+
+print("\n".join(problems) if problems else "")
+PY
+)
+if printf '%s' "$ragu" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 32 gagal dijalankan:"
+  echo "$ragu"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$ragu" ]; then
+  echo "Penanda keraguan tidak lagi digambar dengan benar:"
+  echo "$ragu"
+  echo "-> Tanpa lencana, gambar kandidat terbaca sebagai identitas pasti;"
+  echo "   tanpa penjaga cincin, ciri pengenal bocor ke kandidat."
+  status=1
+else
+  echo "Bersih: lencana ragu digambar tepat saat engine belum pasti."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
