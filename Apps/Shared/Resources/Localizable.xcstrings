@@ -2388,6 +2388,17 @@
         }
       }
     },
+    "experiment.refreshTargets.label": {
+      "comment": "Label VoiceOver tombol segarkan daftar target (ikon panah berputar). Menyebut akibatnya: daftar dihitung ulang untuk langit SEKARANG, bukan sekadar \"muat ulang\".",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh target list for the current sky"
+          }
+        }
+      }
+    },
     "experiment.reset.label": {
       "comment": "Label VoiceOver tombol buang (ikon tong sampah).",
       "localizations": {

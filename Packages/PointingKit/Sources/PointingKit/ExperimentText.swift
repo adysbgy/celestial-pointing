@@ -360,6 +360,16 @@ public enum ExperimentText {
     }
     public static var exportLabel: String { TextLocalization.text(.experimentExportLabel) }
     public static var resetLabel: String { TextLocalization.text(.experimentResetLabel) }
+
+    /// Label VoiceOver tombol segarkan daftar target.
+    ///
+    /// **Yang diucapkan adalah akibatnya**, bukan nama ikonnya: "Segarkan
+    /// daftar target untuk langit sekarang" memberi tahu pengguna VoiceOver
+    /// bahwa perubahannya menyangkut **waktu**, bukan sekadar memuat ulang
+    /// tampilan.
+    public static var refreshTargetsLabel: String {
+        TextLocalization.text(.experimentRefreshTargetsLabel)
+    }
 }
 
 // MARK: - Katalog kunci
@@ -581,4 +591,12 @@ public extension LocalizedText {
         key: "experiment.export.label", id: "Ekspor dataset (JSON)")
     static let experimentResetLabel = LocalizedText(
         key: "experiment.reset.label", id: "Buang semua percobaan")
+
+    /// Tombol ikon panah berputar di layar Experiment 1. Labelnya menyebut
+    /// **akibatnya** (daftar dihitung ulang untuk langit sekarang), bukan nama
+    /// ikonnya: VoiceOver yang mengucapkan "panah berputar" tidak memberi tahu
+    /// pengguna apa pun tentang mengapa daftarnya perlu disegarkan.
+    static let experimentRefreshTargetsLabel = LocalizedText(
+        key: "experiment.refreshTargets.label",
+        id: "Segarkan daftar target untuk langit sekarang")
 }

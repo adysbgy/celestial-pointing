@@ -693,6 +693,7 @@ public extension LocalizedText {
         .experimentTrialsSection, .experimentNoTrials,
         .experimentDatasetSharePreview, .experimentExportLabel,
         .experimentResetLabel,
+        .experimentRefreshTargetsLabel,
         // Frasa yang diucapkan untuk baris "judul … nilai" dan nilai bertanda
         // satuan. Masuk daftar karena seluruh `RowSpeech` mengembalikan frasa
         // Bahasa Indonesia tanpa melewati `LocalizedText` — Aturan 6 tidak

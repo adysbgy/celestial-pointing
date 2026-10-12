@@ -67,6 +67,23 @@ public final class ExperimentRecorder: ObservableObject {
     /// bisa dihitung).
     public var availableTargets: [PointingTarget] { harness.availableTargets }
 
+    /// Buang daftar target yang tersimpan, supaya akses berikutnya menghitung
+    /// ulang untuk langit **saat ini**.
+    ///
+    /// **Kenapa ini harus ada, padahal lokasi saja sudah membatalkan cache.**
+    /// Cache dikunci pada (tempat, jendela 30 detik) — dan tempat tinggal
+    /// tetap. Yang berubah adalah **langitnya**: tinggi objek turun terus
+    /// selama pengukuran berlangsung. Daftar yang masih segar saat dipilih
+    /// bisa memuat benda yang sudah terbenam saat tombol Catat ditekan
+    /// beberapa menit kemudian; `record` menolaknya dengan
+    /// `targetBelowHorizon`, dan penguji kehilangan percobaan yang sudah ia
+    /// kerjakan tanpa cara apa pun untuk menyegarkan daftar.
+    @discardableResult
+    public func refreshTargets() -> [PointingTarget] {
+        harness.invalidateTargets()
+        return harness.availableTargets
+    }
+
     /// Rekam satu percobaan untuk target yang dipilih.
     ///
     /// - Parameter source: asal rekaman (mis. nama perangkat). Dipakai untuk

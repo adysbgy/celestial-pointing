@@ -38,6 +38,35 @@ struct Experiment1View: View {
             // terlihat di balik kartu, bukan chrome sistem.
             .scrollContentBackground(.hidden)
             .toolbar {
+                // **Segarkan daftar target sebelum penguji merekam.**
+                //
+                // Cache daftar dikunci pada (tempat, jendela 30 detik), dan
+                // tempat penguji tidak berpindah. Yang berpindah adalah
+                // langitnya: tinggi objek turun terus selama pengukuran. Daftar
+                // yang masih segar saat dipilih bisa memuat benda yang sudah
+                // terbenam saat tombol Catat ditekan beberapa menit kemudian —
+                // `record` menolaknya, dan sampai siklus ini penguji tidak
+                // punya cara menyegarkan daftarnya selain menutup layar.
+                //
+                // Tombolnya **selalu ada**, bukan hanya saat daftar tampak
+                // basi: yang menentukan basi adalah horizon, bukan jam.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        recorder.refreshTargets()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    // Kalau target yang dipilih hilang dari daftar (terbenam),
+                    // pilihan itu harus ikut dibuang: pilihan yang tidak ada di
+                    // daftar tampil seolah masih bisa direkam.
+                    .onChange(of: recorder.availableTargets.map(\.id)) { _, ids in
+                        if let selected = recorder.selectedTargetID,
+                           !ids.contains(selected) {
+                            recorder.selectedTargetID = nil
+                        }
+                    }
+                    .accessibilityLabel(ExperimentText.refreshTargetsLabel)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         recorder.reset()

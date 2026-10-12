@@ -555,6 +555,46 @@ final class ExperimentHarnessTests: XCTestCase {
                        "langit tempat baru belum pernah dihitung")
     }
 
+    /// **Cache wajib punya tombol buang, dan tombolnya wajib terpasang di layar.**
+    ///
+    /// `invalidateTargets()` lahir untuk satu situasi yang tidak ditangani
+    /// `didSet` lokasi: **langit yang bergerak**. Cache dikunci pada
+    /// (tempat, jendela 30 detik). Tempat tinggal tetap, tapi tinggi objek
+    /// berubah terhadap waktu — jadi daftar yang baik-baik saja saat dipilih
+    /// bisa berisi benda yang **sudah terbenam** saat tombol Catat ditekan
+    /// beberapa menit kemudian. `record` akan menolaknya
+    /// (`targetBelowHorizon`), dan penguji kehilangan satu percobaan yang
+    /// sudah ia kerjakan tanpa cara apa pun untuk menyegarkan daftarnya.
+    ///
+    /// Yang dijaga uji ini bukan bahwa fungsinya benar (ia satu baris), tapi
+    /// bahwa ia **bisa dijangkau dari layar**: sampai siklus ini tidak ada
+    /// satu pun pemanggil di `Apps/`, dan gerbang yang tidak pernah dipanggil
+    /// selalu hijau.
+    func testExperimentViewRefreshesTheTargetListBeforeTheTesterRecords() {
+        let source = Self.appSource("PointAndKnowiOS/Sources/Experiment1View.swift")
+        XCTAssertTrue(source.contains("recorder.refreshTargets()"),
+                      "layar Experiment 1 harus memanggil refreshTargets() — "
+                      + "kalau tidak, daftar target bisa memuat benda yang sudah "
+                      + "terbenam dan penguji tidak punya cara menyegarkannya")
+    }
+
+    /// Isi berkas `Apps/`, supaya uji Linux bisa membuktikan sesuatu tentang
+    /// jalur yang **dipakai layar**, bukan cuma tentang paketnya.
+    ///
+    /// Batasnya dinyatakan: yang diukur di sini **teks**, bukan perilaku
+    /// SwiftUI-nya. Yang bisa dibuktikan hanya bahwa layarnya memanggil jalur
+    /// itu; bahwa jalur itu benar dijaga uji di atas.
+    private static func appSource(_ relativePath: String) -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // PointingKitTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // PointingKit
+            .deletingLastPathComponent()   // Packages
+            .deletingLastPathComponent()   // <repo>
+        let url = root.appendingPathComponent("Apps").appendingPathComponent(relativePath)
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
     /// Memasang lokasi yang sama bukan perpindahan: cache tetap berlaku.
     func testTargetListIsNotRecomputedForSamePlace() {
         let h = harness()

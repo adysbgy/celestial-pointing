@@ -2932,6 +2932,44 @@ final class CelestialVisualTests: XCTestCase {
                           "bintik terjauh \(spot.farthestCorner) R — keluar dari bola")
     }
 
+    /// **Jarak pusat bintik dari pusat bola harus diukur dari area yang
+    /// digambar, bukan dari pusat elipsnya.**
+    ///
+    /// `distanceFromCenter` adalah satu-satunya anggota `Spot` yang tidak
+    /// pernah dipanggil siapa pun di repo ini (terukur: `sweep-unconsumed`
+    /// melaporkan `app=0 test=0 paket=1`). Anggota yang tidak pernah dibaca
+    /// tidak punya cara untuk berbunyi saat ia diam-diam menjadi salah — dan
+    /// angka inilah yang dipakai untuk menyatakan **seberapa jauh badai itu
+    /// dari pusat piringan** (`JupiterSpot.centerY = 0.31`, yaitu 0.31 R ke
+    /// selatan).
+    ///
+    /// Yang dikunci bukan rumusnya (satu baris Pythagoras), melainkan
+    /// **letaknya**: bintik harus dekat pusat (di dalam separuh radius bola)
+    /// dan tetap **di dalam** piringan bersama tepi terjauhnya. Dua invariant
+    /// ini tetap benar kalau kelak koordinatnya disetel ulang — dan merah
+    /// kalau badainya pindah ke tempat yang tidak lagi menggambarkan belahan
+    /// selatan Jupiter.
+    func testJupiterSpotDistanceIsMeasuredFromItsDeclaredCentre() {
+        let spot = CelestialVisual.jupiterSpot()
+
+        XCTAssertEqual(spot.distanceFromCenter,
+                       (0.10 * 0.10 + 0.31 * 0.31).squareRoot(),
+                       accuracy: 1e-12,
+                       "jarak = panjang vektor (centerX, centerY) dari pusat bola")
+
+        XCTAssertGreaterThan(spot.distanceFromCenter, 0.2,
+                             "bintik harus benar-benar di luar pusat piringan — "
+                             + "badai di tengah bola menggambarkan Jupiter yang lain")
+        XCTAssertLessThan(spot.distanceFromCenter, 1.0,
+                          "bintik terjauh dari pusat masih di dalam bola")
+
+        // Sisi yang sama: ujung terjauh bintik tidak boleh lebih jauh dari bola.
+        XCTAssertLessThan(spot.farthestCorner, 1.0,
+                          "seluruh elips \(spot.farthestCorner) R — keluar dari bola")
+        XCTAssertGreaterThan(spot.farthestCorner, spot.distanceFromCenter,
+                             "tepi terjauh selalu lebih jauh dari pusatnya sendiri")
+    }
+
     /// Pita cincin Saturnus: urut, tidak tumpang tindih, dan celahnya di
     /// tempat yang benar.
     ///
