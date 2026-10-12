@@ -51,8 +51,9 @@ dengan yang ditutup `ExperimentSafetyVerdict`, hanya pindah ke lapisan kata.
 
 ### Hitungan
 
-- PointingKit: **750** hijau (748 dasar + 2 baru). CelestialEngine: **212**.
-- `./swift-test.sh`: engine 212 + PointingKit 750, nol kegagalan.
+- PointingKit: **749** hijau (747 dasar + 2 baru). CelestialEngine: **212**.
+- `./swift-test.sh`: engine 212 + PointingKit 749, nol kegagalan.
+- README (aturan 10) diselaraskan ke 749 agar gerbang paritas hitungan lulus.
 
 ### Yang TIDAK diklaim
 
