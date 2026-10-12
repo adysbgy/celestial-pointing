@@ -98,6 +98,11 @@ C = load("cv_probe", "check-visuals.py")
 WANTED = {
     "Bintik Merah Besar tetap melengkung (bukan stiker rata)",
     "bintik Jupiter masih terbaca setelah pemulihan lengkung",
+    # Gerbang keterbacaan yang ditambahkan bersama warna bintik yang baru.
+    # Ketiganya harus ikut berbunyi saat warnanya dikembalikan ke nilai pucat.
+    "Bintik Merah Besar lebih gelap dari pitanya (siang, 76 px)",
+    "Bintik Merah Besar lebih gelap dari pitanya (malam, 76 px)",
+    "Bintik Merah Besar terbaca pada 76 px (ukuran jam)",
     # Tabel `check_port_matches_swift_constants` memancarkan **dua** hasil per
     # entri, dengan awalan yang berbeda; keduanya diperiksa supaya arah drift
     # (port vs model) dan arah "sumber memuat" tidak bisa lolos bersama-sama.
@@ -111,6 +116,7 @@ WANTED = {
 
 results = []
 C.check_jupiter_spot_keeps_its_curvature(results)
+C.check_jupiter_spot_reads_on_the_watch(results)
 C.check_port_matches_swift_constants(results)
 found = 0
 for r in results:
@@ -133,6 +139,22 @@ STATES = [
         RENDER: ("""    canvas.ellipse(spot_cx, spot_cy, spot_rx, spot_ry,
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))""",
                  """    _spot_dropped = accent_fn(ACCENTS["jupiterSpot"], night_mode)""")}),
+    # C1/C2: gerbang **keterbacaan** yang baru. Warna bintiknya dikembalikan ke
+    # nilai pucat yang dipakai sampai siklus ini — nilai yang lolos
+    # `check_planet_features_present` (bintiknya "ada") dan
+    # `check_jupiter_spot_keeps_its_curvature` (lengkungnya benar), tetapi
+    # terbaca sebagai bagian pita. Harapannya merah; kalau tidak, gerbang baru
+    # ini hanya menambah baris hijau tanpa menjaga apa pun.
+    ("C1. warna bintik kembali pucat", {
+        RENDER: ("jupiterSpot=(0.52, 0.14, 0.10),",
+                 "jupiterSpot=(0.85, 0.35, 0.25),")}),
+    # Arah yang paling sulit: bintiknya tetap **jelas lebih gelap** dari pitanya
+    # (jadi tidak kembali pucat), tetapi tidak lagi cukup jauh untuk terbaca.
+    # Hanya pengukuran **besaran** yang bisa menangkap keadaan ini — kedua
+    # pengukuran arah tetap hijau. Itu sebabnya ambang 12.0% ada.
+    ("C2. warna bintik di antara pucat dan gelap", {
+        RENDER: ("jupiterSpot=(0.52, 0.14, 0.10),",
+                 "jupiterSpot=(0.70, 0.30, 0.22),")}),
     ("B1. port 0.6 -> 0.9 (drift port vs model)", {
         RENDER: ("JUPITER_SPOT_LIMB_SHADING_STRENGTH = 0.6",
                  "JUPITER_SPOT_LIMB_SHADING_STRENGTH = 0.9")}),

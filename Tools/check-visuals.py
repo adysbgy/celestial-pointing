@@ -7899,6 +7899,108 @@ def check_jupiter_spot_keeps_its_curvature(results, size=200, ss=2):
         f"kekuatan 1.0 memberi 0.14%)"))
 
 
+def check_jupiter_spot_reads_on_the_watch(results, ss=8):
+    """Bintik Merah Besar harus **terbaca** di ukuran yang benar-benar tampil.
+
+    **Cacat yang ditutup pemeriksaan ini, dan kenapa gerbang lama tidak
+    melihatnya.** Kelasnya sama persis dengan celah Cassini
+    (`check_saturn_gap_reads_at_the_watch_size`), dan itu bukan kebetulan:
+    keduanya ciri yang **dibuat terlihat** oleh sebuah nilai, lalu diuji
+    hanya pada `--size 200` — tempat setiap nilai yang masuk akal lulus.
+
+    Yang mengukur bintiknya sampai siklus ini semuanya mengukur hal lain:
+
+    | Gerbang | Yang diukur |
+    |---|---|
+    | `check_planet_features_present` | **keberadaan** — ≥ 20 piksel "kemerahan" |
+    | `check_jupiter_spot_keeps_its_curvature` | **lengkung** gradien di dalam bintik |
+    | `testJupiterSpotIsDarkerThanItsOwnBelt` | **arah** token, di kedua mode |
+
+    Tidak satu pun mengukur **keterbacaan piksel**-nya. Terukur pada 76 px
+    (38 pt @2x, `ss=8`), selisih kanal merah bintik terhadap pita tepat di
+    bawahnya:
+
+        warna bintik          siang              malam
+        0.85/0.35/0.25      +16 (lebih TERANG)  +11 (lebih TERANG)   <- gagal
+        0.52/0.14/0.10      -18                 -11                  <- lulus
+
+    Dua cacat, dua-duanya tidak terlihat oleh gerbang mana pun di atas:
+
+    1. **Arahnya salah.** Bintik lama **lebih terang** dari pitanya, di
+       kedua mode. Badai yang lebih terang dari pita yang melingkunginya
+       terbaca sebagai **pita kedua**, bukan badai.
+    2. **Besarnya di bawah ambang baca.** Selisih 12.1/255 terang di mode
+       siang (rasio WCAG 1.09:1) jauh di bawah 3:1, jadi di mode siang
+       bintiknya hanya bisa ditemukan lewat ronanya — dan di mode malam,
+       layar yang justru paling dipakai untuk mengamati, yang tersisa hanya
+       terang: +2.3/255 ke arah yang salah.
+
+    **Kenapa dua pengukuran, bukan satu.** Yang **arah** diukur pada piksel
+    pusat bintiknya (satu piksel, tepat di tengah badai) dan harus bertahan di
+    **kedua** mode — mode malam membuang hue, jadi kalau arahnya di sana
+    benar, ia benar juga bagi mata yang sudah kehilangan warna. Yang
+    **besaran** diukur sebagai rata-rata seluruh daerah bintik terhadap bola
+    polos (`spot_deviation_from_bare`, metrik yang sama dengan gerbang
+    lengkung di atas) dan hanya di mode siang: di mode malam kanal merahnya
+    dipetakan `NightVisual.surface`, yang memampatkan selisihnya sampai
+    besaran siang berhenti bermakna — yang tersisa di sana hanya arah.
+
+    **Kenapa pembandingnya `planet-jupiter-bare`.** Kasus itu menggambar bola
+    Jupiter yang sama **tanpa** ciri pengenal, jadi selisihnya adalah
+    bintiknya sendiri, dan lengkung bola yang benar ikut saling menghapus.
+    Itu sebabnya ambangnya tidak perlu menuliskan warna pita ke dalam
+    gerbang ini.
+
+    **Ukurannya dari token, bukan dari sini.** `WatchMetrics.visualDiameter`
+    adalah 38 **poin**; yang dirender 76 **piksel** karena Apple Watch
+    menggambar @2x. Kalau tokennya hilang, pemeriksaan ini **merah** — bukan
+    hijau tanpa mengukur apa pun.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (Bintik Merah Besar)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=pixels,
+                                    ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-bare", size=pixels, ss=ss)
+
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    px = int(round(cx + spot_x * radius))
+    py = int(round(cy + spot_y * radius))
+
+    def red(rows):
+        return rows[py][px * 4]
+
+    # (1) Arah: bintik harus lebih gelap dari pitanya, di KEDUA mode.
+    for night, label in ((False, "siang"), (True, "malam")):
+        _, (_, _, rows_cn) = render_case("planet-jupiter-confirmed",
+                                         night=night, size=pixels, ss=ss)
+        _, (_, _, rows_bn) = render_case("planet-jupiter-bare",
+                                         night=night, size=pixels, ss=ss)
+        delta = red(rows_cn) - red(rows_bn)
+        results.append(Result(
+            f"Bintik Merah Besar lebih gelap dari pitanya ({label}, {pixels} px)",
+            delta < 0,
+            f"kanal merah bintik {red(rows_cn)} lawan pita "
+            f"{red(rows_bn)} (selisih {delta:+d}); cacat aslinya "
+            f"{'+16' if not night else '+11'} — lebih TERANG, jadi terbaca "
+            f"sebagai pita kedua"))
+
+    # (2) Besaran: rata-rata daerah bintik terhadap bola polos, mode siang.
+    deviation = spot_deviation_from_bare(rows_c, rows_b, w, h)
+    results.append(Result(
+        f"Bintik Merah Besar terbaca pada {pixels} px (ukuran jam)",
+        deviation >= 12.0,
+        f"bintik menyimpang {deviation:.2f}% dari bola polos (ambang 12.0%; "
+        f"warna lama hanya 7.24%, yang baru 20.89%)"))
+
+
 def spot_deviation_from_bare(rows_spot, rows_bare, w, h):
     """Seberapa jauh bintik menyimpang dari **bola polos**, dalam persen terang.
 
@@ -10403,6 +10505,7 @@ def main():
     check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
     check_planet_phase_limb_reads_the_model_constant(results)
     check_moon_new_disc_reads_on_the_watch(results)
+    check_jupiter_spot_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
     check_sun_corona_reaches_beyond_the_disk(results)

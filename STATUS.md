@@ -1,3 +1,121 @@
+## Progres terakhir (11 Okt 2026 — Bintik Merah Besar: ciri yang "ada", dihitung, dan tidak terbaca)
+
+Siklus ini menutup kelas cacat yang sama dengan celah Cassini
+(`check_saturn_gap_reads_at_the_watch_size`), dan pada ciri yang paling sering
+disebut PRD: **Bintik Merah Besar Jupiter**. Bedanya satu hal, dan itu yang
+membuatnya lebih buruk: celah Cassini setidaknya **diukur** di suatu tempat.
+
+### Cacatnya: bintiknya lebih TERANG dari pitanya, di kedua mode
+
+Bintik digambar sebagai elips warna rata (`0.85, 0.35, 0.25`) di atas pita
+Jupiter. Terukur pada ukuran kartu jam (76 px = 38 pt @2x, `ss=8`), selisih
+kanal merah bintik terhadap pita tepat di bawahnya:
+
+| warna bintik | siang | malam |
+|---|---|---|
+| `0.85/0.35/0.25` (lama) | **+16** (lebih TERANG) | **+11** (lebih TERANG) |
+| `0.52/0.14/0.10` (baru) | **−18** | **−11** |
+
+Selisih terangnya di mode siang hanya **12.1/255** — rasio WCAG **1.09:1**, dan
+lebih kecil dari variasi pita itu sendiri. Yang paling parah justru mode malam:
+di sana hue sudah dibuang, jadi **terang adalah satu-satunya pembeda yang
+tersisa**, dan bintiknya 10% lebih terang dari pita yang melingkunginya. Badai
+yang lebih terang dari pitanya terbaca sebagai **pita kedua**, bukan badai.
+
+**Kenapa tidak satu pun gerbang lama melihatnya.** Semuanya mengukur hal lain:
+
+| Gerbang | Yang diukur |
+|---|---|
+| `check_planet_features_present` | **keberadaan** — ≥ 20 piksel "kemerahan" (`r − maks(g,b) > 0`) |
+| `check_jupiter_spot_keeps_its_curvature` | **lengkung** gradien di dalam bintik |
+| `testJupiterSpotLimbShadingIsPartial` | kekuatan pemulihan limb (0.6), bukan warna |
+| `testJupiterSpotIsInTheSouthernHemisphere` | **letaknya**, bukan keterbacaannya |
+
+Persis pola yang berulang di repo ini: gerbang yang menuntut ciri **ada**, bukan
+ciri **terbaca**. Dan cacatnya berumur panjang karena bintiknya memang selalu
+"ada" — 200 piksel merah, lengkung benar, letak benar.
+
+**Kejujuran tentang mode siang.** Di mode siang bintik lama **masih bisa
+ditemukan**: ronanya (oranye pucat lawan krem) memberi petunjuk yang tidak
+tertangkap oleh selisih terang 12.1/255 — kritik visual independen atas render
+ini membacanya sebagai "jelas terbaca". Jadi cacat yang **tegas** ada di mode
+malam, tempat hue sudah dibuang dan bintiknya berbalik jadi lebih terang; di
+mode siang yang cacat adalah **cadangan** yang terlalu tipis (1.09:1), bukan
+ketidakhadiran. Perbaikan ini menaikkan keduanya, dan yang paling penting ia
+membalikkan arah di mode malam.
+
+### Perbaikannya: digelapkan, dan kenapa bukan dicerahkan
+
+Diukur terhadap pita yang sama: **menggelapkan** mencapai selisih 36.8/255,
+**mencerahkan** hanya 10.9/255 — plafonnya ada karena bintik harus tetap
+terbaca sebagai badai merah, bukan sebagai bayangan, dan bintik yang lebih
+terang dari pitanya terbaca sebagai pita tambahan.
+
+**Kenapa `0.52`, bukan `0.55`.** Yang mengikat bukan keterbacaan siang
+melainkan mode malam: `NightVisual.surface` memetakan kanal merah ke
+`0.35 + 0.65·r`, yang **memampatkan** selisih — kanal merah 0.03 di siang
+menyusut jadi 0.02 di malam. Ambang uji (bintik ≤ 85% pita, di kedua mode)
+menuntut kanal merah **≤ 0.53**; 0.52 adalah langkah di bawahnya.
+
+### Gerbangnya: tiga pemeriksaan, dan dibuktikan bisa merah
+
+`check_jupiter_spot_reads_on_the_watch` (baru, dirujuk `main`) mengukur
+**keterbacaan piksel** di ukuran yang benar-benar tampil:
+
+1. bintik lebih gelap dari pitanya — **siang** (76 px)
+2. bintik lebih gelap dari pitanya — **malam** (76 px)
+3. bintik menyimpang **≥ 12.0%** dari bola polos (`planet-jupiter-bare`)
+
+Ukurannya dibaca dari token `WatchMetrics.visualDiameter` (38 pt → 76 px),
+bukan ditulis `76` di dalam gerbang — kalau tokennya hilang, gerbangnya merah.
+
+**Arah diuji di kedua mode karena mode malam adalah tempat cacatnya paling
+parah**, dan ambang 12.0% ada karena satu alasan yang terukur: ia satu-satunya
+yang bisa membedakan "pucat" dari "cukup gelap tapi belum terbaca". Warna
+`(0.70, 0.30, 0.22)` masih **jelas lebih gelap** dari pitanya (kedua arah
+hijau) tetapi hanya menyimpang 7–9% — keadaan itu hanya ditangkap pengukuran
+besaran.
+
+`Tools/bukti-mutasi-bintik.py` diperluas ke **8 keadaan** (dari 6): dua keadaan
+baru mengembalikan warnanya ke nilai pucat dan ke nilai antara, dan keduanya
+**merah** seperti yang dituntut. Baseline nol merah.
+
+Dibuktikan juga secara langsung: dengan warna lama dikembalikan, **ketiga**
+pemeriksaan merah (`+16`, `+11`, `7.24%` lawan ambang `12.0%`); dengan warna
+baru, ketiganya hijau. Sumber dipulihkan dan diverifikasi.
+
+### Yang TIDAK diklaim
+
+- Angka-angka ini diukur pada **port Python** (`Tools/render-visuals.py`),
+  bukan pada perangkat Apple. Yang dibuktikan: warna yang dipakai view dan port
+  sama (dijaga `check_port_matches_swift_constants`), dan warna itu **terbaca**
+  di render.
+- Ambang 12.0% adalah **keputusan yang dikalibrasi** terhadap gambar yang ada
+  (cacat 7.24%, kode benar 20.89%), bukan nilai astronomis.
+- Arah "digelapkan" adalah **pilihan yang diukur**, bukan kebenaran fisis
+  tentang warna GRS. Bintik nyata berubah warna sepanjang dekade; yang dijaga
+  di sini adalah ia tidak boleh menyatu dengan pitanya.
+- `moon-new` yang dilaporkan siklus lalu **bukan cacat**, dan tidak diubah:
+  kontrasnya dibatasi plafon yang diukur — mode malam memetakan kanal merah ke
+  `0.35 + 0.65·r`, jadi piringan gelap Bulan tidak bisa dinaikkan tanpa
+  merusak kontras sabit (`NightVisual.shadow` menulis alasan yang sama).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 742 | **743** (+1 uji keterbacaan bintik) |
+| Pemeriksaan visual | 729 | **732** (+3 bintik) |
+| Harness dirujuk CI | 19 | 19 (satu diperluas, bukan ditambah) |
+| Baris `Apps/` berubah | — | **0** |
+
+Yang berubah: `NightVisual.swift` (warna + alasannya), `NightVisualTests.swift`
+(uji), `render-visuals.py` (port warna), `check-visuals.py` (gerbang),
+`bukti-mutasi-bintik.py` (2 keadaan), `README.md` (hitungan).
+
+---
+
 ## Progres terakhir (11 Okt 2026 — Aturan 31 mengutip dua kawat fase tanpa mengukurnya)
 
 Siklus ini menutup kelas cacat yang sama dengan tiga entri di bawahnya, pada

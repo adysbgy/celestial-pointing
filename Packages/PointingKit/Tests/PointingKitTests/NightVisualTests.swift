@@ -133,6 +133,93 @@ final class NightVisualTests: XCTestCase {
         }
     }
 
+    /// Bintik Merah Besar harus **terbaca sebagai bentuk**, bukan sekadar
+    /// "ada". Warna ini hidup di `NightVisual` supaya bisa diuji di Linux —
+    /// kalau ia hidup di view, tidak ada uji yang bisa menyentuhnya.
+    ///
+    /// **Cacat yang dijaga uji ini — terukur, dan lolos semua gerbang lama.**
+    /// Bintik digambar sebagai elips warna rata di atas pita yang warnanya
+    /// nyaris sama. Terukur pada render 200 px: bintik `(0.85, 0.35, 0.25)`
+    /// hanya **12.8/255 lebih gelap** dari pita di bawahnya (rasio kontras
+    /// WCAG **1.09:1** — jauh di bawah 3:1), dan di mode malam arahnya
+    /// berbalik; lihat di bawah. Di mode siang bintiknya karena itu hanya
+    /// bisa ditemukan lewat **ronanya**, bukan lewat terangnya.
+    ///
+    ///   - **Di mode malam pembedanya berbalik arah.** Mode malam membuang
+    ///     hue, jadi yang tersisa hanya kanal merah: bintik 0.85 → 0.9025
+    ///     lawan pita tergelap 0.72 → 0.818. Bintiknya 10% **lebih terang**
+    ///     dari pitanya — di layar yang justru paling dipakai untuk mengamati,
+    ///     satu-satunya pembeda yang tersisa menunjuk ke arah yang salah.
+    ///
+    /// Dan **tidak satu pun gerbang lama melihatnya**, karena semuanya
+    /// mengukur hal lain:
+    ///
+    /// | Gerbang | Kenapa hijau |
+    /// |---|---|
+    /// | `check_planet_features_present` | menuntut ≥ 20 piksel "kemerahan" (`r − maks(g,b) > 0`) — bintik tetap **ada**, hanya tidak terbaca |
+    /// | `check_jupiter_spot_keeps_its_curvature` | mengukur lengkung gradien **di dalam** bintik; bintik rata tetap punya lengkung, dan kontrasnya tidak masuk |
+    /// | `testJupiterSpotLimbShadingIsPartial` | mengukur kekuatan pemulihan limb (0.6), bukan warna |
+    /// | `testJupiterSpotIsInTheSouthernHemisphere` | mengukur **letaknya**, bukan keterbacaannya |
+    ///
+    /// Persis pola yang sudah berulang di repo ini: gerbang yang menuntut
+    /// **keberadaan** ciri, bukan **keterbacaannya**.
+    ///
+    /// **Kenapa ambangnya 15% dan bukan rasio kontras WCAG.** Pita digambar
+    /// dengan opasitas di atas gradien bola, jadi rasio token mentah **bukan**
+    /// rasio yang dilihat mata — dan menulis rasio mentah ke sini menghasilkan
+    /// gerbang hampa: pada cacat aslinya rasio token terukur 1.18:1, di atas
+    /// ambang mana pun yang masih masuk akal. Yang bisa dipegang model adalah
+    /// **arah dan besaran relatif**: bintik harus lebih gelap dari pitanya.
+    /// 15% token melebar jadi **36.8/255** di render (diukur, 200 px), dari
+    /// cacat aslinya yang hanya 12.8/255. Keterbacaan **piksel**-nya diukur
+    /// terpisah di `Tools/check-visuals.py` (`check_jupiter_spot_reads_on_the_watch`),
+    /// karena di sanalah renderernya hidup; dua gerbang, dua tugas.
+    ///
+    /// Pita pembandingnya **bukan angka yang ditulis di sini**: `jupiterBands`
+    /// adalah sumber yang sama dengan yang dipakai menggambar, dan warna pita
+    /// diambil dari aksen yang sama dengan yang dipakai view.
+    func testJupiterSpotIsDarkerThanItsOwnBelt() {
+        let spot = CelestialVisual.accents.jupiterSpot
+        // Kasus terburuk, bukan pita yang paling menguntungkan: bintik harus
+        // lebih gelap dari **setiap** warna pita, sehingga ia tetap terbaca
+        // tak peduli pita mana yang kebetulan bersebelahan dengannya. Memilih
+        // "pita terdekat" akan mengunci uji ini pada pemetaan indeks→warna
+        // yang hidup di view dan di port — satu salinan ketiga di sini justru
+        // yang bisa berbeda pendapat dengan keduanya.
+        let bands = [CelestialVisual.accents.jupiterBandRust,
+                     CelestialVisual.accents.jupiterBandTan,
+                     CelestialVisual.accents.jupiterBandCream]
+
+        for (name, band) in [("pita paling gelap", bands[0]),
+                             ("pita tengah", bands[1]),
+                             ("pita paling terang", bands[2])] {
+            // 15% lebih gelap, di kedua mode. Siang memakai kanal merah
+            // karena itu kanal yang dibaca mode malam, dan hue siang tidak
+            // boleh menyembunyikan cacat yang justru muncul di malam.
+            XCTAssertLessThanOrEqual(
+                spot.red, band.red * 0.85,
+                "Bintik Merah Besar tidak cukup gelap terhadap \(name): "
+                + String(format: "%.3f", spot.red) + " lawan "
+                + String(format: "%.3f", band.red)
+                + ". Cacat aslinya 0.850 lawan 0.720 — bintiknya justru lebih "
+                + "TERANG, jadi di layar ia terbaca sebagai bagian pita.")
+
+            // **Mode malam diuji terpisah, karena di sanalah cacatnya paling
+            // parah.** Mode malam membuang hue, jadi seluruh pembeda bintik
+            // tinggal kanal merah; kalau itu mengecil, bintik hilang dari
+            // layar malam tanpa satu pun warna berubah.
+            let nightSpot = NightVisual.surface(spot).red
+            let nightBand = NightVisual.surface(band).red
+            XCTAssertLessThanOrEqual(
+                nightSpot, nightBand * 0.85,
+                "Di mode malam bintik harus tetap jelas lebih gelap dari "
+                + "\(name): " + String(format: "%.3f", nightSpot) + " lawan "
+                + String(format: "%.3f", nightBand)
+                + ". Hue sudah dibuang di mode ini, jadi selisih inilah "
+                + "satu-satunya yang tersisa.")
+        }
+    }
+
     /// Mode malam tidak boleh mengubah **kelas** terang: apa yang terang di
     /// langit tetap terang, hanya warnanya yang hilang.
     func testNightMappingIsMonotonicInDaylightBrightness() {

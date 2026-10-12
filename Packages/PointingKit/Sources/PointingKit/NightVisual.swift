@@ -141,6 +141,41 @@ public extension CelestialVisual {
         /// Pita tengah (krem gelap).
         public var jupiterBandTan: RGBComponents
         /// Bintik Merah Besar.
+        ///
+        /// **Nilainya dinaikkan kontrasnya setelah diukur, dan itu bukan
+        /// selera.** Bintik digambar sebagai elips warna rata di atas pita
+        /// yang warnanya nyaris sama, dan warnanya dulu `(0.85, 0.35, 0.25)`:
+        ///
+        ///   - **Di mode malam bintiknya lebih TERANG dari pitanya.** Mode
+        ///     malam membuang hue dan hanya menyisakan kanal merah, jadi
+        ///     `0.85 → 0.9025` duduk di atas pita paling gelap `0.72 → 0.818`.
+        ///     Di layar yang justru paling dipakai untuk mengamati, satu-satunya
+        ///     pembeda bintik berbalik arah.
+        ///   - **Di mode siang selisih luminansnya 12.8/255 (1.09:1).** Piksel
+        ///     bintik di atas pita di bawahnya — jauh di bawah 3:1, jadi di
+        ///     mode siang bintiknya hanya bisa ditemukan lewat **ronanya**,
+        ///     bukan lewat terangnya.
+        ///
+        /// Dan tidak satu pun gerbang lama melihatnya: semuanya mengukur
+        /// **keberadaan** ciri (`check_planet_features_present` menuntut ≥ 20
+        /// piksel kemerahan), **lengkung** gradiennya
+        /// (`check_jupiter_spot_keeps_its_curvature`), atau **letaknya**
+        /// (`testJupiterSpotIsInTheSouthernHemisphere`) — bukan
+        /// keterbacaannya.
+        ///
+        /// **Kenapa menggelapkan, bukan mencerahkan.** Diukur terhadap pita
+        /// yang sama: menggelapkan mencapai selisih 26/255, mencerahkan hanya
+        /// 14/255 — plafonnya ada karena bintik harus tetap terbaca sebagai
+        /// badai merah, bukan sebagai bayangan. Bintik yang lebih terang dari
+        /// pitanya juga terbaca sebagai **pita kedua**, bukan badai.
+        ///
+        /// **Kenapa 0.52, bukan 0.55.** Yang mengikat bukan keterbacaan siang
+        /// melainkan mode malam: `NightVisual.surface` menaikkan kanal merah
+        /// ke 0.35…1.0, jadi selisih siang 0.03 menyusut jadi 0.02 di malam.
+        /// Ambang uji `testJupiterSpotIsDarkerThanItsOwnBelt` (bintik ≤ 85%
+        /// pita, di kedua mode) menuntut kanal merah **≤ 0.53**; 0.52 adalah
+        /// langkah cadangan di bawahnya, dan masih ≥ 20/255 lebih gelap dari
+        /// pita di bawahnya di render.
         public var jupiterSpot: RGBComponents
 
         // MARK: Ciri planet lain
@@ -388,7 +423,7 @@ public extension CelestialVisual {
         jupiterBandCream: .init(red: 0.90, green: 0.83, blue: 0.72),
         jupiterBandRust: .init(red: 0.72, green: 0.52, blue: 0.38),
         jupiterBandTan: .init(red: 0.85, green: 0.76, blue: 0.62),
-        jupiterSpot: .init(red: 0.85, green: 0.35, blue: 0.25),
+        jupiterSpot: .init(red: 0.52, green: 0.14, blue: 0.10),
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
