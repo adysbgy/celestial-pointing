@@ -20646,3 +20646,104 @@ didominasi riak anti-aliasing limb. Artinya metrik yang dipakai harus
   - **Ambang harus diuji terhadap keadaan salah yang nyata**, bukan hanya
     terhadap gambar yang benar. Ambang 3,0 terlihat punya margin 2x terhadap
     6,05; ia sebenarnya hijau pada 3,92 yang berarti cirinya sudah dihapus.
+
+
+## Siklus 12 Okt (malam) #271 — sisa pohon kerja: bercak maria beriak (DIUKUR, DITAHAN)
+
+**Status: tidak ada perubahan kode yang dikirim.** Pohon repo **bersih**
+(`git status --short` kosong, `check-harness-terdaftar.py` 30/30 hijau).
+Siklus ini menemukan sisa WIP dari siklus yang di-`timeout` runner, mengukurnya,
+dan memutuskan **tidak** mengirimnya — dengan alasan yang diukur, bukan selera.
+
+### Apa yang tertinggal di pohon
+
+Siklus sebelumnya (yang mati oleh batas 60 menit) meninggalkan perubahan nyata
+pada tiga berkas: `CelestialVisualView.swift` (+85 baris), `Tools/check-visuals.py`
+(+88), `Tools/render-visuals.py` (+80), plus **tujuh berkas tak-terlacak**
+(enam probe `__cyc-*.py` dan satu harness `bukti-mutasi-kekuatan-maria.py`).
+
+Isinya bukan sampah: maria Bulan digambar ulang dari **4 lingkaran keras**
+menjadi **11 bercak beriak** dengan tepi yang **dilunakkan** (`mariaRipple`
+11 pasang amplitudo/fase; `mariaEdgeSoftness = 0.35`). Diukur dengan mata pada
+tiga baris pembanding (lama-bulat-keras / baru-riak-keras / baru-riak-lembut,
+masing-masing purnama+gibbous di 200 px dan ukuran kartu jam):
+
+> Baris 3 (riak + tepi lembut) adalah satu-satunya yang terbaca sebagai
+> **dataran gelap yang menyatu**, bukan polka dot atau kerikil. Pada ukuran
+> kartu jam, tepi keras (baris 1 & 2) menjaga identitas tiap bercak — dan
+> justru itulah yang membuatnya terbaca sebagai titik, sedangkan tepi lembut
+> meleburkannya menjadi wilayah gelap yang luas, seperti maria sungguhan.
+
+Jadi arah perubahan itu **benar** dan nilainya nyata. Yang tidak siap adalah
+pengawatnya.
+
+### Kenapa TIDAK dikirim: tiga kegagalan CI yang nyata, terukur
+
+Perubahan itu membuat tiga gerbang CI merah, dan tidak satu pun bisa
+diperbaiki dalam sisa waktu siklus ini:
+
+1. **Harness CI yang sudah ada kehilangan jangkarnya.** `bukti-mutasi-maria.py`
+   (dijalankan `engine-tests.yml`) memeriksa tiga jangkar **sebelum** apa pun
+   dan `sys.exit(2)` bila jumlahnya bukan tepat 1x. Terukur pada pohon WIP:
+
+       PORT_MARIA_CLIP  ('canvas.disc(mx, my, size * radius, …')  0x  (dulu 1x)
+       PORT_MARIA_LOOP  ('    for dx, dy, size in MARIA:')         0x  (dulu 1x)
+       MARIA_REFERENCE  (larik 4 bercak di check-visuals.py)       0x  (dulu 1x)
+
+   Ketiganya diganti oleh kode baru (gelung `enumerate` + `canvas.fill`) atau
+   oleh data baru (11 bercak). Harness-nya benar; jangkarnya yang basi.
+
+2. **Harness baru menunjuk tiga hal yang tidak ada.** `bukti-mutasi-kekuatan-maria.py`
+   mengimpor `program_aturan` (berkas **tidak ada**), memanggil
+   `mutasi_sumber.mutate()` (fungsi **tidak didefinisikan** — modul itu hanya
+   punya `require_clean_sources`/`write_source`/`restore_verified`), dan menuntut
+   gerbang `check_moon_feature_strength_on_the_watch` (**tidak ada** di
+   `check-visuals.py`; grep di seluruh riwayat = 0). Sekaligus ia **tidak
+   dirujuk** `engine-tests.yml`, jadi `check-harness-terdaftar.py` juga merah.
+
+3. **Komentar port menjanjikan gerbang yang tidak ada.** Docstring baru di
+   `render-visuals.py` berbunyi "Lihat `check_maria_edge_formula_matches_the_view`"
+   — gerbang itu tidak pernah ditulis. Komentar yang menunjuk gerbang hampa
+   adalah persis kelas yang berkali-kali dicatat di repo ini.
+
+Tiga-tiganya **bukan** cacat pada gambar; ketiganya cacat pada pengawat yang
+belum selesai. Mengirimkannya berarti `main` merah dan harness maria yang sudah
+ada berhenti berbunyi.
+
+### Yang diselamatkan
+
+Perubahan itu disimpan utuh di luar repo supaya siklus berikutnya bisa
+melanjutkan **tanpa menggambar ulang dari nol**:
+
+    /home/ubuntu/.hermes/profiles/xcode-dev/cache/scratch/cyc271-maria-riak/
+      maria-riak-wip.patch        (17 926 byte; `git apply` bersih — diverifikasi)
+      __cyc-*.py (6 probe)        (alat ukur: kontras, opasitas, banding, ciri)
+      bukti-mutasi-kekuatan-maria.py
+
+Patch-nya **diverifikasi bisa dipasang** ke HEAD (`git apply --check` hijau).
+
+### Yang TIDAK diklaim
+
+- Gerbang piksel `check-visuals.py --check` **tidak selesai** dijalankan siklus
+  ini. Pada mesin 2 inti ia melewati **41 menit** dan belum keluar; prosesnya
+  dihentikan. Jadi angka "729 pemeriksaan, 0 gagal" pada siklus sebelumnya
+  **tidak** diverifikasi ulang di sini, dan tidak diklaim untuk pohon WIP.
+- Kontras maria (klaim komentar "5.9% → 8.8%") **tidak** diukur ulang: probe
+  `__cyc-kontras-maria.py` juga belum selesai. Angka itu tetap **klaim yang
+  belum diverifikasi**, bukan hasil ukur siklus ini.
+- Penilaian visual di atas berasal dari **mata pada montase**, bukan dari
+  ambang piksel. Ia menjelaskan *arah* yang benar, bukan *besarnya*.
+
+### Pelajaran
+
+- **Sisa pohon kerja bisa benar arahnya dan tetap tidak boleh dikirim.** Dua
+  hal berbeda: apakah perubahannya memperbaiki gambar (ya), dan apakah ia
+  meninggalkan repo hijau (tidak). Yang pertama tidak menggantikan yang kedua.
+- **Perubahan visual di repo ini punya kewajiban pengawat, bukan cuma gambar.**
+  Mengubah larik/gelung yang dijadikan jangkar harness membuat harness yang
+  benar berbunyi — dan harness itu tidak boleh dilonggarkan agar perubahan
+  lolos; jangkarnya yang harus ikut berubah.
+- **`mutasi_sumber` sengaja menolak jalan di atas pohon kotor** (exit 2,
+  terbukti di sini: ia menyebut `render-visuals.py` & `check-visuals.py`).
+  Karena itu WIP tak-ter-commit **selalu** membuat harness mutasi merah —
+  tanda "jangan uji di atas ini", bukan "gerbangnya rusak".
