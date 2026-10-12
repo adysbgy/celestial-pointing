@@ -803,5 +803,26 @@ jobs:
       - name: Gerbang `public` berlebih di public extension
         run: python3 Tools/bersihkan-public-berlebih.py
 
+      # Setiap harness memanggil gerbang yang **benar-benar ada**.
+      #
+      # Ini melengkapi `check-harness-terdaftar.py`, yang menutup arah lain:
+      # berkas harness di disk wajib dirujuk alur kerja. Yang tidak
+      # ditutupnya adalah **isi** berkas yang menjadi sandaran harness.
+      #
+      # Occurrence ketiga dari pola yang sama (13/12, 17/16, 12/10), dan yang
+      # ketiga punya bentuk baru: berkasnya ada, dirujuk, dan berjalan — tapi
+      # ia memanggil `check_star_spike_halving_reaches_both_languages` yang
+      # saat itu hanya ada di WIP tak-ter-commit `Tools/check-visuals.py`.
+      # Terukur pada checkout bersih `fbb67f7`: grep gerbang itu = 0, dan CI
+      # gagal **setelah 37 menit** dengan enam keadaan `PROBE GAGAL JALAN:
+      # AttributeError`. `check-harness-terdaftar.py` hijau sepanjang itu.
+      #
+      # Bentuknya yang berbahaya: gerbang lama tetap hijau (daftar lengkap),
+      # dan yang gagal bukan yang salah (harness-nya benar, sandarannya belum
+      # ada). Jadi satu-satunya yang bisa menangkapnya adalah gerbang yang
+      # membandingkan **panggilan** dengan **definisi**.
+      - name: Buktikan setiap harness memanggil gerbang yang ada
+        run: python3 Tools/bukti-mutasi-gerbang-dijalankan.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
