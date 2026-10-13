@@ -191,12 +191,26 @@ def main():
     # Yang diuji di sini adalah akibatnya: pengosongan tetap merah meski
     # seseorang mencoba "mendaftarkan" gerbangnya lewat mekanisme apa pun yang
     # kelak muncul. Keadaan ini juga menjaga agar `GATE_AGGREGATORS` tidak
-    # pernah **kembali**.
+    # pernah **kembali** — sebagai **himpunan hidup**, bukan sebagai teks.
+    #
+    # Kenapa bukan `if "GATE_AGGREGATORS" in source`: kata itu sekarang hidup
+    # di docstring gerbangnya sebagai sejarah keputusan, dan pencocokan teks
+    # akan memerahkan harness ini pada berkas yang justru benar. Yang dicari
+    # adalah **penugasan himpunan di tingkat modul** — satu-satunya bentuk
+    # yang bisa dipakai gerbangnya sebagai pengecualian.
     widened = empty_gate(original, target_func)
-    if "GATE_AGGREGATORS" in widened:
-        print("GERBANG: `GATE_AGGREGATORS` muncul lagi di check-visuals.py — "
-              "daftar pengecualian adalah tombol bungkam; hapus, jangan "
-              "diperluas.", file=sys.stderr)
+    live_exemptions = [
+        node.targets[0].id
+        for node in ast.parse(widened).body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id.isupper()
+        and isinstance(node.value, ast.Set)
+    ]
+    if live_exemptions:
+        print("GERBANG: himpunan pengecualian tingkat-modul ditemukan lagi "
+              f"({', '.join(live_exemptions)}) — daftar pengecualian adalah "
+              "tombol bungkam; hapus, jangan diperluas.", file=sys.stderr)
         return 2
 
     # Keadaan: (nama, isi berkas, harapan, nama yang wajib disebut)
