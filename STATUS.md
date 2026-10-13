@@ -1,3 +1,125 @@
+## Progres terakhir (13 Okt 2026 — konversi warna bintang: tujuh koefisien yang dibaca gerbang, bukan warna yang digambar)
+
+Siklus ini meneruskan sapuan yang sama dengan entri di bawah: dari 83 gerbang
+di `check-visuals.py`, **berapa yang pernah dibuktikan bisa merah?** Terukur
+ulang di awal siklus: **16 nirsaksi**. Dipilih satu yang paling dekat dengan
+identitas objek: `check_star_rgb_conversion_matches_the_model`.
+
+### Kenapa gerbang ini, dan kenapa warna hasil saja tidak cukup
+
+Warna spektral adalah **ciri pengenal**: merah Betelgeuse dan biru Rigel
+sama meyakinkannya dengan cincin Saturnus. Yang sudah dijaga sebelum siklus
+ini adalah warna **hasil** di layar — `check_star_colour_order` (piksel,
+"Betelgeuse lebih merah dari Rigel") dan
+`check_star_colour_not_a_claim_when_uncertain` (warna hilang saat ragu),
+keduanya sudah punya harness.
+
+Yang **tidak** dijaga siapa pun: ketujuh koefisien yang mengubah indeks B−V
+menjadi warna itu — dua batas penjepit, `warmth_offset`, `warmth_span`, dan
+tiga pasangan (basis, kemiringan) kanal. Ketujuhnya hidup **dua kali**:
+`CelestialVisual.starRGB(forColorIndex:)` di Swift dan `star_rgb` di port
+Python. Gerbang ini satu-satunya yang membandingkan keduanya, dan ia belum
+pernah merah.
+
+Docstring-nya mengutip angka mutasi ("297 pemeriksaan visual, 637 uji Swift,
+28 aturan lint tetap hijau") untuk cacat yang ia tutup. Angka itu
+**diwarisi**, bukan diukur ulang — dan tidak satu pun dari ketiga hitungan itu
+diperiksa siklus ini. Yang dilakukan sebagai gantinya: menjalankan gerbangnya
+dalam tujuh keadaan rusak.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-konversi-warna.py` — 7 keadaan, semuanya sesuai harapan:
+
+| keadaan | hasil |
+|---|---|
+| baseline | hijau, 0 merah dari 9 |
+| 1. port: penjepit bawah −0.5 → −0.4 | MERAH `clamp_low` + hasil |
+| 2. model: span 1.70 → 1.60, port merah −0.02 | MERAH `span` + kanal + hasil |
+| 3. model **DAN** port: span 1.70 → 1.75 | **hijau** |
+| 4. model: penjepit B−V dibuang | MERAH bentuk (1 hasil) |
+| 5. port: baris tambahan menyalakan ulang `warmth` | MERAH hasil saja |
+| 6. port: penjepit B−V dibuang | MERAH bentuk (1 hasil) |
+
+**Keadaan 3 wajib hijau, dan itu bukan hiasan.** Dua bahasa yang berubah
+bersama dengan nilai yang sama **bukan penyimpangan**: tidak ada yang tampil di
+jam berbeda dari yang digerbangi. Harness yang memerah di sana mengajarkan
+bahwa "gerbang ini menolak setiap suntingan warna" — dan gerbang yang
+dilonggarkan tidak menjaga apa pun.
+
+**Keadaan 5 adalah yang paling berharga, dan ia hanya berbunyi di satu
+pemeriksaan.** Seluruh deklarasi yang dibaca gerbang tetap utuh — penjepit
+−0.5…2.0, offset 0.35, span 1.70, ketiga basis kanal — lalu sebuah baris
+**di bawahnya** menyalakan ulang `warmth` dengan faktor 0.9. Perbandingan
+koefisien **hijau seluruhnya**; yang berbunyi hanya pemeriksaan hasil, karena
+ia membandingkan `star_rgb(i)` sungguhan lawan rumus yang dibaca dari sumber.
+Gerbang yang hanya membandingkan teks akan hijau di sini.
+
+**Keadaan 4 dan 6 menemukan sesuatu yang tidak tertulis di mana pun.** Saat
+penjepitnya hilang, gerbangnya **berhenti lebih awal** dan melaporkan **satu**
+hasil (`"…bentuk terbaca"`) — bukan sembilan. Harness ini menuntut himpunan
+hasilnya **persis**, jadi perbedaan himpunan itu sendiri menjadi bagian dari
+bukti: kalau kelak gerbangnya diubah untuk "melewati saja" keadaan bentuk
+rusak, keadaan 4 dan 6 akan mulai tidak sesuai harapan. Keduanya dijalankan di
+**dua bahasa berbeda** karena pembaca bentuk dipanggil dua kali dengan jangkar
+yang berbeda, dan satu arah tidak membuktikan sisi yang lain terbaca.
+
+### Dua kesalahan harness, keduanya tertangkap sebelum push
+
+1. Versi pertama menulis suntingan sebagai pasangan `(cari, ganti)` padahal
+   perulangannya membaca `(berkas, cari, ganti)` — crash `ValueError` setelah
+   keadaan baseline. Diperbaiki di harness, bukan dengan melonggarkan
+   perulangannya.
+2. Versi kedua menuntut sembilan hasil di **semua** keadaan, sehingga keadaan
+   bentuk-rusak dilaporkan "gerbang kosong". Yang salah adalah **harapannya**:
+   gerbangnya memang berhenti lebih awal, dan itu benar. Dua keadaan tambahan
+   (4 & 6) ditulis untuk menyatakan himpunan satu-hasil itu secara eksplisit.
+
+### Yang TIDAK diklaim
+
+- Gerbang ini mengikat **angkanya**, bukan kebenaran astronomis warnanya.
+  Dua bahasa yang **sepakat dan sama-sama salah** (mis. merah dan biru ditukar
+  di kedua berkas) tidak ditangkapnya — itu milik `check_star_colour_order`
+  dan `testStarColourIsMonotonicInColorIndex`. Pemisahan itu disengaja supaya
+  mengubah nilai kosmetik tidak memaksa dua tempat berubah.
+- Gerbang ini **tidak** membaca piksel app. `Apps/CelestialVisualView.swift`
+  memanggil `CelestialVisual.starRGB` dari paket; kalau view berhenti
+  memanggilnya, tak satu pun pemeriksaan di sini berbunyi.
+- Angka mutasi di docstring gerbangnya ("297 pemeriksaan, 637 uji, 28 aturan")
+  **tidak** diukur ulang; siklus ini menggantinya dengan tujuh keadaan yang
+  dijalankan.
+- **15 gerbang nirsaksi lainnya belum dikerjakan.** Terukur ulang sesudah
+  siklus: 16 → **15**.
+- Tidak ada perubahan perilaku: `Apps/` dan `Packages/` **tidak disentuh**
+  (hanya `Tools/` + langkah CI + STATUS).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 778 | **778** (tak disentuh) |
+| Gerbang nirsaksi | 16 | **15** (−1) |
+| Harness dirujuk CI | 39 | **40** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `python3 Tools/bukti-mutasi-konversi-warna.py` → **7 keadaan, 0 tidak
+    sesuai harapan**; kedua berkas produksi pulih **persis** (md5 sama
+    sebelum/sesudah).
+  - `python3 Tools/check-harness-terdaftar.py` → **40 harness, semuanya
+    dirujuk**.
+  - `./swift-ui-lint.sh` → SEMUA GERBANG UI LULUS. `./swift-typecheck.sh` →
+    SEMUA GERBANG LULUS.
+  - `./swift-test.sh` → **778 uji, 0 gagal pada HEAD bersih**; 1 gagal pada
+    pohon kerja, yaitu WIP siklus lain di `CalibrationSession.swift:193`
+    (dibuktikan dengan menjalankan suite di HEAD bersih: 0 gagal, lalu WIP
+    mereka dipulihkan utuh).
+
+---
+
 ## Progres terakhir (13 Okt 2026 — gerbang keterbacaan bulan baru: 18 gerbang yang belum pernah dibuktikan bisa merah)
 
 Siklus ini dimulai dari satu pertanyaan yang belum pernah diajukan ke

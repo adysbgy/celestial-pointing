@@ -725,6 +725,17 @@ jobs:
       - name: Buktikan gerbang warna spektral bintang berbunyi
         run: python3 Tools/bukti-mutasi-warna-bintang.py
 
+      # Dan bukti untuk **konversi indeks B−V → RGB bintang**: koefisien yang
+      # benar-benar mencapai piksel, dibaca dari kedua bahasa. Saudaranya
+      # `bukti-mutasi-warna-bintang.py` sudah menjaga warna *hasil* di layar;
+      # ini menutup sisi yang tidak dijaganya — ketujuh koefisien di
+      # `CelestialVisual.starRGB` melawan `star_rgb` port. Tanpa ini, "model
+      # berubah, port tidak ikut" (cacat dua bahasa yang paling mungkin) lolos
+      # tanpa satu pun pemeriksaan berbunyi. Keadaan 5 menutup bentuk paling
+      # sunyi: deklarasi utuh, baris tambahan menyalakan ulang warmth.
+      - name: Buktikan gerbang konversi warna bintang berbunyi
+        run: python3 Tools/bukti-mutasi-konversi-warna.py
+
       # Dan bukti untuk gerbang ciri planet di mode malam. Empat dari lima
       # ciri pengenal (cincin, kutub, kawah, kabut) diukur hanya di mode
       # siang; `NightVisual` memetakan setiap warna ke kanal merah saja,
