@@ -1,3 +1,162 @@
+## Progres terakhir (13 Okt 2026 — lengkung piringan Bulan: gerbangnya hijau pada kode yang menulis angkanya)
+
+Dua cacat gerbang ditutup siklus ini, keduanya ditemukan dengan **mengukur**,
+bukan membaca. Sumber pemicunya: `Tools/sapu-buta-view.py`, sapuan baru yang
+menjawab pertanyaan yang belum pernah diajukan repo ini — dari sekian puluh
+angka di `Apps/Shared/CelestialVisualView.swift` yang punya pasangan di port
+Python, **mana** yang perubahannya tidak menyalakan satu pun gerbang teks?
+
+### Cacat 1: dua pemanggil, satu token
+
+`check_moon_disc_keeps_its_curvature` mengklaim *"view membaca radius akhir
+gradien dari model, bukan menulis angkanya"* — dan membuktikannya dengan
+mencari `CelestialVisual.moonSphereGradientEndRadius` di **seluruh berkas**
+view. Berkas itu memuat **dua** pemanggil konstanta yang sama:
+
+```
+CelestialVisualView.swift:178   sphereGradient   <- jalur BULAN
+CelestialVisualView.swift:265   drawPlanet       <- jalur planet
+```
+
+Terukur: mengganti **baris 178 saja** menjadi `endRadius: radius *
+CGFloat(1.15))` membiarkan **ketiga** gerbang hijau. Baris 265 menyumbang
+tokennya, gerbang planet hanya melihat `drawPlanet`, dan pikselnya mengukur
+port — yang tidak diubah. Pemeriksaan yang menyebut dirinya "bukan menulis
+angkanya" lalu hijau pada kode yang menulis angkanya.
+
+### Cacat 2: pola yang tidak pernah cocok
+
+Pemeriksaan "tidak menulis angkanya sendiri" mencari `radius * 1.15`. Kode
+Swift nyata menulis `radius * CGFloat(1.15)` — `endRadius:` bertipe `CGFloat`,
+jadi setiap pemakaiannya terbungkus. Polanya **tidak pernah cocok**, sehingga
+pemeriksaan itu hijau **persis** pada keadaan yang ia ada untuk
+menangkapnya — dan ia melaporkan `"tanpa literal radius * 1.15 — angkanya
+satu, di model"`, kalimat yang terdengar seperti bukti. Kedua gerbang
+(Bulan & planet) membawa cacat yang sama.
+
+### Sisi port tidak punya penjaga sama sekali
+
+Mengganti pemakaian di `_moon_sphere_gradient` (jalur Bulan di port) menjadi
+literal tidak menggerakkan satu pun pemeriksaan, karena **gambarnya
+identik**. Yang hilang bukan gambar hari ini, melainkan **ikatannya**: sejak
+saat itu mengubah konstanta tidak lagi mengubah Bula apa pun. Karena itu
+gerbangnya mendapat pemeriksaan **kepekaan piksel** — konstanta diganti
+1.15 → 1.45, dan piksel pita yang menyala harus bergerak.
+
+Terukur pada 200 px, ss=2, versus **0,00** pada render ulang identik:
+
+| kasus | 1.05 | 1.45 | identik |
+|---|---|---|---|
+| `moon-full` | 5.26 | 11.43 | 0.00 |
+| `moon-gibbous` | 4.84 | 10.51 | 0.00 |
+| `moon-crescent-jakarta` | 6.95 | 15.06 | 0.00 |
+
+`moon-new` dan `moon-unknown-phase` sengaja **tidak** diukur: keduanya
+terklasifikasi 0 piksel menyala, jadi menyertakannya akan membuat gerbang ini
+hijau karena tidak mengukur apa pun — kelas cacat yang seluruh repo ini
+kejar.
+
+### Perbaikannya
+
+Dua pemeriksaan baru dibatasi ke **tubuh** `sphereGradient` lewat
+`_function_body` + `swift_code_only` (pembatas yang sama dengan gerbang
+planet), dan polanya menerima `CGFloat(...)` opsional. Tanpa
+`swift_code_only`, docstring di atas `sphereGradient` yang **menjelaskan**
+nama konstantanya akan dihitung sebagai pemakaian.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-lengkung-bulan.py`, **7 keadaan**, semuanya sesuai
+harapan. Yang paling penting bukan yang merah, melainkan **yang wajib
+hijau**:
+
+| keadaan | harapan |
+|---|---|
+| baseline | 0 merah dari 179 pemeriksaan |
+| 1. view: jalur Bulan → literal | merah **hanya** dua pemeriksaan `sphereGradient`; `drawPlanet` tetap hijau |
+| 2. view: jalur planet → literal | merah **hanya** pemeriksaan `drawPlanet`; `sphereGradient` tetap hijau |
+| 3. port: jalur Bulan → literal | merah lewat kepekaan piksel (dulu: 0 merah) |
+| 4. port: jalur planet → literal | merah (sudah dijaga sebelum siklus ini) |
+| 5. model 1.15 → 1.35 | merah lewat gerbang drift |
+| 6. model **dan** port 1.35 | merah: gerbang drift menyematkan **nilai**, bukan hanya kesamaan antarbahasa |
+
+Kalau keadaan 1 dan 2 sama-sama memerahkan **kedua** pemeriksaan, berarti
+pembatasan tubuh fungsi tidak bekerja dan harness ini sendiri yang harus
+merah. Harness didaftarkan di `engine-tests.yml` — gerbang yang tidak
+dieksekusi selalu hijau, dan `Tools/check-harness-terdaftar.py` menjaga
+daftar itu (34 harness, semuanya dirujuk).
+
+### Cacat proses yang ikut ditutup: sapuan yang menyalahkan angka tetangga
+
+Versi pertama `sapu-buta-view.py` memakai `str.replace`, jadi menyapu `0.7`
+juga menyunting `0.75` — dan `0.75` adalah `CRATER_INNER_FLOOR_OPACITY`,
+yang **memang** dijaga. Sapuannya melaporkan `0.7` "bunyi", padahal yang
+berbunyi adalah gerbang milik angka tetangganya. Gerbang yang mengukur angka
+lain sambil terlihat mengukur angka ini adalah bentuk paling sunyi dari kelas
+cacat ini. Diganti pencocokan batas-angka (`(?<![\w.])…(?![\w.])`).
+
+### 5 uji format angka, dan mutasi yang membuktikan mereka bisa merah
+
+Ditemukan dengan cara yang sama — mengukur. `"%+.4f"` diganti `"%.4f"`
+(tanda `+` dibuang) lalu seluruh suite dijalankan: **773 uji tetap hijau,
+nol kegagalan.** Tidak satu pun gerbang menyentuh `signedDegrees`, padahal
+satu-satunya pemanggilnya (`DiagnosticsView.swift`) menampilkannya sebagai
+baris **declinasi** objek — `+41,9°` (utara) dan `-41,9°` (selatan) adalah
+dua belahan langit yang berbeda, dan tanpa tanda keduanya tercetak `41,9°`.
+
+Kelas cacat yang sama untuk `degreesPerSecond`: satuan `/dtk` dibuang →
+**773 uji tetap hijau**. Baris laju dipakai di tiga layar (`PointingView`,
+`Experiment1View`, `LinkView`), dan "12" pada baris yang mengukur gerak
+tangan bisa dibaca sebagai derajat, ketukan, atau detik.
+
+| mutasi kode produksi | hasil |
+|---|---|
+| `%+.4f` → `%.4f` | RED 3 uji (`testSignedDegreesPrintsTheSign`, `…KeepsTheSignOnZero`, `…FollowsTheActiveLanguage`) |
+| `+ "/dtk"` → `+ ""` | RED 2 uji (`…CarriesItsUnit`, `…RespectsFractionDigits`) |
+
+Kelimanya **bukan** sekadar hijau pada hari ditulis: tiap satu dibuktikan
+merah oleh mutasi pada kode produksinya, lalu sumbernya dipulihkan dan
+`git diff --quiet` atas `NumberFormat.swift` dikonfirmasi bersih.
+
+### Temuan yang muncul dari uji ini sendiri
+
+`testDegreesPerSecondRespectsFractionDigits` mengungkap `String(format:)`
+membulatkan **bankir**: `12,5` dengan nol digit menjadi `12`, bukan `13`.
+Perilaku itu diwarisi dari `degrees` dan **sengaja tidak dibetulkan** di
+sini — uji itu mengunci perilaku apa adanya, supaya kalau kelak ada yang
+"merapikannya", perubahan itu terlihat dan diputuskan, bukan menyelinap.
+
+### Yang TIDAK diklaim
+
+- Gerbang kepekaan piksel membuktikan port **membaca** konstantanya. Ia
+  **tidak** membuktikan nilai 1.15 itu benar secara astronomis — itu
+  keputusan tampilan, dan ambangnya (3.0/255) direkam apa adanya.
+- Uji format angka memakai `String(format:)` sistem; yang dijaga adalah
+  **format** dan **satuan**, bukan pembulatan ideal.
+- **Tidak ada perubahan perilaku.** Seluruh 778 uji hijau pada kode apa
+  adanya; 5 uji yang ditambah semuanya hijau tanpa menyentuh satu baris
+  `Packages/PointingKit/Sources/`.
+
+### Satu cacat yang dibuang, bukan diteruskan
+
+WIP siklus sebelumnya meninggalkan mutasi **nyasar** di view:
+`haze.opacity(0.7)` → `haze.opacity(0.4)` pada `drawHaze` (Venus), sementara
+port Python-nya masih `(rgb, 0.7)`. Asalnya `ukur-dua-angka.py`, yang
+memutasi view lalu memulihkannya di `finally` — dan siklus itu mati
+timeout/SIGKILL di tengah probe, jadi `finally` tidak pernah jalan. Efeknya
+persis kelas cacat yang repo ini kejar: **view dan port menggambar Venus yang
+berbeda**, dan tidak satu pun gerbang berbunyi. Dibuang (`git checkout --`),
+bukan dikomit.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 773 | **778** (+5) |
+| Gerbang piksel | 768 | **768** (0 gagal) |
+| Harness mutasi dirujuk CI | 33 | **34** |
+| README | 773 | **778** (Aturan 10) |
 ## Progres terakhir (13 Okt 2026 — jembatan arah fase Bulan & planet: rumusnya dijaga, penyambungannya tidak)
 
 Sapuan repo (`Tools/sweep-unconsumed.sh`) melaporkan dua fungsi yang
