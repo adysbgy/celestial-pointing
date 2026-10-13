@@ -44,21 +44,37 @@ Perbaikannya ada dua, dan keduanya perlu:
 
 ### Yang diukur harness ini
 
-    [baseline]                                hijau, 5 pemeriksaan
-    1. port: pusat ditambahkan dua kali       MERAH (sumbangan glif)
-       (keadaan cacat yang asli)              — gerbang lama tetap hijau
-    2. port: glif dihapus seluruhnya          MERAH (sumbangan glif)
-    3. port: glif digeser +0.12 R             MERAH (sumbangan glif)
-    4. port: glif diskalakan 3x               MERAH (sumbangan glif,
-                                                      keluar lencana)
-    5. port: titik jadi pergeseran dari pusat MERAH (sumbangan glif)
-       (konvensi satuan salah, arah lain)
-    6. kontrol negatif: komentar diubah       hijau penuh
+    [baseline]                                    hijau, 5 pemeriksaan
+    1. port: pusat ditambahkan dua kali           MERAH (sumbangan glif)
+       (keadaan cacat yang asli)                  — gerbang lama tetap hijau
+    2. port: glif dihapus seluruhnya              MERAH (sumbangan glif)
+    3. port: glif digeser +0.45 R                 MERAH (ketiga posisi)
+    3b. port: glif digeser +0.12 R                hijau penuh  ← batas cakupan
+    4. port: glif diskalakan 3x                   MERAH (sumbangan; terklip)
+    5. port: titik jadi pergeseran dari pusat     MERAH (sumbangan; terklip)
+    6. kontrol negatif: komentar diubah           hijau penuh
 
 Keadaan 1 adalah yang paling penting: ia keadaan yang **benar-benar hidup
 di repo ini** sampai siklus ini, dan gerbang lamanya hijau di sana.
 Keadaan 6 membuktikan harness tidak merah sekadar karena berkasnya
 berubah.
+
+### Dugaan yang terukur salah, dan dicatat supaya tidak diulang
+
+Versi pertama harness ini menuntut keadaan 3 (geser 0.12 R) merah.
+Terukur: **hijau penuh**. Lencananya berjarak ±0.36 R dari pusat jendela,
+jadi pergeseran kecil masih berada di dalam kotaknya dan memang tidak
+seharusnya merah. Geser 0.45 R barulah merah. Mengharapkan 0.12 R merah
+berarti akan **melonggarkan** gerbang pada kode yang benar — cacat yang
+tepat dihindari oleh seluruh pendekatan ini. Keadaan 3b menyimpan
+batasnya secara tertulis.
+
+Keadaan 4 dan 5 juga tidak seperti dugaan: keduanya memerahkan
+**sumbangan**, bukan posisi, karena skala 3x dan pergeseran ganda
+mendorong glif keluar kanvas dan rasterisernya **memotong** stroke di
+luar frame — sehingga nol piksel peringatan tergambar, di dalam maupun di
+luar kotak. Pemeriksaan posisi tidak bisa merah atas piksel yang tidak
+ada. Ini batas nyata gerbangnya dan patut dicatat, bukan disembunyikan.
 
 ### Yang TIDAK diklaim
 
@@ -171,40 +187,66 @@ STATES = [
      {SUMBANGAN: MERAH, TERGAMBAR: HIJAU,
       SATURN: HIJAU, JUPITER: HIJAU, MARS: HIJAU}),
 
-    # ── 3. Glif digeser sedikit ke dalam kanvas ───────────────────────────
-    # Berbeda dari keadaan 1: glifnya **tetap tergambar**, hanya bergeser
-    # 0.12 R dari tempatnya. Keadaan 1 tidak bisa membedakan "glif hilang"
-    # dari "glif salah tempat"; yang ini membuktikan gerbangnya peka
-    # terhadap tempatnya, bukan sekadar keberadaannya.
-    ("3. port: glif digeser +0.12 R (tetap tergambar, salah tempat)",
+    # ── 3. Glif digeser sedikit, masih di dalam lencana ───────────────────
+    # **Keadaan yang paling mudah ditebak salah, dan terukur salah.** Dugaan
+    # pertama: geser 0.12 R pasti merah. Terukur: **hijau penuh**. Geser
+    # 0.45 R barulah ketiga pemeriksaan posisi merah. Lencananya berjarak
+    # ±0.36 R dari pusat jendela, jadi glif bergeser kecil masih di dalam
+    # kotaknya — dan benar begitu, karena gerbang ini menjaga **posisi**,
+    # bukan jarak piksel yang sewenang-wenang.
+    #
+    # Catatan: geser **−**0.45 R memerahkan posisi **dan** sumbangan (0
+    # piksel) karena arah itu membawa glif keluar frame dan terklip; geser
+    # **+**0.45 R memerahkan posisi saja, karena glifnya tetap tergambar di
+    # luar lencana. Ketiga pemeriksaan posisi merah di kedua arah — arah
+    # tidak jadi soal bagi gerbangnya, dan pantas begitu.
+    ("3. port: glif digeser +0.45 R (keluar lencana, tetap tergambar)",
+     [(RENDER, GLYPH_POINTS,
+       "    points = [(size / 2.0 + gx * radius + 0.45 * radius,\n"
+       "              size / 2.0 + gy * radius)\n"
+       "              for gx, gy in points]\n")],
+     {SATURN: MERAH, JUPITER: MERAH, MARS: MERAH}),
+
+    # ── 3b. Geser terlalu kecil untuk merah: batas cakupan yang dinyatakan ─
+    # Keadaan yang **harus tetap hijau**, supaya orang yang membaca harness
+    # ini tidak menyimpulkan "setiap pergeseran ketahuan". Geser 0.12 R
+    # masih di dalam lencana, dan gerbangnya benar-benar hijau di sana.
+    # Tanpa keadaan ini, keadaan 3 terbaca sebagai "gerbang peka terhadap
+    # setiap pergeseran" — klaim yang terukur salah.
+    ("3b. port: glif digeser +0.12 R (masih di dalam lencana) — tetap hijau",
      [(RENDER, GLYPH_POINTS,
        "    points = [(size / 2.0 + gx * radius + 0.12 * radius,\n"
        "              size / 2.0 + gy * radius)\n"
        "              for gx, gy in points]\n")],
-     {SUMBANGAN: MERAH, SATURN: HIJAU, JUPITER: HIJAU, MARS: HIJAU}),
+     dict(ALL_HIJAU)),
 
-    # ── 4. Glif diskalakan 3x: harus keluar lencana ───────────────────────
-    # Satu-satunya keadaan yang menyalakan pemeriksaan **posisi** (glif
-    # tidak keluar lencana), bukan cuma sumbangan. Tanpanya, tiga keadaan
-    # di atas semuanya mengukur satu hal yang sama.
-    ("4. port: glif diskalakan 3x (keluar lencana)",
+    # ── 4. Glif diskalakan 3x ─────────────────────────────────────────────
+    # Terukur: memerahkan **sumbangan**, bukan posisi — dan itu bukan
+    # kelemahan gerbangnya. Skala 3x mendorong glif keluar kanvas,
+    # rasterisernya **memotong** stroke di luar frame, sehingga nol piksel
+    # peringatan tergambar di mana pun, termasuk di luar kotak lencana.
+    # Pemeriksaan posisi tidak bisa merah atas piksel yang tidak ada; yang
+    # menangkapnya adalah pemeriksaan sumbangan (0 piksel). Skala 1.8x
+    # menghasilkan verdict yang sama persis.
+    ("4. port: glif diskalakan 3x (keluar kanvas, terklip)",
      [(RENDER, GLYPH_POINTS,
        "    points = [(size / 2.0 + gx * radius * 3.0,\n"
        "              size / 2.0 + gy * radius * 3.0)\n"
        "              for gx, gy in points]\n")],
-     {SUMBANGAN: MERAH, SATURN: MERAH, JUPITER: MERAH, MARS: MERAH}),
+     {SUMBANGAN: MERAH, SATURN: HIJAU, JUPITER: HIJAU, MARS: HIJAU}),
 
     # ── 5. Konvensi satuan salah, arah sebaliknya ─────────────────────────
-    # Titik absolut diperlakukan sebagai **pergeseran** dari pusat. Berbeda
-    # dari keadaan 1 (yang menambahkan pusat dua kali): di sini glifnya
-    # mendarat di tempat yang berbeda, dan hanya pemeriksaan sumbangan yang
-    # bisa menangkapnya.
-    ("5. port: titik absolut dipakai sebagai pergeseran dari pusat",
+    # Titik absolut diperlakukan sebagai **pergeseran** dari pusat, sehingga
+    # koordinatnya jadi `pusat + (pusat + titik)`. Terukur sama dengan
+    # keadaan 4: keluar kanvas dan terklip, jadi yang merah pemeriksaan
+    # sumbangan. Berbeda dari keadaan 1, di mana glifnya juga hilang tetapi
+    # karena **pergeseran ganda** yang arahnya berlawanan.
+    ("5. port: titik absolut dipakai sebagai pergeseran dari pusat (terklip)",
      [(RENDER, GLYPH_POINTS,
        "    points = [(size / 2.0 + (center[0] + gx) * radius,\n"
        "              size / 2.0 + (center[1] + gy) * radius)\n"
        "              for gx, gy in points]\n")],
-     {SUMBANGAN: MERAH, SATURN: MERAH, JUPITER: MERAH, MARS: MERAH}),
+     {SUMBANGAN: MERAH, SATURN: HIJAU, JUPITER: HIJAU, MARS: HIJAU}),
 
     # ── 6. Kontrol negatif: suntingan yang tidak mengubah gambar ──────────
     # Kalau harness merah di sini, ia merah karena berkasnya berubah, bukan
