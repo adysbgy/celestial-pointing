@@ -1,3 +1,89 @@
+## Progres terakhir (13 Okt 2026 — jembatan arah fase Bulan & planet: rumusnya dijaga, penyambungannya tidak)
+
+Sapuan repo (`Tools/sweep-unconsumed.sh`) melaporkan dua fungsi yang
+**dipakai layar** dengan `test=0`:
+
+| fungsi | dipakai di `Apps/` | uji |
+|---|---|---|
+| `moonBrightLimbAngle` | `PointingEngine.swift:238` | **0** |
+| `planetBrightLimbAngle` | `PointingEngine.swift:256` | **0** |
+
+Keduanya meneruskan hasilnya ke `CelestialVisual` sebagai
+`brightLimbAngleRadians` — yaitu **sudut sabit yang benar-benar digambar di
+layar**. Sapuan itu benar, bukan false positive seperti hitungan sebelumnya di
+siklus ini.
+
+### Kenapa ini celah yang berbahaya
+
+`CelestialVisualTests` sudah menjaga **rumus** murni `brightLimbAngle` dengan
+baik — termasuk kontrol negatif paling penting di repo ini
+(`testWaxingAloneCannotExpressTheLimbAngle`, yang mengunci alasan keberadaan
+sudut lintang: di Jakarta sabit muda menghadap **bawah**, bukan kanan; galat
+85 derajat pada jawaban lama).
+
+Yang tidak dijaga siapa pun adalah **penyambungannya**: benda mana yang
+diambil dari efemeris, apakah penjaga `showsPhase` benar-benar dihormati, dan
+apakah `nil` (tidak tahu) tetap `nil`. Ketiganya tidak bisa dibaca dari nilai
+keluarannya. Sabit Venus yang salah sisi tampak **sama meyakinkannya** dengan
+yang benar, dan tidak ada teks di layar yang bisa membantahnya.
+
+### Bukti bahwa gerbang baru berbunyi
+
+Tiga mutasi dijalankan pada kode yang sama, masing-masing **merah pada uji
+yang tepat**:
+
+| mutasi | hasil |
+|---|---|
+| Bulan mengambil `.sun` sebagai benda | RED `testMoonLimbAngleIsDefinedWhenMoonAndSunDiffer` |
+| `guard planet.showsPhase` dilepas | RED `testOuterPlanetsHaveNoPhaseEvenWithEphemeris` — Mars digambar bersabit |
+| Planet dalam mengambil `.sun` sebagai benda | RED `testInnerPlanetPhaseIsDefinedWhenItDiffersFromTheSun` |
+
+Sumber dipulihkan tiap kali; `git status` atas `CelestialVisual.swift` bersih.
+
+### Temuan yang muncul dari ujinya sendiri, bukan dari membaca rumus
+
+Pasangan Bulan/Matahari yang saya pilih pertama (RA 100°/280°, deklinasi
+±10°) ternyata jatuh **tepat di titik antisolar** di kerangka horizontal
+pengamat:
+
+```
+Bulan    alt/az  52.6 / 295.4
+Matahari alt/az -52.6 / 115.4     <-- persis -M
+```
+
+Delta Matahari−Bulan jadi antiparalel terhadap arah pandang, terproyeksi ke
+nol, dan sudutnya `nil` — **dua uji pertama saya MERAH**. Pasangan diganti ke
+geometri sabit yang wajar (sudut ≈ 68°), dan batas ini dicatat di docstring
+uji supaya tidak ada yang mengulanginya.
+
+### Sifat yang diukur (14 uji)
+
+1. Tanpa efemeris, atau saat efemeris **gagal** → `nil`, bukan angka karangan.
+2. Planet luar (`showsPhase == false`) **selalu** `nil` walau efemeris lengkap.
+3. Benda & Matahari berimpit → `nil`; berbeda posisi → **wajib** ada sudut.
+   Arah inilah satu-satunya yang bisa menangkap mutasi "benda yang salah".
+4. Fraksi Bulan **dijepit** 0…1; fraksi planet **ditolak** di luar rentang.
+   Perbedaan yang disengaja: galat pembulatan di tepi vs perhitungan rusak.
+5. Elongasi dibungkus ke 0…360 sebelum dibandingkan 180, jadi elongasi negatif
+   (−350° = +10°) tidak membalik arah sabit.
+
+### Yang TIDAK diklaim
+
+- Uji ini memakai efemeris **palsu**. Ia membuktikan penyambungannya benar,
+  **bukan** bahwa AstronomyKit mengembalikan posisi yang benar — itu tetap
+  dijaga `EphemerisTests` terhadap JPL Horizons, di macOS.
+- **Tidak ada perubahan perilaku.** Seluruh 14 uji hijau pada kode apa adanya;
+  yang ditambah hanya gerbangnya.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 759 | **773** (+14) |
+| Aturan UI | 35 | **35** (lulus) |
+| Baris `Apps/` berubah | — | **0** |
+
 ## Progres terakhir (13 Okt 2026 — sambungan sebab seri diagnosis: dua petunjuk yang saling meniadakan, tersambung tanpa pemisah)
 
 Cacat kedua dari kelas yang sama dengan entri di bawah, dan ditemukan dengan
