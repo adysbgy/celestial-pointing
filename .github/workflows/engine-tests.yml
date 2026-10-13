@@ -1043,5 +1043,68 @@ jobs:
       - name: Buktikan setiap harness memanggil gerbang yang ada
         run: python3 Tools/bukti-mutasi-gerbang-dijalankan.py
 
+      # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
+      # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
+      # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
+      # ditulis dan tidak dirujuk harness mana pun (16 gerbang nirsaksi).
+      #
+      # Kenapa keduanya layak: cacat yang ditutupnya **sudah pernah nyata**.
+      # `to_png` dulu menulis barisnya tanpa byte filter sementara `_png()`
+      # mengklaim menyisipkannya; arus IDAT jadi `h·w·4` sedangkan spesifikasi
+      # menuntut `h·(w·4+1)`, sehingga Preview, browser, dan `ffmpeg` menolak
+      # berkasnya — sementara `check_png_roundtrip` **lulus**, karena
+      # `decode_png` toleran terhadap bentuk salah itu.
+      #
+      # Temuan yang menentukan bentuk harnessnya: **kedua gerbang tidak
+      # mubazir, dan masing-masing merah di keadaan yang berbeda.**
+      # Menghapus byte filter membuat `well_formed` merah sementara `roundtrip`
+      # tetap **hijau** (dan itu benar — pembaca memilih cabang tanpa filter
+      # lalu mengembalikan piksel yang persis). Sebaliknya, keadaan 3
+      # (filter 1 dideklarasikan tanpa isinya difilter) panjangnya tepat
+      # `h·(w·4+1)` sehingga `well_formed` hijau, tetapi 4032 dari 4096 piksel
+      # berbeda setelah bolak-balik. Harness yang menuntut `roundtrip` merah
+      # di keadaan 1 akan merah pada kode yang benar, dan orang berikutnya
+      # akan melonggarkan gerbangnya.
+      - name: Buktikan gerbang PNG berbunyi
+        run: python3 Tools/bukti-mutasi-png.py
+
+      # Bukti bahwa `check_crater_drawing_constants` bukan gerbang mati — dan
+      # catat batas cakupannya dengan jujur. Harnessnya menjalankan gerbang di
+      # proses baru atas sumber yang dimutasi dan menuntut subset nama hasil
+      # yang diukur, bukan sekadar "ada yang merah". Keadaan 4b/4c membuktikan
+      # klaim docstring gerbangnya salah (bukan invariansi skala), dan (a)–(c)
+      # membuktikan kelas gambar kawah selebihnya tidak terbaca sama sekali.
+      - name: Buktikan gerbang sabit bibir kawah berbunyi
+        run: python3 Tools/bukti-mutasi-sabit-bibir-kawah.py
+
+      # Bukti bahwa `check_candidate_marker_stays_inside_its_badge` berbunyi —
+      # gerbang yang menjaga **satu-satunya penanda di layar** yang mengatakan
+      # "engine ragu". Kalau ia hanya hijau, yang tersisa adalah gambar objek
+      # tanpa penanda, dan gambar tanpa penanda terbaca sebagai identitas yang
+      # pasti — pelanggaran paling keras di PRD.
+      #
+      # Menjalankannya menemukan cacat **di dalam gerbangnya sendiri**, lebih
+      # besar daripada yang ia klaim tutup: titik glif sudah absolut dalam
+      # satuan radius frame, tetapi port menambahkan `center` lagi, sehingga
+      # glif mendarat di (207, −35) pada kanvas 200 px dan **nol piksel**
+      # tergambar. Terukur: menghapus `stroke_polyline`-nya mengubah nol
+      # piksel sementara pemeriksaan "glif tanda tanya tergambar" tetap hijau
+      # di 247 — karena 247 itu piksel **lencananya** (cakram isi, lingkaran
+      # tepi, tetes), yang memang berada di dalam kotak yang diukur.
+      #
+      # Perbaikannya dua, dan keduanya perlu: port memakai `size / 2.0`, dan
+      # gerbang mendapat pemeriksaan baru yang mengukur **selisih** piksel
+      # dengan vs tanpa glif (316 lawan 247 pada keadaan benar, 0 lawan 247
+      # pada keadaan cacat). Harness menuntut **pemeriksaan bernama**:
+      # keadaan 1 (cacat asli) memerahkan hanya pemeriksaan sumbangan,
+      # sementara pemeriksaan lama sengaja tetap hijau di sana — justru
+      # itulah bukti bahwa gerbang lama tidak bisa melihat cacatnya.
+      #
+      # Keadaan 6 adalah kontrol negatif (komentar diubah): kalau harness
+      # merah di sini, ia merah karena berkasnya berubah, bukan karena
+      # cacatnya, dan ia tidak mengukur apa pun.
+      - name: Buktikan gerbang glif lencana kandidat berbunyi
+        run: python3 Tools/bukti-mutasi-glif-lencana.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -8054,6 +8054,67 @@ def check_port_constants_reach_the_drawing(results):
                   f"sebagai bawaan parameter"))
 
 
+def _warning_pixels_inside(image, ex0, ey0, ex1, ey1, warning):
+    """Himpunan piksel berwarna peringatan di dalam kotak lencana.
+
+    Mengembalikan **himpunan** `(x, y)`, bukan jumlah: pemeriksaan
+    "sumbangan glif" membandingkan dua gambar, dan himpunan yang bisa
+    dikurangkan adalah satu-satunya cara memisahkan "glif tergambar" dari
+    "lencana tergambar" — dua hal yang pikselnya menempati kotak yang sama.
+    """
+    w, h, rows = image
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    found = set()
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        row = rows[y]
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if not (ex0 <= ux <= ex1 and ey0 <= uy <= ey1):
+                continue
+            px = row[x * 4:x * 4 + 3]
+            if all(abs(px[k] - warning[k] * 255) < 40 for k in range(3)):
+                found.add((x, y))
+    return found
+
+
+def _render_candidate_badge_without_glyph(size, ss, night=False):
+    """Gambar lencana kandidat **tanpa** glif tanda tanyanya.
+
+    Kenapa lewat penyuntikan, bukan mutated source: yang diukur adalah
+    selisih terhadap gambar yang sama persis kecuali satu panggilan, dan
+    menulis ulang `_draw_candidate_marker` di sini berarti dua versi fungsi
+    yang bisa menyimpang diam-diam — persis kelas cacat yang seluruh repo
+    ini kejar. Satu-satunya baris yang dilepas adalah `stroke_polyline`.
+    """
+    original = R._draw_candidate_marker
+
+    def without_glyph(canvas, canvas_size, night_mode):
+        real_polyline = canvas.stroke_polyline
+        def swallowed(points, width, color_at, alpha=1.0):
+            return None
+        canvas.stroke_polyline = swallowed
+        try:
+            original(canvas, canvas_size, night_mode)
+        finally:
+            canvas.stroke_polyline = real_polyline
+
+    R._draw_candidate_marker = without_glyph
+    try:
+        case = next(c for c in R.build_cases()
+                    if c.name == "planet-saturn-uncertain")
+        canvas = R.render(case, size=size, night_mode=night,
+                          show_frame=False, ss=ss)
+        path = os.path.join(R.OUT_DIR, "__lencana-tanpa-glif.png")
+        os.makedirs(R.OUT_DIR, exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(canvas.to_png())
+        return decode_png(path)
+    finally:
+        R._draw_candidate_marker = original
+
+
 def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
     """Glif tanda tanya harus berada **di dalam** lencananya.
 
@@ -8154,6 +8215,36 @@ def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
     results.append(Result(
         "lencana: glif tanda tanya tergambar", glyph_pixels > 40,
         f"{glyph_pixels} piksel glif di dalam lencana"))
+
+    # ── Sumbangan glifnya sendiri, bukan lencananya ────────────────────────
+    #
+    # **Cacat kedua, yang ditutup di sini dan jauh lebih sunyi dari yang
+    # pertama.** Pemeriksaan di atas menghitung piksel peringatan di dalam
+    # kotak lencana — dan lencananya sendiri (cakram isi, lingkaran tepi,
+    # tetes) menyumbang 247 piksel itu **sendirian**. Terukur: glifnya
+    # dihapus seluruhnya (`stroke_polyline` → `pass`) dan gambar berubah
+    # **nol piksel**, sementara pemeriksaan di atas tetap melaporkan 247.
+    # Glifnya mendarat di (207, −35) pada kanvas 200 px karena pusat lencana
+    # ditambahkan dua kali, dan pemeriksaan itu tidak bisa membedakan
+    # "glif tergambar" dari "lencana tergambar".
+    #
+    # Jadi yang diukur di sini adalah **selisih**: gambar dengan glif lawan
+    # gambar tanpa glif, pada piksel peringatan di dalam lencana. Selisih itu
+    # nol kalau glifnya tidak ikut menggambar apa pun — berapa pun tebal
+    # lencananya. Ambang 40 piksel diukur pada keadaan benar: 563 − 247 =
+    # 316 piksel.
+    with_glyph = _warning_pixels_inside(render_case(
+        "planet-saturn-uncertain", size=size, ss=ss)[1],
+        ex0, ey0, ex1, ey1, warning)
+    without_glyph = _warning_pixels_inside(
+        _render_candidate_badge_without_glyph(size, ss, night=False),
+        ex0, ey0, ex1, ey1, warning)
+    contribution = len(with_glyph - without_glyph)
+    results.append(Result(
+        "lencana: glif menyumbang pikselnya sendiri (bukan lencana)",
+        contribution > 40,
+        f"{contribution} piksel hanya ada saat glif digambar "
+        f"(dengan {len(with_glyph)}, tanpa {len(without_glyph)})"))
 
 
 def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):

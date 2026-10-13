@@ -2051,7 +2051,22 @@ def _draw_candidate_marker(canvas, size, night_mode):
     # sama untuk mengukur, jadi bentuknya hanya boleh hidup di satu tempat.
     glyph = candidate_marker_glyph(marker)
     points, _, dot_offset, dot_radius, _, _ = glyph
-    points = [(center[0] + gx * radius, center[1] + gy * radius)
+    # **Titik glif sudah absolut dalam satuan radius frame**, sedangkan
+    # `dot_offset` di bawah adalah **pergeseran** dari pusat lencana. Dua
+    # konvensi dalam satu fungsi, dan mencampurnya adalah cacat yang pernah
+    # nyata di sini: versi lama menulis `center[0] + gx * radius`, jadi pusat
+    # lencana ditambahkan **dua kali** dan glif mendarat di (207, −35) pada
+    # kanvas 200 px — jauh di luar frame, sehingga tidak satu piksel pun
+    # tergambar. Terukur: menghapus `stroke_polyline`-nya mengubah **nol**
+    # piksel, sementara gerbang "glif tanda tanya tergambar" tetap hijau
+    # karena ia menghitung piksel peringatan **lencana**, bukan glifnya.
+    #
+    # Kenapa dua konvensi tidak disatukan: `dot_offset` memang pergeseran
+    # (`candidate_marker_footprint` menambahkannya ke pusat), sedangkan
+    # titik-titik kurva Bézier absolut — menuliskannya sebagai pergeseran
+    # berarti mengurangi `cx`/`cy` di setiap titik, dan itu justru
+    # menghilangkan kejelasan bahwa ia sudah absolut.
+    points = [(size / 2.0 + gx * radius, size / 2.0 + gy * radius)
               for gx, gy in points]
     canvas.stroke_polyline(points, max(1.0, badge_radius * 0.28), solid(warning))
     dot_dx, dot_dy = dot_offset
