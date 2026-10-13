@@ -1,3 +1,115 @@
+## Progres terakhir (13 Okt 2026 — dua sebab dominan diagnosis: kalimat yang benar, cabang yang bisa tertukar tanpa satu gerbang berbunyi)
+
+Siklus ini mulai dari sapuan yang sudah ada di repo (`Tools/sweep-unconsumed.sh`),
+dan menemukan **dua cabang diagnosis yang tidak punya satu pun uji**: `.tooFar`
+dan `.ambiguous` pada `switch dominant` di `ConfidenceTrace.diagnosis`.
+
+### Cacatnya, diukur bukan dikira-kira
+
+Dua cabang itu ditukar tempatnya:
+
+```swift
+case .tooFar:    return ExperimentText.diagnosisTooFar
+case .ambiguous: return ExperimentText.diagnosisAmbiguous
+```
+
+→ `./swift-test.sh` menjalankan **755 uji, nol kegagalan**. Kedua sebab
+dominan mengembalikan kalimat yang salah, dan tidak ada satu pun gerbang yang
+berbunyi.
+
+Yang membuatnya layak jadi gerbang tersendiri adalah **arah salahnya**.
+Kedua kalimat itu petunjuk perbaikan yang saling meniadakan:
+
+| sebab | kalimat | tindakan yang benar |
+|---|---|---|
+| `.tooFar` | "… Perbaiki kalibrasi dulu." | kalibrasi ulang |
+| `.ambiguous` | "… Ini keterbatasan akurasi, bukan kesalahan kalibrasi." | terima batas akurasi |
+
+Menukarnya berarti menyuruh penguji mengkalibrasi ulang sesuatu yang memang
+sudah benar — atau menerima batas akurasi padahal kalibrasinya bisa
+diperbaiki. Ini persis kelas yang sudah dibayar repo ini di
+`tiedUncertainReasons`: kalimat diagnosis yang sama dipakai untuk memutuskan
+apa yang dikerjakan berikutnya, pada alat ukur repo ini sendiri.
+
+### Kenapa uji yang sudah ada tidak menangkapnya
+
+Bukan karena tidak ada uji sama sekali — ada satu:
+`testDiagnosisPointsAtCalibrationWhenEverythingIsTooFar`, dan ia menuntut
+
+```swift
+XCTAssertTrue(trace.diagnosis(...).contains("kalibrasi"))
+```
+
+Kedua kalimat **sama-sama memuat kata "kalibrasi"**:
+
+```
+tooFar    : "Semua jawaban ragu karena kandidat terlalu jauh … Perbaiki kalibrasi dulu."
+ambiguous : "Semua jawaban ragu karena ada dua kandidat berdekatan. Ini keterbatasan akurasi, bukan kesalahan kalibrasi."
+```
+
+Jadi pemeriksaan itu hijau untuk **kedua** kalimat, dan tidak bisa membedakan
+kedua cabang sama sekali — hijau persis pada keadaan yang ia ada untuk
+menangkapnya. Uji yang mencari kata yang ada di kedua sisi tidak mengukur
+sisi mana pun.
+
+### Perbaikannya: dua uji, satu per arah, frasa yang membedakan
+
+Ditambah di `ConfidenceTraceTests.swift`:
+
+- `testDominantAmbiguousDiagnosisDoesNotBlameCalibration` — menuntut frasa
+  `"keterbatasan akurasi"` **ada** dan `"Perbaiki kalibrasi dulu"` **tidak**.
+- `testDominantTooFarDiagnosisDoesNotClaimAnAccuracyLimit` — arah sebaliknya.
+
+Kedua fixture memuat **kedua** jenis sampel (3 vs 1), jadi yang diuji adalah
+"sebab dominan dipilih dengan benar", bukan "satu-satunya sebab yang ada".
+
+Satu arah saja tidak cukup, dan itu alasan uji kedua ada: kalau kedua cabang
+mengembalikan kalimat ambigu, uji pertama hijau dan hanya uji kedua yang
+berbunyi.
+
+### Bukti bahwa gerbangnya berbunyi
+
+Mutasi penukaran diulang dengan kedua uji di tempatnya → **4 kegagalan**,
+masing-masing mencetak kalimat salah yang akan diterima pengguna:
+
+```
+testDominantAmbiguousDiagnosisDoesNotBlameCalibration   2 gagal
+  "sebab ambigu harus menyebut batas akurasi: … Perbaiki kalibrasi dulu."
+testDominantTooFarDiagnosisDoesNotClaimAnAccuracyLimit  2 gagal
+  "sebab tooFar harus menunjuk kalibrasi: … Ini keterbatasan akurasi, …"
+```
+
+Sumber dipulihkan, `git diff` atas `ConfidenceTrace.swift` bersih.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan kata-katanya. `diagnosisTooFar` dan
+  `diagnosisAmbiguous` sudah benar dan sudah dilokalkan (id + en ada di
+  `Localizable.xcstrings`). Yang ditambah hanya **penjagaannya**.
+- Uji ini mengukur **kalimat yang dihasilkan** untuk keadaan dominan, bukan
+  bahwa layar diagnostik memang memanggil `diagnosis` pada keadaan itu.
+- Cabang seri (`diagnosisMixed`), cabang tanpa sebab, dan cabang rasio
+  **tidak disentuh** — hanya dua cabang dominan yang terbukti bisa tertukar.
+- Sapuan `test=0` masih menyisakan banyak baris lain; siklus ini mengerjakan
+  satu kelas.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 755 | **757** (+2: satu uji per arah) |
+| Aturan UI | 35 | **35** (lulus) |
+| Baris `Apps/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **CelestialEngine 212 + PointingKit 757 hijau**, 0 gagal.
+  - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan).
+  - `./swift-typecheck.sh` → SEMUA GERBANG LULUS.
+  - Mutasi penukaran cabang → 4 kegagalan (merah), sumber dipulihkan → hijau.
+  - CI: `Engine Tests (Linux)` **success**; `Apple Build` (macos-15) menyusul.
+
 ## Progres terakhir (13 Okt 2026 — jangkauan corona: klaim "satu angka, satu sumber" yang tidak dijaga apa pun)
 
 Siklus ini mulai dari satu kalimat yang ditulis port Python tentang dirinya
