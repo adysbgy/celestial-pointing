@@ -1197,5 +1197,33 @@ jobs:
       - name: Buktikan gerbang kasus render morfologi berbunyi
         run: python3 Tools/bukti-mutasi-kasus-morfologi.py
 
+      # Bukti bahwa `check_star_colour_index_matches_the_model` berbunyi —
+      # satu dari 4 gerbang tersisa yang tidak punya harness.
+      #
+      # Gerbang ini menjaga 25 indeks B−V yang ditulis **dua kali** (Swift dan
+      # port). Tidak ada pemeriksaan lain yang membandingkan keduanya: setiap
+      # pemeriksaan warna bintang yang ada mengukur gambar port, jadi
+      # mengubah satu nilai di Swift membiarkan semuanya hijau sambil
+      # mengukur warna yang tidak pernah ada.
+      #
+      # Keadaan 5 dan 6 adalah cermin satu sama lain — bintang yang sama
+      # hilang, sekali dari model dan sekali dari port — dan keduanya
+      # memerahkan pemeriksaan yang **berbeda**. Itu sebabnya harness ini
+      # menuntut nama pemeriksaan yang merah, bukan sekadar "ada yang merah":
+      # kalau salah satu arah tidak diperiksa, bintang yang hilang dari sisi
+      # itu lewat tanpa suara.
+      #
+      # Keadaan 3 dan 4 hanya berbeda **tanda** (1.90 vs −1.85), dan itu
+      # intinya: Betelgeuse +1.85 harus merah, Rigel −0.03 biru. Tanda yang
+      # terbalik tidak akan pernah dilaporkan pengguna — bintang tetap tampak
+      # sebagai titik bercahaya — jadi pemeriksaan tanda harus terbukti
+      # berbunyi.
+      #
+      # Keadaan 7 menjaga gerbangnya tetap jujur: mengubah **kedua** sisi
+      # menjadi nilai yang sama **bukan cacat**. Harness yang merah di sana
+      # mengajarkan bahwa gerbangnya menolak pekerjaan yang benar.
+      - name: Buktikan gerbang indeks warna bintang berbunyi
+        run: python3 Tools/bukti-mutasi-indeks-warna.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

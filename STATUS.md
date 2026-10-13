@@ -1,4 +1,269 @@
-## Progres terakhir (13 Okt 2026 — konversi warna bintang: tujuh koefisien yang dibaca gerbang, bukan warna yang digambar)
+## Progres terakhir (13 Okt 2026 — indeks warna bintang: 25 angka B−V yang ditulis dua kali, dan pohon yang merah sebelum siklus dimulai)
+
+Siklus ini melanjutkan sapuan yang sama — **berapa gerbang di `check-visuals.py`
+yang pernah dibuktikan bisa merah?** — dan menutup satu lagi. Terukur di akhir
+siklus: **3 nirsaksi** tersisa (dari 84 gerbang), semuanya di keluarga
+inti-spiral/langit-dalam. Dipilih `check_star_colour_index_matches_the_model`
+karena warna spektral adalah **ciri pengenal**: merah Betelgeuse dan biru Rigel
+sama meyakinkannya dengan cincin Saturnus.
+
+### Kenapa gerbang ini
+
+25 indeks warna B−V hidup di **dua bahasa**:
+
+    model  Packages/PointingKit/Sources/PointingKit/CelestialVisual.swift
+           static let starColorIndex: [String: Double] = …
+    port   Tools/render-visuals.py
+           STAR_COLOR_INDEX = …
+
+Tidak ada pemeriksaan lain yang membandingkan keduanya. Setiap pemeriksaan warna
+bintang yang sudah ada mengukur **gambar port**, jadi mengubah satu nilai di
+Swift membiarkan semuanya hijau sambil mengukur warna yang **tidak pernah ada**.
+Kelas cacat yang sama persis dengan palet planet, kawah, maria, profil Matahari,
+dan tata letak langit dalam.
+
+Yang membuatnya lebih dari daftar panjang: **tanda adalah identitas**.
+Betelgeuse +1.85 harus merah, Rigel −0.03 biru. Tanda yang terbalik **tidak akan
+pernah dilaporkan pengguna** — bintang tetap tampak sebagai titik bercahaya —
+jadi kalau pemeriksaannya tidak berbunyi, warna yang salah itu bertahan.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-indeks-warna.py` — **9 keadaan, semuanya sesuai harapan**.
+Gerbangnya dijalankan di **proses baru** atas sumber yang dimutasi, dan himpunan
+hasilnya dituntut **persis** (28 nama), bukan sekadar "ada yang merah":
+
+| keadaan | harapan |
+|---|---|
+| baseline | hijau 28/28 |
+| 1. port: betelgeuse 1.85 → −1.85 (tanda) | MERAH 2 (per bintang + tanda) |
+| 2. port: betelgeuse 1.85 → 1.90 (nilai) | MERAH 1 (per bintang saja) |
+| 3. model: betelgeuse 1.85 → 1.90 | MERAH 1 |
+| 4. model: betelgeuse 1.85 → −1.85 | MERAH 2 |
+| 5. model kehilangan rigel | MERAH `tidak ada bintang sisa di port` |
+| 6. port kehilangan rigel | MERAH `setiap bintang model ada di port` |
+| 7. **keduanya diubah bersama, nilai sama** | **hijau 28/28** |
+| 8. jangkar tabel model dirapikan | MERAH 1, menyebut jangkarnya, **tanpa traceback** |
+
+Dua arah yang **tidak simetris** (keadaan 5 & 6) adalah alasan harness ini
+menuntut **nama** pemeriksaan yang merah, bukan sekadar "ada yang merah":
+keadaan 5 memerahkan pemeriksaan arah *"port berlebih"*, keadaan 6 memerahkan
+arah *"model tidak terjangkau"*. Kalau salah satu arah tidak diperiksa, bintang
+yang hilang dari sisi itu lewat tanpa suara — sisi yang tersisa masih memuat
+nama yang sama, jadi pemeriksaan per bintang tidak punya apa pun untuk
+dibandingkan, dan hanya **jumlahnya** yang berubah.
+
+Keadaan 7 menjaga gerbangnya tetap **jujur**: mengubah **kedua** sisi menjadi
+nilai yang sama **bukan cacat** — model dan port masih sepakat, dan itu
+satu-satunya cara yang benar untuk menyunting angka B−V. Harness yang merah di
+sana mengajarkan bahwa gerbangnya menolak pekerjaan yang benar, dan gerbang yang
+dilonggarkan untuk itu berhenti menjaga apa pun.
+
+### Cacat yang ditemukan sebelum menulis apa pun: pohonnya **merah**
+
+`./swift-test.sh` di awal siklus keluar **exit 1**:
+`CalibrationSessionTests.testCaptureRejectsObjectBelowHorizon` —
+*"pengguna harus diberi tahu bintang sudah terbenam, bukan diam"*.
+
+Penyebabnya bukan pekerjaan siklus ini. Satu baris di
+`CalibrationSession.swift` (penjaga `truth.altitudeDeg > 0`) memakai
+`directionUncomputableMessage` alih-alih `belowHorizonMessage`, sehingga objek
+yang **sudah terbenam** dilaporkan sebagai *"arah tidak bisa dihitung"* — pesan
+yang salah untuk keadaan yang salah. Berkasnya bertanggal **14:38**, dan siklus
+runner yang berjalan saat itu **TIMEOUT** pukul 14:51: mutasi setengah jadi yang
+ditinggalkan, bukan suntingan yang sedang berjalan. `HEAD` sendiri **benar**.
+
+Dipulihkan (`git checkout HEAD -- <berkas>`), pohon hijau lagi. Dicatat di sini
+karena inilah kelas cacat yang repo ini paling sering kena: siklus yang mati di
+tengah meninggalkan pekerjaan setengah jadi, dan siklus berikutnya **tidak boleh
+mengadopsinya sebagai «baseline»**-nya sendiri. `git status` tidak bisa
+membedakan keduanya — yang bisa membedakannya adalah menjalankan suite-nya.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** kedua sisi, bukan piksel app Apple. Yang dibuktikan:
+  ketujuh kawat gerbang ini merah pada keadaan yang memang salah, hijau pada
+  penyuntingan yang sah, dan merah dengan pesan bersih saat modelnya dirapikan.
+- Harness ini **tidak** membuktikan 25 angka B−V itu benar secara astronomi.
+  Yang dijaga adalah **kesepakatan dua bahasa** dan tanda hangat/dingin. Angka
+  yang salah di **kedua** bahasa akan tetap hijau — dinyatakan di sini alih-alih
+  disangka tertutup.
+- `Apps/` dan uji Swift **tidak disentuh**; yang berubah hanya `Tools/` +
+  langkah CI + STATUS.
+- **3 gerbang nirsaksi lainnya belum dikerjakan** (terukur: 4 → **3**).
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 784 | **784** (tak disentuh) |
+| Gerbang nirsaksi (terukur) | 4 | **3** |
+| Harness dirujuk CI | 47 | **48** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `./swift-test.sh` → **exit 0**; CelestialEngine **212**, PointingKit **784**,
+    0 gagal. Dijalankan **dua kali**: sekali sebelum (exit 1, merah karena
+    regresi basi di atas), sekali sesudah pemulihan (exit 0).
+  - `python3 Tools/bukti-mutasi-indeks-warna.py` dijalankan di **worktree
+    terpisah yang bersih** (`git worktree add --detach`), karena harness ini
+    menolak jalan di atas sumber yang menyimpang dari HEAD — dan pohon kerja
+    utama memang memuat WIP siklus lain. Hasil: **9 keadaan, semuanya sesuai
+    harapan**; kedua berkas produksi pulih **persis** (md5 sama sebelum/sesudah).
+  - `python3 Tools/check-harness-terdaftar.py` → **47 harness, semuanya
+    dirujuk alur kerja**.
+
+### Pelajaran
+
+- **Harness yang menolak jalan di atas sumber kotor memaksa Anda memisahkan
+  pengukuran dari pohon kerja Anda.** `require_clean_sources` menolak (exit 2)
+  karena `CelestialVisual.swift` memuat WIP siklus lain; jawabannya bukan
+  membersihkan WIP orang lain, melainkan mengukur di `git worktree` terpisah.
+  Penjaga yang sama yang pernah menyelamatkan repo ini dari "pulih persis atas
+  dirinya sendiri" juga memisahkan dua pekerjaan yang berbagi satu berkas.
+- **Merah sebelum mulai bukan selalu milik Anda.** Satu baris berumur lima jam
+  dari siklus yang timeout membuat suite merah; memeriksanya **sebelum** menulis
+  kode mencegah siklus ini melaporkan regresi orang lain sebagai miliknya — atau
+  lebih buruk, memperbaikinya dengan cara yang salah karena mengira itu kodenya.
+
+
+## Progres terakhir (13 Okt 2026 — sabit bibir kawah: satu gerbang nirsaksi lagi ditutup, dan klaim docstring-nya terukur salah)
+
+Siklus ini meneruskan sapuan yang sama: dari 84 gerbang di `check-visuals.py`,
+**berapa yang pernah dibuktikan bisa merah?** Terukur ulang di awal siklus:
+**9 nirsaksi** (sebelumnya dilaporkan 15/17; empat di antaranya — termasuk
+`check_mars_caps_fade_into_the_surface` dan dua gerbang PNG — ditutup WIP yang
+belum dikomit di pohon kerja siklus lain). Dipilih satu yang menjaga **bentuk
+kawah**, karena kawah adalah salah satu ciri pengenal Merkurius/Mars yang paling
+mudah dirusak tanpa suara.
+
+### Kenapa gerbang ini
+
+`check_crater_drawing_constants` menjaga **rasio yang dinyatakan dalam dua
+satuan**:
+
+    view  Path(ellipseIn: … width: size * 1.84, height: size * 1.84 …)   diameter
+    port  canvas.disc(…, mr * 0.92, …)                                   radius
+
+`1.84 = 2 × 0.92`. Keduanya harus tetap begini, dan tidak ada satu pun gerbang
+lain yang menyebut `1.84` maupun `0.92`. Perubahan pada salah satunya berarti
+gambar kawah di PNG — yang diukur **seluruh** gerbang piksel repo ini —
+menyimpang dari gambar kawah di jam, tanpa satu pun pemeriksaan yang berbunyi.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-sabit-bibir-kawah.py` — 12 keadaan, semuanya sesuai harapan.
+Harness ini menjalankan gerbangnya di proses baru atas sumber yang dimutasi dan
+menuntut **subset nama hasil yang diukur**, bukan sekadar "ada yang merah":
+
+| keadaan | hasil |
+|---|---|
+| baseline | hijau, 0 merah dari 7 |
+| 1. view: diameter 1.84 → 1.70 | MERAH `diameter view = dua kali radius port` |
+| 2. view: tinggi 1.84 → 1.50 (elips) | MERAH `…digambar sebagai lingkaran` |
+| 3. port: radius 0.92 → 0.80 | MERAH `diameter view = dua kali radius port` |
+| 4. view 1.70 + port 0.80 (keduanya ×0.924) | **MERAH** |
+| 4b. view 1.84 + port 0.99 (keduanya ×1.08) | **MERAH** |
+| 4c. view 1.9992 + port 0.9936 (rasio 2.0208) | **MERAH** |
+| 4d. view 2.0 + port 1.0 (tempat kedudukan lain) | hijau penuh |
+| 5. kontrol negatif: komentar di ujung baris view | hijau penuh |
+
+### Cacat yang ditemukan dengan mengukur, bukan dengan membaca
+
+**Klaim docstring gerbangnya sendiri salah, dan harness ini membuktikannya.**
+Docstring di `check_crater_drawing_constants` menulis: "Kalau **kedua** sisi
+diubah bersama (`view 1.60 + port 0.80`), gerbang ini tetap hijau. Itu benar: ia
+mengikat **rasio** (satu angka dalam dua satuan), bukan nilai absolutnya."
+Sifat yang diklaim adalah **invarian skala**.
+
+Terukur: yang diuji `abs(view_diameter - 2 * port_radius) < 1e-9` — himpunan
+tempat kedudukan `A = 2B` secara **tepat**, bukan skala. Keadaan 4, 4b, dan 4c
+semuanya mengubah kedua sisi bersama-sama dan **semuanya merah**; hanya lompatan
+tepat ke (2.0, 1.0) yang hijau. Contoh di docstringnya — `view 1.60 + port 0.80`
+— hijau **hanya karena angkanya kebetulan mendarat di tempat kedudukan**
+(`2 × 0.80 = 1.60`), bukan karena aturannya skala. Angka kebetulan yang ditulis
+sebagai bukti invariansi adalah bentuk bukti yang paling sulit dilihat justru
+karena ia tampak cocok.
+
+Docstring-nya **diperbaiki** (komentar saja, tanpa mengubah perilaku gerbang)
+supaya menyatakan batas yang sebenarnya diukur, dan merujuk harness ini sebagai
+bukti. Ini penting karena repo ini memakai docstring gerbang sebagai **sumber
+klaim**: klaim yang salah di sini akan diwarisi siklus berikutnya sebagai fakta.
+
+**Cakupan kelas kawah jauh lebih sempit dari yang terbaca namanya.** Tiga
+mutasi yang mengubah gambar kawah di jam, semuanya **hijau** di gerbang ini
+**dan** di kedua gerbang kawah piksel:
+
+  a. view: `lit.fill(rimDisc, …)` dihapus — sabitnya tidak pernah tergambar,
+     kawahnya jadi cakram gelap rata
+  b. port: `clip_disc` dilepas dari cakram bibir — sabitnya jadi cakram penuh
+     yang meluber keluar kawah
+  c. port: `CRATER_RIM_OPACITY * rim_strength` → `CRATER_RIM_OPACITY` — semua
+     kawah sama terangnya, termasuk yang di sisi gelap
+
+Ketiganya hijau karena **tidak satu pun** dari ketiga gerbang kawah membaca
+sabitnya sebagai gambar. Yang dijaga hanya bentuk elips di view dan rasio
+terhadap port. Batas ini **dinyatakan** di harness sebagai keadaan (a)–(c)
+dengan harapan hijau eksplisit: kalau kelak ada gerbang yang mulai membaca
+sabitnya, keadaan itu mulai tidak sesuai harapan — tanda cakupannya meluas,
+bukan harnessnya rusak.
+
+### Yang TIDAK diklaim
+
+- Harness ini mengukur **teks** kedua sisi, bukan piksel app Apple. Yang
+  dibuktikan: rasio 1.84 : 0.92 terbaca dan merah kalau salah satu sisinya
+  bergeser. Tidak ada klaim bahwa perangkat menggambar kawah dengan lebar persis
+  itu.
+- `check_crater_rim_opacity_is_not_clamped` (klem `max(rs, 0.2)`) menjaga satu
+  bagian kelas yang sama dan **tidak** disentuh siklus ini.
+- **7 gerbang nirsaksi lainnya belum dikerjakan** (terukur: 9 → **8**).
+- `Apps/` dan `Packages/` **tidak disentuh** (hanya `Tools/` + langkah CI +
+  STATUS). Suite Swift tidak berubah oleh siklus ini.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 778 | **778** (tak disentuh) |
+| Gerbang nirsaksi (terukur) | 9 | **8** (−1) |
+| Harness dirujuk CI | 41 | **42** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `python3 Tools/bukti-mutasi-sabit-bibir-kawah.py` → **12 keadaan, 0 tidak
+    sesuai harapan**; kedua berkas produksi pulih **persis** (md5 sama
+    sebelum/sesudah).
+  - `python3 Tools/check-harness-terdaftar.py` → **42 harness, semuanya
+    dirujuk**.
+  - `python3 Tools/check-visuals.py --check` → dijalankan siklus ini (lihat
+    hasil di riwayat commit).
+
+### Pelajaran
+
+- **Docstring gerbang adalah klaim yang bisa salah, dan salahnya menular.**
+  Klaim "invarian skala" di sini tidak pernah diuji siapa pun; begitu diuji
+  dengan empat keadaan, ia langsung gugur. Harness yang mengukur apa yang
+  **diuji** kode, bukan apa yang **ditulis** komentarnya, menemukannya.
+- **Angka yang kebetulan cocok adalah bukti terlemah yang tampak terkuat.**
+  `view 1.60 + port 0.80` mendarat tepat di `2B` — sehingga contoh yang dipilih
+  untuk membuktikan invariansi justru membuktikan keseimbangan titik. Memilih
+  contoh yang **tidak** kebetulan cocok (4b, 4c) yang mengungkap aturan
+  sebenarnya.
+- **Gerbang yang hijau di atas berkas kotor tidak mengukur apa pun.** Sempat
+  muncul kekhawatiran bahwa WIP siklus lain di `render-visuals.py` membuat
+  harness ini tidak sah; `mutasi_sumber.require_clean_sources` justru menolak
+  jalan (exit 2) bila berkas produksinya menyimpang dari HEAD — dan yang terjadi
+  adalah kedua berkas yang dimutasi ternyata **bersih** (byte-identik dengan
+  HEAD), sehingga harness berjalan sah. Diperiksa langsung (`git diff --quiet
+  HEAD -- <berkas>` → 0), bukan disimpulkan dari `git status` yang menyebut
+  berkas lain.
+
+
 
 Siklus ini meneruskan sapuan yang sama dengan entri di bawah: dari 83 gerbang
 di `check-visuals.py`, **berapa yang pernah dibuktikan bisa merah?** Terukur
