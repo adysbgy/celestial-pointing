@@ -663,6 +663,34 @@ jobs:
       - name: Buktikan gerbang jangkauan corona Matahari berbunyi
         run: python3 Tools/bukti-mutasi-jangkauan-corona.py
 
+      # Dan bukti untuk **kekuatan earthshine** — lead yang ditinggalkan
+      # siklus corona, dan kelas cacat yang persis sama satu langkah di
+      # sebelahnya.
+      #
+      # Model punya fungsi bernama
+      # (`CelestialVisual.earthshineStrength(illuminationFraction:)`),
+      # sedangkan port menulis rumusnya **inline** (`strength = 1.0 - f`)
+      # sambil mengklaim di komentarnya "sama seperti … di Swift". Terukur
+      # dengan `Tools/ukur-earthshine.py`: rumus di **model** diubah
+      # `1 - f` -> `(1 - f) * 0.5`, lalu -> `f`, dan **nol dari 8 gerbang
+      # Bulan** berbunyi — karena semuanya mengukur gambar port, sementara
+      # yang menyimpang adalah view.
+      #
+      # Bedanya dari kasus corona, dan ini yang membuatnya layak siklus
+      # sendiri: arah "port menyimpang" sudah sebagian tertutup
+      # `check_earthshine` (terukur: 2 merah saat port diubah sendiri).
+      # Yang sama sekali terbuka adalah arah **"model berubah, port tidak
+      # ikut"** dan arah **"view berhenti memakai namanya"** — yang kedua
+      # menghasilkan 0 merah di seluruh 8 gerbang Bulan, dan hanya bisa
+      # dilihat gerbang teks.
+      #
+      # Keadaan 5 wajib **hijau**: kedua bahasa diubah bersama ke rumus yang
+      # sama, jadi tidak ada penyimpangan. Tanpa keadaan itu, harness tidak
+      # bisa membedakan "gerbang ini mengukur penyimpangan" dari "gerbang ini
+      # mengukur nilainya".
+      - name: Buktikan gerbang kekuatan earthshine berbunyi
+        run: python3 Tools/bukti-mutasi-earthshine.py
+
       # Dan bukti untuk **enam gerbang piksel yang tidak punya bukti sama
       # sekali** — ditemukan dengan membandingkan daftar `def check_*` di
       # `check-visuals.py` terhadap seluruh `check_*` yang dirujuk kedua

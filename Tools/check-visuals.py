@@ -10327,6 +10327,220 @@ def check_sun_corona_reach_matches_the_model(results):
         f">1.6 menabrak bingkai kartu)"))
 
 
+def earthshine_strength_formula(source, anchor, style):
+    """Rumus `earthshineStrength` dari teks sumber → dict batas & suku.
+
+    Dibaca dari **bentuknya**, bukan ditulis ulang sebagai daftar: dua
+    penjepit dan satu suku hidup di dua bahasa, dan daftar tangan di gerbang
+    akan menjadi angka yang tidak pernah dibandingkan — persis lubang yang
+    ditutup fungsi ini.
+
+    **Kenapa `style` harus disebut, bukan ditebak.** Batas badan fungsi
+    berbeda di kedua bahasa: Swift menutup dengan kurawal, Python dengan
+    baris `def` berikutnya pada kolom nol. Versi pertama fungsi ini memakai
+    kurung kurawal untuk keduanya, dan pada port ia menemukan `{` pertama
+    **jauh di bawah** fungsinya — hasilnya "penjepit=False, hasil=False",
+    yaitu gerbang yang merah pada kode yang benar. Yang menentukan batas
+    harus dinyatakan pemanggilnya, bukan diturunkan dari tebakan.
+
+    Komentar (`//` atau `#`) dan docstring dibuang lebih dulu. Keduanya
+    memuat prosa bernomor — `0`, `1`, `f = 1` — yang akan terbaca sebagai
+    koefisien oleh pembaca mentah; kelas cacat yang sudah dibayar
+    `star_rgb_parameters` di repo ini.
+
+    Jangkar yang tidak ditemukan melempar `ValueError` — pemanggilnya
+    melaporkannya sebagai pemeriksaan merah yang **menyebut jangkarnya**,
+    bukan traceback. Gerbang yang melempar pengecualian saat berkasnya
+    dirapikan akan dihapus orang, dan aturan yang dihapus tidak menjaga apa
+    pun.
+    """
+    if anchor not in source:
+        raise ValueError(f"jangkar tidak ditemukan: {anchor!r}")
+    start = source.index(anchor) + len(anchor)
+
+    if style == "swift":
+        opening = source.find("{", start)
+        if opening < 0:
+            raise ValueError(f"tidak ada kurung buka sesudah jangkar {anchor!r}")
+        depth, i = 1, opening + 1
+        while i < len(source) and depth:
+            if source[i] == "{":
+                depth += 1
+            elif source[i] == "}":
+                depth -= 1
+            i += 1
+        body, comment = source[opening + 1:i], "//"
+    else:
+        end = source.find("\ndef ", start)
+        body, comment = source[start:end if end > 0 else len(source)], "#"
+
+    # Docstring dibuang sebelum komentar: ia **bukan** komentar bagi Python,
+    # dan justru di sanalah prosa bernomor itu tinggal.
+    while '"""' in body:
+        first = body.index('"""')
+        second = body.find('"""', first + 3)
+        body = body[:first] + ("" if second < 0 else body[second + 3:])
+    body = "\n".join(line.split(comment)[0] for line in body.split("\n"))
+
+    # Baris penjepit: `let clamped = min(1, max(0, fraction))` (Swift) dan
+    # `f = min(1, max(0, fraction))` (Python). Nama variabelnya sengaja
+    # **boleh berbeda**: yang dibandingkan batasnya, bukan ejaannya.
+    clamp = re.search(
+        r"^\s*(?:let\s+)?(\w+)\s*=\s*min\(\s*(-?[\d.]+)\s*,\s*max\(\s*(-?[\d.]+)\s*,"
+        r"\s*(\w+)\s*\)\s*\)", body, re.M)
+    # Baris hasil: `return 1 - f`. Suku kiri boleh angka, kanan nama variabel
+    # penjepitnya — jadi `1 - f` dan `f` (pembalikan) terbaca sebagai dua
+    # rumus yang berbeda, bukan dua ejaan yang sama.
+    result = re.search(r"^\s*return\s+(-?[\d.]+)\s*-\s*(\w+)\s*$", body, re.M)
+    if not (clamp and result):
+        raise ValueError(
+            f"bentuk earthshineStrength tidak dikenali di jangkar {anchor!r}: "
+            f"penjepit={bool(clamp)}, hasil={bool(result)}")
+    if result.group(2) != clamp.group(1):
+        raise ValueError(
+            f"hasil `{result.group(0).strip()}` memakai "
+            f"'{result.group(2)}', tetapi penjepitnya menulis "
+            f"'{clamp.group(1)}' — rumusnya tidak bisa dibaca")
+    return {
+        "clamp_high": float(clamp.group(2)),
+        "clamp_low": float(clamp.group(3)),
+        "clamped": clamp.group(1),
+        "offset": float(result.group(1)),
+    }
+
+
+def check_earthshine_strength_matches_the_model(results):
+    """Rumus earthshine tidak boleh menyimpang antara model, port, dan view.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan diwarisi.**
+    `Tools/render-visuals.py` menulis, di komentarnya sendiri, bahwa
+    kekuatannya "mengikuti `1 - f` (sama seperti
+    `CelestialVisual.earthshineStrength` di Swift)". Kalimat itu klaim, dan
+    yang menjaganya: **tidak ada**. Terukur dengan `Tools/ukur-earthshine.py`
+    — rumus di **model** diubah, port dibiarkan:
+
+    ```
+    [baseline]                                  0 dari 8 gerbang Bulan
+    1. model `1 - f` -> `(1 - f) * 0.5`         0 dari 8 gerbang Bulan
+    2. model `1 - f` -> `f`                     0 dari 8 gerbang Bulan
+    ```
+
+    Nol, karena setiap gerbang Bulan mengukur **gambar port**, dan port-nya
+    tidak ikut berubah. Yang menyimpang adalah **view**, yang memanggil
+    fungsinya. Jadi yang diuji di Linux dan yang tampil di jam perlahan-lahan
+    menjadi dua Bulan berbeda, sementara kedua sisi hijau.
+
+    **Tiga arah, dan yang ketiga adalah alasan utamanya.**
+
+    1. **Model lawan port** — rumus dan penjepitnya harus sama persis.
+       Mengukur arah "model berubah" itu wajib karena itu arah yang **paling
+       mungkin**: yang memperbaiki tampilan Bulan menyunting model di Mac,
+       bukan port Python di Linux.
+    2. **Pemakaian bernama** — port harus memanggil `earthshine_strength(f)`,
+       bukan menulis `1.0 - f` di tempat menggambar. Angka yang cocok tapi
+       ditulis ulang sebagai literal adalah dua angka yang **kebetulan** sama
+       hari ini; ia akan menyimpang tanpa gerbang berbunyi.
+    3. **View lawan model** — `let earthshine = 1.0 - (… ?? 0)` di
+       `CelestialVisualView.swift` adalah bentuk yang **hanya** gerbang teks
+       bisa lihat: diukur, ia menghasilkan **0 merah di seluruh 8 gerbang
+       Bulan**. Tidak ada gerbang piksel yang bisa menangkapnya, karena
+       gerbang piksel mengukur port — dan port-nya masih benar.
+
+    **Kenapa arah kedua bahasa tidak diukur di sini.** Kalau model *dan* port
+    diubah bersama ke rumus yang sama, tidak ada penyimpangan — dan gerbang
+    yang memerah di sana akan memerah pada kode yang benar. Yang menangkap
+    rumus yang sama-sama salah adalah `check_earthshine` (arah "meredup
+    menuju purnama"), dan itu sudah terbukti: terukur 5 merah, termasuk dua
+    pemeriksaan arahnya. Jadi batas cakupan gerbang ini dinyatakan, bukan
+    disembunyikan.
+
+    **Yang TIDAK diklaim.** Gerbang ini mengikat **satu rumus**, bukan bahwa
+    `1 - f` itu benar secara astronomi — itu milik
+    `testEarthshineOnlyOnPartiallyLitMoon` dan `check_earthshine`. Ia juga
+    tidak membaca piksel: yang diukur adalah jangkauan rumus sampai ke
+    ketiga berkas, bukan apakah gambarnya benar.
+    """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                     "CelestialVisual.swift")
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    try:
+        model_source = open(model_path).read()
+        port_source = open(R.SOURCE, encoding="utf-8").read()
+        view_source = open(view_path).read()
+    except OSError as exc:
+        results.append(Result("earthshine: berkas terbaca", False, str(exc)))
+        return
+
+    try:
+        model = earthshine_strength_formula(
+            model_source, "public static func earthshineStrength(", "swift")
+        port = earthshine_strength_formula(
+            port_source, "def earthshine_strength(fraction):", "python")
+    except ValueError as exc:
+        results.append(Result("earthshine: rumus terbaca di kedua bahasa",
+                              False, str(exc)))
+        return
+
+    results.append(Result(
+        "earthshine: rumus terbaca di kedua bahasa", True,
+        f"penjepit {model['clamp_low']:g}…{model['clamp_high']:g}, "
+        f"hasil `{model['offset']:g} - f`"))
+
+    for key in ("clamp_low", "clamp_high", "offset"):
+        same = abs(model[key] - port[key]) <= 1e-9
+        results.append(Result(
+            f"earthshine: {key} sama di model dan port", same,
+            f"{model[key]:g}" if same
+            else f"model {model[key]:g}, port {port[key]:g}"))
+
+    # Arah kedua: pemakaian **bernama** di tempat menggambar. Angka yang cocok
+    # tetapi ditulis ulang sebagai literal adalah angka yang akan menyimpang
+    # tanpa gerbang berbunyi — bentuk paling sunyi dari kelas ini.
+    port_uses = ("strength = earthshine_strength(f)",)
+    results.append(Result(
+        "earthshine: port memakai fungsinya sendiri (bukan literal)",
+        all(text in port_source for text in port_uses),
+        "; ".join(f"'{t}' {'ada' if t in port_source else 'TIDAK'}"
+                  for t in port_uses)))
+
+    # Arah ketiga: view memanggil **modelnya**, bukan menghitung sendiri.
+    # Dua bentuk pemanggilan, karena keduanya sah dan keduanya sampai ke
+    # gambar: satu baris, dan terpecah dua baris. Yang dilarang adalah
+    # menghitungnya di view.
+    view_uses = ("CelestialVisual.earthshineStrength(",
+                 "illuminationFraction: visual.illuminationFraction ?? 0)")
+    results.append(Result(
+        "earthshine: view memakai fungsi model (bukan literal)",
+        all(text in view_source for text in view_uses),
+        "; ".join(f"'{t}' {'ada' if t in view_source else 'TIDAK'}"
+                  for t in view_uses)))
+
+    # Arah ketiga, sisi sebaliknya: view tidak boleh menulis rumusnya sendiri.
+    # Diukur: `let earthshine = 1.0 - (visual.illuminationFraction ?? 0)`
+    # menghasilkan **0 merah di seluruh 8 gerbang Bulan** — dan bentuk itu
+    # tetap memberi gambar yang benar hari ini, jadi hanya ikatannya yang
+    # hilang. Yang diperiksa di sini **bukan** keberadaan namanya (itu arah
+    # di atas), melainkan tidak adanya perhitungan di view.
+    view_code = swift_code_only(view_source)
+    hand_rolled = [text for text in ("1.0 - (visual.illuminationFraction",
+                                     "1 - (visual.illuminationFraction",
+                                     "1.0 - (illuminationFraction",
+                                     "1 - (illuminationFraction")
+                   if text in view_code]
+    results.append(Result(
+        "earthshine: view tidak menghitung rumusnya sendiri", not hand_rolled,
+        f"view menghitung sendiri: {hand_rolled}" if hand_rolled
+        else "view hanya memanggil, tidak menghitung"))
+
+    # Dan arah rentang: penjepit yang bergeser keluar 0…1 membuat kekuatan
+    # earthshine bisa melebihi 1 (memutihkan sisi gelap) atau menjadi negatif
+    # (membalik tanda lewat opasitas). Kedua ujungnya diukur dari sumber.
+    results.append(Result(
+        "earthshine: penjepit tetap 0…1",
+        model["clamp_low"] == 0.0 and model["clamp_high"] == 1.0,
+        f"model menjepit {model['clamp_low']:g}…{model['clamp_high']:g}"))
+
+
 def check_sun_corona_reaches_beyond_the_disk(results, size=256, ss=2):
     """Corona Matahari harus **bercahaya di luar** piringan, bukan disk tepi keras.
 
@@ -11327,6 +11541,7 @@ def main():
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
     check_sun_corona_reach_matches_the_model(results)
+    check_earthshine_strength_matches_the_model(results)
     check_sun_corona_reaches_beyond_the_disk(results)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)

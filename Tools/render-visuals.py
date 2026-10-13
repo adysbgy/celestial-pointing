@@ -204,6 +204,34 @@ def phase_geometry(fraction, waxing):
     return dict(terminator_offset=lit_side * (1 - 2 * f), lit_side=lit_side, is_gibbous=f > 0.5)
 
 
+def earthshine_strength(fraction):
+    """`CelestialVisual.earthshineStrength(illuminationFraction:)` — `1 - f`.
+
+    **Kenapa port ini wajib ada, dan kenapa ia baru ada sekarang.** Sampai
+    siklus ini rumusnya hidup **inline** di `_draw_moon` sebagai
+    `strength = 1.0 - f`, sambil mengklaim di komentarnya "sama seperti
+    `CelestialVisual.earthshineStrength` di Swift". Klaim itu tidak dijaga
+    apa pun, dan yang menyimpang adalah **model**: ia diubah
+    `1 - f` → `(1 - f) * 0.5` (dan → `f`) dan **nol** dari delapan gerbang
+    Bulan berbunyi — diukur dengan `Tools/ukur-earthshine.py`, bukan dikira.
+
+    **Kenapa ditulis mencerminkan model baris demi baris** (`let` dibuang,
+    indentasi berbeda) alih-alih memakai `unit()` seperti tetangganya:
+    paritasnya jadi bisa **dibuktikan sebagai teks**, tanpa parser Swift.
+    `unit(fraction)` di sini akan setara secara semantik dan tetap hijau
+    hari ini, tapi gerbang paritasnya lalu hanya bisa membandingkan "ada
+    pemanggilan ke semacam penjepit" — dan penjepit yang bergeser dari
+    `0…1` ke `0…2` akan lolos. Yang dijaga di sini **rumusnya**, jadi
+    rumusnya yang ditulis.
+
+    Batas yang jujur: ini **salinan**, bukan panggilan lintas bahasa. Yang
+    menjaganya tetap sama dengan model adalah
+    `check_earthshine_strength_matches_the_model` di `check-visuals.py`.
+    """
+    f = min(1, max(0, fraction))
+    return 1 - f
+
+
 def terminator_rotation_radians(bright_limb_angle, phase):
     """`CelestialVisual.terminatorRotationRadians`.
 
@@ -1696,7 +1724,7 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     # sebelum pita terang supaya hanya terlihat di sisi gelap.
     f = kw.get("illumination")
     if f is not None and f < 1.0:
-        strength = 1.0 - f
+        strength = earthshine_strength(f)
         es = ACCENTS["moonEarthshine"]
         # Aturan `shadow`, sama seperti piringan gelap `moonUnlit` di atas:
         # earthshine memantulkan cahaya yang **tidak memancar sendiri**, jadi
