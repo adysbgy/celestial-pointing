@@ -90,6 +90,87 @@ final class ConfidenceTraceTests: XCTestCase {
         XCTAssertTrue(ConfidenceTrace().diagnosis().contains("Belum ada sampel"))
     }
 
+    // MARK: - Dua cabang sebab dominan tidak boleh tertukar
+    //
+    // Celah yang ditutup di sini diukur, bukan dikira-kira. Dua cabang
+    // `switch dominant` di `ConfidenceTrace.diagnosis` (`.tooFar` ->
+    // `diagnosisTooFar`, `.ambiguous` -> `diagnosisAmbiguous`) ditukar
+    // tempatnya, lalu `./swift-test.sh` dijalankan: **755 uji tetap hijau,
+    // nol kegagalan.** Jadi "penguji disuruh memperbaiki kalibrasi padahal
+    // yang terjadi adalah batas akurasi" (dan sebaliknya) tidak
+    // menghasilkan satu pun kegagalan — padahal itu dua petunjuk perbaikan
+    // yang saling meniadakan, pada layar yang dipakai untuk memutuskan apa
+    // yang dikerjakan berikutnya.
+    //
+    // Kenapa bisa lolos, dan itu yang membuat uji ini bentuknya begini:
+    // kalimat keduanya **sama-sama memuat kata "kalibrasi"** —
+    //
+    //   tooFar    : "… Perbaiki kalibrasi dulu."
+    //   ambiguous : "… Ini keterbatasan akurasi, bukan kesalahan kalibrasi."
+    //
+    // — sedangkan satu-satunya uji yang ada sebelum ini
+    // (`testDiagnosisPointsAtCalibrationWhenEverythingIsTooFar`) menuntut
+    // `.contains("kalibrasi")`. Pemeriksaan itu hijau untuk **kedua**
+    // kalimat, jadi ia tidak bisa membedakan kedua cabang sama sekali:
+    // hijau persis pada keadaan yang ia ada untuk menangkapnya.
+    //
+    // Karena itu yang diuji di bawah adalah **frasa yang membedakan**, dan
+    // di kedua arah: satu uji per cabang. Satu arah saja tidak cukup —
+    // menuntut hanya "kalimat ambigu menyebut keterbatasan akurasi" akan
+    // hijau bila kedua cabang mengembalikan kalimat ambigu.
+
+    /// Sebab dominan `.ambiguous` harus menyebut batas akurasi, **bukan**
+    /// menyuruh memperbaiki kalibrasi.
+    ///
+    /// Rasional produk: "ada dua kandidat berdekatan" berarti katalog/akurasi
+    /// yang membatasi, dan mengkalibrasi ulang tidak mengubahnya. Penguji
+    /// yang mengikuti petunjuk yang salah menghabiskan waktu untuk
+    /// memperbaiki sesuatu yang memang sudah benar.
+    func testDominantAmbiguousDiagnosisDoesNotBlameCalibration() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        // Tiga sampel ambigu: dekat (0.5σ) tapi tetangga 1σ ≤ 2σ.
+        for _ in 0..<3 {
+            trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                         separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+        }
+        // Satu sampel tooFar, supaya "dominan" harus benar-benar dipilih
+        // (bukan sekadar satu-satunya sebab yang ada).
+        trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                     separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+
+        let sentence = trace.diagnosis(policy: policy)
+        XCTAssertTrue(sentence.contains("keterbatasan akurasi"),
+                      "sebab ambigu harus menyebut batas akurasi: \(sentence)")
+        XCTAssertFalse(sentence.contains("Perbaiki kalibrasi dulu"),
+                       "batas akurasi bukan kesalahan kalibrasi: \(sentence)")
+    }
+
+    /// Sebab dominan `.tooFar` harus menyuruh memperbaiki kalibrasi, **bukan**
+    /// menyatakan batas akurasi.
+    ///
+    /// Arah sebaliknya dari uji di atas, dan ia tidak bisa digantikan oleh
+    /// uji itu: kalau kedua cabang mengembalikan kalimat ambigu, uji di atas
+    /// hijau dan yang berbunyi hanya yang ini.
+    func testDominantTooFarDiagnosisDoesNotClaimAnAccuracyLimit() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        // Tiga sampel tooFar: 2.5σ, di atas maxSeparationSigma 1.0.
+        for _ in 0..<3 {
+            trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                         separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+        }
+        // Satu sampel ambigu, supaya tooFar harus menang sebagai dominan.
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+
+        let sentence = trace.diagnosis(policy: policy)
+        XCTAssertTrue(sentence.contains("Perbaiki kalibrasi dulu"),
+                      "sebab tooFar harus menunjuk kalibrasi: \(sentence)")
+        XCTAssertFalse(sentence.contains("keterbatasan akurasi"),
+                       "kandidat terlalu jauh bukan batas akurasi: \(sentence)")
+    }
+
     // MARK: - Diagnosis saat engine tidak pernah menjawab
     //
     // Celah yang ditutup di sini: cabang `diagnosisNoAnswers` di
