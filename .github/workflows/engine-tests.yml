@@ -1167,5 +1167,35 @@ jobs:
       - name: Buktikan gerbang kasus render planet berbunyi
         run: python3 Tools/bukti-mutasi-kasus-planet.py
 
+      # Bukti bahwa `check_every_morphology_in_the_model_has_render_cases`
+      # berbunyi — satu dari 6 gerbang tersisa yang tidak punya harness.
+      #
+      # Gerbang ini menjaga aturan yang berlaku untuk **bentuk objek langit
+      # dalam yang belum ada**: setiap morfologi di enum harus terbaca
+      # pembaca gerbang, punya kasus render, punya layout di port, dan tidak
+      # ada bentuk sisa di port. Keenam morfologi hari ini sudah memenuhi
+      # keempatnya, jadi gerbangnya hijau apa pun yang terjadi pada bentuk
+      # berikutnya.
+      #
+      # Gerbang tetangganya tampak menjaga hal yang sama dan tidak: ia
+      # membandingkan per nama yang ia temukan di **kedua** sisi, dan daftar
+      # namanya ditulis tangan. Keadaan 3 mengukurnya — bentuk baru
+      # ditambahkan ke enum, switch gambar, dan kasus render, dan tetangganya
+      # **hijau 8 dari 8** sementara gerbang ini merah dua kali. Itulah
+      # keadaan sunyinya, dan ia terukur.
+      #
+      # Harness ini juga **menemukan cacat**, bukan sekadar membuktikan:
+      # gerbangnya mati dengan traceback `ValueError` saat satu cabang
+      # `switch` dirapikan, karena jangkar teksnya hilang. Gerbang tetangganya
+      # sudah membungkus pembaca yang sama sejak awal. Perbaikannya ada di
+      # gerbangnya, dan keadaan 5 adalah regresinya.
+      #
+      # Keadaan 5 dan 5b sengaja **berhenti lebih awal** (gerbang melaporkan
+      # satu hasil lalu `return`), jadi himpunan hasilnya dituntut persis —
+      # supaya "berhenti lebih awal" terlihat sebagai berhenti lebih awal,
+      # bukan diam-diam dianggap lulus karena satu hasilnya merah.
+      - name: Buktikan gerbang kasus render morfologi berbunyi
+        run: python3 Tools/bukti-mutasi-kasus-morfologi.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

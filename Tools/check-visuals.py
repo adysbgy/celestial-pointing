@@ -3599,8 +3599,10 @@ def check_every_morphology_in_the_model_has_render_cases(results):
     sekaligus** — yang sunyi justru keadaan di mana model dan port sama-sama
     tidak punya bentuk itu.
 
-    Diukur, bukan diasumsikan (`out/probe-morfologi-baru.py`). Menambahkan
-    satu morfologi baru (`.comet`) ke enum **dan** ke `switch` gambar:
+    Diukur, bukan diasumsikan (`out/probe-morfologi-baru.py`; harness
+    ter-commitnya `Tools/bukti-mutasi-kasus-morfologi.py`, dijalankan CI).
+    Menambahkan satu morfologi baru (`.comet`) ke enum **dan** ke `switch`
+    gambar:
 
     ```
     [baseline]                                  415 pemeriksaan, 0 gagal  <- hijau
@@ -3662,8 +3664,26 @@ def check_every_morphology_in_the_model_has_render_cases(results):
     # 1. Pembaca gerbang harus menjangkau setiap kasus enum. Daftarnya
     #    ditulis tangan di dalam `read_deep_sky_layouts_from_swift`, jadi
     #    inilah tempat nama yang ditambahkan belakangan tertinggal.
-    read_names = set(read_deep_sky_layouts_from_swift(
-        open(model_path, encoding="utf-8").read()))
+    #
+    #    **Kenapa dibungkus `ValueError`.** Pembaca itu menyebut nama
+    #    morfologinya sebagai jangkar teks (`case .<nama>:`), jadi merapikan
+    #    satu cabang `switch` — mis. menggabungkan dua kasus, atau menulis
+    #    ulang `case .globularCluster` — membuatnya melempar. Tanpa
+    #    pembungkus ini, `check-visuals.py` mati dengan traceback alih-alih
+    #    melaporkan satu hasil merah, dan gerbang yang mati dengan traceback
+    #    akan dihapus orang, bukan diperbaiki. Gerbang tetangganya
+    #    (`check_deep_sky_layouts_match_the_model`) sudah memakai bentuk yang
+    #    sama atas pembaca yang sama; ketidaksamaan itu sendiri yang jadi
+    #    cacatnya, dan diukur oleh keadaan 5 harness
+    #    `Tools/bukti-mutasi-kasus-morfologi.py`.
+    try:
+        read_names = set(read_deep_sky_layouts_from_swift(
+            open(model_path, encoding="utf-8").read()))
+    except ValueError as exc:
+        results.append(Result(
+            "kasus render morfologi: pembaca gerbang terbaca dari model",
+            False, str(exc)))
+        return
     unread = sorted(set(declared) - read_names)
     results.append(Result(
         "kasus render morfologi: setiap kasus enum terbaca pembaca gerbang",
