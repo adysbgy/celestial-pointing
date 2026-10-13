@@ -121,6 +121,24 @@ jam menambah sekitar empat menit. Diukur: dari ~12 menit menjadi ~22 menit.
 - **Arah "model berubah" harus diukur terpisah.** Mengikat port ke model saja
   akan melewatkan arah yang paling mungkin terjadi di repo dua bahasa ini.
 
+### Lead siklus berikutnya (belum dikerjakan, sudah diukur)
+
+Kelas cacat yang **sama** ada satu langkah di sebelahnya, dan sudah dipastikan
+tanpa gerbang: `earthshine_strength`. Model punya fungsi bernama
+(`CelestialVisual.earthshineStrength(illuminationFraction:)`), sedangkan port
+menuliskannya **inline** sebagai `strength = 1.0 - f` sambil mengklaim di
+komentarnya "sama seperti `CelestialVisual.earthshineStrength` di Swift".
+Terukur: **nol** gerbang menyebut `earthshineStrength` atau `earthshine_strength`
+— jadi kedua bahasa bisa menyimpang tanpa satu pun pemeriksaan berbunyi, dan
+`check_earthshine` (yang memang punya rasional produk dan ambang terukur)
+mengukur **gambar port**, bukan ikatannya.
+
+Bedanya dari kasus corona, dan ini yang membuatnya layak siklus sendiri:
+`check_earthshine` sudah cukup tajam untuk **ikut memerah** kalau port-nya
+berubah sendiri — jadi arah "port menyimpang" sudah tertutup sebagian. Yang
+sama sekali terbuka adalah arah **"model berubah, port tidak ikut"**, persis
+yang ditutup siklus ini untuk corona.
+
 ## Progres terakhir (12 Okt 2026 — Aturan 35: satu berkas yang bertentangan dengan dirinya sendiri)
 
 Siklus ini mulai dari sisa yang tertinggal di pohon kerja: `PointingView.swift`
