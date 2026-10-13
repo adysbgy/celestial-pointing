@@ -1,3 +1,68 @@
+## Progres terakhir (13 Okt 2026 — sambungan sebab seri diagnosis: dua petunjuk yang saling meniadakan, tersambung tanpa pemisah)
+
+Cacat kedua dari kelas yang sama dengan entri di bawah, dan ditemukan dengan
+cara yang sama — mengukur, bukan membaca. `joined(separator: diagnosisMixedSeparator)`
+diganti `joined(separator: "")`, lalu `./swift-test.sh` dijalankan:
+**757 uji tetap hijau, nol kegagalan.**
+
+### Bentuk cacatnya
+
+Dua sebab yang sama saingnya tercetak menyambung:
+
+```
+Penyebab keraguan berbagi: Semua jawaban ragu karena kandidat terlalu jauh
+dari arah tunjuk. Perbaiki kalibrasi dulu.Semua jawaban ragu karena ada dua
+kandidat berdekatan. Ini keterbatasan akurasi, bukan kesalahan kalibrasi.
+```
+
+Kenapa berbahaya, bukan sekadar tidak rapi: kedua kalimat itu **petunjuk
+perbaikan yang saling meniadakan** — "perbaiki kalibrasi" lawan "ini batas
+akurasi, bukan kesalahan kalibrasi". Tanpa pemisah, batas antara keduanya
+hilang, dan penguji membaca satu paragraf panjang di layar yang justru ada
+untuk memutuskan tindakan berikutnya.
+
+### Kenapa uji seri yang sudah ada tidak menangkapnya
+
+Ketiganya (`testTiedReasonsMustBeReportedTogether`,
+`testAllThreeTiedReasonsAreNamed`, `testADominatingReasonStillReportsAlone`)
+menuntut `.contains(<frasa>)` atas kalimat sebabnya sendiri. Rangkaian tanpa
+pemisah tetap memuat setiap frasa, jadi ketiganya hijau. Yang tidak diukur
+siapa pun adalah **sambungannya** — bentuk yang sama persis dengan
+`.contains("kalibrasi")` yang hijau untuk kedua cabang dominan.
+
+### Perbaikannya: dua uji, satu mengukur sambungannya
+
+- `testTiedReasonsAreSeparatedNotFused` — kalimat diagnosis harus memuat
+  pemisah katalog. Pemisahnya **dibaca dari model** (`diagnosisMixedSeparator`),
+  bukan ditulis ulang di uji: gerbang yang menyimpan pemisahnya sendiri akan
+  hijau saat pemisahnya diubah.
+- `testDiagnosisMixedJoinsWithTheCatalogSeparator` — mengukur `diagnosisMixed`
+  langsung, supaya perbaikan di satu tempat tetap berbunyi walau kalimat
+  diagnosis kebetulan memuat pemisahnya dari jalur lain.
+
+### Bukti bahwa gerbangnya berbunyi
+
+Mutasi pemisah diulang dengan kedua uji di tempatnya → **3 kegagalan**,
+masing-masing mencetak run-on yang akan dibaca penguji. Sumber dipulihkan,
+`git diff` atas `ExperimentText.swift` bersih.
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan kalimatnya. Pemisahnya sudah benar dan sudah berkey
+  katalog (`id`: `"; "`, `en`: `", dan "`). Yang ditambah hanya penjagaannya.
+- Uji mengukur **kalimat yang dihasilkan**, bukan bahwa layar diagnostik
+  menampilkannya.
+- Hanya jalur **seri** yang ditutup; cabang dominan ditutup entri di bawah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 757 | **759** (+2: sambungan & pemisah) |
+| Aturan UI | 35 | **35** (lulus) |
+| Baris `Apps/` berubah | — | **0** |
+
 ## Progres terakhir (13 Okt 2026 — dua sebab dominan diagnosis: kalimat yang benar, cabang yang bisa tertukar tanpa satu gerbang berbunyi)
 
 Siklus ini mulai dari sapuan yang sudah ada di repo (`Tools/sweep-unconsumed.sh`),
