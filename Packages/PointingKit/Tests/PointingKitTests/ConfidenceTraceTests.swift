@@ -283,6 +283,69 @@ final class ConfidenceTraceTests: XCTestCase {
                       "petunjuk akurasi harus ikut disebut: \(sentence)")
     }
 
+    /// Sebab-sebab seri harus **terpisah**, bukan tersambung jadi satu kalimat.
+    ///
+    /// Celah yang ditutup di sini diukur: `joined(separator: diagnosisMixedSeparator)`
+    /// diganti `joined(separator: "")`, lalu `./swift-test.sh` dijalankan —
+    /// **757 uji tetap hijau, nol kegagalan.** Dua sebab yang sama saingnya
+    /// lalu tercetak menyambung tanpa pemisah:
+    ///
+    ///     "Penyebab keraguan berbagi: Semua jawaban ragu karena kandidat
+    ///      terlalu jauh … Perbaiki kalibrasi dulu.Semua jawaban ragu karena
+    ///      ada dua kandidat berdekatan. Ini keterbatasan akurasi, …"
+    ///
+    /// Kenapa berbahaya, bukan sekadar tidak rapi: kedua kalimat itu
+    /// **petunjuk perbaikan yang saling meniadakan** (perbaiki kalibrasi vs
+    /// terima batas akurasi). Tanpa pemisah, batas antara keduanya hilang —
+    /// penguji membaca satu paragraf panjang dan bisa mengambil tindakan yang
+    /// salah, pada layar yang justru ada untuk memutuskan tindakan berikutnya.
+    ///
+    /// Kenapa uji seri yang sudah ada tidak menangkapnya: mereka semua menuntut
+    /// `.contains(<frasa>)` atas kalimat-kalimat sebabnya sendiri. Rangkaian
+    /// tanpa pemisah tetap memuat setiap frasa, jadi ketiganya hijau. Yang
+    /// tidak diukur siapa pun adalah **sambungannya** — bentuk yang sama
+    /// persis dengan uji `.contains("kalibrasi")` yang hijau untuk kedua
+    /// cabang dominan.
+    func testTiedReasonsAreSeparatedNotFused() {
+        let trace = ConfidenceTrace()
+        let policy = ConfidencePolicy(pointingSigmaDeg: 10)
+        trace.record(state: .uncertain, level: .low, objectID: "a", objectName: "A",
+                     separationDeg: 25, sigmaDeg: 10, nearestNeighbourDeg: 60)
+        trace.record(state: .uncertain, level: .low, objectID: "b", objectName: "B",
+                     separationDeg: 5, sigmaDeg: 10, nearestNeighbourDeg: 10)
+
+        let sentence = trace.diagnosis(policy: policy)
+        // Pemisah dibaca dari model, bukan ditulis ulang di sini: gerbang yang
+        // menyimpan pemisahnya sendiri akan hijau saat pemisahnya diubah.
+        let separator = ExperimentText.diagnosisMixedSeparator
+        XCTAssertFalse(separator.isEmpty,
+                       "pemisah antarsebab tidak boleh kosong: kalau kosong, " +
+                       "dua petunjuk yang saling meniadakan menyambung jadi satu")
+        XCTAssertTrue(sentence.contains(separator),
+                      "sebab-sebab seri harus dipisah '\(separator)': \(sentence)")
+    }
+
+    /// Rangkaian sebab yang disambung harus benar-benar memuat pemisahnya, dan
+    /// **bukan** pemisah kosong yang menyatukan dua kalimat.
+    ///
+    /// Arah kedua: uji di atas menuntut pemisahnya ada di kalimat diagnosis;
+    /// uji ini mengukurnya langsung pada `diagnosisMixed`, supaya perbaikan
+    /// yang mengganti pemisah dengan string kosong di **satu** tempat tetap
+    /// berbunyi walau kalimat diagnosis kebetulan masih memuatnya dari jalur
+    /// lain.
+    func testDiagnosisMixedJoinsWithTheCatalogSeparator() {
+        let separator = ExperimentText.diagnosisMixedSeparator
+        let joined = ExperimentText.diagnosisMixed(
+            reasons: [ExperimentText.diagnosisTooFar,
+                      ExperimentText.diagnosisAmbiguous])
+
+        XCTAssertTrue(joined.contains(separator),
+                      "dua sebab harus dipisah '\(separator)': \(joined)")
+        // Bentuk cacatnya: dua kalimat penuh tersambung tanpa pemisah.
+        XCTAssertFalse(joined.contains("dulu.Semua"),
+                       "dua sebab menyambung tanpa pemisah: \(joined)")
+    }
+
     /// Kalimat yang sama harus **stabil** dalam satu proses, dan hanya itu yang
     /// bisa dijaga di sini.
     ///
