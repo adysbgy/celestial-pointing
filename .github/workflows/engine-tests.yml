@@ -644,6 +644,25 @@ jobs:
       - name: Buktikan gerbang warna spektral bintang berbunyi
         run: python3 Tools/bukti-mutasi-warna-bintang.py
 
+      # Dan bukti untuk gerbang ciri planet di mode malam. Empat dari lima
+      # ciri pengenal (cincin, kutub, kawah, kabut) diukur hanya di mode
+      # siang; `NightVisual` memetakan setiap warna ke kanal merah saja,
+      # sehingga ciri yang berhenti digambar di sana hilang tanpa gerbang
+      # berbunyi. Harness ini juga membuktikan gerbang baru **tidak mubazir**:
+      # pada cacat yang sama, gerbang siang yang sudah ada tetap 0 merah.
+      - name: Buktikan gerbang ciri planet di mode malam berbunyi
+        run: python3 Tools/bukti-mutasi-ciri-malam.py
+
+      # Dan bukti untuk **jangkauan corona Matahari**, klaim "satu angka, satu
+      # sumber" yang tidak dijaga apa pun. Terukur: `sunCoronaReach` di model
+      # diubah 1.45 -> 1.60 dan seluruh gerbang Matahari tetap hijau, karena
+      # semuanya mengukur gambar **port** sementara yang menyimpang adalah
+      # **view**. Keadaan 5 menutup bentuk yang paling sunyi: pemakaian
+      # diganti literal (angka masih benar, jadi tak satu pun gerbang angka
+      # berbunyi) -- yang hilang cuma ikatannya.
+      - name: Buktikan gerbang jangkauan corona Matahari berbunyi
+        run: python3 Tools/bukti-mutasi-jangkauan-corona.py
+
       # Dan bukti untuk **enam gerbang piksel yang tidak punya bukti sama
       # sekali** — ditemukan dengan membandingkan daftar `def check_*` di
       # `check-visuals.py` terhadap seluruh `check_*` yang dirujuk kedua

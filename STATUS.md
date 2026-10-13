@@ -1,3 +1,126 @@
+## Progres terakhir (13 Okt 2026 — jangkauan corona: klaim "satu angka, satu sumber" yang tidak dijaga apa pun)
+
+Siklus ini mulai dari satu kalimat yang ditulis port Python tentang dirinya
+sendiri, di `Tools/render-visuals.py`:
+
+```python
+# Corona menjangkau ini × radius gambar — **sama dengan** `VisualFrame.sunCoronaReach`
+# di model Swift. Satu angka, satu sumber, supaya dua bahasa tidak menyimpang.
+SUN_CORONA_REACH = 1.45
+```
+
+Kalimat "satu angka, satu sumber" itu **klaim**. Pertanyaannya sederhana:
+siapa yang memeriksanya? Jawabannya: tidak ada. Diukur, bukan dikira-kira —
+`sunCoronaReach` di model Swift diubah 1.45 → 1.60, dan **seluruh** gerbang
+Matahari tetap hijau:
+
+| gerbang | sebelum | sesudah model diubah |
+|---|---|---|
+| `check_sun_profile_matches_the_model` | hijau | **hijau** |
+| `check_sun_edge_is_soft` | hijau | **hijau** |
+| `check_sun_corona_reaches_beyond_the_disk` | hijau | **hijau** |
+| `check_night_accents_match_the_model` | hijau | **hijau** |
+
+### Kenapa tidak ada satu pun yang berbunyi
+
+Sebabnya kelas cacat yang sudah dibayar repo ini berkali-kali: **semua gerbang
+Matahari mengukur gambar port Python**, dan port-nya tidak ikut berubah. Yang
+menyimpang adalah **view** — `radius / CGFloat(VisualFrame.sunCoronaReach)` di
+`CelestialVisualView.swift`. Jadi yang diuji di Linux dan yang tampil di jam
+perlahan-lahan menjadi dua Matahari berbeda, sementara kedua sisi hijau.
+
+Yang membuatnya layak jadi gerbang tersendiri adalah **arahnya**. Orang yang
+memperbaiki tampilan Matahari menyunting **model** di Mac, bukan port Python
+di Linux. "Model berubah, port tidak ikut" bukan keadaan teoretis di sini — ia
+keadaan yang paling mungkin. Dan `sunCoronaReach` adalah **konstanta tetangga**
+profil: `check_sun_profile_matches_the_model` mengikat *isi* profil, bukan
+angka jangkauan di sebelahnya.
+
+### Gerbangnya, dan tiga arah yang diukur
+
+`check_sun_corona_reach_matches_the_model` (80 gerbang sekarang, dari 79):
+
+1. **Angka sama** — model lawan port, persis. Ini yang menangkap arah
+   "model berubah, port tidak ikut".
+2. **Pemakaian bernama** — tiga situs di port (`radius / SUN_CORONA_REACH`,
+   `SUN_CORONA_REACH * radius`, `1.0 / SUN_CORONA_REACH`) dan tiga di view
+   (`CGFloat(VisualFrame.sunCoronaReach) * radius`, `1.0 / …`, `radius / …`).
+   Angka yang cocok tapi ditulis ulang sebagai literal adalah dua angka yang
+   **kebetulan** sama hari ini; ia akan menyimpang tanpa gerbang berbunyi.
+3. **Rentang** — komentar model menyatakan batasnya sendiri (<1.3 R hampir tak
+   terlihat, >1.6 R menabrak bingkai kartu). Arah ini menangkap dua bahasa
+   yang **sepakat dan sama-sama salah**.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-jangkauan-corona.py` — 6 keadaan, semuanya sesuai harapan.
+Yang paling berharga bukan "ada yang merah", melainkan **merah yang mana**:
+
+```
+OK   [baseline]                                               0 merah / 13
+OK   1. model 1.45 -> 1.60, port tidak ikut                   3 merah
+OK   2. port 1.45 -> 1.60, model tidak ikut                   4 merah
+OK   3. model DAN port 1.45 -> 1.60 (sepakat, sama-sama salah) 4 merah
+OK   4. model DAN port 1.45 -> 1.20 (di bawah rentang)         2 merah
+OK   5. pemakaian diganti literal (angka masih 1.45)           2 merah
+```
+
+Dua keadaan yang mengajarkan paling banyak:
+
+- **Keadaan 3**: kedua bahasa berubah bersama. Di situ gerbang **kesamaan
+  angka hijau** — dan itu benar, karena tidak ada penyimpangan. Yang berbunyi
+  adalah pemeriksaan **rentang** dan `check_sun_edge_is_soft`. Tanpa keadaan
+  ini, harness tidak bisa membedakan "gerbang ini mengukur penyimpangan" dari
+  "gerbang ini mengukur nilainya".
+- **Keadaan 5**: `radius / SUN_CORONA_REACH` ditulis `radius / 1.45`. Setiap
+  angka di repo masih 1.45, jadi gerbang kesamaan angka **hijau** dan kedua
+  gerbang piksel **hijau** — gambarnya identik. Yang hilang hanya **ikatannya**:
+  sejak baris itu, mengubah konstanta tidak lagi mengubah gambar, dan tidak
+  ada yang tahu. Ini bentuk paling sunyi dari seluruh kelas cacat ini, dan ia
+  satu-satunya alasan pemeriksaan "pemakaian bernama" ada.
+
+Keadaan 1 sengaja menuntut `check_sun_profile_matches_the_model` **hijau**.
+Kalau ia ikut memerah, kedua gerbang sedang mengukur hal yang sama — dan salah
+satunya tidak menjaga apa pun.
+
+### Sisa yang tertinggal di pohon kerja, dan apa yang dilakukan dengannya
+
+Siklus ini dimulai dengan pohon kerja yang membawa sisa dari siklus sebelumnya:
+gerbang `check_features_survive_the_watch_size_in_night_mode` di
+`check-visuals.py`, harness `Tools/bukti-mutasi-ciri-malam.py`, dan langkah
+CI-nya — lengkap, tapi belum di-commit. Sisa itu **tidak** dibuang dan
+**tidak** diadopsi begitu saja: harness-nya dijalankan lebih dulu, dan ia
+melaporkan 5 keadaan sesuai harapan (termasuk kontrol negatif yang menyatakan
+bahwa empat dari lima gerbang ciri planet memang **belum pernah** merender
+mode malam). Baru setelah terbukti, ia ikut di-commit bersama gerbang baru.
+
+Gerbang baru ini juga menaikkan biaya `--check`: keadaan `ss=8` pada ukuran
+jam menambah sekitar empat menit. Diukur: dari ~12 menit menjadi ~22 menit.
+
+### Yang TIDAK diklaim
+
+- Gerbang ini mengikat **satu angka**, bukan bahwa 1.45 itu nilai yang benar
+  secara astronomi. Itu milik komentar model dan
+  `testSunCoronaReachIsBeyondTheDisk`.
+- Ia **tidak** membaca piksel. View yang memakai angka itu **tanpa menyebut
+  namanya** (`radius / 1.45`) hanya tertangkap kalau angkanya kebetulan salah;
+  dan justru karena itu pemeriksaan "pemakaian bernama" ada.
+- Rentang 1.3–1.6 adalah **pemikiran** yang dinyatakan model, bukan hasil
+  pengukuran baru. Angka 1.45 hijau dan 1.60 merah sudah diukur; batas bawah
+  1.20 juga. Yang tidak diukur adalah titik di antara keduanya.
+- Sepuluh gerbang lain di `check-visuals.py` masih **tanpa bukti mutasi**
+  (`check_moon_disc_keeps_its_curvature`, `check_earthshine`,
+  `check_crater_rim_opacity_is_not_clamped`, `check_deep_sky_catalogue_values_reach_the_picture`,
+  dan seterusnya). Siklus ini menutup satu, bukan kelasnya.
+
+### Pelajaran
+
+- **Komentar yang menjanjikan kesamaan bukan gerbang.** Kalimat "satu angka,
+  satu sumber" ditulis dengan niat baik dan tetap salah selama dua siklus.
+  Yang menjaganya hanya pemeriksaan yang bisa **merah**.
+- **Arah "model berubah" harus diukur terpisah.** Mengikat port ke model saja
+  akan melewatkan arah yang paling mungkin terjadi di repo dua bahasa ini.
+
 ## Progres terakhir (12 Okt 2026 — Aturan 35: satu berkas yang bertentangan dengan dirinya sendiri)
 
 Siklus ini mulai dari sisa yang tertinggal di pohon kerja: `PointingView.swift`

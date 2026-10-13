@@ -1180,6 +1180,129 @@ def check_features_survive_the_watch_size(results, ss=8):
             f"(nol berarti cirinya lenyap di ukuran yang tampil)"))
 
 
+#: Seberapa banyak ciri pengenal planet yang **harus bertahan** di mode malam,
+#: sebagai nisbah terhadap jumlah piksel ciri yang sama di mode siang, pada
+#: ukuran kartu jam.
+#:
+#: **Kenapa ada lantai, padahal "ciri masih ada" saja bisa diperiksa.** Nisbah
+#: `> 0` hijau pada satu piksel; ciri yang tinggal sepersepuluh pun lolos.
+#: Yang diklaim mode malam bukan "tidak menghapus ciri sepenuhnya", melainkan
+#: "tidak menghilangkan pembeda yang tersisa setelah warna dibuang".
+#:
+#: **Kenapa nisbah, bukan jumlah piksel malam saja.** Jumlah piksel mode malam
+#: ikut bergerak kalau cirinya diperkuat di mode siang (cincin Saturnus dibuat
+#: lebih tebal, dsb), jadi lantai jumlah akan merah pada kode yang benar.
+#: Nisbah mengukur hal yang memang diklaim: malam tidak boleh kehilangan ciri
+#: yang ada di siang.
+#:
+#: **Kenapa 0.70.** Diukur pada 38 pt, `ss=8` — nisbah malam/siang per ciri:
+#:
+#:     Bintik Merah Besar Jupiter   226 / 239 = 0.946
+#:     cincin Saturnus              372 / 377 = 0.987
+#:     kutub Mars                   126 / 126 = 1.000
+#:     kawah Merkurius               51 /  57 = 0.895
+#:     kabut Venus                  177 / 178 = 0.994
+#:
+#: Terlemah 0.895, jadi 0.70 menyisakan margin ~1.28x dan tidak menyentuh kode
+#: yang benar. Nilainya sengaja **tidak** duduk di 0.89 (persis angka terukur)
+#: karena ambang yang dipertanyakan lewat pembulatan akan diubah orang sampai
+#: ia hijau.
+NIGHT_WATCH_FEATURE_RETENTION = 0.70
+
+
+def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
+    """Ciri pengenal planet harus tetap terukur pada ukuran jam **di mode malam**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_features_survive_the_watch_size`
+    (di atas) mengukur kelima ciri pada ukuran yang benar-benar tampil — tetapi
+    hanya di mode siang. Mode malam bukan mode pinggiran di produk ini: ia
+    alasan produknya ada (rhodopsin), dan `NightVisual` memetakan setiap warna
+    ke kanal merah saja, sehingga satu-satunya pembeda yang tersisa adalah
+    **terang**. Ciri yang terbaca dari rona — kutub Mars yang putih lawan merah,
+    kabut Venus yang lebih pucat dari piringannya — bisa kehilangan seluruh
+    kontrasnya di sana tanpa satu pun gerbang berbunyi.
+
+    **Kenapa gerbang lain tidak menangkapnya.** `check_night_mode_purity`
+    menyapu hijau/biru sampai nol (warna dibuang — benar) dan
+    `check_night_mode_never_exceeds_day` menjaga terang tidak naik. Keduanya
+    menjaga **palet**, bukan **keterbacaan**: tidak ada satu pun yang menuntut
+    ciri pengenal masih terbaca setelah warna dibuang. Terukur dari sumber:
+    dari lima gerbang ciri planet, hanya `check_jupiter_spot_reads_on_the_watch`
+    yang pernah merender mode malam — dan itu justru ciri yang sudah pernah
+    punya cacatnya sendiri (Bintik Merah Besar lebih terang dari pitanya di
+    mode malam). Empat sisanya — cincin Saturnus, kutub Mars, kawah Merkurius,
+    kabut Venus — **nol kali**.
+
+    Ini kelas cacat yang sudah dibayar repo ini: ciri yang "ada" tetapi tidak
+    "terbaca". Gerbang yang menuntut `diff > 0` menjawab pertanyaan yang salah;
+    yang menentukan pengalaman pengguna adalah **seberapa banyak** cirinya
+    bertahan.
+
+    **Apa yang persisnya diukur, dan apa yang TIDAK.** Yang diukur adalah
+    **jejak** cirinya: berapa piksel yang berbeda dari bola berpalet yang sama,
+    di luar lencana "?", pada ukuran kartu jam — lalu nisbah malam/siang dari
+    jumlah itu. Jadi gerbang ini menangkap ciri yang **menyusut atau lenyap**
+    saat warna dipetakan ke kanal merah.
+
+    Yang **tidak** ditangkapnya, dan ini harus disebut supaya "hijau" tidak
+    dibaca lebih luas daripada yang diukur: ciri yang jejaknya utuh tetapi
+    **kontrasnya** jatuh. Terukur, mengubah warna ciri sampai sama dengan
+    piringannya tidak menggeser jumlah pikselnya sama sekali (`kutub Mars
+    126 → 126`), karena jumlah piksel mengukur **geometri**, bukan kekuatan
+    sinyal. Kontras malam diukur di tempat lain (`check_jupiter_spot_reads_on_the_watch`
+    untuk bintik; `check_night_mode_never_exceeds_day` untuk terang), dan
+    gerbang ini sengaja tidak mengklaim menggantikannya.
+
+    **Batas yang dinyatakan.** Gerbang ini mengukur **port Python**, bukan view
+    Swift — sama seperti seluruh gerbang gambar lain di berkas ini. Tidak ada
+    klaim bahwa perangkat Apple merender dengan angka yang persis sama.
+    """
+    watch = watch_visual_diameter()
+    if watch is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (mode malam)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+
+    footprint = R.candidate_marker_footprint()
+    pairs = [
+        ("planet-jupiter-confirmed", "planet-jupiter-bare",
+         "Bintik Merah Besar Jupiter"),
+        ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
+        ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-bare", "kabut Venus"),
+    ]
+    for confirmed_name, bare_name, label in pairs:
+        measured = {}
+        for night in (False, True):
+            _, (w, h, rows_a) = render_case(confirmed_name, night=night,
+                                            size=watch, ss=ss)
+            _, (_, _, rows_b) = render_case(bare_name, night=night,
+                                            size=watch, ss=ss)
+            measured[night] = badge_excluded_diff(rows_a, rows_b, w, h, footprint)
+
+        day, night = measured[False], measured[True]
+        if day <= 0:
+            # Ciri yang tidak terukur di siang hari membuat nisbahnya tak
+            # bermakna — dan gerbang yang kehilangan subjeknya harus **merah**,
+            # bukan hijau karena tidak ada yang dibagi.
+            results.append(Result(
+                f"{label} masih terukur di mode malam pada {watch} pt", False,
+                f"ciri tidak terukur di mode siang ({day} piksel di luar "
+                f"lencana), jadi nisbah malamnya tidak mengukur apa pun"))
+            continue
+
+        ratio = night / day
+        results.append(Result(
+            f"{label} masih terukur di mode malam pada {watch} pt "
+            f"(>= {NIGHT_WATCH_FEATURE_RETENTION:.0%} dari siang)",
+            ratio >= NIGHT_WATCH_FEATURE_RETENTION,
+            f"{night} piksel malam lawan {day} piksel siang = {ratio:.3f}; "
+            f"di bawah {NIGHT_WATCH_FEATURE_RETENTION:.2f} jejak cirinya "
+            f"menyusut saat seluruh warna dipetakan ke kanal merah"))
+
+
 def check_png_is_well_formed(results, size=64, ss=2):
     """PNG yang ditulis alat render harus **sah menurut spesifikasi PNG**.
 
@@ -2340,7 +2463,9 @@ def check_every_planet_in_the_model_has_render_cases(results):
             ("check_features_disappear_when_uncertain",
              "gerbang ciri hilang saat ragu", True),
             ("check_features_survive_the_watch_size",
-             "gerbang ciri pada ukuran jam", False)):
+             "gerbang ciri pada ukuran jam", False),
+            ("check_features_survive_the_watch_size_in_night_mode",
+             "gerbang ciri pada ukuran jam di mode malam", False)):
         if f"def {fn}(" not in self_source:
             results.append(Result(f"kasus render planet: {label} terbaca", False,
                                   f"'def {fn}(' tidak ditemukan"))
@@ -10085,6 +10210,123 @@ def check_sun_edge_is_soft(results, size=256, ss=2):
         f"rgb di 0.90 R = {at_090} (harus jelas di atas latar 10,10,15)"))
 
 
+def check_sun_corona_reach_matches_the_model(results):
+    """Jangkauan corona Matahari tidak boleh menyimpang antara model & port.
+
+    **Cacat yang ditutup pemeriksaan ini — dan kenapa ia tidak terlihat.**
+    `SUN_CORONA_REACH` di port mengklaim, di komentarnya sendiri, "**sama
+    dengan** `VisualFrame.sunCoronaReach` di model Swift. Satu angka, satu
+    sumber, supaya dua bahasa tidak menyimpang." Klaim itu **tidak dijaga
+    apa pun**. Diukur, bukan diasumsikan: `sunCoronaReach` di model diubah
+    1.45 -> 1.60 dan **seluruh** gerbang tetap hijau:
+
+    ```
+    check_sun_profile_matches_the_model      ok
+    check_sun_edge_is_soft                   ok
+    check_sun_corona_reaches_beyond_the_disk ok
+    check_night_accents_match_the_model      ok
+    ```
+
+    Alasannya persis kelas yang sudah dibayar repo ini: seluruh gerbang
+    Matahari mengukur **gambar port**, dan port-nya tidak berubah. Yang
+    menyimpang adalah **view** — `radius / CGFloat(VisualFrame.sunCoronaReach)`
+    di `CelestialVisualView.swift` — jadi yang diuji di Linux dan yang tampil
+    di jam perlahan-lahan menjadi dua Matahari yang berbeda, sementara kedua
+    sisi tetap hijau.
+
+    **Kenapa arah sebaliknya juga diukur.** `check_sun_profile_matches_the_model`
+    mengikat **isi** profil; `sunCoronaReach` adalah **konstanta tetangga** yang
+    dipakai di tiga tempat (port dua, view tiga). Mengikat hanya satu arah
+    (port menyimpang dari model) akan melewatkan model yang berubah tanpa
+    port-nya ikut — dan itu justru arah yang **paling mungkin** terjadi, karena
+    yang mengubah model sedang memperbaiki gambar di Mac, bukan port di Linux.
+
+    **Yang TIDAK diklaim.** Gerbang ini mengikat **satu angka**, bukan bahwa
+    1.45 itu nilai yang benar secara astronomi; itu milik komentar model dan
+    `testSunCoronaReachIsBeyondTheDisk`. Ia juga tidak membaca piksel: ia
+    tidak menangkap view yang memakai angka itu **tanpa** menyebut namanya
+    (`radius / 1.45`) — bentuk itu ditangkap `check_sun_edge_is_soft` hanya
+    kalau angkanya kebetulan salah, dan itulah sebabnya kedua arah di bawah
+    menuntut **pemakaian bernama**, bukan sekadar angka yang cocok.
+    """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                     "CelestialVisual.swift")
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    try:
+        model_source = open(model_path).read()
+        port_source = open(R.SOURCE, encoding="utf-8").read()
+        view_source = open(view_path).read()
+    except OSError as exc:
+        results.append(Result("jangkauan corona: berkas terbaca", False, str(exc)))
+        return
+
+    # Jangkar hilang = gagal bersih yang menyebut jangkarnya, bukan traceback.
+    # Gerbang yang melempar pengecualian saat berkasnya dirapikan akan dihapus
+    # orang, dan aturan yang dihapus tidak menjaga apa pun.
+    model_anchor = "sunCoronaReach: Double = "
+    port_anchor = "SUN_CORONA_REACH = "
+    missing = [name for name, source, anchor in (
+        ("model", model_source, model_anchor),
+        ("port", port_source, port_anchor)) if anchor not in source]
+    if missing:
+        results.append(Result(
+            "jangkauan corona: jangkar kedua bahasa masih ada", False,
+            "jangkar tidak ditemukan di: " + ", ".join(missing)))
+        return
+
+    def value_of(source, anchor, label):
+        """Angka pertama sesudah `anchor` — dan gagal bersih kalau tak ada."""
+        tail = source[source.index(anchor) + len(anchor):]
+        match = re.match(r"\s*(-?\d+(?:\.\d+)?)", tail)
+        if not match:
+            results.append(Result(
+                f"jangkauan corona: angka {label} terbaca", False,
+                f"tidak ada angka sesudah '{anchor}'"))
+            return None
+        return float(match.group(1))
+
+    model_reach = value_of(model_source, model_anchor, "model")
+    port_reach = value_of(port_source, port_anchor, "port")
+    if model_reach is None or port_reach is None:
+        return
+
+    results.append(Result(
+        "jangkauan corona: model dan port memakai angka yang sama",
+        abs(model_reach - port_reach) <= 1e-9,
+        f"model {model_reach}, port {port_reach} — komentar port mengklaim "
+        f"«satu angka, satu sumber», jadi keduanya harus sama persis"))
+
+    # Arah kedua: pemakaian **bernama**, di kedua sisi. Angka yang cocok tapi
+    # ditulis ulang sebagai literal adalah dua angka yang kebetulan sama hari
+    # ini; ia akan menyimpang tanpa satu pun gerbang berbunyi.
+    port_uses = ("radius / SUN_CORONA_REACH", "SUN_CORONA_REACH * radius",
+                 "1.0 / SUN_CORONA_REACH")
+    view_uses = ("CGFloat(VisualFrame.sunCoronaReach) * radius",
+                 "1.0 / VisualFrame.sunCoronaReach",
+                 "radius / CGFloat(VisualFrame.sunCoronaReach)")
+    results.append(Result(
+        "jangkauan corona: port memakai konstantanya sendiri (bukan literal)",
+        all(text in port_source for text in port_uses),
+        "; ".join(f"'{t}' {'ada' if t in port_source else 'TIDAK'}"
+                  for t in port_uses)))
+    results.append(Result(
+        "jangkauan corona: view memakai konstanta model (bukan literal)",
+        all(text in view_source for text in view_uses),
+        "; ".join(f"'{t}' {'ada' if t in view_source else 'TIDAK'}"
+                  for t in view_uses)))
+
+    # Arah ketiga: nilai yang menyimpang **ke luar rentang yang bisa dilihat**.
+    # Komentar model menyatakan batasnya sendiri (>1.6 R menabrak bingkai,
+    # <1.3 R hampir tak terlihat). Ambangnya sengaja tidak diletakkan di angka
+    # terukurnya: 1.45 hijau, 1.60 merah — dan 1.60 memang yang membuat
+    # `check_sun_edge_is_soft` berbunyi saat port-nya ikut berubah.
+    results.append(Result(
+        "jangkauan corona: di dalam rentang yang terbaca sebagai glow",
+        1.3 < model_reach < 1.6,
+        f"model {model_reach} (komentar model: <1.3 hampir tak terlihat, "
+        f">1.6 menabrak bingkai kartu)"))
+
+
 def check_sun_corona_reaches_beyond_the_disk(results, size=256, ss=2):
     """Corona Matahari harus **bercahaya di luar** piringan, bukan disk tepi keras.
 
@@ -11063,6 +11305,7 @@ def main():
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
     check_features_survive_the_watch_size(results)
+    check_features_survive_the_watch_size_in_night_mode(results)
     check_every_planet_in_the_model_has_render_cases(results)
     check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
@@ -11083,6 +11326,7 @@ def main():
     check_jupiter_spot_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
     check_sun_edge_is_soft(results)
+    check_sun_corona_reach_matches_the_model(results)
     check_sun_corona_reaches_beyond_the_disk(results)
     check_png_is_well_formed(results)
     check_png_roundtrip(results)
