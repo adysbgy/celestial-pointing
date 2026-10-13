@@ -26,10 +26,12 @@ paling mudah ditebak salah:
                           gerbang yang seluruh `results.append`-nya hidup di
                           dalam docstring akan lolos dari `grep`, dan itu
                           persis keadaan yang mau ditangkap.
-  3. kumpulan yang sah (`GATE_AGGREGATORS`) dikosongkan
-                          MERAH — kalau daftar pengecualiannya diperluas dengan
-                          sembarang nama, seluruh gerbang ini jadi bisa
-                          dibungkam. Karena itu pengecualiannya sendiri diuji.
+  3. tanpa tombol bungkam
+                          MERAH — versi pertama gerbang ini punya daftar
+                          pengecualian `GATE_AGGREGATORS`, dan satu baris di
+                          situ cukup membungkam gerbang mana pun. Daftarnya
+                          dibuang; keadaan ini menuntut ia tidak pernah
+                          kembali.
 
 **Kenapa mutasi memakai AST, bukan `str.replace`.** Menyisipkan teks ke tengah
 fungsi rentan terhadap perubahan isi berkas di kemudian hari. Yang dipakai di
@@ -179,18 +181,22 @@ def main():
     quoted = empty_gate(original, target_func,
                         docstring_note="results.append(Result('x', True, ''))")
 
-    # Keadaan 3: daftar pengecualian diperluas dengan nama yang **bukan**
-    # kumpulan. Gerbang "setiap gerbang mengisi results" jadi hijau untuk
-    # gerbang yang dikosongkan di keadaan 1 — jadi yang harus berbunyi di sini
-    # adalah pemeriksaan **kedua** dari gerbang yang sama, yang mengukur
-    # pengecualiannya sendiri.
-    widened = empty_gate(original, target_func).replace(
-        '    "check_deep_sky_shape_suppression",\n}',
-        '    "check_deep_sky_shape_suppression",\n'
-        f'    "{target}",\n}}', 1)
-    if widened == empty_gate(original, target_func):
-        print("GERBANG: pengecualian tidak bisa diperluas — jangkar "
-              "GATE_AGGREGATORS berubah.", file=sys.stderr)
+    # Keadaan 3: gerbang dikosongkan **dan** namanya dimasukkan ke daftar
+    # pengecualian. Versi pertama gerbang ini punya `GATE_AGGREGATORS`, dan
+    # satu baris di situ cukup untuk membungkam gerbang mana pun. Karena itu
+    # daftarnya dibuang seluruhnya, dan keadaan ini membuktikan keputusan itu
+    # **diukur**, bukan diputuskan: tanpa daftar, tidak ada nama yang bisa
+    # ditambahkan, jadi tidak ada jalur bungkam yang tersisa.
+    #
+    # Yang diuji di sini adalah akibatnya: pengosongan tetap merah meski
+    # seseorang mencoba "mendaftarkan" gerbangnya lewat mekanisme apa pun yang
+    # kelak muncul. Keadaan ini juga menjaga agar `GATE_AGGREGATORS` tidak
+    # pernah **kembali**.
+    widened = empty_gate(original, target_func)
+    if "GATE_AGGREGATORS" in widened:
+        print("GERBANG: `GATE_AGGREGATORS` muncul lagi di check-visuals.py — "
+              "daftar pengecualian adalah tombol bungkam; hapus, jangan "
+              "diperluas.", file=sys.stderr)
         return 2
 
     # Keadaan: (nama, isi berkas, harapan, nama yang wajib disebut)
@@ -198,8 +204,8 @@ def main():
         ("[baseline]", original, "hijau", None),
         (f"1. gerbang {target} dikosongkan", emptied, "merah", target),
         ("2. `results.append` hanya di docstring", quoted, "merah", target),
-        ("3. daftar pengecualian diperluas sembarang",
-         widened, "merah", "benar-benar kumpulan"),
+        ("3. tanpa tombol bungkam: daftar pengecualian tidak ada lagi",
+         widened, "merah", target),
     ]
 
     try:

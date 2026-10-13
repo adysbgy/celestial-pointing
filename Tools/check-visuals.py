@@ -11722,17 +11722,6 @@ def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=20
 #: menulis alasannya di sini, tempat orang berikutnya bisa membacanya.
 LOOP_LEAK_ALLOWED = {}
 
-#: `check_*` yang **boleh** tidak mengisi `results` sendiri.
-#:
-#: Terbukti satu nama, dan ia bukan gerbang melainkan **kumpulan**: tubuhnya
-#: hanya memanggil gerbang lain dan meneruskan `results` ke sana. Menuntutnya
-#: mengisi sendiri berarti menuntut duplikasi.
-GATE_AGGREGATORS = {
-    # Dipanggil dari `check_features_disappear_when_uncertain`.
-    "check_deep_sky_shape_suppression",
-}
-
-
 def check_no_loop_variable_leaks_into_a_call(results):
     """Variabel gelung tidak boleh dipakai sebagai argumen setelah gelungnya.
 
@@ -11853,23 +11842,30 @@ def check_every_gate_fills_its_results(results):
     `ok=True` akan hijau di sini — itu dijaga harness mutasi per gerbang, bukan
     oleh meta-gerbang ini.
 
-    `GATE_AGGREGATORS` adalah pengecualian yang dinyatakan, dan ia **sendiri
-    diukur**: nama di dalamnya wajib benar-benar memanggil gerbang `check_*`
-    lain. Tanpa syarat itu, daftarnya jadi cara membungkam gerbang mana pun
-    dengan satu baris, dan gerbang ini kehilangan seluruh nilainya — bentuk
-    kegagalan yang sama dengan yang ditutupnya, hanya satu lapis lebih dalam.
+    **Kenapa tanpa daftar pengecualian.** Versi pertama gerbang ini punya
+    `GATE_AGGREGATORS` — nama-nama yang "boleh" diam karena tubuhnya hanya
+    memanggil gerbang lain. Dua alasan ia dibuang, keduanya terukur:
+
+      1. Satu-satunya nama di dalamnya, `check_deep_sky_shape_suppression`,
+         ternyata **mengisi `results` sendiri**. Pengecualian itu tidak
+         diperlukan — ia menurunkan cakupan tanpa alasan.
+      2. Daftar nama adalah **tombol bungkam**: tambah satu baris, gerbang
+         mana pun jadi kebal. Menutupnya dengan syarat "wajib memanggil
+         `check_*` lain" hanya menggeser lubangnya — gerbang yang memanggil
+         gerbang lain lalu tidak pernah dihitung.
+
+    Karena itu tidak ada pengecualian sama sekali: setiap `check_*` harus
+    mengisi `results`, titik. Yang **boleh** diam adalah fungsi yang tidak
+    bernama `check_*` (pembantu seperti `swift_tuple_triples`), dan itu
+    diurus oleh namanya sendiri, bukan oleh daftar.
     """
     with open(__file__, encoding="utf-8") as handle:
         source = handle.read()
     tree = ast.parse(source)
-    functions = {f.name: f for f in tree.body
-                 if isinstance(f, ast.FunctionDef)}
     silent = []
     for func in tree.body:
         if not (isinstance(func, ast.FunctionDef)
                 and func.name.startswith("check_")):
-            continue
-        if func.name in GATE_AGGREGATORS:
             continue
         body_calls = [node for node in ast.walk(func)
                       if isinstance(node, ast.Call)
@@ -11882,31 +11878,9 @@ def check_every_gate_fills_its_results(results):
     results.append(Result(
         "setiap gerbang mengisi results-nya",
         not silent,
-        "semua gerbang melapor" if not silent
-        else f"{len(silent)} gerbang diam: {', '.join(silent)} — "
-             f"{len(GATE_AGGREGATORS)} kumpulan dinyatakan di "
-             "GATE_AGGREGATORS"))
-
-    # Pengecualiannya sendiri: nama di `GATE_AGGREGATORS` wajib **kumpulan**,
-    # yakni memanggil setidaknya satu `check_*` lain. Kalau tidak, daftar itu
-    # menjadi tombol bungkam, dan gerbang di atas berhenti mengukur apa pun.
-    not_aggregators = []
-    for name in sorted(GATE_AGGREGATORS):
-        func = functions.get(name)
-        if func is None:
-            not_aggregators.append(f"{name} (tidak ada)")
-            continue
-        calls = [n.func.id for n in ast.walk(func)
-                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-                 and n.func.id.startswith("check_") and n.func.id != name]
-        if not calls:
-            not_aggregators.append(f"{name} (tidak memanggil gerbang lain)")
-    results.append(Result(
-        "pengecualian GATE_AGGREGATORS benar-benar kumpulan",
-        not not_aggregators,
-        f"{len(GATE_AGGREGATORS)} kumpulan, semuanya memanggil gerbang lain"
-        if not not_aggregators
-        else "; ".join(not_aggregators)))
+        f"semua gerbang melapor ({sum(1 for f in tree.body if isinstance(f, ast.FunctionDef) and f.name.startswith('check_'))} diperiksa)"
+        if not silent
+        else f"{len(silent)} gerbang diam: {', '.join(silent)}"))
 
 
 def main():
