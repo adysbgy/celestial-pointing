@@ -1696,6 +1696,28 @@ public enum VisualFrame {
     /// Linux dan port Python membacanya dari sumber yang sama.
     public static let clusterCoreRadiusFraction: Double = 0.30
 
+    /// Penambahan opasitas inti bintang gugus di atas blob yang menaunginya.
+    ///
+    /// **Kenapa angka ini pindah dari `Canvas` ke model.** Ia dulu hidup
+    /// sebagai literal `0.25` di **dua** bahasa sekaligus —
+    /// `core.opacity(min(1, star.opacity + 0.25))` di view dan `op + 0.25` di
+    /// port — tanpa satu pun gerbang yang menjaganya. Terukur di siklus ini
+    /// (`Tools/ukur-gugus.py`): mengganti literal di **view** menjadi `0.55`
+    /// membiarkan seluruh 22 gerbang yang membaca view hijau (0 merah), jadi
+    /// jam bisa kehilangan inti gugusnya tanpa suara; mengganti di **port**
+    /// hanya berbunyi karena kebetulan ada docstring yang mengutip angka
+    /// piksel yang bergeser, bukan karena ada yang menjaga angkanya.
+    ///
+    /// Bentuk cacatnya sama persis dengan `moonSphereGradientEndRadius`:
+    /// **satu angka, dua bahasa, nol penjaga**. Yang membedakan hanya kelas
+    /// objeknya — Bulan vs gugus bintang.
+    ///
+    /// Angka ini **bukan** hiasan: inti tanpa penambahan opasitas tenggelam ke
+    /// dalam blob yang menaunginya, dan gugus kembali tampil sebagai noda
+    /// kabur — persis cacat yang dijaga `clusterCoreRadiusFraction` dari sisi
+    /// ukuran.
+    public static let clusterCoreBrighten: Double = 0.25
+
     /// Plafon jari-jari inti bintang gugus, **diturunkan dari tata letaknya**.
     ///
     /// **Kenapa plafon ini perlu.** Fraksi di atas diambil dari blob yang

@@ -516,6 +516,13 @@ def readable_core_radius(fraction, extent, reference, frame_half_extent):
 # yang tidak dipakai lagi; karena itu ia ikut dibaca `check_port_matches_swift_constants`.
 CLUSTER_CORE_HALO_SCALE = 2.4
 
+# MODEL: `VisualFrame.clusterCoreBrighten`. Penambahan opasitas inti di
+# atas blob yang menaunginya. **Dulu literal `0.25` di sini dan di view**,
+# tanpa penjaga: terukur (`Tools/ukur-gugus.py`) menggantinya di view
+# membiarkan seluruh 22 gerbang yang membaca view hijau. Sekarang satu angka,
+# satu sumber.
+CLUSTER_CORE_BRIGHTEN = 0.25
+
 
 def cluster_cores(morphology, fuzziness, frame_half_extent=None):
     """`VisualFrame.clusterCores` — inti bintang di dalam gugus, kosong untuk morfologi lain.
@@ -1946,7 +1953,7 @@ def _draw_deep_sky(canvas, cx, cy, radius, kw, night_mode):
         canvas.fill(lambda x, y, sx=sx, sy=sy, star_r=star_r:
                     (x - sx) ** 2 + (y - sy) ** 2 <= star_r * star_r,
                     lambda x, y, op=star["opacity"]:
-                    (core_rgb, min(1.0, op + 0.25)))
+                    (core_rgb, min(1.0, op + CLUSTER_CORE_BRIGHTEN)))
 
 
 def _inside_rotated_ellipse(x, y, bx, by, half_w, half_h, cos_a, sin_a):

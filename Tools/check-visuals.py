@@ -2252,6 +2252,21 @@ def check_port_matches_swift_constants(results):
          R.CLUSTER_CORE_HALO_SCALE, 2.4,
          "clusterCoreHaloScale: CGFloat = 2.4", view,
          "CelestialVisualView.swift"),
+        # Penambahan opasitas inti. **Dulu literal di kedua bahasa, tanpa
+        # penjaga** — terukur: mengganti `star.opacity + 0.25` menjadi `+ 0.55`
+        # di view membiarkan seluruh 22 gerbang yang membaca view hijau, jadi
+        # jam bisa kehilangan inti gugusnya tanpa suara. Sekarang angkanya
+        # tinggal di model, dan pasangan (port, view) ini menjaga ketiganya
+        # tetap satu angka: entri tabel membandingkan `port_value` dengan
+        # `source_text` yang **harus** masih tertulis di sumber.
+        ("inti gugus: penambahan opasitas (port == model)",
+         R.CLUSTER_CORE_BRIGHTEN, 0.25,
+         "clusterCoreBrighten: Double = 0.25", model,
+         "CelestialVisual.swift"),
+        ("inti gugus: view membaca penambahan opasitas dari model",
+         "VisualFrame.clusterCoreBrighten" in view, True,
+         "star.opacity + CGFloat(VisualFrame.clusterCoreBrighten)", view,
+         "CelestialVisualView.swift"),
     ]
     # Palet planet. Hingga sini **tidak dijaga siapa pun**: `PLANET_PALETTE`
     # di port Python dan `Planet.palette` di Swift memuat warna + pemetaan

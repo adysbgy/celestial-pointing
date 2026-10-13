@@ -616,6 +616,24 @@ jobs:
       - name: Buktikan gerbang lengkung piringan Bulan berbunyi
         run: python3 Tools/bukti-mutasi-lengkung-bulan.py
 
+      # Dan bukti untuk gerbang **penambahan opasitas inti gugus** — kelas
+      # cacat yang sama dengan lengkung piringan Bulan di atas: satu angka,
+      # dua bahasa, nol penjaga.
+      #
+      # `0.25` hidup sebagai literal di `core.opacity(min(1, star.opacity +
+      # 0.25))` (view) dan `op + 0.25` (port). Terukur (`Tools/ukur-gugus.py`):
+      # menggantinya di **view** membiarkan seluruh 22 gerbang yang membaca
+      # berkas view hijau — 0 merah — jadi jam bisa kehilangan inti gugusnya
+      # tanpa suara. Menggantinya di **port** berbunyi, tetapi **bukan karena
+      # gerbang yang menyebut angka ini**: yang merah adalah docstring yang
+      # mengutip piksel yang kebetulan bergeser, dan itu berhenti berbunyi
+      # begitu docstring-nya disunting.
+      #
+      # Empat keadaan, termasuk satu yang **wajib hijau** pada pemeriksaan
+      # kesamaan (model dan port berubah bersama: tidak ada penyimpangan).
+      - name: Buktikan gerbang penambahan opasitas inti gugus berbunyi
+        run: python3 Tools/bukti-mutasi-inti-opasitas.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #

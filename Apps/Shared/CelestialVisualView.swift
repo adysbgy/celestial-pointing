@@ -1308,7 +1308,7 @@ struct CelestialVisualView: View {
                                                 y: starCenter.y - starRadius,
                                                 width: starRadius * 2,
                                                 height: starRadius * 2)),
-                         with: .color(core.opacity(min(1, star.opacity + 0.25))))
+                         with: .color(core.opacity(min(1, star.opacity + CGFloat(VisualFrame.clusterCoreBrighten)))))
         }
     }
 
