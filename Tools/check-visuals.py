@@ -11851,12 +11851,19 @@ def check_every_gate_fills_its_results(results):
     **Batas yang dinyatakan.** Yang dijaga adalah *setiap gerbang mengisi
     results*, bukan *hasilnya benar*. Gerbang yang selalu mengisi satu hasil
     `ok=True` akan hijau di sini — itu dijaga harness mutasi per gerbang, bukan
-    oleh meta-gerbang ini. `GATE_AGGREGATORS` adalah pengecualian yang
-    dinyatakan: fungsi yang tubuhnya hanya memanggil gerbang lain.
+    oleh meta-gerbang ini.
+
+    `GATE_AGGREGATORS` adalah pengecualian yang dinyatakan, dan ia **sendiri
+    diukur**: nama di dalamnya wajib benar-benar memanggil gerbang `check_*`
+    lain. Tanpa syarat itu, daftarnya jadi cara membungkam gerbang mana pun
+    dengan satu baris, dan gerbang ini kehilangan seluruh nilainya — bentuk
+    kegagalan yang sama dengan yang ditutupnya, hanya satu lapis lebih dalam.
     """
     with open(__file__, encoding="utf-8") as handle:
         source = handle.read()
     tree = ast.parse(source)
+    functions = {f.name: f for f in tree.body
+                 if isinstance(f, ast.FunctionDef)}
     silent = []
     for func in tree.body:
         if not (isinstance(func, ast.FunctionDef)
@@ -11879,6 +11886,27 @@ def check_every_gate_fills_its_results(results):
         else f"{len(silent)} gerbang diam: {', '.join(silent)} — "
              f"{len(GATE_AGGREGATORS)} kumpulan dinyatakan di "
              "GATE_AGGREGATORS"))
+
+    # Pengecualiannya sendiri: nama di `GATE_AGGREGATORS` wajib **kumpulan**,
+    # yakni memanggil setidaknya satu `check_*` lain. Kalau tidak, daftar itu
+    # menjadi tombol bungkam, dan gerbang di atas berhenti mengukur apa pun.
+    not_aggregators = []
+    for name in sorted(GATE_AGGREGATORS):
+        func = functions.get(name)
+        if func is None:
+            not_aggregators.append(f"{name} (tidak ada)")
+            continue
+        calls = [n.func.id for n in ast.walk(func)
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                 and n.func.id.startswith("check_") and n.func.id != name]
+        if not calls:
+            not_aggregators.append(f"{name} (tidak memanggil gerbang lain)")
+    results.append(Result(
+        "pengecualian GATE_AGGREGATORS benar-benar kumpulan",
+        not not_aggregators,
+        f"{len(GATE_AGGREGATORS)} kumpulan, semuanya memanggil gerbang lain"
+        if not not_aggregators
+        else "; ".join(not_aggregators)))
 
 
 def main():
