@@ -10327,17 +10327,12 @@ def check_sun_corona_reach_matches_the_model(results):
         f">1.6 menabrak bingkai kartu)"))
 
 
-def earthshine_strength_formula(source, anchor, style):
-    """Rumus `earthshineStrength` dari teks sumber → dict batas & suku.
-
-    Dibaca dari **bentuknya**, bukan ditulis ulang sebagai daftar: dua
-    penjepit dan satu suku hidup di dua bahasa, dan daftar tangan di gerbang
-    akan menjadi angka yang tidak pernah dibandingkan — persis lubang yang
-    ditutup fungsi ini.
+def earthshine_strength_body(source, anchor, style):
+    """Badan fungsi `earthshineStrength` dari teks sumber, komentar dibuang.
 
     **Kenapa `style` harus disebut, bukan ditebak.** Batas badan fungsi
     berbeda di kedua bahasa: Swift menutup dengan kurawal, Python dengan
-    baris `def` berikutnya pada kolom nol. Versi pertama fungsi ini memakai
+    baris `def` berikutnya pada kolom nol. Versi pertama pembaca ini memakai
     kurung kurawal untuk keduanya, dan pada port ia menemukan `{` pertama
     **jauh di bawah** fungsinya — hasilnya "penjepit=False, hasil=False",
     yaitu gerbang yang merah pada kode yang benar. Yang menentukan batas
@@ -10380,33 +10375,66 @@ def earthshine_strength_formula(source, anchor, style):
         first = body.index('"""')
         second = body.find('"""', first + 3)
         body = body[:first] + ("" if second < 0 else body[second + 3:])
-    body = "\n".join(line.split(comment)[0] for line in body.split("\n"))
+    return "\n".join(line.split(comment)[0] for line in body.split("\n"))
 
-    # Baris penjepit: `let clamped = min(1, max(0, fraction))` (Swift) dan
-    # `f = min(1, max(0, fraction))` (Python). Nama variabelnya sengaja
-    # **boleh berbeda**: yang dibandingkan batasnya, bukan ejaannya.
+
+#: Fraksi iluminasi tempat kedua rumus dibandingkan. Sengaja memuat kedua
+#: ujung rentang dan satu nilai **di luar** rentang: penjepit yang bergeser
+#: tidak terlihat sama sekali kalau semua titik ujinya di dalam 0…1.
+EARTHSHINE_PROBE_FRACTIONS = (-0.2, 0.0, 0.15, 0.5, 0.85, 1.0, 1.4)
+
+#: Karakter yang boleh muncul di suku hasil. Ini **penjaga eval**, bukan
+#: hiasan: teksnya datang dari berkas repo, dan `eval` atas teks yang tidak
+#: dibatasi adalah cara membaca berkas yang berubah jadi cara menjalankan
+#: kode. Daftarnya sempit karena rumusnya memang aritmetika sederhana.
+EARTHSHINE_EXPRESSION_CHARS = set("0123456789.+-*/() f")
+
+
+def earthshine_strength_values(source, anchor, style):
+    """Nilai `earthshineStrength` di titik uji, **dihitung dari teks sumber**.
+
+    **Kenapa nilainya, bukan rumusnya sebagai teks.** Versi pertama gerbang
+    ini membandingkan bentuk tulisannya (`return 1 - f`), dan harness
+    mutasinya langsung menemukan batasnya: `return (1 - f) * 0.5` **tidak
+    terbaca**, jadi keadaan 1 melaporkan "TIDAK ADA" alih-alih merah —
+    gerbang yang buta tepat pada mutasi yang ditulisnya untuk menangkap.
+    Yang diukur di sini adalah **hasilnya**, di beberapa fraksi, sehingga
+    setiap bentuk penulisan yang menghasilkan nilai berbeda ikut tertangkap
+    tanpa perlu dikenali polanya.
+
+    Yang dibaca dari sumber tetap penjepitnya (batas atas & bawah) dan suku
+    hasilnya; yang dihitung hanya hasilnya. `min`/`max` disediakan sendiri di
+    sini, bukan diambil dari modul yang sedang diukur — gerbang yang memakai
+    penjepit milik kode yang diukurnya akan membiarkan penjepit yang salah
+    lolos bersama rumusnya.
+    """
+    body = earthshine_strength_body(source, anchor, style)
     clamp = re.search(
-        r"^\s*(?:let\s+)?(\w+)\s*=\s*min\(\s*(-?[\d.]+)\s*,\s*max\(\s*(-?[\d.]+)\s*,"
-        r"\s*(\w+)\s*\)\s*\)", body, re.M)
-    # Baris hasil: `return 1 - f`. Suku kiri boleh angka, kanan nama variabel
-    # penjepitnya — jadi `1 - f` dan `f` (pembalikan) terbaca sebagai dua
-    # rumus yang berbeda, bukan dua ejaan yang sama.
-    result = re.search(r"^\s*return\s+(-?[\d.]+)\s*-\s*(\w+)\s*$", body, re.M)
-    if not (clamp and result):
+        r"min\(\s*(-?[\d.]+)\s*,\s*max\(\s*(-?[\d.]+)\s*,\s*\w+\s*\)\s*\)", body)
+    returns = re.findall(r"^\s*return\s+(.+?)\s*$", body, re.M)
+    if not clamp or not returns:
         raise ValueError(
             f"bentuk earthshineStrength tidak dikenali di jangkar {anchor!r}: "
-            f"penjepit={bool(clamp)}, hasil={bool(result)}")
-    if result.group(2) != clamp.group(1):
+            f"penjepit={bool(clamp)}, return={len(returns)} (butuh 1)")
+    if len(returns) != 1:
         raise ValueError(
-            f"hasil `{result.group(0).strip()}` memakai "
-            f"'{result.group(2)}', tetapi penjepitnya menulis "
-            f"'{clamp.group(1)}' — rumusnya tidak bisa dibaca")
-    return {
-        "clamp_high": float(clamp.group(2)),
-        "clamp_low": float(clamp.group(3)),
-        "clamped": clamp.group(1),
-        "offset": float(result.group(1)),
-    }
+            f"jangkar {anchor!r}: {len(returns)} baris `return`, butuh tepat 1 "
+            f"— rumusnya bercabang dan nilai tunggal tidak mewakilinya")
+
+    high, low = float(clamp.group(1)), float(clamp.group(2))
+    expression = returns[0]
+    illegal = sorted(set(expression) - EARTHSHINE_EXPRESSION_CHARS)
+    if illegal:
+        raise ValueError(
+            f"suku hasil memuat karakter di luar aritmetika sederhana: "
+            f"{illegal} pada {expression!r}")
+
+    values = {}
+    for fraction in EARTHSHINE_PROBE_FRACTIONS:
+        clamped = min(high, max(low, fraction))
+        values[fraction] = float(eval(expression, {"__builtins__": {}},
+                                      {"f": clamped, "min": min, "max": max}))
+    return {"high": high, "low": low, "expression": expression, "values": values}
 
 
 def check_earthshine_strength_matches_the_model(results):
@@ -10448,11 +10476,24 @@ def check_earthshine_strength_matches_the_model(results):
 
     **Kenapa arah kedua bahasa tidak diukur di sini.** Kalau model *dan* port
     diubah bersama ke rumus yang sama, tidak ada penyimpangan — dan gerbang
-    yang memerah di sana akan memerah pada kode yang benar. Yang menangkap
-    rumus yang sama-sama salah adalah `check_earthshine` (arah "meredup
-    menuju purnama"), dan itu sudah terbukti: terukur 5 merah, termasuk dua
-    pemeriksaan arahnya. Jadi batas cakupan gerbang ini dinyatakan, bukan
-    disembunyikan.
+    yang memerah di sana akan memerah pada kode yang benar.
+
+    Versi pertama docstring ini mengklaim yang menangkapnya adalah
+    `check_earthshine` (arah "meredup menuju purnama"), dengan angka "5
+    merah". **Itu salah, dan diukur.** Keadaan itu dijalankan ulang:
+    `1 - f` → `1 - 0.5 * f` di **kedua** bahasa, lalu kedua gerbang Python
+    dievaluasi — `check_earthshine_strength_matches_the_model` hijau (memang
+    tidak ada penyimpangan) dan `check_earthshine` juga **hijau seluruhnya**,
+    lima pemeriksaannya. Ambang gerbang piksel itu berbasis nisbah dan
+    longgar, jadi separuh kekuatan earthshine tidak terlihatnya.
+
+    Yang benar-benar menangkapnya adalah uji Swift di Linux,
+    `testEarthshineOnlyOnPartiallyLitMoon` — diukur dengan menjalankan
+    `swift test --filter` atas model yang dimutasi: **3 assertion merah**
+    (`f=1.0` memberi 0,5 bukan 0,0; `f=0.5` memberi 0,75 bukan 0,5; `f=1.4`
+    tidak dijepit ke 0,0). Jadi rumus yang sama-sama salah di kedua bahasa
+    memang dijaga — tetapi oleh **uji unit**, bukan oleh gerbang di berkas
+    ini. Batas cakupan itu dinyatakan di sini, bukan disembunyikan.
 
     **Yang TIDAK diklaim.** Gerbang ini mengikat **satu rumus**, bukan bahwa
     `1 - f` itu benar secara astronomi — itu milik
@@ -10472,9 +10513,9 @@ def check_earthshine_strength_matches_the_model(results):
         return
 
     try:
-        model = earthshine_strength_formula(
+        model = earthshine_strength_values(
             model_source, "public static func earthshineStrength(", "swift")
-        port = earthshine_strength_formula(
+        port = earthshine_strength_values(
             port_source, "def earthshine_strength(fraction):", "python")
     except ValueError as exc:
         results.append(Result("earthshine: rumus terbaca di kedua bahasa",
@@ -10483,13 +10524,30 @@ def check_earthshine_strength_matches_the_model(results):
 
     results.append(Result(
         "earthshine: rumus terbaca di kedua bahasa", True,
-        f"penjepit {model['clamp_low']:g}…{model['clamp_high']:g}, "
-        f"hasil `{model['offset']:g} - f`"))
+        f"penjepit {model['low']:g}…{model['high']:g}, "
+        f"hasil `{model['expression']}`"))
 
-    for key in ("clamp_low", "clamp_high", "offset"):
+    # Arah pertama: **nilainya** di titik uji, bukan bentuk tulisannya. Yang
+    # dibandingkan adalah hasil hitungan di tujuh fraksi — termasuk dua di
+    # luar rentang 0…1, tempat penjepit yang bergeser terlihat.
+    differ = [f for f in EARTHSHINE_PROBE_FRACTIONS
+              if abs(model["values"][f] - port["values"][f]) > 1e-9]
+    results.append(Result(
+        "earthshine: nilai sama di model dan port (seluruh titik uji)",
+        not differ,
+        f"{len(EARTHSHINE_PROBE_FRACTIONS)} fraksi diuji" if not differ
+        else "; ".join(
+            f"f={f:g}: model {model['values'][f]:g} vs port {port['values'][f]:g}"
+            for f in differ[:4])))
+
+    # Penjepitnya sendiri, terpisah: dua rumus bisa memberi nilai yang sama di
+    # dalam rentang sementara penjepitnya berbeda — dan perbedaan itu baru
+    # terlihat di luar rentang, atau tidak terlihat sama sekali kalau titik
+    # ujinya kebetulan semuanya di dalam.
+    for key, label in (("low", "batas bawah"), ("high", "batas atas")):
         same = abs(model[key] - port[key]) <= 1e-9
         results.append(Result(
-            f"earthshine: {key} sama di model dan port", same,
+            f"earthshine: penjepit {label} sama di model dan port", same,
             f"{model[key]:g}" if same
             else f"model {model[key]:g}, port {port[key]:g}"))
 
@@ -10537,8 +10595,8 @@ def check_earthshine_strength_matches_the_model(results):
     # (membalik tanda lewat opasitas). Kedua ujungnya diukur dari sumber.
     results.append(Result(
         "earthshine: penjepit tetap 0…1",
-        model["clamp_low"] == 0.0 and model["clamp_high"] == 1.0,
-        f"model menjepit {model['clamp_low']:g}…{model['clamp_high']:g}"))
+        model["low"] == 0.0 and model["high"] == 1.0,
+        f"model menjepit {model['low']:g}…{model['high']:g}"))
 
 
 def check_sun_corona_reaches_beyond_the_disk(results, size=256, ss=2):
