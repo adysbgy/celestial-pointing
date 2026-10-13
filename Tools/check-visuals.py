@@ -2364,8 +2364,16 @@ def check_every_planet_in_the_model_has_render_cases(results):
     Tidak ada satu pun pemeriksaan yang mengikat ketiganya.
 
     **Keadaan yang benar-benar sunyi — diukur, bukan ditebak.** Harness
-    `out/bukti-planet-uranus.py` bagian B menjalankan `main()` penuh dengan
-    gerbang ini dikeluarkan, di atas sumber yang dimutasi:
+    `Tools/bukti-mutasi-kasus-planet.py` (terdaftar di CI, dijalankan setiap
+    push) menjalankan **gerbang ini sendiri** sembilan kali: sekali pada
+    sumber bersih, tujuh kali pada sumber yang dirusak, dan sekali pada
+    Uranus yang terpasang lengkap. Yang pertama menemukan keadaan sunyi ini
+    adalah `out/bukti-planet-uranus.py` bagian B, yang menjalankan `main()`
+    penuh dengan gerbang ini dikeluarkan, di atas sumber yang dimutasi —
+    angka di bawah berasal dari sana. Skrip itu **tidak** ter-commit (`out/`
+    masuk `.gitignore`), jadi ia tidak bisa direproduksi dari klon bersih;
+    harness di `Tools/` itulah penggantinya yang dijalankan CI, dan ia
+    mengukur gerbang ini, bukan `main()` penuh:
 
     ```
     [baseline]                          409 pemeriksaan, 0 gagal  <- hijau
