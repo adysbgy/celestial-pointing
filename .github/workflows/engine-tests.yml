@@ -655,6 +655,18 @@ jobs:
       - name: Buktikan gerbang riak maria berbunyi
         run: python3 Tools/bukti-mutasi-riak-maria.py
 
+      # Dan bukti untuk gerbang **setiap gerbang wajib mengisi results** — kelas
+      # cacat yang tersisa diam tanpa ia ada: `check_feature_arrays_match_the_view`
+      # pernah mencapai `main` sebagai docstring tanpa tubuh (nol `results.append`,
+      # dipanggil, menyumbang nol pemeriksaan) dan lolos dari **tiga** gerbang
+      # meta yang sudah ada. Gerbang ini menutup kelasnya, dan harness di bawah
+      # membuktikan ia berbunyi pada empat keadaan — termasuk keadaan di mana
+      # `results.append` hanya hidup di dalam teks (bukan panggilan AST), dan
+      # keadaan di mana daftar pengecualian dulu digunakan sebagai tombol
+      # bungkam dibuang seluruhnya.
+      - name: Buktikan gerbang "setiap gerbang mengisi results" berbunyi
+        run: python3 Tools/bukti-mutasi-gerbang-kosong.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #

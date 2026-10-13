@@ -119,19 +119,26 @@ def empty_gate(source, func, docstring_note=None):
     di-parse — yang diukur murni "gerbang tidak mengisi", bukan "berkasnya
     rusak" — dan perubahan isi berkas di kemudian hari tidak mematahkan
     harness ini seperti `str.replace` atas teks yang panjang.
+
+    `docstring_note` (keadaan 2) **menyisipkan** teks yang memuat
+    `results.append` tepat sebelum `pass`, **tanpa** menghapus docstring asli.
+    Jadi teks `results.append(Result(...))` hidup di dalam fungsi, tetapi
+    sebagai **prosa/docstring bersarang**, bukan sebagai panggilan AST — dan
+    gerbang yang memakai pencocokan teks akan lolos, sementara pembacaan AST
+    menangkapnya. Ini ujung-ujungnya keadaan yang membedakan kedua pendekatan.
     """
     lines = source.splitlines(keepends=True)
     start = func.body[1].lineno - 1
     end = func.end_lineno
     replacement = "    pass\n"
     if docstring_note is not None:
-        # Sisipkan tepat setelah docstring: `results.append` hidup **di dalam
-        # teks**, bukan sebagai panggilan. Inilah keadaan yang membedakan
-        # pencocokan teks dari pembacaan AST.
-        doc = func.body[0]
-        replacement = (f"    {docstring_note}\n"
-                       + "    pass\n")
-        start = doc.end_lineno
+        # Sisipkan **sebagai pernyataan teks biasa** (bukan panggilan) tepat
+        # setelah docstring asli. `ast` tidak mengenalinya sebagai `append`,
+        # sehingga keadaan 2 tetap "gerbang diam" bagi pembaca AST.
+        replacement = f"    # {docstring_note}\n    pass\n"
+        # Mulai dari akhir docstring agar teks itu berada di dalam fungsi,
+        # bukan menimpa docstring-nya.
+        start = func.body[0].end_lineno
     return "".join(lines[:start]) + replacement + "".join(lines[end:])
 
 
