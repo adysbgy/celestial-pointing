@@ -586,6 +586,36 @@ jobs:
       - name: Buktikan gerbang cembung mengecil berbunyi
         run: python3 Tools/bukti-mutasi-cembung-mengecil.py
 
+      # Dan bukti untuk gerbang **lengkung piringan Bulan** — cacatnya bukan
+      # bahwa gerbangnya longgar, melainkan bahwa dua pemeriksaan terakhirnya
+      # **berbohong**.
+      #
+      # `check_moon_disc_keeps_its_curvature` menuntut view "membaca radius
+      # akhir gradien dari model, bukan menulis angkanya" dengan mencari
+      # `CelestialVisual.moonSphereGradientEndRadius` di **seluruh berkas**
+      # view. Berkas itu memuat dua pemanggil konstanta yang sama:
+      # `sphereGradient` (jalur Bulan, baris 178) dan `drawPlanet` (jalur
+      # planet, baris 265). Terukur: mengganti baris 178 saja menjadi literal
+      # membiarkan ketiga gerbang hijau — baris 265 menyumbang tokennya,
+      # gerbang planet hanya melihat `drawPlanet`, dan pikselnya mengukur
+      # port yang tak diubah.
+      #
+      # Dua cacat berikutnya ditemukan **oleh** harness ini, bukan oleh
+      # gerbangnya. (1) Pemeriksaan "tidak menulis angkanya sendiri" mencari
+      # `radius * 1.15`, padahal kode Swift nyata menulis
+      # `radius * CGFloat(1.15)` — polanya tidak pernah cocok, jadi
+      # pemeriksaan itu hijau persis pada keadaan yang ia ada untuk
+      # menangkapnya, di **kedua** gerbang. (2) Sisi port tidak punya
+      # penjaga sama sekali: mengganti pemakaian di `_moon_sphere_gradient`
+      # menjadi literal tidak menggerakkan satu pun pemeriksaan, karena
+      # gambarnya identik.
+      #
+      # Tujuh keadaan, termasuk keadaan yang **wajib hijau** (jalur planet
+      # diubah, jalur Bulan utuh — kalau kedua pemeriksaan sama-sama memerah,
+      # berarti pembatasan tubuh fungsi tidak bekerja).
+      - name: Buktikan gerbang lengkung piringan Bulan berbunyi
+        run: python3 Tools/bukti-mutasi-lengkung-bulan.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #

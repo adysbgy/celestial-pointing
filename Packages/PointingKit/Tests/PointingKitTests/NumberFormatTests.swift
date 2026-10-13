@@ -149,4 +149,75 @@ final class NumberFormatTests: XCTestCase {
                           "bahasa terpasang tidak boleh jadi hiasan pada properti")
         XCTAssertEqual(english, "42.5")
     }
+
+    // MARK: - Derajat bertanda (lintang & declinasi)
+
+    /// **Tanda wajib ikut tercetak** — inilah satu-satunya alasan fungsi ini
+    /// ada terpisah dari `degrees`.
+    ///
+    /// Ditemukan dengan mengukur, bukan membaca: format `"%+.4f"` diganti
+    /// `"%.4f"` (tanda `+` dibuang) lalu seluruh suite dijalankan —
+    /// **773 uji tetap hijau, nol kegagalan.** Tidak satu pun gerbang
+    /// menyentuh fungsi ini, padahal satu-satunya pemanggilnya
+    /// (`DiagnosticsView.swift`) menampilkannya sebagai baris **declinasi**
+    /// objek: `+41,9°` (utara) dan `-41,9°` (selatan) adalah dua belahan
+    /// langit yang berbeda, dan tanpa tanda keduanya tercetak `41,9°`.
+    ///
+    /// Ini kelas cacat yang sama dengan `.contains("kalibrasi")` di
+    /// `ConfidenceTraceTests`: nilai yang tampak wajar, tidak ada yang merah.
+    func testSignedDegreesPrintsTheSign() {
+        XCTAssertEqual(NumberFormat.signedDegrees(41.9, fractionDigits: 1, localeId: "id_ID"),
+                       "+41,9°", "declinasi utara harus bertanda +")
+        XCTAssertEqual(NumberFormat.signedDegrees(-41.9, fractionDigits: 1, localeId: "id_ID"),
+                       "-41,9°", "declinasi selatan harus bertanda -")
+    }
+
+    /// Nol tetap **bertanda**: `+0,0°` adalah ekuator, dan itu bukan `0,0°`
+    /// yang tanpa konteks terbaca sebagai "tidak ada nilai".
+    ///
+    /// `%+` memang mencetak `+0,0`; yang dijaga di sini bahwa tidak ada yang
+    /// kelak "merapikan" nol menjadi tanpa tanda.
+    func testSignedDegreesKeepsTheSignOnZero() {
+        XCTAssertEqual(NumberFormat.signedDegrees(0, fractionDigits: 1, localeId: "id_ID"),
+                       "+0,0°")
+    }
+
+    /// Pemisah desimal ikut bahasa, sama seperti `degrees`.
+    ///
+    /// Tanpa ini, versi bertanda bisa memakai locale proses sementara versi
+    /// biasa memakai bahasa app — dua baris di layar yang sama dengan aturan
+    /// pemisah berbeda.
+    func testSignedDegreesFollowsTheActiveLanguage() {
+        XCTAssertEqual(NumberFormat.signedDegrees(41.9, fractionDigits: 1, localeId: "en_US"),
+                       "+41.9°")
+    }
+
+    // MARK: - Satuan laju
+
+    /// Satuan harus ikut tercetak, dan **satuannya milik berkas ini**.
+    ///
+    /// Baris laju pergelangan dipakai di tiga layar (`PointingView`,
+    /// `Experiment1View`, `LinkView`) dan angka tanpa satuan tidak bisa
+    /// ditafsirkan: "12" pada baris yang mengukur gerak tangan bisa dibaca
+    /// sebagai derajat, ketukan, atau detik. Satuan `"/dtk"` ditulis di sini —
+    /// **bukan** dibaca dari katalog; yang penting ia tidak hilang, karena
+    /// pemanggil di view tidak menambahkannya sendiri.
+    func testDegreesPerSecondCarriesItsUnit() {
+        let value = NumberFormat.degreesPerSecond(12.5, fractionDigits: 1, localeId: "id_ID")
+        XCTAssertEqual(value, "12,5°/dtk")
+        XCTAssertTrue(value.hasSuffix("°/dtk"),
+                      "satuan laju harus '/dtk', bukan angka telanjang: \(value)")
+    }
+
+    /// Nol digit tetap membuang koma — aturan yang sama dengan `degrees`.
+    ///
+    /// Nilainya `12,5` dibulatkan **bankir** oleh `String(format:)`, jadi
+    /// hasilnya `12`, bukan `13`. Perilaku itu diwarisi dari `degrees` dan
+    /// sengaja tidak dibetulkan di sini (lihat catatan pembulatan di
+    /// `testDegreesAndPercentShareTheSeparatorRule`).
+    func testDegreesPerSecondRespectsFractionDigits() {
+        let whole = NumberFormat.degreesPerSecond(12.5, fractionDigits: 0, localeId: "id_ID")
+        XCTAssertEqual(whole, "12°/dtk")
+        XCTAssertFalse(whole.contains(","))
+    }
 }

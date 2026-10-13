@@ -9501,6 +9501,41 @@ def check_crater_contrast_numbers_come_from_the_sampler(results):
             + ("" if q_side == side_word else f" (sisi tertukar: {q_side})")))
 
 
+def _lum(px):
+    """Luminans Rec. 709 dari satu piksel port (komponen 0…1)."""
+    return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+
+def _moon_lit_pixels(canvas, size):
+    """Koordinat piksel piringan Bulan yang terklasifikasi **menyala**.
+
+    Klasifikasinya jarak-warna RGB terhadap dua aksen Bulan, persis seperti
+    `check_moon_disc_keeps_its_curvature.lit_spread`: piksel masuk kalau ia
+    lebih dekat ke `moonLit` daripada ke `moonUnlit`. Dipakai dua gerbang
+    (lengkung piringan dan kepekaan radius akhir), jadi satu definisi
+    "menyala" untuk keduanya — dua definisi akan membuat metrik yang
+    berbeda-beda tanpa ada yang bisa membandingkannya.
+
+    `size` dipakai sebagai diameter piringan, sama dengan pemanggilnya:
+    `render` menggambar objek di tengah kanvas dengan radius `size / 2`.
+    """
+    lit = tuple(R.ACCENTS["moonLit"])
+    unlit = tuple(R.ACCENTS["moonUnlit"])
+    cx = cy = canvas.w / 2.0
+    radius = min(canvas.w, canvas.h) / 2.0
+    out = []
+    for y in range(canvas.h):
+        for x in range(canvas.w):
+            if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > radius * radius:
+                continue
+            p = canvas.buf[y * canvas.w + x]
+            da = sum((p[k] - lit[k]) ** 2 for k in range(3))
+            db = sum((p[k] - unlit[k]) ** 2 for k in range(3))
+            if da < db:
+                out.append((x, y))
+    return out
+
+
 def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
     """Pita terang Bulan harus **melengkung**, bukan isian warna rata.
 
@@ -9618,6 +9653,71 @@ def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
         f"sebaran luminans pita {spread:.1f} dari {count} piksel "
         f"(ambang 8.0; pita rata 0.0, kekuatan 0.40 memberi 24.1)"))
 
+    # ── Kepekaan piksel terhadap konstantanya ────────────────────────────
+    #
+    # Tiga metrik di atas membuktikan piringan Bulan **melengkung hari ini**.
+    # Mereka tidak membuktikan bahwa port membaca
+    # `MOON_SPHERE_GRADIENT_END_RADIUS`: kalau `_moon_sphere_gradient`
+    # mengganti pemakaiannya dengan literal `1.15`, gambarnya **identik** dan
+    # ketiga metrik tetap hijau — terukur. Yang hilang adalah ikatannya, dan
+    # sejak saat itu mengubah konstanta tidak lagi mengubah Bula apa pun.
+    #
+    # Karena itu konstanta diganti, dan piksel pita yang menyala harus
+    # bergerak. Terukur pada 200 px, ss=2, probe 1.05 / 1.45 (versus 0,00
+    # pada render ulang dengan nilai yang sama):
+    #
+    #     kasus                  1.05      1.45      identik
+    #     moon-full              5.26     11.43        0.00
+    #     moon-gibbous           4.84     10.51        0.00
+    #     moon-crescent-jakarta  6.95     15.06        0.00
+    #
+    # `moon-new` dan `moon-unknown-phase` sengaja **tidak** diukur di sini:
+    # keduanya terklasifikasi 0 piksel menyala, jadi menyertakannya akan
+    # membuat gerbang ini hijau karena tidak mengukur apa pun — kelas cacat
+    # yang seluruh repo ini kejar. `moon-new` memang sengaja rata (earthshine
+    # dilukis di atasnya), dan `moon-unknown-phase` tidak membawa fraksi
+    # iluminasi sama sekali (`illumination=None`).
+    #
+    # Ambang 3.0/255 duduk di bawah 4.79 (terendah yang terukur, pada 38 px)
+    # dan jauh di atas 0.00.
+    _orig = R.MOON_SPHERE_GRADIENT_END_RADIUS
+    try:
+        for name in ("moon-full", "moon-gibbous", "moon-crescent-jakarta"):
+            case = next((c for c in R.build_cases() if c.name == name), None)
+            if case is None:
+                results.append(Result(
+                    f"kasus {name} ada di katalog render", False,
+                    f"'{name}' tidak ditemukan di build_cases() — gerbang ini "
+                    "kehilangan salah satu sauhnya, dan itu merah, bukan lulus"))
+                continue
+            base = R.render(case, size=size, night_mode=False,
+                            show_frame=False, ss=ss)
+            pixels = _moon_lit_pixels(base, size)
+            if not pixels:
+                results.append(Result(
+                    f"pita {name} punya piksel menyala untuk diukur", False,
+                    f"0 piksel terklasifikasi menyala pada {size} px — gerbang "
+                    "ini akan lulus karena tidak ada yang diukur"))
+                continue
+            try:
+                R.MOON_SPHERE_GRADIENT_END_RADIUS = 1.45
+                moved = R.render(case, size=size, night_mode=False,
+                                 show_frame=False, ss=ss)
+            finally:
+                R.MOON_SPHERE_GRADIENT_END_RADIUS = _orig
+            deltas = [abs(_lum(base.buf[y * base.w + x])
+                          - _lum(moved.buf[y * base.w + x])) * 255
+                      for x, y in pixels]
+            mean = sum(deltas) / len(deltas)
+            results.append(Result(
+                f"radius akhir gradien {name} bergerak saat konstanta diubah",
+                mean >= 3.0,
+                f"rerata pergeseran {mean:.2f}/255 atas {len(pixels)} piksel "
+                f"menyala pada {size} px (ambang 3.0; port yang mengabaikan "
+                "konstanta = 0.00, render ulang identik = 0.00)"))
+    finally:
+        R.MOON_SPHERE_GRADIENT_END_RADIUS = _orig
+
     # Piksel membuktikan **port**. View bisa lupa memanggilnya sama sekali.
     view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
     results.append(Result(
@@ -9630,6 +9730,54 @@ def check_moon_disc_keeps_its_curvature(results, size=200, ss=2):
         "CelestialVisual.moonSphereGradientEndRadius" in view,
         "view menyebut 'CelestialVisual.moonSphereGradientEndRadius' = "
         f"{'ada' if 'CelestialVisual.moonSphereGradientEndRadius' in view else 'TIDAK'}"))
+
+    # **Dua pemeriksaan di atas membaca seluruh berkas, dan itu celahnya.**
+    # `drawPlanet` — jalur planet dalam — menyebut konstanta yang sama di
+    # `CelestialVisualView.swift:265`, jadi walau `sphereGradient` (pemanggil
+    # Bulan, baris 178) berhenti membacanya dan menulis `1.15` sendiri,
+    # `"…moonSphereGradientEndRadius" in view` tetap **ada** berkat baris 265.
+    # Terukur di siklus ini: mengganti baris 178 saja menjadi literal
+    # membiarkan ketiga gerbang hijau (`ukur5.py` keadaan 1). Pemeriksaan
+    # yang menyebut dirinya "bukan menulis angkanya" lalu hijau pada kode
+    # yang menulis angkanya — hijau palsu, bentuk cacat yang sama dengan
+    # `check_planet_phase_limb_reads_the_model_constant` sebelum ia
+    # memakai `_function_body`.
+    #
+    # Dua pemeriksaan di bawah mengulang klaim yang sama **terbatas pada
+    # tubuh `sphereGradient`**, memakai pembatas kurawal yang sama
+    # (`_function_body`) dan pembuang komentar yang sama (`swift_code_only`)
+    # yang dipakai gerbang planet. Tanpa `swift_code_only`, docstring di
+    # atas `sphereGradient` yang **menjelaskan** nama konstantanya akan
+    # dihitung sebagai pemakaian.
+    moon_body = swift_code_only(_function_body(view, "func sphereGradient("))
+    if not moon_body:
+        results.append(Result(
+            "sphereGradient terbaca di view", False,
+            "'func sphereGradient(' TIDAK ditemukan di "
+            "CelestialVisualView.swift — pemeriksaan terbatas ini tidak bisa "
+            "dijalankan, dan itu merah, bukan lulus"))
+        return
+    named = "CelestialVisual.moonSphereGradientEndRadius" in moon_body
+    results.append(Result(
+        "sphereGradient (jalur Bulan) membaca radius akhir dari model", named,
+        "'CelestialVisual.moonSphereGradientEndRadius' "
+        f"{'ada' if named else 'TIDAK ada'} di kode sphereGradient "
+        "(komentar & string dibuang; bukan sekadar di berkasnya)"))
+    # `CGFloat(...)` **wajib** ada di dalam pola. Pola yang hanya mencari
+    # `radius * 1.15` tidak pernah cocok dengan kode Swift yang sebenarnya —
+    # `endRadius:` bertipe `CGFloat`, jadi setiap pemakaiannya tertulis
+    # `radius * CGFloat(1.15)`. Terukur di siklus ini: dengan pola lama,
+    # mengganti pemakaian menjadi literal tetap melaporkan "tanpa literal
+    # `radius * 1.15` — angkanya satu, di model". Pemeriksaan itu hijau
+    # **persis** pada keadaan yang ia ada untuk menangkapnya, dan ia
+    # berbohong lewat kalimat yang terdengar seperti bukti.
+    literal = re.search(r"radius\s*\*\s*(?:CGFloat\(\s*)?1\.15", moon_body)
+    results.append(Result(
+        "sphereGradient (jalur Bulan) tidak menulis radius akhirnya sendiri",
+        literal is None,
+        "sphereGradient memuat `radius * 1.15` yang ditulis langsung"
+        if literal else
+        "sphereGradient tanpa literal `radius * 1.15` — angkanya satu, di model"))
 
 
 def inner_planet_phase_cases():
@@ -9786,7 +9934,12 @@ def check_planet_phase_limb_reads_the_model_constant(results, size=None, ss=2):
         "'CelestialVisual.moonSphereGradientEndRadius' "
         f"{'ada' if named else 'TIDAK ada'} di kode drawPlanet "
         "(komentar & string dibuang)"))
-    literal = re.search(r"radius\s*\*\s*1\.15", code)
+    # Pola yang sama dengan pemeriksaan `sphereGradient` di
+    # `check_moon_disc_keeps_its_curvature`, dan dengan alasan yang sama:
+    # tanpa `CGFloat(...)` opsional di dalamnya, pola ini tidak pernah cocok
+    # dengan kode Swift nyata dan pemeriksaan ini hijau pada keadaan yang
+    # seharusnya memerahkannya.
+    literal = re.search(r"radius\s*\*\s*(?:CGFloat\(\s*)?1\.15", code)
     results.append(Result(
         "drawPlanet tidak menulis radius akhirnya sendiri", literal is None,
         "drawPlanet memuat `radius * 1.15` yang ditulis langsung"
