@@ -5292,6 +5292,182 @@
           }
         }
       }
+    },
+    "telescope.abortCapability.label": {
+      "comment": "Label baris kemampuan mount menghentikan gerakan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can abort"
+          }
+        }
+      }
+    },
+    "telescope.abortCapability.no": {
+      "comment": "Nilai baris: mount tidak bisa menghentikan gerakan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "telescope.abortCapability.yes": {
+      "comment": "Nilai baris: mount bisa menghentikan gerakan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        }
+      }
+    },
+    "telescope.axis.altAz": {
+      "comment": "Nama sumbu mount alt-az.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alt-Az"
+          }
+        }
+      }
+    },
+    "telescope.axis.equatorial": {
+      "comment": "Nama sumbu mount ekuatorial.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Equatorial"
+          }
+        }
+      }
+    },
+    "telescope.coordinate.equatorial": {
+      "comment": "Baris koordinat ekuatorial. %@ = RA, %@ = Deklinasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA %@  Dec %@"
+          }
+        }
+      }
+    },
+    "telescope.coordinate.horizontal": {
+      "comment": "Baris koordinat horizontal. %@ = ketinggian, %@ = azimut.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alt %@  Az %@"
+          }
+        }
+      }
+    },
+    "telescope.firmware.label": {
+      "comment": "Label baris versi firmware mount.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Firmware"
+          }
+        }
+      }
+    },
+    "telescope.frame.label": {
+      "comment": "Label baris kerangka koordinat ekuatorial.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frame"
+          }
+        }
+      }
+    },
+    "telescope.mount.label": {
+      "comment": "Label baris jenis mount.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mount"
+          }
+        }
+      }
+    },
+    "telescope.note.awaitingObject": {
+      "comment": "Keterangan saat belum ada objek yang lolos uji aman.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No object has passed the safety check yet, so there is nothing to hand to the mount."
+          }
+        }
+      }
+    },
+    "telescope.note.mountCannotAbort": {
+      "comment": "Keterangan saat mount tidak bisa Abort: perintah tidak dibuat sebelum risiko diterima.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This mount cannot stop its motion. No command is built before that risk is accepted explicitly."
+          }
+        }
+      }
+    },
+    "telescope.note.rejected": {
+      "comment": "Keterangan saat gerbang menolak: tidak ada perintah ke motor.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The gate refused, so not a single command reached the motors."
+          }
+        }
+      }
+    },
+    "telescope.rejected.title": {
+      "comment": "Judul kartu saat gerbang menolak perintah.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No command"
+          }
+        }
+      }
+    },
+    "telescope.section.title": {
+      "comment": "Judul bagian serah-terima teleskop.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telescope handoff"
+          }
+        }
+      }
+    },
+    "telescope.target.label": {
+      "comment": "Label baris bentuk target yang dikirim ke mount.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command target"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

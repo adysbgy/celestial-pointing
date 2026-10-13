@@ -329,9 +329,16 @@ final class TextLocalizationTests: XCTestCase {
     /// berkas ini) tidak akan pernah melihatnya. Lihat
     /// `testAllKeysListsEveryDeclaredKey`, yang membandingkan daftar dengan
     /// kenyataan alih-alih mempercayai angkanya.
+    ///
+    /// Angka 337 → 353 karena layar serah-terima teleskop menambah 16 kunci
+    /// `telescope.*` (judul, baris target, bentuk koordinat, status mount,
+    /// dan catatan frame). Keenam belasnya masuk `allKeys` sekaligus — bukan
+    /// dideklarasikan lalu dibiarkan di luar daftar seperti
+    /// `.slewHazardAboveAltitudeLimit` di atas, karena kesalahan yang sama
+    /// tidak perlu diulang.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 337, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 353, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

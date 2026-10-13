@@ -12,10 +12,20 @@ struct LinkView: View {
 
     @ObservedObject var link: PhoneLinkService
     @ObservedObject var trace: ConfidenceTraceStore
+    /// Engine yang berjalan — dipakai bagian serah-terima teleskop untuk
+    /// membaca putusan GoTo yang berlaku. Layar ini memang tempatnya: ia
+    /// menjelaskan apa yang **keluar** dari app (ke jam, dan ke teleskop),
+    /// bukan apa yang diukur sensor.
+    @ObservedObject var engine: PointingEngine
 
     var body: some View {
         NavigationStack {
             List {
+                // Serah-terima teleskop diletakkan **paling atas**: inilah
+                // satu-satunya bagian yang menyangkut pergerakan alat, dan
+                // ia tidak boleh tenggelam di bawah baris status tautan.
+                TelescopeHandoffSection(engine: engine)
+
                 Section(TextLocalization.text(.linkSectionTitle)) {
                     row(TextLocalization.text(.linkRowStatus),
                         link.isActivated

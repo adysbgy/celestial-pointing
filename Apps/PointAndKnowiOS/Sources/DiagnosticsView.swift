@@ -66,7 +66,7 @@ struct RootView: View {
                 .tabItem { Label("Diagnostik", systemImage: "chart.xyaxis.line") }
             Experiment1View(engine: engine, link: link)
                 .tabItem { Label("Experiment 1", systemImage: "target") }
-            LinkView(link: link, trace: trace)
+            LinkView(link: link, trace: trace, engine: engine)
                 .tabItem { Label("Tautan", systemImage: "iphone.gen3.radiowaves.left.and.right") }
         }
         // Perkenalan sekali pakai: satu kartu, bukan tur panjang. Dibungkus

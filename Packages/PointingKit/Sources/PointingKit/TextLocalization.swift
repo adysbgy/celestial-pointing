@@ -354,6 +354,54 @@ public extension LocalizedText {
         key: "link.note.sigmaMissing",
         id: "Sebagian sampel tidak menyertakan σ. Sigma yang tidak terukur ditulis 0, bukan angka bawaan — jangan dibaca sebagai akurasi sempurna.")
 
+    // MARK: Serah-terima teleskop (TelescopeBridge → layar)
+    //
+    // **Kenapa teks ini ada di sini, bukan sebagai literal di view.** Sampai
+    // siklus ini `TelescopeBridge` — yang menerjemahkan putusan GoTo menjadi
+    // perintah motor — nol pemanggil di seluruh `Apps/`. Gerbang keselamatan
+    // yang sudah diuji di Linux itu karena itu tidak punya wajah: pengguna
+    // tidak bisa tahu bentuk koordinat apa yang dikirim ke mount, dalam
+    // kerangka apa, dan apakah gerbangnya menolak. Kelas cacatnya persis sama
+    // dengan yang sudah dua kali tercatat di repo ini (`slewDecision` dan
+    // `Resolution.rejected`): dihitung, benar, dan tidak pernah sampai ke
+    // layar. Kalimat penolakannya lahir dari katalog supaya Aturan 4, 6, 11,
+    // dan 19 bisa melihatnya.
+    static let telescopeSectionTitle = LocalizedText(
+        key: "telescope.section.title", id: "Serah terima teleskop")
+    static let telescopeMountLabel = LocalizedText(
+        key: "telescope.mount.label", id: "Mount")
+    static let telescopeAxisEquatorial = LocalizedText(
+        key: "telescope.axis.equatorial", id: "Ekuatorial")
+    static let telescopeAxisAltAz = LocalizedText(
+        key: "telescope.axis.altAz", id: "Alt-Az")
+    static let telescopeFrameLabel = LocalizedText(
+        key: "telescope.frame.label", id: "Kerangka")
+    static let telescopeFirmwareLabel = LocalizedText(
+        key: "telescope.firmware.label", id: "Firmware")
+    static let telescopeAbortCapabilityLabel = LocalizedText(
+        key: "telescope.abortCapability.label", id: "Bisa hentikan")
+    static let telescopeAbortCapabilityYes = LocalizedText(
+        key: "telescope.abortCapability.yes", id: "Ya")
+    static let telescopeAbortCapabilityNo = LocalizedText(
+        key: "telescope.abortCapability.no", id: "Tidak")
+    static let telescopeTargetLabel = LocalizedText(
+        key: "telescope.target.label", id: "Target perintah")
+    static let telescopeCoordinateEquatorial = LocalizedText(
+        key: "telescope.coordinate.equatorial", id: "RA %@  Dek %@")
+    static let telescopeCoordinateHorizontal = LocalizedText(
+        key: "telescope.coordinate.horizontal", id: "Alt %@  Az %@")
+    static let telescopeRejectedTitle = LocalizedText(
+        key: "telescope.rejected.title", id: "Tidak ada perintah")
+    static let telescopeRejectedNote = LocalizedText(
+        key: "telescope.note.rejected",
+        id: "Gerbang menolak, jadi tidak ada satu pun perintah yang sampai ke motor.")
+    static let telescopeMountCannotAbort = LocalizedText(
+        key: "telescope.note.mountCannotAbort",
+        id: "Mount ini tidak bisa menghentikan gerakan. Tidak ada perintah yang dibuat sebelum risiko itu diterima secara eksplisit.")
+    static let telescopeAwaitingObjectNote = LocalizedText(
+        key: "telescope.note.awaitingObject",
+        id: "Belum ada objek yang lolos uji aman, jadi belum ada yang bisa diserahkan ke mount.")
+
     // MARK: Layar utama (PointingView) & konteks langit
 
     static let pointingTitle = LocalizedText(key: "pointing.title",
@@ -634,6 +682,18 @@ public extension LocalizedText {
         .linkSectionLastCalibration, .linkRowYawOffset, .linkRowSpread,
         .linkRowReferenceCount, .linkNoCalibrationYet, .linkSectionSamples,
         .linkRowRecorded, .linkSamplesNote, .linkSigmaMissingNote,
+        // Serah-terima teleskop. Masuk daftar karena inilah satu-satunya jalur
+        // bentuk koordinat, kerangka, dan penolakan `TelescopeBridge` sampai
+        // ke layar — dan karena Aturan 6 memeriksa dua arah, kunci yang ada di
+        // katalog tapi tidak dideklarasikan akan ketahuan juga.
+        .telescopeSectionTitle, .telescopeMountLabel,
+        .telescopeAxisEquatorial, .telescopeAxisAltAz,
+        .telescopeFrameLabel, .telescopeFirmwareLabel,
+        .telescopeAbortCapabilityLabel, .telescopeAbortCapabilityYes,
+        .telescopeAbortCapabilityNo, .telescopeTargetLabel,
+        .telescopeCoordinateEquatorial, .telescopeCoordinateHorizontal,
+        .telescopeRejectedTitle, .telescopeRejectedNote,
+        .telescopeMountCannotAbort, .telescopeAwaitingObjectNote,
         .pointingTitle, .pointingSkyContextLabel,
         .pointingCalibrationInstalled, .pointingCalibrationNotInstalled,
         .pointingNightModeOn, .pointingNightModeOff,
