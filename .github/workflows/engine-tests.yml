@@ -784,6 +784,35 @@ jobs:
       - name: Buktikan gerbang keterbacaan bulan baru berbunyi
         run: python3 Tools/bukti-mutasi-piringan-bulan-baru.py
 
+      # Gerbang **skala magnitudo** (`check_magnitude_scale_matches_the_
+      # model`): juga nirsaksi, dan yang paling berbahaya dari yang tersisa.
+      # `relative_size` — hasil `sizeFromMagnitude` — dipakai untuk warna
+      # mode malam **dan** geometri bintang, jadi skala yang menyimpang
+      # mengubah kecerahan mode malam yang diukur `check_night_mode_purity`
+      # pada piksel yang tidak pernah ada di jam, **dan** membalik urutan
+      # terang bintang: satu-satunya informasi yang tersisa setelah mode
+      # malam membuang seluruh hue.
+      #
+      # Tujuh keadaan, semuanya dimutasi dalam bentuk yang **tetap terbaca**
+      # parser. Itu disengaja: mutasi yang membuat fungsi tak terbaca
+      # (`raw = 1.0`) hanya memerahkan "bentuk terbaca" — parser menyerah,
+      # bukan angkanya yang diukur.
+      #
+      # Keadaan 5 (model dibalik) satu-satunya yang menyalakan "bintang
+      # terang digambar lebih besar". Keadaan 6 menuntutnya tetap **hijau**
+      # saat port yang dibalik: pemeriksaan itu membaca parameter model,
+      # jadi tanpa keadaan 6, "merah di 5" bisa disangka berarti "menangkap
+      # pembalikan di kedua bahasa" — padahal tidak. Itu batas cakupan yang
+      # dinyatakan, bukan kelonggaran.
+      #
+      # Kontrol negatif (nama gerbang diubah jadi nama yang tak ada): keluar
+      # 1 dengan daftar ketidakcocokan. Diperlukan karena versi pertama
+      # harness ini hanya **mencetak** ketidakcocokan tanpa mencatatnya ke
+      # `failures`, sehingga ia keluar 0 — selalu hijau — sementara semua
+      # keadaannya gagal.
+      - name: Buktikan gerbang skala magnitudo berbunyi
+        run: python3 Tools/bukti-mutasi-skala-magnitudo.py
+
       # Dan bukti untuk **enam gerbang piksel yang tidak punya bukti sama
       # sekali** — ditemukan dengan membandingkan daftar `def check_*` di
       # `check-visuals.py` terhadap seluruh `check_*` yang dirujuk kedua
