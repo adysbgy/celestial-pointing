@@ -853,15 +853,86 @@ struct CelestialVisualView: View {
     /// tentang langit. Yang **tidak** boleh di sini adalah hal yang menyatakan
     /// identitas atau geometri (fase, sisi terang) — semuanya datang dari
     /// model supaya bisa diuji.
+    ///
+    /// **Kenapa beriak, bukan lingkaran.** Versi sebelumnya menggambar setiap
+    /// bercak sebagai `Path(ellipseIn:)` — lingkaran sempurna bertepi keras.
+    /// Pada ukuran kartu jam (38 pt) mata mengenali lingkaran seragam jauh
+    /// sebelum mengenali pola gelapnya, dan hasilnya terbaca sebagai **polka
+    /// dot**, bukan dataran gelap. Maria sesungguhnya adalah dataran lava yang
+    /// tepinya tidak beraturan dan menyatu dengan permukaan di sekitarnya.
+    ///
+    /// Tepi tidak beraturan datang dari riak harmonik: `r(θ) = size · (1 +
+    /// amp · wobble(θ))` dengan `wobble` campuran orde 2, 3, dan 5. Orde ganjil
+    /// dan genap bersama-sama mencegah bentuknya terbaca sebagai elips yang
+    /// digoyangkan; amplitudo dan fase **berbeda tiap bercak** supaya tidak ada
+    /// dua bercak yang berbagi siluet yang sama. Angka riaknya sejajar
+    /// satu-satu dengan `maria` dan dijaga gerbang drift terhadap port Python,
+    /// yang menggambar susunan yang sama.
+    private static let maria: [(CGFloat, CGFloat, CGFloat)] = [
+        (-0.72, 0.02, 0.30), (-0.46, -0.36, 0.28), (-0.18, -0.44, 0.22),
+        (0.06, -0.26, 0.22), (0.36, -0.06, 0.18), (0.62, -0.34, 0.13),
+        (0.24, 0.18, 0.15), (-0.26, 0.34, 0.24), (-0.56, 0.38, 0.20),
+        (-0.34, -0.70, 0.13), (-0.24, -0.16, 0.14)
+    ]
+
+    /// Riak tepi tiap bercak: (amplitudo, fase), sejajar satu-satu dengan
+    /// `maria`. **Inilah yang membuat bercak bukan lingkaran.**
+    private static let mariaRipple: [(CGFloat, CGFloat)] = [
+        (0.20, 0.7), (0.17, 2.4), (0.22, 4.1), (0.15, 1.2),
+        (0.19, 5.3), (0.24, 3.0), (0.16, 0.3), (0.21, 2.9),
+        (0.18, 4.8), (0.23, 1.7), (0.15, 3.6)
+    ]
+
+    /// Lebar pita pelunakan tepi bercak, pecahan jari-jari tepinya.
+    ///
+    /// Tanpa ini, tepi beriak pun tetap tepi **keras**: ia berhenti mendadak
+    /// dari opasitas penuh ke nol, dan pada ukuran kartu jam batas tajam itu
+    /// terbaca sebagai stiker yang ditempel, bukan permukaan. Diukur pada
+    /// kartu jam: pelunakan 0.35 menaikkan kontras bercak dari 5.9% ke 8.8%
+    /// **tanpa** menaikkan opasitas puncaknya, karena piksel tepi yang dulu
+    /// melompat kini ikut membawa sebagian massa gelapnya.
+    private static let mariaEdgeSoftness: CGFloat = 0.35
+
     private static func drawMoonSurfaceShading(_ context: GraphicsContext,
                                                center: CGPoint, radius: CGFloat) {
-        for (dx, dy, size) in [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
-                               (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)] {
-            let rect = CGRect(x: center.x + dx * radius - size * radius,
-                              y: center.y + dy * radius - size * radius,
-                              width: size * radius * 2,
-                              height: size * radius * 2)
-            context.fill(Path(ellipseIn: rect), with: .color(Color.black.opacity(0.12)))
+        for (index, blob) in maria.enumerated() {
+            let (dx, dy, size) = blob
+            let ripple = index < mariaRipple.count ? mariaRipple[index] : (0, 0)
+            let mx = center.x + dx * radius
+            let my = center.y + dy * radius
+            let edge = size * radius
+
+            // Siluet beriak: satu putaran penuh, jari-jari bergantung sudut.
+            let steps = 48
+            var path = Path()
+            for step in 0...steps {
+                let theta = 2 * Double.pi * Double(step) / Double(steps)
+                let phase = Double(ripple.1)
+                let wobble = (cos(2 * theta + phase)
+                              + cos(3 * theta + 2 * phase)
+                              + cos(5 * theta + 0.5 * phase)) / 3
+                let r = edge * (1 + ripple.0 * CGFloat(wobble))
+                let point = CGPoint(x: mx + r * CGFloat(cos(theta)),
+                                    y: my + r * CGFloat(sin(theta)))
+                step == 0 ? path.move(to: point) : path.addLine(to: point)
+            }
+            path.closeSubpath()
+
+            // Pelunakan tepi: opasitas penuh sampai ambang, lalu meluruh nol di
+            // tepi terluar riak. Dinyatakan sebagai gradien radial, bukan
+            // sebagai lapisan bertumpuk: lapisan bertumpuk menjumlahkan alfa
+            // dan menaikkan opasitas puncaknya, sedangkan yang diinginkan
+            // justru tepi yang memudar pada opasitas puncak yang sama.
+            let outer = edge * (1 + ripple.0)
+            let inner = edge * (1 - mariaEdgeSoftness)
+            let shoulder = outer > 0 ? max(0, min(1, inner / outer)) : 0
+            context.fill(path, with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: Color.black.opacity(0.12), location: 0),
+                    .init(color: Color.black.opacity(0.12), location: shoulder),
+                    .init(color: Color.black.opacity(0), location: 1)
+                ]),
+                center: CGPoint(x: mx, y: my), startRadius: 0, endRadius: outer))
         }
     }
 

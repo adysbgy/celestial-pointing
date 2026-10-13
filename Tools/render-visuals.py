@@ -893,8 +893,39 @@ SPOT_CENTER = (-0.10, 0.31)                  # MODEL: `CelestialVisual.jupiterSp
 SPOT_SIZE = (0.52, 0.26)                     # MODEL: `CelestialVisual.jupiterSpot`
 CRATERS = [(-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
            (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)]      # VIEW: `drawCraters`
-MARIA = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
-         (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]        # VIEW: `drawMoon`
+MARIA = [(-0.72, 0.02, 0.30), (-0.46, -0.36, 0.28),
+         (-0.18, -0.44, 0.22), (0.06, -0.26, 0.22),
+         (0.36, -0.06, 0.18), (0.62, -0.34, 0.13),
+         (0.24, 0.18, 0.15), (-0.26, 0.34, 0.24),
+         (-0.56, 0.38, 0.20), (-0.34, -0.70, 0.13),
+         (-0.24, -0.16, 0.14)]                     # VIEW: `drawMoonSurfaceShading`
+# Riak tepi tiap bercak maria: (amplitudo, fase), sejajar satu-satu dengan
+# `MARIA`. **Inilah yang membuat bercak bukan lingkaran.**
+#
+# Sebelumnya setiap bercak digambar sebagai `Path(ellipseIn:)` — lingkaran
+# sempurna dengan tepi keras. Dinilai sebagai kritikus desain pada ukuran
+# kartu jam, hasilnya terbaca sebagai **polka dot**, bukan dataran gelap:
+# mata mengenali lingkaran seragam jauh sebelum mengenali pola gelapnya.
+# Maria sesungguhnya adalah dataran lava yang tepinya tidak beraturan dan
+# menyatu dengan permukaan di sekitarnya.
+#
+# Tepi tidak beraturan datang dari riak harmonik: `r(θ) = size · (1 + amp ·
+# wobble(θ))` dengan `wobble` campuran orde 2, 3, dan 5. Orde ganjil dan
+# genap bersama-sama mencegah bentuknya terbaca sebagai elips yang
+# digoyangkan; amplitudo dan fase **berbeda tiap bercak** supaya tidak ada
+# dua bercak yang berbagi siluet yang sama.
+MARIA_RIPPLE = [(0.20, 0.7), (0.17, 2.4), (0.22, 4.1), (0.15, 1.2),
+                (0.19, 5.3), (0.24, 3.0), (0.16, 0.3), (0.21, 2.9),
+                (0.18, 4.8), (0.23, 1.7), (0.15, 3.6)]
+#: Lebar pita pelunakan tepi bercak, pecahan jari-jari tepinya.
+#:
+#: Tanpa ini, tepi beriak pun tetap tepi **keras**: ia berhenti mendadak dari
+#: opasitas penuh ke nol, dan pada ukuran kartu jam batas tajam itu terbaca
+#: sebagai stiker yang ditempel, bukan permukaan. Diukur: pada kartu jam,
+#: pelunakan 0.35 menaikkan kontras bercak dari 5.9% ke 8.8% **tanpa**
+#: menaikkan opasitas puncaknya, karena piksel tepi yang dulu melompat kini
+#: ikut membawa sebagian massa gelapnya.
+MARIA_EDGE_SOFTNESS = 0.35                                # VIEW: `drawMoonSurfaceShading`
 MOON_PATH_STEPS = 72                                     # VIEW: `drawMoon`
 SPIKE_OPACITY = 0.45                                     # VIEW: `drawStar`
 # Tebal diffraction spike: **pangkal dan ujung**, bukan satu lebar.
@@ -1763,11 +1794,48 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
                 _moon_sphere_gradient(cx, cy, radius, lit_color, night_mode))
 
     maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)
-    for dx, dy, size in MARIA:
+    for index, (dx, dy, size) in enumerate(MARIA):
         mx, my = to_screen(dx, dy)
-        canvas.disc(mx, my, size * radius,
-                    lambda x, y: maria(x, y) if _point_in_polygon(x, y, points)
-                    else (lit_rgb, 0.0))
+        edge = size * radius
+        ripple = MARIA_RIPPLE[index] if index < len(MARIA_RIPPLE) else (0.0, 0.0)
+
+        def at(x, y, mx=mx, my=my, edge=edge, ripple=ripple):
+            # Riak tepi + pelunakan tepi. Lihat `MARIA_RIPPLE` dan
+            # `MARIA_EDGE_SOFTNESS`: lingkaran bertepi keras terbaca sebagai
+            # polka dot pada ukuran kartu jam, bukan dataran gelap.
+            if not _point_in_polygon(x, y, points):
+                return (lit_rgb, 0.0)
+            ox, oy = x - mx, y - my
+            d = math.hypot(ox, oy)
+            if d <= 0:
+                return maria(x, y)
+            theta = math.atan2(oy, ox)
+            wobble = (math.cos(2 * theta + ripple[1])
+                      + math.cos(3 * theta + 2.0 * ripple[1])
+                      + math.cos(5 * theta + 0.5 * ripple[1])) / 3.0
+            local = edge * (1.0 + ripple[0] * wobble)
+            if d >= local:
+                return (lit_rgb, 0.0)
+            # Peluruhan tepi: **satu gradien radial**, persis seperti
+            # `context.fill(path, with: .radialGradient(..., endRadius: outer))`
+            # di view. Jari-jari akhirnya `outer` — **konstan per bercak** —
+            # bukan `local`, yang bergantung sudut; bentuk beriaknya lalu
+            # memotong gradien itu. Bedanya terukur, bukan teoretis: dengan
+            # `local` sebagai jari-jari akhir, opasitas di tepi jalur selalu
+            # nol; dengan `outer`, tepi jalur membawa sisa gradiennya — sampai
+            # 0,0913 dari 0,12 (76%) pada bercak yang riaknya paling dalam.
+            # Port yang memakai `local` menggambar Bulan yang **tidak pernah
+            # tampil di jam**, sementara seluruh gerbang piksel di berkas ini
+            # mengukur port. Lihat `check_maria_edge_formula_matches_the_view`.
+            outer = edge * (1.0 + ripple[0])
+            inner = edge * (1.0 - MARIA_EDGE_SOFTNESS)
+            if d >= outer or outer <= inner:
+                return (lit_rgb, 0.0)
+            if d <= inner:
+                return maria(x, y)
+            return (0.0, 0.0, 0.0), MARIA_OPACITY * (outer - d) / (outer - inner)
+
+        canvas.fill(lambda x, y: _point_in_polygon(x, y, points), at)
 
 
 def _point_in_polygon(x, y, points):

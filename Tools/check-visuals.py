@@ -2092,8 +2092,8 @@ def check_port_matches_swift_constants(results):
          "CelestialVisual.sphereLightOffset.x", view),
         ("kawah pertama Merkurius", tuple(R.CRATERS[0]), (-0.30, -0.22, 0.20),
          "(-0.30, -0.22, 0.20)", view),
-        ("maria pertama Bulan", tuple(R.MARIA[0]), (-0.28, -0.30, 0.26),
-         "(-0.28, -0.30, 0.26)", view),
+        ("maria pertama Bulan", tuple(R.MARIA[0]), (-0.72, 0.02, 0.30),
+         "(-0.72, 0.02, 0.30)", view),
         # Opasitas spike: **pangkal**-nya, karena ujungnya selalu nol. Ujung
         # yang berhenti dengan opasitas sisa tampak terpotong, bukan memudar.
         ("opasitas spike bintang: port == model", R.SPIKE_OPACITY, 0.45,
@@ -3719,12 +3719,22 @@ def check_feature_arrays_match_the_view(results):
     **atau** kalau view berubah tanpa port-nya ikut — yang kedua tidak bisa
     dilihat oleh pemeriksaan gambar mana pun, karena gambar itu sendiri yang
     ikut berubah.
+
+    **Jangkar maria mengikuti bentuk kodenya, bukan teks lamanya.** Jangkar
+    aslinya `for (dx, dy, size) in [` — gelung sebaris yang dulu menggambar
+    bercak. Sejak bercak beriak, `maria` jadi konstanta tersendiri dan
+    gelungnya menjadi `for (index, blob) in maria.enumerated()`. Jangkar lama
+    kini tidak ada di view, dan gerbang yang memakainya akan merah dengan
+    pesan "jangkar TIDAK ditemukan" — merah karena namanya berubah, bukan
+    karena angkanya menyimpang.
     """
-    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift"),
+                encoding="utf-8").read()
     for label, port_array, anchor in (
             ("kawah Merkurius", R.CRATERS,
              "let craters: [(CGFloat, CGFloat, CGFloat)] = ["),
-            ("maria Bulan", R.MARIA, "for (dx, dy, size) in [")):
+            ("maria Bulan", R.MARIA,
+             "private static let maria: [(CGFloat, CGFloat, CGFloat)] = [")):
         # Jangkar yang hilang adalah **kegagalan**, bukan pengecualian. Gerbang
         # yang melempar traceback saat view-nya dirapikan akan dihapus orang,
         # dan aturan yang dihapus tidak menjaga apa pun. Pesannya menyebut
@@ -3751,6 +3761,78 @@ def check_feature_arrays_match_the_view(results):
             else f"beda di indeks {mismatched}: port "
                  f"{[port_array[i] for i in mismatched]}, view "
                  f"{[swift_array[i] for i in mismatched]}"))
+
+
+def check_maria_ripple_matches_the_view(results):
+    """Larik riak maria & lebar pelunakan tepi harus sama di view dan di port.
+
+    **Cacat yang ditutup pemeriksaan ini.** Perubahan "bercak maria beriak,
+    bukan lingkaran" menambahkan **dua** konstanta ke kedua bahasa:
+    `mariaRipple` (11 pasang amplitudo/fase) di
+    `CelestialVisualView.drawMoonSurfaceShading`, dan
+    `mariaEdgeSoftness = 0.35`. Tidak satu pun dijaga gerbang mana pun:
+
+      - `check_port_matches_swift_constants` membandingkan konstanta yang
+        **didaftarkan** di `checks`, dan kedua nama ini tidak ada di sana —
+        jadi ia hijau dengan angka yang berbeda di kedua sisi.
+      - `check_feature_arrays_match_the_view` membaca larik **triple**
+        (`(dx, dy, size)`) lewat `swift_tuple_triples`, jadi larik **pasangan**
+        ini tidak terbaca bentuknya.
+
+    Akibatnya terukur, bukan teoretis: mengubah `mariaRipple` di view saja
+    membuat jam menggambar bercak dengan siluet yang berbeda dari yang diukur
+    729 pemeriksaan piksel — dan seluruh `--check` tetap hijau, karena semua
+    pemeriksaan itu mengukur port.
+
+    **Kenapa dibaca dari sumbernya, bukan ditulis sebagai daftar di sini.**
+    Menyalin 11 pasang angka ke gerbang melahirkan salinan ketiga yang bisa
+    membusuk sendiri — persis kelas yang ditutup
+    `check_moon_maria_reference_matches_the_model`, dan alasan `MARIA_REFERENCE`
+    punya gerbang paritasnya sendiri. Lariknya karena itu dibaca dari teks
+    Swift-nya, dan dibandingkan elemen per elemen supaya pesannya menyebut
+    **indeks** yang berbeda.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift"),
+                encoding="utf-8").read()
+    anchor = "private static let mariaRipple: [(CGFloat, CGFloat)] = ["
+    if anchor not in view:
+        results.append(Result(
+            "riak maria: jangkar masih ada di view", False,
+            f"'{anchor}' TIDAK ditemukan di CelestialVisualView.swift"))
+    else:
+        start = view.index(anchor) + len(anchor)
+        end = view.index("]", start)
+        swift_pairs = [(float(a), float(b)) for a, b in re.findall(
+            r"\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)",
+            view[start:end])]
+        port_pairs = [tuple(p) for p in R.MARIA_RIPPLE]
+        results.append(Result(
+            "riak maria: jumlah sama dengan view",
+            len(swift_pairs) == len(port_pairs),
+            f"port {len(port_pairs)}, view {len(swift_pairs)}"))
+        mismatched = [i for i, (a, b) in enumerate(zip(port_pairs, swift_pairs))
+                      if any(abs(x - y) > 1e-9 for x, y in zip(a, b))]
+        results.append(Result(
+            "riak maria: tiap elemen sama dengan view",
+            not mismatched and len(swift_pairs) == len(port_pairs),
+            "semua elemen cocok" if not mismatched
+            else f"beda di indeks {mismatched}: port "
+                 f"{[port_pairs[i] for i in mismatched]}, view "
+                 f"{[swift_pairs[i] for i in mismatched]}"))
+
+    # Lebar pelunakan tepi: satu angka, hidup di dua bahasa.
+    match = re.search(r"mariaEdgeSoftness:\s*CGFloat\s*=\s*(-?\d+(?:\.\d+)?)",
+                      view)
+    if match is None:
+        results.append(Result(
+            "pelunakan tepi maria: terbaca dari view", False,
+            "`mariaEdgeSoftness: CGFloat = …` TIDAK ditemukan di "
+            "CelestialVisualView.swift"))
+    else:
+        results.append(Result(
+            "pelunakan tepi maria: port == view",
+            abs(float(match.group(1)) - R.MARIA_EDGE_SOFTNESS) <= 1e-9,
+            f"view {match.group(1)}, port {R.MARIA_EDGE_SOFTNESS}"))
 
 
 def check_crater_drawing_constants(results):
@@ -5195,8 +5277,12 @@ def _moon_phase_cases():
 #: waktu; karena itu `check_moon_maria_reference_matches_the_model`
 #: membandingkannya dengan sumbernya, dan gerbang itu dibuktikan berbunyi
 #: oleh `Tools/bukti-mutasi-maria.py`.
-MARIA_REFERENCE = [(-0.28, -0.30, 0.26), (0.10, -0.44, 0.20),
-                   (-0.34, 0.06, 0.22), (0.22, 0.26, 0.16)]
+MARIA_REFERENCE = [(-0.72, 0.02, 0.30), (-0.46, -0.36, 0.28),
+                   (-0.18, -0.44, 0.22), (0.06, -0.26, 0.22),
+                   (0.36, -0.06, 0.18), (0.62, -0.34, 0.13),
+                   (0.24, 0.18, 0.15), (-0.26, 0.34, 0.24),
+                   (-0.56, 0.38, 0.20), (-0.34, -0.70, 0.13),
+                   (-0.24, -0.16, 0.14)]
 
 
 def check_moon_maria_reference_matches_the_model(results):
@@ -11636,6 +11722,16 @@ def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=20
 #: menulis alasannya di sini, tempat orang berikutnya bisa membacanya.
 LOOP_LEAK_ALLOWED = {}
 
+#: `check_*` yang **boleh** tidak mengisi `results` sendiri.
+#:
+#: Terbukti satu nama, dan ia bukan gerbang melainkan **kumpulan**: tubuhnya
+#: hanya memanggil gerbang lain dan meneruskan `results` ke sana. Menuntutnya
+#: mengisi sendiri berarti menuntut duplikasi.
+GATE_AGGREGATORS = {
+    # Dipanggil dari `check_features_disappear_when_uncertain`.
+    "check_deep_sky_shape_suppression",
+}
+
 
 def check_no_loop_variable_leaks_into_a_call(results):
     """Variabel gelung tidak boleh dipakai sebagai argumen setelah gelungnya.
@@ -11705,6 +11801,86 @@ def check_no_loop_variable_leaks_into_a_call(results):
         else f"{len(LOOP_LEAK_ALLOWED)} pengecualian, tidak ada yang bocor"))
 
 
+def check_every_gate_fills_its_results(results):
+    """Setiap `check_*` wajib mengisi `results` — atau mengaku sebagai kumpulan.
+
+    **Cacat yang ditutup pemeriksaan ini, ditemukan dengan mengukur.**
+
+    `check_feature_arrays_match_the_view` — gerbang yang menurut namanya
+    membandingkan **seluruh** larik kawah & maria antara view dan port — sampai
+    ke `main` sebagai **docstring tanpa tubuh**. Definisi, panggilan di `main`,
+    dan 22 baris penjelasan tentang cacat yang ditutupnya; nol `results.append`.
+    Fungsi itu dipanggil, tidak melempar, dan menyumbang **nol** pemeriksaan ke
+    laporan.
+
+    Terukur pada working tree itu, dengan sapuan AST atas 82 `check_*`:
+
+        tanpa results.append (langsung)  : ['check_feature_arrays_match_the_view']
+        dipanggil `main`                 : ya
+        jumlah pemeriksaan yang dilapor  : 0
+
+    **Kenapa ini lolos dari setiap gerbang meta yang sudah ada.** Repo ini
+    sudah punya tiga penjaga lapis-atas, dan tidak satu pun melihatnya:
+
+      - `check_no_loop_variable_leaks_into_a_call` memeriksa *isi* tubuh
+        fungsi; tubuhnya kosong, jadi tidak ada yang bocor.
+      - `Tools/bukti-mutasi-gerbang-dijalankan.py` membandingkan nama yang
+        **dipanggil** harness dengan yang **didefinisikan** — namanya ada di
+        kedua sisi, jadi daftarnya lengkap.
+      - `check-harness-terdaftar.py` membandingkan berkas di disk dengan yang
+        dirujuk alur kerja — berkasnya ada dan dirujuk.
+
+    Yang tidak diaudit siapa pun adalah apakah gerbang itu **mengukur**. Nama
+    yang ada di tiga daftar itu terlihat persis seperti gerbang yang hidup.
+
+    Dan ini bukan cacat yang berdiri sendiri: WIP yang sama juga
+    meninggalkan `bukti-mutasi-maria.py` dengan tiga jangkar yang sudah tidak
+    ada di `render-visuals.py` (`PORT_MARIA_CLIP`, `PORT_MARIA_LOOP`), jadi
+    harness itu keluar 2 di `require_clean_sources`-nya sendiri. Gerbang yang
+    kosong dan harness yang patah lahir dari **satu** sesi yang terputus — dan
+    yang pertama diam, yang kedua berisik. Kelas cacatnya: pekerjaan setengah
+    jadi yang tidak meninggalkan jejak merah.
+
+    **Kenapa AST, bukan `grep "results.append"`.** Pencocokan teks buta
+    terhadap komentar dan docstring: sebuah `check_*` yang seluruh
+    `results.append`-nya hanya hidup di dalam docstring akan lolos dari
+    `grep` — dan itu persis keadaan yang mau ditangkap. Yang dihitung di sini
+    adalah **panggilan `results.append` yang benar-benar dieksekusi**, yakni
+    yang ada di dalam tubuh fungsinya.
+
+    **Batas yang dinyatakan.** Yang dijaga adalah *setiap gerbang mengisi
+    results*, bukan *hasilnya benar*. Gerbang yang selalu mengisi satu hasil
+    `ok=True` akan hijau di sini — itu dijaga harness mutasi per gerbang, bukan
+    oleh meta-gerbang ini. `GATE_AGGREGATORS` adalah pengecualian yang
+    dinyatakan: fungsi yang tubuhnya hanya memanggil gerbang lain.
+    """
+    with open(__file__, encoding="utf-8") as handle:
+        source = handle.read()
+    tree = ast.parse(source)
+    silent = []
+    for func in tree.body:
+        if not (isinstance(func, ast.FunctionDef)
+                and func.name.startswith("check_")):
+            continue
+        if func.name in GATE_AGGREGATORS:
+            continue
+        body_calls = [node for node in ast.walk(func)
+                      if isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Attribute)
+                      and node.func.attr == "append"
+                      and isinstance(node.func.value, ast.Name)
+                      and node.func.value.id == "results"]
+        if not body_calls:
+            silent.append(f"{func.name} (baris {func.lineno})")
+    results.append(Result(
+        "setiap gerbang mengisi results-nya",
+        not silent,
+        "semua gerbang melapor" if not silent
+        else f"{len(silent)} gerbang diam: {', '.join(silent)} — "
+             f"{len(GATE_AGGREGATORS)} kumpulan dinyatakan di "
+             "GATE_AGGREGATORS"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -11744,6 +11920,7 @@ def main():
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
+    check_maria_ripple_matches_the_view(results)
     check_features_survive_the_watch_size(results)
     check_features_survive_the_watch_size_in_night_mode(results)
     check_every_planet_in_the_model_has_render_cases(results)
@@ -11797,6 +11974,9 @@ def main():
     # Terakhir, dan atas berkasnya sendiri: kelas cacat yang membuat pemeriksaan
     # di atas bisa hijau karena alasan yang salah.
     check_no_loop_variable_leaks_into_a_call(results)
+    # Paling akhir: gerbang yang **dipanggil tetapi tidak mengukur apa pun**
+    # tidak bisa hijau karena alasan yang salah — ia hijau karena tidak ada.
+    check_every_gate_fills_its_results(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

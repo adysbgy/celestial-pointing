@@ -152,15 +152,45 @@ for r in results:
 #: mengubah keduanya, dan harness lalu melaporkan keadaan yang tidak pernah
 #: ia uji — jadi jumlah kemunculannya diperiksa eksplisit di `main()`.
 #:
-#: Keadaan 1: potongan maria dilepas. Yang dihapus hanya syaratnya, bukan
-#: penggambarnya — `canvas.disc` tetap menggambar, jadi kalau gerbangnya tetap
-#: hijau, artinya yang diukur bukan "apakah ciri dipotong".
-PORT_MARIA_CLIP = ('        canvas.disc(mx, my, size * radius,\n'
-                   '                    lambda x, y: maria(x, y) if '
-                   '_point_in_polygon(x, y, points)\n'
-                   '                    else (lit_rgb, 0.0))')
-PORT_MARIA_NOCLIP = ('        canvas.disc(mx, my, size * radius,\n'
-                     '                    lambda x, y: maria(x, y))')
+#: **Jangkar ini mengikuti bentuk kodenya, dan itulah sebabnya ia pernah
+#: patah.** Sampai perubahan "bercak maria beriak, bukan lingkaran",
+#: penggambar maria di port adalah satu `canvas.disc` dengan `lambda x, y:
+#: maria(x, y) if _point_in_polygon(...) else (lit_rgb, 0.0)` di dalam gelung
+#: `for dx, dy, size in MARIA:`. Ketiga jangkar di bawah menyebut **bentuk
+#: itu**, dan setelah perubahan itu tidak satu pun ada lagi di
+#: `render-visuals.py` — terukur: `count` 0 untuk ketiganya, dan harness ini
+#: keluar 2 di `main()` sambil melaporkan "jangkar muncul 0x, harus tepat 1x".
+#: Keadaan yang berisik itu bagus; yang **tidak** berisik adalah
+#: `check_feature_arrays_match_the_view`, yang ditinggalkan WIP yang sama
+#: sebagai **docstring tanpa tubuh** dan karena itu diam selamanya. Keduanya
+#: lahir dari satu sesi yang terputus — lihat
+#: `check_every_gate_fills_its_results`.
+#:
+#: Bentuknya sekarang: gelung `enumerate(MARIA)` dengan sebuah `at(x, y)`
+#: bersarang yang memotong ke `_point_in_polygon` **dua** kali — sekali pada
+#: dirinya sendiri, sekali pada `canvas.fill` yang memanggilnya.
+#:
+#: Keadaan 1: potongan maria dilepas. Yang dihapus hanya **syarat di dalam
+#: `at`** — `canvas.fill` tetap menyaring poligonnya sendiri, jadi bercaknya
+#: masih digambar, hanya tidak lagi dibatasi oleh pita terang di dalam `at`.
+#: Kalau gerbangnya tetap hijau, artinya yang diukur bukan "apakah ciri
+#: dipotong", melainkan "apakah bercaknya ada".
+PORT_MARIA_CLIP = ('        def at(x, y, mx=mx, my=my, edge=edge, ripple=ripple):\n'
+                   '            # Riak tepi + pelunakan tepi. Lihat '
+                   '`MARIA_RIPPLE` dan\n'
+                   '            # `MARIA_EDGE_SOFTNESS`: lingkaran bertepi '
+                   'keras terbaca sebagai\n'
+                   '            # polka dot pada ukuran kartu jam, bukan '
+                   'dataran gelap.\n'
+                   '            if not _point_in_polygon(x, y, points):\n'
+                   '                return (lit_rgb, 0.0)\n')
+PORT_MARIA_NOCLIP = ('        def at(x, y, mx=mx, my=my, edge=edge, ripple=ripple):\n'
+                     '            # Riak tepi + pelunakan tepi. Lihat '
+                     '`MARIA_RIPPLE` dan\n'
+                     '            # `MARIA_EDGE_SOFTNESS`: lingkaran bertepi '
+                     'keras terbaca sebagai\n'
+                     '            # polka dot pada ukuran kartu jam, bukan '
+                     'dataran gelap.\n')
 
 #: Keadaan 2: maria tidak digambar sama sekali. **Gelungnya** yang
 #: dikosongkan, bukan lariknya.
@@ -176,9 +206,10 @@ PORT_MARIA_NOCLIP = ('        canvas.disc(mx, my, size * radius,\n'
 #:
 #: Yang dimutasi sekarang adalah **penggambarnya**: gelungnya berhenti
 #: beriterasi sementara lariknya utuh, jadi data tidak tersentuh dan hanya
-#: gerbang "masih tergambar" yang berbunyi.
-PORT_MARIA_LOOP = '    for dx, dy, size in MARIA:'
-PORT_MARIA_NOLOOP = '    for dx, dy, size in []:'
+#: gerbang "masih tergambar" yang berbunyi. Bentuknya kini `enumerate`, jadi
+#: yang dikosongkan adalah argumennya — **bukan** `MARIA` itu sendiri.
+PORT_MARIA_LOOP = '    for index, (dx, dy, size) in enumerate(MARIA):'
+PORT_MARIA_NOLOOP = '    for index, (dx, dy, size) in enumerate([]):'
 
 #: Keadaan 3: larik maria dihidupkan digeser, sementara `MARIA_REFERENCE` yang
 #: dibekukan di gerbang tidak ikut.
@@ -188,14 +219,33 @@ PORT_MARIA_NOLOOP = '    for dx, dy, size in []:'
 #: pernah digambar, dan ia tetap hijau selamanya. Keadaan ini menuntut
 #: `check_moon_maria_reference_matches_the_model` berbunyi — dan **hanya** dia,
 #: karena menggeser satu bercak tidak memindahkan maria ke belahan gelap.
-PORT_MARIA_REFERENCE = ('MARIA_REFERENCE = [(-0.28, -0.30, 0.26), '
-                        '(0.10, -0.44, 0.20),\n'
-                        '                   (-0.34, 0.06, 0.22), '
-                        '(0.22, 0.26, 0.16)]')
-PORT_MARIA_REFERENCE_DRIFT = ('MARIA_REFERENCE = [(-0.28, -0.30, 0.26), '
-                              '(0.10, -0.44, 0.20),\n'
-                              '                   (-0.34, 0.06, 0.22), '
-                              '(0.22, 0.26, 0.99)]')
+#:
+#: Isinya sekarang **sebelas** bercak (dulu empat): susunannya mengikuti
+#: `MARIA` di port, karena gerbang ini membandingkan `MARIA_REFERENCE` dengan
+#: larik yang hidup. Menyalin empat bercak lama ke sini membuat jangkarnya
+#: tidak pernah cocok, dan `main()` menolak jalan sebelum itu terjadi.
+PORT_MARIA_REFERENCE = ('MARIA_REFERENCE = [(-0.72, 0.02, 0.30), '
+                        '(-0.46, -0.36, 0.28),\n'
+                        '                   (-0.18, -0.44, 0.22), '
+                        '(0.06, -0.26, 0.22),\n'
+                        '                   (0.36, -0.06, 0.18), '
+                        '(0.62, -0.34, 0.13),\n'
+                        '                   (0.24, 0.18, 0.15), '
+                        '(-0.26, 0.34, 0.24),\n'
+                        '                   (-0.56, 0.38, 0.20), '
+                        '(-0.34, -0.70, 0.13),\n'
+                        '                   (-0.24, -0.16, 0.14)]')
+PORT_MARIA_REFERENCE_DRIFT = ('MARIA_REFERENCE = [(-0.72, 0.02, 0.30), '
+                              '(-0.46, -0.36, 0.28),\n'
+                              '                   (-0.18, -0.44, 0.22), '
+                              '(0.06, -0.26, 0.22),\n'
+                              '                   (0.36, -0.06, 0.18), '
+                              '(0.62, -0.34, 0.13),\n'
+                              '                   (0.24, 0.18, 0.15), '
+                              '(-0.26, 0.34, 0.24),\n'
+                              '                   (-0.56, 0.38, 0.20), '
+                              '(-0.34, -0.70, 0.13),\n'
+                              '                   (-0.24, -0.16, 0.99)]')
 
 #: **Kelas** pemeriksaan, bukan nama satu per satu.
 #:

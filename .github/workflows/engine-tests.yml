@@ -634,6 +634,27 @@ jobs:
       - name: Buktikan gerbang penambahan opasitas inti gugus berbunyi
         run: python3 Tools/bukti-mutasi-inti-opasitas.py
 
+      # Dan bukti untuk gerbang **riak maria** — kelas yang sama sekali berbeda
+      # dari yang di atas: bukan satu angka, melainkan **larik 11 pasangan**
+      # yang hidup di dua bahasa dan tidak terbaca bentuknya oleh gerbang yang
+      # ada.
+      #
+      # `check_feature_arrays_match_the_view` membaca larik **triple**
+      # (`dx, dy, size`) lewat `swift_tuple_triples`; `mariaRipple` adalah
+      # larik **pasangan** (amplitudo, fase), jadi ia lolos dari bentuk
+      # pembacanya. `check_port_matches_swift_constants` hanya membandingkan
+      # konstanta yang **didaftarkan** di `checks`, dan `mariaRipple` tidak ada
+      # di sana. Akibatnya terukur: mengubah riak di view saja membuat jam
+      # menggambar siluet yang tidak pernah diukur 729 pemeriksaan piksel.
+      #
+      # Empat keadaan, dua di antaranya **arah berlawanan** (view vs port) —
+      # karena gerbang yang hanya membaca satu berkas akan lolos kalau cuma
+      # satu arah yang diuji. Keadaan keempat **wajib hijau**: kedua bahasa
+      # berubah bersama berarti tidak ada penyimpangan, dan gerbang yang merah
+      # di situ sedang menyematkan nilai, bukan menjaga kesepakatan.
+      - name: Buktikan gerbang riak maria berbunyi
+        run: python3 Tools/bukti-mutasi-riak-maria.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #
