@@ -657,7 +657,34 @@ struct CelestialVisualView: View {
                 y: center.y + CGFloat(cap.centerY - cap.halfHeight) * radius,
                 width: CGFloat(cap.halfWidth) * radius * 2,
                 height: CGFloat(cap.halfHeight) * radius * 2)
-            inner.fill(Path(ellipseIn: rect), with: .color(capColor.opacity(0.85)))
+            // **Luruh ke tepi dalamnya, bukan warna rata.**
+            //
+            // Sampai siklus ini isinya `capColor.opacity(0.85)` — satu warna
+            // rata — sehingga tepi **dalam** kutub adalah batas elips yang
+            // sempurna. Diukur pada kolom tengah render 400 px: lompatan
+            // **111.4 luminans dalam satu piksel** (utara) dan **139.8**
+            // (selatan), sementara bola Mars di baris yang sama bergerak
+            // 0.9 luminans per piksel. Elips bertepi tajam terbaca sebagai
+            // **stiker putih yang ditempel**; embun beku menipis ke arah
+            // ekuator, jadi batasnya kabur.
+            //
+            // Arah, jangkauan, dan kedua opasitasnya datang dari model
+            // (`CelestialVisual.polarCapFade`). Di sini tidak ada satu angka
+            // pun: mengulang aturannya berarti dua aturan yang akan berbeda,
+            // dan yang berbeda itu tidak terlihat sebagai apa pun di layar.
+            let fade = CelestialVisual.polarCapFade(cap: cap)
+            let stops = [
+                Gradient.Stop(color: capColor.opacity(fade.edgeOpacity), location: 0),
+                Gradient.Stop(color: capColor.opacity(fade.fullOpacity), location: 1),
+            ]
+            inner.fill(Path(ellipseIn: rect),
+                       with: .linearGradient(Gradient(stops: stops),
+                                             startPoint: CGPoint(x: center.x,
+                                                                 y: center.y
+                                                                    + CGFloat(fade.innerEdgeY) * radius),
+                                             endPoint: CGPoint(x: center.x,
+                                                               y: center.y
+                                                                  + CGFloat(fade.fullY) * radius)))
         }
     }
 

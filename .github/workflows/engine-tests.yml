@@ -1225,5 +1225,28 @@ jobs:
       - name: Buktikan gerbang indeks warna bintang berbunyi
         run: python3 Tools/bukti-mutasi-indeks-warna.py
 
+      # Bukti bahwa `check_mars_caps_fade_into_the_surface` berbunyi — gerbang
+      # baru yang lahir bersama luruhan tepi dalam kutub Mars.
+      #
+      # Gerbang ini mengukur kolom tengah di sekitar tepi **dalam** kutub, satu
+      # tempat yang tidak dilihat satu pun dari 210 pemeriksaan lain: kutub
+      # yang diisi warna rata menghasilkan langkah **111.5 luminans dalam satu
+      # piksel** (utara) dan **139.7** (selatan) sementara bola Mars di baris
+      # yang sama bergerak 0.9.
+      #
+      # Keadaan 2 adalah alasan harness ini ada: **satu tanda** dibalik
+      # (`toward_pole`), seluruh nilai opasitas tetap sah, seluruh uji Linux
+      # tetap hijau, dan seluruh 210 pemeriksaan lain tetap hijau — terukur.
+      # Yang berubah hanya ujung mana yang kabur. Uji Linux tidak bisa
+      # menangkapnya karena setiap nilai, satu per satu, tetap benar.
+      #
+      # Keadaan 3 dan 4 adalah batas cakupan yang **dinyatakan**: panjang
+      # luruhan tidak dijaga (0.45 → 0.05 tetap hijau), dan gradien view tidak
+      # dijaga (seluruh gerbang di berkas itu mengukur port Python). Keduanya
+      # ditulis sebagai keadaan wajib hijau supaya batasnya terbaca sebagai
+      # pernyataan, bukan sebagai gerbang yang ketinggalan.
+      - name: Buktikan gerbang luruhan tepi dalam kutub Mars berbunyi
+        run: python3 Tools/bukti-mutasi-luruh-kutub.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

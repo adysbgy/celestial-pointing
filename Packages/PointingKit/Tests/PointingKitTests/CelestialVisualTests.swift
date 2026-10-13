@@ -1061,6 +1061,138 @@ final class CelestialVisualTests: XCTestCase {
                           "kutub utara tidak boleh melewati ekuator")
     }
 
+    /// Opasitas kutub pada satu ketinggian — **dibaca dari model**, bukan
+    /// disalin.
+    ///
+    /// Versi pertama uji ini menyalin rumus luruhannya dari view ke dalam
+    /// berkas uji. Salinan itu menjadikan ujinya **tidak mengukur apa pun
+    /// tentang kode yang dikirim**: ia bisa hijau sementara view dan port
+    /// sama-sama masih menggambar warna rata, karena yang diuji adalah
+    /// salinannya sendiri. Sekarang satu-satunya rumus hidup di
+    /// `CelestialVisual.polarCapFade(cap:)`.
+    private func polarCapOpacityAt(_ cap: CelestialVisual.PolarCaps.Cap,
+                                   height: Double) -> Double {
+        CelestialVisual.polarCapFade(cap: cap).opacity(atHeight: height)
+    }
+
+    func testPolarCapFadesAtItsEquatorFacingEdge() {
+        // **Regresi untuk tepi dalam kutub yang berhenti mendadak.**
+        //
+        // Kutub diisi warna rata membuat tepi **dalamnya** (batas elips yang
+        // menghadap ekuator) menjadi langkah 111.4 luminans dalam satu piksel
+        // pada render 400 px (dan 139.8 di kutub selatan), sementara bola Mars
+        // di bawahnya hanya bergerak 0.9 luminans per piksel di baris yang
+        // sama. Embun beku menipis ke arah ekuator, jadi batasnya kabur —
+        // elips bertepi tajam terbaca sebagai "stiker putih yang ditempel".
+        //
+        // Tiga hal diperiksa sekaligus, dan ketiganya perlu:
+        //   1. tepi dalamnya **nol** (bukan "agak kecil" — sisa 0.05 pun masih
+        //      meninggalkan langkah ~11 luminans),
+        //   2. sisi kutubnya tetap **penuh**, karena kap yang luruh di kedua
+        //      ujungnya terbaca sebagai kabut, bukan kap,
+        //   3. **monoton** ke arah kutub: luruhan yang naik-turun akan
+        //      menghasilkan tepi kedua di tengah kap.
+        let caps = CelestialVisual.polarCaps()
+        for (name, cap) in [("north", caps.north), ("south", caps.south)] {
+            let towardPole: Double = cap.centerY < 0 ? -1 : 1
+            let innerEdge = cap.centerY - towardPole * cap.halfHeight
+            let poleTip = cap.centerY + towardPole * cap.halfHeight
+
+            let atEdge = polarCapOpacityAt(cap, height: innerEdge)
+            XCTAssertEqual(atEdge, CelestialVisual.polarCapEdgeOpacity,
+                           accuracy: 1e-12,
+                           "kutub \(name): tepi dalam tidak luruh ke nol — "
+                           + "\(atEdge), langkah di layar ~\(atEdge * 139.8) luminans")
+
+            let atTip = polarCapOpacityAt(cap, height: poleTip)
+            XCTAssertEqual(atTip, CelestialVisual.polarCapOpacity, accuracy: 1e-12,
+                           "kutub \(name): sisi kutubnya ikut redup (\(atTip)) — "
+                           + "kap yang luruh di kedua ujungnya terbaca sebagai kabut")
+
+            // Monoton: 40 sampel dari tepi dalam ke ujung kutub, tidak boleh
+            // ada yang turun.
+            var previous = -Double.infinity
+            for i in 0...40 {
+                let t = Double(i) / 40.0
+                let height = innerEdge + (poleTip - innerEdge) * t
+                let value = polarCapOpacityAt(cap, height: height)
+                XCTAssertGreaterThanOrEqual(value, previous - 1e-12,
+                                            "kutub \(name): luruhan tidak monoton di t=\(t)")
+                previous = value
+            }
+        }
+    }
+
+    func testPolarCapKeepsItsFullOpacityAtItsWidestRow() {
+        // **Kenapa ini dijaga terpisah.** Baris **terlebar** kutub ada di
+        // tengah kedalamannya (`centerY`, 50%). Kalau pita luruhannya lebih
+        // lebar dari 50% kedalaman, baris itu ikut redup — dan gerbang piksel
+        // `check_mars_caps_touch_the_limb` mengenali kutub lewat ambang warna
+        // tetap, sehingga kutub yang benar-benar menyentuh tepi bola berhenti
+        // terbaca menyentuh. Diukur: `polarCapFadeStart = 0.55` membuat baris
+        // itu jatuh ke opasitas 0.77 dan gerbang itu merah (0.390 R lawan
+        // 0.680 R). Jadi batas 0.5 di sini bukan selera — ia yang menjaga
+        // gerbang lain tetap bisa mengukur.
+        let caps = CelestialVisual.polarCaps()
+        XCTAssertLessThan(CelestialVisual.polarCapFadeStart, 0.5,
+                          "pita luruhan (\(CelestialVisual.polarCapFadeStart) dari "
+                          + "kedalaman kutub) mencapai baris terlebar kutub — "
+                          + "gerbang 'kutub menyentuh tepi bola' akan merah")
+        for (name, cap) in [("north", caps.north), ("south", caps.south)] {
+            let atWidest = polarCapOpacityAt(cap, height: cap.centerY)
+            XCTAssertEqual(atWidest, CelestialVisual.polarCapOpacity, accuracy: 1e-12,
+                           "kutub \(name): baris terlebar redup (\(atWidest))")
+        }
+    }
+
+    func testPolarCapFadeGeometryNamesTheInnerEdgeNotThePoleTip() {
+        // **Regresi untuk cacat yang paling mudah tidak terlihat: luruhan yang
+        // arahnya terbalik.**
+        //
+        // `opacity(atHeight:)` sendiri tidak bisa membedakan kedua ujungnya
+        // kalau yang diuji hanya dua titiknya — ia linier, jadi "luruh dari
+        // tepi dalam" dan "luruh dari ujung kutub" sama-sama menghasilkan dua
+        // angka yang benar. Yang membedakan adalah **arah** `towardPole` dan
+        // **di mana** `innerEdgeY` diletakkan, dan keduanya dibaca penggambar
+        // dari struct ini. Karena itu yang diuji di sini geometrinya, bukan
+        // opasitasnya.
+        let caps = CelestialVisual.polarCaps()
+        for (name, cap, expectedSign) in [("north", caps.north, -1.0),
+                                          ("south", caps.south, 1.0)] {
+            let fade = CelestialVisual.polarCapFade(cap: cap)
+            XCTAssertEqual(fade.towardPole, expectedSign, accuracy: 1e-12,
+                           "kutub \(name): arah ke kutub salah — luruhannya akan "
+                           + "dipasang di ujung yang lain")
+            // Tepi dalam = sisi kutub yang menghadap **ekuator**, yaitu yang
+            // lebih dekat ke pusat bola.
+            let innerEdge = cap.centerY - expectedSign * cap.halfHeight
+            XCTAssertEqual(fade.innerEdgeY, innerEdge, accuracy: 1e-12,
+                           "kutub \(name): innerEdgeY \(fade.innerEdgeY) bukan tepi "
+                           + "yang menghadap ekuator (\(innerEdge))")
+            XCTAssertLessThan(abs(fade.innerEdgeY), abs(cap.centerY),
+                              "kutub \(name): innerEdgeY harus lebih dekat ke pusat "
+                              + "bola daripada pusat elipsnya")
+            // `fullY` harus berada **di dalam** kutub dan di sisi kutub dari
+            // tepi dalamnya. Yang pertama menangkap luruhan yang menjulur
+            // keluar elips; yang kedua menangkap arah yang terbalik.
+            let poleTip = cap.centerY + expectedSign * cap.halfHeight
+            XCTAssertGreaterThan((fade.fullY - fade.innerEdgeY) * expectedSign, 0,
+                                 "kutub \(name): luruhan berjalan ke sisi ekuator, "
+                                 + "bukan ke sisi kutub")
+            XCTAssertLessThan((fade.fullY - fade.innerEdgeY) * expectedSign,
+                              (poleTip - fade.innerEdgeY) * expectedSign,
+                              "kutub \(name): luruhan berakhir di luar kutub "
+                              + "(fullY \(fade.fullY), ujung kutub \(poleTip))")
+            XCTAssertLessThan(fade.span, cap.halfHeight,
+                              "kutub \(name): luruhan lebih panjang dari separuh "
+                              + "kedalaman kutub — baris terlebar ikut redup")
+            XCTAssertEqual(fade.edgeOpacity, CelestialVisual.polarCapEdgeOpacity,
+                           accuracy: 1e-12)
+            XCTAssertEqual(fade.fullOpacity, CelestialVisual.polarCapOpacity,
+                           accuracy: 1e-12)
+        }
+    }
+
     // MARK: - Batas frame: tidak ada bentuk yang boleh keluar dari Canvas
     //
     // `Canvas` memotong apa pun di luar `frame`-nya dengan **tepi lurus**.

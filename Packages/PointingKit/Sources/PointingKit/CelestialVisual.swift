@@ -2163,6 +2163,144 @@ public extension CelestialVisual {
     /// dalam". Kutub adalah **ciri pengenal Mars**, jadi ini bukan soal rasa:
     /// gambar yang salah adalah **klaim yang salah**, persis yang PRD larang.
     ///
+    /// **Cacat kedua, yang ditutup belakangan: tepi dalam yang mendadak.**
+    /// Setelah lebar dan irisan diperbaiki, tepi **luar** kutub mengikuti
+    /// lengkung bola — tetapi tepi **dalamnya** (batas elips yang menghadap
+    /// ekuator) tetap merupakan batas geometris sempurna, karena isinya
+    /// warna rata. Diukur pada kolom tengah render 400 px, di
+    /// `centerY + halfHeight` = 0.48 R:
+    ///
+    ///     y=103   luminans 223.5   (240, 220, 210)   <- kutub
+    ///     y=104   luminans 112.0   (198,  92,  57)   <- Mars
+    ///
+    /// Lompatan **111.5 luminans dalam satu piksel**, sementara bola Mars di
+    /// bawahnya hanya bergerak 0.9 luminans per piksel di baris yang sama
+    /// (diukur pada `planet-mars-bare`). Embun beku di Mars menipis ke arah
+    /// ekuator, jadi batasnya kabur; elips bertepi tajam terbaca sebagai
+    /// **stiker putih yang ditempel** — kata yang persis dipakai pengukuran
+    /// mata, dan persis kelas cacat yang sudah dibayar repo ini untuk kawah
+    /// Merkurius dan Bintik Merah Besar. **Kutub selatan lebih parah lagi:
+    /// 139.8 luminans** (y=295 → 296), diukur pada render yang sama.
+    ///
+    /// Perbaikannya **gradien**, bukan warna rata: opasitas penuh di pusat
+    /// kutub, meluruh ke nol di tepi dalamnya. Tiga angka di bawah ini hidup
+    /// di model, bukan di view, karena view dan port Python harus membacanya
+    /// dari tempat yang sama — satu angka di dua tempat adalah dua angka yang
+    /// akan berbeda.
+    ///
+    /// **Angka tanpa pemanggil bukan perbaikan.** Ketiga konstanta ini sempat
+    /// ditulis dan diuji di Linux sementara **tidak satu pun** penggambar
+    /// memakainya: view masih `capColor.opacity(0.85)` dan port masih
+    /// `accent_fn(…, POLAR_CAP_OPACITY)`, keduanya warna **rata**. Diukur
+    /// sesudah konstanta itu ada: lompatan tepi dalamnya **tetap 111.4
+    /// luminans** — persis seperti sebelum konstanta itu ada. Uji Linux hijau
+    /// di atas gambar yang belum berubah adalah bentuk paling sunyi dari kelas
+    /// cacat yang repo ini kejar. Sekarang view (`polarCapFade(cap:)`) dan
+    /// port (`polar_cap_fade`) sama-sama membacanya; diukur sesudahnya,
+    /// lompatan terbesar di kolom tengah **4.0 luminans** (0.35) dan **3.2**
+    /// (0.45) — turun dari 139.8.
+    static let polarCapOpacity: Double = 0.85
+
+    /// Titik awal luruhnya tepi dalam kutub, sebagai pecahan kedalaman kutub
+    /// (`depthFraction`), diukur dari **tepi dalam** ke arah pusat kutub.
+    ///
+    /// 0.45 berarti: 45% kedalaman kutub yang terdekat dengan ekuator adalah
+    /// pita luruhan, dan 55% sisanya (ke arah kutub) tetap pekat. Sisanya
+    /// tetap penuh bukan sekadar pilihan rasa: baris **terlebar** kutub ada di
+    /// tengah kedalamannya (50%), jadi pita luruhan yang lebih lebar dari 50%
+    /// membuat baris terlebar itu ikut redup — dan
+    /// `check_mars_caps_touch_the_limb` mengenali kutub lewat ambang warna
+    /// tetap, sehingga kutub yang benar-benar menyentuh tepi bola berhenti
+    /// terbaca menyentuh. Diukur pada render 400 px (kutub utara, baris pusat
+    /// `centerY`): 0.45 → bola 0.680 R lawan kutub 0.670 R, rim 2 px
+    /// (1.0% R), **hijau**; 0.55 → 0.390 R lawan 0.680 R, rim 58 px
+    /// (29.0% R), **merah**; 0.60 → kutub 0.000 R, **merah**. Batas 0.5 yang
+    /// dijaga uji Linux karena itu tepat di antara keduanya.
+    ///
+    /// Fisisnya juga begitu: embun beku yang tebal ada di atas kutub, dan
+    /// yang menipis hanya batasnya.
+    static let polarCapFadeStart: Double = 0.45
+
+    /// Opasitas kutub di **tepi dalamnya** (menghadap ekuator).
+    ///
+    /// Nol, bukan angka kecil: luruhan yang berhenti di 0.05 tetap
+    /// meninggalkan langkah sepersepuluh dari 111.5 luminans (≈11), dan
+    /// langkah itu masih terukur. Yang membuat tepinya benar-benar luruh
+    /// adalah mencapai nol di tepi, lalu dibiarkan bertemu bola yang memang
+    /// sudah ada di sana.
+    static let polarCapEdgeOpacity: Double = 0.0
+
+    /// Opasitas kutub pada satu ketinggian, satuan radius dari pusat bola.
+    ///
+    /// **Satu rumus, dibaca tiga bahasa** (view SwiftUI, port Python, uji
+    /// Linux). Yang dihitung: luruhan **linear** dari
+    /// `polarCapEdgeOpacity` di tepi dalam kutub ke `polarCapOpacity` sejauh
+    /// `polarCapFadeStart` dari kedalaman kutub, lalu **tetap penuh** di
+    /// sisanya. `height` di luar rentang kutub dijepit, jadi pemanggil tidak
+    /// perlu tahu batasnya.
+    ///
+    /// **Kenapa di model, bukan di view.** Ini bagian kutub yang paling
+    /// mudah salah tanpa terlihat: luruhan yang arahnya terbalik menaruh tepi
+    /// kaburnya di **kutub** dan tepi tajamnya di ekuator — persis cacat yang
+    /// baru ditutup, hanya berpindah ujung. Arahnya tidak bisa dibaca dari
+    /// teks mana pun di layar, jadi ia hanya bisa dijaga di tempat yang bisa
+    /// diuji di Linux.
+    ///
+    /// **Kenapa geometrinya sekaligus, bukan hanya opasitas di satu titik.**
+    /// Penggambar butuh **dua titik** untuk sebuah gradient, dan kalau ia
+    /// menghitung titik keduanya sendiri dari `polarCapFadeStart`, aturan
+    /// luruhannya hidup dua kali lagi — di view dan di port. Yang dikirim
+    /// karena itu batas luruhannya (`innerEdgeY`, `span`, `towardPole`) plus
+    /// kedua opasitasnya; tidak ada satu angka pun yang tersisa untuk
+    /// ditulis ulang di sisi penggambar.
+    struct PolarCapFade: Equatable, Sendable {
+        /// Ketinggian tepi dalam kutub (menghadap ekuator), satuan radius.
+        public var innerEdgeY: Double
+        /// Arah ke kutub: −1 belahan utara, +1 belahan selatan.
+        public var towardPole: Double
+        /// Jarak dari tepi dalam ke arah kutub sampai opasitasnya penuh.
+        public var span: Double
+        /// Opasitas **di tepi dalam**.
+        public var edgeOpacity: Double
+        /// Opasitas setelah luruhan selesai (ke arah kutub).
+        public var fullOpacity: Double
+
+        public init(innerEdgeY: Double, towardPole: Double, span: Double,
+                    edgeOpacity: Double, fullOpacity: Double) {
+            self.innerEdgeY = innerEdgeY
+            self.towardPole = towardPole
+            self.span = span
+            self.edgeOpacity = edgeOpacity
+            self.fullOpacity = fullOpacity
+        }
+
+        /// Ketinggian tempat opasitasnya mencapai `fullOpacity`.
+        public var fullY: Double { innerEdgeY + towardPole * span }
+
+        /// Opasitas pada satu ketinggian. Di luar rentang luruhan dijepit.
+        public func opacity(atHeight height: Double) -> Double {
+            guard abs(span) > 1e-12 else { return fullOpacity }
+            let t = min(1.0, max(0.0, (height - innerEdgeY) / (fullY - innerEdgeY)))
+            return edgeOpacity + (fullOpacity - edgeOpacity) * t
+        }
+    }
+
+    /// Geometri luruhan tepi dalam satu kutub.
+    ///
+    /// Arah ke kutub dibaca dari tanda `centerY`; satu tanda yang terbalik
+    /// menaruh pita luruhannya di ujung yang salah.
+    static func polarCapFade(cap: PolarCaps.Cap) -> PolarCapFade {
+        let towardPole: Double = cap.centerY < 0 ? -1 : 1
+        let innerEdge = cap.centerY - towardPole * cap.halfHeight
+        return PolarCapFade(innerEdgeY: innerEdge,
+                            towardPole: towardPole,
+                            span: cap.halfHeight * 2 * polarCapFadeStart,
+                            edgeOpacity: polarCapEdgeOpacity,
+                            fullOpacity: polarCapOpacity)
+    }
+
+    /// Kutub es planet, dalam satuan radius dan relatif terhadap pusat bola.
+    ///
     /// Perbaikannya dua bagian, dan keduanya perlu:
     ///
     ///   1. **Lebar diturunkan dari tepi bola**, bukan ditulis sebagai angka.

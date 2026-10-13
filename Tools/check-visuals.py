@@ -2013,8 +2013,29 @@ def check_port_matches_swift_constants(results):
          "opacity=JUPITER_SPOT_LIMB_SHADING_STRENGTH" in port
          and "JUPITER_SPOT_LIMB_SHADING_STRENGTH = " in port, True,
          "opacity=JUPITER_SPOT_LIMB_SHADING_STRENGTH", port),
-        ("opasitas kutub Mars", R.POLAR_CAP_OPACITY, 0.85,
-         "capColor.opacity(0.85)", view),
+        ("opasitas kutub Mars (model)", R.POLAR_CAP_OPACITY, 0.85,
+         "polarCapOpacity: Double = 0.85", model),
+        # **Luruhan tepi dalam kutub.** Sampai siklus ini kutubnya warna
+        # **rata** di view maupun port, jadi tepi dalamnya adalah batas elips
+        # yang sempurna: diukur 111.4 luminans dalam satu piksel (utara) dan
+        # 139.8 (selatan) pada render 400 px, sementara bola Mars di baris
+        # yang sama bergerak 0.9 luminans per piksel. Ketiga konstanta
+        # luruhannya ditulis di model **dan** diuji di Linux, tetapi tidak
+        # satu pun penggambar memakainya — uji hijau di atas gambar yang tidak
+        # berubah. Karena itu yang dijaga di sini bukan angkanya saja,
+        # melainkan **pemakaiannya di kedua penggambar**.
+        ("kutub Mars: jangkauan luruhan (model)", R.POLAR_CAP_FADE_START, 0.45,
+         "polarCapFadeStart: Double = 0.45", model),
+        ("kutub Mars: opasitas di tepi dalam (model)", R.POLAR_CAP_EDGE_OPACITY, 0.0,
+         "polarCapEdgeOpacity: Double = 0.0", model),
+        ("kutub Mars: view membaca luruhan dari model",
+         "CelestialVisual.polarCapFade(cap: cap)" in view, True,
+         "let fade = CelestialVisual.polarCapFade(cap: cap)", view),
+        ("kutub Mars: port memakai gradien, bukan warna rata",
+         "alpha_fn = linear_gradient(" in port
+         and "cap_rgb, _ = accent_fn(ACCENTS[\"marsPolarCap\"], night_mode, 1.0)(cx, cy)"
+             in port, True,
+         "alpha_fn = linear_gradient(", port),
         # Geometri kutub Mars. **Tiga** hal dijaga, karena angkanya saja tidak
         # cukup: nilai `pinchY`/`depth` yang benar dengan rumus lebar yang
         # dikembalikan ke konstanta akan menghasilkan cacat lama tanpa suara —
@@ -10254,6 +10275,123 @@ def check_mars_caps_touch_the_limb(results, size=400, ss=2):
         f"{uncertain_caps} piksel kutub pada kandidat (harus 0)"))
 
 
+def check_mars_caps_fade_into_the_surface(results, size=400, ss=2):
+    """Tepi **dalam** kutub Mars harus luruh, bukan berhenti mendadak.
+
+    **Cacat yang ditutup pemeriksaan ini.** Kutub Mars diisi satu warna rata
+    (`capColor.opacity(0.85)` di view, `accent_fn(…, POLAR_CAP_OPACITY)` di
+    port), jadi tepi **dalamnya** — batas elips yang menghadap ekuator —
+    adalah langkah yang sempurna. Diukur pada kolom tengah render 400 px
+    (`planet-mars-confirmed`, ss=2): **111.5 luminans dalam satu piksel**
+    (utara) dan **139.7** (selatan), sementara bola Mars di baris yang sama
+    bergerak 0.9 luminans per piksel. Embun beku menipis ke arah ekuator,
+    jadi batasnya kabur; elips bertepi tajam terbaca sebagai **stiker putih
+    yang ditempel**.
+
+    **Kenapa gerbang baru, bukan `check_mars_caps_touch_the_limb`.** Gerbang
+    itu mengukur tepi **luar** kutub — apakah kutubnya menyentuh tepi bola —
+    dan ia **tetap hijau** atas kutub yang tepi dalamnya tajam. Terukur:
+    dengan luruhan terpasang ia melaporkan 0.670 R lawan 0.680 R (rim 2 px),
+    dan tanpa luruhan pun ia melaporkan angka yang sama. Yang membedakan
+    hanya kolom tengah di sekitar tepi dalam, tempat tidak ada gerbang lain
+    yang melihat.
+
+    **Kenapa tidak cukup diuji di Linux tanpa piksel.** Yang bisa diuji model
+    adalah **nilai** opasitas di tepi dan di ujung kutub, dan itu sudah diuji
+    (`CelestialVisualTests`). Yang tidak bisa diuji di sana adalah
+    **arahnya**: luruhan yang arahnya terbalik menaruh tepi kaburnya di ujung
+    kutub dan tepi tajamnya di ekuator — nilai-nilainya tetap sah satu per
+    satu. Terukur pada mutasi itu: langkah tepi dalam kembali **111.5 /
+    139.7** (persis cacat lama), sementara seluruh 210 pemeriksaan lain di
+    berkas ini — termasuk `check_mars_caps_touch_the_limb` — tetap hijau.
+
+    **Dua besaran, karena keduanya perlu.** Tepi dalam yang **luruh**
+    (langkah kecil) dan pita yang **lebih pekat ke arah kutub** (bukan kabut
+    rata). Kutub yang luruh di kedua ujungnya lolos besaran pertama dan
+    jatuh di kedua; kutub yang arahnya terbalik jatuh di kedua-duanya juga,
+    tapi lewat angka yang berbeda.
+
+    Ambangnya dipilih di antara dua keadaan yang **diukur**, bukan dirasakan:
+    luruhan yang benar menghasilkan 2.65 / 3.57 (langkah) dan +60.8 / +76.1
+    (selisih pita); warna rata menghasilkan 111.5 / 139.7 dan ≈0; arah
+    terbalik menghasilkan 111.5 / 139.7 dan +12.9 / −1.2. Ambang 25 dan 25
+    duduk di tengah antara keduanya, jadi tidak ada keadaan di antaranya yang
+    lolos sebagai "benar".
+
+    **Yang TIDAK diklaim.** Yang diukur adalah gambar **port Python**, bukan
+    render SwiftUI di perangkat. Pemeriksaan ini membuktikan port menggambar
+    tepi dalam yang luruh **dengan arah yang benar**; ia tidak membuktikan
+    view menggambarnya. Itu dijaga `check_port_matches_swift_constants` (view
+    membaca `CelestialVisual.polarCapFade(cap:)`) — dan tidak oleh
+    pemeriksaan ini.
+    """
+    _, (w, h, rows) = render_case("planet-mars-confirmed", size=size, ss=ss)
+    cx = cy = w / 2.0
+    radius = min(w, h) / 2.0
+    caps = R.polar_caps()
+    half_height = caps["half_height"]
+
+    def lum(x, y):
+        row = rows[y]
+        return (0.2126 * row[x * 4] + 0.7152 * row[x * 4 + 1]
+                + 0.0722 * row[x * 4 + 2])
+
+    def inside(x, y):
+        # Satu piksel di dalam tepi: piksel piringan terluar adalah campuran
+        # dengan latar, dan langkah di sana milik tepi **luar** kutub — yang
+        # sudah dijaga gerbang lain.
+        return math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= radius - 1.0
+
+    column = int(cx)
+    for label, center in (("utara", caps["north_center"]),
+                          ("selatan", caps["south_center"])):
+        toward_pole = -1.0 if center < 0 else 1.0
+        y_edge = cy + (center - toward_pole * half_height) * radius
+        # Kedalaman diukur dari tepi **dalam** (0) ke ujung kutub (1), jadi
+        # "lebih pekat ke arah kutub" terbaca sebagai angka positif.
+        depth_scale = half_height * radius * toward_pole
+
+        steps, inner_band, full_band = [], [], []
+        previous = None
+        for y in range(h):
+            if not inside(column, y):
+                previous = None
+                continue
+            value = lum(column, y)
+            if previous is not None and abs(y - y_edge) <= 25:
+                steps.append(abs(value - previous))
+            previous = value
+            depth = (y - y_edge) / depth_scale
+            if 0.0 <= depth <= 0.15:
+                inner_band.append(value)
+            elif 0.45 <= depth <= 0.70:
+                full_band.append(value)
+
+        # Langkah terbesar di tepi dalam. Nol sampel berarti kutubnya tidak
+        # ada di kolom tengah — dan itu kegagalan, bukan hasil yang bersih.
+        worst = max(steps) if steps else float("inf")
+        results.append(Result(
+            f"kutub Mars {label} luruh ke tepi dalamnya",
+            worst <= 25.0,
+            f"langkah terbesar {worst:.2f} luminans dalam +-25 px tepi dalam "
+            f"(warna rata: 111.5 utara / 139.7 selatan; harus <= 25)"))
+
+        if inner_band and full_band:
+            difference = (sum(full_band) / len(full_band)
+                          - sum(inner_band) / len(inner_band))
+            results.append(Result(
+                f"kutub Mars {label} lebih pekat ke arah kutubnya",
+                difference >= 25.0,
+                f"pita penuh minus pita dalam {difference:+.2f} luminans "
+                f"(arah terbalik: +12.9 utara / -1.2 selatan; harus >= 25)"))
+        else:
+            results.append(Result(
+                f"kutub Mars {label} lebih pekat ke arah kutubnya", False,
+                f"pita tidak terukur ({len(inner_band)} piksel dalam, "
+                f"{len(full_band)} piksel penuh) — kutubnya tidak ada di "
+                "kolom tengah"))
+
+
 def _gradient_end_factors(source):
     """Radius akhir dua gradien piringan, dibaca dari sumber.
 
@@ -12063,6 +12201,7 @@ def main():
     check_moon_new_disc_reads_on_the_watch(results)
     check_jupiter_spot_reads_on_the_watch(results)
     check_mars_caps_touch_the_limb(results)
+    check_mars_caps_fade_into_the_surface(results)
     check_sun_edge_is_soft(results)
     check_sun_corona_reach_matches_the_model(results)
     check_earthshine_strength_matches_the_model(results)

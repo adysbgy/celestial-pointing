@@ -289,6 +289,28 @@ def polar_caps(pinch_y=POLAR_CAP_PINCH_Y, depth_fraction=POLAR_CAP_DEPTH_FRACTIO
                 south_center=-pinch_y)
 
 
+def polar_cap_fade(caps, center):
+    """`CelestialVisual.polarCapFade(cap:)` — luruhan tepi **dalam** kutub.
+
+    Mengembalikan `(inner_edge_y, full_y, edge_opacity, full_opacity)` dalam
+    satuan radius dari pusat bola. Arahnya dibaca dari tanda `center`: kutub
+    utara luruh **ke bawah** (menuju pusat), kutub selatan ke atas.
+
+    **Kenapa ini di port, bukan ditulis di `_draw_polar_caps`.** Aturan
+    luruhannya hidup di model (`polarCapFadeStart`), dan penggambar butuh dua
+    titik untuk sebuah gradient. Menghitung titik kedua di sisi penggambar
+    berarti aturannya hidup dua kali lagi — dan yang menggambar adalah salinan
+    yang tidak dijaga gerbang drift mana pun.
+    """
+    toward_pole = -1.0 if center < 0 else 1.0
+    inner_edge = center - toward_pole * caps["half_height"]
+    span = caps["half_height"] * 2 * POLAR_CAP_FADE_START
+    return dict(inner_edge_y=inner_edge, toward_pole=toward_pole,
+                full_y=inner_edge + toward_pole * span,
+                edge_opacity=POLAR_CAP_EDGE_OPACITY,
+                full_opacity=POLAR_CAP_OPACITY)
+
+
 def saturn_ring(frame_half_extent=1.0, axial_ratio=1.0 / 3.2):
     """`VisualFrame.saturnRing`."""
     return dict(half_width=frame_half_extent, half_height=frame_half_extent * axial_ratio)
@@ -951,7 +973,15 @@ SATURN_RING_BAND_OPACITIES = [0.14, 0.34, 0.78, 0.04, 0.62]
 SATURN_CASSINI_WIDTH = 0.06
 # MODEL: `CelestialVisual.ringBackHalfOpacityScale`
 RING_BACK_HALF_OPACITY_SCALE = 0.55
-POLAR_CAP_OPACITY = 0.85                                 # VIEW: `drawPolarCaps`
+POLAR_CAP_OPACITY = 0.85                                 # MODEL: `CelestialVisual.polarCapOpacity`
+# Luruhan tepi **dalam** kutub. Sebelum siklus ini kutubnya warna rata
+# (`accent_fn(ACCENTS["marsPolarCap"], night_mode, POLAR_CAP_OPACITY)`), jadi
+# tepi dalamnya adalah batas elips yang sempurna: diukur 111.4 luminans dalam
+# satu piksel (utara) dan 139.8 (selatan) pada render 400 px, sementara bola
+# Mars di baris yang sama bergerak 0.9 luminans per piksel. MODEL:
+# `CelestialVisual.polarCapFadeStart` / `polarCapEdgeOpacity`.
+POLAR_CAP_FADE_START = 0.45
+POLAR_CAP_EDGE_OPACITY = 0.0
 MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
 # Kabut Venus: **pusat** elips, satuan radius. MODEL: `CelestialVisual.venusHaze`
 # Sebelumnya kedua situs di berkas ini memakai `cy + radius * 0.14` sementara
@@ -1538,11 +1568,27 @@ def _draw_polar_caps(canvas, cx, cy, radius, night_mode):
     0.530 R, bola hanya 0.436 R). Tanpa irisan, kutubnya meluber ke latar.
     """
     caps = polar_caps()
-    cap = accent_fn(ACCENTS["marsPolarCap"], night_mode, POLAR_CAP_OPACITY)
     erx = caps["half_width"] * radius
     ery = caps["half_height"] * radius
     for center in (caps["north_center"], caps["south_center"]):
         ecy = cy + center * radius
+        fade = polar_cap_fade(caps, center)
+        y0 = cy + fade["inner_edge_y"] * radius
+        y1 = cy + fade["full_y"] * radius
+        # Opasitas dari gradient (luruhan tepi dalam), warna dari `accent_fn`
+        # (pemetaan mode malam). Dua hal berbeda yang harus bertemu di sini:
+        # gradient memuat warna **mentah**, jadi memakai warnanya langsung akan
+        # membuat mode malam menggambar kutub putih.
+        alpha_fn = linear_gradient([(ACCENTS["marsPolarCap"], fade["edge_opacity"]),
+                                    (ACCENTS["marsPolarCap"], fade["full_opacity"])],
+                                   (cx, y0), (cx, y1))
+        # `color_fn` mengabaikan koordinatnya, jadi satu panggilan cukup untuk
+        # mengambil warna yang sudah dipetakan — tanpa menyalin pemetaannya.
+        cap_rgb, _ = accent_fn(ACCENTS["marsPolarCap"], night_mode, 1.0)(cx, cy)
+
+        def shaded(x, y, alpha_fn=alpha_fn, cap_rgb=cap_rgb):
+            _, alpha = alpha_fn(x, y)
+            return cap_rgb, alpha
 
         def inside(x, y, ecy=ecy):
             if (x - cx) ** 2 + (y - cy) ** 2 > radius * radius:
@@ -1550,7 +1596,7 @@ def _draw_polar_caps(canvas, cx, cy, radius, night_mode):
             dx, dy = (x - cx) / erx, (y - ecy) / ery
             return dx * dx + dy * dy <= 1.0
 
-        canvas.fill(inside, cap)
+        canvas.fill(inside, shaded)
 
 
 def crater_relief(craters, light_direction=SPHERE_LIGHT_OFFSET,
