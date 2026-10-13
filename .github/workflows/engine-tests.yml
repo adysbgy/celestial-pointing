@@ -772,6 +772,18 @@ jobs:
       - name: Buktikan gerbang kekuatan earthshine berbunyi
         run: python3 Tools/bukti-mutasi-earthshine.py
 
+      # Gerbang **keterbacaan piringan bulan baru** (`check_moon_new_disc_reads_on_the_watch`)
+      # menutup cacat terukur: pada `moonEarthshine` 0.15 piringan bulan baru jatuh
+      # ke 1.32:1 terhadap latar kartu — kartu kosong di ukuran jam. Gerbangnya punya
+      # ambang terkalibrasi (2.0:1) tetapi, seperti enam gerbang lain di `check-visuals.py`,
+      # belum pernah dibuktikan bisa merah. Harness ini menuntut hasil **bernama**
+      # supaya pemeriksaan yang diganti namanya tidak terbaca sebagai "gerbangnya ada".
+      # Keadaan 5 (model Swift berubah, port tidak ikut) sengaja diharapkan hijau —
+      # itu batas cakupannya, bukan kelulusan: gerbang ini mengukur gambar port, jadi
+      # arah "model berubah" tetap terbuka dan tercatat, bukan disangka tertutup.
+      - name: Buktikan gerbang keterbacaan bulan baru berbunyi
+        run: python3 Tools/bukti-mutasi-piringan-bulan-baru.py
+
       # Dan bukti untuk **enam gerbang piksel yang tidak punya bukti sama
       # sekali** — ditemukan dengan membandingkan daftar `def check_*` di
       # `check-visuals.py` terhadap seluruh `check_*` yang dirujuk kedua

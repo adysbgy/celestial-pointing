@@ -1,3 +1,128 @@
+## Progres terakhir (13 Okt 2026 — gerbang keterbacaan bulan baru: 18 gerbang yang belum pernah dibuktikan bisa merah)
+
+Siklus ini dimulai dari satu pertanyaan yang belum pernah diajukan ke
+perangkat pengawasnya sendiri: dari 83 gerbang di `check-visuals.py`,
+**berapa yang pernah dibuktikan bisa merah?**
+
+### Auditnya: 18 dari 83 gerbang tidak punya satu pun harness
+
+Perbandingannya mekanis, bukan penilaian: daftar `def check_*` di
+`check-visuals.py` disilangkan dengan seluruh `check_*` yang dirujuk oleh
+37 berkas `Tools/bukti-mutasi-*.py`. Hasilnya **18 gerbang nirsaksi** —
+gerbang yang tidak pernah dijalankan dalam keadaan rusak, dan karena itu
+tidak bisa dibedakan dari gerbang yang tidak mengukur apa pun.
+
+Itu kelas cacat yang persis dicari repo ini, hanya kali ini ia hidup **di
+dalam** alat yang dipakai untuk mencarinya. Gerbang yang belum pernah merah
+adalah klaim yang belum dibayar: docstringnya bisa menjelaskan cacat yang
+ditutupnya dengan sangat meyakinkan sambil tidak menahan apa pun.
+
+Dipilih satu, yang paling dekat dengan kepentingan pengguna:
+
+`check_moon_new_disc_reads_on_the_watch` — piringan **bulan baru** pada
+ukuran kartu jam. Cacat yang ia klaim tutup terukur dan nyata: pada
+`moonEarthshine` 0.15 piringan itu jatuh ke **1.32:1** terhadap latar kartu,
+yaitu kartu kosong di pergelangan tangan. Ambangnya (2.0:1) dikalibrasi
+terhadap sapuan yang tercatat. Yang belum pernah ada: bukti bahwa ia berbunyi.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-piringan-bulan-baru.py` (baru, dirujuk
+`engine-tests.yml`) — 6 keadaan, semuanya sesuai harapan:
+
+| keadaan | harapan | terukur |
+|---|---|---|
+| baseline | hijau | **2.39:1** |
+| 1. port 0.30 → 0.15 (cacat asli) | merah | **1.33:1** |
+| 2. port 0.30 → 0.24 (batas bawah) | merah | **1.86:1** |
+| 3. port 0.30 → 0.45 (lebih terbaca) | **hijau** | **4.25:1** |
+| 4. ukuran 76 px | **hijau** | 2.39:1 |
+| 5. model Swift → 0.15, port tidak ikut | **hijau** | 2.39:1 |
+
+Angka 1.32:1 / 1.85:1 / 2.39:1 yang dikutip docstring gerbangnya
+**diukur ulang**, bukan diwarisi: 1.33, 1.86, 2.39 — cocok.
+
+Dua keadaan yang diharapkan hijau bukan hiasan, dan masing-masing menahan
+satu hal yang berbeda:
+
+- **Keadaan 3** membuktikan gerbangnya mengukur **arah dan besaran**, bukan
+  sekadar "ada piringan". Gerbang yang memerah saat piringan justru lebih
+  terbaca akan dilonggarkan orang, dan gerbang yang dilonggarkan tidak
+  menjaga apa pun. Tanpanya, "merah di 0.15" bisa berarti "merah pada
+  setiap perubahan" — yang tidak mengukur keterbacaan sama sekali.
+- **Keadaan 4** menguji klaim "di ukuran jam" dengan menjalankan gerbang
+  yang **sama** pada 76 px. Gerbang yang hanya lulus di satu ukuran tidak
+  bisa mengklaim menjaga ukuran yang dipakai perangkat.
+
+### Batas cakupan yang dinyatakan, bukan dibiarkan
+
+**Keadaan 5 adalah yang paling penting, dan ia dilaporkan hijau.**
+Gerbang ini mengukur **gambar port Python**. Terukur: menurunkan
+`moonEarthshine` di **model Swift** menjadi 0.15 membiarkan gerbangnya
+**hijau** (2.39:1) — karena port-nya tidak ikut berubah.
+
+Jadi arah yang paling mungkin terjadi di repo dua bahasa ini — penyuntingan
+model di Mac, port tertinggal di Linux — **masih terbuka** untuk token ini.
+Keadaan 5 ada supaya batas itu **tercatat dan dijalankan**, bukan disangka
+tertutup: kalau kelak ada gerbang yang mengikat model ke port untuk
+`moonEarthshine`, keadaan 5 akan mulai tidak sesuai harapan, dan itu tanda
+cakupannya meluas, bukan harnessnya rusak.
+
+Perbedaan antara pembiaran dan batas yang dinyatakan adalah bahwa batasnya
+**dieksekusi**.
+
+### Yang TIDAK diklaim
+
+- Harness ini **tidak** menutup arah "model berubah" — ia mendokumentasikan
+  bahwa arah itu terbuka (keadaan 5).
+- **17 gerbang nirsaksi lainnya belum dikerjakan.** Siklus ini mengerjakan
+  satu, bukan kelasnya. Daftarnya tercatat dan bisa diukur lagi kapan saja
+  dengan menyilangkan `def check_*` terhadap `bukti-mutasi-*.py`.
+- Tidak ada perubahan perilaku: seluruh 778 uji tetap berjalan, dan berkas
+  `Apps/` maupun `Packages/` **tidak disentuh** (hanya `Tools/` + langkah CI).
+
+### Satu cacat hidup di pohon kerja, dan apa yang dilakukan dengannya
+
+`./swift-test.sh` di VPS ini melaporkan **778 uji, 1 gagal**:
+`testCaptureRejectsObjectBelowHorizon`. Itu **bukan** milik siklus ini dan
+bukan regresi yang saya buat. Pohon kerja membawa WIP siklus lain yang
+menukar `CalibrationText.belowHorizonMessage` menjadi
+`directionUncomputableMessage` di `CalibrationSession.swift:193`, padahal
+ujinya menuntut kata "terbenam". HEAD memakai `belowHorizonMessage` dan CI
+`main` hijau.
+
+Sengaja **tidak** diperbaiki dan tidak di-commit: memulihkan berkas orang
+lain akan menimpa percobaan yang sedang berjalan, dan `git add -A` akan
+menyapu mutasi setengah jadi mereka ke dalam commit saya. Dua berkas WIP
+(`CalibrationSession.swift`, `render-visuals.py`) hanya di-`stage` bila
+disebut eksplisit — tidak satu pun disentuh siklus ini.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 778 | **778** (tak disentuh) |
+| Gerbang nirsaksi (terukur) | 18 | **17** (−1) |
+| Harness dirujuk CI | 37 | **38** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+  - `python3 Tools/bukti-mutasi-piringan-bulan-baru.py` → **6 keadaan, 0
+    tidak sesuai harapan**; kedua berkas produksi pulih **persis** (md5
+    sama sebelum/sesudah).
+  - `python3 Tools/check-harness-terdaftar.py` → **38 harness, semuanya
+    dirujuk** (gerbang ini sendiri sempat melaporkan harness baru sebagai
+    "tidak dirujuk" sebelum langkah CI-nya ditambahkan — ia bekerja).
+  - `./swift-ui-lint.sh` → SEMUA GERBANG UI LULUS. `./swift-typecheck.sh` →
+    SEMUA GERBANG LULUS.
+  - `./swift-test.sh` → 778 uji, 1 gagal — gagalnya sama sebelum dan
+    sesudah (WIP siklus lain, lihat catatan di atas).
+
+---
+
 ## Progres terakhir (13 Okt 2026 — lengkung piringan Bulan: gerbangnya hijau pada kode yang menulis angkanya)
 
 Dua cacat gerbang ditutup siklus ini, keduanya ditemukan dengan **mengukur**,
