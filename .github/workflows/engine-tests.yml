@@ -1106,5 +1106,30 @@ jobs:
       - name: Buktikan gerbang glif lencana kandidat berbunyi
         run: python3 Tools/bukti-mutasi-glif-lencana.py
 
+      # Bukti bahwa `check_crater_contrast_numbers_come_from_the_sampler`
+      # berbunyi — satu dari 7 gerbang tersisa yang tidak punya harness.
+      #
+      # Gerbang ini menjaga **satu-satunya bukti yang dibaca orang** saat
+      # menilai apakah gerbang kontras kawah layak dipercaya, yaitu angka di
+      # docstring-nya. Empat rentang pernah dikutip di sana dan **tidak satu
+      # pun keluar dari penyampelnya**: `−5,1` menyatakan hampir tidak ada
+      # dinding terang yang hilang, padahal seluruh lima kawah menjadi lebih
+      # gelap dari permukaannya.
+      #
+      # Mutasinya hidup di **docstring gerbang lain di berkas yang sama**
+      # (`check_crater_floor_opacity_comes_from_the_model`), jadi tidak satu
+      # pun berkas di `Apps/` atau `Packages/` yang disentuh.
+      #
+      # Empat keadaan pertama tidak saling menggantikan: 1 & 2 mengubah angka
+      # pada dua keadaan berbeda (sebelum & sesudah), 3 menukar **sisi**
+      # sementara angkanya tetap benar, dan 4 mengubah **bentuk** kutipan —
+      # gerbangnya lalu berhenti lebih awal dan melaporkan satu hasil, bukan
+      # empat, jadi himpunan hasilnya ikut dituntut persis.
+      #
+      # Keadaan 5 adalah kontrol negatif (prosa diubah): kalau harness merah
+      # di sana, ia merah karena berkasnya berubah, bukan karena cacatnya.
+      - name: Buktikan gerbang angka kontras kawah berbunyi
+        run: python3 Tools/bukti-mutasi-angka-kawah.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
