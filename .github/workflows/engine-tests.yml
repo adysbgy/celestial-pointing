@@ -1108,6 +1108,28 @@ jobs:
       - name: Buktikan Aturan 13 berbunyi pada kalimat yang dirakit sebagai argumen
         run: python3 Tools/bukti-mutasi-kalimat-dirakit.py
 
+      # Dan bukti bahwa Aturan 11 (specifier katalog cocok tipe dengan template
+      # kode) benar-benar berbunyi.
+      #
+      # Ini satu-satunya cacat di repo ini yang **menjatuhkan app**, bukan sekadar
+      # salah kata. Bentuk yang paling wajar ditulis penerjemah — menukar posisi
+      # dua specifier supaya angkanya di depan — bisa membuat `%.1f` menerima
+      # sebuah `String`. Di CoreFoundation itu crash; glibc memaafkannya, jadi
+      # `swift-test.sh` hijau ratusan uji dan hanya CI macOS yang merah. Bentuk
+      # itu sudah pernah ada: `spokenError` mengirim `(String, Double, String)`
+      # dengan template `"%@ %.1f %@"`.
+      #
+      # Karena perbedaan glibc vs CoreFoundation itulah penjaganya harus
+      # perbandingan teks — uji runtime di Linux buta di sini.
+      #
+      # Tiga keadaan cacat (ditukar, tipe diganti, specifier hilang) dan satu
+      # kontrol negatif yang paling penting: specifier **sejenis** yang cuma
+      # dipindah harus tetap hijau. Tanpa itu, aturan yang membandingkan string
+      # mentah akan lulus ketiganya dengan sempurna, dan setiap terjemahan yang
+      # sah akan dilaporkan sebagai cacat.
+      - name: Buktikan Aturan 11 berbunyi pada specifier katalog yang tidak cocok
+        run: python3 Tools/bukti-mutasi-specifier.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
