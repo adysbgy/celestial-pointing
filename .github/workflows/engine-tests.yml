@@ -1277,5 +1277,31 @@ jobs:
       - name: Buktikan gerbang luruhan tepi dalam kutub Mars berbunyi
         run: python3 Tools/bukti-mutasi-luruh-kutub.py
 
+      # Aturan 23 (penanda keraguan di complication) menegakkan **aturan
+      # paling keras PRD** ("JANGAN pernah menampilkan visual yang mengklaim
+      # identitas saat engine RAGU") pada permukaan terkecil di seluruh
+      # perangkat: complication `accessoryInline`, yang tidak punya baris
+      # kedua. Satu-satunya kanal yang tersisa di sana adalah ikon
+      # `presentedSymbolName`, jadi tanpa ikon itu nama kandidat `.uncertain`
+      # tampil **persis** seperti nama yang sudah terkunci.
+      #
+      # **Kenapa langkah ini baru ada sekarang.** Harness 422 baris ini
+      # ditambahkan oleh commit `bef9a55` ("GERBANG: Aturan 23 kini menunjuk
+      # cabang yang benar") yang **lupa** menambahkan langkah CI-nya, sehingga
+      # `Tools/check-harness-terdaftar.py` — gerbang yang ada justru untuk
+      # menangkap kelas cacat ini — gagal di `main` (exit 1) dan memblokir
+      # setiap push berikutnya. Gerbang yang tidak pernah dijalankan selalu
+      # hijau; yang di sini bahkan tidak sempat hijau, ia cuma tidak pernah
+      # berbunyi.
+      #
+      # Empat keadaan: ikon dibuang dari `accessoryInline` (cacat aslinya),
+      # ikon dibuang dari `default` (keluarga yang belum didesain, dan karena
+      # itu paling mungkin rusak tanpa ada yang melihat), ikon ada tetapi
+      # **bukan** `presentedSymbolName` (bentuk "ada ikon" yang salah — ikon
+      # tetap, jadi ragu dan terkunci tampil sama), dan satu kontrol negatif
+      # yang harus tetap hijau.
+      - name: Buktikan gerbang penanda keraguan complication Aturan 23 berbunyi
+        run: python3 Tools/bukti-mutasi-penanda-complication.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
