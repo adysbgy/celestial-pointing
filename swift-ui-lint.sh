@@ -863,10 +863,29 @@ fi
 # dan suntikan di atas merah — satu-satunya selisihnya.
 #
 # Yang diperiksa adalah nama API **di kode**, sementara penjaga boleh disebut
-# di mana saja di dalam bloknya (kode atau komentar). Alasannya: dokumentasi
-# aturan ini sendiri menyebut `withAnimation`, jadi penyapu yang ikut menghitung
-# komentar akan melaporkan dirinya sendiri -- persis gerbang yang selalu merah
-# dan akan dimatikan orang lain saat ia berbunyi.
+# di mana saja di dalam bloknya -- **tetapi hanya di kode**. Versi pertama
+# hanya membuang komentar, jadi penjaga yang muncul **di dalam literal
+# string** ikut dihitung. Terukur dengan menyuntik di `PointingView.swift`:
+#
+#     var zzzMotionProbe: some View {
+#         _ = "MotionPolicy(reduceMotion: false)"
+#         withAnimation(.linear(duration: 0.3)) { }
+#         return EmptyView()
+#     }
+#     -> "Bersih: setiap API gerak berada di blok berpenjaga reduce-motion."
+#
+# Satu baris `_ = "…"` yang menyebut nama penjaganya di dalam string membuat
+# gerak tanpa penjaga lolos. Kalimat yang menyebut penjaga bukan penjaga —
+# dan itu justru bentuk yang paling mungkin muncul di repo ini, yang menulis
+# `motion.allowsTransitions` di dalam teks yang **dijelaskan** ke pengguna.
+# Karena itu isi literal string dikosongkan sebelum penjaganya dicari.
+#
+# Kalimat di atas pernah berbunyi "(kode atau komentar)", dan itu **salah**:
+# komentarnya sudah dibuang `strip_comments` sebelum bloknya diuji, jadi
+# penjaga di dalam komentar tidak pernah dihitung (dan memang tidak boleh --
+# dokumentasi aturan ini sendiri menyebut `withAnimation`, jadi penyapu yang
+# ikut menghitung komentar akan melaporkan dirinya sendiri, persis gerbang
+# yang selalu merah dan akan dimatikan orang lain saat ia berbunyi).
 #
 # Batas yang dinyatakan: blok yang diuji adalah blok **terdekat yang memuat**,
 # bukan blok yang sebenarnya mengeksekusi API itu. Penjaga di `if` bersaudara
@@ -953,15 +972,45 @@ def brace_blocks(src):
     return out
 
 
+def blank_strings(src):
+    """Kosongkan isi literal string; tanda kutipnya dipertahankan.
+
+    Penjaga yang hanya **disebut** di dalam string bukan penjaga. Tanpa ini,
+    satu baris `_ = "MotionPolicy(reduceMotion: false)"` di dalam blok
+    membuat setiap API gerak di blok itu lolos -- terukur, bukan dugaan.
+    """
+    out, i, n = [], 0, len(src)
+    while i < n:
+        if src[i] == '"':
+            out.append('""')
+            i += 1
+            while i < n:
+                if src[i] == "\\":
+                    i += 2
+                    continue
+                if src[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        out.append(src[i])
+        i += 1
+    return "".join(out)
+
+
 def is_guarded(src, pos, blocks):
     """Apakah `pos` berada di blok yang memuat rujukan penjaga.
 
     Blok yang diuji adalah blok terdekat yang memuat `pos`, lalu blok yang
     membungkusnya, dan seterusnya ke luar. Penjaga di **saudara** blok tidak
     dihitung — itu yang membedakan gerbang ini dari versi berkas-lebar.
+
+    Isi literal string dikosongkan lebih dulu (`blank_strings`): yang dicari
+    adalah penjaga **di kode**, bukan kalimat yang menyebut namanya.
     """
     for (open_at, close_at) in blocks:
-        if open_at < pos < close_at and GUARD.search(src[open_at:close_at + 1]):
+        if open_at < pos < close_at and GUARD.search(
+                blank_strings(src[open_at:close_at + 1])):
             return True
     return False
 

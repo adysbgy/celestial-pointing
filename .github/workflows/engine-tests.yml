@@ -131,6 +131,26 @@ jobs:
              }
           ' 'Aturan 7'
 
+      # Dan `red-lint.sh` di atas hanya membuktikan **satu** bentuk cacat di
+      # **satu** berkas. Cakupan aturannya lebih luas dari itu, dan sampai
+      # siklus ini tidak ada yang mengukurnya.
+      #
+      # Bentuk yang lolos ditemukan dengan menyuntik, bukan membaca: versi
+      # aturannya membuang komentar tetapi **tidak** isi literal string, jadi
+      # satu baris `_ = "MotionPolicy(reduceMotion: false)"` di dalam blok
+      # membuat setiap API gerak di blok itu lolos — "Bersih". Kalimat yang
+      # menyebut penjaga bukan penjaga, dan repo ini menulis
+      # `motion.allowsTransitions` di dalam teks yang dijelaskan ke pengguna.
+      #
+      # Harness ini menutup kelasnya dengan sembilan keadaan: cacat yang harus
+      # berbunyi, bentuk sah yang harus diam (termasuk `MotionPolicy(reduceMotion:
+      # false)` yang selalu melarang — batas yang dinyatakan sebagai harapan,
+      # bukan catatan), dan **satu pengukuran non-vakuositas**: keadaan
+      # "penjaga hanya di dalam string" dijalankan ulang tanpa `blank_strings`
+      # dan wajib berbalik hijau.
+      - name: Buktikan Aturan 7 berbunyi pada kelasnya, bukan satu bentuknya
+        run: python3 Tools/bukti-mutasi-gerbang-gerak.py
+
       # Gambar objek tidak bisa diperiksa di sini: `CelestialVisualView` hanya
       # terbangun di macOS, dan job ini berjalan di Linux. Karena itu lapisan
       # menggambarnya **diport ke Python** (`Tools/render-visuals.py`) dan
