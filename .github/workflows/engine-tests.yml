@@ -1029,7 +1029,7 @@ jobs:
       # sungguhan dan melaporkan seluruh keadaan hijau; (2) salinannya mula-mula
       # hanya `Apps/`, sehingga aturan yang membaca `Packages/`, `project.yml`,
       # atau `Tools/` semuanya berbunyi dan menenggelamkan tanda yang dicari.
-      - name: Buktikan enam aturan sapu UI berbunyi pada hal yang diklaim
+      - name: Buktikan tujuh aturan sapu UI berbunyi pada hal yang diklaim
         run: python3 Tools/bukti-mutasi-aturan-ui.py
 
       # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah

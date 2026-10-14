@@ -1,3 +1,131 @@
+## Progres terakhir (14 Okt 2026 — Aturan 27: gerbang label yang buta pada bentuk yang repo ini benar-benar tulis)
+
+Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
+`swift-ui-lint.sh`, **berapa yang pernah dibuktikan bisa merah?** Yang dipilih kali
+ini bukan aturan nirsaksi biasa: Aturan 27 **sudah** punya rekam jejak, tetapi
+rekam jejak itu mengukur bentuk yang salah. Ia hijau pada kode benar, dan hijau
+juga pada dua cacat yang **pasti** menggagalkan kompilasi.
+
+### Cacat yang dijaga, dan kenapa ia sunyi
+
+Aturan 27 menjaga label argumen pada `TipePaket(Label:)` di `Apps/`. Tabelnya
+dibangun dari `DECL`, yang mencari nama tipe **sederhana**:
+
+    DECL = re.compile(r"\b(?:struct|enum|class|actor)\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+jadi kuncinya `RGBComponents`, `Planet`. Pencarian pemanggilnya karena itu hanya
+mencocokkan bentuk **tak-berkualifikasi**. Bentuk yang repo ini benar-benar tulis
+adalah bentuk **berkualifikasi**, karena `CelestialVisual` adalah tipe bersarang
+di paket:
+
+    Apps/Shared/CelestialVisualView.swift:1238
+        CelestialVisual.RGBComponents(red: 1, green: 1, blue: 1)
+    Apps/Shared/PointingEngine.swift:585
+        CelestialVisual.Planet(objectID: object.id)
+
+Terukur (probe, salinan bersih per keadaan, 14 Okt 2026) — **keduanya membiarkan
+seluruh 35 aturan hijau, exit 0**:
+
+| suntikan | jalur | sebelum | sesudah |
+|---|---|---|---|
+| `objectID:` → `objectId:` (`PointingEngine.swift:585`) | `init` di dalam `extension` | **hijau** | MERAH |
+| `blue:` dibuang (`CelestialVisualView.swift:1238`) | `init` tipe bersarang biasa | **hijau** | MERAH |
+
+Yang pertama adalah yang paling mahal: `objectId:` bukan galat yang *mungkin*
+lolos kompilasi, ia galat kompilasi yang **pasti**. Satu-satunya yang menangkapnya
+sekarang adalah CI macOS (~4 menit, plus satu push). Gerbang ini ada persis untuk
+menangkapnya dalam 10 detik.
+
+**Cakupan sebenarnya, diukur, bukan diklaim.** Dari 234 kunci tipe berkualifikasi
+yang terindeks di `Packages/`, hanya **2** pemanggilan berkualifikasi di seluruh
+`Apps/` yang sebelumnya tidak diperiksa — dan kedua-duanya adalah situs cacat di
+atas. Perbaikan ini menutup 2 dari 2 jalur, bukan "banyak" yang tak terhitung.
+
+### Cacat kedua yang ditemukan saat memperbaikinya
+
+Percobaan pertama menaikkan `DECL` menjadi sadar-kurung dan menyimpan nama
+berkualifikasi saja. Itu **regresi**, dan terukur: kunci `Planet`, `Blob`, `Core`,
+`Decision`, `RecordRefusal` hilang dari himpunan — kelimanya dideklarasikan di
+dalam tipe lain, dan pemanggilan tak-berkualifikasinya selama ini dijaga lewat
+kunci sederhana itu. Gerbang yang menyempit tanpa suara adalah gerbang yang selalu
+hijau, jadi kunci berkualifikasi ditambahkan **di samping** kunci sederhana, bukan
+menggantinya.
+
+Cacat ketiga muncul setelah itu, dan ia yang paling mudah lolos: **baseline
+menjadi MERAH**. Penyebabnya, diukur dengan menelusuri peristiwa tipe satu per
+satu — `INIT` versi lama juga menangkap **inisialisasi anggota** `.init(red:…)`
+dan `self.init(…)`. Bentuk itu pemanggilan, bukan deklarasi, tetapi ia hidup di
+dalam badan tipe, sehingga setiap `.init(light: .init(red:…))` di dalam
+`extension CelestialVisual.Planet` tercatat sebagai deklarasi milik
+`CelestialVisual.Planet`. Tabelnya berisi tanda tangan palsu `(light:, dark:,
+feature:)`, dan pesan galatnya menuduh label yang tidak pernah ditulis pemanggil:
+
+    Apps/Shared/PointingEngine.swift: CelestialVisual.Planet(objectId:)
+        deklarasi di …/CelestialVisual.swift punya: light, dark, feature
+
+`light, dark, feature` adalah `CelestialVisual.Palette`, bukan `Planet`. Gerbang
+yang benar tapi menyesatkan tetap gerbang yang dimatikan orang. Perbaikannya
+`(?<![.\w])` pada `INIT`, dan `extension` ikut ditelusuri **hanya namanya** —
+`extension CelestialVisual.Planet { … }` menumpuk `CelestialVisual.Planet`,
+sehingga `init?(objectID:)` yang hidup di dalamnya teratribusi ke tipe yang
+benar. Tanpa itu, `Planet(objectID:)` yang **sah** dilaporkan sebagai label yang
+salah.
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-aturan-ui.py` diperluas dari enam keadaan aturan menjadi
+tujuh (berkasnya sudah dirujuk `engine-tests.yml`, jadi tidak ada langkah CI
+baru — hanya nama langkahnya yang ikut diperbaiki: "enam" → "tujuh"). Keadaan
+Aturan 27 ada empat:
+
+| keadaan | harapan | terukur |
+|---|---|---|
+| baseline (kode benar) | hijau | hijau |
+| `objectID:` → `objectId:` (berkualifikasi) | merah | **MERAH** |
+| `blue:` dibuang (berkualifikasi) | merah | **MERAH** |
+| cacat yang sama **tanpa kualifikasi** | merah | **MERAH** |
+
+Keadaan terakhir itu bukan hiasan: ia menahan perbaikan yang menyempitkan gerbang
+lama tanpa suara. Dan harness-nya diuji **berlawanan arah** — dijalankan terhadap
+`swift-ui-lint.sh` versi `origin/main` di worktree bersih terpisah, ia keluar
+merah dengan dua temuan yang tepat:
+
+    Aturan 27 / objectID: -> objectId: (harus merah): hijau padahal diharapkan merah
+    Aturan 27 / blue: dibuang (harus merah): hijau padahal diharapkan merah
+
+Tanpa langkah itu, harness ini hanya akan membuktikan bahwa ia sepakat dengan
+dirinya sendiri.
+
+**Non-vakum, diukur.** Dua pohon identik dijalankan dengan lint lama dan lint
+baru; `diff` keluaran lengkap kedua jalannya **kosong**. Artinya perbaikan ini
+tidak mengubah satu pun putusan 34 aturan lain — ia hanya menambah pemanggilan
+yang sebelumnya tidak terlihat. (Perubahan `INIT` menyentuh jalur atribusi yang
+dipakai bersama, jadi ini diukur, bukan disangka.)
+
+### Yang TIDAK diklaim
+
+- Aturan 27 tetap sapu teks. Ia membandingkan **himpunan label**, bukan tipe
+  argumen: `RGBComponents(red: "x", green: 1, blue: 1)` lolos, karena menilai
+  tipe menuntut compiler.
+- Pemanggilan tanpa label atau posisional tetap dilewati (urutan argumen tidak
+  bisa dipastikan tanpa compiler). Batas ini sudah ada sebelum siklus ini dan
+  tidak diubah.
+- `extension` ditelusuri **hanya namanya**, bukan protokolnya. Tipe yang
+  dideklarasikan di dalam `extension Foo: Bar` karena itu hanya terjaga lewat
+  jalur tak-berkualifikasi.
+- Nol baris Swift berubah. Perubahan hanya di `swift-ui-lint.sh` (aturan),
+  `Tools/bukti-mutasi-aturan-ui.py` (harness), dan `.github/workflows/`
+  (nama langkah).
+
+### Verifikasi siklus ini
+
+- `swift-ui-lint.sh` — **35/35 aturan**, exit 0 (bersih).
+- `Tools/check-harness-terdaftar.py` — **60 harness, semuanya dirujuk** alur kerja.
+- `swift-typecheck.sh` — lulus.
+- `swift-test.sh` (Docker Swift 6.0) — **785 uji, 0 gagal** (81 suite).
+- CI: **Apple Build hijau** pada `a283e8d`; Engine Tests (Linux) menunggu
+  gerbang gambar.
+
 ## Progres terakhir (14 Okt 2026 — Aturan 7: penjaga gerak yang cukup disebut di dalam sebuah string)
 
 Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
