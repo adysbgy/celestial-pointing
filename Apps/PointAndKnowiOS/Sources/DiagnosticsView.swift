@@ -767,6 +767,19 @@ struct DiagnosticsView: View {
         let lockArrivalToken: Int?
         let pulse: Double
 
+        /// Diameter visual objek, **mengikuti Dynamic Type**.
+        ///
+        /// `@ScaledMetric` — bukan angka tetap 132 — supaya lukisan objek di
+        /// panel detail ikut membesar saat pengguna memperbesar teks sistem.
+        /// Diameter tetap dulu (132pt) tidak bergeser saat aksesibilitas teks
+        /// diubah, sehingga objek terlihat menyusut relatif terhadap nama dan
+        /// teks di sebelahnya yang justru membesar. Ini bagian dari BAGIAN 4
+        /// #5 (Dynamic Type penuh): ukuran gambar bukan sekadar angka tetap.
+        /// `relativeTo: .title2` dipakai karena visual ini berpasangan dengan
+        /// nama berukuran `.title2` di `content(pulse:)` — keduanya menekan
+        /// skala yang sama.
+        @ScaledMetric(relativeTo: .title2) private var visualDiameter: CGFloat = 132
+
         @State private var appearScale: CGFloat = 1
         @State private var appearOpacity: Double = 1
         /// Pengguna meminta reduksi gerak: pop dimatikan, dan `TimelineView`
@@ -850,7 +863,7 @@ struct DiagnosticsView: View {
         private func content(pulse currentPulse: Double) -> some View {
             HStack(alignment: .center, spacing: 16) {
                 CelestialVisualView(visual: visual,
-                                     diameter: 132,
+                                     diameter: visualDiameter,
                                      // Bukan `!isStale`: `.uncertain`
                                      // bukan sisa, tapi engine kurang
                                      // yakin — gambar tidak boleh lebih
