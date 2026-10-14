@@ -1303,5 +1303,27 @@ jobs:
       - name: Buktikan gerbang penanda keraguan complication Aturan 23 berbunyi
         run: python3 Tools/bukti-mutasi-penanda-complication.py
 
+      # Bukti bahwa `check_modeled_port_constants_match_the_model` berbunyi —
+      # gerbang yang menjaga setiap konstanta port yang **mengaku** berasal
+      # dari model Swift.
+      #
+      # Uranus dan Neptunus masuk bersama sembilan konstanta geometri di port,
+      # masing-masing dengan komentar `# MODEL: CelestialVisual.<nama>` yang
+      # menjanjikan angkanya sama dengan sumber Swift-nya. Diukur sebelum
+      # gerbang ini ada: mengganti `URANUS_BAND_HALF_HEIGHT 0.30 -> 0.55`
+      # **dan** `NEPTUNE_SPOT_OPACITY 0.55 -> 0.20` membiarkan seluruh gerbang
+      # gambar repo ini pada jumlah merah yang **sama persis** seperti
+      # sebelumnya. Komentar yang menjanjikan kesamaan bukan gerbang.
+      #
+      # Delapan keadaan, dan yang paling berharga adalah yang **terakhir**:
+      # mengganti nama fungsi di model membuat ketiga token `URANUS_BAND_*`
+      # kehilangan sumbernya, dan sebelum penjaga itu ada ketiganya menyusut
+      # dari himpunan hasil sementara gerbangnya tetap hijau — berhenti
+      # mengukur tepat ketika modelnya berubah. Dua arah penyimpangan (port dan
+      # model) diuji terpisah karena keduanya memerahkan token yang berbeda,
+      # dan keadaan 6 menuntut penyuntingan dua sisi yang sah tetap **hijau**.
+      - name: Buktikan gerbang konstanta port yang mengaku dari model berbunyi
+        run: python3 Tools/bukti-mutasi-sabuk-uranus.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

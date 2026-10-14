@@ -2631,6 +2631,92 @@ def read_venus_haze_from_swift(source):
     return values["centerY"], values["halfWidth"], values["halfHeight"]
 
 
+def read_haze_geometry_from_swift(source, function_name):
+    """Baca `(centerY, halfWidth, halfHeight)` dari sebuah fungsi Swift.
+
+    **Kenapa ini pembaca umum, bukan salinan `read_venus_haze_from_swift`.**
+    Venus, Uranus, dan Neptunus semuanya mengembalikan `HazeGeometry` dengan
+    tiga bawaan yang sama; menyalin pembacanya tiga kali berarti tiga pembaca
+    yang bisa berbeda pendapat tentang bentuk fungsinya. Bentuk yang dicari
+    ditulis **eksplisit** (`function_name`) supaya pembaca ini tidak pernah
+    diam-diam membaca fungsi yang salah.
+
+    Mengembalikan `None` bila bentuk fungsinya tidak dikenali — pemanggil yang
+    memutuskan apa artinya, bukan pengecualian tersembunyi.
+    """
+    match = re.search(
+        rf"(?:public\s+)?static func {re.escape(function_name)}\("
+        r"[\s\S]{0,400}?\)\s*->\s*HazeGeometry",
+        source)
+    if match is None:
+        return None
+    signature = match.group(0)
+    values = {}
+    for name in ("centerY", "halfWidth", "halfHeight"):
+        found = re.search(
+            rf"{name}:\s*Double\s*=\s*(-?\d+(?:\.\d+)?)", signature)
+        if found is None:
+            return None
+        values[name] = float(found.group(1))
+    return values["centerY"], values["halfWidth"], values["halfHeight"]
+
+
+def read_named_parameter_from_swift(source, function_name, token_name):
+    """Baca satu parameter dari `static func <function_name>`, dipilih oleh nama token.
+
+    **Kenapa pembaca ini ada.** Port menulis sebagian geometri sebagai konstanta
+    terpisah yang mengaku berasal dari sebuah fungsi:
+
+        URANUS_BAND_CENTER_Y = 0.0      # MODEL: `uranusBand`
+
+    Nama token itu sendiri menyebut parameter mana yang dimaksud — buang
+    `URANUS_BAND_`, sisanya `CENTER_Y`, jadikan `centerY`. Tidak ada pilihan
+    yang tersisa untuk ditebak: kalau `uranusBand` punya `centerY:`, itu
+    pasangannya; kalau tidak, `None` — dan pemanggil menyatakannya di luar
+    cakupan, bukan menebak parameter lain.
+
+    Format angka ditulis apa adanya di sini dan di `read_double_constant`;
+    satu regex untuk keduanya hidup di satu tempat, jadi perubahannya tidak
+    bisa menyimpang.
+    """
+    match = re.search(
+        rf"(?:public\s+)?static func {re.escape(function_name)}\("
+        r"[\s\S]{0,400}?\)\s*(?:->\s*\w+)?\s*\{",
+        source)
+    if match is None:
+        return None
+    signature = match.group(0)
+
+    # `SPHERE_LIGHT_OFFSET` → `offset`; `URANUS_BAND_CENTER_Y` → `centerY`.
+    # Seluruh sufiks dicoba dari yang terpanjang supaya `HALF_WIDTH` tidak
+    # pernah menang atas `WIDTH` secara tidak sengaja.
+    parts = token_name.lower().split("_")
+    for start in range(len(parts)):
+        candidate = parts[start] + "".join(
+            part.capitalize() for part in parts[start + 1:])
+        if not candidate:
+            continue
+        found = re.search(
+            rf"\b{re.escape(candidate)}:\s*Double\s*=\s*(-?\d+(?:\.\d+)?)",
+            signature)
+        if found is not None:
+            return float(found.group(1))
+    return None
+
+
+def read_double_constant_from_swift(source, name):
+    """Baca satu `static let <name>: Double = <angka>` dari teks Swift.
+
+    Mengembalikan `None` bila tidak ada. Dipakai untuk konstanta yang **bukan**
+    geometri (opasitas), supaya `read_haze_geometry_from_swift` tidak ikut
+    melonggar dengan menerima bentuk yang bukan signature-nya.
+    """
+    found = re.search(
+        rf"static let {re.escape(name)}\s*:\s*Double\s*=\s*(-?\d+(?:\.\d+)?)",
+        source)
+    return None if found is None else float(found.group(1))
+
+
 def swift_sextuples(source, anchor, terminator="]"):
     """Semua `(a, b, c, d, e, f)` dari sumber Swift, mulai setelah `anchor`.
 
@@ -4877,6 +4963,272 @@ def check_planet_features_present(results, size=200, ss=2):
         "kutub Mars di kedua sisi", top is not None and bottom is not None
         and sum(top[0]) > 500 and sum(bottom[0]) > 500,
         f"utara={top[0] if top else None}, selatan={bottom[0] if bottom else None}"))
+
+
+def _port_tokens_modeled_after(port_source):
+    """Token port yang komentarnya mengaku berasal dari salah satu nama Swift.
+
+    Port ini memberi setiap konstanta geometri sebuah komentar
+    `# MODEL: CelestialVisual.<nama>`. Fungsi ini **membaca pengakuan itu**
+    untuk menemukan pasangan token-nya, alih-alih menulis daftar token dengan
+    tangan.
+
+    **Kenapa daftarnya dibaca, bukan ditulis.** Daftar tangan adalah daftar
+    yang tertinggal separuh begitu ada planet baru: penambahan `.uranus` ke
+    model akan lolos hanya karena `URANUS_BAND_*` tidak ada di dalam daftar
+    yang ditulis sebelum planet itu ada — persis kelas cacat yang berkas ini
+    ada untuk mencegah, dan persis cara `Planet.palette` dulu luput.
+
+    Yang dikembalikan: `{nama token port: nama konstanta/fungsi Swift}` untuk
+    **setiap** token yang punya pengakuan `# MODEL:` — termasuk yang namanya
+    **tidak ada** di model.
+
+    **Kenapa yang menggantung pun ikut dikembalikan.** Menyaring di sini
+    tampak rapi dan justru itu cacatnya: pengakuan yang namanya hilang dari
+    model (mis. fungsinya diganti nama) akan **menyusut dari himpunan hasil**,
+    sehingga gerbangnya tetap hijau sambil berhenti mengukur token itu.
+    Gerbang yang berhenti mengukur tanpa suara adalah gerbang yang selalu
+    hijau. Pemanggil yang memutuskan mana yang merah — di sini, yang
+    menggantung **merah**.
+    """
+    out: dict[str, str] = {}
+    for match in re.finditer(
+            r"^([A-Z][A-Z0-9_]*)\s*=\s*[^\n#]*#\s*MODEL:\s*`([^`]+)`",
+            port_source, re.M):
+        token, claimed = match.group(1), match.group(2).strip()
+        out[token] = claimed
+    return out
+
+
+def _claim_targets_celestial_visual(claim):
+    """Apakah pengakuan ini menunjuk `CelestialVisual` (bukan tipe lain)?
+
+    Port menulis pengakuan terhadap lebih dari satu tipe Swift, dan menulis
+    sebagian tanpa kualifikasi sama sekali:
+
+        BAND_COUNT = 7   # MODEL: `CelestialVisual.jupiterBands(count:)`
+        SPIKE_ROOT_WIDTH_FACTOR = 0.18   # MODEL: `StarGeometry.spikeRootWidthFactor`
+        MOON_LIMB_SHADING_STRENGTH = 0.4  # MODEL: `moonLimbShadingStrength`
+
+    Nama **tanpa titik** adalah kasus biasa, bukan kasus lain: ia ada di dalam
+    `CelestialVisual`. Yang dikecualikan hanya pengakuan yang menyebut tipe
+    lain secara eksplisit. Kalau aturannya dibalik — "hanya yang berawalan
+    `CelestialVisual.` yang dianggap milik kita" — setiap pengakuan tanpa
+    kualifikasi akan **hilang dari pemeriksaan**, dan itu justru cacat yang
+    gerbang ini ada untuk mencegah.
+    """
+    head = claim.split(".", 1)[0]
+    return "." not in claim or head == "CelestialVisual"
+
+
+def split_model_claim(claim):
+    """Pisahkan pengakuan menjadi `(nama, parameter_eksplisit)`.
+
+        `CelestialVisual.jupiterBands(count:)`      -> ("jupiterBands", "count")
+        `CelestialVisual.uranusBand`                -> ("uranusBand", None)
+        `StarGeometry.spikeRootWidthFactor`         -> ("spikeRootWidthFactor", None)
+        `CelestialVisual.jupiterBands(heightFraction:)`
+                                                    -> ("jupiterBands", "heightFraction")
+
+    Parameter yang ditulis eksplisit di komentar adalah pemetaan yang sudah
+    **dituliskan** penulis port — bukan tebakan. Kalau parameternya ada di
+    sini, tidak ada yang tersisa untuk ditebak.
+    """
+    name = claim.rsplit(".", 1)[-1]
+    param = None
+    if "(" in name and name.endswith(")"):
+        head, _, rest = name.partition("(")
+        param = rest[:-1].split(":")[0].strip() or None
+        name = head
+    return name, param
+
+
+def check_modeled_port_constants_match_the_model(results):
+    """Setiap konstanta port yang **mengaku** berasal dari model harus cocok.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.** Uranus dan
+    Neptunus ditambahkan bersama sembilan konstanta geometri di port, masing-
+    masing dengan komentar `# MODEL: CelestialVisual.<nama>` yang
+    **menjanjikan** angkanya sama dengan sumber Swift-nya. Diukur pada sumber
+    saat itu: mengganti `URANUS_BAND_HALF_HEIGHT 0.30 -> 0.55` **dan**
+    `NEPTUNE_SPOT_OPACITY 0.55 -> 0.20` membiarkan
+    `check_port_matches_swift_constants` pada jumlah merah yang sama persis
+    seperti sebelumnya — 173 pemeriksaan, nol di antaranya menyebut Uranus
+    atau Neptunus. Kelasnya sama dengan yang sudah dibayar repo ini untuk
+    kabut Venus, corona Matahari, dan indeks warna B−V: **komentar yang
+    menjanjikan kesamaan bukan gerbang**, dan di sini ia lebih menipu karena
+    namanya memuat "MODEL" di sebelahnya.
+
+    **Kenapa gerbang ini generik, bukan daftar Uranus/Neptunus.** Daftar
+    tangan hanya menjaga planet yang sudah ada saat gerbangnya ditulis —
+    planet berikutnya lolos justru karena namanya tidak ada di daftar. Yang
+    dibaca di sini karena itu **pengakuan port itu sendiri**: setiap token
+    `UPPER_CASE = … # MODEL: CelestialVisual.<nama>` dicari pasangannya di
+    model, lalu angkanya dibandingkan. Menambah planet baru otomatis ikut
+    terjaga; menghapus komentarnya membuat token itu **hilang dari
+    pemeriksaan**, dan itu dinyatakan di sini sebagai batas — bukan disangka
+    tertutup, karena gerbang yang diam-diam berhenti mengukur adalah gerbang
+    yang selalu hijau.
+
+    **Kenapa arahnya "port == model", bukan "angkanya benar".** Angka-angka
+    itu keputusan tampilan (seberapa samar sabuk Uranus boleh terlihat), bukan
+    hasil pengukuran astronomis. Yang bisa salah tanpa terlihat adalah **dua
+    bahasa yang berbeda pendapat**: view menggambar sabuk setinggi 0.30 R di
+    jam, sementara PNG yang diukur seluruh gerbang gambar repo ini
+    menggambarnya 0.55 R.
+
+    **Yang TIDAK diklaim.** Gerbang ini hanya melihat konstanta yang
+    **berkomentar `# MODEL:`**. Angka port yang tidak mengaku berasal dari
+    mana pun tidak tersentuh — itu memang di luar jangkauannya, dan dinyatakan
+    di sini alih-alih disangka tertutup. Ia juga tidak membaca piksel app
+    Apple.
+    """
+    model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                             "CelestialVisual.swift")).read()
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+
+    # Nama yang boleh diklaim: setiap `static func`/`static let` di model.
+    # Dibaca dari model, bukan ditulis: fungsi yang lahir besok ikut terjaga.
+    swift_names = set(re.findall(
+        r"static (?:func|let)\s+(\w+)", model))
+
+    pairs = _port_tokens_modeled_after(port_source)
+    if not pairs:
+        results.append(Result(
+            "konstanta port yang mengaku dari model terbaca", False,
+            "tidak ada token '# MODEL: CelestialVisual.<nama>' yang cocok "
+            "dengan static func/let mana pun di model — pembacanya perlu "
+            "diselaraskan, atau modelnya berubah bentuk"))
+        return
+
+    # Token yang pengakuannya tidak bisa dipetakan tanpa menebak (bentuk
+    # ke-3). Dikumpulkan supaya batasnya **dinyatakan sekali**, bukan
+    # disangka tertutup.
+    unmatched: list[str] = []
+
+    for token, claim in sorted(pairs.items()):
+        port_value = getattr(R, token, None)
+        if port_value is None:
+            results.append(Result(
+                f"model→port: {token} ada di port", False,
+                f"komentar menyebut '{claim}' tetapi '{token}' tidak "
+                f"terbaca sebagai konstanta di port"))
+            continue
+
+        # Pengakuan ke tipe Swift **lain** (`StarGeometry.…`) di luar
+        # jangkauan gerbang ini: ia punya sumbernya sendiri, dan
+        # memperlakukannya sebagai menggantung akan merah pada kode yang
+        # benar. Dinyatakan sebagai batas.
+        if not _claim_targets_celestial_visual(claim):
+            unmatched.append(token)
+            continue
+
+        swift_name, explicit_param = split_model_claim(claim)
+
+        # Pengakuan yang namanya **tidak ada** di model adalah cacat, bukan
+        # batas: token itu tetap digambar port dari angka yang tidak lagi
+        # punya sumber. Diperiksa lebih dulu supaya berlaku untuk **semua**
+        # bentuk, bukan hanya yang jatuh ke cabang terakhir.
+        if swift_name not in swift_names:
+            results.append(Result(
+                f"model→port: pengakuan {token} punya sumber", False,
+                f"komentar menyebut '{claim}', tetapi '{swift_name}' tidak ada "
+                f"sebagai static func/let di CelestialVisual.swift — "
+                f"pengakuannya menggantung"))
+            continue
+
+        # Dua bentuk yang **tidak ambigu** — dan hanya itu yang dibandingkan:
+        #
+        #   1. token ↔ `static let <nama>: Double = <angka>` di model.
+        #      Satu nama, satu angka.
+        #   2. token fungsi ↔ **seluruh** parameter sebuah fungsi yang
+        #      mengembalikan `HazeGeometry`, dalam urutan deklarasinya.
+        #      Tiga nama, tiga angka, urutannya tertulis di model.
+        #
+        # Bentuk lain **sengaja tidak ditebak**, dan itu dinyatakan sebagai
+        # batas di bawah, bukan ditutup-tutupi. Contoh yang nyata di berkas
+        # ini: `CRATER_RIM_STRENGTH` mengaku berasal dari `craterRelief`, yang
+        # menerimanya sebagai parameter `strength:` **ketiga** dari empat, dan
+        # `SPOT_CENTER` adalah *dua* parameter `jupiterSpot` yang dipakai
+        # bersama sebagai tupel. Menebak pemetaannya menghasilkan gerbang yang
+        # merah pada kode yang benar — dan gerbang yang merah pada kode benar
+        # akan dimatikan orang.
+        model_value = read_double_constant_from_swift(model, swift_name)
+        if model_value is not None:
+            model_values = [model_value]
+        elif getattr(R, token, None) is not None and callable(getattr(R, token, None)):
+            model_values = read_haze_geometry_from_swift(model, swift_name)
+            if model_values is None:
+                continue  # bentuk di luar dua di atas: dilaporkan sekali di bawah
+            model_values = list(model_values)
+        else:
+            # Bentuk ke-3, satu-satunya yang masih bisa dipetakan **tanpa
+            # menebak**: parameter yang dipilih salah satu dari —
+            #
+            #   a. nama yang **ditulis eksplisit** di komentar port
+            #      (`…# MODEL: `CelestialVisual.jupiterBands(count:)``),
+            #   b. sufiks nama tokennya sendiri
+            #      (`URANUS_BAND_CENTER_Y` → `uranusBand(centerY:)`).
+            #
+            # Keduanya pemetaan yang sudah tertulis; tidak ada yang tersisa
+            # untuk ditebak. Yang pertama diutamakan karena penulis port-lah
+            # yang menuliskannya.
+            matched_param = (
+                read_named_parameter_from_swift(model, swift_name, explicit_param)
+                if explicit_param is not None
+                else None)
+            if matched_param is None:
+                matched_param = read_named_parameter_from_swift(model, swift_name, token)
+            if matched_param is None:
+                # Fungsinya **ada** (sudah dipastikan di atas), tetapi tidak
+                # punya parameter yang namanya disebut token ini → bentuk di
+                # luar cakupan. Dinyatakan sebagai batas; menebak di sini akan
+                # merah pada kode yang benar.
+                unmatched.append(token)
+                continue
+            model_values = [matched_param]
+
+        port_values = list(port_value) if callable(port_value) else \
+            list(port_value) if isinstance(port_value, (list, tuple)) else \
+            [port_value]
+        if len(port_values) != len(model_values):
+            results.append(Result(
+                f"model→port: {token} jumlah angka sama", False,
+                f"port punya {len(port_values)} angka "
+                f"({port_values}), model {len(model_values)} "
+                f"({model_values})"))
+            continue
+        for index, (p, m) in enumerate(zip(port_values, model_values)):
+            results.append(Result(
+                f"model→port: {token}[{index}] == model",
+                abs(p - m) < 1e-9,
+                f"port={p}, model={m} ({swift_name})"))
+
+    # Ciri pengenal: kata yang sama di kedua sisi. `Planet.palette` yang
+    # memutuskan ciri mana yang digambar, jadi angka yang cocok dengan nama
+    # ciri yang berbeda tetap menggambar planet yang berbeda.
+    for name, (_, _, port_feature) in read_planet_palettes_from_swift(model).items():
+        port_entry = R.PLANET_PALETTE.get(name)
+        if port_entry is None:
+            continue  # sudah dilaporkan gerbang drift palet
+        results.append(Result(
+            f"model→port: ciri {name} sama",
+            port_entry.get("feature") == port_feature,
+            f"port={port_entry.get('feature')}, model={port_feature}"))
+
+    # Batas yang **dinyatakan**, bukan disangka tertutup: token yang
+    # pengakuannya menunjuk sebuah **fungsi** sementara token-nya sendiri
+    # bernilai skalar atau tupel. Memetakannya menuntut menebak parameter mana
+    # (dan berapa) yang dimaksud; gerbang yang menebak akan merah pada kode
+    # yang benar. Hasilnya **selalu hijau** — ia ada supaya daftarnya bisa
+    # dibaca, bukan supaya ia bisa gagal.
+    results.append(Result(
+        "model→port: batas (pengakuan ke fungsi tak terpetakan)",
+        True,
+        f"{len(unmatched)} token di luar cakupan gerbang ini "
+        f"({', '.join(unmatched) if unmatched else 'tidak ada'}) — "
+        f"pengakuannya menunjuk fungsi yang parameternya tidak bisa dipetakan "
+        f"tanpa menebak"))
 
 
 def check_inner_planet_phase(results, size=200, ss=2):
@@ -12155,6 +12507,7 @@ def main():
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
+    check_modeled_port_constants_match_the_model(results)
     check_inner_planet_phase(results, args.size, args.ss)
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
     check_waning_gibbous_lit_side(results, args.size, args.ss)
