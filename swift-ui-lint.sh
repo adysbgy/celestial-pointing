@@ -3408,9 +3408,58 @@ def decl_params(inside):
 
 
 DECL = re.compile(r"\b(?:struct|enum|class|actor)\s+([A-Za-z_][A-Za-z0-9_]*)")
-INIT = re.compile(r"\b(?:convenience |required |override )*init\s*(\?|\!)?\s*\(")
+# `extension CelestialVisual.Planet { … }` — nama berkualifikasi, tanpa protokol.
+EXT = re.compile(r"\bextension\s+([A-Za-z_][A-Za-z0-9_.]*)")
+# `(?<![.\w])` menolak **inisialisasi anggota** `.init(red:…)` / `self.init(…)`.
+# Bentuk itu adalah pemanggilan, bukan deklarasi: ia hidup di dalam badan tipe
+# dan tidak menambah satu pun label yang sah. Tanpa penolakan ini, setiap
+# `.init(light: .init(red:…))` di dalam `extension CelestialVisual.Planet`
+# tercatat sebagai deklarasi milik `CelestialVisual.Planet`, sehingga tabelnya
+# berisi tanda tangan palsu `(light:, dark:, feature:)` dan pesan galatnya
+# menuduh label yang tidak pernah ditulis pemanggil — gerbang yang benar tapi
+# menyesatkan tetap gerbang yang dimatikan orang.
+INIT = re.compile(
+    r"(?<![.\w])(?:convenience |required |override )*init\s*(\?|\!)?\s*\(")
 
 inits = collections.defaultdict(list)
+# ── Tipe BERSARANG: `CelestialVisual.RGBComponents(…)` ─────────────────────
+#
+# Kenapa indeks kedua ini ada.
+#
+# `DECL` di atas mencari nama tipe **sederhana** (`struct RGBComponents`), jadi
+# kuncinya `RGBComponents` — dan pemanggilan yang dicocokkannya karena itu
+# hanya yang **tidak berkualifikasi**. Bentuk yang repo ini benar-benar tulis
+# adalah bentuk berkualifikasi, karena `CelestialVisual` adalah tipe bersarang
+# di paket:
+#
+#     Apps/Shared/CelestialVisualView.swift:1238
+#         CelestialVisual.RGBComponents(red: 1, green: 1, blue: 1)
+#     Apps/Shared/PointingEngine.swift:585
+#         CelestialVisual.Planet(objectID: object.id)
+#
+# Terukur (probe, 14 Okt 2026): mengganti `objectID:` menjadi `objectId:` di
+# baris 585, dan **membuang `blue:`** di baris 1238, membiarkan seluruh 35
+# aturan `swift-ui-lint.sh` hijau (exit 0). Keduanya hanya ketahuan dari CI
+# macOS — dan `objectId:` bukan galat yang *mungkin* lolos, ia galat kompilasi
+# yang **pasti**, persis yang aturan ini ada untuk menangkapnya satu siklus
+# (~2 menit CI, ditambah satu push) lebih awal.
+#
+# Kenapa ini **tambahan**, bukan penggantian.
+#
+# Membuat `DECL` sadar-kurung dan menyimpan nama berkualifikasi saja akan
+# **menghapus** kunci `Planet`, `Blob`, `Core`, `Decision`, dan `RecordRefusal`
+# dari himpunan: kelimanya dideklarasikan di dalam tipe lain, dan pemanggilan
+# tak-berkualifikasinya sekarang dijaga lewat kunci sederhana itu. Gerbang yang
+# menyempit tanpa suara adalah gerbang yang selalu hijau, jadi kunci
+# berkualifikasi ditambahkan **di samping** kunci sederhana, bukan menggantinya.
+#
+# Batas yang dinyatakan: `extension` **diikuti**, tetapi hanya namanya —
+# `extension CelestialVisual.Planet { … }` menumpuk `CelestialVisual.Planet`,
+# sehingga `init?(objectID:)` yang hidup di dalamnya teratribusi ke tipe yang
+# benar. Tanpa itu, `inits["Planet"]` hanya memuat `init(kind:…)` dan
+# `Planet(objectID:)` yang **sah** dilaporkan sebagai label yang salah — gerbang
+# merah pada kode benar, yang membuatnya dimatikan orang. `extension Foo: Bar`
+# aman: yang ditangkap namanya, bukan protokolnya.
 for root, _, files in os.walk(PKG):
     if ".build" in root:
         continue
@@ -3431,6 +3480,41 @@ for root, _, files in os.walk(PKG):
                 inits[owner].append(
                     (decl_params(balanced(text, m.end() - 1)), path))
 
+        # Nama berkualifikasi untuk `init` yang sama: tumpukan tipe sadar-kurung.
+        events = [(m.start(), "decl", m.group(1)) for m in DECL.finditer(text)]
+        events += [(m.start(), "ext", m.group(1)) for m in EXT.finditer(text)]
+        events += [(m.start(), "brace", m.group(0))
+                   for m in re.finditer(r"[{}]", text)]
+        events += [(m.start(), "init", m) for m in INIT.finditer(text)]
+        events.sort(key=lambda e: (e[0], 0 if e[1] in ("decl", "ext") else 1))
+        depth, stack = 0, []
+        for pos, kind, payload in events:
+            if kind == "brace":
+                if payload == "{":
+                    depth += 1
+                else:
+                    depth -= 1
+                    while stack and depth < stack[-1][1]:
+                        stack.pop()
+                continue
+            if kind in ("decl", "ext"):
+                if kind == "ext":
+                    # Sudah berkualifikasi sendiri (`CelestialVisual.Planet`).
+                    qual = payload if "." in payload else (
+                        f"{stack[-1][0]}.{payload}" if stack else payload)
+                else:
+                    prefix = stack[-1][0] if stack else ""
+                    qual = f"{prefix}.{payload}" if prefix else payload
+                j = pos + len(payload)
+                while j < len(text) and text[j] not in "{;=\n":
+                    j += 1
+                if j < len(text) and text[j] == "{":
+                    stack.append((qual, depth + 1))
+                continue
+            if stack and "." in stack[-1][0]:
+                inits[stack[-1][0]].append(
+                    (decl_params(balanced(text, payload.end() - 1)), path))
+
 
 def matches(given, decl):
     if len(given) > len(decl):
@@ -3442,6 +3526,29 @@ def matches(given, decl):
 
 
 CALL = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\s*\(")
+# Pemanggilan **berkualifikasi**: `CelestialVisual.RGBComponents(…)`.
+# Awalan negatif hanya menolak `a.b.Call(` bertingkat-tiga; satu titik adalah
+# bentuk yang dipakai repo ini, dan yang `CALL` di atas tidak pernah lihat.
+QUALIFIED_CALL = re.compile(
+    r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)+)\s*\(")
+
+
+def resolve_qualified(full, table):
+    """Cari `full` di `table` lewat sufiks terpanjang yang cocok.
+
+    `CelestialVisual.RGBComponents` dicoba apa adanya lebih dulu; kalau tidak
+    ada, `RGBComponents` dicoba. Urutan itu penting: mencoba sufiks terpendek
+    lebih dulu akan mencocokkan tipe bersarang yang **berbeda** dengan nama
+    yang kebetulan sama.
+    """
+    parts = full.split(".")
+    for k in range(len(parts)):
+        cand = ".".join(parts[k:])
+        if cand in table:
+            return cand
+    return None
+
+
 problems = []
 for root, _, files in os.walk(APPS):
     for name in sorted(files):
@@ -3449,9 +3556,11 @@ for root, _, files in os.walk(APPS):
             continue
         path = os.path.join(root, name)
         text = strip(open(path, encoding="utf-8").read())
-        for m in CALL.finditer(text):
-            t = m.group(1)
-            if t not in inits:
+        calls = [(m, m.group(1)) for m in CALL.finditer(text)]
+        calls += [(m, resolve_qualified(m.group(1), inits))
+                  for m in QUALIFIED_CALL.finditer(text)]
+        for m, t in calls:
+            if t is None or t not in inits:
                 continue
             given = call_params(balanced(text, m.end() - 1))
             # Tanpa label tidak ada yang bisa dijamin tanpa menebak urutan —

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Buktikan enam gerbang sapu UI **berbunyi pada hal yang mereka klaim**.
+"""Buktikan tujuh gerbang sapu UI **berbunyi pada hal yang mereka klaim**.
 
 Kenapa berkas ini ada.
 
@@ -10,8 +10,8 @@ Dua puluh dua aturan sisanya tidak punya satu pun rekam jejak bahwa ia bisa
 keluar merah — dan gerbang yang tidak pernah diukur merah persis sama dengan
 gerbang yang tidak mengukur apa pun.
 
-Siklus ini menutup enam di antaranya, yang semuanya punya situs suntik nyata di
-`Apps/` dan kegagalan yang terlihat pengguna:
+Siklus ini menutup tujuh di antaranya, yang semuanya punya situs suntik nyata
+di `Apps/` dan kegagalan yang terlihat pengguna:
 
   - Aturan 4  — teks UI literal tanpa entri katalog (Bahasa Inggris diam)
   - Aturan 9  — WidgetKit tanpa pemanggil reload (complication membeku)
@@ -19,6 +19,12 @@ Siklus ini menutup enam di antaranya, yang semuanya punya situs suntik nyata di
   - Aturan 14 — izin sistem tanpa terjemahan InfoPlist.strings
   - Aturan 22 — judul baris memakai kunci nilainya (tampil "Gelap: Gelap")
   - Aturan 25 — CelestialVisual.X yang bukan anggota (build merah di macOS)
+  - Aturan 27 — label salah pada `TipePaket(Label:)` **berkualifikasi**, bentuk
+                yang repo ini benar-benar tulis (`CelestialVisual.RGBComponents`).
+                Sebelum siklus ini ia hanya melihat bentuk tak-berkualifikasi,
+                sehingga `objectID:` -> `objectId:` di
+                `Apps/Shared/PointingEngine.swift` lolos seluruh 35 aturan
+                dengan exit 0 — padahal itu galat kompilasi yang pasti.
 
 Yang diukur tiap keadaan: cacat yang diklaim disuntik, aturan **dinamai**
 benar-benar melaporkan temuan (bukan aturan lain yang kebetulan berbunyi),
@@ -324,6 +330,93 @@ def check_rule_25(failures: list[str]) -> None:
         shutil.rmtree(workdir, ignore_errors=True)
 
 
+# ── Aturan 27: label argumen `TipePaket(Label:)` — bentuk BERKUALIFIKASI ────
+#
+# Kenapa keadaan ini ada, dan kenapa dua cacat sekaligus.
+#
+# Bentuk yang repo ini benar-benar tulis adalah bentuk **berkualifikasi**
+# (`CelestialVisual.RGBComponents(…)`), karena `CelestialVisual` adalah tipe
+# bersarang di paket. Versi Aturan 27 sebelum siklus ini hanya mencocokkan
+# pemanggilan tak-berkualifikasi, jadi dua cacat nyata lolos seluruh 35 aturan
+# dengan exit 0:
+#
+#   - `Apps/Shared/PointingEngine.swift` — `objectID:` menjadi `objectId:`
+#   - `Apps/Shared/CelestialVisualView.swift` — `blue:` dibuang
+#
+# Keduanya bukan galat yang *mungkin* lolos kompilasi; keduanya galat
+# kompilasi yang **pasti**. Yang pertama adalah yang paling mahal: ia menahan
+# CI macOS penuh (~4 menit) ditambah satu push untuk kesalahan yang bisa
+# ditangkap dalam 10 detik.
+#
+# Dua cacat diuji, bukan satu, karena keduanya menempuh jalur berbeda di dalam
+# aturan: yang pertama adalah `init` yang hidup di dalam `extension`, yang
+# kedua adalah `init` tipe bersarang biasa. Perbaikan yang hanya menangani satu
+# di antaranya akan lulus kalau harness ini hanya memeriksa satu.
+#
+# Kontrol negatifnya dua lapis: kode benar harus diam (menangkap perbaikan yang
+# terlalu longgar), dan cacat yang sama ditulis **tanpa kualifikasi**
+# (`RGBComponents(red: 1, green: 1)`) harus tetap merah — kalau tidak, perbaikan
+# ini bisa saja menyempitkan gerbang tanpa suara, dan gerbang yang menyempit
+# selalu hijau.
+R27_ENGINE = "Apps/Shared/PointingEngine.swift"
+R27_ENGINE_ANCHOR = "CelestialVisual.Planet(objectID: object.id)"
+R27_ENGINE_DEFECT = "CelestialVisual.Planet(objectId: object.id)"
+
+R27_VIEW = "Apps/Shared/CelestialVisualView.swift"
+R27_VIEW_ANCHOR = "CelestialVisual.RGBComponents(red: 1, green: 1, blue: 1)"
+R27_VIEW_DEFECT = "CelestialVisual.RGBComponents(red: 1, green: 1)"
+R27_VIEW_UNQUALIFIED = "RGBComponents(red: 1, green: 1)"
+
+
+def check_rule_27(failures: list[str]) -> None:
+    """Label salah pada pemanggilan berkualifikasi harus berbunyi."""
+    workdir = copy_repo()
+    engine = os.path.join(workdir, R27_ENGINE)
+    view = os.path.join(workdir, R27_VIEW)
+    try:
+        engine_clean = open(engine, encoding="utf-8").read()
+        view_clean = open(view, encoding="utf-8").read()
+        for path, anchor in ((R27_ENGINE, R27_ENGINE_ANCHOR),
+                             (R27_VIEW, R27_VIEW_ANCHOR)):
+            if anchor not in open(os.path.join(workdir, path),
+                                  encoding="utf-8").read():
+                failures.append(
+                    f"  Aturan 27: jangkar `{anchor}` hilang di {path} — "
+                    "harness perlu disesuaikan, bukan aturannya")
+                return
+
+        _, out = run_lint(workdir)
+        expect("27", "kode benar (harus diam)",
+               bool(finding(out, "27")), False, failures)
+
+        # Cacat 1: label salah pada init di dalam `extension`.
+        open(engine, "w", encoding="utf-8").write(
+            engine_clean.replace(R27_ENGINE_ANCHOR, R27_ENGINE_DEFECT, 1))
+        _, out = run_lint(workdir)
+        expect("27", "objectID: -> objectId: (harus merah)",
+               fired_on(out, "27", "objectId"), True, failures)
+        open(engine, "w", encoding="utf-8").write(engine_clean)
+
+        # Cacat 2: label sah dibuang pada tipe bersarang biasa.
+        open(view, "w", encoding="utf-8").write(
+            view_clean.replace(R27_VIEW_ANCHOR, R27_VIEW_DEFECT, 1))
+        _, out = run_lint(workdir)
+        expect("27", "blue: dibuang (harus merah)",
+               fired_on(out, "27", "RGBComponents(red:, green:)"),
+               True, failures)
+        open(view, "w", encoding="utf-8").write(view_clean)
+
+        # Non-vakum: jalur LAMA tak-berkualifikasi harus tetap berbunyi.
+        open(view, "w", encoding="utf-8").write(
+            view_clean.replace(R27_VIEW_ANCHOR, R27_VIEW_UNQUALIFIED, 1))
+        _, out = run_lint(workdir)
+        expect("27", "jalur lama tak-berkualifikasi (harus tetap merah)",
+               fired_on(out, "27", "RGBComponents(red:, green:)"),
+               True, failures)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 def main() -> int:
     require_clean()
     failures: list[str] = []
@@ -333,12 +426,13 @@ def main() -> int:
     check_rule_14(failures)
     check_rule_22(failures)
     check_rule_25(failures)
+    check_rule_27(failures)
     if failures:
         print("GERBANG GAGAL: ada keadaan yang tidak sesuai harapan.")
         print("\n".join(failures))
         return 1
-    print("Bersih: Aturan 4, 9, 10, 14, 22, 25 masing-masing berbunyi pada "
-          "cacat yang diklaimnya (dan diam pada kode yang benar).")
+    print("Bersih: Aturan 4, 9, 10, 14, 22, 25, 27 masing-masing berbunyi "
+          "pada cacat yang diklaimnya (dan diam pada kode yang benar).")
     return 0
 
 
