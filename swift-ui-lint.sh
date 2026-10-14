@@ -2539,12 +2539,31 @@ fi
 # sebenarnya benar. Dua nama itu teruji di Linux
 # (`PointingPresentationTests`), jadi aturannya tidak bergantung pada daftar
 # keluarga lokal yang bisa basi.
+#
+# **Batas cabangnya adalah `switch`-nya, bukan akhir berkas.** Dulu cabang
+# terakhir dibatasi `len(code)`, sehingga ia memuat sisa berkas — termasuk
+# `switch family` kedua di `fallback`, yang tidak memuat `digest.headline`
+# sama sekali. Akibatnya sebuah pelanggaran di cabang `default` dilaporkan
+# sebagai pelanggaran `case .accessoryRectangular`: cabang yang disalahkan
+# bukan cabang yang salah. Itu kelas cacat yang paling merusak kepercayaan
+# pada gerbang — ia berbunyi, tapi menunjuk ke tempat yang tidak bersalah —
+# dan hanya ketahuan setelah harness menuntut **nama cabang yang dimutasi**
+# (`Tools/bukti-mutasi-penanda-complication.py`, keadaan 2).
+#
+# Penanda berhentinya: kurung kurawal penutup pada indentasi **lebih rendah**
+# daripada label cabangnya, atau akhir berkas bila tidak ketemu.
 echo
 echo "== Aturan 23: setiap cabang complication memakai kanal ikon =="
 inline_claim=$(python3 - <<'PY' 2>&1
 import os, re
 
-BRANCH = re.compile(r"^\s*(case\s+\.accessory\w+|default)\s*:", re.M)
+BRANCH = re.compile(r"^(\s*)(case\s+\.accessory\w+|default)\s*:", re.M)
+
+def branch_end(code, start, indent):
+    """Berhenti di `}` yang menutup `switch`, bukan di akhir berkas."""
+    close = re.compile(r"^" + indent + r"\}", re.M)
+    m = close.search(code, start)
+    return m.start() if m else len(code)
 
 problems = []
 for root, _, files in os.walk("Apps"):
@@ -2559,7 +2578,11 @@ for root, _, files in os.walk("Apps"):
             continue
         marks = list(BRANCH.finditer(code))
         for idx, m in enumerate(marks):
-            end = marks[idx + 1].start() if idx + 1 < len(marks) else len(code)
+            end = branch_end(code, m.end(), m.group(1))
+            nxt = marks[idx + 1].start() if idx + 1 < len(marks) else end + 1
+            # Ambil yang lebih dulu: label cabang berikutnya, atau penutup
+            # `switch`. Mana pun yang lebih dekat, cabangnya berhenti di situ.
+            end = min(end, nxt if idx + 1 < len(marks) else end)
             branch = code[m.end():end]
             if "digest.headline" not in branch:
                 continue
@@ -2567,7 +2590,7 @@ for root, _, files in os.walk("Apps"):
                 continue
             line_no = code[:m.start()].count("\n") + 1
             problems.append(
-                f"  {path}:{line_no}: cabang `{m.group(1)}` menampilkan "
+                f"  {path}:{line_no}: cabang `{m.group(2)}` menampilkan "
                 f"`digest.headline` tanpa `presentedSymbolName` — "
                 f"keraguan tidak terlihat")
 
