@@ -1012,6 +1012,33 @@ jobs:
       - name: Buktikan enam aturan sapu UI berbunyi pada hal yang diklaim
         run: python3 Tools/bukti-mutasi-aturan-ui.py
 
+      # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah
+      # merah di mana pun**.
+      #
+      # Aturan 30 mengawal rantai: `Packages/` mendeklarasikan kunci
+      # `NS*UsageDescription`, `project.yml` harus memuat padanannya
+      # `INFOPLIST_KEY_*`, iOS membacanya, pengguna melihat dialog. Putus di
+      # tengah dan `swiftc` diam, `swift test` di Linux hanya melihat ujung
+      # yang mendeklarasi (bukan yang memakai), dan CI macOS hanya gagal pada
+      # *warning*. Yang terjadi: iOS menolak akses tanpa peringatan — fitur
+      # mati di tangan pengguna, hijau di mana-mana. Rantai ini juga yang
+      # membuat Aturan 14 tidak bisa melihat cacatnya sendiri: himpunan
+      # terjemahan Aturan 14 diambil dari `project.yml`, jadi kunci yang tidak
+      # pernah sampai ke sana tidak punya terjemahan untuk diperiksa.
+      #
+      # Tiga keadaan, dan keadaan ketiga yang membuat dua pertama berarti:
+      # kode benar harus diam, kunci yang dihapus harus berbunyi **menyebut
+      # kuncinya**, dan deklarasi yang dihapus harus diam. Tanpa yang ketiga,
+      # aturan yang memerah pada setiap keadaan lulus yang kedua. Yang ketiga
+      # juga memisahkan dua kegagalan yang dari luar identik: himpunan
+      # pencarian yang kosong (PERINGATAN) versus kepatuhan yang hilang
+      # (temuan) — keduanya membuat `declared` tidak kosong.
+      #
+      # Non-vakuositasnya terukur: dengan program Aturan 30 dilumpuhkan,
+      # harness ini merah pada keadaan kepatuhan saja.
+      - name: Buktikan Aturan 30 berbunyi pada kunci izin yang hilang
+        run: python3 Tools/bukti-mutasi-kunci-izin.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
