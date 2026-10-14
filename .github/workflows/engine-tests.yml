@@ -1150,6 +1150,28 @@ jobs:
       - name: Buktikan Aturan 11 berbunyi pada specifier katalog yang tidak cocok
         run: python3 Tools/bukti-mutasi-specifier.py
 
+      # Dan bukti bahwa Aturan 19 (kunci katalog yatim) berbunyi pada **tiga
+      # bentuk** kematian kunci, bukan satu.
+      #
+      # Versi lamanya mencari nama kunci sebagai potongan teks di seluruh
+      # `.swift`, dan tiga kunci mati di katalog ini lolos dari tiga cara yang
+      # berbeda: `'%lld gagal'` hidup dari teks bawaan (`id:`) kunci lain;
+      # `'GoTo'` hidup dari komentar yang mendokumentasikan penghapusannya
+      # sendiri; `'sisa'` hidup dari berkas uji yang justru menjaga keputusan
+      # untuk tidak memakainya. Ketiganya dihapus, dan gerbangnya diperketat
+      # pada dua sumbu — literal berkutip, komentar dikosongkan, berkas uji
+      # dikeluarkan.
+      #
+      # Tiap sumbu menutup tepat satu bentuk, dan itu yang dibuktikan: dengan
+      # pengetatan dikembalikan ke bentuk lama di worktree terpisah, harness ini
+      # merah **persis pada keadaan 2, 3, dan 4** dan tetap hijau pada sisanya.
+      # Tiga keadaan kontrol negatif (rujukan lewat `id:`, `key:`, dan
+      # `Text("…")`) menahan arah sebaliknya: aturan yang memerah pada setiap
+      # kunci yang dirujuk lewat `id:` akan lulus ketiga keadaan cacat dengan
+      # sempurna, dan melaporkan setiap rujukan yang sah sebagai yatim.
+      - name: Buktikan Aturan 19 berbunyi pada tiga bentuk kunci yatim
+        run: python3 Tools/bukti-mutasi-kunci-yatim.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
