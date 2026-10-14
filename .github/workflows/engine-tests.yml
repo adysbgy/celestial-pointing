@@ -973,6 +973,45 @@ jobs:
       - name: Buktikan Aturan 18 & red-lint.sh berbunyi pada hal yang diklaim
         run: python3 Tools/bukti-mutasi-aturan18-redlint.py
 
+      # Dan bukti untuk enam aturan sapu yang **belum punya rekam jejak**
+      # bahwa ia bisa keluar merah.
+      #
+      # Terukur: dari 35 aturan di `swift-ui-lint.sh`, hanya 13 yang punya
+      # pembuktian (langkah `red-lint.sh` di atas, atau harness khusus). Dua
+      # puluh dua sisanya hijau sejak hari ditulis -- dan di repo ini "hijau
+      # sejak hari ditulis" sudah berkali-kali berarti "tidak mengukur apa
+      # pun". Enam di antaranya dipilih siklus ini karena kegagalannya
+      # terlihat pengguna, dan masing-masing punya situs suntik nyata:
+      #
+      #   Aturan 4  teks UI literal tanpa kunci katalog -- pengguna Bahasa
+      #             Inggris membaca Bahasa Indonesia, diam-diam.
+      #   Aturan 9  WidgetKit tanpa pemanggil reload -- complication membeku
+      #             di objek pertama selamanya, dan tidak ada yang tahu karena
+      #             complication hanya ada di perangkat.
+      #   Aturan 10 angka uji di README menyimpang dari suite -- janji ke
+      #             pembaca yang membusuk tanpa satu gerbang pun berbunyi.
+      #   Aturan 14 izin sistem tanpa terjemahan InfoPlist.strings -- dialog
+      #             izin berbahasa Indonesia untuk semua pengguna.
+      #   Aturan 22 judul baris memakai kunci nilainya -- barisnya terbaca
+      #             "Gelap: Gelap" dan tidak pernah menyebut apa yang diukur.
+      #   Aturan 25 `CelestialVisual.X` yang bukan anggota -- build merah di
+      #             macOS, satu siklus penuh terlambat.
+      #
+      # Harness ini menyuntik di atas **salinan** pohon (bukan memutasi sumber
+      # produksi), dan menuntut dua arah per aturan: cacatnya berbunyi, kode
+      # yang benar diam. Tanpa arah kedua, gerbang yang memerah pada segala
+      # sesuatu akan lulus -- dan gerbang yang memerah pada kode benar akan
+      # dimatikan orang.
+      #
+      # Dua cacat harness ditemukan saat menulisnya, keduanya lewat mengukur:
+      # (1) ia menjalankan `swift-ui-lint.sh` repo dengan `cwd` salinan, padahal
+      # skripnya `cd "$(dirname "$0")"` -- jadi ia selalu memeriksa repo
+      # sungguhan dan melaporkan seluruh keadaan hijau; (2) salinannya mula-mula
+      # hanya `Apps/`, sehingga aturan yang membaca `Packages/`, `project.yml`,
+      # atau `Tools/` semuanya berbunyi dan menenggelamkan tanda yang dicari.
+      - name: Buktikan enam aturan sapu UI berbunyi pada hal yang diklaim
+        run: python3 Tools/bukti-mutasi-aturan-ui.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
