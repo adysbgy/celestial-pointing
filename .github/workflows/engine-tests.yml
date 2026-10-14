@@ -955,6 +955,32 @@ jobs:
       - name: Buktikan gerbang fakta-vs-literal Aturan 35 berbunyi
         run: python3 Tools/bukti-mutasi-fakta-literal.py
 
+      # Aturan 3 (aksara non-Latin) sudah punya saksi satu arah sejak lama:
+      # langkah `./red-lint.sh … 'Aturan 3'` di atas membuktikan ia berbunyi
+      # pada satu huruf Arab di sebuah `.swift` di `Apps/`. Yang tidak
+      # diukur siapa pun adalah **cakupan berkasnya** -- dan itu lubang yang
+      # lebih besar: 74 berkas `.py` di `Tools/` dan 2 berkas `.yml` di
+      # `.github/workflows/` tidak pernah dipindai satu kali pun (cakupan
+      # 168 -> 245 berkas sesudah diperluas). Di sanalah prosa Indonesia repo
+      # ini paling padat, dan huruf Arab yang dulu benar-benar menyelinap
+      # masuk ke `swift-ui-lint.sh` datang lewat **komentar**, yaitu bentuk
+      # yang persis sama.
+      #
+      # Tujuh keadaan x dua cakupan: keadaan 2 dan 3 wajib hijau pada cakupan
+      # LAMA dan merah pada cakupan baru, sehingga perluasan cakupannya
+      # terbukti yang menutupnya. Empat kontrol negatif menyatakan batasnya
+      # (Yunani yang dipakai sebagai simbol matematis, tanda baca non-ASCII,
+      # dan `.md` yang mengutip aksara sebagai bukti cacat).
+      #
+      # Catatan metode, karena ia sendiri menemukan cacat: sapuan "aturan mana
+      # yang nirsaksi" yang menyilangkan `Aturan N` di `swift-ui-lint.sh`
+      # dengan berkas `bukti-mutasi-*.py` **menjatuhkan** Aturan 3 diam-diam
+      # -- saksi berbentuk langkah `red-lint.sh` tidak hidup di berkas mana
+      # pun di direktori itu. Aturan 2, 26, 28, dan 29 tetap terukur nirsaksi
+      # sesudah metode itu diperbaiki.
+      - name: Buktikan Aturan 3 berbunyi pada aksara terselip
+        run: python3 Tools/bukti-mutasi-aturan3-aksara.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

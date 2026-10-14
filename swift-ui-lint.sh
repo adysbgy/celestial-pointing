@@ -226,14 +226,52 @@ echo "== Aturan 3: tidak ada huruf non-Latin (selain Yunani) di kode =="
 # tanda baca non-ASCII tidak ditandai, karena komentar repo ini memang
 # memakai `─ ▸ ° × ≥ •` sebagai tata letak. Dan `.build/` dilewati: ia hasil
 # build (termasuk salinan pustaka pihak ketiga), bukan sumber repo ini.
+#
+# **Cakupan berkasnya sendiri adalah lubang kedua, dan ia lebih besar dari
+# yang pertama.** Versi sebelumnya memindai `*.swift`, `*.sh`, `*.yml`, dan
+# `*.yaml` di bawah `Apps/`, `Packages/`, dan `Tools/` — terukur: 168 berkas.
+# Yang **tidak pernah dipindai satu kali pun**: 74 berkas `.py` di `Tools/`
+# dan 2 berkas `.yml` di `.github/workflows/`. Padahal di sanalah prosa
+# Indonesia repo ini paling padat — setiap harness `bukti-mutasi-*.py`
+# menulis penjelasan panjang tentang apa yang ia buktikan — dan huruf Arab
+# yang dulu benar-benar menyelinap masuk ke berkas ini lewat **komentar**,
+# yaitu bentuk yang persis sama.
+#
+# Jadi `Tools/*.py` dan `.github/` kini ikut; terukur, keduanya bersih
+# (cakupan 168 -> 245 berkas dipindai, 0 temuan di keduanya), sehingga
+# perluasannya tidak menambah satu pun pelanggaran — yang berubah hanya
+# ada-tidaknya penjaga. Selisihnya 77 berkas: 75 `.py` di `Tools/` (74 yang
+# sudah ada + harness `bukti-mutasi-aturan3-aksara.py` yang menutup celah ini)
+# dan 2 `.yml` di `.github/workflows/`.
+#
+# Dua pengecualian di bawah keduanya punya alasan yang bisa diperiksa, bukan
+# kemudahan: `.md` mengutip aksara CJK dan Cyrillic **sebagai bukti** cacat
+# yang pernah terjadi (STATUS.md memuatnya apa adanya), dan `out/` adalah
+# direktori keluaran `render-visuals.py` yang sudah di-`.gitignore`, bukan
+# sumber yang ditulis orang.
+#
+# **Batas `out/` yang dinyatakan, bukan diklaim tertutup.** Di checkout bersih
+# direktori itu tidak ada, jadi pengecualiannya belum menutup apa pun — ia ada
+# supaya berkas keluaran tidak masuk cakupan **saat** seseorang menjalankan
+# `render-visuals.py` lebih dulu. Menutupnya secara menyeluruh menuntut
+# melacak berkas yang ditulis proses lain, dan itu di luar jangkauan sapu teks
+# ini. Dicatat di sini supaya tidak terbaca sebagai sudah tertutup.
 cjk=$(python3 - <<'PY'
 import os
 import unicodedata
 
-DIRS = ["Apps", "Packages", "Tools"]
+DIRS = ["Apps", "Packages", "Tools", ".github"]
 FILES = ["project.yml", "swift-ui-lint.sh", "swift-test.sh",
          "swift-typecheck.sh", "red-test.sh", "red-lint.sh"]
-EXTS = (".swift", ".sh", ".yml", ".yaml")
+EXTS = (".swift", ".sh", ".yml", ".yaml", ".py")
+
+# Di luar cakupan meski ekstensinya cocok: `Tools/out/` adalah **keluaran**
+# `render-visuals.py`, bukan sumber yang ditulis orang. Alasannya sama dengan
+# `.build/` — gerbang yang memerah pada berkas hasil alat repo sendiri adalah
+# gerbang yang akan dimatikan orang. Ditulis sebagai awalan path, bukan nama
+# direktori `"out"`, supaya direktori `out` di tempat lain tidak ikut lolos
+# tanpa disadari.
+SKIP_PREFIXES = ("Tools/out/",)
 
 # Diizinkan **secara eksplisit**: huruf Yunani dipakai sebagai simbol
 # matematis di repo ini (σ simpangan baku, Δ selisih, α/θ/φ di uji gambar).
@@ -262,11 +300,16 @@ def mencurigakan(ch):
 
 def berkas():
     for d in DIRS:
+        if not os.path.isdir(d):
+            continue
         for root, dirs, files in os.walk(d):
             dirs[:] = [x for x in dirs if x != ".build"]
             for f in sorted(files):
                 if f.endswith(EXTS):
-                    yield os.path.join(root, f)
+                    p = os.path.join(root, f)
+                    if any(p.startswith(pref) for pref in SKIP_PREFIXES):
+                        continue
+                    yield p
     for f in FILES:
         if os.path.exists(f):
             yield f
