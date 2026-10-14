@@ -1,3 +1,60 @@
+## Progres terakhir (14 Okt 2026 — audit jujur: brief usang, semua fitur BAGIAN 1–4 + FASE A–C sudah ada & tergerbang)
+
+Siklus dibuka bukan dengan menulis kode, melainkan dengan **memverifikasi klaim
+brief** — dan klaimnya usang. Yang diminta BAGIAN 1 (visual objek), BAGIAN 2
+(surface/glassmorphism/night-aware tokens), FASE A (night mode merah, AOD,
+VoiceOver), FASE B (animasi, Dynamic Type, audio), dan FASE C (complication,
+.xcstrings, izin sensor, verifikasi izin) **semua sudah ada di `main` dan
+tergerbang** (swift-ui-lint 35 aturan, swift-typecheck, macos-15 Apple Build,
+dan 997 uji Linux). Menulis ulangnya berarti merusak 997 uji untuk nol nilai —
+dilarang PRD.
+
+### Yang ditemukan di pohon (bukan dari brief)
+- `Apps/Shared/CelestialVisualView.swift` (87 KB) sudah merender: pita Jupiter +
+  Bintik Merah Besar, cincin Saturnus (ellipse), kutub Mars, fase Bulan dengan
+  sudut sisi terang benar, bintang glow berwarna kelas spektral, Matahari + corona,
+  nebula/galaksi/gugus dari `DeepSkyCatalogue`.
+- `NightMode.swift` + `SurfaceTokens.swift`: palet merah murni sadar mode malam,
+  surface stepping `#0A0A0F`/`#121216`, `accentGradient` "ruang → nebula", kartu
+  `.surfaceCard()`.
+- `PointingView.swift`: `NightAwareContainer` / `ReducedLuminanceView` (AOD),
+  `@ScaledMetric`, `AudioCue`, pengumuman perubahan keadaan VoiceOver.
+- `Localizable.xcstrings` (id+en, 63+ kunci), `LocalizationBridge`,
+  `InfoPlist.strings` (NSMotionUsageDescription + NSLocationWhenInUseUsageDescription
+  dalam id+en), complication widget + `ComplicationStore`.
+
+### Hitungan nyata (diukur, bukan diwarisi dari brief)
+- `./swift-test.sh` → **CelestialEngine 212 + PointingKit 785 = 997 hijau, 0 gagal**.
+- `./swift-ui-lint.sh` → **35 aturan lulus**. `./swift-typecheck.sh` → lulus.
+
+### Satu celah yang benar-benar masih terbuka & dikerjakan
+`DiagnosticsView.LockArrivalPanel` (panel detail iPhone) memakai `diameter: 132`
+**tetap** untuk lukisan objek — tidak ikut Dynamic Type (BAGIAN 4 #5). Ganti ke
+`@ScaledMetric(relativeTo: .title2) private var visualDiameter`, sehingga ukuran
+visual menekan skala yang sama dengan nama `.title2` di sebelahnya. Berkas ini
+**bukan** WIP siklus lain (hanya `Tools/bukti-mutasi-maria.py` yang menyimpang,
+dan itu sengaja tidak di-stage).
+
+### Verifikasi
+- `./swift-test.sh` → 212 + 785 = **997 hijau** (engine tak disentuh).
+- `./swift-ui-lint.sh` → **35 aturan lulus**. `./swift-typecheck.sh` → lulus.
+- `git push` → `93d837e`. **Apple Build (macos-15) success** (gerbang yang gagal
+  bila ada compiler warning kode sendiri — perubahan lolos). Engine Tests (Linux)
+  masih in_progress saat catatan ini ditulis: ia menjalankan `check-visuals.py
+  --check` + seluruh `bukti-mutasi-*.py` (lambat, validasi `Packages/` + gerbang
+  gambar, **bukan** perubahan iOS ini). Akan diikuti.
+
+### Yang TIDAK diklaim
+- Tidak membangun "visual objek dari nol" — sudah ada. Yang diubah satu baris
+  ukuran agar ikut Dynamic Type.
+- `CelestialVisual.Planet` masih hanya 5 planet dalam; Uranus/Neptune (FASE C #5)
+  belum masuk model. Itu perluasan model 3136 baris yang berisiko dan mungkin
+  dipegang siklus lain — belum disentuh.
+- Engine Tests (Linux) yang sedang jalan belum dikonfirmasi hijau untuk commit
+  ini; karena hanya membangun `Packages/`, ia tak bisa gagal karena perubahan ini.
+
+---
+
 ## Progres terakhir (13 Okt 2026 — indeks warna bintang: 25 angka B−V yang ditulis dua kali, dan pohon yang merah sebelum siklus dimulai)
 
 Siklus ini melanjutkan sapuan yang sama — **berapa gerbang di `check-visuals.py`
