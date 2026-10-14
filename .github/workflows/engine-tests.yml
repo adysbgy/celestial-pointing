@@ -1087,6 +1087,27 @@ jobs:
       - name: Buktikan Aturan 16 berbunyi pada kalimat aksesibilitas yang literal
         run: python3 Tools/bukti-mutasi-kalimat-a11y.py
 
+      # Dan bukti bahwa Aturan 13 (kalimat yang dirakit sebagai argumen harus
+      # berkunci) benar-benar berbunyi.
+      #
+      # Kelas ini lolos dari **dua** gerbang lokalisasi yang sudah ada: Aturan 4
+      # menyapu literal di dalam `Text(...)`, Aturan 12 menyapu literal yang
+      # ditugaskan ke variabel berakhiran Note/Label. Kalimat di dalam
+      # `String(format: …)` / `parts += […]` tidak menyentuh keduanya.
+      #
+      # Yang membuatnya berbahaya: ia **tidak terlihat salah**. Angka dan derajat
+      # identik di semua bahasa, jadi diff dan tangkapan layar tidak menunjukkan
+      # apa pun — yang berbeda adalah kata pengantar dan urutannya, dan itu hanya
+      # terasa oleh pengguna yang membaca bahasa lain.
+      #
+      # Dua keadaan cacat menutup **dua cabang berbeda** (`String(format:` dan
+      # `+=`), dan tiga kontrol negatif menjaga agar keduanya berarti: helper
+      # katalog tanpa literal, interpolasi murni angka, dan satu kata tanpa
+      # spasi. Tanpa kontrol, aturan yang memerah pada setiap literal di dalam
+      # `append` akan lulus semuanya.
+      - name: Buktikan Aturan 13 berbunyi pada kalimat yang dirakit sebagai argumen
+        run: python3 Tools/bukti-mutasi-kalimat-dirakit.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
