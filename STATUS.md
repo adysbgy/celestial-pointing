@@ -1,3 +1,162 @@
+## Progres terakhir (14 Okt 2026 — konstanta port yang mengaku dari model: sembilan angka yang tidak diperiksa siapa pun)
+
+Siklus ini mulai dari membaca **pengakuan di dalam kode**, bukan dari brief.
+`render-visuals.py` memberi hampir setiap konstanta geometrinya sebuah
+komentar `# MODEL: CelestialVisual.<nama>` yang **menjanjikan** angkanya sama
+dengan sumber Swift-nya. Sembilan di antaranya milik Uranus dan Neptunus —
+planet yang baru masuk, jadi pengakuannya baru juga:
+
+    URANUS_BAND_HALF_HEIGHT = 0.30    # MODEL: `CelestialVisual.uranusBand`
+    NEPTUNE_SPOT_OPACITY = 0.55       # MODEL: `CelestialVisual.neptuneSpotOpacity`
+    …
+
+Terukur: `grep -c 'URANUS_BAND\|NEPTUNE_SPOT' Tools/check-visuals.py` = **0**.
+Tidak ada satu pun gerbang yang membaca kesembilan pasangan itu.
+
+### Kenapa ini cacat, bukan kerapian
+
+Janji itu **diukur**, bukan disangka: mengganti
+`URANUS_BAND_HALF_HEIGHT 0.30 -> 0.55` **dan** `NEPTUNE_SPOT_OPACITY
+0.55 -> 0.20` membiarkan seluruh gerbang gambar repo ini pada jumlah merah
+yang **sama persis** seperti sebelumnya. Kelasnya sama dengan yang sudah
+dibayar repo ini untuk kabut Venus dan indeks warna B−V — komentar yang
+menjanjikan kesamaan bukan gerbang — dan di sini ia lebih menipu karena
+namanya memuat kata "MODEL" di sebelahnya.
+
+Yang bisa salah tanpa terlihat bukan "angkanya keliru" — angka-angka itu
+keputusan tampilan, bukan hasil pengukuran astronomis. Yang bisa salah adalah
+**dua bahasa yang berbeda pendapat**: view menggambar sabuk setinggi 0.30 R di
+jam, sementara PNG yang diukur seluruh gerbang gambar repo ini menggambarnya
+0.55 R.
+
+### Gerbangnya generik, bukan daftar Uranus/Neptunus
+
+Daftar tangan hanya menjaga planet yang sudah ada saat gerbangnya ditulis.
+`check_modeled_port_constants_match_the_model` membaca **pengakuan port itu
+sendiri**: setiap token `UPPER_CASE = … # MODEL: <nama>` dicari pasangannya di
+model, lalu angkanya dibandingkan. Menambah planet berikutnya otomatis ikut
+terjaga.
+
+Dua bentuk dipetakan **tanpa menebak**:
+
+| bentuk | contoh | dipetakan oleh |
+|---|---|---|
+| `static let … : Double` | `uranusBandOpacity` | namanya, satu angka |
+| seluruh parameter `-> HazeGeometry` | `uranusBand(centerY:halfWidth:halfHeight:)` | urutan deklarasi di model |
+| skalar yang mengaku ke fungsi | `URANUS_BAND_CENTER_Y` | sufiks nama tokennya → `centerY:`, atau parameter yang **ditulis eksplisit** di komentar (`jupiterBands(count:)`) |
+
+Sembilan token sisanya (`CRATER_RIM_STRENGTH`, `SPOT_CENTER`,
+`SPIKE_ROOT_WIDTH_FACTOR`, `BAND_COUNT`, …) **dinyatakan di luar cakupan**, dan
+daftarnya dicetak di hasil gerbang supaya batas itu tidak bisa melebar tanpa
+terlihat. Dua di antaranya menuntut tebakan yang sesungguhnya: `craterRelief`
+menerima `CRATER_RIM_STRENGTH` sebagai parameter **ketiga dari empat**, dan
+`SPOT_CENTER` adalah **dua** parameter `jupiterSpot` yang dipakai bersama
+sebagai tupel. Gerbang yang menebak pemetaan itu akan merah pada kode yang
+benar — dan gerbang yang merah pada kode benar akan dimatikan orang. Batasnya
+dinyatakan, bukan disangka tertutup.
+
+### Cacat yang ditemukan sambil menulisnya, dan lebih berbahaya dari yang dikejar
+
+Pembaca pertama **menyaring di sumber**: pengakuan yang namanya tidak ada di
+model langsung dibuang dari daftar pasangan. Akibatnya mengubah nama
+`uranusBand` menjadi `uranusStripe` membuat ketiga token `URANUS_BAND_*`,
+**menyusut dari himpunan hasil** sementara gerbangnya tetap **hijau** — ia
+berhenti mengukur tepat ketika modelnya berubah, yaitu saat gerbang itu paling
+dibutuhkan. Gerbang yang berhenti mengukur tanpa suara adalah gerbang yang
+selalu hijau.
+
+Sekarang pengakuan yang menggantung **merah**, satu hasil per token. Itu
+diukur, bukan diklaim: keadaan 7 harness-nya mengganti nama fungsinya dan
+menuntut **tiga** hasil merah, satu per token yang kehilangan sumbernya.
+
+### Bukti bahwa gerbangnya berbunyi (diukur, dua arah)
+
+`Tools/bukti-mutasi-sabuk-uranus.py`, 11 keadaan. Yang paling berharga bukan
+yang paling mudah:
+
+| keadaan | harapan | kenapa |
+|---|---|---|
+| 1, 2 port menyimpang | MERAH 1 | arah yang menggambar: PNG mengukur angka yang tak ada di jam |
+| 3, 4 model menyimpang | MERAH 1 | arah seberang; memerahkan token yang **berbeda** |
+| 5 komentar `# MODEL:` dicabut | himpunan **menyusut** | token lepas dari pemeriksaan terlihat sebagai hilang |
+| 6 **kedua sisi disunting bersama, nilai sama** | **HIJAU** | menyunting geometri yang sah **bukan** cacat |
+| 7 fungsi model diganti nama | MERAH 3 | pengakuan menggantung — dulu hijau tanpa suara |
+| 8, 10 satu sisi menyimpang | MERAH 1 | jangkar yang ada **sebelum** Uranus lahir |
+| 9 **kedua sisi bersama** | **HIJAU** | idem, di jangkar yang selalu ada |
+
+Keadaan 6 dan 9 adalah yang paling mudah hilang dari sebuah harness, dan
+keduanya yang menjaga gerbangnya tetap jujur: mengubah **kedua** sisi menjadi
+nilai yang sama bukan cacat — model dan port masih sepakat.
+
+### Keadaan yang **dilewati**, dan kenapa itu bukan kelalaian
+
+Uranus/Neptunus hidup di WIP siklus lain yang belum di-commit, jadi keadaan
+1–7 memakai jangkar yang **belum ada di `main`**. Versi pertama harness ini
+yang ter-push karena itu akan memerahkan langkah CI yang baru — persis kelas
+cacat yang `check-harness-terdaftar.py` ada untuk mencegah, dan `main` terblokir
+sampai planet itu masuk.
+
+Sekarang keadaan yang jangkarnya belum ada **dilewati dan dicetak sebagai
+dilewati** — bukan dilaporkan lulus. Tiga keadaan (8–10) memakai jangkar yang
+sudah ada sebelum Uranus lahir, jadi inti mekanismenya tetap terukur hari ini.
+Dan kalau seluruh keadaan dilewati, atau kurang dari tiga yang benar-benar
+jalan, harness-nya **gagal**: "sesuai harapan" atas nol pembuktian adalah cacat
+yang berkas ini ada untuk mencegah.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks**, bukan piksel app Apple. Yang dibuktikan: gerbangnya
+  merah pada kedua arah penyimpangan, hijau pada penyuntingan dua sisi yang
+  sah, dan merah saat sebuah pengakuan kehilangan sumbernya.
+- Harness ini **tidak** membuktikan sembilan angka geometri itu benar secara
+  astronomi. Angka yang sama-sama salah di **kedua** sisi tetap hijau.
+- Gerbang ini **tidak** melihat konstanta port yang tidak berkomentar
+  `# MODEL:` sama sekali — itu di luar jangkauannya dan dinyatakan di
+  docstring-nya.
+- Sembilan token di luar cakupan (di atas). Batas itu **dinyatakan di hasil
+  gerbang**, jadi melebarnya terlihat.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift yang
+  disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
+| Harness dirujuk CI | 51 | **52** (+1) |
+| Pemeriksaan gerbang baru (di `main`) | — | **12**, 0 merah |
+| Pemeriksaan gerbang baru (dgn Uranus) | — | **21**, 0 merah |
+| Token di luar cakupan (dicetak) | — | **9** |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `git worktree` bersih di **commit yang di-push** (`f78eecb`), lalu
+  `python3 Tools/bukti-mutasi-sabuk-uranus.py`: **exit 0**, 11 keadaan, 4
+  benar-benar jalan. Ini yang akan dilihat CI — bukan pohon kerja yang memuat
+  WIP siklus lain.
+- Di pohon yang memuat Uranus/Neptunus: **11 keadaan jalan, semuanya sesuai
+  harapan**, 21 pemeriksaan per keadaan.
+- Gerbang pendaftaran: 52 dari 52 harness dirujuk, **exit 0**.
+- Mutasi dua arah diukur langsung: port `0.30 -> 0.55` + `0.55 -> 0.20` →
+  merah pada kedua token; model `halfHeight 0.30 -> 0.77` +
+  `uranusBandOpacity 0.18 -> 0.66` → merah pada kedua token; fungsi model
+  diganti nama → **tiga** merah "pengakuan … punya sumber".
+- `./swift-test.sh` di Docker Swift 6.0: **785 tes, 0 gagal** (CelestialEngine
+  212 + PointingKit 785 dalam satu laporan suite).
+- `git add` **hanya** tiga berkas (`Tools/check-visuals.py`,
+  `Tools/bukti-mutasi-sabuk-uranus.py`, `.github/workflows/engine-tests.yml`);
+  14 berkas WIP siklus lain di pohon kerja **tidak disentuh dan tidak
+  di-stage**. `git pull --rebase` menuntut pohon bersih, jadi WIP itu
+  di-stash dan **dipulihkan utuh** sesudah push (md5 diperiksa).
+- Push `bff22c9..f78eecb`. **Apple Build (macos-15) success** — gerbang yang
+  gagal bila ada compiler warning kode sendiri. `Engine Tests (Linux)`
+  in_progress saat catatan ini ditulis (~2 jam; ia membangun paket saja).
+
+---
+
 ## Progres terakhir (14 Okt 2026 — harness Aturan 23 yang terkomit tanpa langkah CI: gerbang yang tidak pernah dijalankan)
 
 Siklus ini mulai bukan dari brief, melainkan dari menjalankan gerbang repo ini
