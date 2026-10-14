@@ -1,3 +1,154 @@
+## Progres terakhir (14 Okt 2026 — Aturan 7: penjaga gerak yang cukup disebut di dalam sebuah string)
+
+Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
+`swift-ui-lint.sh`, **berapa yang pernah dibuktikan bisa merah?** Terukur ulang di
+awal siklus dengan menyilangkan 35 nomor aturan terhadap seluruh
+`Tools/bukti-mutasi-*.py` **dan** nama-nama di langkah `red-lint.sh` CI:
+**8 nirsaksi** (2, 7, 8, 19, 21, 26, 27, 28, 29 dikurangi yang sudah bertuan).
+Dipilih Aturan 7 karena ia menjaga janji yang brief nyatakan sebagai syarat di
+FASE B: **"animasi halus"** — dan satu-satunya janji di brief yang bergerak.
+
+### Cacat yang dijaga, dan kenapa ia belum pernah diukur
+
+Aturan 7 menuntut setiap API gerak (`withAnimation`, `.repeatForever`,
+`TimelineView(.animation)`, `.animation(`) berada di blok yang membaca penjaga
+gerak. Satu-satunya buktinya sebelum siklus ini adalah langkah `red-lint.sh` di
+CI: suntik `Text("x").withAnimation(...)`, tuntut `swift-ui-lint.sh` keluar
+bukan-nol. Itu membuktikan **satu** bentuk cacat di **satu** berkas; yang tidak
+diketahui siapa pun adalah **cakupannya**.
+
+### Cacat yang ditemukan dengan menyuntik, bukan membaca
+
+Versi aturannya membuang komentar (`strip_comments`) tetapi **tidak** membuang
+isi literal string. Jadi penjaga yang hanya **disebut** di dalam string dihitung
+sebagai penjaga. Terukur di `PointingView.swift`:
+
+    var zzzMotionProbe: some View {
+        _ = "MotionPolicy(reduceMotion: false)"
+        withAnimation(.linear(duration: 0.3)) { }
+        return EmptyView()
+    }
+    -> "Bersih: setiap API gerak berada di blok berpenjaga reduce-motion."
+
+Satu baris string membuat gerak tanpa penjaga lolos. Itu bukan bentuk karangan:
+repo ini menulis `motion.allowsTransitions` di dalam kalimat yang **dijelaskan**
+ke pengguna, di berkas yang sama dengan geraknya — jadi bentuk yang lolos adalah
+bentuk yang paling mungkin muncul.
+
+Perbaikannya: `blank_strings` mengosongkan isi literal string (tanda kutipnya
+dipertahankan) sebelum penjaganya dicari. Terukur: **nol temuan baru** pada
+seluruh `Apps/`, jadi gerbangnya tidak memerah pada kode yang benar.
+
+### Cacat kedua: kalimat yang menyatakan sebaliknya dari kodenya
+
+Docstring aturannya berbunyi "penjaga boleh disebut di mana saja di dalam
+bloknya (kode **atau komentar**)". Klaim itu **salah**, dan diukur di sini:
+komentarnya sudah dibuang sebelum bloknya diuji, jadi penjaga di dalam komentar
+tidak pernah dihitung. Kalimatnya diperbaiki supaya menyatakan batas yang
+sebenarnya, dan keadaan 7 yang menahannya.
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-gerbang-gerak.py` (baru, dirujuk `engine-tests.yml`) — 9
+keadaan + 1 pengukuran non-vakuositas. Program aturannya **diekstrak** dari
+`swift-ui-lint.sh`, bukan disalin: harness yang menyalin aturannya mengukur
+salinan dan tetap hijau walau aturan aslinya dilonggarkan. Batas potongannya
+diperiksa (judul, penanda bersih, `status=1`, keberadaan `blank_strings`);
+kalau salah satu hilang, harness **berhenti** alih-alih melaporkan hijau.
+
+| keadaan | harapan | terukur |
+|---|---|---|
+| baseline | hijau | hijau |
+| 1 API gerak tanpa penjaga | merah | **MERAH** |
+| 2 penjaga hanya di literal string | merah | **MERAH** — **hijau pada versi lama** |
+| 3 `MotionPolicy(reduceMotion: false)` (selalu melarang) | hijau | hijau |
+| 4 penjaga benar: `reduceMotion` | hijau | hijau |
+| 5 penjaga benar: `MotionPolicy` + `allowsTransitions` | hijau | hijau |
+| 6 penjaga di blok pembungkus | hijau | hijau |
+| 7 penjaga hanya di komentar | merah | **MERAH** |
+| 8 penjaga di blok saudara yang lebih dalam | hijau | hijau |
+
+**Keadaan 2 hijau pada versi lama**, dan ia satu-satunya alasan `blank_strings`
+ada. **Keadaan 3** menyatakan batas sebagai harapan yang dieksekusi: gerbangnya
+sapu teks, bukan penilai kebenaran nilai — penjaga yang selalu melarang tetap
+lolos, dan menutupnya menuntut pelacakan alur yang tidak bisa dibuktikan benar
+oleh sapu teks. **Keadaan 8** adalah batas yang sama bentuknya, dan ia
+dinyatakan, bukan disangka.
+
+Yang wajib hijau bukan hiasan. Tanpa keadaan 3–6 dan 8, aturan yang memerah pada
+**setiap** `withAnimation` akan lulus keadaan 1, 2, dan 7 dengan sempurna — dan
+gerbang yang memerah pada kode benar akan dilonggarkan orang.
+
+### Non-vakuositasnya diukur, bukan diklaim
+
+Harness ini menjalankan keadaan 2 sekali lagi dengan potongan aturannya
+dikembalikan ke bentuk lama (`src[…]` alih-alih `blank_strings(src[…])`), dan
+menuntut keadaan itu **berbalik hijau**. Terukur: dengan `blank_strings`
+dinetralkan di `git worktree` bersih (namanya **dipertahankan** supaya
+pemeriksaan `REQUIRED` tetap lulus, jadi yang berubah hanya perilakunya),
+harness merah **persis pada keadaan 2** dan tidak pada keadaan lain — exit 1.
+Itu sekaligus membuktikan keadaan 1 dan 7 bukan yang menutup cacatnya.
+
+### Kenapa diukur di worktree terpisah
+
+Pohon kerja utama memuat WIP siklus lain yang belum di-commit (13:30–15:08,
+termasuk `Apps/`, `Packages/`, dan dua harness baru yang belum dirujuk CI), dan
+`git status`-nya merah karenanya. Seluruh pengukuran di sini dijalankan di
+`git worktree` bersih di atas `origin/main`; pohon kerja utama **tidak
+disentuh**. Indeks git di pohon utama juga sudah basi (menunjuk pohon commit
+`9027559`), jadi `git commit` polos di sana akan **menghapus**
+`Tools/bukti-mutasi-permukaan.py` dan mengembalikan lint 3 commit ke belakang —
+commit di sini karena itu dilakukan dari worktree terpisah, dengan
+`git add` tiga berkas eksplisit.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** `Apps/`, bukan perilaku app Apple. Yang dibuktikan:
+  aturan berbunyi pada API gerak yang tidak berpenjaga **di kode**, dan diam
+  pada kelima bentuk sah yang dinyatakan.
+- Ia **tidak** membuktikan penjaganya benar secara **nilai** (keadaan 3),
+  maupun bahwa `MotionPolicy` mengembalikan nilai yang benar untuk preferensi
+  pengguna — itu wilayah `PointingKit` dan sudah diuji di sana.
+- Keadaan 8 adalah batas yang **dinyatakan dan dieksekusi**: kalau kelak
+  cakupannya diperketat sampai menjangkau blok saudara, keadaan itu mulai tidak
+  sesuai harapan — tanda cakupannya meluas, bukan harnessnya rusak.
+- **Tujuh aturan nirsaksi lain belum dikerjakan** (terukur: 8 -> **7**): 2, 19,
+  21, 26, 27, 28, 29. Tiga di antaranya mengawasi relasi `TipePaket` yang belum
+  punya situs panggil nyata di `Apps/`.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift yang
+  disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
+| Aturan nirsaksi (terukur) | 8 | **7** (-1) |
+| Harness dirujuk CI | 58 | **59** (+1) |
+| Temuan baru di `Apps/` | — | **0** |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-gerbang-gerak.py` → **9 keadaan + 1 pengukuran
+  non-vakuositas, 0 tidak sesuai harapan**, exit 0.
+- Dengan `blank_strings` dinetralkan di `git worktree` terpisah → **exit 1**,
+  merah persis pada keadaan 2.
+- `python3 Tools/check-harness-terdaftar.py` → **59 harness, semuanya dirujuk**,
+  exit 0.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0;
+  `./red-lint.sh … 'Aturan 7'` masih merah seperti sebelumnya.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS, exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → **212 CelestialEngine + 785
+  PointingKit, 0 gagal**.
+- CI `Apple Build (macos-15)` **success**; langkah CI baru
+  ("Buktikan Aturan 7 berbunyi pada kelasnya, bukan satu bentuknya") **success**
+  di `Engine Tests (Linux)`.
+
+---
+
 ## Progres terakhir (14 Okt 2026 — Aturan 20: gerbang kontras yang hijau karena satu baris dipisah dua)
 
 Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
