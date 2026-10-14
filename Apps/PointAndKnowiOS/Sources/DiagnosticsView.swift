@@ -56,9 +56,13 @@ struct RootView: View {
     /// pun satu sumber (`StateAnnouncement`), supaya kedua app tidak bisa
     /// mengucapkan dua hal berbeda untuk cuplikan yang sama.
     @State private var announcedState: PointingState?
-    /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal (iPhone
-    /// tidak punya Taptic Engine, jadi bunyi menggantikan getaran di sini).
+    /// Pemutar bunyi opsional saat kunci — aksesibilitas multi-modal.
     private let audioCue = AudioCueEngine()
+    /// Pemutar getaran saat kunci / ragu — padanan haptic di app jam.
+    ///
+    /// iPhone punya Taptic Engine sejak 2016, jadi getaran bukan pengganti
+    /// bunyi di sini: keduanya berjalan berdampingan, sama seperti di jam.
+    private let haptics = PhoneHapticEngine()
 
     var body: some View {
         TabView {
@@ -141,8 +145,11 @@ struct RootView: View {
             trace.record(snapshot: update.snapshot,
                          sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
         }
-        // iPhone tidak punya Taptic Engine.
-        engine.haptics = nil
+        // Getaran saat kunci / ragu — saluran multi-modal bagi pengguna yang
+        // tidak melihat layar. iPhone punya Taptic Engine (sejak 2016), jadi
+        // ini padanan tepat dari haptic di app jam, bukan pengganti bunyi.
+        let haptics = self.haptics
+        engine.haptics = { events in haptics.play(events) }
         // Bunyi pendek saat kunci: saluran multi-modal bagi pengguna yang
         // tidak melihat layar. Mirror pola haptic di jam.
         let cue = audioCue
