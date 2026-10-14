@@ -1225,6 +1225,20 @@ jobs:
       - name: Buktikan gerbang indeks warna bintang berbunyi
         run: python3 Tools/bukti-mutasi-indeks-warna.py
 
+      # Bukti bahwa `check_deep_sky_catalogue_values_reach_the_picture` berbunyi
+      # — salah satu dari tiga gerbang yang dulu tidak punya harness sama sekali.
+      #
+      # Ia menjaga **ragam visual** objek langit dalam: tiap entri katalog
+      # digambar dengan angka fuzziness-nya sendiri, dan bedanya terlihat di
+      # ukuran jam (38 pt). Dua arah diuji, karena keduanya hazard nyata:
+      #   1. rumus `growth` model menyimpang dari port (model diedit di Mac,
+      #      port tertinggal di Linux) — arah yang paling mungkin;
+      #   2. satu entri katalog kehilangan keunikan fuzziness-nya (M31 -> 0.6),
+      #      sementara rumus growth tetap hijau — membuktikan penjaga nilainya
+      #      hidup, bukan hanya penjaga rumusnya.
+      - name: Buktikan gerbang katalog langit dalam berbunyi
+        run: python3 Tools/bukti-mutasi-katalog-langit-dalam.py
+
       # Bukti bahwa `check_mars_caps_fade_into_the_surface` berbunyi — gerbang
       # baru yang lahir bersama luruhan tepi dalam kutub Mars.
       #
