@@ -1,3 +1,101 @@
+## Progres terakhir (14 Okt 2026 — dua gerbang inti spiral ditutup: 84/84 gerbang `check-visuals.py` kini punya bukti mutasi)
+
+Siklus ini menutup **sisa terakhir** dari sapuan "berapa gerbang yang pernah
+dibuktikan bisa merah". Terukur di awal siklus: **3 nirsaksi**; terukur di
+akhir siklus: **0**. Seluruh 84 gerbang di `check-visuals.py` kini pernah
+dijalankan dalam keadaan rusak.
+
+Dua gerbang yang ditutup siklus ini mengukur **hal yang sama dari dua sisi
+yang tidak bisa saling menggantikan**:
+
+- `check_spiral_core_reads_as_one_body` — tonjolan inti galaksi spiral
+  benar-benar menerangi pusatnya (selisih cakupan cincin dengan vs tanpa
+  tonjolan, ukuran jam 76 px).
+- `check_spiral_core_docstring_quotes_measured_values` — angka yang dikutip
+  docstring gerbang pertama (+124°/+106°/+44°, batas 0.2725 R) harus keluar
+  dari penyampelnya sendiri.
+
+### Kenapa gerbang kedua
+
+Komentar adalah **satu-satunya bukti yang dibaca orang** saat menilai apakah
+sebuah gerbang layak dipercaya. Docstring yang mengutip angka hasil ukur bisa
+membusuk tanpa satu pun pemeriksaan berbunyi — kelas cacat yang sama dengan
+`check_crater_contrast_numbers_come_from_the_sampler` dan klaim "invarian
+skala" yang gugur siklus lalu. Gerbang kedua mengukur angkanya, gerbang
+pertama mengukur gambarnya.
+
+### Bukti bahwa keduanya berbunyi
+
+`Tools/bukti-mutasi-inti-spiral.py` — **5 keadaan, semuanya sesuai harapan**:
+
+| keadaan | hasil |
+|---|---|
+| baseline | hijau, 0 merah dari 11 |
+| 1. tonjolan diperkecil 0.32 → 0.10 | **7 merah** |
+| 2. tonjolan diredupkan 0.60 → 0.20 | **7 merah** |
+| 3. tonjolan dihapus dari tata letak | **7 merah** |
+| 4. kontrol negatif (komentar di ujung baris) | **0 merah** (harus hijau) |
+
+### Temuan utama: jalurnya bukan yang diklaim namanya
+
+**Mutasi 1 & 2 berbunyi lewat pemeriksaan "sampel inti ada", bukan lewat
+pemeriksaan selisih.** Batas sampel dihitung dari
+`halfWidth · (1 − ambang / (opasitas · 255))`, jadi memperkecil atau
+meredupkan tonjolan memindahkan batas itu ke bawah seluruh sampel —
+himpunannya **runtuh**, dan gerbang pertama melaporkan **satu** hasil
+("tonjolan inti menyinari pusat (ukuran jam)"), bukan tiga hasil per-radius.
+
+Himpunan hasil yang berbeda itu sendiri jadi bagian dari bukti: harness
+menuntut hasilnya **persis**, jadi kalau kelak gerbangnya diubah untuk
+"melewati saja" keadaan bentuk-rusak, keadaan 1 & 2 mulai tidak sesuai
+harapan. Ini sesuai dengan catatan docstring yang sudah diperbaiki siklus
+lalu — dan harness ini menjadikannya **harapan yang dieksekusi**, bukan
+cerita.
+
+**Keadaan 3 lain lagi, dan itu yang paling berharga.** Menghapus tonjolan
+seluruhnya membuat `spiral_core_bulge_index()` jatuh ke **kabut cakram**
+(opasitas 0.13), sehingga sampelnya **tidak** runtuh — ia dihitung dari blob
+yang salah. Yang berbunyi adalah angka-angka docstring, dan arahnya
+terbalik: `r=0.2843` bergerak 0° → **38°**, padahal sampel itu seharusnya
+**di luar** jangkauan inti. Jadi "hapus tonjolan" dan "kecilkan tonjolan"
+ditangkap oleh dua pemeriksaan yang berbeda, dan tak satu pun keadaan bisa
+menggantikan yang lain.
+
+### Yang TIDAK diklaim
+
+- Harness ini mengukur **gambar port Python** dan teks docstring. Ia **tidak**
+  membaca piksel app Apple: view SwiftUI yang berhenti memanggil konstanta
+  ini tidak ditangkapnya.
+- Ia **tidak** membuktikan nilai 0.32 (lebar) dan 0.60 (opasitas) itu benar
+  secara tampilan — itu keputusan desain. Yang dijaga adalah bahwa tonjolan
+  **menyumbang sesuatu yang terbaca** dan bahwa angka yang dikutip
+  docstringnya keluar dari penyampel.
+- `Apps/` **tidak disentuh**; engine tidak diubah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
+| Gerbang nirsaksi (terukur) | 2 | **0** (−2) |
+| Harness dirujuk CI | 49 | **50** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-inti-spiral.py` → **5 keadaan, 0 tidak sesuai
+  harapan**; `render-visuals.py` pulih **persis** (md5 sama).
+- `python3 Tools/check-harness-terdaftar.py` → **50 harness, semuanya
+  dirujuk**.
+- Audit ulang: **84/84** `def check_*` kini dirujuk oleh sebuah harness
+  (terukur, bukan diwarisi).
+- `./swift-test.sh` → **212 + 785 = 997 hijau**, 0 gagal.
+- `./swift-ui-lint.sh` → 35 aturan lulus. `./swift-typecheck.sh` → lulus.
+
+---
+
 ## Progres terakhir (14 Okt 2026 — katalog langit dalam: 1 dari 3 gerbang nirsaksi ditutup, dan dua cacat yang hanya ditemukan dengan mengukur)
 
 Siklus ini meneruskan sapuan yang sudah ada di repo: dari 84 gerbang di
