@@ -1133,6 +1133,32 @@ jobs:
       - name: Buktikan Aturan 16 berbunyi pada kalimat aksesibilitas yang literal
         run: python3 Tools/bukti-mutasi-kalimat-a11y.py
 
+      # Dan bukti bahwa Aturan 12 (kalimat tampilan tidak lahir sebagai literal)
+      # benar-benar berbunyi.
+      #
+      # Aturan ini satu-satunya penjaga celah di antara dua gerbang lokalisasi
+      # yang sudah ada: Aturan 4 menyapu literal **langsung di dalam** `Text(...)`,
+      # sedangkan Aturan 12 menyapu literal yang ditugaskan ke properti
+      # berakhiran Note/Label/Title/… lalu dirender lewat `Text(note)`. Kalimat
+      # seperti itu tak pernah menyentuh `Text(...)` dan tak pernah punya kunci,
+      # jadi **kedua** gerbang tetap hijau sementara pengguna Bahasa Inggris
+      # membaca kalimat Indonesia.
+      #
+      # Cacatnya tidak terlihat salah: kalimatnya terbaca lancar di layar, lulus
+      # tinjauan, dan tidak muncul di diff sebagai kesalahan. `swiftc` tidak
+      # peduli, `swift test` di Linux tidak bisa membangun `Apps/` sama sekali,
+      # dan CI macOS hanya gagal bila ada *warning*.
+      #
+      # Sebelum langkah ini, Aturan 12 **tidak punya satu pun rekam jejak** bahwa
+      # ia bisa keluar merah: tiga langkah `red-lint.sh` di alur kerja ini hanya
+      # menuntut Aturan 3, 18, dan 31. Empat keadaan di bawah menutupnya — satu
+      # cacat yang wajib merah **dan menyebut berkasnya**, tiga kontrol negatif
+      # (kunci katalog bertitik, literal satu kata, kode benar) yang wajib hijau,
+      # karena aturan yang memerah pada setiap penugasan wajar akan dimatikan
+      # orang dan berhenti menjaga apa pun.
+      - name: Buktikan Aturan 12 berbunyi pada kalimat tampilan yang literal
+        run: python3 Tools/bukti-mutasi-kalimat-literal.py
+
       # Dan bukti bahwa Aturan 13 (kalimat yang dirakit sebagai argumen harus
       # berkunci) benar-benar berbunyi.
       #
