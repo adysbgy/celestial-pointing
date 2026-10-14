@@ -115,11 +115,16 @@ isi wilayah Aturan 20-nya dipindahkan ke commit ini.
 | | sebelum | sesudah |
 |---|---|---|
 | CelestialEngine | 212 | **212** (tak disentuh) |
-| PointingKit | 787 | **787** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
 | Aturan nirsaksi (terukur) | 10 | **9** (-1) |
 | Harness dirujuk CI | 54 | **55** (+1) |
 | Baris `Apps/` berubah | — | **0** |
 | Baris `Packages/` berubah | — | **0** |
+
+Angka 212 + 785 diukur di **pohon ter-commit** (`git worktree` pada commit ini),
+bukan di pohon kerja: pohon kerja memuat WIP siklus lain yang menambah uji
+engine, dan di sana terbaca 216 + 787. Menulis angka pohon kerja sebagai "angka
+commit" akan jadi klaim yang tidak pernah saya ukur.
 
 ### Verifikasi
 
@@ -129,8 +134,9 @@ isi wilayah Aturan 20-nya dipindahkan ke commit ini.
 - `python3 Tools/check-harness-terdaftar.py` → **55 harness, semuanya dirujuk**,
   exit 0.
 - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
-- `./swift-test.sh` → **787 PointingKit + 212 CelestialEngine, 0 gagal**
-  (dijalankan di pohon kerja; engine tak disentuh siklus ini).
+- `./swift-test.sh` di **pohon ter-commit** (`wt-verify`, commit ini) → **212
+  CelestialEngine + 785 PointingKit, 0 gagal**. Di pohon kerja — yang memuat WIP
+  siklus lain — terbaca 216 + 787; selisihnya milik mereka, bukan commit ini.
 
 ---
 
