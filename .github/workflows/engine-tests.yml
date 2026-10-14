@@ -1066,6 +1066,27 @@ jobs:
       - name: Buktikan Aturan 20 berbunyi pada permukaan yang dirakit di view
         run: python3 Tools/bukti-mutasi-permukaan.py
 
+      # Dan bukti bahwa Aturan 16 (kalimat aksesibilitas harus datang dari
+      # katalog) benar-benar berbunyi.
+      #
+      # Cacatnya tidak terlihat siapa pun: kalimat VoiceOver ditulis langsung di
+      # `Apps/`, sementara teks di baris yang sama sudah lewat katalog — jadi
+      # komponennya terlihat benar di layar, dan yang salah hanya yang didengar.
+      # `swiftc` tidak peduli, `swift test` di Linux tidak membangun `Apps/`,
+      # dan CI macOS hanya gagal bila ada *warning*.
+      #
+      # Bentuk aslinya pernah hidup di `main`: `linkAccessibilityLabel` merakit
+      # `"iPhone terhubung"` sendiri tepat di atas `linkRow`, yang sudah memakai
+      # kunci katalog. Harness ini mengembalikan bentuk itu dan menuntut aturan
+      # berbunyi **menyebut berkasnya**.
+      #
+      # Dua kontrol negatif menjaga agar keadaan 1-3 berarti: kalimat di
+      # variabel yang **tidak** diumumkan, dan pengenal (`"pointing.state.lock"`)
+      # di variabel yang diumumkan — keduanya harus hijau. Tanpa keduanya,
+      # aturan yang memerah pada setiap literal akan lulus semuanya.
+      - name: Buktikan Aturan 16 berbunyi pada kalimat aksesibilitas yang literal
+        run: python3 Tools/bukti-mutasi-kalimat-a11y.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
