@@ -2266,6 +2266,45 @@ fi
 # Pemeriksaannya sengaja **menyilang seluruh berkas .swift**: kunci bisa
 # dirujuk lewat `key:`, lewat enum ber-kasus, atau lewat `LocalizedText`.
 # Yang dihitung adalah ketiadaan kunci di seluruh kode sumber.
+#
+# **Batas yang sebelumnya salah, dan dua kunci yang ia sembunyikan.** Sampai
+# siklus ini pencariannya adalah `k in source` — kunci yang **muncul di mana
+# saja** dihitung sebagai dirujuk. Dua bentuk kematian kunci lolos dari itu,
+# dan keduanya terukur di katalog ini:
+#
+#   - `'%lld gagal'`. Bentuknya adalah **teks bawaan** (`id:`) milik kunci
+#     lain: `pointing.link.failures` berbunyi `id: "· %lld gagal"`, dan itu
+#     memuat `'%lld gagal'` sebagai potongan. Kuncinya sendiri tidak dipanggil
+#     siapa pun -- yang ada hanyalah salinan teksnya di dalam berkas lain.
+#     Bentuk ini tidak bisa ditutup oleh paritas (`Aturan 6` hanya melihat
+#     kunci ber-namespace; `'%lld gagal'` tidak punya namespace) maupun oleh
+#     uji kelengkapan `en` (entrinya memang punya `en`, jadi ia lulus).
+#   - `'GoTo'`. Bentuknya adalah **komentar yang mendokumentasikan
+#     penghapusannya sendiri**. Ia dulu judul baris `row("GoTo", verdict)`;
+#     baris itu diganti `SlewVerdictBanner` karena bobot visualnya salah, dan
+#     komentar yang menjelaskan penggantian itu menulis `"GoTo"` dengan tanda
+#     kutip. Jadi satu-satunya rujukan ke kunci itu adalah catatan bahwa ia
+#     tidak lagi dipakai.
+#
+# Karena itu yang dicari adalah **literal berkutip** (`"kunci"`), di dalam
+# sumber yang komentarnya sudah dikosongkan. Isi string **tidak** dikosongkan:
+# kunci memang hidup di dalam string. Hanya `.swift` yang dipindai -- `.md`,
+# `.yml`, dan JSON katalognya sendiri bisa memuat nama kunci apa pun, dan
+# memindai mereka berarti katalog merujuk dirinya sendiri.
+#
+# **Berkas uji tidak ikut dipindai**, dan itu keputusan cakupan yang disengaja.
+# Kunci katalog ada untuk **UI yang dikirim ke pengguna**; berkas uji bukan
+# pemakainya. Bentuk ketiga kematian kunci adalah justru ini, dan ia terukur:
+# `'sisa'` -- label layar redup satu kata. Satu-satunya rujukan berkutip ke
+# `"sisa"` di seluruh repo ada di `ObjectSpeechTests.swift`, pada
+# `XCTAssertTrue(note.lowercased().contains("sisa"))`. Uji itu tidak memakai
+# kunci `'sisa'`; ia menegaskan teks **bawaan** kunci lain (`object.speech.
+# stale.short`) memuat kata "sisa" -- dan justru untuk menyatakan bahwa bentuk
+# satu kata itu **sengaja tidak dipakai**. Jadi uji itu menjaga keputusan yang
+# membuat kunci `'sisa'` mati, sambil menjadi satu-satunya alasan kunci itu
+# terlihat hidup. Mengeluarkan berkas uji dari cakupan adalah yang membuat
+# lingkaran itu putus; dan ia tidak menambah yatim lain di pohon ini
+# (terukur: `'sisa'` satu-satunya).
 echo
 echo "== Aturan 19: kunci katalog yang tidak dipakai kode mana pun =="
 orphan_keys=$(python3 - <<'PY' 2>&1
@@ -2278,6 +2317,49 @@ if not os.path.exists(CATALOG):
 
 strings = json.load(open(CATALOG, encoding="utf-8"))["strings"]
 
+
+def strip_comments(text):
+    """Kosongkan komentar, pertahankan isi string apa adanya.
+
+    Isi string **tidak** dikosongkan: kunci katalog hidup di dalam string.
+    Yang dibuang hanya komentar, karena komentar yang **menyebut** sebuah kunci
+    bukan pemakaian -- dan justru komentar seperti itu yang menjaga kunci mati
+    tetap terlihat hidup.
+    """
+    out, i, n = [], 0, len(text)
+    in_string = escaped = False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 # Seluruh kode sumber, sekali, menjadi satu teks. Kunci bisa dirujuk dari
 # Apps/ (pemanggil) maupun Packages/ (deklarasi kunci), jadi kedua pohon
 # harus ikut -- memeriksa hanya satu pohon akan melaporkan kunci yang sah
@@ -2286,16 +2368,21 @@ blob = []
 for root in ("Apps", "Packages"):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d != ".build"]
+        # Berkas uji bukan pemakai katalog: kunci katalog ada untuk UI yang
+        # dikirim. Lihat alasan lengkapnya di komentar Aturan 19.
+        if "/Tests/" in dirpath.replace(os.sep, "/"):
+            continue
         for name in sorted(filenames):
             if name.endswith(".swift"):
                 path = os.path.join(dirpath, name)
                 try:
-                    blob.append(open(path, encoding="utf-8", errors="ignore").read())
+                    blob.append(strip_comments(
+                        open(path, encoding="utf-8", errors="ignore").read()))
                 except OSError:
                     continue
 source = "\n".join(blob)
 
-orphans = sorted(k for k in strings if k not in source)
+orphans = sorted(k for k in strings if f'"{k}"' not in source)
 print("\n".join(f"  {k!r}" for k in orphans))
 PY
 )

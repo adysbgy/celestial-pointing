@@ -12,17 +12,6 @@
         }
       }
     },
-    "%lld gagal": {
-      "comment": "Jumlah kegagalan pengiriman, diawali titik pemisah.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld failed"
-          }
-        }
-      }
-    },
     "Acuan di atas horizon": {
       "comment": "Judul bagian pilihan acuan pada layar kalibrasi.",
       "localizations": {
@@ -459,17 +448,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dark"
-          }
-        }
-      }
-    },
-    "GoTo": {
-      "comment": "Judul baris putusan GoTo di layar Diagnostik iPhone. Nilai `en` sengaja sama: istilah teknis yang dipakai sebagai singkatan visual, dan menaruhnya di katalog membuat keputusan itu terbaca, bukan tersembunyi. Lihat SlewVerdictBanner.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GoTo"
           }
         }
       }
@@ -4486,17 +4464,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Data gerak tidak tersedia."
-          }
-        }
-      }
-    },
-    "sisa": {
-      "comment": "Label sisa pengujian pada tampilan redup.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "left"
           }
         }
       }
