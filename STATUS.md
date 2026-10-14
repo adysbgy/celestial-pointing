@@ -1,3 +1,85 @@
+## Progres terakhir (14 Okt 2026 — harness Aturan 23 yang terkomit tanpa langkah CI: gerbang yang tidak pernah dijalankan)
+
+Siklus ini mulai bukan dari brief, melainkan dari menjalankan gerbang repo ini
+ke **dirinya sendiri**. `python3 Tools/check-harness-terdaftar.py` di HEAD
+bersih (`bef9a55`) keluar **exit 1**, satu masalah:
+
+    bukti-mutasi-penanda-complication.py: ada di Tools/ tetapi tidak dirujuk
+    engine-tests.yml — gerbangnya tidak pernah dijalankan, dan gerbang yang
+    tidak dijalankan selalu hijau
+
+### Kenapa ini cacat, bukan kerapian
+
+Harness 422 baris itu **terkomit** — commit `bef9a55` ("GERBANG: Aturan 23
+kini menunjuk cabang yang benar") menambahkannya bersama `swift-ui-lint.sh`,
+tetapi **lupa** langkah CI-nya. Jadi ada satu berkas bukti mutasi yang tidak
+pernah dijalankan satu kali pun oleh CI, pada aturan yang paling perlu
+dijaga:
+
+> Aturan 23 menegakkan **aturan paling keras PRD** — "JANGAN pernah
+> menampilkan visual yang mengklaim identitas saat engine RAGU" — pada
+> permukaan terkecil di seluruh perangkat: complication `accessoryInline`,
+> yang tidak punya baris kedua. Satu-satunya kanal yang tersisa di sana adalah
+> ikon `presentedSymbolName`. Tanpa ikon itu nama kandidat `.uncertain` tampil
+> **persis** seperti nama yang sudah terkunci.
+
+Kelas cacat ini sudah dua kali dibayar repo ini (13 berkas di disk / 12
+dirujuk, lalu 17 / 16 — keduanya dikutip komentar gerbang pendaftarannya
+sendiri). Yang membuatnya berbeda kali ini: gerbang pendaftarannya **sedang
+berbunyi di HEAD**, dan karena langkah itu ada di CI, `main` merah karenanya.
+
+### Bukti bahwa tambalan ini bekerja (diukur dua arah)
+
+Di `git worktree` bersih di atas HEAD, hanya tambalan ini diterapkan:
+
+| | sebelum tambalan | sesudah tambalan |
+|---|---|---|
+| `check-harness-terdaftar.py` | **exit 1**, 1 masalah | **exit 0** |
+| harness dirujuk | 50 dari 51 | **51 dari 51** |
+| `bukti-mutasi-penanda-complication.py` | — | 5 keadaan, 0 tidak sesuai, exit 0 |
+| `./swift-ui-lint.sh` | — | SEMUA GERBANG UI LULUS, exit 0 |
+
+Arah "sebelum" bukan hiasan: ia membuktikan yang merah memang berkas ini, dan
+arah "sesudah" membuktikan tambalannya yang menutupnya — bukan perubahan lain.
+
+### Yang TIDAK diklaim
+
+- Langkah ini **tidak** memperbaiki kegagalan `bukti-mutasi-maria.py` yang
+  membuat job `Engine Tests` berhenti **lebih dulu** di urutan langkah
+  (keadaan 1-nya melepas satu dari dua potongan yang redundan, jadi tidak ada
+  yang berubah dan gerbangnya benar untuk tetap hijau — kelas cacat yang persis
+  sedang diperbaiki siklus lain di pohon kerja). Karena urutannya, langkah baru
+  ini belum sampai dieksekusi pada push ini; yang dijaganya adalah bahwa
+  **begitu maria hijau, gerbang pendaftaran tidak lagi merah**.
+- Gerbang pendaftaran **tidak** membuktikan harness-nya benar — hanya bahwa ia
+  dirujuk. Kebenaran isinya dibuktikan harness itu sendiri (5 keadaan, 0 tidak
+  sesuai harapan) dan itu dijalankan manual di sini.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Yang berubah hanya alur kerja.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
+| Harness dirujuk CI | 50 | **51** (+1) |
+| `check-harness-terdaftar.py` | exit 1 | **exit 0** |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `git worktree` bersih atas HEAD + tambalan ini saja (bukan pohon kerja yang
+  memuat WIP siklus lain): gerbang pendaftaran **exit 1 → exit 0**, lint
+  **SEMUA GERBANG UI LULUS**.
+- `git add` **hanya** `.github/workflows/engine-tests.yml` (14 berkas WIP
+  siklus lain di pohon kerja sengaja tidak disentuh dan tidak di-stage).
+- Push `bef9a55..d053f1c`. **Apple Build (macos-15) success** — gerbang yang
+  gagal bila ada compiler warning kode sendiri. `Engine Tests (Linux)`
+  in_progress saat catatan ini ditulis; lihat batas di atas.
+
+---
+
 ## Progres terakhir (14 Okt 2026 — dua gerbang inti spiral ditutup: 84/84 gerbang `check-visuals.py` kini punya bukti mutasi)
 
 Siklus ini menutup **sisa terakhir** dari sapuan "berapa gerbang yang pernah
