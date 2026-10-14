@@ -33,13 +33,15 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
   [baseline]                       kedua gerbang hijau (kalau tidak, harness
                                    ini salah, bukan gerbangnya)
   1. port: klip maria dilepas      `_point_in_polygon` dilepas dari penggambar
-                                   maria di port. Harus menyalakan gerbang
-                                   kebocoran pada **kedua ukuran** — bukan
-                                   hanya 200 px — karena ukuran kartu jam
-                                   adalah satu-satunya ukuran yang penting
-                                   bagi pengguna, dan cacat yang tidak
-                                   terlihat di satu ukuran bisa dominan di
-                                   ukuran lain.
+                                   maria di port — **keduanya**, di dalam `at`
+                                   dan pada `canvas.fill` (potongannya
+                                   redundan; lihat `PORT_MARIA_CLIP`). Harus
+                                   menyalakan gerbang kebocoran pada **kedua
+                                   ukuran** — bukan hanya 200 px — karena
+                                   ukuran kartu jam adalah satu-satunya ukuran
+                                   yang penting bagi pengguna, dan cacat yang
+                                   tidak terlihat di satu ukuran bisa dominan
+                                   di ukuran lain.
   2. port: maria tidak digambar     gelung penggambarnya berhenti
                                    beriterasi (`for dx, dy, size in []:`) —
                                    lariknya **tidak** disentuh. Ini keadaan
@@ -170,11 +172,29 @@ for r in results:
 #: bersarang yang memotong ke `_point_in_polygon` **dua** kali — sekali pada
 #: dirinya sendiri, sekali pada `canvas.fill` yang memanggilnya.
 #:
-#: Keadaan 1: potongan maria dilepas. Yang dihapus hanya **syarat di dalam
-#: `at`** — `canvas.fill` tetap menyaring poligonnya sendiri, jadi bercaknya
-#: masih digambar, hanya tidak lagi dibatasi oleh pita terang di dalam `at`.
-#: Kalau gerbangnya tetap hijau, artinya yang diukur bukan "apakah ciri
-#: dipotong", melainkan "apakah bercaknya ada".
+#: Keadaan 1: potongan maria dilepas. **Keduanya** harus dilepas, dan itu
+#: bukan kerapian — diukur, bukan disimpulkan:
+#:
+#:     hanya syarat di dalam `at` dilepas      0 merah dari 16
+#:     hanya topeng `canvas.fill` dilepas      0 merah dari 16
+#:     KEDUANYA dilepas                        16 merah dari 16
+#:
+#: Karena potongannya **redundan**: selama salah satunya masih ada, bercaknya
+#: tetap terbatas pada pita terang, jadi tidak ada yang bocor dan gerbangnya
+#: benar untuk tetap hijau. Versi pertama harness ini melepas **satu** saja —
+#: jadi ia menjalankan keadaan yang tidak merusak apa pun, lalu melaporkan
+#: "gerbangnya buta" atas kerusakan yang tidak pernah ia buat. Pelajarannya
+#: umum: keadaan mutasi yang tidak mengubah perilaku akan selalu terbaca
+#: sebagai gerbang yang buta, dan tidak ada cara membedakan keduanya kecuali
+#: mengukur apa yang sebenarnya berubah.
+#:
+#: Keadaan 2 **tidak** melepas potongannya: gelung penggambarnya berhenti
+#: beriterasi, jadi maria tidak digambar sama sekali. Itu arah yang berlawanan —
+#: yang berbunyi di sana adalah kelas "ciri masih sampai ke sisi terang", bukan
+#: kelas kebocoran. Dua keadaan itu sengaja tidak saling menggantikan: keadaan 1
+#: membuktikan gerbang kebocoran bisa berbunyi, keadaan 2 membuktikan gerbang
+#: arah-sebaliknya bisa berbunyi, dan gerbang yang hanya bisa merah di satu arah
+#: akan melewatkan cacat di arah yang lain tanpa suara.
 PORT_MARIA_CLIP = ('        def at(x, y, mx=mx, my=my, edge=edge, ripple=ripple):\n'
                    '            # Riak tepi + pelunakan tepi. Lihat '
                    '`MARIA_RIPPLE` dan\n'
@@ -191,6 +211,18 @@ PORT_MARIA_NOCLIP = ('        def at(x, y, mx=mx, my=my, edge=edge, ripple=rippl
                      'keras terbaca sebagai\n'
                      '            # polka dot pada ukuran kartu jam, bukan '
                      'dataran gelap.\n')
+
+#: Potongan **kedua**, di pemanggilnya: `canvas.fill(lambda x, y:
+#: _point_in_polygon(x, y, points), at)`.
+#:
+#: Ini yang membuat keadaan 1 harus melepas dua jangkar, bukan satu — dan ia
+#: yang paling mudah terlewat, karena `at` sudah memotong dan pembacaannya
+#: berhenti di situ. Jangkar ini juga yang mengubah makna keadaan 1: sebelum
+#: ia ada, melepas syarat di dalam `at` **memang** membuat bercak bocor;
+#: sesudah ia ada, tidak lagi.
+PORT_MARIA_OUTER_MASK = (
+    '        canvas.fill(lambda x, y: _point_in_polygon(x, y, points), at)')
+PORT_MARIA_OUTER_NOMASK = '        canvas.fill(lambda x, y: True, at)'
 
 #: Keadaan 2: maria tidak digambar sama sekali. **Gelungnya** yang
 #: dikosongkan, bukan lariknya.
@@ -290,7 +322,8 @@ REFERENCE_CLASS = "referensi maria sama dengan model"
 STATES = [
     ("[baseline]", None, []),
     ("1. port: klip maria dilepas",
-     [(RENDER, PORT_MARIA_CLIP, PORT_MARIA_NOCLIP)],
+     [(RENDER, PORT_MARIA_CLIP, PORT_MARIA_NOCLIP),
+      (RENDER, PORT_MARIA_OUTER_MASK, PORT_MARIA_OUTER_NOMASK)],
      [DARK_CLASS]),
     ("2. port: maria tidak digambar sama sekali",
      [(RENDER, PORT_MARIA_LOOP, PORT_MARIA_NOLOOP)],
@@ -354,6 +387,7 @@ def main():
             _originals[path] = handle.read()
     for path, anchor, label in (
             (RENDER, PORT_MARIA_CLIP, "penggambar maria berklip di port"),
+            (RENDER, PORT_MARIA_OUTER_MASK, "topeng poligon pada `canvas.fill`"),
             (RENDER, PORT_MARIA_LOOP, "gelung penggambar maria di port"),
             (CHECK, PORT_MARIA_REFERENCE, "`MARIA_REFERENCE` di gerbang")):
         count = _originals[path].count(anchor)
@@ -366,18 +400,34 @@ def main():
     signal.signal(signal.SIGTERM, lambda *a: (restore(), sys.exit(143)))
 
     def run_state(mutations):
-        """Pasang mutasi (kalau ada), jalankan probe, pulihkan."""
+        """Pasang mutasi (kalau ada), jalankan probe, pulihkan.
+
+        Suntingan **ditumpuk di atas isi yang sudah dimutasi**, bukan selalu
+        diambil dari `_originals`. Versi pertama menulis ulang dari
+        `_originals` untuk setiap jangkar, jadi dua suntingan pada berkas yang
+        sama saling membatalkan — suntingan kedua menimpa yang pertama — dan
+        keadaan yang seharusnya melepas **dua** potongan hanya melepas satu.
+        Cacat itu diam: `content != _originals[path]` tetap benar, jadi tidak
+        ada yang dilaporkan, dan keadaannya hanya tidak merusak apa pun.
+
+        Penuntutan "jangkar berubah" tetap ada, dan itu bukan hiasan: jangkar
+        yang tidak mengubah apa-apa berarti keadaannya tidak menguji apa pun.
+        """
         for path in _sources:
             mutasi_sumber.write_source(path, _originals[path])
         if mutations is not None:
+            edited = {path: _originals[path] for path in _sources}
             for path, old, new in mutations:
-                content = _originals[path].replace(old, new, 1)
-                if content == _originals[path]:
-                    return None, [f"ANCHOR TIDAK DITEMUKAN: {old!r}"]
-                # `_originals` tetap memegang aslinya supaya `finally`
-                # memulihkan yang benar walau keadaan ini gagal di tengah;
-                # yang ditulis ke disk adalah salinan yang termutasi.
-                mutasi_sumber.write_source(path, content)
+                if edited[path].count(old) != 1:
+                    return None, [f"ANCHOR muncul "
+                                  f"{edited[path].count(old)}x, butuh 1: {old!r}"]
+                before = edited[path]
+                edited[path] = edited[path].replace(old, new, 1)
+                if edited[path] == before:
+                    return None, [f"ANCHOR TIDAK MENGUBAH APA PUN: {old!r}"]
+            for path, content in edited.items():
+                if content != _originals[path]:
+                    mutasi_sumber.write_source(path, content)
         return probe()
 
     unexpected = 0
