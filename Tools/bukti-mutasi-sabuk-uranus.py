@@ -48,16 +48,22 @@ angka. Keadaan 2 dan 3 memakai pasangan token ini, jadi jalur pembacaan
 ### Keadaan
 
   keadaan                                              harapan
-  [baseline] sumber bersih                             hijau 21/21
+  [baseline] sumber bersih                             hijau, himpunan
+                                                       diturunkan dari gerbang
   1. port:   URANUS_BAND_HALF_HEIGHT 0.30 -> 0.55      MERAH 1 (token itu)
   2. port:   URANUS_BAND_CENTER_Y 0.0 -> 0.25          MERAH 1 (token itu)
   3. model:  uranusBand(centerY:) 0.0 -> 0.25          MERAH 1 (token itu)
   4. model:  uranusBandOpacity 0.18 -> 0.66            MERAH 1 (token itu)
   5. port kehilangan komentar `# MODEL:`               hasilnya **menyusut**:
                                                        himpunan dituntut persis
-  6. **keduanya diubah bersama, nilai sama**           **hijau 21/21**
-  7. jangkar gerbang dirapikan (fungsi diganti nama)   MERAH, berhenti di
-                                                       pemeriksaan batas
+  6. **keduanya diubah bersama, nilai sama**           **hijau**
+  7. model:  uranusBand diganti nama                   MERAH 3 (satu per token
+                                                       yang kehilangan sumber)
+  8. port:   MOON_LIMB_SHADING_STRENGTH 0.40 -> 0.90   MERAH 1 (jangkar yang
+                                                       ada di kedua dunia)
+  9. **keduanya**: moonLimbShadingStrength 0.40 -> 0.90 **hijau**
+ 10. port:   POLAR_CAP_OPACITY 0.85 -> 0.30            MERAH 1 (jangkar yang
+                                                       ada di kedua dunia)
 
 Keadaan 6 adalah yang paling mudah hilang dari sebuah harness, dan ia yang
 menjaga gerbangnya tetap jujur: mengubah **kedua** sisi menjadi nilai yang
@@ -65,29 +71,42 @@ sama **bukan cacat** — model dan port masih sepakat. Harness yang merah di
 sana akan mengajarkan bahwa gerbangnya menolak pekerjaan yang benar, dan
 gerbang yang dilonggarkan untuk itu berhenti menjaga apa pun.
 
-Keadaan 7 mengukur satu-satunya jalan keluar yang jujur ketika bentuk model
-berubah: pembacanya melaporkan **satu** hasil merah yang menyebut
-pengakuannya, bukan traceback dan bukan hijau.
+### Kenapa ada keadaan 8–10, dan kenapa ada keadaan yang **dilewati**
+
+Gerbang dan harness ini ditulis generik, sementara Uranus/Neptunus lahir di
+pekerjaan yang **belum di-commit** saat harness ini ditulis. Keadaan 1–7
+memakai token planet itu; di `HEAD` hari ini ketujuhnya **dilewati**, dan
+jumlah yang dilewati **dicetak** — bukan dilaporkan lulus. Kalau seluruhnya
+dilewati, harness-nya gagal: "sesuai harapan" atas nol pembuktian adalah
+persis cacat yang berkas ini ada untuk mencegah.
+
+Keadaan 8–10 menjaga **inti** mekanismenya tetap terukur di mana pun, memakai
+jangkar yang sudah ada sebelum Uranus lahir (`MOON_LIMB_SHADING_STRENGTH`,
+`POLAR_CAP_OPACITY`). Tanpa ketiganya, harness ini akan hijau di `HEAD` sambil
+tidak membuktikan apa pun.
 
 ### Yang TIDAK diklaim
 
 - Yang diukur **teks**, bukan piksel app Apple. Yang dibuktikan: gerbangnya
   merah pada kedua arah penyimpangan, hijau pada penyuntingan yang sah, dan
-  berhenti dengan pesan bersih saat bentuk modelnya berubah.
-- Harness ini **tidak** membuktikan bahwa sembilan angka geometri itu benar
-  sebagai astronomi — itu keputusan tampilan (seberapa samar sabuk Uranus
-  boleh terlihat), bukan hasil pengukuran. Angka yang sama-sama salah di
-  **kedua** sisi akan tetap hijau, dan itu dinyatakan di sini alih-alih
-  disangka tertutup.
-- **Lima token sengaja di luar cakupan**, dan jumlahnya dituntut di sini
-  supaya batas itu tidak bisa melebar tanpa terlihat: `CRATER_RIM_STRENGTH`,
-  `CRATER_FLOOR_DEPTH`, `SPHERE_LIGHT_OFFSET`, `SPOT_CENTER`, `SPOT_SIZE`.
-  Pengakuan mereka menunjuk fungsi yang memakainya sebagai parameter
-  **keberapa-tidak-tentu** (`craterRelief` menerima `strength:` sebagai
-  parameter ketiga dari empat) atau sebagai **tupel dua** parameter
-  (`SPOT_CENTER`). Memetakannya menuntut menebak, dan gerbang yang menebak
-  akan merah pada kode yang benar — gerbang yang merah pada kode benar akan
-  dimatikan orang. Batasnya **dinyatakan**, bukan disangka tertutup.
+  merah saat sebuah pengakuan kehilangan sumbernya.
+- Harness ini **tidak** membuktikan bahwa angka geometri itu benar sebagai
+  astronomi — itu keputusan tampilan (seberapa samar sabuk Uranus boleh
+  terlihat), bukan hasil pengukuran. Angka yang sama-sama salah di **kedua**
+  sisi akan tetap hijau, dan itu dinyatakan di sini alih-alih disangka
+  tertutup.
+- **Sembilan token sengaja di luar cakupan**, dan jumlahnya dinyatakan di
+  hasil gerbang supaya batas itu tidak bisa melebar tanpa terlihat:
+  `BAND_COUNT`, `BAND_HEIGHT_FRACTION`, `CRATER_RIM_STRENGTH`,
+  `CRATER_FLOOR_DEPTH`, `SPHERE_LIGHT_OFFSET`, `SPIKE_ROOT_WIDTH_FACTOR`,
+  `SPIKE_TIP_WIDTH_FACTOR`, `SPOT_CENTER`, `SPOT_SIZE`. Pengakuan mereka
+  menunjuk fungsi yang memakainya sebagai parameter **keberapa-tidak-tentu**
+  (`craterRelief` menerima `strength:` sebagai parameter ketiga dari empat),
+  sebagai **tupel dua** parameter (`SPOT_CENTER`), atau sebagai nilai **bukan
+  `Double`** (`BAND_COUNT` = 7, bilangan bulat). Memetakannya menuntut
+  menebak, dan gerbang yang menebak akan merah pada kode yang benar —
+  gerbang yang merah pada kode benar akan dimatikan orang. Batasnya
+  **dinyatakan**, bukan disangka tertutup.
 - Menyentuh dua berkas (model, port) dan memulihkan keduanya persis; md5
   dibandingkan di akhir.
 - Tidak ada berkas di `Apps/` yang disentuh, dan tidak ada uji Swift yang
@@ -188,6 +207,21 @@ MODEL_UC_NEW = "static func uranusBand(centerY: Double = 0.25,"
 MODEL_OP_OLD = "static let uranusBandOpacity: Double = 0.18"
 MODEL_OP_NEW = "static let uranusBandOpacity: Double = 0.66"
 
+# ── Jangkar yang ada di **kedua** dunia (dengan dan tanpa Uranus) ─────────
+#: Tanpa ini, di `HEAD` seluruh keadaan Uranus dilewati dan harness-nya
+#: melaporkan "sesuai harapan" sambil tidak membuktikan apa pun. Dua pasangan
+#: di bawah menjaga **inti** mekanismenya tetap terukur di mana pun:
+#: gerbangnya merah pada penyimpangan satu sisi, dan hijau saat kedua sisi
+#: disunting bersama. Keduanya harus tetap ada demi gerbang yang jujur.
+MOON_OP_OLD = "MOON_LIMB_SHADING_STRENGTH = 0.40"
+MOON_OP_NEW = "MOON_LIMB_SHADING_STRENGTH = 0.90"
+MODEL_MOON_OP_OLD = "static let moonLimbShadingStrength: Double = 0.40"
+MODEL_MOON_OP_NEW = "static let moonLimbShadingStrength: Double = 0.90"
+POLAR_OP_OLD = "POLAR_CAP_OPACITY = 0.85"
+POLAR_OP_NEW = "POLAR_CAP_OPACITY = 0.30"
+HASIL_MOON = "model→port: MOON_LIMB_SHADING_STRENGTH[0] == model"
+HASIL_POLAR = "model→port: POLAR_CAP_OPACITY[0] == model"
+
 #: Menghapus komentar pengakuan membuat token itu **hilang dari pemeriksaan**.
 PORT_COMMENT_OLD = ("URANUS_BAND_HALF_HEIGHT = 0.30               "
                     "# MODEL: `CelestialVisual.uranusBand`")
@@ -224,16 +258,34 @@ for r in results:
 """
 
 
+#: Hasil yang **hanya ada kalau Uranus/Neptunus ada di sumber**. Gerbang dan
+#: harness ini ditulis generik justru karena planet itu belum di-commit saat
+#: harness-nya lahir; di `HEAD` sembilan hasil ini belum ada, dan menuntutnya
+#: hadir akan memblokir seluruh `main` sampai planet itu masuk.
+HANYA_JIKA_PLANET_ADA = {
+    URANUS_CENTER_Y, URANUS_HALF_HEIGHT, URANUS_OPACITY,
+    "model→port: URANUS_BAND_HALF_WIDTH[0] == model",
+    NEPTUNE_CENTER_X, NEPTUNE_CENTER_Y, NEPTUNE_HALF_HEIGHT,
+    NEPTUNE_HALF_WIDTH, NEPTUNE_OPACITY,
+}
+
+
 def _full(*red):
     """Himpunan hasil lengkap; nama yang disebut di `red` memerah."""
     return {name: (MERAH if name in red else HIJAU) for name in FULL}
 
 
-# ── Keadaan ──────────────────────────────────────────────────────────────
-# (nama, [(berkas, cari, ganti), ...] atau None, {nama hasil: harapan})
-STATES = [
-    ("[baseline] sumber bersih", None, _full()),
+def _tanpa_planet():
+    """Himpunan hasil untuk sumber yang **belum** punya Uranus/Neptunus."""
+    return {name: HIJAU for name in FULL if name not in HANYA_JIKA_PLANET_ADA}
 
+
+# ── Keadaan ──────────────────────────────────────────────────────────────
+# (nama, [(berkas, cari, ganti), ...] atau None, {nama hasil: harapan} | None)
+#: Harapan `None` = diturunkan saat jalan dari hasil dasar, jadi sumber yang
+#: belum punya Uranus/Neptunus tidak menuntut hasil yang memang belum ada.
+STATES = [
+    ("[baseline] sumber bersih", None, None),
     # ── Port menyimpang: bentuk `static let` ─────────────────────────────
     ("1. port: URANUS_BAND_HALF_HEIGHT 0.30 -> 0.55",
      [(RENDER, PORT_UH_OLD, PORT_UH_NEW)],
@@ -294,6 +346,26 @@ STATES = [
       _punya_sumber("URANUS_BAND_CENTER_Y"): MERAH,
       _punya_sumber("URANUS_BAND_HALF_HEIGHT"): MERAH,
       _punya_sumber("URANUS_BAND_HALF_WIDTH"): MERAH}),
+
+    # ── Inti mekanisme, di jangkar yang ada di **kedua** dunia ────────────
+    # Keadaan 1–7 memakai token Uranus/Neptunus. Selama planet itu belum
+    # di-commit, ketujuhnya dilewati — dan harness yang melewati semuanya
+    # sambil melaporkan "sesuai harapan" tidak membuktikan apa pun. Dua
+    # keadaan di bawah menjaga inti gerbangnya tetap terukur di `HEAD` hari
+    # ini: satu sisi menyimpang → merah; kedua sisi disunting bersama →
+    # hijau. Keduanya memakai jangkar yang sudah ada sebelum Uranus lahir.
+    ("8. port: MOON_LIMB_SHADING_STRENGTH 0.4 -> 0.9 (jangkar selalu ada)",
+     [(RENDER, MOON_OP_OLD, MOON_OP_NEW)],
+     {"_minimum": HIJAU, HASIL_MOON: MERAH}),
+
+    ("9. KEDUANYA: moonLimbShadingStrength 0.4 -> 0.9 (wajib hijau)",
+     [(RENDER, MOON_OP_OLD, MOON_OP_NEW),
+      (MODEL, MODEL_MOON_OP_OLD, MODEL_MOON_OP_NEW)],
+     {"_minimum": HIJAU}),
+
+    ("10. port: POLAR_CAP_OPACITY 0.85 -> 0.30 (jangkar selalu ada)",
+     [(RENDER, POLAR_OP_OLD, POLAR_OP_NEW)],
+     {"_minimum": HIJAU, HASIL_POLAR: MERAH}),
 ]
 
 
@@ -324,9 +396,14 @@ def mutate(path, old, new):
     Tanpa penuntutan itu, jangkar yang muncul di beberapa tempat akan
     menyasar yang pertama — yang belum tentu yang sedang diuji — dan
     harness-nya lalu mengukur berkas yang salah sambil terlihat benar.
+
+    Mengembalikan `None` bila berhasil, atau **`SKIP`** bila jangkarnya tidak
+    ada **sama sekali** di berkas itu.
     """
     text = open(path, encoding="utf-8").read()
     count = text.count(old)
+    if count == 0:
+        return SKIP
     if count != 1:
         return (f"KELEMAHAN BUKTI: {os.path.basename(path)}: jangkar muncul "
                 f"{count}x, butuh 1")
@@ -335,6 +412,18 @@ def mutate(path, old, new):
         return "KELEMAHAN BUKTI: hasil suntikan tidak ditemukan"
     mutasi_sumber.write_source(path, text)
     return None
+
+
+#: Jangkar tidak ada di berkas. **Bukan** kegagalan: gerbang dan harness-nya
+#: sengaja ditulis generik, dan Uranus/Neptunus hidup di WIP yang belum
+#: di-commit saat harness ini ditulis. Harness yang merah di sini akan
+#: memblokir seluruh `main` sampai planet itu masuk, dan gerbang yang merah
+#: pada keadaan yang bukan cacat akan dimatikan orang.
+#:
+#: Yang **tidak** terjadi di sini: keadaan itu dilaporkan sebagai lulus.
+#: Ia dilaporkan **dilewati**, dan jumlah yang dilewati dicetak. Diam-diam
+#: melaporkan lulus adalah persis cacat yang harness ini ada untuk mencegah.
+SKIP = object()
 
 
 def main():
@@ -356,30 +445,74 @@ def main():
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
 
+    skipped = []
     try:
         for name, edits, expected in STATES:
             restore()
             problems = []
+            skipped_state = False
             if edits is not None:
                 for path, find, replace in edits:
                     problem = mutate(path, find, replace)
+                    if problem is SKIP:
+                        skipped_state = True
+                        break
                     if problem:
                         problems.append(problem)
                         break
+            if skipped_state:
+                # Jangkar tidak ada di sumber ini — keadaan ini tidak bisa
+                # dijalankan, dan **dilewati**, bukan lulus. Dihitung supaya
+                # harness yang melewati **semuanya** tidak bisa melaporkan
+                # "semua sesuai harapan".
+                skipped.append(name)
+                print(f"{name}: DILEWATI (jangkar tidak ada di sumber ini)")
+                continue
             if not problems:
                 verdicts, error = run_probe()
                 if verdicts is None:
                     problems.append(f"probe gagal: {error}")
                 else:
-                    # Himpunan hasilnya dibandingkan **persis**: hasil yang
-                    # hilang (gerbang berhenti lebih awal), hasil tak
-                    # terduga (cakupannya berubah), dan verdict yang salah.
-                    missing = sorted(set(expected) - set(verdicts))
-                    extra = sorted(set(verdicts) - set(expected))
-                    if missing:
-                        problems.append(f"hasil hilang: {missing}")
-                    if extra:
-                        problems.append(f"hasil tak terduga: {extra}")
+                    # Baseline: himpunannya **diturunkan** dari gerbang itu
+                    # sendiri, karena sumber yang belum punya Uranus/Neptunus
+                    # memang tidak mengeluarkan sembilan hasil itu. Yang
+                    # dituntut: setiap hasil yang keluar **hijau**, dan
+                    # seluruh pemeriksaan yang selalu ada tetap hadir —
+                    # gerbang yang menyusut tanpa alasan tetap terlihat.
+                    if expected is None:
+                        expected = {}
+                        unexpected_red = [n for n, w in verdicts.items()
+                                          if w == MERAH]
+                        if unexpected_red:
+                            problems.append(
+                                "baseline merah: " + "; ".join(unexpected_red))
+                        wajib = set(FULL) - HANYA_JIKA_PLANET_ADA
+                        hilang = sorted(wajib - set(verdicts))
+                        if hilang:
+                            problems.append(f"hasil wajib hilang: {hilang}")
+                    else:
+                        # `"_minimum"` = keadaan ini hanya menuntut hasil yang
+                        # **ada di kedua dunia**; hasil Uranus/Neptunus yang
+                        # belum lahir tidak boleh membuatnya merah, tetapi
+                        # yang disebut di sini **wajib** ada dan benar.
+                        baseline_min = "_minimum" in expected
+                        if baseline_min:
+                            wajib = {n: w for n, w in expected.items()
+                                     if n != "_minimum"}
+                            hilang = sorted(set(wajib) - set(verdicts))
+                            if hilang:
+                                problems.append(f"hasil wajib hilang: {hilang}")
+                        else:
+                            # Himpunan hasilnya dibandingkan **persis**: hasil
+                            # yang hilang (gerbang berhenti lebih awal), hasil
+                            # tak terduga (cakupannya berubah), dan verdict
+                            # yang salah.
+                            missing = sorted(set(expected) - set(verdicts))
+                            extra = sorted(set(verdicts) - set(expected))
+                            if missing:
+                                problems.append(f"hasil hilang: {missing}")
+                            if extra:
+                                problems.append(f"hasil tak terduga: {extra}")
                     wrong = [f"{n} diharapkan {w} terukur {verdicts[n]}"
                              for n, w in expected.items()
                              if n in verdicts and verdicts[n] != w]
@@ -397,6 +530,16 @@ def main():
                       f"{len(expected)} pemeriksaan)")
     finally:
         restore()
+
+    if len(skipped) == len(STATES):
+        failures.append(
+            f"SEMUA {len(STATES)} keadaan dilewati — tidak ada satu pun "
+            f"jangkar yang ada di sumber ini, jadi harness ini tidak "
+            f"membuktikan apa pun dan **tidak boleh** dilaporkan lulus")
+    elif len(STATES) - len(skipped) < 3:
+        failures.append(
+            f"hanya {len(STATES) - len(skipped)} dari {len(STATES)} keadaan "
+            f"yang benar-benar jalan — terlalu sedikit untuk disebut bukti")
 
     for path, digest in baseline_md5.items():
         after = hashlib.md5(open(path, "rb").read()).hexdigest()
