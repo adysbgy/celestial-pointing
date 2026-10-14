@@ -2298,7 +2298,98 @@ import os, re
 # supaya `Color.black.opacity(...)` (bayangan di dalam gambar prosedural) dan
 # `palette.surface2.color.opacity(...)` (bagian dari definisi token itu
 # sendiri) tidak ikut tertangkap.
-AD_HOC = re.compile(r'\.(?:background|fill)\s*\([^)]*\.color\s*\.\s*opacity\s*\(')
+#
+# **Kenapa argumennya diekstrak berimbang, bukan dicocokkan baris demi baris.**
+# Versi sebelumnya mencocokkan pola ini atas **satu baris** pada satu waktu, dan
+# itu bukan detail gaya: `.background(` dan `.color.opacity(` yang terpisah
+# baris tidak pernah cocok. Terukur (8 keadaan,
+# `Tools/bukti-mutasi-permukaan.py`): memformat cacat asli yang **sama** menjadi
+#
+#     Text("x").background(
+#         tone.color.opacity(0.12))
+#
+# membiarkan aturan ini **hijau**, padahal bentuk satu-barisnya merah. Yang
+# menentukan apakah aturan ini menggigit jadi **gaya pemformatan**, bukan ada
+# tidaknya cacat — dan repo ini menulis rantai modifier multi-baris di banyak
+# tempat. Jalan kedua ke cacat yang sama (`tone.color\n    .opacity(0.12)`)
+# juga lolos.
+#
+# Pola lamanya pun memakai `[^)]*`, yang **tidak bisa melewati satu `)` pun**;
+# argumen yang memuat pemanggilan bersarang (`pilih(tone.color.opacity(0.12))`)
+# hanya kebetulan tertangkap karena `.color.opacity(` kebetulan mendahului `)`
+# pertama.
+#
+# Karena itu sekarang: komentar dibuang (hormat pada literal string — sama
+# seperti Aturan 29; tanpa itu docstring yang **menjelaskan** pola ini akan
+# dihitung sebagai temuan), isi literal string dikosongkan, lalu setiap
+# `.(background|fill)(` diambil **argumennya secara berimbang** dan polanya
+# diuji di dalam teks argumen itu — bukan di satu baris.
+#
+# Batas yang dinyatakan, bukan disangka tertutup: `background`/`fill` saja,
+# sesuai docstring aturan ini. `.overlay(warna)` yang mencampur token dengan
+# `.opacity(` tidak diperiksa — belum ada situsnya di `Apps/`, dan melebarkan
+# cakupan tanpa situs nyata hanya menambah risiko positif palsu tanpa menambah
+# satu pun cacat yang tertangkap. Nilai campuran yang dipindahkan ke variabel
+# perantara (`let bg = tone.color.opacity(0.12)`) juga di luar jangkauan:
+# melacaknya menuntut pelacakan aliran, dan gerbang yang salah merah pada kode
+# benar akan dimatikan orang.
+def _swift_code(text):
+    """Buang komentar `//` dan `/* */` yang berada di luar literal string."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            out.append(c)
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    out.append(text[i:i + 2])
+                    i += 2
+                    continue
+                out.append(text[i])
+                if text[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if text.startswith("/*", i):
+            j = text.find("*/", i)
+            i = n if j < 0 else j + 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _blank_strings(text):
+    """Kosongkan isi literal string supaya kalimat tidak dicocokkan sebagai kode."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        if text[i] == '"':
+            out.append('"')
+            i += 1
+            while i < n:
+                if text[i] == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                if text[i] == '"':
+                    out.append('"')
+                    i += 1
+                    break
+                out.append(" ")
+                i += 1
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
+AD_HOC = re.compile(r'\.color\s*\.\s*opacity\s*\(')
+CALL = re.compile(r'\.(?:background|fill)\s*\(')
 
 problems = []
 for root, _, files in os.walk("Apps"):
@@ -2306,11 +2397,19 @@ for root, _, files in os.walk("Apps"):
         if not name.endswith(".swift"):
             continue
         path = os.path.join(root, name)
-        for i, line in enumerate(open(path, encoding="utf-8"), 1):
-            code = line.split("//", 1)[0]
-            if AD_HOC.search(code):
-                problems.append(
-                    f"  {path}:{i}: {code.strip()}")
+        code = _swift_code(open(path, encoding="utf-8").read())
+        for m in CALL.finditer(code):
+            depth, i, n = 1, m.end(), len(code)
+            while i < n and depth:
+                if code[i] in "([{":
+                    depth += 1
+                elif code[i] in ")]}":
+                    depth -= 1
+                i += 1
+            arg = _blank_strings(code[m.end():i - 1])
+            if AD_HOC.search(arg):
+                line = code[:m.start()].count("\n") + 1
+                problems.append(f"  {path}:{line}: {arg.strip()[:70]!r}")
 
 if problems:
     print("\n".join(problems))

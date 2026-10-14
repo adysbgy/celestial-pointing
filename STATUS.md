@@ -1,3 +1,139 @@
+## Progres terakhir (14 Okt 2026 — Aturan 20: gerbang kontras yang hijau karena satu baris dipisah dua)
+
+Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
+`swift-ui-lint.sh`, **berapa yang pernah dibuktikan bisa merah?** Terukur ulang di
+awal siklus: **10 nirsaksi** (2, 6, 7, 8, 11, 13, 16, 17, 19, 20, 26–29 dikurangi
+yang sudah bertuan). Dipilih Aturan 20 karena ia satu-satunya yang menjaga janji
+yang **brief nyatakan sebagai syarat**, bukan sebagai rasa: teks **>= 4.5:1
+(WCAG)**.
+
+### Cacat yang dijaga, dan harganya sudah pernah dibayar
+
+View yang merakit latarnya sendiri dari token yang diredupkan —
+
+    .background(phaseTone.color.opacity(0.12))
+
+— menghasilkan warna yang **tidak ada di palet**. Tidak satu pun uji kontras
+melihatnya, karena `TonePaletteTests` menguji teks di atas **permukaan token**,
+bukan di atas latar yang dirakit view. Di mode malam nada paling redup yang
+benar-benar dipakai (`.neutral`, merah 0.94) di atas latar malam jatuh ke
+**4.32:1** — di bawah ambang. Kartu tahap kalibrasi memang pernah memakai bentuk
+itu; komentarnya sendiri mencatatnya.
+
+Yang membuatnya sunyi: katalognya benar, `shortLabel`-nya benar, dan teksnya
+berwarna nada yang sama. Yang salah hanya warnanya.
+
+### Cacat kedua, dan ia yang lebih berbahaya dari yang dikejar
+
+Versi lama aturan ini mencocokkan polanya atas **satu baris** pada satu waktu:
+
+    AD_HOC = re.compile(r'\.(?:background|fill)\s*\([^)]*\.color\s*\.\s*opacity\s*\(')
+
+Terukur (8 keadaan, `Tools/bukti-mutasi-permukaan.py`): cacat asli yang **sama**
+lolos begitu ia diformat berbeda.
+
+| bentuk cacat | versi lama | sesudah perbaikan |
+|---|---|---|
+| `.background(tone.color.opacity(0.12))` satu baris | MERAH | MERAH |
+| `.background(` lalu `tone.color.opacity(0.12))` | **hijau** | MERAH |
+| `.background(tone.color` lalu `.opacity(0.12))` | **hijau** | MERAH |
+| `pemanggilan bersarang(tone.color.opacity(0.12))` | MERAH (kebetulan) | MERAH |
+
+Jadi yang menentukan apakah aturan ini menggigit adalah **gaya pemformatan**,
+bukan ada tidaknya cacat — dan repo ini menulis rantai modifier multi-baris di
+banyak tempat. Cacat yang sama sudah bisa masuk `main` tanpa satu pun gerbang
+berbunyi. Pola lamanya juga memakai `[^)]*`, yang **tidak bisa melewati satu `)`
+pun**; bentuk bersarang hanya tertangkap karena `.color.opacity(` kebetulan
+mendahului `)` pertama.
+
+### Perbaikannya: argumen diambil berimbang, bukan per baris
+
+Komentar dibuang (hormat pada literal string — sama seperti Aturan 29; tanpa itu
+docstring yang **menjelaskan** pola ini akan dihitung sebagai temuan), isi literal
+string dikosongkan, lalu setiap `.(background|fill)(` diambil **argumennya
+dengan kurung dihitung berimbang**, dan polanya diuji di dalam teks argumen itu.
+
+Batasnya **dinyatakan**, bukan disangka tertutup: cakupannya `background`/`fill`
+saja sesuai docstring aturannya, dan nilai campuran yang dipindahkan ke variabel
+perantara (`let bg = tone.color.opacity(0.12)`) tetap di luar jangkauan —
+melacaknya menuntut pelacakan aliran, dan gerbang yang salah merah pada kode
+benar akan dimatikan orang.
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-permukaan.py` (baru, dirujuk `engine-tests.yml`) — **8
+keadaan, semuanya sesuai harapan**. Harness ini menuntut **badan Aturan 20** yang
+merah **dan menyebut berkas yang disuntik**, bukan sekadar "ada yang merah":
+salinan pohon yang tidak lengkap membuat aturan lain berbunyi, dan harness yang
+hanya menuntut "ada yang merah" tidak bisa membedakan aturan mana yang menangkap
+cacatnya.
+
+Lima bentuk cacat merah; **tiga kontrol negatif hijau**, dan ketiganya bukan
+hiasan — gerbang yang memerah pada kode benar akan dilonggarkan orang:
+
+| keadaan | harapan |
+|---|---|
+| 1 kode benar | hijau |
+| 2 cacat satu baris (bentuk asli) | merah |
+| 3 cacat **multi-baris** | merah — **hijau pada versi lama** |
+| 4 `.color` diakhiri baris | merah — **hijau pada versi lama** |
+| 5 pemanggilan bersarang | merah |
+| 5b `.fill` di Rectangle | merah |
+| 6 `Color.black.opacity(0.18)` | **hijau** — bayangan prosedural bukan permukaan bertoken |
+| 7 `.surfaceCard(level:)` | **hijau** — bentuk yang benar harus tetap benar |
+| 8 pola di dalam literal string | **hijau** — kalimat, bukan kode |
+
+**Non-vakuositasnya diukur, bukan diklaim.** Dengan program Aturan 20
+dikembalikan ke bentuk per-baris di worktree terpisah, harness ini merah
+**persis pada keadaan 3 dan 4** — dua bentuk yang saya klaim lewatkan, dan bukan
+yang lain. Itu sekaligus membuktikan keadaan 2, 5, dan 5b bukan yang menutup
+cacatnya.
+
+### Kenapa diukur di worktree terpisah
+
+`mutasi_sumber.require_clean_sources` menolak jalan bila berkas produksinya
+menyimpang dari HEAD. Pohon kerja utama memuat WIP siklus lain di
+`swift-ui-lint.sh` juga, jadi pengukuran dijalankan di `git worktree` bersih:
+seluruh 8 keadaan di atas diukur di sana, dan commit yang diverifikasi itu yang
+isi wilayah Aturan 20-nya dipindahkan ke commit ini.
+
+### Yang TIDAK diklaim
+
+- Harness ini mengukur **teks** `Apps/`, bukan piksel app Apple. Yang dibuktikan:
+  aturan berbunyi pada kelima bentuk cacat dan diam pada ketiga bentuk sah.
+- Ia **tidak** menghitung kontras. Angka 4.32:1 dan ambang 4.5 itu milik
+  `TonePaletteTests`/`SurfacePaletteTests` di Linux; yang dijaga di sini adalah
+  bahwa permukaan yang tak teruji tidak boleh dirakit di view.
+- **Sembilan aturan nirsaksi lain belum dikerjakan** (terukur: 10 -> **9**).
+  Daftarnya bisa diukur lagi kapan saja dengan menyilangkan `== Aturan N:` di
+  `swift-ui-lint.sh` terhadap seluruh `bukti-mutasi-*.py`.
+- Nilai campuran lewat variabel perantara (di atas) — batas yang dinyatakan.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift yang disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 787 | **787** (tak disentuh) |
+| Aturan nirsaksi (terukur) | 10 | **9** (-1) |
+| Harness dirujuk CI | 54 | **55** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-permukaan.py` → **8 keadaan, 0 tidak sesuai
+  harapan**, exit 0. Dengan Aturan 20 dikembalikan ke per-baris → **exit 1**,
+  merah tepat pada keadaan 3 dan 4.
+- `python3 Tools/check-harness-terdaftar.py` → **55 harness, semuanya dirujuk**,
+  exit 0.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
+- `./swift-test.sh` → **787 PointingKit + 212 CelestialEngine, 0 gagal**
+  (dijalankan di pohon kerja; engine tak disentuh siklus ini).
+
+---
+
 ## Progres terakhir (14 Okt 2026 — konstanta port yang mengaku dari model: sembilan angka yang tidak diperiksa siapa pun)
 
 Siklus ini mulai dari membaca **pengakuan di dalam kode**, bukan dari brief.

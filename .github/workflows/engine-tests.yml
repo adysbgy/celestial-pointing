@@ -1039,6 +1039,33 @@ jobs:
       - name: Buktikan Aturan 30 berbunyi pada kunci izin yang hilang
         run: python3 Tools/bukti-mutasi-kunci-izin.py
 
+      # Dan bukti untuk Aturan 20 — janji kontras yang paling keras di app ini.
+      #
+      # Brief menuntut teks **>= 4.5:1 (WCAG)**, dan satu-satunya cara janji itu
+      # bertahan adalah kalau setiap permukaan kartu datang dari
+      # `SurfacePalette` yang kontrasnya sudah dihitung terhadap semua nada.
+      # View yang merakit latarnya sendiri dengan `tone.color.opacity(0.12)`
+      # menghasilkan warna yang **tidak ada di palet**, jadi tidak satu pun uji
+      # kontras melihatnya. Cacatnya nyata dan sudah dibayar: kartu tahap
+      # kalibrasi dulu memakai bentuk itu, dan di mode malam nada `.neutral`
+      # (merah 0.94) di atas latar malam jatuh ke **4.32:1** — di bawah ambang.
+      #
+      # Sampai siklus ini Aturan 20 tidak punya satu pun rekam jejak bahwa ia
+      # bisa keluar merah. Dan versi lamanya mencocokkan polanya atas **satu
+      # baris**, sehingga cacat asli yang sama lolos begitu ia diformat
+      # multi-baris — yang menentukan apakah aturan itu menggigit adalah **gaya
+      # pemformatan**, bukan ada tidaknya cacat. Argumennya sekarang diambil
+      # berimbang (kurung dihitung), jadi `.background(\n …opacity(…))` dan
+      # `pemanggilan bersarang(…)` ikut terbaca.
+      #
+      # Harness ini menuntut **badan Aturan 20** yang merah dan menyebut berkas
+      # yang disuntik — bukan sekadar "ada yang merah", karena salinan pohon
+      # yang tidak lengkap membuat aturan lain berbunyi. Lima bentuk cacat dan
+      # tiga kontrol negatif (bayangan `Color.black`, `.surfaceCard`, dan pola
+      # di dalam literal string).
+      - name: Buktikan Aturan 20 berbunyi pada permukaan yang dirakit di view
+        run: python3 Tools/bukti-mutasi-permukaan.py
+
       # Dan bukti untuk penjaga yang **melindungi semua harness di atas**.
       #
       # `mutasi_sumber.require_clean_sources` menolak jalan bila berkas
