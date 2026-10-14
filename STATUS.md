@@ -1,3 +1,109 @@
+## Progres terakhir (14 Okt 2026 — katalog langit dalam: 1 dari 3 gerbang nirsaksi ditutup, dan dua cacat yang hanya ditemukan dengan mengukur)
+
+Siklus ini meneruskan sapuan yang sudah ada di repo: dari 84 gerbang di
+`check-visuals.py`, **berapa yang pernah dibuktikan bisa merah?** Terukur
+ulang di awal siklus: **3 nirsaksi** —
+
+    check_deep_sky_catalogue_values_reach_the_picture
+    check_spiral_core_reads_as_one_body
+    check_spiral_core_docstring_quotes_measured_values
+
+Dipilih yang pertama, karena ia menjaga **ragam visual** objek langit dalam
+(FASE C #5): 18 entri katalog — nebula, galaksi, gugus — masing-masing
+digambar dengan angka fuzziness-nya sendiri (0.30 M22 sampai 1.00 M31), dan
+bedanya harus **terlihat** di ukuran jam (38 pt), bukan cuma berbeda secara
+aritmetika.
+
+### Kenapa gerbang ini
+
+Gerbang ini satu-satunya yang membandingkan rumus `growth` blob —
+`0.62 + 0.38 · fuzziness` — antara model Swift dan port Python. Rumus itu
+hidup **dua kali**, dan arah yang paling mungkin terjadi di repo dua bahasa
+ini adalah **model diedit di Mac, port tertinggal di Linux**. Tanpa gerbang
+ini, mengecilkan rentang growth di model mengubah gambar di jam sementara
+seluruh gerbang gambar repo ini — yang merender **port** — tetap hijau.
+
+### Bukti bahwa gerbangnya berbunyi
+
+`Tools/bukti-mutasi-katalog-langit-dalam.py` — **3 keadaan, semuanya sesuai
+harapan**:
+
+| keadaan | hasil |
+|---|---|
+| baseline | hijau, 0 merah dari 11 |
+| 1. model: rentang growth 0.38 → 0.10 (port tertinggal) | **2 merah** |
+| 2. entri m31 → netral 0.6 (rumus tetap hijau) | **2 merah** |
+
+Kedua keadaan **tidak saling menggantikan**: keadaan 1 merah pada "rumus
+growth sama di kedua bahasa" (model 0.10 ≠ port 0.38); keadaan 2 merah pada
+"angka katalog punya efek pada gambar jam" sementara "rumus growth sama"
+**tetap hijau** — membuktikan penjaga nilainya hidup, bukan hanya penjaga
+rumusnya.
+
+### Dua cacat harness, keduanya ditemukan dengan mengukur bukan membaca
+
+**1. Mutasi nyasar dari keadaan 1 ke keadaan 2.** Keadaan 2 hanya menyunting
+`DeepSkyCatalogue.swift`, dan versi pertama harness hanya memulihkan berkas
+yang ia mutasi — jadi keadaan 2 diam-diam berjalan di atas
+`CelestialVisual.swift` yang **masih membawa mutasi keadaan 1**, dan
+melaporkan "rumus growth sama di kedua bahasa" **merah** untuk suntingan yang
+tidak menyentuh rumusnya sedikit pun.
+
+Ini kelas cacat yang persis dicari repo ini, hanya kali ini hidup **di dalam
+harnessnya sendiri**: kegagalan pemulihan itu diam, dan yang disalahkan adalah
+gerbangnya, bukan berkas yang belum pulih. Diperbaiki dengan memulihkan
+**kedua** berkas di setiap keadaan — bukan dengan melonggarkan harapannya.
+
+**2. Harapan keadaan 1 salah, dan yang salah adalah dugaannya.** Versi
+pertama menuntut "angka katalog punya efek pada gambar jam" ikut merah saat
+rentang growth dikempeskan. Terukur: pemeriksaan itu membandingkan tiap objek
+ke gambar netral 0.6, dan span 0.10 **masih bukan nol** — jadi tiap objek
+tetap berbeda dari netral dan pemeriksaannya tetap **hijau**. Dugaan saya
+("rentang kecil = tidak ada efek") salah; pemeriksaannya benar. Harapan
+diperbaiki ke yang terukur, **bukan** gerbangnya dilonggarkan.
+
+Kedua cacat ini sejalan dengan pelajaran siklus-siklus sebelumnya: jangkar
+mutasi yang tidak cocok (muncul 0x) tidak pernah berteriak, dan satu-satunya
+yang menemukannya adalah menuntut hitungan jangkar **tepat 1**.
+
+### Yang TIDAK diklaim
+
+- Harness ini mengukur **teks sumber kedua bahasa** dan piksel **port
+  Python**. Ia **tidak** membaca piksel app Apple: view SwiftUI yang berhenti
+  memanggil konstanta ini tidak ditangkapnya.
+- Ia **tidak** membuktikan angka 0.62/0.38 itu benar secara astronomis — itu
+  keputusan tampilan. Yang dijaga adalah **kesepakatan dua bahasa** dan
+  efeknya pada gambar. Dua bahasa yang sepakat dan sama-sama salah tetap
+  hijau.
+- **2 gerbang nirsaksi lain belum dikerjakan** (terukur: 3 → **2**).
+- `Apps/` **tidak disentuh**. Engine tidak diubah.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 785 | **785** (tak disentuh) |
+| Gerbang nirsaksi (terukur) | 3 | **2** (−1) |
+| Harness dirujuk CI | 48 | **49** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** (hanya dimutasi & dipulih) |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-katalog-langit-dalam.py` → **3 keadaan, 0 tidak
+  sesuai harapan**; kedua berkas produksi pulih **persis** (md5 sama
+  sebelum/sesudah).
+- `python3 Tools/check-harness-terdaftar.py` → **49 harness, semuanya
+  dirujuk** (gerbang ini sendiri menolak harness baru sebelum langkah CI-nya
+  ditambahkan — ia bekerja).
+- `./swift-test.sh` → **212 + 785 = 997 hijau**, 0 gagal.
+- `./swift-ui-lint.sh` → **35 aturan lulus**. `./swift-typecheck.sh` → lulus.
+- CI: `Apple Build` (macos-15) **success** — gerbang yang gagal bila ada
+  compiler warning kode sendiri. `Engine Tests (Linux)` menyusul.
+
+---
+
 ## Progres terakhir (14 Okt 2026 — audit jujur: brief usang, semua fitur BAGIAN 1–4 + FASE A–C sudah ada & tergerbang)
 
 Siklus dibuka bukan dengan menulis kode, melainkan dengan **memverifikasi klaim
