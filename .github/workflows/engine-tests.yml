@@ -1239,6 +1239,21 @@ jobs:
       - name: Buktikan gerbang katalog langit dalam berbunyi
         run: python3 Tools/bukti-mutasi-katalog-langit-dalam.py
 
+      # Bukti bahwa dua gerbang inti spiral berbunyi — sisa terakhir dari
+      # tiga gerbang nirsaksi. Keduanya mengukur hal yang sama dari dua sisi
+      # yang tidak bisa saling menggantikan: yang satu mengukur **gambarnya**
+      # (selisih cakupan cincin dengan vs tanpa tonjolan), yang lain mengukur
+      # **angka yang dikutip docstring-nya** keluar dari penyampelnya sendiri.
+      #
+      # Temuan utamanya terukur: mutasi "tonjolan diperkecil/diredupkan"
+      # berbunyi lewat pemeriksaan **"sampel inti ada"** (batas sampel runtuh),
+      # bukan lewat pemeriksaan selisih — persis yang dicatat docstringnya.
+      # Keadaan 3 (tonjolan dihapus) beda lagi: indeksnya jatuh ke kabut
+      # cakram, jadi sampelnya tidak runtuh dan yang berbunyi adalah
+      # angka-angka docstring. Keadaan 4 kontrol negatif, harus tetap hijau.
+      - name: Buktikan gerbang inti spiral berbunyi
+        run: python3 Tools/bukti-mutasi-inti-spiral.py
+
       # Bukti bahwa `check_mars_caps_fade_into_the_surface` berbunyi — gerbang
       # baru yang lahir bersama luruhan tepi dalam kutub Mars.
       #
