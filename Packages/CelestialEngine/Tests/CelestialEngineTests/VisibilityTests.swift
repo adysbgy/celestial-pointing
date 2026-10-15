@@ -472,6 +472,105 @@ final class VisibilityTests: XCTestCase {
     }
 }
 
+// MARK: - Bulan di siang / dekat Matahari
+
+/// **Tepi kasus kejujuran (PRD v0.4 "uncertainty > false confidence", FASE C
+/// #6 "siang hari, bulan redup").** Bintang sudah punya
+/// `DaylightStarVisibilityTests`, tapi jalur Bulan di `classify` belum pernah
+/// dikunci untuk keadaan di mana Bulan justru paling sering tertunjuk tapi
+/// paling tidak bisa diklaim: **siang hari** dan **dekat Matahari**.
+///
+/// Bulan sabit tipis memang ada di langit siang, dan pengguna menunjuknya
+/// karena cahayanya terlihat — tapi mengembalikannya sebagai kandidat
+/// `.visible` (apalagi dengan keyakinan) saat Matahari masih di atas horizon
+/// adalah klaim "bisa kamu lihat dengan jelas" yang salah: bulu sabit itu
+/// tenggelam dalam glare Matahari, dan teleskop yang diarahkan ke arah itu
+/// justru menuju Matahari. Tanpa uji ini, regresi yang membalik urutan
+/// cabang di `classify` (atau yang membaca `context.isDark` alih-alih ambang
+/// ketinggian Matahari) tetap lolos semua uji bintang, dan engine diam-diam
+/// mulai mengklaim Bulan di siang hari.
+///
+/// Yang diuji di sini murni `classify(kind: .moon)` — tanpa efemeris — supaya
+/// aturannya terpisah dari akurasi posisi, sama seperti uji visibilitas lain.
+final class MoonDaylightVisibilityTests: XCTestCase {
+
+    private let policy = VisibilityPolicy()
+
+    /// Bulan di atas horizon (alt 30°) saat Matahari masih tinggi (+20°):
+    /// harus `.daylight`, bukan `.visible`, sekalipun bulannya terang (mag -8).
+    ///
+    /// Altitude Bulan positif menutup gerbang `belowHorizon`; magnitudonya
+    /// (-8) jauh di bawah ambang, menutup `tooFaint`; dan jarak ke Matahari
+    /// lebar (120°) menutup `tooCloseToSun`. Satu-satunya gerbang yang masih
+    /// harus menolaknya adalah kegelapan langit — dan itulah yang diuji.
+    func testBrightMoonInDaylightIsRejected() {
+        let day = SkyContext(sunAltitudeDeg: 20, isDark: false)
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 30, magnitude: -8.0, separationFromSunDeg: 120,
+            context: day, policy: policy, kind: .moon
+        )
+        XCTAssertEqual(result, .daylight,
+                       "Bulan di siang hari tidak boleh jadi kandidat terlihat")
+        XCTAssertFalse(result.isCandidate)
+    }
+
+    /// Bulan di senja, Matahari masih +2° di atas cakrawala sipil (ambang
+    /// gelap = -6°): tetap `.daylight`, meski ia jauh dari Matahari
+    /// (120°) sehingga gerbang `tooCloseToSun` tidak ikut menolaknya.
+    ///
+    /// Ini mengunci gerbang **kegelapan langit** khusus `kind: .moon`:
+    /// `classify` memeriksa `tooCloseToSun` *sebelum* `daylight`, jadi untuk
+    /// benar-benar mencapai gerbang daylight tanpa memicu gerbang Matahari,
+    /// pemisahan harus lewat `minSunSeparationDeg` (30°). Kasus sabit tipis
+    /// yang benar-benar dekat Matahari (< 30°) sudah dikunci oleh
+    /// `testMoonTooCloseToSunIsRejectedEvenAtNight` — di sini kita uji bahwa
+    /// Bulan yang jauh dari Matahari tapi langitnya masih siang tetap tidak
+    /// diklaim terlihat.
+    func testMoonAtCivilTwilightIsDaylight() {
+        let twilight = SkyContext(sunAltitudeDeg: 2, isDark: false)
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 15, magnitude: -6.0, separationFromSunDeg: 120,
+            context: twilight, policy: policy, kind: .moon
+        )
+        XCTAssertEqual(result, .daylight,
+                       "Bulan di senja (Matahari masih +2°) tetap dalam glare siang")
+    }
+
+    /// Bulan berdekatan dengan Matahari (< `minSunSeparationDeg`) harus
+    /// `.tooCloseToSun` — bahkan di malam gelap sekalipun, karena ini
+    /// pengaman teleskop, bukan soal terang/langit.
+    ///
+    /// Dipisah dari uji bintang agar aturannya ikut terkunci untuk `kind:
+    /// .moon`: cabang `tooCloseToSun` berlaku untuk semua benda, tapi kalau
+    /// hanya bintang yang pernah diuji, regresi yang salah memangkas
+    /// pemisahan untuk benda tata surya bisa lolos.
+    func testMoonTooCloseToSunIsRejectedEvenAtNight() {
+        let night = SkyContext(sunAltitudeDeg: -40, isDark: true)
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 30, magnitude: -8.0, separationFromSunDeg: 12,
+            context: night, policy: policy, kind: .moon
+        )
+        XCTAssertEqual(result, .tooCloseToSun,
+                       "Bulan terlalu dekat Matahari tetap berbahaya di malam")
+        XCTAssertFalse(result.isCandidate)
+    }
+
+    /// Kebalikannya, untuk memastikan uji di atas bukan sekadar selalu menolak:
+    /// Bulan purnama tinggi di malam gelap (Matahari -40°, jarak 120°) harus
+    /// `.visible`. Tanpa uji ini, sebuah perubahan yang "memperbaiki"
+    /// siang-hari dengan membuang Bulan secara blanket di semua konteks
+    /// akan lulus uji penolakan tapi diam-diam membunuh Bulan malam.
+    func testMoonAtNightIsVisible() {
+        let night = SkyContext(sunAltitudeDeg: -40, isDark: true)
+        let result = VisibilityFilter.classify(
+            altitudeDeg: 50, magnitude: -12.0, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .moon
+        )
+        XCTAssertEqual(result, .visible)
+        XCTAssertTrue(result.isCandidate)
+    }
+}
+
 // MARK: - Benda tata surya
 
 final class EphemerisBodyTests: XCTestCase {
