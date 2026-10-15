@@ -1130,6 +1130,29 @@ jobs:
       - name: Buktikan Aturan 20 berbunyi pada permukaan yang dirakit di view
         run: python3 Tools/bukti-mutasi-permukaan.py
 
+      # Dan bukti bahwa Aturan 2 (singkatan visual di teks UI) benar-benar
+      # berbunyi — dan, yang lebih penting, benar-benar **diam pada prosa**.
+      #
+      # Cacatnya adalah kebalikan dari cacat biasa: aturannya *terlalu*
+      # berbunyi. Ia melaporkan 9 baris di repo ini dan **semuanya komentar** —
+      # nol sinyal. Aturan yang selalu berbunyi sama tidak bergunanya dengan
+      # aturan yang tidak pernah berbunyi, dan kelas cacat itu sudah dibayar
+      # repo ini berkali-kali (Aturan 7, 20).
+      #
+      # Harness ini memulihkan tiga bentuk nyata — satuan di `Text`, di
+      # `label:` aksesibilitas, dan di kunci `Localizable.xcstrings` (jalan
+      # yang sebelumnya **tidak diperiksa siapa pun**, karena Aturan 4 menyapu
+      # kode yang memakainya dan Aturan 6 hanya membandingkan paritas kunci) —
+      # lalu menuntut lima kontrol negatif hijau: kalimat yang mengutip
+      # singkatannya, komentar, dokumentasi `mag 2.5`, `magnitudo 2.5`, dan
+      # frasa penuh terucap.
+      #
+      # Keadaan komentar adalah yang paling berharga: ia hijau pada versi baru
+      # dan merah pada versi lama, jadi ia mengunci perbaikan itu, bukan
+      # sekadar menemani.
+      - name: Buktikan Aturan 2 berbunyi pada singkatan visual, dan diam pada kalimat
+        run: python3 Tools/bukti-mutasi-singkatan-visual.py
+
       # Dan bukti bahwa Aturan 16 (kalimat aksesibilitas harus datang dari
       # katalog) benar-benar berbunyi.
       #

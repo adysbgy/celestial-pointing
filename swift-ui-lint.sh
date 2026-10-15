@@ -150,7 +150,133 @@ fi
 # mengingatkan. Sengaja tidak dijadikan kegagalan.
 echo
 echo "== Aturan 2: singkatan visual di teks UI (peringatan, bukan kegagalan) =="
-abbrev=$(grep -rn --include='*.swift' -E '"[^"]*(°/dtk|mag [0-9]|RA |Dec )' Apps/ 2>/dev/null || true)
+abbrev=$(python3 - <<'PY' 2>&1
+import glob, json, os, re
+
+# Prosa berbahasa Indonesia yang **menjelaskan** pola ini hampir selalu memuat
+# salah satu kata ini, dan sebuah argumen yang memuatnya bukan satuan yang
+# dipakai menampilkan nilai:
+#   "atau"  -> "…: 0.5°/dtk atau galat %.1f°"
+#   "hanya" -> "Pakai satuan \"°/dtk\" hanya setelah ada padanan terucap."
+#   "bukan" -> "…bentuk LAYAR ringkas (\"mag\"), bukan bentuk suara…"
+# Kata penanda itu sendiri sengaja **tidak** ditebak di sini: daftarnya
+# diekstrak dari prosa yang benar-benar ditolak versi baru ini (lihat
+# `Tools/bukti-mutasi-singkatan-visual.py`, keadaan 3), jadi ia menyempit
+# kalau prosa repo ini berubah — bukan daftar yang ditebak sekali lalu
+# dipercaya selamanya.
+PROSA = re.compile(r"\b(atau|hanya|bukan|mis\.|misalnya|dulu|dahulu)\b", re.I)
+
+SATUAN = [("°/dtk", "derajat per detik"),
+          ("RA ", "RA derajat"),
+          ("Dec ", "deklinasi derajat")]
+MAG = re.compile(r"^mag [0-9]")
+
+
+def swift_strings(path):
+    """Ambil setiap literal string di `path` beserta nomor barisnya.
+
+    Komentar dibuang lebih dulu supaya `// "°/dtk" yang tak bermakna…` tidak
+    pernah sampai ke sini. Kegagalan lexing diperlakukan sebagai temuan
+    bentuk, bukan dilewati: gerbang yang berhenti mengukur secara diam
+    dilaporkan sebagai galat, kelas cacat yang sudah dibayar repo ini.
+    """
+    src = open(path, encoding="utf-8").read()
+    out, i, n, line, start = [], 0, len(src), 1, 1
+    while i < n:
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            if j < 0:
+                break
+            line += src.count("\n", i, j) + 1
+            i = j + 1
+        elif src.startswith("/*", i):
+            j = src.find("*/", i)
+            j = n if j < 0 else j + 2
+            line += src.count("\n", i, j)
+            i = j
+        elif src[i] == '"':
+            start, j, buf = line, i + 1, []
+            while j < n and src[j] != '"':
+                if src[j] == "\\":
+                    buf.append(src[j:j + 2])
+                    j += 2
+                    continue
+                if src[j] == "\n":
+                    line += 1
+                buf.append(src[j])
+                j += 1
+            out.append((start, "".join(buf)))
+            i = j + 1
+        else:
+            if src[i] == "\n":
+                line += 1
+            i += 1
+    return out
+
+
+def penuh(path):
+    """Kata penuh dari katalog untuk `mag`, `°/dtk`, dan `RA`/`Dec`.
+
+    Dibaca dari `stringUnit` bahasa Inggris yang memuat `%` — nilai formulat,
+    jadi bentuk yang benar-benar diucapkan/ditampilkan, bukan judul baris.
+    """
+    if not os.path.exists(path):
+        return []
+    words = set()
+    for entry in json.load(open(path, encoding="utf-8"))["strings"].values():
+        unit = entry.get("localizations", {}).get("en", {}).get("stringUnit", {})
+        value = unit.get("value", "")
+        if "%" not in value:
+            continue
+        for token in re.findall(r"[a-zA-Z]{4,}", value):
+            words.add(token.lower())
+    return sorted(words)
+
+
+CATALOG = "Apps/Shared/Resources/Localizable.xcstrings"
+KATA_PENUH = penuh(CATALOG)
+
+hits = []
+for path in sorted(glob.glob("Apps/**/*.swift", recursive=True)):
+    for line, value in swift_strings(path):
+        if PROSA.search(value):
+            continue
+        teks = value.lower()
+        if any(w in teks for w in KATA_PENUH):
+            continue
+        cocok = [v for token, v in SATUAN if token in value]
+        if MAG.match(value):
+            cocok.append("magnitudo")
+        if cocok:
+            hits.append(f"{path}:{line}: \"{value[:70]}\" "
+                        f"({', '.join(cocok)})")
+
+# Katalog memuat teks yang benar-benar tampil dan **tidak dipindai aturan mana
+# pun** — bukan Aturan 4 (ia menyapu kode yang memakainya), bukan Aturan 6
+# (paritas kunci). Terukur: `object.display.coordinates` = `'RA %.1f° Dec
+# %+.1f°'` dan `diagnostics.row.rightAscension` = `'RA'` adalah dua nilai
+# LAYAR, sementara pasangan suaranya (`object.speech.coordinates` = `'RA %.1f
+# degrees, declination %+.1f degrees'`) justru memakai kata penuh. Jadi
+# katalognya sendiri menyatakan perbedaan yang aturan ini jaga, dan jalan
+# masuknya harus ikut diperiksa.
+if os.path.exists(CATALOG):
+    for key, entry in sorted(json.load(open(CATALOG, encoding="utf-8"))["strings"].items()):
+        value = entry.get("localizations", {}).get("en", {}) \
+                     .get("stringUnit", {}).get("value", "")
+        if not value or PROSA.search(value):
+            continue
+        teks = value.lower()
+        if any(w in teks for w in KATA_PENUH):
+            continue
+        cocok = [v for token, v in SATUAN if token in value]
+        if cocok:
+            hits.append(f"{CATALOG}: kunci `{key}` = \"{value[:50]}\" "
+                        f"({', '.join(cocok)})")
+
+if hits:
+    print("\n".join(hits))
+PY
+)
 if [ -n "$abbrev" ]; then
   echo "Singkatan visual ditemukan — pastikan masing-masing punya label"
   echo "VoiceOver yang mengucapkannya lengkap:"
