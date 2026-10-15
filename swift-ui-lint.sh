@@ -5740,6 +5740,18 @@ fi
 # `switch` bersarang membuat `switch` yang **kurang** satu kasus tampak
 # lengkap.
 #
+# **Kasus bermuatan, dan kenapa itu wajib dibaca.** Versi pertama pembaca ini
+# hanya mengenali `case nama` dan membuang **seluruh** enum yang salah satu
+# kasusnya bermuatan (`case identifiable(CelestialVisual)`). Akibatnya terukur:
+# `switch ReducedLuminanceVisual.plan(...)` (`ReducedLuminanceView.swift:57`)
+# tidak pernah diperiksa, dan menambahkan `case candidate(CelestialVisual)`
+# ke `Plan` membiarkan seluruh aturan hijau sementara `switch`-nya tidak
+# lengkap — kelas cacat yang sama dengan `27dd677`, pada enum yang kebetulan
+# punya muatan. Yang dibandingkan hanya **nama** kasusnya; muatan di sisi
+# `switch` (`let visual`) justru wajib ada dan memang berbeda dari muatan di
+# model, jadi menuntut muatan yang sama akan menuduh kode yang benar.
+# Terukur: enum terindeks **25 → 27**, situs diperiksa **8 → 9**, **0 hilang**.
+#
 # **Batas yang diakui, dan kenapa ia tetap berguna.** Ini sapu **teks**, bukan
 # pemeriksa tipe. Untuk menghindari menuduh kode yang benar, aturan hanya
 # berbunyi bila memenuhi **ketiga** syarat:
@@ -5865,12 +5877,57 @@ def top_level_clauses(body, prefix):
     return out, simple
 
 
-def enum_case_sets(text):
-    """{nama enum: {kasus}} untuk enum yang **semua** kasusnya sederhana.
+def split_top_commas(clause):
+    """Pecah daftar `case` pada koma **kedalaman kurung 0**.
 
-    Enum yang punya kasus berasosiasi-nilai, `rawValue`, atau makro apa pun
-    dibuang seluruhnya: menaksir himpunannya dari teks lalu menuntutnya di
-    `Apps/` akan menuduh kode yang benar.
+    `case a(Int, Int), b` adalah dua kasus, bukan tiga: koma di dalam
+    tanda kurung milik muatan kasus pertama. `str.split(",")` membacanya
+    sebagai tiga potongan dan potongan `Int` lalu tampak seperti kasus
+    yang tidak terbaca — satu-satunya alasan `Plan` (yang punya
+    `.identifiable(CelestialVisual)`) tidak pernah masuk ke himpunan enum
+    dan `switch` atasnya tidak pernah diperiksa.
+    """
+    out = []
+    depth = 0
+    current = ""
+    for ch in clause:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(current)
+            current = ""
+        else:
+            current += ch
+    out.append(current)
+    return out
+
+
+def enum_case_sets(text):
+    """{nama enum: {kasus}} untuk enum yang semua kasusnya berbentuk nama.
+
+    **Kasus berasosiasi-nilai ikut dibaca, namanya saja.** Ini bukan
+    kelonggaran: yang dituntut Aturan 37 adalah *kelengkapan label*, dan
+    `case .identifiable(let visual)` di `Apps/` adalah label `.identifiable`
+    yang sama dengan `case identifiable(CelestialVisual)` di model. Muatannya
+    boleh berbeda antar sisi tanpa membuat labelnya salah — `let` di sisi
+    `switch` justru **wajib** ada supaya nilainya bisa dipakai, dan menuntut
+    muatan yang sama persis akan menuduh kode yang benar.
+
+    Terukur pada pohon ini: membaca kasus bermuatan menaikkan enum terindeks
+    **25 → 27** dan situs diperiksa **8 → 9**, dengan **0 situs hilang**.
+    Situs yang bertambah itu `ReducedLuminanceView.swift:57`
+    (`switch ReducedLuminanceVisual.plan(...)` atas `Plan`) — dan di sana
+    versi lama memang buta: menambahkan `case candidate(CelestialVisual)` ke
+    `Plan` membiarkan seluruh aturan hijau sementara `switch`-nya tidak
+    lengkap. Itu bentuk cacat yang sama dengan `27dd677`, pada enum yang
+    kebetulan punya muatan.
+
+    Yang tetap dibuang: enum yang **tidak punya satu pun kasus** (namespace
+    berisi `static let` saja — 35 dari 62 enum di pohon ini) dan enum yang
+    salah satu klausanya tidak berbentuk `nama` / `nama(muatan)`. Kasus
+    pertama bukan enum, kasus kedua tidak bisa ditaksir dari teks.
     """
     found = {}
     for m in re.finditer(r"\benum\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:{]", text):
@@ -5880,15 +5937,20 @@ def enum_case_sets(text):
             continue
         clauses, _ = top_level_clauses(body, "case")
         cases = set()
-        simple = True
+        readable = True
         for clause in clauses:
-            for part in clause.split(","):
+            for part in split_top_commas(clause):
                 part = part.strip()
-                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part):
-                    cases.add(part)
+                # `nama` atau `nama(muatan)` — muatannya tidak dibaca, hanya
+                # keberadaannya yang menandakan ini kasus bermuatan.
+                match = re.fullmatch(
+                    r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((?:[^()]|\([^()]*\))*\))?",
+                    part, re.S)
+                if match:
+                    cases.add(match.group(1))
                 else:
-                    simple = False
-        if cases and simple:
+                    readable = False
+        if cases and readable:
             found.setdefault(name, set()).update(cases)
         else:
             found.pop(name, None)
@@ -5898,12 +5960,22 @@ def enum_case_sets(text):
 def switch_label_sets(text):
     """(baris, ekspresi, {label}) untuk tiap `switch` tanpa `default:`.
 
-    Klausa yang tidak murni daftar `.anggota` membatalkan `switch` itu —
-    `case .identifiable(let visual):` tidak boleh dibaca sebagai himpunan
-    label, karena labelnya memang tidak dimaksudkan lengkap.
+    Klausa yang tidak berbentuk daftar `.anggota` membatalkan `switch` itu —
+    `case .identifiable(let visual) where x > 0:` tidak boleh dibaca sebagai
+    himpunan label, karena labelnya memang tidak dimaksudkan lengkap.
+
+    **`.anggota(let x)` diterima, dan `let` itu wajib di sisi ini.** Label
+    yang dibandingkan adalah namanya saja; muatannya tidak pernah dipakai
+    untuk memutuskan kelengkapan. Menolak bentuk ini akan membuang seluruh
+    `switch` atas enum bermuatan — terukur: `switch ReducedLuminanceVisual.plan(...)`
+    kehilangan satu-satunya kasusnya yang bermuatan dan tidak pernah diperiksa.
+    Sebaliknya, bentuk yang memang bukan daftar label tetap membatalkan:
+    `case let .identifiable(visual)` (pengikatan di depan), `where`, dan
+    label berangka seperti `.case1` semuanya di luar jangkauan pembaca ini,
+    dan `switch` yang memuatnya dilewati alih-alih dituduh.
 
     Klausanya diambil pada kedalaman 0 saja, dengan alasan yang sama seperti
-    `top_level_cases`: `switch` bersarang yang tidak ber-`default:`
+    `top_level_clauses`: `switch` bersarang yang tidak ber-`default:`
     menyumbangkan labelnya ke himpunan milik induknya. Terukur pada pohon ini
     perubahannya **0 situs** — jadi ini penjaga untuk bentuk yang belum
     ditulis, bukan perbaikan cacat yang sedang ada. Ia tetap ada karena arah
@@ -5920,10 +5992,13 @@ def switch_label_sets(text):
         labels = set()
         readable = True
         for clause in clauses:
-            for part in clause.split(","):
+            for part in split_top_commas(clause):
                 part = part.strip()
-                if re.fullmatch(r"\.[A-Za-z_][A-Za-z0-9_]*", part):
-                    labels.add(part[1:])
+                # `.nama` atau `.nama(muatan)`; muatannya boleh memuat `let`.
+                match = re.fullmatch(
+                    r"\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(.*\))?", part, re.S)
+                if match:
+                    labels.add(match.group(1))
                 else:
                     readable = False
         if not readable or not labels:

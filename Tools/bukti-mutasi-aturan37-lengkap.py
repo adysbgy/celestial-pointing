@@ -140,6 +140,14 @@ AXES_NEW_CASE_ANCHOR = "    case equatorial\n"
 #: kasusnya identik (`CelestialVisual.Kind` dan `ObjectKind`).
 KIND_CASE = "        case .deepSky:\n"
 
+#: Model `Plan` — enum **bermuatan** (`case identifiable(CelestialVisual)`).
+#: `switch` atasnya di `ReducedLuminanceView.swift:57` tidak pernah diperiksa
+#: sampai pembacanya mengenali `case nama(muatan)`: versi lama membuang
+#: seluruh enumnya, jadi keadaan 10 hijau di sana.
+PLAN_MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
+                          "ReducedLuminanceVisual.swift")
+PLAN_NEW_CASE_ANCHOR = "        case identifiable(CelestialVisual)\n"
+
 #: Aturan versi **sebelum** perluasan cakupan: `PACKAGE_SOURCES` tunggal
 #: (PointingKit saja) dan syarat "tepat satu kandidat". Dipakai untuk
 #: menuntut bahwa keadaan 6-7 hijau di sana — tanpa itu, harness ini hanya
@@ -224,6 +232,26 @@ NAIVE_WIDENING_REPLACEMENTS = [
 ]
 
 
+#: Aturan versi **sebelum** kasus bermuatan dibaca. Dipakai untuk menuntut
+#: bahwa keadaan 10 hijau di sana — tanpa itu, keadaan itu hanya sepakat
+#: dengan dirinya sendiri.
+ASSOC_REPLACEMENTS = [
+    (
+        '                match = re.fullmatch(\n'
+        '                    r"([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\((?:[^()]|\\([^()]*\\))*\\))?",\n'
+        '                    part, re.S)\n'
+        '                if match:\n'
+        '                    cases.add(match.group(1))\n'
+        '                else:\n'
+        '                    readable = False\n',
+        '                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part):\n'
+        '                    cases.add(part)\n'
+        '                else:\n'
+        '                    readable = False\n',
+    ),
+]
+
+
 def demote_to_old_rule(program):
     """Cakupan **sebelum** perluasan: PointingKit saja, syarat tepat-satu.
 
@@ -232,6 +260,20 @@ def demote_to_old_rule(program):
     """
     out = program
     for old, new in OLD_SCOPE_REPLACEMENTS:
+        if out.count(old) != 1:
+            return None
+        out = out.replace(old, new, 1)
+    return out
+
+
+def demote_to_no_assoc(program):
+    """Aturan versi **sebelum** kasus bermuatan dibaca.
+
+    Kalau potongannya tidak lagi ada, kembalikan None — harness berhenti
+    alih-alih mengukur program yang berbeda dari yang diklaimnya.
+    """
+    out = program
+    for old, new in ASSOC_REPLACEMENTS:
         if out.count(old) != 1:
             return None
         out = out.replace(old, new, 1)
@@ -363,6 +405,15 @@ STATES = [
      [(AXES_VIEW, "        switch capability.axes {",
        "        switch capability.axes {\n        default: break")],
      False, {"aturan lama": False}),
+    # Keadaan 10: kelas cacat pada enum **bermuatan**. Versi yang tidak
+    # membaca `case nama(muatan)` membuang seluruh enumnya, jadi `switch`
+    # atasnya tidak pernah diperiksa — kelas yang sama dengan `27dd677`,
+    # pada enum yang kebetulan punya muatan.
+    ("10. kasus baru di `Plan` (enum bermuatan), switch dibiarkan",
+     [(PLAN_MODEL, PLAN_NEW_CASE_ANCHOR,
+       "        case identifiable(CelestialVisual)\n"
+       "        case candidate(CelestialVisual)\n")],
+     True, {"tanpa kasus bermuatan": False}),
 ]
 
 
@@ -393,7 +444,16 @@ def main():
               "swift-ui-lint.sh — harness tidak bisa membuktikan bahwa "
               "syarat kandidat memang menahan keadaan 8.", file=sys.stderr)
         sys.exit(2)
-    comparisons = {"aturan lama": old_program, "perluasan naif": naive_program}
+    no_assoc_program = demote_to_no_assoc(program)
+    if no_assoc_program is None:
+        print("GERBANG: potongan pembaca-tanpa-kasus-bermuatan tidak "
+              "ditemukan di swift-ui-lint.sh — harness tidak bisa "
+              "membuktikan bahwa keadaan 10 memang menambah cakupan.",
+              file=sys.stderr)
+        sys.exit(2)
+    comparisons = {"aturan lama": old_program,
+                   "perluasan naif": naive_program,
+                   "tanpa kasus bermuatan": no_assoc_program}
 
     with tempfile.TemporaryDirectory(prefix="aturan37-") as scratch:
         tree = os.path.join(scratch, "tree")
@@ -404,7 +464,8 @@ def main():
         # supaya kegagalan jangkar tidak menyamar sebagai keberhasilan.
         anchors = [(VIEW, CRESCENT_CASE), (VIEW, DRAW_CASE),
                    (MODEL, NEW_CASE_ANCHOR), (AXES_VIEW, AXES_CASE),
-                   (AXES_MODEL, AXES_NEW_CASE_ANCHOR), (VIEW, KIND_CASE)]
+                   (AXES_MODEL, AXES_NEW_CASE_ANCHOR), (VIEW, KIND_CASE),
+                   (PLAN_MODEL, PLAN_NEW_CASE_ANCHOR)]
         for relative, anchor in anchors:
             with open(os.path.join(tree, relative), encoding="utf-8") as handle:
                 count = handle.read().count(anchor)

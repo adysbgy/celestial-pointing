@@ -1782,9 +1782,14 @@ jobs:
       #     (`CelestialVisual.Kind` dan `ObjectKind`), jadi ia hijau pada
       #     "perluasan naif" (cakupan diperluas tanpa melonggarkan syarat
       #     kandidat) — alasan syaratnya harus berubah, bukan cuma cakupannya.
+      #   - kasus baru di `Plan` (enum **bermuatan**): pembaca yang hanya
+      #     mengenali `case nama` membuang seluruh enumnya, jadi `switch
+      #     ReducedLuminanceVisual.plan(...)` tidak pernah diperiksa. Hijau
+      #     pada aturan versi "tanpa kasus bermuatan" — alasan pembacanya
+      #     harus mengenali `case nama(muatan)`, bukan cuma memperluas cakupan.
       #
       # Non-vakuositasnya diukur: dengan keputusan akhir aturan dilumpuhkan
-      # di pohon salinan, keenam keadaan cacat berbalik hijau dan ketiga
+      # di pohon salinan, ketujuh keadaan cacat berbalik hijau dan ketiga
       # kontrol tetap hijau.
       - name: Buktikan Aturan 37 berbunyi pada switch yang kehilangan kasus enum
         run: python3 Tools/bukti-mutasi-aturan37-lengkap.py
