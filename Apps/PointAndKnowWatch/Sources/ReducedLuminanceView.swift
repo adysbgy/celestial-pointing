@@ -44,9 +44,10 @@ struct ReducedLuminanceView: View {
                 //
                 // `isConfirmed` diteruskan eksplisit (bukan `!isStale`): ambang
                 // untuk *klaim identitas* lebih ketat daripada "bukan sisa",
-                // dan `PointingEngine.confirmsIdentity` yang menurunkannya —
-                // sama dengan yang dipakai kartu jam, jadi kedua permukaan
-                // tidak bisa berbeda pendapat soal kapan ciri boleh tampil.
+                // dan `PointingEngine.confirmsDisplayedIdentity` yang
+                // menurunkannya — sama dengan yang dipakai kartu jam, jadi
+                // kedua permukaan tidak bisa berbeda pendapat soal kapan ciri
+                // boleh tampil.
                 //
                 // **Tanpa animasi.** watchOS menyegarkan layar redup sekali per
                 // detik, jadi denyut di sini hanya menghabiskan baterai tanpa
@@ -55,13 +56,13 @@ struct ReducedLuminanceView: View {
                 // layar penuh. `CelestialVisualView` menerima `pulse: 0`.
                 switch ReducedLuminanceVisual.plan(
                     visual: engine.visualForDisplayedObject,
-                    isConfirmed: engine.confirmsIdentity) {
+                    isConfirmed: engine.confirmsDisplayedIdentity) {
                 case .none:
                     EmptyView()
                 case .identifiable(let visual), .candidate(let visual):
                     CelestialVisualView(visual: visual,
                                         diameter: WatchMetrics.reducedVisualDiameter,
-                                        isConfirmed: engine.confirmsIdentity,
+                                        isConfirmed: engine.confirmsDisplayedIdentity,
                                         pulse: 0)
                 }
                 // Nama objek: satu-satunya informasi yang paling mungkin dicari
