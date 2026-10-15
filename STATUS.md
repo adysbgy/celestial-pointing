@@ -1,3 +1,118 @@
+## Progres terakhir (15 Okt 2026 — Aturan 37, lanjutan: tiga lubang yang hanya bisa dilihat dengan mengukur pembacanya sendiri)
+
+Siklus sebelumnya memasang Aturan 37 (switch di `Apps/` wajib memuat setiap
+kasus enum model). Siklus ini tidak menambah aturan baru; ia **mengukur ulang
+pembaca yang baru dipasang itu** — dan menemukan tiga lubang, ketiganya kelas
+yang sama persis dengan cacat yang mendarat di `main` pada `27dd677`: gerbang
+yang hijau pada bentuk tulisan tertentu.
+
+Yang membuat ketiganya layak dikerjakan: **ketiganya hijau pada pohon yang
+sekarang**, dan semuanya hanya berbunyi setelah ada orang menulis kode yang
+salah. Cacatnya di gerbang, bukan di gambar.
+
+### Lubang 1: cakupan berhenti satu paket terlalu awal
+
+`MountAxis` hidup di **CelestialEngine**, dan di-`switch` di
+`TelescopeHandoffView.swift:81`. Aturan hanya membaca enum dari
+`Packages/PointingKit/Sources/`.
+
+Terukur, bukan dibayangkan: menghapus `case .altitudeAzimuth:` dari sana
+membiarkan **seluruh 37 aturan hijau**, sementara compiler macOS menolaknya
+(`switch must be exhaustive`). Itu cacat `27dd677` yang sama, satu paket lebih
+jauh.
+
+### Lubang 2: perluasan cakupan membuat satu situs **hilang** tanpa suara
+
+Perluasan cakupan membuat `switch visual.kind` (`CelestialVisualView.swift:73`)
+cocok dengan **dua** enum berhimpunan kasus identik — `CelestialVisual.Kind`
+(PointingKit) dan `ObjectKind` (CelestialEngine), keduanya
+`{moon, planet, star, sun, deepSky}`. Syarat lama ("subset dari **tepat satu**
+enum") lalu melewatinya.
+
+Jadi perluasan cakupan saja **menyempitkan** gerbang. Karena dua enum
+berhimpunan sama menuntut kelengkapan yang sama, syaratnya menjadi "semua
+kandidat punya himpunan kasus identik"; dua kandidat berhimpunan **berbeda**
+tetap didiamkan (di sana kita memang tidak tahu enum mana yang dimaksud).
+
+### Lubang 3: enum bermuatan dibuang seluruhnya
+
+Pembaca enum hanya mengenali `case nama`. Begitu satu kasus punya muatan
+(`case identifiable(CelestialVisual)`), **seluruh enum itu** dibuang — jadi
+tidak ada satu pun `switch` atasnya yang diperiksa.
+
+Terukur: `switch ReducedLuminanceVisual.plan(...)`
+(`ReducedLuminanceView.swift:57`) tidak pernah masuk daftar situs, dan
+menambahkan `case candidate(CelestialVisual)` ke `Plan` membiarkan seluruh 37
+aturan hijau sementara `switch`-nya tidak lengkap.
+
+Yang dibandingkan hanya **nama** kasusnya. Muatan di sisi `switch`
+(`let visual`) wajib ada dan memang berbeda dari muatan di model; menuntut
+muatan yang sama persis akan menuduh kode yang benar. Dua perubahan kecil:
+`split_top_commas` (koma pada kedalaman-kurung 0 — `case a(Int, Int), b` itu
+**dua** kasus, bukan tiga) dan kedua pembaca menerima `nama(muatan)`.
+
+### Yang diukur, di dua dunia
+
+    enum terindeks        25 -> 27
+    situs diperiksa        8 ->  9
+    situs HILANG           0
+    temuan palsu           0
+
+Situs yang bertambah: `ReducedLuminanceView.swift:57`. Situs yang hilang:
+tidak ada — dan itu wajib diperiksa, karena perluasan cakupan yang menyempit
+adalah kegagalan yang **tidak terlihat** dari jumlah temuan (nol temuan bisa
+berarti "bersih" atau "tidak melihat apa-apa").
+
+Harness: 9 keadaan -> **10**, plus program pembanding **ketiga** ("tanpa kasus
+bermuatan"). Setiap keadaan yang mengklaim menambah cakupan kini dituntut
+hijau pada satu program pembanding, supaya ia tidak hanya sepakat dengan
+dirinya sendiri:
+
+    keadaan 6-7   (MountAxis)          hijau pada "aturan lama"
+    keadaan 8     (dua kandidat)       hijau pada "perluasan naif"
+    keadaan 10    (Plan bermuatan)     hijau pada "tanpa kasus bermuatan"
+
+Non-vakuositas diukur ulang: dengan keputusan akhir aturan dilumpuhkan di
+pohon salinan, **ketujuh** keadaan cacat berbalik hijau dan **ketiga** kontrol
+tetap hijau. Tanpa langkah itu, "10 keadaan lolos" tidak membedakan harness
+yang bekerja dari harness yang tidak melihat apa-apa.
+
+### Yang TIDAK diklaim
+
+- Ini tetap sapu **teks**, bukan pemeriksa tipe. Bentuk yang di luar jangkauan
+  pembaca (mis. `case let .x(y)` dengan pengikatan di depan, atau label
+  berangka) membuat `switch` itu **dilewati**, bukan dituduh. Diukur pada
+  pohon ini: 6 dari 15 `switch` dilewati, dan untuk tiap satunya alasannya
+  adalah enum yang tidak ada di kedua paket (mis. `ScenePhase`,
+  `CLAuthorizationStatus`) — bukan enum yang dibuang tanpa sengaja.
+- `Tools/check-visuals.py` **tidak** disentuh siklus ini. Di pohon kerja ada
+  WIP dari loop lain yang sedang memperbaiki pembaca palet planet
+  (`read_planet_palettes_from_swift`) — pembaca yang **menyaring** klausa
+  `case`/`return` yang dipisah komentar, sehingga melaporkan "uranus tidak ada
+  di `Planet.palette`" padahal ada. Itu milik siklus itu; menyentuhnya di sini
+  berarti dua penulis pada satu berkas.
+- Gerbang piksel `check-visuals.py --check` (~12 menit di mesin ini, dan
+  terukur pernah melewati 41 menit) tidak dijalankan ulang siklus ini. Yang
+  dijalankan: `swift-test.sh` (CelestialEngine 216, PointingKit 799, 0 gagal),
+  seluruh 37 aturan `swift-ui-lint.sh`, gerbang pendaftaran harness, dan
+  harness Aturan 37 itu sendiri.
+
+### Pelajaran
+
+- **Gerbang yang baru dipasang belum terbukti; ia baru berjanji.** Aturan 37
+  hijau di siklus sebelumnya, dan tetap hijau pada dua cacat nyata. Yang
+  membuktikan bukan menjalankannya pada pohon bersih, melainkan menjalankannya
+  pada cacat yang **sengaja** ditanam — dan memeriksa bahwa ia **merah**.
+- **Memperluas cakupan bisa menyempitkan gerbang.** Menambah paket kedua ke
+  `PACKAGE_SOURCES` menghapus satu situs dari pemeriksaan, karena syarat
+  kandidatnya tidak ikut berubah. Arah kegagalan itu tidak muncul di jumlah
+  temuan (tetap nol), jadi ia harus diukur sebagai **selisih himpunan situs**
+  di antara dua versi, bukan sebagai "hijau/merah".
+- **Pembaca yang membuang input berbahaya secara senyap.** Tiga lubang di atas
+  punya satu akar: pembaca yang *melewatkan* sesuatu, bukan yang *salah*
+  membaca. Yang kedua terlihat di hasil; yang pertama hanya terlihat kalau
+  cakupannya dihitung dan dibandingkan.
+
 ## Progres terakhir (15 Okt 2026 — Aturan 37: `switch` di `Apps/` yang kehilangan kasus enum, dan kenapa hanya macOS yang bisa melihatnya)
 
 Siklus ini dimulai dari `git status`, dan yang ditemukan bukan pekerjaan yang
