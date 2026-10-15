@@ -115,6 +115,15 @@ persis kelas cacat yang berkas ini ada untuk mencegah, hanya kali ini hidup
   pertanyaan yang belum dijawab: aturan yang **punya** harness masih bisa
   salah cakupannya, seperti Aturan 26 selama ini. Harness membuktikan
   "pernah merah pada keadaan yang diujinya", bukan "cakupannya lengkap".
+
+  Pengukuran kedua, yang lebih jujur, membatalkan angka di atas. Sapuan
+  pertama membaca seluruh `Tools/bukti-mutasi-*.py` **di disk**, termasuk
+  berkas yang belum ter-commit. Diukur ulang terhadap `git ls-tree HEAD` —
+  yaitu apa yang **benar-benar dilihat CI** — Aturan 21 kembali nirsaksi:
+  `Tools/bukti-mutasi-gerbang-denyut.py` ada di disk sebagai WIP siklus lain
+  (`??`), jadi ia belum pernah dijalankan oleh satu pun langkah CI. Angka
+  yang benar untuk `main`: **34 bersaksi, 1 nirsaksi (21)** — bukan 35/0.
+  Aturan 21 sengaja tidak digarap di sini karena berkasnya milik siklus itu.
 - `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift disentuh.
 
 ### Hitungan
@@ -123,7 +132,8 @@ persis kelas cacat yang berkas ini ada untuk mencegah, hanya kali ini hidup
 |---|---|---|
 | CelestialEngine | 212 | **212** (tak disentuh) |
 | PointingKit | 788 | **788** (tak disentuh) |
-| Aturan nirsaksi (terukur) | 1 | **0** (−1) |
+| Aturan nirsaksi (di disk) | 1 | **0** (−1) |
+| Aturan nirsaksi (di `HEAD`, yg dilihat CI) | 3 | **1** (21, WIP siklus lain) |
 | Harness dirujuk CI | 65 | **66** (+1) |
 | Situs 3 tingkat yang buta | 2 | **0** |
 | Baris `Apps/` berubah | — | **0** |
