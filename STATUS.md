@@ -111,6 +111,18 @@ persis kelas cacat yang berkas ini ada untuk mencegah, hanya kali ini hidup
   (`rawValue` dari `RawRepresentable`, anggota `Equatable`) belum punya
   pengecualian; hari ini tidak ada situsnya di `Apps/`, dan menambahkannya
   tanpa situs berarti menulis pelonggaran yang tidak terukur.
+
+### Temuan sampingan: Aturan 25 punya cacat kelas yang sama
+
+Terukur sesudah perbaikan Aturan 26: Aturan 25 juga buta pada tingkat
+ketiga (`CelestialVisual.Planet.saturn` → `.salahAnggota` tetap **hijau**),
+persis seperti Aturan 26 sebelum siklus ini. **Tidak ditutup di sini**, dan
+bukan karena lupa: Aturan 26 yang sudah diperbaiki kini menangkap situs itu
+(keadaan 1), jadi menutupnya di Aturan 25 akan menambahkan gerbang kedua
+untuk cacat yang **sudah** berbunyi — duplikasi yang membuat dua pesan untuk
+satu baris, tanpa menambah satu pun cacat yang tertangkap. Dicatat di sini
+supaya batas Aturan 25 tidak disangka tertutup.
+
 - **0 nirsaksi tersisa** (terukur: 1 → **0**) — tetapi itu menyisakan
   pertanyaan yang belum dijawab: aturan yang **punya** harness masih bisa
   salah cakupannya, seperti Aturan 26 selama ini. Harness membuktikan
@@ -124,6 +136,10 @@ persis kelas cacat yang berkas ini ada untuk mencegah, hanya kali ini hidup
   (`??`), jadi ia belum pernah dijalankan oleh satu pun langkah CI. Angka
   yang benar untuk `main`: **34 bersaksi, 1 nirsaksi (21)** — bukan 35/0.
   Aturan 21 sengaja tidak digarap di sini karena berkasnya milik siklus itu.
+- Pemeriksaan "kualifikasi tak dikenal dilewati" (bukan ditebak) terukur
+  menyentuh **0** situs di `Apps/` hari ini — jadi pelonggaran yang
+  ditambahkan untuk menjaga kode benar tidak sedang menyembunyikan apa pun.
+  Kalau kelak ada, jumlahnya tercetak dan bisa diukur ulang.
 - `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift disentuh.
 
 ### Hitungan
