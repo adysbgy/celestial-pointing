@@ -1758,17 +1758,34 @@ jobs:
       # karena aturan ini membaca **dua** tempat sekaligus (enum di
       # `Packages/PointingKit/Sources/`, `switch` di `Apps/`).
       #
-      # Lima keadaan. Tiga cacat wajib merah: `case` dihapus dari `switch`
+      # Sembilan keadaan. Enam cacat wajib merah: `case` dihapus dari `switch`
       # jalur sabit (persis cacat yang mendarat di `main`), `case` dihapus
       # dari `switch` jalur gambar (situs berbeda, kelas sama — kalau aturannya
       # hanya melihat satu situs, keadaan ini hijau), dan **kasus baru**
       # ditambahkan ke enum model sementara kedua `switch` dibiarkan. Yang
       # terakhir itu alasan aturannya membaca himpunan kasus dari model,
       # bukan mencocokkan nama `.paleDisk`/`.blueDisk` — daftar nama akan
-      # hijau lagi begitu kasus berikutnya ditambahkan. Dua kontrol negatif:
-      # pohon utuh, dan `default:` yang ditambahkan ke salah satu `switch`
-      # (di sana compiler memang tidak menuntut kelengkapan, jadi aturan yang
-      # memerah di sana akan dilonggarkan orang).
+      # hijau lagi begitu kasus berikutnya ditambahkan. Tiga kontrol negatif:
+      # pohon utuh, dan `default:` yang ditambahkan ke `switch` — di sana
+      # compiler memang tidak menuntut kelengkapan, jadi aturan yang memerah
+      # di sana akan dilonggarkan orang.
+      #
+      # Tiga keadaan sisanya mengukur **cakupan** aturan, dan masing-masing
+      # dituntut hijau pada satu program pembanding supaya ia tidak hanya
+      # sepakat dengan dirinya sendiri:
+      #
+      #   - `case .altitudeAzimuth` dihapus, dan kasus baru di `MountAxis`:
+      #     `MountAxis` hidup di CelestialEngine, jadi keduanya hijau pada
+      #     aturan versi lama (PointingKit saja).
+      #   - `case .deepSky` dihapus dari `switch visual.kind`: situs itu
+      #     punya dua kandidat enum berhimpunan kasus identik
+      #     (`CelestialVisual.Kind` dan `ObjectKind`), jadi ia hijau pada
+      #     "perluasan naif" (cakupan diperluas tanpa melonggarkan syarat
+      #     kandidat) — alasan syaratnya harus berubah, bukan cuma cakupannya.
+      #
+      # Non-vakuositasnya diukur: dengan keputusan akhir aturan dilumpuhkan
+      # di pohon salinan, keenam keadaan cacat berbalik hijau dan ketiga
+      # kontrol tetap hijau.
       - name: Buktikan Aturan 37 berbunyi pada switch yang kehilangan kasus enum
         run: python3 Tools/bukti-mutasi-aturan37-lengkap.py
 

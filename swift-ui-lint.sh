@@ -5703,8 +5703,42 @@ fi
 # yang membaca daftar bernama (`paleDisk`, `blueDisk`) akan hijau pada cacat
 # yang sama persis begitu orang menambahkan kasus berikutnya — dan itu satu
 # baris kerja. Karena itu aturannya **menurunkan** himpunan kasus dari sumber
-# model di `Packages/PointingKit/Sources/`, lalu menuntut setiap `switch` di
-# `Apps/` yang tidak punya `default:` memuat seluruh himpunan itu.
+# model di `Packages/`, lalu menuntut setiap `switch` di `Apps/` yang tidak
+# punya `default:` memuat seluruh himpunan itu.
+#
+# **Kedua paket, dan kenapa itu diukur.** Cakupannya semula hanya
+# `Packages/PointingKit/Sources/`. `MountAxis` hidup di **CelestialEngine** dan
+# di-`switch` di `Apps/PointAndKnowiOS/Sources/TelescopeHandoffView.swift:81`,
+# jadi `switch` itu tidak pernah diperiksa. Terukur: menghapus `case
+# .altitudeAzimuth:` dari sana membiarkan seluruh 37 aturan hijau, sementara
+# compiler menolaknya di macOS (`switch must be exhaustive`) — kelas cacat yang
+# persis sama dengan yang mendarat di `main` pada `27dd677`, hanya satu paket
+# lebih jauh. Terukur sesudah perluasan: 8 situs diperiksa → **9**.
+#
+# **Syarat kandidat ikut berubah, dan itu bukan pelonggaran.** Syarat lama
+# menuntut labelnya subset dari **tepat satu** enum. Perluasan cakupan membuat
+# `switch visual.kind` (`CelestialVisualView.swift:73`) cocok dengan **dua**
+# enum berhimpunan kasus identik — `CelestialVisual.Kind` (PointingKit) dan
+# `ObjectKind` (CelestialEngine), keduanya
+# `{moon, planet, star, sun, deepSky}`. Dengan syarat lama situs itu justru
+# **hilang dari pemeriksaan**: gerbang yang menyempit tanpa suara, terukur.
+# Karena dua enum berhimpunan sama menuntut kelengkapan yang sama, syaratnya
+# sekarang "semua kandidat punya himpunan kasus identik" — dan kalau ada dua
+# kandidat dengan himpunan **berbeda**, kita memang tidak tahu enum mana yang
+# dimaksud, jadi diam tetap jawaban yang jujur di sana.
+#
+# **Pembaca klausanya menghitung kedalaman kurung, bukan baris.** Versi
+# semula memakai `^[ \t]*case` (`re.M`), yang tidak bisa membedakan `case`
+# milik tipe terluar dari `case` yang hidup di dalam `switch` bersarang. Dua
+# akibatnya terukur di pohon ini: `DeepSkyCatalogue` menyerap keenam kasus
+# `Morphology` yang bersarang di dalamnya, dan `Planet` dibuang seluruhnya
+# karena `switch self` di dalam propertinya terbaca sebagai kasus planet.
+# Keduanya membuat himpunan kasus **salah**, bukan sekadar tidak lengkap.
+# Sesudah perbaikan: 12 enum terindeks → **25**, dan tidak ada enum yang
+# hilang. Untuk `switch` di `Apps/` perubahannya hari ini **0 situs**; ia
+# tetap dipasang karena arah kegagalannya yang mahal — label asing dari
+# `switch` bersarang membuat `switch` yang **kurang** satu kasus tampak
+# lengkap.
 #
 # **Batas yang diakui, dan kenapa ia tetap berguna.** Ini sapu **teks**, bukan
 # pemeriksa tipe. Untuk menghindari menuduh kode yang benar, aturan hanya
@@ -5715,10 +5749,11 @@ fi
 #      pengikatan nilai yang bisa membuat daftarnya tidak lengkap;
 #   2. tidak ada `default:` di badannya (kalau ada, compiler memang tidak
 #      menuntut kelengkapan);
-#   3. labelnya **subset ketat dari tepat satu** himpunan enum. Kalau ada dua
-#      enum yang cocok, kita tidak tahu `switch`-nya atas enum yang mana —
-#      dan gerbang yang menebak akan menuduh kode benar, yang membuat orang
-#      melonggarkannya. Diam adalah jawaban yang jujur di sana.
+#   3. labelnya subset dari enum yang **kasusnya sama**. Kalau ada dua
+#      kandidat dengan himpunan berbeda, kita tidak tahu `switch`-nya atas
+#      enum yang mana — dan gerbang yang menebak akan menuduh kode benar,
+#      yang membuat orang melonggarkannya. Diam adalah jawaban yang jujur di
+#      sana.
 #
 # Syarat 3 itu bukan kehati-hatian teoretis: ia **diukur**. Versi pertama
 # tanpa syarat itu menandai `ReducedLuminanceView.swift:57`
@@ -5741,7 +5776,16 @@ switch_lengkap=$(python3 - <<'PY' 2>&1
 import os
 import re
 
-PACKAGE_SOURCES = os.path.join("Packages", "PointingKit", "Sources")
+# Kedua paket, bukan hanya PointingKit.
+#
+# `MountAxis` hidup di CelestialEngine dan di-`switch` di
+# `Apps/PointAndKnowiOS/Sources/TelescopeHandoffView.swift:81`. Selama
+# himpunannya hanya dibaca dari PointingKit, `switch` itu **tidak pernah
+# diperiksa** — dan cacatnya persis kelas yang aturan ini ada untuk menutup:
+# menghapus `case .altitudeAzimuth:` membiarkan seluruh 37 aturan hijau
+# (diukur), sementara compiler menolaknya di macOS.
+PACKAGE_SOURCES = [os.path.join("Packages", "PointingKit", "Sources"),
+                   os.path.join("Packages", "CelestialEngine", "Sources")]
 APPS = "Apps"
 
 
@@ -5771,6 +5815,56 @@ def brace_block(text, start):
     return None, -1
 
 
+def at_line_start(body, i):
+    """Apakah `i` karakter pertama yang bukan-spasi di barisnya.
+
+    Dipakai menggantikan `^[ \\t]*` pada regex ber-`re.M`, yang **tidak bisa
+    menghitung kedalaman kurung**. Perbedaan itu bukan kerapian: regex baris
+    membaca `case` di dalam `switch` bersarang sebagai kasus milik tipe
+    terluar — lihat `top_level_cases` dan `switch_label_sets`.
+    """
+    j = i - 1
+    while j >= 0 and body[j] in " \t":
+        j -= 1
+    return j < 0 or body[j] == "\n"
+
+
+def top_level_clauses(body, prefix):
+    """Klausa ber-`prefix` pada **kedalaman kurung 0**, plus apakah semuanya
+    sederhana (tidak ada pengikatan nilai / `where` / literal).
+
+    Kedalaman itu yang membuat himpunan kasus benar. Regex baris mencampur
+    kasus sebuah enum dengan kasus enum yang dideklarasikan **di dalamnya**:
+    terukur pada pohon ini, `DeepSkyCatalogue` menyerap keenam kasus
+    `Morphology` (yang bersarang di dalamnya) dan `Planet` dibuang seluruhnya
+    karena `switch self` di dalam propertinya terbaca sebagai kasus planet.
+    """
+    out = []
+    simple = True
+    depth = 0
+    i = 0
+    n = len(body)
+    while i < n:
+        ch = body[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0 and at_line_start(body, i) and body.startswith(prefix, i):
+            rest = body.find("\n", i)
+            if rest < 0:
+                rest = n
+            clause = body[i + len(prefix):rest].strip()
+            colon = clause.find(":")
+            if colon >= 0:
+                clause = clause[:colon]
+            out.append(clause)
+            i = rest
+            continue
+        i += 1
+    return out, simple
+
+
 def enum_case_sets(text):
     """{nama enum: {kasus}} untuk enum yang **semua** kasusnya sederhana.
 
@@ -5784,10 +5878,11 @@ def enum_case_sets(text):
         body, _ = brace_block(text, m.end() - 1)
         if body is None:
             continue
+        clauses, _ = top_level_clauses(body, "case")
         cases = set()
         simple = True
-        for cm in re.finditer(r"^[ \t]*case\s+([^\n]+)$", body, re.M):
-            for part in cm.group(1).split(","):
+        for clause in clauses:
+            for part in clause.split(","):
                 part = part.strip()
                 if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part):
                     cases.add(part)
@@ -5806,6 +5901,14 @@ def switch_label_sets(text):
     Klausa yang tidak murni daftar `.anggota` membatalkan `switch` itu —
     `case .identifiable(let visual):` tidak boleh dibaca sebagai himpunan
     label, karena labelnya memang tidak dimaksudkan lengkap.
+
+    Klausanya diambil pada kedalaman 0 saja, dengan alasan yang sama seperti
+    `top_level_cases`: `switch` bersarang yang tidak ber-`default:`
+    menyumbangkan labelnya ke himpunan milik induknya. Terukur pada pohon ini
+    perubahannya **0 situs** — jadi ini penjaga untuk bentuk yang belum
+    ditulis, bukan perbaikan cacat yang sedang ada. Ia tetap ada karena arah
+    kegagalannya yang mahal: label asing membuat `switch` yang **kurang**
+    satu kasus tampak lengkap.
     """
     for m in re.finditer(r"\bswitch\s+([^\{]+?)\s*\{", text):
         body, _ = brace_block(text, m.end() - 1)
@@ -5813,10 +5916,11 @@ def switch_label_sets(text):
             continue
         if re.search(r"^[ \t]*default\s*:", body, re.M):
             continue
+        clauses, _ = top_level_clauses(body, "case")
         labels = set()
         readable = True
-        for cm in re.finditer(r"^[ \t]*case\s+([^\n]+?)\s*:", body, re.M):
-            for part in cm.group(1).split(","):
+        for clause in clauses:
+            for part in clause.split(","):
                 part = part.strip()
                 if re.fullmatch(r"\.[A-Za-z_][A-Za-z0-9_]*", part):
                     labels.add(part[1:])
@@ -5828,15 +5932,16 @@ def switch_label_sets(text):
 
 
 cases = {}
-for dirpath, _, filenames in os.walk(PACKAGE_SOURCES):
-    for filename in filenames:
-        if not filename.endswith(".swift"):
-            continue
-        path = os.path.join(dirpath, filename)
-        with open(path, encoding="utf-8") as handle:
-            for name, values in enum_case_sets(
-                    strip_comments(handle.read())).items():
-                cases.setdefault(name, set()).update(values)
+for source_dir in PACKAGE_SOURCES:
+    for dirpath, _, filenames in os.walk(source_dir):
+        for filename in filenames:
+            if not filename.endswith(".swift"):
+                continue
+            path = os.path.join(dirpath, filename)
+            with open(path, encoding="utf-8") as handle:
+                for name, values in enum_case_sets(
+                        strip_comments(handle.read())).items():
+                    cases.setdefault(name, set()).update(values)
 
 problems = []
 examined = 0
@@ -5848,9 +5953,11 @@ for dirpath, _, filenames in os.walk(APPS):
         with open(path, encoding="utf-8") as handle:
             text = strip_comments(handle.read())
         for line, expr, labels in switch_label_sets(text):
-            # Hanya bila labelnya subset dari **tepat satu** enum: dengan dua
-            # kandidat kita tidak tahu enum mana yang dimaksud, dan gerbang
-            # yang menebak akan menuduh kode yang benar.
+            # Hanya bila labelnya subset dari enum yang **kasusnya sama**.
+            # Kalau ada dua kandidat dengan himpunan kasus **berbeda**, kita
+            # tidak tahu enum mana yang dimaksud — dan gerbang yang menebak
+            # akan menuduh kode benar, yang membuat orang melonggarkannya.
+            # Diam adalah jawaban yang jujur di sana.
             #
             # Perhatikan `<=`, bukan `<`. `switch` yang **lengkap** punya
             # `labels == values`, jadi syarat `<` akan membuang justru
@@ -5858,26 +5965,37 @@ for dirpath, _, filenames in os.walk(APPS):
             # pelanggaran, sehingga pohon yang bersih tampak seperti "tidak
             # mengukur apa pun" dan gerbang ini merah pada kode yang benar.
             # Diukur pada pohon ini: `<` memberi 0 yang diperiksa, `<=`
-            # memberi 8.
+            # memberi 9.
+            #
+            # Syarat "berbeda" itu bukan pelonggaran. Dua enum dengan kasus
+            # yang sama menuntut **kelengkapan yang sama**, jadi memeriksa
+            # salah satunya tidak menebak apa pun. Terukur: `CelestialVisual
+            # .Kind` (PointingKit) dan `ObjectKind` (CelestialEngine)
+            # keduanya {moon, planet, star, sun, deepSky}, dan `switch
+            # visual.kind` di `CelestialVisualView.swift:73` cocok dengan
+            # keduanya. Dengan syarat lama ("tepat satu kandidat") situs itu
+            # **hilang dari pemeriksaan** begitu cakupan diperluas — gerbang
+            # yang menyempit tanpa suara.
             candidates = [name for name, values in cases.items()
                           if labels <= values]
-            if len(candidates) != 1:
+            full = {frozenset(cases[name]) for name in candidates}
+            if len(full) != 1:
                 continue
             examined += 1
-            name = candidates[0]
-            if labels >= cases[name]:
+            complete = next(iter(full))
+            if labels >= complete:
                 continue
-            missing = sorted(cases[name] - labels)
+            missing = sorted(complete - labels)
             problems.append(
                 "  %s:%d: `switch %s` melewatkan %s dari `%s` -- compiler "
                 "menolaknya di macOS (`switch must be exhaustive`), tetapi "
                 "tidak ada gerbang Linux yang melihatnya"
                 % (path, line, expr.replace("\n", " ").strip(),
-                   missing, name))
+                   missing, sorted(set(candidates))))
 
 if not cases:
     print("Tidak ada enum sederhana yang terbaca dari %s; aturan ini tidak "
-          "mengukur apa pun." % PACKAGE_SOURCES)
+          "mengukur apa pun." % ", ".join(PACKAGE_SOURCES))
 elif examined == 0 and not problems:
     print("Tidak ada `switch` di %s yang bisa dipastikan atas satu enum; "
           "aturan ini tidak mengukur apa pun." % APPS)
