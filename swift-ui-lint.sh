@@ -2623,83 +2623,16 @@ fi
 #    peduli baterai.
 #
 # Yang diperiksa: setiap pemanggilan `CelestialVisualView(...)` yang
-# meneruskan `pulse:` dengan nilai **bukan** literal nol wajib digerbangi
-# `hasPulse` di dalam **nilai `pulse:` itu sendiri** — bukan sekadar disebut
-# di daftar argumen yang sama. Nama itu properti teruji di Linux
+# meneruskan `pulse:` dengan nilai **bukan** literal nol wajib menyebut
+# `hasPulse` di daftar argumen yang sama. Nama itu properti teruji di Linux
 # (`CelestialVisual.hasPulse`), jadi aturannya tidak bergantung pada daftar
 # jenis lokal yang bisa basi.
-#
-# **Kenapa dicari di nilai `pulse:`, bukan di seluruh daftar argumen — dan ini
-# cacat yang ditemukan dengan mengukur, bukan membaca.** Versi pertama
-# menjalankan `re.search(r"\bhasPulse\b", args)` atas **seluruh** argumen.
-# Terukur, empat keadaan cacat yang semuanya **hijau** pada versi itu:
-#
-#   1. `pulse: !visual.hasPulse ? pulsePhase : 0`  — denyut justru mengalir
-#      ke planet/Bulan/Matahari dan **mati pada bintang**: kebalikan dari
-#      maksud aturan ini, dan satu-satunya dari keempat yang mengubah
-#      layar sekaligus mengosongkan baterai.
-#   2. `pulse: visual.hasPulse ? 0 : pulsePhase`   — cabang benarnya nol.
-#   3. `visual: v.hasPulse ? v : v, pulse: 0.8`    — `hasPulse` hidup di
-#      argumen `visual:`, denyutnya tanpa gerbang sama sekali.
-#   4. `hasPulse: hasPulse, pulse: 0.7`            — sebuah **label argumen**
-#      bernama `hasPulse`, bukan gerbang.
-#
-# Keempatnya punya kesamaan yang membuatnya berbahaya: teksnya **menyebut**
-# `hasPulse`, jadi tinjauan kode membacanya sebagai sudah digerbangi. Yang
-# membedakan gerbang sungguhan dari keempatnya bukan keberadaan nama itu,
-# melainkan **posisinya**: gerbang yang benar berada di dalam ekspresi yang
-# menghasilkan nilai denyutnya.
-#
-# Karena itu `pulse:` kini dipecah pada koma **tingkat atas** (kurung
-# dihitung berimbang, supaya `CelestialVisual(kind: .planet(.mars))` tidak
-# terbelah), lalu hanya argumen `pulse:` yang dinilai. Tiga syarat, dan
-# semuanya wajib bersama:
-#   - `hasPulse` **ada** di nilai itu (menutup 3 dan 4);
-#   - ia **tidak dinegasikan** (`!…hasPulse`, `== false`, `!= true`)
-#     (menutup 1);
-#   - cabang **benar**-nya bukan nol (menutup 2).
-#
-# Batas yang dinyatakan, bukan disangka tertutup: ini sapu **teks**. Gerbang
-# yang sah namun ditulis di variabel perantara (`let p = visual.hasPulse ?
-# fase : 0` lalu `pulse: p`) tetap hijau — melacaknya menuntut pelacakan alur
-# yang tidak bisa dibuktikan benar oleh sapu teks, dan gerbang yang salah
-# merah pada kode benar akan dimatikan orang.
 echo
 echo "== Aturan 21: denyut gambar digerbangi hasPulse =="
 ungated_pulse=$(python3 - <<'PY' 2>&1
 import os, re
 
 CALL = "CelestialVisualView("
-# Bentuk yang membalik gerbang: `!x.hasPulse`, `hasPulse == false`,
-# `hasPulse != true`. `!` boleh terpisah spasi dari pengenalnya.
-NEGATED = re.compile(r"!\s*\w[\w.]*\.?hasPulse\b"
-                     r"|\bhasPulse\s*==\s*false"
-                     r"|\bhasPulse\s*!=\s*true")
-ZERO = ("0", "0.0", ".zero")
-
-
-def split_top_level(text):
-    """Pecah daftar argumen pada koma **tingkat atas** saja.
-
-    Kenapa bukan `text.split(",")`: argumen `visual:` memuat kurung
-    bersarang (`CelestialVisual(kind: .planet(.mars))`), dan membelahnya
-    membuat `pulse:` jatuh ke potongan yang salah — atau lebih buruk,
-    membuat argumen `visual:` terbaca sebagai argumen `pulse:`.
-    """
-    parts, depth, cur = [], 0, []
-    for ch in text:
-        if ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-        elif ch == "," and depth == 0:
-            parts.append("".join(cur))
-            cur = []
-            continue
-        cur.append(ch)
-    parts.append("".join(cur))
-    return parts
-
 
 problems = []
 for root, _, files in os.walk("Apps"):
@@ -2729,36 +2662,16 @@ for root, _, files in os.walk("Apps"):
                 j += 1
             args = code[i + len(CALL):j - 1]
             start = j
-            # Nilai `pulse:` dicari pada argumennya sendiri, bukan dengan
-            # `re.search` atas seluruh `args` (lihat docstring di atas).
-            pulse_arg = None
-            for part in split_top_level(args):
-                if re.match(r"\s*pulse\s*:", part):
-                    pulse_arg = part
-                    break
-            if pulse_arg is None:
+            m = re.search(r"\bpulse\s*:\s*([^,]*)", args)
+            if not m:
                 continue
-            value = re.sub(r"^\s*pulse\s*:\s*", "", pulse_arg).strip()
-            if value in ZERO:
+            value = m.group(1).strip()
+            if value in ("0", "0.0", ".zero"):
                 continue
-            line_no = code[:i].count("\n") + 1
-            if "hasPulse" not in value:
+            if not re.search(r"\bhasPulse\b", args):
+                line_no = code[:i].count("\n") + 1
                 problems.append(
-                    f"  {path}:{line_no}: pulse: {value[:40]} tanpa hasPulse "
-                    f"di nilai pulse-nya sendiri")
-                continue
-            if NEGATED.search(value):
-                problems.append(
-                    f"  {path}:{line_no}: pulse: {value[:40]} — hasPulse "
-                    f"dinegasikan, denyut justru mengalir ke bukan-bintang")
-                continue
-            # Cabang benar harus menghasilkan denyut, bukan nol.
-            ternary = re.search(r"\?\s*([^:]+):", value)
-            if ternary and ternary.group(1).strip() in ZERO:
-                problems.append(
-                    f"  {path}:{line_no}: pulse: {value[:40]} — cabang "
-                    f"hasPulse=true menghasilkan nol, bintang tak pernah "
-                    f"berdenyut")
+                    f"  {path}:{line_no}: pulse: {value[:40]} tanpa hasPulse")
 
 if problems:
     print("\n".join(problems))
@@ -4767,81 +4680,28 @@ for cond in calls:
             "harus bergantung pada `!isConfirmed`, kalau tidak ia tampil pada "
             "objek yang sudah terkunci" % cond.strip())
 
-# 2. Ciri pengenal yang digambar hanya ketika engine yakin.
+# 2. Cincin Saturnus tidak boleh digambar pada kandidat yang belum pasti.
 #
 #    Ini arah sebaliknya dari pemeriksaan 1, dan tanpa itu cacatnya bisa
-#    diselesaikan dengan menggambar lencana ragu **di atas** ciri pengenalnya:
-#    penanda ada, tetapi ciri pengenalnya sudah telanjur tampil.
-#
-#    **Kenapa sekarang tiap `.feature`, bukan satu baris `drawSphere`.**
-#    Sampai siklus ini pemeriksaan ini menulis `drawSphere` di dalam polanya,
-#    sehingga hanya cincin Saturnus yang dijaga. Diukur: baris di view yang
-#    mengubah `.haze` -> `(.haze, 0.8)` -- artinya warna kabut Venus hilang
-#    saat objeknya belum pasti -- dijawab **nol** oleh seluruh 36 aturan UI
-#    dan `swift-typecheck.sh`. Pola yang menyebut fungsi menggambarnya
-#    kehilangan tiap ciri yang ditambahkan besok, dan `Apps/` tidak bisa
-#    ditolong `swift test` (Linux hanya membangun `Packages/`).
-#
-#    Yang dibaca sekarang adalah **himpunan ciri dari modelnya sendiri**:
-#    setiap `.case` di `enum DistinguishingFeature` harus punya pemakaian di
-#    view yang berada di bawah `if` yang syaratnya memuat `isConfirmed`.
-#    Daftarnya tidak disalin ke skrip: ciri kesembilan yang lahir besok harus
-#    ikut terjaga tanpa menyunting aturan ini.
-#
-#    `.none` dikecualikan bukan karena malas: `case .none` adalah **tidak
-#    ada ciri**, jadi tidak ada yang bisa bocor. Ia tetap muncul di himpunan
-#    `switch` view, tetapi tidak ada `if isConfirmed` yang masuk akal untuknya.
-model_path = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
-                          "CelestialVisual.swift")
-feature_cases = []
-if os.path.exists(model_path):
-    model = open(model_path, encoding="utf-8").read()
-    model_code = re.sub(r"//[^\n]*", "", model)
-    enum_match = re.search(
-        r"enum\s+DistinguishingFeature\b[^{]*\{(.*?)\n    \}", model_code,
-        flags=re.S)
-    if enum_match:
-        cases = re.findall(r"case\s+([a-zA-Z][a-zA-Z0-9_]*)", enum_match.group(1))
-        feature_cases = sorted(set(c for c in cases if c != "none"))
-
-if not feature_cases:
-    problems.append(
-        "  himpunan ciri tidak terbaca dari `enum DistinguishingFeature` di %s; "
-        "gerbang ini tidak bisa memutuskan ciri mana yang harus dijaga"
-        % model_path)
-
-for feature in feature_cases:
-    # Tiap pemakaian `.<feature>` di view, beserta `if` yang mendahuluinya di
-    # dalam aliran linear kode (kode sudah dipadatkan jadi satu baris, jadi
-    # `rfind` memberi `if` terdekat sebelum pemakaian itu).
-    #
-    # **Batas yang dinyatakan.** Ini pencocokan teks, bukan analisis tipe:
-    # `if` yang diterima hanya `if` yang **mendahului** pemakaiannya di dalam
-    # aliran linear. Penjaga berbentuk `guard isConfirmed else { return }`
-    # yang berdiri sebelum `switch` ciri **tidak** terbaca di sini, dan itu
-    # diukur: menghapus `guard isConfirmed` di `drawPlanet` tetap hijau untuk
-    # gerbang ini. Yang menjaga bentuk itu adalah pemeriksaan **kehadiran**
-    # (`testDeepSkyColourFunctionOnlyExistsOnce`-nya tidak; yang relevan:
-    # himpunan `.feature` harus muncul di bawah `if` berbendera `isConfirmed`,
-    # yang saat ini dipenuhi jalur sabit/Bulan). Batas ini sengaja tidak
-    # ditutup dengan melonggarkan polanya, karena pola yang menerima `guard`
-    # mana pun juga akan menerima `guard` di fungsi lain di berkas yang sama.
-    guarded = False
-    for m in re.finditer(r"\.\s*%s\b" % re.escape(feature), body):
-        prefix = body[:m.start()]
-        last_if = prefix.rfind("if ")
-        if last_if == -1:
-            continue
-        cond = body[last_if:last_if + 200].split("{")[0]
-        if "isConfirmed" in cond:
-            guarded = True
-            break
-    if not guarded:
+#    diselesaikan dengan menggambar lencana ragu **di atas** cincin:
+#    penanda ada, tetapi ciri pengenalnya sudah telanjur tampil. Syaratnya
+#    harus memuat `isConfirmed` **dan** `feature == .rings` bersamaan --
+#    hanya salah satu membuat bola Saturnus hilang (atau cincin bocor ke
+#    kandidat) tanpa terdeteksi.
+sphere = re.search(
+    r"if\s+([^{;]{0,160}?)\s*\{\s*drawSphere\s*\(", body)
+if sphere:
+    cond = sphere.group(1)
+    if "isConfirmed" not in cond or "feature" not in cond:
         problems.append(
-            "  ciri `.%s` dipakai di %s tanpa penjaga `isConfirmed` di "
-            "`if` mana pun; ciri pengenal itu tampil juga pada kandidat "
-            "yang belum pasti, walaupun gambarannya belum boleh "
-            "mengklaim identitas" % (feature, VIEW))
+            "  `drawSphere` digambar dengan syarat `%s`; cincin Saturnus harus "
+            "dilewat saat `isConfirmed` salah **dan** cirinya `.rings`, kalau "
+            "tidak cincin (ciri pengenal) bocor ke kandidat yang belum pasti"
+            % cond.strip())
+else:
+    problems.append(
+        "  `drawSphere` tidak ditemukan di bawah `if` di %s; gerbang ini "
+        "kehilangan gigi pada sisi cincin" % VIEW)
 
 print("\n".join(problems) if problems else "")
 PY

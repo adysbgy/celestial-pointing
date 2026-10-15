@@ -1058,6 +1058,24 @@ jobs:
       - name: Buktikan tujuh aturan sapu UI berbunyi pada hal yang diklaim
         run: python3 Tools/bukti-mutasi-aturan-ui.py
 
+      # Aturan 28 — label yang salah pada parameter bernilai bawaan.
+      #
+      # Aturan 28 melaporkan "55 pemanggilan ... cocok dengan deklarasi",
+      # kalimat yang terdengar seperti bukti bahwa semuanya diperiksa.
+      # Terukur: 4 argumen berlabel di `Apps/` lolos dengan label yang salah,
+      # karena `matches()` membebaskan perbandingan label pada parameter yang
+      # punya nilai bawaan (`if not ddef and gl != dl`), dan 94 dari 1489
+      # statika terindeks punya celah itu.
+      #
+      # Yang membuat perbaikannya bukan sekadar menghapus `not ddef`: Swift
+      # mengizinkan argumen berlabel dalam urutan apa pun, jadi mencocokkan
+      # per posisi memerahkan `makeController(location:config:)` — sah, dan
+      # ada di `PointingEngine.swift:92`. Keadaan 3 harness ini yang
+      # membedakan "per nama" dari "per posisi"; tanpanya, perbaikan yang
+      # memerahkan kode benar lulus semua keadaan cacatnya.
+      - name: Buktikan Aturan 28 berbunyi pada label di parameter bawaan
+        run: python3 Tools/bukti-mutasi-label-bawaan.py
+
       # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah
       # merah di mana pun**.
       #

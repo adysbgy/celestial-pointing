@@ -105,8 +105,10 @@ MAKE_CONTROLLER = ("Apps/Shared/PointingEngine.swift",
 MAKE_CONTROLLER_SWAP = ("Apps/Shared/PointingEngine.swift",
                         "location: location, config: config)",
                         "config: config, location: location)")
+# Jangkar arah "sudah dijaga sebelum siklus ini": parameter TANPA nilai bawaan
+# (`bandHalfWidthAt(height:)`), dipanggil nyata di dua baris view.
 JUPITER_BANDS = ("Apps/Shared/CelestialVisualView.swift",
-                 "jupiterBands(count:", "jupiterBands(salahLabel:")
+                 "bandHalfWidthAt(height:", "bandHalfWidthAt(salahLabel:")
 
 
 def require_clean() -> None:
@@ -178,16 +180,24 @@ def old_lint() -> str:
 
 
 CASES = [
-    # (nama, target, cari, ganti, harus_merah)
-    ("0. kode apa adanya", None, None, None, False),
+    # (nama, target, cari, ganti, harus_merah, harus_lolos_di_versi_lama)
+    #
+    # Kolom terakhir **per keadaan**, bukan menyeluruh, dan itu penting:
+    # keadaan 4 adalah arah yang **sudah** dijaga sebelum siklus ini
+    # (parameter tanpa nilai bawaan), jadi versi lama memang sudah merah di
+    # sana — menuntut versi lama hijau akan melaporkan keadaan 4 sebagai
+    # "cacatnya bukan milik perbaikan ini", padahal ia justru bukti bahwa
+    # perbaikan ini tidak merusak arah yang lama. Keadaan 1 dan 2 yang baru
+    # ditutup, dan hanya keduanya yang wajib lolos di versi lama.
+    ("0. kode apa adanya", None, None, None, False, False),
     ("1. deepSky elongation: -> salahLabel: (bawaan)",
-     *DEEP_SKY, True),
+     *DEEP_SKY, True, True),
     ("2. makeController config: -> salahLabel: (bawaan)",
-     *MAKE_CONTROLLER, True),
+     *MAKE_CONTROLLER, True, True),
     ("3. KONTROL: makeController(location:config:) dibalik — urutan sah",
-     *MAKE_CONTROLLER_SWAP, False),
-    ("4. jupiterBands count: -> salahLabel: (tanpa bawaan)",
-     *JUPITER_BANDS, True),
+     *MAKE_CONTROLLER_SWAP, False, False),
+    ("4. bandHalfWidthAt height: -> salahLabel: (tanpa bawaan)",
+     *JUPITER_BANDS, True, False),
 ]
 
 
@@ -196,7 +206,7 @@ def main() -> int:
     old = old_lint()
     failures: list[str] = []
 
-    for name, target, find, repl, must_fire in CASES:
+    for name, target, find, repl, must_fire, must_pass_old in CASES:
         workdir = copy_repo()
         try:
             if target is not None:
@@ -218,16 +228,27 @@ def main() -> int:
                     f"diharapkan {'merah' if must_fire else 'hijau'}")
                 continue
 
-            # Arah kedua: cacat yang wajib merah **harus lolos** di versi lama.
-            # Kalau versi lama juga merah, cacatnya bukan milik perbaikan ini.
+            # Arah kedua, khusus untuk keadaan yang **baru** ditutup siklus
+            # ini (kolom `must_pass_old`): cacat itu harus **lolos** di versi
+            # `origin/main`. Kalau versi lama juga merah, cacatnya bukan yang
+            # ditutup perbaikan ini dan harness berhenti. Tanpa arah kedua,
+            # harness ini hanya membuktikan bahwa ia sepakat dengan dirinya
+            # sendiri.
             if must_fire:
                 out_old = run_lint(workdir, old)
-                if fired(out_old):
+                old_red = fired(out_old)
+                if must_pass_old and old_red:
                     failures.append(
                         f"  {name}: versi origin/main SUDAH merah — cacatnya "
                         f"bukan yang ditutup perbaikan ini")
+                elif not must_pass_old and not old_red:
+                    failures.append(
+                        f"  {name}: versi origin/main punya hijau padahal "
+                        f"arah ini sudah dijaga sebelum siklus ini — "
+                        f"perbaikan ini merusaknya")
                 print(f"  {name}")
-                print(f"      baru: MERAH (sesuai)   lama: hijau (lolos)")
+                print(f"      baru: MERAH (sesuai)   lama: "
+                      f"{'MERAH' if old_red else 'hijau'}")
                 for line in finding(out_new).splitlines()[1:3]:
                     print("      " + line.strip())
             else:
