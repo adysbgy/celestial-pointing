@@ -1058,6 +1058,39 @@ jobs:
       - name: Buktikan tujuh aturan sapu UI berbunyi pada hal yang diklaim
         run: python3 Tools/bukti-mutasi-aturan-ui.py
 
+      # Aturan 29 — kunci katalog yang berdiri di parameter bertipe `String`.
+      #
+      # `Text` punya dua inisialisator yang berlawanan: `Text("Terkunci")`
+      # mencari katalog, `Text(someString)` mencetak apa adanya. Jadi
+      # `row(_ title: String, _ value: String)` yang menerima "Keadaan"
+      # mencetak kata Indonesia itu di **semua** bahasa, dan terjemahan yang
+      # sudah ditulis tidak akan pernah tampil. Tiga gerbang lain menyentuh
+      # permukaan ini dan ketiganya hijau: Aturan 4 (literal itu memang ada di
+      # katalog), Aturan 6 (tidak melihat `Apps/`), dan Aturan 19 (mencari
+      # teks kunci sebagai substring mentah, jadi kemunculannya sebagai teks
+      # Indonesia **menghitung sebagai rujukan**).
+      #
+      # Sebelum harness ini tidak ada satu keadaan pun yang membuktikan Aturan
+      # 29 bisa keluar bukan-nol.
+      #
+      # Dua cacat ketahuan saat menulisnya, keduanya lewat mengukur:
+      # (1) salinan `Apps/` saja membuat indeks helpernya runtuh 69 -> 6,
+      #     karena aturannya membaca tanda tangan helper dari **kedua** pohon;
+      #     gerbangnya lalu melaporkan "Bersih" untuk suntikan yang di pohon
+      #     lengkap MERAH -- kegagalan yang berbentuk hijau;
+      # (2) satu keadaan arah A memakai `"Laju pergelangan: sudut"` sebagai
+      #     "kunci katalog", padahal itu bukan kunci, jadi aturannya benar
+      #     untuk diam dan harnessnya menuduh gerbangnya. Sekarang himpunan
+      #     kuncinya dibaca dari katalog, dan kunci yang tidak ada
+      #     **menghentikan** harness alih-alih dilaporkan hijau.
+      #
+      # Cakupan yang **tidak** dijangkau dinyatakan sebagai keadaan yang
+      # dieksekusi (kunci di dalam interpolasi string; kunci lewat variabel
+      # perantara), bukan disangka tertutup: keduanya hijau hari ini, dan
+      # kalau kelak cakupannya meluas, harnessnya berhenti sesuai harapan.
+      - name: Buktikan Aturan 29 berbunyi pada literal kunci di parameter String
+        run: python3 Tools/bukti-mutasi-literal-string-param.py
+
       # Aturan 28 — label yang salah pada parameter bernilai bawaan.
       #
       # Aturan 28 melaporkan "55 pemanggilan ... cocok dengan deklarasi",

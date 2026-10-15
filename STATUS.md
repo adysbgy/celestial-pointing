@@ -1,3 +1,136 @@
+## Progres terakhir (15 Okt 2026 — Aturan 29: terjemahan yang tidak akan pernah sampai ke layar, dan salinan yang membuat gerbangnya diam)
+
+Siklus ini meneruskan sapuan yang sama: dari 35 aturan di `swift-ui-lint.sh`,
+**berapa yang pernah dibuktikan bisa merah?** Terukur ulang di awal siklus
+dengan menyilangkan nomor aturan terhadap seluruh `Tools/bukti-mutasi-*.py`:
+**3 nirsaksi** (21, 26, 29). Aturan 21 dan 26 sedang digarap WIP siklus lain di
+pohon kerja (`Tools/bukti-mutasi-gerbang-denyut.py`), jadi sengaja tidak
+disentuh. Dipilih Aturan 29, karena ia menjaga janji lokalisasi yang **paling
+tidak terlihat**.
+
+### Cacat yang dijaga
+
+`Text` punya dua inisialisator yang berperilaku berlawanan, dan yang terpakai
+ditentukan oleh **tipe parameter** tempat literal itu berdiri — bukan oleh
+isinya:
+
+    Text("Terkunci")     // LocalizedStringKey -> dicari di katalog
+    Text(someString)     // StringProtocol      -> DICETAK APA ADANYA
+
+Jadi `row(_ title: String, _ value: String)` (DiagnosticsView.swift:715) yang
+menerima `"Keadaan"` mencetak kata **"Keadaan"** di layar — di semua bahasa —
+dan terjemahan `en` yang sudah ditulis tidak akan pernah tampil. Yang membuatnya
+sunyi: tiga gerbang menyentuh permukaan ini dan ketiganya hijau. Aturan 4
+(literal itu memang **ada** di katalog), Aturan 6 (tidak melihat `Apps/`), dan
+Aturan 19 — "kunci yatim", yang mencari teks kunci sebagai **substring mentah**,
+jadi kemunculannya sebagai teks Indonesia **menghitung sebagai rujukan**.
+
+Sebelum siklus ini, tidak ada satu keadaan pun yang membuktikan Aturan 29 bisa
+keluar bukan-nol.
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-literal-string-param.py` (baru, dirujuk `engine-tests.yml`):
+
+| # | keadaan | harap | terukur |
+|---|---|---|---|
+| 1 | literal kunci di parameter judul | merah | **MERAH** |
+| 2 | kunci lain di parameter judul | merah | **MERAH** |
+| 3 | kunci di parameter **nilai** (posisi 2) | merah | **MERAH** |
+| 4 | variabel yang sudah lewat katalog (baseline) | hijau | hijau |
+| 5 | literal yang bukan kunci katalog | hijau | hijau |
+| 6 | string kosong | hijau | hijau |
+
+Keadaan 4–6 bukan hiasan: gerbang yang memerah pada kode benar akan dimatikan
+orang. Keadaan 3 diukur terpisah untuk memastikan posisi **kedua** ikut
+terjaga, bukan cuma yang pertama — jangkar suntiknya hidup di
+`RowSpeech.spokenRow(title:spokenValue:)`, yang **kedua** parameternya
+`String`.
+
+Non-vakuositas diukur, bukan diklaim: dengan program aturannya dilumpuhkan di
+salinan, keadaan 1 berbalik **hijau** — jadi yang berbunyi memang aturannya,
+bukan sebab lain.
+
+### Dua cacat harness, keduanya tertangkap karena menuntut arah
+
+1. **Salinan tidak lengkap membuat gerbangnya diam — dan kegagalannya
+   berbentuk hijau.** Versi pertama hanya menyalin `Apps/`, padahal aturan 29
+   membaca tanda tangan helper dari **kedua** pohon. Indeksnya runtuh
+   **69 → 6**, dan gerbangnya melaporkan "Bersih" untuk suntikan yang di pohon
+   lengkap **MERAH**. Tanpa keadaan "harus berbunyi" sebagai harapan yang
+   dieksekusi, harness ini akan lulus sambil mengukur aturan yang kehilangan
+   separuh indeksnya. Cacat ketiga mengiringinya: `Packages/` ikut membawa
+   `.build` milik Docker, jadi `copytree` mati **Permission denied** sebelum
+   satu keadaan pun terukur — dan versi pertama pengabaiannya hanya melihat
+   tingkat teratas, sehingga `.build` di dalam `Packages/<P>/` tetap tersalin.
+2. **Keadaan yang bukan cacat dilaporkan sebagai cacat.** Keadaan 3 memakai
+   `"Laju pergelangan: sudut"` sebagai "kunci katalog yang lebih panjang".
+   Terukur: itu **bukan kunci**, jadi aturan 29 benar untuk diam, dan
+   harnessnya menuduh gerbangnya. Yang salah adalah **harapannya**. Sekarang
+   himpunan kuncinya dibaca dari katalog, dan kunci yang tidak ada
+   **menghentikan** harness alih-alih dilaporkan hijau.
+
+### Batas yang dinyatakan, bukan disangka tertutup
+
+Dua bentuk cacat yang **sama kelasnya** lolos, dan keduanya dijalankan sebagai
+keadaan dengan harapan **hijau** supaya batasnya tercatat:
+
+| bentuk | kenapa lolos |
+|---|---|
+| kunci di dalam **interpolasi string** | yang dipindai literalnya, bukan ekspresi di dalam `\(…)` |
+| kunci lewat **variabel perantara** | menuntut pelacakan aliran |
+
+Menjangkau keduanya menuntut evaluasi interpolasi atau pelacakan aliran —
+keduanya melampaui sapu teks, dan gerbang yang menebak akan merah pada kode
+benar. Karena itu batasnya **dieksekusi**, bukan diceritakan: kalau kelak
+cakupannya meluas, keadaan itu berhenti sesuai harapan, dan itu tanda kabar
+baik, bukan harness yang rusak.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** `Apps/`, bukan perilaku app Apple. Yang dibuktikan:
+  aturan berbunyi pada tiga bentuk cacat dan diam pada tiga bentuk sah.
+- Harness ini **tidak** membuktikan bahwa tidak ada situs cacat di `main`
+  hari ini — hanya bahwa aturannya berbunyi bila ada.
+- **Dua aturan nirsaksi lain belum dikerjakan** (terukur: 3 → **2**): 21, 26.
+  Keduanya punya WIP di pohon kerja siklus lain.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 788 | **788** (tak disentuh) |
+| Aturan nirsaksi (terukur) | 3 | **2** (-1) |
+| Harness dirujuk CI | 64 | **65** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-literal-string-param.py` → **6 keadaan + 2 batas
+  + 1 non-vakuositas, 0 tidak sesuai harapan**, exit 0.
+- `python3 Tools/check-harness-terdaftar.py` → **65 harness, semuanya
+  dirujuk**, exit 0. (Gerbang ini sendiri menolak harness baru sebelum langkah
+  CI-nya ditambahkan — ia bekerja.)
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS, exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → **212 CelestialEngine + 788
+  PointingKit = 1000 uji, 0 gagal**. Dijalankan di **pohon ter-commit**
+  (`git worktree`), bukan pohon kerja yang memuat WIP siklus lain.
+
+### Catatan proses
+
+Pohon kerja utama memuat WIP siklus lain yang belum di-commit (16 berkas
+termodifikasi + 1 belum terlacak, termasuk penghapusan
+`Tools/bukti-mutasi-permukaan.py` milik mereka). Seluruh pengukuran dijalankan
+di `git worktree` bersih di atas `HEAD`; WIP itu **tidak disentuh** dan
+diverifikasi utuh sesudahnya (17 entri `git status`, sama seperti sebelum
+siklus dimulai).
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 28: "55 pemanggilan cocok" yang tidak memeriksa label pada parameter bawaan)
 
 Siklus ini meneruskan sapuan yang sama seperti entri-entri di bawah — dari 35
