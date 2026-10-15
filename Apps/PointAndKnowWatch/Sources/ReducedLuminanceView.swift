@@ -25,6 +25,45 @@ struct ReducedLuminanceView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 4) {
+                // **Gambar objek, sekecil yang masih terbaca.**
+                //
+                // Layar redup dulu satu-satunya permukaan yang menampilkan objek
+                // terkunci tanpa gambar sama sekali: teks saja. Yang dilihat
+                // pengguna justru layar inilah yang paling sering — pergelangan
+                // yang miring sedikit, tanpa menyentuh layar. Kartu jam penuh
+                // menggambar objeknya, jadi layar yang lebih sering dilihat
+                // menampilkan lebih sedikit daripada layar yang lebih jarang.
+                //
+                // Yang digambar dan yang **tidak** diklaim diputuskan model
+                // (`ReducedLuminanceVisual.plan`), bukan di sini: ciri pengenal
+                // (cincin Saturnus, bentuk galaksi) hanya muncul saat engine
+                // yakin, dan saat ragu gambar tetap ada tapi disamar plus
+                // lencana tanda tanya — penanda yang menempel pada gambar,
+                // karena layar ini tidak punya badge keyakinan maupun baris
+                // kedua untuk menulis "Ragu".
+                //
+                // `isConfirmed` diteruskan eksplisit (bukan `!isStale`): ambang
+                // untuk *klaim identitas* lebih ketat daripada "bukan sisa",
+                // dan `PointingEngine.confirmsIdentity` yang menurunkannya —
+                // sama dengan yang dipakai kartu jam, jadi kedua permukaan
+                // tidak bisa berbeda pendapat soal kapan ciri boleh tampil.
+                //
+                // **Tanpa animasi.** watchOS menyegarkan layar redup sekali per
+                // detik, jadi denyut di sini hanya menghabiskan baterai tanpa
+                // pernah terlihat mulus; `ReducedLuminanceVisual.allowsMotion`
+                // mengikat keputusan ini ke `MotionPolicy` yang sama dengan
+                // layar penuh. `CelestialVisualView` menerima `pulse: 0`.
+                switch ReducedLuminanceVisual.plan(
+                    visual: engine.visualForDisplayedObject,
+                    isConfirmed: engine.confirmsIdentity) {
+                case .none:
+                    EmptyView()
+                case .identifiable(let visual), .candidate(let visual):
+                    CelestialVisualView(visual: visual,
+                                        diameter: WatchMetrics.reducedVisualDiameter,
+                                        isConfirmed: engine.confirmsIdentity,
+                                        pulse: 0)
+                }
                 // Nama objek: satu-satunya informasi yang paling mungkin dicari
                 // pengamat saat layar redup.
                 if let object = engine.displayedObject {

@@ -21,6 +21,16 @@ enum WatchMetrics {
     /// Lebar gambar benda langit di kartu jam. Metric, bukan teks — jadi
     /// tidak ikut Dynamic Type.
     static let visualDiameter: CGFloat = 38
+    /// Lebar gambar benda langit di layar redup (Always-On).
+    ///
+    /// Lebih kecil dari `visualDiameter`, dan itu disengaja: layar redup dibaca
+    /// **sekilas** sambil pergelangan masih bergerak, dan yang paling penting di
+    /// situ adalah nama objeknya. Gambar yang sama besarnya dengan kartu penuh
+    /// akan menyaingi nama untuk perhatian, bukan mengiringinya. Namun ia tetap
+    /// cukup besar untuk ciri pengenal yang kasar (cincin, bentuk kabut) terbaca
+    /// — gambar yang terlalu kecil untuk dibedakan jenisnya hanya menambah
+    /// pekerjaan tanpa menambah informasi.
+    static let reducedVisualDiameter: CGFloat = 30
     // Ukuran ikon status sengaja TIDAK ada di sini: ia harus ikut Dynamic
     // Type, jadi di `PointingView` ia dipegang sebagai `@ScaledMetric`
     // (relatif ke `.headline`) — bukan angka `static` yang mati saat teks
