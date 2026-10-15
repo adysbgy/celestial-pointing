@@ -271,8 +271,38 @@ final class ResolverEphemerisTests: XCTestCase {
         )
         XCTAssertNil(resolution.intent.best)
         XCTAssertGreaterThan(resolution.rejected.count, 0)
-        XCTAssertTrue(resolution.rejected.allSatisfy { $0.visibility == .belowHorizon },
-                      "malam hari, jadi alasan satu-satunya adalah di bawah horizon")
+        // Malam hari: tidak ada penolakan yang dibenarkan karena siang
+        // (`.daylight`) atau terlalu dekat Matahari (`.tooCloseToSun`).
+        let nightIllegitimate = resolution.rejected.filter {
+            $0.visibility == .daylight || $0.visibility == .tooCloseToSun
+        }
+        XCTAssertTrue(nightIllegitimate.isEmpty,
+                      "malam hari, penolakan harus bukan daylight/tooCloseToSun: \(nightIllegitimate)")
+
+        // **Yang paling penting, dan mudah hilang saat `.tooFaint` mulai
+        // muncul.** Sebelum Uranus/Neptunus masuk, tiap benda pointable adalah
+        // objek mata telanjang, jadi di altitude -80 **semuanya** ditolak
+        // karena `.belowHorizon` dan uji ini cukup menuntut itu. Begitu planet
+        // teleskopik masuk, `.tooFaint` mulai sah di sini — dan penyaringan
+        // longgar ("apa pun kecuali daylight/tooCloseToSun") menjadi hijau
+        // **juga** kalau sebuah benda yang seharusnya dilaporkan "di bawah
+        // horizon" malah dicap `.tooFaint`. Itu bukan perbedaan kosmetik:
+        // pengguna diberi tahu hal yang salah tentang mengapa ia tidak melihat
+        // apa pun, dan itu persis kelas cacat yang ditutup ambang planet.
+        //
+        // Jadi pemisahnya dinyatakan, bukan diserahkan ke "bukan dua hal itu":
+        // pada altitude -80, benda yang **cukup terang untuk ambang katalog
+        // mana pun** harus `.belowHorizon`. Hanya benda yang lebih redup
+        // daripada ambang bintang boleh dilaporkan `.tooFaint`, karena bagi
+        // benda itu kedua alasan itu benar sekaligus dan urutan pemeriksaan
+        // yang memutuskan — bukan cacat.
+        let starLimit = VisibilityPolicy().limitingMagnitude
+        for rejected in resolution.rejected where rejected.object.magnitude <= starLimit {
+            XCTAssertEqual(rejected.visibility, .belowHorizon,
+                           "\(rejected.object.name) (mag \(rejected.object.magnitude)) di "
+                           + "altitude -80 hanya boleh ditolak karena di bawah horizon, "
+                           + "bukan \(rejected.visibility)")
+        }
     }
 
     /// Jejak audit harus konsisten dengan jumlah yang dipertimbangkan.

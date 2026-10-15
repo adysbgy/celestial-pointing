@@ -3477,6 +3477,17 @@
         }
       }
     },
+    "object.body.neptune.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Neptunus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neptune"
+          }
+        }
+      }
+    },
     "object.body.saturn.label": {
       "comment": "Nama benda tata surya untuk tampilan (Saturnus).",
       "localizations": {
@@ -3495,6 +3506,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sun"
+          }
+        }
+      }
+    },
+    "object.body.uranus.label": {
+      "comment": "Nama benda tata surya untuk tampilan (Uranus).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uranus"
           }
         }
       }

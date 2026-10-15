@@ -11,11 +11,11 @@ import AstronomyKit
 /// menunjuk teleskop ke Matahari merusak peralatan dan mata. Lihat
 /// `EphemerisBody.pointableBodies`.
 public enum EphemerisBody: String, CaseIterable, Equatable {
-    case sun, moon, mercury, venus, mars, jupiter, saturn
+    case sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune
 
     /// Benda yang boleh menjadi target pointing. Matahari TIDAK termasuk.
     public static let pointableBodies: [EphemerisBody] = [
-        .moon, .mercury, .venus, .mars, .jupiter, .saturn
+        .moon, .mercury, .venus, .mars, .jupiter, .saturn, .uranus, .neptune
     ]
 
     /// Apakah benda ini aman dijadikan target pointing.
@@ -31,6 +31,8 @@ public enum EphemerisBody: String, CaseIterable, Equatable {
         case .mars: return "Mars"
         case .jupiter: return "Jupiter"
         case .saturn: return "Saturnus"
+        case .uranus: return "Uranus"
+        case .neptune: return "Neptunus"
         }
     }
 
@@ -45,6 +47,8 @@ public enum EphemerisBody: String, CaseIterable, Equatable {
         case .mars: return -2.9
         case .jupiter: return -2.9
         case .saturn: return -0.5
+        case .uranus: return 5.3
+        case .neptune: return 7.8
         }
     }
 }
@@ -154,6 +158,8 @@ public struct AstronomyKitEphemeris: SolarSystemEphemeris {
         case .mars: celestial = .mars
         case .jupiter: celestial = .jupiter
         case .saturn: celestial = .saturn
+        case .uranus: celestial = .uranus
+        case .neptune: celestial = .neptune
         }
 
         let eq: Equatorial

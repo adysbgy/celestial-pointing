@@ -191,13 +191,48 @@ def fired(out: str) -> bool:
 
 
 def old_lint() -> str:
-    """Versi `origin/main`, untuk arah "cacat ini dulu lolos"."""
-    p = subprocess.run(["git", "show", "origin/main:swift-ui-lint.sh"],
+    """Versi **sebelum** perbaikan ini, untuk arah "cacat ini dulu lolos".
+
+    **Kenapa `origin/main` tidak bisa dipakai, dan ini cacat yang nyata.**
+    Versi pertama membaca `origin/main:swift-ui-lint.sh`. Itu benar **hanya**
+    selama perbaikan ini belum ter-push: begitu commit ini sampai ke `main`,
+    `origin/main` **berisi perbaikan ini sendiri**, sehingga arah "versi
+    lama" membandingkan perbaikan dengan dirinya sendiri. Terukur: di
+    worktree atas `main` sesudah push, keadaan 1 dan 2 gagal dengan
+    "versi origin/main SUDAH merah" — bukan karena cacatnya bukan milik
+    perbaikan ini, melainkan karena yang dibaca adalah versi **baru**.
+
+    Karena itu versi lama ditambatkan ke **commit induk** perbaikan ini
+    (`513eeff`), yang ter-push dan bisa dibaca CI. Ini eksplisit, bukan
+    `origin/main`: penambat yang mengikuti cabang akan berhenti mengukur
+    tepat pada commit yang memperkenalkan perbaikan — persis kelas gerbang
+    yang berhenti mengukur tanpa suara seperti Aturan 26 sendiri.
+
+    **Kenapa kegagalannya harus berhenti, bukan diam.** Kalau commit itu
+    tidak bisa dibaca (checkout dangkal, ref hilang), skrip kosong akan
+    dijalankan sebagai "versi lama": nol temuan, yaitu hijau. Keadaan 1, 2,
+    dan 4 menuntut versi lama **hijau**, jadi kegagalan itu akan lulus
+    **persis** pada keadaan-keadaan yang seharusnya membuktikan cacatnya —
+    dan harness melaporkan "SEMUA SESUAI" atas nol pembuktian.
+    """
+    # Induk commit perbaikan Aturan 26 — versi yang masih memakai `PAIR`.
+    OLD_REF = "513eeff68648e5d786970d69263e27f043c72cd0"
+    p = subprocess.run(["git", "show", f"{OLD_REF}:swift-ui-lint.sh"],
                        cwd=ROOT, capture_output=True, text=True)
-    if p.returncode != 0:
-        p = subprocess.run(["git", "show", "HEAD:swift-ui-lint.sh"],
-                           cwd=ROOT, capture_output=True, text=True)
-    return p.stdout
+    text = p.stdout
+    if p.returncode != 0 or len(text) < 1000:
+        raise SystemExit(
+            f"GAGAL: tidak bisa membaca `{OLD_REF}:swift-ui-lint.sh` "
+            f"(returncode={p.returncode}, {len(text)} karakter). "
+            "Harness ini menuntut versi pra-perbaikan untuk arah kedua; "
+            "menjalankannya tanpa itu akan melaporkan 'SEMUA SESUAI' atas "
+            "nol pembuktian.")
+    if "DEEP = re.compile" in text:
+        raise SystemExit(
+            f"GAGAL: `{OLD_REF}` sudah memuat `DEEP` — penambat versi lama "
+            "salah menunjuk. Arah kedua akan membandingkan perbaikan dengan "
+            "dirinya sendiri dan tidak membuktikan apa pun.")
+    return text
 
 
 # (nama, relpath, cari, ganti, harus_merah, old_must_red)

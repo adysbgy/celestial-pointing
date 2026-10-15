@@ -20,6 +20,12 @@
     { "body": "jupiter", "utc": "2026-06-15T12:00:00Z", "raDeg": 119.04621, "decDeg":  21.18889, "magnitude":  -1.840 },
     { "body": "saturn",  "utc": "2000-01-01T00:00:00Z", "raDeg":  38.77607, "decDeg":  12.61568, "magnitude":   0.101 },
     { "body": "saturn",  "utc": "2024-01-01T00:00:00Z", "raDeg": 335.77827, "decDeg": -11.83908, "magnitude":   0.955 },
-    { "body": "saturn",  "utc": "2026-06-15T12:00:00Z", "raDeg":  13.17448, "decDeg":   3.13069, "magnitude":   0.833 }
+    { "body": "saturn",  "utc": "2026-06-15T12:00:00Z", "raDeg":  13.17448, "decDeg":   3.13069, "magnitude":   0.833 },
+    { "body": "uranus",  "utc": "2000-01-01T00:00:00Z", "raDeg": 317.44974, "decDeg": -17.02781, "magnitude":   5.941 },
+    { "body": "uranus",  "utc": "2024-01-01T00:00:00Z", "raDeg":  47.01970, "decDeg":  17.27937, "magnitude":   5.691 },
+    { "body": "uranus",  "utc": "2026-06-15T12:00:00Z", "raDeg":  60.86970, "decDeg":  20.58048, "magnitude":   5.823 },
+    { "body": "neptune", "utc": "2000-01-01T00:00:00Z", "raDeg": 305.41451, "decDeg": -19.21723, "magnitude":   7.853 },
+    { "body": "neptune", "utc": "2024-01-01T00:00:00Z", "raDeg": 355.97195, "decDeg":  -3.09223, "magnitude":   7.775 },
+    { "body": "neptune", "utc": "2026-06-15T12:00:00Z", "raDeg":   4.47106, "decDeg":   0.46207, "magnitude":   7.781 }
   ]
 }

@@ -323,6 +323,8 @@ struct CelestialVisualView: View {
         case .polarCaps: drawPolarCaps(context: context, center: center, radius: radius)
         case .craters: drawCraters(context: context, center: center, radius: radius)
         case .haze: drawHaze(context: context, center: center, radius: radius)
+        case .paleDisk: drawPaleDisk(context: context, center: center, radius: radius)
+        case .blueDisk: drawBlueDisk(context: context, center: center, radius: radius)
         case .none: break
         }
     }
@@ -795,6 +797,55 @@ struct CelestialVisualView: View {
                         endPoint: CGPoint(x: center.x, y: center.y)))
     }
 
+    /// Uranus: satu sabuk horizontal yang sangat samar.
+    ///
+    /// **Kenapa tidak memakai `drawBands`.** `drawBands` menggambar tujuh pita
+    /// bergantian terang/gelap dengan Bintik Merah Besar — ciri Jupiter.
+    /// Uranus di teleskop kecil tampak sebagai piringan nyaris polos, jadi
+    /// pita Jupiter di sini akan menyatakan rincian yang tidak pernah
+    /// terlihat. Yang membedakan Uranus justru kepolosannya.
+    private func drawPaleDisk(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                          width: radius * 2, height: radius * 2))
+        var inner = context
+        inner.clip(to: disc)
+        // Geometri dan opasitas dibaca dari model, bukan ditulis di sini:
+        // port Python menggambar elips yang sama dari `uranusBand()`.
+        let band = CelestialVisual.uranusBand()
+        let color = Self.accent(CelestialVisual.accents.uranusBand)
+        inner.fill(Path(ellipseIn: CGRect(
+            x: center.x - radius * CGFloat(band.halfWidth),
+            y: center.y + radius * CGFloat(band.centerY - band.halfHeight),
+            width: radius * CGFloat(band.halfWidth * 2),
+            height: radius * CGFloat(band.halfHeight * 2))),
+                   with: .color(color.opacity(CelestialVisual.uranusBandOpacity)))
+    }
+
+    /// Neptunus: satu bintik gelap di belahan selatan.
+    ///
+    /// **Kenapa bintik, bukan pita.** Pita awan Neptunus jauh lebih redup
+    /// daripada Jupiter/Saturnus; yang benar-benar membedakannya adalah
+    /// bintik gelapnya. Menggambar pita saja membuat Neptunus tampak identik
+    /// dengan Uranus berwarna biru — dan dua planet yang tampak sama berarti
+    /// ciri pengenalnya berhenti menjadi ciri pengenal.
+    private func drawBlueDisk(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                          width: radius * 2, height: radius * 2))
+        var inner = context
+        inner.clip(to: disc)
+        let spot = CelestialVisual.neptuneSpot()
+        // Bintik gelap: warna gelap piringan itu sendiri, bukan warna baru —
+        // supaya ia tidak pernah terbaca sebagai objek yang menempel di atas
+        // bola.
+        let color = Self.accent(CelestialVisual.accents.neptuneSpot)
+        inner.fill(Path(ellipseIn: CGRect(
+            x: center.x + radius * CGFloat(CelestialVisual.neptuneSpotCenterX - spot.halfWidth),
+            y: center.y + radius * CGFloat(spot.centerY - spot.halfHeight),
+            width: radius * CGFloat(spot.halfWidth * 2),
+            height: radius * CGFloat(spot.halfHeight * 2))),
+                   with: .color(color.opacity(CelestialVisual.neptuneSpotOpacity)))
+    }
+
     // MARK: - Bulan
 
     /// Bulan: piringan gelap + pita terang berfase.
@@ -871,7 +922,93 @@ struct CelestialVisualView: View {
                                                  base: CelestialVisual.accents.moonLit),
                     decorate: { inner in
                         Self.drawMoonSurfaceShading(inner, center: center, radius: radius)
+                        drawMoonCraters(inner, center: center, radius: radius)
                     })
+    }
+
+    /// Kawah Bulan, digambar **di dalam** pita terang.
+    ///
+    /// **Kenapa ini butuh pemisahannya sendiri.** Maria membuat Bulan berbintik
+    /// belahan gelap-terang; kawah membuatnya terlihat sebagai **bola**. Keduanya
+    /// mengisi hal yang berbeda: salah satunya kelalaian yang terlihat di layar
+    /// 38 pt, yang satu lagi tidak (yang terlihat adalah "Bulan yang tidak
+    /// seperti koin"). Yang kedua ini juga **bentuk** — bukan warna — dan
+    /// justru bentuk itulah yang tidak dijaga satu pun gerbang gambar saat ini:
+    /// seluruh gerbang gambar Bulan mengukur **terang/gelap**, bukan lengkung.
+    ///
+    /// **Kenapa di dalam maria, bukan salah satu darinya.** Kawah yang
+    /// digambar sebagai cakram gelap rata menenggelamkan maria di bawahnya.
+    /// Karena itu strukturnya sama seperti Merkurius: dinding depan yang
+    /// menghadap cahaya, dinding belakang, dan dasar cekungan — semuanya dari
+    /// `craterRelief`, bukan angka yang ditulis ulang di sini.
+    ///
+    /// **Kenapa ia ikut terpotong sabit.** Ia dipanggil di dalam klip pita
+    /// terang yang sama dengan maria, jadi kawah di sisi gelap tidak pernah
+    /// muncul. Yang perlu dicatat: kawah **mungkin** terlihat di sabit
+    /// **ekor** (saat sisi gelap Bumi tidak melihat kawahnya), karena model ini
+    /// tidak mengklaim orientasi Bulan terhadap Bumi. Diaku, tidak diurai —
+    /// memproyeksikannya dengan rotasi akan berarti mengklaim pengetahuan yang
+    /// engine ini tidak punya.
+    private func drawMoonCraters(_ context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+        let relief = CelestialVisual.craterRelief(
+            craters: VisualFrame.moonCraters.map { c in
+                // `Crater` menyimpan pusat dan radius terpisah; `craterRelief`
+                // mengharapkan tupel `(x, y, radius)` yang sama dengan Merkurius.
+                (c.offsetX, c.offsetY, c.radius)
+            })
+        let floor = Self.accent(CelestialVisual.accents.craterFloor)
+        let rim = Self.accent(CelestialVisual.accents.craterRim)
+
+        for crater in VisualFrame.moonCraters.enumerated() {
+            let (index, geometry) = crater
+            let r = relief[relief.indices.contains(index) ? index : relief.startIndex]
+            // Jarak dari pusat cakram → berapa besar ia harus menyusut supaya
+            // piringan terbaca sebagai bola. 1.0 di tengah, 0.0 di tepi.
+            // Modelnya `craterForeshortening`, diuji di Linux.
+            let centreDistance = (geometry.offsetX * geometry.offsetX
+                                  + geometry.offsetY * geometry.offsetY).squareRoot()
+            let shrink = VisualFrame.craterForeshortening(radiusFromCentre: centreDistance)
+            // Kawah yang jatuh tepat di tepi: faktornya nol, jadi ia hilang.
+            // Itu yang benar, tapi tetap dijaga di sini supaya barisnya tidak
+            // pernah menggambar cakram berskala nol (yang bisa membawa bentuk
+            // degenerat ke kanvas).
+            guard shrink > 0.02, geometry.radius > 0.02 else { continue }
+            let strength = CGFloat(r.rimStrength) * CGFloat(geometry.darkness) * CGFloat(shrink)
+            // Radius yang **sebenarnya**, bukan radius mentah: ini yang membuat
+            // kawah Clavius (0.78 R dari pusat) menyusut dari 0.14 R ke 0.08 R.
+            let size = radius * CGFloat(geometry.radius * shrink)
+            let cx = center.x + CGFloat(geometry.offsetX) * radius
+            let cy = center.y + CGFloat(geometry.offsetY) * radius
+            let disc = Path(ellipseIn: CGRect(x: cx - size, y: cy - size,
+                                              width: size * 2, height: size * 2))
+
+            // 1. Dasar cekungan — dinding yang membelakangi cahaya. Kelegapan
+            //    ikut `floorDepth` dari model, dan makin pekat makin ke tepi
+            //    (kawah tepi adalah yang paling tersembunyi di balik lengkung).
+            context.fill(disc,
+                         with: .color(floor.opacity(CGFloat(r.floorDepth) * strength)))
+
+            // 2. Bibir yang menghadap cahaya: digeser ke arah sumber cahaya
+            //    lalu dipotong cakram kawah, sehingga yang tersisa hanya sabit.
+            //    Geseran 0.45 · ukuran, sama seperti Merkurius — bukan angka
+            //    baru yang bisa menyimpang di antara dua tempat pemanggilan.
+            let offset = size * 0.45
+            let rimDisc = Path(ellipseIn: CGRect(
+                x: cx + CGFloat(r.rimDirectionX) * offset - size,
+                y: cy + CGFloat(r.rimDirectionY) * offset - size,
+                width: size * 1.84, height: size * 1.84))
+            var lit = context
+            lit.clip(to: disc)
+            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * strength)))
+
+            // 3. Dasar tengah yang lebih gelap, supaya cekungannya terbaca
+            //    **cekung** — bukan sekadar gelap.
+            let innerSize = size * 0.5
+            context.fill(Path(ellipseIn: CGRect(x: cx - innerSize, y: cy - innerSize,
+                                                width: innerSize * 2,
+                                                height: innerSize * 2)),
+                         with: .color(floor.opacity(0.75 * strength)))
+        }
     }
 
     /// Bercak gelap (maria) di permukaan Bulan.

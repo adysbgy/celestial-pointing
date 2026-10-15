@@ -91,6 +91,8 @@ PLANET_PALETTE = {
     "mars":    dict(light=(0.88, 0.42, 0.26), dark=(0.38, 0.13, 0.08), feature="polarCaps"),
     "jupiter": dict(light=(0.90, 0.78, 0.61), dark=(0.45, 0.29, 0.17), feature="bands"),
     "saturn":  dict(light=(0.93, 0.84, 0.62), dark=(0.44, 0.36, 0.22), feature="rings"),
+    "uranus":  dict(light=(0.68, 0.85, 0.88), dark=(0.24, 0.40, 0.44), feature="paleDisk"),
+    "neptune": dict(light=(0.28, 0.42, 0.92), dark=(0.08, 0.16, 0.42), feature="blueDisk"),
 }
 
 NEUTRAL_BODY = (0.74, 0.72, 0.68)
@@ -108,6 +110,9 @@ ACCENTS = dict(
     saturnRing=(0.86, 0.78, 0.60),
     marsPolarCap=(0.97, 0.95, 0.93),
     venusHaze=(0.99, 0.96, 0.82),
+    # MODEL: `NightVisual.Accents.uranusBand` / `.neptuneSpot`.
+    uranusBand=(0.74, 0.90, 0.92),
+    neptuneSpot=(0.02, 0.04, 0.105),
     # Pasangan cekungan kawah Merkurius. Lihat `NightVisual.Accents.craterFloor`
     # untuk kenapa bayangan ini **bukan** `planetUnlit`: dasar kawah adalah
     # permukaan berdebu yang masih memantulkan cahaya sekeliling, dan hitam
@@ -915,6 +920,24 @@ SPOT_CENTER = (-0.10, 0.31)                  # MODEL: `CelestialVisual.jupiterSp
 SPOT_SIZE = (0.52, 0.26)                     # MODEL: `CelestialVisual.jupiterSpot`
 CRATERS = [(-0.30, -0.22, 0.20), (0.28, -0.05, 0.15), (-0.12, 0.32, 0.17),
            (0.34, 0.34, 0.11), (0.02, -0.48, 0.13)]      # VIEW: `drawCraters`
+# Kawah **Bulan**. Berbeda dari `CRATERS` di atas — itu kawah Merkurius, yang
+# adalah **ciri pengenal planet** dan karena itu masuk `PLANET_PALETTE` dan
+# ikut hilang saat engine ragu. Kawah Bulan sebaliknya milik permukaan Bulan,
+# sama seperti `MARIA`: tekstur hias yang tidak mengklaim identitas siapa pun.
+#
+# Angka-angka ini **satu-satunya salinan di luar Swift**, dan ia hidup di sini
+# karena gerbang gambar repo ini seluruhnya mengukur port ini — kalau Bulan
+# digambar berkawah di jam dan polos di sini, seluruh gerbang itu tetap hijau
+# sambil mengukur gambar yang tak pernah tampil. Model aslinya
+# `VisualFrame.moonCraters` (+ `craterForeshortening`), diuji di Linux;
+# `check_moon_craters_match_the_model` menjaga keduanya tetap sepakat.
+MOON_CRATERS = [(-0.06, 0.62, 0.09, 0.95),    # MODEL: `CelestialVisual.moonCraters`
+                (-0.30, -0.05, 0.13, 0.90),
+                (0.28, -0.66, 0.11, 0.88),
+                (-0.50, 0.30, 0.08, 0.92),
+                (-0.78, 0.44, 0.10, 0.97),
+                (0.70, 0.16, 0.12, 0.86),
+                (-0.22, 0.78, 0.14, 0.84)]
 MARIA = [(-0.72, 0.02, 0.30), (-0.46, -0.36, 0.28),
          (-0.18, -0.44, 0.22), (0.06, -0.26, 0.22),
          (0.36, -0.06, 0.18), (0.62, -0.34, 0.13),
@@ -992,6 +1015,17 @@ MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
 VENUS_HAZE_CENTER_Y = 0.0                    # MODEL: `CelestialVisual.venusHaze`
 VENUS_HAZE_HALF_WIDTH = 0.55                 # MODEL: `CelestialVisual.venusHaze`
 VENUS_HAZE_HALF_HEIGHT = 0.72                # MODEL: `CelestialVisual.venusHaze`
+# MODEL: `CelestialVisual.uranusBand` — sabuk samar Uranus, satuan radius.
+URANUS_BAND_CENTER_Y = 0.0                   # MODEL: `CelestialVisual.uranusBand`
+URANUS_BAND_HALF_WIDTH = 0.62                # MODEL: `CelestialVisual.uranusBand`
+URANUS_BAND_HALF_HEIGHT = 0.30               # MODEL: `CelestialVisual.uranusBand`
+URANUS_BAND_OPACITY = 0.18                   # MODEL: `CelestialVisual.uranusBandOpacity`
+# MODEL: `CelestialVisual.neptuneSpot` — bintik gelap Neptunus, satuan radius.
+NEPTUNE_SPOT_CENTER_X = 0.18                 # MODEL: `CelestialVisual.neptuneSpotCenterX`
+NEPTUNE_SPOT_CENTER_Y = 0.22                 # MODEL: `CelestialVisual.neptuneSpot`
+NEPTUNE_SPOT_HALF_WIDTH = 0.34               # MODEL: `CelestialVisual.neptuneSpot`
+NEPTUNE_SPOT_HALF_HEIGHT = 0.22              # MODEL: `CelestialVisual.neptuneSpot`
+NEPTUNE_SPOT_OPACITY = 0.55                  # MODEL: `CelestialVisual.neptuneSpotOpacity`
 # MODEL: `CelestialVisual.sphereLightOffset` — arah datang cahaya pada bola,
 # satuan radius, y positif ke bawah. Dipakai **dua** hal: titik pusat gradien
 # bola dan arah bibir terang kawah. Satu konstanta, karena dua salinan angka
@@ -1356,6 +1390,10 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         _draw_craters(canvas, cx, cy, radius, night_mode)
     elif feature == "haze":
         _draw_haze(canvas, cx, cy, radius, night_mode)
+    elif feature == "paleDisk":
+        _draw_pale_disk(canvas, cx, cy, radius, night_mode)
+    elif feature == "blueDisk":
+        _draw_blue_disk(canvas, cx, cy, radius, night_mode)
 
 
 def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
@@ -1709,6 +1747,60 @@ def _draw_haze(canvas, cx, cy, radius, night_mode):
     canvas.ellipse(cx, cy + radius * center_y, radius * half_w, radius * half_h, gradient)
 
 
+def uranus_band():
+    """Port dari `CelestialVisual.uranusBand()` — geometri sabuk Uranus.
+
+    Mengembalikan `(center_y, half_width, half_height)` dalam satuan radius.
+    Angkanya dibaca dari konstanta MODEL di atas, bukan ditulis ulang di sini.
+    """
+    return URANUS_BAND_CENTER_Y, URANUS_BAND_HALF_WIDTH, URANUS_BAND_HALF_HEIGHT
+
+
+def neptune_spot():
+    """Port dari `CelestialVisual.neptuneSpot()` — geometri bintik gelap.
+
+    Mengembalikan `(center_y, half_width, half_height)`; pusat horizontalnya
+    ada di `NEPTUNE_SPOT_CENTER_X` karena `HazeGeometry` hanya memuat sumbu
+    tegak.
+    """
+    return NEPTUNE_SPOT_CENTER_Y, NEPTUNE_SPOT_HALF_WIDTH, NEPTUNE_SPOT_HALF_HEIGHT
+
+
+def _draw_pale_disk(canvas, cx, cy, radius, night_mode):
+    """Sabuk samar Uranus — **bukan** pita Jupiter.
+
+    Uranus di teleskop kecil tampak sebagai piringan nyaris polos; memberinya
+    tujuh pita kontras akan menyatakan rincian yang tidak pernah terlihat.
+    Dijepit ke piringan (`clip_disc`) supaya sabuknya tidak pernah menonjol
+    keluar bola.
+    """
+    band = ACCENTS["uranusBand"]
+    center_y, half_w, half_h = uranus_band()
+    # `accent_fn` — bukan tuple mentah. `Canvas.ellipse` menuntut `color_at`
+    # **callable** yang mengembalikan `(rgb, alpha)`; mengirim tuple membuat
+    # renderer melempar `TypeError: 'tuple' object is not callable`, dan itulah
+    # yang terjadi pada versi pertama fungsi ini — jadi planet terluar tidak
+    # pernah sekali pun bisa digambar.
+    canvas.ellipse(cx, cy + radius * center_y, radius * half_w, radius * half_h,
+                   accent_fn(band, night_mode, URANUS_BAND_OPACITY),
+                   clip_disc=(cx, cy, radius))
+
+
+def _draw_blue_disk(canvas, cx, cy, radius, night_mode):
+    """Bintik gelap Neptunus — ciri yang membedakannya dari Uranus biru.
+
+    Tanpa bintik ini Neptunus hanya "Uranus yang lebih biru", dan dua planet
+    yang tampak identik berarti ciri pengenalnya berhenti menjadi ciri
+    pengenal. Dijepit ke piringan supaya bintiknya tidak pernah keluar bola.
+    """
+    spot = ACCENTS["neptuneSpot"]
+    center_y, half_w, half_h = neptune_spot()
+    canvas.ellipse(cx + radius * NEPTUNE_SPOT_CENTER_X, cy + radius * center_y,
+                   radius * half_w, radius * half_h,
+                   accent_fn(spot, night_mode, NEPTUNE_SPOT_OPACITY),
+                   clip_disc=(cx, cy, radius))
+
+
 def _lit_band_polygon(cx, cy, radius, phase, bright_limb_angle):
     """Poligon pita terang, sudah diputar — port dari `drawLitBand`.
 
@@ -1882,6 +1974,50 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
             return (0.0, 0.0, 0.0), MARIA_OPACITY * (outer - d) / (outer - inner)
 
         canvas.fill(lambda x, y: _point_in_polygon(x, y, points), at)
+
+    # ── Kawah Bulan ───────────────────────────────────────────────────
+    # `CelestialVisualView.drawMoonCraters`. Maria memberi Bulan **tekstur**;
+    # kawah memberinya **bentuk**. Cakram Bulan adalah proyeksi bola, jadi
+    # kawah menyusut menuju tepi — `crater_foreshortening` (duplikat sadar dari
+    # `VisualFrame.craterForeshortening`, dijaga `check_moon_craters_match_the_
+    # model`). Dan tiap kawah digambar sebagai cekungan tiga lapisan, aturan
+    # yang sama dengan `_draw_craters` Merkurius: cakram gelap rata terbaca
+    # sebagai **stiker** pada 76 px, sedangkan sabit bibir yang menghadap
+    # cahaya membuatnya terbaca cekung.
+    relief_all = crater_relief([(c[0], c[1], c[2]) for c in MOON_CRATERS])
+    floor_rgb, _ = accent_fn(ACCENTS["craterFloor"], night_mode, 1.0)(cx, cy)
+    rim_rgb, _ = accent_fn(ACCENTS["craterRim"], night_mode, 1.0)(cx, cy)
+    for (dx, dy, size, darkness), relief in zip(MOON_CRATERS, relief_all):
+        (_, _, _, rim_x, rim_y, rim_strength, floor_depth) = relief
+        # Sama dengan `craterForeshortening(|pusat|)` di Swift: sqrt(1 - r²),
+        # dijepit ke [0, 1], jadi nol di tepi cakram — bukan negatif.
+        distance = min(1.0, math.hypot(dx, dy))
+        shrink = math.sqrt(max(0.0, 1.0 - distance * distance))
+        if shrink <= 0.02 or size <= 0.02:
+            continue
+        # `darkness` (kegelapan relatif maria) dan `shrink` (proyeksi bola)
+        # dua-duanya mengatur kekuatan; keduanya faktor **penumpu**, bukan
+        # penambah opasitas, jadi kawah paling lama pun tetap ≤ opasitas bibir.
+        strength = rim_strength * darkness * shrink
+        mr = size * shrink * radius
+        mx, my = to_screen(dx, dy)
+
+        # 1. Dasar cekungan (dinding yang membelakangi cahaya).
+        canvas.disc(mx, my, mr, lambda x, y, s=floor_depth * strength * 0.85: (
+            (0.0, 0.0, 0.0), s))
+
+        # 2. Sabit bibir yang menghadap cahaya: cakram digeser ke arah sumber
+        #    cahaya, dipotong oleh cakram kawah. Geseran 0.45·mr — angka yang
+        #    sama dengan `_draw_craters`, bukan salinan kedua yang bisa
+        #    menyimpang.
+        offset = mr * 0.45
+        canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,
+                    lambda x, y, a=min(1.0, 0.9 * strength): (rim_rgb, a),
+                    clip_disc=(mx, my, mr))
+
+        # 3. Dasar tengah yang lebih gelap, supaya cekungannya terbaca cekung.
+        canvas.disc(mx, my, mr * 0.5,
+                    lambda x, y, s=0.75 * strength: ((0.0, 0.0, 0.0), s))
 
 
 def _point_in_polygon(x, y, points):
@@ -2135,7 +2271,8 @@ def build_cases():
     cases = []
 
     # ── Planet ────────────────────────────────────────────────────────
-    for planet in ("mercury", "venus", "mars", "jupiter", "saturn"):
+    for planet in ("mercury", "venus", "mars", "jupiter", "saturn",
+                   "uranus", "neptune"):
         cases.append(VisualCase(f"planet-{planet}-confirmed",
                                 f"{planet} — terkunci, ciri pengenal boleh tampil",
                                 "planet", planet=planet, is_confirmed=True))
@@ -2147,7 +2284,8 @@ def build_cases():
     # aturan yang sama terukur di kelimanya.
     for planet, feature in (("jupiter", "pita"), ("saturn", "cincin"),
                             ("mars", "kutub"), ("mercury", "kawah"),
-                            ("venus", "kabut")):
+                            ("venus", "kabut"), ("uranus", "sabuk samar"),
+                            ("neptune", "bintik gelap")):
         cases.append(VisualCase(f"planet-{planet}-uncertain",
                                 f"{planet} saat engine RAGU — {feature} harus hilang",
                                 "planet", planet=planet, is_confirmed=False))
@@ -2186,7 +2324,8 @@ def build_cases():
     #
     # Ia bukan keadaan produksi — di app, bola tanpa ciri hanya muncul saat
     # engine ragu, dan di sana warnanya netral.
-    for planet in ("jupiter", "saturn", "mars", "mercury", "venus"):
+    for planet in ("jupiter", "saturn", "mars", "mercury", "venus",
+                   "uranus", "neptune"):
         cases.append(VisualCase(f"planet-{planet}-bare",
                                 f"bola {planet} TANPA ciri — pembanding "
                                 "bentuk, bukan keadaan produksi",

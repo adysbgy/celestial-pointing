@@ -50,10 +50,62 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                  Gerbang yang kehilangan subjeknya harus
                                  **merah**, bukan hijau tanpa mengukur apa pun.
 
-**Keadaan 1–3 tidak bisa saling menggantikan.** 1 menguji kehadiran bersyarat,
+  5. ciri `.paleDisk` hilang      **Keadaan yang membedakan aturan baru dari
+     dari jalur gambar            yang lama, diukur lewat penyuntikan
+                                 terpisah — bukan lewat harness ini.**
+                                 Seluruh baris `case .paleDisk:
+                                 drawPaleDisk(…)` dihapus, sehingga Uranus
+                                 kehilangan sabuk samarnya dan tampil seperti
+                                 planet tak dikenal — padahal `enum
+                                 DistinguishingFeature` masih menyebut
+                                 `.paleDisk` dan view masih punya jalur untuk
+                                 semua ciri lain. Terukur:
+
+                                     aturan lama (pola `drawSphere`)  hijau
+                                     aturan baru (himpunan ciri)      MERAH
+
+                                 **Kenapa tidak bisa jadi keadaan di sini.**
+                                 Harness ini menolak jalan di atas sumber yang
+                                 tidak sama dengan HEAD (itu yang membuat
+                                 «pulih persis»-nya bermakna), sedangkan
+                                 `.paleDisk` **hanya ada** di pekerjaan yang
+                                 belum di-commit: di HEAD ia tidak ada sama
+                                 sekali, sehingga jangkarnya nol kali dan
+                                 harness berhenti — persis yang terjadi. Jadi
+                                 pengukuran di atas dilakukan dengan menyuntik
+                                 view salinan di luar harness, dan **angka itu
+                                 yang diklaim**, bukan angka dari keadaan di
+                                 bawah. Begitu penambahannya di-commit,
+                                 keadaan ini harus masuk kembali ke sini:
+                                 pada HEAD ia akan punya jangkar yang sah.
+
+  6. `.paleDisk` utuh             Kontrol negatif, dengan alasan yang sama
+                                 belum bisa berdiri di sini. Gerbang yang
+                                 memerah pada ciri yang **memang terjaga**
+                                 akan dilonggarkan orang, jadi keadaan yang
+                                 setara wajib hijau. Yang terukur di sisinya
+                                 adalah **batas** yang dinyatakan di atas:
+                                 mengganti fungsi gambarnya (`drawPaleDisk` →
+                                 `drawNeutralBody`, simbol `.paleDisk` tetap
+                                 ada) juga hijau — gerbang ini menjaga bahwa
+                                 cirinya **dipakai di bawah penjaga**, bukan
+                                 bahwa gambarnya benar.
+
+**Keadaan 1–3 saling tidak bisa menggantikan.** 1 menguji kehadiran bersyarat,
 2 menguji bahwa syaratnya memang `!isConfirmed` (bukan sekadar ada `if`), 3
-menguji bahwa ciri pengenal ikut dijaga. Kalau salah satunya dilewat, gerbang
-bisa dibalik tanpa berbunyi di sisi itu.
+menguji ciri `.rings`. Kelas cacat yang ditangkap keadaan 1–3 adalah **cacat
+pada satu situs** yang sudah hidup di HEAD; kelas cacat keadaan 5 adalah
+**cacat pada ciri mana pun** yang belum ada di HEAD. Karena harness ini hanya
+boleh berjalan di atas HEAD, keadaan 1–3 adalah yang bisa ditegakkan di sini,
+dan keadaan 5 tetap harus diukur di luar lalu disebutkan kejujurannya.
+
+**Yang TIDAK diklaim keadaan ini.** Ia menuntut simbol cirinya **ada** di bawah
+sebuah `if` yang memuat `isConfirmed`. Ia tidak membuktikan bahwa `if` itu
+**dievaluasi** (`if true` dengan `isConfirmed` di dalam ekspresi yang tidak
+dipakai akan hijau), tidak mengenali penjaga `guard isConfirmed else { return }`
+yang berdiri sebelum `switch`, dan tidak tahu apakah cabangnya menggambar
+gambar yang benar. Ketiga batas itu diukur, bukan diduga — lihat catatan di
+`swift-ui-lint.sh`.
 
 Kenapa programnya diekstrak dari `swift-ui-lint.sh`, bukan ditulis ulang di
 sini: menyalin aturannya membuat harness mengukur **salinan**, yang akan tetap
@@ -103,6 +155,10 @@ STATES = [
     ("4. syarat `drawSphere` dihapus total (kontrol negatif)",
      [(VIEW, SPHERE_LINE, "        if true {")],
      True),
+    # Keadaan 5 & 6 sengaja TIDAK ada di sini: keduanya menyentuh `.paleDisk`,
+    # yang belum hidup di HEAD — jangkarnya nol kali dan harness berhenti
+    # (benar, karena harness hanya mengukur apa yang di-commit). Keduanya
+    # diukur lewat penyuntikan terpisah; hasilnya dicatat di kepala berkas.
 ]
 
 _originals = {}

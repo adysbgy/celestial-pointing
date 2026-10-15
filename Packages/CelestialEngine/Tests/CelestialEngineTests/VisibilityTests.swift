@@ -119,6 +119,139 @@ final class VisibilityTests: XCTestCase {
                        "purnama mengetatkan ambang DSO: M57 ditolak di langit terang Bulan")
     }
 
+    // MARK: - Planet luar punya ambang sendiri
+
+    /// Planet teleskopik luar (Neptunus) punya ambang magnitudo sendiri.
+    ///
+    /// **Cacat yang ditutup uji ini.** Sebelum Uranus dan Neptunus masuk
+    /// katalog, seluruh benda pointable adalah objek mata telanjang, sehingga
+    /// ambang bintang 6.0 untuk segalanya tidak pernah salah. Neptunus
+    /// (mag 7.8) mematahkannya: `classify` mengembalikannya `.tooFaint`
+    /// **sebelum** ketinggiannya diperiksa, jadi "tunjuk ke arah Neptunus"
+    /// selalu berakhir "tidak ada" — bukan kejujuran, melainkan engine yang
+    /// diam-diam membuang benda yang memang ada di sana.
+    ///
+    /// Yang diuji, dua arah sekaligus: di langit gelap Neptunus harus
+    /// **terlihat** sebagai planet, sementara bintang mag 7.8 tetap **terlalu
+    /// redup** — ambang bintang tidak boleh ikut longgar, karena itu justru
+    /// mengklaim bintang redup palsu sebagai terlihat.
+    func testOuterPlanetUsesItsOwnLimitingMagnitude() {
+        let neptune = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 7.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .planet
+        )
+        XCTAssertEqual(neptune, .visible,
+                       "Neptunus (mag 7.8) harus terlihat sebagai planet")
+
+        let faintStar = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 7.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .star
+        )
+        XCTAssertEqual(faintStar, .tooFaint,
+                       "bintang mag 7.8 tetap terlalu redup — ambang bintang tidak berubah")
+
+        // Tanpa `kind` (bawaan .star) planet mag 7.8 harus tetap ditolak,
+        // supaya keliru memanggil tanpa `kind` tidak membocorkan ambang planet.
+        let defaultKind = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 7.8, separationFromSunDeg: 120,
+            context: night, policy: policy
+        )
+        XCTAssertEqual(defaultKind, .tooFaint,
+                       "tanpa kind, mag 7.8 tetap di bawah ambang bintang")
+    }
+
+    /// Uranus (mag 5.8) **tidak** boleh bergantung pada ambang planet yang
+    /// lebih longgar: ia benda mata telanjang, jadi ia harus terlihat lewat
+    /// ambang bintang biasa juga.
+    ///
+    /// Ini menjaga ambang planet tetap menjadi **pengecualian untuk Neptunus**,
+    /// bukan pintu belakang yang membuat seluruh planet lolos tanpa syarat.
+    func testBrightOuterPlanetWouldPassEvenOnTheStarLimit() {
+        let uranusAsPlanet = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 5.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .planet
+        )
+        let uranusAsStar = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 5.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .star
+        )
+        XCTAssertEqual(uranusAsPlanet, .visible)
+        XCTAssertEqual(uranusAsStar, .visible,
+                       "Uranus mag 5.8 terlihat mata telanjang; ia tidak butuh ambang planet")
+    }
+
+    /// Ambang planet harus menutup **seluruh** rentang magnitudo Neptunus,
+    /// bukan magnitudo di sekitar oposisinya saja.
+    ///
+    /// **Cacat yang ditutup uji ini, dan kenapa uji sebelumnya melewatkannya.**
+    /// `testOuterPlanetUsesItsOwnLimitingMagnitude` menguji mag **7.8** —
+    /// angka yang kebetulan sama dengan ambangnya (`7.8 <= 7.8`), jadi ia hijau
+    /// walau ambangnya persis sama dengan magnitudo yang diuji. Terukur di
+    /// fixture Horizons repo ini (`horizons_reference.json`): Neptunus
+    /// **7.853** pada 2000-01-01. Di atas ambang 7.8, jadi pada tanggal itu
+    /// engine membuang Neptunus sebagai `.tooFaint` sebelum ketinggiannya
+    /// diperiksa — persis kegagalan yang docstring `planetLimitingMagnitude`
+    /// klaim sudah ditutup.
+    ///
+    /// Yang diuji di sini adalah **selisih**, bukan angka: seluruh sampel
+    /// Neptunus di fixture harus terlihat, dan masing-masing harus terlihat
+    /// dengan margin di atas nol. Uji yang hanya menuntut "terlihat" akan
+    /// kembali hijau pada ambang yang pas-pasan, dan ambang yang pas-pasan
+    /// adalah bentuk cacat yang baru saja diperbaiki.
+    func testPlanetLimitCoversTheWholeNeptuneMagnitudeRange() {
+        // Angka dari fixture, ditulis di sini apa adanya supaya uji ini tidak
+        // bergantung pada pembacaan berkas JSON di dalam suite.
+        let neptuneMagnitudes = [7.853, 7.775, 7.781]
+
+        for magnitude in neptuneMagnitudes {
+            let result = VisibilityFilter.classify(
+                altitudeDeg: 45, magnitude: magnitude, separationFromSunDeg: 120,
+                context: night, policy: policy, kind: .planet
+            )
+            XCTAssertEqual(result, .visible,
+                           "Neptunus mag \(magnitude) harus terlihat, bukan \(result)")
+            XCTAssertGreaterThan(policy.planetLimitingMagnitude, magnitude,
+                                 "ambang planet harus longgar atas Neptunus yang diredup "
+                                 + "oleh orbitnya, bukan hanya pada oposisi")
+        }
+
+        // Arah sebaliknya: ambangnya tetap **bukan** tak terbatas. Bintang
+        // tetap di 6.0, dan ambang planet tidak boleh melar sampai menerima
+        // benda yang jelas teleskopik.
+        XCTAssertLessThan(policy.planetLimitingMagnitude, 9.0,
+                          "ambang planet tidak boleh menyamai ambang langit dalam")
+        let veryFaintPlanet = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 8.9, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .planet
+        )
+        XCTAssertEqual(veryFaintPlanet, .tooFaint,
+                       "planet redup di luar rentang Neptunus tetap ditolak")
+    }
+
+    /// Cahaya Bulan tetap mengketatkan ambang planet — Neptunus yang lolos di
+    /// langit gelap ditolak saat purnama tinggi.
+    ///
+    /// Tanpa ini, ambang planet yang lebih longgar akan menjadi klaim palsu:
+    /// Neptunus **memang** tidak terlihat mata telanjang di langit berbulan
+    /// terang, dan engine yang tetap menawarkannya berbohong dengan tenang.
+    func testMoonlightAlsoTightensThePlanetLimit() {
+        let fullMoon = SkyContext(sunAltitudeDeg: -40,
+                                  moonAltitudeDeg: 30,
+                                  moonIlluminationFraction: 1.0,
+                                  isDark: true)
+        let neptuneDark = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 7.8, separationFromSunDeg: 120,
+            context: night, policy: policy, kind: .planet
+        )
+        let neptuneMoon = VisibilityFilter.classify(
+            altitudeDeg: 45, magnitude: 7.8, separationFromSunDeg: 120,
+            context: fullMoon, policy: policy, kind: .planet
+        )
+        XCTAssertEqual(neptuneDark, .visible, "Neptunus terlihat di langit gelap")
+        XCTAssertEqual(neptuneMoon, .tooFaint,
+                       "purnama mengetatkan ambang planet: Neptunus ditolak di langit terang Bulan")
+    }
+
     func testDaylightRejectsEverything() {
         let result = VisibilityFilter.classify(
             altitudeDeg: 45, magnitude: -1.0, separationFromSunDeg: 120,

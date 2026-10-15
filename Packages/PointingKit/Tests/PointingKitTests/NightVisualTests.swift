@@ -220,6 +220,67 @@ final class NightVisualTests: XCTestCase {
         }
     }
 
+    /// Bintik gelap Neptunus harus **lebih gelap** dari piringannya sendiri.
+    ///
+    /// **Cacat yang ditutup uji ini.** `NightVisual.Accents.neptuneSpot` versi
+    /// pertama bernilai 0.16/0.26/0.62 — **lebih terang** dari sisi gelap
+    /// piringan Neptunus (0.08/0.16/0.42; 1.04 lawan 0.66, yaitu 58% lebih
+    /// terang). Yang sampai ke layar karena itu bukan bintik gelap, melainkan
+    /// bercak **terang** di tengah piringan: kebalikan dari ciri pengenal yang
+    /// membuat Neptunus bisa dibedakan dari Uranus yang sama-sama biru.
+    ///
+    /// **Kenapa dua pembanding yang berbeda, dan itu bukan kelonggaran.**
+    /// Siang: bintik harus lebih gelap dari sisi **gelap** piringan, karena di
+    /// siang ketiga kanal tersedia dan perbandingannya tajam (0.02 lawan 0.08
+    /// = nisbah 0.25, jauh di bawah 0.85).
+    ///
+    /// Malam: seluruh rentang siang dipetakan ke pita merah sempit
+    /// `0.35 + 0.65 x`, sehingga sisi gelap piringan (0.08) **naik** ke 0.402
+    /// dan bintik yang sangat gelap pun hanya bisa mencapai 0.350 — nisbah
+    /// terbaik yang **mungkin** adalah 0.871, yaitu margin 13%. Menuntut 15%
+    /// di sana akan merah pada kode yang benar; yang diuji karena itu sisi
+    /// **terang** piringan (0.532), tempat bintik itu benar-benar digambar dan
+    /// marginnya nyata (0.658). Batas 0.871 itu sendiri diakui di
+    /// `NightVisual.Accents.neptuneSpot`, bukan disembunyikan.
+    ///
+    /// Pembandingnya `planetPalette(.neptune)` — aksen yang sama dengan yang
+    /// dipakai menggambar piringannya — bukan angka yang diketik di sini.
+    func testNeptuneSpotIsDarkerThanItsDisc() {
+        let spot = CelestialVisual.accents.neptuneSpot
+        let palette = CelestialVisual.Planet.neptune.palette
+
+        // Siang: lawan sisi gelap piringan, kanal merah.
+        XCTAssertLessThanOrEqual(
+            spot.red, palette.dark.red * 0.85,
+            "Bintik gelap Neptunus tidak cukup gelap terhadap sisi gelap "
+            + "piringannya: " + String(format: "%.3f", spot.red) + " lawan "
+            + String(format: "%.3f", palette.dark.red)
+            + ". Cacat aslinya 0.160 lawan 0.080 — bintiknya justru lebih "
+            + "TERANG, jadi di layar ia terbaca sebagai bercak terang di "
+            + "tengah piringan, kebalikan dari ciri pengenalnya.")
+
+        // Malam: lawan sisi **terang** piringan — tempat bintiknya digambar,
+        // dan satu-satunya pembanding yang marginnya bisa dipenuhi palet
+        // satu-kanal.
+        let nightSpot = NightVisual.surface(spot).red
+        let nightDiscLight = NightVisual.surface(palette.light).red
+        XCTAssertLessThanOrEqual(
+            nightSpot, nightDiscLight * 0.85,
+            "Di mode malam bintik Neptunus harus tetap jelas lebih gelap dari "
+            + "sisi terang piringannya: " + String(format: "%.3f", nightSpot)
+            + " lawan " + String(format: "%.3f", nightDiscLight)
+            + ". Hue dibuang di mode ini, jadi selisih merah inilah "
+            + "satu-satunya yang tersisa.")
+
+        // Dan bintiknya tidak boleh **sama sekali** hilang jadi hitam: kontras
+        // itu perlu ada dua arah, dan bintik yang jatuh ke lantai palet akan
+        // menyatu dengan latar, bukan terbaca sebagai cekungan.
+        XCTAssertGreaterThan(
+            nightSpot, NightVisual.floorBrightness,
+            "bintik Neptunus jatuh ke lantai palet malam — ia akan menyatu "
+            + "dengan latar, bukan terbaca sebagai cekungan di piringan")
+    }
+
     /// Mode malam tidak boleh mengubah **kelas** terang: apa yang terang di
     /// langit tetap terang, hanya warnanya yang hilang.
     func testNightMappingIsMonotonicInDaylightBrightness() {

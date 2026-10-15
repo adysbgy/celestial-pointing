@@ -47,20 +47,25 @@ final class ReducedLuminanceVisualTests: XCTestCase {
                        "ciri pengenal objek yang sudah dikunci tidak boleh disembunyikan")
     }
 
-    /// Objek yang **belum pasti** kehilangan cirinya, tapi bukan gambarnya.
+    /// Objek yang **belum pasti** kehilangan gambarnya, bukan hanya cirinya.
     ///
-    /// Ini alasan yang sama yang sudah menjaga tiga permukaan lain
-    /// (`drawableStarColorIndex`, `Palette.drawable`, `drawableMorphology`).
-    /// Rencananya sengaja **bukan** "jangan gambar apa-apa": itu membuang
-    /// satu-satunya kanal yang tersedia di layar sekilas. Yang benar adalah
-    /// menggambar dengan ciri dilepas, dan penanda ragu menempel pada gambar —
-    /// di app, `CelestialVisualView` yang menyamar saat `isConfirmed == false`
-    /// dan menggambar lencana tanda tanya.
-    func testUnconfirmedObjectLosesItsFeatureAndKeepsTheVisual() {
+    /// **Kenapa ini berubah dari `.candidate`.** Alasan versi lama ("bola
+    /// netral masih memberi satu hal yang tidak diberi kata Ragu: ada sesuatu
+    /// di arah itu") mengandaikan gambar itu bernama. Di layar redup ia tidak
+    /// pernah bernama — yang ada di sebelahnya hanyalah nama berkurung ragu
+    /// dan lencana tanda tanya, keduanya **lebih kecil** dari gambar, sementara
+    /// bola itu sendiri adalah klaim bentuk. Pengamat yang melirik jam redup
+    /// membaca gambar lebih dulu dan tanda tanya sebagai koreksi. Tiga
+    /// permukaan lain (`drawableStarColorIndex`, `Palette.drawable`,
+    /// `drawableMorphology`) menjawab pertanyaan yang sama dengan "jangan
+    /// tampilkan cirinya"; jawaban yang paling konsisten dengan PRD adalah
+    /// jangan tampilkan gambarnya sama sekali. Teks (nama + keadaan) tetap
+    /// dirender oleh view, jadi kanal itu tidak hilang.
+    func testUnconfirmedObjectIsNotDrawnAtAll() {
         let visual = CelestialVisual(object: object(id: "saturn", kind: .planet))
         XCTAssertEqual(ReducedLuminanceVisual.plan(visual: visual, isConfirmed: false),
-                       .candidate(visual),
-                       "kandidat tetap digambar, tapi tanpa ciri pengenal")
+                       .none,
+                       "ragu = jangan gambar; lencana tanda tanya bukan bingkai, ia koreksi")
     }
 
     /// Tanpa objek, tidak ada gambar — dan keyakinan tidak boleh membangkitkannya.
@@ -74,21 +79,27 @@ final class ReducedLuminanceVisualTests: XCTestCase {
                        "keyakinan tidak boleh mengarang benda dari ketiadaan")
     }
 
-    /// Rencananya membawa gambarnya utuh, bukan salinan yang sudah dilemahkan.
+    /// Rencana tidak pernah membawa gambar saat ragu — jadi penyamaran tidak
+    /// bisa terjadi dua kali dan tidak bisa berbeda pendapat dengan kartu jam.
     ///
-    /// Kalau `plan` menyamar sendiri (mis. memaksa warna netral di sini),
-    /// penyamaran akan terjadi **dua kali** dan yang kedua tidak terlihat —
-    /// lalu `CelestialVisualView` kehilangan kemampuan menyamarkannya sendiri
-    /// saat ia juga dipakai kartu jam. Pemetaan di sini hanya soal keyakinan;
-    /// penyamaran tetap satu tempat.
-    func testPlanDoesNotPreWeakenTheVisual() {
+    /// Versi lama uji ini menuntut `plan` **meneruskan** gambarnya utuh ke
+    /// pemanggil, dengan alasan penyamaran milik view. Uji itu hijau atas
+    /// rencana yang menggambar, jadi ia tidak bisa menangkap apa pun tentang
+    /// apakah gambarnya seharusnya ada. Yang dijaga sekarang adalah
+    /// kebalikannya: satu-satunya bentuk yang mengembalikan gambar adalah
+    /// bentuk yang sudah dikunci, dan gambarnya utuh (bukan salinan yang
+    /// dilemahkan di sini) — supaya `CelestialVisualView` tetap satu-satunya
+    /// tempat penyamaran, untuk permukaan yang memang menggambar.
+    func testOnlyAConfirmedPlanCarriesTheVisualIntact() {
         let visual = CelestialVisual(object: object(id: "jupiter", kind: .planet))
-        guard case .candidate(let carried) =
-                ReducedLuminanceVisual.plan(visual: visual, isConfirmed: false) else {
-            return XCTFail("kandidat harus digambar")
+        guard case .identifiable(let carried) =
+                ReducedLuminanceVisual.plan(visual: visual, isConfirmed: true) else {
+            return XCTFail("objek yang dikunci harus digambar")
         }
         XCTAssertEqual(carried, visual,
                        "penyamaran milik view, bukan milik pemetaan keyakinan")
+        XCTAssertEqual(ReducedLuminanceVisual.plan(visual: visual, isConfirmed: false), .none,
+                       "ragu tidak membawa gambar, jadi tidak ada yang disamarkan")
     }
 
     /// Denyut **selalu** mati di layar redup, apa pun jenis objeknya.

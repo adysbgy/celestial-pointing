@@ -44,6 +44,8 @@ public struct CelestialVisual: Equatable, Sendable {
         case mars
         case jupiter
         case saturn
+        case uranus
+        case neptune
 
         /// Apakah planet ini menampakkan **fase** dari Bumi.
         ///
@@ -67,7 +69,7 @@ public struct CelestialVisual: Equatable, Sendable {
         public var showsPhase: Bool {
             switch self {
             case .mercury, .venus: return true
-            case .mars, .jupiter, .saturn: return false
+            case .mars, .jupiter, .saturn, .uranus, .neptune: return false
             }
         }
     }
@@ -844,6 +846,10 @@ public extension CelestialVisual {
         case craters
         /// Kabut tebal yang menutupi permukaan.
         case haze
+        /// Piringan pucat hampir polos (Uranus): sedikit sabuk horizontal.
+        case paleDisk
+        /// Piringan biru dengan titik gelap (Neptunus).
+        case blueDisk
     }
 
     /// Palet sebuah planet: warna bola + ciri pengenalnya.
@@ -1979,6 +1985,110 @@ public enum VisualFrame {
                                radius: radius, glyphFraction: glyphFraction)
     }
 
+    // MARK: Bulan — kawah
+
+    /// Satu kawah Bulan: di mana ia berada dan seberapa besar.
+    ///
+    /// Koordinatnya dalam satuan radius cakram (1.0 = tepi cakram), sumbu X ke
+    /// kanan dan sumbu Y ke **bawah** — sama seperti kanvas SwiftUI, dan sama
+    /// seperti `DeepSkyCatalogue` yang sudah memakai konvensi ini.
+    ///
+    /// Kenapa sebuah model, bukan angka di dalam view: port Python
+    /// (`Tools/render-visuals.py`) menggambar kawah yang sama untuk gerbang
+    /// gambar repo ini. Dua bahasa yang tidak sepakat tentang **di mana** kawah
+    /// berada menghasilkan gambar yang berbeda dari yang diukur gerbang — dan
+    /// selisih itu tidak akan terlihat, karena kawah tetap "ada".
+    public struct Crater: Equatable, Sendable {
+        /// Jarak pusat dari pusat cakram, dalam satuan radius cakram.
+        public var offsetX: Double
+        public var offsetY: Double
+        /// Radius kawah, dalam satuan radius cakram.
+        public var radius: Double
+        /// Seberapa gelap kawah terhadap maria. 1.0 = maria penuh.
+        public var darkness: Double
+
+        public init(offsetX: Double, offsetY: Double,
+                    radius: Double, darkness: Double) {
+            self.offsetX = offsetX
+            self.offsetY = offsetY
+            self.radius = radius
+            self.darkness = darkness
+        }
+    }
+
+    /// Kawah Bulan — tujuh bentuk, dipilih supaya **jaraknya** dari tepi cakram
+    /// dan dari satu sama lain cukup besar untuk terbaca pada kartu jam 38 pt.
+    ///
+    /// **Kenapa kawah sama sekali.** Sebelum ini Bulan digambar sebagai
+    /// piringan + pita terang berfase + maria; pada sabit ia terbaca sebagai
+    /// benda dengan **dua** bentuk saja — terang dan gelap. Cacatnya halus dan
+    /// justru terlihat di layar kecil: sabit tipis dan cembung sama-sama
+    /// "lengkung terang di atas gelap", sehingga pengguna yang mengangkat jam
+    /// untuk membedakan Bulan **muda** dari Bulan **tua** tidak punya apa pun
+    /// untuk dipegang. Permukaan bertekstur memberi satu-satunya penanda
+    /// identitas yang tidak bergantung arah Matahari.
+    ///
+    /// **Kenapa maria lebih dulu, kawah hanya di dalam maria.** Sebaran kawah
+    /// yang merata akan membuat Bulan berbintik seperti batu, bukan seperti
+    /// Bulan: yang terlihat dari Bumi nyaris seluruhnya maria gelap, dan kawah
+    /// besar yang benar-benar menonjol hampir semuanya berada **di dalam**
+    /// maria (Tycho, Copernicus, Plato berbatasan dengannya). Bentuknya karena
+    /// itu dipilih agar sebagian besar kawah jatuh di area maria, dengan dua
+    /// di antaranya di belahan yang selalu menghadap Bumi.
+    ///
+    /// **Yang TIDAK diklaim.** Posisinya **bukan** koordinat selenografis
+    /// sungguhan; ia komposisi yang dipilih supaya terbaca pada 38 pt. Dan ia
+    /// digambar tanpa arah rotasi Bulan, jadi pada sabit besar ia bisa jatuh di
+    /// bagian yang tidak menyala. Itu terlihat seperti kekurangan dan memang
+    /// kekurangan — tetapi **lebih baik** daripada memindahkannya mengikuti
+    /// sudut sabit, karena memindahkan kawah mengikuti arah Matahari berarti
+    /// mengklaim orientasi Bulan terhadap Bumi yang engine ini tidak punya.
+    /// Ketidakakuratan yang diam tetap lebih jujur daripada akurasi palsu.
+    public static let moonCraters: [Crater] = [
+        // Tycho — yang paling terang dari Bumi (sistem sinarnya), di selatan.
+        Crater(offsetX: -0.06, offsetY: 0.62, radius: 0.09, darkness: 0.95),
+        // Copernicus — utara-tengah, di barat maria yang menghadap kita.
+        Crater(offsetX: -0.30, offsetY: -0.05, radius: 0.13, darkness: 0.90),
+        // Plato — ujung utara, lingkaran kecil yang gelap dan tegas.
+        Crater(offsetX: 0.28, offsetY: -0.66, radius: 0.11, darkness: 0.88),
+        // Kepler — di antara maria barat; kawah pertama yang lewat sabit.
+        Crater(offsetX: -0.50, offsetY: 0.30, radius: 0.08, darkness: 0.92),
+        // Grimaldi — ujung barat, yang gelapnya mengejutkan.
+        Crater(offsetX: -0.78, offsetY: 0.44, radius: 0.10, darkness: 0.97),
+        // Langrenus / kraton timur — sisi yang muncul jelas saat cembung.
+        Crater(offsetX: 0.70, offsetY: 0.16, radius: 0.12, darkness: 0.86),
+        // Clavius — cekungan besar di selatan, di tepi cakram.
+        Crater(offsetX: -0.22, offsetY: 0.78, radius: 0.14, darkness: 0.84),
+    ]
+
+    /// Kawah dikecilkan ini kali di tepi cakram, supaya proyeksi bola dihitung
+    /// alih-alih diabaikan.
+    ///
+    /// Cakram Bulan adalah proyeksi **bola**. Kawah yang sama besar di dekat
+    /// tepi tampak lenyap, bukan karena digambar lebih kecil oleh seniman,
+    /// melainkan karena geometri: kelihatannya nol pada batas cakram. Tanpa
+    /// faktor ini, kawah Clavius (0.86 R dari pusat) akan tampak sebesar
+    /// kawah di tengah — dan Bulan terbaca sebagai koin datar bertekstur,
+    /// bukan bola.
+    ///
+    /// Bentuknya `sqrt(1 - r²)` adalah jejak proyeksi: satu satuan lingkup,
+    /// dilihat dari arah z, menunjukkan tepi pada jari-jari `r` yang
+    /// terkompresi sebesar komponen z-nya. Ia murni fungsi dari jarak pusat,
+    /// jadi ia juga menjaga kawah yang jatuh **di luar** 1 R tidak pernah
+    /// membesar secara keliru (faktornya nol di sana, bukan negatif).
+    ///
+    /// Batas yang diakui: ini **bukan** drop-off sudut pandang yang benar
+    /// (kawah seharusnya juga menjadi elips), dan pada radius 1.0 hasilnya
+    /// nol — jadi kawah di tepi persis tidak terlihat. Menutup keduanya berarti
+    /// memproyeksikan setiap kawah melalui matriks bola; ia tidak dilakukan di
+    /// sini karena hasilnya identik pada lingkaran yang dilihat lurus ke depan,
+    /// dan satu-satunya perbedaan yang terlihat adalah bentuk elips yang tidak
+    /// diklaim model ini miliki.
+    public static func craterForeshortening(radiusFromCentre: Double) -> Double {
+        let r = min(1, max(0, radiusFromCentre))
+        return (1 - r * r).squareRoot()
+    }
+
     // MARK: Matahari
 
     /// Corona Matahari menjangkau ini kali radius gambar (disk penuh = 1.0),
@@ -2147,6 +2257,64 @@ public extension CelestialVisual {
                                  halfHeight: Double = 0.72) -> HazeGeometry {
         HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
     }
+
+    /// Pita samar Uranus — satu sabuk horizontal, dalam satuan radius.
+    ///
+    /// **Kenapa Uranus tidak diberi pita seperti Jupiter.** Uranus memang
+    /// punya sabuk, tetapi di teleskop kecil ia tampak sebagai **piringan
+    /// nyaris polos**: inilah alasan ia dijuluki "planet tanpa ciri" sebelum
+    /// Voyager 2. Menggambar tujuh pita kontras seperti Jupiter akan
+    /// menyatakan tingkat rincian yang tidak pernah terlihat pada ukuran
+    /// yang digambar aplikasi ini — klaim yang terlalu percaya diri, padahal
+    /// yang membedakan Uranus dari Neptunus justru **kepolosannya** plus
+    /// warnanya.
+    ///
+    /// Angkanya hidup di model, bukan di view, karena port Python dan
+    /// pemeriksa piksel harus membaca angka yang sama: satu rumus di dua
+    /// tempat adalah dua rumus yang akan berbeda.
+    static func uranusBand(centerY: Double = 0.0,
+                           halfWidth: Double = 0.62,
+                           halfHeight: Double = 0.30) -> HazeGeometry {
+        HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
+    }
+
+    /// Opasitas pita Uranus.
+    ///
+    /// Sangat rendah (0.18) **bukan** pilihan rasa: pada opasitas ini pita
+    /// masih menambah tekstur yang bisa dilihat, tetapi piringannya tidak
+    /// lagi terbaca sebagai "berpita". Batas yang dipakai gerbang adalah
+    /// "Uranus lebih polos daripada Jupiter", jadi nilai yang terlalu tinggi
+    /// akan membuatnya gagal.
+    static let uranusBandOpacity: Double = 0.18
+
+    /// Titik gelap Neptunus (Great Dark Spot), dalam satuan radius.
+    ///
+    /// **Kenapa satu titik, bukan pita.** Neptunus menampakkan pita awan yang
+    /// jauh lebih redup daripada Jupiter atau Saturnus; yang benar-benar
+    /// membedakannya dalam pengamatan amatir adalah **bintik gelap** besar di
+    /// belahan selatannya. Menggambar pita saja akan membuat Neptunus tampak
+    /// sama dengan Uranus yang berwarna biru — dan dua planet yang tampak
+    /// identik berarti ciri pengenalnya berhenti menjadi ciri pengenal.
+    ///
+    /// Sengaja **di bawah pusat** (`centerY` positif = ke bawah), karena
+    /// bintik gelap Neptunus yang tercatat ada di belahan selatan. Arahnya
+    /// tidak bisa dibaca dari teks mana pun di layar, jadi ia hanya bisa
+    /// dijaga di model yang bisa diuji di Linux.
+    static func neptuneSpot(centerY: Double = 0.22,
+                            halfWidth: Double = 0.34,
+                            halfHeight: Double = 0.22) -> HazeGeometry {
+        HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
+    }
+
+    /// Pusat horizontal titik gelap Neptunus, satuan radius.
+    ///
+    /// Terpisah dari `neptuneSpot` karena `HazeGeometry` hanya memuat sumbu
+    /// tegak; bintik ini juga digeser menyamping, dan menyimpan `centerX`
+    /// sebagai angka terpisah di view akan kembali menciptakan dua sumber.
+    static let neptuneSpotCenterX: Double = 0.18
+
+    /// Opasitas titik gelap Neptunus.
+    static let neptuneSpotOpacity: Double = 0.55
 
     /// Kutub es planet, dalam satuan radius dan relatif terhadap pusat bola.
     ///
@@ -2936,6 +3104,16 @@ public extension CelestialVisual.Planet {
             return .init(light: .init(red: 0.93, green: 0.84, blue: 0.62),
                          dark:  .init(red: 0.44, green: 0.36, blue: 0.22),
                          feature: .rings)
+        case .uranus:
+            // Piringan pucat kehijauan, nyaris polos (sabuk sangat samar).
+            return .init(light: .init(red: 0.68, green: 0.85, blue: 0.88),
+                         dark:  .init(red: 0.24, green: 0.40, blue: 0.44),
+                         feature: .paleDisk)
+        case .neptune:
+            // Piringan biru dalam, dengan titik gelap (Great Dark Spot).
+            return .init(light: .init(red: 0.28, green: 0.42, blue: 0.92),
+                         dark:  .init(red: 0.08, green: 0.16, blue: 0.42),
+                         feature: .blueDisk)
         }
     }
 

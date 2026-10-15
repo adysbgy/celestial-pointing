@@ -202,6 +202,23 @@ public extension CelestialVisual {
         /// cahaya sekeliling, dan hitam murni di atas abu-abu terbaca sebagai
         /// **lubang**, bukan bayangan.
         public var craterFloor: RGBComponents
+        /// Sabuk samar Uranus.
+        ///
+        /// Uranus dikenali justru karena piringannya **nyaris polos**, jadi
+        /// sabuk ini harus lebih terang dari permukaannya tetapi **tidak
+        /// banyak** — bedanya kecil dengan sengaja. Nilai yang terlalu tinggi
+        /// membuat Uranus terbaca sebagai planet berpita seperti Jupiter, yaitu
+        /// tingkat rincian yang tidak pernah tampak pada ukuran yang digambar
+        /// aplikasi ini.
+        public var uranusBand: RGBComponents
+        /// Bintik gelap Neptunus (Great Dark Spot).
+        ///
+        /// Warnanya versi **lebih gelap** dari piringan Neptunus, bukan warna
+        /// baru: bintik itu adalah cekungan di permukaan yang sama, dan warna
+        /// baru akan membuatnya terbaca sebagai objek yang menempel di atas
+        /// bola. Nilainya dijaga `testNeptuneSpotIsDarkerThanItsDisc` supaya
+        /// tidak bisa diam-diam berbalik menjadi bercak terang.
+        public var neptuneSpot: RGBComponents
         /// Dinding kawah Merkurius yang **menghadap cahaya**.
         ///
         /// Pasangan `craterFloor`. Keduanya bersama-sama yang membuat kawah
@@ -370,6 +387,8 @@ public extension CelestialVisual {
                     saturnRing: RGBComponents,
                     marsPolarCap: RGBComponents,
                     venusHaze: RGBComponents,
+                    uranusBand: RGBComponents = .init(red: 0.74, green: 0.90, blue: 0.92),
+                    neptuneSpot: RGBComponents = .init(red: 0.16, green: 0.26, blue: 0.62),
                     craterFloor: RGBComponents,
                     craterRim: RGBComponents,
                     planetUnlit: RGBComponents,
@@ -394,6 +413,8 @@ public extension CelestialVisual {
             self.saturnRing = saturnRing
             self.marsPolarCap = marsPolarCap
             self.venusHaze = venusHaze
+            self.uranusBand = uranusBand
+            self.neptuneSpot = neptuneSpot
             self.craterFloor = craterFloor
             self.craterRim = craterRim
             self.planetUnlit = planetUnlit
@@ -427,6 +448,42 @@ public extension CelestialVisual {
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
+        // Sabuk samar Uranus. Sedikit lebih terang dari permukaan Uranus
+        // (0.68/0.85/0.88) supaya sabuknya tampak, tapi bedanya kecil —
+        // Uranus dikenali justru karena piringannya nyaris polos.
+        uranusBand: .init(red: 0.74, green: 0.90, blue: 0.92),
+        // Bintik gelap Neptunus: versi lebih gelap dari piringan Neptunus
+        // (0.28/0.42/0.92), bukan warna baru — supaya ia terbaca sebagai
+        // cekungan di permukaan, bukan objek yang menempel di atas bola.
+        //
+        // **Nilai lama (0.16/0.26/0.62) melanggar kalimat itu, dan tidak ada
+        // yang memeriksanya sampai uji `testNeptuneSpotIsDarkerThanItsDisc`
+        // ada.** Terukur: sisi gelap piringan Neptunus berjumlah 0.66
+        // (0.08+0.16+0.42), sedangkan bintiknya 1.04 — **58% lebih terang**
+        // daripada permukaan yang dianggap dicukilnya. Yang sampai ke layar
+        // karena itu bukan bintik gelap, melainkan bercak terang berwarna
+        // lebih muda di tengah piringan, yaitu kebalikan dari ciri pengenal
+        // yang membuat Neptunus bisa dibedakan dari Uranus yang sama-sama biru.
+        //
+        // **Kenapa 0.02, bukan 0.052 (nilai pertama yang lolos uji).** Uji
+        // yang sama menguji **mode malam** juga, dan di sana seluruh rentang
+        // siang dipetakan ke pita merah sempit `0.35 + 0.65 x` (`floorBrightness`
+        // + `rangeBrightness`). Pemetaan itu memampatkan selisih kecil sampai
+        // hampir hilang: pada 0.052, bintiknya hanya **4.5% lebih gelap** dari
+        // sisi gelap piringan di malam (0.384 lawan 0.402) — praktis tak
+        // terlihat di mode yang justru alasan produk ini ada. Pada 0.02
+        // selisihnya menjadi ~10% terhadap sisi gelap dan ~32% terhadap sisi
+        // **terang** piringan, tempat bintiknya benar-benar digambar.
+        //
+        // **Batas yang diakui.** Sisi gelap piringan Neptunus sendiri hanya
+        // 0.08, dan di malam ia naik ke 0.402 oleh lantai 0.35 — jadi bintik
+        // **tidak mungkin** lebih dari ~13% lebih gelap dari piksel tergelap
+        // piringan itu (terukur, bintik=0 pun hanya mencapai nisbah 0.871).
+        // Angka itu bukan pilihan rasa, melainkan konsekuensi palet malam
+        // yang memaksa satu kanal; karena itu uji malamnya memakai sisi
+        // **terang** piringan sebagai pembanding (0.658 pada 0.02), bukan
+        // mengklaim margin yang tidak bisa ada.
+        neptuneSpot: .init(red: 0.02, green: 0.04, blue: 0.105),
         // Pasangan cekungan kawah Merkurius. Terangnya sengaja **tidak**
         // memakai `planetUnlit` (0.06) walaupun keduanya sama-sama bayangan:
         // dasar kawah bukan piringan yang tidak menyala, melainkan permukaan

@@ -907,6 +907,15 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
          "planet-mercury-bare", "kawah Merkurius"),
         ("planet-venus-confirmed", "planet-venus-uncertain",
          "planet-venus-bare", "kabut Venus"),
+        # Dua planet terluar. Sebelum kasusnya ada, `uranus` dan `neptune`
+        # hidup di `PLANET_PALETTE` dan di jalur menggambar port, tetapi
+        # **tidak satu pun kasus render** — jadi seluruh gerbang gambar repo
+        # ini hijau tanpa pernah melihat gambarnya sekali pun. Terukur:
+        # `[c.name for c in R.build_cases()]` nol kasus berisi "uranus".
+        ("planet-uranus-confirmed", "planet-uranus-uncertain",
+         "planet-uranus-bare", "sabuk samar Uranus"),
+        ("planet-neptune-confirmed", "planet-neptune-uncertain",
+         "planet-neptune-bare", "bintik gelap Neptunus"),
     ]
     fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
     _, (w, h, rows_neutral) = render_case("planet-unknown-confirmed",
@@ -1162,6 +1171,8 @@ def check_features_survive_the_watch_size(results, ss=8):
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
         ("planet-venus-confirmed", "planet-venus-bare", "kabut Venus"),
+        ("planet-uranus-confirmed", "planet-uranus-bare", "sabuk samar Uranus"),
+        ("planet-neptune-confirmed", "planet-neptune-bare", "bintik gelap Neptunus"),
     ]
     # **Pembandingnya bola berpalet tanpa ciri, bukan kasus "ragu".** Sama
     # seperti `check_features_disappear_when_uncertain`: sejak warna identitas
@@ -1272,6 +1283,8 @@ def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
         ("planet-venus-confirmed", "planet-venus-bare", "kabut Venus"),
+        ("planet-uranus-confirmed", "planet-uranus-bare", "sabuk samar Uranus"),
+        ("planet-neptune-confirmed", "planet-neptune-bare", "bintik gelap Neptunus"),
     ]
     for confirmed_name, bare_name, label in pairs:
         measured = {}

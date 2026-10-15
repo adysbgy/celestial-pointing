@@ -115,6 +115,130 @@ karena itu akan mengadopsi WIP mereka ke dalam commit ini.
 
 ---
 
+## Progres terakhir (15 Okt 2026 — Aturan 36: penjaga identitas yang menerima kawan, bukan faktornya)
+
+Sapu semula bertanya "berapa aturan yang punya nirsaksi?". Sapuan ini
+bertanya pertanyaan yang lebih tajam, dan jawabannya lebih kecil: **berapa
+aturan yang sempat diuji dua arah — cacat harus merah, kode benar harus
+diam?** Yang ditemukan bukan nirsaksi — melainkan aturan yang bersih tanpa
+pernah diuji pada bentuk yang mengompilasi, dan di atasnya berdiri kelas
+cacat yang lolos diam-diam.
+
+### Cacat yang dijaga: `!isConfirmed` dan `isStale` berdiri di tempat penjaga
+
+Larangan paling keras PRD adalah "uncertainty > false confidence". Ia
+dilengkapi banyak aturan: 24 (nama penjaga disebut), 34 (bukan literal), dan
+konstruksi aksestor keyakinan di PointingKit. Semuanya **LULUS** pada dua
+baris yang mengompilasi:
+
+    isConfirmed: !isConfirmed    penjaga dibalik
+    isConfirmed: isStale         fakta lain dipakai sebagai keyakinan
+
+Yang pertama memaksa ciri pengenal tampil **tepat saat engine ragu**. Yang
+kedua memakai fakta yang tak berhubungan dengan keyakinan. Yang terbaca di
+layar **sama** pada keduanya: bintang tetap berwarna Betelgeuse, galaksi
+tetap berpaluk, badge di sebelahnya bertuliskan "Ragu". Gagal secara
+berbeda-beda, tampil sama.
+
+Kenapa kedua aturan yang ada diam di sana:
+
+- Aturan 34 menguji apakah nilainya **literal** `true`/`false`. Setiap
+  ekspresi non-literal lolos — entah benar, entah justru terbalik.
+- Aturan 24 menguji **substring**: `drawableStarColorIndex` ada, dan
+  `isConfirmed` ada di daftar argumen — "Bersih". Nilai yang masuk tidak
+  pernah diperiksa, dan warna adalah ciri pengenal paling mahal.
+
+### Kenapa tiga penjaga, bukan satu
+
+Cacat ini hidup di **tiga** tempat sekaligus: palet planet, warna spektral
+bintang, morfologi objek langit dalam. Harness yang hanya menyuntik satu
+akan melaporkan "tertutup" untuk kelas yang masih terbuka penuh di dua
+lainnya. Ketiganya diukur berurutan dalam satu harness, dengan jangkar yang
+**tepat satu** (jangkar yang meleset membuat harness melaporkan keadaan
+cacatnya hijau — bukan karena aturannya buta, melainkan karena berkasnya
+tidak pernah berubah; itu kelas kesalahan yang sudah pernah terjadi di repo
+ini, dan `inject_guard` sekarang gagal keras (`exit 2`) kalau jangkarnya
+tidak unik, sehingga ia menghentikan harness alih-alih berbohong).
+
+### Cacat kedua, di harness ini sendiri — dan itu yang penting
+
+Setelah aturannya selesai, harness menguji juga bentuk yang **sah**. Di
+sana ia memerahkan kode yang benar: sebuah contoh yang ditulis **di dalam
+string** (`"…itu dilarang"`) terbaca sebagai kode, bukan sebagai prosa.
+
+Penyebabnya bukan aturan 36 — melainkan fungsi `kode_saja` yang dipakai
+bersama Aturan 7 dan Aturan 20. Fungsi itu menghapus komentar dengan benar,
+tetapi **mempertahankan isi** literal string. Untuk aturan yang memindai
+kelas cacat tertentu, mempertahankan isi string membuat komentar jenis
+`// isConfirmed: !isConfirmed itu dilarang` setara dengan kode yang dilarang.
+Repo ini mendokumentasikan bentuk cacatnya di prosa, jadi ini kekeliruan
+"kapan", bukan "apa jadinya".
+
+Perbaikannya satu baris fungsi: string kini **dipertahankan tandanya,
+isinya dikosongkan**. Setelah itu ternyata lebih berdaulat — satu-satunya
+tempat isi string terbaca di repo ini adalah Aturan 39 (string keras & label
+kunci), yang memindai **teks asli**, bukan `kode_saja`.
+
+Yang mengajarkan: menguji arah **sah** bukan hiasan. Kalau harness hanya
+menuntut "cacat harus merah", ia akan kefikiran — dan aturan ini akan
+memakai bentuk false-positive yang belum terukur.
+
+### Yang TIDAK diklaim
+
+Aturan ini tidak mengukur **arah** keyakinan engine — itu milik model
+keyakinan dan sudah diuji PointingKit. Ia mengikat tempat pemanggil:
+nilai yang masuk ke penjaga identitas harus berupa faktanya keyakinan,
+bukan fakta yang mana pun. Dua wajah lain — parameter non-literal yang
+bagus, dan parameter yang layak (nilai belum dikunci `lewat` `!`) — juga
+dijamin teks aturannya, tetapi tercakup aturan lain.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 788 | **788** (tak disentuh) |
+| Aturan di `swift-ui-lint.sh` | 35 | **36** (+1) |
+| Harness dirujuk CI | 66 | **67** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-penjaga-faktor.py` → **31 keadaan, semuanya
+  sesuai harapan** (3 penjaga x 6 keadaan cacat, 3 x 3 bentuk sah,
+  4 non-vakuositas), exit 0.
+- **Bentuk sah diuji, bukan hiasan**: `isConfirmed` apa adanya,
+  `engine.confirmsDisplayedIdentity`, dan `snapshot.confirmsIdentity` harus
+  tiga-tiganya tetap hijau. Gerbang yang memerah pada kode benar akan
+  dilonggarkan orang, dan pelonggarannya menghapus cakupan yang baru
+  ditambahkan.
+- **Non-vakuositas diukur, bukan diklaim**: aturan dilumpuhkan
+  (`if True: continue`, nama variabel dipertahankan supaya yang berubah
+  hanya keputusannya) → harness **exit 1, 12 keadaan cacat berbalik hijau**
+  (3 penjaga x 4 keadaan). Sebaliknya, aturan dikembalikan ke bentuk
+  "hanya-literal" (perilaku Aturan 34) → keempat keadaan cacat berbalik
+  hijau, yang membuktikan yang berbunyi memang perbaikan siklus ini.
+- `python3 Tools/check-harness-terdaftar.py` → **67 harness, semuanya
+  dirujuk**, exit 0.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (36 aturan), exit 0.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS, exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → **CelestialEngine 212** +
+  **PointingKit 788**, exit 0; hitungan itu sama dengan yang tercatat di
+  `README.md`, jadi Aturan 10 tetap benar.
+
+### Catatan proses
+
+Pohon kerja utama memuat WIP siklus lain (17 entri: komponen-layout,
+class-layout, 11WFS+8WAS-length, plus penghapusan `Tools/bukti-mutasi-
+permukaan.py` milik mereka). Seluruh pengukuran dijalankan di `git
+worktree` terpisah di atas `HEAD`; WIP itu **tidak disentuh** dan
+diverifikasi utuh sesudahnya. Push ke `main` dilakukan dari worktree itu,
+bukan dari pohon kerja — kalau dilakukan dari pohon kerja, commit ini akan
+mengadopsi WIP mereka.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 26: tingkat terdalam yang tidak pernah dibaca, dan penanda "Bersih" yang menutupinya)
 
 Siklus ini meneruskan sapuan yang sama: dari 35 aturan di `swift-ui-lint.sh`,

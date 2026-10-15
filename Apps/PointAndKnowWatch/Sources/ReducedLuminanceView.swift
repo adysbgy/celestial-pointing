@@ -59,7 +59,7 @@ struct ReducedLuminanceView: View {
                     isConfirmed: engine.confirmsDisplayedIdentity) {
                 case .none:
                     EmptyView()
-                case .identifiable(let visual), .candidate(let visual):
+                case .identifiable(let visual):
                     CelestialVisualView(visual: visual,
                                         diameter: WatchMetrics.reducedVisualDiameter,
                                         isConfirmed: engine.confirmsDisplayedIdentity,

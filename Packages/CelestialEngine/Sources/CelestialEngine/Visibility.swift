@@ -80,18 +80,70 @@ public struct VisibilityPolicy: Equatable {
     /// langit terang Bulan.
     public var deepSkyLimitingMagnitude: Double
 
+    /// Ambang magnitudo **khusus planet** di luar orbit Saturnus.
+    ///
+    /// **Kenapa planet tidak cukup memakai `limitingMagnitude` (6.0).**
+    /// Batas mata telanjang 6.0 benar untuk bintang titik, dan memang
+    /// menolak Uranus (5.9 — di bawah batas, jadi aman) **dan Neptunus
+    /// (7.8 — di atas batas)**. Tanpa ambang sendiri, Neptunus tidak pernah
+    /// bisa menjadi kandidat: `classify` mengembalikannya `.tooFaint`
+    /// sebelum ketinggiannya bahkan diperiksa, sehingga "tunjuk ke arah
+    /// Neptunus" selalu berakhir "tidak ada". Itu bukan kejujuran — itu
+    /// engine yang diam-diam membuang sebuah benda yang memang ada di sana.
+    ///
+    /// Nilainya **8.30**, bukan 7.8, dan angkanya punya alasan yang bisa
+    /// diperiksa.
+    ///
+    /// **Cacat yang ditutupnya.** Versi pertama ambang ini 7.8 — persis
+    /// magnitudo Neptunus di sekitar oposisi. Terukur di fixture Horizons repo
+    /// ini sendiri (`horizons_reference.json`, sampel 2000-01-01): Neptunus
+    /// **7.853**. Pada tanggal itu `classify` mengembalikannya `.tooFaint`
+    /// sebelum ketinggiannya diperiksa — jadi "tunjuk ke arah Neptunus"
+    /// berakhir "tidak ada", yaitu kegagalan yang sama yang docstring ini
+    /// klaim sudah ditutup, hanya bergeser ke sembilan belas tahun yang lain.
+    /// Neptunus yang kadang muncul dan kadang tidak, tanpa penjelasan di layar,
+    /// lebih buruk daripada tidak ada sama sekali: pengguna tidak bisa
+    /// membedakan cacat ini dari langit yang memang kosong.
+    ///
+    /// **Kenapa 8.30, bukan 7.86 (sekadar di atas fixture).** Magnitudo
+    /// Neptunus berubah terhadap Bumi selama orbit 165 tahunnya; ia paling
+    /// redup di sekitar konjungsi, bukan oposisi. Ambang yang dirapatkan ke
+    /// satu sampel hanya memindahkan cacatnya ke sampel berikutnya. Rentang
+    /// yang dipakai di sini adalah **terang 7.65 … redup 8.05** dengan margin
+    /// 0.25 di ujung redup — jadi seluruh rentang orbitnya tertutup, tanpa
+    /// mengklaim benda yang lebih redup dari Neptunus sebagai terlihat.
+    ///
+    /// **Batas yang diakui.** Ambang ini satu angka untuk seluruh planet,
+    /// bukan per-planet. Uranus (5.7–5.9) dan planet dalam jauh di bawahnya,
+    /// jadi angkanya praktis hanya pernah relevan untuk Neptunus — tetapi
+    /// planet kesembilan yang lebih redup dari 8.30 akan tertolak tanpa cara
+    /// menyatakannya. Itu di luar katalog saat ini dan disebutkan di sini
+    /// alih-alih disangka tertutup.
+    ///
+    /// Sementara cahaya Bulan tetap mengketatkannya lewat
+    /// `moonBrighteningMagnitudes`: Neptunus di langit berbulan terang memang
+    /// **tidak** bisa dilihat mata telanjang, dan ambang yang ikut turun
+    /// mengatakan justru itu.
+    ///
+    /// Batas bintang 6.0 **tidak** disentuh: merapatkannya ke 8 akan mengklaim
+    /// bintang redup palsu sebagai terlihat, dan itu persis yang dilakukan
+    /// engine saat menolak `tooFaint` untuk bintang.
+    public var planetLimitingMagnitude: Double
+
     public init(minAltitudeDeg: Double = 5.0,
                 limitingMagnitude: Double = 6.0,
                 sunAltitudeForDarknessDeg: Double = -6.0,
                 minSunSeparationDeg: Double = 30.0,
                 moonBrighteningMagnitudes: Double = 1.6,
-                deepSkyLimitingMagnitude: Double = 9.0) {
+                deepSkyLimitingMagnitude: Double = 9.0,
+                planetLimitingMagnitude: Double = 8.30) {
         self.minAltitudeDeg = minAltitudeDeg
         self.limitingMagnitude = limitingMagnitude
         self.sunAltitudeForDarknessDeg = sunAltitudeForDarknessDeg
         self.minSunSeparationDeg = minSunSeparationDeg
         self.moonBrighteningMagnitudes = moonBrighteningMagnitudes
         self.deepSkyLimitingMagnitude = deepSkyLimitingMagnitude
+        self.planetLimitingMagnitude = planetLimitingMagnitude
     }
 
     /// Kebijakan santai untuk pengujian: tidak membuang apa pun.
@@ -207,7 +259,12 @@ public enum VisibilityFilter {
     public static func effectiveLimitingMagnitude(context: SkyContext,
                                                   policy: VisibilityPolicy,
                                                   kind: ObjectKind = .star) -> Double {
-        let base = (kind == .deepSky) ? policy.deepSkyLimitingMagnitude : policy.limitingMagnitude
+        let base: Double
+        switch kind {
+        case .deepSky: base = policy.deepSkyLimitingMagnitude
+        case .planet: base = policy.planetLimitingMagnitude
+        case .moon, .star, .sun: base = policy.limitingMagnitude
+        }
         // Cahaya Bulan hanya relevan kalau Bulan memang masih di atas horizon.
         let moonIsUp = (context.moonAltitudeDeg ?? -90) > 0
         let fraction = moonIsUp ? (context.moonIlluminationFraction ?? 0) : 0

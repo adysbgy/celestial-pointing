@@ -738,6 +738,34 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(CelestialVisual.Planet.mars.palette.feature, .polarCaps)
         XCTAssertEqual(CelestialVisual.Planet.mercury.palette.feature, .craters)
         XCTAssertEqual(CelestialVisual.Planet.venus.palette.feature, .haze)
+        // Dua planet terluar: masing-masing punya ciri sendiri, bukan
+        // diwarisi dari Jupiter/Saturnus. Kalau keduanya memakai `.bands`,
+        // Neptunus akan tampak sebagai Jupiter biru, dan warna planet di
+        // sebelahnya berhenti menjadi pembeda.
+        XCTAssertEqual(CelestialVisual.Planet.uranus.palette.feature, .paleDisk)
+        XCTAssertEqual(CelestialVisual.Planet.neptune.palette.feature, .blueDisk)
+    }
+
+    /// Uranus dan Neptunus **tidak berfase** seperti planet dalam.
+    ///
+    /// **Kenapa ini perlu uji sendiri.** `showsPhase` memutuskan apakah angka
+    /// iluminasi dari engine dipakai untuk menggambar pita terang. Planet luar
+    /// tidak pernah menampakkan fase dari Bumi (elongasinya bisa 180°), jadi
+    /// memakai angka fase untuk mereka akan menggambar sabit yang **tidak
+    /// pernah ada di langit** — persis cacat yang sudah ditutup untuk Mars.
+    /// Saat Uranus/Neptunus masuk katalog mereka harus ikut aturan itu, dan
+    /// `showsPhase` punya `switch` yang harus diperbarui; kalau tidak, mereka
+    /// jatuh ke `default` yang bisa saja `true`.
+    func testOuterMostPlanetsDoNotShowPhase() {
+        for planet in [CelestialVisual.Planet.uranus, .neptune,
+                       .mars, .jupiter, .saturn] {
+            XCTAssertFalse(planet.showsPhase,
+                           "\(planet) tidak menampakkan fase dari Bumi")
+        }
+        for planet in [CelestialVisual.Planet.mercury, .venus] {
+            XCTAssertTrue(planet.showsPhase,
+                          "\(planet) menampakkan fase sungguhan")
+        }
     }
 
     /// Warna planet adalah **ciri pengenal**: ia harus hilang saat engine ragu.
@@ -3908,6 +3936,116 @@ final class CelestialVisualTests: XCTestCase {
                        "frameHalfExtent 0 tidak boleh menghasilkan NaN/inf")
         XCTAssertFalse(zero.isNaN || zero.isInfinite,
                        "pembagi nol harus ditangani, bukan NaN")
+    }
+
+    /// Kawah Bulan harus **berada di dalam** cakram, dan tiap kawah harus
+    /// menyisakan tempat untuk dirinya sendiri.
+    ///
+    /// **Cacat yang ditutup uji ini.** `Crater` menyimpan `offsetX`/`offsetY`
+    /// dan `radius` sebagai tiga angka terpisah, jadi tidak ada yang mengikat
+    /// mereka bersama. Satu angka yang salah ketik — `1.60` alih-alih `0.16` —
+    /// menghasilkan kawah yang **sepenuhnya di luar** cakram: ia dilukis,
+    /// diklip, dan tidak satu piksel pun sampai ke layar. Gambar Bulannya tetap
+    /// benar, uji lain tetap hijau, dan kawahnya hilang tanpa suara.
+    ///
+    /// Yang diuji di sini karena itu **hubungan**, bukan nilainya:
+    /// `|pusat| + radius <= 1 R` untuk tiap kawah, sehingga tidak ada yang
+    /// terpotong cakram. Ini juga yang membuat `craterForeshortening` selalu
+    /// menerima radius `< 1` dan tidak pernah menyusut ke nol.
+    func testMoonCratersFitInsideTheDisc() {
+        XCTAssertGreaterThanOrEqual(VisualFrame.moonCraters.count, 6,
+                                    "Bulannya perlu tekstur yang terbaca, bukan satu titik")
+        for (i, c) in VisualFrame.moonCraters.enumerated() {
+            let distance = (c.offsetX * c.offsetX + c.offsetY * c.offsetY).squareRoot()
+            XCTAssertLessThanOrEqual(
+                distance + c.radius, 1.0 + 1e-12,
+                "kawah #\(i) terpotong tepi cakram: pusat \(distance) R "
+                + "+ radius \(c.radius) R > 1 R — ia dilukis lalu diklip, "
+                + "jadi hilang tanpa jejak di layar")
+            XCTAssertGreaterThan(c.radius, 0.0, "radius kawah #\(i) harus positif")
+            XCTAssertLessThanOrEqual(
+                c.radius, 0.20,
+                "kawah #\(i) lebih besar dari 0.20 R: ia akan terbaca sebagai "
+                + "maria kedua, bukan kawah")
+            XCTAssertGreaterThanOrEqual(
+                c.darkness, 0.0, "kegelapan kawah #\(i) tidak boleh negatif")
+            XCTAssertLessThanOrEqual(
+                c.darkness, 1.0,
+                "kegelapan kawah #\(i) melebihi maria penuh: ia akan menembus "
+                + "maria dan terbaca sebagai lubang hitam, bukan kawah")
+        }
+    }
+
+    /// Tidak ada dua kawah yang saling menelan.
+    ///
+    /// Kawah yang tumpang tindih lebih dari separuh bukan lagi dua bentuk —
+    /// ia satu bercak, dan jumlah kawah di `moonCraters` berhenti bermakna.
+    /// Menambah kawah adalah cara paling mudah memperkaya tekstur Bulan, dan
+    /// juga cara paling mudah menghancurkannya tanpa satu pun gerbang gambar
+    /// berbunyi (gerbang gambar mengukur **adanya** tekstur, bukan keteraturan).
+    func testMoonCratersStayDistinct() {
+        let craters = VisualFrame.moonCraters
+        for i in 0..<craters.count {
+            for j in (i + 1)..<craters.count {
+                let a = craters[i], b = craters[j]
+                let dx = a.offsetX - b.offsetX
+                let dy = a.offsetY - b.offsetY
+                let distance = (dx * dx + dy * dy).squareRoot()
+                let smaller = min(a.radius, b.radius)
+                XCTAssertGreaterThanOrEqual(
+                    distance, smaller * 0.5,
+                    "kawah #\(i) dan #\(j) saling menelan (jarak \(distance) R, "
+                    + "radius terkecil \(smaller) R) — keduanya menjadi satu bercak")
+            }
+        }
+    }
+
+    /// Kawah di tepi cakram **harus** menyusut, dan kawah di pusat tidak.
+    ///
+    /// **Kenapa ini bukan hiasan.** Cakram Bulan adalah proyeksi bola. Tanpa
+    /// faktor penyusutan, Clavius (0.86 R dari pusat) digambar sebesar kawah
+    /// di tengah, dan Bulan terbaca sebagai koin datar bertekstur. Gerbang
+    /// gambar mana pun yang mengukur "tekstur ikut terang/gelapnya sabit"
+    /// tetap hijau pada koin datar, jadi tidak ada gerbang lain yang bisa
+    /// menangkapnya.
+    ///
+    /// Arah ketiga yang diuji di sini, dan yang paling mudah hilang: di luar
+    /// cakram faktornya harus **nol**, bukan negatif. Faktor negatif akan
+    /// membalik kawah ke luar dan menggambarnya di sisi yang salah.
+    func testCraterForeshorteningShrinksTowardsTheLimb() {
+        XCTAssertEqual(VisualFrame.craterForeshortening(radiusFromCentre: 0),
+                       1.0, accuracy: 1e-12,
+                       "kawah di pusat cakram tidak menyusut sama sekali")
+        // 0.6 R → sqrt(1 - 0.36) = 0.8. Angka yang tepat, bukan "lebih kecil".
+        XCTAssertEqual(VisualFrame.craterForeshortening(radiusFromCentre: 0.6),
+                       0.8, accuracy: 1e-12,
+                       "penyusutan di 0.6 R harus sqrt(1 - 0.36) = 0.8")
+        XCTAssertEqual(VisualFrame.craterForeshortening(radiusFromCentre: 1.0),
+                       0.0, accuracy: 1e-12,
+                       "di tepi cakram kawah tidak terlihat — proyeksi bola")
+        // Di luar cakram: nol, bukan negatif, dan bukan NaN.
+        for r in [1.2, 2.0, 99.0] {
+            let f = VisualFrame.craterForeshortening(radiusFromCentre: r)
+            XCTAssertEqual(f, 0.0, accuracy: 1e-12,
+                           "radius \(r) R ada di luar cakram; faktornya harus 0")
+            XCTAssertFalse(f.isNaN || f.isInfinite,
+                           "radius \(r) R tidak boleh menghasilkan NaN/inf")
+        }
+        XCTAssertEqual(VisualFrame.craterForeshortening(radiusFromCentre: -3),
+                       1.0, accuracy: 1e-12,
+                       "radius negatif dijepit ke pusat, bukan jadi NaN")
+
+        // Menurun monoton: makin dekat tepi, makin kecil — tanpa satu pun
+        // kenaikan. Kenaikan berarti ada cincin di mana kawah justru membesar.
+        var previous = 1.0
+        for step in 0...20 {
+            let r = Double(step) / 20.0
+            let f = VisualFrame.craterForeshortening(radiusFromCentre: r)
+            XCTAssertLessThanOrEqual(f, previous + 1e-12,
+                                     "faktor naik di r=\(r): kawah membesar "
+                                     + "saat mendekati tepi cakram")
+            previous = f
+        }
     }
 
 }

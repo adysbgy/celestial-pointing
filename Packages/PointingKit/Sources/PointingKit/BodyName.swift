@@ -47,6 +47,8 @@ public enum BodyName {
         case .mars: return "object.body.mars.label"
         case .jupiter: return "object.body.jupiter.label"
         case .saturn: return "object.body.saturn.label"
+        case .uranus: return "object.body.uranus.label"
+        case .neptune: return "object.body.neptune.label"
         }
     }
 }
