@@ -271,6 +271,22 @@ struct CelestialVisualView: View {
                                 self.drawCraters(context: inner, center: center, radius: radius)
                             case .haze:
                                 self.drawHaze(context: inner, center: center, radius: radius)
+                            // `.paleDisk` dan `.blueDisk` **harus** ada di sini,
+                            // bukan dilipat ke `break`. Keduanya milik Uranus
+                            // dan Neptunus, dan keduanya `showsPhase == false`
+                            // (lihat `Planet.showsPhase`), jadi cabang ini tidak
+                            // pernah dieksekusi hari ini. Menuliskannya eksplisit
+                            // menjaga sifat itu **terbaca**: kalau kelak ada
+                            // planet berfase yang memakai ciri ini, `switch`-nya
+                            // sudah punya tempatnya, dan menambahkan gambarnya
+                            // tidak menuntut menemukan cabang ini lebih dulu.
+                            //
+                            // Yang TIDAK diklaim: cabang ini belum pernah diukur
+                            // menggambar apa pun — tidak ada planet berfase yang
+                            // memakainya. Isinya `break` yang sama seperti
+                            // `.bands`/`.rings`/`.polarCaps`, dan itu jujur.
+                            case .paleDisk, .blueDisk:
+                                break
                             case .bands, .rings, .polarCaps, .none:
                                 break
                             }
