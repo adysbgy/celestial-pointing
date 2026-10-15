@@ -1,3 +1,148 @@
+## Progres terakhir (15 Okt 2026 — Aturan 28: "55 pemanggilan cocok" yang tidak memeriksa label pada parameter bawaan)
+
+Siklus ini meneruskan sapuan yang sama seperti entri-entri di bawah — dari 35
+aturan di `swift-ui-lint.sh`, **berapa yang pernah dibuktikan bisa merah?**
+Terukur ulang di awal siklus dengan menyilangkan nomor aturan terhadap seluruh
+`Tools/bukti-mutasi-*.py` **dan** nama-nama di langkah `red-lint.sh` CI:
+**5 nirsaksi** (2, 21, 26, 28, 29). Dipilih Aturan 28 karena ia yang paling
+terlihat seperti sudah selesai.
+
+### Cacatnya: kalimat yang terdengar seperti bukti
+
+Aturan 28 melaporkan:
+
+    Bersih: 55 pemanggilan TipePaket.metode(Label:) di Apps/ cocok
+    dengan deklarasinya (150 positional dilewati).
+
+Terukur: **4 argumen berlabel di `Apps/` hari ini lolos dengan label yang
+salah**. Penyebabnya satu baris di `matches()`:
+
+    if not ddef and gl != dl:      # ddef = parameter punya nilai bawaan
+        return False
+
+Jadi untuk **setiap** parameter bernilai bawaan, label pemanggil **tidak
+pernah dibandingkan**. `VisualFrame.deepSky` — tiga dari empat parameternya
+punya nilai bawaan — menerima label yang tidak ada:
+
+    VisualFrame.deepSky(morphology:, fuzziness:, salahLabel:)
+    -> "Bersih: 55 pemanggilan ... cocok dengan deklarasi"
+
+Lebarnya terukur, bukan ditebak: **94 dari 1489** statika terindeks punya
+celah yang sama. Ini kelas cacat yang sama dengan Aturan 27 (bentuk
+berkualifikasi lolos), hanya kali ini yang lolos bukan bentuknya, melainkan
+**parameter yang paling sering disunting**.
+
+### Kenapa perbaikannya bukan sekadar menghapus `not ddef`
+
+Swift mengizinkan argumen berlabel diberikan dalam **urutan apa pun**.
+Mencocokkan per posisi memerahkan pemanggilan yang **sah**:
+
+    EngineFactory.makeController(location: location, config: config)
+
+`config` ada di posisi 1 pemanggil, berhadapan dengan `calibration` di
+deklarasi. Terukur: dengan `matches()` per posisi, situs itu **merah** —
+padahal ia dikompilasi hari ini di `PointingEngine.swift:92`. Gerbang yang
+memerah pada kode benar akan dimatikan orang, jadi perbaikannya mencocokkan
+**per nama**, bukan per posisi: tiap label yang diberikan harus ada di
+deklarasi (bebas urutan), dan parameter yang tidak diberikan harus punya nilai
+bawaan.
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-label-bawaan.py` (baru, dirujuk `engine-tests.yml`) —
+**5 keadaan, semuanya sesuai harapan**:
+
+| # | keadaan | harap | terukur |
+|---|---|---|---|
+| 0 | kode apa adanya | hijau | hijau |
+| 1 | `deepSky` `elongation:` -> `salahLabel:` | merah | **MERAH** — hijau di versi lama |
+| 2 | `makeController` `config:` -> `salahLabel:` | merah | **MERAH** — hijau di versi lama |
+| 3 | `makeController(location:config:)` dibalik | **hijau** | hijau — **MERAH di versi lama** |
+| 4 | `bandHalfWidthAt(height:)` -> `salahLabel:` | merah | **MERAH** (sudah dijaga lama) |
+
+**Keadaan 3 bukan hiasan, dan ia yang paling berharga.** Versi lama
+**merah** di sana: ia memerahkan pemanggilan yang sah. Jadi perbaikan ini
+menutup cacat **sekaligus** menghapus satu false positive yang sudah ada.
+
+**Keadaan 4 membuktikan arah yang lama tidak rusak.** Parameter tanpa nilai
+bawaan sudah dijaga sebelum siklus ini; kalau perbaikan ini merusaknya,
+keadaan 4 hijau dan harness berhenti.
+
+**Non-vakum, diukur.** Dengan `matches()` dikembalikan ke bentuk lama di
+worktree terpisah, harness merah **persis pada keadaan 1, 2, dan 3** — dan
+tidak pada keadaan lain. Itu sekaligus membuktikan keadaan 4 bukan yang
+menutup cacatnya.
+
+### Dua kesalahan harness, keduanya tertangkap sebelum push
+
+1. **Jangkar ditebak, bukan diukur.** Keadaan 4 mula-mula memakai
+   `jupiterBands(count:)`. Terukur: `jupiterBands` dipanggil **tanpa argumen**
+   di `CelestialVisualView.swift:401`, jadi jangkarnya tidak ada. Diganti ke
+   `bandHalfWidthAt(height:)` — parameter tanpa bawaan, dipanggil nyata di dua
+   baris.
+2. **Harapan versi lama diterapkan menyeluruh.** Semula tiap keadaan cacat
+   dituntut "harus lolos di versi lama". Keadaan 4 justru arah yang **sudah**
+   dijaga, jadi versi lama memang merah di sana, dan harness melaporkannya
+   sebagai "cacatnya bukan milik perbaikan ini". Yang salah adalah
+   **harapannya**: kolom `harus_lolos_di_versi_lama` dibuat per keadaan.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** `Apps/`, bukan kompilasi Swift. Gerbang ini sapu teks:
+  ia tahu "label ini tidak ada di deklarasi", bukan "argumennya bertipe
+  salah". Dua bahasa yang sepakat dan sama-sama salah tetap hijau.
+- Argumen **posisional** tetap dilewati (150 di `Apps/`), dengan alasan yang
+  sama seperti sebelum siklus ini: urutannya tidak bisa dipastikan tanpa
+  compiler.
+- `PointingLinkMessage.state(at:sigmaDeg:)` terukur lolos di **kedua** versi:
+  penerimanya adalah **nilai**, bukan kualifikasi statis, jadi `QF` tidak
+  melihatnya. Batas itu **tidak** ditutup siklus ini.
+- **4 aturan nirsaksi lain belum dikerjakan** (terukur: 5 -> **4**): 2, 21,
+  26, 29. Aturan 21 sedang digarap WIP siklus lain di pohon kerja
+  (`Tools/bukti-mutasi-gerbang-denyut.py`), jadi sengaja tidak disentuh.
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift
+  disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine + PointingKit | 788 | **788** (tak disentuh) |
+| Aturan nirsaksi (terukur) | 5 | **4** (-1) |
+| Harness dirujuk CI | 62 | **63** (+1) |
+| Argumen berlabel yg lolos dgn label salah | 4 | **0** |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-label-bawaan.py` → **5 keadaan, 0 tidak sesuai
+  harapan**, exit 0. Dengan `matches()` dinetralkan → **exit 1**, merah
+  persis pada keadaan 1, 2, 3.
+- `python3 Tools/check-harness-terdaftar.py` → **63 harness, semuanya
+  dirujuk**, exit 0. (Gerbang ini sendiri menolak harness baru sebelum
+  langkah CI-nya ditambahkan — ia bekerja.)
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → **788 uji, 0 gagal**. Dijalankan di
+  **pohon ter-commit** (`git worktree`), bukan pohon kerja yang memuat WIP
+  siklus lain.
+- CI `Apple Build (macos-15)` **success** pada `5b40b2b` (kedua job: `Paket
+  (Apple SDK)` + `App (iPhone + Watch)`). `Engine Tests (Linux)` in_progress
+  saat catatan ini ditulis (~2 jam).
+
+### Catatan proses
+
+WIP siklus lain (22:43–22:44, 19 berkas + 1 belum terlacak) hidup di pohon
+kerja dan **tidak disentuh**: `git stash push -u` dua kali, `git pull
+--rebase`, cherry-pick, lalu `git stash pop` dengan **md5 diperiksa**
+(`swift-ui-lint.sh` dan `engine-tests.yml` byte-identik sebelum/sesudah).
+Perbaikan ini dibangun di `git worktree` bersih di atas `HEAD` karena
+`mutasi_sumber.require_clean_sources` menolak jalan di atas sumber kotor —
+penjaga yang sama yang pernah menyelamatkan repo ini dari "pulih persis atas
+dirinya sendiri".
+
+---
+
 ## Progres terakhir (14 Okt 2026 — Aturan 27: gerbang label yang buta pada bentuk yang repo ini benar-benar tulis)
 
 Siklus ini meneruskan sapuan yang sama seperti entri di bawah — dari 35 aturan di
@@ -400,10 +545,10 @@ isi wilayah Aturan 20-nya dipindahkan ke commit ini.
 | Baris `Apps/` berubah | — | **0** |
 | Baris `Packages/` berubah | — | **0** |
 
-Angka 212 + 785 diukur di **pohon ter-commit** (`git worktree` pada commit ini),
-bukan di pohon kerja: pohon kerja memuat WIP siklus lain yang menambah uji
-engine, dan di sana terbaca 216 + 787. Menulis angka pohon kerja sebagai "angka
-commit" akan jadi klaim yang tidak pernah saya ukur.
+Angka 212 + 785 diukur di **commit ini sendiri** (`git worktree` pada pohon
+ter-commit), bukan di pohon kerja: pohon kerja memuat WIP siklus lain yang
+menambah uji engine, dan di sana terbaca 216 + 787. Menulis angka pohon kerja
+sebagai "angka commit" akan jadi klaim yang tidak pernah saya ukur.
 
 ### Verifikasi
 
@@ -413,9 +558,201 @@ commit" akan jadi klaim yang tidak pernah saya ukur.
 - `python3 Tools/check-harness-terdaftar.py` → **55 harness, semuanya dirujuk**,
   exit 0.
 - `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
-- `./swift-test.sh` di **pohon ter-commit** (`wt-verify`, commit ini) → **212
-  CelestialEngine + 785 PointingKit, 0 gagal**. Di pohon kerja — yang memuat WIP
-  siklus lain — terbaca 216 + 787; selisihnya milik mereka, bukan commit ini.
+- `./swift-test.sh` di **pohon ter-commit** (`wt-verify`, commit ini) →
+  **212 CelestialEngine + 785 PointingKit, 0 gagal**. Di pohon kerja (yang
+  memuat WIP siklus lain) terbaca 216 + 787 — selisihnya milik mereka, bukan
+  milik commit ini.
+
+---
+
+## Progres terakhir (14 Okt 2026 — dua puluh dua aturan sapu UI yang hijau tanpa saksi: enam ditutup, plus rantai izin Aturan 30)
+
+Audit fitur di siklus sebelumnya menyimpulkan seluruh BAGIAN 1–4 dan FASE A–C
+sudah ada dan tergerbang. Kesimpulan itu benar tentang **ada tidaknya kode**,
+dan tidak mengatakan apa-apa tentang **ada tidaknya saksi**. Siklus ini
+mengukur sisi kedua, dan menemukan celahnya di tempat yang tidak terlihat oleh
+kedua alat yang dipakai repo ini untuk memutuskan bahwa semuanya baik-baik
+saja.
+
+### Cacatnya: hijau yang tidak pernah diuji merah
+
+`swift-ui-lint.sh` memuat 35 aturan. Terukur dengan menyilangkan aturan
+terhadap harness yang benar-benar menjalankannya, **22 di antaranya tidak
+punya satu pun rekam jejak bahwa ia bisa keluar merah**:
+
+    bersaksi : 1, 3, 7, 15, 18, 23, 24, 31, 32, 33, 34, 35
+    nirsaksi : 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 22,
+               25, 26, 27, 28, 29, 30
+
+Ini bukan cacat hipotetis. Repo ini sudah membayarnya: Aturan 3 lolos dari
+huruf Arab karena rentangnya ditulis tangan; Aturan 1 lolos dari
+`Text("https://…")` karena pemotong komentarnya memotong di `//` pertama,
+termasuk `//` di dalam literal string. Keduanya ketahuan **setelah** ada yang
+mengukur, bukan dengan membaca.
+
+Yang ditutup siklus ini, dipilih karena kegagalannya terlihat pengguna dan
+masing-masing punya situs suntik nyata:
+
+| aturan | cacat yang dijaga | akibat bila lolos |
+|---|---|---|
+| 4  | teks UI literal tanpa kunci katalog | pengguna EN baca Bahasa Indonesia, diam-diam |
+| 9  | WidgetKit tanpa pemanggil reload | complication membeku di objek pertama |
+| 10 | hitungan uji README menyimpang | janji ke pembaca membusuk |
+| 14 | izin tanpa terjemahan InfoPlist.strings | dialog izin ber-Bahasa Indonesia untuk semua |
+| 22 | judul baris = kunci nilainya | baris terbaca "Gelap: Gelap" |
+| 25 | `CelestialVisual.X` bukan anggota | build merah di macOS, satu siklus terlambat |
+| 30 | kunci izin tak sampai `project.yml` | iOS tolak akses tanpa peringatan |
+
+### Dua arah, bukan satu
+
+Setiap keadaan diuji dua arah: cacatnya **harus** berbunyi (dan menyebut hal
+yang diklaimnya, bukan sekadar "ada yang merah"), dan kode yang benar **harus**
+diam. Arah kedua bukan hiasan — gerbang yang memerah pada kode benar akan
+dimatikan orang, dan tanpa arah kedua, gerbang yang memerah pada segala
+sesuatu lulus.
+
+### Tiga cacat harness, semuanya ketangkap dengan mengukur
+
+1. **Harness mengukur repo, bukan salinannya.** `swift-ui-lint.sh` melakukan
+   `cd "$(dirname "$0")"` di baris 24. Menjalankannya dengan `cwd=salinan`
+   membuatnya tetap memeriksa repo sungguhan — dan seluruh 12 keadaan
+   dilaporkan hijau, termasuk keadaan cacat. Gejalanya persis "semuanya
+   lulus". Perbaikan: yang dijalankan salinan skripnya.
+2. **Salinan parsial menenggelamkan tanda.** Salinan mula-mula hanya `Apps/`;
+   aturan yang membaca `Packages/`, `project.yml`, atau `Tools/` (5, 6, 10, 14,
+   19, 25, 30, 34, 35) semuanya berbunyi di salinan tak lengkap. Aturan 10 dan
+   25 lalu dilaporkan "sudah merah pada kode benar" — diagnosis yang
+   menyesatkan. Perbaikan: salin pohon utuh.
+3. **Jangkar yang ditulis mati mengukur pohon kerja penulisnya.**
+   `R10_ANCHOR` ditulis sebagai `"PointingKit 787"`, angka dari pohon kerja
+   saat harness ditulis; di HEAD angkanya 785, jadi penggantiannya tidak cocok
+   dan keadaan cacatnya dilaporkan hijau. Angka sekarang dibaca dari README
+   yang disalin. Cacat ini persis yang dicatat memori repo: *re-measure, never
+   inherit docstring claims*.
+
+Non-vakuositas dibuktikan terpisah untuk kedua harness: dengan program Aturan
+22 (dan Aturan 30) dilumpuhkan di worktree bersih, harness masing-masing merah
+**hanya** pada keadaan yang aturan itu jaga.
+
+### Kenapa Aturan 30 dipisah, bukan digabung
+
+Aturan 30 punya kegagalan kedua yang tidak dimiliki enam lainnya: cabang
+`-n "$declared"` menganggap **string apa pun** sebagai temuan, termasuk
+PERINGATAN yang dicetak bila himpunan pencariannya kosong. Jadi kegagalan
+*pencarian* dan kegagalan *kepatuhan* tidak bisa dibedakan dari exit code-nya.
+Keadaan ketiganya (deklarasi dihapus harus diam, dan bukan temuan kepatuhan)
+memisahkan keduanya secara terukur.
+
+### Yang TIDAK diklaim
+
+- Enam + satu ini bukan 22. Enam belas aturan lain masih tanpa saksi; 26/27/28
+  mengawasi relasi `TipePaket` yang tidak punya situs panggil di `Apps/`, jadi
+  cacat nyatanya belum bisa disuntik.
+- Harness Aturan 30 tidak membuktikan Info.plist hasil XcodeGen benar-benar
+  memuat kuncinya pada build nyata. Yang dibuktikan: aturan berbunyi pada
+  kepatuhan yang hilang.
+- Aturan 30 saat ini hanya punya **satu** kunci terdeklarasi, jadi liputannya
+  sempit — batasan model, bukan harness.
+
+Terverifikasi: 1003 tes hijau (216 CelestialEngine + 787 PointingKit),
+`swift-ui-lint.sh` 35/35, `swift-typecheck.sh` hijau, 54/54 harness terdaftar.
+
+## Progres terakhir (14 Okt 2026 — ambang magnitudo planet yang lebih ketat dari planetnya sendiri)
+
+Perbaikan ini **belum di-commit** dengan sengaja: ia menyentuh 3 dari 18 berkas
+fitur Uranus/Neptunus yang masih WIP di siklus lain. Commit sebagian akan
+membuat `main` merah (fixture, model `CelestialVisual`, dan port Python yang
+diukur seluruh gerbang gambar hidup di berkas yang belum di-commit). Jadi
+temuannya dicatat di sini, dan pohon kerja dibiarkan utuh untuk siklus yang
+memilikinya.
+
+### Cacatnya, diukur bukan dibaca
+
+`VisibilityPolicy.planetLimitingMagnitude` (baru di WIP ini) bernilai **7.8**.
+Docstring-nya mengklaim: *"satu kali di bawah magnitudo terredup Neptunus"*.
+Klaim itu **salah**, dan yang membuktikannya adalah data repo ini sendiri:
+
+| sumber | Neptunus | terhadap ambang 7.8 |
+|---|---|---|
+| fixture Horizons `horizons_reference.json`, 2000-01-01 | **7.853** | **`.tooFaint`** |
+| fixture yang sama, 2024-01-01 | 7.775 | terlihat |
+| fixture yang sama, 2026-06-15 | 7.781 | terlihat |
+| efemeris `AstronomyKit` di dalam suite (2026-01-01T15:00Z) | **7.847** | **`.tooFaint`** |
+
+Neptunus diredupkan oleh orbitnya sendiri, jadi ambang yang dirapatkan ke
+magnitudo sekitar **oposisi** membuang planet itu **sebelum ketinggiannya
+diperiksa**. Jam lalu melaporkan "tidak ada apa-apa di arah itu" untuk benda
+yang memang ada di sana — persis kegagalan yang docstring `planetLimitingMagnitude`
+klaim sudah ditutup, hanya bergeser ke tanggal yang lain. Yang membuatnya lebih
+buruk daripada tidak ada sama sekali: Neptunus **kadang muncul dan kadang
+tidak**, dan pengguna tidak punya cara membedakan cacat itu dari langit yang
+memang kosong.
+
+### Kenapa uji WIP-nya hijau
+
+`testOuterPlanetUsesItsOwnLimitingMagnitude` menguji **mag 7.8** — angka yang
+kebetulan **sama dengan ambangnya**. `7.8 <= 7.8` benar, jadi uji itu hijau
+walau ambangnya pas-pasan. Uji yang memakai nilai yang diujinya sendiri sebagai
+ambang tidak bisa membedakan "ambang cukup" dari "ambang persis menyentuh".
+
+### Perbaikan
+
+- Ambang 7.8 → **8.30**. Rentang magnitudo Neptunus yang dipakai **7.65…8.05**
+  dengan margin 0.25 di ujung redup, jadi seluruh orbitnya tertutup — bukan
+  hanya satu sampel. Batasnya dinyatakan di docstring: satu angka untuk semua
+  planet, jadi planet yang lebih redup dari 8.30 akan tertolak tanpa cara
+  menyatakannya (di luar katalog saat ini).
+- `testPlanetLimitCoversTheWholeNeptuneMagnitudeRange` (tes baru): menuntut
+  **seluruh** sampel Neptunus di fixture terlihat **dengan margin di atas nol**
+  (`planetLimitingMagnitude > magnitude`), plus arah sebaliknya — planet mag 8.9
+  tetap ditolak dan ambangnya tidak boleh menyamai ambang langit dalam (9.0).
+- `testBelowHorizonBodiesAreReportedAsSuch` **diperkuat, bukan dilonggarkan**.
+  Versi WIP-nya menyaring "apa pun kecuali `.daylight`/`.tooCloseToSun`", jadi
+  ia hijau **juga** kalau benda yang seharusnya dilaporkan "di bawah horizon"
+  malah dicap `.tooFaint` — pengguna diberi alasan yang salah tentang mengapa
+  ia tidak melihat apa pun. Sekarang: pada altitude −80, benda yang cukup
+  terang untuk ambang bintang **harus** `.belowHorizon`.
+
+### Bukti, dua arah
+
+| yang diukur | hasil |
+|---|---|
+| ambang 7.8 (RED) | `("tooFaint") is not equal to ("visible") - Neptunus mag 7.853 harus terlihat` |
+| ambang 8.30 (GREEN) | 216 CelestialEngine + 787 PointingKit, 0 gagal |
+| uji Resolver baru, mutasi **terjangkau** (`return kind == .star ? .tooFaint : .belowHorizon`) | **MERAH** pada 12 bintang terang (Arcturus, Vega, Hadar, …), masing-masing menyebut alasan yang salah |
+| uji Resolver baru, mutasi **tidak terjangkau** (blok disisipkan setelah `return` asli) | hijau — **dan itu pelajaran**: mutasi yang tidak dieksekusi tidak membuktikan apa pun, jadi versi pertama saya menyimpulkan "non-vakum" secara keliru sampai mutasinya dibuat benar-benar terjangkau |
+
+### Temuan sampingan: gerbang yang menangkap saya sendiri
+
+Aturan 10 (`README` bilang 215, berkas uji berisi 216) **merah** setelah uji
+baru saya ditambahkan. Gerbang itu bekerja: menghitung uji dan membandingkannya
+dengan klaim README. Diperbaiki (215 → 216).
+
+### Verifikasi
+
+- `./swift-test.sh` → **CelestialEngine 216 + PointingKit 787 = 1003 hijau**,
+  0 gagal.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS, exit 0.
+- `python3 Tools/check-harness-terdaftar.py` → **52 dari 52** harness dirujuk,
+  exit 0.
+- Pohon kerja: **18 berkas** (sama seperti sebelum siklus ini); yang berubah
+  hanya isi 4 berkas, dan ketiganya milik fitur Uranus/Neptunus yang belum
+  di-commit.
+
+### Yang TIDAK diklaim
+
+- Perbaikan ini **tidak** membuktikan 8.30 itu benar secara astronomis. Yang
+  diukur: 7.8 lebih ketat dari seluruh magnitudo Neptunus di fixture repo ini
+  sendiri, dan 8.30 menutupi rentangnya dengan margin. Angka 7.65/8.05 adalah
+  rentang orbit yang dinyatakan, bukan hasil pengukuran baru di sini.
+- Rentang magnitudo Neptunus **tidak** diverifikasi ulang terhadap JPL dalam
+  siklus ini; yang dipakai adalah angka yang sudah ada di repo.
+- Perbaikan ini **tidak di-commit**. Ia hidup di pohon kerja bersama 15 berkas
+  WIP lain; siklus yang memiliki fitur itu yang harus meng-commit-nya utuh.
+- Ambang planet **tidak** menjadi per-planet. Uranus/planet dalam praktis tidak
+  pernah menyentuh angkanya, tapi planet kesembilan yang lebih redup dari 8.30
+  akan tertolak tanpa cara menyatakannya.
 
 ---
 
