@@ -1,3 +1,159 @@
+## Progres terakhir (15 Okt 2026 — Aturan 26: tingkat terdalam yang tidak pernah dibaca, dan penanda "Bersih" yang menutupinya)
+
+Siklus ini meneruskan sapuan yang sama: dari 35 aturan di `swift-ui-lint.sh`,
+**berapa yang pernah dibuktikan bisa merah?** Terukur ulang di awal siklus
+dengan menyilangkan nomor aturan terhadap seluruh `Tools/bukti-mutasi-*.py`
+**dan** `.github/workflows/engine-tests.yml`: **1 nirsaksi (26)** — turun dari
+3 (21 dan 29 ditutup dua siklus sebelumnya; 21 juga digarap WIP siklus lain di
+pohon kerja). Dipilih Aturan 26 karena ia yang terakhir, dan karena ia
+mengawasi **nama yang diketik paling sering**: `TipePaket.anggota`.
+
+### Cacat yang dijaga, dan kenapa ia berbentuk hijau
+
+Aturan 26 membaca akses berkualifikasi dengan `PAIR`:
+
+    PAIR = re.compile(r"(?<![A-Za-z0-9_.\"'])"
+                      r"(?P<t>[A-Z][A-Za-z0-9_]*)"
+                      r"\.(?P<m>[A-Za-z_][A-Za-z0-9_]*)")
+
+Awalan negatifnya menolak titik di kiri, jadi dari
+`CelestialVisual.Planet.saturn` ia hanya membaca `CelestialVisual.Planet` —
+dan anggota yang **paling spesifik** (`saturn`) tidak pernah diperiksa.
+Terukur: mengganti `.saturn` menjadi `.salahAnggota` membiarkan aturan ini
+melaporkan
+
+    Bersih: setiap TipePaket.anggota di Apps/ ada di paket.
+
+padahal itu galat kompilasi yang **pasti**. Yang hilang bukan satu nama,
+melainkan satu **tingkat kedalaman** — dan tingkat terdalam adalah yang paling
+sering disunting. Lebarnya terukur, bukan ditebak: **2** situs `Tipe.Luar
+.Dalam` di `Apps/` hari ini, keduanya buta.
+
+Perbaikannya `DEEP`: awalan berkualifikasi ditangkap berapa pun tingkatnya,
+lalu anggotanya diperiksa pada tipe **terdalam**, bukan pada akar.
+
+### Dua cacat yang muncul hanya karena perbaikannya dijalankan
+
+Keduanya ketahuan dengan **menjalankan** gerbangnya, bukan dengan membacanya:
+
+1. **`allCases` disintesis compiler, jadi tidak ada di indeks teks.** Dengan
+   `DEEP` terpasang, `CelestialVisual.Planet.allCases` — baris yang
+   dikompilasi hari ini di `PointingEngine.swift:251` — dilaporkan sebagai
+   anggota yang hilang. Gerbang yang memerah pada kode benar akan dimatikan
+   orang, jadi `allCases` dilewati **bersyarat**: hanya bila
+   `CaseIterable` tertulis di deklarasi tipenya.
+2. **`root` tertimpa.** Variabel perulangan `for root, _, files in
+   os.walk(APPS)` ditugaskan ulang sebagai akar kualifikasi, sehingga baris
+   berikutnya membuka `<tipe>/<Berkas>.swift`. Gejalanya bukan temuan,
+   melainkan `FileNotFoundError: 'CalibrationText/HapticEngine.swift'` —
+   aturan ini **mati**, dan mati tanpa suara.
+
+Keduanya hanya terlihat karena baseline dijalankan **sesudah** setiap
+perubahan, bukan diwarisi dari keadaan sebelumnya.
+
+### Keadaan 4: pelewatan `allCases` harus **bisa salah**
+
+Kontrol pertama berbentuk no-op (`allCases` diganti `allCases`), dan no-op
+tidak mengukur apa pun — ia lulus di gerbang yang benar **dan** di gerbang
+yang membeku. Keadaan 4 karena itu mencabut `CaseIterable` dari model:
+`Planet.allCases` lalu menjadi cacat sungguhan dan **harus** merah. Ini
+membedakan "pelewatan bersyarat" dari "lubang".
+
+### Bukti bahwa gerbangnya berbunyi, dua arah
+
+`Tools/bukti-mutasi-anggota-bertahap.py` (baru, dirujuk `engine-tests.yml`) —
+**7 keadaan, semuanya sesuai harapan**:
+
+| # | keadaan | harap | baru | `origin/main` |
+|---|---|---|---|---|
+| 0 | kode apa adanya | hijau | hijau | — |
+| 1 | `Planet.saturn` → `.salahAnggota` (3 tingkat) | MERAH | **MERAH** | **hijau** |
+| 2 | `Planet.allCases` → `.salahAnggota` (3 tingkat) | MERAH | **MERAH** | **hijau** |
+| 3 | `NumberFormat.decimal` → `.salahAnggota` (2 tingkat) | MERAH | **MERAH** | MERAH |
+| 4 | cabut `CaseIterable` di model | MERAH | **MERAH** | hijau |
+| 5 | mutasi di **komentar** | hijau | hijau | — |
+| 6 | mutasi di **literal string** | hijau | hijau | — |
+
+**Keadaan 3 adalah yang paling berharga.** Arah 2 tingkat **sudah** dijaga
+sebelum siklus ini, jadi versi `origin/main` memang merah di sana. Tanpa
+keadaan itu, perbaikan yang merusak arah lama akan lulus keadaan 1 dan 2
+dengan sempurna — ia hanya akan terlihat "menambah cakupan".
+
+**Keadaan 5 dan 6 menahan bahwa gerbang ini tetap sapu teks**: komentar dan
+kalimat di dalam tanda kutip bukan kode. Keduanya hijau.
+
+**Non-vakuositas diukur, bukan diklaim.** Dengan `DEEP` dikembalikan ke
+`PAIR` (namanya dipertahankan supaya pemeriksaan struktur tidak berubah),
+harness merah **persis pada keadaan 1, 2, dan 4** — dan **tidak** pada
+keadaan 3. Itu sekaligus membuktikan keadaan 3 bukan yang menutup cacatnya,
+dan bahwa yang berbunyi memang perbaikannya, bukan sebab lain.
+
+### Satu cacat harness, tertangkap karena menuntut arah
+
+Detektor `fired()` disalin dari harness Aturan 28 sebagai
+`"GAGAL" in finding(out)`. Aturan 26 **tidak pernah** mencetak kata itu, jadi
+seluruh empat keadaan cacat dilaporkan **hijau** — harnessnya sepakat dengan
+dirinya sendiri dan mengukur nol. Diperbaiki menjadi `finding(out) != ""`,
+karena `finding()` sudah mengembalikan `""` untuk seksi yang bersih. Ini
+persis kelas cacat yang berkas ini ada untuk mencegah, hanya kali ini hidup
+**di dalam harnessnya sendiri**.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** `Apps/`, bukan kompilasi Swift. Gerbang ini tahu
+  "anggota dengan nama ini tidak ada di tipe terdalam", bukan "tipenya
+  bertipe salah".
+- Akses **tak-berkualifikasi** dan `self.member` tetap tidak terlihat — batas
+  itu sama seperti sebelum siklus ini, dinyatakan di sini alih-alih disangka
+  tertutup.
+- Tipe yang dideklarasi **di `Apps/`** tetap tidak diindeks.
+- `allCases` dilewati **hanya** untuk `CaseIterable`. Anggota sintesis lain
+  (`rawValue` dari `RawRepresentable`, anggota `Equatable`) belum punya
+  pengecualian; hari ini tidak ada situsnya di `Apps/`, dan menambahkannya
+  tanpa situs berarti menulis pelonggaran yang tidak terukur.
+- **0 nirsaksi tersisa** (terukur: 1 → **0**) — tetapi itu menyisakan
+  pertanyaan yang belum dijawab: aturan yang **punya** harness masih bisa
+  salah cakupannya, seperti Aturan 26 selama ini. Harness membuktikan
+  "pernah merah pada keadaan yang diujinya", bukan "cakupannya lengkap".
+- `Apps/` dan `Packages/` berubah: **0 baris**. Tidak ada uji Swift disentuh.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 212 | **212** (tak disentuh) |
+| PointingKit | 788 | **788** (tak disentuh) |
+| Aturan nirsaksi (terukur) | 1 | **0** (−1) |
+| Harness dirujuk CI | 65 | **66** (+1) |
+| Situs 3 tingkat yang buta | 2 | **0** |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `python3 Tools/bukti-mutasi-anggota-bertahap.py` → **7 keadaan, 0 tidak
+  sesuai harapan**, exit 0. Dengan `DEEP` → `PAIR` → **exit 1**, merah
+  persis pada keadaan 1, 2, 4.
+- `python3 Tools/check-harness-terdaftar.py` → **66 harness, semuanya
+  dirujuk**, exit 0. (Gerbang ini sendiri menolak harness baru sebelum
+  langkah CI-nya ditambahkan — ia bekerja.)
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (35 aturan), exit 0.
+- `./swift-typecheck.sh` → SEMUA GERBANG LULUS, exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → lihat baris uji di bawah; dijalankan
+  di **pohon ter-commit** (`git worktree`), bukan pohon kerja yang memuat WIP
+  siklus lain.
+
+### Catatan proses
+
+Pohon kerja utama memuat WIP siklus lain yang belum di-commit (17 entri,
+termasuk penghapusan `Tools/bukti-mutasi-permukaan.py` milik mereka). Seluruh
+pengukuran dijalankan di `git worktree` bersih di atas `HEAD`; WIP itu
+**tidak disentuh** dan diverifikasi utuh sesudahnya. `git add` hanya
+menyebut **tiga** jalur eksplisit — bukan `git add -A`, karena itu akan
+mengadopsi WIP mereka ke dalam commit ini.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 29: terjemahan yang tidak akan pernah sampai ke layar, dan salinan yang membuat gerbangnya diam)
 
 Siklus ini meneruskan sapuan yang sama: dari 35 aturan di `swift-ui-lint.sh`,

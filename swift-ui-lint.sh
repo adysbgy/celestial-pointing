@@ -3303,6 +3303,27 @@ PAIR = re.compile(r"(?<![A-Za-z0-9_.\"'])"
                   r"(?P<t>[A-Z][A-Za-z0-9_]*)"
                   r"\.(?P<m>[A-Za-z_][A-Za-z0-9_]*)")
 
+# Akses berkualifikasi **bertingkat**: `Tipe.Luar.Dalam.anggota`.
+#
+# Kenapa `PAIR` saja tidak cukup, dan kegagalannya berbentuk hijau. `PAIR`
+# memakai awalan negatif `(?<![A-Za-z0-9_.])`, jadi dari
+# `CelestialVisual.Planet.saturn` ia hanya membaca `CelestialVisual.Planet` —
+# anggota yang **paling spesifik** (`saturn`) tidak pernah diperiksa.
+#
+# Terukur 15 Okt 2026: mengganti `CelestialVisual.Planet.saturn` menjadi
+# `.salahAnggota` membiarkan aturan ini melaporkan "Bersih", padahal itu
+# galat kompilasi yang **pasti**. Yang hilang bukan satu nama, melainkan satu
+# tingkat kedalaman — dan tingkat terdalam adalah yang paling sering disunting.
+#
+# `DEEP` menangkap awalan berkualifikasi berapa pun tingkatnya, lalu anggotanya
+# diperiksa pada tipe **terdalam**, bukan pada akar. Kualifikasi yang tidak
+# seluruhnya ada di indeks paket dilewati: itu bukan "anggota hilang", dan
+# menebaknya akan memerahkan kode yang benar.
+DEEP = re.compile(r"(?<![A-Za-z0-9_.\"'])"
+                  r"(?:(?P<q>[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)*)\.)?"
+                  r"(?P<t>[A-Z][A-Za-z0-9_]*)"
+                  r"\.(?P<m>[A-Za-z_][A-Za-z0-9_]*)")
+
 
 def index(root_dir):
     """Pindai pohon tipe: nama berkualifikasi -> anggota langsung + basis."""
@@ -3382,20 +3403,47 @@ for root, _, files in os.walk(APPS):
         path = os.path.join(root, name)
         for i, raw in enumerate(open(path, encoding="utf-8").read().split("\n")):
             line = strip(raw)
-            for m in PAIR.finditer(line):
+            for m in DEEP.finditer(line):
                 t, mem = m.group("t"), m.group("m")
-                if t not in pkg_types or t in apps_types:
+                prefix = m.group("q")
+                qual = f"{prefix}.{t}" if prefix else t
+                # `root` sengaja **bukan** nama ini: `for root, _, files in
+                # os.walk(APPS)` memakai nama itu, dan menugaskannya di sini
+                # akan menimpa variabel perulangannya — baris berikutnya lalu
+                # membuka `<tipe>/<Berkas>.swift` dan aturan ini mati dengan
+                # `FileNotFoundError`, bukan dengan temuan.
+                akar = prefix.split(".")[0] if prefix else t
+                # Tipe yang dideklarasi di `Apps/` dilewati: aturan ini menjaga
+                # pemakaian API **paket** dari view (lihat docstring Aturan 26).
+                if akar not in pkg_types or akar in apps_types:
+                    continue
+                # Hanya periksa kualifikasi yang **seluruhnya** ada di indeks
+                # paket. Kalau `Outer.Inner` tidak dikenali, itu bukan
+                # "anggota hilang" — menebaknya akan memerahkan kode benar,
+                # dan gerbang yang memerah pada kode benar akan dimatikan orang.
+                if qual not in resolved:
                     continue
                 # `Type.self` / `Type.Type` disediakan compiler.
-                if mem in ("self", "Type") or mem in resolved[t]:
+                if mem in ("self", "Type") or mem in resolved[qual]:
                     continue
-                nested = f"{t}.{mem}"
+                # Anggota yang **disintesis compiler** tidak pernah tertulis di
+                # sumber, jadi teks indeks tidak memuatnya. `CaseIterable`
+                # menyediakan `allCases`; tanpa ini, `CelestialVisual.Planet
+                # .allCases` — baris yang dikompilasi hari ini di
+                # `PointingEngine.swift:251` — dilaporkan sebagai anggota yang
+                # hilang. Gerbang yang memerah pada kode benar akan dimatikan
+                # orang, jadi ini bukan pelonggaran: yang ditambahkan hanya
+                # nama yang keberadaannya dijamin konformansinya, dan hanya
+                # bila konformansi itu **tertulis** di deklarasi tipenya.
+                if mem == "allCases" and "CaseIterable" in bases.get(qual, ()):
+                    continue
+                nested = f"{qual}.{mem}"
                 hint = ""
                 if nested in pkg_types:
                     hint = (f" — `{nested}` ada sebagai tipe bersarang; "
                             f"akses anggotanya lewat `{mem}.<anggota>`")
                 problems.append(
-                    f"  {path}:{i + 1}: `{t}.{mem}` — bukan anggota `{t}`"
+                    f"  {path}:{i + 1}: `{qual}.{mem}` — bukan anggota `{qual}`"
                     f"{hint}")
 
 if problems:

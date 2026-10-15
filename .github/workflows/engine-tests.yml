@@ -1109,6 +1109,40 @@ jobs:
       - name: Buktikan Aturan 28 berbunyi pada label di parameter bawaan
         run: python3 Tools/bukti-mutasi-label-bawaan.py
 
+      # Dan bukti untuk Aturan 26 — tingkat terdalam yang tidak pernah
+      # dibaca.
+      #
+      # Aturan 26 mengklaim memeriksa keanggotaan `TipePaket.anggota` di
+      # `Apps/`. Hingga siklus ini ia satu-satunya aturan tanpa saksi, dan
+      # terukur ia punya cacat diam: `PAIR` memakai awalan negatif
+      # `(?<![A-Za-z0-9_.])`, jadi dari `CelestialVisual.Planet.saturn` ia
+      # hanya membaca `CelestialVisual.Planet` — anggota yang **paling
+      # spesifik** tidak pernah diperiksa. Mengganti `.saturn` menjadi
+      # `.salahAnggota` (galat kompilasi yang pasti) membiarkan aturan ini
+      # melaporkan "Bersih".
+      #
+      # Yang membuatnya lebih dari daftar panjang: tingkat terdalam adalah
+      # yang paling sering disunting, dan satu-satunya yang menangkapnya hari
+      # ini adalah CI macOS — ~4 menit, plus satu push.
+      #
+      # Tujuh keadaan. Yang paling berharga bukan yang paling mudah:
+      #
+      #  - keadaan 1 & 2 (3 tingkat) hijau di `origin/main` dan merah sesudah
+      #    perbaikan — itulah cacatnya;
+      #  - keadaan 3 (2 tingkat) merah di **kedua** versi: arah yang sudah
+      #    dijaga sebelum siklus ini, dan perbaikan ini tidak boleh
+      #    merusaknya;
+      #  - keadaan 4 membuktikan pelewatan `allCases` **bersyarat** pada
+      #    konformansi `CaseIterable`, bukan lubang: cabut konformansinya di
+      #    model dan baris yang sama menjadi cacat;
+      #  - keadaan 5 & 6 menahan bahwa komentar dan literal string bukan kode.
+      #
+      # Non-vakuositasnya terukur: dengan `DEEP` dikembalikan ke `PAIR`,
+      # harness ini merah **persis** pada keadaan 1, 2, dan 4 — dan tidak pada
+      # keadaan 3, yang membuktikan keadaan 3 bukan yang menutup cacatnya.
+      - name: Buktikan Aturan 26 berbunyi pada anggota berkualifikasi bertingkat
+        run: python3 Tools/bukti-mutasi-anggota-bertahap.py
+
       # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah
       # merah di mana pun**.
       #
