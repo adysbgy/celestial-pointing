@@ -2567,7 +2567,7 @@ def swift_tuple_triples(source, anchor, terminator="]"):
 
 
 def read_planet_palettes_from_swift(source):
-    """Baca seluruh `Planet.palette` dari teks Swift, per planet.
+    r"""Baca seluruh `Planet.palette` dari teks Swift, per planet.
 
     Pemetaan planet → warna + ciri hidup di **dua bahasa** (`Planet.palette`
     di Swift dan `PLANET_PALETTE` di port Python). Yang dijaga di sini bukan
@@ -2580,15 +2580,53 @@ def read_planet_palettes_from_swift(source):
     .<ciri>)`. Nama berkas yang salah akan membuat `source.index(...)` lempas
     — itu kegagalan yang disengaja, bukan pengecualian tersembunyi: pesannya
     menyebut `var palette` supaya pembaca tahu apa yang harus dikembalikan.
+
+    **Cacat yang ditutup di sini: pembaca yang *menyaring*, bukan mengukur.**
+    Versi sebelumnya menuntut `return` **persis** setelah `case .<nama>:`
+    (`case \.(\w+):\s*return`). Begitu ada satu komentar penjelas di antara
+    keduanya — persis yang ditulis untuk Uranus dan Neptunus — cabang itu
+    **dilewati tanpa suara**, dan gerbangnya lalu melaporkan kalimat yang
+    salah: "uranus tidak ada di `Planet.palette` Swift", padahal ada, tiga
+    baris di bawah komentarnya. Pembaca yang menyaring lebih berbahaya
+    daripada pembaca yang melempar: yang pertama mengubah **cakupan** jadi
+    merah, yang kedua mengubah **hasil** jadi merah — dan hanya yang kedua
+    terbaca sebagai cacat.
+
+    Karena itu jumlah hasil di sini **dihitung ulang** dan dibandingkan
+    dengan jumlah `case .<nama>:` di wilayah yang sama. Kalau suatu saat
+    bentuk tulisannya berubah lagi, gerbangnya merah dengan pesan yang
+    menyebut selisihnya — bukan hijau dengan daftar yang diam-diam pendek.
     """
     anchor = "var palette: CelestialVisual.Palette {"
     if anchor not in source:
         raise ValueError("'var palette' tidak ditemukan di CelestialVisual.swift")
     region = source[source.index(anchor):]
+    # Wilayahnya berhenti di penutup `var palette`, bukan di EOF.
+    #
+    # Tanpa batas ini, `case .nama:` dari **enum mana pun di bawahnya** ikut
+    # terhitung oleh penjaga cakupan di bawah — dan penjaga itu lalu melempar
+    # pada kode yang benar. Terukur, bukan dibayangkan: menyisipkan satu enum
+    # baru berisi `case .alfa:`/`case .beta:` **sesudah** fungsi ini membuat
+    # pembaca ini melaporkan "hanya mengenali 7 dari 9 cabang `case`", padahal
+    # ketujuh cabang palet terbaca lengkap dan paletnya tidak tersentuh sama
+    # sekali. Berkas ini memang terus ditumbuhi enum baru (bentuk langit
+    # dalam, glif lencana), jadi itu bukan keadaan karangan.
+    #
+    # Jebakan yang sama sudah tertulis di `read_planet_switch_cases_from_swift`
+    # ("membaca melewati batas fungsi adalah jebakan yang sama yang baru saja
+    # ditemukan di pembaca kunci penggambar langit dalam"); pembaca ini belum
+    # memakainya, jadi penjaga barunya mewarisi jebakan itu.
+    closing = region.find("\n    }")
+    if closing != -1:
+        region = region[:closing]
     out: dict[str, tuple[tuple[float, float, float],
                           tuple[float, float, float], str]] = {}
     for m in re.finditer(
-            r"case \.(\w+):\s*"
+            r"case \.(\w+):"
+            # Komentar penjelas di antara `case` dan `return` itu sah, dan
+            # memang ditulis untuk Uranus/Neptunus. `//` sampai akhir baris,
+            # boleh berulang, baru `return`.
+            r"(?:\s*//[^\n]*)*\s*"
             r"return \.init\(\s*"
             r"light:\s*\.init\(red: ([\d.]+), green: ([\d.]+), blue: ([\d.]+)\)"
             r"[\s\S]*?"
@@ -2600,6 +2638,19 @@ def read_planet_palettes_from_swift(source):
         dark = (float(m.group(5)), float(m.group(6)), float(m.group(7)))
         feature = m.group(8)
         out[name] = (light, dark, feature)
+
+    # Penjaga cakupan: setiap `case .<nama>:` di wilayah ini harus menghasilkan
+    # satu entri. Selisihnya berarti pola di atas tidak lagi mengenali bentuk
+    # yang ditulis — dan pembaca yang menyaring akan melaporkannya sebagai
+    # "planet ini tidak ada di model", yang menyesatkan.
+    clauses = re.findall(r"case \.(\w+):", region)
+    if len(out) != len(clauses):
+        raise ValueError(
+            "read_planet_palettes_from_swift hanya mengenali "
+            f"{len(out)} dari {len(clauses)} cabang `case`: "
+            f"terbaca {sorted(out)}, tidak terbaca "
+            f"{sorted(set(clauses) - set(out))} — bentuk tulisan berubah, "
+            "perbaiki polanya alih-alih melaporkan planet yang hilang")
     return out
 
 
@@ -6439,7 +6490,7 @@ def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
     membuang tiap cuplikan dengan `abs(xr) <= body + 0.02`, dengan alasan yang
     benar di sana ("di dalam proyeksi bola yang terlihat adalah permukaan
     planet, bukan cincin"). Justru karena pembuangan itu, keduanya buta pada
-    urutannya. Dibuktikan, bukan diklaim: seluruh **36** hasil enam
+    urutannya. Dibuktikan, bukan diklaim: seluruh **42** hasil enam
     pemeriksaan Saturnus dijalankan ulang dengan urutan dibalik, dan **nol**
     di antaranya berubah warna — termasuk `check_saturn_has_no_extra_disc`
     yang justru mengukur "tidak ada yang menyala di luar cincin dan bola".

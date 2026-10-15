@@ -23,7 +23,7 @@ mengukur apa pun.
 
 Apa yang diukur harness ini.
 
-**Delapan keadaan**, dan yang paling berharga bukan yang merah melainkan
+**Sembilan keadaan**, dan yang paling berharga bukan yang merah melainkan
 **yang wajib hijau**:
 
   keadaan                                                    harapan
@@ -38,6 +38,19 @@ Apa yang diukur harness ini.
   8. **uranus terpasang lengkap** (model+port+kasus+gerbang)   **hijau 7/7**
      — dan aturan kejujuran kini berlaku untuknya: dua pemeriksaan
      "pita Uranus" dari `check_features_disappear_when_uncertain` hijau
+  9. **enum baru sesudah palet** (kode sah, palet utuh)        **hijau 7/7**
+
+Keadaan 9 menjaga arah yang **tidak** dijaga ketujuh keadaan merah: bukan
+"merah pada yang salah", melainkan **merah pada yang benar**. Penjaga
+cakupan pembaca tabel pada versi pertamanya memindai dari jangkar
+`var palette` sampai EOF, jadi `case` dari enum mana pun di bawahnya ikut
+terhitung; menyisipkan satu enum yang sah membuatnya melempar, dan gerbang
+yang menghukum penambahan benar akan dilonggarkan orang alih-alih
+diperbaiki. Terukur: keadaan ini merah pada pembaca versi pertama dan hijau
+pada pembaca yang wilayahnya dibatasi ke penutup `var palette` — persis
+jebakan yang sudah tertulis di `read_planet_switch_cases_from_swift`
+("membaca melewati batas fungsi adalah jebakan yang sama yang baru saja
+ditemukan di pembaca kunci penggambar langit dalam").
 
 Keadaan 1 dan 2 dipisah karena **arahnya berbeda**, dan itu bukan kerapian.
 Di keadaan 1 ada drift antarbahasa yang bisa berbunyi (gerbang drift palet);
@@ -249,6 +262,28 @@ JUPITER_PAIR_TUKAR = (
     '        ("planet-jupiter-confirmed", "planet-saturn-uncertain",\n'
     '         "planet-jupiter-bare", "Bintik Merah Besar Jupiter"),\n')
 
+#: Keadaan 4 di atas mengukur pembaca tabel yang **kehilangan** satu planet.
+#: Keadaan 9 mengukur arah sebaliknya: pembaca yang **menolak** pohon yang
+#: benar. Keduanya cacat, tapi hanya yang pertama terlihat sebagai "merah
+#: pada yang salah"; yang kedua terlihat sebagai **merah pada yang benar**,
+#: dan itu justru lebih mahal — ia menghukum penambahan enum yang sah, jadi
+#: orang akan melonggarkan penjaganya alih-alih memperbaiki pembacanya.
+#:
+#: Jangkar: satu enum baru yang **sah** disisipkan sesudah fungsi palet.
+#: Paletnya sendiri tidak tersentuh satu karakter pun.
+NEW_ENUM_AFTER_PALETTE = ("    /// Kenali planet dari `CelestialObject.id`.\n")
+NEW_ENUM_ADDED = ("    /// Enum yang ditambahkan SESUDAH `var palette` — kode\n"
+                  "    /// yang sah: paletnya tidak tersentuh.\n"
+                  "    enum ContohGlif {\n"
+                  "        var label: String {\n"
+                  "            switch self {\n"
+                  "            case .alfa: return \"a\"\n"
+                  "            case .beta: return \"b\"\n"
+                  "            }\n"
+                  "        }\n"
+                  "    }\n"
+                  "\n")
+
 # Dijalankan di proses baru: mengimpor ulang `check-visuals` (dan `R` di
 # dalamnya) dari berkas yang **sudah dimutasi** di disk. Mengimpor sekali di
 # dalam proses ini akan memakai salinan lama, dan seluruh harness berbohong.
@@ -393,6 +428,24 @@ STATES = [
       (CHECK, PAIR_JAM_JUPITER, PAIR_JAM_JUPITER + PAIR_JAM_URANUS, WATCH_SIZE),
       (CHECK, PAIR_JAM_JUPITER, PAIR_JAM_JUPITER + PAIR_JAM_URANUS, NIGHT)],
      _full(), True),
+
+    # ── Yang wajib hijau: enum baru SESUDAH palet ────────────────────────
+    # Kode yang sah dan tidak menyentuh palet sama sekali. Harapannya hijau,
+    # jadi keadaan ini **tidak** membuktikan penjaganya berbunyi (itu tugas
+    # keadaan 4). Yang ia buktikan sebaliknya: penjaganya **tidak menghukum
+    # penambahan yang benar**.
+    #
+    # Terukur kenapa ia perlu ada: penjaga cakupan itu pada versi pertamanya
+    # memindai dari jangkar `var palette` sampai **EOF**, sehingga `case`
+    # dari enum mana pun di bawahnya ikut terhitung. Menyisipkan enum ini
+    # membuat pembaca melempar "hanya mengenali 7 dari 9 cabang `case`" —
+    # merah pada pohon yang benar. Jebakan yang sama sudah tertulis di
+    # `read_planet_switch_cases_from_swift`; pembaca tabel mewarisinya karena
+    # penjaganya ditulis belakangan.
+    ("9. enum baru sesudah palet (wajib hijau)",
+     [(MODEL, NEW_ENUM_AFTER_PALETTE, NEW_ENUM_ADDED + NEW_ENUM_AFTER_PALETTE,
+       None)],
+     _full(), False),
 ]
 
 #: Dua pemeriksaan yang **hanya** ada kalau aturan kejujuran berlaku bagi
