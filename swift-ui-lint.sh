@@ -2748,17 +2748,90 @@ fi
 #    sampel sensor, jadi ini ongkos yang nyata: baterai, di layar yang paling
 #    peduli baterai.
 #
-# Yang diperiksa: setiap pemanggilan `CelestialVisualView(...)` yang
-# meneruskan `pulse:` dengan nilai **bukan** literal nol wajib menyebut
-# `hasPulse` di daftar argumen yang sama. Nama itu properti teruji di Linux
-# (`CelestialVisual.hasPulse`), jadi aturannya tidak bergantung pada daftar
-# jenis lokal yang bisa basi.
+# **Kenapa "menyebut `hasPulse`" bukan gerbang — diukur, bukan ditebak.**
+#
+# Versi pertama aturan ini mencari `re.search(r"\bhasPulse\b", args)` atas
+# seluruh daftar argumen. Terukur (Tools/ukur-cakupan-aturan21.py, commit
+# `a229176`): **1 dari 5** keadaan cacat berbunyi. Empat sisanya lolos,
+# masing-masing **menyebut** `hasPulse` dan masing-masing tampak digerbangi
+# pada tinjauan kode:
+#
+#   pulse: !visual.hasPulse ? pulsePhase : 0   denyut mengalir ke planet,
+#                                              mati pada bintang — kebalikan
+#                                              maksud aturan ini
+#   pulse: visual.hasPulse ? 0 : pulsePhase    cabang benarnya nol, bintang
+#                                              tidak pernah berdenyut
+#   visual: v.hasPulse ? v : v, pulse: 0.8     hasPulse di argumen `visual:`
+#   hasPulse: true, pulse: 0.7                 sebuah **label argumen**
+#
+# Yang membedakan gerbang sungguhan bukan keberadaan nama itu, melainkan
+# **posisinya**: di dalam ekspresi yang menghasilkan nilai denyutnya, pada
+# cabang yang benar, tanpa dinegasikan.
+#
+# Yang diperiksa sekarang, untuk setiap `pulse:` bernilai bukan-nol:
+#   1. ekspresi nilai denyutnya memuat `hasPulse`;
+#   2. `hasPulse` tidak dinegasikan (`!hasPulse`, `== false`, `!= true`);
+#   3. cabang **benar** dari `? :` bukan nol, dan cabang **salah** yang
+#      bukan-nol → denyut terbalik.
+#
+# Nama itu properti teruji di Linux (`CelestialVisual.hasPulse`), jadi
+# aturannya tidak bergantung pada daftar jenis lokal yang bisa basi.
+#
+# **Batas yang dinyatakan, bukan disangka tertutup.** Gerbang yang sah
+# ditulis di variabel perantara (`let p = visual.hasPulse ? fase : 0` lalu
+# `pulse: p`) tetap hijau — melacaknya menuntut pelacakan aliran, dan
+# gerbang yang menebak akan merah pada kode benar.
 echo
 echo "== Aturan 21: denyut gambar digerbangi hasPulse =="
 ungated_pulse=$(python3 - <<'PY' 2>&1
 import os, re
 
 CALL = "CelestialVisualView("
+# Nilai yang dianggap "denyut mati": pemanggil tidak menggerakkan apa pun.
+MATI = ("0", "0.0", ".zero")
+
+
+def ekspresi_nilai(args):
+    """Teks argumen `pulse:`-nya saja — bukan seluruh daftar argumen.
+
+    Inilah inti perbaikannya. Mencari `hasPulse` di **seluruh** daftar
+    argumen membuat `visual: v.hasPulse ? v : v, pulse: 0.8` lolos, dan
+    sebuah label argumen bernama `hasPulse` lolos. Yang menentukan
+    gerbangnya adalah ekspresi yang menghasilkan **nilai denyutnya**.
+    """
+    for arg in re.split(r",(?![^()\[\]]*[)\]])", args):
+        m = re.match(r"\s*pulse\s*:\s*(.*)$", arg, re.S)
+        if m:
+            return m.group(1).strip()
+    # `pulse:` bisa hidup di dalam argumen yang memuat koma bersarang;
+    # jatuh kembali ke pencarian lama agar bentuk itu tidak **hilang**.
+    m = re.search(r"\bpulse\s*:\s*(.*)", args, re.S)
+    return m.group(1).strip() if m else None
+
+
+def terbalik(nilai):
+    """`hasPulse` yang dinegasikan: denyut jalan tepat saat gambar diam."""
+    return bool(re.search(r"!\s*\w*\.?\s*hasPulse|"
+                          r"hasPulse\s*(?:==\s*false|!=\s*true)", nilai))
+
+
+def cabang_salah(nilai):
+    """Cabang `? :` yang **benar** nol, atau yang **salah** bukan nol.
+
+    `visual.hasPulse ? 0 : pulsePhase` menyebut gerbang yang benar pada
+    posisi yang benar, tetapi denyutnya mati. Tanpa pemeriksaan ini,
+    "menyebut hasPulse" sudah cukup untuk lolos walau bintang diam.
+    """
+    if "?" not in nilai or ":" not in nilai:
+        return False
+    # Ambil cabang benar & salah pada `?` tingkat teratas.
+    i = nilai.index("?")
+    j = nilai.rindex(":")
+    if j < i:
+        return False
+    benar, salah = nilai[i + 1:j].strip(), nilai[j + 1:].strip()
+    return benar in MATI or salah not in MATI
+
 
 problems = []
 for root, _, files in os.walk("Apps"):
@@ -2788,16 +2861,22 @@ for root, _, files in os.walk("Apps"):
                 j += 1
             args = code[i + len(CALL):j - 1]
             start = j
-            m = re.search(r"\bpulse\s*:\s*([^,]*)", args)
-            if not m:
+            value = ekspresi_nilai(args)
+            if value is None or value in MATI:
                 continue
-            value = m.group(1).strip()
-            if value in ("0", "0.0", ".zero"):
-                continue
-            if not re.search(r"\bhasPulse\b", args):
-                line_no = code[:i].count("\n") + 1
+            line_no = code[:i].count("\n") + 1
+            if not re.search(r"\bhasPulse\b", value):
                 problems.append(
-                    f"  {path}:{line_no}: pulse: {value[:40]} tanpa hasPulse")
+                    f"  {path}:{line_no}: pulse: {value[:40]} tanpa hasPulse "
+                    "di ekspresi nilainya")
+            elif terbalik(value):
+                problems.append(
+                    f"  {path}:{line_no}: pulse: {value[:40]} — hasPulse "
+                    "dinegasikan, denyut jalan tepat saat gambar diam")
+            elif cabang_salah(value):
+                problems.append(
+                    f"  {path}:{line_no}: pulse: {value[:40]} — cabang "
+                    "hasPulse=true nol (atau cabang salahnya bukan nol)")
 
 if problems:
     print("\n".join(problems))
@@ -2809,9 +2888,11 @@ if [ -n "$ungated_pulse" ]; then
   echo "$ungated_pulse"
   echo "   Sebab: Canvas digambar ulang tiap nilai tangkapan berubah; denyut"
   echo "   hanya dibaca drawStar, jadi denyut pada planet cuma membuang baterai."
+  echo "   `hasPulse` yang hanya **disebut** (di argumen lain, dinegasikan,"
+  echo "   atau cabangnya terbalik) bukan gerbang."
   status=1
 else
-  echo "Bersih: setiap denyut gambar digerbangi hasPulse."
+  echo "Bersih: setiap denyut gambar digerbangi hasPulse pada cabang yang benar."
 fi
 
 # ── Aturan 22: judul & nilai satu baris tidak boleh kunci yang sama ─────────

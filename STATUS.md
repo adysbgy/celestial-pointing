@@ -1,3 +1,120 @@
+## Progres terakhir (15 Okt 2026 — Aturan 21: denyut yang *menyebut* `hasPulse` tanpa menggerbanginya)
+
+Sapuan sebelumnya bertanya *"berapa aturan yang pernah dibuktikan bisa
+merah?"* dan menjawabnya dengan hitungan. Sapuan ini memakai hitungan yang
+sama dan menemukan jawabannya **menipu**: satu-satunya aturan nirsaksi (21)
+ternyata **memiliki** harness yang lengkap — 7 keadaan, dua arah, salinan
+pohon utuh — sejak 08:16, dan harness itu **tidak pernah dijalankan satu kali
+pun oleh CI**. Ia nirsaksi bukan karena tidak ada yang menulis buktinya,
+melainkan karena buktinya hidup di pohon kerja siklus lain sebagai berkas
+belum-terlacak (`??`). Daftar berkas di `HEAD` dan daftar berkas di disk
+adalah dua himpunan yang berbeda, dan yang dilihat CI hanya yang pertama.
+
+Jadi yang dikerjakan siklus ini bukan "menulis harness", melainkan dua hal
+yang berbeda: **membuat buktinya sampai ke CI**, dan — karena menjalankannya
+menghasilkan merah — **memperbaiki aturannya**.
+
+### Cacat yang dijaga: penjaga yang tampak digerbangi
+
+Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai.
+`Canvas` digambar ulang setiap kali nilai yang ditangkapnya berubah, jadi
+`pulse` yang bergerak memaksa planet, Bulan, dan Matahari digambar ulang
+20x/detik untuk piksel yang identik — denyut hanya dibaca `drawStar`. Tidak
+ada *warning*, `Apps/` tidak pernah dibangun di Linux, dan tangkapan layar
+statis tidak bisa membedakan 20 fps dari 1 fps.
+
+Versi aturannya mencari `re.search(r"\bhasPulse\b", args)` atas **seluruh**
+daftar argumen. Terukur di `HEAD` (`Tools/ukur-cakupan-aturan21.py`): **1
+dari 5** keadaan cacat berbunyi. Empat sisanya lolos, dan keempatnya
+**menyebut** `hasPulse`:
+
+| bentuk | kenapa lolos | akibat di pergelangan |
+|---|---|---|
+| `pulse: !visual.hasPulse ? pulsePhase : 0` | nama ada, tidak dinegasikan-pun tidak dicek | denyut **mengalir ke planet** dan **mati pada bintang** — kebalikan maksud aturan ini |
+| `pulse: visual.hasPulse ? 0 : pulsePhase` | nama ada | cabang benarnya nol: bintang tidak pernah berdenyut |
+| `visual: v.hasPulse ? v : v, pulse: 0.8` | `hasPulse` hidup di argumen `visual:` | denyut tanpa gerbang |
+| `hasPulse: true, pulse: 0.7` | sebuah **label argumen** | idem |
+
+Yang membuat kelas ini mahal bukan jumlahnya, melainkan bahwa **tinjauan kode
+tidak bisa melihatnya**: keempat baris itu terbaca sebagai sudah digerbangi
+karena namanya ada di sana. Gerbang yang bisa diluluskan oleh keberadaan
+namanya sendiri tidak lebih baik daripada tidak ada gerbang.
+
+Perbaikannya menggeser yang dicari dari **daftar argumen** ke **ekspresi yang
+menghasilkan nilai denyutnya**, lalu menuntut tiga hal: `hasPulse` ada di
+sana, tidak dinegasikan (`!hasPulse`, `== false`, `!= true`), dan cabang
+**benar** dari `? :` tidak nol sementara cabang salahnya nol. Terukur sesudah
+perbaikan: **5 dari 5** keadaan cacat berbunyi, dan dua kontrol negatif tetap
+hijau.
+
+### Dua arah, dan kenapa arah "harus diam" yang lebih berharga
+
+Gerbang yang memerah pada kode benar akan dilonggarkan orang, dan
+pelonggarannya menghapus cakupan yang baru ditambahkan. Karena itu dua
+keadaan **wajib hijau**:
+
+- kode apa adanya (`pulse: visual.hasPulse ? pulsePhase : 0`);
+- `pulse: 0` — denyut nol adalah keadaan yang **sah**: itulah yang dikirim jam
+  saat layar redup. Aturan yang memerah di sana memaksa setiap pemanggil
+  menulis gerbang untuk nilai yang memang tidak bergerak.
+
+Terukur: seluruh 36 aturan tetap **SEMUA GERBANG UI LULUS** di pohon
+ter-commit, jadi perbaikan ini tidak mengubah satu pun putusan aturan lain.
+
+### Yang TIDAK diklaim
+
+- Yang diukur **teks** `Apps/`, bukan piksel perangkat. Yang dibuktikan:
+  kelima keadaan cacat berbunyi dan dua keadaan sah diam.
+- Gerbang yang sah ditulis di **variabel perantara** (`let p =
+  visual.hasPulse ? fase : 0` lalu `pulse: p`) tetap hijau — melacaknya
+  menuntut pelacakan aliran, dan gerbang yang menebak akan merah pada kode
+  benar. Batas ini dinyatakan di docstring aturannya, bukan disangka
+  tertutup.
+- Aturan ini **tidak** membuktikan `CelestialVisual.hasPulse` benar secara
+  tampilan; itu milik `CelestialVisualTests` di Linux.
+- Harness `bukti-mutasi-gerbang-denyut.py` **bukan** tulisan siklus ini: ia
+  lahir di siklus lain pada 08:16. Yang ditambahkan di sini adalah langkah
+  CI-nya dan perbaikan aturan yang membuatnya hijau.
+
+### Hitungan
+
+| | sebelum | sesudah |
+|---|---|---|
+| CelestialEngine | 216 | **216** (tak disentuh) |
+| PointingKit | 799 | **799** (tak disentuh) |
+| Aturan nirsaksi di `HEAD` (yg dilihat CI) | 1 | **0** (−1) |
+| Keadaan cacat Aturan 21 yg berbunyi | 1 dari 5 | **5 dari 5** |
+| Harness dirujuk CI | 67 | **68** (+1) |
+| Baris `Apps/` berubah | — | **0** |
+| Baris `Packages/` berubah | — | **0** |
+
+### Verifikasi
+
+- `Tools/ukur-cakupan-aturan21.py` → sebelum perbaikan **exit 1**, 1 dari 5;
+  sesudah perbaikan **exit 0**, 5 dari 5, dua kontrol negatif hijau.
+- `python3 Tools/bukti-mutasi-gerbang-denyut.py` → **exit 0** pada pohon
+  ter-commit (7 keadaan, 0 tidak sesuai harapan). Dijalankan **di worktree
+  setelah commit**, bukan di pohon kerja: penjaga `require_clean_sources`
+  menolak jalan di atas `swift-ui-lint.sh` yang menyimpang dari `HEAD`
+  (exit 2), dan penolakan itu benar — di CI berkasnya ter-commit, jadi
+  keadaan yang diukur harus keadaan ter-commit.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (36 aturan), exit 0.
+- `./swift-test.sh` di Docker Swift 6.0 → **CelestialEngine 216 +
+  PointingKit 799 = 1015 uji, 0 gagal**, exit 0.
+- `python3 Tools/check-harness-terdaftar.py` → exit 1 pada pohon kerja
+  karena `bukti-mutasi-permukaan.py` dihapus WIP siklus lain; **bukan**
+  karena perubahan siklus ini (perubahannya di-stage per jalur eksplisit).
+
+### Catatan proses
+
+Pohon kerja utama memuat WIP siklus lain (22 entri, termasuk penghapusan
+`Tools/bukti-mutasi-permukaan.py`). Seluruh pengukuran dan commit dilakukan
+di `git worktree` bersih di atas `HEAD`; WIP itu **tidak disentuh** dan tidak
+di-stage. `git add` hanya menyebut tiga jalur eksplisit — bukan `git add -A`,
+karena itu akan mengadopsi WIP mereka ke dalam commit ini.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 26: tingkat terdalam yang tidak pernah dibaca, dan penanda "Bersih" yang menutupinya)
 
 Siklus ini meneruskan sapuan yang sama: dari 35 aturan di `swift-ui-lint.sh`,

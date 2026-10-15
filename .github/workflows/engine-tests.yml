@@ -1163,6 +1163,32 @@ jobs:
       - name: Buktikan Aturan 36 berbunyi pada penjaga yang bukan faktornya
         run: python3 Tools/bukti-mutasi-penjaga-faktor.py
 
+      # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
+      #
+      # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:
+      # `Canvas` digambar ulang setiap kali nilai yang ditangkapnya berubah, jadi
+      # `pulse` yang bergerak memaksa planet, Bulan, dan Matahari digambar ulang
+      # 20x/detik untuk piksel yang identik — denyut hanya dibaca `drawStar`.
+      # Tidak ada *warning*, `Apps/` tidak pernah dibangun di Linux, dan tangkapan
+      # layar statis tidak bisa membedakan 20 fps dari 1 fps.
+      #
+      # Cacat yang ditutup aturannya, dan yang membuatnya layak punya bukti
+      # tersendiri: **menyebut `hasPulse` bukan gerbang**. Empat bentuk lolos
+      # pada versi pertamanya dan semuanya terbaca sebagai sudah digerbangi pada
+      # tinjauan kode — `!visual.hasPulse ? fase : 0` (denyut justru mengalir ke
+      # planet dan mati pada bintang), `visual.hasPulse ? 0 : fase` (cabang
+      # benarnya nol), `hasPulse` di argumen `visual:`, dan `hasPulse` sebagai
+      # **label argumen**. Terukur di `HEAD` sebelum perbaikan: 1 dari 5 keadaan
+      # cacat berbunyi.
+      #
+      # Harness ini menuntut kelima keadaan cacat merah **dan** dua kontrol
+      # negatif hijau: kode apa adanya, dan `pulse: 0` — denyut nol adalah
+      # keadaan yang sah (itulah yang dikirim jam saat layar redup), jadi
+      # aturan yang memerah di sana memaksa gerbang untuk nilai yang memang
+      # tidak bergerak.
+      - name: Buktikan Aturan 21 berbunyi pada denyut yang tampak digerbangi
+        run: python3 Tools/bukti-mutasi-gerbang-denyut.py
+
       # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah
       # merah di mana pun**.
       #
