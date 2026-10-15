@@ -1143,6 +1143,26 @@ jobs:
       - name: Buktikan Aturan 26 berbunyi pada anggota berkualifikasi bertingkat
         run: python3 Tools/bukti-mutasi-anggota-bertahap.py
 
+      # Dan bukti untuk Aturan 36 — penjaga identitas yang menerima **faktor
+      # yang bukan faktornya**. Dua bentuk cacat yang mengompilasi dan
+      # melewati kelima aturan identitas yang sudah ada:
+      #
+      #     isConfirmed: !isConfirmed    penjaga dibalik: ciri pengenal
+      #                                  dipaksa muncul tepat saat engine ragu
+      #     isConfirmed: isStale         fakta lain dipakai sebagai keyakinan
+      #
+      # Aturan 34 diam karena ia hanya menolak **literal**; Aturan 24 diam
+      # karena ia menguji **substring** nama penjaganya. Yang terbaca di layar
+      # sama pada keduanya: bintang tetap berwarna Betelgeuse, galaksi tetap
+      # berpaluk, badge di sebelahnya bertuliskan "Ragu".
+      #
+      # Harness ini menguji **tiga** penjaga (palet planet, warna bintang,
+      # bentuk langit dalam), tiga bentuk cacat, tiga bentuk sah, dan satu
+      # pengukuran non-vakuositas. Bentuk sah diuji karena gerbang yang
+      # memerah pada kode benar akan dilonggarkan orang.
+      - name: Buktikan Aturan 36 berbunyi pada penjaga yang bukan faktornya
+        run: python3 Tools/bukti-mutasi-penjaga-faktor.py
+
       # Dan bukti untuk Aturan 30 — rantai izin yang putusnya **tidak pernah
       # merah di mana pun**.
       #

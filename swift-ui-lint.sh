@@ -5420,6 +5420,182 @@ else
   echo "Bersih: fakta Bool yang dibaca berkasnya sampai apa adanya."
 fi
 
+# ── Aturan 36: penjaga identitas menerima faktornya, bukan kawan tunggal ──
+#
+# Kelas cacat yang ditutup, **diukur** bukan dikira-kira: Aturan 34 sudah
+# melarang literal (`isConfirmed: true`), dan Aturan 24 sudah menuntut nama
+# penjaga disebut. Terukur:
+#
+#     isConfirmed: !isConfirmed     ->  swift-ui-lint.sh  LULUS (exit 0)
+#     isConfirmed: otherBool        ->  swift-ui-lint.sh  LULUS (exit 0)
+#
+# Keduanya **mengompilasi**, dan keduanya mematahkan larangan paling keras
+# PRD — \"uncertainty > false confidence\" — dengan arah yang paling parah:
+# bentuk inversi memaksa ciri pengenal tampil **tepat saat engine ragu**, dan
+# nama lain memakainya dari fakta yang tidak ada hubungannya. Yang terbaca di
+# layar tetap sama: bintang tetap berwarna Betelgeuse, galaksi tetap
+# berpaluk, badge di sebelahnya tetap bertuliskan \"Ragu\". Gambar lebih yakin
+# daripada teksnya, dan **kedua aturan yang ada untuk itu diam**.
+#
+# Kenapa Aturan 34 tidak menangkapnya: ia hanya menguji `nilai` **bukan**
+# `true`/`false`. Semua ekspresi non-literal lolos, entah benar entah tidak.
+#
+# Kenapa Aturan 24 tidak menangkapnya: ia menguji **substring** — nama
+# `drawableStarColorIndex` ada dan `isConfirmed` ada di dalam daftar
+# argumen, jadi ia melaporkan \"Bersih\". Warnanya sendiri justru yang paling
+# mahal: warna spektral adalah ciri pengenal, dan satu-satunya yang
+# memutuskan boleh-tidak-nya tampil adalah argumen ini.
+#
+# **Batasnya dinyatakan, bukan disangka tertutup.** Yang boleh: nama penjaga
+# yang diteruskan apa adanya (`isConfirmed` — bentuk yang dipakai seluruh
+# sembilan situs panggilan hari ini), atau akses berkualifikasi yang
+# **bertumpu** pada fakta yang sama (`engine.confirmsDisplayedIdentity`,
+# `object.isConfirmed`, `snapshot.confirmsIdentity`). Yang HARUS merah:
+# negasi (`!isConfirmed`, `!` di awal ekspresi) dan nama yang bukan fakta
+# keyakinan (`showsCandidateMarker`, `isStale`, `link.isReachable`, …).
+#
+# Yang TIDAK diklaim: ini sapu teks, bukan pemeriksa tipe. Ia tidak tahu
+# bahwa `otherBool` memang `Bool`, dan tidak tahu bahwa `otherBool` dan
+# `isConfirmed` kebetulan punya nilai sama — keduanya tetap hijau.
+echo
+echo "== Aturan 36: penjaga identitas menerima faktornya, bukan kawan tunggal =="
+penjaga_faktor=$(python3 - <<'PY' 2>&1
+import os, re
+
+PK = os.path.join("Packages", "PointingKit", "Sources", "PointingKit")
+if not os.path.isdir(PK):
+    print("Tidak bisa membaca %s -- aturan ini tidak bisa memutuskan." % PK)
+    raise SystemExit(0)
+
+aksesor = set()
+for root, _, files in os.walk(PK):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        text = open(os.path.join(root, name), encoding="utf-8").read()
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        datar = re.sub(r"\s+", " ", code)
+        for m in re.finditer(
+                r"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)", datar):
+            if re.search(r"\bisConfirmed\s*:", m.group(2)):
+                aksesor.add(m.group(1))
+
+if not aksesor:
+    print("Tidak ada aksesor model ber-`isConfirmed:` yang ditemukan; "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+
+def kode_saja(teks):
+    """Buang komentar **dan isi** literal string.
+
+    Kodinya dipakai aturan Aturan 7 dan 20 untuk kelas cacat yang sama, dan
+    alasan mengosongkan -- bukan cuma menghapus tanda kutipnya -- diukur di
+    sini: repo ini mendokumentasikan bentuk yang dilarang sebagai contoh di
+    dalam `"..."` ("drawable(isConfirmed: !isConfirmed) itu dilarang"), dan
+    isi yang dibiarkan hidup terbaca sebagai **pemanggilan**. Terukur: tanpa
+    pengosongan, baris dokumentasi itu memerahkan aturan ini pada kode yang
+    benar. Tanda kutipnya dipertahankan supaya pemotong komentar tidak mengubah
+    makna baris yang tersisa.
+    """
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam_str, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam_str:
+                if esc:
+                    esc = False
+                    buf.append(" ")
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam_str = False
+                    buf.append('"')
+                else:
+                    buf.append(" ")
+            else:
+                if ch == '"':
+                    dalam_str = True
+                    buf.append('"')
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+# Nama yang **boleh** berdiri di posisi penjaga. Akhiran yang sama dipakai
+# modelnya sendiri (`confirmsDisplayedIdentity`, `confirmsIdentity`), jadi
+# whitelist ini ikut arah model, bukan milik larangan ini.
+NAMA_FAKTOR = re.compile(
+    r"^(?:[A-Za-z_][A-Za-z0-9_]*\.)*(?:isConfirmed|confirmsIdentity|"
+    r"confirmsDisplayedIdentity)$")
+
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for fn in sorted(aksesor):
+            for m in re.finditer(re.escape(fn) + r"\s*\(", kode):
+                i, depth, mulai = m.end(), 1, m.end()
+                while i < len(kode) and depth:
+                    if kode[i] == "(":
+                        depth += 1
+                    elif kode[i] == ")":
+                        depth -= 1
+                    i += 1
+                args = kode[mulai:i - 1]
+                nilai = re.search(r"\bisConfirmed\s*:\s*([^,\)]+)", args)
+                if not nilai:
+                    continue
+                diperiksa += 1
+                ekspresi = nilai.group(1).strip()
+                # Negasi diperiksa lebih dulu: `!isConfirmed` memakai nama
+                # yang **benar**, jadi daftar nama saja akan meloloskannya.
+                if ekspresi.startswith("!"):
+                    baris = kode[:m.start()].count("\n") + 1
+                    masalah.append(
+                        "  %s:%d: `%s(isConfirmed: %s)` -- penjaga "
+                        "dibalik, jadi ciri pengenal dipaksa muncul saat "
+                        "engine ragu" % (path, baris, fn, ekspresi))
+                elif not NAMA_FAKTOR.match(ekspresi):
+                    baris = kode[:m.start()].count("\n") + 1
+                    masalah.append(
+                        "  %s:%d: `%s(isConfirmed: %s)` -- penjaga bukan "
+                        "fakta keyakinan engine, jadi identitas diklaim "
+                        "atau dibungkam karena sebab yang lain"
+                        % (path, baris, fn, ekspresi))
+
+if diperiksa == 0:
+    print("Tidak ada pemanggilan aksesor identitas di Apps/; aturan ini "
+          "tidak mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Kirim faktornya apa adanya (`isConfirmed`, "
+          "`engine.confirmsDisplayedIdentity`), bukan `!` atau nama lain: "
+          "penjaga yang bukan faktornya membuat gambar lebih yakin atau "
+          "lebih ragu daripada teksnya.")
+PY
+)
+if printf '%s' "$penjaga_faktor" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 36 gagal dijalankan:"
+  echo "$penjaga_faktor"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$penjaga_faktor" ]; then
+  echo "$penjaga_faktor"
+  status=1
+else
+  echo "Bersih: penjaga identitas menerima faktornya, bukan kawan tunggal."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
