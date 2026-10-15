@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **36 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **37 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -311,6 +311,36 @@ adalah **perintah** ("hentikan sensor"), bukan klaim, dan berkas itu tidak
 membaca `.available` sama sekali — jadi ia tetap hijau. Yang dilarang adalah
 fakta yang sudah dibaca lalu diganti tetapan di kanal lain, karena di situlah
 layar dan suara bisa berbeda.
+
+Aturan 37 menutup kelas yang **tidak bisa** ditangkap gerbang cepat mana pun,
+dan itu sudah dibuktikan dengan cara yang paling langsung: cacatnya mendarat
+di `main`. Penambahan `.paleDisk` dan `.blueDisk` ke `enum
+DistinguishingFeature` memperbarui **satu** dari dua `switch` atas
+`palette.feature` di `CelestialVisualView.swift`; yang terlewat ada di jalur
+sabit. Pada commit itu seluruh gerbang Linux hijau — 216 + 799 uji, seluruh
+aturan UI saat itu, `swift-typecheck.sh` — dan yang merah hanya Apple Build
+(macos-15): `error: switch must be exhaustive`.
+
+Kenapa Linux memang tidak bisa melihatnya: runner Linux hanya membangun
+`Packages/`, tidak pernah `Apps/`, dan kelengkapan `switch` adalah pemeriksaan
+**semantik** yang butuh seluruh tipe diketahui — `swiftc -parse` tidak
+melakukannya. Jadi satu-satunya gerbang yang mampu adalah yang paling lambat.
+Karena itu Aturan 37 **menurunkan** himpunan kasus dari enum di
+`Packages/PointingKit/Sources/`, lalu menuntut setiap `switch` di `Apps/` yang
+tidak punya `default:` memuat seluruh himpunan itu — bukan mencocokkan daftar
+nama (`paleDisk`, `blueDisk`), yang akan hijau lagi begitu kasus berikutnya
+ditambahkan.
+
+Batasnya diakui dan diukur: ini sapu teks, bukan pemeriksa tipe. Ia hanya
+berbunyi bila setiap klausa `case`-nya murni daftar `.anggota` (tanpa `let`,
+`where`, atau literal), tidak ada `default:`, dan labelnya subset dari
+**tepat satu** enum. Syarat terakhir itu lahir dari pengukuran, bukan
+kehati-hatian: versi pertama tanpa syarat itu menuduh
+`ReducedLuminanceView.swift:57` — `switch ReducedLuminanceVisual.plan(...)`
+yang sudah benar — sebagai kehilangan `Subline`, `UncertainReason`, dan
+`DistinguishingFeature`, semata karena enum-enum itu kebetulan punya superset
+label yang sama. Gerbang yang menuduh kode benar akan dilonggarkan orang.
+Yang TIDAK diklaim: ia tidak membuktikan `switch`-nya benar, hanya lengkap.
 
 ### Uji harus pernah merah
 

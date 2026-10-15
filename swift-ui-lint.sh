@@ -5677,6 +5677,228 @@ else
   echo "Bersih: penjaga identitas menerima faktornya, bukan kawan tunggal."
 fi
 
+# ── Aturan 37: `switch` di Apps/ wajib memuat SETIAP kasus enum model ───────
+#
+# Cacat yang ditutup aturan ini nyata dan sudah pernah mendarat di `main`:
+# commit `27dd677` menambahkan `.paleDisk` dan `.blueDisk` ke
+# `enum DistinguishingFeature` (PointingKit), dan memperbarui **satu** dari
+# dua `switch` atas `palette.feature` di `CelestialVisualView.swift`. Yang
+# belum diperbarui ada di jalur sabit (`showsPhase`).
+#
+# Seluruh gerbang Linux hijau pada commit itu: 216 + 799 uji, 36 aturan UI,
+# dan `swift-typecheck.sh`. Yang merah hanya Apple Build (macos-15):
+#
+#     Apps/Shared/CelestialVisualView.swift:269:29:
+#       error: switch must be exhaustive
+#
+# Kenapa Linux **tidak bisa** melihatnya, dan itu bukan kelalaian yang bisa
+# ditambal di tempat lain: runner Linux hanya membangun `Packages/`, tidak
+# pernah `Apps/`. `swift-typecheck.sh` hanya `-parse` — sintaks — dan
+# kelengkapan `switch` adalah pemeriksaan **semantik** yang butuh seluruh tipe
+# diketahui. Jadi tidak ada satu pun gerbang cepat yang bisa menangkap kelas
+# ini, sementara gerbang yang bisa (macOS) adalah yang paling lambat dan
+# paling akhir.
+#
+# **Kenapa aturan ini tidak boleh hanya memeriksa enum yang "baru".** Aturan
+# yang membaca daftar bernama (`paleDisk`, `blueDisk`) akan hijau pada cacat
+# yang sama persis begitu orang menambahkan kasus berikutnya — dan itu satu
+# baris kerja. Karena itu aturannya **menurunkan** himpunan kasus dari sumber
+# model di `Packages/PointingKit/Sources/`, lalu menuntut setiap `switch` di
+# `Apps/` yang tidak punya `default:` memuat seluruh himpunan itu.
+#
+# **Batas yang diakui, dan kenapa ia tetap berguna.** Ini sapu **teks**, bukan
+# pemeriksa tipe. Untuk menghindari menuduh kode yang benar, aturan hanya
+# berbunyi bila memenuhi **ketiga** syarat:
+#
+#   1. setiap klausa `case`-nya murni daftar koma dari anggota berbentuk
+#      `.nama` (tanpa `let`, tanpa `where`, tanpa literal) — jadi tidak ada
+#      pengikatan nilai yang bisa membuat daftarnya tidak lengkap;
+#   2. tidak ada `default:` di badannya (kalau ada, compiler memang tidak
+#      menuntut kelengkapan);
+#   3. labelnya **subset ketat dari tepat satu** himpunan enum. Kalau ada dua
+#      enum yang cocok, kita tidak tahu `switch`-nya atas enum yang mana —
+#      dan gerbang yang menebak akan menuduh kode benar, yang membuat orang
+#      melonggarkannya. Diam adalah jawaban yang jujur di sana.
+#
+# Syarat 3 itu bukan kehati-hatian teoretis: ia **diukur**. Versi pertama
+# tanpa syarat itu menandai `ReducedLuminanceView.swift:57`
+# (`switch ReducedLuminanceVisual.plan(...) { case .none / .identifiable }`)
+# sebagai kehilangan `Subline`, `UncertainReason`, `DistinguishingFeature`,
+# dan dua enum lain yang kebetulan punya superset label yang sama — sebuah
+# tuduhan pada kode yang benar. Ditemukan dengan menjalankan kandidat aturan
+# atas pohon yang sudah diperbaiki (0 temuan) **dan** atas pohon pra-perbaikan
+# (tepat 1 temuan, `CelestialVisualView.swift:269`, kehilangan
+# `['blueDisk', 'paleDisk']`) — bukan dengan membayangkan kasusnya.
+#
+# **Yang TIDAK diklaim.** Ia tidak membuktikan `switch`-nya benar, hanya
+# lengkap. Ia tidak melihat `switch` ber-`default:` (di sana kelengkapan
+# memang tidak dituntut compiler). Ia tidak mengenali enum yang dideklarasikan
+# di `Apps/` sendiri. Dan ia tidak tahu apakah cabang yang lengkap itu
+# menggambar hal yang benar.
+echo
+echo "== Aturan 37: switch di Apps/ wajib memuat setiap kasus enum model =="
+switch_lengkap=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+PACKAGE_SOURCES = os.path.join("Packages", "PointingKit", "Sources")
+APPS = "Apps"
+
+
+def strip_comments(text):
+    """Kode saja. Berkas di repo ini menceritakan cacat lamanya panjang lebar
+    di komentar, dan `case .paleDisk:` yang **dikomentari** tidak boleh
+    terbaca sebagai kenyataan."""
+    text = re.sub(r"//[^\n]*", "", text)
+    return re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+
+
+def brace_block(text, start):
+    """Isi blok `{...}` yang mulai di/atau setelah `start`, atau (None, -1)."""
+    i = text.find("{", start)
+    if i < 0:
+        return None, -1
+    depth = 0
+    j = i
+    while j < len(text):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1:j], j
+        j += 1
+    return None, -1
+
+
+def enum_case_sets(text):
+    """{nama enum: {kasus}} untuk enum yang **semua** kasusnya sederhana.
+
+    Enum yang punya kasus berasosiasi-nilai, `rawValue`, atau makro apa pun
+    dibuang seluruhnya: menaksir himpunannya dari teks lalu menuntutnya di
+    `Apps/` akan menuduh kode yang benar.
+    """
+    found = {}
+    for m in re.finditer(r"\benum\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:{]", text):
+        name = m.group(1)
+        body, _ = brace_block(text, m.end() - 1)
+        if body is None:
+            continue
+        cases = set()
+        simple = True
+        for cm in re.finditer(r"^[ \t]*case\s+([^\n]+)$", body, re.M):
+            for part in cm.group(1).split(","):
+                part = part.strip()
+                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part):
+                    cases.add(part)
+                else:
+                    simple = False
+        if cases and simple:
+            found.setdefault(name, set()).update(cases)
+        else:
+            found.pop(name, None)
+    return found
+
+
+def switch_label_sets(text):
+    """(baris, ekspresi, {label}) untuk tiap `switch` tanpa `default:`.
+
+    Klausa yang tidak murni daftar `.anggota` membatalkan `switch` itu —
+    `case .identifiable(let visual):` tidak boleh dibaca sebagai himpunan
+    label, karena labelnya memang tidak dimaksudkan lengkap.
+    """
+    for m in re.finditer(r"\bswitch\s+([^\{]+?)\s*\{", text):
+        body, _ = brace_block(text, m.end() - 1)
+        if body is None:
+            continue
+        if re.search(r"^[ \t]*default\s*:", body, re.M):
+            continue
+        labels = set()
+        readable = True
+        for cm in re.finditer(r"^[ \t]*case\s+([^\n]+?)\s*:", body, re.M):
+            for part in cm.group(1).split(","):
+                part = part.strip()
+                if re.fullmatch(r"\.[A-Za-z_][A-Za-z0-9_]*", part):
+                    labels.add(part[1:])
+                else:
+                    readable = False
+        if not readable or not labels:
+            continue
+        yield text[:m.start()].count("\n") + 1, m.group(1).strip(), labels
+
+
+cases = {}
+for dirpath, _, filenames in os.walk(PACKAGE_SOURCES):
+    for filename in filenames:
+        if not filename.endswith(".swift"):
+            continue
+        path = os.path.join(dirpath, filename)
+        with open(path, encoding="utf-8") as handle:
+            for name, values in enum_case_sets(
+                    strip_comments(handle.read())).items():
+                cases.setdefault(name, set()).update(values)
+
+problems = []
+examined = 0
+for dirpath, _, filenames in os.walk(APPS):
+    for filename in sorted(filenames):
+        if not filename.endswith(".swift"):
+            continue
+        path = os.path.join(dirpath, filename)
+        with open(path, encoding="utf-8") as handle:
+            text = strip_comments(handle.read())
+        for line, expr, labels in switch_label_sets(text):
+            # Hanya bila labelnya subset dari **tepat satu** enum: dengan dua
+            # kandidat kita tidak tahu enum mana yang dimaksud, dan gerbang
+            # yang menebak akan menuduh kode yang benar.
+            #
+            # Perhatikan `<=`, bukan `<`. `switch` yang **lengkap** punya
+            # `labels == values`, jadi syarat `<` akan membuang justru
+            # `switch` yang benar — dan `examined` lalu hanya menghitung
+            # pelanggaran, sehingga pohon yang bersih tampak seperti "tidak
+            # mengukur apa pun" dan gerbang ini merah pada kode yang benar.
+            # Diukur pada pohon ini: `<` memberi 0 yang diperiksa, `<=`
+            # memberi 8.
+            candidates = [name for name, values in cases.items()
+                          if labels <= values]
+            if len(candidates) != 1:
+                continue
+            examined += 1
+            name = candidates[0]
+            if labels >= cases[name]:
+                continue
+            missing = sorted(cases[name] - labels)
+            problems.append(
+                "  %s:%d: `switch %s` melewatkan %s dari `%s` -- compiler "
+                "menolaknya di macOS (`switch must be exhaustive`), tetapi "
+                "tidak ada gerbang Linux yang melihatnya"
+                % (path, line, expr.replace("\n", " ").strip(),
+                   missing, name))
+
+if not cases:
+    print("Tidak ada enum sederhana yang terbaca dari %s; aturan ini tidak "
+          "mengukur apa pun." % PACKAGE_SOURCES)
+elif examined == 0 and not problems:
+    print("Tidak ada `switch` di %s yang bisa dipastikan atas satu enum; "
+          "aturan ini tidak mengukur apa pun." % APPS)
+elif problems:
+    print("\n".join(problems))
+PY
+)
+if printf '%s' "$switch_lengkap" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 37 gagal dijalankan:"
+  echo "$switch_lengkap"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$switch_lengkap" ]; then
+  echo "$switch_lengkap"
+  echo "-> Lengkapi case-nya, atau tambahkan default: bila switch itu memang"
+  echo "   tidak dimaksudkan menutup seluruh enum."
+  status=1
+else
+  echo "Bersih: setiap switch di Apps/ memuat seluruh kasus enum model."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

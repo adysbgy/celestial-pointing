@@ -1,3 +1,146 @@
+## Progres terakhir (15 Okt 2026 — Aturan 37: `switch` di `Apps/` yang kehilangan kasus enum, dan kenapa hanya macOS yang bisa melihatnya)
+
+Siklus ini dimulai dari `git status`, dan yang ditemukan bukan pekerjaan yang
+belum selesai melainkan **`main` yang merah**. Push siklus sebelumnya
+(`27dd677`, Uranus + Neptunus) meninggalkan Apple Build (macos-15) gagal di
+langkah "App (iPhone + Watch)":
+
+    Apps/Shared/CelestialVisualView.swift:269:29:
+      error: switch must be exhaustive
+
+Cacatnya satu baris dan penyebabnya jelas begitu lognya dibaca: commit itu
+menambahkan `.paleDisk` dan `.blueDisk` ke `enum DistinguishingFeature`
+(PointingKit), dan memperbarui **satu dari dua** `switch` atas
+`palette.feature` di `CelestialVisualView.swift`. Yang terlewat ada di jalur
+**sabit** (`showsPhase`) — dan justru itu yang paling mudah terlewat, karena
+Uranus dan Neptunus keduanya `showsPhase == false`: cabang itu tidak pernah
+dieksekusi, jadi cacatnya tidak bisa ketahuan dari perilaku. Yang salah bukan
+gambarnya, melainkan **kelengkapannya**.
+
+### Kenapa tidak ada gerbang cepat yang bisa menangkapnya
+
+Ini bagian yang membuat siklus ini layak dikerjakan, bukan sekadar ditambal.
+Pada commit itu **seluruh** gerbang Linux hijau: CelestialEngine 216 uji,
+PointingKit 799 uji, seluruh aturan UI saat itu, `swift-typecheck.sh`, dan
+gerbang pendaftaran harness. Yang merah hanya gerbang paling lambat dan paling
+akhir.
+
+Sebabnya struktural, bukan kelalaian yang bisa ditambal di tempat lain:
+
+- Runner Linux (`swift-test.sh`) hanya membangun `Packages/`, **tidak pernah**
+  `Apps/`. Seluruh view SwiftUI tidak pernah dikompilasi di Linux.
+- `swift-typecheck.sh` memakai `swiftc -parse`, yang hanya membaca **sintaks**.
+  Kelengkapan `switch` adalah pemeriksaan **semantik**: ia butuh seluruh tipe
+  diketahui, termasuk himpunan kasus enum di paket lain.
+
+Jadi tidak ada satu pun gerbang cepat yang mampu melihat kelas ini, sementara
+satu-satunya yang mampu berjalan paling belakangan — dan cacatnya sampai ke
+`main`.
+
+### Yang dikerjakan: aturan yang menurunkan himpunannya, bukan mencocokkan nama
+
+Perbaikannya sendiri kecil (menambahkan `case .paleDisk, .blueDisk:` ke
+`switch` jalur sabit). Yang lebih bernilai adalah gerbangnya, karena bentuk
+cacat ini akan berulang setiap kali ada kasus enum baru — dan itu satu baris
+kerja.
+
+**Kenapa bukan daftar nama.** Aturan yang mencari `paleDisk`/`blueDisk` akan
+hijau pada cacat yang sama persis begitu orang menambahkan kasus berikutnya.
+Karena itu Aturan 37 **menurunkan** himpunan kasus dari `enum` di
+`Packages/PointingKit/Sources/`, lalu menuntut setiap `switch` di `Apps/` yang
+tidak punya `default:` memuat seluruh himpunan itu.
+
+**Batas yang diakui.** Ini sapu teks, bukan pemeriksa tipe. Ia hanya berbunyi
+bila setiap klausa `case`-nya murni daftar `.anggota` (tanpa `let`, `where`,
+atau literal), tidak ada `default:`, dan labelnya subset dari **tepat satu**
+enum.
+
+### Yang diukur, bukan dibayangkan
+
+Versi pertama aturan itu **menuduh kode yang benar**, dan itu ditemukan dengan
+menjalankannya — bukan dengan membayangkannya:
+
+    ReducedLuminanceView.swift:57
+      `switch ReducedLuminanceVisual.plan(...)` kehilangan
+      ['objectKind', 'staleMarker', 'uncertainMarker'] dari `Subline`,
+      ['ambiguous', 'tooFar'] dari `UncertainReason`, …
+
+`switch` itu sudah lengkap dan benar. Ia tertuduh semata karena enum-enum lain
+kebetulan punya **superset** label yang sama, sehingga syarat "subset" saja
+tidak cukup untuk memastikan enum mana yang dimaksud. Gerbang yang menuduh
+kode benar akan dilonggarkan orang — dan gerbang yang dilonggarkan tidak
+menjaga apa pun. Karena itu syaratnya diperketat jadi **subset dari tepat satu
+enum**: kalau ada dua kandidat, kita memang tidak tahu, dan diam adalah
+jawaban yang jujur.
+
+Diukur pada dua dunia, bukan satu:
+
+    pohon yang sudah diperbaiki      0 temuan
+    pohon pra-perbaikan (27dd677)    tepat 1 temuan, CelestialVisualView.swift:269,
+                                     kehilangan ['blueDisk', 'paleDisk']
+
+Satu cacat lain ikut ketahuan dari pengukuran yang sama: `examined` semula
+memakai syarat `<` (subset ketat), sehingga `switch` yang **lengkap** justru
+dibuang dari hitungan — pohon yang bersih lalu tampak seperti "aturan ini tidak
+mengukur apa pun". Dengan `<=`, 8 `switch` diperiksa. Gerbang yang melaporkan
+"tidak mengukur apa pun" pada kode benar adalah bentuk kegagalan yang sama
+dengan gerbang yang hijau tanpa memeriksa.
+
+### Bukti bahwa aturannya bisa merah
+
+`Tools/bukti-mutasi-aturan37-lengkap.py`, **lima keadaan**, diekstrak dari
+`swift-ui-lint.sh` (bukan disalin — salinan tetap hijau walau aturan aslinya
+dilonggarkan) dan dijalankan di pohon salinan sementara, jadi **tidak** ada
+sumber produksi yang dimutasi:
+
+    1. case ciri dihapus dari switch jalur sabit    MERAH   (persis cacat di main)
+    2. case ciri dihapus dari switch jalur gambar   MERAH   (situs lain, kelas sama)
+    3. kasus baru di enum model, switch dibiarkan   MERAH   (bentuk cacat BERIKUTNYA)
+    4. `default:` ditambahkan ke switch jalur sabit hijau   (kontrol negatif)
+    5. pohon utuh                                   hijau   (kontrol negatif)
+
+Keadaan 3 adalah alasan aturannya membaca himpunan kasus dari model: daftar
+nama akan hijau di sana. Keadaan 4 menjaga agar gerbang tidak memerah pada
+`default:` yang sah — di sana compiler memang tidak menuntut kelengkapan.
+
+Pohon salinan wajib ada karena aturan ini membaca **dua** tempat sekaligus
+(enum di `Packages/`, `switch` di `Apps/`); memutasi salah satunya saja akan
+mengukur hal yang berbeda. Langkah CI-nya ditambahkan di
+`.github/workflows/engine-tests.yml`, dan `Tools/check-harness-terdaftar.py`
+sempat merah saat harness itu ada di disk tanpa dirujuk — persis fungsi
+gerbang pendaftaran itu.
+
+### Verifikasi
+
+- `./swift-test.sh` (Docker Swift 6.0) → **CelestialEngine 216 +
+  PointingKit 799 = 1015 uji, 0 gagal**, exit 0.
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (37 aturan), exit 0.
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS**, exit 0.
+- `python3 Tools/check-harness-terdaftar.py` → **69 harness, semuanya dirujuk
+  alur kerja**, exit 0.
+- `python3 Tools/bukti-mutasi-aturan37-lengkap.py` → 5 keadaan, 0 tidak
+  sesuai harapan, exit 0.
+- Apple Build (macos-15) pada `53c799d` → **success** (pada `27dd677` →
+  failure, dengan galat di atas).
+
+### Yang TIDAK diklaim
+
+- Aturan 37 membuktikan `switch`-nya **lengkap**, bukan **benar**. Ia tidak
+  tahu apakah cabang yang lengkap itu menggambar hal yang benar.
+- Ia tidak melihat `switch` ber-`default:` (kelengkapan memang tidak dituntut
+  compiler di sana) dan tidak mengenali enum yang dideklarasikan di `Apps/`
+  sendiri.
+- Perbaikan pada `switch` jalur sabit belum pernah diukur menggambar apa pun:
+  tidak ada planet berfase yang memakai `.paleDisk`/`.blueDisk`, jadi isinya
+  `break` yang sama seperti `.bands`/`.rings`/`.polarCaps`. Yang diperbaiki
+  adalah kelengkapan, bukan tampilan.
+- Aturan 37 adalah sapu teks; ia bisa tertinggal dari bahasa Swift yang lebih
+  rumit (mis. `switch` atas ekspresi bertipe sama sekali lain yang kebetulan
+  berlabel mirip), dan di situ ia diam — bukan hijau karena memeriksa,
+  melainkan hijau karena tidak bisa memastikan.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 21: denyut yang *menyebut* `hasPulse` tanpa menggerbanginya)
 
 Sapuan sebelumnya bertanya *"berapa aturan yang pernah dibuktikan bisa

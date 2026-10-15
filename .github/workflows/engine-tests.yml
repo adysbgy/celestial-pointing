@@ -1730,5 +1730,47 @@ jobs:
       - name: Buktikan gerbang konstanta port yang mengaku dari model berbunyi
         run: python3 Tools/bukti-mutasi-sabuk-uranus.py
 
+      # Dan bukti untuk Aturan 37 — `switch` di `Apps/` yang kehilangan satu
+      # `case` ketika enum modelnya bertambah.
+      #
+      # Ini satu-satunya kelas di daftar ini yang cacatnya **sudah mendarat di
+      # `main`**: commit `27dd677` menambahkan `.paleDisk`/`.blueDisk` ke
+      # `enum DistinguishingFeature` dan memperbarui satu dari dua `switch`
+      # atas `palette.feature`. Yang terlewat ada di jalur sabit. Pada commit
+      # itu 216 + 799 uji hijau, seluruh aturan UI hijau, dan
+      # `swift-typecheck.sh` hijau; yang merah hanya Apple Build (macos-15):
+      #
+      #     Apps/Shared/CelestialVisualView.swift:269:29:
+      #       error: switch must be exhaustive
+      #
+      # Kenapa tidak ada gerbang cepat yang bisa menangkapnya, dan kenapa itu
+      # bukan kelalaian yang bisa ditambal di tempat lain: runner Linux hanya
+      # membangun `Packages/`, tidak pernah `Apps/`, dan kelengkapan `switch`
+      # adalah pemeriksaan **semantik** yang butuh seluruh tipe diketahui —
+      # `swiftc -parse` (yang dipakai `swift-typecheck.sh`) hanya membaca
+      # sintaks. Jadi satu-satunya gerbang yang mampu adalah yang paling
+      # lambat dan paling akhir, dan cacatnya lolos ke `main`.
+      #
+      # Harness ini **tidak** memutasi sumber produksi: ia mengekstrak program
+      # Aturan 37 dari `swift-ui-lint.sh` — bukan menyalinnya, karena salinan
+      # akan tetap hijau walau aturan aslinya dilonggarkan — lalu
+      # menjalankannya di pohon salinan sementara. Pohon salinan wajib ada
+      # karena aturan ini membaca **dua** tempat sekaligus (enum di
+      # `Packages/PointingKit/Sources/`, `switch` di `Apps/`).
+      #
+      # Lima keadaan. Tiga cacat wajib merah: `case` dihapus dari `switch`
+      # jalur sabit (persis cacat yang mendarat di `main`), `case` dihapus
+      # dari `switch` jalur gambar (situs berbeda, kelas sama — kalau aturannya
+      # hanya melihat satu situs, keadaan ini hijau), dan **kasus baru**
+      # ditambahkan ke enum model sementara kedua `switch` dibiarkan. Yang
+      # terakhir itu alasan aturannya membaca himpunan kasus dari model,
+      # bukan mencocokkan nama `.paleDisk`/`.blueDisk` — daftar nama akan
+      # hijau lagi begitu kasus berikutnya ditambahkan. Dua kontrol negatif:
+      # pohon utuh, dan `default:` yang ditambahkan ke salah satu `switch`
+      # (di sana compiler memang tidak menuntut kelengkapan, jadi aturan yang
+      # memerah di sana akan dilonggarkan orang).
+      - name: Buktikan Aturan 37 berbunyi pada switch yang kehilangan kasus enum
+        run: python3 Tools/bukti-mutasi-aturan37-lengkap.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
