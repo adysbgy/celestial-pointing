@@ -1,3 +1,62 @@
+## Progres terakhir (15 Okt 2026 — siklus XCODE-DEV: celah kejujuran Bulan di siang/dekat Matahari ditutup; audit menyeluruh brief)
+
+Siklus ini masuk ke repo yang **sudah jauh melampaui** brief aslinya. Audit
+menyeluruh ditempuh dulu sebelum menyentuh apa pun, dan hasilnya: BAGIAN 1
+(visual objek prosedural — planet berpita/cincin/kutub/kawah, fase Bulan &
+planet dalam, bintang ber-glow spektral, Matahari ber-corona, objek langit
+dalam ber-morfologi), BAGIAN 2 (surface stepping, glassmorphism, token
+WatchTheme), FASE A (#1 night mode merah via @AppStorage, #2 AOD via
+`isLuminanceReduced`, #3 VoiceOver + umumkan lock), FASE B (#4 animasi
+spring, #5 Dynamic Type `@ScaledMetric` — `diameter: 132` tetap sudah
+diganti, #6 audio lock), dan FASE C (#1 complication, #2 `.xcstrings` +
+SWIFT_EMIT_LOC_STRINGS, #3 izin Motion/Location di Info.plist, #4
+penanganan penolakan izin) **seluruhnya sudah ada dan tergerbang**.
+
+Satu-satunya celah kejujuran yang **belum** punya bukti (FASE C #6: "siang
+hari, bulan redup") adalah jalur **Bulan** di `VisibilityFilter.classify`
+saat siang / dekat Matahari. Bintang punya `DaylightStarVisibilityTests`,
+tapi `kind: .moon` di siang hari dan dekat Matahari belum pernah dikunci.
+Bulan adalah benda yang paling sering tertunjuk tapi paling tidak bisa
+diklaim saat glare Matahari — mengembalikannya `.visible` di siang hari
+adalah klaim palsu persis yang dilarang PRD v0.4.
+
+### Yang dikerjakan (satu unit terkecil, terverifikasi Linux)
+
+- **TAMBAH** `MoonDaylightVisibilityTests` (4 kasus) di
+  `Packages/CelestialEngine/Tests/CelestialEngineTests/VisibilityTests.swift`:
+  bulan terang di siang → `.daylight`; bulan di senja (Matahari +2°) →
+  `.daylight`; bulan dekat Matahari di malam → `.tooCloseToSun` (pengaman
+  teleskop); dan kebalikannya bulan purnama malam → `.visible` (supaya
+  penolakan blanket tidak lolos). Murni `classify` tanpa efemeris, sama
+  seperti uji visibilitas lain.
+- **DOK** README hitungan `CelestialEngine 216 → 220` (Aturan 10 di
+  `swift-ui-lint.sh` menuntut angka README cocok dengan berkas uji; tanpa
+  ini gerbang UI CI merah). Narasi historis baris 320 **tidak** diubah.
+
+### Kenapa (bukan sekadar apa)
+
+Cacat yang ditutup: regresi yang membalik urutan cabang `classify` (atau
+membaca `context.isDark` alih-alih ambang ketinggian Matahari) tetap lolos
+seluruh uji bintang dan engine diam-diam mulai mengklaim Bulan di siang
+hari. Ini satu-satunya gerbang yang menangkapnya, dan sebelum ini tidak ada
+yang menegakkannya untuk `kind: .moon`.
+
+### Verifikasi
+
+- `./swift-test.sh` → **799 uji, 0 gagal** (target engine sekarang 220,
+  PointingKit 799).
+- `./swift-ui-lint.sh` → **SEMUA GERBANG UI LULUS** (exit 0), termasuk
+  Aturan 10 setelah perbaikan README.
+- Dua commit di-push: `044bff5` (uji) + `a5cec14` (README). WIP loop lain
+  (`Tools/bukti-mutasi-kasus-planet.py`) **tidak disentuh**: di-stash sebelum
+  rebase, dipulihkan persis (diff 183 baris utuh).
+- Catatan CI: `gh run view` mengembalikan 404 di sandbox ini (run ID dari
+  `gh run list` tidak ter-resolve via API), jadi konklusi CI diambil dari
+  verifikasi lokal kedua gerbang di atas — keduanya hijau pada kode yang
+  di-push.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — Aturan 37, lanjutan: tiga lubang yang hanya bisa dilihat dengan mengukur pembacanya sendiri)
 
 Siklus sebelumnya memasang Aturan 37 (switch di `Apps/` wajib memuat setiap
