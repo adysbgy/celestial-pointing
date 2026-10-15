@@ -51,17 +51,23 @@ muatan yang sama persis akan menuduh kode yang benar. Dua perubahan kecil:
 `split_top_commas` (koma pada kedalaman-kurung 0 — `case a(Int, Int), b` itu
 **dua** kasus, bukan tiga) dan kedua pembaca menerima `nama(muatan)`.
 
-### Yang diukur, di dua dunia
+### Yang diukur, per revisi — bukan per klaim
 
-    enum terindeks        25 -> 27
-    situs diperiksa        8 ->  9
-    situs HILANG           0
-    temuan palsu           0
+Diukur dengan menyisipkan pencatat ke program aturan **tiap revisi** dan
+menjalankannya di pohon yang sama (`git show <rev>:swift-ui-lint.sh`):
 
-Situs yang bertambah: `ReducedLuminanceView.swift:57`. Situs yang hilang:
-tidak ada — dan itu wajib diperiksa, karena perluasan cakupan yang menyempit
-adalah kegagalan yang **tidak terlihat** dari jumlah temuan (nol temuan bisa
-berarti "bersih" atau "tidak melihat apa-apa").
+    revisi    enum terindeks    situs diperiksa
+    324d0ad   12                8      (PointingKit saja, tepat-1)
+    cb8162b   25                9      (+CelestialEngine, +sadar-kedalaman, +kandidat)
+    010f4c2   27               10      (+kasus bermuatan)   <- sekarang
+
+Situs yang bertambah di revisi terakhir: `ReducedLuminanceView.swift:57`.
+Situs yang **hilang** di seluruh rantai: **0** — dan itu wajib diperiksa,
+karena perluasan cakupan yang menyempit adalah kegagalan yang **tidak
+terlihat** dari jumlah temuan (nol temuan bisa berarti "bersih" atau "tidak
+melihat apa-apa"). Terukur memang menyempit di revisi kedua sebelum syarat
+kandidat ikut diperbaiki: `CelestialVisualView.swift:73` **hilang** dari
+`perluasan naif`, dan kembali hanya karena syaratnya berubah.
 
 Harness: 9 keadaan -> **10**, plus program pembanding **ketiga** ("tanpa kasus
 bermuatan"). Setiap keadaan yang mengklaim menambah cakupan kini dituntut
@@ -82,9 +88,12 @@ yang bekerja dari harness yang tidak melihat apa-apa.
 - Ini tetap sapu **teks**, bukan pemeriksa tipe. Bentuk yang di luar jangkauan
   pembaca (mis. `case let .x(y)` dengan pengikatan di depan, atau label
   berangka) membuat `switch` itu **dilewati**, bukan dituduh. Diukur pada
-  pohon ini: 6 dari 15 `switch` dilewati, dan untuk tiap satunya alasannya
-  adalah enum yang tidak ada di kedua paket (mis. `ScenePhase`,
-  `CLAuthorizationStatus`) — bukan enum yang dibuang tanpa sengaja.
+  pohon ini: **5 dari 15** `switch` tanpa `default:` dilewati, dan kelimanya
+  ber-**kandidat kosong** — `ScenePhase` (dua tempat), `CLAuthorizationStatus`,
+  `CLAccuracyAuthorization`, dan `Status` — yaitu enum yang memang tidak
+  dideklarasikan di kedua paket, bukan enum yang diam-diam terbuang.
+  `switch visual.kind` (dua kandidat identik) **tidak** termasuk yang
+  dilewati: ia diperiksa lewat himpunan kasus yang sama.
 - `Tools/check-visuals.py` **tidak** disentuh siklus ini. Di pohon kerja ada
   WIP dari loop lain yang sedang memperbaiki pembaca palet planet
   (`read_planet_palettes_from_swift`) — pembaca yang **menyaring** klausa

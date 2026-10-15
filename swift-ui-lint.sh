@@ -5750,7 +5750,7 @@ fi
 # punya muatan. Yang dibandingkan hanya **nama** kasusnya; muatan di sisi
 # `switch` (`let visual`) justru wajib ada dan memang berbeda dari muatan di
 # model, jadi menuntut muatan yang sama akan menuduh kode yang benar.
-# Terukur: enum terindeks **25 → 27**, situs diperiksa **8 → 9**, **0 hilang**.
+# Terukur: enum terindeks **25 → 27**, situs diperiksa **9 → 10**, **0 hilang**.
 #
 # **Batas yang diakui, dan kenapa ia tetap berguna.** Ini sapu **teks**, bukan
 # pemeriksa tipe. Untuk menghindari menuduh kode yang benar, aturan hanya
@@ -5916,7 +5916,7 @@ def enum_case_sets(text):
     muatan yang sama persis akan menuduh kode yang benar.
 
     Terukur pada pohon ini: membaca kasus bermuatan menaikkan enum terindeks
-    **25 → 27** dan situs diperiksa **8 → 9**, dengan **0 situs hilang**.
+    **25 → 27** dan situs diperiksa **9 → 10**, dengan **0 situs hilang**.
     Situs yang bertambah itu `ReducedLuminanceView.swift:57`
     (`switch ReducedLuminanceVisual.plan(...)` atas `Plan`) — dan di sana
     versi lama memang buta: menambahkan `case candidate(CelestialVisual)` ke
