@@ -8,7 +8,8 @@ docstringnya, dan **empat di antaranya tidak pernah dihasilkan oleh alat ukur
 di bawahnya**. Diukur ulang:
 
     49,7% (24 064 dari 48 400)      dikutip: 50% (110 dari 220)
-    36 hasil tetangga               dikutip: 35
+    36 hasil tetangga               dikutip: 35   (kini 42 — enam
+                                                  pemeriksaan tumbuh)
     margin 0 -> 14 px @200 / 6 @76  dikutip: "nol piksel"
     cacat @76px -> 232 px           dikutip: 245 px
 
@@ -96,7 +97,7 @@ TABLE_76 = "tabel margin '76 px'"
 #: uji.
 STATES = [
     ("[baseline]", None, None, []),
-    ("1. jumlah hasil tetangga 36 -> 35", "**36** hasil enam", "**35** hasil enam",
+    ("1. jumlah hasil tetangga 42 -> 35", "**42** hasil enam", "**35** hasil enam",
      [COUNTED]),
     ("2. persentase geometri 49,7% -> 50%", "**49,7%** titik", "**50%** titik",
      [FRACTION]),
