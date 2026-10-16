@@ -13326,6 +13326,171 @@ def check_deep_sky_colours(results):
         f"{len(collisions)} tabrakan: {'; '.join(collisions)}"))
 
 
+def _defined_test_names():
+    """Nama setiap `func test…` di berkas uji Swift.
+
+    **Kenapa bukan `ast.parse`.** Versi pertama fungsi ini memakai `ast` —
+    dan itu salah, karena berkasnya **Swift**, bukan Python: setiap berkas
+    uji melempar `SyntaxError`, seluruhnya dilewati, himpunan definisinya
+    kosong, dan gerbangnya melaporkan **43 dari 43** kutipan sebagai
+    menggantung sementara 1037 uji berjalan hijau. Jadi cacat itu bukan
+    hipotetis; ia terjadi pada percobaan pertama gerbang ini, dan yang
+    menyelamatkannya adalah bahwa gerbangnya melaporkan **daftar**, bukan
+    sekadar "ada yang salah" — daftar itu langsung menunjukkan bahwa nama-nama
+    yang jelas ada (`testJupiterSpotIsDarkerThanItsOwnBelt`) ikut tertuduh.
+
+    Yang dipakai karena itu pencocokan **bentuk deklarasi**: `func <nama>(`
+    yang dimulai di awal baris, setelah komentar dibuang. Penambat awal baris
+    itulah yang membedakan **deklarasi** dari **sebutan**: `/// Lihat
+    \\`testX\\`` tinggal di dalam komentar dan tidak pernah cocok, sehingga uji
+    yang hanya *disebut* di prosa tidak bisa dihitung sebagai uji yang ada —
+    tepat kelas cacat yang gerbang ini tutup.
+
+    **Batas yang dinyatakan.** String literal multi-baris yang memuat baris
+    berawalan `func test…` akan ikut terhitung. Tidak ada satu pun di repo ini,
+    dan membedakannya menuntut parser Swift sungguhan yang tidak ada di sini —
+    jadi batasnya ditulis, bukan disangka tertutup.
+    """
+    names = set()
+    for path in glob.glob(os.path.join(ROOT, "Packages/*/Tests/**/*.swift"),
+                          recursive=True):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+        except OSError:
+            continue
+        # Komentar dibuang lebih dulu: `//` dan `/* … */`. Tanpa ini, contoh
+        # kode di dalam docstring bisa terhitung sebagai uji yang ada.
+        source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+        source = re.sub(r"//[^\n]*", "", source)
+        names |= set(re.findall(r"^\s*func\s+(test\w+)\s*\(",
+                                source, re.M))
+    return names
+
+
+def _cited_test_names():
+    """Nama uji yang **dikutip sumber produksi**, beserta lokasinya.
+
+    Cakupannya sengaja hanya berkas yang **dijalankan**: sumber paket dan
+    `Apps/`. `Tools/*.py` tidak dihitung, dan itu batas yang dinyatakan —
+    harness mutasi dan docstring gerbang memang mengutip nama uji sebagai
+    **riwayat** ("keadaan ini lolos `testX` sebelum cacatnya ditutup"), jadi
+    menuntut setiap kutipan di sana masih ada akan memaksa riwayat ditulis
+    ulang setiap kali sebuah uji dinamai ulang. Di sumber produksi tidak ada
+    riwayat: setiap kutipan di sana adalah klaim bahwa sesuatu **sedang**
+    dijaga.
+    """
+    cited = {}
+    targets = []
+    for pattern in ("Packages/*/Sources/**/*.swift", "Apps/**/*.swift"):
+        targets += glob.glob(os.path.join(ROOT, pattern), recursive=True)
+    for path in sorted(set(targets)):
+        if "/.build/" in path:
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+        except OSError:
+            continue
+        for match in re.finditer(r"\btest[A-Z][A-Za-z0-9_]*", source):
+            cited.setdefault(match.group(0), []).append(
+                (os.path.relpath(path, ROOT),
+                 source[:match.start()].count("\n") + 1))
+    return cited
+
+
+def check_cited_test_names_exist(results):
+    """Nama uji yang dikutip sumber produksi harus punya definisinya.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.** Tiga
+    kalimat di sumber produksi menunjuk uji sebagai **penjaga** sebuah angka,
+    dan tidak satu pun dari ketiganya punya uji:
+
+        NightVisual.swift:227   "Nilainya dijaga
+                                 `testCraterRimIsBrighterThanItsFloor`"
+        NightVisual.swift:163   "`testJupiterSpotIsInTheSouthernHemisphere`"
+        CelestialVisual.swift:2163  "Lihat `testSunCoronaReachesBeyondTheDisk`"
+
+    Terukur dengan `Tools/ukur-uji-menggantung.py`: 43 nama uji dikutip sumber
+    produksi, **3** di antaranya tanpa definisi.
+
+    **Kenapa ini lebih buruk daripada nama gerbang yang menggantung.** Repo ini
+    sudah punya gerbang untuk referensi `check_*` yang tidak terdefinisi
+    (`check_gate_names_mentioned_in_code_exist`) dan untuk jangkar harness yang
+    menggantung (`Tools/check-jangkar-harness.py`). Yang belum diperiksa siapa
+    pun adalah bentuk ketiga: nama **uji**. Bedanya bukan derajat, melainkan
+    arah. Nama gerbang yang menggantung adalah janji yang tidak ditepati;
+    nama uji yang menggantung adalah **izin** — kalimat itu dibaca orang
+    berikutnya sebagai "angka ini sudah dijaga, jangan diutak-atik", dan ia
+    berhenti memeriksa.
+
+    Dan ketiganya menutupi hal yang nyata, bukan kosmetik:
+
+      - `craterRim`/`craterFloor` — pasangan warna yang membuat kawah
+        Merkurius terbaca sebagai **cekungan** dan bukan bercak rata. Dijaga
+        gerbang port (`check_night_accents_match_the_model`, baris "bibir kawah
+        lebih terang dari dasarnya"), tetapi **tidak** oleh uji Swift — dan
+        `swift-test.sh` hanya membangun `Packages/`, sementara gerbang port
+        tidak ada di Linux tanpa `--check`.
+      - `jupiterSpot().centerY = +0.31` — tanda yang menyatakan Bintik Merah
+        Besar ada di belahan **selatan**. Ia sudah dijaga
+        `testJupiterSpotIsCenteredNotCornered`, tetapi kalimatnya menyebut nama
+        lain, jadi pembaca yang mencari nama itu tidak menemukannya.
+      - `sunCoronaReach` — sudah dijaga `testSunCoronaReachIsBeyondTheDisk`;
+        nama di komentarnya yang keliru.
+
+    Jadi dua dari tiga adalah **kutipan yang salah nama**, dan satu adalah
+    **janji tanpa uji**. Ketiganya diperlakukan sama oleh gerbang ini, karena
+    dari sisi pembaca ketiganya sama: nama yang ditunjuk tidak ada. Yang
+    membedakannya hanya cara memperbaikinya, dan itu keputusan manusia.
+
+    **Kenapa gerbang ini membaca AST uji, bukan daftar nama.** Daftar tangan
+    akan basi pada uji pertama yang ditambahkan sesudahnya — dan justru itu
+    yang terjadi pada kutipan-kutipan ini. Yang dibaca di sini adalah
+    definisinya sendiri.
+
+    **Fail-closed.** Bila nol kutipan terbaca, gerbang **merah**: itu berarti
+    pembacanya berhenti cocok dengan bentuk berkasnya, bukan bahwa tidak ada
+    yang perlu dijaga. Gerbang yang hijau karena tidak mengukur apa pun adalah
+    kelas cacat yang seluruh berkas ini kejar.
+
+    **Yang TIDAK diklaim.** Yang dijaga adalah *namanya ada*, bukan bahwa uji
+    itu **mengukur** hal yang diklaim komentarnya. Uji yang ada tapi hampa
+    (`XCTAssertTrue(true)`) lolos di sini — itu milik uji itu sendiri, dan
+    tidak ada gerbang statis yang bisa membacanya. Gerbang ini juga tidak
+    memeriksa `Tools/*.py`, dengan alasan yang ditulis di `_cited_test_names`.
+    """
+    defined = _defined_test_names()
+    cited = _cited_test_names()
+
+    if not cited:
+        results.append(Result(
+            "uji yang dikutip produksi ada", False,
+            "tidak ada satu pun kutipan `test…` terbaca dari "
+            "Packages/*/Sources atau Apps/ — pembacanya perlu diselaraskan "
+            "dengan bentuk berkasnya; nol kutipan bukan berarti tidak ada "
+            "yang perlu dijaga"))
+        return
+
+    dangling = {name: locs for name, locs in cited.items()
+                if name not in defined}
+    for name in sorted(dangling):
+        for path, line in dangling[name]:
+            results.append(Result(
+                f"uji yang dikutip produksi ada: {path}:{line}", False,
+                f"`{name}` tidak terdefinisi di Packages/*/Tests — kutipan ini "
+                f"membaca sebagai 'sudah dijaga', padahal tidak ada ujinya"))
+
+    results.append(Result(
+        "uji yang dikutip produksi ada",
+        not dangling,
+        f"semua {len(cited)} nama uji yang dikutip terdefinisi "
+        f"({len(defined)} uji di suite)"
+        if not dangling
+        else f"{len(dangling)} nama uji dikutip tanpa definisi: "
+             f"{', '.join(sorted(dangling))}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -13434,6 +13599,11 @@ def main():
     # tidak bisa hijau karena alasan yang salah — ia hijau karena tidak ada.
     check_every_gate_fills_its_results(results)
     check_gate_names_mentioned_in_code_exist(results)
+    # Bentuk ketiga dari kelas yang sama, dan yang terakhir ditemukan: nama
+    # **uji** yang dikutip sumber produksi. Dua yang di atas menjaga nama
+    # gerbang dan nama berkas; yang ini menjaga kalimat "nilainya dijaga
+    # `testX`" supaya tidak menjadi izin yang tidak pernah diperiksa siapa pun.
+    check_cited_test_names_exist(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

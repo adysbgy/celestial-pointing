@@ -2160,7 +2160,7 @@ public enum VisualFrame {
     /// juta kilometer, tapi di kartu jam 38 pt jangkauan >1.6 R sudah menabrak
     /// bingkai kartu (dan menutupi teks di sebelahnya), sementara <1.3 R hampir
     /// tidak terlihat sebagai glow. 1.45 memberi halo yang terbaca sebagai
-    /// cahaya tanpa membanjiri kartu. Lihat `testSunCoronaReachesBeyondTheDisk`.
+    /// cahaya tanpa membanjiri kartu. Lihat `testSunCoronaReachIsBeyondTheDisk`.
     public static let sunCoronaReach: Double = 1.45
 
     /// Satu perhentian gradient piringan Matahari: warnanya, dan pada radius

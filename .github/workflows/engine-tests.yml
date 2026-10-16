@@ -1950,5 +1950,32 @@ jobs:
       - name: Buktikan Aturan 8 & 17 berbunyi (kata asing; kunci ditulis ulang di Apps/)
         run: python3 Tools/bukti-mutasi-aturan8-17.py
 
+      # Dan bukti untuk bentuk **ketiga** dari kelas "gerbang mengutip sesuatu
+      # yang tidak ada" — kali ini bukan nama gerbang, melainkan nama **uji**.
+      #
+      # Ditemukan dengan `Tools/ukur-uji-menggantung.py`: dari 43 nama `test…`
+      # yang dikutip sumber produksi, **3** tidak punya definisi. Ketiganya
+      # dikutip sebagai "penjaganya" di komentar yang menjelaskan **kenapa**
+      # sebuah konstanta bernilai seperti itu — jadi pembaca komentar itu
+      # menyimpulkan invariannya terjaga, padahal tidak ada yang menjaganya di
+      # Linux: `check-visuals.py` tidak dijalankan `swift-test.sh`.
+      #
+      # Tiga keadaan, dan keadaan 3 yang paling penting. Gerbang ini membaca
+      # dua himpunan (kutipan di produksi, definisi di berkas uji); setiap
+      # himpunan bisa berhenti terbaca sendiri-sendiri, dan tiap cara gagal
+      # terlihat sama di layar: hijau. Keadaan 1 menamai ulang **definisinya**
+      # (kutipan menggantung), keadaan 2 menambah **kutipannya** (uji tidak
+      # ada) — kalau salah satunya hijau, gerbangnya cuma membaca satu sisi.
+      # Keadaan 3 membuat pola pembaca kutipan berhenti cocok: himpunan kutipan
+      # kosong, tidak ada yang menggantung, dan gerbang yang naif akan hijau
+      # **karena tidak mengukur apa pun**. Karena itu ia fail-closed, dan
+      # keadaan 3 membuktikan cabang itu benar-benar berbunyi.
+      #
+      # Yang TIDAK diklaim: ini gerbang statis nama-vs-nama. Uji hampa
+      # (`XCTAssertTrue(true)`) lolos di sini — yang dijaga adalah kutipannya
+      # menunjuk sesuatu yang ada, bukan bahwa uji itu mengukur yang diklaim.
+      - name: Buktikan gerbang nama uji yang dikutip produksi berbunyi
+        run: python3 Tools/bukti-mutasi-uji-menggantung.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

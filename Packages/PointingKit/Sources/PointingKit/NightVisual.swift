@@ -160,7 +160,7 @@ public extension CelestialVisual {
         /// **keberadaan** ciri (`check_planet_features_present` menuntut ≥ 20
         /// piksel kemerahan), **lengkung** gradiennya
         /// (`check_jupiter_spot_keeps_its_curvature`), atau **letaknya**
-        /// (`testJupiterSpotIsInTheSouthernHemisphere`) — bukan
+        /// (`testJupiterSpotIsCenteredNotCornered`) — bukan
         /// keterbacaannya.
         ///
         /// **Kenapa menggelapkan, bukan mencerahkan.** Diukur terhadap pita

@@ -460,6 +460,87 @@ final class NightVisualTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Cekungan kawah Merkurius
+
+    /// `craterRim` harus **lebih terang** dari `craterFloor`, di kedua mode.
+    ///
+    /// **Kenapa uji ini ada, padahal gerbang port sudah memeriksanya.**
+    /// Hubungan ini dijaga `check_night_accents_match_the_model` (baris "bibir
+    /// kawah lebih terang dari dasarnya") — tetapi gerbang itu hidup di
+    /// `Tools/check-visuals.py`, yang **tidak dijalankan** oleh
+    /// `./swift-test.sh` dan tidak ada di Linux tanpa `--check`. Sementara itu
+    /// `NightVisual.swift` menyebut nama uji ini sebagai penjaganya, dan nama
+    /// itu **tidak pernah ada**: diukur dengan
+    /// `Tools/ukur-uji-menggantung.py`, `testCraterRimIsBrighterThanItsFloor`
+    /// adalah salah satu dari tiga kutipan di sumber produksi yang tidak punya
+    /// definisi. Jadi yang salah bukan hubungannya — melainkan bahwa satu-
+    /// satunya penjaganya hidup di berkas yang tidak selalu dijalankan,
+    /// sementara sumber produksinya berkata "sudah dijaga uji".
+    ///
+    /// **Kenapa hubungan ini penting, bukan kosmetik.** Merkurius satu-satunya
+    /// planet yang ciri pengenalnya justru kawah, dan yang membuat sebuah
+    /// cekungan terbaca sebagai cekungan adalah **dua sisi yang berlawanan
+    /// terang-gelap** — bibir yang menghadap cahaya, dasar yang membelakangi.
+    /// Kalau keduanya bertukar, kawahnya tidak menghilang: ia terbaca sebagai
+    /// **tonjolan**, bentuk yang justru berlawanan dengan yang digambar.
+    /// Merkurius lalu tampak seperti planet berkawah yang lain dari yang
+    /// sebenarnya, dan tidak ada teks di layar yang bisa membantahnya.
+    ///
+    /// **Mode malam diuji terpisah, karena di sanalah hubungannya bisa
+    /// berbalik.** Mode malam membuang hue dan memetakan kanal merah lewat
+    /// `NightVisual.surface` (0.35 + 0.65·x, dijepit di 1.0). Pemetaan itu
+    /// **monoton**, jadi ia tidak bisa membalik urutan dengan sendirinya —
+    /// tetapi ia **memampatkan**: `craterRim` (0.86) memetakan ke 0.909
+    /// sementara `craterFloor` (0.16) ke 0.454. Memeriksa kanal merah siang
+    /// saja akan lolos pada kode yang benar sambil tidak pernah mengukur apa
+    /// pun tentang layar yang paling dipakai untuk mengamati; dan sebaliknya,
+    /// sebuah `craterFloor` yang dinaikkan sampai di atas `craterRim` hanya
+    /// akan terlihat di mode malam kalau selisih siangnya ikut menipis.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini mengukur **urutan**, bukan
+    /// keterbacaan pikselnya. Kontras sesungguhnya (setelah digambar di atas
+    /// gradien bola dan di atas latar kartu) diukur di `Tools/check-visuals.py`;
+    /// di sini yang dijaga adalah syarat yang harus benar sebelum renderer
+    /// punya kesempatan menggambarnya benar.
+    func testCraterRimIsBrighterThanItsFloor() {
+        let rim = CelestialVisual.accents.craterRim
+        let floor = CelestialVisual.accents.craterFloor
+
+        // Pembandingnya `nightModeBrightness` — **kanal yang sama** yang
+        // dibaca mode malam — bukan `(r+g+b)/3`. Kalau pembandingnya rata-rata,
+        // sebuah `craterFloor` yang lebih terang di kanal merah tetapi lebih
+        // gelap rata-rata akan lolos di sini sambil **berbalik** di layar
+        // malam, dan uji ini justru buta tepat pada mode yang diklaimnya jaga.
+        XCTAssertGreaterThan(
+            rim.nightModeBrightness, floor.nightModeBrightness,
+            "bibir kawah harus lebih terang dari dasarnya di mode siang: "
+            + String(format: "%.3f", rim.nightModeBrightness) + " lawan "
+            + String(format: "%.3f", floor.nightModeBrightness)
+            + ". Kalau terbalik, kawah terbaca sebagai TONJOLAN.")
+
+        let nightRim = NightVisual.surface(rim).red
+        let nightFloor = NightVisual.surface(floor).red
+        XCTAssertGreaterThan(
+            nightRim, nightFloor,
+            "bibir kawah harus tetap lebih terang dari dasarnya di mode "
+            + "malam: " + String(format: "%.3f", nightRim) + " lawan "
+            + String(format: "%.3f", nightFloor)
+            + ". Mode malam hanya menyisakan kanal merah, jadi urutan inilah "
+            + "satu-satunya pembeda yang tersisa di layar malam.")
+
+        // Arah yang berlawanan juga harus dijaga: bibir yang **sama** dengan
+        // dasar berarti tidak ada cekungan sama sekali — bercak rata, persis
+        // bentuk yang sudah pernah mendarat (lihat `craterFloor` di
+        // `NightVisual.Accents`). Urutan saja tidak cukup; harus ada selisih.
+        XCTAssertLessThan(
+            floor.nightModeBrightness, rim.nightModeBrightness * 0.5,
+            "dasar kawah harus JAUH lebih gelap dari bibirnya, bukan sekadar "
+            + "sedikit: " + String(format: "%.3f", floor.nightModeBrightness)
+            + " lawan " + String(format: "%.3f", rim.nightModeBrightness)
+            + ". Selisih yang menipis membuat kawahnya kembali jadi bercak "
+            + "rata yang tidak menyatakan apa pun.")
+    }
 }
 
 // MARK: - Utilitas
