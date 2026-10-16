@@ -6573,7 +6573,7 @@ def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
     `ss=2`:
 
         ukuran    margin 0    cacat (margin 0,02)
-        200 px    0           1533
+        200 px    14          1533
         76 px     6           232
 
     Tanpa margin, kode yang benar **tetap** menghasilkan piksel di dalam —
