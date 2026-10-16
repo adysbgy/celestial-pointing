@@ -128,12 +128,15 @@ WARMTH_FLIPPED = "    warmth = 1.0 - (clamped + 0.35) / 1.70"
 
 # Warna "tidak mengklaim" untuk bintang. Harus **akromatik** (R=G=B): nilai
 # ber-hue apa pun adalah warna spektral, dan warna spektral mengklaim kelas
-# bintang. Nilai di sini adalah **warna netral lama** — yaitu `starRGB(0,00)`,
-# putih kebiruan kelas A (warna Sirius/Vega) — persis regresi yang dijaga
-# keadaan 4. Bukan angka karangan: ini keluaran `star_rgb(0.0)` yang dulu
-# dipakai sebagai sentinel.
-NEUTRAL_STAR = "NEUTRAL_STAR_BODY = (0.78, 0.78, 0.78)"
-NEUTRAL_STAR_SPECTRAL = "NEUTRAL_STAR_BODY = (0.6982, 0.7471, 0.8518)"
+# bintang.
+#
+# Keadaan 4 memutasi **cabang sentinel** di `star_rgb`, bukan konstanta
+# netralnya: itulah bentuk cacat aslinya — sentinel B−V 0,00 yang **lolos ke
+# rumus warna biasa**, sehingga keluarannya `star_rgb(0,0)`, warna spektral
+# kelas A (Sirius/Vega). Mutasi lewat konstanta hanya menyalin angkanya; yang
+# ini menjalankan rumusnya, jadi hasilnya persis seperti dulu.
+NEUTRAL_STAR = "    if math.isnan(index):\n        return NEUTRAL_STAR_BODY"
+NEUTRAL_STAR_SPECTRAL = "    if math.isnan(index):\n        index = 0.0"
 
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
