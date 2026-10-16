@@ -407,6 +407,51 @@ final class VisibilityTests: XCTestCase {
         }
     }
 
+    /// **Permisif berarti permisif untuk setiap `kind`, bukan hanya bintang.**
+    ///
+    /// Uji di atas memanggil `classify` **tanpa** `kind:`, jadi ia selalu
+    /// memakai `kind: .star` dan hanya pernah menguji `limitingMagnitude`.
+    /// Itu persis bentuk yang sudah menutupi celah cahaya Bulan di
+    /// `testPermissivePolicyIgnoresMoonlight` ("uji lamanya hanya memeriksa
+    /// konteks tanpa Bulan") — dan kini bentuk yang sama menutupi celah
+    /// planet: `permissive` **tidak** menyetel `planetLimitingMagnitude`,
+    /// jadi ia terjatuh ke nilai bawaan produksi 8.30.
+    ///
+    /// Akibatnya `permissive` — yang docstring-nya berbunyi "tidak membuang
+    /// apa pun" — diam-diam membuang setiap planet di bawah 8.30, termasuk
+    /// benda tulis-tangan di paket uji. Policy pengujian dipakai justru
+    /// untuk **melepas** penyaringan visibilitas, jadi penyaring yang
+    /// tersisa di sini akan mengubah hasil uji tanpa ada yang tahu sebabnya.
+    ///
+    /// Benda yang dipakai sengaja redup (magnitudo 20) untuk **setiap**
+    /// `kind`: angka itu hanya lolos kalau ambang `kind` itu benar-benar
+    /// dimatikan, bukan sekadar dinaikkan sedikit.
+    ///
+    /// Keempat kasus ditulis eksplisit karena `ObjectKind` bukan `CaseIterable`
+    /// — dan itu kebetulan lebih jujur: `kind` baru harus ditambahkan ke sini
+    /// dengan sengaja, bukan ikut teruji karena `allCases` kebetulan bertambah.
+    func testPermissivePolicyRejectsNothingForEveryKind() {
+        for kind in [ObjectKind.star, .planet, .deepSky, .moon, .sun] {
+            let result = VisibilityFilter.classify(
+                altitudeDeg: 45, magnitude: 20, separationFromSunDeg: 0,
+                context: day, policy: .permissive, kind: kind
+            )
+            XCTAssertEqual(result, .visible,
+                           "kebijakan permissive membuang \(kind) padahal tidak boleh")
+        }
+    }
+
+    /// Angka yang menutup celah di atas, dibaca langsung dari policy-nya.
+    ///
+    /// Uji perilaku di atas sudah cukup untuk menangkapnya, tetapi menilai
+    /// **angkanya** membuat pesan kegagalannya menunjuk sebab yang tepat
+    /// (field mana yang ketinggalan), bukan sekadar "ada yang ditolak".
+    func testPermissivePolicyLoosensEveryMagnitudeThreshold() {
+        XCTAssertEqual(VisibilityPolicy.permissive.planetLimitingMagnitude,
+                       VisibilityPolicy.permissive.limitingMagnitude,
+                       "planetLimitingMagnitude permissive tertinggal di angka produksi")
+    }
+
     /// **Permisif berarti permisif, termasuk di bawah purnama.**
     ///
     /// Policy pengujian dipakai untuk menyaring kode yang tidak boleh menyentuh

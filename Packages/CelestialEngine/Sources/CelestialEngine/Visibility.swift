@@ -155,13 +155,29 @@ public struct VisibilityPolicy: Equatable {
     /// penyaringan cahaya Bulan — tanpa itu policy permisif akan tetap membuang
     /// bintang redup saat ada purnama, dan "tidak membuang apa pun" jadi
     /// setengah benar.
+    ///
+    /// **Ketiga ambang magnitudo harus ikut dinaikkan, bukan hanya dua.**
+    /// `limitingMagnitude` dan `deepSkyLimitingMagnitude` sudah dinaikkan ke
+    /// 30 sejak awal; `planetLimitingMagnitude` tertinggal di nilai bawaan
+    /// produksi (8.30), sehingga `permissive` — yang docstring-nya berbunyi
+    /// "tidak membuang apa pun" — diam-diam membuang setiap planet redup.
+    /// Cacat itu bertahan lama karena uji "permissive tidak menolak apa pun"
+    /// memanggil `classify` tanpa `kind:`, jadi ia selalu memakai `.star` dan
+    /// tidak pernah menyentuh ambang planet. Bentuk yang sama persis dengan
+    /// celah cahaya Bulan di atas, satu `kind` lebih jauh.
+    ///
+    /// Karena itu `planetLimitingMagnitude` disetel sama dengan
+    /// `limitingMagnitude`, bukan angka lain: yang diklaim policy ini adalah
+    /// **tidak ada ambang magnitudo yang tersisa**, dan menulis angka lain akan
+    /// membuat klaim itu tidak lagi bisa diperiksa dari satu perbandingan.
     public static let permissive = VisibilityPolicy(
         minAltitudeDeg: -90,
         limitingMagnitude: 30,
         sunAltitudeForDarknessDeg: 91,
         minSunSeparationDeg: 0,
         moonBrighteningMagnitudes: 0,
-        deepSkyLimitingMagnitude: 30
+        deepSkyLimitingMagnitude: 30,
+        planetLimitingMagnitude: 30
     )
 }
 

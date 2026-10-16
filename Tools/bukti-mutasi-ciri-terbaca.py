@@ -21,8 +21,16 @@ bisa dibedakan dari gerbang yang tidak mengukur apa pun.
     1. kutub Mars tidak digambar                   MERAH 1 (kutub Mars), Merkurius hijau
     2. kabut Venus tidak digambar                  hijau penuh  ← Venus tidak diklaim
     3. kawah Merkurius tidak digambar              MERAH 1 (Merkurius), Mars hijau
-    4. kutub Mars digambar terlalu pudar (0,12x)   MERAH 1 (kutub Mars)
+    4. kutub Mars digambar terlalu pudar (0,02x)   MERAH 1 (kutub Mars)
     5. kontrol negatif: prosa lain diubah          hijau penuh
+
+**Skala 0,12x pada keadaan 4 pernah salah dan menutupi cacatnya sendiri.**
+Terukur, deviasi kutub Mars adalah 107,54% di produksi; 0,12x hanya
+menurunkannya ke 12,91% — masih di atas ambang 3,0, jadi keadaan itu hijau
+padahal harapannya MERAH, dan `Engine Tests (Linux)` merah satu siklus penuh.
+0,02x (2,15%) adalah skala terkecil yang **diukur** masih membedakan "pudar"
+dari "hilang" sambil benar-benar melewati ambang. Angka lengkapnya ada di
+komentar keadaan 4.
 
 Keadaan 1 dan 3 tidak saling menggantikan: keduanya mematikan **ciri yang
 berbeda**, dan harness menuntut himpunan hasilnya **persis** — mencabut satu
@@ -161,14 +169,32 @@ STATES = [
     # Arah ini yang tidak bisa digantikan keadaan 1: geometrinya utuh, hanya
     # kontrasnya jatuh. Gerbang "ada bedanya?" hijau di sini — dan justru
     # itulah celah yang ditutup gerbang ini. Opasitasnya diambil dari
-    # `polar_cap_fade(...)`, jadi mutasinya menskalakan keduanya ke 0,12x.
-    ("4. kutub Mars digambar terlalu pudar (0,12x)",
+    # `polar_cap_fade(...)`, jadi mutasinya menskalakan keduanya.
+    #
+    # **Skalanya 0,02x, dan angka itu diukur, bukan dipilih.** Versi pertama
+    # memakai 0,12x dengan alasan "sepersepuluh kekuatan" — dan itu **salah**:
+    # terukur di gerbangnya sendiri, deviasi kutub Mars pada 76 px adalah
+    # 107,54% di produksi, dan 0,12x hanya menurunkannya ke **12,91%** —
+    # masih 4,3x di atas ambang 3,0, jadi keadaan itu **hijau** padahal
+    # harapannya MERAH. Harness-nya merah pada sumber bersih, dan itulah
+    # sebab `Engine Tests (Linux)` merah satu siklus penuh.
+    #
+    # Diukur ulang untuk mencari skala yang benar-benar melewati ambang:
+    #     1,00x -> 107,54%   hijau
+    #     0,12x ->  12,91%   hijau   <- harapan lama, salah
+    #     0,03x ->   3,21%   hijau   (masih di atas ambang)
+    #     0,02x ->   2,15%   MERAH   <- dipakai di sini
+    #     0,01x ->   1,09%   MERAH
+    # 0,02x dipilih karena ia **di bawah** ambang dengan margin yang cukup
+    # untuk tidak bergantung pada pembulatan satu piksel, tetapi masih jauh
+    # dari nol — jadi ia tetap membedakan "pudar" dari "hilang" (keadaan 1).
+    ("4. kutub Mars digambar terlalu pudar (0,02x)",
      [(RENDER, '        fade = polar_cap_fade(caps, center)\n',
        '        _f = polar_cap_fade(caps, center)  # MUT: pudarkan kutub\n'
        '        fade = {"inner_edge_y": _f["inner_edge_y"],\n'
        '                "full_y": _f["full_y"],\n'
-       '                "edge_opacity": _f.get("edge_opacity", 0.0) * 0.12,\n'
-       '                "full_opacity": _f.get("full_opacity", 0.0) * 0.12}\n')],
+       '                "edge_opacity": _f.get("edge_opacity", 0.0) * 0.02,\n'
+       '                "full_opacity": _f.get("full_opacity", 0.0) * 0.02}\n')],
      {MARS: MERAH, MERKURIUS: HIJAU}),
 
     # ── 5. Kontrol negatif: prosa yang tidak dibaca gerbang ──────────────
