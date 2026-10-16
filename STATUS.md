@@ -1,3 +1,101 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: satu mutasi harness yang tertinggal di sumber produksi, dan bagaimana ia sampai ke `main`)
+
+### Kenapa siklus ini juga bukan fitur baru
+
+`main` merah lagi — kali ini `Engine Tests (Linux)` gagal **7 dari 909**
+pemeriksaan pada `check-visuals.py --check`, seluruhnya di satu kelas: inti
+bintang gugus. Brief tetap meminta poles UI/UX dan FASE C, tetapi seluruh
+BAGIAN 1–4, FASE A, dan FASE C memang sudah ada dan tergerbang (diaudit ulang
+siklus ini), dan yang menghalangi adalah gerbang yang merah. Jadi yang
+dikerjakan bukan fitur, melainkan akar dari satu angka yang salah.
+
+### Cacat: `CLUSTER_CORE_HALO_SCALE = 40.0` — mutasi, bukan angka
+
+`Tools/render-visuals.py` memuat `CLUSTER_CORE_HALO_SCALE = 40.0`; view Swift
+memakai `2.4`. Gerbang drift berbunyi persis seperti seharusnya:
+
+    GAGAL port sejalan: inti gugus: skala halo (port == view)
+                                            port=40.0, seharusnya 2.4
+
+Enam kegagalan sisanya adalah turunannya: halonya, bukan intinya, yang
+terukur.
+
+**`40.0` bukan angka yang dipilih siapa pun.** Ia **mutasi keadaan 2
+`Tools/bukti-mutasi-inti-gugus.py`** — keadaan yang justru mengganti
+`2.4` → `40.0` untuk membuktikan ambang ketajaman berbunyi ("halo inti 40x:
+inti menyatu dengan kabutnya"). Nilai itu tertinggal di berkas produksi dan
+ikut ter-commit di `cf3c56b` — commit yang pesannya tentang ciri planet
+(Mars/Merkurius), bukan tentang inti gugus.
+
+### Diukur lebih dulu, bukan disimpulkan dari angka view
+
+Probe di proses terpisah. **Probe pertama saya salah dan itu dicatat:** ia
+menyetel `R.CLUSTER_CORE_HALO_SCALE` pada modul `render-visuals` yang saya
+impor, sementara `check-visuals` memuat **salinannya sendiri** sebagai `C.R`
+— jadi mutasinya tidak pernah sampai ke jalur gambar, dan kedua nilai
+menghasilkan angka identik. Itu persis "gerbang mengukur gambar yang tidak
+pernah tampil", di lapis probe. Sesudah diperbaiki (mutasi pada `C.R`):
+
+    CLUSTER_CORE_HALO_SCALE = 2.4   terbuka 0.767 / 0.824   bola 0.535 / 0.526
+    CLUSTER_CORE_HALO_SCALE = 40.0  terbuka 0.343 / 0.325   bola 0.090 / 0.064
+
+`2.4` mereproduksi **persis** empat angka yang dikutip komentar
+`MIN_CLUSTER_CORE_SHARPNESS` (0,77 / 0,82 / 0,53 / 0,53) dan menghijaukan
+kedelapannya. `40.0` mereproduksi **persis** kegagalan CI (0,34 / 0,09 / 0,06)
+dan memerahkan gugus bola di kedua ukuran. Mekanismenya: halo `40 ×` jari-jari
+inti menyapu kabut sekelilingnya dengan `0,5 · op`, sehingga puncak intinya
+tenggelam ke lengkungan halonya sendiri — intinya masih ada (kontras tetap
+hijau), tapi tidak lagi menonjol (ketajaman runtuh). Itu **satu-satunya** kelas
+yang dijaga ambang 0,20, dan karena itu keadaan 2 harness itu memang
+dipertahankan.
+
+### Bukti
+
+    python3 (gerbang inti gugus, tiga fungsi)     26 pemeriksaan, 0 gagal
+                                                  (tadinya 7 gagal)
+    python3 (drift + konstanta-sampai-gambar)    178 pemeriksaan, 0 gagal
+                                                  (tadinya 1 gagal)
+    python3 Tools/bukti-mutasi-inti-gugus.py     8/8 baseline hijau, 2 keadaan
+                                                 sesuai harapan, sumber pulih
+    python3 Tools/bukti-mutasi-ciri-terbaca.py   6 keadaan lulus, md5 pulih persis
+    ./swift-test.sh                              CelestialEngine 222,
+                                                 PointingKit 819, 0 gagal
+    Apple Build (macos-15, commit ee4a117)       HIJAU
+    Engine Tests (Linux, ee4a117)                in_progress saat catatan ini
+                                                 ditulis (~2 jam)
+
+### Yang TIDAK diklaim
+
+- **Akar prosesnya belum ditutup.** `mutasi_sumber.require_clean_sources`
+  membandingkan berkas dengan `git HEAD`, jadi ia **menolak jalan** di atas
+  pohon kotor — dan itu memang bekerja (terbukti siklus ini: harness menolak
+  jalan atas perbaikan saya yang belum di-commit). Tetapi begitu mutasi yang
+  bocor **ikut ter-commit**, berkas itu **menjadi** HEAD dan penjaganya puas
+  selamanya. Yang menangkap cacat ini adalah gerbang drift `port == view`, dan
+  ia berhasil karena view kebetulan memegang angka yang benar. Kelas "mutasi
+  bocor yang menjadi HEAD" masih **terbuka** untuk konstanta yang tidak punya
+  pasangan di bahasa kedua.
+- **Cacat kelas ini nyata, bukan teoretis** — dan terbukti di dalam sesi ini:
+  `bukti-mutasi-inti-opasitas.py` yang saya hentikan karena melewati batas
+  waktu meninggalkan `CLUSTER_CORE_BRIGHTEN = 0.0` di `render-visuals.py`
+  (terukur lewat `git diff`); saya memulihkannya dengan `git checkout --`.
+  Harness yang di-`SIGKILL`/timeout melewati `finally` dan handler sinyalnya,
+  persis seperti yang docstring `bukti-mutasi-inti-gugus.py` sendiri catat.
+- **Prototipe penjaganya belum dipasang.** Gagasannya: jangkar `find` setiap
+  harness harus masih ada di berkas sasarannya (kalau tidak, yang ada di sana
+  adalah penggantinya = mutasi bocor). Prototipe AST membaca 196 jangkar dari
+  71 harness, dan pada pohon bersih **0 mutasi bocor terdeteksi** — benar.
+  Tetapi dua hal belum selesai: (a) pembaca itu harus me-resolve konstanta
+  path tingkat modul (`VIEW = os.path.join(...)`, `_sources = (VIEW,)`) untuk
+  tahu berkas sasaran tiap jangkar — tanpa itu 13 jangkar terbaca "hilang"
+  padahal hanya salah berkas; dan (b) gerbang baru berarti langkah CI baru
+  (`check-harness-terdaftar.py` akan memerahkan `main` bila tidak), plus bukti
+  bahwa ia bisa merah. Belum dikerjakan, dan **tidak** diklaim selesai.
+- Tidak satu pun ambang, view Swift, atau model disentuh. Yang berubah: satu
+  angka di port Python, kembali ke nilai yang memang dipakai view.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: dua cacat yang menahan main merah — policy permisif yang membuang planet, dan keadaan harness yang salah skala)
 
 ### Kenapa siklus ini bukan fitur baru
