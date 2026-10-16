@@ -53,8 +53,20 @@ public enum DisplayLabel {
                                   catalogue: [CelestialObject]) -> String? {
         // Katalog dulu: di sinilah slug katalog berasal, dan nama yang tepat
         // sudah tersimpan berdampingan dengannya.
+        //
+        // **Kenapa `ObjectDisplayName.text` dan bukan `match.name` langsung.**
+        // Mengembalikan `match.name` apa adanya benar untuk bintang — `Sirius`
+        // memang sama di dua bahasa — tapi **salah untuk seluruh objek langit
+        // dalam**, yang namanya frasa Bahasa Indonesia: `Nebula Orion`,
+        // `Gugus Sarang Lebah`, `Galaksi Kincir Angin`. Tujuh belas dari
+        // delapan belas nama di `DeepSkyCatalogue` berbentuk frasa, dan
+        // semuanya melewati baris ini — jadi satu pemanggil ini menguasai
+        // seluruh kelas objek yang paling sering salah.
+        //
+        // Nama yang tidak punya baris katalog tetap dikembalikan apa adanya oleh
+        // `ObjectDisplayName.text`, jadi perilaku lama tidak bergeser.
         if let match = catalogue.first(where: { $0.id == id }) {
-            return match.name
+            return ObjectDisplayName.text(match.name)
         }
         // Benda tata surya: id-nya `EphemerisBody.rawValue`. Nama
         // Bahasa Indonesianya sudah ada di engine (`displayName`), jadi

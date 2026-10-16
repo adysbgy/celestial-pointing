@@ -5457,6 +5457,405 @@
           }
         }
       }
+    },
+    "object.name.bulan": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulan"
+          }
+        }
+      }
+    },
+    "object.name.galaksiAndromeda": {
+      "comment": "Nama objek langit dalam (M31) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Andromeda Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Andromeda"
+          }
+        }
+      }
+    },
+    "object.name.galaksiKincirAngin": {
+      "comment": "Nama objek langit dalam (M101) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinwheel Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Kincir Angin"
+          }
+        }
+      }
+    },
+    "object.name.galaksiPusaran": {
+      "comment": "Nama objek langit dalam (M51) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whirlpool Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Pusaran"
+          }
+        }
+      }
+    },
+    "object.name.galaksiTriangulum": {
+      "comment": "Nama objek langit dalam (M33) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triangulum Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Triangulum"
+          }
+        }
+      }
+    },
+    "object.name.gugusBebekLiar": {
+      "comment": "Nama objek langit dalam (M11) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wild Duck Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Bebek Liar"
+          }
+        }
+      }
+    },
+    "object.name.gugusHercules": {
+      "comment": "Nama objek langit dalam (M13) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hercules Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Hercules"
+          }
+        }
+      }
+    },
+    "object.name.gugusKupuKupu": {
+      "comment": "Nama objek langit dalam (M6) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butterfly Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Kupu-kupu"
+          }
+        }
+      }
+    },
+    "object.name.gugusM2": {
+      "comment": "Nama objek langit dalam (M2) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M2 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M2"
+          }
+        }
+      }
+    },
+    "object.name.gugusM35": {
+      "comment": "Nama objek langit dalam (M35) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M35 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M35"
+          }
+        }
+      }
+    },
+    "object.name.gugusPtolemy": {
+      "comment": "Nama objek langit dalam (M7) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ptolemy Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Ptolemy"
+          }
+        }
+      }
+    },
+    "object.name.gugusSagitarius": {
+      "comment": "Nama objek langit dalam (M22) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagittarius Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sagitarius"
+          }
+        }
+      }
+    },
+    "object.name.gugusSarangLebah": {
+      "comment": "Nama objek langit dalam (M44) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beehive Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sarang Lebah"
+          }
+        }
+      }
+    },
+    "object.name.jupiter": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        }
+      }
+    },
+    "object.name.mars": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        }
+      }
+    },
+    "object.name.matahari": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matahari"
+          }
+        }
+      }
+    },
+    "object.name.merkurius": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merkurius"
+          }
+        }
+      }
+    },
+    "object.name.nebulaCincin": {
+      "comment": "Nama objek langit dalam (M57) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ring Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Cincin"
+          }
+        }
+      }
+    },
+    "object.name.nebulaDumbel": {
+      "comment": "Nama objek langit dalam (M27) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dumbbell Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Dumbel"
+          }
+        }
+      }
+    },
+    "object.name.nebulaLaguna": {
+      "comment": "Nama objek langit dalam (M8) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagoon Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Laguna"
+          }
+        }
+      }
+    },
+    "object.name.nebulaOmega": {
+      "comment": "Nama objek langit dalam (M17) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omega Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Omega"
+          }
+        }
+      }
+    },
+    "object.name.nebulaOrion": {
+      "comment": "Nama objek langit dalam (M42) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orion Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Orion"
+          }
+        }
+      }
+    },
+    "object.name.neptunus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neptunus"
+          }
+        }
+      }
+    },
+    "object.name.pleiades": {
+      "comment": "Nama objek langit dalam (M45) yang dipasang katalog engine. Kata tunggal, dan sama di dua bahasa — barisnya tetap ada supaya cakupan kunci object.name.* lengkap dan bisa diperiksa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        }
+      }
+    },
+    "object.name.saturnus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturnus"
+          }
+        }
+      }
+    },
+    "object.name.uranus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uranus"
+          }
+        }
+      }
+    },
+    "object.name.venus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
