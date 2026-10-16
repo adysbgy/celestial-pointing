@@ -1,3 +1,140 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang jangkar buta pada 22 dari 22 kebocoran + fail-closed)
+
+### Mengapa siklus ini tidak mulai dari fitur
+
+Misi FASE A/B/C sudah selesai dan ter-gerbang: `CelestialVisual` (Canvas),
+mode malam `@AppStorage`, `isLuminanceReduced`, label aksesibilitas, katalog
+langit-dalam, complication, lokalisasi, izin sensor. Siklus sebelumnya
+memperbaiki **satu** harness yang tak terbaca gerbang jangkar dan menaikkan
+cakupan 196 → 202. Pertanyaan yang belum dijawab: berapa banyak harness
+**lain** yang juga tak terbaca, dan apa yang terjadi pada mutasi bocor dari
+mereka?
+
+Jawabannya terukur dan buruk: gerbangnya buta pada **22 dari 22** mutasi bocor
+yang ditanamkan dari harness yang dilewatinya — sambil mencetak `OK`.
+
+### Akar masalahnya: pembaca, bukan datanya
+
+`_collect_edits` hanya mengenal bentuk `(label, [(jangkar, pengganti)])`.
+Bentuk yang sungguh dipakai repo ini — dan karenanya dilewati **tanpa suara**:
+
+| bentuk | contoh harness |
+| --- | --- |
+| `(label, (find, replace))` | `-fase.py`, `-bintang.py`, `-bintik.py` |
+| `(label, find, replace, [targets])` | `-angka-urutan-cincin.py` |
+| `{path: (find, replace)}` | `-aksen.py`, `-ciri-malam.py` |
+| `*KONSTANTA_TUPLE` di dalam tabel | `-anggota-bertahap.py`, `-label-bawaan.py` |
+| `ANCHORS["kunci"]` | `-kalimat-a11y.py` |
+| tabel `*_STATES` / `*_CASES` | `PARITY_STATES` di `-lengan.py` |
+
+Dua pelajaran dari bentuk-bentuk itu:
+
+1. **`_is_state_table` harus predikat, bukan daftar nama.** Daftar
+   `("STATES", "CASES")` gagal **diam-diam** saat seseorang menamai tabelnya
+   sedikit berbeda — dan `PARITY_STATES` sudah membuktikannya: empat mutasi
+   bocornya tak terlihat selama daftarnya sempit.
+2. **`_string` harus meresolusi subskrip tabel bernama.** Repo ini menulis
+   `A_LINK = ANCHORS["badan \`linkAccessibilityLabel\`"]`, jadi jangkarnya ada
+   tapi tersembunyi di balik subskrip.
+
+### Fail-closed: kelasnya ditutup, bukan gejalanya
+
+Menambah bentuk ke pembaca saja akan rusak lagi pada bentuk berikutnya. Yang
+menutup kelasnya adalah aturan: **harness yang menulis sumber produksi di
+tempat dan tidak menyumbang satu jangkar pun = GERBANG MERAH.** Sebelum ini
+gerbang mencetak `OK: 202 jangkar` sambil mengukur 40 dari 74 berkas.
+
+Kriterianya mekanis dan sengaja **hanya penulisan** (`mutasi_sumber.write_source`
+/ `restore_verified`). `require_clean_sources` **tidak** dihitung: ia penjaga
+**baca** yang juga dipakai seluruh harness kotak pasir (terukur: 13 dari 18
+kandidat pertama hanya memanggilnya tanpa pernah menulis). Menghitungnya akan
+menuntut harness kotak pasir menyumbang jangkar — tuntutan yang tidak ada
+hubungannya dengan kebocoran, dan gerbang yang menuntut hal yang tidak benar
+akan dilonggarkan orang.
+
+Dan dibaca dari **AST, bukan teks**: versi pertama memakai `in source`, lalu
+`bukti-mutasi-jangkar-harness.py` — yang menyimpan potongan kode contoh
+sebagai **string literal** di pengujiannya sendiri — ikut dituduh menulis
+produksi. Gerbang merah pada pohon bersih; yang diukur harus **panggilan**,
+bukan tulisan tentang panggilan.
+
+### Penutup sisa: `JANGKAR_KECUALI`
+
+Dua harness (`-gerbang-kosong.py`, `-penjaga-identitas.py`) merakit muatannya
+**saat jalan** (`empty_gate(source, func)`, `mutate("morphology")`), jadi
+jangkarnya tidak pernah ada sebagai teks tetap dan **tidak ada** pembaca statis
+yang bisa menemukannya — dulu maupun nanti. Gerbang menuntut alasannya tertulis
+di berkas harness-nya (`JANGKAR_KECUALI = "…"`, min. 40 karakter) lalu
+mencetaknya setiap kali gerbang jalan. Daftar pengecualian di dalam gerbang
+akan menjadi daftar tangan yang tak bisa diperiksa siapa pun.
+
+### Bukti (bukan klaim)
+
+- **Cakupan: 40 → 54 dari 74 harness terbaca; 171 → 323 jangkar.**
+- **22 dari 22 → 0 dari 0 kebocoran buta.** Angka kedua itu **vakum** dan
+  disebut apa adanya: pengukurnya menanam dari harness yang dulu tak terbaca,
+  dan sekarang harness itu terbaca, jadi tidak ada lagi yang ditanam. Yang
+  benar-benar mengukur kelasnya adalah uji tanam kedua di bawah.
+- **Uji tanam atas jangkar yang dulu tak terlihat**: 31 ditanam, **28
+  ditangkap**, 3 masih buta. Ketiganya satu sebab yang sudah terdokumentasi
+  (lihat "Yang TIDAK diklaim").
+- **Bukti langsung pada kebocoran yang sedang berjalan**: gerbang baru
+  menangkap mutasi hidup di pohon kerja sesi paralel
+  (`**49,7%** titik` → `**50%** titik`) dari
+  `bukti-mutasi-angka-urutan-cincin.py` — harness yang gerbang **lama** baca
+  **0 jangkar**. Diukur berdampingan: lama 0, baru 4.
+- **Non-vakuos**: `bukti-mutasi-jangkar-harness.py` bertambah 2 keadaan.
+  Keadaan 4 = harness baru tanpa jangkar terbaca **wajib merah**; keadaan 5 =
+  pengecualian yang dinyatakan **wajib hijau tapi tercetak**. Diverifikasi:
+  keduanya berperilaku begitu, dan keduanya MERAH pada gerbang pra-perbaikan
+  (`d1a6a2e`) — jadi keduanya sungguh mengukur perbaikan ini.
+- PointingKit 830 uji hijau; `check-harness-terdaftar.py` 74/74;
+  `check-anchor-versi-lama.py` hijau; Apple Build **hijau**.
+
+### Yang TIDAK diklaim
+
+- **Tiga jangkar `bukti-mutasi-kasus-planet.py` masih tak terlihat gerbang.**
+  Penggantinya berbentuk **sisipan** yang **memuat jangkarnya sendiri**
+  (`"case saturn\n"` → `"case saturn\ncase uranus\n"`), jadi syarat
+  `jangkar hilang && pengganti ada` tidak pernah bisa terpenuhi — selama
+  jangkarnya masih ada, gerbang menjawab "bersih". Kelas ini sudah dicatat di
+  siklus sebelumnya dan **tidak** ditutup di sini; menutupnya menuntut kriteria
+  yang berbeda (mis. hitung kemunculan), bukan pembaca bentuk yang lebih luas.
+- **Deklarasi `JANGKAR_KECUALI` tidak membuktikan alasannya benar.** Gerbang
+  hanya memeriksa bahwa alasannya ada, berupa literal, dan cukup panjang untuk
+  dinilai. Harness yang menulis alasan masuk akal padahal jangkarnya sebenarnya
+  terbaca akan lolos. Yang menahannya: alasan itu **tercetak setiap kali
+  gerbang jalan**, jadi bisa dibantah di tinjauan.
+- **Satu batch kerja dibuang karena terbukti tidak berguna.** Perubahan pada
+  `_looks_like_path` dan `_edit_pairs` (menambah fallback wadah) diukur
+  berdampingan dengan `banding-cakupan.py`: **323 jangkar sebelum, 323
+  sesudah, 0 berkas berbeda** — no-op. Komentarnya mengklaim tiga keadaan
+  `-angka-kawah.py` "lenyap tanpa suara"; klaim itu **palsu**, dan yang salah
+  adalah **skrip pengukurnya sendiri** (memodelkan gerbang lebih sempit
+  daripada perilaku aslinya). Batch itu di-`git checkout` kembali. Pelajaran:
+  pengukur yang lebih sempit dari yang diukur akan "menemukan" cacat yang tidak
+  ada, dan klaim yang ditulis dari temuan itu ikut palsu.
+- Engine Tests (Linux) belum selesai saat catatan ini ditulis.
+
+### Pelajaran
+
+- **"Berapa yang terbaca" adalah pertanyaan yang harus dijawab angka, bukan
+  asumsi.** Gerbang ini sudah dua siklus dinyatakan beres; yang belum pernah
+  dilakukan adalah **menghitung** berapa harness yang dilewatinya. 40 dari 74.
+- **Pemeriksaan cakupan-nol tidak menangkap "sebagian hilang".** Gerbang
+  sebelumnya sudah punya penjaga `if not edits` — dan itu lolos dengan 40/74
+  karena yang diperiksa "semua hilang", bukan "satu hilang". Cakupan harus
+  dibandingkan dengan **jumlah harness di disk**, bukan dengan nol.
+- **Kebocoran nyata lebih meyakinkan daripada kebocoran yang ditanamkan.**
+  Yang menutup perdebatan bukan 22 angka di berkas ukur, melainkan gerbang
+  baru yang menangkap mutasi **hidup** di pohon kerja sesi paralel — sesuatu
+  yang gerbang lama, pada saat yang sama, baca sebagai 0 jangkar.
+- **Uji yang tidak pernah merah bukan bukti.** Keadaan 4 dan 5 harness
+  diverifikasi MERAH pada gerbang `d1a6a2e` sebelum dinyatakan sah.
+- **Pengukur sendiri bisa jadi sumber cacat palsu.** Batch yang dibuang itu
+  menghabiskan satu putaran penuh; yang menyelamatkannya adalah kebiasaan
+  mengukur **sebelum vs sesudah** pada berkas yang sama, bukan membaca ulang
+  komentar yang baru saja ditulis.
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harness yang tak terbaca gerbang jangkar + bukti Aturan 8 & 17)
 
 ### Mengapa siklus ini tidak mulai dari fitur
