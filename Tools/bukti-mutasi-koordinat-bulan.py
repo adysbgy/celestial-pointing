@@ -131,9 +131,19 @@ FIXTURE_LOW = """        XCTAssertGreaterThan(fromEphemeris.altitudeDeg, 88,
                              "fixture harus Bulan di atas 30°")
 """
 #: Keadaan 3: fixture dipaku ke waktu lain, sehingga Bulan tidak lagi tinggi.
-NIGHT_SCAN = """        let when = try XCTUnwrap(moonNightFixture(),
+#:
+#: Jangkar menyertakan komentar di atasnya supaya ia **tidak ambigu**:
+#: `let when = try XCTUnwrap(moonNightFixture(),` muncul dua kali di berkas
+#: itu (di uji siang-lawan-malam dan di uji ini), dan jangkar yang ambigu
+#: membuat harness menyasar uji yang salah sambil terlihat benar.
+NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
+        // tes ini tidak menguji apa pun dan harus gagal keras.
+        let when = try XCTUnwrap(moonNightFixture(),
                                  "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")"""
-NIGHT_SCAN_LOW = """        let when = try XCTUnwrap(epoch.addingTimeInterval(0),
+
+NIGHT_SCAN_LOW = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
+        // tes ini tidak menguji apa pun dan harus gagal keras.
+        let when = try XCTUnwrap(epoch.addingTimeInterval(0),
                                  "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")"""
 
 PROBE = r"""
