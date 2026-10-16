@@ -209,4 +209,95 @@ final class MoonDaylightHonestyTests: XCTestCase {
         XCTAssertNotEqual(moonRejection?.visibility, .daylight,
                           "saat gelap, Bulan tidak boleh ditolak karena daylight")
     }
+
+    // MARK: - Yang TIDAK diuji sampai siklus ini: koordinat Bulan dari efemeris
+
+    /// Bulan **tidak boleh** diperlakukan sebagai benda berkoordinat tetap.
+    ///
+    /// **Kenapa ini ditambahkan.** Seluruh tes kejujuran lain di repo ini —
+    /// termasuk empat uji di atas — menguji **penolakan** (tidak boleh lock).
+    /// Tidak satu pun menguji **posisinya**. Padahal ada satu asumsi struktural
+    /// yang menopang semuanya: benda tata surya dihitung dari `EphemerisSample`
+    /// (apparent of-date), bukan dari `raDeg`/`decDeg` pada `CelestialObject`.
+    ///
+    /// **Bentuk cacat yang dijaga.** `PointingResolver.consider` menerima
+    /// sebuah objek dan sebuah posisi horizontal. Untuk bintang, pemanggilnya
+    /// meneruskan pasangan (objek katalog, posisi hasil presesi). Untuk benda
+    /// tata surya, pasangannya adalah (objek dari `catalogueObject(for:sample:)`,
+    /// posisi dari `sample`). Kedua cabang terlihat identik di layar kode —
+    /// itulah kenapa cacat ini berbahaya: satu argumen tertukar (mis. memakai
+    /// `horizontal(of: object)`, jalur bintang, untuk benda tata surya) tidak
+    /// mengubah bentuk apa pun.
+    ///
+    /// **Apa yang terjadi kalau tertukar.** RA/Dec Bulan bergerak ~13,2°/hari
+    /// (~0,55°/jam) terhadap bintang. Jarak sudut dari posisi lamanya karena itu
+    /// melewati lebar kerucut (20°) dalam hitungan jam, dan mencapai puluhan
+    /// derajat dalam hitungan hari. Engine lalu mengklasifikasi visibilitas dan
+    /// menghitung separasi pada tempat yang sudah lama ditinggalkan Bulan: ia
+    /// bisa melaporkan Bulan yang sedang tinggi sebagai `belowHorizon`, atau
+    /// menolaknya karena `tooFaint`, dan `.lock` yang dihasilkan mengarah ke
+    /// arah yang salah sama sekali.
+    ///
+    /// **Yang diukur di sini: jarak antara koordinat tetap dan posisi nyata.**
+    /// Angka itu adalah **lebar cacatnya**, dan ia harus jauh lebih besar dari
+    /// toleransi mana pun yang masuk akal. Kalau suatu saat efemeris diganti
+    /// tabel J2000 (atau disuntik dengan koordinat tetap), jarak ini menciut
+    /// ke nol dan tes merah.
+    ///
+    /// **Kenapa ambangnya 10°, bukan angka yang lebih tajam.** Cacatnya
+    /// bergerak pada skala puluhan derajat, jadi ambang renggang tetap
+    /// menangkapnya sementara tes tidak ikut merah karena pembaruan model
+    /// efemeris yang menggeser satu-dua derajat. Uji yang rapuh akan dimatikan
+    /// orang, dan gerbang yang dimatikan sama dengan gerbang yang tidak ada.
+    func testMoonCataloguePositionIsNotItsCurrentPosition() throws {
+        let resolver = makeResolver()
+
+        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
+        // tes ini tidak menguji apa pun dan harus gagal keras.
+        let when = try XCTUnwrap(moonNightFixture(),
+                                 "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")
+
+        let sample = try XCTUnwrap(
+            try? AstronomyKitEphemeris().apparent(.moon, at: when, from: observer),
+            "efemeris Bulan harus tersedia pada waktu ini")
+        let fromEphemeris = try XCTUnwrap(
+            resolver.horizontal(ofBody: .moon, observer: observer, date: when),
+            "Bulan harus punya arah dari efemeris pada waktu ini")
+        XCTAssertGreaterThan(fromEphemeris.altitudeDeg, 30,
+                             "fixture harus Bulan di atas 30°")
+
+        // Koordinat J2000 yang menempel pada Bulan di katalog — jalur yang
+        // TIDAK boleh dipakai mesin. Benda tata surya tidak ada di dalam
+        // `Catalogue.brightStars`; yang mengikatnya ke katalog adalah
+        // `CelestialObject` hasil `catalogueObject(for:sample:)`, dan
+        // `raDeg`/`decDeg` di sana adalah salinan J2000 yang dibekukan pada
+        // saat berkas ini ditulis.
+        let frozen = CelestialObject(id: "moon", name: "Bulan", kind: .moon,
+                                     raDeg: 218.0, decDeg: -19.0, magnitude: -12.7)
+        let jd = SkyMath.julianDate(from: when)
+        let fromFrozen = SkyMath.equatorialToHorizontal(
+            SkyMath.precessJ2000ToDate(
+                EquatorialCoord(raDeg: frozen.raDeg, decDeg: frozen.decDeg), jd: jd),
+            observer: observer, jd: jd)
+
+        let separation = SkyMath.angularSeparationHorizontalDeg(fromEphemeris, fromFrozen)
+        XCTAssertGreaterThan(separation, 10.0,
+                             "koordinat tetap Bulan berjarak hanya \(separation)° dari "
+                             + "posisi efemerisnya; kalau mesin memakai koordinat tetap, "
+                             + "visibilitas dan separasinya dihitung di tempat yang salah")
+
+        // Dan jalur yang benar-benar dipakai mesin tidak boleh menganggap Bulan
+        // di bawah horizon saat ia sedang tinggi. Kalau posisinya dihitung dari
+        // koordinat tetap, penolakannya `belowHorizon` atau `tooFaint` — bukan
+        // alasan lain yang jujur.
+        let resolution = resolver.diagnose(pointing: fromEphemeris,
+                                           observer: observer,
+                                           date: when,
+                                           coneDeg: 20.0)
+        let moonRejection = resolution.rejected.first { $0.object.id == "moon" }
+        XCTAssertNotEqual(moonRejection?.visibility, .belowHorizon,
+                          "Bulan di atas 30° tidak boleh ditolak karena horizon; "
+                          + "itu tanda posisinya dihitung dari koordinat tetap")
+        XCTAssertEqual(sample.illuminationFraction >= 0, true)
+    }
 }

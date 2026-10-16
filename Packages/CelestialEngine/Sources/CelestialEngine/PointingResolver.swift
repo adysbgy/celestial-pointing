@@ -270,11 +270,24 @@ public struct PointingResolver {
             for body in EphemerisBody.pointableBodies {
                 do {
                     let sample = try ephemeris.apparent(body, at: date, from: observer)
-                    consider(Self.catalogueObject(for: body, sample: sample),
-                             horizontal: SkyMath.equatorialToHorizontal(
-                                EquatorialCoord(raDeg: sample.raDeg, decDeg: sample.decDeg),
-                                observer: observer, jd: jd
-                             ),
+                    // **[MODEL]** Benda tata surya memakai koordinat
+                    // **efemeris** (`sample`), bukan tabel J2000 katalog.
+                    // Bulan bergerak ~13,2°/hari, jadi memakai `raDeg`/`decDeg`
+                    // bawaannya (satu-satunya jalur lain, dan bentuknya identik
+                    // dengan cabang bintang di atas) akan mengklasifikasi
+                    // visibilitas dan menghitung separasi pada posisi yang
+                    // sudah lama ditinggalkan benda itu. Kontrak ini dikunci
+                    // oleh `testMoonCataloguePositionIsNotItsCurrentPosition`.
+                    let object = Self.catalogueObject(for: body, sample: sample)
+                    let horizontal = SkyMath.equatorialToHorizontal(
+                        EquatorialCoord(raDeg: sample.raDeg, decDeg: sample.decDeg),
+                        observer: observer, jd: jd
+                    )
+                    // **[MODEL]** Objek yang benar-benar diklasifikasi adalah
+                    // `object`, dan posisi yang benar-benar dipakai adalah
+                    // `horizontal` — keduanya berasal dari sampel yang sama.
+                    consider(object,
+                             horizontal: horizontal,
                              magnitude: sample.magnitude)
                 } catch {
                     failures.append(body)
