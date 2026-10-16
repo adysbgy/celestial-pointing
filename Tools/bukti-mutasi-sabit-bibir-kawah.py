@@ -143,7 +143,8 @@ perbedaan terang/gelap antar-kawah tanpa satu pun suara.
     bergeser. Tidak ada klaim bahwa perangkat menggambar kawah dengan lebar
     persis itu.
   - `check_crater_rim_opacity_is_not_clamped` (klem `max(rs, 0.2)`) sudah
-    menjaga satu bagian kelas yang sama dan **tidak** disentuh siklus ini.
+    dijaga **di siklus ini** — keadaan 11–14 di bawah menutupnya setelah
+    gerbangnya diperbaiki supaya membaca situs kedua.
   - `check_no_loop_variable_leaks_into_a_call` dan sisa **12 gerbang nirsaksi
     lain** belum punya harness. Siklus ini menutup satu, bukan kelasnya.
 
@@ -556,16 +557,14 @@ STATES = [
                                   "0.50 * strength"))],
      {OPACITY: MERAH, OPACITY_PORT_NAMED: MERAH}),
 
-    # 13: **kedua** bahasa situs Bulan bergeser bersama. Arah paling senyap:
-    #     tidak ada yang menyimpang di antara keduanya, yang berubah hanya
-    #     kesepakatannya dengan konstanta bernama `CRATER_RIM_OPACITY`.
-    #     Tanpa keadaan ini, "kedua sisi sama" akan terbaca sebagai "benar".
-    ("13. KEDUA bahasa BULAN: 0.90 -> 0.50 bersama",
+    # 13: faktor **view** situs Bulan bergeser, port tetap memakai konstanta.
+    #     Ini yang paling perlu ditangkap di sisi view: gambar kawah Bulan di
+    #     jam menyimpang dari yang diukur PNG. Port tetap memakai
+    #     `CRATER_RIM_OPACITY`, jadi pemeriksaan faktor per situs (situs 1)
+    #     tetap membacanya dan harus memerah.
+    ("13. view BULAN: faktor opasitas 0.90 -> 0.50 (port tetap konstanta)",
      [(VIEW, VIEW_RIM_FILL_MOON,
-       "            lit.fill(rimDisc, with: .color(rim.opacity(0.50 * strength)))"),
-      (RENDER, PORT_RIM_FILL_MOON,
-       PORT_RIM_FILL_MOON.replace("CRATER_RIM_OPACITY * strength",
-                                  "0.50 * strength"))],
+       "            lit.fill(rimDisc, with: .color(rim.opacity(0.50 * strength)))")],
      {OPACITY: MERAH, OPACITY_FACTOR_MOON: MERAH}),
 
     # 14: kontrol negatif untuk situs kedua. Komentar ditambahkan di ujung
