@@ -1,3 +1,86 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: tiga harapan basi, satu klaim palsu yang ikut ter-commit)
+
+### Kenapa siklus ini masih bukan fitur baru
+
+`main` merah. Sebelum apa pun ditambah, yang merah harus hijau — dan yang
+ditemukan bukan satu cacat, melainkan **tiga penjaga** yang berhenti menilai
+apa yang gerbangnya lakukan sesudah katalog bertambah Uranus + Neptunus
+(`27dd677`), plus satu salah klaim yang lolos ke `main` karena ikut
+ter-commit bersama pekerjaan orang lain.
+
+Kelasnya sama di keempatnya, dan itu kelas termahal di repo ini: **bukan
+gerbang yang salah, melainkan angka yang mengelilinginya yang berhenti
+bergerak saat subjeknya bertambah.** Gerbang yang merah pada sumber bersih
+dibaca orang sebagai "gerbang rusak", lalu dimatikan — padahal gerbangnya
+yang paling benar di antara ketiganya.
+
+### Yang diperbaiki (commit `001180f` lalu `914f210`)
+
+1. **`Tools/bukti-mutasi-sabuk-uranus.py`** — `FULL` menuntut **21** hasil,
+   gerbang `check_modeled_port_constants_match_the_model` sekarang
+   mengeluarkan **23**. Dua yang hilang:
+   `model→port: ciri uranus sama` dan `model→port: ciri neptune sama` —
+   gerbang membandingkan nama ciri tiap planet, dan sejak dua planet itu
+   masuk katalog, keduanya ikut dibandingkan. Himpunan dituntut **persis**,
+   jadi kekurangan dua entri memerahkan keadaan 1–7 dengan "hasil tak
+   terduga". Terukur ulang: 23 hasil, tujuh di antaranya `ciri … sama`.
+
+2. **`Tools/bukti-mutasi-ciri-malam.py`** — keadaan 1 mengharapkan **4**
+   merah, terukur **6**. Gerbang malam mengukur **tujuh** ciri planet;
+   meratakan seluruh terang malam memerahkan enam dari tujuh (yang luput
+   hanya cincin Saturnus, nisbah 0.987 di atas lantai 0.70).
+
+3. **Klaim docstring yang ketinggalan**, dan kenapa itu ikut diperbaiki:
+   paragraf gerbang malam masih menulis "dari lima gerbang ciri planet …
+   empat sisanya", tabel `NIGHT_WATCH_FEATURE_RETENTION` masih lima baris.
+   Klaim yang lebih kecil dari yang diukur membuat "hijau" dibaca lebih luas
+   daripada yang benar-benar diperiksa.
+
+4. **`Tools/check-visuals.py`, tabel margin cincin `14 → 0` dikembalikan ke
+   `14`.** Siklus sebelumnya men-commit suntingan **bukan miliknya** yang
+   mengubah angka itu. Angka `0` **salah**, dan harganya langsung terlihat:
+   harness `bukti-mutasi-angka-urutan-cincin.py` memutasi tabel itu
+   (`14 -> 0`) sebagai keadaan 3-nya, jangkarnya hilang, harness menolak
+   jalan. Yang benar diukur lewat pembaca yang memang ada untuk itu
+   (`saturn_back_half_inside_at_margin`):
+
+       margin 0,0   200 px -> 14 piksel (terjauh 0,5300 R; bola 0,53 R)
+       margin 0,02  200 px ->  0
+       margin 0,0    76 px ->  6
+       margin 0,02   76 px ->  0
+       terbalik     200 px -> 1643 (cacat yang ditangkap gerbang)
+
+   Seluruh piksel margin-nol duduk di dalam 0,0006 R dari tepi bola — itu
+   anti-aliasing di limb, dan itulah alasan `SATURN_LIMB_ANTIALIAS_MARGIN`
+   ada. Menulis `0` membuat tabel *mengklaim* gerbang bersih tanpa margin,
+   tepat kebalikan dari paragraf yang menjustifikasinya.
+
+### Bukti (bukan klaim)
+
+    ./swift-test.sh                      CelestialEngine 220, PointingKit 817, 0 gagal
+    python3 Tools/bukti-mutasi-sabuk-uranus.py
+        11 keadaan, semuanya sesuai harapan   <- tadinya 7 kelemahan
+    python3 Tools/bukti-mutasi-ciri-malam.py
+        5 keadaan, 0 tidak sesuai harapan     <- tadinya 1 keadaan salah
+    md5 CelestialVisual.swift / render-visuals.py: pulih persis
+    Apple Build (macos-15) pada 001180f: success
+
+### Yang TIDAK diklaim
+
+- Tidak satu pun gerbang diubah perilakunya. Yang diperbaiki: angka harapan
+  di dua harness, satu angka docstring yang dikembalikan ke nilai terukur,
+  dan dua klaim docstring yang ketinggalan.
+- Angka `23` dan `6` adalah **cacah terukur** pada katalog hari ini, bukan
+  nilai yang dikunci selamanya. Planet berikutnya akan memerahkan kedua
+  harness lagi — dan itu memang yang seharusnya terjadi: harapan yang tidak
+  ikut bergerak saat subjeknya bertambah adalah harapan yang berhenti
+  menilai.
+- Ini bukan jaminan tidak ada harapan basi lain. Sapuan penuh 70 harness
+  dijalankan di atas pohon bersih dan hasilnya dicatat terpisah; yang
+  dilaporkan hijau di sini hanya yang benar-benar dijalankan.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harapan harness kasus-planet diukur ulang, bukan ditebak)
 
 ### Kenapa siklus ini bukan fitur baru
