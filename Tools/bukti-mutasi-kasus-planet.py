@@ -28,8 +28,8 @@ Apa yang diukur harness ini.
 
   keadaan                                                    harapan
   [baseline]                                                 hijau (8/8)
-  1. model: +pluto (enum, palet .bands, showsPhase)          MERAH 2 kawat
-  2. model + port: pluto di kedua bahasa                     MERAH 2 kawat
+  1. model: +pluto (enum, palet .bands, showsPhase)          MERAH 5 kawat
+  2. model + port: pluto di kedua bahasa                     MERAH 5 kawat
   3. model: jupiter .bands -> .none                          MERAH 1 kawat
   4. model: satu kasus palet kehilangan badan terbaca        MERAH 2 kawat
   5. gerbang: pasangan mars hilang dari "hilang saat ragu"    MERAH 1 kawat
@@ -39,6 +39,15 @@ Apa yang diukur harness ini.
      — dan aturan kejujuran kini berlaku untuknya: dua pemeriksaan
      "pita Pluto" dari `check_features_disappear_when_uncertain` hijau
   9. **enum baru sesudah palet** (kode sah, palet utuh)        **hijau 8/8**
+
+**Kenapa tabel di atas menyebut lima, padahal harapan kodenya sempat dua.**
+Baris 1 dan 2 mengikuti ukuran, bukan kebiasaan: harapan keadaannya sempat
+ditulis `_full(TERKUNCI, RAGU)` — dua kawat — sementara gerbang yang sebenarnya
+berbunyi berbunyi **lima**. Ketiga kawat sisanya adalah pemeriksaan cakupan
+gerbang ciri (`GERBANG_RAGU`, `GERBANG_JAM`, `GERBANG_MALAM`), yang dibelakangi
+**sesudah** angka dua itu ditulis. Tabel ini ikut diukur ulang, bukan
+disalin, supaya ia tidak mengulangi cacat yang justru sedang diceritakan
+bagian bawah docstring ini.
 
 **Kenapa planet "baru"-nya Pluto, bukan Uranus.** Uranus sudah ada di enum,
 di `showsPhase`, dan di palet sejak `27dd677` (URANUS + NEPTUNUS), jadi
@@ -425,22 +434,55 @@ STATES = [
     #
     # Terukur di kotak pasir (lihat docstring): lima merah, dan yang tetap
     # hijau di antaranya `SEPAKAT` & `CIRI_MATI`.
+    #
+    # **Kenapa kelimanya, bukan dua.** Sampai siklus ini harapannya ditulis
+    # `_full(TERKUNCI, RAGU)` — peninggalan dari bentuk gerbang yang lebih
+    # tua, ketika ketiga pemeriksaan cakupan gerbang ciri (`GERBANG_RAGU`,
+    # `GERBANG_JAM`, `GERBANG_MALAM`) belum ada. Ketiganya kini membandingkan
+    # daftar planet berciri **dari model** dengan pasangan yang ada di
+    # ketiga gerbang ciri, jadi planet berciri yang baru ditambahkan memerahkan
+    # ketiganya sekaligus — dan itu memang yang diinginkan: planet baru yang
+    # belum punya pasangan kasus render berarti aturan kejujuran tidak berlaku
+    # baginya. Harapan lama menyebut dua, ukuran menyebut lima; yang benar
+    # adalah ukurannya.
+    #
+    # Diukur dalam proses baru atas kotak pasir (sumber + pembaca, `ROOT`
+    # diarahkan ke salinannya):
+    #
+    #     STATE 1 -> 8 hasil
+    #       OK    setiap cabang palet terbaca
+    #       OK    switch palet & tabel palet sepakat
+    #       RED   setiap planet di model punya kasus terkunci
+    #       RED   setiap planet berciri punya kasus ragu
+    #       OK    tidak ada ciri yang tidak dipakai planet mana pun
+    #       RED   gerbang ciri hilang saat ragu memuat semua planet berciri
+    #       RED   gerbang ciri pada ukuran jam memuat semua planet berciri
+    #       RED   gerbang ciri pada ukuran jam di mode malam memuat semua
+    #             planet berciri
     ("1. model: +pluto (enum, palet .bands, showsPhase)",
      [(MODEL, ENUM_OLD, ENUM_NEW, None),
       (MODEL, PHASE_OLD, PHASE_NEW, None),
       (MODEL, SATURN_CASE, SATURN_CASE + PLUTO_CASE, None)],
-     _full(TERKUNCI, RAGU), False),
+     _full(TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM), False),
 
     # ── Keadaan paling sunyi: kedua bahasa sepakat ───────────────────────
     # Tidak ada drift antarbahasa yang bisa diberitakan. Kalau gerbang ini
     # tidak ada, Pluto tampil di jam dengan pita yang tidak pernah diukur
     # hilang saat engine ragu.
+    #
+    # Harapannya **lima merah yang sama** dengan keadaan 1, dan itu terukur:
+    # port Python tidak mengubah apa yang dilihat gerbang ini — gerbang
+    # membandingkan `switch` Swift, tabel palet Swift, dan daftar pasangan
+    # kasus di gerbang ciri; ketiganya tidak tersentuh oleh port. Yang
+    # dibuktikan keadaan 2 justru **`SEPAKAT` tetap hijau**: kedua bahasa
+    # sepakat delapan planet, jadi tidak ada ketidaksepakatan yang bisa
+    # menyamar sebagai sebab, dan yang merah benar-benar cakupan.
     ("2. model + port: pluto di kedua bahasa",
      [(MODEL, ENUM_OLD, ENUM_NEW, None),
       (MODEL, PHASE_OLD, PHASE_NEW, None),
       (MODEL, SATURN_CASE, SATURN_CASE + PLUTO_CASE, None),
       (RENDER, PORT_HEAD, PORT_HEAD + PORT_PLUTO, None)],
-     _full(TERKUNCI, RAGU), False),
+     _full(TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM), False),
 
     # ── Ciri jadi mati ───────────────────────────────────────────────────
     # Jupiter kehilangan pitanya, jadi `bands` adalah ciri yang **tidak

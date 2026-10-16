@@ -1,3 +1,68 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harapan harness kasus-planet diukur ulang, bukan ditebak)
+
+### Kenapa siklus ini bukan fitur baru
+
+Repo ini sudah menyelesaikan Fase 1–C (engine 220, PointingKit 817, visual
+prosedural, mode malam, AOD, VoiceOver, lokalisasi, complication). Yang
+dibuka siklus ini bukan layar, melainkan **harness** yang memagari gerbang
+visual terpenting: `Tools/bukti-mutasi-kasus-planet.py`.
+
+### Cacat yang diangkat
+
+Harness itu **salah melaporkan kegagalan** pada gerbang yang sebenarnya
+hijau. Keadaan 1 dan 2 mengharapkan **dua** kawat merah (`_full(TERKUNCI,
+RAGU)`), padahal gerbang `check_every_planet_in_the_model_has_render_cases`
+sekarnya memerahkan **lima** — tiga kawat cakupan gerbang ciri
+(`GERBANG_RAGU`, `GERBANG_JAM`, `GERBANG_MALAM`) dibelakangi **sesudah**
+angka dua itu ditulis, jadi ia tidak pernah masuk harapan. Tabel ringkasan di
+docstring (`MERAH 2 kawat`) pun ikut ketinggalan, sementara paragraf di bawah
+docstring yang sama sudah menulis lima.
+
+Bentuk ini persis kelas yang paling mahal di repo ini: **bukan gerbang yang
+rusak, melainkan penjaganya yang diam-diam tidak menilai apa yang gerbang
+lakukan** — dan karena harness melapor "TIDAK SESUAI HARAPAN" pada sumber
+bersih, ia menutupi sinyal asli.
+
+### Yang diukur sebelum memperbaiki
+
+Gerbang dijalankan dalam proses baru atas kotak pasir (sumber + pembaca,
+`ROOT` diarahkan ke salinannya) untuk keadaan 1 dan 2:
+
+    STATE 1 -> 8 hasil  (5 merah: TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM)
+    STATE 2 -> 8 hasil  (sama; SEPAKAT tetap hijau — kedua bahasa sepakat)
+
+Jadi gerbangnya **benar**: lima merah adalah yang diinginkan, dan `SEPAKAT`
+hijau membuktikan keadaan 2 memang "kedua bahasa sepakat", bukan drift.
+Yang salah adalah harapan harness + tabel docstring.
+
+### Yang diperbaiki
+
+- Keadaan 1 & 2: `_full(TERKUNCI, RAGU)` →
+  `_full(TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM)`.
+- Tabel ringkasan di atas docstring: `MERAH 2 kawat` → `MERAH 5 kawat` untuk
+  baris 1 dan 2, plus catatan kenapa angkanya lima bukan dua.
+
+### Bukti (bukan klaim)
+
+    ./swift-test.sh            PointingKit 817, 0 gagal (CelestialEngine 220)
+    python3 Tools/bukti-mutasi-kasus-planet.py
+        10 keadaan, semuanya sesuai harapan   <- tadinya 2 keadaan salah
+    md5 CelestialVisual.swift / check-visuals.py / render-visuals.py: pulih persis
+    ./swift-ui-lint.sh        37 aturan lulus
+
+### Yang TIDAK diklaim
+
+- Perbaikan ini **bukan** perbaikan gerbang — gerbang tidak diubah satu baris
+  pun. Ini perbaikan *harness* yang membaca gerbang, supaya ia kembali
+  menilai yang benar-benar terjadi.
+- Diuji kejujuran harapan: saat satu kawat cakupan (`GERBANG_MALAM`) sengaja
+  dikeluarkan dari harapan, harness kembali **merah** (1 kelemahan) — jadi
+  angka lima itu beban, bukan dekorasi.
+- Tidak ada perubahan visual atau paket. Siklus ini memperbaiki *penjaga*,
+  bukan gambar.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harness kasus-planet diperbaiki, dan cacat gerbang yang tersembunyinya diangkat)
 
 ### Kenapa siklus ini tidak mengerjakan UI
