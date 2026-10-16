@@ -27,18 +27,18 @@ Apa yang diukur harness ini.
 **yang wajib hijau**:
 
   keadaan                                                    harapan
-  [baseline]                                                 hijau (7/7)
-  1. model: +pluto (enum, palet .bands, showsPhase)          MERAH 5 kawat
-  2. model + port: pluto di kedua bahasa                     MERAH 5 kawat
+  [baseline]                                                 hijau (8/8)
+  1. model: +pluto (enum, palet .bands, showsPhase)          MERAH 2 kawat
+  2. model + port: pluto di kedua bahasa                     MERAH 2 kawat
   3. model: jupiter .bands -> .none                          MERAH 1 kawat
-  4. model: satu kasus palet kehilangan badan terbaca        MERAH 1 kawat
+  4. model: satu kasus palet kehilangan badan terbaca        MERAH 2 kawat
   5. gerbang: pasangan mars hilang dari "hilang saat ragu"    MERAH 1 kawat
   6. gerbang: pasangan venus hilang dari "ukuran jam"         MERAH 1 kawat
   7. gerbang: pasangan jupiter memakai nama saturn            MERAH 1 kawat
-  8. **pluto terpasang lengkap** (model+port+kasus+gerbang)    **hijau 7/7**
+  8. **pluto terpasang lengkap** (model+port+kasus+gerbang)    **hijau 8/8**
      — dan aturan kejujuran kini berlaku untuknya: dua pemeriksaan
      "pita Pluto" dari `check_features_disappear_when_uncertain` hijau
-  9. **enum baru sesudah palet** (kode sah, palet utuh)        **hijau 7/7**
+  9. **enum baru sesudah palet** (kode sah, palet utuh)        **hijau 8/8**
 
 **Kenapa planet "baru"-nya Pluto, bukan Uranus.** Uranus sudah ada di enum,
 di `showsPhase`, dan di palet sejak `27dd677` (URANUS + NEPTUNUS), jadi
@@ -429,7 +429,7 @@ STATES = [
      [(MODEL, ENUM_OLD, ENUM_NEW, None),
       (MODEL, PHASE_OLD, PHASE_NEW, None),
       (MODEL, SATURN_CASE, SATURN_CASE + PLUTO_CASE, None)],
-     _full(TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM), False),
+     _full(TERKUNCI, RAGU), False),
 
     # ── Keadaan paling sunyi: kedua bahasa sepakat ───────────────────────
     # Tidak ada drift antarbahasa yang bisa diberitakan. Kalau gerbang ini
@@ -440,7 +440,7 @@ STATES = [
       (MODEL, PHASE_OLD, PHASE_NEW, None),
       (MODEL, SATURN_CASE, SATURN_CASE + PLUTO_CASE, None),
       (RENDER, PORT_HEAD, PORT_HEAD + PORT_PLUTO, None)],
-     _full(TERKUNCI, RAGU, GERBANG_RAGU, GERBANG_JAM, GERBANG_MALAM), False),
+     _full(TERKUNCI, RAGU), False),
 
     # ── Ciri jadi mati ───────────────────────────────────────────────────
     # Jupiter kehilangan pitanya, jadi `bands` adalah ciri yang **tidak
@@ -670,7 +670,17 @@ def main():
                     # bentuk yang diharapkan lahir dari cara gerbangnya berhenti.
                     # Yang dibandingkan karena itu: verdict untuk nama yang
                     # memang dilaporkan, dan larangan atas nama tak terduga.
-                    if expected.get(SEPAKAT) == MERAH:
+                    # **Gerbang yang tidak melaporkan apa pun selalu "sesuai
+                    # harapan"** — pemeriksaan atas himpunan kosong tidak bisa
+                    # salah, jadi abort total akan lulus diam-diam. Itu bentuk
+                    # paling sunyi dari harness yang tidak mengukur apa pun,
+                    # dan ia pernah hampir terjadi di sini: `return` pada
+                    # pembaca membuat gerbang keluar tanpa satu pun Result.
+                    if not gate:
+                        problems.append(
+                            "gerbang tidak melaporkan satu pun pemeriksaan — "
+                            "abort, bukan merah yang bisa dibaca")
+                    elif expected.get(SEPAKAT) == MERAH:
                         expectation = {n: w for n, w in expected.items()
                                        if n in gate}
                     else:
