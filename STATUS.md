@@ -24799,3 +24799,105 @@ Uji baru: `testNeutralStarColourIsActuallyAchromatic`,
   hilang; harness melaporkan "jangkar muncul 0x" — bukan lulus. Yang diperbaiki
   adalah jangkarnya, dan sekaligus ditambah keadaan 4 yang membuktikan gerbang
   akromatik baru tidak hampa.
+
+## Siklus 16 Okt (siang) #272 — aplikasi astronomi tanpa langit (DIKIRIM, HIJAU)
+
+### Cacat yang ditutup
+
+Pengguna menilai UI masih "jelek", dan seluruh pohon kerja sebelumnya
+menjawabnya dengan merapikan **kartu**. Pemeriksaan isi repo menunjukkan
+kartunya sudah matang: palet bertingkat teruji kontrasnya, mode malam,
+AOD, VoiceOver, lokalisasi 516 kunci tanpa sisa, complication, izin
+sensor — semuanya ada. Yang tidak ada adalah **langit**: seluruh layar
+dibangun di atas `SurfacePalette.appBackground`, yaitu gradien dua warna
+tanpa apa pun di antaranya.
+
+Itu menjelaskan keluhan yang tidak bisa dijawab dengan merapikan kartu.
+Aplikasi sekelas Star Walk / Sky Tonight menaruh datanya **di atas
+langit**; tanpa langit, kartu yang sudah rapi tetap terbaca sebagai
+daftar pengaturan, bukan jendela ke langit.
+
+### Yang ditambahkan
+
+- `SkyBackdrop` (PointingKit): model langit berbintang, deterministik
+  (SplitMix64 berseod), 11 uji.
+- `SkyBackdropView` (Apps/Shared): mengubah angka itu menjadi piksel;
+  `appBackdrop()` dipakai 5 layar.
+- Layar Always-On (`ReducedLuminanceView`) memakai
+  `appBackdrop(starfield: false)` — langit mati saat layar redup.
+
+### Batasnya adalah inti perubahan, bukan hiasannya
+
+Titik latar **tidak** mewakili bintang nyata. Membiarkannya terbaca
+sebagai "benda yang baru saja dikunci" adalah kebohongan yang lebih
+halus daripada menyebut nama yang salah — tidak ada teks di layar yang
+bisa dibantah. Dua hal dikunci uji, bukan niat:
+
+1. **Ukuran** < bintang paling redup yang bisa dikenali engine. Batasnya
+   diturunkan dari `Catalogue.brightStars` (Polaris, mag 1.98 → 0.2014),
+   **bukan diketik** — jadi menambah bintang redup ke katalog otomatis
+   mengecilkan batasnya. Dikalikan 0.55 agar jaraknya terlihat, bukan
+   cuma ada (uji terpisah: selisih 0.0001 memenuhi "lebih kecil" tetapi
+   tidak terlihat sebagai dua kelas).
+2. **Warna akromatik.** Rona spektral adalah ciri pengenal — merahnya
+   Betelgeuse sama meyakinkannya dengan cincin Saturnus — dan hiasan
+   tidak boleh punya ciri pengenal.
+
+### Cacat yang ditemukan dengan mengukur, dua kali
+
+Pembangkit `seed + index·K` membuat aliran titik ke-i **bersambung** ke
+aliran sebelumnya: karena `next()` menambah K lebih dulu, nilai pertama
+aliran i persis sama dengan nilai kedua aliran i−1. **89 titik beruntun**
+punya x yang sama dengan y titik sebelumnya (400×400). Langitnya
+berbentuk untaian diagonal: mata membacanya sebagai pola, dan pola pada
+latar mengundang pengguna mencari arti yang tidak ada — kebalikan dari
+tujuan lapisan ini.
+
+Percobaan pertama (menyisipkan satu nilai yang dibuang) **tidak**
+menyembuhkannya, dan ini yang penting: rantainya ada di **antara**
+aliran, bukan di antara nilai berturutan dalam satu aliran. Yang
+menyembuhkan adalah mengavalanche indeks lewat finalizer SplitMix64
+(`SkyBackdrop.mix`), sehingga dua aliran yang berdekatan tidak punya
+hubungan yang bisa ditebak — sifat "bidang membesar tanpa menggeser
+titik yang sudah ada" tetap terpelihara.
+
+### Bukti (bukan klaim)
+
+- 11 uji baru; **tiap-tiap** dibuktikan merah sebelum diperbaiki:
+  mutasi margin ukuran → merah, mutasi seed → merah, mutasi rantai →
+  merah (89 kegagalan). Uji yang tidak pernah merah bukan bukti.
+- Distribusi **diukur**, bukan diklaim: NN ratio 1.16 (acak; <1
+  menggumpal, >1 berkisi), chi² 9.56 pada df=15 (tak berkisi), 0 titik
+  berantai.
+- Mode malam **diukur** pada tiruan bertingkat: kanal hijau/ biru sama
+  dengan latar (maks 10/15), jadi tidak ada emisi non-merah yang luput.
+- PointingKit 819 → 830 uji hijau; lint 37 aturan hijau (Aturan 10
+  menuntut README diperbarui, sudah); typecheck hijau; 73/73 harness
+  terdaftar; 202 jangkar tanpa mutasi tertinggal.
+- Apple Build **hijau** setelah satu perbaikan nyata: `RGBComponents`
+  sengaja buta SwiftUI, jadi jembatan `.color` ada di `SurfaceColor`.
+
+### Yang TIDAK diklaim
+
+- Tampilan akhir **belum pernah dilihat** di perangkat maupun simulator:
+  tidak ada Xcode di VPS. Yang diverifikasi adalah angka-angkanya dan
+  bahwa ia terkompilasi di macOS tanpa peringatan.
+- "Pengguna sudah tidak menganggapnya jelek" **tidak** diklaim. Yang
+  diklaim: satu sebab yang terukur sudah dihilangkan.
+- Engine Tests (Linux) untuk dorongan ini belum selesai saat catatan
+  ini ditulis.
+
+### Pelajaran
+
+- **Keluhan "jelek" bisa berarti "tidak ada tempat"**, bukan "tidak
+  rapi". Memeriksa isi repo lebih dulu menghemat sebuah siklus yang
+  akan dihabiskan untuk memoles kartu yang sudah benar.
+- **Hiasan adalah tempat paling mudah menyelundupkan klaim.** Tidak ada
+  teks yang menyebutnya, jadi satu-satunya yang bisa membuktikan ia
+  tidak berbohong adalah uji — dan uji itu harus menguji **sifat**
+  (akromatik, di bawah ambang), bukan pasangan nilai.
+- **Membuang satu nilai tidak memutus rantai yang ada di antara
+  aliran.** Dua percobaan salah arah terbuang karena gejalanya dibaca
+  sebagai "nilai berturutan", padahal rantainya hidup di keadaan awal
+  tiap aliran. Mengukur 89 kegagalan itulah yang mengarahkan ke
+  tempat yang benar.
