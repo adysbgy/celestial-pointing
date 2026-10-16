@@ -1,3 +1,51 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: verifikasi premis brief + satu unit poles kaca)
+
+### Temuan pembuka: premis brief sudah terwujud sepenuhnya
+Siklus ini dibuka dengan membaca `git log`/`gh run`, bukan brief. Yang
+ditemukan: seluruh BAGIAN 1–4, FASE A/B/C **sudah ada dan ter-gerbang** di
+`Apps/`, persis seperti yang dicatat siklus-siklus sebelumnya dan memori
+sesi. Yang dikerjakan bukan fitur baru, melainkan satu-satunya ketegangan
+nyata terhadap brief yang belum beres:
+
+- **Glassmorphism (BAGIAN 2)** meminta `.ultraThinMaterial`, tapi
+  `SurfaceTokens.swift` sengaja **menolak** material karena kontras teks tak
+  terjamin. Itu keputusan yang benar soal kontras, tapi meninggalkan rasa
+  "kaca" yang diminta brief tak terpenuhi.
+
+### Yang dikerjakan (satu unit terkecil, terverifikasi macOS)
+`surfaceCard` (`Apps/Shared/SurfaceTokens.swift`) kini **menumpuk**
+`.ultraThinMaterial` pada opasitas rendah `0.10` **di atas** alas token
+buram yang kontrasnya sudah lulus `SurfacePaletteTests`. Teks tetap duduk di
+atas alas buram, jadi klaim kontras 4.5:1 tidak bergeser; material hanya
+menyapu permukaan kosong kartu sebagai kilau frosted. Satu titik lintasan
+(`surfaceCard`) berarti Watch + iPhone ikut berubah.
+
+### Kenapa (bukan sekadar apa)
+Penolakan material versi lama benar: material di opasitas penuh menggeser
+luminans efektif di bawah teks melewati ambang WCAG, dan tidak ada gerbang
+kontras di lapisan `Apps/`. Lapisan rendah-opasitas menjawab brief tanpa
+membatalkan jaminan itu — lalu menyatakannya: angkanya pilihan desain, bukan
+hasil ukur perangkat (tidak ada gate yang mengukur render kartu macOS).
+
+### Verifikasi
+- `./swift-test.sh` → PointingKit **831 hijau** (CelestialEngine 222); tak
+  disentuh, perubahan hanya di `Apps/`.
+- `./swift-ui-lint.sh` → **37 aturan hijau**.
+- `./swift-typecheck.sh` → **SEMUA GERBANG LULUS** (parse).
+- Apple Build (macos-15), commit `63b221f` → **success** (compiler warning
+  kode sendiri = gagal; jadi tanpa warning).
+- Linux Engine Tests (38973190442) masih `in_progress` saat catatan ini —
+  perubahan berada di `Apps/`, yang tidak dibangun Linux, jadi tak memengaruhi
+  222+831.
+
+### Yang TIDAK diklaim
+- Ini bukan "menambah fitur baru" — brief sudah lengkap. Unit ini menutup
+  satu-satunya celah rasa yang benar-benar kontradiktif dengan kode ada.
+- Opasitas `0.10` belum diukur perangkat; ia sengaja rendah supaya tidak
+  mengubah kontras teruji, dan docstring menyebutnya pilihan desain.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang kawah buta pada situs kedua, dan harness yang menolak jalan karena itu)
 
 ### Ringkas
