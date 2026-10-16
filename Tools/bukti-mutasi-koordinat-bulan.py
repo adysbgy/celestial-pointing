@@ -16,9 +16,12 @@ pasangannya (objek hasil `catalogueObject(for:sample:)`, posisi dari
 `sample`). Kedua cabang itu **terlihat identik** di layar kode — itulah
 kenapa cacat ini berbahaya: satu argumen tertukar tidak mengubah bentuk apa
 pun, tidak menghasilkan peringatan compiler, dan tidak menyentuh satu pun
-dari empat uji kejujuran Bulan yang sudah ada (`testMoonDaytimeNeverLocks`,
-`testMoonDaytimeRefusalIsHonest`, `testMoonAtNightIsNotRejectedForDaylight`,
-`testMoonBelowHorizonNeverLocks`) — terukur di harness ini, lihat keadaan 1.
+dari empat uji kejujuran Bulan yang sudah ada — terukur di harness ini untuk
+ketiga uji yang tinggal di suite yang sama (`testMoonDaytimeNeverLocks`,
+`testMoonDaytimeRefusalIsHonest`, `testMoonAtNightIsNotRejectedForDaylight`);
+yang keempat (`testMoonBelowHorizonNeverLocks`) hidup di
+`BelowHorizonHonestyTests`, jadi filter suite ini tidak menjalankannya dan
+harness **tidak** mengklaimnya.
 
 Kenapa uji Swift lain tidak bisa menggantikannya. Seluruh tes kejujuran di
 repo ini menguji **penolakan** ("tidak boleh lock"). Yang diuji di sini
@@ -32,7 +35,7 @@ Apa yang diukur harness ini.
   keadaan                                                       harapan
   [baseline] sumber bersih                                      HIJAU 5/5
   1. resolver: posisi benda tata surya dipaku koordinat tetap    MERAH 1/5
-     (cacat aslinya; empat uji Bulan lain tetap hijau)
+     (cacat aslinya; tiga uji Bulan lain di suite ini tetap hijau)
   2. resolver: koordinat tetap DIAM, efemeris yang bergerak      HIJAU 5/5
      (kontrol negatif — bukan koordinat tetapnya yang dibenci)
   3. uji: fixture malam dipindah ke siang                        MERAH 1/5
@@ -214,15 +217,14 @@ STATES = [
 
     # Cacat aslinya, dan satu-satunya keadaan yang membuktikan ujinya berbunyi.
     # Terukur: tepat satu uji merah (`testMoonCataloguePositionIsNot…`),
-    # empat uji Bulan lainnya **hijau** — bukti bahwa celahnya nyata dan tidak
-    # tertutup uji mana pun yang sudah ada.
+    # tiga uji Bulan lainnya **hijau** — bukti bahwa celahnya nyata dan tidak
+    # tertutup uji mana pun di suite ini.
     ("1. resolver: posisi benda tata surya dipaku koordinat tetap",
      [(RESOLVER, EFEMERIS_POSITION, FIXED_POSITION)],
      {CASE: "failed", "testMoonDaytimeNeverLocks": "passed",
       "testMoonDaytimeRefusalIsHonest": "passed",
-      "testMoonAtNightIsNotRejectedForDaylight": "passed",
-      "testMoonBelowHorizonNeverLocks": "passed"},
-     "ujinya berbunyi; empat uji Bulan lain tetap hijau"),
+      "testMoonAtNightIsNotRejectedForDaylight": "passed"},
+     "ujinya berbunyi; tiga uji Bulan lain di suite ini tetap hijau"),
 
     # Kontrol negatif: bukan koordinat tetapnya yang dibenci, melainkan
     # **dipakainya**. Di sini koordinat tetap di uji justru digeser, dan
