@@ -527,7 +527,7 @@ struct DiagnosticsView: View {
             // kedua tab tetap hidup. Siklus hidupnya ada di `RootView`, tempat
             // ia berjalan tepat sekali untuk seluruh app.
         }
-        .appBackground()
+        .appBackdrop()
         .forceDarkScheme()
     }
 

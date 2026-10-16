@@ -175,7 +175,7 @@ struct ReducedLuminanceView: View {
             .padding(.horizontal, 2)
             .frame(maxWidth: .infinity)
         }
-        .appBackground()
+        .appBackdrop(starfield: false)
         .forceDarkScheme()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(reducedAccessibilityLabel)

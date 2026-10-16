@@ -211,7 +211,7 @@ struct PointingView: View {
         // diuji kontrasnya benar-benar muncul — bukan chrome sistem yang
         // berbalik terang di iPhone yang disetel terang. Mode malam (merah)
         // adalah lapisan di atas skema gelap ini, bukan penggantinya.
-        .appBackground()
+        .appBackdrop()
         .forceDarkScheme()
         // Umumkan **perubahan** keadaan, bukan tiap sampel 20 Hz.
         //

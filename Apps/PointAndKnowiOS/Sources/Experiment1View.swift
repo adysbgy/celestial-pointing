@@ -96,7 +96,7 @@ struct Experiment1View: View {
             // dibagi dengan tab Diagnostik, dan `TabView` menahan kedua tab
             // tetap hidup.
         }
-        .appBackground()
+        .appBackdrop()
         .forceDarkScheme()
     }
 

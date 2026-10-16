@@ -101,7 +101,7 @@ struct LinkView: View {
             .scrollContentBackground(.hidden)
             .onAppear { link.activate() }
         }
-        .appBackground()
+        .appBackdrop()
         .forceDarkScheme()
     }
 
