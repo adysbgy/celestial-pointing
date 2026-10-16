@@ -553,7 +553,7 @@ def readable_core_radius(fraction, extent, reference, frame_half_extent):
 # bercak maria Bulan), jadi ia milik view dan **tidak** diklaim sebagai angka
 # model. Kalau ini berubah di view saja, gerbang gambar akan mengukur halo
 # yang tidak dipakai lagi; karena itu ia ikut dibaca `check_port_matches_swift_constants`.
-CLUSTER_CORE_HALO_SCALE = 40.0
+CLUSTER_CORE_HALO_SCALE = 2.4
 
 # MODEL: `VisualFrame.clusterCoreBrighten`. Penambahan opasitas inti di
 # atas blob yang menaunginya. **Dulu literal `0.25` di sini dan di view**,
