@@ -257,6 +257,15 @@ final class MoonDaylightHonestyTests: XCTestCase {
         let when = try XCTUnwrap(moonNightFixture(),
                                  "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")
 
+        // Fixture harus benar-benar malam. Uji ini membandingkan posisi
+        // efemeris dengan koordinat tetap, jadi ia tidak butuh langit gelap
+        // untuk **mengukur** apa pun — tapi tanpa penjaga ini ia akan tetap
+        // hijau seandainya `moonNightFixture()` suatu saat mengembalikan jam
+        // siang, dan namanya lalu berbohong tentang apa yang dibandingkan.
+        XCTAssertTrue(resolver.skyContext(observer: observer, date: when).isDark,
+                      "fixture harus malam; kalau tidak, uji ini membandingkan "
+                      + "posisi Bulan pada jam yang tidak pernah ia klaim")
+
         let sample = try XCTUnwrap(
             try? AstronomyKitEphemeris().apparent(.moon, at: when, from: observer),
             "efemeris Bulan harus tersedia pada waktu ini")

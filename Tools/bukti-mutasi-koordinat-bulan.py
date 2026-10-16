@@ -130,25 +130,19 @@ MOON_RA_NEW = "raDeg: 218.7, decDeg: -18.4"
 #: Keadaan 3: fixture dipindah ke **siang hari**, sehingga "fixture malam"
 #: tidak lagi malam dan penjaga ketat di uji itu berbunyi.
 #:
-#: **Dua tebakan pertama untuk keadaan ini terukur SALAH, dan keduanya
-#: dicatat di sini karena itu bagian dari buktinya.**
+#: **Kenapa `epoch` (jam siang), dan bukan jam malam hasil hitungan.**
+#: `moonNightFixture()` deterministik: jam ke-199 sesudah epok **adalah**
+#: jawabannya (hari ke-8 pukul 07.0, Bulan 37,7°, `isDark == true`, terukur).
+#: Jadi "memindahkan" fixture ke jam malam yang dihitung sendiri adalah
+#: **tidak memindahkannya** — harness-nya lalu hijau karena tidak mengubah
+#: apa pun, sekalipun ia mencetak "sesuai harapan". Ini terukur: keadaan
+#: dengan `epoch.addingTimeInterval(8*86400 + 7*3600)` hijau, dan yang
+#: membuatnya hijau bukan gerbangnya melainkan kenyataan bahwa nilainya sama.
 #:
-#:  1. `epoch.addingTimeInterval(0)` — disangka sama dengan fixture malam
-#:     "pertama". Terukur **salah**: `moonNightFixture()` baru menemukan
-#:     Bulan di atas 30° saat gelap pada hari ke-8 pukul 07.0 (199 jam
-#:     sesudah epok), bukan pada epok. Epok sendiri (15 Jan 2026 12:00 WIB)
-#:     justru **siang** (`isDark == false`, Matahari 75°) — dan itulah jam
-#:     pertama yang ditemukan `moonDaytimeFixture()`.
-#:  2. Naikkan penjaga `30` → `88`. Terukur hijau: dalam 120 hari Bulan
-#:     memang melewati 88°, jadi fixture-nya masih sah. Yang tidak dibuktikan
-#:     apa pun adalah keadaan yang tidak mengubah berkas, sekalipun ia hijau.
-#:
-#: Yang dipakai sekarang benar-benar mengubah perilaku uji: fixture siang
-#: dipakai di tempat yang menuntut fixture malam. Bulan di sana punya
-#: altitudin 42,6° (bukan 37,7°), dan penjaga `> 30` tetap lolos — jadi
-#: yang berbunyi di keadaan ini **bukan** penjaga itu, melainkan bagian
-#: berikutnya yang menuntut langit gelap. Itu dinyatakan di sini alih-alih
-#: disangka.
+#: Yang dipakai sekarang benar-benar mengubah perilaku uji: epok adalah jam
+#: **siang** (15 Jan 2026 12:00 WIB, Matahari 75°, `isDark == false`), dan
+#: angka tetap 218°/19° punya altitude 13,2° di sana. Penjaga malam di uji
+#: itu yang berbunyi.
 NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
         // tes ini tidak menguji apa pun dan harus gagal keras.
         let when = try XCTUnwrap(moonNightFixture(),
@@ -156,8 +150,8 @@ NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Ka
 
 NIGHT_SCAN_LOW = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
         // tes ini tidak menguji apa pun dan harus gagal keras.
-        let when = try XCTUnwrap(epoch.addingTimeInterval(8 * 86400 + 7 * 3600),
-                                 "tidak ada saat Bulan di atas 30° saat siang dalam 120 hari")"""
+        let when = try XCTUnwrap(epoch.addingTimeInterval(0),
+                                 "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")"""
 
 PROBE = r"""
 import os, subprocess, sys
