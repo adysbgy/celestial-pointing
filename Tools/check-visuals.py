@@ -4817,42 +4817,133 @@ def check_crater_rim_opacity_is_not_clamped(results):
     # `check_port_matches_swift_constants`. Yang tidak dijaga adalah faktor
     # yang dikalikan - dan di situlah klem itu bersembunyi.
     #
+    # **Setiap situs, bukan hanya yang pertama.** Versi sebelum perbaikan ini
+    # memakai `re.search`, yang mengembalikan kemunculan **pertama** saja.
+    # Sampai `27dd677` itu benar: cakram sabit bibir kawah digambar di satu
+    # tempat. Commit itu menambahkan tempat **kedua** - kawah Bulan
+    # (`drawMoonCraters` di view, blok kawah Bulan di port) - dan sejak itu
+    # `re.search` membaca kawah **planet** sementara kawah Bulan tidak diukur
+    # siapa pun. Terukur atas pohon bersih, **hanya** situs Bulan dimutasi,
+    # tiga gerbang kawah dijalankan di proses baru:
+    #
+    #     view Bulan  rim.opacity(0.9 * strength) -> ...(0.9 * max(strength, 0.2))
+    #                                                      3 gerbang, 0 gagal  <- buta
+    #     port Bulan  min(1.0, 0.9 * strength)    -> 0.50 * strength
+    #                                                      3 gerbang, 0 gagal  <- buta
+    #
+    # Klem yang sama di situs **planet** membuat gerbang ini merah. Jadi
+    # cacatnya bukan angkanya, melainkan pembacanya - kelas yang sama dengan
+    # yang `check_crater_drawing_constants` sudah tutup di siklus yang sama,
+    # dan yang sengaja ditutup di sini juga supaya kedua gerbang kawah tidak
+    # berbeda cakupan.
+    #
     # Ekspresi di port **bersarang**: `min(1,0, X * max(rs, 0,2))`. Jadi
-    # ditangkap dari `CRATER_RIM_OPACITY *` sampai akhir baris, bukan dengan
-    # pola `…([^,)]+)\)` — pola itu berhenti di kurung `max(` dan kembali
+    # ditangkap dari `min(1.0,` sampai kurung penutup pertamanya, bukan dengan
+    # pola `…([^,)]+)\)` - pola itu berhenti di kurung `max(` dan kembali
     # merah pada kode yang benar.
-    port_use = re.search(r"CRATER_RIM_OPACITY\s*\*\s*([^\n]+)", port)
-    if not port_use:
+    #
+    # Blok dibaca per **cakram bibir**, bukan per baris: kedua situs port
+    # memakai bentuk `canvas.disc(mx + rim_x * offset, …, mr * N, <warna>)`.
+    port_sites = []
+    for block in port.split("canvas.disc(mx + rim_x * offset")[1:]:
+        body = block.split("clip_disc=(mx, my, mr)")[0]
+        found = re.search(r"min\(\s*1\.0\s*,\s*([^\n]*?)\)", body)
+        port_sites.append(None if found is None else found.group(1).strip())
+    if not port_sites:
         results.append(Result(
             "kawah: opasitas bibir terbaca dari port", False,
-            "'CRATER_RIM_OPACITY * …' tidak ditemukan di render-visuals - "
-            "bentuk perhitungan opasitas tidak lagi terbaca"))
+            "'canvas.disc(mx + rim_x * offset, …' tidak ditemukan di "
+            "render-visuals - bentuk perhitungan opasitas tidak lagi terbaca"))
         return
 
-    factor = port_use.group(1).rstrip(" )").rstrip()
-    floor = re.search(r"max\([^,]+,\s*([\d.]+)", factor)
+    # **Situs kedua yang menulis angkanya sendiri.** `CRATER_RIM_OPACITY`
+    # hanya sampai ke situs planet; situs Bulan menulis `0.9` sebagai literal
+    # di **kedua** bahasa. Akibatnya menggeser `0,9` di situs Bulan - di
+    # bahasa mana pun, bahkan di kedua-duanya sekaligus - tidak digigit
+    # gerbang apa pun: terukur 0 gagal dari tiga gerbang kawah. Dua bahasa
+    # yang "sepakat" di angka yang tidak pernah disepakati dengan konstanta
+    # bernama itu adalah persis kelas cacat yang gerbang ini ada untuk
+    # menutupnya, jadi situs yang tidak memakai konstantanya ikut dilaporkan
+    # di sini - bukan dibiarkan lewat karena angkanya kebetulan sama.
+    named = [s for s in port_sites if s and s.startswith("CRATER_RIM_OPACITY")]
+    results.append(Result(
+        "kawah: setiap situs opasitas bibir port memakai konstantanya",
+        len(named) == len(port_sites),
+        f"{len(named)} dari {len(port_sites)} situs port memakai "
+        f"CRATER_RIM_OPACITY" +
+        ("" if len(named) == len(port_sites) else
+         " - situs yang menulis angkanya sendiri: "
+         + ", ".join(repr(s) for s in port_sites if s not in named))))
+
+    # Klem dibaca per situs, dan situs **mana** yang memakainya ikut
+    # dilaporkan: klem yang sama berbahaya atau tidak tergantung apakah ia ada
+    # di view juga, dan view-nya diperiksa di bawah.
+    floors = []
+    for factor in port_sites:
+        found = re.search(r"max\([^,]+,\s*([\d.]+)", factor or "")
+        floors.append(None if found is None else found.group(1))
+    clamped = [(i, f) for i, f in enumerate(floors) if f is not None]
     results.append(Result(
         "kawah: opasitas bibir port tidak memakai klem yang tidak ada di view",
-        floor is None,
-        f"port memakai '{factor.strip()}'"
-        + ("" if floor is None else
-           " - ada klem max(rim_strength, " + floor.group(1)
-           + ") yang TIDAK ada di view")))
+        not clamped,
+        f"{len(port_sites)} situs port: " + ", ".join(
+            (s or "?") for s in port_sites) +
+        ("" if not clamped else
+         " - situs " + ", ".join(str(i) for i, _ in clamped)
+         + " memakai klem max(…, " + ", ".join(f for _, f in clamped)
+         + ") yang TIDAK ada di view")))
 
     # Dan view-nya sendiri harus tetap bebas klem. Kalau view yang memakai
     # klem tanpa port, gerbang ini hijau karena kedua sisi sama-sama salah -
     # untuk itu arah sebaliknya ikut dijaga di bawah.
-    view_line = re.search(r"rim\.opacity\(([^\n]+)\)", view)
-    if not view_line:
+    #
+    # Setiap situs, dan **jumlahnya wajib sama dengan port**: satu bahasa
+    # mendapat situs gambar baru dan yang lain tidak adalah arah paling
+    # senyap - di situ tidak ada angka yang menyimpang, hanya *banyaknya*.
+    view_sites = re.findall(r"rim\.opacity\(([^\n]+)\)", view)
+    if not view_sites:
         results.append(Result(
             "kawah: opasitas bibir terbaca dari view", False,
             "'rim.opacity(...)' TIDAK ditemukan di CelestialVisualView.swift"))
         return
-    view_factor = view_line.group(1)
+    view_clamped = [s for s in view_sites if "max(" in s]
     results.append(Result(
         "kawah: opasitas bibir view tetap memakai rimStrength apa adanya",
-        "max(" not in view_factor,
-        f"view memakai '{view_factor.strip()}'"))
+        not view_clamped,
+        f"{len(view_sites)} situs view: " + ", ".join(
+            repr(s.strip()) for s in view_sites) +
+        ("" if not view_clamped else
+         " - situs yang memakai klem: " + ", ".join(
+             repr(s.strip()) for s in view_clamped))))
+
+    # Jumlah situs di kedua bahasa harus sama. Tanpa syarat ini, satu bahasa
+    # bisa mendapat situs gambar baru sementara yang lain tidak, dan tidak ada
+    # perbandingan **nilai** pun yang bisa melihatnya.
+    results.append(Result(
+        "kawah: jumlah situs opasitas bibir sama di kedua bahasa",
+        len(view_sites) == len(port_sites),
+        f"view {len(view_sites)} situs, port {len(port_sites)} situs"))
+
+    # **Angka faktornya harus sama di kedua bahasa, per situs.** Inilah yang
+    # menangkap literal yang hidup sendiri: `0.9` di view versus
+    # `CRATER_RIM_OPACITY` (0,90) di port cocok, tapi `0.50` di view versus
+    # `0.9` di port tidak - dan justru keadaan itu yang dulu lolos.
+    view_factors = re.findall(r"rim\.opacity\(\s*([0-9.]+)\s*\*", view)
+    for i, factor in enumerate(view_factors):
+        if i >= len(port_sites):
+            break
+        site = port_sites[i] or ""
+        name = site.split("*")[0].strip()
+        expected = R.__dict__.get(name, None) if name.isidentifier() else None
+        if expected is None:
+            # Situs port menulis angkanya sendiri - sudah dilaporkan di atas,
+            # dan membandingkannya di sini akan menuntut angka yang sama
+            # ditulis di dua tempat, persis yang gerbang ini tolak.
+            continue
+        results.append(Result(
+            f"kawah: situs {i} memakai faktor yang sama di kedua bahasa",
+            abs(float(factor) - expected) < 1e-9,
+            f"view {factor}, {name} = {expected}"))
 
     # **Bukti kedua, yang menentukan.** Dua pemeriksaan di atas membaca bentuk
     # teks. Bentuk teks bisa hijau sementara gambarnya tetap menyimpang -
@@ -4877,7 +4968,8 @@ def check_crater_rim_opacity_is_not_clamped(results):
         # menyimpang - persis kelas cacat yang pemeriksaan
         # `check_crater_relief_matches_the_model` sudah pernah tercatat
         # ("yang dibandingkan adalah port melawan port").
-        clamped = strength if floor is None else max(strength, float(floor.group(1)))
+        floor = floors[0] if floors else None
+        clamped = strength if floor is None else max(strength, float(floor))
         port_opacity = min(1.0, R.CRATER_RIM_OPACITY * clamped)
         view_opacity = min(1.0, R.CRATER_RIM_OPACITY * strength)
         if abs(port_opacity - view_opacity) > 1e-9:

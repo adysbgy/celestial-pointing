@@ -2031,7 +2031,7 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
         #    menyimpang.
         offset = mr * 0.45
         canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,
-                    lambda x, y, a=min(1.0, 0.9 * strength): (rim_rgb, a),
+                    lambda x, y, a=min(1.0, CRATER_RIM_OPACITY * strength): (rim_rgb, a),
                     clip_disc=(mx, my, mr))
 
         # 3. Dasar tengah yang lebih gelap, supaya cekungannya terbaca cekung.

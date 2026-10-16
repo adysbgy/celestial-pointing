@@ -299,6 +299,46 @@ PORT_RIM_UNCLIPPED = (
 PORT_RIM_FLAT = ("min(1.0, CRATER_RIM_OPACITY * rim_strength))),",
                  "min(1.0, CRATER_RIM_OPACITY))),")
 
+#: ── Gerbang opasitas bibir: situs kedua, yang dulu buta ──────────────────
+#: `check_crater_rim_opacity_is_not_clamped` adalah gerbang **lain** dari
+#: kelas yang sama, dan sampai siklus ini ia nirsaksi — tidak dirujuk satu pun
+#: harness. Ia memakai `re.search`, jadi ia membaca kemunculan **pertama**
+#: (`rim.opacity` kawah planet, `CRATER_RIM_OPACITY *` kawah planet) dan
+#: tidak pernah melihat situs Bulan.
+#:
+#: Terukur atas pohon bersih, **hanya** situs Bulan dimutasi, tiga gerbang
+#: kawah dijalankan di proses baru — semuanya **0 gagal**:
+#:
+#:     view Bulan  rim.opacity(0.9 * strength) -> 0.9 * max(strength, 0.2)
+#:     port Bulan  min(1.0, 0.9 * strength)    -> 0.50 * strength
+#:
+#: Klem yang sama di situs **planet** memerahkan gerbang itu. Jadi cacatnya
+#: pembacanya, bukan angkanya.
+#:
+#: Situs Bulan juga menulis `0,9` sebagai **literal** di kedua bahasa,
+#: sementara situs planet memakai konstanta bernama `CRATER_RIM_OPACITY`.
+#: Akibatnya menggeser `0,9` di situs Bulan — di bahasa mana pun, bahkan di
+#: kedua-duanya sekaligus — juga tidak digigit apa pun. Keadaan 12 dan 13
+#: menuntut keduanya MERAH **sesudah** gerbangnya diperbaiki.
+OPACITY = "check_crater_rim_opacity_is_not_clamped"
+#: Nama hasil yang menangkap "situs kedua tidak dibaca".
+OPACITY_VIEW_CLAMP = "kawah: opasitas bibir view tetap memakai rimStrength apa adanya"
+OPACITY_PORT_NAMED = "kawah: setiap situs opasitas bibir port memakai konstantanya"
+OPACITY_PORT_CLAMP = "kawah: opasitas bibir port tidak memakai klem yang tidak ada di view"
+OPACITY_SITES_EQUAL = "kawah: jumlah situs opasitas bibir sama di kedua bahasa"
+#: Situs **kedua** menurut urutan pembacaan (`port.split(...)`): kawah planet
+#: dulu, kawah Bulan kemudian. Namanya deterministik karena urutannya berasal
+#: dari urutan di berkas, bukan dari himpunan.
+OPACITY_FACTOR_MOON = "kawah: situs 1 memakai faktor yang sama di kedua bahasa"
+
+#: Situs **view** kawah Bulan (`drawMoonCraters`): medan `r.…`, kekuatannya
+#: variabel lokal `strength` — bukan `crater.rimStrength`.
+VIEW_RIM_FILL_MOON = "            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * strength)))"
+#: Situs **port** kawah Bulan, sesudah perbaikan: konstanta yang sama dengan
+#: situs planet. Sebelum perbaikan barisnya memuat literal `0.9`.
+PORT_RIM_FILL_MOON = ("                    lambda x, y, a=min(1.0, CRATER_RIM_OPACITY"
+                      " * strength): (rim_rgb, a),")
+
 STATES = [
     ("[baseline] sumber bersih", None,
      {GATE: HIJAU, RATIO: HIJAU, CIRCLE: HIJAU, **{n: HIJAU for n in KONSTANTA}}),
@@ -487,6 +527,56 @@ STATES = [
      {GATE: HIJAU, RATIO: HIJAU, CIRCLE: HIJAU,
       **{n: HIJAU for n in KONSTANTA},
       **{gate: HIJAU for gate in PIXEL_GATES}}),
+
+    # ── 11–14. Gerbang **lain** dari kelas yang sama: opasitas bibir ──────
+    #
+    # Empat keadaan ini menutup gerbang yang sampai siklus ini **nirsaksi**:
+    # tidak dirujuk satu pun dari 76 harness. Ia memakai `re.search`, jadi ia
+    # hanya membaca situs **pertama** — dan sejak `27dd677` menambahkan situs
+    # Bulan, situs itu tidak diukur siapa pun.
+    #
+    # Semua keadaan di bawah **hanya** menyentuh situs Bulan. Itu syaratnya:
+    # kalau salah satunya juga menggeser situs planet, yang terbukti merah
+    # adalah gerbang yang sudah bekerja, bukan cakupan barunya.
+    #
+    # 11: klem yang hidup di satu bahasa saja, di situs kedua. Inilah cacat
+    #     asli gerbangnya, dipindahkan ke situs yang dulu buta.
+    ("11. view BULAN: klem max(strength, 0.2) yang tidak ada di port",
+     [(VIEW, VIEW_RIM_FILL_MOON,
+       "            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * "
+       "max(strength, 0.2))))")],
+     {OPACITY: MERAH, OPACITY_VIEW_CLAMP: MERAH}),
+
+    # 12: faktor di **port** situs Bulan bergeser. Gerbang ini yang paling
+    #     perlu melihatnya: gambar kawah Bulan di PNG menyimpang dari gambar
+    #     di jam, dan seluruh gerbang piksel repo ini mengukur PNG itu.
+    ("12. port BULAN: faktor opasitas 0.90 -> 0.50 (konstanta ditinggalkan)",
+     [(RENDER, PORT_RIM_FILL_MOON,
+       PORT_RIM_FILL_MOON.replace("CRATER_RIM_OPACITY * strength",
+                                  "0.50 * strength"))],
+     {OPACITY: MERAH, OPACITY_PORT_NAMED: MERAH}),
+
+    # 13: **kedua** bahasa situs Bulan bergeser bersama. Arah paling senyap:
+    #     tidak ada yang menyimpang di antara keduanya, yang berubah hanya
+    #     kesepakatannya dengan konstanta bernama `CRATER_RIM_OPACITY`.
+    #     Tanpa keadaan ini, "kedua sisi sama" akan terbaca sebagai "benar".
+    ("13. KEDUA bahasa BULAN: 0.90 -> 0.50 bersama",
+     [(VIEW, VIEW_RIM_FILL_MOON,
+       "            lit.fill(rimDisc, with: .color(rim.opacity(0.50 * strength)))"),
+      (RENDER, PORT_RIM_FILL_MOON,
+       PORT_RIM_FILL_MOON.replace("CRATER_RIM_OPACITY * strength",
+                                  "0.50 * strength"))],
+     {OPACITY: MERAH, OPACITY_FACTOR_MOON: MERAH}),
+
+    # 14: kontrol negatif untuk situs kedua. Komentar ditambahkan di ujung
+    #     baris view Bulan — angka dan bentuknya tidak berubah, jadi gerbang
+    #     wajib tetap hijau. Ini yang membedakan "membaca situs kedua" dari
+    #     "memerahkan apa pun yang menyentuh situs kedua": tanpa dia,
+    #     perbaikan yang cuma menyapu seluruh berkas akan lulus 11–13.
+    ("14. kontrol negatif: komentar di ujung baris view BULAN — wajib hijau",
+     [(VIEW, VIEW_RIM_FILL_MOON, VIEW_RIM_FILL_MOON + "  // sama")],
+     {OPACITY: HIJAU, OPACITY_VIEW_CLAMP: HIJAU, OPACITY_SITES_EQUAL: HIJAU,
+      OPACITY_PORT_NAMED: HIJAU}),
 ]
 
 # Dijalankan di proses baru: memuat ulang `check-visuals.py` (dan
