@@ -35,7 +35,7 @@ Apa yang diukur harness ini.
      (cacat aslinya; empat uji Bulan lain tetap hijau)
   2. resolver: koordinat tetap DIAM, efemeris yang bergerak      HIJAU 5/5
      (kontrol negatif — bukan koordinat tetapnya yang dibenci)
-  3. uji: jangkar fixture dipindah ke Bulan bawah horizon        MERAH penjaga
+  3. uji: fixture malam dipindah ke siang                        MERAH 1/5
      (kontrol kecukupan fixture)
 
 Keadaan 1 dan 2 dipisah karena arahnya berlawanan, dan itu bukan kerapian.
@@ -46,12 +46,17 @@ Tanpa keadaan 2, "hijau" pada keadaan baseline tidak membedakan uji yang
 mengukur perilaku mesin dari uji yang mengukur salinan teks.
 
 Keadaan 3 menjaga **kecukupan fixture**, arah yang tidak dijaga keadaan 1.
-Kalau `moonNightFixture()` suatu saat hanya menemukan Bulan di bawah horizon,
-jarak 10° masih terpenuhi (koordinat tetap selalu sejauh itu) tetapi uji
-berhenti menguji apa pun yang berarti tentang mesin: yang tersisa hanyalah
-perbandingan dua angka yang tidak pernah bertemu mesin. Penjaga 30° di uji
-itu satu-satunya yang melihatnya, dan keadaan 3 membuktikan penjaga itu
-berbunyi.
+Kalau fixture-nya bukan malam lagi, uji berhenti menguji apa pun yang berarti
+tentang mesin: yang tersisa hanyalah perbandingan dua angka yang tidak pernah
+bertemu mesin. Keadaan 3 membuktikan uji itu sendiri yang berbunyi.
+
+**Dua tebakan untuk keadaan 3 terukur salah dan diperbaiki di harapannya,
+bukan dengan melonggarkan ujinya.** (a) `epoch.addingTimeInterval(0)` disangka
+fixture malam "pertama"; terukur bukan — fixture malam pertama baru muncul
+pada hari ke-8 pukul 07.0 (epok sendiri justru siang, Matahari 75°). (b)
+Menaikkan penjaga `30` → `88` terukur hijau, karena Bulan memang melewati 88°
+dalam 120 hari. Pelajarannya sama dengan `bukti-mutasi-kasus-planet.py`:
+tebakan tentang keadaan yang belum pernah dijalankan adalah tebakan.
 
 ### Kelemahan yang diakui
 
@@ -122,27 +127,28 @@ MOON_RA = "raDeg: 218.0, decDeg: -19.0"
 MOON_RA_NEW = "raDeg: 218.7, decDeg: -18.4"
 
 # ── Jangkar: fixture uji (kontrol kecukupan) ─────────────────────────────
-#: Keadaan 3: fixture dipindah ke **siang hari**, sehingga Bulan tidak lagi
-#: boleh menjadi "fixture malam" dan penjaga 30° di uji itu berbunyi.
+#: Keadaan 3: fixture dipindah ke **siang hari**, sehingga "fixture malam"
+#: tidak lagi malam dan penjaga ketat di uji itu berbunyi.
 #:
-#: **Kenapa bukan `epoch`.** Dugaan pertama untuk keadaan ini adalah memakai
-#: `epoch.addingTimeInterval(0)` — dan itu **terukur tidak mengubah apa pun**:
-#: `epoch` (15 Jan 2026 12:00 WIB) justru **adalah** jam malam pertama yang
-#: ditemukan `moonNightFixture()`, jadi "memindahkan" fixture ke sana adalah
-#: tidak memindahkannya sama sekali. Keadaan yang tidak mengubah berkas tidak
-#: membuktikan apa pun, sekalipun ia hijau.
+#: **Dua tebakan pertama untuk keadaan ini terukur SALAH, dan keduanya
+#: dicatat di sini karena itu bagian dari buktinya.**
 #:
-#: **Kenapa bukan mengganti penjaganya** (`30` → `88`, jangkar `FIXTURE_GUARD`).
-#: Itu juga terukur hijau: `moonNightFixture()` mencari dalam 120 hari, dan
-#: Bulan memang melewati 88° pada malam berikutnya (hari ke-4: 72,5°, dan
-#: terus naik). Fixture-nya sendiri baik; yang perlu dibuktikan adalah bahwa
-#: uji itu **bergantung pada fixture yang baik**, bukan bahwa angkanya bisa
-#: dinaikkan sampai tidak ada yang memenuhinya.
+#:  1. `epoch.addingTimeInterval(0)` — disangka sama dengan fixture malam
+#:     "pertama". Terukur **salah**: `moonNightFixture()` baru menemukan
+#:     Bulan di atas 30° saat gelap pada hari ke-8 pukul 07.0 (199 jam
+#:     sesudah epok), bukan pada epok. Epok sendiri (15 Jan 2026 12:00 WIB)
+#:     justru **siang** (`isDark == false`, Matahari 75°) — dan itulah jam
+#:     pertama yang ditemukan `moonDaytimeFixture()`.
+#:  2. Naikkan penjaga `30` → `88`. Terukur hijau: dalam 120 hari Bulan
+#:     memang melewati 88°, jadi fixture-nya masih sah. Yang tidak dibuktikan
+#:     apa pun adalah keadaan yang tidak mengubah berkas, sekalipun ia hijau.
 #:
-#: Jangkar menyertakan komentar di atasnya supaya ia **tidak ambigu**:
-#: `let when = try XCTUnwrap(moonNightFixture(),` muncul dua kali di berkas
-#: itu (di uji siang-lawan-malam dan di uji ini), dan jangkar yang ambigu
-#: membuat harness menyasar uji yang salah sambil terlihat benar.
+#: Yang dipakai sekarang benar-benar mengubah perilaku uji: fixture siang
+#: dipakai di tempat yang menuntut fixture malam. Bulan di sana punya
+#: altitudin 42,6° (bukan 37,7°), dan penjaga `> 30` tetap lolos — jadi
+#: yang berbunyi di keadaan ini **bukan** penjaga itu, melainkan bagian
+#: berikutnya yang menuntut langit gelap. Itu dinyatakan di sini alih-alih
+#: disangka.
 NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
         // tes ini tidak menguji apa pun dan harus gagal keras.
         let when = try XCTUnwrap(moonNightFixture(),
@@ -150,7 +156,7 @@ NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Ka
 
 NIGHT_SCAN_LOW = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
         // tes ini tidak menguji apa pun dan harus gagal keras.
-        let when = try XCTUnwrap(moonDaytimeFixture(),
+        let when = try XCTUnwrap(epoch.addingTimeInterval(8 * 86400 + 7 * 3600),
                                  "tidak ada saat Bulan di atas 30° saat siang dalam 120 hari")"""
 
 PROBE = r"""
@@ -234,10 +240,10 @@ STATES = [
 
     # Kontrol kecukupan fixture: kalau Bulan tidak lagi tinggi di fixture,
     # penjaga 30° di uji itu satu-satunya yang melihatnya.
-    ("3. uji: fixture siang dipakai seolah malam (penjaga fixture)",
+    ("3. uji: fixture malam dipindah ke siang (penjaga fixture)",
      [(TESTS, NIGHT_SCAN, NIGHT_SCAN_LOW)],
      {CASE: "failed"},
-     "penjaga 'Bulan di atas 30°' berbunyi saat fixture siang dipakai"),
+     "uji menolak run bila fixture-nya bukan malam"),
 ]
 
 
