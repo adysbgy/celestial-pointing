@@ -1,4 +1,60 @@
-## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: satu mutasi harness yang tertinggal di sumber produksi, dan bagaimana ia sampai ke `main`)
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang jangkar harness, penutup kelas "mutasi tertinggal")
+
+### Dua kali kelas yang sama, dua kali tidak ada yang menahannya
+
+Siklus sebelumnya memperbaiki **satu** mutasi harness yang tertinggal
+(`CLUSTER_CORE_HALO_SCALE = 40.0`). Yang tidak diperbaiki waktu itu adalah
+**kelasnya**: apa pun yang bisa mendaratkan mutasi di sumber produksi akan
+mendaratkan yang berikutnya juga.
+
+Terbukti di siklus ini juga, dan di dalam sesi yang sama: menjalankan
+`bukti-mutasi-inti-opasitas.py` sampai `timeout` 420 detik meninggalkan
+`clusterCoreBrighten: Double = 0.0` hidup di berkas model. Nilai `0.0` itu
+persis `replace` keadaan 5 harness tersebut. Saya sempat membacanya sebagai
+"WIP loop agen lain" **dua kali** dan melindunginya dengan `git stash` —
+salah; yang saya lindungi adalah mutasi bocor dari run saya sendiri.
+Gerbang baru inilah yang menemukannya.
+
+### Kenapa `require_clean_sources` tidak menutupnya
+
+`Tools/mutasi_sumber.py` sudah membandingkan berkas yang akan dimutasi dengan
+`git HEAD` dan menolak jalan di atas pohon kotor. Benar, dan bekerja — tetapi
+hanya selama mutasinya **belum ter-commit**. Begitu ia ikut ter-commit, berkas
+itu *menjadi* HEAD, dan penjaganya puas selamanya. Itu bukan kelalaian
+`require_clean_sources`; itu memang batas cakupannya.
+
+### `Tools/check-jangkar-harness.py`
+
+Yang diukur: untuk setiap pasangan (`find`, `replace`) yang **dibaca dari AST**
+`STATES` tiap harness — **`find` sudah tidak ada sementara `replace` ada.**
+Arah kedua yang membuatnya berguna: satu arah saja ("`find` hilang") akan merah
+setiap kali jangkar harness diperbarui dengan sengaja, dan itu rutin di repo
+ini. Dua arah bersama hanya merah pada keadaan yang memang salah.
+
+Cakupan 196 jangkar dari 72 harness, 165 di antaranya dengan berkas sasaran
+yang di-resolve dari konstanta path harness (`os.path.join(ROOT, …)`), bukan
+dari daftar tangan.
+
+### Yang TIDAK diklaim
+
+Gerbang ini mengukur **keberadaan jangkar**, bukan kebenaran nilainya. Mutasi
+yang kebetulan menghasilkan teks yang sah bagi harness lain tetap tidak
+terlihat; yang tertangkap hanya bentuk yang sudah terbukti terjadi. Dan
+`TAK TERBACA` (sasaran yang tidak bisa dibaca karena salinan parsial) sengaja
+**bukan** temuan — ia dicetak, tidak dihitung.
+
+### Cacat di dalam gerbangnya sendiri, ditangkap oleh saksinya
+
+`Tools/bukti-mutasi-jangkar-harness.py` keadaan 3 melumpuhkan pembaca `STATES`
+dan menuntut gerbang keluar **bukan-nol**. Percobaan pertama: gerbang mencetak
+`OK: 0 jangkar; tidak ada mutasi tertinggal` dan keluar 0 — hijau dengan alasan
+yang salah, tepat kelas cacat yang ia ada untuk menutup. Gerbangnya sekarang
+memperlakukan cakupan nol sebagai kegagalan, dengan pesan yang menyebut
+kemungkinan sebabnya (bentuk `STATES` berubah).
+
+---
+
+## Progres sebelumnya (16 Okt 2026 — siklus XCODE-DEV: satu mutasi harness yang tertinggal di sumber produksi, dan bagaimana ia sampai ke `main`)
 
 ### Kenapa siklus ini juga bukan fitur baru
 
