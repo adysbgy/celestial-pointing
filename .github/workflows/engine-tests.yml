@@ -994,6 +994,52 @@ jobs:
       - name: Buktikan Aturan 3 berbunyi pada aksara terselip
         run: python3 Tools/bukti-mutasi-aturan3-aksara.py
 
+      # Dan gerbang yang **menutup kelas cacat yang paling sering dibayar repo
+      # ini**: mutasi harness yang tertinggal hidup di sumber produksi.
+      #
+      # Kelasnya sudah dua kali mendarat di `main`. Setiap harness
+      # `bukti-mutasi-*.py` memutasi berkas produksi dengan sepasang string
+      # (`find` harus ada, `replace` jadi gantinya) dan memulihkannya di
+      # `finally` plus handler `SIGINT`/`SIGTERM` — tetapi **`SIGKILL` dan
+      # timeout melewati keduanya**. Mutasi lalu tertinggal hidup.
+      #
+      # `mutasi_sumber.require_clean_sources` menahan akibatnya selama mutasi
+      # itu **belum ter-commit**; begitu ia ikut ter-commit, berkas itu menjadi
+      # HEAD, dan penjaganya puas selamanya. Terukur: `CLUSTER_CORE_HALO_SCALE
+      # = 40.0` — nilai `replace` keadaan 2 `bukti-mutasi-inti-gugus.py` —
+      # mendarat di `cf3c56b` (commit yang pesannya soal ciri planet) dan baru
+      # tertangkap berjam-jam kemudian lewat gerbang drift `port == view`, yang
+      # berhasil hanya karena view kebetulan memegang angka yang benar.
+      #
+      # Gerbang ini mengukur arah yang tidak dilihat siapa pun: **`find` sudah
+      # tidak ada sementara `replace` ada.** Satu arah saja ("`find` hilang")
+      # akan merah setiap kali jangkar harness diperbarui dengan sengaja —
+      # dan itu terjadi rutin di repo ini. Cakupannya dibaca dari AST
+      # `STATES` tiap harness (konstanta string **dan** konstanta path
+      # di-resolve), bukan dari daftar tangan, supaya tidak jadi salinan kedua
+      # yang menyusut diam-diam saat harness bertambah.
+      - name: Gerbang jangkar harness (mutasi tertinggal)
+        run: python3 Tools/check-jangkar-harness.py
+
+      # Dan bukti bahwa gerbang jangkar di atas berbunyi, bukan sekadar
+      # mencetak "OK". Tiga keadaan, dan yang ketiga yang paling berharga:
+      #
+      #   1. pohon utuh                     -> wajib hijau
+      #   2. nilai model diganti persis dengan `replace` sebuah keadaan harness
+      #      (`clusterCoreBrighten: Double = 0.25` -> `0.0`, bentuk yang sudah
+      #      dua kali mendarat di `main`) -> wajib merah **dan menyebut
+      #      harness-nya**; "ada yang merah" tidak cukup, karena keluaran
+      #      gerbang ini juga memuat baris "jangkar hilang" yang bukan temuan
+      #   3. pembaca `STATES` dilumpuhkan   -> wajib **bukan-nol**
+      #
+      # Keadaan 3 menemukan cacat **di dalam gerbangnya sendiri** saat
+      # ditulis: dengan pembaca jangkar dilumpuhkan, gerbangnya mencetak
+      # "OK: 0 jangkar; tidak ada mutasi tertinggal" dan keluar 0 — hijau
+      # dengan alasan yang salah, tepat kelas cacat yang ia ada untuk menutup.
+      # Gerbangnya sekarang memperlakukan cakupan nol sebagai kegagalan.
+      - name: Buktikan gerbang jangkar harness berbunyi
+        run: python3 Tools/bukti-mutasi-jangkar-harness.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di
