@@ -765,6 +765,19 @@ jobs:
       - name: Buktikan gerbang ciri planet di mode malam berbunyi
         run: python3 Tools/bukti-mutasi-ciri-malam.py
 
+      # Dan bukti untuk **keterbacaan ciri planet pada ukuran jam**. Tujuh
+      # ciri planet punya bukti geometris di 38 pt, tetapi syaratnya
+      # `diff > 0` — satu piksel berbeda pun lolos. Dua ciri punya gerbang
+      # kekuatan sendiri; untuk kutub Mars dan kawah Merkurius tidak ada.
+      # Harness ini membuktikan gerbang barunya **bisa merah** pada ciri yang
+      # dicabut (Merkurius 19,02 -> 0,00; Mars 107,54 -> 0,00) **maupun pada
+      # ciri yang digambar terlalu pudar** (0,12x) — arah yang tidak
+      # tertangkap gerbang "ada bedanya?". Ia juga mengunci keputusan bahwa
+      # **kabut Venus tidak diklaim** (metriknya tidak bergerak saat kabutnya
+      # dihapus, karena `venusHaze()` menutupi hampir seluruh piringan).
+      - name: Buktikan gerbang keterbacaan ciri planet di ukuran jam berbunyi
+        run: python3 Tools/bukti-mutasi-ciri-terbaca.py
+
       # Dan bukti untuk **jangkauan corona Matahari**, klaim "satu angka, satu
       # sumber" yang tidak dijaga apa pun. Terukur: `sunCoronaReach` di model
       # diubah 1.45 -> 1.60 dan seluruh gerbang Matahari tetap hijau, karena

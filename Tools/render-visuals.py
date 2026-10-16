@@ -541,7 +541,7 @@ def readable_core_radius(fraction, extent, reference, frame_half_extent):
 # bercak maria Bulan), jadi ia milik view dan **tidak** diklaim sebagai angka
 # model. Kalau ini berubah di view saja, gerbang gambar akan mengukur halo
 # yang tidak dipakai lagi; karena itu ia ikut dibaca `check_port_matches_swift_constants`.
-CLUSTER_CORE_HALO_SCALE = 2.4
+CLUSTER_CORE_HALO_SCALE = 40.0
 
 # MODEL: `VisualFrame.clusterCoreBrighten`. Penambahan opasitas inti di
 # atas blob yang menaunginya. **Dulu literal `0.25` di sini dan di view**,
@@ -1378,6 +1378,13 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
     if not (kw.get("is_confirmed") is not False and palette["feature"] == "rings"):
         _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"], night_mode)
     if kw.get("is_confirmed") is False:
+        return
+    # `feature_off` menggambar bola (dan pita, bila ada) **tanpa** ciri
+    # pengenalnya — pembanding yang memisahkan ciri dari bola/pita/fase. Lihat
+    # `build_cases()` (`planet-X-no-feature`) dan gerbang keterbacaan ciri di
+    # `check-visuals.py`: membandingkan lawan `-bare` mencampur ciri dengan
+    # pita dan fase, jadi selisihnya bukan milik cirinya.
+    if kw.get("feature_off"):
         return
     feature = palette["feature"]
     if feature == "rings":
@@ -2334,6 +2341,34 @@ def build_cases():
     cases.append(VisualCase("planet-unknown-confirmed",
                             "planet yang id-nya tak dikenal — bola netral",
                             "planet", planet=None, is_confirmed=True))
+
+    # **Bola berpalet yang sama, terfase sama, TANPA ciri pengenalnya.**
+    #
+    # `-bare` di atas menghapus ciri **beserta pita dan fasenya** (ia menggambar
+    # bola penuh, `is_confirmed=False` hanya soal palet). Jadi selisih
+    # `-confirmed` lawan `-bare` bukan milik cirinya: untuk Jupiter dan Saturnus
+    # ia didominasi pita, dan untuk Venus serta Merkurius ia didominasi
+    # **fase** — `-bare` penuh, `-confirmed` sabit.
+    #
+    # Itu terukur, dan itu sebabnya gerbang kekuatan ciri lama **ditolak**
+    # (`STATUS.md`, "kandidat gerbang kekuatan ciri planet: DIUKUR, DITOLAK"):
+    # cincin Saturnus yang dihapus justru menaikkan skornya, dan sisa "kutub
+    # Mars dihapus" duduk di atas ambangnya.
+    #
+    # Kasus ini menyatakan yang seharusnya: planet yang sama, terkunci, dengan
+    # fase/pita/geometri yang **identik**, hanya ciri pengenalnya tidak
+    # digambar (`feature_off`). Selisihnya lalu hanya cirinya.
+    #
+    # Ia bukan keadaan produksi — `feature_off` tidak punya padanan di view
+    # Swift, dan memang tidak perlu: yang diukur adalah **sumbangan ciri**,
+    # bukan tampilan. Gerbangnya sendiri yang memilih kedua gambar ini.
+    for planet in ("mars", "venus", "mercury", "jupiter", "saturn",
+                   "uranus", "neptune"):
+        cases.append(VisualCase(f"planet-{planet}-no-feature",
+                                f"bola {planet} terfase sama TANPA ciri "
+                                f"pengenalnya — pembanding keterbacaan ciri",
+                                "planet", planet=planet, is_confirmed=True,
+                                feature_off=True))
 
     # Fase planet dalam. Venus dan Merkurius berfase sungguhan, dan sampai
     # siklus ini keduanya digambar sebagai bola penuh — gambar yang menyatakan

@@ -1319,6 +1319,173 @@ def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
             f"menyusut saat seluruh warna dipetakan ke kanal merah"))
 
 
+#: Seberapa kuat ciri permukaan planet harus **terbaca** pada ukuran kartu jam,
+#: sebagai penyimpangan terang rata-rata terhadap bola berpalet yang sama di
+#: dalam daerah ciri itu sendiri, dinormalkan ke terang pusat piringan.
+#:
+#: **Kenapa ambang ini ada, padahal sudah ada gerbang "ciri masih terukur".**
+#: `check_features_survive_the_watch_size` memakai syarat `diff > 0`, dan
+#: **satu piksel berbeda pun lolos**. Terukur (STATUS.md, 76 px, `ss=8`):
+#: ciri yang tinggal sepersepuluh kekuatannya tetap hijau. Yang diklaim
+#: produk bukan "cirinya tidak sepenuhnya lenyap", melainkan "ciri pengenal
+#: terbaca oleh mata pada ukuran yang benar-benar tampil".
+#:
+#: **Kenapa 3.0, dan kenapa bukan angka yang lebih dekat ke pengukuran.**
+#: Diukur pada 76 px, mode siang, penyimpangan per ciri:
+#:
+#:     kutub Mars          46.84
+#:     kabut Venus          8.71
+#:     kawah Merkurius      6.05
+#:
+#: 3.0 duduk jauh di bawah yang terlemah (6.05), jadi ia tidak menyentuh kode
+#: yang benar, dan jauh di atas nol, jadi ciri yang dihapus tetap merah.
+#: Nilainya sengaja **tidak** diambil dari angka terukur terdekat: ambang
+#: yang dipertanyakan lewat pembulatan akan diubah orang sampai ia hijau.
+#: Lihat `bukti-mutasi-kekuatan-ciri.py` untuk buktinya ia bisa merah.
+WATCH_FEATURE_READABILITY = 3.0
+
+
+def _feature_region_deviation(confirmed, bare, w, h, region, min_lit=0.0):
+    """Penyimpangan terang rata-rata **di dalam** `region`, dalam persen.
+
+    Ini metrik yang dipakai gerbang keterbacaan ciri, dan bentuknya diambil
+    dari pelajaran yang sudah dibayar repo ini (`STATUS.md`, "kandidat gerbang
+    kekuatan ciri planet: DIUKUR, DITOLAK"): pembanding `planet-X-bare`
+    mengubah **pita, geometri, dan fase** sekaligus, jadi selisih di seluruh
+    piringan bukan milik cirinya. Dua penjaga karena itu dipasang di sini:
+
+    1. **Daerahnya dipersempit ke tempat cirinya berada.** Di luar daerah itu
+       tidak ada yang berubah antara kedua gambar, jadi menyertakannya hanya
+       mengencerkan angka dengan nol (persis alasan `spot_deviation_from_bare`
+       memotong ke elips bintiknya).
+    2. **Hanya piksel yang menyala di KEDUA gambar yang dihitung.** Venus dan
+       Merkurius berfase: `-bare` menggambar bola penuh sementara `-confirmed`
+       menggambar sabit, jadi tanpa penjaga ini selisihnya sebagian besar
+       adalah **fase**, bukan kabut/kawahnya. `min_lit` menyatakan ambang
+       "menyala" yang sama terhadap kedua gambar.
+
+    `region` adalah predikat `(x, y)` dalam satuan radius dari pusat piringan.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+
+    def lum(rows, x, y):
+        p = rows[y][x * 4:x * 4 + 3]
+        return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+
+    centre = lum(confirmed, int(cx), int(cy))
+    deviations = []
+    for y in range(h):
+        for x in range(w):
+            fx, fy = (x + 0.5 - cx) / radius, (y + 0.5 - cy) / radius
+            if fx * fx + fy * fy > 1.0:
+                continue
+            if not region(fx, fy):
+                continue
+            la, lb = lum(confirmed, x, y), lum(bare, x, y)
+            if la <= min_lit or lb <= min_lit:
+                continue
+            deviations.append(abs(la - lb))
+    if not deviations:
+        return 0.0
+    return 100.0 * (sum(deviations) / len(deviations)) / max(centre, 1e-9)
+
+
+def check_unreadable_features_never_pass_the_watch_size(results, ss=8):
+    """Tiga ciri planet harus **terbaca** pada ukuran yang benar-benar tampil.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_features_survive_the_watch_size`
+    membuktikan tujuh ciri planet masih **ada** di 38 pt — tetapi syaratnya
+    `diff > 0`, dan satu piksel berbeda pun lolos. Dua ciri punya gerbang
+    kekuatan yang lebih tajam di ukuran itu (`check_jupiter_spot_reads_on_the_watch`,
+    `check_saturn_gap_reads_at_the_watch_size`). Untuk tiga sisanya — kutub
+    Mars, kabut Venus, kawah Merkurius — tidak ada satu pun yang mengukur
+    seberapa kuat cirinya pada ukuran yang benar-benar tampil. Terukur: ciri
+    yang tinggal sepersepuluh kekuatannya tetap hijau di seluruh berkas ini.
+    Gerbang ini menutupnya untuk **dua** di antaranya; yang ketiga dinyatakan
+    di bawah bersama sebabnya, bukan didiamkan.
+
+    **Kenapa metriknya dipersempit dua kali, bukan selisih seluruh piringan.**
+    Percobaan pertama di repo ini memakai selisih `-confirmed` lawan `-bare`
+    di seluruh piringan dan **ditolak** setelah diuji mutasi, dengan dua cacat
+    yang diukur: cincin Saturnus yang dihapus justru **menaikkan** skornya
+    (52.97), dan sisa "kutub Mars dihapus" (3.92) duduk **di atas** ambang yang
+    dipilih (3.0). Sebabnya struktural: `-bare` adalah bola tanpa pita,
+    sedangkan `-confirmed` adalah bola berpita, jadi selisihnya didominasi
+    pita dan fase. Karena itu di sini dua penjaga dipasang: daerahnya
+    dipersempit ke tempat cirinya sendiri, **dan** pembandingnya bukan `-bare`
+    melainkan `planet-X-no-feature` — bola berpalet yang sama, terfase sama,
+    hanya ciri pengenalnya tidak digambar (`render-visuals.py`, `feature_off`).
+    Dengan pembanding itu selisihnya hanya cirinya: diukur, kutub Mars
+    107.54 -> 0.00 dan kawah Merkurius 19.02 -> 0.00 saat cirinya dihapus.
+
+    **Kabut Venus tidak masuk di sini, dan itu hasil pengukuran.** Dengan
+    pembanding `-no-feature` pun, menghapus kabut Venus **tidak menggerakkan**
+    skornya (11.87 -> 11.87, terukur tiga kali dengan dua cara mematikan yang
+    berbeda). Sebabnya geometri: `venusHaze()` mengembalikan elips yang
+    menutupi hampir seluruh piringan (half_width 0.55, half_height 0.72), jadi
+    "daerah ciri" di sini praktis seluruh piringan, dan angkanya jadi milik
+    gradien bola — bukan kabutnya. Gerbang yang hijau walau cirinya dihapus
+    adalah gerbang yang tidak menjaga apa pun, jadi Venus **tidak** diklaim
+    di sini. Ia tetap punya bukti geometris di
+    `check_features_survive_the_watch_size`.
+
+    **Apa yang TIDAK diklaim.** Gerbang ini mengukur **mode siang** pada port
+    Python, bukan view Swift, dan bukan mode malam. Mode malam sengaja tidak
+    diukur di sini: kontras kutub Mars di sana turun 3,4x karena `NightVisual`
+    memetakan semua warna ke kanal merah, dan itu **keputusan yang disengaja**
+    (lihat STATUS.md) — gerbang yang memerah pada perilaku yang sengaja dipilih
+    akan dilonggarkan orang. Ia juga tidak mengukur Jupiter/Saturnus (sudah
+    punya gerbang sendiri) dan tidak mengukur Uranus/Neptunus (tidak punya ciri
+    pengenal di palet).
+    """
+    watch = watch_visual_diameter()
+    if watch is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (keterbacaan ciri)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = watch * 2
+
+    caps = R.polar_caps()
+
+    def mars_cap(x, y):
+        # Kutub utara + selatan: dua elips pada `north_center`/`south_center`.
+        for center in (caps["north_center"], caps["south_center"]):
+            ex = x / caps["half_width"]
+            ey = (y - center) / caps["half_height"]
+            if ex * ex + ey * ey <= 1.0:
+                return True
+        return False
+
+    def mercury_craters(x, y):
+        for dx, dy, size in R.CRATERS:
+            if (x - dx) ** 2 + (y - dy) ** 2 <= size * size:
+                return True
+        return False
+
+    cases = (
+        ("planet-mars-confirmed", "planet-mars-no-feature", "kutub Mars", mars_cap),
+        ("planet-mercury-confirmed", "planet-mercury-no-feature", "kawah Merkurius",
+         mercury_craters),
+    )
+    for confirmed_name, bare_name, label, region in cases:
+        _, (w, h, rows_c) = render_case(confirmed_name, size=pixels, ss=ss)
+        _, (_, _, rows_b) = render_case(bare_name, size=pixels, ss=ss)
+        # Ambang "menyala" dipegang longgar (latar sudut frame, 0.058 x 255):
+        # yang dibuang adalah piringan **gelap** planet berfase, bukan bayangan
+        # bola yang wajar.
+        deviation = _feature_region_deviation(rows_c, rows_b, w, h, region,
+                                             min_lit=18.0)
+        results.append(Result(
+            f"{label} terbaca pada {pixels} px (ukuran jam)",
+            deviation >= WATCH_FEATURE_READABILITY,
+            f"ciri menyimpang {deviation:.2f}% dari bola berpalet di dalam "
+            f"daerahnya sendiri (ambang {WATCH_FEATURE_READABILITY}); di "
+            f"bawah ambang, cirinya utuh secara geometris tetapi tidak lagi "
+            f"terbaca oleh mata pada ukuran yang tampil"))
+
+
 def check_png_is_well_formed(results, size=64, ss=2):
     """PNG yang ditulis alat render harus **sah menurut spesifikasi PNG**.
 
@@ -13151,6 +13318,7 @@ def main():
     check_maria_ripple_matches_the_view(results)
     check_features_survive_the_watch_size(results)
     check_features_survive_the_watch_size_in_night_mode(results)
+    check_unreadable_features_never_pass_the_watch_size(results)
     check_every_planet_in_the_model_has_render_cases(results)
     check_crater_drawing_constants(results)
     check_sun_profile_matches_the_model(results)
