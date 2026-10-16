@@ -1572,6 +1572,35 @@ jobs:
       - name: Buktikan gerbang kasus render planet berbunyi
         run: python3 Tools/bukti-mutasi-kasus-planet.py
 
+      # Bukti bahwa `testMoonCataloguePositionIsNotItsCurrentPosition` berbunyi
+      # — dan bahwa ia tidak bisa hijau karena kebetulan.
+      #
+      # Uji itu mengunci satu asumsi struktural yang menopang **seluruh** jalur
+      # benda tata surya: posisinya datang dari `EphemerisSample` (apparent
+      # of-date), bukan dari `raDeg`/`decDeg` tetap yang menempel pada
+      # `CelestialObject`. Kedua cabang `consider` di `PointingResolver`
+      # **terlihat identik** di layar kode, jadi satu argumen tertukar tidak
+      # menghasilkan peringatan compiler apa pun.
+      #
+      # Empat uji kejujuran Bulan yang sudah ada menguji **penolakan** ("tidak
+      # boleh lock"); tidak satu pun menguji **posisinya**. Terukur di keadaan
+      # 1: dengan posisi benda tata surya dipaku ke koordinat tetap, tepat satu
+      # uji merah — yang baru — dan tiga uji Bulan lain di suite itu tetap
+      # hijau. Itulah bukti celahnya nyata dan tidak tertutup uji mana pun.
+      #
+      # Keadaan 2 adalah kontrol negatif yang arahnya berlawanan: koordinat
+      # tetap di berkas uji justru **digeser**, dan seluruh suite tetap hijau —
+      # membuktikan yang diukur uji adalah perilaku mesin, bukan salinan teks.
+      #
+      # Keadaan 3 menjaga kecukupan fixture. Dua tebakan pertamanya terukur
+      # salah dan diperbaiki di harapannya, bukan dengan melonggarkan gerbang:
+      # (a) `epoch.addingTimeInterval(0)` bukan fixture malam apa pun, dan
+      # (b) jam malam yang dihitung sendiri (hari ke-8 pukul 07.0) **adalah**
+      # jawaban `moonNightFixture()` — sehingga "memindahkannya" ke sana tidak
+      # mengubah apa pun dan hijau tanpa membuktikan apa-apa.
+      - name: Buktikan uji koordinat Bulan berbunyi
+        run: python3 Tools/bukti-mutasi-koordinat-bulan.py
+
       # Bukti bahwa `check_every_morphology_in_the_model_has_render_cases`
       # berbunyi — satu dari 6 gerbang tersisa yang tidak punya harness.
       #
