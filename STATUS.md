@@ -62,7 +62,11 @@ pemeriksaan bernama menyala per keadaan.
     5 keadaan, 0 tidak sesuai harapan
 
 `./swift-ui-lint.sh` -> exit 0, seluruh 37 aturan "Bersih".
-`./swift-test.sh` -> **799 uji, 0 gagal** (CelestialEngine + PointingKit).
+`./swift-test.sh` -> **CelestialEngine 220 + PointingKit 799 = 1019 uji,
+0 gagal**. (Angka per paket diambil dari baris `All tests` masing-masing
+paket, bukan dijumlahkan dari baris per-suite — menjumlahkan baris per-suite
+menghitung suite bersarang dua kali dan menghasilkan 3057 yang tidak berarti
+apa-apa.)
 Perubahan hanya menyentuh satu berkas harness di `Tools/`; tidak ada baris
 `Apps/` atau paket yang tersentuh, jadi angka uji itu memang seharusnya sama.
 
