@@ -120,7 +120,23 @@ public enum DeepSkyCatalogue {
         // yang paling terkenal, jadi ia pasangan yang jujur untuk M51.
         // Mag 7.86 — masih dalam jangkauan binokuler, sama seperti M51.
         CelestialObject(id: "m101", name: "Galaksi Kincir Angin", kind: .deepSky,
-                        raDeg: 210.80254167, decDeg:  54.34916667, magnitude: 7.86)
+                        raDeg: 210.80254167, decDeg:  54.34916667, magnitude: 7.86),
+        // Kelompok keenam: memperluas wakil tanpa membuka bentuk baru. Ketiganya
+        // objek Messier terang yang naik tinggi di lintang Jakarta (deklinasi
+        // -20.75°, +69.07°, +12.17° → kulminasi masing-masing ≈ 75°, 15°, 72°
+        // di atas horizon — semua lolos ambang 10° di
+        // `testEveryObjectRisesAboveTheHorizonForTheTargetLatitude`) dan memakai
+        // morfologi yang sudah ada, jadi penambahan ini tidak mengubah cakupan
+        // bentuk yang diuji (`testEveryMorphologyHasMoreThanOneRepresentative`
+        // tetap terpenuhi). M41 = gugus terbuka terang dekat Sirius (sangat
+        // mudah ditemukan mata telanjang), M81 = galaksi spiral miring, M15 =
+        // gugus bola padat.
+        CelestialObject(id: "m41", name: "Gugus M41", kind: .deepSky,
+                        raDeg: 101.4125, decDeg: -20.7500, magnitude: 4.50),
+        CelestialObject(id: "m81", name: "Galaksi Bode", kind: .deepSky,
+                        raDeg: 148.9183, decDeg:  69.0653, magnitude: 6.94),
+        CelestialObject(id: "m15", name: "Gugus Pegasus", kind: .deepSky,
+                        raDeg: 322.4933, decDeg:  12.1667, magnitude: 6.20)
     ]
 
     /// Seberapa "menyebar" tiap objek (0 = titik, 1 = kabut paling lebar).
@@ -156,7 +172,10 @@ public enum DeepSkyCatalogue {
         "m11": 0.42,   // Bebek Liar — gugus terbuka padat (22′)
         "m2":  0.32,   // M2 — gugus bola, padat seperti Hercules
         "m35": 0.52,   // M35 — gugus terbuka longgar, lebih lebar dari Bebek Liar
-        "m101": 0.88   // Kincir Angin — galaksi berlengan, lebar seperti Pusaran
+        "m101": 0.88,  // Kincir Angin — galaksi berlengan, lebar seperti Pusaran
+        "m41":  0.50,  // M41 — gugus terbuka longgar dekat Sirius
+        "m81":  0.85,  // Bode — galaksi spiral miring, lebar
+        "m15":  0.34   // Pegasus — gugus bola padat
     ]
 
     /// Seberapa menyebar sebuah objek langit dalam, dari id-nya.
@@ -318,7 +337,10 @@ public enum DeepSkyCatalogue {
         "m11": .openCluster,      // Bebek Liar — gugus terbuka padat
         "m2":  .globularCluster,  // M2 — gugus bola padat
         "m35": .openCluster,      // M35 — gugus terbuka longgar
-        "m101": .spiralGalaxy     // Kincir Angin — galaksi spiral berlengan
+        "m101": .spiralGalaxy,    // Kincir Angin — galaksi spiral berlengan
+        "m41":  .openCluster,     // M41 — gugus terbuka
+        "m81":  .galaxy,          // Bode — galaksi spiral miring
+        "m15":  .globularCluster  // Pegasus — gugus bola
     ]
 
     /// Bentuk sebuah objek langit dalam, dari id-nya.

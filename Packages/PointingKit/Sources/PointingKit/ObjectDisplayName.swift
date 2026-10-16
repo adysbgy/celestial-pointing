@@ -168,7 +168,10 @@ public enum ObjectDisplayName {
         "object.name.gugusBebekLiar",
         "object.name.gugusM2",
         "object.name.gugusM35",
-        "object.name.galaksiKincirAngin"
+        "object.name.galaksiKincirAngin",
+        "object.name.gugusM41",
+        "object.name.galaksiBode",
+        "object.name.gugusPegasus"
     ]
 
     /// Pengenal stabil untuk sebuah nama: tanpa spasi, tanpa tanda baca, kata

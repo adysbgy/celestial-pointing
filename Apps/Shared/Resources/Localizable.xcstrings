@@ -5802,6 +5802,57 @@
         }
       }
     },
+    "object.name.gugusM41": {
+      "comment": "Nama objek langit dalam (M41) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M41 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M41"
+          }
+        }
+      }
+    },
+    "object.name.galaksiBode": {
+      "comment": "Nama objek langit dalam (M81) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bode's Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Bode"
+          }
+        }
+      }
+    },
+    "object.name.gugusPegasus": {
+      "comment": "Nama objek langit dalam (M15) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pegasus Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Pegasus"
+          }
+        }
+      }
+    },
     "object.name.neptunus": {
       "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
       "localizations": {
