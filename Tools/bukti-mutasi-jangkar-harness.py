@@ -150,6 +150,69 @@ def main():
             print("CATATAN: pelumpuhan tidak terlihat di keluaran — cakupan "
                   "keadaan ini perlu diperiksa.")
 
+    # --- Keadaan 4: harness baru tanpa jangkar terbaca (wajib MERAH). ---
+    #
+    # Kelas yang dijaga di sini: harness **baru** yang menulis sumber produksi
+    # di tempat sementara `STATES`-nya berbentuk yang belum dikenali pembaca.
+    # Tanpa keadaan ini, pengecualian yang ditambahkan supaya pohon bersih
+    # kembali hijau bisa melebar tanpa batas: apa pun yang buta akan lolos.
+    with tempfile.TemporaryDirectory() as tmp:
+        salin_pohon(tmp)
+        baru = os.path.join(tmp, "Tools", "bukti-mutasi-harness-baru.py")
+        with open(baru, "w", encoding="utf-8") as handle:
+            handle.write(
+                "import os\n"
+                "import mutasi_sumber\n"
+                "ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
+                "STATES = [(nomor, rakit()) for nomor in range(3)]\n"
+                "def main():\n"
+                "    mutasi_sumber.write_source(os.path.join(ROOT, 'x'), 'y')\n")
+        code, out = run_gerbang(tmp)
+        print("\n=== Keadaan 4: harness baru tanpa jangkar terbaca (wajib MERAH) ===")
+        print(out.strip()[-600:])
+        if code == 0:
+            failures.append(
+                "Keadaan 4: gerbang hijau untuk harness baru yang memutasi "
+                "sumber produksi tanpa satu jangkar terbaca. Pengecualian "
+                "harus dinyatakan eksplisit, bukan diberikan diam-diam.")
+        elif "bukti-mutasi-harness-baru.py" not in out:
+            failures.append(
+                "Keadaan 4: gerbang merah tetapi tidak menyebut harness yang "
+                "buta — pembaca tidak tahu berkas mana yang harus diperbaiki.")
+
+    # --- Keadaan 5: pengecualian yang dinyatakan (wajib HIJAU, tapi terlihat). ---
+    #
+    # Deklarasi `JANGKAR_KECUALI` harus **bekerja** — kalau tidak, satu-satunya
+    # cara membuat gerbang hijau adalah menghapus pemeriksaannya. Dan harus
+    # **tercetak**: pengecualian yang senyap sama saja dengan kebohongan.
+    with tempfile.TemporaryDirectory() as tmp:
+        salin_pohon(tmp)
+        baru = os.path.join(tmp, "Tools", "bukti-mutasi-harness-baru.py")
+        with open(baru, "w", encoding="utf-8") as handle:
+            handle.write(
+                "import os\n"
+                "import mutasi_sumber\n"
+                "ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
+                "JANGKAR_KECUALI = (\n"
+                "    'muatan dirakit saat jalan dari AST berkas sasaran, jadi '\n"
+                "    'tidak ada pasangan jangkar tetap untuk dibaca gerbang')\n"
+                "STATES = [(nomor, rakit()) for nomor in range(3)]\n"
+                "def main():\n"
+                "    mutasi_sumber.write_source(os.path.join(ROOT, 'x'), 'y')\n")
+        code, out = run_gerbang(tmp)
+        print("\n=== Keadaan 5: pengecualian dinyatakan (wajib HIJAU + tercetak) ===")
+        print(out.strip()[-700:])
+        if code != 0:
+            failures.append(
+                "Keadaan 5: gerbang tetap merah padahal harness-nya menyatakan "
+                "alasan pengecualiannya. Satu-satunya jalan keluar yang tersisa "
+                "adalah menghapus pemeriksaannya — dan itu yang akan dilakukan "
+                "orang berikutnya.")
+        if "bukti-mutasi-harness-baru.py" not in out:
+            failures.append(
+                "Keadaan 5: pengecualian diterima tetapi tidak dicetak. "
+                "Pengecualian yang tidak terlihat tidak bisa ditinjau siapa pun.")
+
     print()
     if failures:
         print(f"GAGAL: {len(failures)} keadaan tidak sesuai harapan.")

@@ -67,6 +67,15 @@ import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
 
 CHECK = os.path.join(ROOT, "Tools", "check-visuals.py")
 
+#: Kenapa gerbang jangkar tidak bisa memeriksa keadaan berkas ini secara statis.
+#: Berkas ini tidak punya tabel `STATES` sama sekali: yang dimutasinya adalah
+#: **gerbang mana pun** yang ditemukan punya `results.append` di `check-visuals.py`,
+#: dan tubuh barunya dibangun lewat AST (`empty_gate(source, func)`) — termasuk
+#: docstring yang disisipkan. Tidak ada teks tetap yang bisa dijadikan jangkar.
+JANGKAR_KECUALI = (
+    "tidak ada tabel STATES; gerbang yang dimutasi dan tubuh barunya dicari "
+    "lewat AST (empty_gate) saat jalan, jadi jangkarnya tidak berupa teks tetap")
+
 GATE = "check_every_gate_fills_its_results"
 
 # Dijalankan di proses baru: mengimpor ulang `check-visuals` dari berkas yang

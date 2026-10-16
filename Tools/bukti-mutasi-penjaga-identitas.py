@@ -127,6 +127,20 @@ WATCH = os.path.join(ROOT, "Apps", "PointAndKnowWatch", "Sources",
 RULE_HEADER = "== Aturan 34:"
 CLEAN_MARK = "Bersih: penjaga identitas menerima keyakinan engine."
 
+#: Kenapa gerbang jangkar tidak bisa memeriksa keadaan berkas ini secara statis.
+#: `STATES` menyebut `mutate("morphology")` dan sejenisnya, jadi jangkar dan
+#: penggantinya baru ditentukan saat fungsi itu dipanggil: jangkarnya diambil
+#: dari tabel `ANCHORS`, dan **penggantinya disusun dari isi jangkarnya**
+#: (`anchor.replace("isConfirmed: isConfirmed", "isConfirmed: true")`). Gerbang
+#: butuh pasangan (jangkar, pengganti) untuk membedakan mutasi tertinggal dari
+#: suntingan sah; pasangan itu tidak ada sebagai teks tetap, dan menyimpulkan
+#: penggantinya dari jangkarnya berarti meniru logika harness-nya di dalam
+#: gerbang — persis duplikasi yang akan menyimpang diam-diam.
+JANGKAR_KECUALI = (
+    "STATES memanggil mutate(...): jangkar diambil dari tabel ANCHORS dan "
+    "penggantinya disusun dari isi jangkarnya saat jalan, jadi pasangan "
+    "(jangkar, pengganti) tidak ada sebagai teks tetap")
+
 #: Jangkar: baris **utuh**, supaya mutasinya tidak bergantung pada spasi dan
 #: supaya kemunculannya bisa diperiksa eksplisit.
 ANCHORS = {
