@@ -1,3 +1,100 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: dua cacat yang menahan main merah — policy permisif yang membuang planet, dan keadaan harness yang salah skala)
+
+### Kenapa siklus ini bukan fitur baru
+
+Brief meminta poles UI/UX dan FASE C. Dibuka dengan `git status` +
+`gh run list` seperti biasa — dan yang ditemukan bukan layar yang belum jadi,
+melainkan **`main` yang merah**: seluruh run `Engine Tests (Linux)` sejak
+`30e1b86f` gagal, dan run-run sesudahnya menumpuk `in_progress` tanpa pernah
+selesai. Audit menyeluruh lebih dulu: BAGIAN 1 (visual prosedural), BAGIAN 2
+(surface stepping/glassmorphism/token), FASE A (night mode, AOD, VoiceOver),
+FASE B (animasi, Dynamic Type, audio), dan FASE C (complication, `.xcstrings`,
+Info.plist izin Motion/Location, penanganan penolakan izin) **semuanya sudah
+ada dan tergerbang**. Jadi yang dikerjakan bukan fitur, melainkan gerbang yang
+merah — dan dua cacat nyata di bawah.
+
+### Cacat 1: `VisibilityPolicy.permissive` diam-diam membuang planet
+
+Docstring `permissive` berbunyi "kebijakan santai untuk pengujian: **tidak
+membuang apa pun**". Ia menaikkan `limitingMagnitude` dan
+`deepSkyLimitingMagnitude` ke 30, mematikan cahaya Bulan dan penyaring
+Matahari — tetapi **tidak menyetel `planetLimitingMagnitude`**, sehingga ia
+terjatuh ke nilai bawaan produksi **8.30**. Terukur (uji RED lebih dulu):
+
+    classify(kind: .planet, mag: 20, policy: .permissive) -> .tooFaint
+
+Policy pengujian dipakai justru untuk **melepas** penyaringan visibilitas;
+penyaring yang tersisa di sini mengubah hasil uji tanpa ada yang tahu
+sebabnya. Cacatnya bertahan karena uji lama `testPermissivePolicyRejectsNothing`
+memanggil `classify` **tanpa `kind:`** — jadi selalu `.star` dan tidak pernah
+menyentuh ambang planet. Itu bentuk yang sama persis dengan celah cahaya Bulan
+yang sudah ditutup `testPermissivePolicyIgnoresMoonlight` ("uji lamanya hanya
+memeriksa konteks tanpa Bulan"), satu `kind` lebih jauh.
+
+Perbaikan: `planetLimitingMagnitude: 30` (sama dengan `limitingMagnitude`, jadi
+klaim "tidak ada ambang yang tersisa" bisa diperiksa dari satu perbandingan),
+plus **2 uji**: `testPermissivePolicyRejectsNothingForEveryKind` (kelima `kind`,
+magnitudo 20, harus `.visible`) dan `testPermissivePolicyLoosensEveryMagnitudeThreshold`
+(menilai angkanya supaya pesan gagal menunjuk field yang ketinggalan).
+
+### Cacat 2: keadaan 4 harness ciri-terbaca salah skala, dan itu yang merah di CI
+
+`Tools/bukti-mutasi-ciri-terbaca.py` keadaan 4 memudarkan kutub Mars ke 0,12x
+opasitas dengan harapan **MERAH**. Terukur di gerbangnya sendiri:
+
+    opasitas 1,00x -> deviasi kutub Mars 107,54%   hijau (produksi)
+    opasitas 0,12x -> deviasi 12,91%               hijau  <- harapan lama SALAH
+    opasitas 0,02x -> deviasi  2,15%               MERAH  <- dipakai sekarang
+    opasitas 0,00x -> deviasi  0,00%               MERAH (ciri hilang)
+
+0,12x **tidak** mendekati ambang 3,0 (masih 4,3x di atasnya), jadi keadaan itu
+hijau padahal harapannya merah — harness merah pada sumber bersih, dan itulah
+yang menahan `Engine Tests (Linux)`. Skala dikoreksi ke **0,02x** (2,15%),
+dengan angka lengkapnya ditulis di komentar keadaan 4 dan di tabel ringkasan
+docstring supaya tidak basi lagi.
+
+**Gerbangnya sendiri tidak diubah dan tetap benar**: 0,00x → 0,00% = MERAH
+membuktikan ia mengukur kekuatan ciri, bukan sekadar "ada bedanya"; keadaan 1
+(kutub hilang) dan 3 (kawah hilang) tetap memerahkan hasil yang tepat. Yang
+salah adalah klaim harapan, bukan perilaku engine.
+
+### Bukti (bukan klaim)
+
+    ./swift-test.sh                CelestialEngine 222, PointingKit 819, 0 gagal
+                                   (tadinya 220 — dua uji baru)
+    ./swift-ui-lint.sh             seluruh 37 aturan lulus (Aturan 10: README 222)
+    ./swift-typecheck.sh           SEMUA GERBANG LULUS
+    python3 Tools/bukti-mutasi-ciri-terbaca.py
+                                   6 keadaan, semuanya sesuai harapan   <- tadinya 1 salah
+    python3 Tools/bukti-mutasi-skala-magnitudo.py        7 keadaan, lulus
+    python3 Tools/bukti-mutasi-ciri-malam.py             5 keadaan, lulus
+    python3 Tools/bukti-mutasi-penjaga-identitas.py      10 keadaan, lulus
+    python3 Tools/check-harness-terdaftar.py             71 harness, semuanya dirujuk
+    md5 Tools/render-visuals.py: pulih persis setelah setiap keadaan harness
+
+Uji RED dijalankan **lebih dulu**, sebelum perbaikan, dan gagal seperti
+diramalkan (`8.3` vs `30.0`; `tooFaint` vs `visible`). Harness keadaan 4 juga
+diukur lewat skrip pengukur terpisah (empat skala) sebelum angka 0,02x dipilih.
+
+### Yang TIDAK diklaim
+
+- Tidak ada satu pun gerbang diperbaiki perilakunya. Yang diperbaiki: satu
+  field policy yang ketinggalan, dua uji baru yang menutupnya, dan satu angka
+  skala di harness yang salah.
+- `Visibility.swift` dan `VisibilityTests.swift` **tidak** menyentuh logika
+  visibilitas produksi: yang berubah hanya nilai di dalam `permissive`, yang
+  hanya dipakai uji dan harness. Tidak ada ambang produksi (bintang 6,0,
+  langit-dalam 9,0, planet 8,30) yang disentuh.
+- `Engine Tests (Linux)` pada `a0f5c62` belum selesai saat catatan ini
+  ditulis (~2 jam, dan antrean lama masih menumpuk). Yang hijau dan terukur:
+  seluruh gerbang lokal di atas, dijalankan pada kode yang di-push.
+- Angka 107,54% / 12,91% / 3,21% / 2,15% adalah cacah **terukur** pada
+  port Python hari ini, bukan nilai yang dikunci. Perubahan pada render Mars
+  akan menggesernya; kalau keadaan 4 berhenti sesuai harapan, itu tanda
+  gambarnya berubah, bukan harnessnya rusak.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: tiga harapan basi, satu klaim palsu yang ikut ter-commit)
 
 ### Kenapa siklus ini masih bukan fitur baru
