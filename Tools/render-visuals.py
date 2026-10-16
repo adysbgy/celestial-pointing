@@ -557,7 +557,7 @@ CLUSTER_CORE_HALO_SCALE = 2.4
 
 # MODEL: `VisualFrame.clusterCoreBrighten`. Penambahan opasitas inti di
 # atas blob yang menaunginya. **Dulu literal `0.25` di sini dan di view**,
-# tanpa penjaga: terukur (`Tools/ukur-gugus.py`) menggantinya di view
+# tanpa penjaga: terukur (`Tools/bukti-mutasi-inti-opasitas.py`) menggantinya di view
 # membiarkan seluruh 22 gerbang yang membaca view hijau. Sekarang satu angka,
 # satu sumber.
 CLUSTER_CORE_BRIGHTEN = 0.25

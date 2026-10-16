@@ -6,7 +6,7 @@ Kenapa harness ini ada.
 Penambahan opasitas inti bintang gugus hidup sebagai literal `0.25` di **dua**
 bahasa sekaligus -- `core.opacity(min(1, star.opacity + 0.25))` di view dan
 `op + 0.25` di port -- tanpa satu pun gerbang yang menjaganya. Terukur di
-siklus ini (`Tools/ukur-gugus.py`):
+siklus ini (`Tools/bukti-mutasi-inti-opasitas.py`):
 
     view  'star.opacity + 0.25' -> 'star.opacity + 0.55'   0 merah baru
     port  'op + 0.25'           -> 'op + 0.55'             4 merah baru

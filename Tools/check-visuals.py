@@ -13491,6 +13491,132 @@ def check_cited_test_names_exist(results):
              f"{', '.join(sorted(dangling))}"))
 
 
+def _cited_tool_files():
+    """Berkas `Tools/…` yang **dirujuk sumber produksi**, beserta lokasinya.
+
+    Cakupannya sama dengan `_cited_test_names` — hanya sumber paket dan
+    `Apps/` — dan alasannya sama: di sana setiap rujukan adalah klaim bahwa
+    sesuatu **sedang** bisa diperiksa. `Tools/*.py` sendiri tidak dihitung,
+    karena harness dan docstring gerbang memang mengutip nama alat sebagai
+    **riwayat** ("angka ini terukur dengan `Tools/x.py` pada siklus itu"), dan
+    riwayat yang sah tidak boleh memaksa berkasnya tetap ada selamanya.
+    Menghitungnya juga membuat gerbang ini menuduh dirinya sendiri: docstring
+    di bawah ini mengutip `Tools/ukur-gugus.py` justru karena ia **tidak ada**,
+    dan itu satu-satunya cara menuliskan cacatnya.
+
+    Yang dihitung hanya rujukan berbentuk jalur `Tools/<berkas>`, bukan
+    penyebutan nama berkas tanpa jalur: kalimat seperti "ukur-gugus" di dalam
+    prosa bisa berarti banyak hal, sementara jalur itu adalah **alamat**.
+    """
+    cited = {}
+    targets = []
+    for pattern in ("Packages/*/Sources/**/*.swift", "Apps/**/*.swift"):
+        targets += glob.glob(os.path.join(ROOT, pattern), recursive=True)
+    for path in sorted(set(targets)):
+        if "/.build/" in path:
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+        except OSError:
+            continue
+        for match in re.finditer(r"Tools/([A-Za-z0-9_\-]+\.(?:py|sh))", source):
+            cited.setdefault(match.group(1), []).append(
+                (os.path.relpath(path, ROOT),
+                 source[:match.start()].count("\n") + 1))
+    return cited
+
+
+def check_cited_tool_files_exist(results):
+    """Berkas alat yang dirujuk sumber harus benar-benar ada.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.** Empat
+    kalimat di tiga berkas berbeda menunjuk `Tools/ukur-gugus.py` sebagai
+    sumber angka yang mereka kutip, dan berkas itu **tidak pernah ada** di
+    repo — tidak pernah sekalipun dikomit:
+
+        .github/workflows/engine-tests.yml:664   "Terukur (`Tools/ukur-gugus.py`)"
+        CelestialVisual.swift:1767               "Terukur di siklus ini
+                                                  (`Tools/ukur-gugus.py`)"
+        Tools/render-visuals.py:560              "terukur (`Tools/ukur-gugus.py`)"
+        Tools/bukti-mutasi-inti-opasitas.py:9    "Terukur di siklus ini
+                                                  (`Tools/ukur-gugus.py`)"
+
+    Terukur dengan membandingkan 95 jalur `Tools/…` yang dirujuk 196 berkas
+    (sumber, `Tools/`, dokumen, alur kerja) terhadap isi `Tools/`: **1** di
+    antaranya menggantung. Gerbangnya sendiri memeriksa cakupan yang lebih
+    sempit — 4 jalur di 91 berkas sumber produksi — karena di situlah rujukan
+    berarti "sedang bisa diperiksa"; situs di `Tools/` dan komentar alur kerja
+    sudah diperbaiki, tetapi tidak ditegakkan (lihat `_cited_tool_files`).
+    Cacat aslinya ada di salah satu berkas produksi itu, jadi cakupan sempit
+    ini menangkapnya.
+
+    **Kenapa rujukannya diperbaiki, bukan berkasnya ditulis.** Pertanyaan
+    pertama adalah apakah angka yang dikutip masih berlaku — dan jawabannya
+    ya: `star.opacity + 0.25` di view memang sudah menjadi
+    `+ CGFloat(VisualFrame.clusterCoreBrighten)` (`CelestialVisualView.swift:1562`),
+    jadi keputusan arsitektur yang dijelaskan kalimat-kalimat itu sudah
+    dijalankan. Yang hilang bukan pengukurannya, melainkan **berkas alat
+    ukurnya**: harness yang mengukur matriks itu (`bukti-mutasi-inti-opasitas.py`)
+    sudah dikomit dan memuat angkanya, sementara alat sekali-pakai yang
+    menghasilkan angka itu tidak pernah ikut. Menulis ulang alatnya berarti
+    menebak kembali keadaan pohon yang sudah berubah; yang benar adalah
+    menunjuk ke tempat angkanya sekarang benar-benar bisa diperiksa.
+
+    **Kenapa ini bukan cacat kosmetik.** Yang dikutip adalah **angkanya**, dan
+    angka itu dipakai sebagai alasan sebuah keputusan arsitektur: `0.25`
+    dipindahkan dari literal di view ke model `clusterCoreBrighten` karena
+    gerbangnya buta total terhadap nilai itu. Pembaca yang ingin memeriksa
+    klaim itu — atau mengulanginya setelah kodenya berubah — membuka berkas
+    yang disebut, tidak menemukannya, dan tidak punya jalan lain. Klaim
+    "terukur" berubah menjadi klaim yang **tidak bisa diperiksa**, dan itu
+    sama saja dengan tidak ada pengukuran.
+
+    **Kenapa gerbangnya memeriksa keberadaan, bukan isinya.** Isi `ukur-*.py`
+    tidak punya bentuk yang bisa dijanjikan; yang bisa dijanjikan adalah
+    bahwa alamatnya menunjuk sesuatu. Memeriksa isi akan menuntut setiap alat
+    ukur mempertahankan antarmuka yang sama, dan itu tuntutan yang tidak
+    pernah disepakati siapa pun.
+
+    **Fail-closed.** Bila nol rujukan terbaca, gerbang **merah**: pembacanya
+    berhenti cocok dengan bentuk berkasnya, bukan berarti tidak ada rujukan
+    yang perlu diperiksa.
+
+    **Yang TIDAK diklaim.** Yang dijaga adalah berkasnya **ada**, bukan bahwa
+    angka di dalamnya masih sama dengan angka yang dikutip. Alat ukur yang
+    ada tetapi sudah kedaluwarsa lolos di sini — memeriksa itu menuntut
+    menjalankan alatnya, dan beberapa di antaranya memakan puluhan menit.
+    """
+    cited = _cited_tool_files()
+
+    if not cited:
+        results.append(Result(
+            "berkas alat yang dirujuk ada", False,
+            "tidak ada satu pun rujukan `Tools/…` terbaca dari Packages/, "
+            "Apps/, Tools/, dokumen, atau alur kerja CI — pembacanya perlu "
+            "diselaraskan dengan bentuk berkasnya; nol rujukan bukan berarti "
+            "tidak ada yang perlu diperiksa"))
+        return
+
+    dangling = {name: locs for name, locs in cited.items()
+                if not os.path.exists(os.path.join(ROOT, "Tools", name))}
+    for name in sorted(dangling):
+        for path, line in dangling[name]:
+            results.append(Result(
+                f"berkas alat yang dirujuk ada: {path}:{line}", False,
+                f"`Tools/{name}` tidak ada di repo — rujukan ini membaca "
+                f"sebagai 'angkanya bisa diperiksa di sana', padahal alamat "
+                f"itu kosong"))
+
+    results.append(Result(
+        "berkas alat yang dirujuk ada",
+        not dangling,
+        f"semua {len(cited)} berkas alat yang dirujuk ada di Tools/"
+        if not dangling
+        else f"{len(dangling)} berkas alat dirujuk tapi tidak ada: "
+             f"{', '.join(sorted(dangling))}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -13604,6 +13730,7 @@ def main():
     # gerbang dan nama berkas; yang ini menjaga kalimat "nilainya dijaga
     # `testX`" supaya tidak menjadi izin yang tidak pernah diperiksa siapa pun.
     check_cited_test_names_exist(results)
+    check_cited_tool_files_exist(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

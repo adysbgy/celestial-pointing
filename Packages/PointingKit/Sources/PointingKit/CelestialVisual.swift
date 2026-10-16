@@ -1763,12 +1763,13 @@ public enum VisualFrame {
     /// **Kenapa angka ini pindah dari `Canvas` ke model.** Ia dulu hidup
     /// sebagai literal `0.25` di **dua** bahasa sekaligus —
     /// `core.opacity(min(1, star.opacity + 0.25))` di view dan `op + 0.25` di
-    /// port — tanpa satu pun gerbang yang menjaganya. Terukur di siklus ini
-    /// (`Tools/ukur-gugus.py`): mengganti literal di **view** menjadi `0.55`
-    /// membiarkan seluruh 22 gerbang yang membaca view hijau (0 merah), jadi
-    /// jam bisa kehilangan inti gugusnya tanpa suara; mengganti di **port**
-    /// hanya berbunyi karena kebetulan ada docstring yang mengutip angka
-    /// piksel yang bergeser, bukan karena ada yang menjaga angkanya.
+    /// port — tanpa satu pun gerbang yang menjaganya. Terukur
+    /// (`Tools/bukti-mutasi-inti-opasitas.py`): mengganti literal di **view**
+    /// menjadi `0.55` membiarkan seluruh 22 gerbang yang membaca view hijau
+    /// (0 merah), jadi jam bisa kehilangan inti gugusnya tanpa suara;
+    /// mengganti di **port** hanya berbunyi karena kebetulan ada docstring
+    /// yang mengutip angka piksel yang bergeser, bukan karena ada yang
+    /// menjaga angkanya.
     ///
     /// Bentuk cacatnya sama persis dengan `moonSphereGradientEndRadius`:
     /// **satu angka, dua bahasa, nol penjaga**. Yang membedakan hanya kelas

@@ -661,7 +661,8 @@ jobs:
       # dua bahasa, nol penjaga.
       #
       # `0.25` hidup sebagai literal di `core.opacity(min(1, star.opacity +
-      # 0.25))` (view) dan `op + 0.25` (port). Terukur (`Tools/ukur-gugus.py`):
+      # 0.25))` (view) dan `op + 0.25` (port). Terukur
+      # (`Tools/bukti-mutasi-inti-opasitas.py`):
       # menggantinya di **view** membiarkan seluruh 22 gerbang yang membaca
       # berkas view hijau — 0 merah — jadi jam bisa kehilangan inti gugusnya
       # tanpa suara. Menggantinya di **port** berbunyi, tetapi **bukan karena
@@ -1976,6 +1977,24 @@ jobs:
       # menunjuk sesuatu yang ada, bukan bahwa uji itu mengukur yang diklaim.
       - name: Buktikan gerbang nama uji yang dikutip produksi berbunyi
         run: python3 Tools/bukti-mutasi-uji-menggantung.py
+
+      # Dan bentuk **keempat**: bukan nama uji, bukan nama gerbang, melainkan
+      # **berkas alat**. Empat kalimat di tiga berkas menunjuk
+      # `Tools/ukur-gugus.py` sebagai sumber angka yang mereka kutip, dan
+      # berkas itu tidak pernah dikomit sama sekali.
+      #
+      # Angka yang dikutip masih berlaku — `star.opacity + 0.25` di view sudah
+      # menjadi `+ CGFloat(VisualFrame.clusterCoreBrighten)` — jadi yang hilang
+      # bukan pengukurannya, melainkan alamatnya. Yang diperbaiki rujukannya,
+      # bukan dengan menulis ulang alat sekali-pakai yang sudah hilang: itu
+      # berarti menebak kembali keadaan pohon yang sudah berubah.
+      #
+      # Keadaan 2 sengaja **wajib hijau**: gerbangnya hanya menghitung rujukan
+      # berbentuk jalur (`Tools/x.py`), bukan penyebutan nama tanpa jalur.
+      # Menuntut keduanya akan menuduh prosa biasa, dan gerbang yang menuntut
+      # hal yang tidak benar akan dilonggarkan orang.
+      - name: Buktikan gerbang berkas alat yang dirujuk berbunyi
+        run: python3 Tools/bukti-mutasi-tool-dirujuk.py
 
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
