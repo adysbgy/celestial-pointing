@@ -5654,6 +5654,58 @@ for root, _, files in os.walk("Apps"):
                         "atau dibungkam karena sebab yang lain"
                         % (path, baris, fn, ekspresi))
 
+# ── Badan `confirmsDisplayedIdentity` sendiri harus meneruskan fakta ──────
+#
+# **Kenapa cabang ini ada, padahal pemanggilnya sudah diperiksa di atas.**
+# Pemeriksaan di atas hanya melihat **argumen** yang dikirim pemanggil. Kalau
+# badan properti ini menyimpang, seluruh pemanggil tetap mengirim nama yang
+# benar — jadi aturan versi sebelumnya hijau sementara nilainya sudah bukan
+# keyakinan.
+#
+# Terukur, bukan ditebak: mengganti badannya menjadi `!isDisplayingStaleObject`
+# — persis kegagalan yang diperingatkan docstring properti ini — membiarkan
+# **seluruh 37 aturan lulus** (exit 0). `.uncertain` ikut `hasAnswer`, jadi
+# `!isStale` benar pada saat engine menyatakan diri ragu, dan cincin Saturnus
+# tampil di sebelah badge "Ragu". Gambar jadi lebih yakin daripada teksnya.
+#
+# Properti ini hidup di `Apps/`, yang tidak pernah dibangun `swift-test.sh`,
+# jadi tidak ada uji Linux yang bisa menahannya.
+DEFINISI = "public var confirmsDisplayedIdentity: Bool {"
+SUMBER_DEFINISI = os.path.join("Apps", "Shared", "PointingEngine.swift")
+badan = None
+if os.path.exists(SUMBER_DEFINISI):
+    teks = kode_saja(open(SUMBER_DEFINISI, encoding="utf-8").read())
+    if DEFINISI in teks:
+        # Ambil sampai kurung kurawal tutup pada kedalaman yang sama.
+        i = teks.index(DEFINISI) + len(DEFINISI)
+        kedalaman, j = 1, i
+        while j < len(teks) and kedalaman:
+            if teks[j] == "{":
+                kedalaman += 1
+            elif teks[j] == "}":
+                kedalaman -= 1
+            j += 1
+        badan = teks[i:j - 1].strip()
+
+if badan is None:
+    # Fail-closed: propertinya hilang atau berubah nama berarti aturan ini
+    # tidak lagi mengukur saklar identitas yang paling penting.
+    masalah.append(
+        "  %s: deklarasi `confirmsDisplayedIdentity` tidak ditemukan -- "
+        "aturan ini tidak bisa memutuskan apakah gambar boleh mengklaim "
+        "identitas; jangan anggap bersih." % SUMBER_DEFINISI)
+elif badan.startswith("!"):
+    masalah.append(
+        "  %s: `confirmsDisplayedIdentity` menegasikan (%s) -- kebalikan "
+        "dari maksudnya, ciri pengenal muncul saat engine ragu."
+        % (SUMBER_DEFINISI, badan))
+elif not re.search(r"\b(?:confirmsIdentity|confirmsDisplayedIdentity)\b", badan):
+    masalah.append(
+        "  %s: `confirmsDisplayedIdentity` berbadan `%s` -- bukan fakta "
+        "keyakinan engine, jadi identitas diklaim atau dibungkam karena "
+        "sebab yang lain (mis. `!isStale` lolos pada `.uncertain`)."
+        % (SUMBER_DEFINISI, badan))
+
 if diperiksa == 0:
     print("Tidak ada pemanggilan aksesor identitas di Apps/; aturan ini "
           "tidak mengukur apa pun.")

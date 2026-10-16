@@ -117,6 +117,40 @@ ALLOWED_CASES = [
     ("kualifikasi keyakinan snapshot", "snapshot.confirmsIdentity"),
 ]
 
+#: Berkas & badan `confirmsDisplayedIdentity` — saklar tunggal yang
+#: memutuskan apakah gambar boleh mengklaim identitas.
+#:
+#: Kenapa diawasi **badannya**, bukan cuma pemanggilnya: nilai ini hidup di
+#: `Apps/Shared/PointingEngine.swift`, yang tidak pernah dibangun
+#: `swift-test.sh`, jadi tidak ada uji Linux yang bisa menahannya. Terukur:
+#: mengganti badannya jadi `!isDisplayingStaleObject` membiarkan seluruh 37
+#: aturan lulus. `.uncertain` ikut `hasAnswer`, sehingga `!isStale` benar
+#: tepat saat engine menyatakan ragu — cincin Saturnus tampil di sebelah
+#: badge "Ragu".
+BODY_TARGET = "Apps/Shared/PointingEngine.swift"
+BODY_OLD = ("    public var confirmsDisplayedIdentity: Bool {\n"
+            "        snapshot.confirmsIdentity(lastLocked: lastLockedObject)\n"
+            "    }")
+
+#: (nama, badan pengganti, harus_berbunyi). `None` = baseline.
+BODY_CASES = [
+    ("baseline (badan apa adanya)", None, False),
+    ("turun dari !isStale", "    public var confirmsDisplayedIdentity: Bool {\n"
+                            "        !isDisplayingStaleObject\n"
+                            "    }", True),
+    ("negasi fakta keyakinan",
+     "    public var confirmsDisplayedIdentity: Bool {\n"
+     "        !snapshot.confirmsIdentity(lastLocked: lastLockedObject)\n"
+     "    }", True),
+    ("literal true", "    public var confirmsDisplayedIdentity: Bool {\n"
+                     "        true\n"
+                     "    }", True),
+    ("nama lain  isCalibrated", "    public var confirmsDisplayedIdentity: Bool {\n"
+                                "        snapshot.isCalibrated\n"
+                                "    }", True),
+    ("baseline ulang (pulih)", None, False),
+]
+
 #: Versi lama aturan: **hanya** menolak literal — yaitu perilaku yang setara
 #: dengan Aturan 34. Dipakai untuk mengukur non-vakuositas.
 LEGACY_ONLY_LITERAL = (
@@ -197,6 +231,22 @@ def inject_guard(workdir: str, old: str, new: str) -> None:
         sys.exit(f"GERBANG: jangkar penjaga tidak unik ({n} kali) di {TARGET}: "
                  f"{old!r} — harness ini tidak bisa mengukur.\n"
                  f"Jangkarnya mungkin berubah di sumber; perbarui GUARDS.")
+    open(path, "w", encoding="utf-8").write(text.replace(old, new))
+
+
+def inject_body(workdir: str, old: str, new: str) -> None:
+    """Ganti **badan** `confirmsDisplayedIdentity` di salinan berkasnya.
+
+    Sama seperti `inject_guard`, jangkar yang tidak muncul tepat satu kali
+    menghentikan harness: jangkar yang meleset membuat keadaan cacat
+    dilaporkan hijau padahal berkasnya tidak pernah berubah.
+    """
+    path = os.path.join(workdir, BODY_TARGET)
+    text = open(path, encoding="utf-8").read()
+    n = text.count(old)
+    if n != 1:
+        sys.exit(f"GERBANG: jangkar badan tidak unik ({n} kali) di "
+                 f"{BODY_TARGET}: {old!r} — harness ini tidak bisa mengukur.")
     open(path, "w", encoding="utf-8").write(text.replace(old, new))
 
 
@@ -282,6 +332,36 @@ def main() -> int:
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
 
+    # ── b2. Badan `confirmsDisplayedIdentity` sendiri. ─────────────────────
+    #
+    # Kenapa keadaan-keadaan ini terpisah dari (a): yang dimutasi di sini
+    # **bukan** argumen pemanggil, melainkan badan properti yang
+    # menghasilkan faktanya. Aturan versi sebelumnya hanya membaca argumen,
+    # jadi seluruh keadaan di bawah ini **hijau** di sana — terukur, bukan
+    # ditebak (lihat docstring cabangnya di `swift-ui-lint.sh`).
+    for case_name, body, must_fire in BODY_CASES:
+        workdir = copy_repo()
+        try:
+            if body is not None:
+                inject_body(workdir, BODY_OLD, body)
+            _, out = run_rule(program, workdir)
+            ran += 1
+            fired = bool(out.strip())
+            if fired != must_fire:
+                failures.append(
+                    f"  badan confirmsDisplayedIdentity / {case_name}: "
+                    f"{'hijau' if not fired else 'merah'} pada keadaan yang "
+                    f"seharusnya {'berbunyi' if must_fire else 'diam'}")
+            # Temuan harus menyebut berkasnya: kalau yang merah aturan lain,
+            # harness ini akan mengklaim kemenangan yang bukan miliknya.
+            if fired and must_fire and BODY_TARGET not in out:
+                failures.append(
+                    f"  badan confirmsDisplayedIdentity / {case_name}: "
+                    f"berbunyi, tetapi temuannya tidak menyebut "
+                    f"{BODY_TARGET}")
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
     # ── c. Non-vakuositas: dengan aturannya dikembalikan ke hanya-literal,
     #       keadaan cacat harus **berbalik hijau**. ─────────────────────────
     legacy = to_legacy(program)
@@ -320,6 +400,7 @@ def main() -> int:
     print(f"{konteks} — {ran} keadaan, semuanya sesuai harapan "
           f"({len(GUARDS)} penjaga x {len(DEFECT_CASES)} keadaan cacat, "
           f"{len(GUARDS)} x {len(ALLOWED_CASES)} bentuk sah, "
+          f"{len(BODY_CASES)} keadaan badan confirmsDisplayedIdentity, "
           f"{len([c for c in DEFECT_CASES if c[2]])} non-vakuositas).")
     return 0
 
