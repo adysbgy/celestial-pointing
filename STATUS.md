@@ -1,3 +1,95 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: `main` merah diperbaiki — jangkar harness basi, gerbangnya benar)
+
+Siklus ini dibuka dengan `git status` (dua berkas WIP milik agen lain, tidak
+disentuh) lalu **membaca CI**, bukan membaca brief. Hasilnya bukan pekerjaan
+fitur: `main` sedang **merah**, dan sudah merah lewat satu siklus penuh.
+
+    Engine Tests (Linux)  6c9e521  failure  1h29m43s
+    Apple Build           6c9e521  success  3m50s
+
+### Cacatnya
+
+`Tools/bukti-mutasi-angka-urutan-cincin.py` berhenti dengan `exit 2` sebelum
+menguji apa pun:
+
+    GERBANG: jangkar keadaan «1. jumlah hasil tetangga 36 -> 35» muncul 0x,
+    harus tepat 1x — harness tidak boleh jalan.
+
+Commit `6c2fb0d` memperbarui docstring
+`check_saturn_ring_passes_behind_the_globe` dari **36** menjadi **42** hasil
+enam (jumlah pemeriksaan tetangga yang ditakarnya tumbuh), tetapi jangkar
+keadaan 1 di harness masih menunjuk `**36** hasil enam` — yang kini muncul
+nol kali.
+
+### Kenapa perbaikannya memindahkan jangkar, bukan melonggarkan gerbang
+
+Ini yang menentukan arah perbaikan, jadi diukur dulu, bukan ditebak.
+Menjalankan enam pemeriksaan tetangga yang sama persis seperti gerbangnya
+menghasilkan **42** hasil, dan kelima pemeriksaan
+`check_saturn_ring_order_docstring_quotes_measured_values` hijau:
+
+    jumlah tetangga   42 hasil dari enam pemeriksaan
+    geometri          49,7%  (kisi 220x220 paruh atas)
+    tabel 200 px      margin 0 -> 14,  cacat -> 1533
+    tabel 76 px       margin 0 -> 6,   cacat -> 232
+    cacat terbaca     ya pada kedua ukuran
+
+Jadi **gerbangnya benar**; yang basi adalah jangkarnya. Longgar-kan jangkarnya
+(atau buang keadaan 1) akan membuat harness berhenti membuktikan hal yang
+justru paling sering rusak di repo ini — angka di docstring yang tidak lagi
+keluar dari pengukuran. Yang benar adalah memindahkan jangkar ke nilai yang
+memang sekarang terukur, dan membiarkan harness tetap menuntut tepat satu
+pemeriksaan bernama menyala per keadaan.
+
+### Perubahan
+
+- jangkar keadaan 1: `**36** hasil enam` -> `**42** hasil enam`; label
+  keadaannya ikut (`42 -> 35`).
+- docstring harness: baris riwayat `36 hasil tetangga / dikutip: 35` diberi
+  keterangan `(kini 42 — enam pemeriksaan tumbuh)`. Angka 36 itu **benar**
+  sebagai catatan cacat aslinya; berdiri sendiri ia terbaca seperti keadaan
+  sekarang, dan itu bentuk menyesatkan yang sama dengan yang dijaga harness
+  ini.
+
+### Terukur setelah perbaikan (dijalankan penuh di Linux)
+
+    [baseline]                          OK  0 merah
+    1. jumlah hasil tetangga 42 -> 35    OK  1 merah: mengutip jumlah hasil tetangga
+    2. persentase geometri 49,7% -> 50%  OK  1 merah: mengutip persentase geometri
+    3. tabel 200 px: margin 0 14 -> 0    OK  1 merah: tabel margin '200 px'
+    4. tabel 76 px: cacat 232 -> 245     OK  1 merah: tabel margin '76 px'
+
+    5 keadaan, 0 tidak sesuai harapan
+
+`./swift-ui-lint.sh` -> exit 0, seluruh 37 aturan "Bersih".
+`./swift-test.sh` -> **799 uji, 0 gagal** (CelestialEngine + PointingKit).
+Perubahan hanya menyentuh satu berkas harness di `Tools/`; tidak ada baris
+`Apps/` atau paket yang tersentuh, jadi angka uji itu memang seharusnya sama.
+
+### Dua kegagalan lain yang diperiksa dan ternyata sudah beres
+
+Dua run merah sebelumnya (`TAMBAH: uji penolakan Bulan...`) gugur karena
+**Aturan 10** — README menulis `CelestialEngine 216`, berkas uji berisi 220.
+Itu sudah ditutup commit `a5cec14`, dan run `Apple Build` sesudahnya hijau.
+Diperiksa supaya tidak "memperbaiki" sesuatu yang sudah benar.
+
+### Pelajaran
+
+- **Jangkar harness adalah klaim tentang kode, dan klaim itu ikut basi.**
+  Harness yang berhenti dengan `exit 2` justru sedang bekerja: ia menolak
+  menguji apa pun di atas jangkar yang tidak lagi ada. Yang salah bukan
+  penolakannya, melainkan jangkarnya yang tidak ikut diperbarui saat angkanya
+  berubah. Perbaikannya **memindahkan** jangkar — bukan menghapus keadaan.
+- **CI merah satu siklus penuh lebih mahal daripada satu harness yang berhenti
+  keras.** `exit 2` itu bunyi yang benar pada saat yang salah: ia lahir dari
+  perubahan yang benar (enam pemeriksaan tumbuh) di commit yang sama yang
+  memperbarui docstring-nya, hanya tidak memperbarui pengawasnya.
+- **"Baca status, bukan brief."** Brief meminta fitur baru; `git log` + `gh run
+  list` menunjukkan `main` merah lebih dulu. Fitur di atas `main` yang merah
+  tidak bisa diverifikasi, jadi ia harus menunggu.
+
+---
+
 ## Progres terakhir (15 Okt 2026 — siklus XCODE-DEV: celah kejujuran Bulan di siang/dekat Matahari ditutup; audit menyeluruh brief)
 
 Siklus ini masuk ke repo yang **sudah jauh melampaui** brief aslinya. Audit
