@@ -1,3 +1,107 @@
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: nama objek langit dalam tampil Bahasa Indonesia di layar Inggris)
+
+### Yang dikerjakan, dan kenapa bukan fitur baru
+
+Siklus ini membuka berkas pemetaan kunci katalog, bukan menambah layar. Yang
+ditemukan: `DisplayLabel.objectName(forObjectID:catalogue:)` mengembalikan
+`match.name` **mentah** untuk cabang katalog.
+
+Benar untuk bintang — `Sirius` memang sama di dua bahasa. Salah untuk
+**tujuh belas dari delapan belas** nama di `DeepSkyCatalogue`, yang semuanya
+frasa Bahasa Indonesia:
+
+    Nebula Orion    Galaksi Kincir Angin    Gugus Sarang Lebah
+    Gugus Kupu-kupu Nebula Cincin           Galaksi Pusaran  …
+
+Di perangkat berbahasa Inggris pengguna melihat Bahasa Indonesia.
+
+### Kenapa cacat ini bertahan lama
+
+Setiap uji di `DisplayLabelTests` memakai id **bintang**, dan nama bintang
+kebetulan identik di dua bahasa. Jadi jalur yang rusak tidak pernah dilewati
+satu uji pun — seluruh suite hijau di atas bug yang terlihat jelas di layar.
+
+Bentuk ini yang berulang di repo ini: bukan kode yang salah, melainkan
+**permukaan yang tidak diuji karena kebetulan benar di kasus yang mudah**.
+
+### Kenapa satu baris itu penting
+
+`PointingEngine.displayedObjectName` meneruskannya ke **lima** permukaan:
+
+    PointingView (kartu jam)         text + accessibilityLabel
+    ReducedLuminanceView (AOD)       teks always-on
+    ObjectDetailView                 judul panel rincian
+    DiagnosticsView                  baris objek (dua tempat)
+    ComplicationDigest               headline komplikasi
+
+Satu perbaikan menutup kelimanya sekaligus — dan yang terakhir itu berarti
+nama Bahasa Indonesia juga terlihat **tanpa membuka app**.
+
+### Perubahan
+
+- **`ObjectDisplayName`** (`PointingKit`, baru) — accessor nama berbahasa
+  aktif. Membaca kunci benda (`object.body.*`) untuk bendera tata surya, lalu
+  kunci frasa (`object.name.*`). **Tidak** melokalkan kata pertama: itu
+  menghasilkan `Moon Purnama` — separuh baris yang tampak benar, dan justru
+  karena itu tidak ada yang mencarinya. Nama tanpa baris katalog dikembalikan
+  **utuh**.
+- `DisplayLabels.swift` — cabang katalog lewat `ObjectDisplayName.text`.
+- `Localizable.xcstrings` — **27 baris** baru (9 `object.name.<benda>`,
+  18 nama katalog langit dalam termasuk `Pleiades` yang kata tunggal).
+  Diff-nya murni penambahan: 399 insertions, 0 deletions.
+- `ObjectDisplayNameTests` (12) + `DeepSkyObjectNameTests` (4).
+
+### Kenapa katalog tidak menuntut `localizations.id` untuk `object.body.*`
+
+`sourceLanguage` katalog adalah `id`. Bentuk Indonesianya hidup **satu kali**,
+di `LocalizedText.id` di dalam paket (`BodyName.declaration`). Menuntut
+salinannya di katalog berarti setiap nama benda ditulis dua kali — dan salinan
+kedua itulah yang akan melenceng. Yang tidak boleh hilang adalah `en`.
+
+### Yang ditangkap CI, dan apa artinya
+
+Push pertama (`42bd1d5`) **merah** di Aturan 19: dua puluh tujuh baris baru
+dilaporkan **yatim**. Penyebabnya bukan katalognya — `catalogKey(forName:)`
+**membangun** kunci saat jalan, dan gerbang mencari **literal** di kode yang
+dikirim. `BodyName.catalogKey(for:)` sudah memakai bentuk yang benar sejak
+awal.
+
+Perbaikan (`3e6207e`): `ObjectDisplayName.catalogueKeys` — daftar literal,
+yang sekaligus menjawab "kunci ini dipakai di mana". Daftar tangan selalu bisa
+basi, jadi uji penutupnya **dua arah** terhadap katalog engine. Uji itu
+langsung menemukan satu kesalahan rancangan: dua puluh lima **nama bintang**
+ikut terhitung, padahal nama bintang sama di dua bahasa dan tidak perlu baris
+katalog. Penyaringnya `Catalogue.brightStars` — katalog yang sama yang dipakai
+resolver, bukan daftar karangan.
+
+Juga diperbaiki: Aturan 10 (README 799 → 815).
+
+### Bukti
+
+    mutasi: `match.name` dikembalikan -> testEveryDeepSkyPhraseNameIs
+            TranslatedThroughObjectName MERAH, tepat 17 kegagalan
+            (satu per objek, berbanding 17 nama frasa)
+
+    ./swift-test.sh    CelestialEngine 220 + PointingKit 815, 0 gagal
+    ./swift-ui-lint.sh seluruh 37 aturan lulus (dijalankan LOKAL sebelum
+                       push, bukan menunggu CI — satu putaran CI = ~3 menit
+                       macOS, ~2 jam Linux)
+    CI (3e6207e)       Apple Build success 2m45s
+
+### Yang TIDAK diklaim
+
+- Accessor tidak memeriksa bahwa terjemahannya **benar**, hanya bahwa katanya
+  ada, tidak kosong, dan bukan pengenal mentah. Terjemahan yang salah tapi
+  tidak kosong adalah kelas yang tidak bisa dilihat dari sini.
+- Aturan 19 masih menuntut literal di kode. Daftar `catalogueKeys` menutupnya
+  untuk nama objek; accessor generik lain yang membangun kunci saat jalan akan
+  menemui masalah yang sama.
+- Engine Tests (Linux) pada `3e6207e` **belum selesai** saat catatan ini
+  ditulis (~2 jam). Apple Build (macos-15) — gerbang cepat — sudah hijau.
+- Tidak ada perubahan visual. Siklus ini memperbaiki **teks**, bukan gambar.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: `main` merah diperbaiki — jangkar harness basi, gerbangnya benar)
 
 Siklus ini dibuka dengan `git status` (dua berkas WIP milik agen lain, tidak
