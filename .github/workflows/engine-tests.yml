@@ -1882,5 +1882,16 @@ jobs:
       - name: Buktikan Aturan 37 berbunyi pada switch yang kehilangan kasus enum
         run: python3 Tools/bukti-mutasi-aturan37-lengkap.py
 
+      # Kenapa dua aturan ini butuh langkah sendiri, padahal 35 aturan lain
+      # tidak: terukur pada commit ini, Aturan 8 dan Aturan 17 adalah
+      # **satu-satunya** aturan di `swift-ui-lint.sh` yang tidak punya keadaan
+      # cacat yang dieksekusi. Keduanya muncul di harness lain hanya sebagai
+      # pembatas blok (`END = "# ── Aturan 8:"`) atau sebagai prosa — tidak
+      # satu pun menanam cacat lalu menuntut aturannya menyala. Gerbang yang
+      # tidak pernah dibuktikan bisa merah adalah gerbang yang hijau karena
+      # tidak memeriksa, dan itu kelas cacat termahal di repo ini.
+      - name: Buktikan Aturan 8 & 17 berbunyi (kata asing; kunci ditulis ulang di Apps/)
+        run: python3 Tools/bukti-mutasi-aturan8-17.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

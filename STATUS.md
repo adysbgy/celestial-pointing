@@ -1,4 +1,71 @@
-## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang jangkar harness, penutup kelas "mutasi tertinggal")
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harness yang tak terbaca gerbang jangkar + bukti Aturan 8 & 17)
+
+### Mengapa siklus ini tidak mulai dari fitur
+
+Misi FASE A/B/C sudah selesai dan ter-gerbang: `CelestialVisual` (Canvas),
+mode malam via `AppStorage`, `isLuminanceReduced`, label aksesibilitas,
+katalog langit-dalam — semuanya ada. Menambah fitur di atasnya tidak menambah
+nilai; yang belum ada adalah **bukti bahwa gerbang pembukanya bisa merah**.
+`Tools/bukti-mutasi-aturan-ui.py` mengklaim setiap aturan "masing-masing
+berbunyi". Audit ketat (setiap penyebutan `Aturan N` di CI + 72 harness,
+bukan cuma `grep -c`) menunjukkan klaim itu tidak pernah dieksekusi untuk
+**Aturan 8** (kata asing) dan **Aturan 17** (kunci katalog ditulis ulang):
+penyebutan mereka di luar `swift-ui-lint.sh` hanyalah pemisah
+(`END = "# ── Aturan 8:"`) dan prosa. Klaim tanpa eksekusi = hijau vakum.
+
+### Yang dikerjakan
+
+- `Tools/bukti-mutasi-aturan8-17.py` (baru): program Python **milik aturan
+  sendiri** diekstrak dari `swift-ui-lint.sh`, dijalankan atas salinan kotak
+  pasir. 8 keadaan: 5 cacat (komentar, kode, literal string, `project.yml`,
+  kunci katalog) + 2 baseline + 1 kontrol hijau. Semua berbunyi, exit 0.
+- Non-vakum diuji: menetralkan langkah keputusan kedua aturan membuat **5
+  keadaan cacat berbalik MERAH → HIJAU**. Jadi harness peka pada aturannya,
+  bukan pada "kebetulan hijau".
+- Terdaftar di `.github/workflows/engine-tests.yml`.
+
+### Temuan yang lebih besar dari tugasnya
+
+Harness baru saya **tak terbaca** oleh `Tools/check-jangkar-harness.py`.
+Pembaca gerbang itu mengambil `elemen[1]` tiap keadaan sebagai daftar
+(`path, find, replace`); bentuk `(label, rel, (old,new), must_fire)` saya
+membuatnya dilewati **tanpa suara** — gerbang tetap mencetak
+`OK: 196 jangkar`, padahal ia mengukur 72 harness, bukan 73. Pemeriksaan
+nol-total tidak menangkap "satu hilang", hanya "semua hilang".
+
+Dua perbaikan:
+1. `STATES` dibentuk ulang ke `(label, [(path, find, replace)], must_fire)` —
+   gerbang kini membaca 6 jangkar baru (196 → **202**).
+2. Pengganti yang **memuat jangkarnya** membuat gerbang buta selamanya:
+   syaratnya `jangkar hilang && pengganti ada`, dan selama pengganti memuat
+   jangkar sebagai substring, syarat pertama tak pernah terpenuhi. Lima dari
+   enam jangkar pertama saya berbentuk begitu ("tempelkan kata asing di
+   belakang"). Semua diubah jadi **substitusi nilai** — yang juga bentuk
+   mutasi yang sungguh terjadi di repo ini (`2.4 -> 40.0`, `0.25 -> 0.0`).
+   Diverifikasi: substitusi nilai kini dilaporkan `MUTASI BOCOR`.
+
+Pemeriksaan keunikan jangkar juga diturunkan dari `STATES`, bukan daftar
+tangan, supaya tidak basi saat keadaan ditambah. Diverifikasi berbunyi
+(exit 2) saat sebuah jangkar pensiun.
+
+### Yang TIDAK diklaim
+
+- `TextLocalization.text("…")` (literal String) dilaporkan "Bersih" oleh
+  Aturan 17, tetapi `text(_ key: LocalizedText)` — jadi bentuk itu **takkan
+  dikompilasi**. Bukan celah, tidak dilaporkan.
+- Kata asing yang **menempel** pada pengenal (`deshalbPointAndKnow`) tidak
+  terbaca sebagai kata oleh Aturan 8: `WORD` menyapu seluruh pengenal. Ini
+  batas Aturan 8 yang sah, dan kini terdokumentasi di harness.
+
+### Gerbang siklus ini
+
+819 tes PointingKit hijau · `swift-ui-lint.sh` hijau (37 aturan) ·
+`swift-typecheck.sh` hijau · `check-harness-terdaftar.py` 73/73 ·
+`check-jangkar-harness.py` 202 jangkar · harness baru 8/8, exit 0.
+
+---
+
+## Siklus sebelumnya (16 Okt 2026 — gerbang jangkar harness, penutup kelas "mutasi tertinggal")
 
 ### Dua kali kelas yang sama, dua kali tidak ada yang menahannya
 
