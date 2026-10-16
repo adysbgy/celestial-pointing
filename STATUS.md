@@ -1,4 +1,124 @@
-## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang jangkar buta pada 22 dari 22 kebocoran + fail-closed)
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: bentuk keempat "dirujuk padahal tidak ada" + 3 uji penjaga yang tidak pernah ada)
+
+### Mengapa siklus ini tidak mulai dari fitur
+
+Misi FASE A/B/C sudah selesai dan ter-gerbang. Siklus sebelumnya menutup
+**jangkar harness** yang tak terbaca gerbang (22 dari 22 mutasi bocor lolos).
+Pertanyaan yang belum dijawab: keluarga cacat "sesuatu dirujuk padahal tidak
+ada" sudah ditutup untuk **dua** bentuk (nama gerbang, jangkar harness).
+Berapa bentuk lagi yang belum?
+
+Jawabannya dua, dan keduanya terukur:
+
+| bentuk | alat ukur | temuan |
+| --- | --- | --- |
+| nama **uji** yang dikutip produksi | `Tools/ukur-uji-menggantung.py` (baru) | 3 dari 43 |
+| berkas **alat** yang dirujuk | pemeriksaan 95 jalur `Tools/…` di 196 berkas | 1 dari 95 |
+
+### Bentuk ketiga: nama uji yang dikutip sebagai penjaga
+
+Tiga kalimat di sumber produksi menunjuk uji sebagai penjaga sebuah angka,
+dan tidak satu pun punya ujinya:
+
+    NightVisual.swift:227      testCraterRimIsBrighterThanItsFloor
+    NightVisual.swift:163      testJupiterSpotIsInTheSouthernHemisphere
+    CelestialVisual.swift:2163 testSunCoronaReachesBeyondTheDisk
+
+Ini lebih buruk daripada nama gerbang yang menggantung, dan bedanya **arah**:
+nama gerbang yang menggantung adalah janji yang tidak ditepati, sedangkan nama
+uji yang menggantung adalah **izin** — kalimat itu dibaca orang berikutnya
+sebagai "angka ini sudah dijaga, jangan diutak-atik", lalu ia berhenti
+memeriksa. Dan di Linux tidak ada yang menjaganya: `check-visuals.py` tidak
+dijalankan `swift-test.sh`, dan tanpa `--check` ia tidak jalan sama sekali.
+
+Perbaikannya **tidak** satu resep, dan itu diputuskan dengan mengukur dulu:
+
+- `craterRim`/`craterFloor` — **ujinya ditulis**. Invariannya nyata dan tidak
+  punya penjaga di Linux. Kalau bertukar, kawah Merkurius tidak hilang: ia
+  terbaca sebagai **tonjolan**, bentuk yang berlawanan dengan yang digambar,
+  dan tidak ada teks di layar yang bisa membantahnya. Diuji di dua mode, dan
+  pembandingnya `nightModeBrightness` — kanal yang **sama** yang dibaca mode
+  malam — bukan rata-rata RGB. Rata-rata akan meloloskan `craterFloor` yang
+  lebih terang di kanal merah sambil berbalik di layar malam: buta tepat pada
+  mode yang diklaimnya jaga.
+- Dua sisanya — **kutipannya diperbaiki**. Diukur lebih dulu: invariannya
+  sudah dijaga uji yang benar-benar ada (`testJupiterSpotIsCenteredNotCornered`
+  menegakkan hemisfer selatan lewat syarat bintiknya tidak di sudut;
+  `testSunCoronaReachIsBeyondTheDisk` menegakkan jangkauan korona). Yang salah
+  hanya namanya; menulis uji baru di situ akan menduplikasi penjaga yang ada.
+
+### Bentuk keempat: berkas alat yang dirujuk
+
+Empat kalimat di tiga berkas menunjuk `Tools/ukur-gugus.py` sebagai sumber
+angka yang mereka kutip. Berkas itu **tidak pernah dikomit sekali pun**:
+
+    .github/workflows/engine-tests.yml:664   Tools/render-visuals.py:560
+    CelestialVisual.swift:1767               Tools/bukti-mutasi-inti-opasitas.py:9
+
+Yang diperbaiki adalah **rujukannya**, bukan dengan menulis ulang alatnya —
+dan itu keputusan yang diambil setelah mengukur, bukan menebak. Angka yang
+dikutip masih berlaku: `star.opacity + 0.25` di view memang sudah menjadi
+`+ CGFloat(VisualFrame.clusterCoreBrighten)` (`CelestialVisualView.swift:1562`).
+Jadi keputusan arsitektur yang kalimat-kalimat itu jelaskan sudah dijalankan;
+yang hilang bukan pengukurannya, melainkan alamatnya — dan harness yang memuat
+matriks angkanya (`bukti-mutasi-inti-opasitas.py`) sudah dikomit. Menulis
+ulang alat sekali-pakai berarti menebak kembali keadaan pohon yang sudah
+berubah.
+
+### Dua pelajaran tentang cakupan gerbang
+
+**1. Cakupan sempit bukan kelonggaran — asalkan alasannya diukur.** Gerbang
+`check_cited_tool_files_exist` hanya memeriksa **sumber produksi** (91 berkas,
+4 jalur), bukan `Tools/` atau alur kerja. Alasannya sama seperti
+`_cited_test_names`: di sumber produksi rujukan berarti "sedang bisa
+diperiksa", sementara di harness dan docstring gerbang rujukan adalah
+**riwayat** yang sah. Versi pertama saya memeriksa keduanya dan langsung
+menuduh dirinya sendiri — docstring gerbang ini mengutip `Tools/ukur-gugus.py`
+justru karena ia tidak ada. Batas itu dinyatakan di docstring dan dijaga
+**keadaan 2** harness (wajib hijau).
+
+**2. Pembaca berbasis pola bisa berhenti mengukur tanpa memberi tahu.** Kedua
+gerbang baru **fail-closed**: nol kutipan/rujukan = MERAH. Kalau polanya tidak
+lagi cocok dengan bentuk berkasnya, himpunannya kosong, tidak ada yang
+menggantung, dan gerbang yang naif akan hijau **karena tidak mengukur apa
+pun** — kelas cacat termahal di repo ini. Keadaan terakhir di kedua harness
+membuktikan cabang itu benar-benar berbunyi.
+
+### Kesalahan yang ketahuan karena gerbangnya dijalankan
+
+Versi pertama `check_cited_test_names_exist` mengurai berkas **Swift** dengan
+`ast` Python dan melaporkan **43 temuan palsu**. Itu ketahuan hanya karena
+gerbangnya dijalankan sebelum dipercaya, bukan karena dibaca. Diganti pembaca
+berbasis regex yang sadar-komentar; hasilnya **3**, persis yang diukur
+`ukur-uji-menggantung.py`.
+
+### Gerbang & bukti
+
+- `Tools/ukur-uji-menggantung.py` (baru): 1038 uji terdefinisi, 43 nama uji
+  dikutip produksi, **0** tanpa definisi.
+- `Tools/bukti-mutasi-uji-menggantung.py` (baru, terdaftar CI): 3 keadaan +
+  baseline. Definisi dinamai ulang (MERAH), kutipan baru tanpa ujinya (MERAH),
+  pembaca berhenti cocok (MERAH, fail-closed).
+- `Tools/bukti-mutasi-tool-dirujuk.py` (baru, terdaftar CI): 3 keadaan +
+  baseline. Rujukan ke berkas yang tidak ada (MERAH), nama alat tanpa jalur
+  `Tools/` (hijau — batas cakupan), pembaca berhenti cocok (MERAH).
+- `check-jangkar-harness.py`: 329 jangkar, tidak ada mutasi tertinggal.
+- `check-harness-terdaftar.py`: 76 harness, semuanya dirujuk alur kerja.
+- `swift-test.sh`: **222 + 831 hijau**. Apple Build macOS **hijau**.
+
+### Yang TIDAK diklaim
+
+- Kedua gerbang baru **statis**: nama-vs-nama dan alamat-vs-alamat. Uji hampa
+  (`XCTAssertTrue(true)`) lolos gerbang nama-uji; alat ukur yang ada tetapi
+  angkanya sudah kedaluwarsa lolos gerbang berkas-alat. Memeriksa yang terakhir
+  menuntut menjalankan alatnya, dan beberapa di antaranya puluhan menit.
+- Cacat `Tools/` dan komentar alur kerja **sudah diperbaiki** tetapi tidak
+  ditegakkan gerbang mana pun. Itu dinyatakan di docstring, bukan dibiarkan
+  terbaca sebagai "terjaga".
+- Siklus ini tidak menyentuh UI. Visual objek, mode malam, AOD, VoiceOver,
+  complication, dan lokalisasi tetap seperti siklus sebelumnya.
+
+## Progres sebelumnya (16 Okt 2026 — gerbang jangkar buta pada 22 dari 22 kebocoran + fail-closed)
 
 ### Mengapa siklus ini tidak mulai dari fitur
 
