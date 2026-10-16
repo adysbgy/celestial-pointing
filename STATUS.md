@@ -1,4 +1,84 @@
-## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: bentuk keempat "dirujuk padahal tidak ada" + 3 uji penjaga yang tidak pernah ada)
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: gerbang kawah buta pada situs kedua, dan harness yang menolak jalan karena itu)
+
+### Ringkas
+
+`main` merah sejak `27dd677`: harness `bukti-mutasi-sabit-bibir-kawah.py`
+menolak jalan ("jangkar muncul 2x, butuh 1"). Ternyata itu **gejala**, bukan
+cacatnya. Cacatnya: gerbang `check_crater_drawing_constants` memakai
+`re.search` — kemunculan **pertama** saja — sehingga sejak situs kawah
+**kedua** (kawah Bulan) ada, gerbangnya mengukur kawah **planet** sambil
+mencetak hasil yang berbunyi seolah seluruh kelasnya terjaga.
+
+Dua akibat, satu sebab:
+
+| akibat | terukur |
+| --- | --- |
+| harness menolak jalan → `main` merah | jangkar lama muncul 2x, `verify_anchors` menuntut 1x |
+| gerbang **buta** pada situs Bulan | 2 mutasi, 7 gerbang kawah/Bulan, **0 gagal** |
+
+### Angka yang mengubah keputusan
+
+Atas pohon bersih, **hanya** situs Bulan dimutasi, tujuh gerbang kawah/Bulan
+dijalankan di proses baru:
+
+    view  Bulan  1.84 -> 1.60    7 gerbang, 0 gagal   <- buta
+    port  Bulan  0.92 -> 0.70    7 gerbang, 0 gagal   <- buta
+
+Tanpa pengukuran ini, "perbaiki jangkarnya" akan terasa cukup — harnessnya
+jalan lagi, CI hijau lagi, dan kawah Bulan tetap tidak diukur siapa pun.
+
+### Perbaikan
+
+- Gerbang: `re.search` → `findall`, **plus** syarat **jumlah situs di kedua
+  bahasa wajib sama**. Syarat kedua itu menutup arah paling senyap: satu
+  bahasa mendapat situs gambar baru dan yang lain tidak — di situ tidak ada
+  angka yang menyimpang, hanya *banyaknya*, sehingga tidak ada perbandingan
+  nilai pun yang bisa melihatnya.
+- Jangkar harness: menyebut pembeda yang **ada di kode**
+  (`crater.rimDirectionY` vs `r.rimDirectionY`, `CRATER_RIM_OFFSET` vs
+  `mr * 0.45`), bukan nomor baris.
+- Konstanta `VIEW_CIRCLES` lama **dihapus**, bukan dibiarkan: ia persis
+  substring ambigu penyebab cacat ini.
+
+### Yang diukur, bukan dikira-kira
+
+Harness 17 keadaan, semuanya sesuai harapan — termasuk dua yang **dulu buta**:
+
+    6. view BULAN  1.84 -> 1.60            MERAH (dulu hijau)
+    7. port BULAN  0.92 -> 0.70            MERAH (dulu hijau)
+    8. view BULAN  1.84 x 1.50 (elips)     MERAH
+    9. situs BULAN jadi cakram penuh       MERAH (jumlah situs berbeda)
+    10. view BULAN 2.0 + port BULAN 1.0    hijau  <- kontrol negatif
+
+Keadaan 10 yang membedakan "membaca semua situs" dari "memerahkan apa pun yang
+menyentuh situs kedua". Tanpa dia, perbaikan yang cuma menghitung situs lulus
+6–9 dengan sempurna — jadi hijau di sana adalah bukti, bukan hiasan.
+
+Keadaan (a)–(c) tetap hijau di ketiga gerbangnya, seperti sebelumnya: batas
+cakupan gerbang ini **tidak berubah** — ia tetap tidak melihat *kekuatan* dan
+*pemotongan* bibir. Itu dinyatakan, bukan disembunyikan.
+
+### Yang TIDAK diklaim
+
+- Cakupan gerbang ini tetap terbatas pada **angka** sabit bibir (diameter,
+  rasio, jumlah situs) dan bentuknya (lingkaran, bukan elips). Kekuatan dan
+  pemotongan bibir dijaga keadaan (a)–(c) sebagai **bukti batas**, bukan
+  sebagai gerbang.
+- Kawah Bulan kini diukur **sejauh angka yang sama** dengan kawah planet.
+  Persamaan bentuk antar keduanya bukan klaim di sini.
+- `KONSTANTA` di harness tetap **kosong** — sudah begitu di `origin/main`, dan
+  sebabnya pembacanya mencari nama literal sementara nama hasilnya f-string.
+  Bukan regresi dari siklus ini, dan tidak diperluas di sini.
+
+### Verifikasi
+
+    CelestialEngine  222 uji, 0 gagal
+    PointingKit     831 uji, 0 gagal
+    jangkar harness 335 jangkar, tidak ada mutasi tertinggal
+    harness terdaftar 76 harness, semuanya dirujuk alur kerja
+    harness kawah   17 keadaan, semuanya sesuai harapan
+
+## Progres sebelumnya (16 Okt 2026 — siklus XCODE-DEV: bentuk keempat "dirujuk padahal tidak ada" + 3 uji penjaga yang tidak pernah ada)
 
 ### Mengapa siklus ini tidak mulai dari fitur
 
