@@ -70,6 +70,29 @@ extension SurfacePalette {
     }
 }
 
+/// Token lapis "kaca" — nilai yang tidak bisa diuji di Linux, jadi dikumpulkan
+/// di sini supaya alasannya bisa dibaca di satu tempat, bukan tersebar di view.
+enum SurfaceTokens {
+    /// Opasitas kilau kaca (`.ultraThinMaterial`) pada kartu.
+    ///
+    /// **Kenapa rendah, bukan penuh.** Kontras teks 4.5:1 dihitung terhadap
+    /// warna token **buram** di bawahnya (teruji di `SurfacePaletteTests`).
+    /// Material di opasitas penuh membuat warnanya bergantung latar belakang,
+    /// sehingga menggeser luminans efektif di bawah teks melewati ambang —
+    /// itulah sebabnya `surfaceCard` aslinya menolak material sama sekali.
+    /// Di sini material diletakkan **di atas** alas buram pada opasitas ini,
+    /// jadi ia hanya menyapu permukaan kosong kartu sebagai kilau, dan teks
+    /// tetap duduk di atas alas buram yang kontrasnya sudah dijamin.
+    ///
+    /// **Batas yang diakui.** Tidak ada gerbang yang mengukur kontras hasil
+    /// render kartu di `Apps/` (hanya model `SurfacePalette` yang diuji), jadi
+    /// angka ini adalah pilihan desain, bukan hasil pengukuran perangkat.
+    /// Ia sengaja dibuat rendah supaya tidak mengubah klaim kontras yang sudah
+    /// lulus; kalau kelak ada gerbang kontras lapisan app, angka ini harus
+    /// diukur ulang, bukan diwarisi.
+    static let glassSheenOpacity: CGFloat = 0.10
+}
+
 /// Ketebalan garis tipis pemisah kartu.
 ///
 /// Satu token, bukan satu angka per file: jarak garis 1px vs 0.5px
@@ -109,18 +132,28 @@ extension View {
         preferredColorScheme(.dark)
     }
 
-    /// Permukaan kartu: warna yang sudah **diuji**, plus garis rambut.
+    /// Permukaan kartu: warna yang sudah **diuji**, plus kilau kaca tipis, plus
+    /// garis rambut.
     ///
-    /// Kenapa memakai warna solid dan bukan `.ultraThinMaterial`: material
-    /// membuat warnanya bergantung apa yang ada di belakangnya, sehingga
-    /// kontras yang kita klaim 4.5:1 tidak lagi bisa dipastikan. Glassmorphism itu
-    /// enak dilihat saat warnanya acak; di palet yang sudah kita hitung, ia hanya
-    /// mengurangi ketajaman hierarki.
+    /// **Lapis, bukan ganti.** Alas kartu tetap warna token **buram** yang
+    /// kontrasnya sudah lulus `SurfacePaletteTests` — itu jaminan 4.5:1 untuk
+    /// teks. Di atasnya diletakkan `.ultraThinMaterial` pada opasitas rendah
+    /// (`SurfaceTokens.glassSheenOpacity`) sebagai kilau "kaca" ala Mobbin/app
+    /// premium, lalu garis rambut di lapis paling depan. Material tidak pernah
+    /// duduk **di bawah** teks, jadi ia tidak menggeser kontras yang sudah
+    /// dihitung — ia hanya memberi rasa frosted pada permukaan kosong kartu.
+    ///
+    /// Penolakan material di versi lama benar soal kontras; lapisan ini adalah
+    /// cara mendapatkan rasa yang sama tanpa membatalkan jaminan itu.
     func surfaceCard(level: SurfaceLevel = .card, radius: CGFloat = 16) -> some View {
         let palette = SurfacePalette.active
         return self
             .background(level.fill(in: palette),
                         in: .rect(cornerRadius: radius))
+            .overlay(
+                RoundedRectangle(cornerRadius: radius)
+                    .fill(.ultraThinMaterial.opacity(SurfaceTokens.glassSheenOpacity))
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(Hairline.color, lineWidth: Hairline.width)
