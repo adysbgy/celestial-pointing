@@ -4375,42 +4375,87 @@ def check_crater_drawing_constants(results):
     # dari `size * 1.84` dan membuat gerbang merah **pada kode yang benar**.
     # Gerbang yang merah pada kode benar akan dimatikan orang, jadi ini bukan
     # gangguan: ini syarat agar gerbang ini bisa hidup.
-    view_rim = re.search(r"width:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*,\s*"
-                         r"height:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*\)", view)
-    if not view_rim:
+    # **Setiap situs, bukan hanya yang pertama.**
+    #
+    # Versi sebelum perbaikan ini memakai `re.search`, yang mengembalikan
+    # kemunculan **pertama** saja. Sampai `27dd677` itu benar: cakram sabit
+    # bibir kawah digambar di **satu** tempat. Commit itu menambahkan tempat
+    # **kedua** — kawah Bulan (`drawMoonCraters` di view, blok kawah Bulan di
+    # port) — dan sejak itu `re.search` membaca kawah **planet** sementara
+    # kawah Bulan tidak diukur siapa pun. Gerbangnya tetap mencetak
+    # "kawah: diameter view = dua kali radius port" seolah-olah seluruh
+    # kelasnya terjaga.
+    #
+    # Terukur (dua mutasi atas pohon bersih, **hanya** situs Bulan disentuh,
+    # tujuh gerbang kawah/Bulan dijalankan di proses baru):
+    #
+    #     view  Bulan  1.84 -> 1.60    7 gerbang, 0 gagal   <- buta
+    #     port  Bulan  0.92 -> 0.70    7 gerbang, 0 gagal   <- buta
+    #
+    # Jadi cacatnya bukan angkanya, melainkan **pembacanya** — dan itu kelas
+    # yang sama dengan yang sudah dua kali tercatat di repo ini: bukan gerbang
+    # yang salah, melainkan gerbang yang berhenti melihat subjeknya saat
+    # subjeknya bertambah.
+    #
+    # Perbaikannya `findall` + **jumlah situs di kedua bahasa harus sama**.
+    # Syarat kedua itu yang menutup arah paling senyap: satu bahasa mendapat
+    # situs gambar baru dan yang lain tidak, sehingga PNG yang diukur seluruh
+    # gerbang piksel repo ini bukan lagi gambar yang tampil di jam.
+    view_rims = re.findall(r"width:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*,\s*"
+                           r"height:\s*size\s*\*\s*(?<![\w.])(\d+\.\d+)\s*\)", view)
+    port_rims = re.findall(r"canvas\.disc\(mx \+ rim_x \* offset, "
+                           r"my \+ rim_y \* offset, mr \s*\*\s*(?<![\w.])(\d+\.\d+),", port)
+    if not view_rims:
         results.append(Result(
             "kawah: diameter sabit bibir terbaca dari view", False,
             "'width: size * N, height: size * N)' tidak ditemukan di "
-            "CelestialVisualView.drawCraters — faktor cakram sabit tidak "
-            "lagi terbaca"))
+            "CelestialVisualView — faktor cakram sabit tidak lagi terbaca"))
         return
-
-    port_rim = re.search(r"canvas\.disc\(mx \+ rim_x \* offset, "
-                         r"my \+ rim_y \* offset, mr \s*\*\s*(?<![\w.])(\d+\.\d+),", port)
-    if not port_rim:
+    if not port_rims:
         results.append(Result(
             "kawah: radius sabit bibir terbaca dari port", False,
             "'canvas.disc(…, mr * N,' tidak ditemukan di render-visuals — "
             "faktor cakram sabit tidak lagi terbaca"))
         return
 
-    view_diameter = float(view_rim.group(1))
-    view_height = float(view_rim.group(2))
-    # View menulis `width` dan `height` terpisah; dua angka itu harus sama,
-    # karena elips yang lebar != tinggi bukan cakram dan bukan lagi "bibir
-    # kawah" — ia jadi bentuk lain tanpa satu pun yang menyadarinya.
+    same_site_count = len(view_rims) == len(port_rims)
+    results.append(Result(
+        "kawah: jumlah situs sabit bibir sama di kedua bahasa",
+        same_site_count,
+        f"view {len(view_rims)} situs, port {len(port_rims)} situs"))
+
+    view_diameters = [float(width) for width, _height in view_rims]
+    view_heights = [float(height) for _width, height in view_rims]
+    port_radii = [float(radius) for radius in port_rims]
+
+    # View menulis `width` dan `height` terpisah; **setiap** situs harus
+    # lingkaran, karena elips yang lebar != tinggi bukan cakram dan bukan lagi
+    # "bibir kawah" — ia jadi bentuk lain tanpa satu pun yang menyadarinya.
+    ellipses = [(width, height) for width, height in zip(view_diameters, view_heights)
+                if abs(width - height) >= 1e-9]
     results.append(Result(
         "kawah: sabit bibir digambar sebagai lingkaran (view)",
-        abs(view_diameter - view_height) < 1e-9,
-        f"diameter {view_diameter:g} × tinggi {view_height:g}"))
+        not ellipses,
+        "; ".join(f"diameter {width:g} × tinggi {height:g}"
+                  for width, height in zip(view_diameters, view_heights))
+        + (f" — {len(ellipses)} situs berbentuk elips" if ellipses else "")))
 
-    port_radius = float(port_rim.group(1))
-    same_disc = abs(view_diameter - 2 * port_radius) < 1e-9
+    # Dibandingkan **terurut**, bukan berpasangan posisi: urutan fungsi di
+    # kedua berkas adalah urutan penulisan, bukan bagian dari kontraknya, dan
+    # gerbang yang memerah saat orang merapikan urutan berkas akan dimatikan.
+    # Satu sisi yang bergeser tetap terlihat karena `2 × radius` bergerak dan
+    # diameternya tidak — termasuk saat jumlah situsnya berbeda (di situ
+    # panjangnya tidak sama, dan itu sudah merah lewat syarat di atas).
+    left = sorted(view_diameters)
+    right = sorted(2 * radius for radius in port_radii)
+    same_disc = (same_site_count and len(left) == len(right)
+                 and all(abs(a - b) < 1e-9 for a, b in zip(left, right)))
     results.append(Result(
         "kawah: diameter view = dua kali radius port",
         same_disc,
-        f"view {view_diameter:g} = 2 × port {port_radius:g}" if same_disc
-        else f"view {view_diameter:g} vs 2 × port {2 * port_radius:g}"))
+        "view " + ", ".join(f"{value:g}" for value in left) + " vs 2 × port "
+        + ", ".join(f"{value:g}" for value in right)
+        + ("" if same_disc else "  ← menyimpang")))
 
 
 

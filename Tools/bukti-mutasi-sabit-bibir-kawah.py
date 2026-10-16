@@ -11,15 +11,41 @@ dua siklus terakhir; `check_mars_caps_fade_into_the_surface` dan
 `check_png_is_well_formed` / `check_png_roundtrip` sudah ditutup lebih dulu, WIP
 yang belum dikomit di pohon kerja).
 
-Gerbang itu menjaga **rasio yang dinyatakan dalam dua satuan**:
+Gerbang itu menjaga **rasio yang dinyatakan dalam dua satuan** — di **dua**
+tempat gambar, dan keduanya harus sama:
 
-    view  Path(ellipseIn: … width: size * 1.84, height: size * 1.84 …)   diameter
-    port  canvas.disc(…, mr * 0.92, …)                                   radius
+    view  drawCraters      Path(… width: size * 1.84, height: size * 1.84 …)  diameter
+    view  drawMoonCraters  Path(… width: size * 1.84, height: size * 1.84 …)  diameter
+    port  kawah planet     canvas.disc(…, mr * 0.92, …)                       radius
+    port  kawah Bulan      canvas.disc(…, mr * 0.92, …)                       radius
 
-`1.84 = 2 × 0.92`. Keduanya harus tetap begini, dan tidak ada satu pun gerbang
-lain yang menyebut `1.84` maupun `0.92`. Perubahan pada salah satunya berarti
-gambar kawah di PNG (yang diukur **seluruh** gerbang piksel repo ini) menyimpang
-dari gambar kawah di jam — tanpa satu pun pemeriksaan yang berbunyi.
+`1.84 = 2 × 0.92`. Perubahan pada salah satunya berarti gambar kawah di PNG
+(yang diukur **seluruh** gerbang piksel repo ini) menyimpang dari gambar kawah
+di jam — tanpa satu pun pemeriksaan yang berbunyi.
+
+**Situs kedua adalah temuan siklus ini, dan ia temuan tentang gerbangnya, bukan
+tentang angka.** Sampai `27dd677` cakram sabit bibir kawah digambar di satu
+tempat. Commit itu menambahkan `drawMoonCraters` (view) + blok kawah Bulan
+(port), dan gerbangnya — yang memakai `re.search`, jadi hanya membaca kemunculan
+**pertama** — sejak itu mengukur kawah **planet** saja sambil tetap mencetak
+"kawah: diameter view = dua kali radius port" seolah seluruh kelasnya terjaga.
+Terukur atas pohon bersih, **hanya** situs Bulan dimutasi, tujuh gerbang
+kawah/Bulan dijalankan di proses baru:
+
+    view  Bulan  1.84 -> 1.60    7 gerbang, 0 gagal   <- buta
+    port  Bulan  0.92 -> 0.70    7 gerbang, 0 gagal   <- buta
+
+Dua akibat yang berbeda, dan keduanya ditutup di sini:
+
+  - **Harness menolak jalan.** Jangkar lamanya (`width: size * 1.84 …`) kini
+    muncul 2x, dan `verify_anchors` menuntut tepat 1x — itulah yang memerahkan
+    `Engine Tests (Linux)`. Jangkar sekarang menyebut pembeda yang benar-benar
+    ada di kode (`crater.rimDirectionY` vs `r.rimDirectionY`,
+    `CRATER_RIM_OFFSET` vs `mr * 0.45`), bukan nomor baris.
+  - **Gerbangnya buta pada situs kedua.** Diperbaiki jadi `findall`, dan
+    **jumlah situs di kedua bahasa wajib sama** — syarat yang menutup arah
+    paling senyap (satu bahasa dapat situs gambar baru, yang lain tidak), di
+    mana tidak ada angka yang menyimpang dan hanya *banyaknya* yang berbeda.
 
 ### Yang diukur, bukan dikira-kira
 
@@ -30,19 +56,22 @@ salah dapat dibedakan dari hasil yang hilang.
 
   keadaan                                                     hasil
   [baseline]                                                  hijau
-  1. view: diameter 1.84 -> 1.70                              MERAH 1
+  1. view PLANET: diameter 1.84 -> 1.70                       MERAH 1
        "kawah: diameter view = dua kali radius port"
-  2. view: tinggi 1.84 -> 1.50 (cakram jadi elips)            MERAH 1
+  2. view PLANET: tinggi 1.84 -> 1.50 (cakram jadi elips)     MERAH 1
        "kawah: sabit bibir digambar sebagai lingkaran (view)"
-  3. port: radius 0.92 -> 0.80                                MERAH 1
+  3. port PLANET: radius 0.92 -> 0.80                         MERAH 1
        "kawah: diameter view = dua kali radius port"
   4. view 1.70 + port 0.80 (dua-duanya 0.92×)           MERAH 1
-       "kawah: diameter view = dua kali radius port"
   4b. view 1.84 + port 0.99 (dua-duanya 1.08×)          MERAH 1
-       "kawah: diameter view = dua kali radius port"
   4c. view 1.9992 + port 0.9936 (dua-duanya 1.08×)      MERAH 1
-  4d. view 2.0 + port 1.0 (keduanya ×1.087 dubius)       MERAH 1
+  4d. view 2.0 + port 1.0 (tempat kedudukan lain)        hijau penuh
   5. kontrol negatif: baris view ditambah komentar di ujungnya hijau penuh
+  6. view BULAN: diameter 1.84 -> 1.60                  MERAH 1  <- dulu buta
+  7. port BULAN: radius 0.92 -> 0.70                    MERAH 1  <- dulu buta
+  8. view BULAN: 1.84 × 1.50 (elips)                    MERAH 1
+  9. situs BULAN dihapus dari view                      MERAH 1
+  10. view BULAN 2.0 + port BULAN 1.0                    hijau penuh
 
 Keadaan 4, 4b, 4c, 4d bersama-sama mengukur **himpunan tempat kedudukan** yang
 sebenarnya dijaga gerbang ini — dan itu bukan yang dibilangkan docstring-nya.
@@ -200,11 +229,56 @@ KONSTANTA = [name for name in _gate_result_names(
 #: (nama keadaan, [(berkas, cari, ganti), …] atau None, {nama hasil: harapan})
 
 #: ── Jangkar sumber ──────────────────────────────────────────────────────
-#: Cakram sabit bibir di view: satu-satunya tempat diameter 1.84 hidup.
-VIEW_CIRCLES = "width: size * 1.84, height: size * 1.84))"
+#: **Dua situs, dan keduanya harus unik.** Sampai `27dd677` cakram sabit
+#: bibir kawah digambar di satu tempat saja, jadi satu jangkar `width: size *
+#: 1.84 …` cukup. Commit itu menambahkan situs **kedua** (kawah Bulan),
+#: dan sejak itu kedua jangkar lama muncul **2x** — `verify_anchors` menolak
+#: seluruh harness (`JANGKAR TIDAK TERBACA`), dan itulah yang memerahkan
+#: `Engine Tests (Linux)`.
+#:
+#: Pelajaran yang menentukan bentuk jangkar baru ini: **jangkar yang sama di
+#: dua tempat bukan sekadar masalah penghitung.** Selama jangkarnya ambigu,
+#: mutasi selalu mengenai situs **pertama** — jadi kawah Bulan tidak pernah
+#: diukur, dan harness ini akan melaporkan "sesuai harapan" sambil tidak
+#: pernah menyentuh subjek yang baru. Karena itu setiap jangkar di sini
+#: menyebut **nama variabel medan arahnya** (`crater.rimDirectionY` vs
+#: `r.rimDirectionY`) dan **baris pemakaian offsetnya** (`CRATER_RIM_OFFSET`
+#: vs `mr * 0.45`) — pembeda yang benar-benar ada di kode, bukan nomor baris.
+#: Situs kawah **planet** (`drawCraters`): medan `crater.…`.
+VIEW_CIRCLES_PLANET = ("                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+                       "                width: size * 1.84, height: size * 1.84))")
+#: Situs kawah **Bulan** (`drawMoonCraters`): medan `r.…` dari `craterRelief`.
+VIEW_CIRCLES_MOON = ("                y: cy + CGFloat(r.rimDirectionY) * offset - size,\n"
+                     "                width: size * 1.84, height: size * 1.84))")
+#: Blok sabit bibir Bulan **utuh**, dipakai keadaan 9: yang diganti adalah
+#: seluruh tiga barisnya, supaya situsnya benar-benar lenyap dari berkas.
+VIEW_CIRCLES_MOON_WHOLE = (
+    "            let rimDisc = Path(ellipseIn: CGRect(\n"
+    "                x: cx + CGFloat(r.rimDirectionX) * offset - size,\n"
+    "                y: cy + CGFloat(r.rimDirectionY) * offset - size,\n"
+    "                width: size * 1.84, height: size * 1.84))\n"
+    "            var lit = context\n"
+    "            lit.clip(to: disc)\n"
+    "            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * strength)))")
+#: Penggantinya: cakram penuh menggantikan sabit bibir. Masih Swift yang sah,
+#: dan `width: size * N` tidak lagi ada di sana — jadi jumlah situs view
+#: berkurang satu sementara port tetap dua.
+VIEW_CIRCLES_MOON_REFACTORED = (
+    "            let rimDisc = Path(ellipseIn: CGRect(\n"
+    "                x: cx - size, y: cy - size,\n"
+    "                width: size * 2, height: size * 2))\n"
+    "            var lit = context\n"
+    "            lit.clip(to: disc)\n"
+    "            lit.fill(rimDisc, with: .color(rim.opacity(0.9 * strength)))")
 #: Cakram sabit bibir di port (dipakai mutasi 3 dan 4).
 PORT_DISC = ("canvas.disc(mx + rim_x * offset, my + rim_y * offset, "
              "mr * 0.92,")
+#: Situs port untuk kawah planet: offsetnya dari `CRATER_RIM_OFFSET`.
+PORT_DISC_PLANET = ("        offset = mr * CRATER_RIM_OFFSET\n"
+                    "        canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,")
+#: Situs port untuk kawah Bulan: offsetnya literal `mr * 0.45`.
+PORT_DISC_MOON = ("        offset = mr * 0.45\n"
+                  "        canvas.disc(mx + rim_x * offset, my + rim_y * offset, mr * 0.92,")
 #: Baris yang menggambar sabitnya di view; dipakai mutasi (a), yang **tidak**
 #: ditangkap gerbang mana pun — lihat docstring.
 VIEW_RIM_FILL = ("lit.fill(rimDisc, with: .color(rim.opacity(0.9 * "
@@ -239,8 +313,10 @@ STATES = [
     # diameter, dan tinggi ikut berubah bersamanya. Kalau ia ikut merah,
     # kedua pemeriksaan sedang mengukur hal yang sama — dan salah satunya
     # tidak menjaga apa pun.
-    ("1. view: diameter 1.84 -> 1.70 (port tidak ikut)",
-     [(VIEW, VIEW_CIRCLES, "width: size * 1.70, height: size * 1.70))")],
+    ("1. view PLANET: diameter 1.84 -> 1.70 (port tidak ikut)",
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.70, height: size * 1.70))")],
      {GATE: MERAH, RATIO: MERAH}),
 
     # ── 2. Cakram jadi elips ─────────────────────────────────────────────
@@ -248,16 +324,18 @@ STATES = [
     # diubah menghasilkan **bentuk lain** — bukan lagi bibir kawah. Rasio
     # terhadap port tetap 1:2 di sini, jadi `RATIO` wajib hijau: itulah yang
     # membuktikan kedua pemeriksaan itu tidak mubazir.
-    ("2. view: tinggi 1.84 -> 1.50 (cakram jadi elips)",
-     [(VIEW, VIEW_CIRCLES, "width: size * 1.84, height: size * 1.50))")],
+    ("2. view PLANET: tinggi 1.84 -> 1.50 (cakram jadi elips)",
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.84, height: size * 1.50))")],
      {GATE: MERAH, RATIO: HIJAU, CIRCLE: MERAH}),
 
     # ── 3. Port mengecil, view tidak ─────────────────────────────────────
     # Arah sebaliknya. Sifat simetrisnya penting: kalau hanya satu arah yang
     # dijaga, `view 1.70 + port 0.80` (dua-duanya diperkecil) lolos sebagai
     # "keseimbangan", padahal tidak ada yang mengatakannya sama.
-    ("3. port: radius 0.92 -> 0.80 (view tidak ikut)",
-     [(RENDER, PORT_DISC, PORT_DISC.replace("0.92", "0.80"))],
+    ("3. port PLANET: radius 0.92 -> 0.80 (view tidak ikut)",
+     [(RENDER, PORT_DISC_PLANET, PORT_DISC_PLANET.replace("0.92", "0.80"))],
      {GATE: MERAH, RATIO: MERAH}),
 
     # ── 4. Kedua sisi diperkecil bersama (faktor sama) ───────────────────
@@ -271,8 +349,10 @@ STATES = [
     # Ini bukan keluhan: hasil ini yang membuat 4b berarti — 4b adalah
     # satu-satunya arah di mana kedua sisi boleh bergerak bersama.
     ("4. view 1.70 + port 0.80 (dua-duanya 0.92×) — terukur MERAH",
-     [(VIEW, VIEW_CIRCLES, "width: size * 1.70, height: size * 1.70))"),
-      (RENDER, PORT_DISC, PORT_DISC.replace("0.92", "0.80"))],
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.70, height: size * 1.70))"),
+      (RENDER, PORT_DISC_PLANET, PORT_DISC_PLANET.replace("0.92", "0.80"))],
      {GATE: MERAH, RATIO: MERAH}),
 
     # ── 4b–4d. Dua sisi bergerak bersama, dan gerbangnya tetap merah ──────
@@ -286,7 +366,7 @@ STATES = [
     #
     # 4b: dikali 1.08 → 2·0.99 = 1.98 ≠ 1.84. MERAH.
     ("4b. view 1.84 + port 0.99 (dua-duanya 1.08×)",
-     [(RENDER, PORT_DISC, PORT_DISC.replace("0.92", "0.99"))],
+     [(RENDER, PORT_DISC_PLANET, PORT_DISC_PLANET.replace("0.92", "0.99"))],
      {GATE: MERAH, RATIO: MERAH}),
 
     # 4c: dikali 1.08 **dan** tempat kedudukan dipenuhi lewat angka lain —
@@ -294,8 +374,10 @@ STATES = [
     # port × 2.0208" (rasio), ini hijau. Terukur: MERAH, karena yang dijaga
     # `view = 2 × port` dengan **kedua** angka, bukan rasio bebas.
     ("4c. view 1.9992 + port 0.9936 (rasio 2.0208, bukan 2)",
-     [(VIEW, VIEW_CIRCLES, "width: size * 1.9992, height: size * 1.9992))"),
-      (RENDER, PORT_DISC, PORT_DISC.replace("0.92", "0.9936"))],
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.9992, height: size * 1.9992))"),
+      (RENDER, PORT_DISC_PLANET, PORT_DISC_PLANET.replace("0.92", "0.9936"))],
      {GATE: MERAH, RATIO: MERAH}),
 
     # 4d: satu-satunya lompatan bersama yang **lulus** — (2.0, 1.0) mendarat
@@ -303,8 +385,10 @@ STATES = [
     # bukan "semua mutasi merah karena regex rusak": satu arah yang sah
     # memang hijau, dan itu terukur.
     ("4d. view 2.0 + port 1.0 (tempat kedudukan lain) — wajib hijau",
-     [(VIEW, VIEW_CIRCLES, "width: size * 2.0, height: size * 2.0))"),
-      (RENDER, PORT_DISC, PORT_DISC.replace("0.92", "1.0"))],
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 2.0, height: size * 2.0))"),
+      (RENDER, PORT_DISC_PLANET, PORT_DISC_PLANET.replace("0.92", "1.0"))],
      {GATE: HIJAU, RATIO: HIJAU, CIRCLE: HIJAU, **{n: HIJAU for n in KONSTANTA}}),
 
     # ── 5. Kontrol negatif: mekanisme pengukurannya sendiri ─────────────
@@ -312,7 +396,66 @@ STATES = [
     # menggeser hasil bacanya — kalau keadaan ini memerah, yang berubah bukan
     # kode produksi, dan seluruh himpunan harapan di atas tidak berarti.
     ("5. kontrol negatif: komentar ditambahkan di ujung baris view",
-     [(VIEW, VIEW_CIRCLES, "width: size * 1.84, height: size * 1.84))  // sama")],
+     [(VIEW, VIEW_CIRCLES_PLANET,
+       "                y: cy + CGFloat(crater.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.84, height: size * 1.84))  // sama")],
+     {GATE: HIJAU, RATIO: HIJAU, CIRCLE: HIJAU, **{n: HIJAU for n in KONSTANTA}}),
+
+    # ── 6–9. Situs **kedua** (kawah Bulan): yang selama ini tak terukur ──
+    #
+    # Empat keadaan ini ada karena diukur, bukan dikira. Atas pohon bersih,
+    # **hanya** situs Bulan yang dimutasi, lalu ketujuh gerbang kawah/Bulan
+    # repo ini dijalankan di proses baru:
+    #
+    #     view  Bulan  1.84 -> 1.60    7 gerbang, 0 gagal   <- buta
+    #     port  Bulan  0.92 -> 0.70    7 gerbang, 0 gagal   <- buta
+    #
+    # Sebabnya bukan gerbangnya salah, melainkan pembacanya: `re.search`
+    # mengembalikan kemunculan **pertama**, dan yang pertama selalu kawah
+    # planet. Karena itu keadaan 6 dan 7 menuntut MERAH — dan keduanya
+    # diverifikasi merah **sesudah** gerbangnya diperbaiki.
+    ("6. view BULAN: diameter 1.84 -> 1.60 (situs kedua, dulu buta)",
+     [(VIEW, VIEW_CIRCLES_MOON,
+       "                y: cy + CGFloat(r.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.60, height: size * 1.60))")],
+     {GATE: MERAH, RATIO: MERAH}),
+
+    ("7. port BULAN: radius 0.92 -> 0.70 (situs kedua, dulu buta)",
+     [(RENDER, PORT_DISC_MOON, PORT_DISC_MOON.replace("0.92", "0.70"))],
+     {GATE: MERAH, RATIO: MERAH}),
+
+    ("8. view BULAN: 1.84 × 1.50 (elips di situs kedua)",
+     [(VIEW, VIEW_CIRCLES_MOON,
+       "                y: cy + CGFloat(r.rimDirectionY) * offset - size,\n"
+       "                width: size * 1.84, height: size * 1.50))")],
+     {GATE: MERAH, CIRCLE: MERAH, RATIO: HIJAU}),
+
+    # Keadaan 9 adalah arah **paling senyap** dari kelas ini, dan alasan syarat
+    # "jumlah situs sama" ada: satu bahasa mendapat situs gambar baru dan
+    # bahasa lain tidak. Di situ tidak ada angka yang menyimpang — yang
+    # berbeda hanya **berapa banyak** yang digambar, sehingga tidak ada
+    # perbandingan nilai pun yang bisa melihatnya. Tanpa syarat jumlah,
+    # gerbangnya hijau selama himpunan angka yang **tersisa** cocok.
+    #
+    # Mutasinya sengaja berbentuk refaktor yang **sah secara Swift** — sabit
+    # bibir Bulan diganti cakram penuh, jadi situsnya benar-benar hilang —
+    # bukan penghapusan baris yang meninggalkan kode rusak. Yang diukur di sini
+    # adalah hitungan situs, dan itu hanya berarti kalau kodenya masih kode.
+    ("9. situs BULAN di view jadi cakram penuh (jumlah situs berbeda)",
+     [(VIEW, VIEW_CIRCLES_MOON_WHOLE, VIEW_CIRCLES_MOON_REFACTORED)],
+     {GATE: MERAH, RATIO: MERAH}),
+
+    # ── 10. Kontrol negatif: situs kedua bergerak **bersama** ────────────
+    # Pasangan 4d untuk situs Bulan. Kedua sisi naik ke (2.0, 1.0) bersama,
+    # jadi himpunannya tetap cocok dan gerbangnya wajib hijau. Inilah yang
+    # membedakan "membaca semua situs" dari "memerahkan apa pun yang
+    # menyentuh situs kedua" — tanpa keadaan ini, perbaikan yang cuma
+    # menghitung situs akan lulus 6–9 dengan sempurna.
+    ("10. kontrol negatif: view BULAN 2.0 + port BULAN 1.0 — wajib hijau",
+     [(VIEW, VIEW_CIRCLES_MOON,
+       "                y: cy + CGFloat(r.rimDirectionY) * offset - size,\n"
+       "                width: size * 2.0, height: size * 2.0))"),
+      (RENDER, PORT_DISC_MOON, PORT_DISC_MOON.replace("0.92", "1.0"))],
      {GATE: HIJAU, RATIO: HIJAU, CIRCLE: HIJAU, **{n: HIJAU for n in KONSTANTA}}),
 
     # ── (a)–(c). Batas cakupan, dan diukur supaya tidak jadi klaim ───────
