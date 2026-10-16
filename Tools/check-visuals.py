@@ -10145,22 +10145,50 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
     #
     # Yang ditegakkan: warna "tidak mengklaim" **akromatik** (R=G=B), sehingga
     # ia tidak mungkin menjadi warna spektral bintang mana pun.
+    #
+    # Ambangnya **2/255**, bukan 0: `brightest_pixel` mengembalikan kanal
+    # 0…255, dan pembulatan ke 8 bit membuat kanal yang sama bisa berbeda satu
+    # langkah (diukur: 197/197/198 pada abu 0,78). Selisih satu langkah bukan
+    # hue; yang dijaga adalah selisih yang cukup besar untuk dibaca mata —
+    # warna spektral kelas A yang lama berbeda 20 langkah di kanal biru.
     unknown_pixel = brightest_pixel(rows_unknown, w5, h5, 0, 0, w5, h5)[0]
     hue_spread = max(unknown_pixel) - min(unknown_pixel)
     results.append(Result(
-        "warna tak dikenal benar-benar akromatik (R=G=B)", hue_spread <= 0.01,
-        f"sebaran kanal {hue_spread:.4f} pada piksel terterang "
-        f"{_rgb_text(unknown_pixel)} (abu netral ~0.78)"))
+        "warna tak dikenal benar-benar akromatik (R=G=B)", hue_spread <= 2,
+        f"sebaran kanal {hue_spread}/255 pada piksel terterang "
+        f"{_rgb_text(unknown_pixel)} (abu netral ~0,78; ambang 2/255 untuk "
+        f"pembulatan 8 bit)"))
 
-    # Dan sisi yang benar-benar dilihat pengguna: Sirius yang **dikonfirmasi**
-    # harus berbeda dari bintang yang **tak dikenal**. Tanpa ini, "menyembunyikan
-    # ciri saat ragu" tetap hijau walau ia justru menunjuk Sirius.
-    _, (w7, h7, rows_sirius) = render_case("star-sirius", size=size, ss=ss)
-    sirius_pixel = brightest_pixel(rows_sirius, w7, h7, 0, 0, w7, h7)[0]
+    # Dan sisi yang benar-benar dilihat pengguna: warna bintang yang
+    # **dikonfirmasi** harus berbeda dari warna bintang yang **tak dikenal**.
+    #
+    # **Ukurannya disamakan, dan itu bukan kerapian.** Versi pertama
+    # pemeriksaan ini membandingkan dua **kasus render** (`star-sirius` lawan
+    # `star-unknown-id`), dan kedua kasus itu membawa `relative_size` yang
+    # berbeda — Sirius m −1,46 lawan kasus tak dikenal m 0,0. Diukur, dengan
+    # sentinel **lama** (B−V 0,00, warna Sirius) kedua piksel itu **tetap
+    # berbeda** (0,6941/0,7426/0,8468 lawan 0,6933/0,7418/0,8459): yang
+    # terukur besarnya titik, bukan warnanya. Persis jebakan yang sudah
+    # pernah dicatat untuk pemeriksaan tetangga di atas. Jadi probe di bawah
+    # memakai `relative_size` **identik** (0,5) dan hanya `color_index` yang
+    # berbeda — kalau warnanya hilang, dua probe itu menjadi gambar yang sama,
+    # dan itu tidak bisa dijelaskan oleh ukuran.
+    def colour_probe(color_index):
+        case = R.VisualCase("probe", "probe", "star", color_index=color_index,
+                            relative_size=0.5, is_confirmed=True)
+        buf = R.render(case, size=size, night_mode=False,
+                       show_frame=False, ss=ss).buf
+        return tuple(round(c, 6) for p in buf for c in p)
+
+    sirius_confirmed = colour_probe(R.STAR_COLOR_INDEX["sirius"])
+    unknown_colour = colour_probe(R.UNKNOWN_STAR_COLOR_INDEX)
     results.append(Result(
-        "Sirius terkonfirmasi ≠ bintang tak dikenal", sirius_pixel != unknown_pixel,
-        f"Sirius {_rgb_text(sirius_pixel)} vs tak dikenal "
-        f"{_rgb_text(unknown_pixel)}"))
+        "Sirius terkonfirmasi ≠ bintang tak dikenal (ukuran disamakan)",
+        sirius_confirmed != unknown_colour,
+        "warna saja (ukuran 0,5): "
+        + ("identik — identitas Sirius tidak terlihat"
+           if sirius_confirmed == unknown_colour
+           else "berbeda (Sirius B−V 0,00 lawan sentinel tak-berwarna)")))
 
 
 def check_crater_floor_opacity_comes_from_the_model(results, size=76, ss=6):

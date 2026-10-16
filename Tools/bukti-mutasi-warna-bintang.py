@@ -51,6 +51,14 @@ Keadaan yang diuji:
                                     ketika yakin, dan masih identik ketika
                                     ragu. Inilah pembeda "warna salah" dari
                                     "warna hilang".
+  4. warna netral jadi spektral      `NEUTRAL_STAR_BODY` dikembalikan menjadi
+                                    warna ber-hue (putih kebiruan kelas A).
+                                    Gerbang akromatik **merah**, dan gerbang
+                                    "Sirius ≠ tak dikenal" **merah**. Ini
+                                    regresi yang paling mudah kembali tanpa
+                                    terlihat: yang salah bukan urutannya,
+                                    melainkan **bahwa netral itu sendiri
+                                    mengklaim satu kelas spektral.
 
 Berkas sumber produksi (`Tools/render-visuals.py`) **dimutasi dengan sengaja**
 lalu dipulihkan di `finally` per keadaan, plus handler `SIGINT`/`SIGTERM`:
@@ -102,8 +110,15 @@ COLOUR_CALL = "    base = star_rgb(color_index)"
 COLOUR_CALL_FLAT = "    base = star_rgb(0.0)"
 
 # Penjaga keraguan: warna hanya boleh sampai ke gambar saat engine yakin.
+#
+# Jangkar ini **ikut berubah** ketika sentinel warna netral pindah dari
+# B−V 0,00 ke `UNKNOWN_STAR_COLOR_INDEX` (di luar rentang B−V). Jangkar lama
+# (`return STAR_COLOR_INDEX.get("", 0.0)`) sudah tidak ada di sumber, dan
+# harness yang jangkarnya hilang berhenti mengukur apa pun — ia melaporkan
+# "jangkar muncul 0x", bukan lulus. Aturan repo ini berlaku di sini: yang
+# bergerak adalah jangkarnya, bukan harapannya.
 GUARD = ('    if not is_confirmed:\n'
-         '        return STAR_COLOR_INDEX.get("", 0.0)\n'
+         '        return UNKNOWN_STAR_COLOR_INDEX\n'
          '    return color_index')
 GUARD_OFF = '    return color_index'
 
@@ -111,12 +126,23 @@ GUARD_OFF = '    return color_index'
 WARMTH = "    warmth = (clamped + 0.35) / 1.70"
 WARMTH_FLIPPED = "    warmth = 1.0 - (clamped + 0.35) / 1.70"
 
+# Warna "tidak mengklaim" untuk bintang. Harus **akromatik** (R=G=B): nilai
+# ber-hue apa pun adalah warna spektral, dan warna spektral mengklaim kelas
+# bintang. Nilai di sini adalah **warna netral lama** — yaitu `starRGB(0,00)`,
+# putih kebiruan kelas A (warna Sirius/Vega) — persis regresi yang dijaga
+# keadaan 4. Bukan angka karangan: ini keluaran `star_rgb(0.0)` yang dulu
+# dipakai sebagai sentinel.
+NEUTRAL_STAR = "NEUTRAL_STAR_BODY = (0.78, 0.78, 0.78)"
+NEUTRAL_STAR_SPECTRAL = "NEUTRAL_STAR_BODY = (0.6982, 0.7471, 0.8518)"
+
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
 ORDER = ("betelgeuse lebih merah dari rigel", "betelgeuse lebih merah dari sirius")
 IDENTICAL_WHEN_UNSURE = "dua bintang berbeda tampil sama saat ragu"
 DIFFERENT_WHEN_SURE = "dua bintang berbeda tetap berbeda saat yakin"
 NEUTRAL_WHEN_UNSURE = "warna ragu = warna bintang tak dikenal"
+ACHROMATIC_NEUTRAL = "warna tak dikenal benar-benar akromatik (R=G=B)"
+SIRIUS_NOT_UNKNOWN = "Sirius terkonfirmasi ≠ bintang tak dikenal (ukuran disamakan)"
 
 HIJAU = "hijau"
 MERAH = "merah"
@@ -131,7 +157,8 @@ STATES = [
     ("[baseline]", None,
      _expect(**{ORDER[0]: HIJAU, ORDER[1]: HIJAU,
                 IDENTICAL_WHEN_UNSURE: HIJAU, DIFFERENT_WHEN_SURE: HIJAU,
-                NEUTRAL_WHEN_UNSURE: HIJAU})),
+                NEUTRAL_WHEN_UNSURE: HIJAU,
+                ACHROMATIC_NEUTRAL: HIJAU, SIRIUS_NOT_UNKNOWN: HIJAU})),
 
     # Warna spektral dibuang: seluruh bintang digambar dengan warna indeks 0.
     # Gerbang urutan memerah karena jaraknya menjadi **nol** — inilah arah yang
@@ -166,6 +193,21 @@ STATES = [
      _expect(**{ORDER[0]: MERAH, ORDER[1]: MERAH,
                 IDENTICAL_WHEN_UNSURE: HIJAU, DIFFERENT_WHEN_SURE: HIJAU,
                 NEUTRAL_WHEN_UNSURE: HIJAU})),
+
+    # 4. Warna "tidak mengklaim" dikembalikan menjadi warna **spektral**
+    # (putih kebiruan kelas A, yaitu warna Sirius dan Vega). Inilah cacat yang
+    # baru ditutup: dulu sentinel-nya memang B−V 0,00, jadi tidak ada
+    # pemeriksaan yang bisa melihatnya — ketiganya hanya membandingkan nilai
+    # dengan nilai lain. Gerbang baru `ACHROMATIC_NEUTRAL` memerah karena
+    # R≠B, dan `SIRIUS_NOT_UNKNOWN` memerah karena Sirius terkonfirmasi
+    # kembali tampil sama dengan bintang tak dikenal. Gerbang lain tetap hijau,
+    # dan itu benar: urutannya tidak berubah, dan keraguannya masih identik.
+    ("4. warna netral dikembalikan jadi spektral",
+     [(NEUTRAL_STAR, NEUTRAL_STAR_SPECTRAL)],
+     _expect(**{ORDER[0]: HIJAU, ORDER[1]: HIJAU,
+                IDENTICAL_WHEN_UNSURE: HIJAU, DIFFERENT_WHEN_SURE: HIJAU,
+                NEUTRAL_WHEN_UNSURE: HIJAU,
+                ACHROMATIC_NEUTRAL: MERAH, SIRIUS_NOT_UNKNOWN: MERAH})),
 ]
 
 

@@ -38,9 +38,17 @@ yang paling benar di antara ketiganya.
 
 4. **`Tools/check-visuals.py`, tabel margin cincin `14 → 0` dikembalikan ke
    `14`.** Siklus sebelumnya men-commit suntingan **bukan miliknya** yang
-   mengubah angka itu. Angka `0` **salah**, dan harganya langsung terlihat:
-   harness `bukti-mutasi-angka-urutan-cincin.py` memutasi tabel itu
-   (`14 -> 0`) sebagai keadaan 3-nya, jangkarnya hilang, harness menolak
+   mengubah angka itu. Angka `0` **salah**, dan harganya langsung terlihat —
+   dua kali. Pertama di CI: langkah **"Gerbang gambar objek (port Python)"
+   gagal pada `001180f`** dengan
+
+       GAGAL Saturnus: tabel margin '200 px' cocok dengan ukurannya
+       terukur: margin 0 → 14, cacat → 1533; docstring: 0 / 1533 (ss=2)
+       — angka yang tidak pernah diukur
+
+   Gerbang itu sudah ada, dan ia menangkap klaimnya sendiri. Kedua di
+   harness `bukti-mutasi-angka-urutan-cincin.py`, yang memutasi tabel itu
+   (`14 -> 0`) sebagai keadaan 3-nya: jangkarnya hilang, harness menolak
    jalan. Yang benar diukur lewat pembaca yang memang ada untuk itu
    (`saturn_back_half_inside_at_margin`):
 
@@ -54,6 +62,13 @@ yang paling benar di antara ketiganya.
    anti-aliasing di limb, dan itulah alasan `SATURN_LIMB_ANTIALIAS_MARGIN`
    ada. Menulis `0` membuat tabel *mengklaim* gerbang bersih tanpa margin,
    tepat kebalikan dari paragraf yang menjustifikasinya.
+
+   **Pelajaran yang lebih besar dari angka itu**: `main` sempat menerima
+   klaim palsu bukan karena tidak ada gerbangnya, melainkan karena
+   suntingan itu ikut ter-commit tanpa pernah dijalankan. Gerbang yang sudah
+   ada hanya menolong kalau ia dijalankan **sebelum** commit — dan itulah
+   sebabnya gerbang itu sekarang ikut jadi langkah CI pertama yang
+   mengukur dokumennya sendiri.
 
 ### Bukti (bukan klaim)
 
@@ -24380,3 +24395,89 @@ Patch-nya **diverifikasi bisa dipasang** ke HEAD (`git apply --check` hijau).
   terbukti di sini: ia menyebut `render-visuals.py` & `check-visuals.py`).
   Karena itu WIP tak-ter-commit **selalu** membuat harness mutasi merah —
   tanda "jangan uji di atas ini", bukan "gerbangnya rusak".
+
+## Siklus: warna "tidak mengklaim" bintang ternyata warna spektral Sirius
+
+### Cacat yang ditutup
+
+Sentinel "tidak ada klaim" untuk warna bintang adalah indeks B−V **0,00**,
+dan `starRGB(0)` = (0,693, 0,742, 0,846): R−B = −0,153, yaitu **putih
+kebiruan kelas A** — warna **Sirius** dan **Vega**, yang kebetulan juga
+B−V 0,00. Diukur di piksel (port Python, proses baru):
+
+    SIRIUS terkonfirmasi : (0.693, 0.742, 0.846)
+    bintang tak dikenal   : (0.693, 0.742, 0.846)   <- identik piksel demi piksel
+    Rigel saat ragu       : (0.693, 0.742, 0.846)
+
+Artinya aturan "ciri pengenal hilang saat engine ragu" **gagal tepat pada dua
+bintang di katalog**: Sirius dan Vega yang sudah dikunci tampil sama persis
+dengan ketidaktahuan.
+
+### Kenapa semua gerbang lama hijau
+
+Tiga pemeriksaan yang ada semuanya membandingkan **nilai dengan nilai lain**:
+"warna ragu == warna bintang tak dikenal", dan "dua bintang ragu == sama".
+Ketiganya benar, dan tetap benar ketika nilai yang dipakai bersama itu justru
+**mengklaim**. Yang tidak pernah diperiksa: apakah nilai itu sendiri tidak
+mengklaim. Docstring `colorIndex(forStarID:)` menyebutnya "putih netral" —
+dan `0` bukan putih. Nama uji `testUnknownStarIsNeutralNotInvented` menegakkan
+**nilai** sentinel sambil **menganggap** sifat yang tidak dimilikinya.
+
+### Perbaikan
+
+- `CelestialVisual.unknownStarColorIndex = Double.nan` — di luar rentang B−V,
+  mustahil dihasilkan bintang mana pun.
+- `starRGB(forColorIndex:)` menangkap `NaN` **lebih dulu** (sebelum penjepit:
+  `min`/`max` meneruskan `NaN`, tanpa cabang itu titiknya menghilang) dan
+  mengembalikan `neutralStarBody` = (0,78, 0,78, 0,78): R=G=B, jadi tidak
+  mungkin menjadi warna spektral. Pola yang sama sudah dipakai planet
+  (`neutralBody`).
+- `colorIndex(forStarID:)` dan `drawableStarColorIndex` memakai sentinel baru.
+- Port Python (`render-visuals.py`) disamakan: `NEUTRAL_STAR_BODY`,
+  `UNKNOWN_STAR_COLOR_INDEX`.
+- View **tidak disentuh**: `starColor` sudah lewat `starRGB`. Audio juga tidak:
+  `spokenStarColor` sudah dijaga `isConfirmed`.
+
+### Bukti (bukan klaim)
+
+    ./swift-test.sh                      CelestialEngine 220, PointingKit 819, 0 gagal
+    gh run (Apple Build, macos-15)       success 95498d9
+    check_star_colour_not_a_claim...     5 pemeriksaan hijau (2 baru), diukur ulang
+                                          di proses baru
+    bukti-mutasi-warna-bintang.py        5 keadaan, semuanya sesuai harapan
+    bukti-mutasi-indeks-warna.py         9 keadaan, semuanya sesuai harapan
+    check-harness-terdaftar.py           71 harness, semuanya dirujuk alur kerja
+
+Gerbang baru di `check_star_colour_not_a_claim_when_uncertain`:
+- warna tak dikenal harus **akromatik** di piksel terterang
+- Sirius terkonfirmasi harus **berbeda** dari bintang tak dikenal
+
+Uji baru: `testNeutralStarColourIsActuallyAchromatic`,
+`testNoConfirmedCatalogueStarLooksLikeAnUnknownStar` (seluruh katalog).
+
+### Yang TIDAK diklaim
+
+- Gerbang piksel penuh (`check-visuals.py --check`) **tidak selesai** dijalankan
+  siklus ini: pada mesin ini ia melewati puluhan menit dan dihentikan. Yang
+  dijalankan adalah **fungsi gerbangnya langsung** di proses baru, plus harness
+  mutasi. Jadi angka "N pemeriksaan, 0 gagal" untuk seluruh berkas **tidak**
+  diverifikasi ulang di sini.
+- "Kelompok uji lain ikut hijau" tidak diklaim; hanya Apple Build dan gerbang
+  yang disebut di atas.
+
+### Pelajaran
+
+- **Gerbang yang membandingkan nilai dengan nilai lain tidak bisa melihat
+  nilai yang salah arti.** Ketiga pemeriksaan lama semuanya benar secara
+  internal dan tetap hijau atas warna yang mengklaim. Yang menutupnya bukan
+  pemeriksaan baru atas **pasangan**, melainkan pemeriksaan atas **sifat**
+  nilai itu sendiri (akromatik).
+- **Sentinel harus berada di luar rentang nilai yang sah.** B−V 0,00 adalah
+  B−V yang sah. Selama sentinel dan nilai sah berbagi ruang, keduanya bisa
+  bertukar tempat tanpa satu pun gerbang berbunyi — persis yang membuat
+  cacat ini bertahan meski docstring-nya sudah menyebut "tidak mengklaim".
+- **Jangkar harness bergerak bersama sumbernya.** Memperbaiki guard
+  `drawable_star_color_index` membuat jangkar state 2 `bukti-mutasi-warna-bintang.py`
+  hilang; harness melaporkan "jangkar muncul 0x" — bukan lulus. Yang diperbaiki
+  adalah jangkarnya, dan sekaligus ditambah keadaan 4 yang membuktikan gerbang
+  akromatik baru tidak hampa.
