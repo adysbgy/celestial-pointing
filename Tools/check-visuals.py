@@ -2702,9 +2702,16 @@ def read_planet_palettes_from_swift(source):
         # tentang **pola pembaca ini**. Yang berubah hanya salurannya —
         # diangkat lewat pemeriksaan yang memerah, bukan lewat lemparan yang
         # menyamar sebagai kegagalan model.
+        # Bentuknya **tetap tripel** `(terang, gelap, ciri)` supaya setiap
+        # pemanggil yang sudah membongkar tiga nilai tidak perlu tahu soal
+        # sentinel ini. Sempat ditulis pasangan `("unreadable", urutan)` dan
+        # terukur meledak di `featured = sorted(...)`: `ValueError: not enough
+        # values to unpack (expected 3, got 2)`. Satu bentuk yang konsisten
+        # lebih baik daripada satu pengecualian yang harus diingat di empat
+        # tempat. Yang membedakannya dari planet asli: `feature` bukan `str`.
         for order, name in enumerate(clauses):
             if name not in out:
-                out[name] = ("unreadable", order)
+                out[name] = (None, None, order)
         out["__unreadable__"] = unreadable
     return out
 

@@ -507,14 +507,24 @@ STATES = [
     # cacatnya (tabel kehilangan planet, `switch` masih memuatnya).
     #
     # Bentuk sekarang: pembaca mengembalikan planet yang tak terbaca sebagai
-    # `("unreadable", urutan)`, gerbang berjalan sampai selesai, dan yang
-    # merah adalah **dua nama yang tepat** — `SEPAKAT` (tabel vs switch) dan
-    # `CABANG` (polanya memang belum mengenali bentuk baru itu). Ini yang
-    # membedakan keadaan 4 dari sekadar "gerbang menyala": bukan *apakah* ia
-    # menyalakan, melainkan *apa yang ia sebut*.
+    # tripel dengan ciri bukan-`str`, gerbang berjalan sampai selesai, dan
+    # yang merah adalah **dua nama yang tepat**, keduanya masuk akal:
+    #
+    #   CABANG     polanya memang belum mengenali bentuk baru itu — dan itu
+    #              satu-satunya tempat kabar itu boleh muncul
+    #   TERKUNCI   Pluto memang belum punya kasus render, dan itulah cacat
+    #              sebenarnya yang ingin dilihat pengguna app
+    #
+    # Yang **hijau**, sama pentingnya: `SEPAKAT` (tabel dan `switch` sepakat
+    # delapan planet — planetnya ada, yang tak terbaca hanya isinya) dan
+    # `RAGU` (Pluto tidak dihitung berciri, jadi ia tidak dituntut punya kasus
+    # ragu atas dasar ciri yang tidak diketahui). Keduanya dulu merah karena
+    # gerbangnya berhenti lebih awal; sekarang keduanya hijau karena memang
+    # begitu keadaannya. Ini yang membedakan keadaan 4 dari sekadar "gerbang
+    # menyala": bukan *apakah* ia menyalakan, melainkan *apa yang ia sebut*.
     ("4. model: satu kasus palet kehilangan badan yang terbaca",
      [(MODEL, SATURN_CASE, SATURN_CASE + PLUTO_UNREADABLE, None)],
-     _full(SEPAKAT, CABANG), False),
+     _full(CABANG, TERKUNCI), False),
 
     # ── Tiga cara gerbang ciri bisa kehilangan cakupannya ────────────────
     ("5. gerbang: pasangan mars hilang dari 'hilang saat ragu'",
