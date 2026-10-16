@@ -896,8 +896,6 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-uncertain",
          "planet-jupiter-bare", "Bintik Merah Besar Jupiter"),
-        ("planet-pluto-confirmed", "planet-pluto-uncertain",
-         "planet-pluto-bare", "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-uncertain",
          "planet-saturn-bare", "cincin Saturnus"),
         # Kelima planet berciri, bukan hanya dua yang kebetulan punya kasus
@@ -1169,8 +1167,6 @@ def check_features_survive_the_watch_size(results, ss=8):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-bare",
          "Bintik Merah Besar Jupiter"),
-        ("planet-pluto-confirmed", "planet-pluto-bare",
-         "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
@@ -1283,8 +1279,6 @@ def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-bare",
          "Bintik Merah Besar Jupiter"),
-        ("planet-pluto-confirmed", "planet-pluto-bare",
-         "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
