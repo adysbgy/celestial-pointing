@@ -676,6 +676,62 @@ final class DeepSkyColourTests: XCTestCase {
             XCTAssertTrue(predicate(colour), "\(message) — didapat \(colour)")
         }
     }
+
+    /// Enam warna kabut harus **berbeda satu sama lain di mode malam**.
+    ///
+    /// **Cacat yang ditutup uji ini.** Mode malam membuang hue seluruhnya:
+    /// `NightVisual.surface` mengembalikan `(brightness, 0, 0)`, jadi dari
+    /// enam warna siang yang berbeda yang tersisa hanyalah **satu angka**.
+    /// Uji yang ada menjaga hal lain: `testEveryMorphologyHasItsOwnColour`
+    /// mengukur jarak di **ruang RGB siang** (jarak >= 0.15), sementara
+    /// `testDeepSkyNightBrightnessMatchesTheDocumentedOrdering` hanya
+    /// memeriksa **empat pasangan** yang dikutip komentar palet. Di antara
+    /// keduanya ada celah yang nyata: dua warna bisa berjarak RGB jauh
+    /// (lolos uji pertama) dan jatuh pada kecerahan malam yang **sama persis**
+    /// (tidak diperiksa pasangan mana pun). Di layar malam keduanya digambar
+    /// identik, dan pengguna yang sengaja memakai mode merah kehilangan
+    /// justru informasinya — satu-satunya kanal yang masih terbaca.
+    ///
+    /// Karena itu yang diukur di sini bukan warna siangnya, melainkan
+    /// `NightVisual.surface(...).red` — jalur yang sama dengan layar — untuk
+    /// **seluruh pasangan**, bukan empat yang disebut komentar.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini menuntut nilainya **berbeda**, bukan
+    /// berjarak lebar: ambang "cukup jauh" adalah keputusan estetis yang
+    /// diukur di tempat lain (`Experiment*` dan rasio kontras). Yang dijaga:
+    /// tidak ada dua jenis benda yang bertabrakan di mode malam.
+    func testDeepSkyColoursAreDistinct() {
+        var brightness: [(DeepSkyCatalogue.Morphology, Double)] = []
+        for morphology in DeepSkyCatalogue.Morphology.allCases {
+            let night = NightVisual.surface(
+                CelestialVisual.deepSkyColour(for: morphology))
+            brightness.append((morphology, night.red))
+        }
+
+        // Setiap **pasangan**, bukan hanya tetangga terdekat: dua nilai bisa
+        // bertabrakan tanpa pernah bersebelahan setelah diurutkan.
+        for i in 0..<brightness.count {
+            for j in (i + 1)..<brightness.count {
+                let (a, valueA) = brightness[i]
+                let (b, valueB) = brightness[j]
+                XCTAssertNotEqual(
+                    valueA, valueB,
+                    "\(a) dan \(b) sama persis di mode malam "
+                    + "(\(valueA)) — di layar merah keduanya digambar identik")
+            }
+        }
+
+        // Dan tidak satu pun boleh bertabrakan dengan "tidak tahu": kabut
+        // netral adalah warna ketidakpastian, jadi benda yang jatuh padanya
+        // tampil sebagai ragu padahal engine mengenalinya.
+        let neutralNight = NightVisual.surface(neutral).red
+        for (morphology, value) in brightness {
+            XCTAssertNotEqual(
+                value, neutralNight,
+                "\(morphology) bertabrakan dengan kabut netral di mode malam "
+                + "(\(value)) — tampil sebagai 'tidak tahu' padahal dikenali")
+        }
+    }
 }
 
 /// Rasio kontras WCAG antara dua warna.

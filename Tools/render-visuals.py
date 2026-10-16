@@ -2411,7 +2411,15 @@ def build_cases():
     # perlengkapan render ini, dan justru perlengkapan inilah yang diukur
     # gerbang gambar. Magnitudonya sekarang dibaca dari `Catalogue.swift`.
     _MAG = catalogue_magnitudes()
-    for star in ("sirius", "betelgeuse", "rigel", "vega"):
+    # **Semua bintang katalog, bukan cuma empat.** Sampai siklus ini hanya
+    # Sirius/Betelgeuse/Rigel/Vega yang punya kasus render; 21 bintang
+    # sisanya hidup di tabel warna port dan di ukuran port, tetapi tidak
+    # pernah digambar — jadi setiap gerbang yang "mengukur bintang"
+    # sebenarnya mengukur empat titik yang dipilih tangan. Itu celah yang
+    # sama dengan palet planet: angka bisa menyimpang tanpa ada gambar yang
+    # berubah. Daftarnya diambil dari `STAR_COLOR_INDEX`, jadi bintang yang
+    # ditambah ke port otomatis ikut tergambar (dan ikut diukur).
+    for star in sorted(STAR_COLOR_INDEX):
         cases.append(VisualCase(
             f"star-{star}", f"{star} — m {_MAG[star]:+.2f}, B−V {STAR_COLOR_INDEX[star]:+.2f}",
             "star", color_index=STAR_COLOR_INDEX[star],

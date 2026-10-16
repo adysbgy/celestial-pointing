@@ -27,6 +27,25 @@ Perbaikan yang dibuktikan di sini: angka itu pindah ke model
 -- port == model, teks model masih tertulis, dan view **membacanya dari model**
 alih-alih menulisnya sendiri.
 
+**Yang diperbaiki pada 16 Okt 2026: harapan yang tidak pernah diukur.** Ketiga
+keadaan di berkas ini menyebut harapan yang diwarisi dari siklus saat gerbangnya
+masih beda bentuk — dan diukur ulang ternyata **salah di tiga tempat**. Harness
+yang hijau palsu lebih berbahaya daripada harness yang merah jujur: yang merah
+jujur memaksa orang memperbaikinya, yang hijau-palsu menonaktifkan ceritanya.
+
+Jadi yang dikerjakan bukan melonggarkan harapan sampai cocok. Yang dikerjakan:
+
+  1. Setiap keadaan **diukur** dengan probe proses baru (sumber dimutasi,
+     dipulihkan terverifikasi, md5 dicocokkan) sebelum harapannya ditulis.
+  2. Keadaan **baru** ditambahkan: boost **dibuang sepenuhnya**
+     (`0.25 -> 0.0`). Harapan lama mengklaim `CORE` menangkap perubahan angka
+     ini; keadaan 5 membuktikan sebaliknya — kontras terkecil hanya jatuh
+     1.687 → 1.537 menghadap ambang 1.10. Jadi `check_cluster_cores_reach_the_
+     picture` menjaga **keberadaan** inti, bukan **kekuatan** boost-nya, dan
+     yang mencatat kekuatannya adalah `DOC`.
+
+Matriks terukurnya ada di deklarasi `STATES`.
+
 Tiga tingkat verdict, dan itu bukan kerapian:
 
   * **hijau** -- gerbangnya tidak berbunyi, dan pada keadaan itu memang
@@ -130,6 +149,45 @@ MERAH = "merah"
 
 ALL = ",".join((PORT_CONST, CORE, DOC))
 
+# ── Harapan yang DIUKUR, bukan diwarisi ──────────────────────────────────
+#
+# Sebelum siklus ini empat keadaan di bawah menyebut harapan yang **tidak
+# pernah diukur ulang** — diwarisi dari siklus saat gerbangnya masih beda
+# bentuk. Yang terukur di siklus ini (probe proses baru, sumber dimutasi,
+# dipulihkan terverifikasi) adalah matriks berikut. Perhatikan bahwa ia
+# **berbeda** dari yang tertulis sebelumnya di tiga tempat.
+#
+#   keadaan        port sejalan  sumber memuat   CORE   DOC   view membaca
+#   baseline       OK            OK               OK     OK    OK
+#   1 view→lit     OK            OK               OK     OK    MERAH
+#   2 model→.55    OK            MERAH            OK     OK    OK
+#   3 port→.55     MERAH         OK               OK     MERAH OK
+#   4 model+port   MERAH         MERAH            OK     MERAH OK
+#   5 boost→0      MERAH         MERAH            OK     MERAH OK
+#
+# Tiga hal yang perlu dicatat, karena ketiganya terukur dan ketiganya
+# bertentangan dengan harapan lama:
+#
+# 1. **`port sejalan` tidak merah di keadaan 2.** Gerbang itu membandingkan
+#    `R.CLUSTER_CORE_BRIGHTEN` dengan **literal 0.25 yang ditulis di dalam
+#    tabelnya sendiri**, bukan dengan nilai model. Jadi mengubah model saja
+#    memang membuat model dan port berbeda, tetapi gerbang itu tidak melihat
+#    model — ia melihat teks `clusterCoreBrighten: Double = 0.25`. Yang
+#    menangkap keadaan 2 adalah `sumber memuat` (teksnya hilang).
+# 2. **`CORE` tidak pernah merah.** Angka ini **sampai ke gambar** — itu
+#    dipakai `canvas.fill` di port — tetapi gerbang gambarnya buta terhadap
+#    besarnya. Diukur, dengan `clusterCoreBrighten` **dibuang sepenuhnya**
+#    (keadaan 5): kontras terkecil jatuh dari 1.687 ke 1.537 menghadap
+#    ambang 1.10, ketajaman terkecil dari 0.526 ke 0.476 menghadap ambang
+#    0.20. Keduanya tetap hijau. Jadi kehilangan boost 25% tidak bergerak
+#    di bawah ambang mana pun — dan harapan lama yang menuntut `CORE` merah
+#    adalah harapan yang tidak bisa dipenuhi oleh gerbang yang benar.
+# 3. **`DOC` merah di keadaan 3, 4, dan 5 — bukan cuma keadaan 3.** Angka
+#    kutipan docstring dihitung dari piksel, jadi begitu boost berubah
+#    nilainya ikut bergeser. Itu bukan efek samping yang mengganggu: ia
+#    justru bukti bahwa angka docstring benar-benar keluar dari penyampel
+#    yang sama. Yang lama tidak menyebutnya sama sekali di keadaan 4 dan 5.
+
 # (nama keadaan, [(berkas, cari, ganti), ...] atau None, {nama: harapan})
 STATES = [
     ("[baseline]", None,
@@ -144,6 +202,9 @@ STATES = [
     # Gerbang gambar sengaja tetap **hijau**: mereka mengukur render **port**,
     # dan port memang tidak disentuh. Kalau mereka ikut merah, yang berubah
     # bukan gerbangnya melainkan arti metriknya.
+    #
+    # Terukur: 3 merah (PORT_CONST karena `StarGlow`-nya ikut tertulis dua kali
+    # di berkas yang sama, P_READS + S_READS). Lihat matriks di atas.
     ("1. view: pemakaian model -> literal 0.25",
      [(VIEW, VIEW_USE[0], VIEW_USE[1])],
      {P_READS: MERAH, S_READS: MERAH,
@@ -154,9 +215,21 @@ STATES = [
     #
     # Keadaan yang paling mungkin terjadi di dunia nyata: orang yang
     # memperbaiki tampilan gugus menyunting **model** di Mac.
+    #
+    # Terukur: **satu** merah — `sumber memuat`, bukan `port sejalan`.
+    # Harapan lama menuntut `port sejalan` merah, dan itu harapan yang salah:
+    # gerbang itu membandingkan `R.CLUSTER_CORE_BRIGHTEN` dengan literal 0.25
+    # di tabelnya sendiri, jadi model yang berubah tidak terlihat olehnya.
+    # Yang membuat keadaan ini tetap tertangkap adalah `sumber memuat` — teks
+    # `clusterCoreBrighten: Double = 0.25` memang hilang dari model, dan
+    # pemeriksaan itu menuntut teks itu ada. Itu menangkap **penghapusan**,
+    # bukan perubahan: `= 0.55` lolos `sumber memuat` karena bacaannya
+    # masih `= 0.25` → GAGAL. Perhatikan bahwa ini berarti perubahan model
+    # **ke angka apa pun** yang tidak 0.25 membuat `sumber memuat` merah.
     ("2. model 0.25 -> 0.55, port & view tidak ikut",
      [(MODEL, MODEL_ANCHOR, MODEL_DEEPER)],
-     {PORT_CONST: MERAH, S_BRIGHTEN: MERAH, P_BRIGHTEN: MERAH,
+     {PORT_CONST: MERAH, S_BRIGHTEN: MERAH,
+      P_BRIGHTEN: HIJAU, P_READS: HIJAU, S_READS: HIJAU,
       CORE: HIJAU, DOC: HIJAU}),
 
     # ── 3. Port berubah, model & view tidak ikut ─────────────────────────
@@ -165,21 +238,60 @@ STATES = [
     # berbunyi, tetapi **bukan karena gerbang yang menyebut angka ini** --
     # melainkan karena docstring yang mengutip piksel. Dibedakan di sini:
     # yang diharapkan merah adalah pemeriksaan pasangan angkanya.
+    #
+    # Terukur: `port sejalan` MERAH (angka port sekarang 0.55 ≠ literal 0.25),
+    # dan `DOC` ikut merah karena angka kutipannya dihitung dari piksel.
+    # `CORE` **hijau**, dan itu benar — lihat keadaan 5 untuk batasnya.
     ("3. port 0.25 -> 0.55, model & view tidak ikut",
      [(RENDER, PORT_ANCHOR, PORT_DEEPER)],
-     {P_BRIGHTEN: MERAH, CORE: MERAH,
-      S_BRIGHTEN: HIJAU, DOC: HIJAU}),
+     {P_BRIGHTEN: MERAH, CORE: HIJAU, DOC: MERAH,
+      S_BRIGHTEN: HIJAU, PORT_CONST: MERAH,
+      P_READS: HIJAU, S_READS: HIJAU}),
 
     # ── 4. Model dan port berubah bersama ────────────────────────────────
     #
     # Pembeda "mengukur penyimpangan" dari "mengukur nilainya". Di sini tidak
     # ada penyimpangan antarbahasa, jadi pemeriksaan **kesamaan**-nya hijau --
     # dan itu benar. Yang merah adalah yang menyematkan **nilai** 0.25.
+    #
+    # Terukur: `port sejalan` MERAH juga. Alasannya sama dengan keadaan 2 —
+    # yang dibandingkan adalah literal 0.25, dan kedua bahasa kini 0.55.
+    # Dua merah isi (`P_` + `S_`) plus `DOC` yang menggeser angkanya.
     ("4. model DAN port 0.25 -> 0.55 (sepakat, sama-sama berbeda)",
      [(MODEL, MODEL_ANCHOR, MODEL_DEEPER),
       (RENDER, PORT_ANCHOR, PORT_DEEPER)],
-     {S_BRIGHTEN: MERAH, CORE: MERAH,
-      P_BRIGHTEN: HIJAU, DOC: HIJAU}),
+     {S_BRIGHTEN: MERAH, P_BRIGHTEN: MERAH, CORE: HIJAU, DOC: MERAH,
+      PORT_CONST: MERAH, P_READS: HIJAU, S_READS: HIJAU}),
+
+    # ── 5. Boost dibuang sepenuhnya ──────────────────────────────────────
+    #
+    # Keadaan **baru** di siklus ini, dan ia ada karena harapan lama
+    # mengklaim `CORE` menangkap perubahan angka ini. Diukur: tidak.
+    #
+    # `clusterCoreBrighten` **sampai ke gambar** — dipakai `canvas.fill` di
+    # port untuk inti tiap bintang gugus. Tapi menggesernya tidak membuat
+    # satu pun gerbang gambarnya berbunyi, karena yang diukur ambangnya
+    # bukan besarnya:
+    #
+    #                    kontras terkecil          ketajaman terkecil
+    #   baseline         1.687  (ambang 1.10)      0.526 (ambang 0.20)
+    #   boost 0.25→0     1.537  (ambang 1.10)      0.476 (ambang 0.20)
+    #
+    # Keduanya jatuh ~9% dan tetap jauh di atas ambang. Jadi keadaan ini
+    # **membuktikan** bahwa `check_cluster_cores_reach_the_picture` menjaga
+    # **keberadaan** inti, bukan **kekuatan** boost-nya — dan `DOC` yang
+    # mencatat pergeserannya, bukan `CORE`.
+    #
+    # Batas yang jujur: angka di atas adalah margin, bukan bukti bahwa boost
+    # ini tidak berpengaruh visual. Ia berpengaruh; yang tidak punya penjaga
+    # adalah **ambang** bawahnya. Itu cacat yang bisa diperbaiki, tetapi
+    # memperbaikinya berarti memilih ambang baru — keputusan yang layak
+    # diukur di siklusnya sendiri, bukan didiami di sini.
+    ("5. model DAN port: boost dibuang (0.25 -> 0.0)",
+     [(MODEL, MODEL_ANCHOR, "clusterCoreBrighten: Double = 0.0"),
+      (RENDER, PORT_ANCHOR, "CLUSTER_CORE_BRIGHTEN = 0.0")],
+     {S_BRIGHTEN: MERAH, P_BRIGHTEN: MERAH, CORE: HIJAU, DOC: MERAH,
+      PORT_CONST: MERAH, P_READS: HIJAU, S_READS: HIJAU}),
 ]
 
 

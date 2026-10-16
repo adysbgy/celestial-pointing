@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import glob
 import math
 import os
 import re
@@ -12622,6 +12623,481 @@ def check_every_gate_fills_its_results(results):
         else f"{len(silent)} gerbang diam: {', '.join(silent)}"))
 
 
+def check_gate_names_mentioned_in_code_exist(results):
+    """Setiap nama `check_*` yang **dirujuk kode** harus benar-benar ada.
+
+    **Cacat yang ditutup pemeriksaan ini, diukur pada working tree ini.**
+    Tiga nama gerbang dikutip di dalam kode seolah-olah menjaga sesuatu,
+    dan tidak satu pun pernah didefinisikan:
+
+        render-visuals.py:933   `check_moon_craters_match_the_model`
+        render-visuals.py:1967  `check_maria_edge_formula_matches_the_view`
+        NightVisual.swift:547   `check_deep_sky_colours`
+
+    Sapuan atas 85 `check_*` yang terdefinisi mengembalikan nol untuk
+    ketiganya. Jadi bukan "gerbangnya kurang ketat" — **tidak ada
+    gerbangnya**. Komentar itu menjanjikan pengawasan yang tidak pernah
+    ditulis, dan janji itu hidup berdampingan dengan keadaan yang
+    diklaimnya dijaga.
+
+    **Kenapa ini lolos dari tiga penjaga meta yang sudah ada.** Repo ini
+    sudah punya `check_every_gate_fills_its_results` (gerbang harus
+    mengukur), `bukti-mutasi-gerbang-dijalankan.py` (harness harus
+    menyebut gerbang yang ada), dan `check-harness-terdaftar.py`
+    (berkas harus dirujuk CI). Ketiganya memeriksa **daftar nama yang
+    sudah terdefinisi**. Referensi yang menggantung tidak ada di daftar
+    mana pun, jadi ketiganya hijau: yang diaudit adalah gerbang yang
+    hidup, bukan klaim tentang gerbang.
+
+    Ini kelas cacat yang sama dengan yang dibayar repo ini pada komentar
+    `# MODEL:` yang menjanjikan kesamaan tanpa gerbang — bedanya, di sana
+    penjaganya sudah dibuat (`check_modeled_port_constants_match_the_model`).
+    Di sini yang belum ada adalah penjaga **namanya sendiri**, dan satu
+    gerbang generik menutup ketiganya sekaligus.
+
+    **Kenapa hanya referensi di dalam kode, bukan di STATUS.md.** STATUS.md
+    adalah sejarah keputusan: ia mengutip nama gerbang yang **pernah**
+    ada dan sengaja dicatat sebagai riwayat. Menghitungnya di sini
+    berarti menuntut setiap catatan lama diperbarui — dan gerbang yang
+    menuntut itu akan dimatikan orang. Yang dijaga karena itu hanya
+    `.swift`, `render-visuals.py`, dan `check-visuals.py` sendiri:
+    berkas yang **menjalankan** atau **dijalankan** gerbang ini.
+
+    **Yang TIDAK diklaim.** Pemeriksaan ini hanya menjaga *namanya ada*.
+    Gerbang yang ada tetapi tidak mengukur adalah cacat lain, dan itu
+    milik `check_every_gate_fills_its_results`. Berkaitan tapi berbeda:
+    nama tanpa tubuh (di sini) vs tubuh tanpa hasil (di sana).
+    """
+    with open(__file__, encoding="utf-8") as handle:
+        own_source = handle.read()
+    defined = set(re.findall(r"^def (check_\w+)", own_source, re.M))
+
+    # Hanya berkas yang ikut menjalankan atau dijalankan gerbang ini. Lihat
+    # "Yang TIDAK diklaim" — STATUS.md sengaja tidak masuk.
+    targets = [
+        os.path.join(ROOT, "Tools/render-visuals.py"),
+        os.path.join(ROOT, "Tools/check-visuals.py"),
+    ]
+    for path in glob.glob(os.path.join(ROOT, "**", "*.swift"), recursive=True):
+        if ".build" not in path:
+            targets.append(path)
+
+    dangling = []
+    for path in targets:
+        try:
+            source = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        # Kutipan di dalam **tubuh gerbang ini sendiri** adalah contoh cacat
+        # yang ia jaga, bukan cacat baru: tanpa ini gerbangnya merah pada
+        # dirinya sendiri dan akan dimatikan orang. Rentangnya dibaca lewat
+        # AST dari berkasnya sendiri — `inspect.getdoc` tidak bisa dipakai
+        # karena ia merapikan indentasi, sehingga hasilnya tidak pernah cocok
+        # dengan teks mentahnya.
+        if os.path.abspath(path) == os.path.abspath(__file__):
+            own_tree = ast.parse(source)
+            own_span = next(
+                ((f.lineno, f.end_lineno) for f in own_tree.body
+                 if isinstance(f, ast.FunctionDef)
+                 and f.name == "check_gate_names_mentioned_in_code_exist"),
+                None)
+            if own_span:
+                lines = source.splitlines(keepends=True)
+                blank = ["\n"] * len(lines)
+                for index in range(own_span[0] - 1, own_span[1]):
+                    blank[index] = ""
+                source = "".join(blank)
+        for match in re.finditer(r"`(check_[a-z0-9_]+)`", source):
+            name = match.group(1)
+            if name in defined:
+                continue
+            line = source[:match.start()].count("\n") + 1
+            dangling.append(f"{name} di {os.path.relpath(path, ROOT)}:{line}")
+
+    results.append(Result(
+        "nama gerbang yang dirujuk kode ada definisinya",
+        not dangling,
+        f"semua nama gerbang yang dikutip terdefinisi ({len(defined)} gerbang)"
+        if not dangling
+        else f"{len(dangling)} nama menggantung — janji pengawasan tanpa "
+             f"gerbang: {'; '.join(sorted(dangling))}"))
+
+
+def check_moon_craters_match_the_model(results):
+    """Kawah Bulan di port harus **angka demi angka** sama dengan modelnya.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.**
+    `MOON_CRATERS` di port menyandang komentar `# MODEL: CelestialVisual.
+    moonCraters`, yang menjanjikan kesamaan — tapi gerbang yang ada membaca
+    pengakuan berbentuk `UPPER_CASE = ... # MODEL:`, sedangkan ini sebuah
+    **larik**, jadi `check_modeled_port_constants_match_the_model` meloncati
+   nya. Jadi tujuh pasang angka itu tidak dijaga siapa pun.
+
+    Ini bukan cacat hipotetis. Kedua belah pihak hidup di bahasa berbeda dan
+    berubah sendiri-sendiri: kalau kawah Clavius digeser di Swift dan tidak
+    digeser di sini, **seluruh gerbang piksel repo ini tetap hijau** sambil
+    mengukur Bulan yang berbeda dari yang tampil di jam. Kelasnya persis
+    seperti Uranus/Neptunus yang sudah dibayar di gerbang konstanta — hanya
+    saja di sini yang lolos adalah bentuknya, bukan ukurannya.
+
+    **Kenapa dibaca generik, bukan daftar tujuh baris.** Daftar tangan hanya
+    menjaga kawah yang ada saat gerbangnya ditulis; kawah kedelapan lolos
+    justru karena namanya tidak ada di daftar. Karena itu kedua sisi diurai
+    dari sumber masing-masing — baris `Crater(offsetX:...)` di Swift dan
+    tuple di port — lalu dibandingkan berurutan, termasuk **jumlahnya**.
+
+    **Yang TIDAK diklaim.** Pemeriksaan ini menjaga *kesamaan dua salinan*,
+    bukan kebenaran selenografis posisinya. Bahwa Tycho ada di -0.06/0.62
+    adalah keputusan komposisi yang sengaja diakui tidak akurat di
+    `CelestialVisual.moonCraters`; menggesernya ke koordinat sungguhan
+    **tidak** akan membuat gerbang ini merah, dan itu benar — akurasi palsu
+    bukan tujuan. Yang dijaga hanya: jam dan PNG jangan berbeda pendapat.
+    """
+    swift_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                    "CelestialVisual.swift")
+
+    def _swift_craters(source):
+        # Isi `public static let moonCraters: [Crater] = [ ... ]` saja, supaya
+        # contoh angka di dalam dokumentasi tidak ikut terbaca sebagai kawah.
+        start = source.find("static let moonCraters")
+        if start < 0:
+            return None
+        open_at = source.find("[", source.find("=", start))
+        depth, end = 0, None
+        for index in range(open_at, len(source)):
+            if source[index] == "[":
+                depth += 1
+            elif source[index] == "]":
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+        if end is None:
+            return None
+        body = source[open_at:end + 1]
+        found = []
+        for match in re.finditer(
+                r"Crater\(\s*offsetX:\s*(-?[\d.]+),\s*offsetY:\s*(-?[\d.]+),"
+                r"\s*radius:\s*(-?[\d.]+),\s*darkness:\s*(-?[\d.]+)\s*\)", body):
+            found.append(tuple(float(g) for g in match.groups()))
+        return found
+
+    def _port_craters(source):
+        start = source.find("MOON_CRATERS = ")
+        if start < 0:
+            return None
+        open_at = source.find("[", start)
+        depth, end = 0, None
+        for index in range(open_at, len(source)):
+            if source[index] == "[":
+                depth += 1
+            elif source[index] == "]":
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+        if end is None:
+            return None
+        body = source[open_at:end + 1]
+        found = []
+        for match in re.finditer(
+                r"\(\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\)",
+                body):
+            found.append(tuple(float(g) for g in match.groups()))
+        return found
+
+    swift = _swift_craters(open(swift_path, encoding="utf-8").read())
+    port = _port_craters(open(R.SOURCE, encoding="utf-8").read())
+
+    if swift is None or port is None:
+        results.append(Result(
+            "kawah Bulan port == model", False,
+            "sumber tidak terbaca — penjaga ini tidak boleh menjadi gerbang "
+            "yang hijau karena gagal menemukan apa yang ia cari"))
+        return
+
+    if len(swift) != len(port):
+        results.append(Result(
+            "kawah Bulan port == model", False,
+            f"jumlah kawah berbeda: model {len(swift)}, port {len(port)} — "
+            f"port menggambar Bulan yang tidak ada di jam"))
+        return
+
+    drift = [f"#{i} model {s} vs port {p}"
+             for i, (s, p) in enumerate(zip(swift, port))
+             if any(abs(a - b) > 1e-9 for a, b in zip(s, p))]
+
+    results.append(Result(
+        "kawah Bulan port == model",
+        not drift,
+        f"kedua salinan sepakat pada {len(swift)} kawah"
+        if not drift else
+        f"{len(drift)} kawah bergeser: {'; '.join(drift)}"))
+
+
+def check_maria_edge_formula_matches_the_view(results):
+    """Tepi bercak Bulan di port harus memakai rumus yang **sama** dengan view.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.** Tiga
+    konstanta tepi (`MARIA_EDGE_SOFTNESS`, `MARIA_OPACITY`, `MARIA_RIPPLE`)
+    dan satu pilihan rumus yang lebih halus hidup di dua bahasa. Yang terakhir
+    adalah cacatnya yang sebenarnya, dan ia **tidak terlihat dari angka**:
+
+        outer = edge * (1 + ripple)     # konstan per bercak
+        local = edge * (1 + ripple * wobble)   # bergantung sudut
+
+    Keduanya masuk akal sebagai jari-jari akhir gradien radial, dan hanya satu
+    yang dipakai view (`endRadius: outer`). Port yang memakai `local`
+    menggambar Bulan yang **tidak pernah tampil di jam** — dan seluruh gerbang
+    piksel repo ini mengukur port, jadi mereka akan tetap hijau sambil
+    mengukur gambar yang salah. Bedanya terukur: sampai 76% opasitas puncak di
+    tepi jalur. Karena itu yang dijaga di sini bukan hanya nilainya, tetapi
+    **jari-jari mana** yang dipakai sebagai ujung gradien.
+
+    **Kenapa dibandingkan dari sumber kedua belah pihak.** Tidak ada cara
+    menjalankan `GraphicsContext` Swift di Linux, jadi yang mungkin diukur
+    adalah *kesepakatan dua salinan*, bukan pikselnya. Itu batas yang
+    dinyatakan, bukan disangka tertutup: gerbang ini akan tetap hijau jika
+    **kedua** belah pihak diubah bersama-sama dengan salah. Yang ia cegah
+    adalah perubahan sebelah — kelas cacat yang nyata terjadi di sini.
+
+    **Yang TIDAK diklaim.** Pemeriksaan ini tidak mengukur piksel app Apple,
+    dan tidak membuktikan 0.35 atau 0.12 adalah pilihan estetis yang tepat;
+    angka itu keputusan tampilan. Yang dijaga: jam dan PNG jangan berbeda
+    pendapat tentang berapa gelap tepi sebuah bercak.
+    """
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+
+    def _numbers(source, name):
+        """Ambil larik tuple `(a, b), (c, d), ...` dari sebuah `let <name>`."""
+        start = source.find(name)
+        if start < 0:
+            return None
+        # Lewati anotasi tipe: di Swift larik ditulis `let x: [(CGFloat,
+        # CGFloat)] = [...]`, dan kurung siku **pertama** adalah tipe itu
+        # sendiri — kalau terbaca, yang diurai adalah tipe kosong, bukan
+        # isinya, dan gerbang ini akan merah tanpa sebab.
+        eq = source.find("=", start)
+        open_at = source.find("[", eq if eq >= 0 else start)
+        if open_at < 0:
+            return None
+        depth, end = 0, None
+        for index in range(open_at, len(source)):
+            if source[index] == "[":
+                depth += 1
+            elif source[index] == "]":
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+        if end is None:
+            return None
+        body = source[open_at:end + 1]
+        found = []
+        for match in re.finditer(
+                r"\(\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\)", body):
+            found.append((float(match.group(1)), float(match.group(2))))
+        return found
+
+    def _scalar(source, pattern):
+        # `re.M` perlu karena `MARIA_EDGE_SOFTNESS` dan `MARIA_OPACITY`
+        # didefinisikan di kolom pertama port, sementara `re.search` tanpa
+        # itu menganggap `^` hanya awal berkas — yang terbaca cuma nol.
+        match = re.search(pattern, source, re.M)
+        return float(match.group(1)) if match else None
+
+    view_src = open(view_path, encoding="utf-8").read()
+    port_src = open(R.SOURCE, encoding="utf-8").read()
+
+    checks = []
+
+    view_softness = _scalar(view_src, r"mariaEdgeSoftness: CGFloat = ([\d.]+)")
+    port_softness = _scalar(port_src, r"^MARIA_EDGE_SOFTNESS = ([\d.]+)")
+    if view_softness is None or port_softness is None:
+        checks.append("pelunakan tepi tidak terbaca di salah satu sisi")
+    elif abs(view_softness - port_softness) > 1e-9:
+        checks.append(f"pelunakan tepi: view {view_softness} vs port {port_softness}")
+
+    # Opasitas puncak: di view ia opasitas berhenti gradiennya, di port ia
+    # `MARIA_OPACITY`. Kalau keduanya menyimpang, komentar "tanpa menaikkan
+    # opasitas puncaknya" di view menjadi tidak benar untuk gambar yang diukur.
+    #
+    # Dicari **di dalam `drawMoonSurfaceShading` saja**: berkas ini memakai
+    # `Color.black.opacity(...)` untuk kawah dan untuk hal lain juga, dan
+    # angka pertama yang kebetulan lebih dulu dalam berkas bukan angka maria.
+    # Tanpa pembatasan fungsi, gerbang ini berdebat dengan kawah Merkurius.
+    view_opacity = None
+    # `func`-nya, bukan **pemanggilnya**: `drawMoonSurfaceShading` muncul lebih
+    # dulu sebagai panggilan, dan jendela 2600 karakter dari sana tidak memuat
+    # gradien yang dicari — jadi yang terbaca adalah `None`, yang oleh cabang
+    # di bawah dilaporkan sebagai "tidak terbaca" alih-alih salah banding.
+    marker = view_src.find("static func drawMoonSurfaceShading")
+    if marker >= 0:
+        view_opacity = _scalar(view_src[marker:marker + 2600],
+                               r"Color\.black\.opacity\(([\d.]+)\)")
+    port_opacity = _scalar(port_src, r"^MARIA_OPACITY = ([\d.]+)")
+    if view_opacity is None or port_opacity is None:
+        checks.append("opasitas puncak tidak terbaca di salah satu sisi")
+    elif abs(view_opacity - port_opacity) > 1e-9:
+        checks.append(f"opasitas puncak: view {view_opacity} vs port {port_opacity}")
+
+    view_ripple = _numbers(view_src, "mariaRipple")
+    port_ripple = _numbers(port_src, "MARIA_RIPPLE")
+    if not view_ripple or not port_ripple:
+        checks.append("riak tepi tidak terbaca di salah satu sisi")
+    elif len(view_ripple) != len(port_ripple):
+        checks.append(f"jumlah riak: view {len(view_ripple)} vs port {len(port_ripple)}")
+    else:
+        drift = [f"#{i} view {v} vs port {p}"
+                 for i, (v, p) in enumerate(zip(view_ripple, port_ripple))
+                 if any(abs(a - b) > 1e-9 for a, b in zip(v, p))]
+        checks.extend(drift)
+
+    # Klaim yang tidak terlihat dari angka: ujung gradien adalah `outer`
+    # (konstan per bercak), BUKAN `local` (bergantung sudut). Kalau port
+    # diganti memakai `local`, semua angka di atas tetap sama dan gerbang
+    # ini akan hijau — sementara gambar yang diukur bukan gambar yang tampil.
+    port_uses_outer = re.search(r"outer = edge \* \(1\.0 \+ ripple\[0\]\)", port_src) \
+        and re.search(r"MARIA_OPACITY \* \(outer - d\) / \(outer - inner\)", port_src)
+    view_uses_outer = re.search(r"endRadius: outer\)", view_src)
+    if not port_uses_outer:
+        checks.append("port tidak meluruhkan tepi memakai `outer` konstan")
+    if not view_uses_outer:
+        checks.append("view tidak memakai `outer` sebagai endRadius gradien")
+
+    results.append(Result(
+        "rumus tepi maria port == view",
+        not checks,
+        "kedua salinan sepakat pada pelunakan, opasitas, riak, dan ujung gradien"
+        if not checks else
+        f"{len(checks)} ketidaksepakatan: {'; '.join(checks)}"))
+
+
+def check_deep_sky_colours(results):
+    """Enam jenis benda langit dalam harus terpisah **di mode malam**.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan disangka.** Mode
+    malam membuang hue seluruhnya: `NightVisual.surface` mengembalikan
+    `(brightness, 0, 0)`. Jadi dari enam warna siang yang berbeda, yang
+    tersisa hanyalah **satu angka** — kecerahan kanal merah — dan satu-satunya
+    cara enam benda tetap terbedakan di layar malam adalah angka itu berbeda
+    satu per satu. Kalau dua jenis benda jatuh pada kecerahan mode malam yang
+    sama, di malam hari keduanya digambar **identik**, dan pengguna yang
+    sengaja memakai mode merah kehilangan justru informasinya.
+
+    Lebih buruk lagi: kalau salah satunya jatuh pada kecerahan **kabut
+    netral** (`deepSky`), maka "gugus terbuka" tampil sebagai "tidak tahu" —
+    dan cacat yang sengaja ditutup warna per-morfologi ini kembali dalam
+    bentuk lain. Itu sebabnya kabut netral ikut dihitung di sini sebagai
+    pembanding ketujuh.
+
+    **Kenapa memakai `NightVisual.surface` dan bukan selisih RGB.** Selisih
+    kanal RGB siang tinggi di semua enam kasus dan karena itu **bukan**
+    pengukuran yang relevan: dua warna bisa sangat berbeda siang hari dan
+    sama persis setelah hue dibuang. Yang dipakai di sini karena itu fungsi
+    yang benar-benar dipanggil view — `nightModeBrightness` lalu petakan —
+    sehingga angkanya adalah angka yang dilihat pengguna, bukan proksi.
+
+    **Yang TIDAK diklaim.** Pemeriksaan ini tidak mengukur warna di app Apple
+    (tidak ada simulator di sini), dan tidak menuntut jaraknya besar — hanya
+    **berbeda**, karena ambang "cukup jauh" adalah keputusan estetis yang
+    diukur lewat gerbang piksel di tempat lain. Yang dijaga: tidak ada dua
+    jenis benda yang bertabrakan, dan tidak ada yang bertabrakan dengan
+    "tidak tahu".
+    """
+    swift_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                    "NightVisual.swift")
+    source = open(swift_path, encoding="utf-8").read()
+
+    # Kecerahan mode malam = `nightModeBrightness` (proyeksi di CelestialVisual),
+    # lalu `surface` memetakannya linier. Untuk perbandingan "sama atau tidak",
+    # yang perlu diambil hanyalah `nightModeBrightness` tiap warna + parameter
+    # pemetaan, sehingga gerbang tetap mengikuti kalau parameternya diubah.
+    map_match = re.search(
+        r"let brightness = floorBrightness\s*\n\s*\+ rangeBrightness \* "
+        r"min\(1,\s*max\(0,\s*day\.nightModeBrightness\)\)", source)
+    floor_match = re.search(r"floorBrightness:\s*Double\s*=\s*([\d.]+)", source)
+    range_match = re.search(r"rangeBrightness:\s*Double\s*=\s*([\d.]+)", source)
+    if not (map_match and floor_match and range_match):
+        results.append(Result(
+            "warna benda langit dalam terpisah di mode malam", False,
+            "pemetaan mode malam tidak terbaca — penjaga ini tidak boleh hijau "
+            "karena gagal memahami apa yang ia ukur"))
+        return
+    floor_b = float(floor_match.group(1))
+    range_b = float(range_match.group(1))
+
+    names = ["deepSkyNebula", "deepSkyPlanetaryNebula", "deepSkyGalaxy",
+             "deepSkySpiralGalaxy", "deepSkyOpenCluster",
+             "deepSkyGlobularCluster"]
+    tokens = re.findall(
+        r"(deepSky\w*): \.init\(red: ([\d.]+), green: ([\d.]+), blue: ([\d.]+)\)",
+        source)
+    table = {name: (float(r), float(g), float(b))
+             for name, r, g, b in tokens}
+
+    missing = [name for name in names if name not in table]
+    if missing:
+        results.append(Result(
+            "warna benda langit dalam terpisah di mode malam", False,
+            f"warna tidak terbaca di model: {', '.join(missing)}"))
+        return
+
+    # Proyeksi ke kecerahan mode malam, sama seperti `surface`.
+    # `nightModeBrightness` didefinisikan di `CelestialVisual` — bobotnya
+    # dibaca dari sana supaya gerbang tidak menyalin rumus, tapi tetap
+    # gagal-tertutup kalau bentuknya berubah.
+    visual = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                      "CelestialVisual.swift"),
+                  encoding="utf-8").read()
+    weights = None
+    plain = re.search(r"nightModeBrightness:\s*Double\s*\{\s*red\s*\}", visual)
+    if plain:
+        weights = (1.0, 0.0, 0.0)
+    else:
+        combo = re.search(
+            r"nightModeBrightness:\s*Double\s*\{\s*([\d.]+) \* red"
+            r"(?:\s*\+ ([\d.]+) \* green)?(?:\s*\+ ([\d.]+) \* blue)?\s*\}",
+            visual)
+        if combo:
+            weights = (float(combo.group(1)),
+                       float(combo.group(2) or 0.0),
+                       float(combo.group(3) or 0.0))
+    if weights is None:
+        results.append(Result(
+            "warna benda langit dalam terpisah di mode malam", False,
+            "bobot kecerahan mode malam tidak terbaca di CelestialVisual"))
+        return
+    wr, wg, wb = weights
+
+    def night_brightness(rgb):
+        day = wr * rgb[0] + wg * rgb[1] + wb * rgb[2]
+        return floor_b + range_b * min(1, max(0, day))
+
+    bright = {name: round(night_brightness(table[name]), 6) for name in names}
+
+    # Kabut netral: warna yang **bukan** identitas, dan justru itu bahayanya.
+    neutral = table.get("deepSky")
+    neutral_b = round(night_brightness(neutral), 6) if neutral else None
+
+    collisions = []
+    ordered = sorted(bright.items(), key=lambda kv: kv[1])
+    for (name_a, value_a), (name_b, value_b) in zip(ordered, ordered[1:]):
+        if abs(value_a - value_b) <= 1e-9:
+            collisions.append(f"{name_a} == {name_b} @ {value_a}")
+    for name, value in bright.items():
+        if neutral_b is not None and abs(value - neutral_b) <= 1e-9:
+            collisions.append(f"{name} == kabut netral (deepSky) @ {value}")
+
+    results.append(Result(
+        "warna benda langit dalam terpisah di mode malam",
+        not collisions,
+        f"keenam jenis terpisah di mode malam (kecerahan {min(bright.values()):.3f}"
+        f"…{max(bright.values()):.3f}; kabut netral {neutral_b:.3f})"
+        if not collisions else
+        f"{len(collisions)} tabrakan: {'; '.join(collisions)}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -12638,6 +13114,14 @@ def main():
     check_features_disappear_when_uncertain(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
+    # Tiga gerbang yang **dijanjikan komentar tetapi tidak pernah ditulis**
+    # (ditemukan `check_gate_names_mentioned_in_code_exist`): kawah Bulan,
+    # rumus tepi maria, dan warna benda langit dalam di mode malam. Ketiganya
+    # diletakkan bersama gerbang paritas model karena kelasnya sama —
+    # dua salinan yang bisa berbeda pendapat tanpa ada yang mengukur.
+    check_moon_craters_match_the_model(results)
+    check_maria_edge_formula_matches_the_view(results)
+    check_deep_sky_colours(results)
     check_inner_planet_phase(results, args.size, args.ss)
     check_phase_direction_on_the_waning_half(results, args.size, args.ss)
     check_waning_gibbous_lit_side(results, args.size, args.ss)
@@ -12720,6 +13204,7 @@ def main():
     # Paling akhir: gerbang yang **dipanggil tetapi tidak mengukur apa pun**
     # tidak bisa hijau karena alasan yang salah — ia hijau karena tidak ada.
     check_every_gate_fills_its_results(results)
+    check_gate_names_mentioned_in_code_exist(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
