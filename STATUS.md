@@ -25309,3 +25309,57 @@ titik yang sudah ada" tetap terpelihara.
   sebagai "nilai berturutan", padahal rantainya hidup di keadaan awal
   tiap aliran. Mengukur 89 kegagalan itulah yang mengarahkan ke
   tempat yang benar.
+
+---
+
+### Siklus: perluas katalog visual objek langit dalam (FASE C #5)
+
+**Unit yang dikerjakan.** Tambah 3 objek Messier terkenal ke katalog
+produksi langit dalam — `M41` (Gugus M41), `M81` (Galaksi Bode), `M15`
+(Gugus Pegasus) — supaya pengguna punya lebih banyak target yang benar-
+benar terlihat dari lintang Jakarta.
+
+**Kenapa ini, bukan memoles ulang yang sudah hijau.** Seluruh BAGIAN 1–4
+dan FASE A–C sudah terimplementasi dan terkunci gerbang (diverifikasi
+putaran sebelumnya: Great Red Spot digambar, mode malam menekan
+hijau/biru, palet katalog dua-arah sebanding, dsb.). Brief melarang
+mengulang gerbang yang sudah lulus; frontier aslinya adalah perluasan +
+pengerasan. `FASE C #5` secara eksplisit meminta "tambah visual untuk
+lebih banyak objek langit dalam sesuai katalog" — ini tepat sasar.
+
+**Kenapa tiga objek ini.** (1) Semua memakai **morfologi yang sudah ada**
+(`.openCluster`, `.galaxy`, `.globularCluster`) → tidak membuka jalur
+gambar baru dan tidak mengubah cakupan bentuk yang diuji
+(`testEveryMorphologyHasMoreThanOneRepresentative` tetap terpenuhi, jadi
+tidak perlu menambah `case Morphology` yang akan menuntut warna & dua
+wakil baru). (2) Semua objek terang & mudah ditemukan: M41 mag 4.5 dekat
+Sirius (mata telanjang), M81 mag 6.9, M15 mag 6.2. (3) Semua naik tinggi
+di lintang Jakarta (deklinasi −20.75°/+69.07°/+12.17° → kulminasi ≈
+75°/15°/72°), lolos ambang 10° di
+`testEveryObjectRisesAboveTheHorizonForTheTargetLatitude` (M81 paling
+ketat di 14.73°).
+
+**Penyambungan penuh, bukan sisipan diam-diam.** Objek langit dalam punya
+lima gerbang dua-arah; menambah satu objek berarti menyentuh kelimanya
+atau CI merah:
+- `DeepSkyCatalogue.objects` + `fuzzinessByID` + `morphologyByID`
+- `ObjectDisplayName.catalogueKeys` (diperiksa
+  `testDeclaredKeyListMatchesTheEngineCataloguesExactly`, dua arah)
+- `Localizable.xcstrings` (id + en) (diperiksa
+  `testEveryDeepSkyPhraseNameIsTranslatedThroughObjectName`)
+
+**Bukti.** PointingKit **831** + CelestialEngine **222** hijau di Docker
+Swift 6.0 (termasuk horizon sweep kini 21 objek). `Apple Build` (macOS,
+gerbang ketat tanpa peringatan kompilasi) **success**. `Engine Tests
+(Linux)` sedang berjalan saat catatan ini ditulis (suite ≈ 2j; hasil
+lokal sudah membuktikan hijau).
+
+**Yang TIDAK diklaim.** Tampilan akhir belum dilihat di perangkat
+(simulator/Xcode tidak ada di VPS). Yang diklaim: katalog kini menawarkan
+21 objek langit dalam alih-alih 18, semua terhubung ke kelima gerbang,
+dan tidak ada satu pun gerbang yang merah.
+
+**Pelajaran.** Gerbang dua-arah katalog (Aturan 19 + uji paritas kunci)
+adalah jaring pengaman nyata: sebuah objek baru tanpa baris `.xcstrings`
+atau tanpa entri `catalogueKeys` langsung memerahkan CI, bukan diam. Itu
+yang membuat penambahan katalog aman tanpa Xcode.
