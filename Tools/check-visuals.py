@@ -896,6 +896,8 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-uncertain",
          "planet-jupiter-bare", "Bintik Merah Besar Jupiter"),
+        ("planet-pluto-confirmed", "planet-pluto-uncertain",
+         "planet-pluto-bare", "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-uncertain",
          "planet-saturn-bare", "cincin Saturnus"),
         # Kelima planet berciri, bukan hanya dua yang kebetulan punya kasus
@@ -1167,6 +1169,8 @@ def check_features_survive_the_watch_size(results, ss=8):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-bare",
          "Bintik Merah Besar Jupiter"),
+        ("planet-pluto-confirmed", "planet-pluto-bare",
+         "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
@@ -1279,6 +1283,8 @@ def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
     pairs = [
         ("planet-jupiter-confirmed", "planet-jupiter-bare",
          "Bintik Merah Besar Jupiter"),
+        ("planet-pluto-confirmed", "planet-pluto-bare",
+         "pita Pluto"),
         ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
         ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
         ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
@@ -2313,6 +2319,14 @@ def check_port_matches_swift_constants(results):
     # baru ke satu sisi tanpa pasangannya ikut merah, bukan diam.
     swift_planets = read_planet_palettes_from_swift(model)
     for name, (light, dark, feature) in swift_planets.items():
+        # Pembaca mengembalikan `("unreadable", urutan)` untuk cabang yang
+        # polanya tidak dikenali: **bukan** planet, dan bukan alasan untuk
+        # menuduh port Python kehilangan entri. Tanpa penyaring ini,
+        # `zip(light, ...)` akan menelan dua karakter tupel itu dan
+        # melaporkan selisih warna yang tidak ada — persis bentuk "menyaring
+        # diam-diam" yang justru dihindari pembacanya.
+        if not isinstance(light, tuple) or len(light) != 3:
+            continue
         if name not in R.PLANET_PALETTE:
             results.append(Result(
                 f"palet planet: {name} ada di kedua sisi", False,
@@ -2458,6 +2472,20 @@ def check_every_planet_in_the_model_has_render_cases(results):
         results.append(Result("kasus render planet: terbaca dari model", False, str(exc)))
         return
 
+    # `__unreadable__` bukan planet: ia kabar dari pembaca bahwa ada cabang
+    # `case` yang tidak dikenali polanya. Dikeluarkan di sini supaya ia tidak
+    # pernah ikut dihitung sebagai planet — tetapi **dibaca**, karena kalau
+    # tidak, planet yang tak terbaca akan lenyap diam-diam dari tabel dan
+    # setiap pemeriksaan cakupan di bawahnya justru hijau.
+    unreadable = planets.pop("__unreadable__", [])
+    results.append(Result(
+        "kasus render planet: setiap cabang palet terbaca",
+        not unreadable,
+        f"{len(planets)} cabang" if not unreadable
+        else f"pola pembaca tidak mengenali: {unreadable} — bentuk tulisan di "
+             "`var palette` berubah; perbaiki polanya alih-alih melaporkan "
+             "planet yang hilang"))
+
     if set(planets) != set(switch_names):
         results.append(Result(
             "kasus render planet: switch palet & tabel palet sepakat",
@@ -2478,7 +2506,12 @@ def check_every_planet_in_the_model_has_render_cases(results):
         else f"tidak ada kasus render: {missing_confirmed} — planet itu tampil di jam "
              "tanpa satu pun gerbang gambar"))
 
-    featured = sorted(n for n, (_, _, feature) in planets.items() if feature != "none")
+    # Planet yang cabang paletnya tak terbaca tidak dianggap berciri: yang
+    # diketahui tentangnya hanyalah bahwa polanya tidak dikenali, dan
+    # menuduhnya "tidak punya kasus ragu" adalah melaporkan bentuk pembaca
+    # sebagai cacat model. Kabarnya sudah diangkat pemeriksaan di atas.
+    featured = sorted(n for n, (_, _, feature) in planets.items()
+                      if feature != "none" and isinstance(feature, str))
     missing_uncertain = sorted(n for n in featured if f"planet-{n}-uncertain" not in names)
     results.append(Result(
         "kasus render planet: setiap planet berciri punya kasus ragu",
@@ -2619,8 +2652,7 @@ def read_planet_palettes_from_swift(source):
     closing = region.find("\n    }")
     if closing != -1:
         region = region[:closing]
-    out: dict[str, tuple[tuple[float, float, float],
-                          tuple[float, float, float], str]] = {}
+    out = {}
     for m in re.finditer(
             r"case \.(\w+):"
             # Komentar penjelas di antara `case` dan `return` itu sah, dan
@@ -2645,12 +2677,35 @@ def read_planet_palettes_from_swift(source):
     # "planet ini tidak ada di model", yang menyesatkan.
     clauses = re.findall(r"case \.(\w+):", region)
     if len(out) != len(clauses):
-        raise ValueError(
-            "read_planet_palettes_from_swift hanya mengenali "
-            f"{len(out)} dari {len(clauses)} cabang `case`: "
-            f"terbaca {sorted(out)}, tidak terbaca "
-            f"{sorted(set(clauses) - set(out))} — bentuk tulisan berubah, "
-            "perbaiki polanya alih-alih melaporkan planet yang hilang")
+        unreadable = sorted(set(clauses) - set(out))
+        # **Bentuk yang sah tidak boleh memerahkan pembaca — ia harus
+        # memerahkan pemeriksaan yang tepat, dengan sebab yang tepat.**
+        #
+        # Sampai siklus ini cabang yang tak terbaca langsung melempar, dan
+        # pemanggilnya melaporkannya sebagai "terbaca dari model" sebelum
+        # sempat memeriksa apa pun. Akibatnya kejadian yang justru paling
+        # ingin ditangkap — tabel palet kehilangan satu planet sementara
+        # `switch` masih memuatnya — memerah dengan pesan yang menunjuk
+        # **pembaca**, padahal cacatnya di tabel. Terukur di
+        # `Tools/bukti-mutasi-kasus-planet.py` keadaan 4: satu-satunya merah
+        # yang muncul adalah nama yang salah.
+        #
+        # Bentuk yang dihindari di sini adalah **kembalinya sebagian tabel**.
+        # Kalau `out` dikembalikan apa adanya, planet yang tak terbaca lenyap
+        # diam-diam dan gerbang cakupan di atasnya justru **hijau** — tabel
+        # yang mengecil tidak menuntut apa pun. Jadi yang hilang dibawa serta
+        # sebagai kabar, dan dicatat di `unreadable`, supaya pemeriksaan
+        # cakupan di atasnya tetap bisa merah.
+        #
+        # Permintaan "perbaiki polanya, jangan laporkan planet yang hilang"
+        # tetap berlaku: `unreadable` bukan laporan tentang model, melainkan
+        # tentang **pola pembaca ini**. Yang berubah hanya salurannya —
+        # diangkat lewat pemeriksaan yang memerah, bukan lewat lemparan yang
+        # menyamar sebagai kegagalan model.
+        for order, name in enumerate(clauses):
+            if name not in out:
+                out[name] = ("unreadable", order)
+        out["__unreadable__"] = unreadable
     return out
 
 
@@ -5272,6 +5327,10 @@ def check_modeled_port_constants_match_the_model(results):
     # memutuskan ciri mana yang digambar, jadi angka yang cocok dengan nama
     # ciri yang berbeda tetap menggambar planet yang berbeda.
     for name, (_, _, port_feature) in read_planet_palettes_from_swift(model).items():
+        # Cabang yang polanya tidak dikenali bukan planet: kabarnya sudah
+        # diangkat `check_every_planet_in_the_model_has_render_cases`.
+        if not isinstance(port_feature, str):
+            continue
         port_entry = R.PLANET_PALETTE.get(name)
         if port_entry is None:
             continue  # sudah dilaporkan gerbang drift palet
@@ -12128,7 +12187,12 @@ def check_uncertain_planet_loses_its_identity_colour(results, size=None, ss=8,
         f"terang {_rgb_text(neutral_body)}"))
 
     names = {case.name for case in R.build_cases()}
-    planets = sorted(read_planet_palettes_from_swift(model_source))
+    # Cabang tak terbaca bukan planet: ia dilaporkan pemeriksaan cakupan
+    # palet, dan menuntutnya punya gambar "ragu" berarti menuduh model atas
+    # bentuk yang tidak dikenali pembaca.
+    planets = sorted(name for name, entry in
+                     read_planet_palettes_from_swift(model_source).items()
+                     if isinstance(entry[2], str))
     missing = [f"planet-{name}-uncertain" for name in planets
                if f"planet-{name}-uncertain" not in names]
     if missing:
@@ -12322,9 +12386,10 @@ def check_unknown_planet_is_a_neutral_sphere(results, size=None, ss=8, detail=20
             "tidak mengukur apa pun, dan itu merah, bukan lulus"))
         return
 
-    planets = sorted(read_planet_palettes_from_swift(
+    planets = sorted(name for name, entry in read_planet_palettes_from_swift(
         open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
-                                "CelestialVisual.swift"), encoding="utf-8").read()))
+                                "CelestialVisual.swift"), encoding="utf-8").read()).items()
+        if isinstance(entry[2], str))
     missing = sorted(f"planet-{name}-confirmed" for name in planets
                      if f"planet-{name}-confirmed" not in names)
     if missing:

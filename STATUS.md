@@ -1,4 +1,72 @@
-## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: nama objek langit dalam tampil Bahasa Indonesia di layar Inggris)
+## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: harness kasus-planet diperbaiki, dan cacat gerbang yang tersembunyinya diangkat)
+
+### Kenapa siklus ini tidak mengerjakan UI
+
+`main` sedang **merah**. Sebelum menambah fitur apa pun, yang berjalan lebih
+dulu harus hijau — dan yang ditemukan bukan harness yang jangkar-nya
+bergeser, melainkan **gerbangnya salah bentuk**.
+
+### Cacat yang diangkat
+
+`check_every_planet_in_the_model_has_render_cases` (`Tools/check-visuals.py`)
+adalah gerbang **berhenti-penuh**: begitu satu pemeriksaan gagal ia `return`,
+dan pemeriksaan sesudahnya tidak pernah dicatat. Untuk pemakaian sehari-hari
+itu wajar. Yang tidak wajar adalah gabungannya:
+
+    if palette_planets != switch_planets:
+        results.append(Fail("switch palet & tabel palet sepakat", ...))
+        return 0          # ← enam pemeriksaan sesudahnya hilang
+
+Akibatnya, kejadian yang justru paling ingin ditangkap — **tabel palet
+kehilangan satu planet sedangkan `switch` masih memuatnya** — dilaporkan
+sebagai `terbaca dari model`, bukan sebagai `switch palet & tabel palet
+sepakat`. Pesannya menunjuk pembaca, padahal cacatnya di tabel. Itu persis
+bentuk yang paling mahal: gerbang merah dengan sebab yang salah.
+
+Terukur, bukan disangka. Keadaan 4 harness ini memindahkan badan satu kasus
+palet dari warna literal ke variabel perantara (perubahan yang **sah** di
+Swift), dan hasilnya:
+
+    terukur : 1 merah — "terbaca dari model"
+    harapan : 1 merah — "switch palet & tabel palet sepakat"
+
+Enam nama lain hilang dari keluaran karena `return` itu. Jadi yang menentukan
+bukan sekadar "gerbang menyala", melainkan **apakah ia menyebut sebabnya**.
+
+### Yang diperbaiki siklus ini
+
+- **Jangkar basi**: `PHASE_OLD` masih `case .mars, .jupiter, .saturn:` padahal
+  model sudah memuat `.uranus, .neptune` sejak `27dd677`. Suntingannya tidak
+  pernah cocok, sehingga keadaan 1 dan 2 mengukur model yang **tidak
+  berubah** sambil melaporkan seolah berubah.
+- **Planet "baru"-nya Uranus → Pluto.** Uranus sudah ada di enum, di
+  `showsPhase`, dan di palet; menyuntikkannya kembali bukan menambah planet,
+  melainkan menyentuh yang sudah ada — dan `ENUM_NEW` versi lama menghasilkan
+  **dua** `case uranus`. Pluto dipilih karena ia ada di
+  `CelestialEngine.EphemerisBody` tetapi **tidak** ada di `CelestialVisual.Planet`,
+  jadi tiga suntikannya benar-benar menambahkan planet.
+- **Harapan yang diwarisi diukur ulang.** Docstring mengutip "MERAH 5 kawat"
+  dengan rujukan `6c2fb0d`; commit itu tidak memuat keadaan-keadaan ini
+  (planet barunya masih Uranus di sana). Diukur dalam kotak pasir atas dunia
+  pluto yang sebenarnya: **lima** merah untuk keadaan 1 **dan** 2.
+- **Perbandingan himpunan hasil tahu soal `return` itu.** Untuk keadaan yang
+  memang memerahkan "terbaca dari model", nama yang tidak pernah sampai tidak
+  lagi dihitung sebagai "hasil hilang"; keadaan lain tetap dibandingkan
+  persis, jadi kelonggaran ini tidak bocor ke sekitarnya.
+
+### Yang TIDAK diklaim
+
+- Cacat gerbang di atas **belum diperbaiki**, hanya diangkat. Perbaikan yang
+  benar — mengumpulkan semua masalah sebelum memutuskan merah, supaya pesan
+  menunjuk sebab yang tepat — adalah perubahan perilaku gerbang dan harus
+  punya keadaan merahnya sendiri lebih dulu.
+- `main` belum hijau sampai gerbang itu diperbaiki. Harness kini **jujur
+  merah**, bukan hijau palsu.
+- Keadaan 8 membangun ulang jalur `<planet>-bare`/`-uncertain` untuk Pluto;
+  yang dibuktikan adalah jalurnya jalan, bukan bahwa angkanya cocok di
+  perangkat.
+
+
 
 ### Yang dikerjakan, dan kenapa bukan fitur baru
 
