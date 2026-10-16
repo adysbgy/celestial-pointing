@@ -106,8 +106,8 @@ public enum ObjectDisplayName {
 
     /// Kunci katalog untuk nama objek yang dipasang engine.
     ///
-    /// Dibentuk dari **pengenal**, bukan dari kalimatnya: `"Bulan Purnama"`
-    /// menjadi `object.name.bulanPurnama`, dan `"Barnard's Star"` menjadi
+    /// Dibentuk dari **pengenal**, bukan dari kalimatnya: `"Nebula Orion"`
+    /// menjadi `object.name.nebulaOrion`, dan `"Barnard's Star"` menjadi
     /// `object.name.barnardsStar`. Kalau kalimatnya sendiri yang jadi kunci,
     /// kuncinya akan memuat spasi — dan kunci berspasi membuat
     /// `TextLocalization` tidak lagi bisa membedakan "kunci tidak ada" dari
@@ -115,6 +115,61 @@ public enum ObjectDisplayName {
     public static func catalogKey(forName name: String) -> String {
         "object.name." + identifier(forName: name)
     }
+
+    /// Kunci yang **mungkin** dipakai: satu per nama yang dirakit engine, dan
+    /// yang namanya **perlu diterjemahkan**.
+    ///
+    /// **Kenapa daftar ini ada, padahal kuncinya sudah dihitung dari nama.**
+    /// Gerbang Aturan 19 menuntut setiap kunci katalog dirujuk oleh **literal**
+    /// di kode yang dikirim — dan `catalogKey(forName:)` membangun kunci saat
+    /// jalan, jadi baris yang ditambahkan bersamanya dilaporkan sebagai yatim
+    /// dan membuat CI merah. Bentuk yang sama sudah dipakai
+    /// `BodyName.catalogKey(for:)`: kunci ditulis lengkap di kode, bukan
+    /// disusun.
+    ///
+    /// **Kenapa bintang tidak ada di sini.** Dua puluh lima bintang di
+    /// `Catalogue.brightStars` punya nama baku yang sama di dua bahasa —
+    /// `Sirius`, `Vega`, `Betelgeuse` — jadi baris katalog untuk mereka akan
+    /// mengklaim menerjemahkan sesuatu yang tidak berubah, dan
+    /// `testPhraseNamesAssembledByTheEngineAlsoHaveRows` sudah menahan
+    /// perubahan itu. Yang di sini adalah nama yang **berbeda** antar bahasa:
+    /// sembilan bendera tata surya, dan delapan belas objek langit dalam yang
+    /// namanya frasa Indonesia.
+    ///
+    /// **Yang membuat daftar ini tidak bisa basi.**
+    /// `testDeclaredKeyListMatchesTheEngineCataloguesExactly` membandingkannya
+    /// dua arah dengan kunci yang dihitung dari katalog engine: nama yang
+    /// berubah atau objek yang dibuang membuat uji itu merah, bukan membuat
+    /// daftarnya diam-diam salah.
+    public static let catalogueKeys: [String] = [
+        "object.name.matahari",
+        "object.name.bulan",
+        "object.name.merkurius",
+        "object.name.venus",
+        "object.name.mars",
+        "object.name.jupiter",
+        "object.name.saturnus",
+        "object.name.uranus",
+        "object.name.neptunus",
+        "object.name.pleiades",
+        "object.name.galaksiAndromeda",
+        "object.name.gugusPtolemy",
+        "object.name.nebulaOrion",
+        "object.name.gugusHercules",
+        "object.name.nebulaLaguna",
+        "object.name.gugusSarangLebah",
+        "object.name.galaksiTriangulum",
+        "object.name.gugusSagitarius",
+        "object.name.gugusKupuKupu",
+        "object.name.nebulaOmega",
+        "object.name.nebulaDumbel",
+        "object.name.nebulaCincin",
+        "object.name.galaksiPusaran",
+        "object.name.gugusBebekLiar",
+        "object.name.gugusM2",
+        "object.name.gugusM35",
+        "object.name.galaksiKincirAngin"
+    ]
 
     /// Pengenal stabil untuk sebuah nama: tanpa spasi, tanpa tanda baca, kata
     /// pertama huruf kecil dan sisanya huruf besar.

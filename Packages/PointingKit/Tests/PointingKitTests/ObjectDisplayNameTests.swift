@@ -187,6 +187,18 @@ final class ObjectDisplayNameTests: XCTestCase {
     /// akan membuat uji ini hijau sambil melewatkan seluruh kelas objek yang
     /// paling banyak memakai nama frasa.
     private static func enginePhraseNames() -> [String] {
+        engineNames().filter { $0.contains(" ") }
+    }
+
+    /// **Semua** nama yang dirakit engine dari ketiga sumbernya: katalog
+    /// bintang, katalog langit dalam, dan `EphemerisBody`.
+    ///
+    /// Katalog dibaca dengan memangsa literal `name: "..."` dari berkas
+    /// sumber. Itu pembacaan yang kasar, jadi keabsahannya dijaga oleh
+    /// `XCTAssertGreaterThan` di tiap pemanggil: kalau bentuk berkasnya
+    /// berubah dan pembacanya mengembalikan terlalu sedikit, ujinya merah
+    /// alih-alih hijau tanpa arti.
+    private static func engineNames() -> [String] {
         let sources = [
             "Packages/CelestialEngine/Sources/CelestialEngine/Catalogue.swift",
             "Packages/PointingKit/Sources/PointingKit/DeepSkyCatalogue.swift"
@@ -203,11 +215,59 @@ final class ObjectDisplayNameTests: XCTestCase {
                 names += text.components(separatedBy: "name: \"")
                     .dropFirst()
                     .compactMap { $0.components(separatedBy: "\"").first }
-                    .filter { $0.contains(" ") }
                 break
             }
         }
-        return names
+        return names + EphemerisBody.allCases.map { $0.displayName }
+    }
+
+    /// **`ObjectDisplayName.catalogueKeys` harus persis sama dengan kunci
+    /// untuk nama yang perlu diterjemahkan.**
+    ///
+    /// Daftar itu ada karena gerbang Aturan 19 menuntut setiap kunci katalog
+    /// dirujuk oleh literal di kode yang dikirim — kunci yang disusun saat
+    /// jalan tidak terlihat oleh gerbang, jadi daftar itu adalah harga yang
+    /// dibayar untuk baris katalog yang tidak dianggap yatim. Uji ini yang
+    /// membayar sisanya: daftar tangan selalu bisa basi, dan bentuk basi yang
+    /// berbahaya adalah **kunci yang hilang** — baris katalog yang sudah
+    /// ditulis lalu dilaporkan yatim, sehingga seseorang menghapusnya, dan
+    /// namanya kembali Bahasa Indonesia.
+    ///
+    /// Yang diharapkan adalah nama **non-bintang**: nama bintang adalah nama
+    /// baku yang sama di dua bahasa, jadi ia sengaja tidak punya baris katalog.
+    /// Kata "non-bintang" di sini bukan tebakan: yang menentukan adalah
+    /// `Catalogue.brightStars`, katalog yang sama yang dipakai resolver.
+    ///
+    /// Jadi ujinya dua arah:
+    ///
+    /// - setiap nama yang perlu diterjemahkan **punya** kuncinya di daftar;
+    /// - tidak ada satu pun kunci di daftar yang **tidak** berasal dari katalog.
+    ///
+    /// Arah kedua menangkap kunci yang tertinggal setelah sebuah objek
+    /// berganti nama — kunci yang akan tetap "dirujuk" oleh daftar, jadi
+    /// Aturan 19 tidak akan pernah melihatnya.
+    func testDeclaredKeyListMatchesTheEngineCataloguesExactly() {
+        let starNames = Set(Catalogue.brightStars.map(\.name))
+        let translatable = Self.engineNames().filter { !starNames.contains($0) }
+        let expected = Set(translatable.map { ObjectDisplayName.catalogKey(forName: $0) })
+        let declared = Set(ObjectDisplayName.catalogueKeys)
+
+        XCTAssertGreaterThan(declared.count, 20,
+                             "daftar kunci menyusut — cakupan uji ini bohong")
+        XCTAssertGreaterThan(starNames.count, 20,
+                             "katalog bintang tidak terbaca — penyaringnya bohong, "
+                             + "dan uji ini akan menuntut kunci untuk nama baku")
+
+        let missing = expected.subtracting(declared).sorted()
+        XCTAssertTrue(missing.isEmpty,
+                      "kunci ini dihitung dari katalog tapi tidak ada di "
+                      + "`catalogueKeys`, jadi barisnya dilaporkan yatim oleh "
+                      + "Aturan 19: \(missing)")
+
+        let extra = declared.subtracting(expected).sorted()
+        XCTAssertTrue(extra.isEmpty,
+                      "kunci ini ada di `catalogueKeys` tapi tidak ada objeknya "
+                      + "lagi di katalog engine: \(extra)")
     }
 
     /// Ketujuh kunci itu harus **berbeda** satu sama lain.
