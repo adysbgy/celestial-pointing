@@ -70,7 +70,20 @@ struct SkyBackdropView: View {
                         ? SkyBackdrop.nightBrightness(speck.brightness)
                         : speck.brightness
 
-                    let color = baseColor.color
+                    // Warna dibangun dari `neutralStarBody` lewat
+                    // `SurfaceColor` — satu-satunya jembatan ke `Color` yang
+                    // sudah ada. `RGBComponents` tidak punya jembatan itu
+                    // (ia sengaja buta warna-SwiftUI, supaya tetap teruji di
+                    // Linux), jadi konversinya dilakukan di sini, di batas
+                    // yang memang tidak bisa diuji.
+                    //
+                    // Yang dikonversi hanya **rona**-nya; terangnya sudah
+                    // dibawa `brightness` dan diteruskan lewat
+                    // `context.opacity`, supaya mode malam tidak perlu
+                    // mengubah rona dua kali.
+                    let color = SurfaceColor(red: baseColor.red,
+                                             green: baseColor.green,
+                                             blue: baseColor.blue).color
                     context.opacity = brightness * SkyBackdrop.layerOpacity
                     context.fill(Path(ellipseIn: rect), with: .color(color))
                 }
