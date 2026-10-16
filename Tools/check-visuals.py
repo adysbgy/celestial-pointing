@@ -10131,6 +10131,37 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
         "warna ragu = warna bintang tak dikenal", diff_unknown == 0,
         f"{diff_unknown} piksel berbeda dari bintang tak dikenal (inti saja)"))
 
+    # **Dan warna itu harus benar-benar tidak mengklaim.**
+    #
+    # Cacat yang ditutup: ketiga pemeriksaan di atas semuanya mengukur
+    # "apakah warna ragu **sama** dengan warna bintang tak dikenal", dan
+    # "apakah dua bintang ragu **sama**". Semuanya hijau ketika nilai yang
+    # dipakai bersama itu adalah B−V 0,00 — yang bukan netral, melainkan
+    # putih kebiruan kelas A: warna **Sirius** dan **Vega**. Jadi dua
+    # bintang yang memang tidak boleh menampilkan cirinya justru menampilkan
+    # cirinya, persis di depan mata pengguna, dan tidak ada satu pun
+    # pemeriksaan di atas yang bisa melihatnya karena ketiganya hanya
+    # membandingkan nilai dengan nilai lain.
+    #
+    # Yang ditegakkan: warna "tidak mengklaim" **akromatik** (R=G=B), sehingga
+    # ia tidak mungkin menjadi warna spektral bintang mana pun.
+    unknown_pixel = brightest_pixel(rows_unknown, w5, h5, 0, 0, w5, h5)[0]
+    hue_spread = max(unknown_pixel) - min(unknown_pixel)
+    results.append(Result(
+        "warna tak dikenal benar-benar akromatik (R=G=B)", hue_spread <= 0.01,
+        f"sebaran kanal {hue_spread:.4f} pada piksel terterang "
+        f"{_rgb_text(unknown_pixel)} (abu netral ~0.78)"))
+
+    # Dan sisi yang benar-benar dilihat pengguna: Sirius yang **dikonfirmasi**
+    # harus berbeda dari bintang yang **tak dikenal**. Tanpa ini, "menyembunyikan
+    # ciri saat ragu" tetap hijau walau ia justru menunjuk Sirius.
+    _, (w7, h7, rows_sirius) = render_case("star-sirius", size=size, ss=ss)
+    sirius_pixel = brightest_pixel(rows_sirius, w7, h7, 0, 0, w7, h7)[0]
+    results.append(Result(
+        "Sirius terkonfirmasi ≠ bintang tak dikenal", sirius_pixel != unknown_pixel,
+        f"Sirius {_rgb_text(sirius_pixel)} vs tak dikenal "
+        f"{_rgb_text(unknown_pixel)}"))
+
 
 def check_crater_floor_opacity_comes_from_the_model(results, size=76, ss=6):
     """Kelegapan dasar kawah harus **nilai model**, bukan angka tetap.

@@ -661,11 +661,40 @@ public struct CelestialVisual: Equatable, Sendable {
     /// biru, Sirius (A1, B−V ≈ 0.00) putih-biru. Tanda yang terbalik tidak
     /// akan pernah dilaporkan pengguna — karena itu ia diuji.
     ///
-    /// Bintang yang tidak ada di tabel mengembalikan `0` (putih), bukan
-    /// warna karangan: putih netral tidak mengklaim apa-apa.
+    /// Bintang yang tidak ada di tabel mengembalikan `unknownStarColorIndex`,
+    /// yang **bukan** warna spektral apa pun (lihat catatan di sana).
+    ///
+    /// **Koreksi docstring.** Sampai siklus ini kalimatnya berbunyi "Bintang
+    /// yang tidak ada di tabel mengembalikan `0` (putih), bukan warna
+    /// karangan: putih netral tidak mengklaim apa-apa." Itu **salah dua kali**.
+    /// `0` bukan putih: `starRGB(0)` = (0,69, 0,74, 0,85), putih kebiruan
+    /// dengan R−B = −0,15 — kelas spektral A, warna Sirius dan Vega. Dan
+    /// karena warnanya spektral, ia **mengklaim**. Yang benar: nilai tak
+    /// dikenal harus di luar rentang B−V, supaya tidak ada bintang nyata yang
+    /// bisa menghasilkannya.
     public static func colorIndex(forStarID id: String) -> Double {
-        Self.starColorIndex[id] ?? 0
+        Self.starColorIndex[id] ?? Self.unknownStarColorIndex
     }
+
+    /// Indeks "tidak ada klaim" untuk warna bintang.
+    ///
+    /// **Kenapa bukan `0`.** Cacat yang ditutup nilai ini: `0` adalah B−V yang
+    /// **sah** — kelas A0, warna Sirius dan Vega. Memakainya sebagai sentinel
+    /// berarti "bintang tak dikenal" dan "Sirius terkonfirmasi" menghasilkan
+    /// gambar yang identik piksel demi piksel (diukur di port: keduanya
+    /// (0,693, 0,742, 0,846)). Untuk dua bintang itu, seluruh jalur "ciri
+    /// hilang saat ragu" tidak mencapai tujuannya — dan tidak ada uji yang
+    /// bisa melihatnya, karena yang diukur "apakah ragu == tak dikenal",
+    /// bukan "apakah nilainya tidak mengklaim".
+    ///
+    /// `NaN` dipilih karena ia **tidak bisa** dihasilkan oleh B−V bintang
+    /// mana pun, jadi ia tidak bisa kebetulan menunjuk bintang — persis alasan
+    /// yang sama yang membuat `neutralBody` planet dipakai alih-alih angka
+    /// baru. `starRGB` menanganinya sebagai kasus khusus: hasilnya abu-abu
+    /// akromatik (R=G=B), dan nilai akromatik tidak bisa menjadi warna
+    /// spektral. Karena `NaN != NaN`, cabang ini **wajib** ditangani sebelum
+    /// perbandingan apa pun di `starRGB`.
+    public static let unknownStarColorIndex = Double.nan
 
     /// Indeks warna yang boleh **digambar**, mengingat keyakinan engine.
     ///
@@ -683,19 +712,20 @@ public struct CelestialVisual: Equatable, Sendable {
     /// badge, dan tidak ada teks di layar yang bisa membuktikan titik merah
     /// itu tidak diklaim.
     ///
-    /// Saat `isConfirmed == false` hasilnya adalah nilai yang **sudah** dipakai
-    /// untuk bintang yang tidak ada di katalog — bukan angka netral baru.
-    /// Bedanya penting: nilai baru masih bisa kebetulan berupa warna spektral
-    /// yang khas, sedangkan nilai ini sudah lama dianggap tidak mengklaim
-    /// apa pun. Yang tetap tampil saat ragu hanyalah **terang** (ukuran dari
-    /// magnitudo), dan terang bukan identitas: ia tidak menyebut bintang mana.
+    /// Saat `isConfirmed == false` hasilnya adalah `unknownStarColorIndex` —
+    /// indeks "tidak ada klaim" yang **di luar** rentang B−V, bukan `0`.
     ///
-    /// - Parameters:
-    ///   - colorIndexBV: indeks B−V bintang, dari `colorIndex(forStarID:)`.
-    ///   - isConfirmed: apakah engine sudah mengunci identitasnya.
+    /// **Kenapa bukan `0`, padahal `0` juga dipakai untuk bintang tak
+    /// dikenal.** Dulu memang begitu, dan itu bagian dari cacatnya: `0` adalah
+    /// B−V sah (A0 — warna Sirius dan Vega), jadi "ragu" dan "Sirius
+    /// terkonfirmasi" menghasilkan gambar yang sama. Mengganti nilainya
+    /// sekaligus di sini dan di `colorIndex(forStarID:)` menjaga sifat yang
+    /// memang benar — warna ragu == warna bintang tak dikenal — tanpa ikut
+    /// mewarisi klaim spektralnya. Yang tetap tampil saat ragu hanyalah
+    /// **terang** (ukuran dari magnitudo), dan terang bukan identitas.
     public static func drawableStarColorIndex(_ colorIndexBV: Double,
                                               isConfirmed: Bool) -> Double {
-        guard isConfirmed else { return colorIndex(forStarID: "") }
+        guard isConfirmed else { return Self.unknownStarColorIndex }
         return colorIndexBV
     }
 
@@ -733,7 +763,29 @@ public struct CelestialVisual: Equatable, Sendable {
         "polaris":     0.60    // F7 — putih kekuningan
     ]
 
+    /// Warna **"tidak ada klaim"** untuk bintang: abu-abu akromatik.
+    ///
+    /// Dipakai saat identitas belum dikunci (`drawableStarColorIndex`
+    /// mengembalikan `unknownStarColorIndex`) dan untuk bintang yang tidak ada
+    /// di tabel. R=G=B disengaja: nilai akromatik **tidak bisa** menjadi warna
+    /// spektral mana pun, jadi tidak ada bintang nyata yang bisa dikira
+    /// terlihat di situ. Sebelumnya jalur ini memakai B−V 0,00 — yang justru
+    /// adalah warna Sirius dan Vega (putih kebiruan), sehingga ketidaktahuan
+    /// dan identifikasi Sirius tampak sama persis.
+    ///
+    /// Terangnya dipilih **lebih rendah** dari bintang paling redup di
+    /// katalog **bukan** tujuannya di sini — ukuran titik tetap dari
+    /// magnitudo, dan yang berubah hanya warna. Nilainya diletakkan di tengah
+    /// rentang kanal `starRGB` supaya titik "tidak mengklaim" tidak tampak
+    /// menyala dibanding bintang sekitar.
+    public static let neutralStarBody = RGBComponents(red: 0.78, green: 0.78, blue: 0.78)
+
     /// RGB **siang** untuk sebuah indeks B−V, sebagai komponen mentah.
+    ///
+    /// Indeks `unknownStarColorIndex` (`NaN`) adalah kasus khusus dan
+    /// **ditangani lebih dulu**, sebelum penjepitan apa pun — karena
+    /// `min`/`max` meneruskan `NaN`, sehingga tanpa cabang ini seluruh
+    /// perhitungan di bawah akan menghasilkan `NaN` dan titiknya menghilang.
     ///
     /// Monokromatik: panjang gelombang "berat" = merah. B−V positif
     /// (Betelgeuse, Arcturus, Aldebaran) → hangat; negatif (Rigel, Alnitak,
@@ -753,6 +805,10 @@ public struct CelestialVisual: Equatable, Sendable {
     private static func unit(_ value: Double) -> Double { min(1, max(0, value)) }
 
 public static func starRGB(forColorIndex index: Double) -> RGBComponents {
+        // Sentinel "tidak ada klaim". Dicek dengan `isNaN`, bukan `==`,
+        // karena `NaN == NaN` selalu salah — perbandingan tidak akan pernah
+        // mengenalinya.
+        if index.isNaN { return neutralStarBody }
         let clamped = min(2.0, max(-0.5, index))
         // −0.35 … +1.35 → 0 … 1 (biru ke merah), lalu dingatkan sedikit di
         // ujung biru supaya Rigel tidak tampak ungu.

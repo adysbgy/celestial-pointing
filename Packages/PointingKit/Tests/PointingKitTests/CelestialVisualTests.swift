@@ -706,10 +706,26 @@ final class CelestialVisualTests: XCTestCase {
     }
 
     func testUnknownStarIsNeutralNotInvented() {
-        // Bintang tanpa entri warna harus putih netral: warna karangan
-        // mengklaim kelas spektral yang tidak diketahui.
-        XCTAssertEqual(CelestialVisual.colorIndex(forStarID: "bintang_tak_dikenal"), 0,
-                       accuracy: 1e-9)
+        // Bintang tanpa entri warna tidak boleh mengklaim kelas spektral
+        // apa pun. Dulu uji ini menegakkan nilai `0` sambil **menyebutnya**
+        // "putih netral" — dan itu keliru: `starRGB(0)` adalah putih
+        // kebiruan (kelas A, warna Sirius/Vega), bukan netral. Yang benar
+        // ditegakkan sekarang: sentinel-nya berada di luar rentang B−V, dan
+        // warnanya akromatik (R=G=B). Nama ujinya tetap sama karena maksudnya
+        // memang tidak berubah — yang berubah hanya nilainya, supaya maksud
+        // itu benar-benar tercapai.
+        let unknown = CelestialVisual.colorIndex(forStarID: "bintang_tak_dikenal")
+        // `XCTAssertEqual(unknown, unknownStarColorIndex)` tidak bisa dipakai:
+        // keduanya `NaN`, dan `NaN != NaN`. Yang benar-benar dinyatakan adalah
+        // "keduanya sentinel yang sama" — dicek lewat `isNaN` plus warnanya.
+        XCTAssertTrue(unknown.isNaN,
+                      "bintang tak dikenal harus memakai sentinel NaN, bukan indeks warna")
+        let neutral = CelestialVisual.starRGB(forColorIndex: unknown)
+        XCTAssertEqual(neutral, CelestialVisual.starRGB(
+            forColorIndex: CelestialVisual.unknownStarColorIndex))
+        XCTAssertEqual(neutral.red, neutral.green, accuracy: 1e-12)
+        XCTAssertEqual(neutral.green, neutral.blue, accuracy: 1e-12,
+                       "warna bintang tak dikenal harus akromatik, bukan kelas spektral")
     }
 
     func testEveryPlanetHasADistinctPalette() {
@@ -2842,15 +2858,23 @@ final class CelestialVisualTests: XCTestCase {
 
         // Saat ragu: **satu** warna untuk semua bintang, dan warna itu harus
         // netral — bukan warna salah satu kandidatnya.
-        let uncertainBetelgeuse =
-            CelestialVisual.drawableStarColorIndex(betelgeuse, isConfirmed: false)
-        let uncertainRigel =
-            CelestialVisual.drawableStarColorIndex(rigel, isConfirmed: false)
+        //
+        // Dibandingkan lewat **warnanya**, bukan lewat indeksnya. Indeks
+        // "tidak mengklaim" adalah `NaN`, dan `NaN != NaN`: membandingkan
+        // indeks akan selalu merah, dan `assertNotEqual` di bawah ikut
+        // menjadi tidak berarti karena `NaN` memang tak pernah sama dengan
+        // apa pun. Yang diuji di sini sebenarnya soal gambar — jadi yang
+        // dibandingkan memang warnanya.
+        let uncertainBetelgeuse = CelestialVisual.starRGB(forColorIndex:
+            CelestialVisual.drawableStarColorIndex(betelgeuse, isConfirmed: false))
+        let uncertainRigel = CelestialVisual.starRGB(forColorIndex:
+            CelestialVisual.drawableStarColorIndex(rigel, isConfirmed: false))
         XCTAssertEqual(uncertainBetelgeuse, uncertainRigel,
                        "dua bintang berbeda tidak boleh tetap berbeda saat ragu")
-        XCTAssertNotEqual(uncertainBetelgeuse, betelgeuse,
+        XCTAssertNotEqual(uncertainBetelgeuse,
+                          CelestialVisual.starRGB(forColorIndex: betelgeuse),
                           "warna Betelgeuse tidak boleh tetap tampil saat ragu")
-        XCTAssertNotEqual(uncertainRigel, rigel,
+        XCTAssertNotEqual(uncertainRigel, CelestialVisual.starRGB(forColorIndex: rigel),
                           "warna Rigel tidak boleh tetap tampil saat ragu")
     }
 
@@ -2863,11 +2887,76 @@ final class CelestialVisualTests: XCTestCase {
     /// yang sama persis — dan bintang tak dikenal sudah lama dianggap tidak
     /// mengklaim apa pun.
     func testUncertainStarColourMatchesTheUnknownStarColour() {
+        // Dibandingkan lewat **warnanya**, bukan lewat indeksnya: sentinel
+        // "tidak mengklaim" adalah `NaN`, dan `NaN != NaN` — membandingkan
+        // indeks akan selalu merah walaupun keduanya memang jalur yang sama.
+        // Yang sebenarnya penting bagi pengguna juga warna, bukan angka.
         let unknown = CelestialVisual.colorIndex(forStarID: "bintang-yang-tidak-ada")
         XCTAssertEqual(
-            CelestialVisual.drawableStarColorIndex(1.85, isConfirmed: false),
-            unknown,
+            CelestialVisual.starRGB(forColorIndex:
+                CelestialVisual.drawableStarColorIndex(1.85, isConfirmed: false)),
+            CelestialVisual.starRGB(forColorIndex: unknown),
             "warna saat ragu harus sama dengan warna bintang tak dikenal")
+    }
+
+    /// Warna "tidak mengklaim" harus benar-benar **akromatik**.
+    ///
+    /// **Cacat yang ditutup uji ini.** Nama uji di atas, dan docstring
+    /// `colorIndex(forStarID:)`, keduanya menyebut nilai sentinel itu "putih
+    /// netral" — dan itulah satu-satunya alasan ia dianggap tidak mengklaim
+    /// apa pun. Diukur, ternyata bukan. Sentinel itu **indeks B−V 0,00**, dan
+    /// `starRGB(0,00)` menghasilkan (0,693, 0,742, 0,846): R−B = −0,153, yaitu
+    /// **putih kebiruan**, kelas spektral A. Itu bukan warna netral — itu
+    /// warna **Sirius** dan **Vega**, yang kebetulan juga B−V 0,00.
+    ///
+    /// Akibatnya terukur pula di piksel: bintang yang **dikonfirmasi sebagai
+    /// Sirius** dan bintang yang **tidak dikenal** menghasilkan gambar yang
+    /// identik piksel demi piksel. Jadi seluruh jalur `drawableStarColorIndex`
+    /// tidak mencapai tujuannya untuk tepat dua bintang di katalog — dan
+    /// uji-uji di atas tidak bisa melihatnya, karena yang diukur "apakah
+    /// keduanya **sama**", bukan "apakah nilainya **tidak mengklaim**".
+    ///
+    /// Yang ditegakkan di sini: warna netral harus punya kanal R=G=B. Nilai
+    /// yang akromatik **tidak bisa** menjadi warna spektral mana pun, jadi ia
+    /// tidak bisa kebetulan menunjuk bintang.
+    func testNeutralStarColourIsActuallyAchromatic() {
+        let neutral = CelestialVisual.starRGB(
+            forColorIndex: CelestialVisual.unknownStarColorIndex)
+        XCTAssertEqual(neutral.red, neutral.green, accuracy: 1e-12,
+                       "warna tidak mengklaim harus R=G=B; kanal yang berbeda berarti ada hue")
+        XCTAssertEqual(neutral.green, neutral.blue, accuracy: 1e-12,
+                       "warna tidak mengklaim harus R=G=B; kanal yang berbeda berarti ada hue")
+
+        // Dan sentinel-nya tidak boleh berada di rentang B−V yang sah untuk
+        // bintang mana pun: kalau ia sah, `starRGB` biasa akan menghasilkannya
+        // untuk bintang nyata, dan "netral" kembali berarti kelas spektral.
+        XCTAssertTrue(CelestialVisual.unknownStarColorIndex.isNaN
+                      || CelestialVisual.unknownStarColorIndex < -0.5
+                      || CelestialVisual.unknownStarColorIndex > 2.0,
+                      "sentinel harus di luar rentang B−V yang dikenali starRGB "
+                      + "(saat ini \(CelestialVisual.unknownStarColorIndex))")
+    }
+
+    /// Bintang yang **dikonfirmasi** tidak boleh tampil sama dengan bintang
+    /// yang **tidak dikenal**.
+    ///
+    /// Ini sisi sebaliknya dari uji di atas, dan bagian yang benar-benar
+    /// penting bagi pengguna: identifikasi yang dikunci harus punya gambar
+    /// yang berbeda dari ketidaktahuan. Dijaga untuk **setiap** bintang di
+    /// katalog, bukan hanya yang warna ekstrem — karena cacat aslinya tepat
+    /// pada dua bintang yang warnanya kebetulan sama dengan sentinel.
+    func testNoConfirmedCatalogueStarLooksLikeAnUnknownStar() {
+        let unknownColour = CelestialVisual.starRGB(
+            forColorIndex: CelestialVisual.unknownStarColorIndex)
+        for star in CelestialEngine.Catalogue.brightStars {
+            let index = CelestialVisual.colorIndex(forStarID: star.id)
+            let drawn = CelestialVisual.starRGB(
+                forColorIndex: CelestialVisual.drawableStarColorIndex(index,
+                                                                     isConfirmed: true))
+            XCTAssertNotEqual(drawn, unknownColour,
+                              "bintang terkonfirmasi \(star.id) tampil persis seperti "
+                              + "bintang tak dikenal — identitasnya tidak terlihat")
+        }
     }
 
     /// Pengumuman warna bintang juga tidak boleh mengklaim saat engine ragu.

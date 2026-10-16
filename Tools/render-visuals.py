@@ -101,6 +101,16 @@ NEUTRAL_SHADOW = (0.28, 0.27, 0.26)
 # (`Palette.drawable(isConfirmed:)`). Yang kedua baru: warna planet adalah ciri
 # pengenal, jadi ia harus hilang saat engine belum mengunci identitasnya.
 
+# Warna bintang "tidak mengklaim" — `CelestialVisual.neutralStarBody`.
+# Akromatik (R=G=B), jadi tidak bisa menjadi warna spektral mana pun. Dulu
+# jalur ini memakai B−V 0,00, yang justru putih kebiruan (kelas A — warna
+# Sirius dan Vega), sehingga "tidak dikenal" dan "Sirius terkonfirmasi"
+# menghasilkan gambar yang identik piksel demi piksel.
+NEUTRAL_STAR_BODY = (0.78, 0.78, 0.78)
+# `CelestialVisual.unknownStarColorIndex` — di luar rentang B−V supaya tidak
+# ada bintang nyata yang bisa menghasilkannya.
+UNKNOWN_STAR_COLOR_INDEX = float("nan")
+
 # `CelestialVisual.accents` — satu konstanta di paket, disalin apa adanya.
 ACCENTS = dict(
     jupiterBandCream=(0.90, 0.83, 0.72),
@@ -186,7 +196,9 @@ def unit(v):
 
 
 def star_rgb(index):
-    """`CelestialVisual.starRGB(forColorIndex:)`."""
+    """`CelestialVisual.starRGB(forColorIndex:)` — abu netral untuk sentinel."""
+    if math.isnan(index):
+        return NEUTRAL_STAR_BODY
     clamped = min(2.0, max(-0.5, index))
     warmth = (clamped + 0.35) / 1.70
     return (unit(0.62 + 0.38 * warmth),
@@ -2044,11 +2056,12 @@ def drawable_star_color_index(color_index, is_confirmed):
 
     Warna spektral bintang adalah ciri pengenal (biru Rigel vs merah
     Betelgeuse), jadi saat engine ragu ia tidak boleh tampil. Nilai "tidak
-    mengklaim" adalah indeks bintang yang tidak ada di tabel — sama dengan
-    yang sudah dipakai `colorIndex(forStarID:)` untuk id tak dikenal.
+    mengklaim" adalah `UNKNOWN_STAR_COLOR_INDEX` — di luar rentang B−V,
+    sehingga tidak ada bintang nyata yang bisa menghasilkannya. Dulu nilai
+    itu B−V 0,00, yang justru warna Sirius dan Vega.
     """
     if not is_confirmed:
-        return STAR_COLOR_INDEX.get("", 0.0)
+        return UNKNOWN_STAR_COLOR_INDEX
     return color_index
 
 
@@ -2489,7 +2502,7 @@ def build_cases():
     cases.append(VisualCase(
         "star-unknown-id",
         "bintang yang tidak ada di katalog — warna netral, tidak mengklaim",
-        "star", color_index=STAR_COLOR_INDEX.get("", 0.0),
+        "star", color_index=UNKNOWN_STAR_COLOR_INDEX,
         relative_size=size_from_magnitude(0.0), is_confirmed=True))
 
     # ── Matahari ──────────────────────────────────────────────────────

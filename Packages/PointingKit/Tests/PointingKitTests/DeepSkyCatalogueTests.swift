@@ -231,8 +231,11 @@ final class DeepSkyCatalogueTests: XCTestCase {
     ///
     /// Nol berarti "titik": nebula yang tidak dikenal akan digambar seperti
     /// bintang. Nilai tengah tidak mengklaim bentuk tertentu — sama dengan
-    /// `colorIndex(forStarID:)` yang mengembalikan 0 (putih netral) untuk
-    /// bintang yang tidak dikenal, bukan warna karangan.
+    /// `colorIndex(forStarID:)` yang mengembalikan indeks "tidak mengklaim"
+    /// (di luar rentang B−V, sehingga tidak ada bintang nyata yang bisa
+    /// menghasilkannya) untuk bintang yang tidak dikenal, bukan warna
+    /// karangan. Dulu komentar ini menyebut nilainya "0 (putih netral)";
+    /// itu keliru — `starRGB(0)` justru putih kebiruan, warna Sirius.
     func testUnknownIDFallsBackToNeutralNotPoint() {
         let fallback = DeepSkyCatalogue.fuzziness(forObjectID: "tidak-ada")
         XCTAssertGreaterThan(fallback, 0,
