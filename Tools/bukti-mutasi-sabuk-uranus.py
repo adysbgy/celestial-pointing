@@ -157,10 +157,16 @@ BATAS = "model→port: batas (pengakuan ke fungsi tak terpetakan)"
 #: gerbangnya berhenti melaporkannya, bukan lulus.
 FULL = [
     # Ciri pengenal planet: kata yang sama di kedua sisi.
+    # Uranus dan Neptunus ikut di sini sejak keduanya masuk katalog: gerbang
+    # membandingkan naman ciri mereka juga, dan himpunan di bawah dituntut
+    # **persis** — tanpa dua entri ini seluruh keadaan 1-7 merah dengan
+    # "hasil tak terduga", bukti yang berbunyi pada keadaan yang benar.
     "model→port: ciri jupiter sama",
     "model→port: ciri mars sama",
     "model→port: ciri mercury sama",
+    "model→port: ciri neptune sama",
     "model→port: ciri saturn sama",
+    "model→port: ciri uranus sama",
     "model→port: ciri venus sama",
     # Bentuk `static let … : Double` di model.
     URANUS_OPACITY,
@@ -181,7 +187,7 @@ FULL = [
     BATAS,
 ]
 FULL = sorted(set(FULL))
-assert len(FULL) == 21, f"21 pemeriksaan, terukur {len(FULL)}"
+assert len(FULL) == 23, f"23 pemeriksaan, terukur {len(FULL)}"
 
 #: Nama hasil untuk pengakuan yang namanya hilang dari model. Dibentuk dari
 #: nama tokennya, jadi keadaan 7 memerahkan ketiga token sabuk Uranus —

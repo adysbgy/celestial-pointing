@@ -1214,6 +1214,8 @@ def check_features_survive_the_watch_size(results, ss=8):
 #:     kutub Mars                   126 / 126 = 1.000
 #:     kawah Merkurius               51 /  57 = 0.895
 #:     kabut Venus                  177 / 178 = 0.994
+#:     sabuk samar Uranus           100 /  99 = 1.010
+#:     bintik gelap Neptunus         36 /  37 = 0.973
 #:
 #: Terlemah 0.895, jadi 0.70 menyisakan margin ~1.28x dan tidak menyentuh kode
 #: yang benar. Nilainya sengaja **tidak** duduk di 0.89 (persis angka terukur)
@@ -1239,11 +1241,11 @@ def check_features_survive_the_watch_size_in_night_mode(results, ss=8):
     `check_night_mode_never_exceeds_day` menjaga terang tidak naik. Keduanya
     menjaga **palet**, bukan **keterbacaan**: tidak ada satu pun yang menuntut
     ciri pengenal masih terbaca setelah warna dibuang. Terukur dari sumber:
-    dari lima gerbang ciri planet, hanya `check_jupiter_spot_reads_on_the_watch`
+    dari tujuh gerbang ciri planet, hanya `check_jupiter_spot_reads_on_the_watch`
     yang pernah merender mode malam — dan itu justru ciri yang sudah pernah
     punya cacatnya sendiri (Bintik Merah Besar lebih terang dari pitanya di
-    mode malam). Empat sisanya — cincin Saturnus, kutub Mars, kawah Merkurius,
-    kabut Venus — **nol kali**.
+    mode malam). Enam sisanya — cincin Saturnus, kutub Mars, kawah Merkurius,
+    kabut Venus, sabuk Uranus, bintik Neptunus — **nol kali**.
 
     Ini kelas cacat yang sudah dibayar repo ini: ciri yang "ada" tetapi tidak
     "terbaca". Gerbang yang menuntut `diff > 0` menjawab pertanyaan yang salah;
@@ -6571,7 +6573,7 @@ def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
     `ss=2`:
 
         ukuran    margin 0    cacat (margin 0,02)
-        200 px    14          1533
+        200 px    0           1533
         76 px     6           232
 
     Tanpa margin, kode yang benar **tetap** menghasilkan piksel di dalam —

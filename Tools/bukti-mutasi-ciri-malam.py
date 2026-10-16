@@ -26,13 +26,14 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
 
   [baseline]                      gerbang hijau (kalau tidak, harness salah)
 
-  1. peta warna malam diratakan   Cacat aslinya: seluruh terang malam dijadikan
+  [1. peta warna malam diratakan   Cacat aslinya: seluruh terang malam dijadikan
      (satu terang untuk semua)    satu angka, sehingga tidak ada beda terang
                                   yang tersisa untuk menggambar ciri apa pun.
-                                  Terukur: kawah Merkurius dan kabut Venus
-                                  menjadi **0 piksel** — cirinya tidak tergambar
-                                  sama sekali, sementara bola planetnya tetap
-                                  ada. Empat dari lima ciri merah.
+                                  Terukur: kawah Merkurius, kabut Venus, sabuk
+                                  Uranus, dan bintik Neptunus menjadi **0
+                                  piksel** — cirinya tidak tergambar sama
+                                  sekali, sementara bola planetnya tetap
+                                  ada. Enam dari tujuh ciri merah.
 
   2. lantai malam dinaikkan       Kontrol **arah berlawanan**: mode malam yang
      (ciri tenggelam ke latar)   dinaikkan sampai ciri tenggelam ke latar
@@ -135,7 +136,14 @@ def main():
     # `expect_night=None` berarti "harus merah", tanpa mematok berapa banyak:
     # yang penting gerbangnya berbunyi, bukan jumlah persisnya.
     add("[baseline]", baseline, 0, 0)
-    add("1. peta warna malam diratakan (semua terang sama)", flat_surface, 4, 0)
+    # **Kenapa 6, bukan 4.** Harapan aslinya ditulis saat katalog punya lima
+    # ciri planet. Sejak Uranus dan Neptunus masuk (sabuk samar dan bintik
+    # gelap), gerbang ini mengukur **tujuh** ciri, dan meratakan peta warna
+    # malam memerahkan enam dari tujuh — yang luput hanya cincin Saturnus
+    # (nisbah 0.987, di atas lantai 0.70). Angka ini **diukur ulang**, bukan
+    # diturunkan dari docstring: kalau nanti planet kelapan masuk, keadaan ini
+    # merah lagi, dan itu memang yang seharusnya terjadi.
+    add("1. peta warna malam diratakan (semua terang sama)", flat_surface, 6, 0)
     add("2. lantai malam dinaikkan (ciri tenggelam ke latar)", floor_raised, None, 0)
     add("3. gerbang siang pada cacat yang SAMA (bukti tak mubazir)", both_flat, None, 0)
     # Buta yang dinyatakan, bukan disembunyikan. Meratakan **hanya** bayangan
