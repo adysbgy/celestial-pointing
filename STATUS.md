@@ -100,6 +100,29 @@ akan menjadi daftar tangan yang tak bisa diperiksa siapa pun.
   jangkarnya masih ada, gerbang menjawab "bersih". Kelas ini sudah dicatat di
   siklus sebelumnya dan **tidak** ditutup di sini; menutupnya menuntut kriteria
   yang berbeda (mis. hitung kemunculan), bukan pembaca bentuk yang lebih luas.
+  **Dua kriteria pengganti sudah diukur dan keduanya ditolak karena berbunyi
+  palsu pada pohon bersih:**
+  - *Delta* (pengganti − jangkar): 6 dari 17 pasangan sisipan deltanya sudah
+    ada di kode bersih (`'case uranus\n'` ada di baris 47; `' ** 2'` di
+    `render-visuals.py`) → akan melaporkan kebocoran palsu.
+  - *Kehadiran pengganti utuh*: 3 dari 17 sudah ada di pohon bersih — dan itu
+    memang berkas yang sama, `CelestialVisual.swift:46-47` memuat
+    `case saturn\n        case uranus\n` persis. Kriteria kehadiran mustahil
+    di sini.
+  - *Hitungan kemunculan* menutup 9 dari 12 yang terukur, tetapi 3 sisanya
+    **terbukti tak terlihat**: jumlah teks penggantinya di pohon bersih sudah
+    sama dengan di pohon termutasi (1 → 1), karena delta-nya sudah berdiri
+    tepat di sebelah jangkarnya. Itu batas **teks**, bukan batas pembaca —
+    disebut, bukan disembunyikan.
+  - **Yang menahannya bukan gerbang ini, melainkan kompilator** — dan itu
+    **diukur**, bukan diasumsikan: mutasi `case uranus` ganda di
+    `CelestialVisual.Planet` dijalankan atas `Packages/PointingKit` yang
+    sungguhan (`swift build`, Docker Swift 6.0) dan gagal dengan
+    `error: raw value for enum case is not unique` +
+    `error: invalid redeclaration of 'uranus'`. Itu **error**, bukan
+    peringatan, jadi `swift build` sendiri yang menghentikannya — jauh sebelum
+    langkah `Gerbang peringatan (kode sendiri)` di `ios-build.yml` sempat
+    membaca lognya.
 - **Deklarasi `JANGKAR_KECUALI` tidak membuktikan alasannya benar.** Gerbang
   hanya memeriksa bahwa alasannya ada, berupa literal, dan cukup panjang untuk
   dinilai. Harness yang menulis alasan masuk akal padahal jangkarnya sebenarnya
