@@ -75,6 +75,49 @@ def _git(args):
                           capture_output=True, text=True)
 
 
+def git_show(ref, path, min_bytes=1000):
+    """Isi `path` pada `ref`, atau **berhenti keras** kalau tidak terbaca.
+
+    Dipakai harness yang butuh "versi sebelum perbaikan" untuk arah kedua
+    (membuktikan cacatnya dulu lolos). Kenapa tidak boleh mengembalikan
+    string kosong: skrip kosong yang dijalankan sebagai "versi lama"
+    menemukan **nol** temuan, yaitu hijau — jadi kegagalan membaca akan lulus
+    **persis** pada keadaan-keadaan yang seharusnya membuktikan cacatnya, dan
+    harness melaporkan "SEMUA SESUAI" atas nol pembuktian. Gerbang yang
+    gagal-terbuka lebih buruk daripada tidak ada gerbang.
+
+    Kenapa lewat `_git` dan bukan `subprocess` langsung: tanpa
+    `-c safe.directory` git **menolak** repo yang pemiliknya berbeda dari
+    pengguna yang menjalankannya — persis keadaan job CI (checkout sebagai
+    uid lain, langkah berjalan sebagai root). Penolakan itu keluar non-nol,
+    dan pemanggil yang hanya membaca `p.stdout` menerima string kosong tanpa
+    tahu ada yang salah. Terukur: `bukti-mutasi-label-bawaan.py` gagal di CI
+    dengan gejala yang **berbeda** dari kegagalannya di mesin pengembang,
+    justru karena perbedaan ini.
+
+    `min_bytes` memisahkan "ref-nya salah menunjuk" dari "isi sah": berkas
+    yang ditambat di sini berukuran ratusan ribu karakter, jadi pembacaan di
+    bawah ambang berarti ref-nya tidak memuat berkas itu — dan itu juga
+    berhenti, bukan diam.
+
+    Catatan lingkungan: `git show <sha>` hanya bekerja bila riwayatnya ada.
+    `actions/checkout` bawaan mengambil **satu** commit, dan pada kedalaman
+    itu penambat commit gagal terbaca; alur kerja karena itu memakai
+    `fetch-depth: 0`.
+    """
+    proc = _git(["show", f"{ref}:{path}"])
+    text = proc.stdout
+    if proc.returncode != 0 or len(text) < min_bytes:
+        raise SystemExit(
+            f"GAGAL: tidak bisa membaca `{ref}:{path}` "
+            f"(exit {proc.returncode}, {len(text)} karakter, "
+            f"butuh >= {min_bytes}). {proc.stderr.strip()}\n"
+            "        Harness yang butuh versi pra-perbaikan tidak boleh "
+            "jalan tanpa itu: skrip kosong akan dilaporkan hijau, dan "
+            "arah kedua berhenti membuktikan apa pun.")
+    return text
+
+
 def require_clean_sources(paths):
     """Hentikan harness kalau berkas produksi yang akan dimutasi sudah kotor.
 

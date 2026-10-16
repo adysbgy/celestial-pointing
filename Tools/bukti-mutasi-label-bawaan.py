@@ -170,13 +170,49 @@ def fired(out: str) -> bool:
 
 
 def old_lint() -> str:
-    """Versi `origin/main`, untuk arah "cacat ini dulu lolos"."""
-    p = subprocess.run(["git", "show", "origin/main:swift-ui-lint.sh"],
-                       cwd=ROOT, capture_output=True, text=True)
-    if p.returncode != 0:
-        p = subprocess.run(["git", "show", "HEAD:swift-ui-lint.sh"],
-                           cwd=ROOT, capture_output=True, text=True)
-    return p.stdout
+    """Versi **sebelum** perbaikan ini, untuk arah "cacat ini dulu lolos".
+
+    **Kenapa `origin/main` tidak bisa dipakai, dan ini cacat yang nyata.**
+    Versi pertama membaca `origin/main:swift-ui-lint.sh`. Itu benar **hanya**
+    selama perbaikan ini belum ter-push: begitu commit perbaikan sampai ke
+    `main`, `origin/main` **berisi perbaikan ini sendiri**, sehingga arah
+    "versi lama" membandingkan perbaikan dengan dirinya sendiri. Terukur di
+    worktree atas `main`: keadaan 1 dan 2 gagal dengan "versi origin/main
+    SUDAH merah" — bukan karena cacatnya bukan milik perbaikan ini,
+    melainkan karena yang dibaca adalah versi **baru**.
+
+    Karena itu versi lama ditambatkan ke **commit induk** perbaikan ini
+    (`a9cd5e3`), bukan `origin/main`: penambat yang mengikuti cabang berhenti
+    mengukur tepat pada commit yang memperkenalkan perbaikan.
+
+    **Kenapa lewat `mutasi_sumber.git_show`, bukan `subprocess` langsung.**
+    Dua cacat berbeda bersembunyi di bentuk lamanya, dan masing-masing
+    menutupi yang lain — itulah kenapa `main` sempat merah lama:
+
+      * di **mesin pengembang** `git show` berhasil, tetapi `origin/main`
+        sudah memuat perbaikannya → gejala "versi lama SUDAH merah";
+      * di **CI** repo di-checkout sebagai uid lain sementara langkah
+        berjalan sebagai root, jadi `git` menolak repo (dubious ownership),
+        `p.stdout` kosong, dan "versi lama" menjadi **skrip kosong** — nol
+        temuan, yaitu hijau. Gejalanya lalu "versi lama punya hijau", yang
+        menuduh perbaikan ini merusak arah lama padahal yang rusak adalah
+        pembacaannya.
+
+    `git_show` menutup keduanya: ia memakai `safe.directory` dan berhenti
+    keras kalau isinya kosong, jadi kegagalan membaca tidak pernah lagi
+    dilaporkan sebagai bukti.
+    """
+    # Induk commit perbaikan Aturan 28 — versi yang masih memakai
+    # `if not ddef and gl != dl`.
+    OLD_REF = "a9cd5e3cd5f466f6aac95c5140b0111b1a4c2fac"
+    text = mutasi_sumber.git_show(OLD_REF, "swift-ui-lint.sh")
+    if "not ddef and gl != dl" not in text:
+        raise SystemExit(
+            f"GAGAL: `{OLD_REF}` tidak memuat bentuk lama "
+            "`not ddef and gl != dl` — penambat versi lama salah menunjuk. "
+            "Arah kedua akan membandingkan perbaikan dengan dirinya sendiri "
+            "dan tidak membuktikan apa pun.")
+    return text
 
 
 CASES = [
@@ -239,11 +275,11 @@ def main() -> int:
                 old_red = fired(out_old)
                 if must_pass_old and old_red:
                     failures.append(
-                        f"  {name}: versi origin/main SUDAH merah — cacatnya "
+                        f"  {name}: versi pra-perbaikan SUDAH merah — cacatnya "
                         f"bukan yang ditutup perbaikan ini")
                 elif not must_pass_old and not old_red:
                     failures.append(
-                        f"  {name}: versi origin/main punya hijau padahal "
+                        f"  {name}: versi pra-perbaikan punya hijau padahal "
                         f"arah ini sudah dijaga sebelum siklus ini — "
                         f"perbaikan ini merusaknya")
                 print(f"  {name}")

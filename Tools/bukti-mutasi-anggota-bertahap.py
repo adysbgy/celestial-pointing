@@ -217,16 +217,7 @@ def old_lint() -> str:
     """
     # Induk commit perbaikan Aturan 26 — versi yang masih memakai `PAIR`.
     OLD_REF = "513eeff68648e5d786970d69263e27f043c72cd0"
-    p = subprocess.run(["git", "show", f"{OLD_REF}:swift-ui-lint.sh"],
-                       cwd=ROOT, capture_output=True, text=True)
-    text = p.stdout
-    if p.returncode != 0 or len(text) < 1000:
-        raise SystemExit(
-            f"GAGAL: tidak bisa membaca `{OLD_REF}:swift-ui-lint.sh` "
-            f"(returncode={p.returncode}, {len(text)} karakter). "
-            "Harness ini menuntut versi pra-perbaikan untuk arah kedua; "
-            "menjalankannya tanpa itu akan melaporkan 'SEMUA SESUAI' atas "
-            "nol pembuktian.")
+    text = mutasi_sumber.git_show(OLD_REF, "swift-ui-lint.sh")
     if "DEEP = re.compile" in text:
         raise SystemExit(
             f"GAGAL: `{OLD_REF}` sudah memuat `DEEP` — penambat versi lama "
@@ -294,12 +285,12 @@ def main() -> int:
                 old_red = fired(out_old)
                 if old_must_red and not old_red:
                     failures.append(
-                        f"  {name}: versi origin/main hijau padahal arah ini "
+                        f"  {name}: versi pra-perbaikan hijau padahal arah ini "
                         f"sudah dijaga sebelum siklus ini — perbaikan ini "
                         f"merusak arah lama")
                 elif old_must_red is False and old_red:
                     failures.append(
-                        f"  {name}: versi origin/main SUDAH merah — cacatnya "
+                        f"  {name}: versi pra-perbaikan SUDAH merah — cacatnya "
                         f"bukan yang ditutup perbaikan ini")
                 print(f"  {name}")
                 print(f"      baru: {'MERAH' if got else 'hijau'} (sesuai)   "

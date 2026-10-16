@@ -6,7 +6,27 @@ jobs:
     container:
       image: swift:6.0
     steps:
+      # `fetch-depth: 0`, bukan bawaan `1`.
+      #
+      # Dua harness (`bukti-mutasi-label-bawaan.py`,
+      # `bukti-mutasi-anggota-bertahap.py`) membuktikan arah kedua: cacat yang
+      # ditutup sebuah perbaikan **dulu lolos**. Itu butuh `swift-ui-lint.sh`
+      # versi **sebelum** perbaikan, yang ditambat ke commit induk perbaikan.
+      #
+      # Terukur: pada `fetch-depth: 1` hanya `HEAD` dan `origin/main` yang
+      # terbaca; `git show <sha-induk>` gagal, dan kegagalan itu membuat
+      # "versi lama" menjadi **skrip kosong** — nol temuan, yaitu hijau.
+      # Arah kedua lalu lulus persis pada keadaan yang seharusnya
+      # membuktikannya, dan harness melaporkan "SEMUA SESUAI" atas nol
+      # pembuktian. Riwayat penuh harganya kecil (klon penuh repo ini ~4 MB)
+      # dibanding gerbang yang berhenti mengukur tanpa suara.
+      #
+      # Penambat `origin/main` **bukan** pengganti yang sah: ia mengikuti
+      # cabang, jadi ia berhenti mengukur tepat pada commit yang
+      # memperkenalkan perbaikan (dan memang begitu `main` sempat merah).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # `swift:6.0` (Ubuntu 24.04) **tidak memuat Python**. Sebelas aturan di
       # `swift-ui-lint.sh` dijalankan lewat `python3 - <<'PY'`; tanpanya
@@ -1039,6 +1059,43 @@ jobs:
       # Gerbangnya sekarang memperlakukan cakupan nol sebagai kegagalan.
       - name: Buktikan gerbang jangkar harness berbunyi
         run: python3 Tools/bukti-mutasi-jangkar-harness.py
+
+      # Penambat "versi lama" harness harus eksplisit dan gagal-tertutup.
+      #
+      # Dua harness membuktikan **arah kedua** (cacat yang ditutup sebuah
+      # perbaikan dulu lolos), dan itu butuh `swift-ui-lint.sh` versi
+      # **sebelum** perbaikan. Membacanya punya dua cara yang tampak benar dan
+      # keduanya berhenti mengukur **tanpa suara**:
+      #
+      #   1. `git show origin/main:<berkas>` — penambat yang mengikuti cabang.
+      #      Benar hanya selama perbaikannya belum ter-push; begitu sampai ke
+      #      `main`, `origin/main` memuat perbaikan itu sendiri, dan arah
+      #      kedua membandingkan perbaikan dengan dirinya sendiri.
+      #   2. `subprocess.run(["git", "show", ...])` tanpa `-c safe.directory=`.
+      #      Di job ini berkas di-checkout sebagai uid lain sementara langkah
+      #      berjalan sebagai root, jadi git menolak repo (dubious ownership)
+      #      dan hasilnya **kosong**. Skrip kosong sebagai "versi lama"
+      #      menemukan nol temuan — yaitu hijau.
+      #
+      # Keduanya saling menutupi: di mesin pengembang yang berbunyi gejala (1),
+      # di CI gejala (2). Karena itu yang dijaga di sini **bentuk
+      # pembacaannya**: versi lama wajib lewat `mutasi_sumber.git_show` dengan
+      # penambat commit SHA penuh. Terukur di kontainer: pembacaan tanpa
+      # `safe.directory` mengembalikan 0 karakter dari 228.017.
+      #
+      # `fetch-depth: 0` di atas adalah syaratnya: `git show <sha-induk>`
+      # tidak terbaca pada checkout satu-commit.
+      - name: Gerbang penambat versi lama (gagal-tertutup)
+        run: python3 Tools/check-anchor-versi-lama.py
+
+      # Dan bukti bahwa gerbang penambat di atas berbunyi: kedua bentuk cacat
+      # itu ditanamkan ke salinan pohon (wajib merah **dan menyebut
+      # berkasnya**), sementara pohon utuh wajib hijau — gerbang yang memerah
+      # pada kode benar akan dimatikan orang. Keadaan terakhir melumpuhkan
+      # pola globnya: gerbang yang tidak menemukan berkas apa pun mencetak
+      # "OK: 0 harness" dan keluar 0, jadi cakupan nol harus jadi kegagalan.
+      - name: Buktikan gerbang penambat versi lama berbunyi
+        run: python3 Tools/bukti-mutasi-anchor-versi-lama.py
 
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
