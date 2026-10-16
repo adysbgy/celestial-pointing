@@ -122,15 +122,22 @@ MOON_RA = "raDeg: 218.0, decDeg: -19.0"
 MOON_RA_NEW = "raDeg: 218.7, decDeg: -18.4"
 
 # ── Jangkar: fixture uji (kontrol kecukupan) ─────────────────────────────
-#: Penjaga "Bulan harus benar-benar tinggi" di dalam uji itu. Kalau fixture
-#: pindah ke Bulan rendah, penjaga inilah satu-satunya yang berbunyi.
-FIXTURE_GUARD = """        XCTAssertGreaterThan(fromEphemeris.altitudeDeg, 30,
-                             "fixture harus Bulan di atas 30°")
-"""
-FIXTURE_LOW = """        XCTAssertGreaterThan(fromEphemeris.altitudeDeg, 88,
-                             "fixture harus Bulan di atas 30°")
-"""
-#: Keadaan 3: fixture dipaku ke waktu lain, sehingga Bulan tidak lagi tinggi.
+#: Keadaan 3: fixture dipindah ke **siang hari**, sehingga Bulan tidak lagi
+#: boleh menjadi "fixture malam" dan penjaga 30° di uji itu berbunyi.
+#:
+#: **Kenapa bukan `epoch`.** Dugaan pertama untuk keadaan ini adalah memakai
+#: `epoch.addingTimeInterval(0)` — dan itu **terukur tidak mengubah apa pun**:
+#: `epoch` (15 Jan 2026 12:00 WIB) justru **adalah** jam malam pertama yang
+#: ditemukan `moonNightFixture()`, jadi "memindahkan" fixture ke sana adalah
+#: tidak memindahkannya sama sekali. Keadaan yang tidak mengubah berkas tidak
+#: membuktikan apa pun, sekalipun ia hijau.
+#:
+#: **Kenapa bukan mengganti penjaganya** (`30` → `88`, jangkar `FIXTURE_GUARD`).
+#: Itu juga terukur hijau: `moonNightFixture()` mencari dalam 120 hari, dan
+#: Bulan memang melewati 88° pada malam berikutnya (hari ke-4: 72,5°, dan
+#: terus naik). Fixture-nya sendiri baik; yang perlu dibuktikan adalah bahwa
+#: uji itu **bergantung pada fixture yang baik**, bukan bahwa angkanya bisa
+#: dinaikkan sampai tidak ada yang memenuhinya.
 #:
 #: Jangkar menyertakan komentar di atasnya supaya ia **tidak ambigu**:
 #: `let when = try XCTUnwrap(moonNightFixture(),` muncul dua kali di berkas
@@ -143,8 +150,8 @@ NIGHT_SCAN = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Ka
 
 NIGHT_SCAN_LOW = """        // Prasyarat fixture: Bulan tinggi saat langit gelap. Kalau tidak ada,
         // tes ini tidak menguji apa pun dan harus gagal keras.
-        let when = try XCTUnwrap(epoch.addingTimeInterval(0),
-                                 "tidak ada saat Bulan di atas 30° saat malam dalam 120 hari")"""
+        let when = try XCTUnwrap(moonDaytimeFixture(),
+                                 "tidak ada saat Bulan di atas 30° saat siang dalam 120 hari")"""
 
 PROBE = r"""
 import os, subprocess, sys
@@ -227,10 +234,10 @@ STATES = [
 
     # Kontrol kecukupan fixture: kalau Bulan tidak lagi tinggi di fixture,
     # penjaga 30° di uji itu satu-satunya yang melihatnya.
-    ("3. uji: fixture Bulan tidak lagi tinggi (penjaga fixture)",
+    ("3. uji: fixture siang dipakai seolah malam (penjaga fixture)",
      [(TESTS, NIGHT_SCAN, NIGHT_SCAN_LOW)],
      {CASE: "failed"},
-     "penjaga 'fixture harus Bulan di atas 30°' berbunyi"),
+     "penjaga 'Bulan di atas 30°' berbunyi saat fixture siang dipakai"),
 ]
 
 
