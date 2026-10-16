@@ -1,3 +1,105 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: saklar identitas yang tidak diawasi siapa pun)
+
+### Mengapa siklus ini tidak menambah fitur
+
+Brief meminta poles UI/UX + perluas katalog visual. Dibuka dengan `git log` +
+`gh run` seperti biasa: `main` **hijau** (Apple Build success pada `f35558c`),
+katalog baru saja bertambah M41/M81/M15, dan seluruh BAGIAN 1–4 serta FASE
+A/B/C sudah terwujud. Jadi tidak ada yang menahan pekerjaan baru, dan
+menambahkan fitur di atas premis yang sudah penuh tidak menambah nilai.
+
+Yang dikerjakan adalah pertanyaan yang tersisa setelah premisnya diverifikasi:
+**apa yang memutuskan apakah gambar boleh mengklaim identitas, dan siapa yang
+mengawasinya?**
+
+### Cacat yang diangkat: `confirmsDisplayedIdentity` buta pada seluruh gerbang
+
+Jawaban pertama: `Apps/Shared/PointingEngine.swift:498`. Satu properti, dan
+ia adalah saklar tunggal yang dipakai **empat** permukaan (kartu jam, layar
+redup, panel rincian iPhone, Diagnostics) untuk memutuskan apakah cincin
+Saturnus, pita Jupiter, warna spektral Betelgeuse, dan bentuk galaksi boleh
+tampil.
+
+Jawaban kedua, yang membuatnya layak dikerjakan: **tidak ada yang mengawasi
+badannya.** Aturan 36 (`swift-ui-lint.sh`) memeriksa **argumen** yang dikirim
+pemanggil — `isConfirmed: engine.confirmsDisplayedIdentity` — dan itu nama
+yang benar. Kalau badannya menyimpang, seluruh pemanggil tetap mengirim nama
+yang benar, dan aturan tetap hijau.
+
+**Terukur, bukan ditebak.** Badannya diganti menjadi `!isDisplayingStaleObject`
+— persis kegagalan yang diperingatkan docstring properti ini sendiri — lalu
+`./swift-ui-lint.sh` dijalankan:
+
+    mutasi: confirmsDisplayedIdentity -> !isDisplayingStaleObject
+    hasil : SEMUA GERBANG UI LULUS (exit 0)   <- buta
+
+Mekanismenya tertulis di docstringnya: `.uncertain` ikut `hasAnswer`, jadi
+`!isStale` **benar** tepat saat engine menyatakan diri ragu. Akibatnya ciri
+pengenal tampil di sebelah badge "Ragu" — gambar lebih yakin daripada teksnya,
+pelanggaran paling keras PRD, dan mata membaca gambar lebih dulu daripada
+badge. Properti ini hidup di `Apps/`, yang tidak pernah dibangun
+`swift-test.sh`, jadi tidak ada satu pun uji Linux yang bisa menahannya.
+
+### Perbaikan
+
+- **Aturan 36** kini memeriksa **badan** `confirmsDisplayedIdentity`, bukan
+  cuma pemanggilnya. Tiga bentuk ditolak: negasi di awal, badan yang bukan
+  fakta keyakinan (`confirmsIdentity`/`confirmsDisplayedIdentity`), dan —
+  fail-closed — **deklarasi yang hilang**. Yang terakhir penting: kalau
+  propertinya berganti nama, pembacanya menemukan kosong, dan gerbang yang
+  naif akan hijau *karena tidak mengukur apa pun*.
+- **Harness** `Tools/bukti-mutasi-penjaga-faktor.py` bertambah **6 keadaan**
+  badan (2 baseline + 4 cacat). Memakai harness yang **sudah terdaftar** CI,
+  jadi tidak ada langkah alur kerja baru.
+
+### Non-vakuositas diukur, bukan diklaim
+
+Keempat keadaan cacat dijalankan atas **versi aturan pra-perbaikan**
+(`7c2eaa7^`):
+
+    aturan lama : 4 keadaan badan -> hijau (buta)
+    aturan baru : 4 keadaan badan -> MERAH
+
+Kedua baseline tetap diam pada keduanya. Tanpa pengukuran ini, "37 keadaan
+lolos" tidak membedakan harness yang bekerja dari harness yang tidak melihat
+apa pun.
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                    SEMUA GERBANG UI LULUS (37 aturan)
+    python3 Tools/bukti-mutasi-penjaga-faktor.py
+                                          37 keadaan, semuanya sesuai harapan
+                                          (tadinya 31)
+    python3 Tools/check-jangkar-harness.py  339 jangkar, tidak ada mutasi
+                                            tertinggal
+    python3 Tools/check-harness-terdaftar.py 76 harness, semuanya dirujuk
+    ./swift-test.sh                       CelestialEngine 222 + PointingKit
+                                          831 = 1053 uji, 0 gagal
+
+### Klaim palsu di STATUS.md yang ikut diperbaiki
+
+Sapuan menemukan catatan "Cacat gerbang ... **belum diperbaiki**, hanya
+diangkat" tentang `check_every_planet_in_the_model_has_render_cases`. Klaim
+itu **sudah basi**: berkasnya kini memakai `if ... else`, bukan `return`
+berhenti-penuh, jadi pesan gagalnya menyebut sebab yang tepat. Diverifikasi
+dengan membaca bloknya, lalu catatannya dikoreksi beserta pelajarannya —
+catatan "belum diperbaiki" yang tidak pernah diukur ulang adalah klaim palsu
+yang menyesatkan pembaca berikutnya, kelas cacat yang sama dengan yang dijaga
+repo ini di kode.
+
+### Yang TIDAK diklaim
+
+- Aturan 36 tetap **sapu teks**, bukan pemeriksa tipe. Ia tidak tahu bahwa
+  `snapshot.confirmsIdentity` benar secara semantik — hanya bahwa namanya
+  adalah fakta keyakinan. Badan yang memanggil fakta keyakinan **lalu**
+  membaliknya di dalam fungsi lain tetap tidak terlihat.
+- Yang diawasi satu properti ini. Kalau nanti ada saklar identitas kedua di
+  `Apps/`, aturan ini tidak menemukannya sendiri; daftarnya harus ditambah.
+- Tidak ada baris `Apps/` produksi yang diubah. Perubahan hanya di
+  `swift-ui-lint.sh` dan satu harness di `Tools/`.
+
+---
+
 ## Progres terakhir (16 Okt 2026 — siklus XCODE-DEV: verifikasi premis brief + satu unit poles kaca)
 
 ### Temuan pembuka: premis brief sudah terwujud sepenuhnya
@@ -945,12 +1047,16 @@ bukan sekadar "gerbang menyala", melainkan **apakah ia menyebut sebabnya**.
 
 ### Yang TIDAK diklaim
 
-- Cacat gerbang di atas **belum diperbaiki**, hanya diangkat. Perbaikan yang
-  benar — mengumpulkan semua masalah sebelum memutuskan merah, supaya pesan
-  menunjuk sebab yang tepat — adalah perubahan perilaku gerbang dan harus
-  punya keadaan merahnya sendiri lebih dulu.
-- `main` belum hijau sampai gerbang itu diperbaiki. Harness kini **jujur
-  merah**, bukan hijau palsu.
+- Cacat gerbang di atas **sudah diperbaiki** (dikoreksi 17 Okt 2026 — catatan
+  asli ini mengklaim "belum diperbaiki, hanya diangkat", dan klaim itu
+  ketinggalan dari kodenya). `check_every_planet_in_the_model_has_render_cases`
+  kini memakai `if ... else`, bukan `return` berhenti-penuh, sehingga pesan
+  gagalnya menyebut sebab yang tepat ("switch palet & tabel palet sepakat"),
+  bukan menunjuk pembaca. Diverifikasi dengan membaca berkasnya
+  (`Tools/check-visuals.py`, blok `if set(planets) != set(switch_names)`).
+  **Pelajaran:** catatan "belum diperbaiki" yang tidak pernah diukur ulang
+  menjadi klaim palsu yang menyesatkan pembaca berikutnya — kelas cacat yang
+  sama dengan yang dijaga repo ini di kode.
 - Keadaan 8 membangun ulang jalur `<planet>-bare`/`-uncertain` untuk Pluto;
   yang dibuktikan adalah jalurnya jalan, bukan bahwa angkanya cocok di
   perangkat.
