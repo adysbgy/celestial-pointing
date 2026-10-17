@@ -3972,14 +3972,14 @@ def check_deep_sky_layouts_match_the_model(results):
 
     port = R.DEEP_SKY_LAYOUT
 
-    missing_in_port = sorted(set(swift) - set(port))
+    missing_in_port = sorted(set(swift) - set(port), key=str)
     results.append(Result(
         "tata letak objek langit dalam: setiap bentuk model ada di port",
         not missing_in_port,
         "semua bentuk ada" if not missing_in_port
         else f"tidak ada di port: {missing_in_port}"))
 
-    extra_in_port = sorted(set(port) - set(swift))
+    extra_in_port = sorted(set(port) - set(swift), key=str)
     results.append(Result(
         "tata letak objek langit dalam: tidak ada bentuk sisa di port",
         not extra_in_port,
@@ -4137,7 +4137,22 @@ def check_every_morphology_in_the_model_has_render_cases(results):
     # 4. Nama-nama yang **tidak** berasal dari model. Port yang punya bentuk
     #    yang tidak ada di enum adalah bentuk yang tidak bisa dipilih objek
     #    mana pun — kode mati yang tampak seperti pekerjaan selesai.
-    extra_port = sorted(port_names - set(declared) - {"nebula"})
+    #
+    #    **Bentuk netral dibaca dari model, bukan didaftar di sini.** Port
+    #    memuat dua kunci yang bukan kasus enum: `"nebula"` dan `None` (kabut
+    #    ragu). Sampai siklus ini `"nebula"` dikecualikan dengan daftar tangan
+    #    `{"nebula"}`, dan kunci `None` — yang lahir bersama `uncertainFog` —
+    #    tidak ikut, jadi **seluruh gerbang memerah pada pohon yang benar**
+    #    selama dua commit. Daftar tangan selalu tertinggal satu kunci di
+    #    belakang model; yang dipakai sekarang adalah kunci yang benar-benar
+    #    dibaca `read_deep_sky_layouts_from_swift` dari `CelestialVisual.swift`
+    #    (`read_names`), jadi bentuk netral baru ikut terkecuali tanpa ada
+    #    yang perlu ingat menambahkannya.
+    #
+    #    `key=str` karena himpunan ini bisa memuat `None` bersama `str`, dan
+    #    `sorted` atas keduanya melempar `TypeError` — gerbang yang mati
+    #    dengan traceback bukan gerbang, ia undangan untuk dihapus orang.
+    extra_port = sorted(port_names - set(declared) - read_names, key=str)
     results.append(Result(
         "kasus render morfologi: tidak ada bentuk sisa di port",
         not extra_port,
