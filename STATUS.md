@@ -1,4 +1,72 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: warna bintang jenuh di mode malam, dan tiga bintang katalog yang menjadi titik yang sama)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: gambar objek bisa berasal dari benda lain, dan 42 gerbang tidak melihatnya)
+
+### Cacat yang diangkat
+
+`PointingEngine.visualForDisplayedObject` — properti yang menghasilkan gambar
+objek di kartu jam dan panel iPhone — merakit dirinya dari `displayedObject`,
+tetapi **badannya tinggal di `Apps/`**, yang tidak pernah dibangun di Linux
+(Runner hanya membangun `Packages/`). Jadi tidak satu pun dari 42 aturan UI
+bisa memerahkannya.
+
+Diukur, bukan diduga. Satu baris di badannya:
+
+    guard let object = displayedObject          -> hijau, 42/42, exit 0
+    guard let object = lastLockedObject         -> hijau, 42/42, exit 0
+
+Aturan 34/35/36 membaca **argumen pemanggil**, dan Aturan 42 hanya mengurus
+penerusan satu-fakta yang namanya ada sebagai anggota model. Fungsi yang
+merakit tujuh sumber tidak masuk cakupan aturan mana pun.
+
+Akibatnya bukan teoretis. Pada keadaan `.pointing`, `displayedObject`
+mengembalikan `intent?.best` — objek dari arah tunjuk **sebelumnya**, yang
+sengaja dipertahankan supaya panel tidak berkedip — sementara
+`lastLockedObject` bisa berisi benda lain sama sekali. Kartu lalu menampilkan
+nama Jupiter dengan **gambar cincin Saturnus** di sebelahnya. Diukur pada port
+(`Tools/render-visuals.py`): 10.579 vs 10.491 byte PNG, dua benda berbeda.
+Mata membaca gambar lebih dulu daripada nama, jadi bentuk cacatnya persis yang
+dilarang PRD: menyatakan identitas yang engine tidak punya.
+
+### Perbaikannya
+
+Bukan "tambah satu jika" di `Apps/`, tetapi memindahkan **pemilihan objek** ke
+tempat yang bisa dieksekusi dan diuji di Linux:
+`PointingSnapshot.displayedVisual(lastLocked:)` di PointingKit.
+
+Invariannya struktural, bukan disiplin: fungsi itu **tidak menerima objek
+sebagai argumen**. Ia menurunkan sendiri dari `displayedObject`, jadi tidak ada
+bentuk panggilan di mana pemanggil bisa menyodorkan benda lain. Selama objeknya
+parameter, cacat ini akan kembali ditulis ulang oleh siapa pun yang
+"menghemat" satu baris.
+
+Pengambilan fakta fase (fraksi Bulan dari `skyContext`, fase planet dalam,
+arah, sudut sisi terang) **sengaja tetap di `Apps/`**: Aturan 31 menelusuri
+setiap kabel itu sebagai *nilai*, dan memindahkannya ke Swift murni hanya akan
+memindahkan pemeriksaannya juga. Yang dipindah hanya apa yang tidak bisa
+diperiksa di sana.
+
+### Bukti bahwa ujinya tidak hampa
+
+Lima uji baru (`VisualAssemblyTests.swift`), dijalankan pada mutan
+`lastLocked` — 4 dari 5 merah, dengan pesan yang menyebut cacatnya sendiri:
+
+    idle intent=jupiter locked=saturn: visual menggambar saturn
+    sementara kartu menampilkan jupiter
+
+Yang dijaga: invarian atas 6 keadaan × 2 intent × 2 kunci (kombinasi itulah
+satu-satunya tempat cacat ini bisa muncul), Saturnus tidak menyentuh kartu
+Jupiter, `nil` bukan gambar generik, dan fase Bulan tidak pernah menjadi fase
+planet luar.
+
+### Status gerbang
+
+Engine 222 + PointingKit 869 hijau (`./swift-test.sh`), 42/42 aturan UI
+(`swift-ui-lint.sh`), typecheck bersih, 84 harness semuanya terdaftar di CI.
+Gerbang hitungan README menangkap angka lamanya sendiri (864 → 869) — bekerja
+seperti seharusnya, bukan dilewati.
+
+---
+
+## Progres sebelumnya (17 Okt 2026 — warna bintang jenuh di mode malam, dan tiga bintang katalog yang menjadi titik yang sama)
 
 ### Mengapa siklus ini bukan fitur baru
 
