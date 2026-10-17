@@ -53,7 +53,30 @@ public extension CelestialVisual {
     /// Berbentuk kalimat (`"kelas spektral %@"`) dan bukan sekadar `"B8"`,
     /// karena VoiceOver membaca `"Rigel, B8"` sebagai dua ejaan tanpa
     /// hubungan; `"kelas spektral B8"` menyebutkan apa yang diucapkan.
-    static func spokenStarClassLine(spectralClass: String?) -> String? {
+    ///
+    /// **Kenapa ia punya `isConfirmed:`, padahal warnanya sudah punya
+    /// penjaganya sendiri.** Kelas spektral adalah ciri pengenal yang
+    /// berdiri sendiri — `M1` di katalog 25 bintang ini menunjuk Betelgeuse
+    /// atau Antares, sama langsungnya dengan warna merahnya. Karena ia bukan
+    /// turunan warna, penjaga di `spokenStarColor(isConfirmed:)` tidak
+    /// menaunginya: dulu fungsi ini tidak punya parameter itu sama sekali,
+    /// sehingga ia diucapkan pada setiap keadaan, termasuk saat engine ragu.
+    /// Yang terjadi waktu itu adalah suara yang lebih yakin daripada
+    /// layarnya — VoiceOver menyebut "kelas spektral M1" sementara titik di
+    /// layar abu-abu "tidak mengklaim" dan badge-nya bertuliskan "Ragu".
+    ///
+    /// Tanpa parameter ini pula, Aturan 34/36 tidak pernah melihat fungsi
+    /// ini: daftar aksesor yang mereka periksa dibaca dari deklarasi
+    /// ber-`isConfirmed:`, dan deklarasi tanpa parameter itu tidak ada di
+    /// daftar. Jadi penjaganya kini **terlihat oleh gerbang yang sudah ada**,
+    /// bukan hanya oleh uji ini.
+    ///
+    /// Tanpa nilai bawaan, dengan alasan yang sama seperti
+    /// `spokenStarColor(isConfirmed:)`: pemanggil yang lupa harus gagal
+    /// kompilasi, bukan diam-diam mengucapkan klaim.
+    static func spokenStarClassLine(spectralClass: String?,
+                                    isConfirmed: Bool) -> String? {
+        guard isConfirmed else { return nil }
         guard let spectralClass = spokenStarClass(spectralClass: spectralClass) else {
             return nil
         }

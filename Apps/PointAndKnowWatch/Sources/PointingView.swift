@@ -683,11 +683,15 @@ struct ObjectDetailView: View {
         // kebiruan" tidak membedakan B8 dari B9, sedangkan katalog teleskop
         // menyebut kelasnya. Id-nya datang dari visual yang sama, jadi
         // pengucapan ini **tidak mungkin** menyebut bintang lain.
-        // `spokenStarClassLine` mengembalikan `nil` untuk benda lain dan untuk
-        // bintang tanpa kelas di tabel — tidak ada yang ditebak.
+        // `spokenStarClassLine` mengembalikan `nil` untuk benda lain, untuk
+        // bintang tanpa kelas di tabel, **dan saat engine ragu** — kelas
+        // spektral (`M1`) menunjuk Betelgeuse/Antares sama langsungnya dengan
+        // warnanya, jadi ia ciri pengenal yang harus ikut diam ketika warna
+        // dan morfologi di atasnya diam. Tidak ada yang ditebak.
         if let visual,
            let starClass = CelestialVisual.spokenStarClassLine(
-               spectralClass: visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:))) {
+               spectralClass: visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:)),
+               isConfirmed: isConfirmed) {
             parts.append(starClass)
         }
         parts.append(ObjectSpeech.magnitude(object.magnitude))

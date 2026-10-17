@@ -67,6 +67,41 @@ final class StarNameSpeechTests: XCTestCase {
         }
     }
 
+    /// Kelas spektral ikut diam saat engine ragu — **cacat yang ditutup uji
+    /// ini**.
+    ///
+    /// `spokenStarClassLine(spectralClass:)` dulu tidak punya parameter
+    /// `isConfirmed:` sama sekali, jadi ia tidak bisa ikut diam: pemanggilnya
+    /// di `ObjectDetailView.kindAccessibilityLabel` memanggilnya tanpa syarat,
+    /// tepat di sebelah `spokenStarColor(isConfirmed:)` dan
+    /// `spokenDeepSkyMorphology(isConfirmed:)` yang **keduanya** diam. Hasilnya
+    /// VoiceOver mengucapkan "kelas spektral M1" — yang di katalog 25 bintang
+    /// ini menunjuk Betelgeuse atau Antares — sementara titik di layar
+    /// berwarna abu-abu "tidak mengklaim" dan badge-nya bertuliskan "Ragu".
+    /// Suara lebih yakin daripada layarnya, persis yang dilarang PRD.
+    ///
+    /// Kenapa ini tidak ketahuan: kelas spektral adalah ciri pengenal yang
+    /// **berdiri sendiri**, bukan turunan warna, jadi uji warna tidak
+    /// menyentuhnya. Dan Aturan 34/36 membaca daftar aksesornya dari
+    /// deklarasi ber-`isConfirmed:` — fungsi tanpa parameter itu tidak ada di
+    /// daftar, jadi gerbang tidak pernah melihatnya.
+    ///
+    /// Keadaan "yakin" diuji lebih dulu agar uji ini tidak bisa dipuaskan
+    /// oleh fungsi yang mengembalikan `nil` untuk semua keadaan.
+    func testStarClassLineIsSilentWhenTheEngineIsUncertain() {
+        let visual = CelestialVisual(object: object(id: "betelgeuse", kind: .star))
+        let kelas = visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:))
+        XCTAssertEqual(kelas, "M1", "jalur view harus sampai ke tabel kelas — "
+                       + "tanpa ini kedua keadaan di bawah lulus karena nil")
+        XCTAssertEqual(CelestialVisual.spokenStarClassLine(spectralClass: kelas,
+                                                           isConfirmed: true),
+                       "kelas spektral M1")
+        XCTAssertNil(CelestialVisual.spokenStarClassLine(spectralClass: kelas,
+                                                         isConfirmed: false),
+                     "kelas spektral diucapkan saat engine ragu — suara lebih "
+                     + "yakin daripada gambar abu-abu di sebelahnya")
+    }
+
     /// Dan diam saat engine ragu — janji yang sama dengan gambar.
     ///
     /// Uji ini **bukan** pengulangan uji warnanya: ia menjaga bahwa perbaikan
@@ -211,9 +246,11 @@ final class StarNameSpeechTests: XCTestCase {
     /// Inggris-nya dicek terpisah di bawah — dua-duanya karena Aturan 4/6
     /// hanya menjaga kunci, bukan kalimat yang akhirnya terbaca.
     func testClassLineSaysWhatItIsJoinedTo() {
-        XCTAssertEqual(CelestialVisual.spokenStarClassLine(spectralClass: "B8"),
+        XCTAssertEqual(CelestialVisual.spokenStarClassLine(spectralClass: "B8",
+                                                           isConfirmed: true),
                        "kelas spektral B8")
-        XCTAssertTrue(CelestialVisual.spokenStarClassLine(spectralClass: "B8")?
+        XCTAssertTrue(CelestialVisual.spokenStarClassLine(spectralClass: "B8",
+                                                          isConfirmed: true)?
             .contains("B8") == true)
     }
 
@@ -239,7 +276,8 @@ final class StarNameSpeechEnglishTests: BridgedTextTestCase {
             // B−V 0,00 adalah Sirius/Vega: **putih kebiruan**, bukan biru.
             "star.color.whiteBlue.spoken.label": "blue-white",
         ])
-        XCTAssertEqual(CelestialVisual.spokenStarClassLine(spectralClass: "B8"),
+        XCTAssertEqual(CelestialVisual.spokenStarClassLine(spectralClass: "B8",
+                                                           isConfirmed: true),
                        "spectral class B8")
         XCTAssertEqual(CelestialVisual.spokenStarColorLine(colorIndexBV: 0.0, isConfirmed: true),
                        "blue-white")
