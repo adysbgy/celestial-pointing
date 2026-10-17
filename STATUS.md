@@ -1,3 +1,114 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: nama yang tersembunyi di balik pemanggil yang benar)
+
+### Cacatnya
+
+Empat permukaan menampilkan nama objek, dan keempatnya punya cabang cadangan
+yang mengembalikan **`CelestialObject.name` apa adanya**:
+
+    ObjectDetailView.objectDisplayName   displayName ?? object.name
+    DiagnosticsView (judul)              displayName ?? object.name
+    DiagnosticsView (ucapan)             displayName ?? object.name
+    PointingEngine.displayedObjectName   DisplayLabel.objectName(...) ?? object.name
+
+`CelestialObject.name` adalah data engine yang memuat bentuk Bahasa Indonesia
+yang **dibekukan** (`Saturnus`, `Bulan`, `Merkurius`). Jadi pada perangkat
+berbahasa English, judul terbesar di kartu menampilkan `Saturnus` sementara
+badge keyakinan dan baris jenis di sebelahnya mengikuti bahasa perangkat —
+dua bahasa dalam satu kartu, persis cacat yang dulu ditutup `BodyName` dan
+`DisplayLabel`.
+
+### Kenapa ia bertahan: tersembunyi oleh kode yang benar
+
+Ini yang membuat cacat ini layak dikerjakan, dan berbeda dari yang
+sebelumnya. Pemanggil `ObjectDetailView` di `PointingView` **selalu**
+meneruskan `engine.displayedObjectName(object)`, jadi cabang kiri yang benar
+menutupi cabang kanan yang salah: selama tidak ada yang memanggil tanpa
+`displayName`, baris yang salah **tidak pernah dieksekusi**. Tidak ada uji
+Linux yang bisa mengeksekusinya juga, karena `Apps/` tidak dibangun
+`swift-test.sh`.
+
+**Terukur, bukan ditebak** (salinan utuh, proses baru, `Apps/` + `Packages/`
+dibawa): mengganti judul kartu menjadi `Text(object.name)` — bentuk yang
+persis dipakai cabang cadangan itu — membuat **ke-40 aturan tetap hijau**
+(exit 0). Begitu pula `displayedObjectName -> object.name`, yang mengembalikan
+bentuk Indonesia ke empat permukaan sekaligus.
+
+### Perbaikan
+
+- Keempat situs kini melewati `ObjectDisplayName.text(of:)` (PointingKit,
+  teruji di Linux). `DisplayLabel.objectName(forObjectID:catalogue:)`
+  **sengaja tidak** dipakai di `ObjectDetailView`: ia menuntut katalog, dan
+  panel itu tidak punya akses resolver — meneruskan katalog kemari justru
+  membuka kemungkinan label diambil dari katalog yang bukan yang
+  dipertimbangkan engine.
+- **Aturan 41** (`swift-ui-lint.sh`) menyapu satu bentuk sempit:
+  `?? <sesuatu>.name` di berkas `Apps/` yang menangani `CelestialObject`.
+  Tidak semua `.name` dituduh — `CalibrationTarget.name` dan `MountFrame.name`
+  juga `.name` tetapi tidak dibekukan engine, dan gerbang yang menuduh kode
+  benar akan dilonggarkan orang.
+- **Lantainya bukan "harus ada temuan."** Nol temuan dengan berkas terbaca
+  adalah keadaan **benar** setelah perbaikan; menjadikannya kegagalan membuat
+  gerbang mustahil dipuaskan. Yang dilarang adalah nol **berkas terbaca** —
+  itu berarti pembacanya berhenti melihat.
+- **Tes penjaga** `testDetailViewFallbackLocalizesTheEngineName` merah pada
+  `object.name` dan hijau hanya bila nama melewati accessor. Kontrol
+  negatifnya (`...KeepsNamesWithoutTranslation`) menuntut nama tanpa
+  terjemahan dikembalikan apa adanya — tanpa itu accessor yang mengembalikan
+  string kosong akan lulus.
+- **Harness** `Tools/bukti-mutasi-aturan41-nama.py`: 5 keadaan, dua di
+  antaranya kontrol negatif (perbaikan dan berkas apa adanya wajib diam),
+  terdaftar di `engine-tests.yml`.
+
+### Non-vakuositas diukur, bukan diklaim
+
+    mutasi `text(of:) -> object.name`   -> uji MERAH (Matahari/Bulan/Merkurius)
+    revert salah satu dari 4 situs       -> Aturan 41 MERAH (lint utuh, proses baru)
+
+Tanpa pengukuran kedua, "5 keadaan sesuai harapan" tidak membedakan harness
+yang bekerja dari harness yang menyetujui dirinya sendiri.
+
+### Dua cacat yang muncul dari perbaikan ini, dan keduanya ketahuan sebelum `main` merah
+
+1. **Harness yang salah menuntut tanda bersih.** Awalnya `run_rule`
+   menuntut baris `Bersih: ...` dari program Python Aturan 41. Baris itu
+   dicetak **shell**, bukan programnya — programnya diam bila bersih.
+   Akibatnya keadaan bersih terbaca "berbunyi": kontrol 4 dan 5 merah.
+   Konvensi `CLEAN_MARK = ""` (sama dengan `bukti-mutasi-aturan3-aksara.py`)
+   yang benar.
+2. **Jangkar harness Aturan 39 basi.** Memecah `objectDisplayName` menjadi
+   deklarasi multi-baris membatalkan jangkar sisip di
+   `bukti-mutasi-aturan39-statis.py` — CI Linux merah dengan
+   `anchor tidak ditemukan`. Jangkarnya **bukan** cacat yang dijaga aturan
+   itu, hanya titik sisip; perbaikannya memindahkan jangkar ke pembuka
+   deklarasi, **bukan** melonggarkan `assert`-nya. (Ini kelas cacat yang sama
+   dengan yang pernah memerahkan `main` seharian.)
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                      SEMUA GERBANG UI LULUS (41 aturan)
+    CelestialEngine 222 + PointingKit 847 = 1069 uji, 0 gagal
+    Tools/bukti-mutasi-aturan41-nama.py     5 keadaan, 0 tidak sesuai harapan
+    Tools/check-jangkar-harness.py          342 jangkar, tidak ada mutasi tertinggal
+    Tools/check-harness-terdaftar.py        81 harness, semuanya dirujuk
+    Apple Build (macos-15)                  hijau — bukti `Apps/` benar-benar
+                                            dikompilasi dengan perubahan ini
+
+### Yang TIDAK diklaim
+
+- Aturan 41 adalah **sapu teks**, bukan pemeriksa tipe. Ia tidak tahu bahwa
+  `object.name` adalah `CelestialObject.name`; ia tahu berkasnya menangani
+  `CelestialObject` dan ada `?? ...name` di dalamnya. `??` yang dirakit di
+  dalam fungsi lain, atau nama yang diteruskan lewat variabel perantara,
+  tetap tidak terlihat.
+- Uji baru mengunci **jalur `ObjectDisplayName.text(of:)` di model**, bukan
+  bahwa keempat pemanggil memakainya — itu kerja Aturan 41, dan kedua
+  penjaga itu sengaja berbeda kelas.
+- Yang diperbaiki cabang cadangannya. Nama yang **memang tidak punya**
+  terjemahan (`Sirius`, `M42`) tetap dikembalikan apa adanya, sesuai aturan
+  repo: mengarang nama dari id dilarang.
+
+---
+
 ## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: galat CI macOS, dan gerbang yang harus berbunyi sebelum push)
 
 ### Cacatnya
