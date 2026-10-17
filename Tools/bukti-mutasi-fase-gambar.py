@@ -196,15 +196,24 @@ def keadaan_nonvakuositas() -> None:
     Yang dipangkas adalah cabang `elif [ -n "$fase_hilang" ]` milik Aturan 40
     saja — dicari lewat teksnya yang unik, bukan lewat nomor baris, dan
     kegagalan menemukannya adalah LEWAT, bukan lulus.
+
+    Suntikan punya **dua** bagian: cacatnya di `ONBOARDING`, pelaporannya di
+    lint. Keduanya di kotak yang sama, jadi yang berbalik adalah satu-satunya
+    sebab — kalau cacatnya tidak disuntik, keadaan ini hijau karena tidak ada
+    temuan, dan itu bukan bukti apa pun.
     """
     wd = copy_repo()
     try:
-        path = os.path.join(wd, TARGET_ANCHOR_FILE)
-        src = open(path, encoding="utf-8").read()
+        app = os.path.join(wd, ONBOARDING)
+        src = open(app, encoding="utf-8").read()
         if src.count(ONBOARDING_ANCHOR) != 1:
             failures.append("  non-vakuositas: jangkar onboarding hilang")
             return
-        src = src.replace(ONBOARDING_ANCHOR, "", 1)
+        open(app, "w", encoding="utf-8").write(
+            src.replace(ONBOARDING_ANCHOR, "", 1))
+
+        path = os.path.join(wd, LINT_FILE)
+        src = open(path, encoding="utf-8").read()
         cabang = 'elif [ -n "$fase_hilang" ]; then'
         if src.count(cabang) != 1:
             failures.append(f"  non-vakuositas: cabang {cabang!r} muncul "
@@ -222,7 +231,7 @@ def keadaan_nonvakuositas() -> None:
         shutil.rmtree(wd, ignore_errors=True)
 
 
-TARGET_ANCHOR_FILE = "swift-ui-lint.sh"
+LINT_FILE = "swift-ui-lint.sh"
 
 
 def cek() -> None:
