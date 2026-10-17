@@ -1,4 +1,45 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: gambar objek bisa berasal dari benda lain, dan 42 gerbang tidak melihatnya)
+### Siklus berikutnya (17 Okt 2026 — layar redup membacakan layar yang berbeda dari yang dilihat orang lain)
+
+Cacat kedua dari pola yang sama: **logika di `Apps/` tidak bisa salah di mata
+gerbang mana pun**, karena `Apps/` tidak pernah dibangun di Linux.
+
+`ReducedLuminanceView` menampilkan baris `motionNote` saat gerak tidak
+tersedia ("Data gerak tidak tersedia."), tetapi `reducedAccessibilityLabel`
+— properti `private` di view yang sama — tidak pernah menyebutnya. Pengguna
+VoiceOver lalu mendengar nama objek dan status, tanpa satu pun alasan mengapa
+jam tidak menanggapi gerakan: **keberhasilan yang membeku**. Ironinya persis:
+`reducedAccessibilityLabel` sudah mengucapkan `safetyWarningText` dengan
+alasan yang sama ("layar redup yang membacakan nama tanpa alasan itu terdengar
+seperti keberhasilan"), dan catatan sensor adalah satu-satunya baris yang
+lolos ke layar itu tapi tidak lolos ke telinganya.
+
+Dua cacat berurutan di pola yang sama memberi pelajaran yang sama: yang
+terlewat bukan barisnya, melainkan **tempatnya**. Keduanya ada di `Apps/`,
+keduanya tidak punya uji, dan keduanya baru ketahuan setelah dimutasi.
+
+### Yang diubah
+
+Perakitannya dipindah ke `PointingKit` (`ReducedLuminanceLabel`), mengikuti
+pola `RowSpeech`/`SensorStatusText` yang sudah ada. Lima uji baru, dan terbukti
+tidak hampa — mengembalikan barisnya ke bentuk lama membuat 2 dari 5 merah:
+
+    catatan sensor tampil di layar redup tetapi tidak diucapkan:
+    label = Saturnus. Terkunci
+
+Yang ikut dikunci, karena urutan kata adalah janji produk: penanda ragu
+**mendahului** nama (nama kandidat paling mudah terbaca sebagai temuan), tanpa
+objek tidak ada nama yang dikarang, tanpa catatan tidak ada pemisah kosong,
+dan urutan di telinga sama dengan urutan di layar.
+
+### Status gerbang
+
+Engine 222 + PointingKit 874 hijau, 42/42 aturan UI, typecheck bersih.
+Aturan 34 mencatat 66 pemanggilan berlabel (naik dari 65) — gerbang itu
+melihat titik panggil barunya, bukan melewatkannya.
+
+---
+
+### (17 Okt 2026 — siklus XCODE-DEV: gambar objek bisa berasal dari benda lain, dan 42 gerbang tidak melihatnya)
 
 ### Cacat yang diangkat
 
