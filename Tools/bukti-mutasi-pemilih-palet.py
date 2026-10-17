@@ -1,56 +1,165 @@
 #!/usr/bin/env python3
 """Bukti non-vakuositas: uji pemilih palet HARUS merah saat sumbernya dimutasi.
 
-Dijalankan di container yang sama dengan CI (Docker Swift 6.0), atas salinan
-yang dimutasi. Menjalankan `SurfacePaletteTests` dan menuntut merah.
-"""
-import os, subprocess, shutil, sys
+Kenapa arah ini, bukan uji tambahan.
 
-SRC = "Packages/PointingKit/Sources/PointingKit/NightPaletteSelector.swift"
+`NightPaletteSelector` (PointingKit) memindahkan keputusan palet mode malam
+keluar dari `Apps/`, yang tidak pernah dibangun `swift-test.sh` di Linux.
+Tapi memindahkan kode ke paket teruji **belum** berarti ia terjaga: uji yang
+hanya memanggil fungsi dan mencocokkan hasil pada `UserDefaults` tiruan bisa
+lulus untuk pemetaan yang terbalik, selama fixture-nya ikut terbalik. Yang
+dibuktikan di sini adalah arah yang mudah hilang: **ujinya masih berbunyi
+saat pemetaannya salah.**
+
+Harness ini memutasi sumber produksinya di container yang sama dengan CI
+(Docker Swift 6.0), menjalankan `SurfacePaletteTests` untuk tiap keadaan, dan
+menuntut merah pada tiga pemetaan yang salah serta hijau pada pohon apa
+adanya.
+
+Penulisan & pemulihan lewat `mutasi_sumber`, sama seperti harness lain:
+
+  * `require_clean_sources` menolak jalan bila sumber sudah menyimpang dari
+    HEAD — kalau tidak, harness akan mengadopsi mutasi yang tertinggal
+    sebagai «aslinya» dan melaporkan «pulih persis» atas dirinya sendiri;
+  * `write_source` menulis atomik, jadi `swift test` hanya pernah melihat
+    versi lama atau versi baru;
+  * `restore_verified` membaca balik byte demi byte dan **melempar** bila
+    tidak cocok.
+
+Tanpa ketiganya, SIGKILL di tengah keadaan ketiga meninggalkan
+`NightPaletteSelector.swift` termutasi, dan siklus berikutnya mengukur
+keadaan yang tidak pernah ada.
+
+Lingkungan: `swift` langsung, atau docker + image `swift:6.0`. Kalau tidak
+ada keduanya, harness **berhenti** (exit 2) alih-alih melaporkan hijau atas
+nol pembuktian.
+
+Pakai: python3 Tools/bukti-mutasi-pemilih-palet.py
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import shutil
+import signal
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (penulisan atomik bersama, lihat modulnya)
+
+SRC = os.path.join(ROOT, "Packages", "PointingKit", "Sources", "PointingKit",
+                   "NightPaletteSelector.swift")
+TESTS = os.path.join(ROOT, "Packages", "PointingKit", "Tests",
+                     "PointingKitTests", "SurfacePaletteTests.swift")
+
+#: Jangkar pemetaan yang benar. Kalau ini hilang dari sumber, harness berhenti
+#: daripada melaporkan "sesuai harapan" atas nol pembuktian.
 ANCHOR = "isNightModeEnabled ? .night : .day"
 
-# (label, pengganti, harus_merah)
+RULE = "SurfacePaletteTests"
+
+#: (label, pengganti, harus_merah). `None` = baseline, harus hijau.
 STATES = [
-    ("1. selalu .day",    ".day", True),
-    ("2. selalu .night",  ".night", True),
-    ("3. dibalik",        "!isNightModeEnabled ? .night : .day", True),
+    ("baseline (kode apa adanya)", None, False),
+    ("selalu .day", ".day", True),
+    ("selalu .night", ".night", True),
+    ("dibalik", "!isNightModeEnabled ? .night : .day", True),
+    ("basil ulang (pulih)", None, False),
 ]
 
 
-def main():
-    repo = os.getcwd()
-    bersih = open(SRC, encoding="utf-8").read()
-    if ANCHOR not in bersih:
-        print("JANGKAR HILANG: %s" % ANCHOR)
-        return 1
-    gagal = 0
+def run_tests() -> tuple[bool, str]:
+    """Jalankan hanya uji palet, di lingkungan yang sama dengan CI.
+
+    `--filter` dipakai supaya keadaan yang tidak dimaksud tidak ikut
+    menentukan hasil: harness ini mengklaim tentang `SurfacePaletteTests`,
+    bukan tentang seluruh paket (itu tugas `swift-test.sh`).
+    """
+    if shutil.which("swift"):
+        cmd = ["swift", "test", "--package-path", "Packages/PointingKit",
+               "--filter", RULE]
+    else:
+        cmd = ["sudo", "-n", "docker", "run", "--rm",
+               "-v", f"{ROOT}:/src",
+               "-w", "/src/Packages/PointingKit",
+               "swift:6.0", "swift", "test", "--filter", RULE]
     try:
-        # baseline: sumber apa adanya harus HIJAU
-        rc = run_tests()
-        print("%-18s %s" % ("[baseline] asli", "HIJAU" if rc == 0 else "MERAH"))
-        if rc != 0:
-            gagal += 1
-        for label, rep, harus_merah in STATES:
-            open(SRC, "w", encoding="utf-8").write(bersih.replace(ANCHOR, rep, 1))
-            rc = run_tests()
-            merah = rc != 0
+        proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                             timeout=1800)
+    except subprocess.TimeoutExpired:
+        return False, "swift test melewati batas waktu"
+    output = proc.stdout + proc.stderr
+    # Gagal build bukan "uji merah": kalau tidak dibedakan, keadaan merah
+    # karena alasan yang salah akan dihitung sebagai bukti.
+    if "unable to load standard library" in output:
+        return False, output
+    if f"Test Suite '{RULE}'" not in output and RULE not in output:
+        return False, output
+    return proc.returncode == 0, output
+
+
+def main() -> int:
+    if not (shutil.which("swift") or shutil.which("docker")):
+        print("docker/swift tidak ditemukan: harness tidak bisa membuktikan "
+              "apa pun.", file=sys.stderr)
+        return 2
+
+    mutasi_sumber.require_clean_sources([SRC, TESTS])
+    original = open(SRC, "rb").read()
+    teks = original.decode("utf-8")
+    if teks.count(ANCHOR) != 1:
+        print(f"GERBANG: jangkar {ANCHOR!r} muncul {teks.count(ANCHOR)}x, "
+              f"harus tepat 1x — harness tidak boleh jalan.", file=sys.stderr)
+        return 2
+    baseline_md5 = hashlib.md5(original).hexdigest()
+
+    def restore():
+        mutasi_sumber.restore_verified(SRC, original)
+
+    def on_signal(signum, _frame):
+        restore()
+        print(f"\n[signal {signum}] sumber produksi dipulihkan, keluar.")
+        sys.exit(130)
+
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
+
+    unexpected = 0
+    try:
+        for label, ganti, harus_merah in STATES:
+            restore()
+            if ganti is not None:
+                mutasi_sumber.write_source(SRC, teks.replace(ANCHOR, ganti, 1))
+            hijau, output = run_tests()
+            merah = not hijau
             ok = merah == harus_merah
             if not ok:
-                gagal += 1
-            print("%-18s %-6s %s" % (label, "MERAH" if merah else "HIJAU",
-                                     "sesuai" if ok else "TIDAK SESUAI"))
+                unexpected += 1
+            print(f"{'OK  ' if ok else 'SALAH'} {label:28s} "
+                  f"{'MERAH' if merah else 'hijau'}")
+            if not ok:
+                for baris in output.splitlines():
+                    if "error:" in baris or "XCTAssert" in baris:
+                        print(f"      {baris.strip()[:160]}")
+                        break
     finally:
-        open(SRC, "w", encoding="utf-8").write(bersih)
+        restore()
+
+    after = hashlib.md5(open(SRC, "rb").read()).hexdigest()
+    pulih = after == baseline_md5
+    print(f"\nmd5 {os.path.relpath(SRC, ROOT)}: {baseline_md5} -> {after} "
+          f"({'pulih persis' if pulih else 'TIDAK PULIH'})")
+    if not pulih:
+        unexpected += 1
+
     print()
-    print("0 tidak sesuai harapan" if gagal == 0 else "%d TIDAK SESUAI" % gagal)
-    return 1 if gagal else 0
-
-
-def run_tests():
-    cmd = ["sudo", "-n", "docker", "run", "--rm", "-v", "%s:/src" % os.getcwd(),
-           "-w", "/src/Packages/PointingKit", "swift:6.0", "swift", "test",
-           "--filter", "SurfacePaletteTests"]
-    return subprocess.run(cmd, capture_output=True, text=True).returncode
+    print("0 tidak sesuai harapan" if unexpected == 0
+          else f"{unexpected} TIDAK SESUAI")
+    return 1 if unexpected else 0
 
 
 if __name__ == "__main__":
