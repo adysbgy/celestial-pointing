@@ -188,6 +188,12 @@ struct ReducedLuminanceView: View {
 
     /// Label layar redup untuk VoiceOver.
     ///
+    /// **Perakitannya ada di `PointingKit`, bukan di sini.** Bentuknya —
+    /// urutan, pemisah, penanda ragu yang mendahului nama — adalah janji
+    /// produk, dan berkas ini tidak ikut terbangun di Linux, jadi janji itu
+    /// tidak bisa diperiksa satu gerbang pun di sini. Terukur: versi lama
+    /// melewatkan **catatan sensor** yang justru tampil di layar.
+    ///
     /// Sengaja pendek: saat layar redup, pembaca layar berjalan lebih lambat,
     /// dan pengumuman panjang justru menutupi informasi yang paling penting.
     /// Penanda sisa tetap ikut diucapkan — di layar redup yang satu-satunya
@@ -199,35 +205,20 @@ struct ReducedLuminanceView: View {
     /// kalimat — "…LK · sisa" bukan "…LK · sisa pandangan sebelumnya". Satu
     /// kunci, dua panjang: `staleShort` untuk suara, `stale` untuk layar penuh.
     private var reducedAccessibilityLabel: String {
-        var parts: [String] = []
-        // Penanda ragu ikut diucapkan **sebelum** nama, bukan sesudahnya.
-        //
-        // Urutannya penting: nama kandidat adalah kata yang paling mungkin
-        // diartikan sebagai temuan, jadi penandanya harus terdengar lebih dulu.
-        // Meletakkannya sesudah nama menghasilkan "Vega. Belum pasti" — di
-        // mana klausa kedua terdengar seperti koreksi, bukan syarat.
-        //
-        // Frasa yang diucapkan sama persis dengan yang ditampilkan: satu
-        // kunci untuk dua medianya.
-        if engine.carriesUncertaintyMarker {
-            parts.append(TextLocalization.text(.confidenceUncertainMarker))
-        }
-        if let object = engine.displayedObject {
-            parts.append(engine.displayedObjectName(object))
-        }
-        parts.append(engine.snapshot.state.shortLabel)
-        // Peringatan keselamatan ikut diucapkan: ia alasan teleskop tidak
-        // bergerak, dan layar redup yang membacakan nama objek tanpa alasan
-        // itu terdengar seperti keberhasilan.
-        if let warning = engine.slewVerdict?.safetyWarningText {
-            parts.append(warning)
-        }
-        if engine.isDisplayingStaleObject {
-            // Aksesor yang sama dengan baris di atasnya (line 60), supaya
-            // dua pemanggilan ke kunci yang sama tidak bisa berbeda bentuk.
-            parts.append(ObjectSpeech.staleShortNote)
-        }
-        return parts.joined(separator: ". ")
+        ReducedLuminanceLabel.text(
+            isUncertain: engine.carriesUncertaintyMarker,
+            objectName: engine.displayedObject.map(engine.displayedObjectName),
+            stateLabel: engine.snapshot.state.shortLabel,
+            // Peringatan keselamatan ikut diucapkan: ia alasan teleskop tidak
+            // bergerak, dan layar redup yang membacakan nama objek tanpa alasan
+            // itu terdengar seperti keberhasilan.
+            safetyWarning: engine.slewVerdict?.safetyWarningText,
+            // Catatan sensor juga: ia alasan jam tidak menanggapi gerakan.
+            // Baris ini tampil di layar (lihat `motionNote`), jadi VoiceOver
+            // yang melewatkannya membacakan layar yang berbeda dari yang
+            // dilihat orang lain.
+            sensorNote: motionNote,
+            isStale: engine.isDisplayingStaleObject)
     }
 
     private var motionNote: String? { engine.sensorNote }
