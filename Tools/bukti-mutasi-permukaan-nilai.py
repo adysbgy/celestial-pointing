@@ -161,18 +161,31 @@ def copy_repo() -> str:
 
 
 def inject_body(workdir: str, prop: str, new_body: str) -> None:
-    """Ganti badan `var <prop>: T?` di salinan berkasnya."""
+    """Ganti badan `var <prop>: T?` di salinan berkasnya.
+
+    Dua bentuk deklarasi hidup di berkas itu — multi-baris (mayoritas) dan
+    satu-baris (`answeredIntent`). Keduanya dicoba, dan harus **tepat satu**
+    yang cocok: jangkar yang meleset membuat keadaan cacat dilaporkan hijau
+    padahal berkasnya tidak pernah berubah.
+    """
     tipe, badan = PERMUKAAN[prop]
     path = os.path.join(workdir, TARGET)
     text = open(path, encoding="utf-8").read()
-    old = "    public var %s: %s {\n%s    }" % (prop, tipe, badan)
-    n = text.count(old)
-    if n != 1:
-        sys.exit(f"GERBANG: jangkar badan tidak unik ({n} kali) di {TARGET}: "
-                 f"{prop!r} — harness ini tidak bisa mengukur.\n"
-                 f"Jangkarnya mungkin berubah di sumber; perbarui PERMUKAAN.")
-    new = "    public var %s: %s {\n%s    }" % (prop, tipe, new_body)
-    open(path, "w", encoding="utf-8").write(text.replace(old, new))
+    kandidat = [
+        ("    public var %s: %s {\n%s    }" % (prop, tipe, badan),
+         "    public var %s: %s {\n%s    }" % (prop, tipe, new_body)),
+        # Satu baris: `<badan>` tanpa baris baru, dan badan baru dipipihkan.
+        ("    public var %s: %s { %s }" % (prop, tipe, badan.strip()),
+         "    public var %s: %s { %s }" % (prop, tipe, new_body.strip())),
+    ]
+    for old, new in kandidat:
+        n = text.count(old)
+        if n == 1:
+            open(path, "w", encoding="utf-8").write(text.replace(old, new))
+            return
+    sys.exit(f"GERBANG: jangkar badan tidak unik (0 kali) di {TARGET}: "
+             f"{prop!r} — harness ini tidak bisa mengukur.\n"
+             f"Jangkarnya mungkin berubah di sumber; perbarui PERMUKAAN.")
 
 
 def to_legacy(program: str) -> str:
