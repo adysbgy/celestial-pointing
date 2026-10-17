@@ -27360,3 +27360,200 @@ ini kali kedua ia muncul di berkas yang sama.
   pada instance"), bukan satu nama spesifik. Itu lebih lemah untuk nama itu
   dan lebih kuat untuk kelasnya; yang tidak dilakukan adalah melonggarkan
   `assert`-nya.
+
+---
+
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: layar pertama tanpa langit, dan mode malam yang ternyata putih)
+
+Dua unit di siklus ini. Keduanya cacat **yang sudah terkirim**, bukan fitur
+baru, dan keduanya ditemukan dengan melihat hasilnya — bukan dengan membaca
+kode. Itu bukan kebetulan: seluruh 49 aturan UI dan 908 uji PointingKit tidak
+punya satu pun yang bisa melihat "layar ini terlihat datar" atau "titik ini
+putih padahal seharusnya merah".
+
+### Unit 1 — `OnboardingView` satu-satunya layar tanpa langit
+
+Dari enam layar penuh, lima memakai `AppBackdropView` (gradien malam + titik
+bintang). `OnboardingView` — layar **pertama** yang dilihat pengguna — memakai
+`SurfacePalette.appBackground` mentah. Efeknya: layar perkenalan adalah satu-
+satunya yang rata, tanpa bintang, dan terasa seperti lembar sheet biasa di atas
+app astronomi.
+
+Penyebabnya bukan kelalaian sekali tulis, tapi **jebakan yang disediakan**:
+ada helper `appBackground()` di `SurfaceTokens.swift` yang tidak pernah
+dipanggil siapa pun sejak `appBackdrop()` lahir. Helper mati dengan nama yang
+masuk akal adalah undangan. Jadi perbaikannya dua bagian:
+
+1. `OnboardingView` memakai `AppBackdropView`.
+2. `appBackground()` **dihapus**, bukan dibiarkan.
+
+Ditambah **Aturan 49** (`swift-ui-lint.sh`): setiap berkas yang mendeklarasikan
+`View` dan menyebut latar aplikasi harus menyebut `appBackdrop`. Berkas yang
+tidak menyentuh latar sama sekali dilewati — view kecil (kartu, lencana) memang
+tidak punya latar sendiri.
+
+Aturan itu menemukan dua hal saat ditulis:
+
+- **Versi pertama lolos secara vakuos.** Ia mencari string `appBackdrop`, tapi
+  berkas yang sudah diperbaiki memanggil `AppBackdropView()`. Huruf besar-kecil
+  saja sudah cukup untuk melewati pemeriksaan — berkasnya "tidak menyentuh
+  latar", jadi dilewati, jadi hijau. Tertangkap oleh harness, bukan oleh
+  membaca ulang. Sekarang yang dicocokkan `[Aa]ppBackdrop` **dan** kemunculan
+  `appBackground`, dan yang memutuskan adalah ada/tidaknya `appBackground`.
+- **Bentuk "cabang lain" juga cacat.** `appBackdrop()` dipanggil, tapi satu
+  cabang `if` menggambar gradien mentah di sebelahnya. Versi berbasis
+  keberadaan menyebutnya bersih. Sekarang ia merah — dan harness mencatat
+  kenapa kontrol itu berubah jadi cacat, bukan diam-diam mengubah harapannya.
+
+### Unit 2 — mode malam di langit menggambar putih, bukan merah
+
+`SkyBackdrop.nightBrightness(_:)` mengembalikan **kanal merah** hasil
+`NightVisual.surface`. Ujinya hijau dan benar: angkanya memang kanal merah.
+Tapi view memakai angka itu sebagai `context.opacity` di atas
+`neutralStarBody` — yang **putih**. Jadi mode malam menggambar titik putih
+yang lebih redup.
+
+Terangnya benar. Ronanya salah. Merah >620nm tidak memicu rhodopsin; putih
+membawa biru dan hijau penuh. Ratusan titik seperti itu ada di setiap layar
+app ini, termasuk layar yang sedang dipakai mengamati langit.
+
+Kenapa tidak ada gerbang yang melihatnya: tidak ada teks di atas titik-titik
+itu, jadi pemeriksaan kontras tidak menyentuhnya, dan "langit agak redup"
+terlihat wajar. Kenapa uji lama lolos: ia memeriksa **angka** dari model, bukan
+warna yang benar-benar masuk ke `GraphicsContext`. Uji yang mengukur model
+tidak bisa menangkap view yang memakai hasilnya untuk hal lain.
+
+Perbaikan: `SkyBackdrop.nightColour(_:)` mengembalikan **warna** (hijau dan
+biru nol persis), dengan `dayColour()` sebagai pasangannya supaya view tidak
+menulis `isOn ? … : …` sendiri. Gambar **siang tidak berubah sama sekali** —
+terang siang tetap dibawa opasitas seperti sebelumnya, dan itu dinyatakan di
+docstring supaya tidak ada yang "merapikan"-nya nanti.
+
+### Verifikasi
+
+    ./swift-test.sh                  CelestialEngine 222 + PointingKit 908, 0 gagal
+    ./swift-ui-lint.sh               49 aturan, hijau
+    ./swift-typecheck.sh             SEMUA GERBANG LULUS
+    Tools/bukti-mutasi-latar-layar.py  6 keadaan, 0 tidak sesuai harapan
+    Tools/check-jangkar-harness.py   hijau
+    Tools/check-harness-terdaftar.py hijau
+    Apple Build (macos-15)           hijau — `Apps/` benar-benar dikompilasi
+
+Uji baru di PointingKit: 2 (906 → 908), keduanya RED lebih dulu.
+
+### Yang TIDAK diklaim
+
+- **Belum ada yang melihat layar ini.** Tidak ada Xcode di mesin ini, dan
+  `swift-typecheck.sh` hanya `-parse`. Yang dibuktikan: model mengembalikan
+  merah murni, view memakainya, dan `Apps/` lolos kompilasi penuh di CI macOS.
+  Apakah hasilnya **terbaca** merah dan apakah langitnya terasa premium —
+  belum diukur siapa pun.
+- Aturan 49 hanya memeriksa berkas yang **mendeklarasikan `struct … : View`**
+  dan menyebut latar aplikasi. Layar yang menyusun latarnya lewat tipe lain,
+  atau yang memakai `.background(...)` dengan warna token langsung tanpa
+  menyebut `appBackground`, tidak terlihat.
+- Perbaikan mode malam hanya menyentuh titik latar. Objek (planet, Bulan,
+  bintang, kabut) sudah lewat `color(_:isShadow:)` dan tidak diubah di unit
+  ini; yang belum diperiksa adalah apakah **semua** jalur gambar memakai
+  pintu itu.
+
+---
+
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: gerbang morfologi memerah pada pohon yang benar, dua commit)
+
+### Dibuka seperti biasa, dan `main` merah
+
+`git log` + `gh run list`: **Apple Build hijau, Engine Tests (Linux) merah
+pada dua commit berturut-turut** (`39057730435`, `39058420822`). Yang gagal
+bukan uji Swift, melainkan gerbang gambar:
+
+    GAGAL kasus render morfologi: tidak ada bentuk sisa di port
+          hanya ada di port: [None] — tidak bisa dipilih objek mana pun
+
+`[None]` itu bukan bentuk sisa. Ia **kabut ragu** — `VisualFrame.uncertainFog`,
+bentuk yang justru baru ditambahkan siklus sebelumnya supaya keraguan tidak
+tampil paling terang di katalog. Gerbangnya melaporkan satu-satunya bentuk
+yang dibaca model untuk keadaan ragu sebagai kode mati.
+
+### Cacatnya: daftar tangan yang tertinggal satu kunci
+
+Gerbang mengecualikan kunci netral dengan **daftar tulisan tangan**:
+
+    extra_port = sorted(port_names - set(declared) - {"nebula"})
+
+Port punya **dua** kunci yang bukan kasus enum: `"nebula"` dan `None`. Yang
+kedua lahir bersama `uncertainFog`, dan daftar `{"nebula"}` tidak ikut
+tumbuh. Kelasnya persis yang sudah berulang di repo ini: daftar tangan selalu
+tertinggal satu entri di belakang model, dan tidak ada yang berbunyi saat ia
+tertinggal — yang berbunyi justru gerbangnya, pada kode yang benar.
+
+**Cacat kedua, di fungsi yang sama, belum sempat berbunyi.** `sorted()` atas
+himpunan yang memuat `None` bersama `str` melempar `TypeError`. Dua
+pemeriksaan tetangga (`missing_in_port`, `extra_in_port` di
+`check_deep_sky_layouts_match_the_model`) memakai `sorted` polos atas himpunan
+yang sama. Begitu satu kunci netral hilang dari salah satu sisi, keduanya
+mati dengan traceback alih-alih melaporkan satu hasil merah — dan gerbang
+yang mati dengan traceback akan dihapus orang, bukan diperbaiki.
+
+### Perbaikannya: baca dari model, bukan dari ingatan penulisnya
+
+    extra_port = sorted(port_names - set(declared) - read_names, key=str)
+
+`read_names` adalah kunci yang **benar-benar dibaca**
+`read_deep_sky_layouts_from_swift` dari `CelestialVisual.swift`. Bentuk netral
+baru ikut terkecuali tanpa ada yang perlu ingat menambahkannya. `key=str`
+menutup `TypeError` di ketiga tempat.
+
+### Bukti bahwa perbaikannya tidak melebar jadi lubang
+
+Pengecualian yang membaca "semua kunci yang tidak ada di enum" akan hijau di
+mana-mana — termasuk pada port yang benar-benar menyimpan bentuk mati. Yang
+menahan itu bukan argumen, melainkan **keadaan 2 harness** (`.comet` hanya di
+`DEEP_SKY_LAYOUT`), yang tetap menuntut MERAH dan tetap merah.
+
+Keadaan baru **2b** menjaga arah sebaliknya: `uncertainFog` diganti namanya di
+model. Gerbang harus **berhenti dengan alasan yang menyebutnya**, bukan
+kembali melaporkan `None` sebagai bentuk sisa. Tanpa 2b, menghapus pembacaan
+`None` dari pembaca gerbang akan menghidupkan bug yang sama tanpa satu pun
+keadaan berbunyi.
+
+**Non-vakuositas diukur, bukan diklaim.** Harness dijalankan atas gerbang
+**pra-perbaikan** di worktree terpisah (`HEAD~1`):
+
+    gerbang lama : 6 dari 8 keadaan TIDAK SESUAI HARAPAN
+                   (termasuk baseline dan "comet TERPASANG LENGKAP")
+    gerbang baru : 9 dari 9 keadaan sesuai harapan
+
+### Harness menangkap ini sebelum saya
+
+`bukti-mutasi-kasus-morfologi.py` sudah merah di `HEAD` bersih: baseline-nya
+menuntut hijau dan terukur merah, dan keadaan "comet TERPASANG LENGKAP (wajib
+hijau)" gagal. Itu **gerbang bekerja** — bukan gerbang yang perlu dilonggarkan.
+Yang salah adalah gerbang yang ia ukur, dan harness-lah yang membuat
+kesalahannya terlihat sebagai kegagalan, bukan sebagai kebisingan.
+
+### Verifikasi
+
+    ./swift-test.sh                        CelestialEngine 222 + PointingKit 908, 0 gagal
+    ./swift-ui-lint.sh                     SEMUA GERBANG UI LULUS (49 aturan)
+    ./swift-typecheck.sh                   SEMUA GERBANG LULUS
+    bukti-mutasi-kasus-morfologi.py        9 keadaan, semuanya sesuai harapan
+    check-jangkar-harness.py               381 jangkar, tidak ada mutasi tertinggal
+    check-harness-terdaftar.py             94 harness, semuanya dirujuk
+    check_every_morphology...              4 hasil hijau (diukur di proses baru)
+    check_deep_sky_layouts_match_the_model 9 hasil, 0 merah (diukur di proses baru)
+
+### Yang TIDAK diklaim
+
+- Ini **perbaikan gerbang**, bukan perubahan perilaku. Tidak ada satu baris
+  `Apps/` maupun `Packages/` yang disentuh; gambar yang tampil di jam sama
+  persis dengan sebelum siklus ini. Yang berubah: gerbangnya berhenti menuduh
+  kode benar, dan berhenti bisa mati dengan `TypeError`.
+- `read_names` membaca kunci yang **pembaca gerbang** kenali, bukan seluruh
+  kunci yang mungkin ada di model. Kalau kelak ada bentuk netral yang tidak
+  dibaca `read_deep_sky_layouts_from_swift`, ia akan tetap dilaporkan sebagai
+  bentuk sisa — arah yang dipilih, karena diam pada bentuk mati adalah
+  kegagalan yang tidak terlihat.
+- `check-visuals.py --check` penuh (~41 menit) **tidak** dijalankan utuh di
+  sini; yang diukur adalah kedua fungsi yang disentuh, di proses baru. Gerbang
+  penuh berjalan di CI.
