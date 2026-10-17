@@ -216,6 +216,29 @@ public extension PointingSnapshot {
             && !state.looksConfident
     }
 
+    /// Model gambar untuk objek yang sedang ditampilkan, atau `nil` bila tidak
+    /// ada objek yang ditampilkan.
+    ///
+    /// **Satu-satunya jalur yang boleh dipakai UI untuk memilih benda yang
+    /// digambar.** Ia tidak menerima objek sebagai argumen — sengaja. Selama
+    /// pemanggil bisa menyodorkan objeknya sendiri, gambar dan nama di kartu
+    /// bisa berasal dari dua benda berbeda tanpa satu gerbang pun bisa
+    /// melihatnya: badan perakitnya dulu hidup di `Apps/`, yang tidak pernah
+    /// dibangun di Linux. Terukur: mengganti `displayedObject` menjadi
+    /// `lastLocked` membuat seluruh 42 aturan UI tetap hijau, sementara kartu
+    /// menampilkan Jupiter dengan gambar cincin Saturnus di sebelahnya.
+    ///
+    /// `nil` (bukan gambar generik) bila tidak ada objek: visual tanpa nama
+    /// akan menampilkan benda yang tidak ditentukan engine, dan itu klaim yang
+    /// dilarang PRD.
+    ///
+    /// Fakta fase tidak diambil di sini: pengambilannya tetap di `Apps/`, di
+    /// mana Aturan 31 menelusuri setiap kabelnya sebagai nilai.
+    func displayedVisual(lastLocked: CelestialObject?) -> CelestialVisual? {
+        guard let object = displayedObject(lastLocked: lastLocked) else { return nil }
+        return CelestialVisual(object: object)
+    }
+
     /// Objek yang berlaku **untuk arah tunjuk sekarang**.
     ///
     /// `bestObject` sengaja mempertahankan objek terakhir supaya panel jam tidak
