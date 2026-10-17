@@ -1430,6 +1430,30 @@ jobs:
       - name: Buktikan uji pemilih palet merah pada pemetaan yang menyimpang
         run: python3 Tools/bukti-mutasi-pemilih-palet.py
 
+      # Aturan 46 — peristiwa yang **berbunyi** tidak boleh dipilih sendiri di
+      # `Apps/`.
+      #
+      # `Apps/Shared/AudioCue.swift` memutuskan peristiwa mana yang boleh
+      # terdengar seperti berhasil (`events.contains(.lockSucceeded)`), dan
+      # berkas itu hidup di `Apps/` yang tidak pernah dibangun
+      # `swift-test.sh`. Terukur sebelum Aturan 46: empat mutasinya — termasuk
+      # `|| .uncertain` yang membuat engine ragu berbunyi **persis** seperti
+      # engine yakin — semuanya lolos ke-45 aturan UI. Bunyi adalah
+      # satu-satunya saluran bagi pengguna yang tidak melihat layar, jadi tidak
+      # ada teks di layar yang bisa membantahnya; itulah yang membuatnya
+      # berbahaya.
+      #
+      # Harness ini menjalankan Aturan 46 atas pohon yang dimutasi: setiap
+      # bentuk lama wajib MERAH, pohon produksi apa adanya wajib HIJAU.
+      - name: Buktikan Aturan 46 berbunyi pada pemilihan peristiwa bunyi di Apps/
+        run: python3 Tools/bukti-mutasi-suara-lint.py
+
+      # Bukti kedua untuk Aturan 46 pada **sisi uji** (PointingKit): politik
+      # `AudioEventPolicy` harus merah saat peristiwa audible-nya dimutasi,
+      # saat semuanya dibisukan, dan saat saklar pengguna tidak digerbangi.
+      - name: Buktikan uji kebijakan bunyi merah pada politik yang menyimpang
+        run: python3 Tools/bukti-mutasi-suara.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

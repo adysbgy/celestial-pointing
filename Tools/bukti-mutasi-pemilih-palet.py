@@ -62,12 +62,27 @@ ANCHOR = "isNightModeEnabled ? .night : .day"
 
 RULE = "SurfacePaletteTests"
 
-#: (label, pengganti, harus_merah). `None` = baseline, harus hijau.
+#: Jalur relatif, dipakai bentuk `(path, find, replace)`.
+#:
+#: **Kenapa bentuk ini, bukan `(label, pengganti, harus_merah)`.** Bentuk
+#: ringkas itu terbaca di sini, tetapi `Tools/check-jangkar-harness.py` tidak
+#: bisa memetik pasangan jangkar darinya: `_edit_pairs` membaca elemen pertama
+#: tuple panjang-3 sebagai **jalur berkas**, dan label keadaan bukan jalur.
+#: Akibatnya harness ini terhitung "memutasi sumber produksi tetapi
+#: menyumbang nol jangkar", dan gerbang itu merah — bukan karena ada mutasi
+#: bocor, melainkan karena bentuk datanya tidak dikenali pemeriksanya.
+#: Gerbangnya **tidak** boleh dilonggarkan untuk menutupi itu (ia satu-satunya
+#: yang mendeteksi mutasi tertinggal), jadi bentuk datanya yang disesuaikan.
+SRC_REL = "Packages/PointingKit/Sources/PointingKit/NightPaletteSelector.swift"
+
+#: (label, edit, harus_merah). `edit` = `None` (baseline) atau
+#: `(path, find, replace)` — bentuk yang dikenali gerbang jangkar.
 STATES = [
     ("baseline (kode apa adanya)", None, False),
-    ("selalu .day", ".day", True),
-    ("selalu .night", ".night", True),
-    ("dibalik", "!isNightModeEnabled ? .night : .day", True),
+    ("selalu .day", (SRC_REL, ANCHOR, ".day"), True),
+    ("selalu .night", (SRC_REL, ANCHOR, ".night"), True),
+    ("dibalik",
+     (SRC_REL, ANCHOR, "!isNightModeEnabled ? .night : .day"), True),
     ("basil ulang (pulih)", None, False),
 ]
 
@@ -130,10 +145,11 @@ def main() -> int:
 
     unexpected = 0
     try:
-        for label, ganti, harus_merah in STATES:
+        for label, edit, harus_merah in STATES:
             restore()
-            if ganti is not None:
-                mutasi_sumber.write_source(SRC, teks.replace(ANCHOR, ganti, 1))
+            if edit is not None:
+                _, jangkar, ganti = edit
+                mutasi_sumber.write_source(SRC, teks.replace(jangkar, ganti, 1))
             hijau, output = run_tests()
             merah = not hijau
             ok = merah == harus_merah

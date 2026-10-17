@@ -7704,6 +7704,122 @@ else
   echo "Bersih: pemilihan palet selalu lewat NightPaletteSelector."
 fi
 
+# ── Aturan 46: peristiwa yang berbunyi tidak boleh dipilih sendiri di Apps/ ──
+#
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka.
+# `Apps/Shared/AudioCue.swift` punya satu baris yang memutuskan peristiwa mana
+# yang boleh terdengar seperti berhasil:
+#
+#     guard AudioCue.isOn, events.contains(.lockSucceeded) else { return }
+#
+# Itu bukan rincian implementasi, melainkan **politik PRD**: hanya
+# `lockSucceeded` yang boleh berbunyi. Bunyi saat engine ragu adalah false
+# confidence yang berwujud suara — dan itu satu-satunya saluran bagi pengguna
+# yang tidak melihat layar, jadi tidak ada teks yang bisa membantahnya.
+#
+# Terukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa),
+# dengan mutasi yang semuanya mengompilasi:
+#
+#     guard ... events.contains(.lockSucceeded) ...    swift-ui-lint.sh LULUS
+#     guard ... .lockSucceeded || .uncertain ...       swift-ui-lint.sh LULUS
+#     guard AudioCue.isOn                              swift-ui-lint.sh LULUS
+#     return                                           swift-ui-lint.sh LULUS
+#
+# Empat keadaan, **nol** yang berbunyi. Yang paling sunyi bukan yang terakhir
+# (bunyi hilang, cukup terlihat) melainkan yang kedua: engine ragu berbunyi
+# **persis** seperti engine yakin, dan tidak ada gerbang yang melihatnya.
+#
+# Kenapa Aturan 38/42 tidak menangkapnya: keduanya menurunkan permukaan yang
+# **namanya ada sebagai anggota model** (properti `var X: Bool { ... }`).
+# `play(_:)` adalah fungsi berbadan banyak-pernyataan yang menerima daftar
+# peristiwa; tidak ada nama permukaan untuk ditambat, dan yang salah bukan
+# "apakah `lockSucceeded` disebut" melainkan **aturan pemilihan**-nya.
+#
+# Kenapa perbaikannya struktural: pemilihnya dipindah ke `AudioEventPolicy`
+# (PointingKit) dan dijaga uji (`AudioEventPolicyTests`), sedangkan `Apps/`
+# hanya meneruskan daftar peristiwa + saklarnya. Aturan ini menutup **sisi
+# `Apps/`** dari kelas yang sama: badan `play` tidak boleh lagi memilih
+# peristiwa audible sendiri.
+#
+# Yang TIDAK diklaim: ini sapu teks atas pemilihan peristiwa yang **ditulis
+# langsung** di `Apps/` (`contains(.lockSucceeded)`, `== .lockSucceeded`,
+# `case .lockSucceeded` di dalam fungsi yang menerima `[HapticEvent]`).
+# Pemilihan yang disembunyikan di balik fungsi helper tetap tidak terlihat —
+# itulah sebabnya uji di PointingKit ikut menahan nilai kembaliannya.
+echo "== Aturan 46: peristiwa berbunyi tidak dipilih sendiri di Apps/ =="
+rakitan46=$(python3 - <<'PY' 2>&1
+import os, re
+
+#: Bentuk pemilihan peristiwa audible yang **dilarang** ditulis di `Apps/`.
+#: Sengaja sempit ke nama peristiwa yang benar-benar menentukan bunyi, supaya
+#: aturan ini tidak menuduh pemakaian sah `lockSucceeded` di tempat lain
+#: (mis. label VoiceOver yang menyebut objek terkunci).
+POLA = (
+    re.compile(r"contains\s*\(\s*\.lockSucceeded\s*\)"),
+    re.compile(r"\.lockSucceeded\s*=="),
+    re.compile(r"==\s*\.lockSucceeded"),
+    re.compile(r"contains\s*\(\s*\.uncertain\s*\)"),
+)
+
+#: Nama berkas/fungsi yang memang berisi keputusan bunyi. Hanya di sana pola di
+#: atas berarti "memilih peristiwa audible"; di tempat lain (label, lencana)
+#: ia bisa sah. Diukur: tanpa pembatas ini, aturan menuduh docstring Aturan 46
+#: sendiri dan `CelestialVisual` yang menyebut `.lockSucceeded` untuk teks.
+KONTEKS = re.compile(r"AudioCue|play\s*\(")
+
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = open(path, encoding="utf-8").read()
+        # Buang komentar agar doc-comment yang mengutip bentuk lama tidak
+        # memicu aturan ini (sama seperti Aturan 38/42/45).
+        buf = []
+        for baris in kode.split("\n"):
+            if "//" in baris:
+                baris = baris.split("//", 1)[0]
+            buf.append(baris)
+        kode = "\n".join(buf)
+        for i, baris in enumerate(kode.split("\n"), 1):
+            if not any(p.search(baris) for p in POLA):
+                continue
+            bersih = baris.strip()
+            # Hanya baris kode: abaikan yang masih sisa string/dokumentasi.
+            if bersih.startswith("///") or bersih.startswith("*") or '"' in bersih:
+                continue
+            # Di luar berkas pemegang keputusan bunyi, pola ini belum tentu
+            # soal audio — jangan menuduh yang sah.
+            if not KONTEKS.search(path) and not KONTEKS.search(bersih):
+                continue
+            diperiksa += 1
+            masalah.append(
+                "  %s:%d: `%s` -- pemilihan peristiwa berbunyi ditulis sendiri "
+                "di Apps/. Pakai `AudioEventPolicy.shouldPlay(events:"
+                "isAudioEnabled:)` (PointingKit, teruji di Linux); berkas ini "
+                "tidak pernah dibangun swift-test.sh." % (path, i, bersih[:90]))
+
+if diperiksa == 0 and not os.path.isdir("Apps"):
+    print("PERINGATAN: Apps/ tidak terbaca -- aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan46" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 46 tidak bisa memutuskan:"
+  echo "$rakitan46"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan46" ]; then
+  echo "$rakitan46"
+  status=1
+else
+  echo "Bersih: pemilihan peristiwa berbunyi selalu lewat AudioEventPolicy."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

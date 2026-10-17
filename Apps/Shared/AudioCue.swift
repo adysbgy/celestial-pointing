@@ -20,8 +20,19 @@ final class AudioCueEngine {
     /// berbunyi. Pemilihan ada di sini: hanya `.lockSucceeded`. Membunyikan
     /// peristiwa lain menjaga janji PRD bahwa "ragu" tidak boleh terdengar
     /// seperti "berhasil".
+    ///
+    /// **Keputusan itu tidak lagi ditulis di berkas ini.** Pemilihan
+    /// peristiwa audible hidup di `AudioEventPolicy` (PointingKit, teruji di
+    /// Linux), karena badan `events.contains(.lockSucceeded)` yang dulu
+    /// tinggal di sini memutuskan politik PRD ("ragu tidak boleh terdengar
+    /// seperti berhasil") di `Apps/`, yang tidak pernah dibangun
+    /// `swift-test.sh`. Terukur: empat mutasinya — termasuk `|| .uncertain`
+    /// yang membuat engine ragu berbunyi persis seperti engine yakin —
+    /// **semuanya** lolos ke-45 aturan UI. Di sini hanya meneruskan daftar
+    /// peristiwanya dan saklar penggunanya.
     func play(_ events: [HapticEvent]) {
-        guard AudioCue.isOn, events.contains(.lockSucceeded) else { return }
+        guard AudioEventPolicy.shouldPlay(events: events,
+                                          isAudioEnabled: AudioCue.isOn) else { return }
         playTone()
     }
 
