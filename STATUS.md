@@ -35,11 +35,22 @@ Diukur (`starRGB`, kanal merah = `0.62 + 0.38·warmth`, `warmth = (B−V + 0.35)
     antares     B−V 1,83  →  merah 1,000
     betelgeuse  B−V 1,85  →  merah 1,000
 
-Tiga bintang, tiga B−V berbeda, satu nilai warna. Mode malam membuang hue dan
-menyisakan **hanya** kanal merah, jadi ketiganya menjadi titik yang identik
-piksel demi piksel — dan tidak ada teks di layar yang bisa membantahnya.
-Raksasa merah paling terang di langit tidak bisa dibedakan satu sama lain tepat
-di mode yang dipakai orang untuk melihat langit.
+Tiga bintang, tiga B−V berbeda, satu nilai warna. Kanal merah itu adalah
+**jalur informasi yang memang dirancang membawa informasi**: docstring
+`nightModeBrightness` menyatakan mode malam menyisakan kanal merah saja, dan
+planet memakai kanal itu untuk menentukan urutan terang
+(`NightVisual.surface`). Untuk bintang, view mengambil terang dari
+`relativeSize`, bukan dari kanal merah — jadi ketiga bintang itu **tidak**
+berakhir menjadi titik yang identik di layar sekarang. Yang berakhir tetap
+identik adalah **kanal merahnya**, dan itu tetap cacat: `starRGB` adalah satu
+persamaan untuk dua bahasa (Swift dan port Python) yang juga dipakai
+`Tools/render-visuals.py` untuk mengukur piksel, dan ia kehilangan seluruh
+perbedaan di atas B−V 1,35 sementara sumbu lain tidak.
+
+Justru itu yang membuatnya layak diberesi: titik yang akan menyesatkan
+pembaca berikutnya adalah docstring yang **menjanjikan** kanal merah membawa
+urutan terang, sementara pada rentang bintang paling ikonik di langit kanal itu
+datar.
 
 ### Kenapa gerbang yang ada tidak menangkapnya
 
@@ -98,9 +109,11 @@ menyentuh dinding kanal**. Merah dengan tepat satu sebab:
 
 ### Yang TIDAK diklaim
 
-- Ini **bukan** perbaikan "di layar". Perubahan ada di `PointingKit` (teruji
-  Linux) dan di port `Tools/render-visuals.py`; tidak satu pun berkas `Apps/`
-  disentuh, jadi tidak ada yang perlu dibangun Apple Build untuk siklus ini.
+- Ini **bukan** perbaikan yang mengubah layar jam. Bintang di `Apps/` mengambil
+  terang dari `relativeSize`, bukan dari kanal merah, jadi ketiga bintang itu
+  memang tidak pernah tergambar sebagai tiga titik yang identik. Yang diperbaiki
+  adalah **model** yang dipakai dua bahasa, dipakai `render-visuals.py` untuk
+  mengukur piksel, dan dipakai planet lewat `nightModeBrightness`.
 - Warna bintang mode malam sekarang **uniqueness per B−V**, bukan per bintang.
   Sirius dan Vega tetap merah yang sama — itu benar, bukan sisa cacat.
 - Empat pasangan B−V identik di katalog (sirius/vega, hadar/spica,

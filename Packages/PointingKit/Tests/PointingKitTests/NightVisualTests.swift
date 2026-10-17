@@ -490,9 +490,18 @@ final class NightVisualTests: XCTestCase {
     /// di atas garis itu — Aldebaran (1,54), Antares (1,83), Betelgeuse (1,85).
     /// Ketiganya keluar merah 1,000 dengan **B−V yang berbeda**, jadi yang
     /// hilang bukan informasi yang memang tak ada, melainkan informasi yang
-    /// ada dan dibuang penjepit. Raksasa merah paling terang di langit pun
-    /// tidak bisa dibedakan dari satu sama lain di mode yang justru dipakai
-    /// untuk melihat langit.
+    /// ada dan dibuang penjepit — di sepanjang rentang bintang paling ikonik
+    /// di langit.
+    ///
+    /// **Apa yang TIDAK diklaim uji ini.** Bahwa layar jam sekarang menggambar
+    /// tiga titik merah berbeda: terang titik bintang diambil dari
+    /// `relativeSize`, bukan dari kanal merah (lihat `starColor` di
+    /// `CelestialVisualView`), jadi cacat ini tidak pernah muncul sebagai tiga
+    /// piksel yang identik. Yang dijaga adalah modelnya: `starRGB` adalah satu
+    /// persamaan yang dipakai dua bahasa (Swift dan port Python), dipakai
+    /// `Tools/render-visuals.py` untuk mengukur piksel, dan dipakai planet
+    /// lewat `nightModeBrightness`. Kanal yang menurut docstring-nya membawa
+    /// urutan terang tidak boleh datar tepat di ujung hangat spektrum.
     ///
     /// **Kenapa uji tetangga tidak menangkapnya.**
     /// `testStarColourIsMonotonicInColorIndex` menuntut "tidak pernah
