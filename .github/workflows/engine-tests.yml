@@ -2141,5 +2141,21 @@ jobs:
       - name: Buktikan gerbang berkas alat yang dirujuk berbunyi
         run: python3 Tools/bukti-mutasi-tool-dirujuk.py
 
+      # Dan bukti bahwa Aturan 44 (objek yang digambar tidak dipilih sendiri di
+      # `Apps/`) benar-benar berbunyi.
+      #
+      # Cacat yang ditutupnya terukur: mengganti `displayedObject` menjadi
+      # `lastLockedObject` di `visualForDisplayedObject` membuat **seluruh**
+      # `swift-ui-lint.sh` lulus (exit 0), sementara kartu jam menampilkan nama
+      # Jupiter dengan gambar cincin Saturnus di sebelahnya. Dua pengikatan itu
+      # sama-sama sah secara sintaks dan sama-sama bukan `nil`.
+      #
+      # Aturan 43 **tidak** menangkapnya — deteksinya menyapu `String`,
+      # sedangkan properti itu mengembalikan `CelestialVisual?`. Itu diukur
+      # berdampingan (4 keadaan cacat: Aturan 43 diam, Aturan 44 berbunyi),
+      # dan koreksinya tertulis di docstring Aturan 43.
+      - name: Buktikan Aturan 44 berbunyi pada objek gambar yang dipilih sendiri
+        run: python3 Tools/bukti-mutasi-objek-gambar.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

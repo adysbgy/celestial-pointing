@@ -571,6 +571,22 @@ public final class PointingEngine: ObservableObject {
     /// boleh memakainya (`Planet.showsPhase`), jadi planet luar tidak akan
     /// pernah mendapat sabit walau kamusnya keliru.
     public var visualForDisplayedObject: CelestialVisual? {
+        // `displayedObject` di sini **bukan** `lastLockedObject`, dan bedanya
+        // bukan gaya. `displayedObject` turun dari
+        // `PointingSnapshot.displayedObject(lastLocked:)`, yaitu objek yang
+        // **namanya tertulis di kartu**; `lastLockedObject` adalah kunci
+        // terakhir, yang pada keadaan `.pointing` bisa benda lain sama sekali.
+        // Menggambar dari yang kedua berarti kartu menampilkan nama Jupiter
+        // dengan gambar cincin Saturnus di sebelahnya.
+        //
+        // Keduanya sama-sama `CelestialObject?` dan sama-sama bukan `nil`, jadi
+        // kompiler tidak membedakannya dan tidak ada teks di layar yang
+        // membedahnya. Yang menahannya sekarang **Aturan 44** (`swift-ui-lint.sh`):
+        // sebelum itu ada, mutasi ini membuat seluruh lint lulus dengan exit 0.
+        //
+        // Fakta fase (fraksi, arah, sudut sisi terang) dirakit di sini, bukan di
+        // PointingKit: Aturan 31 menelusuri tiap kabelnya sebagai *nilai*, dan
+        // memindahkannya ke Swift murni hanya ikut memindahkan pemeriksaannya.
         guard let object = displayedObject else { return nil }
         let isMoon = object.kind == .moon
         let fraction = isMoon ? skyContext?.moonIlluminationFraction : nil

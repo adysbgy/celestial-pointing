@@ -7291,6 +7291,293 @@ else
   echo "Bersih: setiap permukaan bukan-Bool di Apps/ meneruskan faktanya."
 fi
 
+# ── Aturan 43: teks yang dirakit di Apps/ harus hidup di PointingKit ──
+#
+# Cacat siklus ini, dan tidak satu pun dari 42 aturan di atas yang bisa
+# melihatnya:
+#
+#   `ReducedLuminanceView.reducedAccessibilityLabel` merakit enam sumber di
+#   `Apps/`, dan melewatkan catatan sensor yang justru tampil di layar.
+#
+# Ia **String yang dirakit**, ia `private` di `Apps/`, dan ia tidak pernah
+# dieksekusi di Linux — jadi tidak ada uji yang bisa memerahkannya. Aturan
+# 34/35/36/38/42 masing-masing mengurus *satu* fakta yang diteruskan; yang
+# merakit beberapa sumber tidak masuk cakupan satupun.
+#
+# **Yang TIDAK ditangkap aturan ini, meski sempat tertulis di sini.** Versi
+# pertama docstring ini menyebut `visualForDisplayedObject` sebagai cacat
+# "bentuk yang sama". Itu **salah ukur**: mutasi
+# `displayedObject -> lastLockedObject` pada properti itu diukur menjalankan
+# **seluruh** lint (exit 0, "SEMUA GERBANG UI LULUS"), jadi aturan ini tidak
+# menangkapnya — deteksinya menyapu `String`, sedangkan properti itu
+# mengembalikan `CelestialVisual?`. Celah itu ditutup **Aturan 44**, yang
+# menyapu hasil bertipe `CelestialVisual`. Dua aturan, dua kelas: String
+# (43) dan identitas gambar (44). Menyatukannya dalam satu sapu akan
+# menghasilkan deteksi longgar yang menuduh kode benar.
+#
+# Aturan ini menutup **kelasnya**, bukan satu barisnya: anggota `private` di
+# `Apps/` yang merangkai dua fakta engine atau lebih menjadi satu String
+# adalah calon cacat, dan harus dirakit di `PointingKit` (tempat ia bisa
+# diuji). Bentuk yang tertinggal di `Apps/` dilaporkan.
+#
+# **Kenapa deteksinya menyempit pada `parts`/`joined`.** Pemeriksaan longgar
+# ("setiap anggota private yang menyebut dua fakta") juga menangkap
+# `fullView`, `start`, dan `exportDocument` — badan yang memang **harus**
+# tinggal di view. Daftar yang panjang dan semuanya boleh dikecualikan
+# adalah gerbang yang akan dimatikan orang pada hari pertama. Yang dicari
+# di sini hanya pola **perangkaian teks**: `parts` + `joined`, bentuk yang
+# dipakai kedua cacat itu persis.
+echo "== Aturan 43: teks yang dirakit di Apps/ harus hidup di PointingKit =="
+rakitan=$(python3 - <<'PY' 2>&1
+import os, re
+
+
+def kode_saja(teks):
+    """Buang komentar `//` — sama seperti Aturan 38."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam = False
+            else:
+                if ch == '"':
+                    dalam = True
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+berkas = []
+for root, _, files in os.walk("Apps"):
+    for f in files:
+        if f.endswith(".swift"):
+            berkas.append(os.path.join(root, f))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di Apps/ -- aturan ini tidak "
+          "bisa memutuskan.")
+    raise SystemExit(0)
+
+masalah = []
+for jalur in berkas:
+    teks = kode_saja(open(jalur, encoding="utf-8").read())
+    baris = teks.split("\n")
+    for m in re.finditer(r"private (?:var|func)\s+(\w+)([^{]*)\{", teks):
+        nama, sig = m.group(1), m.group(2)
+        # Hanya perangkaian teks: yang mengembalikan String.
+        if "String" not in sig:
+            continue
+        awal = teks[:m.start()].count("\n")
+        dalam_kurung, akhir = 0, awal
+        for j in range(awal, min(awal + 60, len(baris))):
+            dalam_kurung += baris[j].count("{") - baris[j].count("}")
+            if dalam_kurung == 0 and j > awal:
+                akhir = j
+                break
+        else:
+            akhir = min(awal + 60, len(baris) - 1)
+        badan = "\n".join(baris[awal:akhir + 1])
+        # Bentuk yang dicari: mengisi wadah lalu menggabungnya.
+        if not re.search(r"\.joined\(|\bparts\b", badan):
+            continue
+        fakta = set(re.findall(r"engine\.(\w+)", badan))
+        # Satu fakta tidak butuh perakitan; dua ke atas adalah cacat yang
+        # sudah dua kali terjadi.
+        if len(fakta) < 2:
+            continue
+        masalah.append(
+            "  `%s` di %s merangkai %d fakta engine (%s) menjadi satu String "
+            "di dalam Apps/. Berkas ini tidak pernah dibangun di Linux, jadi "
+            "tidak ada uji yang bisa memerahkannya -- pindahkan perakitannya "
+            "ke PointingKit, seperti `ReducedLuminanceLabel` dan `RowSpeech`."
+            % (nama, jalur, len(fakta), ", ".join(sorted(fakta))))
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 43 gagal dijalankan:"
+  echo "$rakitan"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan" ]; then
+  echo "$rakitan"
+  status=1
+else
+  echo "Bersih: tidak ada String yang dirangkai dari beberapa fakta di Apps/."
+fi
+
+# ── Aturan 44: objek yang digambar tidak boleh dipilih sendiri di Apps/ ──
+#
+# Saudaranya Aturan 43, dan lahir dari cacat yang **docstring Aturan 43 sendiri
+# sebut** tapi tidak bisa ditangkapnya:
+#
+#   `PointingEngine.visualForDisplayedObject` mengembalikan `CelestialVisual?`
+#   dan merakitnya dari `displayedObject` + fraksi fase + sudut sisi terang di
+#   `Apps/`. Mengganti `displayedObject` jadi `lastLockedObject` membuat seluruh
+#   43 aturan di atas tetap hijau (terukur: menjalankan seluruh `swift-ui-lint.sh`
+#   di atas salinan yang dimutasi -> exit 0, "SEMUA GERBANG UI LULUS"), sementara
+#   kartu menampilkan nama Jupiter dengan gambar cincin Saturnus.
+#
+# Yang membedakannya dari cacat String: di sini hasilnya adalah **identitas
+# gambar**, bukan teks. `CelestialVisual` memang tinggal di `Packages/`, tapi
+# *pemilihan objek* yang dirakit di `Apps/` tidak pernah dieksekusi di Linux.
+# Perbaikannya dulu (siklus "gambar objek tak bisa lagi berasal dari benda
+# selain yang tertulis di kartunya") memindahkan pemilihan itu ke
+# `PointingSnapshot.displayedVisual(lastLocked:)`, yang meneruskan `object`
+# dari `displayedObject` dan karenanya tidak bisa disodori benda lain. Tapi
+# **gerbang** yang menutup pemindahan itu tidak pernah ditulis — jadi mutasi
+# yang memutar balik pemindahan itu buta sampai hari ini.
+#
+# Aturan ini menutup **pemilihan bendanya**, bukan pembuatan gambarnya.
+# `CelestialVisual(...)` boleh tetap dirakit di `Apps/` — faktanya (fraksi fase,
+# arah, sudut sisi terang) sengaja dijaga Aturan 31 sebagai *nilai* di sini, dan
+# memindahkannya ke Swift murni hanya ikut memindahkan pemeriksaannya. Yang
+# **tidak** boleh: objeknya dipilih di `Apps/`.
+#
+# Terukur, bukan teoretis: `let object = displayedObject` -> `let object =
+# lastLockedObject` di `visualForDisplayedObject` membuat seluruh lint lulus
+# (exit 0, "SEMUA GERBANG UI LULUS"), sementara kartu menampilkan nama Jupiter
+# dengan gambar cincin Saturnus. Kedua pengikatan itu **sama-sama sah** secara
+# sintaks, sama-sama bukan `nil`, dan tidak ada teks di layar yang membedahnya.
+#
+# Karena itu yang dituntut bukan "jangan panggil ctor", melainkan **syarat
+# ketat pada pengikatan**: `let object = <sumber>` di `Apps/` hanya boleh
+# bersumber dari jalur yang namanya menyebut objek yang **sedang ditampilkan**
+# (`displayedObject`, `displayedVisual(...)`). Menyebut `lastLockedObject`,
+# `answeredObject`, `intent?.best`, atau `lastLocked` sebagai sumber langsung
+# dilaporkan. Daftar sumber yang diterima sengaja **pendek dan tertulis**:
+# daftar panjang berarti gerbang yang akan dilonggarkan pada hari pertama.
+#
+# Catatan jujur tentang cakupannya: ini **sapu teks**, bukan pemeriksa tipe.
+# Ia membaca nama di sebelah kanan `=`, bukan nilai yang dihasilkannya.
+# `displayedObject` yang disalurkan lewat variabel perantara tidak terlihat.
+echo "== Aturan 44: objek yang digambar tidak dipilih sendiri di Apps/ =="
+rakitan44=$(python3 - <<'PY' 2>&1
+import os, re
+
+#: Sumber yang **boleh** jadi kanan `let object = ...` di `Apps/`. Semuanya
+#: jalur yang turun dari `displayedObject(lastLocked:)`, jadi tidak ada satupun
+#: yang bisa berbeda dari objek yang namanya tertulis di kartu.
+SUMBER_SAH = (
+    "displayedObject",
+    "displayedVisual",
+)
+
+#: Sumber yang **dilarang**. Daftar ini hanya memperjelas **pesan**-nya: yang
+#: menentukan adalah `SUMBER_SAH` di atas (daftar putih). Sumber yang tidak
+#: dikenal tetap dilaporkan -- cacat yang dulu lolos adalah bentuk yang belum
+#: terpikirkan, jadi daftar hitam persis yang akan tertinggal.
+SUMBER_TERLARANG = (
+    "lastLockedObject",
+    "lastLocked",
+    "answeredObject",
+    "bestObject",
+    "intent?.best",
+    "intent.best",
+)
+
+
+def kode_saja(teks):
+    """Buang komentar `//` — sama seperti Aturan 38/43."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam = False
+            else:
+                if ch == '"':
+                    dalam = True
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+#: Nama lokal yang menandai "objek yang sedang ditampilkan". Disengaja sempit:
+#: `object` dipakai konsisten di keempat situs yang diukur.
+IKATAN = re.compile(r"\blet\s+(object|displayed)\s*=\s*([A-Za-z_?][^\n]*?)\s*$")
+
+berkas = []
+for root, _, files in os.walk("Apps"):
+    for f in files:
+        if f.endswith(".swift"):
+            berkas.append(os.path.join(root, f))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di Apps/ -- aturan ini tidak "
+          "bisa memutuskan.")
+    raise SystemExit(0)
+
+TERHITUNG = 0
+masalah = []
+for jalur in berkas:
+    teks = kode_saja(open(jalur, encoding="utf-8").read())
+    for nomor, baris in enumerate(teks.split("\n"), 1):
+        m = IKATAN.search(baris)
+        if not m:
+            continue
+        kanan = m.group(2)
+        TERHITUNG += 1
+        if any(s in kanan for s in SUMBER_SAH):
+            continue
+        # Bukan daftar hitam: sumber yang **tidak dikenal** tetap dilaporkan,
+        # karena bentuk yang belum terpikirkan persis yang dulu lolos. Nama
+        # terlarang hanya memperjelas pesannya.
+        larang = [s for s in SUMBER_TERLARANG if s in kanan] or ["sumber yang tidak dikenal"]
+        if True:
+            masalah.append(
+                "  %s:%d  `let %s = %s` -- objek yang digambar diambil dari "
+                "%s, bukan dari objek yang sedang ditampilkan. Kartu bisa "
+                "menampilkan nama satu benda dengan gambar benda lain, dan "
+                "Apps/ tidak pernah dibangun di Linux sehingga tidak ada uji "
+                "yang memerahkannya. Pakai `displayedObject` / "
+                "`displayedVisual(lastLocked:)`." %
+                (jalur, nomor, m.group(1), kanan, "/".join(larang)))
+
+if TERHITUNG == 0:
+    # Fail-closed: nol ikatan terbaca berarti pembacanya berhenti melihat,
+    # bukan berarti tidak ada yang perlu dijaga.
+    print("PERINGATAN: tidak satu pun pengikatan `let object = ...` terbaca di "
+          "Apps/ -- aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan44" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 44 tidak bisa memutuskan:"
+  echo "$rakitan44"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan44" ]; then
+  echo "$rakitan44"
+  status=1
+else
+  echo "Bersih: objek yang digambar selalu dari objek yang sedang ditampilkan."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
