@@ -4714,9 +4714,36 @@ def _branch(expr, want_moon):
 
 
 def _bound_value(name):
-    """Ekspresi yang diikat ke `name` lewat `let`, atau None bila tak ada."""
-    match = re.search(r"\blet\s+%s\b[^=\n]*=\s*([^\n]+)" % re.escape(name), code)
-    return match.group(1).strip() if match else None
+    """**Semua** ekspresi yang diikat ke `name` lewat `let`, sebagai daftar.
+
+    **Kenapa semua ikatan, bukan yang pertama, dan kenapa itu tidak sepele.**
+    Diukur pada `Apps/Shared/PointingEngine.swift`: berkas itu mengikat
+    `fraction` **dua** kali (sekali di dalam `for` planet berfase, sekali
+    untuk Bulan) dan `waxing` **dua** kali pula. `re.search` mengembalikan
+    ikatan **pertama** -- milik planet -- jadi menelusuri kawat Bulan
+    `moonIlluminationFraction: fraction` membaca ikatan **planet** dan
+    melaporkan "bersih" berdasarkan baris yang tidak pernah dipakai Bulan.
+    Gerbangnya tidak longgar: ia membaca baris yang salah.
+
+    Terukur, proses baru, dengan mutasi yang tetap bisa dikompilasi
+    (bukan `= nil` polos yang menolak dikompilasi karena `let` tanpa tipe
+    tidak boleh diikat ke `nil`):
+
+        let fraction: Double? = nil          -> HIJAU   (Bulan kehilangan fase)
+        let planet: ...Planet? = nil         -> HIJAU   (planet kehilangan fase)
+        let waxing: Bool? = nil              -> HIJAU   (keduanya kehilangan arah)
+
+    Ketiganya mengubah **31.604 dari 40.000 piksel (79,0%)** pada port --
+    Bulan/planet tergambar sebagai bola penuh di setiap keadaan, persis cacat
+    yang gerbang ini ditulis untuk menangkap.
+
+    Aturannya karena itu: sebuah kawat merah bila **salah satu** ikatan
+    namanya nil untuk benda itu. Bukan "semua ikatan nil" -- itu akan
+    mengembalikan kegagalan yang sama dengan menyembunyikannya di balik
+    ikatan lain yang kebetulan sehat.
+    """
+    return [m.strip() for m in
+            re.findall(r"\blet\s+%s\b[^=\n]*=\s*([^\n]+)" % re.escape(name), code)]
 
 
 def _is_nil_for(expr, want_moon):
@@ -4819,6 +4846,35 @@ def _strip_unbalanced_close(expr):
     return value
 
 
+def _telusuri(name, want_moon, why, wire, depth, visited):
+    """Telusuri `name` ke ikatannya; merah bila **rantaiannya** berujung nil.
+
+    Dua tingkat pertama yang diukur buta, keduanya dengan mutasi yang tetap
+    bisa dikompilasi:
+
+        let fraction: Double? = nil       (kedalaman 0 -- langsung)
+        let planet: ...Planet? = nil      (kedalaman 1 -- lewat `planetPhase`)
+
+    Yang kedua tetap hijau pada penelusuran satu tingkat: `planetPhase`
+    sendiri tidak pernah berubah, karena yang mati adalah `planet` di
+    dalamnya, dan `flatMap` atas `nil` mengembalikan `nil`.
+    """
+    if depth > 4 or name in visited:
+        return
+    visited.add(name)
+    for value in _bound_value(name):
+        if _is_nil_for(value, want_moon):
+            problems.append(
+                "  `%s` memakai `%s`, yang diikat ke `%s` -- nil untuk "
+                "benda berfase; %s" % (wire, name, value, why))
+            continue
+        for inner in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b",
+                                _branch(value, want_moon)):
+            if inner in ("nil", "true", "false", "isMoon", "flatMap"):
+                continue
+            _telusuri(inner, want_moon, why, wire, depth + 1, visited)
+
+
 _seen_wires = set()
 for wire, want_moon, why in PHASE_WIRES:
     args = _phase_wire_args(wire)
@@ -4836,14 +4892,24 @@ for wire, want_moon, why in PHASE_WIRES:
                             % (wire, expr, why))
             continue
         # Telusuri nama yang dipakai **di cabang itu** ke nilai penugasan.
+        #
+        # **Kenapa penelusurannya transitif, dan kenapa kedalaman 2 bukan
+        # berlebihan.** Diukur: `let planet: CelestialVisual.Planet? = nil`
+        # tetap **hijau** setelah perbaikan ikatan-jamak di atas, karena
+        # `planetPhase` sendiri tidak pernah berubah -- ia masih tertulis
+        # `planet.flatMap { planetPhases[$0] }`. Kawatnya mati **satu
+        # tingkat lebih jauh**: `flatMap` pada `nil` mengembalikan `nil`, jadi
+        # seluruh fase planet lenyap sementara barisnya terbaca utuh.
+        # Terukur pada port: 31.604/40.000 piksel (79,0%).
+        #
+        # Kedalaman dibatasi 4 dan memakai himpunan `visited` karena
+        # penelusuran tanpa batas bisa berputar pada ikatan yang saling
+        # menyebut; batasnya bukan soal hemat, melainkan supaya gerbang ini
+        # tidak pernah menggantung.
         for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", side_expr):
             if name in ("nil", "true", "false", "isMoon"):
                 continue
-            value = _bound_value(name)
-            if _is_nil_for(value, want_moon):
-                problems.append(
-                    "  `%s` memakai `%s`, yang diikat ke `%s` -- nil untuk "
-                    "benda berfase; %s" % (wire, name, value, why))
+            _telusuri(name, want_moon, why, wire, 0, set())
 
 print("\n".join(problems) if problems else "")
 PY

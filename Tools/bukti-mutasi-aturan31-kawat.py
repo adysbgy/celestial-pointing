@@ -97,6 +97,32 @@ ANCHOR_WAX = "let waxing = isMoon ? moonIsWaxing : planet.flatMap { planetWaxing
 #: hijau di seluruh 31 aturan. Diukur pada port: 31.604/40.000 piksel (79,0%)
 #: berubah, di kedua cabang benda.
 ANCHOR_WAX_ARG = "isWaxing: waxing,"
+#: Kawat kesepuluh hingga keduabelas -- **ikatannya sendiri**, bukan
+#: argumennya. Tiga ini diukur **buta** pada versi gerbang sebelum siklus ini,
+#: semuanya dengan mutasi yang tetap bisa dikompilasi (`let` tanpa tipe tidak
+#: boleh diikat ke `nil`, jadi mutasinya harus menyebut tipe — itulah sebabnya
+#: bentuk `= nil` polos tidak pernah diuji dan cacat ini tidak pernah
+#: tertangkap):
+#:
+#:     let fraction: Double? = nil   -> HIJAU (Bulan kehilangan fase)
+#:     let planet: ...Planet? = nil  -> HIJAU (planet kehilangan fase)
+#:     let waxing: Bool? = nil       -> HIJAU (keduanya kehilangan arah)
+#:
+#: Ketiganya mengubah **31.604 dari 40.000 piksel (79,0%)** pada port --
+#: Bulan/planet tergambar sebagai bola penuh di setiap keadaan, persis cacat
+#: yang gerbang ini ditulis untuk menangkap. Sebabnya dua, berurutan:
+#:
+#:   1. `_bound_value` memakai `re.search`, jadi untuk nama yang diikat
+#:      **dua** kali di berkas yang sama (`fraction` dan `waxing` diikat sekali
+#:      di dalam `for` planet berfase, sekali untuk Bulan) yang terbaca adalah
+#:      ikatan **pertama** -- milik planet -- dan kawat Bulan lalu dinilai dari
+#:      baris yang tidak pernah dipakai Bulan.
+#:   2. Penelusurannya satu tingkat. `planet -> nil` mematikan kawatnya lewat
+#:      `planetPhase`, yang barisnya tetap utuh: `flatMap` atas `nil`
+#:      mengembalikan `nil`.
+ANCHOR_FRACTION_BINDING = ("let fraction = isMoon ? "
+                           "skyContext?.moonIlluminationFraction : nil")
+ANCHOR_PLANET_BINDING = "let planet = CelestialVisual.Planet(objectID: object.id)"
 
 #: Keadaan: (nama, (cari, ganti) atau None untuk baseline).
 STATES = [
@@ -119,6 +145,12 @@ STATES = [
      (ANCHOR_WAX, "let waxing = isMoon ? moonIsWaxing : nil")),
     ("9. argumen isWaxing -> nil",
      (ANCHOR_WAX_ARG, "isWaxing: nil,")),
+    ("10. ikatan fraksi Bulan -> nil (argumen utuh)",
+     (ANCHOR_FRACTION_BINDING, "let fraction: Double? = nil")),
+    ("11. ikatan waxing -> nil (kedua cabang, argumen utuh)",
+     (ANCHOR_WAX, "let waxing: Bool? = nil")),
+    ("12. ikatan planet -> nil (mati satu tingkat lebih jauh)",
+     (ANCHOR_PLANET_BINDING, "let planet: CelestialVisual.Planet? = nil")),
 ]
 
 #: Pembuka blok program Aturan 31 di dalam `swift-ui-lint.sh`.
@@ -174,7 +206,9 @@ def main() -> int:
                           (ANCHOR_MOON_ARG, "argumen fraksi Bulan"),
                           (ANCHOR_MOON_BINDING, "penugasan limbAngle"),
                           (ANCHOR_WAX, "penugasan waxing"),
-                          (ANCHOR_WAX_ARG, "argumen isWaxing")):
+                          (ANCHOR_WAX_ARG, "argumen isWaxing"),
+                          (ANCHOR_FRACTION_BINDING, "penugasan fraction (Bulan)"),
+                          (ANCHOR_PLANET_BINDING, "penugasan planet")):
         count = original.count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {label} muncul {count}x, harus tepat 1x "
