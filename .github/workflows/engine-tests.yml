@@ -1454,6 +1454,22 @@ jobs:
       - name: Buktikan uji kebijakan bunyi merah pada politik yang menyimpang
         run: python3 Tools/bukti-mutasi-suara.py
 
+      # Bukti untuk Aturan 47 — kembar Aturan 46, pada saluran yang paling
+      # sering dipakai tanpa melihat layar: getaran.
+      #
+      # Keputusan "ragu berbunyi pola yang berbeda dari berhasil" dulu ditulis
+      # **dua kali** di Apps/ (jam dan iPhone), dan mengubah `.uncertain`
+      # menjadi pola yang sama dengan `.lockSucceeded` tetap hijau pada semua
+      # gerbang. Harness ini menjalankan Aturan 47 atas pohon yang dimutasi:
+      # setiap bentuk lama wajib MERAH, pohon produksi apa adanya wajib HIJAU.
+      - name: Buktikan Aturan 47 berbunyi pada pemilihan pola getaran di Apps/
+        run: python3 Tools/bukti-mutasi-getaran-lint.py
+
+      # Sisi uji Aturan 47: `HapticPolicyTests` harus merah saat pemetaan
+      # peristiwa→pola menyimpang, dan sumber harus pulih byte-identik.
+      - name: Buktikan uji kebijakan getaran merah pada pemetaan yang menyimpang
+        run: python3 Tools/bukti-mutasi-getaran.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

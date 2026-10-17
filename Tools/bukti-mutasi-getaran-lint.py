@@ -59,37 +59,43 @@ IPHONE_BENAR = """        case .completed:
         case .unsettled:
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()"""
 
-#: Keadaan: (nama, path, find, replace, harus_merah).
+#: Keadaan: `(path, find, replace, nama, harus_merah)`.
 #:
-#: `replace = None` berarti baseline (kode apa adanya) dan harus HIJAU.
+#: Urutannya **bukan** selera. `Tools/check-jangkar-harness.py` membaca jangkar
+#: statis dari tuple berbentuk `(path, find, replace, ...)`, dan gerbang itu
+#: satu-satunya yang mendeteksi mutasi tertinggal dari proses yang dibunuh di
+#: tengah jalan. Bentuk `(nama, path, find, replace)` membuatnya buta terhadap
+#: berkas ini — terukur: gerbang melaporkan "buta terhadap
+#: bukti-mutasi-getaran-lint.py" dan meminta jangkar dinyatakan lewat
+#: `JANGKAR_KECUALI`. Itu tidak dipakai di sini karena jangkarnya memang string
+#: statis; yang perlu diubah hanya urutan elemennya, bukan pemeriksaannya.
+#:
+#: `path = None` berarti baseline (kode apa adanya) dan harus HIJAU.
 #:
 #: Yang diuji adalah **bentuk yang dilarang Aturan 47**: pemilihan pola per
 #: peristiwa yang ditulis langsung di `Apps/`, dalam berkas yang memainkan
 #: getaran. Tiap keadaan di bawah adalah cacat yang mengompilasi — getaran
 #: tetap berbunyi, hanya tidak lagi membedakan ragu dari berhasil.
 STATES = [
-    ("baseline (kode apa adanya)", None, None, None, False),
+    (None, None, None, "baseline (kode apa adanya)", False),
 
     # Kelas cacat yang persis ditutup aturan: `case .<peristiwa>:` memilih efek.
-    ("jam: switch atas peristiwa lagi",
-     JAM, JAM_BENAR,
+    (JAM, JAM_BENAR,
      """        case .lockSucceeded:
             WKInterfaceDevice.current().play(.success)
         case .uncertain:
             WKInterfaceDevice.current().play(.success)""",
-     True),
+     "jam: switch atas peristiwa lagi", True),
 
-    ("iPhone: switch atas peristiwa lagi",
-     IPHONE, IPHONE_BENAR,
+    (IPHONE, IPHONE_BENAR,
      """        case .lockSucceeded:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case .uncertain:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()""",
-     True),
+     "iPhone: switch atas peristiwa lagi", True),
 
     # Arah sebaliknya: perbandingan langsung, bukan `switch`.
-    ("iPhone: pencocokan langsung event ==",
-     IPHONE, IPHONE_BENAR,
+    (IPHONE, IPHONE_BENAR,
      """        case .completed:
             if event == .uncertain {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -98,15 +104,15 @@ STATES = [
             }
         case .unsettled:
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()""",
-     True),
+     "iPhone: pencocokan langsung event ==", True),
 
     # Non-vakuositas: keadaan yang **tidak** cacat harus tetap hijau, supaya
     # aturan tidak sekadar "selalu merah".
-    ("jam: terjemahan pola tanpa menyebut peristiwa",
-     JAM, JAM_BENAR,
+    (JAM, JAM_BENAR,
      """        case .completed: return .success
         case .unsettled: return .retry
         case .failed:    return .failure""",
+     "jam: terjemahan pola tanpa menyebut peristiwa",
      False),
 ]
 
@@ -122,7 +128,7 @@ def main():
         return 2
 
     gagal = []
-    for nama, path, find, replace, harus_merah in STATES:
+    for path, find, replace, nama, harus_merah in STATES:
         work = tempfile.mkdtemp(prefix="bukti-suara-haptic-")
         tree = os.path.join(work, "repo")
         try:
