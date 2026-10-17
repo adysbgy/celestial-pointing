@@ -457,4 +457,121 @@ final class PointingPresentationTests: XCTestCase {
         XCTAssertEqual(decoded?.stateRaw, original.stateRaw)
         XCTAssertEqual(decoded, original, "round trip harus sama persis")
     }
+
+    // MARK: - Nama di complication mengikuti bahasa perangkat
+
+    /// **Regresi: satu-satunya permukaan yang menampilkan nama engine apa adanya.**
+    ///
+    /// `ComplicationDigest.init(snapshot:lastLocked:)` menyimpan
+    /// `object?.name` — field yang diisi `PointingResolver` dari
+    /// `EphemerisBody.displayName`, yaitu bentuk Bahasa Indonesia yang
+    /// **dibekukan** (`Saturnus`, `Bulan`, `Merkurius`). Keempat permukaan lain
+    /// (kartu jam, layar redup, panel rincian, Diagnostics) sudah melewati
+    /// `ObjectDisplayName`; complication tidak.
+    ///
+    /// Akibatnya, pada perangkat berbahasa Inggris, complication menampilkan
+    /// `Saturnus` sementara baris keadaan dan jenis benda di sebelahnya
+    /// mengikuti bahasa perangkat — dua bahasa di satu lingkaran kecil, di
+    /// permukaan yang justru paling sering dibaca sekilas.
+    ///
+    /// **Kenapa ini tidak tertangkap gerbang mana pun.** `Apps/` tidak
+    /// dibangun `swift-test.sh` di Linux, dan Aturan 41 hanya menyapu berkas
+    /// `Apps/` yang menangani `CelestialObject`; digest dirakit di
+    /// **PointingKit**, tempat setiap uji lain membaca `headline` sebagai
+    /// string yang benar (`"Vega"`) tanpa pernah bertanya bahasa apa yang
+    /// dipakai untuk merakitnya.
+    ///
+    /// Bentuk perbaikannya sengaja **bukan** `headline` memanggil
+    /// `ObjectDisplayName.text`: complication berjalan di proses terpisah
+    /// dengan `Bundle` sendiri, jadi yang harus disimpan adalah
+    /// `LocalizedText` (kunci + teks Indonesia), bukan string yang sudah
+    /// diselesaikan di proses app. Lihat `ObjectDisplayName.declaration(for:)`,
+    /// yang docstring-nya sudah menyebut pemakaian ini.
+    func testDigestHeadlineFollowsTheDeviceLanguage() {
+        TextLocalization.reset()
+        defer { TextLocalization.reset() }
+
+        // Bridge yang meniru katalog Inggris untuk satu kunci benda tata surya.
+        TextLocalization.install { key in
+            key == "object.body.saturn.label" ? "Saturn" : nil
+        }
+
+        let saturn = CelestialObject(id: "saturn", name: "Saturnus", kind: .planet,
+                                     raDeg: 0, decDeg: 0, magnitude: -0.4)
+        let digest = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: saturn, candidates: [])),
+            lastLocked: nil)
+
+        // Kontrol negatif: nama engine memang bentuk Indonesia yang dibekukan,
+        // jadi tanpa pelokalan hasilnya akan `Saturnus` — bukan `Saturn`.
+        XCTAssertEqual(saturn.name, "Saturnus")
+        XCTAssertEqual(digest.headline, "Saturn",
+                       "complication menampilkan nama engine apa adanya, "
+                       + "sementara label keadaan di sebelahnya mengikuti bahasa perangkat")
+    }
+
+    /// Nama yang **tidak** punya terjemahan tidak boleh dikarang.
+    ///
+    /// Tanpa uji ini, accessor yang mengembalikan string kosong (atau kunci
+    /// katalognya sendiri) akan lulus uji di atas.
+    func testDigestHeadlineKeepsNamesWithoutTranslation() {
+        TextLocalization.reset()
+        defer { TextLocalization.reset() }
+        TextLocalization.install { _ in nil }
+
+        let digest = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: vega, candidates: [])),
+            lastLocked: nil)
+        XCTAssertEqual(digest.headline, "Vega",
+                       "bintang tanpa terjemahan tampil apa adanya, bukan kosong")
+    }
+
+    /// Kunci katalog harus **ikut** melewati batas proses.
+    ///
+    /// Kalau hanya `objectName` yang disimpan, widget tidak punya apa pun untuk
+    /// diterjemahkan dan perbaikan di atas hanya berlaku di dalam satu proses —
+    /// yaitu tepat di proses yang bukan complication.
+    func testDigestCarriesTheCatalogKeyAcrossProcesses() {
+        let saturn = CelestialObject(id: "saturn", name: "Saturnus", kind: .planet,
+                                     raDeg: 0, decDeg: 0, magnitude: -0.4)
+        let digest = ComplicationDigest(
+            snapshot: PointingSnapshot(
+                state: .lock,
+                intent: CelestialIntent(level: .high, best: saturn, candidates: [])),
+            lastLocked: nil)
+
+        XCTAssertEqual(digest.objectNameKey, "object.body.saturn.label",
+                       "kunci katalog harus disimpan, bukan hanya teks Indonesianya")
+
+        let data = try? JSONEncoder().encode(digest)
+        let decoded = data.flatMap { try? JSONDecoder().decode(ComplicationDigest.self, from: $0) }
+        XCTAssertEqual(decoded?.objectNameKey, "object.body.saturn.label",
+                       "kunci harus selamat melewati JSON — widget membacanya dari berkas")
+    }
+
+    /// Cuplikan dari versi **sebelum** medan kunci ada tetap harus terbaca.
+    ///
+    /// Cuplikan yang gagal di-decode membuat `ComplicationStore.read()`
+    /// mengembalikan `nil`, dan complication jatuh ke tampilan cadangan —
+    /// kegagalan yang jauh lebih besar daripada satu nama yang belum
+    /// diterjemahkan. Bentuk JSON lamanya ditulis di sini apa adanya, bukan
+    /// dirakit lewat `ComplicationDigest`, supaya uji ini benar-benar mengukur
+    /// berkas yang mungkin ada di perangkat.
+    func testDigestDecodesSnapshotsWrittenBeforeTheKeyExisted() throws {
+        let legacy = """
+        {"stateRaw":"lock","objectName":"Saturnus","objectKindRaw":"planet",\
+        "isConfirmed":true,"updatedAt":776000000}
+        """
+        let decoded = try JSONDecoder().decode(ComplicationDigest.self,
+                                               from: Data(legacy.utf8))
+
+        XCTAssertNil(decoded.objectNameKey, "cuplikan lama tidak punya kunci")
+        XCTAssertEqual(decoded.headline, "Saturnus",
+                       "tanpa kunci, nama dikembalikan apa adanya — bukan kosong")
+        XCTAssertTrue(decoded.isConfirmed)
+    }
 }

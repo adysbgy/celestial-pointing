@@ -307,6 +307,23 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     public var stateRaw: String
     /// Nama objek terkunci, bila ada.
     public var objectName: String?
+    /// **Kunci katalog** untuk `objectName`, bila nama itu punya satu.
+    ///
+    /// **Kenapa kunci disimpan, bukan string yang sudah diterjemahkan.**
+    /// Complication berjalan di proses **terpisah** dengan `Bundle` sendiri,
+    /// jadi menerjemahkan di proses app berarti membekukan bahasa app ke dalam
+    /// berkas yang dibaca widget — dan pengguna yang mengganti bahasa perangkat
+    /// akan melihat ringkasan lama dalam bahasa lama sampai app dibuka lagi.
+    /// Yang disimpan karena itu `LocalizedText` dalam bentuk terkecilnya:
+    /// kunci + teks Indonesia sebagai cadangan (`objectName`). Widget
+    /// menyelesaikannya sendiri lewat bridge-nya (`ComplicationLocalization`).
+    ///
+    /// **Opsional supaya cuplikan lama tetap terbaca.** Berkas dari versi
+    /// sebelumnya tidak punya medan ini; `nil` berarti "pakai `objectName`
+    /// apa adanya", yang persis perilaku lama. Cuplikan yang tidak bisa
+    /// dibaca akan menghapus complication sepenuhnya — kegagalan yang jauh
+    /// lebih besar daripada satu nama yang belum diterjemahkan.
+    public var objectNameKey: String?
     /// Jenis objek sebagai `ObjectKind` mentah (bukan label tampilan).
     public var objectKindRaw: String?
     /// Apakah identitas terkonfirmasi (`state.looksConfident`, hanya `.lock`).
@@ -318,9 +335,11 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
                 objectName: String?,
                 objectKindRaw: String?,
                 isConfirmed: Bool,
-                updatedAt: Date) {
+                updatedAt: Date,
+                objectNameKey: String? = nil) {
         self.stateRaw = stateRaw
         self.objectName = objectName
+        self.objectNameKey = objectNameKey
         self.objectKindRaw = objectKindRaw
         self.isConfirmed = isConfirmed
         self.updatedAt = updatedAt
@@ -337,7 +356,13 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
                   objectName: object?.name,
                   objectKindRaw: object?.kind.rawValue,
                   isConfirmed: snapshot.confirmsIdentity(lastLocked: lastLocked),
-                  updatedAt: Date())
+                  updatedAt: Date(),
+                  // Kunci katalog disimpan **bersama** nama Indonesia-nya.
+                  // Complication menyelesaikannya sendiri di prosesnya, jadi
+                  // bahasa yang tampil adalah bahasa perangkat saat widget
+                  // menggambar — bukan bahasa app saat ringkasan ditulis.
+                  objectNameKey: object.map(ObjectDisplayName.declaration(for:))
+                      .map(\.rawValue))
     }
 
     /// Keadaan sebagai enum, atau `nil` bila `stateRaw` tak dikenal.
@@ -362,11 +387,30 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     /// utama — menutupinya di sini akan membuat complication berbeda dari app
     /// dan menyembunyikan informasi yang memang jujur ("ada kandidat, belum
     /// pasti"). Yang dijaga `isConfirmed`: identitas tidak pernah diklaim pasti.
+    ///
+    /// **Nama diselesaikan di sini, bukan di app.** `objectName` adalah bentuk
+    /// Indonesia yang dibekukan engine (`Saturnus`); `objectNameKey` adalah
+    /// kunci katalognya. Complication berjalan di proses sendiri, jadi ia
+    /// memanggil `TextLocalization.text` saat **menggambar** — dengan bridge
+    /// miliknya sendiri — sehingga bahasa yang tampil adalah bahasa perangkat
+    /// sekarang, bukan bahasa app saat ringkasan ditulis. Cuplikan lama tanpa
+    /// kunci tetap memakai `objectName` apa adanya.
     public var headline: String {
-        if let name = objectName, hasAnswer {
+        if let name = localizedObjectName, hasAnswer {
             return name
         }
         return state?.shortLabel ?? "Point & Know"
+    }
+
+    /// Nama objek dalam bahasa aktif, atau `nil` bila tidak ada nama.
+    ///
+    /// Tanpa kunci (`objectNameKey == nil`), nama dikembalikan apa adanya —
+    /// itu bentuk cuplikan dari versi sebelumnya, dan menebak kuncinya dari
+    /// kalimat akan mengarang terjemahan yang tidak ada.
+    public var localizedObjectName: String? {
+        guard let name = objectName else { return nil }
+        guard let key = objectNameKey else { return name }
+        return TextLocalization.text(LocalizedText(key: key, id: name))
     }
 
     /// Label keadaan untuk fallback (mis. saat nama kosong).

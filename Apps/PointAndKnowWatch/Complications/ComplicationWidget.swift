@@ -312,7 +312,12 @@ struct ComplicationView: View {
 #Preview(as: .accessoryCorner) {
     PointAndKnowComplication()
 } timeline: {
+    // Kunci katalog **ikut** di pratinjau ini, bukan hanya nama Indonesianya:
+    // pratinjau yang hanya mengisi `objectName` menampilkan jalur cuplikan
+    // lama, sehingga tampilan yang benar-benar dipakai di perangkat (nama
+    // diselesaikan widget sendiri) tidak pernah terlihat di Xcode.
     ComplicationEntry(date: .now, digest: ComplicationDigest(
         stateRaw: "lock", objectName: "Saturnus",
-        objectKindRaw: "planet", isConfirmed: true, updatedAt: .now))
+        objectKindRaw: "planet", isConfirmed: true, updatedAt: .now,
+        objectNameKey: "object.body.saturn.label"))
 }
