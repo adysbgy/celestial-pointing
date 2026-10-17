@@ -4938,6 +4938,87 @@ for wire, want_moon, why in PHASE_WIRES:
                 continue
             _telusuri(name, want_moon, why, wire, 0, set())
 
+
+#: Cacat kedua di kelas yang sama, dan **bukan** nullability: planet yang salah.
+#:
+#: Seluruh pemeriksaan di atas menuntut kawat fase berisi nilai yang bukan nil.
+#: Terukur di atas salinan utuh (proses baru, `Apps/` dibawa): satu baris
+#:
+#:     let planet = CelestialVisual.Planet.venus
+#:
+#: membuat **setiap** planet berfase memakai fase Venus -- dan seluruh Aturan 31
+#: (beserta 11 keadaan harnessnya) tetap hijau. Baris itu tidak mengubah satu
+#: pun kawat: `planetPhases`, `planetWaxing`, dan `planetBrightLimbAngles`
+#: masih dibaca dengan kunci yang sah, masih bukan nil; yang berubah hanya
+#: **planet mana** yang dipakai kuncinya. Venus yang sedang sabit tipis
+#: menularkan sabitnya ke Merkurius, dan sebaliknya. Gambarnya tetap "sabit",
+#: jadi tidak ada teks di layar yang bisa dibantah pembaca.
+#:
+#: Satu-satunya sumber identitas di fungsi itu adalah `object`, jadi bentuk sah
+#: untuk baris ini adalah yang **menyebut `object`**. Bentuk tetap seperti
+#: `CelestialVisual.Planet(rawValue: object.id)` dan
+#: `CelestialVisual.Planet(objectID: object.id)` lolos; bentuk yang tidak
+#: menyebutnya -- `.venus`, `.jupiter`, `.allCases.first { … }` -- ditolak.
+IDENTITY = re.compile(r"CelestialVisual\.Planet\s*(?:\(|\.)")
+
+#: Baris yang dibaca: satu-satunya yang mengikat `planet` dari model visual.
+IDENTITY_BINDING = re.compile(r"[ \t]*let\s+planet\s*=\s*CelestialVisual\.Planet\b",
+                              re.M)
+
+
+def _identity_expr():
+    """Ekspresi setelah `=` pada baris pengikatan `planet`, atau None.
+
+    Yang dikembalikan **termasuk** `CelestialVisual.Planet` sendiri, supaya
+    `IDENTITY` menilai ekspresinya utuh, bukan hanya lanjutannya.
+    """
+    m = IDENTITY_BINDING.search(code)
+    if m is None:
+        return None
+    return code[m.end():code.find("\n", m.end())]
+
+
+def _identity_problem():
+    """Satu masalah, atau None: apakah baris `let planet = …` memakai objeknya.
+
+    Arah kedua yang lebih penting: bentuk yang **sah** tetap harus menyebut
+    `object`. Tanpa itu, `CelestialVisual.Planet(objectID: "venus")` -- masih
+    panggilan, tetapi planet tetap yang menyamar -- akan lolos, dan setiap
+    planet berfase memakai fase Venus.
+    """
+    bars = IDENTITY_BINDING.findall(code)
+    if len(bars) != 1:
+        return ("  tidak ditemukan tepat satu `let planet = CelestialVisual.Planet…` "
+                "di %s (%d ketemu); pemeriksa identitas kehilangan gigi, dan tanpa "
+                "baris itu fase planet tidak dihitung dari objek yang tampil"
+                % (WIRE, len(bars)))
+    expr = _identity_expr()
+    if expr is None:
+        return None
+    # Bentuk tetap yang tidak menyebut objeknya. Dua corak, keduanya sungguh
+    # terjadi: kasus enum tanpa argumen (`Planet.venus`) dan terusan penerusnya
+    # yang menyamar sebagai bentuk sah (`Planet(objectID: "venus")`,
+    # `Planet(rawValue: other.id)`).
+    #
+    # Dibaca sebagai label argumen, bukan dicocokkan dengan satu regex besar:
+    # uji-ulang menunjukkan pola berlapis itu mencocokkan `(objectID:` lalu
+    # berhenti -- "ada argumen bernama objectID" terbaca sebagai "memakai
+    # objek". Labelnya harus berisi kata `object` sendiri.
+    arg = re.match(r"\s*\(\s*([A-Za-z_]\w*)\s*:\s*(.*)\)", expr, re.S)
+    if re.match(r"\s*\.\w+", expr) or (
+            arg and arg.group(1) in ("objectID", "rawValue")
+            and not re.search(r"\bobject\b", arg.group(2))):
+        return ("  `let planet = CelestialVisual.Planet%s` tidak mengambil "
+                "identitas planet dari objek yang tampil; setiap planet berfase "
+                "lalu memakai fase planet lain -- sah, bukan nil, dan tidak ada "
+                "teks di layar yang bisa membantahnya" % expr.rstrip())
+    return None
+
+
+_masalah_identitas = _identity_problem()
+if _masalah_identitas:
+    problems.append(_masalah_identitas)
+
 print("\n".join(problems) if problems else "")
 PY
 )

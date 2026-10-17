@@ -945,6 +945,15 @@ jobs:
       - name: Buktikan gerbang kawat fase Aturan 31 berbunyi
         run: python3 Tools/bukti-mutasi-aturan31-kawat.py
 
+      # Aturan 31 juga harus menangkap **planet yang salah**, bukan hanya `nil`.
+      # Kawat lama hanya membuktikan "fase hilang"; cacat yang lolos adalah
+      # bentuk yang tetap sah: `CelestialVisual.Planet.venus` — bukan nil, tidak
+      # hijau, tidak ada teks di layar yang bisa membantahnya. Harness ini
+      # memasang planet tetap lalu mengulangnya tanpa pemeriksa identitas,
+      # sehingga "berbunyi" tidak bisa diklaim sebagai bukti.
+      - name: Buktikan Aturan 31 menangkap planet yang salah, bukan hanya nil
+        run: python3 Tools/bukti-mutasi-planet-tetap.py
+
       # Aturan 32 menutup celah yang **terbukti tak terlihat**: baris
       # `if !isConfirmed { drawCandidateMarker(...) }` — satu-satunya penanda
       # di layar bahwa engine ragu — dihapus seluruhnya, lalu seluruh 31

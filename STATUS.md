@@ -1,4 +1,78 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 42 menutup saudara bukan-Bool dari permukaan kejujuran)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 31 menangkap *planet yang salah*, bukan hanya `nil`)
+
+### Cacat yang diangkat
+
+Kawat fase di Aturan 31 hanya menilai satu arah: *"apakah ekspresinya `nil`?"*
+Arah yang benar-benar dipakai produksi lolos tanpanya. Di
+`Apps/Shared/PointingEngine.swift`, satu baris memutuskan planet mana yang
+fasenya digambar:
+
+    let planet = CelestialVisual.Planet(objectID: object.id)
+
+Ganti baris itu menjadi `CelestialVisual.Planet.venus` dan seluruh gerbang
+lulus: bukan `nil`, tidak ada peringatan, dan **setiap** planet berfase (Mars,
+Jupiter, Saturnus, Uranus) lalu menggambar sabit Venus. Tidak ada teks di
+layar yang bisa membantahnya — fase adalah gambar, bukan nama. Ini kelas cacat
+yang paling dilarang PRD: visual yang **mengklaim identitas** yang tidak
+dimilikinya.
+
+### Kenapa harness-nya terpisah dari `bukti-mutasi-aturan31-kawat.py`
+
+Kawat lama membuktikan "fase hilang" (`nil`). Membuktikan "planet salah" butuh
+keadaan yang berbeda — bentuk yang **sah** tetapi tetap: kasus enum tanpa
+argumen (`Planet.venus`) dan bentuk yang menyamar sah
+(`Planet(objectID: "venus")`, `Planet(rawValue: other.id)`). Bukti baru:
+
+    Tools/bukti-mutasi-planet-tetap.py
+    9 keadaan: 6 harapan + 3 diulang tanpa pemeriksa identitas
+
+Arah kedua itu yang membuat buktinya bermakna. Tanpa pengulangan, "gerbang
+berbunyi" cuma claim — di repo ini sudah dua kali merah datang dari sebab lain.
+
+### Tiga jebakan yang ditemukan saat mengukur (dan kenapa penting)
+
+1. **Pengganti identik dengan jangkar.** Keadaan "sah" semula menulis ulang
+   baris yang sama persis; harness melaporkan *"penggantinya identik dengan
+   jangkar"* — tidak mengukur apa pun. Diperbaiki: keadaan sah kini *tidak
+   mengganti apa pun* dan memakai sumber produksi apa adanya.
+2. **Merah karena sebab lain terbaca sebagai "gerbang berbunyi".** Pemeriksaan
+   awal hanya mencari nama berkas (`PointingEngine.swift`), yang juga muncul di
+   temuan kawat `nil`. Diperbaiki: berbunyi hanya dihitung bila kalimat
+   temuannya berasal dari **pemeriksa identitas** (`mengambil identitas planet`,
+   `kehilangan gigi`).
+3. **Mematikan pola ≠ mematikan pemeriksa.** `IDENTITY` dimatikan saja tidak
+   cukup: cabang *"tidak ada tepat satu pengikatan"* memakai pola yang sama dan
+   tetap berbunyi, jadi keadaan "planet tetap Venus" lolos sebagai "sudah
+   terbukti". Ini vakuositas yang menyamar sebagai bukti. Pemeriksa kini dimatikan
+   utuh (pola + penjaga pengikatan + jalur `search`).
+
+### Aturan yang bertambah
+
+    IDENTITY_BINDING  — tepat satu `let planet = CelestialVisual.Planet…`
+    argumennya harus menyebut objeknya sendiri
+
+Label argumen dibaca sebagai label (`objectID:`, `rawValue:`), bukan dicocokkan
+dengan satu regex berlapis: pola berlapis terbukti mencocokkan `(objectID:`
+lalu berhenti, sehingga *"ada argumen bernama objectID"* terbaca sebagai
+*"memakai objek"* — lewat di salinan produksi sendiri.
+
+### Tidak diklaim
+
+- Hanya planet. Bulan, bintang, dan langit-dalam punya jalur identitas sendiri.
+- Aturan ini membaca **teks** baris pengikatan, bukan tipe. Pengikatan lewat
+  variabel perantara (`let p = .venus; let planet = p`) tidak ditangkap.
+- `IDENTITY_BINDING` mensyaratkan bentuk `CelestialVisual.Planet…`; penulisan
+  ulang import (mis. `typealias Planet = CelestialVisual.Planet`) akan
+  mematikan pemeriksanya — dan pemeriksaan "tepat satu" akan berbunyi, bukan diam.
+
+### Gerbang
+
+`python3 Tools/bukti-mutasi-planet-tetap.py` → 9 keadaan sesuai harapan,
+didaftarkan di `engine-tests.yml` (lewat `check-harness-terdaftar.py`:
+84 harness, semuanya dirujuk). `swift-ui-lint.sh` 0, `swift-typecheck.sh` 0,
+`check-jangkar-harness.py` 347 jangkar tanpa mutasi tertinggal.
+
+## Progres sebelumnya (17 Okt 2026 — Aturan 42 menutup saudara bukan-Bool dari permukaan kejujuran)
 
 ### Mengapa siklus ini bukan fitur baru
 
