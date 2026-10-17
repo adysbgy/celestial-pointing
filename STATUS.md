@@ -1,3 +1,60 @@
+### Siklus (17 Okt 2026 — penjaga keutuhan katalog: dua bintang tak boleh sama warna & magnitudo)
+
+Mulai seperti biasa: `git log` + baca STATUS + jalankan ketiga gerbang. `main`
+hijau. Verifikasi ulang bahwa BAGIAN 1–4 + FASE A/B/C **seluruhnya sudah
+terwujud dan ter-gerbang** (bukan dikutip dari docstring): `CelestialVisualView`
+menggambar planet/Bulan/bintang/Matahari/langit-dalam, `NightMode` palet merah
+murni, `ReducedLuminanceView` Always-On, `InfoPlist.strings` id+en ada,
+`.xcstrings` ada, complication + lokalisasi ada, dan `VisibilityTests` sudah
+mengunci tepi kasus Bulan siang/twilight/dekat-Matahari. Jadi tidak ada lagi
+yang perlu dibangun dari nol.
+
+Yang dikerjakan adalah **satu celah yang STATUS sendiri akui terbuka**:
+progres 17 Okt 2026 (baris ~647) mencatat "dua bintang B−V sama **dan**
+magnitudo sama tidak terbedakan; itu celah yang belum ditutup dan belum
+relevan untuk katalog sekarang." Titik bintang di layar hanya membawa dua sinyal
+identitas — warna (B−V) dan ukuran (magnitudo) — jadi pasangan yang kebetulan
+sama di keduanya tidak bisa dibedakan, apalagi saat engine ragu (hanya terang
+yang tampil). Itu persis kelas false-confidence yang PRD larang.
+
+### Perbaikan
+
+`CatalogueVisualDistinctnessTests` (PointingKit, 2 uji, teruji di Linux):
+- `testNoTwoStarsShareBothColorIndexAndMagnitude` mengunci bahwa tak ada dua
+  bintang `Catalogue.brightStars` yang punya B−V (ε 0,05) **dan** magnitudo
+  sama. Epsilon B−V longgar karena ambang label warna (`StarColorSpeech`)
+  memotong di selisih > 0,10; magnitudo dibandingkan persis karena satu
+  kelipatan adalah satu langkah ukuran titik.
+- `testKnownColorTwinsStillDifferInMagnitude` adalah kontrol negatif: pasangan
+  B−V identik yang memang ada (sirius/vega, hadar/spica, fomalhaut/deneb) harus
+  tetap beda magnitudo — kalau tidak, uji utama lulus hanya karena lupa
+  membandingkan magnitudo.
+
+**Non-vakuositas dibuktikan**: mutasi `deneb` → magnitudo 1,16 (meniru
+`fomalhaut` B−V 0,09 / mag 1,16) membuat **kedua** uji merah (922 uji, 2
+gagal); berkas dikembalikan, hijau kembali.
+
+### Verifikasi
+
+    ./swift-test.sh                  PointingKit 920 -> 922 (+2 uji baru), CelestialEngine 222
+                                     (laporan "Executed 922 tests" = PointingKit saja)
+    ./swift-typecheck.sh             SEMUA GERBANG LULUS
+    ./swift-ui-lint.sh               tak disentuh (perubahan di Packages/)
+    mutasi deneb                    2 uji merah -> non-vakuositas terbukti
+    Apple Build (macos-15)           belum dijalankan lokal; akan ditunggu di CI
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** menambah visual baru; ia mengunci bahwa visual yang sudah ada
+  tidak pernah memunculkan dua bintang yang tak-terbedakan. Celah STATUS memang
+  "belum relevan untuk katalog sekarang" — uji ini menjaga pernyataan itu tetap
+  benar saat katalog bertambah, bukan mengarang perbedaan yang tidak ada.
+- B−V diambil dari `CelestialVisual.starColorIndex` (lapisan visual), magnitudo
+  dari `Catalogue.brightStars` (engine) — keduanya dibandingkan di satu tempat
+  (uji PointingKit, yang sudah mengimpor lintas-paket).
+
+---
+
 ### Siklus berikutnya (17 Okt 2026 — getaran "ragu" yang terasa persis seperti "berhasil", dan salinannya ada dua)
 
 Siklus sebelumnya menutup saluran **bunyi**. Yang tersisa adalah saluran yang
