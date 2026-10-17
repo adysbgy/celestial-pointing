@@ -5019,6 +5019,106 @@ _masalah_identitas = _identity_problem()
 if _masalah_identitas:
     problems.append(_masalah_identitas)
 
+
+#: Cacat ketiga, dan **bukan** soal nullability maupun identitas: kuncinya.
+#:
+#: Pemeriksaan di atas menuntut (a) kawat berisi nilai bukan nil, dan (b)
+#: `let planet` menyebut `object`. Terukur, keduanya hijau pada mutasi ini
+#: (proses baru, program Aturan 31 dijalankan langsung atas salinan):
+#:
+#:     let planetPhase = planet.flatMap { planetPhases[$0] }
+#:   -> let planetPhase = planet.flatMap { _ in planetPhases.values.first }
+#:
+#: `planet` masih benar, kamusnya masih dibaca, nilainya bukan nil — yang
+#: hilang hanya **planet mana** yang jadi kuncinya, jadi setiap planet
+#: berfase memakai fraksi planet pertama di kamus. Diukur pada port: pita
+#: terang Venus berubah **75,6%** piksel (0,22 → 0,90), Merkurius **82,2%**
+#: (0,50 → 0,09). Gambarnya tetap terbaca sebagai "planet berfase", jadi
+#: tidak ada teks di layar yang bisa membantahnya — kelas cacat yang sama
+#: dengan `let planet = .venus`, tetapi lewat kamusnya.
+#:
+#: **Kenapa yang diperiksa bentuk ikatannya, bukan hasil evaluasinya.**
+#: Kamusnya diisi saat `refresh`, dan gerbang ini tidak mengeksekusi Swift.
+#: Yang bisa dibuktikan dari teks adalah bahwa indeks kamusnya **planet itu
+#: sendiri**: penutup fungsinya memakai `planet` — entah lewat `$0` (argumen
+#: `flatMap` atas `planet`) atau lewat `planet` langsung.
+#:
+#: **Kenapa `$0` diterima utuh, bukan dicurigai.** `planet.flatMap { ... }`
+#: dijalankan atas `Optional`, jadi `$0` **adalah** planet yang sedang
+#: digambar. Yang ditolak adalah bentuk yang mengabaikannya: `{ _ in … }`,
+#: `{ _ in values.first }`, `.first`, `.values.first`, `planetPhases.values`,
+#: dan indeks konstanta seperti `planetPhases[.venus]`.
+PHASE_MAPS = ("planetPhases", "planetWaxing", "planetBrightLimbAngles")
+
+#: Satu baris `let <nama> = <indeks> <kamus> [ … ]`, dengan pengikat opsional.
+#: Antara nama kamus dan `[` boleh ada `.values`/`.first`/`.allCases` —
+#: bentuk yang justru jadi cacat (`planetPhases.values.first`) tetap harus
+#: terbaca sebagai **pembacaan kamus itu**, supaya pesannya menunjuk sebab
+#: yang benar alih-alih mengaku kamusnya tidak dibaca.
+_KEY_BINDING = re.compile(
+    r"[ \t]*let\s+(\w+)\s*=\s*(.*?)\b(%s)\b([^\n]*)" % "|".join(PHASE_MAPS), re.M)
+
+
+def _key_problem():
+    """Satu masalah, atau None: apakah tiap kawat kamus memakai planetnya."""
+    found = {}
+    for m in _KEY_BINDING.finditer(code):
+        name, prefix, table, tail = m.groups()
+        # `tail` = `[$0]` untuk bentuk sehat, atau `.values.first` dst.
+        key = "—"
+        if "[" in tail:
+            rest = code[m.end() - len(tail) + tail.index("["):]
+            close = rest.find("]")
+            key = rest[1:close] if close >= 0 else rest[1:41]
+        elif tail.strip():
+            key = tail.strip()
+        found.setdefault(table, []).append((name, prefix.strip(), key.strip(), tail))
+
+    missing = [t for t in PHASE_MAPS if t not in found]
+    # **Kenapa "kamus dibaca" hanya jadi syarat keras bila **ketiganya** hilang.**
+    # Satu mutasi bisa mematikan dua hal sekaligus: `let planetPhase: Double? =
+    # nil` menghapus pembacaan kamus **dan** mematikan kawatnya, dan kawatnya
+    # sudah dilaporkan pemeriksaan nullability di atas. Melaporkan "kamus tidak
+    # dibaca" di situ akan terbaca sebagai cacat **kedua** pada keadaan yang
+    # sebenarnya hanya punya satu -- salah-diagnosis yang sudah dibayar mahal
+    # di harness ini: pembaca lalu memperbaiki sebab yang salah dan gerbangnya
+    # tetap merah (terlihat pada keadaan 2, 4, 8, dan 11 sebelum diperbaiki).
+    #
+    # Tetapi syarat itu **tidak boleh hilang sama sekali**, karena itulah satu-
+    # satunya penjaga non-vakum: bila ketiga kamus lenyap (mis. fungsinya
+    # ditulis ulang tanpa fase planet), tidak ada satu baris pun yang tersisa
+    # untuk diperiksa kuncinya, dan gerbang ini akan hijau tanpa memeriksa apa
+    # pun. Ketiganya sekaligus lenyap **tidak** mungkin akibat satu kawat mati,
+    # jadi pesannya tidak pernah menjadi diagnosis palsu.
+    if len(missing) == len(PHASE_MAPS):
+        return ("  tidak satu pun kamus fase (%s) dibaca di %s; pemeriksa "
+                "kunci kehilangan gigi, dan tanpa baris itu fase planet tidak "
+                "dihitung dari objek yang tampil"
+                % (", ".join("`%s`" % t for t in PHASE_MAPS), WIRE))
+    return _check_keys(found)
+
+
+def _check_keys(found):
+    for table, binds in found.items():
+        for name, prefix, key, tail in binds:
+            # Bentuk sehat: `flatMap { <kamus>[$0] }` atau `[planet]`.
+            uses_whole = key == "$0" and "flatMap" in prefix
+            uses_planet = re.search(r"\bplanet\b", key) is not None
+            if uses_whole or uses_planet:
+                continue
+            excerpt = (prefix + " " + table + tail).strip() if prefix else (table + tail).strip()
+            return ("  `let %s = %s` tidak memakai planet yang sedang "
+                    "digambar sebagai kunci; setiap planet berfase lalu "
+                    "memakai fase planet lain -- sah, bukan nil, dan tidak "
+                    "ada teks di layar yang bisa membantahnya"
+                    % (name, excerpt))
+    return None
+
+
+_masalah_kunci = _key_problem()
+if _masalah_kunci:
+    problems.append(_masalah_kunci)
+
 print("\n".join(problems) if problems else "")
 PY
 )

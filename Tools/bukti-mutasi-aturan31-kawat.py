@@ -123,6 +123,16 @@ ANCHOR_WAX_ARG = "isWaxing: waxing,"
 ANCHOR_FRACTION_BINDING = ("let fraction = isMoon ? "
                            "skyContext?.moonIlluminationFraction : nil")
 ANCHOR_PLANET_BINDING = "let planet = CelestialVisual.Planet(objectID: object.id)"
+#: Kunci kamusnya, bukan identitas planetnya. `planet` sudah benar dan bukan
+#: nil, kamusnya masih dibaca -- yang hilang hanya **kunci** yang dipakai, jadi
+#: setiap planet berfase mendapat fraksi planet pertama di kamus. Karena
+#: `planet` tetap sah, pemeriksaan identitas dan seluruh pemeriksaan
+#: nullability tetap hijau; itulah sebabnya kelas ini butuh pemeriksaan
+#: sendiri. Diukur pada port, pita terang berubah hingga **82,2%** piksel
+#: (Merkurius 0,50 -> 0,09); Venus 75,6% (0,22 -> 0,90).
+ANCHOR_PHASE_KEY = "let planetPhase = planet.flatMap { planetPhases[$0] }"
+ANCHOR_WAX_KEY = "planet.flatMap { planetWaxing[$0] }"
+ANCHOR_LIMB_KEY = "planet.flatMap { planetBrightLimbAngles[$0] }"
 
 #: Keadaan: (nama, (cari, ganti) atau None untuk baseline).
 STATES = [
@@ -151,6 +161,18 @@ STATES = [
      (ANCHOR_WAX, "let waxing: Bool? = nil")),
     ("12. ikatan planet -> nil (mati satu tingkat lebih jauh)",
      (ANCHOR_PLANET_BINDING, "let planet: CelestialVisual.Planet? = nil")),
+    ("13. kunci kamus fase diganti (planet sah, fase planet lain)",
+     (ANCHOR_PHASE_KEY,
+      "let planetPhase = planet.flatMap { _ in planetPhases.values.first }")),
+    ("14. kunci kamus waxing diganti",
+     (ANCHOR_WAX_KEY,
+      "planet.flatMap { _ in planetWaxing.values.first }")),
+    ("15. kunci kamus sudut diganti",
+     (ANCHOR_LIMB_KEY,
+      "planet.flatMap { _ in planetBrightLimbAngles.values.first }")),
+    ("16. kunci kamus konstanta (.venus)",
+     (ANCHOR_PHASE_KEY,
+      "let planetPhase = planet.flatMap { _ in planetPhases[.venus] }")),
 ]
 
 #: Pembuka blok program Aturan 31 di dalam `swift-ui-lint.sh`.
@@ -208,7 +230,10 @@ def main() -> int:
                           (ANCHOR_WAX, "penugasan waxing"),
                           (ANCHOR_WAX_ARG, "argumen isWaxing"),
                           (ANCHOR_FRACTION_BINDING, "penugasan fraction (Bulan)"),
-                          (ANCHOR_PLANET_BINDING, "penugasan planet")):
+                          (ANCHOR_PLANET_BINDING, "penugasan planet"),
+                          (ANCHOR_PHASE_KEY, "kunci kamus planetPhases"),
+                          (ANCHOR_WAX_KEY, "kunci kamus planetWaxing"),
+                          (ANCHOR_LIMB_KEY, "kunci kamus planetBrightLimbAngles")):
         count = original.count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {label} muncul {count}x, harus tepat 1x "

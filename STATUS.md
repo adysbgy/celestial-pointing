@@ -1,4 +1,74 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 31 menangkap *planet yang salah*, bukan hanya `nil`)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: kunci kamus fase, cacat yang lolos semua pemeriksaan sebelumnya)
+
+### Cacat yang diangkat
+
+Siklus sebelumnya menutup "planet yang salah" lewat baris
+`let planet = CelestialVisual.Planet(objectID: object.id)`. Planetnya benar,
+tetapi **kamus mana yang menjadi kunci** belum pernah diperiksa. Ganti satu
+kunci:
+
+    let planetPhase = planet.flatMap { planetPhases[$0] }
+  -> let planetPhase = planet.flatMap { _ in planetPhases.values.first }
+
+`planet` masih sah, kamusnya masih dibaca, nilainya bukan `nil`. Pemeriksaan
+nullability **dan** pemeriksaan identitas Aturan 31 sama-sama hijau, dan 42
+aturan UI hijau. Yang berubah hanya planet mana yang jadi kunci: setiap planet
+berfase memakai fraksi planet pertama di kamus.
+
+Diukur pada port (`Tools/render-visuals.py`, geometri `phase_geometry` +
+`terminator_rotation_radians`, rasterisasi 1 px):
+
+    Venus      0,22 -> 0,90 : 13.681/18.085 piksel pita terang (75,6%)
+    Merkurius  0,50 -> 0,09 :  8.249/10.035 piksel (82,2%)
+
+Sabit Venus yang tipis berubah menjadi sabit tebal milik Merkurius. Gambar itu
+tetap terbaca "planet berfase", jadi tidak ada teks di layar yang bisa
+membantahnya — kelas cacat yang sama dengan `let planet = .venus`, tetapi lewat
+kamusnya.
+
+### Yang ditambahkan
+
+`swift-ui-lint.sh` Aturan 31, pemeriksaan ketiga `_check_keys`: setiap baris
+`let <nama> = … <kamus>…` yang membaca `planetPhases`, `planetWaxing`, atau
+`planetBrightLimbAngles` wajib memakai planet yang sedang digambar sebagai
+kunci — `$0` (argumen `flatMap` atas `planet`) atau `planet` langsung.
+Ditolak: `{ _ in … }`, `.values.first`, `.first`, `[.venus]`,
+`[CelestialVisual.Planet.allCases.first!]`.
+
+Harness `Tools/bukti-mutasi-aturan31-kawat.py` bertambah 4 keadaan (13–16),
+sekarang 17 keadaan, dan ketiga jangkar kunci baru diperiksa tepat-sekali.
+
+### Dua kesalahan di gerbangnya sendiri, tertangkap sebelum push
+
+1. **Salah diagnosis, bukan cuma kurang teliti.** Versi pertama membuat
+   "kamus dibaca" syarat keras, jadi keadaan 2, 4, 8, dan 11 (yang mematikan
+   kawat dengan `= nil`) mendapat pesan tambahan *"kamus fase tidak dibaca"* —
+   cacat kedua yang tidak ada. Pembaca akan memperbaiki sebab yang salah.
+   Diperbaiki: pesan itu hanya muncul bila **ketiga** kamus lenyap sekaligus,
+   yang tidak mungkin akibat satu kawat mati.
+2. **Penjaga non-vakum sempat ikut terhapus.** Perbaikan di atas mula-mula
+   membuang syaratnya sama sekali, sehingga gerbang akan hijau tanpa memeriksa
+   apa pun bila fungsinya ditulis ulang tanpa fase planet. Diverifikasi ulang
+   dengan mutasi "ketiga kamus lenyap" — penjaganya berbunyi.
+
+### Yang TIDAK diklaim
+
+- `isWaxing` planet **tidak** divalidasi arahnya, dan itu bukan celah: dibuktikan
+  pada port bahwa membalik `isWaxing` planet menghasilkan **0 piksel berbeda**
+  di 36 keadaan. Putaran `terminator_rotation_radians` (+π saat `lit_side < 0`)
+  meniadakan pembalikan itu persis — kedua poligon menelusuri himpunan titik
+  yang sama dengan urutan terbalik. Probe pertama siklus ini sempat terbaca
+  sebagai "celah"; itu **salah ukur**, bukan temuan.
+- Pemeriksaan ini membaca **bentuk teks** pengikatan, bukan hasil evaluasinya
+  (gerbang tidak mengeksekusi Swift). Kunci yang dihitung lewat variabel
+  perantara (`planetPhases[someComputedKey]`) akan ditolak sebagai "tidak
+  memakai planet" sampai bentuknya menyebut `planet` atau `$0` — sengaja ketat,
+  karena melonggarkan berarti menerima `.values.first` lagi.
+- Engine tidak disentuh: diff siklus ini hanya `swift-ui-lint.sh`, satu harness,
+  dan STATUS ini. Tidak ada tes Swift baru karena yang diperbaiki adalah
+  gerbang, bukan perilaku.
+
+## Progres sebelumnya (17 Okt 2026 — siklus XCODE-DEV: Aturan 31 menangkap *planet yang salah*, bukan hanya `nil`)
 
 ### Cacat yang diangkat
 
