@@ -6923,6 +6923,174 @@ else
   echo "Bersih: tidak ada nama tampilan yang jatuh kembali ke nama engine."
 fi
 
+# ── Aturan 42: permukaan **bukan-Bool** di Apps/ juga meneruskan faktanya ──
+#
+# Cacat yang ditutup aturan ini **diukur, bukan disangka**. Aturan 38 mengawal
+# badan permukaan kejujuran di `Apps/` — tetapi **hanya yang bertipe `Bool`**
+# (`var x: Bool { ... }`). Saudaranya yang bertipe lain tidak pernah dibaca:
+#
+#     displayedObject           CelestialObject?  -> snapshot.displayedObject(lastLocked:)
+#     pointing                  HorizontalCoord?  -> snapshot.reportedPointing
+#     answeredIntent            CelestialIntent?  -> controller.answeredIntent
+#
+# Ketiganya meneruskan fakta model ke lapisan UI, dan ketiganya hidup di
+# `Apps/`, yang **tidak pernah dibangun** `swift-test.sh` di Linux. Terukur
+# pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa) dengan mutasi
+# yang **mengompilasi**:
+#
+#     displayedObject -> lastLockedObject        swift-ui-lint.sh LULUS (exit 0)
+#
+# yaitu: setiap permukaan menampilkan objek yang terakhir terkunci sebagai
+# jawaban **sekarang**. Jam, panel iPhone, layar redup, dan Diagnostics
+# serentak menyatakan objek yang tidak sedang ditunjuk — dan tidak satu pun
+# gerbang berbunyi, karena seluruh pemanggil tetap mengirim
+# `engine.displayedObject` apa adanya (yang dijaga Aturan 34/35/38 hanya
+# **argumen** dan **badan Bool**, bukan badan `CelestialObject?`).
+#
+# **Kenapa aturan ini menurunkan permukaannya, bukan mendaftar namanya.**
+# Daftar nama tangan akan basi diam-diam — persis yang terjadi pada daftar
+# gerbang dan daftar jangkar yang sudah dua kali menjatuhkan `main` di repo
+# ini. Yang dipakai sebagai sumber kebenaran: setiap `var <nama>: T? { ... }`
+# (dan `T` non-Bool) di `Apps/` yang namanya **ada sebagai anggota model** di
+# `Packages/PointingKit`. Nama yang bukan anggota model (mis. `let name: String?`
+# milik berkas view, `@AppStorage` sendiri) bukan keputusan engine dan tidak
+# diawasi — gerbang yang menuduh kode benar akan dilonggarkan orang.
+#
+# **Batas yang dinyatakan, bukan disangka tertutup.** Aturan ini sapu teks,
+# bukan pemeriksa tipe: ia tahu **bentuk** badannya (penerusan satu ekspresi),
+# tidak tahu nilai yang dihasilkannya. Cabang yang menambahkan `.map { ... }`
+# atau `?? ...` tetap lolos bila menyebut nama anggotanya. Yang ditutup adalah
+# bentuk yang paling senyap: badan yang **sama sekali tidak** menyebut faktanya.
+echo
+echo "== Aturan 42: permukaan bukan-Bool di Apps/ juga meneruskan faktanya =="
+permukaan_nilai=$(python3 - <<'PY' 2>&1
+import os, re
+
+PK = os.path.join("Packages", "PointingKit", "Sources", "PointingKit")
+if not os.path.isdir(PK):
+    print("Tidak bisa membaca %s -- aturan ini tidak bisa memutuskan." % PK)
+    raise SystemExit(0)
+
+
+def kode_saja(teks):
+    """Buang komentar `//` dan isi literal string (sama seperti Aturan 38)."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam_str, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam_str:
+                if esc:
+                    esc = False
+                    buf.append(" ")
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam_str = False
+                    buf.append('"')
+                else:
+                    buf.append(" ")
+            else:
+                if ch == '"':
+                    dalam_str = True
+                    buf.append('"')
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+# 1. Anggota model: properti **dan** fungsi — semua tipe, bukan hanya Bool.
+#    Aturan 38 menurunkan yang Bool; di sini yang penting adalah namanya ada,
+#    supaya nama UI yang meneruskannya bisa dikenali.
+anggota = set()
+for root, _, files in os.walk(PK):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        src = kode_saja(open(os.path.join(root, name), encoding="utf-8").read())
+        for m in re.finditer(r"\bvar\s+([A-Za-z_]\w*)\s*:", src):
+            anggota.add(m.group(1))
+        for m in re.finditer(r"\bfunc\s+([A-Za-z_]\w*)\s*\(", src):
+            anggota.add(m.group(1))
+
+if not anggota:
+    print("Tidak ada anggota model; aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+# Nama sisi-UI untuk anggota model yang dinamai lain (lihat PASANGAN di
+# Aturan 38): `pointing` meneruskan `reportedPointing`.
+PASANGAN = {"pointing": "reportedPointing"}
+
+# `var <nama>: <Tipe>? {` -- **non-Bool** saja; Bool milik Aturan 38.
+DEKL = re.compile(r"\bvar\s+([A-Za-z_]\w*)\s*:\s*([A-Za-z_][\w.<>?, ]*?)\s*\?\s*\{")
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for m in DEKL.finditer(kode):
+            nama, tipe = m.group(1), m.group(2).strip()
+            # `[X: Y]?` dan tipe lain di luar cakupan sempit ini bukan
+            # permukaan kejujuran; biarkan.
+            if tipe in ("Bool",):
+                continue
+            if nama not in anggota and nama not in PASANGAN:
+                continue  # bukan keputusan engine
+            i, d, j = m.end(), 1, m.end()
+            while j < len(kode) and d:
+                if kode[j] == "{":
+                    d += 1
+                elif kode[j] == "}":
+                    d -= 1
+                j += 1
+            badan = " ".join(kode[i:j - 1].split())
+            if not badan:
+                continue  # `{ get }` / protokol: tidak punya badan di sini
+            diperiksa += 1
+            baris = kode[:m.start()].count("\n") + 1
+            sumber = PASANGAN.get(nama, nama)
+            if re.match(r"^\s*(nil|\.none)\s*$", badan):
+                masalah.append(
+                    "  %s:%d: `var %s: %s?` berbadan literal `%s` -- "
+                    "permukaan selalu kosong, jadi pengguna tidak pernah "
+                    "melihat hasil pengukuran"
+                    % (path, baris, nama, tipe, badan))
+                continue
+            if not re.search(r"\b" + re.escape(sumber) + r"\b", badan):
+                masalah.append(
+                    "  %s:%d: `var %s: %s?` berbadan `%s` -- tidak menyebut "
+                    "`%s`, jadi nilainya diambil dari keadaan yang bukan "
+                    "sumbernya" % (path, baris, nama, tipe, badan, sumber))
+
+if diperiksa == 0:
+    print("Tidak ada permukaan bukan-Bool di Apps/; aturan ini tidak "
+          "mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Teruskan faktanya apa adanya (`snapshot.<anggotanya>(...)`): "
+          "permukaan ini yang memberi tahu pengguna hasil pengukuran yang "
+          "berlaku sekarang, bukan objek dari arah tunjuk sebelumnya.")
+PY
+)
+if printf '%s' "$permukaan_nilai" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 42 gagal dijalankan:"
+  echo "$permukaan_nilai"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$permukaan_nilai" ]; then
+  echo "$permukaan_nilai"
+  status=1
+else
+  echo "Bersih: setiap permukaan bukan-Bool di Apps/ meneruskan faktanya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
