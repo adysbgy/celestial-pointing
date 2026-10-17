@@ -193,6 +193,50 @@ public enum SkyBackdrop {
         return NightVisual.surface(components).red
     }
 
+    /// **Warna** titik latar, bukan hanya terangnya.
+    ///
+    /// **Cacat yang ditutup fungsi ini.** `nightBrightness` di atas sudah
+    /// benar — ia mengembalikan kanal merah hasil `NightVisual.surface`, dan
+    /// uji yang menjaganya hijau. Tetapi view memakai angka itu sebagai
+    /// `context.opacity` di atas `neutralStarBody`, yang **putih**. Jadi yang
+    /// tergambar adalah putih yang lebih redup, bukan merah.
+    ///
+    /// Terangnya benar dan ronanya salah, dan itu justru bentuk kegagalan
+    /// yang paling sulit dilihat: tidak ada teks di layar yang menyebut warna
+    /// titik-titik ini, gerbang kontras tidak mengukurnya (tidak ada teks di
+    /// atasnya), dan di mata "langit agak redup" terlihat wajar. Yang
+    /// dikorbankan adalah seluruh alasan mode malam ada: cahaya biru
+    /// mematikan adaptasi gelap 20–40 menit, dan ratusan titik putih tersebar
+    /// di **setiap** layar app ini.
+    ///
+    /// Satu fungsi mengembalikan keduanya supaya terang dan rona tidak bisa
+    /// menyimpang: `nightColour(day).red == nightBrightness(day)` diuji.
+    public static func nightColour(_ day: Double) -> CelestialVisual.RGBComponents {
+        let components = CelestialVisual.RGBComponents(
+            red: day, green: day, blue: day)
+        // `surface` membuang hijau & biru total — itulah isi aturan mode
+        // malam. Tidak ada pemetaan kedua di sini.
+        return NightVisual.surface(components)
+    }
+
+    /// Warna titik latar di mode siang: netral, akromatik, tanpa rona.
+    ///
+    /// **Tanpa parameter terang, dan itu disengaja.** Di mode siang, terang
+    /// titik dibawa `context.opacity` di view (`brightness * layerOpacity`),
+    /// persis seperti sebelum unit ini — jadi gambar siang **tidak berubah
+    /// sama sekali**. Kalau fungsi ini ikut mengalikan terang ke dalam warna,
+    /// setiap titik akan diredupkan dua kali dan langit siang berubah tanpa
+    /// ada yang meminta.
+    ///
+    /// Ada sebagai pasangan `nightColour` supaya view tidak menulis
+    /// `NightMode.isOn ? … : …` sendiri — pemilihan yang ditulis di view
+    /// adalah kelas cacat yang sudah berulang di repo ini (lihat
+    /// `NightPaletteSelector`). Nilai **kedua** cabang datang dari sini, jadi
+    /// mode siang tidak bisa ikut merah.
+    public static func dayColour() -> CelestialVisual.RGBComponents {
+        CelestialVisual.neutralStarBody
+    }
+
     // MARK: - Bantu
 
     /// Finalizer SplitMix64: menyebarkan bit sebuah bilangan ke seluruh

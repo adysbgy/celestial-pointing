@@ -49,7 +49,6 @@ struct SkyBackdropView: View {
                     size: SkyBackdrop.CGSizeLike(width: size.width,
                                                  height: size.height))
                 let night = NightMode.isOn
-                let baseColor = CelestialVisual.neutralStarBody
 
                 for speck in specks {
                     let center = CGPoint(x: speck.x * size.width,
@@ -63,28 +62,36 @@ struct SkyBackdropView: View {
                                       y: center.y - radius,
                                       width: radius * 2,
                                       height: radius * 2)
-                    // Terang: di mode malam dipetakan lewat `NightVisual`
-                    // — jalur yang sama dengan warna benda — sehingga tidak
-                    // ada titik biru/putih yang luput dari aturan merah.
-                    let brightness = night
-                        ? SkyBackdrop.nightBrightness(speck.brightness)
-                        : speck.brightness
 
-                    // Warna dibangun dari `neutralStarBody` lewat
-                    // `SurfaceColor` — satu-satunya jembatan ke `Color` yang
-                    // sudah ada. `RGBComponents` tidak punya jembatan itu
-                    // (ia sengaja buta warna-SwiftUI, supaya tetap teruji di
-                    // Linux), jadi konversinya dilakukan di sini, di batas
-                    // yang memang tidak bisa diuji.
+                    // **Warna, bukan hanya terang — dan ini cacat yang pernah
+                    // dikirim.** Sampai unit ini baris di sini memakai
+                    // `SkyBackdrop.nightBrightness(...)` sebagai
+                    // `context.opacity` di atas `neutralStarBody`, yang putih.
+                    // Jadi mode malam menggambar titik **putih yang lebih
+                    // redup**, bukan titik merah: terangnya benar, ronanya
+                    // salah. Merah >620nm tidak memicu rhodopsin; putih
+                    // mengandung biru dan hijau penuh. Ratusan titik seperti
+                    // itu tersebar di setiap layar app ini, termasuk layar
+                    // yang sedang dipakai mengamati langit.
                     //
-                    // Yang dikonversi hanya **rona**-nya; terangnya sudah
-                    // dibawa `brightness` dan diteruskan lewat
-                    // `context.opacity`, supaya mode malam tidak perlu
-                    // mengubah rona dua kali.
-                    let color = SurfaceColor(red: baseColor.red,
-                                             green: baseColor.green,
-                                             blue: baseColor.blue).color
-                    context.opacity = brightness * SkyBackdrop.layerOpacity
+                    // Uji lama tidak menangkapnya karena ia memeriksa
+                    // **angka** `nightBrightness`, bukan warna yang benar-
+                    // benar diisi ke `GraphicsContext`. Sekarang rona dan
+                    // terang datang dari satu fungsi yang sama
+                    // (`SkyBackdrop.nightColour`), dan uji menuntut kanal
+                    // hijau/biru nol persis.
+                    let rgb = night ? SkyBackdrop.nightColour(speck.brightness)
+                                    : SkyBackdrop.dayColour()
+                    let color = SurfaceColor(red: rgb.red,
+                                             green: rgb.green,
+                                             blue: rgb.blue).color
+                    // Di mode malam, `nightColour` sudah membawa terangnya di
+                    // kanal merah, jadi opasitas cukup dari lapisan. Di siang,
+                    // terang tetap dibawa opasitas seperti sebelumnya — gambar
+                    // siang tidak berubah sama sekali.
+                    context.opacity = night
+                        ? SkyBackdrop.layerOpacity
+                        : speck.brightness * SkyBackdrop.layerOpacity
                     context.fill(Path(ellipseIn: rect), with: .color(color))
                 }
             }

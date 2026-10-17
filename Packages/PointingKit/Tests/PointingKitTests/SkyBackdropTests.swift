@@ -95,6 +95,55 @@ final class SkyBackdropTests: XCTestCase {
             "Titik yang lebih redup dari lantai akan menghilang di latar merah.")
     }
 
+    /// **Warna** titik latar di mode malam, bukan hanya terangnya.
+    ///
+    /// Cacat yang ditutup uji ini. `nightBrightness` mengembalikan **kanal
+    /// merah** hasil `NightVisual.surface`, dan uji di atas membuktikan angka
+    /// itu benar. Tetapi view memakai angka itu sebagai `context.opacity` di
+    /// atas warna `neutralStarBody` — yaitu **putih**. Yang tergambar jadi
+    /// putih dengan opasitas lebih rendah: terangnya benar, ronanya salah.
+    ///
+    /// Itu persis kegagalan yang mode malam ada untuk mencegah. Merah >620nm
+    /// tidak memicu rhodopsin; putih mengandung biru dan hijau penuh, dan
+    /// ratusan titik putih kecil di seluruh latar adalah sumber cahaya biru
+    /// yang tersebar di **setiap** layar app — termasuk layar yang sedang
+    /// dipakai mengamati langit. Ia juga tidak akan pernah tertangkap gerbang
+    /// kontras, karena tidak ada teks di atas titik-titik itu.
+    ///
+    /// Ujinya menuntut kanal hijau dan biru **nol persis**, sama seperti
+    /// `NightVisual` menuntut untuk setiap warna lain di app ini.
+    func testNightModeBackdropColourIsPureRed() {
+        let day = 0.8
+        let night = SkyBackdrop.nightColour(day)
+
+        XCTAssertEqual(night.green, 0, accuracy: 0.0001,
+            "Titik latar mode malam masih mengandung hijau — rhodopsin tidak "
+            + "peduli bahwa terangnya sudah diturunkan.")
+        XCTAssertEqual(night.blue, 0, accuracy: 0.0001,
+            "Titik latar mode malam masih mengandung biru — itu cahaya yang "
+            + "paling merusak adaptasi gelap.")
+        XCTAssertGreaterThan(night.red, 0,
+            "Titik latar mode malam yang kanal merahnya nol tidak terlihat "
+            + "sama sekali; langitnya hilang, bukan jadi merah.")
+        // Terangnya harus sama dengan yang sudah diuji di atas: satu sumber,
+        // bukan dua angka yang bisa menyimpang.
+        XCTAssertEqual(night.red, SkyBackdrop.nightBrightness(day), accuracy: 0.0001,
+            "Terang titik latar mode malam tidak boleh punya dua nilai.")
+    }
+
+    /// Di siang, titik latar tetap netral — bukan merah.
+    ///
+    /// Tanpa uji ini, `nightColour` yang mengembalikan merah **selalu** akan
+    /// lulus uji di atas sambil membuat mode siang ikut merah.
+    func testDayBackdropColourStaysNeutral() {
+        let day = SkyBackdrop.dayColour()
+        let neutral = CelestialVisual.neutralStarBody
+
+        XCTAssertEqual(day.red, neutral.red, accuracy: 0.0001)
+        XCTAssertEqual(day.green, neutral.green, accuracy: 0.0001)
+        XCTAssertEqual(day.blue, neutral.blue, accuracy: 0.0001)
+    }
+
     // MARK: - Deterministik
 
     /// Langit yang sama untuk input yang sama.
