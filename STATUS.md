@@ -1,3 +1,81 @@
+### Siklus berikutnya (17 Okt 2026 — klaim yang salah di dalam gerbangnya sendiri)
+
+Dibuka seperti biasa: `git log` + `gh run`. `main` hijau. Yang dikerjakan
+berasal dari membaca **docstring Aturan 43**, bukan dari fitur baru.
+
+Docstring itu menyebut **dua** cacat sebagai "bentuk yang sama":
+
+1. `PointingEngine.visualForDisplayedObject` merakit tujuh sumber di `Apps/`;
+   mengganti `displayedObject` jadi `lastLockedObject` membuat seluruh 42 aturan
+   hijau, sementara kartu menampilkan nama Jupiter dengan gambar cincin Saturnus.
+2. `ReducedLuminanceView.reducedAccessibilityLabel` merakit enam sumber dan
+   melewatkan catatan sensor.
+
+Klaim nomor 1 **salah ukur**. Diukur pada salinan utuh (proses baru, `Apps/` +
+`Packages/` dibawa), dengan mutasi yang mengompilasi:
+
+    guard let object = displayedObject     ->  lint exit 1 (Aturan 44 berbunyi)
+    guard let object = lastLockedObject    ->  lint exit 0, "SEMUA GERBANG UI LULUS"
+
+Menjalankan **seluruh** `swift-ui-lint.sh` di atas mutasi itu memberi exit 0.
+Aturan 43 tidak menangkapnya karena deteksinya menyapu `String`, sedangkan
+properti itu mengembalikan `CelestialVisual?`. Diukur berdampingan pada
+empat keadaan cacat: **Aturan 43 diam 4/4, Aturan 44 berbunyi 4/4.**
+
+Ini cacat yang sama dengan yang pernah memerahkan `main` seharian di repo ini:
+catatan yang mengklaim sebuah keadaan tanpa pernah diukur ulang. Bedanya kali
+ini catatannya hidup **di dalam gerbang** — tempat yang justru paling
+dipercaya pembaca berikutnya.
+
+### Perbaikan
+
+- **Aturan 44**: `let object = …` di `Apps/` wajib turun dari `displayedObject`
+  / `displayedVisual(...)`. **Daftar putih**, bukan hitam: bentuk cacat yang dulu
+  lolos adalah bentuk yang belum terpikirkan penulisnya, jadi daftar hitam
+  persis yang akan tertinggal. Fail-closed bila nol ikatan terbaca.
+- **Docstring Aturan 43 dikoreksi**, beserta alasannya dan rujukan ke Aturan 44.
+  Dua aturan, dua kelas: String (43) dan identitas gambar (44). Menyatukannya
+  dalam satu sapu menghasilkan deteksi longgar yang menuduh kode benar — versi
+  pertama Aturan 44 saya melakukan tepat itu, dan ia menuduh
+  `visualForDisplayedObject` yang sah.
+- `Tools/bukti-mutasi-objek-gambar.py` (terdaftar CI): 7 keadaan + 4
+  non-vakuositas. Keadaan 5 (`displayedVisual(lastLocked:)` sebagai sumber) dan
+  6 (berkas apa adanya) wajib **diam**: tanpa keduanya, aturan yang melaporkan
+  setiap pengikatan `let object =` lulus semua keadaan cacat.
+- Satu komentar di `PointingEngine.swift` menjelaskan **kenapa** `displayedObject`
+  bukan `lastLockedObject` — bedanya tidak terlihat kompiler maupun mata.
+
+### Satu kesalahan saya sendiri, ketahuan sebelum push
+
+Percobaan pertama memperbaiki *kodenya* dengan memanggil
+`snapshot.displayedVisual(lastLocked:)?.objectForPhaseWiring`. Anggota itu
+**tidak ada** — saya mengarangnya. Kembalikan, lalu aturan dirancang ulang
+mengitar cacat yang **terukur** (objek dipilih sendiri), bukan cacat yang saya
+bayangkan.
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                    SEMUA GERBANG UI LULUS (44 aturan)
+    ./swift-typecheck.sh                  SEMUA GERBANG LULUS
+    ./swift-test.sh                       CelestialEngine 222 + PointingKit 874 hijau
+    bukti-mutasi-objek-gambar.py          7 keadaan + 4 non-vakuositas, sesuai harapan
+    check-harness-terdaftar.py            85 harness, semuanya dirujuk
+    check-jangkar-harness.py              351 jangkar, tidak ada mutasi tertinggal
+    Apple Build (macos-15), 1dd9deb       success
+
+### Yang TIDAK diklaim
+
+- Aturan 44 adalah **sapu teks**. Ia membaca nama di sebelah kanan `=`, bukan
+  tipe. Pengikatan lewat variabel perantara (`let o = lastLockedObject;
+  let object = o`) tidak terlihat.
+- Ia tidak membuktikan `displayedVisual(lastLocked:)` mengembalikan benda yang
+  benar — itu kerja `VisualAssemblyTests` di Linux. Yang dijaga di sini adalah
+  **dari mana `Apps/` mengambilnya**.
+- Tidak ada baris `Apps/` produksi yang diubah seluruhnya: yang ditambah hanya
+  komentar penjelas.
+
+---
+
 ### Siklus berikutnya (17 Okt 2026 — layar redup membacakan layar yang berbeda dari yang dilihat orang lain)
 
 Cacat kedua dari pola yang sama: **logika di `Apps/` tidak bisa salah di mata

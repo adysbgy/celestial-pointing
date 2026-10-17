@@ -7327,6 +7327,19 @@ fi
 # adalah gerbang yang akan dimatikan orang pada hari pertama. Yang dicari
 # di sini hanya pola **perangkaian teks**: `parts` + `joined`, bentuk yang
 # dipakai kedua cacat itu persis.
+#
+# **Batas yang diukur, bukan diasumsikan: fakta dihitung per komponen
+# pertama.** `engine.snapshot.state`, `engine.snapshot.guidanceText`, dan
+# `engine.snapshot.angularRateDegPerSec` semuanya terbaca sebagai satu fakta
+# bernama `snapshot`. Alasannya bukan kecerobohan: menghitung sampai komponen
+# terakhir (`engine\.((?:\w+\.)*\w+)`) membuat `statusAccessibilityLabel`
+# — yang merangkai tiga fakta tapi **hanya** mengambil keputusan "kapan
+# parts.append", dan setiap teksnya sudah lahir di `RowSpeech` — dilaporkan
+# sebagai cacat. Diukur: versi itu merah pada pohon bersih. Gerbang yang
+# menuduh kode benar akan dilonggarkan orang, jadi yang dipilih adalah
+# hitungan yang kasar tetapi tidak pernah menuduh. Konsekuensinya dinyatakan:
+# mutasi yang mengganti **sumber panduan** di dalam anggota itu membuat aturan
+# ini diam.
 echo "== Aturan 43: teks yang dirakit di Apps/ harus hidup di PointingKit =="
 rakitan=$(python3 - <<'PY' 2>&1
 import os, re
