@@ -2124,15 +2124,36 @@ final class CelestialVisualTests: XCTestCase {
 
     /// Morfologi `nil` (id tak dikenal) harus jatuh ke kabut netral, **bukan**
     /// menebak salah satu bentuk.
+    ///
+    /// **Asersinya dulu menuntut `nil == nebula()`, dan itu justru cacatnya.**
+    /// Nebula emisi adalah morfologi yang **sah diklaim** (M42 memang begitu),
+    /// jadi menyamakan kabut ragu dengannya membuat keraguan digambar dengan
+    /// bentuk dan terang yang paling mencolok di seluruh katalog — terukur
+    /// 1.197 pada fuzziness 0.8 melawan galaksi 0.368 dan gugus terbuka
+    /// 0.149. Uji ini dulu hijau sambil menahan cacat itu.
+    ///
+    /// Sekarang yang dituntut adalah `uncertainFog` — kabut yang **paling
+    /// redup** dari semua bentuk (lihat
+    /// `UncertainDeepSkyIsNotTheLoudestTests`), jadi "netral" bukan lagi
+    /// sekadar "tidak menebak jenis", melainkan juga "tidak menarik mata
+    /// lebih dulu daripada jawaban".
     func testUnknownMorphologyFallsBackToNeutralNebula() {
         let unknown = VisualFrame.deepSky(morphology: nil, fuzziness: 0.6)
-        let neutral = VisualFrame.nebula(fuzziness: 0.6)
+        let neutral = VisualFrame.uncertainFog(fuzziness: 0.6)
         XCTAssertEqual(unknown.blobs, neutral.blobs,
                        "morfologi tak dikenal harus memakai kabut netral")
         // Dan bentuk netral itu tidak boleh sama dengan bentuk galaksi/gugus.
         let galaxy = VisualFrame.deepSky(morphology: .galaxy, fuzziness: 0.6)
         XCTAssertNotEqual(unknown.blobs, galaxy.blobs,
                           "kabut netral tidak boleh mengklaim bentuk galaksi")
+        // **Dan tidak boleh sama dengan nebula emisi.** Ini asersi yang
+        // menahan cacat lama kembali: satu baris `return nebula(...)` di
+        // `deepSky` akan membuat kabut ragu identik lagi dengan bentuk
+        // paling terang, dan uji ini merah.
+        let emission = VisualFrame.nebula(fuzziness: 0.6)
+        XCTAssertNotEqual(unknown.blobs, emission.blobs,
+                          "kabut ragu kembali identik dengan nebula emisi — "
+                          + "keraguan tampil sebagai bentuk yang paling terang")
     }
 
     /// `objectID` harus diteruskan dari objek engine ke model visual.

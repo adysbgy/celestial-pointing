@@ -3042,7 +3042,27 @@ def read_deep_sky_layouts_from_swift(source):
     """
     out: dict[str, list[tuple[float, ...]]] = {}
 
-    # Bentuk netral: fungsi `nebula(fuzziness:...)`.
+    # Bentuk netral: `uncertainFog(fuzziness:...)` — kabut yang tampil saat
+    # engine RAGU. **Bukan `nebula()`**: `nebula()` adalah morfologi yang sah
+    # diklaim (M42 memang nebula emisi) dan punya tata letak sendiri. Sampai
+    # siklus ini keduanya satu fungsi, jadi kabut ragu terukur paling terang
+    # dari seluruh katalog — keraguan yang menarik mata lebih dulu daripada
+    # jawaban.
+    anchor = "public static func uncertainFog(fuzziness: Double,"
+    if anchor not in source:
+        raise ValueError(
+            "'public static func uncertainFog(' tidak ditemukan di "
+            "CelestialVisual.swift — kabut ragu tidak lagi punya bentuk "
+            "sendiri, dan ia akan kembali identik dengan nebula emisi")
+    region = source[source.index(anchor):]
+    out[None] = swift_sextuples(region, "let layout: [(Double, Double, "
+                                        "Double, Double, Double, Double)] = [")
+
+    # **`.nebula` tetap punya tata letak sendiri**, dan ia harus tetap dibaca:
+    # `case .nebula:` di `deepSky` hanya memanggil fungsi ini, jadi tanpa
+    # pembacaan di sini bentuknya hilang dari perbandingan dan gerbang akan
+    # melaporkannya sebagai "hanya ada di port" — atau lebih buruk, tidak
+    # membandingkannya sama sekali.
     anchor = "public static func nebula(fuzziness: Double,"
     if anchor not in source:
         raise ValueError(
@@ -3966,7 +3986,10 @@ def check_deep_sky_layouts_match_the_model(results):
         "tidak ada" if not extra_in_port
         else f"hanya ada di port: {extra_in_port}"))
 
-    for name in sorted(set(swift) & set(port)):
+    # `None` adalah kunci sah (kabut ragu), jadi `sorted` atas gabungan kunci
+    # str/None akan melempar TypeError. Urutannya atas `str(name)` — stabil
+    # dan deterministik, dan `None` tetap ikut dibandingkan.
+    for name in sorted(set(swift) & set(port), key=str):
         a, b = swift[name], [tuple(float(v) for v in row) for row in port[name]]
         if len(a) != len(b):
             results.append(Result(

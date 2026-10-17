@@ -111,7 +111,7 @@ POSITION_ONLY = '''def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1
 
 CURRENT_FUNCTION_HEAD = '''def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None):
     """`VisualFrame.deepSky` / `buildDeepSky` — tidak pernah keluar frame."""
-    layout = DEEP_SKY_LAYOUT.get(morphology or "nebula", DEEP_SKY_LAYOUT["nebula"])
+    layout = DEEP_SKY_LAYOUT.get(morphology, DEEP_SKY_LAYOUT[None])
     # MODEL: `.planetaryNebula` mengalikan `offset.1` **dan** `aspect` dengan
     # `elongation`; di sini hal yang sama dilakukan pada layoutnya. Kedua
     # komponen y dipetkan sekaligus supaya lubang tengahnya ikut terskala —

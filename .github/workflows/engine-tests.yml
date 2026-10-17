@@ -2235,5 +2235,22 @@ jobs:
       - name: Buktikan Aturan 44 berbunyi pada objek gambar yang dipilih sendiri
         run: python3 Tools/bukti-mutasi-objek-gambar.py
 
+      # Dan bukti untuk gerbang **"keraguan tidak boleh paling terang"**.
+      #
+      # PRD meminta visual **samar** saat engine ragu. Yang selama ini dijaga
+      # hanya **bentuknya** (`drawableMorphology` mengembalikan `nil`), tidak
+      # pernah **terangnya** — dan terukur kabut ragu memancarkan 1.197 pada
+      # fuzziness 0.8, **paling terang dari seluruh katalog** langit dalam
+      # (galaksi 0.368, gugus terbuka 0.149), karena `deepSky(nil)` dulu
+      # mengembalikan `nebula()` — morfologi yang **sah diklaim**.
+      #
+      # Keadaan #2 adalah yang paling berharga: bentuknya benar tetapi
+      # opasitasnya dinaikkan. Tanpa dia, harness akan menyatakan sifatnya
+      # terjaga padahal jalan pintas "redupkan saja sedikit" masih terbuka.
+      # Ujinya hidup di model Swift, jadi probe menjalankan `swift test`
+      # (lewat Docker di sini, `swift` langsung di CI) dan menuntutnya merah.
+      - name: Buktikan gerbang kabut ragu tidak paling terang berbunyi
+        run: python3 Tools/bukti-mutasi-kabut-ragu.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

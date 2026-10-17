@@ -375,6 +375,22 @@ DEEP_SKY_LAYOUT = {
     "nebula": [(-0.18, 0.12, 1.00, 1.0, 0.0, 0.42),
                (0.22, -0.16, 0.68, 1.0, 0.0, 0.30),
                (0.05, -0.04, 0.40, 1.0, 0.0, 0.55)],
+    # **Kabut netral (yang tampil saat engine RAGU) — paling redup, sengaja.**
+    #
+    # Sampai siklus ini tidak ada kunci `None` di sini: `deep_sky_blobs` jatuh
+    # ke `DEEP_SKY_LAYOUT["nebula"]`, jadi kabut ragu digambar **identik**
+    # dengan nebula emisi. Terangnya terukur 1.197 pada fuzziness 0.8 — lebih
+    # terang daripada setiap morfologi yang boleh diklaim (galaksi 0.368,
+    # gugus terbuka 0.149). Keraguan tampil paling mencolok, kebalikan dari
+    # "visual samar" yang diminta PRD.
+    #
+    # Di Swift ia hidup di `VisualFrame.uncertainFog`, **bukan** di
+    # `nebula()`: `.nebula` adalah morfologi yang sah diklaim (M42 memang
+    # nebula emisi), jadi meredupkannya akan ikut memadamkan jawaban yang
+    # benar.
+    None: [(0.00, 0.00, 0.34, 1.0, 0.0, 0.14),
+           (0.10, 0.06, 0.26, 1.0, 0.0, 0.10),
+           (-0.08, -0.05, 0.20, 1.0, 0.0, 0.11)],
     # MODEL: `VisualFrame.deepSky(.planetaryNebula)` — cangkang berongga.
     # Semua blob pada radius yang sama, dan **tidak ada yang di tengah**:
     # kebalikan dari nebula emisi di atas, yang blobnya justru paling besar &
@@ -490,7 +506,7 @@ DEEP_SKY_ELONGATION = {
 
 def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None):
     """`VisualFrame.deepSky` / `buildDeepSky` — tidak pernah keluar frame."""
-    layout = DEEP_SKY_LAYOUT.get(morphology or "nebula", DEEP_SKY_LAYOUT["nebula"])
+    layout = DEEP_SKY_LAYOUT.get(morphology, DEEP_SKY_LAYOUT[None])
     # MODEL: `.planetaryNebula` mengalikan `offset.1` **dan** `aspect` dengan
     # `elongation`; di sini hal yang sama dilakukan pada layoutnya. Kedua
     # komponen y dipetkan sekaligus supaya lubang tengahnya ikut terskala —

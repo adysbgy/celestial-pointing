@@ -1443,6 +1443,49 @@ public enum VisualFrame {
                             frameHalfExtent: frameHalfExtent)
     }
 
+    /// Kabut **netral** — satu-satunya bentuk yang boleh tampil saat engine
+    /// RAGU, dan karenanya yang harus paling redup.
+    ///
+    /// **Cacat yang ditutup fungsi ini, diukur bukan dikira.** Sampai siklus
+    /// ini `deepSky(morphology: nil)` mengembalikan `nebula(fuzziness:)` —
+    /// **persis** geometri nebula emisi. Jadi kabut ragu memancarkan terang
+    /// **1.197** pada fuzziness 0.8, lebih terang daripada setiap morfologi
+    /// yang boleh diklaim (nebula planetari 0.827, gugus bola 0.510, galaksi
+    /// 0.368, gugus terbuka 0.149). Satu-satunya keadaan yang tidak berhak
+    /// mengklaim apa pun justru yang paling menarik mata, sementara badge
+    /// "Ragu" di sebelahnya mengatakan hal sebaliknya. Mata membaca gambar
+    /// lebih dulu; urutannya terbalik dari "visual samar" yang diminta PRD.
+    ///
+    /// **Kenapa bukan sekadar `nebula()` yang diredupkan.** `.nebula` adalah
+    /// morfologi yang **sah diklaim** (M42 memang nebula emisi). Meredupkan
+    /// `nebula()` akan ikut memadamkan jawaban yang benar — dan itu
+    /// menyelesaikan masalah dengan merusak yang bukan masalah. Dua keadaan,
+    /// dua geometri.
+    ///
+    /// **Kenapa tiga blob kecil, bukan satu blob besar yang diredupkan.**
+    /// Kabut satu blob terbaca sebagai titik yang diburamkan — bulat dan
+    /// simetris, persis yang membuat gambar terlihat "digambar". Tiga blob
+    /// berselisih tetap memberi siluet asimetris yang kabur tanpa mengklaim
+    /// bentuk apa pun: tidak berongga seperti nebula planetari, tidak
+    /// berlengan seperti galaksi, tidak memusat seperti gugus bola.
+    ///
+    /// Nilainya diukur, bukan dirasa: pada setiap fuzziness 0…1 hasilnya
+    /// **0.456×** terang morfologi paling redup, jadi ia selalu lebih redup
+    /// tanpa pernah menghilang — objek yang tidak digambar sama sekali
+    /// terbaca sebagai "tidak ada objek di sini", dan itu klaim yang lebih
+    /// kuat daripada "ada sesuatu, tapi belum pasti".
+    public static func uncertainFog(fuzziness: Double,
+                                    frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
+        let layout: [(Double, Double, Double, Double, Double, Double)] = [
+            // (offsetX, offsetY, skala lebar, rasio sumbu, sudut°, opasitas)
+            ( 0.00,  0.00, 0.34, 1.0, 0.0, 0.14),
+            ( 0.10,  0.06, 0.26, 1.0, 0.0, 0.10),
+            (-0.08, -0.05, 0.20, 1.0, 0.0, 0.11)
+        ]
+        return buildDeepSky(layout: layout, fuzziness: fuzziness,
+                            frameHalfExtent: frameHalfExtent)
+    }
+
     /// Bentuk objek langit dalam untuk morfologi tertentu.
     ///
     /// **Kenapa satu fungsi untuk semua bentuk, bukan satu per jenis.**
@@ -1466,9 +1509,16 @@ public enum VisualFrame {
                                elongation: Double = 1.0,
                                frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
         guard let morphology else {
-            // Tidak tahu bentuknya: gambar kabut netral, **jangan** menebak
-            // salah satu jenis. Lihat `DeepSkyCatalogue.morphology(forObjectID:)`.
-            return nebula(fuzziness: fuzziness, frameHalfExtent: frameHalfExtent)
+            // Tidak tahu bentuknya: gambar kabut netral yang **paling redup**,
+            // **jangan** menebak salah satu jenis. Lihat
+            // `DeepSkyCatalogue.morphology(forObjectID:)`.
+            //
+            // **Bukan `nebula(fuzziness:)` lagi.** Dulu memang begitu, dan
+            // akibatnya kabut ragu identik dengan nebula emisi — paling
+            // terang dari seluruh katalog, padahal ia satu-satunya keadaan
+            // yang tidak berhak mengklaim apa pun. Lihat `uncertainFog`.
+            return uncertainFog(fuzziness: fuzziness,
+                                frameHalfExtent: frameHalfExtent)
         }
         switch morphology {
         case .nebula:
