@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **37 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **38 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -341,6 +341,33 @@ yang sudah benar — sebagai kehilangan `Subline`, `UncertainReason`, dan
 `DistinguishingFeature`, semata karena enum-enum itu kebetulan punya superset
 label yang sama. Gerbang yang menuduh kode benar akan dilonggarkan orang.
 Yang TIDAK diklaim: ia tidak membuktikan `switch`-nya benar, hanya lengkap.
+
+Aturan 38 lahir dari pengukuran yang sama dengan yang melahirkan Aturan 36,
+dan menutup **kelasnya**, bukan satu namanya. `Apps/Shared/PointingEngine.swift`
+punya tiga permukaan kejujuran yang lahir dari satu keputusan `PointingSnapshot`
+yang teruji di Linux: `isDisplayingStaleObject`, `confirmsDisplayedIdentity`,
+dan `carriesUncertaintyMarker`. Aturan 36 menambat **satu** nama di antaranya.
+Terukur: menegasikan atau mengganti badan dua sisanya — termasuk menjadi
+literal `true` — membiarkan seluruh aturan yang ada saat itu lulus. Akibatnya
+tidak simetris
+dan dua di antaranya lebih parah dari yang ditutup Aturan 36:
+`isDisplayingStaleObject -> true` membuat peringatan "sisa pandangan
+sebelumnya" menyala terus-menerus pada jam, dan `carriesUncertaintyMarker ->
+false` membuat **nama kandidat** tampil sebagai temuan di layar redup —
+persis keadaan yang menurut docstring properti itu paling berbahaya, karena di
+sana nama kandidat menjadi huruf terbesar di layar.
+
+Karena itu aturan ini **menurunkan** permukaannya dari model alih-alih
+mendaftar namanya: sebuah `var <Nama>: Bool` di `Apps/` yang namanya sama
+dengan anggota `Bool` di `Packages/` adalah penerusan, dan penerusan harus
+menyebut anggota itu di badannya. Daftar tiga nama akan hijau lagi besok pagi
+begitu permukaan keempat ditambahkan. Syarat "namanya ada di model" bukan
+hiasan: `NightMode.isOn`, `AudioCue.isOn`, `MotionLogger.isAvailable`, dan
+`LocationProvider.hasRealLocation` adalah preferensi dan keadaan sensor, bukan
+keputusan engine — menuntut mereka menyebut anggota model berarti menuduh kode
+yang benar, dan gerbang yang menuduh kode benar akan dilonggarkan orang.
+`confirmsDisplayedIdentity` ikut tercakup walau namanya tidak ada di model,
+karena penamaan sisi UI-nya sengaja berbeda dari `confirmsIdentity`.
 
 ### Uji harus pernah merah
 

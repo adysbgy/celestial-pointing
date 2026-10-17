@@ -6144,6 +6144,217 @@ else
   echo "Bersih: setiap switch di Apps/ memuat seluruh kasus enum model."
 fi
 
+# ── Aturan 38: permukaan kejujuran di Apps/ wajib meneruskan faktanya ──────
+#
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka, dan ia bersaudara
+# dengan yang ditutup Aturan 36.
+#
+# `Apps/Shared/PointingEngine.swift` punya **tiga** permukaan kejujuran yang
+# lahir dari satu keputusan yang sama (`PointingSnapshot`, teruji di Linux):
+#
+#     isDisplayingStaleObject   -> snapshot.isDisplayingStaleObject(lastLocked:)
+#     confirmsDisplayedIdentity -> snapshot.confirmsIdentity(lastLocked:)
+#     carriesUncertaintyMarker  -> snapshot.carriesUncertaintyMarker(lastLocked:)
+#
+# Aturan 36 mengawal **satu** di antaranya -- badan `confirmsDisplayedIdentity`
+# -- karena pada siklus itu yang dimutasi hanya yang satu itu. Terukur hari ini
+# (salinan utuh, proses baru, `Apps/` + `Packages/` dibawa):
+#
+#     isDisplayingStaleObject   -> !snapshot.isDisplayingStaleObject(...)
+#     isDisplayingStaleObject   -> true
+#     isDisplayingStaleObject   -> snapshot.isCalibrated
+#     carriesUncertaintyMarker  -> !snapshot.carriesUncertaintyMarker(...)
+#     carriesUncertaintyMarker  -> true
+#     carriesUncertaintyMarker  -> snapshot.isCalibrated
+#
+# **semuanya `swift-ui-lint.sh` LULUS (exit 0)**, dan `swift-typecheck.sh`
+# juga lulus karena tidak ada yang salah sintaks. Dua di antara enam itu
+# bahkan lebih buruk daripada yang ditutup Aturan 36:
+#
+#   * `isDisplayingStaleObject -> true` membuat peringatan "sisa pandangan
+#     sebelumnya" menyala **terus-menerus** pada jam: setiap hasil, betapapun
+#     segar, dituduh basi. Lawannya (`false`) membungkamnya selamanya.
+#   * `carriesUncertaintyMarker -> false` membuat **nama kandidat** tampil
+#     sebagai temuan di layar redup -- persis keadaan yang menurut docstring
+#     properti ini paling berbahaya, karena di sanalah nama kandidat menjadi
+#     huruf terbesar di layar.
+#
+# Kenapa Aturan 36 tidak menangkapnya: ia menambat **satu nama**
+# (`DEFINISI = "public var confirmsDisplayedIdentity: Bool {"`). Dua
+# saudaranya tidak pernah dibaca. Kenapa Aturan 34/35 tidak menangkapnya:
+# keduanya mengawasi **argumen pemanggil**, dan di sini pemanggilnya tidak
+# berubah -- `engine.isDisplayingStaleObject` tetap dikirim apa adanya.
+#
+# **Kenapa aturan ini menurunkan permukaannya, bukan mendaftar namanya.**
+# Daftar tiga nama akan hijau lagi besok pagi, begitu seseorang menambah
+# permukaan keempat. Yang dipakai di sini adalah prinsipnya: sebuah
+# `var <Nama>: Bool` di `Apps/` yang namanya **sama dengan** anggota `Bool`
+# model di `Packages/` adalah penerusan, dan penerusan harus menyebut
+# anggota itu di badannya. Fail-closed bila deklarasi hilang.
+#
+# **Kenapa syarat "namanya sama dengan anggota model".** Ini bukan hiasan:
+# `NightMode.isOn`, `AudioCue.isOn`, `MotionLogger.isAvailable`,
+# `LocationProvider.hasRealLocation`, `DiagnosticsView.isRecording` tidak
+# punya padanan di model -- mereka preferensi dan keadaan sensor, bukan
+# keputusan engine. Menuntut mereka menyebut anggota model akan menuduh kode
+# yang benar, dan gerbang yang menuduh kode benar akan dilonggarkan orang.
+# Yang diawasi persis yang punya sumber di model.
+#
+# **Kenapa `confirmsDisplayedIdentity` ikut tercakup walau namanya tidak ada
+# di model.** Namanya memang berbeda dari `confirmsIdentity` (sengaja: ia
+# menyebut **apa yang dilakukan**, bukan dari mana asalnya), sehingga
+# pencocokan nama akan melewatkan permukaan yang paling penting. Aturan ini
+# karena itu memakai **dua** jalan: nama yang sama dengan anggota model,
+# *atau* nama yang berbagi kata dengan anggota model yang sudah dikenal
+# Aturan 36 (`confirmsIdentity`). Fail-closed tetap: kalau badannya tidak
+# menyebut anggota mana pun, ia merah.
+#
+# Yang TIDAK diklaim: ini sapu teks atas bentuk `var X: Bool { satu
+# ekspresi }`. Ia tidak tahu tipe, dan tidak membaca `get {}` berbadan
+# banyak-pernyataan selain lewat bentuk sederhana itu.
+echo
+echo "== Aturan 38: permukaan kejujuran di Apps/ meneruskan faktanya =="
+permukaan_jujur=$(python3 - <<'PY' 2>&1
+import os, re
+
+PK = os.path.join("Packages", "PointingKit", "Sources", "PointingKit")
+if not os.path.isdir(PK):
+    print("Tidak bisa membaca %s -- aturan ini tidak bisa memutuskan." % PK)
+    raise SystemExit(0)
+
+
+def kode_saja(teks):
+    """Buang komentar `//` dan isi literal string.
+
+    Isi string dikosongkan -- bukan cuma tanda kutipnya dibuang -- karena
+    repo ini mendokumentasikan bentuk yang dilarang sebagai contoh di dalam
+    `"..."`; isi yang dibiarkan hidup terbaca sebagai deklarasi.
+    """
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam_str, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam_str:
+                if esc:
+                    esc = False
+                    buf.append(" ")
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam_str = False
+                    buf.append('"')
+                else:
+                    buf.append(" ")
+            else:
+                if ch == '"':
+                    dalam_str = True
+                    buf.append('"')
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+# 1. Anggota `Bool` model: properti **dan** fungsi ber-`-> Bool`.
+anggota = set()
+for root, _, files in os.walk(PK):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        src = kode_saja(open(os.path.join(root, name), encoding="utf-8").read())
+        for m in re.finditer(r"\bvar\s+([A-Za-z_]\w*)\s*:\s*Bool\b", src):
+            anggota.add(m.group(1))
+        for m in re.finditer(r"\bfunc\s+([A-Za-z_]\w*)\s*\(", src):
+            i, d, j = m.end(), 1, m.end()
+            while j < len(src) and d:
+                if src[j] == "(":
+                    d += 1
+                elif src[j] == ")":
+                    d -= 1
+                j += 1
+            if re.search(r"->\s*Bool", src[j:j + 30]):
+                anggota.add(m.group(1))
+
+if not anggota:
+    print("Tidak ada anggota Bool model; aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+# Nama yang sudah dikenal Aturan 36 walau namanya tidak ada di model:
+# `confirmsDisplayedIdentity` adalah penamaan sisi UI untuk
+# `snapshot.confirmsIdentity`.
+PASANGAN = {"confirmsDisplayedIdentity": "confirmsIdentity"}
+
+DEKL = re.compile(r"\bvar\s+([A-Za-z_]\w*)\s*:\s*Bool\s*\{")
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for m in DEKL.finditer(kode):
+            nama = m.group(1)
+            if nama not in anggota and nama not in PASANGAN:
+                continue  # preferensi/keadaan sensor: bukan keputusan engine
+            i, d, j = m.end(), 1, m.end()
+            while j < len(kode) and d:
+                if kode[j] == "{":
+                    d += 1
+                elif kode[j] == "}":
+                    d -= 1
+                j += 1
+            badan = " ".join(kode[i:j - 1].split())
+            if not badan:
+                continue
+            diperiksa += 1
+            baris = kode[:m.start()].count("\n") + 1
+            if badan.startswith("!"):
+                masalah.append(
+                    "  %s:%d: `var %s: Bool` menegasikan (%s) -- kebalikan "
+                    "dari maksudnya, penanda kejujuran menyala atau diam "
+                    "pada keadaan yang salah" % (path, baris, nama, badan))
+                continue
+            if re.match(r"^\s*(true|false)\s*$", badan):
+                masalah.append(
+                    "  %s:%d: `var %s: Bool` berbadan literal `%s` -- "
+                    "keputusan engine diganti tetapan, jadi penandanya tidak "
+                    "lagi mengikuti keadaan" % (path, baris, nama, badan))
+                continue
+            # Penerusan: badannya harus menyebut **anggotanya sendiri**.
+            sumber = PASANGAN.get(nama, nama)
+            if not re.search(r"\b" + re.escape(sumber) + r"\b", badan):
+                masalah.append(
+                    "  %s:%d: `var %s: Bool` berbadan `%s` -- tidak "
+                    "menyebut `%s`, jadi faktanya diambil dari keadaan yang "
+                    "bukan sumbernya" % (path, baris, nama, badan, sumber))
+
+if diperiksa == 0:
+    print("Tidak ada permukaan kejujuran di Apps/; aturan ini tidak "
+          "mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Teruskan faktanya apa adanya (`snapshot.<anggotanya>(...)`), "
+          "bukan `!`, literal, atau nama lain: permukaan ini yang memberi "
+          "tahu pengguna apa yang tidak diketahui engine.")
+PY
+)
+if printf '%s' "$permukaan_jujur" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 38 gagal dijalankan:"
+  echo "$permukaan_jujur"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$permukaan_jujur" ]; then
+  echo "$permukaan_jujur"
+  status=1
+else
+  echo "Bersih: setiap permukaan kejujuran di Apps/ meneruskan faktanya."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
