@@ -65,10 +65,18 @@ VIEW = os.path.join("Apps", "PointAndKnowWatch", "Sources", "PointingView.swift"
 DIAG = os.path.join("Apps", "PointAndKnowiOS", "Sources", "DiagnosticsView.swift")
 ENGINE = os.path.join("Apps", "Shared", "PointingEngine.swift")
 
-#: Tanda "bersih" Aturan 41. Kalau gerbang berhenti mencetaknya, harness ini
-#: harus berhenti — bukan menyimpulkan hijau dari keluaran yang tidak dibaca.
-CLEAN_MARK = ("Bersih: tidak ada nama tampilan yang jatuh kembali ke "
-              "nama engine.")
+#: Program Aturan 41 mencetak **temuan** ke stdout dan diam bila bersih.
+#:
+#: Konvensi ini sama dengan `bukti-mutasi-aturan3-aksara.py`, dan ia penting:
+#: baris `Bersih: ...` dicetak oleh **shell**, bukan oleh program Python, jadi
+#: menuntut tanda itu dari programnya akan membuat setiap keadaan bersih
+#: terbaca sebagai "berbunyi" — harness lalu lulus pada kode yang benar
+#: sekaligus gagal pada kode yang benar, tanpa pernah mengukur cacatnya.
+CLEAN_MARK = ""
+
+#: Lantai non-vakuositas. Kalau ini yang tercetak, aturan tidak membaca apa
+#: pun — itu kegagalan harness, bukan "bersih" dan bukan "berbunyi".
+FLOOR_MARK = "TIDAK ADA berkas Swift di Apps/ yang terbaca"
 
 
 def extract_rule_program() -> str:
@@ -104,6 +112,10 @@ def run_rule(workdir: str, program: str) -> tuple[bool, str]:
         tail = (proc.stderr.strip().splitlines() or ["(tanpa galat)"])[-1]
         return False, f"GALAT menjalankan gerbang: {tail}"
     out = proc.stdout.strip()
+    # Lantai: aturan tidak membaca apa pun. Diperlakukan sebagai kegagalan
+    # harness, bukan "bersih" dan bukan "berbunyi".
+    if FLOOR_MARK in out:
+        return False, f"GALAT lantai non-vakuositas: {out}"
     return out == CLEAN_MARK, out
 
 
