@@ -1,3 +1,97 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: 340 kunci katalog tanpa teks Indonesia)
+
+### Cacatnya
+
+`sensor.motion.failed` — "Sensor gerak berhenti: %@" — satu-satunya kunci
+`sensor.*` yang tidak punya entri `id` di `Localizable.xcstrings`. Di layar
+kalimatnya **tampak benar**, dan itu sebabnya ia bertahan: `LocalizedText.id`
+di paket menjadi cadangan, jadi perangkat berbahasa Indonesia tetap membaca
+"Sensor gerak berhenti: timeout" dari **berkas Swift**.
+
+Yang tidak benar ada di katalognya: kunci itu menyatakan punya terjemahan
+Inggris dan **tidak** punya teks Indonesia, sementara `sourceLanguage` katalog
+adalah `id`. Dua jalur pembacaan yang bisa berbeda pendapat tentang satu-satunya
+pesan yang memberitahu pengguna bahwa jamnya berhenti mengukur:
+
+| jalur | sumber Bahasa Indonesia |
+|---|---|
+| `TextLocalization.text(...)` (paket, teruji Linux) | `LocalizedText.id` — selalu benar |
+| `Text("...")` → `LocalizedStringKey` (view) | katalog — **tidak ada** |
+
+Selama setiap kunci hanya dibaca lewat jalur pertama, selisih itu tidak
+terlihat. Ia menjadi cacat yang tampak begitu satu kunci dipakai lewat jalur
+kedua.
+
+### Sapuan: bukan satu kunci, tapi 340
+
+Menulis uji penjaganya lebih dulu (Aturan 10: tes yang menangkap cacat ditulis
+sebelum perbaikan), lalu menjalankannya: **340 dari 353** kunci paket tidak
+punya entri `id`. Probe pertama hanya menyampel enam kunci dan menyimpulkan
+"hanya satu yang salah" — kesimpulan yang keliru, dan yang mengoreksinya adalah
+uji itu sendiri, bukan pembacaan ulang.
+
+### Perbaikannya
+
+340 entri `id` **ditulis dari nilai bawaan paket**, dibangkitkan dari
+`LocalizedText(key:id:)` di seluruh `Packages/PointingKit/Sources` — bukan
+diketik ulang. Salinan yang diketik tangan adalah salinan yang melenceng, dan
+tidak ada yang akan membacanya dua kali.
+
+Diperiksa sebelum commit: 0 dari 519 nilai `en` berubah, 519 kunci tetap 519
+kunci. Yang bertambah hanya `localizations.id`.
+
+### Uji penjaganya
+
+`CatalogIndonesianCoverageTests` (2 uji):
+
+1. setiap kunci paket wajib punya `localizations.id` tidak kosong;
+2. nilai `id` di katalog wajib **sama** dengan nilai bawaan paket.
+
+Uji kedua yang lebih penting dari namanya: tanpa itu, Linux menguji kalimat
+dari Swift sementara perangkat boleh menampilkan kalimat lain dari katalog, dan
+yang lolos adalah yang di Linux.
+
+**Non-vakuositas diukur.** Katalog dikembalikan ke `HEAD`, uji dijalankan ulang:
+merah dengan tepat **340 kunci** terdaftar. Dikembalikan: hijau.
+
+### Kenapa tidak ada gerbang yang menangkapnya
+
+| gerbang | yang diperiksa | mengapa lulus |
+|---|---|---|
+| Aturan 6 | paritas **keberadaan** kunci paket ↔ katalog | kuncinya ada di kedua sisi |
+| Aturan 4 | literal `Text("...")` di `Apps/` | kalimatnya lahir di paket |
+| Aturan 29 | literal katalog di parameter `String` | tidak ada literal di sini |
+
+Tidak satu pun membaca **isi** `localizations` sebuah kunci yang sudah ada.
+Kelasnya sama dengan cacat lain di repo ini: kuncinya ada, jadi setiap gerbang
+yang memeriksa keberadaan lulus. Karena itu penjaganya berupa uji, bukan aturan
+baru — uji bisa membaca katalog, dan katalog itu berkas yang di-commit.
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                     SEMUA GERBANG UI LULUS
+    ./swift-typecheck.sh                   SEMUA GERBANG LULUS
+    ./swift-test.sh                        CelestialEngine 222 + PointingKit 833
+                                           = 1055 uji, 0 gagal
+    Aturan 10                              README 831 -> 833 (uji bertambah 2)
+    Apple Build (macos-15), `fd3b640`      success, tanpa warning kode sendiri
+
+### Yang TIDAK diklaim
+
+- Cacat ini **tidak pernah membuat pengguna berbahasa Indonesia melihat
+  teks Inggris**. Yang dirusak adalah struktur katalog: bahasa sumber tidak
+  lengkap menurut Xcode, dan penyimpangan antara dua jalur baca menjadi
+  mungkin. Menuliskannya sebagai "pengguna melihat bahasa Inggris" akan
+  melebih-lebihkan apa yang benar-benar terjadi.
+- Entri `id` yang dibangkitkan **belum ditinjau seorang penutur** — nilainya
+  disalin dari `LocalizedText.id` yang sudah ada dan sudah dipakai produksi,
+  jadi yang diuji adalah kesamaannya, bukan kualitas bahasanya.
+- Uji ini membaca `Localizable.xcstrings` dari pohon kerja lewat path relatif
+  (`#filePath` naik 6 tingkat), sama seperti empat uji katalog lain di repo.
+  Ia tidak menguji bahwa `Bundle` memuat katalog itu saat berjalan — itu tetap
+  di luar jangkauan Linux.
+
+---
 ## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 31 membaca ikatan yang salah)
 
 ### Mengapa siklus ini tidak menambah fitur
