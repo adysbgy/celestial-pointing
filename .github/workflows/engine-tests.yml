@@ -1139,6 +1139,20 @@ jobs:
       - name: Buktikan gerbang sebutan uji di komentar produksi berbunyi
         run: python3 Tools/bukti-mutasi-ilusi-cakupan.py
 
+      # Bukti untuk Aturan 40 — gambar yang **tidak menyebut** fase denyutnya.
+      #
+      # Aturan 21 mengukur isi argumen `pulse:`, jadi ia buta pada bentuk yang
+      # paling mungkin terjadi: pemanggil yang lupa menulisnya sama sekali.
+      # Di situlah ilustrasi onboarding (bintang, layar pertama pengguna)
+      # duduk tanpa denyut, dan nol gerbang berbunyi.
+      #
+      # Harness ini menanam kelalaian yang persis berbentuk begitu — di
+      # onboarding, di kartu jam, dan di view yang baru ditambahkan — lalu
+      # menuntut Aturan 40 berbunyi; dua bentuk sah dan satu keadaan
+      # non-vakuositas menuntut ia diam.
+      - name: Buktikan gerbang fase gambar berbunyi
+        run: python3 Tools/bukti-mutasi-fase-gambar.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di
