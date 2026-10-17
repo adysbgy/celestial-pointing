@@ -961,6 +961,25 @@ jobs:
       - name: Buktikan gerbang lencana ragu Aturan 32 berbunyi
         run: python3 Tools/bukti-mutasi-lencana-ragu.py
 
+      # Aturan 32 menjaga bahwa lencana itu **digambar**, bukan bahwa
+      # warnanya benar. Sisi warnanya bocor lewat `Color.black.opacity(0.55)`
+      # lewat `shadowAccent(...)`, yang tidak memetakan apa pun: di mode malam
+      # lencana "engine belum pasti" jadi satu-satunya piksel bukan-merah di
+      # layar. Gerbang warna Aturan 15 buta terhadapnya karena `Color.black`
+      # adalah nama, bukan angka prosedural.
+      #
+      # Tokennya kini hidup di `CandidateMarker` (PointingKit) dan diuji
+      # `CandidateMarkerTests` di Linux. Harness ini membuktikan uji itu
+      # **berbunyi**: (1) isi lencana membawa hijau & biru seperti warna lama,
+      # (2) cabang malam mengembalikan merah siang — keadaan ini sempat hijau
+      # dan menyingkap uji yang tidak mengukur selisih malam/siang sama
+      # sekali, jadi ia yang membuat uji itu ada, (3) simbol `?` diganti huruf
+      # biasa. Keadaan 2 dan 3 tidak bisa saling menggantikan: 2 menjaga
+      # terangnya, 3 menjaga bentuknya, dan mode malam membuang hue sehingga
+      # yang tidak dijaga bentuknya akan hilang bersama warnanya.
+      - name: Buktikan uji token lencana ragu berbunyi
+        run: python3 Tools/bukti-mutasi-token-lencana.py
+
       # Aturan 33 (`SlewVerdictBanner`): ikon dan warna putusan GoTo harus
       # diambil dari putusannya, bukan ditulis di view. Empat keadaan —
       # ikon tetap, nada tetap, nada dihitung-lalu-dibuang, dan satu kontrol

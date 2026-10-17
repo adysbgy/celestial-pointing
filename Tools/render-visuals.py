@@ -146,7 +146,7 @@ ACCENTS = dict(
     deepSkySpiralGalaxy=(0.48, 0.58, 0.96),
     deepSkyOpenCluster=(0.95, 0.97, 1.00),
     deepSkyGlobularCluster=(0.93, 0.74, 0.42),
-    candidateFill=(0.10, 0.10, 0.13),
+    candidateFill=(0.34, 0.0, 0.0),
 )
 
 STAR_COLOR_INDEX = {

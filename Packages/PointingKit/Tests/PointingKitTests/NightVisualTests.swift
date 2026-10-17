@@ -51,11 +51,19 @@ final class NightVisualTests: XCTestCase {
         ]
         let shadowed: [(String, CelestialVisual.RGBComponents)] = [
             ("piringan gelap Bulan", accents.moonUnlit),
-            ("isi lencana ragu", accents.candidateFill),
+            ("isi lencana ragu", CandidateMarker.badgeFill(isNight: false)),
         ]
         let named = daylit.map { ($0.0, NightVisual.mapped($0.1, isShadow: false)) }
             + shadowed.map { ($0.0, NightVisual.mapped($0.1, isShadow: true)) }
         XCTAssertEqual(named.count, 13, "seluruh palet aksen harus ikut diuji")
+
+        // Token mentah `accents.candidateFill` **juga** dipetakan: ia yang
+        // dibaca port Python (`ACCENTS["candidateFill"]`) sebelum lencananya
+        // benar-benar digambar. Keduanya harus merah murni, sama seperti
+        // setiap aksen lain.
+        let rawCandidateFill = NightVisual.mapped(accents.candidateFill, isShadow: true)
+        XCTAssertEqual(rawCandidateFill.green, 0)
+        XCTAssertEqual(rawCandidateFill.blue, 0)
 
         for (name, night) in named {
             XCTAssertEqual(night.green, 0,

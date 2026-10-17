@@ -558,7 +558,15 @@ public extension CelestialVisual {
         deepSkySpiralGalaxy: .init(red: 0.48, green: 0.58, blue: 0.96),
         deepSkyOpenCluster: .init(red: 0.95, green: 0.97, blue: 1.00),
         deepSkyGlobularCluster: .init(red: 0.93, green: 0.74, blue: 0.42),
-        candidateFill: .init(red: 0.10, green: 0.10, blue: 0.13)
+        // **Nilai sengaja netral-merah, bukan `Color.black`.** Lencana ini
+        // menandai "engine belum pasti" dan digambar di atas objek yang bisa
+        // saja lagi berwarna. `Color.black.opacity(...)` (bentuk lama di view)
+        // tidak bisa dipetakan `NightVisual` sama sekali — ia bukan angka —
+        // sehingga di mode merah lencananya tetap satu-satunya piksel bukan-
+        // merah di layar. Yang sampai ke layar sekarang membaca token ini lewat
+        // `CandidateMarker.badgeFill(isNight:)`, yang dijaga
+        // `CandidateMarkerTests`.
+        candidateFill: .init(red: 0.34, green: 0, blue: 0)
     )
 
     /// Warna kabut untuk sebuah morfologi, atau warna **netral** saat

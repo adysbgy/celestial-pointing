@@ -1,3 +1,91 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: lencana keraguan yang bukan merah di mode malam)
+
+### Cacatnya
+
+Satu-satunya penanda di layar yang berkata "engine belum **pasti**" adalah
+lencana kandidat di `CelestialVisualView.drawCandidateMarker`, dan warnanya
+dirakit view sendiri:
+
+    context.fill(circle, with: .color(Self.shadowAccent(CelestialVisual.accents.candidateFill)))
+    // shadowAccent(...)  ->  Color.black.opacity(0.55)
+
+`shadowAccent` **tidak memetakan apa pun** ke palet malam; ia hanya
+menggelapkan. Akibatnya di mode merah — satu-satunya mode yang rhodopsin
+izinkan (rod ~498-530nm, cahaya >620nm aman) — lencana "ragu" adalah
+satu-satunya piksel di layar yang **tidak** merah. Istrinya: tombol "Matikan
+mode malam" bukan jalan keluar, karena cahayanya sudah sampai ke mata.
+
+Gerbang warna Aturan 15 **buta** terhadap cacat ini, dan bukan karena
+kelalaian: ia menghitung warna **prosedural** (angka), sedangkan
+`Color.black` adalah nama.
+
+### Kenapa ini kelas cacat baru: dua gerbang, dua klaim
+
+Aturan 32 sudah menjaga lencana ini — tetapi hanya **kehadirannya** di bawah
+`!isConfirmed`. Aturan 32 hijau walau angka warnanya diganti apa pun. Jadi
+claim-nya dibelah dua, dan tiap sisi diuji di tempat yang bisa mengeksekusinya:
+
+    "lencana digambar saat ragu"   -> Aturan 32 (lint, Apps/)
+    "lencananya merah murni"       -> CandidateMarkerTests (PointingKit, Linux)
+
+### Perbaikan
+
+- Token warna & bentuk pindah ke `CandidateMarker` (PointingKit):
+  `badgeFill(isNight:)` mengembalikan **merah murni** di kedua mode
+  (hijau = biru = 0 persis), `glyph = "?"`, `diameterFactor = 0.28`.
+  Alasan bentuk, bukan hanya warna: mode malam membuang hue, jadi penanda
+  yang dibedakan hue saja akan hilang bersama hue-nya.
+- `accents.candidateFill` **tetap dipetakan** ke merah (dan port Python
+  `Tools/render-visuals.py` ikut), supaya palet aksen tidak punya satu entri
+  pun yang lolos dari mode malam — angka mentah itu masih dibaca pemeriksa
+  visual, dan nilainya tak boleh berbohong tentang niat palet.
+- `NightVisualTests` kini menguji `CandidateMarker.badgeFill(isNight: false)`
+  sebagai isi lencana ragu, bukan token mentahnya: yang diuji adalah warna
+  yang benar-benar digambar.
+
+### Harness menyingkap uji yang tidak mengukur apa pun
+
+`Tools/bukti-mutasi-token-lencana.py` (4 keadaan, terdaftar di
+`engine-tests.yml`) menjalankan `CandidateMarkerTests` di container yang sama
+dengan CI, atas salinan yang dimutasi, dan menuntut uji itu **merah**.
+
+Keadaan 2 — *cabang malam mengembalikan merah siang* — awalnya **hijau**,
+yaitu kesalahan harness, bukan kesuksesan uji: ketiga uji yang ada hanya
+menuntut kanal hijau/biru nol dan kecerahan di bawah cincin, dan kedua
+tuntutan itu **dipenuhi** oleh merah siang. Tidak ada satu pun uji yang
+membandingkan malam dengan siang. Uji
+`testNightMarkIsBrighterThanDayMark` lahir dari kegagalan itu, bukan dari
+niat. Keadaannya sekarang:
+
+    [baseline] sumber apa adanya                 hijau
+    1. isi lencana membawa hijau & biru          MERAH  (testMarkIsDarkerThanTheRingItCovers)
+    2. cabang malam = merah siang                MERAH  (testNightMarkIsBrighterThanDayMark)
+    3. simbol `?` diganti huruf biasa            MERAH  (testMarkIsShapedNotJustColoured)
+
+### Verifikasi
+
+    ./swift-ui-lint.sh               SEMUA GERBANG UI LULUS (41 aturan)
+    CelestialEngine 222 + PointingKit 857 = 1079 uji, 0 gagal
+    Tools/bukti-mutasi-token-lencana.py   4 keadaan, 0 tidak sesuai harapan
+    Tools/check-harness-terdaftar.py      82 harness, semuanya dirujuk
+
+### Yang TIDAK diklaim
+
+- Harness ini tidak membangun `Apps/` (Linux tidak punya SwiftUI) dan tidak
+  membuktikan bahwa `CelestialVisualView` **memakai** `badgeFill`. Ia
+  menutup kelas "uji token tidak pernah berbunyi", bukan kelas "view
+  memanggil token yang salah" — itu wilayah Aturan 32 dan pembacaan diff.
+- Angka merah siang (0.38) dan malam (0.72) dipilih agar lencana tetap lebih
+  gelap dari cincin yang ditutupinya **dan** tetap terbaca di latar malam.
+  Itu klaim kontras relatif, bukan klaim WCAG 4.5:1: lencana ini bukan teks,
+  dan ambangnya berbeda (3:1 untuk komponen non-teks). Ambang teks tidak
+  berubah dan tetap dijaga gerbang kontras yang ada.
+- `shadowAccent` sendiri tidak diubah. Ia masih dipakai untuk penggelapan
+  yang memang bukan soal mode malam; yang berhenti adalah pemakaiannya pada
+  satu-satunya penanda keraguan.
+
+---
+
 ## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: nama yang tersembunyi di balik pemanggil yang benar)
 
 ### Cacatnya

@@ -1604,8 +1604,15 @@ struct CelestialVisualView: View {
         let circle = Path(ellipseIn: CGRect(x: center.x - badgeRadius,
                                            y: center.y - badgeRadius,
                                            width: badgeRadius * 2, height: badgeRadius * 2))
+        // **Warna lencana datang dari model, bukan dari sini.** Versi lama
+        // memakai `shadowAccent(candidateFill)` — dan pada mode malam jalur itu
+        // tidak memetakan apa pun, jadi lencananya tetap biru-kehitaman: satu-
+        // satunya piksel di layar merah yang bukan merah, tepat pada penanda
+        // yang menjaga pengguna dari false confidence. `CandidateMarker`
+        // menyatakan warna merah murni untuk kedua mode dan diuji di Linux
+        // (`CandidateMarkerTests`).
         context.fill(circle,
-                     with: .color(Self.shadowAccent(CelestialVisual.accents.candidateFill)))
+                     with: .color(Self.color(CandidateMarker.badgeFill(isNight: NightMode.isOn))))
         context.stroke(circle, with: .color(PointingTone.warning.color), lineWidth: 1.5)
         // Tanda tanya digambar sebagai Path, bukan teks: supaya tidak ikut
         // diwarnai/ diperbesar oleh Dynamic Type, dan supaya konsisten di kedua
