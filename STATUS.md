@@ -25469,3 +25469,125 @@ dan tidak ada satu pun gerbang yang merah.
 adalah jaring pengaman nyata: sebuah objek baru tanpa baris `.xcstrings`
 atau tanpa entri `catalogueKeys` langsung memerahkan CI, bukan diam. Itu
 yang membuat penambahan katalog aman tanpa Xcode.
+
+
+---
+
+### Siklus: Aturan 38 — permukaan kejujuran di Apps/ (FASE "cari celah yang tidak dijaga")
+
+**Unit yang dikerjakan.** Satu aturan baru (`Aturan 38`) + harness buktinya
+(`Tools/bukti-mutasi-permukaan-jujur.py`, 28 keadaan) + satu langkah CI.
+
+**Kenapa ini, bukan memoles UI lagi.** Seluruh BAGIAN 1–4 dan FASE A–C sudah
+terimplementasi dan terkunci gerbang. Brief melarang mengulang gerbang yang
+sudah lulus. Jadi unit yang bernilai adalah mencari **titik yang tidak
+dijaga** — dan mengukur dulu, bukan menebak dari nama aturannya.
+
+**Cacat yang ditemukan dengan mengukur.** `Apps/Shared/PointingEngine.swift`
+punya tiga permukaan kejujuran yang lahir dari satu keputusan
+`PointingSnapshot` (teruji di Linux):
+
+    isDisplayingStaleObject   -> snapshot.isDisplayingStaleObject(lastLocked:)
+    confirmsDisplayedIdentity -> snapshot.confirmsIdentity(lastLocked:)
+    carriesUncertaintyMarker  -> snapshot.carriesUncertaintyMarker(lastLocked:)
+
+Aturan 36 — yang ditambahkan siklus sebelumnya — menambat **satu nama**:
+`confirmsDisplayedIdentity`. Diukur pada commit induknya (salinan utuh,
+proses baru, `Apps/` + `Packages/` dibawa, dan README versi lama ikut
+disalin supaya Aturan 10 tidak berbunyi karena sebab lain):
+
+    isDisplayingStaleObject   -> !snapshot.isDisplayingStaleObject(...)   HIJAU
+    isDisplayingStaleObject   -> true                                     HIJAU
+    isDisplayingStaleObject   -> false                                    HIJAU
+    isDisplayingStaleObject   -> snapshot.isCalibrated                    HIJAU
+    carriesUncertaintyMarker  -> !snapshot.carriesUncertaintyMarker(...)  HIJAU
+    carriesUncertaintyMarker  -> true                                     HIJAU
+    carriesUncertaintyMarker  -> false                                    HIJAU
+    carriesUncertaintyMarker  -> snapshot.isCalibrated                    HIJAU
+
+**8 dari 12 lolos.** Empat yang tertangkap persis yang ditambat Aturan 36 —
+jadi yang lolos adalah **kelasnya**, bukan kebetulan.
+
+Dua di antaranya tidak simetris dan lebih parah dari yang ditutup Aturan 36:
+
+- `isDisplayingStaleObject -> true` membuat peringatan "sisa pandangan
+  sebelumnya" menyala **terus-menerus** pada jam: setiap hasil, betapapun
+  segar, dituduh basi. Pasangannya (`false`) membungkamnya selamanya.
+- `carriesUncertaintyMarker -> false` membuat **nama kandidat** tampil
+  sebagai temuan di layar redup — persis keadaan yang menurut docstring
+  properti itu paling berbahaya, karena di sanalah nama kandidat menjadi
+  huruf terbesar di layar.
+
+**Kenapa aturan lama tidak ada yang menangkapnya.** Aturan 34/35 mengawasi
+**argumen pemanggil**, dan di sini pemanggilnya tidak berubah —
+`engine.isDisplayingStaleObject` tetap dikirim apa adanya. Aturan 36
+menambat satu nama. Yang menyimpang adalah **badannya**, dan badan itu hidup
+di `Apps/`, yang tidak pernah dibangun `swift-test.sh`.
+
+**Kenapa aturan baru menurunkan permukaannya, bukan mendaftar namanya.**
+Daftar tiga nama akan hijau lagi besok pagi begitu permukaan keempat
+ditambahkan. Prinsipnya: sebuah `var <Nama>: Bool` di `Apps/` yang namanya
+sama dengan anggota `Bool` model di `Packages/` adalah penerusan, dan
+penerusan harus menyebut anggota itu di badannya.
+
+Syarat "namanya ada di model" **bukan hiasan**: `NightMode.isOn`,
+`AudioCue.isOn`, `MotionLogger.isAvailable`, `LocationProvider.hasRealLocation`
+adalah preferensi dan keadaan sensor, bukan keputusan engine. Menuntut mereka
+menyebut anggota model berarti menuduh kode yang benar — dan gerbang yang
+menuduh kode benar akan dilonggarkan orang. `confirmsDisplayedIdentity` ikut
+tercakup walau namanya **tidak** ada di model (penamaan sisi UI untuk
+`confirmsIdentity`); tanpa jalan kedua ini, permukaan yang paling penting
+justru yang lolos.
+
+**Bukti (bukan klaim).**
+
+- Harness 28 keadaan, dua arah + non-vakuositas:
+
+      a. sasaran    3 permukaan x 7 keadaan — cacat wajib berbunyi, dan
+                    temuannya wajib menyebut berkas yang disuntik (kalau
+                    yang merah aturan lain di salinan tak lengkap, harness
+                    tidak boleh mengklaimnya)
+      b. ketepatan  2 bentuk sah wajib tetap hijau
+      c. non-vak.   5 keadaan cacat dijalankan lagi dengan program Aturan 38
+                    yang cabang badannya dikosongkan — semuanya berbalik
+                    hijau, jadi yang berbunyi memang cabang baru ini
+
+- Pengukuran **pra-aturan** diulang dari commit induk, bukan dikutip dari
+  ingatan: 8/12 lolos (lihat tabel di atas).
+- Aturan 10 langsung berbunyi pada README yang masih bilang "37 aturan" —
+  gerbang anti-drift itu bekerja, dan README diperbarui.
+- `check-harness-terdaftar.py` menolak harness yang tidak dirujuk CI (77
+  harness, semuanya terdaftar); `check-jangkar-harness.py` 339 jangkar, 0
+  mutasi tertinggal; lint 38 aturan hijau; typecheck hijau.
+
+**Satu cacat pada harness-nya sendiri, ditemukan dengan menjalankannya.**
+Keadaan "fakta tetangga: isStale" untuk permukaan `isDisplayingStaleObject`
+ternyata adalah faktanya **sendiri** — jadi ia wajib hijau, dan harness
+menolaknya (exit 1). Diganti `hasAnswer`, yang memang tetangga. Keadaan uji
+yang bunuh diri bukan bukti; yang menyelamatkannya adalah syarat "jangkar
+harus muncul tepat satu" **plus** menjalankannya.
+
+**Yang TIDAK diklaim.** Aturan 38 adalah sapu teks atas bentuk
+`var X: Bool { satu ekspresi }`: ia tidak tahu tipe, dan tidak membaca
+`get {}` berbadan banyak-pernyataan. Tampilan akhir tetap belum pernah
+dilihat di perangkat (tidak ada Xcode di VPS). Yang diklaim: delapan mutasi
+yang dulu lolos kini berbunyi, dan kode yang benar tetap hijau.
+
+**Pelajaran.**
+
+- **Gerbang yang menambat satu nama menjaga satu nama.** Aturan 36 ditulis
+  dari mutasi yang kebetulan menyentuh `confirmsDisplayedIdentity`, dan
+  karena itu ia mengawal persis yang dimutasi hari itu. Menguji **kelasnya**
+  (tiga permukaan, bukan satu) adalah yang mengubah "tertutup" menjadi
+  benar-benar tertutup.
+- **Ukur pra-aturan dengan README versi lama juga.** Percobaan pertama
+  menghasilkan 0/12 lolos — seluruhnya merah — yang sekilas terbaca sebagai
+  "celah sudah tertutup". Yang sebenarnya merah adalah Aturan 10, karena
+  README sudah diperbarui sementara skripnya belum. Kegagalan itu berbunyi
+  untuk sebab yang sama sekali lain, dan tanpa memeriksa **pesannya** ia
+  akan dibaca sebagai bukti.
+- **Penamaan sisi UI yang bagus mengalahkan pencocokan nama.**
+  `confirmsDisplayedIdentity` menyebut apa yang dilakukan, bukan dari mana
+  asalnya — tepat yang diinginkan untuk keterbacaan, dan tepat yang
+  membuat pencocokan nama buta. Aturan yang menurunkan dari model butuh
+  jalan kedua untuk nama seperti ini, atau ia melewatkan yang paling penting.
