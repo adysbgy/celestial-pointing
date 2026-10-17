@@ -7648,6 +7648,11 @@ POLA = (
     re.compile(r"[?]\s*\.day\s*:\s*\.night"),
     re.compile(r"return\s+\.day\s*$"),
     re.compile(r"return\s+\.night\s*$"),
+    # Badan yang hanya berisi palet itu sendiri: `static var active { .day }`.
+    # Bentuk ini tidak memakai `?` sama sekali, jadi tanpa pola ini ia lolos —
+    # terukur: keadaan "selalu .day" tetap hijau sebelum pola ini ada.
+    re.compile(r"^\s*\.day\s*$"),
+    re.compile(r"^\s*\.night\s*$"),
 )
 
 masalah = []
