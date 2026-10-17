@@ -138,20 +138,37 @@ def extract_rule(number: str) -> str:
     sys.exit(f"GERBANG: Aturan {number} tidak ditemukan di swift-ui-lint.sh.")
 
 
+#: Keluaran yang **bukan** temuan: aturan yang berhenti mengukur (dan
+#: mengatakan begitu), atau yang melaporkan keadaan bersih. Keduanya bukan
+#: "aturan berbunyi", dan memperlakukannya begitu membuat harness ini merah
+#: pada aturan yang sudah dimatikan — terukur, bukan teoretis (lihat
+#: `to_legacy`).
+BUKAN_TEMUAN = (
+    "tidak mengukur apa pun",
+    "Bersih:",
+)
+
+
 def run_rule(program: str, workdir: str) -> tuple[int, str]:
+    """Jalankan program aturan; kembalikan keluaran **hanya bila berbunyi**.
+
+    Aturan yang mati (traceback) dan aturan yang mengaku tidak mengukur apa
+    pun sama-sama tidak boleh dibaca sebagai "berbunyi": yang pertama berarti
+    harnessnya yang rusak, yang kedua berarti aturan yang sudah dimatikan
+    memang diam. Keduanya di sini dibedakan secara eksplisit, bukan dengan
+    `if out.strip()`.
+    """
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     p = subprocess.run([sys.executable, "-c", program], cwd=workdir,
                        capture_output=True, text=True, env=env)
-    # Aturan yang **mati** (traceback / NameError) menulis ke stderr, dan
-    # keluaran itu tidak boleh dibaca sebagai "berbunyi": keadaan
-    # non-vakuositas versi pertama dilaporkan gagal justru karena aturan
-    # yang sudah dimatikan itu melempar `NameError`. Gerbang yang
-    # mati-terbuka di dalam harness-nya sendiri.
-    if "Traceback (most recent call last)" in (p.stdout + p.stderr):
+    gabung = p.stdout + p.stderr
+    if "Traceback (most recent call last)" in gabung:
         sys.exit("GERBANG: program aturan mati dengan traceback — harness ini "
-                 "tidak bisa mengukur apa pun.\n" + p.stdout + p.stderr)
-    return p.returncode, p.stdout + p.stderr
+                 "tidak bisa mengukur apa pun.\n" + gabung)
+    if any(tanda in p.stdout for tanda in BUKAN_TEMUAN):
+        return p.returncode, ""
+    return p.returncode, gabung
 
 
 def copy_repo() -> str:
