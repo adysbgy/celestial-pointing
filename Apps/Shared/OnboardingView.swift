@@ -133,7 +133,7 @@ struct OnboardingView: View {
         if !reduceMotion && illustration.hasPulse {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
                 CelestialVisualView(visual: illustration,
-                                    diameter: 64,
+                                    diameter: VisualImageMetrics.onboardingIllustrationDiameter,
                                     isConfirmed: true,
                                     // Gerbang `hasPulse` di ekspresi nilainya,
                                     // sama seperti jam: hanya bintang yang
@@ -146,7 +146,7 @@ struct OnboardingView: View {
         } else {
             // Diam karena diminta, bukan karena lupa.
             CelestialVisualView(visual: illustration,
-                                diameter: 64,
+                                diameter: VisualImageMetrics.onboardingIllustrationDiameter,
                                 isConfirmed: true,
                                 pulse: MotionPolicy.staticPulsePhase)
                 .accessibilityHidden(true)

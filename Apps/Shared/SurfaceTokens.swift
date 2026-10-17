@@ -108,6 +108,28 @@ enum Hairline {
     }
 }
 
+/// Ukuran gambar benda langit yang **tidak** mengikuti Dynamic Type.
+///
+/// **Kenapa di `Apps/Shared/`, bukan di `WatchMetrics`.** `WatchMetrics`
+/// tinggal di target jam, jadi iPhone tidak bisa membacanya — dan ukuran
+/// ilustrasi onboarding duduk di `OnboardingView` yang dipakai **kedua**
+/// platform. Sebelum ini angkanya ditulis dua kali sebagai `64` telanjang di
+/// dua cabang `onboardingVisual`, sehingga mengubah satu dan lupa yang lain
+/// menghasilkan dua ukuran untuk gambar yang sama tanpa satu pun gerbang
+/// berbunyi.
+///
+/// **Kenapa tidak ikut Dynamic Type.** Ini citra, bukan teks: memperbesarnya
+/// bersama `accessibilityLarge` mendorong judul dan tombol keluar layar jam
+/// 41mm sebelum kartunya bisa dibaca. Ukuran **teks** di layar ini tetap
+/// semantik dan tetap membesar; yang tetap hanyalah gambarnya. Keputusan yang
+/// sama sudah tertulis di `WatchMetrics.visualDiameter`.
+enum VisualImageMetrics {
+    /// Ilustrasi bintang di layar perkenalan. Cukup besar untuk glow dan
+    /// spike terbaca sebagai bintang, cukup kecil untuk tidak menyaingi
+    /// judul di layar jam terkecil yang didukung.
+    static let onboardingIllustrationDiameter: CGFloat = 64
+}
+
 // MARK: - Pemakaian
 
 extension View {
