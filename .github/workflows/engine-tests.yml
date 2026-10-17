@@ -1280,6 +1280,31 @@ jobs:
       - name: Buktikan Aturan 36 berbunyi pada penjaga yang bukan faktornya
         run: python3 Tools/bukti-mutasi-penjaga-faktor.py
 
+      # Aturan 38 lahir karena Aturan 36 menambat **satu nama**.
+      #
+      # Terukur pada pohon sebelum aturan itu ada (salinan utuh, proses baru,
+      # `Apps/` + `Packages/` dibawa): 8 dari 12 mutasi atas dua saudara
+      # `confirmsDisplayedIdentity` lolos tanpa satu pun berbunyi. Empat yang
+      # tertangkap persis yang ditambat Aturan 36 — jadi yang lolos adalah
+      # kelasnya, bukan kebetulan.
+      #
+      # Dua di antara yang lolos itu lebih parah dari yang ditutup Aturan 36,
+      # dan tidak simetris: `isDisplayingStaleObject -> true` membuat
+      # peringatan "sisa pandangan sebelumnya" menyala **terus-menerus** pada
+      # jam (setiap hasil, betapapun segar, dituduh basi), dan
+      # `carriesUncertaintyMarker -> false` membuat **nama kandidat** tampil
+      # sebagai temuan di layar redup — persis keadaan yang menurut docstring
+      # properti itu paling berbahaya, karena di sana nama kandidat menjadi
+      # huruf terbesar di layar.
+      #
+      # Harness ini menguji **ketiga** permukaan (bukan satu), tujuh keadaan
+      # masing-masing, dua bentuk sah, dan lima pengukuran non-vakuositas.
+      # Keadaan sah yang terpenting adalah `confirmsDisplayedIdentity`:
+      # namanya sengaja berbeda dari `confirmsIdentity`, jadi aturan yang
+      # hanya mencocokkan nama akan melewatkan permukaan yang paling penting.
+      - name: Buktikan Aturan 38 berbunyi pada permukaan kejujuran yang menyimpang
+        run: python3 Tools/bukti-mutasi-permukaan-jujur.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:
