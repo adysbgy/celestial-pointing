@@ -1,7 +1,7 @@
 import Foundation
 import CelestialEngine
 
-/// Nama bintang: **kelas spektralnya**, dan jalur yang membuat warnanya sampai
+/// Nama bintang: kelas spektralnya, dan jalur yang membuat warnanya sampai
 /// ke telinga VoiceOver.
 ///
 /// **Kenapa berkas ini ada.** `StarColorSpeech` sudah menjanjikan bahwa
@@ -26,6 +26,28 @@ import CelestialEngine
 /// — komentar dan tabel — tidak bisa ditangkap uji mana pun di repo ini; yang
 /// dijamin adalah tidak ada dua daftar yang berbeda pendapat.
 public extension CelestialVisual {
+
+    /// Nama bintang membawa kelas spektralnya — **aksesor instance** untuk
+    /// pemanggil yang memegang visual, bukan id.
+    ///
+    /// **Kenapa bentuk ini ada.** Dua permukaan menyebut kelas spektral, dan
+    /// keduanya memegang `CelestialVisual`. Yang statis
+    /// (`spokenStarClassLine(spectralClass:isConfirmed:)`) menuntut pemanggil
+    /// merakit id-nya sendiri (`visual.objectID.flatMap(...)`), dan pemanggil
+    /// yang lupa merakitnya berarti kelasnya tidak pernah diucapkan — sama
+    /// persis dengan kelas cacat yang menutup berkas ini (visual tanpa
+    /// `objectID` yang membuat seluruh jalur warna berakhir `nil`). Bentuk
+    /// instance membaca `objectID` dari diri visual yang sama, jadi jalur itu
+    /// tidak bisa terputus di sisi pemanggil.
+    ///
+    /// Aturan yang sama seperti `spokenStarColor(isConfirmed:)` dan
+    /// `spokenDeepSkyMorphology(isConfirmed:)` di sebelahnya: kelas spektral
+    /// adalah ciri pengenal, jadi ia **diam** saat engine belum yakin.
+    func spokenStarClassLine(isConfirmed: Bool) -> String? {
+        guard isConfirmed, let id = objectID else { return nil }
+        return Self.spokenStarClassLine(
+            spectralClass: Self.spectralClass(forStarID: id), isConfirmed: isConfirmed)
+    }
 
     /// Kelas spektral sebuah bintang, dari id-nya — atau `nil` bila tidak ada.
     ///

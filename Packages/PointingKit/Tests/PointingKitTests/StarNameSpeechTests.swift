@@ -98,8 +98,53 @@ final class StarNameSpeechTests: XCTestCase {
                        "kelas spektral M1")
         XCTAssertNil(CelestialVisual.spokenStarClassLine(spectralClass: kelas,
                                                          isConfirmed: false),
-                     "kelas spektral diucapkan saat engine ragu — suara lebih "
-                     + "yakin daripada gambar abu-abu di sebelahnya")
+                     "kelas spektral adalah ciri pengenal: ia harus ikut warna dan "
+                     + "morfologi diam saat engine ragu")
+    }
+
+    /// Bentuk instance `spokenStarClassLine(isConfirmed:)` — aksesor yang
+    /// **memungut id-nya sendiri** dari visual yang sama.
+    ///
+    /// **Cacat yang dijaga uji ini.** Bentuk statis menuntut pemanggil merakit
+    /// id sendiri (`visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:))`).
+    /// Panel iPhone memegang visual, tidak merakit id, dan karena itu **tidak
+    /// pernah menyebut kelas spektral** padahal panel jam menyebutnya: dua
+    /// permukaan, objek sama, satu kalimat yang berbeda. Jalur itu tidak
+    /// terlihat di layar — tidak ada teks yang menyebut "kelas spektral" — jadi
+    /// hanya tes yang bisa menutupnya.
+    ///
+    /// Keadaan "yakin" diuji lebih dulu supaya uji ini tidak bisa dipuaskan
+    /// oleh aksesor yang selalu `nil`.
+    func testClassLineInstanceAccessorReadsTheIDItself() {
+        let visual = CelestialVisual(object: object(id: "rigel", kind: .star))
+        XCTAssertNotNil(visual.objectID, "id harus sampai ke visual — tanpa ini "
+                       + "keadaan di bawah lulus karena nil")
+        XCTAssertEqual(visual.spokenStarClassLine(isConfirmed: true),
+                       "kelas spektral B8")
+        XCTAssertNil(visual.spokenStarClassLine(isConfirmed: false),
+                     "penjaga `isConfirmed` harus ada di bentuk instance juga — "
+                     + "kalau tidak, ia jadi pintu belakang yang melewati "
+                     + "penjaga bentuk statis")
+    }
+
+    /// Visual **tanpa** `objectID` tidak boleh menyebut kelas apa pun.
+    ///
+    /// Ini kelas cacat yang sama seperti "visual tanpa objectID membuat seluruh
+    /// jalur warna berakhir `nil`": id yang tidak ada harus menghasilkan diam,
+    /// bukan kelas yang diarang dari sumber lain.
+    func testClassLineInstanceAccessorIsSilentWithoutAnID() {
+        // `init(object:)` selalu mengisi `objectID` untuk bintang (lihat
+        // `CelestialVisual.init`), jadi jalan untuk menghapus id adalah
+        // memberikannya `nil` langsung di `init(kind:objectID:)` yang lebih
+        // bawah — keadaan yang tidak bisa dicapai lewat view, tapi tetap
+        // harus diam, bukan mengarang.
+        let tanpaID = CelestialVisual(kind: .star,
+                                      colorIndexBV: -0.03,
+                                      objectID: nil)
+        XCTAssertNil(tanpaID.spokenStarClassLine(isConfirmed: true),
+                     "tanpa objectID tidak ada kelas yang bisa diucapkan — "
+                     + "mengarangnya akan terdengar sama berwibawanya "
+                     + "dengan yang benar")
     }
 
     /// Dan diam saat engine ragu — janji yang sama dengan gambar.

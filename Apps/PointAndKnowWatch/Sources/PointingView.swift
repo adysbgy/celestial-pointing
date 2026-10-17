@@ -689,9 +689,7 @@ struct ObjectDetailView: View {
         // warnanya, jadi ia ciri pengenal yang harus ikut diam ketika warna
         // dan morfologi di atasnya diam. Tidak ada yang ditebak.
         if let visual,
-           let starClass = CelestialVisual.spokenStarClassLine(
-               spectralClass: visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:)),
-               isConfirmed: isConfirmed) {
+           let starClass = visual.spokenStarClassLine(isConfirmed: isConfirmed) {
             parts.append(starClass)
         }
         parts.append(ObjectSpeech.magnitude(object.magnitude))

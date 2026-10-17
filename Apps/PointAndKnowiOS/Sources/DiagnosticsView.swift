@@ -1064,6 +1064,21 @@ struct DiagnosticsView: View {
         if let color = visual?.spokenStarColor(isConfirmed: isConfirmed) {
             parts.append(color)
         }
+        // Kelas spektral (`B8`, `M1`) — **supaya iPhone tidak tertinggal dari
+        // jam**. Panel jam menyebutnya; panel ini tidak pernah, sehingga dua
+        // permukaan yang menampilkan objek yang sama mengucapkan dua hal
+        // berbeda untuk objek yang sama. Itu kelas cacat yang sudah berulang di
+        // repo ini, dan bedanya kali ini ada di telinga: tidak ada teks di layar
+        // yang bisa menyebutkan "kelas spektral", jadi satu sisi diam tanpa
+        // terlihat berbeda.
+        //
+        // `spokenStarClassLine(isConfirmed:)` adalah aksesor **instance** yang
+        // mengambil id-nya sendiri dari `objectID` — bentuk yang sama seperti
+        // `spokenStarColor(isConfirmed:)` dan `spokenDeepSkyMorphology(...)`
+        // di sebelahnya, jadi di sini tidak mungkin menyebut bintang lain.
+        if let kelas = visual?.spokenStarClassLine(isConfirmed: isConfirmed) {
+            parts.append(kelas)
+        }
         if includeTechnicalDetails {
             parts.append(ObjectSpeech.magnitude(object.magnitude))
         }
