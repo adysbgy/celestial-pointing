@@ -38,6 +38,26 @@ public enum CandidateMarker {
         .init(red: isNight ? nightRed : dayRed, green: 0, blue: 0)
     }
 
+    /// Isi lencana yang datang **dari palet**, untuk kedua mode.
+    ///
+    /// **Kenapa ada dua fungsi dengan niat sama.** Isi lencana punya dua syarat
+    /// yang saling tarik: `accents.candidateFill` — warna yang dibaca port
+    /// Python dan dijaga gerbang paritas malam — harus benar-benar
+    /// **menggambar** (sebelum siklus ini ia tidak: view hanya membaca
+    /// `badgeFill`, jadi tokennya dilaporkan mati, 25 dari 26, dan CI Linux
+    /// merah); dan mode siang/malam harus tetap **berbeda**
+    /// (`testNightMarkIsBrighterThanDayMark`).
+    ///
+    /// Angkanya tinggal di `CelestialVisual.candidateFill(isNight:)` — extension
+    /// di `NightVisual.swift`, berkas yang sama dengan `accents` — karena
+    /// gerbang jangkauan hanya menelusuri `func` yang **berkasnya** sama dengan
+    /// tempat `Accents` dideklarasikan. Fungsi di sini adalah nama yang dipakai
+    /// view dan uji `CandidateMarkerTests`; ia tidak menambah angka sendiri,
+    /// hanya meneruskan.
+    public static func badgeFillFromPalette(isNight: Bool) -> CelestialVisual.RGBComponents {
+        CelestialVisual.candidateFill(isNight: isNight)
+    }
+
     /// Kanal merah siang.
     ///
     /// Lebih gelap dari `accents.saturnRing` (0.86) dengan margin jauh lebih
@@ -54,6 +74,45 @@ public enum CandidateMarker {
     /// Tanda tanya, bukan warna: satu-satunya saluran yang **tidak** dibuang
     /// mode malam.
     public static let glyph = "?"
+
+    /// Warna **garis** lencana dan glifnya.
+    ///
+    /// **Kenapa ikut ke sini, bukan tetap `PointingTone.warning.color` di
+    /// view.** Lencana adalah satu benda: isi, garis, dan tanda tanya. Dulu
+    /// isinya diatur di satu tempat (tanpa mode malam) dan garisnya di tempat
+    /// lain (`PointingTone`, sudah merah di mode malam), jadi bentuknya
+    /// sendiri tidak pernah bisa diuji sebagai satu kesatuan. Dua uji di sini
+    /// menuntut yang tidak terlihat dari angka mana pun saja: garis dan glif
+    /// harus **lebih terang** dari isinya, dan isinya harus **lebih gelap**
+    /// dari cincin yang ditutupinya — dua arah yang bisa saja sama-sama
+    /// terpenuhi oleh warna yang salah kalau keduanya tidak diuji bersama.
+    ///
+    /// Nilainya **satu pemilik** per mode: mode siang memakai nada `warning`
+    /// `TonePalette.day` (amber, yang gerbang kontras nada sudah jaga), mode
+    /// malam memakai token `accents.candidateStroke` (merah murni, 0.96).
+    ///
+    /// **Kenapa mode malam tidak memakai `TonePalette.night.warning` (0.982).**
+    /// Token itu hanya 0.262 di atas isi lencana malam (0.72) — cukup sebagai
+    /// perbandingan kanal, tetapi garis 1.5 pt yang hampir menyatu dengan
+    /// isinya tidak terbaca sebagai cincin di layar kecil jam. Token aksen
+    /// **1.0** — merah penuh, masih di atas nada 0.982 — memberi jarak 0.28
+    /// terhadap isi: cukup jelas sebagai garis tanpa menjadi objek kedua di
+    /// layar. Angka itu milik `Accents`, jadi palet tetap pemiliknya; uji
+    /// `testStrokeIsBrighterThanTheFillItOutlines` mengukur jaraknya.
+    public static func stroke(isNight: Bool) -> CelestialVisual.RGBComponents {
+        // Dua cabang dari **dua tipe berbeda** (`RGBComponents` milik palet
+        // gambar, `SurfaceColor` milik palet nada), jadi konversinya dilakukan
+        // per cabang, bukan pada hasil `? :` — Swift menolak cabang yang
+        // tipenya berbeda sebelum sempat mengubahnya.
+        if isNight {
+            let token = CelestialVisual.accents.candidateStroke
+            return CelestialVisual.RGBComponents(red: token.red, green: token.green,
+                                                 blue: token.blue)
+        }
+        let tone = TonePalette.day.warning
+        return CelestialVisual.RGBComponents(red: tone.red, green: tone.green,
+                                             blue: tone.blue)
+    }
 
     /// Diameter lencana, sebagai pecahan dari diameter objek.
     ///

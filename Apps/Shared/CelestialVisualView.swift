@@ -1611,9 +1611,18 @@ struct CelestialVisualView: View {
         // yang menjaga pengguna dari false confidence. `CandidateMarker`
         // menyatakan warna merah murni untuk kedua mode dan diuji di Linux
         // (`CandidateMarkerTests`).
+        //
+        // Garis dan glifnya memakai accessor token yang berdampingan dengan
+        // isinya, bukan `CandidateMarker.stroke`. Keduanya satu benda: kalau
+        // garisnya lewat jalur lain, garis itu bisa kembali menjadi warna yang
+        // tidak diukur gerbang palet — persis cacat yang baru saja ditutup
+        // pada isinya. Dibaca sekali ke `stroke`, bukan tiga kali: tiga
+        // pemanggilan identik membuat "bagian yang sama" hanya kebetulan
+        // yang tampak.
+        let stroke = Self.color(CelestialVisual.candidateStroke(isNight: NightMode.isOn))
         context.fill(circle,
-                     with: .color(Self.color(CandidateMarker.badgeFill(isNight: NightMode.isOn))))
-        context.stroke(circle, with: .color(PointingTone.warning.color), lineWidth: 1.5)
+                     with: .color(Self.color(CelestialVisual.candidateFill(isNight: NightMode.isOn))))
+        context.stroke(circle, with: .color(stroke), lineWidth: 1.5)
         // Tanda tanya digambar sebagai Path, bukan teks: supaya tidak ikut
         // diwarnai/ diperbesar oleh Dynamic Type, dan supaya konsisten di kedua
         // platform tanpa aset font.
@@ -1625,12 +1634,12 @@ struct CelestialVisualView: View {
                        control1: CGPoint(x: center.x - r * 0.1, y: top - r * 0.35),
                        control2: CGPoint(x: center.x + r * 0.55, y: top + r * 0.05))
         glyph.addLine(to: CGPoint(x: center.x, y: center.y + r * 0.05))
-        context.stroke(glyph, with: .color(PointingTone.warning.color),
+        context.stroke(glyph, with: .color(stroke),
                        lineWidth: max(1, badgeRadius * 0.28))
         context.fill(Path(ellipseIn: CGRect(x: center.x - badgeRadius * 0.13,
                                            y: center.y + r * 0.42,
                                            width: badgeRadius * 0.26,
                                            height: badgeRadius * 0.26)),
-                     with: .color(PointingTone.warning.color))
+                     with: .color(stroke))
     }
 }

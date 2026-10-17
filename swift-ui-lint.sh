@@ -3225,21 +3225,39 @@ def body_of_extension(text, start):
     return ""
 
 def direct_members(body):
-    """Deklarasi pada kedalaman satu saja — anggota **langsung** tipe ini."""
+    """Deklarasi pada kedalaman satu saja — anggota **langsung** tipe ini.
+
+    **Cacat yang diperbaiki.** Versi lama memanggil `re.match` **di setiap**
+    posisi `{` dan `}`. Kurung penutup sebuah literal (`static let accents =
+    Accents( ... )` diikuti `}`) ikut memicu pencocokan ulang, dan
+    `re.match` yang dijalankan di posisi itu memakan teks sesudahnya — jadi
+    anggota yang **tepat setelah** initializer besar tidak pernah masuk
+    inventaris. Akibatnya `NightVisual.candidateFill`, anggota sah pada
+    kedalaman satu, dilaporkan "bukan anggota NightVisual": gerbang merah di
+    kode benar. Diukur: menggeser satu fungsi ke bawah `static let accents`
+    cukup untuk memicu ini.
+
+    Sekarang posisi setiap karakter dibaca **satu pass**, dan `re.match`
+    hanya dipanggil pada awal baris yang masih pada kedalaman satu — bukan
+    pada kedua jenis kurung.
+    """
     found, depth = set(), 0
-    for k, ch in enumerate(body):
+    i, n = 0, len(body)
+    while i < n:
+        ch = body[i]
+        if depth == 1 and (i == 0 or body[i - 1] == "\n"):
+            m = re.match(
+                r"[ \t]*(?:public |internal |private |fileprivate )?"
+                r"(?:static |indirect )?"
+                r"(?:func|var|let|struct|enum|class|typealias|case)\s+"
+                r"([A-Za-z_][A-Za-z0-9_]*)", body[i:])
+            if m:
+                found.add(m.group(1))
         if ch == "{":
             depth += 1
         elif ch == "}":
             depth -= 1
-        elif depth == 1:
-            m = re.match(
-                r"(?:public |internal |private |fileprivate )?"
-                r"(?:static |indirect )?"
-                r"(?:func|var|let|struct|enum|class|typealias|case)\s+"
-                r"([A-Za-z_][A-Za-z0-9_]*)", body[k:])
-            if m:
-                found.add(m.group(1))
+        i += 1
     return found
 
 members = set()

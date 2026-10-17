@@ -341,6 +341,16 @@ public extension CelestialVisual {
         public var deepSky: RGBComponents
         /// Isi lencana tanda tanya (kandidat).
         public var candidateFill: RGBComponents
+        /// Garis lencana & tanda tanyanya.
+        ///
+        /// Lencana adalah satu benda: isi, garis, dan glif. Isinya dulu diatur
+        /// di satu tempat (tanpa cabang mode malam), garisnya di tempat lain
+        /// (`PointingTone.warning.color`, di luar palet yang diukur pemeriksa
+        /// gambar), jadi bentuknya tidak pernah bisa diuji sebagai satu
+        /// kesatuan. Sekarang keduanya aksen, dan keduanya diuji bersama:
+        /// garis harus lebih terang dari isinya, isinya lebih gelap dari
+        /// cincin yang ditutupinya.
+        public var candidateStroke: RGBComponents
 
         // MARK: Warna kabut per morfologi objek langit dalam
         //
@@ -405,7 +415,16 @@ public extension CelestialVisual {
                     deepSkySpiralGalaxy: RGBComponents,
                     deepSkyOpenCluster: RGBComponents,
                     deepSkyGlobularCluster: RGBComponents,
-                    candidateFill: RGBComponents) {
+                    candidateFill: RGBComponents,
+                    // **Wajib, sengaja.** Sebelumnya parameter ini punya
+                    // nilai bawaan amber siang, dan `static let accents`
+                    // tidak mengisinya: mode malam diam-diam menggambar garis
+                    // amber (0.96/0.70/0.29) — kanal hijau & biru bukan nol —
+                    // tanpa satu pun gerbang berbunyi. Nilai bawaan di sini
+                    // berarti setiap anggota `Accents` baru bisa lupa diisi
+                    // dan tetap kompilasi. Uji
+                    // `testNightStrokeComesFromThePaletteToken` menangkapnya.
+                    candidateStroke: RGBComponents) {
             self.jupiterBandCream = jupiterBandCream
             self.jupiterBandRust = jupiterBandRust
             self.jupiterBandTan = jupiterBandTan
@@ -432,6 +451,7 @@ public extension CelestialVisual {
             self.deepSkyOpenCluster = deepSkyOpenCluster
             self.deepSkyGlobularCluster = deepSkyGlobularCluster
             self.candidateFill = candidateFill
+            self.candidateStroke = candidateStroke
         }
     }
 
@@ -566,8 +586,62 @@ public extension CelestialVisual {
         // merah di layar. Yang sampai ke layar sekarang membaca token ini lewat
         // `CandidateMarker.badgeFill(isNight:)`, yang dijaga
         // `CandidateMarkerTests`.
-        candidateFill: .init(red: 0.34, green: 0, blue: 0)
+        candidateFill: .init(red: 0.34, green: 0, blue: 0),
+        // Garis & glif lencana ragu. Merah penuh: 0.28 di atas isinya (0.72)
+        // supaya cincinnya terbaca sebagai garis di layar jam, bukan menyatu,
+        // dan tetap di atas nada malam (`TonePalette.night.warning` 0.982).
+        // Pemiliknya di sini, bukan di `CandidateMarker`: gerbang jangkauan
+        // aksen hanya menelusuri fungsi di berkas palet ini.
+        candidateStroke: .init(red: 1.0, green: 0, blue: 0)
     )
+
+    /// Isi lencana "engine ragu", per mode, dibaca dari token palet.
+    ///
+    /// **Kenapa di sini, bukan di `CandidateMarker`.** `accents.candidateFill`
+    /// adalah warna mentah yang dibaca port Python (`ACCENTS["candidateFill"]`)
+    /// dan gerbang paritas malam. Sebelum siklus ini ia **tidak pernah
+    /// menggambar**: isi lencana diambil dari konstanta `dayRed`/`nightRed` di
+    /// `CandidateMarker`, jadi gerbang jangkauan melaporkannya sebagai warna
+    /// mati (25 dari 26) dan CI Linux merah. Gerbang itu menelusuri penutupan
+    /// dari **file ini** — nama aksen di view, ditambah aksen di tubuh `func`
+    /// yang tinggal di sini — jadi warnanya tinggal di sini pula, satu baris
+    /// dari `deepSkyColour(for:)`.
+    ///
+    /// **Kenapa parameternya `isNight`.** Kedua mode menghasilkan merah murni
+    /// (hijau & biru nol persis: mode merah membuang hue, rod ~498-530nm),
+    /// tetapi kanal merahnya **berbeda**: latar malam hampir hitam, jadi merah
+    /// siang tenggelam di sana (`testNightMarkIsBrighterThanDayMark`). Token
+    /// palet adalah nilai siangnya; cabang malam mengembalikan
+    /// `CandidateMarker.nightRed` supaya tetap satu pemilik angka.
+    static func candidateFill(isNight: Bool) -> CelestialVisual.RGBComponents {
+        let day = accents.candidateFill
+        if !isNight { return day }
+        return .init(red: CandidateMarker.nightRed, green: 0, blue: 0)
+    }
+
+    /// Garis & glif lencana ragu, per mode — dibaca view, berdampingan dengan
+    /// `candidateFill(isNight:)`.
+    ///
+    /// **Kenapa accessor-nya di sini, bukan cukup di `CandidateMarker`.** Isi
+    /// dan garis lencana adalah satu benda. Kalau garisnya lewat fungsi di
+    /// berkas lain, gerbang jangkauan aksen (`check_night_accents_reach_the_view`)
+    /// hanya bisa melihat token ini lewat fungsi yang **berkasnya** sama dengan
+    /// `Accents`; fungsi di `CandidateMarker.swift` membuat tokennya dilaporkan
+    /// mati (diukur: 26 dari 27, `candidateStroke`) walau view memakainya.
+    ///
+    /// **Kenapa mode siang tetap `TonePalette.day.warning`.** Token di
+    /// `ACCENTS` port Python memegang nilai **malam** (merah murni), sedangkan
+    /// mode siang memang memakai amber yang sudah dijaga gerbang kontras nada
+    /// terhadap `surface2`. Port-nya membaca amber itu dari
+    /// `ACCENTS["candidateStroke"]` lewat `_warning_color(False)`; yang dijaga
+    /// gerbang paritas adalah **nilai malam**, karena hanya nilai malam yang
+    /// bisa salah tanpa terlihat di mode siang.
+    static func candidateStroke(isNight: Bool) -> CelestialVisual.RGBComponents {
+        let day = accents.candidateStroke
+        return isNight ? day : .init(red: TonePalette.day.warning.red,
+                                     green: TonePalette.day.warning.green,
+                                     blue: TonePalette.day.warning.blue)
+    }
 
     /// Warna kabut untuk sebuah morfologi, atau warna **netral** saat
     /// morfologinya tidak boleh diklaim.

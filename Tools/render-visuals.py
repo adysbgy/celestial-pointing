@@ -147,6 +147,9 @@ ACCENTS = dict(
     deepSkyOpenCluster=(0.95, 0.97, 1.00),
     deepSkyGlobularCluster=(0.93, 0.74, 0.42),
     candidateFill=(0.34, 0.0, 0.0),
+    # Garis & glif lencana ragu (mode malam). Merah murni: mode merah membuang
+    # hue, jadi token ini tidak punya hijau/biru sama sekali.
+    candidateStroke=(1.0, 0.0, 0.0),
 )
 
 STAR_COLOR_INDEX = {
@@ -2277,10 +2280,24 @@ def _draw_candidate_marker(canvas, size, night_mode):
 
 
 def _warning_color(night_mode):
-    """`PointingTone.warning.color` dari `TonePalette` (mode terang) / malam."""
-    if night_mode:
-        return night_surface((0.94, 0.62, 0.20))
-    return (0.94, 0.62, 0.20)
+    """Garis & glif lencana: **token yang sama** dengan yang digambar view.
+
+    **Cacat yang ditutup.** Sebelumnya fungsi ini mengembalikan angka tetap
+    `(0.94, 0.62, 0.20)` di mode siang — bukan nilai `TonePalette.day.warning`
+    (0.960/0.700/0.290) yang dipakai `CandidateMarker.stroke`. Port dan view
+    jadi menggambar oranye yang **berbeda** dengan selisih ~0.14 di kanal
+    hijau, dan tidak ada gerbang yang membandingkannya karena
+    `_warning_color` bukan bagian `ACCENTS`. Pemeriksa "glif tidak keluar
+    lencana" memakai toleransi ±40/255, jadi selisih itu masih menutupinya —
+    artinya port bisa menyimpang lebih jauh lagi tanpa ada yang berbunyi.
+
+    Sekarang mode siang membaca `ACCENTS["candidateStroke"]`, dan mode malam
+    membaca token yang sama lewat `night_surface` seperti aksen lain. Gerbang
+    paritas malam (`check_night_accents_match_the_model`) membandingkan token
+    itu antara Swift dan port di kedua arah.
+    """
+    day = ACCENTS["candidateStroke"]
+    return night_surface(day) if night_mode else day
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -188,10 +188,30 @@ def _():
 def _():
     # Kelas paling sunyi: setiap gerbang **nilai** tetap hijau (model dan port
     # sama-sama punya warnanya), dan warnanya tidak pernah menggambar apa pun.
-    return None, BASE_NIGHT.replace(
-        "        candidateFill: .init(red: 0.10, green: 0.10, blue: 0.13)",
-        "        candidateFill: .init(red: 0.10, green: 0.10, blue: 0.13),\n"
-        "        aksenBaruYangTidakDipakai: .init(red: 0.11, green: 0.22, blue: 0.33)")
+    # Jangkar **tanpa angka**: keadaan ini menguji kehadiran aksen baru di
+    # `Accents`, bukan nilai `candidateFill`. Menyematkan angka 0.10/0.13
+    # membuat harness mati (melempar `JangkarHilang`) begitu nilai token itu
+    # diubah — dan perubahan itu justru yang membuatnya sekarang benar-benar
+    # menggambar. Yang disisipkan setelah baris token, apa pun isinya.
+    import re as _re
+    m = _re.search(r"^ +candidateFill: \.init\([^\n]*\),?$", BASE_NIGHT, _re.M)
+    if not m:
+        raise JangkarHilang("baris token `candidateFill:` tidak ditemukan di NightVisual")
+    return None, Sumber(
+        BASE_NIGHT[:m.end()] + "\n"
+        "        aksenBaruYangTidakDipakai: .init(red: 0.11, green: 0.22, blue: 0.33)"
+        + BASE_NIGHT[m.end():])
+
+
+@case("model: token garis lencana dihapus dari view (harus MERAH)", {C_SAMPAI})
+def _():
+    # `candidateStroke` ditambahkan ke `Accents` di siklus yang sama dengan
+    # perbaikan `candidateFill`. Kalau view berhenti memanggil accessor-nya,
+    # gerbang jangkauan harus berbunyi — token baru yang diam-diam mati adalah
+    # persis cacat yang membuat CI Linux merah pada `candidateFill`.
+    return BASE_VIEW.replace(
+        "CelestialVisual.candidateStroke(isNight: NightMode.isOn)",
+        "PointingTone.warning.color"), None
 
 
 @case("view: memakai nama aksen yang tidak ada di model", {C_LUAR, C_DIPAKAI, C_SAMPAI})
