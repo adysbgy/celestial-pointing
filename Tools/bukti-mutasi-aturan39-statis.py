@@ -139,7 +139,13 @@ def main():
             (SRC, "let starClass = CelestialVisual.spokenStarClassLine(",
              "let starClass = visual.spokenStarClassLine("))
 
-    anchor = "    private var objectDisplayName: String { displayName ?? object.name }"
+    # Jangkar ini **bukan** baris produksi yang dijaga Aturan 39; ia hanya
+    # titik sisip untuk membentuk receiver `CelestialVisual?` beranotasi.
+    # Barisnya ikut berubah siklus ini ketika `objectDisplayName` dipecah
+    # menjadi deklarasi multi-baris (perbaikan Aturan 41), dan harness
+    # **harus** mengikuti -- kalau tidak, `assert` di bawah gagal dan CI
+    # merah karena sebab yang bukan cacat yang dicari.
+    anchor = "    private var objectDisplayName: String {"
     periksa("receiver beranotasi + optional chaining", True,
             (SRC, anchor,
              anchor + "\n    private func p() { let v: CelestialVisual? = visual;"
