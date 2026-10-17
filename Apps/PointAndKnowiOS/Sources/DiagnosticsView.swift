@@ -848,12 +848,17 @@ struct DiagnosticsView: View {
                 // memutuskan, bukan view ini — supaya app jam dan iPhone tidak
                 // bisa berbeda pendapat.
                 guard motion.allowsTransitions else { return }
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
-                    appearScale = 1.04
+                // Angka geraknya dari `MotionPolicy.LockArrival` (PointingKit),
+                // sumber yang sama dengan jam — lihat docstring di sana.
+                withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
+                                      dampingFraction: MotionPolicy.LockArrival.dampingFraction)) {
+                    appearScale = MotionPolicy.LockArrival.peakScale
                     appearOpacity = 1
                 }
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.08)) {
-                    appearScale = 1
+                withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
+                                      dampingFraction: MotionPolicy.LockArrival.dampingFraction)
+                                .delay(MotionPolicy.LockArrival.settleDelaySeconds)) {
+                    appearScale = MotionPolicy.LockArrival.settledScale
                 }
             }
             // Hanya bagian **atas** panel yang digabung, bukan seluruhnya.

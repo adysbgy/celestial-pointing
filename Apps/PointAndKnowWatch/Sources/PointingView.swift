@@ -561,12 +561,19 @@ struct ObjectDetailView: View {
             // Always-On, dan layar jam normal berjalan 20 kali per detik
             // tanpa pernah membaca preferensi pengguna.
             guard motion.allowsTransitions else { return }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
-                appearScale = 1.04
+            // Angka geraknya dari `MotionPolicy.LockArrival` (PointingKit),
+            // bukan ditulis di sini: pasangan yang sama dulu ditulis ulang di
+            // `DiagnosticsView` (iPhone), dan dua salinan tidak bisa saling
+            // melihat — `Apps/` tidak pernah dibangun di Linux.
+            withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
+                                  dampingFraction: MotionPolicy.LockArrival.dampingFraction)) {
+                appearScale = MotionPolicy.LockArrival.peakScale
                 appearOpacity = 1
             }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.08)) {
-                appearScale = 1
+            withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
+                                  dampingFraction: MotionPolicy.LockArrival.dampingFraction)
+                            .delay(MotionPolicy.LockArrival.settleDelaySeconds)) {
+                appearScale = MotionPolicy.LockArrival.settledScale
             }
         }
         // Saat jam kembali aktif, jam denyut di-set ulang **sekali** — lihat

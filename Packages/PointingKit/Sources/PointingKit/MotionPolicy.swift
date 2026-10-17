@@ -111,4 +111,57 @@ public struct MotionPolicy: Equatable, Sendable {
         guard allowsContinuousMotion else { return 0 }
         return max(0, elapsedSeconds) * Self.pulseRateRadiansPerSecond
     }
+
+    /// Bentuk gerak untuk pop saat objek terkunci: dua tahap, satu angka.
+    ///
+    /// **Kenapa ini pindah ke sini.** Angka yang sama — `response: 0.42`,
+    /// `dampingFraction: 0.82`, dan jeda `0.08` untuk tahap kedua — ditulis
+    /// **empat kali** di dua aplikasi:
+    ///
+    ///     Apps/PointAndKnowWatch/Sources/PointingView.swift:564,568
+    ///     Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift:851,855
+    ///
+    /// Kedua pasang itu tidak bisa saling melihat. Brief meminta "token tema
+    /// dipakai Watch + iPhone", tetapi yang lebih mendesak: pop saat kunci
+    /// adalah **umpan balik bahwa identifikasi berhasil**. Kalau jam dan iPhone
+    /// memantul dengan bentuk berbeda, keduanya tetap "terlihat benar" sendiri-
+    /// sendiri, dan tidak ada satu pun uji atau gerbang di Linux yang bisa
+    /// membandingkannya — `Apps/` tidak pernah dibangun di sini.
+    ///
+    /// **Kenapa dua tahap, bukan satu.** Tahap pertama menaikkan skala sedikit
+    /// di atas 1 sambil memunculkan opacity; tahap kedua menurunkannya kembali
+    /// ke 1. Kalau keduanya dijalankan bersamaan, skala hanya berhenti di 1.04
+    /// dan tidak pernah kembali — objek terkunci tampak 4% lebih besar
+    /// selamanya. Jedanya yang membuat "memantul" terjadi.
+    ///
+    /// **Yang TIDAK diklaim.** Angka-angka ini **tidak** diukur dari rasa
+    /// Apple; ia angka yang sudah dipakai repo ini dan di sini hanya
+    /// dijadikan satu. Yang dibuktikan uji adalah bahwa keduanya **berbeda
+    /// tahap** dan bahwa tahap kedua memang kembali ke 1 — bukan bahwa 0.42
+    /// detik terasa paling enak.
+    public struct LockArrival: Equatable, Sendable {
+
+        /// Lama tahap pertama, detik.
+        public static let responseSeconds: Double = 0.42
+        /// Redaman pegas. Di bawah 1 berarti memantul sedikit lalu tenang.
+        public static let dampingFraction: Double = 0.82
+        /// Skala puncak tahap pertama — sedikit di atas 1 supaya terlihat
+        /// "muncul", bukan sekadar memudar.
+        public static let peakScale: Double = 1.04
+        /// Skala akhir. **Wajib 1**: objek yang terkunci harus berhenti pada
+        /// ukuran yang sama dengan objek yang tidak pernah beranimasi.
+        public static let settledScale: Double = 1
+        /// Jeda sebelum tahap kedua mulai, detik.
+        public static let settleDelaySeconds: Double = 0.08
+
+        /// Apakah tahap kedua benar-benar mengembalikan skala ke keadaan diam.
+        ///
+        /// Ditulis sebagai fungsi supaya bisa diuji: nilai `peakScale` yang
+        /// sama dengan `settledScale` akan membuat pop tidak terlihat, dan
+        /// `settledScale` selain 1 akan meninggalkan objek pada ukuran yang
+        /// salah selamanya.
+        public static var settlesBackToRest: Bool {
+            settledScale == 1 && peakScale > settledScale
+        }
+    }
 }
