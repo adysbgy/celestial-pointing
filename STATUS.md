@@ -86,7 +86,7 @@ yang bekerja dari harness yang menyetujui dirinya sendiri.
 ### Verifikasi
 
     ./swift-ui-lint.sh                      SEMUA GERBANG UI LULUS (41 aturan)
-    CelestialEngine 222 + PointingKit 847 = 1069 uji, 0 gagal
+    CelestialEngine 222 + PointingKit 850 = 1072 uji, 0 gagal
     Tools/bukti-mutasi-aturan41-nama.py     5 keadaan, 0 tidak sesuai harapan
     Tools/check-jangkar-harness.py          342 jangkar, tidak ada mutasi tertinggal
     Tools/check-harness-terdaftar.py        81 harness, semuanya dirujuk
@@ -26093,3 +26093,125 @@ yang dulu lolos kini berbunyi, dan kode yang benar tetap hijau.
   asalnya — tepat yang diinginkan untuk keterbacaan, dan tepat yang
   membuat pencocokan nama buta. Aturan yang menurunkan dari model butuh
   jalan kedua untuk nama seperti ini, atau ia melewatkan yang paling penting.
+
+---
+
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: kelas spektral yang disebut satu permukaan dan dibungkam permukaan lain)
+
+### Cacatnya
+
+`CelestialVisual.spokenStarClassLine(spectralClass:)` adalah satu-satunya
+pengucap ciri pengenal di paket yang **tidak menerima `isConfirmed`**. Tiga
+tunggangan di sebelahnya punya:
+
+    spokenStarColor(isConfirmed:)                 StarColorSpeech.swift
+    spokenDeepSkyMorphology(isConfirmed:)         DeepSkySpeech.swift
+    spokenPhase(...)                              MoonPhaseSpeech.swift
+
+Jadi saat engine ragu (`.uncertain`), gambar memang digambar samar — tapi
+VoiceOver tetap mengucapkan "kelas spektral M1" untuk Betelgeuse. Suara
+**lebih yakin daripada gambar** di sebelahnya, dan itu persis kebalikan dari
+aturan keras proyek: *uncertainty > false confidence*.
+
+### Kenapa ia bertahan lewat 41 aturan lint
+
+Aturan 34/36 membaca daftar aksesor ciri pengenal dari **deklarasi yang
+ber-parameter `isConfirmed:`**. Fungsi tanpa parameter itu tidak ada di
+daftar, jadi gerbang tidak pernah melihatnya — bukan karena gerbangnya salah,
+tapi karena yang dijaga adalah nama yang terdaftar, dan nama ini tidak terdaftar.
+
+Terukur (proses baru, `swift-ui-lint.sh` utuh):
+
+    mutasi spokenStarClassLine -> tanpa penjaga isConfirmed   -> 41 aturan tetap hijau
+
+Jadi yang menutupnya hanya bisa tes perilaku.
+
+### Perbaikan
+
+- `spokenStarClassLine(spectralClass:isConfirmed:)` menerima penjaga itu dan
+  mengembalikan `nil` saat engine ragu — kontrak yang sama dengan warna dan
+  morfologi.
+- Situs jam berubah dari bentuk statis (merakit `objectID` sendiri) ke
+  **aksesor instance** `visual.spokenStarClassLine(isConfirmed:)`, bentuk yang
+  sama seperti `spokenStarColor(isConfirmed:)` di sebelahnya.
+
+### Cacat kedua, ketahuan justru karena menutup cacat pertama
+
+Saat menyambungkan iPhone, ternyata panel iPhone **tidak pernah** menyebut
+kelas spektral sama sekali — panel jam menyebutnya. Dua permukaan, objek sama,
+satu kalimat yang berbeda, dan bedanya **hanya terdengar**: tidak ada teks di
+layar yang menyebut "kelas spektral", jadi tidak ada gerbang visual yang bisa
+melihatnya.
+
+Sebabnya bukan kelupaan, tapi bentuk statisnya: ia menuntut pemanggil
+merakit id sendiri (`visual.objectID.flatMap(...)`). Pemanggil yang lupa
+merakit berarti jalur itu berakhir `nil` — kelas cacat yang sama seperti
+"visual tanpa `objectID` membuat seluruh jalur warna berakhir `nil`".
+
+Karena itu aksesor instance ditambahkan: ia memungut `objectID` dari diri
+visual yang sama, jadi jalur itu tidak bisa terputus di sisi pemanggil.
+Panel iPhone kini menyebut kelas juga.
+
+3 tes baru (RED dulu, lewat Docker `swift:6.0`):
+
+    testStarClassLineIsSilentWhenTheEngineIsUncertain   statis: diam saat ragu
+    testClassLineInstanceAccessorReadsTheIDItself       instance: yakin + ragu
+    testClassLineInstanceAccessorIsSilentWithoutAnID     tanpa objectID: diam
+
+Keadaan "yakin" diuji lebih dulu di dua tes itu, supaya keduanya tidak bisa
+dipuaskan oleh aksesor yang mengembalikan `nil` untuk semua keadaan.
+
+### Non-vakuositas diukur, bukan diklaim
+
+    mutasi spokenStarClassLine -> tanpa penjaga isConfirmed   -> 41 aturan tetap hijau
+                                                                 (buksi cacat lolos gerbang)
+    mutasi situs jam -> CelestialVisual.spokenStarClassLine(   -> Aturan 34 DAN 36 MERAH
+                                                              (lint utuh, proses baru)
+
+Tanpa pengukuran pertama, "41 aturan hijau" tidak membedakan gerbang yang
+bekerja dari gerbang yang tidak melihat apa-apa.
+
+### Jangkar harness Aturan 39: basi untuk kedua kalinya
+
+Menjadikan pemanggilan itu bentuk **instance** menghapus
+`let starClass = CelestialVisual.spokenStarClassLine(` dari produksi — jangkar
+mutasi `bukti-mutasi-aturan39-statis.py`. CI Linux merah dengan
+`anchor tidak ditemukan`, dan itu **bukan** cacat yang dicari aturan.
+
+Perbaikannya memindahkan mutasi ke anggota yang **hanya statis**
+(`visual.spokenStarClass(forStarID:)`). Perpindahan itu perlu, dan alasannya
+harus dicatat: `spokenStarClassLine` kini ada **dua-duanya** sebagai statis dan
+instance, jadi menyuntikkan bentuk statisnya di atas receiver `visual` tetap
+galat kompilasi **tapi** melewati penjaga instance pemindai
+(`if anggota in instance.get(akar)`) — dengan benar. Nama yang punya kembaran
+instance tidak bisa lagi membuktikan apa pun di harness ini; kontrol
+`phaseGeometry` tetap ada supaya gerbang tetap tidak menuduh kode sah.
+
+Ini kelas cacat yang sama dengan yang pernah memerahkan `main` seharian, dan
+ini kali kedua ia muncul di berkas yang sama.
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                      SEMUA GERBANG UI LULUS (41 aturan)
+    CelestialEngine 222 + PointingKit 850 = 1072 uji, 0 gagal
+    Tools/bukti-mutasi-aturan39-statis.py   5 keadaan, 0 tidak sesuai harapan
+    Tools/check-jangkar-harness.py          342 jangkar, tidak ada mutasi tertinggal
+    Tools/check-harness-terdaftar.py        81 harness, semuanya dirujuk
+    Apple Build (macos-15)                  hijau — bukti `Apps/` benar-benar
+                                            dikompilasi dengan perubahan ini
+
+### Yang TIDAK diklaim
+
+- Kelas spektral di sini berasal dari komentar tabel warna di `CelestialVisual`
+  (`"rigel": -0.03, // B8 — biru`) dan diuji **kesamaannya** dengan komentar
+  itu. Kelas yang salah di kedua tempat — komentar dan tabel — tidak bisa
+  ditangkap uji mana pun di repo ini; yang dijamin adalah tidak ada dua daftar
+  yang berbeda pendapat.
+- Aturan 39 tetap punya batas yang dinyatakan di `swift-ui-lint.sh`: ia hanya
+  memeriksa receiver yang **tipenya tertulis** di berkas yang sama. Receiver
+  tanpa anotasi, anggota statis lewat protokol, dan tipe yang dideklarasi di
+  `Apps/` tidak terlihat.
+- Harness Aturan 39 sekarang membuktikan **kelas** galat ("statis dipanggil
+  pada instance"), bukan satu nama spesifik. Itu lebih lemah untuk nama itu
+  dan lebih kuat untuk kelasnya; yang tidak dilakukan adalah melonggarkan
+  `assert`-nya.
