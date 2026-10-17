@@ -145,6 +145,14 @@ ENUM_ANCHOR_NEW = ("public enum MorphologyX: String, Equatable, Sendable, "
 #: mati dengan traceback.
 SWITCH_GLOB_OLD = "        case .globularCluster:\n"
 SWITCH_GLOB_NEW = "        case .globularClusterRenamed:\n"
+
+#: Jangkar `uncertainFog` — fungsi yang membuat kunci netral `None` ada di
+#: pembaca gerbang. Diganti namanya, jangkarnya hilang, dan pembaca harus
+#: berhenti dengan alasan yang menyebutnya (bukan melaporkan `None` sebagai
+#: bentuk sisa).
+UNCERTAIN_FOG_ANCHOR_OLD = "public static func uncertainFog(fuzziness: Double,"
+UNCERTAIN_FOG_ANCHOR_NEW = ("public static func uncertainFogRenamed("
+                            "fuzziness: Double,")
 COMET_SWITCH = ("        case .comet:\n"
                 "            let layout: [(Double, Double, Double, Double, "
                 "Double, Double)] = [\n"
@@ -239,6 +247,22 @@ STATES = [
     ("2. port saja (.comet di DEEP_SKY_LAYOUT)",
      [(RENDER, PORT_OPEN, PORT_COMET)],
      _full(SISA), None),
+
+    # ── Kunci netral `None` tetap harus dibaca dari model ────────────────
+    # Keadaan ini lahir dari perbaikan gerbangnya, bukan dari niat semula.
+    # Gerbang dulu mengecualikan kunci netral lewat daftar tangan (`{"nebula"}`),
+    # dan daftar itu tertinggal satu kunci saat `uncertainFog` menambah `None`
+    # — gerbang memerah pada pohon yang benar selama dua commit. Penggantinya
+    # membaca kunci netral **dari model**; keadaan ini membuktikan pembacaan
+    # itu tidak bisa diam-diam hilang. Kalau `uncertainFog` lenyap dari
+    # `CelestialVisual.swift`, gerbang harus **berhenti dengan alasan**,
+    # bukan kembali melaporkan `None` sebagai bentuk sisa.
+    #
+    # Keadaan 2 menjaga arah sebaliknya — pengecualian yang melebar sampai
+    # "semua kunci non-enum" akan hijau di sana. Dua keadaan, dua arah.
+    ("2b. model kehilangan uncertainFog (kunci netral tak terbaca)",
+     [(MODEL, UNCERTAIN_FOG_ANCHOR_OLD, UNCERTAIN_FOG_ANCHOR_NEW)],
+     {AWAL_PEMBACA: MERAH}, None),
 
     # ── Keadaan sunyi: tetangganya hijau penuh ───────────────────────────
     # Bentuk ditambahkan ke enum, ke switch, dan ke kasus render — tetapi
