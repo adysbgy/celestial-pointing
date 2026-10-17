@@ -6798,6 +6798,113 @@ else
   echo "Bersih: setiap pemanggilan menyebut fase yang dikirimnya."
 fi
 
+# ── Aturan 41: nama objek yang tampil wajib melewati pelokalan ─────────────
+#
+# Cacat yang ditutup aturan ini **tersembunyi oleh kode yang benar** di
+# atasnya, dan karena itu tidak pernah terlihat walau seluruh suite hijau.
+#
+#   ObjectDetailView.objectDisplayName  ->  displayName ?? object.name
+#
+# `CelestialObject.name` adalah data engine yang memuat bentuk Bahasa
+# Indonesia yang dibekukan (`Saturnus`, `Bulan`, `Merkurius`). Pemanggil di
+# `PointingView` **selalu** meneruskan `engine.displayedObjectName(object)`,
+# jadi cabang kiri yang benar menutupi cabang kanan yang salah: selama tidak
+# ada yang memanggil tanpa `displayName`, cacatnya tidak pernah dieksekusi --
+# dan tidak ada uji Linux yang bisa mengeksekusinya, karena `Apps/` tidak
+# pernah dibangun `swift-test.sh`.
+#
+# Terukur hari ini di salinan utuh: mengganti `Text(objectDisplayName)` di
+# judul kartu menjadi `Text(object.name)` -- persis bentuk yang dipakai
+# cabang cadangan itu -- membuat **ke-40 aturan tetap hijau** (exit 0).
+# Begitu pula `displayedObjectName -> object.name`, yang mengembalikan
+# bentuk Indonesia ke **empat** permukaan sekaligus.
+#
+# Yang diawasi di sini bukan "apakah `object.name` dipakai" (ia sah untuk
+# pengenal dan kunci), melainkan **satu bentuk**: `?? object.name`, yaitu
+# jatuh kembali ke nama engine di tempat nama untuk layar diharapkan.
+# Bentuknya sempit sengaja -- gerbang yang menuduh `object.name` di mana pun
+# akan memerah pada kode yang benar, dan gerbang yang memerah pada kode
+# benar akan dilonggarkan orang.
+#
+# **Kenapa fail-closed, dan kenapa lantainya bukan "harus ada temuan".**
+# Bila tidak ada satu pun berkas `Apps/` yang terbaca, aturan ini
+# menganggap itu GAGAL: nol pembacaan berarti pembacanya berhenti melihat,
+# bukan berarti bersih. Sebaliknya, **nol temuan dengan berkas terbaca
+# adalah keadaan yang benar** setelah keempat situs diperbaiki --
+# menjadikannya kegagalan akan membuat gerbang mustahil dipuaskan, dan
+# gerbang seperti itu akan dimatikan orang.
+echo
+echo "== Aturan 41: nama yang tampil tidak jatuh kembali ke nama engine =="
+nama_mentah=$(python3 - <<'PY' 2>&1
+import os, re
+
+# `?? <sesuatu>.name` -- jatuh kembali ke `CelestialObject.name`.
+POLA = re.compile(r"\?\?\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.name\b")
+
+# ── Aturan 41: nama objek yang tampil wajib melewati pelokalan ─────────────
+
+masalah = []
+diperiksa = 0
+berkas_dibaca = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        teks = open(path, encoding="utf-8").read()
+        berkas_dibaca += 1
+        # Cakupan sengaja **sempit**: hanya berkas yang benar-benar
+        # menangani `CelestialObject`. `CalibrationTarget.name` dan
+        # `MountFrame.name` juga `.name`, tetapi keduanya label internal
+        # app yang tidak dibekukan engine -- menuduhnya akan membuat
+        # gerbang merah pada kode yang benar, dan gerbang seperti itu
+        # akan dilonggarkan orang.
+        if "CelestialObject" not in teks and "displayedObject" not in teks:
+            continue
+        baris_teks = teks.split("\n")
+        for nomor, baris in enumerate(baris_teks, start=1):
+            # Komentar dibuang: repo ini mendokumentasikan `?? object.name`
+            # sebagai bentuk yang dilarang, dan docstring yang menyebutnya
+            # bukan pemakaian.
+            kode = baris.split("//", 1)[0]
+            m = POLA.search(kode)
+            if not m:
+                continue
+            diperiksa += 1
+            masalah.append(
+                "  %s:%d: `%s` -- `CelestialObject.name` memuat bentuk "
+                "Bahasa Indonesia yang dibekukan (`Saturnus`, `Bulan`), "
+                "jadi nama ini tidak mengikuti bahasa perangkat. Pakai "
+                "`ObjectDisplayName.text(of:)` atau "
+                "`DisplayLabel.objectName(forObjectID:catalogue:)`."
+                % (path, nomor, m.group(0).strip()))
+
+# Lantai non-vakuositas: bukan "harus ada temuan" (nol temuan justru
+# keadaan yang benar setelah diperbaiki), melainkan "pembacanya masih
+# membaca". Bila tidak ada berkas `Apps/` yang terbaca sama sekali, aturan
+# ini tidak mengukur apa pun dan tidak boleh diam.
+if berkas_dibaca == 0:
+    print("TIDAK ADA berkas Swift di Apps/ yang terbaca -- aturan ini tidak "
+          "mengukur apa pun")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Cabang cadangan nama ikut mewarisi bentuk engine; pemanggil "
+          "yang meneruskan `displayName` menutupinya, sehingga cacatnya "
+          "hanya muncul pada pemanggil yang tidak meneruskannya.")
+PY
+)
+if printf '%s' "$nama_mentah" | grep -q "Traceback\|^error:\|Error:"; then
+  echo "Pemeriksaan Aturan 41 gagal dijalankan:"
+  echo "$nama_mentah"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$nama_mentah" ]; then
+  echo "$nama_mentah"
+  status=1
+else
+  echo "Bersih: tidak ada nama tampilan yang jatuh kembali ke nama engine."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

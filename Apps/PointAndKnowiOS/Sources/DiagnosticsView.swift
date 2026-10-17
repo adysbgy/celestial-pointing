@@ -896,7 +896,7 @@ struct DiagnosticsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         // Nama = informasi utama: paling besar.
-                        Text(displayName ?? object.name)
+                        Text(displayName ?? ObjectDisplayName.text(of: object))
                             .font(.title2.bold())
                         // Badge keyakinan — permukaan yang **sama** dengan app
                         // jam, memakai `level.tone` yang sama. Ia hanya muncul
@@ -1015,7 +1015,7 @@ struct DiagnosticsView: View {
                                   /// dan tidak ada baris yang tiba-tiba
                                   /// berubah bunyinya.
                                   displayName: String? = nil) -> String {
-        var parts = [displayName ?? object.name]
+        var parts = [displayName ?? ObjectDisplayName.text(of: object)]
         // Tingkat keyakinan ikut diucapkan, sama seperti badge-nya ikut
         // digambar. Keduanya memakai ambang yang sama (`!stale`): pada objek
         // sisa, "Yakin" di sebelahnya terdengar sebagai klaim keyakinan atas

@@ -33,6 +33,8 @@ final class LocalizedObjectNameTests: XCTestCase {
         .mars: "Mars",
         .jupiter: "Jupiter",
         .saturn: "Saturn",
+        .uranus: "Uranus",
+        .neptune: "Neptune",
     ]
 
     override func tearDown() {
@@ -221,5 +223,76 @@ final class LocalizedObjectNameTests: XCTestCase {
                 "\(body) menghasilkan teks kosong dari sumber terjemahan"
             )
         }
+    }
+
+    // MARK: - Jalur cadangan `ObjectDetailView` (cacat siklus ini)
+
+    /// `ObjectDisplayName.text(of:)` — jalur yang dipakai `ObjectDetailView`
+    /// saat `displayName` tidak diteruskan — **wajib melokalkan**.
+    ///
+    /// **Cacat yang diuji di sini.** `ObjectDetailView.objectDisplayName`
+    /// (PointingView.swift) berbunyi `displayName ?? object.name`. Selama
+    /// pemanggilnya di `PointingView` meneruskan `engine.displayedObjectName`,
+    /// cabang `??` tidak pernah diambil — jadi cacatnya tidak terlihat. Ia
+    /// hanya muncul untuk pemanggil yang **tidak** meneruskan namanya, dan
+    /// di sanalah judul terbesar di kartu berubah menjadi bentuk engine
+    /// yang membeku (`Saturnus`, `Bulan`) sementara badge dan baris jenis di
+    /// sebelahnya berbahasa perangkat.
+    ///
+    /// **Kenapa `ObjectDisplayName.text(of:)` dan bukan
+    /// `DisplayLabel.objectName(forObjectID:)`.** Panel itu tidak punya
+    /// akses katalog (katalognya milik resolver), sedangkan
+    /// `DisplayLabel.objectName` **menuntut** katalog sebagai parameter
+    /// justru supaya label tidak diambil dari katalog yang salah. Accessor
+    /// ini bekerja dari nama yang sudah dipasang engine, dan objek di tangan
+    /// panel adalah sumber yang sama dengan yang dipertimbangkan engine —
+    /// jadi tidak ada katalog kedua yang bisa berbeda pendapat.
+    ///
+    /// Uji ini **merah pada `object.name`** (bentuk Indonesia yang dibekukan)
+    /// dan hijau hanya bila nama melewati accessor. Itu yang membuatnya
+    /// menyematkan perbaikan, bukan sekadar menyetujui dirinya sendiri.
+    func testDetailViewFallbackLocalizesTheEngineName() {
+        var byKey: [String: String] = [:]
+        for (body, name) in Self.expectedEnglish {
+            byKey[BodyName.catalogKey(for: body)] = name
+        }
+        let table = byKey
+        TextLocalization.install { table[$0] }
+
+        for body in EphemerisBody.allCases {
+            // Bentuk yang **dulu** dipakai cabang `??` di view.
+            let raw = CelestialObject(
+                id: body.rawValue, name: body.displayName, kind: .planet,
+                raDeg: 0, decDeg: 0, magnitude: 0)
+            XCTAssertEqual(
+                raw.name, body.displayName,
+                "prasyarat: nama engine memang bentuk Indonesia yang dibekukan"
+            )
+            // Hanya benda yang **punya** terjemahan berbeda dari bentuk
+            // Indonesianya yang bisa dituntut berubah. `Venus` dan `Mars`
+            // sama di dua bahasa, dan menuntut perubahan di sana akan
+            // membuat uji ini merah karena sebab yang salah.
+            guard let english = Self.expectedEnglish[body], english != raw.name
+            else { continue }
+            XCTAssertNotEqual(
+                ObjectDisplayName.text(of: raw), raw.name,
+                "\(body): cabang `?? object.name` membekukan bentuk Indonesia "
+                + "ke judul kartu"
+            )
+            XCTAssertEqual(ObjectDisplayName.text(of: raw), english)
+        }
+    }
+
+    /// Kontrol negatif: nama yang **tidak** punya terjemahan dikembalikan
+    /// apa adanya, bukan dibuang atau dikarang.
+    ///
+    /// Tanpa kontrol ini, uji di atas bisa "lulus" oleh accessor yang
+    /// mengembalikan string kosong untuk semua benda — dan judul kartu yang
+    /// kosong lebih buruk daripada judul berbahasa salah.
+    func testDetailViewFallbackKeepsNamesWithoutTranslation() {
+        let sirius = CelestialObject(
+            id: "sirius", name: "Sirius", kind: .star,
+            raDeg: 101.3, decDeg: -16.7, magnitude: -1.4)
+        XCTAssertEqual(ObjectDisplayName.text(of: sirius), "Sirius")
     }
 }

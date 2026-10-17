@@ -462,10 +462,22 @@ public final class PointingEngine: ObservableObject {
     /// `M42` memang nama bakunya. Aturan pengenalnya ada di `PointingKit`
     /// (`DisplayLabel.objectName`) supaya bisa diuji di Linux; di sini
     /// hanya meneruskan, sama seperti `displayedObject` di atas.
+    ///
+    /// **Kenapa cabang cadangannya `ObjectDisplayName.text(of:)`, bukan
+    /// `object.name`.** `DisplayLabel.objectName` mengembalikan `nil` untuk
+    /// id yang tidak ada di katalog dan bukan benda tata surya — keadaan
+    /// yang jarang, dan justru karena jarang cabangnya tidak pernah
+    /// dieksekusi di mesin pengembang. Mengembalikan `object.name` apa
+    /// adanya di sana berarti judul terbesar di kartu membeku ke bentuk
+    /// Indonesia (`Saturnus`, `Bulan`) sementara badge dan baris jenis di
+    /// sebelahnya mengikuti bahasa perangkat. `ObjectDisplayName.text(of:)`
+    /// bekerja dari objek yang sama dan mengembalikan nama apa adanya bila
+    /// tidak ada terjemahannya — jadi perilakunya tidak berubah untuk nama
+    /// yang memang tidak diterjemahkan.
     public func displayedObjectName(_ object: CelestialObject) -> String {
         DisplayLabel.objectName(forObjectID: object.id,
                                 catalogue: controller.resolver.catalogue)
-            ?? object.name
+            ?? ObjectDisplayName.text(of: object)
     }
 
     /// Apakah objek yang ditampilkan adalah sisa dari pandangan sebelumnya.

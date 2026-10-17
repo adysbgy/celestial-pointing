@@ -582,13 +582,33 @@ struct ObjectDetailView: View {
     }
 
     /// Nama untuk tampil dan diucapkan: `displayName` bila diteruskan,
-    /// kalau tidak `object.name`.
+    /// kalau tidak nama objek yang dilokalkan.
     ///
     /// Satu tempat, bukan dua baris `??` di view dan label — kalau hanya
     /// teks yang dilokalkan tapi label tidak, VoiceOver akan membacakan
     /// nama berbeda dari yang terlihat, dan itu cacat yang lebih buruk
     /// daripada nama yang salah bahasa.
-    private var objectDisplayName: String { displayName ?? object.name }
+    ///
+    /// **Kenapa `ObjectDisplayName.text(of:)`, bukan `object.name`.**
+    /// `CelestialObject.name` adalah data engine yang memuat bentuk
+    /// Indonesia yang dibekukan (`Saturnus`, `Bulan`, `Merkurius`).
+    /// Cabang cadangan ini dulunya mengembalikannya apa adanya, dan karena
+    /// pemanggil di `PointingView` selalu meneruskan `displayName`, cabang
+    /// itu tidak pernah diambil — jadi cacatnya tersembunyi persis oleh
+    /// kode yang benar di atasnya. Ia muncul hanya untuk pemanggil yang
+    /// tidak meneruskan nama, dan di sanalah judul terbesar di kartu
+    /// berubah bahasa sementara badge dan baris jenis di sebelahnya tetap
+    /// mengikuti perangkat: `Saturnus` berdampingan dengan "Yakin".
+    ///
+    /// `DisplayLabel.objectName(forObjectID:catalogue:)` **tidak** dipakai
+    /// di sini karena ia menuntut katalog, sedangkan panel ini tidak punya
+    /// akses ke resolver — dan meneruskan katalog kemari akan membuat
+    /// labelnya bisa diambil dari katalog yang bukan yang dipertimbangkan
+    /// engine. `ObjectDisplayName.text(of:)` bekerja dari objek yang sudah
+    /// di tangan, jadi tidak ada sumber kedua yang bisa berbeda pendapat.
+    private var objectDisplayName: String {
+        displayName ?? ObjectDisplayName.text(of: object)
+    }
 
     /// Label panel objek untuk VoiceOver.
     ///
