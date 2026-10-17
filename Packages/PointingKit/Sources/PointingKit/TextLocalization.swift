@@ -769,6 +769,11 @@ public extension LocalizedText {
         // digambar biru vs merah. Lihat `StarColorSpeech.swift`.
         .starColorBlue, .starColorWhiteBlue, .starColorYellow,
         .starColorOrange, .starColorRed,
+        // Kelas spektral bintang (`B8`, `M1`) — potongan nama yang dipakai
+        // katalog teleskop, dan satu-satunya cara pengguna VoiceOver
+        // menghubungkan "yang ia dengar" dengan "yang ia baca" di peta.
+        // Lihat `StarNameSpeech.swift`.
+        .starClassLine,
         // Kalimat keadaan kalibrasi yang tampil di layar Tautan. Disimpan di
         // paket sebagai keadaan + accessor (bukan kalimat jadi di pesan) supaya
         // punya kunci katalog — lihat `PointingLinkMessage.calibrationNoteText`.

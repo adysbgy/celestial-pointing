@@ -7947,6 +7947,23 @@
           }
         }
       }
+    },
+    "star.class.line.spoken.label": {
+      "comment": "Kelas spektral bintang untuk VoiceOver: huruf kelas + angka (mis. B8, M1). Bagian nama bintang yang dipakai katalog teleskop; %1$@ diisi kode kelas yang sama di semua bahasa. Lihat StarNameSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "spectral class %1$@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kelas spektral %1$@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

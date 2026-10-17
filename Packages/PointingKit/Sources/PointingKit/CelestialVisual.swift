@@ -179,8 +179,17 @@ public struct CelestialVisual: Equatable, Sendable {
     /// yang membuat view bisa menanyakan `DeepSkyCatalogue.morphology`
     /// (teruji di Linux) alih-alih menebak bentuk dari lebarnya.
     ///
-    /// `nil` untuk benda tata surya & bintang: bentuk mereka sudah ditentukan
+    /// `nil` untuk benda tata surya: bentuk mereka sudah ditentukan
     /// `kind`/`planet`, jadi id tidak menambah apa pun di sana.
+    ///
+    /// **Bintang sekarang terisi, dan itu koreksi.** Catatan lama di sini
+    /// menyatakan `nil` juga untuk bintang karena "id tidak menambah apa pun".
+    /// Itu benar untuk **gambar** — warna bintang sudah sampai lewat
+    /// `colorIndexBV` — dan salah untuk **ucapan**: `spokenStarColor` dan
+    /// `spokenStarClassLine` menanyakan id untuk membangunkan tabel, jadi tanpa
+    /// id keduanya `nil` dan VoiceOver hanya mengucapkan "bintang". Satu
+    /// properti dengan dua konsumen; ramalan yang hanya membaca salah satunya
+    /// adalah cara cacat itu bertahan.
     public var objectID: String?
 
     /// Apakah gambar ini perlu denyut sama sekali.
@@ -270,7 +279,25 @@ public struct CelestialVisual: Equatable, Sendable {
         case .star:
             self.init(kind: .star,
                       colorIndexBV: Self.colorIndex(forStarID: object.id),
-                      relativeSize: Self.sizeFromMagnitude(object.magnitude))
+                      relativeSize: Self.sizeFromMagnitude(object.magnitude),
+                      // **Id diteruskan juga untuk bintang**, walaupun bentuk
+                      // gambarnya tidak memerlukannya.
+                      //
+                      // Cacat yang ditutup: jalur ini dulu mengisi id hanya
+                      // untuk objek langit dalam, jadi setiap bintang sampai
+                      // ke lapisan ucapan tanpa id — dan seluruh rantai warna
+                      // (`starColorText`, `spokenStarColor`) berakhir `nil`.
+                      // Yang terdengar untuk Rigel hanyalah "bintang": bukan
+                      // salah warna, melainkan diam. Gambarnya tidak berubah
+                      // satu piksel pun (warna tetap lewat `colorIndexBV`),
+                      // dan itulah sebabnya cacat ini tidak punya jejak visual
+                      // sama sekali.
+                      //
+                      // Ramalan lama di catatan `objectID` ("`nil` untuk …
+                      // bintang: id tidak menambah apa pun di sana") benar
+                      // untuk gambar dan salah untuk ucapan — dua konsumen
+                      // yang berbeda dibaca sebagai satu.
+                      objectID: object.id)
         case .sun:
             self.init(kind: .sun, relativeSize: 1.0)
         case .deepSky:

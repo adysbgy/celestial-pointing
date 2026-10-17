@@ -659,6 +659,17 @@ struct ObjectDetailView: View {
         if let color = visual?.spokenStarColor(isConfirmed: isConfirmed) {
             parts.append(color)
         }
+        // Kelas spektral (`B8`, `M1`). Warna saja tidak cukup: "putih
+        // kebiruan" tidak membedakan B8 dari B9, sedangkan katalog teleskop
+        // menyebut kelasnya. Id-nya datang dari visual yang sama, jadi
+        // pengucapan ini **tidak mungkin** menyebut bintang lain.
+        // `spokenStarClassLine` mengembalikan `nil` untuk benda lain dan untuk
+        // bintang tanpa kelas di tabel — tidak ada yang ditebak.
+        if let visual,
+           let starClass = visual.spokenStarClassLine(
+               spectralClass: visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:))) {
+            parts.append(starClass)
+        }
         parts.append(ObjectSpeech.magnitude(object.magnitude))
         if object.kind == .star {
             parts.append(ObjectSpeech.coordinates(raDeg: object.raDeg,

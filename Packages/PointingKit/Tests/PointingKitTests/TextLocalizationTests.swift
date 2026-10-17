@@ -336,9 +336,13 @@ final class TextLocalizationTests: XCTestCase {
     /// dideklarasikan lalu dibiarkan di luar daftar seperti
     /// `.slewHazardAboveAltitudeLimit` di atas, karena kesalahan yang sama
     /// tidak perlu diulang.
+    ///
+    /// Angka 353 → 354 karena `.starClassLine`: kelas spektral bintang
+    /// (`B8`, `M1`) untuk VoiceOver. Kunci ini masuk `allKeys` di commit yang
+    /// sama dengan deklarasinya — lihat `StarNameSpeech.swift`.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 353, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 354, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")
