@@ -1,3 +1,94 @@
+### Siklus berikutnya (17 Okt 2026 — getaran "ragu" yang terasa persis seperti "berhasil", dan salinannya ada dua)
+
+Siklus sebelumnya menutup saluran **bunyi**. Yang tersisa adalah saluran yang
+justru paling sering dipakai: getaran. Saat jam diangkat, pengguna melihat
+jamnya — tetapi saat tangan masih di bawah, atau di malam buta dengan mata
+belum menyesuaikan, getaran yang lebih dulu sampai.
+
+Dua berkas memutuskan pola getaran, dan keduanya di `Apps/`:
+
+    Apps/PointAndKnowWatch/Sources/HapticEngine.swift
+        case .lockSucceeded: device.play(.success)
+        case .uncertain:     device.play(.retry)
+
+    Apps/PointAndKnowiOS/Sources/PhoneHapticEngine.swift
+        case .lockSucceeded: UIImpactFeedbackGenerator(style: .medium)...
+        case .uncertain:     UIImpactFeedbackGenerator(style: .rigid)...
+
+### Cacat yang diangkat
+
+Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
+mutasi yang semuanya mengompilasi dan tetap bergetar:
+
+    case .uncertain: device.play(.success)          swift-ui-lint.sh LULUS
+    case .uncertain: <efek yang sama di iPhone>     swift-ui-lint.sh LULUS
+
+Dua keadaan, **nol** yang berbunyi. Dan karena keputusannya ditulis **dua
+kali**, memperbaiki satu platform tidak memperbaiki yang lain — persis kelas
+penyimpangan yang PRD larang, di saluran yang tidak bisa dibantah teks.
+
+### Perbaikan
+
+`HapticPolicy` (PointingKit) memetakan peristiwa → pola, diuji 6 uji di Linux:
+ragu ≠ berhasil, keempat peristiwa saling terbedakan (injektif), setiap
+peristiwa punya pola, `feelDifferent` sepakat dengan `pattern`, dan daftar
+kasus uji benar-benar memuat setiap kasus enum.
+
+Kedua `Apps/` hanya menerjemahkan **pola** ke API platform. **Aturan 47**
+menutup sisi `Apps/`.
+
+### Gerbang lama menangkap kesalahan saya sendiri
+
+Nama kasus pertama saya `success`/`failure`. Aturan 25 langsung memerah:
+
+    TelescopeHandoffView.swift:99: `switch result` melewatkan ['click','retry']
+    dari `['HapticPattern']`
+
+`switch result` itu men-switch `Result<...>`, yang kasusnya `success`/`failure`
+— dan `{success, failure}` adalah subset dari enum saya. Gerbangnya benar
+menurut informasi yang ada. Ia baru saja menangkap kesalahan kompilasi yang
+**hanya muncul di macOS** (Linux tidak membangun `Apps/`). Gerbangnya tidak
+dilonggarkan; namanya yang diubah jadi `completed`/`unsettled`/`failed`/`tick`
+supaya tidak ada dua enum berbeda yang berbagi himpunan label.
+
+### Harness menangkap cacat di aturan saya sendiri
+
+Versi pertama Aturan 47 melewati **seluruh berkas** bila `HapticPolicy.pattern`
+muncul di mana pun di dalamnya. Harness membuktikannya salah: berkas yang
+mendelegasikan di satu tempat dan memutuskan sendiri di tempat lain tetap
+hijau — kelas cacat yang aturan itu klaim tutup. Jalan keluar per-berkas
+dihapus; yang diperiksa adalah **barisnya**. Karena `switch` atas pola memakai
+nama yang tidak cocok dengan pola peristiwa, tidak perlu pengecualian sama
+sekali.
+
+### Verifikasi
+
+    ./swift-test.sh                        PointingKit 891, 0 gagal (885 + 6)
+    ./swift-ui-lint.sh                     SEMUA GERBANG UI LULUS (47 aturan)
+    ./swift-typecheck.sh                   SEMUA GERBANG LULUS
+    bukti-mutasi-getaran-lint.py           5 keadaan, semuanya sesuai harapan
+    bukti-mutasi-getaran.py                3 keadaan merah, sumber pulih md5
+    check-jangkar-harness.py               362 jangkar, tidak ada mutasi tertinggal
+    check-harness-terdaftar.py             91 harness, semuanya dirujuk
+    Apple Build (macos-15)                 hijau — Apps/ benar-benar dikompilasi
+
+### Yang TIDAK diklaim
+
+- Aturan 47 tetap **sapu teks** atas `case .<peristiwa>:` dan `== .<peristiwa>`
+  yang ditulis langsung di berkas bernama `*Haptic*`. Pemetaan lewat helper
+  bernama lain tidak terlihat; itu sebabnya uji PointingKit menahan **nilai
+  kembaliannya**.
+- `HapticPattern` → `WKHapticType`/`UIImpactFeedbackGenerator` tetap di `Apps/`
+  dan tetap tidak diuji di Linux. Yang diuji adalah keputusan **pola mana**,
+  bukan bahwa polanya enak di tangan.
+- Getaran tetap **tidak pernah terasa** di lingkungan ini. Yang dibuktikan
+  adalah pemetaannya, bukan sensasinya.
+- Kedua platform kini memakai satu sumber pemetaan, tetapi **kesamaan rasa**
+  antara `.retry` (watchOS) dan `.rigid` (iOS) tidak diklaim setara — keduanya
+  hanya dijamin **berbeda** dari pola "berhasil" di platform masing-masing.
+
+---
+
 ### Siklus berikutnya (17 Okt 2026 — bunyi "ragu" yang terdengar persis seperti "berhasil", dan nol dari 45 gerbang melihatnya)
 
 Dibuka seperti biasa: `git log` + `gh run`. `main` hijau. Brief menyebut
