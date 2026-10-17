@@ -1,4 +1,96 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: 340 kunci katalog tanpa teks Indonesia)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: galat CI macOS, dan gerbang yang harus berbunyi sebelum push)
+
+### Cacatnya
+
+Commit sebelumnya memerahkan Apple Build dengan satu baris:
+
+    Apps/PointAndKnowWatch/Sources/PointingView.swift:669:28: error:
+    static member 'spokenStarClassLine' cannot be used on instance of type
+    'CelestialVisual'
+
+Kode yang salah berbunyi `visual.spokenStarClassLine(spectralClass:)`.
+`spokenStarClassLine` adalah `static func` di `StarNameSpeech.swift`; ia boleh
+dipanggil di tipe (`CelestialVisual.x`), tidak di nilai (`visual.x`).
+
+Yang membuat cacat ini bertahan sampai ke `origin/main` bukan kelalaian
+membaca, melainkan bahwa **tidak ada gerbang Linux yang bisa melihatnya**:
+`./swift-typecheck.sh` hanya `-parse` (tidak menyelesaikan tipe anggota), dan
+`./swift-test.sh` hanya membangun `Packages/` — `Apps/` tidak pernah dikompilasi
+di sini. Satu-satunya tempat galat ini terlihat adalah runner macOS, setelah push.
+
+Diperiksa dengan sengaja sebelum menulis aturan baru: Aturan 26 (keanggotaan),
+27 (label argumen), dan 34 (meneruskan `isConfirmed`) **semuanya hijau** pada
+baris itu — dan ketiganya memang benar. Anggotanya ada, labelnya ada,
+argumennya utuh. Yang salah adalah **bentuk pemanggilannya**, satu kelas
+terpisah.
+
+### Gerbang Aturan 39, dan tiga kali ia salah
+
+Aturan 39 mengukur bentuk itu: anggota `static` yang dipanggil pada receiver
+instance. Riwayatnya lebih berguna daripada aturan itu sendiri, karena ketiga
+versi pertamanya **melapor "Bersih"** pada kode yang gagal di CI:
+
+1. **Indeks kosong.** Pencacah kurung kurawal per baris meleset di
+   `CelestialVisual.swift`; 0 anggota tercatat, aturan tidak punya apa pun
+   untuk dibandingkan. "Bersih" di sini berarti "tidak membaca", bukan
+   "tidak ada pelanggaran".
+2. **Indeks berisi, pemilik salah.** Pola deklarator ikut menangkap tipe
+   pengembalian pada `... -> PhaseGeometry? {`, sehingga kepemilikan berpindah
+   ke `PhaseGeometry` dan seluruh anggota `CelestialVisual` sesudahnya tidak
+   dikenali. Indeks terlihat wajar (55 tipe), jadi penjaga lantai lolos.
+3. **Enum bersarang menutup induknya.** Baris `}` milik `enum Kind` ikut
+   mem-pop `CelestialVisual`, jadi anggota induk tercatat milik tipe luar.
+
+Semuanya lolos `./swift-ui-lint.sh`. Yang menghentikan putaran ini bukan
+membaca ulang kode, melainkan `Tools/bukti-mutasi-aturan39-statis.py` yang
+**menyuntikkan galat yang persis sama dengan CI** ke sandbox dan melihat
+gerbangnya diam. Karena itu harness itu ditaruh di CI.
+
+### Yang diukur (bukan diklaim)
+
+| keadaan | harapan | hasil |
+|---|---|---|
+| `visual.spokenStarClassLine(…)` (bentuk yang gagal di CI) | berbunyi | berbunyi |
+| `v?.spectralClass(…)`, `v` beranotasi `CelestialVisual?` | berbunyi | berbunyi |
+| `visual.phaseGeometry(…)` — **kontrol kode sah** | diam | diam |
+| berkas apa adanya | diam | diam |
+
+Kontrol ketiga bukan formalitas: `CelestialVisual` memang punya
+`phaseGeometry(waxing:)` sebagai metode instance **dan**
+`phaseGeometry(fraction:waxing:)` sebagai statis. Aturan yang menuduh baris
+`CelestialVisualView.swift` akan memerahkan kode benar — dan gerbang yang merah
+pada kode benar akan dimatikan orang. Itu sebabnya Aturan 39 membuang anggota
+yang punya kembaran instance **sebelum** memutuskan.
+
+Indeks yang dijaga harness: 68 anggota, termasuk 48 anggota statis
+`CelestialVisual` dan `phaseGeometry` sebagai instance.
+
+### Verifikasi
+
+- Apple Build (macos-15): **hijau**, kedua job — Paket Apple SDK 2m04s,
+  App (iPhone + Watch) 3m24s. Inilah bukti galat kompilasinya benar-benar hilang.
+- CelestialEngine 222 tes, PointingKit 843 tes — hijau.
+- `./swift-ui-lint.sh`: 39 aturan, semua lulus (README disamakan ke 39).
+- `Tools/check-harness-terdaftar.py`: 78 harness, semuanya dirujuk alur kerja.
+
+### Yang TIDAK diklaim
+
+- Aturan 39 hanya memeriksa receiver yang **tipenya tertulis** di berkas yang
+  sama (`let v: CelestialVisual?` atau parameter beranotasi). Receiver tanpa
+  anotasi (`let v = …` lalu `v.x()`), anggota statis lewat protokol, dan tipe
+  yang dideklarasikan di `Apps/` tidak terlihat. Yang dijaga adalah bentuk yang
+  benar-benar lolos ke `main`.
+- Gerbang ini menemukan bentuk salah, bukan memahami Swift. Ia tidak menggantikan
+  kompiler macOS; ia hanya membuat satu kelas galat berbunyi di Linux.
+- Pemindai indeks menurunkan pemilik dari letak deklarator, bukan dari pohon
+  sintaks. Kalau kelak satu berkas memuat anggota tipe A setelah tipe B tanpa
+  deklarator di antaranya, aturannya cenderung berbunyi pada kode benar
+  (bising) — arah yang dipilih, karena diam pada kode salah adalah kegagalan
+  yang tidak terlihat.
+
+---
+
+## Siklus sebelumnya (17 Okt 2026 — 340 kunci katalog tanpa teks Indonesia)
 
 ### Cacatnya
 
