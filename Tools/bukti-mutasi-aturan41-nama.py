@@ -66,6 +66,7 @@ DIAG = os.path.join("Apps", "PointAndKnowiOS", "Sources", "DiagnosticsView.swift
 ENGINE = os.path.join("Apps", "Shared", "PointingEngine.swift")
 EXPERIMENT = os.path.join("Apps", "PointAndKnowiOS", "Sources", "Experiment1View.swift")
 TELESCOPE = os.path.join("Apps", "PointAndKnowiOS", "Sources", "TelescopeHandoffView.swift")
+CALIBRATION = os.path.join("Apps", "PointAndKnowWatch", "Sources", "CalibrationView.swift")
 
 #: Program Aturan 41 mencetak **temuan** ke stdout dan diam bila bersih.
 #:
@@ -145,6 +146,11 @@ def main() -> int:
     experiment_anchor = "            ExperimentText.answerName(trial.trial.intent)))"
     telescope_anchor = ("            row(TextLocalization.text(.telescopeFrameLabel), "
                         "preferredFrame.name)")
+    # Jangkar daftar acuan kalibrasi. `localizedName` yang benar, jadi keadaan
+    # 11 (kontrol) memakai jangkar ini apa adanya dan keadaan 10 memutasi
+    # **hanya** kata itu — bukan baris di sekitarnya, supaya yang diukur
+    # benar-benar `name` vs `localizedName`.
+    calibration_anchor = "                                Text(target.localizedName)"
 
     states = [
         ("1. `?? object.name` di kartu jam",
@@ -188,6 +194,31 @@ def main() -> int:
         ("9. [kontrol] `preferredFrame?.name` (bukan nama objek langit)",
          TELESCOPE, telescope_anchor,
          "            row(TextLocalization.text(.telescopeFrameLabel), preferredFrame?.name ?? \"—\")",
+         False),
+        # ── `PointingTarget`: satu permukaan yang dulu tidak terlihat ──
+        #
+        # Daftar acuan kalibrasi mengulang `[PointingTarget]`, dan
+        # `PointingTarget.name` diisi engine dari `EphemerisBody.displayName`
+        # (`Bulan`, `Saturnus`). Versi lama aturan ini **tidak** membaca berkas
+        # itu: penyaring cakupannya hanya menerima berkas yang menyebut
+        # `CelestialObject`/`displayedObject`, dan komentarnya menyebut
+        # `CalibrationTarget.name` sebagai contoh sah — tipe yang tidak ada di
+        # repo ini. Bentuknya pun `target.name` langsung: tanpa `??` dan tanpa
+        # `?.`, jadi kedua pola lama diam dua kali.
+        ("10. `target.name` di daftar acuan kalibrasi",
+         CALIBRATION, calibration_anchor,
+         "                                Text(target.name)",
+         True),
+        ("11. [kontrol] `target.localizedName` (perbaikan)",
+         CALIBRATION, calibration_anchor, calibration_anchor, False),
+        # Arah sebaliknya untuk penyaring yang baru dilebarkan: `MountFrame`
+        # tetap di luar daftar penerima, jadi `preferredFrame.name` **langsung**
+        # (tanpa `?`) juga harus diam. Tanpa keadaan ini, melebarkan
+        # `POLA_LANGSUNG` menjadi `.name` di mana pun akan hijau di sini dan
+        # merah pada kode yang benar.
+        ("12. [kontrol] `preferredFrame.name` langsung (bukan nama objek)",
+         TELESCOPE, telescope_anchor,
+         "            row(TextLocalization.text(.telescopeFrameLabel), preferredFrame.name)",
          False),
     ]
 

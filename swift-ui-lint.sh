@@ -7058,6 +7058,19 @@ POLA_RANTAI = re.compile(
     r"\b(best|object|target|displayedObject|intent|candidate)"
     r"(?:\.[A-Za-z_]\w*)?\?\.name\b"
 )
+# Bentuk ketiga: akses **langsung**, tanpa `?` dan tanpa `??`.
+#
+#     Text(target.name)      <- daftar acuan kalibrasi
+#
+# Ini yang paling mudah lolos: tidak ada `??`, tidak ada `?.`, jadi kedua
+# pola di atas diam. Yang menahannya bukan pola yang lebih pintar,
+# melainkan daftar penerima yang sempit — hanya nama yang di repo ini
+# memang membawa `CelestialObject`/`PointingTarget`. `preferredFrame.name`
+# dan `MountFrame.name` sengaja di luar daftar karena keduanya label
+# internal app yang tidak dibekukan engine.
+POLA_LANGSUNG = re.compile(
+    r"\b(best|object|target|displayedObject|intent|candidate)\.name\b"
+)
 
 # ── Aturan 41: nama objek yang tampil wajib melewati pelokalan ─────────────
 
@@ -7072,12 +7085,21 @@ for root, _, files in os.walk("Apps"):
         teks = open(path, encoding="utf-8").read()
         berkas_dibaca += 1
         # Cakupan sengaja **sempit**: hanya berkas yang benar-benar
-        # menangani `CelestialObject`. `CalibrationTarget.name` dan
-        # `MountFrame.name` juga `.name`, tetapi keduanya label internal
-        # app yang tidak dibekukan engine -- menuduhnya akan membuat
-        # gerbang merah pada kode yang benar, dan gerbang seperti itu
-        # akan dilonggarkan orang.
-        if "CelestialObject" not in teks and "displayedObject" not in teks:
+        # menangani nama objek langit. `MountFrame.name` adalah label
+        # internal app yang tidak dibekukan engine -- menuduhnya akan
+        # membuat gerbang merah pada kode yang benar, dan gerbang seperti
+        # itu akan dilonggarkan orang.
+        #
+        # **`PointingTarget` ikut, dan dulu tidak.** Versi sebelumnya
+        # menyebut `CalibrationTarget.name` sebagai contoh sah -- tipe
+        # yang **tidak ada** di repo ini. Daftar acuan kalibrasi justru
+        # mengulang `[PointingTarget]`, dan `PointingTarget.name` diisi
+        # engine dari `EphemerisBody.displayName` (`Bulan`, `Saturnus`),
+        # jadi berkas itu lolos hanya karena gerbangnya menyebut tipe
+        # yang salah. `localizedName` di struct yang sama sudah jadi
+        # jalur benar yang dipakai pemilih target Experiment 1.
+        if ("CelestialObject" not in teks and "displayedObject" not in teks
+                and "PointingTarget" not in teks):
             continue
         baris_teks = teks.split("\n")
         for nomor, baris in enumerate(baris_teks, start=1):
@@ -7085,7 +7107,8 @@ for root, _, files in os.walk("Apps"):
             # sebagai bentuk yang dilarang, dan docstring yang menyebutnya
             # bukan pemakaian.
             kode = baris.split("//", 1)[0]
-            m = POLA_CADANGAN.search(kode) or POLA_RANTAI.search(kode)
+            m = (POLA_CADANGAN.search(kode) or POLA_RANTAI.search(kode)
+                 or POLA_LANGSUNG.search(kode))
             if not m:
                 continue
             diperiksa += 1

@@ -215,7 +215,21 @@ struct CalibrationView: View {
                                 .foregroundStyle(PointingTone.active.color)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 0) {
-                                Text(target.name)
+                                // `localizedName`, bukan `name`.
+                                //
+                                // `PointingTarget.name` diisi engine dari
+                                // `EphemerisBody.displayName` / `CelestialObject.name`
+                                // — bentuk Bahasa Indonesia yang **dibekukan**
+                                // (`Bulan`, `Matahari`, `Saturnus`). Daftar acuan
+                                // kalibrasi menampilkannya apa adanya, jadi di
+                                // perangkat berbahasa Inggris pengguna memilih
+                                // acuan bernama `Bulan`.
+                                //
+                                // Jalur yang benar sudah ada dan sudah diuji
+                                // (`PointingTarget.localizedName`, dipakai pemilih
+                                // target Experiment 1); berkas ini satu-satunya
+                                // yang melewatinya.
+                                Text(target.localizedName)
                                     .font(.subheadline.weight(.medium))
                                 Text(CalibrationText.captureAltitudeDisplay(
                                                 altitudeDeg: target.direction.altitudeDeg))
