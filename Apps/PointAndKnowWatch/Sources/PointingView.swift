@@ -666,7 +666,7 @@ struct ObjectDetailView: View {
         // `spokenStarClassLine` mengembalikan `nil` untuk benda lain dan untuk
         // bintang tanpa kelas di tabel — tidak ada yang ditebak.
         if let visual,
-           let starClass = visual.spokenStarClassLine(
+           let starClass = CelestialVisual.spokenStarClassLine(
                spectralClass: visual.objectID.flatMap(CelestialVisual.spectralClass(forStarID:))) {
             parts.append(starClass)
         }

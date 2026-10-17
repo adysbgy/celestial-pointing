@@ -6421,6 +6421,270 @@ else
   echo "Bersih: setiap permukaan kejujuran di Apps/ meneruskan faktanya."
 fi
 
+# ── Aturan 39: anggota `static` tidak boleh dipanggil pada instance ─────────
+#
+# Cacat yang melahirkan aturan ini **sampai ke `origin/main` dan memerahkan
+# CI macOS**, dengan pesan yang tidak bisa dilihat satu gerbang Linux pun:
+#
+#   Apps/PointAndKnowWatch/Sources/PointingView.swift:669:28: error:
+#   static member 'spokenStarClassLine' cannot be used on instance of type
+#   'CelestialVisual'
+#
+# Bentuk barisnya: `visual.spokenStarClassLine(spectralClass: …)`. Dua gerbang
+# yang paling dekat **dua-duanya lulus**, dan masing-masing dengan alasan yang
+# masuk akal:
+#
+#  - Aturan 26 (keanggotaan) benar: `spokenStarClassLine` memang anggota
+#    `CelestialVisual`. Yang salah adalah bagaimana ia dipanggil.
+#  - Aturan 27 (label argumen) benar: `spectralClass:` memang labelnya.
+#  - Aturan 34 (meneruskan `isConfirmed`) juga — argumennya utuh.
+#
+# Jadi yang terlewat bukan nama, label, atau faktor, melainkan **bentuk
+# pemanggilannya**: boleh dipanggil di tipe (`CelestialVisual.x`), tidak di
+# nilai (`visual.x`). Itu satu kelas terpisah, dan penjaganya harus terpisah.
+#
+# **Kenapa instance-receiver-nya lokal pada berkas yang sama.** Menebak tipe
+# sebuah nama dari berkas lain akan memerahkan kode yang benar (repo ini sudah
+# menulis aturan itu untuk Aturan 26/27: gerbang yang merah pada kode benar
+# akan dimatikan orang). Bentuk yang **pasti** salah dan bisa dibaca tanpa
+# menebak: nama yang di-`let`/`var` **di dalam berkas itu sendiri** dengan
+# anotasi tipe paket yang punya anggota `static` bernama sama — atau nama yang
+# di deklarasikan sebagai parameter beranotasi serupa. Di `ObjectDetailView`
+# itu `let visual: CelestialVisual?` (parameter ber-`@Binding`), jadi
+# pemeriksaan parameter wajib ada; kalau tidak, aturan ini diam pada bentuk
+# yang justru terjadi.
+#
+# Batasnya jujur: ia hanya memeriksa receiver yang **tipenya tertulis** di
+# berkas yang sama. Receiver tanpa anotasi (`let v = …` lalu `v.x()`),
+# anggota statis lewat protokol, dan tipe yang dideklarasi di `Apps/` tidak
+# terlihat. Yang dijaga adalah bentuk yang benar-benar lolos ke `main`.
+echo
+echo "== Aturan 39: anggota static tidak dipanggil pada instance =="
+statis_instance=$(python3 - <<'PY' 2>&1
+import os, re
+
+# ── Aturan 39: indeks anggota, dipisah dari pemindainya ─────────────────────
+#
+# **Kenapa berkas ini tidak "membaca blok dengan mencacah kurung kurawal".**
+# Tiga percobaan pertama aturan ini memakai pencacah kurung yang berjalan per
+# baris, dan ketiganya melapor "Bersih" sambil memegang indeks yang **kosong**
+# (0 anggota `CelestialVisual`, padahal tipe itu punya belasan anggota statis).
+# Yang membuatnya bertahan bukan kecerdikan pemindainya, melainkan bahwa
+# "Bersih" adalah kata yang sama untuk "tidak ada pelanggaran" dan "tidak
+# membaca apa pun". Karena itu:
+#
+#   1. kalau indeks kosong -> aturan ini GAGAL, bukan bersih (vacuous green);
+#   2. kepemilikan anggota diturunkan dari **deklarator** `struct/enum/class/
+#      actor/extension` yang terakhir terlihat di berkas itu, setelah komentar
+#      dan isi string dibuang. Tidak ada neraca kurung yang harus benar.
+#
+# Batas yang dinyatakan: satu deklarator berlaku sampai deklarator berikutnya
+# di berkas yang sama. Itu sesuai tata letak paket ini (satu tipe per bagian,
+# extension diberi namanya sendiri, dan metode pada extension memakai `Self.`).
+# Kalau kelak ada anggota tipe A yang ditulis setelah tipe B tanpa deklarator,
+# aturan ini bisa salah membaca pemiliknya; ia akan lebih sering **berbunyi
+# pada kode benar** daripada diam, dan itu arah yang bisa ditoleransi gerbang
+# (dilihat orang), sedangkan diam pada kode salah tidak.
+PKG = "Packages/PointingKit/Sources/PointingKit"
+APPS = "Apps"
+
+
+def kode_saja(teks):
+    """Buang komentar dan isi string literal."""
+    t = re.sub(r"//[^\n]*", "", teks)
+    t = re.sub(r"/\*.*?\*/", "", t, flags=re.S)
+    return "\n".join(re.sub(r'"[^"\n]*"', '""', b) for b in t.split("\n"))
+
+
+# Di-anchor ke AWAL baris (dipakai dengan `.match`): sebuah deklarator hanya
+# yang **memulai** deklarasi. Pola tanpa anchor pernah menangkap
+# `-> PhaseGeometry? {` sebagai deklarasi dan memindahkan kepemilikan anggota.
+DEKL = re.compile(r"\s*(?:(?:public|internal|private|fileprivate|package|"
+                  r"final|open)\s+)*(?:struct|enum|class|actor|extension)\s+"
+                  r"([A-Za-z_][A-Za-z0-9_.]*)")
+STATIS = re.compile(r"^\s*(?:public\s+|internal\s+|private\s+|fileprivate\s+|"
+                    r"package\s+)*static\s+(?:func|var|let)\s+([A-Za-z_][A-Za-z0-9_]*)")
+INSTANCE = re.compile(r"^\s*(?:public\s+|internal\s+|private\s+|fileprivate\s+|"
+                      r"package\s+|mutating\s+|nonmutating\s+)*"
+                      r"(?:func|var|let)\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+statis = {}
+instance = {}
+for root, _, files in os.walk(PKG):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        teks = kode_saja(open(os.path.join(root, name), encoding="utf-8").read())
+        # ── Pemilik anggota: tumpukan deklarator ber-kedalaman ──────────────
+        #
+        # Dua pendekatan sebelumnya sama-sama gagal dan sama-sama melapor
+        # "Bersih":
+        #   * pencacah kurung yang berjalan sendiri -> neraca meleset, indeks
+        #     kosong (0 anggota `CelestialVisual`, padahal belasan).
+        #   * "deklarator terakhir berlaku sampai deklarator berikutnya" ->
+        #     `CelestialVisual` (baris 23) lalu `PhaseGeometry` (331) membuat
+        #     SEMUA metode `CelestialVisual` sesudah 331 tercatat milik
+        #     `PhaseGeometry`; indeks terlihat berisi (55 tipe), jadi penjaga
+        #     lantai pun lolos. Yang menangkapnya: uji harness menanyakan
+        #     anggota yang persis dibutuhkan (`phaseGeometry` instance).
+        #
+        # Yang benar: kedalaman kurung kurawal, dengan deklarator hanya
+        # dicatat pada baris yang MEMULAI deklarasi tipe. Tipe bersarang
+        # dicatat ber-titik (`CelestialVisual.Planet`), dan `extension` tidak
+        # menambah nama ke tumpukan (isinya milik tipe yang sama).
+        EXT = "\0ext"
+        ANON = "\0anon"
+        ext_kini = None
+        tumpukan = []      # nama per blok: str, EXT untuk extension
+        for baris in teks.split("\n"):
+            d = DEKL.match(baris) if re.match(r"\s*(?:(?:public|internal|private|"
+                                              r"fileprivate|package|final|open)\s+)"
+                                              r"*(?:struct|enum|class|actor|extension)\b",
+                                              baris) else None
+
+            # Tipe pemilik baris ini: nama terdalam yang bukan penanda extension.
+            # Pemilik = entri terdalam yang bukan penanda; entri itu SUDAH
+            # ber-titik utuh (`CelestialVisual.Kind`). Menyambung seluruh
+            # tumpukan menghasilkan `CelestialVisual.CelestialVisual.Kind`.
+            nama = [n for n in tumpukan if n not in (EXT, ANON)]
+            pemilik = nama[-1] if nama else (ext_kini if EXT in tumpukan else None)
+
+            if pemilik and not d:
+                m = STATIS.match(baris)
+                if m:
+                    statis.setdefault(pemilik, set()).add(m.group(1))
+                else:
+                    mi = INSTANCE.match(baris)
+                    if mi:
+                        instance.setdefault(pemilik, set()).add(mi.group(1))
+
+            penanda = None
+            if d is not None:
+                is_ext = re.match(r"\s*(?:(?:public|internal|private|fileprivate|package)\s+)*extension\b",
+                                  baris) is not None
+                if is_ext:
+                    ext_kini = d.group(1)
+                    penanda = EXT
+                else:
+                    # Entri tumpukan sudah ber-titik utuh, jadi induknya
+                    # adalah entri terakhir apa adanya (`CelestialVisual`
+                    # atau `CelestialVisual.Kind`). Versi sebelumnya menyambung
+                    # seluruh tumpukan dan menghasilkan
+                    # `CelestialVisual.CelestialVisual.Kind`.
+                    induk = [n for n in tumpukan if n not in (EXT, ANON)]
+                    penanda = (induk[-1] + "." + d.group(1)) if induk else d.group(1)
+
+            # ── Neraca blok ──────────────────────────────────────────────
+            # Setiap blok terbuka dicatat di `tumpukan`; `kedalaman` adalah
+            # panjangnya. Aturannya sederhana dan itu sengaja:
+            #
+            #   * baris deklarasi tipe  -> buka blok (tumpukan +1)
+            #   * baris `}`             -> tutup satu blok (tumpukan -1)
+            #   * baris lain            -> buka/tutup blok anonim (`if`, dsb.)
+            #
+            # Yang membuat versi-versi sebelumnya salah: mereka mencoba
+            # menurunkan kedalaman dari SELISIH kurung per baris, dan setiap
+            # baris yang memuat `}` penutup ikut mem-pop tipe induknya. Di
+            # `CelestialVisual.swift` enum bersarang pertama (`Kind`) menutup
+            # `CelestialVisual`, jadi seluruh anggota induk sesudahnya tercatat
+            # milik tipe lain -- dan gerbangnya tetap melapor "Bersih".
+            selisih = baris.count("{") - baris.count("}")
+            if d is not None:
+                # Deklarasi membuka bloknya sendiri; kurung lain di baris yang
+                # sama (deklarasi satu baris) diterapkan setelahnya.
+                tumpukan.append(penanda)
+                selisih -= 1
+            if selisih > 0:
+                tumpukan.extend([ANON] * selisih)
+            elif selisih < 0:
+                # Baris ini menutup blok. Yang ditutup adalah blok terdalam --
+                # dan blok anonim di atasnya ikut tertutup. Versi sebelumnya
+                # hanya menutup pada baris yang ISINYA persis `}`, sehingga
+                # `            }` punya spasi jadi terlewat (spasi dibuang
+                # `.strip()`, tapi baris seperti `        })` atau
+                # `        } else {` tidak pernah cocok).
+                for _ in range(-selisih):
+                    if tumpukan:
+                        tumpukan.pop()
+            if not tumpukan:
+                ext_kini = None
+
+# **Penjaga kevakuman.** Angka di bawah bukan janji tentang masa depan; ia
+# lantai yang terbukti hari ini. Kalau indeks menyusut di bawahnya, artinya
+# pemindai berhenti bekerja -- bukan artinya kode jadi lebih bersih.
+if len(statis) < 10 or len(instance) < 10:
+    print("Indeks anggota terlalu kecil (%d tipe statis, %d tipe instance): "
+          "pemindai tidak membaca paket; aturan ini tidak mengukur apa pun."
+          % (len(statis), len(instance)))
+    raise SystemExit(0)
+if "CelestialVisual" not in statis:
+    print("`CelestialVisual` tidak ada di indeks anggota statis; pemindai "
+          "salah berkas atau salah pola. Aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+DEKLARASI = re.compile(r"\b(?:let|var)\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)")
+PARAMETER = re.compile(r"(?:@\w+(?:\([^)]*\))?\s+)*(?:let\s+)?([a-z_][A-Za-z0-9_]*)\s*:\s*"
+                       r"([A-Z][A-Za-z0-9_.]*)")
+
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk(APPS):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        teks = kode_saja(open(path, encoding="utf-8").read())
+        repot = {}
+        for m in DEKLARASI.finditer(teks):
+            repot.setdefault(m.group(1), set()).add(m.group(2))
+        for m in PARAMETER.finditer(teks):
+            repot.setdefault(m.group(1), set()).add(m.group(2))
+        for nomor, baris in enumerate(teks.split("\n"), start=1):
+            for m in re.finditer(r"(?<![A-Za-z0-9_.])([a-z_][A-Za-z0-9_]*)\s*\??\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)",
+                                 baris):
+                nama, anggota = m.group(1), m.group(2)
+                if nama in ("self", "Self"):
+                    continue
+                for tipe in repot.get(nama, ()):
+                    akar = tipe.split(".")[0]
+                    # Anggota instance bernama sama: `CelestialVisual.phaseGeometry`
+                    # ada sebagai metode instance DAN statis; `visual.phaseGeometry(…)`
+                    # adalah kode yang benar. Tanpa daftar instance, aturan ini
+                    # menuduh dua baris sah di `CelestialVisualView.swift`.
+                    if anggota in instance.get(akar, ()) or anggota in instance.get(tipe, ()):
+                        continue
+                    if anggota in statis.get(akar, ()) or anggota in statis.get(tipe, ()):
+                        masalah.append(
+                            "  %s:%d: `%s.%s` -- `%s` anggota **static** `%s`; "
+                            "dipanggil pada instance ia galat kompilasi "
+                            "(lihat CI macOS). Pakai `%s.%s(...)`."
+                            % (path, nomor, nama, anggota, anggota, tipe, tipe, anggota))
+                        break
+                diperiksa += 1
+
+if diperiksa == 0:
+    print("Tidak ada akses anggota lewat receiver di Apps/; aturan ini tidak "
+          "mengukur apa pun.")
+elif masalah:
+    print("\n".join(sorted(set(masalah))))
+    print("-> Anggota `static` dipanggil di tipenya, bukan di nilai: "
+          "`CelestialVisual.f(a:)`, bukan `visual.f(a:)`. Linux tidak bisa "
+          "melihat galat ini (`swift-typecheck.sh` hanya `-parse`), jadi "
+          "gerbang inilah satu-satunya yang berbunyi sebelum push.")
+PY
+)
+if printf '%s' "$statis_instance" | grep -q "Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 39 gagal dijalankan:"
+  echo "$statis_instance"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$statis_instance" ]; then
+  echo "$statis_instance"
+  status=1
+else
+  echo "Bersih: tidak ada anggota static yang dipanggil pada instance."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

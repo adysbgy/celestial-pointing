@@ -171,6 +171,17 @@ jobs:
       - name: Buktikan Aturan 7 berbunyi pada kelasnya, bukan satu bentuknya
         run: python3 Tools/bukti-mutasi-gerbang-gerak.py
 
+      # Aturan 39 menutup kelas galat yang **tidak bisa dilihat Linux mana pun**:
+      # anggota `static` yang dipanggil pada instance (`visual.spokenStarClassLine(…)`).
+      # `swift-typecheck.sh` hanya `-parse`, dan `Apps/` tidak pernah dibangun di
+      # sini, jadi bentuk itu baru memerah di runner macOS. Aturan ini pertama
+      # kali ditulis salah tiga kali berturut-turut dan melapor "Bersih" dengan
+      # indeks **kosong**; harness ini yang menangkapnya, dan ia menanyakan
+      # anggota yang persis dibutuhkan (`phaseGeometry` sebagai instance) supaya
+      # indeks yang salah-tipe tidak bisa lolos lagi.
+      - name: Buktikan Aturan 39 berbunyi pada bentuk yang gagal di CI macOS
+        run: python3 Tools/bukti-mutasi-aturan39-statis.py
+
       # Gambar objek tidak bisa diperiksa di sini: `CelestialVisualView` hanya
       # terbangun di macOS, dan job ini berjalan di Linux. Karena itu lapisan
       # menggambarnya **diport ke Python** (`Tools/render-visuals.py`) dan
