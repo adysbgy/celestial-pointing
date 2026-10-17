@@ -1,4 +1,92 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: kunci kamus fase, cacat yang lolos semua pemeriksaan sebelumnya)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: nama jawaban engine di laporan Experiment, bentuk `.name` yang lolos gerbangnya)
+
+### Mengapa siklus ini bukan fitur baru
+
+Dibuka seperti biasa: `git log` + `gh run`. `main` hijau (Apple Build `93b2bdc`
+success), dan seluruh BAGIAN 1–4 serta FASE A/B/C sudah terwujud dan ter-gerbang.
+Yang dikerjakan adalah pertanyaan yang tersisa setelah premisnya diverifikasi:
+**Aturan 41 menjaga `?? object.name`. Berapa banyak bentuk lain dari cacat yang
+sama yang tidak dijaganya?**
+
+### Cacat yang diangkat
+
+`Apps/PointAndKnowiOS/Sources/Experiment1View.swift` merakit baris laporan dari
+`trial.trial.intent.best?.name` — tiga kali (baris layar `detailLine`, baris
+terucap `spokenDetailLine`, dan pesan status di `ExperimentRecorder`), ditambah
+pemilih target lewat `PointingTarget.name`. Nilai itu adalah
+`CelestialObject.name` yang diisi `PointingResolver` dari
+`EphemerisBody.displayName`, yaitu bentuk Bahasa Indonesia yang **dibekukan**
+(`Bulan`, `Matahari`, `Saturnus`, `Merkurius`).
+
+Pada perangkat berbahasa Inggris barisnya berbunyi `answer Bulan` di sebelah
+`none yet` yang datang dari kunci katalog yang sama — dua bahasa di satu baris,
+persis cacat yang dulu ditutup `BodyName`/`DisplayLabel`.
+
+### Kenapa gerbangnya buta, terukur
+
+Aturan 41 mencari `\?\?\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.name\b` — bentuk
+`?? <pengenal>.name`. `best?.name` tidak punya pengenal sebelum titik, jadi
+polanya tidak cocok. Diukur pada salinan utuh (proses baru, `Apps/` dibawa):
+
+    bentuk lama (3 situs)      Aturan 41 (HEAD)  "Bersih"   exit 0
+    bentuk lama (3 situs)      Aturan 41 (baru)  MERAH      menyebut 2 situs
+    pohon produksi apa adanya  Aturan 41 (baru)  "Bersih"
+    preferredFrame?.name       Aturan 41 (baru)  "Bersih"   (MountFrame, bukan nama engine)
+
+### Perbaikan
+
+- `ExperimentText.answerName(_ intent:)` (PointingKit) — satu jalur, teruji di
+  Linux. Tanpa jawaban mengembalikan `detailNoAnswer`, bukan `nil`/`Optional(…)`.
+- `PointingTarget.localizedName` — jalur `ObjectDisplayName.text(_:)` yang sama
+  dengan `CelestialObject.localizedName`, supaya pemilih target dan baris
+  laporan tidak bisa memberi dua nama berbeda untuk objek yang sama.
+- Ketiga situs + pemilih target memakai accessor itu.
+- **Aturan 41** membaca **dua** bentuk: cadangan `?? <pengenal>.name` dan rantai
+  opsional `?.name` pada receiver yang membawa objek langit (`best`, `object`,
+  `target`, `displayedObject`, `intent`, `candidate`). Daftar receiver sengaja
+  sempit: `CalibrationTarget.name` dan `MountFrame.name` memang `.name` tetapi
+  tidak dibekukan engine — gerbang yang menuduh kode benar akan dilonggarkan
+  orang.
+- Harness `Tools/bukti-mutasi-aturan41-nama.py` bertambah 4 keadaan (6–9),
+  sekarang 9 keadaan. Keadaan 6 dan 7 diverifikasi terhadap aturan **pra-
+  perbaikan**: keduanya "Bersih" di sana, MERAH di sini — jadi keduanya
+  sungguh mengukur perluasan ini, bukan mengulang keadaan lama.
+
+### Uji yang ditulis lebih dulu (Aturan 10)
+
+Tiga uji di `ExperimentTextTests`:
+
+- `testRecordedAnswerLineUsesTheLocalizedNameOfTheEngineAnswer` — jawaban `Bulan`
+  pada perangkat Inggris harus `Moon`, dengan kontrol negatif bahwa
+  `intent.best?.name` memang `Bulan`.
+- `testRecordedAnswerLineFallsBackWhenTheEngineHasNoAnswer` — tanpa jawaban
+  tetap kalimat pengganti, tidak pernah `Optional(...)`.
+- `testTargetPickerNameFollowsTheDeviceLanguage` — `Saturnus` → `Saturn`, dan
+  `Vega` dikembalikan apa adanya (nama tanpa terjemahan tidak dikarang).
+
+### Verifikasi
+
+    ./swift-test.sh                  CelestialEngine 222 + PointingKit 863 = 1085 uji, 0 gagal
+    ./swift-ui-lint.sh               SEMUA GERBANG UI LULUS (42 aturan)
+    ./swift-typecheck.sh             SEMUA GERBANG LULUS
+    bukti-mutasi-aturan41-nama.py    9 keadaan, 0 tidak sesuai harapan
+    check-jangkar-harness.py         351 jangkar, tidak ada mutasi tertinggal
+    check-harness-terdaftar.py       84 harness, semuanya dirujuk
+    Aturan 10                        README 860 -> 863
+
+### Yang TIDAK diklaim
+
+- Aturan 41 tetap **sapu teks**. Ia mengenal nama receiver, bukan tipe: nama
+  yang diteruskan lewat variabel perantara (`let x = intent.best; x?.name`)
+  atau receiver bernama lain tetap tidak terlihat. Daftar receiver di atas
+  adalah daftar tangan yang perlu ditambah bila ada nama baru.
+- `ExperimentText.answerName` melokalkan lewat `ObjectDisplayName`, yang
+  mengenali benda tata surya dan kunci `object.name.<pengenal>`. Nama katalog
+  yang tidak punya kunci terjemahan (`Sirius`, `M42`) tetap tampil apa adanya —
+  itu disengaja, mengarang nama dari id dilarang.
+- Perubahan UI ada di `Apps/`, yang **tidak dibangun** `swift-test.sh` di
+  Linux. Bukti kompilasinya adalah Apple Build (macos-15), bukan uji lokal.
+
 
 ### Cacat yang diangkat
 
