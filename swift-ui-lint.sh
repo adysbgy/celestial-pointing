@@ -8241,6 +8241,171 @@ else
   echo "Bersih: setiap layar memakai latar aplikasi yang sama."
 fi
 
+# ── Aturan 50: ciri pengenal planet berhenti saat engine ragu ──────────────
+#
+# Satu baris di `Apps/Shared/CelestialVisualView.swift` adalah satu-satunya
+# yang menghentikan ketujuh ciri pengenal planet (pita Jupiter, cincin
+# Saturnus, tudung es Mars, kawah Merkurius, kabut Venus, piringan Uranus,
+# piringan Neptunus) tampil saat engine belum yakin:
+#
+#   baris 334  `guard isConfirmed else { return }`
+#
+# **Kenapa gerbang ini harus ada: cacatnya terukur tak terlihat.** Baris itu
+# dihapus (mutasi), lalu seluruh 49 aturan UI dijalankan di proses baru:
+# **exit 0, "SEMUA GERBANG UI LULUS"**. `swift test` tidak bisa menolong
+# karena ia hanya membangun `Packages/` — berkas ini hidup di `Apps/`, yang
+# tidak pernah dibangun di Linux. Jadi sampai aturan ini ada, menghapus
+# penjaga yang menahan cincin Saturnus pada kandidat yang belum terkunci
+# tidak menghasilkan satu pun kegagalan.
+#
+# **Kenapa Aturan 32 tidak menutupnya.** Aturan 32 memeriksa dua hal: bahwa
+# lencana `drawCandidateMarker` digambar saat `!isConfirmed`, dan bahwa
+# `drawSphere` dilewat saat `isConfirmed` salah **dan** cirinya `.rings`.
+# Keduanya **tetap hijau** setelah mutasi di atas: lencananya masih digambar
+# (baris 63), dan `drawSphere` masih dijaga (baris 324). Yang hilang justru
+# baris yang menahan `drawBands`/`drawRings`/`drawPolarCaps`/… — yaitu
+# **ciri pengenalnya sendiri**. Lencana tanda tanya di atas cincin Saturnus
+# bukan kejujuran: cirinya sudah telanjur tampil, dan mata membaca cincin
+# lebih dulu daripada lencana.
+#
+# **Kenapa `Palette.drawable(isConfirmed:)` tidak cukup, meski ia benar.**
+# `drawable` sudah mengembalikan `feature: .none` saat ragu, jadi hari ini
+# kedua penjaga itu **tumpang tindih** dan mutasinya diam. Itu justru
+# alasan aturan ini diperlukan, bukan alasan untuk tidak menulisnya:
+# penjaga ganda yang tidak dijaga adalah penjaga yang akan dihapus orang
+# sebagai "duplikat", dan saat itu yang tersisa tinggal `drawable` —
+# sebuah kebetulan yang tidak ada yang mengukurnya. Aturan ini mengunci
+# **keduanya** ada dan sejalan.
+#
+# Yang diperiksa: `switch palette.feature` di dalam `drawPlanet` harus
+# berada **setelah** sebuah `guard isConfirmed`-negatif pada jalur yang sama.
+# Dicari sebagai teks, bukan sebagai pohon sintaks — `swiftc -parse` tidak
+# dijalankan atas `Apps/`, dan bentuk yang dicari cukup sempit.
+echo
+echo "== Aturan 50: ciri pengenal planet berhenti saat engine ragu =="
+ragu=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+VIEW = "Apps/Shared/CelestialVisualView.swift"
+
+if not os.path.exists(VIEW):
+    print("PERINGATAN: %s tidak ada." % VIEW)
+    raise SystemExit
+
+kode = open(VIEW, encoding="utf-8").read()
+# Komentar dibuang: docstring berkas ini mengutip bentuk lama (termasuk
+# `guard isConfirmed` itu sendiri) di beberapa tempat, dan kutipan itu
+# tidak boleh terbaca sebagai kenyataan.
+kode = re.sub(r"//[^\n]*", "", kode)
+kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+
+masalah = []
+
+# 1. Penjaga harus ada, dan harus menghentikan fungsi (bukan sekadar `if`).
+#
+#    Dua bentuk yang sah, dan keduanya **berhenti saat engine ragu**:
+#
+#      `guard isConfirmed else { return }`      afirmatif + `else`
+#      `if isConfirmed == false { return }`     ekuivalen yang ditulis lain
+#
+#    Bentuk **terbalik** — `guard !isConfirmed else { return }` — adalah
+#    cacat pada arah sebaliknya: ia berhenti saat engine **yakin**, jadi
+#    ciri pengenal justru tampil hanya pada kandidat. Karena itu tanda `!`
+#    diperiksa secara terpisah, bukan sekadar "ada `isConfirmed`".
+penjaga = re.findall(
+    r"guard\s+([^{;]{0,120}?)\s+else\s*\{\s*return\s*\}", kode)
+penjaga += re.findall(
+    r"if\s+([^{;]{0,120}?)\s*\{\s*return\s*\}", kode)
+# Penjaga sah: menyebut `isConfirmed` **tanpa** dinegasikan.
+penjaga_ragu = [k.strip() for k in penjaga
+                if "isConfirmed" in k and "!isConfirmed" not in k]
+# Penjaga terbalik: `isConfirmed` dinegasikan, sehingga yang dihentikan
+# justru keadaan yakin.
+penjaga_terbalik = [k.strip() for k in penjaga if "!isConfirmed" in k]
+if penjaga_terbalik:
+    masalah.append(
+        "  penjaga `%s` menghentikan `drawPlanet` saat engine **yakin**; "
+        "ciri pengenal akan tampil hanya pada kandidat yang belum terkunci "
+        "-- kebalikan dari yang diminta PRD" % penjaga_terbalik[0])
+if not penjaga_ragu:
+    masalah.append(
+        "  tidak ada `guard !isConfirmed … else { return }` di %s; ketujuh "
+        "ciri pengenal planet (pita, cincin, tudung es, kawah, kabut, "
+        "piringan) akan digambar pada kandidat yang belum terkunci" % VIEW)
+
+# 2. Ciri pengenal harus **ditarik** dari `palette.feature`, bukan ditulis
+#    sendiri, dan switch-nya harus ada — kalau tidak, penjaga nomor 1
+#    menjadi penjaga atas sesuatu yang tidak pernah digambar (hijau palsu).
+tubuh = re.sub(r"\s+", " ", kode)
+if not re.search(r"switch\s+palette\.feature\s*\{", tubuh):
+    masalah.append(
+        "  `switch palette.feature` tidak ditemukan di %s; ciri pengenal "
+        "tidak lagi dibaca dari palet yang teruji di Linux" % VIEW)
+
+# 3. Penjaga harus mendahului switch ciri pengenal, **di dalam `drawPlanet`**.
+#
+#    Tanpa syarat urut ini, `guard` bisa diletakkan di fungsi lain dan
+#    aturan tetap hijau sementara ciri pengenalnya bocor. Dicari di dalam
+#    tubuh `drawPlanet` — `guard isConfirmed` juga muncul di fungsi lain
+#    (`drawMoon`), jadi mencarinya di seluruh berkas membuat urutannya
+#    tertukar dengan penjaga milik fungsi yang berbeda.
+if penjaga_ragu and re.search(r"switch\s+palette\.feature\s*\{", tubuh):
+    i_fn = kode.find("func drawPlanet(")
+    if i_fn < 0:
+        masalah.append(
+            "  `drawPlanet` tidak ditemukan di %s; penjaga tidak bisa "
+            "dipastikan menahan ciri pengenal planet" % VIEW)
+    else:
+        # Batas fungsi berikutnya: deklarasi `private func` / `func` pada
+        # kolom pertama.
+        lanjut = kode.find("\n    private func ", i_fn)
+        if lanjut < 0:
+            lanjut = kode.find("\n    func ", i_fn)
+        tubuh_fn = kode[i_fn:(lanjut if lanjut > 0 else len(kode))]
+        # Penjaga dicari dalam **dua** bentuk yang sah, sama seperti
+        # pemeriksaan 1: `guard isConfirmed else` maupun
+        # `if isConfirmed == false`. Mengunci hanya bentuk `guard` membuat
+        # aturan ini merah pada penjaga yang ditulis ekuivalen -- gerbang
+        # yang merah pada kode benar akan dimatikan orang.
+        i_guard = tubuh_fn.find("guard isConfirmed")
+        if i_guard < 0:
+            i_guard = tubuh_fn.find("if isConfirmed == false")
+        if i_guard < 0:
+            i_guard = tubuh_fn.find("if !isConfirmed")
+        # **`rfind`, bukan `find`.** `switch palette.feature` muncul **dua
+        # kali** di `drawPlanet`: yang pertama di dalam klip pita terang
+        # (`if isConfirmed, let phase = …`), yang kedua setelah penjaga.
+        # Memakai kemunculan pertama membuat urutannya tertukar dengan
+        # switch yang sudah benar-benar terlindungi, dan aturan ini merah
+        # pada kode yang benar — gerbang yang merah pada kode benar akan
+        # dimatikan orang. Yang dijaga penjaga adalah switch **terakhir**,
+        # tempat ketujuh ciri pengenal digambar tanpa syarat apa pun lagi.
+        i_switch = tubuh_fn.rfind("switch palette.feature")
+        if i_guard < 0 or i_switch < 0 or i_guard > i_switch:
+            masalah.append(
+                "  penjaga `isConfirmed` tidak mendahului "
+                "`switch palette.feature` di dalam `drawPlanet`; ciri "
+                "pengenal digambar sebelum sempat dihentikan")
+
+print("\n".join(masalah) if masalah else "")
+PY
+)
+if printf '%s' "$ragu" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 50 tidak bisa memutuskan:"
+  echo "$ragu"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$ragu" ]; then
+  echo "Ciri pengenal planet tidak lagi berhenti saat engine ragu:"
+  echo "$ragu"
+  echo "-> Cincin Saturnus atau pita Jupiter pada kandidat yang belum"
+  echo "   terkunci adalah identitas yang diklaim gambar, bukan engine."
+  status=1
+else
+  echo "Bersih: ciri pengenal planet berhenti tepat saat engine ragu."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

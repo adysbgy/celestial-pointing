@@ -1,3 +1,84 @@
+### Siklus (17 Okt 2026 — Aturan 50: ciri pengenal planet bocor ke kandidat yang belum terkunci)
+
+Mulai seperti biasa: `git log` + `gh run list` + ketiga gerbang. `main` hijau
+(Apple Build sukses). Verifikasi ulang — bukan dikutip dari STATUS atau
+docstring — bahwa BAGIAN 1–4 + FASE A/B/C **seluruhnya terwujud**:
+`CelestialVisualView` menggambar planet/Bulan/bintang/Matahari/langit-dalam
+secara prosedural, `NightMode` palet merah murni (nol warna biru/hijau lolos
+— disapu sebagai `Color(...)` di `Apps/`, semuanya lewat `NightVisual`/
+`.nightAware*`), `ReducedLuminanceView` Always-On membaca `isLuminanceReduced`,
+`visualPanelLabel` sudah memuat warna bintang + kelas spektral + morfologi
+langit-dalam + fase Bulan, Dynamic Type penuh (nol `.font(.system(size:)`),
+`AudioCue` ada, complication + `.xcstrings` (520 kunci id+en) + izin sensor
+ada. **Tidak ada yang perlu dibangun dari nol.**
+
+#### Cacat yang diangkat
+
+Premisnya sudah selesai, jadi yang dicari adalah **titik yang tidak dijaga**.
+Satu baris di `drawPlanet` adalah satu-satunya yang menghentikan ketujuh ciri
+pengenal planet (pita Jupiter, cincin Saturnus, tudung es Mars, kawah
+Merkurius, kabut Venus, piringan Uranus, piringan Neptunus) tampil saat engine
+belum yakin:
+
+    baris 334   guard isConfirmed else { return }
+
+Baris itu dihapus (mutasi), lalu seluruh 49 aturan UI dijalankan di proses
+baru: **exit 0, "SEMUA GERBANG UI LULUS"**. `swift test` tidak bisa menolong
+karena `Apps/` tidak pernah dibangun di Linux. Artinya aturan yang paling
+penting di PRD — *jangan tampilkan visual yang mengklaim identitas saat engine
+ragu* — selama ini ditahan oleh satu baris yang **tidak diawasi satu pun
+gerbang**. Cacatnya bukan hipotesis: terukur hijau.
+
+#### Mengapa Aturan 32 tidak menutupnya
+
+Aturan 32 memeriksa dua hal: lencana `drawCandidateMarker` digambar saat
+`!isConfirmed`, dan `drawSphere` dilewat saat `isConfirmed` salah **dan**
+cirinya `.rings`. Keduanya **tetap hijau** setelah mutasi: lencananya masih
+digambar (baris 63) dan bolanya masih dijaga (baris 324). Yang hilang justru
+baris yang menahan `drawBands`/`drawRings`/`drawPolarCaps`/… — **ciri
+pengenalnya sendiri**.
+
+Ini bukan duplikat Aturan 32, melainkan arah ketiga yang belum diawasi:
+lencana tanda tanya di atas cincin Saturnus **bukan** kejujuran. Cirinya sudah
+telanjur tampil, dan mata membaca cincin lebih dulu daripada lencana — persis
+kelas "gambar lebih yakin daripada teksnya" yang dilarang PRD §2.
+
+#### Mengapa `Palette.drawable(isConfirmed:)` tidak membuat aturan ini sia-sia
+
+`drawable` sudah mengembalikan `feature: .none` saat ragu, jadi hari ini kedua
+penjaga **tumpang tindih** dan mutasinya diam. Itu justru alasan aturan ini
+perlu: penjaga ganda yang tidak dijaga akan dihapus orang sebagai "duplikat",
+dan saat itu yang tersisa tinggal `drawable` — sebuah kebetulan yang tidak ada
+yang mengukurnya. Aturan 50 mengunci keduanya ada dan sejalan.
+
+#### Yang ditambahkan
+
+- **Aturan 50** (`swift-ui-lint.sh`): `switch palette.feature` di dalam
+  `drawPlanet` wajib didahului penjaga yang mengandung `isConfirmed` dan
+  menghentikan fungsi. Dua bentuk sah diterima (`guard isConfirmed else`,
+  `if isConfirmed == false`); bentuk **terbalik** (`guard !isConfirmed else`)
+  ditolak karena ia menampilkan ciri hanya pada kandidat.
+- **`Tools/bukti-mutasi-ciri-ragu.py`** + langkah CI: 5 keadaan — 3 cacat
+  wajib MERAH (penjaga dihapus, dibalik, dilonggarkan jadi `if` tanpa
+  `return`), 2 kontrol wajib HIJAU (pohon utuh, penjaga ekuivalen).
+- README: hitungan aturan 49 → 50 (Aturan 10 membaca angka itu).
+
+#### Yang TIDAK diklaim
+
+Aturan ini sapu **teks**, bukan pelacakan aliran: ia membuktikan penjaganya
+ada, mengandung `isConfirmed`, dan mendahului switch — bukan bahwa piksel yang
+dihasilkan benar-benar berhenti berubah di perangkat (tidak ada Xcode, dan
+`Apps/` tidak pernah dibangun `swift-test.sh`).
+
+#### Gerbang
+
+    ./swift-ui-lint.sh                50 aturan, hijau
+    ./swift-test.sh                   222 + 922 = 1144, hijau
+    Tools/check-harness-terdaftar.py  95 harness, semua dirujuk
+    Tools/check-jangkar-harness.py    385 jangkar, tidak ada mutasi tertinggal
+
+---
+
 ### Siklus (17 Okt 2026 — penjaga keutuhan katalog: dua bintang tak boleh sama warna & magnitudo)
 
 Mulai seperti biasa: `git log` + baca STATUS + jalankan ketiga gerbang. `main`

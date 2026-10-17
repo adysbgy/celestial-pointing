@@ -1502,6 +1502,23 @@ jobs:
       - name: Buktikan Aturan 49 berbunyi pada latar yang hilang di Apps/
         run: python3 Tools/bukti-mutasi-latar-layar.py
 
+      # Dan bukti untuk Aturan 50 — ciri pengenal planet yang berhenti saat
+      # engine ragu.
+      #
+      # Ini cacat yang **terukur lolos** dari 49 aturan sebelumnya: baris
+      # penjaganya dihapus, seluruh 49 aturan dijalankan di proses baru, dan
+      # hasilnya exit 0 "SEMUA GERBANG UI LULUS". Cincin Saturnus dan pita
+      # Jupiter lalu tampil pada kandidat yang belum terkunci — klaim
+      # identitas yang diklaim gambar, bukan engine, persis yang dilarang
+      # PRD §2. `swift test` tidak bisa menolong karena `Apps/` tidak pernah
+      # dibangun di Linux.
+      #
+      # Harness ini juga menahan keadaan **kontrol** yang wajib HIJAU (pohon
+      # utuh, dan penjaga ekuivalen `isConfirmed == false`), supaya aturan
+      # tidak menuduh kode benar.
+      - name: Buktikan Aturan 50 berbunyi pada ciri pengenal yang bocor
+        run: python3 Tools/bukti-mutasi-ciri-ragu.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:
