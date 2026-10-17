@@ -2031,6 +2031,25 @@ jobs:
       - name: Buktikan Aturan 8 & 17 berbunyi (kata asing; kunci ditulis ulang di Apps/)
         run: python3 Tools/bukti-mutasi-aturan8-17.py
 
+      # Kenapa Aturan 41 butuh langkah sendiri.
+      #
+      # Cacat yang ditutupnya **tersembunyi oleh kode yang benar di atasnya**:
+      # `ObjectDetailView.objectDisplayName` berbunyi `displayName ?? object.name`,
+      # dan pemanggilnya di `PointingView` selalu meneruskan `displayName` —
+      # jadi cabang yang salah tidak pernah dieksekusi. Terukur di salinan utuh
+      # sebelum aturan ini ada: mengganti judul kartu menjadi `Text(object.name)`
+      # membiarkan **ke-40 aturan tetap hijau** (exit 0), dan begitu pula
+      # `displayedObjectName -> object.name` yang mengembalikan bentuk Indonesia
+      # ke empat permukaan sekaligus.
+      #
+      # Harness-nya mengukur lima keadaan, dua di antaranya kontrol negatif:
+      # bentuk yang sudah diperbaiki (`?? ObjectDisplayName.text(of:)`) dan
+      # berkas apa adanya wajib **diam**. Gerbang yang merah pada kode yang
+      # benar akan dilonggarkan orang — jadi kontrol itu yang menentukan
+      # apakah aturan ini masih hidup enam bulan lagi.
+      - name: Buktikan Aturan 41 berbunyi (nama jatuh kembali ke object.name)
+        run: python3 Tools/bukti-mutasi-aturan41-nama.py
+
       # Dan bukti untuk bentuk **ketiga** dari kelas "gerbang mengutip sesuatu
       # yang tidak ada" — kali ini bukan nama gerbang, melainkan nama **uji**.
       #
