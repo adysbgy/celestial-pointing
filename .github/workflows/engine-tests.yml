@@ -1406,6 +1406,30 @@ jobs:
       - name: Buktikan Aturan 42 berbunyi pada permukaan bukan-Bool yang menyimpang
         run: python3 Tools/bukti-mutasi-permukaan-nilai.py
 
+      # Dan bukti untuk Aturan 45 — pemilih palet tidak boleh ditulis sendiri
+      # di `Apps/`.
+      #
+      # `SurfacePalette.active` memilih palet untuk 26 situs (latar, kartu, teks,
+      # aksen, garis rambut, nada, badge, layar redup), hidup di `Apps/` yang
+      # tidak pernah dibangun `swift-test.sh`. Empat mutasinya — `.day`,
+      # `.night`, saklar dibalik, acak — **semuanya** lolos ke-44 aturan UI.
+      # Yang paling sunyi (`return .day`) membuat mode malam memancarkan biru &
+      # hijau penuh sementara tombol bulan menyala, merusak adaptasi gelap rod.
+      #
+      # Harness ini menjalankan Aturan 45 atas pohon yang dimutasi: bentuk lama
+      # dan seluruh variannya wajib MERAH, pohon produksi apa adanya wajib HIJAU.
+      - name: Buktikan Aturan 45 berbunyi pada pemilih palet yang ditulis sendiri di Apps/
+        run: python3 Tools/bukti-mutasi-pemilih-palet-lint.py
+
+      # Bukti kedua untuk Aturan 45 pada **sisi uji** (PointingKit), bukan
+      # gerbang teks: pemetaan saklar → palet harus sepakat dengan klaim
+      # `isNight` milik palet itu sendiri. Diukur dengan memutasi sumber
+      # `NightPaletteSelector` di container yang sama dengan CI: `.day`,
+      # `.night`, dan saklar dibalik semuanya membuat `SurfacePaletteTests`
+      # merah, sedangkan pohon apa adanya hijau.
+      - name: Buktikan uji pemilih palet merah pada pemetaan yang menyimpang
+        run: python3 Tools/bukti-mutasi-pemilih-palet.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

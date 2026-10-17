@@ -1,3 +1,115 @@
+### Siklus berikutnya (17 Okt 2026 — saklar mode malam memilih palet untuk 26 situs, dan nol dari 44 gerbang melihatnya)
+
+Dibuka seperti biasa: `git log` + `gh run`. `main` hijau (Apple Build `dd0c1a5`),
+dan seluruh BAGIAN 1–4 serta FASE A/B/C sudah terwujud dan ter-gerbang. Jadi
+yang dikerjakan bukan fitur baru, melainkan sapuan: setiap badan pass-through
+di `Apps/` dimutasi, lalu ke-44 aturan dijalankan di proses baru. Yang tetap
+hijau bila dimutasi = buta.
+
+Yang paling sunyi yang ditemukan sapuan itu:
+
+    Apps/Shared/SurfaceTokens.swift
+    static var active: SurfacePalette { return NightMode.isOn ? .night : .day }
+
+### Cacat yang diangkat
+
+Satu properti, dan ia memilih palet untuk **26 situs** di jam dan iPhone: latar
+aplikasi, alas kartu, teks utama & sekunder, gradien aksen, garis rambut, warna
+nada, isi badge, dan layar redup. Ia hidup di `Apps/`, yang tidak pernah
+dibangun `swift-test.sh` di Linux.
+
+Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
+mutasi yang semuanya mengompilasi:
+
+    return .day                            swift-ui-lint.sh LULUS (exit 0)
+    return .night                          swift-ui-lint.sh LULUS (exit 0)
+    return NightMode.isOn ? .day : .night  swift-ui-lint.sh LULUS (exit 0)
+    return Bool.random() ? .night : .day   swift-ui-lint.sh LULUS (exit 0)
+
+Empat keadaan, **nol** yang berbunyi.
+
+Yang paling berbahaya bukan yang acak, melainkan `return .day`. Mode malam
+adalah satu-satunya mode yang rhodopsin izinkan (batang rod paling sensitif
+~498–530nm, cahaya >620nm aman), dan ia ada **tepat untuk** mengamati bintang
+lemah. Dengan mutasi itu, tombol bulan di layar menyala seakan mode malam aktif
+— sementara seluruh 26 situs memancarkan **biru dan hijau penuh**. Pengamat
+kehilangan adaptasi gelapnya 20–40 menit karena satu baris yang tidak punya
+gerbang, dan **tidak ada teks di layar yang bisa membantahnya**: labelnya
+bertuliskan "mode malam", warnanya berkata lain. Ini klaim yang lebih yakin
+daripada kenyataannya — persis yang dilarang PRD.
+
+### Kenapa Aturan 38/42 tidak menangkapnya
+
+Keduanya menurunkan permukaan yang **namanya ada sebagai anggota model**, lalu
+menuntut badannya "menyebut faktanya". `active` memang anggota
+`SurfacePalette`; dan `NightMode.isOn ? .day : .night` **menyebut** `NightMode`.
+Jadi kedua aturan lulus pada pemetaan yang terbalik sekalipun.
+
+Yang salah bukan *apakah* faktanya disebut, melainkan **bagaimana ia dipakai**:
+di sini ia menjadi **syarat percabangan**, bukan nilai yang diteruskan. Kelas
+yang berbeda, dan tidak satu pun dari 44 aturan yang membacanya.
+
+### Perbaikan: struktural, bukan daftar baru
+
+- `NightPaletteSelector` (PointingKit): pemetaan saklar → palet jadi fungsi
+  murni. `Apps/` tidak lagi bisa menulis cabang itu tanpa menulis ulang fungsi
+  yang punya uji.
+- `SurfacePalette.active` hanya meneruskan keadaan saklarnya.
+- `Hairline.color` ikut: ia dulu membaca `NightMode.isOn` **terpisah** dari
+  palet yang sedang dipakainya, jadi kedua keputusan itu bisa berbeda pendapat
+  — garis merah di atas kartu siang, atau sebaliknya. Sekarang keduanya turun
+  dari `NightPaletteSelector.isNight(SurfacePalette.active)`, satu sumber.
+- **Aturan 45** (`swift-ui-lint.sh`) menutup sisi `Apps/`: percabangan palet
+  tidak boleh ditulis sendiri di sana. Fail-closed bila `Apps/` tak terbaca.
+
+### Bukti, bukan klaim
+
+    mutasi NightPaletteSelector    -> SurfacePaletteTests MERAH (3/3)
+    bentuk lama di Apps/           -> Aturan 45 MERAH
+    varian .day / dibalik          -> Aturan 45 MERAH
+    pohon produksi apa adanya      -> HIJAU
+
+Dua kelas penjaga, sengaja berbeda: yang diuji di Linux adalah **nilai
+kembaliannya** (`SurfacePaletteTests`), yang dijaga lint adalah **dari mana
+`Apps/` mengambilnya** (Aturan 45). Yang pertama menahan penyimpangan lewat
+helper; yang kedua menahan penulisan ulang cabangnya.
+
+### Dua kesalahan yang ketahuan sebelum push
+
+1. **Uji ketiga yang saya tulis hampa.** `testAnInvertedSwitchFailsTheAgreementTest`
+   hanya memanggil closure lokal, jadi ia lulus apa pun isi produksinya. Dihapus;
+   non-vakuositas yang sah adalah memutasi **sumbernya** dan melihat dua uji
+   lainnya merah — itulah `bukti-mutasi-pemilih-palet.py`.
+2. **Aturan 45 mula-mula menuduh dirinya sendiri.** Pola awalnya
+   `\.night\s*\?` — padahal `?` di Swift ada di **sebelumnya** (`isOn ? .night`).
+   Diperbaiki, lalu ia menuding **docstring saya sendiri** yang mengutip bentuk
+   lama; pembacanya kini membuang komentar lebih dulu, seperti Aturan 38/42.
+
+### Verifikasi
+
+    ./swift-test.sh                          CelestialEngine 222 + PointingKit 876, 0 gagal
+    ./swift-ui-lint.sh                       SEMUA GERBANG UI LULUS (45 aturan)
+    ./swift-typecheck.sh                     SEMUA GERBANG LULUS
+    bukti-mutasi-pemilih-palet.py            3 keadaan + baseline, sesuai harapan
+    bukti-mutasi-pemilih-palet-lint.py       4 keadaan, sesuai harapan
+    check-harness-terdaftar.py               87 harness, semuanya dirujuk
+    Aturan 10                                README 874 -> 876 ( Rule 10 menangkap
+                                             angka lamanya sendiri — bekerja, bukan dilewati)
+
+### Yang TIDAK diklaim
+
+- Aturan 45 tetap **sapu teks**. Pemetaan yang disembunyikan di balik fungsi
+  helper atau variabel perantara di `Apps/` tidak terlihat. Itu sebabnya uji di
+  PointingKit ikut menahan **nilai kembaliannya**, bukan cuma bentuknya.
+- Ini **tidak** mengubah tampilan pada pohon yang benar: pemetaannya persis
+  sama seperti sebelumnya, hanya dipindah tempatnya. Yang berubah adalah bahwa
+  kini ada dua penjaga yang berbunyi bila ia menyimpang.
+- `NightMode.isOn` sendiri (baca/tulis `UserDefaults`) tetap di `Apps/` dan
+  tetap tidak diuji di Linux — yang dipindah hanya **pemetaannya**, bukan
+  sumber keadaannya.
+
+---
+
 ### Siklus berikutnya (17 Okt 2026 — klaim yang salah di dalam gerbangnya sendiri)
 
 Dibuka seperti biasa: `git log` + `gh run`. `main` hijau. Yang dikerjakan

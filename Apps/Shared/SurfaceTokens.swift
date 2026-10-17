@@ -25,8 +25,17 @@ extension SurfacePalette {
 
     /// Palet aktif saat ini — mengikuti mode malam, dibaca ulang tiap
     /// akses supaya `body` SwiftUI yang dievaluasi ulang otomatis ikut berubah.
+    ///
+    /// **Keputusan ini tidak lagi ditulis di sini.** Pemetaan saklar → palet
+    /// hidup di `NightPaletteSelector` (PointingKit, teruji di Linux), karena
+    /// badan `return NightMode.isOn ? .night : .day` yang dulu tinggal di sini
+    /// memilih palet untuk 26 situs (jam + iPhone), hidup di `Apps/` yang tidak
+    /// pernah dibangun `swift-test.sh`, dan seluruh mutasinya lolos ke-44
+    /// aturan UI — termasuk `return .day`, yang membuat mode malam memancarkan
+    /// biru & hijau penuh sementara tombol bulan menyala. Di sini hanya
+    /// meneruskan keadaan saklarnya.
     static var active: SurfacePalette {
-        return NightMode.isOn ? .night : .day
+        NightPaletteSelector.palette(isNightModeEnabled: NightMode.isOn)
     }
 
     var backgroundColor: Color { return background.color }
@@ -104,7 +113,8 @@ enum Hairline {
     /// Warna garis: selalu lebih redup dari teks sekunder, jadi garis tidak
     /// pernah terbaca sebagai elemen. Di mode malam garis ikut merah.
     static var color: Color {
-        SurfacePalette.active.textSecondary.color.opacity(NightMode.isOn ? 0.35 : 0.18)
+        SurfacePalette.active.textSecondary.color.opacity(
+            NightPaletteSelector.isNight(SurfacePalette.active) ? 0.35 : 0.18)
     }
 }
 

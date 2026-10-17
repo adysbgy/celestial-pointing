@@ -335,4 +335,40 @@ final class SurfacePaletteTests: XCTestCase {
                 "\(name): aksen tidak terlihat di atas kartu")
         }
     }
+
+    // MARK: - Pemilih palet aktif (keadaan saklar → palet)
+
+    /// Keadaan saklar harus memetakan ke palet yang **sepakat** dengan
+    /// keadaannya sendiri, bukan sekadar "memilih sesuatu".
+    ///
+    /// Ini mengunci kecacatan yang dulu buta di `Apps/`: badan
+    /// `SurfacePalette.active` memilih palet untuk 26 situs (latar, kartu,
+    /// teks, aksen, garis rambut, nada, badge, layar redup), hidup di
+    /// `Apps/` yang tidak pernah dibangun `swift-test.sh`, dan keempat
+    /// mutasinya — `.day`, `.night`, saklar dibalik, acak — **semuanya**
+    /// lolos ke-44 aturan UI. Mutasi paling sunyi (`return .day`) membuat
+    /// mode malam memancarkan biru & hijau penuh sementara tombol bulan
+    /// menyala, merusak adaptasi gelap rod 20–40 menit tanpa satu pun
+    /// teks di layar yang membantahnya.
+    func testTheSelectedPaletteAgreesWithItsOwnNightClaim() {
+        for enabled in [false, true] {
+            let palette = NightPaletteSelector.palette(isNightModeEnabled: enabled)
+            XCTAssertEqual(
+                NightPaletteSelector.isNight(palette), enabled,
+                "palet terpilih untuk saklar \(enabled ? "nyala" : "mati") " +
+                "tidak sepakat dengan klaim malamnya sendiri")
+        }
+    }
+
+    /// Palet siang salah dipilih saat saklar mati, dan sebaliknya — kedua
+    /// arah, supaya uji tidak lulus cuma karena "selalu malam" juga sepakat.
+    func testDayAndNightAreEachSelectedOnlyWhenTheirSwitchSaysSo() {
+        XCTAssertFalse(NightPaletteSelector.isNight(
+            NightPaletteSelector.palette(isNightModeEnabled: false)),
+            "saklar mati mengembalikan palet malam")
+        XCTAssertTrue(NightPaletteSelector.isNight(
+            NightPaletteSelector.palette(isNightModeEnabled: true)),
+            "saklar nyala mengembalikan palet siang")
+    }
+
 }

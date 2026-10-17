@@ -7591,6 +7591,114 @@ else
   echo "Bersih: objek yang digambar selalu dari objek yang sedang ditampilkan."
 fi
 
+# ── Aturan 45: pemilih palet tidak boleh ditulis sendiri di Apps/ ──────────
+#
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka.
+# `Apps/Shared/SurfaceTokens.swift` punya satu properti yang memilih palet
+# untuk **26 situs** di jam dan iPhone — latar aplikasi, alas kartu, teks
+# utama & sekunder, gradien aksen, garis rambut, warna nada, isi badge, dan
+# layar redup:
+#
+#     static var active: SurfacePalette { return NightMode.isOn ? .night : .day }
+#
+# Terukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa),
+# dengan mutasi yang semuanya mengompilasi:
+#
+#     return .day                            swift-ui-lint.sh LULUS (exit 0)
+#     return .night                          swift-ui-lint.sh LULUS (exit 0)
+#     return NightMode.isOn ? .day : .night  swift-ui-lint.sh LULUS (exit 0)
+#     return Bool.random() ? .night : .day   swift-ui-lint.sh LULUS (exit 0)
+#
+# Empat keadaan, **nol** yang berbunyi. Yang paling sunyi bukan yang acak,
+# melainkan `return .day`: mode malam — satu-satunya mode yang rhodopsin
+# izinkan (batang rod paling sensitif ~498-530nm, cahaya >620nm aman) — lalu
+# memancarkan **biru dan hijau penuh** sementara tombol bulan di layar menyala
+# seakan ia aktif. Pengamat yang sedang mengamati bintang lemah kehilangan
+# adaptasi gelapnya 20-40 menit karena satu baris di berkas yang tidak punya
+# gerbang. Tidak ada teks di layar yang membantahnya: labelnya bertuliskan
+# "mode malam", warnanya berkata lain.
+#
+# Kenapa Aturan 38/42 tidak menangkapnya: keduanya menurunkan permukaan yang
+# **namanya ada sebagai anggota model** dan menuntut badannya "menyebut
+# faktanya". `active` memang anggota `SurfacePalette`, dan
+# `NightMode.isOn ? .day : .night` **menyebut** `NightMode` — jadi kedua
+# aturan itu lulus pada pemetaan yang terbalik sekalipun. Yang salah bukan
+# apakah faktanya disebut, melainkan **bagaimana ia dipakai**: di sini ia
+# menjadi syarat percabangan, bukan nilai yang diteruskan.
+#
+# Kenapa perbaikannya struktural, bukan menambah daftar: pemilihnya dipindah
+# ke `NightPaletteSelector` (PointingKit) dan dijaga uji
+# (`SurfacePaletteTests`), sedangkan `Apps/` cuma meneruskan keadaan saklarnya.
+# Aturan ini menutup **sisi `Apps/`** dari kelas yang sama: badan
+# `SurfacePalette.active` tidak boleh lagi menulis percabangan palet itu
+# sendiri.
+#
+# Yang TIDAK diklaim: ini sapu teks atas bentuk `return ... ? .night : .day`
+# (dan kebalikannya). Pemetaan yang disembunyikan di balik fungsi helper atau
+# variabel perantara tetap tidak terlihat — itulah sebabnya uji di PointingKit
+# ikut menahan nilai kembaliannya, bukan cuma bentuknya.
+echo "== Aturan 45: pemilih palet tidak ditulis sendiri di Apps/ =="
+rakitan45=$(python3 - <<'PY' 2>&1
+import os, re
+
+#: Bentuk percabangan palet yang **dilarang** ditulis di `Apps/`: keduanya
+#: palet langsung, atau syarat yang memilih di antara keduanya.
+POLA = (
+    re.compile(r"[?]\s*\.night\s*:\s*\.day"),
+    re.compile(r"[?]\s*\.day\s*:\s*\.night"),
+    re.compile(r"return\s+\.day\s*$"),
+    re.compile(r"return\s+\.night\s*$"),
+)
+
+masalah = []
+diperiksa = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        # Buang komentar agar doc-comment yang mengutip bentuk lama tidak
+        # memicu aturan ini (sama seperti Aturan 38/42).
+        kode = open(path, encoding="utf-8").read()
+        buf = []
+        for baris in kode.split("\n"):
+            if "//" in baris:
+                baris = baris.split("//", 1)[0]
+            buf.append(baris)
+        kode = "\n".join(buf)
+        for i, baris in enumerate(kode.split("\n"), 1):
+            if not any(p.search(baris) for p in POLA):
+                continue
+            # Hanya baris kode: abaikan yang masih sisa string/dokumentasi.
+            bersih = baris.strip()
+            if bersih.startswith("///") or bersih.startswith("*") or '"' in bersih:
+                continue
+            diperiksa += 1
+            masalah.append(
+                "  %s:%d: `%s` -- pemilihan palet ditulis sendiri di Apps/. "
+                "Pakai `NightPaletteSelector.palette(isNightModeEnabled:)` "
+                "(PointingKit, teruji di Linux); berkas ini tidak pernah "
+                "dibangun swift-test.sh." % (path, i, baris.strip()[:90]))
+
+if diperiksa == 0 and not os.path.isdir("Apps"):
+    print("PERINGATAN: Apps/ tidak terbaca -- aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan45" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 45 tidak bisa memutuskan:"
+  echo "$rakitan45"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan45" ]; then
+  echo "$rakitan45"
+  status=1
+else
+  echo "Bersih: pemilihan palet selalu lewat NightPaletteSelector."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
