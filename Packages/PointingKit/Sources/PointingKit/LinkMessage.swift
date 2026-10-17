@@ -86,6 +86,46 @@ public struct PointingLinkMessage: Codable, Equatable, Sendable {
         self.isCalibrated = isCalibrated
     }
 
+    // MARK: - Nama objek untuk pembaca
+
+    /// Nama objek yang dilaporkan jam, dalam bahasa **pembaca** pesan ini.
+    ///
+    /// **Kenapa tidak memakai `objectName` langsung.** Medan itu diisi engine
+    /// jam dari `snapshot.answeredObject?.name`, yaitu
+    /// `EphemerisBody.displayName` — bentuk Bahasa Indonesia yang **dibekukan**
+    /// (`Bulan`, `Saturnus`, `Nebula Orion`). Pesan ini menyeberang proses,
+    /// jadi di iPhone berbahasa Inggris baris "jam melihat …" akan berbunyi
+    /// `Bulan`.
+    ///
+    /// **Kenapa diperbaiki di sisi pembaca, bukan pengirim.** Menerjemahkan
+    /// di jam akan membekukan bahasa **jam** ke dalam pesan — cacat yang sama
+    /// satu langkah lebih jauh: pengguna mengganti bahasa iPhone dan barisnya
+    /// tetap berbahasa jam.
+    ///
+    /// **Kenapa `objectID`, bukan medan kunci baru di kabel.** `objectID`
+    /// sudah ikut terkirim, dan kedua perangkat memakai katalog yang sama.
+    /// Medan kunci berarti dua salinan kebenaran yang harus tetap sepakat di
+    /// setiap perubahan katalog.
+    ///
+    /// **Kenapa `?? objectName`, dan kenapa itu bukan jalan pintas.** Katalog
+    /// iPhone bisa tertinggal satu versi dari jam. Untuk id yang tidak dikenal,
+    /// nama yang dikirim jam tetap lebih jujur daripada id mentah
+    /// (`nebulaXyz`) — dan `DisplayLabel.objectName` mengembalikan `nil`
+    /// justru supaya pemanggil memutuskan, bukan menerima tebakan.
+    ///
+    /// - Parameter catalogue: katalog yang dipakai **pembaca**. Wajib
+    ///   diteruskan, bukan nilai bawaan: dua perangkat bisa menjalankan
+    ///   katalog berbeda, dan nama untuk id yang tidak dipertimbangkan
+    ///   pembaca adalah nama yang terlihat benar tanpa punya dasar.
+    public func reportedObjectName(catalogue: [CelestialObject]) -> String? {
+        guard let objectName else { return nil }
+        guard let objectID,
+              let resolved = DisplayLabel.objectName(forObjectID: objectID,
+                                                     catalogue: catalogue)
+        else { return objectName }
+        return resolved
+    }
+
     // MARK: - Bentuk kabel
 
     /// Bentuk yang bisa dikirim `WCSession` (property list).

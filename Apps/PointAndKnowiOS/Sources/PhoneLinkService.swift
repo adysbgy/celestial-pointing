@@ -25,6 +25,19 @@ public final class PhoneLinkService: NSObject, ObservableObject {
     /// Setiap pesan yang masuk, untuk direkam ke riwayat keyakinan.
     public var onMessage: ((PointingLinkMessage) -> Void)?
 
+    /// Katalog untuk menyelesaikan **nama** objek yang dilaporkan jam.
+    ///
+    /// Diisi oleh app saat engine dibuat (`LinkView` sudah memegang engine,
+    /// dan engine memegang katalog resolver-nya). **Bukan** nilai bawaan
+    /// `Catalogue.brightStars`: iPhone dan jam bisa menjalankan katalog
+    /// berbeda selama pengembangan, dan nama untuk id yang tidak
+    /// dipertimbangkan pembaca adalah nama yang terlihat benar tanpa dasar.
+    ///
+    /// `nil` berarti "belum tahu katalognya" — dan dalam keadaan itu service
+    /// memakai nama yang dikirim jam, bukan menebak. Lihat
+    /// `PointingLinkMessage.reportedObjectName(catalogue:)`.
+    public var catalogue: [CelestialObject] = []
+
     private var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
     }
@@ -90,7 +103,14 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         switch message.kind {
         case .pointingState:
             lastState = message
-            lastNote = message.objectName.map { LinkStatusText.watchSaw($0) }
+            // `reportedObjectName(catalogue:)`, bukan `objectName`: medan itu
+            // memuat bentuk Indonesia yang dibekukan engine jam (`Bulan`,
+            // `Saturnus`), sementara label keadaan di baris sebelahnya
+            // mengikuti bahasa perangkat. Katalog diteruskan supaya namanya
+            // diselesaikan di **sisi pembaca** — menerjemahkan di jam akan
+            // membekukan bahasa jam ke dalam pesan.
+            lastNote = message.reportedObjectName(catalogue: catalogue)
+                .map { LinkStatusText.watchSaw($0) }
                 ?? LinkStatusText.stateFromWatch
         case .calibrationReady:
             lastCalibration = message

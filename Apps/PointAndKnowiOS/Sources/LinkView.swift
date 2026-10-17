@@ -45,7 +45,14 @@ struct LinkView: View {
                 Section(TextLocalization.text(.linkSectionLastState)) {
                     if let state = link.lastState {
                         row(TextLocalization.text(.linkRowState), state.state?.shortLabel ?? "—")
-                        row(TextLocalization.text(.linkRowObject), state.objectName ?? "—")
+                        // `reportedObjectName(catalogue:)`, bukan
+                        // `objectName`: medan itu memuat nama Indonesia yang
+                        // dibekukan engine jam (`Bulan`, `Saturnus`), jadi
+                        // baris ini dan baris keadaan di atasnya bisa
+                        // berbahasa berbeda untuk pesan yang sama.
+                        row(TextLocalization.text(.linkRowObject),
+                            state.reportedObjectName(
+                                catalogue: engine.controller.resolver.catalogue) ?? "—")
                         row(TextLocalization.text(.linkRowConfidence), state.level?.displayName ?? "—")
                         if let rate = state.angularRateDegPerSec {
                             // Nilainya ditulis "0.5°/dtk" untuk mata; yang

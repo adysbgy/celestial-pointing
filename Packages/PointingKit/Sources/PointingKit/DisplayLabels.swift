@@ -96,6 +96,35 @@ public enum DisplayLabel {
                                               catalogue: [CelestialObject]) -> String {
         objectName(forObjectID: id, catalogue: catalogue) ?? id
     }
+
+    /// Nama untuk perintah teleskop, dalam bahasa perangkat.
+    ///
+    /// **Kenapa tidak memakai `TelescopeCommand.objectName` langsung.** Medan
+    /// itu diisi `TelescopeBridge` dari `object.name` — bentuk Bahasa Indonesia
+    /// yang dibekukan (`Saturnus`, `Nebula Orion`). Layar serah-terima
+    /// mencetaknya apa adanya, jadi di perangkat berbahasa Inggris baris
+    /// "Target" berbunyi `Saturnus` di sebelah koordinat yang sudah benar.
+    ///
+    /// Diselesaikan lewat `objectID`, bukan dengan menerjemahkan di engine:
+    /// perintah teleskop adalah **data alat**, dan menerjemahkan di sana akan
+    /// membekukan bahasa ke dalam perintah yang bisa dikirim ke mount.
+    ///
+    /// **Kenapa menerima dua medan, bukan `TelescopeCommand`.** Inisialisator
+    /// tipe itu `internal` justru sebagai penjaga PRD (satu-satunya jalan
+    /// membuat perintah adalah `TelescopeBridge`, yang menolak apa pun yang
+    /// bukan `SlewDecision.allowed`). Menerima tipe itu di sini akan membuat
+    /// fungsi ini **tidak bisa diuji** di paket yang tidak bisa membangunnya —
+    /// dan aturan yang tidak bisa diuji adalah aturan yang tidak dijaga.
+    /// Pemanggil meneruskan kedua medan dari perintah yang **sama**.
+    ///
+    /// Id yang tidak dikenal memakai nama yang dibawa perintah — katalog bisa
+    /// berbeda versi, dan id mentah lebih buruk daripada nama yang setidaknya
+    /// benar sebagai nama.
+    public static func telescopeTargetName(objectID: String,
+                                           carriedName: String,
+                                           catalogue: [CelestialObject]) -> String {
+        objectName(forObjectID: objectID, catalogue: catalogue) ?? carriedName
+    }
 }
 
 public extension LinkMessageKind {

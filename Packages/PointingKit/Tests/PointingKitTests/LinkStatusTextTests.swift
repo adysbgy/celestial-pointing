@@ -1,4 +1,5 @@
 import XCTest
+import CelestialEngine
 @testable import PointingKit
 
 /// Kalimat status tautan tidak boleh lahir sebagai literal di dalam service.
@@ -210,5 +211,143 @@ final class LinkStatusTextTests: BridgedTextTestCase {
         XCTAssertEqual(LinkStatusText.linkSpeech(isReachable: false,
                                                  sendFailureCount: 0),
                        "The phone cannot be reached.")
+    }
+}
+
+/// Nama objek yang dilaporkan jam harus mengikuti bahasa **pembacanya**.
+///
+/// **Cacat yang dijaga.** `PointingLinkMessage.objectName` diisi engine jam
+/// dari `snapshot.answeredObject?.name`, yaitu `EphemerisBody.displayName` —
+/// bentuk Bahasa Indonesia yang **dibekukan** (`Bulan`, `Saturnus`). Pesan
+/// itu menyeberang proses lewat `WCSession` dan dicetak di iPhone lewat
+/// `LinkStatusText.watchSaw(_:)`, jadi di perangkat berbahasa Inggris baris
+/// statusnya berbunyi "Jam melihat Bulan".
+///
+/// **Kenapa tidak diperbaiki di sisi jam.** Menerjemahkan sebelum mengirim
+/// akan membekukan bahasa **jam** ke dalam pesan, persis cacat yang sama satu
+/// langkah lebih jauh: pengguna mengganti bahasa iPhone, dan barisnya tetap
+/// berbahasa jam.
+///
+/// **Kenapa `objectID` dan bukan medan baru.** Pesan sudah membawa
+/// `objectID`, dan iPhone punya katalog yang sama. Menambah medan kunci ke
+/// kabel berarti dua salinan kebenaran yang harus tetap sepakat; id sudah
+/// cukup untuk menanyakan namanya di sisi yang menggambar.
+final class LinkObjectNameLanguageTests: BridgedTextTestCase {
+
+    private let saturn = CelestialObject(id: "saturnus", name: "Saturnus", kind: .planet,
+                                         raDeg: 10, decDeg: 10, magnitude: 0.5)
+    private let orion = CelestialObject(id: "nebulaOrion", name: "Nebula Orion", kind: .deepSky,
+                                        raDeg: 84, decDeg: -1, magnitude: 4)
+
+    /// Bahasa Inggris: nama planet dan nama frasa langit-dalam ikut berganti.
+    ///
+    /// Dua-duanya diuji karena jalurnya berbeda di `DisplayLabel.objectName`:
+    /// katalog untuk langit-dalam, `EphemerisBody` untuk benda tata surya.
+    func testReportedObjectNameFollowsTheReadersLanguage() {
+        EnglishTranslation.install([
+            "object.body.saturn.label": "Saturn",
+            "object.name.nebulaOrion": "Orion Nebula",
+        ])
+
+        let planet = PointingLinkMessage(kind: .pointingState, state: .lock,
+                                         objectID: "saturnus", objectName: "Saturnus",
+                                         level: .high)
+        XCTAssertEqual(planet.reportedObjectName(catalogue: [saturn, orion]), "Saturn",
+                       "nama yang dikirim jam masih bentuk Indonesia")
+
+        let deepSky = PointingLinkMessage(kind: .pointingState, state: .lock,
+                                          objectID: "nebulaOrion", objectName: "Nebula Orion",
+                                          level: .high)
+        XCTAssertEqual(deepSky.reportedObjectName(catalogue: [saturn, orion]), "Orion Nebula")
+    }
+
+    /// Tanpa terjemahan, nama katalog dikembalikan apa adanya — bukan `nil`,
+    /// bukan id mentah. Kontrol negatif: accessor yang selalu menerjemahkan
+    /// lewat jalur yang salah akan mengganti `Sirius` menjadi sesuatu.
+    func testNameWithoutTranslationIsKeptAsIs() {
+        let vega = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                   raDeg: 279, decDeg: 38, magnitude: 0.03)
+        let message = PointingLinkMessage(kind: .pointingState, state: .lock,
+                                          objectID: "vega", objectName: "Vega", level: .high)
+        XCTAssertEqual(message.reportedObjectName(catalogue: [vega]), "Vega")
+    }
+
+    /// Id yang tidak dikenal katalog **tetap** memakai nama yang dikirim jam.
+    ///
+    /// Ini arah yang penting: `DisplayLabel.objectName` mengembalikan `nil`
+    /// untuk id tak dikenal, dan memakai `??` di sana akan jatuh ke id mentah
+    /// — lebih buruk daripada nama Indonesia yang setidaknya benar sebagai
+    /// nama. Katalog iPhone bisa tertinggal satu versi dari jam; nama yang
+    /// dikirim jam tetap lebih baik daripada `nebulaXyz`.
+    func testUnknownIDKeepsTheNameTheWatchSent() {
+        let message = PointingLinkMessage(kind: .pointingState, state: .lock,
+                                          objectID: "objekMasaDepan",
+                                          objectName: "Objek Masa Depan", level: .high)
+        XCTAssertEqual(message.reportedObjectName(catalogue: [saturn]), "Objek Masa Depan")
+    }
+
+    /// Pesan tanpa jawaban tidak mengarang nama.
+    func testMessageWithoutAnswerHasNoName() {
+        let message = PointingLinkMessage(kind: .pointingState, state: .searching)
+        XCTAssertNil(message.reportedObjectName(catalogue: [saturn, orion]))
+    }
+
+    /// Kalimat lengkapnya memakai accessor itu — bukan `objectName` mentah.
+    ///
+    /// Tanpa uji ini, accessor di atas bisa benar sementara `PhoneLinkService`
+    /// tetap membaca medan mentahnya, dan seluruh berkas ini hijau.
+    func testStatusSentenceUsesTheResolvedName() {
+        EnglishTranslation.install(["object.body.saturn.label": "Saturn"])
+        let message = PointingLinkMessage(kind: .pointingState, state: .lock,
+                                          objectID: "saturnus", objectName: "Saturnus",
+                                          level: .high)
+        let name = message.reportedObjectName(catalogue: [saturn])
+        XCTAssertEqual(name.map { LinkStatusText.watchSaw($0) },
+                       String(format: TextLocalization.text(.linkStatusWatchSaw), "Saturn"))
+    }
+}
+
+/// Nama target teleskop juga harus mengikuti bahasa perangkat.
+///
+/// **Cacat yang dijaga.** `TelescopeBridge` mengisi `objectName` dari
+/// `object.name` (bentuk Indonesia yang dibekukan), dan layar serah-terima
+/// mencetaknya apa adanya. Ini permukaan **ketujuh** dengan cacat yang sama,
+/// dan yang paling mahal: baris itu berdiri tepat di sebelah koordinat yang
+/// akan dikirim ke mount, jadi nama yang salah bahasa di situ terbaca seperti
+/// bagian dari perintah alat.
+final class TelescopeTargetNameLanguageTests: BridgedTextTestCase {
+
+    private let saturn = CelestialObject(id: "saturnus", name: "Saturnus", kind: .planet,
+                                         raDeg: 10, decDeg: 10, magnitude: 0.5)
+
+    func testTargetNameFollowsTheDeviceLanguage() {
+        EnglishTranslation.install(["object.body.saturn.label": "Saturn"])
+        XCTAssertEqual(DisplayLabel.telescopeTargetName(objectID: "saturnus",
+                                                        carriedName: "Saturnus",
+                                                        catalogue: [saturn]),
+                       "Saturn")
+    }
+
+    /// Kontrol negatif: tanpa terjemahan, nama katalog dikembalikan apa adanya
+    /// — bukan `nil`, bukan id mentah.
+    func testNameWithoutTranslationIsKeptAsIs() {
+        let vega = CelestialObject(id: "vega", name: "Vega", kind: .star,
+                                   raDeg: 279, decDeg: 38, magnitude: 0.03)
+        XCTAssertEqual(DisplayLabel.telescopeTargetName(objectID: "vega",
+                                                        carriedName: "Vega",
+                                                        catalogue: [vega]),
+                       "Vega")
+    }
+
+    /// Id yang tidak dikenal katalog tetap memakai nama dari perintah.
+    ///
+    /// Katalog iPhone bisa tertinggal satu versi dari yang membuat perintah;
+    /// `nebulaXyz` di baris "Target" lebih buruk daripada nama Indonesia yang
+    /// setidaknya benar sebagai nama.
+    func testUnknownIDKeepsTheCommandName() {
+        XCTAssertEqual(DisplayLabel.telescopeTargetName(objectID: "objekMasaDepan",
+                                                        carriedName: "Objek Masa Depan",
+                                                        catalogue: [saturn]),
+                       "Objek Masa Depan")
     }
 }

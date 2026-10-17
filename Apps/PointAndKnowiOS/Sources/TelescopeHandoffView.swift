@@ -98,7 +98,17 @@ struct TelescopeHandoffSection: View {
                                         date: Date())
             switch result {
             case .success(let command):
-                row(TextLocalization.text(.telescopeTargetLabel), command.objectName)
+                // `telescopeTargetName`, bukan `command.objectName` langsung:
+                // medan itu memuat nama Indonesia yang dibekukan engine
+                // (`Saturnus`), sementara koordinat di baris bawahnya sudah
+                // benar. Katalog dari resolver yang **sama** dengan yang
+                // membuat perintah, jadi nama dan koordinatnya tidak bisa
+                // menunjuk objek berbeda.
+                row(TextLocalization.text(.telescopeTargetLabel),
+                    DisplayLabel.telescopeTargetName(
+                        objectID: command.objectID,
+                        carriedName: command.objectName,
+                        catalogue: engine.controller.resolver.catalogue))
                 Text(TelescopeDisplay.coordinateLine(for: command.target))
                     .font(.footnote)
                     .foregroundStyle(Color.nightAwareSecondary)

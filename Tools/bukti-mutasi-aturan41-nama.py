@@ -67,6 +67,7 @@ ENGINE = os.path.join("Apps", "Shared", "PointingEngine.swift")
 EXPERIMENT = os.path.join("Apps", "PointAndKnowiOS", "Sources", "Experiment1View.swift")
 TELESCOPE = os.path.join("Apps", "PointAndKnowiOS", "Sources", "TelescopeHandoffView.swift")
 CALIBRATION = os.path.join("Apps", "PointAndKnowWatch", "Sources", "CalibrationView.swift")
+LINKVIEW = os.path.join("Apps", "PointAndKnowiOS", "Sources", "LinkView.swift")
 
 #: Program Aturan 41 mencetak **temuan** ke stdout dan diam bila bersih.
 #:
@@ -151,6 +152,15 @@ def main() -> int:
     # **hanya** kata itu — bukan baris di sekitarnya, supaya yang diukur
     # benar-benar `name` vs `localizedName`.
     calibration_anchor = "                                Text(target.localizedName)"
+    # Jangkar layar Tautan. Perbaikannya memakai `reportedObjectName(catalogue:)`,
+    # jadi keadaan 14 (kontrol) memakai jangkar ini apa adanya dan keadaan 13
+    # memutasi **hanya** bagian `state.objectName` — bukan baris di sekitarnya.
+    # `linkview_anchor` adalah baris yang **sudah benar**, diulang persis agar
+    # mutasi ke `state.objectName` terukur sebagai satu perubahan.
+    linkview_anchor = (
+        "                        row(TextLocalization.text(.linkRowObject),\n"
+        "                            state.reportedObjectName(\n"
+        "                                catalogue: engine.controller.resolver.catalogue) ?? \"—\")")
 
     states = [
         ("1. `?? object.name` di kartu jam",
@@ -220,6 +230,26 @@ def main() -> int:
          TELESCOPE, telescope_anchor,
          "            row(TextLocalization.text(.telescopeFrameLabel), preferredFrame.name)",
          False),
+        # ── Medan `.objectName` yang dibawa antar-permukaan ──
+        #
+        # `LinkView` dan layar serah-terima teleskop mencetak medan `.objectName`
+        # yang diisi dari nama Indonesia yang dibekukan engine. Keduanya juga
+        # membawa `objectID`/katalog, jadi nama yang benar bisa diselesaikan di
+        # sisi pembaca. Yang diuji di sini: mencantumkan medan mentahnya ke
+        # layar **harus** memerah, dan penyelesai yang menyerahkan medan itu
+        # sebagai cadangan harus diam.
+        ("13. `state.objectName` di layar Tautan",
+         LINKVIEW, linkview_anchor,
+         "                        row(TextLocalization.text(.linkRowObject), state.objectName ?? \"—\")",
+         True),
+        ("14. [kontrol] `state.reportedObjectName(catalogue:)` (perbaikan)",
+         LINKVIEW, linkview_anchor, linkview_anchor, False),
+        ("15. `command.objectName` di layar serah-terima teleskop",
+         TELESCOPE, telescope_anchor,
+         "                row(TextLocalization.text(.telescopeTargetLabel), command.objectName)",
+         True),
+        ("16. [kontrol] penyelesai menerima `command.objectName` sebagai cadangan",
+         TELESCOPE, telescope_anchor, telescope_anchor, False),
     ]
 
     failures: list[str] = []

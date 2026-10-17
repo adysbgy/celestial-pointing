@@ -7071,6 +7071,44 @@ POLA_RANTAI = re.compile(
 POLA_LANGSUNG = re.compile(
     r"\b(best|object|target|displayedObject|intent|candidate)\.name\b"
 )
+# Bentuk keempat: medan nama **yang dibawa** antar-permukaan, bukan
+# `CelestialObject.name` langsung.
+#
+#     state.objectName          <- layar Tautan (nama dari jam)
+#     command.objectName        <- layar serah-terima teleskop
+#     message.objectName        <- service tautan
+#
+# Ketiga medan itu diisi dari `snapshot.answeredObject?.name` /
+# `object.name` / `slew.object.name` — semuanya bentuk Indonesia yang
+# dibekukan engine. Ketiganya **juga** membawa `objectID`, jadi nama yang
+# benar bisa diselesaikan di sisi pembaca; yang dilarang adalah mencetak
+# medan mentahnya ke layar.
+#
+# Kenapa pola terpisah, bukan menambah `objectName` ke daftar penerima di
+# atas: nama medannya beda, dan mencampurnya membuat pesan temuan menyebut
+# `CelestialObject.name` untuk sesuatu yang bukan itu.
+POLA_MEDAN = re.compile(
+    r"\b(best|object|target|state|message|command|intent|candidate)\.objectName\b"
+)
+
+#: Baris tempat sebuah nama **sampai ke layar**.
+#:
+#: `POLA_MEDAN` saja akan memerah pada kode yang benar: bentuk perbaikannya
+#: adalah menyerahkan medan itu ke penyelesai nama
+#:
+#:     DisplayLabel.telescopeTargetName(carriedName: command.objectName, ...)
+#:
+#: — di situ `command.objectName` memang dibaca, tapi sebagai **cadangan**
+#: yang hanya dipakai kalau katalog tidak mengenal id-nya, bukan sebagai teks
+#: yang dicetak. Gerbang yang menuduh baris itu akan memerah pada kode benar,
+#: dan gerbang seperti itu akan dilonggarkan orang.
+#:
+#: Jadi yang diperiksa dua hal sekaligus: baris itu menggambar sesuatu
+#: (`row(`/`Text(`/`accessibilityLabel`/`LinkStatusText.`), **dan** namanya
+#: tidak sedang diserahkan ke penyelesai (`carriedName:`). Keduanya sempit
+#: dengan sengaja.
+KONTEKS_GAMBAR = re.compile(r"\b(row\(|Text\(|accessibilityLabel|LinkStatusText\.)")
+PENYERAHAN = re.compile(r"\bcarriedName\s*:")
 
 # ── Aturan 41: nama objek yang tampil wajib melewati pelokalan ─────────────
 
@@ -7098,8 +7136,27 @@ for root, _, files in os.walk("Apps"):
         # jadi berkas itu lolos hanya karena gerbangnya menyebut tipe
         # yang salah. `localizedName` di struct yang sama sudah jadi
         # jalur benar yang dipakai pemilih target Experiment 1.
+        #
+        # **`PointingLinkMessage`/`TelescopeCommand` juga**, dan itu
+        # menutup lubang yang sama sekali lain: kedua layar itu
+        # (Tautan, serah-terima teleskop) **tidak menyebut**
+        # `CelestialObject` sama sekali — mereka membaca medan
+        # `.objectName` yang dibawa pesan. Jadi berkasnya lolos penyaring
+        # bahkan setelah cakupannya dilebarkan, dan bentuknya lolos kedua
+        # pola karena tidak ada `??` maupun `?.`. Terukur: mengembalikan
+        # kedua baris ke `.objectName` mentah membuat Aturan 41 tetap
+        # mencetak "Bersih".
         if ("CelestialObject" not in teks and "displayedObject" not in teks
-                and "PointingTarget" not in teks):
+                and "PointingTarget" not in teks
+                and "PointingLinkMessage" not in teks
+                and "TelescopeCommand" not in teks
+                # `LinkView` membaca `link.lastState` tanpa pernah menamai
+                # tipenya, jadi daftar tipe di atas tetap melewatkannya.
+                # Medan `.objectName` sendiri yang jadi penandanya — dan
+                # pola yang memakainya sudah sempit (`state.`/`message.`/
+                # `command.`), jadi melebarkan penyaring ini tidak
+                # menambahkan tuduhan baru pada kode yang benar.
+                and ".objectName" not in teks):
             continue
         baris_teks = teks.split("\n")
         for nomor, baris in enumerate(baris_teks, start=1):
@@ -7109,6 +7166,13 @@ for root, _, files in os.walk("Apps"):
             kode = baris.split("//", 1)[0]
             m = (POLA_CADANGAN.search(kode) or POLA_RANTAI.search(kode)
                  or POLA_LANGSUNG.search(kode))
+            # `POLA_MEDAN` hanya berbunyi bila baris itu **menggambar**
+            # medannya. Baris yang menyerahkannya ke penyelesai nama
+            # (`carriedName:`) sengaja diam — lihat `PENYERAHAN`.
+            if (not m and POLA_MEDAN.search(kode)
+                    and KONTEKS_GAMBAR.search(kode)
+                    and not PENYERAHAN.search(kode)):
+                m = POLA_MEDAN.search(kode)
             if not m:
                 continue
             diperiksa += 1

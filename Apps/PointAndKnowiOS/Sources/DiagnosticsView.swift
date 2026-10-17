@@ -135,6 +135,14 @@ struct RootView: View {
         // `ratioToSigma` sampel ini memang kosong; itu ditampilkan apa
         // adanya, bukan diisi angka karangan.
         link.onMessage = { message in trace.record(message: message) }
+        // Katalog untuk menyelesaikan nama objek yang dilaporkan jam.
+        //
+        // Diisi dari engine yang **sedang berjalan**, bukan dari
+        // `Catalogue.brightStars` bawaan: nama untuk id yang tidak
+        // dipertimbangkan engine iPhone adalah nama yang terlihat benar tanpa
+        // dasar. Disetel sebelum `activate()` supaya pesan pertama pun sudah
+        // punya katalog.
+        link.catalogue = engine.controller.resolver.catalogue
         link.activate()
 
         // Setiap sampel masuk ke engine **dan** ke riwayat keyakinan.
