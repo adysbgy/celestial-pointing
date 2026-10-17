@@ -123,8 +123,8 @@ GUARD = ('    if not is_confirmed:\n'
 GUARD_OFF = '    return color_index'
 
 # Tabel warna: `warmth` menerjemahkan indeks B−V menjadi hangat/dingin.
-WARMTH = "    warmth = (clamped + 0.35) / 1.70"
-WARMTH_FLIPPED = "    warmth = 1.0 - (clamped + 0.35) / 1.70"
+WARMTH = "    warmth = (clamped + 0.35) / 2.45"
+WARMTH_FLIPPED = "    warmth = 1.0 - (clamped + 0.35) / 2.45"
 
 # Warna "tidak mengklaim" untuk bintang. Harus **akromatik** (R=G=B): nilai
 # ber-hue apa pun adalah warna spektral, dan warna spektral mengklaim kelas

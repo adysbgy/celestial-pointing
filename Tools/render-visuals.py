@@ -199,11 +199,17 @@ def unit(v):
 
 
 def star_rgb(index):
-    """`CelestialVisual.starRGB(forColorIndex:)` — abu netral untuk sentinel."""
+    """`CelestialVisual.starRGB(forColorIndex:)` — abu netral untuk sentinel.
+
+    Rentangnya 2.45, bukan 1.70: B−V tertinggi di katalog (Betelgeuse, 1.85)
+    harus tetap di bawah dinding kanal supaya Aldebaran, Antares, dan
+    Betelgeuse tidak menjadi merah 1.000 yang sama di mode malam. Lihat
+    docstring `starRGB` di `CelestialVisual.swift`.
+    """
     if math.isnan(index):
         return NEUTRAL_STAR_BODY
     clamped = min(2.0, max(-0.5, index))
-    warmth = (clamped + 0.35) / 1.70
+    warmth = (clamped + 0.35) / 2.45
     return (unit(0.62 + 0.38 * warmth),
             unit(0.78 - 0.16 * warmth),
             unit(1.00 - 0.72 * warmth))

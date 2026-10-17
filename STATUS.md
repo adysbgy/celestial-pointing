@@ -1,4 +1,118 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: nama jawaban engine di laporan Experiment, bentuk `.name` yang lolos gerbangnya)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: warna bintang jenuh di mode malam, dan tiga bintang katalog yang menjadi titik yang sama)
+
+### Mengapa siklus ini bukan fitur baru
+
+Dibuka seperti biasa: `git log` + `gh run list`. `main` hijau (Apple Build
+`6c7e057`), 42 aturan UI hijau, dan BAGIAN 1–4 + FASE A/B/C seluruhnya sudah
+terwujud (diverifikasi ulang, bukan dikutip dari STATUS: `CelestialVisualView.swift`
+memang menggambar planet/Bulan/bintang/Matahari/langit-dalam, `NightMode`
+memakai `@AppStorage`, `ReducedLuminanceView` membaca `isLuminanceReduced`,
+`InfoPlist.strings` id+en ada, katalog `.xcstrings` ada, `ComplicationStore`
+ada). Jadi tidak ada yang perlu dibangun dari nol.
+
+Yang dikerjakan adalah mencari titik yang **tidak dijaga**. Mulai dari satu
+kejanggalan di `CelestialVisual.starRGB`: docstring panjang tentang "urutan
+luminansi harus benar" ternyata **menempel pada `unit(_:)`** — sebuah helper
+satu baris — sementara `starRGB` sendiri berdiri tanpa docstring dan tanpa
+indentasi `public extension`. Komentar yatim itu bukan cacat yang bisa
+dikompilasi salah, dan tidak ada gerbang yang membacanya. Tapi ia menunjuk ke
+sebuah **klaim**, dan klaim itu yang diperiksa.
+
+### Cacat yang diangkat
+
+Klaim di docstring yang terlepas itu: *"Kalau konversi ini membuat Rigel lebih
+terang dari Aldebaran, maka di malam keduanya menjadi titik merah dengan ukuran
+yang sama -- dan yang hilang bukan hanya warna, tapi terang juga."*
+
+Klaim itu benar dan teruji. Yang **tidak** teruji adalah kebalikannya: apakah
+ada pasangan bintang yang menjadi titik merah yang sama **bukan** karena
+warnanya memang sama, melainkan karena aritmetikanya habis.
+
+Diukur (`starRGB`, kanal merah = `0.62 + 0.38·warmth`, `warmth = (B−V + 0.35)/1.70`):
+
+    merah mencapai 1,0 pada  B−V = 1,35
+    aldebaran   B−V 1,54  →  merah 1,000
+    antares     B−V 1,83  →  merah 1,000
+    betelgeuse  B−V 1,85  →  merah 1,000
+
+Tiga bintang, tiga B−V berbeda, satu nilai warna. Mode malam membuang hue dan
+menyisakan **hanya** kanal merah, jadi ketiganya menjadi titik yang identik
+piksel demi piksel — dan tidak ada teks di layar yang bisa membantahnya.
+Raksasa merah paling terang di langit tidak bisa dibedakan satu sama lain tepat
+di mode yang dipakai orang untuk melihat langit.
+
+### Kenapa gerbang yang ada tidak menangkapnya
+
+`testStarColourIsMonotonicInColorIndex` menuntut nilai **tidak pernah turun**.
+`1,000 → 1,000` tidak turun, jadi uji itu hijau — bahkan komentarnya menyebut
+dataran tersebut "wajar". `testStarColourStaysInsideChannelRange` justru
+**menuntut** hasilnya ≤ 1, jadi ia tidak bisa memerahkan penjepitan yang
+menghasilkan tepat 1,0. `testNightModeKeepsBrightnessOrdering` menjaga kanal
+merah **unik untuk setiap planet** — aturan yang sama sekali tidak diterapkan
+ke bintang. Jadi kelas cacatnya adalah *"resolusi"*, sementara tiga uji di
+sekitarnya masing-masing menjaga *"arah"*, *"rentang"*, dan *"planet"*.
+
+### Uji yang ditulis lebih dulu (Aturan 10)
+
+`testCatalogueStarsDoNotSaturateTheNightChannel`. Percobaan pertama saya
+menuntut **setiap** bintang punya kanal merah unik, dan itu **salah** — ia
+merah dengan 5 kegagalan, tetapi 4 di antaranya benar secara astronomi:
+
+    aldebaran/betelgeuse/antares   1.000   ← cacat: B−V berbeda, warna jenuh
+    deneb/fomalhaut                0.718   ← B−V 0.09 keduanya: warnanya sama
+    hadar/spica                    0.647   ← B−V −0.23 keduanya
+    sirius/vega                    0.698   ← B−V 0.00 keduanya
+
+Empat pasangan terakhir sama-sama A-type/K-type dengan B−V identik, jadi
+warnanya **memang** sama; yang membedakan keduanya di layar adalah ukuran dari
+magnitudo (Sirius −1,46 lawan Vega 0,03), dan itu sudah dijaga
+`testBrighterStarIsDrawnLarger`. Menuntut warna berbeda berarti mengarang
+perbedaan yang tidak ada — persis *false confidence* yang dilarang PRD. Uji
+itu lalu diperketat ke cacat yang sebenarnya: **tidak ada bintang katalog yang
+menyentuh dinding kanal**. Merah dengan tepat satu sebab:
+
+    kanal merah malam jenuh untuk aldebaran, antares, betelgeuse
+
+### Perbaikan
+
+- `starRGB` — rentang `warmth` 1,70 → **2,45** (B−V −0,35…2,10). Yang dijepit
+  adalah **rentang masukan**, bukan hasilnya: penjepit kanal tetap ada sebagai
+  pengaman `Color`, tetapi tidak lagi menanggung beban kasus nyata. Hasilnya
+  aldebaran 0,913 / antares 0,958 / betelgeuse 0,961 — tiga nilai terurut.
+- Batas 2,10 dipilih, bukan 2,50: ia mengosongkan dataran untuk **seluruh**
+  katalog dengan sisa ruang, sementara melebarkannya lebih jauh mulai menekan
+  perbedaan antar-bintang biru yang justru lebih sering terlihat.
+- Docstring `starRGB` dikembalikan ke fungsi yang ia jelaskan; `unit(_:)`
+  menyimpan docstring satu baris miliknya sendiri.
+- Komentar penjepit tidak lagi mengutip ambang `~1.35` yang sudah tidak berlaku.
+- `Tools/render-visuals.py` (port) ikut 2,45 — kalau tidak,
+  `check_star_rgb_conversion_matches_the_model` akan memerah, dan memang
+  seharusnya: gerbang itu membaca koefisien dari sumber Swift.
+
+### Verifikasi
+
+    ./swift-test.sh                  CelestialEngine 222 + PointingKit 864 = 1086 uji, 0 gagal
+    ./swift-typecheck.sh             SEMUA GERBANG LULUS
+    ./swift-ui-lint.sh               SEMUA GERBANG UI LULUS (42 aturan)
+    Aturan 10                        README 863 -> 864
+
+### Yang TIDAK diklaim
+
+- Ini **bukan** perbaikan "di layar". Perubahan ada di `PointingKit` (teruji
+  Linux) dan di port `Tools/render-visuals.py`; tidak satu pun berkas `Apps/`
+  disentuh, jadi tidak ada yang perlu dibangun Apple Build untuk siklus ini.
+- Warna bintang mode malam sekarang **uniqueness per B−V**, bukan per bintang.
+  Sirius dan Vega tetap merah yang sama — itu benar, bukan sisa cacat.
+- Empat pasangan B−V identik di katalog (sirius/vega, hadar/spica,
+  deneb/fomalhaut) tidak dibedakan oleh warna dan tidak akan pernah; yang
+  membedakan adalah magnitudo. Bila suatu hari ada dua bintang B−V sama **dan**
+  magnitudo sama, tidak ada apa pun di jalur warna maupun ukuran yang
+  membedakan keduanya; itu celah yang belum ditutup dan belum relevan untuk
+  katalog sekarang.
+- Penjepit kanal tetap membatasi B−V di atas 2,0 (lewat `clamped`). Tidak ada
+  bintang katalog di sana; itu memang pengaman, bukan jaminan resolusi.
+
+## Progres sebelumnya (17 Okt 2026 — siklus XCODE-DEV: nama jawaban engine di laporan Experiment, bentuk `.name` yang lolos gerbangnya)
 
 ### Mengapa siklus ini bukan fitur baru
 

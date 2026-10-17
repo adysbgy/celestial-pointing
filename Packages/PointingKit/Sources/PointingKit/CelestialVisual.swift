@@ -807,6 +807,9 @@ public struct CelestialVisual: Equatable, Sendable {
     /// menyala dibanding bintang sekitar.
     public static let neutralStarBody = RGBComponents(red: 0.78, green: 0.78, blue: 0.78)
 
+    /// Menjepit satu komponen kanal ke 0...1.
+    private static func unit(_ value: Double) -> Double { min(1, max(0, value)) }
+
     /// RGB **siang** untuk sebuah indeks B−V, sebagai komponen mentah.
     ///
     /// Indeks `unknownStarColorIndex` (`NaN`) adalah kasus khusus dan
@@ -828,26 +831,40 @@ public struct CelestialVisual: Equatable, Sendable {
     /// keduanya menjadi titik merah dengan ukuran yang sama -- dan informasi
     /// yang hilang bukan hanya warna, tapi terang juga. Itu tidak bisa dibaca
     /// dari layar mana pun, jadi harus diuji, bukan diklaim.
-    /// Menjepit satu komponen kanal ke 0...1.
-    private static func unit(_ value: Double) -> Double { min(1, max(0, value)) }
-
-public static func starRGB(forColorIndex index: Double) -> RGBComponents {
+    ///
+    /// **Kenapa rentangnya `-0.35 … 2.10`, bukan `1.70`.** Cacat yang ditutup
+    /// siklus ini: kanal merah `0.62 + 0.38·warmth` mencapai 1,0 pada B−V
+    /// 1,35, dan katalog memuat **tiga** bintang di atas garis itu —
+    /// Aldebaran (1,54), Antares (1,83), Betelgeuse (1,85). Ketiganya dijepit
+    /// ke merah yang persis sama, 1,000, sehingga raksasa merah paling terang
+    /// di langit tak bisa dibedakan satu sama lain di mode malam. Penjepitan
+    /// itu benar sebagai pengaman (`Color` tidak punya kanal di atas 1) tetapi
+    /// salah sebagai **desain**: yang seharusnya dijepit adalah *rentang
+    /// masukan*, bukan hasilnya, supaya B−V nyata tidak pernah habis di dinding.
+    /// Rentang 2,10 dipilih, bukan 2,50: ia mengosongkan dataran itu untuk
+    /// setiap bintang katalog dengan sisa ruang (merah tertinggi 0,961 di
+    /// Betelgeuse), sementara melebarkannya lebih jauh mulai menekan
+    /// perbedaan antar-bintang biru yang justru lebih sering terlihat. Dijaga
+    /// `testCatalogueStarsDoNotSaturateTheNightChannel`.
+    public static func starRGB(forColorIndex index: Double) -> RGBComponents {
         // Sentinel "tidak ada klaim". Dicek dengan `isNaN`, bukan `==`,
         // karena `NaN == NaN` selalu salah — perbandingan tidak akan pernah
         // mengenalinya.
         if index.isNaN { return neutralStarBody }
         let clamped = min(2.0, max(-0.5, index))
-        // −0.35 … +1.35 → 0 … 1 (biru ke merah), lalu dingatkan sedikit di
-        // ujung biru supaya Rigel tidak tampak ungu.
-        let warmth = (clamped + 0.35) / 1.70
-        // Kanal **harus** dijepit ke 0...1. Tanpa itu, B−V >= ~1.35
-        // menghasilkan kanal merah > 1 -- dan itu bukan "sedikit terlalu
-        // terang": `Color(red:green:blue:)` tidak punya nilai di luar 1, jadi
-        // hasilnya bergantung pada perilaku penjepitan diam-diam milik
-        // SwiftUI. Untuk Betelgeuse (B−V 1.85) warna siang yang keluar
-        //literally 1.11 di kanal merah: lebih terang dari putih, dan
-        // luminance-nya ikut terangkat sehingga urutannya terhadap bintang
-        // lain ikut berubah. Dijepit di sini supaya "merah" berarti merah.
+        // −0.35 … +2.10 → 0 … 1 (biru ke merah), lalu dingatkan sedikit di
+        // ujung biru supaya Rigel tidak tampak ungu. Batas atas 2,10 (bukan
+        // 1,70) menjaga B−V nyata tertinggi di katalog (Betelgeuse, 1,85) tetap
+        // di bawah dinding kanal; lihat docstring di atas.
+        let warmth = (clamped + 0.35) / 2.45
+        // Kanal **tetap** dijepit ke 0...1 sebagai pengaman, walau rentang di
+        // atas sudah menjaga B−V katalog tidak menyentuh dinding. Alasannya
+        // tetap sama seperti dulu: `Color(red:green:blue:)` tidak punya nilai
+        // di luar 1, jadi tanpa penjepit hasilnya bergantung pada perilaku
+        // penjepitan diam-diam milik SwiftUI. Yang berubah adalah siapa yang
+        // menanggung beban: **rentang masukan** yang mengatur hampir semua
+        // kasus, dan penjepit ini hanya menyapu B−V ekstrem di luar katalog
+        // (sampai 2,0 lewat `clamped`) supaya tidak ada kanal yang melewati 1.
         return RGBComponents(red: unit(0.62 + 0.38 * warmth),
                              green: unit(0.78 - 0.16 * warmth),
                              blue: unit(1.00 - 0.72 * warmth))

@@ -419,11 +419,18 @@ final class NightVisualTests: XCTestCase {
     /// Yang dijaga adalah **tanda**nya, karena warna yang terbalik "cukup
     /// meyakinkan" bagi mata dan tidak akan pernah dilaporkan.
     func testStarColourIsMonotonicInColorIndex() {
-        // Monotonik **tidak menurun**, bukan naik ketat: penjepit kanal
-        // membuat merah saturasi di 1.0 untuk B-V >= 4.12, jadi sesudah titik
-        // itu batang mendatar secara wajar. Yang dijaga adalah arahnya --
-        // tidak pernah turun -- supaya tidak ada B-V tinggi yang lebih dingin
-        // dari B-V rendahnya.
+        // Monotonik **tidak menurun**, bukan naik ketat: kanal merah tetap
+        // bisa bertemu dinding 1.0 untuk B-V ekstrem di luar katalog, jadi
+        // sesudah titik itu batang mendatar secara wajar. Yang dijaga adalah
+        // arahnya -- tidak pernah turun -- supaya tidak ada B-V tinggi yang
+        // lebih dingin dari B-V rendahnya.
+        //
+        // Bukan ini penjaga "dataran kosong": uji ini hijau selama nilainya
+        // tidak turun, termasuk saat tiga bintang katalog berbagi merah yang
+        // sama. Itulah yang terjadi sebelum siklus Aturan bintang-jenuh, dan
+        // yang menahannya sekarang adalah
+        // `testCatalogueStarsDoNotSaturateTheNightChannel`. Kelas cacatnya
+        // berbeda: di sini "arah", di sana "resolusi".
         let saturation = 1.35
         for step in 0..<20 {
             let a = -0.4 + 0.1 * Double(step)
@@ -467,6 +474,53 @@ final class NightVisualTests: XCTestCase {
                 XCTAssertLessThanOrEqual(value, 1, "kanal \(name) > 1 pada B-V \(index)")
             }
         }
+    }
+
+    /// Warna bintang tidak boleh **kehilangan resolusi** karena penjepitan.
+    ///
+    /// Mode malam membuang hue dan menyisakan kanal merah. Kanal itu memang
+    /// tidak wajib unik per bintang — Sirius dan Vega sama-sama A0, B−V 0,00,
+    /// dan warnanya **memang** sama; yang membedakan keduanya di layar adalah
+    /// ukuran dari magnitudo (−1,46 vs 0,03). Jadi "dua bintang berbagi merah"
+    /// bukan cacat dengan sendirinya.
+    ///
+    /// Cacatnya adalah bila mereka berbagi merah **karena aritmetikanya habis
+    /// di angka 1,0**, bukan karena warnanya sama. Diukur: kanal merah
+    /// `starRGB` mencapai 1,0 pada B−V 1,35, dan katalog punya **tiga** bintang
+    /// di atas garis itu — Aldebaran (1,54), Antares (1,83), Betelgeuse (1,85).
+    /// Ketiganya keluar merah 1,000 dengan **B−V yang berbeda**, jadi yang
+    /// hilang bukan informasi yang memang tak ada, melainkan informasi yang
+    /// ada dan dibuang penjepit. Raksasa merah paling terang di langit pun
+    /// tidak bisa dibedakan dari satu sama lain di mode yang justru dipakai
+    /// untuk melihat langit.
+    ///
+    /// **Kenapa uji tetangga tidak menangkapnya.**
+    /// `testStarColourIsMonotonicInColorIndex` menuntut "tidak pernah
+    /// **turun**"; 1,000 → 1,000 memang tidak turun, dan uji itu bahkan
+    /// menyebut dataran tersebut "wajar". Yang tidak pernah dituntut adalah
+    /// bahwa dataran itu **kosong** — atau setidaknya tidak memuat bintang
+    /// nyata yang B−V-nya berbeda.
+    ///
+    /// **Non-vakuositas.** Kontrol negatif di akhir memastikan uji ini bisa
+    /// gagal pada arah sebaliknya: secara siang, ketiga bintang itu memang
+    /// berbeda. Tanpa itu, "tidak ada yang jenuh" akan benar untuk alasan yang
+    /// salah bila `starRGB` membuang seluruh warna.
+    func testCatalogueStarsDoNotSaturateTheNightChannel() {
+        let saturated = CelestialVisual.starColorIndex
+            .filter { _, index in
+                CelestialVisual.starRGB(forColorIndex: index).nightModeBrightness >= 1.0
+            }
+            .keys
+            .sorted()
+
+        XCTAssertTrue(saturated.isEmpty,
+                      "kanal merah malam jenuh untuk \(saturated.joined(separator: ", ")) "
+                      + "— B−V-nya berbeda, jadi penjepit membuang perbedaan yang ada")
+
+        // Kontrol negatif: informasinya memang ada sebelum mode malam.
+        XCTAssertNotEqual(CelestialVisual.starRGB(forColorIndex: 1.85),
+                          CelestialVisual.starRGB(forColorIndex: 1.54),
+                          "kontrol: Betelgeuse dan Aldebaran berbeda di siang hari")
     }
 
     // MARK: - Cekungan kawah Merkurius

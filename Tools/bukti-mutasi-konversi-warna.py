@@ -128,8 +128,8 @@ MERAH = "merah"
 MODEL_CLAMP = "        let clamped = min(2.0, max(-0.5, index))"
 PORT_CLAMP = "    clamped = min(2.0, max(-0.5, index))"
 
-MODEL_WARMTH = "        let warmth = (clamped + 0.35) / 1.70"
-PORT_WARMTH = "    warmth = (clamped + 0.35) / 1.70"
+MODEL_WARMTH = "        let warmth = (clamped + 0.35) / 2.45"
+PORT_WARMTH = "    warmth = (clamped + 0.35) / 2.45"
 
 MODEL_RED = "        return RGBComponents(red: unit(0.62 + 0.38 * warmth),"
 PORT_RED = "    return (unit(0.62 + 0.38 * warmth),"
@@ -198,7 +198,7 @@ STATES = [
     # supaya pemeriksaan **per kanal** ikut terbukti dibaca satu per satu
     # (bukan hanya pemeriksaan penyebut). Hijau & biru tetap hijau, karena
     # memang tidak disentuh: pengikatannya per kanal, bukan sepasang.
-    ("2. model: span 1.70 -> 1.60, port kanal merah -0.02",
+    ("2. model: span 2.45 -> 1.60, port kanal merah -0.02",
      [(MODEL, MODEL_WARMTH, "        let warmth = (clamped + 0.35) / 1.60"),
       (RENDER, PORT_RED, PORT_RED.replace("0.62", "0.60"))],
      _full(WARMTH_SPAN, RED_CHANNEL, SAMPLED)),
@@ -210,7 +210,7 @@ STATES = [
     # Tanpa keadaan ini, gerbang yang memerah pada setiap suntingan warna
     # akan dilonggarkan orang — dan gerbang yang dilonggarkan tidak menjaga
     # apa pun.
-    ("3. model DAN port: span 1.70 -> 1.75 (sepakat, bukan cacat)",
+    ("3. model DAN port: span 2.45 -> 1.75 (sepakat, bukan cacat)",
      [(MODEL, MODEL_WARMTH, "        let warmth = (clamped + 0.35) / 1.75"),
       (RENDER, PORT_WARMTH, "    warmth = (clamped + 0.35) / 1.75")],
      _full()),
