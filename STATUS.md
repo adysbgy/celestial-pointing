@@ -1,3 +1,130 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 31 membaca ikatan yang salah)
+
+### Mengapa siklus ini tidak menambah fitur
+
+Brief meminta poles UI/UX dan memperluas katalog visual. Dibuka seperti biasa:
+`git log` + `gh run`. `main` **hijau**, seluruh BAGIAN 1–4 dan FASE A/B/C sudah
+terwujud dan ter-gerbang, dan siklus-siklus sebelumnya sudah mencatat bahwa
+premis brief adalah keadaan yang sudah tidak ada lagi. Jadi tidak ada yang
+menahan pekerjaan fitur baru.
+
+Yang dikerjakan adalah pertanyaan yang tersisa setelah premisnya diverifikasi:
+**apakah gerbang yang mengklaim menjaga kawat fase benar-benar mengukurnya?**
+
+### Cacat yang diangkat, dan bagaimana ia ditemukan
+
+Bukan dengan membaca gerbangnya — dengan **menyapu**: setiap badan
+ber-satu-ekspresi di `Apps/` yang panahnya `Bool` diganti lawannya, lalu
+seluruh 37 aturan UI dijalankan di proses baru. Yang tetap hijau = buta.
+
+Sapuan itu menemukan tiga gerbang muka di `PointingEngine.swift`
+(`displayedObject`, `pointing`, `answeredIntent` -> `nil`; `isDisplayingStaleObject`,
+`confirmsDisplayedIdentity`, `carriesUncertaintyMarker` -> literal) — permukaan
+yang **sudah dibahas** di entri di bawah dan memang sengaja dibiarkan: badan
+ber-satu-ekspresi tidak bisa diuji tanpa menjalankan `Apps/`, sedangkan
+`swift-test.sh` di Linux tidak pernah membangun `Apps/`.
+
+Yang paling berharga justru satu tingkat lebih dalam: Aturan 31.
+
+### Angka yang mengubah keputusan
+
+Empat mutasi pada kawat fase, semuanya **tetap bisa dikompilasi** (bentuk
+`= nil` polos tidak, dan itulah sebabnya ia tidak pernah diuji — lihat di bawah):
+
+| mutasi | Aturan 31 (lama) | piksel berubah di port |
+|---|---|---|
+| `let fraction: Double? = nil` | **hijau** | 31.604 / 40.000 (79,0%) |
+| `let planet: CelestialVisual.Planet? = nil` | **hijau** | 31.604 / 40.000 (79,0%) |
+| `let waxing: Bool? = nil` | **hijau** | 31.604 / 40.000 (79,0%) |
+| `let limbAngle: Double? = nil` | merah | 8.686 / 40.000 (21,7%) |
+
+Tiga yang hijau adalah cacat yang **komentar Aturan 31 sendiri** sebut sebagai
+"terukur 79,0%": seluruh pita terang hilang dan Bulan/planet berfase tergambar
+sebagai bola penuh di setiap keadaan — gambar yang menyatakan kebalikan dari apa
+yang dihitung engine. Seluruh 37 aturan UI tetap lulus.
+
+### Dua sebab, berurutan, keduanya salah-baca
+
+1. **`_bound_value` memakai `re.search`.** Berkas itu mengikat `fraction` dan
+   `waxing` masing-masing **dua kali** — sekali di dalam `for` planet berfase,
+   sekali untuk Bulan. `re.search` mengembalikan ikatan **pertama** (milik
+   planet), jadi kawat Bulan `moonIlluminationFraction: fraction` dinilai dari
+   baris yang tidak pernah dipakai Bulan. Gerbangnya tidak longgar; ia membaca
+   baris yang salah.
+
+2. **Penelusurannya satu tingkat.** `planet -> nil` mematikan kawatnya lewat
+   `planetPhase`, yang barisnya tetap utuh: `flatMap` atas `nil` mengembalikan
+   `nil`. Jadi mutasi yang merusak paling banyak justru yang paling tidak
+   terlihat.
+
+### Perbaikan
+
+- **Semua ikatan ditelusuri**, bukan yang pertama. Merah bila **salah satu**
+  ikatan nil — bukan "semua ikatan nil", yang akan mengembalikan kegagalan yang
+  sama dengan menyembunyikannya di balik ikatan yang kebetulan sehat.
+- **Penelusuran transitif berbatas** (kedalaman 4, dengan himpunan `visited`
+  supaya tidak pernah menggantung). Batasnya bukan soal hemat: gerbang yang bisa
+  berputar adalah gerbang yang bisa membeku di CI.
+- **Harness** `Tools/bukti-mutasi-aturan31-kawat.py` bertambah **3 keadaan**
+  (10–12) plus dua jangkar baru di penjaga keunikan. Memakai harness yang
+  **sudah terdaftar** CI, jadi tidak ada langkah alur kerja baru.
+
+### Non-vakuositas diukur, bukan diklaim
+
+Ketiga keadaan baru dijalankan atas versi aturan **pra-perbaikan**
+(`HEAD:swift-ui-lint.sh`):
+
+    aturan lama : keadaan 10, 11, 12 -> "gerbang TIDAK berbunyi"  (buta)
+    aturan baru : keadaan 10, 11, 12 -> berbunyi
+
+Sepuluh keadaan lama berbunyi di kedua versi. Tanpa pengukuran ini, "13 keadaan
+lolos" tidak membedakan harness yang bekerja dari harness yang tidak melihat
+apa pun.
+
+### Kenapa cacat ini tidak pernah tertangkap, dan pelajarannya
+
+Harness lama menguji bentuk `let planetLimbAngle: Double? = nil` (ber-**tipe**),
+bukan `let planet = nil`. Bentuk tanpa tipe memang **menolak dikompilasi**, jadi
+wajar tidak diuji — tetapi konsekuensinya: varian `fraction` dan `waxing` yang
+sama-sama ber-tipe **tidak pernah ikut diuji**, padahal keduanya sama-sama lolos.
+Pelajarannya bukan "uji lebih banyak", melainkan: daftar keadaan yang disusun
+tangan mengikuti bentuk yang **sudah** dipikirkan penulisnya, dan lubangnya
+persis bentuk yang belum. Sapuan otomatis menemukan yang daftar tangan lewatkan.
+
+**Sapuan itu sendiri butuh dua koreksi, dan keduanya ketahuan sebelum dipakai.**
+Versi pertama memakai salinan berkas yang komentarnya sudah dibuang untuk
+menghitung offset, lalu menulis mutasi kembali ke berkas asli — offsetnya
+bergeser, dan hasilnya 9 dari 9 "buta" pada bodi yang jelas ter-gerbang. Versi
+kedua menutupi komentar & literal dengan spasi **berpanjang tetap**, sehingga
+indeks di salinan bersih sama dengan indeks di berkas asli.
+
+### Verifikasi
+
+    ./swift-ui-lint.sh                            SEMUA GERBANG UI LULUS (37 aturan)
+    python3 Tools/bukti-mutasi-aturan31-kawat.py  13 keadaan, 0 tidak sesuai
+                                                  harapan (tadinya 10)
+    python3 Tools/check-jangkar-harness.py        342 jangkar, tidak ada mutasi
+                                                  tertinggal
+    python3 Tools/check-harness-terdaftar.py      77 harness, semuanya dirujuk
+    ./swift-test.sh                               CelestialEngine 222 + PointingKit
+                                                  831 = 1053 uji, 0 gagal
+    Apple Build (macos-15), `7eccce1`             success
+
+### Yang TIDAK diklaim
+
+- Aturan 31 tetap **sapu teks**, bukan pemeriksa tipe. Ia tidak tahu jenis
+  ekspresi; ia tahu nama dan bentuk binding. Rantai yang lebih panjang dari
+  empat `let`, atau yang melewati fungsi, tetap tidak terlihat.
+- Tiga gerbang muka di `PointingEngine.swift` (`displayedObject`, `pointing`,
+  `answeredIntent`, dan tiga penanda kejujuran) **masih buta** dan sengaja
+  dibiarkan: menutupnya butuh menjalankan `Apps/`, yang tidak dilakukan
+  `swift-test.sh` di Linux. Yang bisa dilakukan tanpa itu adalah mengawasi
+  **bentuk** badannya (Aturan 38 sudah mengawasi tiga dari enam), dan itu kelas
+  yang berbeda dari mengawasi **nilainya**.
+- Tidak ada baris `Apps/` produksi yang diubah. Perubahan hanya di
+  `swift-ui-lint.sh` dan satu harness di `Tools/`.
+
+---
 ## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: saklar identitas yang tidak diawasi siapa pun)
 
 ### Mengapa siklus ini tidak menambah fitur
