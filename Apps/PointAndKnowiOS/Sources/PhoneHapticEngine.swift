@@ -22,6 +22,15 @@ import PointingKit
 /// peristiwa jarang mempercepat apa pun dan menambah state yang tidak perlu.
 /// Peristiwa kunci jauh dari tiap sampel 20 Hz (lihat `PointingController`),
 /// jadi biaya pembuatan generator bisa diabaikan.
+///
+/// **Keputusan pola tidak lagi ditulis di sini.** Dulu berkas ini punya
+/// `switch` sendiri yang memetakan `.lockSucceeded` → `.medium` dan
+/// `.uncertain` → `.rigid`. Jam punya salinannya sendiri (`HapticEngine`).
+/// Dua salinan dari satu politik PRD berarti keduanya bisa menyimpang tanpa
+/// ada yang berbunyi — dan keduanya tinggal di `Apps/`, yang tidak pernah
+/// dibangun `swift-test.sh` di Linux. Pemetaan itu kini di `HapticPolicy`
+/// (PointingKit, diuji di Linux); yang tersisa di sini hanya terjemahan pola
+/// ke API UIKit, satu pola satu efek, tanpa keputusan.
 @MainActor
 final class PhoneHapticEngine {
 
@@ -31,18 +40,24 @@ final class PhoneHapticEngine {
     }
 
     func play(_ event: HapticEvent) {
-        switch event {
-        case .lockSucceeded:
-            // "Selesai" — jelas terasa sebagai keberhasilan.
+        guard let pattern = HapticPolicy.pattern(for: event) else { return }
+        play(pattern)
+    }
+
+    /// Terjemahan pola → efek UIKit. Tanpa keputusan: satu pola, satu efek.
+    ///
+    /// Kenapa `.success` memakai `.medium` dan `.retry` memakai `.rigid`:
+    /// keduanya terasa jelas berbeda di tangan. Itu satu-satunya syaratnya —
+    /// bukan soal intensitas mana yang lebih enak.
+    private func play(_ pattern: HapticPattern) {
+        switch pattern {
+        case .completed:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        case .uncertain:
-            // Berbeda dari sukses: terasa "belum pasti", bukan "selesai".
+        case .unsettled:
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-        case .sensorUnavailable:
-            UINotificationFeedbackGenerator()
-                .notificationOccurred(.warning)
-        case .returnedToIdle:
-            // Transisi lembut kembali ke diam — bukan peringatan.
+        case .failed:
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        case .tick:
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }

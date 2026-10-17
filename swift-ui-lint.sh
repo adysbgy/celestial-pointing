@@ -7820,6 +7820,125 @@ else
   echo "Bersih: pemilihan peristiwa berbunyi selalu lewat AudioEventPolicy."
 fi
 
+# ── Aturan 47: getaran "ragu" tidak boleh dipilih sendiri di Apps/ ──
+#
+# Kembar dari Aturan 46, dan cacatnya **diukur** sebelum ditutup.
+#
+# Getaran adalah satu-satunya saluran yang tidak butuh mata saat jam diangkat
+# — tepat situasi produk ini. Kalau `.uncertain` berbunyi pola yang sama
+# dengan `.lockSucceeded`, pengguna yang mengandalkan getaran tidak punya cara
+# apa pun membedakan "terkunci" dari "kurang yakin".
+#
+# Keputusan itu ditulis **dua kali** di `Apps/`:
+#
+#     Apps/PointAndKnowWatch/Sources/HapticEngine.swift
+#         case .uncertain: device.play(.retry)
+#     Apps/PointAndKnowiOS/Sources/PhoneHapticEngine.swift
+#         case .uncertain: UIImpactFeedbackGenerator(style: .rigid)
+#
+# Terukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
+# mutasi yang semuanya mengompilasi:
+#
+#     case .uncertain: device.play(.success)      swift-ui-lint.sh LULUS
+#     case .uncertain: <efek yang sama>           swift-ui-lint.sh LULUS
+#
+# Dua keadaan, **nol** yang berbunyi. Dan dua salinan berarti memperbaiki satu
+# tidak memperbaiki yang lain.
+#
+# Kenapa Aturan 38/42 tidak menangkapnya: tidak ada properti bernama di model
+# untuk ditambat. Yang salah adalah **isi `switch`** di dalam fungsi berbadan
+# banyak-pernyataan.
+#
+# Perbaikannya struktural, sama seperti Aturan 46: pemetaannya dipindah ke
+# `HapticPolicy` (PointingKit, diuji `HapticPolicyTests` di Linux), dan kedua
+# `Apps/` hanya menerjemahkan pola ke API platform masing-masing.
+#
+# Yang TIDAK diklaim: ini sapu teks atas `case .<peristiwa>:` yang ditulis
+# **langsung** di berkas yang memainkan getaran. Pemetaan yang disembunyikan di
+# balik fungsi helper tidak terlihat — itulah sebabnya uji di PointingKit ikut
+# menahan nilai kembaliannya, bukan cuma bentuk kodenya.
+echo "== Aturan 47: getaran ragu tidak dipilih sendiri di Apps/ =="
+rakitan47=$(python3 - <<'PY' 2>&1
+import os, re
+
+#: Berkas yang benar-benar memainkan getaran. Di luar ini, `case .uncertain:`
+#: bisa sah (mis. lencana keraguan di complication), jadi jangan menuduh.
+BERKAS = re.compile(r"Haptic")
+
+#: Pola yang berarti "Apps/ memilih sendiri pola untuk sebuah peristiwa".
+#: `case .x:` di dalam `switch` atas `HapticEvent` adalah bentuknya; begitu
+#: juga pencocokan langsung `event == .x` yang memilih efek.
+POLA = re.compile(
+    r"case\s+\.(lockSucceeded|uncertain|sensorUnavailable|returnedToIdle)\s*:"
+    r"|==\s*\.(lockSucceeded|uncertain|sensorUnavailable|returnedToIdle)\b"
+)
+
+#: Penanda bahwa keputusan sudah didelegasikan — badan yang memakai
+#: `HapticPolicy` boleh (dan memang harus) menyebut peristiwa.
+#:
+#: **Tidak dipakai sebagai jalan keluar.** Versi pertama aturan ini melewati
+#: seluruh berkas bila `HapticPolicy.pattern` muncul di mana pun di dalamnya.
+#: Harness membuktikan itu salah: berkas yang mendelegasikan di satu tempat dan
+#: memutuskan sendiri di tempat lain tetap hijau — persis kelas cacat yang
+#: aturan ini klaim tutup. Karena itu tidak ada lagi jalan keluar per-berkas;
+#: yang diperiksa adalah **barisnya**, dan `switch` atas pola memakai nama
+#: `completed`/`unsettled`/`failed`/`tick`, yang tidak cocok dengan pola di
+#: bawah. Tidak perlu pengecualian.
+
+masalah = []
+diperiksa = 0
+berkas_dilihat = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift") or not BERKAS.search(name):
+            continue
+        berkas_dilihat += 1
+        path = os.path.join(root, name)
+        kode = open(path, encoding="utf-8").read()
+        # Buang komentar: doc-comment yang mengutip bentuk lama (seperti di
+        # `HapticEngine.swift`) tidak boleh memicu aturan ini.
+        buf = []
+        for baris in kode.split("\n"):
+            if "//" in baris:
+                baris = baris.split("//", 1)[0]
+            buf.append(baris)
+        kode = "\n".join(buf)
+        for i, baris in enumerate(kode.split("\n"), 1):
+            bersih = baris.strip()
+            if bersih.startswith("///") or bersih.startswith("*") or '"' in bersih:
+                continue
+            if not POLA.search(bersih):
+                continue
+            diperiksa += 1
+            masalah.append(
+                "  %s:%d: `%s` -- pola getaran per peristiwa dipilih sendiri "
+                "di Apps/. Pakai `HapticPolicy.pattern(for:)` (PointingKit, "
+                "teruji di Linux); berkas ini tidak pernah dibangun "
+                "swift-test.sh." % (path, i, bersih[:90]))
+
+# Fail-closed: aturan yang tidak menemukan satu pun berkas getaran tidak
+# mengukur apa pun. Lebih jujur memerah daripada melaporkan "Bersih" atas nol
+# pembacaan — `Apps/` yang berubah nama cukup untuk membuat aturan ini tidur.
+if berkas_dilihat == 0:
+    print("PERINGATAN: tidak ada berkas getaran yang terbaca di Apps/ -- "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan47" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 47 tidak bisa memutuskan:"
+  echo "$rakitan47"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan47" ]; then
+  echo "$rakitan47"
+  status=1
+else
+  echo "Bersih: pola getaran per peristiwa selalu lewat HapticPolicy."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
