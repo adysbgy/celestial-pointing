@@ -1,3 +1,137 @@
+### Siklus berikutnya (17 Okt 2026 — bunyi "ragu" yang terdengar persis seperti "berhasil", dan nol dari 45 gerbang melihatnya)
+
+Dibuka seperti biasa: `git log` + `gh run`. `main` hijau. Brief menyebut
+FASE A–C sebagai pekerjaan yang belum ada; diperiksa satu per satu dan
+**semuanya sudah terwujud dan ter-gerbang** — complication, katalog string
++ `LocalizationBridge`, izin `NS*UsageDescription` di `project.yml`,
+penanganan izin ditolak (`LocationProvider` memisahkan `.denied` dari
+`.restricted` karena hanya satu yang bisa diperbaiki pengguna), README
+xcodegen/arsitektur/Experiment 1, dan uji tepi-kasus (`BelowHorizonHonesty`,
+`DaylightLock`, `MoonDaylightHonesty`, `PlanetDaylightHonesty`). Jadi yang
+dikerjakan bukan itu, melainkan sapuan: setiap badan pass-through di `Apps/`
+dimutasi, lalu ke-45 aturan dijalankan di proses baru.
+
+Yang paling sunyi yang ditemukan sapuan itu:
+
+    Apps/Shared/AudioCue.swift
+    guard AudioCue.isOn, events.contains(.lockSucceeded) else { return }
+
+### Cacat yang diangkat
+
+Satu baris, dan ia memutuskan **politik PRD**: peristiwa mana yang boleh
+terdengar seperti berhasil. Ia hidup di `Apps/`, yang tidak pernah dibangun
+`swift-test.sh` di Linux.
+
+Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
+mutasi yang semuanya mengompilasi:
+
+    guard ... events.contains(.lockSucceeded) ...    swift-ui-lint.sh LULUS (exit 0)
+    guard ... .lockSucceeded || .uncertain ...       swift-ui-lint.sh LULUS (exit 0)
+    guard ... .uncertain ...                         swift-ui-lint.sh LULUS (exit 0)
+    guard AudioCue.isOn                              swift-ui-lint.sh LULUS (exit 0)
+
+Empat keadaan, **nol** yang berbunyi.
+
+Yang paling berbahaya bukan yang terakhir (bunyi hilang, cukup terlihat),
+melainkan yang kedua: engine ragu berbunyi **persis** seperti engine yakin.
+Bunyi adalah satu-satunya saluran bagi pengguna yang tidak melihat layar —
+tepat pengguna yang audio ini dibuat untuknya — jadi tidak ada teks di layar
+yang bisa membantahnya. Itu false confidence yang dilarang PRD, dalam bentuk
+yang tidak bisa dibaca siapa pun dari UI.
+
+Yang ketiga menguji arah sebaliknya: pemilihan yang **hanya** membunyikan
+keraguan. Bunyi setiap kali engine tidak yakin, diam setiap kali ia yakin —
+kebalikan sempurna dari yang dimaksud, dan sama sunyinya.
+
+### Kenapa Aturan 38/42 tidak menangkapnya
+
+Keduanya menurunkan permukaan yang **namanya ada sebagai anggota model**
+(`var X: Bool { satu ekspresi }`) lalu menuntut badannya "menyebut faktanya".
+`play(_:)` adalah fungsi berbadan banyak-pernyataan yang menerima daftar
+peristiwa; tidak ada nama permukaan untuk ditambat. Dan yang salah bukan
+"apakah `lockSucceeded` disebut" — melainkan **aturan pemilihan**-nya.
+
+### Perbaikan: struktural, bukan daftar baru
+
+- `AudioEventPolicy` (PointingKit): peristiwa audible jadi fungsi murni
+  (`shouldPlay(events:isAudioEnabled:)`, `isAudible(_:)`), diuji 9 uji di
+  Linux. Saklar `AudioCue.isOn` **tidak** ikut dipindah — ia `UserDefaults`,
+  sama seperti `NightMode.isOn`; yang dipindah hanya pemilihan peristiwanya.
+- `AudioCueEngine.play` hanya meneruskan daftar peristiwa + saklar.
+- **Aturan 46** (`swift-ui-lint.sh`) menutup sisi `Apps/`: pemilihan peristiwa
+  audible tidak boleh ditulis sendiri di sana. Fail-closed bila `Apps/` tak
+  terbaca.
+
+### Batas yang dinyatakan, bukan disembunyikan
+
+Aturan 46 adalah sapu teks atas pemilihan yang **ditulis langsung**
+(`contains(.lockSucceeded)`, `== .lockSucceeded`, `contains(.uncertain)`).
+Badan yang **menghapus** pemilihan (`guard AudioCue.isOn else { return }`,
+`return`) sengaja **tidak** dituntut memerahkannya: menuntut sapu teks
+berbunyi pada badan yang tidak menyebut peristiwa apa pun berarti menuntutnya
+menebak, dan satu-satunya cara memuaskannya adalah pola selebar `if` — yang
+lalu menuduh setiap percabangan sah di `Apps/`.
+
+Kedua keadaan itu tetap dibuktikan, di tempat yang mengukur perilakunya:
+`AudioEventPolicyTests` merah pada keduanya. Dua kelas cacat, dua penjaga —
+bunyi-hilang dijaga **uji**, pemilihan-salah-di-`Apps/` dijaga **sapu teks**.
+
+### Bukti, bukan klaim
+
+    mutasi audibleEvents += .uncertain      -> AudioEventPolicyTests MERAH (5/9)
+    mutasi audibleEvents = []               -> AudioEventPolicyTests MERAH (5/9)
+    hapus gerbang saklar                    -> AudioEventPolicyTests MERAH (1/9)
+    pohon produksi apa adanya               -> HIJAU
+    bentuk lama / ragu / hanya-ragu di Apps/ -> Aturan 46 MERAH
+    versi tanpa pola Aturan 46              -> tidak berbunyi pada keadaan yang sama
+
+### Cacat kedua, ketahuan sebelum push
+
+`Tools/check-jangkar-harness.py` **merah pada `HEAD` bersih** — bukan karena
+perubahan ini. `bukti-mutasi-pemilih-palet.py` (dari siklus sebelumnya)
+memakai bentuk `STATES` `(label, pengganti, harus_merah)`; `_edit_pairs`
+membaca elemen pertama tuple panjang-3 sebagai **jalur berkas**, dan label
+keadaan bukan jalur — jadi harness itu terhitung "memutasi sumber tetapi
+menyumbang nol jangkar", dan gerbang menolak.
+
+Gerbangnya **tidak** dilonggarkan: ia satu-satunya yang mendeteksi mutasi
+tertinggal dari proses yang di-`SIGKILL`. Bentuk datanya yang disesuaikan ke
+`(path, find, replace)`. Hasil: 357 jangkar, tidak ada mutasi tertinggal.
+
+Harness baru saya sempat melakukan kesalahan yang sama (bentuk
+`(label, (find, replace), harus_merah)`), dan juga sempat memakai pengganti
+`""` untuk satu keadaan — `check-jangkar-harness` membacanya sebagai mutasi
+bocor, karena ia tidak bisa membedakan "sengaja menghapus" dari "lupa
+memulihkan". Diganti pengganti non-kosong yang **tetap terlihat di sumber**.
+
+### Verifikasi
+
+    ./swift-test.sh                     PointingKit 885, 0 gagal (876 + 9 baru)
+    ./swift-ui-lint.sh                  SEMUA GERBANG UI LULUS (46 aturan)
+    ./swift-typecheck.sh                SEMUA GERBANG LULUS
+    bukti-mutasi-suara-lint.py          8 keadaan, semuanya sesuai harapan
+    bukti-mutasi-suara.py               5 keadaan, md5 pulih persis
+    bukti-mutasi-pemilih-palet.py       0 tidak sesuai harapan (bentuk STATES diperbaiki)
+    check-harness-terdaftar.py          89 harness, semuanya dirujuk
+    check-jangkar-harness.py            357 jangkar, tidak ada mutasi tertinggal
+    Apple Build (macos-15)              hijau — Apps/ benar-benar dikompilasi
+
+### Yang TIDAK diklaim
+
+- Aturan 46 tetap **sapu teks**. Pemilihan yang disembunyikan di balik fungsi
+  helper atau variabel perantara di `Apps/` tidak terlihat. Itu sebabnya uji di
+  PointingKit ikut menahan **nilai kembaliannya**, bukan cuma bentuknya.
+- `AudioCue.isOn` sendiri (baca/tulis `UserDefaults`) tetap di `Apps/` dan
+  tetap tidak diuji di Linux — yang dipindah hanya pemilihan peristiwanya.
+- Ini **tidak** mengubah bunyi pada pohon yang benar: `.lockSucceeded` tetap
+  satu-satunya yang berbunyi, persis seperti sebelumnya. Yang berubah adalah
+  bahwa kini ada dua penjaga yang berbunyi bila ia menyimpang.
+- Audio tetap **tidak pernah didengar** di lingkungan ini (tidak ada
+  perangkat/audio di VPS). Yang dibuktikan adalah **keputusan** kapan ia
+  berbunyi, bukan bahwa nada 880 Hz terdengar baik di jam.
+
+---
+
 ### Siklus berikutnya (17 Okt 2026 — saklar mode malam memilih palet untuk 26 situs, dan nol dari 44 gerbang melihatnya)
 
 Dibuka seperti biasa: `git log` + `gh run`. `main` hijau (Apple Build `dd0c1a5`),
