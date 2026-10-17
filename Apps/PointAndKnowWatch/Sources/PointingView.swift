@@ -782,7 +782,7 @@ struct PulsingCelestialVisual: View {
             // di Linux, jadi keputusan ini tidak bergantung pada daftar jenis
             // lokal yang bisa basi. Dijaga Aturan 21.
             if motion.allowsContinuousMotion && visual.hasPulse {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                TimelineView(.animation(minimumInterval: MotionPolicy.pulseFrameInterval)) { _ in
                     CelestialVisualView(visual: visual,
                                         diameter: diameter,
                                         isConfirmed: isConfirmed,

@@ -176,7 +176,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 897**.
+Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 902**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **47 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **48 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -368,6 +368,31 @@ keputusan engine — menuntut mereka menyebut anggota model berarti menuduh kode
 yang benar, dan gerbang yang menuduh kode benar akan dilonggarkan orang.
 `confirmsDisplayedIdentity` ikut tercakup walau namanya tidak ada di model,
 karena penamaan sisi UI-nya sengaja berbeda dari `confirmsIdentity`.
+
+Aturan 48 menutup kelas yang **saya sendiri** buat di siklus yang sama.
+Angka pop saat kunci (`response: 0.42`, `dampingFraction: 0.82`, jeda `0.08`,
+skala `1.04`) ditulis terpisah di jam dan iPhone; saya memindahkannya ke
+`MotionPolicy.LockArrival` — lalu mengukur apakah pemindahan itu dijaga
+sesuatu. Jawabannya tidak: `.spring(response: 0.90, dampingFraction: 0.30)`
+dengan skala puncak `1.60` di `PointingView.swift` tetap membuat **seluruh
+gerbang yang ada saat itu lulus**. Angka yang dipindah ke paket tidak menutup apa pun selama
+`Apps/` masih boleh menulis angkanya sendiri; uji di Linux menahan **nilai** di
+model, dan hanya gerbang yang bisa menahan bahwa view benar-benar membacanya.
+
+Saluran kedua ditemukan dengan sapuan yang sama dan umurnya lebih panjang:
+`TimelineView(.animation(minimumInterval: 1.0 / 30.0))` di tiga layar. Angka
+itu bukan angka tampilan — `TimelineView` menyegarkan **seluruh** `Canvas`,
+jadi setiap frame menggambar ulang planet, pita, cincin, dan kabut yang
+pikselnya tidak berubah. Di jam tangan itu baterai. Mengubahnya jadi
+`1.0 / 60.0` juga membuat seluruh gerbang yang ada saat itu lulus.
+
+Karena itu Aturan 48 menyapu tiga bentuk yang **ditulis langsung**:
+`minimumInterval: <angka>`, `.spring(response: <angka>)`, dan
+`dampingFraction: <angka>`. Batasnya dinyatakan: angka yang lewat variabel
+perantara (`let r = 0.42; .spring(response: r)`) atau dirakit fungsi helper
+tidak terlihat — itu sebabnya `LockArrivalMotionTests` dan
+`PulseFrameRateTests` menahan nilai di model, sementara aturan ini menahan
+**dari mana** `Apps/` mengambilnya. Dua penjaga, dua kelas.
 
 ### Uji harus pernah merah
 

@@ -131,7 +131,7 @@ struct OnboardingView: View {
     private var onboardingVisual: some View {
         let illustration = CelestialVisual(kind: .star, relativeSize: 0.72)
         if !reduceMotion && illustration.hasPulse {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+            TimelineView(.animation(minimumInterval: MotionPolicy.pulseFrameInterval)) { _ in
                 CelestialVisualView(visual: illustration,
                                     diameter: VisualImageMetrics.onboardingIllustrationDiameter,
                                     isConfirmed: true,

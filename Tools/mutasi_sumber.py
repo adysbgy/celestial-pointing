@@ -182,13 +182,26 @@ def write_source(path, content):
     `content` boleh `str` atau `bytes`. `os.replace` dalam satu direktori itu
     atomik, jadi pembaca (proses baru yang menjalankan prob) hanya pernah
     melihat versi lama atau versi baru — tidak pernah yang di antaranya.
+
+    **Mode berkas dipertahankan.** `open(tmp, "wb")` membuat berkas baru dengan
+    mode 0644, jadi memutasi `swift-ui-lint.sh` (0755) lewat sini akan
+    menghapus bit eksekusinya dan harness berikutnya gagal dengan
+    `PermissionError` — bukan dengan temuan, yang jauh lebih menyesatkan.
+    Ditemukan oleh `bukti-mutasi-gerak-angka.py`, satu-satunya harness yang
+    memutasi skrip shell, bukan `.swift`.
     """
     data = content.encode("utf-8") if isinstance(content, str) else content
+    try:
+        mode = os.stat(path).st_mode
+    except OSError:
+        mode = None
     tmp = path + ".tmp-mutasi"
     with open(tmp, "wb") as handle:
         handle.write(data)
         handle.flush()
         os.fsync(handle.fileno())
+    if mode is not None:
+        os.chmod(tmp, mode)
     os.replace(tmp, path)
 
 

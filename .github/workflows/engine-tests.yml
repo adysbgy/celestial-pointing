@@ -1470,6 +1470,20 @@ jobs:
       - name: Buktikan uji kebijakan getaran merah pada pemetaan yang menyimpang
         run: python3 Tools/bukti-mutasi-getaran.py
 
+      # Aturan 48: angka gerak (interval `TimelineView` dan bentuk pegas pop
+      # saat kunci) tidak ditulis sendiri di Apps/.
+      #
+      # Kenapa ini butuh bukti sendiri. Aturan itu lahir dari pengukuran, dan
+      # dua keadaan cacatnya **terukur hijau** pada 47 aturan sebelumnya:
+      # `.spring(response: 0.90, dampingFraction: 0.30)` di jam, dan
+      # `minimumInterval: 1.0 / 60.0` di iPhone. Keduanya mengompilasi, jadi
+      # Apple Build pun tidak akan berbunyi. Yang paling penting: keadaan
+      # **kontrol** di harness ini (komentar, variabel perantara, TimelineView
+      # periodik 30 detik) wajib HIJAU — tanpa mereka, aturan yang melaporkan
+      # setiap baris Apps/ akan lulus semua keadaan cacat.
+      - name: Buktikan Aturan 48 berbunyi pada angka gerak yang ditulis di Apps/
+        run: python3 Tools/bukti-mutasi-gerak-angka.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

@@ -815,7 +815,7 @@ struct DiagnosticsView: View {
                 // `hasPulse` diuji di Linux, jadi keputusan ini tidak
                 // bergantung pada ingatan orang yang sedang menulis di view.
                 if motion.allowsContinuousMotion && visual.hasPulse {
-                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                    TimelineView(.animation(minimumInterval: MotionPolicy.pulseFrameInterval)) { _ in
                         content(pulse: pulse)
                     }
                 } else {

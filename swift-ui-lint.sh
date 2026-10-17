@@ -7939,6 +7939,107 @@ else
   echo "Bersih: pola getaran per peristiwa selalu lewat HapticPolicy."
 fi
 
+# ── Aturan 48: angka gerak tidak boleh ditulis sendiri di Apps/ ─────────────
+#
+# Kembar dari Aturan 45/46/47, tetapi cacatnya **terukur di dua saluran
+# sekaligus** dan satu di antaranya saya sendiri yang menciptakannya.
+#
+# Saluran pertama: `TimelineView(.animation(minimumInterval: 1.0 / 30.0))`
+# ditulis tangan di tiga layar. Angka itu bukan angka tampilan — `TimelineView`
+# menyegarkan **seluruh** `Canvas`, jadi setiap frame menggambar ulang planet,
+# pita, cincin, dan kabut yang pikselnya tidak berubah. Di jam tangan, itu
+# baterai; di iPhone, CPU untuk satu titik cahaya. Terukur pada salinan utuh
+# (proses baru), dengan mutasi yang mengompilasi:
+#
+#     1.0 / 30.0  ->  1.0 / 60.0   di DiagnosticsView.swift
+#     swift-ui-lint.sh LULUS (exit 0)
+#
+# Saluran kedua: `withAnimation(.spring(response: 0.42, dampingFraction:
+# 0.82))` — angka pop saat kunci. Ini **umpan balik bahwa identifikasi
+# berhasil**, dan ia ditulis terpisah di jam dan iPhone. Siklus yang menulis
+# aturan ini memindahkan angkanya ke `MotionPolicy.LockArrival`, lalu mengukur
+# apakah pemindahan itu dijaga sesuatu:
+#
+#     .spring(response: 0.90, dampingFraction: 0.30) + appearScale = 1.60
+#     di PointingView.swift            swift-ui-lint.sh LULUS (exit 0)
+#
+# Nol dari 47 aturan. Yang membuatnya layak ditutup: pemindahan angka ke
+# `PointingKit` **tidak menutup apa pun** kalau `Apps/` masih boleh menulis
+# angkanya sendiri. Uji di Linux menahan nilai di model; hanya gerbang yang
+# bisa menahan bahwa view benar-benar membacanya.
+#
+# Yang TIDAK diklaim: ini sapu teks atas dua bentuk yang **ditulis langsung**.
+# Angka yang lewat variabel perantara (`let r = 0.42; .spring(response: r)`)
+# atau yang dirakit fungsi helper tidak terlihat. Itu sebabnya uji
+# `LockArrivalMotionTests`/`PulseFrameRateTests` menahan **nilai** di model,
+# sementara aturan ini menahan **dari mana** `Apps/` mengambilnya.
+echo "== Aturan 48: angka gerak tidak ditulis sendiri di Apps/ =="
+rakitan48=$(python3 - <<'PY' 2>&1
+import os, re
+
+#: Dua bentuk angka gerak yang dimiliki `MotionPolicy`:
+#:   - interval penyegar `TimelineView` (ongkos baterai)
+#:   - bentuk pegas `withAnimation` (umpan balik "kunci berhasil")
+POLA = [
+    (re.compile(r"minimumInterval\s*:\s*[0-9]"),
+     "interval `TimelineView` ditulis sebagai angka",
+     "`MotionPolicy.pulseFrameInterval`"),
+    (re.compile(r"\.spring\s*\(\s*response\s*:\s*[0-9]"),
+     "bentuk pegas `.spring(response:)` ditulis sebagai angka",
+     "`MotionPolicy.LockArrival`"),
+    (re.compile(r"dampingFraction\s*:\s*[0-9]"),
+     "redaman `.spring(dampingFraction:)` ditulis sebagai angka",
+     "`MotionPolicy.LockArrival`"),
+]
+
+masalah = []
+berkas_dilihat = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = open(path, encoding="utf-8").read()
+        # Buang komentar: docstring yang mengutip bentuk lama tidak boleh
+        # memicu aturan ini. (Siklus lalu: Aturan 45 sempat menuduh dirinya
+        # sendiri karena membaca komentarnya sendiri.)
+        buf = []
+        for baris in kode.split("\n"):
+            if "//" in baris:
+                baris = baris.split("//", 1)[0]
+            buf.append(baris)
+        kode = "\n".join(buf)
+        berkas_dilihat += 1
+        for i, baris in enumerate(kode.split("\n"), 1):
+            for pola, sebab, saran in POLA:
+                if pola.search(baris):
+                    masalah.append(
+                        "  %s:%d: %s -- pakai %s (PointingKit, teruji di "
+                        "Linux); berkas ini tidak pernah dibangun "
+                        "swift-test.sh." % (path, i, sebab, saran))
+
+# Fail-closed: nol berkas terbaca berarti aturan ini tidak mengukur apa pun.
+# `Apps/` yang berubah nama cukup untuk membuatnya tidur.
+if berkas_dilihat == 0:
+    print("PERINGATAN: tidak ada berkas Apps/ yang terbaca -- aturan ini "
+          "tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan48" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 48 tidak bisa memutuskan:"
+  echo "$rakitan48"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan48" ]; then
+  echo "$rakitan48"
+  status=1
+else
+  echo "Bersih: angka gerak selalu lewat MotionPolicy."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

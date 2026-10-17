@@ -72,6 +72,36 @@ public struct MotionPolicy: Equatable, Sendable {
     /// tidak akan pernah bisa diuji di Linux.
     public static let pulseRateRadiansPerSecond: Double = 1.1
 
+    /// Berapa kali per detik gambar berdenyut disegarkan.
+    ///
+    /// **Kenapa ini ada di sini, padahal ia bukan soal rasa.** `TimelineView`
+    /// menyegarkan `Canvas` **seluruhnya**, bukan hanya bintangnya: setiap
+    /// frame menggambar ulang planet, pita, cincin, dan kabut yang pikselnya
+    /// tidak berubah. Angka ini adalah ongkos baterai jam tangan, dan ia
+    /// ditulis tangan di **tiga** layar:
+    ///
+    ///     Apps/PointAndKnowWatch/Sources/PointingView.swift:785
+    ///     Apps/Shared/OnboardingView.swift:134
+    ///     Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift:818
+    ///
+    /// Ketiganya `1.0 / 30.0`. Menaikkan satu di antaranya ke 60 membuat layar
+    /// itu menggambar dua kali lebih sering — dan **tidak ada satu pun dari 47
+    /// aturan UI yang berbunyi**, terukur: mutasi `1.0 / 30.0` → `1.0 / 60.0`
+    /// di `DiagnosticsView.swift` menghasilkan `SEMUA GERBANG UI LULUS`
+    /// (exit 0). Di jam tangan, itu jam yang lebih cepat habis untuk gerak
+    /// yang sama; di iPhone, itu CPU yang menyala untuk satu titik cahaya.
+    ///
+    /// **Yang TIDAK diklaim.** 30 fps bukan angka yang diukur dari perangkat;
+    /// ia angka yang sudah dipakai repo ini. Yang dijamin uji adalah bahwa
+    /// **interval** yang dipakai `TimelineView` benar-benar kebalikan dari
+    /// laju ini — angka yang saling bertentangan di dua tempat adalah angka
+    /// yang tidak bisa dibaca siapa pun.
+    public static let pulseFrameRateHertz: Double = 30
+
+    /// Interval antar-frame untuk `TimelineView(.animation(minimumInterval:))`,
+    /// dalam detik. Turunan dari `pulseFrameRateHertz`, bukan angka kedua.
+    public static var pulseFrameInterval: Double { 1.0 / pulseFrameRateHertz }
+
     /// Fase yang dikirim ke **gambar statis** — ilustrasi, bukan pandangan.
     ///
     /// **Kenapa ini ada, padahal nilainya nol.** Tiga pemanggil
