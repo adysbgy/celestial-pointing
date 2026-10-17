@@ -1379,6 +1379,24 @@ jobs:
       - name: Buktikan Aturan 38 berbunyi pada permukaan kejujuran yang menyimpang
         run: python3 Tools/bukti-mutasi-permukaan-jujur.py
 
+      # Aturan 42 mengawal **saudara yang bertipe lain** dari ketiga permukaan
+      # di atas: `displayedObject`, `pointing`, dan `answeredIntent` semuanya
+      # `Optional`, jadi badan `var x: Bool { ... }` milik Aturan 38 tidak
+      # pernah mencocokkan badannya.
+      #
+      # Terukur pada pohon sebelum aturan itu ada (salinan utuh, proses baru,
+      # `Apps/` + `Packages/` dibawa), dengan mutasi yang **mengompilasi**:
+      # keempat bentuk di bawah membiarkan seluruh 41 aturan lulus (exit 0).
+      # `displayedObject -> lastLockedObject` adalah yang paling berbahaya:
+      # jam, panel iPhone, layar redup, dan Diagnostics serentak menyatakan
+      # objek terakhir terkunci sebagai jawaban **sekarang** — pelanggaran
+      # paling keras PRD, tanpa satu pun gerbang berbunyi.
+      #
+      # Harness ini menguji **ketiga** permukaan, lima keadaan masing-masing,
+      # tiga bentuk sah, dan sembilan pengukuran non-vakuositas.
+      - name: Buktikan Aturan 42 berbunyi pada permukaan bukan-Bool yang menyimpang
+        run: python3 Tools/bukti-mutasi-permukaan-nilai.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:
