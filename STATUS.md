@@ -25627,6 +25627,84 @@ Uji baru: `testNeutralStarColourIsActuallyAchromatic`,
   adalah jangkarnya, dan sekaligus ditambah keadaan 4 yang membuktikan gerbang
   akromatik baru tidak hampa.
 
+## Siklus 17 Okt #273 — bintang yang berdenyut di semua layar kecuali layar pertama
+
+### Cacat yang ditutup
+
+`CelestialVisual.hasPulse` menyatakan bintang satu-satunya jenis gambar
+yang berdenyut, dan ia diuji di Linux. Dua layar mematuhinya: jam
+(`PointingView`) dan panel iPhone (`DiagnosticsView`) sama-sama menulis
+`pulse: visual.hasPulse ? fase : 0`, masing-masing di cabang beranimasi
+dan cabang diam.
+
+Pemanggil **ketiga** — ilustrasi di `OnboardingView` — tidak menulis
+`pulse:` sama sekali. Nilai bakunya `0`, jadi ilustrasi itu diam tanpa
+ada keputusan yang pernah diambil. Ilustrasinya adalah
+`CelestialVisual(kind: .star, …)`: **layar pertama yang dilihat
+pengguna** adalah satu-satunya tempat glow bintang tidak bergerak.
+
+### Kenapa tidak ada gerbang yang berbunyi
+
+Aturan 21 mengukur isi argumen `pulse:` (dinegasikah, terbalik, tanpa
+`hasPulse`) dan ia melakukannya dengan baik. Tetapi di pemindainya ada
+`if value is None or value in MATI: continue` — pemanggil yang **tidak
+menyebut** `pulse:` tidak pernah sampai ke sana. Bentuk kelalaian yang
+paling mungkin justru bentuk yang tidak dibacanya, dan itu bukan
+kelemahan implementasinya: tanpa pelacakan aliran, "tidak menyebut
+`pulse:`" tidak bisa dibedakan dari "diam karena diminta".
+
+### Yang ditambahkan
+
+- `MotionPolicy.staticPulsePhase` (PointingKit): satu nilai untuk
+  "gambar ini statis". Sebelumnya tiga jalur denyut-mati menulis `0`
+  masing-masing di layar yang berbeda; nilai yang berbeda di antaranya
+  tidak bisa terdeteksi.
+- Ilustrasi onboarding kini berdenyut lewat `MotionPolicy` yang sama
+  dengan jam dan iPhone (gerbang `hasPulse`), dan berhenti tepat nol saat
+  reduksi gerak — layar itu sebelumnya tidak membaca `reduceMotion`
+  sama sekali.
+- **Aturan 40** (`swift-ui-lint.sh`): setiap `CelestialVisualView(`
+  wajib menyebut fase yang dikirimnya. Diam yang sah ditulis
+  `MotionPolicy.staticPulsePhase`; yang berdenyut ditulis dengan gerbang
+  `hasPulse`. Nol pemanggilan terbaca = GAGAL (fail-closed).
+- Aturan 21 mengenal `staticPulsePhase` sebagai nilai mati — bukan
+  kelonggaran, tetapi supaya "sengaja diam" dan "lupa" tidak lagi
+  dilaporkan sebagai satu keadaan.
+
+### Bukti (bukan klaim)
+
+- Uji ditulis **sebelum** propertinya ada, dan merah dengan galat yang
+  tepat: `type 'MotionPolicy' has no member 'staticPulsePhase'` (3 kali).
+  Satu uji menautkan `staticPulsePhase` dengan `pulsePhase` saat ditolak,
+  jadi dua jalur "denyut mati" tidak bisa menyimpang angka.
+- Probe pra-aturan dijalankan, bukan disangka: `pulse: 0` disuntikkan ke
+  pemanggil onboarding → Aturan 21 **hijau**, `/tmp` seluruh lint exit 0.
+- Aturan 21 **berbunyi pada perbaikan saya sendiri** (empat temuan),
+  termasuk pemanggilan di `onboardingVisual` yang belum dipakai. Itu
+  gerbangnya bekerja; yang salah kode saya.
+- `./swift-test.sh`: CelestialEngine + PointingKit **845** hijau (dari
+  843). Lint **40 aturan** hijau; Aturan 10 menuntut README diperbarui
+  (843→845, 39→40 aturan) — keduanya diperbarui.
+
+### Yang TIDAK diklaim
+
+- Tampilan denyut **belum pernah dilihat** di perangkat: tidak ada Xcode
+  di VPS. Yang diklaim angka fase benar dan kode terkompilasi di macOS.
+- Aturan 40 membaca **teks** pemanggilan `CelestialVisualView(`. Gambar
+  yang dihasilkan fungsi pembangun di berkas lain tidak terbaca; bentuk
+  itu belum ada hari ini dan tidak diklaim tertutup.
+
+### Pelajaran
+
+- **Gerbang yang memeriksa keberadaan sebuah argumen tidak melihat
+  ketiadaannya.** `if value is None: continue` adalah baris yang
+  menjadikan seluruh aturan itu buta pada kelas yang paling sering
+  terjadi — dan baris itu terlihat benar saat dibaca, karena yang
+  dipikirkannya adalah "argumen opsional yang tidak ditulis".
+- Aturan baru harus dijalankan pada **perbaikan yang sedang dibuat**, bukan
+  hanya pada cacat lama. Empat temuan Aturan 21 di pohon yang baru saya
+  sunting muncul dari itu.
+
 ## Siklus 16 Okt (siang) #272 — aplikasi astronomi tanpa langit (DIKIRIM, HIJAU)
 
 ### Cacat yang ditutup

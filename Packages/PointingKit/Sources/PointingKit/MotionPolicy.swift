@@ -72,6 +72,30 @@ public struct MotionPolicy: Equatable, Sendable {
     /// tidak akan pernah bisa diuji di Linux.
     public static let pulseRateRadiansPerSecond: Double = 1.1
 
+    /// Fase yang dikirim ke **gambar statis** — ilustrasi, bukan pandangan.
+    ///
+    /// **Kenapa ini ada, padahal nilainya nol.** Tiga pemanggil
+    /// `CelestialVisualView` di `Apps/` memutuskan denyut dengan cara yang sama
+    /// persis, dan dua di antaranya menulis keputusan itu satu kali per
+    /// cabang. Pemanggil ketiga — ilustrasi onboarding — tidak menulis
+    /// `pulse:` sama sekali, jadi ia menerima nilai baku `0` **tanpa
+    /// keputusan**. Ilustrasinya adalah bintang, dan bintang satu-satunya jenis
+    /// yang berdenyut menurut `CelestialVisual.hasPulse`; hasilnya, layar
+    /// pertama yang dilihat pengguna adalah satu-satunya tempat glow bintang
+    /// diam.
+    ///
+    /// **Kenapa di sini, bukan di gerbang sapu.** Aturan 40 menuntut setiap
+    /// pemanggil menyebut fase yang dikirimnya, dan itu cukup untuk membuat
+    /// kelalaian terlihat. Yang tidak bisa dijawab gerbang teks: **nilai apa**
+    /// yang benar untuk gambar statis. Menulis `0` di setiap layar berarti
+    /// keputusan yang sama ditulis tiga kali, dan nilai yang berbeda di antara
+    /// ketiganya tidak akan terdeteksi — gambar yang sama bisa tampak berbeda
+    /// di onboarding dan di layar redup tanpa satu pun uji berbunyi.
+    ///
+    /// Nilainya **identik** dengan `pulsePhase` saat gerak ditolak, dan itu
+    /// dijaga uji, bukan hanya dikomentari.
+    public static let staticPulsePhase: Double = 0
+
     /// Fase denyut untuk waktu yang sudah lewat, dalam radian.
     ///
     /// Mengembalikan **tepat nol** saat gerak kontinu tidak boleh berjalan,

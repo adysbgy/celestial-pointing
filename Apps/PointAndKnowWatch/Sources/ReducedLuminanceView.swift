@@ -63,7 +63,12 @@ struct ReducedLuminanceView: View {
                     CelestialVisualView(visual: visual,
                                         diameter: WatchMetrics.reducedVisualDiameter,
                                         isConfirmed: engine.confirmsDisplayedIdentity,
-                                        pulse: 0)
+                                        // Diam karena layar redup, dan nilainya
+                                        // konstanta model — bukan `0` yang
+                                        // ditulis ulang di sini, supaya layar
+                                        // redup dan ilustrasi onboarding tidak
+                                        // bisa berbeda angka.
+                                        pulse: MotionPolicy.staticPulsePhase)
                 }
                 // Nama objek: satu-satunya informasi yang paling mungkin dicari
                 // pengamat saat layar redup.

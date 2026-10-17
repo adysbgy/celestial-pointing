@@ -147,4 +147,57 @@ final class MotionPolicyTests: XCTestCase {
             XCTAssertEqual(p.pulsePhase(elapsedSeconds: 12.34), a)
         }
     }
+
+    // MARK: - Satu entri untuk setiap `CelestialVisualView`
+
+    /// Fase yang boleh dikirim ke **gambar statis** (ilustrasi onboarding).
+    ///
+    /// **Cacat yang ditutup.** Selama ini dua layar memutuskan denyut sendiri
+    /// dengan menulis `pulse: visual.hasPulse ? fase : 0`, sementara
+    /// `OnboardingView` — pemanggil ketiga — tidak menulis `pulse:` sama
+    /// sekali dan diam-diam mendapat nilai baku `0`. Ilustrasinya adalah
+    /// **bintang**, dan menurut `CelestialVisual.hasPulse` bintanglah
+    /// satu-satunya jenis yang berdenyut. Jadi layar pertama yang dilihat
+    /// pengguna adalah satu-satunya tempat glow bintang tidak bergerak.
+    ///
+    /// **Kenapa ini hidup di model, bukan di gerbang sapu.** Aturan 21 hanya
+    /// membaca argumen `pulse:` yang **ada**; ia melewati pemanggil yang tidak
+    /// menulisnya (`value is None: continue`), jadi bentuk kelalaian yang
+    /// persis ini tidak bisa dilihatnya tanpa pelacakan aliran. Yang bisa
+    /// dijawab dengan pasti di sini: gambar statis tidak boleh berdenyut,
+    /// betapa pun jenisnya.
+    ///
+    /// Dijaga `Aturan 40` di `swift-ui-lint.sh`: setiap `CelestialVisualView`
+    /// di `Apps/` wajib menyebut fase yang dikirimnya — nilai ini untuk gambar
+    /// statis, atau `hasPulse ? … : 0` untuk yang berdenyut.
+    func testStaticPulsePhaseIsExactlyTheDeniedPhase() {
+        // Nilainya harus sama dengan apa yang dikembalikan `pulsePhase` saat
+        // gerak ditolak. Alasannya tampilan, bukan estetika: dua jalur "denyut
+        // mati" yang menghasilkan angka berbeda berarti gambar yang sama bisa
+        // tampak berbeda di onboarding dan di layar redup — selisih yang tidak
+        // bisa dijelaskan siapa pun yang melihatnya.
+        for p in [policy(reduceMotion: true), policy(reduced: true),
+                  policy(active: false)] {
+            XCTAssertEqual(MotionPolicy.staticPulsePhase,
+                           p.pulsePhase(elapsedSeconds: 7.5),
+                           "fase gambar statis harus sama dengan denyut yang ditolak")
+        }
+        XCTAssertEqual(MotionPolicy.staticPulsePhase, 0,
+                       "`staticPulsePhase` bernama nol; apa pun selain nol bukan \"diam\"")
+    }
+
+    /// Ilustrasi onboarding adalah bintang, dan bintang memang berdenyut.
+    ///
+    /// Uji ini menautkan dua fakta supaya keadaan "gambar onboarding adalah
+    /// bintang, tapi bintang di onboarding diam" tidak bisa kembali tanpa
+    /// sesuatu berbunyi. Kalau suatu saat ilustrasinya diganti jadi planet,
+    /// uji ini ikut berubah — dan itu benar: yang dijaga adalah kesesuaian
+    /// antara jenis gambar dan denyutnya, bukan satu jenis tertentu.
+    func testOnboardingIllustrationIsTheOneKindThatPulses() {
+        let illustration = CelestialVisual(kind: .star, relativeSize: 0.72)
+        XCTAssertTrue(illustration.hasPulse,
+                      "ilustrasi onboarding adalah bintang; bintang berdenyut")
+        XCTAssertEqual(MotionPolicy.staticPulsePhase, 0,
+                       "gambar statis tetap diam — denyutnya datang dari pemanggil")
+    }
 }

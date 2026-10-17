@@ -772,7 +772,7 @@ struct PulsingCelestialVisual: View {
                 CelestialVisualView(visual: visual,
                                     diameter: diameter,
                                     isConfirmed: isConfirmed,
-                                    pulse: 0)
+                                    pulse: MotionPolicy.staticPulsePhase)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

@@ -2788,7 +2788,16 @@ import os, re
 
 CALL = "CelestialVisualView("
 # Nilai yang dianggap "denyut mati": pemanggil tidak menggerakkan apa pun.
-MATI = ("0", "0.0", ".zero")
+MATI = ("0", "0.0", ".zero",
+        # Konstanta model untuk gambar statis (`MotionPolicy`), diuji sama
+        # dengan nol di Linux. Ditambahkan bersamaan dengan Aturan 21 awal,
+        # bukan sebagai kelonggaran: tanpa ia, pemanggil yang **sengaja**
+        # memilih diam — ilustrasi onboarding, layar redup — dilaporkan sama
+        # dengan pemanggil yang lupa, dan dua keadaan yang berbeda artinya
+        # dilaporkan sebagai satu. Tiga jalur "denyut mati" dulu menulis `0`
+        # masing-masing; sekarang satu nama dengan satu nilai yang diuji.
+        "MotionPolicy.staticPulsePhase",
+        "staticPulsePhase")
 
 
 def ekspresi_nilai(args):
@@ -6683,6 +6692,110 @@ elif [ -n "$statis_instance" ]; then
   status=1
 else
   echo "Bersih: tidak ada anggota static yang dipanggil pada instance."
+fi
+
+# ── Aturan 40: setiap gambar wajib MENGATAKAN fase yang dikirimnya ──────────
+# Aturan 21 mengukur isi argumen `pulse:` — dinegasikah, terbalik, tanpa
+# `hasPulse`. Ia melewati `pulse:` yang **tidak ada** (`value is None:
+# continue`), dan di celah itulah cacat yang menutup siklus ini hidup:
+#
+#     CelestialVisualView(visual: CelestialVisual(kind: .star, ...),
+#                         diameter: 64,
+#                         isConfirmed: true)          <- tidak ada `pulse:`
+#
+# Ilustrasi onboarding adalah **bintang**, dan `CelestialVisual.hasPulse`
+# menyatakan bintang satu-satunya jenis yang berdenyut. Nilai baku `0` berarti
+# layar pertama yang dilihat pengguna adalah satu-satunya tempat glow bintang
+# diam — dan tidak ada satu pun gerbang yang berbunyi, karena Aturan 21 hanya
+# memeriksa argumen yang ditulis.
+#
+# Aturannya **bukan** "semua harus berdenyut": gambar statis sah, dan tiga
+# pemanggil memang statis. Yang dituntut adalah **keputusan tertulis**. Diam
+# yang ditulis sebagai `MotionPolicy.staticPulsePhase` adalah keputusan; diam
+# yang terjadi karena labelnya lupa adalah kelalaian, dan keduanya sekarang
+# terlihat berbeda — yang pertama hijau, yang kedua merah.
+#
+# Batas yang dinyatakan: ini membaca **teks** pemanggilan `CelestialVisualView(`
+# yang hurufnya persis begitu. Pemanggil yang disimpan di variabel
+# (`let gambar: () -> some View = { CelestialVisualView(...) }`) tidak
+# berbeda — isinya tetap satu token dan dipindai. Yang TIDAK terbaca adalah
+# view yang dibungkus fungsi pembangun di berkas lain; itu tidak ada hari ini
+# dan tidak diklaim tertutup.
+echo
+echo "== Aturan 40: setiap CelestialVisualView menyebut fase denyutnya =="
+fase_hilang=$(python3 - <<'PY' 2>&1
+import os, re
+
+CALL = "CelestialVisualView("
+
+masalah = []
+jumlah = 0
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        # Komentar dibuang: nama `CelestialVisualView` muncul di dokumentasi
+        # cukup sering, dan docstring yang memuatnya bukan pemanggilan.
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        start = 0
+        while True:
+            i = code.find(CALL, start)
+            if i < 0:
+                break
+            j = i + len(CALL)
+            depth = 1
+            while j < len(code) and depth:
+                if code[j] == "(":
+                    depth += 1
+                elif code[j] == ")":
+                    depth -= 1
+                j += 1
+            args = code[i + len(CALL):j - 1]
+            start = j
+            jumlah += 1
+            # `pulse:` pada tingkat atas daftar argumen saja. `pulse:` di dalam
+            # kurung bersarang milik pemanggil lain tidak berlaku untuk
+            # pemanggilan ini.
+            datar, kedalaman = [], 0
+            for ch in args:
+                if ch in "([":
+                    kedalaman += 1
+                elif ch in ")]":
+                    kedalaman -= 1
+                if ch == "," and kedalaman == 0:
+                    datar.append("\n")
+                else:
+                    datar.append(ch)
+            ada = any(re.match(r"\s*pulse\s*:", a) for a in "".join(datar).split("\n"))
+            if not ada:
+                line_no = code[:i].count("\n") + 1
+                masalah.append(
+                    f"  {path}:{line_no}: tidak menyebut `pulse:` — nilainya "
+                    "baku 0, diterima tanpa keputusan")
+
+if jumlah == 0:
+    print("TIDAK ADA satu pun pemanggilan CelestialVisualView( terbaca — "
+          "pembacanya perlu diselaraskan; nol pemanggilan bukan berarti bersih")
+elif masalah:
+    print("\n".join(masalah))
+    print("-> Diam yang sah ditulis `pulse: MotionPolicy.staticPulsePhase`; "
+          "yang berdenyut ditulis `pulse: visual.hasPulse ? fase : 0`.")
+PY
+)
+if printf '%s' "$fase_hilang" | grep -q "Traceback\|^error:"; then
+  echo "Pemeriksaan Aturan 40 gagal dijalankan:"
+  echo "$fase_hilang"
+  echo "-> Aturan ini tidak bisa memutuskan; anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$fase_hilang" ]; then
+  echo "$fase_hilang"
+  echo "   Sebab: nilai baku `pulse:` adalah 0, dan bintang yang diam di"
+  echo "   layar pertama adalah cacat yang tidak bisa dilihat gerbang lain."
+  status=1
+else
+  echo "Bersih: setiap pemanggilan menyebut fase yang dikirimnya."
 fi
 
 if [ "$status" -eq 0 ]; then

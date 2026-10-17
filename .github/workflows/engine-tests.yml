@@ -1109,6 +1109,36 @@ jobs:
       - name: Buktikan gerbang penambat versi lama berbunyi
         run: python3 Tools/bukti-mutasi-anchor-versi-lama.py
 
+      # Dan bukti untuk gerbang **sebutan uji di komentar produksi** — kelas
+      # yang sampai siklus ini baru diukur oleh alat yang **tidak pernah
+      # dijalankan CI**.
+      #
+      # Kalimat "dijaga `testX`" adalah **izin** bagi pembaca berikutnya untuk
+      # membiarkan sebuah angka; `Tools/ukur-uji-menggantung.py` mengukur
+      # keluarganya tetapi tidak dirujuk satu pun langkah alur kerja, dan tidak
+      # bisa: `Apps/` tidak dibangun di Linux, jadi tidak ada uji Swift yang
+      # bisa menegakkannya. Dua gerbang baru kini hidup di
+      # `check-visuals.py --check` (yang memang berjalan di sini): setiap nama
+      # uji yang disebut di **komentar** harus punya definisi, dan sumber yang
+      # dikirim tidak boleh membawa penanda sementara.
+      #
+      # Harness ini menemukan **tiga cacat pembaca**, bukan satu, dan ketiganya
+      # berbentuk sama: pembaca mencetak nama uji tetapi tidak memeriksanya.
+      #
+      #   1. penanda `///` menjadi bagian isi token — seluruh dokumentasi
+      #      `Apps/` (tempat prosa terpadat) lolos tanpa diperiksa;
+      #   2. kutip ganda berpasangan di satu baris membuat pembaca kehilangan
+      #      awal string berikutnya, sehingga teks sesudahnya terbaca sebagai
+      #      komentar — kontrol negatifnya yang merah;
+      #   3. kutip tunggal (literal sah sejak Swift 5.9) tidak dikenal sama
+      #      sekali, jadi teks di dalamnya terbaca sebagai kode.
+      #
+      # Keadaan 8 adalah pengukuran non-vakuositas: pembaca dilumpuhkan, dan
+      # ringkasannya **wajib** merah — tanpa itu, gerbang yang berhenti
+      # mengukur akan terbaca sama dengan gerbang yang tidak menemukan apa-apa.
+      - name: Buktikan gerbang sebutan uji di komentar produksi berbunyi
+        run: python3 Tools/bukti-mutasi-ilusi-cakupan.py
+
       # Setiap harness `bukti-mutasi-*.py` di disk wajib dirujuk alur kerja
       # ini. Gerbang yang tidak pernah dijalankan selalu hijau, dan ia menutupi
       # cacat yang justru ditulisnya untuk menangkap — tanpa jejak apa pun di

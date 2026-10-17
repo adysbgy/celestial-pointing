@@ -23,6 +23,23 @@ struct OnboardingView: View {
     /// status "sudah dilihat" (bukan view ini), supaya view tetap murni UI.
     var onDone: () -> Void
 
+    /// Aturan gerak yang sama dengan layar lain, bukan ambang lokal.
+    ///
+    /// Sebelum ini layar perkenalan tidak membaca `reduceMotion` sama sekali.
+    /// Begitu ilustrasinya berdenyut (yang memang harus — lihat komentar di
+    /// pemanggilan `CelestialVisualView`), keadaan itu berubah dari "tidak
+    /// relevan" menjadi "penyimpangan": pengguna yang meminta reduksi gerak
+    /// akan melihat satu-satunya bintang di app ini berdenyut terus selama
+    /// kartu terbuka. `MotionPolicy` yang sama dipakai jam dan iPhone, jadi
+    /// tidak ada ambang kedua yang bisa berbeda pendapat.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Jam denyut. Di-reset saat berubah dari nol ke bukan-nol tidak perlu:
+    /// kartu ini berumur pendek dan tidak punya `scenePhase` sendiri — layar
+    /// yang menaunginya yang tahu soal itu, dan `MotionPolicy` di sana yang
+    /// memutuskan. Di sini hanya satu fase dari satu titik mula.
+    @State private var pulseStart = Date()
+
     var body: some View {
         ZStack {
             SurfacePalette.appBackground
@@ -60,11 +77,9 @@ struct OnboardingView: View {
                 // diuji. `isConfirmed: true` pada view hanya menyembunyikan
                 // lencana "?", karena lencana itu untuk engine yang ragu,
                 // bukan untuk ilustrasi statis.
-                CelestialVisualView(
-                    visual: CelestialVisual(kind: .star, relativeSize: 0.72),
-                    diameter: 64,
-                    isConfirmed: true)
-                    .accessibilityHidden(true)
+                // Sumber: `onboardingVisual` di bawah. Denyutnya digerbangi
+                // `hasPulse` + `MotionPolicy`, sama seperti jam dan iPhone.
+                onboardingVisual
 
                 Text(TextLocalization.text(.onboardingTitle))
                     .font(.title2.bold())
@@ -101,5 +116,49 @@ struct OnboardingView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(TextLocalization.text(.onboardingLabel))
+    }
+
+    /// Fase denyut untuk ilustrasi — gerbangnya `hasPulse` seperti di jam.
+    ///
+    /// **Kenapa pembungkus `TimelineView` dipilih lewat `if`, bukan dengan
+    /// mengirim fase yang `0`-nya "cukup kecil".** `Canvas` digambar ulang
+    /// setiap kali nilai tangkapannya berubah; `TimelineView` 30 fps di kartu
+    /// perkenalan berarti 30 gambar identik per detik untuk satu titik cahaya.
+    /// Nilai `0` dari `MotionPolicy` sudah tepat nol, tapi **penyegarannya**
+    /// yang membuang baterai, dan itu hanya berhenti kalau penyegarnya tidak
+    /// terpasang.
+    @ViewBuilder
+    private var onboardingVisual: some View {
+        let illustration = CelestialVisual(kind: .star, relativeSize: 0.72)
+        if !reduceMotion && illustration.hasPulse {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { _ in
+                CelestialVisualView(visual: illustration,
+                                    diameter: 64,
+                                    isConfirmed: true,
+                                    // Gerbang `hasPulse` di ekspresi nilainya,
+                                    // sama seperti jam: hanya bintang yang
+                                    // berdenyut, dan jenisnya dibaca dari
+                                    // model, bukan didaftar ulang di sini.
+                                    pulse: illustration.hasPulse ? pulsePhase
+                                                                 : MotionPolicy.staticPulsePhase)
+                    .accessibilityHidden(true)
+            }
+        } else {
+            // Diam karena diminta, bukan karena lupa.
+            CelestialVisualView(visual: illustration,
+                                diameter: 64,
+                                isConfirmed: true,
+                                pulse: MotionPolicy.staticPulsePhase)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// Fase denyut dalam radian — **nol persis** saat denyut tidak boleh jalan,
+    /// karena ia datang dari `MotionPolicy` dan bukan dari `sin()` lokal.
+    private var pulsePhase: Double {
+        MotionPolicy(reduceMotion: reduceMotion,
+                     isLuminanceReduced: false,
+                     isSceneActive: true)
+            .pulsePhase(elapsedSeconds: Date().timeIntervalSince(pulseStart))
     }
 }

@@ -13754,6 +13754,260 @@ def check_cited_tool_files_exist(results):
              f"{', '.join(sorted(dangling))}"))
 
 
+def _source_files_for_set_coverage():
+    """Berkas sumber yang boleh menyebut uji sebagai alasan sebuah nilai.
+
+    Sama dengan cakupan `Tools/ukur-uji-menggantung.py` (sumber produksi +
+    app). Uji tidak dimasukkan: di sana nama uji adalah **dirinya sendiri**.
+    """
+    out = []
+    for pattern in ("Packages/PointingKit/Sources/**/*.swift",
+                    "Packages/CelestialEngine/Sources/**/*.swift",
+                    "Apps/**/*.swift"):
+        out += glob.glob(os.path.join(ROOT, pattern), recursive=True)
+    return sorted(p for p in set(out) if "/.build/" not in p)
+
+
+def _test_source_files():
+    out = []
+    for pattern in ("Packages/*/Tests/**/*.swift",
+                    "Packages/*/Tests/**/*.py"):
+        out += glob.glob(os.path.join(ROOT, pattern), recursive=True)
+    return sorted(p for p in set(out) if "/.build/" not in p)
+
+
+def _defined_test_names():
+    """Nama uji yang **dideklarasikan**, dari dua bahasa.
+
+    Swift: `func testX`. Python: `def test_x`.
+
+    **Kenapa Python ikut.** Gerbang piksel repo ini (`check-visuals.py`) punya
+    fungsi `check_*` yang dipanggil sebagai pemeriksaan, tetapi konvensi nama
+    uji Swift yang biasa dipakai kalimat "dijaga `testX`" hanya menunjuk uji
+    Swift. Kalau kelak ada uji Python yang dikutip dengan nama `test_…`,
+    pembaca ini sudah bisa menilainya alih-alih melaporkannya menggantung.
+    """
+    names = set()
+    for path in _test_source_files():
+        source = open(path, encoding="utf-8", errors="replace").read()
+        names |= set(re.findall(r"\bfunc\s+(test\w+)", source))
+        names |= set(re.findall(r"\bdef\s+(test\w+)", source))
+    return names
+
+
+def _test_name_mentions(path):
+    """Sebutan nama uji di satu berkas Swift: [(nama, bidang, baris)].
+
+    **Kenapa bidangnya ditandai, bukan sekadar dicari.** Nama `test*` bisa
+    muncul di tiga tempat yang maknanya berbeda:
+
+      - **komentar** — "dijaga `testX`". Inilah kalimat yang menjadi **izin**
+        bagi pembaca berikutnya untuk membiarkan angka itu; hanya bentuk ini
+        yang boleh dan wajib menunjuk uji yang ada.
+      - **literal string** — teks yang ditampilkan atau dikirim; uji yang
+        disebut di sana berarti orang **membaca** nama uji, bukan bergantung
+        padanya.
+      - **kode** — mis. nama variabel; itu kode yang dikompilasi, bukan
+        klaim dokumentasi.
+
+    Dua yang terakhir **tidak** dilaporkan walaupun nama ujinya tidak ada:
+    tuntutan itu akan memerahkan kode benar dan gerbangnya dimatikan orang.
+    Yang dilaporkan hanya komentar — persis kelas yang membuat siklus
+    `ukur-uji-menggantung.py` ditulis. Korpus hari ini: 53 sebutan, 53 di
+    komentar, 0 di string, 0 di kode (terukur, bukan diasumsikan).
+
+    **Kenapa tiga keadaan, bukan dua.** Versi pertama pembaca ini hanya tahu
+    "komentar" dan "bukan komentar", dan dua cacatnya ketahuan dari harness
+    (`bukti-mutasi-ilusi-cakupan.py` keadaan 2):
+
+      1. Penanda dokumentasi (`///`, `/**`) menjadi **bagian isi** token,
+         karena `re` menyapu token literal di dalamnya. Nama uji yang
+         mencakup baris berikutnya bergeser dua karakter dan terklasifikasi
+         sebagai teks biasa — seluruh dokumentasi `Apps/` lolos tanpa
+         diperiksa, sementara ringkasannya tetap mencetak nama uji.
+      2. Tanda kutip ganda yang **berpasangan** di dalam satu baris membuat
+         pembaca kehilangan awal string berikutnya, sehingga teks sesudahnya
+         terbaca sebagai komentar. Kalimat yang menyebut nama `test…` tanpa
+         sedang mengutipnya (mis. seed acak, teks uji) lalu dilaporkan.
+      3. Kutip **tunggal** tidak dikenal sama sekali sebagai pembatas string,
+         padahal Swift 5.9 menerimanya sebagai literal. Teks di dalamnya
+         terbaca sebagai kode, jadi klaim di sana lolos tanpa diperiksa —
+         sebaliknya efek cacat. Keduanya ditutup: pembuka string dikenali
+         dari kutip yang benar-benar muncul, dan pembatasnya pasangan itu.
+
+    Penanda dokumentasi kini dilewati sebagai **sintaks**, dan pembaca yang
+    kehilangan awalnya jatuh ke `code` (diam), bukan ke `comment` (menuduh).
+    """
+    source = open(path, encoding="utf-8", errors="replace").read()
+    #: Pembatas string multibaris, disusun supaya berkas ini tidak memuat tiga
+    #: tanda kutip berturut-turut di mana pun (lihat pengecualian Aturan 3).
+    tri = chr(34) * 3
+    regions = []
+    i, n = 0, len(source)
+    while i < n:
+        kind, end = "code", i + 1
+        if source.startswith("//", i):
+            nl = source.find(chr(10), i)
+            kind, end = "comment", n if nl < 0 else nl
+        elif source.startswith("/*", i):
+            close = source.find("*/", i + 2)
+            kind, end = "comment", n if close < 0 else close + 2
+        elif source[i] in (chr(34), chr(39)):
+            # Kutip tunggal juga pembatas literal di Swift 5.9+; dibaca sama
+            # supaya `'test…'` di dalam kalimat tidak menyamar sebagai kode.
+            quote = source[i]
+            j = i + 1
+            if source.startswith(tri, i):
+                j = i + 3
+                while j < n and not source.startswith(tri, j):
+                    j += 2 if source[j] == chr(92) else 1
+                j = min(n, j + 3)
+            else:
+                while j < n and source[j] != quote:
+                    j += 2 if source[j] == chr(92) else 1
+                j = min(n, j + 1)
+            kind, end = "string", j
+        if kind != "code":
+            start = i + 3 if source.startswith("/**", i) else i
+            if source.startswith("///", i) and (i == 0 or source[i - 1] == chr(10)):
+                start = i + 3
+            regions.append((kind, start, end))
+        i = end
+    out = []
+    for match in re.finditer(r"\btest[A-Z][A-Za-z0-9_]+", source):
+        kind = "code"
+        for name, start, end in regions:
+            if start <= match.start() < end:
+                kind = name
+                break
+        out.append((match.group(0), kind,
+                    source[: match.start()].count("\n") + 1))
+    return out
+
+
+def check_cited_test_names_in_every_source_exist(results):
+    """Nama uji yang dikutip **sumber produksi** harus punya definisi.
+
+    **Cacat yang ditutup pemeriksaan ini.** `Tools/ukur-uji-menggantung.py`
+    mengukur keluarganya — nama uji yang dikutip sebagai penjaga padahal
+    tidak ada ujinya — dan menutup tiga bentuk yang terukur 16 Okt 2026
+    (`craterRim`/`craterFloor`, bintik Jupiter, jangkauan korona). Alat itu
+    **tidak pernah dijalankan CI**: sampai siklus ini tidak ada satu pun
+    langkah alur kerja yang memanggilnya, dan tidak ada uji Swift yang bisa
+    melakukannya — `swift-test.sh` hanya membangun `Packages/`, sementara
+    berkas yang memuat kalimatnya ada di `Apps/`.
+
+    Artinya penutupan itu **sekali pakai**. Tiga kalimat diperbaiki dengan
+    tangan, dan kalimat keempat yang menunjuk uji yang tidak ada akan hidup
+    lagi tanpa satu pun gerbang berbunyi. Yang menutup kelasnya adalah
+    pemeriksaan ini, dijalankan sebagai bagian dari gerbang gambar yang sudah
+    ada di CI.
+
+    **Kenapa ini lebih penting daripada nama gerbang yang menggantung.** Nama
+    gerbang yang menggantung adalah janji yang tidak ditepati; nama uji yang
+    menggantung adalah **izin**: "nilai ini sudah dijaga `testX`, jangan
+    diutak-atik". Pembaca yang menemukan angka mencurigakan mencari `testX`,
+    tidak menemukannya, lalu berhenti memeriksa.
+
+    **Fail-closed.** Nol sebutan terbaca = MERAH. Kalau pola penanda komentar
+    tidak lagi cocok dengan bentuk berkasnya, himpunannya kosong, tidak ada
+    yang menggantung, dan gerbang yang naif akan hijau **karena tidak
+    mengukur apa pun**.
+    """
+    defined = _defined_test_names()
+    if not defined:
+        results.append(Result(
+            "nama uji yang dikutip sumber produksi ada", False,
+            "tidak ada satu pun `func test…` / `def test…` terbaca dari berkas "
+            "uji — pembacanya perlu diselaraskan; nol nama uji terdefinisi "
+            "bukan berarti tidak ada uji"))
+        return
+
+    mentions = 0
+    dangling = []
+    for path in _source_files_for_set_coverage():
+        for name, kind, line in _test_name_mentions(path):
+            if kind != "comment":
+                continue
+            mentions += 1
+            if name not in defined:
+                dangling.append((name, os.path.relpath(path, ROOT), line))
+
+    if mentions == 0:
+        results.append(Result(
+            "nama uji yang dikutip sumber produksi ada", False,
+            "tidak ada sebutan `test…` di komentar Packages/ atau Apps/ — "
+            "pembacanya perlu diselaraskan dengan bentuk berkasnya; nol "
+            "sebutan bukan berarti tidak ada klaim yang perlu diperiksa"))
+        return
+
+    for name, path, line in dangling:
+        results.append(Result(
+            f"nama uji yang dikutip ada: {path}:{line}", False,
+            f"`{name}` tidak punya definisi di mana pun — kalimat ini dibaca "
+            f"sebagai izin membiarkan nilainya, padahal ujinya tidak ada"))
+
+    results.append(Result(
+        "nama uji yang dikutip sumber produksi ada", not dangling,
+        f"{mentions} sebutan nama uji di komentar, semuanya berdefinisi "
+        f"({len(defined)} uji terdefinisi)"
+        if not dangling
+        else f"{len(dangling)} sebutan menunjuk uji yang tidak ada: "
+             f"{', '.join(sorted({d[0] for d in dangling}))}"))
+
+
+def check_shipped_has_no_settling_markers(results):
+    """Baris yang **dikirim** tidak boleh berisi penanda sementara.
+
+    **Cacat yang ditutup pemeriksaan ini.** Setiap siklus di repo ini
+    menyisipkan penanda ala `TODO`/`FIXME`/`XXX` di sekitar pekerjaan yang
+    belum selesai, dan penanda itu **dibaca sebagai izin** oleh pembaca
+    berikutnya persis seperti nama uji menggantung: kalimatnya tidak
+    mengklaim apa pun, jadi tidak ada yang memeriksanya, dan ia bertahan
+    melewati berkas yang sebenarnya sudah selesai.
+
+    Yang diperiksa hanya **komentar**, karena di situlah penanda tinggal.
+    Literal string dikecualikan: pesan pengguna yang kebetulan memuat kata
+    itu tidak sedang berjanji apa pun.
+
+    **Fail-closed.** Nol komentar terbaca = MERAH (pembacanya berhenti
+    cocok dengan bentuk berkasnya), bukan hijau.
+    """
+    markers = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b")
+    pending = []
+    comments_seen = 0
+    for path in _source_files_for_set_coverage():
+        source = open(path, encoding="utf-8", errors="replace").read()
+        for match in re.finditer(r"//[^\n]*|/\*.*?\*/", source, re.S):
+            comments_seen += 1
+            hit = markers.search(match.group(0))
+            if hit:
+                pending.append((hit.group(0), os.path.relpath(path, ROOT),
+                                source[: match.start()].count("\n") + 1))
+
+    if comments_seen == 0:
+        results.append(Result(
+            "sumber yang dikirim tanpa penanda sementara", False,
+            "tidak ada satu pun komentar terbaca dari Packages/ atau Apps/ — "
+            "pembacanya perlu diselaraskan; nol komentar bukan berarti bersih"))
+        return
+
+    for marker, path, line in pending:
+        results.append(Result(
+            f"sumber yang dikirim tanpa penanda sementara: {path}:{line}",
+            False,
+            f"`{marker}` tertinggal di baris yang dikirim — penanda ini dibaca "
+            f"sebagai 'pekerjaan belum selesai di sini' dan tidak ada yang "
+            f"memeriksanya"))
+
+    results.append(Result(
+        "sumber yang dikirim tanpa penanda sementara", not pending,
+        f"{comments_seen} komentar diperiksa, tidak ada penanda"
+        if not pending
+        else f"{len(pending)} penanda tertinggal: "
+             f"{', '.join(sorted({p[0] for p in pending}))}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -13868,6 +14122,11 @@ def main():
     # `testX`" supaya tidak menjadi izin yang tidak pernah diperiksa siapa pun.
     check_cited_test_names_exist(results)
     check_cited_tool_files_exist(results)
+    # Kelas yang sama, satu tingkat lebih luas: nama uji yang dikutip di
+    # **setiap** berkas sumber (bukan hanya `Apps/`), dengan tiga bidang
+    # dibedakan, plus penanda sementara yang tertinggal di kode terkirim.
+    check_cited_test_names_in_every_source_exist(results)
+    check_shipped_has_no_settling_markers(results)
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]
