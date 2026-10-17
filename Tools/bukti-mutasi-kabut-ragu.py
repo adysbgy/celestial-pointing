@@ -80,8 +80,11 @@ LOUD_FOG_OPACITY = """        let layout: [(Double, Double, Double, Double, Doub
         ]"""
 
 STATES = [
+    # Baseline **wajib hijau**: kalau uji ini merah pada sumber yang benar,
+    # gerbangnya bukan menjaga sifat melainkan menghukum kode yang lulus —
+    # dan gerbang yang begitu akan dilonggarkan orang, bukan diperbaiki.
     ("0. baseline (tanpa mutasi)",
-     None, True),
+     None, False),
     ("1. deepSky(nil) kembali memakai nebula() — cacat aslinya",
      [(CURRENT_FALLBACK, OLD_FALLBACK)], True),
     ("2. uncertainFog dinaikkan sampai mengalahkan morfologi paling redup",
