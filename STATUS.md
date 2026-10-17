@@ -1,3 +1,105 @@
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: Aturan 42 menutup saudara bukan-Bool dari permukaan kejujuran)
+
+### Mengapa siklus ini bukan fitur baru
+
+BAGIAN 1–4 dan FASE A/B/C sudah selesai dan ter-gerbang (audit ulang siklus
+ini membenarkannya: `CelestialVisualView` memang menggambar planet/Bulan/
+bintang/Matahari/langit-dalam, `NightMode` memakai `@AppStorage`,
+`ReducedLuminanceView` membaca `isLuminanceReduced`, label aksesibilitas ada,
+complication dan `.xcstrings` ada, `NSMotionUsageDescription`/`NSLocation…`
+ada di `project.yml` + `InfoPlist.strings`). Jadi yang dikerjakan bukan layar,
+melainkan satu-satunya celah nyata yang tersisa di kelas cacat yang sudah dua
+kali menjatuhkan `main` di repo ini: **permukaan penerusan di `Apps/` yang
+tidak dijaga badannya**.
+
+### Cacat yang diangkat
+
+`Apps/Shared/PointingEngine.swift` punya enam permukaan yang meneruskan fakta
+model ke UI. Aturan 36 menjaga satu (`confirmsDisplayedIdentity`), Aturan 38
+menjaga tiga ber-tipe `Bool` (`isDisplayingStaleObject`,
+`carriesUncertaintyMarker`). **Tiga saudaranya bertipe `Optional` lain tidak
+dibaca siapa pun**:
+
+    displayedObject   CelestialObject?  -> snapshot.displayedObject(lastLocked:)
+    pointing         HorizontalCoord?  -> snapshot.reportedPointing
+    answeredIntent   CelestialIntent?  -> controller.answeredIntent
+
+Ketiganya hidup di `Apps/`, yang **tidak pernah dibangun** `swift-test.sh` di
+Linux. Terukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa),
+dengan mutasi yang **mengompilasi**:
+
+    displayedObject -> lastLockedObject   swift-ui-lint.sh  LULUS (exit 0)
+    displayedObject -> nil               swift-ui-lint.sh  LULUS (exit 0)
+    pointing        -> snapshot.calibratedPointing  swift-ui-lint.sh LULUS (0)
+    answeredIntent  -> nil               swift-ui-lint.sh  LULUS (0)
+
+Empat keadaan, **nol** yang berbunyi. Yang paling berbahaya bukan yang `nil`,
+melainkan `displayedObject -> lastLockedObject`: jam, panel iPhone, layar
+redup, dan Diagnostics serentak menyatakan objek terakhir terkunci sebagai
+jawaban **sekarang** — pelanggaran paling keras PRD ("objek lama tidak boleh
+tampil seolah hasil pengukuran sekarang"), dengan `confirmsDisplayedIdentity`
+tetap tenang karena ia membaca `snapshot`, bukan `displayedObject`. Yang
+mencegahnya: tidak ada gerbang yang membaca **nilai kembalian** permukaan,
+hanya **argumen pemanggil** (Aturan 34/35/36) dan **badan Bool** (Aturan 38).
+
+### Perbaikan
+
+- **Aturan 42** (`swift-ui-lint.sh`): menurunkan permukaannya dari model, bukan
+  mendaftar namanya — setiap `var <nama>: T? { … }` non-Bool di `Apps/` yang
+  namanya ada sebagai anggota `PointingKit` wajib menyebut faktanya. Saudara
+  `pointing` yang dinamai lain ditangani `PASANGAN` (`pointing` →
+  `reportedPointing`), sama seperti Aturan 38 menangani `confirmsDisplayedIdentity`.
+  Badan literal `nil`/`.none` ditolak; badan yang tidak menyebut faktanya
+  ditolak. README (41 → 42 aturan) dan Aturan 10 ikut disamakan.
+- **Harness** `Tools/bukti-mutasi-permukaan-nilai.py` (terdaftar di
+  `engine-tests.yml`): 27 keadaan — 3 permukaan × 5 keadaan cacat, 3 bentuk
+  sah, 9 non-vakuositas.
+
+### Dua cacat di dalam harnessnya, ketahuan sebelum `main` merah
+
+1. `to_legacy` (pengukur non-vakuositas) membuang penugasan `DEKL` seluruhnya,
+   jadi program "legacy" mati dengan `NameError: DEKL` — keluaran traceback
+   dibaca sebagai "aturan berbunyi", sehingga ke-9 keadaan non-vakuositas
+   dilaporkan gagal padahal aturan yang dimatikan memang diam. Diperbaiki:
+   `DEKL` dipertahankan sebagai `re.compile(r'(?!x)x')` (tidak pernah cocok),
+   dan `run_rule` menolak keluaran traceback secara khusus.
+2. `run_rule` membaca `if out.strip()` sebagai "berbunyi". Aturan yang
+   dimatikan mencetak "Tidak ada permukaan… tidak mengukur apa pun" — tidak
+   kosong, tetapi bukan temuan. Keadaan non-vakuositas selalu gagal apa pun
+   hasilnya. Diperbaiki: `BUKAN_TEMUAN` memisahkan tiga keadaan (berbunyi /
+   diam / mati).
+
+### Verifikasi
+
+    ./swift-test.sh                CelestialEngine 222 + PointingKit 860 = 1082 uji, 0 gagal
+    ./swift-ui-lint.sh             SEMUA GERBANG UI LULUS (42 aturan)
+    ./swift-typecheck.sh           SEMUA GERBANG LULUS (parse)
+    python3 Tools/bukti-mutasi-permukaan-nilai.py   27 keadaan, semuanya sesuai harapan
+    python3 Tools/bukti-mutasi-permukaan-jujur.py   sesuai harapan (Aturan 38 tidak berubah)
+    python3 Tools/check-harness-terdaftar.py         83 harness, semuanya dirujuk
+    python3 Tools/check-jangkar-harness.py           347 jangkar, tidak ada mutasi tertinggal
+    Apple Build (macos-15), 0fa1474                 success
+    Engine Tests (Linux), 0fa1474                   in_progress saat catatan ini
+
+### Yang TIDAK diklaim
+
+- Aturan 42 masih **sapu teks**, bukan pemeriksa tipe: ia tahu **bentuk**
+  badannya (penerusan satu ekspresi), tidak tahu nilai yang dihasilkannya.
+  Badan yang menyebut faktanya lalu menyimpang lewat `.map { … }` atau `?? …`
+  tetap lolos — dan itu batas yang disengaja (perluasan cakupan ke arah itu
+  akan meniru jebakan Aturan 39: regex menuduh kode benar).
+- Yang diawasi adalah ketiga permukaan penerusan. Bila kelak ada permukaan
+  keempat bertipe `Optional` di `PointingEngine`, aturan ini **menemukannya**
+  dari keanggotaan model — tidak perlu daftar tangan baru, tidak seperti
+  Aturan 38 yang awalnya mengikat tiga nama.
+- `visualForDisplayedObject` **tidak** dirawat aturan ini: ia bukan penerusan
+  satu fakta melainkan perakitan multi-sumber (`skyContext`, `planetPhases`),
+  dan jalurnya sudah dijaga Aturan 31 (arah fase) serta Aturan 24/25 (warna).
+  Memasukkannya ke sini akan menuntut anggota model bernama `visualFor…`
+  yang tidak ada.
+
+---
+
 ## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: garis & glif lencana ragu ikut dijaga, bukan cuma isinya)
 
 ### Cacatnya
