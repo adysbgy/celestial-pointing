@@ -27614,3 +27614,45 @@ kesalahannya terlihat sebagai kegagalan, bukan sebagai kebisingan.
 - `check-visuals.py --check` penuh (~41 menit) **tidak** dijalankan utuh di
   sini; yang diukur adalah kedua fungsi yang disentuh, di proses baru. Gerbang
   penuh berjalan di CI.
+
+---
+
+### Siklus (17 Okt 2026 — audit tuntas: brief BAGIAN 1–4 + FASE A/B/C seluruhnya terwujud & ter-gerbang)
+
+Siklus ini **bukan** menambah fitur. Tujuannya memverifikasi ulang secara
+empiris klaim "seluruh brief sudah selesai" sebelum menganggap repo di plateau,
+dan mencari satu titik keputusan di `Apps/` yang tidak dijaga satupun dari 49
+aturan lint.
+
+**Yang diverifikasi (diukur, bukan dari docstring):**
+
+- `./swift-test.sh` dijalankan utuh: **CelestialEngine 222 + PointingKit 922 =
+  1144 uji, 0 gagal** (laporan "Executed 922" = PointingKit saja). Angka
+  "166 + 143" di brief sudah tidak berlaku.
+- `./swift-ui-lint.sh`: SEMUA GERBANG UI LULUS (49 aturan). `./swift-typecheck.sh`:
+  SEMUA GERBANG LULUS. Apple Build (macos-15) hijau di CI.
+- BAGIAN 1 (visual prosedural), BAGIAN 2 (surface/glass/tipografi/onboarding),
+  FASE A (mode malam merah murni, AOD, VoiceOver), FASE B (animasi, Dynamic
+  Type, audio) — semua ada & di-gerbang.
+- FASE C #1 complication ada; #2 lokalisasi = 520-kunci `.xcstrings` + 6 aturan
+  lint; #3 izin sensor per-app (id+en) + InfoPlist.strings; #4 penolakan izin
+  ditangani terpisah (`.denied` → "buka Pengaturan", `.restricted` → "perangkat
+  membatasi") + tes kejujuran.
+- FASE C #6 tepi kasus: suite khusus `BelowHorizonHonestyTests`,
+  `DaylightLockTests`, `MoonDaylightHonestyTests`, `TooCloseToSunLockHonestyTests`.
+- 94 harness mutasi (`bukti-mutasi-*.py`) **semua** dirujuk di
+  `engine-tests.yml` (diverifikasi: nol yatim).
+
+**Sapuan terakhir: `CelestialVisualView.swift` baris-ke-baris.** Berkas ini
+murni lapisan terjemahan — tiap keputusan visual (palet, geometri fase,
+pita/cincin/kutub/kawah, morfologi, warna, mode malam) diambil dari model di
+`PointingKit`/`CelestialEngine`. Konstanta lokal (`maria`, `glowOpacities`,
+`coronaOpacity`, `neutralBody`) ditandai `VIEW:` dan dijaga gerbang piksel.
+Baku `isConfirmed: Bool = false` ternyata **benar-benar** dijaga Aturan 18
+(terverifikasi membaca regex-nya: memindai `Apps/` untuk `var/let <nama>: Bool
+= true` dengan nama pencocok `(isconfirmed|confirmsidentity|...|claim)`).
+
+**Kesimpulan:** tidak ada lagi celah yang bisa ditutup tanpa mengarang pekerjaan.
+Repo di plateau nyata. Siklus berikutnya, kalau ada, harus diawali dari celah
+yang **ditemukan pengguna/CI**, bukan dari menebak perbaikan di brief yang sudah
+terpenuhi.
