@@ -151,7 +151,7 @@ public final class ExperimentRecorder: ObservableObject {
         statusMessage = ExperimentText.statusRecorded(
             error: error,
             verdict: verdict,
-            answer: intent.best?.name ?? ExperimentText.detailNoAnswer)
+            answer: ExperimentText.answerName(intent))
         return trial
     }
 

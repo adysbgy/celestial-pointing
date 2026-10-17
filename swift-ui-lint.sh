@@ -7037,8 +7037,27 @@ echo "== Aturan 41: nama yang tampil tidak jatuh kembali ke nama engine =="
 nama_mentah=$(python3 - <<'PY' 2>&1
 import os, re
 
-# `?? <sesuatu>.name` -- jatuh kembali ke `CelestialObject.name`.
-POLA = re.compile(r"\?\?\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.name\b")
+# Nama objek yang tampil lewat `.name` — dua bentuk, satu cacat.
+#
+#   1. `?? <pengenal>.name`   -> cabang cadangan ke `CelestialObject.name`
+#   2. `?.name` pada objek    -> rantai opsional, tanpa `??` sama sekali
+#
+# Bentuk kedua **tidak** tertangkap versi pertama aturan ini, dan itu terukur:
+# `Experiment1View` merakit `intent.best?.name` tiga kali (baris layar, baris
+# terucap, dan pesan status di `ExperimentRecorder`), dan `intent.best` adalah
+# `CelestialObject` yang namanya diisi `PointingResolver` dari
+# `EphemerisBody.displayName` — Bahasa Indonesia yang dibekukan (`Bulan`,
+# `Saturnus`). Pola lama menuntut pengenal **sebelum** titik, jadi `best?.name`
+# lolos dan seluruh gerbang UI tetap hijau.
+POLA_CADANGAN = re.compile(r"\?\?\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.name\b")
+# `?.name` hanya ditandai bila barisnya menyebut sesuatu yang memang membawa
+# `CelestialObject`/`PointingTarget`: receiver `best`, `object`, `target`,
+# `displayedObject`, atau `intent`. Sengaja sempit — `preferredFrame?.name`
+# atau `calibrationTarget?.name` bukan nama engine dan tidak dibekukan.
+POLA_RANTAI = re.compile(
+    r"\b(best|object|target|displayedObject|intent|candidate)"
+    r"(?:\.[A-Za-z_]\w*)?\?\.name\b"
+)
 
 # ── Aturan 41: nama objek yang tampil wajib melewati pelokalan ─────────────
 
@@ -7066,7 +7085,7 @@ for root, _, files in os.walk("Apps"):
             # sebagai bentuk yang dilarang, dan docstring yang menyebutnya
             # bukan pemakaian.
             kode = baris.split("//", 1)[0]
-            m = POLA.search(kode)
+            m = POLA_CADANGAN.search(kode) or POLA_RANTAI.search(kode)
             if not m:
                 continue
             diperiksa += 1

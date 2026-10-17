@@ -114,7 +114,11 @@ struct Experiment1View: View {
                     set: { recorder.selectedTargetID = $0 })) {
                     Text(ExperimentText.noneSelected).tag(String?.none)
                     ForEach(targets) { target in
-                        Text(ExperimentText.targetOption(name: target.name,
+                        // `localizedName`, bukan `name`: target benda tata
+                        // surya membawa `EphemerisBody.displayName` yang
+                        // dibekukan (`Bulan`, `Saturnus`), jadi daftar di
+                        // perangkat Inggris berbunyi `Bulan`.
+                        Text(ExperimentText.targetOption(name: target.localizedName,
                                                          altitudeDeg: target.direction.altitudeDeg))
                             .tag(String?.some(target.id))
                     }
@@ -334,8 +338,12 @@ struct Experiment1View: View {
         if let error = trial.analysis?.rawPointingErrorDeg {
             parts.append(RowSpeech.spokenError(error))
         }
+        // `ExperimentText.answerName`, bukan `intent.best?.name`: bentuk
+        // kedua adalah `CelestialObject.name` — Bahasa Indonesia yang
+        // dibekukan engine (`Bulan`, `Saturnus`). Accessor-nya melokalkan
+        // lewat `localizedName` dan sudah diuji di Linux.
         parts.append(ExperimentText.detailAnswer(
-            trial.trial.intent.best?.name ?? ExperimentText.detailNoAnswer))
+            ExperimentText.answerName(trial.trial.intent)))
         parts.append(ExperimentText.detailConfidence(trial.trial.intent.level.displayName))
         parts.append(ExperimentText.detailState(trial.stateAtCapture.shortLabel))
         if let rate = trial.angularRateAtCaptureDegPerSec {
@@ -367,8 +375,9 @@ struct Experiment1View: View {
         if let error = trial.analysis?.rawPointingErrorDeg {
             parts.append(ExperimentText.detailError(degrees: error))
         }
+        // Nama jawaban lewat accessor yang sama dengan baris layar di atas.
         parts.append(ExperimentText.detailAnswer(
-            trial.trial.intent.best?.name ?? ExperimentText.detailNoAnswer))
+            ExperimentText.answerName(trial.trial.intent)))
         parts.append(ExperimentText.detailConfidence(trial.trial.intent.level.displayName))
         parts.append(ExperimentText.detailState(trial.stateAtCapture.shortLabel))
         if let rate = trial.angularRateAtCaptureDegPerSec {

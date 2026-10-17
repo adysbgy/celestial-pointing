@@ -1,4 +1,5 @@
 import Foundation
+import CelestialEngine
 
 /// Teks yang tampil & diucapkan untuk Experiment 1 — satu sumber, teruji di
 /// Linux.
@@ -170,6 +171,26 @@ public enum ExperimentText {
     /// Kata pengganti galat saat tidak ada analisis.
     public static var detailNoError: String {
         TextLocalization.text(.experimentDetailNoError)
+    }
+
+    /// Nama jawaban engine untuk baris laporan, dalam bahasa aktif.
+    ///
+    /// **Kenapa accessor ini ada, bukan `intent.best?.name` di view.** Tiga
+    /// tempat di app iPhone (`Experiment1View` dua kali — baris layar dan
+    /// baris terucap — serta `ExperimentRecorder`) merakit jawaban dari
+    /// `CelestialObject.name`, yaitu bentuk Bahasa Indonesia yang dibekukan
+    /// (`Bulan`, `Matahari`, `Saturnus`, `Merkurius`). Pada perangkat
+    /// berbahasa Inggris barisnya berbunyi `answer Bulan` di sebelah
+    /// `none yet` dari kunci yang sama. Aturan 41 tidak melihatnya karena
+    /// polanya menuntut pengenal sebelum `.name`; rantai opsional
+    /// (`best?.name`) lolos. Menaruh keputusannya di paket membuat satu
+    /// jalur itu teruji di Linux, bukan tiga salinan di `Apps/` yang tidak
+    /// pernah dibangun di sini.
+    ///
+    /// Tanpa jawaban, hasilnya `detailNoAnswer` — bukan `nil`, bukan
+    /// `Optional(...)`, bukan string kosong.
+    public static func answerName(_ intent: CelestialIntent?) -> String {
+        intent?.best?.localizedName ?? detailNoAnswer
     }
 
     public static func detailAnswer(_ name: String) -> String {

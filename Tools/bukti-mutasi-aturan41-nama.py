@@ -64,6 +64,8 @@ BLOCK_CLOSE = '\nPY\n)'
 VIEW = os.path.join("Apps", "PointAndKnowWatch", "Sources", "PointingView.swift")
 DIAG = os.path.join("Apps", "PointAndKnowiOS", "Sources", "DiagnosticsView.swift")
 ENGINE = os.path.join("Apps", "Shared", "PointingEngine.swift")
+EXPERIMENT = os.path.join("Apps", "PointAndKnowiOS", "Sources", "Experiment1View.swift")
+TELESCOPE = os.path.join("Apps", "PointAndKnowiOS", "Sources", "TelescopeHandoffView.swift")
 
 #: Program Aturan 41 mencetak **temuan** ke stdout dan diam bila bersih.
 #:
@@ -140,6 +142,9 @@ def main() -> int:
     engine_anchor = """        DisplayLabel.objectName(forObjectID: object.id,
                                 catalogue: controller.resolver.catalogue)
             ?? ObjectDisplayName.text(of: object)"""
+    experiment_anchor = "            ExperimentText.answerName(trial.trial.intent)))"
+    telescope_anchor = ("            row(TextLocalization.text(.telescopeFrameLabel), "
+                        "preferredFrame.name)")
 
     states = [
         ("1. `?? object.name` di kartu jam",
@@ -160,6 +165,30 @@ def main() -> int:
          VIEW, view_anchor, view_anchor, False),
         ("5. [kontrol] berkas apa adanya",
          None, None, None, False),
+        # ── Bentuk rantai opsional: satu cacat yang lolos gerbang lama ──
+        #
+        # `intent.best?.name` **bukan** bentuk `?? <pengenal>.name`: tidak ada
+        # pengenal sebelum titik, jadi pola lama tidak cocok dan gerbang
+        # mencetak "Bersih". Terukur: tiga situs produksi memakai bentuk ini
+        # (baris layar, baris terucap, pesan status recorder), dan seluruh
+        # gerbang UI tetap hijau.
+        ("6. `intent.best?.name` (rantai opsional) di laporan",
+         EXPERIMENT, experiment_anchor,
+         "            trial.trial.intent.best?.name ?? ExperimentText.detailNoAnswer))",
+         True),
+        ("7. `intent.best?.name` di pesan status recorder",
+         EXPERIMENT, experiment_anchor,
+         "            intent.best?.name ?? ExperimentText.detailNoAnswer)",
+         True),
+        ("8. [kontrol] `answerName(intent)` (perbaikan)",
+         EXPERIMENT, experiment_anchor, experiment_anchor, False),
+        # `preferredFrame.name` adalah `MountFrame.name` — label internal app,
+        # tidak dibekukan engine. Aturan yang menuduhnya akan merah pada kode
+        # benar. `?.name` pada receiver yang sama juga harus diam.
+        ("9. [kontrol] `preferredFrame?.name` (bukan nama objek langit)",
+         TELESCOPE, telescope_anchor,
+         "            row(TextLocalization.text(.telescopeFrameLabel), preferredFrame?.name ?? \"—\")",
+         False),
     ]
 
     failures: list[str] = []

@@ -1,5 +1,6 @@
 import XCTest
 @testable import PointingKit
+import CelestialEngine
 
 /// Uji untuk teks Experiment 1 yang dihasilkan di luar view.
 ///
@@ -20,6 +21,11 @@ final class ExperimentTextTests: XCTestCase {
         TextLocalization.reset()
         NumberFormat.reset()
         super.tearDown()
+    }
+
+    private func object(id: String, name: String, kind: ObjectKind) -> CelestialObject {
+        CelestialObject(id: id, name: name, kind: kind,
+                        raDeg: 101.287, decDeg: -16.716, magnitude: -1.46)
     }
 
     func testDefaultIsIndonesianAndNotEmpty() {
@@ -388,5 +394,74 @@ final class ExperimentTextTests: XCTestCase {
                        "Location not yet available — computed for Jakarta.")
         XCTAssertEqual(ExperimentText.locationComputed(label: "Jakarta"),
                        "Computed for Jakarta.")
+    }
+
+    // MARK: - Nama jawaban engine wajib ikut bahasa perangkat
+
+    /// **Cacat yang diukur siklus ini.** Tiga tempat di app iPhone merakit
+    /// baris laporan percobaan langsung dari `intent.best?.name` — field
+    /// `CelestialObject.name` yang diisi `PointingResolver` dari
+    /// `EphemerisBody.displayName`, yaitu bentuk Bahasa Indonesia yang
+    /// **dibekukan** (`Bulan`, `Matahari`, `Saturnus`, `Merkurius`). Pada
+    /// perangkat berbahasa Inggris barisnya berbunyi `answer Bulan`
+    /// sementara `detailNoAnswer` di sebelahnya berbunyi `none yet`.
+    ///
+    /// Aturan 41 (`swift-ui-lint.sh`) tidak melihatnya: polanya menuntut
+    /// pengenal **sebelum** `.name` (`?? object.name`), sedangkan bentuk di
+    /// sini adalah rantai opsional (`best?.name`). Jadi gerbangnya hijau
+    /// pada kode yang salah — kelas cacat yang sama dengan cabang cadangan
+    /// yang tertutup pemanggil benar.
+    ///
+    /// Yang diuji adalah **nilai yang tampil**, bukan teks pemanggilnya:
+    /// `detailAnswer(intent.best.map(\.localizedName) ?? detailNoAnswer)`.
+    /// Bentuk lama (`intent.best?.name ?? …`) merah di sini.
+    func testRecordedAnswerLineUsesTheLocalizedNameOfTheEngineAnswer() {
+        TextLocalization.install { key in
+            key == "object.body.moon.label" ? "Moon" : nil
+        }
+        let moon = object(id: "moon", name: "Bulan", kind: .moon)
+        let intent = CelestialIntent(level: .high, best: moon, candidates: [])
+
+        let answer = ExperimentText.answerName(intent)
+        XCTAssertEqual(answer, "Moon",
+                       "nama jawaban engine tidak mengikuti bahasa perangkat")
+
+        // Kontrol: bentuk yang dipakai produksi sebelum perbaikan.
+        XCTAssertEqual(intent.best?.name, "Bulan",
+                       "kontrol negatif: engine memang menyimpan bentuk Indonesia")
+    }
+
+    // MARK: - Pemilih target memakai jalur nama yang sama
+
+    /// Daerah target Experiment 1 diisi `PointingTarget.name` dari
+    /// `EphemerisBody.displayName` (`Bulan`, `Saturnus`), jadi pemilihnya
+    /// menampilkan bentuk Indonesia di perangkat Inggris.
+    func testTargetPickerNameFollowsTheDeviceLanguage() {
+        TextLocalization.install { key in
+            key == "object.body.saturn.label" ? "Saturn" : nil
+        }
+        let target = PointingTarget(id: "saturn", name: "Saturnus", kind: .planet,
+                                    magnitude: 0.5,
+                                    direction: HorizontalCoord(altitudeDeg: 40, azimuthDeg: 180),
+                                    isMoving: true)
+        XCTAssertEqual(target.localizedName, "Saturn")
+
+        let vega = PointingTarget(id: "vega", name: "Vega", kind: .star,
+                                  magnitude: 0.03,
+                                  direction: HorizontalCoord(altitudeDeg: 50, azimuthDeg: 90),
+                                  isMoving: false)
+        XCTAssertEqual(vega.localizedName, "Vega",
+                       "nama tanpa terjemahan harus dikembalikan apa adanya")
+    }
+
+    /// Tanpa jawaban, barisnya tetap kalimat pengganti — bukan string kosong
+    /// dan bukan `Optional(...)`. Cabang ini yang dieksekusi paling sering
+    /// di dataset yang baru dibuka.
+    func testRecordedAnswerLineFallsBackWhenTheEngineHasNoAnswer() {
+        let intent = CelestialIntent(level: .low, best: nil, candidates: [])
+        let answer = ExperimentText.answerName(intent)
+        XCTAssertEqual(answer, ExperimentText.detailNoAnswer)
+        XCTAssertFalse(answer.contains("Optional"),
+                       "baris laporan bocor sintaks Swift ke layar")
     }
 }

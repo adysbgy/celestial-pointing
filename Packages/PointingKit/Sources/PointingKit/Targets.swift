@@ -17,6 +17,22 @@ public struct PointingTarget: Equatable, Sendable, Identifiable {
     /// Apakah arah ini dihitung dari efemeris (benda bergerak) atau katalog.
     public var isMoving: Bool
 
+    /// Nama target untuk layar, dalam bahasa aktif.
+    ///
+    /// `name` diisi dari `CelestialObject.name` (bintang & langit-dalam) atau
+    /// `EphemerisBody.displayName` (Matahari/Bulan/planet), jadi ia memuat
+    /// bentuk Bahasa Indonesia **yang dibekukan** — `Bulan`, `Matahari`,
+    /// `Saturnus`. Daftar target Experiment 1 menampilkannya apa adanya, dan
+    /// pada perangkat berbahasa Inggris pilihannya berbunyi `Bulan`.
+    ///
+    /// Accessor ini memakai `ObjectDisplayName.text(_:)` — jalur yang sama
+    /// dengan `CelestialObject.localizedName` — supaya pemilih target dan
+    /// baris laporan tidak bisa memberi dua nama berbeda untuk objek yang
+    /// sama. Nama yang tidak punya terjemahan dikembalikan apa adanya.
+    public var localizedName: String {
+        ObjectDisplayName.text(name)
+    }
+
     public init(id: String, name: String, kind: ObjectKind,
                 magnitude: Double, direction: HorizontalCoord, isMoving: Bool) {
         self.id = id
