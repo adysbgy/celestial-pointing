@@ -143,6 +143,14 @@ def run_rule(program: str, workdir: str) -> tuple[int, str]:
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     p = subprocess.run([sys.executable, "-c", program], cwd=workdir,
                        capture_output=True, text=True, env=env)
+    # Aturan yang **mati** (traceback / NameError) menulis ke stderr, dan
+    # keluaran itu tidak boleh dibaca sebagai "berbunyi": keadaan
+    # non-vakuositas versi pertama dilaporkan gagal justru karena aturan
+    # yang sudah dimatikan itu melempar `NameError`. Gerbang yang
+    # mati-terbuka di dalam harness-nya sendiri.
+    if "Traceback (most recent call last)" in (p.stdout + p.stderr):
+        sys.exit("GERBANG: program aturan mati dengan traceback — harness ini "
+                 "tidak bisa mengukur apa pun.\n" + p.stdout + p.stderr)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -200,9 +208,14 @@ def to_legacy(program: str) -> str:
                  "harness non-vakuositas ini perlu disesuaikan sebelum ia "
                  "bisa mengukur apa pun.")
     head = program[:program.index(marker)]
-    # Buang sampai akhir baris `DEKL = ...` (deklarasi itu satu baris).
     rest = program[program.index(marker):]
-    _, _, tail = rest.partition("\n")
+    _, newline, tail = rest.partition("\n")
+    # `re.compile(r'(?!x)x')` tidak pernah cocok, tetapi **tetap** atribut
+    # `DEKL` yang sah. Versi pertama menghapus penugasannya seluruhnya, dan
+    # akibatnya programnya mati dengan `NameError: DEKL` — keluaran traceback,
+    # yang oleh harness ini dibaca sebagai "aturan berbunyi". Itu gerbang
+    # mati-terbuka di dalam harness-nya sendiri: keadaan non-vakuositas
+    # dilaporkan gagal padahal aturannya memang sudah dimatikan.
     return head + "DEKL = re.compile(r'(?!x)x')\n" + tail
 
 
