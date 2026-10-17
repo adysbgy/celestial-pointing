@@ -143,10 +143,13 @@ enum VisualImageMetrics {
 // MARK: - Pemakaian
 
 extension View {
-    /// Latar aplikasi, dipakai di akar kedua app.
-    func appBackground() -> some View {
-        background(SurfacePalette.appBackground.ignoresSafeArea())
-    }
+    // **`appBackground()` sudah dihapus, dan penghapusannya bagian dari
+    // perbaikan.** Helper itu tidak pernah dipanggil siapa pun sejak
+    // `appBackdrop()` lahir, dan justru dialah bentuk yang menghasilkan cacat
+    // Aturan 49: satu baris yang "terlihat benar" (gradien aplikasi), tapi
+    // diam-diam tanpa langit berbintang. Selama ia ada, setiap penulis baru
+    // punya dua jalan yang sama wajarnya, dan yang salah tidak berbunyi di
+    // gerbang mana pun. Yang tersisa hanya satu jalan: `appBackdrop()`.
 
     /// Paksa skema gelap di seluruh app.
     ///

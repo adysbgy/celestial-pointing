@@ -1484,6 +1484,24 @@ jobs:
       - name: Buktikan Aturan 48 berbunyi pada angka gerak yang ditulis di Apps/
         run: python3 Tools/bukti-mutasi-gerak-angka.py
 
+      # Dan bukti untuk Aturan 49 — latar aplikasi yang hilang di layar pertama.
+      #
+      # Aturan 49 menutup kelas cacat yang **terukur hijau** pada 48 aturan:
+      # `OnboardingView` — layar pertama yang dilihat pengguna — menggambar
+      # `SurfacePalette.appBackground` mentah, bukan langit berbintang yang
+      # dimiliki lima layar lain. Tidak ada *warning* untuk ini: `Apps/` tidak
+      # pernah dibangun di Linux, `swiftc -parse` tidak peduli latar, dan
+      # Apple Build hanya gagal pada *warning*. Yang paling menentukan: sapuan
+      # "apakah layar memakai latar aplikasi" hijau, karena yang tidak
+      # terlihat adalah **ketiadaan** di berkas keenam.
+      #
+      # Harness ini juga menahan keadaan **kontrol** yang wajib HIJAU (gradien
+      # di dalam komentar, `appBackdrop(starfield:)` eksplisit, view kecil
+      # tanpa latar sendiri). Tanpa mereka, aturan yang melaporkan setiap
+      # berkas `Apps/` akan lulus semua keadaan cacat.
+      - name: Buktikan Aturan 49 berbunyi pada latar yang hilang di Apps/
+        run: python3 Tools/bukti-mutasi-latar-layar.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

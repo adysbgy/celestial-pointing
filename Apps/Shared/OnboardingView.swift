@@ -42,8 +42,23 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            SurfacePalette.appBackground
-                .ignoresSafeArea()
+            // **`AppBackdropView`, bukan `SurfacePalette.appBackground` mentah.**
+            //
+            // Sampai siklus ini layar perkenalan adalah satu-satunya layar
+            // penuh yang menggambar gradien dua warna saja. Lima layar lain
+            // memakai `appBackdrop()`, jadi app ini punya langit berbintang di
+            // mana-mana **kecuali** di tempat pertama pengguna melihatnya.
+            //
+            // Cacatnya tidak berbunyi di gerbang mana pun: setiap sapuan
+            // "apakah layar memakai latar aplikasi" melihat lima pemakaian
+            // yang benar dan hijau. Yang tidak terlihat adalah ketiadaan di
+            // berkas keenam. Aturan 49 sekarang menutupnya, dan aturan itu
+            // **memerah pada bentuk lama** — bukan pada bentuk ini.
+            //
+            // `starfield: true` sama dengan layar utama: kartu ini muncul di
+            // atas layar yang sudah punya langit, jadi mematikan langit di
+            // sini akan membuatnya terlihat seperti potongan kertas.
+            AppBackdropView()
 
             VStack(spacing: 18) {
                 // Pahlawan prosedural, bukan ikon SF Symbol: layar perkenalan

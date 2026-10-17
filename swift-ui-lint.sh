@@ -8040,6 +8040,120 @@ else
   echo "Bersih: angka gerak selalu lewat MotionPolicy."
 fi
 
+# ── Aturan 49: layar penuh memakai latar aplikasi yang **sama** ─────────────
+#
+# Cacat yang ditutup: `OnboardingView` — layar **pertama** yang dilihat
+# pengguna — adalah satu-satunya layar penuh yang menggambar
+# `SurfacePalette.appBackground` mentah, bukan `appBackdrop()`. Akibatnya ia
+# kehilangan langit berbintang yang dimiliki lima layar lain, dan justru di
+# tempat yang paling menentukan kesan pertama: pengguna membuka app astronomi
+# dan melihat satu gradien dua warna.
+#
+# Kenapa tidak ada gerbang yang berbunyi. `appBackdrop()` benar-benar dipakai
+# di lima berkas, jadi sapuan "apakah ada layar memakai latar" hijau. Yang
+# tidak terlihat adalah **ketiadaannya di berkas keenam** — kelas cacat yang
+# sama dengan Aturan 40: gerbang yang memeriksa keberadaan tidak melihat
+# ketiadaan. Diukur pada salinan utuh (proses baru, 48 aturan):
+#
+#     OnboardingView: appBackground mentah   -> SEMUA GERBANG UI LULUS
+#
+# Aturan ini menuntut: setiap berkas `Apps/**` yang mendeklarasikan sebuah
+# `View` **dan** menyentuh latar aplikasi harus menyebut `appBackdrop`.
+# Menyebut `SurfacePalette.appBackground` tanpa `appBackdrop` di berkas yang
+# sama = merah.
+#
+# Kenapa `appBackground()` (helper lama di `SurfaceTokens`) tidak dipakai
+# sebagai penanda sah. Ia **dead code**: nol pemanggil di seluruh repo, dan
+# ia justru bentuk yang menghasilkan cacat ini — gradien polos tanpa langit.
+# Membiarkannya sebagai jalan keluar yang sah berarti aturan ini bisa
+# dipuaskan oleh latar yang salah.
+#
+# Batasnya jujur: ini sapu teks per berkas, bukan pelacakan aliran. Layar
+# yang membangun latarnya di berkas lain (mis. lewat sebuah container) tidak
+# terlihat; bentuk itu belum ada hari ini dan tidak diklaim tertutup.
+echo "== Aturan 49: layar penuh memakai latar aplikasi yang sama =="
+rakitan49=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+masalah = []
+berkas_layar = 0
+
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        kode = open(path, encoding="utf-8").read()
+        # Buang komentar: docstring di berkas ini banyak mengutip bentuk
+        # lama, dan kutipan itu tidak boleh memicu aturan (kelas cacat yang
+        # sudah dua kali terjadi di repo ini).
+        baris_kode = []
+        for baris in kode.split("\n"):
+            if "//" in baris:
+                baris = baris.split("//", 1)[0]
+            baris_kode.append(baris)
+        kode = "\n".join(baris_kode)
+
+        # Hanya berkas yang benar-benar mendeklarasikan View.
+        if not re.search(r"struct\s+\w+\s*:\s*View\b", kode):
+            continue
+        # Berkas yang **memang** menyusun gradiennya sendiri. Ia satu-satunya
+        # tempat `SurfacePalette.appBackground` sah: dialah yang membungkus
+        # gradien itu bersama langit menjadi `AppBackdropView`, dan semua
+        # layar lain memakai hasilnya. Kalau ia ikut dilarang, aturannya
+        # melarang dirinya sendiri.
+        if os.path.basename(path) == "SkyBackdropView.swift":
+            berkas_layar += 1
+            continue
+        # **Satu-satunya hal yang diperiksa: gradien mentah di kode.**
+        #
+        # Versi pertama aturan ini menuntut "menyebut `appBackdrop`", dan itu
+        # lebih lemah dalam dua arah sekaligus. Terukur di harness:
+        #
+        #   1. `AppBackdropView()` (bentuk yang BENAR) tidak cocok dengan
+        #      penanda `appBackdrop` huruf kecil, jadi `OnboardingView` yang
+        #      sudah diperbaiki **dilewati** — hijau karena tidak melihat
+        #      apa-apa, persis kelas cacat yang aturan ini klaim tutup.
+        #   2. Berkas yang memanggil `appBackdrop()` **dan** menggambar
+        #      gradien mentah di cabang lain tetap hijau, padahal cabang itu
+        #      tampil tanpa langit.
+        #
+        # Menegasikan bentuk yang salah menutup keduanya tanpa daftar
+        # pengecualian: setiap pemakaian `appBackground` di luar berkas
+        # pembungkusnya adalah cacat, terlepas dari apa lagi yang ada di
+        # berkas itu.
+        if "appBackground" not in kode:
+            continue
+        berkas_layar += 1
+        masalah.append(
+            "  %s: memakai `SurfacePalette.appBackground` mentah -- layar "
+            "ini kehilangan langit berbintang yang dimiliki layar lain. "
+            "Pakai `appBackdrop()` atau `AppBackdropView()`." % path)
+
+# Fail-closed: nol berkas layar terbaca berarti aturan ini tidak mengukur
+# apa pun. `Apps/` yang berubah nama cukup untuk membuatnya tidur.
+if berkas_layar == 0:
+    print("PERINGATAN: tidak ada berkas layar yang menyentuh latar -- "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+print("\n".join(masalah))
+PY
+)
+if printf '%s' "$rakitan49" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 49 tidak bisa memutuskan:"
+  echo "$rakitan49"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$rakitan49" ]; then
+  echo "$rakitan49"
+  status=1
+else
+  echo "Bersih: setiap layar memakai latar aplikasi yang sama."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
