@@ -24,7 +24,8 @@ Karena itu setiap keadaan di bawah disuntikkan, bukan dibayangkan.
 
 Keadaan yang diuji:
 
-    1. `visual.spokenStarClassLine(…)`   -> berbunyi   (bentuk yang gagal di CI)
+    1. `visual.spokenStarClass(forStarID:)`   -> berbunyi   (statis, hanya
+                                           statis — bentuk yang gagal di CI)
     2. `v?.spectralClass(…)`, `v` beranotasi `CelestialVisual?`
                                          -> berbunyi   (optional chaining)
     3. `visual.phaseGeometry(…)`         -> DIAM       (kontrol: `phaseGeometry`
@@ -32,6 +33,17 @@ Keadaan yang diuji:
                                            kode yang sah -- gerbang yang menuduh
                                            kode benar akan dimatikan orang)
     4. berkas apa adanya                 -> DIAM       (baseline)
+
+**Mutasi keadaan 1 ikut baris produksi yang berubah.** Bentuk yang memerahkan
+CI dulu adalah `visual.spokenStarClassLine(spectralClass:…)`. Siklus
+`spokenStarClassLine(isConfirmed:)` menambah kembaran **instance** untuk nama
+itu, jadi menyuntikkan `CelestialVisual.spokenStarClassLine(…)` di atas receiver
+`visual` tetap galat kompilasi **tapi** melewati penjaga instance pemindai
+(`if anggota in instance.get(akar)`) — dengan benar, sebab nama itu memang
+punya kembaran instance. Mutasi karena itu memakai anggota yang **hanya
+statis** (`spokenStarClass`): kelas galat yang sama, nama tanpa jalan keluar
+instance. Yang dibuktikan tetap satu: *statis dipanggil pada instance terbaca
+gerbang ini*, bukan bahwa satu nama spesifik terbaca.
 
 Cara mengukur, sama dengan pelajaran `bukti-mutasi-aturan31-kawat.py`: program
 Aturan 39 **diekstrak dari `swift-ui-lint.sh`** dan dijalankan langsung di
@@ -135,9 +147,29 @@ def main():
     else:
         print("%s %-46s %s anggota statis, phaseGeometry instance" % ("OK   ", "indeks anggota terbaca", bidang[1]))
 
+    # **Jangkar ini ikut baris produksi yang dijaga.** Aturan 39 lahir dari
+    # galat `static member 'spokenStarClassLine' cannot be used on instance`
+    # yang sampai ke `origin/main` dan memerahkan CI macOS.
+    #
+    # Bentuk yang gagal dulu ada di produksi; kini produksi memakai bentuk
+    # **instance**. Itu mengubah apa yang bisa dibuktikan di sini, dan
+    # perubahannya harus dinyatakan, bukan dikalahkan:
+    # `spokenStarClassLine` kini ada **dua-duanya** sebagai statis (dipakai
+    # panel iPhone) dan sebagai instance (dipakai panel jam), jadi menyuntikkan
+    # `CelestialVisual.spokenStarClassLine(…)` di atas receiver `visual` tetap
+    # galat kompilasi, tapi penjaga instance di pemindai
+    # (`if anggota in instance.get(akar)`) melewatinya dengan benar — nama itu
+    # memang punya kembaran instance, seperti `phaseGeometry`.
+    #
+    # Karena itu mutasi memakai anggota yang **hanya statis** yang dijangkau dari
+    # `Apps/`: `visual.spokenStarClass(forStarID:)`. Bentuk yang disuntikkan sama
+    # persis — statis dipanggil pada instance `CelestialVisual` — dan nama itu
+    # tidak punya jalan keluar instance. Yang dibuktikan tetap "kelas galat yang
+    # memerahkan CI macOS berbunyi di gerbang"; kontrol `phaseGeometry` di bawah
+    # tetap membuktikan gerbang ini tidak menuduh kode yang sah.
     periksa("galat yang persis memerahkan CI", True,
-            (SRC, "let starClass = CelestialVisual.spokenStarClassLine(",
-             "let starClass = visual.spokenStarClassLine("))
+            (VIEW, "if isConfirmed, let phase = visual.phaseGeometry(waxing: visual.isWaxing) {\n            let disc = Path(ellipseIn:",
+             "if isConfirmed, let phase = visual.spokenStarClass(forStarID: visual.objectID) {\n            let disc = Path(ellipseIn:"))
 
     # Jangkar ini **bukan** baris produksi yang dijaga Aturan 39; ia hanya
     # titik sisip untuk membentuk receiver `CelestialVisual?` beranotasi.
