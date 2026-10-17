@@ -1,4 +1,76 @@
-## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: lencana keraguan yang bukan merah di mode malam)
+## Progres terakhir (17 Okt 2026 — siklus XCODE-DEV: garis & glif lencana ragu ikut dijaga, bukan cuma isinya)
+
+### Cacatnya
+
+`main` merah di CI Linux: gerbang jangkauan aksen
+(`check_night_accents_reach_the_view`) melaporkan 25 dari 26 warna terjangkau,
+`candidateFill` tidak dipakai. Bukan gerbang yang salah — isi lencana "engine
+ragu" memang diambil dari konstanta `dayRed`/`nightRed` di `CandidateMarker`,
+sementara token paletnya (`accents.candidateFill`) hanya dideklarasikan.
+
+Memperbaikinya menyingkap **tiga** cacat lain yang semuanya sunyi:
+
+1. `candidateStroke` (garis & glif lencana) dideklarasikan di `Accents`
+   tetapi **tidak diinisialisasi**, dan parameternya punya nilai bawaan amber
+   siang. Mode malam akan menggambar garis `(0.96, 0.70, 0.29)` — hijau &
+   biru bukan nol, tepat di mode yang membuang hue — tanpa satu gerbang pun
+   berbunyi. Nilai bawaan dihapus: anggota palet baru tidak bisa lagi lupa
+   diisi dan tetap kompilasi.
+2. Port Python `_warning_color` mengembalikan `(0.94, 0.62, 0.20)`, **bukan**
+   `TonePalette.day.warning` `(0.960, 0.700, 0.290)` yang dipakai view. Dua
+   oranye berbeda, dan `_warning_color` bukan bagian `ACCENTS` sehingga tak
+   ada yang membandingkannya. Sekarang membaca token yang sama.
+3. Harness `bukti-mutasi-aksen.py` menyematkan nilai `candidateFill` di
+   jangkarnya, jadi harness **mati** (melempar `JangkarHilang`) begitu nilai
+   tokennya berubah — persis yang terjadi saat perbaikan ini. Jangkar kini
+   tanpa angka.
+
+### Perbaikan
+
+- View memanggil `CelestialVisual.candidateFill(isNight:)` untuk isi dan
+  `CelestialVisual.candidateStroke(isNight:)` untuk garis/glif — kedua accessor
+  berdampingan di `NightVisual.swift`, sehingga gerbang jangkauan (yang hanya
+  menelusuri fungsi **berkas yang sama** dengan `Accents`) melihat keduanya.
+  Garis dibaca sekali ke `let stroke`, bukan tiga kali.
+- `candidateStroke` diinisialisasi eksplisit dari `ACCENTS`. Nilai malam
+  `1.0` (merah penuh): jarak 0.28 ke isi `0.72`, masih di atas nada malam
+  `0.982`.
+
+### Kenapa uji lama tidak menangkapnya (dan uji baru)
+
+Tidak ada uji yang menjaga **garis** lencana: ia dulu memakai
+`PointingTone.warning.color`, jalur di luar palet gambar. Uji baru di
+`CandidateMarkerTests`:
+
+- `testStrokeIsBrighterThanTheFillItOutlines`: garis harus >0.10 **kanal merah
+  mentah** di atas isi, kedua mode. Luma (0.2126·R) memampatkan selisih 4.7×
+  dan menyembunyikan perbedaan nyata — diukur: ambang 0.10 pada luma hanya
+  lolos kalau selisih merah ≥ 0.47, mustahil karena merah mentok di 1.0.
+- `testNightStrokeComesFromThePaletteToken`: garis malam = token `Accents` +
+  merah murni (hijau/biru = 0).
+
+`bukti-mutasi-token-lencana.py` (jalur `swift test` di Docker, terdaftar di
+`engine-tests.yml`) ditambah dua keadaan: 4. garis = isi (MERAH lewat uji
+pemilik), 5. token garis diturunkan berdekatan isinya (MERAH lewat uji jarak,
+bukan uji pemilik — mutasinya sengaja di `NightVisual.swift`).
+
+### Verifikasi
+
+    ./swift-test.sh          CelestialEngine 222 + PointingKit 860, 0 gagal
+    ./swift-ui-lint.sh       SEMUA GERBANG UI LULUS (41 aturan)
+    bukti-mutasi-aksen.py    14 keadaan, 0 tidak sesuai harapan
+    bukti-mutasi-token-lencana.py  6 keadaan, 0 tidak sesuai harapan
+    check-harness-terdaftar  82 harness, semuanya dirujuk
+    swift-typecheck.sh       SEMUA GERBANG LULUS
+    CI: Apple Build hijau pada ced2bed; Engine Tests (Linux) sedang berjalan
+
+### Yang TIDAK diklaim
+
+- Gerbang jangkauan mengukur **nama token** yang sampai ke view, bukan
+  pikselnya. Penempatan garis di layar jam tetap wilayah Apple Build.
+- Harness mutasi tidak membangun `Apps/` (Linux tanpa SwiftUI) dan tidak
+  membuktikan view memanggil `candidateStroke` — itu dijaga terpisah oleh
+  pembacaan diff dan Aturan 32.
 
 ### Cacatnya
 

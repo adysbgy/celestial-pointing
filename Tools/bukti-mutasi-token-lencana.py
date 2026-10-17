@@ -52,6 +52,19 @@ Keadaan yang diukur, dan apa yang masing-masing buktikan:
                dibedakan warna saja menghilang bersama hue-nya; yang
                tersisa harus tanda tanya. Wajib MERAH.
 
+  4. garis lencana = isi lencana
+               Garis yang sama dengan isinya berarti cincin hilang. Dulu garis
+               ini memakai `PointingTone.warning.color`, jalur di luar palet
+               gambar, jadi tidak ada uji yang menjaganya. Wajib MERAH.
+
+  5. token garis malam dibawa **turun** sampai menyentuh isinya
+               Nilainya diubah di palet (`NightVisual.swift`), bukan di
+               `CandidateMarker`. Itu disengaja: keadaan ini harus dibuktikan
+               oleh **jarak** (`testStrokeIsBrighterThanTheFillItOutlines`),
+               bukan oleh uji "satu pemilik". Kalau mutasinya di
+               `CandidateMarker`, uji pemilik yang lebih dulu berbunyi, dan
+               klaim jaraknya tidak pernah terbukti bisa merah.
+
 **Yang TIDAK diklaim harness ini.** Ia tidak menjalankan lint, tidak
 membangun `Apps/` (Linux tidak punya SwiftUI), dan tidak membuktikan bahwa
 `CelestialVisualView` benar-benar **memakai** `CandidateMarker.badgeFill` —
@@ -76,20 +89,40 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(ROOT, "Packages", "PointingKit", "Sources",
                       "PointingKit", "CandidateMarker.swift")
+#: Palet — tujuan mutasi keadaan 5. Nilai token diubah **di sini** supaya yang
+#: berbunyi adalah uji jarak, bukan uji "satu pemilik".
+PALETTE = os.path.join(ROOT, "Packages", "PointingKit", "Sources",
+                       "PointingKit", "NightVisual.swift")
+STROKE_TOKEN = "        candidateStroke: .init(red: 1.0, green: 0, blue: 0)"
 
 FILL_LINE = ("        .init(red: isNight ? nightRed : dayRed, "
              "green: 0, blue: 0)")
 GLYPH_LINE = '    public static let glyph = "?"'
+#: Cabang malam `stroke`, satu baris utuh (termasuk nama token) supaya
+#: penggantinya tidak ikut menyisipkan nama aksen yang mengubah hasil gerbang
+#: jangkauan — harness ini mengukur **uji lencana**, bukan gerbang lint.
+STROKE_NIGHT = ("            let token = CelestialVisual.accents.candidateStroke\n"
+                "            return CelestialVisual.RGBComponents("
+                "red: token.red, green: token.green,\n"
+                "                                                 "
+                "blue: token.blue)")
 
 STATES = [
     ("[baseline] sumber apa adanya", None),
-    ("1. isi lencana membawa hijau & biru", [
+    ("1. isi lencana membawa hijau & biru", {TARGET: [
         (FILL_LINE, "        .init(red: isNight ? nightRed : dayRed, "
-                    "green: 0.10, blue: 0.13)")]),
-    ("2. cabang malam mengembalikan merah siang", [
-        (FILL_LINE, "        .init(red: dayRed, green: 0, blue: 0)")]),
-    ("3. simbol ? diganti huruf biasa", [
-        (GLYPH_LINE, '    public static let glyph = "i"')]),
+                    "green: 0.10, blue: 0.13)")]}),
+    ("2. cabang malam mengembalikan merah siang", {TARGET: [
+        (FILL_LINE, "        .init(red: dayRed, green: 0, blue: 0)")]}),
+    ("3. simbol ? diganti huruf biasa", {TARGET: [
+        (GLYPH_LINE, '    public static let glyph = "i"')]}),
+    # 4 & 5 menjaga **garis** lencana, bagian yang sampai siklus ini tidak
+    # dijaga apa pun: ia dulu memakai `PointingTone.warning.color`, jalur di
+    # luar palet gambar yang diukur pemeriksa visual.
+    ("4. garis lencana = isi lencana", {TARGET: [
+        (STROKE_NIGHT, "            return badgeFill(isNight: true)")]}),
+    ("5. token garis menyentuh isinya", {PALETTE: [
+        (STROKE_TOKEN, "        candidateStroke: .init(red: 0.75, green: 0, blue: 0)")]}),
 ]
 
 #: Satu-satunya keadaan yang wajib HIJAU: baseline. Sisanya wajib merah —
@@ -133,24 +166,29 @@ def main() -> int:
               "apa pun.", file=sys.stderr)
         return 2
 
-    original = open(TARGET, encoding="utf-8").read()
-    for label, mutations in STATES:
-        for old, _new in mutations or ():
-            count = original.count(old)
-            if count != 1:
-                print(f"GERBANG: jangkar {label!r} muncul {count}x, harus "
-                      f"tepat 1x — harness tidak boleh jalan.", file=sys.stderr)
-                return 2
+    originals = {path: open(path, encoding="utf-8").read()
+                 for path in (TARGET, PALETTE)}
+    for label, per_file in STATES:
+        for path, mutations in (per_file or {}).items():
+            for old, _new in mutations:
+                count = originals[path].count(old)
+                if count != 1:
+                    print(f"GERBANG: jangkar {label!r} di "
+                          f"{os.path.basename(path)} muncul {count}x, harus "
+                          f"tepat 1x — harness tidak boleh jalan.",
+                          file=sys.stderr)
+                    return 2
 
     unexpected = 0
     try:
-        for index, (label, mutations) in enumerate(STATES):
+        for index, (label, per_file) in enumerate(STATES):
             must_be_red = index != 0 or BASELINE_MUST_BE_RED
-            text = original
-            for old, new in mutations or ():
-                text = text.replace(old, new, 1)
-            with open(TARGET, "w", encoding="utf-8") as handle:
-                handle.write(text)
+            for path in (TARGET, PALETTE):
+                text = originals[path]
+                for old, new in (per_file or {}).get(path, ()):
+                    text = text.replace(old, new, 1)
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write(text)
             green, output = run_tests()
             got_red = not green
             ok = got_red == must_be_red
@@ -164,13 +202,15 @@ def main() -> int:
                         print(f"       {line.strip()[:160]}")
                         break
     finally:
-        with open(TARGET, "w", encoding="utf-8") as handle:
-            handle.write(original)
+        for path, text in originals.items():
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(text)
 
-    if open(TARGET, encoding="utf-8").read() != original:
-        print("PEMULIHAN GAGAL — periksa CandidateMarker.swift",
-              file=sys.stderr)
-        return 2
+    for path, text in originals.items():
+        if open(path, encoding="utf-8").read() != text:
+            print(f"PEMULIHAN GAGAL — periksa {os.path.basename(path)}",
+                  file=sys.stderr)
+            return 2
 
     print()
     if unexpected:
