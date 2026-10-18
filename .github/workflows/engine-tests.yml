@@ -2420,5 +2420,32 @@ jobs:
       - name: Buktikan gerbang kabut ragu tidak paling terang berbunyi
         run: python3 Tools/bukti-mutasi-kabut-ragu.py
 
+      # Dan bukti untuk gerbang **"layar redup menerima versi hemat"**
+      # (Aturan 56).
+      #
+      # `NightAwareContainer` memilih isi mana yang tampil saat watchOS
+      # meredupkan layar. Sebelum Aturan 56, pemilihan itu berbunyi
+      # `if isLuminanceReduced` di berkas `Apps/` yang tidak pernah dibangun
+      # `swift-test.sh` di Linux dan tidak dibaca badan satu pun dari 55 aturan
+      # UI saat itu. Diukur pada salinan utuh, proses baru: **keenam** mutasi
+      # di bawah lulus seluruh lint (exit 0).
+      #
+      # Yang paling berbahaya bukan yang mengosongkan layar, melainkan yang
+      # mengisinya kembali dengan `fullView`: animasi, tombol, dan gestur yang
+      # justru diabaikan watchOS saat redup kembali ke Always-On -- dan tidak
+      # satu pun bisa terlihat dari layar lain, karena layar ini hanya tampil
+      # saat pergelangan diturunkan.
+      #
+      # Keadaan #6 (`choose(isLuminanceReduced: false)`) adalah yang paling
+      # berharga: bentuknya **memakai** model, jadi penjaga "ada
+      # `AlwaysOnContent.choose(`" akan hijau. Itu sebabnya Aturan 56 menuntut
+      # pengenalnya, bukan nama fungsinya.
+      #
+      # Pemilihan isinya sendiri sudah pindah ke `AlwaysOnContent` (PointingKit)
+      # dan diuji di Linux; harness ini menjaga sisi yang tidak bisa dieksekusi
+      # di sini, yaitu pemanggilnya.
+      - name: Buktikan Aturan 56 berbunyi pada layar redup yang diisi layar penuh
+        run: python3 Tools/bukti-mutasi-aturan56-layar-redup.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

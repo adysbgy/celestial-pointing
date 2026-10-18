@@ -237,6 +237,15 @@ struct ReducedLuminanceView: View {
 /// menghabiskan baterai tanpa pernah terlihat mulus. Menaruh keputusan ini di
 /// pembungkus (bukan di tiap layar) membuat penambahan animasi di cabang
 /// reduksi harus dilakukan secara eksplisit.
+///
+/// **Pemilihan isinya bukan `if` di sini lagi.** `switch AlwaysOnContent
+/// .choose(isLuminanceReduced:)` — diputuskan di `PointingKit` dan diuji di
+/// Linux — karena `if isLuminanceReduced` yang tinggal di berkas ini tidak
+/// dibaca badan satu pun dari 55 aturan UI: menggantinya dengan `if false`
+/// (selalu layar penuh) terukur membuat seluruh lint lulus. Lihat
+/// `AlwaysOnContentTests`. Dijaga juga Aturan 56 di `swift-ui-lint.sh`, yang
+/// membaca **pemanggilnya** — supaya cabang `reduced:` tetap menerima
+/// `ReducedLuminanceView(engine:)` dan bukan isi lain yang mengompilasi.
 struct NightAwareContainer<Content: View, Reduced: View>: View {
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
@@ -245,9 +254,15 @@ struct NightAwareContainer<Content: View, Reduced: View>: View {
     @ViewBuilder let reduced: () -> Reduced
 
     var body: some View {
-        if isLuminanceReduced {
+        // Kedua kasus ditulis eksplisit, tanpa `default:`. `AlwaysOnContent`
+        // punya dua kasus hari ini; kalau kelak bertambah, `switch` ini gagal
+        // dikompilasi (Aturan 37 di `swift-ui-lint.sh` menuntut daftar
+        // lengkap), sehingga layar baru tidak bisa diam-diam jatuh ke cabang
+        // yang salah.
+        switch AlwaysOnContent.choose(isLuminanceReduced: isLuminanceReduced) {
+        case .reduced:
             reduced()
-        } else {
+        case .full:
             content()
         }
     }

@@ -9403,6 +9403,167 @@ else
   echo "Bersih: setiap teks status dibaca minimal satu layar."
 fi
 
+# ── Aturan 56: layar redup menerima versi hemat, bukan layar penuh ──────────
+#
+# Kelas cacatnya: `NightAwareContainer` memilih **isi** mana yang tampil saat
+# watchOS meredupkan layar. Pemilihan itu dulu berbunyi `if isLuminanceReduced`
+# di `Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift` — berkas yang
+# tidak pernah dibangun `swift-test.sh` di Linux dan tidak dibaca badan satu pun
+# dari 55 aturan di atas.
+#
+# Terukur pada salinan utuh, proses baru, sebelum aturan ini ada. Ketiga mutasi
+# di bawah ini mengompilasi dan **seluruh 55 aturan lulus (exit 0)**:
+#
+#     reduced: { fullView }                            -> exit 0
+#     reduced: { ReducedLuminanceView(engine: PointingEngine()) } -> exit 0
+#     reduced: { EmptyView() }                          -> exit 0
+#     if isLuminanceReduced  ->  if false               -> exit 0
+#
+# Yang pertama mengembalikan seluruh layar interaktif ke Always-On: animasi,
+# tombol, dan gestur yang justru diabaikan watchOS saat redup. Yang kedua
+# menampilkan nama objek dari mesin yang tidak pernah menerima satu sampel pun
+# — layar redup yang selalu berbunyi "Mencari" di sebelah jam yang sedang
+# terkunci. Yang ketiga mengosongkan layar yang dibuat untuk dibaca sekilas.
+# Tidak satu pun bisa terlihat dari layar lain, karena layar ini hanya tampil
+# saat pergelangan diturunkan.
+#
+# **Kenapa keputusannya dipindah, bukan hanya dijaga.** Pemilihan isi sekarang
+# hidup di `AlwaysOnContent.choose(isLuminanceReduced:)` (PointingKit) dan
+# diuji di Linux (`AlwaysOnContentTests`). Aturan ini menjaga sisi yang tidak
+# bisa dieksekusi di sini: **pemanggilnya**. Dua lapis, dua kelas cacat —
+# nilai yang salah dijaga uji, isi yang salah dijaga sapuan teks.
+#
+# **Kenapa fail-closed.** Nol pemanggil `NightAwareContainer` berarti aturan
+# ini tidak mengukur apa pun. Hijau dalam keadaan itu adalah hijau yang kosong,
+# dan justru itulah bentuk kegagalan yang paling mungkin: berkasnya diganti
+# nama, atau layarnya berhenti memakai pembungkus itu sama sekali.
+echo
+echo "== Aturan 56: layar redup menerima versi hemat, bukan layar penuh =="
+redup_salah=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+def blok_dari(isi, buka):
+    """Isi antara `{` di posisi buka dan pasangannya, atau None."""
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "{":
+            dalam += 1
+        elif isi[i] == "}":
+            dalam -= 1
+            if dalam == 0:
+                return isi[buka + 1:i], i
+    return None, -1
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 56 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+pemanggil = 0
+wadah_terbaca = 0
+
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+
+    # ── Arah 1: setiap pemanggil wajib mengisi `reduced:` dengan versi hemat.
+    for m in re.finditer(r"\bNightAwareContainer\s*\{", isi):
+        buka = isi.find("{", m.start())
+        isi_utama, tutup = blok_dari(isi, buka)
+        if isi_utama is None:
+            masalah.append("  %s: `NightAwareContainer` tanpa kurung kurawal "
+                           "seimbang -- aturan tidak bisa memutuskan." % path)
+            continue
+        sisa = isi[tutup + 1:]
+        label = re.match(r"\s*reduced\s*:\s*\{", sisa)
+        if not label:
+            masalah.append(
+                "  %s: `NightAwareContainer` tanpa cabang `reduced:` -- layar "
+                "redup tidak punya isi hemat." % path)
+            continue
+        buka_redup = tutup + 1 + label.end() - 1
+        isi_redup, _ = blok_dari(isi, buka_redup)
+        if isi_redup is None:
+            masalah.append("  %s: cabang `reduced:` tanpa kurung kurawal "
+                           "seimbang." % path)
+            continue
+        pemanggil += 1
+        # Bentuk yang sah: `ReducedLuminanceView(engine: <pengenal>)`.
+        # Penerima yang mengandung tanda kurung berarti mesin baru
+        # (`PointingEngine()`), bukan mesin yang sedang diamati layar.
+        sah = re.search(r"\bReducedLuminanceView\s*\(\s*engine\s*:\s*"
+                        r"([A-Za-z_]\w*)\s*[,)]", isi_redup)
+        if not sah:
+            masalah.append(
+                "  %s: cabang `reduced:` tidak meneruskan "
+                "`ReducedLuminanceView(engine: <mesin yang sama>)` -- isi "
+                "layar redup bukan versi hemat." % path)
+
+    # ── Arah 2: pembungkusnya sendiri wajib memakai keputusan model.
+    for m in re.finditer(r"\bstruct\s+NightAwareContainer\b", isi):
+        buka = isi.find("{", m.start())
+        badan, _ = blok_dari(isi, buka)
+        if badan is None:
+            continue
+        wadah_terbaca += 1
+        if "AlwaysOnContent.choose(isLuminanceReduced: isLuminanceReduced)" \
+                not in badan:
+            masalah.append(
+                "  %s: `NightAwareContainer` tidak memakai "
+                "`AlwaysOnContent.choose(isLuminanceReduced: "
+                "isLuminanceReduced)` -- pemilihan isi harus meneruskan "
+                "keadaan layar yang sebenarnya, bukan literal." % path)
+        if re.search(r"\bif\s+isLuminanceReduced\b", badan):
+            masalah.append(
+                "  %s: `NightAwareContainer` masih bercabang langsung pada "
+                "`isLuminanceReduced` -- keputusan isi harus lewat model "
+                "yang diuji." % path)
+
+if wadah_terbaca == 0:
+    print("PERINGATAN: `NightAwareContainer` tidak ditemukan di %s -- "
+          "Aturan 56 tidak mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+if pemanggil == 0:
+    print("PERINGATAN: tidak ada pemanggil `NightAwareContainer` di %s -- "
+          "Aturan 56 tidak mengukur satu layar pun." % AKAR)
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$redup_salah" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 56 tidak bisa memutuskan:"
+  echo "$redup_salah"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$redup_salah" ]; then
+  echo "$redup_salah"
+  echo "-> Saat layar redup, yang tampil harus versi sederhana & kontras"
+  echo "   tinggi dari mesin yang sama -- bukan layar penuh, bukan mesin baru,"
+  echo "   bukan layar kosong."
+  status=1
+else
+  echo "Bersih: setiap layar redup memakai versi hemat dari mesinnya sendiri."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
