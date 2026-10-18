@@ -1,5 +1,24 @@
 name: Engine Tests (Linux)
 on: [push, pull_request, workflow_dispatch]
+
+# Hanya commit terbaru per ref yang perlu diuji.
+#
+# Tanpa ini, setiap push menambah satu run penuh di samping yang masih jalan:
+# 236 langkah, ~2 jam, tanpa batas. Terukur pada 18 Okt 2026 — delapan run
+# berjalan bersamaan, yang tertua sudah 91 menit dan yang terbaru baru
+# menyiapkan container. Yang penting: run tertua menguji kode yang **sudah
+# tidak ada** di `main`, jadi hijau-nya tidak membuktikan apa pun tentang
+# commit sekarang, sementara hasil yang benar tertahan di belakang tumpukan.
+#
+# `cancel-in-progress: true` menghapus tumpukan itu: hasil yang datang selalu
+# tentang commit terbaru. Sama seperti `ios-build.yml`, yang sudah begini.
+#
+# Yang TIDAK diklaim: membatalkan run lama bukan berarti lebih cepat. Waktu
+# satu run tetap ~2 jam; yang hilang hanya pekerjaan yang sudah pasti basi.
+concurrency:
+  group: engine-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
