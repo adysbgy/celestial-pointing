@@ -102,6 +102,36 @@ yang punya sumber di berkas itu (supaya `objectName: nil` yang sah tidak
 tertuduh). Pemilihan fakta yang disembunyikan di balik fungsi pembantu tetap
 tidak terlihat oleh aturan ini.
 
+#### Dua `main` merah sebelum hijau: parser bash macOS menolak isi Aturan 35
+
+Aturan baru ini ditulis sebagai badan heredoc `$(python3 - <<'PY' ... PY )`.
+Di Linux (bash 5.2/5.3) ia jalan; di runner macOS ia **tidak pernah sampai
+Aturan 36**. Dua kegagalan, dua sebab berbeda, keduanya hanya muncul di
+bash 3.2:
+
+    line 8974: unexpected EOF while looking for matching `'
+    line 9003: syntax error: unexpected end of file
+
+1. **Apostrof.** `['is','displaying',...]` dan `# 2c'.` kutaruh di badan.
+   Bash 3.2 menghitung kutip tunggal saat mengumpulkan `$( ... )` meskipun
+   delimiter-nya berpetik. Diganti kata biasa — **belum cukup**, masih merah.
+2. **Backtick tunggal.** Tiga literal `"/`."` masing-masing membawa satu
+   backtick. Hitungannya ganjil, jadi bash 3.2 membuka command substitution di
+   dalam heredoc, mencari pasangan sampai EOF, dan menelan sisa berkas —
+   Aturan 36..52 tidak pernah dijalankan sama sekali. Diganti `"/."`.
+
+Cara menemukannya, karena tebakan dua kali salah: `bash -n` versi lama exit 0,
+versi baruku exit 2 di image `bash:3.2` — regresinya terbukti milikku, bukan
+bawaan. Lalu badan Aturan 35 diuji **sendiri** di image itu, dan tiap baris
+tambahan diperiksa satu per satu sampai tinggal tiga baris ber-backtick ganjil.
+
+Aturan untuk siklus berikut: **di dalam badan heredoc `$( ... )`, tidak boleh
+ada backtick ganjil dan tidak ada kutip tunggal tak berpasangan** — keduanya
+sah sebagai Python, tetapi bukan sebagai masukan parser bash 3.2. Gerbang yang
+menangkapnya tanpa macOS:
+
+    sudo docker run --rm -v "$PWD":/src -w /src bash:3.2 bash -n /src/swift-ui-lint.sh
+
 ---
 
 ### Siklus (18 Okt 2026 — `main` merah lagi: angka 42 yang dilaporkan "sudah diperbaiki" ternyata **tidak pernah diubah**)
