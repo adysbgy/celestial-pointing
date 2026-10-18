@@ -1076,6 +1076,27 @@ jobs:
       - name: Buktikan gerbang kejujuran izin lokasi Aturan 54 berbunyi
         run: python3 Tools/bukti-mutasi-aturan54-izin-lokasi.py
 
+      # Teks status yang **ditulis tapi tidak pernah dibaca**. Kelas yang paling
+      # sulit dilihat karena tidak ada yang tampak salah: tidak ada teks yang
+      # salah kata, tidak ada tata letak yang jebol, dan 54 aturan lain hijau.
+      # Yang hilang justru kabarnya.
+      #
+      # Terukur di `main`: `WatchLinkService.lastMessageNote` ditulis 7 kali,
+      # dibaca 0 kali. Kembarannya di iPhone (`PhoneLinkService.lastNote`)
+      # dibaca `LinkView` — jadi membandingkan kedua service tidak
+      # mencurigakan. Yang membuatnya berbahaya: `send(calibration:)` adalah
+      # satu-satunya jalan sigma sampai ke iPhone, dan saat sesi belum aktif ia
+      # menulis `calibrationNotSent` sementara layar jam berbunyi "Kalibrasi
+      # terpasang".
+      #
+      # Tujuh keadaan: cacat aslinya, properti baru tanpa pembaca (membuktikan
+      # daftarnya diturunkan dari akhiran nama, bukan daftar tangan), kontrol
+      # negatif, pembacaan hanya di berkas sendiri (yang membuat cacat ini
+      # lolos: `handle(_:)` membacanya untuk menyusun nilai berikutnya),
+      # `Apps/` hilang, dan berkas view hilang.
+      - name: Buktikan gerbang teks-status-mati Aturan 55 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan55-teks-mati.py
+
       # Samaran keraguan: gambar yang **belum pasti** harus kehilangan
       # ketegasannya, bukan hanya cirinya. Semua gerbang keraguan lain bekerja
       # dari ciri pengenal (pita, cincin, maria, morfologi); yang tidak pernah
