@@ -10703,9 +10703,131 @@ else
        "semuanya punya penanda kedua."
 fi
 
+# ── Aturan 62: layar yang mengenali objek wajib menggambar visualnya ────────
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka.
+#
+# Seluruh misi produk ini adalah "arahkan jam ke langit, ketahui apa yang kamu
+# lihat". Ketika engine mengenali objek, hal yang membuat pengguna percaya
+# adalah **bentuknya** — pita Jupiter, cincin Saturnus, sabit Bulan. Teks saja
+# sudah ada sebelum misi poles dimulai.
+#
+# Dua mutasi berikut mengompilasi dan membuat seluruh **61** aturan tetap
+# hijau, dan keduanya menghapus persis hal itu:
+#
+#     PointingView.swift      `if let visual {`  -> `if false {`      exit 0
+#     DiagnosticsView.swift   `CelestialVisualView(...)` -> `EmptyView()`  exit 0
+#
+# Yang pertama adalah kartu jawaban di jam — satu-satunya tempat pengguna
+# melihat objek saat `.lock`. Yang kedua adalah panel detail iPhone. Setelah
+# mutasi itu aplikasi tetap berjalan, tetap mengunci objek dengan benar, tetap
+# menulis namanya, dan tetap lulus setiap gerbang: hanya gambarnya yang hilang.
+#
+# Kenapa tidak ada gerbang yang menangkapnya: `check-visuals.py` membaca
+# `CelestialVisualView.swift` (penggambarnya) dan port Python-nya, jadi ia bisa
+# membuktikan pita Jupiter digambar dengan benar **tanpa pernah bertanya apakah
+# penggambar itu dipanggil di layar**. Aturan 34 menjaga argumen
+# `isConfirmed:` pada pemanggilan itu, bukan keberadaan pemanggilannya.
+#
+# Yang diperiksa karena itu bukan "apakah `CelestialVisualView` ada di berkas",
+# melainkan: setiap permukaan yang **menyatakan identitas objek** harus
+# memuat pemanggilan penggambar visual di dalam badan yang sama, dan
+# pemanggilan itu tidak boleh berada di bawah kondisi yang selalu salah.
+echo
+echo "== Aturan 62: layar yang mengenali objek wajib menggambar visualnya =="
+visual_objek=$(python3 - <<'PY' 2>&1
+import os
+import re
+import sys
+
+MASALAH = []
+TERBACA = 0
+
+# Permukaan yang menyatakan identitas objek, beserta penanda bahwa ia memang
+# permukaan jawaban. Yang dituntut: pemanggilan penggambar di badan yang sama.
+PERMUKAAN = [
+    ("Apps/PointAndKnowWatch/Sources/PointingView.swift",
+     "kartu jawaban jam"),
+    ("Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift",
+     "panel detail iPhone"),
+]
+
+PENGGAMBAR = "CelestialVisualView("
+
+# Kondisi yang selalu salah: pemanggilan di bawahnya tidak pernah tampil.
+SELALU_SALAH = re.compile(r"(?<![\w.])if\s+false\b|\bguard\s+false\b")
+
+for path, sebutan in PERMUKAAN:
+    if not os.path.exists(path):
+        MASALAH.append("  %s: berkas %s tidak ada -- permukaan %s hilang, "
+                       "dan aturan ini tidak bisa memeriksanya"
+                       % (path, path, sebutan))
+        continue
+    with open(path, encoding="utf-8") as handle:
+        sumber = handle.read()
+    TERBACA += 1
+    jumlah = sumber.count(PENGGAMBAR)
+    if jumlah == 0:
+        MASALAH.append(
+            "  %s: %s tidak memanggil %s sama sekali -- pengguna melihat nama "
+            "objek tanpa bentuknya, dan tidak ada gerbang lain yang membaca ini"
+            % (path, sebutan, PENGGAMBAR.rstrip("(")))
+        continue
+    # Setiap pemanggilan harus berada di luar kondisi yang selalu salah.
+    for m in re.finditer(re.escape(PENGGAMBAR), sumber):
+        baris = sumber.count("\n", 0, m.start()) + 1
+        # Cari `if false`/`guard false` terdekat di atasnya yang membuka blok
+        # dan belum ditutup pada baris ini. Pendekatan sederhana dan cukup:
+        # hitung kedalaman kurawal sejak awal berkas.
+        kedalaman = 0
+        salah_pada = None
+        for i, ch in enumerate(sumber[:m.start()]):
+            if ch == "{":
+                kedalaman += 1
+            elif ch == "}":
+                kedalaman -= 1
+        # Kumpulkan `if false` yang bloknya masih terbuka di titik ini.
+        for s in SELALU_SALAH.finditer(sumber[:m.start()]):
+            buka = sumber.find("{", s.end())
+            if buka < 0 or buka > m.start():
+                continue
+            dalam = 0
+            for ch in sumber[buka:m.start()]:
+                if ch == "{":
+                    dalam += 1
+                elif ch == "}":
+                    dalam -= 1
+            if dalam > 0:
+                salah_pada = sumber.count("\n", 0, s.start()) + 1
+                break
+        if salah_pada is not None:
+            MASALAH.append(
+                "  %s:%d: pemanggilan %s berada di bawah kondisi yang selalu "
+                "salah (baris %d) -- gambarnya tidak pernah tampil"
+                % (path, baris, PENGGAMBAR.rstrip("("), salah_pada))
+
+if TERBACA == 0:
+    print("PERINGATAN: tidak ada permukaan yang terbaca -- aturan ini tidak "
+          "mengukur apa pun. Hijau di sini berarti 'tidak diperiksa', bukan "
+          "'benar'.")
+    sys.exit(1)
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    sys.exit(1)
+
+print("Bersih: %d permukaan mengenali objek dan menggambar visualnya."
+      % TERBACA)
+PY
+)
+status=$?
+echo "$visual_objek"
+[ "$status" -ne 0 ] && status=1
+
+
 if [ "$status" -eq 0 ]; then
   echo
-  echo "== SEMUA GERBANG UI LULUS =="
+echo "== SEMUA GERBANG UI LULUS =="
 else
   echo
   echo "== GERBANG UI GAGAL =="
