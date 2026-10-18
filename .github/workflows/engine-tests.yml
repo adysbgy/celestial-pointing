@@ -1519,6 +1519,24 @@ jobs:
       - name: Buktikan Aturan 50 berbunyi pada ciri pengenal yang bocor
         run: python3 Tools/bukti-mutasi-ciri-ragu.py
 
+      # Dan bukti untuk Aturan 51 — dua situs **lain** yang sama kelasnya dan
+      # terukur lolos dari seluruh 50 aturan sebelumnya:
+      #
+      #   1. penjaga fase planet dalam (`if isConfirmed, let phase = …`) di
+      #      `drawPlanet` dihapus, atau dibalik -> exit 0;
+      #   2. `planet.palette.drawable(isConfirmed: isConfirmed)` kehilangan
+      #      argumennya (`drawable()`, di Swift berarti palet penuh) ->
+      #      exit 0. Aturan 34 hanya menangkap literal `isConfirmed: true`,
+      #      bukan argumen yang hilang.
+      #
+      # Arah keduanya yang membuat harness ini berharga: gerbang
+      # pra-Aturan51 (dibaca lewat `git show`) dijalankan atas cacat yang
+      # sama dan **wajib hijau** — bukti lubangnya nyata, bukan dikarang
+      # aturan yang selalu berbunyi. Langkah Aturan 10 dilepas di salinan
+      # gerbang lama, karena angka aturan di README pohon ini sudah 51.
+      - name: Buktikan Aturan 51 berbunyi pada sabit & warna planet yang bocor
+        run: python3 Tools/bukti-mutasi-saputangan-ragu.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:

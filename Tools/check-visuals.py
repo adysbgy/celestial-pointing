@@ -997,20 +997,27 @@ def check_deep_sky_shape_suppression(results, size=200, ss=2):
          mutasi itu, kedua gerbang tersebut hijau sementara bentuknya jelas
          sama. Hanya pemeriksaan ini yang memerah.
 
-         **`nebula` dikecualikan, dan itu fakta model, bukan kelonggaran.**
-         `CelestialVisual.deepSky(morphology:)` memetakan `.nebula` ke
-         `nebula(fuzziness:)` — fungsi yang **sama** dengan yang dipanggil
-         untuk morfologi `nil`. Jadi kabut emisi memang berbentuk identik
-         dengan kabut netral; yang membedakan keduanya hanya warna. Diukur:
-         bentuk-saja `nebula` = 0 piksel di semua keadaan, dan itu benar.
-         Menuntutnya bukan-nol berarti menuntut model diubah.
+         **`nebula` TIDAK dikecualikan — dan itu baru, bukan kelonggaran.**
+         Sampai siklus ini ia dikecualikan berdasar kalimat yang sudah basah:
+         "`deepSky(morphology:)` memetakan `.nebula` ke `nebula(fuzziness:)` —
+         fungsi yang sama dengan yang dipanggil untuk `nil`". Itu **benar**
+         sampai `uncertainFog` lahir; sejak itu `nil` memanggil
+         `uncertainFog`, dan bentuknya berbeda. Diukur pada fuzziness 0.8:
+
+             nebula : blob (-0.18, 0.12) (0.22, -0.16) (0.05, -0.04)
+                      setengah-lebar 0.758 / 0.490 / 0.351
+             ragu   : blob ( 0.00, 0.00) (0.10,  0.06) (-0.08, -0.05)
+                      setengah-lebar 0.314 / 0.216 / 0.170
+
+         Pengecualian yang bertahan di atas kalimat basah itu membuat arah (2)
+         **buta pada satu morfologi yang sah diklaim**: terukur, port yang
+         menjatuhkan `.nebula` ke geometri kabut netral tetap hijau di sini.
+         `nebula` pun ikut diukur sekarang, dan bentuk-sajanya terhadap netral
+         terukur **11997 piksel** — bukan nol.
     """
     fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
     morphologies = ("nebula", "planetaryNebula", "galaxy",
                     "spiralGalaxy", "openCluster", "globularCluster")
-    # `nebula` berbentuk sama dengan netral (lihat docstring) — perbandingan
-    # bentuk-saja tidak bisa dan tidak boleh menuntut apa pun darinya.
-    shape_morphologies = tuple(m for m in morphologies if m != "nebula")
 
     def render_case_for(morphology, confirmed, colour_neutral=False):
         """Render satu morfologi lewat PNG yang sama dengan `render_case`.
@@ -1067,7 +1074,7 @@ def check_deep_sky_shape_suppression(results, size=200, ss=2):
     # (2) Arah sebaliknya, bentuk-saja: saat terkunci, bentuk morfologi itu
     # benar-benar sampai ke gambar.
     _, _, rows_locked_neutral = render_case_for(None, True, colour_neutral=True)
-    for morphology in shape_morphologies:
+    for morphology in morphologies:
         _, _, rows_shape = render_case_for(morphology, True, colour_neutral=True)
         diff = badge_excluded_diff(rows_shape, rows_locked_neutral,
                                    w0, h0, (fx0, fy0, fx1, fy1))
@@ -3035,10 +3042,15 @@ def read_deep_sky_layouts_from_swift(source):
     untuk mencegah, dan yang sudah muncul untuk palet planet, kawah, dan
     maria.
 
-    Nama kuncinya sama dengan `Morphology.rawValue`, ditambah `"nebula"`
-    untuk bentuk netral (`VisualFrame.nebula`, yang dipakai saat morfologi
-    `nil`). Dibaca dari sumber, bukan ditulis sebagai daftar: daftar tangan
-    adalah daftar yang bisa tertinggal separuh saat bentuk baru ditambah.
+    Nama kuncinya sama dengan `Morphology.rawValue`, **ditambah** kunci `None`
+    untuk kabut ragu (`VisualFrame.uncertainFog`) — dan `.nebula` adalah
+    morfologi yang **sah diklaim** (M42 memang nebula emisi), bukan bentuk
+    netral. Sampai siklus ini berkas ini menyebut `nebula` sebagai \"bentuk
+    netral yang dipakai saat `nil`\"; itu benar sebelum `uncertainFog` ada,
+    dan kalimat itulah yang melahirkan pengecualian `nebula` di
+    `check_deep_sky_shape_suppression` — pengecualian yang membuat gerbang
+    itu buta pada satu morfologi yang bisa diklaim. Dua kalimat basah, dua
+    lubang; karena itu keduanya diganti di siklus yang sama.
     """
     out: dict[str, list[tuple[float, ...]]] = {}
 
@@ -4062,8 +4074,10 @@ def check_every_morphology_in_the_model_has_render_cases(results):
          ia tidak pernah menggambar apa pun. Arah ini yang menutup "bentuk
          ditambahkan ke port saja" — keadaan yang, tanpa pemeriksaan ini,
          hanya terlihat oleh pembaca yang membandingkan dua berkas dengan
-         mata. `"nebula"` dikecualikan karena ia bentuk **netral** (dipakai
-         saat morfologi `nil`), bukan kasus enum.
+         mata. Bentuk netral dibaca dari pembacanya (`read_names`), bukan
+         didaftar: `.nebula` **bukan** kasus enum-neutral — ia kasus enum yang
+         sah diklaim, dan menyebutnya netral pernah membuat gerbang tetangga
+         memaafkannya. Lihat `read_deep_sky_layouts_from_swift`.
 
     Daftar `cases` dibaca dari `DeepSkyCatalogue.swift` (tempat enum-nya),
     bukan dari `Planet`-style `allCases` — lihat
@@ -4139,13 +4153,18 @@ def check_every_morphology_in_the_model_has_render_cases(results):
     #    mana pun — kode mati yang tampak seperti pekerjaan selesai.
     #
     #    **Bentuk netral dibaca dari model, bukan didaftar di sini.** Port
-    #    memuat dua kunci yang bukan kasus enum: `"nebula"` dan `None` (kabut
-    #    ragu). Sampai siklus ini `"nebula"` dikecualikan dengan daftar tangan
-    #    `{"nebula"}`, dan kunci `None` — yang lahir bersama `uncertainFog` —
-    #    tidak ikut, jadi **seluruh gerbang memerah pada pohon yang benar**
-    #    selama dua commit. Daftar tangan selalu tertinggal satu kunci di
-    #    belakang model; yang dipakai sekarang adalah kunci yang benar-benar
-    #    dibaca `read_deep_sky_layouts_from_swift` dari `CelestialVisual.swift`
+    #    memuat satu kunci yang bukan kasus enum: `None` (kabut ragu,
+    #    `uncertainFog`). Sampai siklus ini kalimat ini berbunyi "dua kunci,
+    #    `\"nebula\"` dan `None`" — padahal `.nebula` adalah **kasus enum yang
+    #    sah diklaim** (M42 memang nebula emisi). Kekeliruan yang sama
+    #    melahirkan pengecualian `nebula` di
+    #    `check_deep_sky_shape_suppression`, dan membuat gerbang itu buta pada
+    #    satu morfologi yang bisa diklaim. Kalimatnya diganti di siklus yang
+    #    sama dengan pengecualiannya, karena keduanya satu cacat.
+    #
+    #    Daftar tangan selalu tertinggal satu kunci di belakang model; yang
+    #    dipakai sekarang adalah kunci yang benar-benar dibaca
+    #    `read_deep_sky_layouts_from_swift` dari `CelestialVisual.swift`
     #    (`read_names`), jadi bentuk netral baru ikut terkecuali tanpa ada
     #    yang perlu ingat menambahkannya.
     #

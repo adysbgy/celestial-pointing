@@ -31,12 +31,12 @@ Keadaan yang diuji:
                                       benar: ia membandingkan dua render
                                       **terkunci**, yang pada mutasi ini tidak
                                       berubah.
-  2. bentuk bocor saat ragu,          mutasi paling licik: gerbang versi kedua
-     warna tetap ditekan              hijau di sini untuk 5 dari 6 morfologi.
-                                      Arah (1) harus memerah untuk kelimanya.
-                                      `nebula` tetap hijau karena bentuknya
-                                      memang sama dengan kabut netral (diukur),
-                                      jadi mutasi ini tak mengubah gambarnya.
+  2. bentuk bocor saat ragu,          mutasi paling licik. Arah (1) memerah
+     warna tetap ditekan              untuk **keenam** morfologi, `nebula`
+                                      ikut: bentuknya berbeda dari kabut
+                                      netral sejak `uncertainFog` ada (diukur
+                                      18852 piksel pada mutasi ini), jadi
+                                      mutasi ini memang mengubah gambarnya.
   3. bentuk diabaikan **selamanya**   morfologi tidak pernah dipakai untuk
      (warna tetap benar)              bentuk, terkunci maupun ragu. Arah (1)
                                       hijau (penekanan tetap benar) dan seluruh
@@ -46,6 +46,18 @@ Keadaan yang diuji:
                                       berbeda). Hanya arah (2) yang memerah —
                                       inilah satu-satunya gerbang yang
                                       menangkapnya.
+  4. nebula jatuh ke geometri         **Non-vakuositas keadaan 1-3.** Keempat
+     netral (wajib merah di arah 2)   keadaan di atas tidak pernah bisa gagal
+                                      karena `.nebula` berhenti diukur: nama
+                                      pemeriksaannya tinggal tidak muncul dan
+                                      `verdicts.get(...)` mengembalikan
+                                      "TIDAK ADA". Keadaan ini memutasi
+                                      `DEEP_SKY_LAYOUT` — tata letaknya hidup
+                                      di tingkat modul, di luar penggambar —
+                                      dan menuntut arah (2) memerah **khusus
+                                      nebula**. Terukur pada gerbang
+                                      pra-perbaikan: "TIDAK ADA" di baseline
+                                      sekalipun, jadi lubangnya nyata.
 
 Berkas sumber produksi (`Tools/render-visuals.py`) **dimutasi dengan sengaja**
 lalu dipulihkan di `finally` per keadaan, plus handler `SIGINT`/`SIGTERM`:
@@ -129,6 +141,15 @@ SHAPE_CALL_NONE = 'blobs = deep_sky_blobs(None,'
 CLUSTER_CORES_CALL = 'for star in cluster_cores(morphology,'
 CLUSTER_CORES_CALL_NONE = 'for star in cluster_cores(None,'
 
+# Mutasi **di luar** fungsi penggambar: tata letak blob itu sendiri. Dipakai
+# keadaan 4, yang tidak bisa dijangkau dari dalam `_draw_deep_sky`.
+NEBULA_LAYOUT = '''    "nebula": [(-0.18, 0.12, 1.00, 1.0, 0.0, 0.42),
+               (0.22, -0.16, 0.68, 1.0, 0.0, 0.30),
+               (0.05, -0.04, 0.40, 1.0, 0.0, 0.55)],'''
+NEBULA_LAYOUT_AS_NEUTRAL = '''    "nebula": [(0.00, 0.00, 0.34, 1.0, 0.0, 0.14),
+               (0.10, 0.06, 0.26, 1.0, 0.0, 0.10),
+               (-0.08, -0.05, 0.20, 1.0, 0.0, 0.11)],'''
+
 # Penjaga: jangkar harus muncul **tepat sekali** — tetapi di dalam **fungsi
 # penggambarnya**, bukan di seluruh berkas.
 #
@@ -183,19 +204,29 @@ M2_CALL = 'blobs = deep_sky_blobs(_shape_morphology,'
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
 MORPHOLOGIES = ("nebula", "planetaryNebula", "galaxy",
                 "spiralGalaxy", "openCluster", "globularCluster")
-# `nebula` berbentuk identik dengan kabut netral: `deep_sky_blobs("nebula", f)`
-# **sama persis** dengan `deep_sky_blobs(None, f)` di semua fuzziness (diukur),
-# karena `CelestialVisual.deepSky(morphology:)` memetakan `.nebula` ke fungsi
-# yang sama dengan `nil`. Konsekuensinya, pemeriksaan berbasis **bentuk**
-# memang tidak bisa menuntut apa pun dari `nebula` — dan itu fakta model.
-# Yang membedakan nebula emisi dari kabut netral hanyalah **warna**.
-SHAPE_MORPHOLOGIES = tuple(m for m in MORPHOLOGIES if m != "nebula")
+# **Kenapa `nebula` TIDAK dikecualikan, padahal dulu pernah.** Pengecualiannya
+# dibangun di atas satu kalimat: "`deepSky(morphology:)` memetakan `.nebula` ke
+# `nebula(fuzziness:)` — fungsi yang sama dengan yang dipanggil untuk `nil`".
+# Kalimat itu benar **sampai `uncertainFog` lahir**; sejak itu `nil` memanggil
+# `uncertainFog`, dan kedua bentuknya berbeda. Diukur pada fuzziness 0.8:
+#
+#     nebula : blob (-0.18, 0.12) (0.22, -0.16) (0.05, -0.04)
+#              setengah-lebar 0.758 / 0.490 / 0.351
+#     ragu   : blob ( 0.00, 0.00) (0.10,  0.06) (-0.08, -0.05)
+#              setengah-lebar 0.314 / 0.216 / 0.170
+#
+# Kalimat yang basah itu melakukan dua kerusakan sekaligus, dan keduanya
+# terukur: (a) arah (2) gerbang menjadi **buta** pada `.nebula` — port yang
+# menjatuhkan nebula ke geometri kabut netral tetap hijau; (b) harness ini
+# menuntut `nebula` **hijau** di keadaan 2, padahal mutasinya mengubah gambar
+# nebula sebesar 18852 piksel, sehingga **harness memerah pada gerbang yang
+# benar** dan `main` merah tiga commit berturut-turut.
+#
+# Jadi keenam morfologi diukur, tanpa pengecualian.
 SUPPRESSED = [f"saat ragu, morfologi {m} tidak mengubah gambar"
               for m in MORPHOLOGIES]
-SUPPRESSED_SHAPE = [f"saat ragu, morfologi {m} tidak mengubah gambar"
-                    for m in SHAPE_MORPHOLOGIES]
 VISIBLE = [f"bentuk {m} sampai ke gambar saat terkunci"
-           for m in SHAPE_MORPHOLOGIES]
+           for m in MORPHOLOGIES]
 
 
 def _hijau(names):
@@ -216,13 +247,16 @@ STATES = [
      {**_hijau(VISIBLE), **{n: "merah" for n in SUPPRESSED}}),
     # Mutasi paling licik: warna tetap ditekan (gerbang versi kedua hijau di
     # sini untuk lima dari enam morfologi), tapi bentuknya bocor saat ragu.
-    # Arah (1) memerah untuk kelima morfologi yang bentuknya berbeda dari
-    # netral. `nebula` tetap hijau karena bentuknya memang sama dengan netral
-    # (diukur) — mutasi ini tidak mengubah gambar nebula sama sekali.
+    # Arah (1) memerah untuk **keenam** morfologi. `nebula` ikut memerah:
+    # sejak `uncertainFog` ada, bentuk nebula emisi berbeda dari kabut netral,
+    # jadi mutasi ini mengubah gambar nebula sebesar 18852 piksel (diukur).
+    # Sampai siklus ini harness menuntutnya **hijau** — dan karena gerbang
+    # mengukur benar (merah), harness memerah pada gerbang yang benar dan
+    # `main` merah tiga commit. Harapannya yang salah, bukan gerbangnya:
+    # keadaan 4 di bawah membuktikan gerbang ini berbunyi pada nebula.
     ("2. bentuk bocor saat ragu, warna tetap ditekan",
      [(SHAPE_ANCHOR, M2_SHAPE), (SHAPE_CALL, M2_CALL)],
-     {**_hijau(VISIBLE + [f"saat ragu, morfologi nebula tidak mengubah gambar"]),
-      **{n: "merah" for n in SUPPRESSED_SHAPE}}),
+     {**_hijau(VISIBLE), **{n: "merah" for n in SUPPRESSED}}),
     # Bentuk diabaikan **selamanya**: morfologi tidak pernah dipakai untuk
     # bentuk. Penekanan warna tetap benar, jadi arah (1) hijau seluruhnya;
     # keenam morfologi pun tetap berbeda warna, jadi 42 pemeriksaan
@@ -241,6 +275,26 @@ STATES = [
      [(SHAPE_CALL, SHAPE_CALL_NONE),
       (CLUSTER_CORES_CALL, CLUSTER_CORES_CALL_NONE)],
      {**_hijau(SUPPRESSED), **{n: "merah" for n in VISIBLE}}),
+    # 4. **Non-vakuositas penghapusan pengecualian `nebula`.** Keadaan ini ada
+    #    karena menghapus sebuah pengecualian adalah perubahan yang **tidak
+    #    pernah bisa gagal sendirian**: keenam keadaan di atas akan tetap
+    #    sesuai harapan jika gerbangnya berhenti mengukur `nebula` sama sekali
+    #    — nama pemeriksaannya tinggal tidak muncul, dan `verdicts.get(...)`
+    #    mengembalikan "TIDAK ADA" alih-alih cocok.
+    #
+    #    Yang dituntut karena itu adalah arah **sebaliknya**: `.nebula`
+    #    dijatuhkan ke geometri kabut netral tepat di `DEEP_SKY_LAYOUT`, dan
+    #    arah (2) harus memerah **khusus untuk nebula**. Terukur pada gerbang
+    #    pra-perbaikan (pengecualian masih ada): pemeriksaannya tidak ada,
+    #    jadi keadaan ini melaporkan "TIDAK ADA" — lubangnya nyata, bukan
+    #    dikarang. Arah (1) tetap hijau: penekanan saat ragu tidak disentuh,
+    #    dan kabut netral memang tidak berubah.
+    ("4. nebula jatuh ke geometri netral (wajib merah di arah 2)",
+     [(NEBULA_LAYOUT, NEBULA_LAYOUT_AS_NEUTRAL)],
+     {**_hijau(SUPPRESSED),
+      "bentuk nebula sampai ke gambar saat terkunci": "merah",
+      **{n: "hijau" for n in VISIBLE if n != "bentuk nebula "
+                                             "sampai ke gambar saat terkunci"}}),
 ]
 
 
@@ -299,20 +353,43 @@ def main():
                     restore()
                     continue
                 before, body, after = span
+                # **Ruang lingkup per keadaan, bukan per harness.** Keadaan
+                # 1-3 memutasi **pemanggilan di dalam penggambar**, karena
+                # yang mereka ubah adalah keputusan menggambar. Keadaan 4
+                # memutasi **tata letak blob itu sendiri** — ia hidup di
+                # tingkat modul, di luar `_draw_deep_sky`, dan tidak bisa
+                # dijangkau dari dalam badan fungsi mana pun.
+                #
+                # Yang dipilih karena itu adalah coba badan fungsi dulu, lalu
+                # seluruh berkas — dengan **kedua** pencarian berjangkar:
+                # jangkar yang tidak ketemu di kedua tempat adalah kegagalan
+                # yang menyebut dirinya, bukan jatuh ke salah satu cakupan.
                 for find, replace in edits:
                     hits = body.count(find)
-                    if hits == 0:
-                        failures.append(
-                            f"{name}: jangkar tidak ditemukan di dalam "
-                            f"{DRAW_HEADER!r}: {find!r}")
-                        break
+                    if hits == 1:
+                        body = body.replace(find, replace)
+                        continue
                     if hits > 1:
                         failures.append(
                             f"{name}: jangkar muncul {hits}× di dalam "
                             f"{DRAW_HEADER!r}, butuh 1 (replace akan "
                             f"memutasi yang lain): {find!r}")
                         break
-                    body = body.replace(find, replace)
+                    # Tidak ada di badan fungsi: coba seluruh berkas.
+                    whole = source.count(find)
+                    if whole == 0:
+                        failures.append(
+                            f"{name}: jangkar tidak ditemukan di dalam "
+                            f"{DRAW_HEADER!r} maupun di seluruh berkas: "
+                            f"{find!r}")
+                        break
+                    if whole > 1:
+                        failures.append(
+                            f"{name}: jangkar muncul {whole}× di seluruh "
+                            f"berkas, butuh 1: {find!r}")
+                        break
+                    source = source.replace(find, replace)
+                    before, body, after = "", source, ""
                 else:
                     mutasi_sumber.write_source(RENDER, before + body + after)
 

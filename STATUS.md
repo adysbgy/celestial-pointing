@@ -1,3 +1,87 @@
+### Siklus (17 Okt 2026 — Aturan 51: sabit Venus & warna planet lolos tanpa keyakinan engine)
+
+Buka siklus dengan `git log` + `gh run list` + ketiga gerbang. Ternyata
+`main` **merah** tiga commit berturut-turut (`39068467794`, `39070250477`,
+`39072788456`), semuanya di langkah `Tools/bukti-mutasi-langit-dalam.py`
+keadaan 2. Itu juga yang pertama ditutup:
+
+**Harness langit-dalam, bukan gerbangnya.** Harness menuntut `.nebula`
+**hijau** di keadaan 2, berdasar kalimat di `check-visuals.py` yang sudah
+basah: "`deepSky(morphology:)` memetakan `.nebula` ke `nebula(fuzziness:)` —
+fungsi yang sama dengan `nil`". Benar sampai `uncertainFog` lahir; sejak itu
+`nil` memanggil `uncertainFog` dan bentuknya berbeda (diukur: setengah-lebar
+0.758/0.490/0.351 vs 0.314/0.216/0.170 pada fuzziness 0.8). Satu kalimat
+basah, dua kerusakan: arah (2) gerbang **buta** pada morfologi yang sah
+diklaim (bentuk-saja nebula terukur 11997 piksel, bukan nol), dan harness
+memerah pada gerbang yang benar. Pengecualian `nebula` dihapus dari kedua
+tempat (gerbang + pembaca tata letak); **keadaan 4** ditambahkan untuk
+membuktikan penghapusan itu tidak vakuos — mutasi `DEEP_SKY_LAYOUT` (di luar
+`_draw_deep_sky`, jadi `main()` kini mencoba badan fungsi dulu lalu seluruh
+berkas, keduanya berjangkar) dan menuntut arah (2) merah **khusus nebula**.
+Diuji ulang di gerbang pra-perbaikan: `"TIDAK ADA"` bahkan di baseline.
+
+#### Cacat yang diangkat siklus ini
+
+Aturan 50 menutup **satu** jalur cacat (ciri pengenal planet). Dua jalur yang
+sama kelasnya tidak dijaga satu pun dari 50 aturan, dan keduanya **diukur
+hijau pada pohon yang benar** — mutasi, lalu seluruh lint di proses baru:
+
+    penjaga fase planet dalam dihapus   -> exit 0, "SEMUA GERBANG UI LULUS"
+    penjaga fase dibalik (!isConfirmed) -> exit 0
+    .palette.drawable()  (tanpa argumen) -> exit 0
+    .palette            (tanpa drawable) -> exit 0
+
+Yang bocor: **sabit Venus/Merkurius** (bentuk pengenal, sama kelasnya dengan
+cincin Saturnus) dan **warna planet** (ciri yang paling cepat dibaca mata,
+lebih cepat daripada teks di bawahnya). Dua-duanya tampil di sebelah lencana
+"Ragu".
+
+**Kenapa Aturan 34 tidak menutupnya.** Aturan 34 menangkap `isConfirmed`
+yang diganti **literal** (`drawable(isConfirmed: true)`) — dan itu memang
+merah. Ia tidak menangkap argumen yang **hilang**: `drawable()` di Swift
+berarti palet penuh, jadi warnanya diklaim tanpa satu pun literal.
+**Kenapa Aturan 26 tidak**: ia memeriksa bahwa `TipePaket.anggota` ada di
+paket, dan `palette` **memang** anggota `Planet` — hijau.
+
+#### Yang ditambahkan
+
+- **Aturan 51** (`swift-ui-lint.sh`): di dalam `drawPlanet` saja, (1)
+  `phaseGeometry(waxing:)` wajib didahului `if`/`guard` yang menyebut
+  `isConfirmed` tanpa dinegasikan, (2) `.palette` wajib lewat
+  `drawable(isConfirmed:)` dengan argumennya. Cakupan `drawPlanet` **bukan**
+  seluruh berkas, dan itu keharusan: `phaseGeometry(waxing: visual.isWaxing)`
+  di `drawMoon` sengaja **tanpa** penjaga (fase Bulan fakta tanggal, dituntut
+  `check_moon_phase_survives_uncertainty`), dan `.palette` di `drawRings`
+  dipakai untuk `saturnRing` (token, bukan palet planet) sementara cincinnya
+  sudah ditahan Aturan 50 + 32. Versi pertama aturan ini menyapu seluruh
+  berkas dan menuduh kedua kode benar itu — diperbaiki sebelum di-commit.
+- **`Tools/bukti-mutasi-saputangan-ragu.py`** + langkah CI: 7 keadaan —
+  4 cacat wajib MERAH (dan **Aturan 51** yang menyala, bukan aturan lain),
+  1 kontrol hijau (pohon utuh), dan **2 keadaan arah kedua**: gerbang
+  pra-Aturan51 (`git show 4a0a15d:swift-ui-lint.sh`) dijalankan atas cacat
+  yang sama dan **wajib HIJAU**. Langkah Aturan 10 dilepas di salinan gerbang
+  lama (angka di README sudah 51) — tanpa itu seluruh keadaan gerbang lama
+  merah di Aturan 10 dan arah kedua tidak membuktikan apa pun.
+- README: hitungan aturan 50 → 51 (Aturan 10 membaca angka itu).
+
+#### Yang TIDAK diklaim
+
+Aturan 51 dan harness-nya adalah sapu **teks**, bukan pelacakan aliran: yang
+dibuktikan adalah situsnya **menyebut** keyakinan engine, bukan bahwa piksel
+yang dihasilkan berhenti berubah di perangkat. `Apps/` tidak pernah dibangun
+`swift-test.sh`, dan tidak ada Xcode di VPS ini.
+
+#### Gerbang
+
+    ./swift-ui-lint.sh                     51 aturan, hijau
+    ./swift-test.sh                        222 + 922 = 1144, hijau
+    Tools/bukti-mutasi-langit-dalam.py     5 keadaan, semua sesuai harapan
+    Tools/bukti-mutasi-saputangan-ragu.py  7 keadaan, semua sesuai harapan
+    Tools/check-harness-terdaftar.py       96 harness, semua dirujuk
+    Tools/check-jangkar-harness.py         386 jangkar, tidak ada mutasi tertinggal
+
+---
+
 ### Siklus (17 Okt 2026 — Aturan 50: ciri pengenal planet bocor ke kandidat yang belum terkunci)
 
 Mulai seperti biasa: `git log` + `gh run list` + ketiga gerbang. `main` hijau

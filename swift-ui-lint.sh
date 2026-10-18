@@ -8406,6 +8406,154 @@ else
   echo "Bersih: ciri pengenal planet berhenti tepat saat engine ragu."
 fi
 
+# ── Aturan 51: saputangan yang mengklaim identitas wajib membaca keyakinan ──
+#
+# Aturan 50 menutup **satu** jalur: `switch palette.feature` di `drawPlanet`.
+# Dua jalur yang **sama persis kelasnya** tidak dijaga satu pun gerbang, dan
+# keduanya diukur di siklus ini lewat mutasi pada pohon yang benar:
+#
+#   1. `if isConfirmed, let phase = visual.phaseGeometry(...)` di `drawPlanet`
+#      — **fase planet dalam** (sabit Venus & Merkurius). Sabit adalah bentuk,
+#      sama seperti cincin Saturnus. Penjaga `isConfirmed` dihapus -> seluruh
+#      50 aturan tetap **exit 0**. Dibalik (`if !isConfirmed`) juga exit 0.
+#   2. `planet.palette.drawable(isConfirmed: isConfirmed)` — **warna** planet.
+#      Argumennya dihapus (`drawable()`; di Swift itu berarti palet penuh)
+#      -> exit 0. `planet.palette` tanpa `drawable(...)` sama sekali -> exit 0.
+#      Aturan 34 hanya menangkap `drawable(isConfirmed: true)` — **literal** —
+#      bukan argumen yang hilang sama sekali.
+#
+# Kenapa Aturan 26 tidak menutupnya, meski ia tampak melakukan hal serupa.
+# Aturan 26 memeriksa bahwa `TipePaket.anggota` ada di paket. `planet.palette`
+# **memang anggota** `Planet`, jadi ia hijau; tidak ada gerbang yang menuntut
+# nilainya disalurkan lewat `drawable(isConfirmed:)`.
+#
+# **Kenapa cakupannya `drawPlanet`, bukan seluruh berkas.** Kedua polanya
+# muncul di tempat lain dengan teks yang sama persis, dan keduanya sah tanpa
+# `isConfirmed`: `phaseGeometry(waxing: visual.isWaxing)` di `drawMoon` — fase
+# Bulan adalah fakta tanggal, bukan hasil pencarian id, dan
+# `check_moon_phase_survives_uncertainty` menuntutnya **tetap tampil** saat
+# ragu — serta `.palette` di `drawRings`, yang dipakai untuk `saturnRing`
+# (warna dari `CelestialVisual.accents`, token, bukan palet planet) sementara
+# cincinnya sendiri sudah ditahan Aturan 50 dan 32. Menuntut `isConfirmed`
+# di kedua situs itu berarti merah pada kode yang benar, dan gerbang yang
+# merah pada kode benar akan dimatikan orang.
+#
+# Ini sapu teks, bukan pelacakan aliran: ia membuktikan situsnya **menyebut**
+# keyakinan engine, bukan bahwa pikselnya berhenti berubah di perangkat
+# (`Apps/` tidak pernah dibangun `swift-test.sh`, dan tidak ada Xcode di sini).
+echo
+echo "== Aturan 51: saputangan identitas wajib membaca keyakinan engine =="
+klaim_ragu=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+VIEW = "Apps/Shared/CelestialVisualView.swift"
+
+if not os.path.exists(VIEW):
+    print("PERINGATAN: %s tidak ada." % VIEW)
+    raise SystemExit
+
+teks = open(VIEW, encoding="utf-8").read()
+# Komentar dibuang: docstring berkas ini mengutip bentuk lama dari kedua
+# situs ini (termasuk `if isConfirmed, let phase`), dan kutipan itu tidak
+# boleh terbaca sebagai kenyataan. Alasan yang sama dengan Aturan 50.
+kode = re.sub(r"//[^\n]*", "", teks)
+kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+
+masalah = []
+
+# Tubuh `drawPlanet`, dibatasi deklarasi fungsi berikutnya pada kolom
+# pertama — bukan "sisa berkas". Tanpa batas ini, `phaseGeometry` milik
+# `drawMoon` ikut dituntut berpenjaga dan gerbang ini merah pada kode benar.
+i_fn = kode.find("func drawPlanet(")
+if i_fn < 0:
+    masalah.append(
+        "  `drawPlanet` tidak ditemukan di %s; sabit planet dalam dan warna "
+        "planet tidak bisa dipastikan membaca keyakinan engine" % VIEW)
+else:
+    lanjut = kode.find("\n    private func ", i_fn)
+    if lanjut < 0:
+        lanjut = kode.find("\n    func ", i_fn)
+    tubuh = kode[i_fn:(lanjut if lanjut > 0 else len(kode))]
+
+    def nomor_baris(offset):
+        """Nomor baris di berkas asli untuk offset di dalam `tubuh`."""
+        return kode[:i_fn].count("\n") + tubuh[:offset].count("\n") + 1
+
+    # ── Situs 1: fase planet dalam ─────────────────────────────────────────
+    # Dituntut: `if`/`guard` yang memuat panggilan ini menyebut `isConfirmed`
+    # **tanpa** dinegasikan. `if !isConfirmed` adalah kebalikan arah yang
+    # sama cacatnya dengan `guard !isConfirmed` di Aturan 50.
+    for m in re.finditer(r"\bphaseGeometry\s*\(", tubuh):
+        awal = tubuh.rfind("\n", 0, m.start()) + 1
+        pernyataan = tubuh[awal:m.start() + 160]
+        if not re.search(r"\b(if|guard)\b[^;{]*\bisConfirmed\b", pernyataan) \
+                or re.search(r"\b(if|guard)\b[^;{]*!isConfirmed", pernyataan):
+            masalah.append(
+                "  %s:%d: `phaseGeometry(waxing:)` di `drawPlanet` tanpa "
+                "penjaga `isConfirmed` — sabit Venus/Merkurius adalah bentuk "
+                "pengenal, jadi ia tidak boleh digambar saat engine ragu"
+                % (VIEW, nomor_baris(m.start())))
+
+    # ── Situs 2: palet warna planet ────────────────────────────────────────
+    # Warna planet adalah ciri pengenal yang paling cepat dibaca mata — lebih
+    # cepat daripada teks di bawahnya — jadi nilainya **wajib** lewat
+    # `drawable(isConfirmed:)`.
+    #
+    # Kenapa bukan sekadar "ada kata `drawable(` di berkas": `drawable()` tanpa
+    # argumen **juga** mengandung kata itu, dan di Swift `drawable()` berarti
+    # palet penuh — persis cacatnya. Yang dituntut karena itu adalah
+    # argumennya, yaitu `isConfirmed:` **di dalam** tanda kurungnya — sama
+    # seperti Aturan 24 menuntut argumen, bukan keberadaan nama fungsinya.
+    palet_dipakai = False
+    for m in re.finditer(r"\.palette\b", tubuh):
+        palet_dipakai = True
+        ekor = tubuh[m.end():m.end() + 200]
+        pemanggilan = re.match(r"\s*\.drawable\s*\(", ekor)
+        if not pemanggilan:
+            masalah.append(
+                "  %s:%d: `.palette` dipakai tanpa `drawable(isConfirmed:)` — "
+                "warna planet adalah ciri pengenal, jadi ia tampil walau "
+                "engine ragu" % (VIEW, nomor_baris(m.start())))
+            continue
+        j, depth, mulai = pemanggilan.end(), 1, pemanggilan.end()
+        while j < len(ekor) and depth:
+            if ekor[j] == "(":
+                depth += 1
+            elif ekor[j] == ")":
+                depth -= 1
+            j += 1
+        args = ekor[mulai:j - 1]
+        if not re.search(r"\bisConfirmed\s*:", args):
+            masalah.append(
+                "  %s:%d: `drawable(%s)` tanpa argumen `isConfirmed:` — warna "
+                "planet diklaim tanpa membaca keyakinan engine"
+                % (VIEW, nomor_baris(m.start()), args.strip()))
+
+    if not palet_dipakai:
+        # Bukan "bersih": tanpa situsnya aturan ini lulus pada pohon apa pun.
+        # Kegagalan terbuka lebih buruk daripada tidak ada gerbang.
+        masalah.append(
+            "  tidak ada pemakaian `.palette` di dalam `drawPlanet` (%s); "
+            "aturan ini kehilangan gigi dan akan lulus selamanya" % VIEW)
+
+print("\n".join(masalah) if masalah else "")
+PY
+)
+if printf '%s' "$klaim_ragu" | grep -q "PERINGATAN\|Traceback\|Error\|error:"; then
+  echo "Pemeriksaan Aturan 51 tidak bisa memutuskan:"
+  echo "$klaim_ragu"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$klaim_ragu" ]; then
+  echo "$klaim_ragu"
+  echo "-> Sabit planet dalam dan warna planet adalah ciri pengenal: keduanya"
+  echo "   wajib membaca keyakinan engine, bukan diasumsikan terkunci."
+  status=1
+else
+  echo "Bersih: sabit & warna planet membaca keyakinan engine."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
