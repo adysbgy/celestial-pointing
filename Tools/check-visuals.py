@@ -809,12 +809,21 @@ def check_moon_phase_survives_uncertainty(results, size=200, ss=2):
                     count += 1
         return count
 
-    _, crescent = render_case("moon-crescent-jakarta", size=size, ss=ss)
+    # Pembandingnya adalah sabit yakin **tanpa** peredupan permukaan, bukan
+    # `moon-crescent-jakarta` yang membawanya. Fase Bulan yang dijaga di sini
+    # adalah **pita fase**, bukan bercak maria/kawah — dan bercak itu sengaja
+    # **hilang** saat ragu (`check_moon_surface_hides_when_uncertain`, lahir
+    # di `a5df51e`). Kalau pembandingnya membawa peredupan, selisihnya bukan
+    # fase melainkan maria, dan gerbang ini merah meski fasenya utuh.
+    # Diukur: sabit yakin vs `moon-crescent-jakarta-plain` nol piksel di luar
+    # lencana; sabit yakin vs `moon-crescent-jakarta` (bereda peredupan) 1879
+    # piksel — persis beda yang tidak boleh dihitung sebagai "fase hilang".
+    _, crescent = render_case("moon-crescent-jakarta-plain", size=size, ss=ss)
     _, crescent_uncertain = render_case("moon-crescent-uncertain", size=size, ss=ss)
     diff = outside_badge_diff(crescent, crescent_uncertain)
     results.append(Result(
         "fase Bulan tetap tampil saat ragu", diff == 0,
-        f"{diff} piksel berbeda di luar lencana antara sabit yakin & ragu"))
+        f"{diff} piksel berbeda di luar lencana antara sabit yakin (tanpa peredupan) & ragu"))
 
     # Arah sebaliknya: fase memang digambar, dan bentuknya berbeda per fase.
     # Tanpa ini, membuang pita fase di **semua** keadaan akan lolos di atas.
@@ -6970,7 +6979,7 @@ def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
     membuang tiap cuplikan dengan `abs(xr) <= body + 0.02`, dengan alasan yang
     benar di sana ("di dalam proyeksi bola yang terlihat adalah permukaan
     planet, bukan cincin"). Justru karena pembuangan itu, keduanya buta pada
-    urutannya. Dibuktikan, bukan diklaim: seluruh **42** hasil enam
+    urutannya. Dibuktikan, bukan diklaim: seluruh **43** hasil enam
     pemeriksaan Saturnus dijalankan ulang dengan urutan dibalik, dan **nol**
     di antaranya berubah warna — termasuk `check_saturn_has_no_extra_disc`
     yang justru mengukur "tidak ada yang menyala di luar cincin dan bola".

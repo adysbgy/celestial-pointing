@@ -1,3 +1,81 @@
+### Siklus (18 Okt 2026 — `main` merah lagi: angka 42 yang dilaporkan "sudah diperbaiki" ternyata **tidak pernah diubah**)
+
+Dibuka dengan `git log` + `gh run list`. `Engine Tests (Linux)` untuk `08bfb55`
+**merah**, padahal STATUS siklus itu menyimpulkan angka 42 → 43 sudah beres.
+Dua kegagalan, dan yang pertama adalah koreksi atas laporan sebelumnya.
+
+#### Cacat 1: klaim perbaikan yang tidak pernah menyentuh sumbernya
+
+`08bfb55` berjudul "angka docstring urutan cincin 42 -> 43" dan STATUS-nya
+menulis *"Angka docstring 42 → **43**"*. Yang benar-benar berubah di commit itu
+hanya **jangkar harness** (`Tools/bukti-mutasi-angka-urutan-cincin.py`,
+`**42** hasil enam` → `**43** hasil enam`). Docstring yang dijaga gerbang —
+`Tools/check-visuals.py:6973` — **masih berbunyi 42**.
+
+Diukur ulang di proses baru, bukan dikutip dari STATUS:
+
+    enam pemeriksaan tetangga dijalankan ulang  -> 43 hasil
+    docstring dikutip                            -> 42
+
+Jadi gerbangnya benar sejak awal, dan siklus sebelumnya memperbaiki **bayangan**
+angka itu (jangkar harness) sambil melaporkan pohonnya beres. Pembelajaran yang
+dicatat: **`git show --stat` wajib dibaca sebelum STATUS menyimpulkan "sudah
+diperbaiki"** — commit yang menyentuh harness *terlihat* seperti commit yang
+menyentuh sumber, karena keduanya menyebut angka yang sama.
+
+Diperbaiki: `check-visuals.py` 42 → **43**.
+
+#### Cacat 2: dua gerbang fase Bulan saling berlawanan
+
+`check_moon_phase_survives_uncertainty` menuntut sabit **ragu** identik piksel
+dengan sabit **yakin** di luar lencana — dan itu benar selama keduanya membawa
+peredupan permukaan yang sama. Tapi `a5df51e` (siklus sebelumnya, benar)
+memutuskan peredupan permukaan — maria & kawah — **hilang saat ragu**, karena
+itu ciri pengenal. Sejak itu sabit ragu **tidak lagi identik** dengan sabit
+yakin, dan gerbang lama membaca selisihnya sebagai "fase hilang":
+
+    750 piksel berbeda di luar lencana antara sabit yakin & ragu
+
+Gerbang itu salah sasaran, bukan salah ambang. Yang dijaganya adalah **pita
+fase**; yang ia ukur ternyata **maria**. Diukur untuk memisahkan keduanya:
+
+    uncertain vs moon-crescent-jakarta        -> 750 px  (fase + peredupan)
+    uncertain vs moon-crescent-jakarta-plain  ->   0 px  (fase saja)
+
+Diperbaiki dengan **mempersempit pembanding ke `-plain`** — bukan dengan
+melonggarkan ambang `== 0`. Arah kedua (`check_moon_surface_hides_when_uncertain`,
+kedua arahnya) tetap hijau, jadi peredupan tetap wajib tampil saat yakin
+(1879 px) dan wajib hilang saat ragu (0 px). Keduanya tidak bisa dipuaskan
+sekaligus oleh gambar yang salah.
+
+#### Non-vakuositas
+
+Kedua gerbang dijalankan ulang di proses baru atas pekerjaan yang sudah
+diperbaiki: **10 pemeriksaan, 0 gagal** — termasuk empat pemeriksaan Saturnus
+lain (49,7%, margin 14/1533, 6/232) yang tidak pernah berubah, jadi gerbangnya
+tidak "hijau karena semua dimatikan".
+
+#### Yang TIDAK diklaim
+
+- `check-visuals.py` **penuh** tidak dijalankan di VPS ini (~41 menit lebih).
+  Yang dijalankan adalah kesepuluh pemeriksaan terkait secara langsung; sisanya
+  diserahkan ke CI. Ini batas yang dinyatakan.
+- Perbaikan fase Bulan hanya berlaku untuk keadaan `moon-crescent-*` pada
+  `size=200, ss=2`. Ukuran lain tidak diklaim.
+- Bukan perbaikan engine: tidak ada logika PointerKit/CelestialEngine yang
+  berubah pada cacat 2, hanya pembanding gerbangnya.
+
+#### Gerbang (lokal)
+
+    ./swift-test.sh                   CelestialEngine 222 + PointingKit 931 = 1153, 0 gagal
+    ./swift-ui-lint.sh                SEMUA GERBANG UI LULUS (52 aturan)
+    ./swift-typecheck.sh              SEMUA GERBANG LULUS
+    check-jangkar-harness.py          405 jangkar, tidak ada mutasi tertinggal
+    check-harness-terdaftar.py        98 harness, semuanya dirujuk
+    check-visuals (10 pemeriksaan)    10/10 OK (sebelumnya 2 gagal)
+
+---
+
 ### Siklus (18 Okt 2026 — `sampleCount` @Published: 20 redraw/detik untuk angka yang tidak pernah tampil)
 
 Dibuka dengan `git log` + `gh run list` + ketiga gerbang. `main` **hijau**, jadi
