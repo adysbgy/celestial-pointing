@@ -1,3 +1,101 @@
+### Siklus (18 Okt 2026 — dua janji FASE A yang tidak dijaga satu pun gerbang)
+
+`git log` + `gh run list` membuka siklus ini: `Apple Build` hijau, `Engine
+Tests` berjalan. Repo sudah punya 55 aturan UI dan 1160 uji, dan brief meminta
+poles UI/UX. Jadi pertanyaan yang benar bukan "apa yang belum dibangun",
+melainkan **"janji mana yang tidak bisa gagal secara terlihat"**.
+
+#### Cara memilih unit: mutasi dulu, aturan kemudian
+
+Delapan mutasi di `Apps/` dijalankan pada salinan repo yang utuh, proses baru,
+dan yang dicari bukan yang merah — melainkan yang **hijau padahal salah**.
+Tiga di antaranya menjanjikan hal yang tidak bisa dilihat dari layar mana pun:
+
+    AOD: reduced -> fullView          hijau (55 aturan lulus)
+    Night toggle does nothing         hijau
+    Onboarding never shows            hijau
+
+Dua yang pertama adalah FASE A #1 dan #2. Keduanya lolos karena alasan yang
+sama: kode yang menjanjikannya hidup di `Apps/`, yang **tidak pernah dibangun**
+`swift-test.sh` di Linux, dan tidak dibaca badan aturan mana pun — hanya
+pemanggilnya.
+
+#### Unit 1 — Aturan 56: layar redup menerima versi hemat
+
+`NightAwareContainer` memilih isi mana yang tampil saat watchOS meredupkan
+layar. Keenam mutasi berikut mengompilasi dan lulus seluruh 55 aturan:
+
+    reduced: { fullView }                            -> exit 0
+    reduced: { ReducedLuminanceView(engine: PointingEngine()) } -> exit 0
+    reduced: { EmptyView() }                          -> exit 0
+    kalibrasi: calibrationContent                     -> exit 0
+    if isLuminanceReduced -> if false                 -> exit 0
+    choose(isLuminanceReduced: false)                 -> exit 0
+
+Yang paling berbahaya bukan yang mengosongkan layar, melainkan yang mengisinya
+kembali dengan layar penuh: animasi, tombol, dan gestur yang justru diabaikan
+watchOS saat redup kembali ke Always-On. Yang kedua lebih sunyi lagi — layar
+redup yang selalu berbunyi "Mencari" di sebelah jam yang terkunci, karena
+mesinnya baru dan belum menerima satu sampel pun.
+
+Perbaikannya dua lapis, karena dua kelas cacatnya berbeda:
+
+1. **Nilai** pindah ke `AlwaysOnContent.choose(isLuminanceReduced:)` di
+   PointingKit, diuji di Linux (5 uji). Enum, bukan `Bool`: yang perlu
+   diputuskan adalah *isi mana*, bukan *ya/tidak*, sehingga pemanggil tidak
+   bisa "menghapus" versi hemat tanpa menulis kasus yang tidak ada.
+2. **Isi** dijaga Aturan 56 di sisi yang tidak bisa dieksekusi di sini:
+   pemanggilnya.
+
+Aturan 56 menuntut pengenal `isLuminanceReduced` itu sendiri, bukan hanya nama
+fungsinya. Itu bukan kelebihan: keadaan #6 membuktikan penjaga
+`AlwaysOnContent.choose(` hijau pada `choose(isLuminanceReduced: false)` —
+bentuk yang memakai model tetapi membuang faktanya. (Aturan 35 juga
+menangkapnya; harness menuntut 56 **ikut** merah, bukan hanya "ada yang merah".)
+
+Fail-closed: nol pemanggil = PERINGATAN. Diuji dengan membuang pembungkusnya
+dari kedua layar.
+
+#### Unit 2 — Aturan 57: kunci preferensi lewat token
+
+Mutasi yang tersisa di kelas yang sama: `@AppStorage` dengan literal.
+Ketiganya hijau di seluruh 56 aturan:
+
+    Watch  : NightModeStorage.key -> "nightMode"   -> exit 0
+    iPhone : AudioCueStorage.key  -> "soundOn"     -> exit 0
+    Watch  : AudioCueStorage.key  -> "audio"       -> exit 0
+
+Akibatnya: pengguna menyalakan Mode Malam di jam, membuka iPhone, dan mendapati
+Mode Malam mati. Tidak satu pun layar salah, dan tidak ada yang bisa dibaca
+untuk menyadarinya. Pada mode malam ini bukan kosmetik — palet merah
+satu-satunya yang menjaga rhodopsin, dan pengguna yang mengira sudah
+menyalakannya mendapat layar putih di gelap.
+
+Aturan 57 menuntut **token enum**, bukan kesamaan string. Penjaga yang
+membandingkan nilai literal akan hijau pada dua layar yang sama-sama menulis
+`"nightMode"` — keadaan #5 di harness: bentuk yang tampak konsisten, tetap dua
+sumber yang bisa menyimpang nanti. Yang dijaga adalah satu sumber.
+
+Kode hari ini sudah benar (7 pemakaian, semuanya token). Yang belum ada adalah
+yang mengingatnya.
+
+#### Yang TIDAK diklaim
+
+- Kedua aturan membaca **bentuk kode**, bukan perilaku. Aturan 56 tidak
+  membuktikan `ReducedLuminanceView` benar-benar kontras tinggi atau tanpa
+  animasi — itu dijaga uji lain di PointingKit dan Aturan 35.
+- Aturan 57 tidak membuktikan nilai `UserDefaults` benar-benar terbaca; ia
+  hanya memastikan tidak ada dua sumber.
+- Harness mutasi menulis di atas sumber sungguhan dan memulihkannya
+  terverifikasi (`mutasi_sumber`), dan menolak jalan bila sumber sudah kotor
+  terhadap HEAD. Itu bukan kehati-hatian berlebih: harness yang mengadopsi
+  penyimpangan sebagai "aslinya" akan melaporkan "pulih persis" atas dirinya
+  sendiri.
+- `Onboarding never shows` masih hijau dan **belum** ditangani. Ia bukan
+  kegagalan senyap yang sama kelasnya: onboarding yang tidak muncul terlihat
+  langsung di layar pertama, sedangkan dua yang di atas tidak terlihat sama
+  sekali.
+
 ### Siklus (18 Okt 2026 — `main` merah: tujuh gerbang mengukur **derau**, bukan identitas)
 
 `git log` + `gh run list` membuka siklus ini, dan kedua alat langsung sepakat
