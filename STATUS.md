@@ -1,3 +1,128 @@
+### Siklus (18 Okt 2026 — keyakinan yang hilang di satu simpul rantai)
+
+Siklus dibuka dengan sapuan mutasi kesepuluh pada lapisan gambar, dan yang
+dicari tetap yang sama: keadaan **hijau padahal salah**. Sepuluh mutasi
+dijalankan pada salinan utuh, proses baru. Tujuh hijau. Satu di antaranya
+jauh lebih berat daripada enam sisanya:
+
+    PointingView.swift
+      PulsingCelestialVisual(... isConfirmed: isConfirmed ...)
+   -> PulsingCelestialVisual(... isConfirmed: true ...)
+      exit 0, "SEMUA GERBANG UI LULUS"
+
+Enam sisanya (`diameter: 1`, `diameter: 0`, samaran yang dinetralkan) memang
+cacat, tetapi cacat **tampilan**: objeknya terlalu kecil atau terlalu tegas
+disamarkan. Yang satu ini cacat **klaim**. `PulsingCelestialVisual` adalah
+pembungkus kartu jawaban di jam — satu-satunya jalur keyakinan engine ke
+tempat pengguna melihat hasilnya. Dengan `true`, saat engine berkeadaan
+`.uncertain` kartu itu menggambar cincin Saturnus dan pita Jupiter di samping
+badge bertuliskan "Ragu". Mata membaca gambar lebih dulu daripada badge, dan
+PRD melarang tepat itu.
+
+#### Kenapa 62 aturan tidak menangkapnya
+
+Aturan 52 sudah ada khusus untuk kelas ini, dan `SITUS`-nya menyebut tiga
+nama: `CelestialVisualView(`, `LockArrivalPanel(`, `ObjectDetailView(`.
+Ketiganya benar — dan ketiganya **tidak** mencakup pembungkus yang berdiri di
+antaranya. Aturan 34 menuntut argumen `isConfirmed:` ada pada pemanggilan yang
+dikenal; di sini ia ada, dan namanya bahkan benar. Aturan 50/51 menjaga
+`Palette.drawable` dan saputangan di **dalam** penggambar; penggambar tidak
+berubah, hanya nilai yang sampai ke sana. Setiap gerbang memeriksa simpul yang
+ia kenal, dan tidak ada satu pun yang membaca rantainya **sebagai rantai**.
+
+Bandingkan dengan iPhone: mutasi yang sama di `DiagnosticsView` **memerah**
+sejak lama. Jadi cacatnya bukan "kelas yang belum dijaga" — ia cacat
+**cakupan**, dan cakupan yang ditulis tangan selalu ketinggalan satu simpul.
+
+#### Perbaikan: daftarnya diturunkan, bukan ditambah
+
+Menambahkan `PulsingCelestialVisual` ke `SITUS` akan menutup keadaan ini dan
+meninggalkan bentuk cacatnya utuh: pembungkus berikutnya akan lolos lagi.
+Karena itu `SITUS` sekarang **diturunkan dari pemanggilan**: setiap tipe yang
+dideklarasikan `: View` dan dipanggil dengan argumen `isConfirmed:` adalah
+simpul rantai, dan simpul rantai wajib membaca keyakinan langsung.
+
+Dua percobaan pertama derivasi itu salah, dan keduanya menuduh kode benar —
+yang justru harus dihindari:
+
+  1. **Dari deklarasi.** Tipe yang memuat properti `isConfirmed` **dan**
+     meneruskannya. `DiagnosticsView` membungkus `LockArrivalPanel` sebagai
+     tipe bersarang, jadi ia mewarisi properti dan penerusan milik panelnya,
+     lalu terdaftar sebagai penerus — dan aturan menuduh
+     `DiagnosticsView(engine:…)` di akar app, yang tidak punya argumen itu dan
+     tidak perlu punya.
+  2. **Dari deklarasi, badan langsung.** Tipe bersarang dibuang, dan itu
+     memperbaiki (1) — tetapi masih salah arah: derivasi hanya menemukan tipe
+     yang **sudah** meneruskan dengan benar. Pembungkus baru yang meneruskan
+     `true` tidak pernah muncul di daftar, jadi ia tetap lolos.
+
+Bentuk ketiga — dari **pemanggilan** — adalah satu-satunya yang menjawab
+pertanyaan yang benar. Yang menentukan keyakinan apa yang sampai ke gambar
+adalah pemanggilnya, bukan isi badan tipe. `ComplicationEntry` dan
+`ComplicationDigest` juga dipanggil dengan `isConfirmed:` di `#Preview`;
+keduanya sengaja tidak masuk karena bukan view yang menggambar identitas
+objek, dan menuntut keduanya membaca `confirmsDisplayedIdentity` akan
+memerahkan kode yang benar.
+
+Fail-closed pada derivasinya sendiri: kalau `CelestialVisualView` hilang dari
+daftar turunan (pembaca panggilan berhenti bekerja), atau simpul rantai yang
+terbaca kurang dari tiga, aturan **memerah** — bukan diam dan kembali jadi
+daftar tertulis tangan.
+
+#### Bukti gerbangnya berbunyi — `Tools/bukti-mutasi-aturan52-kartu-jam.py`
+
+10 keadaan, 0 tidak sesuai harapan. Program aturannya **diekstrak dari
+`swift-ui-lint.sh`**, bukan disalin:
+
+    OK   1 kartu jam: pembungkus menerima literal `true`          MERAH
+    OK   2 kartu jam: keyakinan lewat nama perantara              MERAH
+    OK   3 panel jam: literal `true` (cakupan lama)               MERAH
+    OK   4 pembungkus BARU yang tidak terdaftar: literal `true`   MERAH
+    OK   5 kontrol negatif: pohon apa adanya                      hijau
+    OK   6 kontrol negatif: parameter diteruskan apa adanya       hijau
+
+    arah kedua, lint pra-perbaikan (wajib HIJAU):
+    OK   pra 1..4                                                 hijau
+
+Keadaan 4 adalah inti rancangannya, dan bentuknya **dua tingkat** karena
+percobaan pertama tidak membuktikan apa pun: satu pembungkus yang langsung
+memanggil `CelestialVisualView(..., isConfirmed: true)` sudah memerah di lint
+lama, karena `CelestialVisualView` memang ada di daftar lama. Di bentuk final,
+`PembungkusBaru` meneruskan keyakinan **dengan benar** (lama: hijau), dan yang
+berbuat salah adalah pemanggilnya, `PembungkusLuar` — nama yang belum pernah
+ada di daftar mana pun. Ia tetap tertangkap.
+
+Keadaan 3 memakai acuan arah-kedua yang berbeda (`29ca41b^`), karena panel jam
+memang sudah dijaga sejak komit itu: memakai `HEAD` sebagai "pra-perbaikan"
+untuk keadaan 3 akan menuntut hijau dari aturan yang sudah benar.
+
+Harness terdaftar di `engine-tests.yml`; `check-harness-terdaftar.py`
+melaporkan **110 harness, semuanya dirujuk**.
+
+#### Hasil terukur siklus ini
+
+    swift-ui-lint.sh   62 aturan, exit 0
+    swift-test.sh      engine 222 uji, PointingKit 943 uji, 0 gagal
+    swift-typecheck.sh SEMUA GERBANG LULUS
+    harness 52-kartu   10 keadaan, 0 tidak sesuai harapan
+    harness 52 (lama)  13 keadaan, semuanya sesuai harapan
+
+#### Yang TIDAK diklaim
+
+Aturan 52 menjaga **bentuk pemanggilan**, bukan bahwa nilai yang diteruskan
+itu benar. `isConfirmed: engine.confirmsDisplayedIdentity` yang salah
+**definisinya** di `PointingEngine` tetap lolos — itu wilayah Aturan 34/42.
+Derivasi juga tetap sapu teks: tipe yang dipanggil lewat nama yang tidak
+diawali huruf besar, atau lewat fungsi yang mengembalikan `some View`, tidak
+terbaca. Yang ditutup adalah kelas yang terukur hari ini: pembungkus `View`
+yang meneruskan keyakinan ke lapisan gambar tanpa diperiksa.
+
+Enam mutasi lain yang hijau di sapuan ini (diameter gambar menjadi 1 atau 0,
+samaran yang dinetralkan) **belum ditutup**, dan sengaja tidak dikerjakan
+dalam siklus yang sama: masing-masing butuh ambang yang bisa diukur
+(`check-visuals.py` mengukur piksel, bukan ukuran frame), dan menutupnya
+setengah-setengah akan menghasilkan gerbang yang memerah pada kode benar.
+
 ### Siklus (18 Okt 2026 — dua sinyal yang hanya bisa dibaca lewat warna)
 
 Siklus sebelumnya menutup satu kelas dengan sapuan mutasi. Siklus ini memakai

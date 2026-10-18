@@ -8898,7 +8898,144 @@ DEKL = re.compile(r'\b(?:let|var)\s+(?:isConfirmed|confirmsDisplayedIdentity)\b'
 # ke pembaca identitas**. Awalnya hanya `CelestialVisualView(`, dan bentuk itu
 # terukur buta pada satu kelas cacat yang sama (lihat catatan panjang di atas
 # `echo "== Aturan 52"`).
-SITUS = re.compile(r'(?:\bCelestialVisualView|\bLockArrivalPanel|\bObjectDetailView)\s*\(')
+#
+# **Daftar ini sekarang DITURUNKAN, bukan ditulis tangan.** Tiga nama yang
+# dulu ditulis tangan adalah daftar yang benar tentang hari ia ditulis, dan
+# itulah bentuk cacatnya: `PulsingCelestialVisual` — pembungkus kartu jam yang
+# meneruskan keyakinan ke **dua** pemanggilan `CelestialVisualView` — tidak
+# pernah masuk daftar, jadi satu-satunya jalur keyakinan ke kartu jawaban jam
+# tidak diperiksa siapa pun. Terukur pada pohon utuh, proses baru:
+#
+#   PointingView.swift  `isConfirmed: isConfirmed` (pada `PulsingCelestialVisual`)
+#                    -> `isConfirmed: true`   exit 0, SEMUA GERBANG LULUS
+#
+# Akibatnya persis yang dilarang PRD: pada `.uncertain`, kartu jam menggambar
+# cincin Saturnus dan pita Jupiter di samping badge "Ragu". Enam aturan lain
+# (18, 32, 34, 50, 51) tetap hijau karena semuanya memeriksa **pemanggil yang
+# mereka kenal**; pembungkus ini bukan salah satunya.
+#
+# Karena itu daftarnya dibaca dari sumber: setiap `struct`/`extension` yang
+# memuat properti `isConfirmed` **dan** meneruskannya (`isConfirmed:
+# isConfirmed`) adalah simpul rantai, dan simpul rantai wajib diperiksa.
+# Tipe baru yang meneruskan keyakinan ikut terjaga tanpa ada yang ingat
+# mendaftarkannya — dan itu satu-satunya cara lubang ini tidak kembali.
+#
+# `PENGGAMBAR` sengaja tetap ada sebagai jangkar: ia yang menggambar, jadi
+# kalau ia hilang dari daftar turunan, artinya pemeriksaannya kehilangan
+# sasaran dan aturan harus memerah, bukan diam.
+PENGGAMBAR = "CelestialVisualView"
+
+
+def tanpa_komentar_dan_string(swift):
+    """Buang komentar dan isi literal string, jaga posisi baris.
+
+    Kurung kurawal di dalam komentar dan string akan menggeser kedalaman blok,
+    dan kedalaman yang bergeser membuat `struct` yang benar terbaca sebagai
+    milik tipe lain.
+    """
+    hasil = []
+    i = 0
+    n = len(swift)
+    while i < n:
+        dua = swift[i:i + 2]
+        if dua == "//":
+            j = swift.find("\n", i)
+            if j < 0:
+                break
+            hasil.append(" " * (j - i))
+            i = j
+        elif dua == "/*":
+            j = swift.find("*/", i + 2)
+            if j < 0:
+                hasil.append(" " * (n - i))
+                break
+            potong = swift[i:j + 2]
+            hasil.append("".join("\n" if c == "\n" else " " for c in potong))
+            i = j + 2
+        elif swift[i] == '"':
+            j = i + 1
+            while j < n:
+                if swift[j] == "\\":
+                    j += 2
+                    continue
+                if swift[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            hasil.append(" " * (j - i))
+            i = j
+        else:
+            hasil.append(swift[i])
+            i += 1
+    return "".join(hasil)
+
+
+def _argumen(kode, buka):
+    """Isi daftar argumen mulai dari `(` di indeks `buka`."""
+    depth = 0
+    j = buka
+    while j < len(kode):
+        if kode[j] in "([{":
+            depth += 1
+        elif kode[j] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return kode[buka + 1:j]
+        j += 1
+    return ""
+
+
+def turunkan_situs(berkas):
+    """Tipe **View** yang dipanggil dengan argumen `isConfirmed:`.
+
+    **Kenapa dari pemanggilan, bukan dari deklarasi.** Versi pertama aturan ini
+    memakai daftar nama tertulis tangan, dan daftar itu selalu ketinggalan
+    satu pembungkus: `PulsingCelestialVisual` — pembungkus kartu jam yang
+    meneruskan keyakinan ke dua pemanggilan `CelestialVisualView` — tidak
+    pernah masuk daftar, jadi satu-satunya jalur keyakinan ke kartu jawaban
+    jam tidak diperiksa siapa pun. Terukur: `isConfirmed: true` di sana,
+    exit 0, seluruh gerbang lulus.
+
+    Definisi yang dipakai karena itu diturunkan dari **bentuk panggilan**:
+    siapa pun yang dipanggil dengan `isConfirmed:` adalah simpul rantai,
+    karena ia yang memutuskan keyakinan apa yang sampai ke lapisan gambar.
+    Dibatasi ke tipe yang dideklarasikan `: View` — `ComplicationEntry` dan
+    `ComplicationDigest` juga menerima `isConfirmed:` di `#Preview`, tetapi
+    keduanya bukan view yang menggambar identitas objek; menuntut mereka
+    membaca `confirmsDisplayedIdentity` akan menuduh kode yang benar.
+    """
+    view = set()
+    dipanggil = set()
+    for path, kode in berkas:
+        for m in re.finditer(r"\bstruct\s+(\w+)\s*:\s*[^{]*\bView\b", kode):
+            view.add(m.group(1))
+        for m in re.finditer(r"\b([A-Z]\w*)\s*\(", kode):
+            if re.search(r"(?:struct|class|enum|func)\s+$",
+                         kode[max(0, m.start() - 12):m.start()]):
+                continue
+            if re.search(r"\bisConfirmed\s*:", _argumen(kode, m.end() - 1)):
+                dipanggil.add(m.group(1))
+    return dipanggil & view
+
+
+# Baca seluruh `Apps/` sekali: daftar situs diturunkan dari sumber, bukan
+# ditulis tangan. Berkas yang tidak bisa dibaca dilewati — `terbaca` di bawah
+# yang memutuskan apakah aturan ini mengukur apa pun.
+_sumber = []
+for _root, _dirs, _files in os.walk("Apps"):
+    _dirs[:] = [d for d in _dirs if d not in (".build", "build")]
+    for _nama in sorted(_files):
+        if not _nama.endswith(".swift"):
+            continue
+        _path = os.path.join(_root, _nama)
+        try:
+            _sumber.append((_path, tanpa_komentar_dan_string(
+                open(_path, encoding="utf-8").read())))
+        except OSError:
+            continue
+
+SITUS_NAMA = sorted(turunkan_situs(_sumber))
+SITUS = re.compile(r"(?:\b" + r"|\b".join(re.escape(n) for n in SITUS_NAMA) + r")\s*\(")
 #: Bentuk yang diterima, dan **hanya** itu — daftar putih receiver, bukan
 #: pola bebas. Tiga versi sebelumnya buta, dan masing-masing terukur di
 #: harness sebelum ditulis:
@@ -8925,6 +9062,24 @@ ILUSTRASI = {"OnboardingView.swift"}
 
 masalah = []
 terbaca = 0
+
+# Fail-closed pada **derivasi**, bukan hanya pada hasilnya.
+#
+# Kalau pembaca `struct` berhenti bekerja (mis. sintaks Swift berubah, atau
+# kurung kurawal tidak lagi seimbang karena satu berkas dipotong), daftar
+# turunan menjadi kosong dan aturan ini diam-diam kembali ke tiga nama
+# tertulis tangan — persis keadaan yang membuat lubang ini ada. Karena itu
+# penggambar wajib muncul di daftar, dan jumlah simpul rantai wajib > 0.
+if PENGGAMBAR not in SITUS_NAMA:
+    masalah.append(
+        "  daftar situs turunan tidak memuat `%s` -- pembaca panggilan "
+        "berhenti bekerja, dan aturan ini kembali jadi daftar tertulis tangan"
+        % PENGGAMBAR)
+if len(SITUS_NAMA) < 3:
+    masalah.append(
+        "  hanya %d simpul rantai yang terbaca di Apps/ -- derivasi terlalu "
+        "sempit, jadi pembungkus baru tidak akan pernah diperiksa"
+        % len(SITUS_NAMA))
 
 for root, dirs, files in os.walk("Apps"):
     dirs[:] = [d for d in dirs if d not in (".build", "build")]

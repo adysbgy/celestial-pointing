@@ -2536,5 +2536,21 @@ jobs:
       - name: Buktikan Aturan 62 berbunyi saat visual objek hilang dari layar
         run: python3 Tools/bukti-mutasi-aturan62-visual-di-layar.py
 
+      # Dan bukti bahwa Aturan 52 menjangkau **jalur kartu jam**, bukan hanya
+      # pemanggil langsung yang ditulis tangan di `SITUS`.
+      #
+      # `PulsingCelestialVisual` menerima `isConfirmed` lalu meneruskannya ke
+      # dua pemanggilan `CelestialVisualView` — ia satu-satunya jalur keyakinan
+      # ke kartu jawaban di jam, dan namanya tidak pernah ada di daftar.
+      # Terukur: `isConfirmed: isConfirmed` -> `isConfirmed: true` di sana,
+      # exit 0, seluruh 62 aturan hijau — padahal akibatnya kartu jam
+      # menggambar cincin Saturnus dan pita Jupiter di samping badge "Ragu".
+      #
+      # Harness ini juga membuktikan daftarnya **diturunkan dari panggilan**,
+      # bukan ditulis tangan: keadaan 4 memasang pembungkus dua tingkat yang
+      # belum pernah ada, dan aturan tetap berbunyi.
+      - name: Buktikan Aturan 52 menjangkau pembungkus kartu jam
+        run: python3 Tools/bukti-mutasi-aturan52-kartu-jam.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
