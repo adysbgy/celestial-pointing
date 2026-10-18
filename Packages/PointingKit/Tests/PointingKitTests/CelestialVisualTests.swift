@@ -2070,6 +2070,25 @@ final class CelestialVisualTests: XCTestCase {
                           "elongasi diabaikan bahkan pada morfologi yang diketahui")
     }
 
+    /// Maria dan kawah menyebut **muka** yang mana — ciri pengenal, bukan
+    /// sesuatu yang boleh tampil sebelum identitasnya dikunci.
+    ///
+    /// Cacat yang ditutup (terukur): `drawMoon` di view tidak menerima
+    /// `isConfirmed` sama sekali, sehingga Bulan yang ragu digambar dengan
+    /// bercak maria lengkap. Diukur pada render 200 px, ss=2: 1879 piksel
+    /// berbeda antara sabit ragu berpendar dan sabit ragu tanpa peredupan.
+    ///
+    /// Uji ini mengukur keputusannya, bukan gambarnya — gambar diukur
+    /// `check_moon_surface_hides_when_uncertain` di `Tools/check-visuals.py`.
+    /// Keduanya perlu: tanpa yang ini, aturan hanya hidup di port Python;
+    /// tanpa yang itu, tidak ada yang membuktikan view mematuhinya.
+    func testMoonSurfaceShadingIsGatedByCertaintyLikeEveryOtherIdentityCue() {
+        XCTAssertFalse(CelestialVisual.drawsMoonSurfaceShading(isConfirmed: false),
+                       "maria & kawah tampil walau Bulan belum dikunci")
+        XCTAssertTrue(CelestialVisual.drawsMoonSurfaceShading(isConfirmed: true),
+                      "maria & kawah hilang walau Bulan sudah dikunci")
+    }
+
     /// Bentuk adalah ciri pengenal, jadi elongasi pun harus lewat gerbang
     /// keyakinan yang sama dengan morfologi dan warna.
     ///

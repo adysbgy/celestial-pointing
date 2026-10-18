@@ -839,6 +839,62 @@ def check_moon_phase_survives_uncertainty(results, size=200, ss=2):
         f"(kalau 0, sudutnya hilang)"))
 
 
+def check_moon_surface_hides_when_uncertain(results, size=200, ss=2):
+    """Peredupan permukaan Bulan (maria + kawah) harus **hilang** saat ragu.
+
+    Cacat yang dijaga, dan kenapa tak satu pun gerbang lama menangkapnya.
+    `drawMoon` di view tidak menerima `isConfirmed` sama sekali — terukur,
+    nol kemunculan — jadi bercak maria dan kawah digambar untuk Bulan yang
+    belum dikunci. Kedua hal itu **ciri pengenal**: maria menyebut muka yang
+    mana, dan hanya Bulan yang punya pola itu. `check_moon_phase_survives_uncertainty`
+    tidak bisa melihatnya karena ia justru **menuntut** sabit yang ragu
+    identik dengan sabit yang yakin; maria ada di kedua render, jadi
+    selisihnya nol dan gerbangnya hijau — bukan karena cacatnya tidak ada,
+    melainkan karena yang dibandingkan sama-sama membawanya.
+
+    Yang diukur di sini: sabit ragu **dengan** peredupan permukaan lawan
+    sabit ragu **tanpa** peredupan, fase dan arah sama persis. Kalau
+    peredupan tidak pernah digambar, selisihnya nol dan pemeriksaan ini
+    merah — jadi cakupannya bukan palsu di arah mana pun.
+    """
+    _, dengan = render_case("moon-crescent-uncertain", size=size, ss=ss)
+    _, tanpa = render_case("moon-crescent-uncertain-plain", size=size, ss=ss)
+
+    w, h, rows_a = dengan
+    _, _, rows_b = tanpa
+    beda = 0
+    for y in range(h):
+        ra, rb = rows_a[y], rows_b[y]
+        for x in range(w):
+            if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
+                beda += 1
+
+    results.append(Result(
+        "peredupan permukaan Bulan hilang saat ragu", beda == 0,
+        f"{beda} piksel berbeda -- maria & kawah adalah ciri pengenal, "
+        f"mereka tidak boleh tampil sebelum identitasnya dikunci"))
+
+    # Arah sebaliknya, supaya pemeriksaan di atas bukan cakupan palsu:
+    # mematikan peredupan permukaan **selalu** akan membuat selisihnya nol
+    # di atas tanpa satu pun ciri pernah digambar. Yang dituntut di sini:
+    # pada Bulan yang **terkunci**, peredupan itu memang ada.
+    # Pembandingnya fase & arah yang **sama**, hanya peredupan permukaan
+    # yang berbeda. Membandingkan Bulan yakin lawan Bulan ragu tidak sah:
+    # keduanya juga berbeda lencana dan sabitnya, jadi angkanya tetap tidak
+    # nol walaupun peredupan dimatikan seluruhnya -- sudah diukur, 3434
+    # piksel pada port yang tidak menggambar peredupan sama sekali.
+    _, yakin = render_case("moon-crescent-jakarta", size=size, ss=ss)
+    _, yakin_tanpa = render_case("moon-crescent-jakarta-plain", size=size, ss=ss)
+    beda_yakin = sum(1 for y in range(h)
+                     for x in range(w)
+                     if yakin[2][y][x * 4:x * 4 + 3]
+                     != yakin_tanpa[2][y][x * 4:x * 4 + 3])
+    results.append(Result(
+        "peredupan permukaan Bulan tampil saat yakin", beda_yakin > 0,
+        f"{beda_yakin} piksel berbeda antara sabit yakin berpendar & tanpanya -- "
+        f"kalau 0, peredupan permukaan tidak pernah digambar sama sekali"))
+
+
 def check_features_disappear_when_uncertain(results, size=200, ss=2):
     """Ciri pengenal wajib hilang saat engine ragu — diukur dari piksel.
 
@@ -14110,6 +14166,7 @@ def main():
     check_spiral_core_docstring_quotes_measured_values(results)
     check_spiral_arm_docstring_quotes_measured_values(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
+    check_moon_surface_hides_when_uncertain(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)

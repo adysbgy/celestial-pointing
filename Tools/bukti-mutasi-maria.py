@@ -142,6 +142,13 @@ results = []
 C.check_moon_feature_stays_inside_the_lit_band(results)
 C.check_moon_feature_still_reaches_the_lit_side(results)
 C.check_moon_maria_reference_matches_the_model(results)
+# Gerbang keyakinan peredupan permukaan: maria & kawah menyebut **muka** yang
+# mana, jadi ia tunduk pada gerbang yang sama dengan pita Jupiter. Ukuran
+# dipilih dari dua ujung: 38 px (kartu jam, satu-satunya ukuran yang penting
+# bagi pengguna) dan 200 px (panel iPhone). Gerbang yang hanya mengukur satu
+# ukuran akan buta di ukuran lain — kelas cacat yang sudah dibayar di repo ini.
+for _size in (38, 200):
+    C.check_moon_surface_hides_when_uncertain(results, size=_size, ss=2)
 # `TAK: ` / `YA: ` — dipisah supaya kelasnya dihitung di proses ini, atas
 # **semua** pemeriksaan (bukan cuma yang merah). Tanpa itu, gerbang yang
 # berhenti mengukur (mis. daftar kasusnya kosong) tidak bisa dibedakan dari
@@ -299,6 +306,33 @@ DARK_CLASS = "tidak bocor ke belahan gelap"
 LIT_CLASS = "masih tergambar di belahan menyala"
 #: Gerbang paritas `MARIA_REFERENCE` — bukan kelas piksel, satu pemeriksaan.
 REFERENCE_CLASS = "referensi maria sama dengan model"
+#: Gerbang keyakinan peredupan permukaan, dua arah. Kelas "hides" == maria &
+#: kawah tidak tampil saat ragu; kelas "shows" == keduanya tetap tampil saat
+#: Bulan terkunci. Keduanya dijaga terpisah karena cara termurah memenuhi
+#: "hilang saat ragu" adalah berhenti menggambarnya sama sekali — dan gerbang
+#: yang hanya punya satu arah tidak bisa membedakan keduanya.
+SHADING_HIDDEN_CLASS = "peredupan permukaan Bulan hilang saat ragu"
+SHADING_SHOWN_CLASS = "peredupan permukaan Bulan tampil saat yakin"
+
+#: Jangkar gerbang keyakinan peredupan di port.
+#:
+#: Keadaan 4 melepas **penjaga keyakinan** di `_draw_moon`: maria & kawah lalu
+#: digambar walaupun `is_confirmed` False. Itu cacat yang persis dijaga
+#: `check_moon_surface_hides_when_uncertain`, jadi hanya kelas "hides" yang
+#: boleh berbunyi. Penjaga `surface_shading` **tidak** ikut dilepas: ia
+#: pembanding pembaca, bukan keputusan produksi.
+#:
+#: Keadaan 5 adalah arah sebaliknya: seluruh peredupan permukaan dimatikan
+#: (bukan hanya saat ragu). Yang wajib berbunyi kelas "shows", dan kelas
+#: "hides" wajib tetap hijau — peredupan yang tidak pernah digambar memang
+#: tidak pernah bocor, dan menuntut keduanya merah berarti harness tidak bisa
+#: membedakan "disembunyikan" dari "dihapus".
+PORT_SHADING_CERTAINTY = ('    if kw.get("is_confirmed") is False:\n'
+                          '        return\n'
+                          '    maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)')
+PORT_SHADING_NOCERTAINTY = ('    maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)')
+PORT_SHADING_LOOP = '    for index, (dx, dy, size) in enumerate(MARIA):\n        mx, my = to_screen(dx, dy)\n        edge = size * radius\n        ripple = MARIA_RIPPLE[index] if index < len(MARIA_RIPPLE) else (0.0, 0.0)'
+PORT_SHADING_NOLOOP = '    for index, (dx, dy, size) in enumerate([]):\n        mx, my = to_screen(dx, dy)\n        edge = size * radius\n        ripple = MARIA_RIPPLE[index] if index < len(MARIA_RIPPLE) else (0.0, 0.0)'
 
 #: Setiap keadaan: (nama, daftar (berkas, jangkar, pengganti), pemeriksaan
 #: yang **wajib** merah).
@@ -331,6 +365,16 @@ STATES = [
     ("3. gerbang: MARIA_REFERENCE menyimpang dari model",
      [(CHECK, PORT_MARIA_REFERENCE, PORT_MARIA_REFERENCE_DRIFT)],
      [REFERENCE_CLASS]),
+    # Keadaan 4 & 5: keyakinan peredupan permukaan. Anchor pertama ada di
+    # penjaga `_draw_moon` yang **baru**; ia akan hilang bila orang menulis
+    # ulang fungsi itu — dan jangkar yang hilang membuat harness keluar 2,
+    # bukan hijau diam-diam.
+    ("4. port: peredupan digambar walau engine ragu",
+     [(RENDER, PORT_SHADING_CERTAINTY, PORT_SHADING_NOCERTAINTY)],
+     [SHADING_HIDDEN_CLASS]),
+    ("5. port: peredupan tidak digambar sama sekali",
+     [(RENDER, PORT_SHADING_LOOP, PORT_SHADING_NOLOOP)],
+     [SHADING_SHOWN_CLASS]),
 ]
 
 _originals = {}
@@ -389,6 +433,8 @@ def main():
             (RENDER, PORT_MARIA_CLIP, "penggambar maria berklip di port"),
             (RENDER, PORT_MARIA_OUTER_MASK, "topeng poligon pada `canvas.fill`"),
             (RENDER, PORT_MARIA_LOOP, "gelung penggambar maria di port"),
+            (RENDER, PORT_SHADING_CERTAINTY, "penjaga keyakinan peredupan permukaan"),
+            (RENDER, PORT_SHADING_LOOP, "gelung peredupan permukaan di port"),
             (CHECK, PORT_MARIA_REFERENCE, "`MARIA_REFERENCE` di gerbang")):
         count = _originals[path].count(anchor)
         if count != 1:
@@ -448,7 +494,8 @@ def main():
                 print(f"       {name}")
             sys.exit(1)
         counts = {cls: sum(1 for _, name in checks if cls in name)
-                  for cls in (DARK_CLASS, LIT_CLASS, REFERENCE_CLASS)}
+                  for cls in (DARK_CLASS, LIT_CLASS, REFERENCE_CLASS,
+                              SHADING_HIDDEN_CLASS, SHADING_SHOWN_CLASS)}
         for cls, n in counts.items():
             if n == 0:
                 print(f"GERBANG: kelas «{cls}» tidak punya satu pun "

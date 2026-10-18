@@ -756,6 +756,31 @@ public struct CelestialVisual: Equatable, Sendable {
         return colorIndexBV
     }
 
+    /// Apakah **peredupan permukaan** Bulan (maria + kawah) boleh digambar.
+    ///
+    /// Cacat yang ditutup (terukur): `drawMoon` di view **tidak menerima
+    /// `isConfirmed` sama sekali** — nol kemunculan di badannya — sehingga
+    /// bercak maria dan kawah digambar untuk Bulan yang belum dikunci.
+    /// Maria adalah ciri pengenal: pola gelap-terang itu menyebut **muka**
+    /// yang mana, dan hanya Bulan yang memilikinya. Gambar yang
+    /// memperlihatkannya lebih yakin daripada badge "Ragu" di sebelahnya,
+    /// persis yang dilarang PRD §2.
+    ///
+    /// **Kenapa gerbangnya di sini, bukan di view.** `Apps/` tidak pernah
+    /// dibangun di Linux, jadi aturan yang hidup hanya di badan view tidak
+    /// bisa diuji di sini. Yang bisa diuji: keputusan "boleh atau tidak",
+    /// dan itu yang diuji (`testMoonSurfaceShadingIsGatedByCertaintyLikeEveryOtherIdentityCue`).
+    /// Gerbang pikselnya ada di `Tools/check-visuals.py` dan mengukur render
+    /// yang sesungguhnya.
+    ///
+    /// **Yang TIDAK diklaim.** Saat belum pasti, piringan tetap **bola** dan
+    /// sabitnya tetap gambar fase yang benar — bentuk fase bukan identitas
+    /// (semua benda berfase punya sabit), sedangkan pola maria adalah
+    /// identitas. Yang dibuang hanya pola itu.
+    public static func drawsMoonSurfaceShading(isConfirmed: Bool) -> Bool {
+        isConfirmed
+    }
+
     /// Tabel B−V per id bintang di `Catalogue.brightStars`.
     ///
     /// Sengaja `internal` (bukan `private`) supaya uji bisa menegakkan bahwa

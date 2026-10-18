@@ -72,7 +72,8 @@ struct CelestialVisualView: View {
     private func drawBody(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
         switch visual.kind {
         case .planet: drawPlanet(context: context, center: center, radius: radius)
-        case .moon: drawMoon(context: context, center: center, radius: radius)
+        case .moon: drawMoon(context: context, center: center, radius: radius,
+                             isConfirmed: isConfirmed)
         case .star: drawStar(context: context, center: center, radius: radius)
         case .sun:
             // Corona menjangkau `sunCoronaReach` × radius, jadi piringan
@@ -865,7 +866,16 @@ struct CelestialVisualView: View {
     // MARK: - Bulan
 
     /// Bulan: piringan gelap + pita terang berfase.
-    private func drawMoon(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
+    /// - Parameter isConfirmed: apakah engine sudah mengunci identitasnya.
+    ///   **Peredupan permukaan** (maria + kawah) hanya digambar saat terkunci:
+    ///   pola gelap-terang Bulan menyebut muka yang mana, jadi ia ciri
+    ///   pengenal, sama seperti pita Jupiter dan cincin Saturnus. Fase tetap
+    ///   digambar — sabit bukan identitas, semua benda berfase punya sabit.
+    ///   Sebelum ini `drawMoon` tidak menerima parameter itu sama sekali
+    ///   (terukur: nol kemunculan `isConfirmed` di badannya), sehingga Bulan
+    ///   yang ragu tampil dengan maria lengkap.
+    private func drawMoon(context: GraphicsContext, center: CGPoint, radius: CGFloat,
+                          isConfirmed: Bool) {
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                           width: radius * 2, height: radius * 2))
 
@@ -937,6 +947,11 @@ struct CelestialVisualView: View {
                     litFill: Self.sphereGradient(center: center, radius: radius,
                                                  base: CelestialVisual.accents.moonLit),
                     decorate: { inner in
+                        // Gerbangnya dari model (`drawsMoonSurfaceShading`),
+                        // bukan `if isConfirmed` di sini — supaya keputusannya
+                        // bisa diuji di Linux, tempat `Apps/` tidak dibangun.
+                        guard CelestialVisual.drawsMoonSurfaceShading(
+                            isConfirmed: isConfirmed) else { return }
                         Self.drawMoonSurfaceShading(inner, center: center, radius: radius)
                         drawMoonCraters(inner, center: center, radius: radius)
                     })

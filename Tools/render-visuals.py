@@ -1975,6 +1975,16 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     canvas.fill(inside_lit,
                 _moon_sphere_gradient(cx, cy, radius, lit_color, night_mode))
 
+    # **Peredupan permukaan: ciri pengenal, jadi tunduk pada keyakinan.**
+    # Port dari `CelestialVisual.drawsMoonSurfaceShading(isConfirmed:)`.
+    # `surface_shading=False` adalah pembanding murni di
+    # `check_moon_surface_hides_when_uncertain`; ia tidak boleh dipakai
+    # keadaan produksi mana pun, karena keadaan itu akan menggambar Bulan
+    # terkunci tanpa maria.
+    if kw.get("surface_shading", True) is False:
+        return
+    if kw.get("is_confirmed") is False:
+        return
     maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)
     for index, (dx, dy, size) in enumerate(MARIA):
         mx, my = to_screen(dx, dy)
@@ -2484,6 +2494,29 @@ def build_cases():
                             "sabit saat engine RAGU — lencana tanya di atasnya",
                             "moon", illumination=0.18, is_waxing=True,
                             bright_limb_angle=-math.pi / 2, is_confirmed=False))
+    # **Pembanding peredupan permukaan.** Sampai siklus ini maria dan kawah
+    # digambar tanpa melihat keyakinan sama sekali: `_draw_moon` tidak punya
+    # parameter itu, jadi Bulan yang ragu tampil dengan bercak maria lengkap
+    # -- ciri yang menyebut **muka** yang mana. Kasus ini menggambar fase,
+    # arah, dan piringan yang sama persis dengan `moon-crescent-uncertain`,
+    # hanya tanpa peredupan permukaan, sehingga selisih keduanya mengukur
+    # **hanya** ciri pengenal itu.
+    # Pembanding yang sama untuk Bulan **terkunci**: arah kedua gerbang di
+    # `check_moon_surface_hides_when_uncertain` memakainya untuk membuktikan
+    # peredupan itu memang pernah digambar. Tanpa kasus ini, arah kedua akan
+    # membandingkan Bulan yakin dengan Bulan ragu -- fase, arah, DAN
+    # peredupan ikut berbeda, sehingga angkanya tidak nol walaupun peredupan
+    # dimatikan seluruhnya.
+    cases.append(VisualCase("moon-crescent-jakarta-plain",
+                            "sabit Jakarta TANPA peredupan permukaan -- pembanding",
+                            "moon", illumination=0.18, is_waxing=True,
+                            bright_limb_angle=-math.pi / 2, is_confirmed=True,
+                            surface_shading=False))
+    cases.append(VisualCase("moon-crescent-uncertain-plain",
+                            "sabit ragu TANPA peredupan permukaan — pembanding",
+                            "moon", illumination=0.18, is_waxing=True,
+                            bright_limb_angle=-math.pi / 2, is_confirmed=False,
+                            surface_shading=False))
 
     # ── Bintang ───────────────────────────────────────────────────────
     #
