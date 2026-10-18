@@ -1,3 +1,56 @@
+### Siklus (18 Okt 2026 — Aturan 52 buta pada panel yang **meneruskan** keyakinan)
+
+Dibuka dengan `git log` + `gh run list` + gerbang. BAGIAN 1–4 / FASE A–C sudah
+terwujud dan ter-gerbang, jadi yang dicari adalah satu titik yang **belum**
+dijaga — lewat sapuan mutasi badan `Apps/`, bukan tebakan.
+
+#### Cacat: satu literal `true` di panel detail, nol gerbang berbunyi
+
+Aturan 34 (argumen wajib ada), 18 (tak boleh `true`), dan 52 (tak lewat nama
+lain) semuanya memeriksa **pemanggil `CelestialVisualView(`**. Dua permukaan
+tidak memanggilnya langsung:
+
+    Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift   (LockArrivalPanel)
+    Apps/PointAndKnowWatch/Sources/PointingView.swift     (ObjectDetailView)
+
+Keduanya menerima `isConfirmed`, lalu memakainya untuk gambar **dan** keempat
+aksesor `spoken*` (fase Bulan, bentuk langit dalam, warna spektral, kelas
+spektral). Terukur pada pohon utuh (salinan, proses baru):
+
+    isConfirmed: engine.confirmsDisplayedIdentity -> exit 0  (benar)
+    isConfirmed: true                            -> exit 0  <- SEBELUM perbaikan
+    Latar redup (ReducedLuminanceView)           -> exit 1  (sudah dijaga 52)
+
+Baris kedua itu menampilkan cincin Saturnus dan pita Jupiter pada kandidat
+yang engine belum kunci, di samping badge "Ragu" — persis false confidence
+yang dilarang PRD.
+
+#### Perbaikan
+
+- `SITUS` Aturan 52 diperluas dari `CelestialVisualView\s*\(` menjadi
+  `CelestialVisualView|LockArrivalPanel|ObjectDetailView`. Daftar putih
+  receiver (`LANGSUNG`) tidak dilonggarkan, jadi setiap panel tetap wajib
+  meneruskan keyakinan apa adanya.
+- Pesan galat kini menyebut nama pemanggil yang benar (`%s(...)`), bukan
+  selalu `CelestialVisualView(...)`.
+- `bukti-mutasi-keyakinan-visual.py`: +2 keadaan cacat (panel iPhone, panel
+  jam) dan +2 keadaan **arah kedua** (wajib HIJAU pada lint pra-perbaikan).
+  13 keadaan, semuanya sesuai harapan.
+
+Dua keadaan arah kedua itu yang membuat perluasan ini bukan klaim: lubangnya
+nyata (hijau sebelum), dan perbaikannya yang menutupnya (merah sesudah) —
+bukan aturan lain yang kebetulan memerah.
+
+#### Yang TIDAK diklaim
+
+- Daftar pemanggil masih tertutup. Panel **baru** yang meneruskan keyakinan
+  ke gambar tidak tertangkap sampai namanya ditambahkan ke `SITUS`.
+- Ini sapu teks; ia tidak membuktikan perilaku `spoken*` di perangkat.
+
+Gate: engine **936 test** hijau, `swift-ui-lint.sh` hijau, `swift-typecheck.sh`
+hijau, `check-harness-terdaftar.py` 99 harness dirujuk. Apple Build (macos-15)
+hijau untuk `29ca41b`.
+
 ### Siklus (18 Okt 2026 — keraguan lewat **bentuk**: planet ragu tetap tajam, dan gerbang yang membuktikan "terbalikkan" ternyata mengukur **palet**)
 
 Dibuka dengan `git log` + `gh run list` + gerbang. Brief meminta BAGIAN 1–4 /
