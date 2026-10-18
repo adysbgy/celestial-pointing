@@ -125,21 +125,23 @@ CHOOSE = "AlwaysOnContent.choose(isLuminanceReduced: isLuminanceReduced)"
 STATES = [
     ("[baseline]", None, False),
     ("1. isi: layar penuh",
-     [(POINTING, "        } reduced: {\n            fullView\n        }")], True),
+     [(POINTING, POINTING_REDUCED,
+       "        } reduced: {\n            fullView\n        }")], True),
     ("2. isi: mesin baru",
-     [(POINTING,
+     [(POINTING, POINTING_REDUCED,
        "        } reduced: {\n            ReducedLuminanceView(engine: "
        "PointingEngine())\n        }")], True),
     ("3. isi: kosong",
-     [(POINTING, "        } reduced: {\n            EmptyView()\n        }")], True),
+     [(POINTING, POINTING_REDUCED,
+       "        } reduced: {\n            EmptyView()\n        }")], True),
     ("4. kalibrasi: layar penuh",
-     [(CALIBRATION, "            calibrationContent\n        }")], True),
+     [(CALIBRATION, CALIBRATION_REDUCED,
+       "            calibrationContent\n        }")], True),
     ("5. pemilihan: if isLuminanceReduced",
-     [(None, SWITCH_LAMA)], True),
+     [(REDUCED, SWITCH, SWITCH_LAMA)], True),
     ("6. pemilihan: selalu penuh",
-     [(None, SWITCH.replace(CHOOSE,
-                            "AlwaysOnContent.choose(isLuminanceReduced: "
-                            "false)"))], True),
+     [(REDUCED, CHOOSE,
+       "AlwaysOnContent.choose(isLuminanceReduced: false)")], True),
     ("7. kontrol negatif: repo apa adanya", None, False),
 ]
 
@@ -207,15 +209,7 @@ def main():
 
             if mutations is not None:
                 bad = False
-                for anchor, replacement in mutations:
-                    # `anchor is None` berarti mutasinya di
-                    # `ReducedLuminanceView.swift`, tempat `SWITCH` hidup.
-                    if anchor is None:
-                        target = REDUCED
-                        old = SWITCH
-                    else:
-                        target = anchor
-                        old = anchor
+                for target, old, replacement in mutations:
                     base = _originals[target]
                     content = base.replace(old, replacement, 1)
                     if content == base:
