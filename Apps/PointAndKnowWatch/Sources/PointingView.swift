@@ -258,27 +258,30 @@ struct PointingView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let rate = engine.snapshot.angularRateDegPerSec {
-                Text(NumberFormat.degreesPerSecond(rate, fractionDigits: 0))
-                    .font(.caption2.monospacedDigit())
-                    // **Ambangnya dibaca dari cuplikan, bukan ditulis `8` di
-                    // sini.** Ambang "pergelangan masih bergerak" hidup di
-                    // `PointingPolicy.maxAngularRateDegPerSec`, dan menurut
-                    // docstring-nya ia **bisa dikalibrasi lewat Experiment 1**.
-                    // Menulis angkanya sendiri di view berarti layar
-                    // mewarnai "terlalu cepat" memakai ambang yang bisa
-                    // berbeda dari ambang yang dipakai mesin keadaan untuk
-                    // menahan kunci — dua versi kebenaran yang tidak pernah
-                    // terlihat bertentangan, karena tidak ada teks di layar
-                    // yang menyebut ambangnya.
-                    //
-                    // Kelasnya sama dengan `moonSphereGradientEndRadius`:
-                    // konstanta model yang disalin ke view lalu tidak pernah
-                    // ikut berubah. Dijaga
-                    // `testSnapshotCarriesTheAngularRateThresholdFromThePolicy`
-                    // dan `testRateThresholdFollowsThePolicyAfterItChanges`.
-                    .foregroundStyle(rate > engine.snapshot.maxAngularRateDegPerSec
-                                     ? PointingTone.warning.color
-                                     : SurfacePalette.active.textSecondaryColor)
+                // **Warna bukan satu-satunya pembeda.** Angkanya sama persis
+                // untuk "bergerak cepat" dan "diam"; satu-satunya yang berubah
+                // dulu adalah `foregroundStyle`. Bagi pengguna buta warna
+                // (deuteranopia ~6% pria) dua keadaan itu terbaca identik —
+                // padahal seluruh guna baris ini adalah memberi tahu bahwa
+                // arah tunjuk belum boleh dipercaya. Karena itu ada **kata**
+                // di sebelah angkanya, dan kata itu yang menjadi sinyalnya.
+                // Warnanya tinggal penguat, bukan pembawa informasi.
+                // Dijaga Aturan 61.
+                let tooFast = rate > engine.snapshot.maxAngularRateDegPerSec
+                HStack(spacing: 3) {
+                    Text(NumberFormat.degreesPerSecond(rate, fractionDigits: 0))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(tooFast
+                                         ? PointingTone.warning.color
+                                         : SurfacePalette.active.textSecondaryColor)
+                    if tooFast {
+                        Text(TextLocalization.text(.pointingRateTooFast))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(PointingTone.warning.color)
+                    }
+                }
+                // Ambangnya dibaca dari cuplikan, bukan ditulis `8` di sini:
+                // lihat catatan panjang di `maxAngularRateDegPerSec`.
             }
         }
         .frame(maxWidth: .infinity)

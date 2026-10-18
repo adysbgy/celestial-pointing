@@ -426,6 +426,22 @@ public extension LocalizedText {
         key: "pointing.link.disconnected", id: "iPhone tidak terjangkau")
     static let pointingLinkFailures = LocalizedText(
         key: "pointing.link.failures", id: "· %lld gagal")
+    /// Penanda kedua untuk laju sudut yang melewati ambang.
+    ///
+    /// **Kenapa ini ada.** Baris laju di kartu status mewarnai angkanya
+    /// (`warning` vs `secondary`) saat pergelangan bergerak lebih cepat
+    /// daripada ambang yang dipakai engine untuk menahan kunci. Warna itu
+    /// **satu-satunya** pembeda: angkanya sama, kata-katanya sama. Bagi
+    /// pengguna buta warna — deuteranopia ~6% pria — jam yang bergetar terlalu
+    /// cepat dan jam yang diam terbaca persis sama, padahal seluruh guna baris
+    /// itu adalah memberi tahu bahwa arah tunjuk belum boleh dipercaya.
+    ///
+    /// Kata "Cepat" dipilih, bukan kalimat: baris ini hidup di kartu jam yang
+    /// ruangnya sempit, dan `guidanceText` di bawahnya sudah menjelaskan
+    /// **apa yang harus dilakukan**. Yang kurang hanya penanda bahwa
+    /// keadaannya sedang tidak normal.
+    static let pointingRateTooFast = LocalizedText(
+        key: "pointing.rate.tooFast", id: "Cepat")
     static let objectDetailStaleNoteDisplay = LocalizedText(
         key: "objectDetail.staleNote.display",
         id: "Sisa pandangan sebelumnya — bukan hasil sekarang")
@@ -699,6 +715,12 @@ public extension LocalizedText {
         .pointingNightModeOn, .pointingNightModeOff,
         .pointingAudioCueOn, .pointingAudioCueOff,
         .pointingLinkConnected, .pointingLinkDisconnected, .pointingLinkFailures,
+        // Penanda kedua untuk laju sudut. Tanpa baris ini, uji paritas
+        // `testAllKeysListsEveryDeclaredKey` merah -- dan itu memang gunanya:
+        // kunci di luar `allKeys` tidak diperiksa uji ber-prefix maupun gerbang
+        // paritas katalog, jadi ia bisa hilang dari katalog tanpa satu pun
+        // gerbang berbunyi.
+        .pointingRateTooFast,
         .objectDetailStaleNoteDisplay, .pointingLocationFallbackPrefix,
         .skyContextDark, .skyContextLight, .skyContextSkyLabel,
         .skyContextSun, .skyContextMoon,

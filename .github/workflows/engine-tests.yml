@@ -2515,16 +2515,18 @@ jobs:
       - name: Buktikan Aturan 59 berbunyi pada kartu perkenalan yang rusak
         run: python3 Tools/bukti-mutasi-aturan59-kartu-perkenalan.py
 
-      # Dan bukti untuk gerbang **"penanda kejujuran yang digambar"** (Aturan 60).
-      #
-      # Tujuh bentuk cacatnya semuanya **terukur lolos** dari 59 aturan
-      # sebelumnya, dan semuanya mengompilasi: penanda "basi"/"ragu" bisa
-      # dicabut dari empat permukaan layar (`if false`, `!isStale` dihapus,
-      # `stale: false` di pemanggil) tanpa satu gerbang berbunyi. Yang hilang
-      # di sana justru satu-satunya hal di layar yang memberi tahu pengguna
-      # bahwa engine **tidak** yakin -- aturan pertama PRD.
-      - name: Buktikan Aturan 60 berbunyi pada penanda kejujuran yang dicabut
+      # Dan bukti untuk gerbang **"penanda kejujuran yang digambar"**: kelas
+      # cacat yang ditemukan lewat sapuan mutasi, bukan lewat membaca kode --
+      # 8 penanda basi/ragu bisa dihapus dari empat permukaan layar tanpa satu
+      # pun dari 59 aturan berbunyi.
+      - name: Buktikan Aturan 60 berbunyi pada penanda kejujuran yang digambar
         run: python3 Tools/bukti-mutasi-aturan60-penanda-jujur.py
+
+      # Dan bukti untuk WCAG 1.4.1: sinyal yang hanya dibedakan warna. Dua
+      # situs nyata (laju sudut, lokasi darurat) mengompilasi, lolos 60 aturan,
+      # dan tidak terbaca oleh pengguna buta warna.
+      - name: Buktikan Aturan 61 berbunyi pada sinyal yang hanya dibedakan warna
+        run: python3 Tools/bukti-mutasi-aturan61-sinyal-warna.py
 
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

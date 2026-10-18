@@ -10471,6 +10471,238 @@ else
        "keputusan model)."
 fi
 
+# ── Aturan 61: sinyal yang HANYA dibedakan warna wajib punya penanda kedua ──
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka. Sapuan teks
+# atas seluruh `Apps/` menemukan lima `foregroundStyle(<kondisi> ? … : …)`.
+# Tiga di antaranya sudah membawa penanda kedua di teksnya sendiri:
+#
+#   PointingView:169      ikon berubah bentuk (`scope` vs `exclamationmark.circle`)
+#   CalibrationView:203   teksnya memuat angka spread dan ambangnya
+#   Experiment1View:282   teksnya memuat putusan ("Salah kunci"/"Benar"/"Salah")
+#
+# Dua sisanya tidak:
+#
+#   PointingView:279      laju sudut — angka yang sama, hanya warnanya berubah
+#   Experiment1View:142   "lokasi darurat" — teksnya bergantung pada nilai yang
+#                         SAMA, tapi tidak satu katanya menyebut bahwa itu
+#                         perkiraan
+#
+# Keduanya lolos seluruh 60 aturan, dan keduanya adalah WCAG 1.4.1 (Use of
+# Color): informasi yang disampaikan **hanya** lewat warna. Bagi pengguna
+# buta warna — deuteranopia adalah ~6% pria — jam yang bergetar terlalu cepat
+# dan jam yang diam terbaca sama persis. Untuk cacat di `PointingView:279` itu
+# bukan cacat kosmetik: seluruh gunanya layar ini adalah memberi tahu bahwa
+# pergelangan masih bergerak, dan itulah satu-satunya alasan engine menahan
+# kunci.
+#
+# **Kenapa aturan ini menurunkan prinsipnya, bukan mendaftar dua situsnya.**
+# Daftar situs akan basi diam-diam. Yang dipakai:
+#
+#     `foregroundStyle(<kondisi> ? A : B)` boleh, asalkan di cabang yang SAMA
+#     ada teks yang juga bergantung pada `<kondisi>` itu — bukan pada nilai
+#     lain yang kebetulan searah.
+#
+# Bentuk terakhir itu yang paling mudah salah dan yang paling sulit dilihat:
+# `Experiment1View:142` punya teks yang **memang** bercabang pada
+# `isFallback` — jadi pemeriksaan naif ("ada `isFallback` di blok itu?") akan
+# hijau. Yang diperiksa karena itu bukan keberadaan kondisinya, melainkan
+# apakah teksnya **menyatakan** hal yang dibedakan warnanya.
+#
+# **Batas yang dinyatakan, bukan disangka tertutup.** Aturan ini sapu teks: ia
+# tidak tahu apakah teks yang bergantung pada kondisi itu benar-benar terbaca
+# (bisa jadi `lineLimit(0)`), dan ia tidak memeriksa kontras. Ia menutup satu
+# bentuk yang paling senyap — warna sebagai satu-satunya pembeda — bukan
+# seluruh WCAG 1.4.1.
+echo
+echo "== Aturan 61: sinyal yang hanya dibedakan warna punya penanda kedua =="
+sinyal_warna=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+
+def kode_saja(teks):
+    """Buang komentar `//` dan isi literal string (sama seperti Aturan 38)."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam:
+                if esc:
+                    esc = False
+                    buf.append(" ")
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam = False
+                    buf.append('"')
+                else:
+                    buf.append(" ")
+            else:
+                if ch == '"':
+                    dalam = True
+                    buf.append('"')
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+def imbang(kode, mulai, buka="(", tutup=")"):
+    """Indeks penutup yang sepadan untuk kurung yang mulai di `mulai`."""
+    d, j = 0, mulai
+    while j < len(kode):
+        if kode[j] == buka:
+            d += 1
+        elif kode[j] == tutup:
+            d -= 1
+            if d == 0:
+                return j
+        j += 1
+    return -1
+
+
+def kondisi_dari(expr):
+    """Ambil `<kondisi>` dari `<kondisi> ? A : B` (ternary tingkat atas)."""
+    d = 0
+    for i, ch in enumerate(expr):
+        if ch in "([":
+            d += 1
+        elif ch in ")]":
+            d -= 1
+        elif ch == "?" and d == 0:
+            return expr[:i].strip()
+    return None
+
+
+def blok_terdekat(kode, pos):
+    """Teks blok `{...}` terdalam yang memuat `pos`, atau None."""
+    terbaik = None
+    for m in re.finditer(r"\{", kode):
+        if m.start() >= pos:
+            continue
+        akhir = imbang(kode, m.start(), "{", "}")
+        if akhir > pos:
+            if terbaik is None or m.start() > terbaik[0]:
+                terbaik = (m.start(), akhir)
+    if terbaik is None:
+        return None
+    return kode[terbaik[0] + 1:terbaik[1]]
+
+
+#: Penanda kedua yang diterima: perubahan **bentuk** ikon (SF Symbol yang
+#: dipilih oleh kondisi yang sama) dan teks yang bercabang pada kondisi itu.
+masalah = []
+terbaca = 0
+punya_penanda = 0
+
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for nama in sorted(files):
+        if not nama.endswith(".swift"):
+            continue
+        path = os.path.join(root, nama)
+        kode = kode_saja(open(path, encoding="utf-8").read())
+        for m in re.finditer(r"\.foregroundStyle\s*\(", kode):
+            buka = m.end() - 1
+            tutup = imbang(kode, buka)
+            if tutup < 0:
+                continue
+            expr = " ".join(kode[buka + 1:tutup].split())
+            kondisi = kondisi_dari(expr)
+            if kondisi is None:
+                continue  # warna tetap: bukan sinyal, tidak ada yang dibedakan
+            terbaca += 1
+            baris = kode[:m.start()].count("\n") + 1
+            blok = blok_terdekat(kode, m.start())
+            if blok is None:
+                masalah.append(
+                    "  %s:%d: `foregroundStyle(%s)` -- warna bergantung "
+                    "kondisi di luar blok mana pun, jadi tidak ada teks yang "
+                    "bisa menyatakan hal yang sama" % (path, baris, expr))
+                continue
+            # Penanda kedua yang diterima, dan **hanya** ini:
+            #
+            #   (a) `if <kondisi>` di blok yang sama -- kata yang menyatakan
+            #       keadaannya, mis. `if tooFast { Text("Cepat") }`.
+            #   (b) `Image(systemName: <kondisi> ? … : …)` -- bentuk berubah,
+            #       bukan warna.
+            #   (c) `Text(...)` yang memuat kondisi itu sendiri.
+            #   (d) `Text(...)` yang memuat **semua** nilai yang dibandingkan
+            #       kondisi itu, sehingga pembacanya bisa membandingkan sendiri
+            #       tanpa warna.
+            #
+            # (d) ada karena versi pertama aturan ini menuduh kode yang benar:
+            # baris sebaran kalibrasi menampilkan "Sebaran 1.2° (maks 3.0°)"
+            # dan mewarnainya hijau/kuning. Warnanya memang satu-satunya
+            # pembeda **warna**, tetapi bukan satu-satunya pembeda informasi:
+            # kedua angka yang dibandingkan ada di layar, jadi pengguna buta
+            # warna tetap bisa menyimpulkan sendiri. Gerbang yang menuduh kode
+            # benar akan dilonggarkan orang, jadi bentuk ini diterima.
+            #
+            # Yang **tidak** diterima (d): menampilkan hanya satu dari dua
+            # nilai. Baris laju sudut menampilkan angkanya ("12°/s") tetapi
+            # tidak pernah menyebut ambangnya, jadi "terlalu cepat" tidak bisa
+            # disimpulkan tanpa warna -- dan itulah cacat yang ditutup.
+            ada_teks = re.search(r"(?<![\w.])if\b[^{]*"
+                                 + re.escape(kondisi) + r"\b", blok)
+            ada_bentuk = re.search(r"systemName\s*:\s*[^,\n]*"
+                                   + re.escape(kondisi) + r"\b", blok)
+            ada_teks_langsung = re.search(r"Text\s*\([^()]*"
+                                          + re.escape(kondisi) + r"\b", blok)
+            ada_nilai_lengkap = False
+            if not (ada_teks or ada_bentuk or ada_teks_langsung):
+                # Semua pengenal yang dibandingkan kondisi (buang kata kunci
+                # dan angka), lalu tuntut masing-masing muncul di sebuah
+                # `Text(...)` pada blok yang sama.
+                operan = [w for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", kondisi)
+                          if w not in {"true", "false", "nil"}]
+                if len(operan) >= 2:
+                    teks_blok = " ".join(
+                        " ".join(kode2.split())
+                        for kode2 in re.findall(r"Text\s*\(([^;]*?)\)\s*\n",
+                                                blok, flags=re.S))
+                    ada_nilai_lengkap = all(
+                        re.search(r"\b" + re.escape(o) + r"\b", teks_blok)
+                        for o in operan)
+            if ada_teks or ada_bentuk or ada_teks_langsung or ada_nilai_lengkap:
+                punya_penanda += 1
+                continue
+            masalah.append(
+                "  %s:%d: `foregroundStyle(... ? ... : ...)` atas `%s` -- "
+                "hanya warna yang membedakan; pengguna buta warna membaca dua "
+                "keadaan itu sama persis" % (path, baris, kondisi))
+
+if terbaca == 0:
+    print("PERINGATAN: tidak ada `foregroundStyle` berkondisi di Apps/ -- "
+          "aturan ini tidak mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+else:
+    print("JUMLAH %d %d" % (terbaca, punya_penanda))
+PY
+)
+jumlah_warna=$(printf '%s' "$sinyal_warna" | sed -n 's/^JUMLAH \([0-9]*\) \([0-9]*\)$/\1 \2/p')
+if printf '%s' "$sinyal_warna" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 61 tidak bisa memutuskan:"
+  echo "$sinyal_warna"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$sinyal_warna" ] && [ -z "$jumlah_warna" ]; then
+  echo "$sinyal_warna"
+  echo "-> Sinyal yang hanya dibedakan warna tidak terbaca oleh pengguna buta"
+  echo "   warna. Tambahkan penanda kedua yang dibaca mata DAN VoiceOver:"
+  echo "   bentuk ikon yang berubah, atau kata di teksnya."
+  status=1
+else
+  echo "Bersih: $(echo "$jumlah_warna" | cut -d' ' -f1) sinyal berwarna," \
+       "semuanya punya penanda kedua."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

@@ -340,9 +340,14 @@ final class TextLocalizationTests: XCTestCase {
     /// Angka 353 → 354 karena `.starClassLine`: kelas spektral bintang
     /// (`B8`, `M1`) untuk VoiceOver. Kunci ini masuk `allKeys` di commit yang
     /// sama dengan deklarasinya — lihat `StarNameSpeech.swift`.
+    ///
+    /// Angka 354 → 355 karena `.pointingRateTooFast`: penanda **kata** untuk
+    /// laju sudut yang melewati ambang. Sebelumnya satu-satunya pembeda antara
+    /// "terlalu cepat" dan "diam" adalah warna, sehingga pengguna buta warna
+    /// tidak bisa membedakannya (WCAG 1.4.1). Dijaga Aturan 61.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 354, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 355, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

@@ -7964,6 +7964,23 @@
           }
         }
       }
+    },
+    "pointing.rate.tooFast": {
+      "comment": "Penanda kedua (bukan warna) saat laju sudut melewati ambang: pengguna buta warna harus bisa membedakan 'terlalu cepat' dari 'diam' tanpa membedakan warna.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cepat"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
