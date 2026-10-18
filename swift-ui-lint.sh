@@ -10743,6 +10743,52 @@ import sys
 MASALAH = []
 TERBACA = 0
 
+
+def tanpa_komentar(swift):
+    """Buang komentar `//` dan `/* */`, jaga isi string.
+
+    **Kenapa wajib.** Percobaan pertama aturan ini melaporkan "Bersih" untuk
+    pemanggilan yang sudah diganti `EmptyView() // CelestialVisualView(...)`:
+    nama itu masih ADA di berkas, di dalam komentar. Gerbang yang bisa
+    dipuaskan dengan mengomentari kode akan dipuaskan dengan mengomentari kode.
+    """
+    hasil = []
+    i = 0
+    n = len(swift)
+    while i < n:
+        dua = swift[i:i + 2]
+        if dua == "//":
+            j = swift.find("\n", i)
+            if j < 0:
+                break
+            hasil.append(" " * (j - i))
+            i = j
+        elif dua == "/*":
+            j = swift.find("*/", i + 2)
+            if j < 0:
+                hasil.append(" " * (n - i))
+                break
+            potong = swift[i:j + 2]
+            hasil.append("".join("\n" if c == "\n" else " " for c in potong))
+            i = j + 2
+        elif swift[i] == '"':
+            j = i + 1
+            while j < n:
+                if swift[j] == "\\":
+                    j += 2
+                    continue
+                if swift[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            hasil.append(swift[i:j])
+            i = j
+        else:
+            hasil.append(swift[i])
+            i += 1
+    return "".join(hasil)
+
+
 # Permukaan yang menyatakan identitas objek, beserta penanda bahwa ia memang
 # permukaan jawaban. Yang dituntut: pemanggilan penggambar di badan yang sama.
 PERMUKAAN = [
@@ -10764,7 +10810,7 @@ for path, sebutan in PERMUKAAN:
                        % (path, path, sebutan))
         continue
     with open(path, encoding="utf-8") as handle:
-        sumber = handle.read()
+        sumber = tanpa_komentar(handle.read())
     TERBACA += 1
     jumlah = sumber.count(PENGGAMBAR)
     if jumlah == 0:
@@ -10820,9 +10866,12 @@ print("Bersih: %d permukaan mengenali objek dan menggambar visualnya."
       % TERBACA)
 PY
 )
-status=$?
+# Kode keluar harus diambil dari **python-nya**, bukan dari perintah sebelumnya.
+# Percobaan pertama menulis `status=$?` tepat setelah `echo`, jadi statusnya
+# selalu 0: aturan mencetak pelanggaran lalu tetap melaporkan lulus.
+visual_status=$?
 echo "$visual_objek"
-[ "$status" -ne 0 ] && status=1
+[ "$visual_status" -ne 0 ] && status=1
 
 
 if [ "$status" -eq 0 ]; then
