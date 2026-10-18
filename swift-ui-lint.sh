@@ -9006,6 +9006,107 @@ else
   echo "Bersih: setiap gambar membaca keyakinan engine secara langsung."
 fi
 
+# ── Aturan 53: kejujuran sensor di MotionLogger tidak boleh dibalik ──────
+#
+# `MotionLogger.swift` adalah satu-satunya berkas yang membaca sensor gerak
+# (jam maupun iPhone). Ia punya **tiga** titik jujur yang, kalau dibalik,
+# membuat jam terus menampilkan objek terakhir sebagai "terkonfirmasi"
+# padahal sensornya mati — persis yang dilarang PRD (false confidence).
+#
+# Diukur pada salinan utuh (proses baru, `Apps/` dibawa), mutasi yang
+# semuanya **mengompilasi** — sebelum aturan ini ada, **semua lolos** (exit 0):
+#
+#   let events = controller.setSensorAvailable(false)   -> (true)
+#       lint LULUS  swift-typecheck LULUS  ./swift-test.sh 0 gagal
+#   unavailableReason = SensorStatusText.motionMissing  -> nil
+#       lint LULUS  (alasan ketiadaan sensor dihapus, layar diam)
+#   isRunning = manager.isDeviceMotionActive            -> true
+#       lint LULUS  (klaim sensor selalu hidup)
+#
+# Yang paling berbahaya yang pertama: `setSensorAvailable(false)` memanggil
+# `PointingController.setSensorAvailable(false)`, yang (lihat
+# `PointingController.swift:243-260`) menghentikan alur dan membuang jawaban.
+# Tapi `PointingEngine.snapshot` — satu-satunya sumber yang dibaca UI — tidak
+# ikut berubah kalau `onUpdate` tidak dipanggil; `publishSensorLoss()` yang
+# memanggilnya justru lewat saluran itu. Membaliknya ke `true` berarti "sensor
+# hilang tapi laporkan tersedia": jam tetap menampilkan objek terakhir seolah
+# masih terkonfirmasi.
+#
+# **Kenapa ini di lint, bukan di PointingKit.** Ketiga bentuk itu adalah
+# **perintah** yang dipanggil di `Apps/`, bukan nilai yang diturunkan — tidak
+# ada tipe murni yang bisa menampung "jangan membalik perintah ini" tanpa
+# mengubah `MotionLogger` jadi tidak melakukan pekerjaannya. Aturan 52 sudah
+# membuktikan pola ini: perintah sensor lolos semua gerbang karena ia bukan
+# "klaim identitas", hanya "perintah".
+#
+# **Fail-closed, bukan daftar-hitam.** Dua penjaga memaksa aturan ini merah
+# kalau ia berhenti mengukur: (a) `MotionLogger.swift` harus ada, dan (b) ke-
+# tiga bentuk jujur harus muncul **tepat sekali**. Kalau seseorang
+# memindahkan/menggabung berkas ini, atau menghapus salah satu titik jujur,
+# aturan memerah — bukan diam. Kalau semua bentuk jujur hilang sekaligus, itu
+# adalah "gerbang buta selamanya" yang kita larang.
+echo
+echo "== Aturan 53: kejujuran sensor MotionLogger tidak dibalik =="
+sensor_nama=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+MOTION = "Apps/Shared/MotionLogger.swift"
+
+# Bentuk **jujur** yang wajib ada tepat sekali (fail-closed: hilang = gagal).
+# Setiap bentuk ini adalah **satu-satunya** tempat di berkas yang melakukan
+# kejujuran itu -- membaliknya (false->true, alasan->nil, isRunning->true)
+# menghapus bentuk jujur ini, sehingga hitungannya menjadi 0 dan aturan
+# memerah. Daftar-hitam per-kata ("jangan tulis `isRunning = true`") tidak
+# dipakai: `unavailableReason = nil` **sah** ada di tempat lain (mengosongkan
+# alasan saat sensor berhasil menyala), jadi melarang kata itu akan memerah
+# pada kode benar. Fail-closed lewat hitungan bentuk jujur menangkap mutasi
+# tanpa menuduh kode yang sah.
+SENSOR_LOSS = "let events = controller.setSensorAvailable(false)"
+REASON      = "unavailableReason = SensorStatusText.motionMissing"
+RUNNING     = "isRunning = manager.isDeviceMotionActive"
+
+masalah = []
+
+if not os.path.exists(MOTION):
+    print("PERINGATAN: %s tidak ditemukan -- Aturan 53 tidak mengukur apa pun."
+          % MOTION)
+else:
+    kode = open(MOTION, encoding="utf-8").read()
+    # Komentar dibuang: docstring di Apps/ mengutip bentuk cacat.
+    kode = re.sub(r"//[^\n]*", "", kode)
+    kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+
+    # Fail-closed: ketiga bentuk jujur harus ada tepat sekali. Mutasi yang
+    # membalik salah satunya menghapus bentuk itu dari berkas, sehingga
+    # hitungannya bukan 1 -- aturan memerah, bukan diam.
+    for bentuk in (SENSOR_LOSS, REASON, RUNNING):
+        n = kode.count(bentuk)
+        if n != 1:
+            masalah.append(
+                "  %s: bentuk jujur `%s` muncul %d kali (harus tepat 1) -- "
+                "kejujuran sensor dibalik atau aturan berhenti mengukur."
+                % (MOTION, bentuk, n))
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$sensor_nama" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 53 tidak bisa memutuskan:"
+  echo "$sensor_nama"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$sensor_nama" ]; then
+  echo "$sensor_nama"
+  echo "-> MotionLogger harus jujur saat sensor tidak ada: jangan balik"
+  echo "   perintah sensor-hilang, jangan hapus alasannya, jangan klaim"
+  echo "   sensor selalu hidup."
+  status=1
+else
+  echo "Bersih: MotionLogger tetap jujur saat sensor tidak ada."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

@@ -1028,6 +1028,25 @@ jobs:
       - name: Buktikan gerbang fakta-vs-literal Aturan 35 berbunyi
         run: python3 Tools/bukti-mutasi-fakta-literal.py
 
+      # Kejujuran sensor: `MotionLogger.swift` adalah satu-satunya berkas yang
+      # membaca sensor gerak (jam maupun iPhone), dan ia punya tiga titik
+      # jujur yang kalau dibalik membuat jam terus menampilkan objek terakhir
+      # seolah terkonfirmasi padahal sensor mati — persis yang dilarang PRD.
+      #
+      # Semua mutasi itu **lolos** sebelum Aturan 53 ada: lint lulus,
+      # typecheck lulus, `./swift-test.sh` hijau (0 gagal), karena `Apps/`
+      # tidak pernah dibangun di Linux. Yang paling berbahaya
+      # `setSensorAvailable(false)` -> `(true)`: sensor mati dilaporkan
+      # tersedia, dan objek terakhir tetap tampak terkunci.
+      #
+      # Lima keadaan: tiga bentuk cacat (perintah dibalik dua ejaan, alasan
+      # dihapus, `isRunning` dipaksa `true`) plus kontrol negatif — perintah
+      # jujur harus tetap hijau. Aturan 53 fail-closed: menghitung bentuk
+      # jujur (harus tepat 1), bukan melarang kata, karena `unavailableReason
+      # = nil` **sah** ada di tempat lain.
+      - name: Buktikan gerbang kejujuran sensor Aturan 53 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan53-kejujuran-sensor.py
+
       # Samaran keraguan: gambar yang **belum pasti** harus kehilangan
       # ketegasannya, bukan hanya cirinya. Semua gerbang keraguan lain bekerja
       # dari ciri pengenal (pita, cincin, maria, morfologi); yang tidak pernah

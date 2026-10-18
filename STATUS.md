@@ -28655,3 +28655,68 @@ Baku `isConfirmed: Bool = false` ternyata **benar-benar** dijaga Aturan 18
 Repo di plateau nyata. Siklus berikutnya, kalau ada, harus diawali dari celah
 yang **ditemukan pengguna/CI**, bukan dari menebak perbaikan di brief yang sudah
 terpenuhi.
+
+---
+
+## Siklus 2026-10-18 (2): celah tak-terjaga di `MotionLogger` — Aturan 53
+
+**Celah yang ditemukan (bukan ditebak).** `MotionLogger.swift` adalah satu-satunya
+berkas yang membaca sensor gerak, dan punya **tiga** titik jujur. Semuanya bisa
+dibalik tanpa satu pun dari 52 aturan UI berbunyi — dan tanpa `./swift-test.sh`
+berbunyi, karena `Apps/` tidak pernah dibangun di Linux. Diukur pada salinan utuh,
+proses baru, mutasi yang semuanya mengompilasi:
+
+    setSensorAvailable(false) -> (true)          lint LULUS, typecheck LULUS, uji hijau
+    unavailableReason = motionMissing -> nil     lint LULUS  (layar diam, alasan hilang)
+    isRunning = manager.isDeviceMotionActive
+               -> true                           lint LULUS  (klaim sensor selalu hidup)
+
+Yang pertama yang paling berbahaya. `setSensorAvailable(false)` menghentikan alur
+dan membuang jawaban (lihat `PointingController.setSensorAvailable`), tetapi
+`PointingEngine.snapshot` — satu-satunya sumber yang dibaca UI — tidak ikut
+berubah kalau `onUpdate` tidak dipanggil; `publishSensorLoss()` yang memanggilnya
+justru lewat saluran itu. Membaliknya ke `true` = "sensor mati dilaporkan
+tersedia": jam tetap menampilkan objek terakhir **seolah masih terkonfirmasi**.
+Itu persis yang dilarang PRD — uncertainty > false confidence.
+
+**Kenapa Aturan 35 tidak menangkapnya.** Aturan 35 memisahkan "fakta" dari
+"literal" dan secara eksplisit menjadikan `setSensorAvailable(false)` sebagai
+**kontrol negatif**: ia perintah, bukan klaim, jadi tidak boleh memerah. Celahnya
+justru ada di balik itu — perintah yang dibalik bukan lagi perintah yang sama.
+
+**Kenapa digerbangi di lint, bukan dipindah ke PointingKit.** Pola repo yang sudah
+terbukti (`NightPaletteSelector`, `MotionPolicy`) adalah memindahkan *nilai turunan*
+ke paket yang bisa diuji. Ketiga bentuk ini **perintah**, bukan nilai: tidak ada
+tipe murni yang bisa menampung "jangan balik perintah ini". Yang bisa dijaga
+hanya bentuknya di sumbernya.
+
+**Kenapa fail-closed lewat hitungan bentuk jujur, bukan daftar-hitam kata.**
+Percobaan pertama memakai daftar-hitam (`jangan tulis isRunning = true`) dan
+langsung salah: `unavailableReason = nil` **sah** ada di baris lain (mengosongkan
+alasan saat sensor berhasil menyala). Gerbang yang memerah pada kode benar akan
+dilonggarkan orang, dan pelonggaran itu yang membunuh gerbangnya. Bentuk final
+menghitung ketiga bentuk jujur — masing-masing wajib muncul **tepat 1 kali** —
+jadi mutasi apa pun yang membaliknya membuat hitungan jadi 0 dan gerbang memerah,
+tanpa menuduh kode yang sah. Berkas hilang/dipindah juga memerah (PERINGATAN).
+
+**Bukti gerbangnya berbunyi, bukan sekadar hijau** — `Tools/bukti-mutasi-aturan53-
+kejujuran-sensor.py`, 6 keadaan, 0 tidak sesuai:
+
+    OK   [baseline]                                   hijau
+    OK   1. perintah sensor dibalik (false)->(true)    MERAH
+    OK   1b. perintah sensor dibalik (available: true) MERAH
+    OK   2. alasan ketiadaan sensor dihapus (-> nil)   MERAH
+    OK   3. isRunning dipaksa true                     MERAH
+    OK   4. kontrol negatif: perintah jujur            hijau
+
+Keadaan 4 yang paling penting: tanpa kontrol negatif, gerbang yang memerah pada
+kode benar akan dilonggarkan. Harness terdaftar di `engine-tests.yml`; gate
+`check-harness-terdaftar.py` sekarang melaporkan **100 harness, semuanya dirujuk**.
+
+**Yang TIDAK diklaim.** Aturan 53 menjaga **bentuk** kejujuran sensor di
+`MotionLogger`, bukan bahwa UI selalu menampilkannya. Belum diukur: apakah
+`PointingEngine.snapshot` benar-benar berubah pada setiap jalur sensor-hilang.
+Itu celah berikutnya yang layak — dan harus dibuktikan buta dulu sebelum ditutup.
+
+**Catatan samping.** README diperbarui 52 → 53 aturan (aturan 10 menangkapnya
+dan memerahkan lint sampai diubah — gerbang itu bekerja persis seperti rancangannya).
