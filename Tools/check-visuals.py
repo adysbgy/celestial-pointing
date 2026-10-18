@@ -6662,10 +6662,26 @@ def _moon_phase_cases():
     2 806 pikselnya. Menuntut keduanya merah berarti menuntut gerbang
     berbunyi pada gambar yang **benar**, dan gerbang yang merah pada gambar
     benar akan dimatikan orang, bukan diperbaiki.
+
+    **Kasus pembanding pembaca dikecualikan, dan itu wajib.** Tiga kasus
+    berakhiran `-plain` / `-uncertain` ada di `build_cases()` dengan
+    `kind == "moon"`, tetapi peredupan permukaannya **memang** tidak digambar
+    — `surface_shading=False` (pembanding murni) atau `is_confirmed=False`
+    (penjaga keyakinan di `_draw_moon`). Menyertakannya ke daftar ini membuat
+    gerbang dituntut berbunyi atas piksel yang tidak pernah ada: melepas klip
+    maria tidak memindahkan apa pun pada gambar yang tidak punya maria, dan
+    harness melaporkan "gerbangnya buta" atas kerusakan yang tidak ia buat.
+    Terukur pada `bukti-mutasi-maria.py` keadaan 1: 20 yang dituntut, 14 yang
+    menyala — keenam sisanya tepat tiga kasus pembanding × dua ukuran.
     """
     names = []
     for case in R.build_cases():
         if case.kind != "moon" or case.kw.get("illumination") is None:
+            continue
+        # Pembanding pembaca: maria tidak digambar secara sengaja.
+        if case.kw.get("surface_shading", True) is False:
+            continue
+        if case.kw.get("is_confirmed", True) is False:
             continue
         if _moon_dark_overlap(case, maria=MARIA_REFERENCE) > 0:
             names.append(case.name)

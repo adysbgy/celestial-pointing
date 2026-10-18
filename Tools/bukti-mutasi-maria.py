@@ -374,7 +374,18 @@ STATES = [
      [SHADING_HIDDEN_CLASS]),
     ("5. port: peredupan tidak digambar sama sekali",
      [(RENDER, PORT_SHADING_LOOP, PORT_SHADING_NOLOOP)],
-     [SHADING_SHOWN_CLASS]),
+     # Dua kelas, bukan satu, dan itu terukur. Mematikan gelung peredupan
+     # menghapus **maria dari gambar**, bukan cuma dari saat ragu — jadi
+     # selain "shows" (yang memang wajib berbunyi), gerbang *arah sebaliknya*
+     # untuk piringan yang cukup terang (`moon-gibbous`,
+     # `moon-waning-gibbous`) juga berbunyi sah: "masih tergambar di belahan
+     # menyala 0 piksel" adalah laporan yang **benar** tentang gambar yang
+     # maria-nya dihapus. Sebelum ini kelasnya ditulis satu, keempat merah itu
+     # dilaporkan sebagai "MERAH YANG TIDAK DIMINTA" — padahal yang salah
+     # cakupan keadaan ini, bukan gerbangnya. Sabit tidak ikut berbunyi karena
+     # `MOON_FEATURE_VISIBLE_FROM_ILLUMINATION` sudah mengecualikannya (pita
+     # tipis tidak menutupi pusat piringan); itu juga benar.
+     [SHADING_SHOWN_CLASS, LIT_CLASS]),
 ]
 
 _originals = {}
