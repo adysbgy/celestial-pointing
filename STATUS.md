@@ -1,3 +1,82 @@
+### Siklus (18 Okt 2026 — penanda kejujuran yang DIGAMBAR tidak dibaca siapa pun)
+
+Siklus dibuka dengan sapuan mutasi, bukan dengan membaca STATUS: dua belas
+mutasi di `Apps/` dijalankan pada salinan utuh, proses baru, dan yang dicari
+bukan yang merah — melainkan yang **hijau padahal salah**. Sepuluh dari dua
+belas hijau. Tujuh di antaranya satu kelas, dan itu kelas yang paling
+bertentangan dengan aturan pertama PRD:
+
+    PointingView:         `if isStale {` -> `if false {`         exit 0
+    PointingView:         `if let level, !isStale {` -> tanpa !  exit 0
+    PointingView:         label a11y `if isStale {` -> `if false` exit 0
+    ReducedLuminanceView: `if engine.isDisplayingStaleObject {` -> `if false` exit 0
+    ReducedLuminanceView: `if engine.carriesUncertaintyMarker {` -> `if false` exit 0
+    DiagnosticsView:      `if let level, !isStale {` -> tanpa !   exit 0
+    DiagnosticsView:      `stale: isStale,` -> `stale: false,`    exit 0
+
+Tujuh cacat, satu kelas: **penanda "ini basi" / "ini ragu" bisa dicabut dari
+empat permukaan layar tanpa satu gerbang berbunyi**, dan semuanya tetap
+mengompilasi. Yang hilang di sana justru satu-satunya hal di layar yang
+memberi tahu pengguna bahwa engine tidak yakin — pada layar redup, di mana
+nama objek adalah huruf terbesar di layar.
+
+#### Kenapa 59 aturan tidak menangkapnya
+
+Aturan 34/35/38/42/52 semuanya menjaga **dari mana** fakta kejujuran datang:
+argumen pemanggil, badan penerus, nama yang dipakai di pemanggil. Di ketujuh
+mutasi di atas, pemanggilnya **tidak berubah sama sekali** —
+`engine.isDisplayingStaleObject` tetap dikirim apa adanya ke `isStale:`.
+Yang berubah adalah **cabang yang menggambar** penandanya, dan cabang itu
+tidak pernah dibaca siapa pun. `Apps/` juga tidak dibangun `swift-test.sh` di
+Linux, jadi tidak ada jalur kedua.
+
+#### Unit — Aturan 60: penanda yang digambar wajib dijaga predikatnya
+
+Prinsipnya, bukan daftar situs (daftar situs sudah dua kali menjatuhkan `main`
+di repo ini):
+
+    setiap tempat yang MENGGAMBAR penanda kejujuran wajib berada di dalam
+    `if`/`guard` yang membaca predikat fakta itu — atau di dalam `case`
+    sebuah `switch` atas keputusan model yang sudah diuji di Linux.
+
+Penandanya dikenali dari **bentuk yang digambar** (`Text(level.displayName)`,
+`.objectDetailStaleNoteDisplay`, `.confidenceUncertainMarker`,
+`ObjectSpeech.staleShortNote`, `.staleNote`), jadi permukaan baru yang memakai
+salah satu bentuk itu otomatis ikut terjaga. Dua bentuk sah, dan keduanya
+dibuktikan bukan diasumsikan:
+
+  * `if`/`guard` yang membaca predikat — `isStale` positif untuk penanda sisa,
+    `!isStale` untuk badge keyakinan (badge hanya untuk jawaban yang berlaku).
+  * `case` pada `switch` atas keputusan model — `ComplicationWidget.subline`
+    membaca `digest.sublineContent(at:)`, yang teruji di Linux. Menuntut `if`
+    di sana akan menuduh kode yang benar.
+
+**Arah kedua**, karena satu dari tujuh cacat itu berbeda arah: `stale: isStale`
+-> `stale: false` di panel iPhone. Badannya benar — ia memakai `stale` sebagai
+syarat penanda — yang berbohong pemanggilnya. Aturan ini karena itu juga
+menelusuri fungsi yang badannya memakai parameter sebagai syarat penanda, lalu
+menolak literal untuk parameter itu. Yang **tidak** ikut: parameter tampilan
+seperti `includeTechnicalDetails: false` (ia mengatur berapa banyak yang
+ditampilkan, bukan apa yang benar) — versi pertama aturan ini menuduhnya, dan
+gerbang yang menuduh kode benar akan dilonggarkan orang.
+
+#### Bukti
+
+`Tools/bukti-mutasi-aturan60-penanda-jujur.py` — 11 keadaan, 0 tidak sesuai
+harapan: baseline hijau, ketujuh cacat merah, kontrol negatif hijau, cakupan
+yang menyusut dilaporkan jujur (8 -> 3 penanda, bukan hijau kosong), dan
+fail-closed merah saat semua bentuk diganti nama. Terdaftar di
+`engine-tests.yml`, jadi `check-harness-terdaftar.py` (107/107) menutupnya.
+
+#### Hasil terukur siklus ini
+
+    swift-ui-lint.sh   60 aturan, exit 0
+    swift-test.sh      engine 222 uji, PointingKit 943 uji, 0 gagal
+    harness            11 keadaan, 0 tidak sesuai harapan
+
+Catatan: angka "166 + 143" di brief sudah basi; yang terukur hari ini
+222 + 943. README ikut diperbarui (Aturan 10 membaca angka aturan dari sana).
+
 ### Siklus (18 Okt 2026 — dua janji FASE A yang tidak dijaga satu pun gerbang)
 
 `git log` + `gh run list` membuka siklus ini: `Apple Build` hijau, `Engine

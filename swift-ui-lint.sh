@@ -10107,6 +10107,370 @@ else
   echo "Bersih: perkenalan tampil sekali, bisa ditutup, dan tidak kembali."
 fi
 
+# ── Aturan 60: penanda kejujuran yang DIGAMBAR wajib dijaga predikatnya ────
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka. Sampai siklus
+# ini, 59 aturan menjaga **dari mana** fakta kejujuran datang (Aturan 34/35/38/
+# 42/52 menelusuri argumen dan badan penerus), tetapi tidak satu pun membaca
+# **tempat penandanya digambar**. Terukur pada salinan utuh (proses baru,
+# `Apps/` + `Packages/` dibawa), dengan mutasi yang semuanya **mengompilasi**:
+#
+#   PointingView:        `if isStale {` -> `if false {`         exit 0
+#   PointingView:        `if let level, !isStale {` -> tanpa !  exit 0
+#   PointingView:        label a11y `if isStale {` -> `if false` exit 0
+#   ReducedLuminanceView:`if engine.isDisplayingStaleObject {` -> `if false` exit 0
+#   ReducedLuminanceView:`if engine.carriesUncertaintyMarker {` -> `if false` exit 0
+#   DiagnosticsView:     `if let level, !isStale {` -> tanpa !   exit 0
+#   DiagnosticsView:     `stale: isStale,` -> `stale: false,`    exit 0
+#
+# Tujuh cacat, satu kelas: **penanda yang menyatakan "ini basi" atau "ini
+# ragu" bisa dihapus dari empat permukaan layar tanpa satu gerbang berbunyi.**
+# Itu bukan cacat kosmetik. PRD menaruh "uncertainty > false confidence" sebagai
+# aturan pertama, dan yang dihapus di sini justru satu-satunya hal di layar
+# yang memberi tahu pengguna bahwa engine **tidak** yakin:
+#
+#   * `if false` pada `isStale` membuat objek sisa pandangan sebelumnya tampil
+#     persis seperti hasil pengukuran sekarang — di layar redup, di mana nama
+#     itu huruf terbesar di layar.
+#   * `if let level` tanpa `!isStale` menempelkan badge "Yakin" pada objek
+#     basi — klaim keyakinan atas pengukuran yang tidak sedang berlangsung.
+#   * `if false` pada `carriesUncertaintyMarker` membuat **nama kandidat**
+#     tampil sebagai temuan, bukan sebagai kandidat.
+#
+# Kenapa Aturan 34/35/38/42/52 tidak menangkapnya: kelimanya mengawasi
+# **argumen pemanggil** dan **badan penerus**. Di ketujuh mutasi di atas,
+# pemanggilnya tidak berubah sama sekali — `engine.isDisplayingStaleObject`
+# tetap dikirim apa adanya ke `isStale:`. Yang berubah adalah **cabang yang
+# menggambar** penandanya, dan cabang itu tidak pernah dibaca siapa pun.
+# `Apps/` juga tidak pernah dibangun `swift-test.sh` di Linux, jadi tidak ada
+# jalur kedua yang bisa menangkapnya.
+#
+# **Kenapa aturan ini menurunkan prinsipnya, bukan mendaftar situsnya.**
+# Daftar situs akan basi diam-diam — persis yang sudah dua kali menjatuhkan
+# `main` di repo ini (daftar gerbang, daftar jangkar). Yang dipakai:
+#
+#     setiap tempat yang MENGGAMBAR penanda kejujuran wajib berada di dalam
+#     `if`/`guard` yang membaca predikat fakta itu — atau di dalam `case`
+#     sebuah `switch` atas keputusan model yang sudah diuji di Linux.
+#
+# Penandanya dikenali dari **bentuk yang digambar**, bukan dari nama variabel
+# view: `Text(level.displayName)` (badge keyakinan), kunci katalog
+# `.objectDetailStaleNoteDisplay` / `.confidenceUncertainMarker`, dan
+# `ObjectSpeech.staleShortNote` / `.staleNote`. Menambah permukaan baru yang
+# memakai salah satu bentuk itu otomatis ikut terjaga.
+#
+# **Kenapa `switch` diterima sebagai bentuk sah.** `ComplicationWidget.subline`
+# memutuskan prioritas baris kedua di `ComplicationDigest.sublineContent(at:)`
+# — model yang teruji di Linux (`ComplicationDigestStalenessTests`). Menuntut
+# `if` di sana akan menuduh kode yang benar, dan gerbang yang menuduh kode
+# benar akan dilonggarkan orang. Yang disyaratkan: `switch`-nya atas
+# keputusan model (`digest.`/`engine.`/`snapshot.`), bukan atas nilai lokal.
+#
+# **Arah kedua: literal di pemanggil.** Satu cacat di daftar di atas berbeda
+# arah — `stale: isStale` -> `stale: false` di panel iPhone. Badannya benar
+# (ia memakai `stale` sebagai syarat penanda), yang berbohong adalah
+# pemanggilnya. Karena itu aturan ini juga menelusuri fungsi yang **badannya**
+# memakai parameter sebagai syarat penanda, lalu menolak literal untuk
+# parameter itu di setiap pemanggilan. Yang **tidak** ikut: parameter tampilan
+# seperti `includeTechnicalDetails: false` — ia mengatur berapa banyak yang
+# ditampilkan, bukan apa yang benar.
+#
+# Yang TIDAK diklaim aturan ini. Ia sapu teks, bukan pemeriksa tipe: ia tidak
+# tahu apakah `isStale` benar-benar Bool yang dimaksud, tidak membaca blok
+# komentar `/* */`, dan tidak menilai apakah `if`-nya **cukup** (mis. `if
+# isStale || true` lolos). Yang ditutup adalah bentuk yang paling senyap dan
+# paling mudah terjadi saat merapikan tampilan: penanda yang **dicabut** dari
+# syaratnya, atau syaratnya diganti literal.
+echo
+echo "== Aturan 60: penanda kejujuran yang digambar dijaga predikatnya =="
+penanda_jujur=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+
+def kode_saja(teks):
+    """Buang komentar `//` dan isi literal string (sama seperti Aturan 38)."""
+    hasil = []
+    for baris in teks.split("\n"):
+        buf, i, dalam, esc = [], 0, False, False
+        while i < len(baris):
+            ch = baris[i]
+            if dalam:
+                if esc:
+                    esc = False
+                    buf.append(" ")
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    dalam = False
+                    buf.append('"')
+                else:
+                    buf.append(" ")
+            else:
+                if ch == '"':
+                    dalam = True
+                    buf.append('"')
+                elif ch == "/" and i + 1 < len(baris) and baris[i + 1] == "/":
+                    break
+                else:
+                    buf.append(ch)
+            i += 1
+        hasil.append("".join(buf))
+    return "\n".join(hasil)
+
+
+def blok(kode, kata_kunci):
+    """Rentang `kata_kunci <kondisi> { ... }` beserta teks kondisinya."""
+    hasil = []
+    for m in re.finditer(kata_kunci, kode):
+        i = m.end()
+        kedalaman, j = 0, i
+        while j < len(kode):
+            ch = kode[j]
+            if ch in "([":
+                kedalaman += 1
+            elif ch in ")]":
+                kedalaman -= 1
+            elif ch == "{" and kedalaman == 0:
+                break
+            j += 1
+        if j >= len(kode):
+            continue
+        kondisi = " ".join(kode[i:j].split())
+        d, k = 0, j
+        while k < len(kode):
+            if kode[k] == "{":
+                d += 1
+            elif kode[k] == "}":
+                d -= 1
+                if d == 0:
+                    break
+            k += 1
+        hasil.append((m.start(), kondisi, j, k))
+    return hasil
+
+
+def kasus_switch(kode):
+    """Rentang badan setiap `case` di dalam setiap `switch`, beserta judulnya.
+
+    `case` Swift tidak memakai kurung kurawal: badannya berakhir di `case`/
+    `default` berikutnya pada kedalaman yang sama. Karena itu `blok()` tidak
+    bisa dipakai untuknya.
+    """
+    hasil = []
+    for m in re.finditer(r"(?<![\w.])switch\b", kode):
+        i = kode.find("{", m.end())
+        if i < 0:
+            continue
+        d, j = 0, i
+        while j < len(kode):
+            if kode[j] == "{":
+                d += 1
+            elif kode[j] == "}":
+                d -= 1
+                if d == 0:
+                    break
+            j += 1
+        judul = " ".join(kode[m.end():i].split())
+        tanda = []
+        d = 0
+        k = i
+        while k < j:
+            ch = kode[k]
+            if ch == "{":
+                d += 1
+            elif ch == "}":
+                d -= 1
+            elif d == 1 and (kode.startswith("case ", k)
+                             or kode.startswith("default", k)):
+                batas = kode.find(":", k)
+                if batas > 0:
+                    tanda.append((k, batas, " ".join(kode[k:batas].split())))
+                    k = batas
+            k += 1
+        for n, (awal, titikdua, teks) in enumerate(tanda):
+            akhir = tanda[n + 1][0] if n + 1 < len(tanda) else j
+            hasil.append((awal, teks, titikdua, akhir, judul))
+    return hasil
+
+
+#: (pola yang menggambar penanda, sebutan, ejaan predikat yang sah)
+#: `(nama, positif)` -- `positif=False` berarti penandanya justru harus
+#: disembunyikan saat fakta itu benar (`badge` hanya untuk yang berlaku).
+PENANDA = [
+    (r"Text\(\s*level\.displayName\s*\)", "badge keyakinan",
+     [("isStale", False)]),
+    (r"\.objectDetailStaleNoteDisplay\b", "catatan sisa (panel)",
+     [("isStale", True)]),
+    (r"\.confidenceUncertainMarker\b", "penanda ragu",
+     [("carriesUncertaintyMarker", True)]),
+    (r"ObjectSpeech\.staleShortNote\b", "penanda sisa (layar redup)",
+     [("isDisplayingStaleObject", True)]),
+    (r"ObjectSpeech\.staleNote\b", "penanda sisa (VoiceOver)",
+     [("isStale", True), ("stale", True)]),
+]
+
+masalah = []
+terbaca = 0
+lewat_model = 0
+berkas = []
+
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for nama in sorted(files):
+        if nama.endswith(".swift"):
+            berkas.append(os.path.join(root, nama))
+
+for path in berkas:
+    kode = kode_saja(open(path, encoding="utf-8").read())
+    ifs = blok(kode, r"(?<![\w.])if\b") + blok(kode, r"(?<![\w.])guard\b")
+    kasus = kasus_switch(kode)
+    for pola, sebutan, sah in PENANDA:
+        for m in re.finditer(pola, kode):
+            terbaca += 1
+            baris = kode[:m.start()].count("\n") + 1
+            dalam = [b for b in ifs if b[2] < m.start() < b[3]]
+            if dalam:
+                kondisi = max(dalam, key=lambda b: b[0])[1]
+                ok = False
+                for predikat, positif in sah:
+                    if positif:
+                        if re.search(r"(?<![!])\b" + re.escape(predikat)
+                                     + r"\b", kondisi):
+                            ok = True
+                    else:
+                        if re.search(r"!\s*" + re.escape(predikat)
+                                     + r"\b", kondisi):
+                            ok = True
+                if ok:
+                    continue
+                masalah.append(
+                    "  %s:%d: %s di dalam `if %s` -- predikat %s tidak dibaca, "
+                    "jadi penandanya bisa hilang atau menyala pada keadaan "
+                    "yang salah" % (path, baris, sebutan, kondisi,
+                                    "/".join(p for p, _ in sah)))
+                continue
+            # Bentuk sah kedua: `case` pada switch atas keputusan model.
+            dalam_case = [b for b in kasus if b[2] < m.start() < b[3]]
+            if dalam_case:
+                terdekat = max(dalam_case, key=lambda b: b[0])
+                if re.search(r"\b(digest|engine|snapshot)\.", terdekat[4]):
+                    lewat_model += 1
+                    continue
+            masalah.append(
+                "  %s:%d: %s tampil TANPA syarat -- penanda kejujuran yang "
+                "tidak dijaga predikatnya" % (path, baris, sebutan))
+
+
+def fungsi_penanda(kode):
+    """Fungsi yang badannya memakai parameter sebagai syarat penanda."""
+    hasil = []
+    for m in re.finditer(r"\bfunc\s+([A-Za-z_]\w*)\s*\(", kode):
+        i = kode.find("(", m.end() - 1)
+        d, j = 0, i
+        while j < len(kode):
+            if kode[j] == "(":
+                d += 1
+            elif kode[j] == ")":
+                d -= 1
+                if d == 0:
+                    break
+            j += 1
+        kurung = kode[i + 1:j]
+        k = kode.find("{", j)
+        if k < 0:
+            continue
+        d, e = 0, k
+        while e < len(kode):
+            if kode[e] == "{":
+                d += 1
+            elif kode[e] == "}":
+                d -= 1
+                if d == 0:
+                    break
+            e += 1
+        badan = kode[k:e]
+        if not any(re.search(p, badan) for p, _, _ in PENANDA):
+            continue
+        # Hanya parameter yang menjadi syarat **blok berisi penanda**.
+        # Parameter tampilan (mis. `includeTechnicalDetails`) sah dikirim
+        # literal: ia mengatur berapa banyak yang ditampilkan, bukan apa
+        # yang benar.
+        syarat = []
+        for b in blok(badan, r"(?<![\w.])if\b"):
+            isi = badan[b[2]:b[3]]
+            if any(re.search(p, isi) for p, _, _ in PENANDA):
+                syarat.append(b[1])
+        syarat = " ".join(syarat)
+        parameter = []
+        for pm in re.finditer(r"([A-Za-z_]\w*)\s*:\s*(?:Bool|String\??)\b", kurung):
+            nama = pm.group(1)
+            if re.search(r"\b" + re.escape(nama) + r"\b", syarat):
+                parameter.append(nama)
+        if parameter:
+            hasil.append((m.group(1), parameter))
+    return hasil
+
+
+# Arah kedua: pemanggil fungsi penanda tidak boleh mengirim literal untuk
+# parameter yang badannya pakai sebagai syarat.
+for path in berkas:
+    kode = kode_saja(open(path, encoding="utf-8").read())
+    for fungsi, parameter in fungsi_penanda(kode):
+        for pm in re.finditer(r"\b" + re.escape(fungsi) + r"\s*\(", kode):
+            i = kode.find("(", pm.end() - 1)
+            d, j = 0, i
+            while j < len(kode):
+                if kode[j] == "(":
+                    d += 1
+                elif kode[j] == ")":
+                    d -= 1
+                    if d == 0:
+                        break
+                j += 1
+            daftar = kode[i + 1:j]
+            for p in parameter:
+                am = re.search(r"\b" + re.escape(p) + r"\s*:\s*"
+                               r"(true|false|nil)\b", daftar)
+                if not am:
+                    continue
+                terbaca += 1
+                masalah.append(
+                    "  %s:%d: `%s` menerima `%s: %s` -- literal, padahal "
+                    "badannya memakai parameter itu untuk memutuskan penanda "
+                    "kejujuran" % (path, kode[:pm.start()].count("\n") + 1,
+                                   fungsi, p, am.group(1)))
+
+# Keluaran bersih sengaja berbentuk ringkas yang **dikenali** di bawah: pesan
+# "Bersih" biasa akan terbaca sebagai temuan oleh cabang `elif [ -n ... ]`,
+# dan aturan yang hijau akan memerahkan gerbangnya sendiri.
+if terbaca == 0:
+    print("PERINGATAN: tidak ada penanda kejujuran yang terbaca di Apps/ -- "
+          "aturan ini tidak mengukur apa pun.")
+elif masalah:
+    print("\n".join(masalah))
+else:
+    print("JUMLAH %d %d" % (terbaca, lewat_model))
+PY
+)
+jumlah_penanda=$(printf '%s' "$penanda_jujur" | sed -n 's/^JUMLAH \([0-9]*\) \([0-9]*\)$/\1 \2/p')
+if printf '%s' "$penanda_jujur" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 60 tidak bisa memutuskan:"
+  echo "$penanda_jujur"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$penanda_jujur" ] && [ -z "$jumlah_penanda" ]; then
+  echo "$penanda_jujur"
+  echo "-> Penanda \"basi\"/\"ragu\" hanya boleh muncul di bawah predikat yang"
+  echo "   menyatakan fakta itu. Tanpa syarat, layar mengklaim lebih daripada"
+  echo "   yang diketahui engine -- persis yang dilarang PRD."
+  status=1
+else
+  echo "Bersih: $(echo "$jumlah_penanda" | cut -d' ' -f1) penanda kejujuran" \
+       "dijaga predikatnya ($(echo "$jumlah_penanda" | cut -d' ' -f2) lewat" \
+       "keputusan model)."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

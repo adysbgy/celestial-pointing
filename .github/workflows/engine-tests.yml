@@ -2515,5 +2515,16 @@ jobs:
       - name: Buktikan Aturan 59 berbunyi pada kartu perkenalan yang rusak
         run: python3 Tools/bukti-mutasi-aturan59-kartu-perkenalan.py
 
+      # Dan bukti untuk gerbang **"penanda kejujuran yang digambar"** (Aturan 60).
+      #
+      # Tujuh bentuk cacatnya semuanya **terukur lolos** dari 59 aturan
+      # sebelumnya, dan semuanya mengompilasi: penanda "basi"/"ragu" bisa
+      # dicabut dari empat permukaan layar (`if false`, `!isStale` dihapus,
+      # `stale: false` di pemanggil) tanpa satu gerbang berbunyi. Yang hilang
+      # di sana justru satu-satunya hal di layar yang memberi tahu pengguna
+      # bahwa engine **tidak** yakin -- aturan pertama PRD.
+      - name: Buktikan Aturan 60 berbunyi pada penanda kejujuran yang dicabut
+        run: python3 Tools/bukti-mutasi-aturan60-penanda-jujur.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
