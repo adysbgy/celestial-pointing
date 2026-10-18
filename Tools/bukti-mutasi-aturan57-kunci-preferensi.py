@@ -69,25 +69,30 @@ NIGHT_WATCH = "@AppStorage(NightModeStorage.key) private var nightMode"
 AUDIO_WATCH = "@AppStorage(AudioCueStorage.key) private var audioCueEnabled"
 ONBOARD_WATCH = "@AppStorage(OnboardingStorage.key) private var onboardingSeen"
 
+#: `DiagnosticsView.swift` memuat **dua** view yang masing-masing punya
+#: `@AppStorage(NightModeStorage.key) private var nightMode` (layar diagnostik
+#: dan layar pengaturan). Jangkar yang sah muncul lebih dari sekali di sana;
+#: mutasinya mengganti **semua** kemunculan, karena itulah bentuk nyatanya
+#: bila kuncinya diubah di sisi iPhone.
 STATES = [
     ("[baseline]", None, False),
     ("1. Watch: night mode -> literal",
      [(POINTING, NIGHT_WATCH,
-       '@AppStorage("nightMode") private var nightMode')], True),
+       '@AppStorage("nightMode") private var nightMode', 1)], True),
     ("2. iPhone: audio -> literal",
      [(IPHONE, AUDIO_WATCH,
-       '@AppStorage("soundOn") private var audioCueEnabled')], True),
+       '@AppStorage("soundOn") private var audioCueEnabled', 1)], True),
     ("3. Watch: audio -> literal",
      [(POINTING, AUDIO_WATCH,
-       '@AppStorage("audio") private var audioCueEnabled')], True),
+       '@AppStorage("audio") private var audioCueEnabled', 1)], True),
     ("4. iPhone: night mode -> literal",
      [(IPHONE, NIGHT_WATCH,
-       '@AppStorage("nightModeOn") private var nightMode')], True),
+       '@AppStorage("nightModeOn") private var nightMode', -1)], True),
     ("5. dua layar menulis literal yang sama",
      [(POINTING, NIGHT_WATCH,
-       '@AppStorage("nightMode") private var nightMode'),
+       '@AppStorage("nightMode") private var nightMode', 1),
       (IPHONE, NIGHT_WATCH,
-       '@AppStorage("nightMode") private var nightMode')], True),
+       '@AppStorage("nightMode") private var nightMode', -1)], True),
     ("6. kontrol negatif: repo apa adanya", None, False),
 ]
 
@@ -133,14 +138,17 @@ def main():
         with open(path, encoding="utf-8") as handle:
             _originals[path] = handle.read()
 
-    # Jangkar harus muncul tepat sekali di berkas bersih.
-    for path, anchor in ((POINTING, NIGHT_WATCH), (POINTING, AUDIO_WATCH),
-                         (WATCHAPP, ONBOARD_WATCH), (IPHONE, NIGHT_WATCH),
-                         (IPHONE, AUDIO_WATCH)):
+    # Setiap jangkar harus muncul sebanyak yang diharapkan. `IPHONE` memang
+    # memuat dua view dengan `@AppStorage(NightModeStorage.key) private var
+    # nightMode`; jumlah lain berarti kode berubah dan harness perlu ditinjau.
+    for path, anchor, diharapkan in (
+            (POINTING, NIGHT_WATCH, 1), (POINTING, AUDIO_WATCH, 1),
+            (WATCHAPP, ONBOARD_WATCH, 1), (IPHONE, NIGHT_WATCH, 2),
+            (IPHONE, AUDIO_WATCH, 1)):
         count = _originals[path].count(anchor)
-        if count != 1:
+        if count != diharapkan:
             print(f"GERBANG: jangkar {anchor!r} muncul {count}x di {path}, "
-                  f"harus tepat 1 -- harness tidak boleh jalan.",
+                  f"harus {diharapkan} -- harness tidak boleh jalan.",
                   file=sys.stderr)
             sys.exit(2)
 
@@ -155,9 +163,10 @@ def main():
 
             if mutations is not None:
                 bad = False
-                for target, old, replacement in mutations:
+                for target, old, replacement, jumlah in mutations:
                     base = _originals[target]
-                    content = base.replace(old, replacement, 1)
+                    # `-1` = ganti semua kemunculan.
+                    content = base.replace(old, replacement, jumlah)
                     if content == base:
                         print(f"{label:42s} JANGKAR TIDAK DITEMUKAN")
                         bad = True
