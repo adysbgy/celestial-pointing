@@ -1,3 +1,82 @@
+### Siklus (18 Okt 2026 — dua sinyal yang hanya bisa dibaca lewat warna)
+
+Siklus sebelumnya menutup satu kelas dengan sapuan mutasi. Siklus ini memakai
+cara yang sama sekali lagi, tetapi menyapu hal yang berbeda: **bukan** apakah
+suatu cabang bisa dihapus, melainkan apakah setiap `foregroundStyle(kondisi ?
+… : …)` di `Apps/` masih bisa dibaca oleh orang yang tidak membedakan warna.
+
+Lima situs ditemukan. Tiga membawa penanda kedua (ikon, kata, atau angka
+pembanding). Dua tidak — dan keduanya mengompilasi, lolos seluruh 60 aturan,
+dan tidak terlihat salah di layar mana pun bagi mata yang bisa membedakan
+warna:
+
+    PointingView:279     laju sudut: angka identik, kata identik,
+                         satu-satunya pembeda `foregroundStyle`
+    Experiment1View:142  lokasi darurat: teks bercabang pada fakta yang sama,
+                         tidak satu katanya menyebut "dihitung untuk tempat lain"
+
+Yang pertama adalah cacat yang paling bertentangan dengan aturan pertama PRD.
+Seluruh guna baris itu adalah memberi tahu pengguna bahwa arah tunjuk **belum
+boleh dipercaya** karena pergelangan masih bergerak. Jam yang bergetar terlalu
+cepat dan jam yang diam menghasilkan angka yang sama persis ("12°/s" vs
+"12°/s"); yang berubah hanya warnanya. Bagi pengguna dengan deuteranopia —
+sekitar 6% pria — dua keadaan itu terbaca identik, jadi baris yang seharusnya
+menahan mereka justru diam.
+
+#### Perbaikan
+
+  * `PointingView` — kata **"Cepat"** di sebelah angkanya saat melewati
+    ambang. Warnanya tinggal penguat, bukan pembawa informasi. Kunci baru
+    `pointing.rate.tooFast` (id+en) di katalog.
+  * `Experiment1View` — kalimat lokasi darurat menyebut sendiri bahwa
+    tingginya dihitung untuk tempat lain, bukan hanya diwarnai kuning.
+
+Ambangnya tetap dibaca dari `engine.snapshot.maxAngularRateDegPerSec`, bukan
+ditulis ulang di view — komentar lama di sana menjelaskan kenapa, dan tetap
+berlaku.
+
+#### Aturan 61, dan dua kali ia salah sebelum benar
+
+Aturan 61 menerima empat bentuk penanda kedua: `if <kondisi>`, `Image(systemName:
+<kondisi> ? … : …)`, `Text` atas kondisi itu, dan `Text` yang memuat **semua**
+nilai yang dibandingkan. Bentuk keempat ada karena versi pertama aturan ini
+menuduh kode yang **benar**: baris sebaran kalibrasi menampilkan
+"Sebaran 1.2° (maks 3.0°)" lalu mewarnainya. Warnanya memang satu-satunya
+pembeda warna, tetapi bukan satu-satunya pembeda informasi — kedua angka ada di
+layar, jadi pembacanya bisa menyimpulkan sendiri. Gerbang yang menuduh kode
+benar akan dilonggarkan orang, jadi bentuk itu diterima; yang tetap ditolak
+adalah menampilkan hanya **satu** dari dua nilai, seperti baris laju sudut.
+
+Dua gerbang lama juga menangkap kelalaian saya secara berurutan, dan keduanya
+bekerja persis seperti rancangannya:
+
+  1. `testAllKeysListsEveryDeclaredKey` merah karena `pointing.rate.tooFast`
+     belum masuk `allKeys` — kunci di luar daftar itu tidak diperiksa uji
+     ber-prefix maupun gerbang paritas katalog.
+  2. `testDeclaredKeysAreUniqueNonEmptyAndComplete` merah karena jumlah kunci
+     dikunci di 354. Dinaikkan ke 355 dengan catatan alasannya.
+
+#### Bukti
+
+`Tools/bukti-mutasi-aturan61-sinyal-warna.py` — 5 keadaan, 0 tidak sesuai
+harapan. Program aturannya **diekstrak dari `swift-ui-lint.sh`**, bukan disalin:
+menyalin aturan berarti harness mengukur salinan, yang tetap hijau walau aturan
+aslinya dilonggarkan.
+
+Percobaan pertama keadaan fail-closed hanya mengganti nama `.foregroundStyle(`
+di dua berkas target; aturan tetap menemukan 2 sinyal di layar lain lalu
+melaporkan "semuanya punya penanda kedua" — hijau yang benar tentang repo,
+tetapi salah sebagai uji fail-closed, karena yang diuji bukan keadaan "tidak ada
+sinyal". Kini disapu ke seluruh `Apps/`.
+
+#### Hasil terukur siklus ini
+
+    swift-ui-lint.sh   61 aturan, exit 0
+    swift-test.sh      engine 222 uji, PointingKit 943 uji, 0 gagal
+    harness 61         5 keadaan, 0 tidak sesuai harapan
+    harness 60         11 keadaan, 0 tidak sesuai harapan
+    Apple Build        hijau
+
 ### Siklus (18 Okt 2026 — penanda kejujuran yang DIGAMBAR tidak dibaca siapa pun)
 
 Siklus dibuka dengan sapuan mutasi, bukan dengan membaca STATUS: dua belas
