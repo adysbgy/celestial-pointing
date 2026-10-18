@@ -2528,5 +2528,13 @@ jobs:
       - name: Buktikan Aturan 61 berbunyi pada sinyal yang hanya dibedakan warna
         run: python3 Tools/bukti-mutasi-aturan61-sinyal-warna.py
 
+      # Dan bukti untuk **visual objek benar-benar dipanggil di layar**. Dua
+      # mutasi yang memotivasinya menghapus seluruh gambar objek dari kartu jam
+      # dan panel iPhone sambil membuat 61 aturan tetap hijau: aplikasi tetap
+      # berjalan, engine tetap mengunci objek dengan benar, namanya tetap
+      # tertulis, hanya bentuknya yang hilang.
+      - name: Buktikan Aturan 62 berbunyi saat visual objek hilang dari layar
+        run: python3 Tools/bukti-mutasi-aturan62-visual-di-layar.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -52,7 +52,7 @@ IPHONE = os.path.join(ROOT, "Apps", "PointAndKnowiOS", "Sources",
                       "DiagnosticsView.swift")
 
 RULE_HEADER = "== Aturan 62:"
-CLEAN_MARK = "menggambar visualnya"
+CLEAN_MARK = "Bersih: 2 permukaan"
 
 KARTU = """            if let visual {
                 // Visual + denyutnya dipegang `PulsingCelestialVisual`: denyut"""
@@ -65,10 +65,17 @@ PANEL_MATI = """                EmptyView() // CelestialVisualView(visual: visua
                                      diameter: visualDiameter,"""
 
 BUNGKUS = """                CelestialVisualView(visual: visual,
-                                     diameter: visualDiameter,"""
-BUNGKUS_MATI = """                if false { _ = 0 }
+                                    diameter: diameter,
+                                    isConfirmed: isConfirmed,
+                                    pulse: MotionPolicy.staticPulsePhase)
+            }"""
+BUNGKUS_MATI = """                if false {
                 CelestialVisualView(visual: visual,
-                                     diameter: visualDiameter,"""
+                                    diameter: diameter,
+                                    isConfirmed: isConfirmed,
+                                    pulse: MotionPolicy.staticPulsePhase)
+                }
+            }"""
 
 STATES = [
     ("[baseline]", None, False),
@@ -123,7 +130,7 @@ def main():
         with open(path, encoding="utf-8") as handle:
             _originals[path] = handle.read()
 
-    for path, anchor in ((WATCH, KARTU), (IPHONE, PANEL)):
+    for path, anchor in ((WATCH, KARTU), (IPHONE, PANEL), (WATCH, BUNGKUS)):
         count = _originals[path].count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar muncul {count}x di {path}, harus 1 -- "
@@ -176,7 +183,7 @@ def main():
     if unexpected:
         print(f"{unexpected} keadaan tidak sesuai harapan")
         sys.exit(1)
-    print(f"{len(STATES)} keadaan, 0 tidak sesuai harapan")
+    print(f"{len(STATES) + 1} keadaan, 0 tidak sesuai harapan")
 
 
 if __name__ == "__main__":
