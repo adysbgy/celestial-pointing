@@ -5827,7 +5827,7 @@ for root, _, files in os.walk("Apps"):
             `safetyWarningText` (awalan dua kata), tetapi `title` tidak cocok
             dengan `.rowTitleNote` yang tidak ada hubungannya. Substring polos
             (percobaan pertama) membuat `title`, `value`, `name`, `label`
-            tercatat punya "sumber" di hampir setiap berkas -- arah yang
+            tercatat punya sumber di hampir setiap berkas -- arah yang
             memerahkan kode benar.
             """
             hasil = []
@@ -5909,7 +5909,7 @@ for root, _, files in os.walk("Apps"):
                             % (path, baris, fn, prm,
                                nilai.group(1).strip(),
                                prm if prm in dibaca
-                               else "/`.".join(sumber[prm])))
+                               else "/.".join(sumber[prm])))
                     # 2c. String? yang dibaca berkas itu, lalu diganti `nil`.
                     elif (prm in sumber
                           and re.match(r"^\s*nil\s*$", nilai.group(1))):
@@ -5918,7 +5918,7 @@ for root, _, files in os.walk("Apps"):
                             "  %s:%d: `%s(%s: nil)` -- berkas ini membaca "
                             "`.%s`, jadi faktanya tersedia dan diganti `nil`"
                             % (path, baris, fn, prm,
-                               "/`.".join(sumber[prm])))
+                               "/.".join(sumber[prm])))
                     # 2c-opsional. Fakta opsional yang dibaca berkas itu lewat
                     #      properti perantara, lalu diganti `nil`:
                     #      `sensorNote: nil` sementara `motionNote` membacakan
@@ -5939,7 +5939,7 @@ for root, _, files in os.walk("Apps"):
                             "faktanya (`%s`), jadi faktanya tersedia dan "
                             "diganti `nil`"
                             % (path, baris, fn, prm,
-                               "`.".join(sumber[prm])))
+                               ".".join(sumber[prm])))
                     # 2d. Fakta lewat **properti perantara**: argumennya nama
                     #     properti lokal (`sensorNote: motionNote`), dan badan
                     #     properti itu yang membaca faktanya
