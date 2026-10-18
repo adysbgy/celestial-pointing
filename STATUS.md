@@ -1,3 +1,90 @@
+### Siklus (18 Okt 2026 — keraguan lewat **bentuk**: planet ragu tetap tajam, dan gerbang yang membuktikan "terbalikkan" ternyata mengukur **palet**)
+
+Dibuka dengan `git log` + `gh run list` + gerbang. Brief meminta BAGIAN 1–4 /
+FASE A–C, dan audit ulang menunjukkan semuanya sudah terwujud dan ter-gerbang
+(`CelestialVisualView` planet/Bulan/bintang/Matahari/langit-dalam, `NightMode`,
+`ReducedLuminanceView`, complication 4 keluarga, `.xcstrings`, izin sensor,
+`AudioCue`). Jadi yang dikerjakan adalah satu titik yang belum dijaga, dan
+sebuah unit yang sudah disiapkan tetapi belum di-commit.
+
+#### Cacat 1: gambar ragu kehilangan **ciri**, tetapi tidak kehilangan **ketegasan**
+
+Semua gerbang keraguan bekerja dari ciri pengenal (`drawable(isConfirmed:)`,
+Aturan 50/51): pita, cincin, maria, morfologi. Yang tidak pernah diukur adalah
+ketajaman yang **tersisa** setelah ciri itu ditahan. Terukur pada port:
+
+    piksel bertepi keras, planet Jupiter 200 px
+      yakin (pita + Bintik Merah)  575
+      ragu  (cakram netral)          0   <- tapi tepi cakramnya tetap tajam
+
+Cakram penuh berpalet netral masih terbaca sebagai benda langit **pasti**, dan
+lencana tanda tanya duduk di sudut sementara mata membaca bentuk lebih dulu.
+
+#### Perbaikan: samaran (blur), diputuskan di model
+
+- `UncertainBlur` (PointingKit): `.planet`/`.deepSky` disamarkan,
+  `.moon`/`.star`/`.sun` tidak. Bulan **wajib** tetap tajam — sabitnya fakta
+  tanggal, dan `check_moon_phase_survives_uncertainty` menuntut sabit ragu
+  identik piksel. Bintang/Matahari sudah disamarkan warna, dan blur pada 38 pt
+  hanya menghapusnya.
+- `CelestialVisualView`: `DrawingGroup` + `.linear` + `.blur` (radius 6%
+  diameter, opacity 0.75). `.linear` supaya rasterisasi tidak menggeser warna
+  **gambar yang sudah pasti** yang berbagi layar.
+- `UncertainBlurTests` (5 uji, Linux) menahan **siapa** yang disamarkan dan
+  menuntut setiap `Kind` diputuskan (salah satu arah, tidak diam-diam).
+
+#### Cacat 2 — di dalam gerbangnya sendiri, tertangkap sebelum push
+
+`check_uncertain_blur_is_reversible` membandingkan `pre_blur` dengan
+`planet-saturn-bare` yang docstring-nya sebut "bola netral". Terukur merah
+pada pohon yang **benar**:
+
+    pre_blur vs planet-saturn-bare         0.0837  (ambang < 0.05)  MERAH
+    pre_blur vs planet-unknown-confirmed   0.0200                   hijau
+
+Sebabnya `bare_sphere` mengembalikan palet **planetnya** (`render()`), jadi
+selisih 8.37% itu **selisih palet Saturnus lawan netral**, bukan bukti
+pemulihan bentuk. Pembanding diganti `planet-unknown-confirmed` (id tak
+dikenal → palet netral), yaitu bola tak mengklaim yang sesungguhnya.
+Gerbangnya **tidak** dilonggarkan: ambang tetap `< 0.05`.
+
+#### Cacat 3: harness meninggalkan mutant bila dihentikan
+
+`bukti-mutasi-objek-samar.py` memutasi `render-visuals.py` lalu memulihkan di
+`finally`; `SIGTERM` (timeout) tidak menjalankan `finally`. Terjadi **nyata**
+di siklus ini: jalankan yang timeout meninggalkan `if False and …` hidup, dan
+jalankan berikutnya gagal `ANCHOR TIDAK DITEMUKAN` — kegagalan yang terbaca
+seperti cacat anchor, bukan cacat proses. Ditambahkan handler
+`SIGINT`/`SIGTERM` yang memulihkan sumber (pola yang sudah dipakai
+`bukti-mutasi-fase.py`); `SIGKILL` tetap batas yang diakui.
+
+#### Verifikasi
+
+    ./swift-test.sh                        CelestialEngine 222 + PointingKit 936 = 1158, 0 gagal
+    ./swift-ui-lint.sh                     SEMUA GERBANG UI LULUS (52 aturan)
+    ./swift-typecheck.sh                   SEMUA GERBANG LULUS
+    check-visuals (3 gerbang samaran)      4 pemeriksaan, 0 gagal
+                                           (yakin 575 → ragu 0; Bulan 0 px;
+                                            terbalikkan 0.0200 / 0.0164)
+    check-harness-terdaftar.py             99 harness, semuanya dirujuk
+    check-jangkar-harness.py               408 jangkar, tidak ada mutasi tertinggal
+
+#### Yang TIDAK diklaim
+
+- `bukti-mutasi-objek-samar.py` **tidak dijalankan utuh** di VPS ini: ia
+  menjalankan seluruh katalog render (~41 menit) dan `--only` hanya menyaring
+  keluaran, bukan eksekusi. Eksekusi penuhnya diserahkan ke CI (langkah baru
+  di `engine-tests.yml`). Yang diverifikasi lokal adalah ketiga pemeriksaannya
+  atas pohon bersih.
+- `blur` SwiftUI memakai Gaussian ala CoreImage; port memakai kotak
+  sejajar-sumbu. Yang diukur adalah **jarak antara dua kanvas milik model
+  yang sama**, bukan kesamaan piksel dengan Apple. Radius 6% dipilih dari
+  bangun geometri, bukan dari pengukuran di perangkat.
+- `Apps/` tetap tidak dibangun `swift-test.sh` di Linux; kompilasi jalur
+  `.drawingGroup`/`.blur` sebenarnya milik Apple Build (macos-15).
+
+---
+
 ### Siklus (18 Okt 2026 — Aturan 35 punya **nama** sebagai syarat, bukan **fakta**: tiga fakta di layar Always-On bisa jadi tetapan tanpa satu gerbang berbunyi)
 
 Dibuka dengan memverifikasi ulang brief, bukan mengikutinya. Brief meminta

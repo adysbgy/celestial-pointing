@@ -90,9 +90,11 @@ struct CelestialVisualView: View {
         // bisa dibaca dari kode dan tidak bisa ditangkap uji di Linux.
         // `.linear` membuat rasterisasi itu tidak mengubah piksel sama sekali.
         // `drawingGroup(...)` sudah merasterisasi, jadi `blur` di bawahnya
-        // tidak menambah biaya lapisan kedua.
-        .drawingGroup(opaque: false, colorMode: .linear,
-                      rendersAsynchronously: false)
+        // tidak menambah biaya lapisan kedua. Parameter ketiga
+        // (`rendersAsynchronously:`) **tidak ada** di `drawingGroup` — ia milik
+        // `Canvas`; menambahkannya adalah galat kompilasi yang hanya muncul di
+        // runner macOS, karena Linux tidak membangun `Apps/`.
+        .drawingGroup(opaque: false, colorMode: .linear)
         .opacity(isConfirmed || UncertainBlur.allows(visual.kind)
                  ? 1
                  : Self.uncertainBlurOpacity)
