@@ -29278,3 +29278,95 @@ lemah dari niat penulisnya, dan yang menemukannya bukan pembacaan ulang
 melainkan keadaan yang dirancang untuk gagal. Karena itu harness ditulis
 sesudah aturannya, bukan sebelumnya: yang pertama menguji niat, yang kedua
 menguji kenyataan.
+
+## Siklus 2026-10-18 (4): ukuran gambar objek — Aturan 64
+
+**Celah yang ditemukan (bukan ditebak).** Sisa satu pertanyaan dari siklus
+Aturan 52: berkas itu menjaga **siapa** yang menggambar, dan Aturan 62 menjaga
+**apakah** layar yang mengenali objek menggambarnya. Tidak ada yang menjaga
+**seberapa besar**. Terukur pada pohon utuh, proses baru, seluruh 63 aturan
+hijau:
+
+    PointingView.swift      diameter: visualDiameter -> diameter: 1    exit 0
+    PointingView.swift      diameter: visualDiameter -> diameter: 0    exit 0
+    DiagnosticsView.swift   diameter: visualDiameter -> diameter: 1    exit 0
+    WatchTheme.swift        visualDiameter 38 -> 16                    exit 0
+    PointingView.swift      = WatchMetrics.visualDiameter -> = 38      exit 0
+
+Empat yang pertama adalah cacat yang sama di empat tempat: kartu tetap menulis
+nama objek, tetap memasang lencana keyakinan, dan gambarnya menjadi satu
+piksel. Seluruh misi produk ini adalah pengguna **mengenali** objek dari
+bentuknya; setelah mutasi itu tidak ada bentuk yang tersisa untuk dikenali,
+dan tidak ada teks di layar yang bisa membantahnya. Kelas cacat ini sama
+dengan yang sudah tercatat dua kali di repo: gerbang yang mengukur salinan,
+bukan yang dipakai.
+
+**Dua sisi, dua gerbang — dan satu celah yang hanya terlihat setelah keduanya
+ada.**
+
+`check-visuals.py` → `check_drawn_visual_sizes_keep_features` membaca **token**
+lalu merender pada ukuran itu. Ambangnya **diukur**, bukan dipilih. Diukur pada
+`ss=8`, selisih piksel terhadap bola berpalet tanpa ciri:
+
+    ukuran   38    30    24    22    20    18    16    14    12
+    min      37    22     9     3     3     2     0     0     0
+
+24 pt adalah ukuran terkecil yang masih memperlihatkan **ketujuh** ciri. Lantai
+16 akan hijau pada gambar yang sudah kehilangan cincin Saturnus dan Bintik
+Merah Jupiter — jadi lantainya 24, dan angka 24 itu sendiri tidak diklaim
+sebagai hasil ukur di perangkat.
+
+`swift-ui-lint.sh` → Aturan 64 membaca **pemanggil**, karena layar yang menulis
+angka sendiri tidak pernah menyentuh token dan tidak bisa diukur di sana.
+
+Celah ketiga muncul justru setelah dua gerbang itu hijau: **nilai bawaan
+parameter**. `var visualDiameter: CGFloat = WatchMetrics.visualDiameter`
+mengganti token dengan `= 38` tidak menyentuh satu pun pemanggilan (gerbang
+pemanggil tetap hijau) dan tidak menyentuh token (pengukuran token tetap
+hijau) — tetapi setiap `#Preview` dan setiap pemakaian baru mewarisi angka yang
+tidak dibaca siapa pun. Keadaan 2 harness menutupnya.
+
+**Keadaan 3, yang paling mudah terlewat.** Kalau `WatchMetrics.visualDiameter`
+berganti nama, gerbang pemanggil tetap hijau — ia hanya memeriksa bahwa yang
+diteruskan **bukan literal**, dan sebuah nama tetap nama. Tanpa keadaan 3,
+aturan ini bisa hijau abadi sementara tidak ada lagi satu tempat yang
+menentukan ukuran gambar.
+
+```
+OK   1 pemanggil menulis literal              MERAH
+OK   2 nilai bawaan parameter jadi literal    MERAH
+OK   3 token WatchMetrics hilang              MERAH
+OK   4 kontrol negatif: pohon apa adanya      hijau
+OK   pra: ketiganya di 276e6ec                hijau
+```
+
+**Tiga cacat di harness sendiri, ditemukan dengan menjalankannya.**
+
+1. Arah kedua memakai salinan lint di berkas lain. Aturan 10 membaca
+   `swift-ui-lint.sh` **dari cakram**, bukan berkas yang sedang berjalan, jadi
+   salinan lama tetap menghitung 64 aturan dari lint baru. Perbaikannya:
+   tulis ulang lint-nya sendiri, pulihkan lewat `mutasi_sumber`.
+
+2. README juga harus dikembalikan ke hitungan lama selama arah kedua. Tanpa
+   itu lint lama memerah karena **hitungan aturan**, bukan karena cacat yang
+   sedang diuji — dan arah kedua gagal dengan alasan yang tidak ada hubungannya
+   dengan aturan ini.
+
+3. `BAWAAN == 0` sebagai syarat fail-closed salah: pada pohon bersih memang
+   tidak ada properti penerus-token (nol adalah jawaban yang benar). Yang benar
+   adalah menuntut sapuannya **melihat** deklarasi apa pun (`TERLIHAT`), lalu
+   menuntut tokennya ada (`TOKEN`). Gerbang yang menuntut "ada pelanggaran
+   untuk diperiksa" akan memerah pada pohon yang justru bersih.
+
+**Yang TIDAK diklaim.** Aturan ini menjaga **asal angka**, bukan nilai
+estetiknya: 24 pt bukan ukuran yang tepat, hanya ukuran terkecil yang masih
+memperlihatkan ketujuh ciri pada model ini. Ia juga tidak membuktikan gambar
+benar-benar digambar pada ukuran itu (itu wilayah Aturan 52/62). Pemanggil yang
+tidak menyebut `diameter:` sama sekali tidak dibaca — ia memakai nilai bawaan,
+dan nilai bawaan itulah yang dijaga keadaan 2.
+
+**Catatan samping.** README 63 → 64 aturan; Aturan 10 memerahkan lint sampai
+diubah (keempat kalinya di sesi ini).
+
+Engine 222 + PointingKit 943 tetap hijau. Gerbang jangkar 462 → 465 jangkar,
+0 kebocoran; 112 harness, semuanya dirujuk alur kerja.
