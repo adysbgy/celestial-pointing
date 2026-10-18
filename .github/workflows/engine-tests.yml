@@ -1028,6 +1028,26 @@ jobs:
       - name: Buktikan gerbang fakta-vs-literal Aturan 35 berbunyi
         run: python3 Tools/bukti-mutasi-fakta-literal.py
 
+      # Samaran keraguan: gambar yang **belum pasti** harus kehilangan
+      # ketegasannya, bukan hanya cirinya. Semua gerbang keraguan lain bekerja
+      # dari ciri pengenal (pita, cincin, maria, morfologi); yang tidak pernah
+      # diukur adalah ketajaman yang tersisa setelah ciri itu ditahan — cakram
+      # penuh berwarna netral masih terbaca sebagai benda langit **pasti** di
+      # sebelah badge "Ragu", dan mata membaca bentuk lebih dulu daripada
+      # lencana di sudut.
+      #
+      # Empat keadaan + kontrol negatif, masing-masing menuduh **nama
+      # pemeriksaan tertentu** di `check-visuals.py` (bukan "ada yang gagal"),
+      # dan arah sebaliknya ikut dijaga: penyamaran yang diterapkan ke Bulan
+      # memerahkan `uncertain_blur_excludes_moon` **dan** membuat
+      # `check_moon_phase_survives_uncertainty` hijau karena gambar rusak;
+      # penyamaran yang menghapus objek (bukan menyamar) memerahkan
+      # `uncertain_blur_is_reversible`. Di Linux yang dieksekusi adalah port
+      # `Tools/render-visuals.py` — jalur `Apps/`-nya sendiri tetap milik
+      # Apple Build.
+      - name: Buktikan gerbang samaran keraguan berbunyi
+        run: python3 Tools/bukti-mutasi-objek-samar.py
+
       # Aturan 3 (aksara non-Latin) sudah punya saksi satu arah sejak lama:
       # langkah `./red-lint.sh … 'Aturan 3'` di atas membuktikan ia berbunyi
       # pada satu huruf Arab di sebuah `.swift` di `Apps/`. Yang tidak

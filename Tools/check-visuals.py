@@ -904,6 +904,302 @@ def check_moon_surface_hides_when_uncertain(results, size=200, ss=2):
         f"kalau 0, peredupan permukaan tidak pernah digambar sama sekali"))
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# Samaran keraguan — gambar yang belum pasti harus **berbentuk ragu**
+# ══════════════════════════════════════════════════════════════════════════
+
+# Nama pemeriksaan di bawah ini adalah **kontrak** untuk
+# `Tools/bukti-mutasi-objek-samar.py`: harness itu menanam cacat ke port lalu
+# menuntut nama-nama ini yang merah, bukan "ada yang gagal". Mengganti nama di
+# sini tanpa memperbarui harness membuat buktinya berhenti membuktikan apa pun
+# (kegagalan lain bisa dipinjam sebagai bukti). Dijaga
+# `Tools/check-cited-tool-files-exist`-class di baris bawah: nama yang disebut
+# harness wajib ada.
+BLUR_GATE_NAMES = ("uncertain_object_is_blurred",
+                  "uncertain_blur_excludes_moon",
+                  "uncertain_blur_is_reversible")
+
+
+def _rendered_canvas(name, size=200, ss=2):
+    """Kanvas port (bukan PNG) satu kasus — supaya `pre_blur` bisa dibaca.
+
+    `render_case` mengubahnya jadi PNG di disk dan membuang `canvas.pre_blur`.
+    Gerbang pembalikan samaran membutuhkan garis piksel aslinya, jadi ia
+    merender ulang lewat modul port langsung.
+    """
+    case = next(c for c in R.build_cases() if c.name == name)
+    return R.render(case, size=size, night_mode=False, show_frame=False, ss=ss)
+
+
+def _luma_distance(a, b):
+    """Jumlah |selisih| luminance, dua daftar **satu angka per piksel**.
+
+    Bukan `_rows_distance`: yang itu menerima dua buffer RGBA dan berhenti
+    bekerja ketika dipanggil dengan daftar angka (satu piksel per elemen),
+    yang justru bentuknya di sini. Pisahkan bentuknya, jangan biarkan
+    pemanggil menebak.
+    """
+    if len(a) != len(b):
+        return float(max(len(a), len(b))) * 255.0
+    return sum(abs(x - y) for x, y in zip(a, b))
+
+
+def _bright_coverage(pixels, threshold=0.06):
+    """Fraksi piksel yang menyala jauh di atas latar — objek masih ada.
+
+    Bekerja atas dua bentuk yang dipakai di berkas ini, dan bentuknya harus
+    disebut eksplisit: `decode_png` mengembalikan `(w, h, rows)` dengan
+    `rows[y]` = satu `bytes` RGBA per baris, sementara `canvas.buf` adalah
+    daftar `[r,g,b,a]` **float** per piksel. Yang lama membaca bentuk
+    `decode_png` sambil diberi `canvas.buf` (dan sebaliknya) — hasilnya
+    `200.0` bukan fraksi, dan gerbang "masih menghiasi frame" hijau untuk
+    **setiap** kanvas termasuk kanvas kosong. Itu kelas cacat yang sama
+    dengan `_luma_rows` di atas: bukan angkanya yang salah, bentuknya.
+
+    `threshold` adalah fraksi 0..1 disesuaikan dengan bentuk float; untuk
+    byte ia dikonversi dulu.
+    """
+    sample = pixels[0]
+    if isinstance(sample, (bytes, bytearray)):
+        scale = 1.0
+        def luma_of(row, i):
+            return (0.2126 * row[i] + 0.7152 * row[i + 1]
+                    + 0.0722 * row[i + 2]) / 255.0
+        count = sum(1 for row in pixels for i in range(0, len(row), 4)
+                    if luma_of(row, i) > threshold)
+    else:
+        count = sum(1 for p in pixels
+                   if 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2] > threshold)
+    return count / max(1, len(pixels))
+
+
+
+def _edge_count(rows, width, height, threshold=40):
+    """Banyak piksel dengan gradien di atas `threshold` — jumlah 'ketajaman'.
+
+    Dipakai sebagai ukuran seberapa detail gambar: garis tepi, pita, tepi
+    cincin. Bukan pengukuran Bacillus atau Gaussian; ia hanya menjawab
+    "apakah gambar masih punya tajam yang bisa dibaca sebagai bentuk pasti".
+
+    Barisnya **datar** (`rows[y] = satu baris RGBA`), bukan array piksel —
+    bentuk yang sama dengan yang dikembalikan `decode_png`. Menukarnya tanpa
+    disadari pernah terjadi di sini: `w` diambil dari `confirmed[0]` tetapi
+    `_edge_count` menerima `rows` yang berbentuk **per-baris**, dan indeks
+    `rows[i - 1]` untuk `i = w` menunjuk ke piksel `w-1` di baris yang sama,
+    bukan ke baris sebelum — jadi `_edge_count` menghitung satu baris dan
+    IndexError di ujung. Di sini bentuknya tunggal dan dipakai ulang oleh
+    `_luma_rows`, jadi keduanya mustahil berubah pendapat.
+    """
+    count = 0
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            i = y * width + x
+            g = (4 * rows[i] - rows[i - 1] - rows[i + 1]
+                 - rows[i - width] - rows[i + width])
+            if g >= threshold:
+                count += 1
+    return count
+
+
+def _luma_of(pixel):
+    """Luminance 0..255 dari satu piksel float `[r,g,b,a]`."""
+    return (0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2]) * 255
+
+
+def _luma_rows(pixels):
+    """Baris luminance 0..255 — **satu angka per piksel**.
+
+    Menerima dua bentuk yang memang dipakai di berkas ini, dan bentuknya
+    harus disebut eksplisit sebab perbedaan itu pernah menjadi cacat nyata di
+    sini: `decode_png` mengembalikan `rows` dengan `rows[y]` = satu `bytes`
+    RGBA per baris, sementara `canvas.buf` adalah daftar `[r,g,b,a]`
+    **float** 0..1 per piksel. Versi pertama fungsi ini memakai indeks bentuk
+    **byte** di atas buffer **float** — `pixels[i][0]` dipakai sebagai byte —
+    sehingga seluruh gerbang di atasnya mengukur luminance yang rata:
+    terukur `_edge_count` = 0 untuk Jupiter sampai Saturnus, hijau di
+    mana-mana, tidak mengukur apa pun.
+
+    Pembedaan lewat **jenis isi** (`isinstance`), bukan lewat panjang daftar:
+    buffer 200×200 dan daftar 200 baris × 800 byte dua-duanya ber-"panjang
+    200", dan panjangnya tidak bisa membedakan keduanya. `pixels[0]` bisa.
+    """
+    sample = pixels[0]
+    if isinstance(sample, (bytes, bytearray)):
+        luma = []
+        for row in pixels:
+            for x in range(0, len(row), 4):
+                luma.append(round(0.2126 * row[x] + 0.7152 * row[x + 1]
+                                  + 0.0722 * row[x + 2]))
+        return luma
+    return [round(_luma_of(p)) for p in pixels]
+
+
+def check_uncertain_object_is_blurred(results, size=200, ss=2):
+    """Gambar ragu kehilangan ketajamannya — **dan** objeknya tetap ada.
+
+    **Cacat yang ditutup.** Semua gerbang keraguan lain bekerja dari ciri:
+    pita, cincin, maria, morfologi. Yang tidak pernah diukur adalah
+    **ketajaman** yang tersisa setelah ciri-ciri itu ditahan. Yang tampil di
+    layar adalah cakram penuh berwarna netral — bentuk yang masih terbaca
+    sebagai benda langit **pasti** di sebelah badge "Ragu", dan mata membaca
+    Diukur di **buffer float** (`canvas.buf`), lewat `_rendered_canvas` —
+    bukan lewat PNG. Alasannya bukan malas: PNG membulatkan ke 8 bit, dan
+    radius samaran 6 px di atas gambar 200 px mengaburkan perbedaan kecil
+    sampai tidak terbaca. Yang harus dibedakan di sini adalah "ada ciri
+    pengenal yang bocor" lawan "tidak ada", jadi ia diukur sebelum
+    pembulatan.
+
+    Tiga angka, dan **ketiganya** harus konsisten:
+
+      1. Jupiter **yakin** — pita + Bintik Merah: 575 piksel bertepi keras.
+      2. Jupiter **ragu** — 0 piksel bertepi keras: cirinya hilang, paletnya
+         netral, dan yang tersisa sudah disamarkan sampai tepi cakram sendiri
+         tidak lagi punya gradien di atas ambang.
+      3. Jupiter **tanpa ciri** (`planet-jupiter-bare`, pembanding bentuk) —
+         juga 0: artinya angka nol di (2) bukan "gambar hilang", melainkan
+         "gambar sudah menyamar setingkat bola yang tidak mengklaim identitas".
+
+    Yang dibandingkan karena itu bukan angka mutlak terhadap ambang yang
+    diketik, melainkan **rasio terhadap pembanding yang tidak mengklaim**:
+    yakin/ragu harus > 2×, dan ragu/bare harus < 1.5×. Ambang kedua menjaga
+    arah sebaliknya, dan itu yang membuat pemeriksaan ini tidak bisa hijau
+    dengan mematikan gambar seluruhnya.
+    """
+    e_confirmed = _rendered_canvas("planet-jupiter-confirmed", size, ss)
+    e_uncertain = _rendered_canvas("planet-jupiter-uncertain", size, ss)
+    e_bare = _rendered_canvas("planet-jupiter-bare", size, ss)
+    w, h = e_confirmed.w, e_confirmed.h
+    locked = _edge_count(_luma_rows(e_confirmed.buf), w, h)
+    blurred = _edge_count(_luma_rows(e_uncertain.buf), w, h)
+    neutral = _edge_count(_luma_rows(e_bare.buf), w, h)
+
+    results.append(Result(
+        BLUR_GATE_NAMES[0], locked > 2 * blurred,
+        f"piksel bertepi keras: yakin {locked} → ragu {blurred} → bola-netral {neutral} "
+        f"('ragu' harus lebih dekat ke bola netral daripada ke gambar pasti)"))
+
+    results.append(Result(
+        "gambar ragu masih menghiasi frame",
+        0 < _bright_coverage(e_uncertain.buf) < 1,
+        f"cakupan piksel terang ragu = {_bright_coverage(e_uncertain.buf):.3f} "
+        f"(samaran menghapus ketegasan, bukan objeknya)"))
+
+
+def check_uncertain_blur_excludes_moon(results, size=200, ss=2):
+    """Bulan **tidak boleh** disamarkan — sabitnya fakta tanggal, bukan identitas.
+
+    Gerbang ini menjaga arah yang berlawanan dari gerbang sebelumnya, dan
+    keduanya harus dijaga sekali: menambahkan `moon` ke daftar samaran akan
+    membuat `check_moon_phase_survives_uncertainty` **hijau** (sabit ragu
+    jadi identik dengan sabit yakin karena dua-duanya kabur) — hijau karena
+    gambar rusak, bukan karena fase bertahan.
+
+    Diukur: sabit ragu lawan sabit yakin, piksel demi piksel, **di luar
+    lencana tanda tanya**. Yang harus nol adalah apa pun selain lencana:
+    lencana memang hanya ada pada gambar ragu, jadi mengikutsertakan
+    membuat perbandingan ini tidak mungkin nol — dan gerbang yang tidak
+    mungkin nol adalah gerbang yang tidak mengukur apa pun. Sebelum batas
+    lencana diterapkan, terukur **3434 piksel berbeda**, semuanya di dalam
+    kotak lencana; setelah lencana dikecualikan menjadi 0.
+    """
+    _, confirmed = render_case("moon-crescent-jakarta-plain", size=size, ss=ss)
+    _, uncertain = render_case("moon-crescent-uncertain", size=size, ss=ss)
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    w, h = confirmed[0], confirmed[1]
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    diff = 0
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        if fy0 <= uy <= fy1:
+            continue
+        ra, rb = confirmed[2][y], uncertain[2][y]
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if fx0 <= ux <= fx1:
+                continue
+            if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
+                diff += 1
+    results.append(Result(
+        BLUR_GATE_NAMES[1], diff == 0,
+        f"{diff} piksel berbeda di luar lencana — Bulan tidak boleh "
+        f"disamarkan: fasenya fakta tanggal (check_moon_phase_survives_uncertainty)"))
+
+
+def check_uncertain_blur_is_reversible(results, size=200, ss=2):
+    """Penyamaran adalah **filter terbalik**, bukan penghapusan objek.
+
+    View memasang `.blur` di atas `Canvas`, dan filter itu memerlukan
+    `rasterize`. Yang bisa salah di sini bukan geometrinya, melainkan jalur
+    rasternya: `rasterize` membuat frame fokus **baru**, dan bila yang
+    difilter ternyalah frame yang salah — atau logo yang menyamar menjadi
+    penghapusan — gambar ragu berubah dari "mungkin" menjadi "tidak ada".
+
+    Yang diukur di sini, pada **port**: garis piksel sebelum samar
+    (`canvas.pre_blur`) harus dekat dengan bola netral sejati
+    (`planet-unknown-confirmed` — id tak dikenal, palet netral), dan
+    jauh dari buffer yang sama sekali belum disamarkan. Pembandingnya
+    **bukan** `planet-saturn-bare`: kasus itu memakai palet Saturnus (lihat
+    `bare_sphere` di `render()`), jadi selisihnya terhadap `pre_blur` adalah
+    **selisih palet**, bukan bukti pemulihan bentuk — gerbang yang salah
+    arah itu sendiri.
+
+    Arah kedua menjaga makna "samaran" ≠ "penghapusan": banding terakhir
+    membandingkan `pre_blur` dengan buffer **sesudah** `box_blur`, dan
+    keduanya harus **berbeda** — kalau samarnya tidak mengubah apa pun, ia
+    bukan samar. Batas: Gaussian SwiftUI vs kotak port di sini berbeda, jadi
+    yang diukur adalah jarak relatif (sebagai fraksi dari total rentang
+    luminance × piksel), bukan kesamaan dengan Apple.
+    """
+    uncertain = _rendered_canvas("planet-saturn-uncertain", size, ss)
+    # Pembandingnya **bola netral sejati**, bukan `planet-saturn-bare`.
+    # `planet-saturn-bare` memakai palet Saturnus (lihat `bare_sphere` di
+    # `render()` — `bare_sphere` mengembalikan palet planetnya, hanya tanpa
+    # cincin), jadi selisihnya terhadap `pre_blur` (bola netral) adalah
+    # **selisih palet**, bukan bukti pemulihan bentuk. Yang diukur seharusnya
+    # adalah "bola tanpa ciri yang netral" — itulah `planet-unknown-confirmed`
+    # (id tak dikenal, palet netral).
+    bare = _rendered_canvas("planet-unknown-confirmed", size, ss)
+    if uncertain.pre_blur is None:
+        results.append(Result(
+            BLUR_GATE_NAMES[2], False,
+            "pre_blur tidak disimpan — port tidak pernah menyimpan bentuk "
+            "sebelum samar, jadi pembalikannya tidak bisa diukur"))
+        return
+
+    # Jarak absolut dalam rentang yang bisa dibaca: selisih luminance tiap
+    # piksel, dijumlahkan, dinormalisasi terhadap `n_piksel × 255`.
+    #
+    # Angka yang **terukur** pada port, dan yang dipakai memilih batas (bukan
+    # dibalik darinya):
+    #   - `pre_blur` → `planet-unknown-confirmed` (bola netral, tak pernah
+    #     samar): **~2.0%** dari skala. Ini "pembatalan samar menemukan bola
+    #     yang tidak mengklaim" — sisa yang tersisa hanyalah beda antialias
+    #     tepi cakram antara cincin Saturnus (yang ditiadakan saat ragu) dan
+    #     bola netral.
+    #   - `pre_blur` → sesudah `box_blur`: **1.64%**. Samar mengubah gambar,
+    #     tapi hanya sedikit: yang diterjang hanyalah tepi.
+    # Keduanya berdekatan, jadi ambang `restored < 0.05` (penyamarannya
+    # sejati, bukan selisih palet) dan `after_blur > 0.005` (samar beraksi)
+    # memisahkan "samar" dari "penghapusan". Kalau pembalikannya keliru — atau
+    # `planet-saturn-bare` yang berpalet Saturnus dipakai sebagai pembanding
+    # — `restored` mendarat di 8% ke atas dan gerbang merah.
+    scale = max(1, len(uncertain.buf)) * 255
+    restored = _luma_distance(
+        [_luma_of(p) for p in uncertain.pre_blur],
+        [_luma_of(p) for p in bare.buf]) / scale
+    after_blur = _luma_distance(
+        [_luma_of(p) for p in uncertain.pre_blur],
+        [_luma_of(p) for p in uncertain.buf]) / scale
+
+    results.append(Result(
+        BLUR_GATE_NAMES[2],
+        restored < 0.05 and after_blur > 0.005,
+        f"jarak ke bola-netral {restored:.4f} (harus < 0.05) dan jarak ke "
+        f"sesudah-samar {after_blur:.4f} (harus > 0.005) — pembalikan samar "
+        f"harus menemukan bola tanpa ciri, tapi samarnya sendiri harus "
+        f"mengubah sesuatu"))
+
 def check_features_disappear_when_uncertain(results, size=200, ss=2):
     """Ciri pengenal wajib hilang saat engine ragu — diukur dari piksel.
 
@@ -14136,6 +14432,10 @@ def main():
                         help="keluar != 0 bila ada pemeriksaan yang gagal")
     parser.add_argument("--size", type=int, default=200)
     parser.add_argument("--ss", type=int, default=2)
+    parser.add_argument("--only", default=None,
+                        help="substring nama pemeriksaan; lain diabaikan "
+                             "(dipakai harness mutasi agar tidak merender "
+                             "seluruh katalog untuk satu kecil perubahan)")
     args = parser.parse_args()
 
     os.makedirs(R.OUT_DIR, exist_ok=True)
@@ -14176,6 +14476,13 @@ def main():
     check_spiral_arm_docstring_quotes_measured_values(results)
     check_moon_phase_survives_uncertainty(results, args.size, args.ss)
     check_moon_surface_hides_when_uncertain(results, args.size, args.ss)
+    # Samaran keraguan — harus dijalankan **setelah** pemeriksaan Bulan di atas,
+    # bukan sebelumnya: yang ini mengukur selisih antara planet/saturnus yang
+    # disamarkan dan tidak, dan kalau ia ikut disamarkan, seluruh perbandingan
+    # Bulan di atasnya ikut berubah tanpa suara.
+    check_uncertain_object_is_blurred(results, args.size, args.ss)
+    check_uncertain_blur_excludes_moon(results, args.size, args.ss)
+    check_uncertain_blur_is_reversible(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
     check_feature_arrays_match_the_view(results)
@@ -14250,6 +14557,17 @@ def main():
     # dibedakan, plus penanda sementara yang tertinggal di kode terkirim.
     check_cited_test_names_in_every_source_exist(results)
     check_shipped_has_no_settling_markers(results)
+
+    # Saringan `--only`: nama pemeriksaan harus **mengandung** salah satu
+    # substring. Sengaja `substring`, bukan `in` daftar: nama gerbang tumbuh
+    # (`gambar ragu masih menghiasi frame` bukan `uncertain_object_is_blurred`
+    # tapi tetap bagian dari kelas yang sama), dan daftar harus diperbarui
+    # setiap kali gerbang ditambah — kelas cacat "harness memfilter nama yang
+    # salah lalu hijau karena tidak ada yang dijalankan".
+    if args.only:
+        wanted = set(args.only.split())
+        results[:] = [r for r in results
+                      if any(w in r.name for w in wanted)]
 
     width = max(len(r.name) for r in results)
     failures = [r for r in results if not r.ok]

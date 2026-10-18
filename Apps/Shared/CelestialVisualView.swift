@@ -63,6 +63,42 @@ struct CelestialVisualView: View {
             if !isConfirmed { drawCandidateMarker(context: context, size: size) }
         }
         .frame(width: diameter, height: diameter)
+        // **Samaran, bukan hanya lencana.**
+        //
+        // Saat engine belum pasti, ciri pengenal sudah ditahan
+        // (`drawable(isConfirmed:)`, Aturan 50/51) — tetapi yang tersisa
+        // adalah cakram/kabut kosong yang masih berbentuk benda langit pasti,
+        // dan lencana tanda tanya duduk di **sudut**, sementara mata membaca
+        // bentuk lebih dulu. Samaran memakai `DrawingGroup` dengan
+        // `rasterize` sebab filter `blur` butuh raster: lapisan ini memuat
+        // dirinya sendiri, difilter, lalu dipasang kembali.
+        //
+        // **Kenapa hanya saat `!isConfirmed`.** Rasterisasi memaksa frame
+        // fokus sendiri dan menggeser anti-aliasing glow; gambar yang sudah
+        // pasti tidak boleh membayar itu. Dan jenisnya dibaca dari model
+        // (`UncertainBlur.allows`), bukan dicabang di sini: Bulan dikecualikan
+        // karena sabitnya fakta tanggal yang wajib bertahan saat ragu
+        // (`check_moon_phase_survives_uncertainty`), bintang & Matahari
+        // karena warna sudah menyamar dan blur pada 38 pt hanya menghapusnya.
+        //
+        // **Kenapa `.linear`, bukan bawaan `sRGB`.** Dua kelompok di layar ini
+        // — "engine ragu" (baru) dan "engine yakin" (sudah ada) — memutuskan
+        // penyamaran dari predikat yang sama (`isConfirmed || allows`). Kalau
+        // satu jalur merasterisasi dalam ruang warna berbeda dari jalur lain,
+        // gambar yang sudah yakin pun berubah warnanya **hanya** karena ada
+        // kelompok kedua di layar yang butuh rasterisasi — cacat yang tidak
+        // bisa dibaca dari kode dan tidak bisa ditangkap uji di Linux.
+        // `.linear` membuat rasterisasi itu tidak mengubah piksel sama sekali.
+        // `drawingGroup(...)` sudah merasterisasi, jadi `blur` di bawahnya
+        // tidak menambah biaya lapisan kedua.
+        .drawingGroup(opaque: false, colorMode: .linear,
+                      rendersAsynchronously: false)
+        .opacity(isConfirmed || UncertainBlur.allows(visual.kind)
+                 ? 1
+                 : Self.uncertainBlurOpacity)
+        .blur(radius: isConfirmed || UncertainBlur.allows(visual.kind)
+              ? 0
+              : Self.uncertainBlurRadius(diameter: diameter))
         // Grafis tidak pernah diumumkan sebagai teks — VoiceOver membaca nama
         // objek & keyakinannya (lihat `ObjectDetailView`), dan menambah
         // deskripsi gambar hanya menambah yang harus dilalui pengguna.
@@ -146,6 +182,34 @@ struct CelestialVisualView: View {
     private static func accent(_ raw: CelestialVisual.RGBComponents) -> Color {
         color(raw)
     }
+
+    /// Radius samaran untuk gambar yang **belum pasti**, sebagai fraksi
+    /// diameter.
+    ///
+    /// **Kenapa fraksi, bukan angka titik.** Gambar yang sama dipakai pada
+    /// 38 pt di kartu jam dan 132 pt di panel iPhone; radius titik tetap
+    /// berarti samaran yang hampir tak terlihat di jam (0.6 px) atau samaran
+    /// yang menghapus objeknya di iPhone. Fraksi membuat *jumlah detail
+    /// yang hilang* sama di kedua ukuran.
+    ///
+    /// **Kenapa 0.06, dan apa yang TIDAK diklaim.** Nilai ini dipilih dari
+    /// bangun geometrinya, bukan dari pengukuran di perangkat: pita Jupiter
+    /// adalah pecahan radius, jadi menyamarkan selebar ~6% diameter
+    /// menghapus tepi pita (yang sempit) tanpa meleburkan cakramnya (yang
+    /// selebar penuh) — tujuannya **bukan** menyembunyikan benda, melainkan
+    /// menghilangkan ketegasan bentuknya. Tidak ada satu pun gerbang yang
+    /// mengukur radius ini di layar; yang dijaga di Linux adalah **siapa**
+    /// yang disamarkan (`UncertainBlurTests`), bukan seberapa.
+    private static func uncertainBlurRadius(diameter: CGFloat) -> CGFloat {
+        diameter * 0.06
+    }
+
+    /// Opasitas gambar yang disamarkan. Turun tipis, bukan dramatis: samaran
+    /// harus terbaca sebagai "mungkin", bukan sebagai "hilang". Nilainya
+    /// dijaga tetap tinggi supaya lencana tanda tanya di atasnya (digambar
+    /// di dalam kanvas, jadi ikut tersamar) tetap punya kontras terhadap
+    /// latar — lencana itu satu-satunya penanda tekstual keraguan di gambar.
+    private static let uncertainBlurOpacity: Double = 0.75
 
     /// Shading bola untuk piringan Bulan: warna dasar → ujung gelapnya.
     ///

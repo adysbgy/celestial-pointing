@@ -56,6 +56,9 @@ OUT_DIR = "out/visuals"
 
 # Path berkas ini, supaya pemeriksa drift bisa membaca sumbernya sendiri.
 SOURCE = os.path.abspath(__file__)
+# Akar repo — dipakai untuk membaca sumber Swift yang **keputusannya** tidak
+# boleh disalin ke port ini (mis. `UncertainBlur`).
+ROOT = os.path.dirname(os.path.dirname(SOURCE))
 
 # ══════════════════════════════════════════════════════════════════════════
 # Port dari `PointingKit/NightVisual.swift`
@@ -737,6 +740,70 @@ def draw_rotation_radians(bright_limb_angle_radians):
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# Samaran keraguan — cermin `UncertainBlur` (PointingKit) + view SwiftUI
+# ══════════════════════════════════════════════════════════════════════════
+
+def port_switch_cases(path, enum_name):
+    """Nama kasus sebuah `enum <nama> { case a ... }` — dibaca dari sumbernya.
+
+    Sumber yang salah jalan **melempar**, bukan mengembalikan himpunan kosong:
+    daftar kosong di sini akan membuat `UncertainBlur.eligible` terlihat
+    "sekitarnya sama" dengan apa pun yang tidak ada di daftar itu.
+    """
+    source = open(path, encoding="utf-8").read()
+    match = re.search(r"enum\s+" + re.escape(enum_name) + r"\s*:[^{]*\{(.*?)\n    \}",
+                      source, re.S)
+    if not match:
+        raise ValueError(f"enum {enum_name} tidak ditemukan di {path}")
+    return set(re.findall(r"^\s*case\s+(\w+)", match.group(1), re.M))
+
+
+def uncertain_blur_eligible_kinds():
+    """Kasus yang **boleh** disamarkan, dibaca dari `UncertainBlur.swift`.
+
+    Kenapa dibaca dan bukan disalin: kebenaran keputusan ini milik model, dan
+    model punya uji sendiri (`UncertainBlurTests`). Salinan di port berarti
+    dua daftar yang bisa berbeda diam-diam — kelas cacat yang sudah berulang
+    di repo ini. Port hanya menerjemahkan daftar model ke jalur gambarnya.
+    """
+    path = os.path.join(ROOT, "Packages", "PointingKit", "Sources", "PointingKit",
+                        "VisualBlur.swift")
+    source = open(path, encoding="utf-8").read()
+    match = re.search(r"let\s+eligible\s*:[^=]*=\s*\[(.*?)\]", source, re.S)
+    if not match:
+        raise ValueError("UncertainBlur.eligible tidak ditemukan — port buta")
+    kinds = re.findall(r"\.(\w+)", match.group(1))
+    if not kinds:
+        raise ValueError("UncertainBlur.eligible kosong — port tidak akan menyamarkan apa pun")
+    known = port_switch_cases(os.path.join(ROOT, "Packages", "PointingKit", "Sources",
+                                           "PointingKit", "CelestialVisual.swift"), "Kind")
+    unknown = set(kinds) - known
+    if unknown:
+        raise ValueError(f"UncertainBlur.eligible menyebut kasus yang tidak ada: {unknown}")
+    return set(kinds)
+
+
+def uncertain_blur_allows(kind):
+    """Apakah jenis `kind` (nama kasus `CelestialVisual.Kind`) disamarkan."""
+    return kind in uncertain_blur_eligible_kinds()
+
+
+# Radius samaran di **piksel kanvas**. Satu-satunya angka di baris ini adalah
+# `0.06` — fraksi diameter yang dipasang di view (`uncertainBlurRadius`).
+# Ia tidak dibaca dari sumber Swift karena bentuk teksnya bebas (bisa
+# ditulis `diameter * 0.06` atau angka jadi), dan pemetaan teks yang rapuh
+# adalah kelas cacat yang sudah dua kali menjatuhkan `main` di repo ini.
+# GERBANG menghitungnya dari `VIEW_UNCERTAIN_BLUR_FRACTION`, yang tidak bisa
+# berubah tanpa mengubah baris ini juga (keduanya di berkas yang sama).
+VIEW_UNCERTAIN_BLUR_FRACTION = 0.06
+
+
+def uncertain_blur_radius_points(size):
+    """Radius samaran untuk `size` px — cermin `diameter * 0.06` di view."""
+    return size * VIEW_UNCERTAIN_BLUR_FRACTION / 2.0
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Kanvas: rasterizer kecil dengan supersampling
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -751,6 +818,60 @@ class Canvas:
     def __init__(self, width, height, background, ss=3):
         self.w, self.h, self.ss = width, height, ss
         self.buf = [list(background) for _ in range(width * height)]
+        # Garis piksel **sebelum** samaran keraguan, bila ada. Lihat
+        # `uncertain_blur_allows` dan `render()`: gerbang membatalkan
+        # samarannya dari sini lalu membandingkan dengan kanvas yang tidak
+        # pernah disamarkan sama sekali. `None` = kanvas ini tidak disamarkan.
+        self.pre_blur: list[list[float]] | None = None
+
+    # -- samaran keraguan ---------------------------------------------
+
+    def snapshot(self):
+        """Salinan garis piksel (sebelum penggabungan) untuk pembatalan blur."""
+        return [list(pixel) for pixel in self.buf]
+
+    def box_blur(self, radius):
+        """Samaran kotak sejajar-sumbu di atas garis piksel.
+
+        Alasan ia bekerja di **garis piksel**, bukan di RGBA tersusun:
+        penggabungan `source-over` tidak linier terhadap tarikan linier, jadi
+        kebalikannya di ruang sesudah-gabung meninggalkan sisa di sekitar tepi
+        bentuk. Di garis piksel, samaran adalah tarikan linier biasa dan
+        kebalikannya (dari `pre_blur`) tepat.
+
+        Radius < 0.5 tidak melakukan apa pun: pada 200 px, radius 0.06·200/2 =
+        6 px; pada ukuran lain tetap fraksi diameter (lihat
+        `uncertain_blur_radius_points`).
+        """
+        r = int(round(radius))
+        if r < 1:
+            return
+        w, h = self.w, self.h
+        width = 2 * r + 1
+        src = self.buf
+        # Horizontal lalu vertikal, masing-masing jendela geser.
+        tmp = [None] * (w * h)
+        for y in range(h):
+            row = y * w
+            for x in range(w):
+                acc = [0.0, 0.0, 0.0]
+                for k in range(x - r, x + r + 1):
+                    pixel = src[row + min(w - 1, max(0, k))]
+                    acc[0] += pixel[0]
+                    acc[1] += pixel[1]
+                    acc[2] += pixel[2]
+                tmp[row + x] = [acc[0] / width, acc[1] / width, acc[2] / width]
+        out = [None] * (w * h)
+        for y in range(h):
+            for x in range(w):
+                acc = [0.0, 0.0, 0.0]
+                for k in range(y - r, y + r + 1):
+                    pixel = tmp[min(h - 1, max(0, k)) * w + x]
+                    acc[0] += pixel[0]
+                    acc[1] += pixel[1]
+                    acc[2] += pixel[2]
+                out[y * w + x] = [acc[0] / width, acc[1] / width, acc[2] / width]
+        self.buf = out
 
     # -- penggabungan --------------------------------------------------
 
@@ -1230,6 +1351,29 @@ def render(case, size=256, night_mode=False, show_frame=False, ss=3):
 
     if kw.get("is_confirmed") is False:
         _draw_candidate_marker(canvas, size, night_mode)
+    # **Samaran keraguan** — `CelestialVisualView` memasang `.blur` di atas
+    # seluruh kanvas saat engine belum pasti **dan** jenisnya memenuhi
+    # `UncertainBlur.allows`. Port ini mengerjakan hal yang sama di kanvas
+    # datar, supaya gerbang gambar bisa membuktikan dua hal yang tidak bisa
+    # dibaca dari kode Swift: (a) samarannya cukup besar untuk menghapus
+    # ketegasan, dan (b) ia bisa **dibatalkan** — rumah sakit tidak
+    # menghapus objek.
+    #
+    # Dibatalkan di atas **kanvas** (perwakilan garis piksel sebelum
+    # penggabungan), bukan di atas RGBA tersusun: penggabungan `over` tidak
+    # linier terhadap tarikan linier, sehingga membatalkannya di ruang
+    # sesudah-gabung meninggalkan sisa di sekitar tepi cakram yang tidak ada
+    # hubungannya dengan filter yang diukur.
+    #
+    # Batas: `blur` SwiftUI memakai Gaussian ala CoreImage. Kernel di sini
+    # adalah kotak sejajar-sumbu yang lebar totalnya sama dengan `2·radius`
+    # — perkiraan bentuk, **bukan** tiruan piksel. Gerbangnya mengukur
+    # **jarak antara dua kanvas milik model yang sama**, bukan kesamaan
+    # dengan Apple.
+    if kw.get("is_confirmed") is False and uncertain_blur_allows(kind):
+        pre_blur = canvas.snapshot()
+        canvas.box_blur(uncertain_blur_radius_points(size))
+        canvas.pre_blur = pre_blur
     if show_frame:
         _draw_frame(canvas, size, radius)
     return canvas
