@@ -240,15 +240,37 @@ def main():
             if not ok:
                 print(f"       {detail[:300]}")
 
-        # 8. Fail-closed: kedua pemanggil dilepas. Aturan harus merah karena
-        # tidak lagi mengukur satu layar pun, bukan hijau karena kosong.
+        # 8. Fail-closed: kedua pemanggil dilepas seluruhnya dari
+        # `NightAwareContainer` (pembungkusnya ikut dibuang, supaya yang
+        # memerah benar-benar "tidak ada pemanggil" dan bukan kode yang tidak
+        # mengompilasi).
+        label = "8. fail-closed: tanpa pemanggil"
         for path, anchor, replacement in (
-                (POINTING, POINTING_REDUCED, "        fullView"),
-                (CALIBRATION, CALIBRATION_REDUCED, "        calibrationContent")):
+                (POINTING,
+                 "        NightAwareContainer {\n"
+                 "            fullView\n"
+                 "        } reduced: {\n"
+                 "            ReducedLuminanceView(engine: engine)\n"
+                 "        }",
+                 "        fullView"),
+                (CALIBRATION,
+                 "        NightAwareContainer {\n"
+                 "            calibrationContent\n"
+                 "        } reduced: {\n"
+                 "            // Saat layar redup, alur kalibrasi tidak bisa dijalankan (gestur\n"
+                 "            // diabaikan sistem), dan layar ini memang tidak punya apa pun yang\n"
+                 "            // harus terbaca sekilas selain nama objek & status. Karena itu\n"
+                 "            // tampilan jam yang dipakai — bukan versi khusus kedua.\n"
+                 "            ReducedLuminanceView(engine: engine)\n"
+                 "        }",
+                 "        calibrationContent")):
             base = _originals[path]
+            if anchor not in base:
+                print(f"{label:40s} JANGKAR FAIL-CLOSED TIDAK DITEMUKAN")
+                unexpected += 1
+                continue
             mutasi_sumber.write_source(path, base.replace(anchor, replacement, 1))
         fired, detail = probe(program)
-        label = "8. fail-closed: tanpa pemanggil"
         ok = fired is True and "PERINGATAN" in (detail or "")
         if not ok:
             unexpected += 1
