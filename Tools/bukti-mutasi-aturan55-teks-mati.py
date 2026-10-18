@@ -118,6 +118,60 @@ NEW_PROP_NAME = "lastRouteNote"
 NEW_WRITE = ("    @Published public private(set) var lastRouteNote: String?\n"
              "    private func markRoute(_ text: String) { lastRouteNote = text }\n")
 
+#: Jangkar yang **ditulis di tempat** oleh harness ini, dinyatakan di tingkat
+#: modul bernama `STATES`.
+#:
+#: Kenapa tabel ini ada di sini, padahal `main()` tidak membacanya untuk
+#: memutuskan mutasi: `Tools/check-jangkar-harness.py` membaca tabel keadaan
+#: tingkat modul untuk mengetahui pasangan (berkas, jangkar) yang bisa
+#: **tertinggal di sumber produksi** bila harness ini dihentikan di tengah
+#: jalan (timeout, `SIGTERM`, `SIGKILL` — jalur yang sudah nyata terjadi di
+#: repo ini). Harness ini merakit mutasinya dengan `.replace()` di dalam
+#: `main()`, jadi pembaca statis tidak menemukan pasangan apa pun dan
+#: melaporkan "nol jangkar": gerbangnya buta, dan pohon bersih tampak merah.
+#:
+#: Daftar ini **bukan** daftar keadaan kedua yang menentukan hasil. Ia
+#: menyatakan jangkar mana yang ditulis, dan `_assert_states_are_real()`
+#: menuntut setiap jangkar di sini benar-benar ada di berkasnya — supaya
+#: tabel yang basi memerahkan harness ini, bukan menjadi dekorasi.
+#:
+#: Bentuk: `(berkas, jangkar, pengganti)`. Pengganti `None` berarti jangkar
+#: hanya dihapus/disisipi (keadaan 1 dan 7 membuang baris tampilan).
+STATES = [
+    (VIEW, READ_IN_VIEW, "        // (catatan tautan dibuang)"),
+    (VIEW, READ_IN_VIEW, "        // (baris tampilan dibuang)"),
+    (LINK, "    @Published public private(set) var lastMessageNote: String?\n",
+     "    @Published public private(set) var lastMessageNote: String?\n" + NEW_PROP),
+    (VIEW, "                    linkNote\n",
+     "                    linkNote\n"
+     "                    if let r = link.lastRouteNote { Text(r) }\n"),
+    (LINK, "    @Published public private(set) var lastMessageNote: String?\n",
+     "    @Published public private(set) var lastMessageNote: String?\n" + NEW_WRITE),
+]
+
+
+def _assert_states_are_real():
+    """Setiap jangkar di `STATES` wajib ada di berkasnya, tepat satu kali.
+
+    Tanpa ini, `STATES` bisa menyebut jangkar yang sudah tidak ada dan tetap
+    terlihat seperti dokumentasi yang sah — sementara gerbang jangkar
+    melaporkan "jangkar hilang" yang sebenarnya hanya tabel basi. Harness
+    yang mengukur dirinya sendiri lebih murah daripada pembaca yang menebak.
+    """
+    for path, anchor, _ in STATES:
+        try:
+            isi = open(path, encoding="utf-8").read()
+        except OSError as galat:
+            print(f"GERBANG: {path} tidak terbaca ({galat}) -- harness tidak "
+                  "boleh jalan.", file=sys.stderr)
+            sys.exit(2)
+        jumlah = isi.count(anchor)
+        if jumlah != 1:
+            print(f"GERBANG: jangkar {anchor!r} muncul {jumlah}x di {path}, "
+                  "harus 1 -- tabel STATES basi, harness tidak boleh jalan.",
+                  file=sys.stderr)
+            sys.exit(2)
+
 
 def restore(*_):
     for path, content in _originals.items():
@@ -152,6 +206,7 @@ _moved = []
 
 def main():
     mutasi_sumber.require_clean_sources([LINK, VIEW])
+    _assert_states_are_real()
 
     program = extract_rule55()
     if program is None or RULE_HEADER not in program:

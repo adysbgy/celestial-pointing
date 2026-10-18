@@ -151,6 +151,9 @@ PANEL_SALAH = "                                         isConfirmed: true,"
 PARAMETER_SAH = ("                                       isConfirmed: isConfirmed,\n"
                  "                                       motion: motion)")
 
+#: Keadaan 2 menyisipkan baris perantara sebelum pemanggilan kartu.
+KARTU_SISIP = ("                let keyakinan = true\n" + KARTU_BENAR)
+
 #: Arah kedua memakai **lint pra-perbaikan yang berbeda per keadaan**, karena
 #: tiap keadaan menutup lubang yang lahir pada waktu berbeda. Memakai satu
 #: revisi untuk semuanya membuat keadaan 3 "merah" di arah kedua — panel jam
@@ -161,13 +164,39 @@ PARAMETER_SAH = ("                                       isConfirmed: isConfirme
 #:   keadaan 3     -> lint sebelum `29ca41b` (sebelum panel ikut dijaga)
 PRA_KEADAAN_3 = "29ca41b^"
 
+#: Tabel keadaan, di **tingkat modul** dan bernama `STATES`.
+#:
+#: Kenapa di sini, bukan di dalam `main()`: `Tools/check-jangkar-harness.py`
+#: membaca tabel keadaan tingkat modul untuk mengetahui pasangan (jangkar,
+#: pengganti) yang bisa **tertinggal di sumber produksi** bila harness ini
+#: dihentikan di tengah jalan (timeout, `SIGTERM`, `SIGKILL`). Tabel yang
+#: hidup di dalam fungsi terbaca sebagai "nol jangkar", dan gerbangnya lalu
+#: menuduh harness ini buta — merah pada pohon bersih, padahal pohonnya benar.
+#:
+#: Bentuk: `(label, [(berkas, cari, ganti), …], harus_merah)`.
+#:
+#: Ini juga **satu-satunya** sumber keadaan: `main()` membaca tabel ini, bukan
+#: daftar kedua yang ditulis ulang di bawah. Daftar kembar akan menyimpang,
+#: dan yang menyimpang di sini adalah daftar yang menentukan mutasi mana yang
+#: dianggap bukti.
 STATES = [
-    ("1 kartu jam: pembungkus menerima literal `true`", True),
-    ("2 kartu jam: keyakinan lewat nama perantara", True),
-    ("3 panel jam: literal `true` (cakupan lama)", True),
-    ("4 kontrol negatif: pohon apa adanya", False),
-    ("5 kontrol negatif: parameter diteruskan apa adanya", False),
+    ("1 kartu jam: pembungkus menerima literal `true`",
+     [(WATCH, KARTU_NILAI, KARTU_NILAI_SALAH)], True),
+    ("2 kartu jam: keyakinan lewat nama perantara",
+     [(WATCH, KARTU_BENAR, KARTU_SISIP),
+      (WATCH, KARTU_NILAI, KARTU_PERANTARA)], True),
+    ("3 panel jam: literal `true` (cakupan lama)",
+     [(WATCH, PANEL_BENAR, PANEL_SALAH)], True),
+    ("4 pembungkus BARU yang tidak terdaftar: literal `true`",
+     [(WATCH, PEMBUNGKUS_BARU_JANGKAR, PEMBUNGKUS_BARU)], True),
+    ("5 kontrol negatif: pohon apa adanya", [], False),
+    ("6 kontrol negatif: parameter diteruskan apa adanya",
+     [(WATCH, KARTU_NILAI, PARAMETER_SAH)], False),
 ]
+
+#: Keadaan 3 menutup lubang yang lahir sebelum `29ca41b`; keadaan 1, 2, dan 4
+#: menutup lubang yang masih terbuka di `HEAD` saat aturan ini ditulis.
+PRA_PER_KEADAAN_3 = {3}
 
 
 def _baca_lint_dari(rev):
@@ -233,9 +262,21 @@ def main():
               "-- harness tidak boleh jalan.", file=sys.stderr)
         sys.exit(2)
 
-    induk = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
-                           capture_output=True, text=True).stdout.strip()
-    lint_lama = _baca_lint_dari(induk)
+    # Arah kedua memakai **lint yang benar-benar pra-perbaikan**, dan itu bukan
+    # `HEAD`.
+    #
+    # Versi sebelumnya membaca `git rev-parse HEAD`, dengan alasan "lint di HEAD
+    # hari ini (sebelum SITUS diperluas)". Alasan itu benar sampai perbaikannya
+    # di-commit: sejak `4302081` (daftar situs diturunkan dari panggilan), `HEAD`
+    # **memuat** perbaikannya, jadi keadaan 1, 2, dan 4 memerah di arah kedua —
+    # harness melaporkan 3 keadaan tidak sesuai harapan pada pohon yang benar.
+    #
+    # Acuan tetap ini `4302081^`: revisi terakhir yang masih memakai daftar
+    # `SITUS` tulisan tangan. Jangkar tetap, bukan `HEAD`, supaya commit
+    # berikutnya tidak memindahkan arti "pra-perbaikan" tanpa ada yang menulis
+    # apa pun. Terukur: keadaan 1 hijau di revisi ini, merah di `4302081`.
+    PRA_KEADAAN_1_2_4 = "4302081^"
+    lint_lama = _baca_lint_dari(PRA_KEADAAN_1_2_4)
     program_lama = _program_aturan52(lint_lama) if lint_lama else None
     lint_lama3 = _baca_lint_dari(PRA_KEADAAN_3)
     program_lama3 = _program_aturan52(lint_lama3) if lint_lama3 else None
@@ -244,32 +285,15 @@ def main():
               "bisa dijalankan.", file=sys.stderr)
         sys.exit(2)
 
-    # (label, mutasi) — mutasi: daftar (cari, ganti)
-    def mutasi_kartu(nilai_baru):
-        return [(KARTU_NILAI, nilai_baru)]
-
-    kasus = [
-        ("1 kartu jam: pembungkus menerima literal `true`",
-         mutasi_kartu(KARTU_NILAI_SALAH)),
-        ("2 kartu jam: keyakinan lewat nama perantara",
-         [(KARTU_BENAR,
-           "                let keyakinan = true\n" + KARTU_BENAR),
-          (KARTU_NILAI, KARTU_PERANTARA)]),
-        ("3 panel jam: literal `true` (cakupan lama)",
-         [(PANEL_BENAR, PANEL_SALAH)]),
-        ("4 pembungkus BARU yang tidak terdaftar: literal `true`",
-         [(PEMBUNGKUS_BARU_JANGKAR, PEMBUNGKUS_BARU)]),
-        ("5 kontrol negatif: pohon apa adanya", []),
-        ("6 kontrol negatif: parameter diteruskan apa adanya",
-         [(KARTU_NILAI, PARAMETER_SAH)]),
-    ]
-
+    # Keadaan dibaca dari `STATES` (tabel tingkat modul), bukan dari daftar
+    # kedua di sini: daftar kembar akan menyimpang, dan yang menyimpang adalah
+    # daftar yang menentukan mutasi mana yang dianggap bukti.
     salah = 0
     try:
         print("── Aturan 52 sekarang ──")
-        for label, mutasi in kasus:
+        for label, mutasi, harap_menyala in STATES:
             isi = asli
-            for cari, ganti in mutasi:
+            for _berkas, cari, ganti in mutasi:
                 if cari not in isi:
                     print(f"JANGKAR TIDAK DITEMUKAN: {label}")
                     salah += 1
@@ -280,7 +304,6 @@ def main():
                 continue
             mutasi_sumber.write_source(WATCH, isi)
             menyala, detail = _jalankan(program)
-            harap_menyala = not label.startswith(("5", "6"))
             if menyala is None:
                 print(f"PROBE GAGAL: {label}: {detail}")
                 salah += 1
@@ -291,11 +314,11 @@ def main():
                   f"{'MERAH' if menyala else 'hijau'}")
 
         print("\n── arah kedua: lint pra-perbaikan (wajib HIJAU) ──")
-        for label, mutasi in kasus:
-            if label.startswith(("5", "6")):
+        for nomor, (label, mutasi, harap_menyala) in enumerate(STATES, start=1):
+            if not harap_menyala:
                 continue
             isi = asli
-            for cari, ganti in mutasi:
+            for _berkas, cari, ganti in mutasi:
                 if cari not in isi:
                     print(f"JANGKAR TIDAK DITEMUKAN: {label}")
                     salah += 1
@@ -305,8 +328,8 @@ def main():
             if isi is None:
                 continue
             # Keadaan 3 menutup lubang yang lahir sebelum `29ca41b`; keadaan
-            # 1 & 2 menutup lubang yang masih terbuka di `HEAD` hari ini.
-            acuan = program_lama3 if label.startswith("3") else program_lama
+            # 1, 2, dan 4 menutup lubang yang masih terbuka di `HEAD` hari ini.
+            acuan = program_lama3 if nomor in PRA_PER_KEADAAN_3 else program_lama
             mutasi_sumber.write_source(WATCH, isi)
             menyala, detail = _jalankan(acuan)
             if menyala is None:
