@@ -9787,6 +9787,22 @@ def blok(src):
     return hasil
 
 
+def _operand(cond, mulai, akhir):
+    """Potongan ekspresi yang memuat `[mulai, akhir)`, dipisah `&&`/`||`.
+
+    Kenapa perlu: negasi tidak menempel pada nama penjaganya. Pada
+    `!motion.allowsTransitions` tanda `!` mendahului **penerima**
+    (`motion`), bukan propertinya. Versi pertama aturan ini mencari `!`
+    tepat sebelum nama, sehingga bentuk itu -- justru bentuk yang paling
+    berbahaya -- terbaca sebagai penjaga positif.
+    """
+    kiri = max(cond.rfind("&&", 0, mulai), cond.rfind("||", 0, mulai)) + 2
+    kanan_opsi = [x for x in (cond.find("&&", akhir), cond.find("||", akhir))
+                  if x != -1]
+    kanan = min(kanan_opsi) if kanan_opsi else len(cond)
+    return cond[kiri:kanan]
+
+
 def masalah_polaritas(kondisi):
     """Salah arah? Kembalikan penjelasan, atau None kalau bentuknya sah."""
     if re.search(r"\bMotionPolicy\s*\(", kondisi):
@@ -9794,9 +9810,11 @@ def masalah_polaritas(kondisi):
         return None
     ketemu = False
     for nama in POSITIF + NEGATIF:
-        for m in re.finditer(r"(!?)\s*\b" + nama + r"\b", kondisi):
+        for m in re.finditer(r"\b" + nama + r"\b", kondisi):
             ketemu = True
-            dinegasikan = m.group(1) == "!"
+            operan = _operand(kondisi, m.start(), m.end())
+            inti = operan.strip().lstrip("(").lstrip()
+            dinegasikan = inti.startswith("!")
             if nama in POSITIF and dinegasikan:
                 return ("`!%s` membalik penjaga: gerak hanya berjalan saat "
                         "gerak justru dilarang" % nama)

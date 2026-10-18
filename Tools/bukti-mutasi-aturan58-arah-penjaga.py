@@ -180,10 +180,15 @@ def main():
 
         # 7. Fail-closed: seluruh API gerak diganti nama, sehingga aturan
         # berhenti mengukur satu penjaga pun. Harus merah, bukan hijau kosong.
+        # `TimelineView(.animation` ikut diganti -- versi pertama harness hanya
+        # mengganti `withAnimation`, sehingga aturan masih menemukan tiga API
+        # lain dan tetap hijau; itu bukan keadaan "tidak mengukur apa pun".
         label = "7. fail-closed: tanpa API gerak"
         for path in targets:
-            mutasi_sumber.write_source(
-                path, _originals[path].replace("withAnimation", "withAnim"))
+            isi = _originals[path]
+            isi = isi.replace("withAnimation", "withAnim")
+            isi = isi.replace("TimelineView(.animation", "TimelineView(.statis")
+            mutasi_sumber.write_source(path, isi)
         fired, detail = probe(program)
         ok = fired is True and "PERINGATAN" in (detail or "")
         if not ok:
