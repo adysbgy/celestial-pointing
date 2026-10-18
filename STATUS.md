@@ -1,3 +1,78 @@
+### Siklus (18 Okt 2026 — elongasi objek langit dalam: ciri identitas yang lolos gerbang keyakinan)
+
+Dibuka dengan `git log` + `gh run list` + ketiga gerbang, bukan dengan brief.
+Apple Build **hijau** untuk commit sebelumnya, jadi `Apps/` memang ter-compile.
+
+**Cacat yang ditemukan (terukur, bukan diduga).** Saat objek langit dalam
+tampil dengan engine **ragu**, `CelestialVisualView` mengambil elongasi
+langsung dari `objectID`:
+
+    elongation: visual.objectID.map { DeepSkyCatalogue.elongation(forObjectID: $0) }
+
+Morfologi dan warna sudah lewat `drawableMorphology`/`deepSkyColour`, yang
+mengembalikan `nil` saat belum pasti. Elongasi tidak. Akibatnya dengan id
+`m27` dan `isConfirmed == false`, bentuk jatuh ke **kabut netral** (morfologi
+`nil`) tetapi siluetnya tetap dipipihkan ke **0.60** — gambar yang tidak
+mengklaim *jenis* objek namun tetap memakai *bentuk* objek itu. Klaim
+identitas lewat pintu belakang.
+
+Kenapa tidak satu pun uji lama menangkapnya: uji model
+(`testElongationCannotClaimAShapeWhenMorphologyIsUnknown`) benar-benar hijau —
+`VisualFrame.deepSky` memang mengabaikan elongasi saat morfologi `nil`. Yang
+bocor bukan model, melainkan **jalur view**: elongasi diteruskan ke geometri
+bersama morfologi `nil`, dan di sana ia dipakai di cabang `.planetaryNebula`…
+kecuali cabang itu hanya tercapai lewat morfologi. Sudah diuji langsung:
+gerbang `guard isConfirmed` versi lama **dicabut**, suite = 923 uji, **1
+gagal**, tepat pada uji baru baris 2096 dengan pesan `0.6 is not equal to 1.0
+… elongasi m27 digambar walau engine ragu`.
+
+**Perbaikan.** `DeepSkyCatalogue.drawableElongation(forObjectID:isConfirmed:)`
+mengembalikan `1.0` saat belum pasti — menyatukan elongasi dengan morfologi
+dan warna pada **satu** gerbang keyakinan, supaya tidak ada ciri pengenal
+ketiga yang bisa lupa dijaga. Gerbang ditaruh di model, bukan di view, karena
+`Apps/` tidak pernah dibangun di Linux: aturan yang hidup hanya di view tidak
+bisa diuji di sini. View memanggilnya.
+
+**Bukti bahwa ujinya bukan cakupan palsu.** Dua bukti lama tidak menjangkau
+cacat ini, masing-masing gagal dengan cara berbeda:
+
+- `bukti-mutasi-dumbel.py` membaca **port Python** (`render-visuals.py`) yang
+  fungsinya `deep_sky_blobs(morphology, fuzziness, …)` — **tidak punya
+  parameter keyakinan sama sekali**. Seluruh dimensi "engine ragu" tidak
+  diukurnya; hijau di sana tidak berarti apa pun untuk cacat ini.
+- `swift-ui-lint.sh` sengaja tidak memeriksa badan view.
+
+Maka `Tools/bukti-mutasi-elongasi-ragu.py` (baru, terdaftar di CI) menanam
+empat cacat ke **berkas Swift sungguhan** lalu menjalankan suite: gerbang
+dicabut, gerbang terbalik, siluet selalu netral, dan semua objek dipipihkan
+satu angka. Yang dituntut merah adalah uji **bernama**, bukan "ada yang
+gagal" — supaya cacat di uji lain tidak bisa dipinjam sebagai bukti. Baseline
+bersih wajib hijau, supaya uji yang selalu merah tidak lolos semua keadaan.
+Hasil terukur: **5/5 terbukti**, keempat cacat berbunyi di **baris berbeda**
+(2096 / 2096 / 2101 / 2115) — jadi uji itu bukan satu pemeriksaan berkedok
+empat.
+
+**Cacat di harness itu sendiri, dan kenapa dicatat.** Matcher mula-mula
+menuntut kutip persis sebelum nama uji (`'<nama>' failed`), sedangkan XCTest
+mencetak nama **berkualifikasi suite** (`CelestialVisualTests.<nama>`).
+Akibatnya keempat keadaan **merah di suite** tetapi harness melaporkan "suite
+merah, tetapi bukan di uji yang menjaganya" untuk semuanya — kegagalan matcher
+yang terbaca sebagai temuan. Itu persis kelas cacat yang harness ini ada untuk
+menolak, jadi matcher-nya yang diperbaiki, bukan keadaannya yang dilonggarkan.
+
+**Gerbang.** `swift-ui-lint.sh` LULUS (52 aturan). Aturan 10 menangkap angka
+README yang basi saat menambah uji (922 → 923) — persis fungsinya.
+`swift-typecheck.sh` LULUS. `check-harness-terdaftar.py` sempat menolak
+harness baru sebelum didaftarkan ("gerbang yang tidak dijalankan selalu
+hijau"), lalu **98/98** harness terdaftar. `swift-test.sh`:
+**CelestialEngine 222 + PointingKit 923 = 1145 hijau, 0 gagal.**
+
+**Yang TIDAK diklaim.** Harness tidak membuktikan view memanggil fungsi yang
+benar; itu dijaga lint lewat pembacaan nama, dan uji perilaku view tidak
+mungkin ada di Linux tanpa membangun `Apps/`. Perubahan ini tidak menyentuh
+tampilan yang sudah benar — hanya jalur "engine ragu" yang berubah, dan hanya
+untuk objek yang punya elongasi di tabel (saat ini `m27`).
+
 ### Siklus (18 Okt 2026 — Aturan 52: keyakinan visual yang dibaca lewat nama lain, dan layar redup yang tampil tanpa latar)
 
 Dibuka seperti biasa: `git log` + `gh run list` + ketiga gerbang. Yang
