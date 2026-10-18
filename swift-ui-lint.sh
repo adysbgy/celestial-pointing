@@ -9262,6 +9262,19 @@ fi
 # sementara layar tetap tidak pernah menerimanya. Itu persis bentuk yang
 # lolos hari ini. Yang dihitung hanya pembacaan dari **berkas lain**.
 #
+# **Kenapa pembacaan di dalam `.onChange(of: ...)` juga TIDAK dihitung.**
+# Ini lubang yang ditemukan justru setelah aturan ini ditulis. Perbaikan
+# pertama menambahkan dua pembaca: satu baris `Text(note)` di layar, dan satu
+# `.onChange(of: link.lastMessageNote)` yang mengumumkannya ke VoiceOver.
+# Menghapus baris `Text`-nya menyisakan pengumuman — dan aturan tetap hijau,
+# padahal teksnya tidak lagi tampil di layar mana pun. Cacat aslinya kembali
+# utuh, hanya bergeser satu tingkat: dari "tidak dibaca" menjadi "dibaca
+# tetapi hanya untuk diucapkan". Pengumuman adalah saluran **tambahan**, bukan
+# pengganti tampilan — teks yang hanya diucapkan tidak bisa dibaca ulang
+# dengan mengusap layar, dan tidak ada di tangkapan layar mana pun.
+# Jadi pembacaan yang berada di dalam blok `.onChange(of: <properti>)` untuk
+# properti itu dianggap pengumuman, bukan tampilan, dan tidak dihitung.
+#
 # **Kenapa zero-item = GAGAL.** Kalau `Apps/` tidak ditemukan atau tidak ada
 # satu pun properti teks status yang terdeteksi, aturan ini tidak mengukur
 # apa pun. Hijau dalam keadaan itu adalah hijau yang kosong.
@@ -9277,9 +9290,41 @@ def buang_komentar(s):
     s = re.sub(r"//[^\n]*", "", s)
     return re.sub(r"/\*.*?\*/", "", s, flags=re.S)
 
+def rentang_onchange(isi, nama):
+    """Rentang blok `.onChange(of: <nama>) { ... }` untuk satu properti.
+
+    Dipakai untuk memisahkan **pengumuman** dari **tampilan**. Kurung kurawal
+    diseimbangkan dari `{` pertama sesudah `.onChange(of: nama)`; tidak ada
+    parser Swift di sini dan tidak perlu — satu tingkat kedalaman sudah cukup
+    untuk membedakan blok pengumuman dari baris tampilan di luarnya.
+    """
+    rentang = []
+    pola = re.compile(r"\.onChange\(of:\s*[^)]*\b%s\b" % re.escape(nama))
+    for m in pola.finditer(isi):
+        buka = isi.find("{", m.end())
+        if buka < 0:
+            continue
+        dalam = 0
+        for i in range(buka, len(isi)):
+            if isi[i] == "{":
+                dalam += 1
+            elif isi[i] == "}":
+                dalam -= 1
+                if dalam == 0:
+                    # Rentang mulai dari **awal `.onChange`**, bukan dari `{`.
+                    # Nama properti muncul dua kali di blok ini: sekali di
+                    # klausa `of:` dan sekali (mungkin) di badannya. Kalau
+                    # rentangnya mulai dari `{`, kemunculan di `of:` dihitung
+                    # sebagai tampilan — dan aturan tetap hijau walau baris
+                    # `Text`-nya sudah dibuang. Itu persis yang terjadi pada
+                    # percobaan pertama aturan ini.
+                    rentang.append((m.start(), i + 1))
+                    break
+    return rentang
+
 berkas = []
-for dasar, _, nama in os.walk(AKAR):
-    for n in nama:
+for dasar, _, nama_berkas in os.walk(AKAR):
+    for n in nama_berkas:
         if n.endswith(".swift"):
             berkas.append(os.path.join(dasar, n))
 
@@ -9317,12 +9362,13 @@ if not teks_status:
 
 masalah = []
 for b, nama in sorted(teks_status):
-    dibaca_di = set()
+    tampil_di = set()
     for lain, isi in sumber.items():
         if lain == b:
             # Pembacaan di berkas sendiri sengaja dilewati: itu bisa berarti
             # menulis-lalu-membaca di tempat yang sama, bukan sampai ke layar.
             continue
+        abaikan = rentang_onchange(isi, nama)
         for m in re.finditer(r"\b%s\b" % re.escape(nama), isi):
             sebelum = isi[max(0, m.start() - 8):m.start()]
             if re.search(r"\b(var|let)\s+$", sebelum):
@@ -9330,11 +9376,14 @@ for b, nama in sorted(teks_status):
             sesudah = isi[m.end():m.end() + 4].lstrip()
             if sesudah.startswith("=") and not sesudah.startswith("=="):
                 continue
-            dibaca_di.add(lain)
-    if not dibaca_di:
+            if any(a <= m.start() < z for a, z in abaikan):
+                # Pengumuman VoiceOver, bukan tampilan.
+                continue
+            tampil_di.add(lain)
+    if not tampil_di:
         masalah.append(
-            "  %s: `%s` ditulis tetapi tidak dibaca berkas lain mana pun -- "
-            "kalimatnya tidak pernah sampai ke layar." % (b, nama))
+            "  %s: `%s` ditulis tetapi tidak ditampilkan berkas lain mana pun "
+            "-- kalimatnya tidak pernah sampai ke layar." % (b, nama))
 
 if masalah:
     print("\n".join(masalah))
