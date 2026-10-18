@@ -11029,6 +11029,168 @@ echo "$visual_objek"
 [ "$visual_status" -ne 0 ] && status=1
 
 
+
+# ── Aturan 63: samaran "engine ragu" yang DIPAKAI wajib sama dengan yang DIUKUR ──
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka.
+#
+# Ada dua samaran di repo ini. Satu diukur, satu dipakai:
+#
+#   Tools/render-visuals.py  VIEW_UNCERTAIN_BLUR_FRACTION = 0.06
+#     Port Python. Diukur `check-visuals.py` (piksel bertepi keras) dan
+#     dibuktikan berbunyi oleh `bukti-mutasi-objek-samar.py`.
+#
+#   Apps/Shared/CelestialVisualView.swift  diameter * 0.06
+#     Yang benar-benar menggambar di jam dan di iPhone.
+#
+# Kedua angka itu sama hari ini, dan **tidak ada satu pun gerbang yang menuntut
+# mereka sama**. Terukur pada pohon utuh, proses baru:
+#
+#     CelestialVisualView.swift  diameter * 0.06       -> diameter * 0.0   exit 0
+#     CelestialVisualView.swift  uncertainBlurOpacity 0.75 -> 1.0          exit 0
+#
+# Akibatnya kandidat yang engine belum kunci digambar tajam dan penuh — cincin
+# Saturnus, pita Jupiter, warna spektral bintang — tepat di samping lencana
+# "Ragu". Seluruh aturan lain tetap hijau karena semuanya memeriksa **cabang**
+# yang memutuskan menyamar (`UncertainBlur.allows`, Aturan 50/51) atau **siapa**
+# yang disamarkan, bukan **seberapa kuat** samarannya. Port Python tetap hijau
+# karena ia membaca konstantanya sendiri.
+#
+# Satu hal yang **tidak** termasuk kelas ini, dan diukur supaya tidak
+# diklaim: mematikan `guard NightMode.isOn` di `color(_:isShadow:)` memang
+# memerahkan Aturan 15 (ia menjaga warna prosedural lewat penjaga mode malam).
+# Jadi mode malam sudah dijaga; yang belum dijaga hanyalah **kekuatan**
+# samaran.
+#
+# Yang diperiksa karena itu bukan "apakah ada angka 0.06 di berkas", melainkan
+# **dua angka yang berbeda tempat itu harus sama** — sehingga mengubah salah
+# satunya saja memerahkan gerbang. Itu satu-satunya bentuk yang menutup cacat
+# "gerbang mengukur salinan, bukan yang dipakai", yang sudah dua kali
+# menjatuhkan `main` di repo ini.
+#
+# Fail-closed: kalau salah satu angka tidak terbaca (literal diganti ekspresi,
+# nama konstanta diubah), aturan MEMERAH — bukan diam dan lulus.
+echo
+echo "== Aturan 63: samaran yang dipakai Swift sama dengan yang diukur Python =="
+samaran_objek=$(python3 - <<'PY' 2>&1
+import re
+import sys
+
+MASALAH = []
+
+
+def tanpa_komentar(swift):
+    """Buang komentar, jaga isi string.
+
+    Sama seperti Aturan 62: gerbang yang bisa dipuaskan dengan mengomentari
+    kode akan dipuaskan dengan mengomentari kode. Di sini itu bukan teori —
+    baris `diameter * 0.06` muncul juga di dalam docstring di atas fungsinya.
+    """
+    hasil = []
+    i = 0
+    n = len(swift)
+    while i < n:
+        dua = swift[i:i + 2]
+        if dua == "//":
+            j = swift.find("\n", i)
+            if j < 0:
+                break
+            hasil.append(" " * (j - i))
+            i = j
+        elif dua == "/*":
+            j = swift.find("*/", i + 2)
+            if j < 0:
+                break
+            hasil.append(" " * (j + 2 - i))
+            i = j + 2
+        else:
+            hasil.append(swift[i])
+            i += 1
+    return "".join(hasil)
+
+
+VIEW = "Apps/Shared/CelestialVisualView.swift"
+PORT = "Tools/render-visuals.py"
+
+try:
+    swift = tanpa_komentar(open(VIEW, encoding="utf-8").read())
+except OSError as galat:
+    print("TIDAK TERBACA: %s (%s)" % (VIEW, galat))
+    sys.exit(1)
+
+try:
+    port = open(PORT, encoding="utf-8").read()
+except OSError as galat:
+    print("TIDAK TERBACA: %s (%s)" % (PORT, galat))
+    sys.exit(1)
+
+# ── 1. Radius samaran: dua angka, satu kebenaran ────────────────────────────
+# Dicari lewat **badan fungsinya**, bukan lewat seluruh berkas: `0.06` juga
+# muncul di daftar bintik Mars, dan mencocokkan yang pertama ditemukan akan
+# mengikat gerbang ini pada angka yang salah.
+badan = re.search(
+    r"func\s+uncertainBlurRadius\s*\([^)]*\)\s*->\s*CGFloat\s*\{(.*?)\n\s*\}",
+    swift, re.S)
+if badan is None:
+    MASALAH.append(
+        "fungsi uncertainBlurRadius() tidak ditemukan di %s -- gerbang ini "
+        "tidak bisa memeriksa apa pun, jadi ia memerah." % VIEW)
+else:
+    angka_swift = re.search(r"diameter\s*\*\s*([0-9]*\.?[0-9]+)", badan.group(1))
+    if angka_swift is None:
+        MASALAH.append(
+            "uncertainBlurRadius() tidak lagi berbentuk `diameter * <angka>`; "
+            "gerbang tidak bisa membaca fraksi samarannya.")
+        angka_swift = None
+
+    angka_port = re.search(
+        r"^VIEW_UNCERTAIN_BLUR_FRACTION\s*=\s*([0-9]*\.?[0-9]+)",
+        port, re.M)
+    if angka_port is None:
+        MASALAH.append(
+            "VIEW_UNCERTAIN_BLUR_FRACTION tidak ditemukan di %s; gerbang tidak "
+            "bisa membandingkan." % PORT)
+
+    if angka_swift is not None and angka_port is not None:
+        swift_nilai = float(angka_swift.group(1))
+        port_nilai = float(angka_port.group(1))
+        if swift_nilai <= 0:
+            MASALAH.append(
+                "radius samaran Swift = %g: gambar ragu jadi setajam gambar "
+                "pasti, jadi kandidat tampil seolah sudah dikunci." % swift_nilai)
+        if swift_nilai != port_nilai:
+            MASALAH.append(
+                "radius samaran BERBEDA: Swift %g, port Python %g. Yang diukur "
+                "check-visuals.py bukan yang dipakai di layar."
+                % (swift_nilai, port_nilai))
+
+# ── 2. Opasitas samaran ────────────────────────────────────────────────────
+opasitas = re.search(
+    r"uncertainBlurOpacity\s*:\s*Double\s*=\s*([0-9]*\.?[0-9]+)", swift)
+if opasitas is None:
+    MASALAH.append("uncertainBlurOpacity tidak terbaca di %s." % VIEW)
+else:
+    nilai = float(opasitas.group(1))
+    if not 0 < nilai < 1:
+        MASALAH.append(
+            "opasitas samaran = %g (harus di antara 0 dan 1): pada 1.0 tidak "
+            "ada peredupan, pada 0 objeknya hilang dan samaran tidak lagi "
+            "terbaca sebagai \"mungkin\"." % nilai)
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    sys.exit(1)
+
+print("Bersih: samaran ragu %g = %g (Swift = Python), opasitas %g."
+      % (swift_nilai, port_nilai, float(opasitas.group(1))))
+PY
+)
+# Kode keluar diambil dari python-nya, bukan dari `echo` di atasnya.
+samaran_status=$?
+echo "$samaran_objek"
+[ "$samaran_status" -ne 0 ] && status=1
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
