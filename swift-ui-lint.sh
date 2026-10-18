@@ -9684,6 +9684,210 @@ else
   echo "Bersih: setiap preferensi memakai token penyimpanan yang sama."
 fi
 
+# ── Aturan 58: penjaga gerak tidak boleh dibalik atau diganti literal ───────
+#
+# Aturan 7 menuntut **adanya** penjaga reduce-motion di blok yang sama. Ia
+# tidak pernah menanyakan **arah** penjaganya, dan itu bukan kelalaian kecil:
+# blok yang sama juga menyebut `MotionPolicy.LockArrival.responseSeconds` di
+# argumen `withAnimation`, dan `MotionPolicy` cocok dengan penjaga Aturan 7.
+# Jadi begitu penjaganya diganti literal, Aturan 7 tetap hijau karena nama
+# modelnya masih ada di baris berikutnya.
+#
+# Terukur pada salinan utuh, proses baru, sebelum aturan ini ada — ketiganya
+# mengompilasi dan **seluruh 57 aturan lulus (exit 0)**:
+#
+#     guard motion.allowsTransitions else { return }   -> guard true else
+#     guard motion.allowsTransitions else { return }   -> guard !motion.allowsTransitions else
+#     if motion.allowsContinuousMotion && visual.hasPulse -> if true && visual.hasPulse
+#
+# Yang **kedua** paling berbahaya, dan bukan karena geraknya hilang: `!` di
+# depan penjaga membuat animasi berjalan **hanya** untuk pengguna yang meminta
+# reduksi gerak, dan berhenti untuk semua orang lain. Preferensi accessibility
+# yang dibalik adalah cacat yang tidak bisa dilihat oleh orang yang tidak
+# memakai preferensi itu — termasuk semua orang yang mengembangkan app ini.
+#
+# **Kenapa arahnya bisa diperiksa.** Keempat penjaga di repo ini berbentuk
+# nilai turunan yang sudah diuji di Linux (`MotionPolicy.allowsTransitions`,
+# `allowsContinuousMotion`) atau preferensi mentah yang wajib dinegasikan
+# (`!reduceMotion`, `!isLuminanceReduced`). Jadi pertanyaannya bukan "apakah
+# kondisinya masuk akal" — itu butuh pelacakan alur yang tidak bisa dibuktikan
+# sapuan teks — melainkan "apakah polaritasnya salah satu dari dua bentuk
+# yang benar". Itu bisa dijawab.
+#
+# **Yang TIDAK diklaim.** Aturan ini membaca **kondisi penjaga terdekat**,
+# bukan alur eksekusi. Penjaga di `if` bersaudara, atau penjaga yang benar
+# tetapi dinegasikan lagi di dalam badan blok, tidak terlihat. Batas itu sama
+# dengan Aturan 7, dan dinyatakan supaya tidak dikira lebih kuat dari
+# kenyataannya.
+#
+# Fail-closed: nol API gerak = PERINGATAN, bukan hijau kosong.
+echo
+echo "== Aturan 58: penjaga gerak tidak dibalik atau diganti literal =="
+arah_gerak=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+API = re.compile(r"\bwithAnimation\b"
+                 r"|\.repeatForever\b"
+                 r"|TimelineView\(\s*\.animation"
+                 r"|\.animation\s*\(")
+
+#: Penjaga yang **wajib positif** (nilainya sudah berarti "boleh").
+POSITIF = ("allowsTransitions", "allowsContinuousMotion")
+#: Penjaga yang **wajib dinegasikan** (preferensi mentah: "dilarang").
+NEGATIF = ("reduceMotion", "isLuminanceReduced")
+
+
+def buang_komentar(src):
+    """Buang `//` dan `/* */` di luar literal string."""
+    out, i, n = [], 0, len(src)
+    dalam, esc = False, False
+    while i < n:
+        ch = src[i]
+        if dalam:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                dalam = False
+            i += 1
+            continue
+        if ch == '"':
+            dalam = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def blok(src):
+    """Semua pasangan `{...}` berimbang sebagai (buka, tutup)."""
+    tumpuk, hasil = [], []
+    for i, ch in enumerate(src):
+        if ch == "{":
+            tumpuk.append(i)
+        elif ch == "}" and tumpuk:
+            hasil.append((tumpuk.pop(), i))
+    return hasil
+
+
+def masalah_polaritas(kondisi):
+    """Salah arah? Kembalikan penjelasan, atau None kalau bentuknya sah."""
+    if re.search(r"\bMotionPolicy\s*\(", kondisi):
+        # Model yang memutuskan; arahnya diuji di Linux, bukan di sini.
+        return None
+    ketemu = False
+    for nama in POSITIF + NEGATIF:
+        for m in re.finditer(r"(!?)\s*\b" + nama + r"\b", kondisi):
+            ketemu = True
+            dinegasikan = m.group(1) == "!"
+            if nama in POSITIF and dinegasikan:
+                return ("`!%s` membalik penjaga: gerak hanya berjalan saat "
+                        "gerak justru dilarang" % nama)
+            if nama in NEGATIF and not dinegasikan:
+                return ("`%s` dipakai tanpa `!`: gerak berjalan saat "
+                        "pengguna meminta reduksi gerak" % nama)
+    if not ketemu:
+        return ("penjaga tidak membaca kebijakan gerak sama sekali "
+                "(literal `true` atau kondisi lain)")
+    return None
+
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 58 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+jumlah_api = 0
+jumlah_penjaga = 0
+
+for path in berkas:
+    try:
+        asli = open(path, encoding="utf-8").read()
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+    src = buang_komentar(asli)
+    semua_blok = blok(src)
+
+    for m in API.finditer(src):
+        pos = m.start()
+        jumlah_api += 1
+        # Blok yang memuat API ini, dari yang terdekat ke luar.
+        memuat = [(o, c) for (o, c) in semua_blok if o < pos < c]
+        memuat.sort(key=lambda oc: oc[1] - oc[0])
+
+        kandidat = []   # (posisi, kondisi, jenis)
+        for (o, c) in memuat:
+            # (a) Blok yang dibuka oleh `if <kondisi> {`.
+            awal_baris = src.rfind("\n", 0, o) + 1
+            sebelum = src[awal_baris:o]
+            mi = re.search(r"\bif\s+(.+?)\s*$", sebelum)
+            if mi:
+                kandidat.append((o, mi.group(1), "if"))
+            # (b) `guard <kondisi> else` di dalam blok ini, sebelum API.
+            for g in re.finditer(r"\bguard\s+([^\n{]+?)\s+else\b", src[o + 1:pos]):
+                kandidat.append((o + 1 + g.start(), g.group(1), "guard"))
+
+        if not kandidat:
+            # Tidak ada penjaga: itu wilayah Aturan 7, bukan aturan ini.
+            continue
+        kandidat.sort()
+        _, kondisi, jenis = kandidat[-1]
+        jumlah_penjaga += 1
+        salah = masalah_polaritas(kondisi)
+        if salah:
+            baris = src.count("\n", 0, pos) + 1
+            masalah.append("  %s:%d: %s (%s `%s`)"
+                           % (path, baris, salah, jenis, kondisi.strip()[:70]))
+
+if jumlah_api == 0:
+    print("PERINGATAN: tidak ada API gerak di %s -- Aturan 58 tidak "
+          "mengukur satu penjaga pun." % AKAR)
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$arah_gerak" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 58 tidak bisa memutuskan:"
+  echo "$arah_gerak"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$arah_gerak" ]; then
+  echo "$arah_gerak"
+  echo "-> Penjaga yang dibalik membuat gerak berjalan hanya untuk pengguna"
+  echo "   yang memintanya berhenti; penjaga literal membuatnya berjalan"
+  echo "   untuk semua orang."
+  status=1
+else
+  echo "Bersih: setiap penjaga gerak menghadap arah yang benar."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

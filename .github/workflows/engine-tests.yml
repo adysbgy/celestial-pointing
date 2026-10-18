@@ -2469,5 +2469,23 @@ jobs:
       - name: Buktikan Aturan 57 berbunyi pada kunci preferensi yang menyimpang
         run: python3 Tools/bukti-mutasi-aturan57-kunci-preferensi.py
 
+      # Dan bukti untuk gerbang **"arah penjaga gerak"** (Aturan 58).
+      #
+      # Aturan 7 menuntut *adanya* penjaga reduce-motion di blok yang sama,
+      # tetapi tidak pernah menanyakan arahnya -- dan blok yang sama menyebut
+      # `MotionPolicy.LockArrival.responseSeconds` di argumen `withAnimation`,
+      # yang cocok dengan penjaga Aturan 7. Jadi penjaga yang diganti literal
+      # tetap hijau di sana.
+      #
+      # Diukur pada salinan utuh, proses baru, sebelum Aturan 58: ketiga
+      # mutasi lulus **seluruh 57 aturan** (exit 0).
+      #
+      # Keadaan #2 adalah yang paling berbahaya: `!motion.allowsTransitions`
+      # membuat animasi berjalan **hanya** untuk pengguna yang meminta reduksi
+      # gerak. Cacatnya tidak bisa dilihat oleh orang yang tidak memakai
+      # preferensi itu -- termasuk semua orang yang mengembangkan app ini.
+      - name: Buktikan Aturan 58 berbunyi pada penjaga gerak yang dibalik
+        run: python3 Tools/bukti-mutasi-aturan58-arah-penjaga.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
