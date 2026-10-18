@@ -91,10 +91,12 @@ yang mengingatnya.
   terhadap HEAD. Itu bukan kehati-hatian berlebih: harness yang mengadopsi
   penyimpangan sebagai "aslinya" akan melaporkan "pulih persis" atas dirinya
   sendiri.
-- `Onboarding never shows` masih hijau dan **belum** ditangani. Ia bukan
-  kegagalan senyap yang sama kelasnya: onboarding yang tidak muncul terlihat
-  langsung di layar pertama, sedangkan dua yang di atas tidak terlihat sama
-  sekali.
+- `Onboarding never shows` sudah ditangani: **Aturan 59** menuntut bentuk
+  `get: { !<kunci> }` persis, bukan sekadar "memakai token". Ketiga arah
+  cacatnya (`{ true }`, `{ false }`, `{ onboardingSeen }`) terukur lolos dari
+  58 aturan dan sekarang memerah. Ia tetap kelasnya sendiri: onboarding yang
+  tidak muncul terlihat langsung di layar pertama, sedangkan dua yang di atas
+  tidak terlihat sama sekali.
 
 ### Siklus (18 Okt 2026 — `main` merah: tujuh gerbang mengukur **derau**, bukan identitas)
 
