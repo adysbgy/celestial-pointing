@@ -9924,6 +9924,189 @@ else
   echo "Bersih: setiap penjaga gerak menghadap arah yang benar."
 fi
 
+# ── Aturan 59: kartu perkenalan harus bisa ditutup dan tidak kembali ────────
+#
+# Kelas cacatnya: `sheet(isPresented:)` dengan pengikat yang **tidak bisa
+# berpindah ke `false`**. Perkenalan adalah satu-satunya layar yang menghalangi
+# seluruh app, jadi cacat di sini bukan cacat kosmetik — ia adalah app yang
+# tidak bisa dipakai sama sekali, atau kartu yang muncul setiap kali dibuka.
+#
+# Terukur pada salinan utuh, proses baru, sebelum aturan ini ada — keduanya
+# mengompilasi dan **seluruh 58 aturan lulus (exit 0)**:
+#
+#     Watch  : get: { !onboardingSeen }  ->  get: { false }   -> exit 0
+#     iPhone : get: { !onboardingSeen }  ->  get: { true }    -> exit 0
+#
+# `false` berarti perkenalan tidak pernah tampil: pengguna tidak pernah membaca
+# satu-satunya kalimat yang menjelaskan bahwa app ini **boleh** menjawab "tidak
+# tahu", lalu menafsirkan keraguan sebagai kerusakan. `true` lebih buruk:
+# `set:` tetap menulis `onboardingSeen = true`, tetapi `get:` tidak pernah
+# membacanya, jadi sheet tidak pernah bisa ditutup dan app jam tidak bisa
+# dipakai.
+#
+# **Kenapa kedua arah diperiksa, bukan hanya "jangan literal".** Penjaga yang
+# hanya melarang literal akan hijau pada `get: { onboardingSeen }` — bentuk
+# yang memakai token, mengompilasi, dan membalik artinya: perkenalan muncul
+# **hanya setelah** pengguna menutupnya. Yang benar adalah satu ekspresi
+# tertentu, jadi yang diperiksa adalah ekspresi itu.
+#
+# Fail-closed: nol pemanggil `OnboardingView` di `sheet` = PERINGATAN. Itu
+# bentuk kegagalan yang paling mungkin: perkenalan dipindah ke `fullScreenCover`
+# atau ke alur onboarding baru, dan aturan ini diam-diam berhenti menjaga.
+echo
+echo "== Aturan 59: kartu perkenalan bisa ditutup dan tidak kembali =="
+kartu_perkenalan=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+def blok_dari(isi, buka):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "{":
+            dalam += 1
+        elif isi[i] == "}":
+            dalam -= 1
+            if dalam == 0:
+                return isi[buka + 1:i], i
+    return None, -1
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 59 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+jumlah = 0
+
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+
+    for m in re.finditer(r"\.sheet\s*\(\s*isPresented\s*:", isi):
+        # Isi panggilan `.sheet(...)` sampai kurung penutupnya.
+        buka = isi.find("(", m.start())
+        dalam, akhir = 0, -1
+        for i in range(buka, len(isi)):
+            if isi[i] == "(":
+                dalam += 1
+            elif isi[i] == ")":
+                dalam -= 1
+                if dalam == 0:
+                    akhir = i
+                    break
+        if akhir < 0:
+            masalah.append("  %s: `.sheet(isPresented:)` tanpa kurung "
+                           "seimbang -- aturan tidak bisa memutuskan." % path)
+            continue
+        panggilan = isi[buka:akhir + 1]
+        # Isi sheet ada di **trailing closure**, di luar kurung penutup
+        # `isPresented:`: `.sheet(isPresented: .init(...)) { OnboardingView() }`.
+        # Tanpa menyertakannya, aturan ini tidak pernah melihat view-nya dan
+        # melaporkan "tidak mengukur satu layar pun" pada kode yang benar.
+        sesudah = akhir + 1
+        while sesudah < len(isi) and isi[sesudah] in " \t\n":
+            sesudah += 1
+        if sesudah < len(isi) and isi[sesudah] == "{":
+            badan_sheet, tutup = blok_dari(isi, sesudah)
+            if badan_sheet is not None:
+                panggilan += badan_sheet
+        if "OnboardingView" not in panggilan:
+            # Sheet lain (mis. detail objek) bukan wilayah aturan ini.
+            continue
+        jumlah += 1
+
+        # `get:` harus `!<kunci>`; `set:` harus menulis kunci yang sama.
+        mi = re.search(r"get\s*:\s*\{\s*([^}]*?)\s*\}", panggilan)
+        if not mi:
+            masalah.append(
+                "  %s: sheet perkenalan tanpa `get:` -- aturan tidak bisa "
+                "memastikan kapan kartunya tampil." % path)
+            continue
+        get = mi.group(1).strip()
+        if not re.fullmatch(r"!\s*[A-Za-z_]\w*", get):
+            masalah.append(
+                "  %s: `get: { %s }` -- perkenalan harus tampil **tepat saat "
+                "belum pernah dilihat** (`!<kunci>`). Bentuk lain membuatnya "
+                "tidak pernah tampil, atau tidak pernah bisa ditutup."
+                % (path, get))
+
+        # `set: { seen in onboardingSeen = seen }` -- yang harus sama dengan
+        # `get:` adalah **kunci yang ditulis**, bukan parameter masuknya.
+        ms = re.search(r"set\s*:\s*\{([^{}]*)\}", panggilan)
+        if not ms:
+            masalah.append(
+                "  %s: sheet perkenalan tanpa `set:` -- `onDone` tidak "
+                "menyimpan apa pun, jadi kartunya muncul lagi tiap buka."
+                % path)
+            continue
+        badan_set = ms.group(1) if ms.groups() else ""
+        mt = re.search(r"([A-Za-z_]\w*)\s*=\s*[^=]", badan_set)
+        if not mt:
+            masalah.append(
+                "  %s: `set:` tidak menulis kunci apa pun -- menutup kartu "
+                "tidak menyimpan apa-apa." % path)
+            continue
+        set_val = mt.group(1)
+        kunci_get = get.lstrip("! ").strip()
+        if set_val != kunci_get:
+            masalah.append(
+                "  %s: `set:` menulis `%s` tetapi `get:` membaca `%s` -- "
+                "menutup kartu tidak mengubah yang dibacanya." %
+                (path, set_val, kunci_get))
+
+        # `onDone` harus menutup kartu, bukan sekadar ada.
+        mo = re.search(r"OnboardingView\s*\(\s*onDone\s*:\s*\{([^}]*)\}", panggilan)
+        if not mo:
+            masalah.append(
+                "  %s: `OnboardingView` tanpa `onDone:` -- tombol tutup tidak "
+                "melakukan apa pun." % path)
+        else:
+            badan = mo.group(1).strip()
+            if "= true" not in badan and "=true" not in badan:
+                masalah.append(
+                    "  %s: `onDone: { %s }` tidak menandai perkenalan sudah "
+                    "dilihat -- kartunya muncul lagi setiap kali app dibuka."
+                    % (path, badan))
+
+if jumlah == 0:
+    print("PERINGATAN: tidak ada sheet perkenalan di %s -- Aturan 59 tidak "
+          "mengukur satu layar pun." % AKAR)
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$kartu_perkenalan" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 59 tidak bisa memutuskan:"
+  echo "$kartu_perkenalan"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$kartu_perkenalan" ]; then
+  echo "$kartu_perkenalan"
+  echo "-> Perkenalan adalah layar yang menghalangi seluruh app: salah di"
+  echo "   sini berarti app yang tidak bisa dipakai, atau kartu yang tak"
+  echo "   pernah berhenti muncul."
+  status=1
+else
+  echo "Bersih: perkenalan tampil sekali, bisa ditutup, dan tidak kembali."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

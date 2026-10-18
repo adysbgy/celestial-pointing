@@ -2487,5 +2487,14 @@ jobs:
       - name: Buktikan Aturan 58 berbunyi pada penjaga gerak yang dibalik
         run: python3 Tools/bukti-mutasi-aturan58-arah-penjaga.py
 
+      # Dan bukti untuk gerbang **"kartu perkenalan bisa ditutup"** (Aturan 59).
+      #
+      # Perkenalan satu-satunya layar yang menghalangi seluruh app. Tiga bentuk
+      # cacatnya semuanya **terukur lolos** dari 58 aturan sebelumnya:
+      # `get: { true }` (sheet tak bisa ditutup), `get: { false }` (tak pernah
+      # tampil), dan `get: { onboardingSeen }` (token benar, arah salah).
+      - name: Buktikan Aturan 59 berbunyi pada kartu perkenalan yang rusak
+        run: python3 Tools/bukti-mutasi-aturan59-kartu-perkenalan.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
