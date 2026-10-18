@@ -1,3 +1,74 @@
+### Siklus (18 Okt 2026 — `sampleCount` @Published: 20 redraw/detik untuk angka yang tidak pernah tampil)
+
+Dibuka dengan `git log` + `gh run list` + ketiga gerbang. `main` **hijau**, jadi
+bukan siklus perbaikan. Siklus ini siklus **pengukuran**: mencari simpul di
+`Apps/` yang tidak dijaga satu gerbang pun, karena `Apps/` tidak pernah dibangun
+`swift-test.sh` dan `swift-ui-lint.sh` hanya membaca teksnya.
+
+#### Yang terukur
+
+`PointingEngine.sampleCount` adalah `@Published`, dinaikkan di setiap `ingest`
+(**20 Hz**), dan **dibaca nol layar**. Baris "Sampel" di layar Diagnostik
+membaca `motion.sampleCount` — `MotionLogger`, objek yang berbeda. Jadi setiap
+sampel memanggil `objectWillChange` **dua kali**: sekali untuk `sampleCount`,
+sekali untuk `snapshot`.
+
+Sembilan layar meng-observasi `PointingEngine` (`PointingView`,
+`ReducedLuminanceView`, `CalibrationView`, `DiagnosticsView`, `Experiment1View`,
+`LinkView`, `TelescopeHandoffView`, panel detail, layar redup). Satu properti
+berubah per sampel = **sembilan redraw per sampel**, bukan satu — termasuk di
+`ReducedLuminanceView`, jalur Always-On yang justru diminta hemat baterai
+(butir 8 brief).
+
+Bukan sekadar dugaan: `@Published` dihapus saja membuat 52 aturan UI tetap
+exit 0, dan menghapus **seluruh** properti pun tetap exit 0. Angka ini tidak
+punya penjaga.
+
+#### Yang diperbaiki
+
+1. `ObservedState` (baru, `PointingKit`) — peran setiap properti `.published`
+   engine: `.renderInput` (dibaca layar, boleh memicu render) atau
+   `.bookkeeping` (tidak dibaca, tidak boleh). Nama tak dikenal dijawab
+   **diam** (`false`), karena diamnya cuma kehilangan satu render sementara
+   berisiknya membayar sembilan redraw per sampel.
+2. `sampleCount` → bukan `@Published` lagi (masih `public private(set)`,
+   nilainya tetap benar; hanya berhenti menjadi pemicu render).
+3. `ObservedStateTests` (7 uji, Linux) — membaca **sumber**
+   `Apps/Shared/PointingEngine.swift` dan menuntut (a) setiap `@Published` punya
+   peran, (b) properti `.bookkeeping` bukan `@Published`, (c) peran tidak
+   menyebut properti hantu.
+
+#### Non-vakuositas (diukur)
+
+Tiga mutasi, ketiganya merah, pohon dipulihkan byte-identik:
+
+    M1 @Published dikembalikan ke sampleCount  -> testBookkeepingPropertiesAreNotPublished MERAH
+    M2 @Published baru tanpa peran             -> testEveryPublishedPropertyHasARole       MERAH
+    M3 peran menyebut properti yang tidak ada  -> testRolesMentionOnlyRealProperties       MERAH
+
+RED dulu (1 gagal, 6 lulus — gerbangnya bukan vacuous), baru hijau.
+
+#### Yang TIDAK diklaim
+
+- **Tidak ada pengukuran FPS, energi, atau waktu baterai.** Klaimnya sempit:
+  jumlah pemanggilan `objectWillChange` turun dari 2 menjadi 1 per sampel.
+  Berapa ms atau berapa mAh yang dihemat **tidak diukur** di VPS tanpa Watch.
+- Tidak ada properti `.published` lain yang diubah perannya. Peran lain
+  dicatat apa adanya sesuai pembaca yang ada; kalau ada yang salah catat,
+  gerbangnya hanya tahu apa yang ditulis, bukan apa yang sebenarnya dibaca.
+- Uji membaca teks sumber dengan regex, bukan AST. Penulisan deklarasi yang
+  tidak lazim di luar pola (`var` dengan atribut di baris terpisah, misalnya)
+  bisa lolos dari sapuan — `XCTAssert` bahwa sapuan tidak kosong menutup kasus
+  path-salah, bukan kasus sintaks aneh.
+
+#### Gerbang (lokal)
+
+    ./swift-test.sh                   CelestialEngine 222 + PointingKit 931 = 1153, 0 gagal
+    ./swift-ui-lint.sh                SEMUA GERBANG UI LULUS (52 aturan)
+    ./swift-typecheck.sh              SEMUA GERBANG LULUS
+
+---
+
 ### Siklus (18 Okt 2026 — `main` merah 12 commit berturut-turut, dan angka 42 yang tidak pernah diukur ulang)
 
 Dibuka dengan `git log` + `gh run list`. **`main` merah 12 commit berturut-turut**
@@ -55,7 +126,7 @@ sendiri **tidak** dilonggarkan: ia benar, angkanya yang basi.
 
 #### Gerbang (lokal)
 
-    ./swift-test.sh                   CelestialEngine 222 + PointingKit 924 = 1146, 0 gagal
+    ./swift-test.sh                   CelestialEngine 222 + PointingKit 931 = 1153, 0 gagal
     ./swift-ui-lint.sh                SEMUA GERBANG UI LULUS (52 aturan)
     ./swift-typecheck.sh              SEMUA GERBANG LULUS
     check-jangkar-harness.py          405 jangkar, tidak ada mutasi tertinggal

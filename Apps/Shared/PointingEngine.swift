@@ -51,7 +51,18 @@ public final class PointingEngine: ObservableObject {
     /// (teruji di Linux); di sini hanya meneruskan.
     @Published public private(set) var lockArrival: LockArrival?
     /// Jumlah sampel sensor yang sudah diproses.
-    @Published public private(set) var sampleCount = 0
+    ///
+    /// **Sengaja BUKAN `@Published`.** Nilainya dinaikkan di setiap `ingest`
+    /// (20 Hz) dan **tidak dibaca layar mana pun** — baris "Sampel" di layar
+    /// Diagnostik membaca `motion.sampleCount`, objek yang berbeda. Kalau
+    /// `@Published`, setiap sampel memanggil `objectWillChange` **dua kali**
+    /// (sekali untuknya, sekali untuk `snapshot`) pada sembilan layar yang
+    /// meng-observasi engine ini — termasuk `ReducedLuminanceView`, layar
+    /// Always-On yang justru diminta hemat baterai. Ini pembukuan, bukan
+    /// input render; perannya dicatat di `ObservedState` dan dijaga
+    /// `ObservedStateTests` (Linux), karena aturan UI tidak melihat `Apps/`
+    /// sama sekali.
+    public private(set) var sampleCount = 0
 
     /// Gerbang kedatangan kunci.
     ///
