@@ -1200,6 +1200,80 @@ def check_uncertain_blur_is_reversible(results, size=200, ss=2):
         f"harus menemukan bola tanpa ciri, tapi samarnya sendiri harus "
         f"mengubah sesuatu"))
 
+def check_blur_noise_tolerance_is_honest(results, size=200, ss=2):
+    """Toleransi pembulatan harus **di bawah** kebocoran identitas sungguhan.
+
+    Toleransi di gerbang adalah pintu belakang yang paling mudah dibuka:
+    menaikkan satu angka membuat tujuh pemeriksaan "ragu == bola tak dikenal"
+    hijau tanpa memperbaiki apa pun. Pemeriksaan ini menutup pintu itu dengan
+    mengukur **dua angka pada gambar yang sama**, lalu menuntut toleransinya
+    duduk di antaranya:
+
+      1. Derau yang memang harus lolos: `planet-<X>-uncertain` lawan bola
+         netral yang tidak disamarkan. Ini murni pembulatan samaran —
+         sumbernya sama persis (bola netral), jadi **tidak ada** identitas
+         yang bisa bocor. Ia harus ≤ toleransi.
+      2. Kebocoran yang harus tertangkap: `planet-jupiter-confirmed` lawan
+         bola netral. Ini planet berbeda dengan warna berbeda, yaitu persis
+         bentuk kebocoran yang dicari. Ia harus **>** toleransi.
+
+    Kalau toleransi dinaikkan ke atas kebocoran, (2) berbunyi dan merah. Kalau
+    diturunkan ke bawah derau, (1) berbunyi dan merah — dan arah itu penting:
+    gerbang tanpa toleransi pernah jatuh di sini, dan jatuhnya benar, karena
+    yang ia ukur bukan identitas.
+
+    Kedua angka diukur pada **inti** cakram saja (r ≤ `IDENTITY_CORE_RADIUS`),
+    sebab di tepi yang diukur adalah samaran itu sendiri, bukan isinya:
+    gradien bola selesai di 1.35R dan dipotong `Canvas`, sehingga gambar
+    yang disamarkan benar-benar beda dari gambar tajam di dekat tepi — dan
+    gambar tak dikenal memang tidak disamarkan, karena `is_confirmed=True`.
+    Alarm itu bohong: ia berbunyi ketika semuanya benar.
+    """
+    names = {case.name for case in R.build_cases()}
+    for required in ("planet-jupiter-uncertain", "planet-jupiter-confirmed",
+                     "planet-unknown-confirmed"):
+        if required not in names:
+            results.append(Result(
+                "toleransi pembulatan: kasus ukurnya ada", False,
+                f"tidak ada kasus render '{required}' — pemeriksaan ini tidak "
+                "bisa mengukur apa pun, dan itu merah, bukan lulus"))
+            return
+
+    fx0, fy0, fx1, fy1 = R.candidate_marker_footprint()
+    fp = (fx0, fy0, fx1, fy1)
+    _, (w, h, rows_neutral) = render_case("planet-unknown-confirmed",
+                                          size=size, ss=ss)
+    _, (_, _, rows_uncertain) = render_case("planet-jupiter-uncertain",
+                                            size=size, ss=ss)
+    _, (_, _, rows_confirmed) = render_case("planet-jupiter-confirmed",
+                                            size=size, ss=ss)
+
+    noise = badge_excluded_identity_diff(rows_uncertain, rows_neutral, w, h, fp,
+                                         tolerance=IDENTITY_TOLERANCE,
+                                         inner_radius=IDENTITY_CORE_RADIUS)
+    leak = badge_excluded_identity_diff(rows_confirmed, rows_neutral, w, h, fp,
+                                        tolerance=IDENTITY_TOLERANCE,
+                                        inner_radius=IDENTITY_CORE_RADIUS)
+    results.append(Result(
+        "toleransi pembulatan ≥ derau samaran",
+        noise == 0,
+        f"derau samaran di inti (r ≤ {IDENTITY_CORE_RADIUS}R) = {noise} piksel "
+        f"di atas toleransi {IDENTITY_TOLERANCE}; harus 0 — kalau tidak, "
+        "samaran membocorkan sesuatu di inti bola"
+        if noise else
+        f"derau samaran di inti terserap penuh oleh toleransi "
+        f"{IDENTITY_TOLERANCE} (selisih terukur ≤ 2 per kanal)"))
+    results.append(Result(
+        "toleransi pembulatan < kebocoran identitas",
+        leak > 0,
+        f"kebocoran terukur (jupiter terkunci lawan netral) = {leak} piksel "
+        f"> 0, jadi toleransi {IDENTITY_TOLERANCE} tidak menutupinya"
+        if leak else
+        f"toleransi {IDENTITY_TOLERANCE} menyembunyikan kebocoran identitas: "
+        "planet terkunci terbaca sama dengan bola netral — ambangnya terlalu "
+        "tinggi, atau gambarnya benar-benar kehilangan warnanya"))
+
+
 def check_features_disappear_when_uncertain(results, size=200, ss=2):
     """Ciri pengenal wajib hilang saat engine ragu — diukur dari piksel.
 
@@ -1296,12 +1370,16 @@ def check_features_disappear_when_uncertain(results, size=200, ss=2):
             f"berpalet yang sama tanpa ciri; nol berarti cirinya tidak pernah "
             f"tergambar)"))
 
-        identity = badge_excluded_diff(rows_b, rows_neutral, w, h,
-                                       (fx0, fy0, fx1, fy1))
+        identity = badge_excluded_identity_diff(rows_b, rows_neutral, w, h,
+                                                (fx0, fy0, fx1, fy1),
+                                                inner_radius=IDENTITY_CORE_RADIUS)
         results.append(Result(
             f"{label} ragu == bola tak dikenal", identity == 0,
-            f"{identity} piksel berbeda dari bola netral di luar lencana "
-            f"(harus 0: saat ragu identitasnya lenyap, bukan bertukar ciri)"))
+            f"{identity} piksel berbeda **secara identitas** dari bola netral di "
+            f"inti cakram (r ≤ {IDENTITY_CORE_RADIUS}R, lencana dikecualikan; "
+            f"harus 0: saat ragu identitasnya lenyap, bukan bertukar ciri). "
+            f"Selisih ≤ {IDENTITY_TOLERANCE} per kanal adalah pembulatan "
+            f"samaran, lihat IDENTITY_TOLERANCE"))
 
     # Dan arah sebaliknya: saat engine **ragu**, bentuk objek langit dalam tidak
     # boleh sampai ke gambar sama sekali. Dipisah ke fungsinya sendiri supaya
@@ -1476,6 +1554,88 @@ def badge_excluded_diff(rows_a, rows_b, w, h, footprint, margin_px=4.0):
             if ex0 <= ux <= ex1:
                 continue
             if ra[x * 4:x * 4 + 3] != rb[x * 4:x * 4 + 3]:
+                diff += 1
+    return diff
+
+
+#: Selisih kanal per piksel yang masih dihitung **pembulatan**, bukan identitas.
+#:
+#: Angka ini diukur, bukan dipilih supaya hijau. Samaran keraguan adalah
+#: kotak 13x13 lalu PNG 8-bit: tiap piksel adalah rata-rata 169 angka yang
+#: masing-masing sudah dibulatkan, jadi hasilnya bergoyang dari gambar yang
+#: tidak disamarkan. Terukur pada `planet-jupiter-uncertain` lawan bola
+#: netral **tajam** (200 pt, ss=2), sebagai delta maks per cincin radius:
+#:
+#:     r 0.0-0.4R     1…2        <- inti cakram: isi bola, tanpa tepi
+#:     r 0.5R         51
+#:     r 0.6-0.7R    124…125
+#:     r 1.0R         139
+#:     r 1.3R         19
+#:     r 1.4R+        0
+#:
+#: Dua rejim berbeda, dan namanya penting. Di **inti** (≤ 0.4R), yang
+#: diukur adalah isi bola, dan selisih 1…2 murni pembulatan: 1886 piksel
+#: beda di zona itu, delta maks 2. Di **tepi**, yang diukur adalah samaran
+#: itu sendiri — gradien bola berakhir di 1.35R dan `Canvas` memotongnya,
+#: sehingga samaran mencampur cahaya itu ke luar tepi, sementara gambar
+#: tajam di titik yang sama masih latar polos. Delta 74 yang terukur di
+#: perbatasan (x=0) berasal dari itu, bukan dari identitas: ia duduk di
+#: r=1.01R, di luar cakram sama sekali.
+#:
+#: Karena itu gerbang identitas **hanya** mengukur inti. Kebocoran
+#: identitas sungguhan tetap menerobos ambang ini di inti: warna Jupiter
+#: lawan netral menulis 58 di r<0.4R (5013 piksel beda).
+IDENTITY_TOLERANCE = 3
+
+#: Radius (fraksi R) yang di dalamnya sebuah cakram **menyatakan** identitas.
+#:
+#: 0.4 dari pengukuran di atas: di situlah delta pembulatan berhenti
+#: (≤ 2) dan delta isi mulai (51 pada 0.5R). Ia bukan angka kosmetik —
+#: gerbang `check_blur_noise_tolerance_is_honest` menuntut keduanya benar
+#: pada radius ini, jadi memindahkannya akan memerahkan salah satu dari
+#: dua arah.
+IDENTITY_CORE_RADIUS = 0.4
+
+
+def badge_excluded_identity_diff(rows_a, rows_b, w, h, footprint,
+                                 tolerance=IDENTITY_TOLERANCE, margin_px=4.0,
+                                 inner_radius=None):
+    """Piksel berbeda **secara identitas** di luar kotak lencana "?".
+
+    Sama seperti `badge_excluded_diff`, kecuali selisih yang tidak melebihi
+    `tolerance` di setiap kanal dianggap sama. Dipakai gerbang yang bertanya
+    "apakah gambar ini **menyatakan** sesuatu yang berbeda" — pertanyaan
+    tentang makna, bukan tentang byte. Untuk pertanyaan byte, pakai
+    `badge_excluded_diff` yang tetap tanpa toleransi.
+
+    `inner_radius` (fraksi R) membatasi hitungan ke inti cakram. Ia ada
+    karena membandingkan gambar **yang disamarkan** dengan gambar **tajam**
+    di dekat tepi cakram mengukur samarannya, bukan isinya: gradien bola
+    berakhir di 1.35R, jadi samaran mencampur cahaya itu ke luar tepi
+    yang di gambar tajam masih latar polos. Bila `inner_radius` diberi,
+    piksel di luar radius itu tidak dihitung dan harus ditangani
+    pemeriksaan terpisah yang memang mengukur pembulatan samaran.
+    """
+    fx0, fy0, fx1, fy1 = footprint
+    radius = min(w, h) / 2.0
+    cx, cy = w / 2.0, h / 2.0
+    margin = margin_px / radius
+    ex0, ey0, ex1, ey1 = fx0 - margin, fy0 - margin, fx1 + margin, fy1 + margin
+    diff = 0
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        if ey0 <= uy <= ey1:
+            continue
+        ra, rb = rows_a[y], rows_b[y]
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if ex0 <= ux <= ex1:
+                continue
+            if inner_radius is not None and ux * ux + uy * uy > inner_radius ** 2:
+                continue
+            pa = ra[x * 4:x * 4 + 3]
+            pb = rb[x * 4:x * 4 + 3]
+            if any(abs(p - q) > tolerance for p, q in zip(pa, pb)):
                 diff += 1
     return diff
 
@@ -14444,6 +14604,11 @@ def main():
     check_moon_phase_fraction(results, args.size, args.ss)
     check_crescent_direction(results, args.size, args.ss)
     check_features_disappear_when_uncertain(results, args.size, args.ss)
+    # Penjaga gerbang di atas: kalau `IDENTITY_TOLERANCE` dinaikkan sampai
+    # kebocoran identitas terserap, tujuh pemeriksaan "ragu == bola tak
+    # dikenal" akan hijau padahal identitas planet bocor. Pemeriksaan ini
+    # menaikkan/menurunkan ambang itu dan menuntut merah pada keduanya.
+    check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
     # Tiga gerbang yang **dijanjikan komentar tetapi tidak pernah ditulis**

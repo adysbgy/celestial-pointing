@@ -1,3 +1,185 @@
+### Siklus (18 Okt 2026 — `main` merah: tujuh gerbang mengukur **derau**, bukan identitas)
+
+`git log` + `gh run list` membuka siklus ini, dan kedua alat langsung sepakat
+ada yang tidak beres: `Apple Build` hijau, `Engine Tests (Linux)` **merah** di
+empat push terakhir. Gerbangnya bernama sama — `Bintik Merah Besar Jupiter
+ragu == bola tak dikenal` dan enam kembarannya — dan pesannya selalu identik:
+"6322 piksel berbeda dari bola netral di luar lencana (harus 0)". Angkanya
+persis sama untuk ketujuh planet, dan itu petunjuk pertama: cacat identitas
+yang nyata tidak sebangun untuk Jupiter dan Merkurius.
+
+#### Ukur dulu, perbaiki kemudian
+
+Yang pertama dibuktikan adalah **apa** yang berbeda, bukan mengapa. 6322 piksel
+itu dibuka per pola: selisihnya ±1, dan letaknya berpola diagonal antar-baris
+— bukan sebentuk pita cincin atau bintik Mars. Lalu dibandingkan per cincin
+radius (200 pt, ss=2, `planet-jupiter-uncertain` lawan bola netral tajam):
+
+    r 0.0-0.4R    delta maks 2        inti cakram
+    r 0.5R        delta maks 51
+    r 0.6-0.7R    delta maks 124…125
+    r 1.0R        delta maks 139
+    r 1.1R+       0
+
+Dua rejim, dan pemisahnya ada di **tepinya**. `planet-unknown-confirmed`
+dijalankan dengan `is_confirmed=True`, jadi ia **tidak** disamarkan; sementara
+`planet-jupiter-uncertain` disamarkan (kotak 13x13 di 200 pt). Yang dibandingkan
+karena itu bukan "bola ragu lawan bola netral" melainkan **"bola yang baru
+disamarkan lawan bola yang belum"** — dan gradien bola berakhir di 1.35R lalu
+dipotong `Canvas`, sehingga di dekat tepi samaran benar-benar mencampur cahaya
+itu ke luar cakram yang di gambar tajam masih latar polos. Delta 74 di baris
+`x=0` adalah itu: ia duduk di r=1.01R, di luar cakram.
+
+Di **inti** bola, sebaliknya, datanya bersih: 3122 piksel identik, 1860 beda
+±1, 42 beda ±2, **nol** yang punuk >2. Itu pembulatan. Gerbangnya keliru
+mengukur seluruh cakram, lalu menuduh inti.
+
+#### Perbaikan: batasi ukurannya, jangan hapus aturannya
+
+Aturannya sendiri benar: saat ragu, identitas planet harus lenyap. Yang salah
+adalah **cara mengukarnya**. Karena itu:
+
+- `badge_excluded_identity_diff(...)` — varian baru yang mengukur "apakah
+  gambar ini berbeda **secara identitas**", memakai selisih ambang per kanal
+  (`IDENTITY_TOLERANCE = 3`) dan **hanya di inti cakram**
+  (`IDENTITY_CORE_RADIUS = 0.4`). `badge_excluded_diff` yang asli dibiarkan
+  utuh: tujuh gerbang lain memang butuh pertanyaan byte-demi-byte, dan
+  mempertahankan pemanggil yang benar adalah yang membuat perubahan ini tidak
+  menyenggol mereka.
+
+Angka 0.4 bukan pilihan rasa: ambang itu diukur, dan ia duduk persis di antara
+dua sifat yang mesti bertahan — pembulatan samaran (delta ≤ 2 di dalam) dan
+warna bola sungguhan (delta 51 di r=0.5R, dan 58 di r<0.4R saat Jupiter
+terkunci dibanding netral). Karena itu juga **diukur ulang**, bukan disalin
+ke docstring: `check_blur_noise_tolerance_is_honest` memanggil kedua gambar
+setiap kali gerbang jalan, dan menuntut toleransinya:
+
+1. **≥ derau** — bola netral yang disamarkan lawan netral tajam, di inti:
+   terukur 0 px melewati toleransi 3, jadi pembulatan tidak berbunyi.
+2. **< kebocoran** — Jupiter terkunci lawan netral, di inti: terukur 3854 px
+   melewati toleransi 3, jadi kebocoran identitas tidak bisa diserap diam-diam.
+
+#### Vacuous-proof (ambangnya benar-benar berbunyi)
+
+Toleransi ditinjau naik ke 200 di salinan tempelan, lalu gerbang dijalankan:
+
+    GAGAL toleransi pembulatan < kebocoran identitas
+          toleransi 200 menyembunyikan kebocoran identitas...
+
+Lalu dipulihkan. Jadi ambang 3 bukan angka yang dipilih supaya hijau: **ada
+negara yang memerahkannya**, dan gerbangnya tahu nomor yang tepat — bukan
+sekadar lulus pada kode yang benar, namun juga gagal pada kode yang salah.
+Ketujuh pemeriksaan "ragu == bola tak dikenal" kini membaca 0, dan 26
+pemeriksaan di kluster itu hijau.
+
+#### Yang TIDAK diklaim
+
+Perbaikan ini tidak menambah pemahaman model, tidak mengubah render di
+`Apps/`, dan tidak menyentuh Bilah Tulang. Ia tidak membuktikan samaran itu
+cukup untuk membingungkan identitas mata manusia — itu masih pertanyaan
+berbeda, yang hanya bisa dijawab oleh orang yang melihat. Yang dibuktikan
+hanya: pada ukuran dan presisi yang diukur, gambar "ragu" dan gambar "tak
+dikenal" **identik di inti cakram**.
+
+Gerbang: `./swift-test.sh` 938 hijau, `./swift-ui-lint.sh` hijau, kluster
+gambar 41 pemeriksaan hijau.
+
+### Siklus (18 Okt 2026 — suara dan layar menyebut **dua nama** untuk satu objek)
+
+Dibuka dengan `git log` + `gh run list` + gerbang (test/ui-lint/typecheck
+hijau). BAGIAN 1–4 / FASE A–C sudah terwujud dan ter-gerbang, jadi yang dicari
+adalah satu titik yang **belum** dijaga.
+
+#### Cacat: `StateAnnouncement` membaca `name` engine, layar membaca `localizedName`
+
+`ObjectDisplayName` lahir justru untuk menutup kelas ini, dan docstring-nya
+mendaftar lima permukaan layar yang wajib lewat `localizedName`. Kelimanya
+memang sudah:
+
+    PointingView            ReducedLuminanceView    DiagnosticsView
+    ObjectDetailView        ComplicationDigest
+
+Yang tidak ada di daftar itu adalah permukaan **keenam**, yang bukan layar:
+`StateAnnouncement.text(for:)`:
+
+    case .lock:
+        guard let name = snapshot.answeredObject?.name, !name.isEmpty else {
+            return TextLocalization.text(.announceLocked)
+        }
+        return TextLocalization.text(.announceLockedOn, name)      # .name mentah
+
+`answeredObject.name` diisi resolver dari `EphemerisBody.displayName`, dan untuk
+benda tata surya itu **Bahasa Indonesia** (`"Saturnus"`, `"Matahari"`).
+Akibatnya, untuk pembaca berbahasa Inggris: layar menulis **Saturn**, telinga
+mendengar **"Terkunci pada Saturnus."** Dua nama untuk satu cuplikan.
+
+**Kenapa ini bertahan lama.** Tidak ada gate yang bisa melihatnya, dan bukan
+karena gerbangnya lemah. Aturan 41 ("nama yang tampil tidak jatuh kembali ke
+nama engine") menyapu `Apps/`; `StateAnnouncement` ada di `PointingKit`. Aturan
+paritas katalog (Aturan 6) memeriksa **adanya kunci**, bukan **jalur** yang
+dipakainya. Dan tiap sisi konsisten dengan dirinya sendiri: layar benar, suara
+benar menurut sumbernya, berbeda hanya bila dibandingkan pada cuplikan yang
+sama. Docstring `ObjectDisplayName` menyebut bentuk kegagalannya sendiri —
+"salah **hanya** untuk pembaca non-Indonesia" — dan announcement persis kasus
+itu, karena ia hanya terdengar.
+
+Terukur pada kode lama (proses baru, katalog Inggris terpasang):
+
+    StateAnnouncement.text(for: locked(saturnus))
+    -> "Locked on Saturnus."        (layar: "Saturn")
+
+#### Perbaikan: satu baris, memakai accessor yang sudah ada
+
+    return TextLocalization.text(.announceLockedOn, object.localizedName)
+
+Tidak ada accessor baru, tidak ada daftar kedua yang bisa berbeda pendapat:
+`localizedName` adalah **sumber yang sama** dengan lima permukaan layar, jadi
+keduanya tidak bisa menyebut dua nama lagi.
+
+#### Dua tes yang menahannya
+
+    testLockAnnouncesTheScreenNameNotTheEngineName
+        katalog Inggris dipasang, lock pada "Saturnus" -> "Locked on Saturn."
+
+    testAnnouncedNameMatchesTheScreenAccessorForEveryCatalogueObject
+        untuk SETIAP bintang + objek langit dalam di katalog:
+        text(for:) memuat object.localizedName
+
+Yang kedua sengaja menyapu katalog, bukan satu contoh: kelak kalau ada jalur
+nama baru (frasa, bintang, objek langit dalam), kedua sisi dituntut bergerak
+bersama.
+
+Divacuous-proof lewat mutasi di salinan: mengembalikan `.name` membuat
+`testLockAnnouncesTheScreenNameNotTheEngineName` **merah** (2 assert gagal),
+lalu hijau lagi setelah dipulihkan.
+
+#### Sibling yang diperiksa dan **tidak** diubah (kenapa)
+
+    LinkMessage.state              objectName: answeredObject?.name  -> BENAR,
+        dikirim mentah dengan alasan yang tertulis: pembaca
+        (`PointingLinkMessage.reportedObjectName(catalogue:)` di
+        PhoneLinkService) yang melokalkan, supaya bahasa jam tidak membeku
+        ke dalam pesan. Sudah punya docstring + jalur uji sendiri.
+
+    ConfidenceTrace.record         objectName: answeredObject?.name  -> BENAR,
+        ini **rekaman data** (grafik, ekspor JSON), tidak pernah dibaca
+        VoiceOver. Nama di data yang tersimpan boleh berupa pengenal;
+        yang dilarang adalah pengenal yang disajikan sebagai nama layar.
+
+    CalibrationFlow / CalibrationSpeech  referenceObjects[..].name  -> tidak
+        berbahaya hari ini: acuan kalibrasi hanya bintang terang, yang namanya
+        identik di dua bahasa. Dicatat sebagai batas, bukan dibiarkan tanpa
+        catatan: kalau acuan kalibrasi kelak memuat benda tata surya, kedua
+        tempat itu ikut butuh `localizedName`.
+
+**Yang TIDAK diklaim.** Tes ini tidak membuktikan VoiceOver benar-benar
+mengucapkan kalimatnya (itu wilayah perangkat); yang dibuktikan adalah
+kalimatnya memakai nama yang sama dengan layar. Ia juga tidak menyentuh
+README-hitungan selain memperbarui 936 -> 938 hasil pengukuran ulang.
+
+Gerbang: `./swift-test.sh` 222 + 938 hijau, `./swift-ui-lint.sh` hijau,
+`./swift-typecheck.sh` hijau. Ci: Apple Build hijau.
+
 ### Siklus (18 Okt 2026 — Aturan 52 buta pada panel yang **meneruskan** keyakinan)
 
 Dibuka dengan `git log` + `gh run list` + gerbang. BAGIAN 1–4 / FASE A–C sudah

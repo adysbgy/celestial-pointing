@@ -1370,7 +1370,19 @@ def render(case, size=256, night_mode=False, show_frame=False, ss=3):
     # — perkiraan bentuk, **bukan** tiruan piksel. Gerbangnya mengukur
     # **jarak antara dua kanvas milik model yang sama**, bukan kesamaan
     # dengan Apple.
-    if kw.get("is_confirmed") is False and uncertain_blur_allows(kind):
+    #
+    # **Kenapa `bare_sphere` dikecualikan.** Kasus `planet-X-bare` bukan keadaan
+    # produksi — ia pembanding **bentuk**: "bola berpalet yang sama, tanpa
+    # ciri", dipakai gerbang untuk mengurangkan bola lalu menyisakan pitanya.
+    # Ia ditulis `is_confirmed=False` hanya untuk mematikan cabang ciri, bukan
+    # untuk menyatakan "engine ragu". Menyamarkannya membuat bola pembanding
+    # ikut kabur, dan pengurangannya lalu menghitung **kekaburan**, bukan
+    # pita: setiap tepi pita terbaca 6 px lebih ke dalam dan gerbang busur
+    # limb gagal di semua pita kecuali yang terdekat khatulistiwa (terukur:
+    # galat 15.3% R pada pita 0, ambang 3%). Samaran adalah filter tampilan,
+    # jadi ia dipasang di **gambar objek**, tidak di pembanding geometri.
+    if (kw.get("is_confirmed") is False and not kw.get("bare_sphere")
+            and uncertain_blur_allows(kind)):
         pre_blur = canvas.snapshot()
         canvas.box_blur(uncertain_blur_radius_points(size))
         canvas.pre_blur = pre_blur
