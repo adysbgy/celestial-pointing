@@ -9804,7 +9804,13 @@ def _dinegasikan(kondisi, mulai, akhir):
     `!`, padahal `!` itu milik suku pertama. Jadi `!` hanya dihitung kalau ia
     menempel pada suku ini -- yaitu tidak ada `&&`/`||` di antaranya.
     """
-    kiri = max(kondisi.rfind("&&", 0, mulai), kondisi.rfind("||", 0, mulai)) + 2
+    # Awal suku: tepat **setelah** pemisah terakhir. `+2` hanya berlaku kalau
+    # pemisahnya memang ada -- `rfind` mengembalikan -1 saat tidak ada, dan
+    # `-1 + 2 = 1` memotong karakter pertama (`!`), sehingga
+    # `!reduceMotion && ...` terbaca sebagai penjaga positif.
+    kiri = max(kondisi.rfind("&&", 0, mulai),
+               kondisi.rfind("||", 0, mulai))
+    kiri = 0 if kiri < 0 else kiri + 2
     # Batas kanan harus **akhir suku**, bukan akhir nama. Kalau dipotong di
     # `akhir`, `!reduceMotion && illustration.hasPulse` untuk suku kedua
     # menghasilkan `!reduceMotion && illustration.hasPulse` (karena `&&` jatuh
