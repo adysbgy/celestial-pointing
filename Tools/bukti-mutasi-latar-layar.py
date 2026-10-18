@@ -67,6 +67,61 @@ ONBOARDING_BENAR = "            AppBackdropView()"
 ONBOARDING_CACAT = """            SurfacePalette.appBackground
                 .ignoresSafeArea()"""
 
+SKY_KONTEKS = "Apps/PointAndKnowWatch/Sources/PointingView.swift"
+
+#: Komit terakhir sebelum arah ketiga (latar hilang, bukan latar salah) ada.
+#: Dipakai arah kedua: gerbang lama **wajib hijau** pada cacat yang sama,
+#: kalau tidak lubangnya cuma dikarang oleh aturan yang selalu berbunyi.
+PRA_ARAH_KETIGA = "b514826"
+
+# ── Arah ketiga: latar yang **tidak ada sama sekali** ──────────────────────
+#
+# Dua arah pertama menanyakan "apakah `appBackground` dipakai mentah".
+# Keduanya menjawab **tidak** untuk layar yang tidak menyentuh latar — dan
+# bentuk itulah yang terukur exit 0 pada 51 aturan:
+#
+#   `SkyContextView` (jam) membungkus isinya dalam `List { … }` tanpa
+#   `.scrollContentBackground(.hidden)`; `CalibrationView` membungkus isinya
+#   dalam `ScrollView { … }` tanpa `.appBackdrop()`.
+#
+# Kenapa itu cacat, bukan selera: mode malam dibangun dari palet tanpa cahaya
+# biru/hijau (rod ~498-530 nm). `List` di watchOS menggambar latar bawaan
+# sistem, jadi satu layar penuh permukaan terang muncul justru di tengah mode
+# yang dibuat untuk mencegahnya. Di mode siang, layar yang sama kehilangan
+# langit berbintang, persis cacat yang Aturan 49 tutup untuk onboarding.
+SKY_BENAR = ("        .scrollContentBackground(.hidden)\n"
+             "        .appBackdrop()\n"
+             "        .navigationTitle(TextLocalization.text"
+             "(.pointingSkyContextLabel))\n")
+
+#: Hijau palsu: latar terpasang, tetapi latar bawaan `List` menutupinya.
+SKY_BACKDROP_TERTUTUP = ("        .appBackdrop()\n"
+                         "        .navigationTitle(TextLocalization.text"
+                         "(.pointingSkyContextLabel))\n")
+
+#: Jangkar kalibrasi. Dua bentuk, dan keduanya **dibaca dari berkasnya**,
+#: bukan dikarang:
+#:
+#:   `CAL_ADA`   pohon sekarang: baris `.appBackdrop()`.
+#:   `CAL_TIDAK` bentuk cacatnya: baris itu dihapus.
+#:
+#: Jangkar pertama yang dicoba (`"            .navigationTitle(...)"`) tidak
+#: pernah cocok: baris judul di berkas itu didahului `}\n` tanpa spasi, jadi
+#: teksnya diawali 12 spasi. Harness melaporkan JANGKAR HILANG — perilaku
+#: yang benar (lebih baik berhenti daripada mengukur nol mutasi), dan yang
+#: membuat kesalahannya terlihat di putaran pertama.
+#:
+#: Jangkar semula menjulur melewati `.appBackdrop()` ke komentar penjelas di
+#: bawahnya. Itu cacat: keadaan **cacat** (tanpa latar) tidak pernah cocok,
+#: karena menghapus `.appBackdrop()` membuat baris berikutnya menjadi
+#: komentar — harness melaporkan JANGKAR HILANG, bukan berdiri di atas cacat
+#: yang benar. Yang diukur harness harus **satu baris penuh**, bukan sampai
+#: komentar penjelas. Terukur: dua keadaan melaporkan JANGKAR HILANG sebelum
+#: dibetulkan; sesudahnya keduanya berjalan.
+CAL_JUDUL = "            .appBackdrop()\n"
+CAL_ADA = CAL_JUDUL
+CAL_TIDAK = ""  # mengganti `.appBackdrop()` yang hanya barisnya sendiri
+
 STATES = [
     # ── Keadaan cacat: aturan WAJIB berbunyi ────────────────────────────────
     # Cacat aslinya, dikembalikan persis ke bentuk yang pernah dikirim.
@@ -120,6 +175,28 @@ STATES = [
     }
 
     private var referenceList: some View {""")}, False),
+
+    # ── Arah ketiga: latar yang tidak ada (bukan latar yang salah) ──────────
+    # Cacat asli #1: `List` di watchOS tanpa latar aplikasi dan tanpa
+    # menyembunyikan latar bawaannya. Terukur exit 0 sebelum arah ini ada.
+    ("skyContext: List tanpa latar aplikasi (cacat asli)",
+     {SKY_KONTEKS: (SKY_BENAR, "")}, True),
+    # Cacat asli #2: `ScrollView` tanpa latar apa pun.
+    ("kalibrasi: ScrollView tanpa appBackdrop (cacat asli)",
+     {KALIBRASI: (CAL_ADA, CAL_TIDAK)}, True),
+    # Hijau palsu: `.appBackdrop()` **terpasang** tetapi latar `List` masih
+    # menutupinya. Inilah alasan gerbangnya `.scrollContentBackground(.hidden)`
+    # dan bukan keberadaan `appBackdrop`. Bentuk ini dulu diloloskan.
+    ("skyContext: appBackdrop tertutup latar bawaan List",
+     {SKY_KONTEKS: (SKY_BENAR, SKY_BACKDROP_TERTUTUP)}, True),
+
+    # Arah kedua untuk arah ketiga: gerbang **pra-perbaikan** wajib hijau pada
+    # cacat yang sama. Tanpa ini, ketiga keadaan di atas hanya membuktikan
+    # bahwa sebuah aturan berbunyi, bukan bahwa lubangnya nyata.
+    ("pra-perbaikan: List tanpa latar (wajib HIJAU = lubang nyata)",
+     {SKY_KONTEKS: (SKY_BENAR, "")}, False, PRA_ARAH_KETIGA),
+    ("pra-perbaikan: ScrollView tanpa latar (wajib HIJAU)",
+     {KALIBRASI: (CAL_ADA, CAL_TIDAK)}, False, PRA_ARAH_KETIGA),
 ]
 
 
@@ -146,13 +223,50 @@ def apply_edits(tree, edits):
     return gagal
 
 
+def buang_aturan_10(tree):
+    """Hapus **langkah Aturan 10** dari lint yang dipasang di `tree`.
+
+    Kenapa ini perlu untuk arah kedua. Aturan 10 menuntut angka aturan di
+    README sama dengan jumlah aturan di `swift-ui-lint.sh`, jadi gerbang lama
+    bisa merah di Aturan 10 karena alasan yang tidak ada hubungannya dengan
+    latar layar — dan arah kedua berhenti membuktikan lubangnya. Yang dihapus
+    hanya pemeriksa hitungannya; aturan lain tetap berjalan utuh, jadi
+    keadaan pra-perbaikan tetap membuktikan "seluruh gerbang lama lulus pada
+    cacat ini".
+    """
+    target = os.path.join(tree, "swift-ui-lint.sh")
+    teks = open(target, encoding="utf-8").read()
+    awal = teks.find('echo "== Aturan 10:')
+    akhir = teks.find('echo "== Aturan 11:')
+    if awal < 0 or akhir < 0 or akhir <= awal:
+        raise SystemExit("GAGAL: tidak bisa memisahkan Aturan 10 dari lint "
+                         "pra-perbaikan; arah kedua tidak bisa dijalankan.")
+    mutasi_sumber.write_source(target, teks[:awal] + teks[akhir:])
+
+
+#: Nama keadaan arah ketiga yang **harus** memerahkan Aturan 49. Tanpa ini,
+#: "merah" bisa berarti aturan lain yang kebetulan gagal, dan harness akan
+#: melaporkan bukti yang tidak ia miliki.
+WAJIB_MENYALA = {
+    "skyContext: List tanpa latar aplikasi (cacat asli)": "Aturan 49",
+    "kalibrasi: ScrollView tanpa appBackdrop (cacat asli)": "Aturan 49",
+    "skyContext: appBackdrop tertutup latar bawaan List": "Aturan 49",
+}
+
+
 def main():
     if not os.path.isfile(os.path.join(ROOT, "swift-ui-lint.sh")):
         print("Tidak menemukan swift-ui-lint.sh di %s" % ROOT)
         return 2
 
+    # Versi lint **pra-perbaikan**, dibaca lewat git — bukan dikarang. Kalau
+    # ini gagal terbaca, gerbang lama akan tampak hijau karena kosong, dan
+    # arah kedua berhenti membuktikan apa pun.
+    lama = mutasi_sumber.git_show(PRA_ARAH_KETIGA, "swift-ui-lint.sh",
+                                  min_bytes=10000)
+
     gagal = []
-    for nama, edits, harus_merah in STATES:
+    for nama, edits, harus_merah, *sisa in STATES:
         work = tempfile.mkdtemp(prefix="bukti-latar-")
         tree = os.path.join(work, "repo")
         try:
@@ -160,6 +274,11 @@ def main():
                 ROOT, tree, symlinks=True,
                 ignore=shutil.ignore_patterns(".build", ".git", "__pycache__",
                                               "out"))
+            if sisa:
+                mutasi_sumber.write_source(
+                    os.path.join(tree, "swift-ui-lint.sh"), lama)
+                buang_aturan_10(tree)
+
             rusak = apply_edits(tree, edits)
             if rusak:
                 print("%-56s JANGKAR HILANG: %s" % (nama, "; ".join(rusak)))
@@ -185,6 +304,11 @@ def main():
                     for baris in hasil.stdout.split("\n"):
                         if "Aturan 49" in baris or "appBackdrop" in baris:
                             print("    %s" % baris.strip())
+            # Aturan yang menyala harus **yang dimaksud**.
+            wajib = WAJIB_MENYALA.get(nama)
+            if merah and harus_merah and wajib and wajib not in hasil.stdout:
+                gagal.append(nama)
+                print("    merah, tetapi %s tidak menyala di keluaran" % wajib)
         finally:
             shutil.rmtree(work, ignore_errors=True)
 

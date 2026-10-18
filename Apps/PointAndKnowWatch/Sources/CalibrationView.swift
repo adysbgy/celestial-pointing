@@ -70,6 +70,15 @@ struct CalibrationView: View {
                 .padding(.horizontal, 2)
             }
             .navigationTitle(TextLocalization.text(.calibrationTitle))
+            // **Latar aplikasi, sama seperti layar utama.** Layar ini dibuka
+            // **dari** `PointingView` lewat `NavigationLink`, dan `ScrollView`
+            // tidak membawa latar sendiri — jadi tanpa baris ini latar induk
+            // yang gelap tidak ikut, dan yang tampil permukaan bawaan sistem.
+            // Di mode malam itu berarti satu layar permukaan abu-abu di
+            // tengah alur yang sengaja dijaga tanpa cahaya biru/hijau; di mode
+            // siang berarti layar ini kehilangan langit berbintangnya, persis
+            // cacat yang Aturan 49 sudah tutup untuk `OnboardingView`.
+            .appBackdrop()
             .onAppear { ensureSession() }
             // Daftar acuan bergantung pada lokasi: lokasi sungguhan tiba beberapa
             // detik setelah layar ini dibuka, dan bintang yang tampak "di atas

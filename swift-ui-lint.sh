@@ -8165,6 +8165,11 @@ import re
 
 masalah = []
 berkas_layar = 0
+# Kode (komentar dibuang) tiap berkas yang mendeklarasikan View. Dipakai arah
+# ketiga di bawah, yang harus melihat **satu berkas utuh** dan bukan satu
+# `struct`, karena latar dipasang per berkas.
+kode_per_berkas = []
+wadah_terbaca = 0
 
 for root, dirs, files in os.walk("Apps"):
     dirs[:] = [d for d in dirs if d not in (".build", "build")]
@@ -8186,6 +8191,9 @@ for root, dirs, files in os.walk("Apps"):
         # Hanya berkas yang benar-benar mendeklarasikan View.
         if not re.search(r"struct\s+\w+\s*:\s*View\b", kode):
             continue
+        kode_per_berkas.append((path, kode))
+        wadah_terbaca += len(re.findall(r"\b(?:List|Form|ScrollView)\b\s*(?:\{|\()",
+                                        kode))
         # Berkas yang **memang** menyusun gradiennya sendiri. Ia satu-satunya
         # tempat `SurfacePalette.appBackground` sah: dialah yang membungkus
         # gradien itu bersama langit menjadi `AppBackdropView`, dan semua
@@ -8219,11 +8227,70 @@ for root, dirs, files in os.walk("Apps"):
             "ini kehilangan langit berbintang yang dimiliki layar lain. "
             "Pakai `appBackdrop()` atau `AppBackdropView()`." % path)
 
+# ── Arah ketiga: `appBackdrop()` yang **dipasang tapi tertutup** ──────────
+#
+# Dua pemeriksaan di atas menanyakan "apakah `appBackground` dipakai mentah".
+# Keduanya menjawab **tidak** untuk layar yang sama sekali tidak menyentuh
+# latar — dan bentuk itulah yang terukur luput di siklus ini.
+#
+#   `SkyContextView` (jam)  membungkus isinya dalam `List { … }` tanpa
+#                           `.scrollContentBackground(.hidden)`.
+#   `CalibrationView` (jam) membungkus isinya dalam `ScrollView { … }` tanpa
+#                           `.appBackdrop()` sama sekali.
+#
+# Keduanya **exit 0** pada 50 aturan. Layar konteks langit lalu tampil dengan
+# latar bawaan sistem — permukaan terang di mode malam yang paletnya sengaja
+# dibuat tanpa cahaya biru/hijau, dan tanpa langit berbintang di mode siang.
+# Ini kelas cacat yang sama dengan asal Aturan 49 (`OnboardingView`), hanya
+# satu langkah lebih jauh: bukan latar yang salah, melainkan **tidak ada
+# latar**.
+#
+# Yang diperiksa, dan **kenapa keduanya**, bukan salah satunya:
+#
+#   a. `List`/`Form` **wajib** menyembunyikan latar bawaannya. Tanpa
+#      `.scrollContentBackground(.hidden)`, `appBackdrop()` boleh terpasang
+#      dan tetap tak terlihat — hijau palsu, persis cacat yang harness
+#      gerbang ini dibangun untuk menangkap.
+#   b. `ScrollView` tanpa `.scrollContentBackground(.hidden)` juga **wajib**
+#      memasang `appBackdrop()`. Kalau sudah menyembunyikan latar bawaannya,
+#      `appBackdrop()` di berkas yang sama sudah cukup (atau ia sudah
+#      menumpang latar induk yang benar — `ReducedLuminanceView` menyembunyikan
+#      latar dan memasang `appBackdrop(starfield: false)` di level yang sama).
+#
+# Cakupannya **seluruh berkas**, bukan per `struct`: `PointingView.swift`
+# memuat dua layar, dan latar dipasang per berkas — menuntut per `struct`
+# akan membuat layar kedua menuduh layar pertama yang sudah benar.
+for path, kode in kode_per_berkas:
+    if os.path.basename(path) == "SkyBackdropView.swift":
+        continue          # dialah yang membangun latarnya.
+    bungkus = re.findall(r"\b(List|Form|ScrollView)\b\s*(?:\{|\()", kode)
+    if not bungkus:
+        continue
+    tersembunyi = ".scrollContentBackground(.hidden)" in kode
+    punya_latar = "appBackdrop(" in kode
+    if ("List" in bungkus or "Form" in bungkus) and not tersembunyi:
+        masalah.append(
+            "  %s: memakai `List`/`Form` tanpa `.scrollContentBackground"
+            "(.hidden)` -- latar bawaan sistem menutupi latar aplikasi, jadi"
+            " `appBackdrop()` (kalau ada) tidak terlihat di mode malam" % path)
+    elif "ScrollView" in bungkus and not tersembunyi and not punya_latar:
+        masalah.append(
+            "  %s: memakai `ScrollView` tanpa `.appBackdrop()` dan tanpa "
+            "`.scrollContentBackground(.hidden)` -- layar ini tampil dengan "
+            "permukaan bawaan sistem, bukan latar aplikasi" % path)
+
 # Fail-closed: nol berkas layar terbaca berarti aturan ini tidak mengukur
 # apa pun. `Apps/` yang berubah nama cukup untuk membuatnya tidur.
 if berkas_layar == 0:
     print("PERINGATAN: tidak ada berkas layar yang menyentuh latar -- "
           "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+# Fail-closed arah ketiga: tanpa satu pun wadah yang terbaca, pemeriksaan
+# baru di atas diam dan gerbang ini hijau karena tidak melihat apa-apa.
+if wadah_terbaca == 0:
+    print("PERINGATAN: tidak ada List/Form/ScrollView yang terbaca di Apps/ "
+          "-- arah ketiga Aturan 49 tidak mengukur apa pun.")
     raise SystemExit(0)
 
 print("\n".join(masalah))
@@ -8552,6 +8619,159 @@ elif [ -n "$klaim_ragu" ]; then
   status=1
 else
   echo "Bersih: sabit & warna planet membaca keyakinan engine."
+fi
+
+# ── Aturan 52: klaim keyakinan pada `CelestialVisualView` tidak boleh lewat nama lain ──
+#
+# Ke-51 aturan sebelumnya menjaga **dari mana** keyakinan datang: Aturan 34
+# menuntut argumennya ada, Aturan 18 melarang nilai bawaannya `true`, dan dua
+# aturan lain menolak `!isStale` sebagai penggantinya. Yang tidak dijaga satu
+# pun: argumen yang **membaca keyakinan** tetapi menyebutnya lewat nama lain.
+#
+# Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
+# mutasi yang semuanya **mengompilasi** — hanya satu bentuk yang memerah:
+#
+#   isConfirmed: true                                    -> MERAH (Aturan 34)
+#   isConfirmed: engine.isDisplayingStaleObject ? false
+#                : engine.confirmsDisplayedIdentity       -> MERAH (Aturan 34)
+#   let keyakinan = engine.confirmsDisplayedIdentity
+#   isConfirmed: keyakinan                               -> **exit 0, semua lulus**
+#   isConfirmed: CelestialVisualView.defaultConfirmation -> **exit 0, semua lulus**
+#
+# Bentuk terakhir yang paling sunyi: `defaultConfirmation` **tidak ada** di
+# `CelestialVisualView`, jadi baris itu tidak bisa dikompilasi — dan justru
+# itu yang membuatnya layak dijaga. Siapa pun yang "merapikan" nama panjang
+# itu cukup menambahkan satu `static let` di view dan seluruh ciri pengenal
+# (cincin Saturnus, pita Jupiter, warna spektral Betelgeuse) tampil pada
+# kandidat yang engine belum kunci, di samping badge "Ragu".
+#
+# **Kenapa gerbang ini wajib, bukan sekadar rapi.** `Apps/` tidak pernah
+# dibangun `swift-test.sh` di Linux; satu-satunya tempat nama yang tidak ada
+# terlihat adalah runner macOS setelah push. Dan keyakinan adalah satu-satunya
+# fakta yang keberadaannya menentukan apakah gambar mengklaim identitas.
+#
+# Bentuk yang diterima, dan **hanya** itu — daftar putih, bukan daftar hitam:
+#
+#   isConfirmed: <ekspresi>            di mana `<ekspresi>` menyebut
+#                                      `confirmsDisplayedIdentity` langsung,
+#                                      atau `isConfirmed` (meneruskan parameter)
+#
+# Daftar hitam tidak dipakai karena bentuk cacat yang dulu lolos adalah bentuk
+# yang belum terpikirkan penulisnya. Fail-closed: nol situs terbaca = gagal,
+# karena kalau konstruktor berganti nama, aturan ini akan hijau selamanya.
+echo
+echo "== Aturan 52: klaim keyakinan visual tidak lewat nama lain =="
+keyakinan_nama=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+DEKL = re.compile(r'\b(?:let|var)\s+(?:isConfirmed|confirmsDisplayedIdentity)\b')
+# Situs: `isConfirmed:` di dalam daftar argumen `CelestialVisualView(...)`.
+SITUS = re.compile(r'CelestialVisualView\s*\(')
+#: Bentuk yang diterima, dan **hanya** itu — daftar putih receiver, bukan
+#: pola bebas. Tiga versi sebelumnya buta, dan masing-masing terukur di
+#: harness sebelum ditulis:
+#:
+#:   `\b(isConfirmed|confirmsDisplayedIdentity)\b`   `visual.isConfirmed` lolos
+#:   `^(?:[\w.]*)?isConfirmed$`                     rantai bertitik apa pun lolos,
+#:                                                  termasuk `visual.isConfirmed`
+#:   `\bisConfirmed\b(?!\s*\.)`                     `engine.confirms…` ditolak
+#:
+#: Yang salah bukan arah rantainya, melainkan **receiver-nya**. `visual` adalah
+#: gambar itu sendiri; `visual.isConfirmed` menjawab "apakah saya terkunci"
+#: dengan bertanya pada dirinya sendiri. Receiver yang boleh hanya sumber
+#: keyakinan: `engine` dan `snapshot` (dan turunannya).
+LANGSUNG = re.compile(
+    r'(?:isConfirmed|(?:[A-Za-z_][A-Za-z0-9_]*\.)*(?:engine|snapshot)\.'
+    r'confirmsDisplayedIdentity)')
+#: Receiver yang **tidak** boleh menjawab keyakinan, namun bentuknya lolos
+#: kalau hanya dicek "nama kata terakhir". Diperiksa terpisah supaya
+#: pesannya menyebut sebabnya, bukan sekadar "tidak cocok pola".
+RECEIVER_TERLARANG = re.compile(
+    r'^(?:[A-Za-z_][A-Za-z0-9_]*\.)*(?:visual|object|planet|illustration|'
+    r'preview)\.isConfirmed$')
+ILUSTRASI = {"OnboardingView.swift"}
+
+masalah = []
+terbaca = 0
+
+for root, dirs, files in os.walk("Apps"):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for nama in sorted(files):
+        if not nama.endswith(".swift"):
+            continue
+        path = os.path.join(root, nama)
+        teks = open(path, encoding="utf-8").read()
+        # Komentar dibuang lebih dulu: docstring di `Apps/` mengutip bentuk
+        # cacatnya, dan gerbang yang menuduh docstring akan dilonggarkan orang.
+        kode = re.sub(r"//[^\n]*", "", teks)
+        kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+        for m in SITUS.finditer(kode):
+            # Tutup kurung yang sepadan untuk seluruh daftar argumen.
+            i = kode.find("(", m.end() - 1)
+            depth = 0
+            dot = 0
+            akhir = -1
+            for j in range(i, len(kode)):
+                ch = kode[j]
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                    if depth == 0:
+                        akhir = j
+                        break
+                elif ch == '"':
+                    # Lewati literal string supaya tanda kurung di dalamnya
+                    # tidak menggulung kedalaman.
+                    k = j + 1
+                    while k < len(kode) and kode[k] != '"':
+                        if kode[k] == "\\":
+                            k += 1
+                        k += 1
+                    continue
+            daftar = kode[i + 1:akhir] if akhir > 0 else ""
+            terbaca += 1
+            situs = re.search(r'\bisConfirmed\s*:\s*([^,\n]+)', daftar)
+            if not situs:
+                masalah.append(
+                    "  %s: `CelestialVisualView(...)` tanpa argumen `isConfirmed:` "
+                    "-- nilai bawaan `false` berlaku, yang aman, tetapi baris ini "
+                    "tidak bisa dibedakan dari lupa" % path)
+                continue
+            nilai = situs.group(1).strip()
+            if nilai == "true" and nama in ILUSTRASI:
+                continue
+            if RECEIVER_TERLARANG.fullmatch(nilai):
+                masalah.append(
+                    "  %s: `isConfirmed: %s` -- keyakinan dibaca dari gambar "
+                    "itu sendiri, bukan dari engine" % (path, nilai))
+                continue
+            if not LANGSUNG.fullmatch(nilai):
+                masalah.append(
+                    "  %s: `isConfirmed: %s` -- keyakinan engine tidak dibaca "
+                    "langsung; nama lain bisa berarti apa saja" % (path, nilai))
+
+if terbaca == 0:
+    print("PERINGATAN: tidak ada pemanggilan `CelestialVisualView(` yang terbaca "
+          "di Apps/ -- aturan ini tidak mengukur apa pun.")
+else:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$keyakinan_nama" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 52 tidak bisa memutuskan:"
+  echo "$keyakinan_nama"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$keyakinan_nama" ]; then
+  echo "$keyakinan_nama"
+  echo "-> Teruskan keyakinan engine dari confirmsDisplayedIdentity, atau"
+  echo "   parameter isConfirmed, apa adanya. Nama perantara bisa menunjuk"
+  echo "   nilai yakin tanpa satu pun baris yang membacanya."
+  status=1
+else
+  echo "Bersih: setiap gambar membaca keyakinan engine secara langsung."
 fi
 
 if [ "$status" -eq 0 ]; then

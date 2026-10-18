@@ -824,6 +824,19 @@ struct SkyContextView: View {
     @ObservedObject var engine: PointingEngine
 
     var body: some View {
+        // **Latar aplikasi, bukan `List` telanjang.** `List` di watchOS
+        // menggambar latar bawaan sistem, bukan latar aplikasi: di mode siang
+        // ia permukaan abu-abu tanpa langit yang dimiliki sembilan layar lain,
+        // dan di mode malam — yang paletnya sengaja tanpa cahaya biru/hijau
+        // demi rhodopsin — `List` mempertahankan latarnya sendiri. Akibatnya
+        // satu layar penuh permukaan terang muncul justru pada mode yang
+        // dibuat untuk mencegahnya, dan itu terukur, bukan dikira-kira.
+        //
+        // `.scrollContentBackground(.hidden)` dulu, baru `.appBackdrop()`:
+        // tanpa yang pertama, latar `List` menutupi latar aplikasi dan
+        // `appBackdrop()` jadi hijau palsu (dipasang, tak terlihat). Dijaga
+        // Aturan 49, yang membaca keberadaan `appBackdrop` **dan** menolak
+        // `appBackground` mentah di berkas yang mendeklarasikan `View`.
         List {
             if let context = engine.skyContext {
                 // Judul baris ini adalah **nama barisnya** ("Langit"), bukan
@@ -864,6 +877,9 @@ struct SkyContextView: View {
                     engine.location.sourceDisplayName)
             }
         }
+        .scrollContentBackground(.hidden)
+        .appBackdrop()
+        .navigationTitle(TextLocalization.text(.pointingSkyContextLabel))
     }
 
     private func row(_ title: String, _ value: String) -> some View {

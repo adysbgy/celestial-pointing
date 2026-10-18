@@ -1,3 +1,82 @@
+### Siklus (18 Okt 2026 — Aturan 52: keyakinan visual yang dibaca lewat nama lain, dan layar redup yang tampil tanpa latar)
+
+Dibuka seperti biasa: `git log` + `gh run list` + ketiga gerbang. Yang
+dikerjakan bukan fitur baru, karena audit ulang (bukan dikutip) menunjukkan
+BAGIAN 1-4 + FASE A/B/C **seluruhnya sudah terwujud dan ter-gerbang**:
+`CelestialVisualView` menggambar planet (pita, cincin, tudung es, kawah,
+kabut, piringan), Bulan berfase, bintang `drawableStarColorIndex`, Matahari
+berkorona, dan langit-dalam bermorfologi; `NightMode` palet merah murni;
+`ReducedLuminanceView` membaca `isLuminanceReduced`; `.xcstrings` (id+en),
+complication, izin sensor, dan AudioCue ada. Jadi yang dicari adalah **titik
+yang tidak dijaga**.
+
+#### Cacat 1: latar layar yang **tidak ada** (dua layar, terukur exit 0)
+
+`SkyContextView` membungkus isinya dalam `List { … }` tanpa
+`.scrollContentBackground(.hidden)`, dan `CalibrationView` dalam
+`ScrollView { … }` tanpa `.appBackdrop()`. Seluruh 51 aturan hijau pada
+keduanya: Aturan 49 menanyakan "apakah `appBackground` dipakai mentah",
+dan jawabannya **tidak** untuk layar yang tidak menyentuh latar sama sekali.
+Di watchOS `List` menggambar latar bawaan sistem — satu layar penuh
+permukaan terang di tengah mode yang dibangun justru untuk mencegahnya.
+
+Perbaikan: `.scrollContentBackground(.hidden)` **sebelum** `.appBackdrop()`
+(urutan itu yang membuat latar aplikasi benar-benar terlihat; sebaliknya
+adalah hijau palsu), dan arah ketiga di Aturan 49. Harness
+`bukti-mutasi-latar-layar.py` bertambah 3 keadaan cacat + 2 keadaan
+**pra-perbaikan** yang wajib HIJAU (`git show b514826`), + `WAJIB_MENYALA`
+supaya "merah" tidak diterima dari aturan lain. Jangkar kalibrasi yang
+semula menjulur melewati `.appBackdrop()` ke komentar penjelas **salah**:
+keadaan cacatnya tidak pernah cocok (dilaporkan JANGKAR HILANG pada putaran
+pertama). Jangkar kini **satu baris penuh**.
+
+#### Cacat 2: keyakinan yang dibaca lewat nama lain (Aturan 52)
+
+Satu baris di layar Always-On, dimutasi pada salinan utuh (proses baru):
+
+    isConfirmed: engine.confirmsDisplayedIdentity
+    -> isConfirmed: CelestialVisualView.defaultConfirmation  -> exit 0, semua lulus
+
+`defaultConfirmation` tidak ada di `CelestialVisualView`, jadi baris itu
+**tidak bisa dikompilasi** — dan itu yang membuatnya layak dijaga: ia lolos
+setiap gerbang tulisan, `Apps/` hanya dikompilasi di runner macOS setelah
+push, dan satu `static let` cukup untuk memunculkan cincin Saturnus di
+samping badge "Ragu". Aturan 34 menangkap literal `isConfirmed: true`;
+aturan ini tidak menangkap nama penggantinya.
+
+Aturan 52 = daftar putih receiver: `isConfirmed` (parameter diteruskan) atau
+`engine.confirmsDisplayedIdentity` / `snapshot.confirmsDisplayedIdentity`. `visual.isConfirmed`
+ditolak **dengan pesan sendiri**: gambar tidak boleh menjawab keyakinannya
+sendiri. Ilustrasi onboarding (`true`, bintang generik) dikecualikan berkas,
+dan pengecualian itu dibuktikan **sah** oleh keadaan kontrol.
+
+**Tiga versi aturan ini buta, dan ketiganya ketahuan dari harness, bukan dari
+membaca ulang:** `\b…\b` (titik adalah batas kata, jadi `visual.isConfirmed`
+lolos), rantai `[\w.]*` bebas (rantai apa pun lolos), dan `(?!\s*\.)`
+(`engine.confirms…` ikut ditolak). Pelajarannya sama dengan siklus Aturan 51:
+daftar hitam mengikuti bentuk yang **sudah** dipikirkan penulisnya.
+
+#### Gerbang
+
+    ./swift-ui-lint.sh                       52 aturan, hijau
+    ./swift-typecheck.sh                     SEMUA GERBANG LULUS
+    Tools/bukti-mutasi-keyakinan-visual.py   9 keadaan (3 cacat merah, 3 sah
+                                             hijau, 3 pra-52 wajib hijau)
+    Tools/bukti-mutasi-latar-layar.py        11 keadaan, semua sesuai harapan
+    Tools/check-harness-terdaftar.py         97 harness, semua dirujuk
+    Tools/check-jangkar-harness.py           403 jangkar, tidak ada mutasi
+                                             tertinggal
+
+#### Yang TIDAK diklaim
+
+Keduanya sapu **teks**, bukan pelacakan aliran atau piksel. Aturan 52
+membuktikan **receiver** yang dipakai, bukan nilai yang dihasilkannya; nama
+yang dibuat di berkas lain lalu diteruskan sebagai parameter bernama lain
+tetap tidak terlihat. `Apps/` tetap tidak pernah dibangun `swift-test.sh` di
+Linux — kompilasi sebenarnya tetap milik Apple Build (macos-15).
+
+---
+
 ### Siklus (17 Okt 2026 — Aturan 51: sabit Venus & warna planet lolos tanpa keyakinan engine)
 
 Buka siklus dengan `git log` + `gh run list` + ketiga gerbang. Ternyata

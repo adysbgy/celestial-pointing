@@ -1537,6 +1537,25 @@ jobs:
       - name: Buktikan Aturan 51 berbunyi pada sabit & warna planet yang bocor
         run: python3 Tools/bukti-mutasi-saputangan-ragu.py
 
+      # Dan bukti untuk Aturan 52 — keyakinan yang dibaca lewat **nama lain**.
+      #
+      # Pada pohon utuh, satu baris di layar Always-On diganti:
+      #
+      #     isConfirmed: engine.confirmsDisplayedIdentity
+      #  -> isConfirmed: CelestialVisualView.defaultConfirmation
+      #
+      # Seluruh 51 aturan waktu itu dijalankan di proses baru: exit 0. Baris
+      # itu bahkan tidak bisa dikompilasi (`defaultConfirmation` tidak ada),
+      # tetapi setiap gerbang tulisan meloloskannya, dan `Apps/` hanya
+      # dikompilasi di runner macOS setelah push.
+      #
+      # Arah kedua di harness ini menjalankan lint pra-Aturan52 (`git show`)
+      # atas ketiga cacat yang sama dan menuntut **hijau** — bukti lubangnya
+      # nyata. Tiga bentuk sah wajib diam, termasuk `visual.isConfirmed`
+      # yang sengaja ditolak dengan pesan tersendiri.
+      - name: Buktikan Aturan 52 berbunyi pada keyakinan yang lewat nama lain
+        run: python3 Tools/bukti-mutasi-keyakinan-visual.py
+
       # Dan bukti untuk Aturan 21 — denyut gambar yang **tampak** digerbangi.
       #
       # Aturan 21 mengawal ongkos yang tidak terlihat di mana pun selain baterai:
