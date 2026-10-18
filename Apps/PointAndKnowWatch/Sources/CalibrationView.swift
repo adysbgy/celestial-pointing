@@ -27,6 +27,14 @@ struct CalibrationView: View {
     /// tidak adanya apa pun yang keliru.
     @State private var announcedStatus: String?
 
+    /// Catatan tautan terakhir yang **sudah diumumkan** ke VoiceOver.
+    ///
+    /// Terpisah dari `announcedStatus`: keduanya properti berbeda dan bisa
+    /// berubah pada aksi yang sama (menekan "Pakai" menulis status lokal
+    /// "Kalibrasi terpasang" **dan** — bila gagal — catatan kiriman). Satu
+    /// penanda bersama akan membuat salah satu pengumuman menelan yang lain.
+    @State private var announcedLinkNote: String?
+
     var body: some View {
         NightAwareContainer {
             calibrationContent
@@ -109,6 +117,25 @@ struct CalibrationView: View {
                 guard announcedStatus != newMessage else { return }
                 announcedStatus = newMessage
                 AccessibilityNotification.Announcement(newMessage).post()
+            }
+            // Kegagalan **pengiriman** juga harus terdengar, bukan hanya
+            // terlihat.
+            //
+            // Tanpa ini, `linkNote` hanya menambah baris yang bisa dibaca
+            // dengan mengusap layar — sementara pengumuman yang sudah ada
+            // berbunyi "Kalibrasi terpasang" tepat sebelumnya, dan bagi
+            // pengguna VoiceOver itulah satu-satunya hasil aksi yang mereka
+            // dengar. Dua kalimat bertentangan, dan yang terdengar adalah yang
+            // salah: persis cacat yang baru ditutup di layar, dipindahkan ke
+            // saluran suara.
+            //
+            // Dipisah dari `announcedStatus` karena keduanya properti berbeda
+            // dan bisa berubah pada aksi yang sama; menggabungkannya membuat
+            // salah satu pengumuman menelan yang lain.
+            .onChange(of: link.lastMessageNote) { _, newNote in
+                guard let newNote, announcedLinkNote != newNote else { return }
+                announcedLinkNote = newNote
+                AccessibilityNotification.Announcement(newNote).post()
             }
         }
     }

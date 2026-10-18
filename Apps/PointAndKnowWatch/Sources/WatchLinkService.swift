@@ -124,6 +124,21 @@ public final class WatchLinkService: NSObject, ObservableObject {
             return
         }
         session.transferUserInfo(PointingLinkMessage.calibration(calibration).plist)
+        // Catatan kegagalan sebelumnya **dibuang** setelah kiriman berhasil.
+        //
+        // Tanpa ini, layar kalibrasi menampilkan "Hasil kalibrasi tidak
+        // terkirim" dari percobaan yang sudah lewat, di bawah status yang
+        // berbunyi "Kalibrasi terpasang" — dan pengguna tidak punya cara
+        // membedakan peringatan yang masih berlaku dari yang sudah basi.
+        // Peringatan yang tidak pernah dicabut sama menyesatkannya dengan
+        // kegagalan yang tidak pernah muncul: keduanya membuat layar berkata
+        // hal yang tidak lagi benar.
+        //
+        // Hanya di jalur ini, bukan di `send(_:)`: jalur itu berjalan pada
+        // setiap perubahan keputusan, dan mengosongkan catatan di sana akan
+        // menghapus pesan masuk (mis. "ambang tidak sah") yang justru harus
+        // dibaca pengguna.
+        lastMessageNote = nil
     }
 
     /// Kirim pesan apa adanya. Gagal kirim **tidak** diam: penghitungnya naik
