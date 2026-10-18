@@ -8840,12 +8840,21 @@ else
   echo "Bersih: sabit & warna planet membaca keyakinan engine."
 fi
 
-# ── Aturan 52: klaim keyakinan pada `CelestialVisualView` tidak boleh lewat nama lain ──
+# ── Aturan 52: klaim keyakinan pada gambar/panel tidak boleh lewat nama lain ──
 #
 # Ke-51 aturan sebelumnya menjaga **dari mana** keyakinan datang: Aturan 34
 # menuntut argumennya ada, Aturan 18 melarang nilai bawaannya `true`, dan dua
 # aturan lain menolak `!isStale` sebagai penggantinya. Yang tidak dijaga satu
 # pun: argumen yang **membaca keyakinan** tetapi menyebutnya lewat nama lain.
+#
+# `SITUS` mencakup **setiap** pemanggil yang meneruskan keyakinan ke gambar
+# atau ke pembaca identitas: `CelestialVisualView` (penggambar), dan dua
+# panel yang meneruskan `isConfirmed` ke gambar *serta* keempat aksesor
+# `spoken*` — `LockArrivalPanel` (DiagnosticsView.swift) dan `ObjectDetailView`
+# (PointingView.swift). Cakupan ini terukur buta sebelum diperluas: literal
+# `true` pada kedua panel itu **exit 0** padahal membuka ciri pengenal pada
+# kandidat yang engine belum kunci (lihat Tools/bukti-mutasi-keyakinan-visual.py,
+# keadaan "panel iPhone"/"panel jam").
 #
 # Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa), dengan
 # mutasi yang semuanya **mengompilasi** — hanya satu bentuk yang memerah:
@@ -8885,8 +8894,11 @@ import os
 import re
 
 DEKL = re.compile(r'\b(?:let|var)\s+(?:isConfirmed|confirmsDisplayedIdentity)\b')
-# Situs: `isConfirmed:` di dalam daftar argumen `CelestialVisualView(...)`.
-SITUS = re.compile(r'CelestialVisualView\s*\(')
+# Situs: setiap pemanggilan yang meneruskan keyakinan engine ke **gambar atau
+# ke pembaca identitas**. Awalnya hanya `CelestialVisualView(`, dan bentuk itu
+# terukur buta pada satu kelas cacat yang sama (lihat catatan panjang di atas
+# `echo "== Aturan 52"`).
+SITUS = re.compile(r'(?:\bCelestialVisualView|\bLockArrivalPanel|\bObjectDetailView)\s*\(')
 #: Bentuk yang diterima, dan **hanya** itu — daftar putih receiver, bukan
 #: pola bebas. Tiga versi sebelumnya buta, dan masing-masing terukur di
 #: harness sebelum ditulis:
@@ -8951,12 +8963,13 @@ for root, dirs, files in os.walk("Apps"):
                     continue
             daftar = kode[i + 1:akhir] if akhir > 0 else ""
             terbaca += 1
+            dipanggil = kode[m.start():m.end()].rstrip("( \t\n").strip()
             situs = re.search(r'\bisConfirmed\s*:\s*([^,\n]+)', daftar)
             if not situs:
                 masalah.append(
-                    "  %s: `CelestialVisualView(...)` tanpa argumen `isConfirmed:` "
+                    "  %s: `%s(...)` tanpa argumen `isConfirmed:` "
                     "-- nilai bawaan `false` berlaku, yang aman, tetapi baris ini "
-                    "tidak bisa dibedakan dari lupa" % path)
+                    "tidak bisa dibedakan dari lupa" % (path, dipanggil))
                 continue
             nilai = situs.group(1).strip()
             if nilai == "true" and nama in ILUSTRASI:

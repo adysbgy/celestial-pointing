@@ -33,6 +33,25 @@ Yang dibuktikan
    show`, bukan dikarang) **hijau** pada cacat yang sama. Tanpa arah ini,
    "aturan berbunyi" cuma klaim: merah bisa datang dari sebab lain.
 
+Lubang kedua: yang meneruskan, bukan yang menggambar
+====================================================
+
+Aturan 52 semula hanya mengenali `CelestialVisualView(`. Tetapi dua permukaan
+tidak memanggilnya langsung — keduanya menerima `isConfirmed` lalu
+meneruskannya ke panel yang membacanya untuk cincin Saturnus, pita Jupiter,
+warna spektral, fase Bulan, bentuk objek langit dalam, **dan** keempat
+kalimat `spoken*`:
+
+    Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift  (LockArrivalPanel)
+    Apps/PointAndKnowWatch/Sources/PointingView.swift    (ObjectDetailView)
+
+Terukur pada pohon utuh (salinan, proses baru), `isConfirmed: true` di
+keduanya: **exit 0, seluruh aturan hijau** — padahal satu literal `true` di
+sana menampilkan ciri pengenal pada kandidat yang engine belum kunci, di
+samping badge "Ragu". `SITUS` diperluas ke ketiga nama itu, dan dua keadaan
+di bawah — serta dua arah keduanya — menjaga perluasan itu agar tidak diam
+kalau nama pemanggilnya berubah lagi.
+
 Yang TIDAK dibuktikan
 =====================
 
@@ -40,7 +59,13 @@ Ini sapu teks. Ia tidak membuktikan sifat `defaultConfirmation` di perangkat;
 ia membuktikan bahwa **nama** yang dipakai sebagai keyakinan tidak lolos tanpa
 dibaca. Nama yang dibuat di berkas lain lalu diteruskan sebagai parameter
 bernama lain tetap tidak terlihat — itu batas yang dinyatakan, bukan
-disembunyikan.
+disembunyikan. Daftar pemanggil yang dijaga juga tertutup: panel baru yang
+meneruskan keyakinan ke gambar tidak tertangkap sampai namanya ditambahkan
+ke `SITUS`, dan itu satu-satunya cara lubang ini kembali.
+
+Kalau README memuat hitungan aturan, angka yang dibaca Aturan 10 tidak
+berubah di sini: Aturan 52 tidak dipecah maupun ditambah, hanya cakupan
+situssnya yang diperluas.
 """
 
 import os
@@ -56,6 +81,12 @@ import mutasi_sumber  # noqa: E402
 
 REDUCED = "Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift"
 ONBOARDING = "Apps/Shared/OnboardingView.swift"
+#: Dua permukaan yang **meneruskan** keyakinan ke gambar *dan* ke keempat
+#: aksesor `spoken*`. Keduanya terukur HIJAU pada Aturan 52 sebelum `SITUS`
+#: diperluas: aturan hanya mengenali `CelestialVisualView(`, sedangkan
+#: `isConfirmed:` di sini diteruskan ke panel yang membacanya.
+IOS_PANEL = "Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift"
+WATCH_DETAIL = "Apps/PointAndKnowWatch/Sources/PointingView.swift"
 
 #: Komit terakhir sebelum Aturan 52 ada. Arah kedua membaca lint dari sini.
 PRA_ATURAN52 = "b514826"
@@ -86,10 +117,27 @@ ILUSTRASI_SAH = """                CelestialVisualView(visual: illustration,
                                     diameter: VisualImageMetrics.onboardingIllustrationDiameter,
                                     isConfirmed: true,"""
 
+#: Jangkar panel iPhone (`LockArrivalPanel`, `DiagnosticsView.swift`) dan panel
+#: jam (`ObjectDetailView`, `PointingView.swift`). Keduanya wajib muncul tepat
+#: sekali — kalau tidak, harness berhenti alih-alih melaporkan "sesuai harapan".
+IOS_BENAR = "                                             isConfirmed: engine.confirmsDisplayedIdentity,"
+IOS_SALAH = "                                             isConfirmed: true,"
+WATCH_BENAR = "                                         isConfirmed: engine.confirmsDisplayedIdentity,"
+WATCH_SALAH = "                                         isConfirmed: true,"
+
 STATES = [
     # ── Keadaan cacat: aturan WAJIB berbunyi ────────────────────────────────
     ("latar redup: keyakinan lewat `defaultConfirmation` (cacat asli)",
      {REDUCED: (BENAR, NAMA_AKAR)}, True),
+    #: Kelas cacat yang sama, di dua pemanggil yang **bukan** `CelestialVisualView`:
+    #: keyakinan diteruskan ke panel detail, yang lalu memakainya untuk cincin
+    #: Saturnus *dan* keempat kalimat `spoken*`. Keduanya terukur `exit 0`
+    #: sebelum `SITUS` diperluas — jadi tanpa dua baris ini, perluasan itu
+    #: hanya klaim.
+    ("panel iPhone: keyakinan dipaksa `true` (lubang receivers)",
+     {IOS_PANEL: (IOS_BENAR, IOS_SALAH)}, True),
+    ("panel jam: keyakinan dipaksa `true` (lubang receivers)",
+     {WATCH_DETAIL: (WATCH_BENAR, WATCH_SALAH)}, True),
     ("latar redup: keyakinan disalin ke variabel perantara",
      {REDUCED: [("                    CelestialVisualView(visual: visual,",
                  "                    let keyakinan = engine.confirmsDisplayedIdentity\n"
@@ -113,6 +161,8 @@ WAJIB_MENYALA = {
     "latar redup: keyakinan lewat `defaultConfirmation` (cacat asli)",
     "latar redup: keyakinan disalin ke variabel perantara",
     "latar redup: keyakinan dibaca dari `visual.isConfirmed`",
+    "panel iPhone: keyakinan dipaksa `true` (lubang receivers)",
+    "panel jam: keyakinan dipaksa `true` (lubang receivers)",
 }
 
 #: Arah kedua: keempat keadaan cacat dijalankan lagi atas lint pra-Aturan52
@@ -129,6 +179,13 @@ ARAH_KEDUA = [
                         "                                        // Diam karena layar redup")]}),
     ("pra-52: keyakinan dibaca dari `visual.isConfirmed` (wajib HIJAU)",
      {REDUCED: (BENAR, MENYAMAR)}),
+    #: Arah kedua untuk perluasan `SITUS`. Keduanya **wajib HIJAU** pada lint
+    #: pra-perbaikan: kalau salah satunya sudah merah, lubang "receivers"
+    #: tidak nyata dan perluasan ini hanya mengulang gerbang yang ada.
+    ("pra-52: panel iPhone dipaksa `true` (wajib HIJAU)",
+     {IOS_PANEL: (IOS_BENAR, IOS_SALAH)}),
+    ("pra-52: panel jam dipaksa `true` (wajib HIJAU)",
+     {WATCH_DETAIL: (WATCH_BENAR, WATCH_SALAH)}),
 ]
 
 
