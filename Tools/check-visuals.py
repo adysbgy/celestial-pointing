@@ -1640,6 +1640,22 @@ def badge_excluded_identity_diff(rows_a, rows_b, w, h, footprint,
     return diff
 
 
+def _render_named(kasus, name, size, ss):
+    """Render satu kasus yang sudah diambil, tanpa menyusun ulang katalog.
+
+    Sama persis dengan `render_case` — lewat `to_png()` + `decode_png()`, supaya
+    yang dibandingkan tetap byte 8-bit — tetapi `build_cases()` tidak dipanggil
+    ulang. Menyusun katalog 28 kali adalah biaya yang tidak mengukur apa pun.
+    """
+    canvas = R.render(kasus[name], size=size, night_mode=False,
+                      show_frame=False, ss=ss)
+    path = os.path.join(R.OUT_DIR, f"{name}.png")
+    os.makedirs(R.OUT_DIR, exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(canvas.to_png())
+    return kasus[name], decode_png(path)
+
+
 def watch_visual_diameter():
     """`WatchMetrics.visualDiameter` (poin), dibaca dari token — atau `None`.
 
@@ -1760,9 +1776,15 @@ def check_drawn_visual_sizes_keep_features(results, ss=8):
             f"token = {size} pt"))
 
         worst = None
+        # `render_case` mencari kasusnya dengan `R.build_cases()` di setiap
+        # panggilan, dan `build_cases()` menyusun **seluruh** katalog. Di sini
+        # 14 render x 2 ukuran = 28 pencarian penuh. Terukur: 43 detik untuk
+        # satu pemeriksaan, padahal render-nya sendiri hanya sebagian kecil.
+        # Kasus diambil sekali, lalu dirender lewat `R.render` langsung.
+        kasus = {c.name: c for c in R.build_cases()}
         for confirmed_name, bare_name, feature in pairs:
-            _, confirmed = render_case(confirmed_name, size=size, ss=ss)
-            _, bare = render_case(bare_name, size=size, ss=ss)
+            _, confirmed = _render_named(kasus, confirmed_name, size, ss)
+            _, bare = _render_named(kasus, bare_name, size, ss)
             w, h, rows_a = confirmed
             _, _, rows_b = bare
             diff = badge_excluded_diff(rows_a, rows_b, w, h, footprint)
