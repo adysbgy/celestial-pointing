@@ -9787,20 +9787,34 @@ def blok(src):
     return hasil
 
 
-def _operand(cond, mulai, akhir):
-    """Potongan ekspresi yang memuat `[mulai, akhir)`, dipisah `&&`/`||`.
+def _dinegasikan(kondisi, mulai, akhir):
+    """Apakah **suku** yang memuat `[mulai, akhir)` dinegasikan.
 
-    Kenapa perlu: negasi tidak menempel pada nama penjaganya. Pada
-    `!motion.allowsTransitions` tanda `!` mendahului **penerima**
-    (`motion`), bukan propertinya. Versi pertama aturan ini mencari `!`
-    tepat sebelum nama, sehingga bentuk itu -- justru bentuk yang paling
-    berbahaya -- terbaca sebagai penjaga positif.
+    Negasi tidak menempel pada nama penjaganya: pada `!motion.allowsTransitions`
+    tanda `!` mendahului **penerima** (`motion`), bukan propertinya. Karena itu
+    yang diperiksa adalah awal suku (`&&`/`||` sebagai pemisah), bukan karakter
+    tepat sebelum nama.
+
+    Versi pertama aturan ini mencari `!` tepat sebelum nama, sehingga bentuk
+    `!motion.allowsTransitions` -- justru yang paling berbahaya -- terbaca
+    sebagai penjaga positif.
+
+    Versi kedua memeriksa awal **seluruh operand**, dan itu memerah pada
+    `!reduceMotion && illustration.hasPulse` untuk suku kedua: awal operand-nya
+    `!`, padahal `!` itu milik suku pertama. Jadi `!` hanya dihitung kalau ia
+    menempel pada suku ini -- yaitu tidak ada `&&`/`||` di antaranya.
     """
-    kiri = max(cond.rfind("&&", 0, mulai), cond.rfind("||", 0, mulai)) + 2
-    kanan_opsi = [x for x in (cond.find("&&", akhir), cond.find("||", akhir))
-                  if x != -1]
-    kanan = min(kanan_opsi) if kanan_opsi else len(cond)
-    return cond[kiri:kanan]
+    kiri = max(kondisi.rfind("&&", 0, mulai), kondisi.rfind("||", 0, mulai)) + 2
+    # Batas kanan harus **akhir suku**, bukan akhir nama. Kalau dipotong di
+    # `akhir`, `!reduceMotion && illustration.hasPulse` untuk suku kedua
+    # menghasilkan `!reduceMotion && illustration.hasPulse` (karena `&&` jatuh
+    # di luar potongan) dan `!` milik suku pertama terbaca sebagai milik suku
+    # ini -- gerbang memerah pada kode yang benar.
+    kanan_kandidat = [x for x in (kondisi.find("&&", akhir),
+                                  kondisi.find("||", akhir)) if x != -1]
+    kanan = min(kanan_kandidat) if kanan_kandidat else len(kondisi)
+    suku = kondisi[kiri:kanan].strip()
+    return suku.lstrip("(").lstrip().startswith("!")
 
 
 def masalah_polaritas(kondisi):
@@ -9812,9 +9826,7 @@ def masalah_polaritas(kondisi):
     for nama in POSITIF + NEGATIF:
         for m in re.finditer(r"\b" + nama + r"\b", kondisi):
             ketemu = True
-            operan = _operand(kondisi, m.start(), m.end())
-            inti = operan.strip().lstrip("(").lstrip()
-            dinegasikan = inti.startswith("!")
+            dinegasikan = _dinegasikan(kondisi, m.start(), m.end())
             if nama in POSITIF and dinegasikan:
                 return ("`!%s` membalik penjaga: gerak hanya berjalan saat "
                         "gerak justru dilarang" % nama)
