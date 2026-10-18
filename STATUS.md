@@ -28864,3 +28864,34 @@ akan menuntutnya sendiri kalau namanya diubah menjadi berakhiran Note.
 
 **Catatan samping.** README 54 → 55 aturan; Aturan 10 memerahkan lint sampai
 diubah (ketiga kalinya di sesi ini — gerbang itu memang bekerja).
+
+### Susulan: gerbang yang dilonggarkan oleh perbaikannya sendiri
+
+Perbaikan Aturan 55 menambahkan **dua** pembaca untuk `lastMessageNote`: satu
+baris `Text(note)` di layar, dan satu `.onChange(of: link.lastMessageNote)`
+yang mengumumkannya ke VoiceOver. Lalu harness-nya memerah pada keadaan 1 —
+hijau padahal baris `Text`-nya sudah dibuang. Dua sebab, keduanya instruktif:
+
+1. **Pengumuman dihitung sebagai tampilan.** Menghapus `Text` menyisakan
+   `.onChange`, dan aturan menganggapnya "sudah dibaca". Cacat aslinya kembali
+   utuh, hanya bergeser satu tingkat: dari "tidak dibaca" menjadi "dibaca
+   tetapi hanya untuk diucapkan". Pengumuman adalah saluran **tambahan**, bukan
+   pengganti tampilan — teks yang hanya diucapkan tidak bisa dibaca ulang
+   dengan mengusap layar dan tidak ada di tangkapan layar mana pun.
+
+2. **Rentang blok `.onChange` salah titik awal.** Percobaan pertama memulai
+   rentang dari kurung kurawal pembuka. Nama properti muncul **di klausa
+   `of:`**, yang berada di luar `{` — jadi kemunculan itu sendiri dihitung
+   sebagai tampilan dan gerbangnya hijau pada keadaan yang seharusnya merah.
+   Perbaikannya: rentang mulai dari awal `.onChange`.
+
+Keadaan 7 harness sekarang mengunci keputusan ini. Tanpa keadaan itu, aturan
+bisa dilonggarkan ke arah "cukup diumumkan" dan tetap tampak hijau — dan tidak
+ada yang akan tahu sampai ada pengguna VoiceOver yang bertanya mengapa
+peringatan yang ia dengar tidak ada di layar.
+
+**Pelajaran yang lebih umum.** Gerbang yang baru ditulis hampir selalu lebih
+lemah dari niat penulisnya, dan yang menemukannya bukan pembacaan ulang
+melainkan keadaan yang dirancang untuk gagal. Karena itu harness ditulis
+sesudah aturannya, bukan sebelumnya: yang pertama menguji niat, yang kedua
+menguji kenyataan.

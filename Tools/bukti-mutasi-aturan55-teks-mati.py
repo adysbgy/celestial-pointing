@@ -66,6 +66,19 @@ Keadaan yang diuji:
                                     merah. Membuktikan sambungannya ada di
                                     view, bukan di suatu tempat lain.
 
+  7. hanya diumumkan, tidak tampil  baris `Text(note)` dibuang tetapi
+                                    `.onChange` yang mengumumkannya tetap ada
+                                    -> merah. Inilah lubang yang ditemukan
+                                    harness ini sendiri pada percobaan pertama
+                                    aturan: pengumuman VoiceOver adalah
+                                    saluran **tambahan**, bukan pengganti
+                                    tampilan. Tanpa keadaan ini, aturan bisa
+                                    dilonggarkan ke arah itu dan tetap tampak
+                                    hijau -- dan cacat aslinya kembali utuh
+                                    satu tingkat lebih dalam.
+
+  8. fail-closed: Apps/ hilang      (lihat keadaan 5)
+
 Kenapa programnya diekstrak dari `swift-ui-lint.sh`, bukan ditulis ulang di
 sini: salinan akan tetap hijau walau aturan aslinya dilonggarkan.
 
@@ -241,6 +254,21 @@ def main():
         print(f"{'OK  ' if ok else 'SALAH'} "
               f"{'6. berkas view hilang -> catatan tanpa pembaca':56s} "
               f"{'MERAH' if fired else 'hijau'}")
+        results.append(ok)
+
+        # 7. Hanya diumumkan, tidak ditampilkan.
+        reset()
+        mutasi_sumber.write_source(
+            VIEW, _originals[VIEW].replace(READ_IN_VIEW,
+                                           "        // (baris tampilan dibuang)", 1))
+        fired, detail = probe(program)
+        ok = fired is True
+        print(f"{'OK  ' if ok else 'SALAH'} "
+              f"{'7. hanya diumumkan, tidak tampil':56s} "
+              f"{'MERAH' if fired else 'hijau'}")
+        if not ok:
+            print("       pengumuman VoiceOver dihitung sebagai tampilan -- "
+                  "cacat aslinya kembali satu tingkat lebih dalam")
         results.append(ok)
     finally:
         restore()
