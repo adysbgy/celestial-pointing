@@ -11191,6 +11191,228 @@ echo "$samaran_objek"
 [ "$samaran_status" -ne 0 ] && status=1
 
 
+# ── Aturan 64: ukuran gambar objek wajib berasal dari token, bukan literal ───
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka.
+#
+# Seluruh misi produk ini adalah pengguna **mengenali** objek dari bentuknya.
+# Gambar yang terlalu kecil untuk memperlihatkan pita Jupiter atau cincin
+# Saturnus tetap lolos setiap gerbang lain: ia menggambar sesuatu, ia memakai
+# keyakinan yang benar, ia disamarkan saat ragu. Yang hilang hanya
+# keterbacaannya — dan tidak ada teks di layar yang bisa membantahnya.
+#
+# Terukur pada pohon utuh, proses baru, seluruh **63** aturan hijau:
+#
+#     PointingView.swift      `diameter: visualDiameter` -> `diameter: 1`   exit 0
+#     PointingView.swift      `diameter: visualDiameter` -> `diameter: 0`   exit 0
+#     DiagnosticsView.swift   `diameter: visualDiameter` -> `diameter: 1`   exit 0
+#
+# `check-visuals.py` sekarang mengukur tokennya
+# (`check_drawn_visual_sizes_keep_features`), tetapi ia **tidak bisa melihat
+# pemanggil**: layar yang menulis angka sendiri tidak pernah menyentuh token,
+# jadi tidak ada yang diukur di sana. Dua sisi, dua gerbang.
+#
+# Yang diperiksa: setiap pemanggilan `CelestialVisualView(` dan
+# `PulsingCelestialVisual(` yang menyebut `diameter:` harus meneruskan
+# **nama** (token, properti `@ScaledMetric`, atau parameter), bukan literal
+# angka. Literal berarti ukuran gambar tidak lagi bisa dibaca dari satu
+# tempat, dan tidak ada gerbang yang bisa menuntutnya tetap terbaca.
+#
+# Fail-closed: kalau tidak ada satu pun pemanggilan yang terbaca, aturan
+# MEMERAH — bukan diam dan lulus, karena itu berarti sapuannya berhenti
+# bekerja (nama tipe berubah, atau `Apps/` tidak terbaca).
+echo
+echo "== Aturan 64: ukuran gambar objek berasal dari token, bukan literal =="
+ukuran_objek=$(python3 - <<'PY' 2>&1
+import os
+import re
+import sys
+
+MASALAH = []
+DIPERIKSA = 0
+
+
+def tanpa_komentar(swift):
+    """Buang komentar `//` dan `/* */`, jaga isi string.
+
+    Tanpa ini, pemanggilan yang sudah diganti literal tetap "menyebut token"
+    di dalam komentar penjelas, dan gerbangnya hijau karena membaca kalimat
+    tentang kode, bukan kodenya.
+    """
+    hasil = []
+    i = 0
+    n = len(swift)
+    while i < n:
+        dua = swift[i:i + 2]
+        if dua == "//":
+            j = swift.find("\n", i)
+            if j < 0:
+                break
+            hasil.append(" " * (j - i))
+            i = j
+        elif dua == "/*":
+            j = swift.find("*/", i + 2)
+            if j < 0:
+                break
+            hasil.append(" " * (j + 2 - i))
+            i = j + 2
+        else:
+            hasil.append(swift[i])
+            i += 1
+    return "".join(hasil)
+
+
+APPS = "Apps"
+PENGGAMBAR = ("CelestialVisualView", "PulsingCelestialVisual")
+
+berkas = []
+for akar, _, nama_nama in os.walk(APPS):
+    for nama in nama_nama:
+        if nama.endswith(".swift"):
+            berkas.append(os.path.join(akar, nama))
+
+if not berkas:
+    print("TIDAK TERBACA: tidak ada berkas .swift di %s" % APPS)
+    sys.exit(1)
+
+for jalur in sorted(berkas):
+    try:
+        isi = tanpa_komentar(open(jalur, encoding="utf-8").read())
+    except OSError as galat:
+        MASALAH.append("TIDAK TERBACA: %s (%s)" % (jalur, galat))
+        continue
+
+    for tipe in PENGGAMBAR:
+        # Argumen `diameter:` sampai koma penutup tingkat atas. Nilainya boleh
+        # berupa ekspresi; yang diperiksa adalah **apakah ia literal angka**.
+        for m in re.finditer(r"\b" + tipe + r"\s*\(", isi):
+            mulai = m.end()
+            kedalaman = 1
+            i = mulai
+            while i < len(isi) and kedalaman > 0:
+                if isi[i] == "(":
+                    kedalaman += 1
+                elif isi[i] == ")":
+                    kedalaman -= 1
+                i += 1
+            argumen = isi[mulai:i - 1]
+            diameter = re.search(r"\bdiameter\s*:\s*([^,)]+)", argumen)
+            if diameter is None:
+                continue
+            DIPERIKSA += 1
+            nilai = diameter.group(1).strip()
+            if re.fullmatch(r"[0-9][0-9_]*(\.[0-9]+)?", nilai):
+                baris = isi.count("\n", 0, m.start()) + 1
+                MASALAH.append(
+                    "%s:%d: %s(diameter: %s) -- ukuran gambar ditulis "
+                    "sebagai literal, bukan token. Angka di sini tidak "
+                    "dibaca gerbang mana pun, dan gambar bisa mengecil "
+                    "sampai cirinya lenyap tanpa satu pun gerbang berbunyi."
+                    % (jalur, baris, tipe, nilai))
+
+if DIPERIKSA == 0:
+    MASALAH.append(
+        "tidak ada satu pun pemanggilan %s dengan argumen `diameter:` yang "
+        "terbaca. Gerbang ini tidak mengukur apa pun, jadi ia memerah -- "
+        "bukan lulus." % " / ".join(PENGGAMBAR))
+
+# ── Sisi kedua: nilai bawaan parameter ────────────────────────────────────
+#
+# `var visualDiameter: CGFloat = WatchMetrics.visualDiameter` adalah **nilai
+# bawaan**, dan nilai bawaan bisa diganti angka tanpa menyentuh satu pun
+# pemanggilan: setiap `#Preview` dan setiap pemakaian baru langsung ikut.
+# Terukur: menggantinya dengan `= 38` membuat gerbang pemanggil di atas tetap
+# hijau, karena pemanggilnya masih meneruskan nama.
+#
+# Dua jenis deklarasi **bukan** cacat dan tidak diperiksa, dengan alasan:
+#
+#   `static let visualDiameter: CGFloat = 38`  di `WatchMetrics`
+#       Ini tokennya sendiri — tempat angka itu memang boleh lahir. Kalau
+#       baris ini ikut diperiksa, aturannya menuntut token merujuk dirinya
+#       sendiri.
+#
+#   `@ScaledMetric(...) var visualDiameter: CGFloat = 132`
+#       Basis `@ScaledMetric` memang angka, dan angkanya diskalakan Dynamic
+#       Type. Ia bukan salinan token yang bisa melenceng diam-diam; ia ukuran
+#       tersendiri yang dinyatakan sebagai ukuran tersendiri.
+#
+# Yang tersisa — dan yang diperiksa — adalah properti tampilan biasa yang
+# seharusnya meneruskan token tetapi menulis angka sendiri.
+BAWAAN = 0
+TERLIHAT = 0
+for jalur in sorted(berkas):
+    try:
+        isi = tanpa_komentar(open(jalur, encoding="utf-8").read())
+    except OSError:
+        continue
+    for m in re.finditer(
+            r"\b(var|let)\s+visualDiameter\s*:\s*CGFloat\s*=\s*([^\n]+)", isi):
+        TERLIHAT += 1
+        nilai = m.group(2).strip()
+        if not re.fullmatch(r"[0-9][0-9_]*(\.[0-9]+)?", nilai):
+            continue
+        baris_awal = isi.rfind("\n", 0, m.start()) + 1
+        # `static` atau `@ScaledMetric` di baris deklarasinya sendiri, atau
+        # atribut `@ScaledMetric` di salah satu baris atribut tepat di atasnya.
+        awalan_baris = isi[baris_awal:m.start()]
+        if re.search(r"\bstatic\b", awalan_baris):
+            continue
+        if "@ScaledMetric" in awalan_baris:
+            continue
+        sebelumnya = isi[:baris_awal].rstrip("\n").split("\n")[-3:]
+        if any("@ScaledMetric" in b for b in sebelumnya):
+            continue
+        BAWAAN += 1
+        baris = isi.count("\n", 0, m.start()) + 1
+        MASALAH.append(
+            "%s:%d: visualDiameter diberi nilai bawaan literal (%s). "
+            "Setiap #Preview dan pemakaian baru mewarisi angka itu, dan "
+            "tidak ada gerbang yang membaca angka tersebut."
+            % (jalur, baris, nilai))
+
+if TERLIHAT == 0:
+    MASALAH.append(
+        "tidak ada satu pun deklarasi `visualDiameter: CGFloat = ...` yang "
+        "terbaca; sapuan gerbang ini berhenti bekerja (nama token berubah, "
+        "atau Apps/ tidak terbaca), jadi ia memerah.")
+
+# Token itu sendiri harus terlihat. Kalau `WatchMetrics.visualDiameter`
+# berganti nama, gerbang pemanggil di atas tetap hijau (pemanggilnya masih
+# meneruskan sebuah nama), dan gerbang ini akan hijau juga kalau ia hanya
+# menghitung "ada deklarasi apa pun" — dua deklarasi lain masih ada.
+# Terukur: `visualDiameter` -> `lebarGambar` di WatchTheme membuat kedua
+# sisi hijau tanpa baris ini.
+TOKEN = 0
+for jalur in sorted(berkas):
+    try:
+        isi = tanpa_komentar(open(jalur, encoding="utf-8").read())
+    except OSError:
+        continue
+    if re.search(r"\bstatic\s+let\s+visualDiameter\s*:\s*CGFloat\s*=", isi):
+        TOKEN += 1
+
+if TOKEN == 0:
+    MASALAH.append(
+        "token `static let visualDiameter: CGFloat` tidak ditemukan di Apps/. "
+        "Kalau tokennya berganti nama, tidak ada lagi satu tempat yang "
+        "menentukan ukuran gambar — dan gerbang pemanggil tetap hijau karena "
+        "ia hanya memeriksa bahwa yang diteruskan bukan literal.")
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    sys.exit(1)
+
+print("Bersih: %d pemanggilan penggambar memakai ukuran dari token, bukan "
+      "literal; %d deklarasi visualDiameter terbaca, %d di antaranya "
+      "penerus-token; token WatchMetrics ada." % (DIPERIKSA, TERLIHAT, BAWAAN))
+PY
+)
+# Kode keluar diambil dari python-nya, bukan dari `echo` di atasnya.
+ukuran_status=$?
+echo "$ukuran_objek"
+[ "$ukuran_status" -ne 0 ] && status=1
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

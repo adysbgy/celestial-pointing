@@ -1649,17 +1649,141 @@ def watch_visual_diameter():
     mengukur apa pun. Satu pembaca, dua pemakai: `check_features_survive_the_watch_size`
     dan `check_saturn_gap_reads_at_the_watch_size`.
     """
+    return _watch_diameter_token("visualDiameter")
+
+
+def watch_reduced_visual_diameter():
+    """`WatchMetrics.reducedVisualDiameter` (poin, layar Always-On) — atau `None`."""
+    return _watch_diameter_token("reducedVisualDiameter")
+
+
+def _watch_diameter_token(name):
+    """Nilai satu token `CGFloat` di `WatchTheme.swift`, atau `None`.
+
+    Nama token dicocokkan **utuh** (`\\bvisualDiameter`), bukan sebagai awalan:
+    `reducedVisualDiameter` juga berakhir dengan `visualDiameter`, dan
+    pembaca yang tidak membedakan keduanya akan mengembalikan 38 untuk layar
+    redup yang sebenarnya 30 — gerbangnya lalu mengukur ukuran yang salah
+    tanpa satu pun tanda.
+    """
     theme_path = os.path.join(
         ROOT, "Apps/PointAndKnowWatch/Sources/WatchTheme.swift")
     try:
         source = open(theme_path, encoding="utf-8").read()
     except OSError:
         return None
-    match = re.search(r"visualDiameter\s*:\s*CGFloat\s*=\s*(\d+(?:\.\d+)?)",
-                      source)
+    match = re.search(
+        r"\b" + re.escape(name) + r"\s*:\s*CGFloat\s*=\s*(\d+(?:\.\d+)?)",
+        source)
     if match is None:
         return None
     return int(round(float(match.group(1))))
+
+
+def check_drawn_visual_sizes_keep_features(results, ss=8):
+    """Ukuran gambar yang **benar-benar dipakai** harus masih memperlihatkan cirinya.
+
+    **Cacat yang ditutup pemeriksaan ini.** `check_features_survive_the_watch_size`
+    membaca `WatchMetrics.visualDiameter` dan membuktikan ciri planet masih
+    terukur di ukuran itu. Ia benar, dan ia **tidak** menahan apa pun terhadap
+    layar yang memilih angka lain: dua tempat menggambar benda langit dengan
+    ukuran yang **bukan** token itu.
+
+        PointingView.swift:432    var visualDiameter: CGFloat = WatchMetrics.visualDiameter
+        ReducedLuminanceView:64   diameter: WatchMetrics.reducedVisualDiameter
+
+    Yang pertama adalah nilai **bawaan** sebuah parameter, dan pemanggilnya di
+    `#Preview` (serta setiap pemakaian baru) boleh mengirim angka apa pun.
+    Yang kedua adalah layar Always-On — 30 pt, dan tidak satu pun gerbang
+    pernah merendernya. Terukur pada pohon utuh, proses baru:
+
+        PointingView  `diameter: visualDiameter` -> `diameter: 1`   exit 0, 63 aturan hijau
+
+    Kartu jawaban di jam tetap menulis nama objeknya, tetap memasang lencana
+    keyakinan, dan gambarnya menjadi satu piksel. Seluruh misi produk ini
+    adalah pengguna **mengenali** objek dari bentuknya; setelah mutasi itu
+    tidak ada bentuk yang tersisa untuk dikenali, dan tidak ada teks di layar
+    yang bisa membantahnya.
+
+    **Kenapa ambangnya diukur, bukan dipilih.** Diukur pada `ss=8` untuk
+    ketujuh planet, selisih piksel terhadap bola berpalet tanpa ciri:
+
+        ukuran   38    30    24    22    20    18    16    14    12
+        min       37    22     9     3     3     2     0     0     0
+
+    Jadi 24 pt adalah ukuran terkecil yang masih memperlihatkan **ketujuh**
+    ciri, dan 16 pt adalah ukuran terbesar yang sudah menghapus sebagian.
+    Lantainya diletakkan di 24 — bukan 16, karena lantai 16 akan hijau pada
+    gambar yang sudah kehilangan cincin Saturnus dan Bintik Merah Jupiter.
+    Angka 24 dan angka-angkanya sendiri tidak diklaim sebagai hasil pengukuran
+    di perangkat; yang diklaim adalah bahwa **di bawah 24 pt, ciri pengenal
+    planet tidak lagi terukur pada model ini**.
+
+    **Yang diukur adalah tokennya, bukan pemanggilnya.** Gerbang ini tidak
+    membaca `diameter:` di view — ia membaca `WatchMetrics.visualDiameter` dan
+    `WatchMetrics.reducedVisualDiameter`, lalu merender pada ukuran itu. Jadi
+    mengecilkan token memerahkannya, sedangkan mengecilkan satu pemanggil
+    tidak. Batas itu dinyatakan, bukan disembunyikan: mutasi `diameter: 1` di
+    `PointingView` **tidak** tertangkap di sini (ia tidak memakai token), dan
+    yang menutupnya adalah Aturan 64 di `swift-ui-lint.sh`.
+    """
+    drawn = (
+        ("kartu jam", watch_visual_diameter()),
+        ("layar redup (Always-On)", watch_reduced_visual_diameter()),
+    )
+    footprint = R.candidate_marker_footprint()
+    pairs = [
+        ("planet-jupiter-confirmed", "planet-jupiter-bare", "Bintik Merah Besar Jupiter"),
+        ("planet-saturn-confirmed", "planet-saturn-bare", "cincin Saturnus"),
+        ("planet-mars-confirmed", "planet-mars-bare", "kutub Mars"),
+        ("planet-mercury-confirmed", "planet-mercury-bare", "kawah Merkurius"),
+        ("planet-venus-confirmed", "planet-venus-bare", "kabut Venus"),
+        ("planet-uranus-confirmed", "planet-uranus-bare", "sabuk samar Uranus"),
+        ("planet-neptune-confirmed", "planet-neptune-bare", "bintik gelap Neptunus"),
+    ]
+
+    for label, size in drawn:
+        if size is None:
+            results.append(Result(
+                f"ukuran gambar {label} terbaca dari token", False,
+                "token diameter tidak ditemukan di WatchTheme.swift"))
+            continue
+        if size < MIN_DRAWN_DIAMETER:
+            results.append(Result(
+                f"ukuran gambar {label} minimal {MIN_DRAWN_DIAMETER} pt", False,
+                f"token = {size} pt; di bawah {MIN_DRAWN_DIAMETER} pt ciri "
+                "pengenal planet tidak lagi terukur, jadi gambar berhenti "
+                "mengenali objek yang diklaimnya"))
+            continue
+        results.append(Result(
+            f"ukuran gambar {label} minimal {MIN_DRAWN_DIAMETER} pt", True,
+            f"token = {size} pt"))
+
+        worst = None
+        for confirmed_name, bare_name, feature in pairs:
+            _, confirmed = render_case(confirmed_name, size=size, ss=ss)
+            _, bare = render_case(bare_name, size=size, ss=ss)
+            w, h, rows_a = confirmed
+            _, _, rows_b = bare
+            diff = badge_excluded_diff(rows_a, rows_b, w, h, footprint)
+            if worst is None or diff < worst[1]:
+                worst = (feature, diff)
+        results.append(Result(
+            f"{label} {size} pt: ciri planet masih terukur", worst[1] > 0,
+            f"paling tipis: {worst[0]} {worst[1]} piksel di luar lencana "
+            f"pada {size}x{size} px (nol berarti cirinya lenyap di ukuran "
+            "yang benar-benar dipakai)"))
+
+
+#: Diameter terkecil (poin) yang masih memperlihatkan **ketujuh** ciri
+#: pengenal planet. Diukur, bukan dipilih: lihat tabel di docstring
+#: `check_drawn_visual_sizes_keep_features`.
+#:
+#: Kenapa 24 dan bukan 16. Di 16 pt, Uranus dan Neptunus sudah **0** piksel
+#: ciri, dan Merkurius tinggal 2 — jadi lantai 16 akan hijau pada gambar yang
+#: sudah kehilangan tiga dari tujuh cirinya. 24 adalah ukuran terkecil yang
+#: masih > 0 untuk semuanya (terkecil: Neptunus 9).
+MIN_DRAWN_DIAMETER = 24
 
 
 def check_features_survive_the_watch_size(results, ss=8):
@@ -14670,6 +14794,7 @@ def main():
     check_maria_ripple_matches_the_view(results)
     check_features_survive_the_watch_size(results)
     check_features_survive_the_watch_size_in_night_mode(results)
+    check_drawn_visual_sizes_keep_features(results)
     check_unreadable_features_never_pass_the_watch_size(results)
     check_every_planet_in_the_model_has_render_cases(results)
     check_crater_drawing_constants(results)

@@ -2563,5 +2563,17 @@ jobs:
       - name: Buktikan Aturan 63 menjaga kekuatan samaran ragu
         run: python3 Tools/bukti-mutasi-aturan63-samaran.py
 
+      # Aturan 64: ukuran gambar objek berasal dari token, bukan literal.
+      #
+      # Terukur pada pohon utuh: `diameter: visualDiameter` -> `diameter: 1`
+      # di `PointingView.swift` exit 0, seluruh 63 aturan hijau. Kartu tetap
+      # menulis nama objek, tetap memasang lencana keyakinan, dan gambarnya
+      # jadi satu piksel — tidak ada teks yang bisa membantahnya.
+      #
+      # Dua sisi: pemanggil (Aturan 64) dan token (check-visuals.py). Nilai
+      # bawaan parameter adalah celah ketiga yang hanya ditangkap di sini.
+      - name: Buktikan Aturan 64 menjaga ukuran gambar objek
+        run: python3 Tools/bukti-mutasi-aturan64-ukuran-gambar.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
