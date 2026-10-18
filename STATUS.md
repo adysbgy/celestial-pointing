@@ -1,3 +1,69 @@
+### Siklus (18 Okt 2026 — `main` merah 12 commit berturut-turut, dan angka 42 yang tidak pernah diukur ulang)
+
+Dibuka dengan `git log` + `gh run list`. **`main` merah 12 commit berturut-turut**
+di `Engine Tests (Linux)` — dan setiap STATUS siklus itu melaporkan
+`./swift-test.sh` hijau. Keduanya tidak bertentangan: `swift-test.sh` membangun
+`Packages/` saja dan **tidak pernah menjalankan `check-visuals.py`**, sementara
+gerbang yang merah hidup tepat di sana. Jadi "uji lokal hijau" di repo ini tidak
+pernah menjadi bukti bahwa CI akan hijau — celah yang selama ini tertutup hanya
+karena kebetulan.
+
+Termanjing satu gerbang, sama di ke-12 run:
+
+    GAGAL Saturnus: docstring urutan cincin mengutip jumlah hasil tetangga
+    terhitung 43 hasil dari enam pemeriksaan; docstring mengutip 42
+         — angka yang tidak pernah diukur
+
+#### Kenapa 43, dan kenapa itu bukan regresi
+
+Gerbang ini menghitung **ulang** hasil enam pemeriksaan tetangga lalu
+membandingkannya dengan angka yang dikutip docstring. Angkanya bukan konstanta
+— sengaja, karena menuliskannya sebagai konstanta hanya memindahkan cacatnya.
+Jadi 42 → 43 harus dijelaskan, bukan dicocokkan.
+
+Diukur pada worktree `6c2fb0d` (commit yang menuliskan **42**): **42 hasil**,
+dan daftarnya **tidak memuat** `bentuk nebula sampai ke gambar saat terkunci`.
+Di `HEAD`: **43 hasil**, memuatnya. Penyebabnya `f5876c5`, yang menghapus
+pengecualian `nebula` dari `check_deep_sky_shape_suppression` — pengecualian
+yang bertahan di atas kalimat docstring yang sudah basah sejak `uncertainFog`
+lahir. Jadi angkanya bertambah karena **gerbangnya melihat lebih banyak**, bukan
+karena ada yang rusak. Tiga angka docstring lainnya (persentase 49,7%, tabel
+margin 14/1533 dan 6/232) **tetap cocok** dengan ukurannya — hanya hitungan
+tetangga yang basi.
+
+#### Yang diperbaiki
+
+Angka docstring 42 → **43**, dan jangkar harness
+`bukti-mutasi-angka-urutan-cincin.py` yang ikut menyematkannya (`**42** hasil
+enam`) — kalau tidak, harness itu akan melempar `JangkarHilang` di CI dan
+memerahkan `main` untuk kedua kalinya dengan sebab yang berbeda. Gerbangnya
+sendiri **tidak** dilonggarkan: ia benar, angkanya yang basi.
+
+#### Yang TIDAK diklaim
+
+- Tidak ada baris produksi (Swift) yang berubah. Yang diubah hanya satu angka
+  di docstring gerbang dan satu jangkar harness.
+- Harness `bukti-mutasi-angka-urutan-cincin.py` **tidak dijalankan utuh** di
+  VPS ini: tiap keadaannya merender ulang seluruh katalog (~41 menit untuk
+  gerbang penuh), jadi 5 keadaan berarti berjam-jam. Non-vakuositas keadaan 1
+  diverifikasi lewat jalur cepat (pemanggilan langsung
+  `check_saturn_ring_order_docstring_quotes_measured_values` atas pohon yang
+  dimutasi), dan eksekusi penuhnya diserahkan ke CI. Ini batas yang dinyatakan,
+  bukan verifikasi yang selesai.
+- Angka 43 hanya berlaku untuk keenam pemeriksaan yang dipanggil badan gerbang
+  itu, pada `size=200, ss=2`. Ukuran atau `ss` lain tidak diklaim.
+
+#### Gerbang (lokal)
+
+    ./swift-test.sh                   CelestialEngine 222 + PointingKit 924 = 1146, 0 gagal
+    ./swift-ui-lint.sh                SEMUA GERBANG UI LULUS (52 aturan)
+    ./swift-typecheck.sh              SEMUA GERBANG LULUS
+    check-jangkar-harness.py          405 jangkar, tidak ada mutasi tertinggal
+    check-harness-terdaftar.py        98 harness, semuanya dirujuk
+    check_saturn_ring_order_docstring 5/5 OK (sebelumnya 4/5, 1 gagal)
+
+---
+
 ### Siklus (18 Okt 2026 — elongasi objek langit dalam: ciri identitas yang lolos gerbang keyakinan)
 
 Dibuka dengan `git log` + `gh run list` + ketiga gerbang, bukan dengan brief.

@@ -97,7 +97,7 @@ TABLE_76 = "tabel margin '76 px'"
 #: uji.
 STATES = [
     ("[baseline]", None, None, []),
-    ("1. jumlah hasil tetangga 42 -> 35", "**42** hasil enam", "**35** hasil enam",
+    ("1. jumlah hasil tetangga 43 -> 35", "**43** hasil enam", "**35** hasil enam",
      [COUNTED]),
     ("2. persentase geometri 49,7% -> 50%", "**49,7%** titik", "**50%** titik",
      [FRACTION]),
