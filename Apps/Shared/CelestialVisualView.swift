@@ -1486,8 +1486,17 @@ struct CelestialVisualView: View {
             // Saat engine ragu, `morphology` sudah `nil`, jadi cabangnya
             // bukan `.planetaryNebula` dan elongasi tidak pernah dipakai —
             // siluet lonjong adalah klaim bentuk, sama seperti cangkangnya.
+            // **Elongasi lewat gerbang keyakinan yang sama**, bukan lewat
+            // `elongation(forObjectID:)` yang tidak sadar keyakinan. Dulu di
+            // sini elongasi diambil langsung dari id: dengan id `m27` dan
+            // engine ragu, morfologinya `nil` (kabut netral) tetapi siluetnya
+            // tetap dipipihkan ke 0.60 -- gambar yang tidak mengklaim jenis
+            // objek tapi memakai bentuk objeknya. Bentuk adalah ciri
+            // pengenal, jadi ia tunduk pada aturan yang sama dengan cincin
+            // Saturnus dan pita Jupiter.
             elongation: visual.objectID.map {
-                DeepSkyCatalogue.elongation(forObjectID: $0)
+                DeepSkyCatalogue.drawableElongation(forObjectID: $0,
+                                                    isConfirmed: isConfirmed)
             } ?? 1.0)
         for blob in geometry.blobs {
             let halfWidth = CGFloat(blob.halfWidth) * radius

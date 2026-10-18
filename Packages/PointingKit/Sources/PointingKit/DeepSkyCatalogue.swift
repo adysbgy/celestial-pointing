@@ -236,8 +236,32 @@ public enum DeepSkyCatalogue {
     /// Seberapa memanjang siluet sebuah objek, dari id-nya.
     ///
     /// Bawaannya **1.0** (bulat) — lihat alasannya di `elongationByID`.
+    ///
+    /// **Tidak sadar keyakinan.** Fungsi ini menjawab "berapa elongasi objek
+    /// ini", bukan "bolehkah elongasi itu digambar sekarang". Untuk yang
+    /// kedua, pakai `drawableElongation(forObjectID:isConfirmed:)`.
     public static func elongation(forObjectID id: String) -> Double {
         elongationByID[id] ?? 1.0
+    }
+
+    /// Elongasi yang **boleh digambar** pada tingkat keyakinan sekarang.
+    ///
+    /// Cacat yang ditutup (terukur): view menggambar objek langit dalam
+    /// memakai `drawableMorphology` (yang `nil` saat engine ragu) tetapi
+    /// mengambil elongasi **langsung dari id** — jadi dengan id `m27` dan
+    /// `isConfirmed == false`, bentuknya jatuh ke kabut netral sementara
+    /// siluetnya tetap dipipihkan ke 0.60. Hasilnya gambar yang tidak
+    /// mengklaim **jenis** objek tetapi tetap memakai **bentuk** objek itu:
+    /// klaim identitas lewat pintu belakang, persis yang dilarang PRD §2.
+    ///
+    /// Aturannya disamakan dengan morfologi dan warna: satu gerbang
+    /// keyakinan untuk semua ciri pengenal, supaya tidak ada ciri kedua yang
+    /// bisa lupa dijaga. Saat belum pasti hasilnya `1.0` — siluet netral,
+    /// bukan siluet objek lain.
+    public static func drawableElongation(forObjectID id: String,
+                                           isConfirmed: Bool) -> Double {
+        guard isConfirmed else { return 1.0 }
+        return elongation(forObjectID: id)
     }
 
     // MARK: - Bentuk: apa objeknya, bukan cuma seberapa lebar

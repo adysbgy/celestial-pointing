@@ -2070,6 +2070,53 @@ final class CelestialVisualTests: XCTestCase {
                           "elongasi diabaikan bahkan pada morfologi yang diketahui")
     }
 
+    /// Bentuk adalah ciri pengenal, jadi elongasi pun harus lewat gerbang
+    /// keyakinan yang sama dengan morfologi dan warna.
+    ///
+    /// Cacat yang ditutup: `CelestialVisualView` menggambar objek langit
+    /// dalam dengan `drawableMorphology` (yang `nil` saat engine ragu) tetapi
+    /// mengambil elongasi **langsung dari id**. Dengan id `m27` dan
+    /// `isConfirmed == false`, bentuk jatuh ke kabut netral sementara siluet
+    /// tetap dipipihkan ke 0.60 — gambar yang tidak mengklaim jenis objek
+    /// tapi tetap memakai bentuk objek itu. Klaim identitas itu tidak
+    /// terlihat di morfologi, jadi tidak satu pun uji morfologi menangkapnya.
+    ///
+    /// Uji ini **bukan cakupan palsu**: sisi keduanya menuntut elongasi
+    /// yang diketahui benar-benar dipakai saat engine yakin. Fungsi yang
+    /// selalu mengembalikan 1.0 akan lolos paruh pertama dan merah di
+    /// paruh kedua.
+    func testElongationIsGatedByCertaintyLikeEveryOtherIdentityCue() {
+        // Id dari tabel katalog, bukan angka yang diketik: objek lonjong baru
+        // ikut terukur tanpa uji ini disunting.
+        let squashed = DeepSkyCatalogue.elongationByID.filter { $0.value < 1.0 }
+        XCTAssertFalse(squashed.isEmpty,
+                       "tabel elongasi tidak punya satu pun objek lonjong — uji ini kosong")
+
+        for (id, elongation) in squashed {
+            XCTAssertEqual(DeepSkyCatalogue.drawableElongation(forObjectID: id,
+                                                               isConfirmed: false),
+                           1.0, accuracy: 1e-9,
+                           "elongasi \(id) digambar walau engine ragu — "
+                           + "siluet objek itu adalah klaim identitas")
+            XCTAssertEqual(DeepSkyCatalogue.drawableElongation(forObjectID: id,
+                                                               isConfirmed: true),
+                           elongation, accuracy: 1e-9,
+                           "elongasi \(id) hilang padahal engine yakin")
+        }
+
+        // Objek bulat tetap bulat di kedua keadaan — gerbang tidak mengarang
+        // bentuk, ia hanya menahan bentuk yang belum boleh diklaim.
+        for (id, elongation) in DeepSkyCatalogue.elongationByID where elongation == 1.0 {
+            XCTAssertEqual(DeepSkyCatalogue.drawableElongation(forObjectID: id,
+                                                               isConfirmed: false),
+                           1.0, accuracy: 1e-9)
+        }
+        // Id yang tidak dikenal tidak pernah mendapat bentuk lonjong.
+        XCTAssertEqual(DeepSkyCatalogue.drawableElongation(forObjectID: "tidak-ada",
+                                                           isConfirmed: true),
+                       1.0, accuracy: 1e-9)
+    }
+
     /// Katalog harus benar-benar memuat galaksi berlengan — **dan geometri
     /// yang dipetakannya harus punya lengan.**
     ///
