@@ -334,6 +334,29 @@ PORT_SHADING_NOCERTAINTY = ('    maria = solid((0.0, 0.0, 0.0), MARIA_OPACITY)')
 PORT_SHADING_LOOP = '    for index, (dx, dy, size) in enumerate(MARIA):\n        mx, my = to_screen(dx, dy)\n        edge = size * radius\n        ripple = MARIA_RIPPLE[index] if index < len(MARIA_RIPPLE) else (0.0, 0.0)'
 PORT_SHADING_NOLOOP = '    for index, (dx, dy, size) in enumerate([]):\n        mx, my = to_screen(dx, dy)\n        edge = size * radius\n        ripple = MARIA_RIPPLE[index] if index < len(MARIA_RIPPLE) else (0.0, 0.0)'
 
+#: **Kawah Bulan juga peredupan permukaan, dan keadaan 5 wajib mematikannya
+#: bersama maria.**
+#:
+#: `check_moon_surface_hides_when_uncertain` berpasangan dengan dirinya
+#: sendiri: "hilang saat ragu" lawan "tampil saat yakin". Yang pertama
+#: memakai `moon-crescent-uncertain` (penjaga keyakinan mengembalikan lebih
+#: awal, jadi maria **dan** kawah tidak digambar). Yang kedua memakai
+#: `moon-crescent-jakarta` lawan `-plain`, yang bedanya hanya
+#: `surface_shading=False` — **kedua** gelung dilewati di sana.
+#:
+#: Mengosongkan gelung maria saja karena itu menyisakan kawah tergambar:
+#: "tampil saat yakin" lalu membaca 1535 piksel (200 px) dan 74 piksel
+#: (38 px) — sisa cekungan kawah — dan tetap **hijau**. Keadaan 5 lalu
+#: melaporkan "HARUSNYA MERAH, TIDAK" pada ukuran yang justru paling
+#: penting, sementara penyebabnya ada di keadaan ini, bukan di gerbangnya.
+#: Terukur sebelum perbaikan: 4 merah, 2 di kelas yang dituntut.
+#:
+#: Pilihan lain — menurunkan ambang "tampil saat yakin" ke piksel kawah
+#: — ditolak: itu akan membuat gerbang itu hijau walau maria dihapus,
+#: persis kelas cacat yang ia tulis untuk ditangkap.
+PORT_CRATER_LOOP = '    for (dx, dy, size, darkness), relief in zip(MOON_CRATERS, relief_all):'
+PORT_CRATER_NOLOOP = '    for (dx, dy, size, darkness), relief in zip([], relief_all):'
+
 #: Setiap keadaan: (nama, daftar (berkas, jangkar, pengganti), pemeriksaan
 #: yang **wajib** merah).
 #:
@@ -373,7 +396,13 @@ STATES = [
      [(RENDER, PORT_SHADING_CERTAINTY, PORT_SHADING_NOCERTAINTY)],
      [SHADING_HIDDEN_CLASS]),
     ("5. port: peredupan tidak digambar sama sekali",
-     [(RENDER, PORT_SHADING_LOOP, PORT_SHADING_NOLOOP)],
+     [(RENDER, PORT_SHADING_LOOP, PORT_SHADING_NOLOOP),
+      # Kedua gelung, bukan satu — lihat `PORT_CRATER_LOOP`. Mengosongkan
+      # gelung maria saja menyisakan **kawah** tergambar, dan
+      # "peredupan tampil saat yakin" lalu membaca 1535 px (200) / 74 px
+      # (38) sisa cekungan itu — hijau, padahal keadaan ini mengklaim
+      # seluruh peredupan permukaan dimatikan.
+      (RENDER, PORT_CRATER_LOOP, PORT_CRATER_NOLOOP)],
      # Dua kelas, bukan satu, dan itu terukur. Mematikan gelung peredupan
      # menghapus **maria dari gambar**, bukan cuma dari saat ragu — jadi
      # selain "shows" (yang memang wajib berbunyi), gerbang *arah sebaliknya*
@@ -446,6 +475,7 @@ def main():
             (RENDER, PORT_MARIA_LOOP, "gelung penggambar maria di port"),
             (RENDER, PORT_SHADING_CERTAINTY, "penjaga keyakinan peredupan permukaan"),
             (RENDER, PORT_SHADING_LOOP, "gelung peredupan permukaan di port"),
+            (RENDER, PORT_CRATER_LOOP, "gelung kawah Bulan di port"),
             (CHECK, PORT_MARIA_REFERENCE, "`MARIA_REFERENCE` di gerbang")):
         count = _originals[path].count(anchor)
         if count != 1:
