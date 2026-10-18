@@ -1537,6 +1537,13 @@ jobs:
       - name: Buktikan Aturan 51 berbunyi pada sabit & warna planet yang bocor
         run: python3 Tools/bukti-mutasi-saputangan-ragu.py
 
+      # Harness ini membaca **berkas Swift** lalu menjalankan suite, jadi ia
+      # satu-satunya bukti yang melihat gerbang keyakinan di model. Port
+      # Python geometri tidak punya dimensi keyakinan sama sekali, dan lint
+      # sengaja tidak memeriksa badan view.
+      - name: Buktikan gerbang elongasi dijaga uji (bukan cakupan palsu)
+        run: python3 Tools/bukti-mutasi-elongasi-ragu.py
+
       # Dan bukti untuk Aturan 52 — keyakinan yang dibaca lewat **nama lain**.
       #
       # Pada pohon utuh, satu baris di layar Always-On diganti:
