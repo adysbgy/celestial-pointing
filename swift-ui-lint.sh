@@ -5820,7 +5820,8 @@ for root, _, files in os.walk("Apps"):
         def kata_dari(nama):
             """Pecah nama camelCase menjadi kata huruf kecil.
 
-            `isDisplayingStaleObject` -> ['is','displaying','stale','object'].
+            `isDisplayingStaleObject` -> kata is: is, displaying, stale, object.
+
             Pencocokan per kata, bukan substring: `stale` cocok dengan
             `...Stale...` dan `safetyWarning` cocok dengan
             `safetyWarningText` (awalan dua kata), tetapi `title` tidak cocok
@@ -5918,8 +5919,8 @@ for root, _, files in os.walk("Apps"):
                             "`.%s`, jadi faktanya tersedia dan diganti `nil`"
                             % (path, baris, fn, prm,
                                "/`.".join(sumber[prm])))
-                    # 2c'. Fakta opsional yang dibaca berkas itu lewat properti
-                    #      perantara, lalu diganti `nil`:
+                    # 2c-opsional. Fakta opsional yang dibaca berkas itu lewat
+                    #      properti perantara, lalu diganti `nil`:
                     #      `sensorNote: nil` sementara `motionNote` membacakan
                     #      `engine.sensorNote`. Inilah bentuk yang paling sunyi
                     #      di layar redup: catatan "sensor tidak tersedia"
