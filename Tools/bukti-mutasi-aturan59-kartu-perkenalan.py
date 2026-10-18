@@ -64,12 +64,21 @@ def jalankan(kerja):
 
 
 def merah_di(keluaran, nomor):
-    """Apakah aturan `nomor` yang merah -- bukan aturan lain kebetulan."""
+    """Apakah aturan `nomor` yang merah -- bukan aturan lain kebetulan.
+
+    Header aturan (`== Aturan N: ...`) membuka blok; **header apa pun**
+    menutupnya, termasuk `== SEMUA GERBANG UI LULUS ==`. Tanpa itu, baseline
+    yang hijau terbaca merah hanya karena baris penutupnya tidak berawalan
+    "Bersih".
+    """
     aktif = None
     for baris in keluaran.splitlines():
         m = re.match(r"== Aturan (\d+)", baris)
         if m:
             aktif = int(m.group(1))
+            continue
+        if baris.startswith("=="):
+            aktif = None
             continue
         if aktif == nomor and baris.strip() and not baris.startswith("Bersih"):
             return True
