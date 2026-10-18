@@ -2447,5 +2447,27 @@ jobs:
       - name: Buktikan Aturan 56 berbunyi pada layar redup yang diisi layar penuh
         run: python3 Tools/bukti-mutasi-aturan56-layar-redup.py
 
+      # Dan bukti untuk gerbang **"kunci preferensi lewat token"** (Aturan 57).
+      #
+      # `@AppStorage("nightModeEnabled")` di satu layar dan
+      # `@AppStorage("nightMode")` di layar lain mengompilasi, berjalan, dan
+      # **menyimpan ke tempat berbeda**. Pengguna menyalakan Mode Malam di jam,
+      # membuka iPhone, dan mendapati Mode Malam mati -- tidak satu pun layar
+      # salah, dan tidak ada yang bisa dibaca untuk menyadarinya.
+      #
+      # Diukur pada salinan utuh, proses baru, sebelum Aturan 57: ketiga
+      # mutasi lulus **seluruh 56 aturan** (exit 0).
+      #
+      # Keadaan #5 adalah yang paling berharga: kedua layar menulis literal
+      # yang **sama** ("nightMode"). Penjaga yang membandingkan string akan
+      # hijau di sana, padahal itu tetap dua sumber yang bisa menyimpang nanti.
+      # Itu sebabnya Aturan 57 menuntut token enum, bukan kesamaan nilai.
+      #
+      # Pada mode malam ini bukan kosmetik: palet merah satu-satunya yang
+      # menjaga rhodopsin, dan pengguna yang mengira sudah menyalakannya
+      # mendapat layar putih di gelap.
+      - name: Buktikan Aturan 57 berbunyi pada kunci preferensi yang menyimpang
+        run: python3 Tools/bukti-mutasi-aturan57-kunci-preferensi.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

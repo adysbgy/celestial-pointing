@@ -9564,6 +9564,126 @@ else
   echo "Bersih: setiap layar redup memakai versi hemat dari mesinnya sendiri."
 fi
 
+# ── Aturan 57: kunci preferensi wajib lewat token, bukan literal ────────────
+#
+# Kelas cacatnya: `@AppStorage("nightModeEnabled")` di satu layar dan
+# `@AppStorage("nightMode")` di layar lain. Keduanya mengompilasi, keduanya
+# berjalan, dan **keduanya menyimpan ke tempat berbeda**. Pengguna menyalakan
+# Mode Malam di jam, membuka iPhone, dan mendapati Mode Malam mati — sementara
+# tidak satu pun layar salah, dan tidak ada yang bisa dibaca untuk menyadarinya.
+# Pada mode malam ini bukan cacat kosmetik: palet merah adalah satu-satunya
+# yang menjaga rhodopsin, dan pengguna yang mengira sudah menyalakannya
+# mendapat layar putih di gelap.
+#
+# Terukur pada salinan utuh, proses baru, sebelum aturan ini ada. Ketiga mutasi
+# di bawah mengompilasi dan **seluruh 56 aturan lulus (exit 0)**:
+#
+#     Watch  : NightModeStorage.key  ->  "nightMode"        -> exit 0
+#     iPhone : AudioCueStorage.key   ->  "soundOn"          -> exit 0
+#     Watch  : AudioCueStorage.key   ->  "audio"            -> exit 0
+#
+# Dua yang terakhir paling sunyi: bunyi kunci adalah aksesibilitas
+# multi-modal, jadi mematikan saklar di jam dan mendapatinya masih menyala di
+# iPhone (atau sebaliknya) hanya terasa seperti "kadang berbunyi, kadang
+# tidak".
+#
+# **Kenapa token, bukan sekadar "string yang sama".** Memeriksa kesamaan
+# literal antar-berkas akan hijau pada dua layar yang sama-sama menulis
+# `"nightMode"` — padahal itu tetap dua tempat yang bisa menyimpang nanti.
+# Yang dijaga di sini adalah **satu sumber**: kuncinya hidup di enum
+# penyimpanan, dan pemakainya menyebut enum itu.
+#
+# **Kenapa fail-closed.** Nol `@AppStorage` berarti aturan ini tidak mengukur
+# apa pun — dan itu justru bentuk kegagalan yang paling mungkin: seluruh
+# preferensi dipindah ke `@SceneStorage` atau ke lapisan pengaturan baru, dan
+# aturan ini diam-diam berhenti menjaga apa pun.
+echo
+echo "== Aturan 57: kunci preferensi lewat token, bukan literal =="
+kunci_pref=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 57 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+pemakai = 0
+#: kunci literal -> daftar (berkas, nilai token yang seharusnya)
+literal = {}
+
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+
+    for m in re.finditer(r"@AppStorage\s*\(\s*([^)]*)\)", isi):
+        argumen = m.group(1).strip()
+        pemakai += 1
+        # Bentuk yang sah: `@AppStorage(SomeStorage.key)`.
+        if re.fullmatch(r"[A-Za-z_]\w*\.key", argumen):
+            continue
+        if argumen.startswith('"'):
+            nilai = re.match(r'"([^"]*)"', argumen)
+            if nilai:
+                literal.setdefault(nilai.group(1), []).append(path)
+                masalah.append(
+                    "  %s: `@AppStorage(%s)` memakai literal -- kuncinya "
+                    "harus datang dari enum penyimpanan, supaya jam & iPhone "
+                    "tidak bisa menyimpang." % (path, argumen.split(",")[0]))
+                continue
+        masalah.append(
+            "  %s: `@AppStorage(%s)` bukan `SomeStorage.key` -- aturan tidak "
+            "bisa memastikan kuncinya satu sumber." % (path, argumen[:60]))
+
+if pemakai == 0:
+    print("PERINGATAN: tidak ada `@AppStorage` di %s -- Aturan 57 tidak "
+          "mengukur satu preferensi pun." % AKAR)
+    raise SystemExit(0)
+
+#: Kunci yang dipakai lebih dari satu berkas tetapi ditulis sebagai literal di
+#: salah satunya sudah dilaporkan di atas. Di sini hanya penjaga tambahan:
+#: satu nilai literal tidak boleh dipakai dua berkas, karena itu berarti dua
+#: layar menyimpan sendiri-sendiri tanpa token.
+for nilai, paths in sorted(literal.items()):
+    if len(set(paths)) > 1:
+        masalah.append(
+            '  kunci "%s" ditulis sebagai literal di %d berkas -- satu '
+            "preferensi, dua sumber." % (nilai, len(set(paths))))
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$kunci_pref" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 57 tidak bisa memutuskan:"
+  echo "$kunci_pref"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$kunci_pref" ]; then
+  echo "$kunci_pref"
+  echo "-> Preferensi yang disimpan dengan literal bisa menyimpang antar"
+  echo "   layar tanpa satu pun layar terlihat salah."
+  status=1
+else
+  echo "Bersih: setiap preferensi memakai token penyimpanan yang sama."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
