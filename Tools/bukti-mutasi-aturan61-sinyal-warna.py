@@ -174,22 +174,42 @@ def main():
             if not ok:
                 print(f"       {detail[:300]}")
 
-        # 5. Fail-closed: setiap `foregroundStyle(` yang berkondisi diganti
+        # 5. Fail-closed: setiap `.foregroundStyle(` di SELURUH `Apps/` diganti
         # nama, sehingga aturan tidak menemukan satu sinyal pun. Harus merah
         # karena PERINGATAN, bukan hijau kosong.
-        label = "5 fail-closed: sinyal warna hilang"
-        for path in targets:
-            isi = _originals[path]
-            isi = isi.replace(".foregroundStyle(", ".warnaLama(")
-            mutasi_sumber.write_source(path, isi)
-        fired, detail = probe(program)
-        ok = fired is True and "PERINGATAN" in (detail or "")
-        if not ok:
+        #
+        # Menyapu seluruh `Apps/`, bukan hanya dua berkas target: percobaan
+        # pertama hanya mengganti nama di berkas target, dan aturan tetap
+        # menemukan 2 sinyal di layar lain lalu melaporkan "semuanya punya
+        # penanda kedua" -- hijau yang benar tentang repo, tetapi salah sebagai
+        # uji fail-closed, karena yang diuji bukan keadaan "tidak ada sinyal".
+        label = "4 fail-closed: sinyal warna hilang"
+        disapu = []
+        for akar, _, berkas in os.walk(os.path.join(ROOT, "Apps")):
+            for nama in berkas:
+                if not nama.endswith(".swift"):
+                    continue
+                path = os.path.join(akar, nama)
+                with open(path, encoding="utf-8") as handle:
+                    isi = handle.read()
+                if ".foregroundStyle(" not in isi:
+                    continue
+                _originals.setdefault(path, isi)
+                mutasi_sumber.write_source(
+                    path, isi.replace(".foregroundStyle(", ".warnaLama("))
+                disapu.append(path)
+        if not disapu:
+            print(f"{label:40s} JANGKAR TIDAK DITEMUKAN")
             unexpected += 1
-        print(f"{'OK  ' if ok else 'SALAH'} {label:40s} "
-              f"{'MERAH' if fired else 'hijau'}")
-        if not ok:
-            print(f"       {detail[:300]}")
+        else:
+            fired, detail = probe(program)
+            ok = fired is True and "PERINGATAN" in (detail or "")
+            if not ok:
+                unexpected += 1
+            print(f"{'OK  ' if ok else 'SALAH'} {label:40s} "
+                  f"{'MERAH' if fired else 'hijau'}")
+            if not ok:
+                print(f"       {detail[:300]}")
     finally:
         restore()
 
