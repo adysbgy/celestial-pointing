@@ -76,6 +76,13 @@ seperti cacat anchor, bukan cacat proses. Ditambahkan handler
   keluaran, bukan eksekusi. Eksekusi penuhnya diserahkan ke CI (langkah baru
   di `engine-tests.yml`). Yang diverifikasi lokal adalah ketiga pemeriksaannya
   atas pohon bersih.
+- **Layar Always-On tidak ikut tersamar**, dan itu bukan celah melainkan
+  konsekuensi yang diperiksa: `ReducedLuminanceVisual.plan` mengembalikan
+  `.none` saat engine belum pasti, jadi `ReducedLuminanceView` selalu
+  memanggil `CelestialVisualView(isConfirmed: true)` dan cabang blur/opacity
+  tidak pernah aktif di layar hemat-baterai. Rasterisasi (`drawingGroup`) pun
+  karena itu tidak masuk ke jalur Always-On — tetapi **biaya baterainya tidak
+  diukur** di sini; yang diklaim hanyalah bahwa cabang itu tidak tercapai.
 - `blur` SwiftUI memakai Gaussian ala CoreImage; port memakai kotak
   sejajar-sumbu. Yang diukur adalah **jarak antara dua kanvas milik model
   yang sama**, bukan kesamaan piksel dengan Apple. Radius 6% dipilih dari
