@@ -76,6 +76,37 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                     larangan menyeluruh akan memerah di sini,
                                     dan itu salah.
 
+  6. fakta yang namanya             **Kelas cacat kedua, dan ini yang paling
+     berbeda dari                    senyap.** Layar redup (Always-On) mengirim
+     nama parameternya              tiga fakta ke `ReducedLuminanceLabel.text`,
+                                    dan nama parameternya **tidak sama** dengan
+                                    nama properti yang membacanya:
+
+                                        isStale:        engine.isDisplayingStaleObject
+                                        safetyWarning:  engine.slewVerdict?.safetyWarningText
+                                        sensorNote:     motionNote  (-> engine.sensorNote)
+
+                                    Diukur pada salinan utuh, proses baru:
+                                    masing-masing diganti literal `false`/`nil`
+                                    -> `swift-ui-lint.sh` LULUS (exit 0).
+                                    Artinya **keempat** salinan fakta di layar
+                                    redup bisa dijadikan tetapan dan tidak satu
+                                    pun gerbang berbunyi -- termasuk sebelum
+                                    Aturan 35 ada, karena `dibaca` hanya
+                                    mencocokkan nama parameter persis.
+
+                                    Yang paling berbahaya `isStale: false`:
+                                    Always-On lalu membungkam peringatan "ini
+                                    sisa pandangan lama" selamanya, di layar
+                                    yang justru paling sedikit diberi konteks.
+
+  7. kontrol negatif: parameter      `isStale:` yang memang **tidak** punya
+     tanpa sumber di berkas itu     sumber di berkas itu tidak boleh dipaksa
+                                    menyebut fakta apa pun. Bentuk ini menjaga
+                                    arah sebaliknya: gerbang yang menuntut
+                                    setiap literal `nil`/`false` menyebut
+                                    anggota model akan memerah pada kode benar.
+
 **Keadaan 1-3 tidak bisa saling menggantikan.** 1 menguji jalur suara tautan di
 berkas jam, 2 aksesor fase di berkas gambar, 3 aksesor rekaman di berkas
 iPhone. Satu aksesor yang dijaga tidak menjaga yang lain, dan keadaan 3
@@ -110,13 +141,27 @@ MOTION = os.path.join(ROOT, "Apps", "Shared", "MotionLogger.swift")
 RULE_HEADER = "== Aturan 35:"
 CLEAN_MARK = "Bersih: fakta Bool yang dibaca berkasnya sampai apa adanya."
 
+REDUCED = os.path.join(ROOT, "Apps", "PointAndKnowWatch", "Sources",
+                       "ReducedLuminanceView.swift")
+
 #: Jangkar: baris **utuh**, supaya mutasinya tidak bergantung pada spasi dan
 #: supaya kemunculannya bisa diperiksa eksplisit.
 LINK_SPEECH = "LinkStatusText.linkSpeech(isReachable: link.isReachable,"
 PHASE = "phaseGeometry(waxing: visual.isWaxing)"
 WATCH_SAMPLE = "                    let fromWatch = trace.samples.filter(\\.fromWatch)"
-ONBOARDING_VISUAL = "                    isConfirmed: true)"
+#: Unik: situs visual kedua diiringi `pulse:` statis. Situs pertama memakai
+#: `isConfirmed: true,` juga, tetapi diikuti blok `// Gerbang hasPulse`, jadi
+#: jangkar satu-baris akan muncul 2x dan harness menolak jalan.
+ONBOARDING_VISUAL = ("                                isConfirmed: true,\n"
+                     "                                pulse: MotionPolicy.staticPulsePhase)")
+
 SENSOR_LOSS = "        let events = controller.setSensorAvailable(false)"
+
+#: Layar redup: fakta yang namanya **berbeda** dari nama parameter tujuan.
+REDUCED_STALE = "isStale: engine.isDisplayingStaleObject)"
+REDUCED_SAFETY = "safetyWarning: engine.slewVerdict?.safetyWarningText,"
+REDUCED_SENSOR = "sensorNote: motionNote,"
+
 
 STATES = [
     ("[baseline]", None, False),
@@ -144,6 +189,18 @@ STATES = [
      True),
     ("4. kontrol negatif: literal sah di ilustrasi statis", None, False),
     ("5. kontrol negatif: perintah sensor, bukan klaim", None, False),
+    # 6. Fakta yang namanya berbeda dari nama parameternya. Tiga situs, tiga
+    #    jenis: `Bool` (isStale), `String?` terekam (safetyWarning), dan
+    #    `String?` lewat properti perantara (sensorNote). Semuanya lolos
+    #    Aturan 35 sebelum keadaan ini ada, karena `dibaca` mencocokkan nama
+    #    parameter persis.
+    ("6a. layar redup: sisa pandangan dibungkam", [(REDUCED, REDUCED_STALE,
+                                                   "isStale: false)")], True),
+    ("6b. layar redup: peringatan keselamatan dihapus",
+     [(REDUCED, REDUCED_SAFETY, "safetyWarning: nil,")], True),
+    ("6c. layar redup: catatan sensor dihapus",
+     [(REDUCED, REDUCED_SENSOR, "sensorNote: nil,")], True),
+    ("7. kontrol negatif: literal di berkas tanpa faktanya", None, False),
 ]
 
 #: Keadaan 4-5 menyuntik kode yang **tidak boleh** memerah. Keduanya suntikan
@@ -167,6 +224,14 @@ NEGATIVE_STATES = {
     5: [(MOTION, SENSOR_LOSS,
          SENSOR_LOSS + "\n"
          "        _ = controller.setSensorAvailable(available: false)")],
+    # 7. Literal untuk parameter yang berkasnya **tidak punya** sumbernya.
+    #    `ReducedLuminanceView` tidak membaca fase apa pun, jadi `waxing: true`
+    #    yang disuntikkan ke sana tidak menyembunyikan fakta yang tersedia --
+    #    gerbang yang menuntut setiap `true`/`false` menyebut anggota model
+    #    akan memerah di sini, dan itu menuduh kode yang benar.
+    7: [(REDUCED, REDUCED_STALE,
+         REDUCED_STALE + "\n"
+         "        _ = phaseGeometry(waxing: true)")],
 }
 
 _originals = {}
@@ -194,7 +259,13 @@ def extract_rule35():
 
 
 def probe(program):
-    proc = subprocess.run(["bash", "-c", program], cwd=ROOT,
+    # Lewat **stdin**, bukan argv: `Program Argumen terlalu panjang` (E2BIG)
+    # muncul begitu program Aturan 35 melewati batas satu argumen Linux
+    # (~128 KiB). Diukur pada saat keadaan 6-7 ditambahkan: programnya 148.829
+    # byte, dan `bash -c` menolak jalan -- harness lalu gagal karena alasan
+    # yang tidak ada hubungannya dengan aturan yang diuji. Batas itu akan
+    # tercapai lagi tanpa perubahan ini setiap kali aturan tumbuh.
+    proc = subprocess.run(["bash", "-s"], cwd=ROOT, input=program,
                           capture_output=True, text=True)
     if proc.returncode not in (0, 1):
         return None, (proc.stderr.strip().splitlines() or ["(tanpa galat)"])[-1]
@@ -204,7 +275,8 @@ def probe(program):
 
 def main():
     mutasi_sumber.require_clean_sources(
-        [WATCH, VIEW, PHONE_LINK, ONBOARDING, MOTION])
+        [WATCH, VIEW, PHONE_LINK, ONBOARDING, MOTION, REDUCED])
+
 
     program = extract_rule35()
     if program is None or RULE_HEADER not in program:
@@ -212,18 +284,21 @@ def main():
               "-- harness tidak boleh jalan.", file=sys.stderr)
         sys.exit(2)
 
-    for path in (WATCH, VIEW, PHONE_LINK, ONBOARDING, MOTION):
+    for path in (WATCH, VIEW, PHONE_LINK, ONBOARDING, MOTION, REDUCED):
         with open(path, encoding="utf-8") as handle:
             _originals[path] = handle.read()
 
     # Jangkar harus muncul tepat sekali, kecuali yang memang berjumlah lain.
     # `phaseGeometry(waxing: visual.isWaxing)` ada di **dua** jalur gambar
     # (kandidat dan terkunci) dan keduanya wajib ikut bermutasi.
-    expected = {PHASE: 2}
+    expected = {PHASE: 2, REDUCED_STALE: 1}
     for path, anchor in ((WATCH, LINK_SPEECH), (VIEW, PHASE),
                          (PHONE_LINK, WATCH_SAMPLE),
                          (ONBOARDING, ONBOARDING_VISUAL),
-                         (MOTION, SENSOR_LOSS)):
+                         (MOTION, SENSOR_LOSS),
+                         (REDUCED, REDUCED_STALE),
+                         (REDUCED, REDUCED_SAFETY),
+                         (REDUCED, REDUCED_SENSOR)):
         count = _originals[path].count(anchor)
         want = expected.get(anchor, 1)
         if count != want:
@@ -277,7 +352,9 @@ def main():
             # pemanggilan yang dilanggar. Merah dengan pesan kosong berarti ia
             # berbunyi tanpa mengukur.
             names = any(n in detail for n in
-                        ("isReachable", "waxing", "fromWatch"))
+                        ("isReachable", "waxing", "fromWatch",
+                         "isStale", "safetyWarning", "sensorNote"))
+
             ok = (fired == must_fire) and (not fired or names)
             if not ok:
                 unexpected += 1

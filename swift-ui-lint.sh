@@ -5631,6 +5631,44 @@ fi
 # melihat blok komentar `/* */` (hanya `//`). Batas itu sama dengan Aturan 34,
 # dan disebut di sini supaya "hijau" tidak dibaca lebih luas daripada yang
 # benar-benar diukur.
+#
+# ── Perluasan siklus ini: fakta yang **namanya berbeda** ────────────────────
+#
+# Kelas cacat kedua, dan diukur sebelum diperluas:
+#
+#     Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift
+#         isStale:       engine.isDisplayingStaleObject
+#         safetyWarning: engine.slewVerdict?.safetyWarningText
+#         sensorNote:    motionNote   (-> engine.sensorNote)
+#
+# Ketiganya diganti literal (`false`, `nil`, `nil`) -> `swift-ui-lint.sh`
+# **LULUS (exit 0)**. Artinya keempat salinan fakta di layar Always-On bisa
+# dijadikan tetapan, dan tidak satu pun gerbang berbunyi.
+#
+# Kenapa aturan versi lama melewatkannya: `dibaca` mencocokkan nama parameter
+# **persis**. Di sini nama parameternya memang sengaja berbeda dari nama
+# faktanya -- `isStale` adalah kata yang dipakai label, sedangkan
+# `isDisplayingStaleObject` adalah fakta yang dimilikinya. Nama yang sama persis
+# bukan syarat yang benar untuk kelas ini.
+#
+# Yang diperluas, dan batasnya yang diukur:
+#   * Parameter model dikumpulkan dari tipe `Bool` **dan** `String?`; hanya
+#     `Bool` membuat `safetyWarning:`/`sensorNote:` tidak pernah terdaftar.
+#   * Sumber fakta dicari dengan **kata camelCase berurutan di awal nama**
+#     (`safetyWarning` -> `safetyWarningText`, kata isi `stale` ->
+#     `isDisplayingStaleObject`). Percobaan pertama memakai substring biasa,
+#     dan itu **memerahkan kode benar**: `title`, `value`, `name`, `label`
+#     tercatat punya sumber di hampir setiap berkas.
+#   * Sumber yang **tidak diawali** tidak dihitung. Diukur: `objectName` ->
+#     `reportedObjectName` membuat `record(objectName: nil)` -- nilai yang sah,
+#     "tidak ada objek" -- ditandai sebagai fakta yang disembunyikan.
+#   * Nama yang sama persis tetap dihitung sebagai sumber bila dibaca lewat
+#     **properti perantara** (`var motionNote { engine.sensorNote }`), karena
+#     itulah jalur yang dipakai layar redup.
+#
+# Arah sebaliknya tetap dijaga `bukti-mutasi-fakta-literal.py` keadaan 4, 5,
+# dan 7: literal yang sah (ilustrasi statis, perintah sensor, parameter yang
+# berkasnya tidak punya sumbernya) harus tetap hijau.
 echo
 echo "== Aturan 35: fakta Bool yang dibaca berkasnya tidak diganti literal =="
 kontradiksi_literal=$(python3 - <<'PY' 2>&1
@@ -5693,13 +5731,19 @@ for root, _, files in os.walk(PK):
         datar = re.sub(r"\s+", " ", kode)
         for m in re.finditer(r"\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", datar):
             params = argumen(datar, m.end() - 1)
+            # `Bool` **dan** `String?`/`Bool?` opsional: fakta opsional adalah
+            # fakta. Diukur pada keadaan 6b/6c `bukti-mutasi-fakta-literal.py`:
+            # dengan hanya `Bool` didaftarkan, `safetyWarning:`
+            # (`String?`) dan `sensorNote:` (`String?`) tidak pernah dibaca
+            # sebagai parameter, sehingga `nil` yang menggantikannya tidak
+            # diperiksa apa pun. `Bool?` sudah ikut lewat awalan `Bool`.
             bools = re.findall(
-                r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Bool\??\b", params)
+                r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:Bool|String)\??\b", params)
             if bools:
                 aksesor.setdefault(m.group(1), set()).update(bools)
 
 if not aksesor:
-    print("Tidak ada aksesor model ber-parameter Bool yang ditemukan; "
+    print("Tidak ada aksesor model ber-parameter Bool/String ditemukan; "
           "aturan ini tidak mengukur apa pun.")
     raise SystemExit(0)
 
@@ -5731,7 +5775,118 @@ for root, _, files in os.walk("Apps"):
                 if re.search(re.escape(bentuk) + r"\b", kode):
                     dibaca.add(prm)
                     break
-        if not dibaca:
+
+        # 2b. Fakta yang **dibaca berkas ini** tetapi namanya tidak sama
+        #     dengan nama parameternya.
+        #
+        #     Inilah yang dijaga keadaan 6 `bukti-mutasi-fakta-literal.py`, dan
+        #     diukur sebelum perluasan ini: layar redup mengirim
+        #
+        #         isStale:       engine.isDisplayingStaleObject
+        #         safetyWarning: engine.slewVerdict?.safetyWarningText
+        #         sensorNote:    motionNote  (properti -> engine.sensorNote)
+        #
+        #     Ketiganya diganti literal, dan `swift-ui-lint.sh` LULUS. Sebabnya
+        #     `dibaca` di atas hanya mencocokkan nama parameter persis, sedang
+        #     di sini nama parameternya memang sengaja berbeda: `isStale` adalah
+        #     kata yang dipakai label, `isDisplayingStaleObject` adalah fakta
+        #     yang dimilikinya.
+        #
+        #     Cara mencocokkannya tanpa daftar tangan: nama parameter dipotong
+        #     jadi kata isi (buang awalan `is`/`has`), lalu setiap anggota di
+        #     berkas yang memuat kata itu sebagai **kata utuh dalam camelCase**
+        #     dianggap sumber faktanya. `isDisplayingStaleObject` memuat kata
+        #     `Stale`; `safetyWarningText` memuat `safety` + `Warning`.
+        #
+        #     **Kenapa camelCase, bukan substring.** Diukur: pencocokan
+        #     substring membuat `title`, `value`, `name`, dan `label` ikut
+        #     tercatat punya "sumber" di hampir setiap berkas (karena `.label`,
+        #     `.localizedName`, `.rowTitle` ada di mana-mana). Itu arah yang
+        #     memerahkan kode benar, dan gerbang yang menuduh kode benar akan
+        #     dilonggarkan orang. Dengan batas kata camelCase, `safetyWarning`
+        #     hanya cocok dengan `.safetyWarningText`, bukan dengan `.title`.
+        #
+        #     **Kenapa kata isi, bukan awalan `is`/`has` saja.** `safetyWarning`
+        #     dan `sensorNote` bukan aksesor `is`-berawalan; perluasan yang
+        #     hanya menangani awalan itu akan hijau pada 6b/6c.
+        #
+        #     **Kenapa pencocokan boleh gagal tanpa memerah.** Bentuk ini
+        #     menjaga arah sebaliknya (keadaan 7): `waxing: true` di berkas yang
+        #     tidak membaca sumber apa pun tidak punya kata yang cocok, jadi
+        #     tidak memerah.
+        def kata_isi(prm):
+            return re.sub(r"^(is|has)(?=[A-Z])", "", prm)
+
+        def kata_dari(nama):
+            """Pecah nama camelCase menjadi kata huruf kecil.
+
+            `isDisplayingStaleObject` -> ['is','displaying','stale','object'].
+            Pencocokan per kata, bukan substring: `stale` cocok dengan
+            `...Stale...` dan `safetyWarning` cocok dengan
+            `safetyWarningText` (awalan dua kata), tetapi `title` tidak cocok
+            dengan `.rowTitleNote` yang tidak ada hubungannya. Substring polos
+            (percobaan pertama) membuat `title`, `value`, `name`, `label`
+            tercatat punya "sumber" di hampir setiap berkas -- arah yang
+            memerahkan kode benar.
+            """
+            hasil = []
+            for bagian in re.split(r"[^A-Za-z0-9]+", nama):
+                if not bagian:
+                    continue
+                hasil.extend(w.lower() for w in
+                             re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+",
+                                        bagian))
+            return hasil
+
+        def memuat_kata(nama, kata):
+            """`nama` **diawali** seluruh kata `kata`.
+
+            Diawali, bukan sekadar memuat: `safetyWarning` -> `safetyWarningText`
+            cocok (awalan), `isStale` -> `isDisplayingStaleObject` cocok lewat
+            kata isi `stale`... tetapi `objectName` -> `reportedObjectName`
+            **tidak** cocok, karena di sana `objectName` adalah kata *belakang*
+            dari nama yang berbeda maknanya.
+
+            Diukur: dengan pencocokan "memuat" biasa, keadaan 3
+            `bukti-mutasi-fakta-literal.py` memunculkan pemeriksaan palsu
+            `record(objectName: nil)` -- `nil` untuk `objectName` adalah nilai
+            sah ("tidak ada objek"), bukan fakta yang disembunyikan, dan
+            pemanggil sah itu memerahkan gerbangnya sendiri.
+            """
+            butuh = kata_dari(kata)
+            punya = kata_dari(nama)
+            return bool(butuh) and punya[:len(butuh)] == butuh
+
+        anggota = {m.group(1)
+                   for m in re.finditer(r"\.([A-Za-z_][A-Za-z0-9_]*)\b", kode)}
+        # Anggota yang dibaca di dalam badan properti **lain** (bukan langsung
+        # sebagai argumen). `sensorNote: motionNote` di mana
+        # `var motionNote { engine.sensorNote }` termasuk di sini; `objectName:`
+        # yang dibaca langsung di argumen tidak -- dan `nil` untuk `objectName`
+        # adalah nilai sah, bukan fakta yang disembunyikan.
+        dalam_properti = set()
+        for m in re.finditer(
+                r"\bvar\s+([a-z][A-Za-z0-9_]*)\b[^\n{]*\{([^}]*)\}", kode):
+            for a in re.finditer(r"\.([A-Za-z_][A-Za-z0-9_]*)\b", m.group(2)):
+                dalam_properti.add((m.group(1), a.group(1)))
+        sumber = {}
+        for prm in {p for ps in aksesor.values() for p in ps}:
+            kata = kata_isi(prm)
+            if len(kata) < 4:
+                continue
+            calon = {a for a in anggota
+                     if memuat_kata(a, kata) and a != prm}
+            # Buang dirinya sendiri: `.isStale` bukan bukti fakta berbeda.
+            calon.discard("is" + kata[0].upper() + kata[1:])
+            calon.discard("has" + kata[0].upper() + kata[1:])
+            # Nama yang sama persis tetap sumber bila dibaca lewat properti
+            # perantara: itulah jalur `sensorNote: motionNote`.
+            if any(a == prm for _, a in dalam_properti):
+                calon.add(prm)
+            if calon:
+                sumber[prm] = sorted(calon)
+
+        if not dibaca and not sumber:
             continue
 
         for fn, params in sorted(aksesor.items()):
@@ -5739,7 +5894,7 @@ for root, _, files in os.walk("Apps"):
                     r"(?<![A-Za-z0-9_])" + re.escape(fn) + r"\s*\(", kode):
                 args = argumen(kode, m.end() - 1)
                 for prm in sorted(params):
-                    if prm not in dibaca:
+                    if prm not in dibaca and prm not in sumber:
                         continue
                     nilai = re.search(r"\b" + prm + r"\s*:\s*([^,)]+)", args)
                     if not nilai:
@@ -5751,7 +5906,70 @@ for root, _, files in os.walk("Apps"):
                             "  %s:%d: `%s(%s: %s)` -- berkas ini juga membaca "
                             "`.%s`, jadi faktanya tersedia dan diganti literal"
                             % (path, baris, fn, prm,
-                               nilai.group(1).strip(), prm))
+                               nilai.group(1).strip(),
+                               prm if prm in dibaca
+                               else "/`.".join(sumber[prm])))
+                    # 2c. String? yang dibaca berkas itu, lalu diganti `nil`.
+                    elif (prm in sumber
+                          and re.match(r"^\s*nil\s*$", nilai.group(1))):
+                        baris = kode[:m.start()].count("\n") + 1
+                        masalah.append(
+                            "  %s:%d: `%s(%s: nil)` -- berkas ini membaca "
+                            "`.%s`, jadi faktanya tersedia dan diganti `nil`"
+                            % (path, baris, fn, prm,
+                               "/`.".join(sumber[prm])))
+                    # 2c'. Fakta opsional yang dibaca berkas itu lewat properti
+                    #      perantara, lalu diganti `nil`:
+                    #      `sensorNote: nil` sementara `motionNote` membacakan
+                    #      `engine.sensorNote`. Inilah bentuk yang paling sunyi
+                    #      di layar redup: catatan "sensor tidak tersedia"
+                    #      hilang, dan layar yang membeku terbaca sebagai
+                    #      keberhasilan.
+                    #
+                    #      Sengaja **hanya** untuk `nil`: `nil` adalah nilai sah
+                    #      untuk banyak parameter opsional (`objectName: nil`),
+                    #      jadi cabang ini menuntut bukti bahwa faktanya memang
+                    #      dibaca berkas ini lewat sebuah properti.
+                    elif (re.match(r"^\s*nil\s*$", nilai.group(1))
+                          and prm in sumber):
+                        baris = kode[:m.start()].count("\n") + 1
+                        masalah.append(
+                            "  %s:%d: `%s(%s: nil)` -- berkas ini membaca "
+                            "faktanya (`%s`), jadi faktanya tersedia dan "
+                            "diganti `nil`"
+                            % (path, baris, fn, prm,
+                               "`.".join(sumber[prm])))
+                    # 2d. Fakta lewat **properti perantara**: argumennya nama
+                    #     properti lokal (`sensorNote: motionNote`), dan badan
+                    #     properti itu yang membaca faktanya
+                    #     (`private var motionNote: String? { engine.sensorNote }`).
+                    #     Tanpa jalur ini, keadaan 6c hijau: nama argumennya
+                    #     tidak sama dengan nama apa pun di model.
+                    elif prm in sumber:
+                        lewat = re.match(r"^\s*([a-z][A-Za-z0-9_]*)\s*$",
+                                         nilai.group(1))
+                        if not lewat or lewat.group(1) == prm:
+                            continue
+                        badan = re.search(
+                            r"\bvar\s+" + lewat.group(1)
+                            + r"\b[^=\n]*=\s*\{?\s*([^\n}]*)",
+                            kode)
+                        if not badan:
+                            continue
+                        kata = re.sub(r"^(is|has)", "",
+                                      prm if prm in dibaca else "")
+                        if not kata:
+                            continue
+                        if not any(k.lower() in badan.group(1).lower()
+                                   for k in [kata] + sumber.get(prm, [])):
+                            continue
+                        baris = kode[:m.start()].count("\n") + 1
+                        masalah.append(
+                            "  %s:%d: `%s(%s: %s)` -- `%s` membaca faktanya "
+                            "(`%s`), jadi faktanya tersedia dan dialirkan "
+                            "lewat nama lain"
+                            % (path, baris, fn, prm, nilai.group(1).strip(),
+                               lewat.group(1), badan.group(1).strip()[:60]))
 
 if diperiksa == 0:
     print("Tidak ada pemanggilan aksesor Bool di Apps/; aturan ini tidak "

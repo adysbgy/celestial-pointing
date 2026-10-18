@@ -1,3 +1,109 @@
+### Siklus (18 Okt 2026 — Aturan 35 punya **nama** sebagai syarat, bukan **fakta**: tiga fakta di layar Always-On bisa jadi tetapan tanpa satu gerbang berbunyi)
+
+Dibuka dengan memverifikasi ulang brief, bukan mengikutinya. Brief meminta
+"BAGIAN 1–4 / FASE A–C", dan seluruhnya **sudah ada dan sudah dijaga**:
+`CelestialVisualView` menggambar planet berpita, cincin, kutub, kawah, fase
+Bulan bersudut, bintang berwarna kelas spektral, corona Matahari, dan morfologi
+lanit-dalam; `NightMode`, `ReducedLuminanceView`, complication, `.xcstrings`,
+dan `AudioCue` semuanya berstatus tertutup gerbang. Tidak ada yang dibangun
+ulang di siklus ini. Yang dikerjakan adalah **mencari titik yang tidak dijaga**,
+dengan menyapu mutasi badan `Apps/` (19 mutasi, satu per jalankan) — lapisan
+yang `swift-test.sh` tidak pernah membangun di Linux.
+
+#### Cacat: `dibaca` mencocokkan **nama**, sedangkan yang perlu diketahui adalah **asal faktanya**
+
+`Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift` (layar Always-On)
+mengirim tiga fakta ke `ReducedLuminanceLabel.text`, dan ketiganya **dibaca di
+berkas itu** — tetapi nama parameternya sengaja berbeda dari nama faktanya:
+
+    isStale:       engine.isDisplayingStaleObject
+    safetyWarning: engine.slewVerdict?.safetyWarningText
+    sensorNote:    motionNote   (private var motionNote { engine.sensorNote })
+
+Diukur pada salinan utuh, proses baru, dengan mutasi yang mengompilasi:
+
+    isStale: → false     swift-ui-lint.sh  LULUS (exit 0)
+    safetyWarning: → nil swift-ui-lint.sh  LULUS (exit 0)
+    sensorNote: → nil    swift-ui-lint.sh  LULUS (exit 0)
+
+Artinya **seluruh salinan fakta di layar redup bisa dijadikan tetapan** dan tidak
+satu pun gerbang berbunyi. Yang paling berbahaya `isStale: false`: Always-On
+membungkam "ini sisa pandangan lama" selamanya, di layar yang justru paling
+sedikit diberi konteks — dan `isStale`/`isUncertain` terdaftar sebagai parameter
+`Bool`, sedangkan `safetyWarning`/`sensorNote` bertipe `String?` sehingga
+**tidak pernah dibaca sebagai parameter sama sekali**.
+
+Kenapa Aturan 35 versi lama melewatkannya: `dibaca` hanya menerima nama
+parameter **persis**. Nama yang sama persis bukan syarat yang benar untuk kelas
+ini — `isStale` adalah kata yang dipakai label, `isDisplayingStaleObject` adalah
+fakta yang dimilikinya.
+
+#### Perbaikan, dan dua jalan buntu yang diukur (bukan dikira-kira)
+
+  1. **Parameter** dikumpulkan dari `Bool` **dan** `String?`. Tanpa ini
+     `safetyWarning:`/`sensorNote:` tidak terdaftar, dan cabang `nil` tidak punya
+     apa pun untuk dibandingkan.
+  2. **Sumber fakta** dicocokkan dengan **kata camelCase berurutan di awal
+     nama**: `safetyWarning` → `safetyWarningText`, kata isi `stale` →
+     `isDisplayingStaleObject`.
+  3. **Nama yang sama persis** tetap dihitung sebagai sumber bila dibaca lewat
+     **properti perantara** (`var motionNote { engine.sensorNote }`) — jalur
+     `sensorNote: motionNote`.
+
+Dua pencocokan yang **lebih longgar ditolak karena mengukur merah palsu**:
+
+    substring biasa ("memuat")            -> `title`, `value`, `name`, `label`
+                                             tercatat punya "sumber" di hampir
+                                             setiap berkas
+    urutan kata di mana saja ("memuat")   -> `record(objectName: nil)` ditandai
+                                             sebagai fakta yang disembunyikan,
+                                             padahal `nil` = "tidak ada objek"
+
+Keduanya diukur **sebelum** dipilih, dan keduanya memerahkan kode yang benar.
+Gerbang yang menuduh kode benar akan dilonggarkan orang — jadi batasnya
+"diawali", bukan "memuat".
+
+#### Bukti gerbangnya berbunyi, dan arah sebaliknya tetap hijau
+
+`Tools/bukti-mutasi-fakta-literal.py` diperluas dari 5 → **10 keadaan** (3
+keadaan baru + kedua kontrol negatif). Sebelum perbaikan, keadaan 6a/6b/6c
+**merah pada harness** (artinya hijau pada aturan = cacat); sesudahnya:
+
+    10 keadaan, 0 tidak sesuai harapan
+
+Keadaan 4, 5, dan 7 tetap **hijau** — literal sah (ilustrasi onboarding,
+perintah `setSensorAvailable(false)`, `waxing: true` di berkas tanpa sumbernya)
+tidak diberhentikan. Dua cacat lain di harness yang ikut ditemukan siklus ini:
+
+  * **Jangkar basi**: `ONBOARDING_VISUAL` masih mencari `isConfirmed: true)`,
+    sedangkan sumbernya sudah `isConfirmed: true,` + `pulse:` — harness
+    menolak jalan (exit 2), bukan diam-diam mengukur nol. Ini kelas cacat yang
+    sudah dua kali menjatuhkan `main`; yang ini tertangkap sebelum push.
+  * **`bash -c` E2BIG**: program Aturan 35 kini 148.829 byte, di atas batas satu
+    argumen Linux (~128 KiB). `probe()` dialihkan ke `bash -s` (stdin). Tanpa
+    itu harness gagal karena ukuran, bukan karena aturan.
+
+#### Verifikasi
+
+    bash swift-ui-lint.sh                             exit 0  (52 aturan)
+    bash swift-typecheck.sh                           exit 0
+    python3 Tools/bukti-mutasi-fakta-literal.py       exit 0  (10/10 keadaan)
+    python3 Tools/check-harness-terdaftar.py          exit 0  (98 harness, 98 dirujuk)
+    python3 Tools/bukti-mutasi-ciri-ragu.py           exit 0
+    python3 Tools/bukti-mutasi-bintang.py             exit 0
+    ./swift-test.sh                                   CelestialEngine 222 + PointingKit 931, 0 gagal
+
+Tidak ada berkas di `Packages/` yang disentuh: seluruh perubahan ada di
+`swift-ui-lint.sh` + harness-nya.
+
+**Yang TIDAK diklaim.** Aturan 35 tetap sapu teks: ia tidak tahu tipe, tidak
+membaca blok komentar `/* */`, dan cabang `nil` hanya berlaku untuk parameter
+yang punya sumber di berkas itu (supaya `objectName: nil` yang sah tidak
+tertuduh). Pemilihan fakta yang disembunyikan di balik fungsi pembantu tetap
+tidak terlihat oleh aturan ini.
+
+---
+
 ### Siklus (18 Okt 2026 — `main` merah lagi: angka 42 yang dilaporkan "sudah diperbaiki" ternyata **tidak pernah diubah**)
 
 Dibuka dengan `git log` + `gh run list`. `Engine Tests (Linux)` untuk `08bfb55`
