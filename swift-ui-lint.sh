@@ -9107,6 +9107,116 @@ else
   echo "Bersih: MotionLogger tetap jujur saat sensor tidak ada."
 fi
 
+# ── Aturan 54: kejujuran izin lokasi di LocationProvider tidak boleh dibalik ──
+#
+# `LocationProvider.swift` adalah satu-satunya berkas yang membaca izin lokasi
+# (jam maupun iPhone). Ia cermin persis `MotionLogger` (Aturan 53): punya
+# **empat** titik jujur yang, kalau dibalik, membuat penolakan izin tampil
+# senyap — persis yang dilarang PRD ("jangan diam saat izin ditolak").
+#
+# Diukur pada salinan utuh (proses baru, `Apps/` + `Packages/` dibawa),
+# mutasi yang semuanya **mengompilasi di macOS** — sebelum aturan ini ada,
+# **seluruh 53 aturan UI lolos (exit 0)**:
+#
+#   denied     -> note = nil           (alasan ditolak dibuang, layar diam)
+#   restricted -> note = nil           (alasan dibatasi dibuang, layar diam)
+#   failed     -> self.note = nil      (kegagalan lokasi diam)
+#   guard horizontalAccuracy >= 0       -> guard let last = … else return
+#       (lokasi dengan akurasi invalid diterima sebagai lokasi sah;
+#        `last` bisa `CLLocation` yang `horizontalAccuracy == -1`)
+#
+# Yang paling berbahaya bukan sekadar "diam": PRD menuntut penolakan izin
+# **terlihat dan jelas** (Aturan 14 & `SensorStatusText`), dan `LocationProvider`
+# adalah satu-satunya yang mengisinya. `note` yang lenyap berarti penolakan
+# izin tidak ditampilkan — lokasi darurat (Jakarta) dipakai tanpa satu kata
+# pun yang memberi tahu pengguna bahwa langit dihitung untuk tempat lain.
+#
+# **Kenapa ini di lint, bukan di PointingKit.** Keempat bentuk itu adalah
+# **perintah penulisan** ke properti `@Published` (keadaan sensor/lokasi),
+# bukan nilai turunan yang bisa ditampung tipe murni — sama seperti ketiga
+# bentuk jujur di Aturan 53. Aturan 38 menyapu `var X: Bool` yang namanya
+# sama dengan anggota model; keempat bentuk di sini bukan `Bool` dan bukan
+# penerusan `snapshot.*`, jadi lepas dari jangkauannya. Aturan 36/37/38 tidak
+# menangkapnya karena mereka mengawasi kawan `MotionLogger` (sensor gerak),
+# bukan kawan lokasi.
+#
+# **Fail-closed, bukan daftar-hitam per-kata.** Empat bentuk jujur dihitung
+# **berpasangan dengan jumlah kemunculannya yang sah**, bukan dilarang kata
+# per kata:
+#   - `note = SensorStatusText.locationDeniedNote`    harus **tepat 2** (start
+#     + delegasi — dua jalur keadaan ditolak yang sama-sama wajib menampilkan
+#     alasannya).
+#   - `note = SensorStatusText.locationRestrictedNote` harus **tepat 2** (sama).
+#   - `self.note = SensorStatusText.locationFailedNote(message)` harus **tepat
+#     1** (hanya di delegasi kegagalan).
+#   - `locations.last, last.horizontalAccuracy >= 0`   harus **tepat 1**
+#     (satu gerbang akurasi di `didUpdateLocations`).
+# Daftar-hitam per-kata (`note = nil` dilarang) salah: `self.note = nil` **sah**
+# ada persis 2 kali (mengosongkan catatan saat lokasi sah tiba), jadi
+# melarangnya memerah pada kode benar. Fail-closed lewat hitungan bentuk jujur
+# menangkap mutasi tanpa menuduh kode yang sah.
+#
+# **Kenapa hitungannya berpasangan, bukan "ada".** `denied`/`restricted` masing-
+# masing muncul 2 kali *by design* (dua jalur keadaan). Memaksa "ada ≥ 1"
+# akan lulus bila salah satu dari dua jalur dibalik (sisanya tetap ada), sehingga
+# mutasi `denied start -> nil` tetap hijau — cacat lolos. Menuntut tepat 2
+# membuat hilangnya satu dari dua jalur memerah.
+echo
+echo "== Aturan 54: kejujuran izin lokasi LocationProvider tidak dibalik =="
+izin_nama=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+LOCATION = "Apps/Shared/LocationProvider.swift"
+
+# Bentuk **jujur** yang wajib ada pada hitungan tertentu (fail-closed).
+# (label, teks, jumlah wajib) -- jumlah mewakili berapa jalur keadaan yang
+# memanggilnya; mutasi yang menghapus salah satu jalur membuat hitungannya
+# bukan nilai wajib, sehingga aturan memerah, bukan diam.
+BENTUK = (
+    ("denied.note",     "note = SensorStatusText.locationDeniedNote",     2),
+    ("restricted.note", "note = SensorStatusText.locationRestrictedNote", 2),
+    ("failed.note",     "self.note = SensorStatusText.locationFailedNote(message)", 1),
+    ("akurasi.guard",   "locations.last, last.horizontalAccuracy >= 0",    1),
+)
+
+masalah = []
+
+if not os.path.exists(LOCATION):
+    print("PERINGATAN: %s tidak ditemukan -- Aturan 54 tidak mengukur apa pun."
+          % LOCATION)
+else:
+    kode = open(LOCATION, encoding="utf-8").read()
+    # Komentar dibuang: docstring di Apps/ mengutip bentuk cacat.
+    kode = re.sub(r"//[^\n]*", "", kode)
+    kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+
+    for label, bentuk, wajib in BENTUK:
+        n = kode.count(bentuk)
+        if n != wajib:
+            masalah.append(
+                "  %s: bentuk jujur `%s` muncul %d kali (harus tepat %d) -- "
+                "penolakan izin lokasi dibalik atau aturan berhenti mengukur."
+                % (LOCATION, bentuk, n, wajib))
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$izin_nama" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 54 tidak bisa memutuskan:"
+  echo "$izin_nama"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$izin_nama" ]; then
+  echo "$izin_nama"
+  echo "-> LocationProvider harus jujur saat izin lokasi ditolak/dibatasi/gagal:"
+  echo "   jangan buang catatannya, jangan terima lokasi akurasi invalid."
+  status=1
+else
+  echo "Bersih: LocationProvider tetap jujur saat izin lokasi ditolak/dibatasi/gagal."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

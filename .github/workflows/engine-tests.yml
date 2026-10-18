@@ -1047,6 +1047,35 @@ jobs:
       - name: Buktikan gerbang kejujuran sensor Aturan 53 berbunyi
         run: python3 Tools/bukti-mutasi-aturan53-kejujuran-sensor.py
 
+      # Kejujuran izin **lokasi**: `LocationProvider.swift` adalah kembaran
+      # `MotionLogger` untuk izin lokasi (jam maupun iPhone), dan ia punya
+      # empat titik jujur yang kalau dibalik membuat penolakan izin tampil
+      # senyap — persis yang dilarang PRD ("jangan diam saat izin ditolak").
+      #
+      # Yang paling berbahaya bukan sekadar diam: kalau `note` penolakan
+      # lenyap, lokasi darurat (Jakarta) dipakai tanpa satu kata pun yang
+      # memberi tahu pengguna bahwa langit dihitung untuk tempat lain. Itu
+      # klaim yang salah tentang **tempat**, dan tidak ada teks di layar yang
+      # bisa dibaca untuk memeriksanya.
+      #
+      # Sebelum Aturan 54 ada, keempat mutasi itu lolos seluruh 53 aturan UI
+      # (exit 0) — diukur pada salinan utuh, proses baru, dengan gerbang
+      # `HEAD` yang masih ada. `Apps/` tidak pernah dibangun di Linux, jadi
+      # tidak ada gerbang cepat lain yang bisa menangkapnya.
+      #
+      # Sembilan keadaan: enam cacat wajib merah (dua jalur `denied`, dua
+      # jalur `restricted`, `failed`, penjaga akurasi), satu kontrol negatif
+      # yang harus tetap hijau (`self.note = nil` **sah** saat lokasi
+      # sungguhan tiba — gerbang yang memerah di situ membunuh kode benar,
+      # dan gerbang yang membunuh kode benar akan dilonggarkan orang), satu
+      # keadaan fail-closed (berkas hilang harus PERINGATAN, bukan diam), dan
+      # baseline. Dua jalur `denied`/`restricted` diuji terpisah supaya
+      # hitungan "tepat 2" terbukti perlu: dengan penjaga "ada >= 1", keadaan
+      # 1 dan 3 tetap hijau karena jalur delegasinya masih memanggil bentuk
+      # yang sama.
+      - name: Buktikan gerbang kejujuran izin lokasi Aturan 54 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan54-izin-lokasi.py
+
       # Samaran keraguan: gambar yang **belum pasti** harus kehilangan
       # ketegasannya, bukan hanya cirinya. Semua gerbang keraguan lain bekerja
       # dari ciri pengenal (pita, cincin, maria, morfologi); yang tidak pernah
