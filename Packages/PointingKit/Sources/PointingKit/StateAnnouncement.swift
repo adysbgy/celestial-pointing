@@ -46,16 +46,27 @@ public enum StateAnnouncement {
     /// mengumumkan objek lama persis seperti hasil pengukuran sekarang —
     /// false confidence dalam bentuk audio.
     ///
+    /// **Namanya dibaca lewat `localizedName`, bukan `.name`.** `answeredObject`
+    /// membawa `CelestialObject.name` apa adanya dari resolver, dan untuk benda
+    /// tata surya itu Bahasa Indonesia (`"Saturnus"`, `"Matahari"`). Kelima
+    /// permukaan layar sudah membaca `localizedName`; membaca `.name` di sini
+    /// membuat pembaca berbahasa Inggris melihat "Saturn" di layar dan mendengar
+    /// "Terkunci pada Saturnus." — dua nama untuk satu cuplikan. Cacat ini tidak
+    /// bisa dilihat gate mana pun: tiap sisi konsisten dengan dirinya sendiri.
+    /// `testLockAnnouncesTheScreenNameNotTheEngineName` menahannya sekarang.
+    ///
     /// Kalimat panduan pun diambil dari `snapshot.guidanceText`, **sumber yang
     /// sama** dengan yang tampil di layar, jadi suara dan layar tidak bisa
     /// menyebut dua hal berbeda untuk cuplikan yang sama.
     public static func text(for snapshot: PointingSnapshot) -> String {
         switch snapshot.state {
         case .lock:
-            guard let name = snapshot.answeredObject?.name, !name.isEmpty else {
+            guard let object = snapshot.answeredObject,
+                  !object.name.isEmpty else {
                 return TextLocalization.text(.announceLocked)
             }
-            return TextLocalization.text(.announceLockedOn, name)
+            return TextLocalization.text(.announceLockedOn,
+                                         object.localizedName)
         case .uncertain:
             return TextLocalization.text(.announceUncertain,
                           snapshot.guidanceText)

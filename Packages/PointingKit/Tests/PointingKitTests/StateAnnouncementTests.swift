@@ -165,4 +165,58 @@ final class StateAnnouncementTests: XCTestCase {
         XCTAssertEqual(StateAnnouncement.text(for: idle),
                        "\(idle.state.shortLabel). \(idle.guidanceText)")
     }
+
+    // MARK: - Nama yang diucapkan = nama yang tertulis di layar
+
+    /// Saat katalog berbahasa Inggris terpasang, pengumuman lock menyebut nama
+    /// **layar** (`Saturn`), bukan nama engine (`Saturnus`).
+    ///
+    /// **Kenapa ini cacat, bukan kerapian.** `answeredObject.name` adalah field
+    /// yang diisi resolver dari `EphemerisBody.displayName` — Bahasa Indonesia.
+    /// Sampai giliran ini `StateAnnouncement` membacanya apa adanya, sementara
+    /// kelima permukaan layar (`PointingView`, `ReducedLuminanceView`,
+    /// `DiagnosticsView`, `ObjectDetailView`, komplikasi) membaca
+    /// `localizedName`/`ObjectDisplayName.text`. Akibatnya untuk pembaca
+    /// berbahasa Inggris: layar berkata "Saturn" dan telinga mendengar
+    /// "Terkunci pada Saturnus." — dua versi kebenaran untuk satu cuplikan,
+    /// tepat kelas cacat yang `ObjectDisplayName` dibuat untuk mencegah, dan
+    /// tidak ada gate yang bisa melihatnya karena keduanya konsisten dengan
+    /// dirinya sendiri.
+    ///
+    /// Uji ini gagal pada kode lama (`Terkunci pada Saturnus.`) dan lulus
+    /// setelah `StateAnnouncement` memakai `localizedName`.
+    func testLockAnnouncesTheScreenNameNotTheEngineName() {
+        TextLocalization.install { key in
+            switch key {
+            case "object.body.saturn.label": return "Saturn"
+            case "pointing.announce.lockedOn": return "Locked on %@."
+            default: return nil
+            }
+        }
+        defer { TextLocalization.reset() }
+
+        let saturnus = CelestialObject(id: "saturnus", name: "Saturnus",
+                                       kind: .planet, raDeg: 340, decDeg: -12,
+                                       magnitude: 0.6)
+        let text = StateAnnouncement.text(for: locked(saturnus))
+        XCTAssertEqual(text, "Locked on Saturn.")
+        XCTAssertFalse(text.contains("Saturnus"),
+                       "suara dan layar tidak boleh menyebut dua nama berbeda")
+    }
+
+    /// Tanpa katalog pun, nama yang diumumkan **sama persis** dengan nama yang
+    /// akan tercetak layar — bukan sekadar sama kebetulan.
+    ///
+    /// Invariant-nya: `text(for:)` ⊇ `answeredObject.localizedName`. Kalau
+    /// kelak ada jalur nama baru (bintang, objek langit dalam, frasa), uji ini
+    /// menuntut kedua sisi bergerak bersama.
+    func testAnnouncedNameMatchesTheScreenAccessorForEveryCatalogueObject() {
+        TextLocalization.reset()
+        for object in Catalogue.brightStars + DeepSkyCatalogue.objects {
+            let text = StateAnnouncement.text(for: locked(object))
+            XCTAssertTrue(text.contains(object.localizedName),
+                          "\(object.id): pengumuman \"\(text)\" tidak memuat "
+                          + "nama layar \"\(object.localizedName)\"")
+        }
+    }
 }
