@@ -9217,6 +9217,143 @@ else
   echo "Bersih: LocationProvider tetap jujur saat izin lokasi ditolak/dibatasi/gagal."
 fi
 
+# ── Aturan 55: teks status yang ditulis wajib dibaca satu layar ─────────────
+#
+# Kelas cacatnya: sebuah properti `@Published` berakhiran Note/Reason/Message/
+# Label/Speech ditulis berkali-kali — tiap jalur kegagalan, tiap penolakan
+# izin — lalu **tidak pernah dibaca satu view pun**. Layar tidak tampak salah:
+# tidak ada yang hilang dari tata letak, tidak ada teks yang salah kata, dan
+# seluruh 54 aturan lain hijau. Yang hilang justru kabarnya.
+#
+# Terukur di `main` sebelum aturan ini ada: `WatchLinkService.lastMessageNote`
+# ditulis **7 kali** (kalibrasi tidak terkirim, pesan tidak terkirim, kirim
+# gagal, ambang tidak sah, permintaan keadaan terlalu dini, aktivasi sesi
+# gagal, dan catatan pesan masuk) dan dibaca **0 kali**. Kembarannya di iPhone,
+# `PhoneLinkService.lastNote`, dibaca `LinkView` — jadi tidak ada yang
+# mencurigakan saat membandingkan kedua service: keduanya "punya properti
+# catatan", dan hanya satu yang tersambung ke layar.
+#
+# Yang membuat ini bukan sekadar kerapian: `link.send(calibration:)` adalah
+# satu-satunya jalan hasil kalibrasi sampai ke iPhone (sigma-nya menyetel
+# ambang keyakinan di sana). Saat sesi belum aktif, ia menulis
+# `calibrationNotSent` — dan pengguna di jam tidak melihat apa pun, karena
+# `CalibrationView` hanya menampilkan `statusMessage` miliknya sendiri yang
+# berbunyi "Kalibrasi terpasang". Dua kalimat itu bertentangan, dan yang
+# salah adalah yang terlihat. PRD menuntut kegagalan terlihat; di sini
+# kegagalan paling penting (hasil ukur hilang di jalan) justru senyap.
+#
+# **Kenapa ini bukan urusan Aturan 12/16.** Aturan 12 menyapu penugasan
+# berakhiran Note yang berisi **literal**; di sini nilainya accessor katalog
+# (`LinkStatusText.calibrationNotSent`), jadi bentuknya justru yang benar.
+# Aturan 16 menyapu literal peritel aksesibilitas. Keduanya mengawasi **isi**
+# kalimat; tidak ada yang mengawasi apakah kalimat itu sampai ke layar.
+#
+# **Kenapa fail-closed, bukan daftar-hitam.** Aturan ini tidak menyebut nama
+# properti apa pun. Ia menurunkan daftarnya dari sumbernya: setiap properti
+# `@Published` di `Apps/` yang namanya berakhiran Note/Reason/Message/Label/
+# Speech adalah "teks status", dan masing-masing wajib punya **minimal satu
+# pembacaan di luar deklarasinya**. Properti baru otomatis ikut terjaga tanpa
+# ada yang ingat mendaftarkannya — dan properti yang dibaca tetap hijau tanpa
+# pengecualian khusus.
+#
+# **Kenapa pembacaan di berkas sendiri TIDAK dihitung.** Kalau dihitung,
+# `lastMessageNote` akan lolos lewat `handle(_:)` yang membacanya untuk
+# menyusun nilai berikutnya — menulis dan membaca di tempat yang sama,
+# sementara layar tetap tidak pernah menerimanya. Itu persis bentuk yang
+# lolos hari ini. Yang dihitung hanya pembacaan dari **berkas lain**.
+#
+# **Kenapa zero-item = GAGAL.** Kalau `Apps/` tidak ditemukan atau tidak ada
+# satu pun properti teks status yang terdeteksi, aturan ini tidak mengukur
+# apa pun. Hijau dalam keadaan itu adalah hijau yang kosong.
+echo
+echo "== Aturan 55: teks status yang ditulis wajib dibaca satu layar =="
+teks_mati=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+def buang_komentar(s):
+    s = re.sub(r"//[^\n]*", "", s)
+    return re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in nama:
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 55 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+sumber = {}
+for b in berkas:
+    try:
+        sumber[b] = buang_komentar(open(b, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (b, e))
+        raise SystemExit(0)
+
+# Teks status = properti @Published yang namanya berakhiran salah satu ini.
+# Daftar akhiran ini **bukan** daftar properti: ia aturan penamaan yang sudah
+# dipakai repo (`lastNote`, `lastMessageNote`, `sensorNote`,
+# `unavailableReason`), jadi properti baru ikut terjaga dengan sendirinya.
+AKHIRAN = ("Note", "Reason", "Message", "Label", "Speech")
+DEKLARASI = re.compile(r"@Published[^\n]*\bvar\s+(\w+)\s*:")
+
+teks_status = []          # (berkas, nama)
+for b, isi in sumber.items():
+    for m in DEKLARASI.finditer(isi):
+        nama = m.group(1)
+        if nama.endswith(AKHIRAN):
+            teks_status.append((b, nama))
+
+if not teks_status:
+    print("PERINGATAN: tidak ada properti teks status di %s -- Aturan 55 "
+          "tidak mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+for b, nama in sorted(teks_status):
+    dibaca_di = set()
+    for lain, isi in sumber.items():
+        if lain == b:
+            # Pembacaan di berkas sendiri sengaja dilewati: itu bisa berarti
+            # menulis-lalu-membaca di tempat yang sama, bukan sampai ke layar.
+            continue
+        for m in re.finditer(r"\b%s\b" % re.escape(nama), isi):
+            sebelum = isi[max(0, m.start() - 8):m.start()]
+            if re.search(r"\b(var|let)\s+$", sebelum):
+                continue
+            sesudah = isi[m.end():m.end() + 4].lstrip()
+            if sesudah.startswith("=") and not sesudah.startswith("=="):
+                continue
+            dibaca_di.add(lain)
+    if not dibaca_di:
+        masalah.append(
+            "  %s: `%s` ditulis tetapi tidak dibaca berkas lain mana pun -- "
+            "kalimatnya tidak pernah sampai ke layar." % (b, nama))
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$teks_mati" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 55 tidak bisa memutuskan:"
+  echo "$teks_mati"
+  echo "-> Anggap GAGAL, bukan bersih."
+  status=1
+elif [ -n "$teks_mati" ]; then
+  echo "$teks_mati"
+  echo "-> Teks status yang ditulis harus dibaca minimal satu view:"
+  echo "   kegagalan yang tidak pernah tampil sama saja dengan diam."
+  status=1
+else
+  echo "Bersih: setiap teks status dibaca minimal satu layar."
+fi
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

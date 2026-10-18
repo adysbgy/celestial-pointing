@@ -66,6 +66,7 @@ struct CalibrationView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel(TextLocalization.text(.calibrationStatusPrefix,
                                                                   statusMessage))
+                    linkNote
                 }
                 .padding(.horizontal, 2)
             }
@@ -313,6 +314,35 @@ struct CalibrationView: View {
                     .font(.caption2)
                     .foregroundStyle(Color.nightAwareSecondary)
             }
+        }
+    }
+
+    /// Catatan pengiriman tautan, ditampilkan **di bawah** status lokal.
+    ///
+    /// **Kenapa ini ada.** `CalibrationView` menampilkan `statusMessage`
+    /// miliknya sendiri, dan setelah "Pakai" ia berbunyi "Kalibrasi terpasang"
+    /// — kalimat yang benar tentang **sisi jam**. Tetapi `link.send(calibration:)`
+    /// bisa gagal (sesi belum aktif, iPhone tidak terjangkau), dan kegagalan
+    /// itu ditulis ke `link.lastMessageNote` yang sampai hari ini tidak dibaca
+    /// satu layar pun. Jadi pengguna melihat "terpasang" sementara sigma yang
+    /// menyetel ambang keyakinan iPhone tidak pernah berangkat: dua kalimat
+    /// yang bertentangan, dan yang terlihat adalah yang salah.
+    ///
+    /// Dua baris, bukan satu yang digabung: status lokal dan status kiriman
+    /// menjawab dua pertanyaan berbeda ("apakah offsetnya terpasang di jam?"
+    /// vs "apakah hasilnya sampai ke iPhone?"), dan menggabungkannya membuat
+    /// satu kegagalan terlihat seperti kegagalan yang lain.
+    ///
+    /// Warna `warning`, bukan `danger`: kalibrasi tetap terpasang dan tetap
+    /// dipakai di jam — yang hilang hanya salinannya di iPhone. `nil` saat
+    /// normal, jadi baris ini tidak pernah muncul saat semuanya beres.
+    @ViewBuilder
+    private var linkNote: some View {
+        if let note = link.lastMessageNote {
+            Text(note)
+                .font(.caption2)
+                .foregroundStyle(PointingTone.warning.color)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

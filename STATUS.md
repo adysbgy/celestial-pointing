@@ -28720,3 +28720,147 @@ Itu celah berikutnya yang layak — dan harus dibuktikan buta dulu sebelum ditut
 
 **Catatan samping.** README diperbarui 52 → 53 aturan (aturan 10 menangkapnya
 dan memerahkan lint sampai diubah — gerbang itu bekerja persis seperti rancangannya).
+
+## Siklus 2026-10-18 (3): celah tak-terjaga di `LocationProvider` — Aturan 54
+
+**Celah yang ditemukan (bukan ditebak).** Setelah Aturan 53 menutup
+`MotionLogger`, kandidat berikutnya adalah berkas **kembarannya**:
+`Apps/Shared/LocationProvider.swift` — satu-satunya pembaca izin lokasi (jam
+maupun iPhone). Ia punya **empat** titik jujur, dan keempatnya bisa dibalik
+tanpa satu pun dari 53 aturan UI berbunyi. Diukur pada salinan utuh, proses
+baru, dengan gerbang `HEAD` yang masih ada — semuanya **exit 0**:
+
+    denied (start)      -> nil     lint LULUS  (penolakan izin dibuang, layar diam)
+    denied (delegasi)   -> nil     lint LULUS  (jalur kedua, arah yang sama)
+    restricted (start)  -> nil     lint LULUS  (pembatasan perangkat dibuang)
+    restricted (deleg)  -> nil     lint LULUS  (jalur kedua pembatasan)
+    failed              -> nil     lint LULUS  (kegagalan lokasi dibungkam)
+    akurasi guard       -> hilang  lint LULUS  (lokasi akurasi -1 diterima sah)
+
+**Kenapa ini lebih berbahaya daripada "sekadar diam".** PRD menuntut penolakan
+izin terlihat dan jelas (`SensorStatusText`, Aturan 14). Kalau `note` penolakan
+lenyap, lokasi darurat (Jakarta) dipakai menghitung langit **tanpa satu kata
+pun** yang memberi tahu pengguna bahwa koordinatnya bukan tempatnya. Itu klaim
+yang salah tentang **tempat**, dan tidak ada teks di layar yang bisa dibaca
+untuk memeriksanya — kesalahan yang bahkan tidak bisa disadari pengguna.
+
+**Kenapa Aturan 36/37/38 tidak menangkapnya.** Ketiganya mengawasi kawan
+`MotionLogger` (sensor gerak). Aturan 38 menyapu `var X: Bool` yang namanya
+sama dengan anggota model; keempat bentuk di sini bukan `Bool` dan bukan
+penerusan `snapshot.*`, jadi lepas dari jangkauannya. Aturan 14 mengawasi
+*keberadaan* jalur penolakan, bukan bahwa isinya dipertahankan.
+
+**Kenapa fail-closed lewat hitungan berpasangan.** Daftar-hitam per-kata
+(`note = nil` dilarang) langsung salah: `self.note = nil` **sah** ada 2 kali
+(mengosongkan catatan saat lokasi sungguhan tiba), jadi gerbang itu memerah
+pada kode benar. Sebaliknya penjaga "ada >= 1" juga salah: `denied` dan
+`restricted` masing-masing muncul 2 kali *by design* (dua jalur keadaan), jadi
+membalik satu jalur menyisakan jalur lainnya dan gerbang tetap hijau. Bentuk
+final menuntut **tepat 2 / 2 / 1 / 1**, sehingga hilangnya satu jalur memerah.
+
+**Bukti gerbangnya berbunyi** — `Tools/bukti-mutasi-aturan54-izin-lokasi.py`,
+9 keadaan, 0 tidak sesuai:
+
+    OK   [baseline]                                     hijau
+    OK   1. denied (start) -> nil                       MERAH
+    OK   2. denied (delegasi) -> nil                    MERAH
+    OK   3. restricted (start) -> nil                   MERAH
+    OK   4. restricted (delegasi) -> nil                MERAH
+    OK   5. failed -> nil                               MERAH
+    OK   6. penjaga akurasi dihapus                     MERAH
+    OK   7. kontrol negatif: `self.note = nil` sah      hijau
+    OK   8. fail-closed: berkas hilang -> PERINGATAN    MERAH
+
+Keadaan 7 adalah yang menjaga gerbang tetap hidup: gerbang yang memerah pada
+kode benar akan dilonggarkan orang, dan pelonggaran itu yang membunuhnya.
+Harness mengekstrak program aturannya dari `swift-ui-lint.sh` (bukan menyalin),
+karena salinan akan tetap hijau walau aturan aslinya dilonggarkan. Terdaftar di
+`engine-tests.yml`; `check-harness-terdaftar.py` kini melaporkan **101 harness,
+semuanya dirujuk**.
+
+**Yang TIDAK diklaim.** Aturan 54 menjaga **bentuk** kejujuran izin di
+`LocationProvider`, bukan bahwa setiap layar benar-benar menampilkan `note`-nya.
+Belum diukur: apakah `PointingEngine`/`PointingView` membaca `note` itu di semua
+jalur (termasuk saat aplikasi kembali dari latar). Itu celah berikutnya.
+
+**Catatan samping.** README diperbarui 53 → 54 aturan; Aturan 10 menangkapnya
+dan memerahkan lint sampai diubah — lagi-lagi gerbang itu bekerja persis seperti
+rancangannya.
+
+## Siklus 2026-10-18 (4): teks status yang ditulis 7 kali, dibaca 0 kali — Aturan 55
+
+**Cacat yang ditemukan, bukan dikarang.** Setelah Aturan 54 menutup jalur
+penulisan `LocationProvider`, pertanyaan berikutnya adalah arah sebaliknya:
+apakah setiap kalimat status yang **ditulis** benar-benar sampai ke layar?
+Saya turunkan daftarnya dari sumbernya — semua properti `@Published` di `Apps/`
+yang namanya berakhiran Note/Reason/Message/Label/Speech — lalu hitung
+pembacaannya di berkas lain. Hasilnya satu baris:
+
+    WatchLinkService.lastMessageNote   ditulis 7x, dibaca 0x
+
+Tujuh jalur: kalibrasi tidak terkirim, pesan tidak terkirim, kirim gagal,
+ambang tidak sah, permintaan keadaan terlalu dini, aktivasi sesi gagal, dan
+catatan pesan masuk. Kembarannya di iPhone (`PhoneLinkService.lastNote`) dibaca
+`LinkView` — jadi membandingkan kedua service **tidak** mencurigakan: keduanya
+punya properti catatan, hanya satu yang tersambung ke layar.
+
+**Kenapa ini bukan kerapian.** `link.send(calibration:)` adalah satu-satunya
+jalan hasil kalibrasi sampai ke iPhone, dan sigma di dalamnya yang menyetel
+ambang keyakinan di sana. Saat sesi belum aktif ia menulis
+`calibrationNotSent` — sementara `CalibrationView` menampilkan `statusMessage`
+miliknya sendiri yang berbunyi "Kalibrasi terpasang". Dua kalimat bertentangan,
+dan yang terlihat adalah yang salah. PRD menuntut kegagalan terlihat; di sini
+kegagalan yang paling merugikan (hasil ukur hilang di jalan) justru senyap.
+
+**Kenapa Aturan 12/16 tidak menangkapnya.** Aturan 12 menyapu penugasan
+berakhiran Note yang berisi **literal**; di sini nilainya accessor katalog
+(`LinkStatusText.calibrationNotSent`), jadi bentuknya justru yang benar. Aturan
+16 menyapu literal peritel aksesibilitas. Keduanya mengawasi **isi** kalimat;
+tidak ada yang mengawasi apakah kalimat itu sampai ke layar. Seluruh 54 aturan
+lain hijau.
+
+**Perbaikan.** `CalibrationView` kini punya `linkNote` — baris kedua di bawah
+status lokal, dengan warna `warning` (kalibrasi tetap terpasang di jam; yang
+hilang hanya salinannya di iPhone). Dua baris, bukan satu yang digabung:
+"apakah offsetnya terpasang?" dan "apakah hasilnya sampai ke iPhone?" adalah
+dua pertanyaan, dan menggabungkannya membuat satu kegagalan terlihat seperti
+kegagalan yang lain.
+
+**Kenapa fail-closed, bukan daftar-hitam.** Aturan 55 tidak menyebut satu nama
+properti pun. Ia menurunkan daftarnya dari akhiran nama pada deklarasi
+`@Published`, jadi properti baru ikut terjaga tanpa ada yang ingat
+mendaftarkannya. Pembacaan di **berkas sendiri** sengaja tidak dihitung: kalau
+dihitung, `lastMessageNote` lolos lewat `handle(_:)` yang membacanya untuk
+menyusun nilai berikutnya — menulis dan membaca di tempat yang sama, layar tetap
+tidak menerima apa pun. Itu persis bentuk yang lolos hari ini. Zero-item (tidak
+ada berkas, tidak ada properti teks status) = GAGAL: hijau tanpa mengukur apa
+pun adalah hijau yang kosong.
+
+**Bukti gerbangnya berbunyi** — `Tools/bukti-mutasi-aturan55-teks-mati.py`,
+7 keadaan, 0 tidak sesuai:
+
+    OK   [baseline]                                     hijau
+    OK   1. catatan tautan dibuang dari layar            MERAH
+    OK   2. properti teks status baru, tanpa pembaca     MERAH
+    OK   3. kontrol negatif: properti baru dibaca        hijau
+    OK   4. dibaca hanya di berkas sendiri               MERAH
+    OK   5. fail-closed: Apps/ hilang -> PERINGATAN      MERAH
+    OK   6. berkas view hilang -> tanpa pembaca          MERAH
+
+Keadaan 2 adalah inti rancangannya: properti yang **tidak pernah ada** di daftar
+mana pun tetap terjaga, karena daftarnya diturunkan dari sumber. Keadaan 3
+menjaga gerbang tetap hidup (gerbang yang memerah pada teks status yang benar
+akan dilonggarkan orang). Keadaan 4 mengunci keputusan "pembacaan di berkas
+sendiri tidak dihitung" — tanpa keadaan itu, aturan bisa dilonggarkan ke arah
+itu dan tetap terlihat hijau.
+
+**Yang TIDAK diklaim.** Aturan 55 menjaga bahwa teks status **dibaca** berkas
+lain, bukan bahwa ia tampil di layar yang tepat atau bahwa pengguna melihatnya.
+`lastPolicyFromPhone` juga ditulis tanpa pembaca, tetapi ia sengaja tidak masuk
+akhiran yang dijaga: nilai itu sudah dialirkan ke `onPolicyReceived` dan
+dipakai, jadi propertinya adalah cermin untuk pengujian, bukan kalimat untuk
+layar. Kalau nanti ia ingin tampil, ia harus dibaca sebuah view — dan aturan ini
+akan menuntutnya sendiri kalau namanya diubah menjadi berakhiran Note.
+
+**Catatan samping.** README 54 → 55 aturan; Aturan 10 memerahkan lint sampai
+diubah (ketiga kalinya di sesi ini — gerbang itu memang bekerja).
