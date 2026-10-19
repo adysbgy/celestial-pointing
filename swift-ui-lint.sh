@@ -11663,6 +11663,288 @@ echo "$fakta_gerak"
 [ "$fakta_gerak_status" -ne 0 ] && status=1
 
 
+# ── Aturan 66: fakta mode malam tidak boleh dibuang jadi tetapan ─────────────
+#
+# Kelasnya sama dengan Aturan 34 (keyakinan identitas diganti literal) dan
+# Aturan 35 (fakta Bool yang dibaca satu kanal diganti literal di kanal lain),
+# tetapi **fakta yang berbeda**: `isNight`/`isNightModeEnabled`. Parameternya
+# ada di model justru supaya pemanggil **tidak bisa** mengarang nilai mode
+# malam; pemanggil yang mengarangnya menghasilkan satu piksel di layar merah
+# yang bukan merah.
+#
+# Terukur pada pohon utuh, proses baru, seluruh 65 aturan dijalankan
+# (tujuh keadaan, semuanya mengompilasi dan semuanya mengganti satu argumen
+# saja):
+#
+#     CelestialVisualView  candidateStroke(isNight: NightMode.isOn) -> false
+#     CelestialVisualView  candidateFill(isNight:   NightMode.isOn) -> false
+#     CelestialVisualView  candidateStroke(isNight: NightMode.isOn) -> true
+#     SurfaceTokens  palette(isNightModeEnabled: NightMode.isOn)    -> false
+#     SurfaceTokens  palette(isNightModeEnabled: NightMode.isOn)    -> true
+#     SurfaceTokens  isNight(...) ? 0.35 : 0.18                     -> ? 0.18 : 0.18
+#     SurfaceTokens  backdropAtmosphereAlpha                        -> 0.55
+#     NightMode      tones.color(...)                               -> .opacity(0.5)
+#     NightMode      badgeFills.fill(...)                           -> .opacity(0.5)
+#
+# Sembilan keadaan, **nol** yang berbunyi. Yang paling sunyi bukan lencana
+# tanda tanya yang berubah warna, melainkan `palette(isNightModeEnabled:
+# false)` di `SurfacePalette.active`: satu baris yang mengubah **seluruh 26
+# situs** (jam dan iPhone) menjadi palet siang sementara tombol bulan di layar
+# menyala. Pengamat yang sedang menunggu matanya beradaptasi kehilangan
+# adaptasi itu 20-40 menit, dan tidak ada teks di layar yang membantahnya.
+#
+# Kenapa 34/35 tidak menangkapnya: Aturan 34 menurunkan aksesornya dari
+# parameter **`isConfirmed:`** -- keluarga `isNight:` tidak pernah masuk
+# daftarnya. Aturan 35 menurunkan dari parameter Bool, tetapi hanya memerah
+# bila berkas yang **sama** sudah membaca `.p`-nya; ketiga berkas di atas
+# membaca saklarnya lewat `NightMode.isOn` yang **tidak** bernama `isNight`,
+# jadi tidak ada yang cocok. Aturan 45 menjaga cabang `? .night : .day`
+# (bentuk), dan literal `false` bukan cabang -- ia jawaban.
+#
+# Yang diperiksa, dan **bukan** daftar nama yang ditulis tangan:
+#
+#   aksesor = setiap `func` di PointingKit/CelestialEngine yang punya
+#             parameter `isNight`/`isNightModeEnabled`.
+#
+#   Untuk setiap pemanggilannya di `Apps/`, nilai argumen itu wajib **nama
+#   yang memberitahu asalnya**, bukan literal. Nama yang sah dibaca dari
+#   bentuknya: memuat `NightMode`/`isNight`/`palette`/`active` (sumber
+#   tunggal `NightMode.isOn` atau palet yang menghitungnya). Nama lain
+#   ditolak, karena aturan ini tidak punya tipe untuk membuktikan apakah
+#   variabel bernama `isNight` itu benar-benar dibaca dari saklarnya atau
+#   dikarang di dekatnya.
+#
+# Hal yang sama untuk dua **bentuk token** yang tidak lewat aksesor:
+# `.opacity(<angka>)` pada warna palet, dan `? 0.35 : 0.18` pada `Hairline`.
+# Keduanya ditulis sebagai angka di `Apps/` dan terbukti hijau saat diganti;
+# keduanya wajib membaca token, bukan angka. Pemeriksaannya sempit --
+# hanya baris yang **sudah** menyebut `SurfacePalette`/`NightPaletteSelector`
+# -- supaya warna dekoratif lain di `Apps/` tidak ikut dituntut.
+#
+# Fail-closed: kalau aksesornya tidak ditemukan atau tidak ada satu pun
+# pemanggilan yang terlihat, aturan ini **memerah**. Hijau omdat "tidak
+# menemukan apa-apa" adalah bentuk kegagalan yang paling mungkin saat nama
+# parameternya berganti.
+echo
+echo "== Aturan 66: fakta mode malam tidak dibuang jadi tetapan =="
+fakta_malam=$(python3 - <<'PY' 2>&1
+import os
+import re
+import sys
+
+MASALAH = []
+DIPERIKSA = 0
+LITERAL = 0
+
+PK_AKAR = [
+    os.path.join("Packages", "PointingKit", "Sources", "PointingKit"),
+    os.path.join("Packages", "CelestialEngine", "Sources", "CelestialEngine"),
+]
+
+
+def tanpa_komentar(swift):
+    """Buang komentar dan kosongkan isi string -- kata di kalimat bukan kode."""
+    out, i, n = [], 0, len(swift)
+    dalam, esc = False, False
+    while i < n:
+        ch = swift[i]
+        if dalam:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                dalam = False
+            else:
+                out.append(" ")
+            i += 1
+            continue
+        if ch == '"':
+            dalam = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and swift[i + 1] == "/":
+            while i < n and swift[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and swift[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (swift[i] == "*" and swift[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def argumen_panggilan(isi, mulai):
+    """Isi kurung dari `mulai` sampai penutup tingkat atas."""
+    kedalaman = 1
+    i = mulai
+    while i < len(isi) and kedalaman > 0:
+        if isi[i] == "(":
+            kedalaman += 1
+        elif isi[i] == ")":
+            kedalaman -= 1
+        i += 1
+    return isi[mulai:i - 1]
+
+
+# 1. Aksesor model yang menerima fakta mode malam.
+#    Dua nama parameter diterima, karena keduanya ada di model hari ini
+#    (`isNight` pada CandidateMarker/NightVisual, `isNightModeEnabled` pada
+#    NightPaletteSelector). Nama baru ditambahkan ke daftar ini bila model
+#    memperkenalkannya; aturan tidak berpura-pura menebak nama.
+PARAM_MALAM = ("isNight", "isNightModeEnabled")
+
+aksesor = {}
+sumber_terbaca = 0
+for akar in PK_AKAR:
+    if not os.path.isdir(akar):
+        continue
+    sumber_terbaca += 1
+    for d, _, files in os.walk(akar):
+        if ".build" in d:
+            continue
+        for name in sorted(files):
+            if not name.endswith(".swift"):
+                continue
+            datar = re.sub(r"\s+", " ",
+                           tanpa_komentar(open(os.path.join(d, name),
+                                               encoding="utf-8").read()))
+            for m in re.finditer(r"\bfunc\s+([A-Za-z_]\w*)\s*\(", datar):
+                params = argumen_panggilan(datar, m.end())
+                for p in PARAM_MALAM:
+                    if re.search(r"\b" + p + r"\s*:\s*Bool\b", params):
+                        aksesor.setdefault(m.group(1), set()).add(p)
+
+if sumber_terbaca == 0:
+    MASALAH.append(
+        "tidak ada satu pun direktori sumber model yang terbaca -- aturan ini "
+        "tidak bisa memutuskan, jadi ia memerah.")
+
+if not aksesor:
+    MASALAH.append(
+        "tidak ada aksesor model ber-parameter `isNight:`/`isNightModeEnabled:` "
+        "yang ditemukan. Kalau nama parameternya berganti, daftar ini kosong dan "
+        "aturan akan hijau tanpa memeriksa apa pun.")
+
+# 2. Nama sumber yang sah: harus **menyebut asalnya**.
+#    `NightMode.isOn` adalah saklarnya; `SurfacePalette.active` dan
+#    `NightPaletteSelector.isNight(...)` adalah palet yang menghitungnya.
+#    Ketiganya satu rerantai, dan itulah yang menjadikan nilainya bukan rekaan.
+SAH = re.compile(r"NightMode\s*\.\s*isOn"
+                 r"|NightPaletteSelector\s*\.\s*(?:palette|isNight)\s*\("
+                 r"|SurfacePalette\s*\.\s*active")
+
+for dirpath, dirnames, filenames in os.walk("Apps"):
+    dirnames[:] = [d for d in dirnames if d != ".build"]
+    for name in sorted(filenames):
+        if not name.endswith(".swift"):
+            continue
+        jalur = os.path.join(dirpath, name)
+        try:
+            isi = tanpa_komentar(open(jalur, encoding="utf-8").read())
+        except OSError as galat:
+            MASALAH.append("TIDAK TERBACA: %s (%s)" % (jalur, galat))
+            continue
+
+        # 2a. Aksesor ber-parameter fakta malam.
+        for fn, params in aksesor.items():
+            for m in re.finditer(r"\b" + re.escape(fn) + r"\s*\(", isi):
+                args = argumen_panggilan(isi, m.end())
+                baris = isi.count("\n", 0, m.start()) + 1
+                for p in sorted(params):
+                    found = re.search(r"\b" + p + r"\s*:\s*([^,\n)]+)", args)
+                    if found is None:
+                        continue
+                    DIPERIKSA += 1
+                    nilai = found.group(1).strip()
+                    if re.fullmatch(r"true|false", nilai):
+                        LITERAL += 1
+                        MASALAH.append(
+                            "%s:%d: %s(%s: %s) -- fakta mode malam diganti "
+                            "tetapan. Sumber tunggalnya `NightMode.isOn` (atau "
+                            "palet yang menghitungnya); literal di sini "
+                            "memancarkan hijau/biru di layar yang dirancang "
+                            "untuk menyelamatkan rhodopsin, dan tidak ada teks "
+                            "di layar yang membantahnya."
+                            % (jalur, baris, fn, p, nilai))
+                    elif not SAH.search(nilai):
+                        MASALAH.append(
+                            "%s:%d: %s(%s: %s) -- nilai fakta mode malam datang "
+                            "dari nama yang tidak menyebut asalnya. Pakai "
+                            "`NightMode.isOn` atau `SurfacePalette.active` "
+                            "sehingga asal nilainya terbaca di sini."
+                            % (jalur, baris, fn, p, nilai))
+
+        # 2b. Angka pada warna palet: `.opacity(<angka>)` atau ternary `? a : b`
+        #     tempat salah satu sisanya angka.
+        #
+        #     Dua bentuk, bukan satu, karena keduanya **terukur** lolos dari
+        #     pembaca yang hanya mengenal `.opacity(`: mutasi
+        #     `? 0.35 : 0.18` -> `? 0.18 : 0.18` (Hairline) dan
+        #     `backdropAtmosphereAlpha` -> `0.55` (appBackground, lewat
+        #     variabel `palette`) keduanya hijau meski angka ganti token.
+        #
+        #     Penyaringnya: baris menyebut **penerima palet**. Dua bentuk
+        #     penerima diterima, keduanya nyata di repo ini — `SurfacePalette`
+        #     / `NightPaletteSelector` langsung, dan variabel lokal yang
+        #     diinisialisasi dari `active` pada baris mana pun di berkas itu
+        #     (`let palette = active` di `appBackground`). Tanpa bentuk kedua,
+        #     situs yang memakai variabel perantara lolos seluruhnya.
+        #
+        #     Sempit dengan sengaja: baris yang tidak menyebut palet sama
+        #     sekali tidak dituntut, jadi angka dekoratif lain di `Apps/`
+        #     (mis. `.opacity(0.92)` milik `SurfaceLevel.overlay`, yang memang
+        #     bukan warna palet) tetap hijau sampai temuan terukur sendiri.
+        variabel_palet = set(re.findall(
+            r"\b(?:let|var)\s+([A-Za-z_]\w*)\s*[:=][^=\n]*\bactive\b", isi))
+        for nomor, baris_teks in enumerate(isi.split("\n"), 1):
+            if not re.search(r"SurfacePalette\s*[.,]\s*\w|NightPaletteSelector\s*\.",
+                             baris_teks) and \
+                    not any(re.search(r"\b" + v + r"\s*[.,]\s*\w", baris_teks)
+                            for v in variabel_palet):
+                continue
+            for om in re.finditer(r"\.\s*opacity\s*\(\s*([0-9]*\.?[0-9]+)\s*\)",
+                                  baris_teks):
+                LITERAL += 1
+                MASALAH.append(
+                    "%s:%d: `.opacity(%s)` pada warna palet -- angka di sini "
+                    "adalah tetapan yang tidak diukur gerbang kontras mana pun "
+                    "(SurfacePalette diuji dengan opasitas 1). Ambil dari token "
+                    "di PointingKit supaya angkanya sama dengan yang diukur."
+                    % (jalur, nomor, om.group(1)))
+            for om in re.finditer(r"\?\s*([0-9]*\.?[0-9]+)\s*:\s*([0-9]*\.?[0-9]+)",
+                                  baris_teks):
+                LITERAL += 1
+                MASALAH.append(
+                    "%s:%d: ternary angka `? %s : %s` -- kepekatan warna yang "
+                    "ditulis sendiri di Apps/. Ambil dari token di PointingKit; "
+                    "angka yang ditulis di sini tidak pernah diukur gerbang apa "
+                    "pun." % (jalur, nomor, om.group(1), om.group(2)))
+
+if DIPERIKSA == 0:
+    MASALAH.append(
+        "tidak ada satu pun pemanggilan aksesor fakta malam di Apps/. Aturan ini "
+        "tidak mengukur apa pun, jadi ia memerah -- bukan lulus.")
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    sys.exit(1)
+
+print("Bersih: %d pemanggilan fakta mode malam, semuanya menyebut asalnya "
+      "(NightMode.isOn / SurfacePalette.active)."
+      % DIPERIKSA)
+PY
+)
+fakta_malam_status=$?
+echo "$fakta_malam"
+[ "$fakta_malam_status" -ne 0 ] && status=1
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

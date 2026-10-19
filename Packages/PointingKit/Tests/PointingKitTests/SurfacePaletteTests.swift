@@ -371,4 +371,84 @@ final class SurfacePaletteTests: XCTestCase {
             "saklar nyala mengembalikan palet siang")
     }
 
+    // MARK: - Token kepekatan garis rambut & lapisan atas
+
+    /// Garis rambut mode malam **wajib** lebih pekat dari siang.
+    ///
+    /// Ini bukan selera: di palet malam kanal hijau dan biru adalah nol,
+    /// jadi satu-satunya kanal yang bisa membedakan garis dari permukaan di
+    /// belakangnya adalah merah. Dengan kepekatan siang, garis itu jatuh di
+    /// bawah satu langkah kuantisasi sRGB dan berhenti menjadi batas.
+    ///
+    /// Uji ini menahan dua angka yang dulu hidup sebagai literal di
+    /// `Apps/Shared/SurfaceTokens.swift` — lapisan yang tidak pernah dibangun
+    /// `swift-test.sh`, sehingga mengganti keduanya tidak memerahkan apa pun.
+    func testHairlineIsMoreVisibleInNightModeThanInDayMode() {
+        XCTAssertGreaterThan(SurfacePalette.hairlineNightOpacity,
+                             SurfacePalette.hairlineDayOpacity,
+                             "garis rambut malam harus lebih pekat dari siang")
+
+        // Keduanya harus benar-benar terlihat terhadap kartu yang sama, dan
+        // tidak boleh jadi garis penuh (yang akan terbaca sebagai elemen
+        // sendiri, bukan pemisah tipis).
+        for alpha in [SurfacePalette.hairlineNightOpacity,
+                      SurfacePalette.hairlineDayOpacity] {
+            XCTAssertGreaterThan(alpha, 0.0, "garis rambut tak terlihat")
+            XCTAssertLessThan(alpha, 1.0, "garis rambut jadi elemen, bukan pemisah")
+        }
+    }
+
+    /// Pemilihan kepekatan garis rambut membaca **isi paletnya**, bukan
+    /// saklar yang menghasilkannya: kalau keduanya bisa berbeda pendapat,
+    /// layar bisa menggambar garis mode siang di atas palet malam.
+    func testHairlineOpacityFollowsThePaletteNotTheSwitch() {
+        XCTAssertEqual(
+            SurfacePalette.hairlineOpacity(for: NightPaletteSelector.palette(isNightModeEnabled: true)),
+            SurfacePalette.hairlineNightOpacity)
+        XCTAssertEqual(
+            SurfacePalette.hairlineOpacity(for: NightPaletteSelector.palette(isNightModeEnabled: false)),
+            SurfacePalette.hairlineDayOpacity)
+    }
+
+    /// Lapisan `overlay` harus tetap terbaca satu tingkat di atas kartu,
+    /// tetapi teks sekunder di atasnya tetap memenuhi WCAG AA 4.5:1.
+    ///
+    /// Yang dihitung adalah warna **hasil komposisi**, bukan `surface2`
+    /// murni: itulah warna yang benar-benar digambar, dan yang tidak diukur
+    /// selama angka 0.92 ditulis sebagai literal di `Apps/`.
+    func testOverlayLayerKeepsSecondaryTextReadableInBothModes() {
+        for enabled in [false, true] {
+            let palette = NightPaletteSelector.palette(isNightModeEnabled: enabled)
+            let composited = palette.surface2.composited(
+                over: palette.surface1, alpha: SurfacePalette.overlaySurfaceOpacity)
+            let contrast = palette.textSecondary.contrastRatio(against: composited)
+            XCTAssertGreaterThanOrEqual(
+                contrast, SurfacePalette.minimumTextContrast,
+                "teks sekunder di atas lapisan overlay mode "
+                + (enabled ? "malam" : "siang")
+                + " hanya \(contrast):1, di bawah ambang "
+                + "\(SurfacePalette.minimumTextContrast):1")
+        }
+    }
+
+    /// Angka 0.92 bukan hiasan: ia harus **kurang dari 1** (lapisan harus
+    /// benar-benar mencampur) dan cukup dekat untuk masih terasa satu
+    /// keluarga dengan `surface2`.
+    func testOverlayOpacityActuallyBlendsTowardTheCardBelow() {
+        XCTAssertGreaterThan(SurfacePalette.overlaySurfaceOpacity, 0.0)
+        XCTAssertLessThan(SurfacePalette.overlaySurfaceOpacity, 1.0,
+                          "opasitas 1 berarti lapisan overlay identik dengan surface2")
+        let palette = SurfacePalette.day
+        let composited = palette.surface2.composited(
+            over: palette.surface1, alpha: SurfacePalette.overlaySurfaceOpacity)
+        // Hasil campuran harus di antara kedua permukaan — itu yang membuat
+        // lapisan ini "satu tingkat di atas kartu", bukan permukaan ketiga.
+        XCTAssertGreaterThan(
+            SurfacePalette.largestChannelGap(from: palette.surface1, to: composited), 0.0,
+            "lapisan overlay jatuh persis di permukaan kartunya sendiri")
+        XCTAssertLessThan(
+            SurfacePalette.largestChannelGap(from: palette.surface2, to: composited), 0.01,
+            "lapisan overlay tidak komposisi, bahkan identik dengan surface2")
+    }
+
 }

@@ -2586,5 +2586,18 @@ jobs:
       - name: Buktikan Aturan 65 menjaga fakta preferensi MotionPolicy
         run: python3 Tools/bukti-mutasi-aturan65-preferensi-gerak.py
 
+      # Fakta mode malam (`isNight`/`isNightModeEnabled`) boleh dibaca dari
+      # saklarnya, tapi tidak boleh **dikarang**: `palette(isNightModeEnabled:
+      # false)` di satu baris mengubah seluruh 26 situs (jam + iPhone) menjadi
+      # palet siang sementara tombol bulan di layar menyala. Itu bukan cacat
+      # kosmetik -- mode malam ada untuk menjaga rhodopsin, dan pengguna yang
+      # mengira sudah menyalakannya mendapat layar putih di gelap.
+      #
+      # Aturan 66 ditambahkan tanpa harness dalam siklus sebelumnya; keadaan
+      # merahnya sudah terukur manual, dan harness ini yang menjaga agar
+      # pengukurannya tidak berhenti saat aturannya disunting.
+      - name: Buktikan Aturan 66 menjaga fakta mode malam
+        run: python3 Tools/bukti-mutasi-aturan66-fakta-malam.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

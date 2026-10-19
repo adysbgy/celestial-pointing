@@ -114,7 +114,7 @@ enum Hairline {
     /// pernah terbaca sebagai elemen. Di mode malam garis ikut merah.
     static var color: Color {
         SurfacePalette.active.textSecondary.color.opacity(
-            NightPaletteSelector.isNight(SurfacePalette.active) ? 0.35 : 0.18)
+            SurfacePalette.hairlineOpacity(for: SurfacePalette.active))
     }
 }
 
@@ -214,7 +214,7 @@ enum SurfaceLevel {
         switch self {
         case .card:    return palette.surface1.color
         case .raised:  return palette.surface2.color
-        case .overlay: return palette.surface2.color.opacity(0.92)
+        case .overlay: return palette.surface2.color.opacity(SurfacePalette.overlaySurfaceOpacity)
         }
     }
 }

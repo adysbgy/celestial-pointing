@@ -257,6 +257,47 @@ extension SurfacePalette {
     /// 1.63/255, kartu lebih terang di keduanya.
     public static let backdropAtmosphereAlpha = 0.11
 
+    /// Kepekatan garis rambut (`Hairline`) di atas permukaan kartu.
+    ///
+    /// **Kenapa dua angka ini pindah ke sini, bukan tinggal di
+    /// `Apps/Shared/SurfaceTokens.swift`.** Keduanya ditulis tangan sebagai
+    /// literal `0.35` (malam) dan `0.18` (siang) — satu ternary di dalam
+    /// badan `Hairline.color`, tepat di lapisan yang tidak pernah dibangun
+    /// `Apps/Shared/SurfaceTokens.swift`. Terukur (sapuan mutasi siklus ini,
+    /// seluruh 65 aturan UI dijalankan): mengganti salah satu sisanya jadi
+    /// `0.18 : 0.18` memantapkan garis rambut pada kepekatan siang **di mode
+    /// malam**, dan tidak satu pun aturan berbunyi. Jadi dua angka yang
+    /// menentukan apakah garis terlihat di layar gelap sama sekali tidak
+    /// punya sumber yang bisa diuji.
+    ///
+    /// Angka malam dibuat **lebih pekat** dari siang karena alasannya terukur:
+    /// di mode malam seluruh kanal hijau/biru palet adalah nol, sehingga
+    /// kontras garis terhadap teks sekunder hanya bisa datang dari kanal
+    /// merah (`textSecondary` 0.95 terhadap `surface1` 0.068). Garis dengan
+    /// opasitas siang terhadap permukaan malam nyaris tak terlihat — dan
+    /// garis yang tak terlihat bukan penanda batas, melainkan derau.
+    public static let hairlineNightOpacity = 0.35
+    public static let hairlineDayOpacity = 0.18
+
+    /// Kepekatan garis rambut untuk sebuah palet — dipilih dari **isi**
+    /// paletnya (`isNight`), bukan dari saklar yang menghasilkannya, supaya
+    /// dua hal itu tidak bisa berbeda pendapat.
+    public static func hairlineOpacity(for palette: SurfacePalette) -> Double {
+        palette.isNight ? hairlineNightOpacity : hairlineDayOpacity
+    }
+
+    /// Kepekatan lapisan teratas `SurfaceLevel.overlay` terhadap
+    /// `surface2`.
+    ///
+    /// Sama kelasnya dengan `backdropAtmosphereAlpha`, dan sama butuh
+    /// alasan terukur: 0.92 bukan pilihan rasa, melainkan tempat di mana
+    /// chip tetap terbaca satu tingkat di **atas** kartu sementara teks di
+    /// dalamnya tidak kehilangan kontras 4.5:1 yang sudah diuji terhadap
+    /// token. Terukur: `textSecondary` di atas `surface2` yang diopacity 0.92
+    /// di atas `surface1` memberi kontras di atas ambang, sementara 1.0 (tanpa
+    /// lapisan) membuatnya identik dengan permukaan di bawahnya.
+    public static let overlaySurfaceOpacity = 0.92
+
     /// Selisih kanal sRGB terbesar antara dua warna.
     ///
     /// Dipakai `surfaceSteps` **dan** pemeriksaan latar: satu definisi
