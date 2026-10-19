@@ -1,3 +1,100 @@
+### Siklus (18 Okt 2026 — preferensi pengguna yang boleh dibaca, tapi tidak boleh dibuat)
+
+Siklus dibuka dengan `git log` + `gh run list` + gerbang, dan dua hal langsung
+terlihat. Pertama, `main` **merah**: `bukti-mutasi-maria.py` keadaan 5 gagal
+karena harness-nya sendiri salah hitung (harness versi lama sudah dikoreksi di
+komit lokal, belum terpushed). Kedua, ada pekerjaan **belum selesai** di
+pohon kerja: blok Aturan 65 di `swift-ui-lint.sh`, tanpa harness.
+
+Yang pertama diperbaiki lebih dulu (pulihkan `Tools/render-visuals.py` dari
+mutasi yang bocor — `check-jangkar-harness.py` menangkapnya sebelum push).
+Yang kedua dilanjutkan, dan **bukan** langsung dikcommit.
+
+#### Cacat: lima mutasi kompilasi, nol gerbang berbunyi
+
+Terukur pada pohon utuh, proses baru, seluruh 64 aturan hijau:
+
+    PointingView.swift:474      reduceMotion: reduceMotion -> reduceMotion: false
+    DiagnosticsView.swift:269   reduceMotion: reduceMotion -> reduceMotion: false
+    OnboardingView.swift:174    reduceMotion: reduceMotion -> reduceMotion: false
+    DiagnosticsView.swift:811   reduceMotion: reduceMotion -> reduceMotion: false
+    (x4)                        isSceneActive: scenePhase == .active -> true
+    PointingView.swift:481      isLuminanceReduced: false -> true
+
+Yang hilang bukan animasi yang lebih cepat — yang hilang adalah **preferensi
+pengguna yang diabaikan tanpa satu pun gerbang berbunyi**. Reduce Motion tidak
+pernah ditampilkan sebagai status di layar mana pun, jadi pengabaiannya
+sama tidak terlihat dengan tidak ada Preferred Motion yang diaktifkan.
+
+Kenapa Aturan 58 tidak menutupnya: ia memeriksa **arah** penjaga pada kondisi
+yang memanggil API gerak, dan **meng-exempt** `MotionPolicy(` dengan alasan
+"model yang memutuskan; arahnya diuji di Linux". Alasan itu benar untuk nilai
+yang **keluar**, dan tidak berlaku untuk nilai yang **masuk**:
+`MotionPolicy(reduceMotion: false)` melewati keputusan model dengan mengarang
+masukannya, lalu `allowsContinuousMotion` menghitung dari angka rekaan itu.
+Kenapa Aturan 35 tidak: ia mencari sumber fakta dari **nama parameter** di
+deklarasi fungsi model, dan `MotionPolicy` adalah inisialiser struct —
+`init(reduceMotion:)` tidak pernah tercatat sebagai pemanggilan aksesor.
+
+#### Tiga cacat pada aturan itu sendiri, ketiganya terukur
+
+Aturan ini lahir dari percobaan sebelumnya dan **tiga versinya salah melewati
+gerbang** — bukan karena gerbangnya lemah. Semuanya ditemukan dengan menjalankan
+mutasi yang seharusnya merah, lalu membacanya:
+
+1. **`isSceneActive` tidak pernah berbunyi.** Versi pertama memakai
+   `bool(sumber) and bool(re.search("scenePhase", nilai))`, sementara `nilai`
+   sudah dibatasi literal `true`/`false` di baris sebelumnya. Dua syarat yang
+   saling meniadakan — literal tidak pernah memuat kata `scenePhase`, jadi
+   cabang itu **mati selamanya**. Terukur: keadaan 4 hijau.
+2. **`isLuminanceReduced` bocor lewat pencocokan kata.** Versi kedua menulis
+   "nilai harus muncul sebagai kata di berkas ini" — `true` lolos karena kata
+   `true` ada di mana saja pada berkas itu. Terukur: keadaan 6 hijau.
+3. **Per berkas, bukan per lingkup tipe.** Versi ketiga mengumpulkan
+   `@Environment` per **berkas**, dan itu membuat aturan **memerah pada kode
+   benar**: `LockArrivalPanel` (nested di `DiagnosticsView`) memakai
+   `isSceneActive: true` yang benar — panel itu tidak punya `scenePhase` sendiri
+   dan tidak pernah dirender saat app tidak aktif — tetapi sapuan melihat
+   `scenePhase` milik `DiagnosticsView` di berkas yang sama. Terukur: exit 1
+   pada `DiagnosticsView.swift:811`.
+
+Yang benar: sumber preferensi dibaca dari **blok tipe terdalam** yang memuat
+pemanggilan. Tipe nested di Swift tidak mewarisi properti milik tipe
+enclosing-nya — itulah yang membuat nilai `LockArrivalPanel` yang benar tetap
+hijau, tanpa perlu daftar pengecualian per situs. Pencocokan deklarasi tipe
+memakai indentasi sebarang; pola `\nstruct ` yang lebih sempit tidak pernah
+menemukan tipe nested dan membuat pemanggil di dalamnya terlihat seperti
+pemanggil di tipe luar (terukur sebagai cacat 3 di atas).
+
+#### Bukti
+
+`Tools/bukti-mutasi-aturan65-preferensi-gerak.py` — **19 keadaan** (11
+sekarang + 8 arah kedua), 0 tidak sesuai harapan. Program aturnya
+**diekstrak** dari `swift-ui-lint.sh`, bukan disalin. Arah kedua memakai lint
+pra-perbaikan dari `f700e05` dan wajib **HIJAU** atas keenam cacat — kalau lint
+lama sudah merah sendiri, keadaan itu tidak membuktikan apa pun.
+
+Empat jangkar harus **unik** di berkasnya, dan tiga di antaranya butuh
+perbaikan setelah pengukuran: jangkar blok-argumen penuh tidak cocok di
+`PointingView` (ada tiga baris komentar di antaranya, terukur "jangkar 0x"),
+`MotionPolicy(reduceMotion:` cocok **dua kali** di `DiagnosticsView` (terukur
+"JANGKAR 2x"), dan jangkar `isSceneActive: true)` di perkenalan tidak
+beririsan dengan `reduceMotion`. Semuanya gerbang jangkar yang menolak jalan, bukan diam.
+
+#### Yang TIDAK diklaim
+
+- Sapu teks. Tidak tahu tipe argumen, tidak tahu apakah `reduceMotion` di
+  berkas itu memang `@Environment(\.accessibilityReduceMotion)`, dan
+  penyaringan komentarnya tidak membaca blok `/* */`.
+- **Nilai non-literal tidak diperiksa** (keadaan 8 affirms hijau): aturan
+  tidak bisa menilai apakah `sensorNote` adalah sumber faktanya tanpa tipe.
+- `isLuminanceReduced: true` ditolak **mutlak** — tidak perlu lingkup punya
+  deklarasinya — karena "layar ini sedang diredupkan" adalah klaim, bukan
+  preferensi yang boleh ditebak. `false` tetap satu-satunya literal yang sah.
+- `./swift-test.sh` sedang berjalan saat STATUS ini ditulis.
+
+---
+
 ### Siklus (18 Okt 2026 — keyakinan yang hilang di satu simpul rantai)
 
 Siklus dibuka dengan sapuan mutasi kesepuluh pada lapisan gambar, dan yang

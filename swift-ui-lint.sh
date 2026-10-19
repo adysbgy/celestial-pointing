@@ -11413,6 +11413,256 @@ echo "$ukuran_objek"
 [ "$ukuran_status" -ne 0 ] && status=1
 
 
+# ── Aturan 65: fakta preferensi MotionPolicy wajib diteruskan apa adanya ───
+#
+# (CATATAN PENJAGA + EKSEKUSI ada DI BAWAH badan python ini -- lihat blok
+#  `fakta_gerak=$(python3 - <<'PY' … PY )` tepat sebelum penutup.)
+echo
+echo "== Aturan 65: fakta preferensi MotionPolicy diteruskan apa adanya =="
+fakta_gerak=$(python3 - <<'PY' 2>&1
+import os
+import re
+import sys
+
+MASALAH = []
+DIPERIKSA = 0
+TERLIHAT = 0
+
+
+def tanpa_komentar(swift):
+    """Buang `//` dan `/* */` yang di luar literal string, dan kosongkan isi
+    string -- penjaga yang hanya disebut di dalam kalimat bukan penjaga.
+    """
+    out, i, n = [], 0, len(swift)
+    dalam, esc = False, False
+    while i < n:
+        ch = swift[i]
+        if dalam:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                dalam = False
+            else:
+                out.append(ch if ch == '"' else " ")
+            i += 1
+            continue
+        if ch == '"':
+            dalam = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and swift[i + 1] == "/":
+            while i < n and swift[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and swift[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (swift[i] == "*" and swift[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def argumen_panggilan(isi, mulai):
+    """Isi tanda kurung dari `mulai` sampai penutup tingkat atas."""
+    kedalaman = 1
+    i = mulai
+    while i < len(isi) and kedalaman > 0:
+        if isi[i] == "(":
+            kedalaman += 1
+        elif isi[i] == ")":
+            kedalaman -= 1
+        i += 1
+    return isi[mulai:i - 1]
+
+
+#: Sumber preferensi yang sah: **nama variabel** yang dideklarasikan dari
+#: setiap kunci `@Environment`, dibaca di **lingkup tipe** tempat pemanggil
+#: hidup.
+#:
+#: Kenapa per lingkup tipe, bukan per berkas. `@Environment` adalah properti
+#: yang tersimpan pada tipe itu. Tipe **nested** di Swift tidak mewarisi
+#: properti milik tipe enclosing-nya -- ia harus mendeklarasikan sendiri.
+#: `LockArrivalPanel` (nested di `DiagnosticsView`) punya
+#: `@Environment(\.accessibilityReduceMotion)` sendiri di baris 808, dan
+#: **tidak** punya `scenePhase`; ia karena itu boleh menulis
+#: `isSceneActive: true`. Dikumpulkan per berkas, aturan ini akan melihat
+#: `scenePhase` milik `DiagnosticsView` di berkas yang sama dan menuduh panel
+#: mengabaikannya -- gerbang yang menuduh kode benar akan dilonggarkan orang.
+def sumber_preferensi(ruang):
+    """`{kunci @Environment: {nama variabel}}` di dalam blok tipe `ruang`."""
+    hasil = {}
+    for kunci, nama in re.findall(
+            r"@Environment\(\s*\\\.(\w+)\s*\)\s*(?:private\s+)?var\s+"
+            r"([A-Za-z_]\w*)", ruang):
+        hasil.setdefault(kunci, set()).add(nama)
+    return hasil
+
+
+#: Deklarasi tipe, dengan indentasi sebarang. Tipe nested di `Apps/` ditulis
+#: `    struct LockArrivalPanel: View {` -- pola `\nstruct ` hanya menemukan
+#: tipe tingkat atas, sehingga pemanggil di dalam tipe nested terlihat seperti
+#: pemanggil di tipe **luar** dan mewarisi `@Environment`-nya. Terukur saat
+#: pola itu dipakai: aturan memerah pada `DiagnosticsView.swift:811`, yang
+#: `isSceneActive: true`-nya **benar** (panel itu tidak punya `scenePhase`).
+#: Gerbang yang menuduh kode benar akan dilonggarkan orang.
+DEKLARASI_TIPE = re.compile(
+    r"^[ \t]*(?:public\s+|internal\s+|private\s+|fileprivate\s+)?"
+    r"(?:final\s+)?(?:struct|class|enum|extension|actor)\s+\w+",
+    re.MULTILINE)
+
+
+def ruang_tipe(isi, posisi):
+    """Potongan teks tipe **terdalam** yang memuat posisi `posisi`.
+
+    Satu posisi berada persis di dalam satu blok deklarasi tipe, jadi blok itu
+    dibaca dari deklarasinya (`struct X: View {`, `final class X {`, `class X
+    {`) sampai kurung kurawal penutupnya. Tipe nested di dalam blok itu ikut
+    terbaca sebagai isi, tapi pemanggil yang hidup **di** tipe nested
+    menyorot blok nested itu sendiri -- itu yang membuat `@Environment` milik
+    tipe luar tidak diwariskan ke pemanggil yang tidak punya deklarasinya
+    sendiri.
+
+    Pemanggil di luar setiap tipe (mis. variabel lingkup berkas) mendapat
+    ruang kosong: tidak ada `@Environment` yang bisa dibaca, dan tidak ada
+    yang perlu dijaga di sana.
+    """
+    awal = -1
+    for m in DEKLARASI_TIPE.finditer(isi):
+        if m.start() < posisi and m.start() > awal:
+            awal = m.start()
+    if awal < 0:
+        return ""
+    kedalaman = 0
+    for i in range(awal, len(isi)):
+        if isi[i] == "{":
+            kedalaman += 1
+        elif isi[i] == "}":
+            kedalaman -= 1
+            if kedalaman == 0:
+                return isi[awal:i + 1]
+    return isi[awal:]
+
+
+#: Fakta preferensi yang wajib diteruskan apa adanya, sebagai
+#: `(nama argumen, kunci @Environment, {nilai literal yang SAH})`.
+#:
+#: Bentuk literal yang **tidak** ada di tuple itu adalah cacat: kalau lingkup
+#: punya deklarasinya, mengarang nilainya berarti motion policy menghitung
+#: dari angka rekaan. Kalau lingkup **tidak** punya deklarasinya, pemanggil
+#: tidak punya pilihan lain dan angka itu adalah **jawaban** yang jujur --
+#: `OnboardingView` dan `LockArrivalPanel` benar begitu, dan memerahkannya
+#: berarti memaksa penambahan `scenePhase` yang tidak dibutuhkan.
+#:
+#: Pengecualian `isLuminanceReduced`: satu-satunya literal yang sah adalah
+#: `false`. Itu bukan formatting, itu **jawaban**: layar yang tidak pernah
+#: dirender saat redup harus bilang "tidak redup" supaya denyutnya jalan.
+#: `true` pernah berarti "berhenti berdenyut selamanya" -- klaim yang tidak
+#: bisa dibantah apa pun di layar, karena denyut yang berhenti tidak pernah
+#: botheredik menjelaskan kenapa.
+def alasan(mutlak, kunci, sumber):
+    """Kalimat yang menyebut **kenapa** nilai literal ini tidak boleh diarang."""
+    if mutlak:
+        return ("`%s` menandai layar yang sedang diredupkan sistem. Satu-satunya "
+                "literal yang boleh ditulis di `Apps/` adalah `false`, dan "
+                "hanya di layar yang benar-benar tidak pernah dirender saat "
+                "redup. `true` di sini berarti denyut berhenti tanpa sebab "
+                "yang terbaca -- klaim yang tidak bisa dibantah apa pun di "
+                "layar" % kunci)
+    return ("lingkup ini sudah membaca `%s` dari @Environment sebagai %s, jadi "
+            "nilainya tidak boleh diarang -- preferensi pengguna bukan "
+            "material yang boleh dikarang" % (kunci, ", ".join(sorted(sumber[kunci]))))
+
+
+FAKTA = (
+    ("reduceMotion", "accessibilityReduceMotion", frozenset(), False),
+    ("isSceneActive", "scenePhase", frozenset(), False),
+    ("isLuminanceReduced", "isLuminanceReduced", frozenset(["false"]), True),
+)
+
+
+for dirpath, dirnames, filenames in os.walk("Apps"):
+    dirnames[:] = [d for d in dirnames if d != ".build"]
+    for name in sorted(filenames):
+        if not name.endswith(".swift"):
+            continue
+        jalur = os.path.join(dirpath, name)
+        try:
+            isi = tanpa_komentar(open(jalur, encoding="utf-8").read())
+        except OSError as galat:
+            MASALAH.append("TIDAK TERBACA: %s (%s)" % (jalur, galat))
+            continue
+
+        for m in re.finditer(r"\bMotionPolicy\s*\(", isi):
+            argumen = argumen_panggilan(isi, m.end())
+            baris = isi.count("\n", 0, m.start()) + 1
+            DIPERIKSA += 1
+            sumber = sumber_preferensi(ruang_tipe(isi, m.start()))
+
+            for fakta, kunci, sah_literal, mutlak in FAKTA:
+                found = re.search(r"\b" + fakta + r"\s*:\s*([^,\n)]+)", argumen)
+                if found is None:
+                    continue
+                nilai = found.group(1).strip()
+                if not re.fullmatch(r"true|false", nilai):
+                    # Bukan literal: nilai datang dari suatu nama. Bentuk itu
+                    # tidak diperiksa di sini -- Aturan 52/41 menjadi
+                    # penjaganya, dan Aturan ini tidak punya tipe untuk menilai
+                    # apakah nama itu memang sumber faktanya.
+                    continue
+                # Dihitung **sebelum** siftannya: yang membuat fail-closed
+                # berarti adalah "aturan ini punya fakta untuk diperiksa",
+                # bukan "aturan ini punya pelanggaran". Menghitung yang
+                # bermasalah saja membuat pohon yang justru **bersih**
+                # dilaporkan "tidak punya apa-apa untuk diperiksa" -- gerbang
+                # yang memerah pada kode benar, kelas cacat yang sudah
+                # beberapa kali menjatuhkan `main` di repo ini.
+                TERLIHAT += 1
+                if nilai in sah_literal:
+                    continue
+                if kunci not in sumber and not mutlak:
+                    # Lingkup ini memang tidak punya fakta itu, jadi angka
+                    # di sini adalah jawaban jujur dan bukan pengabaian.
+                    continue
+                MASALAH.append(
+                    "%s:%d: MotionPolicy(%s: %s) -- %s. Yang keluar dari model "
+                    "dihitung dari angka rekaan, bukan dari keadaan sebenarnya; "
+                    "dan tidak ada apa pun di layar yang bisa memberi tahu "
+                    "dia."
+                    % (jalur, baris, fakta, nilai, alas(mutlak, kunci, sumber)))
+
+if DIPERIKSA == 0:
+    MASALAH.append(
+        "tidak ada satu pun pemanggilan `MotionPolicy(` di Apps/. Gerbang ini "
+        "tidak mengukur apa pun, jadi ia memerah -- bukan lulus.")
+
+if TERLIHAT == 0:
+    MASALAH.append(
+        "tidak ada satu pun fakta preferensi yang diteruskan sebagai literal "
+        "di Apps/. Kalau nama parameternya berganti, daftar FAKTA ikut "
+        "kosong dan aturan ini akan hijau karena tidak punya apa-apa untuk "
+        "diperiksa.")
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    sys.exit(1)
+
+print("Bersih: %d pemanggilan MotionPolicy, %d fakta preferensi diteruskan "
+      "apa adanya (daftar putih FAKTA: %s)."
+      % (DIPERIKSA, TERLIHAT,
+         ", ".join("%s<=%s" % (f, sorted(s) or "-") for f, _, s, _ in FAKTA)))
+PY
+)
+fakta_gerak_status=$?
+echo "$fakta_gerak"
+[ "$fakta_gerak_status" -ne 0 ] && status=1
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
