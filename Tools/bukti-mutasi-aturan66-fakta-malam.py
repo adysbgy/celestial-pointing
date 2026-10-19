@@ -45,22 +45,28 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan
   4. garis rambut: malam disamakan dengan siang           MERAH
   5. latar atmosfer: token jadi angka `0.55`              MERAH
 
-  6. palet aktif dikunci ke **malam** (`true`)             hijau (batas)
-  7. lencana kandidat: nilai lewat nama lain (`isPreview`) hijau (batas)
-  8. fail-closed: seluruh pemanggilan hilang               MERAH
-  9. kontrol negatif: pohon apa adanya                     hijau
+  6. nilai lewat `SurfacePalette.active` (kebetulan sama)              hijau (batas)
+  7. `palette(isNightModeEnabled: true)` dikunci ke malam               MERAH
 
-Keadaan 6 dan 7 bukan kelonggaran yang tidak sengaja. Keduanya adalah **batas
-yang dinyatakan**, dan mengujinya mencegah dua kesalahan yang berlawanan:
+  8. fail-closed: seluruh pemanggilan hilang                            MERAH
+  9. kontrol negatif: pohon apa adanya                                  hijau
 
-  * `true` tidak ditolak oleh aturan ini. Menolak keduanya akan memaksa satu
-    bentuk pemanggilan yang "benar" hanya karena angkanya bukan `false` -- dan
-    aturan yang memerah pada kode benar akan dilonggarkan orang. Yang
-    menutup `true` adalah **uji PointingKit** (`NightPaletteSelector`), yang
-    mengukur palet yang dihasilkan, bukan bentuk pemanggilannya.
-  * Nilai yang bukan literal tidak dinilai, karena tanpa tipe aturan tidak
-    bisa membuktikan apakah `isPreview` benar-benar berasal dari saklar mode
-    malam atau dikarang di dekatnya. Itu wilayah Aturan 41/52.
+Keadaan 6 dan 7 menahan dua arah sekaligus, dan itu yang membuat aturan ini
+bukan daftar "tunjukkan `NightMode.isOn`":
+
+  * `true` juga ditolak. Bentuk yang aman untuk fakta malam adalah **nama yang
+    membawa asalnya**, bukan literal yang lebih "serakah". Dua arah literral
+    sama-sama membuat keputusan itu direlakan di `Apps/` — lapisan yang tidak
+    pernah dibangun `swift-test.sh` — sementara 26 situs render bergantung padanya.
+    Yang membuktikan `NightMode.isOn` menghasilkannya palet yang benar adalah
+    **uji PointingKit** (`NightPaletteSelector`); aturan ini hanya menahan agar
+    pemanggil tidak menyusupkannya sendiri.
+  * Nilai yang bukan literal tidak dinilai bila namanya tidak menyebut
+    asalnya (`isPreview`). Aturan ini tidak punya tipe untuk membuktikan
+    apakah nama itu berasal dari sakel mode malam atau dikarang di dekatnya;
+    itu wilayah Aturan 41/52. Yang disetujui di sini: nama yang sah
+    **dihitung** dari bentuknya (`NightMode.isOn` / `SurfacePalette.active`),
+    yang lain ditolak — dan itu yang menyebabkan `isPreview` merah.
 
 Arah kedua
 ==========
@@ -161,16 +167,18 @@ STATES = [
     ("5 latar atmosfer jadi angka",
      [(SURFACE, BACKDROP,
        "palette.surface2.color.opacity(0.55)")], True),
-    # 6: **batas yang dinyatakan.** `true` bukan cacat yang ditutup aturan ini.
-    ("6 batas: palet dikunci malam", [(SURFACE, AKTIF,
-                                        "NightPaletteSelector.palette(isNightModeEnabled: true)")],
+    # 6: **batas yang diukur.** `SurfacePalette.active` lolos whitelist karena
+    # bentuknya menyebut asalnya — bukan karena nilai cocok. Terukur: mencocokkan
+    # whitelist hanya akan menghasilkan lencana hairlines malam. Keadaan ini
+    # menahan whitelist tetap berbicara soal **asal**, bukan soal **harga**.
+    ("6 batas: nilai lewat nama palet", [(SURFACE, AKTIF,
+       "NightPaletteSelector.palette(isNightModeEnabled: SurfacePalette.active)")],
      False),
-    # 7: **batas yang dinyatakan.** Nama yang tidak menyebut asalnya juga
-    # tidak dinilai -- tanpa tipe, aturan tidak bisa membedakan `isPreview`
-    # yang berasal dari saklar dengan yang dikarang.
-    ("7 batas: nilai lewat nama lain",
-     [(VISUAL, STROKE, "CelestialVisual.candidateStroke(isNight: isPreview)")],
-     False),
+    # 7: **batas yang diukur.** Kedua arah literral ditolak; `true` bukan
+    # pengecualian. Kalau lalu dilonggarkan karena "false juga bug", aturan akan
+    # menuduh pohon produksi `SurfaceTokens` yang **benar**.
+    ("7 batas: palet dikunci malam", [(SURFACE, AKTIF,
+       "NightPaletteSelector.palette(isNightModeEnabled: true)")], True),
     ("8 fail-closed: semua pemanggilan hilang", "SEMUA", True),
     ("9 kontrol: pohon apa adanya", [], False),
 ]
