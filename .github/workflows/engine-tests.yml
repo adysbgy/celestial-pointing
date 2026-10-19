@@ -2644,6 +2644,15 @@ jobs:
       - name: Buktikan Aturan 71 menggambar baris yang diucapkan
         run: python3 Tools/bukti-mutasi-aturan71-baris-digambar.py
 
+      # Tombol yang label-nya membaca keadaan (`nightMode ? "moon.fill" :
+      # "moon"`) tetapi aksinya tidak mengubah keadaan itu. Terukur sebelum
+      # Aturan 72 ada (seluruh 71 aturan UI, proses baru): mengganti
+      # `nightMode.toggle()` menjadi `nightMode = nightMode` tetap exit 0 --
+      # yang hilang justru Mode Malam satu-ketuk, dan ikonnya tetap
+      # melaporkan keadaan yang tidak pernah berubah.
+      - name: Buktikan Aturan 72 menangkap tombol yang tak mengubah keadaannya
+        run: python3 Tools/bukti-mutasi-aturan72-tombol-keadaan.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan

@@ -12740,6 +12740,157 @@ elif [ "$baris_suara_status" -ne 0 ]; then
 fi
 
 
+# ── Aturan 72: tombol yang label-nya MEMBACA keadaan wajib MENGUBAHNYA ──────
+#
+# Kelas cacatnya: tombol yang **terlihat dan terdengar** benar, tetapi aksinya
+# tidak melakukan apa pun. Label-nya membaca keadaan (`nightMode ? "moon.fill"
+# : "moon"`), jadi ikon dan kalimat aksesibilitasnya mengikuti keadaan itu --
+# dan keadaan itu tidak pernah berubah, sehingga tombolnya melaporkan
+# kebalikan dari yang terjadi.
+#
+# Terukur pada salinan utuh repo ini, proses baru: mengganti
+# `nightMode.toggle()` menjadi `nightMode = nightMode` di `PointingView`
+# membuat seluruh **71** aturan UI lulus (exit 0). Yang hilang justru FASE A
+# nomor 1 dari brief: Mode Malam satu-ketuk. Tidak ada layar yang salah,
+# tidak ada teks yang berbohong, dan tidak ada compiler yang melihatnya --
+# `nightMode = nightMode` bertipe benar dan tidak menghasilkan peringatan.
+#
+# Kenapa ini bukan sekadar salah ketik. Mode malam bukan hiasan: palet merah
+# ada supaya rhodopsin tidak rusak 20-40 menit. Tombol yang tidak melakukan
+# apa pun membuat pengguna **mengira** ia sudah aman sambil tetap menerima
+# cahaya putih-biru. Kegagalannya senyap di tempat yang paling mahal.
+#
+# Kenapa bentuknya sempit. Prototipe longgar ("setiap Button harus mengubah
+# sesuatu") tidak bisa diputuskan: banyak tombol sah yang hanya memanggil
+# fungsi, membuka NavigationLink, atau menulis ke model. Yang diputuskan di
+# sini hanya tombol yang **label-nya menyebut nama** sebuah properti
+# `@AppStorage` boolean: untuk tombol seperti itu, "label membaca keadaan"
+# dan "aksi mengubah keadaan" adalah satu kesepakatan, dan satu sisi yang
+# hilang membuat sisi lain berbohong.
+#
+# Dua arah tetap dihitung: jumlah tombol yang diperiksa dilaporkan, dan nol
+# berarti GAGAL (bukan bersih) -- aturan yang tidak menemukan apa pun tidak
+# membuktikan apa pun.
+echo
+echo "== Aturan 72: tombol yang membaca keadaan di labelnya wajib mengubahnya =="
+tombol_keadaan=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+PENYIMPAN = re.compile(
+    r"@AppStorage\([^)]*\)\s*(?:private\s+)?var\s+([A-Za-z_]\w*)\s*(?::\s*Bool\s*)?=")
+
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+
+def pasangan(isi, buka, kiri, kanan):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == kiri:
+            dalam += 1
+        elif isi[i] == kanan:
+            dalam -= 1
+            if dalam == 0:
+                return i
+    return -1
+
+
+def mengubah(aksi, nama):
+    """Apakah aksi benar-benar mengubah `nama`?"""
+    if re.search(r"\b%s\s*\.\s*toggle\s*\(\s*\)" % re.escape(nama), aksi):
+        return True
+    # Penugasan dihitung hanya kalau sisi kanannya BUKAN nama itu sendiri.
+    # Perbandingannya pada teks yang sudah di-strip: lookahead sesudah `\s*`
+    # bisa mundur melewati spasi dan lolos pada `x = x`.
+    for m in re.finditer(r"\b%s\s*=\s*([^;\n}]+)" % re.escape(nama), aksi):
+        if m.group(1).strip() != nama:
+            return True
+    return False
+
+
+berkas = []
+for dasar, dirs, nama in os.walk(AKAR):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 72 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+tombol = 0
+lulus = 0
+masalah = []
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+    bools = set(PENYIMPAN.findall(isi))
+    if not bools:
+        continue
+    for m in re.finditer(r"\bButton\s*(?:\([^)]*\))?\s*\{", isi):
+        buka = isi.find("{", m.start())
+        tutup = pasangan(isi, buka, "{", "}")
+        if tutup < 0:
+            continue
+        aksi = isi[buka:tutup + 1]
+        sisa = isi[tutup + 1:]
+        if not re.match(r"\s*label\s*:\s*\{", sisa):
+            continue
+        lb = isi.find("{", tutup + 1)
+        lt = pasangan(isi, lb, "{", "}")
+        if lt < 0:
+            continue
+        label = isi[lb:lt + 1]
+        dipakai = sorted(b for b in bools
+                         if re.search(r"\b%s\b" % re.escape(b), label))
+        if not dipakai:
+            continue
+        tombol += 1
+        for b in dipakai:
+            if mengubah(aksi, b):
+                lulus += 1
+            else:
+                masalah.append(
+                    "  %s: label tombol membaca `%s`, tetapi aksinya tidak "
+                    "mengubahnya (%s) -- tombolnya melaporkan keadaan yang "
+                    "tidak pernah ia ubah."
+                    % (path, b, " ".join(aksi.split())[:70]))
+
+if tombol == 0:
+    print("PERINGATAN: nol tombol berkeadaan terbaca -- Aturan 72 tidak "
+          "mengukur satu tombol pun.")
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+
+print("Bersih: %d tombol berkeadaan, %d bacaan label, semuanya diubah "
+      "aksinya." % (tombol, lulus))
+PY
+)
+tombol_keadaan_status=$?
+echo "$tombol_keadaan"
+if printf '%s' "$tombol_keadaan" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 72 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$tombol_keadaan_status" -ne 0 ]; then
+  echo "-> Ada tombol yang labelnya membaca keadaan yang tidak ia ubah."
+  echo "   Ikon dan kalimat aksesibilitasnya mengikuti keadaan itu, jadi"
+  echo "   tombolnya melaporkan kebalikan dari yang benar-benar terjadi."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

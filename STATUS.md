@@ -1,3 +1,71 @@
+### Siklus (19 Okt 2026 — Aturan 72: tombol yang membaca keadaan di labelnya berhenti mengubahnya)
+
+Siklus dibuka dengan **melihat** gambar, bukan membaca STATUS.md. Port Python
+repo ini (`Tools/render-visuals.py`) merender `CelestialVisualView` ke PNG
+tanpa Xcode, jadi Jupiter bisa diperiksa seperti produk: hasilnya dinilai
+**3/10** — pitanya "uniformly beige", bukan oranye-cokelat seperti yang
+diminta Bagian 1 brief. Diukur dari piksel: saturasi pita 0.30–0.41 (Mars
+0.70), dan dua pita bersebelahan berbeda **dS = 0.013** — tidak terbedakan.
+
+Itu cacat nyata, tetapi memperbaikinya berarti menyentuh palet yang dijaga
+tujuh gerbang piksel, `check_night_accents_match_the_model`, dan tiga uji
+Linux yang saling mengunci (`testJupiterSpotIsDarkerThanItsOwnBelt`,
+`testNightAccentsKeepTheDaylightBrightnessOrdering`, dan urutan terang mode
+malam). Satu percobaan palet yang lebih hangat sudah diukur di port dan
+**belum** menutup masalahnya (dua pasangan masih dS 0.004 dan dL 3.7 — pitanya
+tertutup lapisan gradien bola, bukan salah warna). Itu unit tersendiri, dan ia
+tidak dikerjakan setengah jalan di siklus ini.
+
+Yang dikerjakan: cacat yang **lebih murah dibuktikan dan lebih mahal kalau
+dibiarkan**. Sapuan mutasi pada salinan utuh menemukan bahwa
+
+    Button { nightMode.toggle() }  ->  Button { nightMode = nightMode }
+
+membuat seluruh **71** aturan UI lulus (exit 0). Ikon bulan tetap tergambar,
+kalimat aksesibilitasnya tetap diucapkan, dan tidak ada layar yang salah —
+tetapi palet merah tidak pernah aktif. Yang hilang justru **FASE A nomor 1**
+dari brief: Mode Malam satu-ketuk.
+
+Kenapa ini bukan cacat kosmetik: palet merah ada supaya rhodopsin tidak rusak
+20-40 menit. Tombol yang tidak melakukan apa pun membuat pengguna **mengira**
+ia sudah aman sambil tetap menerima cahaya putih-biru. `nightMode = nightMode`
+bertipe benar dan tidak menghasilkan peringatan compiler, jadi tidak ada
+gerbang lain yang bisa melihatnya.
+
+#### Bentuknya dipersempit supaya bisa diputuskan
+
+"Setiap `Button` harus mengubah sesuatu" tidak bisa diputuskan: banyak tombol
+sah yang hanya memanggil fungsi atau membuka `NavigationLink`. Yang diputuskan
+hanya tombol yang **label-nya menyebut nama** sebuah properti `@AppStorage`
+boolean — untuk tombol itu, "label membaca keadaan" dan "aksi mengubah
+keadaan" adalah satu kesepakatan, dan satu sisi yang hilang membuat sisi lain
+berbohong. Prototipe pertama saya sendiri sempat **salah hijau** pada mutasi
+ini karena lookahead `(?!nama)` sesudah `\s*` bisa mundur melewati spasi dan
+lolos pada `x = x`; perbaikannya membandingkan sisi kanan yang sudah
+di-strip. Itu ketahuan karena mutasinya dijalankan, bukan karena dibaca.
+
+#### Angka
+
+- 72 aturan UI hijau; Aturan 72 memeriksa 2 tombol berkeadaan (2 bacaan label).
+- 122 harness, semuanya dirujuk CI; 496 jangkar, nol mutasi tertinggal.
+- `bash -n` lolos di bash 3.2.
+- 956 tes (engine + PointingKit) tetap hijau.
+- Harness `bukti-mutasi-aturan72-tombol-keadaan.py`: 3 keadaan, 0 menyimpang —
+  pohon utuh hijau, mutasi MERAH dan menyebut `nightMode`, aturan
+  pra-perbaikan hijau pada mutasi yang sama (non-vakuitas).
+
+#### Yang TIDAK diklaim
+
+- Aturan 72 tidak membuktikan aksi tombolnya **benar**, hanya bahwa ia
+  menyentuh keadaan yang dibaca labelnya. `nightMode = !nightMode` dan
+  `nightMode = false` sama-sama lolos.
+- Ia tidak melihat tombol yang labelnya membaca keadaan lewat pembantu
+  (`Image(systemName: icon(for: nightMode))`) atau lewat `Toggle`.
+- **Pita Jupiter masih beige.** Cacat yang ditemukan di awal siklus ini
+  **belum diperbaiki**; yang tertulis di atas adalah ukurannya, bukan
+  klaim bahwa ia sudah hilang. Ia menunggu unit tersendiri karena menyentuh
+  palet yang dijaga tiga uji Linux + tujuh gerbang piksel sekaligus.
+
 ### Siklus (19 Okt 2026 — Aturan 71: baris yang diucapkan berhenti menggambar nilainya)
 
 Lanjutan langsung dari Aturan 70. Aturan 70 menjaga **satu layar** (redup) dan
