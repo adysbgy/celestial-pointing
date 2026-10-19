@@ -2623,6 +2623,17 @@ jobs:
       - name: Buktikan Aturan 69 menolak sasaran mutasi yang bukan sumber
         run: python3 Tools/bukti-mutasi-aturan69-sasaran-sumber.py
 
+      # Layar redup punya DUA saluran untuk fakta yang sama: baris yang
+      # digambar, dan label yang diucapkan VoiceOver. Keduanya membaca properti
+      # yang sama, jadi selama keduanya ada layar terlihat benar DAN terdengar
+      # benar. Terukur sebelum Aturan 70 ada (seluruh 69 aturan, proses baru):
+      # membuang baris peringatan keselamatan tetap exit 0, sementara
+      # VoiceOver tetap mengucapkannya -- dua saluran di layar yang sama
+      # saling membantah, dan yang dibantah adalah satu-satunya penolakan
+      # yang mencegah cahaya Matahari masuk ke lensa.
+      - name: Buktikan Aturan 70 menggambar fakta yang diucapkan layar redup
+        run: python3 Tools/bukti-mutasi-aturan70-fakta-digambar.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan

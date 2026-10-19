@@ -1,3 +1,80 @@
+### Siklus (19 Okt 2026 — Aturan 70: fakta yang diucapkan layar redup berhenti digambar)
+
+Siklus dibuka dengan sapuan mutasi, bukan dengan membaca STATUS.md, karena
+STATUS.md sendiri memperingatkan bahwa catatan "belum diperbaiki" di dalamnya
+basi. Yang dicari: **mutasi kecil pada `Apps/` yang lolos seluruh gerbang.**
+
+Dari 8 mutasi terverifikasi (jangkar yang muncul tepat sekali), **dua lolos**.
+Keduanya di `ReducedLuminanceView.swift` — layar yang muncul saat pergelangan
+miring sedikit, tanpa satu pun sentuhan, jadi permukaan yang paling sering
+dilihat dan paling sedikit diperiksa:
+
+    baris gambar  if let warning = engine.slewVerdict?.safetyWarningText {
+               -> if let warning = String?.none {                 -> exit 0
+    label suara   safetyWarning: engine.slewVerdict?.safetyWarningText,
+               -> safetyWarning: nil,                              -> MERAH
+
+#### Kenapa arah pertama adalah cacat, bukan sekadar informasi yang hilang
+
+Layar redup punya **dua saluran** untuk fakta yang sama: baris yang digambar,
+dan argumen `ReducedLuminanceLabel.text(...)` yang diucapkan VoiceOver.
+Keduanya membaca properti yang sama, jadi selama keduanya ada, layar terlihat
+benar **dan** terdengar benar — dan begitulah ia lolos 69 aturan selama ini.
+
+Yang hilang pada arah pertama bukan cuma informasi dari mata: VoiceOver tetap
+mengucapkan peringatan keselamatan yang tidak lagi ada di layar. Dua saluran di
+layar yang sama saling membantah, dan yang dibantah adalah satu-satunya
+penolakan yang mencegah cahaya Matahari masuk ke lensa. Arah kedua sudah dijaga
+Aturan 35, jadi ia tidak diuji ulang — hijau karena aturan lain bukan bukti
+tentang Aturan 70.
+
+#### Yang ditambahkan
+
+**Aturan 70** (`swift-ui-lint.sh`) — parameternya **diturunkan**, bukan
+didaftarkan: ia membaca argumen pemanggilan label yang **berupa ekspresi**
+(bukan literal), mengambil nama-nama yang dipakai ekspresi itu, lalu menuntut
+setiap nama masih muncul di luar pemanggilan label. Argumen baru yang
+ditambahkan besok otomatis ikut terjaga tanpa ada yang ingat mendaftarkannya.
+Nama yang dijaga diambil dari **ekspresi**, bukan dari nama parameter:
+`safetyWarning:` adalah nama parameter, sedangkan yang bisa hilang dari layar
+adalah properti yang dibacanya (`slewVerdict`, `safetyWarningText`).
+
+Fail-closed: nol panggilan label atau nol argumen fakta terbaca → GAGAL. Bentuk
+kegagalan yang paling mungkin adalah label dipindah ke berkas lain atau
+namanya berubah, dan hijau dalam keadaan itu adalah hijau yang kosong.
+
+**`Tools/bukti-mutasi-aturan70-fakta-digambar.py`** — tiga keadaan:
+pohon utuh wajib hijau, mutasi wajib MERAH **dan** menyebut `safetyWarning`,
+dan aturan pra-perbaikan (`git show HEAD:swift-ui-lint.sh`) pada mutasi yang
+**sama** wajib hijau. Keadaan ketiga itu bukti non-vakuitas: kalau aturan lama
+juga merah di sana, cacat ini sudah terjaga dan Aturan 70 tidak menambah apa
+pun. Dijalankan dari salinan pohon kerja di direktori sementara, jadi berkas
+repo tidak pernah tersentuh.
+
+#### Angka
+
+- 70 aturan UI, semuanya hijau (`./swift-ui-lint.sh` exit 0).
+- 120 harness, semuanya dirujuk `engine-tests.yml` (`check-harness-terdaftar.py`).
+- 496 jangkar, nol mutasi tertinggal (`check-jangkar-harness.py`).
+- `bash -n` lolos di bash 5 **dan** bash 3.2 (Docker) — heredoc baru tidak
+  memuat backtick, jadi tidak memicu jebakan yang pernah mematikan aturan
+  sesudahnya.
+
+#### Yang TIDAK diklaim
+
+- Aturan 70 **tidak** membuktikan bahwa baris yang digambar itu benar isinya —
+  hanya bahwa properti yang diucapkan masih dibaca di luar label. Baris yang
+  membaca properti benar lalu menggambarnya salah tetap lolos.
+- Ia tidak memeriksa layar lain. Kelas cacatnya (fakta bersaluran ganda di satu
+  layar) bisa ada di `ObjectDetailView` dan complication; keduanya belum
+  diukur, dan Aturan 70 sengaja sempit supaya tidak menjadi daftar layar yang
+  harus dirawat.
+- Satu false positive ditemukan saat menulis aturan ini (`map` pada
+  `engine.displayedObject.map(...)` dibaca sebagai nama fakta). Diselesaikan
+  dengan mengecualikan **anggota pustaka standar**, bukan dengan menambahkan
+  nama properti app ke daftar kecuali — menambahkan `safetyWarning` ke situ
+  akan mematikan aturan pada persis argumen yang ia jaga.
+
 ### Siklus (19 Okt 2026 malam — `check-visuals` merah di `main`: pembaca yang membaca cabang tetangganya)
 
 Siklus dibuka seperti biasa: `git log` + `gh run list`. `Engine Tests (Linux)`

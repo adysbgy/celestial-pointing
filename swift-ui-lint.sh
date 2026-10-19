@@ -12385,6 +12385,204 @@ elif [ "$app_group_status" -ne 0 ]; then
 fi
 
 
+# ── Aturan 70: fakta yang DIUCAPKAN layar redup wajib juga DIGAMBAR ──────────
+#
+# Kelas cacatnya: satu fakta punya **dua saluran** di layar yang sama — ia
+# digambar sebagai baris, dan ia diucapkan lewat label VoiceOver. Kedua saluran
+# membaca properti yang sama (`engine.slewVerdict?.safetyWarningText`), jadi
+# selama keduanya ada, layar terlihat benar dan terdengar benar.
+#
+# Yang tidak dijaga satu pun: **salah satu saluran dibuang.** Terukur pada
+# salinan utuh, proses baru, sebelum aturan ini ada — seluruh 69 aturan UI
+# lulus (exit 0) pada kedua arah:
+#
+#     baris gambar  if let warning = engine.slewVerdict?.safetyWarningText {
+#                -> if let warning = String?.none {                 -> exit 0
+#     label suara   safetyWarning: engine.slewVerdict?.safetyWarningText,
+#                -> safetyWarning: nil,                              -> MERAH
+#
+# Arah pertama adalah cacat yang sebenarnya: **peringatan keselamatan hilang
+# dari layar sementara VoiceOver tetap mengucapkannya.** Itu bukan cuma
+# informasi yang lenyap dari mata — ia membuat dua saluran di layar yang sama
+# saling membantah, dan yang dibantah adalah satu-satunya penolakan yang
+# mencegah cahaya Matahari masuk ke lensa. Layar redup adalah permukaan yang
+# paling sering dilihat pengguna (pergelangan miring sedikit, tanpa menyentuh
+# layar), jadi cacat ini paling sering tampil di tempat yang paling sedikit
+# diperiksa.
+#
+# Arah kedua sudah dijaga Aturan 35 (fakta Bool yang dibaca berkasnya tidak
+# boleh diganti literal). Aturan ini menutup arah yang **tidak** dijaga, dan
+# kelasnya bukan Bool: yang diukur adalah kesepakatan antara dua saluran,
+# bukan nilai satu ekspresi.
+#
+# **Kenapa parameternya diturunkan, bukan didaftarkan.** Aturan ini tidak
+# menyebut nama `safetyWarning` di mana pun sebagai daftar yang harus ada. Ia
+# membaca argumen pemanggilan `ReducedLuminanceLabel.text(...)` yang **berupa
+# ekspresi** (bukan literal `nil`/`true`/`false`), mengambil nama-nama yang
+# dipakai ekspresi itu, lalu menuntut setiap nama masih muncul di luar
+# pemanggilan label. Argumen baru yang ditambahkan besok otomatis ikut
+# terjaga tanpa ada yang ingat mendaftarkannya — dan begitulah cacat ini
+# seharusnya tertangkap sejak awal: `safetyWarning` dulu bukan daftar, ia
+# hanya argumen yang kebetulan sepi.
+#
+# **Kenapa nama diambil dari ekspresinya, bukan dari nama parameternya.**
+# `safetyWarning:` adalah nama parameter; yang bisa hilang dari layar adalah
+# **properti yang dibacanya** (`slewVerdict`, `safetyWarningText`). Menjaga
+# nama parameter saja akan hijau pada mutasi yang mengganti ekspresinya
+# dengan ekspresi lain yang sama-sama bukan literal.
+#
+# Fail-closed: nol panggilan label, atau nol argumen fakta terbaca, berarti
+# aturan ini tidak mengukur apa pun -> GAGAL. Hijau dalam keadaan itu adalah
+# hijau yang kosong, dan bentuk kegagalan yang paling mungkin adalah label
+# dipindah ke berkas lain atau namanya berubah.
+echo
+echo "== Aturan 70: fakta yang diucapkan layar redup juga digambar =="
+redup_suara=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+PANGGILAN = re.compile(r"\bReducedLuminanceLabel\s*\.\s*text\s*\(")
+
+# Kata yang bukan nama fakta: kata kunci Swift dan anggota pustaka standar
+# yang muncul di ekspresi apa pun. Tanpa daftar ini, `engine.displayedObject
+# .map(engine.displayedObjectName)` akan menuntut `map` "dibaca di luar
+# label" -- dan gerbang yang salah merah akan dimatikan orang saat ia
+# berbunyi.
+#
+# **Kenapa `map`, bukan daftar nama fakta.** Daftar ini sengaja berisi
+# **anggota pustaka**, bukan nama properti app: menambahkan `safetyWarning`
+# ke sini akan mematikan aturan pada persis argumen yang ia jaga. Yang
+# dikecualikan hanya kata yang tidak pernah bisa menjadi fakta milik layar.
+BUKAN_FAKTA = {
+    "nil", "true", "false", "self", "engine", "some", "any",
+    "Optional", "String", "Bool", "Int", "Double", "Array",
+    # Anggota pustaka standar yang lazim di ekspresi argumen.
+    "map", "flatMap", "compactMap", "filter", "count", "isEmpty",
+    "first", "last", "text", "label",
+}
+
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+
+def blok_dari(isi, buka):
+    """Isi antara '(' di posisi buka dan pasangannya, atau None."""
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "(":
+            dalam += 1
+        elif isi[i] == ")":
+            dalam -= 1
+            if dalam == 0:
+                return isi[buka + 1:i], i
+    return None, -1
+
+
+def argumen_top(nalar):
+    """Pecah daftar argumen pada koma tingkat atas saja."""
+    hasil, dalam, mulai = [], 0, 0
+    for i, c in enumerate(nalar):
+        if c in "([{":
+            dalam += 1
+        elif c in ")]}":
+            dalam -= 1
+        elif c == "," and dalam == 0:
+            hasil.append(nalar[mulai:i])
+            mulai = i + 1
+    hasil.append(nalar[mulai:])
+    return hasil
+
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 70 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+panggilan = 0
+argumen_diperiksa = 0
+
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+
+    for m in PANGGILAN.finditer(isi):
+        buka = isi.find("(", m.start())
+        argumen, tutup = blok_dari(isi, buka)
+        if argumen is None:
+            masalah.append("  %s: argumen label tidak terbaca -- aturan tidak "
+                           "bisa memutuskan." % path)
+            continue
+        panggilan += 1
+        # Bagian berkas di luar pemanggilan label: di sinilah baris yang
+        # DIGAMBAR hidup.
+        luar = isi[:buka] + " " * (tutup + 1 - buka) + isi[tutup + 1:]
+
+        for bagian in argumen_top(argumen):
+            if ":" not in bagian:
+                continue
+            nama, nilai = bagian.split(":", 1)
+            nama = nama.strip()
+            # Argumen tanpa label (bukan `nama: nilai`) bukan fakta bernama.
+            if not re.fullmatch(r"\w+", nama):
+                continue
+            token = [t for t in re.findall(r"[A-Za-z_]\w*", nilai)
+                     if t not in BUKAN_FAKTA]
+            if not token:
+                continue
+            argumen_diperiksa += 1
+            hilang = [t for t in token
+                      if not re.search(r"\b%s\b" % re.escape(t), luar)]
+            if hilang:
+                masalah.append(
+                    "  %s: argumen `%s:` diucapkan, tetapi %s tidak dibaca "
+                    "lagi di luar label -- fakta ini terdengar tanpa terlihat, "
+                    "dan dua saluran di layar yang sama saling membantah."
+                    % (path, nama, ", ".join(hilang)))
+
+if panggilan == 0:
+    print("PERINGATAN: tidak ada panggilan `ReducedLuminanceLabel.text(...)` "
+          "di %s -- Aturan 70 tidak mengukur satu layar pun." % AKAR)
+    raise SystemExit(0)
+if argumen_diperiksa == 0:
+    print("PERINGATAN: nol argumen fakta terbaca dari %d panggilan label -- "
+          "Aturan 70 tidak mengukur apa pun." % panggilan)
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+
+print("Bersih: %d argumen fakta di %d label redup, semuanya juga digambar."
+      % (argumen_diperiksa, panggilan))
+PY
+)
+redup_suara_status=$?
+echo "$redup_suara"
+if printf '%s' "$redup_suara" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 70 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$redup_suara_status" -ne 0 ]; then
+  echo "-> Layar redup mengucapkan fakta yang tidak lagi ia gambar."
+  echo "   Yang hilang dari layar bukan cuma informasi: dua saluran di"
+  echo "   layar yang sama saling membantah, dan yang terdengar adalah"
+  echo "   saluran yang tidak bisa dilihat siapa pun."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
