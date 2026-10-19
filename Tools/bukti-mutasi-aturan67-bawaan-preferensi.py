@@ -39,10 +39,15 @@ Keadaan yang diuji:
   6. Fail-closed: token salah bentuk    `PreferenceDefaults[0]` bukan nama
                                          sederhana -- aturan menolak ekspresi,
                                          bukan hanya menerima awalan.
-  7. Arah kedua (lint pra-perbaikan)     keempat mutasi di atas wajib HIJAU
-                                         pada lint sebelum Aturan 67. Kalau
-                                         lint lama sudah merah, keadaan 1–4
-                                         tidak membuktikan adanya lubang.
+  7. Arah kedua (lint tanpa Aturan 67)  keempat mutasi di atas wajib HIJAU
+                                         pada lint yang blok Aturan 67-nya
+                                         dicabut. Kalau aturan itu sudah ada
+                                         dan merah, keadaan 1–4 tidak
+                                         membuktikan adanya lubang. Blok
+                                         dicabut dari berkas itu sendiri —
+                                         bukan `git show HEAD^:` — karena HEAD^
+                                         ikut memuat aturan itu setelah satu
+                                         commit, dan arah kedua jadi tautologi.
 
 Kenapa programnya diekstrak dari `swift-ui-lint.sh`, bukan ditulis ulang di
 sini: menyalin aturannya membuat harness mengukur **salinan**, yang tetap hijau
@@ -74,30 +79,31 @@ RULE_HEADER = "# \u2500\u2500 Aturan 67:"
 PANEL_MARK = "nilai bawaan"
 TOKEN = "PreferenceDefaults"
 
+#: Jangkar ditulis **literal**, bukan f-string yang merujuk `TOKEN`: pembaca
+#: `Tools/check-jangkar-harness.py` menyelesaikan konstanta bernama dan string
+#: telanjang, tetapi tidak mengevaluasi f-string. Sebelum diperbaiki, gerbang
+#: itu melaporkan harness ini "memutasi sumber produksi tanpa satu jangkar pun"
+#: -- benar, karena jangkarnya baru dirakit saat jalan. Yang diperbaiki adalah
+#: bentuk jangkarnya, bukan gerbangnya (`JANGKAR_KECUALI` tidak dipakai).
 STATES = [
     ("[baseline]", None, False),
     ("1 Mode Malam -> literal true",
-     [(WATCH, f"= {TOKEN}.nightMode", "= true", 1)], True),
+     [(WATCH, "= PreferenceDefaults.nightMode", "= true", 1)], True),
     ("2 bunyi jam -> literal false",
-     [(WATCH, f"= {TOKEN}.audioCueEnabled", "= false", 1)], True),
+     [(WATCH, "= PreferenceDefaults.audioCueEnabled", "= false", 1)], True),
     ("3 perkenalan -> literal true",
-     [(APP, f"= {TOKEN}.onboardingSeen", "= true", 1)], True),
+     [(APP, "= PreferenceDefaults.onboardingSeen", "= true", 1)], True),
     ("4 bunyi iPhone -> literal false",
-     [(IPHONE, f"= {TOKEN}.audioCueEnabled", "= false", 1)], True),
+     [(IPHONE, "= PreferenceDefaults.audioCueEnabled", "= false", 1)], True),
     ("5 kontrol negatif: pohon apa adanya", None, False),
 ]
 
 #: Keadaan yang diuji terhadap lint PRA-Perbaikan. Kalau lint lama sudah merah
 #: atas mutasi yang sama, keadaan 1-4 tidak membuktikan adanya lubang.
 ARAH_KEDUA = [("lint lama: Mode Malam -> true",
-               [(WATCH, f"= {TOKEN}.nightMode", "= true", 1)]),
+               [(WATCH, "= PreferenceDefaults.nightMode", "= true", 1)]),
               ("lint lama: bunyi jam -> false",
-               [(WATCH, f"= {TOKEN}.audioCueEnabled", "= false", 1)])]
-
-#: Commit pra-Aturan 67. `HEAD` tidak bisa dipakai: commit unit ini sendiri
-#: sudah memuat Aturan 67, sehingga "lint lama" akan menjalankan aturan yang
-#: sedang diuji dan arah kedua jadi tautologi.
-LINT_PRA = "HEAD^"
+               [(WATCH, "= PreferenceDefaults.audioCueEnabled", "= false", 1)])]
 
 _originals = {}
 
@@ -108,15 +114,51 @@ def restore(*_):
 
 
 def _bounds(text):
+    """Rentang seluruh blok Aturan 67, termasuk pembungkus bash-nya.
+
+    Blok `$(python3 - <<'PY' … PY )` hanya berisi program penterjemahnya;
+    sesudahnya masih ada status-harness (`grep -q "PERINGATAN\|Traceback"` →
+    `status=1`) yang **ikut menghapus nama aturan** ketika tulisan ini hanya
+    memotong sampai `\nPY\n)`. Membiarkan potongan pembungkus itu tinggal
+    membuat pemeriksaan "aturan sudah dicabut" gagal walau bloknya sudah hilang.
+    """
     start = text.find(RULE_HEADER)
     if start < 0:
         return None, None
-    # Berkas diakhiri ringkasan; penutup program aturan adalah `PY` diikuti
-    # `)` pada akhir blok `$(python3 - <<'PY' ... PY )`.
     akhir = text.find("\nPY\n)", start)
     if akhir < 0:
         return None, None
-    return start, akhir + len("\nPY\n)")
+    akhir += len("\nPY\n)")
+    akhir = _akhir_status(text, akhir)
+    return start, akhir
+
+
+def _akhir_status(text, akhir):
+    """Perpanjang `akhir` sampai `fi` yang menutup uji status-harness."""
+
+    while True:
+        baris = text.find("\nfi", akhir)
+        if baris < 0:
+            return akhir
+        akhir = baris + len("\nfi")
+        if "PERINGATAN" in text[baris:akhir] or "$bawaan_pref" in \
+                text[max(0, baris - 40):baris]:
+            return akhir
+
+
+def _lint_tanpa_aturan67():
+    """Isi `swift-ui-lint.sh` dengan blok Aturan 67 dicabut.
+
+    Cara menentukan "lint lama": aturan itu **tidak ada** di berkas ini, bukan
+    "satu commit ke belakang". Tag `git show HEAD^:…` akan berhenti bekerja
+    begitu satu commit selesai, karena HEAD^ tetap memuat Aturan 67 — dan itu
+    yang bikin arah kedua menjadi tautologi sehingga pembuktiannya palsu.
+    """
+    text = open(LINT, encoding="utf-8").read()
+    start, end = _bounds(text)
+    if start is None:
+        return text
+    return text[:start] + text[end:]
 
 
 def extract_rule67():
@@ -226,15 +268,22 @@ def main():
         if not ok:
             print(f"       {detail[:300]}")
 
-        # 7. Arah kedua: lint pra-perluasan wajib HIJAU atas mutasi yang sama.
-        lama = subprocess.run(["git", "-C", ROOT, "show",
-                               f"{LINT_PRA}:swift-ui-lint.sh"],
-                              capture_output=True, text=True)
-        if lama.returncode != 0:
-            print(f"{'SALAH'} {'7 arah kedua: lint lama tidak terbaca':38s}")
+        # 7. Arah kedua: lint **tanpa Aturan 67** wajib HIJAU atas mutasi yang
+        #    sama.
+        #
+        #    Kenapa tidak `git show <commit>`: commit unit ini sendiri memuat
+        #    Aturan 67, jadi commit pra hanya bisa ditebak mundur (`HEAD^`,
+        #    `HEAD^^`, …) dan tebakannya **berubah setiap commit** -- terukur,
+        #    `HEAD^` kini sudah memuat aturan itu (putaran sebelumnya) sehingga
+        #    keadaan ini merah pada pohon yang benar. Yang menentukan arah kedua
+        #    adalah **tidak adanya aturan itu**, bukan nomor commit; jadi
+        #    bloknya dicabut dari lint di disk.
+        pra = _lint_tanpa_aturan67()
+        if "Aturan 67" in pra:
+            print(f"{'SALAH'} {'7 arah kedua: aturan masih hidup di lint pra':38s}")
             unexpected += 1
         else:
-            prog = extract_rule67_from_text(lama.stdout)
+            prog = extract_rule67_from_text(pra)
             for label, mutations in ARAH_KEDUA:
                 for path in _originals:
                     mutasi_sumber.write_source(path, _originals[path])
@@ -243,8 +292,8 @@ def main():
                         target,
                         _originals[target].replace(old, new, jumlah))
                 if prog is None:
-                    # Aturan belum ada di lint lama: setiap mutasi must be
-                    # hijau, dan itu memang yang diuji (lubangnya nyata).
+                    # Aturan belum ada di lint pra: setiap mutasi harus hijau,
+                    # dan itu memang yang diuji (lubangnya nyata).
                     fired = False
                 else:
                     fired, detail = probe(prog)

@@ -29688,3 +29688,84 @@ diubah (keempat kalinya di sesi ini).
 
 Engine 222 + PointingKit 943 tetap hijau. Gerbang jangkar 462 → 465 jangkar,
 0 kebocoran; 112 harness, semuanya dirujuk alur kerja.
+
+## Siklus 2026-10-19 (1): jangkar yang hanya hidup saat run — arah kedua jadi tautologi
+
+Dibuka dengan menjalankan gerbang yang tempel di push sebelumnya:
+`Tools/check-jangkar-harness.py`, gerbangnya sendiri **merah**.
+
+```
+alasan : STATES memanggil mutate(...): jangkar diambil dari tabel ANCHORS
+         dan penggantinya disusun dari isi jangkarnya saat jalan ...
+```
+
+Gerbang ini melaporkan harness Aturan 67 **memutasi sumber produksi tanpa satu
+jangkar pun**. Terukur: 496 jangkar terdaftar, tapi 0 pasangan
+(jangkar, pengganti) bisa dibaca sebagai teks tetap. Padahal harness itu baru
+saja lulus di push sebelumnya — karena kedua gerbang dijalankan terpisah, dan
+yang satu menuntut sesuatu yang tidak dikerjakan yang lain.
+
+### Cacatnya: jangkar dirakit dari konstanta, bukan ditulis
+
+`STATES` menulis `f"= {TOKEN}.nightMode"` — jangkar itu baru punya isi setelah
+const-nya disubtitusi saat run. Bukan berarti harness mengukur salinan; tapi
+pembacanya, satu proses statis berbasis AST, tidak punya cara melihat isi itu
+tanpa meng-evaluasi program. Cacat bentuk yang sama ada di harness Aturan 68:
+f-string merujuk `GROUP`. Dan jangkar yang tidak terlihat statis dibaca gerbang
+sebagai "tidak ada jangkar" — meskipun sebenarnya ada.
+
+### Cacat kedua, dirakit karena jangkar dirakit
+
+Mengikuti "arah kedua" di kedua harness: cabut aturan dari lint di disk, bukan
+`git show HEAD^:`. Sebab `HEAD^` **ikut memuat Aturan 67** sekarang. Terukur:
+
+```
+HEAD     Aturan67=5
+HEAD^    Aturan67=5
+HEAD^^   Aturan67=0
+```
+
+`git show HEAD^:` tidak berhenti berfungsi — tapi hasilnya sekarang tautologi:
+harness menjalankan aturan yang sedang diuji melawan dirinya sendiri, dan
+menyebutnya "lint lama". Di atas pohon yang benar, kedua keadaan arah kedua
+menyala MERAH. Arah kedua yang dinyalakan oleh aturan yang sama mengukur nol
+kebenaran. Untuk cabang Aturan 68, `HEAD^` tidak digunakan sejak awal — commit
+unit Aturan 68 belum di-push, jadi `HEAD` belum memuatnya (belum ada arah
+git yang dilepas).
+
+### Perbaikan: jangkar literal + blok dicabut dari disk
+
+Kedua harness kini memakai `ANCHORS` yang literal (`"= PreferenceDefaults.nightMode"`,
+bukan f-string) dan `_lint_tanpa_aturan67()` yang menulis `swift-ui-lint.sh`
+di disk **tanpa** blok Aturan 67 — lalu mengembalikannya lewat `mutasi_sumber`.
+Bentuk `_bounds` juga diperbaiki: blok `$(python3 - <<'PY' ... PY )` hanya
+berisi program penterjemahnya; pembungkus status-harness sesudah `PY` baru
+ikut memotong "Aturan 67" di kalimat "Pemeriksaan Aturan 67 tidak bisa
+memutuskan". Tanpa potong itu, pemeriksaan "aturan sudah dicabut" gagal
+walau bloknya sudah hilang — bukan karena aturannya masih ada.
+
+```
+OK   [baseline]                             hijau
+OK   1 Mode Malam -> literal true           MERAH
+OK   2 bunyi jam -> literal false            MERAH
+OK   3 perkenalan -> literal true           MERAH
+OK   4 bunyi iPhone -> literal false         MERAH
+OK   5 kontrol negatif: pohon apa adanya     hijau
+OK   6 fail-closed: token bentuk menyimpang  MERAH
+OK   lint lama: Mode Malam -> true           hijau
+OK   lint lama: bunyi jam -> false           hijau
+9 keadaan, 0 tidak sesuai harapan
+```
+
+Aturan 68 juga lulus dua arah (8 keadaan, 0 tidak sesuai harapan):
+mutasi nilai App Group yang sama di ketiga tempat — app jam, entitlements complication,
+dan Swift `appGroupID` — diuji berkelompok, dan lint pra-perbaikan diuji
+hijau atas mutasi yang sama.
+
+**Yang TIDAK diklaim.** Gerbang jangkar ini membaca pasangan statis; ia tidak
+memverifikasi apakah jangkarnya menunjuk ke **sumber produksi**. Harness yang
+mutasi berkas bash sebagai jangkar lulus gate — ia terbaca sebagai konstanta,
+tapi tidak menghasilkan mutasi software. Ada satu celah baca yang tersisa:
+"17 jangkar tidak ditemukan tanpa penggantinya", yang saya perlakukan sebagai
+kewajaran (harness-lama yang belum diperbarui), **bukan** sebagai kebocoran
+non-vakuos. Verifikasi itu menjadi unit berikutnya.

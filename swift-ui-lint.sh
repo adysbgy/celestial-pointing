@@ -12218,6 +12218,173 @@ elif [ "$bawaan_pref_status" -ne 0 ]; then
 fi
 
 
+# ── Aturan 68: satu App Group, satu nilai, diturunkan dari project.yml ───────
+#
+# Kelas cacatnya: **nilai yang sama ditulis di tiga tempat yang tidak saling
+# tahu.** Complication watchOS berjalan di proses terpisah, jadi satu-satunya
+# cara ia tahu objek terakhir yang terkunci adalah berkas yang dibagi lewat
+# App Group. Nilai itu tinggal di tiga berkas:
+#
+#     Apps/Shared/Complication/ComplicationStore.swift   (Swift)
+#     Apps/PointAndKnowWatch/PointAndKnowWatch.entitlements
+#     Apps/PointAndKnowWatch/Complications/…entitlements
+#
+# Terukur pada salinan utuh, proses baru: mengganti **hanya** group complication
+# menjadi `group.dev.celestial.pointandknow.typo` membuat **kedua** gerbang
+# (seluruh 67 aturan UI + 1178 uji) lulus, exit 0. Tidak ada satu pun yang
+# berbunyi.
+#
+# Kenapa ini parah padahal tidak melanggar PRD: layar app tetap benar, UI
+# benar, dan yang mati adalah **complication** — permukaan yang dilihat
+# pengguna justru saat tidak membuka app. Ia gagal diam: `containerURL:`
+# mengembalikan nil → store jatuh ke cache yang berbeda → complication tidak
+# membaca tulisan app. Tidak crash, tidak ada galat, tidak ada log. Dan di CI
+# (tanpa tanda tangan) kedua jalur memang selalu memakai fallback cache, jadi
+# build paling hijau justru saat keduanya berbeda.
+#
+# Kenapa daftar berkas **diturunkan dari `project.yml`**, bukan ditulis tangan:
+# daftar pelapis di `project.yml` sudah menjadi sumber kebenaran (XcodeGen
+# membacanya), jadi menulis daftar kedua hanya menghasilkan tempat baru untuk
+# menyimpang — situs entitlements baru akan lolos selamanya. Kalau
+# `entitlementsPath` hilang dari project.yml, aturan ini memerah.
+echo
+echo "== Aturan 68: satu App Group di Swift + semua entitlements =="
+app_group=$(python3 - <<'PY' 2>&1
+import os
+import re
+import sys
+
+
+def baca(path):
+    try:
+        return open(path, encoding="utf-8").read()
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        return None
+
+
+def group_dari_entitlements(isi):
+    # Bentuk: <key>com.apple.security.application-groups</key><array>…
+    blok = re.search(
+        r"<key>com\.apple\.security\.application-groups</key>\s*"
+        r"<array>(.*?)</array>", isi, re.S)
+    if not blok:
+        return None
+    return sorted(set(re.findall(r"<string>([^<]+)</string>", blok.group(1))))
+
+
+def group_dari_swift(isi):
+    # Bentuk: static let appGroupID = "…"
+    return re.findall(r"static\s+let\s+appGroupID\s*[:=]\s*\"([^\"]+)\"", isi)
+
+
+# ── 1. Daftar entitlements diturunkan dari project.yml, bukan ditulis tangan.
+pyml = baca("project.yml")
+if pyml is None:
+    raise SystemExit(0)
+
+ent = []
+for baris in pyml.splitlines():
+    if "entitlementsPath:" not in baris:
+        continue
+    nilai = baris.split("entitlementsPath:", 1)[1].strip()
+    if nilai.startswith("[") or not nilai:
+        continue
+    ent.append(nilai)
+
+if not ent:
+    print("PERINGATAN: tidak satu pun `entitlementsPath` di project.yml -- "
+          "aturan ini tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+for p in ent:
+    if not os.path.exists(p):
+        print("PERINGATAN: entitlements yang direferensikan project.yml tidak "
+              "ada di pohon: %s" % p)
+        raise SystemExit(0)
+
+# ── 2. Semua sumber yang menyebut App Group: entitlements + sumber Swift.
+nilai_terlihat = {}
+masalah_kosong = []
+
+
+def catat(path, nilai):
+    # `None` = blok application-groups tidak ada sama sekali;
+    # `[]`  = blok ada, tetapi kosong.
+    # Dua-duanya cacat ketika sumber lain masih memakai App Group: yang
+    # pertama menghapus seluruh group dari berkas ini, yang kedua menghapus
+    # seluruh **nilainya**. Keduanya tidak boleh diam.
+    if not nilai:
+        masalah_kosong.append(path)
+        return
+    for g in nilai:
+        nilai_terlihat.setdefault(g, []).append(path)
+
+
+for e in ent:
+    isi = baca(e)
+    if isi is None:
+        raise SystemExit(0)
+    catat(e, group_dari_entitlements(isi))
+
+sumber_swift = 0
+for d, _, nama in os.walk("Apps"):
+    for n in sorted(nama):
+        if not n.endswith(".swift"):
+            continue
+        p = os.path.join(d, n)
+        t = baca(p)
+        if t is None:
+            raise SystemExit(0)
+        nilai = group_dari_swift(t)
+        if nilai:
+            sumber_swift += 1
+            catat(p, nilai)
+
+if not nilai_terlihat:
+    print("PERINGATAN: tidak satu pun sumber menyebut App Group -- aturan ini "
+          "tidak mengukur apa pun.")
+    raise SystemExit(0)
+
+# ── 3. Setiap sumber wajib sepakat -- dan yang kosong ikut dihitung.
+# Blok entitlements tanpa isi bukan "tidak tahu": kembarannya masih masuk
+# daftar project.yml, jadi yang berarti adalah "sumber ini dihapus
+# nilainya", dan itu harus berbunyi -- kalau tidak, mengosongkan satu
+# entitlements akan terlihat seperti berkas yang tidak pernah memakai group.
+masalah = ["  %s: blok application-groups ada, tetapi isinya kosong -- "
+           "sumber lain masih memakai App Group." % p
+           for p in masalah_kosong]
+if len(nilai_terlihat) > 1:
+    for g, paths in sorted(nilai_terlihat.items()):
+        masalah.append("  nilai `%s` dipakai di: %s"
+                       % (g, ", ".join(sorted(paths))))
+    masalah.append("")
+    masalah.append("App Group yang berbeda berarti complication dan app membaca "
+                   "dua direktori berbeda:")
+    masalah.append("complication gagal diam -- memeriksa cache-nya sendiri, "
+                   "tanpa galat.")
+
+if masalah:
+    print("\n".join(masalah))
+    sys.exit(1)
+
+total = len(ent) + sumber_swift
+print("Bersih: 1 nilai App Group di %d sumber (%s)."
+      % (total, ", ".join(sorted(list(nilai_terlihat.values())[0]))))
+PY
+)
+app_group_status=$?
+echo "$app_group"
+if printf '%s' "$app_group" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 68 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$app_group_status" -ne 0 ]; then
+  echo "-> Satu fakta, beberapa nilai: complication bisa gagal diam"
+  echo "   (memeriksa cache-nya sendiri) tanpa satu pun galat."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

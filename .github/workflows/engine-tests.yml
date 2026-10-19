@@ -2620,5 +2620,14 @@ jobs:
       - name: Buktikan Aturan 35 mengawasi panel `struct` di Apps/
         run: python3 Tools/bukti-mutasi-panel-anak-view.py
 
+      # Satu fakta, tiga nilai: App Group adalah jalan pintas tunggal antara app
+      # jam dan complication (proses terpisah). Terukur sebelum Aturan 68 ada
+      # (seluruh 67 aturan + 1178 uji, proses baru): mengganti group hanya di
+      # berkas yang satu -- Swift, entitlements app, atau entitlements
+      # complication -- semuanya exit 0. Complication lalu memeriksa cache-nya
+      # sendiri selamanya, tanpa galat, tanpa log.
+      - name: Buktikan Aturan 68 menjaga satu App Group
+        run: python3 Tools/bukti-mutasi-aturan68-app-group.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
