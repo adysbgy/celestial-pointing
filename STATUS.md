@@ -1,3 +1,71 @@
+### Siklus (19 Okt 2026 — M7/M41: dari mencatat tabrakan menjadi memisahkan lewat susunan bintang)
+
+Siklus dibuka dengan `git log` + `gh run list` + gerbang. `main` punya 4
+berkas di pohon kerja yang belum ter-commit: sisa dari komit terakhir yang
+**hanya** mencatat tabrakan gugus terbuka m7/m41 tanpa memisahkannya. Karena
+STATUS sendiri akui (siklus 17 Okt) itu celah hijau-palsu — gambar M41 = gambar
+M7 — siklus ini menyelesaikannya, bukan mengulang "mencatat".
+
+#### Cacat: dua gugus terbuka digambar identik, dan komit lalu tidak memperbaiki
+
+`m7` (Gugus Ptolemy) dan `m41` (Gugus M41) bertabrakan di **seluruh** sinyal
+bentuk: sama `.openCluster`, `fuzziness` 0,50, elongasi 1,0, dan warna ikut
+morfologi. `VisualFrame.deepSky` lalu menghasilkan tujuh blob dengan offset,
+setengah-lebar, dan opasitas **sama persis**. Di layar, saat engine menunjuk
+M41, gambarnya milik M7 — kelas "gambar lebih yakin daripada teksnya" yang
+dilarang PRD.
+
+#### Dua jalan perbaikan yang **salah**, diukur bukan dikira
+
+1. Menurunkan `fuzziness` m41 → 0,44 hanya mengubah lebar tiap blob, bukan
+   letaknya: render berubah ~7% piksel, delta kanal ~0,09 — tak terbaca pada
+   kartu jam 38 pt. Hijau palsu.
+2. Memipihkan siluet lewat `elongation` **tidak dipakai**: M7 dan M41 sama-sama
+   nyaris bulat, jadi memipihkan salah satunya = mengarang bentuk demi lulus
+   uji.
+
+#### Perbaikan: derajat kebebasan yang nyata
+
+`VisualFrame.scatterRotated(_:byObjectID:)` memutar susunan bintang dengan
+sudut deterministik yang diturunkan dari id lewat campuran FNV-1a 32-bit
+(`hashValue` Swift **tidak** dipakai karena diacak per proses). Memutar tidak
+mengubah jumlah, ukuran, sebaran, maupun opasitas satu blob pun — hanya
+arahnya. `objectID` diteruskan ke `deepSky` dan **diturunkan ke `nil` saat
+engine ragu** (`isConfirmed ? visual.objectID : nil` di view), jadi kabut netral
+saat `.uncertain` tetap susunan bawaan — tidak menunjuk satu gugus lewat tata
+letak bintangnya.
+
+`render-visuals.py` (port gerbang piksel) diikuti dengan `_rotate_scatter`
+menggunakan campuran yang sama persis, supaya kedua sisi menghasilkan sudut
+identik.
+
+#### Uji ditulis ulang, bukan cuma diganti nama
+
+`testOpenClusterPairRendersDistinctArrangements` menuntut tiga hal sekaligus:
+(1) geometri kedua id **benar-benar berbeda** (toleransi 0,01 — jauh di atas
+galat titik-mengambang, jauh di bawah pergeseran sudut terkecil); (2) `nil` ==
+susunan bawaan persis (akurasi 1e-12); (3) deterministik antar panggilan.
+Kontrol prasyarat menjaga bahwa sinyal tabel m7/m41 **masih** bertabrakan,
+supaya uji (1) tidak lulus karena lupa membandingkan.
+
+#### Yang TIDAK diklaim
+
+- Sudut ini **bukan** bentuk gugus yang sebenarnya — sebaran aslinya tidak
+  dikenal katalog ini. Yang dijaga hanya bahwa dua objek berbeda tidak tampil
+  identik, bukan bahwa posisinya akurat secara astronomis.
+- Hanya M7/M41 yang sebelumnya identik yang berubah; gugus terbuka lain tetap
+  memakai susunan bawaan (id tak dikenal → sudut 0 deterministik, bukan acak).
+- Gerbang piksel penuh (`check-visuals.py`) tidak dijalankan utuh di VPS; yang
+  dijalankan adalah uji model + typecheck + ui-lint. Eksekusi penuh di CI.
+
+#### Gerbang
+
+    swift-test.sh      950 hijau, 0 gagal
+    swift-ui-lint.sh   66 aturan, hijau
+    swift-typecheck.sh SEMUA GERBANG LULUS
+
+---
+
 ### Siklus (19 Okt 2026 — Aturan 66: fakta mode malam yang hilang tanpa harness, dan dua batas yang salah saya kira)
 
 Siklus dibuka dengan `git log` + `gh run list`: `Engine Tests (Linux)` **masih
