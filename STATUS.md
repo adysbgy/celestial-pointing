@@ -1,3 +1,83 @@
+### Siklus (19 Okt 2026 — Aturan 66: fakta mode malam yang hilang tanpa harness, dan dua batas yang salah saya kira)
+
+Siklus dibuka dengan `git log` + `gh run list`: `Engine Tests (Linux)` **masih
+berjalan** untuk siklus Aturan 65, sementara di pohon kerja ada blok Aturan 66
+yang **lengkap tapi tidak punya harness** dan satu `main` yang berpotensi
+merah olehnya. Blok itu diukur dulu, dipush sesudah ada yang menjaga
+ukurannya.
+
+#### Cacat: mutasi yang mengompilasi, nol gerang berbunyi
+
+Terukur pada salinan utuh, proses baru, seluruh **65** aturan dijalankan, dengan
+mutasi yang semuanya mengompilasi dan semuanya hanya mengganti satu argumen
+atau satu angka:
+
+    CelestialVisualView  candidateStroke(isNight: NightMode.isOn) -> false
+    CelestialVisualView  candidateFill(isNight:   NightMode.isOn) -> true
+    SurfaceTokens        palette(isNightModeEnabled: NightMode.isOn) -> false
+    SurfaceTokens        backdrop  backdropAtmosphereAlpha       -> 0.55
+
+Lima keadaan, nol yang berbunyi. `palette(isNightModeEnabled: false)` di
+`SurfacePalette.active` adalah yang paling sunyi: satu baris yang mengubah
+**seluruh 26 situs** (jam dan iPhone) menjadi palet siang sementara tombol
+bulan di layar menyala. Aturan 66 yang sudah ditulis siklus sebelumnya
+menutupnya; yang belum ada adalah bukti bahwa aturan itu **bisa merah**.
+
+#### Harness: sembilan keadaan, dan dua yang saya salah tulis
+
+`Tools/bukti-mutasi-aturan66-fakta-malam.py` menjalankan blok aturannya —
+**diekstrak** dari `swift-ui-lint.sh`, bukan disalin — atas sembilan keadaan,
+lalu mengulang kelima keadaan cacat atas lint pra-perbaikan (`02b0dc4`, wajib
+HIJAU).
+
+Versi pertama harness saya menempatkan keadaan 6 dan 7 sebagai **hijau**
+("batas yang dinyatakan"): `palette(isNightModeEnabled: true)` dan
+`candidateStroke(isNight: isPreview)`. Harness menjalankannya dan keduanya
+**MERAH**. Aturan 66 menolak kedua arah literal dan menolak nama yang tidak
+menyebut asalnya.
+
+Harapannya diperbaiki ke hasil ukur, **aturan tidak dilonggarkan** — dan itu
+keputusan yang benar, karena `true` memang cacat: lencana kandidat akan memakai
+palet malam di layar yang mode malamnya mati. Keadaan 6 akhirnya memakai
+`SurfacePalette.active`, yang lolos karena bentuknya menyebut asalnya; itu
+menahan whitelist aturan tetap berbicara soal **asal**, bukan soal **nilai**.
+
+    OK   1 lencana: stroke jadi false            MERAH
+    OK   2 lencana: fill jadi true               MERAH
+    OK   3 palet aktif dikunci siang              MERAH
+    OK   4 garis rambut: malam = siang            MERAH
+    OK   5 latar atmosfer jadi angka              MERAH
+    OK   6 batas: nilai lewat nama palet          hijau
+    OK   7 batas: palet dikunci malam             MERAH
+    OK   8 fail-closed: pemanggilan hilang       MERAH
+    OK   9 kontrol: pohon apa adanya              hijau
+    arah kedua (lint 02b0dc4, wajib HIJAU): 1..5, 7, 8 semua hijau
+
+Dua hal lain yang gagal lebih dulu dan keduanya menolak jalan, bukan diam:
+`require_clean_sources` memerahkan harness selama `SurfaceTokens.swift` masih
+tertulis di pohon kerja (harness tidak boleh mengadopsi penyimpangan sebagai
+"aslinya"), dan jangkar yang saya coba pakai `isPreview` tidak pernah cocok
+setelah cabangnya ternyata dibaca dari baris lain. Jangkar final diperiksa
+**unik per berkas** di `main()`, seperti harness saudaranya.
+
+Terdaftar di `engine-tests.yml` (`check-harness-terdaftar.py`: 114 harness,
+semuanya dirujuk). Diaman `git stash`/`pop` membuktikan 481 jangkar terhitung
+sama sebelum dan sesudah harness ini — angka 16 "jangkar tanpa pengganti" itu
+**bawaan**, bukan dari siklus ini.
+
+#### Yang TIDAK diklaim
+
+- Aturan 66 tetap **sapu teks**: ia tidak tahu tipe argumen dan tidak menuntut
+  angka dibaca dari token bila barisnya tidak menyebut penerima palet. Yang
+  terbukti hanya bentuk pemanggilan yang **ada**.
+- `bukti-mutasi-aturan66-fakta-malam.py` dijalankan penuh secara lokal
+  (~4 menit), tapi **eksekusi CI-nya belum selesai** saat STATUS ini ditulis;
+  yang sudah hijau adalah `Apple Build` (macos-15, 3m44s) untuk `b03a426`.
+- Keadaan 6 dan 7 bukan bukti bahwa whitelist `NightMode.isOn` /
+  `SurfacePalette.active` cukup; ia hanya menahan agar keduanya tetap disebut.
+
+---
+
 ### Siklus (18 Okt 2026 — preferensi pengguna yang boleh dibaca, tapi tidak boleh dibuat)
 
 Siklus dibuka dengan `git log` + `gh run list` + gerbang, dan dua hal langsung
