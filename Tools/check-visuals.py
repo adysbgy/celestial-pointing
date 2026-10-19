@@ -879,7 +879,7 @@ def check_moon_surface_hides_when_uncertain(results, size=200, ss=2):
                 beda += 1
 
     results.append(Result(
-        "peredupan permukaan Bulan hilang saat ragu", beda == 0,
+        f"peredupan permukaan Bulan hilang saat ragu ({size} px)", beda == 0,
         f"{beda} piksel berbeda -- maria & kawah adalah ciri pengenal, "
         f"mereka tidak boleh tampil sebelum identitasnya dikunci"))
 
@@ -899,7 +899,7 @@ def check_moon_surface_hides_when_uncertain(results, size=200, ss=2):
                      if yakin[2][y][x * 4:x * 4 + 3]
                      != yakin_tanpa[2][y][x * 4:x * 4 + 3])
     results.append(Result(
-        "peredupan permukaan Bulan tampil saat yakin", beda_yakin > 0,
+        f"peredupan permukaan Bulan tampil saat yakin ({size} px)", beda_yakin > 0,
         f"{beda_yakin} piksel berbeda antara sabit yakin berpendar & tanpanya -- "
         f"kalau 0, peredupan permukaan tidak pernah digambar sama sekali"))
 

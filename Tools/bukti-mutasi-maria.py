@@ -60,6 +60,18 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                    menyalakan gerbang paritas referensi juga
                                    (mengubah **data**, bukan gambar) — dua
                                    gerbang berbunyi untuk satu kelas.
+  4. port: peredupan digambar       penjaga `is_confirmed` di `_draw_moon`
+     walau engine ragu             dilepas; yang wajib berbunyi hanya
+                                   "hilang saat ragu".
+  5. port: peredupan tidak          kedua gelung peredupan berhenti
+     digambar sama sekali          beriterasi. Arah sebaliknya dari 2, dan
+                                   yang wajib berbunyi "tampil saat yakin" di
+                                   **kedua** ukuran (38 & 200 px) **dan**
+                                   "masih tergambar di belahan menyala"
+                                   **penuh** (terukur 4 dari 4). "Hilang
+                                   saat ragu" **tidak** ikut berbunyi, dan
+                                   itu bukan celah — lihat
+                                   `SHOWN_AT_BOTH_SIZES`.
 
 **Batas yang dinyatakan.** Keadaan 1–2 memutasi **port Python**, bukan view
 Swift: yang diukur kedua gerbang itu adalah piksel port, jadi hanya port yang
@@ -313,6 +325,34 @@ REFERENCE_CLASS = "referensi maria sama dengan model"
 #: yang hanya punya satu arah tidak bisa membedakan keduanya.
 SHADING_HIDDEN_CLASS = "peredupan permukaan Bulan hilang saat ragu"
 SHADING_SHOWN_CLASS = "peredupan permukaan Bulan tampil saat yakin"
+#: Kelas bantu keadaan 5: "tampil saat yakin" wajib berbunyi di **kedua**
+#: ukuran (38 px kartu jam & 200 px panel), bukan salah satunya. Namanya
+#: membawa kedua angka, jadi keempat pemeriksaan (2 ukuran x 2 sisi
+#: pembanding) ikut terhitung — dan itulah yang dituntut keadaan 5.
+SHOWN_AT_BOTH_SIZES = "38 px|200 px"
+#: **Kenapa keadaan 5 menuntut kelas yang MENYEBUT ukurannya, bukan "hilang
+#: saat ragu".**
+#:
+#: Bentuk lain keadaan ini — rebind global yang mematikan maria & kawah di
+#: **kedua** jalur (`MARIA = []; MOON_CRATERS = []` di kepala `_draw_moon`) —
+#: diukur di salinan repo, proses baru, dua ukuran:
+#:
+#:     "hilang saat ragu"          hijau di 38 & 200  (0 piksel, sah)
+#:     "tampil saat yakin"         MERAH di 38 & 200  (0 piksel, seharusnya > 0)
+#:     "masih tergambar…menyala"   MERAH 2 dari 6
+#:
+#: "Hilang saat ragu" memang tidak bisa berbunyi di sana, dan itu benar: ia
+#: membandingkan sabit ragu berperedupan lawan sabit ragu tanpa peredupan;
+#: kalau peredupan tidak pernah digambar, keduanya identik dan selisihnya nol
+#: — nol yang sah, bukan kebocoran. Gerbang yang hanya punya dua jalur tidak
+#: bisa berbicara tentang keadaan yang menghapus keduanya, dan menuntutnya
+#: merah berarti menuntutnya menebak. Arah itu ditutup keadaan 4.
+#:
+#: Bentuk yang dipakai sekarang (`enumerate([])` / `zip([], …)`) melemahkan
+#: gelung di port sehingga jalur **yakin** kehilangan peredupan; karena itu
+#: "tampil saat yakin" dan "masih tergambar" yang wajib berbunyi, di kedua
+#: ukuran. Kelas di bawah menyebut **kedua ukuran** itu di namanya: gerbang
+#: yang berhenti mengukur satu ukuran tidak bisa lulus lagi.
 
 #: Jangkar gerbang keyakinan peredupan di port.
 #:
@@ -403,18 +443,22 @@ STATES = [
       # (38) sisa cekungan itu — hijau, padahal keadaan ini mengklaim
       # seluruh peredupan permukaan dimatikan.
       (RENDER, PORT_CRATER_LOOP, PORT_CRATER_NOLOOP)],
-     # Dua kelas, bukan satu, dan itu terukur. Mematikan gelung peredupan
-     # menghapus **maria dari gambar**, bukan cuma dari saat ragu — jadi
-     # selain "shows" (yang memang wajib berbunyi), gerbang *arah sebaliknya*
-     # untuk piringan yang cukup terang (`moon-gibbous`,
-     # `moon-waning-gibbous`) juga berbunyi sah: "masih tergambar di belahan
-     # menyala 0 piksel" adalah laporan yang **benar** tentang gambar yang
-     # maria-nya dihapus. Sebelum ini kelasnya ditulis satu, keempat merah itu
-     # dilaporkan sebagai "MERAH YANG TIDAK DIMINTA" — padahal yang salah
-     # cakupan keadaan ini, bukan gerbangnya. Sabit tidak ikut berbunyi karena
-     # `MOON_FEATURE_VISIBLE_FROM_ILLUMINATION` sudah mengecualikannya (pita
-     # tipis tidak menutupi pusat piringan); itu juga benar.
-     [SHADING_SHOWN_CLASS, LIT_CLASS]),
+     # Tiga hal yang dituntut, dan ketiganya **terukur** pada keadaan ini
+     # (bukan dugaan): mematikan kedua gelung peredupan permukaan mengosongkan
+     # maria **dan** kawah dari kedua jalur, sehingga
+     #   1. "tampil saat yakin" berbunyi di **kedua** ukuran (38 & 200 px) —
+     #      itu yang ditegakkan `SHOWN_AT_BOTH_SIZES`;
+     #   2. "masih tergambar di belahan menyala" berbunyi **penuh** (4 dari 4),
+     #      karena tidak ada satu pun maria/kawah yang lagi tercetak di sisi
+     #      terang — bukan hanya sebagian kasus. Versi lama harness mengira
+     #      hanya "2 dari 6" dan karena itu **tidak** menuntut kelas ini,
+     #      sehingga keadaannya yang benar dilaporkan "MERAH YANG TIDAK
+     #      DIMINTA" tepat di run CI. Angka 4 dari 4 di sini adalah hasil
+     #      pengukuran di atas, bukan tebakan.
+     #   3. "hilang saat ragu" **tidak** ikut berbunyi — peredupan yang tidak
+     #      pernah digambar memang tidak pernah bocor; arah itu ditutup
+     #      keadaan 4.
+     [SHADING_SHOWN_CLASS, SHOWN_AT_BOTH_SIZES, LIT_CLASS]),
 ]
 
 _originals = {}
@@ -537,6 +581,20 @@ def main():
         counts = {cls: sum(1 for _, name in checks if cls in name)
                   for cls in (DARK_CLASS, LIT_CLASS, REFERENCE_CLASS,
                               SHADING_HIDDEN_CLASS, SHADING_SHOWN_CLASS)}
+        # `SHOWN_AT_BOTH_SIZES` **bukan** kelas substring dan sengaja tidak
+        # masuk hitungan ini. Nilainya `"38 px|200 px"` — pola alternatif yang
+        # tidak pernah muncul sebagai isi nama pemeriksaan, jadi
+        # `SHOWN_AT_BOTH_SIZES in must_fire` hanya dibaca sebagai **penanda**
+        # oleh blok "kedua ukuran" di bawah, bukan lewat pencocokan `in`.
+        # Kalau ikut dihitung di sini, ia selalu nol dan kelas beranggota nol
+        # akan menggagalkan fail-closed tanpa alasan.
+        #
+        # Jumlah "tampil saat yakin" tetap dijaga lewat
+        # `SHADING_SHOWN_CLASS`, yang namanya kini **menyebut ukuran**
+        # ("...tampil saat yakin (38 px)") — itu yang membuat keadaan 5 bisa
+        # menuntut "kedua ukuran" tanpa menebak, karena setiap ukuran punya
+        # barisnya sendiri di baseline.
+
         for cls, n in counts.items():
             if n == 0:
                 print(f"GERBANG: kelas «{cls}» tidak punya satu pun "
@@ -568,13 +626,56 @@ def main():
             missing = [name for name in expected if name not in fired]
             spurious = [name for name in fired
                         if not any(cls in name for cls in must_fire)]
-            # Kalau jumlah anggotanya berbeda dari baseline, katalognya
-            # bergerak di tengah harness — itu sendiri layak merah.
+            # Kalau jumlah anggota **tiap kelas** berbeda dari baseline,
+            # katalognya bergerak di tengah harness — itu sendiri layak merah.
+            #
+            # Perbandingannya **per kelas**, bukan satu angka untuk seluruh
+            # `must_fire`. Versi pertama membandingkan `len(expected)` dengan
+            # `counts[cls]` untuk tiap kelas, padahal `expected` adalah
+            # gabungan semua kelas yang dituntut — jadi pada keadaan yang
+            # menuntut dua kelas (keadaan 5) keduanya dibandingkan dengan
+            # ukuran gabungan dan **semuanya** salah, termasuk keadaan yang
+            # benar. Terukur di `main` merah: keadaan 5 melaporkan "kelas
+            # «…tampil saat yakin»: 6 pemeriksaan, baseline 2" padahal
+            # keadaannya benar — yang 6 itu gabungan dua kelas.
+            # `SHOWN_AT_BOTH_SIZES` **bukan** kelas substring dan tidak ada
+            # di `counts` — penanda, bukan pemeriksaan — jadi dilewati di
+            # sini (dibaca oleh blok "kedua ukuran" di bawah). Tanpa lompatan
+            # ini namanya memicu `KeyError` karena tidak punya hitungan
+            # baseline.
             for cls in must_fire:
-                if len(expected) != counts[cls]:
+                if cls not in counts:
+                    continue
+                dalam_kelas = sum(1 for name in expected if cls in name)
+                if dalam_kelas != counts[cls]:
                     spurious.append(
-                        f"kelas «{cls}»: {len(expected)} pemeriksaan, "
+                        f"kelas «{cls}»: {dalam_kelas} pemeriksaan, "
                         f"baseline {counts[cls]}")
+            # Keadaan 5 menuntut "tampil saat yakin" berbunyi di **kedua** ukuran.
+            #
+            # Blok ini menolak keadaan yang hanya menyalakan satu ukuran —
+            # kelas yang sudah tercatat di repo ini (salah satu ukuran
+            # diukur, ukuran yang-important tidak). Cara menghitungnya
+            # bergantung pada nama pemeriksaan yang **menyebut ukuran**,
+            # jadi inilah alasan nama gerbang di `check-visuals.py` ditulis
+            # sebagai "...tampil saat yakin (38 px)": tanpa ukuran di nama,
+            # dua pemeriksaan yang sama-sama bernama itu tidak bisa
+            # dibedakan dan "kedua ukuran" tidak dapat dinyatakan.
+            #
+            # Angka "2 dari 6" yang pernah tertulis di sini **salah**, dan
+            # kesalahannya terukur: di run CI yang merah, keadaan 5
+            # menyalakan 6 pemeriksaan total = 2 "tampil saat yakin"
+            # (38 & 200 px) + 4 "masih tergambar di belahan menyala". Karena
+            # itu kelas kedua ikut dituntut di `STATES`.
+            if SHOWN_AT_BOTH_SIZES in must_fire:
+                fired_sizes = sorted(
+                    "38" if "38 px" in name else "200"
+                    for name in fired if SHADING_SHOWN_CLASS in name)
+                if fired_sizes != ["200", "38"]:
+                    spurious.append(
+                        'peredupan mati tetapi "tampil saat yakin" hanya '
+                        f"berbunyi di ukuran {fired_sizes or '—'}, bukan "
+                        "kedua ukuran")
             ok = not missing and not spurious
             if not ok:
                 unexpected += 1
