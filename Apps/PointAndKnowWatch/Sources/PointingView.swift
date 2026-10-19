@@ -20,10 +20,10 @@ struct PointingView: View {
     /// Preferensi mode malam, disimpan ke `UserDefaults` lewat `NightMode`.
     /// Satu ketukan membalik palet merah murni di seluruh layar (lihat
     /// `PointingTone.color` / `Color.nightAwareSecondary`).
-    @AppStorage(NightModeStorage.key) private var nightMode = false
+    @AppStorage(NightModeStorage.key) private var nightMode = PreferenceDefaults.nightMode
     /// Bunyi pendek saat engine mengunci — aksesibilitas multi-modal.
     /// Default nyala (lihat `AudioCue.isOn`); dimatikan via toolbar.
-    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
+    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = PreferenceDefaults.audioCueEnabled
 
     /// Pengumuman perubahan keadaan untuk VoiceOver.
     ///

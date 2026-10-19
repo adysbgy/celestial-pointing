@@ -27,7 +27,7 @@ struct PointAndKnowWatchApp: App {
     @StateObject private var location = LocationProvider()
 
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
-    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+    @AppStorage(OnboardingStorage.key) private var onboardingSeen = PreferenceDefaults.onboardingSeen
 
     /// Pemutar getaran. Satu instance untuk seluruh umur app: membuatnya ulang
     /// tiap render tidak berbahaya, tapi menyimpannya membuat pemetaan

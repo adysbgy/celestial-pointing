@@ -43,9 +43,9 @@ struct RootView: View {
     /// `TabView` menahan semua tab tetap hidup, jadi menaruhnya di akar
     /// berarti paletnya berubah serentak di Diagnostik, Experiment 1, dan
     /// Tautan. Kuncinya sama dengan app jam (lihat `NightModeStorage.key`).
-    @AppStorage(NightModeStorage.key) private var nightMode = false
+    @AppStorage(NightModeStorage.key) private var nightMode = PreferenceDefaults.nightMode
     /// Apakah layar perkenalan sudah pernah dilihat (per-device, sekali).
-    @AppStorage(OnboardingStorage.key) private var onboardingSeen = false
+    @AppStorage(OnboardingStorage.key) private var onboardingSeen = PreferenceDefaults.onboardingSeen
     /// Keadaan terakhir yang sudah diumumkan ke VoiceOver.
     ///
     /// **Kenapa disimpan.** `engine.snapshot` ditulis ulang 20 kali per detik.
@@ -243,10 +243,10 @@ struct DiagnosticsView: View {
     /// Preferensi mode malam. Menulis ke kunci yang **sama** dengan `RootView`
     /// (`NightModeStorage.key`), jadi saklar ini dan palet seluruh app tidak
     /// bisa berbeda pendapat — keduanya membaca `UserDefaults` yang sama.
-    @AppStorage(NightModeStorage.key) private var nightMode = false
+    @AppStorage(NightModeStorage.key) private var nightMode = PreferenceDefaults.nightMode
     /// Bunyi saat kunci, disimpan ke `UserDefaults` lewat `AudioCueStorage`.
     /// Satu preferensi untuk seluruh app, sama seperti mode malam.
-    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = true
+    @AppStorage(AudioCueStorage.key) private var audioCueEnabled = PreferenceDefaults.audioCueEnabled
 
     /// Fase denyut glow untuk gambar bintang.
     ///

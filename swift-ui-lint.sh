@@ -12099,6 +12099,125 @@ echo "$fakta_malam"
 [ "$fakta_malam_status" -ne 0 ] && status=1
 
 
+# ── Aturan 67: nilai bawaan preferensi wajib dari model, bukan literal ──────
+#
+# Kelas cacatnya: satu preferensi, **dua** nilai bawaan. SwiftUI meminta nilai
+# bawaan `@AppStorage` di setiap situs pemakaian, sehingga yang berlaku untuk
+# kunci yang belum pernah diset ditulis sekali per layar — sementara aksesor
+# modelnya punya aturannya sendiri. `AudioCue.isOn` mengembalikan `true` untuk
+# kunci kosong; `NightMode.isOn` mengembalikan `false`. Selama kedua sisi
+# kebetulan sepakat, tidak ada yang terlihat.
+#
+# Terukur pada salinan utuh, proses baru, sebelum aturan ini ada. Empat mutasi
+# yang masing-masing hanya membalik satu literal bawaan **semuanya hijau**
+# pada seluruh 66 aturan:
+#
+#     PointingView  nightMode          = false -> true    -> exit 0
+#     PointingView  audioCueEnabled    = true  -> false   -> exit 0
+#     WatchApp      onboardingSeen     = false -> true    -> exit 0
+#     Diagnostics   audioCueEnabled    = true  -> false   -> exit 0
+#
+# Yang pertama paling sunyi dan paling berat: app **terbuka** di palet merah
+# murni tanpa pernah dipilih pengguna — dan tidak satu pun layar salah.
+#
+# Kenapa tidak cukup mengubah satu layar: aturan yang mengunci satu berkas
+# meninggalkan berkas lain bebas menyimpang, itu sebabnya syaratnya "setiap
+# situs". Aturan 57 sudah menjaga *kunci*-nya satu sumber; yang ditambah di sini
+# sisi *nilai bawaannya*, karena itulah yang terukur lolos. Sisi Linux dijaga
+# `PreferenceDefaultsTests`: setiap situs `@AppStorage` di `Apps/` wajib
+# menyebut `PreferenceDefaults.<nama>`, dan aksesor model wajib sepakat untuk
+# kunci yang belum diset.
+echo
+echo "== Aturan 67: nilai bawaan preferensi dari model, bukan literal =="
+bawaan_pref=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+TOKEN = "PreferenceDefaults"
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+berkas = []
+for dasar, _, nama in os.walk(AKAR):
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 67 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+situs = 0
+literal = 0
+
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+
+    for m in re.finditer(r"@AppStorage\s*\(\s*([^)]*)\)([^=\n]*)=\s*([^\n]+)", isi):
+        kunci = m.group(1).strip()
+        nilai = m.group(3).strip()
+        # Bentuk yang sah: nilai bawaan datang dari `PreferenceDefaults.<nama>`.
+        if nilai.startswith(TOKEN + "."):
+            situs += 1
+            if not re.fullmatch(TOKEN + r"\.\w+", nilai):
+                masalah.append(
+                    "  %s: nilai bawaan `%s` bukan nama sederhana "
+                    "`%s.<nama>` -- ekspresi di sini bisa berbeda antar layar."
+                    % (path, nilai, TOKEN))
+            continue
+        # `@AppStorage(Token.key)` tanpa nilai bawaan juga sah: SwiftUI
+        # memakai `false` implisit, dan itu keputusan yang bisa dipertahankan
+        # (tapi harus sengaja -- situs tanpa bawaan sama dengan `false`).
+        if not kunci.endswith(".key"):
+            masalah.append(
+                "  %s: `@AppStorage(%s)` kuncinya bukan `<Enum>.key` (lihat "
+                "Aturan 57)." % (path, kunci[:60]))
+            continue
+        if nilai == "":
+            situs += 1
+            continue
+        literal += 1
+        masalah.append(
+            "  %s: nilai bawaan `%s` ditulis sebagai literal -- apa yang "
+            "berlaku untuk kunci yang belum pernah diset jadi satu angka per "
+            "layar, sementara aksesor modelnya punya aturannya sendiri. "
+            "Pakai `%s.<nama>`."
+            % (path, nilai, TOKEN))
+
+if situs == 0 and literal == 0:
+    print("PERINGATAN: tidak ada `@AppStorage` di %s -- Aturan 67 tidak "
+          "mengukur satu preferensi pun." % AKAR)
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+    sys.exit(1)
+
+print("Bersih: %d nilai bawaan preferensi semuanya dari %s, 0 literal."
+      % (situs, TOKEN))
+PY
+)
+bawaan_pref_status=$?
+echo "$bawaan_pref"
+if printf '%s' "$bawaan_pref" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 67 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$bawaan_pref_status" -ne 0 ]; then
+  echo "-> Nilai bawaan yang ditulis per layar bisa menyimpang antar layar"
+  echo "   tanpa satu pun layar terlihat salah."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
