@@ -2599,6 +2599,16 @@ jobs:
       - name: Buktikan Aturan 66 menjaga fakta mode malam
         run: python3 Tools/bukti-mutasi-aturan66-fakta-malam.py
 
+      # Satu preferensi, dua nilai bawaan: literal `@AppStorage` di setiap
+      # layar, dan aturan aksesor modelnya untuk kunci yang belum diset.
+      # Terukur sebelum Aturan 67 ada (seluruh 66 aturan, proses baru):
+      # membalik `nightMode = false` menjadi `true` di kartu jam membuat app
+      # terbuka di palet merah murni tanpa pernah dipilih pengguna -- exit 0.
+      # Tiga mutasi lain juga hijau. Aturan 57 menjaga *kunci*-nya satu sumber;
+      # nilai bawaannya tidak terjaga.
+      - name: Buktikan Aturan 67 menjaga nilai bawaan preferensi
+        run: python3 Tools/bukti-mutasi-aturan67-bawaan-preferensi.py
+
       # Panel yang dideklarasikan sebagai `struct` di `Apps/` bukan `func` di
       # PointingKit, jadi ia tidak pernah masuk daftar penerima fakta Aturan 35.
       # Terukur: `ObjectDetailView(isStale: engine.isDisplayingStaleObject)`

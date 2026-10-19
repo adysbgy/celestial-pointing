@@ -94,8 +94,10 @@ ARAH_KEDUA = [("lint lama: Mode Malam -> true",
               ("lint lama: bunyi jam -> false",
                [(WATCH, f"= {TOKEN}.audioCueEnabled", "= false", 1)])]
 
-#: Commit pra-Aturan67.
-LINT_PRA = "HEAD"
+#: Commit pra-Aturan 67. `HEAD` tidak bisa dipakai: commit unit ini sendiri
+#: sudah memuat Aturan 67, sehingga "lint lama" akan menjalankan aturan yang
+#: sedang diuji dan arah kedua jadi tautologi.
+LINT_PRA = "HEAD^"
 
 _originals = {}
 
@@ -156,10 +158,6 @@ def main():
             _originals[path] = handle.read()
 
     # Setiap jangkar harus unik di berkasnya.
-    for path in targets:
-        for anchor in (f"= {TOKEN}.",
-                       ):
-            pass
     anchors = [(WATCH, f"= {TOKEN}.nightMode"),
                (WATCH, f"= {TOKEN}.audioCueEnabled"),
                (APP, f"= {TOKEN}.onboardingSeen"),
