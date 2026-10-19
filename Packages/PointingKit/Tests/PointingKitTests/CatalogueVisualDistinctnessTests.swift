@@ -84,4 +84,103 @@ final class CatalogueVisualDistinctnessTests: XCTestCase {
                              "supaya masih terbedakan ukuran titik")
         }
     }
+
+    // MARK: - Objek langit dalam: tabrakan sinyal yang tidak terlihat
+
+    /// Tiga sinyal yang menentukan gambar objek langit dalam.
+    ///
+    /// Semuanya dibaca dari **tabel katalog**, dan tidak satu pun tahu apa
+    /// objeknya — itu yang membuatnya mungkin kebetulan sama:
+    ///
+    ///   * `morphology` → susunan blob (`VisualFrame.deepSky`)
+    ///   * `fuzziness`  → seberapa lebar blob itu
+    ///   * `elongation` → rasio sumbu siluet (hanya `.planetaryNebula`)
+    ///
+    /// Warna **tidak** ikut menjadi sinyal pembeda: `deepSkyColour(for:)`
+    /// bergantung pada morfologi saja, jadi dua objek ber-morfologi sama
+    /// selalu berwarna sama. Yang tersisa untuk membedakan mereka hanyalah
+    /// ketiga angka di atas — dan kalau ketiganya sama, **tidak ada** satu
+    /// pun di layar yang bisa dibedakan.
+    private func deepSkySignature(_ object: CelestialObject) -> String {
+        let morphology = DeepSkyCatalogue.morphology(forObjectID: object.id)
+        let fuzziness = DeepSkyCatalogue.fuzziness(forObjectID: object.id)
+        let elongation = DeepSkyCatalogue.elongation(forObjectID: object.id)
+        return "morphology=\(morphology.map { String(describing: $0) } ?? "nil") "
+             + "fuzziness=\(String(format: "%.4f", fuzziness)) "
+             + String(format: "elongation=%.4f", elongation)
+    }
+
+    /// **Fakta terukur (19 Okt 2026) yang dikunci, bukan disembunyikan.**
+    ///
+    /// Pasangan `m7` (Gugus Ptolemy) dan `m41` (Gugus M41) di katalog **saat
+    /// ini** bertabrakan di ketiga sinyal: sama-sama `.openCluster`,
+    /// `fuzziness` 0,50, dan elongasi bawaan 1,0. `VisualFrame.deepSky` lalu
+    /// menghasilkan tujuh blob dengan offset, setengah-lebar, dan opasitas
+    /// yang **sama persis** — diukur lewat port render yang dipakai gerbang
+    /// piksel: 7 blob identik, pada morfologi yang juga memberi warna yang
+    /// sama. Artinya di layar, saat engine menunjuk M41, gambarnya = gambar
+    /// M7; seluruh teks lain bisa benar sementara gambar milik benda lain.
+    /// Itu kelas "gambar lebih yakin daripada teksnya" yang dilarang PRD.
+    ///
+    /// Dua jalan perbaikan yang **salah** dan sengaja tidak diambil:
+    ///
+    ///   1. Menurunkan `fuzziness` m41 ke 0,44 "memisahkan" penanda di atas
+    ///      kertas, tetapi render nyatanya hanya berubah ~7% piksel (delta
+    ///      kanal maks ~0,09) — tak terbaca mata pada kartu jam 38 pt. Itu
+    ///      hijau palsu: uji lulus, pengguna tetap tak beda.
+    ///   2. Menuntut "tidak ada pasangan yang tabrakan" memerah hari ini —
+    ///      lalu melonggarkan entri tabel supaya hijau. Sama salahnya.
+    ///
+    /// Uji ini oleh karena itu **tidak** menuntut tabrakan hilang; ia menuntut
+    /// *fakta* tabrakan itu tercatat dan *penanda* memang bekerja (uji
+    /// non-vakuositas di bawah). Perbaikan yang jujur adalah **struktural**
+    /// (misal elongasi/konsentrasi yang berlaku untuk gugus terbuka, atau
+    /// bentuk yang berbeda), dan saat itu tiba, uji ini yang mengunci bahwa
+    /// perbaikan itu benar-benar memisahkan sinyal — bukan cuma mencolek
+    /// angka. Melaporkan begini, bukan hijau palsu, adalah agar siklus
+    /// berikutnya tidak mengulang cacat "uji lulus padahal gambar sama".
+    func testDeepSkyClusterPairCollisionIsRecordedNotHidden() {
+        let m7 = DeepSkyCatalogue.objects.first { $0.id == "m7" }!
+        let m41 = DeepSkyCatalogue.objects.first { $0.id == "m41" }!
+        XCTAssertEqual(DeepSkyCatalogue.morphology(forObjectID: m7.id),
+                       DeepSkyCatalogue.morphology(forObjectID: m41.id),
+                       "prasyarat: keduanya gugus terbuka")
+        XCTAssertEqual(deepSkySignature(m7), deepSkySignature(m41),
+                       "tabrakan m7/m41 berubah — kalau ini gagal, perbaikinya " +
+                       "harus memisahkan gambar, bukan cuma nilai tabel")
+    }
+
+    /// **Non-vakuositas penanda.** Kalau `deepSkySignature` mengembalikan satu
+    /// nilai untuk semua objek (misal selalu jatuh ke bawaan), uji di atas
+    /// lulus tanpa menangkap apa pun. Uji ini menuntut penanda benar-benar
+    /// membaca ketiga sinyal: tiga pasangan yang **memang** berbeda bentuk
+    /// harus punya penanda berbeda.
+    func testDeepSkySignatureMarkerActuallySeparatesShapes() {
+        let pleiades = DeepSkyCatalogue.objects.first { $0.id == "m45" }!  // gugus terbuka
+        let hercules = DeepSkyCatalogue.objects.first { $0.id == "m13" }!  // gugus bola
+        let andromeda = DeepSkyCatalogue.objects.first { $0.id == "m31" }! // galaksi
+        XCTAssertNotEqual(deepSkySignature(pleiades), deepSkySignature(hercules),
+                          "morfologi berbeda tapi penanda identik")
+        XCTAssertNotEqual(deepSkySignature(pleiades), deepSkySignature(andromeda),
+                          "galaksi dan gugus terbuka harus terbedakan")
+        XCTAssertNotEqual(deepSkySignature(andromeda), deepSkySignature(hercules))
+    }
+
+    /// **Non-vakuositas sinyal elongasi.** M27/M57 sama-sama nebula planetari;
+    /// satu-satunya pembeda di tabel adalah elongasi (0,60 vs 1,0). Kalau
+    /// penanda mengabaikan elongasi, dua objek ini jadi kembar dan uji bentuk
+    /// di atas cuma terhindar karena `fuzziness`-nya kebetulan berbeda.
+    func testDeepSkySignatureMarkerReadsElongation() {
+        let dumbell = DeepSkyCatalogue.objects.first { $0.id == "m27" }!
+        let ring = DeepSkyCatalogue.objects.first { $0.id == "m57" }!
+        XCTAssertEqual(DeepSkyCatalogue.morphology(forObjectID: "m27"),
+                       DeepSkyCatalogue.morphology(forObjectID: "m57"),
+                       "prasyarat: keduanya nebula planetari")
+        XCTAssertNotEqual(DeepSkyCatalogue.elongation(forObjectID: "m27"),
+                          DeepSkyCatalogue.elongation(forObjectID: "m57"),
+                          "prasyarat: elongasi memang berbeda di katalog")
+        XCTAssertTrue(deepSkySignature(dumbell).contains("elongation=0.6000"),
+                      "penanda tidak membaca elongasi: \(deepSkySignature(dumbell))")
+        XCTAssertNotEqual(deepSkySignature(dumbell), deepSkySignature(ring))
+    }
 }
