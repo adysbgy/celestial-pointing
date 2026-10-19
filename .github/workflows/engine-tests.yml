@@ -2599,5 +2599,16 @@ jobs:
       - name: Buktikan Aturan 66 menjaga fakta mode malam
         run: python3 Tools/bukti-mutasi-aturan66-fakta-malam.py
 
+      # Panel yang dideklarasikan sebagai `struct` di `Apps/` bukan `func` di
+      # PointingKit, jadi ia tidak pernah masuk daftar penerima fakta Aturan 35.
+      # Terukur: `ObjectDetailView(isStale: engine.isDisplayingStaleObject)`
+      # -> `isStale: false` pada `PointingView.swift` membuat kartu jawaban jam
+      # berhenti menandai "sisa pandangan lama" DAN berhenti menyembunyikan
+      # badge keyakinan -- objek lama tampil persis seperti hasil ukur sekarang.
+      # Kembarannya di `ReducedLuminanceView` sudah merah sejak lama; yang
+      # membedakan hanya tempat deklarasinya.
+      - name: Buktikan Aturan 35 mengawasi panel `struct` di Apps/
+        run: python3 Tools/bukti-mutasi-panel-anak-view.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -3681,6 +3681,32 @@ def read_double_constant_from_swift(source, name):
     return None if found is None else float(found.group(1))
 
 
+def marker_positions(region, after):
+    """Posisi `case` berikutnya setelah `after`, atau akhir `region`.
+
+    Memotong sebuah cabang `switch` tepat sebelum cabang tetangganya. Yang
+    dibutuhkan pemanggil (`read_deep_sky_layouts_from_swift`) adalah batas
+    yang **aman-bersalah**: kalau ia salah memotong terlalu pendek, bentuk di
+    dalam cabang tetap utuh dan gerbang merah dengan pesan yang menyebut
+    cabangnya; kalau ia tidak memotong sama sekali (perilaku sebelum
+    `marker_positions` ada), sebuah cabang bisa membaca bentuk cabang lain.
+
+    Karena itu pencocokannya sengaja sempit dan **eksplisit**: `case .<nama>:`
+    — nama kasus enum langsung setelah titik, ditutup titik-dua. Bentuk lain
+    yang mengandung kata `case` (label `switch`, `case let`, komentar yang
+    menulis `case .x`) tidak cocok, jadi kedalaman `switch`/`}` tidak perlu
+    dihitung sama sekali — justru itu yang sebelumnya memotong semuanya jadi
+    `END`. `switch` bersarang tidak dibedakan; bila ia muncul di antara dua
+    cabang, kasus-kasusnya punya bentuk `case .a:` yang cocok, dan pemotongan
+    terjadi di situ — lebih awal dari yang sebenarnya, yang tetap ke arah
+    aman.
+    """
+    for match in re.finditer(r"case \.(\w+):", region):
+        if match.start() > region.index(after) + len(after):
+            return match.start()
+    return len(region)
+
+
 def swift_sextuples(source, anchor, terminator="]"):
     """Semua `(a, b, c, d, e, f)` dari sumber Swift, mulai setelah `anchor`.
 
@@ -3688,9 +3714,30 @@ def swift_sextuples(source, anchor, terminator="]"):
     angka per blob (geser x, geser y, skala lebar, rasio sumbu, sudut,
     opasitas). Alasannya sama persis — yang dibandingkan **seluruh** larik,
     dan angkanya sebagai `float` supaya `0.30` sama dengan `0.3`.
+
+    **Kenapa penanda akhirnya `\\n` + `]`, bukan `]` saja.** Jangkar yang
+    dicari berakhiran `= [`, jadi `anchor` sendiri **memuat** `]` milik tipe
+    `[(Double, ... )]`. Mencari `]` pertama dari situ langsung mengenai
+    kurung tipe itu: wilayahnya kosong, dan pembacaan mengembalikan nol blob —
+    yang dulu tidak terlihat karena pemeriksaan hanya menyebut nama bentuk
+    sebagai "hilang", bukan berapa blob yang terbaca. Penutup larik sungguhan
+    selalu berdiri sendiri di awal baris, jadi itu yang dipakai.
     """
     start = source.index(anchor) + len(anchor)
-    end = source.index(terminator, start)
+    # Penutup sungguhan adalah baris yang **hanya** berisi `]` (dan spasi):
+    # jangkar `anchor` sendiri sudah memuat `]` milik tipe `[(Double, ...)]`,
+    # jadi mencari `]` saja akan langsung mengenai kurung tipe itu. Kedalaman
+    # cabang bervariasi (12 spasi di `.galaxy`, 16 di `.openCluster`), jadi
+    # indentasinya tidak ikut dicocokkan — hanya bahwa barisnya sendiri.
+    end, offset = -1, start
+    for lineno, line in enumerate(source[start:].splitlines(keepends=True),
+                                  start=source.count("\n", 0, start) + 1):
+        offset += len(line)
+        if line.strip() == terminator:
+            end = offset - len(line)
+            break
+    if end == -1:
+        end = source.index(terminator, start)
     region = source[start:end]
     number = r"\s*(-?\d+(?:\.\d+)?)\s*"
     return [tuple(float(v) for v in match)
@@ -3772,15 +3819,43 @@ def read_deep_sky_layouts_from_swift(source):
         marker = f"case .{name}:"
         if marker not in region:
             raise ValueError(f"'{marker}' tidak ditemukan di CelestialVisual.swift")
-        tail = region[region.index(marker):]
+        # **Wilayah cabang dipotong di `case` berikutnya, bukan sampai akhir
+        # fungsi.** Sebelumnya `tail` berjalan sampai penutup `deepSky`, jadi
+        # pembacaan sebuah cabang bisa berlanjut memasuki cabang tetangganya
+        # kalau cabang itu sendiri tidak punya bentuk yang dicari. Itulah yang
+        # terjadi pada `.openCluster`: cabang itu menyusun susunannya sebagai
+        # `let stars:` (karena ia harus diputar lebih dulu lewat
+        # `scatterRotated`), sedangkan pembacaan hanya mencari `let layout:` —
+        # dan ia lulus membaca **tiga belas blob `.globularCluster`** sebagai
+        # susunan gugus terbuka. Gerbang perbandingan lalu merah dengan pesan
+        # yang benar tetapi keliru sebab ("model 13, port 7"): modelnya bukan 13.
+        # Memotong di `case` berikutnya membuat cabang hanya bisa membaca
+        # dirinya sendiri, dan sebuah cabang yang kehilangan bentuknya jadi
+        # gagal bersih — bukan mencuri milik tetangganya.
+        after = marker_positions(region, after=marker)
+        tail = region[region.index(marker):after]
         # `.planetaryNebula` menyusun layout lewat `zip` dari `ring`, jadi
         # angkanya tidak berbentuk larik segi-enam — ia punya pembacaan
         # sendiri, dan tanpa itu bentuk ini akan dilaporkan "hilang".
         if "let ring:" in tail[:tail.index("return buildDeepSky")]:
             out[name] = _shell_layout_from_swift(tail, default_elongation)
             continue
-        out[name] = swift_sextuples(tail, "let layout: [(Double, Double, "
-                                          "Double, Double, Double, Double)] = [")
+        # `.openCluster` menyimpan susunannya di `stars` karena susunan itu
+        # diputar lebih dulu; yang disimpan port adalah susunan **sebelum**
+        # diputar (putarannya diterapkan `_rotate_scatter` saat menggambar),
+        # jadi `stars` — bukan `layout` — adalah pembanding yang benar.
+        anchor_key = next((k for k in ("let layout: [(Double, Double, ",
+                                       "Double, Double, Double, Double)] = [",
+                                       "let stars: [(Double, Double, ",
+                                       "Double, Double, Double, Double)] = [")
+                           if k in tail), None)
+        if anchor_key is None:
+            raise ValueError(
+                f"cabang '.{name}' di CelestialVisual.swift tidak punya "
+                f"'let layout:' maupun 'let stars:' segi-enam — susunannya "
+                f"berpindah ke bentuk yang tidak dikenali pembacaan ini, dan "
+                f"gerbangnya akan membaca cabang lain seolah milik cabang ini")
+        out[name] = swift_sextuples(tail, anchor_key)
     return out
 
 

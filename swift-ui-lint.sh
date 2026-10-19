@@ -5742,10 +5742,123 @@ for root, _, files in os.walk(PK):
             if bools:
                 aksesor.setdefault(m.group(1), set()).update(bools)
 
+# 1b. Deklarasi **View yang hidup di `Apps/`**, bukan di PointingKit.
+#
+# Kelas cacat yang ditutupnya, dan diukur pada pohon utuh (proses baru):
+#
+#     Apps/PointAndKnowWatch/Sources/PointingView.swift:80
+#         isStale: engine.isDisplayingStaleObject   -> isStale: false
+#         swift-ui-lint.sh  LULUS (exit 0), 66 aturan
+#
+#     bandingkan dengan kembarannya, yang sudah dijaga:
+#
+#         ReducedLuminanceView: isStale: engine.isDisplayingStaleObject -> false
+#         swift-ui-lint.sh  MERAH  (`text(isStale: false)`)
+#
+# Bedanya bukan bentuk cacatnya -- keduanya satu baris yang sama, di berkas
+# yang berbeda. Bedanya: `ReducedLuminanceLabel.text(isStale:)` adalah `func`
+# di PointingKit, jadi ia masuk `aksesor` di atas; `ObjectDetailView(isStale:)`
+# adalah `struct` di `Apps/`, dan tidak pernah terdaftar di sana. Akibatnya
+# kartu jawaban jam bisa disembunyikan penandanya: `ObjectDetailView` lalu
+# tidak menggambar `objectDetailStaleNoteDisplay` **dan** tidak menyembunyikan
+# badge keyakinan, sehingga objek dari pandangan sebelumnya tampil persis
+# seperti hasil pengukuran sekarang. Tidak ada kanal lain di layar itu yang
+# membantahnya.
+#
+# **Kenapa didaftarkan dari sumber, bukan ditulis tangan.** Daftar tertulis
+# tangan adalah bentuk cacat yang sudah dua kali menjatuhkan repo ini
+# (`PulsingCelestialVisual` pada Aturan 52, dan `SITUS` pada aturan yang
+# sama). Panel yang lahir sesudah hari ini tidak akan pernah masuk daftar.
+# Yang dipakai karena itu prinsipnya:
+#
+#     setiap `struct` yang dideklarasikan di `Apps/` dan menerima parameter
+#     bernama fakta kejujuran (`isStale`/`stale`/`isConfirmed`) adalah
+#     penerima fakta, dan pemanggilnya tidak boleh mengirim literal.
+#
+# Dibatasi ke `struct` (bukan seluruh tipe) supaya `func` di `Apps/` tidak ikut
+# dan memerahkan pemanggilan yang sah. Parameternya diterima apa pun tipenya
+# (`Bool` dan `Bool?`), karena keduanya fakta.
+FAKTA_PANEL = ("isStale", "stale", "isConfirmed")
+panel_terbaca = set()
+for _root, _dirs, _files in os.walk("Apps"):
+    _dirs[:] = [d for d in _dirs if d not in (".build", "build")]
+    for _nama in sorted(_files):
+        if not _nama.endswith(".swift"):
+            continue
+        _kode = kode_saja(open(os.path.join(_root, _nama),
+                               encoding="utf-8").read())
+        _datar = re.sub(r"\s+", " ", _kode)
+        for m in re.finditer(r"\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\b", _datar):
+            # Kepala hanya memuat `: View` dsb — properti tersimpannya ada di
+            # **dalam** badan. Yang benar-benar dibaca pemanggil, sebetulnya,
+            # adalah parameter konstruktor member-only struct; tapi di Swift
+            # properti `let isStale: Bool` langsung membuat pemanggilan
+            # `ObjectDetailView(..., isStale: …)` sah dan **bertanda**.
+            # Karena itu badan dibaca sampai `}` level-pertama tipe ini, dan
+            # pencocokan dibatasi ke bagian itu supaya field tipe lain yang
+            # dideklarasikan lebih jauh tidak ikut terhitung.
+            buka = _datar.find("{", m.end())
+            if buka < 0:
+                continue
+            d, k = 0, buka
+            while k < len(_datar):
+                if _datar[k] == "{":
+                    d += 1
+                elif _datar[k] == "}":
+                    d -= 1
+                    if d == 0:
+                        break
+                k += 1
+            kepala = _datar[m.end():k]
+            # **Apa yang menjadikan sebuah `struct` panel kejujuran.**
+            #
+            # Diukur pada repo ini: panel yang menyajikan hasil pengukuran
+            # (`ObjectDetailView` di jam, `LockArrivalPanel` dan
+            # `DiagnosticsView` di iPhone) semuanya punya satu hal yang sama —
+            # `let isStale: Bool`, fakta sisa yang **wajib** dikirim
+            # penungguhnya. Yang **bukan** pengukuran tidak memilikinya:
+            # `CelestialVisualView` hanya punya `var isConfirmed: Bool = false`
+            # (bawaan = "kalau lupa, anggap belum pasti") dan
+            # `PulsingCelestialVisual` adegan berdenyut untuk ilustrasi.
+            #
+            # Tanpa pembeda ini, Aturan 35 memerah pada
+            # `Apps/Shared/OnboardingView.swift:150` dan `:163` — ilustrasi
+            # bintang statis yang `.accessibilityHidden(true)`, bukan klaim
+            # apa pun. Gerbang yang menuduh kode benar akan dilonggarkan orang,
+            # dan lubang aslinya kembali.
+            if not re.search(r"\blet\s+isStale\s*:", kepala):
+                continue
+            for f in FAKTA_PANEL:
+                if re.search(r"\b(?:let|var)\s+" + f + r"\s*:", kepala):
+                    aksesor.setdefault(m.group(1), set()).add(f)
+                    panel_terbaca.add(m.group(1))
+
 if not aksesor:
     print("Tidak ada aksesor model ber-parameter Bool/String ditemukan; "
           "aturan ini tidak mengukur apa pun.")
     raise SystemExit(0)
+
+# Fail-closed pada derivasi panel: kalau pembaca `struct` berhenti bekerja
+# (sintaks berubah, kurung kurawal tak seimbangan), daftarnya kosong dan aturan
+# diam-diam kembali hanya menjaga `func` PointingKit -- persis keadaan yang
+# membuat lubang ini ada. Panel yang terbukti ada hari ini wajib terbaca.
+#
+# **Kenapa ini `SystemExit(1)`, bukan `SystemExit(0)`.** Versi pertama berkas
+# ini keluar dengan 0 -- "jangan merah pada kode yang benar" -- dan itu
+# ternyata memilih sisi yang salah: keluaran program kosong, jadi bash
+# mencetak "Bersih: fakta Bool ... sampai apa adanya". Cabang yang **memang**
+# gagal-memutuskan (tidak mengukur seluruh cakupannya) terbaca persis seperti
+# aturan yang menjalankan seluruh pemeriksaannya dan menemukan bersih. Terukur
+# di siklus ini lewat keadaan 7 `bukti-mutasi-panel-anak-view.py`: keempat
+# penerima fakta di-rename sekaligus, cabang ini tercapai, dan aturan tetap
+# lulus -- hijau yang justru paling berbahaya, karena ia muncul tepat ketika
+# pembacanya rusak. Yang benar adalah memerah dan **menyebut** keadaannya.
+if not panel_terbaca:
+    print("Tidak ada panel `struct` di Apps/ yang menerima fakta kejujuran "
+          "-- pembaca deklarasi berhenti bekerja, aturan ini tidak mengukur "
+          "seluruh cakupannya. Aturan ini tidak memutuskan: GAGAL, bukan "
+          "bersih.")
+    raise SystemExit(1)
 
 # 2. Per berkas `Apps/`: fakta Bool yang **dibaca** dari sebuah penerima,
 #    lalu pemanggilan aksesor yang mengirim literal untuk fakta itu.
@@ -5871,6 +5984,18 @@ for root, _, files in os.walk("Apps"):
             for a in re.finditer(r"\.([A-Za-z_][A-Za-z0-9_]*)\b", m.group(2)):
                 dalam_properti.add((m.group(1), a.group(1)))
         sumber = {}
+        # Pasangan parameter -> anggota model yang **membuktikan** faktanya,
+        # diturunkkan dari model PointingKit (bukan daftar tangan situs
+        # panggilan). `confirmsDisplayedIdentity`/`confirmsIdentity` adalah
+        # penamaan sisi UI untuk fakta yang sama yang dibaca `.confirmed` di
+        # panel; tanpa pemetaan ini, `isConfirmed: true` membaca hijau
+        # (diukur pada pohon utuh, proses baru, sebelum perluasan ini: keadaan
+        # 2/4 harness `bukti-mutasi-panel-anak-view.py`). `kata_isi` tidak
+        # menangkapnya karena batang kata kerjanya (`confirm`) lebih pendek dari
+        # `confirmed`.
+        SUMBER_FAKTA = {
+            "isConfirmed": {"confirmsDisplayedIdentity", "confirmsIdentity"},
+        }
         for prm in {p for ps in aksesor.values() for p in ps}:
             kata = kata_isi(prm)
             if len(kata) < 4:
@@ -5880,6 +6005,12 @@ for root, _, files in os.walk("Apps"):
             # Buang dirinya sendiri: `.isStale` bukan bukti fakta berbeda.
             calon.discard("is" + kata[0].upper() + kata[1:])
             calon.discard("has" + kata[0].upper() + kata[1:])
+            # Pemetaan eksplisit dari model: `isConfirmed` dibuktikan oleh
+            # `confirmsDisplayedIdentity`/`confirmsIdentity` yang dibaca berkas
+            # ini.
+            for angg in SUMBER_FAKTA.get(prm, set()):
+                if angg in anggota:
+                    calon.add(angg)
             # Nama yang sama persis tetap sumber bila dibaca lewat properti
             # perantara: itulah jalur `sensorNote: motionNote`.
             if any(a == prm for _, a in dalam_properti):
@@ -5895,7 +6026,16 @@ for root, _, files in os.walk("Apps"):
                     r"(?<![A-Za-z0-9_])" + re.escape(fn) + r"\s*\(", kode):
                 args = argumen(kode, m.end() - 1)
                 for prm in sorted(params):
-                    if prm not in dibaca and prm not in sumber:
+                    # Fakta yang **dideklarasikan** panel (`let isStale: Bool`)
+                    # selalu tersedia, terlepas dari apakah berkas ini masih
+                    # membaca anggota modelnya: setelah `isConfirmed:
+                    # engine.confirmsDisplayedIdentity` diganti `true`, tidak
+                    # ada lagi bukti `.confirmsDisplayedIdentity` di berkas —
+                    # dan justru itulah cacatnya. Karena itu, untuk pemanggilan
+                    # panel, literal tidak butuh pembuktian bacaan.
+                    panel_fakta = (fn in panel_terbaca and prm in params)
+                    if not panel_fakta and prm not in dibaca \
+                            and prm not in sumber:
                         continue
                     nilai = re.search(r"\b" + prm + r"\s*:\s*([^,)]+)", args)
                     if not nilai:
@@ -5903,13 +6043,17 @@ for root, _, files in os.walk("Apps"):
                     diperiksa += 1
                     if re.match(r"^\s*(true|false)\s*$", nilai.group(1)):
                         baris = kode[:m.start()].count("\n") + 1
+                        if prm in dibaca:
+                            asal = prm
+                        elif prm in sumber:
+                            asal = "/".join(sumber[prm])
+                        else:
+                            asal = "%s (parameter panel)" % prm
                         masalah.append(
                             "  %s:%d: `%s(%s: %s)` -- berkas ini juga membaca "
                             "`.%s`, jadi faktanya tersedia dan diganti literal"
                             % (path, baris, fn, prm,
-                               nilai.group(1).strip(),
-                               prm if prm in dibaca
-                               else "/.".join(sumber[prm])))
+                               nilai.group(1).strip(), asal))
                     # 2c. String? yang dibaca berkas itu, lalu diganti `nil`.
                     elif (prm in sumber
                           and re.match(r"^\s*nil\s*$", nilai.group(1))):

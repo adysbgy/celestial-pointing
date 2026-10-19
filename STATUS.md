@@ -1,3 +1,76 @@
+### Siklus (19 Okt 2026 malam — `check-visuals` merah di `main`: pembaca yang membaca cabang tetangganya)
+
+Siklus dibuka seperti biasa: `git log` + `gh run list`. `Engine Tests (Linux)`
+untuk commit terakhir `main` **merah** (`39243969559`, 45m), sementara `Apple
+Build` untuk commit yang sama hijau. Jadi engine Swift tidak rusak — yang
+merah adalah gerbang Python `Tools/check-visuals.py`, satu dari 935 pemeriksaan:
+
+    GAGAL tata letak openCluster: jumlah blob sama   model 13, port 7
+
+#### Dua cacat, dan cuma satu yang kelihatan
+
+Yang paling mudah disimpulkan adalah "port tertinggal dari model" — dan itu
+memang benar, tapi **bukan** letak cacatnya. Port Python `DEEP_SKY_LAYOUT`
+sejak dulu memuat 13 blob untuk `openCluster`; model Swift sejak siklus M7/M41
+memakai **7** blob + `scatterRotated`. Jadi angka "13" itu milik port, bukan
+milik model. Yang perlu dibetulkan bukan portnya.
+
+Sebabnya ada di pembaca gerbang. `read_deep_sky_layouts_from_swift` memotong
+tiap cabang `case .x:` dengan mencari `let layout: [(Double,...)] = [` di
+wilayah yang berjalan **sampai akhir fungsi**. Cabang `.openCluster` tidak punya
+`let layout:` — susunannya disimpan sebagai `let stars:` (karena ia harus
+diputar lebih dulu lewat `scatterRotated`) — jadi pembacaan melanjutkan diri ke
+cabang berikutnya dan membaca **13 blob `.globularCluster`** sebagai susunan
+gugus terbuka. Pesan gagalnya benar isinya tapi keliru sebab: modelnya bukan 13.
+
+Diperbaiki di dua tempat, keduanya jadi gagal-bersih, bukan hijau:
+
+1. Wilayah cabang dipotong di `case` berikutnya (`marker_positions`), jadi
+   cabang hanya bisa membaca dirinya sendiri.
+2. Bentuk susunan diterima apa adanya: `let layout:` **atau** `let stars:`, dan
+   kalau dua-duanya tidak ada → `ValueError`, bukan mencari ke cabang lain.
+
+Tiga cacat lain di sekitarnya diukur juga dan ditutup:
+
+- `swift_sextuples` berakhir di `]` **pertama** — dan jangkar `anchor` sendiri
+  sudah memuat `]` milik tipe `[(Double,...)]`, sehingga `galaxy` dan
+  `spiralGalaxy` terbaca **nol blob**. Terlihat: "bentuk hilang", bukan
+  "berapa blob yang terbaca". Kini penutu C dicari sebagai baris yang hanya
+  berisi `]`.
+- Keadaan 7 `bukti-mutasi-panel-anak-view.py` (fail-closed panel) mutasinya
+  hanya mengganti `ObjectDetailView` → `PanelLama` — nama struct, padahal
+  pembaca menandai panel lewat `let isStale:` di dalam badan. Terukur:
+  `panel_terbaca` tetap berisi, cabang fail-closed tidak pernah tercapai, dan
+  keadaan itu lulus "hijau" sebagai bukti. Mutasi kini mencabut **deklarasi
+  fakta**-nya.
+- Cabang fail-closed itu sendiri `raise SystemExit(0)`, yang menghasilkan
+  keluaran **kosong** — dan bash menampilkannya sebagai "Bersih". Cabang yang
+  memang gagal-memutuskan terbaca persis seperti aturan yang menjalankan semua
+  pemeriksaannya dan menemukan bersih. Kini `SystemExit(1)` + kalimat yang
+  menyebut keadaannya. Harness juga tidak lagi mengandalkan kode keluar program
+  bash (di berkas asli keputusannya baru jadi kode keluar di akhir berkas):
+  potongan aturan ditutup `exit "${status:-0}"`.
+
+#### Yang TIDAK diklaim
+
+- Perbaikan di sini murni di `Tools/` — pembacanya, bukan modelnya. Susunan
+  `openCluster` di Swift tidak disentuh; ketujuh blob dan putaran per-id-nya
+  tetap seperti siklus M7/M41 sebelumnya.
+- Rotasi M7/M41 masih **bukan** bentuk gugus yang sebenarnya (lihat siklus
+  M7/M41): yang dijaga hanya bahwa dua objek berbeda tidak tampil identik.
+- Gerbang penuh `check-visuals.py` hanya dijalankan pada ukuran 200 px; jalur
+  ukuran kartu jam (38 px) dan `render-visuals.py` penuh bergantung CI seperti
+  selama ini.
+
+#### Gerbang (lokal, sebelum push)
+
+    Tools/check-visuals.py --check   935 pemeriksaan, 0 gagal
+    Tools/bukti-mutasi-panel-anak-view.py   10 keadaan, 0 tidak sesuai harapan
+    swift-ui-lint.sh                 66 aturan, SEMUA GERBANG UI LULUS
+    bash:3.2 bash -n swift-ui-lint.sh    0 (heredoc tetap aman)
+    python3 -m py_compile  4 berkas Tools/ yang disentuh   OK
+
+---
 ### Siklus (19 Okt 2026 — M7/M41: dari mencatat tabrakan menjadi memisahkan lewat susunan bintang)
 
 Siklus dibuka dengan `git log` + `gh run list` + gerbang. `main` punya 4
