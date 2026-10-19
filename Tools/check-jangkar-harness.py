@@ -165,6 +165,34 @@ def _module_constants(tree):
     return consts
 
 
+def _ekstensi_sumber(path):
+    """Apakah berkas ini salah satu ekstensi **sumber** (bukan dokumen)?
+
+    Kenapa ada: gerbang ini menjaga mutasi tertinggal, tapi sampai roda ini ia
+    tidak pernah bertanya **berkas apa** yang dimutasi. Terukur, harness uji
+    coba yang pasangannya `(README.md, "68 aturan")` dan
+    `(swift-ui-lint.sh, "Aturan 68:")` diterima sebagai dua jangkar sah ->
+    "+2 jangkar, 0 kebocoran, exit 0". Keduanya bukan satu pun baris kode:
+    yang diubah adalah prosa laporan dan naskah gerbangnya sendiri. Sebuah
+    harness bisa karena itu "menjaga kode" sementara hanya menyunting
+    dokumen.
+
+    Yang tidak diklaim: `swift-ui-lint.sh` memang **bukan** `.swift`, padahal
+    sebagian besar harness repo ini memutasi berkas itu dengan benar. Daftar
+    ini sengaja menyebut ekstensi yang diterima sehingga berkas seperti
+    `.sh` muncul sebagai penyimpangan yang bisa dibaca -- bukan dilewatkan
+    diam-diam, bukan juga dilarang tanpa alasan.
+    """
+    _, ext = os.path.splitext(path or "")
+    return ext.lower() in _EXT_SUMBER
+
+
+#: Ekstensi yang dianggap **sumber** ketika sebuah harness menyebut berkas
+#: sasarannya eksplisit. `.md`/`.txt`/`.sh` tidak ada di sini dengan sengaja.
+_EXT_SUMBER = (".swift", ".py", ".plist", ".xcstrings", ".entitlements",
+               ".json", ".yml", ".yaml", ".strings")
+
+
 def _looks_like_path(value):
     """Apakah nilai string ini **jalur berkas**, bukan label keadaan?
 
@@ -540,32 +568,39 @@ def main():
 
     leaks, missing, unreadable_target = [], [], []
     cache = {}
+    # Sasaran eksplisit yang ekstensinya bukan sumber. Dikumpulkan, bukan
+    # diabaikan: harness yang "menjaga kode" tetapi hanya menyunting dokumen
+    # lolos gerbang mutasi tertinggal tanpa menjaga apa pun (lihat
+    # `_ekstensi_sumber`).
+    nonsumber = []
     for name, anchor, replacement, target in edits:
         candidates = []
         if target:
+            if not _ekstensi_sumber(target):
+                nonsumber.append((name, anchor, target))
             text = cache.get(target)
             if text is None:
                 text = cache[target] = _read(target)
             if text is None:
                 unreadable_target.append((name, anchor, target))
                 continue
-            candidates = [text]
+            candidates = [(target, text)]
         else:
             # Tak ada berkas eksplisit: uji terhadap seluruh berkas produksi
             # yang dikenal repo ini. `find` hilang di **semua** yang diperiksa
             # baru berarti bocor.
-            for rel in KNOWN_TARGETS:
+            for rel in _sumber_produksi():
                 path = os.path.join(ROOT, rel)
                 text = cache.get(path)
                 if text is None:
                     text = cache[path] = _read(path)
                 if text is not None:
-                    candidates.append(text)
+                    candidates.append((path, text))
         if not candidates:
             unreadable_target.append((name, anchor, target or "(tanpa sasaran)"))
             continue
 
-        anchor_present = any(anchor in text for text in candidates)
+        anchor_present = any(anchor in text for _, text in candidates)
         if not anchor_present:
             # Pengganti `None` berarti harness membangun muatannya saat jalan
             # (`ring(8)`, `mutate("morphology")`, `empty_gate(source, func)`).
@@ -577,9 +612,17 @@ def main():
             if replacement is None:
                 missing.append((name, anchor))
                 continue
-            replace_present = any(replacement in text for text in candidates)
-            if replace_present:
-                leaks.append((name, anchor, replacement))
+            # **Berkas mana yang memuat penggantinya.** Tanpa ini, kebocoran
+            # pada jangkar tanpa sasaran dilaporkan sebagai "(tanpa sasaran)",
+            # dan pembaca tidak tahu berkas mana yang harus dipulihkan —
+            # persis pada keadaan yang paling sulit ditebak (jangkar tanpa
+            # sasaran, yaitu satu-satunya bentuk yang bisa bocor tanpa
+            # disebut namanya).
+            pembawa = [p for p, text in candidates if replacement in text]
+            if pembawa:
+                leaks.append((name, anchor, replacement,
+                              ", ".join(os.path.relpath(p, ROOT)
+                                        for p in pembawa[:3])))
             else:
                 missing.append((name, anchor))
 
@@ -595,8 +638,9 @@ def main():
         if line not in seen:
             seen.add(line)
             print(line)
-    for name, anchor, replacement in leaks:
+    for name, anchor, replacement, target in leaks:
         print(f"  MUTASI BOCOR : {name}")
+        print(f"      berkas sasaran : {target}")
         print(f"      jangkar hilang : {anchor[:70]!r}")
         print(f"      pengganti ada  : {replacement[:70]!r}")
 
@@ -606,6 +650,25 @@ def main():
         print("       Pulihkan berkasnya (nilai yang benar = yang dipakai kode, "
               "bukan yang tertinggal):")
         print("           git log -p -- <berkas>   # lihat nilai sebelum mutasi")
+        return 1
+
+    # Sasaran eksplisit yang bukan sumber: harness menyebut berkas tujuannya
+    # sendiri, tetapi berkas itu dokumen/naskah, bukan kode. Sebelum pemeriksaan
+    # ini ada, pasangan `(README.md, "68 aturan")` dihitung sebagai jangkar sah.
+    if nonsumber:
+        print(f"GAGAL: {len(nonsumber)} jangkar menyebut sasaran yang bukan "
+              "berkas sumber.")
+        print("       Mutasi atas dokumen/naskah tidak membuktikan bahwa kode "
+              "berubah:")
+        for name, anchor, target in nonsumber[:12]:
+            print(f"           {name}: {target!r} <- {anchor!r}")
+        if len(nonsumber) > 12:
+            print(f"           ... dan {len(nonsumber) - 12} lagi")
+        print("       Ekstensi yang diterima: "
+              + ", ".join(_EXT_SUMBER))
+        print("       Kalau mutasinya memang atas naskah (mis. `swift-ui-lint.sh`), "
+              "nyatakan sasaran sumbernya eksplisit di `STATES` "
+              "agar pasangannya diuji terhadap kode.")
         return 1
 
     # Harness yang **bisa** memutasi sumber produksi di tempat, tetapi tidak
@@ -650,13 +713,48 @@ def main():
 
     print(f"OK: {len(edits)} jangkar; tidak ada mutasi tertinggal.")
     if missing:
-        print(f"    ({len(missing)} jangkar tidak ditemukan tanpa penggantinya — "
-              "bukan kebocoran, tapi harness itu mungkin perlu diperbarui.)")
+        # **Dulu dicetak sebagai catatan lalu keluar 0.** Sekarang ia temuan.
+        #
+        # Jangkar yang tidak ditemukan dan penggantinya juga tidak ada berarti
+        # dua hal yang tidak bisa dibedakan dari sini: sasarannya keliru, atau
+        # teksnya memang sudah berubah. Gerbang yang mengklaim "tidak ada
+        # mutasi tertinggal" tidak boleh menebak yang mana.
+        #
+        # Terukur sebelum ini: `return nil` disisipkan ke
+        # `HapticPolicy.pattern(for:)` (mematikan seluruh getaran) -> gerbang
+        # mencetak "OK: 496 jangkar" dan keluar 0, karena `HapticPolicy.swift`
+        # tidak ada di `KNOWN_TARGETS` dan jangkarnya jadi "hilang" saja.
+        # Bentuk itu benar-benar pernah tertinggal di pohon kerja repo ini.
+        print()
+        print(f"GAGAL: {len(missing)} jangkar tidak ditemukan di berkas "
+              "sasarannya, dan penggantinya juga tidak ada.")
+        print("       Ini bisa berarti sasaran harness-nya keliru, atau teks "
+              "yang dimutasi sudah berubah:")
+        for name, anchor in sorted(set(missing))[:12]:
+            print(f"           {name}: {anchor[:70]!r}")
+        if len(set(missing)) > 12:
+            print(f"           ... dan {len(set(missing)) - 12} lagi")
+        print("       Perbaiki jangkarnya dari sumber, jangan turunkan "
+              "pemeriksaan ini.")
+        return 1
     return 0
 
 
-#: Berkas produksi yang boleh menjadi sasaran mutasi. Dipakai hanya untuk
-#: jangkar yang harness-nya tidak menyebut berkas sasaran eksplisit.
+#: Berkas produksi yang boleh menjadi sasaran mutasi, untuk jangkar yang
+#: harness-nya **tidak** menyebut berkas sasaran eksplisit.
+#:
+#: **Kenapa ini hasil penemuan, bukan daftar tangan.** Sampai keadaan 6 di
+#: `bukti-mutasi-jangkar-harness.py` ada, daftar ini ditulis tangan dan
+#: berhenti di 12 berkas, sementara `Apps/` + `Packages/` memuat ~200 berkas
+#: sumber. Jangkar tanpa sasaran di luar 12 itu selalu "tidak ditemukan", dan
+#: karena "tidak ditemukan" dulu hanya dicatat, gerbang **tidak bisa**
+#: memerahkan mutasi tertinggal di 8 jangkar nyata (`HapticPolicy`,
+#: `HapticEngine`, `PhoneHapticEngine`, `CalibrationView`) — termasuk
+#: `return nil` yang mematikan semua getaran.
+#:
+#: Daftar tetap dipertahankan untuk berkas yang **tidak** berekstensi sumber
+#: tetapi memang dimutasi harness (`swift-ui-lint.sh`, dan naskah gerbang
+#: lain); penemuan menambahkan seluruh sumber di `Apps/` + `Packages/`.
 KNOWN_TARGETS = (
     "Tools/render-visuals.py",
     "Tools/check-visuals.py",
@@ -671,6 +769,50 @@ KNOWN_TARGETS = (
     "Packages/PointingKit/Sources/PointingKit/NightVisual.swift",
     "swift-ui-lint.sh",
 )
+
+#: Ekstensi yang dipindai saat mencari sumber produksi. Sama dengan daftar
+#: `_EXT_SUMBER`, ditambah `.sh` karena naskah gerbang repo ini memang
+#: dimutasi oleh harness (dan itu sah — lihat `nonsumber` di `main`).
+_EXT_PINDAI = _EXT_SUMBER + (".sh",)
+
+#: Direktori yang dipindai untuk sumber produksi. `out/` dan `.build/`
+#: sengaja tidak: keduanya keluaran, bukan sumber.
+_DIR_PINDAI = ("Apps", "Packages", "Tools")
+
+#: Berkas di luar `Apps/`/`Packages/`/`Tools/` yang ikut dipindai.
+_BERKAS_PINDAI = ("project.yml", "swift-ui-lint.sh", "red-lint.sh",
+                  "red-test.sh")
+
+
+def _sumber_produksi():
+    """Seluruh berkas sumber produksi, diurutkan — dihitung, bukan didaftar.
+
+    Kenapa ada: daftar tangan `KNOWN_TARGETS` adalah himpunan yang harus
+    dipelihara setiap kali berkas baru lahir, dan setiap kali ia ketinggalan,
+    jangkar tanpa sasaran menjadi "tidak ditemukan" — yang dulu berarti hijau.
+    Penemuan membuat cakupan gerbang tumbuh bersama pohonnya.
+
+    Yang TIDAK diklaim: memindai lebih banyak berkas membuat setiap jangkar
+    **menemukan** sasaran yang benar. Ia hanya menghapus alasan "berkasnya
+    tidak pernah dibaca". Jangkar yang benar-benar basi tetap harus
+    diperbaiki, dan sekarang itu memerahkan gerbang (lihat `missing`).
+    """
+    hasil = []
+    for base in _DIR_PINDAI:
+        akar = os.path.join(ROOT, base)
+        for dirpath, dirnames, filenames in os.walk(akar):
+            dirnames[:] = [d for d in dirnames
+                           if d not in (".build", ".git", "node_modules")]
+            for nama in filenames:
+                if nama.endswith(_EXT_PINDAI):
+                    hasil.append(os.path.relpath(os.path.join(dirpath, nama),
+                                                 ROOT))
+    for rel in _BERKAS_PINDAI:
+        if os.path.isfile(os.path.join(ROOT, rel)):
+            hasil.append(rel)
+    # Digabung dengan daftar tetap supaya berkas yang sah tetapi berada di
+    # luar ketiga direktori itu (kalau nanti ada) tidak diam-diam hilang.
+    return tuple(sorted(set(hasil) | set(KNOWN_TARGETS)))
 
 
 if __name__ == "__main__":

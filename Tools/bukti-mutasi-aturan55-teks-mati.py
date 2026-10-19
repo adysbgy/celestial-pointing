@@ -109,6 +109,21 @@ CLEAN_MARK = "Bersih: setiap teks status dibaca minimal satu layar."
 RULE_HEADER = "== Aturan 55:"
 
 #: Jangkar: baris utuh supaya mutasi tidak bergantung pada spasi.
+#:
+#: **Kenapa bukan `private var linkNote: some View {`.** Percobaan pertama di
+#: bawah pohon ini memakai header komponen itu -- satu baris, unik, dan
+#: memang terlihat seperti "tempat catatan ditampilkan". Terukur: keadaan 1
+#: dan 7 **hijau**. Aturan 55 menentukan "teks ditampilkan" dari pembacaan
+#: propertinya di **berkas lain**, bukan dari bentuk deklarasinya; membuang
+#: header komponen tidak menghapus pembacaan `link.lastMessageNote` di
+#: dalamnya, jadi yang diukur bukan yang dimutasi.
+#:
+#: **Kenapa keadaan 1 dan 7 tetap menunjuk baris itu, padahal ia jarang
+#: berubah.** Jangkar di sini harus baris yang **dibaca aturan**: Aturan 55
+#: menghitung pembacaan `<link>.lastMessageNote` di berkas lain, jadi
+#: mengganti header komponen `linkNote` (percobaan pertama) tidak memeras
+#: apa pun — keadaan 1 dan 7 tetap hijau. Mengubah baris ini, sebaliknya,
+#: langsung menghapus pembacaan terakhir yang dihitung.
 READ_IN_VIEW = "        if let note = link.lastMessageNote {"
 #: Deklarasi yang ditambahkan untuk keadaan 2/3/4.
 NEW_PROP = ("    @Published public private(set) var lastRouteNote: String?\n")
@@ -138,8 +153,8 @@ NEW_WRITE = ("    @Published public private(set) var lastRouteNote: String?\n"
 #: Bentuk: `(berkas, jangkar, pengganti)`. Pengganti `None` berarti jangkar
 #: hanya dihapus/disisipi (keadaan 1 dan 7 membuang baris tampilan).
 STATES = [
-    (VIEW, READ_IN_VIEW, "        // (catatan tautan dibuang)"),
-    (VIEW, READ_IN_VIEW, "        // (baris tampilan dibuang)"),
+    (VIEW, READ_IN_VIEW, "        // (catatan tautan dibuang: baris tampilan dihapus)"),
+    (VIEW, READ_IN_VIEW, "        // (baris tampilan dibuang, pengumuman tetap)"),
     (LINK, "    @Published public private(set) var lastMessageNote: String?\n",
      "    @Published public private(set) var lastMessageNote: String?\n" + NEW_PROP),
     (VIEW, "                    linkNote\n",
@@ -253,7 +268,7 @@ def main():
         reset()
         mutasi_sumber.write_source(
             VIEW, _originals[VIEW].replace(READ_IN_VIEW,
-                                           "        // (catatan tautan dibuang)", 1))
+                                           "        // (catatan tautan dibuang: baris tampilan dihapus)", 1))
         results.append(run("1. catatan tautan dibuang dari layar", True))
 
         # 2. Properti teks status BARU yang tidak pernah dibaca.
@@ -315,7 +330,7 @@ def main():
         reset()
         mutasi_sumber.write_source(
             VIEW, _originals[VIEW].replace(READ_IN_VIEW,
-                                           "        // (baris tampilan dibuang)", 1))
+                                           "        // (baris tampilan dibuang, pengumuman tetap)", 1))
         fired, detail = probe(program)
         ok = fired is True
         print(f"{'OK  ' if ok else 'SALAH'} "

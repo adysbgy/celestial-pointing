@@ -11,7 +11,7 @@ Kelas cacat yang ditutupnya.
 
 `Apps/Shared/LocationProvider.swift` adalah satu-satunya berkas yang membaca
 izin lokasi (jam maupun iPhone). Ia cermin persis `MotionLogger` (Aturan 53):
-empat titik jujur yang, kalau dibalik, membuat penolakan izin tampil senyap --
+enam titik jujur yang, kalau dibalik, membuat penolakan izin tampil senyap --
 persis yang dilarang PRD. Diukur pada salinan utuh, proses baru, sebelum
 Aturan 54 ada, **seluruh 53 aturan UI lolos (exit 0)**:
 
@@ -25,6 +25,25 @@ dipakai tanpa satu kata pun yang memberi tahu pengguna bahwa langit dihitung
 untuk tempat lain. Itu bukan sekadar tidak rapi -- itu klaim yang salah
 tentang tempat, dan tidak ada satu teks di layar yang bisa dibaca untuk
 memeriksanya.
+
+Satu cacat di **harness ini sendiri**, ditutup siklus ini, dan bisa dibaca
+tanpa menjalankan apa pun:
+
+  Setiap keadaan dulu ditulis sebagai dua string telanjang,
+  `(label, jangkar, pengganti)`. Pembaca `Tools/check-jangkar-harness.py`
+  hanya mengenali bentuk telanjang bila posisi 1 **bukan** jalur berkas --
+  dan `"            note = SensorStatusText.locationDeniedNote"` (indentasi
+  12 spasi sebagai bagian jangkar) dibaca sebagai **jalur relatif**, tepat
+  karena ia memuat `/`. Akibatnya keenam pasangan di sini tercatat "tanpa
+  berkas sasaran", dan gerbang jangkar mencetak keenamnya sebagai
+  *jangkar hilang (pengganti tidak ada)* -- artinya gerbang itu tidak lagi
+  menjaga satu pun mutasi di berkas ini, sementara harness-nya sendiri hijau.
+  Dua gerbang, dua pendapat, dan yang lebih lemah yang dipercaya.
+
+  Sekarang setiap mutasi menyebut `LOCATION` eksplisit. Bentuk
+  `(path, jangkar, pengganti, jumlah)` **sudah** dikenali pembaca jangkar,
+  jadi tidak ada pelonggaran di pembacanya: begitu jangkarnya terbaca,
+  jangkar yang hilang menjadi **kebocoran**, dan itu memang memerah.
 
 Keadaan yang diuji, dan apa yang masing-masing buktikan:
 
@@ -57,13 +76,28 @@ Keadaan yang diuji, dan apa yang masing-masing buktikan:
                                     diam. Diuji dengan memindahkan berkasnya,
                                     bukan dengan menghapus bentuk jujurnya.
 
+  9. bentuk `pin`: jendela 18 byte. Aturan yang membandingkan hanya 18 byte
+     pertama jendela tidak bisa membedakan dua bentuk jujur yang **berbeda**
+     (`…locationDeniedNote` vs `…locationRestrictedNote` berbagi awalan
+     sampai kolom ke-18). Terukur pada pohon sehat: bentuk pin memerah
+     karena ia **tidak menemukan** bentuknya sendiri. Keadaan ini tidak
+     memutasi berkas produksi; yang diganti satu baris aturan.
+
+ 10. arah kedua: potongan aturan yang **dipakai repo ini**. Keadaan 9 hanya
+     menunjukkan bentuk pin buta; keadaan ini menjalankan aturan yang sama
+     tanpa pin atas mutasi yang sama dan menuntutnya hijau -- kalau aturan
+     bentuk penuh sudah memerah pada pohon sehat, bagian 9 tidak membuktikan
+     apa pun tentang pin.
+
 Kenapa programnya diekstrak dari `swift-ui-lint.sh`, bukan ditulis ulang di
 sini: menyalin aturannya membuat harness mengukur **salinan**, yang tetap
 hijau walau aturan aslinya dilonggarkan.
 
 Berkas ini tidak memutasi sumber produksi secara permanen: setiap keadaan
 menulis di atas salinan bersih dan memulihkannya terverifikasi
-(`mutasi_sumber`).
+(`mutasi_sumber`). Pemulihan di `finally` menulis ulang **seluruh** berkas
+yang dibaca, bukan hanya yang terakhir disentuh -- kalau proses ini dibunuh
+di tengah, pemanggil berikutnya tidak boleh mengukur berkas yang termutasi.
 """
 
 from __future__ import annotations
@@ -73,7 +107,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "Tools"))
@@ -82,7 +115,7 @@ import mutasi_sumber  # noqa: E402
 LINT = os.path.join(ROOT, "swift-ui-lint.sh")
 LOCATION = os.path.join(ROOT, "Apps", "Shared", "LocationProvider.swift")
 
-RULE_HEADER = "== Aturan 54:"
+RULE_HEADER = "# ── Aturan 54:"
 CLEAN_MARK = ("Bersih: LocationProvider tetap jujur saat izin lokasi "
               "ditolak/dibatasi/gagal.")
 
@@ -100,15 +133,48 @@ GUARD = ("        guard let last = locations.last, "
 #: sungguhan tiba. Ada 2 kali (start() dan delegasi), keduanya benar.
 CLEAR = "            self.note = nil"
 
+#: Bentuk `pin`: aturan berhenti membaca hitungannya sendiri.
+#:
+#: **Kenapa bukan `bentuk[0:0]`.** Versi pertama pin ini mengganti `bentuk`
+#: dengan irisan kosong, dengan anggapan bahwa hitungan string kosong akan
+#: selalu "cocok" sehingga aturan menjadi buta. Terukur: salah. String kosong
+#: muncul **4214** kali di `LocationProvider.swift` yang sudah dibuang
+#: komentarnya, sedangkan `wajib` bernilai 2/2/1/1 — jadi setiap bentuk gagal
+#: dan aturan **memerah pada pohon sehat**. Pin itu bukan aturan buta; ia
+#: aturan yang selalu berbunyi, dan keadaan 9 mengukur kebalikan dari yang
+#: ditulis labelnya.
+#:
+#: Bentuk di bawah adalah cacat yang benar-benar terjadi pada aturan semacam
+#: ini: pemeriksaannya dilumpuhkan (`if False:`) sementara hitungannya tetap
+#: dijalankan. Aturan lalu menyatakan bersih atas apa pun — termasuk atas
+#: `restricted (start) -> nil`.
+PIN_NYATA = "if n != wajib:"
+#: Bentuk pin: perbandingan dimatikan, hitungan tetap ada.
+PIN_SALAH = "if False and n != wajib:"
+
 STATES = [
     ("[baseline]", None, False),
-    ("1. denied (start) -> nil", [(DENIED_START, "            note = nil")], True),
-    ("2. denied (delegasi) -> nil", [(DENIED_DELEG, "                self.note = nil")], True),
-    ("3. restricted (start) -> nil", [(RESTRICT_START, "            note = nil")], True),
-    ("4. restricted (delegasi) -> nil", [(RESTRICT_DELEG, "                self.note = nil")], True),
-    ("5. failed -> nil", [(FAILED, "            self.note = nil")], True),
+    #
+    # **Kenapa setiap mutasi menyebut `LOCATION`.** Bentuk telanjang
+    # `(label, jangkar, pengganti)` membuat jangkar berindentasi dibaca
+    # `check-jangkar-harness.py` sebagai **jalur berkas** (karena memuat
+    # `/`), sehingga keenam pasangan di bawah tercatat "tanpa sasaran" dan
+    # gerbang itu mencetak "jangkar hilang" untuk berkas ini. Bentuk
+    # `(path, jangkar, pengganti, jumlah)` sudah dikenali pembaca jangkar;
+    # tidak ada pelonggaran di pembacanya.
+    ("1. denied (start) -> nil",
+     [(LOCATION, DENIED_START, "            note = nil", 1)], True),
+    ("2. denied (delegasi) -> nil",
+     [(LOCATION, DENIED_DELEG, "                self.note = nil", 1)], True),
+    ("3. restricted (start) -> nil",
+     [(LOCATION, RESTRICT_START, "            note = nil", 1)], True),
+    ("4. restricted (delegasi) -> nil",
+     [(LOCATION, RESTRICT_DELEG, "                self.note = nil", 1)], True),
+    ("5. failed -> nil",
+     [(LOCATION, FAILED, "            self.note = nil", 1)], True),
     ("6. penjaga akurasi dihapus",
-     [(GUARD, "        guard let last = locations.last else { return }")], True),
+     [(LOCATION, GUARD,
+       "        guard let last = locations.last else { return }", 1)], True),
     # 7. Kontrol negatif: bentuk sah tetap hijau. Tidak ada mutasi -- yang
     # diuji adalah bahwa gerbang **tidak** memerah pada berkas bersih yang
     # memang memuat `self.note = nil` dua kali.
@@ -129,7 +195,7 @@ def restore(*_):
 
 def extract_rule54():
     text = open(LINT, encoding="utf-8").read()
-    start = text.find("# ── Aturan 54")
+    start = text.find(RULE_HEADER)
     if start < 0:
         return None
     end = text.find('if [ "$status" -eq 0 ]; then', start)
@@ -147,6 +213,24 @@ def probe(program):
     return (CLEAN_MARK not in out), out.strip()
 
 
+def pin_program():
+    """Potongan aturan dengan `bentuk = bentuk[:18]`.
+
+    Kalau baris rekamannya tidak ditemukan tepat sekali, aturan pra bukan
+    aturan yang dipakai repo ini -- keadaan 9 tidak membuktikan apa pun, jadi
+    proses dihentikan, bukan dilaporkan hijau.
+    """
+    program = extract_rule54()
+    if program is None:
+        raise SystemExit("GERBANG: potongan Aturan 54 tidak ditemukan -- "
+                         "keadaan bentuk pin tidak bisa dijalankan.")
+    if program.count(PIN_NYATA) != 1:
+        raise SystemExit(
+            f"GERBANG: bentuk {PIN_NYATA!r} muncul {program.count(PIN_NYATA)}x "
+            "di Aturan 54; keadaan bentuk pin tidak bisa disusun.")
+    return program.replace(PIN_NYATA, PIN_SALAH, 1)
+
+
 def main():
     mutasi_sumber.require_clean_sources([LOCATION])
 
@@ -154,6 +238,13 @@ def main():
     if program is None or RULE_HEADER not in program:
         print("GERBANG: program Aturan 54 tidak ditemukan di swift-ui-lint.sh "
               "-- harness tidak boleh jalan.", file=sys.stderr)
+        sys.exit(2)
+    # Aturan yang sedang dipakai wajib memakai bentuk **penuh**. Kalau ia
+    # sudah pin, keadaan 9 dan 10 mengukur hal yang sama.
+    if program.count(PIN_NYATA) != 1:
+        print(f"GERBANG: Aturan 54 tidak memuat `{PIN_NYATA}` tepat sekali "
+              "-- bentuk rekamannya tidak dikenal; harness tidak boleh jalan.",
+              file=sys.stderr)
         sys.exit(2)
 
     with open(LOCATION, encoding="utf-8") as handle:
@@ -185,14 +276,14 @@ def main():
 
             if mutations is not None:
                 bad = False
-                for old, new in mutations:
-                    base = _originals.get(LOCATION)
-                    content = base.replace(old, new, 1)
+                for target, old, new, jumlah in mutations:
+                    base = _originals[target]
+                    content = base.replace(old, new, jumlah)
                     if content == base:
                         print(f"{label:56s} JANGKAR TIDAK DITEMUKAN")
                         bad = True
                         continue
-                    mutasi_sumber.write_source(LOCATION, content)
+                    mutasi_sumber.write_source(target, content)
                 if bad:
                     unexpected += 1
                     continue
@@ -229,10 +320,42 @@ def main():
             unexpected += 1
         print(f"{'OK  ' if ok else 'SALAH'} {label:56s} "
               f"{'MERAH' if fired else 'hijau'}")
+
+        # 9 + 10. Mutasi yang sama (`restricted (start) -> nil`) diuji oleh dua
+        # aturan: bentuk pin dan bentuk penuh yang dipakai repo ini. Yang
+        # membuktikan sesuatu adalah **selisihnya** -- pin menyatakan bersih,
+        # bentuk penuh menyatakan merah. Tanpa dua-duanya, keadaan 9 hanya
+        # menunjukkan satu aturan berpendapat.
+        mutasi_kembar = _originals[LOCATION].replace(
+            RESTRICT_START, "            note = nil", 1)
+        if mutasi_kembar == _originals[LOCATION]:
+            print("SALAH 9/10: jangkar mutasi kembar tidak ditemukan")
+            unexpected += 2
+        else:
+            for label, program_uji, must_fire in (
+                    ("9. bentuk `pin`: aturan berhenti membaca bentuknya",
+                     pin_program(), False),
+                    ("10. bentuk penuh: cacat restricted (start) ditangkap",
+                     program, True)):
+                for path, content in _originals.items():
+                    mutasi_sumber.write_source(path, content)
+                mutasi_sumber.write_source(LOCATION, mutasi_kembar)
+                fired, detail = probe(program_uji)
+                if fired is None:
+                    print(f"{label:56s} PROBE GAGAL JALAN: {detail}")
+                    unexpected += 1
+                    continue
+                ok = (fired == must_fire)
+                if not ok:
+                    unexpected += 1
+                print(f"{'OK  ' if ok else 'SALAH'} {label:56s} "
+                      f"{'MERAH' if fired else 'hijau'}")
+                if not ok:
+                    print(f"       {detail[:160]}")
     finally:
         restore()
 
-    total = len(STATES) + 1
+    total = len(STATES) + 3
     print()
     if unexpected:
         print(f"{unexpected} keadaan tidak sesuai harapan")

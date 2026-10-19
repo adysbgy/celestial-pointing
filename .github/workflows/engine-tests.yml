@@ -2620,6 +2620,18 @@ jobs:
       - name: Buktikan Aturan 35 mengawasi panel `struct` di Apps/
         run: python3 Tools/bukti-mutasi-panel-anak-view.py
 
+      - name: Buktikan Aturan 69 menolak sasaran mutasi yang bukan sumber
+        run: python3 Tools/bukti-mutasi-aturan69-sasaran-sumber.py
+
+      # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
+      # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
+      # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan
+      # di sana, dan gerbang itu dulu mencetaknya sebagai catatan ("bukan
+      # kebocoran, tapi harness itu mungkin perlu diperbarui") lalu keluar 0 --
+      # hijau sebagai pernyataan tentang berkas yang tidak dimutasi.
+      - name: Buktikan gerbang mutasi tertinggal menolak jangkar-hilang
+        run: python3 Tools/bukti-mutasi-jangkar-sasaran-eksplisit.py
+
       # Satu fakta, tiga nilai: App Group adalah jalan pintas tunggal antara app
       # jam dan complication (proses terpisah). Terukur sebelum Aturan 68 ada
       # (seluruh 67 aturan + 1178 uji, proses baru): mengganti group hanya di

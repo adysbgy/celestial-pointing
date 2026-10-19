@@ -99,9 +99,27 @@ TOO_FLAT = '''DEEP_SKY_ELONGATION = {
 # 3. Hanya **posisi** yang dipetkan, tingginya dibiarkan — siluet memipih
 #    sambil lubangnya menutup. Ini yang paling penting: ia membuktikan gerbang
 #    "berongga" mengukur hal yang tidak diukur gerbang siluet.
+#: **Kenapa blok `openCluster` di bawah ikut ditulis.** Kepala fungsi di
+#: `render-visuals.py` tumbuh (blok `openCluster` disisipkan sebelum
+#: `planetaryNebula`), sedangkan konstanta ini tetap memuat versi lamanya.
+#: Akibatnya keadaan 3 tidak pernah mendarat: jangkar tidak ditemukan, dan
+#: pemeriksaan "siluet" yang seharusnya **hijau** memerah karena yang berjalan
+#: adalah pohon yang belum dimutasi. Harness melaporkannya sendiri (bukan diam),
+#: tetapi satu-satunya cara memperbaikinya adalah jangkarnya diambil ulang dari
+#: sumber: seluruh kepala fungsi, diubah **satu** pemetaan (`a * elongation`
+#: -> `a`). Versi yang hanya menyalin potongan `planetaryNebula` tidak cukup --
+#: `str.replace` membutuhkannya identik byte demi byte.
+#:
+#: **Kenapa `a * elongation` yang dihapus, bukan yang lain.** Percobaan ini
+#: sempat mengganti `a * elongation` -> `a * 1` dan hasilnya sah-sah saja (tiap
+#: blob bulat, pusat terisi), lalu sempat menghapus pemetaan **lebar** (`w`)
+#: dan keadaan itu hijau -- karena pemeriksaan "berongga" mengukur terang di
+#: satu titik pusat: blob yang lebih ramping membuka bagian tengahnya lagi.
+#: Bentuk yang benar-benar menutup lubang adalah blob yang **tingginya** tidak
+#: ikut memipih, jadi mutasinya harus tepat pada `aspect`.
 POSITION_ONLY = '''def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None):
     """`VisualFrame.deepSky` / `buildDeepSky` — tidak pernah keluar frame."""
-    layout = DEEP_SKY_LAYOUT.get(morphology or "nebula", DEEP_SKY_LAYOUT["nebula"])
+    layout = DEEP_SKY_LAYOUT.get(morphology, DEEP_SKY_LAYOUT[None])
     if morphology == "planetaryNebula":
         elongation = DEEP_SKY_ELONGATION.get(object_id or "", 1.0)
         layout = [(ox, oy * elongation, w, a, ang, op)
@@ -116,6 +134,13 @@ CURRENT_FUNCTION_HEAD = '''def deep_sky_blobs(morphology, fuzziness, frame_half_
     # `elongation`; di sini hal yang sama dilakukan pada layoutnya. Kedua
     # komponen y dipetkan sekaligus supaya lubang tengahnya ikut terskala —
     # memetkan salah satu saja menutup lubangnya (lihat komentar di model).
+    if morphology == "openCluster":
+        # MODEL: `VisualFrame.scatterRotated(_:byObjectID:)` — susunan gugus
+        # terbuka diputar dengan sudut tetap per objek, karena M7 dan M41
+        # bertabrakan di semua sinyal bentuk yang lain. Sudutnya dihitung
+        # dengan campuran FNV-1a yang sama persis dengan Swift (bukan
+        # `hash()`), supaya kedua sisi menghasilkan susunan yang identik.
+        layout = _rotate_scatter(layout, object_id)
     if morphology == "planetaryNebula":
         elongation = DEEP_SKY_ELONGATION.get(object_id or "", 1.0)
         layout = [(ox, oy * elongation, w, a * elongation, ang, op)

@@ -133,7 +133,19 @@ BLOCK_RULE17 = "wrapped=$(python3 - <<'PY'"
 #: bentuknya diperbaiki agar cacat kelas itu memang bisa tertangkap.
 ANCHOR_8_COMMENT = "jadi garis tidak"
 ANCHOR_8_CODE = "static let width: CGFloat = 0.5"
-ANCHOR_8_STRING = ".textSecondary.color.opacity(NightMode.isOn ? 0.35 : 0.18)"
+#: **Kenapa jangkar ini tidak menyebut `NightMode.isOn ?`.** Versi lamanya
+#: `".textSecondary.color.opacity(NightMode.isOn ? 0.35 : 0.18)"` -- potongan
+#: tiga literal yang dulu hidup di `Apps/`, dan langsung basi ketika opasitas
+#: garis pindah ke model (`SurfacePalette.hairlineOpacity(for:)`). Terukur:
+#: jangkar itu muncul **0 kali**, sementara `Tools/check-jangkar-harness.py`
+#: mencetaknya sebagai "jangkar hilang tanpa pengganti" dan tetap keluar 0 --
+#: dua keadaan di berkas ini (8c dan 17a) yang jangkar mutasinya tidak pernah
+#: lagi mengena apa pun, dilaporkan sebagai pembuktian.
+#:
+#: Jangkar baru diambil dari baris yang **akan tetap ada**: pemanggilan aturan
+#: model di berkas yang sama. Ia harus unik dan tidak boleh memuat teks
+#: penggantinya (lihat catatan di atas).
+ANCHOR_8_STRING = "SurfacePalette.hairlineOpacity(for: SurfacePalette.active)"
 ANCHOR_8_TOP = "name: PointAndKnow"
 
 #: Berkas sasaran tiap jangkar, relatif terhadap ROOT.

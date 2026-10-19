@@ -49,6 +49,25 @@ MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
 MODEL_ANCHOR = "clusterCoreBrighten: Double = 0.25"
 MODEL_LEAKED = "clusterCoreBrighten: Double = 0.0"
 
+#: Berkas sumber yang **tidak** ada di `KNOWN_TARGETS` milik gerbang, dipakai
+#: keadaan 6 untuk membuktikan gerbang buta terhadap mutasi di luar daftar itu.
+#: Jangkar di bawah adalah milik `Tools/bukti-mutasi-getaran.py` — jadi keadaan
+#: ini memakai pasangan yang sudah ada di repo, bukan yang dikarang untuk lolos.
+HAPTIC = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
+                      "HapticPolicy.swift")
+#: Jangkar **dan** penggantinya, diambil dari keadaan kedua
+#: `Tools/bukti-mutasi-getaran.py` ("semua peristiwa mendapat pola yang sama").
+#:
+#: Kenapa bukan `pattern(for:)` + `return nil`: jangkar itu adalah **awalan**
+#: dari penggantinya sendiri, jadi setelah mutasi ia masih "ada" dan gerbang
+#: melaporkan hijau karena alasan yang benar tetapi bukan yang diuji. Bentuk
+#: di bawah menghapus jangkarnya, sehingga hanya pengganti yang tersisa —
+#: persis bentuk "mutasi tertinggal" yang harus ditangkap.
+HAPTIC_ANCHOR = ("        case .sensorUnavailable:\n            return .failed\n"
+                 "        case .returnedToIdle:\n            return .tick")
+HAPTIC_LEAKED = ("        case .sensorUnavailable:\n            return .completed\n"
+                 "        case .returnedToIdle:\n            return .completed")
+
 #: Berkas yang ikut disalin: cukup untuk gerbang (AST `STATES` + sumber sasaran).
 #: Salinan parsial membuat gerbang melaporkan "TAK TERBACA" untuk berkas yang
 #: tidak disalin; itu bukan temuan, dan menuntutnya merah akan mengukur
@@ -58,6 +77,15 @@ COPY = (
     "Packages/PointingKit/Sources/PointingKit",
     "Apps/Shared",
     "Apps/PointAndKnowWatch/Sources",
+    # Ditambahkan bersama keadaan 6: berkas yang tidak ada di `KNOWN_TARGETS`
+    # milik gerbang hanya bisa diuji kalau ia ikut disalin. Tanpa `Apps/
+    # PointAndKnowiOS` dan `project.yml`, gerbang melaporkan "TAK TERBACA" --
+    # yang bukan temuan, dan menuntutnya merah akan mengukur kelengkapan
+    # salinan, bukan gerbangnya.
+    "Apps/PointAndKnowiOS/Sources",
+    "Apps/PointAndKnowWatch/Complications",
+    "Packages/CelestialEngine/Sources",
+    "project.yml",
 )
 
 
@@ -212,6 +240,59 @@ def main():
             failures.append(
                 "Keadaan 5: pengecualian diterima tetapi tidak dicetak. "
                 "Pengecualian yang tidak terlihat tidak bisa ditinjau siapa pun.")
+
+    # --- Keadaan 6: mutasi tertinggal di berkas yang TIDAK ada di daftar tangan. ---
+    #
+    # Kelas yang dijaga di sini, dan ia nyata: `KNOWN_TARGETS` adalah daftar
+    # 12 berkas yang ditulis tangan, sedangkan `Apps/` + `Packages/` memuat
+    # ratusan berkas sumber. Jangkar tanpa sasaran eksplisit hanya diuji
+    # terhadap 12 berkas itu. Mutasi tertinggal di luar daftar karena itu
+    # dilaporkan sebagai "jangkar hilang (pengganti tidak ada)" -- yang
+    # komentarnya sendiri menyebutnya "bukan kebocoran" -- lalu keluar 0.
+    #
+    # Terukur pada `HEAD` sebelum keadaan ini ada: `return nil` disisipkan ke
+    # `HapticPolicy.pattern(for:)` (memadamkan seluruh getaran) -> gerbang
+    # mencetak "OK: 496 jangkar; tidak ada mutasi tertinggal" dan keluar 0.
+    # Bentuk persisnya pernah mendarat di pohon kerja sesi ini.
+    #
+    # Kenapa `HapticPolicy.swift` yang dipakai: ia berkas sumber produksi yang
+    # **tidak** ada di `KNOWN_TARGETS`, dan jangkarnya milik
+    # `bukti-mutasi-getaran.py` -- jadi keadaan ini mengukur gerbang, bukan
+    # berkas baru yang dikarang untuk lolos.
+    with tempfile.TemporaryDirectory() as tmp:
+        salin_pohon(tmp)
+        haptic = os.path.join(tmp, HAPTIC)
+        if not os.path.isfile(haptic):
+            print(f"FATAL: {HAPTIC} tidak tersalin — keadaan 6 tidak bisa diuji.")
+            return 2
+        text = open(haptic, encoding="utf-8").read()
+        if text.count(HAPTIC_ANCHOR) != 1:
+            print(f"FATAL: jangkar {HAPTIC_ANCHOR!r} tidak ada tepat satu kali "
+                  f"di {HAPTIC} — keadaan 6 mengukur teks yang sudah bergeser.")
+            return 2
+        open(haptic, "w", encoding="utf-8").write(
+            text.replace(HAPTIC_ANCHOR, HAPTIC_LEAKED, 1))
+
+        code, out = run_gerbang(tmp)
+        print("\n=== Keadaan 6: mutasi tertinggal di luar daftar tangan "
+              "(wajib MERAH) ===")
+        print(out.strip()[-700:])
+        if code == 0:
+            failures.append(
+                "Keadaan 6: gerbang hijau padahal `return nil` tertinggal di "
+                "`HapticPolicy.pattern(for:)` — berkas sumber yang tidak ada "
+                "di `KNOWN_TARGETS`. Jangkar tanpa sasaran yang tidak "
+                "ditemukan hanya dicatat, jadi mutasi di luar 12 berkas itu "
+                "tidak pernah bisa memerahkan gerbang.")
+        else:
+            if "MUTASI BOCOR" not in out:
+                failures.append(
+                    "Keadaan 6: gerbang merah, tetapi tidak menyebut "
+                    "'MUTASI BOCOR' — merah karena sebab lain.")
+            if "HapticPolicy" not in out:
+                failures.append(
+                    "Keadaan 6: gerbang tidak menyebut berkas yang termutasi, "
+                    "jadi pembaca tidak tahu apa yang harus dipulihkan.")
 
     print()
     if failures:
