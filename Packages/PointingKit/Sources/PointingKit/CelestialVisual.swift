@@ -1528,10 +1528,13 @@ public enum VisualFrame {
     ///   - elongation: rasio sumbu **minor : mayor** siluet — 1.0 bulat,
     ///     0.60 = memanjang seperti M27 dilihat dari samping. Lihat
     ///     `DeepSkyCatalogue.elongationByID`.
+    ///   - objectID: id objek katalog, **hanya** untuk memberi susunan
+    ///     bintang yang khas pada gugus terbuka. `nil` = susunan bawaan.
     ///   - frameHalfExtent: setengah lebar frame.
     public static func deepSky(morphology: DeepSkyCatalogue.Morphology?,
                                fuzziness: Double,
                                elongation: Double = 1.0,
+                               objectID: String? = nil,
                                frameHalfExtent: Double = halfExtent) -> NebulaGeometry {
         guard let morphology else {
             // Tidak tahu bentuknya: gambar kabut netral yang **paling redup**,
@@ -1763,7 +1766,29 @@ public enum VisualFrame {
             // bukan ukurannya — jadi tidak ada blob di sekitar pusat, dan
             // ukurannya nyaris seragam supaya tidak ada yang tampak sebagai
             // inti.
-            let layout: [(Double, Double, Double, Double, Double, Double)] = [
+            //
+            // **Kenapa susunannya diputar per objek.** Dua gugus terbuka
+            // katalog, M7 (Gugus Ptolemy) dan M41, bertabrakan di seluruh
+            // sinyal bentuk yang ada — sama `.openCluster`, sama
+            // `fuzziness` 0,50, elongasi bawaan 1,0 — sehingga digambar
+            // **identik**. Menurunkan `fuzziness` m41 dicoba dan ditolak:
+            // ia hanya mengubah lebar tiap blob, sementara **letaknya**
+            // tetap, jadi render-nya cuma bergeser ~7% piksel dengan delta
+            // kanal ~0,09 — tak terbaca di kartu jam 38 pt. Itu hijau palsu:
+            // ujinya lulus, matanya tidak.
+            //
+            // Bentuk memipih juga **tidak** dipakai di sini, walaupun
+            // `elongation` tersedia: M7 dan M41 sama-sama nyaris bulat,
+            // jadi memipihkan salah satunya berarti mengarang bentuk demi
+            // lulus uji. Yang dipakai adalah derajat kebebasan yang memang
+            // nyata: **arah sebaran** bintangnya. Memutar susunan tidak
+            // mengubah sebaran, jumlah, ukuran, maupun opasitas apa pun —
+            // hanya arahnya — dan dua gugus terbuka sungguhan memang tidak
+            // punya pola bintang yang sama. Sudutnya diturunkan dari id
+            // (deterministik, `hashValue` tidak dipakai karena ia diacak
+            // per proses di Swift), jadi objek yang sama selalu tampil
+            // sama, dan `nil` tetap menghasilkan susunan bawaan.
+            let stars: [(Double, Double, Double, Double, Double, Double)] = [
                 ( 0.000000, -0.620000, 0.34, 1.0, 0.0, 0.55),
                 (-0.560000, -0.300000, 0.31, 1.0, 0.0, 0.50),
                 ( 0.520000, -0.340000, 0.33, 1.0, 0.0, 0.45),
@@ -1772,6 +1797,7 @@ public enum VisualFrame {
                 (-0.340000,  0.580000, 0.33, 1.0, 0.0, 0.42),
                 ( 0.300000,  0.620000, 0.29, 1.0, 0.0, 0.55)
             ]
+            let layout = Self.scatterRotated(stars, byObjectID: objectID)
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
                                 frameHalfExtent: frameHalfExtent)
 
@@ -2051,6 +2077,28 @@ public enum VisualFrame {
     ///
     /// - Parameter layout: (offsetX, offsetY, skala lebar, rasio sumbu,
     ///   sudut°, opasitas). `rasio sumbu` = setengah tinggi / setengah lebar.
+    ///
+    /// **Yang TIDAK diklaim:** sudut ini bukan bentuk gugus yang sebenarnya.
+    /// Sebaran aslinya tidak dikenal katalog ini, jadi yang dijaga hanya
+    /// bahwa dua objek berbeda **tidak tampil identik**, bukan bahwa
+    /// posisinya akurat secara astronomis.
+    static func scatterRotated(_ stars: [(Double, Double, Double, Double, Double, Double)],
+                               byObjectID objectID: String?) -> [(Double, Double, Double, Double, Double, Double)] {
+        guard let objectID, !objectID.isEmpty else { return stars }
+        var mixed: UInt32 = 2_166_136_261
+        for byte in objectID.utf8 {
+            mixed = (mixed ^ UInt32(byte)) &* 16_777_619
+        }
+        let angle = Double(mixed % 3600) / 3600.0 * 2 * Double.pi
+        let cosA = cos(angle)
+        let sinA = sin(angle)
+        return stars.map { star in
+            let x = star.0 * cosA - star.1 * sinA
+            let y = star.0 * sinA + star.1 * cosA
+            return (x, y, star.2, star.3, star.4, star.5)
+        }
+    }
+
     private static func buildDeepSky(
         layout: [(Double, Double, Double, Double, Double, Double)],
         fuzziness: Double,

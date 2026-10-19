@@ -507,6 +507,21 @@ DEEP_SKY_ELONGATION = {
 }
 
 
+# MODEL: `VisualFrame.scatterRotated(_:byObjectID:)`. Campuran FNV-1a 32-bit
+# yang sama dengan Swift; `hash()` Python diacak per proses, persis seperti
+# `hashValue` Swift, jadi keduanya tidak boleh dipakai.
+def _rotate_scatter(layout, object_id):
+    if not object_id:
+        return layout
+    mixed = 2166136261
+    for byte in object_id.encode("utf-8"):
+        mixed = ((mixed ^ byte) * 16777619) & 0xFFFFFFFF
+    angle = (mixed % 3600) / 3600.0 * 2 * math.pi
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    return [(x * cos_a - y * sin_a, x * sin_a + y * cos_a, w, a, ang, op)
+            for (x, y, w, a, ang, op) in layout]
+
+
 def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None):
     """`VisualFrame.deepSky` / `buildDeepSky` — tidak pernah keluar frame."""
     layout = DEEP_SKY_LAYOUT.get(morphology, DEEP_SKY_LAYOUT[None])
@@ -514,6 +529,13 @@ def deep_sky_blobs(morphology, fuzziness, frame_half_extent=1.0, object_id=None)
     # `elongation`; di sini hal yang sama dilakukan pada layoutnya. Kedua
     # komponen y dipetkan sekaligus supaya lubang tengahnya ikut terskala —
     # memetkan salah satu saja menutup lubangnya (lihat komentar di model).
+    if morphology == "openCluster":
+        # MODEL: `VisualFrame.scatterRotated(_:byObjectID:)` — susunan gugus
+        # terbuka diputar dengan sudut tetap per objek, karena M7 dan M41
+        # bertabrakan di semua sinyal bentuk yang lain. Sudutnya dihitung
+        # dengan campuran FNV-1a yang sama persis dengan Swift (bukan
+        # `hash()`), supaya kedua sisi menghasilkan susunan yang identik.
+        layout = _rotate_scatter(layout, object_id)
     if morphology == "planetaryNebula":
         elongation = DEEP_SKY_ELONGATION.get(object_id or "", 1.0)
         layout = [(ox, oy * elongation, w, a * elongation, ang, op)

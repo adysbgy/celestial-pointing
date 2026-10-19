@@ -110,44 +110,83 @@ final class CatalogueVisualDistinctnessTests: XCTestCase {
              + String(format: "elongation=%.4f", elongation)
     }
 
-    /// **Fakta terukur (19 Okt 2026) yang dikunci, bukan disembunyikan.**
+    /// **Tabrakan m7/m41 — sekarang terpisah lewat susunan bintangnya.**
     ///
-    /// Pasangan `m7` (Gugus Ptolemy) dan `m41` (Gugus M41) di katalog **saat
-    /// ini** bertabrakan di ketiga sinyal: sama-sama `.openCluster`,
-    /// `fuzziness` 0,50, dan elongasi bawaan 1,0. `VisualFrame.deepSky` lalu
-    /// menghasilkan tujuh blob dengan offset, setengah-lebar, dan opasitas
-    /// yang **sama persis** — diukur lewat port render yang dipakai gerbang
-    /// piksel: 7 blob identik, pada morfologi yang juga memberi warna yang
-    /// sama. Artinya di layar, saat engine menunjuk M41, gambarnya = gambar
-    /// M7; seluruh teks lain bisa benar sementara gambar milik benda lain.
-    /// Itu kelas "gambar lebih yakin daripada teksnya" yang dilarang PRD.
+    /// Pasangan `m7` (Gugus Ptolemy) dan `m41` (Gugus M41) bertabrakan di
+    /// **seluruh** sinyal bentuk lain: sama `.openCluster`, sama `fuzziness`
+    /// 0,50, elongasi bawaan 1,0, dan warna ikut morfologi sehingga juga
+    /// sama. Sebelum siklus ini `VisualFrame.deepSky` menghasilkan tujuh blob
+    /// dengan offset, setengah-lebar, dan opasitas **sama persis** — di layar,
+    /// saat engine menunjuk M41 gambarnya milik M7.
     ///
-    /// Dua jalan perbaikan yang **salah** dan sengaja tidak diambil:
+    /// Perbaikannya **bukan** mengubah angka tabel:
     ///
-    ///   1. Menurunkan `fuzziness` m41 ke 0,44 "memisahkan" penanda di atas
-    ///      kertas, tetapi render nyatanya hanya berubah ~7% piksel (delta
-    ///      kanal maks ~0,09) — tak terbaca mata pada kartu jam 38 pt. Itu
-    ///      hijau palsu: uji lulus, pengguna tetap tak beda.
-    ///   2. Menuntut "tidak ada pasangan yang tabrakan" memerah hari ini —
-    ///      lalu melonggarkan entri tabel supaya hijau. Sama salahnya.
+    ///   1. Menurunkan `fuzziness` m41 ke 0,44 hanya mengubah lebar tiap blob,
+    ///      bukan letaknya: render berubah ~7% piksel dengan delta kanal
+    ///      ~0,09 — tak terbaca pada kartu jam 38 pt. Hijau palsu.
+    ///   2. Memipihkan siluet lewat `elongation` **tidak dipakai**: M7 dan
+    ///      M41 sama-sama nyaris bulat, jadi memipihkan salah satunya berarti
+    ///      mengarang bentuk demi lulus uji.
     ///
-    /// Uji ini oleh karena itu **tidak** menuntut tabrakan hilang; ia menuntut
-    /// *fakta* tabrakan itu tercatat dan *penanda* memang bekerja (uji
-    /// non-vakuositas di bawah). Perbaikan yang jujur adalah **struktural**
-    /// (misal elongasi/konsentrasi yang berlaku untuk gugus terbuka, atau
-    /// bentuk yang berbeda), dan saat itu tiba, uji ini yang mengunci bahwa
-    /// perbaikan itu benar-benar memisahkan sinyal — bukan cuma mencolek
-    /// angka. Melaporkan begini, bukan hijau palsu, adalah agar siklus
-    /// berikutnya tidak mengulang cacat "uji lulus padahal gambar sama".
-    func testDeepSkyClusterPairCollisionIsRecordedNotHidden() {
+    /// Yang dipakai adalah derajat kebebasan yang nyata: **arah sebaran**
+    /// bintang (`scatterRotated`). Memutar susunan tidak mengubah jumlah,
+    /// ukuran, sebaran, maupun opasitas satu blob pun — hanya arahnya.
+    ///
+    /// Uji ini menuntut dua hal sekaligus, karena memenuhi satu saja
+    /// menghasilkan cacat lain:
+    ///
+    ///   1. geometri `deepSky` untuk kedua id **benar-benar berbeda**; dan
+    ///   2. `objectID: nil` tetap **persis** susunan bawaan — kalau tidak,
+    ///      objek yang belum masuk katalog ikut berpindah tanpa dasar, dan
+    ///      kabut netral saat engine ragu kehilangan acuannya.
+    func testOpenClusterPairRendersDistinctArrangements() {
         let m7 = DeepSkyCatalogue.objects.first { $0.id == "m7" }!
         let m41 = DeepSkyCatalogue.objects.first { $0.id == "m41" }!
         XCTAssertEqual(DeepSkyCatalogue.morphology(forObjectID: m7.id),
                        DeepSkyCatalogue.morphology(forObjectID: m41.id),
                        "prasyarat: keduanya gugus terbuka")
         XCTAssertEqual(deepSkySignature(m7), deepSkySignature(m41),
-                       "tabrakan m7/m41 berubah — kalau ini gagal, perbaikinya " +
-                       "harus memisahkan gambar, bukan cuma nilai tabel")
+                       "prasyarat: sinyal tabelnya memang masih bertabrakan — " +
+                       "kalau ini gagal, uji di bawah jadi tidak membuktikan apa-apa")
+
+        func geometry(_ id: String?, fuzziness: Double = 0.5) -> [Double] {
+            let resolved = fuzziness
+            let frame = VisualFrame.deepSky(morphology: .openCluster,
+                                            fuzziness: resolved,
+                                            objectID: id)
+            return frame.blobs.flatMap { [$0.offsetX, $0.offsetY,
+                                          $0.halfWidth, $0.halfHeight, $0.opacity] }
+        }
+
+        let layout7 = geometry("m7")
+        let layout41 = geometry("m41")
+        XCTAssertEqual(layout7.count, 35, "prasyarat: tujuh blob × lima angka")
+
+        // (1) Kedua objek tidak lagi digambar sama. Toleransinya jauh di atas
+        // galat titik-mengambang, dan jauh di bawah pergeseran sudut terkecil
+        // yang mungkin dari pemetaan (1/3600 putaran ≈ 0,0017 rad).
+        let shift = zip(layout7, layout41).map { abs($0 - $1) }.max() ?? 0
+        XCTAssertGreaterThan(shift, 0.01,
+                             "m7 dan m41 masih digambar identik (selisih maks \(shift)) — " +
+                             "gambar di layar akan milik benda lain")
+
+        // (2) Tanpa id, susunannya harus tepat susunan bawaan: `nil` bukan
+        // sekadar "sudut 0, kalau kebetulan".
+        let noID = geometry(nil)
+        let emptyID = geometry("")
+        XCTAssertEqual(noID.count, emptyID.count)
+        XCTAssertEqual(zip(noID, emptyID).map { abs($0 - $1) }.max() ?? 1, 0,
+                       accuracy: 1e-12,
+                       "objectID kosong harus menghasilkan susunan bawaan")
+
+        // (3) Deterministik: id yang sama, dipanggil ulang, susunan sama.
+        // Tanpa ini `hashValue` bisa menyelinap dan gambar berubah tiap
+        // proses.
+        let again = geometry("m7")
+        XCTAssertEqual(again.count, layout7.count)
+        XCTAssertEqual(Array(again.enumerated()).map { abs($0.element - layout7[$0.offset]) }.max() ?? 1,
+                       0, accuracy: 1e-12,
+                       "susunan m7 tidak stabil antar pemanggilan")
     }
 
     /// **Non-vakuositas penanda.** Kalau `deepSkySignature` mengembalikan satu

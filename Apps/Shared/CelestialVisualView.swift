@@ -1578,7 +1578,12 @@ struct CelestialVisualView: View {
             elongation: visual.objectID.map {
                 DeepSkyCatalogue.drawableElongation(forObjectID: $0,
                                                     isConfirmed: isConfirmed)
-            } ?? 1.0)
+            } ?? 1.0,
+            // **Id juga lewat gerbang yang sama.** Susunan bintang per objek
+            // adalah ciri pengenal juga: kalau engine ragu, gambar memakai
+            // susunan bawaan, bukan susunan objeknya. Tanpa ini, kabut netral
+            // masih bisa "menunjuk" satu gugus lewat tata letak bintangnya.
+            objectID: isConfirmed ? visual.objectID : nil)
         for blob in geometry.blobs {
             let halfWidth = CGFloat(blob.halfWidth) * radius
             let halfHeight = CGFloat(blob.halfHeight) * radius
