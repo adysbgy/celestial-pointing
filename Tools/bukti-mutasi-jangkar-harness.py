@@ -68,6 +68,33 @@ HAPTIC_ANCHOR = ("        case .sensorUnavailable:\n            return .failed\n
 HAPTIC_LEAKED = ("        case .sensorUnavailable:\n            return .completed\n"
                  "        case .returnedToIdle:\n            return .completed")
 
+#: Keadaan 7: suntingan **sisipan murni** — penggantinya memuat jangkarnya,
+#: sehingga `anchor in text` tetap benar setelah mutasi mendarat.
+#:
+#: Pasangan ini diambil apa adanya dari keadaan `bukti-mutasi-aturan52-kartu-jam.py`
+#: (pembungkus `isConfirmed: true` yang ditempel di atas
+#: `PulsingCelestialVisual`). Memakai suntingan yang sudah ada berarti keadaan
+#: ini mengukur gerbang, bukan jangkar karangan yang dibuat agar lolos.
+SISIPAN = os.path.join("Apps", "PointAndKnowWatch", "Sources", "PointingView.swift")
+SISIPAN_ANCHOR = "struct PulsingCelestialVisual: View {"
+SISIPAN_LEAKED = (
+    "struct PembungkusLuar: View {\n"
+    "    var body: some View {\n"
+    "        PembungkusBaru(isConfirmed: true)\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "struct PembungkusBaru: View {\n"
+    "    let isConfirmed: Bool\n"
+    "    var body: some View {\n"
+    "        CelestialVisualView(visual: CelestialVisual(kind: .star),\n"
+    "                            diameter: 10,\n"
+    "                            isConfirmed: isConfirmed)\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "struct PulsingCelestialVisual: View {")
+
 #: Berkas yang ikut disalin: cukup untuk gerbang (AST `STATES` + sumber sasaran).
 #: Salinan parsial membuat gerbang melaporkan "TAK TERBACA" untuk berkas yang
 #: tidak disalin; itu bukan temuan, dan menuntutnya merah akan mengukur
@@ -292,6 +319,65 @@ def main():
             if "HapticPolicy" not in out:
                 failures.append(
                     "Keadaan 6: gerbang tidak menyebut berkas yang termutasi, "
+                    "jadi pembaca tidak tahu apa yang harus dipulihkan.")
+
+    # --- Keadaan 7: mutasi SISIPAN murni (jangkar tetap ada). ---
+    #
+    # Keadaan 6 menutup satu bentuk kebocoran, tetapi gerbang masih memakai
+    # `anchor in text` sebagai satu-satunya tanda. Itu cukup untuk mutasi yang
+    # **menghapus** jangkarnya, dan tidak cukup untuk mutasi yang
+    # **menyisipkan** teks baru tanpa membuang jangkar — bentuk yang justru
+    # paling umum di harness repo ini: 22 dari 496 suntingan punya pengganti
+    # yang **memuat** jangkarnya sendiri (mis. `bukti-mutasi-aturan52-kartu-jam.py`
+    # menempel `PembungkusLuar`/`PembungkusBaru` **di atas**
+    # `struct PulsingCelestialVisual`, sehingga jangkarnya tetap utuh).
+    #
+    # Terukur pada `HEAD` sebelum keadaan ini ada: `PembungkusLuar` disisipkan
+    # ke `PointingView.swift` lalu dibiarkan -> gerbang mencetak
+    # "OK: 496 jangkar; tidak ada mutasi tertinggal" dan keluar 0. Kode mati
+    # yang mengklaim `isConfirmed: true` pada visual bintang ikut tertinggal
+    # di pohon produksi tanpa satu pun gerbang berbunyi.
+    #
+    # Kenapa keadaan ini memakai suntingan yang **sudah ada** di harness lain
+    # (`bukti-mutasi-aturan52-kartu-jam.py`), bukan teks karangan: supaya yang
+    # diukur adalah gerbang, bukan jangkar baru yang dibuat agar lolos.
+    with tempfile.TemporaryDirectory() as tmp:
+        salin_pohon(tmp)
+        view = os.path.join(tmp, SISIPAN)
+        if not os.path.isfile(view):
+            print(f"FATAL: {SISIPAN} tidak tersalin — keadaan 7 tidak bisa diuji.")
+            return 2
+        text = open(view, encoding="utf-8").read()
+        if text.count(SISIPAN_ANCHOR) != 1:
+            print(f"FATAL: jangkar {SISIPAN_ANCHOR!r} tidak ada tepat satu kali "
+                  f"di {SISIPAN} — keadaan 7 mengukur teks yang sudah bergeser.")
+            return 2
+        if SISIPAN_ANCHOR not in SISIPAN_LEAKED:
+            print("FATAL: pengganti keadaan 7 tidak memuat jangkarnya, jadi "
+                  "keadaan ini tidak menguji bentuk sisipan murni.")
+            return 2
+        open(view, "w", encoding="utf-8").write(
+            text.replace(SISIPAN_ANCHOR, SISIPAN_LEAKED, 1))
+
+        code, out = run_gerbang(tmp)
+        print("\n=== Keadaan 7: mutasi SISIPAN murni, jangkar tetap ada "
+              "(wajib MERAH) ===")
+        print(out.strip()[-700:])
+        if code == 0:
+            failures.append(
+                "Keadaan 7: gerbang hijau padahal suntingan sisipan tertinggal "
+                "di `PointingView.swift` dan jangkarnya masih utuh. Gerbang "
+                "hanya bertanya 'apakah jangkar masih ada', sehingga bentuk "
+                "yang menambah teks tanpa membuang jangkar tidak pernah "
+                "terbaca sebagai mutasi tertinggal.")
+        else:
+            if "MUTASI BOCOR" not in out:
+                failures.append(
+                    "Keadaan 7: gerbang merah, tetapi tidak menyebut "
+                    "'MUTASI BOCOR' — merah karena sebab lain.")
+            if "PointingView" not in out:
+                failures.append(
+                    "Keadaan 7: gerbang tidak menyebut berkas yang termutasi, "
                     "jadi pembaca tidak tahu apa yang harus dipulihkan.")
 
     print()

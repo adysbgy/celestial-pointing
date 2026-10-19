@@ -29769,3 +29769,120 @@ tapi tidak menghasilkan mutasi software. Ada satu celah baca yang tersisa:
 "17 jangkar tidak ditemukan tanpa penggantinya", yang saya perlakukan sebagai
 kewajaran (harness-lama yang belum diperbarui), **bukan** sebagai kebocoran
 non-vakuos. Verifikasi itu menjadi unit berikutnya.
+
+## Siklus 2026-10-19 (2): "jangkar tidak ditemukan" bukan kebocoran — dan itu salah
+
+Siklus sebelumnya menutup dengan satu celah yang **dinamai sendiri**: "17 jangkar
+tidak ditemukan tanpa penggantinya, yang saya perlakukan sebagai kewajaran,
+**bukan** sebagai kebocoran non-vakuos. Verifikasi itu menjadi unit berikutnya."
+Siklus ini mengerjakan unit itu, dan hasilnya membalik kesimpulannya.
+
+### Yang terukur: 8 jangkar, bukan 17 — dan semuanya palsu
+
+Angka 17 itu sendiri sudah basi. Pada pohon ini gerbang mencetak **8** jangkar
+"hilang", dan tidak satu pun benar-benar hilang. Penyebabnya satu baris:
+
+```python
+for rel in KNOWN_TARGETS:      # 12 berkas, ditulis tangan
+```
+
+`KNOWN_TARGETS` berhenti di 12 berkas, sedangkan `Apps/` + `Packages/` memuat
+~200 berkas sumber. Jangkar tanpa sasaran eksplisit hanya diuji terhadap 12 itu;
+di luar daftar ia **selalu** "tidak ditemukan". Terukur per berkas:
+
+```
+bukti-mutasi-aturan55-teks-mati.py  -> CalibrationView.swift      (ada, 1x)
+bukti-mutasi-getaran-lint.py        -> HapticEngine.swift         (ada, 1x)
+bukti-mutasi-getaran-lint.py        -> PhoneHapticEngine.swift    (ada, 1x)
+bukti-mutasi-getaran.py             -> HapticPolicy.swift         (ada, 1x)
+```
+
+Semuanya ada tepat satu kali di berkasnya. Yang rusak bukan jangkarnya —
+yang rusak adalah **himpunan yang diperiksa**.
+
+### Cacat kedua: "hilang" adalah tempat mutasi bersembunyi
+
+Jangkar tidak ditemukan **dan** penggantinya tidak ada dicetak sebagai catatan,
+lalu `return 0`. Alasannya masuk akal dan ditulis di kode: gerbang tidak bisa
+membedakan "sasaran keliru" dari "teks sudah berubah", dan gerbang yang merah
+pada pohon bersih akan dimatikan orang.
+
+Masalahnya, ketidakmampuan membedakan itu **bukan** alasan untuk hijau. Gerbang
+yang mengklaim "tidak ada mutasi tertinggal" tidak boleh menebak; ia harus
+menolak. Dan gabungan kedua cacat itu membuat lubang yang bisa dibuktikan:
+
+```
+sisipkan `return nil` ke HapticPolicy.pattern(for:)   # mematikan SEMUA getaran
+python3 Tools/check-jangkar-harness.py
+-> OK: 496 jangkar; tidak ada mutasi tertinggal.        exit 0
+```
+
+Bentuk itu bukan hipotesis. `return nil` yang sama **benar-benar tertinggal di
+pohon kerja sesi ini** saat siklus dimulai, dan ditemukan dengan mata — bukan
+oleh gerbang yang tugasnya persis itu.
+
+### Perbaikan: cakupan dihitung, dan "hilang" jadi temuan
+
+`_sumber_produksi()` memindai `Apps/`, `Packages/`, `Tools/` untuk ekstensi
+sumber (`.swift`, `.py`, `.plist`, `.xcstrings`, `.strings`, `.entitlements`,
+`.json`, `.yml`, `.yaml`, `.sh`), lalu menggabungkannya dengan `KNOWN_TARGETS`
+— daftar tetap dipertahankan hanya untuk berkas non-sumber yang memang dimutasi
+harness. Cakupan kini tumbuh bersama pohonnya, bukan bersama ingatan penulisnya.
+
+`missing` berhenti jadi catatan dan menjadi kegagalan. Pesannya menyebut
+**berkas mana yang memuat pengganti**, bukan `(tanpa sasaran)` — karena jangkar
+tanpa sasaran justru satu-satunya bentuk yang bisa bocor tanpa disebut namanya.
+
+### Bukti dua arah, di proses baru
+
+Keadaan 6 di `bukti-mutasi-jangkar-harness.py` menanamkan mutasi milik
+`bukti-mutasi-getaran.py` ke `HapticPolicy.swift` dan menuntut MERAH.
+
+```
+gerbang pra-perbaikan (git show HEAD:Tools/check-jangkar-harness.py)
+    -> Keadaan 6 GAGAL: gerbang hijau padahal `return nil` tertinggal
+gerbang sekarang
+    -> MUTASI BOCOR : bukti-mutasi-getaran.py
+       berkas sasaran : Packages/PointingKit/Sources/PointingKit/HapticPolicy.swift
+    -> OK: gerbang jangkar berbunyi pada mutasi bocor, dan diam pada pohon yang benar
+```
+
+Enam keadaan, 0 tidak sesuai harapan. Delapan jangkar "hilang" palsu hilang
+seluruhnya dari keluaran gerbang.
+
+### Dua cacat lain, ditemukan karena gerbang ini akhirnya membaca
+
+- **`bukti-mutasi-aturan54` keadaan 9** memakai pin `bentuk[0:0]` dengan label
+  "aturan berhenti membaca bentuknya". Terukur salah: string kosong muncul
+  **4214** kali di `LocationProvider.swift` (komentar dibuang), sedangkan
+  `wajib` bernilai 2/2/1/1 — jadi setiap bentuk gagal dan pin itu **selalu
+  memerah pada pohon sehat**. Ia bukan aturan buta; ia aturan yang selalu
+  berbunyi, dan keadaan 9 mengukur kebalikan dari labelnya. Pin diganti
+  `if False and n != wajib:`, yang benar-benar melumpuhkan pemeriksaan:
+  keadaan 9 hijau, keadaan 10 merah pada mutasi yang sama — selisihnya kini
+  yang membuktikan sesuatu.
+- **`main` merah satu run penuh** karena `bukti-mutasi-dumbel.py` menyimpan
+  kepala fungsi `deep_sky_blobs` **tanpa** blok `openCluster` yang sudah ada
+  di `render-visuals.py`. `str.replace` menuntut byte identik, jadi keadaan 3
+  tidak pernah mendarat dan "siluet harus hijau" memerah karena yang berjalan
+  adalah pohon yang belum dimutasi. Jangkar disegarkan dari sumber.
+
+### Yang TIDAK diklaim
+
+- Memindai lebih banyak berkas **tidak** membuat setiap jangkar menemukan
+  sasaran yang benar. Ia hanya menghapus alasan "berkasnya tidak pernah
+  dibaca". Jangkar yang benar-benar basi tetap harus diperbaiki — bedanya,
+  sekarang itu memerahkan gerbang alih-alih lewat sebagai catatan.
+- `_sumber_produksi()` tidak memindai `out/` atau `.build/`; keduanya keluaran.
+  Berkas sumber di luar `Apps/`/`Packages/`/`Tools/` hanya terjangkau lewat
+  `_BERKAS_PINDAI` dan `KNOWN_TARGETS`.
+- Keadaan 6 menguji **satu** keputusan `main` (kebocoran pada jangkar tanpa
+  sasaran). Aturan lain di `main` sudah punya keadaan di
+  `bukti-mutasi-jangkar-sasaran-eksplisit.py` dan `bukti-mutasi-aturan69-*`.
+- Brief "FASE A/B/C" (visual objek, night mode, AOD, VoiceOver, complication,
+  `.xcstrings`, Info.plist) **sudah selesai dan sudah dijaga gerbang** sebelum
+  siklus ini. Tidak ada yang dikerjakan ulang di sana; yang diperiksa adalah
+  klaimnya, dan klaimnya benar.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **956** hijau,
+`swift-ui-lint.sh` hijau, parse `bash:3.2` hijau, Apple Build hijau.

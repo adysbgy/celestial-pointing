@@ -47,6 +47,7 @@ Pakai:
 from __future__ import annotations
 
 import ast
+import fnmatch
 import glob
 import os
 import sys
@@ -61,6 +62,33 @@ PATTERN = "bukti-mutasi-*.py"
 #: sebagai "sasaran tak terbaca", bukan diabaikan — jangkar yang diabaikan
 #: membuat gerbang ini hijau karena tidak memeriksa apa pun.
 MAX_SOURCE_BYTES = 2_000_000
+
+#: Ambang panjang untuk mendeteksi mutasi **sisipan** yang tertinggal.
+#:
+#: Suntingan sisipan punya bentuk `pengganti ⊃ jangkar`, jadi `anchor in text`
+#: tetap benar setelah mutasinya mendarat — pemeriksaan jangkar tidak bisa
+#: membedakan pohon bersih dari pohon termutasi. Yang membedakan adalah **teks
+#: yang ditambahkan** (`pengganti` tanpa satu kemunculan jangkar).
+#:
+#: Ambang ini ada karena bagian tambahan yang sangat pendek terlalu mudah cocok
+#: secara kebetulan. Terukur pada pohon bersih: `ENUM_NEW` di
+#: `bukti-mutasi-kasus-planet.py` menambah `case uranus` (11 karakter) yang
+#: memang sudah ada di enum, dan `bukti-mutasi-sabit-bibir-kawah.py` menambah
+#: `// sama` (7) — keduanya suntingan no-op yang sah. Di bawah 40, keempat
+#: kecocokan itu muncul sebagai kebocoran palsu; pada 40 ke atas, nol.
+SISIPAN_MIN = 40
+
+
+def _is_harness(path):
+    """Apakah `path` salah satu berkas harness (`Tools/bukti-mutasi-*.py`).
+
+    Dipakai oleh pemeriksaan mutasi sisipan: pasangan (jangkar, pengganti)
+    dituliskan **di dalam** berkas harness, jadi teks tambahannya selalu
+    ditemukan di sana. Harness yang menjadi saksi bagi dirinya sendiri akan
+    melaporkan setiap suntingan sisipan sebagai kebocoran pada pohon bersih.
+    """
+    return (os.path.dirname(os.path.abspath(path)) == TOOLS
+            and fnmatch.fnmatch(os.path.basename(path), PATTERN))
 
 
 def _string(node, consts):
@@ -601,6 +629,63 @@ def main():
             continue
 
         anchor_present = any(anchor in text for _, text in candidates)
+        if anchor_present:
+            # **Mutasi SISIPAN: jangkar masih ada, teks baru ikut tertinggal.**
+            #
+            # Sampai siklus ini gerbang berhenti di sini — `anchor in text`
+            # sudah cukup, dan untuk 471 dari 496 suntingan memang cukup,
+            # karena penggantinya menghapus jangkarnya. Dua puluh lima sisanya
+            # **menyisipkan**: pengganti memuat jangkarnya sendiri, jadi
+            # pemeriksaan ini menjawab "masih ada" pada pohon yang sudah
+            # termutasi.
+            #
+            # Bentuk yang lolos karena itu nyata dan bukan karangan: keadaan 7
+            # di `Tools/bukti-mutasi-jangkar-harness.py` menyisipkan
+            # `PembungkusLuar`/`PembungkusBaru` (milik
+            # `bukti-mutasi-aturan52-kartu-jam.py`) ke `PointingView.swift` lalu
+            # membiarkannya — gerbang mencetak "OK: 496 jangkar" dan keluar 0.
+            #
+            # Yang diperiksa karena itu **teks yang ditambahkan**, bukan
+            # jangkarnya: `added` = pengganti tanpa satu kemunculan jangkar.
+            # Kalau bagian itu sudah ada di berkas, mutasinya mendarat.
+            #
+            # **Kenapa ambang 40 karakter, bukan "ada".** Bagian tambahan yang
+            # pendek terlalu mudah cocok secara kebetulan. Terukur pada pohon
+            # bersih: `ENUM_NEW` milik `bukti-mutasi-kasus-planet.py` menambah
+            # `case uranus` (11 karakter) yang memang sudah ada di enum, dan
+            # `bukti-mutasi-sabit-bibir-kawah.py` menambah `// sama` (7).
+            # Keduanya suntingan **no-op** yang sah, bukan kebocoran; menandai
+            # keduanya akan memerahkan gerbang pada pohon yang benar. Dengan
+            # ambang 40, keempat kecocokan palsu itu hilang dan tidak ada
+            # satu pun suntingan sisipan yang lebih panjang tertinggal di pohon
+            # bersih (terukur: 0 dari 9).
+            if replacement is not None and replacement != anchor and anchor in replacement:
+                added = replacement.replace(anchor, "", 1).strip()
+                if len(added) >= SISIPAN_MIN:
+                    # **Harness tidak boleh menjadi saksinya sendiri.**
+                    #
+                    # Ketika `target` kosong, kandidatnya adalah seluruh berkas
+                    # sumber — termasuk `Tools/bukti-mutasi-*.py`, tempat
+                    # pasangan (jangkar, pengganti) itu **dituliskan**. Teks
+                    # `added` karena itu selalu "ada" di berkas yang
+                    # mendefinisikannya, dan tanpa pengecualian ini setiap
+                    # suntingan sisipan tanpa sasaran eksplisit akan dilaporkan
+                    # sebagai kebocoran pada pohon yang bersih. Terukur:
+                    # `bukti-mutasi-aturan55-teks-mati.py` langsung memerahkan
+                    # gerbang lewat `STATES`-nya sendiri.
+                    #
+                    # Yang dikecualikan hanya berkas harness (pola
+                    # `bukti-mutasi-*.py`), bukan seluruh `Tools/`: sasaran
+                    # seperti `Tools/render-visuals.py` memang produksi dan
+                    # harus tetap diperiksa.
+                    pembawa = [p for p, text in candidates
+                               if added in text
+                               and not _is_harness(p)]
+                    if pembawa:
+                        leaks.append((name, anchor, replacement,
+                                      ", ".join(os.path.relpath(p, ROOT)
+                                                for p in pembawa[:3])))
+            continue
         if not anchor_present:
             # Pengganti `None` berarti harness membangun muatannya saat jalan
             # (`ring(8)`, `mutate("morphology")`, `empty_gate(source, func)`).
