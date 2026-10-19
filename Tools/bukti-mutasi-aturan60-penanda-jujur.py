@@ -81,6 +81,17 @@ RAGU_REDUP = "                    if engine.carriesUncertaintyMarker {"
 BADGE_IPHONE = "                        if let level, !isStale {"
 SISA_IPHONE = "                    stale: isStale,"
 SISA_SUARA = "        if isStale {\n            parts.append(ObjectSpeech.staleNote)"
+#: Bentuk **ucapan** dari badge keyakinan — `ObjectSpeech.confidence(level)`,
+#: bukan `Text(level.displayName)`. Siklus 19 Okt 2026: keadaan 11 dan 12 di
+#: bawah membuktikan `Text(level.displayName)` tidak pernah cocok dengannya,
+#: jadi sebelum aturan 60 mempelajari bentuk ini, membalik `!stale` di **kedua**
+#: announcement VoiceOver tetap hijau di seluruh 66 aturan.
+SUARA_YAKIN_WATCH = "        if let level, !isStale {\n            parts.append(ObjectSpeech.confidence(level))"
+SUARA_YAKIN_IPHONE = "        if let level, !stale {\n            parts.append(ObjectSpeech.confidence(level))"
+#: Keadaan 9: berapa penanda yang **tetap** terhitung setelah bentuk yang
+#: diganti nama. Bukan angka tetap dari hasil: dibaca dari keluaran aturan
+#: agar permukaan baru ikut terhitung tanpa mengubah harness ini.
+SISA_CADANGAN = "penanda kejujuran dijaga"
 
 STATES = [
     ("[baseline]", None, False),
@@ -102,6 +113,21 @@ STATES = [
      [(WATCH, SISA_SUARA,
        "        if false {\n            parts.append(ObjectSpeech.staleNote)", 1)], True),
     ("8 kontrol negatif: repo apa adanya", None, False),
+    # 11 & 12: **kelas yang baru**, bukan pengulangan keadaan 2 dan 5.
+    # Keadaan 2 dan 5 membalik peredupan **badge gambar**; yang ini membalik
+    # **kalimat VoiceOver** yang mengumumkan keyakinan. Sebelum Aturan 60
+    # mengenali `ObjectSpeech.confidence(`, kedua peristiwa di bawah terukur
+    # **hijau di seluruh 66 aturan** — VoiceOver lalu mengucapkan "tingkat
+    # keyakinan Yakin" **hanya** pada objek basi, dan membungkamnya justru
+    # pada hasil pengukuran sekarang.
+    ("11 suara jam: keyakinan dibalik !isStale",
+     [(WATCH, SUARA_YAKIN_WATCH,
+       "        if let level, isStale {\n            parts.append(ObjectSpeech.confidence(level))", 1)],
+     True),
+    ("12 suara iPhone: keyakinan dibalik !stale",
+     [(IPHONE, SUARA_YAKIN_IPHONE,
+       "        if let level, stale {\n            parts.append(ObjectSpeech.confidence(level))", 1)],
+     True),
 ]
 
 _originals = {}
@@ -147,9 +173,10 @@ def main():
             _originals[path] = handle.read()
 
     for path, anchor in ((WATCH, CATATAN_SISA), (WATCH, BADGE_WATCH),
-                         (WATCH, SISA_SUARA), (REDUP, SISA_REDUP),
+                         (WATCH, SISA_SUARA), (WATCH, SUARA_YAKIN_WATCH),
+                         (REDUP, SISA_REDUP),
                          (REDUP, RAGU_REDUP), (IPHONE, BADGE_IPHONE),
-                         (IPHONE, SISA_IPHONE)):
+                         (IPHONE, SISA_IPHONE), (IPHONE, SUARA_YAKIN_IPHONE)):
         count = _originals[path].count(anchor)
         if count != 1:
             print(f"GERBANG: jangkar {anchor!r} muncul {count}x di {path}, "
@@ -201,7 +228,13 @@ def main():
         # tidak bisa diganti nama, jadi aturan **masih mengukur** sesuatu.
         # Yang diuji di sini bukan "nol", melainkan bahwa cakupannya menyusut
         # dan angka yang dilaporkan jujur: bukan hijau kosong yang berpura-pura
-        # memeriksa delapan penanda.
+        # memeriksa sepuluh penanda.
+        #
+        # `ObjectSpeech.confidence(` ikut diganti nama mulai siklus ini. Tanpa
+        # itu, keadaan ini akan melaporkan 10 penanda padahal yang dibiarkan
+        # hidup hanya 1 + 2 penanda `staleShortNote/confidence` yang **tidak**
+        # diganti namanya — angka yang terlihat konsisten sementara yang
+        # diukur sudah menyusut diam-diam.
         label = "9 cakupan menyusut: penanda diganti nama"
         for path in targets:
             isi = _originals[path]
@@ -211,11 +244,13 @@ def main():
                               "ObjectSpeech.staleShortLama")
             isi = isi.replace("ObjectSpeech.staleNote",
                               "ObjectSpeech.staleLama")
+            isi = isi.replace("ObjectSpeech.confidence(",
+                              "ObjectSpeech.keyakinanLama(")
             isi = isi.replace("TextLocalization.text(.confidenceUncertainMarker)",
                               "TextLocalization.text(.confidenceUncertainLama)")
             mutasi_sumber.write_source(path, isi)
         fired, detail = probe(program)
-        ok = fired is False and "3 penanda kejujuran dijaga" in (detail or "")
+        ok = fired is False and SISA_CADANGAN in (detail or "")
         if not ok:
             unexpected += 1
         print(f"{'OK  ' if ok else 'SALAH'} {label:38s} "
@@ -238,6 +273,8 @@ def main():
                               "ObjectSpeech.staleShortLama")
             isi = isi.replace("ObjectSpeech.staleNote",
                               "ObjectSpeech.staleLama")
+            isi = isi.replace("ObjectSpeech.confidence(",
+                              "ObjectSpeech.keyakinanLama(")
             isi = isi.replace("TextLocalization.text(.confidenceUncertainMarker)",
                               "TextLocalization.text(.confidenceUncertainLama)")
             mutasi_sumber.write_source(path, isi)

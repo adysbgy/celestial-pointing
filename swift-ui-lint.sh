@@ -10455,6 +10455,16 @@ def kasus_switch(kode):
 PENANDA = [
     (r"Text\(\s*level\.displayName\s*\)", "badge keyakinan",
      [("isStale", False)]),
+    #: `ObjectSpeech.confidence(level)` adalah **bentuk ucapan** dari badge
+    #: yang sama — fungsi yang memotong ke katalog string, sehingga pola
+    #: `Text(level.displayName)` tidak pernah cocok dengannya. Terukur: tanpa
+    #: baris ini, membalik `!stale` menjadi `stale` di **kedua** pengumuman
+    #: VoiceOver (`PointingView.detailAccessibilityLabel` dan
+    #: `DiagnosticsView.visualPanelLabel`) tetap hijau di seluruh 66 aturan —
+    #: VoiceOver lalu mengucapkan "tingkat keyakinan Yakin" **hanya** pada
+    #: objek basi, dan membungkamnya justru pada hasil pengukuran sekarang.
+    (r"ObjectSpeech\.confidence\(", "keyakinan VoiceOver",
+     [("isStale", False), ("stale", False)]),
     (r"\.objectDetailStaleNoteDisplay\b", "catatan sisa (panel)",
      [("isStale", True)]),
     (r"\.confidenceUncertainMarker\b", "penanda ragu",
