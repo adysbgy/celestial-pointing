@@ -12583,6 +12583,163 @@ elif [ "$redup_suara_status" -ne 0 ]; then
 fi
 
 
+# ── Aturan 71: baris yang DIUCAPKAN wajib juga DIGAMBAR ─────────────────────
+#
+# Aturan 70 menjaga satu layar (redup) dan satu kelas argumen (yang berupa
+# ekspresi). Aturan ini menjaga kelas yang lebih umum dengan bentuk yang lebih
+# sempit, karena bentuk longgarnya terbukti tidak bisa diputuskan: prototipe
+# pertama yang membandingkan "nama yang diucapkan" dengan "seluruh badan
+# `struct`" melaporkan 15 temuan pada pohon yang **benar** — semuanya karena
+# nilai itu digambar lewat fungsi pembantu (`spokenDegrees(row.raDeg)`), bukan
+# lewat `Text(...)` langsung. Gerbang yang salah merah akan dimatikan orang,
+# dan setelah dimatikan ia tidak menjaga apa pun.
+#
+# Jadi yang diputuskan hanya argumen berbentuk **pengenal sederhana**
+# (`title:`, `value:`), dan hanya terhadap `Text(...)` di **fungsi yang sama**.
+# Argumen berbentuk panggilan dihitung sebagai "dilewati" dan dilaporkan
+# jumlahnya, supaya hijau tidak mungkin berarti "tidak ada yang diperiksa".
+#
+# Cacat yang ditutup, terukur pada salinan utuh dengan Aturan 70 sudah ada
+# (proses baru): di `DiagnosticsView.detailRow` mengganti `Text(value)` menjadi
+# `Text(title)` membuat baris menggambar **judul dua kali** sementara VoiceOver
+# mengucapkan "judul, nilai" — pengguna melihat baris tanpa nilai sama sekali,
+# dan pembaca layar melaporkan nilai yang tidak ada di layar. Seluruh 70
+# aturan lulus (exit 0).
+#
+# Kenapa kelas ini bukan sekadar "salah ketik": `RowSpeech.label(title:value:)`
+# ada supaya judul dan nilai diumumkan sebagai satu kalimat. Kesepakatannya
+# adalah **dua saluran membaca dua nilai yang sama**. Begitu satu saluran
+# membaca nilai lain, yang rusak bukan tampilannya saja — yang rusak adalah
+# kesepakatan itu, dan tidak ada compiler yang melihatnya karena kedua sisi
+# tetap bertipe `String`.
+echo
+echo "== Aturan 71: baris yang diucapkan juga digambar =="
+baris_suara=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+PANGGILAN = re.compile(r"\bRowSpeech\s*\.\s*(?:label|spokenRow)\s*\(")
+
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+
+def pasangan(isi, buka, kiri="(", kanan=")"):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == kiri:
+            dalam += 1
+        elif isi[i] == kanan:
+            dalam -= 1
+            if dalam == 0:
+                return i
+    return -1
+
+
+def argumen_top(nalar):
+    hasil, dalam, mulai = [], 0, 0
+    for i, c in enumerate(nalar):
+        if c in "([{":
+            dalam += 1
+        elif c in ")]}":
+            dalam -= 1
+        elif c == "," and dalam == 0:
+            hasil.append(nalar[mulai:i])
+            mulai = i + 1
+    hasil.append(nalar[mulai:])
+    return hasil
+
+
+def fungsi_pembungkus(isi, pos):
+    """Badan `func` terdekat yang memuat pos, atau seluruh berkas."""
+    for m in reversed(list(re.finditer(r"\bfunc\s+\w+\s*(?:<[^>]*>)?\s*\(", isi))):
+        if m.start() > pos:
+            continue
+        buka = isi.find("{", m.end())
+        if buka < 0 or buka > pos:
+            continue
+        tutup = pasangan(isi, buka, "{", "}")
+        if tutup > pos:
+            return buka, tutup
+    return 0, len(isi)
+
+
+berkas = []
+for dasar, dirs, nama in os.walk(AKAR):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 71 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(0)
+
+masalah = []
+diperiksa = 0
+dilewati = 0
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(0)
+    for m in PANGGILAN.finditer(isi):
+        buka = isi.find("(", m.start())
+        tutup = pasangan(isi, buka)
+        if tutup < 0:
+            masalah.append("  %s: panggilan RowSpeech tidak terbaca -- aturan "
+                           "tidak bisa memutuskan." % path)
+            continue
+        awal, akhir = fungsi_pembungkus(isi, m.start())
+        badan = isi[awal:akhir]
+        for bagian in argumen_top(isi[buka + 1:tutup]):
+            if ":" not in bagian:
+                continue
+            nilai = bagian.split(":", 1)[1].strip()
+            # Ekspresi (panggilan, aritmetika, literal) tidak diputuskan:
+            # nilainya bisa digambar lewat pembantu yang sah.
+            if not re.fullmatch(r"[A-Za-z_]\w*", nilai):
+                dilewati += 1
+                continue
+            diperiksa += 1
+            if not re.search(r"\bText\s*\(\s*%s\b" % re.escape(nilai), badan):
+                masalah.append(
+                    "  %s: `%s` diucapkan lewat RowSpeech, tetapi tidak "
+                    "pernah digambar sebagai Text(%s) di fungsi yang sama -- "
+                    "dua saluran membaca dua nilai yang berbeda."
+                    % (path, nilai, nilai))
+
+if diperiksa == 0:
+    print("PERINGATAN: nol argumen pengenal terbaca dari panggilan RowSpeech "
+          "-- Aturan 71 tidak mengukur satu baris pun.")
+    raise SystemExit(0)
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+
+print("Bersih: %d pengenal diucapkan dan digambar; %d ekspresi dilewati."
+      % (diperiksa, dilewati))
+PY
+)
+baris_suara_status=$?
+echo "$baris_suara"
+if printf '%s' "$baris_suara" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 71 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$baris_suara_status" -ne 0 ]; then
+  echo "-> Ada baris yang mengucapkan nilai yang tidak ia gambar."
+  echo "   Pengguna melihat baris tanpa nilai, sementara VoiceOver"
+  echo "   membacakan nilai yang tidak ada di layar."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

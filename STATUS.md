@@ -1,3 +1,57 @@
+### Siklus (19 Okt 2026 — Aturan 71: baris yang diucapkan berhenti menggambar nilainya)
+
+Lanjutan langsung dari Aturan 70. Aturan 70 menjaga **satu layar** (redup) dan
+**satu bentuk argumen** (yang berupa ekspresi). Pertanyaan berikutnya: apakah
+kelasnya lebih umum dari itu? `RowSpeech.label(title:value:)` dipakai di **11
+tempat** dengan bentuk yang sama — menggambar judul dan nilai, lalu
+mengumumkan keduanya sebagai satu kalimat.
+
+Satu mutasi terukur pada salinan utuh (Aturan 70 sudah ada, proses baru):
+di `DiagnosticsView.detailRow`, `Text(value)` → `Text(title)`.
+
+    baris     Text(title)  …  Text(value)   ->  Text(title)  …  Text(title)
+    suara     RowSpeech.label(title: title, value: value)        (utuh)
+    hasil     seluruh 70 aturan exit 0
+
+Pengguna melihat baris yang menggambar judulnya **dua kali** dan nilainya tidak
+sama sekali; pembaca layar mengucapkan "judul, nilai". Yang rusak bukan
+tampilannya saja: `RowSpeech` ada supaya kedua saluran membaca **dua nilai yang
+sama**, dan tidak ada compiler yang melihat pelanggarannya karena kedua sisi
+tetap bertipe `String`.
+
+#### Bentuk longgar gagal, dan itu diukur
+
+Prototipe pertama membandingkan nama yang diucapkan dengan **seluruh badan
+`struct`** dan melaporkan **15 temuan pada pohon yang benar** — semuanya karena
+nilainya digambar lewat pembantu (`spokenDegrees(row.raDeg)`), bukan
+`Text(...)` langsung. Gerbang yang salah merah akan dimatikan orang, dan
+setelah dimatikan ia tidak menjaga apa pun. Jadi Aturan 71 dipersempit ke yang
+bisa ia putuskan: pengenal sederhana, terhadap `Text(...)` di **fungsi yang
+sama**. Argumen berbentuk ekspresi dilewati dan **dihitung** (10 dari 22),
+supaya hijau tidak mungkin berarti "tidak ada yang diperiksa".
+
+#### Angka
+
+- 71 aturan UI hijau; Aturan 71 memeriksa 12 pengenal, melewati 10 ekspresi.
+- 121 harness, semuanya dirujuk CI; 496 jangkar, nol mutasi tertinggal.
+- `bash -n` lolos di bash 5 dan bash 3.2.
+- 222 tes engine + 956 tes PointingKit tetap hijau.
+
+#### Yang TIDAK diklaim
+
+- Aturan 71 hanya memutuskan pengenal sederhana. Baris yang menggambar
+  `Text(spokenDegrees(value))` lalu mengucapkan `value` tetap lolos — bentuk
+  itu butuh analisis yang lebih dalam daripada pencocokan teks, dan aturan ini
+  memilih melewatkannya secara terhitung daripada menebaknya.
+- Ia tidak membuktikan urutan atau formatnya benar, hanya bahwa nilainya
+  muncul di saluran gambar.
+- Dua temuan "survivor" lain dari sapuan yang sama **bukan** cacat: 19 literal
+  `Text("…")` di `DiagnosticsView`/`ComplicationWidget` ternyata semuanya sudah
+  ada di `Localizable.xcstrings` dengan terjemahan `en` — Aturan 4 memang
+  menutupnya, dan nama produk (`Point & Know`, `Experiment 1`) sengaja tidak
+  diterjemahkan. Satu survivor lain (`AudioCue`) adalah false positive: jangkar
+  sapuan cocok dengan docstring, bukan kode.
+
 ### Siklus (19 Okt 2026 — Aturan 70: fakta yang diucapkan layar redup berhenti digambar)
 
 Siklus dibuka dengan sapuan mutasi, bukan dengan membaca STATUS.md, karena

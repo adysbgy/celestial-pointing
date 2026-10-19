@@ -2634,6 +2634,16 @@ jobs:
       - name: Buktikan Aturan 70 menggambar fakta yang diucapkan layar redup
         run: python3 Tools/bukti-mutasi-aturan70-fakta-digambar.py
 
+      # Baris `judul … nilai` punya dua saluran yang sama bentuknya: `Text(value)`
+      # menggambar nilainya, `RowSpeech.label(title:value:)` mengumumkannya.
+      # Terukur sebelum Aturan 71 ada (seluruh 70 aturan, proses baru):
+      # mengganti `Text(value)` menjadi `Text(title)` membuat baris menggambar
+      # judul DUA kali sementara VoiceOver mengucapkan "judul, nilai" -- dan
+      # seluruh gerbang tetap exit 0. Pengguna melihat baris tanpa nilai;
+      # pembaca layar membacakan nilai yang tidak ada di layar.
+      - name: Buktikan Aturan 71 menggambar baris yang diucapkan
+        run: python3 Tools/bukti-mutasi-aturan71-baris-digambar.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan
