@@ -3104,6 +3104,65 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// `Band.halfWidth` — **medan yang benar-benar dipakai view** — harus
+    /// sama dengan busur limb di `centerY` pita itu.
+    ///
+    /// **Kenapa uji ini ada, dan kenapa percobaan pertamanya gugur.**
+    /// `drawBands` membaca `radius * band.halfWidth` lalu menurunkan tepi
+    /// atas/bawahnya dari `bandHalfWidthAt`. Versi pertama uji ini
+    /// **menghitung ulang** tepi trapesium dari `bandHalfWidthAt(centerY)` dan
+    /// tidak pernah membaca `band.halfWidth` sama sekali. Akibatnya ia
+    /// **hijau pada bentuk ber-cacat**: `halfWidth` dikembalikan ke
+    /// `cos((t - 0.5) * .pi * 0.92)` (cacat yang dicatat di docstring
+    /// `jupiterBands`, 19% R terlalu sempit di kutub) dan uji tetap lulus.
+    /// Itu diukur, bukan dikira: mutasi dijalankan di Docker Swift 6.0.
+    ///
+    /// Gerbang yang hijau pada mutasi yang katanya ia jaga **tidak menjaga
+    /// apa pun**. Karena itu uji ini membandingkan **medan model** dengan
+    /// busur, dan tidak menghitung ulang apa pun dari sumber yang sama.
+    ///
+    /// Ongkos `halfWidth` salah, terukur pada bentuk kosinus di kartu jam
+    /// (radius 19 pt): pita kutub berhenti di 0.326 R sementara bola
+    /// setinggi itu 0.515 R — pitanya tampak mengambang di tengah piringan
+    /// yang polos di kutubnya.
+    ///
+    /// **Yang TIDAK diklaim.** Ini **model**, bukan piksel: uji tidak
+    /// menyatakan bentuk render benar, dan tidak menggantikan
+    /// `check_jupiter_bands_reach_the_limb` maupun `check_bands_follow_the_limb_arc`
+    /// di port Python. Ia juga tidak mengukur tepi trapesium di simpulnya —
+    /// yang dijaga hanya medan `halfWidth` di `centerY`.
+    func testJupiterBandHalfWidthIsTheLimbArcAtItsCenter() {
+        let geometry = CelestialVisual.jupiterBands()
+        var checked = 0
+        for (index, band) in geometry.enumerated() {
+            // Busur limb di ketinggian pita, dari rumusnya langsung — bukan
+            // dari `bandHalfWidthAt`, yang bisa berubah bersama medannya dan
+            // lalu sepakat satu sama lain tanpa satu pun benar.
+            let limb = (1 - band.centerY * band.centerY).squareRoot()
+            XCTAssertEqual(
+                band.halfWidth, limb, accuracy: 1e-12,
+                "pita \(index) di centerY \(band.centerY): halfWidth "
+                + "\(band.halfWidth), busur limb \(limb) — selisih "
+                + "\((limb - band.halfWidth) * 100)% R. Bentuk kosinus "
+                + "memberi 0.326 R vs 0.515 R di pita kutub.")
+            checked += 1
+        }
+        XCTAssertEqual(checked, geometry.count,
+                       "setiap pita harus diperiksa; nol berarti sapuannya kosong")
+        // Kontrol prasyarat: kalau semua pita punya halfWidth sama, uji di atas
+        // bisa lulus hanya karena bola dipaksa lurus. Pita kutub **wajib**
+        // lebih sempit dari ekuator.
+        if let first = geometry.first, let equator = geometry.first(
+            where: { $0.centerY == 0 }) {
+            XCTAssertLessThan(
+                first.halfWidth, equator.halfWidth,
+                "pita kutub harus lebih sempit dari ekuator; kalau tidak, "
+                + "geometrinya bukan busur bola")
+        } else {
+            XCTFail("geometri harus punya pita kutub dan pita ekuator")
+        }
+    }
+
     /// Pita harus **simetris** terhadap ekuator.
     ///
     /// Bukan kerapian: Jupiter yang pitanya lebih banyak di satu belahan

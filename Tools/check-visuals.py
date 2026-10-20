@@ -2729,12 +2729,18 @@ def check_port_matches_swift_constants(results):
         ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 0.11,
          "heightFraction: Double = 0.11", model),
         # Kekuatan pemulihan peredupan limb di atas pita. Angka ini **bukan**
-        # hiasan: pada 0 pita menghapus lengkung bola (cacat terukur 20.8% vs
-        # 50.6%), pada 1 pitanya tertutup bola. Ia hidup di model supaya view,
-        # port Python, dan uji Linux membaca angka yang sama — dan supaya
+        # hiasan: pada 1.0 satu pita tertutup gradien bola dan pitanya berhenti
+        # terbaca, pada 0 lengkungnya rata kembali. Ia hidup di model supaya
+        # view, port Python, dan uji Linux membaca angka yang sama — dan supaya
         # mengubahnya di satu tempat saja membuat pemeriksaan ini merah.
-        ("kekuatan pemulihan limb di atas pita", R.BAND_LIMB_SHADING_STRENGTH, 0.6,
-         "bandLimbShadingStrength: Double = 0.6", model),
+        #
+        # 0,75, bukan 0,6: `aaba2d4` mengubah tekniknya (naungan dipotong ke
+        # **tiap pita**, bukan ditumpuk ke seluruh cakram), dan angka lamanya
+        # tidak lagi berlaku. Gerbang ini tertinggal di 0,6 selama satu siklus
+        # dan membuat `main` merah — dua GAGAL dari satu anchor basi, bukan dari
+        # gambar yang salah.
+        ("kekuatan pemulihan limb di atas pita", R.BAND_LIMB_SHADING_STRENGTH, 0.75,
+         "bandLimbShadingStrength: Double = 0.75", model),
         # Peredupan limb piringan Bulan. Dua angka, keduanya diukur terhadap
         # render: 0.40 adalah kekuatan yang dipakai (purnama +33.5% lengkung,
         # gerbang fase 9/9), dan 1.15 adalah radius akhir gradiennya (purnama
@@ -10214,7 +10220,8 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
     dalam tepi, tapi cacat yang nyata (0.19 R) jauh di atas itu.
     """
     _, confirmed = render_case("planet-jupiter-confirmed", size=size, ss=ss)
-    # Bola tanpa pita, dari kasus "ragu" — gambar bola yang sama persis.
+    # Bola Jupiter yang **sama, tanpa ciri** — bukan kasus "ragu": sejak palet
+    # ikut hilang saat ragu, selisihnya jadi warna, bukan pita.
     _, sphere_only = render_case("planet-jupiter-bare", size=size, ss=ss)
     w, h, _ = confirmed
     radius = min(w, h) / 2.0
@@ -10234,12 +10241,33 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
         # sama-sama salah). Yang tidak boleh jadi parameter bebas adalah
         # **proyeksi bola** — ia satu-satunya nilai yang benar, dan ia
         # dihitung dari rumusnya langsung.
-        sphere = math.sqrt(max(0.0, 1 - band_y * band_y))
+        #
+        # **Dan dihitung di baris yang benar-benar diukur, bukan di
+        # `band_y`.** Sampai siklus ini pembandingnya `sqrt(1 - band_y^2)` —
+        # busur di ketinggian **pusat** pita, tempat pita paling lebar,
+        # sementara `band_left_reach` membaca baris pusat **piksel** yang
+        # dibulatkan. Kedua ketinggian itu berbeda, dan selisihnya bertambah
+        # dengan selisih lain, tidak saling meniadakan:
+        #
+        #   pita 0: 0,64 px (jarak baris ke `band_y`) + 0,90 px (cakupan
+        #           sebagian di tepi miring) = 1,5 px, terbaca 1,36% R
+        #   pita 6: 0,82 px (jarak baris) + 1,14 px (cakupan sebagian)
+        #           = 1,96 px, terbaca 1,68% R terhadap barisnya — dan
+        #           **2,50%** terhadap `band_y`, yaitu di atas ambang 2%
+        #
+        # Pita 6 gagal semata-mata karena pembanding yang salah tempat.
+        # Terukur: dengan busur di baris yang diukur, semua pita ≤ 1,68% R,
+        # sedangkan bentuk ber-cacat (kosinus) tetap 18,7–19,4% R di pita
+        # kutub. Ambang 0.02 tidak dilonggarkan — modul tetap
+        # `check_bands_follow_the_limb_arc` (ambang 3%) yang menjaga bentuk,
+        # dan ia memeriksa dua ketinggian tepi per pita.
+        band_row_y = (row + 0.5 - h / 2.0) / radius
+        sphere = math.sqrt(max(0.0, 1 - band_row_y * band_row_y))
         results.append(Result(
             f"pita Jupiter {index} menjangkau tepi bola",
             sphere - reach <= 0.02,
-            f"jangkauan {reach:.3f} R, bola {sphere:.3f} R, "
-            f"selisih {(sphere - reach) * 100:.1f}% R (baris {row})"))
+            f"jangkauan {reach:.3f} R, bola {sphere:.3f} R di baris {row}, "
+            f"selisih {(sphere - reach) * 100:.1f}% R"))
 
 
 def check_bands_follow_the_limb_arc(results, size=200, ss=2):
