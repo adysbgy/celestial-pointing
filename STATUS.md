@@ -30205,3 +30205,71 @@ seluruhnya dari keluaran gerbang.
 
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **956** hijau,
 `swift-ui-lint.sh` hijau, parse `bash:3.2` hijau, Apple Build hijau.
+
+### Siklus (20 Okt 2026 — Aturan 75: ikon complication wajib membaca umur cuplikan)
+
+Siklus dibuka dengan `git log` + `gh run list`, bukan dengan brief. `main`
+hijau: `Apple Build` 3m16s lulus, `Engine Tests (Linux)` jalan 40m+. Brief
+BAGIAN 1–4 / FASE A–C sudah terwujud dan ter-gerbang, jadi yang dicari
+sisanya: titik di `Apps/` yang **belum** dibaca satu pun aturan.
+
+#### Cacat
+
+Sapu mutasi menemukan lima mutasi yang tetap hijau padahal salah di
+`ComplicationWidget.swift`. Yang bernilai: menghilangkan `at:` dari kelima
+`presentedSymbolName(at: Date())` — tipe tetap sah (`public var` di samping
+`public func`), sehingga tidak ada peringatan compiler, dan seluruh aturan
+lulus sementara ikon lock di pergelangan berhenti tahu umur cuplikannya.
+
+Complication berjalan di proses terpisah dan hanya menerima cuplikan baru
+saat ada perubahan, jadi "basi" di situ paling lama bertahan. Yang dibaca
+pengguna di pergelangan bukan angka, melainkan **apakah jam masih mengenali
+langitnya** — ikon hijau yang tidak tahu umurnya adalah false confidence
+dalam bentuk paling ringkas.
+
+#### Kenapa ini bukan memperluas Aturan 23
+
+Aturan 23 menjawab "apakah ikon keadaan ada di cabang" (keraguan vs kunci),
+dan pertanyaan itu tetap benar. Aturan 75 menjawab pertanyaan lain — "apakah
+ikon itu tahu umur cuplikan". Dua pertanyaan yang gagal karena dua sebab
+berbeda, digabung, akan dilaporkan dengan satu pesan.
+
+JSON modelnya sudah benar dan sudah teruji di Linux
+(`ComplicationStaleSymbolTests`); yang tidak dijaga adalah **pemakaiannya di
+view** — tepat kelas yang dijaga gerbang teks, bukan uji model.
+
+#### Cacat kedua, ditemukan saat membuktikan keadaan 4
+
+Bukti non-vakuitas kelima harness Aturan 70–74 memakai
+`git show HEAD:swift-ui-lint.sh` sebagai "aturan pra-perbaikan". Itu benar
+pada hari harness itu ditulis, dan **menjadi salah begitu commit aturannya
+mendarat**: HEAD bergerak maju, jadi HEAD kini memuat aturan yang seharusnya
+belum ada, dan keadaan yang dimaksud "dulu buta" terbaca "sudah merah".
+Terukur pada `main` hari ini: kelimanya **SALAH** di keadaan 4, padahal
+deteksinya benar.
+
+Artinya bukti non-vakuitas di repo ini punya masa kedaluwarsa — lima gerbang
+yang sebenarnya berbunyi akan memerahkan CI tanpa satu baris aturan berubah.
+Karena itu jangkarnya diubah: commit pengenal diambil dari
+`git log -S <penanda> -- swift-ui-lint.sh` (entri paling tua = yang
+memperkenalkan), dan yang dijadikan "pra-perbaikan" adalah **induk**nya.
+Penjaga ikut: kalau blob pra-perbaikan ternyata sudah memuat penanda aturan,
+keadaan itu dinyatakan SALAH, bukan hijau — "pra-perbaikan" yang memuat
+aturannya sendiri tidak membuktikan apa pun.
+
+#### Yang TIDAK diklaim
+
+- Aturan 75 tidak memutuskan **apakah** cuplikan basi, dan tidak memeriksa
+  `isStale(at:)` dipakai. Keduanya wilayah model + uji Linux. Ia hanya
+  menuntut cabang yang menampilkan nama complication memakai bentuk yang
+  **melakukan** keputusan waktu itu.
+- Harness memaksa lima panggilan `presentedSymbolName(at: Date())` harus ada.
+  Kalau cabang complication diubah menjadi bentuk lain yang sah secara tipe
+  dan memakai waktu, harness akan menolak dan meminta diperbarui — itu
+  jangkar yang harus didaftarkan ulang, bukan gerbang yang longgar.
+- Lima harness yang diperbaiki hanya mendapat jangkaran pra-perbaikan yang
+  tidak kedaluwarsa. Deteksi, mutasi, dan pesan galatnya tidak diubah.
+- Brief "FASE A/B/C" tetap belum disentuh ulang di siklus ini.
+
+CelestialEngine **222** + PointingKit **956** harus tetap hijau; engine tidak
+disentuh. `swift-ui-lint.sh` 74 aturan hijau, parse `bash:3.2` hijau.

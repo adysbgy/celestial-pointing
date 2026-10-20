@@ -32,8 +32,8 @@ Tiga keadaan diuji:
   2. kontrol negatif (pohon utuh) -> wajib HIJAU. Tanpa keadaan ini, aturan
      yang selalu merah (mis. karena regex labelnya salah) akan lulus
      keadaan 1 tanpa membuktikan apa pun.
-  3. aturan pra-perbaikan (`lint-lama.sh` dari `git show HEAD:...`) pada
-     mutasi yang **sama** -> wajib HIJAU. Ini bukti non-vakuitas: kalau
+  3. aturan pra-perbaikan (induk commit yang MEMPERKENALKAN aturan ini),
+     pada mutasi yang **sama** -> wajib HIJAU. Ini bukti non-vakuitas: kalau
      aturan lama juga merah di sini, cacat ini sudah terjaga dan Aturan 72
      tidak menambah apa pun.
 
@@ -65,6 +65,22 @@ REPLACEMENT = "nightMode = nightMode"
 
 #: Penanda aturan di naskah gerbang; tanpa ini Aturan 72 belum diterapkan.
 RULE_MARK = "Aturan 72: tombol yang label-nya MEMBACA keadaan wajib MENGUBAHNYA"
+
+
+def commit_pengenal(penanda):
+    """Commit yang pertama kali memuat `penanda` di swift-ui-lint.sh.
+
+    `git log -S` mencocokkan perubahan jumlah kemunculan, jadi entri terakhir
+    (paling tua) adalah commit yang menambahkannya. `None` berarti penanda
+    tidak pernah masuk riwayat -- non-vakuitas tidak bisa dibuktikan.
+    """
+    proc = subprocess.run(
+        ["git", "log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"],
+        capture_output=True, text=True, cwd=ROOT)
+    if proc.returncode != 0:
+        return None
+    baris = [b for b in proc.stdout.split() if b]
+    return baris[-1] if baris else None
 
 
 def jalankan_lint(cwd, skrip="swift-ui-lint.sh"):
@@ -145,8 +161,13 @@ def main():
         # Keadaan 3: aturan pra-perbaikan pada mutasi yang sama wajib hijau.
         # Kalau merah, cacat ini sudah dijaga dan aturan baru tidak menambah.
         lama = os.path.join(kerja, "lint-lama.sh")
-        proc = subprocess.run(["git", "show", "HEAD:swift-ui-lint.sh"],
-                              capture_output=True, text=True, cwd=ROOT)
+        # Pra-perbaikan = induk commit yang MEMPERKENALKAN aturan ini, bukan
+        # HEAD. HEAD bergerak maju sesudah aturan mendarat; begitu ia memuat
+        # aturan ini sendiri, "HEAD" berhenti berarti "sebelum aturan ini" dan
+        # keadaan ini berbalik jadi lawannya tanpa satu baris pun diubah.
+        proc = subprocess.run(
+            ["git", "show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"],
+            capture_output=True, text=True, cwd=ROOT)
         if proc.returncode != 0 or not proc.stdout.strip():
             print("SALAH aturan pra-perbaikan tidak terbaca dari git -- "
                   "non-vakuitas tidak bisa dibuktikan.")

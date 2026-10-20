@@ -13131,6 +13131,106 @@ elif [ "$pasangan_nama_status" -ne 0 ]; then
   status=1
 fi
 
+# ── Aturan 75: ikon complication wajib membaca umur cuplikan ───────────────
+# Complication berjalan di proses terpisah dan hanya menerima cuplikan baru
+# saat ada perubahan, jadi ikon di pergelangan bisa jadi berjam-jam lebih tua
+# dari cuplikan yang digambar. Model sudah punya jawabannya —
+# `presentedSymbolName(at:)` menggeser ikon lock/ragu yang sudah basi menjadi
+# `clock.badge.exclamationmark` — dan ujinya sendiri (`ComplicationStaleSymbol
+# Tests`) menyatakan bentuk tanpa waktu kedaluwarsa. Yang tidak dijaga satu pun
+# gerbang adalah pemakaiannya di view: Aturan 23 hanya menuntut sebuah
+# `presentedSymbolName` muncul di cabang, tanpa melihat apakah bentuk itu
+# membaca waktu.
+#
+# Terukur: mengganti kelima `presentedSymbolName(at: Date())` di
+# ComplicationWidget menjadi bentuk tanpa waktu membuat SELURUH 74 ATURAN HIJAU
+# (exit 0), sementara centang hijau "kunci berhasil" kini berdiri di pergelangan
+# berjam-jam sesudah pandangan pengguna berpindah.
+#
+# Kenapa bukan memperbaiki Aturan 23: Aturan 23 menjawab "apakah ikon keadaan
+# ada" (keraguan vs kunci), pertanyaan yang tetap benar. Aturan ini pertanyaan
+# lain — "apakah ikon itu tahu umur cuplikan" — dan menggabungkannya berarti dua
+# pertanyaan yang gagal karena dua sebab berbeda dilaporkan dengan satu pesan.
+#
+# Fail-closed: nol cabang dibaca = GAGAL. Complication yang cabangnya tidak
+# terbaca bukan complication yang bersih.
+echo "== Aturan 75: ikon complication wajib membaca umur cuplikan (presentedSymbolName(at:)) =="
+ikon_umur=$(python3 - <<'PY' 2>&1
+import os, re
+
+# Nama host: cabang yang menampilkan nama objek complication.
+TARGET = "digest.headline"
+# Bentuk yang memakai waktu: `presentedSymbolName(at: ...)`.
+BERWAKTU = re.compile(r"presentedSymbolName\s*\(\s*at\s*:")
+# Bentuk tanpa waktu: `presentedSymbolName` yang TIDAK diikuti `(at:`.
+TANPA_WAKTU = re.compile(r"presentedSymbolName(?!\s*\(\s*at\s*:)")
+
+BRANCH = re.compile(r"^(\s*)(case\s+\.accessory\w+|default)\s*:", re.M)
+
+def branch_end(code, start, indent):
+    close = re.compile(r"^" + indent + r"\}", re.M)
+    m = close.search(code, start)
+    return m.start() if m else len(code)
+
+masalah = []
+cabang_dibaca = 0
+berwaktu = 0
+
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        if TARGET not in code:
+            continue
+        marks = list(BRANCH.finditer(code))
+        for idx, m in enumerate(marks):
+            end = branch_end(code, m.end(), m.group(1))
+            nxt = marks[idx + 1].start() if idx + 1 < len(marks) else end + 1
+            end = min(end, nxt if idx + 1 < len(marks) else end)
+            branch = code[m.end():end]
+            if TARGET not in branch:
+                continue
+            cabang_dibaca += 1
+            if BERWAKTU.search(branch):
+                berwaktu += 1
+                continue
+            line_no = code[:m.start()].count("\n") + 1
+            if TANPA_WAKTU.search(branch):
+                sebab = "pakai presentedSymbolName tanpa (at:) -- ikon tidak tahu umur cuplikan"
+            else:
+                sebab = "tidak memanggil presentedSymbolName sama sekali"
+            masalah.append(
+                "  %s:%d: cabang `%s` menampilkan %s -> %s"
+                % (path, line_no, m.group(2), TARGET, sebab))
+
+if masalah:
+    print("\n".join(masalah))
+    print("\n-> Centang hijau lock bisa berdiri berjam-jam sesudah pandangan")
+    print("   pengguna berpindah. Pakai presentedSymbolName(at: Date()) supaya")
+    print("   cuplikan basi ikut berganti ikon menjadi clock.badge.exclamationmark.")
+    raise SystemExit(1)
+
+if cabang_dibaca == 0:
+    print("PERINGATAN: nol cabang complication membaca %s -- Aturan 75 tidak "
+          "mengukur satu cabang pun." % TARGET)
+    raise SystemExit(1)
+
+print("Bersih: %d cabang menampilkan nama, semuanya baca umur cuplikan." % berwaktu)
+PY
+)
+ikon_umur_status=$?
+echo "$ikon_umur"
+if printf '%s' "$ikon_umur" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 75 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$ikon_umur_status" -ne 0 ]; then
+  echo "-> Ada ikon complication yang tidak tahu umur cuplikannya."
+  status=1
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo

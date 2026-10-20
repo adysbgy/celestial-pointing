@@ -42,7 +42,7 @@ Empat keadaan, dan keempatnya harus benar sekaligus:
      keadaan 1 tanpa membuktikan apa pun.
   3. `.post()` **di luar** `onChange` -> HIJAU. Itu bukan pengumuman
      perubahan keadaan; menuntutnya lewat gerbang keadaan adalah salah tuduh.
-  4. aturan pra-perbaikan (`git show HEAD:swift-ui-lint.sh`) pada mutasi yang
+  4. aturan pra-perbaikan (induk commit yang MEMPERKENALKAN aturan ini) pada mutasi yang
      **sama** -> HIJAU. Bukti non-vakuitas: kalau lint lama sudah merah di
      sini, cacat ini sudah terjaga dan Aturan 74 tidak menambah apa pun.
 
@@ -75,6 +75,22 @@ MUTASI = ("guard announcedState != newState else { return }\n"
 
 #: Penanda aturan di naskah gerbang; tanpa ini Aturan 74 belum diterapkan.
 RULE_MARK = "Aturan 74: pengumuman keadaan harus lewat AnnouncementGate"
+
+
+def commit_pengenal(penanda):
+    """Commit yang pertama kali memuat `penanda` di swift-ui-lint.sh.
+
+    `git log -S` mencocokkan perubahan jumlah kemunculan, jadi entri terakhir
+    (paling tua) adalah commit yang menambahkannya. `None` berarti penanda
+    tidak pernah masuk riwayat -- non-vakuitas tidak bisa dibuktikan.
+    """
+    proc = subprocess.run(
+        ["git", "log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"],
+        capture_output=True, text=True, cwd=ROOT)
+    if proc.returncode != 0:
+        return None
+    baris = [b for b in proc.stdout.split() if b]
+    return baris[-1] if baris else None
 
 
 def jalankan_lint(cwd, skrip="swift-ui-lint.sh"):
@@ -181,11 +197,20 @@ def main():
         with open(sasaran, "w", encoding="utf-8") as handle:
             handle.write(isi.replace(ANCHOR, MUTASI))
         lama = os.path.join(kerja, "lint-lama.sh")
-        proc = subprocess.run(["git", "show", "HEAD:swift-ui-lint.sh"],
-                              capture_output=True, text=True, cwd=ROOT)
+        # Pra-perbaikan = induk commit yang MEMPERKENALKAN aturan ini, bukan
+        # HEAD. HEAD bergerak maju sesudah aturan mendarat; begitu ia memuat
+        # aturan ini sendiri, "HEAD" berhenti berarti "sebelum aturan ini" dan
+        # keadaan ini berbalik jadi lawannya tanpa satu baris pun diubah.
+        proc = subprocess.run(
+            ["git", "show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"],
+            capture_output=True, text=True, cwd=ROOT)
         if proc.returncode != 0 or not proc.stdout.strip():
-            print("SALAH aturan pra-perbaikan tidak terbaca dari git -- "
+            print("SALAH aturan pra-perbaikan tidak terlacak dari git -- "
                   "non-vakuitas tidak bisa dibuktikan.")
+            hasil.append(False)
+        elif RULE_MARK in proc.stdout:
+            print("SALAH 'pra-perbaikan' ternyata sudah memuat aturan ini -- "
+                  "jangkarnya salah, keadaan ini tidak membuktikan apa pun.")
             hasil.append(False)
         else:
             with open(lama, "w", encoding="utf-8") as handle:

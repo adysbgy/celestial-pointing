@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **73 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **74 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
@@ -393,6 +393,23 @@ perantara (`let r = 0.42; .spring(response: r)`) atau dirakit fungsi helper
 tidak terlihat — itu sebabnya `LockArrivalMotionTests` dan
 `PulseFrameRateTests` menahan nilai di model, sementara aturan ini menahan
 **dari mana** `Apps/` mengambilnya. Dua penjaga, dua kelas.
+
+Aturan 75 menutup kelas yang sama pada ikon complication — bukan pada **ada**
+ikonnya, melainkan pada **apakah ikon itu membaca waktu**. Complication berjalan
+di proses terpisah dan hanya menerima cuplikan baru saat ada perubahan, jadi
+ikon di pergelangan bisa jadi berjam-jam lebih tua dari cuplikan yang
+digambar. Model sudah menjawabnya: `presentedSymbolName(at:)` menggeser ikon
+lock/ragu yang sudah basi menjadi `clock.badge.exclamationmark`, dan ujinya
+sendiri (`ComplicationStaleSymbolTests`) menandai bentuk tanpa waktu sebagai
+kedaluwarsa. Yang belum dijaga satu pun gerbang adalah **pemakaiannya di view**:
+Aturan 23 hanya menuntut sebuah `presentedSymbolName` muncul di cabang
+complication, tanpa melihat apakah bentuk itu memanggil `at:`. Terukur sebelum
+aturan ini ada — mengganti kelima `presentedSymbolName(at: Date())` menjadi
+bentuk tanpa waktu membiarkan seluruh aturan yang ada saat itu lulus,
+sementara centang hijau
+"kunci berhasil" kini berdiri di pergelangan berjam-jam sesudah pandangan
+pengguna berpindah. Ia aturan sendiri, bukan perluasan Aturan 23, karena
+keduanya menjawab dua pertanyaan yang gagal karena dua sebab berbeda.
 
 ### Uji harus pernah merah
 

@@ -2682,6 +2682,21 @@ jobs:
       - name: Buktikan Aturan 74 menuntut pengumuman lewat gerbang
         run: python3 Tools/bukti-mutasi-aturan74-announcement.py
 
+      # Ikon complication yang tidak tahu umur cuplikannya. Complication
+      # berjalan di proses terpisah dan hanya menerima cuplikan baru saat ada
+      # perubahan, jadi ikon lock di pergelangan bisa berjam-jam lebih tua dari
+      # yang digambar. Modelnya sudah ada dan teruji di Linux
+      # (`presentedSymbolName(at:)` + `ComplicationStaleSymbolTests`), dan
+      # Aturan 23 hanya menuntut *sebuah* ikon muncul di cabang -- bentuk tanpa
+      # `at:` lulus di sana. Terukur sebelum Aturan 75: kelima panggilan
+      # diganti bentuk tanpa waktu, seluruh aturan yang ada saat itu **exit 0**.
+      #
+      # Keadaan 3 harness ini yang membuatnya bukan pencocok tulisan: satu
+      # cabang (`accessoryCircular`) dikembalikan ke bentuk buta-umur, empat
+      # lainnya tetap benar.
+      - name: Buktikan Aturan 75 menuntut ikon complication membaca umur cuplikan
+        run: python3 Tools/bukti-mutasi-aturan75-ikon-umur.py
+
       # Gerbang keterpisahan pita Jupiter. Sampai siklus ini keempat gerbang
       # pita yang ada bertanya "apakah pitanya ada", dan keempatnya lulus pada
       # pola tan->rust->cream berulang yang terukur residual 0.006 -- pita yang

@@ -64,6 +64,22 @@ REPLACEMENT = ANCHOR.replace("Text(value)", "Text(title)")
 RULE_MARK = "Aturan 71: baris yang DIUCAPKAN wajib juga DIGAMBAR"
 
 
+def commit_pengenal(penanda):
+    """Commit yang pertama kali memuat `penanda` di swift-ui-lint.sh.
+
+    `git log -S` mencocokkan perubahan jumlah kemunculan, jadi entri terakhir
+    (paling tua) adalah commit yang menambahkannya. `None` berarti penanda
+    tidak pernah masuk riwayat -- non-vakuitas tidak bisa dibuktikan.
+    """
+    proc = subprocess.run(
+        ["git", "log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"],
+        capture_output=True, text=True, cwd=ROOT)
+    if proc.returncode != 0:
+        return None
+    baris = [b for b in proc.stdout.split() if b]
+    return baris[-1] if baris else None
+
+
 def jalankan_lint(cwd, skrip="swift-ui-lint.sh"):
     proc = subprocess.run(["bash", skrip], capture_output=True, text=True,
                           cwd=cwd, env=dict(os.environ, PYTHONWARNINGS="ignore"))
@@ -129,8 +145,13 @@ def main():
         hasil.append(ok)
 
         lama = os.path.join(kerja, "lint-lama.sh")
-        proc = subprocess.run(["git", "show", "HEAD:swift-ui-lint.sh"],
-                              capture_output=True, text=True, cwd=ROOT)
+        # Pra-perbaikan = induk commit yang MEMPERKENALKAN aturan ini, bukan
+        # HEAD. HEAD bergerak maju sesudah aturan mendarat; begitu ia memuat
+        # aturan ini sendiri, "HEAD" berhenti berarti "sebelum aturan ini" dan
+        # keadaan ini berbalik jadi lawannya tanpa satu baris pun diubah.
+        proc = subprocess.run(
+            ["git", "show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"],
+            capture_output=True, text=True, cwd=ROOT)
         if proc.returncode != 0 or not proc.stdout.strip():
             print("SALAH aturan pra-perbaikan tidak terbaca dari git -- "
                   "non-vakuitas tidak bisa dibuktikan.")
