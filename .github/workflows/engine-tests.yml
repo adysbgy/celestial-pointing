@@ -2728,5 +2728,22 @@ jobs:
       - name: Buktikan Aturan 68 menjaga satu App Group
         run: python3 Tools/bukti-mutasi-aturan68-app-group.py
 
+      # Ukuran bintang saat engine RAGU: gerbang warnanya sudah ada, tetapi
+      # warna hanya menutup **satu** dari dua ciri pengenal. Ukuran adalah ciri
+      # yang kedua dan lebih kuat di katalog ini (24 ukuran berbeda untuk 25
+      # bintang, Sirius 0.982 lawan Polaris 0.201 — hampir 5x), dan ia tidak
+      # pernah menjadi variabel di gerbang mana pun sebelum cycle ini.
+      #
+      # Harness ini lahir dari cacat gerbang, bukan dari kebetulan: ketiga
+      # keadaannya menuntut tiga **arah** yang berbeda, karena ketiga arah itu
+      # bisa lolos terpisah. Yang paling sunyi adalah keadaan 3 — sentinel
+      # dikembalikan ke 0,15. Semua bintang ragu tetap identik satu sama lain,
+      # jadi gerbang "sebaran cahaya 0%" tetap hijau; yang menangkapnya hanya
+      # gerbang `sentinel ukuran ragu bukan salah satu magnitudo`, karena 0,15
+      # adalah keluaran `size_from_magnitude(+3.5)` dan seluruh magnitudo di
+      # atasnya. Tanpa gerbang itu keadaan ini lulus dengan nol merah.
+      - name: Buktikan gerbang ukuran bintang saat ragu berbunyi
+        run: python3 Tools/bukti-mutasi-ukuran-bintang.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

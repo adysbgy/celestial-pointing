@@ -11545,6 +11545,30 @@ def check_star_size_not_a_claim_when_uncertain(results, size=200, ss=2):
         f"sebaran cahaya {spread * 100:.1f}% antara bintang ragu "
         f"bermagnitudo −1.46 … +3.5 (harus 0%)"))
 
+    # **Sentinel tidak boleh menjadi magnitudo.**
+    #
+    # Pemeriksaan di atas hanya menuntut semua bintang ragu **sama besar**, dan
+    # syarat itu dipenuhi oleh nilai sentinel apa pun — termasuk `0.15`, lantai
+    # skala yang **adalah** ukuran magnitudo paling redup. Dibuktikan dengan
+    # mengukur, bukan dikira: sentinel dipaksa 0,15 dan sebaran cahayanya
+    # **0,0%** persis sama seperti sentinel 0,5. Jadi gerbang "tidak
+    # mengklaim" tetap hijau sementara setiap bintang ragu digambar sebesar
+    # bintang redup kategori tertentu.
+    #
+    # Yang membedakan keduanya bukan sebaran antar-bintang ragu, melainkan
+    # **jarak ke skala magnitudo**: sentinel harus tidak dapat dihasilkan
+    # `size_from_magnitude` untuk magnitudo mana pun, sedangkan 0,15 adalah
+    # keluaran `size_from_magnitude(+3.5)` dan seluruh magnitudo di atasnya
+    # (klip lantai). Karena itu diukur terhadap tabel itu sendiri, bukan
+    # terhadap angka yang ditulis di sini.
+    magnitudo_scale = {round(R.size_from_magnitude(m), 12) for m in
+                       (-1.46, 0.0, 0.13, 1.0, 2.0, 3.5)}
+    results.append(Result(
+        "sentinel ukuran ragu bukan salah satu magnitudo",
+        round(R.UNKNOWN_STAR_SIZE, 12) not in magnitudo_scale,
+        f"sentinel {R.UNKNOWN_STAR_SIZE} lawan {len(magnitudo_scale)} ukuran "
+        f"magnitudo (−1.46 … +3.5); 0,15 di sini berarti \"bintang redup\""))
+
     # Arah sebaliknya — tanpa ini view yang **selalu** membuang ukuran lolos.
     # Saat yakin, Sirius memang harus jauh lebih besar dari bintang redup.
     bright = render_case_obj(
@@ -11634,8 +11658,39 @@ def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
     # disengaja, dan membandingkan seluruh frame akan mengukur lencananya,
     # bukan warnanya. Radiusnya dipilih di luar glow inti tapi di dalam
     # jangkauan lencana.
-    _, (w5, h5, rows_unknown) = render_case("star-unknown-id", size=size, ss=ss)
-    _, (w6, h6, rows_rigel2) = render_case("star-rigel-uncertain", size=size, ss=ss)
+    #
+    # **Kenapa bandingnya bukan `star-unknown-id` apa adanya.** Pemeriksaan ini
+    # ingin mengukur **warna**, jadi ukurannya wajib sama. Dulu keduanya
+    # kebetulan sama — `star-unknown-id` lahir dari magnitudo 0,0
+    # (`size_from_magnitude(0,0)` = 0,50119), dan puluhan pemeriksaan lain sudah
+    # membandingkannya sebagai "ukuran 0,5". Jadi selama sentinel ragu juga
+    # magnitudo B−V 0,00, selisihnya nol dan gerbangnya benar.
+    #
+    # Sejak cycle "ukuran bintang tidak lagi jadi klaim" sentinel itu punya
+    # nilainya sendiri (`UNKNOWN_STAR_SIZE` = 0,5) — bukan lagi ukuran
+    # magnitudo, karena magnitudo praktis adalah sidik jari. Terukur: nol
+    # magnitudo di katalog ini yang menghasilkannya persis; yang terdekat Vega
+    # pada 0,4943, dan nol magnitudo sendiri pada 0,50119. Selisih 0,24% itu
+    # membuat ketiga pemeriksaan **merah pada kode yang benar** (332 piksel
+    # berbeda, maks delta 10/255, 324 di antaranya pembulatan ±1) — bukan
+    # kebocoran warna, melainkan ukuran yang tak lagi persis sama. Gerbang yang
+    # salah sasaran pada kode benar akan ditonjol orang.
+    #
+    # Karena itu bandingnya dibuat **khusus** dengan ukuran sentinel yang sama,
+    # bukan diambil dari kasus render yang ukurannya milik fakta lain. Yang
+    # diukur tetap utuh: apakah warna ragu benar-benar sama dengan warna "tidak
+    # mengklaim", dan arah sebaliknya (dua bintang ragu harus identik) tetap
+    # diukur oleh pemeriksaan pertama di fungsi ini.
+    def unknown_sentinel_case():
+        return R.VisualCase("__unknown-sentinel", "probe", "star",
+                            color_index=R.UNKNOWN_STAR_COLOR_INDEX,
+                            relative_size=R.UNKNOWN_STAR_SIZE,
+                            is_confirmed=True)
+
+    _, (w5, h5, rows_unknown) = render_case_obj(
+        unknown_sentinel_case(), "__unknown-sentinel", size=size, ss=ss)
+    _, (w6, h6, rows_rigel2) = render_case("star-rigel-uncertain",
+                                           size=size, ss=ss)
     cx5, cy5 = w5 / 2.0, h5 / 2.0
     mask_radius = 0.25 * w5
     diff_unknown = 0

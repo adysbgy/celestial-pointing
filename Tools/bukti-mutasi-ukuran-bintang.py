@@ -42,14 +42,20 @@ Keadaan yang diuji:
                                    sama-sama kecil. Inilah pembeda "ukuran
                                    hilang" dari "ukuran bocor", dan kenapa
                                    kedua arah itu wajib ada.
-  3. penjaga kembali ke nilai      sentinel `UNKNOWN_STAR_SIZE` dikembalikan
+  3. sentinel kembali ke nilai      sentinel `UNKNOWN_STAR_SIZE` dikembalikan
      ujung skala                   menjadi 0.15 (lantai magnitudo paling
-                                   redup). Gerbang ukuran **merah**: 0.15
-                                   **adalah** satu magnitudo, jadi "ragu" tetap
-                                   menyebut bintang paling redup. Ini regresi
-                                   halus yang tidak akan terlihat dari gambar
-                                   — semua bintang ragu tetap identik satu
-                                   sama lain.
+                                   redup). Gerbang "keraguan" **tetap hijau**
+                                   — semua bintang ragu memang masih
+                                   identik; terukur sebaran cahaya 0,0%
+                                   persis sama seperti sentinel 0,5. Yang
+                                   menangkapnya adalah gerbang
+                                   `sentinel ukuran ragu bukan salah satu
+                                   magnitudo`, yang **merah** karena 0,15
+                                   adalah keluaran `size_from_magnitude(+3.5)`
+                                   dan seluruh magnitudo di atasnya. Tanpa
+                                   gerbang itu keadaan ini lulus dengan nol
+                                   merah, dan itulah cacat yang mengapa
+                                   harness ini menuntut ketiga arah.
 
 Berkas sumber produksi (`Tools/render-visuals.py`) **dimutasi dengan sengaja**
 lalu dipulihkan di `finally` per keadaan, plus handler `SIGINT`/`SIGTERM`:
@@ -115,6 +121,7 @@ SENTINEL_FLOOR = 'UNKNOWN_STAR_SIZE = 0.15'
 # Nama pemeriksaan, dipakai apa adanya supaya perubahan nama di gerbang
 # membuat berkas ini merah — bukan diam-diam mencocokkan himpunan kosong.
 NO_CLAIM = "ukuran bintang tidak mengklaim saat ragu"
+NOT_A_MAGNITUDO = "sentinel ukuran ragu bukan salah satu magnitudo"
 KEEPS_BRIGHT = "ukuran bintang tetap menyebut terang saat yakin"
 
 HIJAU = "hijau"
@@ -128,7 +135,7 @@ def _expect(**verdicts):
 # (nama keadaan, [(cari, ganti), ...] atau None, {nama pemeriksaan: harapan})
 STATES = [
     ("[baseline]", None,
-     _expect(**{NO_CLAIM: HIJAU, KEEPS_BRIGHT: HIJAU})),
+     _expect(**{NO_CLAIM: HIJAU, NOT_A_MAGNITUDO: HIJAU, KEEPS_BRIGHT: HIJAU})),
 
     # Penjaga keyakinan dilewati: ukuran identitas bocor ke gambar yang belum
     # mengklaim apa pun. Sebaran cahaya antara magnitudo −1.46 dan +3.5
@@ -136,7 +143,7 @@ STATES = [
     # menyentuh bintang terkunci.
     ("1. penjaga ukuran dilewati",
      [(GUARD, GUARD_OFF)],
-     _expect(**{NO_CLAIM: MERAH, KEEPS_BRIGHT: HIJAU})),
+     _expect(**{NO_CLAIM: MERAH, NOT_A_MAGNITUDO: HIJAU, KEEPS_BRIGHT: HIJAU})),
 
     # Ukuran dibuang di sumber: semua bintang digambar sekecil sentinel.
     # Gerbang "tetap menyebut terang saat yakin" memerah karena Sirius dan
@@ -145,7 +152,7 @@ STATES = [
     # sama-sama tidak menyebut terang.
     ("2. ukuran dibuang di sumber",
      [(SIZE_CALL, SIZE_CALL_FLAT)],
-     _expect(**{NO_CLAIM: HIJAU, KEEPS_BRIGHT: MERAH})),
+     _expect(**{NO_CLAIM: HIJAU, NOT_A_MAGNITUDO: HIJAU, KEEPS_BRIGHT: MERAH})),
 
     # Sentinel dikembalikan ke lantai skala (0.15) — nilai yang **adalah**
     # magnitudo bintang paling redup yang bisa dikenali. Semua bintang ragu
@@ -154,7 +161,7 @@ STATES = [
     # arah kedua. Ini regresi halus yang paling mudah kembali tanpa terlihat.
     ("3. sentinel kembali ke ujung skala",
      [(SENTINEL, SENTINEL_FLOOR)],
-     _expect(**{NO_CLAIM: HIJAU, KEEPS_BRIGHT: HIJAU})),
+     _expect(**{NO_CLAIM: HIJAU, NOT_A_MAGNITUDO: MERAH, KEEPS_BRIGHT: HIJAU})),
 ]
 
 
