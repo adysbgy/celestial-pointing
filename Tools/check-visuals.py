@@ -2523,8 +2523,39 @@ def accents_reaching_the_view(model_source, view_code, extra_model_sources=()):
             body_accents = set(re.findall(r"accents\.(\w+)", body))
             if not body_accents:
                 continue
-            # Dipakai view bila **namanya** disebut di kode view.
-            if re.search(r"\b" + re.escape(match.group(1)) + r"\b", view_code):
+            # Dipakai view bila view **memanggil** fungsinya, bukan hanya
+            # menyebut namanya.
+            #
+            # **Kenapa pemanggilan, bukan penyebutan.** Penyebutan nama
+            # (`re.search(r"\b<nama>\b")`) cocok juga dengan nama lokal, nama
+            # parameter, dan metode pada penerima yang sama sekali tak
+            # berkaitan — dan itu bukan cacat hipotetis: `CandidateMarker.stroke`
+            # adalah fungsi model yang badan-nya membaca `accents.candidateStroke`,
+            # sementara view **tidak pernah memanggilnya** (lihat
+            # `drawCandidateMarker`, yang memakai accessor token
+            # `candidateStroke(isNight:)` dan mendokumentasikan alasannya).
+            # Yang ada di view hanyalah variabel lokal `let stroke = …` dan
+            # pemanggilan `context.stroke(...)` pada `GraphicsContext`.
+            # Karena `\bstroke\b` cocok dengan keduanya, token `candidateStroke`
+            # tercatat "sampai ke view" selamanya — termasuk ketika pemanggilan
+            # sungguhnya dihapus. Terukur: mutasi yang justru jadi alasan
+            # harness `bukti-mutasi-aksen.py` hidup tetap **hijau** di gerbang
+            # ini sejak Oct 2026 (perkenalan `CandidateMarker.stroke`).
+            #
+            # **Kenapa syaratnya "dipanggil pada nama tipe", bukan sekadar
+            # "diikuti `(`".** Penerima `context.stroke(circle, …)` adalah
+            # variabel lokal bernama kecil — `GraphicsContext`. Setiap fungsi
+            # model yang dipakai view hari ini dipanggil lewat nama tipe
+            # (`CelestialVisual.candidateStroke(…)`,
+            # `VisualFrame.saturnRing()`), jadi aturan yang menuntut penerima
+            # berhuruf besar menolak `context.stroke` tanpa perlu daftar
+            # nama penerima yang harus dipelihara — daftar begitu akan basi
+            # begitu view memakai variabel baru, dan gerbang yang basi diam.
+            # Konsekuensinya diakui: fungsi model yang benar-benar dipanggil
+            # tanpa kualifikasi akan dihitung tidak terpakai, dan hari ini
+            # tidak ada satu pun (diukur — hanya `color`, milik `Self`).
+            if re.search(r"(?:[A-Z]\w*\s*\.\s*)*[A-Z]\w*\s*\.\s*"
+                         + re.escape(match.group(1)) + r"\s*\(", view_code):
                 reached |= body_accents
     return reached
 
