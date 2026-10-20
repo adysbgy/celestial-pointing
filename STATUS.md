@@ -1,3 +1,98 @@
+### Siklus (20 Okt 2026 — Aturan 73: nama sisa yang memerahkan Apple Build, dan kenapa tiga gerbang lokal buta)
+
+Siklus dibuka dengan `git log` + `gh run list`, bukan dengan brief. **`main`
+merah dua arah** untuk `aaba2d4`: `Apple Build` gagal (3m36s) dan `Engine
+Tests (Linux)` masih berjalan. Brief BAGIAN 1–4 / FASE A–C sudah terwujud dan
+ter-gerbang (audit ulang, bukan dikutip), jadi yang dicari adalah titik yang
+**belum** dijaga.
+
+#### Cacat
+
+`aaba2d4` ("Pita Jupiter: naungan bola dipotong ke tiap pita") mengubah loop
+pita Jupiter ke iterasi langsung tetapi membiarkan pengurai pasangannya:
+
+    for (index, band) in bands.enumerated() {     // `index` tidak dibaca lagi
+
+    Apps/Shared/CelestialVisualView.swift:487:14: warning:
+        immutable value 'index' was never used; consider replacing with '_'
+
+Gerbang "Peringatan compiler (kode sendiri)" di `ios-build.yml` memerahkan
+build karena peringatan ini. Jadi **satu nama sisa menjatuhkan `main`** — dan
+`index` di sana bukan sekadar kosmetik: ia sisa dari perbaikan pita yang
+sebelumnya memakai `index % 3` untuk warna pita, peta yang kini pindah ke
+model (`jupiterBandTone(at:)`). Warna pitanya sudah benar; yang tertinggal
+hanya nama yang tidak lagi menjawab apa pun.
+
+#### Kenapa tiga gerbang lokal buta, dan ketahuannya tidak bersamaan
+
+- `swift-ui-lint.sh` membaca **teks** `Apps/`, dan **nol dari 72 aturan**
+  membaca pemakaian nama di dalam badan loop. Terukur pada salinan utuh,
+  proses baru, Aturan 73 belum ada: **exit 0**.
+- `swift-typecheck.sh` hanya `-parse` berkas SwiftUI. Parse memeriksa sintaks,
+  bukan pemakaian nama — dan batas itu memang dinyatakan sendiri di kepala
+  skripnya.
+- `Apps/` **tidak pernah dibangun** `swift-test.sh` di Linux, jadi peringatan
+  compiler hanya bisa dilihat runner macOS, satu siklus penuh kemudian.
+
+#### Bentuk yang diputuskan, dan yang **sengaja tidak**
+
+Versi pertama detektornya ikut memeriksa `if let`/`guard let` tanpa penugasan,
+dan melaporkan **7 temuan pada kode yang benar** — ketujuhnya memakai nama yang
+sama di klausa lanjutan atau di kondisi, bukan di badan kurung kurawal:
+
+    guard let session, session.activationState != .activated else { return }
+    if let visual, let starClass = visual.spokenStarClassLine(...) { ... }
+
+Gerbang yang menuduh kode benar akan dimatikan orang. Karena itu Aturan 73
+hanya memutuskan loop `for` **dengan pasangan**: di sana badan loop adalah
+satu-satunya tempat nama itu bisa dipakai, jadi keputusannya bisa diambil dari
+teks tanpa analisis lingkup penuh.
+
+#### Perbaikan sumber
+
+    for (index, band) in bands.enumerated()  ->  for band in JupiterBands()
+
+`enumerated()` ikut dibuang, bukan diganti `_`: indeksnya memang tidak dipakai,
+jadi `_` hanya menyisakan pembungkus yang tidak menjawab apa pun.
+
+#### Bukti — `Tools/bukti-mutasi-aturan73-pasangan.py` (terdaftar di CI)
+
+    OK  pohon utuh             -> hijau
+    OK  nama tak dipakai       -> MERAH, menyebut index
+    OK  `_` pembuangan sah     -> hijau
+    OK  aturan pra-perbaikan   -> hijau pada mutasi yang sama (dulu buta)
+
+Keadaan 4 adalah inti rancangannya: kalau lint pra-perbaikan juga merah pada
+mutasi yang sama, cacat ini sudah terjaga dan Aturan 73 tidak menambah apa pun.
+
+#### Angka
+
+- 72 aturan UI hijau (`./swift-ui-lint.sh` exit 0); Aturan 73 memeriksa
+  4 loop berpasangan.
+- 124 harness, semuanya dirujuk CI; 496 jangkar, nol mutasi tertinggal.
+- `bash -n` lolos di bash 5 dan bash 3.2 (Docker) — tidak ada backtick ganjil
+  atau kutip tunggal tak berpasangan di badan heredoc.
+- 222 tes engine + 961 tes PointingKit, 0 gagal.
+- **Apple Build `39354013879` hijau** (macos-15): gerbang peringatan compiler
+  bersih, app iPhone + Watch ter-compile.
+- README 71 → **72 aturan**; Aturan 10 sendiri yang menangkapnya basi.
+
+#### Yang TIDAK diklaim
+
+- Sapu teks + pencocokan kurung kurawal, bukan AST. Nama yang dipakai lewat
+  `$0` atau closure implisit tidak diperiksa; badan loop yang kurung kurawalnya
+  tidak seimbang dilewati sebagai `continue` dan **tidak dihitung**.
+- Aturan 73 **tidak** membuktikan `.enumerated()` sendiri bebas peringatan;
+  yang dijaga hanya nama pasangan yang diurai.
+- Ia tidak menutup kelas peringatan compiler secara umum — hanya satu bentuk
+  yang bisa diputuskan dari teks tanpa menuduh kode benar.
+- **Pita Jupiter: perbaikan `aaba2d4` belum dinilai ulang di siklus ini.**
+  `check-visuals.py` penuh (~41 menit) dijalankan di latar belakang, dan
+  hasilnya belum ada saat STATUS ini ditulis. Yang bisa diklaim hari ini:
+  ia tidak lagi memerahkan `Apple Build` karena peringatan.
+
+---
+
 ### Siklus (19 Okt 2026 — Aturan 72: tombol yang membaca keadaan di labelnya berhenti mengubahnya)
 
 Siklus dibuka dengan **melihat** gambar, bukan membaca STATUS.md. Port Python
