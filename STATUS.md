@@ -30367,3 +30367,61 @@ aturannya sendiri tidak membuktikan apa pun.
 
 CelestialEngine **222** + PointingKit **956** harus tetap hijau; engine tidak
 disentuh. `swift-ui-lint.sh` 74 aturan hijau, parse `bash:3.2` hijau.
+
+### Siklus (20 Okt 2026 — bagian 2: pita Jupiter yang cuma menutupi 39% piringan)
+
+Siklus ini dibuka dari brief BAGIAN 1 ("Planet → bola dengan gradient +
+pita/banding", "Jupiter: pita oranye-cokelat + Bintik Merah Besar"), lalu
+**diukur ulang**, bukan dipercaya dari dokumen. Yang ditemukan bukan soal
+warna: geometrinya yang bocor.
+
+#### Cacat, diukur bukan dinilai
+
+`jupiterBands(heightFraction: 0.11)` dengan 7 pita. Separuh tinggi 0.055,
+jarak antar pusat 0.286 — jadi celah antar pita sekitar 0.176, **tiga kali
+lebar pita itu sendiri**. Tutupan integral kuadratik (4000 sampel garis,
+normalisasi `sqrt(1-y²)`): **39.1%** piringan punya pita, **60.9%** bola
+polos beige. Itu yang terbaca sebagai "washed-out beige" — bukan saturasi.
+
+Diukur juga pada render 256 px: luminansi siang di pita 0.30–0.46, di celah
+0.20–0.26; selisih pita terang melawan bola hanya 0.084. Sementara
+dokumen membacanya "pita oranye-cokelat", pikselnya lebih dekat ke bola
+beige.
+
+#### Yang dikerjakan: tutupan pita dari 39.1% → 100%
+
+`jupiterBands(heightFraction: Double? = nil)` — `nil` artinya pita
+**bersambung**, tingginya persis jarak antar pusat (`2/count`). Pita tetap
+tujuh, tetap tidak dikempit jadi satu, dan tepinya tetap busur bola.
+
+Tes penjaga ditulis **lebih dulu** (RED) di
+`testJupiterBandsCoverTheDisc`: integral kuadratik adalah 100 sampel (bukan
+4000) supaya tetap cepat, dan toleransinya 4%. Pada 0.11 ia gagal 39.1%,
+pada 2/count ia lulus 100%.
+
+Port Python `render-visuals.py:BAND_HEIGHT_FRACTION` jadi nilai **turunan**
+`2/BAND_COUNT` (bukan `None`, karena pembacanya menuntut float), dan
+`check-visuals.py` diperbarui bersama — satu sumber, dua bahasa.
+
+#### Yang TIDAK diklaim
+
+- **Bintik Merah Besar tidak disentuh di siklus ini.** Ia diperiksa dengan
+  empat gerbang miliknya sendiri (`check_jupiter_spot_reads_on_the_watch`,
+  `check_jupiter_spot_is_not_a_hole`, `check_jupiter_spot_keeps_its_curvature`
+  + `testJupiterSpotIsDarkerThanItsOwnBelt`); semuanya hijau dengan angka
+  kesehatan (bintik gelap 145 lawan pita 176 di siang). Satu bacaan awal saya
+  sendiri ("bintik 2.1x lebih terang dari pitanya") salah karena pita
+  pembandingnya saya ambil di luar piringan — dan sayangnya penyebabnya
+  **sama** dengan cacat ini: pada 0.11, 60% piksel adalah bola polos, jadi
+  "pita di sebelah bintik" mudah jatuh pada bola kosong.
+- Pita **bersambung**, bukan pita tebal yang terpisah. Tutupan 100%
+  dicapai dengan pita saling bertemu, bukan dengan menaikkan tinggi satu pita;
+  yang terakhir akan menghilangkan alternansi nada yang menjadi ciri Jupiter.
+- Perubahan tidak menyentuh limb darkening maupun arah cahaya
+  (`sphereLightOffset`), dan tidak menaikkan `jupiterBandOpacity`.
+  Alternansi nada tetap: `jupiterBandTone(at:)` tidak diubah, jadi urutan
+  cream→tan→rust bertingkat masih terbaca — yang berubah hanya tinggi pita
+  supaya tutupannya 100%.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **973** hijau,
+`swift-ui-lint.sh` 74 aturan hijau, parse `bash:3.2` hijau, Apple Build hijau.
