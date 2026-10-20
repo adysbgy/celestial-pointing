@@ -502,15 +502,41 @@ struct CelestialVisualView: View {
             // (`band.centerY ∓ band.halfHeight`), karena tanda itulah yang
             // menentukan sisi mana yang lebih dalam. Semuanya dari model, jadi
             // `check-visuals` bisa menahannya di kedua bahasa.
-            let topHalfWidth = radius * CGFloat(
-                CelestialVisual.bandHalfWidthAt(height: band.centerY - band.halfHeight))
-            let bottomHalfWidth = radius * CGFloat(
-                CelestialVisual.bandHalfWidthAt(height: band.centerY + band.halfHeight))
+            //
+            // **Tepinya poligon yang mengikuti busur, bukan empat simpul.**
+            // Empat simpul (trapesium) tidak bisa mengikuti lingkaran: ruas
+            // garis lurus antara tepi atas dan tepi bawah memotong ke dalam
+            // busur, paling dalam di tengah pita. Pada pita kutub — setinggi
+            // jarak antar pusatnya, 0.2857 R — tepi kirinya di baris tengah
+            // jatuh di **0.350 R** sementara bola di ketinggian itu
+            // **0.515 R**; selisih 0.165 R itu persis yang dilaporkan CI
+            // ("jangkauan 0.355 R, bola 0.519 R, selisih 16.4% R"). Tepi
+            // atasnya bahkan jatuh tepat di kutub, jadi gerbang busur limb
+            // tidak menemukan pita sama sekali ("tepi pita tidak ditemukan").
+            //
+            // Jumlah ruasnya dari model (`CelestialVisual.bandEdgeSteps`),
+            // dan panah taksirannya `≈1.6·10⁻⁴ R` — jauh di bawah satu piksel
+            // di kartu jam.
+            let edges = CelestialVisual.jupiterBandEdges(
+                centerY: band.centerY, halfHeight: band.halfHeight)
             var ribbon = Path()
-            ribbon.move(to: CGPoint(x: center.x - topHalfWidth, y: y - halfHeight))
-            ribbon.addLine(to: CGPoint(x: center.x + topHalfWidth, y: y - halfHeight))
-            ribbon.addLine(to: CGPoint(x: center.x + bottomHalfWidth, y: y + halfHeight))
-            ribbon.addLine(to: CGPoint(x: center.x - bottomHalfWidth, y: y + halfHeight))
+            for (index, edge) in edges.enumerated() {
+                let point = CGPoint(
+                    x: center.x - radius * CGFloat(edge.halfWidth),
+                    y: center.y + CGFloat(edge.height) * radius)
+                if index == 0 {
+                    ribbon.move(to: point)
+                } else {
+                    ribbon.addLine(to: point)
+                }
+            }
+            // Sisi kanan: telusuri kembali dari bawah ke atas, memakai lebar
+            // yang sama di tiap ketinggian (bola simetris kiri-kanan).
+            for edge in edges.reversed() {
+                ribbon.addLine(to: CGPoint(
+                    x: center.x + radius * CGFloat(edge.halfWidth),
+                    y: center.y + CGFloat(edge.height) * radius))
+            }
             ribbon.closeSubpath()
             // Warna pita dibaca dari model, mode malam dihitung dari kanal
             // merahnya. Versi lama menulis angka malam sendiri

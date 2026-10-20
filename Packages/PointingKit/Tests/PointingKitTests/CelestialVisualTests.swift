@@ -3233,6 +3233,84 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// **Cacat yang ditutup uji ini — diukur, bukan diperkirakan.**
+    ///
+    /// Siklus "pita bersambung" menaikkan tinggi pita dari 0.11 R ke jarak
+    /// antar pusatnya (2/7 = 0.2857 R) supaya tidak ada bola bocor di
+    /// antaranya. Yang tidak diperhitungkan: separuh tinggi pita kutub
+    /// (0.1429 R) kini **tepat sama** dengan jarak pusatnya ke tepi bola
+    /// (1 − 0.857 = 0.1429 R), sehingga pita itu bertemu kutubnya sendiri.
+    ///
+    /// Yang **bukan** sebabnya bentuknya salah: view sudah memakai
+    /// `bandHalfWidthAt` untuk tepi atas/bawahnya. Cacatnya di **ujung**:
+    /// empat simpul trapesium tidak bisa mengikuti busur lingkaran, jadi
+    /// ruas garis lurus antara `topHalfWidth` dan `bottomHalfWidth` memotong
+    /// ke dalam busur. Pada pita 0 tepi kirinya di baris tengah jatuh di
+    /// **0.350 R** sementara bola di ketinggian itu **0.515 R** — selisih
+    /// 0.165 R, dan itu persis yang dilaporkan CI:
+    /// *"jangkauan 0.355 R, bola 0.519 R di baris 14, selisih 16.4% R"*.
+    ///
+    /// Di pita kutub tepinya juga **hilang** dari gerbang busur: `y − halfHeight`
+    /// jatuh tepat di kutub (lebar 0), jadi `band_edge` tidak menemukan pita
+    /// di x ≤ −0.40 sama sekali dan gerbangnya merah dengan
+    /// *"tepi pita tidak ditemukan (atas None)"*.
+    ///
+    /// **Kenapa diuji di model, bukan di view.** Tepi pita adalah angka yang
+    /// dipakai **keduanya** (view Swift dan port Python), jadi kalau tepi
+    /// yang benar hanya hidup di Swift, renderer gambar tetap bisa
+    /// menyimpang. Tepi itu ada di `CelestialVisual.jupiterBandEdges` dan
+    /// diperiksa di sini.
+    ///
+    /// **Kenapa arahnya "harus mencapai", bukan "tidak boleh melebihi".**
+    /// Versi pertama uji ini menulis `edge <= limb`, dan ia **hijau pada
+    /// cacat yang sebenarnya** — karena cacatnya justru tepi yang terlalu
+    /// **kecil** (memotong ke dalam busur). Arah pertidaksamaan yang salah
+    /// membuat gerbang yang selalu hijau. Yang diuji sekarang adalah
+    /// **jangkauan**: tiap tepi harus sampai ke busur dalam 1% R, arah yang
+    /// sama dengan gerbang pikselnya.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini memeriksa **model**, bukan piksel: ia
+    /// tidak menyatakan render Swift sudah benar, dan tidak menggantikan
+    /// `check_jupiter_bands_reach_the_limb` maupun
+    /// `check_bands_follow_the_limb_arc`. Yang dinilai bukan keindahan
+    /// lengkung, hanya bahwa tepinya mencapai busur pada tiap ketinggian
+    /// sampel.
+    func testJupiterBandEdgesReachTheLimbArc() {
+        let geometry = CelestialVisual.jupiterBands()
+        var checked = 0
+        for (index, band) in geometry.enumerated() {
+            let edges = CelestialVisual.jupiterBandEdges(
+                centerY: band.centerY, halfHeight: band.halfHeight)
+            XCTAssertGreaterThan(edges.count, 2,
+                                 "pita \(index) harus punya lebih dari dua titik "
+                                 + "tepi — dua titik berarti trapesium lagi")
+            for edge in edges {
+                let limb = max(0, 1 - edge.height * edge.height).squareRoot()
+                XCTAssertLessThanOrEqual(
+                    limb - edge.halfWidth, 0.01,
+                    "pita \(index) pada tinggi \(edge.height): tepi "
+                    + "\(edge.halfWidth) R, busur \(limb) R — berhenti "
+                    + "\((limb - edge.halfWidth) * 100)% R di dalam bola")
+                checked += 1
+            }
+        }
+        XCTAssertGreaterThan(checked, 0, "sapuan kosong: tidak ada yang diukur")
+        // Kontrol prasyarat: tepi kutub **wajib** lebih sempit dari ekuator.
+        // Kalau semua tepi selebar 1.0, uji di atas bisa lulus hanya karena
+        // busurnya dipaksa lurus.
+        let equator = CelestialVisual.jupiterBandEdges(centerY: 0, halfHeight: 1.0 / 14)
+        if let widest = equator.max(by: { $0.halfWidth < $1.halfWidth }),
+           let pole = CelestialVisual.jupiterBandEdges(centerY: -0.857, halfHeight: 1.0 / 14)
+            .min(by: { $0.halfWidth < $1.halfWidth }) {
+            XCTAssertGreaterThan(
+                widest.halfWidth, pole.halfWidth,
+                "tepi ekuator harus lebih lebar dari tepi kutub; kalau tidak, "
+                + "bentuknya bukan busur bola")
+        } else {
+            XCTFail("geometri harus punya tepi ekuator dan tepi kutub")
+        }
+    }
+
     /// Pita harus **simetris** terhadap ekuator.
     ///
     /// Bukan kerapian: Jupiter yang pitanya lebih banyak di satu belahan

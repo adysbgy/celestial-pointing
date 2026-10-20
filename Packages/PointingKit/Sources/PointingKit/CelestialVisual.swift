@@ -3041,6 +3041,67 @@ public extension CelestialVisual {
         min(1, max(0, 1 - height * height)).squareRoot()
     }
 
+    /// Satu titik tepi pita: ketinggiannya di bola dan separuh lebarnya.
+    struct BandEdge: Equatable, Sendable {
+        /// Ketinggian di bola, −1…+1 (satuan radius). Bertanda, seperti
+        /// `Band.centerY`: negatif = belahan utara layar.
+        var height: Double
+        /// Setengah-lebar pita pada ketinggian itu.
+        var halfWidth: Double
+    }
+
+    /// Berapa ruas yang dipakai menaksir busur tepi satu pita.
+    ///
+    /// **Kenapa tidak 1 (dua titik).** Dua titik per tepi **adalah** trapesium
+    /// — bentuk yang membuat pita memotong ke dalam busur. Tepi pita harus
+    /// berupa **poligon** yang mengikuti lingkaran, dan jumlah ruasnya
+    /// menentukan seberapa dekat ia ke busur.
+    ///
+    /// **Kenapa 8, dihitung bukan dirasakan.** Panah maksimum sebuah tali
+    /// busur yang membentang `Δy` pada lingkaran berjari-jari 1 adalah
+    /// kira-kira `Δy²/8`. Pita tertinggi membentang 2/7 = 0.2857 R, jadi
+    /// dengan 8 ruas `Δy = 0.0357` dan panahnya `≈ 1.6·10⁻⁴ R` — 60× lebih
+    /// kecil dari ambang 1% R yang dipakai uji dan gerbangnya. Di kartu jam
+    /// (radius 19 pt) itu 0.003 pt: jauh di bawah satu piksel, jadi tidak ada
+    /// tangga yang terlihat di tepinya.
+    static let bandEdgeSteps = 8
+
+    /// Tepi satu pita sebagai **poligon yang mengikuti busur limb**.
+    ///
+    /// **Cacat yang ditutup fungsi ini — diukur, bukan diperkirakan.**
+    /// View sudah memakai `bandHalfWidthAt` untuk tepi atas dan bawahnya,
+    /// tetapi pita digambar sebagai **empat simpul**. Empat simpul tidak bisa
+    /// mengikuti lingkaran: ruas garis lurus antara tepi atas dan tepi bawah
+    /// memotong ke dalam busur, dan potongannya paling dalam di tengah pita.
+    /// Pada pita kutub — yang kini setinggi jarak antar pusatnya, 0.2857 R —
+    /// tepi kirinya di baris tengah jatuh di **0.350 R** sementara bola di
+    /// ketinggian itu **0.515 R**. Selisih 0.165 R itu persis yang dilaporkan
+    /// CI: *"jangkauan 0.355 R, bola 0.519 R di baris 14, selisih 16.4% R"*,
+    /// dan pita 6 kembarannya 16.7% R.
+    ///
+    /// **Kenapa di model, bukan di view.** Tepi ini dipakai **dua** bahasa
+    /// (view Swift dan port Python yang mengukur gambar), jadi kalau bentuk
+    /// yang benar hanya hidup di Swift, renderer Python tetap boleh
+    /// menyimpang dan gerbangnya akan mengukur gambar yang tidak ada di
+    /// layar. Satu rumus, dua bahasa, dan `check_port_matches_swift_constants`
+    /// menahan keduanya agar sama.
+    ///
+    /// **Batas yang dinyatakan.** Ini taksiran busur dengan 8 ruas, bukan
+    /// busur eksak — panahnya `≈1.6·10⁻⁴ R` (lihat `bandEdgeSteps`). Fungsi
+    /// ini tidak mengembalikan titik di luar bola: `halfWidth` dihitung dari
+    /// `bandHalfWidthAt`, jadi tepi pita selalu **di dalam atau tepat di**
+    /// busur, tidak pernah menggantung di luarnya.
+    static func jupiterBandEdges(centerY: Double, halfHeight: Double,
+                                 steps: Int = bandEdgeSteps) -> [BandEdge] {
+        let count = max(1, steps)
+        let top = centerY - halfHeight
+        let span = 2 * halfHeight
+        return (0...count).map { index in
+            let height = top + span * Double(index) / Double(count)
+            return BandEdge(height: height, halfWidth: bandHalfWidthAt(height: height))
+        }
+    }
+
     /// Nada satu pita Jupiter.
     ///
     /// **Kenapa ini ada di model, bukan di view.** Peta indeks→warna hidup

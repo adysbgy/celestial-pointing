@@ -1684,6 +1684,34 @@ def band_half_width(height):
     return math.sqrt(max(0.0, 1 - height * height))
 
 
+# MODEL: `CelestialVisual.bandEdgeSteps` — jumlah ruas taksiran busur per pita.
+#
+# Panah maksimum tali busur yang membentang `dy` pada lingkaran jari-jari 1
+# kira-kira `dy^2 / 8`. Pita tertinggi membentang 2/7 = 0.2857 R, jadi dengan
+# 8 ruas panahnya ~1.6e-4 R — 60x lebih kecil dari ambang 1% R di gerbangnya.
+BAND_EDGE_STEPS = 8
+
+
+def jupiter_band_edges(center_y, half_height, steps=BAND_EDGE_STEPS):
+    """Port `CelestialVisual.jupiterBandEdges` — tepi pita sebagai poligon busur.
+
+    **Cacat yang ditutup fungsi ini.** Pita digambar sebagai empat simpul
+    (trapesium) dan tepinya dihitung dari `band_half_width` di atas dan bawah.
+    Empat simpul tidak bisa mengikuti lingkaran: ruas garis lurus di antaranya
+    memotong ke dalam busur, paling dalam di tengah pita. Pada pita kutub
+    tepi kirinya jatuh di 0.350 R sementara bola 0.515 R — 16.4% R, persis
+    yang dilaporkan CI.
+
+    Mengembalikan daftar `(height, half_width)` dari tepi atas ke tepi bawah.
+    """
+    count = max(1, steps)
+    top = center_y - half_height
+    span = 2 * half_height
+    return [(top + span * index / count,
+             band_half_width(top + span * index / count))
+            for index in range(count + 1)]
+
+
 def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
     # **Pita diwarnai sambil dinaungi cahaya bola — bukan dicat rata lalu
     # ditutupi ulang.** Dua generasi sebelumnya berdebat: pita rata menghapus
@@ -1718,19 +1746,24 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
         y = cy + band_y * radius
         if half_width * radius <= 1:
             continue
-        # **Pita digambar sebagai tali busur, bukan elips.** Tepi pita
-        # mengikuti busur limb: pada ketinggian `yc ± half_height` bola sudah
-        # menyempit, sementara elips mempertahankan lebarnya sampai ujung.
-        # Diukur sebagai IoU pada render 200 px, elips hanya menutupi 79%
-        # pita yang benar. Ketinggiannya **bertanda** — memulihkannya dengan
-        # `sqrt(1 - hw^2)` kehilangan sisi, dan pita utara jadi miring ke arah
-        # yang salah.
-        # MODEL: `CelestialVisual.bandHalfWidthAt(height:)`
-        top = cx + radius * band_half_width(band_y - half_height)
-        bottom = cx + radius * band_half_width(band_y + half_height)
-        half_h = radius * half_height
-        points = [(cx - (top - cx), y - half_h), (top, y - half_h),
-                  (bottom, y + half_h), (cx - (bottom - cx), y + half_h)]
+        # **Pita digambar sebagai poligon yang mengikuti busur limb.** Empat
+        # simpul (trapesium) tidak bisa mengikuti lingkaran: ruas garis lurus
+        # antara tepi atas dan bawahnya memotong ke dalam busur, paling dalam
+        # di tengah pita. Pada pita kutub — setinggi jarak antar pusatnya,
+        # 0.2857 R — tepi kirinya di baris tengah jatuh di **0.350 R**
+        # sementara bola di ketinggian itu **0.515 R**; selisih 0.165 R itu
+        # persis yang dilaporkan CI ("jangkauan 0.355 R, bola 0.519 R,
+        # selisih 16.4% R"), dan tepi atasnya jatuh tepat di kutub sehingga
+        # gerbang busur tidak menemukan pita sama sekali.
+        #
+        # MODEL: `CelestialVisual.jupiterBandEdges` — jumlah ruas dan
+        # rumusnya sama dengan Swift, supaya gerbang mengukur bentuk yang
+        # benar-benar dikirim ke layar.
+        edges = jupiter_band_edges(band_y, half_height)
+        points = [(cx - radius * edge_half_width, cy + height * radius)
+                  for height, edge_half_width in edges]
+        points += [(cx + radius * edge_half_width, cy + height * radius)
+                   for height, edge_half_width in reversed(edges)]
         name = BAND_TONE_ACCENTS[BAND_TONES[index % len(BAND_TONES)]]
         band_rgb = night_mapped(ACCENTS[name], False) if night_mode else ACCENTS[name]
         if shade is None:
