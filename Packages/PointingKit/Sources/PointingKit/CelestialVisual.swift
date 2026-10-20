@@ -2971,11 +2971,35 @@ public extension CelestialVisual {
     ///   - count: jumlah pita, dari kutub ke kutub. Ganjil supaya ada pita
     ///     yang tepat di ekuator — itu yang membuat susunannya simetris.
     ///   - heightFraction: tinggi tiap pita (2 × separuh tinggi), satuan
-    ///     radius bola.
+    ///     radius bola. `nil` = pita **bersambung**: tingginya diambil dari
+    ///     jarak antar pusat pita (`2/count`), sehingga tidak ada bola polos
+    ///     yang bocor di antaranya. Lihat catatan di bawah.
+    ///
+    /// **Kenapa bawaannya `nil` (bersambung), bukan angka 0.11.** Sampai
+    /// siklus ini bawaannya `0.11` dengan tujuh pita: jarak antar pusat
+    /// 2/7 = 0.2857 R, tinggi pita 0.11 R, jadi **0.1757 R** di antaranya
+    /// adalah bola polos. Ditimbang lebar tali busur, pita hanya menutupi
+    /// **39.1%** piringan — 60.9% adalah bola beige. Yang tergambar karena
+    /// itu bukan Jupiter ber-pita melainkan bola beige bergaris tipis, dan
+    /// penilaian manusia atas render 256 px-nya: "washed-out beige".
+    ///
+    /// Seluruh gerbang piksel yang ada tetap hijau pada keadaan itu, karena
+    /// masing-masing mengukur **satu pita** (ada, sampai limb, mengikuti
+    /// busur, terpisah) dan tidak ada yang bertanya apakah ada bola di
+    /// antaranya. Karena itu invariannya sekarang diuji di Linux
+    /// (`testJupiterBandsCoverTheDisc`), bukan diserahkan ke mata.
+    ///
+    /// Angka `heightFraction` eksplisit tetap diterima supaya pemanggil bisa
+    /// meminta pita bergaris (mis. untuk eksperimen), tetapi bawaan produk
+    /// adalah pita bersambung — itulah yang membuat piringan terbaca sebagai
+    /// gas giant.
     static func jupiterBands(count: Int = 7,
-                                    heightFraction: Double = 0.11) -> [Band] {
+                             heightFraction: Double? = nil) -> [Band] {
         guard count > 0 else { return [] }
-        let halfHeight = heightFraction / 2
+        // Jarak antar pusat pita. Pita bersambung = tingginya persis jarak
+        // itu, jadi tepi bawah satu pita bertemu tepi atas pita berikutnya.
+        let spacing = 2.0 / Double(count)
+        let halfHeight = (heightFraction ?? spacing) / 2
         return (0..<count).map { index in
             let t = (Double(index) + 0.5) / Double(count)
             // −1 … +1, dari kutub utara ke selatan.

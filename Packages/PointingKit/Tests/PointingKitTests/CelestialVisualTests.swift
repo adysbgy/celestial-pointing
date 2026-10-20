@@ -3246,6 +3246,64 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Pita Jupiter harus **menutupi piringannya**, bukan mengambang di atas
+    /// bola beige yang bocor di antaranya.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan dinilai dengan mata.**
+    /// Sampai siklus ini `jupiterBands()` memakai `heightFraction: 0.11` dengan
+    /// tujuh pita, jadi jarak antar pusat pita 2/7 = 0.2857 R sementara tiap
+    /// pita hanya 0.11 R tinggi. Sisanya **0.1757 R** adalah bola polos, dan
+    /// karena pita yang dekat kutub juga lebih sempit, luas piringan yang
+    /// tertutup pita terukur hanya **39.1%** — **60.9% piringan adalah bola
+    /// polos**.
+    ///
+    /// Yang sampai ke layar karena itu bukan Jupiter ber-pita, melainkan bola
+    /// beige dengan tujuh garis cokelat tipis di atasnya. Penilaian manusia
+    /// atas render 256 px yang sama: pita "washed-out beige", dan gerbang
+    /// piksel yang ada **semuanya hijau** — ia mengukur ketujuh pita itu satu
+    /// per satu (ada, sampai limb, mengikuti busur, terpisah), dan tidak satu
+    /// pun bertanya apakah ada bola di antaranya. Kelas cacat yang sama dengan
+    /// `saturnBodyRadius`: gerbang mengukur bagian yang benar dari gambar yang
+    /// salah.
+    ///
+    /// **Kenapa ambangnya 95%, bukan 100%.** Pada `heightFraction` tepat
+    /// 2/7 = 0.2857 pita bersambung sempurna (100.0%). Ambang 95% memberi
+    /// ruang untuk `count` yang berbeda (mis. 9 pita) tanpa menuntut angka
+    /// ajaib yang hanya benar untuk satu nilai; yang ditolak adalah keadaan
+    /// hari ini (39.1%) dengan selisih yang tidak bisa disebut pembulatan.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini mengukur **geometri model**, bukan
+    /// piksel: ia tidak tahu apakah pitanya indah, dan tidak memeriksa warna
+    /// (itu `testJupiterBandsReadAsDistinctStripes`). Ia juga tidak menuntut
+    /// pita menutupi kutub **di luar** bola — `halfWidth` tetap mengikuti
+    /// busur limb, jadi pita teratas tetap lebih pendek.
+    func testJupiterBandsCoverTheDisc() {
+        let geometry = CelestialVisual.jupiterBands()
+        guard geometry.count > 1 else { return XCTFail("tidak ada pita") }
+
+        // Luas piringan yang tertutup pita, ditimbang lebar tali busur:
+        // tiap ketinggian y menyumbang `2·sqrt(1−y²)`, jadi pita di dekat
+        // ekuator (yang lebih lebar) menyumbang lebih banyak daripada pita
+        // di kutub. Bobot itu yang membuat angka ini "luas piringan", bukan
+        // "jumlah pita".
+        let samples = 4000
+        var covered = 0.0
+        var total = 0.0
+        for step in 0..<samples {
+            let y = -1 + 2 * Double(step) / Double(samples - 1)
+            let chord = max(0, 1 - y * y).squareRoot()
+            total += chord
+            if geometry.contains(where: { abs(y - $0.centerY) <= $0.halfHeight }) {
+                covered += chord
+            }
+        }
+        let fraction = covered / total
+        XCTAssertGreaterThanOrEqual(
+            fraction, 0.95,
+            "pita hanya menutupi \(String(format: "%.1f", fraction * 100))% piringan; "
+            + "sisanya bola polos yang terbaca sebagai beige di antara garis")
+    }
+
     /// Pita teratas harus **lebih pendek** dari pita ekuator.
     ///
     /// Invarian arah: kalau pita teratas lebih lebar, gambarnya adalah bola

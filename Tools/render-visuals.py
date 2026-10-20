@@ -1068,7 +1068,13 @@ def _png(width, height, pixels):
 
 GLOW_OPACITIES = [0.10, 0.22, 1.0]          # VIEW: `CelestialVisualView.glowOpacities`
 BAND_COUNT = 7                              # MODEL: `CelestialVisual.jupiterBands(count:)`
-BAND_HEIGHT_FRACTION = 0.11                 # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
+# Tinggi pita Jupiter. **Turunan, bukan angka pilihan**: pita bersambung
+# tingginya persis jarak antar pusat, `2/count` — sama dengan
+# `CelestialVisual.jupiterBands(heightFraction: nil)` yang mengambil
+# `spacing = 2/count`. Angka 0.11 yang lama membuat pita hanya menutupi 39.1%
+# piringan; sisanya bola beige yang terbaca sebagai "washed-out beige" — lihat
+# `testJupiterBandsCoverTheDisc`.
+BAND_HEIGHT_FRACTION = 2.0 / BAND_COUNT     # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
 BAND_OPACITY = 0.85                         # MODEL: `CelestialVisual.jupiterBandOpacity`
 # Pola nada pita dari kutub utara ke selatan — **sama dengan**
 # `CelestialVisual.jupiterBandTones`. Peta ini dulu hidup dua kali (di sini dan
@@ -1636,7 +1642,7 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
         _draw_blue_disk(canvas, cx, cy, radius, night_mode)
 
 
-def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
+def jupiter_bands(count=BAND_COUNT, height_fraction=None):
     """Port dari `CelestialVisual.jupiterBands()` — geometri pita dari bola.
 
     **Kenapa rumusnya ada di sini, bukan di `_draw_bands`.** Versi lama
@@ -1648,8 +1654,16 @@ def jupiter_bands(count=BAND_COUNT, height_fraction=BAND_HEIGHT_FRACTION):
     adalah yang dipakai `check-visuals.py` untuk mengukur gambar. Sekarang
     satu rumus (`sqrt(1 - y^2)`), ditulis di kedua bahasa, dan
     `check_port_matches_swift_constants` yang menahan keduanya agar sama.
+
+    **`height_fraction=None` = pita bersambung**, sama dengan model: tingginya
+    diambil dari jarak antar pusat (`2/count`), jadi tidak ada bola polos yang
+    bocor di antaranya. Sebelumnya bawaannya 0.11 dan pita hanya menutupi
+    39.1% piringan; sisanya bola beige — itulah "washed-out beige" yang
+    terlihat di render. Lihat `CelestialVisual.jupiterBands` untuk angka
+    lengkapnya.
     """
-    half_height = height_fraction / 2.0
+    spacing = 2.0 / count
+    half_height = (spacing if height_fraction is None else height_fraction) / 2.0
     bands = []
     for index in range(count):
         t = (index + 0.5) / count

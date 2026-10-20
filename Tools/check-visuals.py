@@ -2795,8 +2795,14 @@ def check_port_matches_swift_constants(results):
         # hidup di dua tempat adalah dua angka yang akan berbeda.
         ("jumlah pita Jupiter", R.BAND_COUNT, 7,
          "count: Int = 7", model),
-        ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 0.11,
-         "heightFraction: Double = 0.11", model),
+        # **Turunan sekarang**: pita bersambung, tingginya 2/count = 0.2857.
+        # Angka 0.11 yang lama membuat pita hanya menutupi 39.1% piringan
+        # (60.9% bola beige), dan setiap gerbang piksel tetap hijau karena
+        # masing-masing mengukur satu pita, bukan ruang di antaranya.
+        # Invariannya sekarang diuji di Linux (`testJupiterBandsCoverTheDisc`),
+        # jadi yang dijaga di sini hanya bahwa kedua bahasa sepakat.
+        ("tinggi pita Jupiter", R.BAND_HEIGHT_FRACTION, 2.0 / 7,
+         "heightFraction: Double? = nil", model),
         # Kekuatan pemulihan peredupan limb di atas pita. Angka ini **bukan**
         # hiasan: pada 1.0 satu pita tertutup gradien bola dan pitanya berhenti
         # terbaca, pada 0 lengkungnya rata kembali. Ia hidup di model supaya
