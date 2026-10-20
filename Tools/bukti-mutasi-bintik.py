@@ -139,22 +139,25 @@ STATES = [
         RENDER: ("""    canvas.ellipse(spot_cx, spot_cy, spot_rx, spot_ry,
                    accent_fn(ACCENTS["jupiterSpot"], night_mode))""",
                  """    _spot_dropped = accent_fn(ACCENTS["jupiterSpot"], night_mode)""")}),
-    # C1/C2: gerbang **keterbacaan** yang baru. Warna bintiknya dikembalikan ke
-    # nilai pucat yang dipakai sampai siklus ini — nilai yang lolos
-    # `check_planet_features_present` (bintiknya "ada") dan
-    # `check_jupiter_spot_keeps_its_curvature` (lengkungnya benar), tetapi
-    # terbaca sebagai bagian pita. Harapannya merah; kalau tidak, gerbang baru
-    # ini hanya menambah baris hijau tanpa menjaga apa pun.
-    ("C1. warna bintik kembali pucat", {
-        RENDER: ("jupiterSpot=(0.52, 0.14, 0.10),",
-                 "jupiterSpot=(0.85, 0.35, 0.25),")}),
-    # Arah yang paling sulit: bintiknya tetap **jelas lebih gelap** dari pitanya
-    # (jadi tidak kembali pucat), tetapi tidak lagi cukup jauh untuk terbaca.
-    # Hanya pengukuran **besaran** yang bisa menangkap keadaan ini — kedua
-    # pengukuran arah tetap hijau. Itu sebabnya ambang 12.0% ada.
-    ("C2. warna bintik di antara pucat dan gelap", {
-        RENDER: ("jupiterSpot=(0.52, 0.14, 0.10),",
-                 "jupiterSpot=(0.70, 0.30, 0.22),")}),
+    # C1/C2: gerbang **terang** bintik yang baru
+    # (`check_jupiter_spot_is_not_a_hole`). Bintik yang dikembalikan ke nilai
+    # gelapnya dulu (0.26/0.05/0.04) lolos SELURUH gerbang bintik lama — ia
+    # lebih gelap dari pitanya, menyimpang 20% dari bola polos, melengkung —
+    # tetapi pada render terangnya jatuh ke 0.519 dan ia terbaca sebagai
+    # **lubang**, bukan badai. Keadaan ini memulihkan nilai itu sebagai cacat
+    # dan menuntut gerbang baru MERAH. Kalau tidak, gerbang baru hanya baris
+    # hijau tambahan.
+    ("C1. bintik kembali jadi lubang", {
+        RENDER: ("jupiterSpot=(0.39, 0.115, 0.08),",
+                 "jupiterSpot=(0.26, 0.05, 0.04),")}),
+    # Arah yang paling sulit: bintiknya masih jelas lebih gelap dari pitanya
+    # (jadi tidak kembali pucat), tetapi terangnya menyentuh ambang 0.55 dari
+    # bawah. Pengukuran besaran (terang) yang menangkap ini; pengukuran arah
+    # tetap hijau. Itu sebabnya ambang 0.55 duduk di antara 0.519 (lubang)
+    # dan 0.571 (sekarang).
+    ("C2. bintik di batas terang", {
+        RENDER: ("jupiterSpot=(0.39, 0.115, 0.08),",
+                 "jupiterSpot=(0.30, 0.09, 0.06),")}),
     ("B1. port 0.6 -> 0.9 (drift port vs model)", {
         RENDER: ("JUPITER_SPOT_LIMB_SHADING_STRENGTH = 0.6",
                  "JUPITER_SPOT_LIMB_SHADING_STRENGTH = 0.9")}),

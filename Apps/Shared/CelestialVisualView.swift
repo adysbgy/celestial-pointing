@@ -520,44 +520,51 @@ struct CelestialVisualView: View {
             // pita paling terang (0.85) -- 0.43 vs 0.34. Mode malam
             // mengorbankan hue secara sengaja, tapi terang-gelap tidak boleh
             // ikut terbalik; itu informasi yang masih terbaca di malam.
-            let bandColor: CelestialVisual.RGBComponents
-            switch index % 3 {
-            case 0: bandColor = CelestialVisual.accents.jupiterBandTan
-            case 1: bandColor = CelestialVisual.accents.jupiterBandRust
-            default: bandColor = CelestialVisual.accents.jupiterBandCream
-            }
+            //
+            // **Nada pita datang dari model, bukan dari `index % 3` di sini.**
+            // Sampai siklus ini peta indeks→warna hidup dua kali: di baris ini
+            // dan di larik `render-visuals.py`. Keduanya menyusun pita
+            // tan→rust→cream berulang, dan terukur hanya **dL 0.020** antar
+            // pita bersebelahan — pitanya ada, tetapi tidak terpisah. Peta itu
+            // sekarang satu tempat (`CelestialVisual.jupiterBandTones`), dan
+            // polanya diuji di Linux.
+            let bandColor = CelestialVisual.jupiterBandColour(
+                for: CelestialVisual.jupiterBandTone(at: band.centerY))
+            // **Pita dinaungi cahaya bola sebagai bagian dari warnanya, bukan
+            // dicat rata lalu ditutupi ulang.** Dua generasi sebelumnya
+            // berdebat: pita rata menghapus lengkung bola (jadi stiker), dan
+            // menutupinya lagi dengan gradien bola penuh memulihkan lengkung
+            // tetapi mencuci warna pitanya.
+            //
+            // Diukur pada port Python yang memakai konstanta yang sama, render
+            // 200 px, ss=2 (residual keterpisahan vs lengkung, ambang 0.05 /
+            // 70%):
+            //
+            //     opasitas 0.85, tutup ulang 0.75 : lengkung 71.9%, residual 0.002
+            //     opasitas 0.85, tutup ulang 0.60 : lengkung 57.4%, residual 0.093
+            //     opasitas 0.55, tutup ulang 0.60 : lengkung 71.3%, residual 0.007
+            //
+            // Kolomnya berlawanan arah, dan itu bukan soal menyetel angka: dua
+            // besaran itu diukur dari pixel yang sama dengan arah berlawanan —
+            // kontras pita tinggal di tepi piringan, sementara lengkung justru
+            // diukur sebagai gelapnya tepi itu. Satu konstanta opasitas tidak
+            // bisa memenuhi keduanya.
+            //
+            // Jadi naungannya digambar **ke dalam bentuk pitanya sendiri**
+            // (sama seperti pemulihan Bintik Merah Besar di bawah), bukan ke
+            // seluruh cakram. Lengkung jadi intrinsik — tidak perlu dipulihkan
+            // karena tidak pernah terhapus — dan warna pita tetap terbaca
+            // karena gradiennya hanya menutupi satu pita, bukan seluruh bola.
             context.fill(ribbon,
-                         with: .color(Self.accent(bandColor).opacity(0.55)))
+                         with: .color(Self.accent(bandColor)
+                             .opacity(CelestialVisual.jupiterBandOpacity)))
+            context.drawLayer { bandContext in
+                bandContext.clip(to: ribbon)
+                drawSphere(context: bandContext, center: center, radius: radius,
+                           from: palette.light, to: palette.dark,
+                           opacity: CelestialVisual.bandLimbShadingStrength)
+            }
         }
-        // **Restorasi peredupan limb: kenapa ada, dan kenapa `drawSphere`
-        // dipanggil ulang, bukan diganti gradien baru.**
-        //
-        // Pita di atas digambar sebagai **tali busur** warna rata (opasitas
-        // 0.55), jadi tiap pita menghapus lengkung bola di bawahnya. Diukur
-        // pada baris ekuator render 200 px: selisih terang pusat-ke-limb turun
-        // dari 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R
-        // pitanya +62.6 lebih terang daripada bola tanpa pita di titik yang
-        // sama. Yang terlihat karena itu bukan bola berpita, melainkan stiker
-        // rata yang ditempel di piringan.
-        //
-        // Gradien yang dipakai di sini **persis gradien `drawSphere`** — pusat,
-        // warna, dan radius yang sama. Dua akibat yang keduanya penting:
-        //
-        //   1. Di daerah yang **tidak** tertutup pita, gradien ini menumpuk
-        //      di atas dirinya sendiri, dan itu identitas — jadi piksel di
-        //      luar pita tidak berubah sama sekali. Tidak ada cacat baru yang
-        //      bisa lahir di tempat yang tidak saya maksud.
-        //   2. Arah cahayanya tidak bisa berbeda pendapat dengan bola, karena
-        //      ia dibaca dari `sphereLightOffset` yang sama.
-        //
-        // Kekuatannya **sebagian** (`bandLimbShadingStrength`): pada 1.0
-        // pitanya hilang tertutup bola, pada 0 lengkungnya kembali rata.
-        //
-        // Tidak ada klip tambahan: `drawSphere` mengisi cakram dengan radius
-        // yang sama persis, jadi bentuknya sudah terbatas pada piringan.
-        drawSphere(context: context, center: center, radius: radius,
-                   from: palette.light, to: palette.dark,
-                   opacity: CelestialVisual.bandLimbShadingStrength)
 
         // Bintik Merah Besar: elips merah di belahan selatan, sedikit di bawah
         // ekuator — posisinya memang di sana secara nyata.

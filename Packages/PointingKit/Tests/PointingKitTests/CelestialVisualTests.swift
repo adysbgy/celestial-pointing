@@ -3134,6 +3134,181 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Tujuh pita Jupiter harus **terbaca sebagai pita**, dan warnanya harus
+    /// datang dari satu tempat — bukan dari salinan di view dan di port.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan dinilai dengan mata.**
+    /// Sampai siklus ini peta indeks→warna hidup **dua kali**: `switch index % 3`
+    /// di `CelestialVisualView.drawBands`, dan larik yang sama di
+    /// `render-visuals.py`. Keduanya menyusun pita sebagai tan → rust → cream
+    /// berulang, dan hasilnya terukur pada render 200 px:
+    ///
+    ///     dL minimum antar pita bersebelahan   0.020   (skala 0..1)
+    ///     dS minimum antar pita bersebelahan   0.012
+    ///
+    /// Dua pita bersebelahan **hampir tidak bisa dibedakan**, sehingga yang
+    /// terbaca bukan pita melainkan bola beige dengan gradien. Itu penilaian
+    /// 3/10 atas gambar yang sudah lolos seluruh gerbang piksel — karena semua
+    /// gerbang itu mengukur **keberadaan** pita (`check_jupiter_bands_reach_the_limb`)
+    /// dan **lengkungnya**, tidak satu pun mengukur apakah pitanya terpisah.
+    ///
+    /// Uji ini mengunci tiga invarian yang tidak bisa dibaca dari kode:
+    ///
+    /// 1. **Setiap pita punya nada, dan dua pita bersebelahan tidak sama.**
+    ///    Tanpa ini, "pita" boleh berarti satu warna diulang tujuh kali.
+    /// 2. **Ekuator adalah zona terang yang diapit sabuk gelap.** Itu fakta
+    ///    astronomi tentang Jupiter (zona ekuator diapit NEB/SEB), bukan
+    ///    selera — dan pola yang terbalik (ekuator gelap) tetap "berpita",
+    ///    jadi tidak ada gerbang lain yang bisa melihatnya.
+    /// 3. **Ketiga aksen tetap terpakai.** `check_night_accents_reach_the_view`
+    ///    menuntut setiap warna model sampai ke gambar; kalau pemetaan baru
+    ///    membuang salah satu, gerbang itu memerah di CI dan bukan di sini —
+    ///    jadi yang lebih murah adalah menuntutnya di sini juga.
+    func testJupiterBandsReadAsDistinctStripes() {
+        let bands = CelestialVisual.jupiterBands()
+        let tones = bands.map { CelestialVisual.jupiterBandTone(at: $0.centerY) }
+
+        XCTAssertEqual(tones.count, bands.count)
+        for (index, pair) in zip(tones, tones.dropFirst()).enumerated() {
+            XCTAssertNotEqual(pair.0, pair.1,
+                              "pita \(index) dan \(index + 1) bernada sama — "
+                              + "keduanya akan terbaca sebagai satu pita lebar")
+        }
+
+        // Ekuator: pita dengan |centerY| terkecil. Harus `zone` (terang), dan
+        // kedua tetangganya harus `belt` (gelap).
+        guard let equatorIndex = bands.indices.min(by: {
+            abs(bands[$0].centerY) < abs(bands[$1].centerY)
+        }) else { return XCTFail("tidak ada pita") }
+        XCTAssertEqual(tones[equatorIndex], .zone,
+                       "zona ekuator Jupiter harus terang, bukan sabuk gelap")
+        for neighbour in [equatorIndex - 1, equatorIndex + 1] where bands.indices.contains(neighbour) {
+            XCTAssertEqual(tones[neighbour], .belt,
+                           "pita \(neighbour) mengapit ekuator dan harus sabuk gelap")
+        }
+
+        // Ketiga aksen terpakai. Diukur dari nada, bukan dari daftar terpisah.
+        let used = Set(tones)
+        XCTAssertEqual(used, Set(CelestialVisual.JupiterBandTone.allCases),
+                       "setiap aksen pita harus dipakai: pola yang membuang satu "
+                       + "membuat warnanya mati di model dan tidak ada yang tahu")
+    }
+
+    /// Kutub harus **lebih redup** dari ekuator, bukan lebih terang.
+    ///
+    /// Pola `CRCRCRC` (kutub terang) terukur memberi dL 0.139 — sama baiknya
+    /// dengan pola yang dipakai — tetapi ekuatornya menjadi **gelap** (-0.264),
+    /// kebalikan dari Jupiter. Uji di atas menangkap arah itu lewat nada;
+    /// uji ini menangkapnya lewat **kanal merah aksen**, supaya keduanya tidak
+    /// bisa sepakat salah.
+    func testJupiterPoleToneIsDimmerThanTheEquator() {
+        let accents = CelestialVisual.accents
+        XCTAssertLessThan(accents.jupiterBandTan.nightModeBrightness,
+                          accents.jupiterBandCream.nightModeBrightness,
+                          "nada kutub harus lebih redup dari zona ekuator")
+        XCTAssertLessThan(accents.jupiterBandRust.nightModeBrightness,
+                          accents.jupiterBandTan.nightModeBrightness,
+                          "sabuk harus paling gelap: rust < tan < cream")
+    }
+
+    /// Bintik Merah Besar harus **gelap terhadap pitanya tanpa menjadi
+    /// hampir hitam** — dua batas, karena masing-masing sendirian bisa
+    /// dipuaskan oleh gambar yang salah.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan dinilai dengan mata.**
+    /// Ketika palet pita digelapkan supaya pitanya terpisah, bintiknya harus
+    /// ikut digelapkan untuk tetap lolos `testJupiterSpotIsDarkerThanItsOwnBelt`
+    /// (15% lebih gelap dari **setiap** pita). Nilai yang memenuhi syarat itu
+    /// dengan sisa paling longgar adalah 0.26/0.05/0.04 — dan ia lolos
+    /// **seluruh** uji bintik yang ada. Tetapi pada render, terang bintiknya
+    /// jatuh ke 0.519 (dari 0.624), dan pada terang itu mata membaca
+    /// **lubang**, bukan badai. Yang hilang bukan warnanya: saturasinya
+    /// nyaris tidak berubah (0.50 lawan 0.55), jadi uji yang mengukur
+    /// saturasi akan hijau pada keadaan yang salah.
+    ///
+    /// Yang diuji di sini karena itu **terang token**, yaitu batas atas yang
+    /// menjaga bintiknya tetap berwarna. Batas bawahnya sudah dijaga
+    /// `testJupiterSpotIsDarkerThanItsOwnBelt`; keduanya sengaja di uji
+    /// berbeda supaya pesan gagalnya menunjuk sisi mana yang rusak.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini mengukur token, bukan piksel. Apakah
+    /// bintiknya benar-benar terbaca sesudah digambar diukur di
+    /// `Tools/check-visuals.py` (`check_jupiter_spot_is_not_a_hole`), dan di
+    /// sanalah ambang 0.55 berasal — dari render 152 px ss=8, bukan dari sini.
+    func testJupiterSpotStaysBrightEnoughToReadAsRed() {
+        let spot = CelestialVisual.accents.jupiterSpot
+        // Batas bawah di sini **bukan** pilihan bebas: ia ditentukan uji
+        // malam. `testJupiterSpotIsDarkerThanItsOwnBelt` menuntut
+        // `0.35 + 0.65 x merah <= 0.85 x (0.35 + 0.65 x 0.56)`, yaitu
+        // merah <= 0.395. Di bawah 0.30 render memberi terang 0.519 dan
+        // bintiknya terbaca sebagai lubang; pada 0.39 render memberi 0.571,
+        // yang masih di atas ambang 0.55. Jendela yang sah karena itu
+        // sempit tetapi **tidak kosong** — dan uji ini menjaga sisi
+        // bawahnya, bukan memilih angka yang kebetulan lolos.
+        XCTAssertGreaterThan(spot.red, 0.30,
+                             "kanal merah bintik " + String(format: "%.3f", spot.red)
+                             + " terlalu gelap: pada 0.26 render memberi terang 0.519, "
+                             + "dan bintiknya terbaca sebagai lubang, bukan badai")
+        // Masih harus merah, bukan pucat: hijau dan biru jauh di bawah merah.
+        XCTAssertGreaterThan(spot.red - spot.green, 0.20,
+                             "bintik kehilangan ronanya: merah-hijau hanya "
+                             + String(format: "%.3f", spot.red - spot.green))
+        XCTAssertGreaterThan(spot.red - spot.blue, 0.20,
+                             "bintik kehilangan ronanya: merah-biru hanya "
+                             + String(format: "%.3f", spot.red - spot.blue))
+    }
+
+    /// Bintik Merah Besar harus **gelap terhadap pitanya**, dan arah itu
+    /// tidak boleh terbalik saat paletnya berubah.
+    ///
+    /// **Kenapa uji ini ada padahal ada `testJupiterSpotIsDarkerThanItsOwnBelt`.**
+    /// Uji itu menuntut 15% lebih gelap dari **setiap** pita — dan 15% dari
+    /// `rust` yang baru (0.56) adalah 0.476, yang masih di atas batas terang
+    /// 0.30 di atas. Artinya kedua batas itu **bisa** dipenuhi sekaligus, dan
+    /// uji ini yang membuktikannya: kalau kelak paletnya bergerak sampai
+    /// keduanya bertabrakan, yang gagal adalah uji ini, bukan gambar di
+    /// perangkat.
+    func testJupiterSpotFitsBetweenItsTwoBounds() {
+        let spot = CelestialVisual.accents.jupiterSpot
+        let darkestBand = CelestialVisual.accents.jupiterBandRust
+        XCTAssertLessThan(spot.red, darkestBand.red,
+                          "bintik harus lebih gelap dari sabuk tergelap")
+        XCTAssertGreaterThan(spot.red, 0.30,
+                             "bintik harus tetap cukup terang untuk berwarna")
+        // Jarak ke kedua batas harus **nyata**, bukan seperseribu: kalau
+        // tinggal beberapa unit, satu perubahan palet berikutnya akan
+        // menjatuhkan salah satunya tanpa ada ruang untuk melihatnya.
+        XCTAssertGreaterThan(darkestBand.red - spot.red, 0.05,
+                             "bintik terlalu dekat dengan sabuk: tidak akan terbaca sebagai bintik")
+        XCTAssertGreaterThan(spot.red - 0.30, 0.05,
+                             "bintik terlalu dekat batas bawah: tidak akan terbaca sebagai merah")
+    }
+
+    /// Setiap nada harus benar-benar **menunjuk** aksennya sendiri.
+    ///
+    /// **Cacat yang dijaga uji ini — dan ia lolos uji di atas.** Uji nada
+    /// membandingkan `JupiterBandTone` hasil `jupiterBandTone(at:)`, yaitu
+    /// enum. Enum itu tetap benar walau `jupiterBandColour(for:)` menukar
+    /// `pole` dan `belt`: terukur, menukar keduanya membuat seluruh 958 uji
+    /// hijau, dan yang berubah hanya gambar — kutub menjadi paling gelap
+    /// sementara sabuk menjadi paling terang. Kelasnya sama dengan cacat yang
+    /// sudah berulang di repo ini: **peran** yang benar dengan **warna** yang
+    /// salah, tanpa satu pun gerbang yang membandingkan keduanya.
+    ///
+    /// Yang diuji karena itu pemetaan nada → **identitas aksen**, bukan
+    /// kecerlangannya: kecerlangannya sudah diuji di atas, dan menguji
+    /// keduanya lewat kecerahan akan lolos pada dua aksen yang kebetulan
+    /// berdekatan.
+    func testEachJupiterBandToneMapsToItsOwnAccent() {
+        let accents = CelestialVisual.accents
+        XCTAssertEqual(CelestialVisual.jupiterBandColour(for: .belt), accents.jupiterBandRust,
+                       "sabuk gelap harus memakai aksen rust")
+        XCTAssertEqual(CelestialVisual.jupiterBandColour(for: .zone), accents.jupiterBandCream,
+                       "zona terang harus memakai aksen cream")
+        XCTAssertEqual(CelestialVisual.jupiterBandColour(for: .pole), accents.jupiterBandTan,
+                       "kutub harus memakai aksen tan")
+    }
+
     /// Kekuatan pemulihan peredupan limb harus **sebagian**, bukan 0 atau 1.
     ///
     /// **Cacat yang dijaga uji ini — diukur, bukan diperkirakan.** Pita Jupiter
@@ -3152,17 +3327,20 @@ final class CelestialVisualTests: XCTestCase {
     ///     Jupiter hilang sama sekali. Diukur: kontras pita jatuh dari 24.7%
     ///     (tanpa pemulihan) ke 17.0%, dan pita berhenti terbaca.
     ///
-    /// Nilai 0.6 memulihkan 75% lengkung sambil menyisakan 18.3% kontras pita —
+    /// Nilai 0.75 memulihkan 72% lengkung sambil menyisakan kontras pita —
     /// jadi **kedua** sisi diuji di sini, karena memperbaiki salah satu saja
-    /// bisa merusak yang lain tanpa satu pun galat kompilasi.
+    /// bisa merusak yang lain tanpa satu pun galat kompilasi. Pada 0.6 lengkung
+    /// jatuh ke 57% (stiker rata) dan pada opasitas pita 0.85 itu gagal
+    /// gerbang `check_banded_disc_keeps_its_curvature` (ambang 70%) — jadi
+    /// angka ini dan `jupiterBandOpacity` saling mengunci.
     func testBandLimbShadingIsPartial() {
         let strength = CelestialVisual.bandLimbShadingStrength
         XCTAssertGreaterThan(strength, 0,
                              "tanpa pemulihan, pita menghapus lengkung bola (cacat 20.8% vs 50.6%)")
         XCTAssertLessThan(strength, 1,
                           "pemulihan penuh menutup pitanya sendiri (kontras pita 17.0% vs 24.7%)")
-        XCTAssertEqual(strength, 0.6, accuracy: 1e-12,
-                       "nilai ini diukur terhadap render: 75% lengkung, 18.3% kontras pita")
+        XCTAssertEqual(strength, 0.75, accuracy: 1e-12,
+                       "nilai ini diukur terhadap render: 72% lengkung, opasitas pita 0.85")
     }
 
     /// Pemulihan peredupan limb di atas Bintik Merah Besar: sama kelasnya

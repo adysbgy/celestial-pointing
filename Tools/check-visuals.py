@@ -2434,7 +2434,7 @@ def accent_names_in_view_code(view_code):
     return names
 
 
-def accents_reaching_the_view(model_source, view_code):
+def accents_reaching_the_view(model_source, view_code, extra_model_sources=()):
     """Nama aksen yang sampai ke gambar di `CelestialVisualView.swift`.
 
     **Cacat yang ditutup fungsi ini, dan kenapa daftar tangan tidak cukup.**
@@ -2452,6 +2452,16 @@ def accents_reaching_the_view(model_source, view_code):
     sumber, bukan diketik — fungsi baru yang ditambahkan besok langsung
     terjangkau.
 
+    **Kenapa `extra_model_sources`, dan kenapa itu cacat nyata.**
+    Penutupan ini dulu hanya membaca **satu** berkas model. Selama setiap
+    pemetaan nada→aksen tinggal di `NightVisual.swift` itu cukup; begitu
+    `jupiterBandColour(for:)` pindah ke `CelestialVisual.swift` (tempat
+    `JupiterBandTone` tinggal), pemetaan itu menjadi **tak terlihat** dan
+    gerbangnya melaporkan tiga aksen pita "tidak pernah sampai ke view"
+    padahal view memanggilnya. Warna yang hilang bukan warna yang hilang —
+    yang buta pembacanya. Karena itu sumber penutupan adalah **seluruh paket
+    model**, bukan satu berkas yang kebetulan memuat `Accents`.
+
     Batas yang jujur: yang diukur adalah **jangkauan nama**, bukan apakah
     pikselnya benar. Fungsi yang mengembalikan warna lalu dibuang pemanggilnya
     tetap terhitung "sampai". Yang menutup itu adalah gerbang piksel
@@ -2460,23 +2470,24 @@ def accents_reaching_the_view(model_source, view_code):
     """
     reached = accent_names_in_view_code(view_code)
     # Fungsi di model yang mengembalikan aksen: nama + nama aksen di tubuhnya.
-    for match in re.finditer(
-            r"func\s+(\w+)\s*\([^)]*\)\s*(?:->[^{]*)?\{", model_source):
-        body_start = match.end()
-        depth, i = 1, body_start
-        while i < len(model_source) and depth:
-            if model_source[i] == "{":
-                depth += 1
-            elif model_source[i] == "}":
-                depth -= 1
-            i += 1
-        body = model_source[body_start:i]
-        body_accents = set(re.findall(r"accents\.(\w+)", body))
-        if not body_accents:
-            continue
-        # Dipakai view bila **namanya** disebut di kode view.
-        if re.search(r"\b" + re.escape(match.group(1)) + r"\b", view_code):
-            reached |= body_accents
+    for source in (model_source, *extra_model_sources):
+        for match in re.finditer(
+                r"func\s+(\w+)\s*\([^)]*\)\s*(?:->[^{]*)?\{", source):
+            body_start = match.end()
+            depth, i = 1, body_start
+            while i < len(source) and depth:
+                if source[i] == "{":
+                    depth += 1
+                elif source[i] == "}":
+                    depth -= 1
+                i += 1
+            body = source[body_start:i]
+            body_accents = set(re.findall(r"accents\.(\w+)", body))
+            if not body_accents:
+                continue
+            # Dipakai view bila **namanya** disebut di kode view.
+            if re.search(r"\b" + re.escape(match.group(1)) + r"\b", view_code):
+                reached |= body_accents
     return reached
 
 
@@ -2521,11 +2532,21 @@ def check_night_accents_reach_the_view(results, view_source=None, night_source=N
             "blok `static let accents = Accents(` terbaca tetapi nol warna "
             "terurai — gerbang yang tidak menemukan apa pun tidak boleh lulus"))
         return
-    # Sumber penutupan: **NightVisual.swift**, tempat `Accents` dan
-    # `deepSkyColour(for:)` sama-sama tinggal. Membacanya dari CelestialVisual
-    # melewatkan pemetaan morfologinya, dan tujuh warna langit dalam akan
-    # dilaporkan tidak terpakai.
-    reached = accents_reaching_the_view(night, swift_code_only(view))
+    # Sumber penutupan: **seluruh paket model**, bukan satu berkas.
+    #
+    # Sampai siklus pita Jupiter, `Accents` dan `deepSkyColour(for:)` sama-sama
+    # tinggal di `NightVisual.swift`, jadi membaca satu berkas itu cukup.
+    # Begitu pemetaan nada→aksen pindah ke `CelestialVisual.swift` (di sebelah
+    # `JupiterBandTone`), penutupan berhenti melihatnya dan melaporkan tiga
+    # aksen pita "tidak pernah sampai ke view" — padahal view memanggilnya
+    # lewat `jupiterBandColour(for:)`. Gerbangnya merah pada kode yang benar,
+    # dan itu harus diperbaiki di pembacanya.
+    model_dir = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit")
+    extra = [open(os.path.join(model_dir, name)).read()
+             for name in sorted(os.listdir(model_dir))
+             if name.endswith(".swift") and name != "NightVisual.swift"]
+    reached = accents_reaching_the_view(night, swift_code_only(view),
+                                        extra_model_sources=extra)
     missing = sorted(in_model - reached)
     results.append(Result(
         "aksen gambar: setiap warna model sampai ke view", not missing,
@@ -2732,8 +2753,8 @@ def check_port_matches_swift_constants(results):
          "(1 - y * y).squareRoot()", model, "CelestialVisual.swift"),
         ("rumus separuh-lebar pita (Python)", R.BAND_HALF_WIDTH_RULE, "sqrt",
          "math.sqrt(max(0.0, 1 - y * y))", port, "render-visuals.py"),
-        ("opasitas pita Jupiter", R.BAND_OPACITY, 0.55,
-         "opacity(0.55)", view),
+        ("opasitas pita Jupiter", R.BAND_OPACITY, 0.85,
+         "jupiterBandOpacity: Double = 0.85", model),
         # Pita cincin Saturnus. **Kelas cacat yang sama** dengan Bintik Merah
         # Besar di bawah: struktur yang punya nama di data nyata hidup di
         # dalam view, jadi tidak ada uji Linux yang bisa memeriksanya. Yang
@@ -6267,6 +6288,283 @@ def split_model_claim(claim):
         param = rest[:-1].split(":")[0].strip() or None
         name = head
     return name, param
+
+
+def check_jupiter_band_tones_match_the_model(results):
+    """Pola nada pita Jupiter harus sama di model, di port, dan di view.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini peta
+    indeks->warna pita hidup **dua kali**: `switch index % 3` di
+    `CelestialVisualView.drawBands`, dan larik yang sama di
+    `render-visuals.py`. Keduanya menyusun tan->rust->cream berulang, jadi
+    hari itu keduanya sepakat — tetapi tidak ada satu pun gerbang yang
+    membandingkannya, dan itulah yang membuat kesepakatannya tidak berarti
+    apa-apa besok. Kelasnya sudah berulang di repo ini (lihat
+    `check_port_matches_swift_constants`): **satu aturan, dua bahasa, tidak
+    ada yang membandingkan.**
+
+    Yang dijaga di sini **tiga hal**, dan yang ketiga yang paling mudah
+    hilang:
+
+    1. **Pola** di Swift sama dengan pola di port, urut dan panjangnya.
+    2. **Peta nada->aksen** sama di kedua bahasa.
+    3. **Setiap nada dipakai**, dan **dua nada bersebelahan berbeda**.
+
+    Tanpa (3), pola yang sah secara tipe tetapi mengulang satu nada (mis.
+    `.zone, .zone, .zone, ...`) tetap "berpita" dan tetap hijau di seluruh
+    gerbang lain — pitanya ada, hanya tidak terpisah. Diukur pada keadaan
+    itu: dL 0.000 antar pita bersebelahan.
+
+    **Kenapa dibaca dari teks, bukan dari angka.** Gerbang paritas generik
+    (`check_modeled_port_constants_match_the_model`) hanya membaca
+    `static let <nama>: Double = <angka>`; pola ini larik enum, jadi ia
+    dilaporkan sebagai "bentuk di luar jangkauan" di sana. Gerbang ini
+    melengkapinya untuk satu bentuk yang **dipakai** hari ini, bukan
+    membuka tebakan untuk semua bentuk.
+
+    **Batas yang dinyatakan.** Ia membaca teks, bukan AST: pola yang ditulis
+    dengan baris terlipat atau lewat `map` tidak terbaca, dan itu membuatnya
+    **merah** (bukan hijau) karena pola kosong dianggap gagal. Yang tidak
+    bisa dilihatnya: apakah view benar-benar memanggil
+    `jupiterBandTone(at:)` — itu dijaga Aturan 35 lewat nama properti, dan
+    `testEachJupiterBandToneMapsToItsOwnAccent` lewat pemetaan warna.
+    """
+    model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                             "CelestialVisual.swift")).read()
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+
+    # Pola di Swift: blok `static let jupiterBandTones: [JupiterBandTone] = [ ... ]`.
+    block = re.search(
+        r"static let jupiterBandTones:\s*\[JupiterBandTone\]\s*=\s*\[(.*?)\]",
+        model, re.S)
+    if not block:
+        results.append(Result(
+            "pola nada pita: terbaca dari model", False,
+            "`static let jupiterBandTones: [JupiterBandTone] = [` tidak "
+            "ditemukan di CelestialVisual.swift — pembacanya perlu "
+            "diselaraskan, atau polanya dipindah"))
+        return
+    swift_tones = re.findall(r"\.(\w+)", block.group(1))
+    port_tones = list(R.BAND_TONES)
+
+    results.append(Result(
+        "pola nada pita: sama di model dan port", swift_tones == port_tones,
+        f"swift={swift_tones} port={port_tones}"))
+
+    # Setiap nada dipakai, dan tidak ada dua nada bersebelahan yang sama.
+    results.append(Result(
+        "pola nada pita: setiap nada dipakai",
+        set(swift_tones) == {"pole", "zone", "belt"},
+        f"nada terpakai: {sorted(set(swift_tones))}"))
+    adjacent_same = [i for i in range(len(swift_tones) - 1)
+                     if swift_tones[i] == swift_tones[i + 1]]
+    results.append(Result(
+        "pola nada pita: tidak ada nada kembar bersebelahan",
+        bool(swift_tones) and not adjacent_same,
+        f"pasangan bersebelahan yang sama: {adjacent_same}"
+        if adjacent_same else f"{len(swift_tones)} nada, semuanya berbeda dari tetangganya"))
+
+    # Peta nada->aksen, dari `jupiterBandColour(for:)` di model.
+    colour_block = re.search(
+        r"static func jupiterBandColour\(for tone: JupiterBandTone\)"
+        r"\s*->\s*RGBComponents\s*\{(.*?)\n    \}", model, re.S)
+    if not colour_block:
+        results.append(Result(
+            "pola nada pita: peta warna terbaca dari model", False,
+            "`static func jupiterBandColour(for tone: JupiterBandTone)` tidak "
+            "ditemukan — peta nada->aksen tidak bisa dibandingkan"))
+    else:
+        swift_map = dict(re.findall(
+            r"case \.(\w+):\s*return accents\.(\w+)", colour_block.group(1)))
+        results.append(Result(
+            "pola nada pita: peta warna sama di model dan port",
+            swift_map == R.BAND_TONE_ACCENTS,
+            f"swift={swift_map} port={R.BAND_TONE_ACCENTS}"))
+
+    # Arah ketiga: view harus membaca nadanya dari model, bukan menyusun
+    # sendiri. Tanpa ini, view bisa kembali ke `index % 3` dan setiap gerbang
+    # di atas tetap hijau sambil menggambar pola yang berbeda.
+    results.append(Result(
+        "pola nada pita: view membaca nada dari model",
+        "CelestialVisual.jupiterBandTone(at:" in view,
+        "view memanggil 'CelestialVisual.jupiterBandTone(at:' = "
+        f"{'ada' if 'CelestialVisual.jupiterBandTone(at:' in view else 'TIDAK'}"))
+
+
+#: Ambang **residual** keterpisahan pita, dalam satuan luma 0..1.
+#:
+#: Bukan dL mentah: dL mentah antara dua pita **sudah** berisi gradien bola
+#: (pita atas selalu lebih gelap karena dekat limb), jadi pita yang seragam
+#: pun memberinya angka. Yang diukur di sini adalah dL **dikurangi** dL yang
+#: dimiliki pola seragam — bagian yang datang dari nada dan warnanya sendiri.
+#:
+#: Diukur pada render 200 px, ss=2, jendela x = +0.20..+0.40 R (sisi kanan,
+#: jauh dari Bintik Merah Besar di x = -0.10). Kolom ini **diukur ulang**
+#: sesudah naungan bola dipindah ke dalam bentuk tiap pita (lihat
+#: `CelestialVisual.bandLimbShadingStrength`); angka generasi sebelumnya
+#: (0.093 / 0.012 / 0.006 / 0.023) sudah tidak berlaku lagi:
+#:
+#:     pola + palet sekarang      residual minimum 0.095  (siang)
+#:     palet lama, pola sekarang  residual minimum 0.021  (siang)
+#:     pola lama,  palet sekarang residual minimum 0.012  (siang)
+#:     keduanya lama              residual minimum 0.038  (siang)
+#:     satu nada (kontrol)        residual minimum 0.000  (siang)
+#:
+#: 0.05 duduk di antara 0.038 dan 0.095 — jarak 1.3x ke cacat terdekat dan
+#: 1.9x ke keadaan benar. Angka yang lebih longgar (0.03) akan menerima
+#: "keduanya lama", dan itulah cacat yang gerbang ini ada untuk menolaknya.
+BAND_TONE_SEPARATION_FLOOR = 0.05
+
+#: Ambang yang sama untuk **mode malam**, yang lebih ketat karena kanal
+#: hijau-biru dibuang: hanya kanal merah yang tersisa, jadi seluruh
+#: keterpisahan harus datang dari kanal itu.
+#:
+#: Diukur ulang bersama ambang siang di atas, dan hasilnya bergeser jauh dari
+#: generasi renderer sebelumnya. Angka lama (0.027 / 0.011 / 0.007 / 0.004)
+#: berasal dari renderer yang mencuci pita, sehingga keadaan sehat pun hanya
+#: mencapai 0.027 dan ambangnya harus diletakkan di 0.018 agar sehat bisa
+#: lolos. Renderer sekarang memberi 0.046 pada keadaan sehat, dan **ambang
+#: 0.018 tidak lagi memisahkan apa pun**: palet lama duduk di 0.019, jarak
+#: 0.001 — itu derau, bukan keputusan, dan harness non-vakuinya terbukti
+#: merah karenanya ("palet lama" diharapkan 2/2 merah, terukur 1/2).
+#:
+#:     sekarang      residual minimum 0.046
+#:     palet lama    residual minimum 0.019
+#:     pola lama     residual minimum 0.012
+#:     keduanya lama residual minimum 0.023
+#:     satu nada     residual minimum 0.000
+#:
+#: 0.030 duduk di antara 0.023 dan 0.046: jarak 1.3x ke cacat terdekat dan
+#: 1.5x ke keadaan benar. Dinaikkan karena data berubah, bukan karena gerbang
+#: butuh lolos — keadaan sehat lolos dengan sisa 0.016.
+BAND_TONE_SEPARATION_FLOOR_NIGHT = 0.030
+
+
+def jupiter_band_means(rows, w, h, radius, x0=0.20, x1=0.40):
+    """Rata-rata RGB tiap pita Jupiter di satu jendela horizontal.
+
+    **Kenapa jendela x = +0.20..+0.40 R, bukan kolom tengah.** Bintik Merah
+    Besar duduk di `centerX = -0.10` dengan lebar 0.52 R (tepi kirinya
+    -0.36 R), jadi kolom tengah **dan** sisi kiri sama-sama memuat bintiknya.
+    Versi pertama probe ini memakai x = -0.20..-0.05 dan hasilnya tetap benar,
+    tetapi yang terukur sebagian adalah bintik, bukan pita — dan bintik itu
+    sendiri lebih gelap dari pitanya, jadi ia bisa memberi keterpisahan palsu
+    pada satu pasangan.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    lo = int(round(cx + x0 * radius))
+    hi = int(round(cx + x1 * radius))
+    means = []
+    for band_y, _, _ in R.jupiter_bands():
+        py = int(round(cy + band_y * radius))
+        acc = [0.0, 0.0, 0.0]
+        count = 0
+        for px in range(lo, hi + 1):
+            pixel = rows[py][px * 4:px * 4 + 3]
+            for k in range(3):
+                acc[k] += pixel[k]
+            count += 1
+        means.append(tuple(v / count for v in acc))
+    return means
+
+
+def _band_luma(rgb):
+    return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255.0
+
+
+def _band_signal(rgb, night):
+    """Sinyal yang dibandingkan antar pita: luma (siang) atau kanal merah (malam).
+
+    **Kenapa kanal merah di mode malam.** Palet malam membuang hijau dan biru
+    total (`NightVisual.surface`), jadi luma di sana hanya 0.2126 × merah —
+    sinyal yang sama dengan kanal merah, tetapi dibagi skala. Memakai kanal
+    merah langsung membuat angkanya bisa dibaca sebagai "seberapa terang
+    pitanya di mata", yang memang satu-satunya yang tersisa di mode itu.
+    """
+    return rgb[0] / 255.0 if night else _band_luma(rgb)
+
+
+def check_jupiter_bands_read_as_separate_stripes(results, size=200, ss=2):
+    """Pita Jupiter harus **terpisah** di mata, bukan hanya ada.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan dinilai.** Seluruh
+    gerbang pita yang ada menjawab pertanyaan "apakah pitanya ada": ia sampai
+    ke limb (`check_jupiter_bands_reach_the_limb`), ia mengikuti busur
+    (`check_bands_follow_the_limb_arc`), ia tidak menghapus lengkung bola
+    (`check_banded_disc_keeps_its_curvature`), dan ia masih terbaca setelah
+    pemulihan limb (`band_deviation_from_bare`). Tidak satu pun bertanya
+    apakah **dua pita bersebelahan bisa dibedakan**. Jupiter dengan tujuh pita
+    berwarna sama lulus keempatnya dengan sempurna.
+
+    Keadaan itu bukan hipotetis: ia adalah keadaan **sebelum siklus ini**.
+    Diukur pada port yang sama, render 200 px, ss=2:
+
+        pola tan->rust->cream berulang   dL minimum antar pita  0.045
+        pola yang dipakai sekarang       dL minimum antar pita  0.131
+
+    dan sesudah gradien bola dikurangkan (residual), 0.006 vs 0.093. Di kartu
+    jam 38 pt angkanya 0.012 vs 0.089. Pada 0.006 yang terbaca bukan pita
+    melainkan bola beige — penilaian manusia atas PNG yang sama: **3/10**.
+
+    **Kenapa residual, bukan dL mentah.** Pita atas dan bawah duduk lebih
+    dekat ke limb, jadi gradien bola **sendiri** sudah membuatnya lebih gelap.
+    dL mentah karena itu bukan bukti apa pun tentang pitanya: pola seragam
+    (kontrol satu nada) terukur memberi dL sampai 0.061. Yang diuji di sini
+    adalah `dL(terukur) - dL(kontrol)`, yaitu bagian yang datang dari nada dan
+    warna pita. Untuk pola seragam ia **nol persis** — dan itu kontrol
+    negatifnya, dijalankan di dalam pemeriksaan ini setiap kali, bukan
+    dikutip dari docstring.
+
+    **Kenapa dua mode diukur terpisah.** Mode malam membuang hijau dan biru,
+    jadi keterpisahan yang tersisa hanya dari kanal merah: 0.027 lawan 0.093
+    di siang. Satu ambang untuk keduanya akan menerima mode malam yang pucat
+    atau menolak siang yang benar.
+
+    **Yang TIDAK diklaim.** Ini mengukur **port**, bukan view Apple: yang
+    dijamin adalah modelnya satu dan gambarnya terpisah di render ini, bukan
+    bahwa piksel di perangkat sama. Ia juga tidak mengukur apakah pitanya
+    **indah** — hanya bahwa dua pita bersebelahan berbeda cukup untuk tidak
+    menyatu. Dan ia tidak memeriksa Saturnus, Uranus, atau Neptunus: ketiganya
+    punya satu pita, dan "dua pita bersebelahan" tidak berlaku di sana.
+    """
+    controls = {False: ["zone"] * R.BAND_COUNT, True: ["zone"] * R.BAND_COUNT}
+    saved = R.BAND_TONES
+    try:
+        for night, floor in ((False, BAND_TONE_SEPARATION_FLOOR),
+                             (True, BAND_TONE_SEPARATION_FLOOR_NIGHT)):
+            _, (w, h, rows) = render_case("planet-jupiter-confirmed", night=night,
+                                          size=size, ss=ss)
+            radius = min(w, h) / 2.0
+            means = jupiter_band_means(rows, w, h, radius)
+            signals = [_band_signal(m, night) for m in means]
+            measured = [abs(signals[i] - signals[i + 1])
+                        for i in range(len(signals) - 1)]
+
+            # Kontrol **satu nada**: pola seragam. Yang tersisa di sana hanya
+            # lengkung bola dan peredupan limb, yaitu bagian yang bukan milik
+            # nada pita.
+            R.BAND_TONES = controls[night]
+            _, (_, _, rows_c) = render_case("planet-jupiter-confirmed", night=night,
+                                            size=size, ss=ss)
+            means_c = jupiter_band_means(rows_c, w, h, radius)
+            signals_c = [_band_signal(m, night) for m in means_c]
+            control = [abs(signals_c[i] - signals_c[i + 1])
+                       for i in range(len(signals_c) - 1)]
+            R.BAND_TONES = saved
+
+            residual = [abs(measured[i] - control[i])
+                        for i in range(len(measured))]
+            worst = min(residual) if residual else 0.0
+            mode = "malam" if night else "siang"
+            results.append(Result(
+                f"pita Jupiter terpisah di mata ({mode})",
+                bool(residual) and worst >= floor,
+                f"residual minimum {worst:.3f} (ambang {floor:.3f}); "
+                f"dL terukur {min(measured):.3f}, kontrol satu nada "
+                f"{max(control):.3f}, per pasangan "
+                f"{[round(v, 3) for v in residual]}"))
+    finally:
+        R.BAND_TONES = saved
 
 
 def check_modeled_port_constants_match_the_model(results):
@@ -10452,6 +10750,122 @@ def check_jupiter_spot_reads_on_the_watch(results, ss=8):
         deviation >= 12.0,
         f"bintik menyimpang {deviation:.2f}% dari bola polos (ambang 12.0%; "
         f"warna lama hanya 7.24%, yang baru 20.89%)"))
+
+
+def spot_brightness(rows, w, h, sample=5):
+    """Terang (HSV value) bintik di **piksel yang benar-benar tergambar**, 0…1.
+
+    **Kenapa terang, bukan saturasi — diukur, bukan ditebak.** Hipotesis
+    pertama saya adalah rona: "bintik yang terbaca sebagai lubang pasti kurang
+    jenuh". Itu **salah**, dan render membuktikannya. Saturasi di dalam
+    bintik, pada 152 px ss=8:
+
+        warna bintik        V (terang)   S (saturasi)
+        0.52/0.14/0.10        0.624          0.545
+        0.26/0.05/0.04        0.519          0.499   <- terbaca "lubang"
+        0.44/0.13/0.09        0.591          0.527
+        0.50/0.16/0.11        0.616          0.532
+
+    Saturasinya **nyaris tidak bergerak** (0.50 → 0.55) dan tidak memisahkan
+    keadaan baik dari keadaan buruk sama sekali. Yang bergerak adalah
+    **terangnya**: 0.519 lawan 0.591–0.624. Itu masuk akal secara optik —
+    gradien bola menggelapkan bintik yang duduk di belahan bawah, jadi
+    token yang sudah gelap menjadi lebih gelap lagi setelah digambar, dan
+    pada terang itu mata membaca **lubang**, bukan warna.
+
+    Karena itu yang diukur adalah terang hasil render. Token tidak diukur di
+    sini: `testJupiterSpotIsDarkerThanItsOwnBelt` sudah menjaganya, dan yang
+    tidak dijaga adalah apa yang sampai ke mata **sesudah** gradien bola.
+
+    Rata-rata diambil dari kisi `sample x sample` di dalam elips bintik yang
+    dipotong ke piringan, supaya tepi elips (tercampur anti-aliasing dengan
+    pita di belakangnya) tidak mengencerkan angkanya.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    spot_w, spot_h = R.SPOT_SIZE
+    half_w, half_h = spot_w * radius / 2.0, spot_h * radius / 2.0
+    total, count = 0.0, 0
+    for iy in range(sample):
+        for ix in range(sample):
+            # 0.8, bukan 1.0: tetap di dalam elips dengan jarak dari tepinya.
+            ex = (ix + 0.5) / sample * 1.6 - 0.8
+            ey = (iy + 0.5) / sample * 1.6 - 0.8
+            if ex * ex + ey * ey > 1.0:
+                continue
+            px = cx + spot_x * radius + ex * half_w
+            py = cy + spot_y * radius + ey * half_h
+            if (px - cx) ** 2 + (py - cy) ** 2 > radius * radius:
+                continue
+            r, g, b = rows[int(py)][int(px) * 4:int(px) * 4 + 3]
+            total += max(r, g, b) / 255.0
+            count += 1
+    return total / count if count else 0.0
+
+
+def check_jupiter_spot_is_not_a_hole(results, ss=8):
+    """Bintik Merah Besar harus **badai**, bukan lubang gelap.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan dinilai dengan mata.**
+    Ketika palet pita Jupiter digelapkan supaya pitanya terpisah
+    (`check_jupiter_bands_read_as_separate_stripes`), bintiknya ikut
+    digelapkan supaya tetap lolos "15% lebih gelap dari **setiap** pita".
+    Nilai yang dipilih, 0.26/0.05/0.04, lolos **seluruh** gerbang bintik yang
+    ada: ia lebih gelap dari pitanya, ia menyimpang 20% dari bola polos, ia
+    melengkung. Tetapi di layar ia terbaca sebagai **lubang**: pada terang
+    hasil render 0.519, dengan tepi tajam dan tanpa struktur dalam, mata
+    membaca cekungan — bukan badai. Nama cirinya sendiri ("Merah") tidak
+    pernah diukur satu gerbang pun, dan yang hilang bukan warna melainkan
+    **terang minimum** yang membuat warna itu terbaca.
+
+    **Kenapa terang, bukan saturasi.** Sudah diukur dan hipotesisnya salah:
+    saturasi bintik 0.50 (lubang) lawan 0.53 (sekarang) — tidak memisahkan
+    apa pun. Terangnya 0.519 lawan 0.591. Angkanya ada di docstring
+    `spot_brightness`, dari render yang sama.
+
+    **Kenapa tetap dituntut lebih gelap dari pita.** "Cukup terang" saja
+    dipuaskan oleh bintik yang lebih terang dari pitanya — cacat asli yang
+    membuatnya terbaca sebagai pita kedua (`+16` kanal merah). Yang
+    membedakan badai dari keduanya adalah **gelap DAN cukup terang untuk
+    berwarna**, jadi kedua syarat diukur di satu pemeriksaan yang sama:
+    selisih kanal merah harus negatif, dan terangnya harus di atas ambang.
+
+    **Yang TIDAK diklaim.** Ambang di bawah diukur pada port Python (152 px,
+    ss=8), bukan pada renderer Apple. Ia tidak mengukur apakah bintiknya
+    tampak seperti badai yang berputar — hanya bahwa ia tidak lagi terbaca
+    sebagai lubang pada terang dan ukuran yang diukur di sini.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (terang bintik)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=pixels, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-bare", size=pixels, ss=ss)
+
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    px = int(round(cx + spot_x * radius))
+    py = int(round(cy + spot_y * radius))
+    spot_red = rows_c[py][px * 4]
+    band_red = rows_b[py][px * 4]
+
+    #: Terang minimum bintik **sesudah** gradien bola, 0…1. Duduk di antara
+    #: keadaan yang terbaca sebagai lubang (0.519) dan yang terbaca sebagai
+    #: badai (0.591): 0.55 memberi jarak ~0.03 ke keduanya, jadi ia bukan
+    #: angka yang dipilih supaya satu palet tertentu lulus.
+    brightness = spot_brightness(rows_c, w, h)
+    results.append(Result(
+        f"Bintik Merah Besar bukan lubang ({pixels} px)",
+        brightness >= 0.55 and spot_red < band_red,
+        f"terang bintik {brightness:.3f} (ambang 0.55); kanal merah "
+        f"{spot_red} lawan pita {band_red} ({spot_red - band_red:+d}) — "
+        f"bintik harus gelap DAN cukup terang untuk berwarna; gelap saja "
+        f"membuatnya terbaca sebagai lubang"))
 
 
 def spot_deviation_from_bare(rows_spot, rows_bare, w, h):
@@ -14848,6 +15262,8 @@ def main():
     check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
+    check_jupiter_band_tones_match_the_model(results)
+    check_jupiter_bands_read_as_separate_stripes(results, args.size, args.ss)
     # Tiga gerbang yang **dijanjikan komentar tetapi tidak pernah ditulis**
     # (ditemukan `check_gate_names_mentioned_in_code_exist`): kawah Bulan,
     # rumus tepi maria, dan warna benda langit dalam di mode malam. Ketiganya
@@ -14911,6 +15327,7 @@ def main():
     check_planet_phase_limb_reads_the_model_constant(results)
     check_moon_new_disc_reads_on_the_watch(results)
     check_jupiter_spot_reads_on_the_watch(results)
+    check_jupiter_spot_is_not_a_hole(results)
     check_mars_caps_touch_the_limb(results)
     check_mars_caps_fade_into_the_surface(results)
     check_sun_edge_is_soft(results)

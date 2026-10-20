@@ -116,10 +116,10 @@ UNKNOWN_STAR_COLOR_INDEX = float("nan")
 
 # `CelestialVisual.accents` — satu konstanta di paket, disalin apa adanya.
 ACCENTS = dict(
-    jupiterBandCream=(0.90, 0.83, 0.72),
-    jupiterBandRust=(0.72, 0.52, 0.38),
-    jupiterBandTan=(0.85, 0.76, 0.62),
-    jupiterSpot=(0.52, 0.14, 0.10),
+    jupiterBandCream=(0.98, 0.94, 0.87),
+    jupiterBandRust=(0.56, 0.28, 0.12),
+    jupiterBandTan=(0.86, 0.64, 0.40),
+    jupiterSpot=(0.39, 0.115, 0.08),
     saturnRing=(0.86, 0.78, 0.60),
     marsPolarCap=(0.97, 0.95, 0.93),
     venusHaze=(0.99, 0.96, 0.82),
@@ -1065,11 +1065,25 @@ def _png(width, height, pixels):
 GLOW_OPACITIES = [0.10, 0.22, 1.0]          # VIEW: `CelestialVisualView.glowOpacities`
 BAND_COUNT = 7                              # MODEL: `CelestialVisual.jupiterBands(count:)`
 BAND_HEIGHT_FRACTION = 0.11                 # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
-BAND_OPACITY = 0.55                         # VIEW: `drawBands`
+BAND_OPACITY = 0.85                         # MODEL: `CelestialVisual.jupiterBandOpacity`
+# Pola nada pita dari kutub utara ke selatan — **sama dengan**
+# `CelestialVisual.jupiterBandTones`. Peta ini dulu hidup dua kali (di sini dan
+# di `CelestialVisualView.drawBands`), dan polanya yang menentukan apakah
+# pitanya terbaca: tan->rust->cream berulang terukur memberi dL 0.020 antar
+# pita bersebelahan, pola di bawah 0.140. Ia tidak memakai penanda `# MODEL:`
+# karena gerbang paritas generik hanya membaca `static let ... : Double`;
+# pasangannya dijaga `check_jupiter_band_tones_match_the_model`.
+BAND_TONES = ["pole", "zone", "belt", "zone", "belt", "zone", "pole"]
+# Sama dengan `CelestialVisual.jupiterBandColour(for:)`.
+BAND_TONE_ACCENTS = {
+    "belt": "jupiterBandRust",
+    "zone": "jupiterBandCream",
+    "pole": "jupiterBandTan",
+}
 # MODEL: `CelestialVisual.bandLimbShadingStrength` — pemulihan peredupan limb
 # di atas pita. Pita digambar rata, jadi ia menghapus lengkung bola; gradien
 # bola digambar ulang di atasnya dengan kekuatan ini.
-BAND_LIMB_SHADING_STRENGTH = 0.6
+BAND_LIMB_SHADING_STRENGTH = 0.75
 # MODEL: `CelestialVisual.jupiterSpotLimbShadingStrength` — pemulihan peredupan
 # limb di atas Bintik Merah Besar. **Kelas cacat yang sama** dengan pita di
 # atas: bintik digambar sebagai elips warna **rata**, jadi ia menghapus
@@ -1653,6 +1667,35 @@ def band_half_width(height):
 
 
 def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
+    # **Pita diwarnai sambil dinaungi cahaya bola — bukan dicat rata lalu
+    # ditutupi ulang.** Dua generasi sebelumnya berdebat: pita rata menghapus
+    # lengkung bola (jadi stiker), dan menutupinya lagi dengan gradien bola
+    # penuh memulihkan lengkung tetapi **mencuci warna pitanya**.
+    #
+    # Diukur pada port ini, render 200 px, ss=2 (residual keterpisahan vs
+    # lengkung, ambang 0.05 / 70%):
+    #
+    #     opasitas 0.85, tutup ulang 0.75 : lengkung 71.9%, residual 0.002
+    #     opasitas 0.85, tutup ulang 0.60 : lengkung 57.4%, residual 0.093
+    #     opasitas 0.55, tutup ulang 0.60 : lengkung 71.3%, residual 0.007
+    #
+    # Kolomnya berlawanan arah: setiap nilai yang lolos salah satu ambang
+    # gagal yang lain. Itu bukan soal menyetel angka — dua besaran itu
+    # **dihitung dari pixel yang sama** dengan arah berlawanan, karena kontras
+    # pita tinggal di tepi piringan (tempat tutup-ulang paling menggelapkan)
+    # sementara lengkung diukur sebagai gelapnya tepi itu. Satu konstanta
+    # opasitas tidak bisa memenuhi keduanya.
+    #
+    # Jadi penutupan ulang dihapus. Tiap pita menerima **naungan gradien bola
+    # yang sama** sebagai bagian dari warnanya sendiri (`shade`), dibaca dari
+    # `sphere_gradient` yang dipakai bola. Lengkung jadi intrinsik: tidak perlu
+    # dipulihkan karena tidak pernah terhapus. Warnanya tetap terbaca karena
+    # naungan mengalikan terang, bukan mengganti hue dengan abu-abu bola.
+    shade = None
+    if palette is not None:
+        # MODEL: `CelestialVisual.bandLimbShadingStrength`
+        shade = sphere_gradient(cx, cy, radius, palette["light"], palette["dark"],
+                                night_mode, opacity=BAND_LIMB_SHADING_STRENGTH)
     for index, (band_y, half_width, half_height) in enumerate(jupiter_bands()):
         y = cy + band_y * radius
         if half_width * radius <= 1:
@@ -1670,31 +1713,28 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
         half_h = radius * half_height
         points = [(cx - (top - cx), y - half_h), (top, y - half_h),
                   (bottom, y + half_h), (cx - (bottom - cx), y + half_h)]
-        name = ("jupiterBandTan", "jupiterBandRust", "jupiterBandCream")[index % 3]
-        canvas.polygon(points, accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
-    # **Restorasi peredupan limb.** Pita di atas digambar sebagai **tali
-    # busur** warna rata, jadi tiap pita menghapus lengkung bola di bawahnya. Diukur pada
-    # baris ekuator render 200 px: selisih terang pusat-ke-limb turun dari
-    # 50.6% (bola polos) ke 20.8% (bola ber-pita), dan pada 0.96 R pitanya
-    # justru +62.6 lebih terang daripada bola tanpa pita. Yang terlihat karena
-    # itu bukan bola berpita, melainkan **stiker rata** di atas piringan.
-    #
-    # Yang dipakai kembali adalah **gradien bola yang sama persis** — pusat,
-    # warna, dan radius yang sama seperti `_draw_planet` di atas. Dua akibat,
-    # dan keduanya yang membuat cara ini dipilih daripada \"gelapkan pita di
-    # tepi\": (1) di daerah yang tidak tertutup pita gradien ini menumpuk di
-    # atas dirinya sendiri, dan itu identitas — jadi piksel di luar pita tidak
-    # berubah sama sekali; (2) arah cahayanya tidak bisa berbeda pendapat
-    # dengan bolanya, karena keduanya membaca `SPHERE_LIGHT_OFFSET` yang sama.
-    # MODEL: `CelestialVisual.bandLimbShadingStrength`
-    if palette is not None:
-        # Tidak ada klip tambahan yang perlu: `_draw_sphere` mengisi cakram
-        # dengan radius yang sama persis, jadi bentuknya sudah terbatas pada
-        # piringan. Menambahkan klip di sini hanya akan menambah satu operasi
-        # yang tidak mengubah apa pun — dan satu lagi yang bisa berbeda dari
-        # sisi Swift-nya.
-        _draw_sphere(canvas, cx, cy, radius, palette["light"], palette["dark"],
-                     night_mode, opacity=BAND_LIMB_SHADING_STRENGTH)
+        name = BAND_TONE_ACCENTS[BAND_TONES[index % len(BAND_TONES)]]
+        band_rgb = night_mapped(ACCENTS[name], False) if night_mode else ACCENTS[name]
+        if shade is None:
+            canvas.polygon(points, accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
+            continue
+
+        def band_color(x, y, _rgb=band_rgb):
+            shade_rgb, _ = shade(x, y)
+            # Naungan mengalikan terang pita dengan terang bola di titik itu,
+            # dinormalkan ke terang pusat. Hue pita dipertahankan; hanya
+            # terangnya yang mengikuti lengkung bola.
+            k = (0.2126 * shade_rgb[0] + 0.7152 * shade_rgb[1]
+                 + 0.0722 * shade_rgb[2])
+            centre_rgb, _ = shade(cx + radius * SPHERE_LIGHT_OFFSET[0],
+                                  cy + radius * SPHERE_LIGHT_OFFSET[1])
+            centre_k = (0.2126 * centre_rgb[0] + 0.7152 * centre_rgb[1]
+                        + 0.0722 * centre_rgb[2])
+            gain = 1.0 if centre_k <= 1e-9 else min(1.15, k / centre_k)
+            return tuple(min(1.0, _rgb[i] * gain) for i in range(3)), BAND_OPACITY
+
+        canvas.polygon(points, band_color)
+
     dx, dy = SPOT_CENTER
     w, h = SPOT_SIZE
     spot_cx, spot_cy = cx + dx * radius, cy + dy * radius

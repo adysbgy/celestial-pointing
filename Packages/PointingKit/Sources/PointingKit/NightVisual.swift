@@ -461,10 +461,10 @@ public extension CelestialVisual {
     /// satu bisa tertinggal saat palet diubah dan tidak ada yang mengetahuinya
     /// -- persis jebakan yang sudah menutupi satu bug warna di siklus lalu.
     static let accents = Accents(
-        jupiterBandCream: .init(red: 0.90, green: 0.83, blue: 0.72),
-        jupiterBandRust: .init(red: 0.72, green: 0.52, blue: 0.38),
-        jupiterBandTan: .init(red: 0.85, green: 0.76, blue: 0.62),
-        jupiterSpot: .init(red: 0.52, green: 0.14, blue: 0.10),
+        jupiterBandCream: .init(red: 0.98, green: 0.94, blue: 0.87),
+        jupiterBandRust: .init(red: 0.56, green: 0.28, blue: 0.12),
+        jupiterBandTan: .init(red: 0.86, green: 0.64, blue: 0.40),
+        jupiterSpot: .init(red: 0.39, green: 0.115, blue: 0.08),
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),

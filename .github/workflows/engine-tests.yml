@@ -2653,6 +2653,19 @@ jobs:
       - name: Buktikan Aturan 72 menangkap tombol yang tak mengubah keadaannya
         run: python3 Tools/bukti-mutasi-aturan72-tombol-keadaan.py
 
+      # Gerbang keterpisahan pita Jupiter. Sampai siklus ini keempat gerbang
+      # pita yang ada bertanya "apakah pitanya ada", dan keempatnya lulus pada
+      # pola tan->rust->cream berulang yang terukur residual 0.006 -- pita yang
+      # menyatu, dinilai manusia 3/10. Gerbang barunya mengukur residual
+      # terhadap kontrol satu nada, di siang dan malam.
+      #
+      # Biayanya ~1 menit (lima keadaan x empat render), bukan ~40 menit:
+      # yang dijalankan adalah fungsi pemeriksaan yang sama, bukan gerbang
+      # penuh. Gerbang yang terlalu lambat untuk dijalankan adalah gerbang
+      # yang dilewati.
+      - name: Buktikan gerbang keterpisahan pita Jupiter berbunyi
+        run: python3 Tools/bukti-mutasi-pita-terpisah.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan

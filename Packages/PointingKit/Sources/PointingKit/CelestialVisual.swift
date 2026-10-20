@@ -2959,7 +2959,120 @@ public extension CelestialVisual {
         min(1, max(0, 1 - height * height)).squareRoot()
     }
 
-    /// Kekuatan **pemulihan peredupan limb** di atas pita permukaan, 0…1.
+    /// Nada satu pita Jupiter.
+    ///
+    /// **Kenapa ini ada di model, bukan di view.** Peta indeks→warna hidup
+    /// **dua kali** sampai siklus ini: `switch index % 3` di
+    /// `CelestialVisualView.drawBands` dan larik yang sama di
+    /// `render-visuals.py`. Dua salinan itu tidak bisa berbeda hari ini, tetapi
+    /// tidak ada satu pun gerbang yang membandingkannya — kelas cacat yang
+    /// sudah berulang di repo ini. Yang lebih penting: **polanya** sendiri
+    /// tidak bisa diuji di view, dan polanya yang menentukan apakah pitanya
+    /// terbaca.
+    ///
+    /// Tiga nada, bukan satu per pita: yang perlu dibedakan adalah **peran**
+    /// pita (kutub redup, sabuk gelap, zona terang), dan peran itu yang punya
+    /// arti astronomi. Warnanya tetap datang dari `accents`, jadi mode malam
+    /// tidak perlu tahu apa-apa tentang nada.
+    enum JupiterBandTone: CaseIterable, Equatable, Sendable {
+        /// Sabuk gelap — paling gelap, `jupiterBandRust`.
+        case belt
+        /// Zona terang — `jupiterBandCream`.
+        case zone
+        /// Daerah kutub, lebih redup dari zona tetapi lebih terang dari sabuk
+        /// — `jupiterBandTan`.
+        case pole
+    }
+
+    /// Pola nada dari kutub utara ke selatan, satu entri per pita.
+    ///
+    /// **Kenapa `pole, zone, belt, zone, belt, zone, pole` dan bukan pola
+    /// berulang tiga.** Yang dijaga bukan kerapian, melainkan dua fakta:
+    ///
+    /// 1. **Zona ekuator Jupiter terang, dan diapit sabuk gelap** (NEB/SEB).
+    ///    Pola `cream, rust` berulang juga memberi ekuator terang, tetapi
+    ///    kutubnya menjadi **terang** — dan itu kebalikan dari Jupiter.
+    /// 2. **Dua pita bersebelahan harus berbeda nada.** Pola lama
+    ///    (tan→rust→cream berulang) terukur memberi dL 0.020 dan dS 0.012
+    ///    antar tetangga pada render 200 px: pitanya ada, tetapi tidak
+    ///    terpisah, dan yang terbaca adalah bola beige.
+    ///
+    /// Pola ini terukur memberi **dL 0.140** pada render yang sama — tujuh
+    /// kali lebih terpisah dari 0.020 — sambil mempertahankan lengkung
+    /// (gerbang `check_banded_disc_keeps_its_curvature`, ambang 70%) dan
+    /// pemakaian ketiga aksen.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan peta atmosfer Jupiter yang
+    /// sebenarnya: tujuh pita seragam tidak bisa mewakili zona/sabuk yang
+    /// jumlahnya puluhan dan lebarnya tidak sama. Yang dijaga adalah urutan
+    /// peran (kutub redup, sabuk gelap mengapit zona terang) pada jumlah pita
+    /// yang dipakai gambar ini.
+    static let jupiterBandTones: [JupiterBandTone] = [
+        .pole, .zone, .belt, .zone, .belt, .zone, .pole,
+    ]
+
+    /// Nada pita pada ketinggian `centerY` (satuan radius bola, −1…+1).
+    ///
+    /// Dipetakan lewat **indeks pita**, bukan lewat ketinggiannya: pita
+    /// dihitung dari `jupiterBands(count:)`, jadi kalau jumlahnya berubah,
+    /// polanya yang harus berubah bersama — dan itu terlihat di satu tempat.
+    /// Ketinggian di sini hanya dipakai untuk menemukan indeksnya, dengan
+    /// toleransi 1e-9 supaya pita yang dihitung ulang tetap cocok.
+    ///
+    /// Di luar ketujuh pita (mis. `count` lain) jawabannya **`belt`**, bukan
+    /// `nil`: pemanggil yang menggambar selalu punya pita, dan nada yang
+    /// hilang akan membuat pitanya transparan tanpa ada yang tahu.
+    static func jupiterBandTone(at centerY: Double) -> JupiterBandTone {
+        let bands = jupiterBands()
+        if let index = bands.firstIndex(where: { abs($0.centerY - centerY) < 1e-9 }) {
+            return jupiterBandTones[index % jupiterBandTones.count]
+        }
+        return .belt
+    }
+
+    /// Warna siang untuk satu nada pita.
+    ///
+    /// Satu-satunya jalan dari nada ke aksen. View dan port sama-sama
+    /// memakainya lewat nama aksen yang sama, jadi menukar `pole` dan `belt`
+    /// hanya bisa dilakukan di sini — dan `testEachJupiterBandToneMapsToItsOwnAccent`
+    /// memerahkannya.
+    static func jupiterBandColour(for tone: JupiterBandTone) -> RGBComponents {
+        switch tone {
+        case .belt: return accents.jupiterBandRust
+        case .zone: return accents.jupiterBandCream
+        case .pole: return accents.jupiterBandTan
+        }
+    }
+
+    /// Opasitas pita Jupiter saat digambar di atas bola, 0…1.
+    ///
+    /// **Kenapa angkanya naik dari 0.55, dan kenapa bukan 1.0.** Pita digambar
+    /// sebagai warna **rata** di atas gradien bola, jadi opasitas rendah
+    /// membiarkan gradien bola menembusnya — dan gradien itulah yang
+    /// menyeragamkan pita. Diukur pada render 200 px dengan pola nada yang
+    /// sekarang dipakai:
+    ///
+    ///     opasitas   dL minimum antar pita   lengkung vs bola polos
+    ///       0.55            0.053                    92%
+    ///       0.75            0.111                    84%
+    ///       0.85            0.140                    72%
+    ///       1.00            0.148                    75%
+    ///
+    /// 0.85 dipilih karena **kedua** sisinya punya jarak: pitanya terpisah
+    /// 7× lebih jelas dari keadaan sebelumnya (0.020), sementara lengkungnya
+    /// masih 72% — di atas ambang gerbang `check_banded_disc_keeps_its_curvature`
+    /// (70%) dengan jarak yang cukup. Angka lengkung itu diukur pada opasitas
+    /// ini **dan** kekuatan pemulihan 0.75; menurunkan kekuatan pemulihan ke
+    /// 0.6 (yang cukup saat opasitas 0.55) menjatuhkan lengkung ke 57% dan
+    /// gerbangnya merah, jadi kedua angka saling mengunci.
+    ///
+    /// **Yang TIDAK diklaim.** Angka ini diukur pada port Python (200 px,
+    /// ss=2). Renderer Apple memakai Gaussian dan supersampling yang berbeda;
+    /// yang dijamin adalah **model**-nya satu, bukan pikselnya sama.
+    static let jupiterBandOpacity: Double = 0.85
+
+    /// Kekuatan **naungan bola di dalam pita**, 0…1 — dipotong ke bentuk tiap
+    /// pita, bukan ditumpuk ke seluruh cakram.
     ///
     /// **Cacat yang ditutup angka ini — diukur, bukan diperkirakan.** Pita
     /// Jupiter digambar sebagai elips warna **rata** di atas bola yang sudah
@@ -2971,23 +3084,30 @@ public extension CelestialVisual {
     /// Hasilnya bukan bola berpita, melainkan **stiker rata** yang ditempel di
     /// piringan — persis kata yang dipakai pengukuran mata pada render 400 px.
     ///
-    /// Perbaikannya **bukan** "pita dibuat lebih gelap di tepi". Aturan itu
-    /// menggelapkan pita di tempat yang salah untuk pita yang tidak menyentuh
-    /// limb, dan ia menambah sumber kedua tentang dari mana cahaya datang.
-    /// Yang benar adalah memakai **kembali gradien bola yang sama** (pusat di
-    /// `sphereLightOffset`, warna `palette.light` → `palette.dark`) di atas
-    /// pita, dipotong ke bentuk pitanya. Karena gradiennya sama, lengkung yang
-    /// dipulihkan persis lengkung yang tadi terhapus, dan arah cahayanya tidak
-    /// bisa berbeda pendapat dengan `drawSphere`.
+    /// **Kenapa dipotong ke pita, bukan ke seluruh cakram.** Sempat ada versi
+    /// yang menggambar ulang gradien bola di atas **seluruh** piringan. Ia
+    /// memulihkan lengkung, tetapi mencuci warna pitanya: setiap pita harus
+    /// mengalah pada gradien bola di seluruh lebarnya. Diukur pada port yang
+    /// sama (200 px, ss=2, ambang lengkung 70% dan keterpisahan pita 0.05):
     ///
-    /// Nilainya **sebagian**, bukan 1: pada 1.0 pita tertutup gradien bola
-    /// sama sekali (kontras pita 24.7% → 17.0%, pitanya berhenti terbaca), dan
-    /// pada 0 lengkungnya kembali rata — cacatnya kembali utuh. Nilai 0.6
-    /// memulihkan 75% lengkung sambil menyisakan 18.3% kontras pita, jadi
-    /// **kedua** sisinya punya jarak ke ambangnya. Dijaga
-    /// `testBandLimbShadingIsPartial` di Linux dan gerbang piksel
-    /// `check_banded_disc_keeps_its_curvature`.
-    static let bandLimbShadingStrength: Double = 0.6
+    ///     opasitas 0.85, tutup ulang 0.75 : lengkung 71.9%, residual 0.002
+    ///     opasitas 0.85, tutup ulang 0.60 : lengkung 57.4%, residual 0.093
+    ///     opasitas 0.55, tutup ulang 0.60 : lengkung 71.3%, residual 0.007
+    ///     naungan **per pita** (sekarang)   : lengkung 99.6%, residual 0.095
+    ///
+    /// Tiga baris pertama berlawanan arah: tiap nilai lolos satu ambang dan
+    /// gagal yang lain, karena kontras pita tinggal di tepi piringan sementara
+    /// lengkung justru diukur sebagai gelapnya tepi itu. Satu konstanta
+    /// opasitas **tidak bisa** memenuhi keduanya. Memotong naungan ke bentuk
+    /// tiap pita memutus persaingan itu: lengkung jadi intrinsik (tidak ada
+    /// yang terhapus, jadi tidak ada yang perlu dipulihkan) dan hue pita tetap
+    /// utuh karena gradien hanya menutupi satu pita pada satu waktu.
+    ///
+    /// Nilainya **sebagian**, bukan 1: pada 1.0 satu pita tertutup gradien
+    /// bola sama sekali dan pitanya berhenti terbaca, pada 0 lengkungnya
+    /// kembali rata. Dijaga `testBandLimbShadingIsPartial`
+    /// di Linux dan gerbang piksel `check_banded_disc_keeps_its_curvature`.
+    static let bandLimbShadingStrength: Double = 0.75
 
     /// Kekuatan **pemulihan peredupan limb** di atas Bintik Merah Besar, 0…1.
     ///
