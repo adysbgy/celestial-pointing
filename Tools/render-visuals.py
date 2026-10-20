@@ -1686,9 +1686,12 @@ def band_half_width(height):
 
 # MODEL: `CelestialVisual.bandEdgeSteps` — jumlah ruas taksiran busur per pita.
 #
-# Panah maksimum tali busur yang membentang `dy` pada lingkaran jari-jari 1
-# kira-kira `dy^2 / 8`. Pita tertinggi membentang 2/7 = 0.2857 R, jadi dengan
-# 8 ruas panahnya ~1.6e-4 R — 60x lebih kecil dari ambang 1% R di gerbangnya.
+# Simpulnya terbagi seragam **di sepanjang busur** (sampel dalam sudut,
+# `theta = asin(y)`), bukan seragam dalam `y`. Dengan `y` seragam, `sqrt(1-y^2)`
+# berubah paling cepat di dekat kutub sehingga galat menumpuk di ruas terakhir.
+# Diukur tegak-lurus ke busur, 8 ruas: 8.97e-3 R (seragam-y) -> 1.17e-3 R
+# (seragam-sudut), 7.6x lebih kecil tanpa menambah simpul. Rumus `dy^2/8` yang
+# dulu dipakai di sini memberi 1.6e-4 R dan salah 56x.
 BAND_EDGE_STEPS = 8
 
 
@@ -1702,14 +1705,30 @@ def jupiter_band_edges(center_y, half_height, steps=BAND_EDGE_STEPS):
     tepi kirinya jatuh di 0.350 R sementara bola 0.515 R — 16.4% R, persis
     yang dilaporkan CI.
 
+    **Kenapa sampelnya seragam dalam SUDUT, bukan dalam `y`.** Dengan `y`
+    seragam, `dy` tiap ruas sama, tetapi busur `sqrt(1 - y^2)` berubah paling
+    cepat justru di dekat kutub (turunannya tak hingga di |y| = 1). Akibatnya
+    galat menumpuk di ruas terakhir, tempat rumus `dy^2/8` justru meramalkan
+    galat terkecil. Menyampel seragam dalam `theta = asin(y)` membuat tiap ruas
+    membentang busur yang **sama panjang**, sehingga panahnya terbagi rata.
+    Diukur tegak-lurus ke busur, 8 ruas: 8.97e-3 R (seragam-y) -> 1.17e-3 R
+    (seragam-sudut), 7.6x lebih kecil tanpa menambah satu simpul pun.
+
     Mengembalikan daftar `(height, half_width)` dari tepi atas ke tepi bawah.
     """
     count = max(1, steps)
     top = center_y - half_height
-    span = 2 * half_height
-    return [(top + span * index / count,
-             band_half_width(top + span * index / count))
-            for index in range(count + 1)]
+    bottom = center_y + half_height
+    # asin butuh |y| <= 1; pita kutub menyentuh tepat 1.0 dan pembulatan
+    # floating point bisa melewatinya sedikit.
+    start = math.asin(max(-1.0, min(1.0, top)))
+    end = math.asin(max(-1.0, min(1.0, bottom)))
+    edges = []
+    for index in range(count + 1):
+        theta = start + (end - start) * index / count
+        height = math.sin(theta)
+        edges.append((height, band_half_width(height)))
+    return edges
 
 
 def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):

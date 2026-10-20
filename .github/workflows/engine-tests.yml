@@ -2761,5 +2761,28 @@ jobs:
       - name: Buktikan gerbang ukuran bintang saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-ukuran-bintang.py
 
+      # `main` pernah merah sehari penuh karena kelas cacat ini, dan tidak ada
+      # gerbang lokal yang bisa melihatnya. `a951cb9` membuat
+      # `jupiterBandEdges` publik tetapi `BandEdge` di dalam `public extension`
+      # yang sama tetap punya anggota internal. Terukur atas pohon itu:
+      # `swift build` lulus (BUILD_EXIT=0), `-enable-library-evolution` lulus,
+      # `swift-typecheck.sh` hanya `-parse` SwiftUI, dan seluruh 77 berkas uji
+      # memakai `@testable import` sehingga `internal` terlihat oleh uji.
+      # Yang berbunyi hanya `Apple Build`, dengan empat galat
+      # `'halfWidth' is inaccessible due to 'internal' protection level`.
+      #
+      # Gerbang ini menaruh pemakai **luar** di depan tanda-tangan publik
+      # (impor tanpa `@testable`) dan membiarkan compiler memutuskan. Ia
+      # berjalan di dalam container ini karena `swiftc` sudah ada — memanggil
+      # Docker dari sini akan merah karena sebab yang salah.
+      - name: Batas modul PointingKit terbaca dari pemakai luar
+        run: python3 Tools/check-batas-modul.py
+
+      # Gerbang di atas hijau pada hari ia ditulis tidak membuktikan apa pun.
+      # Harness ini menuntut empat keadaan, termasuk mode penuh atas salinan
+      # `a951cb9` yang wajib merah dengan galat yang **sama** seperti CI.
+      - name: Buktikan gerbang batas modul berbunyi
+        run: python3 Tools/bukti-mutasi-batas-modul.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

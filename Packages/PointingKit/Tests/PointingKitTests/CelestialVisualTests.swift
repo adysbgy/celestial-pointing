@@ -3311,6 +3311,70 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// **Kenapa uji ini ada, padahal `testJupiterBandEdgesReachTheLimbArc`
+    /// sudah hijau.** Uji itu memeriksa **simpul** tepi — dan simpulnya
+    /// memang duduk tepat di busur, karena `halfWidth` dihitung dari
+    /// `bandHalfWidthAt`. Yang tidak pernah diukur siapa pun adalah **ruas di
+    /// antara simpul**: garis lurus yang menghubungkan dua titik busur selalu
+    /// memotong ke dalam lingkaran, dan besar potongannya itulah yang
+    /// menentukan apakah tepinya terlihat sebagai busur atau sebagai tangga.
+    ///
+    /// **Cacat yang ditangkap uji ini.** Docstring `bandEdgeSteps` dulu
+    /// menulis panahnya `≈1.6·10⁻⁴ R`, dihitung dari `Δy²/8`. Angka itu salah
+    /// 56×: `Δy²/8` mengukur panah terhadap busur **parameternya**, sedangkan
+    /// tepi pita dibaca sebagai **separuh-lebar pada ketinggian tetap**, dan
+    /// `√(1−y²)` punya turunan tak hingga di kutub. Yang lebih buruk: rumus
+    /// itu hanya berlaku bila simpulnya terbagi rata **di sepanjang busur**,
+    /// sedangkan fungsi ini dulu menyampel seragam dalam `y` — jadi galatnya
+    /// menumpuk di ruas terakhir pita kutub. Diukur tegak-lurus: **8.97·10⁻³ R**
+    /// sebelum, **1.17·10⁻³ R** sesudah sampel diubah ke seragam-sudut.
+    ///
+    /// **Kenapa tegak-lurus, bukan jarak horizontal.** Jarak horizontal pada
+    /// ketinggian tetap **tidak pernah** mengecil mendekati kutub: `dx/dy → ∞`
+    /// di `|y| → 1`, jadi bahkan dengan 128 ruas ia masih 1.7·10⁻² R. Itu
+    /// bukan ukuran seberapa jauh tepinya dari busur, melainkan seberapa
+    /// curam busurnya di sana — memakainya sebagai ambang akan menghukum
+    /// geometri yang benar. Yang menentukan tepinya terlihat bertangga adalah
+    /// jarak **tegak-lurus** ruas garis ke lingkaran, dan itulah yang diukur.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini memeriksa model, bukan piksel, dan
+    /// ambang 2·10⁻³ R bukan penilaian keindahan: ia menahan panahnya tetap
+    /// di orde 10⁻³ R sehingga angka di docstring tidak bisa berbohong lagi.
+    /// Ia tidak menggantikan `check_jupiter_bands_reach_the_limb` maupun
+    /// `check_bands_follow_the_limb_arc`, yang mengukur gambar sungguhan.
+    func testJupiterBandEdgeSegmentsDoNotSagPastTheThreshold() {
+        let geometry = CelestialVisual.jupiterBands()
+        var worst = 0.0
+        var worstWhere = ""
+        for (index, band) in geometry.enumerated() {
+            let edges = CelestialVisual.jupiterBandEdges(
+                centerY: band.centerY, halfHeight: band.halfHeight)
+            for pair in zip(edges, edges.dropFirst()) {
+                let (a, b) = pair
+                // 120 titik per ruas: puncak panah di ruas kutub duduk sangat
+                // dekat ujungnya, jadi sampel jarang akan melewatkannya.
+                for step in 1..<120 {
+                    let t = Double(step) / 120.0
+                    let height = a.height + (b.height - a.height) * t
+                    let straight = a.halfWidth + (b.halfWidth - a.halfWidth) * t
+                    // Jarak tegak-lurus dari titik ruas ke lingkaran satuan.
+                    let sag = 1 - (height * height + straight * straight).squareRoot()
+                    if sag > worst {
+                        worst = sag
+                        worstWhere = "pita \(index) tinggi \(height)"
+                    }
+                }
+            }
+        }
+        XCTAssertGreaterThan(worst, 0,
+                             "sapuan kosong: ruas tepi tidak pernah diukur — "
+                             + "kalau ini nol, uji tidak membuktikan apa pun")
+        XCTAssertLessThan(
+            worst, 0.002,
+            "ruas tepi pita menyimpang \(worst) R dari busur di \(worstWhere); "
+            + "ambangnya 2·10⁻³ R (terukur 1.17·10⁻³ R dengan 8 ruas)")
+    }
+
     /// Pita harus **simetris** terhadap ekuator.
     ///
     /// Bukan kerapian: Jupiter yang pitanya lebih banyak di satu belahan

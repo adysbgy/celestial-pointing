@@ -514,9 +514,14 @@ struct CelestialVisualView: View {
             // atasnya bahkan jatuh tepat di kutub, jadi gerbang busur limb
             // tidak menemukan pita sama sekali ("tepi pita tidak ditemukan").
             //
-            // Jumlah ruasnya dari model (`CelestialVisual.bandEdgeSteps`),
-            // dan panah taksirannya `≈1.6·10⁻⁴ R` — jauh di bawah satu piksel
-            // di kartu jam.
+            // Jumlah ruasnya dari model (`CelestialVisual.bandEdgeSteps`), dan
+            // simpulnya terbagi seragam **di sepanjang busur** (sampel dalam
+            // sudut), bukan seragam dalam `y`. Itu bukan kerapian: dengan
+            // sampel seragam-y, galatnya menumpuk di ruas terakhir pita kutub
+            // dan tepinya terlihat bertangga di sana. Diukur tegak-lurus ke
+            // busur, 8 ruas: 8.97·10⁻³ R (seragam-y) → 1.17·10⁻³ R
+            // (seragam-sudut). Angka `1.6·10⁻⁴ R` yang dulu tertulis di sini
+            // salah 56×; lihat catatan di `bandEdgeSteps`.
             let edges = CelestialVisual.jupiterBandEdges(
                 centerY: band.centerY, halfHeight: band.halfHeight)
             var ribbon = Path()

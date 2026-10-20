@@ -2922,7 +2922,7 @@ public extension CelestialVisual {
     ///
     /// Dalam satuan radius bola, relatif terhadap pusatnya. `centerY` negatif
     /// = belahan utara (ingat: di `Canvas` y bertambah ke bawah).
-    struct Band: Equatable, Sendable {
+    public struct Band: Equatable, Sendable {
         /// Ketinggian pusat pita, −1…+1 (satuan radius bola).
         public var centerY: Double
         /// Separuh lebar pita di ketinggian itu (satuan radius bola).
@@ -2993,7 +2993,7 @@ public extension CelestialVisual {
     /// meminta pita bergaris (mis. untuk eksperimen), tetapi bawaan produk
     /// adalah pita bersambung — itulah yang membuat piringan terbaca sebagai
     /// gas giant.
-    static func jupiterBands(count: Int = 7,
+    public static func jupiterBands(count: Int = 7,
                              heightFraction: Double? = nil) -> [Band] {
         guard count > 0 else { return [] }
         // Jarak antar pusat pita. Pita bersambung = tingginya persis jarak
@@ -3037,17 +3037,22 @@ public extension CelestialVisual {
     /// seharusnya, dan piringannya terlihat miring. Tanda itu memang ada di
     /// model: `Band.centerY` **adalah** ketinggian bola yang bertanda, jadi
     /// pemanggil cukup meneruskannya.
-    static func bandHalfWidthAt(height: Double) -> Double {
+    public static func bandHalfWidthAt(height: Double) -> Double {
         min(1, max(0, 1 - height * height)).squareRoot()
     }
 
     /// Satu titik tepi pita: ketinggiannya di bola dan separuh lebarnya.
-    struct BandEdge: Equatable, Sendable {
+    public struct BandEdge: Equatable, Sendable {
         /// Ketinggian di bola, −1…+1 (satuan radius). Bertanda, seperti
         /// `Band.centerY`: negatif = belahan utara layar.
-        var height: Double
+        public var height: Double
         /// Setengah-lebar pita pada ketinggian itu.
-        var halfWidth: Double
+        public var halfWidth: Double
+
+        public init(height: Double, halfWidth: Double) {
+            self.height = height
+            self.halfWidth = halfWidth
+        }
     }
 
     /// Berapa ruas yang dipakai menaksir busur tepi satu pita.
@@ -3057,14 +3062,25 @@ public extension CelestialVisual {
     /// berupa **poligon** yang mengikuti lingkaran, dan jumlah ruasnya
     /// menentukan seberapa dekat ia ke busur.
     ///
-    /// **Kenapa 8, dihitung bukan dirasakan.** Panah maksimum sebuah tali
-    /// busur yang membentang `Δy` pada lingkaran berjari-jari 1 adalah
-    /// kira-kira `Δy²/8`. Pita tertinggi membentang 2/7 = 0.2857 R, jadi
-    /// dengan 8 ruas `Δy = 0.0357` dan panahnya `≈ 1.6·10⁻⁴ R` — 60× lebih
-    /// kecil dari ambang 1% R yang dipakai uji dan gerbangnya. Di kartu jam
-    /// (radius 19 pt) itu 0.003 pt: jauh di bawah satu piksel, jadi tidak ada
-    /// tangga yang terlihat di tepinya.
-    static let bandEdgeSteps = 8
+    /// **Kenapa 8, dan angka yang salah di sini sebelumnya.** Versi pertama
+    /// docstring ini menulis "panahnya ≈ 1.6·10⁻⁴ R", dihitung dari `Δy²/8`
+    /// dengan `Δy = 0.0357`. Angka itu **salah 56×**, dan salahnya berarah
+    /// menjemukan: `Δy²/8` adalah panah tali busur terhadap **busur
+    /// parameternya sendiri**, sedangkan tepi pita dibaca sebagai
+    /// **separuh-lebar di ketinggian tetap** — jarak horizontal dari pusat,
+    /// bukan jarak tegak-lurus ke busur. Di dekat kutub kedua ukuran itu
+    /// berbeda jauh: `x(y) = √(1−y²)` punya turunan tak hingga di `y → 1`.
+    ///
+    /// **Dan angka `Δy²/8` itu sendiri hanya benar bila sampelnya seragam
+    /// dalam busur.** Dengan sampel seragam dalam `y` — cara fungsi ini dulu
+    /// bekerja — galat menumpuk justru di ruas terakhir pita kutub: diukur
+    /// tegak-lurus, **8.97·10⁻³ R**, bukan 1.6·10⁻⁴ R. Menyampel seragam
+    /// dalam **sudut** (`asin(y)`, lihat `jupiterBandEdges`) membuat tiap ruas
+    /// membentang busur sama panjang dan panahnya jatuh ke **1.17·10⁻³ R**
+    /// dengan jumlah ruas yang sama. Di kartu jam (radius 19 pt) itu 0.022 pt
+    /// — jauh di bawah satu piksel, dan kali ini karena panahnya memang kecil,
+    /// bukan karena radiusnya kecil.
+    public static let bandEdgeSteps = 8
 
     /// Tepi satu pita sebagai **poligon yang mengikuti busur limb**.
     ///
@@ -3087,17 +3103,32 @@ public extension CelestialVisual {
     /// menahan keduanya agar sama.
     ///
     /// **Batas yang dinyatakan.** Ini taksiran busur dengan 8 ruas, bukan
-    /// busur eksak — panahnya `≈1.6·10⁻⁴ R` (lihat `bandEdgeSteps`). Fungsi
-    /// ini tidak mengembalikan titik di luar bola: `halfWidth` dihitung dari
-    /// `bandHalfWidthAt`, jadi tepi pita selalu **di dalam atau tepat di**
+    /// busur eksak. Diukur **tegak-lurus ke busur** (jarak sesungguhnya dari
+    /// ruas garis ke lingkaran), panahnya **1.17·10⁻³ R** dengan 8 ruas —
+    /// 0.022 pt di kartu jam radius 19 pt, 0.12 px di render gerbang 100 px.
+    /// Angka `1.6·10⁻⁴ R` yang dulu tertulis di sini salah 56×; ia dihitung
+    /// dari `Δy²/8` dengan sampel seragam dalam `y`, padahal justru
+    /// pensampelan itulah yang membuat galat menumpuk di kutub (lihat
+    /// `bandEdgeSteps`).
+    ///
+    /// Fungsi ini tidak mengembalikan titik di luar bola: `halfWidth` dihitung
+    /// dari `bandHalfWidthAt`, jadi tepi pita selalu **di dalam atau tepat di**
     /// busur, tidak pernah menggantung di luarnya.
-    static func jupiterBandEdges(centerY: Double, halfHeight: Double,
+    public static func jupiterBandEdges(centerY: Double, halfHeight: Double,
                                  steps: Int = bandEdgeSteps) -> [BandEdge] {
         let count = max(1, steps)
-        let top = centerY - halfHeight
-        let span = 2 * halfHeight
+        // Sampel seragam dalam SUDUT (`asin(y)`), bukan dalam `y`: dengan `y`
+        // seragam, tiap ruas membentang busur yang panjangnya berbeda-beda dan
+        // galat menumpuk di ruas terakhir pita kutub. Seragam dalam sudut
+        // membuat tiap ruas membentang busur sama panjang, sehingga panahnya
+        // terbagi rata — 7.6× lebih kecil tanpa menambah satu simpul pun.
+        // `asin` butuh |y| ≤ 1, dan pita kutub menyentuh tepat 1.0, jadi
+        // pembulatan floating point bisa melewatinya sedikit.
+        let start = asin(max(-1.0, min(1.0, centerY - halfHeight)))
+        let end = asin(max(-1.0, min(1.0, centerY + halfHeight)))
         return (0...count).map { index in
-            let height = top + span * Double(index) / Double(count)
+            let theta = start + (end - start) * Double(index) / Double(count)
+            let height = sin(theta)
             return BandEdge(height: height, halfWidth: bandHalfWidthAt(height: height))
         }
     }
