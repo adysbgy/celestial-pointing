@@ -75,8 +75,14 @@ for r in results:
 """
 
 # ── Jangkar di dalam port ────────────────────────────────────────────────
-# Panggilan gambar pita, di dalam `_draw_rings`.
-BANDS_CALL = "    _draw_saturn_bands(canvas, cx, cy, radius, palette, night_mode)"
+# Panggilan gambar pita, di dalam `_draw_rings`. Anjarnya harus **persis**
+# seperti di sumber, termasuk `body_radius * radius`: versi pertama harness ini
+# menulis `radius` saja, jangkar tidak pernah cocok, dan keadaan 1 diam-diam
+# **tidak memutasi apa pun** — probe lalu mengukur pohon utuh dan melaporkan
+# keempat gerbang hijau. Kegagalannya terbaca sebagai "gerbang tidak berbunyi",
+# padahal yang gagal adalah jangkarnya. Karena itu jangkar yang hilang sekarang
+# menghentikan keadaan itu, bukan diteruskan.
+BANDS_CALL = "    _draw_saturn_bands(canvas, cx, cy, body_radius * radius, palette, night_mode)"
 BANDS_CALL_OFF = ("    # MUTASI UJI: pita tidak digambar.\n"
                   "    pass")
 
@@ -172,12 +178,21 @@ def main():
         for name, edits, expected in STATES:
             if edits:
                 text = original.decode()
+                missing = False
                 for old, new in edits:
                     if old not in text:
                         print(f"GAGAL {name}: jangkar tidak ditemukan: {old[:60]!r}")
                         failures.append(name)
-                        continue
+                        missing = True
+                        break
                     text = text.replace(old, new, 1)
+                # Jangkar yang hilang berarti keadaan itu **tidak menguji apa
+                # pun**: tanpa `continue` di sini, probe mengukur pohon utuh,
+                # seluruh gerbang hijau, dan baris "OK" di bawah tetap tercetak
+                # — persis kegagalan yang membuat keadaan 1 hijau palsu.
+                if missing:
+                    restore()
+                    continue
                 mutasi_sumber.write_source(RENDER, text.encode())
             verdicts, err = run_probe()
             if verdicts is None:
