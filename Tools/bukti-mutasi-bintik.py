@@ -103,6 +103,15 @@ WANTED = {
     "Bintik Merah Besar lebih gelap dari pitanya (siang, 76 px)",
     "Bintik Merah Besar lebih gelap dari pitanya (malam, 76 px)",
     "Bintik Merah Besar terbaca pada 76 px (ukuran jam)",
+    # Gerbang **rona**: satu-satunya yang berbunyi pada keadaan "bintiknya
+    # tidak digambar" (A3). Tiga gerbang terang di atas semuanya lulus di sana,
+    # karena naungan limb menggelapkan daerah bintik tanpa mengubah ronanya.
+    "Bintik Merah Besar membawa warnanya sendiri (76 px)",
+    # Gerbang **terang** bintik (`check_jupiter_spot_is_not_a_hole`). Ia sudah
+    # ada dan sudah dipanggil `check-visuals.py`, tetapi PROBE di bawah tidak
+    # pernah memanggilnya — jadi C1/C2 mengklaim dijaga pemeriksaan yang tidak
+    # ikut dijalankan, dan kedua keadaan itu melaporkan "0 merah".
+    "Bintik Merah Besar bukan lubang (76 px)",
     # Tabel `check_port_matches_swift_constants` memancarkan **dua** hasil per
     # entri, dengan awalan yang berbeda; keduanya diperiksa supaya arah drift
     # (port vs model) dan arah "sumber memuat" tidak bisa lolos bersama-sama.
@@ -117,6 +126,8 @@ WANTED = {
 results = []
 C.check_jupiter_spot_keeps_its_curvature(results)
 C.check_jupiter_spot_reads_on_the_watch(results)
+C.check_jupiter_spot_is_not_a_hole(results)
+C.check_jupiter_spot_has_its_own_colour(results)
 C.check_port_matches_swift_constants(results)
 found = 0
 for r in results:

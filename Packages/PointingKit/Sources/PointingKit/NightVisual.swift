@@ -181,6 +181,30 @@ public extension CelestialVisual {
         // MARK: Ciri planet lain
         /// Cincin Saturnus.
         public var saturnRing: RGBComponents
+        /// Pita samar bola Saturnus — **bukan** warna cincinnya.
+        ///
+        /// **Kenapa token baru, bukan `saturnRing`.** Bola Saturnus digambar di
+        /// dalam `drawRings`/`_draw_rings`, dan sampai siklus ini ia digambar
+        /// sebagai **bola polos tanpa pita sama sekali** — `STATUS.md`
+        /// mencatatnya sebagai "Saturnus masih bola polos tanpa pita". Pita
+        /// yang memakai warna cincin akan lenyap di depan cincinnya sendiri
+        /// (cincin melintas tepat di ekuator bola), dan yang tersisa hanya
+        /// garis yang menyatu dengan cincin. Karena itu pita punya warnanya
+        /// sendiri: lebih **gelap dan lebih kebiruan** dari cincin, sehingga
+        /// pitanya terbaca sebagai pita di belakang cincin.
+        ///
+        /// Nisbahnya sengaja dijaga tetap: pita Saturnus di alam nyata jauh
+        /// lebih samar dari Jupiter (kontras ~1:1.1 lawan ~1:1.6). Nilai ini
+        /// 0.72/0.63/0.48 lawan bola 0.93/0.84/0.62 — cukup terukur berbeda
+        /// tanpa berpura-pura Saturnus seberpita Jupiter.
+        public var saturnBand: RGBComponents
+        /// Nada **gelap** pita Saturnus — pasangan `saturnBand` di atas.
+        ///
+        /// Dua nada berganti (lihat `CelestialVisual.saturnBandColour(for:)`).
+        /// Nilainya tetap **di bawah** terang bola Saturnus (0.93/0.84/0.62):
+        /// pita tidak boleh lebih terang dari permukaan yang diaturnya, kalau
+        /// tidak yang tergambar adalah garis menyala, bukan pita.
+        public var saturnBandDeep: RGBComponents
         /// Kutub es Mars.
         public var marsPolarCap: RGBComponents
         /// Kabut Venus.
@@ -395,6 +419,8 @@ public extension CelestialVisual {
                     jupiterBandTan: RGBComponents,
                     jupiterSpot: RGBComponents,
                     saturnRing: RGBComponents,
+                    saturnBand: RGBComponents = .init(red: 0.72, green: 0.63, blue: 0.48),
+                    saturnBandDeep: RGBComponents = .init(red: 0.58, green: 0.50, blue: 0.38),
                     marsPolarCap: RGBComponents,
                     venusHaze: RGBComponents,
                     uranusBand: RGBComponents = .init(red: 0.74, green: 0.90, blue: 0.92),
@@ -430,6 +456,8 @@ public extension CelestialVisual {
             self.jupiterBandTan = jupiterBandTan
             self.jupiterSpot = jupiterSpot
             self.saturnRing = saturnRing
+            self.saturnBand = saturnBand
+            self.saturnBandDeep = saturnBandDeep
             self.marsPolarCap = marsPolarCap
             self.venusHaze = venusHaze
             self.uranusBand = uranusBand
@@ -466,6 +494,12 @@ public extension CelestialVisual {
         jupiterBandTan: .init(red: 0.86, green: 0.64, blue: 0.40),
         jupiterSpot: .init(red: 0.39, green: 0.115, blue: 0.08),
         saturnRing: .init(red: 0.86, green: 0.78, blue: 0.60),
+        // Pita samar bola Saturnus. Lebih gelap dan lebih kebiruan dari
+        // cincinnya (0.86/0.78/0.60), supaya pitanya tidak menyatu dengan
+        // cincin yang melintas tepat di ekuator bola. Lihat doc
+        // `Accents.saturnBand` untuk kenapa ia token tersendiri.
+        saturnBand: .init(red: 0.72, green: 0.63, blue: 0.48),
+        saturnBandDeep: .init(red: 0.58, green: 0.50, blue: 0.38),
         marsPolarCap: .init(red: 0.97, green: 0.95, blue: 0.93),
         venusHaze: .init(red: 0.99, green: 0.96, blue: 0.82),
         // Sabuk samar Uranus. Sedikit lebih terang dari permukaan Uranus

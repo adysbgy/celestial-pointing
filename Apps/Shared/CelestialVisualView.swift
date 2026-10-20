@@ -728,6 +728,13 @@ struct CelestialVisualView: View {
         // Bola Saturnus, di antara paruh belakang dan paruh depan.
         drawSphere(context: context, center: center, radius: CGFloat(bodyRadius) * radius,
                    from: palette.light, to: palette.dark)
+        // Pitanya **di atas bola, di bawah cincin depan**. Urutan itu bukan
+        // pilihan: cincin depan melintas tepat di ekuator, jadi pita yang
+        // digambar sesudahnya akan menutupi cincin — dan pita yang memakai
+        // warna cincin akan lenyap di depan cincinnya sendiri.
+        drawSaturnBands(context: context, center: center,
+                        radius: CGFloat(bodyRadius) * radius,
+                        palette: palette)
 
         // Paruh DEPAN: paruh bawah elips, di atas bola. Karena pita digambar
         // sebagai path cincin, ia benar-benar melintas di muka bola pada
@@ -740,6 +747,71 @@ struct CelestialVisualView: View {
                                 CGFloat(band.innerRadius) * fullWidth),
                        with: .color(ringColor.opacity(band.opacity)),
                        style: FillStyle(eoFill: true))
+        }
+    }
+
+    /// Pita bola Saturnus: pita horizontal samar, **bukan** pita Jupiter.
+    ///
+    /// **Cacat yang ditutup metode ini — diukur, bukan dinilai dengan mata.**
+    /// Sampai siklus ini bola Saturnus digambar sebagai `drawSphere` polos di
+    /// dalam `drawRings`, sementara Jupiter mendapat `drawBands`. `STATUS.md`
+    /// mencatatnya sebagai "Saturnus masih bola polos tanpa pita". Terukur
+    /// pada port Python, render 200 px, ss=2, kolom x = +0.20 R pada paruh
+    /// atas bola: **0 titik balik** (terang 141.3 → 159.4, monoton) — hanya
+    /// gradien bola. Jupiter pada kolom yang sama memberi titik balik.
+    ///
+    /// **Kenapa geometrinya dari model, bukan dihitung di sini.** Bentuk tepi
+    /// pita adalah kelas cacat yang sudah dibayar repo ini dua kali (elips
+    /// datar → trapesium → busur limb). Yang dipakai karena itu
+    /// `CelestialVisual.saturnBands()` untuk tinggi dan lebar, dan
+    /// `CelestialVisual.jupiterBandEdges` untuk poligon busurnya — rumus yang
+    /// sama dengan Jupiter, jadi pitanya tidak bisa berbeda bentuk dari bola.
+    ///
+    /// **Kenapa naungannya digambar ke dalam bentuk pita.** Pita warna rata
+    /// menghapus lengkung bola di bawahnya dan piringan terbaca sebagai stiker
+    /// — cacat yang ditutup `bandLimbShadingStrength` untuk Jupiter. Di sini
+    /// gradien bola yang sama dipotong ke bentuk tiap pita, jadi lengkungnya
+    /// intrinsik dan tidak perlu dipulihkan.
+    ///
+    /// **Yang TIDAK diklaim.** Jumlah dan posisi pita adalah pilihan gambar,
+    /// bukan peta atmosfer Saturnus. Yang dijamin adalah pitanya tergambar,
+    /// mengikuti busur bola, dan memakai nada di bawah terang bola.
+    private func drawSaturnBands(context: GraphicsContext, center: CGPoint,
+                                 radius: CGFloat, palette: CelestialVisual.Palette) {
+        for band in CelestialVisual.saturnBands() {
+            let halfWidth = radius * CGFloat(band.halfWidth)
+            guard halfWidth > 1 else { continue }
+            // Tepi pita sebagai poligon busur — rumus yang sama dengan Jupiter
+            // (`jupiterBandEdges`), jadi bentuknya tidak bisa menyimpang.
+            let edges = CelestialVisual.jupiterBandEdges(
+                centerY: band.centerY, halfHeight: band.halfHeight)
+            var ribbon = Path()
+            for (index, edge) in edges.enumerated() {
+                let point = CGPoint(x: center.x - radius * CGFloat(edge.halfWidth),
+                                    y: center.y + CGFloat(edge.height) * radius)
+                if index == 0 {
+                    ribbon.move(to: point)
+                } else {
+                    ribbon.addLine(to: point)
+                }
+            }
+            for edge in edges.reversed() {
+                ribbon.addLine(to: CGPoint(x: center.x + radius * CGFloat(edge.halfWidth),
+                                           y: center.y + CGFloat(edge.height) * radius))
+            }
+            ribbon.closeSubpath()
+            // Warna dari model; mode malam dihitung dari kanal merahnya, jadi
+            // pitanya ikut meredup tanpa angka malam yang ditulis ulang di sini.
+            let bandColor = CelestialVisual.saturnBandColour(for: band.centerY)
+            context.fill(ribbon,
+                         with: .color(Self.accent(bandColor)
+                             .opacity(CelestialVisual.saturnBandOpacity)))
+            context.drawLayer { bandContext in
+                bandContext.clip(to: ribbon)
+                drawSphere(context: bandContext, center: center, radius: radius,
+                           from: palette.light, to: palette.dark,
+                           opacity: CelestialVisual.bandLimbShadingStrength)
+            }
         }
     }
 

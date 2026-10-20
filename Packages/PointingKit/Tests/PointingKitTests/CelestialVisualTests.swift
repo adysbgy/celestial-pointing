@@ -4731,5 +4731,117 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// Bola Saturnus harus **berpita**, bukan bola polos.
+    ///
+    /// **Cacat yang dijaga uji ini — diukur, bukan dinilai dengan mata.**
+    /// `STATUS.md` mencatatnya sebagai satu baris: "Saturnus masih bola polos
+    /// tanpa pita". Sampai siklus ini baris itu benar dan **tidak ada satu pun
+    /// uji atau gerbang yang menangkapnya**. Alasannya struktural: bola
+    /// Saturnus digambar di dalam `drawRings` (`Apps/Shared/CelestialVisualView.swift`)
+    /// dan `_draw_rings` (`Tools/render-visuals.py`), bukan lewat jalur
+    /// `drawBands`/`_draw_bands` milik Jupiter. Seluruh gerbang pita yang ada
+    /// (`check_jupiter_bands_read_as_separate_stripes`,
+    /// `check_banded_disc_keeps_its_curvature`, `check_jupiter_bands_reach_the_limb`)
+    /// mengukur `planet-jupiter-confirmed`; Saturnus tidak pernah masuk
+    /// jangkauannya, jadi bola polos lolos semuanya.
+    ///
+    /// Terukur pada port Python, render 200 px, ss=2, kolom di x = +0.20 R
+    /// pada paruh **atas** (tempat cincin belakang saja, jadi cincin tidak ikut
+    /// terukur), dari tepi atas bola 0.53 R ke ekuator:
+    ///
+    ///     planet-saturn-bare        0 titik balik   terang 168.2 … 176.1
+    ///     planet-saturn-confirmed   0 titik balik   terang 141.3 … 159.4
+    ///     planet-jupiter-confirmed  1 titik balik   terang  80.1 … 187.3
+    ///
+    /// Nol titik balik berarti kolom itu **monoton**: yang tergambar hanya
+    /// gradien bola, tidak ada pita yang menaikkan lalu menurunkan terang.
+    /// Angka terang Saturnus yang lebih rendah dari `-bare` datang dari cincin
+    /// belakang yang menutupi sebagian paruh atas, bukan dari pita.
+    ///
+    /// Uji ini mengunci **model**, bukan piksel: ia menuntut pita Saturnus ada
+    /// sebagai geometri di `CelestialVisual`, memakai busur limb yang sama
+    /// dengan Jupiter, dan memakai aksen yang terpisah dari aksen bola —
+    /// sehingga view dan port tidak bisa menyimpang diam-diam. Gambar yang
+    /// benar-benar sampai ke layar dijaga gerbang piksel
+    /// `check_saturn_globe_is_banded` di `Tools/check-visuals.py`.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan peta atmosfer Saturnus: pita Saturnus
+    /// jauh lebih samar dan lebih lebar dari Jupiter, dan jumlah pita di sini
+    /// adalah pilihan gambar, bukan pengukuran. Yang dijaga adalah bahwa
+    /// bolanya **berpita** dan pitanya mengikuti bola.
+    func testSaturnGlobeIsBanded() {
+        let bands = CelestialVisual.saturnBands()
+        XCTAssertGreaterThanOrEqual(bands.count, 3,
+                                    "bola Saturnus harus punya beberapa pita, bukan satu sabuk")
+        XCTAssertLessThanOrEqual(bands.count, 9,
+                                 "pita Saturnus lebih sedikit dari Jupiter; sembilan sudah terlalu ramai")
+
+        // Pita harus menutupi **luas piringan**, ditimbang lebar tali busur —
+        // bukan jumlah tinggi pita.
+        //
+        // **Kenapa bukan `sum(halfHeight * 2)`.** Versi pertama uji ini
+        // menjumlahkan tinggi tiap pita dan menuntut `>= 0.9`. Untuk pita
+        // bersambung (`2/count`) jumlahnya selalu **2.0 = 200%**, jadi
+        // ambangnya tidak pernah bisa gagal — angka di atas 100% itu sendiri
+        // tanda bahwa satuannya bukan "bagian dari piringan". Versi yang sama
+        // sempat masuk ke `check-visuals.py` dan memberi "cakupan 100.0%",
+        // yang juga vakum untuk pita bersambung.
+        //
+        // Ditimbang tali busur, angkanya bermakna: pita ekuator (lebar)
+        // menyumbang lebih banyak daripada pita kutub (sempit), dan bola
+        // polos yang bocor di antara pita benar-benar menurunkan angka ini.
+        var covered = 0.0
+        var total = 0.0
+        let samples = 4000
+        for step in 0..<samples {
+            let y = -1 + 2 * Double(step) / Double(samples - 1)
+            let chord = max(0, 1 - y * y).squareRoot()
+            total += chord
+            if bands.contains(where: { abs(y - $0.centerY) <= $0.halfHeight }) {
+                covered += chord
+            }
+        }
+        let fraction = covered / total
+        XCTAssertGreaterThanOrEqual(
+            fraction, 0.95,
+            "pita hanya menutupi \(String(format: "%.1f", fraction * 100))% piringan; "
+            + "sisanya bola polos yang terbaca sebagai celah beige di antara garis")
+
+        // Tepi pita mengikuti busur limb, bukan elips. Elips memberi lebar yang
+        // sama di pusat dan kedua tepinya; bola memberi lebar yang **berbeda**.
+        // Invarian yang benar karena itu "tepi dalam lebih lebar dari pusat,
+        // tepi luar lebih sempit" — bukan "keduanya lebih sempit", yang hanya
+        // berlaku untuk tepi luar.
+        for band in bands where abs(band.centerY) > band.halfHeight + 1e-12 {
+            let inner = band.centerY < 0
+                ? CelestialVisual.bandHalfWidthAt(height: band.centerY + band.halfHeight)
+                : CelestialVisual.bandHalfWidthAt(height: band.centerY - band.halfHeight)
+            let outer = band.centerY < 0
+                ? CelestialVisual.bandHalfWidthAt(height: band.centerY - band.halfHeight)
+                : CelestialVisual.bandHalfWidthAt(height: band.centerY + band.halfHeight)
+            XCTAssertGreaterThan(inner, band.halfWidth,
+                                 "tepi dalam pita di y=\(band.centerY) harus lebih lebar dari pusatnya")
+            XCTAssertLessThan(outer, band.halfWidth,
+                              "tepi luar pita di y=\(band.centerY) harus lebih sempit dari pusatnya")
+        }
+
+        // Aksen pita Saturnus harus **berbeda** dari bola dan dari cincin.
+        // Kalau pitanya memakai warna bola, ia menggambar nol piksel yang
+        // berbeda dan seluruh uji di atas tetap hijau.
+        let accents = CelestialVisual.accents
+        XCTAssertNotEqual(accents.saturnBand, accents.saturnRing,
+                          "pita Saturnus tidak boleh sama dengan cincinnya")
+        let colours = bands.reduce(into: [CelestialVisual.RGBComponents]()) { found, band in
+            let colour = CelestialVisual.saturnBandColour(for: band.centerY)
+            if !found.contains(where: { $0 == colour }) { found.append(colour) }
+        }
+        XCTAssertGreaterThanOrEqual(colours.count, 2,
+                                    "pita Saturnus harus punya lebih dari satu nada")
+        for colour in colours {
+            XCTAssertNotEqual(colour, accents.saturnRing,
+                              "warna pita Saturnus tidak boleh warna cincin")
+        }
+    }
+
 }
 

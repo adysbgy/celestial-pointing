@@ -2761,6 +2761,21 @@ jobs:
       - name: Buktikan gerbang ukuran bintang saat ragu berbunyi
         run: python3 Tools/bukti-mutasi-ukuran-bintang.py
 
+      # `check_saturn_globe_is_banded` lahir dari **klaim tanpa gerbang**: uji
+      # Swift menyebut nama itu, tetapi `grep` di `check-visuals.py` menemukan
+      # nol kemunculan, dan tidak ada satu pun pemeriksaan yang bisa memerah
+      # kalau pita Saturnus dihapus. Gerbang yang lahir dari riwayat seperti
+      # itu wajib dibuktikan bisa gagal, karena bentuk kegagalannya paling
+      # mudah: hijau karena tidak ada yang diukur.
+      #
+      # Ketiga keadaan menuntut tiga arah yang berbeda, dan ketiganya bisa
+      # lolos terpisah. Yang paling sunyi adalah keadaan 3 — opasitas
+      # dinaikkan ke 0.85 (nilai Jupiter): pita tetap ada dan tetap
+      # terbedakan, jadi gerbang gambar tetap hijau; yang menangkapnya hanya
+      # gerbang konstanta. Tanpa gerbang itu keadaan ini lulus tanpa merah.
+      - name: Buktikan gerbang pita Saturnus berbunyi
+        run: python3 Tools/bukti-mutasi-pita-saturnus.py
+
       # `main` pernah merah sehari penuh karena kelas cacat ini, dan tidak ada
       # gerbang lokal yang bisa melihatnya. `a951cb9` membuat
       # `jupiterBandEdges` publik tetapi `BandEdge` di dalam `public extension`

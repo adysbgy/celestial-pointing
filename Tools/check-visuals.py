@@ -11133,6 +11133,126 @@ def spot_deviation_from_bare(rows_spot, rows_bare, w, h):
     return 100.0 * (sum(deviations) / len(deviations)) / max(centre, 1e-9)
 
 
+def spot_hue_shift_deg(rows_spot, rows_bare, w, h, inner=0.6):
+    """Selisih **rona** daerah bintik terhadap bola polos, dalam derajat.
+
+    **Kenapa rona, bukan terang — cacat yang lolos tanpanya.** Seluruh gerbang
+    bintik yang ada mengukur terang: lebih gelap dari pita, menyimpang dari
+    bola polos, cukup terang untuk bukan lubang. Ketiganya **lulus** pada
+    keadaan yang menghapus elips warna bintik dan menyisakan naungan limbnya
+    saja — terukur: penyimpangan terang 24.9% (ambang 12%), terang 0.593
+    (ambang 0.55). Naungan limb menggelapkan daerah bintik **tanpa mengubah
+    warnanya**, jadi setiap metrik terang memuaskan syaratnya sementara
+    bintiknya sendiri tidak ada di layar. Yang hilang di sana adalah **warna**,
+    jadi warna yang harus diukur.
+
+    **Kenapa sudut antara vektor kroma.** `(R−rata, B−rata)` adalah bidang
+    kroma yang sama dipakai HSV, tetapi sudutnya diukur sebagai sudut antara
+    dua vektor — bukan `atan2` yang titik nolnya (abu-abu) membuat sudut
+    melompat saat saturasi mendekati nol. Diukur pada 76 px, ss=8, siang:
+
+        keadaan                              dHue
+        bintik digambar (0.39/0.115/0.08)     6.42°
+        hanya naungan (bintik dibuang)        2.12°
+        cacat pucat asli (0.85/0.35/0.25)     7.72°
+
+    **Hanya mode siang.** Di mode malam `NightVisual.surface` memetakan semua
+    warna ke satu rona merah, jadi dHue = 0.00° untuk **ketiga** keadaan di
+    atas — angkanya tidak memisahkan apa pun di sana. Gerbang ini karena itu
+    mengukur mode siang saja; mode malam sudah dijaga gerbang terang, yang
+    bertahan justru karena malam membuang hue.
+
+    **Yang TIDAK diklaim.** Ia tidak mengukur apakah bintiknya tampak seperti
+    badai — hanya bahwa ada **rona bintik** di sana, bukan cuma naungan. Ambang
+    dan angkanya diukur pada port Python (76 px, ss=8), bukan renderer Apple.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    spot_x, spot_y = R.SPOT_CENTER
+    spot_w, spot_h = R.SPOT_SIZE
+    half_w, half_h = spot_w * radius / 2.0, spot_h * radius / 2.0
+
+    acc_spot = [0.0, 0.0, 0.0]
+    acc_bare = [0.0, 0.0, 0.0]
+    count = 0
+    for y in range(h):
+        for x in range(w):
+            px, py = x + 0.5, y + 0.5
+            if (px - cx) ** 2 + (py - cy) ** 2 > radius * radius:
+                continue
+            ex, ey = (px - cx - spot_x * radius) / half_w, \
+                     (py - cy - spot_y * radius) / half_h
+            # Hanya inti elips: tepinya berbaur dengan pita di sekelilingnya,
+            # jadi menyertakannya mencampur dua rona yang berbeda.
+            if ex * ex + ey * ey > inner * inner:
+                continue
+            for i in range(3):
+                acc_spot[i] += rows_spot[y][x * 4 + i]
+                acc_bare[i] += rows_bare[y][x * 4 + i]
+            count += 1
+    if not count:
+        return 0.0
+
+    def chroma(acc):
+        mean = sum(acc) / 3.0
+        return (acc[0] / count - mean / count, acc[2] / count - mean / count)
+
+    xs, ys = chroma(acc_spot)
+    xb, yb = chroma(acc_bare)
+    denom = math.hypot(xs, ys) * math.hypot(xb, yb)
+    if denom < 1e-9:
+        return 0.0
+    cos = max(-1.0, min(1.0, (xs * xb + ys * yb) / denom))
+    return math.degrees(math.acos(cos))
+
+
+def check_jupiter_spot_has_its_own_colour(results, ss=8):
+    """Bintik harus **membawa warnanya sendiri**, bukan cuma naungan di atasnya.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan dinilai dengan mata.**
+    Keadaan "bintiknya tidak digambar" menghapus elips warna bintik dan hanya
+    menyisakan naungan limb berbentuk elips yang sama. Seluruh gerbang bintik
+    yang ada tetap **hijau**: penyimpangan terang 24.9% (ambang 12%), terang
+    0.593 (ambang 0.55), lebih gelap dari pita, dan melengkung. Sebabnya
+    semuanya mengukur terang, dan naungan limb memang menggelapkan daerah itu.
+    Di layar tidak ada bintik — yang ada cekungan yang lebih gelap dari
+    pitanya, yaitu persis "lubang" yang ditolak gerbang sebelumnya, hanya
+    dicapai lewat jalur yang berbeda.
+
+    **Kenapa gerbang terpisah, bukan ambang terang yang dinaikkan.** Menaikkan
+    ambang 0.55 akan menolak bintik yang sah pada palet yang lebih gelap, dan
+    tetap tidak mengukur warna. Gerbang ini mengukur besaran yang **berbeda**:
+    rona. Ketiga gerbang bintik sekarang masing-masing menjaga satu hal —
+    arah (lebih gelap dari pita), besaran terang (bukan lubang), dan warna
+    (ada bintiknya). Tidak ada satu pun yang bisa menggantikan yang lain.
+
+    **Ukurannya dari token, bukan dari sini**, dengan alasan yang sama seperti
+    gerbang bintik lainnya: kalau `WatchMetrics.visualDiameter` hilang,
+    pemeriksaannya **merah**, bukan hijau tanpa mengukur apa pun.
+    """
+    diameter = watch_visual_diameter()
+    if diameter is None:
+        results.append(Result(
+            "ukuran visual jam terbaca dari token (rona bintik)", False,
+            "WatchMetrics.visualDiameter tidak ditemukan di WatchTheme.swift"))
+        return
+    pixels = diameter * 2
+    _, (w, h, rows_c) = render_case("planet-jupiter-confirmed", size=pixels, ss=ss)
+    _, (_, _, rows_b) = render_case("planet-jupiter-bare", size=pixels, ss=ss)
+
+    shift = spot_hue_shift_deg(rows_c, rows_b, w, h)
+    #: 4.0° duduk di antara keadaan BENAR (6.42°) dan keadaan tanpa bintik
+    #: (2.12°) dengan jarak ~2.4° ke keduanya — bukan angka yang dipilih supaya
+    #: satu palet tertentu lulus.
+    results.append(Result(
+        f"Bintik Merah Besar membawa warnanya sendiri ({pixels} px)",
+        shift >= 4.0,
+        f"rona bintik bergeser {shift:.2f}° dari bola polos (ambang 4.0°; "
+        f"tanpa bintik hanya 2.12°, dengan bintik 6.42°) — naungan limb "
+        f"menggelapkan daerah ini tanpa mengubah ronanya, jadi terang saja "
+        f"tidak membuktikan bintiknya digambar"))
+
+
 def check_banded_disc_keeps_its_curvature(results, size=200, ss=2):
     """Piringan ber-pita harus **tetap melengkung**, bukan jadi stiker rata.
 
@@ -15565,6 +15685,293 @@ def check_shipped_has_no_settling_markers(results):
              f"{', '.join(sorted({p[0] for p in pending}))}"))
 
 
+SATURN_TONE_APART_FLOOR = 0.05
+"""Jarak minimum antara **dua nada pita Saturnus**, siang dan malam.
+
+Kalau kedua nada bertabrakan, pitanya lenyap dan bola Saturnus kembali polos.
+Diukur: **0.140** siang, **0.091** malam. 0.05 = 13/255, satu setengah
+langkah di atas derau kuantisasi 8-bit dan di bawah kedua nilai terukur.
+
+Ambang ini **tidak** dipakai untuk memisahkan Saturnus dari Jupiter di mode
+malam: palet malam membuang hijau dan biru, jadi semua warna memampat ke satu
+kanal merah dan `saturnBandDeep` (0.727) memang berimpit dengan
+`jupiterBandRust` (0.714). Di mode malam planet dipisahkan oleh **bentuk**,
+bukan warna.
+"""
+
+
+SATURN_JUPITER_TONE_FLOOR = 0.06
+"""Jarak minimum tiap kanal antara nada pita Saturnus dan nada pita Jupiter,
+**siang saja**.
+
+Saturnus dan Jupiter sama-sama bola berpita; salah identifikasi yang paling
+mungkin adalah Saturnus terbaca sebagai Jupiter pucat. Nada terdekat Saturnus
+`(0.72, 0.63, 0.48)` ke Jupiter tan `(0.86, 0.64, 0.40)` berjarak 0.141 /
+0.01 / 0.08 — kanal hijau hampir sama, kanal merah jelas berbeda.
+
+0.06 = 15/255: satu langkah di atas derau kuantisasi 8-bit, dan cukup untuk
+menolak nada Jupiter yang disalin apa adanya (jarak 0.0).
+"""
+
+
+SATURN_BAND_STEP_FLOOR = 0.02
+"""Residual langkah minimum di batas pita Saturnus, siang **dan** malam.
+
+Diukur di render 200 px, ss=2 (kolom x = +0.20 R): **0.051 / 0.053** siang,
+**0.041 / 0.043** malam pada dua batas yang tidak tertutup cincin depan.
+Derau kuantisasi PNG 8-bit ±0.004. Ambang 0.02 karena itu ~5x di atas derau
+dan ~2x di bawah nilai terendah yang benar: cukup longgar untuk tidak rapuh,
+cukup ketat untuk memerah kalau pitanya dihapus atau dipudarkan.
+
+Satu angka, bukan dua, karena selisih siang–malam di bawah 25% — memisahkan
+keduanya hanya akan membuat dua angka yang harus dijaga selaras tanpa
+menambah daya pisah.
+"""
+
+
+def saturn_band_boundaries():
+    """Batas antar-pita Saturnus, dalam satuan radius **bola**, dari port.
+
+    **Kenapa batas, bukan pusat pita.** `jupiter_band_means` merata-ratakan
+    jendela horizontal di **pusat** tiap pita. Untuk Saturnus cara itu tidak
+    bisa dipakai: bola 0.53 R berarti tiap pita hanya ~8 px di render 200 px,
+    dan paruh **depan** cincin melintas di atas bola tepat di ekuator — jadi
+    rata-rata di pusat pita mencampur cincin dengan pita. Yang diukur di sini
+    adalah **langkah** yang melintasi batas dua pita bertetangga, di jendela
+    yang sempit (2 baris tiap sisi), supaya cincin yang lebar tidak ikut
+    terhitung sebagai pita.
+    """
+    bands = R.saturn_bands()
+    return [(bands[i][0] + bands[i + 1][0]) / 2.0 for i in range(len(bands) - 1)]
+
+
+def saturn_band_boundary_is_covered_by_front_ring(uy, x0=0.20):
+    """Apakah titik `(x0, uy)` (satuan radius frame) tertutup paruh DEPAN cincin.
+
+    Paruh depan adalah `y > 0` di luar lubang dalam elips. Batas pita yang
+    duduk di situ **tidak bisa** dipakai mengukur pita: cincin depan memang
+    digambar di atas bola. Batas seperti itu dibuang dari pengukuran dan
+    **dihitung**, bukan diukur lalu diharapkan kecil.
+    """
+    ring = R.saturn_ring()
+    if uy <= 0:
+        return False
+    inner = R.saturn_body_radius(ring)
+    axial = ring["half_height"] / ring["half_width"]
+    return (x0 / inner) ** 2 + (uy / (inner * axial)) ** 2 > 1.0
+
+
+def saturn_band_steps(rows, w, h, night, x0=0.20):
+    """Langkah sinyal yang melintasi tiap batas pita Saturnus, di satu kolom.
+
+    Mengembalikan `[(uy_batas, langkah, tertutup_cincin)]`. `langkah` adalah
+    rata-rata 2 baris di bawah batas dikurangi rata-rata 2 baris di atasnya,
+    dalam sinyal yang sama dengan `_band_signal` (luma siang, kanal merah
+    malam) — supaya angkanya bisa dibandingkan dengan gerbang Jupiter.
+    """
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    body = R.saturn_body_radius(R.saturn_ring())
+    x = int(round(cx + x0 * radius))
+
+    def signal(py):
+        px = rows[py][x * 4:x * 4 + 3]
+        return _band_signal(px, night)
+
+    out = []
+    for uy in saturn_band_boundaries():
+        py = int(round(cy + uy * body * radius))
+        above = [signal(y) for y in range(py - 3, py - 1)]
+        below = [signal(y) for y in range(py + 1, py + 3)]
+        if len(above) < 2 or len(below) < 2:
+            continue
+        step = sum(below) / len(below) - sum(above) / len(above)
+        out.append((uy, step,
+                    saturn_band_boundary_is_covered_by_front_ring(uy, x0)))
+    return out
+
+
+def check_saturn_globe_is_banded(results, size=200, ss=2):
+    """Bola Saturnus harus **berpita**, dan pitanya harus datang dari nadanya.
+
+    **Cacat yang ditutup pemeriksaan ini — diukur, bukan dinilai dengan mata.**
+    Bola Saturnus digambar di dalam `_draw_rings`, sementara Jupiter mendapat
+    `_draw_bands`. Seluruh gerbang pita yang ada mengukur
+    `planet-jupiter-confirmed`; Saturnus tidak pernah masuk jangkauan satu pun
+    dari mereka. Terukur pada port, render 200 px, ss=2, kolom x = +0.20 R,
+    paruh atas bola: **0 titik balik** (terang 141.3 → 159.4, monoton) — hanya
+    gradien bola. `STATUS.md` mencatatnya sebagai "Saturnus masih bola polos
+    tanpa pita", dan ia benar selama beberapa siklus.
+
+    **Kenapa langkah di batas pita, bukan titik balik di kolom.** Versi
+    pertama probe memakai titik balik sepanjang kolom. Ia **bukan pengukur
+    yang sah** untuk Saturnus: paruh depan cincin melintas di atas bola dan
+    membuat 2 titik balik palsu di kedua mode, sehingga bola polos pun
+    "berpita" begitu cincinnya ada. Diukur: `planet-saturn-bare` (tanpa cincin,
+    tanpa pita) memberi 0, tetapi begitu cincinnya digambar, gerbang yang sama
+    tidak bisa membedakan pita dari cincin. Karena itu yang diukur adalah
+    **langkah sinyal di batas dua pita** — di tempat yang secara geometri
+    **tidak** tertutup cincin depan.
+
+    **Kenapa kontrol satu nada dijalankan di dalam pemeriksaan ini.** Langkah
+    di batas pita tidak nol bahkan tanpa pita: gradien bola dan naungan limb
+    sudah mengubah sinyal sepanjang kolom. Yang membuktikan pitanya ada adalah
+    `langkah(terukur) − langkah(satu nada)`. Kontrolnya dijalankan setiap kali,
+    bukan dikutip dari docstring — dan ia **nol persis** untuk nada seragam,
+    yang memang definisinya.
+
+    **Kenapa dua mode diukur terpisah.** Mode malam membuang hijau dan biru
+    total, jadi sinyal yang tersisa hanya kanal merah. Satu ambang untuk
+    keduanya akan menerima mode malam yang pucat atau menolak siang yang benar.
+
+    **Kenapa satu ambang untuk dua mode, padahal sinyalnya berbeda.** Diukur
+    di kedua mode pada render 200 px, ss=2: residual minimum **0.051 / 0.053**
+    (siang) dan **0.041 / 0.043** (malam). Selisihnya di bawah 25%, dan derau
+    kuantisasi PNG 8-bit pada langkah dua-baris ini ±0.004. Satu ambang 0.02
+    karena itu ~5x di atas derau dan ~2x di bawah nilai terendah yang benar —
+    cukup longgar untuk tidak rapuh, cukup ketat untuk memerah kalau pitanya
+    dihapus atau dipudarkan sampai tak terbaca.
+
+    **Yang TIDAK diklaim.** Ini mengukur **port**, bukan view Apple. Ia tidak
+    mengukur apakah pitanya **indah**, dan tidak mengklaim peta atmosfer
+    Saturnus: jumlah, tinggi, dan posisi pita adalah pilihan gambar. Yang
+    dijamin: pita itu ada, menutupi bola, dan nadanya — bukan lengkung bola —
+    yang membuat batasnya terbaca.
+    """
+    for night in (False, True):
+        _, (w, h, rows) = render_case("planet-saturn-confirmed", night=night,
+                                      size=size, ss=ss)
+        measured = saturn_band_steps(rows, w, h, night)
+
+        saved = R.SATURN_BAND_TONES
+        try:
+            # Kontrol satu nada: pita tetap ada, geometrinya tetap, hanya
+            # nadanya diseragamkan. Yang tersisa di langkahnya hanya lengkung
+            # bola dan naungan limb — yaitu bagian yang bukan milik nada pita.
+            # Bola polos menghasilkan residual **nol** di sini, jadi ambang
+            # apa pun di atas derau kuantisasi sudah memisahkan keduanya.
+            R.SATURN_BAND_TONES = ("saturnBand", "saturnBand")
+            _, (_, _, rows_c) = render_case("planet-saturn-confirmed", night=night,
+                                            size=size, ss=ss)
+            control = saturn_band_steps(rows_c, w, h, night)
+        finally:
+            R.SATURN_BAND_TONES = saved
+
+        clean = [(m[0], abs(m[1] - c[1]))
+                 for m, c in zip(measured, control)
+                 if not m[2]]
+        covered = sum(1 for m in measured if m[2])
+        worst = min((residual for _, residual in clean), default=0.0)
+        mode = "malam" if night else "siang"
+        results.append(Result(
+            f"bola Saturnus berpita ({mode})",
+            bool(clean) and worst >= SATURN_BAND_STEP_FLOOR,
+            f"residual minimum {worst:.4f} (ambang "
+            f"{SATURN_BAND_STEP_FLOOR:.4f}) pada {len(clean)} batas bersih, "
+            f"{covered} batas dibuang karena tertutup cincin depan; per batas "
+            f"{[round(v, 4) for _, v in clean]}"
+            if clean else
+            "tidak ada batas pita yang bisa diukur — geometri pita hilang?"))
+
+
+def check_saturn_band_tones_stay_apart(results):
+    """Dua nada pita Saturnus harus **tetap terbedakan**, di siang dan malam.
+
+    **Kenapa "bukan Jupiter" bukan gerbang yang sah di mode malam.** Versi
+    pertama pemeriksaan ini menuntut jarak nada Saturnus ke nada Jupiter di
+    kedua mode. Siang lolos (0.14), malam **gagal** (0.01) — dan kegagalan itu
+    bukan cacat gambar, melainkan konsekuensi palet: `NightVisual.surface`
+    membuang hijau dan biru total, jadi **setiap** warna menjadi satu angka
+    merah. Diukur: `saturnBandDeep` (0.58, 0.50, 0.38) → 0.727 dan
+    `jupiterBandRust` (0.56, 0.28, 0.12) → 0.714. Dua nada yang jelas berbeda
+    di siang menjadi 0.013 di malam. Menuntut planet terpisah **warna** di
+    mode malam berarti menolak mode malam itu sendiri; yang memisahkan planet
+    di mode malam adalah **bentuk** (cincin, Bintik Merah, kutub), dan itu
+    dijaga gerbang lain.
+
+    **Yang benar-benar bisa gagal, dan penting.** Yang harus bertahan di
+    kedua mode adalah nada pita Saturnus **terhadap satu sama lain** — kalau
+    tidak, pitanya lenyap dan bolanya kembali polos, tepat cacat yang
+    ditutup `check_saturn_globe_is_banded`. Diukur: **0.140** (siang),
+    **0.091** (malam). Ambang 0.05 = 13/255, satu setengah langkah di atas
+    derau 8-bit, dan di bawah kedua nilai terukur supaya tidak rapuh.
+
+    **Kenapa jarak Jupiter tetap diukur, tapi hanya siang.** Di siang ia
+    bermakna dan bisa gagal: menyalin nada Jupiter apa adanya memberi 0.0.
+    Ia dicatat di detail sebagai angka, dan gerbangnya hanya menuntut siang.
+    """
+    tones = list(R.SATURN_BAND_TONES)
+    for night in (False, True):
+        mapped = [R.night_mapped(R.ACCENTS[k], False) if night else R.ACCENTS[k]
+                  for k in tones]
+        apart = max(abs(a - b) for a, b in zip(mapped[0], mapped[1]))
+        mode = "malam" if night else "siang"
+        results.append(Result(
+            f"dua nada pita Saturnus tetap terbedakan ({mode})",
+            apart >= SATURN_TONE_APART_FLOOR,
+            f"jarak {apart:.4f} (ambang {SATURN_TONE_APART_FLOOR:.4f}) antara "
+            f"{tuple(round(v, 3) for v in mapped[0])} dan "
+            f"{tuple(round(v, 3) for v in mapped[1])}"))
+
+    # Siang saja: di malam semua warna memampat ke satu kanal, jadi
+    # perbandingan ini tidak mengukur apa pun di sana (lihat docstring).
+    jupiter = [R.ACCENTS[k] for k in
+               ("jupiterBandCream", "jupiterBandRust", "jupiterBandTan")]
+    saturn = [R.ACCENTS[k] for k in tones]
+    closest = min(max(abs(a - b) for a, b in zip(s, j)) for s in saturn for j in jupiter)
+    results.append(Result(
+        "nada pita Saturnus bukan Jupiter (siang)",
+        closest >= SATURN_JUPITER_TONE_FLOOR,
+        f"jarak kanal terbesar terdekat {closest:.4f} "
+        f"(ambang {SATURN_JUPITER_TONE_FLOOR:.4f}); mode malam tidak diukur "
+        f"karena paletnya memampatkan semua warna ke satu kanal"))
+
+
+
+
+def check_saturn_band_constants_match_the_model(results):
+    """Konstanta pita Saturnus di port harus sama dengan yang di model Swift.
+
+    **Kenapa pemeriksaan terpisah.** `check_port_matches_swift_constants`
+    membandingkan angka yang **dipakai gambar**. Pita Saturnus punya dua
+    angka yang menentukan identitasnya — jumlah pita dan opasitasnya — dan
+    keduanya hidup di dua bahasa. Opasitas yang dinaikkan ke 0.85 (nilai
+    Jupiter) membuat Saturnus terbaca sebagai Jupiter pucat: salah
+    identifikasi, tepat yang PRD larang. Tanpa pemeriksaan ini, mengubahnya
+    di model meninggalkan port yang mengukur gambar yang sudah tidak ada.
+    """
+    model = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "CelestialVisual.swift")).read()
+    night = open(os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                              "NightVisual.swift")).read()
+    checks = [
+        ("jumlah pita Saturnus", len(R.saturn_bands()), 5,
+         "static func saturnBands(count: Int = 5)", model),
+        ("opasitas pita Saturnus", R.SATURN_BAND_OPACITY, 0.55,
+         "static let saturnBandOpacity: Double = 0.55", model),
+        # Token nada pita: dua warna, dan **bukan** warna cincinnya. Yang
+        # dibaca adalah deklarasinya di model aksen, tempat nilainya tinggal.
+        ("nada terang pita Saturnus", R.ACCENTS["saturnBand"],
+         (0.72, 0.63, 0.48),
+         "saturnBand: .init(red: 0.72, green: 0.63, blue: 0.48)", night),
+        ("nada gelap pita Saturnus", R.ACCENTS["saturnBandDeep"],
+         (0.58, 0.50, 0.38),
+         "saturnBandDeep: .init(red: 0.58, green: 0.50, blue: 0.38)", night),
+    ]
+    for name, port_value, expected, source_text, source in checks:
+        ok = source_text in source
+        if isinstance(expected, tuple):
+            ok = ok and tuple(round(v, 6) for v in port_value) == \
+                tuple(round(v, 6) for v in expected)
+        else:
+            ok = ok and abs(float(port_value) - float(expected)) < 1e-9
+        results.append(Result(
+            f"{name} sama dengan model", ok,
+            f"port {port_value!r}, model {expected!r}, "
+            f"sumber {'memuat' if source_text in source else 'TIDAK memuat'} "
+            f"'{source_text}'"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -15609,6 +16016,9 @@ def main():
     check_moon_feature_still_reaches_the_lit_side(results, args.size, args.ss)
     check_moon_maria_reference_matches_the_model(results)
     check_saturn_ring_bands_render(results, args.size, args.ss)
+    check_saturn_globe_is_banded(results, args.size, args.ss)
+    check_saturn_band_tones_stay_apart(results)
+    check_saturn_band_constants_match_the_model(results)
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)
     check_saturn_ring_passes_behind_the_globe(results, args.size, args.ss)
@@ -15656,6 +16066,7 @@ def main():
     check_moon_new_disc_reads_on_the_watch(results)
     check_jupiter_spot_reads_on_the_watch(results)
     check_jupiter_spot_is_not_a_hole(results)
+    check_jupiter_spot_has_its_own_colour(results)
     check_mars_caps_touch_the_limb(results)
     check_mars_caps_fade_into_the_surface(results)
     check_sun_edge_is_soft(results)

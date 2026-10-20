@@ -125,6 +125,11 @@ ACCENTS = dict(
     jupiterBandTan=(0.86, 0.64, 0.40),
     jupiterSpot=(0.39, 0.115, 0.08),
     saturnRing=(0.86, 0.78, 0.60),
+    # MODEL: `NightVisual.Accents.saturnBand` / `.saturnBandDeep` — pita bola
+    # Saturnus, **bukan** warna cincinnya. Lihat doc di `NightVisual.swift`
+    # untuk kenapa dua nada dan kenapa lebih gelap dari bola.
+    saturnBand=(0.72, 0.63, 0.48),
+    saturnBandDeep=(0.58, 0.50, 0.38),
     marsPolarCap=(0.97, 0.95, 0.93),
     venusHaze=(0.99, 0.96, 0.82),
     # MODEL: `NightVisual.Accents.uranusBand` / `.neptuneSpot`.
@@ -1219,6 +1224,13 @@ MARIA_OPACITY = 0.12                                     # VIEW: `drawMoon`
 VENUS_HAZE_CENTER_Y = 0.0                    # MODEL: `CelestialVisual.venusHaze`
 VENUS_HAZE_HALF_WIDTH = 0.55                 # MODEL: `CelestialVisual.venusHaze`
 VENUS_HAZE_HALF_HEIGHT = 0.72                # MODEL: `CelestialVisual.venusHaze`
+# MODEL: `CelestialVisual.saturnBands()` — pita bola Saturnus, satuan radius.
+# Pita bersambung: tingginya persis jarak antar pusat, `2/count`, sama dengan
+# model Swift. Lihat `CelestialVisual.saturnBandOpacity` untuk kenapa 0.55.
+SATURN_BAND_COUNT = 5                        # MODEL: `CelestialVisual.saturnBands(count:)`
+SATURN_BAND_OPACITY = 0.55                   # MODEL: `CelestialVisual.saturnBandOpacity`
+# MODEL: `CelestialVisual.saturnBandColour(for:)` — dua nada berganti.
+SATURN_BAND_TONES = ("saturnBand", "saturnBandDeep")
 # MODEL: `CelestialVisual.uranusBand` — sabuk samar Uranus, satuan radius.
 URANUS_BAND_CENTER_Y = 0.0                   # MODEL: `CelestialVisual.uranusBand`
 URANUS_BAND_HALF_WIDTH = 0.62                # MODEL: `CelestialVisual.uranusBand`
@@ -1924,10 +1936,91 @@ def _draw_rings(canvas, cx, cy, radius, palette, night_mode):
     _draw_sphere(canvas, cx, cy, body_radius * radius,
                  palette["light"], palette["dark"], night_mode)
 
+    # Pita bola Saturnus, tepat setelah bola dan **sebelum** paruh depan
+    # cincin — jadi cincin depan tetap melintas di muka ekuator, di atas pita.
+    _draw_saturn_bands(canvas, cx, cy, body_radius * radius, palette, night_mode)
+
     # Paruh depan: di atas bola.
     for inner_r, outer_r, opacity in bands:
         annulus(outer_r * full_width, inner_r * full_width,
                 accent_fn(ring_color, night_mode, opacity), "front")
+
+
+def saturn_bands(count=SATURN_BAND_COUNT):
+    """Port `CelestialVisual.saturnBands()` — pita bola Saturnus.
+
+    **Kenapa ada di sini, bukan di `_draw_rings`.** Sama alasannya dengan
+    `jupiter_bands`: rumus yang hidup di dua tempat harus diperbaiki dua kali,
+    dan yang di Python adalah yang **diukur** `check-visuals.py`. Satu rumus
+    (`sqrt(1 - y^2)`), ditulis di kedua bahasa, ditahan
+    `check_port_matches_swift_constants`.
+
+    Pita bersambung (`2/count`), jadi tidak ada bola polos yang bocor di
+    antaranya — syarat yang sama dengan Jupiter.
+    """
+    spacing = 2.0 / count
+    half_height = spacing / 2.0
+    bands = []
+    for index in range(count):
+        t = (index + 0.5) / count
+        y = -1 + 2 * t
+        half_width = math.sqrt(max(0.0, 1 - y * y))
+        bands.append((y, half_width, half_height))
+    return bands
+
+
+def saturn_band_colour(center_y):
+    """Port `CelestialVisual.saturnBandColour(for:)` — dua nada berganti."""
+    for index, (y, _, _) in enumerate(saturn_bands()):
+        if abs(y - center_y) < 1e-9:
+            return ACCENTS[SATURN_BAND_TONES[index % 2]]
+    # Di luar pita yang dikenal: nada terang, bukan `None` — warna yang hilang
+    # akan menggambar pita transparan tanpa ada yang tahu.
+    return ACCENTS[SATURN_BAND_TONES[0]]
+
+
+def _draw_saturn_bands(canvas, cx, cy, radius, palette, night_mode):
+    """Port `CelestialVisualView.drawSaturnBands` — pita bola Saturnus.
+
+    **Cacat yang ditutup fungsi ini — diukur, bukan dinilai dengan mata.**
+    Bola Saturnus dulu digambar `_draw_sphere` polos di dalam `_draw_rings`,
+    sementara Jupiter mendapat `_draw_bands`. Diukur pada render 200 px, ss=2,
+    kolom x = +0.20 R paruh atas bola: **0 titik balik** (141.3 -> 159.4,
+    monoton) — hanya gradien bola. Lihat `STATUS.md`: "Saturnus masih bola
+    polos tanpa pita".
+
+    Naungannya mengikuti gradien bola yang **sama** (`sphere_gradient`),
+    dikalikan ke terang tiap pita: lengkungnya intrinsik, jadi tidak perlu
+    dipulihkan seperti `BAND_LIMB_SHADING_STRENGTH` pada Jupiter yang menutup
+    ulang pitanya.
+    """
+    shade = sphere_gradient(cx, cy, radius, palette["light"], palette["dark"],
+                            night_mode, opacity=BAND_LIMB_SHADING_STRENGTH)
+    centre_rgb, _ = shade(cx + radius * SPHERE_LIGHT_OFFSET[0],
+                          cy + radius * SPHERE_LIGHT_OFFSET[1])
+    centre_k = (0.2126 * centre_rgb[0] + 0.7152 * centre_rgb[1]
+                + 0.0722 * centre_rgb[2])
+    for center_y, half_width, half_height in saturn_bands():
+        if half_width * radius <= 1:
+            continue
+        # Poligon busur — rumus yang sama dengan Jupiter (`jupiter_band_edges`),
+        # jadi bentuk pitanya tidak bisa menyimpang dari bolanya.
+        edges = jupiter_band_edges(center_y, half_height)
+        points = [(cx - radius * edge_width, cy + height * radius)
+                  for height, edge_width in edges]
+        points += [(cx + radius * edge_width, cy + height * radius)
+                   for height, edge_width in reversed(edges)]
+        band_rgb = night_mapped(saturn_band_colour(center_y), False) if night_mode \
+            else saturn_band_colour(center_y)
+
+        def band_color(x, y, _rgb=band_rgb):
+            shade_rgb, _ = shade(x, y)
+            k = (0.2126 * shade_rgb[0] + 0.7152 * shade_rgb[1]
+                 + 0.0722 * shade_rgb[2])
+            gain = 1.0 if centre_k <= 1e-9 else min(1.15, k / centre_k)
+            return tuple(min(1.0, _rgb[i] * gain) for i in range(3)), SATURN_BAND_OPACITY
+
+        canvas.polygon(points, band_color)
 
 
 def _draw_polar_caps(canvas, cx, cy, radius, night_mode):

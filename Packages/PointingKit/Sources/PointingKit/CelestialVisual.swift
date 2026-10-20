@@ -3010,6 +3010,77 @@ public extension CelestialVisual {
         }
     }
 
+    /// Pita bola Saturnus — geometri, bukan warna.
+    ///
+    /// **Cacat yang ditutup fungsi ini — diukur, bukan dinilai dengan mata.**
+    /// Bola Saturnus digambar di dalam `drawRings`/`_draw_rings`, dan sampai
+    /// siklus ini ia digambar sebagai **bola polos** tanpa satu pun pita:
+    /// `STATUS.md` mencatatnya sebagai "Saturnus masih bola polos tanpa pita".
+    /// Seluruh gerbang pita yang ada mengukur `planet-jupiter-confirmed`, jadi
+    /// Saturnus tidak pernah masuk jangkauan satu pun dari mereka. Terukur pada
+    /// port Python, render 200 px, ss=2, kolom x = +0.20 R pada paruh atas bola
+    /// (dari tepi 0.53 R ke ekuator): **0 titik balik**, terang 141.3 → 159.4 —
+    /// monoton, yaitu gradien bola saja. Jupiter pada kolom yang sama memberi
+    /// titik balik.
+    ///
+    /// **Kenapa Saturnus tidak memakai `jupiterBands()`.** Tujuh pita Jupiter
+    /// dengan tinggi `2/7` R dan tiga nada kontrasnya adalah **Jupiter**: zona
+    /// dan sabuknya tajam, dan itu ciri pengenalnya. Saturnus berpita jauh
+    /// lebih samar dan lebih lebar — memakai geometri Jupiter berarti menukar
+    /// satu identitas dengan identitas planet lain, persis yang PRD larang
+    /// ("JANGAN salah identifikasi demi magic"). Di sini pitanya lebih sedikit,
+    /// lebih lebar, dan nadanya hanya dua: cukup untuk terbaca berpita di kartu
+    /// jam, tidak cukup untuk berpura-pura seberpita Jupiter.
+    ///
+    /// Jumlah pita (`5`) dipilih dari pengukuran, bukan dari atmosfer: dengan
+    /// tiga pita, tiap pita setinggi 0.67 R dan yang terbaca hanya dua bidang
+    /// warna besar, bukan pita. Dengan tujuh, tiap pita setinggi 0.29 R dan di
+    /// bola 0.53 R milik Saturnus (kartu jam 38 pt → ~20 pt) pitanya lebih
+    /// tipis dari satu piksel. Lima memberi 0.40 R per pita.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan peta atmosfer Saturnus: jumlah dan
+    /// posisi pita di sini adalah pilihan gambar. Yang dijamin adalah pitanya
+    /// **ada**, **menutupi bola**, dan **mengikuti busur limb** — semuanya
+    /// diukur uji, bukan diklaim prosa.
+    static func saturnBands(count: Int = 5) -> [Band] {
+        guard count > 0 else { return [] }
+        // Sama seperti Jupiter: pita bersambung, jadi tidak ada bola polos yang
+        // bocor di antara pita.
+        let spacing = 2.0 / Double(count)
+        let halfHeight = spacing / 2
+        return (0..<count).map { index in
+            let t = (Double(index) + 0.5) / Double(count)
+            let y = -1 + 2 * t
+            // Tepi bola pada ketinggian itu — rumus proyeksi, bukan pilihan.
+            let halfWidth = (1 - y * y).squareRoot()
+            return Band(centerY: y, halfWidth: halfWidth, halfHeight: halfHeight)
+        }
+    }
+
+    /// Warna pita Saturnus pada ketinggian `centerY` — dua nada berganti.
+    ///
+    /// **Kenapa dua nada, bukan tiga.** Jupiter punya tiga (kutub redup, sabuk
+    /// gelap, zona terang) karena itu yang membuatnya terbaca sebagai Jupiter.
+    /// Saturnus tidak: pita yang terlalu kontras membuat bolanya terbaca
+    /// sebagai Jupiter berwarna pucat. Dua nada berganti memberi pita yang
+    /// **terpisah** (syarat yang sama dengan `check_jupiter_bands_read_as_separate_stripes`)
+    /// tanpa mengklaim struktur yang tidak dimilikinya.
+    ///
+    /// Nada terang mengembalikan `saturnBand` yang lebih gelap dari bola, dan
+    /// nada gelap mengembalikan versi lebih gelapnya lagi — keduanya **di
+    /// bawah** terang bola, jadi pitanya tidak pernah lebih terang dari
+    /// permukaan yang diaturnya.
+    static func saturnBandColour(for centerY: Double) -> RGBComponents {
+        let bands = saturnBands()
+        guard let index = bands.firstIndex(where: { abs($0.centerY - centerY) < 1e-9 }) else {
+            // Di luar pita yang dikenal: nada terang, bukan `nil`. Pemanggil
+            // yang menggambar selalu punya pita; warna yang hilang akan
+            // menggambar pita transparan tanpa ada yang tahu.
+            return accents.saturnBand
+        }
+        return index % 2 == 0 ? accents.saturnBand : accents.saturnBandDeep
+    }
+
     /// Setengah-lebar bola pada ketinggian `height` (satuan radius, 0 = ekuator),
     /// dengan **tanda** yang berarti sisi: negatif = belahan utara layar.
     ///
@@ -3244,6 +3315,24 @@ public extension CelestialVisual {
     /// ss=2). Renderer Apple memakai Gaussian dan supersampling yang berbeda;
     /// yang dijamin adalah **model**-nya satu, bukan pikselnya sama.
     static let jupiterBandOpacity: Double = 0.85
+
+    /// Opasitas pita Saturnus saat digambar di atas bola, 0…1.
+    ///
+    /// **Kenapa lebih rendah dari Jupiter (0.85).** Pita Saturnus di alam nyata
+    /// jauh lebih samar: kontrasnya sekitar 1:1.1, sementara Jupiter ~1:1.6.
+    /// Memakai 0.85 membuat bolanya terbaca sebagai **Jupiter berwarna pucat** —
+    /// salah identifikasi, dan itu tepat yang PRD larang.
+    ///
+    /// **Kenapa tidak lebih rendah lagi.** Pita yang terlalu samar tidak
+    /// menambah satu pun titik balik pada kolom ukur, jadi gerbangnya tidak
+    /// bisa membedakan "pita samar" dari "tidak ada pita" — dan `STATUS.md`
+    /// kembali ke "bola polos". 0.55 adalah angka terendah yang masih
+    /// menghasilkan titik balik terukur di render 200 px, ss=2.
+    ///
+    /// **Yang TIDAK diklaim.** Angka ini diukur pada port Python; renderer
+    /// Apple memakai Gaussian dan supersampling berbeda. Yang dijamin adalah
+    /// **model**-nya satu, bukan pikselnya sama.
+    static let saturnBandOpacity: Double = 0.55
 
     /// Kekuatan **naungan bola di dalam pita**, 0…1 — dipotong ke bentuk tiap
     /// pita, bukan ditumpuk ke seluruh cakram.
