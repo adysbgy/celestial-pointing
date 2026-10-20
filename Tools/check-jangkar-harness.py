@@ -595,6 +595,12 @@ def main():
         return 1
 
     leaks, missing, unreadable_target = [], [], []
+    # Jangkar yang teksnya hanya ditemukan di berkas harness yang
+    # menuliskannya — bukan di sumber produksi mana pun. Dikumpulkan
+    # terpisah dari `missing` karena sebabnya berbeda dan pembaca harus
+    # tahu mana yang harus diperbaiki (jangkar di harnessnya, bukan
+    # berkas produksinya).
+    stale_only = []
     cache = {}
     # Sasaran eksplisit yang ekstensinya bukan sumber. Dikumpulkan, bukan
     # diabaikan: harness yang "menjaga kode" tetapi hanya menyunting dokumen
@@ -628,7 +634,33 @@ def main():
             unreadable_target.append((name, anchor, target or "(tanpa sasaran)"))
             continue
 
-        anchor_present = any(anchor in text for _, text in candidates)
+        anchor_any = any(anchor in text for _, text in candidates)
+        # **Jangkar yang hanya hidup di berkas harness itu sendiri adalah
+        # jangkar BASI, bukan jangkar yang masih ada.**
+        #
+        # Ketika `target` kosong, kandidatnya adalah seluruh berkas sumber —
+        # termasuk `Tools/bukti-mutasi-*.py`, tempat pasangan (jangkar,
+        # pengganti) itu **dituliskan**. Satu kesaksian "jangkar masih ada"
+        # karena itu bisa datang dari berkas yang mendefinisikannya, dan
+        # jangkar yang bentuknya sudah lama hilang dari produksi tidak pernah
+        # terlihat sebagai basi.
+        #
+        # Bentuk ini nyata, bukan karangan: `bukti-mutasi-bintang.py` keadaan
+        # 2 memakai jangkar `star_geometry(kw.get("relative_size", 0.5))` yang
+        # sudah digantikan `drawable_star_size(...)`. Gerbang ini mencetak
+        # "OK: 499 jangkar; tidak ada mutasi tertinggal" atas keduanya,
+        # sementara harnessnya memerah pada pohon sehat — dan satu-satunya
+        # jalan yang terlihat bagi pembaca adalah mematikan gerbangnya.
+        #
+        # Yang diperiksa karena itu **produksi**, bukan "di mana pun".
+        # Jangkar dengan berkas sasaran eksplisit tidak tersentuh: sasarannya
+        # memang satu berkas itu, dan menuntutnya "juga ada di tempat lain"
+        # akan memerah untuk jangkar yang sah.
+        anchor_present = any(anchor in text for p, text in candidates
+                             if target or not _is_harness(p))
+        if anchor_any and not anchor_present:
+            stale_only.append((name, anchor))
+            continue
         if anchor_present:
             # **Mutasi SISIPAN: jangkar masih ada, teks baru ikut tertinggal.**
             #
@@ -685,6 +717,42 @@ def main():
                         leaks.append((name, anchor, replacement,
                                       ", ".join(os.path.relpath(p, ROOT)
                                                 for p in pembawa[:3])))
+            continue
+        anchor_present_produksi = any(
+            anchor in text for p, text in candidates if not _is_harness(p))
+        # **Jangkar yang hanya hidup di berkas harness itu sendiri adalah
+        # jangkar BASI, bukan jangkar yang masih ada.** Kandidat bagi jangkar
+        # tanpa sasaran eksplisit adalah seluruh berkas sumber — termasuk
+        # `Tools/bukti-mutasi-*.py`, tempat pasangan (jangkar, pengganti) itu
+        # dituliskan. Akibatnya satu kesaksian "jangkar masih ada" tadi bisa
+        # dijawab oleh berkas yang **mendefinisikan** jangkar itu, dan jangkar
+        # yang bentuknya sudah lama hilang dari produksi tidak pernah terlihat.
+        #
+        # Bentuk ini nyata, bukan karangan: `bukti-mutasi-bintang.py` keadaan
+        # 2 memakai jangkar `star_geometry(kw.get("relative_size", 0.5))` yang
+        # sudah digantikan `drawable_star_size(...)`. Gerbang ini mencetak
+        # "OK: 499 jangkar; tidak ada mutasi tertinggal" atas keduanya, sementara
+        # harnessnya memerah pada pohon sehat — satu-satunya jalan yang
+        # terlihat bagi pembaca adalah mematikan gerbangnya, dan itu jalan
+        # yang salah.
+        #
+        # Yang diperiksa: jangkar harus ditemukan di **produksi**, bukan hanya
+        # di berkas yang menuliskannya. Jangkar dengan berkas sasaran eksplisit
+        # tidak tersentuh — sasarannya memang hanya satu berkas itu, dan
+        # menuntutnya "juga ada di tempat lain" akan memerah untuk jangkar
+        # yang sah.
+        if not anchor_present_produksi:
+            if replacement is None:
+                missing.append((name, anchor))
+                continue
+            pembawa = [p for p, text in candidates
+                       if replacement in text and not _is_harness(p)]
+            if pembawa:
+                leaks.append((name, anchor, replacement,
+                              ", ".join(os.path.relpath(p, ROOT)
+                                        for p in pembawa[:3])))
+            else:
+                missing.append((name, anchor))
             continue
         if not anchor_present:
             # Pengganti `None` berarti harness membangun muatannya saat jalan
@@ -795,6 +863,33 @@ def main():
     for name, reason in sorted(set(exempted)):
         print(f"  dikecualikan : {name}")
         print(f"      alasan   : {reason}")
+
+    if stale_only:
+        # **Jangkar yang hanya hidup di berkas harness itu sendiri.**
+        #
+        # Teksnya memang ditemukan — di `Tools/bukti-mutasi-*.py`, tempat
+        # pasangan (jangkar, pengganti) itu selalu ada. Yang tidak ada adalah
+        # bentuknya di sumber produksi, jadi mutasi yang diklaim jangkar itu
+        # tidak pernah mendarat: tidak pohon bersih, tidak pohon termutasi.
+        #
+        # Ini gagalnya `bukti-mutasi-bintang.py` keadaan 2 yang memerah
+        # `Engine Tests (Linux)` dua run berturut-turut — dan karena gerbang
+        # tercetak "OK" atasnya, jalan paling tampak bagi pembaca adalah
+        # mematikan gerbangnya, bukan memperbaiki jangkarnya.
+        print()
+        print(f"GAGAL: {len(stale_only)} jangkar hanya ditemukan di berkas "
+              "harness itu sendiri, bukan di sumber produksi.")
+        print("       Jangkar seperti itu menjaga nol kode: mutasinya tidak "
+              "pernah bisa mendarat.")
+        for name, anchor in sorted(set(stale_only))[:12]:
+            print(f"           {name}: {anchor[:70]!r}")
+        if len(set(stale_only)) > 12:
+            print(f"           ... dan {len(set(stale_only)) - 12} lagi")
+        print("       Perbaiki jangkarnya dari sumber di mana ia mestinya "
+              "ada (perbaiki teks yang berubah), atau keluarkan "
+              "keadaan itu dari `STATES` kalau suntingan yang dijaganya "
+              "tidak ada lagi.")
+        return 1
 
     print(f"OK: {len(edits)} jangkar; tidak ada mutasi tertinggal.")
     if missing:

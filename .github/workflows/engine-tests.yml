@@ -1208,6 +1208,22 @@ jobs:
       - name: Buktikan gerbang jangkar harness berbunyi
         run: python3 Tools/bukti-mutasi-jangkar-harness.py
 
+      # Dan bukti untuk celah yang gerbang itu sendiri masih punya: jangkar
+      # yang teksnya hanya ditemukan di berkas harness yang menuliskannya,
+      # bukan di sumber produksi mana pun.
+      #
+      # Bentuknya nyata: `bukti-mutasi-bintang.py` keadaan 2 memakai jangkar
+      # `star_geometry(kw.get("relative_size", 0.5))` yang sudah digantikan
+      # `drawable_star_size(...)`. Gerbang jangkar mencetak "OK: 499 jangkar"
+      # atasnya, harnessnya memerah pada pohon sehat, dan `Engine Tests
+      # (Linux)` merah dua run berturut-turut — jalan paling tampak bagi
+      # pembaca adalah mematikan gerbangnya.
+      #
+      # Harness ini menuntut merah pada bentuk itu dan hijau pada pohon yang
+      # benar, supaya perbaikan gerbangnya tidak bisa dibalik tanpa suara.
+      - name: Buktikan gerbang jangkar memerah pada jangkar basi
+        run: python3 Tools/bukti-mutasi-jangkar-basi.py
+
       # Penambat "versi lama" harness harus eksplisit dan gagal-tertutup.
       #
       # Dua harness membuktikan **arah kedua** (cacat yang ditutup sebuah
