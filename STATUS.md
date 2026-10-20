@@ -1,3 +1,88 @@
+### Siklus (20 Okt 2026 — `main` merah: batas modul tak terlihat semua gerbang lokal)
+
+Siklus dibuka dengan `git log` + `gh run list`. `main` merah di `Apple Build`
+pada `a951cb9`, sementara seluruh gerbang lokal hijau. Penyebabnya bukan
+UI: `jupiterBandEdges` dipublikkan, tetapi tipe kembaliannya `BandEdge`
+tetap internal — anggota `height`/`halfWidth` tidak bisa dibaca pemakai
+modul. Kelas cacat ini **tidak terlihat** oleh `swift build` (exit 0 pada
+pohon rusak), tidak oleh `-enable-library-evolution` (exit 0 juga), dan
+tidak oleh `swift-test.sh` karena 77 dari 77 berkas uji memakai
+`@testable import PointingKit` — tes melihat anggota `internal`. Diagnostik
+hanya muncul di **use site lintas modul**, yaitu app.
+
+#### Gerbang baru: `Tools/check-batas-modul.py`
+
+Gerbang ini tidak menebak dari teks; ia membangun modul lalu menyusun
+berkas pemakai di luar modul yang menyentuh setiap tipe publik dan setiap
+anggotanya, kemudian men-typecheck berkas itu dengan `swiftc`. Otoritasnya
+compiler, bukan regex.
+
+Empat kesalahan pengukuran ditemukan dan diperbaiki **sebelum** gerbang
+dipakai, semuanya dengan mengukur ulang, bukan menurunkan standar:
+
+1. **Vakum pada pohon rusak.** Gerbang hijau di `a951cb9`. Sebab terukur:
+   `jupiterBandEdges` di HEAD adalah `static func` **tanpa** kata `public`
+   (ia mewarisi dari `public extension`), dan regex hanya menerima `func`.
+2. **Kedalaman `public extension` salah satu.** Saya bandingkan
+   `level == depth + 1`; baris di dalam extension berada pada `depth` itu
+   sendiri. Akibatnya `public_scope` selalu `false`.
+3. **Nama bare berkolisi.** `CandidateMarker` ada sebagai enum top-level
+   **dan** sebagai tipe nested `CelestialVisual.CandidateMarker`. Kunci
+   dict diganti qualified path.
+4. **`public final class` tidak dikenali.** Modifier ganda membuat
+   `UncertainReason` (kelas `ConfidenceTrace`) terbaca sebagai tipe dengan
+   jalur salah.
+
+Sesudah keempatnya: **merah pada `a951cb9`** dengan pesan yang menyebut
+`BandEdge` dan anggotanya, dan **hijau pada pohon yang diperbaiki**
+(51 tipe, 167 anggota terbaca dari luar modul).
+
+`Tools/bukti-mutasi-batas-modul.py` menjaga gerbang ini tetap berbunyi
+lewat empat keadaan; keadaan terakhir menjalankan compiler sungguhan pada
+salinan pohon rusak dan menuntut diagnostik `BandEdge` muncul.
+
+#### Dua peringatan compiler yang memerahkan Apple Build
+
+Perbaikan pertama saya menambahkan `public` pada enam deklarasi di dalam
+`public extension`. Itu **redundan** dan menjadi peringatan, yang
+`ios-build.yml` memerahkan build. Bentuk yang benar: `public` hanya pada
+anggota `BandEdge` dan `init`-nya, tidak pada deklarasi yang sudah mewarisi.
+`Tools/bersihkan-public-berlebih.py` dipakai untuk memastikan tidak ada sisa.
+
+Sesudah itu Apple Build masih merah karena dua `let` mati di
+`CelestialVisualView.swift:487,490` (`y`, `halfHeight`) — sisa refaktor pita
+Jupiter jadi tali busur; jalur sekarang memakai `edge.height`/`edge.halfWidth`.
+
+Sapuan lokal untuk kelas yang sama **diukur non-vakuum dulu**: scanner versi
+pertama melaporkan 0 pada pohon yang terbukti punya 2, karena ia membaca
+komentar (`y ± halfHeight`), akses anggota (`center.y`), dan label argumen
+(`halfHeight:`). Setelah ketiganya dikecualikan, scanner melaporkan tepat 2
+pada `a96ec48` dan 0 pada pohon ini. **Tidak** dijadikan gerbang:
+`bukti-mutasi-aturan73-pasangan.py` sudah mencatat bahwa pemakaian nama di
+badan fungsi tidak bisa diputuskan dari teks secara umum.
+
+#### Keadaan terukur
+
+- `Engine Tests (Linux)` + `Apple Build`: **975 tes hijau**, Apple Build
+  hijau pada `1bd942d` (run `39476996040`).
+- `./swift-test.sh`, `./swift-ui-lint.sh`, `./swift-typecheck.sh`: lulus.
+- `check-batas-modul.py`: merah di `a951cb9`, hijau di `1bd942d`.
+- `check-harness-terdaftar.py`: 129 harness, semuanya dirujuk.
+
+#### Yang TIDAK diklaim
+
+- Gerbang baru hanya menangkap tipe/anggota yang **dikembalikan atau
+  disebut** di tanda-tangan publik. Tipe internal yang bocor lewat jalur
+  lain (mis. `@inlinable`, protokol turunan) tidak diperiksa.
+- Peringatan compiler tetap hanya tertangkap Apple Build. Tidak ada gerbang
+  lokal untuk kelas `let` mati, dan sengaja tidak dibuat.
+- Sapuan visual pada siklus ini terbatas pada berkas render yang ada
+  (`out/visuals/`). Saturnus masih bola polos tanpa pita — model
+  `DistinguishingFeature` hanya punya satu ciri per planet (`.rings`), jadi
+  menambah pita berarti mengubah model dan gerbangnya, bukan sekadar view.
+
+---
+
 ### Siklus (20 Okt 2026 — `main` merah empat commit: gerbang yang mengukur **ukuran** dengan nama **warna**)
 
 Siklus dibuka dengan `git log` + `gh run list`. `main` **merah di empat push
