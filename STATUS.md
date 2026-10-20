@@ -91,6 +91,31 @@ mutasi yang sama, cacat ini sudah terjaga dan Aturan 73 tidak menambah apa pun.
   hasilnya belum ada saat STATUS ini ditulis. Yang bisa diklaim hari ini:
   ia tidak lagi memerahkan `Apple Build` karena peringatan.
 
+#### Ukur ulang cacat siklus 19 Okt: pita Jupiter sudah terpisah (0.181, bukan 0.012)
+
+Siklus 19 Okt menutupnya dengan catatan "pita Jupiter masih beige — **belum
+diperbaiki**". Karena catatan "belum diperbaiki" di STATUS sudah terbukti basi
+satu kali di repo ini, itu diukur ulang, bukan dikutip.
+
+Gerbangnya dijalankan apa adanya pada pohon sekarang
+(`check_jupiter_bands_read_as_separate_stripes`, render 200 px, ss=2,
+**kedua mode**):
+
+    residual keterpisahan pita   siang 0.1809   (ambang 0.050)
+                                  malam 0.0801   (ambang 0.030)
+
+Bandingkan dengan angka yang membuatnya dinilai 3/10: residual **0.012**.
+Jadi bukan "belum diperbaiki" — ia sudah 15× ambangnya di siang. Per pasangan
+(dL mentah): 0.219 / 0.370 / 0.355 / 0.403 / 0.231 / 0.201.
+
+Non-vakuositas diukur juga, bukan dikutip: pita dijadikan satu nada (`zone` × 7)
+membuat gerbang **MERAH** di kedua mode dengan residual **0.000** persis. Jadi
+0.181 itu datang dari nada pita, bukan dari ambang yang longgar.
+
+Yang **tidak** ikut dinilai: apakah pitanya sekarang **indah** — itu tetap
+pertanyaan mata manusia atas PNG, bukan angka. `check-visuals.py` penuh
+(~41 menit) masih berjalan; hasil penuhnya diserahkan ke CI.
+
 ---
 
 ### Siklus (19 Okt 2026 — Aturan 72: tombol yang membaca keadaan di labelnya berhenti mengubahnya)
