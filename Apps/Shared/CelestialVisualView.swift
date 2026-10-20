@@ -1337,7 +1337,9 @@ struct CelestialVisualView: View {
         // Inti kini dihitung **mundur dari ruang yang tersedia**, jadi
         // memperbesar glow/spike tidak bisa lagi mendorong ujungnya keluar.
         // Ujinya ada di Linux (`testEveryCatalogueStarStaysInsideTheFrame`).
-        let geometry = VisualFrame.star(relativeSize: visual.relativeSize)
+        let geometry = VisualFrame.star(
+            relativeSize: CelestialVisual.drawableStarSize(visual,
+                                                           isConfirmed: isConfirmed))
         let coreRadius = radius * CGFloat(geometry.coreRadius)
         let color = starColor
         // Denyut halus datang dari `pulse` — bukan timer di dalam view, supaya
@@ -1450,7 +1452,9 @@ struct CelestialVisualView: View {
         // Mode malam memang membuang warna; ia tidak seharusnya membuang
         // terang juga.
         let brightness = NightVisual.floorBrightness
-            + NightVisual.rangeBrightness * min(1, max(0, visual.relativeSize))
+            + NightVisual.rangeBrightness * min(
+                1, max(0, CelestialVisual.drawableStarSize(visual,
+                                                           isConfirmed: isConfirmed)))
         return Color(red: brightness, green: 0, blue: 0)
     }
 

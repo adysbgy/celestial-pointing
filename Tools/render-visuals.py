@@ -113,6 +113,10 @@ NEUTRAL_STAR_BODY = (0.78, 0.78, 0.78)
 # `CelestialVisual.unknownStarColorIndex` — di luar rentang B−V supaya tidak
 # ada bintang nyata yang bisa menghasilkannya.
 UNKNOWN_STAR_COLOR_INDEX = float("nan")
+# `CelestialVisual.unknownStarSize` — ukuran "tidak mengklaim" untuk
+# bintang ragu. 0,5 bukan hasil `size_from_magnitude` magnitudo mana pun di
+# katalog: yang terdekat Vega (+0,03) pada 0.4943. Lihat docstring Swift.
+UNKNOWN_STAR_SIZE = 0.5
 
 # `CelestialVisual.accents` — satu konstanta di paket, disalin apa adanya.
 ACCENTS = dict(
@@ -2317,16 +2321,38 @@ def drawable_star_color_index(color_index, is_confirmed):
         return UNKNOWN_STAR_COLOR_INDEX
     return color_index
 
+def drawable_star_size(relative_size, is_confirmed):
+    """`CelestialVisual.drawableStarSize` — ukuran hanya saat yakin.
+
+    **Kenapa ini ada.** Ukuran bintang adalah ciri pengenal: pada katalog 25
+    bintang repo ini `size_from_magnitude` memberi 24 ukuran berbeda — Sirius
+    (−1.46) 0.982, Polaris (+1.98) 0.201, hampir 5x. Jadi magnitudo praktis
+    adalah sidik jari, dan warna yang sudah ditahan tidak melengkapi yang
+    ini: titik besar di samping badge "Ragu" tetap menyebut Sirius.
+
+    Terukur di piksel (200 px, ss=2): bintang ragu bermagnitudo Sirius membawa
+    1725 satuan cahaya sementara bintang redup 1095 — selisih 57%.
+
+    Nilai tengah `UNKNOWN_STAR_SIZE`, bukan lantai (0.15) atau Sirius (0.98):
+    kedua ujung itu **adalah** magnitudo, jadi memakainya cuma memindahkan
+    klaimnya.
+    """
+    if not is_confirmed:
+        return UNKNOWN_STAR_SIZE
+    return relative_size
+
 
 def _draw_star(canvas, cx, cy, radius, kw, night_mode):
-    geometry = star_geometry(kw.get("relative_size", 0.5))
+    drawable_size = drawable_star_size(kw.get("relative_size", 0.5),
+                                       kw.get("is_confirmed", True))
+    geometry = star_geometry(drawable_size)
     core_radius = radius * geometry["core_radius"]
     # VIEW: `starColor` memakai `drawableStarColorIndex` lebih dulu.
     color_index = drawable_star_color_index(kw.get("color_index", 0.0),
                                             kw.get("is_confirmed", True))
     base = star_rgb(color_index)
     if night_mode:
-        relative = kw.get("relative_size", 0.5)
+        relative = drawable_size
         brightness = NIGHT_FLOOR_BRIGHTNESS + NIGHT_RANGE_BRIGHTNESS * min(1, max(0, relative))
         color = (brightness, 0.0, 0.0)
     else:

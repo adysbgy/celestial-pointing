@@ -3054,6 +3054,76 @@ final class CelestialVisualTests: XCTestCase {
     /// sama persis. Tanpa ini, pengguna VoiceOver mendengar "merah" di
     /// sebelah badge "Ragu" yang di layar justru tidak berwarna merah —
     /// pengumuman dan gambar jadi tidak lagi cocok.
+    /// **Ukuran bintang adalah sidik jari identitas, dan ia belum dijaga.**
+    ///
+    /// Warna spektral sudah dijaga (`drawableStarColorIndex`), palet planet
+    /// dijaga `palette.drawable`, bentuk objek langit dalam dijaga
+    /// `drawableMorphology`. **Ukuran tidak dijaga apa pun** — dan docstring
+    /// `drawableStarColorIndex` bahkan menyatakan premis yang salah:
+    /// "Yang tetap tampil saat ragu hanyalah terang (ukuran dari magnitudo),
+    /// dan terang bukan identitas."
+    ///
+    /// Diukur pada katalog 25 bintang repo ini: `sizeFromMagnitude` memberi
+    /// **24 ukuran berbeda untuk 25 bintang** (rentang 0,201 … 0,982).
+    /// Sirius 0,982 adalah bintang paling terang di langit; Polaris 0,201
+    /// hampir 5x lebih kecil. Di piksel, pada render 200 px ss=2, bintang
+    /// "ragu" bermagnitudo Sirius membawa **1725** satuan cahaya sementara
+    /// bintang redup **1095** — selisih 57%, terukur, bukan diperkirakan.
+    ///
+    /// Jadi ukuran **adalah** klaim di katalog ini: titik besar dan terang
+    /// di samping badge "Ragu" tetap menyebut Sirius. Mata membaca ukuran
+    /// sebelum membaca lencana.
+    ///
+    /// **Yang dijaga uji ini.** Saat `isConfirmed == false`, **setiap**
+    /// bintang di katalog menghasilkan ukuran gambar yang sama, dan ukuran
+    /// itu bukan ukuran bintang mana pun yang dikonfirmasi.
+    ///
+    /// **Yang TIDAK diklaim.** Ukuran tetap membedakan bintang saat engine
+    /// **yakin** — itu memang fiturnya (magnitudo -> besar glow). Uji ini juga
+    /// tidak mengukur piksel; ia mengunci nilai yang dibaca view, dan
+    /// `check-visuals.py` yang mengukur render.
+    func testUncertainStarSizeIsNotAClaim() {
+        let catalogue: [(String, Double)] = [
+            ("sirius", -1.46), ("canopus", -0.74), ("arcturus", -0.05),
+            ("vega", 0.03), ("capella", 0.08), ("rigel", 0.13),
+            ("procyon", 0.34), ("betelgeuse", 0.50), ("altair", 0.77),
+            ("polaris", 1.98),
+        ]
+        func size(_ id: String, _ magnitude: Double, confirmed: Bool) -> Double {
+            CelestialVisual.drawableStarSize(
+                CelestialVisual(object: object(id: id, kind: .star,
+                                               magnitude: magnitude)),
+                isConfirmed: confirmed)
+        }
+        // Prasyarat: saat yakin, magnitudonya memang memberi ukuran berbeda.
+        let confirmedSizes = catalogue.map { size($0.0, $0.1, confirmed: true) }
+        let distinctConfirmed = Set(confirmedSizes.map { ($0 * 1000).rounded() })
+        XCTAssertEqual(distinctConfirmed.count, catalogue.count,
+                       "prasyarat: saat yakin setiap bintang punya ukuran "
+                       + "sendiri — kalau tidak, uji di bawah lulus karena "
+                       + "semua memang sudah sama")
+
+        // Yang dijaga: saat ragu, semuanya **satu** ukuran.
+        let uncertainSizes = catalogue.map { size($0.0, $0.1, confirmed: false) }
+        let distinctUncertain = Set(uncertainSizes.map { ($0 * 1000).rounded() })
+        XCTAssertEqual(distinctUncertain.count, 1,
+                       "saat engine ragu, ukuran bintang tidak boleh menyebut "
+                       + "bintang mana pun; terukur \(uncertainSizes)")
+
+        // Dan ukuran "ragu" itu bukan ukuran bintang terang mana pun —
+        // kalau ia sama dengan Sirius, klaimnya cuma berpindah nama.
+        XCTAssertNotEqual(uncertainSizes[0], confirmedSizes[0],
+                          "ukuran ragu tidak boleh sama dengan ukuran Sirius, "
+                          + "karena itu tetap menyebut Sirius")
+    }
+
+    /// **Ucapan harus sama jujurnya dengan gambar.**
+    ///
+    /// Warna spektral di layar sudah ditahan saat ragu
+    /// (`drawableStarColorIndex`). Nama warnanya tidak: `spokenStarColor`
+    /// menyebut "merah" dari B−V mentah, sehingga pengguna VoiceOver mendengar
+    /// "bintang, merah" di sebelah badge "Ragu" yang di layar justru tidak
+    /// berwarna. Pengumuman dan gambar jadi tidak lagi cocok.
     func testSpokenStarColourIsSilentWhenUncertain() {
         let betelgeuse = CelestialVisual(object: object(id: "betelgeuse", kind: .star,
                                                        magnitude: 0.5))

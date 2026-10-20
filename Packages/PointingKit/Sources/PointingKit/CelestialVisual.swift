@@ -723,6 +723,32 @@ public struct CelestialVisual: Equatable, Sendable {
     /// perbandingan apa pun di `starRGB`.
     public static let unknownStarColorIndex = Double.nan
 
+    /// Ukuran "tidak mengklaim" untuk bintang ragu — satu nilai tengah yang
+    /// bukan ukuran magnitudo bintang mana pun.
+    ///
+    /// **Kenapa bukan 0,15 atau 0,98.** Kedua ujung itu **adalah** magnitudo:
+    /// 0,15 adalah lantai yang dipakai bintang paling redup yang bisa
+    /// dikenali, sementara 0,98 adalah Sirius. Memakai salah satunya berarti
+    /// klaimnya cuma berpindah nama. 0,5 bukan hasil `sizeFromMagnitude`
+    /// magnitudo apa pun di katalog 25 bintang ini — terukur, bukan dinyatakan.
+    /// Yang terdekat adalah Vega (+0,03) pada 0,4943, yaitu 0,0057 dari 0,5;
+    /// Arcturus (−0,05) 0,5129. Tidak ada yang sama persis.
+    ///
+    /// **Batas yang diakui: 0,0057 itu kecil.** Ukuran ragu 0,5 memang dekat
+    /// dengan ukuran Vega, jadi "ragu" masih lebih mirip Vega daripada Sirius.
+    /// Yang dijaga bukan kemiripan dengan bintang tertentu — mustahil dihindari
+    /// untuk satu nilai tengah — melainkan bahwa **semua** bintang ragu punya
+    /// ukuran yang sama, sehingga ukuran tidak lagi bisa membedakan Sirius
+    /// dari bintang redup. Gerbang ukuran-by-pixel di `check-visuals.py`
+    /// mengukur jarak itu, bukan mendeklarasikannya.
+    ///
+    /// **Kenapa bukan deterministik-dari-id.** Sudut `scatterRotated` bintang
+    /// dapat dipakai karena ia tidak mengubah jumlah, ukuran, maupun opasitas
+    /// satu blob pun. Membuat ukuran ragu bervariasi per-id akan membawa pulih
+    /// kegunaan magnitudo lewat pintu lain: "ragu" jadi tetap menyebut bintang,
+    /// hanya dengan nama yang lebih kecil.
+    public static let unknownStarSize: Double = 0.5
+
     /// Indeks warna yang boleh **digambar**, mengingat keyakinan engine.
     ///
     /// **Kenapa ini ada.** Warna spektral adalah ciri pengenal: biru pada
@@ -750,6 +776,38 @@ public struct CelestialVisual: Equatable, Sendable {
     /// memang benar — warna ragu == warna bintang tak dikenal — tanpa ikut
     /// mewarisi klaim spektralnya. Yang tetap tampil saat ragu hanyalah
     /// **terang** (ukuran dari magnitudo), dan terang bukan identitas.
+    /// Ukuran gambar bintang yang **belum mengklaim** identitas.
+    ///
+    /// **Kenapa `relativeSize` butuh gerbang keyakinan.** Warna spektral sudah
+    /// ditahan oleh `drawableStarColorIndex`, palet planet oleh
+    /// `Palette.drawable`, morfologi objek langit dalam oleh
+    /// `drawableMorphology`. `relativeSize` tidak — dan docstring ketiga fungsi
+    /// itu menyatakan premis yang dibantah pengukuran: "Yang tetap tampil saat
+    /// ragu hanyalah terang (ukuran dari magnitudo), dan terang bukan
+    /// identitas."
+    ///
+    /// Diukur pada katalog 25 bintang repo ini. `sizeFromMagnitude` memberi
+    /// **24 ukuran berbeda untuk 25 bintang**: Sirius (−1.46) -> 0.982,
+    /// Polaris (+1.98) -> 0.201 — hampir 5x. Jadi di katalog ini magnitudo
+    /// praktis adalah sidik jari. Di piksel (render 200 px, ss=2) bintang ragu
+    /// bermagnitudo Sirius membawa **1725** satuan cahaya sementara bintang
+    /// redup **1095** — selisih 57%. Titik besar dan terang di samping badge
+    /// "Ragu" tetap menyebut Sirius, dan mata membaca ukuran sebelum lencana.
+    ///
+    /// **Bukan memadatkan seluruh skala.** Ukuran ragu satu nilai untuk semua
+    /// bintang: nilai "tidak mengklaim", sama seperti `unknownStarColorIndex`
+    /// untuk warna. Nilai itu **tengah** rentang (0,5): bukan 0,15 (yang
+    /// merupakan magnitudo tertentu) dan bukan 0,98.
+    ///
+    /// **Yang TIDAK diklaim.** Ukuran tetap wajar saat engine **yakin** — itu
+    /// memang fiturnya, magnitudo -> besar glow. Yang ditahan hanya klaim lewat
+    /// ukuran saat identitas belum pasti.
+    public static func drawableStarSize(_ visual: CelestialVisual,
+                                        isConfirmed: Bool) -> Double {
+        guard isConfirmed else { return Self.unknownStarSize }
+        return visual.relativeSize
+    }
+
     public static func drawableStarColorIndex(_ colorIndexBV: Double,
                                               isConfirmed: Bool) -> Double {
         guard isConfirmed else { return Self.unknownStarColorIndex }

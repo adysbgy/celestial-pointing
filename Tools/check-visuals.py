@@ -674,6 +674,44 @@ def render_case(name, night=False, size=200, ss=2):
     return case, decode_png(path)
 
 
+def render_case_obj(case, name, night=False, size=200, ss=2):
+    """Render satu `VisualCase` ad-hoc, lalu baca balik lewat PNG 8-bit.
+
+    Sama seperti `render_case`, tetapi kasusnya dibuat di sini alih-alih
+    diambil dari `build_cases()`. Dipakai untuk menyapu rentang magnitudo
+    yang tidak ada di katalog tetap.
+    """
+    canvas = R.render(case, size=size, night_mode=night, show_frame=False, ss=ss)
+    path = os.path.join(R.OUT_DIR, f"{name}.png")
+    os.makedirs(R.OUT_DIR, exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(canvas.to_png())
+    return case, decode_png(path)
+
+
+def total_luminance(width, height, rows, floor=None):
+    """Jumlah cahaya di atas latar, dalam satuan 0…255.
+
+    Latar diambil dari piksel sudut (2,2) — sudut selalu latar, bahkan untuk
+    bintang terbesar, karena semua geometri bintang dihitung **mundur dari
+    ruang tersedia** supaya ujungnya tidak pernah keluar frame.
+
+    Ini ukuran yang tepat untuk "seberapa besar titik ini terlihat": ia
+    menjumlahkan luas **dan** terang, jadi glow yang lebih lebar maupun lebih
+    pekat sama-sama terhitung. Jari-jari ambang akan salah menilai, karena
+    glow bintang memudar ke nol secara bertahap.
+    """
+    r0, g0, b0 = rows[2][2 * 4:2 * 4 + 3]
+    base = (r0 + g0 + b0) / 3.0 if floor is None else floor
+    total = 0.0
+    for y in range(height):
+        row = rows[y]
+        for x in range(width * 4)[::4]:
+            r, g, b = row[x:x + 3]
+            total += max(0.0, (r + g + b) / 3.0 - base)
+    return total
+
+
 def moon_colors():
     """Warna tersinari & gelap Bulan dalam skala 0…255, dari port render."""
     lit = tuple(round(c * 255) for c in R.ACCENTS["moonLit"])
@@ -11439,6 +11477,61 @@ def check_star_colour_order(results, size=200, ss=2):
             f"R−B {star}={a_warmth}, {warmer_than}={b_warmth}"))
 
 
+def check_star_size_not_a_claim_when_uncertain(results, size=200, ss=2):
+    """Ukuran bintang harus hilang saat engine ragu — diukur dari piksel.
+
+    **Celah yang ditutup.** Gerbang warna di atas membandingkan Betelgeuse
+    (relative_size 0.398) dengan Rigel (0.472). Kedua ukuran itu hanya 19%
+    berbeda, dan keduanya **sudah** setara sejak gerbang warna memaksa
+    `UNKNOWN_STAR_COLOR_INDEX`. Jadi gerbang itu tidak pernah menguji ukuran
+    sama sekali: dengan `drawable_star_size` dicabut, ia tetap hijau.
+
+    Padahal ukuran adalah klaim yang lebih kuat dari warna di katalog ini.
+    `size_from_magnitude` memberi **24 ukuran berbeda untuk 25 bintang** —
+    Sirius (−1.46) 0.982 lawan Polaris (+1.98) 0.201, hampir 5x. Terukur di
+    piksel (200 px, ss=2) sebelum perbaikan: bintang ragu bermagnitudo Sirius
+    membawa 1725 satuan cahaya, bintang redup 1095 — 57% lebih terang. Titik
+    besar di samping badge "Ragu" tetap menyebut Sirius, dan mata membaca
+    ukuran sebelum lencana.
+
+    Rentang magnitudo yang disapu sengaja **lebar** (−1.46 … +3.5), bukan
+    dua bintang bertetangga: itulah rentang yang dulu membocorkan 57%.
+    """
+    luminances = []
+    for magnitude in (-1.46, 0.0, 0.13, 1.0, 2.0, 3.5):
+        name = f"__star-size-{magnitude}"
+        case = R.VisualCase(name, "sementara", "star",
+                            color_index=0.0,
+                            relative_size=R.size_from_magnitude(magnitude),
+                            is_confirmed=False)
+        _, (w, h, rows) = render_case_obj(case, name, size=size, ss=ss)
+        luminances.append(total_luminance(w, h, rows))
+
+    spread = (max(luminances) - min(luminances)) / max(luminances)
+    results.append(Result(
+        "ukuran bintang tidak mengklaim saat ragu",
+        spread <= 1e-9,
+        f"sebaran cahaya {spread * 100:.1f}% antara bintang ragu "
+        f"bermagnitudo −1.46 … +3.5 (harus 0%)"))
+
+    # Arah sebaliknya — tanpa ini view yang **selalu** membuang ukuran lolos.
+    # Saat yakin, Sirius memang harus jauh lebih besar dari bintang redup.
+    bright = render_case_obj(
+        R.VisualCase("__star-size-sirius", "sementara", "star", color_index=0.0,
+                     relative_size=R.size_from_magnitude(-1.46),
+                     is_confirmed=True), "__star-size-sirius", size=size, ss=ss)[1]
+    faint = render_case_obj(
+        R.VisualCase("__star-size-faint", "sementara", "star", color_index=0.0,
+                     relative_size=R.size_from_magnitude(3.5),
+                     is_confirmed=True), "__star-size-faint", size=size, ss=ss)[1]
+    lum_bright = total_luminance(*bright)
+    lum_faint = total_luminance(*faint)
+    results.append(Result(
+        "ukuran bintang tetap menyebut terang saat yakin",
+        lum_bright > lum_faint * 1.2,
+        f"Sirius {lum_bright:.0f} vs bintang redup {lum_faint:.0f} satuan cahaya"))
+
+
 def check_star_colour_not_a_claim_when_uncertain(results, size=200, ss=2):
     """Warna bintang harus hilang saat engine ragu — diukur dari piksel.
 
@@ -15372,6 +15465,7 @@ def main():
     check_star_size_follows_magnitude(results)
     check_star_pulse_reaches_the_picture(results, args.size, args.ss)
     check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
+    check_star_size_not_a_claim_when_uncertain(results, args.size, args.ss)
     check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
     check_cluster_cores_reach_the_picture(results, args.ss)
     check_cluster_core_docstring_quotes_measured_values(results)
