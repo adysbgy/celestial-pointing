@@ -1,4 +1,98 @@
-### Siklus (20 Okt 2026 — Aturan 73: nama sisa yang memerahkan Apple Build, dan kenapa tiga gerbang lokal buta)
+### Siklus (20 Okt 2026 — `main` merah empat commit: gerbang yang mengukur **ukuran** dengan nama **warna**)
+
+Siklus dibuka dengan `git log` + `gh run list`. `main` **merah di empat push
+terakhir** pada `Engine Tests (Linux)` sementara `Apple Build` hijau di
+keempatnya — jadi kode Swift selalu benar, dan yang merah adalah gerbang Python
+`Tools/check-visuals.py`. Satu pesan, sama persis di keempat run:
+
+    GAGAL warna ragu = warna bintang tak dikenal
+         332 piksel berbeda dari bintang tak dikenal (inti saja)
+
+#### Ukur dulu: 332 piksel itu apa
+
+Dibuka per pola, bukan diduga. Selisihnya **±1 pada 324 piksel** dan **10
+pada 8 piksel**, di dalam masker radial 0,25 R — bukan sebentuk bintik, cincin,
+atau pita. Piksel terterang kedua gambar **identik** (197/197/198). Jadi
+kebocoran warna spektral: tidak ada. Yang berbeda **ukurannya**.
+
+Sebabnya terukur, bukan diurai: `star-unknown-id` lahir dari magnitudo 0,0,
+yaitu `size_from_magnitude(0,0)` = **0,50119**; sementara sentinel ragu dari
+`3ce0033` **memiliki nilainya sendiri**, `UNKNOWN_STAR_SIZE` = **0,5**. Selisih
+0,24% — cukup untuk menghasilkan 332 piksel, tidak cukup untuk dibaca mata.
+Gerbang itu mengukur **warna**, tetapi nama "warna" kini duduk di atas ukuran
+yang tidak lagi persis sama. Dua kalimat di `check-visuals.py` menyatakan
+dirinya sendiri salah sasaran — "ukuran disamakan, dan itu bukan kerapian" —
+tetapi hanya untuk probe di sebelahnya; banding utama tidak pernah
+disamarkan.
+
+#### Perbaikan: banding dibuat khusus, bukan diambil dari kasus tetangga
+
+`star-unknown-id` **tidak** dihapus — ia dipakai puluhan pemeriksaan lain
+sebagai "bintang tak dikenal", dan memindahkannya akan menyenggol seluruh
+kluster. Yang diubah hanya pemeriksaan ini: bandingnya kini dibuat ad-hoc
+dengan `color_index = UNKNOWN_STAR_COLOR_INDEX` dan `relative_size =
+UNKNOWN_STAR_SIZE`, yaitu **ukuran yang sama persis** dengan sisi ragu.
+Terukur sesudahnya: **0 piksel berbeda** (dari 332), dan ketiga pemeriksaan
+lain di fungsi yang sama tetap hijau.
+
+#### Non-vakuositas diukur, bukan dikutip
+
+- `bukti-mutasi-warna-bintang.py` (lima keadaan) — **semua sesuai harapan**,
+  sumber pulih byte-identik (`md5 1bff7b7… -> 1bff7b7…`).
+- Gerbang yang baru diuji **bisa merah**: baseline hijau, mutasi sentinel
+  0,15 → `GAGAL sentinel ukuran ragu bukan salah satu magnitudo`.
+
+#### Cacat kedua: harness yang ada di disk, tidak pernah dijalankan CI
+
+`check-harness-terdaftar.py` memerahkan: `bukti-mutasi-ukuran-bintang.py`
+dari `3ce0033` **tidak dirujuk satu langkah pun** di `engine-tests.yml` —
+gerbang bukti yang tidak pernah dieksekusi, persis kelas yang gerbang itu
+ada untuk mencegah. Harness-nya sendiri benar dan lulus keempat keadaannya
+lokal. Karena itu ia **didaftarkan** (127 harness, semuanya dirujuk), bukan
+dilonggarkan.
+
+#### Cacat ketiga: keadaan 3 lulus dengan nol merah, padahal menyatakan diri menangkap regresi
+
+Docstring harness itu menulis keadaan 3 menutup "sentinel dikembalikan ke
+0,15" — dan **tidak**; terukur **0 merah** pada keadaan itu. Sebabnya
+diukur: sentinel dipaksa 0,15 dan sebaran cahayanya **0,0% persis**, sama
+dengan sentinel 0,5. Pemeriksaan "ukuran bintang tidak mengklaim saat ragu"
+hanya menuntut semua bintang ragu **sama besar**, dan syarat itu dipenuhi
+nilai apa pun. Sedangkan 0,15 **adalah** magnitudo: `size_from_magnitude(+3.5)`
+= 0,15, dan seluruh magnitudo di atasnya terklip ke sana. Jadi "ragu" tetap
+sebesar bintang paling redup, dan tidak ada yang melihatnya.
+
+Pemeriksaan baru: `sentinel ukuran ragu bukan salah satu magnitudo` —
+sentinel diuji terhadap skala `size_from_magnitude` itu sendiri, bukan
+terhadap angka yang ditulis di sisi ini. Harness diikuti: keempat keadaannya
+kini menuntut ketiga arah, dan keadaan 3 akhirnya **merah seperti yang
+dokstring-nya klaim** (3 pemeriksaan, 1 merah).
+
+#### Gerbang (lokal)
+
+    ./swift-test.sh                   CelestialEngine 222 + PointingKit 972, 0 gagal
+    ./swift-ui-lint.sh                73 aturan, exit 0
+    ./swift-typecheck.sh              SEMUA GERBANG LULUS
+    check-visuals (cluster bintang)   10 pemeriksaan, 0 gagal
+    bukti-mutasi-warna-bintang.py     5 keadaan, semua sesuai harapan
+    bukti-mutasi-ukuran-bintang.py    4 keadaan, semua sesuai harapan
+    check-harness-terdaftar.py        127 harness, semuanya dirujuk
+    check-jangkar-harness.py          499 jangkar, nol mutasi tertinggal
+
+#### Yang TIDAK diklaim
+
+- **Gerbang penuh `check-visuals.py` (~41 menit) tidak dijalankan di VPS ini.**
+  Yang dijalankan adalah sepuluh pemeriksaan kluster bintang itu plus dua
+  harness; sisanya diserahkan ke CI. Itu batas yang dinyatakan.
+- Perbaikan di sini hanya di `Tools/` + alur kerja — **tidak ada baris
+  produksi (Swift) yang berubah**. Ukuran sentinel 0,5 tetap, palet tetap,
+  dan `3ce0033` tidak dinilai ulang di sini.
+- Pemeriksaan sentinel-bukan-magnitudo hanya menyapu magnitudo yang sama
+  dengan yang disapu gerbang sebaran (−1,46 … +3,5). Rentang magnitudo lain
+  tidak diklaim.
+
+---
+
 
 Siklus dibuka dengan `git log` + `gh run list`, bukan dengan brief. **`main`
 merah dua arah** untuk `aaba2d4`: `Apple Build` gagal (3m36s) dan `Engine
