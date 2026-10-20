@@ -2922,7 +2922,7 @@ public extension CelestialVisual {
     ///
     /// Dalam satuan radius bola, relatif terhadap pusatnya. `centerY` negatif
     /// = belahan utara (ingat: di `Canvas` y bertambah ke bawah).
-    public struct Band: Equatable, Sendable {
+    struct Band: Equatable, Sendable {
         /// Ketinggian pusat pita, −1…+1 (satuan radius bola).
         public var centerY: Double
         /// Separuh lebar pita di ketinggian itu (satuan radius bola).
@@ -2993,7 +2993,7 @@ public extension CelestialVisual {
     /// meminta pita bergaris (mis. untuk eksperimen), tetapi bawaan produk
     /// adalah pita bersambung — itulah yang membuat piringan terbaca sebagai
     /// gas giant.
-    public static func jupiterBands(count: Int = 7,
+    static func jupiterBands(count: Int = 7,
                              heightFraction: Double? = nil) -> [Band] {
         guard count > 0 else { return [] }
         // Jarak antar pusat pita. Pita bersambung = tingginya persis jarak
@@ -3037,12 +3037,12 @@ public extension CelestialVisual {
     /// seharusnya, dan piringannya terlihat miring. Tanda itu memang ada di
     /// model: `Band.centerY` **adalah** ketinggian bola yang bertanda, jadi
     /// pemanggil cukup meneruskannya.
-    public static func bandHalfWidthAt(height: Double) -> Double {
+    static func bandHalfWidthAt(height: Double) -> Double {
         min(1, max(0, 1 - height * height)).squareRoot()
     }
 
     /// Satu titik tepi pita: ketinggiannya di bola dan separuh lebarnya.
-    public struct BandEdge: Equatable, Sendable {
+    struct BandEdge: Equatable, Sendable {
         /// Ketinggian di bola, −1…+1 (satuan radius). Bertanda, seperti
         /// `Band.centerY`: negatif = belahan utara layar.
         public var height: Double
@@ -3080,7 +3080,7 @@ public extension CelestialVisual {
     /// dengan jumlah ruas yang sama. Di kartu jam (radius 19 pt) itu 0.022 pt
     /// — jauh di bawah satu piksel, dan kali ini karena panahnya memang kecil,
     /// bukan karena radiusnya kecil.
-    public static let bandEdgeSteps = 8
+    static let bandEdgeSteps = 8
 
     /// Tepi satu pita sebagai **poligon yang mengikuti busur limb**.
     ///
@@ -3114,7 +3114,7 @@ public extension CelestialVisual {
     /// Fungsi ini tidak mengembalikan titik di luar bola: `halfWidth` dihitung
     /// dari `bandHalfWidthAt`, jadi tepi pita selalu **di dalam atau tepat di**
     /// busur, tidak pernah menggantung di luarnya.
-    public static func jupiterBandEdges(centerY: Double, halfHeight: Double,
+    static func jupiterBandEdges(centerY: Double, halfHeight: Double,
                                  steps: Int = bandEdgeSteps) -> [BandEdge] {
         let count = max(1, steps)
         // Sampel seragam dalam SUDUT (`asin(y)`), bukan dalam `y`: dengan `y`
