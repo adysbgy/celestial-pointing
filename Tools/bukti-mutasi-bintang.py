@@ -76,9 +76,14 @@ STATES = [
     ("1. fixture kembali ke m=0.0",
      ("relative_size=size_from_magnitude(_MAG[star]), is_confirmed=True))",
       "relative_size=size_from_magnitude(0.0), is_confirmed=True))")),
-    ("2. penggambar mengabaikan relative_size",
-     ('geometry = star_geometry(kw.get("relative_size", 0.5))',
-      "geometry = star_geometry(0.5)")),
+    # Sumber berubah bentuk sejak keadaan ini ditulis: ukuran diteruskan
+    # `relative_size` melalui `drawable_star_size(...)`. Anchor di bawah ikut
+    # berubah bentuk — kalau tidak, ia menemukan dirinya sendiri di berkas
+    # harness lalu keadaannya tidak pernah mendarat, dan harness ini memerah
+    # pada pohon sehat (persis yang dijatuhkan main dua run terakhir).
+    ("2. penggambar mengabaikan ukuran",
+     ('    geometry = star_geometry(drawable_size)',
+      "    geometry = star_geometry(0.5)")),
     ("3. pembaca magnitudo bergeser +1",
      ("    return {name: float(value) for name, value in found}",
       "    return {name: float(value) + 1.0 for name, value in found}")),
