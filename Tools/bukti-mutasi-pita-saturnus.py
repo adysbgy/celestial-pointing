@@ -115,10 +115,19 @@ STATES = [
     # Pita tidak digambar sama sekali. Gerbang pita harus memerah: residual
     # antara "berpita" dan "satu nada" menjadi nol, karena keduanya sekarang
     # gambar yang sama persis.
+    #
+    # **Gerbang nada tetap HIJAU di sini, dan itu benar.** Versi pertama
+    # harapan ini menuntutnya merah; hasil terukur: hijau. Sebabnya
+    # `check_saturn_band_tones_stay_apart` membaca `R.SATURN_BAND_TONES` dan
+    # `R.ACCENTS` — konstanta, bukan piksel — jadi menghapus panggilan gambar
+    # tidak menyentuhnya sama sekali. Harapan yang salah itu bukan cacat
+    # gerbang: kalau ia ikut merah di sini, ia berarti mengukur gambar, dan
+    # itu tugas `check_saturn_globe_is_banded`. Dibiarkan hijau justru
+    # membuktikan ketiga gerbang mengukur besaran yang berbeda.
     ("1. pita Saturnus tidak digambar",
      [(BANDS_CALL, BANDS_CALL_OFF)],
-     {BANDED_DAY: MERAH, BANDED_NIGHT: MERAH, APART_DAY: MERAH,
-      APART_NIGHT: MERAH, NOT_JUPITER: HIJAU, COUNT_OK: HIJAU,
+     {BANDED_DAY: MERAH, BANDED_NIGHT: MERAH, APART_DAY: HIJAU,
+      APART_NIGHT: HIJAU, NOT_JUPITER: HIJAU, COUNT_OK: HIJAU,
       OPACITY_OK: HIJAU}),
 
     # Kedua nada disamakan. Gerbang pita memerah karena pitanya lenyap,
