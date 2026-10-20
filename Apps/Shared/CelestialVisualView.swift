@@ -484,10 +484,8 @@ struct CelestialVisualView: View {
         // (`jupiterBands`), dan `check-visuals.py` menjaga agar port Python
         // tidak tertinggal saat nilainya berubah.
         for band in CelestialVisual.jupiterBands() {
-            let y = center.y + CGFloat(band.centerY) * radius
             let halfWidth = radius * CGFloat(band.halfWidth)
             guard halfWidth > 1 else { continue }
-            let halfHeight = radius * CGFloat(band.halfHeight)
             // **Pita digambar sebagai tali busur, bukan elips.** Tepi pita
             // mengikuti busur limb: pada ketinggian `y ± halfHeight` bola
             // sudah menyempit, sementara elips mempertahankan lebarnya sampai
