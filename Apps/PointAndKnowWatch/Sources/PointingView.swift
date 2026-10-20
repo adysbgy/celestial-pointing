@@ -219,9 +219,22 @@ struct PointingView: View {
         // pengumuman hanya terjadi saat keadaannya benar-benar berganti —
         // kalau tidak, VoiceOver akan mengucapkan "Terkunci" berpuluh kali per
         // menit dan menutupi semua hal lain yang ingin dibaca pengguna.
+        //
+        // **Keputusan itu tidak ditulis di sini lagi.** Tiga baris guard yang
+        // dulu tinggal di sini (`guard announcedState != newState else {
+        // return }`) tidak dilindungi apa pun: `Apps/` tidak dibangun
+        // `swift-test.sh`, `-parse` tidak melihat guard yang dibalik, dan
+        // tidak ada aturan teks yang membacanya. Terukur: membalik `!=`
+        // menjadi `==` membuat seluruh aturan UI hijau, lalu app berhenti
+        // berbunyi saat lock berhasil — dan berbunyi 20x/detik saat keadaan
+        // diam, karena cuplikan ditulis 20 kali per detik. Sekarang
+        // keputusannya datang dari `AnnouncementGate` (PointingKit, teruji di
+        // Linux) dan Aturan 74 menuntut pemanggilan ini memakainya.
         .onChange(of: engine.snapshot.state) { _, newState in
-            guard announcedState != newState else { return }
-            announcedState = newState
+            let step = AnnouncementGate.step(announced: announcedState,
+                                             current: newState)
+            announcedState = step.remember
+            guard step.shouldSpeak else { return }
             // Kalimatnya datang dari `StateAnnouncement` (PointingKit), bukan
             // dari `switch` di sini. Dulu ia hidup sebagai literal di view ini,
             // dan itu berarti (a) katalog string tidak bisa menjangkaunya, jadi

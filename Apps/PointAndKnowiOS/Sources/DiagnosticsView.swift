@@ -105,9 +105,17 @@ struct RootView: View {
         // Keadaan awal (`nil`) sengaja tidak diumumkan: membuka app bukan
         // peristiwa yang perlu dikabarkan, dan mengumumkan "Siap" pada
         // peluncuran hanya menunda pembacaan isi layar.
+        //
+        // **Keputusannya di `AnnouncementGate`, bukan tiga baris di sini.**
+        // Lihat catatan di `PointingView`: guard tulisan tangan di `Apps/`
+        // tidak dijaga satu gerbang lokal pun (terukur: membalik `!=` membuat
+        // semua aturan UI hijau), dan Aturan 74 menuntut pemanggilan ini
+        // lewat gerbang yang teruji di Linux.
         .onChange(of: engine.snapshot.state) { _, newState in
-            guard announcedState != newState else { return }
-            announcedState = newState
+            let step = AnnouncementGate.step(announced: announcedState,
+                                             current: newState)
+            announcedState = step.remember
+            guard step.shouldSpeak else { return }
             AccessibilityNotification.Announcement(
                 StateAnnouncement.text(for: engine.snapshot)).post()
         }

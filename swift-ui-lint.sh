@@ -12891,6 +12891,149 @@ elif [ "$tombol_keadaan_status" -ne 0 ]; then
 fi
 
 
+echo "== Aturan 74: pengumuman keadaan harus lewat AnnouncementGate ==="
+pengumuman_gerbang=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+# Panggilan yang menuntut gerbang: setiap `.post()` pada
+# `AccessibilityNotification.Announcement` di Apps/ -- ini satu-satunya cara
+# mengirim kalimat ke VoiceOver, dan satu-satunya tempat cacat bisa bersembunyi.
+PANGGILAN = re.compile(
+    r"\bAccessibilityNotification\s*\.\s*Announcement\s*\(")
+
+
+def buang_komentar(s):
+    # Komentar blok dulu, lalu sebaris -- sama urutan seperti Aturan 71/72,
+    # supaya contoh di dalam komentar tidak terbaca sebagai kode.
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+
+def pasangan(isi, buka):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "(":
+            dalam += 1
+        elif isi[i] == ")":
+            dalam -= 1
+            if dalam == 0:
+                return i
+    return -1
+
+
+def tutup_kurawal(isi, buka):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "{":
+            dalam += 1
+        elif isi[i] == "}":
+            dalam -= 1
+            if dalam == 0:
+                return i
+    return -1
+
+
+def badan_onchange(isi, pos):
+    """Badan closure `onChange` terdekat yang memuat pos, atau None.
+
+    Pengumuman keadaan hanya boleh hidup di dalam `onChange` yang mengawasi
+    `engine.snapshot.state`; kalau ia di luar, ia tidak ada hubungannya dengan
+    perubahan keadaan dan harus berbunyi lewat `AnnouncementGate` juga."""
+    for m in reversed(list(re.finditer(r"\.onChange\s*\(", isi))):
+        if m.start() > pos:
+            continue
+        buka = isi.find("(", m.start())
+        tutup = pasangan(isi, buka)
+        if tutup < 0 or tutup > pos:
+            continue
+        ulang = isi.find("{", tutup)
+        if ulang < 0:
+            continue
+        akhir = tutup_kurawal(isi, ulang)
+        if akhir > pos:
+            return m.start(), akhir
+    return None
+
+
+berkas = []
+for dasar, dirs, nama in os.walk(AKAR):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 74 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(1)
+
+masalah = []
+diperiksa = 0
+for path in berkas:
+    isi = buang_komentar(open(path, encoding="utf-8").read())
+    for m in PANGGILAN.finditer(isi):
+        diperiksa += 1
+        cakupan = badan_onchange(isi, m.start())
+        if cakupan is None:
+            # `.post()` di luar `onChange`: ia tidak mengawasi perubahan
+            # keadaan, jadi sah -- pembatasannya bukan yang diuji di sini.
+            continue
+        awal, akhir = cakupan
+        badan = isi[awal:akhir]
+        baris = isi[:m.start()].count("\n") + 1
+        # Yang dibutuhkan: keputusan "berbunyi atau tidak" datang dari
+        # `AnnouncementGate.step(announced:current:)`, bukan dari guard
+        # tulisan tangan. Nama `remember`/`shouldSpeak` adalah aksesor
+        # eksternal, jadi nama-namanya boleh berubah; yang tidak boleh adalah
+        # gerbangnya sendiri ditulis di sini.
+        if "AnnouncementGate" not in badan:
+            # Nama properti yang di-_guard_ ikut disebut: pesan yang hanya
+            # menunjuk berkas dan baris tidak bisa diperiksa, dan yang
+            # membuktikan aturan berbunyi justru **apa** yang ia tuduhkan.
+            kawal = ""
+            for m in re.finditer(r"\bguard\s+(\w+)", badan):
+                kawal = m.group(1)
+                break
+            masalah.append(
+                "  %s:%d: pengumuman keadaan memakai guard tulisan sendiri%s. "
+                "Gerbang 'berbunyi hanya saat keadaan berubah' hidup di "
+                "PointingKit (`AnnouncementGate`) supaya ia teruji di Linux; "
+                "di Apps/ ia tidak dibangun satu gerbang pun."
+                % (path, baris,
+                   " (%s)" % kawal if kawal else ""))
+
+if diperiksa == 0:
+    print("PERINGATAN: nol panggilan AccessibilityNotification.Announcement "
+          "terbaca -- Aturan 74 tidak mengukur satu pengumuman pun.")
+    raise SystemExit(1)
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+
+print("Bersih: %d panggilan Announcement; yang mengawasi keadaan lewat "
+      "AnnouncementGate." % diperiksa)
+PY
+)
+pengumuman_gerbang_status=$?
+echo "$pengumuman_gerbang"
+if printf '%s' "$pengumuman_gerbang" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 74 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$pengumuman_gerbang_status" -ne 0 ]; then
+  echo "-> Ada pengumuman keadaan yang memanggilnya dengan guard tulisan sendiri."
+  echo "   Itu tiga baris yang tidak dilindungi apa pun: Apps/ tidak dibangun"
+  echo "   swift-test.sh, -parse tidak melihat guard yang dibalik, dan tidak"
+  echo "   ada aturan teks yang membacanya. Terukur: membalik guard membuat"
+  echo "   seluruh aturan lain hijau sementara app berhenti berbunyi saat"
+  echo "   keadaan berubah -- lalu berbunyi 20x/detik saat keadaan diam."
+  status=1
+fi
+
+
 echo "== Aturan 73: nama yang diurai dari sebuah pasangan wajib dipakai ==="
 pasangan_nama=$(python3 - <<'PY' 2>&1
 import os

@@ -2664,6 +2664,24 @@ jobs:
       - name: Buktikan Aturan 73 menangkap nama pasangan yang tak dipakai
         run: python3 Tools/bukti-mutasi-aturan73-pasangan.py
 
+      # Bacaan keadaan VoiceOver. Keputusan "berbunyi hanya saat berubah" hidup
+      # sebagai tiga baris `guard ... else { return }` di dalam tiga view, dan
+      # tidak satu pun gerbang melihatnya: `Apps/` tidak dibangun di Linux,
+      # `-parse` tidak menilai guard, dan tidak ada aturan teks yang
+      # membacanya. Terukur sebelum Aturan 74 ada (proses baru): membalik
+      # `!=` menjadi `==` membuat seluruh 73 aturan UI **exit 0** -- app lalu
+      # berhenti berbunyi saat lock berhasil, dan berbunyi 20x/detik saat
+      # keadaan diam, karena cuplikan ditulis 20 Hz.
+      #
+      # Yang merusak paling mahal di sini bukan diamnya app: justru pengguna
+      # VoiceOver adalah yang paling bergantung pada alat ini (mereka tidak
+      # bisa melihat langit), dan mereka yang paling sedikit menerima kabar.
+      # Aturan 74 menuntut keputusan itu lewat `AnnouncementGate`
+      # (PointingKit, teruji di Linux); harness ini membuktikan aturannya
+      # memang berbunyi.
+      - name: Buktikan Aturan 74 menuntut pengumuman lewat gerbang
+        run: python3 Tools/bukti-mutasi-aturan74-announcement.py
+
       # Gerbang keterpisahan pita Jupiter. Sampai siklus ini keempat gerbang
       # pita yang ada bertanya "apakah pitanya ada", dan keempatnya lulus pada
       # pola tan->rust->cream berulang yang terukur residual 0.006 -- pita yang

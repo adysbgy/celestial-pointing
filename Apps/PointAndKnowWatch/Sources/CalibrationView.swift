@@ -113,9 +113,15 @@ struct CalibrationView: View {
             // pengumuman tetap pada perubahan: `onChange` sudah tidak memicu saat
             // nilai sama, tapi pesan "Belum siap dipakai" bisa muncul berkali-kali
             // untuk satu masalah yang sama.
+            //
+            // **Keputusannya di `AnnouncementGate`, bukan guard tulisan
+            // sendiri.** Gerbang yang sama dipakai `PointingView` dan
+            // `RootView`, dan ia teruji di Linux (Aturan 74 menuntutnya).
             .onChange(of: statusMessage) { _, newMessage in
-                guard announcedStatus != newMessage else { return }
-                announcedStatus = newMessage
+                let step = AnnouncementGate.step(announced: announcedStatus,
+                                                 current: newMessage)
+                announcedStatus = step.remember
+                guard step.shouldSpeak else { return }
                 AccessibilityNotification.Announcement(newMessage).post()
             }
             // Kegagalan **pengiriman** juga harus terdengar, bukan hanya
@@ -133,8 +139,11 @@ struct CalibrationView: View {
             // dan bisa berubah pada aksi yang sama; menggabungkannya membuat
             // salah satu pengumuman menelan yang lain.
             .onChange(of: link.lastMessageNote) { _, newNote in
-                guard let newNote, announcedLinkNote != newNote else { return }
-                announcedLinkNote = newNote
+                guard let newNote else { return }
+                let step = AnnouncementGate.step(announced: announcedLinkNote,
+                                                 current: newNote)
+                announcedLinkNote = step.remember
+                guard step.shouldSpeak else { return }
                 AccessibilityNotification.Announcement(newNote).post()
             }
         }
