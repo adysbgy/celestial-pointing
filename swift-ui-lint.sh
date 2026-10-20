@@ -12891,6 +12891,104 @@ elif [ "$tombol_keadaan_status" -ne 0 ]; then
 fi
 
 
+echo "== Aturan 73: nama yang diurai dari sebuah pasangan wajib dipakai ==="
+pasangan_nama=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+AKAR = "Apps"
+
+
+def buang_komentar(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    return re.sub(r"//[^\n]*", "", s)
+
+
+def tutup_kurawal(isi, buka):
+    dalam = 0
+    for i in range(buka, len(isi)):
+        if isi[i] == "{":
+            dalam += 1
+        elif isi[i] == "}":
+            dalam -= 1
+            if dalam == 0:
+                return i
+    return -1
+
+
+berkas = []
+for dasar, dirs, nama in os.walk(AKAR):
+    dirs[:] = [d for d in dirs if d not in (".build", "build")]
+    for n in sorted(nama):
+        if n.endswith(".swift"):
+            berkas.append(os.path.join(dasar, n))
+
+if not berkas:
+    print("PERINGATAN: tidak ada berkas Swift di %s -- Aturan 73 tidak "
+          "mengukur apa pun." % AKAR)
+    raise SystemExit(1)
+
+diperiksa = 0
+masalah = []
+for path in berkas:
+    try:
+        isi = buang_komentar(open(path, encoding="utf-8").read())
+    except OSError as e:
+        print("PERINGATAN: %s tidak terbaca (%s)." % (path, e))
+        raise SystemExit(1)
+    for m in re.finditer(r"\bfor\s*\(([^)]*)\)\s*in\s+", isi):
+        nama_nama = [x.strip() for x in m.group(1).split(",") if x.strip()]
+        if not nama_nama:
+            continue
+        buka = isi.find("{", m.end())
+        if buka < 0:
+            continue
+        tutup = tutup_kurawal(isi, buka)
+        if tutup < 0:
+            continue
+        badan = isi[buka + 1:tutup]
+        diperiksa += 1
+        jumlah_baris = isi[:m.start()].count("\n") + 1
+        for n in nama_nama:
+            # `_` adalah pembuangan yang disengaja: itu memang cara menyatakan
+            # "saya tidak memakai bagian ini".
+            if n == "_":
+                continue
+            if not re.search(r"\b%s\b" % re.escape(n), badan):
+                masalah.append(
+                    "  %s:%d: nama `%s` diurai dari pasangan tetapi tidak "
+                    "dipakai di badan loop -- compiler memperingatkan "
+                    "\"immutable value was never used\"."
+                    % (path, jumlah_baris, n))
+
+if diperiksa == 0:
+    print("PERINGATAN: nol loop berpasangan terbaca -- Aturan 73 tidak "
+          "mengukur satu binding pun.")
+    raise SystemExit(1)
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+
+print("Bersih: %d loop berpasangan, semua nama yang diurai dipakai." % diperiksa)
+PY
+)
+pasangan_nama_status=$?
+echo "$pasangan_nama"
+if printf '%s' "$pasangan_nama" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 73 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$pasangan_nama_status" -ne 0 ]; then
+  echo "-> Ada nama yang diurai dari pasangan lalu tidak dipakai."
+  echo "   Ini bukan cuma peringatan kosmetik: peringatan compiler pada"
+  echo "   kode sendiri MEMERAHKAN Apple Build, dan berkas SwiftUI tidak"
+  echo "   pernah dibangun di Linux -- jadi satu nama sisa di sini lolos"
+  echo "   semua gerbang lokal dan baru ketahuan satu siklus penuh kemudian."
+  echo "   Buang namanya atau ganti dengan _ kalau memang tidak dipakai."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

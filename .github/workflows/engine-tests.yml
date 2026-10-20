@@ -2653,6 +2653,17 @@ jobs:
       - name: Buktikan Aturan 72 menangkap tombol yang tak mengubah keadaannya
         run: python3 Tools/bukti-mutasi-aturan72-tombol-keadaan.py
 
+      # Aturan 73. `aaba2d4` membiarkan `for (index, band)` sesudah loop-nya
+      # berhenti memakai `index`; itu peringatan compiler pada kode sendiri,
+      # dan gerbang peringatan di ios-build.yml memerahkan Apple Build. Nol
+      # dari 72 aturan sebelumnya melihatnya: `swift-ui-lint.sh` membaca teks,
+      # `swift-typecheck.sh` hanya parse SwiftUI, dan `Apps/` tidak pernah
+      # dibangun `swift-test.sh` di Linux. Keadaan 4 harness ini menuntut
+      # lint pra-perbaikan HIJAU pada mutasi yang sama -- kalau ia merah di
+      # sana, cacatnya sudah terjaga dan aturan ini tidak menambah apa pun.
+      - name: Buktikan Aturan 73 menangkap nama pasangan yang tak dipakai
+        run: python3 Tools/bukti-mutasi-aturan73-pasangan.py
+
       # Gerbang keterpisahan pita Jupiter. Sampai siklus ini keempat gerbang
       # pita yang ada bertanya "apakah pitanya ada", dan keempatnya lulus pada
       # pola tan->rust->cream berulang yang terukur residual 0.006 -- pita yang

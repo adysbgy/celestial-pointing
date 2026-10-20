@@ -483,8 +483,7 @@ struct CelestialVisualView: View {
         // yang terlalu tipis hilang di layar jam. Angkanya milik model
         // (`jupiterBands`), dan `check-visuals.py` menjaga agar port Python
         // tidak tertinggal saat nilainya berubah.
-        let bands = CelestialVisual.jupiterBands()
-        for (index, band) in bands.enumerated() {
+        for band in CelestialVisual.jupiterBands() {
             let y = center.y + CGFloat(band.centerY) * radius
             let halfWidth = radius * CGFloat(band.halfWidth)
             guard halfWidth > 1 else { continue }
