@@ -26,7 +26,22 @@ import PointingKit
 public final class MotionLogger: ObservableObject {
 
     /// Apakah device motion sedang menyala.
-    @Published public private(set) var isRunning = false
+    ///
+    /// **Kenapa TIDAK `@Published`.** Nilainya ditulis di tiga jalur (`start`,
+    /// `stop`, `handleFailure`) dan **tidak dibaca satu layar pun** — sensor
+    /// hidup/mati sudah sampai ke pengguna lewat `PointingEngine.sensorNote`
+    /// dan `unavailableReason`, yang keduanya memang dibaca. Sebagai
+    /// `@Published`, setiap perubahan memanggil `objectWillChange` untuk
+    /// **setiap** layar yang mengobservasi `MotionLogger` (`PointingView`,
+    /// `CalibrationView`, `ReducedLuminanceView`, dokumen aplikasi) — render
+    /// yang tidak pernah menghasilkan satu piksel.
+    ///
+    /// Terukur: `grep -rn '\bisRunning\b' Apps/ Packages/` menemukan tiga
+    /// penulisan dan **nol** pembacaan. Properti ini tetap ada (dan tetap
+    /// jujur) karena `swift-ui-lint.sh` Aturan 53 mengawalnya sebagai titik
+    /// kejujuran sensor: `isRunning = manager.isDeviceMotionActive` wajib
+    /// muncul tepat sekali. Yang dihapus hanya saluran render-nya.
+    public private(set) var isRunning = false
     /// Pesan terakhir saat sensor tidak bisa dipakai.
     @Published public private(set) var unavailableReason: String?
     /// Jumlah sampel yang sudah diterima — untuk memastikan sensor benar hidup.
