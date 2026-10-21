@@ -2933,6 +2933,17 @@ jobs:
       - name: Buktikan gerbang peringatan laju berbunyi
         run: python3 Tools/bukti-mutasi-aturan84-peringatan-laju.py
 
+      # Aturan 85: permukaan **skalar** di `Apps/` juga meneruskan faktanya.
+      # Aturan 42 mengawal badan permukaan kejujuran, tetapi hanya yang bertipe
+      # `T?`; saudaranya yang bertipe `String`/`Int`/`Double` tidak dibaca satu
+      # gerbang pun. Terukur di pohon utuh: `ExperimentRecorder.verdict`
+      # diganti `summaryPassed(..., accuracy: "100%")` -> layar Experiment 1
+      # mencetak "Lulus, akurasi 100%" tanpa membaca satu pun percobaan, dan
+      # seluruh 84 aturan tetap exit 0. Harness ini menuntut keempat bentuk
+      # cacat berbunyi, ketiga kontrol diam, dan fail-closed saat `Apps/` kosong.
+      - name: Buktikan gerbang permukaan skalar berbunyi
+        run: python3 Tools/bukti-mutasi-aturan85-permukaan-skalar.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada

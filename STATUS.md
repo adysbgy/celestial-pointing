@@ -1,3 +1,72 @@
+### Siklus (21 Okt 2026 — permukaan skalar: putusan Experiment 1 bisa dikarang tanpa satu gerbang berbunyi)
+
+Aturan 42 mengawal badan permukaan kejujuran di `Apps/`, tetapi **hanya yang
+bertipe `T?`** (`var displayedObject: CelestialObject?`, `var pointing:
+HorizontalCoord?`). Saudaranya yang bertipe skalar tidak dibaca satu gerbang
+pun. Yang paling berharga di antaranya adalah satu-satunya kalimat di app ini
+yang menyatakan apakah alat bantu tunjuk **lulus syarat keselamatan**:
+
+    Apps/PointAndKnowiOS/Sources/ExperimentRecorder.swift:181
+        public var verdict: String { harness.verdict }
+
+Terukur di pohon utuh, proses baru, dengan mutasi yang mengompilasi:
+
+    verdict -> ExperimentText.summaryPassed(trialCount: ..., accuracy: "100%", ...)
+    ./swift-ui-lint.sh  ->  exit 0, "SEMUA GERBANG UI LULUS"
+
+Layar Experiment 1 bisa mencetak "Lulus, akurasi 100%" tanpa membaca satu pun
+percobaan, dan seluruh 84 aturan saat itu tetap hijau.
+
+#### Kenapa tidak satu gerbang pun berbunyi
+
+- `ExperimentSafetyVerdictTests` menguji `ExperimentHarness.verdict` — milik
+  **paket**, bukan milik app. Mesin kejujuran di bawahnya tetap benar dan tetap
+  teruji: ambang 20 percobaan, asimetri gagal/lulus, semuanya hijau.
+- `Apps/` tidak pernah dibangun `swift-test.sh` di Linux, dan
+  `swift-typecheck.sh` hanya `-parse` berkas SwiftUI: tidak ada kompilasi,
+  tidak ada tes.
+- Aturan 42 melewatkan tipe skalar secara struktural (`tipe.endswith("?")`),
+  dan `Bool` sudah milik Aturan 38.
+
+Kelas cacat yang sama dengan siklus-siklus sebelumnya: bagian yang memutuskan
+benar, bagian yang menampilkan tidak, dan tidak ada gerbang yang
+menghubungkan keduanya.
+
+#### Yang dikerjakan
+
+- `Tools/check-aturan85-permukaan-skalar.py` — Aturan 85. Setiap
+  `var <nama>: <skalar> { ... }` di `Apps/` yang namanya **ada sebagai anggota
+  model** di `Packages/PointingKit` wajib menyebut namanya di badannya.
+  Menurunkan permukaan dari model, bukan mendaftar nama tangan (daftar tangan
+  sudah dua kali menjatuhkan `main` di repo ini).
+- `Tools/bukti-mutasi-aturan85-permukaan-skalar.py` — 7 keadaan: 4 bentuk cacat
+  (verdict dikarang, `recordedCount` -> `summary.trialCount`, `unanalyzableCount`
+  -> literal `0`, `pulsePhase` -> `* 1.0`), 3 kontrol yang harus **diam**
+  (`AnyView`, `Bool` literal, baseline), dan fail-closed saat `Apps/` kosong.
+- `swift-ui-lint.sh` — aturan 85, logika di `Tools/` bukan heredoc (bash 3.2
+  di macOS CI; diverifikasi `bash -n` di kontainer bash:3.2).
+- `.github/workflows/engine-tests.yml` — harness terdaftar.
+- `README.md` — 83 -> 84 aturan (Aturan 10 menangkapnya sendiri saat pertama
+  dijalankan).
+
+#### Yang TIDAK diklaim
+
+- Ini sapu **teks**, bukan pemeriksa tipe: ia tahu bentuk badannya, tidak tahu
+  nilai yang dihasilkannya. `harness.verdict + " Lulus"` lolos, dan `?? "Lulus"`
+  juga. Yang ditutup adalah bentuk yang paling senyap dan yang terbukti lolos
+  seluruh gerbang: badan yang sama sekali tidak menyebut faktanya.
+- Aturan 85 tidak membuktikan angka di layar benar; ia membuktikan angkanya
+  **berasal dari** mesin yang benar. Kebenaran mesin tetap milik tes paket.
+- Enam permukaan skalar yang ada hari ini sudah benar semua; aturan ini
+  **regresi**, bukan perbaikan cacat yang sedang hidup.
+
+#### Gerbang
+
+`./swift-test.sh` 1255 hijau (Engine 222 + PointingKit 1033) ·
+`./swift-ui-lint.sh` 85 aturan exit 0 · `bash -n` di bash:3.2 exit 0 ·
+143/143 harness terdaftar.
+
+
 ### Siklus (21 Okt 2026 — kalimat hint yang mengklaim lebih banyak daripada yang diukur kode)
 
 Cacat ini hidup di **satu string** di `Packages/PointingKit/Sources/PointingKit/SearchHint.swift`,

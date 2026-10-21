@@ -14541,6 +14541,50 @@ else
 fi
 
 
+# ── Aturan 85: permukaan **skalar** di Apps/ juga meneruskan faktanya ───────
+#
+# Aturan 42 mengawal badan permukaan kejujuran di `Apps/`, tetapi hanya yang
+# bertipe `T?`. Saudaranya yang bertipe skalar (`String`, `Int`, `Double`) tidak
+# dibaca satu gerbang pun — dan yang paling berharga di antaranya adalah
+# kalimat putusan Experiment 1:
+#
+#     Apps/PointAndKnowiOS/Sources/ExperimentRecorder.swift:181
+#         public var verdict: String { harness.verdict }
+#
+# Terukur pada salinan utuh di proses baru, dengan mutasi yang mengompilasi:
+# menggantinya dengan `ExperimentText.summaryPassed(..., accuracy: "100%")`
+# membuat layar Experiment 1 mencetak "Lulus, akurasi 100%" tanpa membaca satu
+# pun percobaan — dan **seluruh 84 aturan tetap hijau** (`exit 0`). Seluruh
+# mesin kejujuran di bawahnya tetap benar dan tetap teruji; yang hilang adalah
+# kaitannya ke layar. `ExperimentSafetyVerdictTests` menguji
+# `ExperimentHarness.verdict` (milik paket), dan `Apps/` tidak pernah dibangun
+# `swift-test.sh` di Linux.
+#
+# Logikanya tinggal di `Tools/check-aturan85-permukaan-skalar.py`, bukan
+# di-inline di sini — alasan yang sama dengan Aturan 84: badan heredoc
+# `$(python3 - <<'PY')` diurai bash 3.2 di macOS CI, dan satu kutip tunggal atau
+# backtick ganjil di dalamnya membuat skrip memindai sampai EOF lalu
+# **melewati seluruh aturan berikutnya tanpa suara**.
+echo
+echo "== Aturan 85: permukaan skalar di Apps/ meneruskan faktanya =="
+if [ ! -f "Tools/check-aturan85-permukaan-skalar.py" ]; then
+  echo "FAIL Tools/check-aturan85-permukaan-skalar.py tidak ada: Aturan 85 tidak"
+  echo "     mengukur apa pun, dan kalimat putusan Experiment 1 kehilangan"
+  echo "     gerbangnya."
+  status=1
+else
+  permukaan_skalar=$(python3 Tools/check-aturan85-permukaan-skalar.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$permukaan_skalar"
+    echo "-> Permukaan skalar di Apps/ wajib meneruskan anggota model yang"
+    echo "   namanya dipakainya. Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$permukaan_skalar"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
