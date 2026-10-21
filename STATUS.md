@@ -1,3 +1,109 @@
+### Siklus (21 Okt 2026 — `PhoneLinkService`: cabang yang berjanji menjawab, dan tidak menjawab)
+
+`Apps/PointAndKnowiOS/Sources/PhoneLinkService.swift` satu dari tiga berkas
+`Apps/` yang **nol** gerbang merujuknya. Di dalamnya ada cabang yang membawa
+komentar janji eksplisit:
+
+    case .stateRequest:
+        // Jam meminta keadaan — balas dengan yang terakhir kita punya.
+        // (Peran ini jarang terpakai, tapi harus ada supaya permintaan
+        // tidak berakhir tanpa jawaban.)
+        if let lastState { send(lastState) }
+
+Kalau `lastState` belum ada, cabang itu **tidak melakukan apa pun**. Janjinya
+tidak dijaga kode apa pun. Terukur di pohon utuh, proses baru, dengan mutasi
+yang mengompilasi:
+
+    (seluruh cabang .stateRequest dihapus)
+    ./swift-ui-lint.sh  ->  exit 0, "SEMUA GERBANG UI LULUS", 85 aturan hijau
+
+Jam bisa meminta keadaan dan tidak pernah menerima jawaban, tanpa satu gerbang
+pun berbunyi.
+
+#### Yang membuat cacat ini berbeda dari "kurang satu jawaban"
+
+Sisi **jam** sudah benar sejak awal. `WatchLinkService` menulis
+`stateRequestTooEarly` saat ia tidak punya keadaan. Jadi yang hilang bukan
+kalimatnya — kalimat itu sudah ada, sudah terlokalisasi, dan sudah diuji. Yang
+hilang **paritas**: dua salinan `if let … else …` yang menjawab dua hal
+berbeda untuk keadaan yang sama.
+
+Dan kerugiannya bukan diamnya, melainkan bahwa diam itu **tidak terlihat**: di
+layar Tautan, jam yang meminta lalu tidak dijawab tampak persis sama dengan
+jam yang tidak pernah meminta.
+
+#### Kenapa diperbaiki di `PointingKit`, bukan di `Apps/`
+
+`Apps/` tidak pernah dibangun `swift-test.sh` di Linux, dan
+`swift-typecheck.sh` hanya `-parse`: tidak ada kompilasi, tidak ada tes. Jadi
+memperbaiki badan `handle(_:)` saja akan menghasilkan perbaikan yang **tidak
+bisa diuji** di mesin ini.
+
+Putusannya karena itu dipindah ke fungsi murni:
+
+    Packages/PointingKit/Sources/PointingKit/LinkStatusText.swift
+        public enum StateRequestReply { case resendLastState, reportUnanswerable }
+        public static func stateRequestReply(hasState: Bool) -> StateRequestReply
+
+Tidak ada cabang "diam" yang bisa dipilih. Kedua service memakai fungsi yang
+sama, jadi penyimpangan tidak mungkin lagi. Diuji di Linux:
+`StateRequestReplyTests` (5 uji). Terbukti tidak hampa — memaksa fungsinya
+selalu `.resendLastState` membuat **dua** uji gagal:
+
+    LinkStatusTextTests.swift:389  testWithoutStateTheRequestIsAnsweredHonestly
+    LinkStatusTextTests.swift:400  testTheTwoStatesAreNotTheSameDecision
+
+#### Gerbangnya, dan kenapa bentuknya begitu
+
+Aturan 86 (`Tools/check-aturan86-jawaban-state-request.py`) menuntut **kedua**
+berkas wajib memakai `stateRequestReply` dan menangani `.reportUnanswerable`
+dengan penugasan yang benar-benar menulis kalimat.
+
+Versi pertama aturan ini memeriksa *kehadiran* kata `send(` dan `lastNote =`.
+Itu terlalu lemah: `if false { send(lastState) }` lolos, dan `lastNote = nil`
+juga lolos. Ketahuan saat harness-nya sendiri ditulis — 3 dari 4 mutasi diam.
+Sekarang ia memeriksa **badan tiap sub-cabang** dan menolak penugasan `nil`.
+
+`Tools/bukti-mutasi-aturan86-jawaban-state-request.py` membuktikannya berbunyi
+pada 8 bentuk cacat, diam pada 1 kontrol, dan fail-closed saat `Apps/` kosong.
+Terdaftar di `engine-tests.yml` (dijaga `check-harness-terdaftar.py`, yang
+memang **menolak** harness ini sampai langkahnya ditambahkan — 144 harness,
+143 dirujuk, 1 masalah).
+
+Satu catatan tentang harness itu sendiri: versi pertamanya memakai jangkar dua
+baris (`case .stateRequest:` + baris komentar) untuk mengganti cabang. Itu
+meninggalkan `switch` di tempatnya, sehingga mutasinya bukan cacat yang
+dimaksud, dan ia melaporkan 3 keadaan GAGAL padahal aturannya bekerja. Sekarang
+mutasi "cabang lama" mengganti **seluruh** cabang lewat `ganti_cabang`.
+
+#### Yang TIDAK diklaim
+
+- Cabang `.stateRequest` masih **laten**: tidak ada pengirim `stateRequest` di
+  `Apps/` saat ini. Perbaikan ini membuatnya benar kalau nanti dipakai, bukan
+  membuatnya terpakai.
+- Fungsi ini memutuskan **apa** yang dijawab, bukan apakah jawabannya sampai.
+  Pengiriman gagal tetap dilaporkan `send(_:)`.
+- Tidak ada perubahan pada akurasi, pada model keyakinan, atau pada jalur
+  POINT → OBJECT ID → SAFE GOTO. Tidak ada wrist angle yang menjadi perintah
+  motor.
+- Tidak ada gerbang yang bisa membuktikan cabang ini benar di **jam sungguhan**;
+  yang terbukti adalah bahwa kode kedua sisi memakai satu putusan yang diuji,
+  dan bahwa menghapus putusan itu membuat gerbang berbunyi.
+
+#### Hitungan
+
+| Gerbang | Sebelum | Sesudah |
+|---|---|---|
+| `./swift-test.sh` | 1038 hijau | 1038 hijau (3 uji baru masuk hitungan ini) |
+| `./swift-typecheck.sh` | lulus | lulus |
+| `./swift-ui-lint.sh` | 85 aturan, exit 0 | 85 aturan + Aturan 86, exit 0 |
+
+Catatan angka: `swift-ui-lint.sh` punya **85** header `== Aturan` meski nomor
+tertingginya 86 — nomor 69 tidak pernah ada. Aturan 10 (hitungan README)
+menghitung header, bukan nomor tertinggi, jadi README diperbarui ke 85.
+Angka PointingKit di README juga basi (1033 → 1038); Aturan 10 menangkapnya
+saat siklus ini, dan itu memang tugasnya.
+
 ### Siklus (21 Okt 2026 — permukaan skalar: putusan Experiment 1 bisa dikarang tanpa satu gerbang berbunyi)
 
 Aturan 42 mengawal badan permukaan kejujuran di `Apps/`, tetapi **hanya yang

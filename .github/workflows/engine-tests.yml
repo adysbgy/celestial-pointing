@@ -2944,6 +2944,16 @@ jobs:
       - name: Buktikan gerbang permukaan skalar berbunyi
         run: python3 Tools/bukti-mutasi-aturan85-permukaan-skalar.py
 
+      # Aturan 86: cabang `.stateRequest` wajib menjawab, dan menjawab selalu.
+      # Terukur di `main` sebelum aturan ini ada: menghapus **seluruh** cabang
+      # itu di `PhoneLinkService.handle(_:)` membuat `swift-ui-lint.sh` exit 0
+      # dengan 85 aturan hijau — jam bisa meminta keadaan dan tidak pernah
+      # menerima jawaban, tanpa satu gerbang pun berbunyi. Sisi jam sudah
+      # benar sejak awal; yang hilang paritas kedua sisi, jadi harness ini
+      # menuntut **kedua** berkas memakai putusan bersama yang diuji di Linux.
+      - name: Buktikan gerbang jawaban stateRequest berbunyi
+        run: python3 Tools/bukti-mutasi-aturan86-jawaban-state-request.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada

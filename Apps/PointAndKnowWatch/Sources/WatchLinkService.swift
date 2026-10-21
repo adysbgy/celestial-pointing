@@ -197,10 +197,17 @@ public final class WatchLinkService: NSObject, ObservableObject {
             // Balas dengan keadaan yang berlaku sekarang. Kalau app belum
             // menyediakan sumbernya, katakan terus terang — iPhone yang meminta
             // dan tidak menerima apa-apa akan mengira jam tidak menjawab.
-            if let currentSnapshot {
-                send(state: currentSnapshot())
-            } else {
-                lastMessageNote = LinkStatusText.stateRequestTooEarly
+            //
+            // Putusannya dari `LinkStatusText.stateRequestReply`, fungsi yang
+            // sama dengan yang dipakai `PhoneLinkService`: dua salinan
+            // `if let … else …` sudah pernah menyimpang (sisi iPhone diam
+            // saat belum ada keadaan), dan satu fungsi bersama membuat
+            // penyimpangan itu tidak mungkin lagi.
+            switch LinkStatusText.stateRequestReply(hasState: currentSnapshot != nil) {
+            case .resendLastState:
+                if let currentSnapshot { send(state: currentSnapshot()) }
+            case .reportUnanswerable:
+                lastMessageNote = LinkStatusText.stateRequestUnanswerable
             }
         default:
             break

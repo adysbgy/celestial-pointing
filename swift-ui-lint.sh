@@ -14585,6 +14585,26 @@ else
 fi
 
 
+echo
+echo "== Aturan 86: cabang .stateRequest menjawab, bukan diam =="
+if [ ! -f "Tools/check-aturan86-jawaban-state-request.py" ]; then
+  echo "FAIL Tools/check-aturan86-jawaban-state-request.py tidak ada: Aturan 86"
+  echo "     tidak mengukur apa pun, dan cabang .stateRequest bisa kembali diam."
+  status=1
+else
+  jawaban_state=$(python3 Tools/check-aturan86-jawaban-state-request.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$jawaban_state"
+    echo "-> Cabang .stateRequest wajib memakai LinkStatusText.stateRequestReply"
+    echo "   dan menangani .reportUnanswerable. Perbaiki kodenya, jangan"
+    echo "   longgarkan aturannya."
+    status=1
+  else
+    echo "$jawaban_state"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

@@ -118,10 +118,26 @@ public final class PhoneLinkService: NSObject, ObservableObject {
         case .policyUpdate:
             lastNote = LinkStatusText.policyFromWatch
         case .stateRequest:
-            // Jam meminta keadaan — balas dengan yang terakhir kita punya.
-            // (Peran ini jarang terpakai, tapi harus ada supaya permintaan
-            // tidak berakhir tanpa jawaban.)
-            if let lastState { send(lastState) }
+            // Jam meminta keadaan — jawab, dan jawab **selalu**.
+            //
+            // Dulu cabang ini berbunyi `if let lastState { send(lastState) }`:
+            // saat belum ada keadaan ia tidak melakukan apa pun, sementara
+            // komentarnya mengklaim "supaya permintaan tidak berakhir tanpa
+            // jawaban". Klaim itu tidak dijaga apa pun — menghapus seluruh
+            // cabangnya pun membuat 85 aturan UI tetap hijau. Di layar Tautan
+            // akibatnya tak terlihat: jam yang meminta lalu tidak dijawab
+            // tampak persis sama dengan jam yang tidak pernah meminta.
+            //
+            // Putusannya sekarang dari `LinkStatusText.stateRequestReply`, yang
+            // diuji di Linux; ia tidak punya cabang "diam". Jam memakai fungsi
+            // yang sama, jadi kedua sisi tidak bisa lagi menyimpang.
+            switch LinkStatusText.stateRequestReply(hasState: lastState != nil) {
+            case .resendLastState:
+                if let lastState { send(lastState) }
+            case .reportUnanswerable:
+                lastNote = LinkStatusText.stateRequestUnanswerable
+            }
+
         case .acknowledgement:
             lastNote = LinkStatusText.acknowledgement
         }

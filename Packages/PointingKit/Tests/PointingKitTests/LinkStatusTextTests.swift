@@ -351,3 +351,66 @@ final class TelescopeTargetNameLanguageTests: BridgedTextTestCase {
                        "Objek Masa Depan")
     }
 }
+
+/// Jawaban atas `.stateRequest` tidak boleh pernah **diam**.
+///
+/// **Cacat yang dijaga.** `PhoneLinkService.handle(_:)` punya cabang
+/// `.stateRequest` yang berbunyi `if let lastState { send(lastState) }` —
+/// dan tidak melakukan apa pun bila `lastState` masih `nil`. Komentar cabang
+/// itu mengklaim sebaliknya ("harus ada supaya permintaan tidak berakhir tanpa
+/// jawaban"), jadi klaimnya tidak dijaga kode apa pun. Diukur di `main`
+/// sebelum uji ini ada: menghapus **seluruh** cabangnya membuat semua 85
+/// aturan UI tetap hijau, karena `PhoneLinkService` tidak dirujuk satu gerbang
+/// pun.
+///
+/// Kerugiannya bukan sekadar diam. Di layar Tautan, jam yang meminta lalu
+/// tidak dijawab terlihat **persis sama** dengan jam yang tidak pernah
+/// meminta: `lastNote` tidak berubah. Padahal PRD melarang klaim tanpa dasar —
+/// dan "tidak ada apa-apa di layar" adalah klaim bahwa tidak ada yang perlu
+/// dilaporkan.
+///
+/// Uji ini menahan keputusannya di `PointingKit`, yang dibangun dan diuji di
+/// Linux, sehingga `Apps/` tidak bisa lagi memilih diam tanpa menulis ulang
+/// fungsi yang diuji di sini.
+final class StateRequestReplyTests: XCTestCase {
+
+    /// Keadaan tersedia → kirim ulang keadaan terakhir.
+    func testWithStateTheRequestIsAnswered() {
+        XCTAssertEqual(LinkStatusText.stateRequestReply(hasState: true),
+                       .resendLastState)
+    }
+
+    /// Tidak ada keadaan → **bukan** diam, melainkan laporan terus terang.
+    ///
+    /// Ini satu-satunya uji yang menangkap cacat aslinya: versi lama
+    /// menghasilkan "tidak ada tindakan" untuk keadaan ini, dan tidak ada uji
+    /// yang bisa membedakannya dari tindakan yang benar-benar dijalankan.
+    func testWithoutStateTheRequestIsAnsweredHonestly() {
+        XCTAssertEqual(LinkStatusText.stateRequestReply(hasState: false),
+                       .reportUnanswerable)
+    }
+
+    /// Dua keadaan tidak boleh menghasilkan putusan yang sama.
+    ///
+    /// Kalau keduanya sama, salah satunya pasti salah — dan yang paling
+    /// mungkin adalah `reportUnanswerable` dilipat menjadi `resendLastState`,
+    /// yang akan mengirim `nil`/tidak mengirim apa pun sambil berpura-pura
+    /// menjawab.
+    func testTheTwoStatesAreNotTheSameDecision() {
+        XCTAssertNotEqual(LinkStatusText.stateRequestReply(hasState: true),
+                          LinkStatusText.stateRequestReply(hasState: false))
+    }
+
+    /// Kalimat "tidak bisa dijawab" berasal dari katalog, bukan literal.
+    func testUnanswerableSentenceComesFromTheCatalog() {
+        XCTAssertEqual(LinkStatusText.stateRequestUnanswerable,
+                       TextLocalization.text(.linkStatusStateRequestTooEarly))
+    }
+
+    /// Kalimat itu tidak membocorkan placeholder ke layar.
+    func testUnanswerableSentenceHasNoPlaceholder() {
+        XCTAssertFalse(LinkStatusText.stateRequestUnanswerable.contains("%@"))
+        XCTAssertFalse(LinkStatusText.stateRequestUnanswerable.isEmpty)
+    }
+}
+

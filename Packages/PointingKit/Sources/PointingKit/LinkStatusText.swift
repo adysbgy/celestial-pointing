@@ -107,6 +107,70 @@ public enum LinkStatusText {
         TextLocalization.text(.linkStatusAcknowledgement)
     }
 
+    /// Jawaban atas permintaan keadaan dari jam yang **tidak bisa** dipenuhi.
+    ///
+    /// **Kenapa ini kalimat yang sama dengan `stateRequestTooEarly`.** Keadaan
+    /// yang dirujuknya memang sama: jam meminta keadaan, dan tidak ada keadaan
+    /// yang bisa dikirim. Di jam, sebabnya "alur belum siap"; di iPhone,
+    /// sebabnya "belum ada keadaan yang pernah diterima". Yang penting bagi
+    /// pembaca bukan sebab internalnya, melainkan **bahwa permintaannya tidak
+    /// dijawab** — dan itu satu kalimat, bukan dua yang harus dijaga tetap
+    /// sepakat.
+    ///
+    /// Lihat `stateRequestReply(hasState:)` untuk kenapa jawaban ini harus ada.
+    public static var stateRequestUnanswerable: String {
+        TextLocalization.text(.linkStatusStateRequestTooEarly)
+    }
+
+    /// Apa yang harus dijawab sebuah service tautan saat **jam meminta
+    /// keadaan** (`LinkMessageKind.stateRequest`).
+    ///
+    /// **Kenapa keputusan ini ada di sini, bukan di badan `handle(_:)`.**
+    /// Kedua service (`PhoneLinkService`, `WatchLinkService`) punya cabang
+    /// `.stateRequest` masing-masing, dan sampai siklus ini keduanya menjawab
+    /// dua hal yang **berbeda** untuk keadaan yang sama:
+    ///
+    /// ```swift
+    /// // Apps/PointAndKnowWatch/Sources/WatchLinkService.swift
+    /// if let currentSnapshot { send(state: currentSnapshot()) }
+    /// else { lastMessageNote = LinkStatusText.stateRequestTooEarly }   // jujur
+    ///
+    /// // Apps/PointAndKnowiOS/Sources/PhoneLinkService.swift
+    /// if let lastState { send(lastState) }                            // diam
+    /// ```
+    ///
+    /// Yang kedua **tidak melakukan apa pun** saat belum ada keadaan. Komentarnya
+    /// sendiri mengklaim sebaliknya — "harus ada supaya permintaan tidak
+    /// berakhir tanpa jawaban" — dan klaim itu tidak dijaga kode apa pun:
+    /// menghapus seluruh cabangnya pun membuat seluruh 85 aturan UI tetap
+    /// hijau (diukur, proses baru). Yang paling merugikan bukan diamnya,
+    /// melainkan bahwa diam itu **tidak terlihat**: di layar Tautan, jam yang
+    /// meminta dan tidak dijawab terlihat persis sama dengan jam yang tidak
+    /// pernah meminta.
+    ///
+    /// Karena itu keputusannya dipindah ke fungsi murni di sini: satu masukan
+    /// (`hasState`), satu tindakan keluar, dan `Apps/` tidak bisa lagi memilih
+    /// "diam" tanpa menulis ulang fungsi ini — yang diuji di Linux.
+    ///
+    /// **Batas yang diakui.** Fungsi ini tidak tahu apakah sesinya aktif;
+    /// pengiriman yang gagal tetap dilaporkan oleh `send(_:)`. Ia hanya
+    /// memutuskan **apa** yang dijawab, bukan apakah jawabannya sampai.
+    public enum StateRequestReply: Equatable, Sendable {
+        /// Ada keadaan yang bisa dikirim: kirim ulang yang terakhir diketahui.
+        case resendLastState
+        /// Tidak ada keadaan: katakan terus terang lewat `lastNote`.
+        case reportUnanswerable
+    }
+
+    /// Putusan jawaban atas `.stateRequest`. Lihat `StateRequestReply`.
+    ///
+    /// - Parameter hasState: apakah service memegang keadaan yang bisa dikirim.
+    ///   `false` **tidak boleh** menghasilkan diam — itulah cacat yang
+    ///   fungsi ini ada untuk mencegah.
+    public static func stateRequestReply(hasState: Bool) -> StateRequestReply {
+        hasState ? .resendLastState : .reportUnanswerable
+    }
+
     // MARK: - Penerimaan di jam
 
     /// Ambang keyakinan dari iPhone tidak sah, jadi diabaikan.
