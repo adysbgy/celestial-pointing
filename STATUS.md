@@ -31239,3 +31239,72 @@ adalah menganggapnya cukup.
 
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **1011** =
 **1233** hijau (0 kegagalan) di Docker Swift 6.0. 78 aturan UI hijau.
+
+---
+
+## Siklus: baris acuan kalibrasi tumbuh bersama Dynamic Type (Aturan 79)
+
+**Cacat.** `CalibrationView` memakai `.lineLimit(2)` **tetap** pada nama acuan.
+Itu satu-satunya permukaan nama di app yang tidak tumbuh, setelah kartu jam,
+layar Always-On, dan panel iPhone semuanya dibuat tumbuh di siklus sebelumnya.
+Aturan 76 tetap hijau di sana — dan benar: ia menuntut **adanya** kebijakan
+luapan, bukan kebijakan yang bertahan saat huruf membesar. Itu kelas celah yang
+sama dengan yang berulang di proyek ini: gerbangnya mengukur hal yang sedikit
+berbeda dari yang diklaim komentar.
+
+**Terukur, bukan diperkirakan.** Nama terlebar katalog, "Gugus Sarang Lebah",
+174.86 pt pada `.subheadline` (DejaVu Sans Bold 15 pt), di kolom nama 120 pt
+dengan lantai skala 0.7:
+
+| ukuran | skala | susut yang dibutuhkan (2 baris) | hasil |
+|---|---|---|---|
+| large | 1.00 | 1.373 | muat |
+| AX2 | 1.95 | 0.704 | muat (sisa 0.004) |
+| AX3 | 2.31 | 0.594 | **terpotong** |
+| AX5 | 3.12 | 0.440 | **terpotong** |
+
+AX2 muat dengan sisa 0.004 — jadi cacat ini tidak akan terlihat pada uji
+sekadar "coba satu ukuran besar". Yang kena justru pengguna yang memperbesar
+huruf karena sulit membaca, di layar yang dipakai sambil berdiri di lapangan.
+Dan katalog ini punya "Galaksi Kincir Angin" / "Galaksi Andromeda" / "Galaksi
+Triangulum": elipsis memotong tepat kata pembedanya.
+
+**Perbaikan.** Jumlah baris dan lantai skala datang dari model teruji
+(`ObjectCardLayout.calibrationLineLimit(at:)` / `calibrationScaleFloor`), bukan
+dari ambang yang ditulis di view — ambang di view tidak bisa diuji dari Linux.
+View membaca `dynamicTypeSize` lewat `switch` eksplisit; `"\(dynamicTypeSize)"`
+akan menghasilkan `"accessibility1"` sementara tabel skala memakai `"AX1"`,
+sehingga setiap ukuran aksesibilitas jatuh ke cabang cadangan tanpa satu pun
+galat.
+
+**Gerbang baru Aturan 79** memeriksa bentuk yang tidak bisa diukur uji runtime
+(`Apps/` tidak pernah dibangun di Linux): view membaca `dynamicTypeSize`,
+`lineLimit` datang dari model, lantai memakai konstanta bersama, `.lineLimit(2)`
+tetap tidak boleh kembali, model menyatakan kolom/lantai/lebar acuan, dan kedua
+uji ada. **Dibuktikan non-vakum dengan mutasi**: mengembalikan `.lineLimit(2)`
+membuat Aturan 79 merah dengan dua temuan dan `exit 1`; memulihkannya
+mengembalikan `exit 0`.
+
+**Kenapa gerbang, bukan hanya uji.** Aritmetikanya diuji di Linux
+(`NameOverflowTests`), tetapi uji itu tidak bisa melihat apakah **view**
+memakai hasilnya. Dua lapisan itu menutup dua celah berbeda: model membuktikan
+angkanya benar, gerbang membuktikan angkanya dipakai.
+
+**Yang TIDAK diklaim.**
+- Lebar memakai DejaVu Sans Bold, bukan San Francisco; SF lebih sempit, jadi
+  di perangkat nama terbaca pada satu tingkat lebih besar. Angka ini ambang
+  kehati-hatian, bukan janji piksel.
+- Kolom 120 pt adalah **estimasi** dari `padding` + chevron + `Spacer` di jam
+  45 mm; cacatnya tetap muncul pada kolom 123 pt maupun 130 pt, jadi
+  kesimpulannya tidak bergantung pada tebakan itu — tetapi angkanya bukan
+  hasil ukur tata letak sungguhan.
+- Tata letak SwiftUI tidak dijalankan di Linux. Yang diuji aritmetika dan
+  bentuk keputusan, bukan piksel di perangkat.
+- `lineLimit` yang tumbuh mengurangi jumlah pemotongan, bukan menghapusnya:
+  pada AX5 nama terpanjang masih bisa melewati 4 baris. Itu disengaja —
+  alternatifnya mengecilkan huruf sampai tak terbaca, yang mengalahkan alasan
+  pengguna memperbesarnya.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1022** =
+**1244** hijau (0 kegagalan) di Docker Swift 6.0. 78 aturan UI hijau,
+typecheck hijau.
