@@ -6741,11 +6741,56 @@ def _port_tokens_modeled_after(port_source):
     menggantung **merah**.
     """
     out: dict[str, str] = {}
+    # Bentuk 1 — pengakuan **di baris tokennya sendiri**:
+    #
+    #     BAND_OPACITY = 0.85   # MODEL: `CelestialVisual.jupiterBandOpacity`
     for match in re.finditer(
             r"^([A-Z][A-Z0-9_]*)\s*=\s*[^\n#]*#\s*MODEL:\s*`([^`]+)`",
             port_source, re.M):
         token, claimed = match.group(1), match.group(2).strip()
         out[token] = claimed
+
+    # Bentuk 2 — pengakuan di baris **komentar tersendiri**, di atas tokennya:
+    #
+    #     # MODEL: `CelestialVisual.ringShadowOpacity`
+    #     RING_SHADOW_OPACITY = 0.62
+    #
+    # **Kenapa bentuk ini harus dibaca, bukan dianggap salah tulis.** Bentuk
+    # inilah yang dipakai setiap konstanta yang komentarnya butuh lebih dari
+    # satu baris (lebar tepi pita, pemulihan limb, skala paruh belakang), dan
+    # bagi pembaca manusia ia pengakuan yang sama sahnya. Selama pembaca ini
+    # hanya mengenal bentuk 1, token-token itu **tidak masuk himpunan** yang
+    # diperiksa gerbang paritas — jadi angka port-nya boleh menyimpang dari
+    # model tanpa satu pun gerbang berbunyi. Terukur sebelum perluasan ini:
+    # `RING_SHADOW_OPACITY`, `BAND_FEATHER_FRACTION`,
+    # `BAND_LIMB_SHADING_STRENGTH`, `RING_BACK_HALF_OPACITY_SCALE` dan
+    # `SATURN_BAND_TONES` semuanya di luar himpunan, dan gerbang paritas tetap
+    # melaporkan nol kegagalan.
+    #
+    # Batasnya sengaja sempit: pengakuan hanya menempel pada token bila
+    # **seluruh** baris di antaranya kosong atau komentar, dan jaraknya ≤ 6
+    # baris. Dengan begitu kalimat prosa yang kebetulan memuat "MODEL:" di
+    # tengahnya (`… per piksel. MODEL:` lalu nama di baris berikutnya) tidak
+    # pernah dibaca sebagai pengakuan — ia bukan pengakuan, dan memperlakukannya
+    # sebagai pengakuan akan merah pada kode yang benar.
+    lines = port_source.splitlines()
+    claim_line = re.compile(r"^\s*#\s*MODEL:\s*`([^`]+)`")
+    token_line = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=")
+    for index, line in enumerate(lines):
+        claim = claim_line.match(line)
+        if not claim:
+            continue
+        for probe in range(index + 1, min(index + 7, len(lines))):
+            stripped = lines[probe].strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            token_match = token_line.match(stripped)
+            if token_match:
+                token = token_match.group(1)
+                # Bentuk 1 menang bila keduanya ada: pengakuan di baris token
+                # adalah yang paling dekat dan paling eksplisit.
+                out.setdefault(token, claim.group(1).strip())
+            break
     return out
 
 
@@ -7313,6 +7358,132 @@ def check_band_feather_docstring_quotes_measured_values(results):
             + ("" if ok_med_before and ok_med_after else
                f"; median terukur tidak cocok dengan tabel "
                f"{want['median_sebelum']}/{want['median_sesudah']}")))
+
+
+def check_model_claims_are_on_the_token_line(results):
+    """Setiap komentar `# MODEL:` di port harus **terbaca** oleh pembaca paritas.
+
+    **Cacat yang ditutup pemeriksaan ini — ditemukan pada kode yang baru saja
+    ditulis, bukan pada kode lama.** `_port_tokens_modeled_after` memakai regex
+    yang menuntut komentar `# MODEL:` berada di **baris yang sama** dengan
+    tokennya (`^([A-Z][A-Z0-9_]*)\\s*=\\s*[^\\n#]*#\\s*MODEL:`). Penulis
+    `RING_SHADOW_OPACITY` menaruh pengakuannya di baris **sebelumnya** — bentuk
+    yang terbaca sama bagi manusia, dan bahkan lazim untuk konstanta yang
+    komentarnya panjang:
+
+        # MODEL: `CelestialVisual.ringShadowOpacity`
+        RING_SHADOW_OPACITY = 0.62
+
+    Akibatnya token itu **tidak masuk himpunan** yang diperiksa
+    `check_modeled_port_constants_match_the_model` sama sekali. Diukur pada
+    `git show HEAD:Tools/render-visuals.py`: pembaca lama menemukan **28** token,
+    `RING_SHADOW_OPACITY` bukan salah satunya, dan gerbang paritas melaporkan
+    "26 pemeriksaan, 0 gagal" seolah tidak ada yang kurang.
+
+    **Kerusakannya lebih luas dari satu token.** Setelah pembaca mengenali
+    bentuk komentar-di-atas, diukur pada pohon yang sama: **29** token, dan
+    yang **angkanya benar-benar dibandingkan** naik dari **18 → 21**. Tiga token
+    (`BAND_FEATHER_FRACTION`, `BAND_LIMB_SHADING_STRENGTH`,
+    `CLUSTER_CORE_BRIGHTEN`) sudah ada di port sejak siklus-siklus sebelumnya
+    dengan pengakuan yang **tidak pernah** diperiksa. `RING_SHADOW_OPACITY`
+    adalah yang keempat — ditemukan karena ia baru ditulis, bukan karena ia
+    satu-satunya.
+
+    **Kenapa ini bukan sekadar kerapian.** Kelasnya sama dengan yang sudah
+    dibayar repo ini berkali-kali: **gerbang yang berhenti mengukur tanpa
+    suara selalu hijau.** Yang membuatnya berbahaya di sini adalah bentuknya
+    yang meyakinkan — komentarnya benar, namanya benar, tokennya ada; yang
+    hilang hanya keanggotaannya di himpunan, dan itu tidak terlihat dari
+    keluaran mana pun.
+
+    **Yang diukur.** Setiap baris yang memuat `# MODEL:` dan menyebut nama
+    `CelestialVisual`/`StarGeometry` harus berada di baris yang **juga** memuat
+    token `UPPER_CASE = …`, atau token itu harus muncul di baris berikutnya
+    dan sudah terdeteksi pembaca paritas. Arah kedua: pengakuan **inline** yang
+    menempel pada baris yang *tampak* seperti token tetapi tidak terbaca
+    pembaca paritas (mis. `NAMA: float = 0.62  # MODEL: …`) juga dilaporkan —
+    bentuk itu menjanjikan kesamaan yang tidak pernah diperiksa, dan ia hilang
+    tanpa suara.
+
+    **Pengakuan di atas `def` sengaja TIDAK dilaporkan.** Bentuk
+
+        # MODEL: `CelestialVisual.saturnRingShadow`
+        def saturn_ring_shadow(ring, ...):
+
+    adalah anotasi yang sah — ia menyatakan bahwa *fungsi* itu meniru model,
+    dan tidak ada konstanta yang bisa dibandingkan. Diukur saat gerbang ini
+    ditulis: 18 pengakuan berbentuk itu ada di port. Melaporkannya akan merah
+    pada kode yang benar, dan gerbang yang merah pada kode yang benar akan
+    dimatikan orang — setelah itu ia tidak menjaga apa pun.
+
+    **Yang TIDAK diklaim.** Ia tidak memeriksa apakah angka token itu benar —
+    itu tugas gerbang paritas. Ia juga tidak memaksa semua pengakuan berada di
+    satu baris: bentuk komentar-panjang-di-atas tetap boleh, **asalkan**
+    tokennya benar-benar terdeteksi (dibuktikan dengan membaca hasil pembaca
+    yang sama, bukan dengan mencocokkan ulang teks).
+    """
+    port_source = open(R.SOURCE, encoding="utf-8").read()
+    lines = port_source.splitlines()
+    detected = set(_port_tokens_modeled_after(port_source))
+
+    # Setiap **token** (bukan setiap kalimat) yang pengakuannya menempel
+    # padanya harus muncul di himpunan yang dibaca gerbang paritas. Arahnya
+    # dari token ke pembaca, bukan dari kalimat ke token: prosa yang kebetulan
+    # memuat "MODEL:" di tengah kalimat bukan pengakuan, dan menuduhnya akan
+    # merah pada kode yang benar.
+    claimed: dict[str, int] = {}
+    orphaned: list[str] = []
+    claim_line = re.compile(r"^\s*#\s*MODEL:\s*`([^`]+)`")
+    inline_claim = re.compile(
+        r"^([A-Z][A-Z0-9_]*)\s*=\s*[^\n#]*#\s*MODEL:\s*`([^`]+)`")
+    token_line = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=")
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("#") and "# MODEL:" in line:
+            inline = inline_claim.match(stripped)
+            if inline:
+                claimed.setdefault(inline.group(1), index + 1)
+            else:
+                # Klaim **inline** pada baris yang tidak terbaca sebagai token
+                # (`RING_SHADOW_OPACITY: float = 0.62  # MODEL: …`): pembaca
+                # paritas melewatinya, dan tanpa cabang ini ia hilang tanpa
+                # suara — diukur hijau, "36 token dari 36 pengakuan".
+                orphaned.append(f"baris {index + 1} → {stripped[:50]!r}")
+            continue
+        if not claim_line.match(line):
+            continue
+        found = False
+        lookalike = None
+        for probe in range(index + 1, min(index + 7, len(lines))):
+            candidate = lines[probe].strip()
+            if not candidate or candidate.startswith("#"):
+                continue
+            match = token_line.match(candidate)
+            if match:
+                claimed.setdefault(match.group(1), probe + 1)
+                found = True
+            elif re.match(r"^[A-Z][A-Z0-9_]*\s*:", candidate):
+                # Bentuk yang **mirip token** tetapi tidak terbaca pembaca
+                # paritas (`NAMA: tipe = nilai`).
+                lookalike = candidate[:50]
+            break
+        if not found and lookalike is not None:
+            orphaned.append(f"baris {index + 1} → {lookalike!r}")
+
+    missed = [f"{token} (baris {line_no})"
+              for token, line_no in sorted(claimed.items(), key=lambda kv: kv[1])
+              if token not in detected]
+
+    ok = not missed and not orphaned
+    detail = f"{len(detected)} token paritas terbaca dari {len(claimed)} pengakuan"
+    if missed:
+        detail += f"; {len(missed)} pengakuan tak terbaca paritas: " + \
+                  ", ".join(missed[:5])
+    if orphaned:
+        detail += f"; {len(orphaned)} pengakuan di atas token yang tak terbaca: " + \
+                  ", ".join(orphaned[:3])
+    results.append(Result("port: setiap pengakuan MODEL terbaca gerbang paritas",
+                          ok, detail))
 
 
 def check_modeled_port_constants_match_the_model(results):
@@ -8693,6 +8864,110 @@ def _saturn_rings_back_half_last(canvas, cx, cy, radius, palette, night_mode):
         annulus(outer_r * full_width, inner_r * full_width,
                 R.accent_fn(ring_color, night_mode,
                             opacity * R.RING_BACK_HALF_OPACITY_SCALE), "back")
+
+
+def check_saturn_rings_carry_the_planet_shadow(results, size=200, ss=2):
+    """Cincin Saturnus harus **lebih gelap** di sisi yang menjauhi cahaya.
+
+    **Cacat yang ditutup pemeriksaan ini.** Sampai siklus ini cincin Saturnus
+    digambar sebagai pita yang terang rata di kedua paruhnya. Bola di
+    sebelahnya memakai gradien dengan cahaya dari kiri-atas, jadi cincin dan
+    bola **menyatakan arah cahaya yang berbeda** — dan cincin yang terang
+    merata di sisi yang seharusnya terhalang terbaca sebagai stiker yang
+    mengapung di muka bola, bukan benda yang melingkupinya. Di layar 38 pt
+    itulah satu-satunya isyarat kedalaman yang dimiliki gambar Saturnus.
+
+    **Kenapa tidak ada gerbang lain yang menangkapnya.** Seluruh gerbang
+    cincin yang ada mengukur **keberadaan** pita, celah Cassini, urutan
+    paruh, dan tidak adanya piringan kedua. Tidak satu pun mengukur
+    **kecerahan** cincin sebagai fungsi sisi. Cincin yang terang rata lolos
+    semuanya dengan angka yang sama persis seperti cincin yang berbayangan —
+    dibuktikan di bawah.
+
+    **Yang diukur.** Rata-rata luma cincin di dalam **kapsul bayangan**
+    dibanding cincin di luar bayangan, keduanya di **paruh depan** cincin
+    (paruh yang melintas di muka bola) dan di luar proyeksi bola.
+
+    **Kenapa dibatasi ke paruh depan.** Gerbang pertama versi ini
+    membandingkan paruh yang menghadap cahaya dengan paruh yang menjauhinya,
+    dan hasilnya menyesatkan: paruh **belakang** cincin sudah digelapkan
+    `ringBackHalfOpacityScale` sebelum bayangan digambar, jadi rasio 0.885
+    yang terukur sebagian berasal dari perbedaan paruh, bukan dari bayangan.
+    Angka itu tidak bisa membedakan "bayangan tipis" dari "tidak ada
+    bayangan sama sekali". Membandingkan di dalam satu paruh menghapus
+    perancu itu: satu-satunya yang tersisa adalah bayangannya.
+
+    Tanpa bayangan, rasio itu ≈ 1.0 (dibuktikan dengan mematikan bayangan di
+    port); dengan bayangan ia turun di bawah 0.85.
+
+    **Dua arah, karena satu arah bisa dipenuhi dengan merusak.** Rasio < 0.85
+    juga terpenuhi kalau **seluruh** cincin digelapkan. Karena itu arah kedua
+    menuntut cincin di luar bayangan tetap terang: harus di atas luma latar.
+    """
+    _, (w, h, rows) = render_case("planet-saturn-confirmed", size=size, ss=ss)
+    background = background_of(w, h, rows)
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    geometry = saturn_globe_geometry()
+    axial, body = geometry["axial"], geometry["body"]
+    ring = R.saturn_ring()
+    full_width = ring["half_width"]
+    # Bentuk bayangan dari model, bukan dari angka di sini.
+    shadow = R.saturn_ring_shadow(ring)
+
+    inside_sum = inside_n = 0
+    outside_sum = outside_n = 0
+    for y in range(h):
+        uy = (y + 0.5 - cy) / radius
+        for x in range(w):
+            ux = (x + 0.5 - cx) / radius
+            if ux * ux + uy * uy > 0.95 * 0.95:
+                continue
+            # Harus di dalam pita cincin: di luar bola, di dalam tepi luar.
+            ex, ey = ux / full_width, uy / (full_width * axial)
+            if ex * ex + ey * ey > 1.0:
+                continue
+            bx, by = ux / body, uy / body
+            if bx * bx + by * by <= 1.0:
+                continue
+            # Hanya paruh depan: paruh belakang sudah digelapkan pita, dan
+            # mencampurnya membuat rasio mengukur dua hal sekaligus.
+            if uy <= 0:
+                continue
+            row = rows[y]
+            base = x * 4
+            # Luma Rec.709, dinormalkan ke 0..1.
+            luma = (0.2126 * row[base] + 0.7152 * row[base + 1]
+                    + 0.0722 * row[base + 2]) / 255.0
+            if R.ring_shadow_contains(shadow, ux, uy, axial):
+                inside_sum += luma
+                inside_n += 1
+            else:
+                outside_sum += luma
+                outside_n += 1
+
+    if inside_n < 10 or outside_n < 20:
+        results.append(Result(
+            f"Saturnus: bayangan bola pada cincin @{size}px", False,
+            f"sampel cincin tidak cukup (dalam bayangan {inside_n}, "
+            f"luar {outside_n}); butuh >=10 dalam dan >=20 luar"))
+        return
+
+    inside_avg = inside_sum / inside_n
+    outside_avg = outside_sum / outside_n
+    ratio = inside_avg / outside_avg if outside_avg > 0 else 0.0
+    # Arah 1: di dalam bayangan harus lebih gelap.
+    darker = ratio < 0.85
+    # Arah 2: cincin di luar bayangan tidak boleh ikut digelapkan.
+    bg_luma = (0.2126 * background[0] + 0.7152 * background[1]
+               + 0.0722 * background[2]) / 255.0
+    floor = bg_luma + 0.05
+    still_lit = outside_avg > floor
+    results.append(Result(
+        f"Saturnus: bayangan bola pada cincin @{size}px",
+        darker and still_lit,
+        f"dalam/luar {ratio:.3f} (harap <0.85), luar {outside_avg:.3f} "
+        f"(harap >{floor:.3f}); {inside_n}+{outside_n} sampel"))
 
 
 def check_saturn_ring_passes_behind_the_globe(results, size=200, ss=2):
@@ -16664,6 +16939,7 @@ def main():
     check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
+    check_model_claims_are_on_the_token_line(results)
     check_band_feather_curve_is_the_models(results)
     check_jupiter_band_tones_match_the_model(results)
     check_jupiter_bands_read_as_separate_stripes(results, args.size, args.ss)
@@ -16692,6 +16968,7 @@ def main():
     check_saturn_gap_reads_at_the_watch_size(results)
     check_saturn_has_no_extra_disc(results, args.size, args.ss)
     check_saturn_ring_passes_behind_the_globe(results, args.size, args.ss)
+    check_saturn_rings_carry_the_planet_shadow(results, args.size, args.ss)
     check_saturn_ring_order_docstring_quotes_measured_values(results)
     check_spiral_arms_stay_continuous(results)
     check_spiral_arms_actually_spiral(results)

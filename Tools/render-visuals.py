@@ -359,6 +359,53 @@ def saturn_body_radius(ring, body_fraction=0.53):
     return ring["half_width"] * body_fraction
 
 
+RING_SHADOW_OPACITY = 0.62                           # MODEL: `ringShadowOpacity`
+
+
+def saturn_ring_shadow(ring, body_fraction=0.53, light_direction=None,
+                       reach=0.95):
+    """`VisualFrame.saturnRingShadow` — bayangan bola pada cincin.
+
+    **Kenapa di port, bukan hanya di view.** Gerbang piksel mengukur port ini,
+    jadi bayangan yang hanya digambar view berarti tidak satu pun gerbang bisa
+    membuktikan cincinnya punya bayangan. Yang diuji: bayangan jatuh di sisi
+    yang **menjauhi** cahaya, dan rasionya mengikuti kemiringan cincin.
+
+    Arah cahaya nol mengembalikan `None`: bayangan tanpa arah akan jatuh tepat
+    di pusat dan menutupi bola itu sendiri.
+    """
+    if light_direction is None:
+        light_direction = SPHERE_LIGHT_OFFSET
+    lx, ly = light_direction
+    length = (lx * lx + ly * ly) ** 0.5
+    if length <= 1e-9:
+        return None
+    body = saturn_body_radius(ring, body_fraction)
+    shift = body * reach
+    # Bayangan jatuh **berlawanan** arah datangnya cahaya, dan **membentang**
+    # dari pusat: bayangan bola adalah silinder, jadi jejaknya kapsul.
+    axial = ring["half_height"] / ring["half_width"]
+    return dict(offset_x=-(lx / length) * shift,
+                offset_y=-(ly / length) * shift,
+                radius=body, radius_y=body * axial)
+
+
+def ring_shadow_contains(shadow, ux, uy, axial):
+    """`RingShadow.contains` — jarak ke **ruas** pusat→ujung, bukan ke titik."""
+    if shadow is None:
+        return False
+    safe = axial if axial > 1e-9 else 1e-9
+    px, py = ux, uy / safe
+    dx, dy = shadow["offset_x"], shadow["offset_y"] / safe
+    length_squared = dx * dx + dy * dy
+    t = 0.0
+    if length_squared > 1e-18:
+        t = (px * dx + py * dy) / length_squared
+        t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    qx, qy = px - dx * t, py - dy * t
+    return (qx * qx + qy * qy) ** 0.5 <= shadow["radius"]
+
+
 def star_geometry(relative_size, pulse_amplitude=0.10, glow_scales=(3.0, 1.9, 1.0),
                   spike_scale=3.2, frame_half_extent=1.0,
                   outer_fraction=(0.62, 0.92)):
@@ -1991,6 +2038,38 @@ def _draw_rings(canvas, cx, cy, radius, palette, night_mode):
     for inner_r, outer_r, opacity in bands:
         annulus(outer_r * full_width, inner_r * full_width,
                 accent_fn(ring_color, night_mode, opacity), "front")
+
+    # **Bayangan bola pada cincin** — digambar paling akhir, di atas kedua
+    # paruh, dipotong ke bentuk pita cincin. Lihat `saturn_ring_shadow` untuk
+    # kenapa arahnya dari model dan bukan dari sini.
+    shadow = saturn_ring_shadow(ring)
+    if shadow is not None:
+        sx = cx + shadow["offset_x"] * radius
+        sy = cy + shadow["offset_y"] * radius
+        srx = shadow["radius"] * radius
+        sry = shadow["radius_y"] * radius
+        shade = shadow_fn(ACCENTS["moonUnlit"], night_mode, RING_SHADOW_OPACITY)
+
+        def in_shadow(x, y):
+            # Harus di dalam **kapsul** bayangan (ruas pusat→ujung) dan di
+            # dalam salah satu pita cincin. Bentuk kapsulnya dari model.
+            if not ring_shadow_contains(shadow, (x - cx) / radius,
+                                        (y - cy) / radius, axial):
+                return False
+            for inner_r, outer_r, _ in bands:
+                orx, ory = outer_r * full_width, outer_r * full_width * axial
+                ix, iy = inner_r * full_width, inner_r * full_width * axial
+                ex, ey = (x - cx) / orx, (y - cy) / ory
+                if ex * ex + ey * ey > 1.0:
+                    continue
+                if inner_r <= 0:
+                    return True
+                fx, fy = (x - cx) / ix, (y - cy) / iy
+                if fx * fx + fy * fy > 1.0:
+                    return True
+            return False
+
+        canvas.fill(in_shadow, shade)
 
 
 def saturn_bands(count=SATURN_BAND_COUNT):

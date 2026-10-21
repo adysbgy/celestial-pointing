@@ -1336,6 +1336,74 @@ final class CelestialVisualTests: XCTestCase {
                              "cincin tidak boleh nol tinggi")
     }
 
+    func testSaturnRingShadowFallsAwayFromTheLight() {
+        // Bayangan bola di cincin harus jatuh di sisi yang **menjauhi** cahaya.
+        // Tanpa ini cincin terang merata di kedua paruh dan terbaca sebagai
+        // stiker yang mengapung di depan bola.
+        let ring = VisualFrame.saturnRing()
+        guard let shadow = VisualFrame.saturnRingShadow(for: ring) else {
+            return XCTFail("bayangan cincin tidak terbentuk untuk cahaya bawaan")
+        }
+        let light = CelestialVisual.sphereLightOffset
+        // Dot product arah bayangan dengan arah cahaya harus negatif: bayangan
+        // dan sumber cahaya ada di sisi yang berlawanan.
+        let dot = shadow.offsetX * light.x + shadow.offsetY * light.y
+        XCTAssertLessThan(dot, 0,
+                          "bayangan jatuh di sisi yang sama dengan sumber cahaya")
+        // Dan jaraknya harus benar-benar terlihat, bukan nol yang lolos
+        // pemeriksaan tanda di atas.
+        let distance = (shadow.offsetX * shadow.offsetX
+                        + shadow.offsetY * shadow.offsetY).squareRoot()
+        XCTAssertGreaterThan(distance, 0.1 * ring.halfWidth,
+                             "bayangan menempel di pusat -- tidak terbaca sebagai bayangan")
+    }
+
+    func testSaturnRingShadowFollowsTheRingTilt() {
+        // Bayangan yang bulat di atas cincin miring terbaca sebagai lubang,
+        // bukan bayangan. Rasionya harus sama dengan rasio cincinnya.
+        let ring = VisualFrame.saturnRing()
+        guard let shadow = VisualFrame.saturnRingShadow(for: ring) else {
+            return XCTFail("bayangan cincin tidak terbentuk")
+        }
+        let ringRatio = ring.halfHeight / ring.halfWidth
+        XCTAssertEqual(shadow.radiusY / shadow.radius, ringRatio, accuracy: 1e-12,
+                       "bayangan tidak mengikuti kemiringan cincin")
+        // Cincin yang lebih pipih harus memberi bayangan yang lebih pipih juga.
+        let flatter = VisualFrame.saturnRing(axialRatio: 1.0 / 6.0)
+        guard let flatShadow = VisualFrame.saturnRingShadow(for: flatter) else {
+            return XCTFail("bayangan tidak terbentuk untuk cincin pipih")
+        }
+        XCTAssertLessThan(flatShadow.radiusY / flatShadow.radius,
+                          shadow.radiusY / shadow.radius,
+                          "bayangan tidak ikut memipih saat cincin memipih")
+    }
+
+    func testSaturnRingShadowRefusesAZeroLightDirection() {
+        // Arah cahaya nol tidak punya arah: bayangannya akan jatuh tepat di
+        // pusat dan menutupi bola itu sendiri. Harus ditolak, bukan digambar.
+        let ring = VisualFrame.saturnRing()
+        XCTAssertNil(VisualFrame.saturnRingShadow(for: ring,
+                                                  lightDirection: (x: 0, y: 0)),
+                     "arah cahaya nol menghasilkan bayangan tanpa arah")
+    }
+
+    func testSaturnRingShadowScalesWithTheBody() {
+        // Bayangan adalah proyeksi **bola**, jadi ukurannya harus ikut bola.
+        // Kalau ia memakai angka sendiri, mengubah `bodyFraction` akan
+        // menghasilkan bayangan yang lebih besar atau lebih kecil dari bendanya.
+        let ring = VisualFrame.saturnRing()
+        guard let wide = VisualFrame.saturnRingShadow(for: ring, bodyFraction: 0.6),
+              let narrow = VisualFrame.saturnRingShadow(for: ring, bodyFraction: 0.3) else {
+            return XCTFail("bayangan cincin tidak terbentuk")
+        }
+        XCTAssertEqual(wide.radius / narrow.radius, 2.0, accuracy: 1e-12,
+                       "bayangan harus ikut ukuran bola, persis linear")
+        // Dan bola yang dipakai harus bola yang sama dengan yang digambar.
+        let body = VisualFrame.saturnBodyRadius(for: ring, bodyFraction: 0.6)
+        XCTAssertEqual(wide.radius, body, accuracy: 1e-12,
+                       "jari-jari bayangan harus sama dengan jari-jari bola")
+    }
+
     func testOverflowReportsNothingForCentredSmallShapes() {
         // Fungsi batas harus benar untuk bentuk yang memang muat: nilai
         // negatif berarti "tidak ada yang keluar", bukan "kurang"/"lebih".

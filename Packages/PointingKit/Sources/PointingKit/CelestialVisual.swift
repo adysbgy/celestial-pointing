@@ -1320,6 +1320,143 @@ public enum VisualFrame {
         ring.halfWidth * bodyFraction
     }
 
+    /// Bayangan bola Saturnus pada cincinnya — satu elips yang digeser
+    /// **menjauh dari sumber cahaya**.
+    ///
+    /// **Cacat yang ditutup ini.** Sampai siklus ini cincin Saturnus digambar
+    /// sebagai pita yang terang rata di kedua paruhnya, tanpa satu pun tanda
+    /// bahwa bola menghalangi cahaya. Akibatnya cincin terbaca sebagai
+    /// **stiker yang mengapung di depan bola**, bukan benda yang mengelilingi
+    /// bola — dan itu justru satu-satunya isyarat kedalaman yang dimiliki
+    /// gambar Saturnus di layar 38 pt. Bola yang memakai gradien (cahaya dari
+    /// kiri-atas) bersebelahan dengan cincin yang terang merata di kedua sisi
+    /// adalah dua gambar yang menyatakan arah cahaya berbeda.
+    ///
+    /// **Kenapa geometrinya di model, bukan di view.** Sama alasannya dengan
+    /// `craterRelief`: bayangan yang arahnya ditentukan di dalam `Canvas`
+    /// tidak bisa diuji di Linux, dan repo ini sudah membayar kelas cacat itu
+    /// berkali-kali. Di sini arahnya diturunkan dari `sphereLightOffset` yang
+    /// sama dengan gradien bola, jadi bola dan cincin tidak bisa berbeda
+    /// pendapat tentang dari mana cahaya datang.
+    ///
+    /// **Bentuknya.** Bola menghalangi cahaya, jadi bayangan yang jatuh di
+    /// cincin adalah **proyeksi bola** sepanjang arah cahaya — bukan lingkaran
+    /// di sekitar bola. Karena cincinnya miring (elips), bayangannya juga
+    /// elips dengan rasio sumbu yang sama, digeser sejauh proyeksi itu.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan perhitungan geometri 3D sungguhan:
+    /// jarak geser adalah pilihan gambar, dan bayangan tidak memendek di tepi
+    /// cincin seperti pada benda nyata. Yang dijamin: bayangannya ada, berada
+    /// di sisi yang **menjauhi** cahaya, dan tidak pernah menutupi sisi yang
+    /// menghadap cahaya.
+    ///
+    /// - Parameters:
+    ///   - ring: cincin dari `saturnRing`.
+    ///   - bodyFraction: jari-jari bola, pecahan dari setengah lebar cincin.
+    ///   - lightDirection: arah sumber cahaya (lihat `sphereLightOffset`).
+    ///   - reach: jarak geser pusat bayangan, pecahan dari jari-jari bola.
+    public struct RingShadow: Equatable, Sendable {
+        /// Ujung **jauh** bayangan relatif pusat cincin, satuan radius frame.
+        ///
+        /// Bayangan mulai di pusat (tepi bola yang menghadap cahaya) dan
+        /// membentang ke arah menjauhi cahaya. Satu titik saja tidak cukup:
+        /// bayangan bola yang hanya digeser satu radius terbaca sebagai
+        /// bercak, bukan sebagai bayangan yang **membentang** — dan itulah
+        /// bentuk yang membuat cincin Saturnus terlihat punya kedalaman.
+        public var offsetX: Double
+        public var offsetY: Double
+        /// Jari-jari bayangan pada sumbu x, satuan radius frame.
+        public var radius: Double
+        /// Jari-jari bayangan pada sumbu y (sudah dikalikan rasio cincin).
+        public var radiusY: Double
+
+        public init(offsetX: Double, offsetY: Double,
+                    radius: Double, radiusY: Double) {
+            self.offsetX = offsetX
+            self.offsetY = offsetY
+            self.radius = radius
+            self.radiusY = radiusY
+        }
+
+        /// Apakah titik `(ux, uy)` — satuan radius frame — jatuh di bayangan.
+        ///
+        /// **Kenapa jarak ke ruas garis, bukan ke titik.** Bayangan bola yang
+        /// disinari dari satu arah adalah **silinder**, jadi jejaknya di
+        /// bidang cincin adalah kapsul: semua titik yang berjarak ≤ jari-jari
+        /// bola dari ruas `pusat → ujung jauh`. Menggeser satu lingkaran
+        /// menghasilkan bayangan yang 30% lebih sempit dan tidak pernah
+        /// mencapai tepi luar cincin, sehingga tidak terbaca sebagai bayangan.
+        ///
+        /// **Kenapa y dibagi rasio cincin dulu.** Cincin digambar sebagai
+        /// elips (dipipihkan pada y), jadi lingkaran di bidang cincin menjadi
+        /// elips di layar. Jarak diukur di bidang cincin — tempat bayangannya
+        /// memang lingkaran — supaya bayangan ikut memipih bersama cincinnya.
+        /// Mengukur jarak langsung di layar akan memberi bayangan yang terlalu
+        /// lebar pada arah y.
+        public func contains(ux: Double, uy: Double,
+                             axialRatio: Double) -> Bool {
+            let safeRatio = axialRatio > 1e-9 ? axialRatio : 1e-9
+            // Ke bidang cincin: y dikembalikan ke skala x.
+            let px = ux, py = uy / safeRatio
+            let dx = offsetX, dy = offsetY / safeRatio
+            let lengthSquared = dx * dx + dy * dy
+            var t = 0.0
+            if lengthSquared > 1e-18 {
+                t = (px * dx + py * dy) / lengthSquared
+                t = min(max(t, 0.0), 1.0)
+            }
+            let cx = dx * t, cy = dy * t
+            let qx = px - cx, qy = py - cy
+            return (qx * qx + qy * qy).squareRoot() <= radius
+        }
+    }
+
+    /// Seberapa pekat bayangan bola pada cincin Saturnus.
+    ///
+    /// **Kenapa di model, bukan angka di view.** Port Python
+    /// (`Tools/render-visuals.py`) menggambar gambar yang sama, dan gerbang
+    /// piksel mengukur **port**-nya. Angka opasitas yang hidup hanya di view
+    /// berarti gerbang mengukur bayangan yang lebih pekat atau lebih pucat
+    /// daripada yang dilihat pengguna — kelas cacat yang sudah dibayar repo
+    /// ini berkali-kali (lihat `ringBackHalfOpacityScale`).
+    ///
+    /// **Kenapa 0.62, bukan lebih pekat.** Cincin Saturnus nyata tembus
+    /// pandang, jadi bayangannya tidak hitam: cukup untuk terbaca sebagai
+    /// bayangan, tidak sampai menghapus pita di bawahnya. Angka ini
+    /// **diukur, bukan dipilih dengan mata**: gerbang
+    /// `check_saturn_rings_carry_the_planet_shadow` menuntut rasio
+    /// dalam/luar < 0.85, dan pada 0.62 terukur 0.565. Pada 0.0 (bayangan
+    /// dimatikan) rasio itu 0.969 — jadi angkanya memang yang membuat
+    /// bayangan itu ada, bukan gerbang yang longgar.
+    ///
+    /// Di mode malam nilainya dipetakan lewat aturan `shadow` yang sama
+    /// dengan piringan gelap Bulan, supaya bayangan tidak menambah cahaya di
+    /// layar merah.
+    public static let ringShadowOpacity: Double = 0.62
+
+    public static func saturnRingShadow(for ring: RingGeometry,
+                                        bodyFraction: Double = 0.53,
+                                        lightDirection: (x: Double, y: Double)
+                                            = CelestialVisual.sphereLightOffset,
+                                        reach: Double = 0.95) -> RingShadow? {
+        // Arah cahaya nol tidak punya arah: bayangannya akan jatuh ke pusat
+        // dan menutupi bola itu sendiri. Menolaknya di sini lebih baik
+        // daripada menghasilkan gambar yang "masuk akal".
+        let length = (lightDirection.x * lightDirection.x
+                      + lightDirection.y * lightDirection.y).squareRoot()
+        guard length > 1e-9 else { return nil }
+        let body = saturnBodyRadius(for: ring, bodyFraction: bodyFraction)
+        // Bayangan jatuh **berlawanan** arah datangnya cahaya.
+        let shift = body * reach
+        let offsetX = -(lightDirection.x / length) * shift
+        let offsetY = -(lightDirection.y / length) * shift
+        // Rasio sumbu mengikuti cincinnya: bayangan yang bulat di atas cincin
+        // miring akan terbaca sebagai lubang, bukan bayangan.
+        let axialRatio = ring.halfHeight / ring.halfWidth
+        return RingShadow(offsetX: offsetX, offsetY: offsetY,
+                          radius: body, radiusY: body * axialRatio)
+    }
+
     /// Geometri kabut objek langit dalam: sekumpulan blob tanpa tepi keras.
     ///
     /// **Kenapa ini di model, bukan di view.** Blob digeser dari pusat

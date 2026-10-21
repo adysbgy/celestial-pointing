@@ -2769,6 +2769,28 @@ jobs:
       - name: Buktikan gerbang pelembutan tepi pita berbunyi
         run: python3 Tools/bukti-mutasi-tepi-pita.py
 
+      # Gerbang "setiap pengakuan MODEL terbaca". Lahir dari cacat yang
+      # ditemukan pada kode yang baru ditulis: `RING_SHADOW_OPACITY` diberi
+      # komentar `# MODEL:` di baris **sebelumnya**, pembaca paritas hanya
+      # mengenali bentuk satu-baris, dan token itu tidak pernah masuk himpunan
+      # yang diperiksa. Gerbang paritasnya hijau — "26 pemeriksaan, 0 gagal" —
+      # dan tidak satu pun angkanya berarti untuk token itu.
+      #
+      # Kerusakannya bukan satu token. Setelah pembaca mengenali bentuk
+      # komentar-di-atas, diukur pada `git show HEAD:Tools/render-visuals.py`:
+      # token terbaca 28 -> 29, dan yang **angkanya benar-benar dibandingkan**
+      # 18 -> 21. Tiga token sudah lama membawa pengakuan yang tidak pernah
+      # diperiksa; yang keempat ditemukan karena ia baru ditulis.
+      #
+      # Empat keadaan, dua di antaranya **wajib hijau** — bentuk komentar-di-atas
+      # (lazim, sah) dan pengakuan di atas `def` (18 di antaranya ada di port;
+      # melaporkannya akan merah pada kode yang benar). Keadaan keempat
+      # mengembalikan pembaca ke regex lamanya dan menuntut gerbangnya merah:
+      # tanpa itu, gerbang ini bisa saja membandingkan pembaca dengan dirinya
+      # sendiri dan selalu hijau.
+      - name: Buktikan gerbang pengakuan MODEL terbaca berbunyi
+        run: python3 Tools/bukti-mutasi-pengakuan-model.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan

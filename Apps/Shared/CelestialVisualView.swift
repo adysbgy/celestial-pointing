@@ -844,6 +844,66 @@ struct CelestialVisualView: View {
                        with: .color(ringColor.opacity(band.opacity)),
                        style: FillStyle(eoFill: true))
         }
+
+        // **Bayangan bola pada cincin.** Digambar paling akhir, di atas kedua
+        // paruh, dan dipotong ke bentuk pita cincin.
+        //
+        // Kenapa urutannya di sini: bayangan harus menutupi cincin di paruh
+        // belakang **dan** paruh depan, karena bola menghalangi cahaya ke
+        // keduanya. Kalau ia digambar bersama pita belakang, paruh depan
+        // menimpanya dan bayangan itu terlihat sebagai garis yang berhenti di
+        // ekuator. Kalau ia digambar bersama pita depan, paruh belakang
+        // terang kembali di sisi yang seharusnya gelap.
+        //
+        // Kenapa dipotong ke pita, bukan digambar sebagai elips gelap: elips
+        // yang tidak dipotong akan menutupi **bola** (yang berada di antara
+        // paruh) di daerah tempat bayangan itu seharusnya hanya menyentuh
+        // cincin. Pemotongan memakai path pita yang sama dengan pita itu
+        // sendiri, jadi bayangan tidak bisa keluar dari cincin.
+        //
+        // Geometrinya dari `VisualFrame.saturnRingShadow` (teruji di Linux),
+        // bukan dihitung di sini — supaya arah bayangan dan arah gradien bola
+        // tidak bisa berbeda pendapat tentang dari mana cahaya datang.
+        if let shadow = VisualFrame.saturnRingShadow(for: ring) {
+            var shade = context
+            var ringShape = Path()
+            for band in bands {
+                ringShape.addPath(ringPath(CGFloat(band.outerRadius) * fullWidth,
+                                           CGFloat(band.innerRadius) * fullWidth))
+            }
+            shade.clip(to: ringShape, style: FillStyle(eoFill: true))
+            // **Kapsul, bukan satu elips tergeser.** Jejak bayangan bola yang
+            // disinari satu arah adalah silinder, jadi bentuknya di bidang
+            // cincin adalah kapsul: semua titik yang berjarak ≤ jari-jari bola
+            // dari ruas `pusat → ujung jauh`. Versi pertama berkas ini
+            // menggambar **satu elips** di ujung ruas itu, dan itu persis
+            // bentuk yang diperingatkan docstring `RingShadow.contains`
+            // ("30% lebih sempit dan tidak pernah mencapai tepi luar cincin").
+            //
+            // Cacat itu tidak tertangkap gerbang mana pun pada putaran
+            // pertamanya: port Python menggambar kapsul, gerbang piksel
+            // mengukur port, dan view menggambar elips — jadi gerbangnya hijau
+            // sambil mengukur gambar yang tidak pernah dikirim ke jam. Dua
+            // elips bertumpuk di ujung ruas cukup untuk menutup jarak itu
+            // tanpa memanggil rasterisasi di dalam `Canvas`.
+            let bodyRadiusPx = CGFloat(shadow.radius) * radius
+            let tailX = center.x + CGFloat(shadow.offsetX) * radius
+            let tailY = center.y + CGFloat(shadow.offsetY) * radius
+            let shadowColor = Self.shadowAccent(CelestialVisual.accents.moonUnlit)
+                .opacity(VisualFrame.ringShadowOpacity)
+            var capsule = Path()
+            for step in 0...8 {
+                let t = CGFloat(step) / 8
+                let cx = center.x + (tailX - center.x) * t
+                let cy = center.y + (tailY - center.y) * t
+                capsule.addEllipse(in: CGRect(
+                    x: cx - bodyRadiusPx,
+                    y: cy - CGFloat(shadow.radiusY) * radius,
+                    width: bodyRadiusPx * 2,
+                    height: CGFloat(shadow.radiusY) * radius * 2))
+            }
+            shade.fill(capsule, with: .color(shadowColor))
+        }
     }
 
     /// Pita bola Saturnus: pita horizontal samar, **bukan** pita Jupiter.
