@@ -1,3 +1,89 @@
+### Siklus (21 Okt 2026 — bayangan yang diukur di satu sisi, dikirim dari sisi lain)
+
+Siklus ini berangkat dari WIP yang belum di-commit: bayangan bola pada cincin
+Saturnus. Pertanyaan pertamanya bukan "apakah fiturnya jalan" melainkan
+"apakah yang diukur sama dengan yang dikirim".
+
+Jawabannya tidak, dan selisihnya tidak terlihat oleh satu gerbang pun.
+
+#### Cacat 1: pohon tidak kompilabel
+
+`CelestialVisual.swift` berisi
+
+    let px, py = ux, uy / safeRatio
+
+Tiga baris seperti ini, ditulis dengan kebiasaan Python. Swift tidak punya
+penugasan rangkap ke dua binding `let`; ini bukan gaya, ini galat sintaks.
+Dipecah per variabel dengan `safeRatio = axialRatio > 1e-9 ? axialRatio : 1e-9`
+(pembagi nol dijaga di satu tempat, bukan di tiga).
+
+#### Cacat 2: bentuk yang diukur ≠ bentuk yang digambar
+
+Bayangan digambar **dua kali**: di port Python — yang diukur
+`check_ring_shadow_darkens_the_ring` dengan 401+1425 sampel piksel — dan di
+view SwiftUI, yang benar-benar digambar jam.
+
+Versi pertama view menggambar **satu elips** di ujung ruas bayangan. Port
+menggambar **kapsul**. Elips itu 30% lebih sempit, tidak pernah mencapai tepi
+luar cincin, dan persis bentuk yang diperingatkan docstring `RingShadow.contains`
+di repo ini sendiri. Seluruh 980 pemeriksaan hijau.
+
+Kelas cacatnya: **gerbang mengukur satu sisi dari kesepakatan dua sisi.**
+Gerbang piksel tidak bisa menutupnya dan bukan karena kurang teliti — ia
+membaca PNG yang dihasilkan port. Selama kedua sisi tidak dibandingkan,
+kesepakatan itu hanya diukur di satu sisi.
+
+View diperbaiki menyusun kapsul dari `VisualFrame.saturnRingShadow`, lalu
+dikunci `check_ring_shadow_shape_matches_the_port`. Gerbang itu mengukur
+**bentuk**, bukan ejaan: gelung di sepanjang ruas, lerp
+`center + (tail - center) * t`, dan radius yang tidak berubah sepanjang gelung.
+Tiga sifat yang membedakan kapsul dari elips tergeser — penulisan ulang yang
+setia tetap hijau. Lima keadaan di `bukti-mutasi-bentuk-bayangan.py`, termasuk
+"radius mengecil sepanjang gelung" (kerucut: gerbang yang hanya mencari
+`for step` akan hijau di sana) dan `drawRings` diganti nama sebagai kontrol
+sisi pembaca.
+
+Batas yang dinyatakan: ini pemeriksaan **teks**. Ia membuktikan view menyusun
+kapsul dari model, bukan bahwa hasilnya di perangkat identik dengan PNG port.
+
+#### Cacat 3: pembaca paritas buta delapan token, bukan satu
+
+`RING_SHADOW_OPACITY` tidak pernah masuk himpunan paritas. Penyebabnya:
+`_port_tokens_modeled_after` menuntut komentar `# MODEL:` **di baris yang sama**
+dengan token. Komentar di baris atas token — bentuk yang sah dan dipakai di
+seluruh berkas — dibaca sebagai tidak ada.
+
+Diukur pada `git show HEAD:Tools/render-visuals.py`: pembaca lama memeriksa
+**18** token, pembaca baru **21**. Tiga token berkomentar-di-atas selama ini
+tidak pernah dibandingkan angkanya dengan model, dan `RING_SHADOW_OPACITY`
+salah satunya. Itu bukan satu token yang lolos; itu **kelas** token yang lolos.
+
+Karena itu yang diperbaiki adalah **pembacanya**, bukan hanya gerbangnya, dan
+gerbang baru `check_model_claims_are_on_the_token_line` menguji pembaca itu —
+bukan menyalin regexnya (versi pertama begitu, dan tautologis).
+
+#### Cacat 4: dua komentar menjanjikan gerbang yang tidak pernah ada
+
+`BandFeatherTests.swift` dan `render-visuals.py` sama-sama merujuk
+`check_band_separation`. Tidak ada fungsi bernama itu di repo. Gerbang yang
+dimaksud bernama `check_jupiter_bands_read_as_separate_stripes`. Ditemukan
+karena CI merah (`NameError`), bukan karena ada yang membacanya.
+
+Komentar diarahkan ke nama sebenarnya, bukan dihapus: klaimnya benar, namanya
+yang salah.
+
+#### Angka
+
+- Engine **222** + PointingKit **996** = **1218**, 0 gagal (Docker Swift 6.0).
+- `check_ring_shadow_darkens_the_ring`: **0.565** OK vs **0.969** saat
+  `RING_SHADOW_OPACITY = 0.0` — gerbang bayangan non-vakum.
+- `bukti-mutasi-bentuk-bayangan.py`: **5 keadaan**, 0 tidak sesuai harapan.
+- `bukti-mutasi-pengakuan-model.py`: **5 keadaan**, 0 tidak sesuai harapan.
+- 137 harness terdaftar (semua dirujuk alur kerja); 515 jangkar, nol mutasi
+  tertinggal; 77 aturan UI hijau; typecheck lulus.
+- CI: Apple Build `39587747508` **hijau** (4m3s, tanpa warning kode sendiri);
+  Engine Tests `39587747673` menyusul (~2 jam).
+
 ### Siklus (21 Okt 2026 — dua cacat yang hanya terlihat setelah di-push)
 
 Siklus dibuka dengan `git log` + `gh run list` + gerbang, dan pertanyaan
