@@ -2791,6 +2791,21 @@ jobs:
       - name: Buktikan gerbang pengakuan MODEL terbaca berbunyi
         run: python3 Tools/bukti-mutasi-pengakuan-model.py
 
+      # Gerbang bentuk bayangan cincin Saturnus. Cacatnya lolos **980
+      # pemeriksaan piksel** karena bayangan digambar dua kali: di port Python
+      # (yang diukur gerbang piksel) dan di view SwiftUI (yang digambar jam).
+      # Versi pertama view menggambar satu elips di ujung ruas; port
+      # menggambar kapsul. Keduanya hijau di gerbang masing-masing, dan yang
+      # dikirim ke jam adalah bentuk yang tidak pernah diukur.
+      #
+      # Gerbang ini mengukur **bentuk**, bukan ejaan: tiga sifat yang
+      # membedakan kapsul dari elips tergeser, jadi penulisan ulang yang setia
+      # tetap hijau. Lima keadaan, satu di antaranya `drawRings` diganti nama
+      # (kontrol untuk sisi pembaca, supaya gerbang tidak diam-diam hijau
+      # karena `_function_body` memulangkan string kosong).
+      - name: Buktikan gerbang bentuk bayangan cincin berbunyi
+        run: python3 Tools/bukti-mutasi-bentuk-bayangan.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan

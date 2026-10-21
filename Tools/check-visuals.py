@@ -7486,6 +7486,73 @@ def check_model_claims_are_on_the_token_line(results):
                           ok, detail))
 
 
+def check_ring_shadow_shape_matches_the_port(results, view_source=None):
+    """Bayangan cincin di view harus berbentuk **kapsul**, sama seperti port.
+
+    **Cacat yang ditutup pemeriksaan ini — dan kenapa gerbang piksel tidak
+    bisa menangkapnya.** Bayangan bola pada cincin Saturnus digambar dua kali:
+    di port Python (yang diukur `check_ring_shadow_darkens_the_ring`, 401+1425
+    sampel piksel) dan di view SwiftUI (yang digambar jam). Gerbang piksel
+    hanya melihat port. Jadi kedua sisi bisa menggambar bentuk yang berbeda
+    dan **seluruh 980 pemeriksaan tetap hijau** — dan itu memang terjadi:
+    versi pertama view menggambar **satu elips** di ujung ruas bayangan,
+    sementara port menggambar kapsul. Elips itu 30% lebih sempit dan tidak
+    pernah mencapai tepi luar cincin, persis bentuk yang diperingatkan
+    docstring `RingShadow.contains`.
+
+    Kelasnya sama dengan yang sudah dibayar repo ini berkali-kali: **gerbang
+    mengukur satu sisi dari kesepakatan dua sisi.** Yang diukur di sini bukan
+    piksel, melainkan **bentuk** — apakah view menyusun kapsul (titik-titik di
+    sepanjang ruas `pusat → ujung jauh`), atau menggambar satu elips tergeser.
+
+    **Kenapa tiga penanda, bukan satu.** Satu penanda bisa dipenuhi sambil
+    tetap salah: `addEllipse` sendirian juga dipakai elips tunggal. Yang
+    membedakan kapsul adalah **gelung di sepanjang ruas** (`0...8`, `t`),
+    posisi `center + (tail - center) * t`, dan radius yang **tidak** berubah
+    sepanjang gelung (itu yang membuatnya kapsul, bukan kerucut).
+
+    **Batas yang jujur.** Ini pemeriksaan **teks**: ia membuktikan view
+    menyusun kapsul dari model, bukan bahwa hasilnya di perangkat identik
+    dengan PNG port. Yang menutup itu hanya render di macOS.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    body = _function_body(view, "private func drawRings(")
+    if not body:
+        results.append(Result(
+            "Saturnus: bayangan cincin di view berbentuk kapsul", False,
+            "fungsi `drawRings` tidak ditemukan di CelestialVisualView.swift"))
+        return
+
+    # Geometri dari model, bukan angka di sini — sama seperti port.
+    anchor = body.find("VisualFrame.saturnRingShadow(for: ring)")
+    if anchor < 0:
+        results.append(Result(
+            "Saturnus: bayangan cincin di view berbentuk kapsul", False,
+            "`VisualFrame.saturnRingShadow(for: ring)` tidak ditemukan di "
+            "`drawRings` — bayangannya tidak lagi memakai geometri model"))
+        return
+    region = body[anchor:]
+
+    steps = re.search(r"for step in 0\.\.\.(\d+)", region)
+    lerp = re.search(
+        r"center\.x \+ \(tailX - center\.x\) \* t", region) and re.search(
+        r"center\.y \+ \(tailY - center\.y\) \* t", region)
+    constant_radius = re.search(
+        r"addEllipse\(in: CGRect\(\s*x: cx - bodyRadiusPx,\s*"
+        r"y: cy - CGFloat\(shadow\.radiusY\) \* radius,\s*"
+        r"width: bodyRadiusPx \* 2,", region)
+
+    ok = bool(steps and lerp and constant_radius)
+    detail = (f"gelung {steps.group(0) if steps else 'TIDAK ADA'}, "
+              f"lerp {'ada' if lerp else 'TIDAK ADA'}, "
+              f"radius tetap {'ada' if constant_radius else 'TIDAK ADA'}")
+    if not ok:
+        detail += " — bentuk yang gagal salah satu penanda bukan kapsul"
+    results.append(Result(
+        "Saturnus: bayangan cincin di view berbentuk kapsul", ok, detail))
+
+
 def check_modeled_port_constants_match_the_model(results):
     """Setiap konstanta port yang **mengaku** berasal dari model harus cocok.
 
@@ -16939,6 +17006,7 @@ def main():
     check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
+    check_ring_shadow_shape_matches_the_port(results)
     check_model_claims_are_on_the_token_line(results)
     check_band_feather_curve_is_the_models(results)
     check_jupiter_band_tones_match_the_model(results)
