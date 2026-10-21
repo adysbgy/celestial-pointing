@@ -1,3 +1,92 @@
+### Siklus (21 Okt 2026 — kilau kaca yang membatalkan seluruh alasan mode malam)
+
+Cacat ini hidup di **satu baris** di `Apps/Shared/SurfaceTokens.swift`, di
+lapisan yang tidak pernah dibangun `swift-test.sh` dan tidak dibaca satu pun
+dari 82 aturan UI:
+
+    .overlay(RoundedRectangle(...).fill(.ultraThinMaterial.opacity(0.10)))
+
+Dua cacat keluar dari angka itu, dan keduanya hanya terlihat setelah dihitung.
+
+#### Cacat 1: kanal 498–530nm bocor di setiap kartu mode malam
+
+`.ultraThinMaterial` di atas permukaan gelap menghasilkan lapisan **terang**.
+Pada kepekatan 0.10, kanal hijau dan biru kartu mode malam naik dari `0.000`
+ke **`0.042`**.
+
+Mode malam ada justru untuk memastikan kanal itu **nol** — batang rod paling
+sensitif ~498–530nm, jadi hijau dan biru harus hilang sepenuhnya, bukan
+diredupkan. Satu lapisan hiasan membatalkan seluruh alasannya, di **setiap
+kartu di setiap layar**, dan tidak ada teks di layar yang bisa membuat pengguna
+curiga bahwa mode malamnya bocor. Kegagalannya justru paling sulit dilihat:
+di mata "kartu agak lebih terang" terlihat wajar.
+
+#### Cacat 2: kontras teks malam jatuh di bawah 4.5:1
+
+| teks | tanpa kilau | dengan kilau 0.10 | ambang |
+|---|---|---|---|
+| utama | 5.13 | **4.19** | 4.5 |
+| sekunder | 4.67 | **3.82** | 4.5 |
+
+Merah murni di atas hitam hanya punya plafon **5.25:1** — itu fisika, bukan
+selera. Seluruh anggaran kontras mode malam sudah terpakai sebelum hiasan apa
+pun, jadi tidak ada "kurangi sedikit" yang menyelamatkan. Satu-satunya angka
+yang sah adalah **nol**.
+
+#### Cacat 3: dokumentasinya menyatakan kebalikan dari kodenya
+
+Komentar `surfaceCard` berbunyi material itu "tidak pernah duduk **di bawah**
+teks, jadi ia tidak menggeser kontras yang sudah dihitung". Itu terbalik:
+`.overlay` menggambar **sesudah** isi, jadi kilau menyapu teks. Seluruh klaim
+kontras yang dihitung terhadap alas buram tidak berlaku untuk piksel yang
+dilihat pengguna. Kelasnya sama dengan yang berulang di proyek ini — gerbang
+mengukur model, dan modelnya memang benar; yang salah adalah view yang
+menambahkan lapisan di atasnya.
+
+#### Perbaikan
+
+1. **Kepekatan pindah ke model.** `SurfacePalette.glassSheenAlpha(for:)`:
+   0.10 siang, **0.0** malam, dipilih dari `isNight` (isi palet), bukan dari
+   saklar. Dua konstanta bernama, bukan `0` di dalam ternary — nilai yang tidak
+   bernama akan "dirapikan" seseorang menjadi satu angka bersama.
+2. **Kilau duduk di antara alas dan isi** (`.background` bertingkat), dijaga
+   `if sheen > 0` supaya mode malam tidak menggambar material sama sekali.
+3. **`SurfaceTokens` sekarang kosong**, dan menyebut alasannya: angka pertama
+   yang pernah tinggal di sana ternyata **bisa** diuji — dan setelah diuji, ia
+   salah. Sebelum menambah token di sana, tanyakan dulu apakah ia bisa pindah
+   ke `PointingKit`; jawabannya biasanya bisa.
+
+#### Gerbangnya
+
+**Aturan 83** menutup kelasnya, bukan barisnya: kepekatan wajib datang dari
+model, tidak boleh literal di `Apps/`, kilau tidak boleh `.overlay` pada self,
+penjaga `sheen > 0` wajib ada, `glassSheenNightAlpha` wajib `0`, dan ketiga uji
+kontrasnya wajib masih ada.
+
+Dibuktikan non-vakum dengan **tiga mutasi terpisah** (masing-masing `exit 1`):
+kilau kembali `.overlay`, penjaga `sheen > 0` dihapus, dan kepekatan ditulis
+literal `0.10` di `Apps/`.
+
+#### Yang TIDAK diklaim
+
+- `.ultraThinMaterial` tidak bisa dirender di Linux. Semua angka di atas adalah
+  **batas atas** dengan material = putih penuh. Nilai sebenarnya di perangkat
+  tidak pernah lebih buruk — tetapi angkanya bukan hasil ukur perangkat.
+- Kilau mode siang 0.10 tidak diukur terhadap material sungguhan, hanya
+  dibatasi: pada batas atas ia menahan kontras (sekunder 9.55:1), dan
+  `≤ 0.25` dijaga uji supaya ia tetap kilau, bukan penggeser warna.
+- Tidak ada gerbang yang mengukur piksel hasil render `Apps/`. Yang diuji
+  aritmetika komposisi dan **bentuk** pemasangannya.
+- Nol di mode malam berarti mode malam tidak punya kilau kaca sama sekali. Itu
+  kerugian rasa yang diterima dengan sadar: brief meminta glassmorphism, dan
+  yang bisa dipenuhinya hanya di mode siang.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1029** =
+**1251** hijau (0 kegagalan) di Docker Swift 6.0. 83 aturan UI hijau,
+typecheck hijau.
+
+---
+
 ### Siklus (21 Okt 2026 — samaran keraguan yang terbalik di view, hijau di 119 gerbang)
 
 Ditemukan satu cacat yang **tidak bisa** ditangkap gerbang mana pun yang ada,

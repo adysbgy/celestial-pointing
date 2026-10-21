@@ -96,7 +96,9 @@ enum SurfaceTokens {
     /// (`glassSheenOpacity`) ternyata **bisa** diuji — dan setelah diuji, ia
     /// salah. Sebelum menambah token di sini, tanyakan dulu apakah ia bisa
     /// pindah ke `PointingKit`; jawabannya biasanya bisa.
-    private init() {}
+    ///
+    /// Enum tanpa case dipakai justru karena itu: ia tidak bisa dipakai
+    /// sebagai nilai, jadi satu-satunya isinya adalah konstanta `static`.
 }
 
 /// Ketebalan garis tipis pemisah kartu.
