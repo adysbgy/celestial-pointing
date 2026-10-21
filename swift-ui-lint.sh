@@ -13513,6 +13513,127 @@ else
   echo "        baik saat pemasangan maupun setiap pembaruan."
 fi
 
+# -- Aturan 78: kartu objek wajib menyusun ulang saat huruf membesar ----------
+# Cacatnya terukur, bukan dugaan. `swift-ui-lint.sh` Aturan 76 menghitung
+# luapan nama pada **satu** ukuran huruf (20 pt, `.title3` bawaan) dan
+# menyimpulkan "Galaksi Kincir Angin" muat di kolom 96 pt dengan skala 0.847.
+# Itu benar -- pada ukuran bawaan. Yang tidak pernah diukur: apa yang terjadi
+# saat Dynamic Type memperbesar huruf itu 3.12x di ukuran aksesibilitas
+# terbesar. Terukur dengan font yang sama (DejaVu Sans Bold, nama terlebar
+# katalog "Gugus Sarang Lebah" = 233.22 pt pada 20 pt):
+#
+#     ukuran   skala   skala-wajib   hasil
+#     large    1.00      0.823        muat, menyusut 18%
+#     AX1      1.64      0.517        TERPOTONG (di bawah lantai 0.6)
+#     AX5      3.12      0.281        TERPOTONG
+#
+# Jadi nama objek terpotong di **setiap** ukuran aksesibilitas, dan tidak ada
+# satu pun dari 77 aturan yang bisa melihatnya, karena semuanya mengukur teks
+# pada ukuran bawaan. Ini kelas cacat yang sama dengan Aturan 77: aplikasi yang
+# tampak benar, dan pengguna yang memakai huruf besar hanya melihat potongan.
+#
+# Kenapa gerbangnya memeriksa bentuk, bukan menjalankan uji: `Apps/` tidak
+# pernah dibangun di Linux, jadi tidak ada uji runtime yang bisa melihat tata
+# letak SwiftUI. Yang bisa diperiksa dari sini adalah **bentuk** keputusan itu:
+# apakah view benar-benar membaca `dynamicTypeSize`, dan apakah ia menyusun
+# ulang (`AnyLayout`) alih-alih mengecilkan huruf sampai tak terbaca.
+echo "== Aturan 78: kartu objek menyusun ulang saat Dynamic Type membesar =="
+dynamic_type=$(python3 - <<'PY2' 2>&1
+import io
+import os
+
+CARD = os.path.join("Apps", "PointAndKnowWatch", "Sources", "PointingView.swift")
+MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit", "NameOverflow.swift")
+TESTS = os.path.join("Packages", "PointingKit", "Tests", "PointingKitTests",
+                     "NameOverflowTests.swift")
+
+masalah = []
+
+for path in (CARD, MODEL, TESTS):
+    if not os.path.exists(path):
+        masalah.append("  %s tidak ditemukan -- Aturan 78 tidak mengukur apa pun." % path)
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(0)
+
+kartu = io.open(CARD, encoding="utf-8").read()
+model = io.open(MODEL, encoding="utf-8").read()
+uji = io.open(TESTS, encoding="utf-8").read()
+
+# (1) View wajib membaca ukuran huruf yang sedang berlaku. Tanpa ini,
+#     keputusan tata letak apa pun buta terhadap Dynamic Type.
+if "dynamicTypeSize" not in kartu:
+    masalah.append(
+        "  %s: tidak membaca `dynamicTypeSize`.\n"
+        "    Kartu memakai ukuran huruf yang sama untuk semua pengguna, jadi\n"
+        "    nama objek terpotong begitu hurufnya diperbesar." % CARD)
+
+# (2) Keputusan tata letak harus datang dari model yang diuji, bukan dari
+#     ambang yang ditulis di dalam view (ambang di view tidak bisa diuji di
+#     Linux, dan tidak ada gerbang yang bisa menjangkaunya).
+if "ObjectCardLayout.stacksName" not in kartu:
+    masalah.append(
+        "  %s: keputusan menyusun ulang tidak memakai `ObjectCardLayout.stacksName`.\n"
+        "    Ambang tata letak yang ditulis di dalam view tidak dapat diuji dari\n"
+        "    sini dan tidak dijaga gerbang mana pun." % CARD)
+
+# (3) Menyusun ulang, bukan mengecilkan. `AnyLayout` adalah bentuk yang
+#     membuktikan kedua susunan benar-benar dipakai.
+for bentuk in ("AnyLayout", "VStackLayout", "HStackLayout"):
+    if bentuk not in kartu:
+        masalah.append(
+            "  %s: tidak memakai `%s`.\n"
+            "    Tanpa dua susunan yang nyata, nama hanya bisa dipaksa muat\n"
+            "    dengan mengecilkan huruf -- dan huruf yang dikecilkan sampai\n"
+            "    tak terbaca bukan aksesibilitas." % (CARD, bentuk))
+
+# (3b) Baris nama wajib ikut tumbuh. Menyusun ulang hanya membeli 48% lebar,
+#      sementara huruf tumbuh 212%; kolom susunan 142 pt dengan 2 baris gagal
+#      mulai AX3. Karena kartu ada di dalam `ScrollView`, baris tambahan tidak
+#      merebut ruang dari apa pun -- dimensi yang benar-benar tumbuh saat huruf
+#      membesar adalah tinggi.
+if "nameLineLimit(at:" not in kartu:
+    masalah.append(
+        "  %s: `lineLimit` tidak ikut tumbuh bersama Dynamic Type.\n"
+        "    Menyusun ulang hanya membeli lebar 48%%, sedangkan huruf tumbuh\n"
+        "    sampai 212%% -- nama tetap terpotong mulai AX3." % CARD)
+
+# (4) Model wajib menyatakan batasnya, bukan hanya mengembalikan boolean.
+#     Tanpa `firstFailingSize`, tidak ada yang bisa menyebut ukuran mana yang
+#     rusak, dan gerbang hanya bisa bilang "ada yang salah".
+if "firstFailingSize" not in model:
+    masalah.append(
+        "  %s: tidak menyatakan ukuran pertama yang gagal.\n"
+        "    Gerbang yang tidak bisa menyebut ukuran yang rusak akan\n"
+        "    dilonggarkan orang begitu ia merah." % MODEL)
+
+# (5) Setiap ukuran aksesibilitas wajib punya uji. Kalau hanya satu yang
+#     diuji, ukuran lain bisa rusak tanpa gerbang berbunyi.
+for ukuran in ("accessibility1", "accessibility3", "accessibility5"):
+    if ukuran not in uji:
+        masalah.append(
+            "  %s: tidak menguji `%s`.\n"
+            "    Satu ukuran yang diuji tidak membuktikan ukuran lain." % (TESTS, ukuran))
+
+if masalah:
+    print("\n".join(masalah))
+PY2
+)
+if printf '%s' "$dynamic_type" | grep -q "Traceback"; then
+  echo "Pemeriksaan Aturan 78 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  echo "$dynamic_type"
+  status=1
+elif [ -n "$dynamic_type" ]; then
+  echo "$dynamic_type"
+  echo "-> Kartu objek wajib menyusun ulang saat Dynamic Type membesar,"
+  echo "   dan nama wajib tetap terbaca di setiap ukuran aksesibilitas."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+else
+  echo "Bersih: kartu objek membaca dynamicTypeSize, menyusun ulang lewat"
+  echo "        AnyLayout, dan batasnya diuji di setiap ukuran aksesibilitas."
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo
