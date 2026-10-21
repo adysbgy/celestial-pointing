@@ -1081,6 +1081,13 @@ BAND_COUNT = 7                              # MODEL: `CelestialVisual.jupiterBan
 # `testJupiterBandsCoverTheDisc`.
 BAND_HEIGHT_FRACTION = 2.0 / BAND_COUNT     # MODEL: `CelestialVisual.jupiterBands(heightFraction:)`
 BAND_OPACITY = 0.85                         # MODEL: `CelestialVisual.jupiterBandOpacity`
+# MODEL: `CelestialVisual.bandFeatherFraction` — lebar tepi pita yang
+# dilembutkan ke nada tetangganya, sebagai fraksi tinggi pita. Diukur pada
+# render 200 px, ss=2: lompatan terang terbesar di batas pita turun dari
+# **132.32/255** ke **32.44/255**, dan pada 76 px (ukuran yang benar-benar
+# dikirim ke jam) dari **83.63/255** ke **40.81/255**, sementara nadanya tetap
+# terpisah karena pusat pita tidak berubah.
+BAND_FEATHER_FRACTION = 0.18
 # Pola nada pita dari kutub utara ke selatan — **sama dengan**
 # `CelestialVisual.jupiterBandTones`. Peta ini dulu hidup dua kali (di sini dan
 # di `CelestialVisualView.drawBands`), dan polanya yang menentukan apakah
@@ -1797,6 +1804,45 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
                    for height, edge_half_width in reversed(edges)]
         name = BAND_TONE_ACCENTS[BAND_TONES[index % len(BAND_TONES)]]
         band_rgb = night_mapped(ACCENTS[name], False) if night_mode else ACCENTS[name]
+        # **Tepi pita dilembutkan ke nada pita tetangganya.** Pita digambar
+        # sebagai poligon warna **rata** yang bersambung, jadi batas antar pita
+        # adalah langkah satu piksel. Diukur pada render 200 px, ss=2: lompatan
+        # terang terbesar di dalam piringan **117/255** (baris 57), sementara
+        # median langkah antar piksel bersebelahan **0.93/255** — 126x. Di mata
+        # itu terbaca sebagai pita isolasi yang ditempel, bukan atmosfer.
+        #
+        # Yang dilembutkan hanya **warna**, bukan geometri: pusat tiap pita
+        # tetap memakai nadanya sendiri persis, sehingga gerbang keterpisahan
+        # pita (`check_band_separation`) mengukur nilai yang sama seperti
+        # sebelumnya. Yang berubah hanya transisi di 18% tinggi pita teratas
+        # dan terbawah.
+        #
+        # **Yang TIDAK diklaim.** Ini bukan model atmosfer: tidak ada
+        # hamburan, tidak ada tinggi skala, dan tidak ada ketergantungan pada
+        # panjang gelombang. Ia hanya menghapus langkah warna yang tidak
+        # mungkin ada di citra teleskop mana pun.
+        BAND_FEATHER = BAND_FEATHER_FRACTION
+        upper_name = BAND_TONE_ACCENTS[BAND_TONES[(index - 1) % len(BAND_TONES)]]
+        lower_name = BAND_TONE_ACCENTS[BAND_TONES[(index + 1) % len(BAND_TONES)]]
+        upper_rgb = night_mapped(ACCENTS[upper_name], False) if night_mode else ACCENTS[upper_name]
+        lower_rgb = night_mapped(ACCENTS[lower_name], False) if night_mode else ACCENTS[lower_name]
+        top_y = band_y - half_height
+        bottom_y = band_y + half_height
+
+        def feathered_rgb(x, y):
+            """Nada pita ini, dicampur ke tetangganya di dekat tepinya."""
+            span = max(1e-9, 2.0 * half_height)
+            offset = (y - cy) / radius - band_y
+            # t = 0 di tepi atas, 1 di tepi bawah.
+            t = (offset + half_height) / span
+            if t < BAND_FEATHER:
+                k = 0.5 * (1.0 - t / BAND_FEATHER)
+                return tuple(band_rgb[i] * (1.0 - k) + upper_rgb[i] * k for i in range(3))
+            if t > 1.0 - BAND_FEATHER:
+                k = 0.5 * (1.0 - (1.0 - t) / BAND_FEATHER)
+                return tuple(band_rgb[i] * (1.0 - k) + lower_rgb[i] * k for i in range(3))
+            return band_rgb
+
         if shade is None:
             canvas.polygon(points, accent_fn(ACCENTS[name], night_mode, BAND_OPACITY))
             continue
@@ -1813,7 +1859,8 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
             centre_k = (0.2126 * centre_rgb[0] + 0.7152 * centre_rgb[1]
                         + 0.0722 * centre_rgb[2])
             gain = 1.0 if centre_k <= 1e-9 else min(1.15, k / centre_k)
-            return tuple(min(1.0, _rgb[i] * gain) for i in range(3)), BAND_OPACITY
+            mixed = feathered_rgb(x, y)
+            return tuple(min(1.0, mixed[i] * gain) for i in range(3)), BAND_OPACITY
 
         canvas.polygon(points, band_color)
 

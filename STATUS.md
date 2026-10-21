@@ -30789,3 +30789,100 @@ Port Python `render-visuals.py:BAND_HEIGHT_FRACTION` jadi nilai **turunan**
 
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **973** hijau,
 `swift-ui-lint.sh` 74 aturan hijau, parse `bash:3.2` hijau, Apple Build hijau.
+
+---
+
+### Siklus (21 Okt 2026 — bagian 3: angka yang terdengar terukur, gerbang yang membandingkan docstring dengan ukuran)
+
+Siklus ini melanjutkan unit `bandFeatherFraction` yang sudah ter-commit
+sebelumnya. View, model, port, dan salah satu uji-nya sudah hijau; yang
+belum diperiksa adalah **prosa yang menjelaskan mengapa angkanya layak
+dipercaya**.
+
+#### Cacat, dan ia sudah mendarat di pohon
+
+`bandFeatherFraction = 0.18` lahir dengan docstring yang mengutip lompatan
+terang terbesar **117.4/255 → 23.3/255** (200 px) dan **76.4/255 →
+37.2/255** (76 px). Angka itu muncul di **empat** berkas sekaligus — model
+Swift, view, port Python, dan uji skala matahari — yang membuatnya terasa
+seperti telah diukur empat kali. Ia tidak pernah diukur sama sekali.
+
+**Diukur ulang, bukan dipercaya.** Tujuh probe dijalankan untuk mencari
+definisi yang menghasilkan angka itu (satu kolom, maksimum seluruh piringan,
+`ss=1` vs `ss=2`, luma Rec.709 lawan rata-rata RGB, beberapa radius piringan,
+mengutamakan tepi pita lawan mengutamakan bintik). Tidak satu pun
+menghasilkannya. Yang cocok persis justru **median**-nya: 0.93 dan 2.00 —
+jadi pengukurannya memang pengukuran yang sama, dan hanya puncaknya yang
+salah. Pola itu khas angka yang ditulis dari ingatan, bukan dari terminal.
+
+Angka yang benar, pada definisi yang membuat mediannya cocok:
+
+    200 px   puncak 132.32 -> 32.44   median 0.93 -> 1.00   (4.1x)
+     76 px   puncak  83.63 -> 40.81   median 2.00 -> 3.00   (2.0x)
+
+#### Perbaikan: dua gerbang, bukan satu koreksi teks
+
+Mengganti angka di docstring saja akan menyelesaikan gejala dan meninggalkan
+kelas cacatnya utuh — itu sudah dibayar repo ini **empat kali**
+(`check_crater_contrast_numbers_come_from_the_sampler`,
+`check_spiral_core_docstring_quotes_measured_values`,
+`check_spiral_arm_docstring_quotes_measured_values`,
+`check_saturn_ring_order_docstring_quotes_measured_values`) dan setiap kali
+cara menyelesaikannya sama: ukur keduanya.
+
+**Gerbang 1 — `check_band_feather_softens_the_edge`.** Mengukur ketajaman
+tepi sebagai **puncak lompatan luma tegak** di dalam piringan, pada 200 px
+dan 76 px, dan menuntut pelembutan menurunkannya ≥4× dan ≥2×. Ia mengukur
+besaran yang **tidak** dijaga gerbang pita yang sudah ada: keterpisahan nada
+mengukur tone tiap pita di jendela horizontal, dan tone pusat pita tidak
+berubah oleh pelembutan tepi sama sekali — jadi duduk di keadaan "seluruh
+pita bersambung jadi satu warna rata" dan tetap hijau.
+
+**Gerbang 2 — `check_band_feather_docstring_quotes_measured_values`.** Membaca
+docstring `bandFeatherFraction` **dari berkas model**, mengukur ulang kedua
+ukuran, lalu menolak penyimpangan > 0.05/255. Arah inilah yang paling mudah
+menjadi tautologi — gerbang yang membandingkan docstring dengan salinannya
+sendiri tidak mengukur apa pun — dan justru itu yang mengubahnya dari
+koreksi teks menjadi gerbang: ia **merah pada angka lama**, dan itu
+terbukkan diharness, bukan diasumsikan.
+
+Kedua gerbang terbukti bisa merah sebelum prosa diperbaiki: pada putaran
+pertama mereka gagal pada angka asli (docstring mengutip 117.4/76.4,
+terukur 132.32/83.63). Putaran kedua — setelah docstring dikoreksi — 4/4
+hijau.
+
+#### Buktinya, bukan klaimnya
+
+`Tools/bukti-mutasi-tepi-pita.py`, terdaftar di `engine-tests.yml`, tujuh
+keadaan:
+
+1. **pohon utuh** (kontrol negatif) — 0/2 merah. Kalau keadaan ini sudah
+   merah, merah pada keadaan lain tidak membedakan apa pun.
+2. **pelembutan dimatikan** (`0.18 -> 0.0`) — MERAH.
+3. **docstring mengutip angka lama** — MERAH. Harness menanam kembali
+   117.4/23.3 (`BAND_EDGE_QUOTED` dibaca dari gerbangnya, bukan ditulis
+   ulang) dan menuntut gerbang paritasnya berbunyi.
+4. **docstring dibulatkan 1 desimal** (`132.32 -> 132.3`) — **hijau**.
+   Toleransi 0.05 memisahkan pembulatan sah dari angka karangan; gerbang
+   yang merah pada pembulatan akan dimatikan orang.
+5. **kutipan 76 px dihapus** — MERAH. "Tidak ada angka untuk diperiksa"
+   tidak boleh terbaca sebagai "angka benar".
+
+#### Yang TIDAK diklaim
+
+- **Definisi pengukuran bukan banyak, dan sengaja diukur sebagai lompatan
+  vertikal.** Populasinya `|L[y][x] − L[y−1][x]|` untuk pasangan bersebelahan
+  yang keduanya di dalam `dx²+dy² ≤ 0.92²` pada kolom `|dx| ≤ 0.5`. Bintik
+  Merah Besar **tidak** dikecualikan: ia bagian dari gambar yang dikirim ke
+  jam, dan tepinya memang lompatan yang sah. Dua cakupan memang-tidak-
+  dijamin: batas pisaunya `0.5` dan ambang piringan `0.92` adalah pilihan,
+  bukan ditemukan.
+- **4.1× (200 px) bukan kekuatan pelembutan, itu rasio pada tampak saat
+  ini.** Angkanya bergantung pada bintik dan palet bintang yang ikut di
+  kolom itu; ia dijaga sebagai ambang, bukan sebagai identitas.
+- **Pita tidak diubah.** Siklus ini hanya mengoreksi prosa dan menambah
+  gerbang; geometri pita, tutupan 100%, dan Bintik Merah Besar dari siklus
+  sebelumnya tetap seperti itu.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **770** = **992**
+hijau (0 kegagalan) di Docker Swift 6.0.

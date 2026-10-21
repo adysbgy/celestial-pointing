@@ -3204,6 +3204,134 @@ public extension CelestialVisual {
         }
     }
 
+    /// Lebar pita yang dilembutkan di tepinya, sebagai fraksi tinggi pita.
+    ///
+    /// **Cacat yang ditutup angka ini.** Pita Jupiter digambar sebagai poligon
+    /// warna **rata** yang bersambung, jadi batas antar pita adalah langkah
+    /// satu piksel. Diukur pada port Python, render 200 px, ss=2, di dalam
+    /// piringan: lompatan terang terbesar **132.32/255** sementara median
+    /// langkah antar piksel bersebelahan **0.93/255** — 142×. Pada ukuran yang
+    /// benar-benar dikirim ke jam (76 px) lompatannya masih **83.63/255**
+    /// terhadap median 2.00. Di mata itu terbaca sebagai pita isolasi yang
+    /// ditempel, bukan atmosfer sebuah planet.
+    ///
+    /// Sesudah dilembutkan pada 0.18: **32.44/255** (200 px) dan
+    /// **40.81/255** (76 px). Nadanya masih terpisah — pusat pita tidak
+    /// berubah sama sekali — tetapi tidak ada lagi dinding satu piksel.
+    ///
+    /// **Kenapa angka di atas persis angka gerbang.** Dua gerbang di
+    /// `Tools/check-visuals.py` mengukur ulang keduanya tiap kali suite jalan
+    /// (`check_band_feather_softens_the_edge`, dan
+    /// `check_band_feather_docstring_quotes_measured_values` yang membaca
+    /// docstring ini lalu membandingkannya dengan hasil ukur). Versi pertama
+    /// docstring ini mengutip 117.4 / 23.3 / 76.4 / 37.2 — angka yang **tidak
+    /// pernah dihasilkan pengukuran mana pun**; yang cocok hanya mediannya,
+    /// jadi definisinya benar dan puncaknya saja yang salah tulis. Gerbang
+    /// paritas itu ada supaya kekeliruan seperti itu tidak bisa bertahan
+    /// sebagai prosa yang terdengar terukur.
+    ///
+    /// **Kenapa hanya warna yang dilembutkan, bukan geometri.** Geometri pita
+    /// sudah dijaga gerbang lain (`jupiterBandEdges`, keterpisahan pita, dan
+    /// lengkung bola). Yang tidak dijaga siapa pun adalah **ketajaman tepi**
+    /// warna, dan justru itu yang merusak kesan realistis. Melembutkan warna
+    /// di dalam bentuk yang sudah benar tidak bisa menggeser satu pun dari
+    /// angka yang sudah diukur.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan model atmosfer: tidak ada hamburan,
+    /// tidak ada tinggi skala, dan tidak ada ketergantungan panjang gelombang.
+    /// Ia hanya menghapus langkah warna yang tidak mungkin muncul di citra
+    /// teleskop mana pun.
+    static let bandFeatherFraction: Double = 0.18
+
+    /// Seberapa jauh piksel di dalam satu pita bercampur ke nada tetangganya.
+    ///
+    /// `t` adalah posisi tegak di dalam pita: 0 di tepi atas, 1 di tepi bawah.
+    /// Hasilnya 0 di tengah pita dan **0.5 tepat di tepi**, sehingga dua pita
+    /// bersebelahan bertemu di titik tengah nada keduanya — bukan di salah
+    /// satunya. Itu yang membuat langkahnya hilang: keduanya menyumbang sama
+    /// besar di bidang batas.
+    ///
+    /// Mengembalikan 0…0.5. Nilai 0.5 (bukan 1.0) disengaja: campuran penuh
+    /// akan membuat tiap pita kehilangan nadanya sendiri di tepi dan pitanya
+    /// berhenti terpisah.
+    static func bandFeatherWeight(atFraction t: Double,
+                                 width: Double = bandFeatherFraction) -> Double {
+        guard width > 0 else { return 0 }
+        let clamped = max(0.0, min(1.0, t))
+        if clamped < width {
+            return 0.5 * (1.0 - clamped / width)
+        }
+        if clamped > 1.0 - width {
+            return 0.5 * (1.0 - (1.0 - clamped) / width)
+        }
+        return 0
+    }
+
+    /// Kurva pelembutan sebagai **titik-titik gradien**: `(lokasi, berat)`.
+    ///
+    /// **Kenapa kurvanya dipindah ke sini, bukan tinggal di pemanggil.**
+    /// `bandFeatherWeight` di atas adalah fungsi; view SwiftUI dan port Python
+    /// sama-sama perlu menggambarnya sebagai gradien, dan keduanya dulu
+    /// menyusun titiknya sendiri. Hasilnya terukur: port memakai **dataran**
+    /// (berat 0.5 di tepi, nol pada 18%, nol sampai tepi seberang), sementara
+    /// view memakai **segitiga** (berat 0.5 di tepi, nol di tengah) — dan
+    /// `check_port_matches_swift_constants` tetap hijau karena yang ia
+    /// bandingkan adalah konstanta `0.18`, bukan bentuk kurvanya. Dua bahasa,
+    /// satu nama, dua gambar.
+    ///
+    /// Empat titik ini mereproduksi `bandFeatherWeight` **persis**, bukan
+    /// mendekatinya: interpolasi linear antara `(0, 0.5)` dan `(w, 0)` adalah
+    /// fungsi linear yang sama dengan cabang pertama, dataran `(w, 0)`–`(1-w, 0)`
+    /// adalah cabang kedua, dan cabang ketiga adalah cermin cabang pertama.
+    /// `BandFeatherTests` menuntutnya pada 201 sampel, bukan pada empat titik
+    /// yang sama — membandingkan titik yang sama dengan dirinya sendiri tidak
+    /// membuktikan apa pun tentang bagian di antaranya.
+    ///
+    /// **Kenapa pasangan (lokasi, berat), bukan `Gradient`.** Tipe itu milik
+    /// SwiftUI; model ini bebas Apple API supaya bisa diuji di Linux. Yang
+    /// dipindahkan adalah **angkanya**, dan pemanggil memetakannya ke tipe
+    /// gambarnya sendiri.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan model atmosfer. Ia hanya menghapus
+    /// langkah warna satu piksel di batas pita.
+    static func bandFeatherStops(width: Double = bandFeatherFraction) -> [(location: Double, weight: Double)] {
+        // Lebar ≥ 0.5 berarti dua tepi bertemu atau melewatinya: kurvanya
+        // berhenti berupa dataran dan gradiennya jadi tak monoton. Yang
+        // dikembalikan adalah kurva tanpa pelembutan, bukan kurva yang
+        // dilipat — melipat akan menghasilkan warna negatif di satu sisi,
+        // yaitu garis gelap, cacat yang lebih buruk daripada yang diperbaiki.
+        guard width > 0, width < 0.5 else {
+            return [(location: 0.0, weight: 0.0), (location: 1.0, weight: 0.0)]
+        }
+        return [(location: 0.0, weight: bandFeatherWeight(atFraction: 0.0, width: width)),
+                (location: width, weight: 0.0),
+                (location: 1.0 - width, weight: 0.0),
+                (location: 1.0, weight: bandFeatherWeight(atFraction: 1.0, width: width))]
+    }
+
+    /// Berat pelembutan pada posisi `t`, dibaca dari `bandFeatherStops`.
+    ///
+    /// Ini pembaca gradien yang sama dengan yang dipakai view, jadi uji yang
+    /// membandingkannya dengan `bandFeatherWeight` menguji **bentuk yang
+    /// benar-benar digambar**, bukan fungsi yang mungkin tidak dipanggil
+    /// siapa pun.
+    static func bandFeatherWeightFromStops(atFraction t: Double,
+                                           width: Double = bandFeatherFraction) -> Double {
+        let stops = bandFeatherStops(width: width)
+        guard let first = stops.first, let last = stops.last else { return 0 }
+        let clamped = max(first.location, min(last.location, t))
+        for index in 1..<stops.count {
+            let lower = stops[index - 1]
+            let upper = stops[index]
+            guard clamped <= upper.location else { continue }
+            let span = upper.location - lower.location
+            guard span > 0 else { return upper.weight }
+            let k = (clamped - lower.location) / span
+            return lower.weight + (upper.weight - lower.weight) * k
+        }
+        return last.weight
+    }
+
     /// Nada satu pita Jupiter.
     ///
     /// **Kenapa ini ada di model, bukan di view.** Peta indeks→warna hidup

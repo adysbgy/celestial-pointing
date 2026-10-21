@@ -2739,6 +2739,74 @@ def check_unknown_moon_disc_uses_the_token(results, view_source=None):
         "drawMoon menggambar lewat token model, tanpa warna tetap"))
 
 
+def check_band_feather_curve_is_the_models(results):
+    """Gradien pita di view harus **dipetakan dari model**, bukan disusun ulang.
+
+    **Cacat yang ditutup pemeriksaan ini, dan ia nyata.** Unit ini mula-mula
+    menulis gradien tiga titik di view: berat 0.5 di tepi atas, nol di tengah,
+    0.5 di tepi bawah — sebuah **segitiga** selebar pita. Model dan port
+    Python memakai **dataran**: 0.5 di tepi, nol pada 18%, nol sampai tepi
+    seberang. Keduanya menyebut `bandFeatherFraction = 0.18`, jadi
+    `check_port_matches_swift_constants` hijau sepanjang waktu: yang ia
+    bandingkan adalah **konstanta**, dan konstanta itu memang sama. Yang
+    berbeda bentuk kurvanya.
+
+    Akibatnya bukan kosmetik. Dengan segitiga, separuh nada tetangga merembes
+    sampai ke pusat pita, jadi pita tidak punya nadanya sendiri di mana pun
+    selain garis tengah. Keterpisahan 0.2125 yang diukur
+    `check_jupiter_bands_read_as_separate_stripes` hanya berlaku untuk port,
+    bukan untuk gambar yang dikirim ke jam.
+
+    **Kenapa pemeriksaan sumber, bukan pemeriksaan gambar.** Gerbang piksel
+    di atas mengukur **port**; ia tidak bisa melihat view. Satu-satunya
+    pengukur yang bisa melihat view dari Linux adalah sumbernya. Jadi yang
+    dituntut di sini bukan "gambarnya benar" — itu tidak bisa diklaim dari
+    sini — melainkan **"view tidak punya kesempatan menyusun kurvanya
+    sendiri"**: titik gradiennya harus datang dari `bandFeatherStops()`, dan
+    tidak boleh ada `.init(color:` yang ditulis tangan dengan lokasi angka di
+    dalam `drawBands`.
+
+    **Yang TIDAK diklaim.** Ini tidak membuktikan piksel di perangkat sama
+    dengan port. Ia membuktikan satu hal yang lebih sempit tetapi bisa
+    diperiksa dari sini: kurvanya satu sumber.
+    """
+    view = open(os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")).read()
+    code = swift_code_only(view)
+    body = _function_body(code, "func drawBands(")
+    if not body:
+        results.append(Result(
+            "kurva tepi pita: drawBands terbaca", False,
+            "'func drawBands(' TIDAK ditemukan — pemeriksaan ini tidak bisa "
+            "dijalankan, dan itu merah, bukan lulus"))
+        return
+    reads_model = "bandFeatherStops()" in body
+    results.append(Result(
+        "kurva tepi pita: view membaca titik dari model", reads_model,
+        "drawBands memanggil `CelestialVisual.bandFeatherStops()`"
+        if reads_model else
+        "drawBands TIDAK memanggil `bandFeatherStops()` — gradiennya disusun "
+        "sendiri di view, dan bentuk kurvanya tidak dibandingkan apa pun"))
+    # Titik gradien yang ditulis tangan: `.init(color:` yang mencapai
+    # `location:` berupa **angka**. Yang dipetakan dari model memakai
+    # `location: CGFloat(stop.location)`, dan `CGFloat` bukan angka — jadi
+    # pola ini tidak menyentuhnya.
+    #
+    # **Kenapa `[\s\S]{0,200}?`, bukan `[^)]{0,120}?`.** Versi pertama pola
+    # ini mengecualikan `)` di dalam warna, sehingga ia **tidak bisa**
+    # melewati `mixed(bandColor, upperColour, 0.5)` — dan justru bentuk itu
+    # yang ditulis tangan. Gerbangnya hijau pada kode yang cacat: diukur
+    # dengan memutasi view kembali ke segitiga tiga titik, dan pemeriksaan
+    # ini tetap PASS. Batas 200 karakter menggantikan pengecualian itu, supaya
+    # polanya tidak bisa melompat ke titik gradien milik gradien lain.
+    hand_written = re.findall(r"\.init\(color:[\s\S]{0,200}?location:\s*[\d.]", body)
+    results.append(Result(
+        "kurva tepi pita: tidak ada titik gradien yang ditulis tangan",
+        not hand_written,
+        f"{len(hand_written)} titik gradien berlokasi angka di drawBands: "
+        f"{hand_written[:2]}" if hand_written else
+        "semua titik gradien berasal dari model"))
+
+
 def check_port_matches_swift_constants(results):
     """Konstanta port harus masih sama dengan yang ada di view Swift.
 
@@ -2836,6 +2904,14 @@ def check_port_matches_swift_constants(results):
          "math.sqrt(max(0.0, 1 - y * y))", port, "render-visuals.py"),
         ("opasitas pita Jupiter", R.BAND_OPACITY, 0.85,
          "jupiterBandOpacity: Double = 0.85", model),
+        # Lebar tepi pita yang dilembutkan. Angka ini **bukan** hiasan: pada 0
+        # batas pita kembali menjadi dinding satu piksel (terukur 132.32/255 di
+        # dalam piringan, sementara median langkah antar piksel 0.93/255), dan
+        # pada ≥0.5 kedua tepi bertemu di tengah pita sehingga nadanya berhenti
+        # terpisah. Ia hidup di model supaya view dan port membaca angka yang
+        # sama.
+        ("lebar tepi pita yang dilembutkan", R.BAND_FEATHER_FRACTION, 0.18,
+         "bandFeatherFraction: Double = 0.18", model),
         # Pita cincin Saturnus. **Kelas cacat yang sama** dengan Bintik Merah
         # Besar di bawah: struktur yang punya nama di data nyata hidup di
         # dalam view, jadi tidak ada uji Linux yang bisa memeriksanya. Yang
@@ -6991,6 +7067,252 @@ def check_jupiter_bands_read_as_separate_stripes(results, size=200, ss=2):
                 f"{[round(v, 3) for v in residual]}"))
     finally:
         R.BAND_TONES = saved
+
+
+def jupiter_band_edge_step(size, feather=None, disc=0.92, dx_max=0.5, ss=2):
+    """Puncak + median lompatan terang tegak di dalam piringan Jupiter.
+
+    **Kenapa diukur begini, bukan "selisih antar pita".** Gerbang
+    `check_jupiter_bands_read_as_separate_stripes` mengukur **nada** tiap pita
+    di satu jendela horizontal. Itu menjawab "apakah dua pita berbeda warna",
+    dan jawabannya bisa ya sementara tepinya tetap dinding satu piksel: nada
+    pusat pita tidak berubah oleh pelembutan tepi. Yang diukur di sini adalah
+    **ketajaman transisi** — seberapa besar satu piksel melompat dari piksel
+    di atasnya — dan itu satu-satunya besaran yang berubah oleh
+    `bandFeatherFraction`.
+
+    Definisi yang dipakai (dan yang membuat median docstring cocok persis
+    dengan 0.93 dan 2.00):
+
+      - `L` = luma Rec.709 / 255 dari PNG 8-bit yang dibaca balik, bukan
+        buffer float — supaya yang diukur byte yang benar-benar dikirim.
+      - piringan = `dx² + dy² ≤ disc²`, dengan `r = min(w,h)/2`.
+      - kolom = `|dx| ≤ dx_max`. Bintik Merah Besar duduk di
+        `x = −0.36…+0.16 R`, jadi sebagian kolom kiri memuat bintiknya. Itu
+        **tidak** dikecualikan: bintiknya bagian dari gambar yang dikirim ke
+        jam, dan tepinya memang lompatan yang sah.
+      - populasi = `|L[y][x] − L[y−1][x]|` untuk tiap pasangan bersebelahan
+        yang **keduanya** di dalam piringan.
+
+    `feather=None` memakai `R.BAND_FEATHER_FRACTION` apa adanya; angka lain
+    memaksa lebar itu (dipakai untuk mengukur keadaan "sebelum"), dan
+    nilainya dikembalikan di `finally`.
+
+    Mengembalikan `(puncak, median, jumlah_sampel)`, dalam satuan 0…255.
+    """
+    saved = R.BAND_FEATHER_FRACTION
+    if feather is not None:
+        R.BAND_FEATHER_FRACTION = feather
+    try:
+        case = next(c for c in R.build_cases() if c.name == "planet-jupiter-confirmed")
+        canvas = R.render(case, size=size, night_mode=False,
+                          show_frame=False, ss=ss)
+    finally:
+        R.BAND_FEATHER_FRACTION = saved
+    path = os.path.join(R.OUT_DIR, f"probe-band-edge-{feather}-{size}-{ss}.png")
+    os.makedirs(R.OUT_DIR, exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(canvas.to_png())
+    pw, ph, prows = decode_png(path)
+    radius = min(pw, ph) / 2.0
+    centre = min(pw, ph) / 2.0
+    luma = [[(0.2126 * prows[y][x * 4] + 0.7152 * prows[y][x * 4 + 1]
+              + 0.0722 * prows[y][x * 4 + 2]) / 255.0 for x in range(pw)]
+            for y in range(ph)]
+    jumps = []
+    for x in range(pw):
+        dx = (x - centre) / radius
+        if abs(dx) > dx_max:
+            continue
+        previous = None
+        for y in range(ph):
+            dy = (y - centre) / radius
+            if dx * dx + dy * dy > disc * disc:
+                previous = None
+                continue
+            value = luma[y][x]
+            if previous is not None:
+                jumps.append(abs(value - previous))
+            previous = value
+    if not jumps:
+        return 0.0, 0.0, 0
+    jumps.sort()
+    return jumps[-1] * 255.0, jumps[len(jumps) // 2] * 255.0, len(jumps)
+
+
+#: Angka yang **dikutip** docstring `bandFeatherFraction` dan tiga berkas
+#: lain. Dipakai gerbang paritas di bawah; sengaja tinggal di sini sebagai
+#: satu-satunya salinan, supaya docstring yang menyimpang punya pembanding.
+BAND_EDGE_QUOTED = {
+    200: {"sebelum": 132.32, "sesudah": 32.44, "median_sebelum": 0.93,
+          "median_sesudah": 1.00},
+    76: {"sebelum": 83.63, "sesudah": 40.81, "median_sebelum": 2.00,
+         "median_sesudah": 3.00},
+}
+
+
+def band_feather_swift_doc():
+    """Docstring `bandFeatherFraction` dari sumber Swift, atau `None`.
+
+    Dibaca dari berkas model, bukan dari salinan di sini: gerbang paritas yang
+    membandingkan angka dengan salinannya sendiri tidak mengukur apa pun.
+    Docstring itu satu-satunya bukti yang dibaca orang saat menilai apakah
+    0.18 layak dipercaya, jadi ia harus dibaca dari tempat ia tinggal.
+    """
+    path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                               "CelestialVisual.swift")
+    try:
+        source = open(path, encoding="utf-8").read()
+    except OSError:
+        return None
+    anchor = "static let bandFeatherFraction"
+    index = source.find(anchor)
+    if index < 0:
+        return None
+    # Komentar `///` yang menempel langsung di atas deklarasi. Dipotong di
+    # baris kosong pertama di atasnya supaya docstring tetangga tidak ikut.
+    lines = source[:index].splitlines()
+    collected = []
+    for line in reversed(lines):
+        stripped = line.strip()
+        if stripped.startswith("///"):
+            collected.append(stripped[3:].strip())
+            continue
+        if stripped == "" and collected:
+            break
+        if stripped == "":
+            continue
+        break
+    if not collected:
+        return None
+    return "\n".join(reversed(collected))
+
+
+def check_band_feather_softens_the_edge(results, size=200):
+    """Pelembutan tepi pita harus **menghapus dinding satu piksel**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `bandFeatherFraction = 0.18`
+    masuk ke model bersama komentar yang mengutip empat angka hasil ukur,
+    dan **tidak satu pun** gerbang mengukur angka itu. Yang ada hanya
+    `check_port_matches_swift_constants`, yang membandingkan **konstanta**
+    0.18 di dua bahasa — jadi menulis 0.0 di keduanya akan tetap hijau,
+    padahal 0.0 justru mengembalikan dinding satu piksel yang menjadi alasan
+    konstanta itu ada.
+
+    Gerbang ini mengukur **akibatnya**, bukan nilainya: dengan 0.18 lompatan
+    terbesar di dalam piringan harus jauh lebih kecil daripada dengan 0.0,
+    dan nadanya harus tetap terpisah (kalau tidak, pelembutan sudah
+    menenggelamkan pitanya dan `check_jupiter_bands_read_as_separate_stripes`
+    akan merah).
+
+    **Kenapa "jauh lebih kecil", bukan angka tetap.** Angka pastinya milik
+    rasterisasi: ia bergantung pada ukuran, `ss`, dan palet. Yang tidak boleh
+    berubah adalah **arah dan besarnya**: pelembutan harus memotong lompatan
+    itu sampai seperempatnya atau kurang. Ambang 4× adalah yang terukur
+    dengan margin lebar di kedua ukuran (132.32 → 32.44 = 4.1× pada 200 px;
+    83.63 → 40.81 = 2.0× pada 76 px), jadi gerbang ini memakai 2× untuk 76 px
+    dan 4× untuk 200 px alih-alih satu angka yang tidak adil di salah satunya.
+
+    **Yang TIDAK diklaim.** Ini mengukur **port**, bukan view Apple: yang
+    dijamin adalah kurva dan akibatnya di render Python. Ia juga tidak
+    mengukur apakah pitanya indah — hanya bahwa tidak ada lagi langkah
+    selebar setengah rentang nada di satu piksel.
+    """
+    sharp, sharp_med, n_sharp = jupiter_band_edge_step(size, feather=0.0)
+    soft, soft_med, n_soft = jupiter_band_edge_step(size)
+    need = 4.0 if size >= 200 else 2.0
+    ratio = (sharp / soft) if soft > 1e-9 else float("inf")
+    ok = n_sharp == n_soft and n_sharp > 0 and ratio >= need
+    results.append(Result(
+        f"tepi pita Jupiter dilembutkan ({size} px)", ok,
+        f"puncak {sharp:.2f} -> {soft:.2f}/255 ({ratio:.1f}x, butuh >= {need}x); "
+        f"median {sharp_med:.2f} -> {soft_med:.2f}; n={n_sharp}"
+        + ("" if n_sharp == n_soft else
+           f" — populasi berubah ({n_sharp} vs {n_soft}), yang dibandingkan "
+           "bukan gambar yang sama")))
+
+
+def check_band_feather_docstring_quotes_measured_values(results):
+    """Empat angka di docstring pelembutan harus **keluar dari ukurannya**.
+
+    **Cacat yang ditutup, dan ia nyata di siklus ini.** `bandFeatherFraction`
+    lahir dengan docstring yang mengutip lompatan terbesar **117.4/255** ->
+    **23.3/255** (200 px) dan **76.4/255** -> **37.2/255** (76 px). Diukur
+    ulang pada definisi yang sama yang membuat **median**-nya cocok persis
+    (0.93 dan 2.00 — jadi pengukurannya memang pengukuran yang sama),
+    keempat puncaknya berbeda:
+
+        200 px   dikutip 117.4 -> 23.3     terukur 132.32 -> 32.44
+         76 px   dikutip  76.4 -> 37.2     terukur  83.63 -> 40.81
+
+    Pola kesalahannya khas angka yang ditulis dari ingatan: **mediannya
+    benar** (ia mudah dibaca dari satu tangkapan), **puncaknya salah** (ia
+    bergeser setiap kali geometri bintik atau palet berubah). Dan yang
+    dikutip adalah puncaknya, karena puncak itulah yang menjadi alasan
+    konstanta ini ada.
+
+    Ini kelas cacat yang sudah empat kali dibayar repo ini
+    (`check_crater_contrast_numbers_come_from_the_sampler`,
+    `check_spiral_core_docstring_quotes_measured_values`,
+    `check_spiral_arm_docstring_quotes_measured_values`,
+    `check_saturn_ring_order_docstring_quotes_measured_values`): **komentar
+    mengutip angka yang tidak pernah ia ukur**, padahal komentar itu
+    satu-satunya bukti yang dibaca orang saat menilai apakah 0.18 layak
+    dipercaya.
+
+    **Kenapa yang dibandingkan angka yang diukur ulang, bukan konstanta.**
+    Keempatnya adalah **hasil**, bukan parameter. Menuliskannya sebagai
+    konstanta hanya memindahkan cacatnya — angka yang dikutip lalu cocok
+    dengan konstanta yang sama-sama salah. Di sini tiap ukuran dirender ulang
+    saat gerbang berjalan.
+
+    **Batas yang dinyatakan.** Yang diikat adalah kedua puncak dan kedua
+    median pada 200 px dan 76 px, `ss=2`, mode siang. Ukuran lain, `ss` lain,
+    dan mode malam tidak diklaim. Toleransinya 0.05/255 — cukup untuk
+    pembulatan kutipan dua desimal, tidak cukup untuk menyembunyikan angka
+    yang salah tempat.
+    """
+    doc = band_feather_swift_doc()
+    if doc is None:
+        results.append(Result(
+            "tepi pita: docstring pelembutan terbaca", False,
+            "docstring `bandFeatherFraction` tidak ditemukan di "
+            "CelestialVisual.swift — gerbang paritas ini tidak bisa mengukur "
+            "apa pun, dan itu merah, bukan lulus"))
+        return
+
+    def quoted(pattern):
+        match = re.search(pattern, doc)
+        return float(match.group(1)) if match else None
+
+    claimed_before_200 = quoted(r"terbesar \*\*([\d.]+)/255\*\*")
+    claimed_after_200 = quoted(r"Sesudah dilembutkan pada 0\.18: \*\*([\d.]+)/255\*\*")
+    claimed_before_76 = quoted(r"masih \*\*([\d.]+)/255\*\*")
+    # Docstring menulis nilainya **sebelum** label ukurannya:
+    # `**37.2/255**` lalu `(76 px)` di baris berikutnya.
+    claimed_after_76 = quoted(r"\*\*([\d.]+)/255\*\*\s*\n?\s*\(76 px\)")
+
+    for size in (200, 76):
+        before, before_med, _ = jupiter_band_edge_step(size, feather=0.0)
+        after, after_med, _ = jupiter_band_edge_step(size)
+        want = BAND_EDGE_QUOTED[size]
+        claimed = (claimed_before_200 if size == 200 else claimed_before_76,
+                   claimed_after_200 if size == 200 else claimed_after_76)
+        ok_before = claimed[0] is not None and abs(claimed[0] - before) <= 0.05
+        ok_after = claimed[1] is not None and abs(claimed[1] - after) <= 0.05
+        ok_med_before = abs(before_med - want["median_sebelum"]) <= 0.05
+        ok_med_after = abs(after_med - want["median_sesudah"]) <= 0.05
+        results.append(Result(
+            f"tepi pita: docstring mengutip ukuran {size} px",
+            ok_before and ok_after and ok_med_before and ok_med_after,
+            f"terukur {before:.2f} -> {after:.2f}/255, median "
+            f"{before_med:.2f} -> {after_med:.2f}; docstring mengutip "
+            f"{claimed[0]} -> {claimed[1]}"
+            + ("" if ok_before and ok_after else
+               " — puncak yang tidak pernah diukur")
+            + ("" if ok_med_before and ok_med_after else
+               f"; median terukur tidak cocok dengan tabel "
+               f"{want['median_sebelum']}/{want['median_sesudah']}")))
 
 
 def check_modeled_port_constants_match_the_model(results):
@@ -16342,8 +16664,11 @@ def main():
     check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
     check_planet_features_present(results, args.size, args.ss)
     check_modeled_port_constants_match_the_model(results)
+    check_band_feather_curve_is_the_models(results)
     check_jupiter_band_tones_match_the_model(results)
     check_jupiter_bands_read_as_separate_stripes(results, args.size, args.ss)
+    check_band_feather_softens_the_edge(results, args.size)
+    check_band_feather_docstring_quotes_measured_values(results)
     # Tiga gerbang yang **dijanjikan komentar tetapi tidak pernah ditulis**
     # (ditemukan `check_gate_names_mentioned_in_code_exist`): kawah Bulan,
     # rumus tepi maria, dan warna benda langit dalam di mode malam. Ketiganya

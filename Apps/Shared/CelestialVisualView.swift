@@ -483,7 +483,8 @@ struct CelestialVisualView: View {
         // yang terlalu tipis hilang di layar jam. Angkanya milik model
         // (`jupiterBands`), dan `check-visuals.py` menjaga agar port Python
         // tidak tertinggal saat nilainya berubah.
-        for band in CelestialVisual.jupiterBands() {
+        let allBands = CelestialVisual.jupiterBands()
+        for (index, band) in allBands.enumerated() {
             let halfWidth = radius * CGFloat(band.halfWidth)
             guard halfWidth > 1 else { continue }
             // **Pita digambar sebagai tali busur, bukan elips.** Tepi pita
@@ -558,6 +559,65 @@ struct CelestialVisualView: View {
             // polanya diuji di Linux.
             let bandColor = CelestialVisual.jupiterBandColour(
                 for: CelestialVisual.jupiterBandTone(at: band.centerY))
+            // **Tepi pita dilembutkan ke nada pita tetangganya.**
+            //
+            // Pita digambar sebagai poligon warna **rata** yang bersambung,
+            // jadi batas antar pita adalah langkah satu piksel. Diukur pada
+            // port Python (render 200 px, ss=2, di dalam piringan): lompatan
+            // terang terbesar **132.32/255** sementara median langkah antar
+            // piksel bersebelahan **0.93/255** — 142×. Pada ukuran yang
+            // benar-benar dikirim ke jam (76 px) lompatannya masih
+            // **83.63/255** terhadap median 2.00. Di mata itu terbaca sebagai
+            // pita isolasi yang ditempel, bukan atmosfer sebuah planet.
+            //
+            // **Kenapa hanya warna, bukan geometri.** Geometri pita sudah
+            // dijaga gerbang lain: jumlah ruas, keterpisahan nada, dan
+            // lengkung bola. Yang tidak dijaga siapa pun adalah **ketajaman
+            // tepi warna**, dan justru itu yang merusak kesan realistis.
+            // Melembutkan warna di dalam bentuk yang sudah benar tidak bisa
+            // menggeser satu pun dari angka yang sudah diukur.
+            //
+            // **Kurvanya dibaca dari model di kedua tepinya, bukan satu titik.**
+            //
+            // Versi pertama baris ini memanggil `bandFeatherWeight(atFraction:
+            // 0.0)` **sekali**, lalu menyusun gradien tiga titik: tepi atas
+            // bercampur setengah, tengah murni, tepi bawah bercampur setengah.
+            // Itu bukan kurva yang diukur gerbang mana pun. Model dan port
+            // Python memakai **dataran**: campuran penuh di tepi, turun linear
+            // sampai nol pada `bandFeatherFraction` (18% tinggi pita), lalu
+            // **nol** sampai tepi yang lain. Gradien tiga titik menyebar
+            // campurannya ke **seluruh** pita, jadi separuh nada tetangga
+            // merembes sampai ke pusat dan pita berhenti punya nada sendiri di
+            // mana pun selain garis tengahnya.
+            //
+            // Dua bahasa, satu nama: `check_port_matches_swift_constants`
+            // membandingkan **konstanta** 0.18, dan konstanta itu memang sama
+            // di kedua sisi. Yang berbeda adalah bentuk kurvanya, dan bentuk
+            // kurva tidak dibandingkan apa pun. Itu kelas yang sudah dibayar
+            // repo ini berkali-kali, jadi yang dipakai sekarang empat titik
+            // yang **jatuh tepat** di kurva model: campuran di kedua tepi
+            // dibaca dari `bandFeatherWeight`, dan lokasi dataran dibaca dari
+            // `bandFeatherFraction`.
+            //
+            // Empat titik itu mereproduksi kurva model **persis**, bukan
+            // mendekatinya — tetapi yang lebih penting, titiknya sekarang
+            // **dibaca dari model**, bukan disusun di sini. Selama kurvanya
+            // disusun di dua tempat, kedua tempat bisa sepakat pada konstanta
+            // 0.18 dan tetap menggambar dua bentuk berbeda; itu persis yang
+            // terjadi pada versi pertama baris ini (segitiga di sini, dataran
+            // di port), dan `check_port_matches_swift_constants` hijau
+            // sepanjang waktu karena ia membandingkan konstanta, bukan bentuk.
+            let featherStops = CelestialVisual.bandFeatherStops()
+            // Tetangga atas dan bawah dibedakan, sama seperti port: tepi atas
+            // satu pita bertemu tepi bawah pita sebelumnya, bukan pita yang
+            // sama. Memakai satu tetangga untuk kedua tepi akan menggeser
+            // seluruh pita, bukan melembutkannya.
+            let upperTone = CelestialVisual.jupiterBandTone(
+                at: allBands[(index - 1 + allBands.count) % allBands.count].centerY)
+            let lowerTone = CelestialVisual.jupiterBandTone(
+                at: allBands[(index + 1) % allBands.count].centerY)
+            let upperColour = CelestialVisual.jupiterBandColour(for: upperTone)
+            let lowerColour = CelestialVisual.jupiterBandColour(for: lowerTone)
             // **Pita dinaungi cahaya bola sebagai bagian dari warnanya, bukan
             // dicat rata lalu ditutupi ulang.** Dua generasi sebelumnya
             // berdebat: pita rata menghapus lengkung bola (jadi stiker), dan
@@ -583,9 +643,45 @@ struct CelestialVisualView: View {
             // seluruh cakram. Lengkung jadi intrinsik — tidak perlu dipulihkan
             // karena tidak pernah terhapus — dan warna pita tetap terbaca
             // karena gradiennya hanya menutupi satu pita, bukan seluruh bola.
+            // Pita diisi **gradien tegak** yang melembutkan kedua tepinya ke
+            // nada tetangganya. Titik tengahnya tetap nada pita ini persis,
+            // jadi gerbang keterpisahan nada mengukur angka yang sama; yang
+            // hilang hanya dinding satu piksel di bidang batas.
+            //
+            // Opasitasnya tetap `jupiterBandOpacity`, sama dengan port. Kalau
+            // gradien ini diisi penuh (1.0), pita berhenti ditembus gradien
+            // bola dan port berhenti memprediksi gambar yang dikirim ke layar —
+            // persis kelas cacat "satu angka, dua bahasa" yang berulang di repo
+            // ini.
+            let bandTop = center.y + CGFloat(band.centerY - band.halfHeight) * radius
+            let bandBottom = center.y + CGFloat(band.centerY + band.halfHeight) * radius
+            // Campuran nadanya dihitung dari model (`featherStops`), bukan
+            // ditulis sebagai angka di sini.
+            func mixed(_ from: CelestialVisual.RGBComponents,
+                       _ to: CelestialVisual.RGBComponents,
+                       _ weight: Double) -> Color {
+                Self.accent(CelestialVisual.RGBComponents(
+                    red: from.red + (to.red - from.red) * weight,
+                    green: from.green + (to.green - from.green) * weight,
+                    blue: from.blue + (to.blue - from.blue) * weight))
+            }
+            // Titik-titik gradiennya **dipetakan dari model**, satu per satu:
+            // lokasinya dari `bandFeatherStops`, warnanya campuran pada berat
+            // yang sama. Menulis empat `.init` di sini akan mengembalikan
+            // bentuk yang baru saja dibuang — dua susunan titik yang sepakat
+            // hari ini dan boleh berbeda besok.
+            let bandGradient = Gradient(stops: featherStops.map { stop in
+                .init(color: mixed(bandColor,
+                                   stop.location < 0.5 ? upperColour : lowerColour,
+                                   stop.weight)
+                        .opacity(CelestialVisual.jupiterBandOpacity),
+                      location: CGFloat(stop.location))
+            })
             context.fill(ribbon,
-                         with: .color(Self.accent(bandColor)
-                             .opacity(CelestialVisual.jupiterBandOpacity)))
+                         with: .linearGradient(
+                            bandGradient,
+                            startPoint: CGPoint(x: center.x, y: bandTop),
+                            endPoint: CGPoint(x: center.x, y: bandBottom)))
             context.drawLayer { bandContext in
                 bandContext.clip(to: ribbon)
                 drawSphere(context: bandContext, center: center, radius: radius,

@@ -2756,6 +2756,19 @@ jobs:
       - name: Buktikan gerbang keterpisahan pita Jupiter berbunyi
         run: python3 Tools/bukti-mutasi-pita-terpisah.py
 
+      # Gerbang pelembutan tepi pita. Siklus ini menambahkan pelembutan warna di
+      # tepi pita Jupiter, dan pelajaran siklus ini: docstring yang
+      # mengiringinya mengutip lompatan terbesar 117.4/255 -> 23.3/255, angka
+      # yang **tidak pernah dihasilkan pengukuran mana pun** (hanya mediannya
+      # yang benar). Harness ini bukan sekadar membuktikan gerbang ketajaman
+      # berbunyi ketika pelembutan dimatikan; keadaan 3-nya menanam kembali
+      # angka karangan itu dan menuntut gerbang paritasnya merah.
+      #
+      # Biayanya ~50 detik: yang dijalankan adalah fungsi pemeriksa yang sama
+      # pada 200 px, bukan gerbang penuh.
+      - name: Buktikan gerbang pelembutan tepi pita berbunyi
+        run: python3 Tools/bukti-mutasi-tepi-pita.py
+
       # Gerbang mutasi tertinggal (`check-jangkar-harness.py`) menentukan
       # **berkas mana** yang diperiksa dari bentuk pencatatan harness. Kalau
       # sebuah harness menunjuk berkas yang salah, jangkarnya tidak ditemukan
