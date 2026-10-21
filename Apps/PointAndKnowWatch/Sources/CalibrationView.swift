@@ -277,6 +277,15 @@ struct CalibrationView: View {
                                 // yang melewatinya.
                                 Text(target.localizedName)
                                     .font(.subheadline.weight(.medium))
+                                    // Nama acuan juga dari katalog (30 entri,
+                                    // dua bahasa) dan baris ini berbagi lebar
+                                    // dengan chevron + `Spacer` di jam yang
+                                    // sama sempitnya dengan kartu status.
+                                    // "Galaksi Kincir Angin" di sini akan
+                                    // mendorong tinggi langit di bawahnya
+                                    // keluar dari baris tombol. Dijaga Aturan 76.
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.7)
                                 Text(CalibrationText.captureAltitudeDisplay(
                                                 altitudeDeg: target.direction.altitudeDeg))
                                     .font(.caption2)

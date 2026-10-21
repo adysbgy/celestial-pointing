@@ -919,6 +919,15 @@ struct DiagnosticsView: View {
                         // Nama = informasi utama: paling besar.
                         Text(displayName ?? ObjectDisplayName.text(of: object))
                             .font(.title2.bold())
+                            // Nama dari katalog bisa sepanjang "Galaksi Kincir
+                            // Angin" (20 karakter, dua bahasa). Panel ini lega,
+                            // tetapi `title2` di samping badge keyakinan tetap
+                            // bisa mendorong badge keluar baris saat Dynamic
+                            // Type membesar — dan badge itu satu-satunya
+                            // penanda "Ragu" di sebelah nama. Dua baris
+                            // menahan nama di tempatnya. Dijaga Aturan 76.
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
                         // Badge keyakinan — permukaan yang **sama** dengan app
                         // jam, memakai `level.tone` yang sama. Ia hanya muncul
                         // untuk jawaban yang berlaku sekarang: pada objek sisa,

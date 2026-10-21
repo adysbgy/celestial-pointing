@@ -527,6 +527,18 @@ struct ObjectDetailView: View {
                         // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
                         // tebal di kartu, karena inilah yang dicari pengguna.
                         .font(.title3.bold())
+                        // **Nama datang dari katalog, bukan dari view.** Panjangnya
+                        // ditentukan 30 entri dua bahasa: "Galaksi Kincir Angin"
+                        // butuh ~227 pt, sementara kolom teks di sini hanya
+                        // selebar kartu jam 40 mm dikurangi visual 38 pt dan
+                        // badge keyakinan — terukur ~46 pt. Tanpa batas, nama
+                        // membungkus jadi empat-lima baris dan **menggeser
+                        // status ke luar layar**: informasi utama menenggelamkan
+                        // jawaban yang dicari. Dua baris + skala minimum
+                        // mempertahankan nama terbaca utuh tanpa merebut
+                        // ruangnya. Dijaga Aturan 76.
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
                     Spacer(minLength: 2)
                     // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
                     // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan

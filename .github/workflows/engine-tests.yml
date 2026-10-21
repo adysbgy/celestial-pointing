@@ -2799,5 +2799,20 @@ jobs:
       - name: Buktikan gerbang batas modul berbunyi
         run: python3 Tools/bukti-mutasi-batas-modul.py
 
+      # Aturan 76 lahir dari pengukuran: `grep -ro 'lineLimit\|minimumScaleFactor'
+      # Apps/` menemukan 4 kemunculan, semuanya di complication dan layar redup
+      # — nol di tiga tempat yang menampilkan nama objek. Nama itu panjangnya
+      # ditentukan katalog 30 entri dua bahasa; "Galaksi Kincir Angin" butuh
+      # 227 pt, sedangkan kolom teks di kartu status jam 40 mm terukur ~46 pt.
+      # Teks membungkus 4-5 baris dan mendorong status keluar layar, tanpa satu
+      # pun galat kompilasi dan tanpa satu pun piksel yang bisa diukur
+      # `check-visuals.py` (ia merender objek, bukan layar).
+      #
+      # Harness ini menuntut ketiga situs berbunyi, dua kontrol diam (agar
+      # aturan tidak menuduh baris sah), dan `Apps/` kosong MERAH dengan
+      # PERINGATAN — bukan "Bersih" pada indeks kosong.
+      - name: Buktikan gerbang luapan nama objek berbunyi
+        run: python3 Tools/bukti-mutasi-aturan76-luapan-nama.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

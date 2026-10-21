@@ -13232,6 +13232,130 @@ elif [ "$ikon_umur_status" -ne 0 ]; then
 fi
 
 
+# ── Aturan 76: nama objek dinamis wajib punya kebijakan luapan ──────────────
+# Nama objek TIDAK ditentukan view. Ia datang dari katalog 30 entri dua bahasa
+# (`ObjectDisplayName.catalogueKeys`), dan Bahasa Indonesia lebih panjang:
+# "Galaksi Kincir Angin" 20 karakter, "Gugus Kupu-kupu" 17. Diukur dengan
+# metrik DejaVu Sans Bold 20 pt: 227 pt dan 200 pt.
+#
+# Kartu status jam adalah tempat paling sempit di seluruh app. Kartu itu
+# `.title3.bold()` di dalam HStack bersama visual 38 pt dan badge keyakinan;
+# pada jam 40 mm (162 pt) dikurangi `cardPadding` 10 pt di kedua sisi, kolom
+# teks yang tersisa terukur ~46 pt setelah badge "Ragu" (~45 pt). Nama
+# terpanjang butuh 227 pt — lima kali kolomnya.
+#
+# Terukur sebelum aturan ini ada: `grep lineLimit|minimumScaleFactor Apps/`
+# hanya menemukan 4 kemunculan, semuanya di complication dan layar redup.
+# Nama objek di kartu status, panel detail iPhone, dan daftar acuan kalibrasi
+# tidak punya satu pun. Konsekuensinya bukan galat kompilasi dan bukan piksel
+# yang bisa diukur gerbang gambar: teks hanya membungkus jadi empat-lima baris,
+# dan karena kartu itu berada di dalam `ScrollView`, **status dan panduan
+# terdorong keluar layar** — informasi utama menenggelamkan jawaban.
+#
+# Kenapa bukan gerbang gambar: `check-visuals.py` merender objek, bukan layar
+# (tidak ada `VIEW:` untuk layar penuh), dan teks tidak pernah masuk kanvas.
+# Satu-satunya tempat cacat ini terlihat adalah tata letak SwiftUI di perangkat
+# — persis kelas yang tidak bisa dijangkau gate mana pun di Linux.
+#
+# Fail-closed: nol nama dinamis terbaca = GAGAL. Aturan yang tidak melihat
+# apa pun tidak membuktikan apa-apa, dan "Bersih" pada indeks kosong adalah
+# bentuk paling berbahaya dari gerbang hijau.
+echo "== Aturan 76: nama objek dinamis wajib punya kebijakan luapan =="
+nama_luapan=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+# Sumber nama objek: teks yang panjangnya ditentukan KATALOG, bukan view.
+SUMBER = re.compile(
+    r"Text\(\s*(?:"
+    r"objectDisplayName"
+    r"|displayName\s*\?\?"
+    r"|ObjectDisplayName\.text\([^)]*\)"
+    r"|target\.localizedName"
+    r"|digest\.headline"
+    r"|engine\.displayedObjectName\([^)]*\)"
+    r")")
+
+# Kebijakan luapan yang sah.
+POLICY = re.compile(r"\.(?:lineLimit|minimumScaleFactor)\s*\(")
+
+
+def modifier_block(code, start):
+    """Ambil rantai modifier milik `Text(...)` mulai dari `start`.
+
+    Rantai berakhir saat ada baris yang lebih dangkal dari baris `Text(` dan
+    bukan lanjutan `.modifier`. Baris yang lebih dalam ikut, karena komentar
+    penjelas di antara modifier berada di kedalaman yang sama.
+    """
+    lines = code[start:].split("\n")
+    if not lines:
+        return ""
+    base_indent = len(lines[0]) - len(lines[0].lstrip())
+    out = [lines[0]]
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        stripped = line.strip()
+        if indent > base_indent:
+            out.append(line)
+            continue
+        if indent == base_indent and stripped.startswith("."):
+            out.append(line)
+            continue
+        break
+    return "\n".join(out)
+
+
+masalah = []
+dibaca = 0
+berpolicy = 0
+
+for root, _, files in os.walk("Apps"):
+    for name in sorted(files):
+        if not name.endswith(".swift"):
+            continue
+        path = os.path.join(root, name)
+        text = open(path, encoding="utf-8").read()
+        # Buang komentar supaya `Text(` di dalam penjelasan tidak dihitung.
+        code = "\n".join(l.split("//", 1)[0] for l in text.split("\n"))
+        for m in SUMBER.finditer(code):
+            dibaca += 1
+            blok = modifier_block(code, m.start())
+            if POLICY.search(blok):
+                berpolicy += 1
+                continue
+            line_no = code[:m.start()].count("\n") + 1
+            masalah.append(
+                "  %s:%d: %s -> tanpa lineLimit/minimumScaleFactor"
+                % (path, line_no, m.group(0)[:48]))
+
+if masalah:
+    print("\n".join(masalah))
+    print("\n-> Nama dari katalog bisa 227 pt di kolom 46 pt: ia membungkus")
+    print("   jadi 4-5 baris dan mendorong status keluar layar. Tambahkan")
+    print("   .lineLimit(2) + .minimumScaleFactor(...) pada Text itu.")
+    raise SystemExit(1)
+
+if dibaca == 0:
+    print("PERINGATAN: nol nama objek dinamis terbaca -- Aturan 76 tidak "
+          "mengukur satu nama pun.")
+    raise SystemExit(1)
+
+print("Bersih: %d nama dinamis, semuanya punya kebijakan luapan." % berpolicy)
+PY
+)
+nama_luapan_status=$?
+echo "$nama_luapan"
+if printf '%s' "$nama_luapan" | grep -q "PERINGATAN\|Traceback"; then
+  echo "Pemeriksaan Aturan 76 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  status=1
+elif [ "$nama_luapan_status" -ne 0 ]; then
+  echo "-> Ada nama objek dinamis tanpa kebijakan luapan."
+  status=1
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="
