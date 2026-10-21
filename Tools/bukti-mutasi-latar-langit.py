@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Buktikan lima gerbang latar langit **berbunyi**, bukan sekadar hijau.
+"""Buktikan tujuh gerbang latar langit **berbunyi**, bukan sekadar hijau.
 
 Kenapa harness ini ada.
 
@@ -41,15 +41,30 @@ Yang dibuktikan harness ini, dua arah.
   Keadaan 5  KONTROL NEGATIF: komentar menyebut nama lama -> tetap hijau
   Keadaan 6  model berubah, port tidak (layerOpacity 0.5 -> 0.30) -> gerbang paritas angka memerah
   Keadaan 7  model berubah, port tidak (speckDensity 90 -> 45) -> gerbang paritas angka memerah
-  Keadaan 8  KONTROL NEGATIF: komentar model menyebut angka lama -> tetap hijau
+  Keadaan 8  lantai radius view 0.35 -> 0.90 -> gerbang SPECK_RADIUS_FLOOR memerah
+  Keadaan 9  KONTROL NEGATIF: komentar model menyebut angka lama -> tetap hijau
+  Keadaan 10 port mengalikan radius dengan tinggi, bukan lebar -> gerbang sumbu radius memerah
+  Keadaan 11 port mengalikan y dengan lebar, bukan tinggi -> gerbang sumbu y memerah
+
+Keadaan 11 menutup celah yang **tercatat terbuka** di STATUS.md: gerbang posisi
+`y` tidak pernah ada, karena seluruh gerbang latar membaca bidang persegi dan
+pada bidang persegi `y * width == y * height`.
+
+Keadaan 11 hanya bisa menuntut **tepat satu** gerbang merah karena probe
+`check_backdrop_radius_scales_with_width` dipindah dari `y = 0.5` ke `y = 0.4`.
+Diukur sebelum pemindahan: mutasi sumbu-`y` memerahkan **dua** gerbang, sebab
+titik di `y = 0.5` mendarat tepat di tepi bidang 200x100 (`0.5 * 200 = 100`),
+cakramnya terpotong, dan gerbang radius berbunyi karena pemotongan tepi —
+bukan karena sumbu radiusnya salah. Gerbang yang memerah karena alasan yang
+salah membuat cacat mana yang sebenarnya ada tidak terbaca.
 
 Keadaan 6 dan 7 adalah cacat yang **terukur** sebelum gerbangnya ada.
 
-Empat gerbang piksel di atas mengukur `render-visuals.py`, dan port itu
+Enam gerbang piksel di atas mengukur `render-visuals.py`, dan port itu
 menulis lima angkanya dengan tangan dari `SkyBackdrop.swift`. Tidak satu pun
 dibaca dari model. Diukur pada salinan utuh di proses baru: mengubah
 `layerOpacity` menjadi `0.30` **dan** `speckDensity` menjadi `45` di model
-membiarkan keempat gerbang hijau dengan angka **sama persis** (0.722 / 3361
+membiarkan keenam gerbang hijau dengan angka **sama persis** (0.722 / 3361
 piksel / 0.571). Artinya unit ini mengukur langit yang tidak digambar app
 begitu modelnya berubah — dan model berubah adalah hal yang wajar, bukan
 sabotase.
@@ -73,7 +88,7 @@ karena itu mengosongkan **daftar titik**, bukan saklar AOD — satu gerbang,
 satu cacat.
 
 Jalankan: python3 Tools/bukti-mutasi-latar-langit.py
-Keluar 0 hanya kalau keempat keadaan memerah tepat pada gerbangnya dan
+Keluar 0 hanya kalau setiap keadaan memerah tepat pada gerbangnya dan
 kontrol negatif tetap hijau.
 """
 import importlib.util
@@ -96,16 +111,23 @@ def load_checker():
     return module
 
 
-def run_gates(checker, view_source=None, model_source=None):
-    results = []
-    checker.check_backdrop_night_specks_are_red(results)
-    checker.check_backdrop_day_specks_are_neutral(results)
-    checker.check_backdrop_stops_drawing_when_reduced(results)
-    checker.check_backdrop_view_reads_the_model_colours(results, view_source=view_source)
-    checker.check_backdrop_radius_scales_with_width(results)
-    checker.check_backdrop_port_matches_the_model(
-        results, model_source=model_source, view_source=view_source)
-    return results
+def run_gates(checker, view_source=None, model_source=None, render_module=None):
+    previous = checker.R
+    if render_module is not None:
+        checker.R = render_module
+    try:
+        results = []
+        checker.check_backdrop_night_specks_are_red(results)
+        checker.check_backdrop_day_specks_are_neutral(results)
+        checker.check_backdrop_stops_drawing_when_reduced(results)
+        checker.check_backdrop_view_reads_the_model_colours(results, view_source=view_source)
+        checker.check_backdrop_radius_scales_with_width(results)
+        checker.check_backdrop_speck_y_axis_is_height(results)
+        checker.check_backdrop_port_matches_the_model(
+            results, model_source=model_source, view_source=view_source)
+        return results
+    finally:
+        checker.R = previous
 
 
 def report(label, results, expected_red):
@@ -222,32 +244,55 @@ def main():
                            run_gates(checker, model_source=commented), []))
 
     # Keadaan 10 — port memakai sumbu yang salah: radius dikali **tinggi**.
-    # Kelima gerbang latar yang lain tetap hijau pada mutasi ini (semuanya
-    # memakai bidang persegi), jadi hanya gerbang sumbu yang bisa melihatnya.
+    # Keenam gerbang latar yang lain tetap hijau pada mutasi ini (semuanya
+    # memakai bidang persegi), jadi hanya gerbang sumbu radius yang bisa
+    # melihatnya.
     render_source_path = os.path.join(ROOT, "Tools/render-visuals.py")
     with open(render_source_path) as handle:
         render_source = handle.read()
-    axis_anchor = 'speck["radius"] * width'
-    if axis_anchor not in render_source:
-        print("GAGAL keadaan 10 tidak bisa disiapkan: `speck[\"radius\"] * width` "
-              "tidak ditemukan di port — jangkar harness sudah basi")
+
+    def module_with(anchor, replacement, name):
+        """Salinan port dengan satu penggantian, dimuat sebagai modul baru."""
+        if anchor not in render_source:
+            print(f"GAGAL {name} tidak bisa disiapkan: `{anchor}` tidak "
+                  f"ditemukan di port — jangkar harness sudah basi")
+            return None
+        import types
+        module = types.ModuleType(name)
+        module.__file__ = render_source_path
+        exec(compile(render_source.replace(anchor, replacement),
+                     render_source_path, "exec"), module.__dict__)
+        return module
+
+    broken = module_with('speck["radius"] * width', 'speck["radius"] * height',
+                         "render_visuals_axis")
+    if broken is None:
         return 1
-    import types
-    broken = types.ModuleType("render_visuals_axis")
-    broken.__file__ = render_source_path
-    exec(compile(render_source.replace(axis_anchor, 'speck["radius"] * height'),
-                 render_source_path, "exec"), broken.__dict__)
-    original_renderer = checker.R
-    checker.R = broken
-    try:
-        outcomes.append(report("keadaan 10 (radius diskalakan tinggi) memerah",
-                               run_gates(checker), ["diskalakan lebar"]))
-    finally:
-        checker.R = original_renderer
+    outcomes.append(report("keadaan 10 (radius diskalakan tinggi) memerah",
+                           run_gates(checker, render_module=broken),
+                           ["diskalakan lebar"]))
+
+    # Keadaan 11 — cacat yang **tercatat terbuka** di STATUS.md: posisi `y`
+    # titik diskalakan **lebar**, bukan tinggi. Seluruh gerbang latar yang
+    # ada membaca bidang persegi, tempat kedua sumbu berimpit.
+    #
+    # Ini hanya bisa menuntut **tepat satu** gerbang merah setelah probe
+    # `check_backdrop_radius_scales_with_width` dipindah dari `y = 0.5` ke
+    # `y = 0.4`. Diukur: pada `y = 0.5` mutasi ini memerahkan dua gerbang,
+    # karena titiknya mendarat tepat di tepi bidang dan cakramnya terpotong —
+    # gerbang radius berbunyi karena pemotongan, bukan karena sumbunya.
+    y_axis = module_with('cy = speck["y"] * height', 'cy = speck["y"] * width',
+                         "render_visuals_y_axis")
+    if y_axis is None:
+        return 1
+    outcomes.append(report("keadaan 11 (posisi y diskalakan lebar) memerah",
+                           run_gates(checker, render_module=y_axis),
+                           ["posisi y titik"]))
 
     print()
     if all(outcomes):
-        print("HASIL: SEMUA LULUS — keenam gerbang berbunyi, kontrol negatif diam")
+        print(f"HASIL: SEMUA LULUS — {len(outcomes)} keadaan sesuai harapan, "
+              f"kontrol negatif diam")
         return 0
     print("HASIL: ADA YANG GAGAL")
     return 1

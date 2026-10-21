@@ -6658,13 +6658,32 @@ def check_backdrop_radius_scales_with_width(results, size=200):
     sumbu berbeda **2x** — jauh di luar pembulatan piksel, jadi gerbangnya
     tidak bisa merah atau hijau karena pembulatan.
 
+    **Kenapa titiknya di `y = 0.4`, bukan `0.5` (terukur, bukan selera).**
+    Probe ini dulu duduk tepat di tengah (`y = 0.5`), dan itu membuatnya ikut
+    memerah pada cacat yang **bukan** miliknya: port yang mengalikan `y`
+    dengan **lebar** menaruh titik di `0.5 * 200 = 100` pada bidang 200x100,
+    yaitu tepat di tepi bawah — cakramnya terpotong, kotak pembatasnya jadi
+    `40x20`, dan gerbang ini memerah karena **pemotongan tepi**, bukan karena
+    sumbu radiusnya salah.
+
+    Itu gerbang yang memerah karena alasan yang salah, dan harganya terukur:
+    `check_backdrop_speck_y_axis_is_height` jadi tidak bisa memisahkan
+    cacatnya sendiri, karena dua gerbang berbunyi untuk satu cacat dan
+    harness tidak bisa lagi menuntut "tepat satu gerbang merah".
+
+    Pada `y = 0.4` titiknya 40 px dari tepi (jauh lebih besar dari radius
+    20 px), jadi cakram utuh di kedua sumbu. Diukur sesudah pemindahan:
+    gerbang ini **hijau** pada mutasi sumbu-`y` (`40x40` / `20x20` di kedua
+    bentuk bidang) dan tetap **merah** pada mutasi sumbu radius
+    (`20x20` / `40x40`). Kedua arah diukur, bukan diasumsikan.
+
     **Yang TIDAK diklaim.** Gerbang ini mengukur satu titik yang disuntikkan
     pengganti `backdrop_specks`, bukan titik asli dari `SplitMix64`. Yang
     dijaga adalah **pemetaan radius → piksel**; kesamaan deret acaknya
     memang tidak diklaim di mana pun (lihat `check_backdrop_port_matches_the_model`).
     """
     original_specks = R.backdrop_specks
-    probe = [dict(x=0.5, y=0.5, radius=0.1, brightness=1.0)]
+    probe = [dict(x=0.5, y=0.4, radius=0.1, brightness=1.0)]
     R.backdrop_specks = lambda *a, **k: list(probe)
     try:
         wide = R.render_backdrop(200, 100, night_mode=False, ss=1)
@@ -6697,6 +6716,95 @@ def check_backdrop_radius_scales_with_width(results, size=200):
         f"100x200 -> {tall_x}x{tall_y} px (harus ~20x20 = 0.1 * lebar 100); "
         f"kalau angkanya mengikuti tinggi, port memakai sumbu yang salah "
         f"dan kelima gerbang latar lain tidak bisa melihatnya"))
+
+
+def check_backdrop_speck_y_axis_is_height(results):
+    """Posisi `y` titik diskalakan **tinggi** bidang, bukan lebarnya.
+
+    **Celah yang ditutup, dan ini tercatat terbuka di STATUS.md.** Gerbang
+    `check_backdrop_radius_scales_with_width` menyuntikkan satu titik pada
+    bidang tidak persegi, lalu mengukur diameter. Itu cukup untuk radius —
+    tetapi **tidak** untuk posisi: `cy = 0.5 * width` dan `cy = 0.5 * height`
+    menaruh titik di piksel yang sama selama bidangnya persegi, dan bentuk
+    bidang yang dipakai katalog pun selalu persegi. Jadi port bisa
+    mengalikan `y` dengan `width` dan tidak ada gerbang latar yang membaca
+    **posisi** titik sama sekali.
+
+    Diukur dengan titik yang **sengaja tidak di tengah** pada bidang tidak
+    persegi, lalu pusat massa pikselnya dibandingkan dengan koordinat yang
+    dijanjikan model:
+
+        200 x 100, titik (0.25, 0.40)
+          benar : (50, 40)     -- 0.25*200, 0.40*100
+          salah : (50, 80)     -- 0.40*200
+
+    `y=0.40` dipilih dengan dua alasan, keduanya penting:
+
+    1. **Kedua kemungkinan mendarat di dalam bidang.** `y=0.75` akan lebih
+       jauh (50 px) tetapi salah-sumbunya jatuh di luar bidang dan terpotong
+       tepi bawah — gerbangnya lalu lulus karena **pemotongan**, bukan karena
+       sumbunya benar. Probe yang bisa lulus karena alasan yang salah bukan
+       gerbang.
+    2. **Jaraknya 40 px**, lebih dari tiga belas kali toleransi 3 px, jadi ia
+       tidak bisa
+       merah atau hijau karena pembulatan anti-alias.
+
+    Radiusnya sengaja kecil (`0.05` → 10 px di bidang 200) supaya seluruh
+    cakram muat di dalam bidang dan pusat massanya tidak digeser tepi.
+
+    **Kenapa gerbang ini bisa memisahkan cacatnya sendiri (terukur).** Versi
+    pertama gerbang ini lahir bersama klaim "keenam gerbang latar lain tetap
+    hijau". Klaim itu **salah**, dan diukur pada salinan utuh:
+    `check_backdrop_radius_scales_with_width` ikut memerah — 2 gerbang untuk
+    1 cacat. Sebabnya bukan cacat yang sama: probe gerbang itu dulu duduk di
+    `y = 0.5`, jadi sumbu-`y` yang salah menaruh cakramnya tepat di tepi
+    bidang 200x100 (`0.5 * 200 = 100`) dan kotak pembatasnya mengecil karena
+    **terpotong tepi**, bukan karena radiusnya salah sumbu.
+
+    Probe gerbang itu dipindah ke `y = 0.4` (40 px dari tepi, radius 20 px),
+    dan sesudahnya mutasi ini memerahkan **tepat satu** gerbang — yang ini.
+    Itu penting bukan kerapian: harness menuntut "tepat satu gerbang merah",
+    karena gerbang yang memerah karena alasan yang salah menyembunyikan cacat
+    mana yang sebenarnya ada.
+
+    **Yang TIDAK diklaim.** Gerbang ini mengukur satu titik yang disuntikkan
+    pengganti `backdrop_specks`, bukan deret `SplitMix64`. Yang dijaga adalah
+    **pemetaan posisi → piksel**. Ia juga tidak mengukur jarak antar-titik
+    (distribusi), hanya pemetaan satu titik.
+    """
+    original_specks = R.backdrop_specks
+    probe = [dict(x=0.25, y=0.40, radius=0.05, brightness=1.0)]
+    R.backdrop_specks = lambda *a, **k: list(probe)
+    try:
+        canvas = R.render_backdrop(200, 100, night_mode=False, ss=1)
+    finally:
+        R.backdrop_specks = original_specks
+
+    background = (0.039, 0.039, 0.059)
+    xs, ys = [], []
+    for index, pixel in enumerate(canvas.buf):
+        if max(abs(pixel[channel] - background[channel])
+               for channel in range(3)) > 0.01:
+            xs.append(index % 200)
+            ys.append(index // 200)
+    if not xs:
+        results.append(Result(
+            "latar: posisi y titik diskalakan tinggi, bukan lebar",
+            False, "titik tidak tergambar sama sekali — gerbangnya kosong"))
+        return
+
+    centre_x = sum(xs) / len(xs)
+    centre_y = sum(ys) / len(ys)
+    # Toleransi 3 px: tepi lingkaran anti-alias dan pemotongan di tepi bidang
+    # bisa menggeser pusat massa satu-dua piksel.
+    results.append(Result(
+        "latar: posisi y titik diskalakan tinggi, bukan lebar",
+        abs(centre_x - 50) <= 3 and abs(centre_y - 40) <= 3,
+        f"titik (0.25, 0.40) di 200x100 mendarat di "
+        f"({centre_x:.1f}, {centre_y:.1f}); harusnya (50, 40) = "
+        f"0.25*lebar, 0.40*tinggi. Kalau y-nya ~80, port mengalikan y "
+        f"dengan lebar; tidak ada gerbang latar lain yang membaca "
+        f"posisi titik, jadi ini satu-satunya yang bisa melihatnya"))
 
 
 def check_backdrop_port_matches_the_model(results, model_source=None, view_source=None):
@@ -17244,6 +17352,7 @@ def main():
     check_backdrop_stops_drawing_when_reduced(results, 120, args.ss)
     check_backdrop_view_reads_the_model_colours(results)
     check_backdrop_radius_scales_with_width(results)
+    check_backdrop_speck_y_axis_is_height(results)
     check_backdrop_port_matches_the_model(results)
     check_star_colour_order(results, args.size, args.ss)
     check_star_size_follows_magnitude(results)

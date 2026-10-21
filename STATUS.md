@@ -1,3 +1,129 @@
+### Siklus (21 Okt 2026 — posisi titik latar tidak diukur siapa pun, dan `main` merah oleh jangkar 4 spasi)
+
+Dua cacat, keduanya ditemukan dengan mengukur, bukan membaca: satu **tercatat
+terbuka** di STATUS.md siklus sebelumnya, satu lagi membuat `main` **merah
+sekarang** sementara seluruh gerbang lokal hijau.
+
+#### Cacat 1: celah yang STATUS.md sendiri catat masih terbuka
+
+Siklus latar langit menulis, sebagai batas yang dinyatakan:
+
+> **Jarak antar-titik** tidak diperiksa: port bisa mengalikan `y` dengan
+> `width` alih-alih `height` dan keenam gerbang di atas tetap hijau.
+
+Kalimat itu benar, dan ia lebih lebar daripada bunyinya. Yang tidak diperiksa
+bukan hanya *jarak* — **posisi** titik tidak diperiksa siapa pun. Semua gerbang
+latar memakai bidang **persegi**, dan pada bidang persegi `0.5 * width` dan
+`0.5 * height` menaruh titik di piksel yang sama. Jadi port bisa memakai sumbu
+yang salah untuk `y` dan seluruh gerbang latar tetap hijau dengan angka **sama
+persis**.
+
+Diukur pada salinan utuh, proses baru, `cy = speck["y"] * height` →
+`cy = speck["y"] * width`: **0 dari 6** gerbang latar berbunyi.
+
+Akibatnya di jam tangan: `SkyBackdrop` mengembalikan posisi 0…1 yang
+**satuannya ditentukan model**, dan view mengalikannya dengan tinggi bidang.
+Port yang mengalikannya dengan lebar menggambar langit yang berbeda di setiap
+bidang tidak persegi — dan bidang jam memang tidak persegi. Gerbang piksel
+mengukur langit yang tidak digambar app.
+
+#### Gerbangnya: satu titik yang sengaja tidak di tengah
+
+`check_backdrop_speck_y_axis_is_height` menyuntikkan **satu** titik di
+`(0.25, 0.40)` pada bidang `200 x 100`, lalu membandingkan pusat massa piksel
+dengan koordinat yang dijanjikan model:
+
+    benar : (50, 40)   -- 0.25 * lebar, 0.40 * tinggi
+    salah : (50, 80)   -- 0.40 * lebar
+
+`0.40` dipilih bukan karena angka itu enak: `0.75` akan memberi jarak lebih
+jauh (50 px) tetapi salah-sumbunya jatuh di luar bidang dan terpotong tepi
+bawah — gerbangnya lalu lulus karena **pemotongan**, bukan karena sumbunya
+benar. Radius `0.05` (10 px) menjaga seluruh cakram di dalam bidang supaya
+pusat massanya tidak digeser tepi. Jarak 40 px lebih dari tiga belas kali
+toleransi 3 px.
+
+#### Cacat 2: gerbang radius berbunyi karena alasan yang salah
+
+Versi pertama gerbang ini lahir bersama klaim "kelima/keenam gerbang latar lain
+tetap hijau". Klaim itu **salah**, dan ketahuan karena harness menuntut **tepat
+satu** gerbang merah:
+
+    probe radius di y = 0.5, mutasi sumbu y  ->  2 gerbang merah
+    probe radius di y = 0.4, mutasi sumbu y  ->  1 gerbang merah
+
+Sebabnya terukur: probe `check_backdrop_radius_scales_with_width` dulu duduk di
+tengah (`y = 0.5`). Pada bidang `200 x 100`, sumbu-`y` yang salah menaruh
+cakramnya di `0.5 * 200 = 100` — **tepat di tepi bawah**. Cakramnya terpotong,
+kotak pembatasnya mengecil, dan gerbang radius berbunyi karena **pemotongan
+tepi**, bukan karena sumbu radiusnya salah.
+
+Itu bukan kerapian. Gerbang yang memerah karena alasan yang salah membuat
+harness tidak bisa lagi menuntut "tepat satu merah", dan tanpa tuntutan itu
+cacat mana yang sebenarnya ada tidak terbaca — kelas yang sudah dibayar repo
+ini di keadaan 3 harness latar.
+
+Perbaikannya memindahkan probe ke `y = 0.4` (40 px dari tepi, radius 20 px),
+**bukan** melonggarkan gerbang. Diukur sesudah pemindahan: gerbang radius
+**hijau** pada mutasi sumbu-`y` (40x40 / 20x20 di kedua bentuk bidang) dan tetap
+**merah** pada mutasi sumbu radius (20x20 / 40x40). Kedua arah diukur.
+
+#### Cacat 3: `main` merah oleh jangkar yang bergeser 4 spasi
+
+`Tools/bukti-mutasi-aturan60-penanda-jujur.py` di HEAD mencari
+
+    "                if isStale {\n                    Text(...)"
+
+enam belas spasi. `b80f87d` ("Nama objek terpotong di setiap ukuran
+aksesibilitas") menurunkan blok itu ke **dua belas** spasi, dan jangkar itu
+berhenti cocok:
+
+    GERBANG: jangkar ... muncul 0x di PointingView.swift, harus 1
+             -- harness tidak boleh jalan.
+
+Jadi `main` **merah sekarang** (Engine Tests `39644516962`), sementara `Apple
+Build` hijau — karena harness ini Python, bukan Swift. Jangkar dipindah ke
+indentasi yang benar, dan **gerbangnya tidak dilonggarkan**: ia tetap menuntut
+jangkar muncul tepat sekali.
+
+Ini pola yang sudah tercatat di repo ini (`700d0ca`: "Jangkar basi membuat main
+merah tanpa ada yang tahu") dan penyebabnya selalu sama — indentasi berubah di
+`Apps/`, harness tidak ikut.
+
+#### Non-vakuositas (diukur)
+
+    Tools/bukti-mutasi-latar-langit.py      11 keadaan, 0 tidak sesuai harapan
+      keadaan 10  radius diskalakan tinggi   MERAH (tepat 1 gerbang)
+      keadaan 11  posisi y diskalakan lebar  MERAH (tepat 1 gerbang)
+      keadaan 9   kontrol negatif komentar   hijau
+
+    Tools/bukti-mutasi-aturan60-penanda-jujur.py  13 keadaan, 0 menyimpang
+
+Keadaan 11 mengukur `(49.5, 79.5)` pada mutasi dan `(49.5, 39.5)` pada pohon
+benar — selisih 40 px, bukan pembulatan anti-alias.
+
+#### Gerbang
+
+    ./swift-test.sh          CelestialEngine 222 + PointingKit 1029, 0 gagal
+    ./swift-ui-lint.sh       SEMUA GERBANG UI LULUS (82 blok aturan)
+    ./swift-typecheck.sh     SEMUA GERBANG LULUS
+    check-harness-terdaftar  141 harness, semuanya dirujuk alur kerja
+    check-jangkar-harness    519 jangkar, nol mutasi tertinggal
+
+#### Yang TIDAK diklaim
+
+- Gerbang baru mengukur **satu titik yang disuntikkan** pengganti
+  `backdrop_specks`, bukan deret `SplitMix64`. Yang dijaga pemetaan posisi →
+  piksel, bukan kesamaan deret acak antar kedua sisi.
+- **Distribusi** titik (jarak antar-titik, kerapatan spasial) tetap tidak
+  diukur — celah yang STATUS.md catat sebagai "jarak antar-titik" masih
+  terbuka, dan siklus ini hanya menutup **posisi**, bukan jarak.
+- Tidak ada baris Swift produksi yang berubah: seluruh perubahan di `Tools/`.
+  `SkyBackdrop.swift`, `SkyBackdropView.swift`, dan port-nya tidak disentuh.
+- Tidak ada pengukuran di perangkat. Semua angka dari pohon di Linux.
+
+---
+
 ### Siklus (21 Okt 2026 — kilau kaca yang membatalkan seluruh alasan mode malam)
 
 Cacat ini hidup di **satu baris** di `Apps/Shared/SurfaceTokens.swift`, di

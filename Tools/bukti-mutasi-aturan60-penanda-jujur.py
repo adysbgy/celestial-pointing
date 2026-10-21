@@ -74,8 +74,8 @@ KOMPLIKASI = os.path.join(ROOT, "Apps", "PointAndKnowWatch", "Complications",
 RULE_HEADER = "== Aturan 60:"
 CLEAN_MARK = "penanda kejujuran dijaga predikatnya"
 
-CATATAN_SISA = "                if isStale {\n                    Text(TextLocalization.text(.objectDetailStaleNoteDisplay))"
-BADGE_WATCH = "                    if let level, !isStale {"
+CATATAN_SISA = "            if isStale {\n                Text(TextLocalization.text(.objectDetailStaleNoteDisplay))"
+BADGE_WATCH = "                if let level, !isStale {"
 SISA_REDUP = "                    if engine.isDisplayingStaleObject {"
 RAGU_REDUP = "                    if engine.carriesUncertaintyMarker {"
 BADGE_IPHONE = "                        if let level, !isStale {"
@@ -97,10 +97,10 @@ STATES = [
     ("[baseline]", None, False),
     ("1 panel jam: catatan sisa -> false",
      [(WATCH, CATATAN_SISA,
-       "                if false {\n                    Text(TextLocalization.text(.objectDetailStaleNoteDisplay))", 1)],
+       "            if false {\n                Text(TextLocalization.text(.objectDetailStaleNoteDisplay))", 1)],
      True),
     ("2 panel jam: !isStale dicabut",
-     [(WATCH, BADGE_WATCH, "                    if let level {", 1)], True),
+     [(WATCH, BADGE_WATCH, "                if let level {", 1)], True),
     ("3 redup: penanda sisa -> false",
      [(REDUP, SISA_REDUP, "                    if false {", 1)], True),
     ("4 redup: penanda ragu -> false",
