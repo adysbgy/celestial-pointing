@@ -67,6 +67,20 @@ Dibuktikan non-vakum dengan **tiga mutasi terpisah** (masing-masing `exit 1`):
 kilau kembali `.overlay`, penjaga `sheen > 0` dihapus, dan kepekatan ditulis
 literal `0.10` di `Apps/`.
 
+#### Catatan siklus: gerbang lokal tidak bisa menangkap ini
+
+Patch pertama siklus ini menulis `private init() {}` di dalam `enum
+SurfaceTokens` — dan **Apple Build gagal dengan error 65** (`self.init` isn't
+called on all paths). Enum tanpa case tidak boleh punya initializer. Tidak ada
+gerbang lokal yang bisa melihatnya: `Apps/` tidak pernah dibangun di Linux,
+`swift-ui-lint.sh` hanya membaca teks, dan typecheck hanya mem-parse sintaks.
+Enum kosong sudah cukup dan alasannya ada di docstring. Dihapus, Apple Build
+hijau.
+
+Ini pengulangan pola yang sudah tercatat: **compiler warning/error `Apps/`
+hanya muncul di Apple Build**, jadi build 4 menit itu gate sebenarnya untuk
+setiap perubahan `Apps/` — bukan formalitas sebelum Engine Tests 2 jam.
+
 #### Yang TIDAK diklaim
 
 - `.ultraThinMaterial` tidak bisa dirender di Linux. Semua angka di atas adalah
