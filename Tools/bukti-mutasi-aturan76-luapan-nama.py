@@ -96,7 +96,15 @@ def program_aturan76():
 
 
 def jalankan(program, mutasi=None, kosongkan_apps=False):
-    """Jalankan program aturan di sandbox; kembalikan (stdout, stderr)."""
+    """Jalankan program aturan di sandbox; kembalikan (stdout, stderr).
+
+    `mutasi` boleh satu `(rel, anchor, ganti)` atau daftar dari bentuk itu.
+    Daftar diperlukan oleh keadaan 1b, yang mengubah **dua** tempat di berkas
+    yang sama: mencabut kebijakan dari nama *dan* menempelkannya ke badge.
+    Dengan satu mutasi saja, nama masih punya kebijakannya dan aturan diam
+    dengan benar — harness akan melaporkan "tidak menangkap bentuk" padahal
+    yang salah adalah mutasinya.
+    """
     d = tempfile.mkdtemp(prefix="rule76-")
     try:
         tujuan_apps = os.path.join(d, "Apps")
@@ -107,13 +115,14 @@ def jalankan(program, mutasi=None, kosongkan_apps=False):
                             ignore=shutil.ignore_patterns("*.xcodeproj",
                                                           "*.xcworkspace"))
         if mutasi:
-            rel, anchor, ganti = mutasi
-            path = os.path.join(d, rel)
-            teks = open(path, encoding="utf-8").read()
-            assert anchor in teks, "anchor tidak ditemukan di %s: %r" % (
-                rel, anchor[:60])
-            teks = teks.replace(anchor, ganti, 1)
-            open(path, "w", encoding="utf-8").write(teks)
+            daftar = mutasi if isinstance(mutasi, list) else [mutasi]
+            for rel, anchor, ganti in daftar:
+                path = os.path.join(d, rel)
+                teks = open(path, encoding="utf-8").read()
+                assert anchor in teks, "anchor tidak ditemukan di %s: %r" % (
+                    rel, anchor[:60])
+                teks = teks.replace(anchor, ganti, 1)
+                open(path, "w", encoding="utf-8").write(teks)
         p = subprocess.run([sys.executable, "-c", program], cwd=d,
                            capture_output=True, text=True)
         if p.returncode not in (0, 1):
@@ -134,12 +143,37 @@ def jalankan(program, mutasi=None, kosongkan_apps=False):
 # Jangkar = blok kebijakan yang baru ditambahkan. Kalau baris produksi ini
 # berubah, harness harus ikut — dan `assert` di `jalankan` membuat perubahan
 # itu merah karena sebab yang jelas, bukan diam-diam melewati keadaan.
-WATCH_BLOK = """                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)"""
+#
+# Jangkar kartu jam **berubah di siklus 21 Okt**: badge keyakinan dipindah ke
+# baris meta, jadi nama kini duduk di kolom teks penuh (96 pt, bukan 52 pt)
+# dan rantai modifier-nya turun satu indentasi. Jangkar ikut pindah ke bentuk
+# yang baru — yang **tidak** boleh dilakukan adalah melonggarkan pencocokan
+# sampai kedua bentuk cocok, karena itu menghapus bukti bahwa kebijakannya
+# masih ada di baris yang benar.
+WATCH_BLOK = """                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)"""
 IOS_BLOK = """                            .lineLimit(2)
                             .minimumScaleFactor(0.7)"""
 CALIB_BLOK = """                                    .lineLimit(2)
                                     .minimumScaleFactor(0.7)"""
+
+#: Keadaan 1b: kebijakan **dipindah** dari nama ke badge keyakinan di
+#: bawahnya. `BADGE_SESUDAH` adalah teks badge di pohon ini (dengan
+#: `.fixedSize()` sebagai jangkar terakhirnya); `BADGE_TANPA_POLICY` adalah
+#: badge yang sama dengan kebijakan luapan ditempel padanya. Keduanya
+#: ditulis lengkap supaya perubahannya terbaca di diff, bukan tersembunyi
+#: dalam potongan string.
+BADGE_SESUDAH = """                            .foregroundStyle(level.tone.color)
+                            // Badge tidak boleh ikut menyusut: teksnya pendek
+                            // dan tetap, dan badge yang mengecil sampai tak
+                            // terbaca sama saja dengan badge yang hilang.
+                            .fixedSize()"""
+
+BADGE_TANPA_POLICY = """                            .foregroundStyle(level.tone.color)
+                            .fixedSize()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)"""
+
 
 
 def main():
@@ -170,6 +204,22 @@ def main():
     periksa("1 kartu status jam tanpa kebijakan luapan", True,
             (WATCH, WATCH_BLOK, ""))
 
+    # 1b. **Vakum yang sempat lolos.** Kebijakan dihapus dari nama, lalu
+    #     ditempel pada badge keyakinan di bawahnya. Bentuk ini sah secara
+    #     Swift dan salah secara makna, dan aturan 76 versi pertama
+    #     melaporkannya "Bersih" — karena `modifier_block` menghitung
+    #     indentasi dasar dari potongan `code[start:]` yang selalu berindentasi
+    #     0, sehingga blok nama menelan seluruh sisa fungsi dan membaca
+    #     `.lineLimit` milik badge.
+    #
+    #     Keadaan ini **bukan** variasi dari keadaan 1: keadaan 1 menguji
+    #     apakah aturan melihat situsnya, keadaan 1b menguji apakah ia membaca
+    #     modifier **milik situs itu**. Aturan yang lulus 1 tapi gagal 1b tetap
+    #     hijau pada kode yang tidak punya kebijakan luapan di nama sama sekali.
+    periksa("1b kebijakan dipindah ke badge di bawahnya", True,
+            [(WATCH, WATCH_BLOK, ""),
+             (WATCH, BADGE_SESUDAH, BADGE_TANPA_POLICY)])
+
     # 2. Panel detail iPhone.
     periksa("2 panel detail iPhone tanpa kebijakan", True,
             (IOS, IOS_BLOK, ""))
@@ -178,9 +228,17 @@ def main():
     periksa("3 daftar acuan kalibrasi tanpa kebijakan", True,
             (CALIB, CALIB_BLOK, ""))
 
-    # 4. KONTROL: complication sudah berpolicy sejak awal -> harus diam.
+    # 4. KONTROL: complication `circular` sudah berpolicy sejak awal -> diam.
     #    Jangkar ini sengaja tidak diubah; yang dibuktikan adalah aturan tidak
     #    menuduh baris yang sah.
+    #
+    #    **Catatan 21 Okt.** Keadaan ini dulu lulus karena alasan yang salah:
+    #    keluarga `accessoryRectangular` (baris 192) ternyata TIDAK berpolicy,
+    #    dan yang membuatnya terbaca "diam" adalah `modifier_block` yang
+    #    menghitung indentasi dasar dari potongan (selalu 0) sehingga bloknya
+    #    menelan `.minimumScaleFactor` milik keluarga `circular` di bawahnya.
+    #    Cacat itu sudah ditutup di sumbernya dan di baris 192; kontrol ini
+    #    kini menguji yang benar-benar dimaksud.
     out = periksa("4 kontrol: complication berpolicy tetap diam", False)
     if "ComplicationWidget" in out:
         print("GAGAL kontrol: aturan menuduh complication yang sudah "

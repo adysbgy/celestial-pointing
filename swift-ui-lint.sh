@@ -13286,11 +13286,38 @@ def modifier_block(code, start):
     Rantai berakhir saat ada baris yang lebih dangkal dari baris `Text(` dan
     bukan lanjutan `.modifier`. Baris yang lebih dalam ikut, karena komentar
     penjelas di antara modifier berada di kedalaman yang sama.
+
+    **Cacat yang diperbaiki 21 Okt: indentasi dasar dihitung dari potongan.**
+    `code[start:]` dimulai tepat pada `Text(`, jadi `lines[0]` selalu punya
+    indentasi **0** — bukan indentasi baris tempat `Text(` berada. Akibatnya
+    `base_indent` selalu 0, syarat `indent > base_indent` selalu benar untuk
+    baris berindentasi apa pun, dan blok tidak pernah berhenti di akhir rantai
+    modifier: ia menelan **seluruh sisa fungsi** di bawahnya.
+
+    Itu membuat aturan bisa dipuaskan oleh `.lineLimit` milik `Text` **lain**.
+    Terukur pada bentuk yang sah secara Swift dan salah secara makna:
+
+        Text(objectDisplayName)          <- tanpa kebijakan luapan
+            .font(.title3.bold())
+        ...
+        Text(level.displayName)
+            .lineLimit(1)                <- milik badge
+            .minimumScaleFactor(0.5)
+
+    dilaporkan "Bersih: 7 nama dinamis, semuanya punya kebijakan luapan".
+    Gerbang yang hijau karena membaca modifier tetangganya adalah bentuk
+    paling menyesatkan dari gerbang hijau: ia berbunyi, ia menyebut angka,
+    dan angka itu tidak mengukur apa pun.
     """
+    # Indentasi baris tempat `start` berada — bukan indentasi potongannya.
+    line_start = code.rfind("\n", 0, start) + 1
+    base_indent = 0
+    while line_start + base_indent < len(code) \
+            and code[line_start + base_indent] in " \t":
+        base_indent += 1
     lines = code[start:].split("\n")
     if not lines:
         return ""
-    base_indent = len(lines[0]) - len(lines[0].lstrip())
     out = [lines[0]]
     for line in lines[1:]:
         if not line.strip():
@@ -13332,9 +13359,11 @@ for root, _, files in os.walk("Apps"):
 
 if masalah:
     print("\n".join(masalah))
-    print("\n-> Nama dari katalog bisa 227 pt di kolom 46 pt: ia membungkus")
-    print("   jadi 4-5 baris dan mendorong status keluar layar. Tambahkan")
-    print("   .lineLimit(2) + .minimumScaleFactor(...) pada Text itu.")
+    print("\n-> Nama dari katalog bisa 226.6 pt di kolom 96 pt (kartu jam,")
+    print("   setelah badge pindah ke baris meta): 2.36 baris pada skala 1.0.")
+    print("   Tanpa batas ia membungkus dan mendorong status keluar layar.")
+    print("   Tambahkan .lineLimit(2) + .minimumScaleFactor(>=0.6) pada Text")
+    print("   itu -- 2 baris tercapai di skala 0.847, jadi nama tetap utuh.")
     raise SystemExit(1)
 
 if dibaca == 0:

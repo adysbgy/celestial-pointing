@@ -522,24 +522,41 @@ struct ObjectDetailView: View {
                                        motion: motion)
             }
             VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(objectDisplayName)
-                        // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
-                        // tebal di kartu, karena inilah yang dicari pengguna.
-                        .font(.title3.bold())
-                        // **Nama datang dari katalog, bukan dari view.** Panjangnya
-                        // ditentukan 30 entri dua bahasa: "Galaksi Kincir Angin"
-                        // butuh ~227 pt, sementara kolom teks di sini hanya
-                        // selebar kartu jam 40 mm dikurangi visual 38 pt dan
-                        // badge keyakinan — terukur ~46 pt. Tanpa batas, nama
-                        // membungkus jadi empat-lima baris dan **menggeser
-                        // status ke luar layar**: informasi utama menenggelamkan
-                        // jawaban yang dicari. Dua baris + skala minimum
-                        // mempertahankan nama terbaca utuh tanpa merebut
-                        // ruangnya. Dijaga Aturan 76.
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
-                    Spacer(minLength: 2)
+                // **Nama mendapat seluruh kolom teks, bukan sisa setelah badge.**
+                //
+                // Sebelumnya baris ini adalah `HStack { Text(nama) Spacer badge }`.
+                // Terukur pada jam 40 mm: kartu 162 pt − `cardPadding` 10×2 =
+                // 142 pt − visual 38 pt − spacing 8 pt = **96 pt** kolom teks,
+                // lalu badge keyakinan ("Ragu" 31.6 pt + padding 10 pt) dan
+                // `Spacer(minLength: 2)` menyisakan **~52 pt** untuk nama.
+                //
+                // "Galaksi Kincir Angin" 226.58 pt (DejaVu Bold 20 pt) di kolom
+                // 52 pt butuh 4.36 baris pada skala 1.0 dan **2.61 baris** pada
+                // lantai 0.6 — jadi `.lineLimit(2)` memotongnya dengan elipsis.
+                // Komentar lama di sini mengklaim nama "terbaca utuh"; itu salah,
+                // dan salahnya karena kolomnya, bukan karena batas barisnya.
+                //
+                // Dengan badge dipindah ke baris meta di bawah, nama mendapat
+                // 96 pt: 226.58 / 96 = 2.36 baris pada skala 1.0, dan 2 baris
+                // tercapai pada skala **0.847** — di atas lantai 0.6, jadi nama
+                // benar-benar terbaca utuh, bukan sekadar tidak meluap.
+                // Dijaga Aturan 76.
+                Text(objectDisplayName)
+                    // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
+                    // tebal di kartu, karena inilah yang dicari pengguna.
+                    .font(.title3.bold())
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Baris meta: badge keyakinan + jenis/magnitudo/koordinat.
+                //
+                // Badge tetap **di sini**, bukan disembunyikan: ia satu-satunya
+                // penanda "Ragu" di kartu ini, dan PRD menaruh uncertainty di
+                // atas kenyamanan tata letak. Yang berubah hanya siapa yang
+                // mengalah saat ruang habis — sekarang `kindLine`, yang memang
+                // informasi sekunder (RA/Dec juga ada di panel detail iPhone),
+                // bukan nama, yang justru jawaban yang dicari.
+                HStack(spacing: 5) {
                     // Badge keyakinan hanya untuk jawaban yang berlaku sekarang.
                     // Pada objek sisa, menampilkan "Yakin" di sebelahnya akan
                     // terbaca sebagai klaim keyakinan atas pengukuran sekarang —
@@ -552,11 +569,23 @@ struct ObjectDetailView: View {
                             .background(level.tone.badgeFillColor,
                                         in: .capsule)
                             .foregroundStyle(level.tone.color)
+                            // Badge tidak boleh ikut menyusut: teksnya pendek
+                            // dan tetap, dan badge yang mengecil sampai tak
+                            // terbaca sama saja dengan badge yang hilang.
+                            .fixedSize()
                     }
+                    Text(kindLine)
+                        .font(.caption)
+                        .foregroundStyle(SurfacePalette.active.textSecondaryColor)
+                        // Satu baris + skala minimum: baris ini memuat tiga fakta
+                        // sekunder ("Bintang · mag 1.4 · RA 101.3° Dec −16.7°"
+                        // terukur 247 pt di kolom 96 pt). Membungkusnya jadi
+                        // tiga baris mendorong catatan sisa keluar kartu, dan
+                        // catatan sisa itulah penanda kejujuran yang tidak boleh
+                        // hilang dari pandangan.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                 }
-                Text(kindLine)
-                    .font(.caption)
-                    .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                 if isStale {
                     Text(TextLocalization.text(.objectDetailStaleNoteDisplay))
                         .font(.caption2)

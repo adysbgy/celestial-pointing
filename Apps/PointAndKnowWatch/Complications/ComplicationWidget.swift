@@ -191,6 +191,27 @@ struct ComplicationView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(digest.headline)
                         .font(.headline)
+                        // **Cacat yang baru terlihat 21 Okt.** Baris ini tidak
+                        // pernah punya kebijakan luapan, padahal `headline`
+                        // datang dari katalog dua bahasa dan nama terpanjang
+                        // ("Galaksi Kincir Angin") terukur 226.58 pt di DejaVu
+                        // Bold 20 pt — sementara `accessoryRectangular` hanya
+                        // selebar ~140 pt di jam 45 mm.
+                        //
+                        // Ia lolos selama ini karena **gerbangnya vakum**:
+                        // `modifier_block` di Aturan 76 menghitung indentasi
+                        // dasar dari `code[start:]` (selalu 0), jadi blok nama
+                        // ini menelan seluruh sisa berkas dan membaca
+                        // `.minimumScaleFactor` milik keluarga `circular` di
+                        // bawahnya. Harness pun mengunci kekeliruan itu sebagai
+                        // "kontrol: complication berpolicy tetap diam".
+                        //
+                        // Satu baris + skala minimum, sama seperti keluarga
+                        // lain: di complication, memotong dengan elipsis jauh
+                        // lebih baik daripada mendorong baris kedua (penanda
+                        // keraguan) keluar dari widget.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                     // Baris kedua sudah punya ruang, jadi penanda ragu tampil
                     // sebagai **kata**, bukan hanya ikon. Ini yang membuat
                     // keadaan ragu terbaca tanpa perlu mengermat ke ikon —
