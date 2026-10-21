@@ -1,3 +1,101 @@
+### Siklus (21 Okt 2026 — samaran keraguan yang terbalik di view, hijau di 119 gerbang)
+
+Ditemukan satu cacat yang **tidak bisa** ditangkap gerbang mana pun yang ada,
+dan yang bertahan karena seluruh gerbang gambar mengukur **port Python** —
+sementara yang dilihat pengguna adalah **view Swift**.
+
+#### Cacatnya
+
+`CelestialVisualView` memasang samaran keraguan lewat satu predikat:
+
+    .opacity(isConfirmed || UncertainBlur.allows(visual.kind) ? 1 : 0.75)
+    .blur(radius: isConfirmed || UncertainBlur.allows(visual.kind)
+          ? 0 : Self.uncertainBlurRadius(diameter: diameter))
+
+`UncertainBlur.allows` di model berarti "jenis ini **boleh** disamarkan"
+(`eligible = [.planet, .deepSky]`). Di dalam predikat itu, `allows` dipakai
+untuk **membatalkan** samaran. Hasilnya persis terbalik:
+
+    planet / deepSky  ragu  ->  TIDAK disamarkan  (cakram penuh, tajam)
+    moon / star / sun ragu  ->  DISAMARKAN       (sabit Bulan jadi kabur)
+
+Kedua arahnya melanggar PRD, dan arah keduanya yang paling merugikan: sabit
+Bulan adalah satu-satunya gambar yang **tidak** mengklaim identitas — fase
+datang dari tanggal, bukan dari tabel berindeks id — dan model sengaja
+mengecualikannya dari samaran (`deliberatelySharp`). Justru gambar itulah yang
+dikaburkan.
+
+#### Kenapa ia hijau di semua gerbang
+
+`Tools/render-visuals.py` — port Python yang menjadi sasaran 119 gerbang
+gambar — mengerjakan predikat ini **dengan benar** (`uncertain_blur_allows`
+di `render()`), termasuk pengecualian `bare_sphere`. Jadi
+`check_uncertain_object_is_blurred`, `check_uncertain_blur_excludes_moon`, dan
+`check_uncertain_blur_is_reversible` semuanya hijau, karena semuanya mengukur
+gambar yang **port** hasilkan, bukan yang view hasilkan.
+
+Kelasnya sama dengan `check_moon_feature_*`: port dan view sepakat di atas
+kertas, dan tidak ada yang membaca baris Swift-nya. Ini juga alasan
+`check_view_blur_predicate_matches_the_model` membaca **teks** Swift, bukan
+gambar.
+
+#### Perbaikannya
+
+Satu fungsi bernama, dua pemakai:
+
+    private static func dimmedForUncertainty(isConfirmed: Bool,
+                                             kind: CelestialVisual.Kind) -> Bool {
+        !isConfirmed && UncertainBlur.allows(kind)
+    }
+
+Dua salinan predikat adalah persis bagaimana cacat ini lahir; menyatukannya
+membuat `.opacity` dan `.blur` tidak bisa lagi berbeda pendapat.
+
+#### Gerbangnya, dan kenapa ia tidak grep
+
+`check_view_blur_predicate_matches_the_model` (`Tools/check-visuals.py`)
+membaca sumber Swift lewat `swift_code_only` — komentar yang menjelaskan
+predikatnya tidak bisa memuaskannya. Ia menerima dua bentuk (predikat langsung
+di baris modifier, atau di fungsi bernama), lalu menuntut **tiga** hal:
+
+  1. `allows` jadi **syarat** (`&&`), bukan pembatal (`||`)
+  2. predikat menyebut `isConfirmed` (kalau tidak, gambar yang sudah pasti
+     ikut disamarkan)
+  3. predikat itu **dipakai** oleh `.opacity` **dan** `.blur` — fungsi bernama
+     yang tidak dipanggil sama saja dengan tidak ada
+
+#### Non-vakuositas (diukur)
+
+    Tools/bukti-mutasi-samaran-terbalik.py   (5 keadaan)
+
+    [baseline]                            hijau
+    1 arah lama: isConfirmed || allows    MERAH
+    2 tanpa &&: allows(kind) saja         MERAH
+    3 !isConfirmed -> true                MERAH
+    4 .opacity tak memakai predikat       MERAH
+    5 kontrol: pohon apa adanya           hijau
+
+Keempat mutasi mengompilasi dan lolos seluruh 81 aturan UI. Yang berubah hanya
+arah predikatnya.
+
+#### Verifikasi
+
+    ./swift-test.sh          CelestialEngine 222 + PointingKit 1025, 0 gagal
+    ./swift-ui-lint.sh       SEMUA GERBANG UI LULUS (81 aturan)
+    ./swift-typecheck.sh     SEMUA GERBANG LULUS
+    check-visuals.py --check 121 pemeriksaan, 0 gagal
+    check-harness-terdaftar  141 harness, semuanya dirujuk
+
+#### Yang TIDAK diklaim
+
+- Gerbangnya membaca **teks**, bukan menjalankan Swift. Ia tidak membuktikan
+  `visual.kind`/`diameter` yang dipakai benar, dan tidak mengukur piksel di
+  layar. Yang dijaga hanya **arah** predikat — karena arah itulah yang tidak
+  terlihat oleh 119 gerbang lain.
+- Tidak ada pengukuran di perangkat. Semua angka dari pohon di Linux.
+- Radius 0.06 dan opasitas 0.75 tetap **tidak** diukur di layar (lihat
+  docstring `uncertainBlurRadius`); yang dijaga hanya siapa yang disamarkan.
+
 ### Siklus (21 Okt 2026 — Aturan 82: saklar yang bisa dimatikan, dan getter yang membuang nilainya)
 
 Aturan 82 menjaga satu hal yang tidak terlihat oleh 81 aturan lain: bahwa

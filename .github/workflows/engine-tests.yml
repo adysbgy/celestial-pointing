@@ -2900,7 +2900,15 @@ jobs:
       - name: Buktikan gerbang terang bintang malam berbunyi
         run: python3 Tools/bukti-mutasi-aturan81-terang-dari-magnitudo.py
 
-      # Aturan 82: `NightMode.isOn` dibaca 11 tempat di `Apps/` setiap render
+      # Arah predikat samaran **di view**. 119 gerbang gambar lain mengukur
+      # port Python, dan port-nya benar — jadi cacat ini (planet tajam saat
+      # ragu, sabit Bulan dikaburkan) hijau di semuanya. Gerbangnya membaca
+      # teks Swift; harness ini membuktikan ia bisa merah pada empat bentuk
+      # pemutusan yang berbeda.
+      - name: Buktikan gerbang samaran terbalik berbunyi
+        run: python3 Tools/bukti-mutasi-samaran-terbalik.py
+
+      # Aturan 82: `NightMode.isOn` dibaca 7 tempat di `Apps/` setiap render
       # (palet permukaan, latar langit, empat jalur kanvas visual). Mengganti
       # getter-nya dengan tetapan mengompilasi, melewati seluruh gerbang UI, dan
       # mengubah saklar Mode Malam menjadi tombol mati — palet merah menyala
