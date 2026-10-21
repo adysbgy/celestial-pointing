@@ -530,4 +530,49 @@ final class NameOverflowTests: XCTestCase {
         XCTAssertEqual(ObjectCardLayout.detailVisualDiameter(at: .large),
                        ObjectCardLayout.detailVisualBaseDiameter, accuracy: 0.001)
     }
+
+    /// Padding badge di model harus sama dengan padding yang dipasang view.
+    ///
+    /// Model sempat memakai 10 pt sementara view memasang
+    /// `.padding(.horizontal, 7)` = 14 pt. Selisih 4 pt itu tidak mengubah
+    /// susunan mana pun, jadi tidak ada uji yang gagal — tetapi model dan view
+    /// berbeda pendapat tentang lebar badge, dan arah selisihnya membuat kolom
+    /// nama terlihat **lebih lebar** daripada kenyataannya. Itu kelas cacat
+    /// yang sama dengan yang berkas ini perbaiki.
+    ///
+    /// Uji ini membaca **view-nya**, bukan menyalin angkanya. Konstanta yang
+    /// dikunci ke literal hanya membuktikan konstanta sama dengan dirinya
+    /// sendiri; yang perlu dijaga adalah kesepakatannya dengan view.
+    func testDetailBadgePaddingMatchesTheViewPadding() throws {
+        let view = try XCTUnwrap(Self.panelSource(),
+                                 "DiagnosticsView.swift tidak ditemukan dari uji")
+        // Cari `.padding(.horizontal, N)` pada blok badge.
+        let pattern = #"\.padding\(\.horizontal,\s*([0-9]+(?:\.[0-9]+)?)\)"#
+        let regex = try NSRegularExpression(pattern: pattern)
+        let ns = view as NSString
+        let matches = regex.matches(in: view, range: NSRange(location: 0, length: ns.length))
+        let paddings = matches.compactMap {
+            Double(ns.substring(with: $0.range(at: 1)))
+        }
+        // Badge memakai 7 pt; ada padding lain di berkas ini (14, 16, 20),
+        // jadi yang dicari adalah yang benar-benar dipakai badge.
+        XCTAssertTrue(paddings.contains(7),
+                      "badge memasang padding horizontal 7 pt; ditemukan \(paddings)")
+        XCTAssertEqual(ObjectCardLayout.detailBadgePadding, 7 * 2, accuracy: 0.001,
+                       "dua sisi × 7 pt dari view")
+    }
+
+    /// Padding horizontal yang dipakai badge, dibaca dari view-nya.
+    private static func panelSource() -> String? {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<6 {
+            dir.deleteLastPathComponent()
+            let candidate = dir
+                .appendingPathComponent("Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift")
+            if let text = try? String(contentsOf: candidate, encoding: .utf8) {
+                return text
+            }
+        }
+        return nil
+    }
 }

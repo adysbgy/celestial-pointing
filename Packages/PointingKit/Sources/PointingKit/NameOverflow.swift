@@ -419,8 +419,14 @@ public enum ObjectCardLayout {
     /// tidak diam-diam kembali.
     public static let detailBadgeTextWidth: Double = 34.47
 
-    /// Padding horizontal badge (`7` pt × 2).
-    public static let detailBadgePadding: Double = 10
+    /// Padding horizontal badge (`7` pt × 2) — **14**, bukan 10.
+    ///
+    /// Angka 10 lebih kecil daripada font yang diklaimnya, dan arah kelalaiannya
+    /// salah: badge yang lebih lebar berarti kolom nama yang lebih sempit.
+    /// View memasang `.padding(.horizontal, 7)`, jadi totalnya 14 pt. Selisih
+    /// 4 pt ini tidak mengubah susunan mana pun, tetapi ia membuat model dan
+    /// view berbeda pendapat — persis kelas cacat yang berkas ini perbaiki.
+    public static let detailBadgePadding: Double = 14
 
     /// Jarak nama ke badge.
     public static let detailBadgeGap: Double = 8

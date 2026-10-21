@@ -1,3 +1,31 @@
+### Siklus (21 Okt 2026 — panel iPhone: model dan view yang berbeda pendapat soal 4 pt)
+
+Sesudah panel iPhone diperbaiki, model dan view masih berbeda pendapat tentang
+lebar badge. `detailBadgePadding` menyimpan **10**, sedangkan view memasang
+`.padding(.horizontal, 7)` = **14**. Selisih 4 pt tidak mengubah susunan mana
+pun, jadi tidak ada uji yang gagal — tetapi arah selisihnya salah: padding yang
+terlalu kecil membuat kolom nama terlihat **lebih lebar** daripada kenyataannya,
+dan itulah tepat kelas cacat yang siklus sebelumnya perbaiki.
+
+Kenapa angka itu bisa lolos: ia ditulis sebagai konstanta dengan komentar
+"(7 pt × 2)" di atasnya, dan komentarnya benar sementara angkanya salah. Tidak
+ada gerbang yang membaca komentar.
+
+Perbaikan + gerbang:
+- Konstanta menjadi 14, dengan alasan ditulis di tempatnya.
+- Uji baru **membaca `DiagnosticsView.swift`** dan mengambil
+  `.padding(.horizontal, N)` yang dipakai badge, lalu menegaskan
+  `detailBadgePadding == 2 × N`. Konstanta yang dikunci ke literal hanya
+  membuktikan ia sama dengan dirinya sendiri; yang perlu dijaga adalah
+  kesepakatan dengan view.
+- Dua mutasi membuktikan uji itu menggigit: model 14→10 gagal
+  (`10.0 != 14.0`), view 7→9 gagal (`ditemukan [9.0]`).
+
+Yang TIDAK diklaim: 4 pt ini tidak pernah membuat nama terpotong di perangkat
+nyata. Ia cacat **kesepakatan**, bukan cacat tampilan — dan nilainya justru
+supaya model tidak pelan-pelan menjauh dari view sampai suatu hari ia
+menentukan susunan yang salah.
+
 ### Siklus (21 Okt 2026 — panel iPhone: gambar yang memakan nama, dan uji yang mengunci angka salah)
 
 Cacat sebelumnya (nama terpotong di kartu jam) ditutup Aturan 78 untuk **kartu
