@@ -5324,18 +5324,18 @@
       }
     },
     "pointing.search.hint.belowHorizon": {
-      "comment": "Alasan: semua objek katalog sedang di bawah horizon.",
+      "comment": "Alasan: semua objek di dalam kerucut arah tunjuk sedang di bawah horizon.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every object in the catalogue is below the horizon."
+            "value": "Every object in the pointing direction is below the horizon."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Semua objek di katalog sedang di bawah horizon."
+            "value": "Semua objek di arah tunjuk sedang di bawah horizon."
           }
         }
       }

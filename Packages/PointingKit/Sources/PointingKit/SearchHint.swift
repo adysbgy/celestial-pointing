@@ -156,9 +156,24 @@ public extension LocalizedText {
     static let searchHintDaylight = LocalizedText(
         key: "pointing.search.hint.daylight",
         id: "Langit masih terang — bintang belum terlihat.")
+    /// `.allBelowHorizon` hanya muncul bila **benda di dalam kerucut arah
+    /// tunjuk** ditolak karena di bawah horizon, jadi kalimatnya harus
+    /// menyebut cakupan itu — bukan katalog.
+    ///
+    /// **Kenapa "di arah tunjuk", bukan "di katalog".** Versi lama berbunyi
+    /// "Semua objek di katalog sedang di bawah horizon." Hint ini tidak pernah
+    /// memeriksa katalog; ia hanya memeriksa `rejected` yang jaraknya
+    /// `<= pointingConeDeg`. Di luar kerucut itu langit bisa penuh bintang yang
+    /// sedang di atas horizon. Kalimat lama karena itu menyatakan lebih banyak
+    /// daripada yang diukur kode — bentuk pelanggaran PRD v0.4 yang paling
+    /// mudah terjadi: bukan angka yang salah, melainkan **cakupan** kalimat
+    /// yang lebih luas dari cakupan pemeriksaannya.
+    ///
+    /// Dijaga `SearchHintScopeWordingTests` (kata "katalog"/"seluruh langit"
+    /// tidak boleh kembali, dan cakupan sempitnya wajib disebut).
     static let searchHintBelowHorizon = LocalizedText(
         key: "pointing.search.hint.belowHorizon",
-        id: "Semua objek di katalog sedang di bawah horizon.")
+        id: "Semua objek di arah tunjuk sedang di bawah horizon.")
     static let searchHintTooFaint = LocalizedText(
         key: "pointing.search.hint.tooFaint",
         id: "Objek di arah itu terlalu redup untuk dilihat.")

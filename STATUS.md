@@ -1,3 +1,93 @@
+### Siklus (21 Okt 2026 — kalimat hint yang mengklaim lebih banyak daripada yang diukur kode)
+
+Cacat ini hidup di **satu string** di `Packages/PointingKit/Sources/PointingKit/SearchHint.swift`,
+di lapisan yang sudah punya tes — hanya saja tesnya menguji enum, bukan kalimat:
+
+    id: "Semua objek di katalog sedang di bawah horizon."
+
+`Resolution.searchHint` sudah diperbaiki lebih dulu, dan diperbaiki dengan benar:
+ia hanya membaca `rejected` yang `separationDeg <= pointingConeDeg`
+(`SearchHint.swift:119`). Seluruh alasan `.allBelowHorizon` karena itu **hanya**
+tentang benda di dalam kerucut arah tunjuk. `SearchHintConeScopeTests` menjaga
+keputusan itu dengan sapu 24 jam x seluruh arah, dan hijau.
+
+Yang tidak ikut diperbaiki adalah **kalimatnya**. Pengguna tidak membaca enum;
+mereka membaca `SearchHint.message`. Kalimat itu masih menyebut *katalog* —
+cakupan yang tidak pernah diperiksa kode yang memutuskannya. Di luar kerucut
+20 derajat, langit bisa penuh bintang yang sedang di atas horizon; menyebut
+"semua objek di katalog" pada saat itu adalah klaim yang salah, dan salahnya
+justru pada aplikasi yang seluruh nilainya bergantung pada tidak menyatakan
+lebih banyak daripada yang diketahui.
+
+#### Kenapa tidak satu gerbang pun berbunyi
+
+- `SearchHintConeScopeTests` (230 baris, 5 tes) menguji `r.searchHint` — nilai
+  enum. Tidak satu pun menyentuh `hint.text.indonesian`.
+- Aturan 4 & 6 di `swift-ui-lint.sh` memeriksa **keberadaan** kunci di
+  `Localizable.xcstrings`, bukan **isi** kalimatnya. Kunci
+  `pointing.search.hint.belowHorizon` ada, berparitas, dan diterjemahkan —
+  semuanya benar, dan semuanya bisu tentang cakupan.
+- `CatalogIndonesianCoverageTests` memastikan nilai `id` di katalog **sama**
+  dengan nilai bawaan di paket. Keduanya sama-sama salah, jadi paritasnya
+  hijau. Ini bentuk paling rapi dari "hijau yang tidak hijau": dua salinan
+  kesalahan yang saling menguatkan.
+
+Jadi rantainya begini: bagian yang memutuskan benar, bagian yang menampilkan
+salah, dan **tidak ada gerbang yang menghubungkan keduanya**. Kelas cacat yang
+sama dengan siklus-siklus sebelumnya di repo ini — bukan angka yang keliru,
+melainkan cakupan kalimat yang lebih luas dari cakupan pemeriksaannya.
+
+#### Yang dikerjakan
+
+Tes ditulis **lebih dulu** dan terbukti MERAH pada kalimat lama
+(`Executed 4 tests, with 3 failures`):
+
+    testBelowHorizonMessageDoesNotClaimTheWholeCatalogue   MERAH
+    testBelowHorizonMessageStillSaysWhereToLook            MERAH
+    testNoSearchHintClaimsTheWholeCatalogue                MERAH
+    testHintUnderTestIsActuallyReachable                   hijau (prasyarat)
+
+Tes keempat adalah penjaga anti-vacuous: kalau fixture berhenti menghasilkan
+`.allBelowHorizon`, tiga tes di atas akan hijau tanpa menguji apa pun. Sapu
+yang sama membuktikan hint itu benar-benar muncul.
+
+Kalimat diperbaiki di **dua** tempat yang harus tetap sama (paket + katalog
+`id` + `en`), dengan alasan ditulis di docstring:
+
+    "Semua objek di arah tunjuk sedang di bawah horizon."
+    "Every object in the pointing direction is below the horizon."
+
+Kata yang dilarang kembali sengaja **pendek dan konkret** — `katalog`,
+`seluruh langit`, `whole sky`, `entire catalogue`. `"semua objek"` **tidak**
+dilarang: "semua objek di arah tunjuk" adalah kalimat yang benar, dan kuantor
+"sah" selama cakupannya disebut. Yang membuat kalimat lama salah bukan "semua",
+melainkan "di katalog".
+
+#### Gerbang
+
+    ./swift-test.sh          CelestialEngine 222 + PointingKit 1033, 0 gagal
+    ./swift-ui-lint.sh       SEMUA GERBANG UI LULUS (84 blok aturan)
+    Aturan 10                README 1029 -> 1033 (hitungan uji naik 4)
+
+Aturan 10 sempat MERAH (`README bilang PointingKit 1029, berkas uji berisi
+1033`) — itu gerbang yang bekerja sebagaimana mestinya, bukan regresi. Angka di
+README diperbarui ke keadaan yang terukur.
+
+#### Yang TIDAK diklaim
+
+- Tes menjaga **kata**, bukan makna. Kalimat yang menyatakan cakupan terlalu
+  luas dengan kata lain di luar daftar (`"di mana-mana"`, `"semua bintang"`)
+  tidak tertangkap. Yang dijaga adalah bentuk kesalahan yang benar-benar
+  pernah dikirim, bukan seluruh kemungkinan parafrase.
+- Yang diuji adalah nilai `id` (bawaan paket, yang dipakai di Linux). Terjemahan
+  `en` di katalog tidak diuji isinya — hanya paritasnya, lewat Aturan 6.
+- Tidak ada perubahan pada `Resolution.searchHint` maupun `SearchHint` itu
+  sendiri. Perbaikannya **hanya** kalimat; logikanya sudah benar sejak
+  `SearchHintConeScopeTests`.
+- Tidak ada pengukuran di perangkat. Semua angka dari pohon di Linux.
+
+---
+
 ### Siklus (21 Okt 2026 — view latar bisa membalik malam/siang tanpa satu gerbang berbunyi)
 
 Celah ini **tidak** tercatat terbuka di STATUS.md mana pun. Ia ditemukan
