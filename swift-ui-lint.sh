@@ -14495,6 +14495,51 @@ else
   echo "        kartu, dan tiga uji kontrasnya masih ada."
 fi
 
+# ── Aturan 84 ───────────────────────────────────────────────────────────────
+#
+# Peringatan "terlalu cepat" adalah satu-satunya tempat di layar yang memberi
+# tahu bahwa arah tunjuk **belum boleh dipercaya**. Ia ditulis SETELAH disapu:
+# tujuh mutasi dijalankan pada salinan pohon utuh, dan empat lolos seluruh 83
+# aturan — termasuk `let tooFast = false`, yang mematikan peringatan sambil
+# membiarkan angka laju, warna normal, dan panduan "arahkan jam" tetap tampil.
+#
+# Probe lanjutan (di luar tujuh keadaan milik harness) menemukan tiga celah
+# lagi yang lolos **83 aturan sekaligus**:
+#
+#   angka:  degreesPerSecond(rate)  -> degreesPerSecond(0)              HIJAU
+#   angka:  degreesPerSecond(rate)  -> degreesPerSecond(maxAngular)     HIJAU
+#   warna:  tooFast ? warning.color -> textSecondaryColor               HIJAU
+#
+# Ketiganya mempertahankan ambang yang benar. Peringatan tetap "ada" — yang
+# hilang adalah **kanal yang dibaca pengguna**: angka di layar bukan laju yang
+# diperingatkan, dan tidak ada satu pun sinyal yang menonjol. Kelas cacat yang
+# sama dengan seluruh siklus ini: dua kanal, dua nilai.
+#
+# Logikanya tinggal di `Tools/check-aturan84-peringatan-laju.py`, bukan
+# di-inline di sini. Alasannya bukan kerapian: badan heredoc `$(python3 - <<'PY')`
+# diurai bash 3.2 di macOS CI, dan satu kutip tunggal atau backtick ganjil di
+# dalamnya membuat skrip memindai sampai EOF lalu **melewati seluruh aturan
+# berikutnya tanpa suara**. Berkas terpisah tidak punya jalur kegagalan itu,
+# dan bisa dijalankan langsung saat menyelidiki.
+echo
+echo "== Aturan 84: peringatan laju tidak boleh kehilangan kanalnya =="
+if [ ! -f "Tools/check-aturan84-peringatan-laju.py" ]; then
+  echo "FAIL Tools/check-aturan84-peringatan-laju.py tidak ada: Aturan 84 tidak"
+  echo "     mengukur apa pun, dan peringatan laju kehilangan gerbangnya."
+  status=1
+else
+  peringatan_laju=$(python3 Tools/check-aturan84-peringatan-laju.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$peringatan_laju"
+    echo "-> Peringatan laju wajib memakai ambang engine dengan tanda lebih-besar,"
+    echo "   menggambar angka rate yang sama, dan mempertahankan kata + warna"
+    echo "   peringatan. Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$peringatan_laju"
+  fi
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo

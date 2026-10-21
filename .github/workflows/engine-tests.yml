@@ -2919,6 +2919,20 @@ jobs:
       - name: Buktikan gerbang mode malam berbunyi
         run: python3 Tools/bukti-mutasi-aturan82-mode-malam.py
 
+      # Aturan 84: peringatan "terlalu cepat" adalah satu-satunya tempat di
+      # layar yang memberi tahu bahwa arah tunjuk belum boleh dipercaya.
+      # Empat dari tujuh mutasi awalnya lolos SELURUH 83 aturan — termasuk
+      # `let tooFast = false`, yang mematikan peringatan sambil membiarkan
+      # angka laju, warna normal, dan panduan "arahkan jam" tetap tampil.
+      # Probe lanjutan menemukan tiga celah lagi yang lolos 83 aturan
+      # sekaligus: angka diganti `0`, angka diganti properti lain, dan warna
+      # peringatan diganti warna sekunder. Ketiganya mempertahankan ambang
+      # yang benar — yang hilang adalah kanal yang dibaca pengguna.
+      # Harness ini menuntut ketujuh keadaan berbunyi; hijau pada keadaan
+      # yang salah adalah kegagalan yang ia ada untuk mencegah.
+      - name: Buktikan gerbang peringatan laju berbunyi
+        run: python3 Tools/bukti-mutasi-aturan84-peringatan-laju.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada
