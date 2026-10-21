@@ -13384,6 +13384,135 @@ elif [ "$nama_luapan_status" -ne 0 ]; then
   status=1
 fi
 
+# ── Aturan 77: lokasi sungguhan wajib sampai ke engine ──────────────────────
+# PRD v0.4: "Uncertainty > false confidence", dan Watch tetap hipotesis.
+#
+# `LocationProvider.effectiveLocation` adalah **satu-satunya** ekspresi yang
+# memutuskan langit mana yang dihitung: `location ?? .fallback`. Ia dibaca
+# `PointingEngine.bind(location:)` saat pemasangan, dan `DiagnosticsView`
+# menampilkan `effectiveLocation.label` sebagai "lokasi sekarang".
+#
+# Cacatnya nyata dan terukur. Sapuan `Tools/sapu-buta-apps.py` mengganti badan
+# properti itu menjadi `{ .fallback }` — satu baris — dan **seluruh 76 aturan
+# UI lolos**. Akibatnya: engine menghitung seluruh langit dari lokasi bawaan
+# sementara layar diagnostik menampilkan koordinat sungguhan, tanpa satu pun
+# bagian UI terlihat salah. Ini kelas cacat yang paling dilarang PRD: bukan
+# crash, bukan pesan galat, melainkan aplikasi yang **yakin** pada langit yang
+# salah tempat.
+#
+# Kenapa Aturan 54 tidak menangkapnya: aturan itu menjaga jalur **penolakan
+# izin** (`note` saat denied/restricted/failed, dan guard akurasi). Ketiga
+# jalur itu bisa utuh sementara nilai yang dipakai engine sudah dibuang.
+#
+# Kenapa gerbangnya membandingkan teks, bukan menjalankan uji: `Apps/` tidak
+# pernah dibangun di Linux (`LocationProvider` menyentuh CoreLocation), jadi
+# tidak ada uji runtime yang bisa melihatnya. Yang bisa diperiksa dari sini
+# adalah **bentuk** ekspresinya, dan bentuk itulah yang menentukan perilaku.
+#
+# **Dua cacat pada aturan ini, keduanya terukur sebelum diperbaiki.**
+#
+# (a) Pemeriksaan ketiga dulu menuntut kata `fallbackSource` ada di
+#     `ObserverLocation.swift`. Itu **menuduh kode benar**: mengganti seluruh
+#     pemakaian konstanta itu dengan literal `"fallback"` — refaktor yang sah,
+#     tanpa perubahan perilaku — membuat aturan merah, karena kata itu memang
+#     tidak perlu ada. Gerbang yang menuduh kode benar akan dilonggarkan orang,
+#     dan setelah dilonggarkan ia tidak menjaga apa pun. Pemeriksaan itu dibuang
+#     dan diganti dengan invarian **bentuk**, yang tidak bergantung pada nama
+#     maupun nilai.
+#
+# (b) Pemeriksaan `bind(location:)` hanya melihat pemasangan **awal**. Dua
+#     mutasi yang mengompilasi dan tidak menyentuh baris itu lolos seluruh 77
+#     aturan:
+#
+#         self?.update(location: newValue)   -> self?.update(location: .fallback)
+#         provider.onLocationChanged = { [weak self] newValue in
+#                                          -> { [weak self] _ in
+#
+#     Keduanya adalah cacat yang **lebih sunyi** daripada cacat aslinya: lokasi
+#     benar saat app dibuka, lalu berhenti mengikuti pengguna. Pengguna berjalan
+#     beberapa ratus meter, langit dihitung untuk titik lama, dan tidak ada satu
+#     pun bagian UI yang berubah — termasuk layar diagnostik, yang tetap
+#     menampilkan `effectiveLocation` yang benar.
+echo "== Aturan 77: lokasi sungguhan wajib sampai ke engine =="
+lokasi_engine=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+LOCATION = "Apps/Shared/LocationProvider.swift"
+ENGINE = "Apps/Shared/PointingEngine.swift"
+
+# Bentuk yang wajib: lokasi sungguhan bila ada, dan lokasi bawaan hanya
+# sebagai cadangan. `location` boleh bernama lain asalkan berasal dari
+# properti `location`; yang dilarang adalah **cadangan yang menang**.
+BENTUK = "var effectiveLocation: ObserverLocation { location ?? .fallback }"
+
+# Penyambungan punya **dua** arah, dan keduanya wajib. Yang pertama hanya
+# terjadi sekali saat pemasangan; yang kedua terjadi setiap kali pengguna
+# bergerak, dan itulah yang paling mudah hilang tanpa terlihat.
+SAMBUNG_AWAL = "update(location: provider.effectiveLocation)"
+SAMBUNG_UPDATE = "self?.update(location: newValue)"
+
+masalah = []
+
+for path in (LOCATION, ENGINE):
+    if not os.path.exists(path):
+        masalah.append("  %s tidak ditemukan -- Aturan 77 tidak mengukur apa pun." % path)
+
+if not masalah:
+    kode = open(LOCATION, encoding="utf-8").read()
+    kode = re.sub(r"//[^\n]*", "", kode)
+    kode = re.sub(r"/\*.*?\*/", "", kode, flags=re.S)
+
+    if BENTUK not in kode:
+        masalah.append(
+            "  %s: `effectiveLocation` tidak lagi berbentuk `%s`.\n"
+            "    Kalau lokasi bawaan yang menang, engine menghitung langit "
+            "untuk tempat lain sementara layar menampilkan koordinat "
+            "sungguhan -- yakin pada langit yang salah."
+            % (LOCATION, BENTUK))
+
+    eng = open(ENGINE, encoding="utf-8").read()
+    eng = re.sub(r"//[^\n]*", "", eng)
+    eng = re.sub(r"/\*.*?\*/", "", eng, flags=re.S)
+
+    # (1) Pemasangan awal.
+    if SAMBUNG_AWAL not in eng:
+        masalah.append(
+            "  %s: `bind(location:)` tidak lagi meneruskan "
+            "`provider.effectiveLocation` ke engine. Penyambungan yang "
+            "hilang membuat engine memakai lokasi bawaan selamanya."
+            % ENGINE)
+
+    # (2) Pembaruan berikutnya. Diperiksa sebagai **bentuk**, bukan sebagai
+    # nama: yang menentukan perilaku adalah nilai yang dikirim ke `update`,
+    # bukan nama parameternya.
+    if SAMBUNG_UPDATE not in eng:
+        masalah.append(
+            "  %s: closure `onLocationChanged` tidak lagi meneruskan lokasi "
+            "baru ke engine (`%s`).\n"
+            "    Lokasi benar saat app dibuka, lalu berhenti mengikuti "
+            "pengguna; langit dihitung untuk titik lama tanpa satu pun "
+            "bagian UI yang berubah." % (ENGINE, SAMBUNG_UPDATE))
+
+if masalah:
+    print("\n".join(masalah))
+PY
+)
+if printf '%s' "$lokasi_engine" | grep -q "Traceback"; then
+  echo "Pemeriksaan Aturan 77 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  echo "$lokasi_engine"
+  status=1
+elif [ -n "$lokasi_engine" ]; then
+  echo "$lokasi_engine"
+  echo "-> Lokasi sungguhan wajib menang atas lokasi bawaan, dan wajib"
+  echo "   sampai ke engine -- saat pemasangan DAN setiap pembaruan."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+else
+  echo "Bersih: lokasi sungguhan menang atas bawaan dan sampai ke engine,"
+  echo "        baik saat pemasangan maupun setiap pembaruan."
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo
