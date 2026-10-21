@@ -309,54 +309,55 @@ final class NameOverflowTests: XCTestCase {
 
     // MARK: - Panel iPhone: kolom lebar, tetapi bukan tanpa batas
 
-    /// Panel detail iPhone memakai `.title2` (22 pt) dan lantai 0.7, jadi
-    /// angkanya **berbeda** dari kartu jam — dan berbeda pula kesimpulannya.
+    /// Panel detail iPhone memakai `.title2` (22 pt) dan lantai 0.7, dan nama
+    /// di sana **berbagi baris dengan badge keyakinan** — jadi kolomnya bukan
+    /// lebar panel, melainkan lebar panel dikurangi badge.
     ///
-    /// Ini bukan duplikasi demi kelengkapan: dua permukaan yang memakai nama
-    /// yang sama dari katalog yang sama bisa gagal di ukuran yang berbeda, dan
-    /// pengukuran yang hanya dilakukan untuk satu permukaan akan membuat yang
-    /// lain tampak aman. Terukur (DejaVu Bold 22 pt, lebar nama 256.54 pt):
+    /// Versi pertama tes ini memakai 333 pt (lebar panel penuh) dan
+    /// menyimpulkan "aman sampai AX5". Kesimpulannya kebetulan benar, tetapi
+    /// **angkanya salah**: nama tidak pernah mendapat 333 pt, karena badge
+    /// ("Ragu" 31.6 pt + padding 10 pt + spacing 8 pt = 49.6 pt) selalu di
+    /// sebelahnya. Tes yang mengukur kolom yang tidak ada akan tetap hijau
+    /// ketika badge tumbuh — dan badge tumbuh bersama Dynamic Type.
     ///
-    ///     kolom    ruang susut   gagal mulai
-    ///     333 pt      2.596        tidak pernah
-    ///     273 pt      2.128        AX5
-    ///     253 pt      1.972        AX5
+    /// Terukur (DejaVu Bold 22 pt, lebar nama 256.54 pt, kolom 283.4 pt =
+    /// 333 − 49.6):
     ///
-    /// Jadi panel iPhone **lolos** sampai AX5 pada lebar penuh — dan itulah
-    /// alasan ia tidak butuh `AnyLayout` seperti kartu jam. Yang diuji di sini
-    /// adalah batasnya, supaya kalau lebar kolomnya menyusut (padding
-    /// ditambah, visual diletakkan di samping nama) gerbangnya berbunyi
-    /// sebelum pengguna menemukannya.
-    func testIPhoneDetailPanelSurvivesAccessibilitySizesAtFullWidth() {
+    ///     ukuran   2 baris butuh   hasil
+    ///     AX1        147.3 pt      muat
+    ///     AX3        207.4 pt      muat
+    ///     AX5        280.1 pt      muat (tipis, 3.6 pt sisa)
+    ///
+    /// AX5 lolos dengan sisa **3.6 pt**. Itu bukan "aman", itu **pas** — dan
+    /// itulah yang perlu diuji: kalau padding panel ditambah 4 pt saja, atau
+    /// badge memuat kata yang lebih panjang, AX5 mulai memotong.
+    func testIPhoneDetailPanelFitsUntilAX5WithAlmostNoSlack() {
         let nameAtTitle2 = Self.widestNameWidth * 22 / 20   // 256.54 pt
         let floor = 0.7
+        let badgeWidth = 31.6 + 10 + 8                      // teks + padding + spacing
+        let nameColumn = 333 - badgeWidth                   // 283.4 pt
 
-        // Lebar penuh panel (iPhone 15: 393 pt − padding panel 32 pt − padding
-        // kartu 28 pt = 333 pt).
-        let fullWidth = NameOverflow.fit(widthAtDefault: nameAtTitle2,
-                                         columnWidth: 333, lineLimit: 2, floor: floor)
+        let fit = NameOverflow.fit(widthAtDefault: nameAtTitle2,
+                                   columnWidth: nameColumn, lineLimit: 2, floor: floor)
         XCTAssertNil(NameOverflow.firstFailingSize(widthAtDefault: nameAtTitle2,
-                                                   columnWidth: 333, lineLimit: 2,
+                                                   columnWidth: nameColumn, lineLimit: 2,
                                                    floor: floor),
-                     "pada lebar penuh panel iPhone, nama muat sampai AX5")
+                     "panel iPhone muat sampai AX5 pada kolom 283.4 pt")
 
-        // Kalau visual suatu saat diletakkan di samping nama (kolom ~253 pt),
-        // panel itu **berhenti** aman di AX5. Ini batas yang perlu diketahui,
-        // bukan cacat yang sedang terjadi.
-        XCTAssertEqual(NameOverflow.firstFailingSize(widthAtDefault: nameAtTitle2,
-                                                     columnWidth: 253, lineLimit: 2,
-                                                     floor: floor),
-                       .accessibility5,
-                       "kolom 253 pt bertahan sampai AX4 lalu gagal di AX5")
-
-        // "Masih punya ruang di atas AX5" diukur sebagai ruang susut pada AX5,
-        // bukan sebagai `largestFittingScale`: nilai itu **dipangkas** di skala
-        // terbesar tabel, jadi ia tidak bisa menyatakan "lebih dari cukup".
-        // Terukur pada 333 pt: 2.596 / 3.12 = 0.832, masih di atas lantai 0.7.
-        let headroomAtAX5 = fullWidth.requiredScaleAtDefault
+        // Sisa ruangnya tipis: 283.4 − 280.1 = 3.3 pt pada AX5.
+        let headroomAtAX5 = fit.requiredScaleAtDefault
             / ObjectCardLayout.scale(for: .accessibility5)
-        XCTAssertGreaterThan(headroomAtAX5, floor,
-                             "pada AX5 nama masih muat tanpa menyentuh lantai")
-        XCTAssertEqual(headroomAtAX5, 0.832, accuracy: 0.005)
+        XCTAssertGreaterThan(headroomAtAX5, floor)
+        XCTAssertEqual(headroomAtAX5, 0.706, accuracy: 0.005,
+                       "AX5 lolos dengan sisa ~3 pt, bukan lapang")
+
+        // Dan kalau badge memakan 4 pt lagi, AX5 **mulai** memotong. Ini yang
+        // membuat tesnya berarti: ia menyatakan di mana batasnya, bukan hanya
+        // bahwa hari ini aman.
+        XCTAssertEqual(NameOverflow.firstFailingSize(widthAtDefault: nameAtTitle2,
+                                                     columnWidth: nameColumn - 4,
+                                                     lineLimit: 2, floor: floor),
+                       .accessibility5,
+                       "kolom 279.4 pt gagal di AX5")
     }
 }
