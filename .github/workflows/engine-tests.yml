@@ -2894,6 +2894,18 @@ jobs:
       - name: Buktikan gerbang luapan nama objek berbunyi
         run: python3 Tools/bukti-mutasi-aturan76-luapan-nama.py
 
+      # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
+      # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
+      # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada
+      # pohon utuh, seluruh 79 aturan hijau: `.opacity(...)` -> `.opacity(1)`
+      # dan `.blur(...)` -> `.blur(radius: 0)` keduanya exit 0 — kandidat yang
+      # engine belum kunci digambar tajam dan penuh di samping lencana "Ragu",
+      # keyakinan palsu yang persis dilarang PRD. Keadaan yang sama mencabut
+      # penyusutan corona Matahari (`radius / sunCoronaReach` -> `radius`),
+      # sehingga halo terpotong frame.
+      - name: Buktikan gerbang samaran-terpasang berbunyi
+        run: python3 Tools/bukti-mutasi-aturan80-samaran-terpasang.py
+
       # Aturan 77: lokasi sungguhan wajib sampai ke engine. Harness ini
       # menuntut enam keadaan berbunyi sesuai harapan **dan** empat cacatnya
       # hijau di lint pra-perbaikan — tanpa arah kedua, hijau di sini hanya

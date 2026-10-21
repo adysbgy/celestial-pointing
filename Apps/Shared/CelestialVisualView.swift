@@ -1708,11 +1708,22 @@ struct CelestialVisualView: View {
         // terang berbeda berubah menjadi dua titik merah yang sama persis.
         // Mode malam memang membuang warna; ia tidak seharusnya membuang
         // terang juga.
-        let brightness = NightVisual.floorBrightness
-            + NightVisual.rangeBrightness * min(
-                1, max(0, CelestialVisual.drawableStarSize(visual,
-                                                           isConfirmed: isConfirmed)))
-        return Color(red: brightness, green: 0, blue: 0)
+        //
+        // Rumusnya **tidak ditulis di sini**: ia tinggal di
+        // `NightVisual.starBrightness(relativeSize:)` dan diuji di Linux.
+        // Versi lama menulisnya inline, dan menggantinya dengan tetapan
+        // membuat semua bintang menjadi satu merah yang sama tanpa satu pun
+        // aturan berbunyi.
+        //
+        // **Kenapa tidak lewat `Self.color`.** `NightVisual.star` sudah
+        // mengembalikan warna **malam**, dan `color` memetakan kanal merah
+        // sekali lagi (`0.35 + 0.65x`). Pemetaan itu tidak idempoten: bintang
+        // paling redup akan naik dari 0.35 ke 0.58, dan urutan terangnya
+        // memampat. Jalur mode malam di sini karena itu menulis `Color`
+        // langsung dari komponen yang sudah final.
+        let night = NightVisual.star(
+            CelestialVisual.drawableStarSize(visual, isConfirmed: isConfirmed))
+        return Color(red: night.red, green: night.green, blue: night.blue)
     }
 
     // MARK: - Matahari

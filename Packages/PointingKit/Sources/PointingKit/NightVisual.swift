@@ -112,6 +112,36 @@ public enum NightVisual {
     /// sendiri -- supaya nilainya boleh diubah selama fase bulan masih
     /// terbaca.
     public static let shadowFraction: Double = 0.5
+
+    /// Kecerahan merah untuk **titik cahaya** (bintang), dari ukuran relatifnya.
+    ///
+    /// **Kenapa ini ada di model, bukan di view.** Rumusnya dulu ditulis
+    /// langsung di `CelestialVisualView.starColor`: `floorBrightness +
+    /// rangeBrightness * clamp(size)`. Seluruh 79 aturan tetap hijau ketika
+    /// rumus itu diganti tetapan `0.9` — terukur, exit 0 — dan akibatnya
+    /// setiap bintang di mode malam menjadi **satu titik merah yang sama
+    /// persis**, dari Sirius sampai bintang magnitudo 4. Mode malam memang
+    /// membuang hue; ia tidak boleh membuang terang, karena terang itulah
+    /// satu-satunya informasi yang tersisa.
+    ///
+    /// **Kenapa kecerahan dari ukuran, bukan dari warna B−V.** Konversi
+    /// B−V → RGB tidak menjamin kanal merahnya mengikuti terang bintang
+    /// sungguhan: Rigel (B−V −0.03) dan Betelgeuse (1.85) bisa bertukar
+    /// urutan di kanal merah. Ukuran relatif justru **diturunkan dari
+    /// magnitudo**, jadi ia urutan yang benar menurut definisinya.
+    ///
+    /// - Parameter relativeSize: ukuran gambar bintang relatif, 0...1
+    ///   (`CelestialVisual.drawableStarSize`).
+    /// - Returns: kanal merah, `floorBrightness`...1, hijau & biru nol.
+    public static func starBrightness(relativeSize: Double) -> Double {
+        floorBrightness + rangeBrightness * min(1, max(0, relativeSize))
+    }
+
+    /// Warna malam untuk titik bintang: merah murni dengan kecerahan
+    /// `starBrightness(relativeSize:)`.
+    public static func star(_ relativeSize: Double) -> CelestialVisual.RGBComponents {
+        .init(red: starBrightness(relativeSize: relativeSize), green: 0, blue: 0)
+    }
 }
 
 // MARK: - Aksen gambar

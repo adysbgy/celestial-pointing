@@ -13882,6 +13882,221 @@ else
 fi
 
 
+# ── Aturan 80: samaran ragu wajib TERPASANG, dan corona wajib menyusut ───────
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka.
+#
+# Aturan 63 menjaga **angka** samaran (0.06 dan 0.75) dan menyatakannya sama
+# dengan port Python. Yang tidak dijaga siapa pun adalah apakah angka itu
+# **dipasang** pada gambar. Terukur pada pohon utuh, proses baru, seluruh 79
+# aturan hijau:
+#
+#     CelestialVisualView.swift  .opacity(...) -> .opacity(1)                exit 0
+#     CelestialVisualView.swift  .blur(...)    -> .blur(radius: 0)           exit 0
+#     CelestialVisualView.swift  drawSun radius: radius / sunCoronaReach
+#                                -> radius: radius                            exit 0
+#     CelestialVisualView.swift  let reach = sunCoronaReach * radius
+#                                -> let reach = radius                         exit 0
+#
+# Akibatnya: kandidat yang engine belum kunci digambar **tajam dan penuh** —
+# cincin Saturnus, pita Jupiter, warna spektral bintang — tepat di samping
+# lencana "Ragu". Itu persis yang dilarang PRD: keyakinan palsu. Dan Matahari
+# kehilangan coronanya, karena piringan selebar frame memotong halo di tepi.
+#
+# Kenapa aturan lain tidak menangkapnya, dan itu bukan kelalaian:
+#
+#   Aturan 50/51/60  menjaga **cabang** yang memutuskan menyamar
+#                    (`UncertainBlur.allows`, `if !isConfirmed`) — bukan
+#                    **pemasangan** hasilnya.
+#   Aturan 63        menjaga **angka** samaran, bukan pemasangannya.
+#   Aturan 15        menjaga `guard NightMode.isOn`, bukan `guard isConfirmed`.
+#   Aturan 64        menjaga `diameter:` pemanggil, bukan rantai modifier.
+#
+# Keempatnya hijau pada kode yang tidak menyamar sama sekali. Itu kelas
+# "gerbang mengukur salinan, bukan yang dipakai" yang sudah berulang di repo
+# ini.
+#
+# Yang diperiksa karena itu bukan "apakah ada angka 0.06 di berkas":
+#
+#   (1) Setiap `.opacity(` dan `.blur(` di **rantai samaran** (antara
+#       `drawingGroup` dan `accessibilityHidden`) wajib menyebut `isConfirmed`
+#       di argumennya. Rantainya dibatasi supaya gradien di dalam kanvas
+#       (yang punya puluhan `.opacity`) tidak ikut dituduh.
+#   (2) Cabang `.sun` wajib memanggil `drawSun` dengan radius yang menyebut
+#       `sunCoronaReach`, dan `let reach` di `drawSun` wajib berasal dari
+#       konstanta yang sama. Kalau piringan memenuhi frame, corona terpotong.
+#
+# Fail-closed: kalau rantai samaran tidak ditemukan, atau jumlah situsnya
+# kurang dari dua, aturan MEMERAH — bukan diam dan lulus. Rantai yang tidak
+# terbaca berarti sapuannya berhenti bekerja (nama modifier berubah, berkas
+# dipindah), dan gerbang yang gagal-terbuka lebih buruk daripada tidak ada.
+echo
+echo "== Aturan 80: samaran ragu terpasang pada gambar, corona menyusut =="
+samaran_terpasang=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+VIEW = os.path.join("Apps", "Shared", "CelestialVisualView.swift")
+
+MASALAH = []
+
+
+def tanpa_komentar(teks):
+    """Buang komentar, jaga isi string.
+
+    Sama seperti Aturan 63. Di sini itu bukan teori: baris yang dicari
+    (`radius: radius / CGFloat(VisualFrame.sunCoronaReach)`) juga muncul di
+    dalam komentar tepat di atasnya. Gerbang yang bisa dipuaskan dengan
+    mengomentari kode akan dipuaskan dengan mengomentari kode.
+    """
+    hasil = []
+    i = 0
+    n = len(teks)
+    while i < n:
+        dua = teks[i:i + 2]
+        if dua == "//":
+            j = teks.find("\n", i)
+            if j < 0:
+                break
+            hasil.append(" " * (j - i))
+            i = j
+        elif dua == "/*":
+            j = teks.find("*/", i + 2)
+            if j < 0:
+                break
+            hasil.append(" " * (j + 2 - i))
+            i = j + 2
+        else:
+            hasil.append(teks[i])
+            i += 1
+    return "".join(hasil)
+
+
+def sampai_tutup(kode, buka):
+    """Teks di dalam kurung yang dibuka di indeks `buka`, atau None."""
+    kedalaman = 0
+    for j in range(buka, len(kode)):
+        if kode[j] == "(":
+            kedalaman += 1
+        elif kode[j] == ")":
+            kedalaman -= 1
+            if kedalaman == 0:
+                return kode[buka + 1:j]
+    return None
+
+
+try:
+    asli = open(VIEW, encoding="utf-8").read()
+except OSError as galat:
+    print("TIDAK TERBACA: %s (%s)" % (VIEW, galat))
+    raise SystemExit(0)
+
+kode = tanpa_komentar(asli)
+
+# ── (1) Rantai samaran: opacity dan blur wajib membaca keyakinan ─────────────
+AWAL = ".drawingGroup(opaque: false, colorMode: .linear)"
+AKHIR = ".accessibilityHidden(true)"
+
+awal = kode.find(AWAL)
+akhir = kode.find(AKHIR, awal if awal >= 0 else 0)
+if awal < 0 or akhir < 0 or akhir <= awal:
+    MASALAH.append(
+        "  rantai samaran (drawingGroup -> accessibilityHidden) tidak "
+        "ditemukan di %s.\n"
+        "    Aturan 80 tidak bisa memeriksa apa pun, jadi ia memerah. "
+        "Kalau bentuknya memang berubah, pindahkan jangkarnya." % VIEW)
+    rantai = ""
+else:
+    rantai = kode[awal:akhir]
+
+if rantai:
+    situs = 0
+    for nama, pola in (("opacity", r"\.opacity\("),
+                       ("blur", r"\.blur\(radius:")):
+        for m in re.finditer(pola, rantai):
+            buka = rantai.find("(", m.start())
+            isi = sampai_tutup(rantai, buka)
+            situs += 1
+            if isi is None or "isConfirmed" not in isi:
+                MASALAH.append(
+                    "  %s: `.%s` di rantai samaran tidak membaca "
+                    "`isConfirmed`.\n"
+                    "    Kandidat yang engine belum kunci lalu digambar "
+                    "tajam dan penuh di samping lencana Ragu -- keyakinan "
+                    "palsu, persis yang dilarang PRD." % (VIEW, nama))
+
+    if situs < 2:
+        MASALAH.append(
+            "  %s: hanya %d situs samaran terbaca di rantai itu, minimal 2 "
+            "(opacity dan blur).\n"
+            "    Jumlah yang mengecil berarti sapuannya berhenti bekerja, "
+            "bukan berarti samarannya benar." % (VIEW, situs))
+
+# ── (2) Corona Matahari: piringan menyusut, jangkauan dari konstanta ─────────
+m_sun = re.search(r"case \.sun:", kode)
+if m_sun is None:
+    MASALAH.append(
+        "  %s: cabang `case .sun` tidak ditemukan.\n"
+        "    Aturan 80 tidak bisa memeriksa corona, jadi ia memerah." % VIEW)
+else:
+    ekor = kode[m_sun.end():]
+    lanjut = re.search(r"\n\s*case ", ekor)
+    badan = ekor[:lanjut.start()] if lanjut else ekor
+    p = badan.find("drawSun(")
+    if p < 0:
+        MASALAH.append(
+            "  %s: cabang `.sun` tidak memanggil `drawSun(`.\n"
+            "    Tanpa panggilan itu tidak ada corona yang bisa diperiksa."
+            % VIEW)
+    else:
+        isi = sampai_tutup(badan, p + len("drawSun"))
+        if isi is None or "sunCoronaReach" not in isi:
+            MASALAH.append(
+                "  %s: `drawSun` dipanggil dengan radius yang tidak "
+                "menyusut oleh `sunCoronaReach`.\n"
+                "    Piringan lalu memenuhi frame, Canvas memotong corona, "
+                "dan yang tampak kembali jadi disk terang tanpa glow."
+                % VIEW)
+
+f = kode.find("func drawSun(")
+if f < 0:
+    MASALAH.append(
+        "  %s: `func drawSun(` tidak ditemukan.\n"
+        "    Aturan 80 tidak bisa memeriksa jangkauan corona." % VIEW)
+else:
+    r = re.search(r"let reach = ([^\n]+)", kode[f:])
+    if r is None or "sunCoronaReach" not in r.group(1):
+        MASALAH.append(
+            "  %s: `let reach` di `drawSun` tidak berasal dari "
+            "`sunCoronaReach`.\n"
+            "    Jangkauan corona lalu sama dengan radius, jadi halonya "
+            "hilang di tepi frame." % VIEW)
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    # Exit code **dan** keluaran sama-sama menyala. Shell di bawah memutuskan
+    # dari keluaran (`-n`), dan harness memutuskan dari exit code; kalau
+    # keduanya tidak sepakat, salah satu dari mereka akan melaporkan "diam"
+    # atas gerbang yang justru berbunyi. Itu sempat terjadi di harness ini.
+    raise SystemExit(1)
+PY
+)
+if printf '%s' "$samaran_terpasang" | grep -q "Traceback"; then
+  echo "Pemeriksaan Aturan 80 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  echo "$samaran_terpasang"
+  status=1
+elif [ -n "$samaran_terpasang" ]; then
+  echo "$samaran_terpasang"
+  echo "-> Samaran ragu wajib benar-benar terpasang pada gambar, dan corona"
+  echo "   Matahari wajib menyusut agar tidak terpotong frame."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+else
+  echo "Bersih: opacity dan blur di rantai samaran membaca isConfirmed, dan"
+  echo "        corona Matahari menyusut lewat sunCoronaReach."
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

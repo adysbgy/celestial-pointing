@@ -532,8 +532,111 @@ final class NightVisualTests: XCTestCase {
                           "kontrol: Betelgeuse dan Aldebaran berbeda di siang hari")
     }
 
-    // MARK: - Cekungan kawah Merkurius
+    // MARK: - Terang bintang di mode malam
 
+    /// Bintang paling terang dan paling redup harus **tetap berbeda** di mode
+    /// malam.
+    ///
+    /// **Kelas cacat yang dijaga.** Rumus kecerahan bintang dulu ditulis
+    /// langsung di `CelestialVisualView.starColor`. Seluruh 79 aturan UI tetap
+    /// hijau ketika rumus itu diganti tetapan `0.9` — terukur, exit 0 — dan
+    /// akibatnya setiap bintang menjadi satu titik merah yang sama persis,
+    /// dari Sirius (magnitudo −1.46) sampai bintang magnitudo 4. Mode malam
+    /// memang membuang hue; terang adalah satu-satunya informasi yang
+    /// tersisa, jadi membuangnya berarti menghapus bintang yang berbeda
+    /// terangnya.
+    ///
+    /// **Kenapa diukur lewat `NightVisual`, bukan lewat view.** `Apps/` tidak
+    /// pernah dibangun di Linux, jadi tidak ada uji runtime yang bisa melihat
+    /// warnanya. Yang bisa diuji adalah aturan warnanya — dan aturan itu
+    /// sekarang tinggal di sini, satu-satunya tempat ia boleh ditulis.
+    ///
+    /// **Non-vakuositas.** Kontrol negatif memastikan ukuran relatifnya
+    /// memang berbeda sebelum dipetakan; tanpa itu, "berbeda di malam hari"
+    /// bisa benar hanya karena `starBrightness` mengabaikan argumennya dan
+    /// kedua pemanggil kebetulan memberi angka yang sama.
+    func testNightStarBrightnessKeepsTheMagnitudeOrdering() {
+        // Sirius (magnitudo -1.46) vs bintang redup (magnitudo 4.0).
+        let terang = NightVisual.starBrightness(relativeSize: 1.0)
+        let redup = NightVisual.starBrightness(relativeSize: 0.1)
+
+        XCTAssertGreaterThan(terang, redup,
+                             "bintang terang dan redup menjadi merah yang sama "
+                             + "di mode malam — terang adalah satu-satunya "
+                             + "informasi yang tersisa setelah hue dibuang")
+
+        // Seluruh rentang harus **bergerak**, bukan dataran di ujung mana pun.
+        let semua = stride(from: 0.0, through: 1.0, by: 0.1)
+            .map { NightVisual.starBrightness(relativeSize: $0) }
+        for (a, b) in zip(semua, semua.dropFirst()) {
+            XCTAssertGreaterThan(b, a,
+                                 "kecerahan malam datar di \(a) -> \(b); "
+                                 + "selisih terang hilang")
+        }
+
+        // Kontrol negatif: masukannya memang berbeda.
+        XCTAssertNotEqual(1.0, 0.1)
+    }
+
+    /// Titik bintang di mode malam harus **merah murni** dan tidak boleh
+    /// memampat di sepanjang rentang yang benar-benar dipakai katalog.
+    ///
+    /// **Batas atas 0,982 itu terukur, bukan tebakan.** `sizeFromMagnitude`
+    /// memberi Sirius (magnitudo −1.46) ukuran 0,982 — bintang paling besar
+    /// di katalog 25 bintang repo ini. Nilai 1,0 hanya tercapai oleh bintang
+    /// magnitudo ≤ −1,5, dan tidak ada satu pun di katalog. Di bawah 1,0
+    /// pemetaan `0,35 + 0,65·x` masih menyisakan ruang, jadi dua bintang
+    /// berbeda terangnya tetap berbeda merahnya.
+    ///
+    /// **Kenapa 1,0 tidak diuji.** Di 1,0 kanal merahnya memang tepat 1,0 —
+    /// itu ujung matematis rentangnya, bukan cacat. Yang berbahaya adalah
+    /// **memampat sebelum ujung**: kalau rumusnya diganti tetapan, dua bintang
+    /// berbeda menjadi merah yang sama jauh sebelum batas ini, dan itulah yang
+    /// ditangkap uji pertama di atas.
+    func testNightStarIsPureRedAndNeverCompressesAcrossTheCatalogue() {
+        for langkah in stride(from: 0.0, through: 0.982, by: 0.05) {
+            let warna = NightVisual.star(langkah)
+            XCTAssertEqual(warna.green, 0,
+                           "hijau \(warna.green) pada relativeSize \(langkah)")
+            XCTAssertEqual(warna.blue, 0,
+                           "biru \(warna.blue) pada relativeSize \(langkah)")
+            XCTAssertLessThan(warna.red, 1.0,
+                              "kanal merah memampat di relativeSize \(langkah)")
+            XCTAssertGreaterThanOrEqual(warna.red, NightVisual.floorBrightness,
+                                        "bintang menghilang ke latar di "
+                                        + "relativeSize \(langkah)")
+        }
+
+        // Ujung atas yang sebenarnya dipakai katalog, diperiksa terpisah.
+        XCTAssertEqual(NightVisual.star(0.982).red, 0.9883, accuracy: 1e-4,
+                       "Sirius harus menjadi merah paling terang di katalog")
+    }
+
+    /// Skala ukuran bintang **memang menjepit** di 1,0, dan itu harus
+    /// disadari, bukan ditutupi.
+    ///
+    /// `sizeFromMagnitude` berakhir `min(1, max(0.15, raw))`, jadi setiap
+    /// magnitudo ≤ −1,5 menghasilkan ukuran yang sama persis. Di katalog
+    /// sekarang tidak ada bintang seperti itu (Sirius, −1,46, adalah yang
+    /// paling terang), jadi jepitan itu belum merugikan. Uji ini mengunci dua
+    /// hal sekaligus: bahwa Sirius **belum** terjepit, dan bahwa jepitannya
+    /// memang ada — supaya kalau suatu hari katalog memasukkan bintang
+    /// magnitudo ≤ −1,5, perilakunya adalah keputusan sadar, bukan kejutan
+    /// yang muncul sebagai dua titik identik di mode malam.
+    func testStarSizeScaleClampsAndTheCatalogueStaysBelowIt() {
+        XCTAssertLessThan(CelestialVisual.sizeFromMagnitude(-1.46), 1.0,
+                          "Sirius, bintang paling terang di katalog, harus "
+                          + "masih di bawah jepitan")
+
+        // Jepitan itu nyata: dua magnitudo berbeda berakhir sama.
+        XCTAssertEqual(CelestialVisual.sizeFromMagnitude(-2.0),
+                       CelestialVisual.sizeFromMagnitude(-3.0),
+                       "kontrol: skala memang menjepit di 1,0")
+        XCTAssertEqual(CelestialVisual.sizeFromMagnitude(-1.5), 1.0,
+                       "kontrol: tepat di -1,5 skala menyentuh 1,0")
+    }
+
+    // MARK: - Cekungan kawah Merkurius
     /// `craterRim` harus **lebih terang** dari `craterFloor`, di kedua mode.
     ///
     /// **Kenapa uji ini ada, padahal gerbang port sudah memeriksanya.**
