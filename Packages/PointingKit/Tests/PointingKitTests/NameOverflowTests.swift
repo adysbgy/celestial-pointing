@@ -607,4 +607,92 @@ final class NameOverflowTests: XCTestCase {
         }
         return nil
     }
+
+    // MARK: - Daftar acuan kalibrasi
+
+    /// Baris daftar acuan kalibrasi memakai `lineLimit(2)` **tetap** sampai
+    /// siklus ini, sementara kartu jam, layar Always-On, dan panel iPhone sudah
+    /// tumbuh. Tes ini menangkap cacatnya pada bentuk yang lama.
+    func testCalibrationRowTruncatesWithAFixedLineLimit() {
+        let floor = ObjectCardLayout.calibrationScaleFloor
+        let column = ObjectCardLayout.calibrationNameColumn
+        let width = ObjectCardLayout.calibrationNameWidthReference
+
+        // Bentuk lama: 2 baris tetap. Ia benar sampai AX2, lalu gagal.
+        XCTAssertEqual(NameOverflow.firstFailingSize(
+            widthAtDefault: width, columnWidth: column,
+            lineLimit: 2, floor: floor),
+            .accessibility3,
+            "baris acuan dengan 2 baris tetap gagal mulai AX3")
+        XCTAssertEqual(ObjectCardLayout.calibrationLineLimit(at: .large), 2,
+                       "pada ukuran bawaan bentuknya tidak berubah")
+    }
+
+    /// Dan dengan baris yang tumbuh, **setiap** ukuran muat.
+    ///
+    /// Ini yang membuat perbaikannya berarti: bukan "AX3 lolos", melainkan
+    /// seluruh rentang. `AX5` butuh 4 baris — dua kali bentuk lama.
+    func testCalibrationRowFitsAtEveryDynamicTypeSize() {
+        for size in NameOverflow.TextSize.allCases {
+            let lines = ObjectCardLayout.calibrationLineLimit(at: size)
+            let fit = NameOverflow.fit(
+                widthAtDefault: ObjectCardLayout.calibrationNameWidthReference,
+                columnWidth: ObjectCardLayout.calibrationNameColumn,
+                lineLimit: lines,
+                floor: ObjectCardLayout.calibrationScaleFloor)
+            XCTAssertNotNil(fit.largestFittingScale,
+                            "\(size.shortName): nama terlebar harus muat "
+                            + "dengan \(lines) baris")
+            XCTAssertTrue(ObjectCardLayout.calibrationNameFits(at: size),
+                          "\(size.shortName): predikat muat harus setuju")
+        }
+        XCTAssertEqual(ObjectCardLayout.calibrationLineLimit(at: .accessibility5), 4)
+    }
+
+    /// Lebar acuan **diturunkan dari font yang benar-benar dipakai**, bukan
+    /// dari lebar `.title3` yang dipakai permukaan lain.
+    ///
+    /// Memakai 233.22 (20 pt) di sini akan menuntut satu baris lebih banyak
+    /// daripada yang perlu pada setiap ukuran — aman, tetapi menyembunyikan
+    /// bahwa ambangnya salah. Selisihnya 25%, jauh di atas toleransi mana pun.
+    func testCalibrationReferenceWidthComesFromTheSubheadlineFont() {
+        XCTAssertEqual(ObjectCardLayout.calibrationNameWidthReference,
+                       Self.widestNameWidth * 15 / 20,
+                       accuracy: 0.15,
+                       "174.86 pt = nama terlebar pada 15 pt")
+        XCTAssertLessThan(ObjectCardLayout.calibrationNameWidthReference,
+                          ObjectCardLayout.nameWidthReference,
+                          "subheadline lebih sempit daripada title3")
+    }
+
+    /// View benar-benar memakai modelnya, dan tidak kembali ke angka tetap.
+    ///
+    /// Gerbang yang tidak membaca view akan hijau pada view yang sudah
+    /// diperbaiki maupun yang belum.
+    func testCalibrationViewReadsTheGrownLineLimit() throws {
+        guard let view = Self.calibrationSource() else {
+            throw XCTSkip("CalibrationView.swift tidak ditemukan dari tes ini")
+        }
+        XCTAssertTrue(view.contains("calibrationLineLimit(at:"),
+                      "baris acuan wajib memakai lineLimit yang tumbuh")
+        XCTAssertTrue(view.contains("dynamicTypeSize"),
+                      "view wajib membaca ukuran huruf yang berlaku")
+        XCTAssertTrue(view.contains("calibrationNameColumn")
+                      || view.contains("calibrationScaleFloor"),
+                      "lantai/kolom wajib datang dari model, bukan angka di view")
+    }
+
+    /// Sumber `CalibrationView.swift`, dicari ke atas dari berkas tes ini.
+    private static func calibrationSource() -> String? {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<6 {
+            dir.deleteLastPathComponent()
+            let candidate = dir
+                .appendingPathComponent("Apps/PointAndKnowWatch/Sources/CalibrationView.swift")
+            if let text = try? String(contentsOf: candidate, encoding: .utf8) {
+                return text
+            }
+        }
+        return nil
+    }
 }

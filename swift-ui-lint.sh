@@ -13758,6 +13758,130 @@ else
 fi
 
 
+# -- Aturan 79: baris acuan kalibrasi wajib tumbuh bersama Dynamic Type -------
+# Cacatnya terukur. Aturan 76 menuntut setiap nama objek punya **kebijakan
+# luapan**, dan `CalibrationView` memenuhinya dengan `.lineLimit(2)` tetap --
+# jadi Aturan 76 hijau, dan memang benar: ada kebijakan. Yang tidak pernah
+# dituntut siapa pun adalah kebijakan itu **bertahan saat hurufnya membesar**.
+# Tiga permukaan lain (kartu jam, Always-On, panel iPhone) sudah dibuat tumbuh
+# di siklus sebelumnya; baris acuan kalibrasi tertinggal.
+#
+# Terukur (DejaVu Sans Bold 15 pt = `.subheadline`, nama terlebar katalog
+# "Gugus Sarang Lebah" 174.86 pt, kolom nama 120 pt, lantai 0.7):
+#
+#     ukuran   skala   2 baris butuh   hasil
+#     large    1.00       1.373         muat
+#     AX2      1.95       0.704         muat (sisa 0.004 -- pas)
+#     AX3      2.31       0.594         TERPOTONG
+#     AX5      3.12       0.440         TERPOTONG
+#
+# Jadi dengan 2 baris tetap, nama terpotong mulai AX3. Daftar acuan adalah
+# layar yang dipakai **di lapangan, sambil berdiri, sering dengan kacamata** --
+# persis pengguna yang memilih huruf besar. Yang hilang bukan hiasan: katalog
+# ini punya "Galaksi Kincir Angin" / "Galaksi Andromeda" / "Galaksi
+# Triangulum", sehingga elipsis memotong tepat kata pembedanya.
+#
+# Kenapa gerbangnya memeriksa bentuk, bukan menjalankan uji: `Apps/` tidak
+# pernah dibangun di Linux, jadi tidak ada uji runtime yang bisa melihat tata
+# letak SwiftUI. Aritmetikanya diuji di `NameOverflowTests` (Linux); di sini
+# yang diperiksa adalah apakah view benar-benar memakai hasilnya.
+echo "== Aturan 79: baris acuan kalibrasi tumbuh bersama Dynamic Type =="
+acuan_tumbuh=$(python3 - <<'PY3' 2>&1
+import io
+import os
+
+CAL = os.path.join("Apps", "PointAndKnowWatch", "Sources", "CalibrationView.swift")
+MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
+                     "NameOverflow.swift")
+TESTS = os.path.join("Packages", "PointingKit", "Tests", "PointingKitTests",
+                     "NameOverflowTests.swift")
+
+masalah = []
+
+for path in (CAL, MODEL, TESTS):
+    if not os.path.exists(path):
+        masalah.append("  %s tidak ditemukan -- Aturan 79 tidak mengukur apa pun."
+                       % path)
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(0)
+
+view = io.open(CAL, encoding="utf-8").read()
+model = io.open(MODEL, encoding="utf-8").read()
+uji = io.open(TESTS, encoding="utf-8").read()
+
+# (1) View wajib membaca ukuran huruf yang berlaku.
+if "dynamicTypeSize" not in view:
+    masalah.append(
+        "  %s: tidak membaca `dynamicTypeSize`.\n"
+        "    Baris acuan memakai jumlah baris yang sama untuk semua pengguna,\n"
+        "    jadi nama terpotong begitu hurufnya diperbesar." % CAL)
+
+# (2) Jumlah baris wajib datang dari model, bukan angka di view.
+if "calibrationLineLimit(at:" not in view:
+    masalah.append(
+        "  %s: `lineLimit` baris acuan tidak ikut tumbuh.\n"
+        "    Nama terlebar butuh 0.594 pada AX3 sementara lantainya 0.7 --\n"
+        "    dengan 2 baris tetap nama terpotong mulai AX3." % CAL)
+
+# (3) Lantai skala wajib konstanta bersama, bukan angka yang ditulis ulang.
+#     Rumus baris di model memakai lantai ini; dua salinan angka adalah dua
+#     kesempatan berbeda pendapat.
+if "calibrationScaleFloor" not in view:
+    masalah.append(
+        "  %s: lantai skala tidak memakai konstanta bersama.\n"
+        "    Angka 0.7 yang ditulis ulang di view tidak bisa ditahan uji mana\n"
+        "    pun, dan rumus baris di model memakai angka itu." % CAL)
+
+# (4) Angka tetap 2 tidak boleh kembali. Ini probe yang membuat aturan ini
+#     bisa merah: bentuk lama persis `.lineLimit(2)` pada nama acuan.
+if ".lineLimit(2)" in view:
+    masalah.append(
+        "  %s: masih ada `.lineLimit(2)` tetap.\n"
+        "    Itu bentuk yang membuat nama terpotong mulai AX3." % CAL)
+
+# (5) Model wajib menyatakan kolom, lantai, dan lebar acuannya -- kalau salah
+#     satunya hilang, tesnya tidak bisa memeriksa apa pun.
+for konstanta in ("calibrationNameColumn", "calibrationScaleFloor",
+                  "calibrationNameWidthReference", "calibrationLineLimit",
+                  "calibrationNameFits"):
+    if konstanta not in model:
+        masalah.append(
+            "  %s: tidak menyatakan `%s`.\n"
+            "    Ambang yang hanya ada di view tidak bisa diuji dari Linux."
+            % (MODEL, konstanta))
+
+# (6) Uji wajib menguji seluruh rentang, bukan satu ukuran.
+if "testCalibrationRowFitsAtEveryDynamicTypeSize" not in uji:
+    masalah.append(
+        "  %s: tidak menguji baris acuan di setiap ukuran teks.\n"
+        "    Satu ukuran yang diuji tidak membuktikan ukuran lain." % TESTS)
+if "testCalibrationRowTruncatesWithAFixedLineLimit" not in uji:
+    masalah.append(
+        "  %s: tidak menangkap bentuk lamanya.\n"
+        "    Uji yang hanya memeriksa bentuk baru tidak membuktikan cacatnya\n"
+        "    pernah ada, dan tidak bisa merah kalau cacatnya kembali." % TESTS)
+
+if masalah:
+    print("\n".join(masalah))
+PY3
+)
+if printf '%s' "$acuan_tumbuh" | grep -q "Traceback"; then
+  echo "Pemeriksaan Aturan 79 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  echo "$acuan_tumbuh"
+  status=1
+elif [ -n "$acuan_tumbuh" ]; then
+  echo "$acuan_tumbuh"
+  echo "-> Baris acuan kalibrasi wajib tumbuh bersama Dynamic Type,"
+  echo "   dan angka barisnya wajib datang dari model teruji."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+else
+  echo "Bersih: baris acuan kalibrasi membaca dynamicTypeSize, jumlah barisnya"
+  echo "        dari model, dan seluruh rentang ukuran diuji."
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

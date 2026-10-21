@@ -35,6 +35,44 @@ struct CalibrationView: View {
     /// penanda bersama akan membuat salah satu pengumuman menelan yang lain.
     @State private var announcedLinkNote: String?
 
+    /// Ukuran huruf yang sedang berlaku, untuk memutuskan berapa baris nama
+    /// acuan butuhkan.
+    ///
+    /// Baris acuan dulu memakai `lineLimit(2)` **tetap** — satu-satunya
+    /// permukaan nama di app yang tidak tumbuh, setelah kartu jam, layar
+    /// Always-On, dan panel iPhone semuanya diperbaiki. Terukur: nama terlebar
+    /// katalog di `.subheadline` (174.86 pt) butuh susut 0.594 pada AX3
+    /// sementara lantainya 0.7, jadi "Gugus Sarang Lebah" menjadi
+    /// "Gugus Sarang…" mulai AX3. Aturan 76 tetap hijau di sana karena ia
+    /// hanya menuntut *adanya* kebijakan luapan, bukan yang bertahan saat
+    /// huruf membesar.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// Pemetaan lewat `switch`, bukan interpolasi string: `"\(dynamicTypeSize)"`
+    /// menghasilkan `"accessibility1"` sementara tabel skala memakai `"AX1"`,
+    /// sehingga setiap ukuran aksesibilitas akan jatuh ke cabang cadangan tanpa
+    /// satu pun galat. Di sini kasus SwiftUI baru memaksa keputusan.
+    private var textSize: NameOverflow.TextSize {
+        switch dynamicTypeSize {
+        case .xSmall: return .xSmall
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
+        case .xLarge: return .xLarge
+        case .xxLarge: return .xxLarge
+        case .xxxLarge: return .xxxLarge
+        case .accessibility1: return .accessibility1
+        case .accessibility2: return .accessibility2
+        case .accessibility3: return .accessibility3
+        case .accessibility4: return .accessibility4
+        case .accessibility5: return .accessibility5
+        @unknown default:
+            // Ukuran yang belum dikenal Apple: pakai yang terbesar, karena arah
+            // kelalaian yang salah di sini adalah memberi baris terlalu sedikit.
+            return .accessibility5
+        }
+    }
+
     var body: some View {
         NightAwareContainer {
             calibrationContent
@@ -284,8 +322,19 @@ struct CalibrationView: View {
                                     // "Galaksi Kincir Angin" di sini akan
                                     // mendorong tinggi langit di bawahnya
                                     // keluar dari baris tombol. Dijaga Aturan 76.
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.7)
+                                    //
+                                    // **`lineLimit` ikut tumbuh**, bukan 2
+                                    // tetap. Nama terlebar butuh 0.594 pada
+                                    // AX3 sementara lantainya 0.7, jadi
+                                    // dengan 2 baris tetap nama itu terpotong
+                                    // mulai AX3 — sementara kartu jam, Always-On,
+                                    // dan panel iPhone semuanya sudah tumbuh.
+                                    // Angka barisnya datang dari model teruji
+                                    // (`ObjectCardLayout.calibrationLineLimit`),
+                                    // bukan dari ambang yang ditulis di sini:
+                                    // ambang di view tidak bisa diuji dari Linux.
+                                    .lineLimit(ObjectCardLayout.calibrationLineLimit(at: textSize))
+                                    .minimumScaleFactor(ObjectCardLayout.calibrationScaleFloor)
                                 Text(CalibrationText.captureAltitudeDisplay(
                                                 altitudeDeg: target.direction.altitudeDeg))
                                     .font(.caption2)

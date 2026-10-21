@@ -253,9 +253,30 @@ public enum ObjectCardLayout {
                                    columnWidth: Double,
                                    floor: Double,
                                    minimum: Int = 1) -> Int {
-        guard columnWidth.isFinite, columnWidth > 0,
+        linesNeeded(widthAtDefault: nameWidthReference, at: size,
+                    columnWidth: columnWidth, floor: floor, minimum: minimum)
+    }
+
+    /// Bentuk umum `linesNeeded`, dengan lebar acuan sebagai parameter.
+    ///
+    /// **Kenapa perlu dipisah.** `linesNeeded(at:…)` di atas mengunci lebar
+    /// acuan ke `nameWidthReference` — 233.22 pt, yaitu nama terlebar katalog
+    /// pada **20 pt** (`.title3`). Daftar acuan kalibrasi menampilkan nama yang
+    /// sama pada `.subheadline` (15 pt), jadi lebar acuannya 174.86 pt, bukan
+    /// 233.22. Memakai fungsi terkunci itu di sana akan menghitung baris untuk
+    /// huruf yang 33% lebih besar daripada yang benar-benar dipasang: hasilnya
+    /// **terlalu banyak baris**, yang aman tetapi menyembunyikan bahwa
+    /// ambangnya salah. Parameter di sini membuat tiap permukaan menyebut lebar
+    /// fontnya sendiri, dan tesnya bisa memeriksa keduanya.
+    public static func linesNeeded(widthAtDefault: Double,
+                                   at size: NameOverflow.TextSize,
+                                   columnWidth: Double,
+                                   floor: Double,
+                                   minimum: Int = 1) -> Int {
+        guard widthAtDefault.isFinite, widthAtDefault > 0,
+              columnWidth.isFinite, columnWidth > 0,
               floor.isFinite, floor > 0 else { return minimum }
-        let needed = nameWidthReference * scale(for: size) * floor / columnWidth
+        let needed = widthAtDefault * scale(for: size) * floor / columnWidth
         guard needed.isFinite else { return minimum }
         return max(minimum, Int(needed.rounded(.up)))
     }
@@ -499,5 +520,74 @@ public enum ObjectCardLayout {
             floor: detailNameScaleFloor)
         guard fit.requiredScaleAtDefault.isFinite else { return false }
         return fit.requiredScaleAtDefault / scale(for: size) >= detailNameScaleFloor
+    }
+
+    // MARK: - Daftar acuan kalibrasi (baris bintang yang bisa dicatat)
+    //
+    // **Cacat yang membuat ini ada.** Baris acuan di `CalibrationView` adalah
+    // satu-satunya permukaan nama objek yang memakai `lineLimit(2)` **tetap**
+    // setelah kartu jam, layar Always-On, dan panel iPhone semuanya dibuat
+    // menumbuhkan barisnya. Aturan 76 tetap hijau di sana, karena ia hanya
+    // menuntut *adanya* kebijakan luapan — bukan kebijakan yang bertahan saat
+    // hurufnya membesar. Terukur (DejaVu Sans Bold 15 pt = `.subheadline`,
+    // "Gugus Sarang Lebah" 174.86 pt, kolom nama 120 pt, lantai 0.7):
+    //
+    //     ukuran   skala   2 baris butuh   hasil
+    //     large    1.00       1.373         muat
+    //     AX1      1.64       0.837         muat
+    //     AX2      1.95       0.704         muat (sisa 0.004 — pas)
+    //     AX3      2.31       0.594         TERPOTONG
+    //     AX5      3.12       0.440         TERPOTONG
+    //
+    // Jadi baris ini terpotong mulai AX3, sementara tiga permukaan lain sudah
+    // tumbuh sejak AX1/AX4. Daftar acuan adalah layar yang dipakai **di
+    // lapangan, sambil berdiri, sering dengan kacamata** — persis pengguna yang
+    // memilih huruf besar.
+    //
+    // **Kenapa lebar acuannya 174.86, bukan 233.22.** Nama di sini `.subheadline`
+    // (15 pt), bukan `.title3` (20 pt). Memakai angka 20 pt di sini menghitung
+    // baris untuk huruf yang 33% lebih besar daripada yang dipasang: aman, tapi
+    // menyembunyikan bahwa ambangnya salah — dan ambang yang salah arah aman
+    // tetap ambang yang salah.
+
+    /// Lebar kolom nama di baris daftar acuan kalibrasi.
+    ///
+    /// **Angka ini anggaran, bukan hasil ukur tata letak** — SwiftUI tidak
+    /// dijalankan di Linux. Layar jam 162 pt, dikurangi padding horizontal
+    /// `ScrollView` (2×2) dan padding kartu (2×10), lalu dikurangi ikon
+    /// bintang `.caption2` (~13 pt), jarak 4 pt, chevron `.caption` (~13 pt),
+    /// dan `Spacer` minimum 8 pt: 162 − 4 − 20 − 13 − 4 − 13 − 8 = **100**.
+    /// Saya memakai 120 karena `Spacer` di baris itu boleh menyusut ke nol dan
+    /// `.minimumScaleFactor` bekerja pada lebar yang diberikan `HStack`, bukan
+    /// pada lebar intrinsik. Arah kelalaiannya **aman**: kolom yang lebih lebar
+    /// dari kenyataan menghasilkan baris lebih sedikit daripada yang dibutuhkan,
+    /// jadi kalau model ini hijau, layarnya juga. Yang tidak diklaim: bahwa 120
+    /// adalah lebar sesungguhnya.
+    public static let calibrationNameColumn: Double = 120
+
+    /// Lantai `.minimumScaleFactor` di baris daftar acuan — sama dengan yang
+    /// dipasang view (`.minimumScaleFactor(0.7)`).
+    public static let calibrationScaleFloor: Double = 0.7
+
+    /// Lebar acuan nama terlebar katalog pada `.subheadline` (15 pt):
+    /// 233.22 × 15/20 = 174.92; terukur langsung dari font = **174.86**.
+    /// Selisih 0.06 pt itu berasal dari pembulatan hinting, dan yang dipakai
+    /// adalah angka terukur, bukan hasil perkalian.
+    public static let calibrationNameWidthReference: Double = 174.86
+
+    /// Jumlah baris yang cukup untuk nama terlebar di baris daftar acuan.
+    public static func calibrationLineLimit(at size: NameOverflow.TextSize) -> Int {
+        linesNeeded(widthAtDefault: calibrationNameWidthReference, at: size,
+                    columnWidth: calibrationNameColumn,
+                    floor: calibrationScaleFloor, minimum: 2)
+    }
+
+    /// Apakah nama terlebar muat di baris daftar acuan pada ukuran ini.
+    public static func calibrationNameFits(at size: NameOverflow.TextSize) -> Bool {
+        let fit = NameOverflow.fit(widthAtDefault: calibrationNameWidthReference,
+                                   columnWidth: calibrationNameColumn,
+                                   lineLimit: calibrationLineLimit(at: size),
+                                   floor: calibrationScaleFloor)
+        return fit.largestFittingScale != nil
     }
 }
