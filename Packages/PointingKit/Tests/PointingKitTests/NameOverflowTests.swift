@@ -531,6 +531,38 @@ final class NameOverflowTests: XCTestCase {
                        ObjectCardLayout.detailVisualBaseDiameter, accuracy: 0.001)
     }
 
+    /// Panel detail tidak boleh **melebih-lebihkan** lebar yang tersedia.
+    ///
+    /// `detailPanelWidth` sengaja konservatif: ia menganggap padding kartu yang
+    /// tidak dipasang panel ini, jadi lebar nyatanya lebih besar. Arah itu aman
+    /// — gambar menjadi sedikit lebih kecil, bukan nama terpotong.
+    ///
+    /// Uji ini mengunci **arahnya**, bukan angkanya: kalau seseorang "membetulkan"
+    /// 333 menjadi angka yang lebih besar tanpa mengukur inset `List` di
+    /// perangkat, batas gambar ikut naik dan kolom nama menyusut — persis cacat
+    /// yang siklus ini perbaiki.
+    ///
+    /// Lantainya **375 pt**, bukan 320: iOS 18 (deployment target di
+    /// `project.yml`) tidak lagi menjalankan iPhone SE generasi pertama, dan
+    /// perangkat terpendek yang didukung adalah SE generasi kedua — 375 pt.
+    /// Memakai 320 akan menuntut panel lebih sempit daripada yang pernah ada.
+    func testDetailPanelWidthDoesNotOverstateAvailableSpace() {
+        let narrowestScreen: Double = 375
+        let listInset: Double = 16 * 2
+        XCTAssertLessThanOrEqual(
+            ObjectCardLayout.detailPanelWidth,
+            narrowestScreen - listInset,
+            "panel \(ObjectCardLayout.detailPanelWidth) pt lebih lebar daripada "
+            + "layar terpendek yang didukung (\(narrowestScreen) − \(listInset) pt)")
+        // Dan batas gambar harus benar-benar mengikat di AX5 — kalau panel
+        // dinaikkan sampai batasnya tidak lagi mengikat, cacatnya kembali.
+        XCTAssertLessThan(
+            ObjectCardLayout.detailVisualDiameter(at: .accessibility5),
+            ObjectCardLayout.detailVisualBaseDiameter
+                * ObjectCardLayout.scale(for: .accessibility5),
+            "batas harus mengikat di AX5, bukan sekadar ada")
+    }
+
     /// Padding badge di model harus sama dengan padding yang dipasang view.
     ///
     /// Model sempat memakai 10 pt sementara view memasang

@@ -368,8 +368,16 @@ public enum ObjectCardLayout {
     // angka pilihan — ia adalah sisa ruang setelah kolom nama minimum
     // dijamin, jadi ia bergerak kalau panel atau kolom minimumnya berubah.
 
-    /// Lebar isi panel detail iPhone: layar 393 pt − inset `List` bawaan
-    /// 2×16 pt − padding kartu 2×14 pt.
+    /// Lebar isi panel detail iPhone.
+    ///
+    /// **Angka ini sengaja konservatif, dan tidak diklaim tepat.** Rumusnya
+    /// menganggap padding kartu 2×14 pt, sedangkan panel ini sebenarnya baris
+    /// `List` tanpa kartu — jadi lebar nyatanya **lebih besar** daripada 333,
+    /// bukan lebih kecil. Arah kelalaiannya aman: batas gambar jadi lebih
+    /// rendah dan kolom nama lebih lebar daripada yang dimodelkan, sehingga
+    /// yang terjadi di layar adalah gambar sedikit lebih kecil — bukan nama
+    /// terpotong. Angka pastinya bergantung pada inset `List` bawaan iOS yang
+    /// tidak bisa diukur dari Linux, jadi ia tidak ditebak ulang di sini.
     public static let detailPanelWidth: Double = 333
 
     /// Diameter dasar lukisan objek di panel detail, pada `.title2` bawaan.
