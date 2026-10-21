@@ -1860,9 +1860,9 @@ def _draw_bands(canvas, cx, cy, radius, night_mode, palette=None):
         #
         # Yang dilembutkan hanya **warna**, bukan geometri: pusat tiap pita
         # tetap memakai nadanya sendiri persis, sehingga gerbang keterpisahan
-        # pita (`check_band_separation`) mengukur nilai yang sama seperti
-        # sebelumnya. Yang berubah hanya transisi di 18% tinggi pita teratas
-        # dan terbawah.
+        # pita (`check_jupiter_bands_read_as_separate_stripes`) mengukur nilai
+        # yang sama seperti sebelumnya. Yang berubah hanya transisi di 18%
+        # tinggi pita teratas dan terbawah.
         #
         # **Yang TIDAK diklaim.** Ini bukan model atmosfer: tidak ada
         # hamburan, tidak ada tinggi skala, dan tidak ada ketergantungan pada

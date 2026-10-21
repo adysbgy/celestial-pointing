@@ -26,8 +26,8 @@ final class BandFeatherTests: XCTestCase {
     /// Di tengah pita tidak ada pencampuran sama sekali.
     ///
     /// Kalau ini gagal, pita kehilangan nada aslinya dan gerbang
-    /// keterpisahan pita (`check_band_separation`) akan mengukur angka yang
-    /// berbeda dari yang dulu.
+    /// keterpisahan pita (`check_jupiter_bands_read_as_separate_stripes`)
+    /// akan mengukur angka yang berbeda dari yang dulu.
     func testBandCentreIsUntouched() {
         XCTAssertEqual(CelestialVisual.bandFeatherWeight(atFraction: 0.5), 0.0,
                        accuracy: 1e-12)
