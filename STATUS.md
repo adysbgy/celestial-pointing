@@ -1,3 +1,79 @@
+### Siklus (21 Okt 2026 — dua cacat yang hanya terlihat setelah di-push)
+
+Siklus dibuka dengan `git log` + `gh run list` + gerbang, dan pertanyaan
+pertamanya bukan "apa yang belum dibangun" melainkan "apakah `main` benar-benar
+hijau". Jawabannya tidak.
+
+`d5bf654` ada di `git log` lokal tetapi **tidak pernah di-push**. CI yang
+tampak hijau sedang menguji commit sebelumnya, jadi commit itu membawa dua
+cacat yang belum pernah dilihat satu pun gerbang:
+
+  * `Tools/bukti-mutasi-tepi-pita.py` **merah pada pohon yang benar** (2 dari
+    6 keadaan), dan
+  * README mengutip PointingKit **983** sementara berkas uji berisi **992**.
+
+Keduanya kelas yang sama: angka yang ditulis dari ingatan, bukan dari hasil
+ukur. Bedanya, yang kedua sudah punya gerbang (Aturan 10) dan gerbang itu
+menang; yang pertama tidak punya gerbang sama sekali.
+
+#### Cacat 1: satu parameter memikul dua arti
+
+`laporkan(label, hasil, harap_merah, awalan, harap=2)` memakai `harap` sebagai
+**jumlah pemeriksaan yang dikeluarkan gerbangnya**, sementara `harap_merah`
+dibaca sebagai boolean "semua merah". Keadaan 3 dan 5 justru mengharapkan
+**sebagian** merah, jadi keduanya berbunyi:
+
+    SALAH kutipan angka lama    -> 1/2 MERAH (harap 2)
+    SALAH kutipan 76 px dihapus -> 1/2 MERAH (harap 2)
+
+Keadaan 5 hanya menghapus kutipan 76 px; kutipan 200 px masih benar, dan
+menuntut merah di sana berarti menuntut gerbangnya berbunyi tentang angka yang
+**benar** — persis kebalikan dari yang ingin dibuktikan.
+
+Perbaikannya memisahkan tiga besaran yang memang berbeda: `harap` (jumlah
+pemeriksaan), `harap_merah` (hitungan yang wajib merah), dan `merah_wajib`
+(potongan nama yang wajib ada di antara yang merah). Yang ketiga perlu karena
+"1 dari 2 merah" juga terpenuhi bila yang merah justru pemeriksaan yang salah.
+
+#### Cacat 2: `merah_wajib` yang tidak pernah terbukti berbunyi
+
+Gerbang baru yang tidak bisa merah adalah hiasan. Karena itu `bukti_diri()`
+menjalankan `laporkan` pada empat fixture sintetis dan menuntut tiga di
+antaranya **gagal**:
+
+    jumlah merah cocok, pemeriksaan salah yang merah   -> False  (merah_wajib)
+    jumlah pemeriksaan berubah                         -> False  (harap)
+    nama pemeriksaan tidak dikenal                     -> False  (awalan)
+    sebagian merah, pada pemeriksaan yang benar        -> True
+
+Fixture keempat sengaja ada: tanpa itu, `laporkan` yang selalu mengembalikan
+`False` akan lolos ketiga bukti pertama.
+
+#### Angka
+
+- Harness pelembutan tepi pita: **6 keadaan** + **4 bukti-diri**, semuanya
+  sesuai harapan (exit 0); keadaan 5 mencetak nama pemeriksaan yang merah.
+- Engine **222** + PointingKit **992** = **1214**, 0 gagal
+  (`Executed 222 tests` / `Executed 992 tests`, Docker Swift 6.0).
+- 77 aturan UI hijau; `check-harness-terdaftar.py` **135 harness, semuanya
+  dirujuk**; `check-jangkar-harness.py` 515 jangkar, nol mutasi tertinggal.
+- CI: `39579259737` (Apple Build) hijau; `39579259685` (Engine Linux) menyusul.
+
+#### Yang TIDAK diklaim
+
+- Kedua gerbang yang diukur harness ini — `check_band_feather_softens_the_edge`
+  dan `check_band_feather_docstring_quotes_measured_values` — **tidak diubah
+  satu baris pun**. Siklus ini hanya memperbaiki alat ukurnya. Angka 4.1x /
+  2.0x dan toleransi 0.05 tetap seperti `d5bf654`.
+- `bukti_diri()` menguji `laporkan`, bukan gerbang pikselnya. Ia membuktikan
+  bahwa harness bisa menolak, bukan bahwa renderer-nya benar.
+- Angka 983 di dua entri STATUS.md sebelumnya **dibiarkan**: itu catatan
+  historis siklus masing-masing, bukan klaim keadaan sekarang. Yang diperbarui
+  hanya README, karena Aturan 10 membacanya sebagai klaim keadaan sekarang.
+- Pelajaran prosesnya lebih penting daripada kedua perbaikan: commit yang tidak
+  di-push adalah commit yang tidak diuji, dan "CI hijau" hanya berarti hijau
+  untuk commit yang benar-benar sampai ke sana.
+
 ### Siklus (21 Okt 2026 — gerbang latar langit mengukur port, bukan model)
 
 Siklus dibuka dengan `git log` + `gh run list` + gerbang. Di pohon kerja ada
