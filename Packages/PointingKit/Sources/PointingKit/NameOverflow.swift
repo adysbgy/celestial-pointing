@@ -237,11 +237,54 @@ public enum ObjectCardLayout {
     /// sambil berharap kolom yang lebih lebar menyelamatkan nama adalah
     /// menukar satu dimensi tetap dengan dimensi lain yang juga tetap.
     public static func nameLineLimit(at size: NameOverflow.TextSize) -> Int {
-        let needed = nameWidthReference * scale(for: size) * nameScaleFloor
-            / stackedNameColumn
-        // `ceil` lalu minimal `nameLineLimit`: nama pendek tidak perlu lebih
-        // dari dua baris, dan lantai itu menjaga bentuk kartu pada ukuran biasa.
-        return max(nameLineLimit, Int(needed.rounded(.up)))
+        linesNeeded(at: size, columnWidth: stackedNameColumn,
+                    floor: nameScaleFloor, minimum: nameLineLimit)
+    }
+
+    /// Jumlah baris minimum agar nama terlebar muat di kolom selebar
+    /// `columnWidth` pada ukuran teks `size`.
+    ///
+    /// Dipakai bersama oleh tiga permukaan yang lebar kolomnya berbeda — kartu
+    /// jam, layar Always-On, dan (lewat angkanya) panel iPhone. Satu rumus,
+    /// karena tiga salinan rumus yang sama adalah tiga kesempatan berbeda
+    /// pendapat. Yang berbeda antarpermukaan hanya **lebar kolom** dan
+    /// **lantai skalanya**, dan keduanya parameter.
+    public static func linesNeeded(at size: NameOverflow.TextSize,
+                                   columnWidth: Double,
+                                   floor: Double,
+                                   minimum: Int = 1) -> Int {
+        guard columnWidth.isFinite, columnWidth > 0,
+              floor.isFinite, floor > 0 else { return minimum }
+        let needed = nameWidthReference * scale(for: size) * floor / columnWidth
+        guard needed.isFinite else { return minimum }
+        return max(minimum, Int(needed.rounded(.up)))
+    }
+
+    /// Lebar kolom nama di layar Always-On: lebar layar jam 162 pt − padding
+    /// horizontal 2×2 pt.
+    public static let alwaysOnNameColumn: Double = 158
+
+    /// Lantai skala di layar Always-On. Lebih rendah dari kartu (0.5 vs 0.6)
+    /// karena layar itu memang lebih sempit dan lebih mendesak.
+    public static let alwaysOnScaleFloor: Double = 0.5
+
+    /// Jumlah baris yang cukup untuk nama di layar **Always-On**.
+    ///
+    /// Terukur (nama terlebar 233.22 pt pada `.title2` = 256.54 pt, kolom
+    /// 158 pt, lantai 0.5):
+    ///
+    ///     ukuran   butuh 2 baris   hasil
+    ///     AX3        148.2 pt      muat
+    ///     AX4        173.2 pt      TERPOTONG
+    ///     AX5        200.1 pt      TERPOTONG
+    ///
+    /// Layar Always-On adalah permukaan yang **paling** mungkin dipakai dengan
+    /// huruf besar: pengguna yang memasang jam di pergelangan dan tidak bisa
+    /// mengangkat tangan adalah pengguna yang paling butuh teks besar. Di sana
+    /// nama terpotong mulai AX4 dengan `lineLimit(2)` yang tetap.
+    public static func alwaysOnLineLimit(at size: NameOverflow.TextSize) -> Int {
+        linesNeeded(at: size, columnWidth: alwaysOnNameColumn,
+                    floor: alwaysOnScaleFloor, minimum: 2)
     }
 
     /// Lantai `.minimumScaleFactor` yang dipasang di view. Sama dengan yang

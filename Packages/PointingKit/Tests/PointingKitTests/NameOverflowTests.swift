@@ -309,6 +309,36 @@ final class NameOverflowTests: XCTestCase {
 
     // MARK: - Panel iPhone: kolom lebar, tetapi bukan tanpa batas
 
+    /// Layar Always-On punya cacat yang sama seperti kartu objek, dan di sana
+    /// akibatnya lebih buruk: `lineLimit(2)` yang tetap membuat nama terpotong
+    /// mulai AX4 (butuh 173.2 pt, kolomnya 158 pt), sementara Always-On adalah
+    /// permukaan yang paling mungkin dipakai justru oleh orang yang butuh
+    /// huruf besar.
+    func testAlwaysOnScreenGrowsItsLineLimitToo() {
+        // Dengan 2 baris tetap: AX3 muat, AX4 mulai terpotong.
+        XCTAssertEqual(NameOverflow.firstFailingSize(
+            widthAtDefault: Self.widestNameWidth * 22 / 20,
+            columnWidth: ObjectCardLayout.alwaysOnNameColumn,
+            lineLimit: 2, floor: ObjectCardLayout.alwaysOnScaleFloor),
+            .accessibility4,
+            "Always-On dengan 2 baris gagal mulai AX4")
+
+        // Dengan baris yang tumbuh: setiap ukuran muat.
+        for size in NameOverflow.TextSize.allCases {
+            let lines = ObjectCardLayout.alwaysOnLineLimit(at: size)
+            let fit = NameOverflow.fit(
+                widthAtDefault: Self.widestNameWidth * 22 / 20,
+                columnWidth: ObjectCardLayout.alwaysOnNameColumn,
+                lineLimit: lines, floor: ObjectCardLayout.alwaysOnScaleFloor)
+            XCTAssertNotNil(fit.largestFittingScale,
+                            "\(size): nama terlebar harus muat dengan \(lines) baris")
+        }
+
+        // Dan pada ukuran bawaan bentuk layarnya tidak berubah: 2 baris.
+        XCTAssertEqual(ObjectCardLayout.alwaysOnLineLimit(at: .large), 2)
+        XCTAssertGreaterThan(ObjectCardLayout.alwaysOnLineLimit(at: .accessibility5), 2)
+    }
+
     /// Panel detail iPhone memakai `.title2` (22 pt) dan lantai 0.7, dan nama
     /// di sana **berbagi baris dengan badge keyakinan** — jadi kolomnya bukan
     /// lebar panel, melainkan lebar panel dikurangi badge.

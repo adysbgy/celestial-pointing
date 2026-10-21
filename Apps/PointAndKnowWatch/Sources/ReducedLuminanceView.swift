@@ -22,6 +22,34 @@ struct ReducedLuminanceView: View {
 
     @ObservedObject var engine: PointingEngine
 
+    /// Ukuran teks yang sedang berlaku.
+    ///
+    /// Dibaca supaya `lineLimit` nama bisa ikut tumbuh. Sebelumnya layar ini
+    /// memakai `lineLimit(2)` tetap: terukur, nama terlebar katalog butuh
+    /// 173.2 pt pada AX4 dan 200.1 pt pada AX5, sementara kolomnya 158 pt —
+    /// jadi nama terpotong mulai AX4 di permukaan yang justru paling sering
+    /// dilihat tanpa membuka app.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var textSize: NameOverflow.TextSize {
+        switch dynamicTypeSize {
+        case .xSmall: return .xSmall
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
+        case .xLarge: return .xLarge
+        case .xxLarge: return .xxLarge
+        case .xxxLarge: return .xxxLarge
+        case .accessibility1: return .accessibility1
+        case .accessibility2: return .accessibility2
+        case .accessibility3: return .accessibility3
+        case .accessibility4: return .accessibility4
+        case .accessibility5: return .accessibility5
+        @unknown default:
+            return .accessibility5
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 4) {
@@ -100,8 +128,8 @@ struct ReducedLuminanceView: View {
                         // di bawahnya — persis hierarki yang dibalik.
                         .font(.title2.bold())
                         .foregroundStyle(SurfacePalette.active.textPrimaryColor)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(2)
+                        .minimumScaleFactor(ObjectCardLayout.alwaysOnScaleFloor)
+                        .lineLimit(ObjectCardLayout.alwaysOnLineLimit(at: textSize))
                         .multilineTextAlignment(.center)
                     // Penanda sisa dipertahankan: di layar redup tidak ada
                     // ruang untuk panel peringatan, tapi klaim tanpa dasar

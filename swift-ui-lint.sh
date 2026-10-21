@@ -13598,6 +13598,27 @@ if "nameLineLimit(at:" not in kartu:
         "    Menyusun ulang hanya membeli lebar 48%%, sedangkan huruf tumbuh\n"
         "    sampai 212%% -- nama tetap terpotong mulai AX3." % CARD)
 
+# (3c) Layar Always-On punya cacat yang sama, dan di sana akibatnya lebih
+#      buruk: `lineLimit(2)` tetap membuat nama terpotong mulai AX4 (butuh
+#      173.2 pt, kolomnya 158 pt) -- padahal Always-On justru permukaan yang
+#      paling sering dilihat tanpa membuka app. Satu rumus
+#      (`linesNeeded`), dua lebar kolom, dua lantai skala.
+AOD = os.path.join("Apps", "PointAndKnowWatch", "Sources", "ReducedLuminanceView.swift")
+if not os.path.exists(AOD):
+    masalah.append("  %s tidak ditemukan -- Aturan 78 tidak mengukur apa pun." % AOD)
+else:
+    aod = io.open(AOD, encoding="utf-8").read()
+    if "alwaysOnLineLimit(at:" not in aod:
+        masalah.append(
+            "  %s: `lineLimit` Always-On tidak ikut tumbuh bersama Dynamic Type.\n"
+            "    Nama terlebar butuh 173.2 pt di AX4 dan 200.1 pt di AX5,\n"
+            "    sementara kolomnya 158 pt." % AOD)
+    if "alwaysOnScaleFloor" not in aod:
+        masalah.append(
+            "  %s: lantai skala tidak memakai konstanta bersama.\n"
+            "    Angka 0.5 yang ditulis ulang di view tidak bisa ditahan uji\n"
+            "    mana pun, dan rumus baris di atas memakai angka itu." % AOD)
+
 # (4) Model wajib menyatakan batasnya, bukan hanya mengembalikan boolean.
 #     Tanpa `firstFailingSize`, tidak ada yang bisa menyebut ukuran mana yang
 #     rusak, dan gerbang hanya bisa bilang "ada yang salah".
