@@ -123,6 +123,8 @@ def run_gates(checker, view_source=None, model_source=None, render_module=None):
         checker.check_backdrop_view_reads_the_model_colours(results, view_source=view_source)
         checker.check_backdrop_radius_scales_with_width(results)
         checker.check_backdrop_speck_y_axis_is_height(results)
+        checker.check_backdrop_view_wiring_matches_the_model(
+            results, view_source=view_source)
         checker.check_backdrop_port_matches_the_model(
             results, model_source=model_source, view_source=view_source)
         return results
@@ -288,6 +290,40 @@ def main():
     outcomes.append(report("keadaan 11 (posisi y diskalakan lebar) memerah",
                            run_gates(checker, render_module=y_axis),
                            ["posisi y titik"]))
+
+    # Keadaan 12-15 — empat cacat yang **lolos seluruh gerbang latar** sebelum
+    # `check_backdrop_view_wiring_matches_the_model` ada. Disapu pada salinan
+    # utuh di proses baru: semuanya mengompilasi, dan semuanya hijau.
+    #
+    # Harness ini menuntut **tepat satu** gerbang merah per keadaan, dengan
+    # alasan yang menyebut cacatnya sendiri. Itu bukan kerapian: gerbang yang
+    # memerah karena alasan yang salah akan "menangkap" setiap cacat di
+    # sekitarnya secara kebetulan, dan hijau-merahnya berhenti berarti apa pun.
+    for label, old, new, gate in (
+            ("keadaan 12 (posisi x diskalakan tinggi)",
+             "speck.x * size.width", "speck.x * size.height",
+             "view memasang sumbu"),
+            ("keadaan 13 (terang per titik dibuang di siang)",
+             "speck.brightness * SkyBackdrop.layerOpacity",
+             "SkyBackdrop.layerOpacity",
+             "view memasang sumbu"),
+            ("keadaan 14 (malam dan siang dibalik)",
+             "night ? SkyBackdrop.nightColour(speck.brightness)\n"
+             "                                    : SkyBackdrop.dayColour()",
+             "night ? SkyBackdrop.dayColour()\n"
+             "                                    : SkyBackdrop.nightColour(speck.brightness)",
+             "view memasang sumbu"),
+            ("keadaan 15 (guard AOD di view dicabut)",
+             "guard isVisible, size.width > 0", "guard size.width > 0",
+             "view memasang sumbu")):
+        if old not in view:
+            print(f"GAGAL {label} tidak bisa disiapkan: `{old}` tidak "
+                  f"ditemukan di view — jangkar harness sudah basi")
+            return 1
+        outcomes.append(report(label + " memerah",
+                               run_gates(checker,
+                                         view_source=view.replace(old, new, 1)),
+                               [gate]))
 
     print()
     if all(outcomes):

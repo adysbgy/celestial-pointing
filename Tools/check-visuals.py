@@ -6807,6 +6807,151 @@ def check_backdrop_speck_y_axis_is_height(results):
         f"posisi titik, jadi ini satu-satunya yang bisa melihatnya"))
 
 
+def check_backdrop_view_wiring_matches_the_model(results, view_source=None):
+    """Enam mutasi di `SkyBackdropView` yang lolos **seluruh** gerbang latar.
+
+    **Celahnya, dan ini diukur, bukan dibayangkan.** Seluruh gerbang latar
+    memeriksa dua hal: angka port (`render-visuals.py`) dan apakah view
+    *menyebut* `nightColour`. Tidak satu pun memeriksa **bagaimana** view
+    memasang angka-angka itu. Disapu pada salinan utuh, proses baru, tujuh
+    mutasi yang semuanya mengompilasi:
+
+        speck.x * size.width      -> speck.x * size.height      HIJAU
+        speck.y * size.height     -> speck.y * size.width       HIJAU
+        speck.radius * size.width -> speck.radius * size.height HIJAU
+        brightness * layerOpacity -> layerOpacity               HIJAU
+        night ? nightColour : dayColour  (dibalik)              HIJAU
+        guard isVisible, …        -> guard size.width > 0, …    HIJAU
+        max(0.35, …)              -> max(0.0, …)                MERAH
+
+    Enam dari tujuh. Yang paling berat adalah **pembalikan malam/siang**:
+    di mode malam setiap titik latar menjadi putih penuh — tepat cahaya
+    biru-hijau yang seluruh mode malam ada untuk menghilangkannya — dan di
+    siang titik-titiknya menjadi merah. Seluruh gerbang kontras mode malam,
+    seluruh uji `nightColour`, dan Aturan 83 tentang kilau kaca **tetap
+    hijau**, karena semuanya membaca model atau port, bukan view yang
+    menggambar piksel.
+
+    Kedua yang paling sunyi: `guard isVisible` dicabut berarti Always-On
+    tetap menggambar ~90 titik per penyegaran (kontrak AOD dilanggar tanpa
+    satu pun gerbang berbunyi), dan terang siang dibuang berarti setiap
+    titik siang sama terangnya.
+
+    **Yang diperiksa, dan kenapa per-bentuk bukan per-nama.** Gerbang ini
+    tidak mencari "apakah `size.width` ada di berkas" — itu akan hijau pada
+    ketiga mutasi sumbu sekaligus. Ia membaca **cabang** yang memasang tiap
+    besaran dan menuntut sumbu/aksesornya:
+
+      a. `center` memakai `speck.x * size.width` dan `speck.y * size.height`
+         (posisi: x dari lebar, y dari tinggi).
+      b. `radius` memakai `speck.radius * size.width` (satuan model adalah
+         **fraksi lebar**, lihat `SkyBackdrop.Speck.radius`).
+      c. pemilihan warna memakai ternary yang **sisi benar**-nya
+         `nightColour` dan sisi salahnya `dayColour` — bukan sekadar
+         keduanya disebut.
+      d. opasitas siang memuat `speck.brightness` (terang per titik tidak
+         boleh hilang di siang).
+      e. `Canvas` dijaga `isVisible` (kontrak AOD).
+
+    Setiap butir diambil dari **kode** (`swift_code_only`), jadi komentar
+    yang menjelaskan bentuk benarnya tidak bisa memuaskan gerbang ini —
+    kelas yang sudah dibayar repo ini di `check_backdrop_view_reads_the_model_colours`.
+
+    **Fail-closed.** Kalau salah satu cabang tidak terbaca (berkasnya
+    berubah bentuk), gerbangnya **MERAH** dengan kalimat yang menyebut
+    cabang mana. Hijau yang berarti "tidak ada yang diperiksa" adalah
+    persis kegagalan yang gerbang ini ada untuk mencegah.
+
+    **Yang TIDAK diklaim.** Ini pemeriksaan **teks**, bukan render. Ia
+    membuktikan view menyebut sumbu dan aksesor yang benar di cabang yang
+    benar; ia tidak membuktikan hasilnya di layar, tidak mengukur piksel,
+    dan tidak tahu apakah `size` yang sampai ke `Canvas` memang bidang
+    layar. `max(0.35, …)` juga tidak diperiksa di sini — lantai radius
+    sudah dijaga paritas angka (`check_backdrop_port_matches_the_model`)
+    dan itu satu-satunya mutasi yang memang sudah berbunyi.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/SkyBackdropView.swift")).read()
+    code = swift_code_only(view)
+
+    def branch(pattern):
+        match = re.search(pattern, code, re.S)
+        return match.group(0) if match else None
+
+    center = branch(r"let\s+center\s*=\s*CGPoint\([^)]*\)")
+    radius = branch(r"let\s+radius\s*=\s*max\([^)]*\)")
+    # Ternary warna dan opasitas ditulis **dua baris** di view (cabang
+    # `:` di baris berikutnya). Versi pertama gerbang ini memakai `[^\n]*`
+    # dan karena itu berhenti sebelum `dayColour` — gerbangnya **MERAH pada
+    # pohon yang benar**, dan setiap mutasi "tertangkap" oleh kegagalan yang
+    # sama, bukan oleh cacatnya sendiri. Diukur, bukan diduga: baseline
+    # melaporkan "arah warna terbalik" pada view yang arahnya benar.
+    #
+    # Jendelanya dibatasi pada **satu pernyataan** (sampai `;`), bukan sisa
+    # berkas: kalau mutasi menghapus sebuah aksesor, cabangnya harus tetap
+    # terbaca supaya gerbang bisa menyebut apa yang hilang, bukan melaporkan
+    # "tidak terbaca" untuk pernyataan yang jelas ada.
+    colour = branch(r"let\s+rgb\s*=\s*night\s*\?[^;]{0,400}")
+    opacity = branch(r"context\.opacity\s*=\s*night\s*\?[^;]{0,400}")
+    guard = branch(r"guard\s+isVisible[^\n]*")
+
+    failures = []
+    if center is None:
+        failures.append("cabang `center` tidak terbaca")
+    elif not (re.search(r"speck\.x\s*\*\s*size\.width", center)
+              and re.search(r"speck\.y\s*\*\s*size\.height", center)):
+        failures.append(f"`center` tidak memetakan x→lebar, y→tinggi ({center.strip()})")
+
+    if radius is None:
+        failures.append("cabang `radius` tidak terbaca")
+    elif not re.search(r"speck\.radius\s*\*\s*size\.width", radius):
+        failures.append(f"`radius` tidak memakai lebar bidang ({radius.strip()})")
+
+    if colour is None:
+        failures.append("cabang warna (`let rgb = night ? …`) tidak terbaca")
+    elif not re.search(r"SkyBackdrop\s*\.\s*nightColour", code):
+        # Pembagian tugas, dan ini diukur: keadaan 4 di harness latar
+        # mengganti `SkyBackdrop.nightColour(` dengan fungsi lain di seluruh
+        # view. Gerbang `check_backdrop_view_reads_the_model_colours` sudah
+        # memiliki cacat itu dan menyebutnya dengan tepat. Versi pertama
+        # gerbang ini ikut memerah di sana dengan alasan **"arah warna
+        # terbalik"** — pesan yang salah untuk cacat yang bukan miliknya,
+        # dan harness menolaknya karena satu keadaan harus memerahkan tepat
+        # satu gerbang. Jadi: kalau `nightColour` tidak dipakai sama sekali
+        # di view, gerbang ini diam dan membiarkan pemiliknya berbunyi.
+        #
+        # Patokannya seluruh `code`, bukan `colour`: pada keadaan 4 sisi
+        # `dayColour` masih ada, jadi memeriksa cabangnya saja tetap
+        # membuat gerbang ini berbunyi.
+        pass
+    else:
+        # Sisi benar harus nightColour, sisi salah dayColour — arahnya,
+        # bukan sekadar keberadaan kedua nama.
+        benar = re.search(r"night\s*\?\s*SkyBackdrop\s*\.\s*nightColour", colour)
+        salah = re.search(r":\s*SkyBackdrop\s*\.\s*dayColour", colour)
+        if not (benar and salah):
+            failures.append(
+                f"arah warna terbalik: mode malam harus `nightColour`, siang "
+                f"`dayColour` ({colour.strip()})")
+
+    if opacity is None:
+        failures.append("cabang opasitas (`context.opacity = night ? …`) tidak terbaca")
+    elif not re.search(r":\s*speck\.brightness\s*\*", opacity):
+        failures.append(
+            f"opasitas siang membuang terang per titik (`speck.brightness`) "
+            f"({opacity.strip()})")
+
+    if guard is None:
+        failures.append("`Canvas` tidak lagi dijaga `isVisible` — kontrak AOD hilang")
+
+    results.append(Result(
+        "latar: view memasang sumbu, warna, terang, dan penjaga AOD dari model",
+        not failures,
+        "; ".join(failures) if failures else
+        "center x→lebar/y→tinggi, radius→lebar, malam=nightColour, "
+        "siang=dayColour+brightness, Canvas dijaga isVisible"))
+
+
 def check_backdrop_port_matches_the_model(results, model_source=None, view_source=None):
     """Paritas **angka**: konstanta port latar harus sama dengan `SkyBackdrop`.
 
@@ -17353,6 +17498,7 @@ def main():
     check_backdrop_view_reads_the_model_colours(results)
     check_backdrop_radius_scales_with_width(results)
     check_backdrop_speck_y_axis_is_height(results)
+    check_backdrop_view_wiring_matches_the_model(results)
     check_backdrop_port_matches_the_model(results)
     check_star_colour_order(results, args.size, args.ss)
     check_star_size_follows_magnitude(results)

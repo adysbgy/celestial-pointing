@@ -1,3 +1,76 @@
+### Siklus (21 Okt 2026 — view latar bisa membalik malam/siang tanpa satu gerbang berbunyi)
+
+Celah ini **tidak** tercatat terbuka di STATUS.md mana pun. Ia ditemukan
+dengan menyapu mutasi ke `Apps/Shared/SkyBackdropView.swift` pada salinan
+utuh di proses baru, dan hasilnya: **enam dari tujuh** mutasi yang semuanya
+mengompilasi lolos **seluruh** gerbang latar.
+
+    speck.x * size.width      -> speck.x * size.height      HIJAU
+    speck.y * size.height     -> speck.y * size.width       HIJAU
+    speck.radius * size.width -> speck.radius * size.height HIJAU
+    brightness * layerOpacity -> layerOpacity               HIJAU
+    night ? nightColour : dayColour  (dibalik)              HIJAU
+    guard isVisible, …        -> guard size.width > 0, …    HIJAU
+    max(0.35, …)              -> max(0.0, …)                MERAH
+
+#### Kenapa seluruh gerbang latar buta pada ini
+
+Kesembilan gerbang latar memeriksa dua hal saja: angka port
+(`render-visuals.py`) dan apakah view **menyebut** `nightColour`. Tidak satu
+pun memeriksa **bagaimana** view memasang angka itu ke geometri dan warna.
+
+Yang paling berat adalah pembalikan malam/siang. Di mode malam setiap titik
+latar menjadi putih penuh — tepat cahaya biru-hijau yang seluruh mode malam
+ada untuk menghilangkannya, dan tepat kelas cacat yang Aturan 83 tangani
+untuk kilau kaca — sementara di siang titiknya menjadi merah. Seluruh uji
+kontras mode malam, seluruh uji `nightColour`, dan Aturan 83 **tetap hijau**,
+karena semuanya membaca model atau port, bukan view yang menggambar piksel.
+
+Dua yang paling sunyi: `guard isVisible` dicabut berarti Always-On tetap
+menggambar ~90 titik per penyegaran (kontrak AOD dilanggar tanpa gerbang
+berbunyi), dan terang siang dibuang berarti setiap titik siang sama terangnya.
+
+#### Yang ditambahkan
+
+`check_backdrop_view_wiring_matches_the_model` membaca **cabang**, bukan
+keberadaan nama — itu yang membedakannya dari gerbang `…reads_the_model_colours`
+yang sudah ada, yang akan hijau pada ketiga mutasi sumbu sekaligus:
+
+  a. `center` = `speck.x * size.width` dan `speck.y * size.height`
+  b. `radius` = `speck.radius * size.width` (satuan model fraksi **lebar**)
+  c. warna: sisi benar ternary `nightColour`, sisi salah `dayColour` — arahnya
+  d. opasitas siang memuat `speck.brightness`
+  e. `Canvas` dijaga `isVisible`
+
+Harness latar naik dari 11 ke **15 keadaan**, dan keempat keadaan baru menuntut
+**tepat satu** gerbang merah dengan alasan yang menyebut cacatnya sendiri.
+
+#### Dua kesalahan saya sendiri, keduanya tertangkap sebelum push
+
+**Pertama: gerbangnya MERAH pada pohon yang benar.** Versi pertama memakai
+`[^\n]*` untuk cabang warna, padahal ternary-nya ditulis **dua baris** — regex
+berhenti sebelum `dayColour` dan melaporkan "arah warna terbalik" pada view
+yang arahnya benar. Yang membuat ini berbahaya: setiap mutasi tampak
+"tertangkap", padahal tertangkap oleh kegagalan yang sama, bukan oleh cacatnya.
+Baseline hijau adalah bagian dari uji, bukan formalitas.
+
+**Kedua: gerbang saya memerah karena alasan yang salah.** Keadaan 4 harness
+mengganti `nightColour(` dengan fungsi lain; gerbang saya ikut berbunyi dengan
+pesan "arah warna terbalik" — salah, dan merampas kepemilikan cacat dari
+gerbang yang memang menjaganya. Harness menolaknya (satu keadaan = tepat satu
+gerbang), dan perbaikannya adalah **pembagian tugas**: kalau `nightColour`
+tidak dipakai sama sekali di view, gerbang ini diam. Patokannya seluruh kode,
+bukan cabangnya — pada keadaan 4 sisi `dayColour` masih ada, jadi memeriksa
+cabang saja tetap membuatnya berbunyi.
+
+#### Yang TIDAK diklaim
+
+Gerbang ini **teks, bukan render**. Ia membuktikan view menyebut sumbu dan
+aksesor yang benar di cabang yang benar; ia tidak membuktikan hasilnya di
+layar, tidak mengukur piksel, dan tidak tahu apakah `size` yang sampai ke
+`Canvas` memang bidang layar. Lantai radius tidak diperiksa di sini — paritas
+angka sudah menjaganya (diverifikasi ulang: `port=0.35, model=0.0` → merah).
+
 ### Siklus (21 Okt 2026 — posisi titik latar tidak diukur siapa pun, dan `main` merah oleh jangkar 4 spasi)
 
 Dua cacat, keduanya ditemukan dengan mengukur, bukan membaca: satu **tercatat
