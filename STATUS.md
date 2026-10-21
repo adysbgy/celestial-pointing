@@ -1,3 +1,81 @@
+### Siklus (21 Okt 2026 — daftar peran `@Published` bisa bertengkar dengan kode, dan tetap hijau)
+
+Siklus dibuka dengan `git log` + `gh run list`, sesuai disiplin repo. Yang
+ditemukan bukan UI: sebuah gerbang baru (`ObservedProperty`) sudah ada di
+pohon kerja tetapi **belum pernah bisa merah**, dan alasan sebenarnya
+adalah satu kelas cacat yang lebih dalam daripada cacat yang ia kejar.
+
+#### Cacatnya: daftar peran hanya diperiksa satu arah
+
+`ObservedProperty.roles` menyebut `"isRunning": .bookkeeping`. Arti peran
+itu bukan "ini properti penting", melainkan **"harus ada, dan tidak boleh
+`@Published`"**. Tetapi satu-satunya aturan yang membaca daftar itu
+memeriksa **keberadaan nama** saja. Jadi daftar bisa mengatakan
+`bookkeeping` sementara kode menulis `@Published`, dan tidak ada yang
+berbunyi — daftar yang salah tetap hijau.
+
+Keadaannya memang begitu: `MotionLogger.isRunning` `@Published`, ditulis di
+tiga jalur (`start`, `stop`, `handleFailure`), dan **nol** pembacaan
+(`grep -rn '\bisRunning\b' Apps/ Packages/`). Setiap penulisan memanggil
+`objectWillChange` untuk **setiap** layar yang mengobservasi `MotionLogger`
+— `PointingView`, `CalibrationView`, `ReducedLuminanceView`, dokumen
+aplikasi — yaitu render yang tidak pernah menghasilkan satu piksel. Yang
+membuatnya lebih dari soal gaya: biaya itu dibayar justru di layar
+Always-On yang diminta hemat baterai.
+
+#### Yang TIDAK diubah
+
+Properti `isRunning` **tetap ada**, dan tetap ditulis dengan jujur
+(`isRunning = manager.isDeviceMotionActive`). `swift-ui-lint.sh` Aturan 53
+mengawalnya sebagai titik kejujuran sensor, dan membalik atau menghapusnya
+akan membuat sensor mati dilaporkan hidup. Yang dihapus hanya **saluran
+render**-nya: kata kunci `@Published`.
+
+Ini juga alasan `sensorNote` dan `unavailableReason` tidak ikut disentuh:
+keduanya memang dibaca layar, jadi keduanya tetap `renderInput`.
+
+#### Gerbangnya: dua arah, bukan satu
+
+`testRenderInputRolesArePublished` kini menegakkan arah kedua —
+`renderInput`/`eventCarrier` **wajib** `@Published` (janji render yang
+bohong adalah cacat yang paling sunyi: layar tidak ikut berubah tanpa
+galat apa pun), dan `bookkeeping` wajib ada tetapi **tidak** `@Published`.
+Uji ini menggantikan nama lama `testRolesMentionOnlyRealProperties`, yang
+menjanjikan lebih banyak daripada yang diukurnya.
+
+#### Buktinya, dan kenapa harus ada
+
+Gerbang baru selalu hijau pada hari ia ditulis; itu bukan bukti apa pun.
+`Tools/bukti-mutasi-peran-published.py` menjalankan uji itu atas lima
+keadaan, dan menuntut **uji mana** yang berbunyi — bukan sekadar "ada yang
+merah", karena dua keadaan yang menyalakan uji yang sama berarti separuh
+gerbangnya tidak mengukur apa pun:
+
+| Keadaan | Hasil | Uji yang berbunyi |
+|---|---|---|
+| 0. baseline tanpa mutasi | LULUS (wajib) | — |
+| 1. properti `@Published` baru tanpa peran | MERAH | `testEveryPublishedPropertyInAppsHasARole` |
+| 2. peran `renderInput` atas properti bukan-`@Published` | MERAH | `testBookkeepingPropertiesAreNotPublished`, `testRenderInputRolesArePublished` |
+| 3. properti pembukuan masih `@Published` (cacat asli) | MERAH | sama dengan 2 |
+| 4. nama di daftar dihapus dari kode | MERAH | `testRenderInputRolesArePublished` |
+| 5. kontrol negatif: peran sah diubah | MERAH | sama dengan 2 |
+
+Keadaan 4 sengaja menuntut uji yang **berbeda** dari 2/3/5: menghapus
+properti dari kode dan membalik perannya adalah dua kesalahan yang tidak
+boleh tertangkap oleh pemeriksaan yang sama.
+
+Harness ini terdaftar di `engine-tests.yml`; `Tools/check-harness-terdaftar.py`
+kini melaporkan **132 harness, semuanya dirujuk alur kerja**. Sebelum
+didaftarkan, gerbang yang tidak pernah dijalankan itu selalu hijau — bentuk
+kegagalan yang sudah tercatat dua kali di repo ini (`bukti-mutasi-piringan.py`,
+`bukti-mutasi-warna-ragu.py`).
+
+#### Angka
+
+Engine tidak disentuh: CelestialEngine **222**, PointingKit **983** (naik 7
+dari uji peran baru). `swift-ui-lint.sh` hijau, `swift-typecheck.sh` hijau,
+`Apple Build` hijau (46 dtk). `Engine Tests (Linux)` antre.
+
 ### Siklus (20 Okt 2026 — `main` merah: batas modul tak terlihat semua gerbang lokal)
 
 Siklus dibuka dengan `git log` + `gh run list`. `main` merah di `Apple Build`
