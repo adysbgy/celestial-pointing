@@ -308,6 +308,41 @@ extension SurfacePalette {
                   Swift.max(Swift.abs(b.green - a.green), Swift.abs(b.blue - a.blue)))
     }
 
+    /// Kepekatan kilau kaca (`.ultraThinMaterial`) pada kartu.
+    ///
+    /// **Kenapa ada di model, bukan di `Apps/`.** Angka ini dulu hidup sebagai
+    /// `SurfaceTokens.glassSheenOpacity = 0.10` di `Apps/Shared/SurfaceTokens.swift`
+    /// — lapisan yang tidak pernah dibangun `swift-test.sh` dan tidak dibaca
+    /// gerbang mana pun. Diukur, dua cacat keluar dari satu angka itu:
+    ///
+    ///   1. **Mode malam bocor.** `.ultraThinMaterial` di atas permukaan gelap
+    ///      menghasilkan lapisan terang; pada kepekatan 0.10 kanal hijau & biru
+    ///      kartu naik dari `0.000` ke `0.042`. Mode malam ada justru untuk
+    ///      memastikan kanal 498–530nm **nol**, jadi angka ini membatalkan
+    ///      seluruh alasan mode malam ada — pada setiap kartu di setiap layar,
+    ///      dan tidak ada teks di layar yang bisa membuat pengguna curiga.
+    ///   2. **Kontras malam jatuh di bawah ambang.** `textPrimary` 5.13 → 4.35
+    ///      dan `textSecondary` 4.67 → 3.99 terhadap ambang 4.5. Mode malam
+    ///      sudah hanya punya ruang 5.13 (plafon fisika merah murni), jadi
+    ///      tidak ada kepekatan kilau yang aman di sana — bukan "kurangi",
+    ///      melainkan **nol**.
+    ///
+    /// Karena itu kilau punya dua angka dan sebuah pemilih, dan pemilihnya
+    /// membaca `isNight` (isi palet), bukan saklar. `glassSheenNightAlpha`
+    /// sengaja ditulis sebagai konstanta bernama dan bukan `0` di dalam
+    /// ternary: nilainya adalah keputusan, dan keputusan yang tidak bernama
+    /// akan "dirapikan" seseorang menjadi satu angka bersama.
+    public static let glassSheenDayAlpha = 0.10
+    public static let glassSheenNightAlpha = 0.0
+
+    /// Kepekatan kilau kaca untuk sebuah palet.
+    ///
+    /// Dipanggil `surfaceCard` di `Apps/`; tidak ada view yang boleh menulis
+    /// kepekatan sendiri, karena itu persis bagaimana cacat di atas lahir.
+    public static func glassSheenAlpha(for palette: SurfacePalette) -> Double {
+        palette.isNight ? glassSheenNightAlpha : glassSheenDayAlpha
+    }
+
     /// Warna di puncak gradien latar — satu-satunya latar yang kartu pernah
     /// bertemu, karena gradien itu digambar di balik segalanya.
     ///

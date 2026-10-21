@@ -14369,6 +14369,133 @@ else
 fi
 
 
+# ── Aturan 83: Kilau kaca tidak boleh membatalkan mode malam ────────────────
+#
+# Kelas cacatnya: satu angka hiasan di lapisan yang **tidak pernah dibangun**
+# `swift-test.sh` (`Apps/Shared/SurfaceTokens.swift`), dipakai sebagai
+# `.overlay` di atas isi kartu.
+#
+#     .overlay(RoundedRectangle(...).fill(.ultraThinMaterial.opacity(0.10)))
+#
+# Diukur, dua cacat keluar dari satu baris itu:
+#
+#   1. kanal hijau/biru kartu mode malam 0.000 -> 0.042. Mode malam ada untuk
+#      memastikan kanal 498-530nm **nol**, jadi seluruh alasannya batal di
+#      setiap kartu sekaligus — dan tidak ada teks di layar yang bisa membuat
+#      pengguna curiga.
+#   2. teks utama mode malam 5.13 -> 4.19, sekunder 4.67 -> 3.82 (ambang 4.5).
+#      Merah murni hanya punya plafon 5.25:1, jadi tidak ada anggaran kontras
+#      untuk membayar hiasan apa pun.
+#
+# Tidak satu pun dari 82 aturan sebelumnya berbunyi, karena semuanya mengukur
+# **model** `SurfacePalette` — dan modelnya benar. Yang salah adalah view yang
+# menambahkan lapisan di atas model itu.
+#
+# Yang dituntut aturan ini, semuanya bisa dibaca dari teks Swift:
+#   (a) kepekatan kilau datang dari `SurfacePalette.glassSheenAlpha(for:)`,
+#       bukan literal di `Apps/`;
+#   (b) kilau tidak boleh `.overlay` pada `self` (itu menggambar di atas isi);
+#   (c) `if sheen > 0` menjaga mode malam tidak menggambar material sama sekali;
+#   (d) uji model yang mengunci ketiga klaim di atas masih ada.
+echo
+echo "== Aturan 83: Kilau kaca tidak boleh membocorkan mode malam =="
+kilau_kaca=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+BERKAS = os.path.join("Apps", "Shared", "SurfaceTokens.swift")
+UJI = os.path.join("Packages", "PointingKit", "Tests", "PointingKitTests",
+                   "SurfacePaletteTests.swift")
+MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit",
+                     "SurfacePalette.swift")
+
+masalah = []
+
+
+def kode_saja(teks):
+    """Buang komentar dan isi string — keduanya tidak menggambar apa pun."""
+    teks = re.sub(r"/\*.*?\*/", "", teks, flags=re.S)
+    teks = re.sub(r"//[^\n]*", "", teks)
+    return re.sub(r'"(?:[^"\\]|\\.)*"', '""', teks)
+
+
+if not os.path.exists(BERKAS):
+    masalah.append(f"FAIL {BERKAS} tidak ada: aturan kilau kaca tidak mengukur apa pun.")
+    kode = ""
+else:
+    kode = kode_saja(open(BERKAS, encoding="utf-8").read())
+
+if kode:
+    # (a) Kepekatan dari model, bukan literal.
+    if "glassSheenAlpha(for:" not in kode:
+        masalah.append(
+            "FAIL surfaceCard tidak membaca SurfacePalette.glassSheenAlpha(for:). "
+            "Kepekatan kilau kembali ditulis di lapisan yang tidak bisa diuji, "
+            "dan itulah bagaimana 0.10 membocorkan mode malam.")
+    # Literal pecahan langsung di dalam `.opacity(` pada rantai material.
+    for m in re.finditer(r"ultraThinMaterial\s*\.\s*opacity\s*\(\s*([0-9.]+)\s*\)", kode):
+        masalah.append(
+            "FAIL kepekatan kilau ditulis sebagai literal "
+            f"{m.group(1)} di Apps/: mode malam hanya aman pada 0.0, dan "
+            "angka yang tidak lewat model tidak bisa diuji.")
+
+    # (b) Kilau tidak boleh `.overlay` pada self. `.overlay` menggambar
+    # SESUDAH isi, jadi material menyapu teks — persis kebalikan dari yang
+    # dokumentasinya klaimkan.
+    if re.search(r"\.overlay\s*\(\s*RoundedRectangle[^)]*\.fill\s*\(\s*\.ultraThinMaterial", kode):
+        masalah.append(
+            "FAIL kilau kaca dipasang sebagai .overlay pada self: ia menggambar "
+            "di ATAS isi kartu, sehingga teks kehilangan alas kontras yang sudah "
+            "diuji (terukur 4.19:1 di mode malam).")
+
+    # (c) Penjaga `sheen > 0` harus ada: mode malam tidak menggambar material
+    # sama sekali, bukan menggambarnya pada opasitas nol.
+    if not re.search(r"if\s+sheen\s*>\s*0\b", kode):
+        masalah.append(
+            "FAIL tidak ada penjaga `if sheen > 0` di sekitar kilau. Tanpa itu "
+            "mode malam tetap membuat lapisan material; pada kepekatan 0 hasilnya "
+            "kebetulan sama, tetapi niatnya tidak lagi terkunci dan angka "
+            "berikutnya akan lolos.")
+
+# (d) Uji model yang mengunci klaimnya masih ada.
+if not os.path.exists(UJI):
+    masalah.append(f"FAIL {UJI} tidak ada: klaim kilau tidak lagi diuji.")
+else:
+    uji = open(UJI, encoding="utf-8").read()
+    for nama in ("testGlassSheenNeverLeaksGreenOrBlueIntoNightMode",
+                 "testGlassSheenKeepsNightTextAboveTheContrastFloor",
+                 "testGlassSheenStillExistsInDayModeAndKeepsContrast"):
+        if nama not in uji:
+            masalah.append(f"FAIL uji {nama} hilang: klaim kilau tidak lagi dijaga.")
+
+if not os.path.exists(MODEL):
+    masalah.append(f"FAIL {MODEL} tidak ada.")
+else:
+    model = kode_saja(open(MODEL, encoding="utf-8").read())
+    if not re.search(r"glassSheenNightAlpha\s*=\s*0(?:\.0+)?\b", model):
+        masalah.append(
+            "FAIL SurfacePalette.glassSheenNightAlpha bukan 0: setiap kepekatan "
+            "> 0 membocorkan kanal 498-530nm ke setiap kartu mode malam.")
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+PY
+)
+if [ $? -ne 0 ]; then
+  echo "$kilau_kaca"
+  echo "-> Kilau kaca wajib nol di mode malam dan duduk di BAWAH isi kartu."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+elif [ -n "$kilau_kaca" ]; then
+  echo "$kilau_kaca"
+  status=1
+else
+  echo "Bersih: kilau kaca dari model (0.0 di mode malam), duduk di bawah isi"
+  echo "        kartu, dan tiga uji kontrasnya masih ada."
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
 echo "== SEMUA GERBANG UI LULUS =="

@@ -451,4 +451,115 @@ final class SurfacePaletteTests: XCTestCase {
             "lapisan overlay tidak komposisi, bahkan identik dengan surface2")
     }
 
+    // MARK: - Kilau kaca: kilau yang tidak boleh membatalkan mode malam
+
+    /// **Regresi: kilau kaca membocorkan biru & hijau ke mode malam.**
+    ///
+    /// `surfaceCard` menaruh `.ultraThinMaterial.opacity(0.10)` di atas alas
+    /// token. Material di atas permukaan gelap menghasilkan lapisan **terang**,
+    /// dan karena ia berada di lapis paling depan, ia mencampur ke kanal hijau
+    /// dan biru kartu. Diukur pada kepekatan 0.10: kanal yang seharusnya
+    /// `0.000` naik ke `0.042`.
+    ///
+    /// Yang dikorbankan bukan estetika. Seluruh alasan mode malam ada adalah
+    /// menjaga rhodopsin: rod paling sensitif ~498–530nm, jadi hijau dan biru
+    /// harus **nol**, bukan redup. Satu lapisan hiasan di atas setiap kartu
+    /// membatalkan itu di seluruh app sekaligus, dan tidak ada teks di layar
+    /// yang bisa membuat pengguna curiga bahwa mode malamnya bocor.
+    ///
+    /// Uji ini memakai **batas atas**, bukan sampel: `.ultraThinMaterial`
+    /// tidak bisa dirender di Linux, jadi yang dihitung adalah kasus terburuk
+    /// (material = putih penuh). Kalau batas atasnya nol, material apa pun
+    /// aman — itu satu-satunya bentuk klaim yang jujur di sini.
+    func testGlassSheenNeverLeaksGreenOrBlueIntoNightMode() {
+        let night = SurfacePalette.night
+        let alpha = SurfacePalette.glassSheenAlpha(for: night)
+        XCTAssertEqual(alpha, 0,
+            "mode malam masih memasang kilau kaca pada kepekatan \(alpha); "
+            + "setiap kepekatan > 0 membocorkan kanal 498–530nm")
+
+        // Batas atas: material putih penuh pada kepekatan itu di atas kartu.
+        let worstCase = SurfaceColor(red: 1, green: 1, blue: 1)
+            .composited(over: night.surface1, alpha: alpha)
+        XCTAssertEqual(worstCase.green, 0, accuracy: 1e-12,
+            "kanal hijau kartu mode malam bukan nol")
+        XCTAssertEqual(worstCase.blue, 0, accuracy: 1e-12,
+            "kanal biru kartu mode malam bukan nol")
+    }
+
+    /// **Regresi: kilau kaca menjatuhkan kontras teks malam di bawah 4.5:1.**
+    ///
+    /// Ini kerusakan yang **berbeda** dari kebocoran kanal di atas, dan
+    /// keduanya datang dari angka yang sama. Diukur pada kepekatan lama 0.10:
+    /// `textPrimary` 5.13 → 4.35 dan `textSecondary` 4.67 → 3.99, keduanya di
+    /// bawah ambang yang brief nyatakan.
+    ///
+    /// Kenapa ini penting justru di mode malam: merah murni di atas hitam
+    /// hanya punya plafon 5.25:1 (fisika, bukan selera), jadi seluruh anggaran
+    /// kontras mode malam sudah terpakai sebelum hiasan apa pun. Tidak ada
+    /// "kurangi sedikit" yang menyelamatkan — satu-satunya angka yang aman
+    /// adalah nol, dan itulah yang dikunci di sini.
+    ///
+    /// Diukur sebagai batas atas (material = putih penuh), sama seperti uji
+    /// kebocoran: nilai sebenarnya di perangkat tidak pernah lebih buruk.
+    func testGlassSheenKeepsNightTextAboveTheContrastFloor() {
+        let night = SurfacePalette.night
+        let alpha = SurfacePalette.glassSheenAlpha(for: night)
+        let white = SurfaceColor(red: 1, green: 1, blue: 1)
+
+        let card = white.composited(over: night.surface1, alpha: alpha)
+        for (name, text) in [("utama", night.textPrimary),
+                             ("sekunder", night.textSecondary)] {
+            let ratio = text.contrastRatio(against: card)
+            XCTAssertGreaterThanOrEqual(
+                ratio, SurfacePalette.minimumTextContrast,
+                "teks \(name) mode malam di atas kartu berkilau hanya \(ratio):1, "
+                + "di bawah ambang \(SurfacePalette.minimumTextContrast):1")
+        }
+    }
+
+    /// Dan pasangan positifnya: di mode siang kilau itu **memang ada**, dan
+    /// tetap menahan kontras. Tanpa uji ini, "perbaikan" yang menghapus kilau
+    /// dari kedua mode akan lolos — padahal brief memintanya, dan siang punya
+    /// anggaran kontras yang cukup (16.96:1) untuk membayarnya.
+    func testGlassSheenStillExistsInDayModeAndKeepsContrast() {
+        let day = SurfacePalette.day
+        let alpha = SurfacePalette.glassSheenAlpha(for: day)
+        XCTAssertGreaterThan(alpha, 0,
+            "kilau kaca hilang juga di mode siang — brief memintanya, dan siang "
+            + "punya anggaran kontras untuk membayarnya")
+        XCTAssertLessThanOrEqual(alpha, 0.25,
+            "kilau \(alpha) terlalu pekat: ia mulai menggeser warna permukaan, "
+            + "bukan lagi sekadar kilau")
+
+        // Batas atas yang sama, dan **teks sekunder** yang menentukan — ia
+        // yang paling dekat ke ambang.
+        let white = SurfaceColor(red: 1, green: 1, blue: 1)
+        let card = white.composited(over: day.surface1, alpha: alpha)
+        for (name, text) in [("utama", day.textPrimary),
+                             ("sekunder", day.textSecondary)] {
+            let ratio = text.contrastRatio(against: card)
+            XCTAssertGreaterThanOrEqual(
+                ratio, SurfacePalette.minimumTextContrast,
+                "teks \(name) mode siang di atas kartu berkilau hanya \(ratio):1")
+        }
+    }
+
+    /// Kilau dipilih dari **isi** palet, bukan dari saklar yang menghasilkannya.
+    ///
+    /// Sama kelasnya dengan `hairlineOpacity`: dua jalur yang bisa berbeda
+    /// pendapat tentang "ini mode malam?" adalah dua jalur yang suatu hari
+    /// akan berbeda. Di sini yang diuji adalah pemilihnya benar-benar membaca
+    /// palet — memanggilnya dengan palet malam dan palet siang harus memberi
+    /// dua angka berbeda, dan angka malam harus nol.
+    func testGlassSheenIsChosenFromThePaletteNotFromASwitch() {
+        XCTAssertEqual(SurfacePalette.glassSheenAlpha(for: .night),
+                       SurfacePalette.glassSheenNightAlpha)
+        XCTAssertEqual(SurfacePalette.glassSheenAlpha(for: .day),
+                       SurfacePalette.glassSheenDayAlpha)
+        XCTAssertNotEqual(SurfacePalette.glassSheenAlpha(for: .night),
+                          SurfacePalette.glassSheenAlpha(for: .day),
+                          "kedua mode memakai kepekatan kilau yang sama: pemilihnya "
+                          + "tidak membaca palet")
+    }
 }

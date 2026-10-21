@@ -81,25 +81,22 @@ extension SurfacePalette {
 
 /// Token lapis "kaca" — nilai yang tidak bisa diuji di Linux, jadi dikumpulkan
 /// di sini supaya alasannya bisa dibaca di satu tempat, bukan tersebar di view.
+///
+/// **Kepekatan kilau sudah pindah ke model.** `glassSheenOpacity` pernah hidup
+/// di sini sebagai `0.10` telanjang, dan angka itu membocorkan kanal hijau/biru
+/// ke mode malam (0.000 → 0.042) sekaligus menjatuhkan kontras teks malam ke
+/// 4.19:1. Sekarang kepekatannya datang dari
+/// `SurfacePalette.glassSheenAlpha(for:)` — teruji di Linux, nol di mode malam.
+/// Yang tersisa di berkas ini hanya hal yang memang tidak bisa dihitung.
 enum SurfaceTokens {
-    /// Opasitas kilau kaca (`.ultraThinMaterial`) pada kartu.
-    ///
-    /// **Kenapa rendah, bukan penuh.** Kontras teks 4.5:1 dihitung terhadap
-    /// warna token **buram** di bawahnya (teruji di `SurfacePaletteTests`).
-    /// Material di opasitas penuh membuat warnanya bergantung latar belakang,
-    /// sehingga menggeser luminans efektif di bawah teks melewati ambang —
-    /// itulah sebabnya `surfaceCard` aslinya menolak material sama sekali.
-    /// Di sini material diletakkan **di atas** alas buram pada opasitas ini,
-    /// jadi ia hanya menyapu permukaan kosong kartu sebagai kilau, dan teks
-    /// tetap duduk di atas alas buram yang kontrasnya sudah dijamin.
-    ///
-    /// **Batas yang diakui.** Tidak ada gerbang yang mengukur kontras hasil
-    /// render kartu di `Apps/` (hanya model `SurfacePalette` yang diuji), jadi
-    /// angka ini adalah pilihan desain, bukan hasil pengukuran perangkat.
-    /// Ia sengaja dibuat rendah supaya tidak mengubah klaim kontras yang sudah
-    /// lulus; kalau kelak ada gerbang kontras lapisan app, angka ini harus
-    /// diukur ulang, bukan diwarisi.
-    static let glassSheenOpacity: CGFloat = 0.10
+
+    /// **Kenapa enum ini sekarang kosong.** Ia dipertahankan sebagai tempat
+    /// untuk token lapis app yang benar-benar tidak bisa diuji, bukan sebagai
+    /// wadah yang harus diisi. Angka pertama yang pernah tinggal di sini
+    /// (`glassSheenOpacity`) ternyata **bisa** diuji — dan setelah diuji, ia
+    /// salah. Sebelum menambah token di sini, tanyakan dulu apakah ia bisa
+    /// pindah ke `PointingKit`; jawabannya biasanya bisa.
+    private init() {}
 }
 
 /// Ketebalan garis tipis pemisah kartu.
@@ -170,25 +167,44 @@ extension View {
     /// Permukaan kartu: warna yang sudah **diuji**, plus kilau kaca tipis, plus
     /// garis rambut.
     ///
-    /// **Lapis, bukan ganti.** Alas kartu tetap warna token **buram** yang
-    /// kontrasnya sudah lulus `SurfacePaletteTests` — itu jaminan 4.5:1 untuk
-    /// teks. Di atasnya diletakkan `.ultraThinMaterial` pada opasitas rendah
-    /// (`SurfaceTokens.glassSheenOpacity`) sebagai kilau "kaca" ala Mobbin/app
-    /// premium, lalu garis rambut di lapis paling depan. Material tidak pernah
-    /// duduk **di bawah** teks, jadi ia tidak menggeser kontras yang sudah
-    /// dihitung — ia hanya memberi rasa frosted pada permukaan kosong kartu.
+    /// **Urutan lapisnya bagian dari perbaikan, bukan selera.** Versi lama
+    /// menaruh kilau sebagai `.overlay` — yaitu **di atas** isi kartu — lalu
+    /// dokumentasinya menyatakan material itu "tidak pernah duduk di bawah
+    /// teks". Itu kebalikan dari yang dikerjakan kodenya: `.overlay` menggambar
+    /// sesudah isi, jadi kilau menyapu teks, dan seluruh klaim kontras yang
+    /// dihitung terhadap alas buram tidak lagi berlaku untuk piksel yang
+    /// dilihat pengguna. Diukur dengan material = putih penuh pada kepekatan
+    /// lama 0.10: teks utama mode malam 5.13 → **4.19**, sekunder 4.67 →
+    /// **3.82**, keduanya di bawah ambang 4.5.
     ///
-    /// Penolakan material di versi lama benar soal kontras; lapisan ini adalah
-    /// cara mendapatkan rasa yang sama tanpa membatalkan jaminan itu.
+    /// Sekarang kilau duduk **di antara alas dan isi** (`.background` bertingkat):
+    /// alas token buram, kilau di atasnya, lalu isi kartu. Teks kembali berada
+    /// di atas alas yang kontrasnya sudah diuji, dan yang mendapat kilau adalah
+    /// permukaan kosong kartu — persis seperti yang dokumentasi lama klaimkan.
+    ///
+    /// **Kepekatannya dari model, dan nol di mode malam.** Diatur
+    /// `SurfacePalette.glassSheenAlpha(for:)`: 0.10 di siang, **0.0** di malam.
+    /// Nol bukan pengecilan angka, melainkan satu-satunya nilai yang sah —
+    /// setiap kepekatan > 0 membocorkan kanal 498–530nm ke kartu mode malam
+    /// (0.000 → 0.042 pada 0.10), dan merah murni hanya punya plafon kontras
+    /// 5.25:1 sehingga tidak ada anggaran untuk membayar hiasan apa pun.
     func surfaceCard(level: SurfaceLevel = .card, radius: CGFloat = 16) -> some View {
         let palette = SurfacePalette.active
+        let sheen = SurfacePalette.glassSheenAlpha(for: palette)
         return self
-            .background(level.fill(in: palette),
-                        in: .rect(cornerRadius: radius))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius)
-                    .fill(.ultraThinMaterial.opacity(SurfaceTokens.glassSheenOpacity))
-            )
+            .background {
+                // Dua lapis: alas buram (kontras teruji), lalu kilau di atasnya.
+                // Kilau **di sini**, bukan sebagai `.overlay`, supaya ia tidak
+                // pernah menyentuh isi kartu.
+                level.fill(in: palette)
+                    .overlay {
+                        if sheen > 0 {
+                            RoundedRectangle(cornerRadius: radius)
+                                .fill(.ultraThinMaterial.opacity(sheen))
+                        }
+                    }
+            }
+            .clipShape(.rect(cornerRadius: radius))
             .overlay(
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(Hairline.color, lineWidth: Hairline.width)
