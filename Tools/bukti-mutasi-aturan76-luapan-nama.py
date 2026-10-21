@@ -150,12 +150,12 @@ def jalankan(program, mutasi=None, kosongkan_apps=False):
 # yang baru — yang **tidak** boleh dilakukan adalah melonggarkan pencocokan
 # sampai kedua bentuk cocok, karena itu menghapus bukti bahwa kebijakannya
 # masih ada di baris yang benar.
-WATCH_BLOK = """                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)"""
-IOS_BLOK = """                            .lineLimit(2)
-                            .minimumScaleFactor(0.7)"""
-CALIB_BLOK = """                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.7)"""
+WATCH_BLOK = """                .lineLimit(ObjectCardLayout.nameLineLimit(at: textSize))
+                .minimumScaleFactor(0.6)"""
+IOS_BLOK = """                            .lineLimit(ObjectCardLayout.detailNameLineLimit)
+                            .minimumScaleFactor(ObjectCardLayout.detailNameScaleFloor)"""
+CALIB_BLOK = """                                    .lineLimit(ObjectCardLayout.calibrationLineLimit(at: textSize))
+                                    .minimumScaleFactor(ObjectCardLayout.calibrationScaleFloor)"""
 
 #: Keadaan 1b: kebijakan **dipindah** dari nama ke badge keyakinan di
 #: bawahnya. `BADGE_SESUDAH` adalah teks badge di pohon ini (dengan
@@ -163,16 +163,16 @@ CALIB_BLOK = """                                    .lineLimit(2)
 #: badge yang sama dengan kebijakan luapan ditempel padanya. Keduanya
 #: ditulis lengkap supaya perubahannya terbaca di diff, bukan tersembunyi
 #: dalam potongan string.
-BADGE_SESUDAH = """                            .foregroundStyle(level.tone.color)
-                            // Badge tidak boleh ikut menyusut: teksnya pendek
-                            // dan tetap, dan badge yang mengecil sampai tak
-                            // terbaca sama saja dengan badge yang hilang.
-                            .fixedSize()"""
+BADGE_SESUDAH = """                        .foregroundStyle(level.tone.color)
+                        // Badge tidak boleh ikut menyusut: teksnya pendek
+                        // dan tetap, dan badge yang mengecil sampai tak
+                        // terbaca sama saja dengan badge yang hilang.
+                        .fixedSize()"""
 
-BADGE_TANPA_POLICY = """                            .foregroundStyle(level.tone.color)
-                            .fixedSize()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)"""
+BADGE_TANPA_POLICY = """                        .foregroundStyle(level.tone.color)
+                        .fixedSize()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)"""
 
 
 
