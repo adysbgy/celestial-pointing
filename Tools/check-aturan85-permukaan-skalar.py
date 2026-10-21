@@ -50,7 +50,11 @@ mengulanginya di sini berarti dua aturan yang bisa berbeda pendapat. Tipe
 non-skalar non-opsional (mis. `some View`, `Color`, `SurfacePalette`) adalah
 hiasan atau pembungkus tampilan, bukan fakta pengukuran; menuntutnya menyebut
 namanya sendiri akan menuduh kode yang benar (`var color: Color { return
-Color(...) }`). Batas ini dinyatakan, bukan disangka tertutup.
+Color(...) }`). Batas ini **terukur**, bukan disangka: memperluas aturan ke
+tipe non-skalar menghasilkan tepat dua temuan di pohon ini, dan keduanya kode
+yang benar — `SurfaceTokens.color` (membungkus tuple RGB mentah) dan
+`SurfaceTokens.active` (memilih palet lewat `NightPaletteSelector`, sumber
+yang memang berbeda). Keduanya akan jadi positif palsu.
 
 **Batas yang dinyatakan, bukan disangka tertutup.** Ini sapu teks, bukan
 pemeriksa tipe: ia tahu **bentuk** badannya, tidak tahu nilai yang
