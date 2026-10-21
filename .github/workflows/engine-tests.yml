@@ -2894,6 +2894,12 @@ jobs:
       - name: Buktikan gerbang luapan nama objek berbunyi
         run: python3 Tools/bukti-mutasi-aturan76-luapan-nama.py
 
+      # Aturan 81: terang bintang malam wajib berasal dari magnitudo, bukan
+      # dari ukuran yang dikarang view. Rumusnya diuji di Linux, tetapi
+      # pemasangannya tidak terlihat oleh uji model mana pun.
+      - name: Buktikan gerbang terang bintang malam berbunyi
+        run: python3 Tools/bukti-mutasi-aturan81-terang-dari-magnitudo.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada

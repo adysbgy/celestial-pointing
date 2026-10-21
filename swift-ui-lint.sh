@@ -14096,6 +14096,181 @@ else
   echo "        corona Matahari menyusut lewat sunCoronaReach."
 fi
 
+# ── Aturan 81: terang bintang mode malam wajib berasal dari magnitudo ────────
+#
+# Kelas cacat yang ditutup aturan ini **diukur**, bukan disangka.
+#
+# Aturan 80 menutup pemasangan samaran. Aturan 81 menutup tetangganya:
+# rumus terang bintang memang **sudah** pindah ke
+# `NightVisual.starBrightness(relativeSize:)` dan **sudah** diuji di Linux
+# (`testNightStarBrightnessKeepsTheMagnitudeOrdering`), tetapi yang tidak
+# dijaga siapa pun adalah apakah view **memberi** rumus itu ukuran yang
+# berasal dari magnitudo. Terukur pada pohon utuh, proses baru, seluruh 80
+# aturan hijau dan 1025 uji hijau:
+#
+#     CelestialVisualView.swift
+#       let night = NightVisual.star(
+#           CelestialVisual.drawableStarSize(visual, isConfirmed: isConfirmed))
+#     -> let night = NightVisual.star(0.5)                       exit 0
+#
+# Akibatnya setiap bintang kembali menjadi satu titik merah identik — dari
+# Sirius sampai bintang magnitudo 4 — sementara uji model tetap hijau,
+# karena uji itu memanggil `NightVisual` **langsung**, bukan lewat view.
+# Itu kelas "gerbang mengukur salinan, bukan yang dipakai" yang sudah
+# berulang di repo ini: rumusnya benar, pemasangannya dikarang.
+#
+# Kenapa aturan lain tidak menangkapnya:
+#
+#   Aturan 66   menjaga fakta `isNight` yang **dibaca** lalu diganti literal.
+#               Di sini tidak ada argumen `isNight` yang diganti; yang
+#               diganti adalah argumen `relativeSize`.
+#   Aturan 64   menjaga `diameter:` pemanggil, bukan `relativeSize:`.
+#   Aturan 80   menjaga `.opacity`/`.blur`/`sunCoronaReach`, bukan jalur
+#               warna bintang.
+#
+# Yang diperiksa: setiap pemanggilan `NightVisual.star(` di `Apps/` wajib
+# meneruskan `drawableStarSize(`, dan `drawableStarSize(` itu sendiri wajib
+# menyebut `isConfirmed`. Dua mata rantai, karena keduanya bisa diputus
+# terpisah: view bisa mengarang ukuran, dan `drawableStarSize` bisa berhenti
+# membaca keyakinan.
+#
+# Fail-closed: kalau `NightVisual.star(` tidak ditemukan sama sekali di
+# `Apps/`, aturan MEMERAH. Jalur warna bintang yang hilang berarti sapuannya
+# berhenti bekerja, dan gerbang yang gagal-terbuka lebih buruk daripada
+# tidak ada.
+echo
+echo "== Aturan 81: terang bintang malam berasal dari magnitudo =="
+bintang_terang=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+APP = "Apps"
+MASALAH = []
+SITUS = 0
+
+
+def tanpa_komentar(teks):
+    """Buang komentar, jaga isi string (sama seperti Aturan 63 & 80)."""
+    hasil = []
+    i = 0
+    n = len(teks)
+    while i < n:
+        c = teks[i]
+        if c == '"':
+            j = i + 1
+            while j < n:
+                if teks[j] == "\\":
+                    j += 2
+                    continue
+                if teks[j] == '"':
+                    break
+                j += 1
+            hasil.append(teks[i:j + 1])
+            i = j + 1
+        elif teks.startswith("//", i):
+            j = teks.find("\n", i)
+            i = n if j < 0 else j
+        elif teks.startswith("/*", i):
+            j = teks.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        else:
+            hasil.append(c)
+            i += 1
+    return "".join(hasil)
+
+
+def sampai_tutup(teks, mulai):
+    """Ambil isi tanda kurung seimbang mulai dari `mulai` (indeks '(')."""
+    if mulai >= len(teks) or teks[mulai] != "(":
+        return None
+    dalam = 0
+    for k in range(mulai, len(teks)):
+        if teks[k] == "(":
+            dalam += 1
+        elif teks[k] == ")":
+            dalam -= 1
+            if dalam == 0:
+                return teks[mulai + 1:k]
+    return None
+
+
+for akar, _, berkas in os.walk(APP):
+    for nama in sorted(berkas):
+        if not nama.endswith(".swift"):
+            continue
+        path = os.path.join(akar, nama)
+        kode = tanpa_komentar(open(path, encoding="utf-8").read())
+        for m in re.finditer(r"NightVisual\.star\s*\(", kode):
+            SITUS += 1
+            arg = sampai_tutup(kode, m.end() - 1)
+            if arg is None:
+                MASALAH.append(
+                    "  %s: pemanggilan `NightVisual.star(` tidak bisa dibaca "
+                    "argumennya.\n    Aturan 81 tidak bisa memutuskan, jadi ia "
+                    "memerah." % path)
+                continue
+            if "drawableStarSize(" not in arg:
+                MASALAH.append(
+                    "  %s: `NightVisual.star(%s)` tidak meneruskan "
+                    "`drawableStarSize(`.\n"
+                    "    Terang bintang lalu tidak lagi berasal dari "
+                    "magnitudo, dan setiap bintang menjadi merah yang sama."
+                    % (path, arg.strip()[:60]))
+                continue
+            # Mata rantai kedua: drawableStarSize wajib membaca keyakinan
+            # dari **nama**, bukan dari literal. `isConfirmed: true` lolos
+            # kalau yang diperiksa hanya keberadaan kata "isConfirmed" --
+            # dan itu justru cacat yang paling mungkin ditulis: ukuran lalu
+            # menyebut bintang tertentu persis saat engine ragu.
+            dalam = sampai_tutup(arg, arg.find("drawableStarSize(")
+                                + len("drawableStarSize"))
+            if dalam is None:
+                MASALAH.append(
+                    "  %s: argumen `drawableStarSize(` tidak bisa dibaca.\n"
+                    "    Aturan 81 tidak bisa memutuskan, jadi ia memerah."
+                    % path)
+                continue
+            nilai = re.search(r"isConfirmed\s*:\s*([A-Za-z_][A-Za-z0-9_]*)",
+                              dalam)
+            if nilai is None:
+                MASALAH.append(
+                    "  %s: `drawableStarSize(` tidak meneruskan argumen "
+                    "`isConfirmed:`.\n"
+                    "    Ukuran lalu menyebut bintang tertentu justru saat "
+                    "engine ragu." % path)
+            elif nilai.group(1) in ("true", "false"):
+                MASALAH.append(
+                    "  %s: `drawableStarSize(..., isConfirmed: %s)` memakai "
+                    "literal.\n"
+                    "    Keyakinan dikarang di sini, jadi ukuran bintang "
+                    "berhenti mengikuti engine." % (path, nilai.group(1)))
+
+if SITUS == 0:
+    MASALAH.append(
+        "  Tidak ada pemanggilan `NightVisual.star(` di `Apps/`.\n"
+        "    Jalur warna bintang mode malam hilang, atau namanya berubah.\n"
+        "    Gerbang yang gagal-terbuka lebih buruk daripada tidak ada.")
+
+if MASALAH:
+    print("\n".join(MASALAH))
+    raise SystemExit(1)
+PY
+)
+if printf '%s' "$bintang_terang" | grep -q "Traceback"; then
+  echo "Pemeriksaan Aturan 81 tidak bisa memutuskan -> dianggap GAGAL, bukan bersih."
+  echo "$bintang_terang"
+  status=1
+elif [ -n "$bintang_terang" ]; then
+  echo "$bintang_terang"
+  echo "-> Terang bintang mode malam wajib berasal dari magnitudo lewat"
+  echo "   drawableStarSize(..., isConfirmed:)."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+else
+  echo "Bersih: terang bintang malam berasal dari magnitudo lewat"
+  echo "        drawableStarSize(..., isConfirmed:)."
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo
