@@ -1123,6 +1123,145 @@ def check_uncertain_object_is_blurred(results, size=200, ss=2):
         f"(samaran menghapus ketegasan, bukan objeknya)"))
 
 
+def check_view_blur_predicate_matches_the_model(results):
+    """Predikat samaran **di view** harus membaca model dengan arah yang benar.
+
+    **Cacat yang ditutup pemeriksaan ini, dan kenapa ia tak terlihat selama
+    ini.** `CelestialVisualView` memasang samaran keraguan lewat satu predikat:
+
+        .opacity(isConfirmed || UncertainBlur.allows(visual.kind) ? 1 : 0.75)
+        .blur(radius: isConfirmed || UncertainBlur.allows(visual.kind)
+              ? 0 : Self.uncertainBlurRadius(diameter: diameter))
+
+    Arti `UncertainBlur.allows` di model adalah "jenis ini **boleh**
+    disamarkan" — `eligible = [.planet, .deepSky]`. Di dalam predikat di atas,
+    `allows` dipakai untuk **membatalkan** samaran. Hasilnya persis
+    terbalik dari yang dimaksud:
+
+        planet / deepSky  ragu  -> TIDAK disamarkan (cakram penuh tajam)
+        moon / star / sun ragu  -> DISAMARKAN (sabit Bulan jadi kabur)
+
+    Dua arahnya sama-sama melanggar PRD, dan keduanya **hijau di 119 gerbang
+    lain** karena seluruh gerbang gambar mengukur **port Python**, yang
+    mengerjakan predikat ini dengan benar (`uncertain_blur_allows` di
+    `render()`). Kelas cacatnya sama dengan `check_moon_feature_*`: port dan
+    view sepakat di atas kertas, dan tidak ada yang membaca barisnya.
+
+    Akibatnya bukan kosmetik. Bulan yang sabitnya kabur saat ragu berarti
+    pengguna kehilangan satu-satunya gambar yang **tidak** mengklaim
+    identitas — fase adalah fakta tanggal, dan model sengaja
+    mengecualikannya (`deliberatelySharp`). Sebaliknya planet yang tetap
+    tajam mempertahankan bentuk yang dibaca mata sebagai "benda langit
+    pasti" di sebelah lencana "Ragu" — persis kebalikan dari yang
+    `check_uncertain_object_is_blurred` buktikan di port.
+
+    **Yang diukur.** Sumber Swift dibaca (`swift_code_only`, jadi komentar
+    yang menjelaskan predikatnya tidak bisa memuaskannya), lalu tiap baris
+    `.opacity(` / `.blur(` yang memuat `UncertainBlur.allows` diklasifikasi:
+    ia harus memakai `allows` sebagai **penyebab** penyamaran, bukan
+    pembatalnya. Dua bentuk yang diterima, keduanya eksplisit:
+
+        allows(kind) && !isConfirmed      -> disamarkan
+        !isConfirmed && allows(kind)      -> disamarkan
+        isConfirmed || allows(kind)       -> MEMBATALKAN  (merah)
+
+    **Yang TIDAK diklaim.** Ini pembacaan teks satu berkas, bukan analisis
+    Swift sungguhan. Ia tidak membuktikan `diameter`/`visual.kind` yang
+    dipakai benar, dan tidak mengukur hasil di layar — itu
+    `check_uncertain_object_is_blurred` (port) dan `check_uncertain_blur_
+    excludes_moon`. Yang dijaga di sini hanya arah predikatnya, karena arah
+    itulah yang tidak terlihat oleh gerbang mana pun.
+    """
+    view = swift_code_only(open(os.path.join(
+        ROOT, "Apps/Shared/CelestialVisualView.swift"), encoding="utf-8").read())
+    model = R.uncertain_blur_eligible_kinds()
+
+    # Bentuk yang dijaga ada dua, dan keduanya harus diterima:
+    #
+    #   (a) predikat ditulis langsung di baris `.opacity(`/`.blur(`
+    #   (b) predikat tinggal di satu fungsi bernama, lalu dipanggil dari
+    #       kedua baris itu — bentuk yang dipakai sekarang, karena dua
+    #       salinan predikat adalah persis bagaimana cacat ini lahir.
+    #
+    # Jadi yang dicari lebih dulu adalah **fungsi** yang memuat
+    # `UncertainBlur.allows`, lalu arah predikatnya dibaca dari badannya.
+    fn_match = re.search(
+        r"func\s+(\w+)\s*\([^)]*\)\s*->\s*Bool\s*\{(.*?)\n    \}",
+        view, re.S)
+    named = None
+    predicate = None
+    if fn_match and "UncertainBlur.allows" in fn_match.group(2):
+        named = fn_match.group(1)
+        predicate = fn_match.group(2)
+    else:
+        # (a) langsung di baris modifier
+        direct = [l for l in view.splitlines()
+                  if "UncertainBlur.allows" in l
+                  and (".opacity(" in l or ".blur(" in l)]
+        if not direct:
+            results.append(Result(
+                "view_blur_predicate_matches_the_model", False,
+                "tidak ada predikat yang membaca UncertainBlur.allows — baik "
+                "langsung di .opacity/.blur maupun di fungsi bernama. "
+                "Samaran keraguan tidak terpasang di view sama sekali"))
+            return
+        predicate = "\n".join(direct)
+
+    # Arah: `allows` harus jadi **syarat** samaran (`&&`), bukan
+    # pembatalnya (`||`).
+    if "||" in predicate:
+        code = [l.strip() for l in predicate.splitlines() if "allows" in l]
+        results.append(Result(
+            "view_blur_predicate_matches_the_model", False,
+            f"`allows` dipakai untuk MEMBATALKAN samaran (`||`) — artinya "
+            f"{sorted(model)} justru tidak disamarkan dan "
+            f"{sorted({'moon', 'star', 'sun'} - model)} disamarkan. "
+            f"Predikat harus `allows(kind) && !isConfirmed`. "
+            f"Baris: {(code[0] if code else predicate.strip())[:90]}"))
+        return
+    if "&&" not in predicate:
+        results.append(Result(
+            "view_blur_predicate_matches_the_model", False,
+            "predikat memuat `UncertainBlur.allows` tanpa `&&` — arahnya "
+            "tidak bisa dibaca sebagai syarat samaran. Tulis eksplisit: "
+            "`allows(kind) && !isConfirmed`"))
+        return
+    if "isConfirmed" not in predicate:
+        results.append(Result(
+            "view_blur_predicate_matches_the_model", False,
+            "predikat tidak menyebut `isConfirmed` — samaran akan berlaku "
+            "juga untuk gambar yang sudah pasti"))
+        return
+
+    # Arah kedua: predikat itu harus benar-benar **dipakai** oleh kedua
+    # modifier. Fungsi bernama yang tidak dipanggil sama saja dengan tidak ada,
+    # dan itulah kenapa keberadaan nama saja tidak cukup.
+    sites = {"opacity": 0, "blur": 0}
+    for line in view.splitlines():
+        if named is not None and named not in line:
+            continue
+        if named is None and "UncertainBlur.allows" not in line:
+            continue
+        if ".opacity(" in line:
+            sites["opacity"] += 1
+        if ".blur(" in line:
+            sites["blur"] += 1
+    missing = [k for k, v in sites.items() if v == 0]
+    if missing:
+        results.append(Result(
+            "view_blur_predicate_matches_the_model", False,
+            f"predikat {('`' + named + '`') if named else 'langsung'} tidak "
+            f"dipakai oleh {missing} — samaran butuh **keduanya**: opasitas "
+            f"meredupkan, blur menghilangkan ketegasan"))
+        return
+
+    results.append(Result(
+        "view_blur_predicate_matches_the_model", True,
+        f"predikat {('`' + named + '`') if named else 'langsung'} memakai "
+        f"allows sebagai syarat (`&&`), dipakai di .opacity dan .blur; "
+        f"eligible = {sorted(model)}"))
+
+
 def check_uncertain_blur_excludes_moon(results, size=200, ss=2):
     """Bulan **tidak boleh** disamarkan — sabitnya fakta tanggal, bukan identitas.
 
@@ -17053,6 +17192,9 @@ def main():
     # Bulan di atasnya ikut berubah tanpa suara.
     check_uncertain_object_is_blurred(results, args.size, args.ss)
     check_uncertain_blur_excludes_moon(results, args.size, args.ss)
+    # Arah predikat samaran **di view** — 119 gerbang lain mengukur port, dan
+    # port benar; view tidak. Lihat docstring-nya untuk cacat yang ditutup.
+    check_view_blur_predicate_matches_the_model(results)
     check_uncertain_blur_is_reversible(results, args.size, args.ss)
     check_earthshine(results, args.size, args.ss)
     check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)

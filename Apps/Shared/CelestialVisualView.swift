@@ -81,26 +81,36 @@ struct CelestialVisualView: View {
         // (`check_moon_phase_survives_uncertainty`), bintang & Matahari
         // karena warna sudah menyamar dan blur pada 38 pt hanya menghapusnya.
         //
+        // **Arah predikatnya `allows && !isConfirmed`, bukan `isConfirmed ||
+        // allows`.** Versi sebelumnya menulis `isConfirmed || allows(...)`
+        // dan itu **membalik** arti model: `allows` berarti "boleh
+        // disamarkan", jadi memakainya sebagai operand `||` membuat planet &
+        // deepSky justru tajam saat ragu, sementara Bulan/bintang/Matahari
+        // ikut kabur — sabit Bulan kehilangan satu-satunya gambar yang tidak
+        // mengklaim identitas. Seluruh 119 gerbang gambar hijau karena
+        // semuanya mengukur port Python, yang arahnya benar. Dijaga
+        // `check_view_blur_predicate_matches_the_model` (Tools/check-visuals.py).
+        //
         // **Kenapa `.linear`, bukan bawaan `sRGB`.** Dua kelompok di layar ini
         // — "engine ragu" (baru) dan "engine yakin" (sudah ada) — memutuskan
-        // penyamaran dari predikat yang sama (`isConfirmed || allows`). Kalau
-        // satu jalur merasterisasi dalam ruang warna berbeda dari jalur lain,
-        // gambar yang sudah yakin pun berubah warnanya **hanya** karena ada
-        // kelompok kedua di layar yang butuh rasterisasi — cacat yang tidak
-        // bisa dibaca dari kode dan tidak bisa ditangkap uji di Linux.
-        // `.linear` membuat rasterisasi itu tidak mengubah piksel sama sekali.
+        // penyamaran dari predikat yang sama. Kalau satu jalur merasterisasi
+        // dalam ruang warna berbeda dari jalur lain, gambar yang sudah yakin
+        // pun berubah warnanya **hanya** karena ada kelompok kedua di layar
+        // yang butuh rasterisasi — cacat yang tidak bisa dibaca dari kode dan
+        // tidak bisa ditangkap uji di Linux. `.linear` membuat rasterisasi itu
+        // tidak mengubah piksel sama sekali.
         // `drawingGroup(...)` sudah merasterisasi, jadi `blur` di bawahnya
         // tidak menambah biaya lapisan kedua. Parameter ketiga
         // (`rendersAsynchronously:`) **tidak ada** di `drawingGroup` — ia milik
         // `Canvas`; menambahkannya adalah galat kompilasi yang hanya muncul di
         // runner macOS, karena Linux tidak membangun `Apps/`.
         .drawingGroup(opaque: false, colorMode: .linear)
-        .opacity(isConfirmed || UncertainBlur.allows(visual.kind)
-                 ? 1
-                 : Self.uncertainBlurOpacity)
-        .blur(radius: isConfirmed || UncertainBlur.allows(visual.kind)
-              ? 0
-              : Self.uncertainBlurRadius(diameter: diameter))
+        .opacity(Self.dimmedForUncertainty(isConfirmed: isConfirmed, kind: visual.kind)
+                 ? Self.uncertainBlurOpacity
+                 : 1)
+        .blur(radius: Self.dimmedForUncertainty(isConfirmed: isConfirmed, kind: visual.kind)
+              ? Self.uncertainBlurRadius(diameter: diameter)
+              : 0)
         // Grafis tidak pernah diumumkan sebagai teks — VoiceOver membaca nama
         // objek & keyakinannya (lihat `ObjectDetailView`), dan menambah
         // deskripsi gambar hanya menambah yang harus dilalui pengguna.
@@ -204,6 +214,21 @@ struct CelestialVisualView: View {
     /// yang disamarkan (`UncertainBlurTests`), bukan seberapa.
     private static func uncertainBlurRadius(diameter: CGFloat) -> CGFloat {
         diameter * 0.06
+    }
+
+    /// Apakah gambar ini harus **disamarkan** karena engine belum pasti.
+    ///
+    /// Satu tempat, dua pemakai (`.opacity` dan `.blur`). Versi sebelumnya
+    /// menulis predikatnya dua kali dengan arah yang salah di keduanya —
+    /// lihat catatan di badan `body`.
+    ///
+    /// Arahnya sengaja `allows && !isConfirmed`, bukan `isConfirmed ||
+    /// allows`: `UncertainBlur.allows` menjawab "jenis ini **boleh**
+    /// disamarkan", jadi ia syarat untuk menyamarkan, bukan alasan
+    /// membatalkannya.
+    private static func dimmedForUncertainty(isConfirmed: Bool,
+                                             kind: CelestialVisual.Kind) -> Bool {
+        !isConfirmed && UncertainBlur.allows(kind)
     }
 
     /// Opasitas gambar yang disamarkan. Turun tipis, bukan dramatis: samaran
