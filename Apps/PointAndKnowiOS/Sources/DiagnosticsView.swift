@@ -859,6 +859,19 @@ struct DiagnosticsView: View {
             ObjectCardLayout.detailStacksVisual(at: textSize)
         }
 
+        /// Susunan untuk nama + badge keyakinan.
+        ///
+        /// Properti terhitung, bukan `let` di dalam `ViewBuilder`: closure
+        /// `content` adalah result builder, dan `let` di sana mengharuskan
+        /// `return` — yang justru ditolak builder. Sebagai properti, satu
+        /// keputusan dipakai dua tempat (gambar di atas nama, badge di bawah
+        /// nama) tanpa bisa berbeda pendapat.
+        private var nameBadgeLayout: AnyLayout {
+            stacksVisualAboveName
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+        }
+
         @State private var appearScale: CGFloat = 1
         @State private var appearOpacity: Double = 1
         /// Pengguna meminta reduksi gerak: pop dimatikan, dan `TimelineView`
@@ -961,7 +974,7 @@ struct DiagnosticsView: View {
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
                 : AnyLayout(HStackLayout(alignment: .center, spacing: ObjectCardLayout.detailVisualGap))
 
-            layout {
+            return layout {
                 CelestialVisualView(visual: visual,
                                      diameter: visualDiameter,
                                      // Bukan `!isStale`: `.uncertain`
@@ -996,11 +1009,12 @@ struct DiagnosticsView: View {
                     // kembali terpotong meski kolomnya "lebar penuh". Badge
                     // turun ke barisnya sendiri; yang berkurang hanya tinggi,
                     // dan panel ini ada di dalam `List`.
-                    let nameAndBadge = stacksVisualAboveName
-                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
-
-                    nameAndBadge {
+                    //
+                    // Susunannya datang dari properti terhitung, bukan `let`
+                    // di dalam closure: closure ini adalah `ViewBuilder`, dan
+                    // di sana `let` + pemakaian mengharuskan `return` — yang
+                    // justru ditolak result builder.
+                    nameBadgeLayout {
                         // Nama = informasi utama: paling besar.
                         Text(displayName ?? ObjectDisplayName.text(of: object))
                             .font(.title2.bold())
