@@ -31048,3 +31048,77 @@ keadaan:
 
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **770** = **992**
 hijau (0 kegagalan) di Docker Swift 6.0.
+
+## Siklus: nama objek terpotong di setiap ukuran aksesibilitas
+
+**Cacatnya.** Aturan 76 menghitung luapan nama pada **satu** ukuran huruf
+(20 pt, `.title3` bawaan) dan menyimpulkan "Galaksi Kincir Angin" muat di
+kolom 96 pt pada skala 0.847. Itu benar — pada ukuran bawaan. Angka 0.847
+adalah hasil bagi pada skala 1.0; setiap langkah Dynamic Type mengalikan
+pembilangnya sementara penyebutnya tetap 96 pt. Terukur (DejaVu Sans Bold,
+nama terlebar katalog "Gugus Sarang Lebah" = 233.22 pt):
+
+    ukuran   skala   skala-wajib   hasil
+    large    1.00      0.823        muat, menyusut 18%
+    xxxLarge 1.30      0.633        muat (tipis)
+    AX1      1.64      0.517        TERPOTONG (di bawah lantai 0.6)
+    AX5      3.12      0.281        TERPOTONG
+
+Jadi nama objek terpotong di **setiap** ukuran aksesibilitas — ukuran yang
+justru dipilih orang yang **butuh** huruf besar. Yang hilang bukan hiasan:
+katalog ini punya "Galaksi Kincir Angin" / "Galaksi Andromeda" / "Galaksi
+Triangulum", sehingga elipsis memotong tepat **kata pembeda**-nya.
+
+Kenapa 77 aturan UI tidak melihatnya: semuanya mengukur teks pada ukuran
+bawaan. Ini kelas cacat yang sama dengan Aturan 77 — aplikasi yang tampak
+benar, dan hanya pengguna yang memakai huruf besar yang melihat potongannya.
+
+**Tiga lapis perbaikan, dan lapis ketiga yang sebenarnya bekerja.**
+
+1. Kartu membaca `dynamicTypeSize` dan menyusun ulang lewat `AnyLayout`
+   (gambar di atas nama), bukan mengecilkan huruf sampai tak terbaca.
+2. Keputusan tata letak pindah ke `ObjectCardLayout` (PointingKit) supaya
+   bisa diuji di Linux. Ambang yang ditulis di dalam view tidak bisa diuji
+   dari sini dan tidak dijaga gerbang mana pun.
+3. `lineLimit` **ikut tumbuh**. Ini ditemukan oleh tes yang saya tulis untuk
+   memeriksa klaim saya sendiri, dan klaim itu ternyata salah: menyusun
+   ulang hanya membeli lebar 48% (96 → 142 pt), sedangkan huruf tumbuh 212%
+   (AX5 3.12× vs AX2 1.95×). Kolom susunan 142 pt dengan 2 baris **gagal
+   mulai AX3**. Kartu ada di dalam `ScrollView`, jadi baris tambahan tidak
+   merebut ruang dari apa pun — dimensi yang benar-benar tumbuh saat huruf
+   membesar adalah **tinggi**. Menahan `lineLimit` di 2 sambil berharap
+   kolom lebih lebar menyelamatkan nama adalah menukar satu dimensi tetap
+   dengan dimensi lain yang juga tetap.
+
+**Pemetaan ukuran memakai `switch` ke enum, bukan interpolasi string.**
+Versi pertama berkas ini memakai `scale(forSizeNamed: "\(dynamicTypeSize)")`.
+`DynamicTypeSize` SwiftUI diinterpolasi menjadi `"accessibility1"`,
+sementara tabelnya memakai `"AX1"` — jadi **setiap** ukuran aksesibilitas
+jatuh ke cabang "tidak dikenal" tanpa satu pun galat. Kebetulan arahnya
+aman di sini (memakai skala terbesar), tapi kebetulan yang sama bisa
+berbalik. Sekarang `switch` yang diperiksa compiler: ukuran SwiftUI baru
+memaksa keputusan.
+
+**Aturan 78 (baru)** menjaga kelas cacat ini: kartu wajib membaca
+`dynamicTypeSize`, keputusan wajib lewat `ObjectCardLayout`, wajib memakai
+`AnyLayout`, `lineLimit` wajib ikut tumbuh, dan tes wajib menguji AX1/AX3/AX5.
+Probe: mengganti `lineLimit` kembali ke `2` membuatnya **merah**.
+
+Aturan 76 **tidak** diubah. Ia benar untuk apa yang diukurnya; yang salah
+adalah menganggapnya cukup.
+
+**Yang TIDAK diklaim.**
+- Angka lebar memakai **DejaVu Sans Bold**, bukan San Francisco. SF lebih
+  sempit, jadi nama di perangkat terbaca pada ukuran satu tingkat lebih
+  besar daripada yang dihitung di sini. Hasilnya dipakai sebagai **ambang
+  kehati-hatian**, bukan janji piksel.
+- Skala Dynamic Type adalah **pendekatan** HIG (AX1 ≈ 1.6×, AX5 ≈ 3.1×),
+  bukan tabel resmi yang diukur dari perangkat.
+- Model menganggap satu baris butuh lebar penuh; nama berspasi bisa
+  membungkus lebih awal, dan itu membuat hasil sebenarnya **lebih buruk** —
+  jadi arah kesalahannya aman, tetapi angkanya bukan janji.
+- Tata letak SwiftUI tidak dijalankan di Linux. Yang diuji adalah
+  **aritmetika** dan **bentuk** keputusan, bukan piksel di perangkat.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1011** =
+**1233** hijau (0 kegagalan) di Docker Swift 6.0. 78 aturan UI hijau.
