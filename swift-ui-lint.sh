@@ -14271,6 +14271,103 @@ else
   echo "        drawableStarSize(..., isConfirmed:)."
 fi
 
+# ── Aturan 82: Mode Malam wajib bisa DIMATIKAN ──────────────────────────────
+#
+# Kelas cacatnya: `NightMode.isOn` adalah getter yang membaca `UserDefaults`,
+# dan 7 tempat di `Apps/` membacanya tiap render. Menggantinya dengan
+# tetapan —
+#
+#     get { UserDefaults.standard.bool(forKey: NightModeStorage.key) }
+#  -> get { true }                                            exit 0
+#
+# — mengompilasi, melewati SELURUH 81 aturan, dan membuat saklar Mode Malam
+# menjadi tombol mati: palet merah menyala selamanya. Aturan 57 tidak
+# menangkapnya karena ia menjaga **kunci** penyimpanan (satu sumber, bukan
+# literal), bukan apakah getter-nya benar-benar membaca kunci itu.
+#
+# Pada mode malam ini bukan cacat kosmetik di dua arah. Pengguna yang tidak
+# butuh mode malam mendapat layar merah permanen — dan warna merah menurunkan
+# kontras teks, jadi ia juga kehilangan keterbacaan. Pengguna yang butuh mode
+# malam tidak bisa mematikannya saat siang.
+#
+# **Kenapa getter, bukan `@AppStorage`.** `@AppStorage` di layar menjaga
+# pembacaan preferensi untuk layar itu; ia tidak menjaga jalur yang dipakai
+# lapisan warna (`SurfacePalette.active`, `SkyBackdropView`, kanvas visual).
+# Mutasi di atas memutus justru jalur bersama itu, dan hanya jalur bersama yang
+# bisa membuat seluruh UI salah serempak.
+#
+# **Kenapa fail-closed.** `NightMode.isOn` yang hilang sama sekali berarti
+# lapisan warna tidak lagi lewat sana; aturan ini akan memerah, dan itu benar —
+# sapuannya harus diperbarui, bukan dibiarkan diam.
+echo
+echo "== Aturan 82: Mode Malam wajib membaca preferensi, bukan tetapan =="
+mode_malam=$(python3 - <<'PY' 2>&1
+import os
+import re
+
+BERKAS = os.path.join("Apps", "Shared", "NightMode.swift")
+KUNCI = "NightModeStorage.key"
+PEMBACA = re.compile(r"bool\s*\(\s*forKey\s*:\s*" + re.escape(KUNCI) + r"\s*\)")
+
+masalah = []
+if not os.path.exists(BERKAS):
+    masalah.append(f"FAIL {BERKAS} tidak ada: gerbang Mode Malam tidak mengukur apa pun.")
+else:
+    teks = open(BERKAS, encoding="utf-8").read()
+    kode = "\n".join(l.split("//", 1)[0] for l in teks.split("\n"))
+    m = re.search(r"static\s+var\s+isOn\s*:\s*Bool\s*\{", kode)
+    if not m:
+        masalah.append("FAIL NightMode.isOn tidak ditemukan: lapisan warna tidak lagi "
+                      "lewat getter itu, jadi aturan ini tidak mengukur apa pun.")
+    else:
+        tutup = kode.find("\n}", m.end())
+        badan = kode[m.end():tutup if tutup != -1 else len(kode)]
+        if not PEMBACA.search(badan):
+            masalah.append(
+                "FAIL NightMode.isOn tidak membaca UserDefaults lewat "
+                f"{KUNCI}. Saklar Mode Malam menjadi tombol mati: palet merah "
+                "menyala selamanya dan tidak bisa dimatikan.")
+        else:
+            # Membaca kunci yang benar belum tentu **memakai** nilainya.
+            # `get { UserDefaults.standard.bool(forKey: NightModeStorage.key) && false }`
+            # membaca kunci yang benar, menyebut nama yang benar, dan tetap
+            # memaku palet. Jadi yang diperiksa di sini adalah bentuk badannya:
+            # hasil bacaan harus dikembalikan apa adanya, dan tidak boleh ada
+            # `&&`/`||`/perbandingan yang bisa membuangnya.
+            #
+            # Bentuk sah yang diterima hanya dua, dan keduanya literal:
+            #   get { UserDefaults.standard.bool(forKey: NightModeStorage.key) }
+            #   let on = UserDefaults...; return on
+            tanpa_spasi = re.sub(r"\s+", " ", badan).strip()
+            salah_bentuk = [
+                pola for pola in (r"&&", r"\|\|", r"==", r"!=", r"\?", r"!")
+                if re.search(pola, tanpa_spasi)
+            ]
+            if salah_bentuk:
+                masalah.append(
+                    "FAIL NightMode.isOn membaca kunci yang benar tetapi "
+                    "mengubah nilainya (ditemukan "
+                    + ", ".join(repr(p.replace("\\", "")) for p in salah_bentuk)
+                    + "). Saklar Mode Malam tidak lagi mengendalikan palet.")
+
+if masalah:
+    print("\n".join(masalah))
+    raise SystemExit(1)
+PY
+)
+if [ $? -ne 0 ]; then
+  echo "$mode_malam"
+  echo "-> Mode Malam wajib membaca preferensi lewat NightModeStorage.key."
+  echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+  status=1
+elif [ -n "$mode_malam" ]; then
+  echo "$mode_malam"
+  status=1
+else
+  echo "Bersih: NightMode.isOn membaca UserDefaults lewat NightModeStorage.key,"
+  echo "        jadi saklar Mode Malam benar-benar bisa dimatikan."
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo

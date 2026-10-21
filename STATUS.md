@@ -1,3 +1,183 @@
+### Siklus (21 Okt 2026 — Aturan 82: saklar yang bisa dimatikan, dan getter yang membuang nilainya)
+
+Aturan 82 menjaga satu hal yang tidak terlihat oleh 81 aturan lain: bahwa
+`NightMode.isOn` — satu-satunya jalur yang membuat seluruh UI menjadi merah —
+benar-benar **membaca** preferensi pengguna.
+
+#### Kenapa ini cacat, bukan kosmetik
+
+`NightMode.isOn` dibaca **7 tempat** di `Apps/` setiap render (diukur dengan
+membuang komentar: `SurfacePalette.active`, `SkyBackdropView`, empat jalur
+kanvas visual). Menggantinya dengan tetapan mengompilasi dan melewati seluruh
+gerbang UI:
+
+    get { UserDefaults.standard.bool(forKey: NightModeStorage.key) }
+ -> get { true }                                            exit 0
+
+Saklar Mode Malam menjadi tombol mati. Dua arah kerugiannya nyata: pengguna
+yang tidak butuh mode malam mendapat layar merah permanen — dan karena merah
+menurunkan kontras teks, ia **juga** kehilangan keterbacaan; pengguna yang
+butuh mode malam tidak bisa mematikannya saat siang.
+
+Aturan 57 tidak menangkapnya karena ia menjaga **kunci** penyimpanan (satu
+sumber, bukan literal), bukan apakah getter-nya memakai nilai dari kunci itu.
+
+#### Versi pertama aturannya sendiri vakuos
+
+Versi pertama menuntut adanya `bool(forKey: NightModeStorage.key)` di badan
+getter. Diukur pada salinan pohon:
+
+    get { UserDefaults.standard.bool(forKey: NightModeStorage.key) && false }
+                                                        -> exit 0  (Bersih)
+
+Bentuk itu membaca kunci yang benar, menyebut nama yang benar, dan tetap
+memaku palet merah. Aturannya **bunyi nama, bukan memakai nilai**. Yang
+ditambahkan sekarang: badan getter tidak boleh memuat `&&`, `||`, `==`, `!=`,
+`?`, atau `!` — hasil bacaan harus dikembalikan apa adanya. Dua bentuk sah
+yang tersisa (satu baris, atau `let` lalu `return`) keduanya literal, jadi
+aturan ini tidak menuduh baris yang benar.
+
+Bentuk itu masuk harness sebagai keadaan wajib-bunyi, dan docstring-nya
+mencatat bahwa ia lolos versi pertama — supaya penyempitan ini punya jejak,
+bukan hanya jadi aturan yang "kebetulan lebih ketat".
+
+#### Angka di docstring ikut diukur
+
+Docstring awal menulis "23 tempat" dan "melewati 80 aturan". Yang terukur:
+**7** tempat (kode, komentar dibuang) dan **81** aturan yang ada saat Aturan 82
+ditulis. Keduanya diperbaiki ke angka hasil ukur — kelas drift yang sama
+dengan Aturan 76, dan alasan kenapa angka di docstring tidak boleh dikutip
+tanpa diukur ulang.
+
+#### Non-vakuositas (diukur, bukan diklaim)
+
+    salinan v1 (tanpa penjaga bentuk) + `&& false`   exit 0   <- vakuos
+    salinan v2 (dengan penjaga bentuk) + `&& false`  exit 1   FAIL ... '&&'
+    salinan v2 + pohon apa adanya                    exit 0
+    harness lengkap: 4 keadaan berbunyi, 1 kontrol diam
+
+#### Verifikasi
+
+    ./swift-test.sh        CelestialEngine 222 + PointingKit 1025, 0 gagal
+    ./swift-ui-lint.sh     SEMUA GERBANG UI LULUS (81 aturan)
+    bash -n (bash 3.2)     OK  (docker bash:3.2, seperti CI macOS)
+    check-harness-terdaftar 140 harness, semuanya dirujuk
+
+#### Yang TIDAK diklaim
+
+- Aturan ini membaca **teks** `NightMode.swift`, bukan menjalankannya. Ia tidak
+  membuktikan saklar di layar terpasang ke `@AppStorage` — itu Aturan 57 dan
+  pembacaan diff. Ia juga tidak membuktikan palet merahnya benar; itu
+  `TonePaletteTests` + `SurfacePaletteTests`.
+- Penjaga bentuk menolak `?`/`!`, jadi getter yang sah tetapi ditulis dengan
+  ternary akan memerah. Itu dipilih sengaja (fail-closed): bentuk seperti itu
+  belum ada, dan kalau muncul, ia harus ditambahkan ke daftar sah **dengan
+  alasan**, bukan diloloskan diam-diam.
+- Tidak ada pengukuran di perangkat. Semua angka berasal dari pohon di Linux.
+
+### Siklus (21 Okt 2026 — gerbang yang mengukur salinan, bukan yang dipakai)
+
+Sapu mutasi atas 79 aturan UI menemukan **empat** mutasi di `Apps/` yang lolos
+seluruh gerbang. Semuanya satu kelas, dan kelas itu berulang di repo ini:
+nilainya benar, tetapi **pemasangannya** tidak dijaga siapa pun.
+
+#### Cacat 1: samaran ragu benar angkanya, tidak terpasang
+
+Aturan 63 menjaga angka samaran (`0.06`, `0.75`) dan menyatakannya sama dengan
+port Python. Ia tidak menjaga apakah angka itu **dipasang** pada gambar:
+
+    .opacity(...)  -> .opacity(1)        exit 0
+    .blur(...)     -> .blur(radius: 0)   exit 0
+
+Akibatnya objek "kandidat" digambar **tajam dan penuh** — cincin Saturnus, pita
+Jupiter, warna spektral bintang — tepat di samping lencana "Ragu". Itu persis
+keyakinan palsu yang dilarang PRD §2, dan tidak satu pun dari 79 aturan
+melihatnya.
+
+#### Cacat 2: corona Matahari hilang
+
+    radius: radius / CGFloat(VisualFrame.sunCoronaReach)  ->  radius: radius
+
+Piringan selebar frame, `Canvas` memotong corona di tepi, dan yang tampak
+kembali jadi disk terang tanpa glow. Komentar di atas baris itu **sudah**
+menyebut cacat ini pernah ditutup — komentarnya benar, gerbangnya tidak ada.
+
+#### Perbaikan: Aturan 80 menjaga pemasangan, bukan angka
+
+Dua mata rantai: `.opacity`/`.blur` di **rantai samaran** (antara `drawingGroup`
+dan `accessibilityHidden`) wajib menyebut `isConfirmed`, dan cabang `.sun`
+wajib memanggil `drawSun` dengan radius yang menyebut `sunCoronaReach`.
+Rantainya dibatasi supaya puluhan `.opacity` di gradien dalam kanvas tidak ikut
+dituduh. Fail-closed: rantai yang tidak terbaca **memerah**, bukan diam.
+
+#### Cacat 3: terang bintang dihapus, dan uji model tidak bisa melihatnya
+
+Rumus terang bintang mode malam dulu ditulis inline di
+`CelestialVisualView.starColor`:
+
+    floorBrightness + rangeBrightness * clamp(size)
+
+Menggantinya dengan tetapan `0.9` membuat setiap bintang — Sirius sampai
+magnitudo 4 — menjadi satu titik merah identik. Mode malam memang membuang hue;
+terang adalah **satu-satunya** informasi yang tersisa setelahnya, jadi membuang
+terang berarti menghapus bintang yang berbeda terangnya.
+
+Rumusnya pindah ke `NightVisual.starBrightness(relativeSize:)` dan diuji di
+Linux. Tetapi memindahkannya belum cukup — dan itu pelajaran siklus ini:
+
+#### Cacat 4: rumus benar, view boleh mengarang masukannya
+
+    let night = NightVisual.star(
+        CelestialVisual.drawableStarSize(visual, isConfirmed: isConfirmed))
+    -> let night = NightVisual.star(0.5)                     exit 0
+
+Seluruh 80 aturan hijau, 1025 uji hijau, dan semua bintang kembali identik.
+Uji model memanggil `NightVisual` **langsung**, bukan lewat view, jadi ia tidak
+pernah melihat argumen yang dikarang pemanggil. Inilah bedanya "rumus benar"
+dan "rumus dipakai".
+
+#### Aturan 81 menjaga pemasangannya
+
+Setiap `NightVisual.star(` di `Apps/` wajib meneruskan `drawableStarSize(`, dan
+`drawableStarSize(` wajib membaca `isConfirmed` dari **nama**, bukan literal.
+
+Versi pertama aturan ini hanya memeriksa keberadaan kata `isConfirmed`, jadi
+`isConfirmed: true` lolos. **Harness-nya yang menangkap itu**, sebelum
+aturannya di-push: keadaan kedua dilaporkan `diam` padahal seharusnya
+`bunyi`. Yang diperiksa sekarang nilainya, bukan katanya.
+
+#### Yang ditemukan saat menulis uji, bukan sesudahnya
+
+Uji baru langsung gagal pada `relativeSize = 1.0`: `0.35 + 0.65·1.0` tepat
+`1.0`, jadi kanal merah **jenuh**. Di katalog sekarang tidak ada bintang yang
+mencapainya (Sirius, −1,46 → 0,982), tetapi kalau suatu hari bintang magnitudo
+≤ −1,5 masuk, dua bintang akan bertabrakan di ujung skala dan menjadi merah
+yang sama — lewat pintu yang berbeda dari cacat di atas.
+`testStarSizeScaleClampsAndTheCatalogueStaysBelowIt` mengunci keduanya: Sirius
+masih di bawah jepitan, **dan** jepitannya memang ada, supaya ia keputusan
+sadar dan bukan kejutan.
+
+#### Non-vakuositas
+
+- Aturan 80: empat jalur dicabut satu per satu (opacity, blur, piringan,
+  `let reach`), semuanya berbunyi; diam pada gradien di dalam kanvas.
+- Aturan 81: tiga jalur dicabut (ukuran dikarang, keyakinan dikarang, jalur
+  dihapus), semuanya berbunyi; diam pada pohon apa adanya.
+- Model: mengganti rumus dengan tetapan `0.9` → 12 kegagalan uji.
+- Sapu model terpisah mengonfirmasi empat mutasi PointingKit lain (fase planet
+  dalam hilang, fase planet luar dipaksa, fraksi fase dibalik, arah fase
+  diabaikan) **sudah** tertangkap suite Linux. Lint memang tidak menjalankan
+  Swift, dan itu benar — bukan celah.
+
+#### Yang TIDAK diklaim
+
+Sapu ini hanya menguji **lapisan visual** (`Apps/Shared/CelestialVisualView`,
+`PointingKit/CelestialVisual`, `NightVisual`). Ia tidak menyentuh tata letak,
+AOD, complication, atau lokalisasi; keempat area itu punya gerbang sendiri
+(Aturan 56, 70, 75, 6) dan tidak diperiksa ulang di siklus ini. Tidak ada
+pengukuran di perangkat nyata: semua angka di atas berasal dari pohon di Linux
+dan render 200 px, bukan dari jam atau iPhone.
+
 ### Siklus (21 Okt 2026 — panel iPhone: model dan view yang berbeda pendapat soal 4 pt)
 
 Sesudah panel iPhone diperbaiki, model dan view masih berbeda pendapat tentang

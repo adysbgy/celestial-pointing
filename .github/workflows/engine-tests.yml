@@ -2900,6 +2900,17 @@ jobs:
       - name: Buktikan gerbang terang bintang malam berbunyi
         run: python3 Tools/bukti-mutasi-aturan81-terang-dari-magnitudo.py
 
+      # Aturan 82: `NightMode.isOn` dibaca 11 tempat di `Apps/` setiap render
+      # (palet permukaan, latar langit, empat jalur kanvas visual). Mengganti
+      # getter-nya dengan tetapan mengompilasi, melewati seluruh gerbang UI, dan
+      # mengubah saklar Mode Malam menjadi tombol mati — palet merah menyala
+      # selamanya, dan karena merah menurunkan kontras teks, pengguna juga
+      # kehilangan keterbacaan. Tiga keadaan wajib berbunyi: `true`, `false`,
+      # dan getter yang membaca **kunci lain** (yang terakhir paling penting:
+      # ia tetap punya getter, tetap membaca `UserDefaults`, dan tetap salah).
+      - name: Buktikan gerbang mode malam berbunyi
+        run: python3 Tools/bukti-mutasi-aturan82-mode-malam.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada
