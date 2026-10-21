@@ -790,18 +790,74 @@ struct DiagnosticsView: View {
         let lockArrivalToken: Int?
         let pulse: Double
 
-        /// Diameter visual objek, **mengikuti Dynamic Type**.
+        /// Diameter visual objek, **mengikuti Dynamic Type tetapi dibatasi**.
         ///
-        /// `@ScaledMetric` — bukan angka tetap 132 — supaya lukisan objek di
-        /// panel detail ikut membesar saat pengguna memperbesar teks sistem.
-        /// Diameter tetap dulu (132pt) tidak bergeser saat aksesibilitas teks
-        /// diubah, sehingga objek terlihat menyusut relatif terhadap nama dan
-        /// teks di sebelahnya yang justru membesar. Ini bagian dari BAGIAN 4
-        /// #5 (Dynamic Type penuh): ukuran gambar bukan sekadar angka tetap.
-        /// `relativeTo: .title2` dipakai karena visual ini berpasangan dengan
-        /// nama berukuran `.title2` di `content(pulse:)` — keduanya menekan
-        /// skala yang sama.
-        @ScaledMetric(relativeTo: .title2) private var visualDiameter: CGFloat = 132
+        /// **Cacat yang membuat ini berubah.** Properti ini dulu
+        /// `@ScaledMetric(relativeTo: .title2)` bertumpu pada 132 pt tanpa batas
+        /// atas, sehingga diameternya 132 → 411.8 pt di AX5 — **lebih lebar
+        /// daripada panel itu sendiri** (333 pt). Pada AX4 `HStack` memampatkan
+        /// kolom nama ke nol dan nama objek hilang sama sekali; yang tersisa
+        /// hanya gambar besar, tepat di ukuran huruf yang dipilih orang yang
+        /// butuh teks. Tidak ada galat kompilasi dan tidak ada piksel yang bisa
+        /// diukur `check-visuals.py` (ia merender objek, bukan tata letak layar),
+        /// jadi satu-satunya cara menangkapnya adalah menghitungnya.
+        ///
+        /// Batasnya dihitung di `ObjectCardLayout.detailVisualDiameterCap`:
+        /// panel 333 − jarak 16 − kolom nama minimum 150 = 167 pt. Angka itu
+        /// bukan pilihan, ia sisa ruang — dan ia bergerak kalau panel atau
+        /// kolom minimumnya berubah. `ObjectCardLayout.detailVisualDiameter(at:)`
+        /// yang mengikatkan `min`, dan uji di Linux menyatakan setiap ukuran
+        /// Dynamic Type tetap muat (`NameOverflowTests`).
+        ///
+        /// **Kenapa `@ScaledMetric` diganti, bukan ditambah `min`.** `min` di
+        /// dalam `body` akan mengikat gambar tetapi tidak mengubah apa pun di
+        /// bawahnya: susunan `HStack` → `VStack` tetap tidak pernah terjadi,
+        /// sehingga pada AX4 nama masih kehilangan kolomnya meski gambarnya
+        /// tidak lagi melebihi panel. Ukuran gambar dan susunan adalah satu
+        /// keputusan, jadi keduanya datang dari satu fungsi yang diuji.
+        private var visualDiameter: CGFloat {
+            CGFloat(ObjectCardLayout.detailVisualDiameter(at: textSize))
+        }
+
+        /// Ukuran teks aktif, dalam bentuk yang dipakai `PointingKit`.
+        ///
+        /// `switch`, bukan interpolasi string — alasannya sama dengan
+        /// `PointingView.textSize`: `"\(dynamicTypeSize)"` menghasilkan
+        /// `"accessibility1"` sementara tabelnya memakai `"AX1"`, jadi setiap
+        /// ukuran aksesibilitas akan jatuh ke cabang cadangan tanpa galat.
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+        private var textSize: NameOverflow.TextSize {
+            switch dynamicTypeSize {
+            case .xSmall: return .xSmall
+            case .small: return .small
+            case .medium: return .medium
+            case .large: return .large
+            case .xLarge: return .xLarge
+            case .xxLarge: return .xxLarge
+            case .xxxLarge: return .xxxLarge
+            case .accessibility1: return .accessibility1
+            case .accessibility2: return .accessibility2
+            case .accessibility3: return .accessibility3
+            case .accessibility4: return .accessibility4
+            case .accessibility5: return .accessibility5
+            @unknown default:
+                // Ukuran yang belum dikenal Apple: pakai yang terbesar, karena
+                // arah kelalaian yang salah adalah menganggap ruang cukup.
+                return .accessibility5
+            }
+        }
+
+        /// Apakah gambar dipindah **di atas** nama pada ukuran ini.
+        ///
+        /// Sumbernya `ObjectCardLayout.detailStacksVisual(at:)` — model yang
+        /// sama yang menghitung kolom nama, jadi susunan dan ukuran tidak bisa
+        /// berbeda pendapat. Diukur: berdampingan gagal mulai xxLarge (skala
+        /// wajib 0.62 < lantai 0.7), jadi dari sana nama mendapat lebar penuh
+        /// dan badge turun ke barisnya sendiri.
+        private var stacksVisualAboveName: Bool {
+            ObjectCardLayout.detailStacksVisual(at: textSize)
+        }
 
         @State private var appearScale: CGFloat = 1
         @State private var appearOpacity: Double = 1
@@ -889,7 +945,23 @@ struct DiagnosticsView: View {
         /// panel ikut hidup di dalam `TimelineView`, mematikan denyut berarti
         /// mematikan panel — dan panel adalah **jawaban**, bukan hiasan.
         private func content(pulse currentPulse: Double) -> some View {
-            HStack(alignment: .center, spacing: 16) {
+            // **Dua susunan, satu identitas.** `AnyLayout` dipakai supaya
+            // gambar dan teks tidak dibangun ulang sebagai view berbeda saat
+            // susunannya berganti — sama seperti kartu jam
+            // (`PointingView.stacksVisualAboveName`). Tanpa itu, mengganti
+            // ukuran teks di tengah jalan membuang state animasi dan pop
+            // kedatangan kunci ikut hilang.
+            //
+            // Berdampingan = gambar di kiri, nama di kanan (ukuran bawaan
+            // sampai xLarge). Disusun = gambar di atas, nama mendapat lebar
+            // penuh, badge turun ke barisnya sendiri (mulai xxLarge) — karena
+            // terukur, berdampingan gagal mulai xxLarge: kolom nama tinggal
+            // 97.8 pt sementara nama terlebar butuh 256.54 pt.
+            let layout = stacksVisualAboveName
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                : AnyLayout(HStackLayout(alignment: .center, spacing: ObjectCardLayout.detailVisualGap))
+
+            layout {
                 CelestialVisualView(visual: visual,
                                      diameter: visualDiameter,
                                      // Bukan `!isStale`: `.uncertain`
@@ -915,7 +987,20 @@ struct DiagnosticsView: View {
                 // dengan penanda **sisa** ikut terbawa — tanpa itu, objek
                 // basi terdengar persis seperti hasil pengukuran sekarang.
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    // Nama dan badge: berdampingan pada ukuran biasa, dan
+                    // **bertumpuk** saat gambar sudah disusun di atas nama.
+                    //
+                    // Kalau badge tetap di sebelah nama pada AX4/AX5, ia
+                    // memakan 116.6 pt dari lebar penuh yang baru saja dibeli
+                    // dengan menyusun ulang — dan nama terlebar (256.54 pt)
+                    // kembali terpotong meski kolomnya "lebar penuh". Badge
+                    // turun ke barisnya sendiri; yang berkurang hanya tinggi,
+                    // dan panel ini ada di dalam `List`.
+                    let nameAndBadge = stacksVisualAboveName
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+
+                    nameAndBadge {
                         // Nama = informasi utama: paling besar.
                         Text(displayName ?? ObjectDisplayName.text(of: object))
                             .font(.title2.bold())
@@ -926,8 +1011,16 @@ struct DiagnosticsView: View {
                             // Type membesar — dan badge itu satu-satunya
                             // penanda "Ragu" di sebelah nama. Dua baris
                             // menahan nama di tempatnya. Dijaga Aturan 76.
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.7)
+                            //
+                            // `lineLimit` tetap 2 di semua ukuran: yang
+                            // bertambah saat huruf membesar adalah **tinggi**,
+                            // dan baris tambahan tidak merebut ruang dari apa
+                            // pun di dalam `List`. Lantai 0.7 sama dengan
+                            // `ObjectCardLayout.detailNameScaleFloor` — angka
+                            // yang dipakai model untuk memutuskan susunan, jadi
+                            // view dan model tidak bisa berbeda pendapat.
+                            .lineLimit(ObjectCardLayout.detailNameLineLimit)
+                            .minimumScaleFactor(ObjectCardLayout.detailNameScaleFloor)
                         // Badge keyakinan — permukaan yang **sama** dengan app
                         // jam, memakai `level.tone` yang sama. Ia hanya muncul
                         // untuk jawaban yang berlaku sekarang: pada objek sisa,
@@ -986,6 +1079,13 @@ struct DiagnosticsView: View {
                     }
                     .tint(SurfacePalette.active.textSecondaryColor)
                 }
+                // Saat gambar disusun di atas, kolom teks harus **benar-benar**
+                // mendapat lebar penuh — itulah yang dibeli dengan menyusun
+                // ulang. Tanpa `maxWidth: .infinity`, `VStack` memberi lebar
+                // selebar isinya, dan nama tetap memakai kolom sempit yang
+                // sama seperti saat berdampingan. Saat berdampingan, batas ini
+                // tidak berpengaruh: `HStack` sudah memberi sisa ruang.
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .contain)
                 // Label ini hanya untuk bagian **atas**; grup dan disclosure
                 // di bawahnya tetap elemen terpisah supaya bisa dibuka.

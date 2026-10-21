@@ -1,3 +1,92 @@
+### Siklus (21 Okt 2026 — panel iPhone: gambar yang memakan nama, dan uji yang mengunci angka salah)
+
+Cacat sebelumnya (nama terpotong di kartu jam) ditutup Aturan 78 untuk **kartu
+jam dan layar Always-On**. Panel detail iPhone memakai rumus yang sama, di
+berkas yang sama, dengan nama objek yang sama — dan tidak pernah masuk cakupan
+aturan itu. Satu permukaan tertinggal di belakang dua permukaan lain yang
+sudah diperbaiki.
+
+#### Cacat: `@ScaledMetric` tanpa batas atas
+
+`visualDiameter` di `DiagnosticsView.swift` adalah
+
+    @ScaledMetric(relativeTo: .title2) private var visualDiameter: CGFloat = 132
+
+132 pt bertumpu pada `.large`, lalu ikut skala Dynamic Type tanpa batas:
+**132 → 411.8 pt di AX5**, sementara panel detail lebarnya **333 pt**. Bukan
+cuma "kebesaran" — di AX4 gambarnya **356.4 pt**, lebih lebar daripada baris
+yang memuatnya. Di `HStack`, gambar yang lebih lebar dari barisnya memampatkan
+kolom nama ke **nol**; nama objek hilang sama sekali, tepat pada ukuran huruf
+yang dipilih orang yang justru **butuh** teks.
+
+Hitungannya: kolom nama = 333 − 16 (jarak) − 132 (gambar) = 185 pt pada
+ukuran bawaan. Dengan gambar 356.4 pt di AX4, kolomnya **−39.4 pt**; dengan
+411.8 pt di AX5, **−94.8 pt**. Nama terlebar ("Gugus Sarang Lebah", 20
+karakter) butuh 256.5 pt di AX5 — tidak ada susunan yang bisa memuatnya
+selama gambar memakan seluruh lebar.
+
+#### Kenapa tidak ada gerbang yang melihatnya
+
+- Compiler tidak bisa: `@ScaledMetric` sah di semua ukuran.
+- `check-visuals.py` merender **objek**, bukan tata letak layar; ia tidak
+  pernah melihat panel.
+- Aturan 64 mengunci diameter **132 pt** di ukuran bawaan — dan itu tetap
+  benar. Yang tidak dijaga adalah pertumbuhannya.
+- Aturan 78 mengukur kartu jam + Always-On, bukan panel ini.
+
+#### Perbaikan: batas dari geometri, susunan dari model
+
+`ObjectCardLayout.detailVisualDiameterCap` = **167 pt**, bukan angka pilihan:
+ia 50.2% lebar panel, cukup untuk menjaga gambar sebagai fokus visual tanpa
+memakan kolom nama. `detailVisualDiameter(at:)` mengembalikan `min(raw, cap)`.
+
+`detailStacksVisual(at:)` menyusun gambar **di atas** nama mulai **xxLarge**
+(1.23×). Di bawah itu berdampingan; di atasnya bertumpuk, dan kolom nama
+menjadi **lebar panel penuh (333 pt)**, bukan sisa setelah gambar.
+
+Diverifikasi di **setiap** ukuran: kolom nama tidak pernah negatif, dan nama
+terlebar di dua bahasa selalu muat dengan margin ≥ 0.83. Tanpa batas, uji yang
+sama melaporkan kolom **−150.5 pt di AX4** — jadi ujinya tidak hampa.
+
+**Badge ikut turun.** Saat bertumpuk, badge keyakinan pindah ke barisnya
+sendiri. Kalau ia tetap di samping nama, ia memakan 116.6 pt dari lebar penuh
+yang baru saja dibeli dengan menyusun ulang — dan nama terlebar kembali
+terpotong meski kolomnya "lebar penuh".
+
+**Uji lama mengunci angka yang salah.** `NameOverflowTests` menguji panel ini
+dengan kolom **283.4 pt** yang (a) tidak pernah mengurangi lebar gambar dan
+(b) memakai lebar badge **tetap** padahal teks badge ikut membesar bersama
+`.caption`. Uji itu hijau di AX5 selama bertahun-siklus sambil cacatnya nyata.
+Uji baru menguji **setiap** ukuran dengan kolom efektif yang benar.
+
+**Aturan 78 diperluas**, bukan dilonggarkan: panel detail wajib membaca
+`dynamicTypeSize`, wajib memakai `detailStacksVisual` + `detailVisualDiameter(at:)`,
+wajib `AnyLayout`, dan tidak boleh punya deklarasi `@ScaledMetric`. Empat
+mutasi diuji dan **semuanya memerahkan gerbang**: mengembalikan `@ScaledMetric`,
+menghapus batas (132 tetap), mengembalikan susunan ke `false`, dan menghapus
+`AnyLayout`.
+
+Satu jebakan yang tertangkap saat menguji mutasi: versi pertama gerbang
+mencari `@ScaledMetric` di **seluruh berkas**, sehingga ia merah pada pohon
+yang benar — karena komentar yang menjelaskan kenapa pembungkus itu diganti
+menyebut namanya. Gerbang sekarang membuang komentar dulu (`kode_saja`), dan
+mutasi yang menghapus pemakaian nyata tetapi meninggalkan sebutan di komentar
+tetap tertangkap.
+
+#### Yang TIDAK diklaim
+
+- Lebar panel **333 pt** adalah model untuk iPhone lebar 393 pt dengan inset
+  baris; perangkat lain lebih sempit, jadi arah kesalahannya aman (nama lebih
+  cepat terpotong daripada yang dihitung) tetapi angkanya bukan janji piksel.
+- Lebar teks memakai **DejaVu Sans Bold**, bukan San Francisco.
+- Tata letak SwiftUI tidak dijalankan di Linux. Yang diuji adalah aritmetika
+  dan bentuk keputusan, bukan piksel di perangkat.
+- Batas 167 pt dipilih dari geometri panel ini, bukan dari riset visual. Ia
+  menjamin nama muat; ia tidak menjamin gambar terasa "besar" bagi desainer.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1016** =
+**1238** hijau (0 kegagalan) di Docker Swift 6.0. 78 aturan UI hijau.
+
 ### Siklus (21 Okt 2026 — bayangan yang diukur di satu sisi, dikirim dari sisi lain)
 
 Siklus ini berangkat dari WIP yang belum di-commit: bayangan bola pada cincin

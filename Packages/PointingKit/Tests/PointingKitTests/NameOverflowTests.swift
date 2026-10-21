@@ -390,4 +390,144 @@ final class NameOverflowTests: XCTestCase {
                        .accessibility5,
                        "kolom 279.4 pt gagal di AX5")
     }
+
+    // MARK: - Panel detail iPhone: lukisan objek vs kolom nama
+
+    /// Badge keyakinan **membesar** bersama Dynamic Type, dan tes di atas
+    /// menahannya di lebar bawaan.
+    ///
+    /// `testIPhoneDetailPanelFitsUntilAX5WithAlmostNoSlack` memakai badge
+    /// 49.6 pt tetap untuk semua ukuran. Badge itu `.caption`, jadi ia
+    /// diskalakan persis seperti teks lain: pada AX5 ia 3.12× lebih lebar
+    /// (116.6 pt), bukan 49.6 pt. Selisih 67 pt itu diambil dari kolom nama,
+    /// dan tes yang menahannya tidak bisa melihatnya — ia mengukur kolom yang
+    /// tidak pernah ada.
+    ///
+    /// Terukur (nama 256.54 pt, panel 333 pt, lantai 0.7, 2 baris):
+    ///
+    ///     ukuran   badge   kolom nama   butuh skala   hasil
+    ///     large     49.6     283.4        2.21        muat
+    ///     AX3       91.0     242.0        0.82        muat
+    ///     AX4      103.3     229.7        0.66        TERPOTONG
+    ///     AX5      116.6     216.4        0.54        TERPOTONG
+    ///
+    /// Jadi badge yang tumbuh **sendirian** sudah memotong nama mulai AX4,
+    /// bahkan tanpa lukisan objek. Itu sebabnya `detailNameColumn(at:)`
+    /// mengambil ukuran, bukan konstanta.
+    func testDetailBadgeScalesWithDynamicTypeAndEatsTheNameColumn() {
+        let floor = ObjectCardLayout.detailNameScaleFloor
+
+        // Angka lama 31.6 pt bukan lebar "Ragu" pada font yang diklaimnya.
+        XCTAssertEqual(ObjectCardLayout.detailBadgeTextWidth, 34.47, accuracy: 0.01)
+        XCTAssertGreaterThan(ObjectCardLayout.detailBadgeTextWidth, 31.6,
+                             "badge yang lebih lebar = kolom nama lebih sempit; "
+                             + "angka lama terlalu kecil ke arah yang salah")
+
+        // Kolom nama menyusut saat badge membesar.
+        let atLarge = ObjectCardLayout.detailNameColumn(at: .large)
+        let atAX5 = ObjectCardLayout.detailNameColumn(at: .accessibility5)
+        XCTAssertLessThan(atAX5, atLarge,
+                          "badge AX5 lebih lebar, jadi kolom nama harus lebih sempit")
+
+        // Dengan badge yang benar-benar tumbuh, AX5 gagal **berdampingan**.
+        // Itu bukan bug: itu alasan `detailStacksVisual` ada.
+        let fitAX5 = NameOverflow.fit(
+            widthAtDefault: ObjectCardLayout.detailNameWidthReference,
+            columnWidth: ObjectCardLayout.detailNameColumn(at: .accessibility5),
+            lineLimit: ObjectCardLayout.detailNameLineLimit,
+            floor: floor)
+        let requiredAX5 = fitAX5.requiredScaleAtDefault
+            / ObjectCardLayout.scale(for: .accessibility5)
+        XCTAssertLessThan(requiredAX5, floor,
+                          "berdampingan di AX5 gagal — dan itu yang harus "
+                          + "memicu penyusunan ulang")
+        XCTAssertTrue(ObjectCardLayout.detailStacksVisual(at: .accessibility5))
+    }
+
+    /// Lukisan objek tidak boleh tumbuh melebihi baris yang memuatnya.
+    ///
+    /// **Cacat yang ditangkap tes ini.** `visualDiameter` di
+    /// `LockArrivalPanel` adalah `@ScaledMetric(relativeTo: .title2)` bertumpu
+    /// pada 132 pt, tanpa batas atas. Diameternya karena itu:
+    ///
+    ///     large   132.0 pt      AX2   257.4 pt
+    ///     AX1     216.5 pt      AX3   304.9 pt
+    ///     AX4     356.4 pt   <- lebih lebar daripada panel 333 pt
+    ///     AX5     411.8 pt   <- 79 pt lebih lebar daripada panel
+    ///
+    /// Pada AX4 `HStack` memampatkan kolom nama ke nol dan nama hilang sama
+    /// sekali. Yang tersisa hanya gambar — di ukuran huruf yang dipilih orang
+    /// yang justru butuh teks.
+    func testDetailVisualNeverGrowsWiderThanTheRowThatContainsIt() {
+        let cap = ObjectCardLayout.detailVisualDiameterCap
+        XCTAssertEqual(cap, 167, accuracy: 0.5,
+                       "batas = panel 333 − jarak 16 − kolom nama minimum 150")
+
+        for size in NameOverflow.TextSize.allCases {
+            let diameter = ObjectCardLayout.detailVisualDiameter(at: size)
+            XCTAssertLessThanOrEqual(
+                diameter, cap + 0.001,
+                "\(size.shortName): diameter \(diameter) pt melebihi batas \(cap) pt")
+            // Gambar + jarak harus menyisakan ruang untuk nama sama sekali.
+            XCTAssertGreaterThan(
+                ObjectCardLayout.detailPanelWidth - diameter
+                    - ObjectCardLayout.detailVisualGap, 0,
+                "\(size.shortName): gambar + jarak menghabiskan seluruh panel")
+        }
+
+        // Tanpa batas (perilaku lama), AX4 dan AX5 memang melebihi panel.
+        // Dibuktikan di sini supaya tesnya tidak bisa hijau karena batasnya
+        // kebetulan tidak pernah aktif.
+        for size in [NameOverflow.TextSize.accessibility4, .accessibility5] {
+            let uncapped = ObjectCardLayout.detailVisualBaseDiameter
+                * ObjectCardLayout.scale(for: size)
+            XCTAssertGreaterThan(uncapped, ObjectCardLayout.detailPanelWidth,
+                                 "\(size.shortName): tanpa batas, gambar "
+                                 + "\(uncapped) pt lebih lebar daripada panel "
+                                 + "\(ObjectCardLayout.detailPanelWidth) pt")
+        }
+    }
+
+    /// Setiap ukuran Dynamic Type muat: nama terlebar tidak terpotong di
+    /// panel detail setelah susunan dipilih.
+    ///
+    /// Ini yang membuat dua tes di atas punya akibat. Batas gambar dan
+    /// penyusunan ulang bukan tujuan — tujuannya adalah nama terbaca di
+    /// **setiap** ukuran, dan itu harus dinyatakan per ukuran, bukan
+    /// disimpulkan dari ukuran bawaan.
+    func testDetailPanelFitsAtEveryDynamicTypeSize() {
+        for size in NameOverflow.TextSize.allCases {
+            let column = ObjectCardLayout.detailEffectiveNameColumn(at: size)
+            XCTAssertGreaterThan(column, 0,
+                                 "\(size.shortName): kolom nama tidak ada")
+            XCTAssertTrue(ObjectCardLayout.detailNameFits(at: size),
+                          "\(size.shortName): nama terlebar masih terpotong di "
+                          + "kolom \(column) pt setelah susunan dipilih")
+        }
+    }
+
+    /// Batas gambar dihitung dari ruang, bukan dipilih.
+    ///
+    /// Kalau panel atau kolom nama minimumnya berubah, batasnya wajib ikut —
+    /// kalau tidak, angka 167 yang "terbukti" hari ini menjadi angka yang
+    /// salah tanpa ada yang memberi tahu.
+    func testDetailVisualCapFollowsTheGeometryItComesFrom() {
+        let cap = ObjectCardLayout.detailVisualDiameterCap
+        XCTAssertEqual(
+            cap,
+            ObjectCardLayout.detailPanelWidth
+                - ObjectCardLayout.detailVisualGap
+                - ObjectCardLayout.detailMinNameColumn,
+            accuracy: 0.001)
+        // Batas itu harus benar-benar mengikat di AX5, bukan hiasan.
+        let uncappedAX5 = ObjectCardLayout.detailVisualBaseDiameter
+            * ObjectCardLayout.scale(for: .accessibility5)
+        XCTAssertEqual(ObjectCardLayout.detailVisualDiameter(at: .accessibility5),
+                       cap, accuracy: 0.001,
+                       "di AX5 batas harus aktif (\(uncappedAX5) pt → \(cap) pt)")
+        // Dan tidak boleh mengikat pada ukuran bawaan: gambar di ukuran
+        // normal tetap 132 pt, bukan ikut mengecil ke batas.
+        XCTAssertEqual(ObjectCardLayout.detailVisualDiameter(at: .large),
+                       ObjectCardLayout.detailVisualBaseDiameter, accuracy: 0.001)
+    }
 }

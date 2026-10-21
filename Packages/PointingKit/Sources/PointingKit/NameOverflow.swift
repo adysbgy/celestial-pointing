@@ -337,4 +337,153 @@ public enum ObjectCardLayout {
     public static func stacksName(at size: NameOverflow.TextSize) -> Bool {
         stacksName(scale: scale(for: size))
     }
+
+    // MARK: - Panel detail iPhone (lukisan objek + nama)
+    //
+    // **Cacat yang membuat ini ada.** Panel detail iPhone menaruh
+    // `CelestialVisualView` dan kolom nama dalam satu `HStack`, dan lukisannya
+    // memakai `@ScaledMetric(relativeTo: .title2)` bertumpu pada 132 pt. Itu
+    // benar untuk teks, dan salah untuk gambar: `@ScaledMetric` menaikkan
+    // diameternya bersama huruf, tanpa satu pun batas atas. Terukur dengan
+    // tabel skala yang sama dengan `NameOverflow.dynamicTypeScales`:
+    //
+    //     ukuran   skala   diameter   lebar panel 353 pt
+    //     large    1.00     132.0 pt   muat
+    //     AX1      1.64     216.5 pt   muat
+    //     AX2      1.95     257.4 pt   muat
+    //     AX3      2.31     304.9 pt   muat (kolom nama 32 pt)
+    //     AX4      2.70     356.4 pt   MELEBIHI panel: kolom nama −19 pt
+    //     AX5      3.12     411.8 pt   MELEBIHI panel: kolom nama −75 pt
+    //
+    // Pada AX4 lukisan objeknya **lebih lebar daripada baris yang memuatnya**.
+    // SwiftUI tidak melaporkan itu sebagai galat: `HStack` memampatkan kolom
+    // teks ke nol, nama hilang, dan yang tersisa hanya gambar besar — di
+    // ukuran huruf yang justru dipilih orang yang butuh teks besar.
+    //
+    // **Kenapa ada batas atas, padahal di tempat lain "jangan angka tetap".**
+    // Di kartu jam, gambar 38 pt tetap benar karena kartunya sendiri tetap.
+    // Di sini yang berubah adalah **huruf**, dan gambar tidak perlu ikut
+    // membesar tanpa batas untuk tetap terbaca: setelah beberapa kali, ia
+    // berhenti menjadi informasi dan mulai menjadi penghalang. Batasnya bukan
+    // angka pilihan — ia adalah sisa ruang setelah kolom nama minimum
+    // dijamin, jadi ia bergerak kalau panel atau kolom minimumnya berubah.
+
+    /// Lebar isi panel detail iPhone: layar 393 pt − inset `List` bawaan
+    /// 2×16 pt − padding kartu 2×14 pt.
+    public static let detailPanelWidth: Double = 333
+
+    /// Diameter dasar lukisan objek di panel detail, pada `.title2` bawaan.
+    public static let detailVisualBaseDiameter: Double = 132
+
+    /// Jarak antara lukisan dan kolom teks di panel detail.
+    public static let detailVisualGap: Double = 16
+
+    /// Kolom nama minimum yang masih layak untuk menyusun berdampingan.
+    ///
+    /// 150 pt ≈ enam huruf `.title2` selebar rata-rata, atau sekitar dua
+    /// pertiga dari nama terlebar (256.54 pt). Di bawah ini nama bukan lagi
+    /// "terpotong sedikit" melainkan "tidak terbaca", dan menyusun berdampingan
+    /// berhenti membeli apa pun.
+    public static let detailMinNameColumn: Double = 150
+
+    /// Batas atas diameter lukisan objek di panel detail.
+    ///
+    /// Dihitung dari sisa ruang, bukan dipilih: panel − jarak − kolom nama
+    /// minimum. 333 − 16 − 150 = **167 pt**.
+    public static var detailVisualDiameterCap: Double {
+        detailPanelWidth - detailVisualGap - detailMinNameColumn
+    }
+
+    /// Diameter lukisan objek pada ukuran teks `size`, **dibatasi**.
+    ///
+    /// Bentuk yang dipakai view. Tanpa `min` di sini, `@ScaledMetric` tetap
+    /// membesar tanpa batas dan cacatnya kembali.
+    public static func detailVisualDiameter(at size: NameOverflow.TextSize) -> Double {
+        let raw = detailVisualBaseDiameter * scale(for: size)
+        guard raw.isFinite, raw > 0 else { return detailVisualBaseDiameter }
+        return min(raw, detailVisualDiameterCap)
+    }
+
+    /// Lebar teks badge keyakinan pada ukuran bawaan, terukur.
+    ///
+    /// 34.47 pt = "Ragu" DejaVu Sans Bold 12 pt (`.caption`):
+    ///
+    ///     python3 -c "from PIL import ImageFont; \
+    ///       print(ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',12) \
+    ///       .getlength('Ragu'))"
+    ///
+    /// **Bukan 31.6.** Angka itu dipakai `NameOverflowTests` sebelum ini dan
+    /// 2.9 pt lebih kecil daripada font yang diklaimnya — arah kelalaian yang
+    /// salah, karena badge yang lebih lebar berarti kolom nama yang lebih
+    /// sempit. Tes menegaskan kedua angka itu tidak sama, supaya angka lama
+    /// tidak diam-diam kembali.
+    public static let detailBadgeTextWidth: Double = 34.47
+
+    /// Padding horizontal badge (`7` pt × 2).
+    public static let detailBadgePadding: Double = 10
+
+    /// Jarak nama ke badge.
+    public static let detailBadgeGap: Double = 8
+
+    /// Lantai `.minimumScaleFactor` yang dipasang panel detail.
+    public static let detailNameScaleFloor: Double = 0.7
+
+    /// `lineLimit` nama di panel detail.
+    public static let detailNameLineLimit = 2
+
+    /// Lebar acuan nama terlebar pada `.title2`: 233.22 × 22/20.
+    public static let detailNameWidthReference: Double = 256.54
+
+    /// Kolom nama yang benar-benar tersisa saat gambar **dan** badge dihitung.
+    ///
+    /// Badge ikut dihitung karena `.caption` juga diskalakan Dynamic Type:
+    /// menahannya di lebar bawaan membuat anggarannya terlalu longgar tepat
+    /// pada ukuran yang paling sempit.
+    public static func detailNameColumn(at size: NameOverflow.TextSize) -> Double {
+        detailPanelWidth
+            - detailVisualDiameter(at: size)
+            - detailVisualGap
+            - (detailBadgeTextWidth * scale(for: size) + detailBadgePadding + detailBadgeGap)
+    }
+
+    /// Apakah lukisan objek harus dipindah **di atas** nama pada ukuran ini.
+    ///
+    /// Sama alasannya dengan kartu jam (`stacksName`): yang bertambah saat
+    /// huruf membesar adalah tinggi, bukan lebar, dan panel ada di dalam
+    /// `List` — baris tambahan tidak merebut ruang dari apa pun.
+    public static func detailStacksVisual(at size: NameOverflow.TextSize) -> Bool {
+        let fit = NameOverflow.fit(widthAtDefault: detailNameWidthReference,
+                                   columnWidth: detailNameColumn(at: size),
+                                   lineLimit: detailNameLineLimit,
+                                   floor: detailNameScaleFloor)
+        return fit.requiredScaleAtDefault / scale(for: size) < detailNameScaleFloor
+    }
+
+    /// Kolom nama yang berlaku setelah susunan dipilih.
+    ///
+    /// Disusun = lebar panel penuh (badge turun ke baris sendiri); berdampingan
+    /// = `detailNameColumn`. Dipakai uji untuk menyatakan bahwa **setiap**
+    /// ukuran muat, bukan hanya ukuran bawaan.
+    public static func detailEffectiveNameColumn(at size: NameOverflow.TextSize) -> Double {
+        detailStacksVisual(at: size) ? detailPanelWidth : detailNameColumn(at: size)
+    }
+
+    /// Apakah nama terlebar muat di panel ini **pada ukuran teks ini**, setelah
+    /// susunan yang berlaku di ukuran itu dipilih.
+    ///
+    /// **Kenapa bukan `firstFailingSize`.** Fungsi itu menjawab pertanyaan yang
+    /// berbeda: "pada kolom tetap ini, ukuran mana yang gagal". Panel detail
+    /// tidak punya kolom tetap — kolomnya berubah bersama susunan, dan
+    /// susunannya berubah bersama ukuran. Menyodorkan kolom satu ukuran ke
+    /// `firstFailingSize` melaporkan kegagalan di ukuran yang justru sudah
+    /// ditangani, dan gerbangnya jadi merah pada tata letak yang benar.
+    public static func detailNameFits(at size: NameOverflow.TextSize) -> Bool {
+        let fit = NameOverflow.fit(
+            widthAtDefault: detailNameWidthReference,
+            columnWidth: detailEffectiveNameColumn(at: size),
+            lineLimit: detailNameLineLimit,
+            floor: detailNameScaleFloor)
+        guard fit.requiredScaleAtDefault.isFinite else { return false }
+        return fit.requiredScaleAtDefault / scale(for: size) >= detailNameScaleFloor
+    }
 }

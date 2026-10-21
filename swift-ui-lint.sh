@@ -13541,6 +13541,7 @@ echo "== Aturan 78: kartu objek menyusun ulang saat Dynamic Type membesar =="
 dynamic_type=$(python3 - <<'PY2' 2>&1
 import io
 import os
+import re
 
 CARD = os.path.join("Apps", "PointAndKnowWatch", "Sources", "PointingView.swift")
 MODEL = os.path.join("Packages", "PointingKit", "Sources", "PointingKit", "NameOverflow.swift")
@@ -13618,6 +13619,107 @@ else:
             "  %s: lantai skala tidak memakai konstanta bersama.\n"
             "    Angka 0.5 yang ditulis ulang di view tidak bisa ditahan uji\n"
             "    mana pun, dan rumus baris di atas memakai angka itu." % AOD)
+
+# (3d) Panel detail iPhone punya cacat yang sama, dan di sana lukisan objek
+#      ikut menyerempet. `visualDiameter` dulu `@ScaledMetric(relativeTo:
+#      .title2)` bertumpu pada 132 pt tanpa batas atas: 132 -> 411.8 pt di AX5,
+#      sementara panel hanya 333 pt. Pada AX4 (356.4 pt) gambarnya lebih lebar
+#      daripada baris yang memuatnya, `HStack` memampatkan kolom nama ke nol,
+#      dan nama objek hilang -- di ukuran huruf yang dipilih orang yang justru
+#      butuh teks. Tidak ada galat kompilasi, dan `check-visuals.py` merender
+#      objek (bukan tata letak layar), jadi tidak satu pun dari 78 aturan bisa
+#      melihatnya. Yang bisa diperiksa dari sini adalah bentuknya: apakah
+#      diameter datang dari model yang dibatasi, dan apakah susunannya dipilih
+#      model yang sama.
+PANEL = os.path.join("Apps", "PointAndKnowiOS", "Sources", "DiagnosticsView.swift")
+
+
+def kode_saja(teks):
+    """Buang komentar supaya gerbang membaca kode, bukan prosa.
+
+    Gerbang yang mencari di seluruh berkas akan lolos oleh komentar yang
+    menyebut nama API -- dan justru komentar di berkas ini yang menjelaskan
+    kenapa `@ScaledMetric` diganti. Mutasi yang menghapus pemakaian nyata tapi
+    meninggalkan sebutan di komentar harus tetap tertangkap.
+    """
+    hasil = []
+    for baris in teks.splitlines():
+        tanpa = baris.split("//")[0]
+        hasil.append(tanpa)
+    return "\n".join(hasil)
+
+
+if not os.path.exists(PANEL):
+    masalah.append("  %s tidak ditemukan -- Aturan 78 tidak mengukur panel "
+                   "detail iPhone." % PANEL)
+else:
+    panel = io.open(PANEL, encoding="utf-8").read()
+    panel_kode = kode_saja(panel)
+    if "dynamicTypeSize" not in panel_kode:
+        masalah.append(
+            "  %s: panel detail tidak membaca dynamicTypeSize.\n"
+            "    Ukuran gambar dan susunan sama untuk semua pengguna, jadi\n"
+            "    nama terpotong begitu hurufnya diperbesar." % PANEL)
+    if "detailStacksVisual" not in panel_kode:
+        masalah.append(
+            "  %s: susunan panel detail tidak memakai "
+            "ObjectCardLayout.detailStacksVisual.\n"
+            "    Ambang tata letak di dalam view tidak bisa diuji dari sini."
+            % PANEL)
+    if "detailVisualDiameter(at:" not in panel_kode:
+        masalah.append(
+            "  %s: diameter lukisan objek tidak memakai "
+            "ObjectCardLayout.detailVisualDiameter(at:).\n"
+            "    @ScaledMetric tanpa batas atas membuat gambar 411.8 pt di AX5,\n"
+            "    lebih lebar daripada panel 333 pt, dan nama hilang sama sekali."
+            % PANEL)
+    # Cari **deklarasi**, bukan sebutan. Komentar yang menjelaskan kenapa
+    # `@ScaledMetric` diganti justru harus boleh menyebut namanya; yang dilarang
+    # adalah properti yang benar-benar memakai pembungkus itu untuk diameter.
+    for nomor, baris in enumerate(panel.splitlines(), 1):
+        kode = baris.split("//")[0] if not baris.lstrip().startswith("//") else ""
+        if re.match(r"\s*@ScaledMetric\b", kode):
+            masalah.append(
+                "  %s:%d: masih memakai @ScaledMetric.\n"
+                "    Itu yang membesar tanpa batas (132 -> 411.8 pt di AX5).\n"
+                "    Batasnya harus datang dari ObjectCardLayout."
+                ".detailVisualDiameterCap." % (PANEL, nomor))
+            break
+    for bentuk in ("AnyLayout", "VStackLayout", "HStackLayout"):
+        if bentuk not in panel_kode:
+            masalah.append(
+                "  %s: tidak memakai %s untuk menyusun ulang.\n"
+                "    Tanpa dua susunan yang nyata, nama hanya bisa dipaksa muat\n"
+                "    dengan mengecilkan huruf." % (PANEL, bentuk))
+    for konstanta in ("detailNameLineLimit", "detailNameScaleFloor"):
+        if konstanta not in panel_kode:
+            masalah.append(
+                "  %s: %s tidak dipakai view.\n"
+                "    Angka yang ditulis ulang di view tidak bisa ditahan uji\n"
+                "    mana pun, dan model memakai angka itu untuk memutuskan\n"
+                "    susunan." % (PANEL, konstanta))
+
+# (3e) Batas diameter wajib lahir dari geometri, bukan angka pilihan, dan
+#      wajib benar-benar mengikat di ukuran terbesar. Batas yang tidak pernah
+#      aktif adalah komentar, bukan gerbang.
+if "detailVisualDiameterCap" not in model:
+    masalah.append(
+        "  %s: tidak menyatakan batas diameter lukisan objek.\n"
+        "    Batas yang hanya ada di view tidak bisa diuji dari sini." % MODEL)
+if "detailNameFits" not in model:
+    masalah.append(
+        "  %s: tidak menyatakan apakah nama muat pada satu ukuran.\n"
+        "    Tanpa itu, gerbang hanya bisa menguji ukuran bawaan." % MODEL)
+for ukuran in ("accessibility4", "accessibility5"):
+    if ukuran not in uji:
+        masalah.append(
+            "  %s: tidak menguji %s pada panel detail.\n"
+            "    Itu dua ukuran tempat gambar melebihi panel." % (TESTS, ukuran))
+if "detailVisualDiameter(at:" not in uji:
+    masalah.append(
+        "  %s: tidak menguji diameter lukisan objek yang dibatasi.\n"
+        "    Batas tanpa uji adalah angka yang boleh berubah diam-diam."
+        % TESTS)
 
 # (4) Model wajib menyatakan batasnya, bukan hanya mengembalikan boolean.
 #     Tanpa `firstFailingSize`, tidak ada yang bisa menyebut ukuran mana yang
