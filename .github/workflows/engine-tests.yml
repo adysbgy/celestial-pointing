@@ -2851,5 +2851,11 @@ jobs:
       - name: Buktikan gerbang lokasi-ke-engine berbunyi
         run: python3 Tools/bukti-mutasi-lokasi-engine.py
 
+      # Latar langit: lapisan yang digambar di SETIAP layar, dan sampai unit
+      # ini nol cakupan render. Bentuk cacat yang pernah dikirim — titik putih
+      # diredupkan sebagai "mode malam" — hijau di seluruh gerbang lain.
+      - name: Buktikan gerbang latar langit berbunyi
+        run: python3 Tools/bukti-mutasi-latar-langit.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

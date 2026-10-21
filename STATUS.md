@@ -1,3 +1,204 @@
+### Siklus (21 Okt 2026 — gerbang latar langit mengukur port, bukan model)
+
+Siklus dibuka dengan `git log` + `gh run list` + gerbang. Di pohon kerja ada
+satu unit belum ter-commit: **port render + empat gerbang piksel** untuk
+`SkyBackdropView` — lapisan langit yang digambar di **setiap** layar app dan
+sampai unit itu nol cakupan render. View dan modelnya sendiri sudah dikomit
+(`f5eab44`). Unit itu kini mendarat dengan **enam** gerbang: empat yang sudah
+ada, ditambah dua yang siklus ini temukan hilang.
+
+Unit itu tidak dikomit apa adanya. Empat gerbangnya hijau, harness-nya lulus,
+tetapi pertanyaannya bukan "hijau?" melainkan "hijau tentang apa?".
+
+#### Cacat: kelima angka port ditulis tangan, dan tidak ada yang memeriksanya
+
+`Tools/render-visuals.py` adalah renderer otoritatif repo ini — README
+menyebutnya sendiri di baris 267: `check-visuals.py` merender **port
+Python**-nya, bukan view Swift-nya. Jadi seluruh paritas bergantung pada
+salinan. Untuk lapisan ini, salinan itu memuat lima angka yang ditulis tangan
+dari `SkyBackdrop.swift`:
+
+    SPECK_SIZE_MARGIN   = 0.55        # sizeMargin
+    SPECK_LAYER_OPACITY = 0.5         # layerOpacity
+    SPECK_DENSITY       = 90          # speckDensity
+    SPECK_REFERENCE_AREA = 400*400    # let reference: Double = 400 * 400
+    max(0.35, …)                      # lantai radius di view
+
+**Diukur, bukan disangka.** Pada salinan utuh di proses baru, `layerOpacity`
+diubah `0.5 -> 0.30` **dan** `speckDensity` `90 -> 45` di `SkyBackdrop.swift`.
+Keempat gerbang tetap **hijau**, dengan angka **sama persis** seperti sebelum
+mutasi: `0.722` / `3361` piksel / `0.571`. Artinya seluruh unit ini mengukur
+langit yang tidak digambar app begitu modelnya berubah — dan model berubah
+adalah hal yang wajar, bukan sabotase. Justru itu gunanya model.
+
+Kelas ini sudah pernah dibayar repo ini untuk pita Saturnus dan cincinnya.
+Jawabannya selalu sama: ukur keduanya.
+
+#### Perbaikan: dua gerbang baru yang membaca model dan geometrinya
+
+**Gerbang 5 — paritas angka.** `check_backdrop_port_matches_the_model`
+membandingkan konstanta port dengan konstanta yang **dibaca dari**
+`SkyBackdrop.swift`, bukan dengan angka yang ditulis ulang di sisi gerbang —
+menulis ulang `0.55` di gerbang hanya membuat salinan kedua yang bisa
+menyimpang lagi.
+
+Tiga keputusan bentuk, masing-masing karena satu cara gerbang ini bisa salah:
+
+1. **Komentar dibuang dulu** (`swift_code_only`). Tanpa itu, `// dulu:
+   layerOpacity = 0.5` di atas baris yang sudah diganti memenuhi gerbang.
+   Gerbang yang bisa dipuaskan komentar akan dimatikan orang begitu ia merah
+   pada kode benar — dan itu sudah diukur di repo ini.
+2. **`maximumSpeckRadius` dibandingkan sebagai fungsi**, bukan angka. Di Swift
+   ia `var` yang diturunkan dari katalog; port menurunkannya dengan cara yang
+   sama. Kalau katalog bertambah bintang redup, kedua sisi bergerak bersama
+   tanpa ada yang perlu ingat.
+3. **Lantai radius hidup di view, bukan di model** (`max(0.35, speck.radius *
+   size.width)`), jadi ia dibaca dari view. Di sinilah gerbang baru langsung
+   membayar dirinya: pada putaran pertama ia **MERAH** — port menulis `0.35`
+   sebagai angka telanjang di dalam `render_backdrop`, dan angka yang hanya
+   hidup di dalam ekspresi tidak bisa dibandingkan apa pun. Angka itu sekarang
+   bernama `SPECK_RADIUS_FLOOR`.
+
+**Gerbang 6 — sumbu radius.** `check_backdrop_radius_scales_with_width`
+mengukur sesuatu yang **tidak bisa dilihat** kelima gerbang lain: radius titik
+diskalakan lebar bidang atau tingginya. Kelimanya memakai bidang **persegi**,
+dan pada bidang persegi lebar == tinggi, jadi port yang menukar sumbu tetap
+hijau di semuanya — sambil menggambar langit yang berbeda di jam tangan, yang
+bidangnya tidak persegi.
+
+Diukur pada bidang 200×100 dan 100×200 dengan satu titik radius 0.1: 40 px dan
+20 px. Kedua kemungkinan sumbu berbeda 2×, jauh di luar pembulatan piksel.
+Gerbangnya **MERAH** pada port yang memakai `height` (terukur: 20×20 / 40×40),
+hijau pada yang memakai `width`.
+
+#### Harness: 10 keadaan, dua di antaranya kontrol negatif
+
+`Tools/bukti-mutasi-latar-langit.py` naik dari 5 keadaan menjadi 10:
+
+  keadaan 6   model `layerOpacity` 0.5 -> 0.30  -> gerbang opasitas memerah
+  keadaan 7   model `speckDensity` 90 -> 45     -> gerbang kepadatan memerah
+  keadaan 8   lantai radius view 0.35 -> 0.90   -> gerbang lantai memerah
+  keadaan 9   KONTROL NEGATIF: komentar model menyebut angka lama -> tetap hijau
+  keadaan 10  port memakai `height`, bukan `width`  -> gerbang sumbu memerah
+
+Keadaan 6–8 dan 10 adalah cacat yang **terukur** sebelum gerbangnya ada, bukan
+cacat yang dibayangkan. Keadaan 9 ada karena gerbang paritas membaca **teks**:
+kalau komentar bisa memuaskannya, ia merah pada kode benar.
+
+Setiap keadaan menuntut **tepat satu** gerbang merah. Gerbang yang mewarisi
+cacat tetangga menyembunyikan cacat mana yang sebenarnya ada — itu sudah
+dibayar di keadaan 3 unit ini.
+
+#### Angka
+
+- Harness latar langit: **10 keadaan**, semuanya sesuai harapan (exit 0).
+- `check-visuals.py`: **6 gerbang latar** hijau — malam merah murni 0.722,
+  siang netral 3361 piksel, AOD berhenti 0.571, paritas sumber, sumbu radius
+  40/20 px, paritas angka (6 pemeriksaan).
+- Engine **222** + PointingKit **983**, 0 gagal. `swift-typecheck.sh` lulus.
+- 77 aturan UI hijau; `check-harness-terdaftar.py` **134 harness, semuanya
+  dirujuk**; `check-jangkar-harness.py` 515 jangkar, nol mutasi tertinggal.
+
+#### Yang TIDAK diklaim
+
+- Gerbang paritas menyamakan **konstanta**, bukan perilaku. Ia tidak
+  membuktikan `SplitMix64` di port menghasilkan deret yang identik dengan
+  Swift — kesamaan deret hanya bisa dibuktikan dengan menjalankan Swift-nya.
+- Gerbang sumbu menyuntikkan satu titik lewat pengganti `backdrop_specks`,
+  bukan titik asli dari `SplitMix64`. Yang dijaga adalah pemetaan radius →
+  piksel, bukan deret acaknya.
+- **Jarak antar-titik** tidak diperiksa: port bisa mengalikan `y` dengan
+  `width` alih-alih `height` dan keenam gerbang di atas tetap hijau, karena
+  titik-titiknya memang acak. Itu celah yang **diketahui dan masih terbuka**,
+  dicatat di sini supaya tidak dikira tertutup.
+- `Apps/` tidak dibangun di Linux, jadi tidak ada uji runtime yang melihat
+  view-nya. Yang diukur adalah port dan teks sumbernya.
+
+---
+
+### Siklus (21 Okt 2026 — Aturan 77 menuduh refaktor sah, dan buta pada separuh penyambungan)
+
+Siklus dibuka dengan `git log` + `gh run list` + gerbang, sesuai disiplin
+repo. Di pohon kerja ada satu unit **selesai tapi belum ter-commit**: Aturan 77
+(lokasi sungguhan wajib sampai ke engine) + harness-nya. Ia tidak dikomit apa
+adanya, karena dua hal terukur lebih dulu.
+
+#### Cacat 1: gerbang yang menuduh kode benar
+
+Pemeriksaan ketiga Aturan 77 menuntut kata `fallbackSource` ada di
+`ObserverLocation.swift`. Diukur pada salinan utuh, proses baru: mengganti
+**seluruh** pemakaian konstanta itu dengan literal `"fallback"` — refaktor yang
+sah, tanpa perubahan perilaku — membuat aturan **MERAH**. Kata itu memang tidak
+perlu ada; yang dijaga seharusnya invarian bentuk, bukan keberadaan sebuah nama.
+
+Ini bukan cacat kosmetik pada gerbang. Gerbang yang memerah pada kode benar
+akan dilonggarkan orang, dan setelah dilonggarkan ia tidak menjaga apa pun.
+Pemeriksaan itu dibuang.
+
+#### Cacat 2: penyambungan punya dua arah, yang diperiksa hanya satu
+
+`bind(location:)` memasang lokasi **sekali**, lalu memasang closure untuk
+pembaruan berikutnya. Yang diperiksa aturan hanya yang pertama. Dua mutasi yang
+mengompilasi, keduanya lolos seluruh 77 aturan:
+
+    self?.update(location: newValue)  ->  self?.update(location: .fallback)
+    self?.update(location: newValue)  ->  _ = newValue
+
+Keduanya **lebih sunyi** daripada cacat aslinya: lokasi benar saat app dibuka,
+lalu berhenti mengikuti pengguna. Pengguna berjalan beberapa ratus meter, langit
+dihitung untuk titik lama, dan tidak satu pun bagian UI berubah — termasuk layar
+diagnostik, yang tetap menampilkan `effectiveLocation` yang benar. Itu definisi
+"yakin pada langit yang salah tempat" yang PRD larang.
+
+#### Cacat 3: keadaan harness yang tidak mengompilasi
+
+Keadaan 3 harness lama memakai `fallbackSourceLama` — mutasi yang **tidak
+mengompilasi**, jadi ia tidak membuktikan apa pun tentang pohon yang bisa
+dibangun. Diganti dua cacat yang mengompilasi (di atas). Percobaan pertama saya
+mengganti nama parameter closure menjadi `_` juga tidak mengompilasi (`newValue`
+lalu tak terdefinisi) — dan itu ketahuan karena harness-nya dijalankan, bukan
+dibaca.
+
+#### Arah kedua, dan satu jebakan di dalamnya
+
+Gerbang baru yang hijau pada hari ia ditulis bukan bukti apa pun. Harness kini
+menjalankan keempat cacat itu juga atas lint **pra-perbaikan**
+(`git show HEAD:swift-ui-lint.sh`), dan menuntut **HIJAU** — kalau lint lama
+sudah merah di sana, Aturan 77 tidak menambah apa pun.
+
+Probe pertama saya untuk arah kedua melaporkan baseline **merah**, dan
+sebabnya bukan aturannya: README pohon kerja sudah menyebut **76** aturan
+sementara lint HEAD baru punya **75**. Aturan 10 membandingkan angka itu. Pohon
+pra-perbaikan karena itu harus konsisten — lint **dan** README dari HEAD.
+Baseline yang merah membuat setiap "merah" di bawahnya tidak bisa dipercaya,
+jadi ini diperbaiki, bukan diabaikan.
+
+#### Angka
+
+- Harness: **6 keadaan** + **4 arah kedua**, semuanya sesuai harapan.
+- 77 aturan UI hijau; `check-harness-terdaftar.py` **133 harness, semuanya
+  dirujuk** (sebelum siklus ini harness tersebut tidak dirujuk sama sekali —
+  gerbang yang tidak pernah dijalankan selalu hijau).
+- `check-jangkar-harness.py`: 515 jangkar, nol mutasi tertinggal.
+- Engine **222** + PointingKit **983**, 0 gagal. `swift-typecheck.sh` lulus.
+- `bash -n` lolos di bash 5 **dan** bash 3.2 (Docker).
+
+#### Yang TIDAK diklaim
+
+- Aturan 77 memeriksa **bentuk teks** dua simpul penyambungan, bukan perilaku
+  runtime. `Apps/` tidak dibangun di Linux (`LocationProvider` menyentuh
+  CoreLocation), jadi tidak ada uji runtime yang bisa melihatnya.
+- Penyambungan lewat jalur lain (mis. `onLocationChanged` dipanggil ulang di
+  tempat ketiga) tidak diperiksa. Yang ditutup adalah dua simpul yang terukur
+  hari ini.
+- Keadaan 4 (berkas hilang) sengaja dilewati di arah kedua: lint lama juga
+  merah di sana karena aturan lain membaca berkas itu, jadi ia tidak
+  membuktikan apa pun tentang Aturan 77.
+- **Tidak ada baris Swift produksi yang berubah** di siklus ini; seluruh
+  perubahan ada di `swift-ui-lint.sh`, harness, alur kerja, dan README.
+
+---
+
 ### Siklus (21 Okt 2026 — daftar peran `@Published` bisa bertengkar dengan kode, dan tetap hijau)
 
 Siklus dibuka dengan `git log` + `gh run list`, sesuai disiplin repo. Yang

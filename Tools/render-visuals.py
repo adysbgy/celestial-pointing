@@ -2739,6 +2739,132 @@ def _warning_color(night_mode):
 # Kasus-kasus yang dirender
 # ══════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════
+# Port dari `PointingKit/SkyBackdrop.swift` + `Apps/Shared/SkyBackdropView.swift`
+# ══════════════════════════════════════════════════════════════════════════
+#
+# **Kenapa lapisan ini diport, padahal ia bukan "visual objek".**
+# `SkyBackdropView` digambar di **setiap** layar app ini — ia satu-satunya
+# lapisan yang dilihat pengguna di semua keadaan, termasuk saat engine tidak
+# mengunci apa pun. Sampai unit ini ia punya **nol** cakupan render: 13 tes
+# menjaga model `SkyBackdrop`, dan tidak satu pun gerbang membaca gambarnya.
+# Bentuk cacat yang hidup di celah itu sudah pernah dikirim ke `main` dan
+# dicatat di docstring modelnya sendiri: titik latar digambar **putih yang
+# diredupkan** di mode malam, bukan merah — karena view memakai
+# `nightBrightness` sebagai `opacity` di atas `neutralStarBody`. Terangnya
+# benar, ronanya salah, dan tidak ada teks di layar yang bisa membantah.
+#
+# Dua angka model yang menentukan hasilnya, dan **keduanya diturunkan di
+# sini** alih-alih diketik:
+#   - `maximum_speck_radius` = `size_from_magnitude(redup) * 0.55`
+#   - `layer_opacity` = 0.5
+# Kalau katalog bertambah bintang redup, batas ini ikut bergerak.
+
+SPECK_SIZE_MARGIN = 0.55
+SPECK_LAYER_OPACITY = 0.5
+SPECK_DENSITY = 90
+SPECK_REFERENCE_AREA = 400.0 * 400.0
+# Lantai radius hidup di **view**, bukan di model: `max(0.35, speck.radius *
+# size.width)`. Ia ada supaya titik terkecil masih punya satu piksel yang
+# bisa digambar; tanpanya titik terjauh dari kamera menghilang dan langit
+# jadi bolong di layar kecil. Dinamai di sini supaya
+# `check_backdrop_port_matches_the_model` bisa membandingkannya dengan view
+# — angka yang hanya hidup di dalam ekspresi tidak bisa dibandingkan apa pun.
+SPECK_RADIUS_FLOOR = 0.35
+SPECK_SEED = 0x9E37_79B9_7F4A_7C15
+_MASK64 = (1 << 64) - 1
+
+
+def _splitmix_next(state):
+    """`SplitMix64.next` — satu langkah, lebar 64 bit."""
+    state = (state + 0x9E37_79B9_7F4A_7C15) & _MASK64
+    z = state
+    z = ((z ^ (z >> 30)) * 0xBF58_476D_1CE4_E5B9) & _MASK64
+    z = ((z ^ (z >> 27)) * 0x94D0_49BB_1331_11EB) & _MASK64
+    return state, (z ^ (z >> 31)) & _MASK64
+
+
+def _splitmix_unit(state):
+    state, value = _splitmix_next(state)
+    return state, (value >> 11) / float(1 << 53)
+
+
+def _backdrop_mix(value):
+    """`SkyBackdrop.mix` — finalizer SplitMix64 untuk keadaan awal aliran."""
+    z = value & _MASK64
+    z = ((z ^ (z >> 30)) * 0xBF58_476D_1CE4_E5B9) & _MASK64
+    z = ((z ^ (z >> 27)) * 0x94D0_49BB_1331_11EB) & _MASK64
+    return (z ^ (z >> 31)) & _MASK64
+
+
+def maximum_speck_radius():
+    """`SkyBackdrop.maximumSpeckRadius`, diturunkan dari katalog."""
+    dimmest = max(catalogue_magnitudes().values())
+    return size_from_magnitude(dimmest) * SPECK_SIZE_MARGIN
+
+
+def backdrop_specks(width, height, seed=SPECK_SEED):
+    """`SkyBackdrop.specks(size:)` — posisi 0…1, radius satuan lebar bidang."""
+    area = max(0.0, width) * max(0.0, height)
+    scaled = math.sqrt(area / SPECK_REFERENCE_AREA)
+    count = int(round(SPECK_DENSITY * scaled))
+    if count <= 0:
+        return []
+    maximum = maximum_speck_radius()
+    out = []
+    for index in range(count):
+        state = _backdrop_mix(seed ^ ((index * 0x9E37_79B9_7F4A_7C15) & _MASK64))
+        state, x = _splitmix_unit(state)
+        state, y = _splitmix_unit(state)
+        state, base = _splitmix_unit(state)
+        state, bright = _splitmix_unit(state)
+        out.append(dict(x=x, y=y,
+                        radius=maximum * base * base,
+                        brightness=0.25 + 0.75 * bright))
+    return out
+
+
+def backdrop_night_colour(day):
+    """`SkyBackdrop.nightColour` — rona merah, bukan putih yang diredupkan."""
+    return night_surface((day, day, day))
+
+
+def backdrop_day_colour():
+    """`SkyBackdrop.dayColour` — netral akromatik."""
+    return NEUTRAL_STAR_BODY
+
+
+def render_backdrop(width, height, night_mode, is_visible=True, ss=1):
+    """Port `SkyBackdropView.body`: latar gradien + titik latar.
+
+    Yang diport hanya **titik latarnya**, di atas latar yang sama dengan
+    `render()` — karena pertanyaan gerbangnya tentang titik, bukan gradien
+    (gradien permukaan sudah dijaga gerbang kontras).
+    """
+    if night_mode:
+        background = night_mapped((0.04, 0.04, 0.06), is_shadow=False)
+        background = (background[0] * 0.35, 0.0, 0.0)
+    else:
+        background = (0.039, 0.039, 0.059)
+    canvas = Canvas(width, height, background, ss=ss)
+    if not is_visible or width <= 0 or height <= 0:
+        return canvas
+    for speck in backdrop_specks(width, height):
+        cx = speck["x"] * width
+        cy = speck["y"] * height
+        # Radius dikalikan **lebar** bidang, bukan sisi terpendek — sama
+        # dengan view, dan itu keputusan yang bisa salah tanpa terlihat.
+        radius = max(SPECK_RADIUS_FLOOR, speck["radius"] * width)
+        if night_mode:
+            rgb = backdrop_night_colour(speck["brightness"])
+            opacity = SPECK_LAYER_OPACITY
+        else:
+            rgb = backdrop_day_colour()
+            opacity = speck["brightness"] * SPECK_LAYER_OPACITY
+        canvas.disc(cx, cy, radius, solid(rgb, opacity))
+    return canvas
+
+
 def build_cases():
     cases = []
 

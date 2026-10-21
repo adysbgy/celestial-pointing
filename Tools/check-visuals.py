@@ -6261,6 +6261,351 @@ def check_night_mode_never_exceeds_day(results, size=120, ss=2):
             f"{naiknya} piksel lebih terang, puncak +{terparah:.1f}"))
 
 
+def check_backdrop_night_specks_are_red(results, size=120, ss=1):
+    """Titik latar di mode malam harus **merah**, bukan putih yang diredupkan.
+
+    **Cacat yang ditutup, dan kenapa ia pantas jadi gerbang.** Bentuk ini
+    sudah pernah dikirim ke `main`: view memakai `nightBrightness(...)` sebagai
+    `context.opacity` di atas `neutralStarBody` — yang **putih**. Terangnya
+    benar, ronanya salah. Tidak ada teks di layar yang menyebut warna
+    titik-titik itu, gerbang kontras tidak mengukurnya (tidak ada teks di
+    atasnya), dan di mata "langit agak redup" terlihat wajar. Yang dikorbankan
+    seluruh alasan mode malam ada: cahaya biru mematikan adaptasi gelap 20–40
+    menit, dan titik-titik ini ada di **setiap** layar app.
+
+    Diukur di **piksel**, bukan di model: `SkyBackdrop.nightColour` sudah
+    diuji benar oleh 13 tes Linux, dan itulah sebabnya cacat ini bisa hidup —
+    yang salah bukan fungsinya, melainkan apa yang diisi view ke
+    `GraphicsContext`. Gerbang yang membaca fungsi akan hijau pada gambar yang
+    putih.
+    """
+    canvas = R.render_backdrop(size, size, night_mode=True, ss=ss)
+    worst_green = max(pixel[1] for pixel in canvas.buf)
+    worst_blue = max(pixel[2] for pixel in canvas.buf)
+    lit = max(pixel[0] for pixel in canvas.buf)
+    results.append(Result(
+        "latar malam: titik latar merah murni",
+        worst_green == 0 and worst_blue == 0 and lit > 0.5,
+        f"kanal hijau/biru tertinggi = {worst_green:.3f}/{worst_blue:.3f} "
+        f"(harus 0), merah tertinggi = {lit:.3f} (harus > 0.5 — kalau 0, "
+        f"tidak ada titik yang tergambar dan gerbangnya hijau karena kosong)"))
+
+
+def check_backdrop_day_specks_are_neutral(results, size=120, ss=1):
+    """Arah sebaliknya: mode siang **tidak** boleh ikut merah.
+
+    Tanpa gerbang ini, "semua titik merah" adalah perbaikan yang lolos:
+    memindahkan `nightColour` ke kedua cabang membuat mode malam hijau dan
+    langit siang merah tanpa ada yang memberitahu. Yang dijaga di sini
+    hubungan, bukan angka: setiap piksel siang harus akromatik (R≈G≈B),
+    karena warna spektral adalah **ciri pengenal** dan hiasan tidak boleh
+    punya ciri pengenal.
+    """
+    canvas = R.render_backdrop(size, size, night_mode=False, ss=ss)
+    # Hanya **piksel titik** yang diperiksa: selisih terhadap render yang
+    # lapisannya disembunyikan. Mengukur seluruh kanvas akan ikut menghitung
+    # latar gradien, yang memang kebiruan (#0A0A0F) — gerbang itu merah pada
+    # kode benar, dan angka 0.0200 yang dilaporkannya berasal dari latar.
+    #
+    # **Kenapa yang dibandingkan selisihnya, bukan angkanya.** Percobaan
+    # pertama memakai "selisih kanal titik <= 0.01" dan merah pada kode benar
+    # dengan 0.0168: titik putih beropasitas < 1 dicampur di atas latar
+    # kebiruan, jadi sisa kebiruan latar **ikut terbaca**. Itu artefak
+    # pengomposisian, bukan pilihan warna.
+    #
+    # Invarian yang benar: mencampur warna akromatik ke latar hanya bisa
+    # **mengurangi** selisih kanal latar itu, tak pernah menambah. Jadi
+    # `selisih(titik) <= selisih(latar) + eps` untuk setiap piksel titik. Titik
+    # berwarna (merah, mis.) akan melampauinya — dan itu tepat yang harus
+    # memerah.
+    # Pembanding: render yang sama dengan **daftar titik dikosongkan**. Bukan
+    # `is_visible=False` — itu saklar AOD, dan memakainya di sini membuat
+    # gerbang ini ikut memerah saat guard AOD dimutasi (terukur: keadaan 3
+    # memerahkan dua gerbang sekaligus). Satu gerbang, satu cacat.
+    original_specks = R.backdrop_specks
+    R.backdrop_specks = lambda *a, **k: []
+    try:
+        empty = R.render_backdrop(size, size, night_mode=False, ss=ss)
+    finally:
+        R.backdrop_specks = original_specks
+    worst_excess, lit, touched = 0.0, 0.0, 0
+    for drawn, base in zip(canvas.buf, empty.buf):
+        if max(abs(x - y) for x, y in zip(drawn, base)) <= 1e-6:
+            continue
+        touched += 1
+        excess = ((max(drawn[:3]) - min(drawn[:3]))
+                  - (max(base[:3]) - min(base[:3])))
+        worst_excess = max(worst_excess, excess)
+        lit = max(lit, max(drawn[:3]))
+    results.append(Result(
+        "latar siang: titik latar tetap netral",
+        touched > 0 and worst_excess <= 0.002 and lit > 0.3,
+        f"{touched} piksel titik, kelebihan selisih kanal atas latar = "
+        f"{worst_excess:.4f} (harus <= 0.002 — titik berwarna akan "
+        f"melampauinya), terang tertinggi = {lit:.3f}"
+        + ("" if touched else " — nol piksel titik, gerbangnya hijau karena kosong")))
+
+
+def check_backdrop_stops_drawing_when_reduced(results, size=120, ss=1):
+    """Always-On: lapisan langit harus **berhenti menggambar**, bukan meredup.
+
+    `SkyBackdropView(isVisible:)` menerima saklar ini dan docstring-nya
+    menyebutnya "bagian dari kontrak AOD" — tetapi sampai unit ini tidak ada
+    gerbang yang membaca apa pun tentangnya. Cacat yang dijaga: `guard
+    isVisible` dibuang atau dibalik, dan layar redup kembali menggambar
+    puluhan titik yang digambar ulang setiap detik, di layar yang justru
+    diminta berhenti menyegarkan.
+
+    Perbandingan yang dipakai **bukan** "tidak ada piksel terang" (latar
+    gradiennya sendiri terang), melainkan **dua render yang harus identik**:
+    dengan `is_visible=False`, kanvas harus sama persis dengan kanvas yang
+    bidangnya kosong. Itu invarian yang tidak bergantung pada nilai warna
+    mana pun.
+    """
+    hidden = R.render_backdrop(size, size, night_mode=False, is_visible=False, ss=ss)
+    reference = R.Canvas(size, size, (0.039, 0.039, 0.059), ss=ss)
+    worst = 0.0
+    if len(hidden.buf) != len(reference.buf):
+        results.append(Result("AOD: lapisan langit berhenti menggambar", False,
+                              "ukuran kanvas berbeda"))
+        return
+    for a, b in zip(hidden.buf, reference.buf):
+        worst = max(worst, max(abs(x - y) for x, y in zip(a, b)))
+    # Dan arah kedua: dengan `is_visible=True` kanvas itu **harus** berbeda.
+    # Tanpa ini, gerbangnya hijau pada view yang tidak pernah menggambar apa
+    # pun — termasuk pada `guard` yang dibalik permanen.
+    drawn = R.render_backdrop(size, size, night_mode=False, is_visible=True, ss=ss)
+    gap = 0.0
+    for a, b in zip(drawn.buf, reference.buf):
+        gap = max(gap, max(abs(x - y) for x, y in zip(a, b)))
+    results.append(Result(
+        "AOD: lapisan langit berhenti menggambar",
+        worst == 0.0 and gap > 0.05,
+        f"selisih saat disembunyikan = {worst:.6f} (harus 0), "
+        f"selisih saat tampil = {gap:.3f} (harus > 0.05)"))
+
+
+def check_backdrop_view_reads_the_model_colours(results, view_source=None):
+    """Paritas **sumber**: view wajib memakai jalur warna model, bukan terangnya.
+
+    Gerbang piksel di atas mengukur **port Python**. Port bisa benar
+    sementara `SkyBackdropView.swift` — satu-satunya yang benar-benar
+    dijalankan di perangkat — memakai bentuk lama. Kelas cacat itu sudah
+    pernah terjadi di repo ini untuk cincin Saturnus, dan jawabannya sama:
+    ukur keduanya, karena hanya satu yang punya PNG.
+
+    Yang diperiksa, dan **kenapa bukan `"nightColour" in view`**:
+
+      a. `nightColour` **dipanggil** di kode (bukan disebut di komentar) —
+         `swift_code_only` membuang komentar & isi string, jadi `// TODO
+         kembalikan nightColour` tidak menghitung.
+      b. `nightBrightness` **tidak** dipakai sebagai pengisi `opacity` —
+         itulah tepat bentuk cacat yang pernah dikirim, dan ia bisa hidup
+         berdampingan dengan (a) kalau seseorang menambahkan warna merah
+         **dan** mempertahankan opasitas putihnya.
+    """
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/SkyBackdropView.swift")).read()
+    code = swift_code_only(view)
+    calls_colour = re.search(r"\bSkyBackdrop\s*\.\s*nightColour\s*\(", code) is not None
+    brightness_into_opacity = re.search(
+        r"opacity\s*=\s*[^\n]*\bnightBrightness\s*\(", code) is not None
+    results.append(Result(
+        "latar: view memakai warna model, bukan terangnya",
+        calls_colour and not brightness_into_opacity,
+        ("nightColour tidak dipanggil di kode view" if not calls_colour
+         else "nightBrightness masih mengisi opacity (bentuk cacat putih-redup)")
+        if not (calls_colour and not brightness_into_opacity)
+        else "warna datang dari nightColour/dayColour, opacity dari lapisan"))
+
+
+def check_backdrop_radius_scales_with_width(results, size=200):
+    """Radius titik diskalakan **lebar** bidang, bukan sisi terpendeknya.
+
+    **Kenapa ini gerbang, bukan detail.** `SkyBackdrop.specks(size:)`
+    mengembalikan radius sebagai **fraksi lebar** — satuannya ditentukan di
+    model, dan view mengalikannya dengan `size.width`. Port mengalikannya
+    dengan `width` juga, dan sampai gerbang ini tidak ada yang mengukur
+    bahwa kedua sisi memilih sumbu yang sama. Kalau port memakai `height`
+    (atau `min(width, height)`), kelima gerbang latar yang lain **tetap
+    hijau**: warna titik tidak berubah, jumlah piksel titik tidak berubah,
+    dan pada bidang persegi — bentuk yang dipakai semua gerbang itu — lebar
+    dan tinggi sama besar, jadi tidak ada yang bisa membedakannya.
+
+    Diukur pada bidang **tidak persegi**, dengan satu titik tetap di tengah
+    dan radius yang diketahui. Dua arah, karena satu arah saja bisa lolos
+    secara kebetulan:
+
+        200 x 100  radius 0.1  ->  diameter 40 px  (0.1 * 200)
+        100 x 200  radius 0.1  ->  diameter 20 px  (0.1 * 100)
+
+    Angka `0.1` dan dua bentuk bidang itu dipilih supaya kedua kemungkinan
+    sumbu berbeda **2x** — jauh di luar pembulatan piksel, jadi gerbangnya
+    tidak bisa merah atau hijau karena pembulatan.
+
+    **Yang TIDAK diklaim.** Gerbang ini mengukur satu titik yang disuntikkan
+    pengganti `backdrop_specks`, bukan titik asli dari `SplitMix64`. Yang
+    dijaga adalah **pemetaan radius → piksel**; kesamaan deret acaknya
+    memang tidak diklaim di mana pun (lihat `check_backdrop_port_matches_the_model`).
+    """
+    original_specks = R.backdrop_specks
+    probe = [dict(x=0.5, y=0.5, radius=0.1, brightness=1.0)]
+    R.backdrop_specks = lambda *a, **k: list(probe)
+    try:
+        wide = R.render_backdrop(200, 100, night_mode=False, ss=1)
+        tall = R.render_backdrop(100, 200, night_mode=False, ss=1)
+    finally:
+        R.backdrop_specks = original_specks
+
+    def diameter(canvas, width, height):
+        """Diameter kotak pembatas piksel yang tersentuh, atau 0."""
+        background = (0.039, 0.039, 0.059)
+        xs, ys = [], []
+        for index, pixel in enumerate(canvas.buf):
+            if max(abs(pixel[channel] - background[channel])
+                   for channel in range(3)) > 0.01:
+                xs.append(index % width)
+                ys.append(index // width)
+        if not xs:
+            return 0, 0
+        return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+    wide_x, wide_y = diameter(wide, 200, 100)
+    tall_x, tall_y = diameter(tall, 100, 200)
+    # Toleransi 2 piksel: tepi lingkaran anti-alias, jadi kotak pembatasnya
+    # bisa satu piksel lebih lebar/kecil dari diameter matematisnya.
+    results.append(Result(
+        "latar: radius titik diskalakan lebar, bukan tinggi",
+        abs(wide_x - 40) <= 2 and abs(wide_y - 40) <= 2
+        and abs(tall_x - 20) <= 2 and abs(tall_y - 20) <= 2,
+        f"200x100 -> {wide_x}x{wide_y} px (harus ~40x40 = 0.1 * lebar 200), "
+        f"100x200 -> {tall_x}x{tall_y} px (harus ~20x20 = 0.1 * lebar 100); "
+        f"kalau angkanya mengikuti tinggi, port memakai sumbu yang salah "
+        f"dan kelima gerbang latar lain tidak bisa melihatnya"))
+
+
+def check_backdrop_port_matches_the_model(results, model_source=None, view_source=None):
+    """Paritas **angka**: konstanta port latar harus sama dengan `SkyBackdrop`.
+
+    **Cacat yang ditutup pemeriksaan ini, dan diukur bukan disangka.** Empat
+    gerbang piksel di atas mengukur `render-visuals.py`. Port itu menulis
+    lima angkanya dengan **tangan**:
+
+        SPECK_SIZE_MARGIN = 0.55      # sizeMargin
+        SPECK_LAYER_OPACITY = 0.5     # layerOpacity
+        SPECK_DENSITY = 90            # speckDensity
+        SPECK_REFERENCE_AREA = 400*400 # `let reference: Double = 400 * 400`
+        `max(0.35, …)`                # lantai radius di view
+
+    Tidak satu pun dari kelimanya dibaca dari model, dan tidak satu pun
+    pemeriksaan di berkas ini membandingkannya. Terukur pada salinan utuh,
+    proses baru: `layerOpacity 0.5 -> 0.30` **dan** `speckDensity 90 -> 45`
+    di `SkyBackdrop.swift` membiarkan keempat gerbang hijau dengan angka
+    yang **sama persis** (0.722 / 3361 piksel / 0.571). Artinya seluruh
+    unit ini mengukur gambar yang tidak pernah digambar app begitu modelnya
+    berubah — dan berubahnya model adalah hal yang wajar, bukan sabotase:
+    justru itu gunanya model.
+
+    **Kenapa dibaca dari teks model, bukan dari angka yang ditulis di sini.**
+    Menulis ulang `0.55` di sisi gerbang akan membuat dua salinan yang bisa
+    menyimpang lagi — persis kelas yang `check_modeled_port_constants_match_
+    the_model` ada untuk mencegah, dan kelas yang sudah dibayar repo ini
+    untuk pita Saturnus dan cincinnya.
+
+    **Kenapa `maximumSpeckRadius` dihitung, bukan dibaca.** Di Swift ia
+    `var`, diturunkan dari katalog lewat `sizeFromMagnitude`. Port sudah
+    menurunkannya dengan cara yang sama (`maximum_speck_radius`), jadi yang
+    dibandingkan adalah **fungsi**, bukan angka. Kalau katalog bertambah
+    bintang redup, kedua sisi bergerak bersama tanpa ada yang perlu ingat.
+
+    **Yang TIDAK diklaim.** Gerbang ini menyamakan **angka**. Ia tidak
+    membuktikan urutan pemakaiannya sama (mis. radius dikali lebar bidang,
+    bukan tinggi) — itu dijaga `check_backdrop_radius_scales_with_width`,
+    dan tidak membuktikan bahwa `SplitMix64` di port menghasilkan deret yang
+    identik dengan Swift. Kesamaan deret hanya bisa dibuktikan dengan
+    menjalankan Swift-nya; yang ada di sini adalah paritas **konstanta**.
+    """
+    model = model_source if model_source is not None else open(
+        os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                           "SkyBackdrop.swift")).read()
+    # Komentar dibuang **sebelum** dibaca. Tanpa ini, `// dulu: layerOpacity
+    # = 0.5` di atas baris yang sudah diganti memenuhi gerbang — kelas yang
+    # sudah dibayar repo ini di `swift_code_only`, dan gerbang yang bisa
+    # dipuaskan komentar akan dimatikan orang begitu ia merah pada kode benar.
+    model = swift_code_only(model)
+
+    expected = {
+        "SPECK_SIZE_MARGIN": read_double_constant_from_swift(model, "sizeMargin"),
+        "SPECK_LAYER_OPACITY": read_double_constant_from_swift(model, "layerOpacity"),
+        "SPECK_DENSITY": read_double_constant_from_swift(model, "speckDensity"),
+    }
+    # Bidang acuan ditulis sebagai ekspresi (`400 * 400`), bukan literal, jadi
+    # `read_double_constant_from_swift` tidak bisa membacanya — dan itu bukan
+    # alasan untuk melewatinya: angka ini menentukan berapa titik yang
+    # digambar di jam 40 mm. Dibaca dengan pola yang menyebut `let reference`
+    # supaya tidak menebak angka mana pun di berkas itu.
+    reference = re.search(
+        r"let\s+reference\s*:\s*Double\s*=\s*(\d+)\s*\*\s*(\d+)", model)
+    if reference is not None:
+        expected["SPECK_REFERENCE_AREA"] = (float(reference.group(1))
+                                            * float(reference.group(2)))
+    else:
+        results.append(Result(
+            "latar: bidang acuan port == model", False,
+            "`let reference: Double = A * B` tidak terbaca di SkyBackdrop.swift "
+            "— pembacanya perlu diselaraskan, atau bentuknya berubah"))
+
+    # Lantai radius hidup di **view**, bukan di model: `max(0.35, …)`. Ia
+    # menentukan titik terkecil yang masih tergambar, jadi port yang memakai
+    # angka lain menggambar langit yang berbeda dari app-nya.
+    view = view_source if view_source is not None else open(
+        os.path.join(ROOT, "Apps/Shared/SkyBackdropView.swift")).read()
+    view = swift_code_only(view)
+    floor = re.search(r"max\(\s*(\d+(?:\.\d+)?)\s*,\s*speck\.radius", view)
+    if floor is None:
+        results.append(Result(
+            "latar: lantai radius port == view", False,
+            "`max(<angka>, speck.radius …)` tidak terbaca di SkyBackdropView.swift "
+            "— bentuknya berubah, atau lantainya dihapus"))
+    else:
+        expected["SPECK_RADIUS_FLOOR"] = float(floor.group(1))
+
+    if expected.get("SPECK_SIZE_MARGIN") is None:
+        results.append(Result(
+            "latar: margin ukuran port == model", False,
+            "`sizeMargin` tidak terbaca sebagai `static let …: Double` di model"))
+    if expected.get("SPECK_LAYER_OPACITY") is None:
+        results.append(Result(
+            "latar: opasitas lapisan port == model", False,
+            "`layerOpacity` tidak terbaca sebagai `static let …: Double` di model"))
+    if expected.get("SPECK_DENSITY") is None:
+        results.append(Result(
+            "latar: kepadatan port == model", False,
+            "`speckDensity` tidak terbaca sebagai `static let …: Double` di model"))
+
+    for token, model_value in sorted(expected.items()):
+        if model_value is None:
+            continue
+        port_value = getattr(R, token, None)
+        results.append(Result(
+            f"latar: {token} port == model",
+            port_value is not None and abs(float(port_value) - model_value) < 1e-9,
+            f"port={port_value!r}, model={model_value!r}"))
+
+    # `maximumSpeckRadius` adalah **fungsi** dari katalog, dan port sudah
+    # menurunkannya sendiri. Yang dibandingkan: port == turunan model yang
+    # sama, dihitung di sini dari angka model + magnitudo katalog.
+    margin = expected.get("SPECK_SIZE_MARGIN")
+    if margin is not None:
+        dimmest = max(R.catalogue_magnitudes().values())
+        derived = R.size_from_magnitude(dimmest) * margin
+        results.append(Result(
+            "latar: radius titik terbesar port == turunan model",
+            abs(R.maximum_speck_radius() - derived) < 1e-9,
+            f"port={R.maximum_speck_radius():.6f}, turunan model={derived:.6f} "
+            f"(magnitudo teredup {dimmest}, margin {margin})"))
+
+
 def check_planet_features_present(results, size=200, ss=2):
     """Ciri yang **seharusnya** ada juga harus benar-benar tergambar.
 
@@ -16079,6 +16424,15 @@ def main():
     check_port_constants_reach_the_drawing(results)
     check_night_mode_purity(results, args.size, args.ss)
     check_night_mode_never_exceeds_day(results, 120, args.ss)
+    # Lapisan langit latar — digambar di **setiap** layar, dan sampai unit ini
+    # nol cakupan render. Lihat docstring `check_backdrop_night_specks_are_red`
+    # untuk cacat yang pernah dikirim (titik putih redup di mode malam).
+    check_backdrop_night_specks_are_red(results, 120, args.ss)
+    check_backdrop_day_specks_are_neutral(results, 120, args.ss)
+    check_backdrop_stops_drawing_when_reduced(results, 120, args.ss)
+    check_backdrop_view_reads_the_model_colours(results)
+    check_backdrop_radius_scales_with_width(results)
+    check_backdrop_port_matches_the_model(results)
     check_star_colour_order(results, args.size, args.ss)
     check_star_size_follows_magnitude(results)
     check_star_pulse_reaches_the_picture(results, args.size, args.ss)
