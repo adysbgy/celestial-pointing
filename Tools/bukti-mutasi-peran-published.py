@@ -163,10 +163,16 @@ def main():
     try:
         for name, model_edit, motion_edit, expect_red in STATES:
             edits = [("model", MODEL, model_edit), ("kode", MOTION, motion_edit)]
-            for label, path, edit in edits:
+            for label, default_path, edit in edits:
                 if edit is None:
                     continue
-                find, replace = edit
+                # Pola: `(find, replace)` dipakai pada berkas ikutannya; `(path,
+                # find, replace)` mengubah berkasnya sendiri.
+                if len(edit) == 2:
+                    find, replace = edit
+                    path = default_path
+                else:
+                    path, find, replace = edit
                 text = open(path, encoding="utf-8").read()
                 if text.count(find) != 1:
                     raise SystemExit(

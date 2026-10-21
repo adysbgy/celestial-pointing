@@ -1578,6 +1578,36 @@ jobs:
       - name: Buktikan uji kebijakan bunyi merah pada politik yang menyimpang
         run: python3 Tools/bukti-mutasi-suara.py
 
+      # Gerbang **peran @Published** (`ObservedProperty`) baru, dan ia menjaga
+      # cacat yang forma "hijau" nya identik dengan cacat nyata:
+      # `MotionLogger.isRunning` `@Published` padahal **nol** layar membacanya.
+      #
+      # Kenapa ini bukan soal gaya: setiap penulisan `isRunning` memanggil
+      # `objectWillChange` untuk **setiap** layar yang mengobservasi
+      # `MotionLogger` — `PointingView`, `CalibrationView`,
+      # `ReducedLuminanceView`, dan dokumen aplikasi. Render yang tidak pernah
+      # menghasilkan satu piksel, dibayar di layar Always-On yang justru
+      # diminta hemat baterai.
+      #
+      # Yang menyebabkan celahnya lama terbuka: daftar peran di
+      # `ObservedProperty.roles` menyebut `"isRunning": .bookkeeping` —
+      # artinya "harus ada, dan tidak `@Published`" — tetapi aturan yang
+      # membaca daftar itu hanya memeriksa keberadaan nama, bukan sifat
+      # `@Published`-nya. Jadi daftar dan kode bisa bertengkar, dan daftar
+      # yang salah tetap hijau.
+      #
+      # Harness ini menjalankan uji itu pada lima keadaan: baseline wajib
+      # hijau, lalu properti `@Published` baru tanpa peran, peran `renderInput`
+      # atas properti yang bukan `@Published` (janji render yang bohong —
+      # arah yang paling sunyi), properti pembukuan yang masih `@Published`
+      # (cacat asli), nama di daftar yang dihapus dari kode, dan kontrol
+      # negatif di mana peran sah diubah. Yang dituntut adalah **uji mana**
+      # yang berbunyi, bukan sekadar "ada yang merah": keadaan yang
+      # sama-sama menyalakan satu uji berarti separuh gerbang itu tidak
+      # mengukur apa pun.
+      - name: Buktikan gerbang peran @Published berbunyi pada properti yang salah peran
+        run: python3 Tools/bukti-mutasi-peran-published.py
+
       # Bukti untuk Aturan 47 — kembar Aturan 46, pada saluran yang paling
       # sering dipakai tanpa melihat layar: getaran.
       #

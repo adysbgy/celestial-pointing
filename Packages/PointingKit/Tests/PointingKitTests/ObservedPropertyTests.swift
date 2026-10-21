@@ -114,7 +114,7 @@ final class ObservedPropertyTests: XCTestCase {
     /// Arah kedua tetap ditegakkan `testBookkeepingPropertiesAreNotPublished`;
     /// keduanya bersama berarti "peran bookkeeping = ada, dan tidak
     /// `@Published`", bukan "salah satu".
-    func testRolesMentionOnlyRealProperties() throws {
+    func testRenderInputRolesArePublished() throws {
         let published = Set(try propertyNamesInApps(prefix: "@Published")
             .map { "\($0.path)|\($0.name)" })
         let semuaVar = Set(try allVarDeclarationsInApps())
