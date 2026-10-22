@@ -1,3 +1,70 @@
+### Siklus (22 Okt 2026 — yang TIDAK cacat: empat dugaan diukur, semuanya lulus)
+
+Sesudah lencana kandidat ditutup, giliran menyapu dugaan berikutnya. Empat
+dugaan, empat pengukuran, **nol cacat**. Ini dicatat karena hasil negatif yang
+diukur sama pentingnya dengan temuan — dan karena tiga di antaranya nyaris
+dilaporkan sebagai cacat berdasarkan pembacaan kode saja.
+
+#### (a) Glif "?" di lantai piksel `max(1, …)` — TIDAK cacat
+
+Dugaan: lantai `max(1, badgeRadius * strokeFraction)` di
+`CelestialVisualView` menaikkan rasio tebal/tinggi-lengkung dari 0.45 (nilai
+model) ke **0.58** di 38 pt dan **0.73** di 30 pt (AOD), jadi glifnya kembali
+menjadi gumpalan — persis cacat yang baru ditutup, hanya lewat jalur lain.
+
+Diukur dengan merender lencana pada ukuran kirim lalu memeriksanya:
+38 pt (76 px) rasio 0.58, 30 pt AOD (60 px) rasio 0.73, dan tebal lama 3.5 px
+pada 76 px (rasio 1.01) — **ketiganya masih terbaca sebagai tanda tanya dengan
+rongga antara lengkung dan titik**. Ambang 0.9 yang dipakai uji model
+(`CandidateMarkerTests`) adalah ambang **model**, bukan ambang keterbacaan
+piksel; pada resolusi device glif bertahan jauh di atasnya.
+
+Lantai itu justru **benar**: tanpa `max(1, …)`, garis 0.4 pt di 30 pt akan
+hilang oleh rasterisasi. Yang salah adalah klaim di komentar view bahwa 0.28
+"tergambar sebagai gumpalan pejal" pada 38 pt — pada 76 px hasilnya masih
+terbaca, sempit tetapi ada. Klaim itu sudah dikoreksi di siklus sebelumnya.
+
+#### (b) Ciri pengenal di buffer device 76 px — TIDAK hilang
+
+Dugaan: semua gerbang merender di 304–400 px (`size=38, ss=8` = 304 px;
+`size=200, ss=2` = 400 px), sedangkan jam menampilkan 76 px. Selisih luas
+5,3×, jadi ciri yang lolos gerbang bisa hilang di layar.
+
+Diukur pada 400 px lawan 76 px: kontras pita Jupiter 16.63 → 15.08 (0.91),
+piksel cincin Saturnus di luar piringan 2840 → 96 (0.03, dan 0.03 itu tepat
+rasio luas (76/400)² = 0.036 — cirinya utuh, hanya areanya mengecil), sisi
+gelap/terang bulan sabit 1.00 → 0.86. **Tidak ada ciri yang jatuh ke nol.**
+
+Gerbang baru untuk ini **tidak** ditambahkan, dan alasannya diukur: metrik
+yang tersedia tidak memisahkan kasus berfitur dari pembandingnya.
+`planet-jupiter-confirmed` 15.08 lawan `planet-jupiter-no-feature` 12.97
+(pembandingnya bukan nol — bola bergradasi sudah punya simpangan sendiri);
+`planet-saturn-bare` punya **719** piksel di luar piringan, lebih banyak
+daripada `planet-saturn-confirmed` (96), karena bola `bare` lebih besar;
+`moon-crescent-jakarta` dan `…-plain` keduanya 0.857. Gerbang yang ambangnya
+tidak memisahkan dua kelas adalah upacara, bukan penjaga — jadi tidak ditulis.
+
+#### (c) Kemurnian merah mode malam di seluruh katalog — sudah dijaga
+
+Dugaan: `Color.blue`/`Color.green` yang lolos di cabang langka (inti gugus,
+corona matahari, gradien nebula) tidak terlihat dari token palet.
+
+Diukur: 89 dari 89 kasus, **nol piksel** dengan kanal hijau atau biru di atas
+8/255 saat `night_mode=True`. Sudah ada gerbangnya —
+`check_night_mode_purity`, yang menurunkan daftar kasus dari `build_cases()`
+dan merah bila katalog kosong. Probe ini mengulang cakupan yang sudah ada.
+
+#### (d) Penjaga `isConfirmed` di `Apps/` — sudah dijaga Aturan 50
+
+Dugaan: `guard isConfirmed else { return }` di `drawPlanet`
+(`CelestialVisualView:457`) adalah keputusan kejujuran di badan `Apps/` yang
+tidak pernah dibangun `swift-test.sh` — kelas cacat yang sudah berulang.
+
+Diukur dengan menghapus penjaganya dan menjalankan `./swift-ui-lint.sh`:
+**merah**, "Aturan 50: ciri pengenal planet berhenti saat engine ragu — penjaga
+`isConfirmed` tidak mendahului `switch palette.feature` di dalam `drawPlanet`".
+Berkas dipulihkan, lint hijau lagi. Dugaan ini salah: penjaganya dijaga.
+
 ### Siklus (22 Okt 2026 — lencana kandidat: penanda keraguan yang ikut kabur, dan glif yang di ambang)
 
 Dua cacat di satu tempat, dan keduanya mengenai **satu-satunya penanda di
