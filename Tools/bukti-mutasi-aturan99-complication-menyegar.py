@@ -90,10 +90,14 @@ def main() -> int:
                       "        completion(Timeline(entries: [entry],\n"
                       "                               policy: .after(Date().addingTimeInterval(60))))", 1),
          1),
-        ("3. cabang `nil` dibuang (`?? .distantFuture`)",
+        # 3. `.after(now)` — bentuk paling berbahaya dari kelas ini: ia
+        #    **menyegar terus-menerus** (jadwal yang selalu sudah lewat), jadi
+        #    di pergelangan ia menghabiskan baterai dan tetap tidak pernah
+        #    menampilkan penanda basi yang benar. Sapuan "apakah `.after` ada"
+        #    hijau di sini; yang menangkapnya adalah pemeriksaan asal nilai.
+        ("3. `.after(now)` — menyegar terus-menerus, tetap tanpa penanda",
          asli.replace(JADWAL,
-                      "        let refresh = digest?.nextRefreshDate(after: now) ?? .distantFuture\n"
-                      "        completion(Timeline(entries: [entry], policy: .after(refresh)))", 1),
+                      "        completion(Timeline(entries: [entry], policy: .after(now)))", 1),
          1),
         ("4. aksesor hanya disebut di komentar",
          asli.replace(JADWAL,
@@ -101,7 +105,17 @@ def main() -> int:
                       "        completion(Timeline(entries: [entry],\n"
                       "                           policy: .after(now.addingTimeInterval(60))))", 1),
          1),
-        ("5. kontrol negatif: kode jujur", asli, 0),
+        # 5. Jadwal dibulatkan ke jam berikutnya: `.after` ada, aksesornya
+        #    dipanggil, tetapi hasilnya tidak dipakai sebagai tanggal.
+        ("5. hasil aksesor dipakai sebagai syarat, bukan sebagai tanggal",
+         asli.replace(JADWAL,
+                      "        if digest?.nextRefreshDate(after: now) != nil {\n"
+                      "            completion(Timeline(entries: [entry],\n"
+                      "                               policy: .after(now.addingTimeInterval(600))))\n"
+                      "        } else {\n"
+                      "            completion(Timeline(entries: [entry], policy: .never))\n"
+                      "        }", 1),
+         1),
     ]
 
     gagal = 0

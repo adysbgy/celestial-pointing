@@ -61,12 +61,33 @@ APPS = "Apps"
 TIMELINE_CALL = re.compile(r"\bTimeline\s*\(\s*entries\s*:")
 #: Kebijakan yang membekukan complication sampai ada reload dari luar.
 NEVER_POLICY = re.compile(r"policy\s*:\s*\.never\b")
-#: Jalur yang menyegarkan diri sendiri tepat saat klaimnya kedaluwarsa.
-AFTER_POLICY = re.compile(r"policy\s*:\s*\.after\s*\(")
+#: Kebijakan yang menyegar sendiri, beserta **nama** argumennya.
+AFTER_POLICY = re.compile(r"policy\s*:\s*\.after\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)")
 #: Model yang punya lapisan basi — pemicu aturan ini.
 STALENESS_MODEL = re.compile(r"\bComplicationDigest\b")
-#: Aksesor jadwal yang wajib dipakai, bukan angka yang disalin.
-SCHEDULE_ACCESSOR = re.compile(r"\bnextRefreshDate\s*\(\s*after\s*:")
+#: Aksesor jadwal yang wajib menjadi **sumber** argumen `.after(...)`.
+SCHEDULE_ACCESSOR = r"\bnextRefreshDate\s*\(\s*after\s*:"
+
+
+def bound_from_schedule(code: str, name: str) -> bool:
+    """Apakah `name` diikat dari `nextRefreshDate(after:)`?
+
+    **Kenapa bukan sekadar "apakah `.after(` ada".** `.after(now)`,
+    `.after(Date().addingTimeInterval(60))`, dan `.after(refresh ?? .distantFuture)`
+    semuanya memakai `.after` dan semuanya lolos sapuan yang hanya mencari
+    nama API. Dua yang pertama menyegar pada waktu yang tidak berhubungan
+    dengan umur cuplikan (yang satu bahkan menyegar terus-menerus — loop
+    bangun yang menghabiskan baterai), dan yang ketiga mengikat jadwal ke
+    cabang `nil` sehingga digest segar pun ikut dibekukan.
+
+    Yang membuat jadwal itu benar adalah **asal nilainya**: tanggal yang
+    dikembalikan model, yang diuji di Linux. Jadi yang diperiksa adalah
+    ikatannya, bukan keberadaan pemanggilannya.
+    """
+    # `let refresh = ... nextRefreshDate(after: ...)` — boleh multi-baris.
+    pattern = (r"\blet\s+" + re.escape(name) + r"\s*(?::[^=\n]+)?=\s*"
+               r"[^\n]*?" + SCHEDULE_ACCESSOR)
+    return re.search(pattern, code, re.S) is not None
 
 
 def strip_comments(text: str) -> str:
@@ -116,15 +137,20 @@ def main() -> int:
 
         diperiksa += 1
         memakai_never = bool(NEVER_POLICY.search(code))
-        memakai_after = bool(AFTER_POLICY.search(code))
-        memakai_jadwal = bool(SCHEDULE_ACCESSOR.search(code))
+        memakai_jadwal = False
+        memakai_after_tak_terikat = False
+        for name in AFTER_POLICY.findall(code):
+            if bound_from_schedule(code, name):
+                memakai_jadwal = True
+            else:
+                memakai_after_tak_terikat = True
 
-        if memakai_never and not memakai_after:
+        if memakai_never and not memakai_jadwal:
             pelanggaran.append(rel)
-        elif memakai_after and not memakai_jadwal:
-            # `.after(<angka tetap>)` menyegar pada waktu yang tidak
-            # berhubungan dengan umur cuplikan — penanda basi tetap tidak
-            # muncul tepat saat ia dibutuhkan.
+        elif memakai_after_tak_terikat:
+            # `.after(<nama>)` yang namanya **bukan** berasal dari
+            # `nextRefreshDate(after:)` — jadwal yang tidak berhubungan
+            # dengan umur cuplikan. Lihat `bound_from_schedule`.
             tanpa_aksesor.append(rel)
 
     if diperiksa == 0:
