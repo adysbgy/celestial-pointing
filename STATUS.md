@@ -62,10 +62,21 @@ berkas) dan menolak yang keempat (tidak ada).
 
 #### Uji
 
-PointingKit 1041 → **1044**. Tiga uji baru, dan semuanya non-vakum: token
-dimutasi ke putih, suite merah **6 kegagalan**, lalu dikembalikan. Uji
-`testWhiteOnAccentFailsSoTheTokenCannotBeWhite` sengaja menahan kesimpulan
-"putih sedikit lebih redup" supaya perbaikan tidak dibalik.
+PointingKit 1041 → **1045**. Empat uji baru, semuanya non-vakum: token
+dimutasi ke putih, suite merah **8 kegagalan**, lalu dikembalikan.
+
+Satu di antaranya menangkap kesalahan saya sendiri. Versi pertama uji kontras
+mengukur `accentStart`/`accentEnd` — gradien aksen — dan **lolos**. Tetapi
+tombol onboarding memakai `.tint(PointingTone.active.color)`, jadi labelnya
+tidak pernah duduk di gradien itu. Angka sebenarnya jauh lebih buruk: putih
+**1.98:1** di atas tint siang (cyan), bukan 3.70:1. Uji yang mengukur
+permukaan yang salah akan hijau selamanya — kelas cacat yang sama dengan yang
+sedang diperbaiki, kali ini di dalam perbaikannya. Uji sekarang mengukur
+`TonePalette`, dan ada uji kedua yang tetap menjaga gradien karena token yang
+sama dipakai di sana juga.
+
+Pilihan hitam jadi lebih kuat, bukan lebih lemah: 10.63:1 di atas tint siang
+dan 4.83:1 di atas tint malam, versus putih 1.98:1 dan 4.35:1.
 
 ### Siklus (22 Okt 2026 — yang TIDAK cacat: empat dugaan diukur, semuanya lulus)
 

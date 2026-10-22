@@ -195,6 +195,16 @@ extension SurfacePalette {
     /// Yang **tidak** termasuk di sini: `accent` — aksen adalah warna
     /// identitas, bukan teks, dan rasio teks-ke-aksen tidak dijamin. Menguji
     /// semuanya sekaligus hanya menghasilkan angka yang tidak bermakna.
+    ///
+    /// **Itu dulu berarti lubang, bukan sekadar pengecualian.** Label tombol
+    /// `.borderedProminent` memang duduk di atas aksen, jadi "tidak dijamin"
+    /// sama dengan "tidak pernah diukur" — dan memang tidak pernah lolos:
+    /// putih 3.70:1 di atas aksen biru, 4.12:1 di atas ungu. Sekarang ada
+    /// `onAccent` yang diukur terhadap **kedua ujung** aksen di kedua mode
+    /// (`SurfacePaletteTests`), jadi pasangan teks-di-atas-aksen punya token
+    /// dan punya uji. `accent` tetap tidak masuk `weakestTextContrast`:
+    /// yang dijamin adalah `onAccent`, bukan sembarang warna teks di atas
+    /// aksen.
     public var weakestTextContrast: Double {
         let surfaces = [background, surface1, surface2]
         var worst = Double.infinity

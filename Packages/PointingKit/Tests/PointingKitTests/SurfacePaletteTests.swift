@@ -565,30 +565,34 @@ final class SurfacePaletteTests: XCTestCase {
 
     // MARK: - Teks di atas aksen
 
-    /// Label tombol utama harus terbaca di atas **aksen**, bukan di atas kartu.
+    /// Label tombol utama harus terbaca di atas **tint tombol**, bukan kartu.
     ///
-    /// **Cacat yang dijaga.** `.borderedProminent` menint latarnya dengan
-    /// `accentGradient`, jadi labelnya tidak pernah duduk di `surface1`.
-    /// Tidak ada token untuk teks-di-atas-aksen, jadi labelnya jatuh ke
-    /// `.primary` — putih. Terukur: putih 3.70:1 di atas aksen biru dan
-    /// 4.12:1 di atas aksen ungu, keduanya **di bawah** 4.5:1; di mode malam
-    /// 4.00:1, juga di bawah. Label tombol terpenting app ini karena itu tidak
-    /// pernah lolos WCAG, dan tidak ada gerbang yang berbunyi — karena seluruh
-    /// uji kontras yang ada membandingkan teks dengan **permukaan**.
+    /// **Cacat yang dijaga.** `OnboardingView` memberi tombolnya
+    /// `.tint(PointingTone.active.color)`, jadi labelnya tidak pernah duduk di
+    /// `surface1` — ia duduk di atas `TonePalette.active`. Tidak ada token
+    /// untuk teks-di-atas-tint, jadi labelnya jatuh ke `.primary` — putih.
+    /// Terukur: putih **1.98:1** di atas tint siang (cyan 0.310/0.780/0.900)
+    /// dan **4.35:1** di atas tint malam. Keduanya di bawah 4.5:1. Label
+    /// tombol terpenting app ini karena itu tidak pernah lolos WCAG, dan tidak
+    /// ada gerbang yang berbunyi — karena seluruh uji kontras yang ada
+    /// membandingkan teks dengan **permukaan**, dan docstring
+    /// `weakestTextContrast` bahkan menyatakan pasangan teks-ke-aksen
+    /// "tidak dijamin".
     ///
-    /// Uji ini mengukur ketiga ujung yang benar-benar dipakai (biru siang,
-    /// ungu siang, merah malam). Kalau aksen digeser lebih terang, ia merah.
-    func testOnAccentTextIsReadableOnEveryAccentItSitsOn() {
-        for (nama, palet) in [("siang", SurfacePalette.day),
-                              ("malam", SurfacePalette.night)] {
-            for (ujung, aksen) in [("awal", palet.accentStart),
-                                   ("akhir", palet.accentEnd)] {
-                let rasio = palet.onAccent.contrastRatio(against: aksen)
-                XCTAssertGreaterThanOrEqual(
-                    rasio, SurfacePalette.minimumTextContrast,
-                    "label tombol mode \(nama) di atas aksen \(ujung) hanya "
-                    + "\(rasio):1 — di bawah ambang \(SurfacePalette.minimumTextContrast)")
-            }
+    /// **Uji ini mengukur `TonePalette`, bukan `accentGradient`.** Versi
+    /// pertamanya mengukur `accentStart`/`accentEnd` dan lolos — padahal
+    /// tombolnya tidak pernah memakai gradien itu sebagai latar. Uji yang
+    /// mengukur permukaan yang salah akan hijau selamanya; itu kelas cacat
+    /// yang sama dengan yang sedang diperbaiki.
+    func testOnAccentTextIsReadableOnEveryTintItSitsOn() {
+        for (nama, nada) in [("siang", TonePalette.day),
+                             ("malam", TonePalette.night)] {
+            let rasio = SurfacePalette.night.onAccent
+                .contrastRatio(against: nada.active)
+            XCTAssertGreaterThanOrEqual(
+                rasio, SurfacePalette.minimumTextContrast,
+                "label tombol mode \(nama) di atas tint hanya \(rasio):1 — "
+                + "di bawah ambang \(SurfacePalette.minimumTextContrast)")
         }
     }
 
@@ -596,21 +600,39 @@ final class SurfacePaletteTests: XCTestCase {
     ///
     /// Kalau seseorang "memperbaiki" label tombol dengan `.white`, uji di atas
     /// akan merah — tetapi pesannya akan terbaca seperti salah pilih warna.
-    /// Yang sebenarnya terjadi: putih di atas aksen produk ini **memang tidak
-    /// lolos**, di kedua mode. Uji ini menahan kesimpulan itu supaya
-    /// perbaikannya tidak dibalik menjadi "putih sedikit lebih redup".
-    func testWhiteOnAccentFailsSoTheTokenCannotBeWhite() {
+    /// Yang sebenarnya terjadi: putih di atas tint produk ini **memang tidak
+    /// lolos**, di kedua mode (1.98:1 dan 4.35:1). Uji ini menahan kesimpulan
+    /// itu supaya perbaikannya tidak dibalik menjadi "putih sedikit lebih
+    /// redup".
+    func testWhiteOnTintFailsSoTheTokenCannotBeWhite() {
         let putih = SurfaceColor(red: 1, green: 1, blue: 1)
+        for (nama, nada) in [("siang", TonePalette.day),
+                             ("malam", TonePalette.night)] {
+            XCTAssertLessThan(
+                putih.contrastRatio(against: nada.active),
+                SurfacePalette.minimumTextContrast,
+                "putih di atas tint mode \(nama) tiba-tiba lolos: kalau "
+                + "nadanya berubah, token `onAccent` harus ditinjau ulang, "
+                + "bukan uji ini yang dilonggarkan")
+        }
+    }
+
+    /// Token yang sama juga dipakai di atas `accentGradient`, jadi ia harus
+    /// lolos di sana juga — bukan hanya di atas tint.
+    ///
+    /// Dua latar, satu token: `accentGradient` dipakai elemen aktif lain
+    /// (lencana, sorotan), dan `onAccent` adalah satu-satunya warna teks yang
+    /// dijamin di atasnya.
+    func testOnAccentTextIsReadableOnTheAccentGradientToo() {
         for (nama, palet) in [("siang", SurfacePalette.day),
                               ("malam", SurfacePalette.night)] {
             for (ujung, aksen) in [("awal", palet.accentStart),
                                    ("akhir", palet.accentEnd)] {
-                XCTAssertLessThan(
-                    putih.contrastRatio(against: aksen),
-                    SurfacePalette.minimumTextContrast,
-                    "putih di atas aksen \(ujung) mode \(nama) tiba-tiba lolos: "
-                    + "kalau aksennya berubah, token `onAccent` harus ditinjau ulang, "
-                    + "bukan uji ini yang dilonggarkan")
+                let rasio = palet.onAccent.contrastRatio(against: aksen)
+                XCTAssertGreaterThanOrEqual(
+                    rasio, SurfacePalette.minimumTextContrast,
+                    "teks di atas gradien \(ujung) mode \(nama) hanya "
+                    + "\(rasio):1 — di bawah ambang \(SurfacePalette.minimumTextContrast)")
             }
         }
     }
