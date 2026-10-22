@@ -94,4 +94,51 @@ final class ExportErrorDocumentTests: XCTestCase {
         let object = try JSONSerialization.jsonObject(with: data)
         XCTAssertEqual((object as? [String: Any])?["error"] as? String, "")
     }
+
+    // ── Jalur cadangan `escapedFallback` ──────────────────────────────────
+    //
+    // `data(message:)` memakai `JSONSerialization`, dan jalur cadangannya
+    // **tidak bisa dicapai** dari sana: `[String: String]` selalu bisa
+    // diserialisasi. Kalau jalur itu tidak diuji sama sekali, komentar
+    // "tidak ada cabang yang menghasilkan berkas tidak sah" hanya klaim —
+    // dan cabang yang tak teruji adalah tempat cacat berikutnya bersembunyi.
+    // Jadi peng-escape-nya diuji **langsung**, dan hasilnya dibungkus jadi
+    // JSON lalu dibaca balik.
+
+    /// Peng-escape harus menghasilkan literal JSON yang sah dan **bolak-balik
+    /// utuh** untuk pesan yang memuat kutip, garis miring terbalik, dan baris
+    /// baru sekaligus.
+    func testFallbackEscaperProducesValidJSONForHostileMessages() throws {
+        for message in hostileMessages {
+            let literal = "{\"error\": \"\(ExportErrorDocument.escapedFallback(message))\"}"
+            let data = Data(literal.utf8)
+
+            let object = try JSONSerialization.jsonObject(with: data)
+            XCTAssertEqual((object as? [String: Any])?["error"] as? String, message,
+                           "pesan berubah saat lewat jalur cadangan: \(message)")
+        }
+    }
+
+    /// **Urutan escape adalah inti cacatnya.** Garis miring terbalik wajib
+    /// di-escape **sebelum** kutip. Kalau dibalik, garis miring yang baru
+    /// ditambahkan untuk kutip ikut ter-escape lagi dan pesannya berlipat:
+    /// `"` → `\"` → `\\\"` yang terbaca balik sebagai `\"`.
+    ///
+    /// Pesan di bawah memuat keduanya bersebelahan, jadi urutan yang salah
+    /// tidak bisa lolos diam-diam.
+    func testFallbackEscaperEscapesBackslashBeforeQuote() throws {
+        let message = #"path \"kuot\" di C:\Users\observer"#
+        let literal = "{\"error\": \"\(ExportErrorDocument.escapedFallback(message))\"}"
+        let object = try JSONSerialization.jsonObject(with: Data(literal.utf8))
+        XCTAssertEqual((object as? [String: Any])?["error"] as? String, message)
+    }
+
+    /// Baris baru **harus** menjadi `\n`, bukan baris baru sungguhan: JSON
+    /// tidak mengizinkan baris baru mentah di dalam string, dan berkas yang
+    /// memuatnya ditolak pembaca — persis kegagalan yang ingin dicegah.
+    func testFallbackEscaperRejectsRawNewline() {
+        let escaped = ExportErrorDocument.escapedFallback("baris satu\nbaris dua")
+        XCTAssertFalse(escaped.contains("\n"), "baris baru mentah lolos ke literal JSON")
+        XCTAssertTrue(escaped.contains("\\n"), "baris baru tidak di-escape menjadi \\n")
+    }
 }

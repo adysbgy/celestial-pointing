@@ -48,18 +48,40 @@ public enum ExportErrorDocument {
             withJSONObject: object,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         ) else {
-            // Jalan keluar yang tetap sah: string JSON dengan kutip yang
-            // di-escape sendiri. Tidak boleh ada cabang yang menghasilkan
-            // berkas tidak sah, sekalipun serialisasi gagal.
-            let escaped = message
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\"", with: "\\\"")
-                .replacingOccurrences(of: "\n", with: "\\n")
-                .replacingOccurrences(of: "\r", with: "\\r")
-                .replacingOccurrences(of: "\t", with: "\\t")
-            return Data("{\"error\": \"\(escaped)\"}".utf8)
+            // Jalan keluar yang tetap sah.
+            //
+            // **Ini tidak pernah jalan.** `[String: String]` selalu bisa
+            // diserialisasi — `Swift.String` selalu Unicode yang sah, jadi
+            // `JSONSerialization` tidak punya alasan menolaknya. Cabang ini
+            // tetap ada supaya `data(message:)` **tidak punya** jalur yang
+            // mengembalikan `Data()` kosong; berkas kosong adalah bentuk
+            // kegagalan senyap yang justru ingin dicegah.
+            //
+            // Karena tidak bisa dicapai lewat `data(message:)`, peng-escape-nya
+            // diuji langsung (`escapedFallback`) — kalau tidak, kalimat "tidak
+            // ada cabang yang menghasilkan berkas tidak sah" hanya klaim.
+            return Data("{\"error\": \"\(escapedFallback(message))\"}".utf8)
         }
         return data
+    }
+
+    /// Escape satu string supaya aman dipakai di dalam literal JSON.
+    ///
+    /// Dipakai hanya oleh jalur cadangan `data(message:)`, yang tidak bisa
+    /// dicapai di produksi. Ia `internal` (bukan `private`) supaya bisa diuji
+    /// langsung — cabang yang tidak bisa dicapai tapi tidak diuji adalah klaim,
+    /// bukan jaminan.
+    ///
+    /// Urutannya penting: **garis miring terbalik lebih dulu**, lalu yang lain.
+    /// Kalau kutip di-escape lebih dulu, garis miring yang baru ditambahkan
+    /// untuk kutip itu akan ikut di-escape lagi dan hasilnya berlipat.
+    static func escapedFallback(_ message: String) -> String {
+        message
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
     }
 
     /// Nama berkas untuk dokumen galat.
