@@ -205,4 +205,97 @@ final class CandidateMarkerTests: XCTestCase {
         XCTAssertEqual(token.blue, 0, accuracy: 1e-12,
                        "mode malam membuang hue: garis tidak boleh menyelundupkan biru")
     }
+
+    // MARK: - Glif "?" harus terbaca sebagai tanda tanya, bukan gumpalan
+
+    /// **Pengunci cacat: garis glif menelan rongga lengkungnya.**
+    ///
+    /// Selama ini tebal garis glif adalah literal `0.28 · radius lencana` di
+    /// view dan dua kali di port Python. Angka itu **salah**, dan tidak ada
+    /// satu pun gerbang atau uji yang bisa melihatnya:
+    ///
+    /// | Ukuran | Nilai |
+    /// |---|---|
+    /// | radius lencana (kartu jam 38 pt) | 0.3196 R = 3.04 pt |
+    /// | tebal garis glif `0.28 · badge` | 0.0895 R = **1.70 pt** |
+    /// | tinggi lengkung glif `0.55 · 0.52 · badge` | 0.0914 R = **1.74 pt** |
+    /// | rasio garis ÷ lengkung | **0.98** |
+    ///
+    /// Garis yang setebal lengkungnya sendiri mengisi rongga lengkung itu.
+    /// Yang tergambar bukan tanda tanya melainkan **gumpalan pejal** —
+    /// diperiksa langsung pada render 114 px (setara 38 pt @3x) dan 400 px:
+    /// vision menamainya "a filled blob … no gap between the curved top and
+    /// the bottom dot". Pada rasio 0.45 (yang dipakai sekarang: 0.13) ia
+    /// menamainya "a legible question mark … a separate dot".
+    ///
+    /// **Kenapa cacat ini penting justru di sini.** Lencana ini satu-satunya
+    /// penanda di layar yang mengatakan "engine ragu". Glif yang berhenti
+    /// terbaca sebagai tanda tanya menyisakan gambar objek **tanpa** penanda
+    /// yang bisa dibaca — dan gambar tanpa penanda terbaca sebagai identitas
+    /// yang pasti. Itu pelanggaran paling keras di PRD v0.4.
+    ///
+    /// **Kenapa uji ini tidak bisa digantikan paritas port↔view.**
+    /// `check-visuals.py` sendiri mencatat bahwa mutasi VIEW `0.28 → 0.60`
+    /// meninggalkan **313 pemeriksaan hijau**. Paritas hanya menuntut kedua
+    /// bahasa sepakat; keduanya sepakat pada angka yang salah. Yang perlu
+    /// diuji adalah **geometrinya**, bukan kesepakatannya.
+    func testGlyphStrokeIsThinEnoughToLeaveTheHookOpen() {
+        let marker = VisualFrame.candidateMarker()
+        // Ambang 0.5 bukan selera: pada rasio 1.0 garisnya selebar lengkung
+        // (gumpalan, diukur), pada 0.45 glifnya terbaca (diukur). 0.5 adalah
+        // batas atas yang masih menyisakan rongga di kedua sisi garis.
+        XCTAssertLessThan(
+            marker.strokeToHookRatio, 0.5,
+            "tebal garis glif \\(marker.glyphStroke) menutupi tinggi lengkung "
+            + "\\(marker.glyphHookHeight) (rasio \\(marker.strokeToHookRatio)): "
+            + "tanda tanya tergambar sebagai gumpalan, bukan tanda tanya")
+        // Batas bawah: garis yang terlalu tipis hilang di layar jam. Pada
+        // 38 pt, 0.13 · badge = 0.79 pt — masih di atas 1 px @3x, dan
+        // `max(1, …)` di view/port menjaga lantai pikselnya.
+        XCTAssertGreaterThan(
+            marker.strokeToHookRatio, 0.2,
+            "tebal garis glif terlalu tipis untuk terbaca di kartu jam 38 pt")
+    }
+
+    /// Rasio itu **tidak bergantung ukuran**: keduanya pecahan radius, jadi
+    /// kartu 38 pt dan panel 132 pt punya geometri yang sama bentuknya.
+    ///
+    /// Ini bukan duplikat uji di atas — ia menyatakan kenapa tidak perlu
+    /// menguji per ukuran, dan menangkap perbaikan yang "memperbaiki" satu
+    /// ukuran dengan angka mutlak (mis. `lineWidth: 2`) yang hanya benar di
+    /// satu ukuran.
+    func testGlyphShapeIsScaleInvariant() {
+        let watch = VisualFrame.candidateMarker(frameHalfExtent: 1.0)
+        let phone = VisualFrame.candidateMarker(frameHalfExtent: 3.5)
+        XCTAssertEqual(watch.strokeToHookRatio, phone.strokeToHookRatio,
+                       accuracy: 1e-12,
+                       "bentuk glif harus sama di semua ukuran; yang berbeda "
+                       + "hanya skalanya")
+        // Skalanya memang berbeda — kalau tidak, frameHalfExtent diabaikan.
+        XCTAssertGreaterThan(phone.glyphStroke, watch.glyphStroke * 3.0)
+    }
+
+    /// Tebal garis harus **satu pemilik**: `strokeFraction` di model.
+    ///
+    /// Kalau view kembali menulis literal, uji di atas tetap hijau
+    /// (modelnya benar) sementara layarnya tetap gumpalan — persis bentuk
+    /// cacat yang baru saja ditutup. Yang dijaga di sini: token itu ada di
+    /// model dan nilainya yang dipakai, bukan angka ketiga di tempat lain.
+    func testStrokeFractionIsTheSingleOwner() {
+        let marker = VisualFrame.candidateMarker()
+        XCTAssertEqual(marker.strokeFraction, 0.13, accuracy: 1e-12,
+                       "fraksi tebal glif harus dari model")
+        XCTAssertEqual(marker.glyphStroke,
+                       marker.radius * marker.strokeFraction, accuracy: 1e-12)
+        // Nilai lama (0.28) harus **gagal** ambang rongga — kalau tidak,
+        // uji ini tidak menjaga apa pun.
+        let legacy = VisualFrame.CandidateMarker(
+            centerX: marker.centerX, centerY: marker.centerY,
+            radius: marker.radius, glyphFraction: marker.glyphFraction,
+            strokeFraction: 0.28)
+        XCTAssertGreaterThanOrEqual(
+            legacy.strokeToHookRatio, 0.9,
+            "nilai lama harus terbukti menutup rongga lengkung; kalau tidak, "
+            + "ambang 0.5 tidak menangkap cacat yang diklaimnya")
+    }
 }

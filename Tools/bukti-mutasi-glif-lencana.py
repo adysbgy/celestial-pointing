@@ -127,9 +127,16 @@ SUMBANGAN = "lencana: glif menyumbang pikselnya sendiri (bukan lencana)"
 GLYPH_POINTS = (
     "    points = [(size / 2.0 + gx * radius, size / 2.0 + gy * radius)\n"
     "              for gx, gy in points]\n")
+# Jangkar garis glif. Teks ini **ikut berubah** ketika tebal garis pindah dari
+# literal `0.28` ke `marker["stroke_fraction"]`: jangkar yang menunjuk literal
+# lama akan berhenti menemukan sasarannya dan harness-nya mati — bukan merah,
+# melainkan tidak bisa jalan. Itu sebabnya `check-jangkar-harness.py` ada, dan
+# itulah yang menangkapnya di sini. Jangkar harus menyalin bentuk **sekarang**,
+# bukan bentuk yang membuat cacat aslinya dulu kelihatan.
 GLYPH_STROKE = (
-    "    canvas.stroke_polyline(points, max(1.0, badge_radius * 0.28),"
-    " solid(warning))\n")
+    "    canvas.stroke_polyline(points, max(1.0, badge_radius *"
+    " marker[\"stroke_fraction\"]),\n"
+    "                           solid(warning))\n")
 COMMENT = (
     "    # Glif tanda tanya — Path, bukan teks (lihat `drawCandidateMarker`).\n")
 

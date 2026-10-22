@@ -2597,16 +2597,26 @@ def badge_stroke(source):
     frame) dan pemanggilan `stroke_polyline` di penggambar (satuan piksel).
     Menggabungkan keduanya jadi satu daftar membuat mutasi di salah satunya
     tidak terlihat kalau yang lain dibaca.
+
+    **Kenapa sekarang membaca nama token, bukan angka.** Sampai siklus ini
+    tebal garis hidup sebagai literal `0.28` di tiga tempat, dan **0.28 itu
+    salah**: garisnya selebar tinggi lengkung glif, jadi tanda tanya
+    tergambar sebagai gumpalan pejal — lihat catatan di atas
+    `("tebal glif kandidat: port == view", …)`. Paritas angka tidak bisa
+    menangkapnya karena kedua bahasa sepakat pada angka yang salah. Sekarang
+    nilainya satu pemilik di model (`CandidateMarker.strokeFraction`), dan
+    yang diperiksa adalah **pemakaian token itu** di tiap tempat.
     """
     name = "badge_radius" if re.search(r"badge_radius", source) else "badgeRadius"
     # Tiga tempat stroking, masing-masing satu di dua bahasa:
-    #   Swift view   `lineWidth: max(1, badgeRadius * 0.28)`
-    #   Python geometri `stroke_width = badge_radius * 0.28`
-    #   Python penggambar `stroke_polyline(…, max(1.0, badge_radius * 0.28), …)`
+    #   Swift view      `lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction))`
+    #   Python geometri `stroke_width = badge_radius * marker["stroke_fraction"]`
+    #   Python penggambar `stroke_polyline(…, max(1.0, badge_radius * marker["stroke_fraction"]), …)`
+    token = r"(?:marker\[\"stroke_fraction\"\]|marker\.strokeFraction|CANDIDATE_STROKE_FRACTION)"
     return _stroke_width_factors(source, name, [
-        r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
-        r"stroke_width\s*=\s*{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
-        r"stroke_polyline\([^)]*?{r}\s*\*\s*(?<![\w.])(\d+\.\d+)",
+        r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*(?:CGFloat\()?\s*" + token,
+        r"stroke_width\s*=\s*{r}\s*\*\s*" + token,
+        r"stroke_polyline\([^)]*?{r}\s*\*\s*" + token,
     ])
 
 
@@ -3430,13 +3440,20 @@ def check_port_matches_swift_constants(results):
         ("spike bintang: view mengisi baji, bukan men-stroke garis",
          "context.fill(wedge, with: .linearGradient(" in view, True,
          "context.fill(wedge, with: .linearGradient(", view),
-        # Glif "?" kandidat tetap satu faktor lebar garis. `0.28` mengatur
-        # menebalkan **tanda ketidakpastian**: glif yang terlalu tipis hilang
-        # di layar jam, dan itu menghapus satu-satunya penanda visual bahwa
-        # engine sedang **ragu** — PRD v0.4: jangan pernah menampilkan visual
-        # yang mengklaim identitas saat engine ragu. Menipiskan glif sampai
-        # tak terlihat menghapus penanda itu secara senyap.
-        # Bukti audit mutasi: VIEW 0.28 -> 0.60 → 313 pemeriksaan, 0 gagal.
+        # Glif "? kandidat": tebal garis sekarang **token model**, bukan
+        # literal. `0.28` yang lama mengatur menebalkan **tanda
+        # ketidakpastian** sampai rongga lengkungnya tertutup — glifnya
+        # tergambar sebagai gumpalan pejal dan berhenti terbaca sebagai tanda
+        # tanya. Itu menghapus satu-satunya penanda visual bahwa engine
+        # sedang **ragu** — PRD v0.4: jangan pernah menampilkan visual yang
+        # mengklaim identitas saat engine ragu.
+        #
+        # Bukti audit mutasi yang dulu tercatat di sini: VIEW 0.28 -> 0.60
+        # → 313 pemeriksaan, 0 gagal. Itu bukan alasan memperlonggar gerbang;
+        # itu bukti bahwa **paritas angka tidak cukup**. Kedua bahasa bisa
+        # sepakat pada angka yang salah. Yang dijaga sekarang: token model
+        # yang dipakai di ketiga tempat, plus uji yang mengukur rasionya
+        # terhadap tinggi lengkung (`CandidateMarkerTests`).
         # Badge: **himpunan**, bukan satu angka — dan bukan himpunan yang
         # harus sama, karena jumlah situsnya memang berbeda (port punya dua:
         # geometri bersatuan radius frame dan penggambar bersatuan piksel;
@@ -3447,11 +3464,22 @@ def check_port_matches_swift_constants(results):
         # `0.28 -> 0.12` di sana tidak membuat satu pun pemeriksaan merah.
         ("tebal glif kandidat: port == view",
          _same_stroke_factors(badge_stroke(view), badge_stroke(port)),
-         True, "badge_radius * 0.28", port, "render-visuals.py"),
-        ("tebal glif kandidat: view menulisnya",
-         view.count("badgeRadius * 0.28") == 1, True,
-         "lineWidth: max(1, badgeRadius * 0.28))", view,
+         True, "marker.strokeFraction / marker[\"stroke_fraction\"]", port,
+         "render-visuals.py"),
+        ("tebal glif kandidat: view memakai token model",
+         view.count("CGFloat(marker.strokeFraction)") == 1, True,
+         "lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction)))", view,
          "CelestialVisualView.swift"),
+        # Nilai tokennya sendiri: satu pemilik di model, dan **cukup tipis
+        # untuk meninggalkan rongga lengkung glif terbuka**. Dua hal
+        # sekaligus, karena paritas saja tidak menyatakan apakah angkanya
+        # masuk akal — persis cacat yang ditutup di sini.
+        ("lencana: fraksi tebal glif", R.CANDIDATE_STROKE_FRACTION, 0.13,
+         "strokeFraction: Double = 0.13", model),
+        ("lencana: tebal glif < tinggi lengkung glif",
+         R.CANDIDATE_STROKE_FRACTION
+         < R.CANDIDATE_GLYPH_FRACTION * 0.55 * 0.5, True,
+         "0.13 < 0.52 * 0.55 * 0.5", model),
         # Gambar kawah Merkurius. Kelima angka ini ada di **dua bahasa** dan
         # sampai sini **tidak dijaga siapa pun**: mutasi empat di antaranya di
         # view membuat seluruh 195 pemeriksaan tetap hijau (dibuktikan saat
@@ -11654,6 +11682,104 @@ def _render_candidate_badge_without_glyph(size, ss, night=False):
         R._draw_candidate_marker = original
 
 
+def check_candidate_marker_survives_the_uncertainty_blur(results, size=200, ss=2):
+    """Lencana kandidat harus **tajam** walaupun gambarnya disamarkan — di semua jenis.
+
+    **Dua cacat yang ditutup pemeriksaan ini** — tapi yang **terukur** hanya
+    satu; yang kedua direkam di sini sebagai arah cakupan, bukan sebagai
+    angka, supaya klaimnya jujur:
+
+    (a) **Tersamarkan.** Lencana digambar di dalam `Canvas` yang kemudian
+        difilter `.blur` saat engine belum pasti. Akibatnya penanda keraguan
+        ikut kabur bersama gambar objek — persis isyarat yang paling perlu
+        terbaca justru yang paling dirusak oleh penyamaran. Terukur pada
+        render penuh `planet-saturn-uncertain`: tepi glif **0.04**, dan
+        seluruh 901 piksel peringatan yang tersisa adalah olesan tanpa bentuk.
+        Pemeriksaan lama tidak menangkapnya karena ambangnya `> 40` piksel —
+        jumlah itu dipenuhi oleh sisa kabur.
+
+    (b) **Cakupan sempit, bukan piksel yang hilang.** Pemeriksaan lama hanya
+        membaca `planet-saturn-uncertain`. Yang menyebabkan ini berbahaya
+        bukan karena Bulan atau bintang tak bergambar lencana — keduanya
+        memang menggambarnya, dan sudah tajam karena tidak ikut disamarkan
+        (terukur 769 px tepi 1.00 dan 803 px tepi 0.90). Bahayanya: jenis apa
+        pun yang **menjadi** objek ragu sesudah ini — objek langit dalam
+        baru, galaksi, gugus — bisa rusak tanpa ada gerbang yang berbunyi,
+        karena daftar pemeriksaannya ditulis tangan. Jadi cakupan di bawah
+        diturunkan dari katalog, bukan dari daftar nama.
+
+    Yang diukur di sini bukan jumlah, melainkan **ketajaman** (lompatan nilai
+    peringatan antar piksel bersebelahan: glif tajam ≈ 1.0, tersamarkan ≈
+    0.04) — dan cakupannya diturunkan dari katalog. Menambah jenis objek baru
+    yang bisa ragu tanpa menggambar lencananya membuat pemeriksaan ini merah
+    pada hari ia ditambahkan.
+
+    Urutan gambar yang benar: samarkan objek, **lalu** gambar lencana di
+    lapisan atas (`candidateMarkerOverlay` di view, `_draw_candidate_marker`
+    setelah `box_blur` di port).
+    """
+    warning = R._warning_color(False)
+    marker = R.candidate_marker()
+    bx = abs(marker["center_x"]) + marker["radius"]
+    by = abs(marker["center_y"]) + marker["radius"]
+
+    # Cakupan dari katalog: setiap kasus ragu yang **bukan** pembanding bentuk.
+    # `-bare` dikecualikan dengan alasan yang sama seperti di `render()`: ia
+    # pembanding pengurangan bola, dan lencana di atasnya mengukur lencana.
+    catalog = {c.name: c for c in R.build_cases()}
+    uncertain_cases = sorted(
+        c.name for c in catalog.values()
+        if c.kw.get("is_confirmed") is False and not c.kw.get("bare_sphere"))
+    if not uncertain_cases:
+        results.append(Result(
+            "lencana: glif tetap tajam di atas samaran", False,
+            "tidak ada kasus ragu di katalog — gerbang ini tidak mengukur apa pun"))
+        return
+
+    failures = []
+    measured = []
+    for name in uncertain_cases:
+        _, (w, h, rows) = render_case(name, size=size, ss=ss)
+        radius = min(w, h) / 2.0
+        cx, cy = w / 2.0, h / 2.0
+
+        def warningness(x, y):
+            px = rows[y][x * 4:x * 4 + 3]
+            d = sum(abs(px[k] - warning[k] * 255) for k in range(3))
+            return max(0.0, 1.0 - d / 300.0)
+
+        # Hanya di dalam kotak lencana: di luar itu tidak ada glif untuk diukur.
+        lit = 0
+        steepest = 0.0
+        for y in range(h):
+            uy = (y + 0.5 - cy) / radius
+            if abs(uy) > by + 0.05:
+                continue
+            for x in range(w - 1):
+                ux = (x + 0.5 - cx) / radius
+                if abs(ux) > bx + 0.05:
+                    continue
+                v = warningness(x, y)
+                if v < 0.5:
+                    continue
+                lit += 1
+                steepest = max(steepest, abs(v - warningness(x + 1, y)))
+
+        measured.append(f"{name}: {lit} px, tepi {steepest:.2f}")
+        # Ambang 0.80 diukur pada keadaan benar: tepi glif melompat 1.00 dalam
+        # satu piksel (planet & Bulan), 0.90 (bintang & deepSky — glifnya
+        # menimpa glow). Dengan lencana di dalam `box_blur` 6 px nilainya
+        # 0.04. Lantai 100 piksel memisahkan glif utuh dari serpihan.
+        if lit <= 100 or steepest < 0.80:
+            failures.append(f"{name}: {lit} px, tepi {steepest:.2f}")
+
+    results.append(Result(
+        "lencana: glif tetap tajam di atas samaran", not failures,
+        "; ".join(failures) if failures
+        else f"{len(measured)} kasus ragu, semua tajam (harus >= 0.80; "
+             f"tersamarkan ≈ 0.04) — " + "; ".join(measured[:3]) + " …"))
+
+
 def check_candidate_marker_stays_inside_its_badge(results, size=200, ss=2):
     """Glif tanda tanya harus berada **di dalam** lencananya.
 
@@ -17579,6 +17705,7 @@ def main():
     check_unknown_moon_disc_uses_the_token(results)
     check_saturn_ring_order_in_the_view(results)
     check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
+    check_candidate_marker_survives_the_uncertainty_blur(results, args.size, args.ss)
     check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
     check_bands_follow_the_limb_arc(results, args.size, args.ss)
     check_banded_disc_keeps_its_curvature(results, args.size, args.ss)

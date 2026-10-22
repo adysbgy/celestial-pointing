@@ -2351,17 +2351,56 @@ public enum VisualFrame {
         public var radius: Double
         /// Radius glif tanda tanya sebagai pecahan radius lencana.
         public var glyphFraction: Double
+        /// Tebal garis glif sebagai pecahan radius lencana.
+        ///
+        /// **Kenapa ada di model, bukan di dua tempat gambar.** Sebelum ini
+        /// tebal garis hidup sebagai literal `0.28` di view Swift dan dua
+        /// kali di port Python, dan nilainya **salah**: 0.28 · radius lencana
+        /// = 1.70 pt pada kartu jam 38 pt, sedangkan tinggi lengkung glif
+        /// hanya 1.74 pt (`0.55 · 0.52 · radius`). Garis yang selebar
+        /// lengkungnya sendiri mengisi rongga lengkung itu, jadi satu-satunya
+        /// penanda "engine ragu" di layar tergambar sebagai **gumpalan
+        /// pejal** — bukan tanda tanya. Terukur pada render 114 px: 5.10 px
+        /// garis lawan 5.21 px lengkung.
+        ///
+        /// Tidak ada gerbang yang bisa menangkapnya: `check-visuals.py`
+        /// mencatat sendiri bahwa mutasi VIEW `0.28 → 0.60` meninggalkan
+        /// **313 pemeriksaan hijau**. Paritas port↔view hanya menuntut kedua
+        /// bahasa sepakat pada angka yang sama — dan keduanya sepakat pada
+        /// angka yang salah.
+        public var strokeFraction: Double
 
         public init(centerX: Double, centerY: Double,
-                    radius: Double, glyphFraction: Double) {
+                    radius: Double, glyphFraction: Double,
+                    strokeFraction: Double) {
             self.centerX = centerX
             self.centerY = centerY
             self.radius = radius
             self.glyphFraction = glyphFraction
+            self.strokeFraction = strokeFraction
         }
 
         /// Radius glif tanda tanya (satuan radius).
         public var glyphRadius: Double { radius * glyphFraction }
+
+        /// Tebal garis glif (satuan radius).
+        public var glyphStroke: Double { radius * strokeFraction }
+
+        /// Tinggi lengkung glif di atas garis tengahnya (satuan radius).
+        ///
+        /// `0.55 · glyphRadius` — lengkungnya turun dari `top` sejauh
+        /// `0.55 · r` (lihat bentuk Bézier-nya di view & port).
+        public var glyphHookHeight: Double { glyphRadius * 0.55 }
+
+        /// Rasio tebal garis terhadap tinggi lengkung yang harus diisinya.
+        ///
+        /// Di atas ~0.5 rongga lengkung tertutup dan glif terbaca sebagai
+        /// gumpalan. Nilainya dijaga uji, bukan komentar: lihat
+        /// `testGlyphStrokeIsThinEnoughToLeaveTheHookOpen`.
+        public var strokeToHookRatio: Double {
+            guard glyphHookHeight > 0 else { return .infinity }
+            return glyphStroke / glyphHookHeight
+        }
 
         /// Berapa jauh lencana keluar dari frame, satuan radius. `<= 0` aman.
         ///
@@ -2392,16 +2431,19 @@ public enum VisualFrame {
     ///     tetap: lencana digambar pada kartu 38pt dan panel 132pt, dan jarak
     ///     yang tetap akan menempel pada bingkai di ukuran besar.
     ///   - glyphFraction: radius glif tanda tanya terhadap radius lencana.
+    ///   - strokeFraction: tebal garis glif terhadap radius lencana.
     public static func candidateMarker(frameHalfExtent: Double = halfExtent,
                                        cornerFraction: Double = 0.34,
                                        inset: Double = 0.06,
-                                       glyphFraction: Double = 0.52) -> CandidateMarker {
+                                       glyphFraction: Double = 0.52,
+                                       strokeFraction: Double = 0.13) -> CandidateMarker {
         let corner = max(0, frameHalfExtent * (1 - min(1, max(0, inset))))
         let radius = corner * min(1, max(0, cornerFraction))
         // `d + radius == corner`, jadi lencana tidak mungkin keluar.
         let d = corner - radius
         return CandidateMarker(centerX: d, centerY: -d,
-                               radius: radius, glyphFraction: glyphFraction)
+                               radius: radius, glyphFraction: glyphFraction,
+                               strokeFraction: strokeFraction)
     }
 
     // MARK: Bulan — kawah

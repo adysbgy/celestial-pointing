@@ -136,8 +136,17 @@ CLEAN_MARK = "Bersih: lencana ragu digambar tepat saat engine belum pasti."
 #: Jangkar di view. Baris **utuh** supaya mutasinya tidak bergantung pada
 #: spasi; kemunculannya diperiksa eksplisit karena jangkar yang muncul dua
 #: kali mengubah lebih banyak daripada yang dilaporkan.
-BADGE_LINE = ("            if !isConfirmed "
-              "{ drawCandidateMarker(context: context, size: size) }")
+#:
+#: **Kenapa jangkarnya pindah ke `overlay`.** Sampai siklus "lencana selamat
+#: dari samaran", lencana digambar **di dalam** `Canvas` objek, dan `.blur` di
+#: atas kanvas itu mengolesinya bersama gambarnya: tepi glif terukur 0.04,
+#: bukan ≈1.0. Penanda "engine ragu" berhenti terbaca tepat pada penanda yang
+#: menjaga pengguna dari false confidence. Lencana sekarang dipasang sebagai
+#: `overlay` **sesudah** `.blur`, jadi jangkar mutasinya juga di situ — kalau
+#: harness tetap memutasi baris lama, ia mengukur baris yang tidak lagi
+#: menentukan apa pun.
+BADGE_LINE = "            if !isConfirmed { candidateMarkerOverlay }"
+BADGE_BODY = "            drawCandidateMarker(context: context, size: size)"
 SPHERE_LINE = "        if !(isConfirmed && palette.feature == .rings) {"
 
 STATES = [
@@ -147,7 +156,25 @@ STATES = [
      True),
     ("2. lencana tanpa syarat `!isConfirmed`",
      [(VIEW, BADGE_LINE,
-       "            if true { drawCandidateMarker(context: context, size: size) }")],
+       "            if true { candidateMarkerOverlay }")],
+     True),
+    # Arah yang baru bisa dilihat sesudah lencana pindah ke `overlay`: badan
+    # overlay yang dikosongkan. Sebelumnya pemeriksaan "dipanggil" ikut
+    # mencocokkan **definisi** `private func drawCandidateMarker(`, jadi
+    # keadaan ini tetap hijau — diukur, dan itulah kenapa keadaan ini ada.
+    ("2b. badan overlay dikosongkan",
+     [(VIEW, BADGE_BODY, "            // MUTASI: glif dihapus")],
+     True),
+    # Cacat yang persis ditutup siklus ini: lencana dipasang **sebelum**
+    # `.blur`, sehingga samaran mengolesi penanda keraguan itu sendiri.
+    # Syaratnya benar, badannya utuh — yang salah hanya urutannya. Karena itu
+    # ia dua suntingan: blok `overlay` dicabut dari tempatnya, lalu dipasang
+    # di atas `.drawingGroup` (yaitu sebelum `.blur`).
+    ("2c. overlay dipasang sebelum `.blur`",
+     [(VIEW, BADGE_LINE + "\n        }\n", ""),
+      (VIEW, "        .drawingGroup(opaque: false, colorMode: .linear)\n",
+       "        .overlay {\n" + BADGE_LINE + "\n        }\n"
+       "        .drawingGroup(opaque: false, colorMode: .linear)\n")],
      True),
     ("3. cincin bocor ke kandidat (`isConfirmed` dihapus)",
      [(VIEW, SPHERE_LINE, "        if !(palette.feature == .rings) {")],

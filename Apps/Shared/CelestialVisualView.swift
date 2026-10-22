@@ -56,11 +56,15 @@ struct CelestialVisualView: View {
     var pulse: Double = 0
 
     var body: some View {
+        // **Lencana di `overlay`, bukan di dalam `Canvas`.** Alasan lengkapnya
+        // ada di `candidateMarkerOverlay`; ringkasnya: `.blur` di bawah ini
+        // memfilter seluruh hasil `Canvas`, jadi lencana yang digambar di
+        // dalamnya ikut tersamarkan — dan penanda "engine ragu" yang kabur
+        // berhenti menyampaikan bahwa engine ragu.
         Canvas(rendersAsynchronously: false) { context, size in
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
             let radius = min(size.width, size.height) / 2
             drawBody(context: context, center: center, radius: radius)
-            if !isConfirmed { drawCandidateMarker(context: context, size: size) }
         }
         .frame(width: diameter, height: diameter)
         // **Samaran, bukan hanya lencana.**
@@ -111,10 +115,37 @@ struct CelestialVisualView: View {
         .blur(radius: Self.dimmedForUncertainty(isConfirmed: isConfirmed, kind: visual.kind)
               ? Self.uncertainBlurRadius(diameter: diameter)
               : 0)
+        // **Sesudah `.blur`, sengaja.** Lencana kandidat menandai *keyakinan
+        // engine*, bukan *identitas objek* — jadi ia harus tetap tajam justru
+        // ketika gambar objeknya disamarkan. Sebelumnya lencana digambar di
+        // dalam `Canvas` (lihat `drawCandidateMarker`), sehingga `.blur` di
+        // atas memfilternya bersama gambar: pada port Python, render penuh
+        // `planet-saturn-uncertain` kehilangan glifnya **sepenuhnya**
+        // (46 piksel peringatan → 0). Di layar yang tampak sebagai lencana
+        // kosong tanpa tanda tanya — penanda keraguan yang tidak terbaca.
+        .overlay {
+            if !isConfirmed { candidateMarkerOverlay }
+        }
         // Grafis tidak pernah diumumkan sebagai teks — VoiceOver membaca nama
         // objek & keyakinannya (lihat `ObjectDetailView`), dan menambah
         // deskripsi gambar hanya menambah yang harus dilalui pengguna.
         .accessibilityHidden(true)
+    }
+
+    /// Lencana kandidat sebagai lapisan **di atas** samaran.
+    ///
+    /// Geometri & warnanya tetap milik model (`VisualFrame.candidateMarker()`);
+    /// yang pindah hanyalah tempat menggambarnya. Kanvas ini tidak memakai
+    /// `.drawingGroup` dan tidak ikut `.blur` induknya, jadi glifnya
+    /// dirasterisasi tajam.
+    private var candidateMarkerOverlay: some View {
+        Canvas(rendersAsynchronously: false) { context, size in
+            drawCandidateMarker(context: context, size: size)
+        }
+        .frame(width: diameter, height: diameter)
+        // Lencana adalah satu-satunya isyarat "engine ragu"; jangan biarkan
+        // animasi denyut apa pun membuatnya berkedip.
+        .allowsHitTesting(false)
     }
 
     private func drawBody(context: GraphicsContext, center: CGPoint, radius: CGFloat) {
@@ -2032,8 +2063,17 @@ struct CelestialVisualView: View {
                        control1: CGPoint(x: center.x - r * 0.1, y: top - r * 0.35),
                        control2: CGPoint(x: center.x + r * 0.55, y: top + r * 0.05))
         glyph.addLine(to: CGPoint(x: center.x, y: center.y + r * 0.05))
+        // **Tebal garis dari model, bukan literal.** Versi lama menulis
+        // `badgeRadius * 0.28` di sini, dan 0.28 itu terlalu tebal: pada
+        // kartu jam 38 pt garisnya 1.70 pt sedangkan tinggi lengkung glif
+        // hanya 1.74 pt, jadi garisnya mengisi rongga lengkung dan tanda
+        // tanya tergambar sebagai **gumpalan pejal**. Satu-satunya penanda
+        // "engine ragu" di layar berhenti terbaca sebagai tanda tanya —
+        // tepat pada penanda yang menjaga pengguna dari false confidence.
+        // `CandidateMarker.strokeFraction` sekarang satu pemiliknya, dan
+        // `strokeToHookRatio` yang menjaganya tetap terbuka.
         context.stroke(glyph, with: .color(stroke),
-                       lineWidth: max(1, badgeRadius * 0.28))
+                       lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction)))
         context.fill(Path(ellipseIn: CGRect(x: center.x - badgeRadius * 0.13,
                                            y: center.y + r * 0.42,
                                            width: badgeRadius * 0.26,

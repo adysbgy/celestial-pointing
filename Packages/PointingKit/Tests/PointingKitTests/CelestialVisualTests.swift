@@ -2579,7 +2579,8 @@ final class CelestialVisualTests: XCTestCase {
             centerX: (0.846 - 0.5) * 2.0,
             centerY: (0.154 - 0.5) * 2.0,
             radius: widthRadius,
-            glyphFraction: 0.52)
+            glyphFraction: 0.52,
+            strokeFraction: 0.28)
     }
 
     func testLegacyCandidateMarkerOverflowedOnTwoSides() {

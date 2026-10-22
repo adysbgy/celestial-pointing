@@ -5196,18 +5196,66 @@ problems = []
 #    (`!isConfirmed`, `isConfirmed == false`), kalau tidak lencana akan
 #    tampil pada objek yang sudah terkunci.
 body = re.sub(r"\s+", " ", code)
+# 1. Lencana harus digambar, dan **hanya** saat engine belum pasti.
+#
+#    Sejak siklus "lencana selamat dari samaran" lencana tidak lagi digambar di
+#    dalam `Canvas` objek (yang difilter `.blur`), melainkan di lapisan
+#    `overlay` **di atas** samaran — karena `.blur` menyamarkan tepat penanda
+#    yang seharusnya tetap terbaca. Jadi yang dituntut sekarang **dua** hal,
+#    dan keduanya harus ada:
+#
+#      a. `drawCandidateMarker(...)` dipanggil di dalam `candidateMarkerOverlay`
+#         (lencana benar-benar digambar di suatu tempat), dan
+#      b. `candidateMarkerOverlay` dipakai di bawah `if` yang memuat
+#         `!isConfirmed` (lencana hanya tampil saat ragu).
+#
+#    Memeriksa (a) saja akan hijau walau overlay-nya tidak pernah dipasang;
+#    memeriksa (b) saja akan hijau walau badan overlay-nya kosong. Cacat yang
+#    ditutup siklus ini justru bentuk kedua-duanya sekaligus: badan overlay
+#    ada, tetapi ia dipasang **sebelum** `.blur`.
+overlay_body = re.search(
+    r"var\s+candidateMarkerOverlay\s*:\s*some\s+View\s*\{", code)
+# Pemanggilan, bukan **definisi**. `private func drawCandidateMarker(` cocok
+# dengan pola yang sama, dan itu membuat pemeriksaan ini hijau pada overlay
+# yang badannya sudah dikosongkan — diukur: badan diganti komentar, Aturan 32
+# tetap "Bersih". Definisi dikecualikan dengan melihat kata sebelumnya.
+draws = [m.group(0) for m in re.finditer(r"(\w+\s+)?drawCandidateMarker\s*\(", body)
+         if (m.group(1) or "").strip() != "func"]
+if not draws:
+    problems.append(
+        "  `drawCandidateMarker` tidak dipanggil di mana pun di %s; kandidat "
+        "yang belum terkunci digambar tanpa penanda keraguan" % VIEW)
+if overlay_body is None:
+    problems.append(
+        "  `candidateMarkerOverlay` tidak ada di %s; lencana harus digambar "
+        "di lapisan `overlay` di atas `.blur`, bukan di dalam `Canvas` yang "
+        "ikut tersamarkan" % VIEW)
 calls = re.findall(
-    r"if\s+([^{;]{0,120}?)\s*\{[^{}]*?drawCandidateMarker\s*\(", body)
+    r"if\s+([^{;]{0,120}?)\s*\{[^{}]*?candidateMarkerOverlay\b", body)
 if not calls:
     problems.append(
-        "  `drawCandidateMarker` tidak dipanggil di bawah `if` mana pun di %s; "
-        "kandidat yang belum terkunci digambar tanpa penanda keraguan" % VIEW)
+        "  `candidateMarkerOverlay` tidak dipasang di bawah `if` mana pun di "
+        "%s; lencana ragu harus bergantung pada `!isConfirmed`, kalau tidak "
+        "ia tampil pada objek yang sudah terkunci" % VIEW)
 for cond in calls:
     if not re.search(r"!\s*isConfirmed|isConfirmed\s*==\s*false", cond):
         problems.append(
-            "  `drawCandidateMarker` dipanggil dengan syarat `%s`; lencana ragu "
-            "harus bergantung pada `!isConfirmed`, kalau tidak ia tampil pada "
-            "objek yang sudah terkunci" % cond.strip())
+            "  `candidateMarkerOverlay` dipasang dengan syarat `%s`; lencana "
+            "ragu harus bergantung pada `!isConfirmed`, kalau tidak ia tampil "
+            "pada objek yang sudah terkunci" % cond.strip())
+# 1b. Dan pemasangannya harus **sesudah** `.blur` di rantai modifier.
+#
+#     Ini arah yang tidak bisa dibaca dari (a)/(b): keduanya tetap hijau kalau
+#     `overlay` diletakkan sebelum `.blur`, dan itu persis cacat yang ditutup
+#     siklus ini (tepi glif 0.04, glif berhenti terbaca sebagai tanda tanya).
+#     Urutan di rantai modifier = urutan di layar, jadi posisinya diukur.
+blur_at = body.find(".blur(radius:")
+overlay_at = body.find(".overlay")
+if blur_at >= 0 and overlay_at >= 0 and overlay_at < blur_at:
+    problems.append(
+        "  `.overlay` lencana duduk **sebelum** `.blur` di %s; samaran akan "
+        "mengolesi penanda keraguan itu sendiri" % VIEW)
+
 
 # 2. Cincin Saturnus tidak boleh digambar pada kandidat yang belum pasti.
 #

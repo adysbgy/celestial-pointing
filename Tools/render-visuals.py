@@ -721,16 +721,25 @@ def cluster_cores(morphology, fuzziness, frame_half_extent=None):
 CANDIDATE_CORNER_FRACTION = 0.34
 CANDIDATE_INSET = 0.06
 CANDIDATE_GLYPH_FRACTION = 0.52
+# Tebal garis glif. **0.13, bukan 0.28.** Pada 0.28 garisnya selebar tinggi
+# lengkung glif (1.70 pt lawan 1.74 pt di kartu jam 38 pt), jadi rongga
+# lengkungnya tertutup dan tanda tanya tergambar sebagai gumpalan pejal.
+# Nilai ini satu pemilik di model (`CandidateMarker.strokeFraction`); angka di
+# sini hanya salinan yang dijaga `check_port_matches_swift_constants`.
+CANDIDATE_STROKE_FRACTION = 0.13
 
 
 def candidate_marker(frame_half_extent=1.0, corner_fraction=CANDIDATE_CORNER_FRACTION,
                      inset=CANDIDATE_INSET,
-                     glyph_fraction=CANDIDATE_GLYPH_FRACTION):
+                     glyph_fraction=CANDIDATE_GLYPH_FRACTION,
+                     stroke_fraction=CANDIDATE_STROKE_FRACTION):
     """`VisualFrame.candidateMarker` — pusat + radius = sudut, jadi tidak bisa keluar."""
     corner = max(0.0, frame_half_extent * (1 - min(1.0, max(0.0, inset))))
     radius = corner * min(1.0, max(0.0, corner_fraction))
     d = corner - radius
-    return dict(center_x=d, center_y=-d, radius=radius, glyph_fraction=glyph_fraction)
+    return dict(center_x=d, center_y=-d, radius=radius,
+                glyph_fraction=glyph_fraction,
+                stroke_fraction=stroke_fraction)
 
 
 def candidate_marker_glyph(marker=None):
@@ -770,8 +779,12 @@ def candidate_marker_glyph(marker=None):
     # radius frame": 6x lipat, dan `candidate_marker_footprint()` mewarisi
     # luberan itu sehingga kotak pengecualiannya menelan hampir seluruh
     # gambar. Penerjemahan satuan milik **pemanggil**, bukan fungsi geometri:
-    # penggambar memakai `max(1.0, badgeRadiusPiksel * 0.28)`.
-    stroke_width = badge_radius * 0.28
+    # penggambar memakai `max(1.0, badgeRadiusPiksel * <fraksi>)`.
+    #
+    # **Fraktornya dari model, bukan literal.** 0.28 yang lama membuat garis
+    # selebar tinggi lengkung glif — rongganya tertutup dan tanda tanya
+    # tergambar sebagai gumpalan pejal. Lihat `CANDIDATE_STROKE_FRACTION`.
+    stroke_width = badge_radius * marker["stroke_fraction"]
     # Tetes glif, sebagai **pergeseran dari pusat lencana** — bukan posisi
     # mutlak. Versi pertama menyimpannya mutlak (`cy + r*0.42`) lalu
     # menambahkannya ke pusat lagi di penggambar, sehingga tetesnya tergeser
@@ -1461,8 +1474,6 @@ def render(case, size=256, night_mode=False, show_frame=False, ss=3):
     else:
         raise ValueError(f"kind tidak dikenal: {kind}")
 
-    if kw.get("is_confirmed") is False:
-        _draw_candidate_marker(canvas, size, night_mode)
     # **Samaran keraguan** — `CelestialVisualView` memasang `.blur` di atas
     # seluruh kanvas saat engine belum pasti **dan** jenisnya memenuhi
     # `UncertainBlur.allows`. Port ini mengerjakan hal yang sama di kanvas
@@ -1498,6 +1509,53 @@ def render(case, size=256, night_mode=False, show_frame=False, ss=3):
         pre_blur = canvas.snapshot()
         canvas.box_blur(uncertain_blur_radius_points(size))
         canvas.pre_blur = pre_blur
+    # **Lencana kandidat digambar SETELAH samaran.**
+    #
+    # Cacat yang ditutup: lencana digambar **sebelum** `box_blur`, jadi pada
+    # jenis yang disamarkan blur 6 px di kanvas 200 px mengolesinya bersama
+    # gambar objek. Terukur di pohon sebelum perbaikan (proses baru,
+    # `size=200, ss=2`, hanya di dalam kotak lencana, piksel peringatan /
+    # lompatan tepi antar piksel bersebelahan):
+    #
+    #   kasus                        sebelum            sesudah
+    #   planet-jupiter-uncertain     901 px, tepi 0.04  583 px, tepi 1.00
+    #   planet-saturn-uncertain      901 px, tepi 0.04  583 px, tepi 1.00
+    #   planet-mars-uncertain        901 px, tepi 0.04  583 px, tepi 1.00
+    #   deepsky-uncertain            915 px, tepi 0.04  617 px, tepi 0.90
+    #   moon-crescent-uncertain      769 px, tepi 1.00  583 px, tepi 1.00
+    #   star-betelgeuse-uncertain    803 px, tepi 0.90  617 px, tepi 0.90
+    #
+    # Tepi 0.04 berarti tidak ada satu piksel pun yang masih bertepi tajam:
+    # yang tersisa hanya olesan tanpa bentuk. Gerbang lama tidak menangkapnya
+    # karena ambangnya **jumlah** piksel (`> 40`), dan jumlah itu tetap
+    # terpenuhi oleh sisa olesan — hijau pada glif yang berhenti terbaca
+    # sebagai tanda tanya.
+    #
+    # **Yang TIDAK diklaim: bahwa Bulan/bintang/Matahari dulu tanpa lencana.**
+    # Sempat ditulis begitu, dan salah: `_draw_candidate_marker` di HEAD
+    # dipanggil untuk **semua** jenis, dan ketiganya memang tidak disamarkan
+    # (`UncertainBlur.allows`), jadi lencananya sudah tajam sejak awal —
+    # terukur 769 px tepi 1.00 dan 803 px tepi 0.90. Yang rusak hanya jenis
+    # yang ikut disamarkan. Penurunan jumlah piksel 769→583 di sini datang
+    # dari perbaikan tebal garis glif (0.28→0.13) di siklus yang sama, bukan
+    # dari urutan gambar.
+    #
+    # **Kenapa lencana tidak ikut disamarkan secara desain.** Samaran
+    # menyembunyikan **identitas objek** (ciri pengenal ditahan, cakram
+    # dikaburkan). Lencana bukan bagian dari identitas itu — ia meta-informasi
+    # tentang keyakinan engine, dan mengaburkannya justru menyamarkan
+    # ketidakpastian itu sendiri. Gambar objek harus ragu; keterangan bahwa
+    # engine ragu harus tajam. Urutan yang sama dipakai `CelestialVisualView`:
+    # lencana di `overlay` **di atas** `.blur`, bukan di dalam `Canvas` yang
+    # tersamarkan.
+    #
+    # **Kenapa `bare_sphere` tetap dikecualikan.** Kasus `planet-X-bare` bukan
+    # keadaan produksi — ia pembanding **bentuk**, ditulis `is_confirmed=False`
+    # hanya untuk mematikan cabang ciri. Memberinya lencana berarti
+    # menambahkan piksel peringatan ke pembanding yang dipakai gerbang
+    # pengurangan bola; yang terukur lalu lencananya, bukan pitanya.
+    if kw.get("is_confirmed") is False and not kw.get("bare_sphere"):
+        _draw_candidate_marker(canvas, size, night_mode)
     if show_frame:
         _draw_frame(canvas, size, radius)
     return canvas
@@ -2852,7 +2910,8 @@ def _draw_candidate_marker(canvas, size, night_mode):
     # menghilangkan kejelasan bahwa ia sudah absolut.
     points = [(size / 2.0 + gx * radius, size / 2.0 + gy * radius)
               for gx, gy in points]
-    canvas.stroke_polyline(points, max(1.0, badge_radius * 0.28), solid(warning))
+    canvas.stroke_polyline(points, max(1.0, badge_radius * marker["stroke_fraction"]),
+                           solid(warning))
     dot_dx, dot_dy = dot_offset
     canvas.disc(center[0] + dot_dx * radius, center[1] + dot_dy * radius,
                 dot_radius * radius, solid(warning))
