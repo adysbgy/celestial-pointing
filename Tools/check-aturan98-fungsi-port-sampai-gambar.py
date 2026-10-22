@@ -145,14 +145,25 @@ def main() -> int:
             continue
 
         # Bentuk kedua: dipakai sebagai **nilai**, bukan dibuang. `_ = f(…)`
-        # dan `if f(…)` sama-sama "memakai", tetapi `_ =` membuang hasilnya
-        # tanpa jejak di layar — itu yang dilarang.
+        # membuang hasilnya tanpa jejak di layar — itu yang dilarang.
+        #
+        # Jendela 80 karakter, bukan 12, dan kualifikasi `CelestialVisual.`
+        # boleh berada di antaranya. Versi pertama memakai jendela 12
+        # karakter, jadi `_ = CelestialVisual.starCoreRGB(…)` — bentuk yang
+        # justru paling mungkin ditulis orang — **lolos**: 12 karakter sebelum
+        # nama fungsi hanya berisi `= CelestialVis`, dan `_ =` sudah terpotong
+        # keluar jendela. Ditemukan oleh `bukti-mutasi-aturan98-fungsi-port.py`
+        # keadaan 2, bukan oleh penalaran.
+        #
+        # `\s` sengaja dipakai, bukan `[ \t]`: `let x =\n    CelestialVisual.…`
+        # adalah pemakaian yang sah, dan `_\s*=\s*` yang tidak menyeberang
+        # baris akan salah membacanya sebagai «dibuang».
         dibuang = []
         for jalur in pemakai:
             isi = apps[jalur]
             for m in pola.finditer(isi):
-                sebelum = isi[max(0, m.start() - 12):m.start()]
-                if re.search(r"_\s*=\s*$", sebelum):
+                sebelum = isi[max(0, m.start() - 80):m.start()]
+                if re.search(r"_\s*=\s*[\w.]*$", sebelum):
                     dibuang.append(jalur)
                     break
         if dibuang:
