@@ -17986,6 +17986,81 @@ def check_saturn_band_constants_match_the_model(results):
             f"'{source_text}'"))
 
 
+def check_app_icon_has_a_focal_mark(results):
+    """Ikon app harus punya **satu** subjek, dan subjeknya harus selamat dipotong.
+
+    **Cacat yang ditutup, terukur.** Sampai siklus ini ikon yang dikirim ke
+    App Store adalah **starfield acak tanpa subjek**: `Tools/make_app_icons.py`
+    menggambar 120 bintang lalu selesai. Diukur pada berkas 1024 px yang
+    benar-benar terkirim (`HEAD:.../AppIcon-1024.png`):
+
+        massa terang di dalam 0.35 R  0.108   ← praktis tidak ada subjek
+        bingkai luar (4%) terang      32.4    ← bingkai hampir seterang isi
+        piksel terang di luar topeng  0.22    ← 22% hilang di watchOS
+
+    Angka terakhir itu yang paling merugikan. watchOS memotong app icon
+    menjadi **lingkaran**; 22% massa terang ikon berada di luar lingkaran itu,
+    jadi jam menampilkan sisa yang lebih redup daripada yang terlihat di
+    katalog. Tidak ada gerbang mana pun yang membaca ikon — 99 aturan
+    `swift-ui-lint.sh` membaca **teks** Swift, `check-visuals.py` membaca
+    render **objek**, dan keduanya tidak pernah membuka `AppIcon-1024.png`.
+
+    **Kenapa massa terang, bukan "ada piksel di tengah".** Ikon starfield
+    acak juga punya piksel di tengah — kebetulan. Yang membedakan ikon
+    bersubjek dari kebisingan adalah **proporsi**: berapa bagian dari cahaya
+    yang terkumpul di dekat pusat. Ambang 0.30 dipilih dari dua keadaan nyata
+    (0.108 → 0.438), bukan dari selera: ia di tengah, sehingga baik ikon
+    bising maupun ikon yang subjeknya tergeser ke tepi akan merah.
+
+    **Kenapa topeng lingkaran diukur, bukan diasumsikan.** Batas 2% dipakai
+    karena ikon yang benar menyisakan 0.003 — margin 7×, cukup untuk
+    anti-aliasing tapi tidak cukup untuk cincin Saturnus yang menyentuh tepi
+    frame (keadaan yang justru membuat siluetnya hilang di sudut).
+
+    **Batas yang dinyatakan.** Yang dijaga adalah **adanya subjek dan
+    keselamatannya dari topeng**, bukan keindahannya. Ikon yang jelek tetapi
+    terpusat akan hijau di sini; komposisi dan warna tetap dinilai manusia.
+    """
+    icon = os.path.join(ROOT, "Apps/PointAndKnowiOS/Resources/"
+                              "Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
+    if not os.path.exists(icon):
+        results.append(Result("ikon app ada", False, f"{icon} tidak ditemukan"))
+        return
+    width, height, rows = decode_png(icon)
+
+    def luminance(x, y):
+        row = rows[y]
+        i = x * 4
+        return 0.2126 * row[i] + 0.7152 * row[i + 1] + 0.0722 * row[i + 2]
+
+    total = centre = outside = 0.0
+    step = 4
+    for y in range(0, height, step):
+        for x in range(0, width, step):
+            value = luminance(x, y)
+            if value <= 60.0:
+                continue
+            total += value
+            dx = (x - width / 2) / (width / 2)
+            dy = (y - height / 2) / (height / 2)
+            radius2 = dx * dx + dy * dy
+            if radius2 <= 0.35 ** 2:
+                centre += value
+            if radius2 > 1.0:
+                outside += value
+    focal = centre / total if total else 0.0
+    masked = outside / (total or 1.0)
+
+    results.append(Result(
+        "ikon app punya subjek terpusat", focal >= 0.30,
+        f"massa terang dalam 0.35 R = {focal:.3f} (ambang 0.30); "
+        f"ikon starfield tanpa subjek terukur 0.108"))
+    results.append(Result(
+        "ikon app selamat dari topeng lingkaran watchOS", masked <= 0.02,
+        f"piksel terang di luar lingkaran = {masked:.3f} (ambang 0.02); "
+        f"ikon starfield lama kehilangan 0.22 massanya"))
+
+
 def _gate_failed(results, name, error):
     """Satu gerbang melempar → **satu pemeriksaan merah**, bukan traceback.
 
@@ -18570,6 +18645,12 @@ def main():
         check_shipped_has_no_settling_markers(results)
     except Exception as _gate_error:  # noqa: BLE001
         _gate_failed(results, "check_shipped_has_no_settling_markers", _gate_error)
+    # Ikon app: satu-satunya permukaan yang dilihat pengguna **sebelum** app
+    # dibuka, dan sampai siklus ini tidak dibaca gerbang mana pun.
+    try:
+        check_app_icon_has_a_focal_mark(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_app_icon_has_a_focal_mark", _gate_error)
 
     # Saringan `--only`: nama pemeriksaan harus **mengandung** salah satu
     # substring. Sengaja `substring`, bukan `in` daftar: nama gerbang tumbuh

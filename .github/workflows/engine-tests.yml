@@ -3143,5 +3143,8 @@ jobs:
       - name: Buktikan Aturan 97 berbunyi
         run: python3 Tools/bukti-mutasi-aturan97-versi-ekstensi.py
 
+      - name: Bukti mutasi — ikon app punya subjek dan selamat dari topeng jam
+        run: python3 Tools/bukti-mutasi-ikon-app.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
