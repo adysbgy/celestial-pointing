@@ -1,3 +1,71 @@
+### Siklus (22 Okt 2026 — arah tunjuk yang dikirim jam tidak pernah punya baris)
+
+Siklus sebelumnya menutup σ yang hilang. Siklus ini menutup **kelasnya**, dan
+menemukan bahwa σ bukan satu-satunya: `altitudeDeg` dan `azimuthDeg` ikut di
+**setiap** pesan keadaan sejak versi pertama, dan tidak ada satu baris pun di
+iPhone yang menampilkannya.
+
+#### Bagaimana ketemu
+
+Bukan dari membaca STATUS.md — catatan siklus sebelumnya justru menyebut σ
+sebagai kasus tunggal. Ketemu dengan **memutasi**: menghapus seluruh cabang σ
+dari `LinkView` lalu menjalankan ketiga gerbang. Hasilnya 87 aturan UI hijau,
+`swift-typecheck.sh` exit 0, `swift-test.sh` hijau.
+
+Sebabnya struktural, dan penting untuk siklus berikutnya: gerbang repo ini
+bekerja pada **teks** (`swift-ui-lint.sh` membaca berkas) dan pada **gambar**
+(`check-visuals.py` membaca piksel yang dirender `render-visuals.py`).
+Keduanya melihat `Apps/`. Tidak satu pun melihat **kolom mana yang benar-benar
+dirender** — cacatnya adalah ketiadaan baris, dan ketiadaan tidak punya teks
+maupun piksel untuk diperiksa.
+
+#### Yang dikerjakan
+
+- `LinkReport` (`Packages/PointingKit/Sources/PointingKit/LinkReport.swift`):
+  isi bagian "keadaan terakhir dari jam" sebagai fungsi murni, diuji di Linux.
+  `LinkView` hanya merender hasilnya — tidak ada lagi logika kolom di view.
+- Baris **arah** (`link.row.direction`, "Arah (tinggi / azimut)"): satu baris
+  yang membawa kedua angka, karena satu sudut sendiri tidak menunjuk apa pun.
+  Hanya muncul bila **keduanya** ada dan berhingga — setengah pasangan akan
+  terbaca seperti pengukuran yang gagal.
+- 11 uji baru (1049 → 1060) + count katalog 356 → 357.
+
+#### Bukti uji tidak vakum
+
+Setiap klaim diuji dengan mutasi yang **mengompilasi**, dijalankan di proses
+baru, dan gerbangnya terbukti merah:
+
+| Mutasi | Uji yang merah |
+|---|---|
+| baris arah dimatikan (`..., false`) | `testDirectionRowCarriesTheAltitudeAndAzimuthTheWatchSent` |
+| σ dibaca mentah, melewati accessor | `testSigmaRowOnlyAppearsWhenItIsAnActualMeasurement` (4 kasus: 0, -1, nan, inf) |
+
+Tanpa mutasi pertama, uji arah akan hijau pada kode yang tidak merender apa
+pun — persis cacat yang sedang diperbaiki.
+
+#### Temuan sampingan yang ikut ditutup
+
+Percobaan pertama menambahkan medan ketiga `Row.spokenValue` dan memakainya
+sebagai label VoiceOver. **Aturan 71 menangkapnya**: label diucapkan dari
+`item.spokenValue` sementara yang digambar `item.value` — dua saluran membaca
+dua nilai berbeda, kelas cacat yang sama dengan yang sedang diperbaiki.
+
+Perbaikannya bukan melonggarkan aturan: `row(...)` di `LinkView` sudah
+menggabungkan judul dan nilai jadi satu pengumuman, jadi medan ketiga itu
+tidak menambah apa pun. Ia dihapus, dan uji bentuk-ucapan dipindah ke tempat
+yang memang memilikinya (`RowSpeech`).
+
+#### Yang TIDAK diklaim
+
+- **Belum ada aturan UI yang menghitung kolom `LinkView`.** Yang sekarang
+  menjaga adalah uji PointingKit terhadap `LinkReport`, bukan gerbang terhadap
+  view. Kalau `LinkView` berhenti memanggil `stateRows` dan kembali menulis
+  kolomnya sendiri, uji itu tetap hijau. Itu celah berikutnya, dan ia nyata.
+- Baris arah melaporkan arah **yang dikirim jam pada pesan itu**, bukan arah
+  jam sekarang.
+- Arah tidak divalidasi terhadap langit (bisa di bawah horizon, bisa di siang
+  hari); baris ini melaporkan, tidak menilai.
+
 ### Siklus (22 Okt 2026 — sigma yang dikirim jam tidak pernah tampil)
 
 Ditemukan dengan berhenti percaya status sendiri dan mengukur saluran data:
