@@ -189,6 +189,24 @@ def main():
         states.append((f"1. ikon starfield lama ({ref})", old, "merah",
                        "subjek terpusat"))
 
+    # Keadaan: ikon yang isinya benar tetapi **bukan** keluaran generator.
+    # Ditiru dengan mengubah satu byte warna di dalamnya — subjeknya tetap
+    # terpusat, jadi hanya pemeriksaan reproduktibilitas yang bisa menangkapnya.
+    # Tanpa keadaan ini, "ikon adalah keluaran generator" belum pernah
+    # dibuktikan bisa merah, dan gerbang yang tidak pernah merah bukan bukti.
+    try:
+        width, height, rows = decode_icon(original_icon)
+        mutated = bytearray(b"".join(rows))
+        # Satu piksel di kuadran kiri-atas latar: cukup untuk mengubah md5,
+        # tidak cukup untuk menggeser massa terang.
+        mutated[4 * 8 + 4] = (mutated[4 * 8 + 4] + 1) % 256
+        import make_app_icons  # noqa: PLC0415
+        stale = make_app_icons._png(width, height, bytes(mutated))
+        states.append(("3. ikon benar tetapi bukan keluaran generator",
+                       stale, "merah", "keluaran generator"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"CATATAN: keadaan 3 DILEWATI ({type(exc).__name__}: {exc}).")
+
     # Keadaan: ikon yang subjeknya digeser keluar frame. Dibuat dari ikon yang
     # benar dengan memindahkan isinya ke tepi — meniru cacat "subjek di pojok"
     # yang lolos bila gerbang hanya memeriksa "ada piksel terang".

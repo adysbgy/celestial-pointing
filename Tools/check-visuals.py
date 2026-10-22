@@ -18020,6 +18020,13 @@ def check_app_icon_has_a_focal_mark(results):
     **Batas yang dinyatakan.** Yang dijaga adalah **adanya subjek dan
     keselamatannya dari topeng**, bukan keindahannya. Ikon yang jelek tetapi
     terpusat akan hijau di sini; komposisi dan warna tetap dinilai manusia.
+
+    **Kenapa reproduktibilitas ikut diukur di sini.** Ikon yang benar tetapi
+    bukan keluaran generator berarti `make_app_icons.py` sudah tidak
+    menggambarkan apa yang dikirim — dan perubahan berikutnya di generator
+    (palet, geometri) akan **tidak berpengaruh** tanpa ada yang tahu. Satu
+    gerbang, tiga pertanyaan: ada subjek, selamat dari topeng, dan berasal dari
+    sumber yang bisa di-render ulang.
     """
     icon = os.path.join(ROOT, "Apps/PointAndKnowiOS/Resources/"
                               "Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
@@ -18059,6 +18066,32 @@ def check_app_icon_has_a_focal_mark(results):
         "ikon app selamat dari topeng lingkaran watchOS", masked <= 0.02,
         f"piksel terang di luar lingkaran = {masked:.3f} (ambang 0.02); "
         f"ikon starfield lama kehilangan 0.22 massanya"))
+
+    # Ikon harus **turunan** dari generator, bukan berkas yang pernah digambar
+    # sekali lalu dibiarkan. Tanpa pemeriksaan ini, `make_app_icons.py` dan
+    # katalog bisa menyimpang diam-diam: mengubah palet di generator tidak
+    # mengubah apa pun yang dikirim, dan tidak ada yang tahu.
+    try:
+        import hashlib
+        import importlib.util
+        import tempfile
+        spec = importlib.util.spec_from_file_location(
+            "gen_ikon", os.path.join(ROOT, "Tools/make_app_icons.py"))
+        if spec is None or spec.loader is None:
+            raise RuntimeError("tidak bisa memuat make_app_icons.py")
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+        fresh = generator.render(1024, 2)
+        same = hashlib.md5(fresh).hexdigest() == hashlib.md5(
+            open(icon, "rb").read()).hexdigest()
+        results.append(Result(
+            "ikon app adalah keluaran generator, bukan biner beku", same,
+            f"md5 render ulang {hashlib.md5(fresh).hexdigest()[:12]} "
+            f"{'==' if same else '!='} md5 di katalog"))
+    except Exception as exc:  # noqa: BLE001
+        results.append(Result(
+            "ikon app adalah keluaran generator, bukan biner beku", False,
+            f"render ulang gagal: {type(exc).__name__}: {exc}"))
 
 
 def _gate_failed(results, name, error):
