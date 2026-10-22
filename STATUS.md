@@ -1,3 +1,90 @@
+### Siklus (22 Okt 2026 — berkas tanpa gerbang: bridge lokalisasi akhirnya diukur)
+
+Siklus ini berangkat dari satu pertanyaan yang bisa dijawab angka, bukan
+kesan: **berkas mana di `Apps/` yang tidak dirujuk satu pun gerbang?**
+Sensus atas 29 berkas, dibandingkan dengan 365 berkas gerbang (`Tools/`,
+`.github/`, `Packages/`), menyisakan tepat satu: `Apps/Shared/LocalizationBridge.swift`
+— nol rujukan. Berkas lain paling sedikit satu, dan yang paling sedikit itu
+pun dirujuk oleh harness yang mengukur namanya.
+
+#### Temuan — satu kalimat di docstring, bukan gerbang
+
+Bridge itu memasang `TextLocalization` dan `NumberFormat` supaya label yang
+**dihasilkan** `PointingKit` ("Siap", "Arahkan", "Terkunci", "Kurang yakin",
+"Kurang yakin", "Sensor mati") dibaca dari `Localizable.xcstrings`. Label-label
+itu tidak pernah muncul sebagai literal `Text("...")` di `Apps/`, jadi aturan 4
+(kalimat tampilan tidak lahir sebagai literal) **tidak bisa** melihatnya — ia
+hijau justru karena tidak ada literalnya. Yang menjaganya hanya satu kalimat
+di docstring: "Sengaja dipanggil dari `App.init()`".
+
+Diukur, bukan diasumsikan. Panggilan `LocalizationBridge.install()` dihapus
+dari **kedua** entry point (`PointAndKnowWatchWatchApp`, `PointAndKnowiOSApp`),
+lalu ketiga gerbang dijalankan:
+
+    ./swift-ui-lint.sh   → 0  (90 aturan, semuanya hijau)
+    ./swift-typecheck.sh → 0
+    ./swift-test.sh      → 1079 uji, 0 gagal
+
+Di perangkat, hasil yang sama itu berarti: setiap label dari `PointingKit`
+tampil Bahasa Indonesia di **semua** bahasa, tanpa satu pun galat, tanpa satu
+pun baris di layar yang menyatakan ada yang salah. Itu kelas cacat yang sudah
+tiga kali berulang di repo ini — kode benar di paket, tidak tersambung di app.
+
+#### Kenapa `init()`, dan kenapa dua simbol
+
+Label dibaca sebelum `body` pertama selesai dirender. Bridge yang dipasang di
+dalam `body`, di `.task`, atau di layar yang dibuka belakangan datang
+**terlambat**: label pertama sudah jatuh ke nilai bawaan, dan tidak ada yang
+menggambar ulang. `init()` milik tipe `@main` satu-satunya titik yang dijamin
+berjalan lebih dulu. Karena itu aturannya tidak cukup "berkasnya memuat
+panggilan" — bentuk itu lolos untuk pemasangan yang terlambat.
+
+Dua simbol diterima, bukan satu. App memasang `LocalizationBridge.install()`,
+sedangkan complication memasang `ComplicationLocalization.install()`: ia
+target terpisah yang tidak menarik `Apps/Shared` dan `Bundle.main`-nya menunjuk
+bundel widget sendiri. Aturan yang menuntut satu nama akan berbunyi untuk
+sambungan yang justru benar — dan aturan yang berbunyi untuk hal benar akan
+dimatikan orang. Yang diukur adalah invariannya: **ada sumber terjemahan yang
+dipasang di `init()` sebelum layar pertama**.
+
+#### Gerbang baru Aturan 91
+
+`Tools/check-aturan91-bridge-lokalisasi.py`. Tiga hal diperiksa: setiap berkas
+ber-`@main` memuat salah satu pemasangan, pemasangan itu berada di dalam badan
+`init(...)` (kurung kurawal dihitung seimbang, `init()` berbadan closure
+bersarang tidak terpotong), dan **nol `@main` = GAGAL** — entry point yang
+hilang lebih mungkin berarti aturan berhenti mengukur daripada app berhenti
+punya entry point.
+
+Dua bug di versi pertama checker ini ditemukan justru karena ia dijalankan
+pada pohon yang seharusnya hijau: kedalaman kurung mulai dari 0 padahal regex
+sudah memakan `(`, sehingga badan `init()` terbaca kosong; dan `.init(` pada
+`.sheet(isPresented: .init(get:...))` dihitung sebagai deklarasi. Keduanya
+menghasilkan temuan palsu pada kode yang benar. Diperbaiki di checker-nya,
+bukan dengan melonggarkan aturannya.
+
+**Dibuktikan non-vakum dengan mutasi** (`Tools/bukti-mutasi-aturan91-bridge-lokalisasi.py`),
+lima keadaan: panggilan dihapus dari app jam → bunyi; dipindah ke luar
+`init()` (ada tapi terlambat) → bunyi; dihapus dari app iPhone → bunyi;
+dihapus dari complication → bunyi; pohon apa adanya → **diam**. Keadaan kedua
+yang paling penting: ia lolos pemeriksaan naif "berkasnya memuat panggilan".
+
+#### Yang TIDAK diklaim
+
+- Ini sapuan **teks**, bukan pemeriksaan tipe. Ia tidak bisa membuktikan
+  `Bundle` benar-benar membaca `.xcstrings` di perangkat, dan tidak bisa
+  membuktikan katalog ikut terbawa ke bundel tiap target. Ia membuktikan
+  sambungannya ada dan di tempat yang dijanjikan.
+- Tidak ada perubahan perilaku yang bisa dilihat pengguna. Yang berubah: satu
+  klaim yang tadinya kosong sekarang punya bukti, dan bridge tidak bisa lepas
+  diam-diam lagi.
+- `LocalizationBridge` sendiri **tidak** diubah. Ia sudah benar; yang hilang
+  hanya penjaganya.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1079** =
+**1301** hijau (0 kegagalan) di Docker Swift 6.0. 90 aturan UI hijau (Aturan 91
+baru), typecheck hijau, 150 harness semuanya dirujuk `engine-tests.yml`.
+
 ### Siklus (22 Okt 2026 — jalur cadangan dokumen galat akhirnya diukur)
 
 Siklus sebelumnya menulis satu kalimat di `ExportErrorDocument.swift`:

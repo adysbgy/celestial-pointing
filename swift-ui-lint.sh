@@ -14742,6 +14742,35 @@ else
 fi
 
 
+echo
+echo "== Aturan 91: setiap @main memasang sumber terjemahan di init() =="
+# Logikanya tinggal di `Tools/check-aturan91-bridge-lokalisasi.py`, bukan
+# di-inline di sini. Alasannya sama dengan Aturan 84-90: badan heredoc
+# `$(python3 - <<'PY')` diurai bash 3.2 di macOS CI, dan satu kutip tunggal
+# atau backtick ganjil di dalamnya membuat skrip memindai sampai EOF lalu
+# melewati seluruh aturan sesudahnya tanpa satu pun galat.
+if [ ! -f "Tools/check-aturan91-bridge-lokalisasi.py" ]; then
+  echo "FAIL Tools/check-aturan91-bridge-lokalisasi.py tidak ada: Aturan 91"
+  echo "     tidak mengukur apa pun, dan sumber terjemahan bisa lepas dari"
+  echo "     app tanpa satu pun galat — semua label kembali Bahasa Indonesia."
+  status=1
+else
+  bridge_lokalisasi=$(python3 Tools/check-aturan91-bridge-lokalisasi.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$bridge_lokalisasi"
+    echo "-> Setiap target dengan @main wajib memasang sumber terjemahan di"
+    echo "   dalam init(). Label dari PointingKit (\"Siap\", \"Terkunci\","
+    echo "   \"Kurang yakin\") tidak pernah muncul sebagai literal Text(\"...\")"
+    echo "   di Apps/, jadi tidak ada aturan lain yang bisa melihatnya: tanpa"
+    echo "   pemasangan ini teksnya Bahasa Indonesia di semua bahasa, diam-diam."
+    echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$bridge_lokalisasi"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
