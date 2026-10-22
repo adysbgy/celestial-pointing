@@ -3056,5 +3056,21 @@ jobs:
       - name: Buktikan Aturan 92 berbunyi
         run: python3 Tools/bukti-mutasi-aturan92-suara-visual.py
 
+      # Aturan 93 mengukur SIKLUS HIDUP SENSOR: setiap `X.start(` di start()
+      # wajib punya `X.stop()` di stop(), dan scenePhase wajib memanggil stop().
+      # Jalur ini tidak bisa dijangkau tes mana pun — tidak ada tes yang
+      # menurunkan pergelangan tangan. Diukur: isi `stop()` dikosongkan lalu
+      # 92 aturan UI, typecheck, dan seluruh uji tetap hijau, exit 0. Cacatnya
+      # tidak terlihat di layar (compiler diam, teks tidak berubah) padahal
+      # akibatnya dua: baterai terkuras sepanjang malam, DAN objek terakhir
+      # tetap tampak terkonfirmasi karena `PointingEngine.stop()` tidak
+      # membatalkannya — false confidence yang dilarang PRD v0.4. Harness ini
+      # menuntut aturan berbunyi pada lima cara memutusnya (termasuk satu
+      # sumber saja yang tertinggal, scenePhase yang berhenti memanggil stop(),
+      # dan sensor kelima yang ditambahkan tanpa pasangan) serta diam pada
+      # pohon bersih.
+      - name: Buktikan Aturan 93 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan93-siklus-sensor.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

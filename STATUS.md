@@ -33255,3 +33255,66 @@ angkanya benar, gerbang membuktikan angkanya dipakai.
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **1022** =
 **1244** hijau (0 kegagalan) di Docker Swift 6.0. 78 aturan UI hijau,
 typecheck hijau.
+
+## Siklus: siklus hidup sensor yang tidak diukur siapa pun (Aturan 93)
+
+**Cacat yang dicari, bukan diasumsikan.** Repo ini sudah punya 92 aturan UI
+yang semuanya mengukur hal yang *terlihat*: teks yang salah, warna yang
+mengklaim identitas, label aksesibilitas yang tidak sampai, denyut yang tidak
+digerbangi. Yang tidak diukur satu pun adalah hal yang terjadi **setelah layar
+mati** — jalur teardown.
+
+`Apps/PointAndKnowWatch/Sources/PointAndKnowWatchWatchApp.swift` memegang
+empat sumber daya yang hidup di luar pandangan: motion 20 Hz, lokasi, sesi
+`WCSession`, dan `PointingEngine` yang menyimpan objek terakhir. Semuanya
+di-start di `start()` dan di-stop di `stop()`, dan `stop()` dipanggil dari
+`.onDisappear` serta `scenePhase`. Tidak ada tes di repo ini yang bisa
+menjangkau jalur itu: tidak ada tes yang menurunkan pergelangan tangan.
+
+**Diukur dengan mutasi, bukan dibaca.** Isi `stop()` diganti dengan komentar
+kosong di salinan pohon yang seharusnya hijau, lalu `./swift-ui-lint.sh`
+dijalankan: **92 aturan hijau, exit 0**. Seluruh siklus hidup sensor bisa
+dihapus dan tidak satu pun gerbang berbunyi. Compiler juga diam — metodenya
+tetap ada, hanya badannya yang kosong.
+
+**Kenapa ini mahal, dua arah sekaligus.**
+
+1. *Baterai.* Motion 20 Hz dan GPS yang tidak berhenti saat pergelangan
+   diturunkan menguras jam yang justru dipakai sepanjang malam di luar.
+2. *Kejujuran.* `PointingEngine.stop()` membatalkan objek terakhir. Tanpa itu
+   objek terakhir tetap tersisa di layar dan di complication seolah masih
+   terkonfirmasi — persis *false confidence* yang dilarang PRD v0.4. Ini
+   bentuk cacat yang paling berbahaya karena layarnya tidak rusak: ia hanya
+   *terlalu yakin*.
+
+**Aturan 93** (`Tools/check-aturan93-siklus-sensor.py`) memeriksa empat hal:
+`start()`/`stop()` sama-sama ada; setiap `X.start(` di `start()` punya
+`X.stop()` di `stop()`; `scenePhase` masih memetakan `.inactive`/`.background`
+ke `stop()`; dan nol pasangan = GAGAL, bukan lolos.
+
+**Kenapa daftarnya dipanen, bukan ditulis.** Menuliskan `motion` dan
+`location` di checker akan membuat aturan ini berhenti mengukur tepat saat
+sumber kelima ditambahkan — saat ia paling dibutuhkan. Daftarnya dibaca dari
+badan `start()`, jadi menambah sensor langsung menambah tuntutan tanpa
+menyentuh checker. Keadaan [5] di harness membuktikannya: `magnetometer.start()`
+disisipkan tanpa pasangan, dan gerbang berbunyi.
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-aturan93-siklus-sensor.py`, enam
+keadaan, terdaftar di `engine-tests.yml`): `stop()` dikosongkan → bunyi;
+hanya `motion.stop()` hilang → bunyi; hanya `location.stop()` hilang → bunyi;
+`scenePhase` berhenti memanggil `stop()` → bunyi; sumber kelima tanpa pasangan
+→ bunyi; pohon apa adanya → **diam**.
+
+**Yang TIDAK diklaim.**
+- Ini sapuan **teks**, bukan analisis aliran kendali. Ia tidak membuktikan
+  `stop()` benar-benar dieksekusi watchOS, tidak membuktikan urutannya tepat,
+  dan tidak memeriksa app iPhone (yang tidak memegang sensor).
+- `link` (sesi `WCSession`) tidak punya `stop()` di API-nya, jadi ia tidak
+  ikut dituntut. Kalau suatu saat ia mendapatkannya, aturan ini otomatis
+  menuntutnya.
+- Batas baterai yang sebenarnya tidak diukur — hanya keberadaan pasangan
+  start/stop.
+
+Engine tidak disentuh: CelestialEngine **222** + PointingKit **1079** =
+**1301** hijau (0 kegagalan) di Docker Swift 6.0. 92 aturan UI hijau,
+typecheck hijau, `bash -n` di bash 3.2 hijau, 152 harness terdaftar.

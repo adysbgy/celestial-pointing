@@ -14799,6 +14799,32 @@ else
     echo "$suara_visual"
   fi
 fi
+echo "== Aturan 93: setiap sumber sensor yang di-start di-stop di jalur teardown =="
+# Motion 20 Hz, lokasi, dan WCSession hidup di luar pandangan layar. `stop()`
+# dipanggil dari `.onDisappear` dan `scenePhase` — jalur yang tidak bisa
+# dijangkau tes mana pun, karena tidak ada tes yang menurunkan pergelangan
+# tangan. Diukur dengan mutasi: isi `stop()` dikosongkan, 92 aturan tetap
+# hijau, exit 0. Tanpa `stop()` jam menguras baterai sepanjang malam DAN
+# objek terakhir tetap tampak terkonfirmasi — false confidence yang dilarang
+# PRD v0.4. Logikanya di `Tools/`, bukan di-inline, karena alasan yang sama
+# dengan Aturan 84-92 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan93-siklus-sensor.py" ]; then
+  echo "FAIL Tools/check-aturan93-siklus-sensor.py tidak ada: Aturan 93"
+  echo "     tidak mengukur apa pun, dan sensor bisa tetap hidup saat app"
+  echo "     ditinggal tanpa satu pun galat."
+  status=1
+else
+  siklus_sensor=$(python3 Tools/check-aturan93-siklus-sensor.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$siklus_sensor"
+    echo "-> Setiap `X.start(` di start() wajib punya `X.stop()` di stop(),"
+    echo "   dan scenePhase wajib memanggil stop(). Perbaiki kodenya,"
+    echo "   jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$siklus_sensor"
+  fi
+fi
 
 
 if [ "$status" -eq 0 ]; then
