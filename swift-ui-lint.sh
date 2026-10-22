@@ -14920,6 +14920,37 @@ else
 fi
 
 
+echo "== Aturan 97: variabel Info.plist wajib terdefinisi di targetnya sendiri =="
+# Cacatnya tertulis di log Apple Build setiap kali alur kerja itu berjalan:
+# "The CFBundleVersion of an app extension (null) must match that of its
+# containing parent app ('1')". Target complication merujuk
+# `$(CURRENT_PROJECT_VERSION)` di `info.properties`, tapi variabelnya hanya
+# didefinisikan di target app — dan XcodeGen tidak mewariskan `settings` ke
+# extension yang di-embed. Build tetap hijau (Info.plist berisi `null` masih
+# bisa dibangun), jadi tidak ada gerbang lain yang berbunyi: bukan warning
+# compiler kode sendiri, bukan teks di layar. Yang menolaknya adalah App
+# Store, jauh belakangan.
+#
+# Logikanya di `Tools/` karena membaca YAML, bukan teks Swift.
+if [ ! -f "Tools/check-aturan97-versi-ekstensi.py" ]; then
+  echo "FAIL Tools/check-aturan97-versi-ekstensi.py tidak ada: Aturan 97"
+  echo "     tidak mengukur apa pun, dan versi bundel ekstensi bisa kembali"
+  echo "     menjadi null tanpa ada yang berbunyi."
+  status=1
+else
+  versi_ekstensi=$(python3 Tools/check-aturan97-versi-ekstensi.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$versi_ekstensi"
+    echo "-> Setiap variabel di info.properties wajib didefinisikan di"
+    echo "   settings target itu sendiri. Perbaiki project.yml, jangan"
+    echo "   longgarkan aturannya."
+    status=1
+  else
+    echo "$versi_ekstensi"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

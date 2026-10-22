@@ -3103,5 +3103,15 @@ jobs:
       - name: Buktikan Aturan 96 berbunyi
         run: python3 Tools/bukti-mutasi-aturan96-skalar-model.py
 
+      # Aturan 97: setiap `$(VARIABEL)` di `info.properties` wajib
+      # didefinisikan di `settings` target itu sendiri. Cacatnya tertulis di
+      # log Apple Build setiap kali: "The CFBundleVersion of an app extension
+      # (null) must match that of its containing parent app ('1')" — target
+      # complication merujuk `$(CURRENT_PROJECT_VERSION)` tapi variabelnya
+      # hanya ada di target app, dan XcodeGen tidak mewariskan `settings` ke
+      # extension yang di-embed. Build tetap hijau; App Store yang menolak.
+      - name: Buktikan Aturan 97 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan97-versi-ekstensi.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
