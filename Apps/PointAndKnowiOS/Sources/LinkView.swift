@@ -44,43 +44,28 @@ struct LinkView: View {
 
                 Section(TextLocalization.text(.linkSectionLastState)) {
                     if let state = link.lastState {
-                        row(TextLocalization.text(.linkRowState), state.state?.shortLabel ?? "—")
-                        // `reportedObjectName(catalogue:)`, bukan
-                        // `objectName`: medan itu memuat nama Indonesia yang
-                        // dibekukan engine jam (`Bulan`, `Saturnus`), jadi
-                        // baris ini dan baris keadaan di atasnya bisa
-                        // berbahasa berbeda untuk pesan yang sama.
-                        row(TextLocalization.text(.linkRowObject),
-                            state.reportedObjectName(
-                                catalogue: engine.controller.resolver.catalogue) ?? "—")
-                        row(TextLocalization.text(.linkRowConfidence), state.level?.displayName ?? "—")
-                        // Sigma yang berlaku di jam. Tanpa baris ini satu-satunya
-                        // angka yang menyatakan **seberapa tebal** keyakinan itu
-                        // tidak pernah tampil, padahal ia ikut di setiap pesan
-                        // keadaan — dan layar ini justru yang menjelaskan apa
-                        // yang dilaporkan jam.
+                        // **Seluruh isi bagian ini datang dari `LinkReport`.**
                         //
-                        // Ditulis hanya bila ada: σ yang tidak disertakan sudah
-                        // punya peringatannya sendiri di bawah (`σ = 0` tidak
-                        // boleh terbaca sebagai akurasi sempurna), jadi baris
-                        // kosong di sini akan menduplikasi peringatan itu
-                        // dengan cara yang lebih lemah.
-                        if let sigma = state.confidencePolicy?.pointingSigmaDeg {
-                            row(TextLocalization.text(.linkRowSigma),
-                                NumberFormat.degrees(sigma))
+                        // Sebelumnya kolom-kolomnya ditulis di sini, satu per
+                        // satu, dan tidak satu pun dari 87 aturan UI melihatnya
+                        // — terukur: menghapus cabang σ meninggalkan semua
+                        // gerbang hijau. Karena itu barisnya dipindah ke
+                        // fungsi murni di `PointingKit`, yang diuji di Linux
+                        // (termasuk bahwa arah tunjuk yang **dikirim jam**
+                        // benar-benar menjadi baris — ia tidak pernah tampil
+                        // sebelum siklus ini).
+                        // Setiap baris digambar oleh `row(...)`, yang sudah
+                        // menggabungkan judul dan nilai menjadi satu
+                        // pengumuman VoiceOver. Tidak ada lapisan label kedua:
+                        // yang diucapkan dibentuk dari nilai yang **persis**
+                        // digambar, jadi kedua saluran tidak bisa membaca angka
+                        // berbeda (kesepakatan yang dijaga Aturan 71).
+                        ForEach(Array(LinkReport.stateRows(
+                            state,
+                            catalogue: engine.controller.resolver.catalogue
+                        ).enumerated()), id: \.offset) { _, item in
+                            row(item.title, item.value)
                         }
-                        if let rate = state.angularRateDegPerSec {
-                            // Nilainya ditulis "0.5°/dtk" untuk mata; yang
-                            // diucapkan bentuk katanya. Dua-duanya dari
-                            // angka yang sama — tidak ada versi kedua yang
-                            // bisa menyimpang.
-                            row(TextLocalization.text(.linkRowRate), NumberFormat.degreesPerSecond(rate))
-                                .accessibilityLabel(RowSpeech.spokenRow(
-                                    title: TextLocalization.text(.linkRowRate),
-                                    spokenValue: RowSpeech.spokenRate(rate)))
-                        }
-                        row(TextLocalization.text(.linkRowTime),
-                            state.sentAt.formatted(date: .omitted, time: .standard))
                         if let note = state.calibrationNoteText ?? state.note {
                             Text(note).font(.footnote).foregroundStyle(Color.nightAwareSecondary)
                         }

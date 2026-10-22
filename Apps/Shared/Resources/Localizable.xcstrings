@@ -4442,6 +4442,23 @@
         }
       }
     },
+    "link.row.direction": {
+      "comment": "Arah tunjuk yang dikirim jam: ketinggian lalu azimut. Judul menyebut urutan keduanya supaya dua angka bersebelahan tidak tertukar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction (altitude / azimuth)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arah (tinggi / azimut)"
+          }
+        }
+      }
+    },
     "link.row.time": {
       "comment": "Baris waktu",
       "localizations": {

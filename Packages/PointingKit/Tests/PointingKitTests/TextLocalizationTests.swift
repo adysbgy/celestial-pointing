@@ -352,9 +352,17 @@ final class TextLocalizationTests: XCTestCase {
     /// sigma itu sendiri tidak pernah tampil di mana pun. Akurasi tunjuk adalah
     /// hipotesis yang sedang diukur app ini, jadi angkanya adalah isi laporan,
     /// bukan detail teknis.
+    /// Angka 356 → 357 karena `.linkRowDirection`: baris **arah tunjuk** di
+    /// `LinkView`. Jam mengirim `altitudeDeg`/`azimuthDeg` di setiap pesan
+    /// keadaan sejak awal, dan tidak satu baris pun di iPhone membacanya —
+    /// medan yang dikirim tapi tak pernah tampil tidak bisa dibedakan dari
+    /// medan yang lupa ditampilkan. Gerbang 87 aturan tidak menangkapnya
+    /// karena aturan bekerja pada teks dan gambar, sedangkan cacatnya adalah
+    /// **kolom yang tidak pernah ditulis**. Karena itu barisnya pindah ke
+    /// `LinkReport` (fungsi murni, diuji di Linux).
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 356, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 357, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

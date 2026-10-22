@@ -343,7 +343,16 @@ public extension LocalizedText {
     /// menjadi inti laporan itu.
     static let linkRowSigma = LocalizedText(
         key: "link.row.sigma", id: "σ dari jam")
+    /// Arah tunjuk yang **dikirim jam**: ketinggian / azimut.
+    ///
+    /// Judulnya menyebut urutan kedua angka, karena dua angka bersebelahan
+    /// tanpa urutan tidak bisa dibedakan mana yang mana. Nama "Arah" dipilih,
+    /// bukan "Alt/Az": istilah itu hanya berarti bagi pembaca yang sudah tahu,
+    /// dan baris ini dibaca oleh pengguna yang justru sedang belajar.
+    static let linkRowDirection = LocalizedText(
+        key: "link.row.direction", id: "Arah (tinggi / azimut)")
     static let linkRowTime = LocalizedText(key: "link.row.time", id: "Waktu")
+
     static let linkNoStateYet = LocalizedText(
         key: "link.empty.noState", id: "Belum ada keadaan dari jam.")
     static let linkSectionLastCalibration = LocalizedText(
@@ -704,7 +713,8 @@ public extension LocalizedText {
         .linkSectionTitle, .linkRowStatus, .linkValueActive, .linkValueInactive,
         .linkRowReachable, .linkValueYes, .linkValueNo, .linkRowMessagesReceived,
         .linkRequestState, .linkSectionLastState, .linkRowState, .linkRowObject,
-        .linkRowConfidence, .linkRowRate, .linkRowSigma, .linkRowTime, .linkNoStateYet,
+        .linkRowConfidence, .linkRowRate, .linkRowSigma, .linkRowDirection,
+        .linkRowTime, .linkNoStateYet,
         .linkSectionLastCalibration, .linkRowYawOffset, .linkRowSpread,
         .linkRowReferenceCount, .linkNoCalibrationYet, .linkSectionSamples,
         .linkRowRecorded, .linkSamplesNote, .linkSigmaMissingNote,
