@@ -696,8 +696,10 @@ struct DiagnosticsView: View {
             let data = try ConfidenceTraceArchive.encode(export)
             return JSONArchiveDocument(filename: filename, data: data)
         } catch {
-            let message = "{\"error\": \"gagal meng-encode riwayat keyakinan: \(error.localizedDescription)\"}"
-            return JSONArchiveDocument(filename: filename, data: Data(message.utf8))
+            let data = ExportErrorDocument.data(
+                message: "gagal meng-encode riwayat keyakinan: \(error.localizedDescription)")
+            return JSONArchiveDocument(filename: ExportErrorDocument.filename(like: filename),
+                                      data: data)
         }
     }
 

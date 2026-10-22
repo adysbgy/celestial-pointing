@@ -14719,6 +14719,29 @@ else
 fi
 
 
+echo
+echo "== Aturan 90: tidak ada jalur ekspor yang menggabung JSON dengan tangan =="
+if [ ! -f "Tools/check-aturan90-ekspor-json.py" ]; then
+  echo "FAIL Tools/check-aturan90-ekspor-json.py tidak ada: Aturan 90"
+  echo "     tidak mengukur apa pun, dan berkas ekspor bisa kembali dibangun"
+  echo "     dengan penggabungan string sehingga tidak sah sebagai JSON."
+  status=1
+else
+  ekspor_json=$(python3 Tools/check-aturan90-ekspor-json.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$ekspor_json"
+    echo "-> Setiap jalur ekspor wajib memakai ExportErrorDocument.data(message:)"
+    echo "   untuk berkas gagal-encode. localizedDescription berasal dari sistem"
+    echo "   dan boleh memuat kutip; satu kutip membuat berkas .json yang"
+    echo "   dibagikan tidak sah, padahal penerimanya membukanya sebagai dataset."
+    echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$ekspor_json"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

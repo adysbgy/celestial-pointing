@@ -389,17 +389,26 @@ struct Experiment1View: View {
     /// Ekspor sebagai berkas JSON bernama, lewat lembar berbagi.
     ///
     /// Kalau encoding gagal, yang dibagikan adalah pesan kesalahan di dalam
-    /// berkas — bukan berkas kosong yang tampak seperti dataset valid. Nama
-    /// berkasnya memakai stempel waktu UTC dari `DatasetArchive` supaya dua
-    /// ekspor tidak saling menimpa.
+    /// berkas — bukan berkas kosong yang tampak seperti dataset valid.
+    ///
+    /// Pesan itu dibangun `ExportErrorDocument`, **bukan digabung string**:
+    /// `localizedDescription` boleh memuat tanda kutip, dan satu kutip saja
+    /// membuat berkas `.json` ini tidak sah padahal penerimanya membukanya
+    /// sebagai dataset. Aturan 90 di `swift-ui-lint.sh` menjaga agar tidak ada
+    /// jalur ekspor yang kembali menggabung JSON dengan tangan.
+    ///
+    /// Nama berkasnya memakai stempel waktu UTC dari `DatasetArchive` supaya
+    /// dua ekspor tidak saling menimpa.
     private func exportDocument(_ recorder: ExperimentRecorder) -> JSONArchiveDocument {
         let filename = DatasetArchive.suggestedFilename()
         do {
             let data = try DatasetArchive.encode(recorder.dataset())
             return JSONArchiveDocument(filename: filename, data: data)
         } catch {
-            let message = "{\"error\": \"gagal meng-encode dataset: \(error.localizedDescription)\"}"
-            return JSONArchiveDocument(filename: filename, data: Data(message.utf8))
+            let data = ExportErrorDocument.data(
+                message: "gagal meng-encode dataset: \(error.localizedDescription)")
+            return JSONArchiveDocument(filename: ExportErrorDocument.filename(like: filename),
+                                      data: data)
         }
     }
 

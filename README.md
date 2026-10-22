@@ -176,7 +176,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 1070**.
+Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 1076**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **88 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **89 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 89 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 90 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.

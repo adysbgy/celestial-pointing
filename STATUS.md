@@ -1,3 +1,92 @@
+### Siklus (22 Okt 2026 — Aturan 90: berkas ekspor yang gagal-encode akhirnya sah sebagai JSON)
+
+Cacat yang ditutup siklus ini **tidak berasal dari UI**. Ia ditemukan saat
+membaca jalur berbagi berkas, dan bentuknya persis kelas yang repo ini sudah
+tiga kali pelajari: **kode yang benar di layar, salah di berkas**.
+
+#### Temuan — dua jalur ekspor menggabung JSON dengan tangan
+
+`Experiment1View.exportDocument` dan `DiagnosticsView.exportDocument` sama-sama
+membangun berkas pengganti saat encoding gagal:
+
+    let message = "{\"error\": \"gagal meng-encode dataset: \(error.localizedDescription)\"}"
+    return JSONArchiveDocument(filename: filename, data: Data(message.utf8))
+
+`error.localizedDescription` berasal dari sistem. Pesan `NSCocoaErrorDomain`
+boleh menyebut nama berkas bertanda kutip; pesan `EncodingError` boleh
+menyertakan path ber-kutip. **Satu kutip saja** membuat berkasnya tidak sah
+sebagai JSON — padahal namanya `experiment1-….json`, ukurannya wajar, dan
+penerimanya membukanya sebagai dataset. Kerusakannya senyap: tidak ada crash,
+tidak ada layar merah, dan baru ketahuan saat berkasnya dibuka orang lain.
+
+Ini bukan hipotesis. Bentuk lama diuji langsung:
+
+    OLD: {"error": "gagal meng-encode dataset: file "experiment1.json" tidak terbaca"}
+    -> JSONDecodeError: Expecting ',' delimiter: line 1 column 72
+
+#### Kenapa tidak ada gerbang yang berbunyi
+
+Ketiga gerbang repo ini buta pada bentuk itu, dan masing-masing buta dengan
+alasan yang berbeda:
+
+- `swift-typecheck.sh` hanya **mem-parse**. String yang salah isinya tetap
+  sintaks Swift yang sah.
+- `swift-ui-lint.sh` membaca **teks** berkas. Tidak ada aturan yang mengenali
+  "literal string yang memuat JSON hasil interpolasi" sebagai cacat.
+- `swift test` menjalankan `Packages/`, sementara penggabungan string itu
+  tinggal di badan view — bagian `Apps/` yang tidak bisa dijalankan di Linux.
+
+Jadi perbaikannya harus dua lapis: **fungsi murni yang bisa diuji** di
+`Packages/`, dan **gerbang yang mengukur sambungannya** di `Apps/`.
+
+#### Yang dikerjakan
+
+1. `Packages/PointingKit/Sources/PointingKit/ExportErrorDocument.swift` —
+   pembentuk berkas galat yang memakai `JSONSerialization` (jalur yang sama
+   dengan pembaca di sisi penerima). Ada jalur cadangan yang meng-escape
+   sendiri, sehingga **tidak ada cabang** yang menghasilkan berkas tidak sah.
+   `filename(like:)` mempertahankan nama dari pemanggil: akhiran `.json` dan
+   stempel waktu sudah diputuskan di satu tempat, dan berkas galat tidak boleh
+   punya skema nama sendiri.
+
+2. `ExportErrorDocumentTests` (6 uji) — pesan yang memuat kutip, garis miring
+   terbalik, baris baru, `∞`, kurung kurawal, dan kutip tunggal harus
+   menghasilkan JSON sah **dan** pesannya kembali utuh setelah dibaca. Dua uji
+   lagi membuktikan berkas galat **tidak** bisa dibaca sebagai dataset atau
+   sebagai riwayat keyakinan — kalau bisa, penerima akan mengira ia mendapat
+   dataset kosong yang sah.
+
+3. Kedua view memakai fungsi itu. Aturan 90
+   (`Tools/check-aturan90-ekspor-json.py`) mengukur tiga hal: setiap pembangun
+   `JSONArchiveDocument` wajib memakai `ExportErrorDocument`; tidak ada literal
+   JSON ber-interpolasi; tidak ada `Data(...utf8)` dari string berawalan `{"`.
+
+#### Bukti gerbangnya bekerja
+
+Aturan 90 diuji dengan **mengembalikan cacatnya**, bukan dengan percaya pada
+kodenya. `Experiment1View` dikembalikan ke bentuk gabungan string, lalu:
+
+    - Apps/PointAndKnowiOS/Sources/Experiment1View.swift membangun
+      JSONArchiveDocument tanpa memakai ExportErrorDocument — cabang
+      gagal-encode-nya menggabung JSON sendiri, dan berkasnya bisa tidak sah.
+      EXIT=1
+
+Setelah dipulihkan: `Aturan 90: 2 jalur ekspor memakai ExportErrorDocument` /
+`EXIT=0`. Aturan ini juga **gagal bila nol** pembangun ditemukan — jalur ekspor
+yang hilang atau berganti nama lebih mungkin berarti gerbangnya kehilangan
+sasaran daripada produknya berhenti mengekspor.
+
+#### Yang TIDAK diklaim
+
+- Tidak ada yang menjalankan `Experiment1View` di Linux. Yang terbukti adalah
+  fungsi pembentuk berkasnya benar **dan** view memanggilnya — bukan bahwa
+  lembar berbagi di iPhone menghasilkan berkas yang bisa dibuka.
+- Pesan galat itu sendiri tidak diubah isinya; yang berubah hanya caranya
+  ditulis sebagai JSON.
+- `JSONSerialization` dipilih karena hanya satu pasangan kunci–nilai yang
+  ditulis. Yang dijaga bukan pilihan API-nya, melainkan tidak adanya jalur yang
+  menggabung string.
+
 ### Siklus (22 Okt 2026 — Aturan 89: alat sapuan akhirnya mengukur seluruh gerbang, dan sambungan sensor-hilang ditutup)
 
 Siklus ini dimulai bukan dari UI, melainkan dari **alat yang memutuskan apa
