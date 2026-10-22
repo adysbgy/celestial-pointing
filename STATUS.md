@@ -33643,3 +33643,93 @@ ini **tidak lagi** mencetak peringatan `CFBundleVersion ... (null)`;
 `entitlements`, dan tidak menggantikan validasi App Store. Parser YAML-nya
 bukan implementasi lengkap — ia menolak bentuk yang tidak ia pahami, dan
 penolakan itu membuat gerbang merah, bukan hijau.
+
+## Siklus 2026-10-22: complication yang membeku tidak pernah menua (Aturan 99)
+
+**Cacat yang diukur, bukan disangka.** Complication watchOS punya lapisan basi
+yang dibangun selama beberapa siklus dan seluruhnya diuji di Linux:
+`ComplicationDigest.isStale(at:)`, `confirmsIdentityNow(at:)`,
+`sublineContent(at:)`, `presentedSymbolName(at:)`. Semuanya menerima `now`
+sebagai parameter — dan justru itulah yang membuatnya *terlihat* benar: seolah
+complication memang dievaluasi ulang seiring waktu.
+
+Ia tidak. `ComplicationProvider.getTimeline` memakai
+
+    Timeline(entries: [entry], policy: .never)
+
+dan `.never` berarti watchOS **tidak pernah** meminta entri baru kecuali app
+memanggil `reloadAllTimelines()`. App hanya memanggilnya saat tanda tangan
+snapshot berubah (`PointingEngine.recordComplicationIfChanged`). Cuplikan yang
+menua tidak mengubah tanda tangan apa pun — jadi begitu pergelangan berhenti
+bergerak (tepat kasus yang membuat cuplikan basi), tidak ada tulisan baru,
+tidak ada reload, dan tidak ada render baru. `Date()` di dalam view dievaluasi
+sekali, pada detik digest ditulis, ketika umurnya nol.
+
+Akibatnya di pergelangan: 90 menit kemudian masih tampil `checkmark.circle.fill`
+beserta nama objek, sementara app di layar yang sama sudah memberi tahu bahwa
+itu sisa pandangan lama. Seluruh lapisan basi itu **jalur mati** — bukan salah
+hitung, tapi tidak pernah dipanggil. Persis kelas cacat yang dikejar repo ini,
+dan satu-satunya kelas yang tidak bisa dijangkau uji mana pun: WidgetKit tidak
+ada di Linux, jadi `getTimeline` mustahil dipanggil dari `swift-test.sh`.
+
+**Kenapa semua gerbang hijau.** 98 aturan UI hijau, 128 gerbang piksel hijau,
+1095 uji PointingKit hijau. Aturan 9 menuntut **ada** pemanggil
+`reloadAllTimelines` di `Apps/` — syarat itu terpenuhi, dan justru itu yang
+menutupi cacatnya: reload memang ada, hanya tidak pernah dipicu oleh cuplikan
+yang menua.
+
+**Perbaikan: satu tanggal, bukan penyegaran berkala.** Umur digest hanya
+berubah maknanya sekali — saat melewati ambang klaim. Menyegarkan tiap menit
+berarti membangunkan widget 60×/jam untuk menggambar hal yang sama. Keputusan
+"kapan" adalah pertanyaan murni atas dua waktu, jadi ia tinggal di model
+sebagai `ComplicationDigest.nextRefreshDate(after:)` dan diuji di Linux; view
+hanya menerjemahkannya ke `TimelineReloadPolicy.after(_:)`.
+
+Satu detik kelonggaran (`staleRefreshGrace`) di atas ambang, dan itu bukan
+pilihan rasa: `isStale` memakai `>` yang ketat, jadi penyegaran yang mendarat
+**tepat** di `updatedAt + maximumClaimedAge` masih membaca dirinya segar —
+watchOS menggambar centang hijau sekali lagi, jadwal berikutnya `nil`, dan
+penandanya tetap tidak pernah muncul. Penyegaran satu detik terlalu awal sama
+saja dengan tidak ada penyegaran. Uji
+`testRefreshDateLandsOnTheStaleSideOfTheThreshold` menguji tepat itu: bukan
+"ada tanggal", melainkan "tanggal itu benar-benar membuat penandanya muncul".
+
+`nil` untuk yang sudah basi dan yang tak punya jawaban: penanda sudah
+tergambar, dan membangunkan widget untuk menggambar hal yang sama hanya
+membuang baterai.
+
+**Gerbang Aturan 99, dan kelemahan yang ditemukan harnessnya sendiri.** Bentuk
+gerbangnya: timeline provider yang membaca `ComplicationDigest` wajib memakai
+`.after(...)` yang argumennya **terikat** dari `nextRefreshDate(after:)`.
+Versi pertama hanya mencari keberadaan nama `.after(` — dan harness mutasi
+langsung membuktikan itu tidak cukup: `.after(now)` lolos, padahal itu bentuk
+paling berbahaya dari kelas ini (jadwal yang selalu sudah lewat ⇒ WidgetKit
+meminta entri terus-menerus, baterai habis, penanda basi tetap tidak muncul).
+Versi kedua hanya mencocokkan `.after(<nama sederhana>)`, sehingga
+`.after(angka tetap)` tidak pernah diperiksa sama sekali. Yang benar adalah
+memeriksa **asal nilai**, bukan keberadaan pemanggilan.
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-aturan99-complication-menyegar.py`,
+6 keadaan, 0 tidak sesuai; menyunting `ComplicationWidget.swift` sungguhan lalu
+memulihkannya byte-per-byte):
+
+    OK   [baseline] pohon apa adanya                              exit=0
+    OK   1. kembali ke `policy: .never` (bentuk aslinya)          exit=1
+    OK   2. `.after` dengan angka tetap, bukan umur cuplikan      exit=1
+    OK   3. `.after(now)` — menyegar terus-menerus                exit=1
+    OK   4. aksesor hanya disebut di komentar                     exit=1
+    OK   5. aksesor dipakai sebagai syarat, bukan sebagai tanggal exit=1
+
+Harness terdaftar di `engine-tests.yml`. Dua keadaan yang semula saya tulis
+sebagai "harus merah" ternyata **salah harapan**, dan itu dicatat di sini
+karena bentuknya berulang: `?? .distantFuture` ternyata **tidak** berbahaya
+(digest yang sudah basi memang sudah menampilkan penandanya, jadi menjadwalkan
+penyegaran untuknya hanya membuang baterai — bukan cacat kejujuran), dan
+"kontrol negatif" yang identik dengan baseline tidak menguji apa pun. Keduanya
+diganti dengan keadaan yang benar-benar berbeda.
+
+**Yang TIDAK diklaim.** Aturan 99 menjaga bentuk sumbernya, bukan perilaku
+WidgetKit sungguhan — watchOS tetap bisa menunda atau menggabungkan penyegaran,
+dan itu di luar kendali app. Ia juga tidak memeriksa keluarga complication mana
+yang menampilkan penanda (itu sudah dijaga uji model), dan tidak menjamin
+`reloadAllTimelines()` dipanggil pada setiap transisi (itu Aturan 9).
