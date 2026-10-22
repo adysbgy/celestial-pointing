@@ -88,19 +88,25 @@ def run_probe():
     return ("hijau" if verdicts == {"OK"} else None), lines
 
 
-def starfield_icon_from_history():
-    """Ikon starfield pra-perbaikan dari riwayat, atau None bila tidak ada.
+def previous_icon_from_history(current):
+    """Byte ikon pada versi **sebelum** ikon yang sekarang, atau None.
 
-    Dicari beberapa kedalaman karena jarak commit perbaikan bergantung pada
-    bagaimana riwayat ini di-*squash*. Yang dicari bukan commit tertentu,
-    melainkan **isi**: ikon yang massa terangnya rendah. Bila riwayat tidak
-    memuatnya, kembalikan None — dan pemanggil wajib melewati, bukan mengarang.
+    **Kenapa "berbeda dari sekarang", bukan "commit ke-N".** Versi pertama
+    fungsi ini mengambil PNG pertama yang ditemukan menelusuri `HEAD~1`,
+    `HEAD~2`, …; setelah perbaikan ikon di-commit, `HEAD~1` **adalah** ikon
+    baru, jadi keadaan 1 mengukur ikon yang sama dengan baseline dan harness
+    melaporkan "diharapkan merah, terukur hijau". Gejalanya menyesatkan: ia
+    tampak seperti gerbangnya yang terlalu longgar, padahal yang salah adalah
+    bahan ujinya.
 
-    **Kenapa `subprocess` langsung, bukan `mutasi_sumber._git`.** Helper itu
-    memakai `text=True`, jadi PNG dikembalikan sebagai `str` hasil dekode
-    UTF-8 — byte 0x89 dan seterusnya rusak atau melempar. Ikon adalah data
-    biner; membacanya lewat jalur teks akan menghasilkan "berkas tidak ada"
-    yang menyesatkan.
+    **Kenapa bukan "cari yang massa terangnya rendah".** Itu memilih bahan
+    uji memakai **metrik yang sedang diuji**, jadi keadaannya lolos secara
+    lingkar: gerbang selalu menemukan contoh yang pasti merah. Yang dipakai
+    di sini adalah definisi yang tidak bergantung pada metrik — versi
+    sebelumnya yang isinya berbeda.
+
+    `subprocess` langsung, bukan `mutasi_sumber._git`: helper itu memakai
+    `text=True`, dan PNG lewat jalur teks rusak atau melempar.
     """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for depth in range(1, 12):
@@ -112,6 +118,8 @@ def starfield_icon_from_history():
             continue
         if not proc.stdout.startswith(b"\x89PNG"):
             continue
+        if proc.stdout == current:
+            continue          # commit yang tidak mengubah ikon
         return ref, proc.stdout
     return None
 
@@ -147,10 +155,10 @@ def main():
     states: list[tuple[str, bytes, str, str | None]] = [
         ("[baseline] ikon yang dikirim", original_icon, "hijau", None)]
 
-    found = starfield_icon_from_history()
+    found = previous_icon_from_history(original_icon)
     if found is None:
-        print("CATATAN: ikon starfield pra-perbaikan tidak ditemukan di 11 "
-              "commit terakhir — arah kedua DILEWATI dengan alasan, bukan "
+        print("CATATAN: ikon versi sebelumnya tidak ditemukan di 11 commit "
+              "terakhir — arah kedua DILEWATI dengan alasan, bukan "
               "dilaporkan hijau.")
     else:
         ref, old = found
