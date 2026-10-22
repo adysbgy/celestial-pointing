@@ -14860,6 +14860,34 @@ else
 fi
 
 
+echo "== Aturan 95: animasi 'muncul' menggerakkan kedua propertinya =="
+# Aturan 7 memeriksa bahwa penjaga reduce-motion **ada**; tidak ada satu pun
+# aturan yang memeriksa apakah geraknya menggerakkan sesuatu. Kedua app
+# memegang `appearOpacity` yang lahir `= 1` dan ditulis `= 1` lagi di dalam
+# `withAnimation` — dua ujung yang sama, jadi `.opacity` tidak pernah bergerak
+# dan yang tersisa hanya pembesaran. Compiler diam, Aturan 7 hijau, teks di
+# layar tidak berubah, dan harness mutasi gerak hanya memutasi `appearScale`.
+# Logikanya di `Tools/`, bukan di-inline, karena alasan yang sama dengan
+# Aturan 84-94 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan95-pop-opasitas.py" ]; then
+  echo "FAIL Tools/check-aturan95-pop-opasitas.py tidak ada: Aturan 95"
+  echo "     tidak mengukur apa pun, dan animasi muncul bisa kembali menjadi"
+  echo "     gerak yang tidak menggerakkan satu piksel tanpa satu pun galat."
+  status=1
+else
+  pop_opasitas=$(python3 Tools/check-aturan95-pop-opasitas.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$pop_opasitas"
+    echo "-> Nilai diam dan nilai puncak opasitas wajib berbeda dan berurutan,"
+    echo "   keduanya dari MotionPolicy.LockArrival. Perbaiki kodenya, jangan"
+    echo "   longgarkan aturannya."
+    status=1
+  else
+    echo "$pop_opasitas"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

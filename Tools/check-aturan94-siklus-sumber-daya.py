@@ -45,12 +45,25 @@ Karena itu yang diukur sekarang adalah **penerima** panggilan, bukan namanya:
   2. Tipe itu wajib punya metode pelepasan yang memuat pola pelepasan.
   3. Ada properti bertipe itu? (`private let audioCue = AudioCueEngine()` →
      `audioCue`.)
-  4. `audioCue.stop()` wajib muncul di berkas **lain**, atau pelepasannya
-     dipanggil dari `deinit` milik tipe itu.
+  4. `audioCue.stop()` wajib dipanggil di **setiap berkas yang membuat**
+     instance itu, atau pelepasannya dipanggil dari `deinit` milik tipe itu.
 
 Langkah [4] tidak bisa dipenuhi `motion.stop()`: penerimanya `motion`, bukan
 `audioCue`. Itu satu-satunya perbedaan antara gerbang yang mengukur dan gerbang
 yang kebetulan hijau.
+
+Langkah [4] juga **per-berkas-pemilik**, bukan "di mana pun di pohon". Versi
+kedua menerima satu panggilan di berkas mana saja, dan itu tetap buta: kedua
+app mendeklarasikan `private let audioCue = AudioCueEngine()` dengan nama yang
+sama, jadi menghapus pelepasan dari app jam tetap hijau karena app iPhone
+memanggilnya. Satu panggilan dipakai sebagai bukti untuk dua pemilik.
+
+Langkah [3] membedakan **pemilik** dari **peminjam**. `@ObservedObject var
+motion: MotionLogger` adalah dependensi yang disuntikkan: `PointingView` tidak
+membuatnya, dan kalau ia memanggil `motion.stop()` sensornya mati untuk app jam
+seluruhnya. Hanya berkas yang **membuat** instance (`= AudioCueEngine()`) yang
+dituntut melepasnya. Tanpa pemisahan ini aturan berbunyi pada pohon yang benar
+— tiga temuan palsu pada `PointingView` dan `CalibrationView`.
 
 Batasnya jujur. Ini sapuan **teks**, bukan analisis aliran kendali. Ia tidak
 membuktikan `stop()` benar-benar dieksekusi watchOS, tidak memeriksa urutan

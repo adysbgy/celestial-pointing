@@ -82,4 +82,58 @@ final class LockArrivalMotionTests: XCTestCase {
         XCTAssertGreaterThan(MotionPolicy.LockArrival.responseSeconds, 0)
         XCTAssertLessThan(MotionPolicy.LockArrival.responseSeconds, 1)
     }
+
+    // MARK: - Opasitas pop (fade yang dulu tidak pernah terjadi)
+
+    /// Kedua ujung pop opasitas wajib **berbeda**, kalau tidak tidak ada fade.
+    ///
+    /// **Cacat yang ditutup uji ini.** Kedua app memegang
+    /// `@State private var appearOpacity: Double = 1` dan menulis
+    /// `appearOpacity = 1` di dalam `withAnimation` — animasi yang kedua
+    /// ujungnya sama persis. `.opacity(appearOpacity)` karena itu selalu 1,
+    /// dan yang tersisa hanya `scaleEffect`: kartu membesar tanpa memudar.
+    /// Docstring di kedua view menjanjikan "memudar + membesar", jadi
+    /// dokumentasinya benar-benar menggambarkan perilaku yang tidak ada.
+    ///
+    /// Kenapa tidak ada gerbang yang menangkapnya: harness mutasi gerak
+    /// (`bukti-mutasi-gerak-angka.py`) hanya memutasi `appearScale`, dan
+    /// `swift-ui-lint.sh` tidak punya aturan yang membaca opasitas. Angka
+    /// yang tidak pernah diperiksa adalah angka yang boleh berarti apa saja.
+    func testPopActuallyMovesOpacity() {
+        XCTAssertTrue(MotionPolicy.LockArrival.popMovesOpacity,
+                      "peakOpacity == settledOpacity berarti withAnimation "
+                      + "berjalan tanpa menggerakkan satu piksel")
+        XCTAssertLessThan(MotionPolicy.LockArrival.peakOpacity,
+                          MotionPolicy.LockArrival.settledOpacity)
+    }
+
+    /// Kartu yang sudah tenang wajib pekat penuh.
+    ///
+    /// Nilai akhir selain 1 meninggalkan kartu yang pernah terkunci lebih
+    /// transparan daripada kartu yang tidak pernah — cacat yang sama bentuknya
+    /// dengan `settledScale != 1`, dan sama tidak terbacanya dari teks.
+    func testSettledOpacityIsExactlyOne() {
+        XCTAssertEqual(MotionPolicy.LockArrival.settledOpacity, 1)
+    }
+
+    /// Opasitas puncak harus di dalam 0…1: ia opasitas, bukan angka bebas.
+    ///
+    /// Nilai di atas 1 dijepit diam-diam oleh Core Animation, jadi angkanya
+    /// akan "bekerja" sambil berarti sesuatu yang lain — dan
+    /// `popMovesOpacity` tetap benar. Yang diuji di sini adalah bahwa angka
+    /// itu sah sebagai opasitas.
+    func testPeakOpacityIsAValidOpacity() {
+        XCTAssertGreaterThanOrEqual(MotionPolicy.LockArrival.peakOpacity, 0)
+        XCTAssertLessThanOrEqual(MotionPolicy.LockArrival.peakOpacity, 1)
+    }
+
+    /// Ringkasannya sepakat dengan kedua angkanya — sama seperti
+    /// `settlesBackToRest`, supaya penanda tidak bisa berbohong sendirian.
+    func testPopMovesOpacityAgreesWithTheNumbers() {
+        XCTAssertEqual(
+            MotionPolicy.LockArrival.popMovesOpacity,
+            MotionPolicy.LockArrival.peakOpacity
+                < MotionPolicy.LockArrival.settledOpacity
+                && MotionPolicy.LockArrival.peakOpacity >= 0)
+    }
 }

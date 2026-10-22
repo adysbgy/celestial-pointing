@@ -881,7 +881,17 @@ struct DiagnosticsView: View {
         }
 
         @State private var appearScale: CGFloat = 1
-        @State private var appearOpacity: Double = 1
+        /// Opasitas pop. Nilai diamnya `settledOpacity` dari model — lihat
+        /// `MotionPolicy.LockArrival.peakOpacity` untuk alasan kenapa bentuknya
+        /// "puncak lalu tenang", bukan "nol lalu penuh": yang kedua tidak
+        /// beranimasi sama sekali karena kedua penulisannya menyatu sebelum
+        /// render berikutnya.
+        ///
+        /// Dulu baris ini `= 1` dan animasinya menulis `= 1` lagi, jadi
+        /// `.opacity` tidak pernah bergerak. Panel iPhone dan kartu jam
+        /// punya cacat yang sama persis; keduanya diperbaiki bersama supaya
+        /// tidak bisa berbeda pendapat.
+        @State private var appearOpacity: Double = MotionPolicy.LockArrival.settledOpacity
         /// Pengguna meminta reduksi gerak: pop dimatikan, dan `TimelineView`
         /// denyut ikut berhenti (lihat `MotionPolicy` di `PointingKit`).
         ///
@@ -946,12 +956,13 @@ struct DiagnosticsView: View {
                 withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
                                       dampingFraction: MotionPolicy.LockArrival.dampingFraction)) {
                     appearScale = MotionPolicy.LockArrival.peakScale
-                    appearOpacity = 1
+                    appearOpacity = MotionPolicy.LockArrival.peakOpacity
                 }
                 withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
                                       dampingFraction: MotionPolicy.LockArrival.dampingFraction)
                                 .delay(MotionPolicy.LockArrival.settleDelaySeconds)) {
                     appearScale = MotionPolicy.LockArrival.settledScale
+                    appearOpacity = MotionPolicy.LockArrival.settledOpacity
                 }
             }
             // Hanya bagian **atas** panel yang digabung, bukan seluruhnya.

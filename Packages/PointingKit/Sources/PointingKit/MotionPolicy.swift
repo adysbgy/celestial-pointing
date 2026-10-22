@@ -184,6 +184,44 @@ public struct MotionPolicy: Equatable, Sendable {
         /// Jeda sebelum tahap kedua mulai, detik.
         public static let settleDelaySeconds: Double = 0.08
 
+        /// Opasitas **puncak** pop — sedikit di bawah 1, jadi kartu tampak
+        /// "terwujud" lalu penuh.
+        ///
+        /// **Kenapa bukan fade dari nol, dan kenapa ini bukan angka pilihan.**
+        /// Bentuk yang paling wajar ditulis — `appearOpacity = 0` lalu
+        /// `withAnimation { appearOpacity = 1 }` — **tidak beranimasi sama
+        /// sekali** di SwiftUI: kedua penulisan terjadi sebelum render
+        /// berikutnya, jadi nilai yang dilihat sistem sudah 1 sejak awal dan
+        /// tidak ada perubahan untuk dianimasikan. Itu jebakan yang tidak
+        /// berbunyi di mana pun; yang terlihat hanya kartu yang muncul
+        /// mendadak, persis seperti tidak ada animasi.
+        ///
+        /// Bentuk yang **pasti** beranimasi adalah yang dipakai `appearScale`:
+        /// mulai dari keadaan diam, bergerak ke nilai puncak yang **berbeda**,
+        /// lalu kembali ke keadaan diam. Karena itu opasitas di sini adalah
+        /// puncak, bukan titik awal: ia harus berbeda dari `settledOpacity`
+        /// supaya ada yang digerakkan.
+        public static let peakOpacity: Double = 0.72
+
+        /// Opasitas akhir: kartu yang sudah tenang wajib pekat penuh.
+        ///
+        /// Sama alasannya dengan `settledScale`: nilai selain 1 meninggalkan
+        /// kartu yang pernah terkunci lebih transparan daripada kartu yang
+        /// tidak pernah, dan itu tidak terbaca dari teks mana pun.
+        public static let settledOpacity: Double = 1
+
+        /// Apakah pop opasitas benar-benar menggerakkan sesuatu.
+        ///
+        /// Ditulis sebagai fungsi supaya bisa diuji, dengan alasan yang sama
+        /// seperti `settlesBackToRest`: `peakOpacity == settledOpacity`
+        /// membuat `withAnimation` berjalan tanpa mengubah satu piksel.
+        /// Nilai ini juga menutup cacat yang sudah nyata: kedua app dulu
+        /// menulis `appearOpacity = 1` pada keadaan yang juga bernilai 1,
+        /// sehingga docstring "memudar + membesar" hanya benar separuhnya.
+        public static var popMovesOpacity: Bool {
+            peakOpacity < settledOpacity && peakOpacity >= 0
+        }
+
         /// Apakah tahap kedua benar-benar mengembalikan skala ke keadaan diam.
         ///
         /// Ditulis sebagai fungsi supaya bisa diuji: nilai `peakScale` yang

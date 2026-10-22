@@ -463,7 +463,18 @@ struct ObjectDetailView: View {
     /// "dirayakan" kembali tepat saat jawabannya tidak lagi berlaku — justru
     /// yang dilarang PRD.
     @State private var appearScale: CGFloat = 1
-    @State private var appearOpacity: Double = 1
+    /// Opasitas pop. Nilai diamnya `settledOpacity` dari model.
+    ///
+    /// Versi sebelumnya memulai di `1` dan di dalam `withAnimation` menulis
+    /// `appearOpacity = 1` — kedua ujungnya sama, jadi `.opacity` tidak pernah
+    /// bergerak dan yang tersisa hanya `scaleEffect`. Komentar di bawah sudah
+    /// menjanjikan "memudar + membesar"; sekarang fade-nya benar-benar ada,
+    /// dan kedua ujungnya tinggal di `MotionPolicy.LockArrival` supaya bisa
+    /// diuji di Linux (`testPopActuallyMovesOpacity`).
+    ///
+    /// Nilai diamnya tetap **1**: kartu yang tidak pernah beranimasi harus
+    /// tampil persis sama dengan kartu yang sudah tenang.
+    @State private var appearOpacity: Double = MotionPolicy.LockArrival.settledOpacity
 
     /// Pengguna meminta reduksi gerak.
     ///
@@ -696,15 +707,23 @@ struct ObjectDetailView: View {
             // bukan ditulis di sini: pasangan yang sama dulu ditulis ulang di
             // `DiagnosticsView` (iPhone), dan dua salinan tidak bisa saling
             // melihat — `Apps/` tidak pernah dibangun di Linux.
+            // **Opasitas ikut bergerak, bukan ditulis ke nilai yang sama.**
+            // Dulu baris ini `appearOpacity = 1` pada keadaan yang juga
+            // bernilai 1 — animasi tanpa gerak, sehingga yang terlihat hanya
+            // `scaleEffect` dan docstring "memudar + membesar" hanya benar
+            // separuhnya. Sekarang ia memakai bentuk yang sama dengan skala:
+            // ke nilai puncak yang **berbeda** (dari model), lalu kembali ke
+            // keadaan diam di tahap kedua.
             withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
                                   dampingFraction: MotionPolicy.LockArrival.dampingFraction)) {
                 appearScale = MotionPolicy.LockArrival.peakScale
-                appearOpacity = 1
+                appearOpacity = MotionPolicy.LockArrival.peakOpacity
             }
             withAnimation(.spring(response: MotionPolicy.LockArrival.responseSeconds,
                                   dampingFraction: MotionPolicy.LockArrival.dampingFraction)
                             .delay(MotionPolicy.LockArrival.settleDelaySeconds)) {
                 appearScale = MotionPolicy.LockArrival.settledScale
+                appearOpacity = MotionPolicy.LockArrival.settledOpacity
             }
         }
         // Saat jam kembali aktif, jam denyut di-set ulang **sekali** — lihat
