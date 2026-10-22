@@ -52,12 +52,19 @@ final class NameOverflowTests: XCTestCase {
 
     // MARK: - Cacat yang diukur: nama muat di bawaan, terpotong di AX
 
-    /// **Cacat inti.** Pada kolom kartu jam (96 pt, 2 baris, lantai 0.6) nama
-    /// terpanjang muat pada ukuran bawaan tetapi **tidak** muat mulai AX1.
+    /// **Cacat inti.** Pada kolom 96 pt (lebar yang **dulu** dipakai kartu jam;
+    /// kartu sesungguhnya 92 pt — lihat
+    /// `testCardColumnWidthsSubtractTheScrollViewInset`), 2 baris, lantai 0.6,
+    /// nama terpanjang muat pada ukuran bawaan tetapi **tidak** muat mulai AX1.
     ///
     /// Ini bukan dugaan: 233.22 / (96 × 2) = 1.215 > 1.0 pada skala bawaan,
     /// lalu pada AX1 (1.64×) menjadi 233.22 × 1.64 / 192 = 1.993 — jauh di atas
     /// 1.0, jadi `.minimumScaleFactor(0.6)` tidak bisa menyelamatkannya.
+    ///
+    /// Uji ini sengaja memakai 96, bukan konstanta kartu: ia menguji
+    /// **aritmetika** `NameOverflow`, dan angka bulat membuat tabelnya bisa
+    /// diperiksa dengan tangan. Klaim tentang kartu sesungguhnya ada di uji
+    /// terpisah, yang memakai `ObjectCardLayout`.
     func testWidestNameTruncatesAtAccessibilitySizes() {
         let fit = NameOverflow.fit(widthAtDefault: Self.widestNameWidth,
                                    columnWidth: 96, lineLimit: 2, floor: 0.6)
@@ -127,9 +134,9 @@ final class NameOverflowTests: XCTestCase {
         XCTAssertGreaterThan(moreLines.requiredScaleAtDefault, base.requiredScaleAtDefault,
                              "tiga baris memberi ruang susut lebih banyak daripada dua")
 
-        // Kolom penuh kartu (142 pt) baru cukup sampai AX2 — inilah dasar
-        // keputusan tata letak di view: pada ukuran aksesibilitas, visual
-        // dipindah ke atas teks supaya kolomnya melebar.
+        // Kolom penuh kartu (142 pt, lebar susunan versi lama) baru cukup sampai
+        // AX2 — inilah dasar keputusan tata letak di view: pada ukuran
+        // aksesibilitas, visual dipindah ke atas teks supaya kolomnya melebar.
         XCTAssertEqual(wider.largestFittingSize, .accessibility2)
         XCTAssertEqual(base.largestFittingSize, .xxxLarge)
     }
@@ -189,37 +196,44 @@ final class NameOverflowTests: XCTestCase {
 
     /// **Cacat yang ditutup.** Pada ukuran bawaan kartu tetap samping-sebelah
     /// (gambar di kiri, nama di kanan) — tata letak yang sudah dipoles dan tidak
-    /// boleh berubah demi orang yang memakai huruf normal. Mulai AX1 nama pindah
-    /// ke lebar penuh.
+    /// boleh berubah demi orang yang memakai huruf normal. Mulai `xxxLarge` nama
+    /// pindah ke lebar penuh.
     func testCardStacksTheNameExactlyWhenSideBySideWouldTruncate() {
         XCTAssertFalse(ObjectCardLayout.stacksName(scale: 1.0),
                        "pada ukuran bawaan nama muat di samping gambar; "
                        + "menyusun ulang di sini hanya membuang ruang")
         XCTAssertFalse(ObjectCardLayout.stacksName(scale: 1.23),   // xxLarge
                        "xxLarge masih muat")
-        XCTAssertTrue(ObjectCardLayout.stacksName(scale: 1.64),    // AX1
-                      "AX1 adalah ukuran pertama yang terpotong di kolom 96 pt")
+        XCTAssertTrue(ObjectCardLayout.stacksName(scale: 1.35),    // xxxLarge
+                      "xxxLarge adalah ukuran pertama yang terpotong di kolom 92 pt")
         XCTAssertTrue(ObjectCardLayout.stacksName(scale: 3.12))    // AX5
     }
 
     /// Ambang susun-ulang harus **tepat** di titik gagal, bukan di dekatnya:
     /// menyusun terlalu dini membuang ruang, terlalu lambat memotong nama.
+    ///
+    /// **Titik gagalnya `xxxLarge`, bukan `AX1`.** Angka lama (96 pt) berasal
+    /// dari kartu 162 pt yang tidak pernah ada — kartu duduk di dalam
+    /// `ScrollView` ber-`padding` 2, jadi 92 pt. Di lebar sesungguhnya nama
+    /// terlebar sudah terpotong pada `xxxLarge` (butuh susut 0.5844, lantai
+    /// 0.6), jadi menyusun ulang harus terjadi **di sana**. Lihat
+    /// `testCardColumnWidthsSubtractTheScrollViewInset` untuk aritmetikanya.
     func testStackThresholdMatchesTheMeasuredFailurePoint() {
         let firstFail = NameOverflow.firstFailingSize(
             widthAtDefault: ObjectCardLayout.nameWidthReference,
             columnWidth: ObjectCardLayout.sideBySideNameColumn,
             lineLimit: ObjectCardLayout.nameLineLimit,
             floor: ObjectCardLayout.nameScaleFloor)
-        XCTAssertEqual(firstFail, .accessibility1)
+        XCTAssertEqual(firstFail, .xxxLarge)
 
-        let failScale = ObjectCardLayout.scale(for: .accessibility1)
+        let failScale = ObjectCardLayout.scale(for: .xxxLarge)
         XCTAssertTrue(ObjectCardLayout.stacksName(scale: failScale),
                       "pada ukuran yang gagal, kartu harus menyusun ulang")
 
         // Satu langkah di bawah titik gagal: masih muat, jadi belum menyusun.
-        let belowScale = ObjectCardLayout.scale(for: .xxxLarge)
+        let belowScale = ObjectCardLayout.scale(for: .xxLarge)
         XCTAssertFalse(ObjectCardLayout.stacksName(scale: belowScale),
-                       "xxxLarge masih muat — menyusun ulang di sini terlalu dini")
+                       "xxLarge masih muat — menyusun ulang di sini terlalu dini")
     }
 
     /// Kolom lebar-penuh harus benar-benar lebih lega; kalau tidak, menyusun
@@ -243,26 +257,66 @@ final class NameOverflowTests: XCTestCase {
         // Dan tata letak samping-sebelah yang dihitung di sini harus sama dengan
         // angka yang dipakai Aturan 76 — kalau keduanya menyimpang, view dan
         // gerbangnya membicarakan kartu yang berbeda.
-        XCTAssertEqual(ObjectCardLayout.sideBySideNameColumn, 96)
+        XCTAssertEqual(ObjectCardLayout.sideBySideNameColumn, 92)
         XCTAssertEqual(ObjectCardLayout.nameScaleFloor, 0.6)
         XCTAssertEqual(ObjectCardLayout.nameWidthReference, Self.widestNameWidth,
                        "lebar acuan di PointingKit dan di tes harus angka yang sama")
     }
 
+    /// **Cacat yang membuat uji ini ada.** `sideBySideNameColumn` dan
+    /// `stackedNameColumn` dihitung dari kartu **162 pt** — lebar layar jam
+    /// 45 mm. Tetapi kartu itu tidak pernah selebar 162 pt: ia duduk di dalam
+    /// `ScrollView` yang memasang `.padding(.horizontal, 2)`
+    /// (`PointingView.swift:147`), jadi lebar nyatanya **158 pt**. Konstanta
+    /// ketiga di berkas yang sama, `calibrationNameColumn`, sudah mengurangi
+    /// inset itu (`162 − 4 − …`), jadi ini bukan perbedaan pendapat tentang
+    /// layar — ia satu konstanta yang lupa satu suku.
+    ///
+    /// Selisih 4 pt itu **mengubah keputusan**, bukan hanya angka di docstring.
+    /// Pada `xxxLarge` (1.35×), nama terlebar butuh susut 0.6098 di kolom 96 pt
+    /// (muat, di atas lantai 0.6) tetapi 0.5844 di kolom 92 pt (terpotong).
+    /// Artinya kartu yang memakai angka 96 **tidak** menyusun ulang di
+    /// xxxLarge, padahal di lebar sesungguhnya nama sudah terpotong di sana.
+    func testCardColumnWidthsSubtractTheScrollViewInset() {
+        // Layar jam 45 mm, padding horizontal `ScrollView` 2×2, padding kartu
+        // 10×2, gambar 38, dan jarak 8.
+        let screen: Double = 162
+        let scrollInset: Double = 2
+        let cardPadding: Double = 10
+        let visual: Double = 38
+        let gap: Double = 8
+
+        let cardWidth = screen - 2 * scrollInset
+        XCTAssertEqual(cardWidth, 158, "kartu tidak pernah selebar layar")
+
+        let contentWidth = cardWidth - 2 * cardPadding
+        XCTAssertEqual(ObjectCardLayout.stackedNameColumn, contentWidth,
+                       "kolom susunan = lebar isi kartu, bukan 162 − 20")
+        XCTAssertEqual(ObjectCardLayout.sideBySideNameColumn,
+                       contentWidth - visual - gap,
+                       "kolom samping = lebar isi − gambar − jarak")
+
+        // Dan selisihnya harus mengubah ambang, bukan sekadar angkanya:
+        // xxxLarge muat di kolom 96 tetapi TIDAK muat di lebar sesungguhnya.
+        XCTAssertTrue(ObjectCardLayout.stacksName(at: .xxxLarge),
+                      "di lebar kartu sesungguhnya, xxxLarge sudah harus menyusun ulang")
+    }
+
     /// AX3 adalah titik tengah rentang aksesibilitas, dan lebar saja **tidak**
-    /// menyelamatkannya: kolom susunan 142 pt hanya memuat sampai AX2.
+    /// menyelamatkannya: kolom susunan hanya memuat sampai AX2.
     ///
     /// Inilah alasan `nameLineLimit(at:)` ada. Tanpa baris yang ikut tumbuh,
-    /// "menyusun ulang" hanya menunda kegagalan dari AX1 ke AX3 — kartu yang
-    /// terlihat lebih rapi di AX1/AX2, lalu memotong nama lagi tepat di ukuran
-    /// yang dipilih orang yang paling butuh huruf besar.
+    /// "menyusun ulang" hanya menunda kegagalan dari xxxLarge ke AX3 — kartu yang
+    /// terlihat lebih rapi di xxxLarge/AX1/AX2, lalu memotong nama lagi tepat di
+    /// ukuran yang dipilih orang yang paling butuh huruf besar.
     func testGrowingLineLimitIsWhatSavesTheMidAccessibilitySizes() {
-        // Lebar saja: 142 pt memuat AX2, gagal di AX3.
+        // Lebar saja: 138 pt memuat AX2, gagal di AX3.
         XCTAssertEqual(NameOverflow.firstFailingSize(widthAtDefault: Self.widestNameWidth,
-                                                     columnWidth: 142, lineLimit: 2,
+                                                     columnWidth: ObjectCardLayout.stackedNameColumn,
+                                                     lineLimit: 2,
                                                      floor: 0.6),
                        .accessibility3,
-                       "kolom 142 pt dengan 2 baris gagal mulai AX3")
+                       "kolom susunan dengan 2 baris gagal mulai AX3")
 
         // Baris yang ikut tumbuh: setiap ukuran muat.
         for size in NameOverflow.TextSize.allCases {

@@ -6,22 +6,24 @@ import Foundation
 /// **Cacat yang membuat berkas ini ada.** `swift-ui-lint.sh` Aturan 76 menjaga
 /// bahwa setiap `Text(nama)` punya `.lineLimit`/`.minimumScaleFactor`. Ia
 /// mengukur satu hal dengan benar: pada skala teks **bawaan** (title3 = 20 pt),
-/// "Galaksi Kincir Angin" terukur 226.58 pt di kolom 96 pt kartu jam, jadi nama
-/// butuh 2 baris pada skala 0.847 — di atas lantai 0.6, jadi terbaca utuh.
+/// nama terlebar katalog ("Gugus Sarang Lebah") terukur 233.22 pt di kolom
+/// 92 pt kartu jam, jadi nama butuh susut 0.789 — di atas lantai 0.6, jadi
+/// terbaca utuh.
 ///
 /// Yang tidak pernah diukur aturan itu: **apa yang terjadi saat hurufnya
-/// membesar.** Angka 0.847 itu adalah hasil bagi pada skala 1.0. Setiap langkah
-/// Dynamic Type mengalikan pembilangnya, penyebutnya tetap 96 pt. Terukur
-/// (DejaVu Sans Bold, kolom 96 pt, 2 baris, lantai 0.6):
+/// membesar.** Angka 0.789 itu adalah hasil bagi pada skala 1.0. Setiap langkah
+/// Dynamic Type mengalikan pembilangnya, penyebutnya tetap 92 pt. Terukur
+/// (DejaVu Sans Bold, kolom 92 pt, 2 baris, lantai 0.6):
 ///
 ///     ukuran        lebar    skala wajib
-///     Large         226.6      0.847   utuh
-///     xxxLarge      305.9      0.628   utuh (tipis)
-///     AX1           371.6      0.517   TERPOTONG
-///     AX5           706.9      0.272   TERPOTONG
+///     Large         233.2      0.789   utuh
+///     xxLarge       286.9      0.641   utuh (tipis)
+///     xxxLarge      314.8      0.584   TERPOTONG
+///     AX1           382.5      0.481   TERPOTONG
+///     AX5           727.6      0.253   TERPOTONG
 ///
-/// Jadi mulai AX1 — ukuran yang justru dipilih orang yang **butuh** huruf
-/// besar — nama objek terpotong elipsis. Yang hilang bukan hiasan: "Gugus
+/// Jadi mulai xxxLarge — dan setiap ukuran aksesibilitas — nama objek terpotong
+/// elipsis. Yang hilang bukan hiasan: "Gugus
 /// Sarang Lebah" menjadi "Gugus Sarang…", dan pada katalog ini beberapa nama
 /// berbagi awalan ("Galaksi Kincir Angin" / "Galaksi Andromeda" / "Galaksi
 /// Triangulum"), sehingga yang terpotong justru **kata pembeda**-nya.
@@ -186,11 +188,11 @@ public enum NameOverflow {
 /// Bagaimana kartu objek menyusun **gambar dan nama** pada satu ukuran teks.
 ///
 /// **Cacat yang membuat ini ada.** Kartu objek di jam menyusun gambar 38 pt dan
-/// teks dalam satu `HStack`, jadi nama selalu mendapat kolom 96 pt. Itu cukup
+/// teks dalam satu `HStack`, jadi nama selalu mendapat kolom 92 pt. Itu cukup
 /// pada ukuran bawaan — dan itulah yang diukur Aturan 76, satu kali, pada 20 pt.
 /// Tetapi Dynamic Type memperbesar huruf tanpa melebarkan kolom, sehingga pada
-/// AX1 nama butuh susut 0.517 sementara lantainya 0.6: nama terpotong elipsis
-/// tepat pada ukuran yang dipilih orang yang butuh huruf besar.
+/// xxxLarge nama butuh susut 0.584 sementara lantainya 0.6: nama terpotong
+/// elipsis tepat di ukuran yang mendahului ukuran aksesibilitas.
 ///
 /// **Kenapa menyusun ulang, bukan mengecilkan lebih jauh.** Lantai
 /// `.minimumScaleFactor(0.6)` ada karena teks di bawah ~60% ukuran dasarnya
@@ -198,7 +200,7 @@ public enum NameOverflow {
 /// muat dengan menurunkan lantai akan mengembalikan cacatnya sebagai huruf yang
 /// tidak terbaca, yang lebih buruk karena tidak terlihat sebagai cacat. Yang
 /// bisa tumbuh adalah **kolomnya**: gambar dipindah ke atas nama, dan nama
-/// mendapat lebar penuh kartu (142 pt).
+/// mendapat lebar penuh kartu (138 pt).
 ///
 /// **Kenapa ambangnya "akan terpotong", bukan daftar ukuran.** Daftar
 /// (`AX1`, `AX2`, …) mengikat keputusan ke nama ukuran, dan nama itu bisa
@@ -208,30 +210,45 @@ public enum NameOverflow {
 /// nama membuat keputusannya selalu mengikuti pengukuran yang sama.
 public enum ObjectCardLayout {
 
-    /// Lebar kolom nama saat gambar di samping teks: kartu 162 pt − padding
-    /// 10×2 − gambar 38 pt − spacing 8 pt.
-    public static let sideBySideNameColumn: Double = 96
+    /// Lebar kolom nama saat gambar di samping teks: lebar kartu 158 pt −
+    /// padding 10×2 − gambar 38 pt − spacing 8 pt.
+    ///
+    /// **Kenapa 158, bukan 162.** Kartu tidak pernah selebar layar jam: ia
+    /// duduk di dalam `ScrollView` yang memasang `.padding(.horizontal, 2)`
+    /// (`PointingView.swift:147`), jadi 162 − 4 = 158. Versi sebelumnya
+    /// memakai 162 dan menghasilkan 96 pt; konstanta ketiga di berkas ini
+    /// (`calibrationNameColumn`) sudah mengurangi inset itu sejak awal, jadi
+    /// yang salah bukan model layarnya melainkan satu suku yang hilang.
+    ///
+    /// Selisih 4 pt itu **memindahkan ambang**, bukan hanya angkanya: pada
+    /// `xxxLarge` nama terlebar butuh susut 0.6098 di kolom 96 (muat) tetapi
+    /// 0.5844 di kolom 92 (terpotong, lantai 0.6). Dengan angka lama kartu
+    /// **tidak** menyusun ulang di xxxLarge padahal di lebar sesungguhnya nama
+    /// sudah terpotong di sana. Dijaga
+    /// `testCardColumnWidthsSubtractTheScrollViewInset`.
+    public static let sideBySideNameColumn: Double = 92
 
-    /// Lebar kolom nama saat gambar di atas teks: kartu 162 pt − padding 10×2.
-    public static let stackedNameColumn: Double = 142
+    /// Lebar kolom nama saat gambar di atas teks: lebar kartu 158 pt −
+    /// padding 10×2. Lihat catatan inset di `sideBySideNameColumn`.
+    public static let stackedNameColumn: Double = 138
 
     public static let nameLineLimit = 2
 
     /// Jumlah baris yang **cukup** untuk nama pada ukuran teks ini.
     ///
     /// **Kenapa baris, bukan hanya lebar.** Menggeser gambar ke atas nama
-    /// (kolom 96 → 142 pt) membeli ruang 48%, tetapi Dynamic Type membesarkan
+    /// (kolom 92 → 138 pt) membeli ruang 50%, tetapi Dynamic Type membesarkan
     /// huruf sampai 212% (AX5 3.12× vs AX2 1.95×). Terukur pada nama terlebar
-    /// (233.22 pt, lantai 0.6, kolom susunan 142 pt):
+    /// (233.22 pt, lantai 0.6, kolom susunan 138 pt):
     ///
-    ///     ukuran   skala   butuh kolom   di kolom 142
-    ///     AX1      1.64      114.7 pt    muat (2 baris)
-    ///     AX2      1.95      136.4 pt    muat (2 baris)
-    ///     AX3      2.31      161.6 pt    TERPOTONG
-    ///     AX5      3.12      218.3 pt    TERPOTONG
+    ///     ukuran   skala   butuh kolom   di kolom 138
+    ///     AX1      1.64      229.5 pt    muat (2 baris)
+    ///     AX2      1.95      272.9 pt    muat (2 baris)
+    ///     AX3      2.31      323.2 pt    TERPOTONG
+    ///     AX5      3.12      436.6 pt    TERPOTONG
     ///
     /// Jadi menyusun ulang saja **tidak cukup** — ia hanya menunda kegagalan
-    /// dari AX1 ke AX3. Yang benar-benar bertambah saat huruf membesar adalah
+    /// dari xxxLarge ke AX3. Yang benar-benar bertambah saat huruf membesar adalah
     /// **tinggi**, bukan lebar: kartu ada di dalam `ScrollView`, jadi baris
     /// tambahan tidak merebut ruang dari apa pun. Menahan `lineLimit` di 2
     /// sambil berharap kolom yang lebih lebar menyelamatkan nama adalah

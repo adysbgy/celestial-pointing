@@ -21,9 +21,10 @@ metrik DejaVu Sans Bold 20 pt — ukuran `.title3` — keduanya butuh **227 pt**
 dan **200 pt**.
 
 Ruang yang tersedia di kartu status jam 40 mm: layar 162 pt, dikurangi
-`WatchMetrics.cardPadding` 10 pt di kedua sisi = 142 pt, dikurangi visual 38 pt
-dan `HStack` spacing 8 pt = 96 pt, dikurangi badge keyakinan "Ragu" ~45 pt =
-**~46 pt**. Nama terpanjang lima kali kolomnya. Tanpa batas, `Text` membungkus
+`ScrollView` horizontal padding 2 pt di kedua sisi = 158 pt, dikurangi
+`WatchMetrics.cardPadding` 10 pt di kedua sisi = 138 pt, dikurangi visual 38 pt
+dan `HStack` spacing 8 pt = 92 pt, dikurangi badge keyakinan "Ragu" ~45 pt =
+**~48 pt**. Nama terpanjang lima kali kolomnya. Tanpa batas, `Text` membungkus
 jadi empat-lima baris; karena kartu itu berada di dalam `ScrollView`, status
 dan panduan terdorong keluar layar.
 
@@ -145,7 +146,7 @@ def jalankan(program, mutasi=None, kosongkan_apps=False):
 # itu merah karena sebab yang jelas, bukan diam-diam melewati keadaan.
 #
 # Jangkar kartu jam **berubah di siklus 21 Okt**: badge keyakinan dipindah ke
-# baris meta, jadi nama kini duduk di kolom teks penuh (96 pt, bukan 52 pt)
+# baris meta, jadi nama kini duduk di kolom teks penuh (92 pt, bukan 48 pt)
 # dan rantai modifier-nya turun satu indentasi. Jangkar ikut pindah ke bentuk
 # yang baru — yang **tidak** boleh dilakukan adalah melonggarkan pencocokan
 # sampai kedua bentuk cocok, karena itu menghapus bukti bahwa kebijakannya

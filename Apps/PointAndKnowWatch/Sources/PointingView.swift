@@ -560,39 +560,42 @@ struct ObjectDetailView: View {
     var body: some View {
         // **Susunan, bukan skala.** Pada ukuran bawaan kartu tetap
         // samping-sebelah — gambar di kiri, nama di kanan — karena itulah tata
-        // letak yang dipoles. Mulai AX1 gambar pindah ke atas dan nama mendapat
-        // lebar penuh kartu (142 pt, dari 96 pt), karena kolom yang sempit itulah
-        // yang memotong nama begitu hurufnya tumbuh. `ObjectCardLayout` yang
-        // memutuskan; lihat catatan di sana untuk angka terukurnya.
+        // letak yang dipoles. Mulai `xxxLarge` gambar pindah ke atas dan nama
+        // mendapat lebar penuh kartu (138 pt, dari 92 pt), karena kolom yang
+        // sempit itulah yang memotong nama begitu hurufnya tumbuh.
+        // `ObjectCardLayout` yang memutuskan; lihat catatan di sana untuk angka
+        // terukurnya.
         //
         // Yang **tidak** berubah: `minimumScaleFactor(0.6)` tetap dipasang. Ia
         // bukan pengganti susunan ini, melainkan lantai yang mencegah nama
         // mengecil sampai tak terbaca — dan pada ukuran aksesibilitas tertinggi
-        // (AX3+) bahkan kolom 142 pt belum cukup, jadi lantai itu masih bekerja.
+        // (AX3+) bahkan kolom 138 pt belum cukup, jadi lantai itu masih bekerja.
         let nameBlock = VStack(alignment: .leading, spacing: 3) {
             // **Nama mendapat seluruh kolom teks, bukan sisa setelah badge.**
             //
             // Sebelumnya baris ini adalah `HStack { Text(nama) Spacer badge }`.
-            // Terukur pada jam 40 mm: kartu 162 pt − `cardPadding` 10×2 =
-            // 142 pt − visual 38 pt − spacing 8 pt = **96 pt** kolom teks,
-            // lalu badge keyakinan ("Ragu" 31.6 pt + padding 10 pt) dan
-            // `Spacer(minLength: 2)` menyisakan **~52 pt** untuk nama.
+            // Terukur pada jam 40 mm: kartu 162 pt, dikurangi padding
+            // horizontal `ScrollView` 2×2 = 158 pt, dikurangi `cardPadding`
+            // 10×2 = 138 pt, dikurangi visual 38 pt dan spacing 8 pt =
+            // **92 pt** kolom teks, lalu badge keyakinan ("Ragu" 31.6 pt +
+            // padding 10 pt) dan `Spacer(minLength: 2)` menyisakan **~48 pt**
+            // untuk nama.
             //
-            // "Galaksi Kincir Angin" 226.58 pt (DejaVu Bold 20 pt) di kolom
-            // 52 pt butuh 4.36 baris pada skala 1.0 dan **2.61 baris** pada
+            // "Gugus Sarang Lebah" 233.22 pt (DejaVu Bold 20 pt) di kolom
+            // 48 pt butuh 4.86 baris pada skala 1.0 dan **2.91 baris** pada
             // lantai 0.6 — jadi `.lineLimit(2)` memotongnya dengan elipsis.
             // Komentar lama di sini mengklaim nama "terbaca utuh"; itu salah,
             // dan salahnya karena kolomnya, bukan karena batas barisnya.
             //
             // Dengan badge dipindah ke baris meta di bawah, nama mendapat
-            // 96 pt: 226.58 / 96 = 2.36 baris pada skala 1.0, dan 2 baris
-            // tercapai pada skala **0.847** — di atas lantai 0.6, jadi nama
+            // 92 pt: 233.22 / 92 = 2.54 baris pada skala 1.0, dan 2 baris
+            // tercapai pada skala **0.789** — di atas lantai 0.6, jadi nama
             // benar-benar terbaca utuh, bukan sekadar tidak meluap.
             // Dijaga Aturan 76.
             //
-            // **Batas angka 0.847 itu hanya berlaku pada skala 1.0.** Itu yang
+            // **Batas angka 0.789 itu hanya berlaku pada skala 1.0.** Itu yang
             // tidak dilihat Aturan 76 dan yang sekarang ditangani di atas:
-            // 0.847 adalah hasil bagi pada ukuran bawaan, dan setiap langkah
+            // 0.789 adalah hasil bagi pada ukuran bawaan, dan setiap langkah
             // Dynamic Type mengalikan pembilangnya sementara penyebutnya tetap.
             Text(objectDisplayName)
                 // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
@@ -632,7 +635,7 @@ struct ObjectDetailView: View {
                     .foregroundStyle(SurfacePalette.active.textSecondaryColor)
                     // Satu baris + skala minimum: baris ini memuat tiga fakta
                     // sekunder ("Bintang · mag 1.4 · RA 101.3° Dec −16.7°"
-                    // terukur 247 pt di kolom 96 pt). Membungkusnya jadi
+                    // terukur 247 pt di kolom 138 pt). Membungkusnya jadi
                     // tiga baris mendorong catatan sisa keluar kartu, dan
                     // catatan sisa itulah penanda kejujuran yang tidak boleh
                     // hilang dari pandangan.
