@@ -3043,5 +3043,18 @@ jobs:
       - name: Buktikan Aturan 91 berbunyi
         run: python3 Tools/bukti-mutasi-aturan91-bridge-lokalisasi.py
 
+      # Aturan 92 mengukur SAMBUNGAN suara visual -> pembaca layar.
+      # Gambar objek menyampaikan fase Bulan, bentuk objek langit dalam, warna,
+      # dan kelas spektral bintang. Tidak satu pun terbaca dari baris teks di
+      # layar, jadi untuk pembaca layar hanya aksesor `spoken*` yang membawa
+      # informasi itu. Diukur: keempat cabang dihapus dari
+      # `kindAccessibilityLabel` dan `visualPanelLabel` -> 91 aturan UI,
+      # typecheck, dan seluruh uji tetap hijau, exit 0. Harness ini menuntut
+      # aturan berbunyi pada lima cara memutusnya (termasuk aksesor kelima yang
+      # belum dipanggil, dan label yang ada tetapi tidak lagi menerima kalimat
+      # aksesor) serta diam pada pohon bersih.
+      - name: Buktikan Aturan 92 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan92-suara-visual.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

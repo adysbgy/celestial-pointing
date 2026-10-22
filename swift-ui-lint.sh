@@ -14771,6 +14771,36 @@ else
 fi
 
 
+echo
+echo "== Aturan 92: setiap suara visual di PointingKit diucapkan kedua app =="
+# Gambar objek menyampaikan fase Bulan, bentuk objek langit dalam, warna, dan
+# kelas spektral bintang — empat hal yang tidak terbaca dari baris teks mana
+# pun di layar. Untuk pembaca layar hanya aksesor `spoken*` di PointingKit
+# yang membawa informasi itu. Diukur dengan mutasi: keempat cabang dihapus
+# dari `kindAccessibilityLabel`, 91 aturan tetap hijau, exit 0. Aturan ini
+# menutup celah itu. Logikanya di `Tools/`, bukan di-inline, karena alasan
+# yang sama dengan Aturan 84-91 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan92-suara-visual.py" ]; then
+  echo "FAIL Tools/check-aturan92-suara-visual.py tidak ada: Aturan 92"
+  echo "     tidak mengukur apa pun, dan fase/warna/kelas spektral bisa"
+  echo "     berhenti sampai ke pembaca layar tanpa satu pun galat."
+  status=1
+else
+  suara_visual=$(python3 Tools/check-aturan92-suara-visual.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$suara_visual"
+    echo "-> Setiap aksesor suara visual wajib dipanggil di KEDUA app dan"
+    echo "   hasilnya wajib sampai ke .accessibilityLabel. Gambar menunjukkan"
+    echo "   sabit, warna, dan kelas spektral; tanpa sambungan ini pembaca"
+    echo "   layar hanya mendengar nama dan magnitudo. Perbaiki kodenya,"
+    echo "   jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$suara_visual"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

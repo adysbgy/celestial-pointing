@@ -1,3 +1,94 @@
+### Siklus (22 Okt 2026 — suara visual: gambar yang terdengar hanya di satu app)
+
+Siklus ini berangkat dari pertanyaan yang sama seperti siklus Aturan 91, tetapi
+diarahkan ke informasi yang **tidak punya teks sama sekali**. Gambar objek
+menyampaikan empat hal yang tidak terbaca dari baris teks mana pun di layar:
+fase Bulan (sabit muda vs bening), bentuk objek langit dalam (spiral vs elips),
+warna spektral bintang, dan kelas spektralnya. Untuk pembaca layar, satu-satunya
+jalan informasi itu sampai adalah aksesor `spoken*` di `PointingKit` —
+`spokenPhase`, `spokenDeepSkyMorphology`, `spokenStarColor`,
+`spokenStarClassLine` — yang dipanggil dari pembangun label aksesibilitas.
+
+#### Temuan — diukur dengan mutasi, bukan dengan membaca
+
+Keempat cabang itu dihapus dari `kindAccessibilityLabel` di
+`Apps/PointAndKnowWatch/Sources/PointingView.swift`, lalu `./swift-ui-lint.sh`
+dijalankan: **91 aturan hijau, exit 0**. Hal yang sama berlaku untuk
+`visualPanelLabel` di `DiagnosticsView.swift` (app iPhone). Di perangkat,
+pembaca layar mendengar "Bulan, magnitudo −10,4" tanpa "sabit muda": gambar
+menunjukkan bentuknya, suara tidak, dan tidak satu pun gerbang berbunyi.
+
+Ini kelas cacat yang berulang di repo ini — kode benar di paket, tidak
+tersambung di app — dan paling sulit dilihat justru karena tampilannya
+sempurna. Gerbang repo ini membaca **teks** dan **piksel**; sambungan suara
+tidak punya keduanya.
+
+#### Gerbang baru: Aturan 92
+
+`Tools/check-aturan92-suara-visual.py` mengukur tiga hal:
+
+1. Setiap aksesor suara visual dipanggil di app jam **dan** app iPhone. Satu
+   app tertinggal = cacat yang hanya muncul di satu perangkat, dan tidak ada
+   yang akan mencarinya di sana.
+2. Pemanggilan itu benar-benar **sampai** ke `.accessibilityLabel` — bukan
+   sekadar "berkasnya memuat `.accessibilityLabel`". Rantainya ditelusuri dari
+   deklarasi yang memuat pemanggilan ke **pemanggilnya**, sampai ada deklarasi
+   yang muncul di dalam argumen `.accessibilityLabel(...)`.
+3. Nol aksesor = **GAGAL**. Ekstensi yang hilang lebih mungkin berarti aturan
+   ini berhenti mengukur daripada `PointingKit` berhenti punya suara visual.
+
+Daftarnya **dipanen dari `PointingKit`**, bukan empat nama yang dibekukan:
+setiap `func spoken*` instance di dalam `public extension CelestialVisual` ikut
+diukur, jadi menambah aksesor kelima langsung menuntut sambungan baru di kedua
+app. Pembantu `static` sengaja tidak ikut — `static func spokenStarClass(...)`
+tidak punya `self`, jadi ia tidak bisa tahu objek mana yang digambar;
+menuntutnya dipanggil dari app akan berbunyi untuk kode yang benar.
+
+#### Bukti non-vakum: `Tools/bukti-mutasi-aturan92-suara-visual.py`
+
+Enam keadaan, semuanya pada pohon asli yang dipulihkan setelah tiap keadaan:
+
+```
+[0] pohon apa adanya ......................... DIAM (benar)
+[1] cabang fase dihapus (app jam)              BUNYI (benar)
+[2] cabang morfologi dihapus (iPhone)          BUNYI (benar)
+[3a] cabang warna dihapus (app jam)            BUNYI (benar)
+[3b] cabang warna dihapus (iPhone)             BUNYI (benar)
+[4] label tidak lagi memakai kalimat aksesor ...... BUNYI (benar)
+[5] aksesor kelima tanpa pemanggil .............. BUNYI (benar)
+```
+
+Keadaan [5] yang membuktikan daftarnya dipanen: aksesor kelima disisipkan **di
+dalam** ekstensi `CelestialVisual` (bukan di akhir berkas, yang akan
+menaruhnya di ekstensi katalog dan tidak terpanen sama sekali).
+
+Dua versi checker pertama **salah**, dan keduanya ditemukan oleh harness ini,
+bukan oleh mata:
+
+- Versi pertama memeriksa "berkasnya memuat `.accessibilityLabel`". Keadaan [4]
+  lolos — berkas itu punya delapan label lain — jadi syaratnya diganti menjadi
+  rantai pemanggil.
+- Versi kedua menelusuri rantai ke arah **yang dipanggil**, bukan ke
+  pemanggilnya. `kindAccessibilityLabel` menyusun potongan kalimatnya sendiri
+  dan `detailAccessibilityLabel` yang menyerahkannya ke `.accessibilityLabel`;
+  arah yang salah membuat kedua app dilaporkan putus padahal benar.
+- `visualPanelLabel` di app iPhone punya tujuh parameter satu per baris, jadi
+  regex deklarasi yang berhenti di akhir baris tidak memasukkannya ke peta dan
+  rantainya putus di langkah pertama.
+
+Yang **TIDAK** diklaim: ini sapuan teks, bukan pemeriksaan tipe atau render. Ia
+tidak membuktikan kalimat yang disusun benar, dan tidak membuktikan
+`isConfirmed` diteruskan dengan nilai yang tepat — itu diukur tes `PointingKit`
+di Linux. Ia membuktikan sambungannya ada di kedua app dan sampai ke pembaca
+layar, bagian yang tadinya tidak diukur siapa pun.
+
+#### Angka
+
+- `./swift-ui-lint.sh`: **92 aturan**, semuanya hijau (exit 0).
+- `bash -n` di Docker `bash:3.2`: exit 0 (heredoc macOS CI aman).
+- `Tools/check-harness-terdaftar.py`: 151 harness, semuanya dirujuk alur kerja.
+- README: 91 aturan (nomor sampai 92 karena Aturan 69 tinggal di `Tools/`).
+
 ### Siklus (22 Okt 2026 — berkas tanpa gerbang: bridge lokalisasi akhirnya diukur)
 
 Siklus ini berangkat dari satu pertanyaan yang bisa dijawab angka, bukan
