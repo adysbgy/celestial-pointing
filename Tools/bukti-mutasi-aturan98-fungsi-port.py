@@ -95,10 +95,16 @@ def main() -> int:
          asli_view.replace(BADAN, "        // CelestialVisual.starCoreRGB(forColorIndex:relativeSize:)\n"
                                   "        return starColor", 1),
          asli_model, 1),
-        ("4. `public static func starCoreRGB` -> `static func`",
+        # 4. `public` dicabut — irisan menyusut 5 -> 4. Ini BUKAN kegagalan
+        #    gerbang, dan mengharapkan merah di sini adalah kesalahan harness
+        #    ini sendiri: mencabut `public` membuat `Apps/` gagal dikompilasi,
+        #    jadi yang menangkapnya compiler, bukan sapuan teks. Yang bisa dan
+        #    perlu dibuktikan adalah bahwa gerbang **melihat** penyusutannya —
+        #    kalau ia tetap melaporkan 5 fungsi, ia membaca daftar lain.
+        ("4. `public` dicabut: irisan menyusut 5 -> 4",
          asli_view,
          asli_model.replace("public static func starCoreRGB(",
-                            "static func starCoreRGB(", 1), 1),
+                            "static func starCoreRGB(", 1), "menyusut:4"),
     ]
 
     gagal = 0
@@ -123,13 +129,18 @@ def main() -> int:
                 M.restore_verified(os.path.join(ROOT, VIEW), asli_view)
                 M.restore_verified(os.path.join(ROOT, MODEL), asli_model)
 
-        sesuai = (kode == harap)
+        # `harap` boleh int (kode keluar) atau "menyusut:N" (gerbang hijau
+        # tetapi melaporkan N fungsi — membuktikan ia melihat penyusutan).
+        if isinstance(harap, str) and harap.startswith("menyusut:"):
+            jumlah = int(harap.split(":")[1])
+            sesuai = (kode == 0 and f"OK {jumlah} fungsi" in keluaran)
+        else:
+            sesuai = (kode == harap)
         tanda = "OK   " if sesuai else "SALAH"
         ringkas = keluaran.splitlines()[0] if keluaran else "(tanpa keluaran)"
         print(f"{label:58s} {tanda} exit={kode} (harap {harap}) {ringkas[:90]}")
         if not sesuai:
             gagal += 1
-
     print()
     if gagal:
         print(f"{gagal} keadaan tidak sesuai harapan — Aturan 98 tidak "
