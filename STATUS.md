@@ -1,3 +1,71 @@
+### Siklus (22 Okt 2026 — jalur cadangan dokumen galat akhirnya diukur)
+
+Siklus sebelumnya menulis satu kalimat di `ExportErrorDocument.swift`:
+"tidak boleh ada cabang yang menghasilkan berkas tidak sah". Kalimat itu
+**tidak diukur**. Siklus ini mengukurnya, dan menemukan bahwa satu-satunya
+cabang yang menjaganya adalah cabang yang **tidak pernah jalan**.
+
+#### Temuan — klaim yang benar tapi tidak diuji
+
+`data(message:)` memakai `JSONSerialization` atas `[String: String]`.
+Serialisasi itu **tidak bisa gagal**: `Swift.String` selalu Unicode yang
+sah. Jadi jalur `else` yang berisi peng-escape tulisan tangan tidak pernah
+dieksekusi di produksi — dan tidak ada satu pun uji yang menyentuhnya.
+
+Cabang yang tidak bisa dicapai **dan** tidak diuji adalah klaim, bukan
+jaminan. Kalau peng-escape itu salah (dan ia sempat salah bentuk), tidak ada
+gerbang yang akan berbunyi: `data(message:)` tetap hijau karena ia tidak
+pernah lewat sana.
+
+#### Kenapa jalur cadangan tidak dihapus saja
+
+Menghapusnya berarti `data(message:)` boleh mengembalikan `Data()` kosong
+bila serialisasi gagal. Berkas kosong adalah bentuk kegagalan senyap yang
+justru ingin dicegah: penerimanya membuka `experiment1-….json` berukuran 0
+byte dan mengiranya dataset kosong yang sah. Jalur yang tetap menghasilkan
+JSON sah lebih baik daripada jalur yang menghasilkan berkas kosong, sekalipun
+ia tidak bisa dicapai.
+
+#### Yang berubah
+
+- Peng-escape dipindah jadi `escapedFallback(_:)` dan dibuat `internal`
+  (bukan `private`) **supaya bisa diuji langsung**. Ia tetap tidak dipanggil
+  dari mana pun selain jalur cadangan.
+- Tiga uji baru: bolak-balik utuh untuk pesan bermusuhan (kutip, garis miring
+  terbalik, baris baru, non-ASCII), **urutan** escape, dan baris baru yang
+  wajib menjadi `\n`.
+
+#### Kenapa urutan diuji terpisah
+
+Ini inti cacatnya. Garis miring terbalik wajib di-escape **sebelum** kutip.
+Kalau dibalik, garis miring yang baru ditambahkan untuk kutip itu ikut
+ter-escape lagi, dan pesannya berlipat. Urutan yang salah terbukti
+menghasilkan **JSON tidak sah** — diukur dengan pembaca JSON independen
+(`json.loads` di luar Swift), bukan diasumsikan:
+
+    urutan benar   : parses OK, roundtrip SAMA
+    urutan terbalik: JSON TIDAK SAH — Expecting ',' delimiter: column 22
+
+Pesan ujinya memuat keduanya bersebelahan (`path \"kuot\" di C:\Users\…`),
+jadi urutan yang salah tidak bisa lolos diam-diam.
+
+#### Yang TIDAK diklaim
+
+Cabang cadangan itu **tetap tidak bisa dicapai** di produksi. Uji baru
+membuktikan peng-escape-nya benar, bukan bahwa jalur itu pernah jalan. Tidak
+ada perubahan perilaku yang bisa dilihat pengguna dari siklus ini — yang
+berubah adalah satu klaim yang tadinya kosong sekarang punya bukti.
+
+#### Gerbang
+
+- `./swift-test.sh` → **1301 uji, 0 gagal** (engine 222 + PointingKit 1079;
+  baseline siklus lalu 1292 = 222 + 1070). Tambahan 9 uji = 6 uji Aturan 90 +
+  3 uji siklus ini.
+- `./swift-ui-lint.sh` → lulus, termasuk Aturan 90.
+- `./swift-typecheck.sh` → 0.
+- Apple Build (macOS) hijau untuk commit Aturan 90; kompilasi berkas
+  PointingKit baru tanpa warning.
+
 ### Siklus (22 Okt 2026 — Aturan 90: berkas ekspor yang gagal-encode akhirnya sah sebagai JSON)
 
 Cacat yang ditutup siklus ini **tidak berasal dari UI**. Ia ditemukan saat
