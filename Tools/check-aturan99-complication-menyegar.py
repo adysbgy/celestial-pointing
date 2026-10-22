@@ -63,6 +63,8 @@ TIMELINE_CALL = re.compile(r"\bTimeline\s*\(\s*entries\s*:")
 NEVER_POLICY = re.compile(r"policy\s*:\s*\.never\b")
 #: Kebijakan yang menyegar sendiri, beserta **nama** argumennya.
 AFTER_POLICY = re.compile(r"policy\s*:\s*\.after\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)")
+#: Kebijakan `.after(...)` apa pun, termasuk argumen berbentuk ekspresi.
+ANY_AFTER = re.compile(r"policy\s*:\s*\.after\s*\(")
 #: Model yang punya lapisan basi — pemicu aturan ini.
 STALENESS_MODEL = re.compile(r"\bComplicationDigest\b")
 #: Aksesor jadwal yang wajib menjadi **sumber** argumen `.after(...)`.
@@ -137,20 +139,22 @@ def main() -> int:
 
         diperiksa += 1
         memakai_never = bool(NEVER_POLICY.search(code))
-        memakai_jadwal = False
-        memakai_after_tak_terikat = False
-        for name in AFTER_POLICY.findall(code):
-            if bound_from_schedule(code, name):
-                memakai_jadwal = True
-            else:
-                memakai_after_tak_terikat = True
+        # Setiap `.after(...)` harus menyebut tanggal dari model. Argumen yang
+        # bukan nama sederhana (mis. `Date().addingTimeInterval(60)`) tidak
+        # bisa berasal dari aksesornya, jadi langsung dihitung pelanggaran —
+        # bentuk itu justru yang paling sering lolos sapuan "apakah `.after`
+        # ada".
+        ada_after = ANY_AFTER.search(code) is not None
+        nama_after = AFTER_POLICY.findall(code)
+        semua_terikat = bool(nama_after) and all(
+            bound_from_schedule(code, name) for name in nama_after)
 
-        if memakai_never and not memakai_jadwal:
+        if memakai_never and not semua_terikat:
             pelanggaran.append(rel)
-        elif memakai_after_tak_terikat:
-            # `.after(<nama>)` yang namanya **bukan** berasal dari
-            # `nextRefreshDate(after:)` — jadwal yang tidak berhubungan
-            # dengan umur cuplikan. Lihat `bound_from_schedule`.
+        elif ada_after and not semua_terikat:
+            # `.after(<ekspresi>)` atau `.after(<nama>)` yang namanya **bukan**
+            # berasal dari `nextRefreshDate(after:)` — jadwal yang tidak
+            # berhubungan dengan umur cuplikan. Lihat `bound_from_schedule`.
             tanpa_aksesor.append(rel)
 
     if diperiksa == 0:
