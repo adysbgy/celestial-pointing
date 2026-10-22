@@ -2337,6 +2337,118 @@ def check_unreadable_features_never_pass_the_watch_size(results, ss=8):
             f"terbaca oleh mata pada ukuran yang tampil"))
 
 
+#: Lantai cakupan katalog: setiap kasus render wajib mengisi sedikitnya
+#: sekian **fraksi** frame dengan piksel yang berbeda dari latar.
+#:
+#: Diukur pada `ss=1`, ukuran kartu jam, kedua mode, seluruh katalog:
+#:
+#:     ukuran 38 px   kasus terkecil `moon-new`        1,11%  (16 dari 1444)
+#:                    `deepsky-unknown-id`             1,18%  (17 dari 1444)
+#:     ukuran 48 px   kasus terkecil `deepsky-unknown-id` 1,13%  (26 dari 2304)
+#:
+#: Lantainya diletakkan di 0,5% — di bawah **setengah** kasus terkecil yang
+#: benar-benar ada, dan jauh di atas nol. Ia tidak diklaim sebagai batas
+#: persepsi; yang diklaim adalah bahwa kasus yang mengisi kurang dari 0,5%
+#: frame tidak lagi menggambar bendanya, dan itu terukur nol pada cacat yang
+#: ditutupnya.
+CATALOG_MIN_COVERAGE = 0.005
+
+
+def _lit_fraction(canvas, threshold=24):
+    """Fraksi piksel yang **berbeda dari latar** kanvas ini.
+
+    Latar dibaca dari piksel `(0, 0)`, bukan dari konstanta: `render()` memilih
+    latar berbeda untuk mode siang dan mode malam, dan gerbang yang menulis
+    `(0.039, 0.039, 0.059)` sendiri akan mengukur mode malam terhadap latar
+    siang — hijau di semua kasus, dan tidak mengukur apa pun.
+    """
+    width, height, buf = canvas.w, canvas.h, canvas.buf
+    background = buf[0][:3]
+    lit = 0
+    for pixel in buf:
+        if (abs(pixel[0] - background[0]) * 255
+                + abs(pixel[1] - background[1]) * 255
+                + abs(pixel[2] - background[2]) * 255) > threshold:
+            lit += 1
+    return lit / (width * height)
+
+
+def check_every_catalog_case_draws_something(results, ss=1):
+    """Setiap kasus di katalog render wajib **menggambar sesuatu**.
+
+    **Cacat yang ditutup pemeriksaan ini.** `planet-saturn-no-feature` — kasus
+    pembanding yang dipakai gerbang keterbacaan ciri — menghasilkan frame
+    **kosong**: nol piksel menyala. Terukur pada pohon sebelum perbaikan, proses
+    baru:
+
+        ukuran  38 px   0 dari   1 444 piksel
+        ukuran  76 px   0 dari   5 776 piksel
+        ukuran 200 px   0 dari  40 000 piksel
+        ukuran 300 px   0 dari  90 000 piksel
+
+    Penyebabnya bukan angka yang salah, melainkan satu `return` yang
+    melewatkan penggambaran: `_draw_rings` adalah satu-satunya ciri yang
+    menggambar bola Saturnus sendiri (0,53 R), jadi `_draw_planet` melewati
+    `_draw_sphere` untuk Saturnus — benar, supaya tidak ada dua piringan
+    bersarang — dan cabang `feature_off` lalu `return` tanpa menggambar apa
+    pun.
+
+    **Kenapa ini lebih dari satu gambar jelek.** Kasus itu adalah *pembanding*:
+    `check_features_survive_the_watch_size` mengukur selisih
+    `planet-saturn-confirmed` terhadap `planet-saturn-no-feature`, dan
+    membandingkan lawan frame kosong membuat selisihnya **selalu** besar.
+    Gerbangnya jadi mustahil gagal — ia bukan pembanding "tanpa ciri" melainkan
+    "tanpa apa pun" — sementara seluruh 123 pemeriksaan lain tetap hijau,
+    termasuk `check_night_mode_purity` (frame kosong: hijau & biru nol, benar
+    secara harfiah) dan `check_night_mode_never_exceeds_day` (nol <= nol,
+    benar). Kelas cacatnya sama dengan yang sudah dibayar repo ini: **gerbang
+    yang hijau karena tidak ada yang diukur.**
+
+    **Kenapa katalog, bukan daftar tangan.** Daftar tangan akan menutup Saturnus
+    dan tidak menutup kasus berikutnya. Daftarnya diturunkan dari
+    `build_cases()`, jadi kasus render baru — dan setiap `-no-feature`,
+    `-bare`, `-uncertain`, dan `-plain` yang lahir bersamanya — ikut terukur
+    pada hari ia ditambahkan. Katalog kosong menghasilkan **merah**, bukan
+    hijau karena tidak ada yang diperiksa.
+
+    **Ukurannya dari token, bukan dari angka di sini.** Yang diukur adalah
+    `WatchMetrics.visualDiameter` — ukuran yang benar-benar dipakai kartu jam.
+    Token hilang membuat gerbang ini merah (bukan diam-diam melewati
+    pengukuran), dan mengecilkan token ikut menguji ukuran yang baru.
+
+    **Yang tidak diklaim.** Gerbang ini membuktikan frame **tidak kosong**,
+    bukan bahwa yang tergambar adalah benda yang benar: satu bintik acak di
+    tengah frame lolos di sini. Yang menjaga isinya adalah gerbang ciri
+    (`check_features_survive_the_watch_size`, `check_moon_phase_survives_uncertainty`,
+    dan seterusnya). Kedua mode diukur, karena cacat ini sempat hanya terlihat
+    di satu mode pada percobaan pertama.
+    """
+    size = watch_visual_diameter()
+    if size is None:
+        results.append(Result(
+            "katalog tidak kosong: ukuran kartu jam terbaca", False,
+            "`WatchMetrics.visualDiameter` tidak ditemukan di WatchTheme.swift "
+            "— gerbang ini tidak bisa mengukur ukuran yang dipakai"))
+        return
+    cases = R.build_cases()
+    if not cases:
+        results.append(Result("katalog tidak kosong: katalog terbaca", False,
+                              "build_cases() mengembalikan nol kasus"))
+        return
+    for case in cases:
+        for night in (False, True):
+            canvas = R.render(case, size=size, night_mode=night,
+                              show_frame=False, ss=ss)
+            fraction = _lit_fraction(canvas)
+            mode = "malam" if night else "siang"
+            results.append(Result(
+                f"katalog tidak kosong: {case.name} ({mode})",
+                fraction >= CATALOG_MIN_COVERAGE,
+                f"{fraction * 100:.2f}% frame terisi (lantai "
+                f"{CATALOG_MIN_COVERAGE * 100:.2f}%); kasus yang tidak "
+                f"menggambar apa pun terukur 0,00%"))
+
+
 def check_png_is_well_formed(results, size=64, ss=2):
     """PNG yang ditulis alat render harus **sah menurut spesifikasi PNG**.
 
@@ -17484,6 +17596,9 @@ def main():
     check_earthshine_strength_matches_the_model(results)
     check_sun_corona_reaches_beyond_the_disk(results)
     check_png_is_well_formed(results)
+    # Setiap kasus katalog wajib menggambar sesuatu — pembanding yang kosong
+    # membuat gerbang keterbacaan ciri mustahil gagal. Lihat docstring-nya.
+    check_every_catalog_case_draws_something(results)
     check_png_roundtrip(results)
     check_port_matches_swift_constants(results)
     check_port_constants_reach_the_drawing(results)

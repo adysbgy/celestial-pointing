@@ -738,6 +738,21 @@ jobs:
       - name: Buktikan gerbang "setiap gerbang mengisi results" berbunyi
         run: python3 Tools/bukti-mutasi-gerbang-kosong.py
 
+      # Dan bukti untuk gerbang **«setiap kasus katalog menggambar sesuatu»**.
+      #
+      # `planet-saturn-no-feature` menghasilkan frame kosong: 0 piksel menyala
+      # dari 1 444 di 38 px, 0 dari 40 000 di 200 px. Kasus itu adalah
+      # *pembanding* `check_features_survive_the_watch_size`, jadi selisihnya
+      # terhadap frame kosong selalu besar — gerbang keterbacaan ciri Saturnus
+      # mustahil gagal — sementara seluruh pemeriksaan lain tetap hijau
+      # (`check_night_mode_purity` benar secara harfiah pada frame kosong).
+      #
+      # Gerbang barunya hijau pada hari ia ditulis; harness ini membuktikan ia
+      # bisa merah **tepat pada cacat itu**, di kedua mode, dan hijau pada
+      # kontrol negatif.
+      - name: Buktikan gerbang "setiap kasus katalog menggambar sesuatu" berbunyi
+        run: python3 Tools/bukti-mutasi-katalog-kosong.py
+
       # Dan bukti untuk gerbang **warna identitas planet saat engine ragu** —
       # kelas cacat yang lolos ke `main` dan baru ketahuan siklus ini.
       #

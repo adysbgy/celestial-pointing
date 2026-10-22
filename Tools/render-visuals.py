@@ -1690,6 +1690,24 @@ def _draw_planet(canvas, cx, cy, radius, kw, night_mode):
     # `check-visuals.py`: membandingkan lawan `-bare` mencampur ciri dengan
     # pita dan fase, jadi selisihnya bukan milik cirinya.
     if kw.get("feature_off"):
+        # `feature_off` pada planet bercincin tetap harus punya bola.
+        #
+        # Cincin adalah satu-satunya ciri yang **menggambar bolanya sendiri**
+        # (`_draw_rings` memakai `saturn_body_radius`, 0.53 R). Karena itu
+        # guard di atas melewatkan `_draw_sphere` untuk Saturnus terkunci —
+        # benar, supaya tidak ada dua piringan bersarang. Tetapi kalau
+        # `feature_off` lalu `return` tanpa menggambar apa pun, hasilnya
+        # frame **kosong**: terukur 0 piksel menyala dari 1444 di 38 px, 0
+        # dari 5776 di 76 px, 0 dari 90 000 di 300 px.
+        #
+        # Pembanding kosong membuat gerbang keterbacaan ciri mustahil gagal
+        # (selisih lawan latar selalu besar), jadi ia bukan pembanding
+        # "tanpa ciri" melainkan pembanding "tanpa apa pun". Diperbaiki di
+        # sini: gambar bolanya sendiri pada radius yang sama dengan yang
+        # dipakai cincin.
+        if palette["feature"] == "rings":
+            _draw_sphere(canvas, cx, cy, radius * saturn_body_radius(saturn_ring()),
+                         palette["light"], palette["dark"], night_mode)
         return
     feature = palette["feature"]
     if feature == "rings":
