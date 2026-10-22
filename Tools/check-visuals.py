@@ -13538,7 +13538,14 @@ def star_core_swift_doc():
 #: Angka yang **dikutip** docstring `starCoreRGB`, sebagai (bintang, sebelum,
 #: sesudah). Nilainya tidak ditulis di sini — ia dibaca dari docstringnya, dan
 #: inilah yang membuat gerbang ini bisa menangkap kutipan yang salah.
-STAR_CORE_QUOTED_ORDER = ("sirius", "faint", "betelgeuse")
+#:
+#: Keempat baris tabel diikat, bukan tiga. Versi pertama gerbang ini hanya
+#: mengikat Sirius/redup/Betelgeuse dan **menyatakan** Rigel sebagai batas
+#: yang tidak diklaim — padahal Rigel ada di tabel yang sama, dan angka yang
+#: tidak diikat adalah angka yang boleh membusuk diam-diam. "Dinyatakan" bukan
+#: "ditutup": tabel empat baris dengan tiga baris terjaga masih mengundang
+#: pembaca mempercayai baris keempat.
+STAR_CORE_QUOTED_ORDER = ("sirius", "faint", "betelgeuse", "rigel")
 
 
 def check_star_core_docstring_quotes_measured_values(results, size=200, ss=2):
@@ -13582,12 +13589,13 @@ def check_star_core_docstring_quotes_measured_values(results, size=200, ss=2):
     kolom bergerak bersama dan tabelnya harus diperbarui — dan gerbang ini
     yang memberi tahu, alih-alih tabelnya membusuk diam-diam.
 
-    **Batas yang dinyatakan.** Yang diikat adalah tiga bintang (Sirius,
-    redup m +3,50, Betelgeuse) pada 200 px, `ss=2`, mode siang, puncak
-    luminansi. Rigel dikutip di docstring tetapi **tidak** diikat di sini —
-    ia bukan bagian dari tiga klaim yang membuat fungsi ini ada, dan
-    menambahkannya hanya menambah permukaan yang harus diperbarui tanpa
-    menambah klaim. Ukuran lain, `ss` lain, dan mode malam tidak diklaim.
+    **Batas yang dinyatakan.** Yang diikat adalah **keempat** baris tabel
+    (Sirius, redup m +3,50, Betelgeuse, Rigel) pada 200 px, `ss=2`, mode
+    siang, puncak luminansi — empat bintang, delapan angka. Versi pertama
+    gerbang ini mengikat tiga baris dan menyatakan Rigel sebagai batas yang
+    tidak diklaim; itu keliru, karena baris yang tampil di tabel yang sama
+    dan tidak diikat adalah baris yang boleh membusuk sambil gerbangnya
+    hijau. Ukuran lain, `ss` lain, dan mode malam tidak diklaim.
     Toleransinya 0,05/255: cukup untuk pembulatan kutipan dua desimal, tidak
     cukup untuk menyembunyikan angka yang salah tempat.
     """
@@ -13608,20 +13616,20 @@ def check_star_core_docstring_quotes_measured_values(results, size=200, ss=2):
         # Nama, lalu keterangan magnitudo dalam kurung (yang **mengandung
         # angka** — `(m −1,46)` — jadi tidak boleh ditelan `[^\d]*`), lalu dua
         # angka: sebelum dan sesudah.
-        match = re.match(r"\s*(Sirius|redup|Betelgeuse)\b\s*"
+        match = re.match(r"\s*(Sirius|redup|Betelgeuse|Rigel)\b\s*"
                          r"(?:\([^)]*\))?\s*"
                          r"([\d]+[.,][\d]+)\s+([\d]+[.,][\d]+)", line)
         if match:
             label = match.group(1).lower()
             key = {"sirius": "sirius", "redup": "faint",
-                   "betelgeuse": "betelgeuse"}[label]
+                   "betelgeuse": "betelgeuse", "rigel": "rigel"}[label]
             quoted[key] = (float(match.group(2).replace(",", ".")),
                            float(match.group(3).replace(",", ".")))
 
     missing = [name for name in STAR_CORE_QUOTED_ORDER if name not in quoted]
     if missing:
         results.append(Result(
-            "inti bintang: docstring mengutip ketiga angka", False,
+            "inti bintang: docstring mengutip keempat angka", False,
             f"tidak terbaca dari docstring `starCoreRGB`: {', '.join(missing)} "
             f"(terbaca {len(quoted)} dari {len(STAR_CORE_QUOTED_ORDER)}) — "
             "gerbang paritas yang tidak menemukan kutipannya tidak boleh hijau"))
@@ -13660,7 +13668,7 @@ def check_star_core_docstring_quotes_measured_values(results, size=200, ss=2):
     results.append(Result(
         "inti bintang: docstring mengutip angka terukur (sebelum & sesudah)",
         not wrong,
-        "keenam angka cocok dengan pikselnya (toleransi 0,05/255)"
+        "kedelapan angka cocok dengan pikselnya (toleransi 0,05/255)"
         if not wrong
         else "; ".join(wrong)))
 

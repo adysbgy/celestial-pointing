@@ -17,8 +17,8 @@ piksel — tetapi gerbang yang hijau pada hari ia ditulis tidak membuktikan apa
 pun. Yang harus dibuktikan adalah bahwa ia **bisa merah**, dan merah pada angka
 yang memang salah.
 
-Kenapa tiga keadaan, bukan satu. Ketiga jalan menuju angka yang salah berbeda,
-dan satu mutasi hanya membuktikan satu jalan:
+Kenapa empat keadaan, bukan satu. Keempat jalan menuju angka yang salah
+berbeda, dan satu mutasi hanya membuktikan satu jalan:
 
   1. kolom "sebelum" Sirius salah  -> persis angka 196,7 yang dulu dikutip.
                                       Ini bukan angka karangan: ia **pernah
@@ -38,6 +38,14 @@ dan satu mutasi hanya membuktikan satu jalan:
                                       selamanya walaupun perbaikannya dibatalkan
                                       dan kolom "sesudah" jadi dusta. Keadaan
                                       ini mengikat arah itu.
+  4. baris keempat tabel salah     -> Rigel. Gerbang versi pertama **tidak**
+                                      mengikat baris ini dan hanya menyatakan
+                                      di docstringnya bahwa ia "tidak
+                                      diklaim". Baris yang tampil di tabel
+                                      yang sama dan tidak diikat adalah baris
+                                      yang boleh membusuk sambil gerbangnya
+                                      hijau — jadi keadaan ini membuktikan
+                                      baris itu benar-benar diukur.
 
 Tiap keadaan menuntut pemeriksaan **bernama**, bukan sekadar "ada yang merah":
 gerbang yang berbunyi pada pemeriksaan yang salah mengukur hal lain daripada
@@ -115,6 +123,14 @@ STATES = [
     ("3. Betelgeuse sesudah 218,52 -> 220,00",
      "Betelgeuse (+0,50) 173,39   218,52",
      "Betelgeuse (+0,50) 173,39   220,00",
+     [QUOTED]),
+    # 4. Baris keempat tabel. Gerbang versi pertama **tidak** mengikat baris
+    #    ini dan menyatakannya sebagai batas yang tidak diklaim; keadaan ini
+    #    membuktikan baris itu sekarang benar-benar diukur, bukan sekadar
+    #    dinyatakan terjaga.
+    ("4. Rigel sebelum 190,06 -> 190,60",
+     "Rigel    (+0,13)  190,06    229,00",
+     "Rigel    (+0,13)  190,60    229,00",
      [QUOTED]),
 ]
 
