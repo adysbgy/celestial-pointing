@@ -372,4 +372,59 @@ final class LinkMessageTests: XCTestCase {
                 .calibrationNoteText,
             "not calibrated")
     }
+
+    // MARK: - Sigma yang berlaku di jam sampai ke layar
+
+    /// Pesan keadaan yang membawa sigma harus **menyatakan** sigma itu.
+    ///
+    /// **Cacat yang dijaga.** Jam mengirim `pointingSigmaDeg` di setiap pesan
+    /// keadaan, dan `LinkView` sudah memperingatkan pembaca ketika sigma
+    /// **tidak** disertakan. Tetapi angka itu sendiri tidak pernah tampil di
+    /// layar mana pun: satu-satunya layar yang menjelaskan "apa yang
+    /// dilaporkan jam" tidak pernah menunjukkan seberapa tebal keyakinannya.
+    /// Keseluruhan app ini berdiri di atas satu klaim — akurasi tunjuk belum
+    /// diketahui dan sedang diukur — jadi angka itu bukan detail teknis,
+    /// melainkan isi laporannya.
+    ///
+    /// Yang diuji di sini adalah **sumber** baris itu: `confidencePolicy`
+    /// menolak sigma yang tidak masuk akal, sehingga layar tidak bisa
+    /// menampilkan `σ 0.0°` atau `σ nan°` sebagai akurasi sempurna.
+    func testStateExposesTheSigmaItCarries() {
+        let pesan = PointingLinkMessage(
+            kind: .pointingState,
+            pointingSigmaDeg: 3.5)
+        XCTAssertEqual(pesan.confidencePolicy?.pointingSigmaDeg, 3.5)
+    }
+
+    /// Sigma yang tidak masuk akal tidak boleh terbaca sebagai akurasi.
+    ///
+    /// `0` akan berarti "tidak pernah meleset" dan `nan` akan merusak setiap
+    /// perbandingan yang memakainya. Keduanya **bukan** pengukuran, jadi
+    /// keduanya harus hilang — bukan ditampilkan sebagai angka.
+    func testStateHidesASigmaThatIsNotAMeasurement() {
+        for sigma in [0.0, -1.0, Double.nan, Double.infinity] {
+            XCTAssertNil(
+                PointingLinkMessage(kind: .pointingState, pointingSigmaDeg: sigma)
+                    .confidencePolicy?.pointingSigmaDeg,
+                "σ \(sigma) bukan pengukuran dan tidak boleh ditampilkan")
+        }
+    }
+
+    /// Pesan tanpa sigma tidak mengarang angka.
+    func testStateWithoutSigmaShowsNoSigma() {
+        XCTAssertNil(
+            PointingLinkMessage(kind: .pointingState).confidencePolicy)
+    }
+
+    /// Kunci baris sigma ada di katalog, jadi English speaker tidak membaca
+    /// "σ dari jam".
+    func testSigmaRowLabelComesFromTheCatalog() {
+        XCTAssertEqual(TextLocalization.text(.linkRowSigma), "σ dari jam")
+
+        TextLocalization.install { key in
+            key == "link.row.sigma" ? "σ from the watch" : nil
+        }
+        defer { TextLocalization.reset() }
+        XCTAssertEqual(TextLocalization.text(.linkRowSigma), "σ from the watch")
+    }
 }

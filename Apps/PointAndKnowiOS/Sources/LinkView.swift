@@ -54,6 +54,21 @@ struct LinkView: View {
                             state.reportedObjectName(
                                 catalogue: engine.controller.resolver.catalogue) ?? "—")
                         row(TextLocalization.text(.linkRowConfidence), state.level?.displayName ?? "—")
+                        // Sigma yang berlaku di jam. Tanpa baris ini satu-satunya
+                        // angka yang menyatakan **seberapa tebal** keyakinan itu
+                        // tidak pernah tampil, padahal ia ikut di setiap pesan
+                        // keadaan — dan layar ini justru yang menjelaskan apa
+                        // yang dilaporkan jam.
+                        //
+                        // Ditulis hanya bila ada: σ yang tidak disertakan sudah
+                        // punya peringatannya sendiri di bawah (`σ = 0` tidak
+                        // boleh terbaca sebagai akurasi sempurna), jadi baris
+                        // kosong di sini akan menduplikasi peringatan itu
+                        // dengan cara yang lebih lemah.
+                        if let sigma = state.confidencePolicy?.pointingSigmaDeg {
+                            row(TextLocalization.text(.linkRowSigma),
+                                NumberFormat.degrees(sigma))
+                        }
                         if let rate = state.angularRateDegPerSec {
                             // Nilainya ditulis "0.5°/dtk" untuk mata; yang
                             // diucapkan bentuk katanya. Dua-duanya dari

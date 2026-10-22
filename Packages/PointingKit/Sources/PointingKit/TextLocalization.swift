@@ -333,6 +333,16 @@ public extension LocalizedText {
     static let linkRowConfidence = LocalizedText(
         key: "link.row.confidence", id: "Keyakinan")
     static let linkRowRate = LocalizedText(key: "link.row.rate", id: "Laju")
+    /// Sigma yang **berlaku di jam** saat pesan itu dikirim.
+    ///
+    /// Baris ini ada karena seluruh app ini menjual satu hipotesis: akurasi
+    /// tunjuk belum diketahui dan sedang diukur. `LinkView` sudah memperingatkan
+    /// pembaca saat σ **tidak** disertakan (sampel σ=0), tetapi saat σ **ada**
+    /// angkanya tidak pernah tampil di mana pun — jadi satu-satunya layar yang
+    /// menjelaskan apa yang dilaporkan jam tidak pernah menunjukkan angka yang
+    /// menjadi inti laporan itu.
+    static let linkRowSigma = LocalizedText(
+        key: "link.row.sigma", id: "σ dari jam")
     static let linkRowTime = LocalizedText(key: "link.row.time", id: "Waktu")
     static let linkNoStateYet = LocalizedText(
         key: "link.empty.noState", id: "Belum ada keadaan dari jam.")
@@ -694,7 +704,7 @@ public extension LocalizedText {
         .linkSectionTitle, .linkRowStatus, .linkValueActive, .linkValueInactive,
         .linkRowReachable, .linkValueYes, .linkValueNo, .linkRowMessagesReceived,
         .linkRequestState, .linkSectionLastState, .linkRowState, .linkRowObject,
-        .linkRowConfidence, .linkRowRate, .linkRowTime, .linkNoStateYet,
+        .linkRowConfidence, .linkRowRate, .linkRowSigma, .linkRowTime, .linkNoStateYet,
         .linkSectionLastCalibration, .linkRowYawOffset, .linkRowSpread,
         .linkRowReferenceCount, .linkNoCalibrationYet, .linkSectionSamples,
         .linkRowRecorded, .linkSamplesNote, .linkSigmaMissingNote,

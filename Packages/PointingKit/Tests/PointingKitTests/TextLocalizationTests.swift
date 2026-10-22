@@ -345,9 +345,16 @@ final class TextLocalizationTests: XCTestCase {
     /// laju sudut yang melewati ambang. Sebelumnya satu-satunya pembeda antara
     /// "terlalu cepat" dan "diam" adalah warna, sehingga pengguna buta warna
     /// tidak bisa membedakannya (WCAG 1.4.1). Dijaga Aturan 61.
+    ///
+    /// Angka 355 → 356 karena `.linkRowSigma`: label baris sigma di `LinkView`.
+    /// Jam mengirim `pointingSigmaDeg` di setiap pesan keadaan, dan layar itu
+    /// sudah memperingatkan ketika sigma **tidak** disertakan — tetapi angka
+    /// sigma itu sendiri tidak pernah tampil di mana pun. Akurasi tunjuk adalah
+    /// hipotesis yang sedang diukur app ini, jadi angkanya adalah isi laporan,
+    /// bukan detail teknis.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 355, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 356, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

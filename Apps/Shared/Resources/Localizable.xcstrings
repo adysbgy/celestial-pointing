@@ -2165,6 +2165,108 @@
         }
       }
     },
+    "chart.speech.band.confident": {
+      "comment": "Jumlah sampel di bawah atau tepat pada batas yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld confident."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yakin,"
+          }
+        }
+      }
+    },
+    "chart.speech.band.middle": {
+      "comment": "Jumlah sampel yang melewati batas yakin tapi belum batas jauh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld between the two thresholds."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld di antara dua batas,"
+          }
+        }
+      }
+    },
+    "chart.speech.band.tooFar": {
+      "comment": "Jumlah sampel yang melewati batas jauh.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld too far."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld terlalu jauh."
+          }
+        }
+      }
+    },
+    "chart.speech.measured": {
+      "comment": "Jumlah sampel yang punya jarak kandidat terukur.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld samples measured."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sampel terukur."
+          }
+        }
+      }
+    },
+    "chart.speech.nothingMeasured": {
+      "comment": "Cadangan pengumuman grafik saat belum ada jarak kandidat terukur; kalimat sama juga tampil di layar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No measured candidate distance yet."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada jarak kandidat yang terukur."
+          }
+        }
+      }
+    },
+    "chart.speech.unmeasured": {
+      "comment": "Jumlah sampel tanpa jarak kandidat terukur; hanya diucapkan kalau bukan nol.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld without a measured distance."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tanpa jarak terukur."
+          }
+        }
+      }
+    },
     "complication.stale": {
       "comment": "Baris kedua complication saat cuplikan terakhir sudah terlalu tua.",
       "localizations": {
@@ -2267,23 +2369,6 @@
         }
       }
     },
-    "deepSky.morphology.spiralGalaxy.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi spiral berlengan (M51/M101).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "spiral galaxy"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "galaksi spiral"
-          }
-        }
-      }
-    },
     "deepSky.morphology.globularCluster.spoken.label": {
       "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus bola.",
       "localizations": {
@@ -2318,6 +2403,23 @@
         }
       }
     },
+    "deepSky.morphology.openCluster.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gugus terbuka"
+          }
+        }
+      }
+    },
     "deepSky.morphology.planetaryNebula.spoken.label": {
       "comment": "Bentuk objek langit dalam untuk VoiceOver: nebula planetari — cangkang gas berongga, kebalikan nebula emisi yang memusat. Kata sendiri supaya pengguna VoiceOver tahu bedanya, karena gambarnya tidak bisa mereka lihat.",
       "localizations": {
@@ -2335,19 +2437,410 @@
         }
       }
     },
-    "deepSky.morphology.openCluster.spoken.label": {
-      "comment": "Bentuk objek langit dalam untuk VoiceOver: gugus terbuka.",
+    "deepSky.morphology.spiralGalaxy.spoken.label": {
+      "comment": "Bentuk objek langit dalam untuk VoiceOver: galaksi spiral berlengan (M51/M101).",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "open cluster"
+            "value": "spiral galaxy"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "gugus terbuka"
+            "value": "galaksi spiral"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.confident": {
+      "comment": "Legenda grafik keyakinan untuk pita yakin.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confident"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yakin"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.uncertain": {
+      "comment": "Legenda grafik keyakinan untuk pita ragu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uncertain"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ragu"
+          }
+        }
+      }
+    },
+    "diagnostics.legend.unknown": {
+      "comment": "Legenda grafik keyakinan untuk pita tidak tahu.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak tahu"
+          }
+        }
+      }
+    },
+    "diagnostics.row.calibration": {
+      "comment": "Judul baris kalibrasi pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalibrasi"
+          }
+        }
+      }
+    },
+    "diagnostics.row.catalogueId": {
+      "comment": "Judul baris pengenal katalog objek pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catalogue ID"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Id katalog"
+          }
+        }
+      }
+    },
+    "diagnostics.row.declination": {
+      "comment": "Judul baris deklinasi pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dec"
+          }
+        }
+      }
+    },
+    "diagnostics.row.deviceMotion": {
+      "comment": "Judul baris ketersediaan sensor gerak.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device motion"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device motion"
+          }
+        }
+      }
+    },
+    "diagnostics.row.direction": {
+      "comment": "Judul baris arah tunjuk (tinggi / azimut).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arah"
+          }
+        }
+      }
+    },
+    "diagnostics.row.guidance": {
+      "comment": "Judul baris panduan berikutnya pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guidance"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panduan"
+          }
+        }
+      }
+    },
+    "diagnostics.row.location": {
+      "comment": "Judul baris lokasi pengamat yang sedang dipakai.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokasi"
+          }
+        }
+      }
+    },
+    "diagnostics.row.locationSource": {
+      "comment": "Judul baris asal lokasi pengamat.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location source"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asal lokasi"
+          }
+        }
+      }
+    },
+    "diagnostics.row.magnitude": {
+      "comment": "Judul baris magnitudo objek pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnitude"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Magnitudo"
+          }
+        }
+      }
+    },
+    "diagnostics.row.object": {
+      "comment": "Judul baris objek yang sedang ditampilkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objek"
+          }
+        }
+      }
+    },
+    "diagnostics.row.objectStale": {
+      "comment": "Judul baris saat objek yang ditampilkan adalah hasil kedaluwarsa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Object (stale)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objek (sisa)"
+          }
+        }
+      }
+    },
+    "diagnostics.row.rightAscension": {
+      "comment": "Judul baris asensio rekta pada detail teknis.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RA"
+          }
+        }
+      }
+    },
+    "diagnostics.row.sample": {
+      "comment": "Judul baris jumlah sampel yang sudah terkumpul.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Samples"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sampel"
+          }
+        }
+      }
+    },
+    "diagnostics.row.sigmaInUse": {
+      "comment": "Judul baris sigma yang sedang dipakai kebijakan keyakinan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigma in use"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigma dipakai"
+          }
+        }
+      }
+    },
+    "diagnostics.row.state": {
+      "comment": "Judul baris keadaan engine pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keadaan"
+          }
+        }
+      }
+    },
+    "diagnostics.row.wristRate": {
+      "comment": "Judul baris laju pergelangan pada layar Diagnostik.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrist rate"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laju pergelangan"
+          }
+        }
+      }
+    },
+    "diagnostics.value.calibrated": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sudah"
+          }
+        }
+      }
+    },
+    "diagnostics.value.motionAvailable": {
+      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ada"
+          }
+        }
+      }
+    },
+    "diagnostics.value.motionUnavailable": {
+      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada"
+          }
+        }
+      }
+    },
+    "diagnostics.value.notCalibrated": {
+      "comment": "Nilai baris Kalibrasi saat kalibrasi belum terpasang.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum"
           }
         }
       }
@@ -2760,23 +3253,6 @@
         }
       }
     },
-    "experiment.medianError.label": {
-      "comment": "Judul baris galat median.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Median error"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Galat median"
-          }
-        }
-      }
-    },
     "experiment.medianCalibratedError.label": {
       "comment": "Judul baris galat median setelah kalibrasi.",
       "localizations": {
@@ -2790,6 +3266,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Galat median (terkalibrasi)"
+          }
+        }
+      }
+    },
+    "experiment.medianError.label": {
+      "comment": "Judul baris galat median.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Median error"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galat median"
           }
         }
       }
@@ -2913,23 +3406,6 @@
         }
       }
     },
-    "experiment.removeLast.label": {
-      "comment": "Label tombol buang percobaan terakhir.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Discard last trial"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buang percobaan terakhir"
-          }
-        }
-      }
-    },
     "experiment.refreshTargets.label": {
       "comment": "Label VoiceOver tombol segarkan daftar target (ikon panah berputar). Menyebut akibatnya: daftar dihitung ulang untuk langit SEKARANG, bukan sekadar \"muat ulang\".",
       "localizations": {
@@ -2943,6 +3419,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segarkan daftar target untuk langit sekarang"
+          }
+        }
+      }
+    },
+    "experiment.removeLast.label": {
+      "comment": "Label tombol buang percobaan terakhir.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard last trial"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buang percobaan terakhir"
           }
         }
       }
@@ -3151,23 +3644,6 @@
         }
       }
     },
-    "experiment.status.targetUncomputable": {
-      "comment": "Arah target kebenaran tidak bisa dihitung.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Direction of target %@ can't be computed — the trial was not saved."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arah target %@ tidak bisa dihitung — percobaan tidak disimpan."
-          }
-        }
-      }
-    },
     "experiment.status.targetBelowHorizon": {
       "comment": "Target kebenaran sudah terbenam saat tombol ditekan — percobaan tidak disimpan.",
       "localizations": {
@@ -3181,6 +3657,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ sudah terbenam — percobaan tidak disimpan."
+          }
+        }
+      }
+    },
+    "experiment.status.targetUncomputable": {
+      "comment": "Arah target kebenaran tidak bisa dihitung.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direction of target %@ can't be computed — the trial was not saved."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arah target %@ tidak bisa dihitung — percobaan tidak disimpan."
           }
         }
       }
@@ -3881,6 +4374,23 @@
         }
       }
     },
+    "link.row.sigma": {
+      "comment": "Sigma (σ) yang berlaku di jam saat pesan keadaan dikirim — angka inti dari hipotesis akurasi.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "σ from the watch"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "σ dari jam"
+          }
+        }
+      }
+    },
     "link.row.spread": {
       "comment": "Baris sebaran sisa",
       "localizations": {
@@ -4034,6 +4544,40 @@
         }
       }
     },
+    "link.speech.reachable": {
+      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone terjangkau. Bentuk penuh (ada titik akhir), bukan label baris 'pointing.link.connected'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone is connected."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone terhubung."
+          }
+        }
+      }
+    },
+    "link.speech.unreachable": {
+      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone tidak terjangkau. Bentuk penuh, bukan label baris.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone is not reachable."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone tidak terjangkau."
+          }
+        }
+      }
+    },
     "link.status.acknowledgement": {
       "comment": "Tanda terima diterima.",
       "localizations": {
@@ -4047,6 +4591,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tanda terima"
+          }
+        }
+      }
+    },
+    "link.status.activationFailed": {
+      "comment": "Sesi tautan gagal aktif; %@ adalah pesan sistemnya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session failed to activate: %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi gagal aktif: %@"
           }
         }
       }
@@ -4166,6 +4727,23 @@
           "stringUnit": {
             "state": "translated",
             "value": ". %lld %@."
+          }
+        }
+      }
+    },
+    "link.status.sendFailuresClause": {
+      "comment": "Klausa jumlah kiriman gagal yang menempel di belakang kalimat yang sudah selesai. Membawa pemisah di depan (spasi) karena kalimat tu sudah berakhir; bentuk . yang membawa titik dipakai untuk baris yang belum diakhiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " %lld %@."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " %lld %@."
           }
         }
       }
@@ -4370,6 +4948,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jakarta (bawaan)"
+          }
+        }
+      }
+    },
+    "location.source.corelocation": {
+      "comment": "Asal koordinat yang tampil di baris 'Asal lokasi'.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device GPS"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPS perangkat"
+          }
+        }
+      }
+    },
+    "location.source.fallback": {
+      "comment": "Asal koordinat darurat: langit dihitung untuk tempat lain.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default (not your location)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bawaan (bukan lokasimu)"
+          }
+        }
+      }
+    },
+    "location.source.manual": {
+      "comment": "Koordinat yang diketik pengguna sendiri.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entered manually"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimasukkan sendiri"
+          }
+        }
+      }
+    },
+    "location.source.simulator": {
+      "comment": "Koordinat dari simulator, bukan pengukuran.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simulator"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simulator"
+          }
+        }
+      }
+    },
+    "location.source.unknown": {
+      "comment": "Asal koordinat yang tidak dikenal; %@ adalah nama sumbernya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown (%@)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak diketahui (%@)"
           }
         }
       }
@@ -4881,6 +5544,456 @@
         }
       }
     },
+    "object.name.bulan": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulan"
+          }
+        }
+      }
+    },
+    "object.name.galaksiAndromeda": {
+      "comment": "Nama objek langit dalam (M31) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Andromeda Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Andromeda"
+          }
+        }
+      }
+    },
+    "object.name.galaksiBode": {
+      "comment": "Nama objek langit dalam (M81) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bode's Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Bode"
+          }
+        }
+      }
+    },
+    "object.name.galaksiKincirAngin": {
+      "comment": "Nama objek langit dalam (M101) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinwheel Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Kincir Angin"
+          }
+        }
+      }
+    },
+    "object.name.galaksiPusaran": {
+      "comment": "Nama objek langit dalam (M51) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whirlpool Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Pusaran"
+          }
+        }
+      }
+    },
+    "object.name.galaksiTriangulum": {
+      "comment": "Nama objek langit dalam (M33) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triangulum Galaxy"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galaksi Triangulum"
+          }
+        }
+      }
+    },
+    "object.name.gugusBebekLiar": {
+      "comment": "Nama objek langit dalam (M11) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wild Duck Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Bebek Liar"
+          }
+        }
+      }
+    },
+    "object.name.gugusHercules": {
+      "comment": "Nama objek langit dalam (M13) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hercules Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Hercules"
+          }
+        }
+      }
+    },
+    "object.name.gugusKupuKupu": {
+      "comment": "Nama objek langit dalam (M6) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Butterfly Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Kupu-kupu"
+          }
+        }
+      }
+    },
+    "object.name.gugusM2": {
+      "comment": "Nama objek langit dalam (M2) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M2 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M2"
+          }
+        }
+      }
+    },
+    "object.name.gugusM35": {
+      "comment": "Nama objek langit dalam (M35) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M35 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M35"
+          }
+        }
+      }
+    },
+    "object.name.gugusM41": {
+      "comment": "Nama objek langit dalam (M41) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M41 Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus M41"
+          }
+        }
+      }
+    },
+    "object.name.gugusPegasus": {
+      "comment": "Nama objek langit dalam (M15) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pegasus Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Pegasus"
+          }
+        }
+      }
+    },
+    "object.name.gugusPtolemy": {
+      "comment": "Nama objek langit dalam (M7) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ptolemy Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Ptolemy"
+          }
+        }
+      }
+    },
+    "object.name.gugusSagitarius": {
+      "comment": "Nama objek langit dalam (M22) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sagittarius Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sagitarius"
+          }
+        }
+      }
+    },
+    "object.name.gugusSarangLebah": {
+      "comment": "Nama objek langit dalam (M44) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beehive Cluster"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gugus Sarang Lebah"
+          }
+        }
+      }
+    },
+    "object.name.jupiter": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jupiter"
+          }
+        }
+      }
+    },
+    "object.name.mars": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mars"
+          }
+        }
+      }
+    },
+    "object.name.matahari": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matahari"
+          }
+        }
+      }
+    },
+    "object.name.merkurius": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merkurius"
+          }
+        }
+      }
+    },
+    "object.name.nebulaCincin": {
+      "comment": "Nama objek langit dalam (M57) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ring Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Cincin"
+          }
+        }
+      }
+    },
+    "object.name.nebulaDumbel": {
+      "comment": "Nama objek langit dalam (M27) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dumbbell Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Dumbel"
+          }
+        }
+      }
+    },
+    "object.name.nebulaLaguna": {
+      "comment": "Nama objek langit dalam (M8) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lagoon Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Laguna"
+          }
+        }
+      }
+    },
+    "object.name.nebulaOmega": {
+      "comment": "Nama objek langit dalam (M17) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Omega Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Omega"
+          }
+        }
+      }
+    },
+    "object.name.nebulaOrion": {
+      "comment": "Nama objek langit dalam (M42) — frasa yang dirakit katalog engine.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orion Nebula"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nebula Orion"
+          }
+        }
+      }
+    },
+    "object.name.neptunus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neptunus"
+          }
+        }
+      }
+    },
+    "object.name.pleiades": {
+      "comment": "Nama objek langit dalam (M45) yang dipasang katalog engine. Kata tunggal, dan sama di dua bahasa — barisnya tetap ada supaya cakupan kunci object.name.* lengkap dan bisa diperiksa.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleiades"
+          }
+        }
+      }
+    },
+    "object.name.saturnus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saturnus"
+          }
+        }
+      }
+    },
+    "object.name.uranus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uranus"
+          }
+        }
+      }
+    },
+    "object.name.venus": {
+      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Venus"
+          }
+        }
+      }
+    },
     "object.speech.confidence": {
       "comment": "VoiceOver: tingkat keyakinan objek. %@ = nama tingkat (Yakin/Ragu/Tidak tahu), sudah diterjemahkan sendiri.",
       "localizations": {
@@ -5319,6 +6432,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nonaktifkan Mode Malam"
+          }
+        }
+      }
+    },
+    "pointing.rate.tooFast": {
+      "comment": "Penanda kedua (bukan warna) saat laju sudut melewati ambang: pengguna buta warna harus bisa membedakan 'terlalu cepat' dari 'diam' tanpa membedakan warna.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cepat"
           }
         }
       }
@@ -5833,40 +6963,6 @@
         }
       }
     },
-    "sensor.location.restricted.status": {
-      "comment": "Status singkat saat izin lokasi dibatasi perangkat (bukan ditolak pengguna).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location permission restricted by the device — using the default location"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Izin lokasi dibatasi perangkat — memakai lokasi bawaan"
-          }
-        }
-      }
-    },
-    "sensor.location.restricted.note": {
-      "comment": "Penjelasan saat izin lokasi dibatasi perangkat (Pembatasan Orang Tua / MDM). Sengaja tidak menyuruh membuka Pengaturan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location permission is restricted by the device (e.g. Parental Controls or a school profile). This app is not what is blocking it, so no setting here can change it. The app keeps running with the default location (Jakarta)."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Izin lokasi dibatasi perangkat (mis. Pembatasan Orang Tua atau profil sekolah). Bukan aplikasi ini yang memblokirnya, jadi tidak ada pengaturan di sini yang bisa mengubahnya. Aplikasi tetap berjalan dengan lokasi bawaan (Jakarta)."
-          }
-        }
-      }
-    },
     "sensor.location.denied.status": {
       "comment": "Status singkat saat izin lokasi ditolak.",
       "localizations": {
@@ -5935,6 +7031,40 @@
         }
       }
     },
+    "sensor.location.restricted.note": {
+      "comment": "Penjelasan saat izin lokasi dibatasi perangkat (Pembatasan Orang Tua / MDM). Sengaja tidak menyuruh membuka Pengaturan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location permission is restricted by the device (e.g. Parental Controls or a school profile). This app is not what is blocking it, so no setting here can change it. The app keeps running with the default location (Jakarta)."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin lokasi dibatasi perangkat (mis. Pembatasan Orang Tua atau profil sekolah). Bukan aplikasi ini yang memblokirnya, jadi tidak ada pengaturan di sini yang bisa mengubahnya. Aplikasi tetap berjalan dengan lokasi bawaan (Jakarta)."
+          }
+        }
+      }
+    },
+    "sensor.location.restricted.status": {
+      "comment": "Status singkat saat izin lokasi dibatasi perangkat (bukan ditolak pengguna).",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location permission restricted by the device — using the default location"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izin lokasi dibatasi perangkat — memakai lokasi bawaan"
+          }
+        }
+      }
+    },
     "sensor.location.searching": {
       "comment": "Status saat lokasi sedang dicari.",
       "localizations": {
@@ -5982,6 +7112,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Menunggu izin lokasi…"
+          }
+        }
+      }
+    },
+    "sensor.motion.failed": {
+      "comment": "Sensor gerak berhenti di tengah pemakaian; %@ adalah pesan sistemnya.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion sensor stopped: %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sensor gerak berhenti: %@"
           }
         }
       }
@@ -6241,23 +7388,6 @@
         }
       }
     },
-    "slew.hazard.belowAltitudeLimit": {
-      "comment": "Bahaya GoTo: target di bawah batas mekanis ketinggian teleskop.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Below the telescope's altitude limit."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Di bawah batas ketinggian teleskop."
-          }
-        }
-      }
-    },
     "slew.hazard.aboveAltitudeLimit": {
       "comment": "Bahaya GoTo: target melewati batas maksimum ketinggian teleskop (batas meridian).",
       "localizations": {
@@ -6271,6 +7401,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Di atas batas ketinggian teleskop — lewat batas meridian."
+          }
+        }
+      }
+    },
+    "slew.hazard.belowAltitudeLimit": {
+      "comment": "Bahaya GoTo: target di bawah batas mekanis ketinggian teleskop.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Below the telescope's altitude limit."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Di bawah batas ketinggian teleskop."
           }
         }
       }
@@ -6394,6 +7541,23 @@
         }
       }
     },
+    "star.class.line.spoken.label": {
+      "comment": "Kelas spektral bintang untuk VoiceOver: huruf kelas + angka (mis. B8, M1). Bagian nama bintang yang dipakai katalog teleskop; %1$@ diisi kode kelas yang sama di semua bahasa. Lihat StarNameSpeech.swift.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "spectral class %1$@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kelas spektral %1$@"
+          }
+        }
+      }
+    },
     "star.color.blue.spoken.label": {
       "comment": "Warna spektral bintang untuk VoiceOver: biru (kelas B hingga awal A, B−V ≤ −0,10). Lihat StarColorSpeech.swift.",
       "localizations": {
@@ -6486,742 +7650,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "not analysed"
-          }
-        }
-      }
-    },
-    "uncertain.reason.ambiguous": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neighbour too close"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tetangga terlalu dekat"
-          }
-        }
-      }
-    },
-    "uncertain.reason.none": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No measured cause"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tanpa sebab terukur"
-          }
-        }
-      }
-    },
-    "uncertain.reason.tooFar": {
-      "comment": "",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Candidate too far"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kandidat terlalu jauh"
-          }
-        }
-      }
-    },
-    "σ": {
-      "comment": "Label sumbu Y grafik keyakinan: simpangan baku (sigma). Simbol sama di kedua bahasa.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "σ"
-          }
-        }
-      }
-    },
-    "—": {
-      "comment": "Penanda nilai kosong pada baris tabel.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "—"
-          }
-        }
-      }
-    },
-    "location.source.corelocation": {
-      "comment": "Asal koordinat yang tampil di baris 'Asal lokasi'.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Device GPS"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "GPS perangkat"
-          }
-        }
-      }
-    },
-    "location.source.fallback": {
-      "comment": "Asal koordinat darurat: langit dihitung untuk tempat lain.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default (not your location)"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bawaan (bukan lokasimu)"
-          }
-        }
-      }
-    },
-    "location.source.manual": {
-      "comment": "Koordinat yang diketik pengguna sendiri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Entered manually"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dimasukkan sendiri"
-          }
-        }
-      }
-    },
-    "location.source.simulator": {
-      "comment": "Koordinat dari simulator, bukan pengukuran.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simulator"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simulator"
-          }
-        }
-      }
-    },
-    "location.source.unknown": {
-      "comment": "Asal koordinat yang tidak dikenal; %@ adalah nama sumbernya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown (%@)"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tidak diketahui (%@)"
-          }
-        }
-      }
-    },
-    "sensor.motion.failed": {
-      "comment": "Sensor gerak berhenti di tengah pemakaian; %@ adalah pesan sistemnya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Motion sensor stopped: %@"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sensor gerak berhenti: %@"
-          }
-        }
-      }
-    },
-    "link.status.activationFailed": {
-      "comment": "Sesi tautan gagal aktif; %@ adalah pesan sistemnya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session failed to activate: %@"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sesi gagal aktif: %@"
-          }
-        }
-      }
-    },
-    "link.speech.reachable": {
-      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone terjangkau. Bentuk penuh (ada titik akhir), bukan label baris 'pointing.link.connected'.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone is connected."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone terhubung."
-          }
-        }
-      }
-    },
-    "link.speech.unreachable": {
-      "comment": "Kalimat pembuka baris tautan untuk VoiceOver saat iPhone tidak terjangkau. Bentuk penuh, bukan label baris.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone is not reachable."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone tidak terjangkau."
-          }
-        }
-      }
-    },
-    "link.status.sendFailuresClause": {
-      "comment": "Klausa jumlah kiriman gagal yang menempel di belakang kalimat yang sudah selesai. Membawa pemisah di depan (spasi) karena kalimat tu sudah berakhir; bentuk . yang membawa titik dipakai untuk baris yang belum diakhiri.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": " %lld %@."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": " %lld %@."
-          }
-        }
-      }
-    },
-    "chart.speech.measured": {
-      "comment": "Jumlah sampel yang punya jarak kandidat terukur.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld samples measured."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld sampel terukur."
-          }
-        }
-      }
-    },
-    "chart.speech.band.confident": {
-      "comment": "Jumlah sampel di bawah atau tepat pada batas yakin.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld confident."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yakin,"
-          }
-        }
-      }
-    },
-    "chart.speech.band.middle": {
-      "comment": "Jumlah sampel yang melewati batas yakin tapi belum batas jauh.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld between the two thresholds."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld di antara dua batas,"
-          }
-        }
-      }
-    },
-    "chart.speech.band.tooFar": {
-      "comment": "Jumlah sampel yang melewati batas jauh.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld too far."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld terlalu jauh."
-          }
-        }
-      }
-    },
-    "chart.speech.unmeasured": {
-      "comment": "Jumlah sampel tanpa jarak kandidat terukur; hanya diucapkan kalau bukan nol.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld without a measured distance."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld tanpa jarak terukur."
-          }
-        }
-      }
-    },
-    "chart.speech.nothingMeasured": {
-      "comment": "Cadangan pengumuman grafik saat belum ada jarak kandidat terukur; kalimat sama juga tampil di layar.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No measured candidate distance yet."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Belum ada jarak kandidat yang terukur."
-          }
-        }
-      }
-    },
-    "diagnostics.row.state": {
-      "comment": "Judul baris keadaan engine pada layar Diagnostik.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "State"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keadaan"
-          }
-        }
-      }
-    },
-    "diagnostics.row.guidance": {
-      "comment": "Judul baris panduan berikutnya pada layar Diagnostik.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guidance"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Panduan"
-          }
-        }
-      }
-    },
-    "diagnostics.row.calibration": {
-      "comment": "Judul baris kalibrasi pada layar Diagnostik.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calibration"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kalibrasi"
-          }
-        }
-      }
-    },
-    "diagnostics.row.wristRate": {
-      "comment": "Judul baris laju pergelangan pada layar Diagnostik.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wrist rate"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Laju pergelangan"
-          }
-        }
-      }
-    },
-    "diagnostics.row.object": {
-      "comment": "Judul baris objek yang sedang ditampilkan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Object"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Objek"
-          }
-        }
-      }
-    },
-    "diagnostics.row.objectStale": {
-      "comment": "Judul baris saat objek yang ditampilkan adalah hasil kedaluwarsa.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Object (stale)"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Objek (sisa)"
-          }
-        }
-      }
-    },
-    "diagnostics.row.direction": {
-      "comment": "Judul baris arah tunjuk (tinggi / azimut).",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Direction"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Arah"
-          }
-        }
-      }
-    },
-    "diagnostics.row.sigmaInUse": {
-      "comment": "Judul baris sigma yang sedang dipakai kebijakan keyakinan.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigma in use"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sigma dipakai"
-          }
-        }
-      }
-    },
-    "diagnostics.row.deviceMotion": {
-      "comment": "Judul baris ketersediaan sensor gerak.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Device motion"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Device motion"
-          }
-        }
-      }
-    },
-    "diagnostics.row.sample": {
-      "comment": "Judul baris jumlah sampel yang sudah terkumpul.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Samples"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sampel"
-          }
-        }
-      }
-    },
-    "diagnostics.row.location": {
-      "comment": "Judul baris lokasi pengamat yang sedang dipakai.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lokasi"
-          }
-        }
-      }
-    },
-    "diagnostics.row.locationSource": {
-      "comment": "Judul baris asal lokasi pengamat.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Location source"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Asal lokasi"
-          }
-        }
-      }
-    },
-    "diagnostics.row.magnitude": {
-      "comment": "Judul baris magnitudo objek pada detail teknis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Magnitude"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Magnitudo"
-          }
-        }
-      }
-    },
-    "diagnostics.row.rightAscension": {
-      "comment": "Judul baris asensio rekta pada detail teknis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RA"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "RA"
-          }
-        }
-      }
-    },
-    "diagnostics.row.declination": {
-      "comment": "Judul baris deklinasi pada detail teknis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dec"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dec"
-          }
-        }
-      }
-    },
-    "diagnostics.row.catalogueId": {
-      "comment": "Judul baris pengenal katalog objek pada detail teknis.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Catalogue ID"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Id katalog"
-          }
-        }
-      }
-    },
-    "diagnostics.legend.confident": {
-      "comment": "Legenda grafik keyakinan untuk pita yakin.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Confident"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yakin"
-          }
-        }
-      }
-    },
-    "diagnostics.legend.uncertain": {
-      "comment": "Legenda grafik keyakinan untuk pita ragu.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uncertain"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ragu"
-          }
-        }
-      }
-    },
-    "diagnostics.legend.unknown": {
-      "comment": "Legenda grafik keyakinan untuk pita tidak tahu.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tidak tahu"
-          }
-        }
-      }
-    },
-    "diagnostics.value.calibrated": {
-      "comment": "Nilai baris Kalibrasi saat kalibrasi sudah terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yes"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sudah"
-          }
-        }
-      }
-    },
-    "diagnostics.value.notCalibrated": {
-      "comment": "Nilai baris Kalibrasi saat kalibrasi belum terpasang.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Belum"
-          }
-        }
-      }
-    },
-    "diagnostics.value.motionAvailable": {
-      "comment": "Nilai baris Device motion saat sensor gerak tersedia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Available"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ada"
-          }
-        }
-      }
-    },
-    "diagnostics.value.motionUnavailable": {
-      "comment": "Nilai baris Device motion saat sensor gerak tidak tersedia.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not available"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tidak ada"
           }
         }
       }
@@ -7498,486 +7926,75 @@
         }
       }
     },
-    "object.name.bulan": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
+    "uncertain.reason.ambiguous": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bulan"
-          }
-        }
-      }
-    },
-    "object.name.galaksiAndromeda": {
-      "comment": "Nama objek langit dalam (M31) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Andromeda Galaxy"
+            "value": "Neighbour too close"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Galaksi Andromeda"
+            "value": "Tetangga terlalu dekat"
           }
         }
       }
     },
-    "object.name.galaksiKincirAngin": {
-      "comment": "Nama objek langit dalam (M101) — frasa yang dirakit katalog engine.",
+    "uncertain.reason.none": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pinwheel Galaxy"
+            "value": "No measured cause"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Galaksi Kincir Angin"
+            "value": "Tanpa sebab terukur"
           }
         }
       }
     },
-    "object.name.galaksiPusaran": {
-      "comment": "Nama objek langit dalam (M51) — frasa yang dirakit katalog engine.",
+    "uncertain.reason.tooFar": {
+      "comment": "",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Whirlpool Galaxy"
+            "value": "Candidate too far"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Galaksi Pusaran"
+            "value": "Kandidat terlalu jauh"
           }
         }
       }
     },
-    "object.name.galaksiTriangulum": {
-      "comment": "Nama objek langit dalam (M33) — frasa yang dirakit katalog engine.",
+    "σ": {
+      "comment": "Label sumbu Y grafik keyakinan: simpangan baku (sigma). Simbol sama di kedua bahasa.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Triangulum Galaxy"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Galaksi Triangulum"
+            "value": "σ"
           }
         }
       }
     },
-    "object.name.gugusBebekLiar": {
-      "comment": "Nama objek langit dalam (M11) — frasa yang dirakit katalog engine.",
+    "—": {
+      "comment": "Penanda nilai kosong pada baris tabel.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wild Duck Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Bebek Liar"
-          }
-        }
-      }
-    },
-    "object.name.gugusHercules": {
-      "comment": "Nama objek langit dalam (M13) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hercules Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Hercules"
-          }
-        }
-      }
-    },
-    "object.name.gugusKupuKupu": {
-      "comment": "Nama objek langit dalam (M6) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Butterfly Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Kupu-kupu"
-          }
-        }
-      }
-    },
-    "object.name.gugusM2": {
-      "comment": "Nama objek langit dalam (M2) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "M2 Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus M2"
-          }
-        }
-      }
-    },
-    "object.name.gugusM35": {
-      "comment": "Nama objek langit dalam (M35) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "M35 Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus M35"
-          }
-        }
-      }
-    },
-    "object.name.gugusPtolemy": {
-      "comment": "Nama objek langit dalam (M7) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ptolemy Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Ptolemy"
-          }
-        }
-      }
-    },
-    "object.name.gugusSagitarius": {
-      "comment": "Nama objek langit dalam (M22) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sagittarius Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Sagitarius"
-          }
-        }
-      }
-    },
-    "object.name.gugusSarangLebah": {
-      "comment": "Nama objek langit dalam (M44) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Beehive Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Sarang Lebah"
-          }
-        }
-      }
-    },
-    "object.name.jupiter": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jupiter"
-          }
-        }
-      }
-    },
-    "object.name.mars": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mars"
-          }
-        }
-      }
-    },
-    "object.name.matahari": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Matahari"
-          }
-        }
-      }
-    },
-    "object.name.merkurius": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Merkurius"
-          }
-        }
-      }
-    },
-    "object.name.nebulaCincin": {
-      "comment": "Nama objek langit dalam (M57) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ring Nebula"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nebula Cincin"
-          }
-        }
-      }
-    },
-    "object.name.nebulaDumbel": {
-      "comment": "Nama objek langit dalam (M27) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dumbbell Nebula"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nebula Dumbel"
-          }
-        }
-      }
-    },
-    "object.name.nebulaLaguna": {
-      "comment": "Nama objek langit dalam (M8) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lagoon Nebula"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nebula Laguna"
-          }
-        }
-      }
-    },
-    "object.name.nebulaOmega": {
-      "comment": "Nama objek langit dalam (M17) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Omega Nebula"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nebula Omega"
-          }
-        }
-      }
-    },
-    "object.name.nebulaOrion": {
-      "comment": "Nama objek langit dalam (M42) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Orion Nebula"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nebula Orion"
-          }
-        }
-      }
-    },
-    "object.name.gugusM41": {
-      "comment": "Nama objek langit dalam (M41) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "M41 Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus M41"
-          }
-        }
-      }
-    },
-    "object.name.galaksiBode": {
-      "comment": "Nama objek langit dalam (M81) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bode's Galaxy"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Galaksi Bode"
-          }
-        }
-      }
-    },
-    "object.name.gugusPegasus": {
-      "comment": "Nama objek langit dalam (M15) — frasa yang dirakit katalog engine.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pegasus Cluster"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gugus Pegasus"
-          }
-        }
-      }
-    },
-    "object.name.neptunus": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Neptunus"
-          }
-        }
-      }
-    },
-    "object.name.pleiades": {
-      "comment": "Nama objek langit dalam (M45) yang dipasang katalog engine. Kata tunggal, dan sama di dua bahasa — barisnya tetap ada supaya cakupan kunci object.name.* lengkap dan bisa diperiksa.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pleiades"
-          }
-        }
-      }
-    },
-    "object.name.saturnus": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saturnus"
-          }
-        }
-      }
-    },
-    "object.name.uranus": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uranus"
-          }
-        }
-      }
-    },
-    "object.name.venus": {
-      "comment": "Nama benda tata surya yang dirakit engine ke CelestialObject.name — jalur ObjectDisplayName.text(_:). Bentuk Indonesia tidak diduplikasi ke localizations.id karena sourceLanguage katalog adalah id; LocalizedText.id di BodyName yang menyimpannya.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Venus"
-          }
-        }
-      }
-    },
-    "star.class.line.spoken.label": {
-      "comment": "Kelas spektral bintang untuk VoiceOver: huruf kelas + angka (mis. B8, M1). Bagian nama bintang yang dipakai katalog teleskop; %1$@ diisi kode kelas yang sama di semua bahasa. Lihat StarNameSpeech.swift.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "spectral class %1$@"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "kelas spektral %1$@"
-          }
-        }
-      }
-    },
-    "pointing.rate.tooFast": {
-      "comment": "Penanda kedua (bukan warna) saat laju sudut melewati ambang: pengguna buta warna harus bisa membedakan 'terlalu cepat' dari 'diam' tanpa membedakan warna.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fast"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cepat"
+            "value": "—"
           }
         }
       }
