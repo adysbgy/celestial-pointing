@@ -1,3 +1,84 @@
+### Siklus (22 Okt 2026 — `planet-saturn-no-feature`: pembanding yang kosong)
+
+`Tools/render-visuals.py` sudah lama punya kasus pembanding `planet-X-no-feature`
+untuk gerbang keterbacaan ciri. Untuk Saturnus, kasus itu menghasilkan frame
+**kosong**. Terukur pada pohon sebelum perbaikan, proses baru:
+
+    ukuran  38 px   0 dari   1 444 piksel
+    ukuran  76 px   0 dari   5 776 piksel
+    ukuran 200 px   0 dari  40 000 piksel
+    ukuran 300 px   0 dari  90 000 piksel
+
+Penyebabnya bukan angka yang salah, melainkan satu `return` yang melewatkan
+penggambaran: `_draw_rings` adalah satu-satunya ciri yang menggambar bola
+Saturnus sendiri (`saturn_body_radius`, 0,53 R). Karena itu `_draw_planet`
+melewati `_draw_sphere` untuk Saturnus — benar, supaya tidak ada dua piringan
+bersarang — dan cabang `feature_off` lalu `return` tanpa menggambar apa pun.
+
+#### Kenapa ini bukan satu gambar jelek
+
+Kasus itu adalah **pembanding**. `check_features_survive_the_watch_size`
+mengukur selisih `planet-saturn-confirmed` terhadap
+`planet-saturn-no-feature`, dan membandingkan lawan frame kosong membuat
+selisihnya **selalu** besar. Gerbangnya jadi mustahil gagal — ia bukan
+pembanding "tanpa ciri" melainkan "tanpa apa pun".
+
+Yang membuatnya bertahan satu siklus: seluruh 123 pemeriksaan lain tetap hijau.
+`check_night_mode_purity` hijau karena frame kosong memang nol hijau/biru —
+benar secara harfiah. `check_night_mode_never_exceeds_day` hijau karena
+nol <= nol. Kelas cacatnya sama dengan yang sudah dibayar repo ini: **gerbang
+yang hijau karena tidak ada yang diukur.**
+
+#### Gerbangnya: `check_every_catalog_case_draws_something`
+
+Daftarnya diturunkan dari `build_cases()`, bukan ditulis tangan — kasus render
+baru, dan setiap `-no-feature`/`-bare`/`-uncertain`/`-plain` yang lahir
+bersamanya, ikut terukur pada hari ia ditambahkan. Katalog kosong menghasilkan
+merah, bukan hijau karena tidak ada yang diperiksa.
+
+Ukurannya dari **token** (`WatchMetrics.visualDiameter`), bukan angka di dalam
+gerbang; token hilang membuat gerbang merah, bukan diam-diam melewati
+pengukuran. Kedua mode diukur, karena `render()` memilih latar berbeda untuk
+siang dan malam — cacat ini sempat terlihat hanya di satu mode pada percobaan
+pertama.
+
+Lantainya **diukur, bukan dipilih** (`ss=1`, ukuran kartu jam, kedua mode,
+seluruh katalog):
+
+    ukuran 38 px   moon-new              1,11%  (16 dari 1444)
+                   deepsky-unknown-id     1,18%  (17 dari 1444)
+    ukuran 48 px   deepsky-unknown-id     1,13%  (26 dari 2304)
+    cacat yang ditutup                    0,00%
+
+`CATALOG_MIN_COVERAGE = 0.005` diletakkan di bawah **setengah** kasus terkecil
+yang sah dan jauh di atas nol. Ia tidak diklaim sebagai batas persepsi; yang
+diklaim adalah bahwa kasus yang mengisi kurang dari 0,5% frame tidak lagi
+menggambar bendanya.
+
+#### Bukti bahwa gerbangnya bisa merah
+
+Dijalankan dengan sumber **sebelum** perbaikan (`git checkout
+Tools/render-visuals.py`), proses baru:
+
+    178 pemeriksaan, 2 gagal
+    GAGAL katalog tidak kosong: planet-saturn-no-feature (siang)  0.00%
+    GAGAL katalog tidak kosong: planet-saturn-no-feature (malam)  0.00%
+
+Merah **tepat dua** hasil, menyebut nama kasusnya, di kedua mode. Dengan
+perbaikan: 178 pemeriksaan, 0 gagal. `Tools/bukti-mutasi-katalog-kosong.py`
+menjalankan arah itu di CI — tiga keadaan: baseline hijau, bola Saturnus
+`feature_off` dihilangkan lagi (merah di kedua mode), dan kontrol negatif
+(prosa diubah, wajib hijau).
+
+#### Yang TIDAK diklaim
+
+Gerbang ini membuktikan frame **tidak kosong**, bukan bahwa yang tergambar
+adalah benda yang benar: satu bintik acak di tengah frame lolos di sini. Yang
+menjaga isinya adalah gerbang ciri. Mutasinya di port Python; view Swift dijaga
+gerbang lint dan gerbang geometris lain.
+
+`./swift-test.sh`: 1038 tes, 0 gagal.
+
 ### Siklus (21 Okt 2026 — `PhoneLinkService`: cabang yang berjanji menjawab, dan tidak menjawab)
 
 `Apps/PointAndKnowiOS/Sources/PhoneLinkService.swift` satu dari tiga berkas
