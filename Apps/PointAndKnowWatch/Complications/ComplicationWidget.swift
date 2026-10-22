@@ -11,14 +11,19 @@ import PointingKit
 /// proses **terpisah** dari app jam, jadi ia tidak membaca engine langsung —
 /// ia membaca `ComplicationStore.shared.read()` (berkas yang dibagi app).
 ///
-/// **Kenapa timeline statis + reload.** Kita tidak tahu kapan pengguna
-/// mengunci, jadi entri tunggal berlaku "selamanya" (sampai app memanggil
-/// `WidgetCenter.shared.reloadAllTimelines()` saat snapshot berubah). Di sini
-/// kita cukup beri satu entri; app memicu reload lewat
-/// `PointingEngine.complicationReload` (lihat `recordComplicationIfChanged`).
-/// Panggilan itu **wajib**: menulis berkas snapshot tidak membuat watchOS
-/// menggambar ulang apa pun, jadi tanpa reload complication membaca sekali lalu
-/// membeku di objek pertama selamanya.
+/// **Kenapa timeline menyegar sekali, di ambang basi.** Kita tidak tahu kapan
+/// pengguna mengunci, jadi entri berikutnya tidak bisa dijadwalkan dari
+/// peristiwa — hanya dari **umur cuplikan**. `nextRefreshDate(after:)`
+/// mengembalikan saat cuplikan berhenti boleh mengaku terkunci, dan timeline
+/// memakai `.after(tanggal itu)`. Sebelumnya di sini ada `policy: .never`,
+/// yang membuat lapisan basi mustahil tampil: complication hanya digambar
+/// ulang saat app memanggil `reloadAllTimelines()`, dan cuplikan yang menua
+/// tidak mengubah apa pun. Lihat `ComplicationDigest.nextRefreshDate(after:)`
+/// untuk alasannya, dan Aturan 99 untuk gerbangnya.
+///
+/// Reload dari app tetap **wajib**: menulis berkas snapshot tidak membuat
+/// watchOS menggambar ulang apa pun, jadi tanpa reload complication tetap
+/// membaca sekali lalu membeku di objek pertama sampai jadwal di atas tiba.
 @main
 struct PointAndKnowComplication: Widget {
 

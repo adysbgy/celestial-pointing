@@ -91,10 +91,11 @@ public final class PointingEngine: ObservableObject {
     /// ada di Apple platform, dan kelas ini diuji di Linux — persis alasan
     /// `haptics` juga berupa closure. Di sini alasan itu lebih keras lagi:
     /// menulis berkas snapshot **tidak** membuat watchOS menggambar ulang apa
-    /// pun. Complication memakai `Timeline(entries:policy:.never)` — satu entri
-    /// yang berlaku sampai ada yang memintanya berhenti — jadi tanpa panggilan
-    /// ini ia membaca ringkasan sekali lalu membeku di objek pertama selamanya.
-    /// Berkasnya selalu benar; layarnya yang tidak pernah menyegar.
+    /// pun. Complication menjadwalkan penyegaran dari umur cuplikan
+    /// (`ComplicationDigest.nextRefreshDate(after:)`), tetapi jadwal itu hanya
+    /// menjaga **penanda basi**; ia tidak tahu bahwa ada objek baru terkunci.
+    /// Tanpa panggilan ini complication tetap menampilkan objek lama sampai
+    /// ambang basi tiba. Berkasnya selalu benar; layarnya yang tidak menyegar.
     public var complicationReload: (() -> Void)?
 
     public init(location: ObserverLocation = .fallback,
