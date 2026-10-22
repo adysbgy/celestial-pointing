@@ -118,5 +118,18 @@ struct PointAndKnowWatchApp: App {
         motion.stop()
         engine.stop()
         location.stop()
+        // Sesi audio dilepas di sini, bukan dibiarkan hidup.
+        //
+        // **Kenapa ini tidak cukup diselesaikan oleh `PointingEngine.stop()`.**
+        // Mesin itu membatalkan alur dan objek terakhir; ia tidak tahu apa pun
+        // tentang audio — pemutar bunyi disuntikkan sebagai closure, jadi
+        // pemiliknya adalah app. Tanpa baris ini, `setActive(true)` dari bunyi
+        // kunci terakhir menahan sesi audio tetap aktif sampai watchOS
+        // mematikan prosesnya, dan tidak satu pun gerbang berbunyi.
+        //
+        // Aturan 94 menuntut pasangan ini; ia memanen pasangan
+        // akuisisi/pelepasan dari **setiap** berkas di `Apps/`, jadi kelas
+        // cacat yang sama pada sumber daya berikutnya langsung tertangkap.
+        audioCue.stop()
     }
 }

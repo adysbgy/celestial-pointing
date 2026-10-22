@@ -180,6 +180,12 @@ struct RootView: View {
         motion.stop()
         engine.stop()
         location.stop()
+        // Sama seperti app jam: sesi audio yang diakuisisi bunyi kunci terakhir
+        // harus dilepas saat app pergi. Di iPhone akibatnya berbeda —
+        // `.playback` yang tetap aktif memotong audio app lain lebih lama dari
+        // yang seharusnya — tetapi kelas cacatnya identik, dan Aturan 94
+        // menuntut pasangannya di **kedua** app, bukan hanya yang diukur.
+        audioCue.stop()
     }
 }
 

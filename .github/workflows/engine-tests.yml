@@ -3072,5 +3072,22 @@ jobs:
       - name: Buktikan Aturan 93 berbunyi
         run: python3 Tools/bukti-mutasi-aturan93-siklus-sensor.py
 
+      # Aturan 94 mengukur SIKLUS HIDUP SUMBER DAYA BERSAMA di seluruh Apps/:
+      # setiap akuisisi (`setActive(true)`, `startUpdatingLocation`, …) wajib
+      # punya pelepasan yang dipanggil lewat **penerimanya sendiri**, di
+      # **setiap berkas yang membuat instance-nya**. Cacat aslinya terukur:
+      # `setActive(true)` di `AudioCue.swift` tidak punya `setActive(false)` di
+      # mana pun, sehingga bunyi 0,13 detik menahan sesi audio aktif sampai
+      # watchOS mematikan prosesnya — baterai yang dibayar untuk suara yang
+      # sudah lama habis. Aturan 93 tidak bisa melihatnya (akuisisinya malas,
+      # di dalam `AudioCueEngine`, bukan di badan `start()`), compiler diam,
+      # dan teks di layar tidak berubah. Harness ini menuntut aturan berbunyi
+      # pada lima cara memutusnya — termasuk menghapus panggilan di **satu**
+      # app saja, yang membuat versi pertama gerbang ini tetap hijau karena
+      # `motion.stop()` di berkas yang sama dipakai sebagai bukti — serta diam
+      # pada pohon bersih.
+      - name: Buktikan Aturan 94 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan94-siklus-sumber-daya.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

@@ -87,6 +87,40 @@ final class AudioCueEngine {
         node.scheduleBuffer(buf, at: nil, options: .interrupts)
         if !node.isPlaying { node.play() }
     }
+
+    /// Lepaskan sesi audio dan mesinnya.
+    ///
+    /// **Kenapa ini ada, padahal `ensureResources` sudah malas.** Bunyi kunci
+    /// hanya 0,13 detik, tetapi biayanya dibayar setelah bunyinya habis:
+    /// `setActive(true)` menahan sesi audio tetap aktif, dan sesi aktif
+    /// menahan perangkat audio bangun. Pada jam yang dipakai sepanjang malam
+    /// di lapangan, itu baterai yang dibayar untuk suara yang tidak ada.
+    ///
+    /// **Ini kelas cacat yang tidak terlihat gerbang mana pun.** Diukur dengan
+    /// menyapu seluruh `Apps/` untuk pasangan akuisisi/pelepasan: pembaruan
+    /// lokasi punya `startUpdatingLocation`/`stopUpdatingLocation`, device
+    /// motion punya pasangannya, dan `setActive(true)` **tidak punya
+    /// `setActive(false)` di mana pun**. Aturan 93 tidak bisa melihatnya
+    /// karena ia memanen pasangan dari badan `start()` app jam — sedangkan
+    /// sesi audio diakuisisi **malas**, di dalam `AudioCueEngine`, bukan di
+    /// `start()`. Compiler juga diam: tidak ada yang salah secara sintaks.
+    ///
+    /// Aman dipanggil saat belum pernah ada bunyi: semuanya `guard`/`try?`,
+    /// jadi app yang tidak pernah berbunyi tidak membayar apa pun.
+    func stop() {
+        guard audioEngine != nil else { return }
+        playerNode?.stop()
+        audioEngine?.stop()
+        // Urutannya penting: mesin dihentikan **sebelum** sesi dilepas.
+        // Melepas sesi yang masih dipakai mesin membuat `AVAudioSession`
+        // menghentikan mesin dengan cara yang tidak terkendali, dan itu
+        // memunculkan galat yang tidak bisa dibedakan dari kegagalan nyata.
+        try? AVAudioSession.sharedInstance().setActive(false,
+                                                       options: .notifyOthersOnDeactivation)
+        audioEngine = nil
+        playerNode = nil
+        buffer = nil
+    }
 }
 
 /// Preferensi bunyi saat kunci — satu kunci `UserDefaults` untuk jam & iPhone.

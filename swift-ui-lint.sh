@@ -14826,6 +14826,39 @@ else
   fi
 fi
 
+echo "== Aturan 94: setiap sumber daya bersama punya pelepasan yang dipanggil =="
+# Aturan 93 memanen pasangan start/stop dari badan `start()` app jam. Ia tidak
+# bisa melihat sumber daya yang diakuisisi dengan cara lain — dan itu bukan
+# kemungkinan teoretis: `setActive(true)` di `AudioCue.swift` dipanggil malas,
+# di dalam `AudioCueEngine`, dan tidak punya `setActive(false)` di seluruh
+# pohon. Bunyi 0,13 detik menahan sesi audio aktif sampai sistem mematikan
+# prosesnya. Compiler diam, Aturan 93 diam, teks di layar tidak berubah.
+#
+# Aturan ini memeriksa **penerima** panggilan, bukan namanya. Versi pertama
+# hanya mencari `\bstop\(` di berkas lain, dan itu buta pada mutasi yang
+# paling penting: `audioCue.stop()` dihapus dari satu app tetap hijau karena
+# `motion.stop()` dan `engine.stop()` di berkas yang sama cocok dengan pola.
+# Logikanya di `Tools/`, bukan di-inline, karena alasan yang sama dengan
+# Aturan 84-93 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan94-siklus-sumber-daya.py" ]; then
+  echo "FAIL Tools/check-aturan94-siklus-sumber-daya.py tidak ada: Aturan 94"
+  echo "     tidak mengukur apa pun, dan sumber daya bersama bisa tetap hidup"
+  echo "     setelah app ditinggal tanpa satu pun galat."
+  status=1
+else
+  siklus_daya=$(python3 Tools/check-aturan94-siklus-sumber-daya.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$siklus_daya"
+    echo "-> Setiap akuisisi sumber daya bersama wajib punya pelepasan yang"
+    echo "   dipanggil lewat penerimanya sendiri, di setiap berkas yang"
+    echo "   membuat instance-nya. Perbaiki kodenya, jangan longgarkan"
+    echo "   aturannya."
+    status=1
+  else
+    echo "$siklus_daya"
+  fi
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo
