@@ -1,4 +1,82 @@
-### Siklus (22 Okt 2026 — arah tunjuk yang dikirim jam tidak pernah punya baris)
+### Siklus (22 Okt 2026 — peta jalur kirim yang tidak dibaca siapa pun)
+
+Siklus sebelumnya menutup σ, lalu arah tunjuk, dengan uji sapuan
+`LinkReportCoverageTests` yang menyapu setiap medan di pesan. Siklus ini
+memeriksa **alat ukurnya sendiri** — dan menemukan bahwa sapuan itu, pada
+bentuknya yang waktu itu, tidak bisa dipercaya.
+
+#### Dua cacat, keduanya di dalam gerbangnya
+
+**Satu: fixture mengisi semua medan.** `fullMessage()` dulu memanggil
+`PointingLinkMessage(kind:sentAt:state:…:note:isCalibrated:)` dengan **setiap**
+argumen terisi. Akibatnya pesan `.pointingState` membawa `yawOffsetDeg`,
+`residualSpreadDeg`, `sampleCount` — tiga medan yang jam **tidak pernah**
+kirim di jenis pesan itu. Sapuan lalu melaporkannya sebagai "dikirim tetapi
+tidak sampai ke laporan". Dua belas tuduhan palsu dalam satu uji.
+
+Perbaikannya bukan melonggarkan uji, melainkan membangun fixture dari
+**pembuat pesan sungguhan** (`PointingLinkMessage.state(from:at:sigmaDeg:)`,
+`.calibration(at:)`). Kalau suatu hari jam benar-benar mulai mengirim ketiga
+medan itu di pesan keadaan, fixture-nya ikut berubah dan uji ini menuntutnya
+tampil — tanpa ada yang perlu ingat memperbarui daftar.
+
+**Dua: peta `dikirimDi` adalah kode mati.** Ia dideklarasikan, diberi
+docstring yang menjanjikan "medan yang tidak ada di peta akan **gagal** uji
+cakupan, bukan lolos diam-diam", lalu sapuan di bawahnya **melewatinya** dan
+memakai `plist[field] != nil` sebagai gantinya. Terukur: peta mengklaim `note`
+terkirim di tiga jenis pesan, padahal tidak satu pun pembuat pesan mengisinya
+— dan tidak ada gerbang yang merah. Janji di docstring itu tidak pernah
+ditegakkan satu baris pun.
+
+#### Yang dikerjakan
+
+- `LinkReport.calibrationRows` kini merender **σ dan waktu** juga, lewat
+  `sigmaAndTimeRows` yang dipakai bersama `stateRows`. Sebelumnya bagian
+  kalibrasi menulis tiga baris lalu berhenti, jadi dua medan yang **selalu**
+  ikut di pesan kalibrasi tidak punya baris: pembaca iPhone tidak bisa tahu
+  σ berapa yang dipakai jam saat kalibrasi itu dihasilkan — justru angka yang
+  membuat kalibrasinya bisa dinilai.
+- `LinkView` merender `calibrationRows`, bukan menulis ketiga kolomnya di
+  badan `view`. Ini celah yang STATUS siklus sebelumnya catat sebagai terbuka.
+- Tiga penjaga baru di uji sapuan: **1** setiap medan pesan punya entri peta,
+  **1b** setiap entri peta menunjuk medan nyata, **2** setiap pasangan
+  (medan, jenis) yang diklaim terkirim benar-benar diisi pembuat pesan.
+- Ambang `checked >= 20` diganti `checked == expected`, dengan `expected`
+  dihitung dari peta. Angka 20 dulu lolos **hanya** karena fixture lama gemuk;
+  begitu fixture dibangun dari pembuat sungguhan angkanya jatuh ke 14 dan
+  gerbangnya merah — padahal yang salah angkanya, bukan cakupannya.
+- `alternativeString` memetakan `kind` ke jenis sah lain. Sebelumnya ia jatuh
+  ke `default` menjadi `"pointingStateX"`, ditolak pembaca kabel, mutasinya
+  dilewati — dan kedua pasangan (kind, jenis) hilang dari hitungan tanpa satu
+  gerbang pun menyebutnya.
+
+#### Bukti uji tidak vakum
+
+`Tools/bukti-mutasi-linkreport-coverage.py` — lima mutasi, masing-masing
+dijalankan di proses baru lewat `./swift-test.sh`, semuanya **wajib** merah:
+
+| Mutasi | Penjaga yang menangkap |
+|---|---|
+| peta mengklaim `note` terkirim di `pointingState` | Penjaga 2 |
+| entri peta menunjuk medan hantu (`sentAtX`) | Penjaga 1b |
+| `isCalibrated` dihapus dari peta | Penjaga 1 |
+| `+ sigmaAndTimeRows(message)` dihapus | sapuan medan tak terlihat (σ) |
+| baris waktu dihapus dari `sigmaAndTimeRows` | sapuan medan tak terlihat (sentAt) |
+
+Harness ini terdaftar di `engine-tests.yml`. `check-harness-terdaftar.py`
+sendiri yang menangkapnya saat belum terdaftar — "gerbang yang tidak
+dijalankan selalu hijau".
+
+#### Keadaan gerbang
+
+`./swift-test.sh` → **222 + 1065 hijau**. `./swift-ui-lint.sh` → 86 aturan,
+exit 0. `./swift-typecheck.sh` → exit 0. `bash -n` di bash 3.2 → exit 0.
+
+Lint sempat merah dengan sebab yang **bukan** kode: README bilang
+"PointingKit 1060", berkas uji berisi 1065. Aturan 10 menghitung ulang dari
+`func test` di disk, jadi angka di README adalah janji yang diperiksa.
+
+
 
 Siklus sebelumnya menutup σ yang hilang. Siklus ini menutup **kelasnya**, dan
 menemukan bahwa σ bukan satu-satunya: `altitudeDeg` dan `azimuthDeg` ikut di

@@ -121,9 +121,64 @@ public enum LinkReport {
                             value: NumberFormat.degreesPerSecond(rate)))
         }
 
+        // σ dan waktu dibentuk di `sigmaAndTimeRows`, dipakai bersama bagian
+        // kalibrasi: dua medan ini ada di **kedua** jenis pesan, dan menulisnya
+        // dua kali adalah cara paling pasti membuatnya berbeda.
+        return rows + sigmaAndTimeRows(message)
+    }
+
+    /// Baris untuk bagian "kalibrasi terakhir dari jam".
+    ///
+    /// **Kenapa pindah ke sini.** Sama persis dengan `stateRows`: ketiga
+    /// kolom ini dulu ditulis di badan `LinkView`, dan tidak satu pun gerbang
+    /// melihatnya. Uji sapuan `LinkReportCoverageTests` menemukannya sebagai
+    /// tiga medan yang dikirim jam tanpa jejak di laporan yang teruji —
+    /// `yawOffsetDeg`, `residualSpreadDeg`, `sampleCount`.
+    ///
+    /// **Urutannya mengikuti cara membaca kalibrasi**, bukan urutan medan di
+    /// pesan: berapa koreksinya, seberapa rapat sampelnya, lalu berapa banyak
+    /// sampel. Yang pertama adalah hasilnya; dua berikutnya yang membuat hasil
+    /// itu bisa dipercaya.
+    ///
+    /// **Yang TIDAK diklaim.** Fungsi ini tidak menilai apakah kalibrasinya
+    /// bagus — ambang mutu ada di engine (`PointingCalibration`), bukan di
+    /// lapisan tampilan. Nilai yang tidak dikirim ditulis `—`, bukan `0`.
+    public static func calibrationRows(_ message: PointingLinkMessage) -> [Row] {
+        [
+            Row(title: TextLocalization.text(.linkRowYawOffset),
+                value: message.yawOffsetDeg.map { NumberFormat.degrees($0) } ?? "—"),
+            Row(title: TextLocalization.text(.linkRowSpread),
+                value: message.residualSpreadDeg.map { NumberFormat.degrees($0) } ?? "—"),
+            Row(title: TextLocalization.text(.linkRowReferenceCount),
+                value: message.sampleCount.map(String.init) ?? "—"),
+        ] + sigmaAndTimeRows(message)
+    }
+
+    /// Dua baris yang dipakai **oleh kedua jenis laporan** — keadaan dan
+    /// kalibrasi — karena dua medan yang mereka laporkan juga dipakai keduanya.
+    ///
+    /// **Kenapa ini fungsi terpisah.** Uji sapuan `LinkReportCoverageTests`
+    /// melaporkan `pointingSigmaDeg (di calibrationReady)` dan
+    /// `sentAt (di calibrationReady)` sebagai medan yang dikirim jam tetapi
+    /// tidak pernah sampai ke laporan: bagian kalibrasi menulis tiga baris
+    /// kalibrasi dan berhenti, jadi dua medan yang **selalu** ikut di pesan
+    /// kalibrasi tidak punya baris sama sekali. Konsekuensinya bukan
+    /// kosmetik — pembaca iPhone tidak bisa tahu σ berapa yang dipakai jam
+    /// saat kalibrasi itu dihasilkan, dan itu justru angka yang membuat
+    /// kalibrasinya bisa dinilai.
+    ///
+    /// **Kapan keduanya muncul.** σ hanya bila ada (`confidencePolicy`
+    /// menolak σ ≤ 0 atau tak berhingga — lihat `stateRows`), sehingga
+    /// ketiadaannya tidak tercetak sebagai akurasi sempurna. Waktu selalu
+    /// muncul: keduanya adalah pesan yang benar-benar terkirim.
+    private static func sigmaAndTimeRows(_ message: PointingLinkMessage) -> [Row] {
+        var rows: [Row] = []
+        if let sigma = message.confidencePolicy?.pointingSigmaDeg {
+            rows.append(Row(title: TextLocalization.text(.linkRowSigma),
+                            value: NumberFormat.degrees(sigma)))
+        }
         rows.append(Row(title: TextLocalization.text(.linkRowTime),
                         value: message.sentAt.formatted(date: .omitted, time: .standard)))
-
         return rows
     }
 

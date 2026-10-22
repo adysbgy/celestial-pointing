@@ -77,12 +77,19 @@ struct LinkView: View {
 
                 Section(TextLocalization.text(.linkSectionLastCalibration)) {
                     if let calibration = link.lastCalibration {
-                        row(TextLocalization.text(.linkRowYawOffset),
-                            calibration.yawOffsetDeg.map { NumberFormat.degrees($0) } ?? "—")
-                        row(TextLocalization.text(.linkRowSpread),
-                            calibration.residualSpreadDeg.map { NumberFormat.degrees($0) } ?? "—")
-                        row(TextLocalization.text(.linkRowReferenceCount),
-                            calibration.sampleCount.map(String.init) ?? "—")
+                        // Barisnya dari `LinkReport.calibrationRows`, bukan
+                        // ditulis di sini. Sampai siklus ini ketiga kolom ini
+                        // ditulis langsung di badan `view`, dan itu berarti
+                        // tidak satu pun dari 87 aturan UI melihatnya —
+                        // gerbang di repo ini membaca teks dan piksel, dan
+                        // kolom yang tidak pernah ditulis tidak punya
+                        // keduanya. Uji `LinkReportCoverageTests` menyapunya
+                        // sekarang, jadi `sentAt` dan σ yang ikut di pesan
+                        // kalibrasi tidak bisa lagi hilang tanpa gerbang merah.
+                        ForEach(Array(LinkReport.calibrationRows(calibration)
+                            .enumerated()), id: \.offset) { _, item in
+                            row(item.title, item.value)
+                        }
                     } else {
                         Text(TextLocalization.text(.linkNoCalibrationYet))
                             .foregroundStyle(Color.nightAwareSecondary)

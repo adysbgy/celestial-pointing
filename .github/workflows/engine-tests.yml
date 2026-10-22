@@ -3006,5 +3006,15 @@ jobs:
       - name: Buktikan gerbang latar langit berbunyi
         run: python3 Tools/bukti-mutasi-latar-langit.py
 
+      # Laporan tautan iPhone: satu-satunya layar yang menjelaskan apa yang
+      # dilaporkan jam. Tiga cacatnya hijau di seluruh gerbang lain karena
+      # gerbang repo ini membaca teks dan piksel — kolom yang tidak pernah
+      # ditulis tidak punya keduanya. Harness ini menuntut lima penjaga
+      # berbunyi: peta jalur kirim yang mengklaim medan tak terisi, entri peta
+      # yang menunjuk medan hantu, medan pesan tanpa entri peta, dan dua baris
+      # laporan (σ serta waktu) yang hilang dari bagian kalibrasi.
+      - name: Buktikan gerbang laporan-tautan berbunyi
+        run: python3 Tools/bukti-mutasi-linkreport-coverage.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit
