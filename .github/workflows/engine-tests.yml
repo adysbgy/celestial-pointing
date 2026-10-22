@@ -2029,6 +2029,13 @@ jobs:
       - name: Buktikan setiap harness memanggil gerbang yang ada
         run: python3 Tools/bukti-mutasi-gerbang-dijalankan.py
 
+      # Dan bukti untuk **Aturan 98** — gerbang yang menjaga agar fungsi model
+      # yang diuji di Linux benar-benar sampai ke app. Harness ini menyunting
+      # `Apps/Shared/CelestialVisualView.swift` dan `CelestialVisual.swift`
+      # sungguhan, lalu memulihkannya byte-per-byte.
+      - name: Buktikan Aturan 98 berbunyi saat fungsi model putus dari gambar
+        run: python3 Tools/bukti-mutasi-aturan98-fungsi-port.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
