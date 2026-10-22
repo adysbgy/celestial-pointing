@@ -1,3 +1,123 @@
+### Siklus (22 Okt 2026 — Aturan 89: alat sapuan akhirnya mengukur seluruh gerbang, dan sambungan sensor-hilang ditutup)
+
+Siklus ini dimulai bukan dari UI, melainkan dari **alat yang memutuskan apa
+yang belum dijaga**. Ia layak didahulukan karena alat itulah yang menentukan
+seluruh pekerjaan berikutnya, dan ia sedang berbohong.
+
+#### Temuan 1 — alat sapuan mengucapkan "seluruh" untuk sebagian
+
+`Tools/sapu-buta-apps.py` memutasi badan `Apps/`, menjalankan
+`swift-ui-lint.sh` + `swift-typecheck.sh`, lalu mencetak **"LOLOS SELURUH
+GERBANG"**. Repo ini punya gerbang lokal ketiga — `swift test` — dan
+uji-uji `PointingKit` **membaca teks `Apps/`** (`PreferenceDefaultsTests`,
+`ObservedPropertyTests`, `AlwaysOnContentTests`, …). Jadi kalimat itu bukan
+kurang teliti; ia **salah**, dan kesalahannya sudah menular ke docstring
+produksi: `AudioPreference.swift` dan `AudioCue.swift` sama-sama pernah
+menulis bahwa mutasi `return true` "lolos seluruh gerbang". `swift test`
+memerahkannya dengan dua kegagalan.
+
+Alatnya sekarang menjalankan ketiga gerbang, menyebut **gerbang mana** yang
+berbunyi, dan memasang **kontrol positif** sebelum satu pun verdict dipakai:
+satu mutasi yang sudah terukur (`as? Bool` → `bool(forKey:)`) wajib ditangkap
+`swift test` dan **hanya** `swift test`. Kalau kontrolnya hijau, sapuan
+berhenti — gerbang ketiga tidak mengukur apa pun, dan setiap "LOLOS" di
+bawahnya tidak berarti.
+
+Hasil sapuan ulang, 5 kandidat: **0 yang lolos ketiga gerbang.**
+
+#### Temuan 2 — cacat yang benar-benar tidak dijaga siapa pun
+
+Setelah alatnya jujur, satu kandidat tetap hijau di ketiga gerbang: menghapus
+`publishSensorLoss()` dari `handleFailure` di `MotionLogger`.
+
+Bentuknya menjelaskan kenapa semua gerbang tidur. Aturan 53 menuntut perintah
+`controller.setSensorAvailable(false)` muncul tepat sekali — dan ia **masih**
+muncul tepat sekali, di dalam `publishSensorLoss()`. Yang hilang hanya
+**pemanggilannya** dari satu jalur. Tidak ada teks yang berubah bentuk, dan
+tidak ada fungsi murni yang berubah perilaku; `MotionLogger` butuh CoreMotion,
+yang tidak ada di Linux.
+
+Akibatnya bukan kosmetik. `PointingEngine.snapshot` — satu-satunya sumber
+yang dibaca semua layar — hanya ditulis lewat `onUpdate`, dan `onUpdate` hanya
+dipanggil dari `consume(_:)` dan `publishSensorLoss()`. Sampel sudah berhenti
+karena CoreMotion melaporkan galat, jadi `consume` tidak akan datang lagi.
+Tanpa pemberitahuan: `controller.setSensorAvailable(false)` tidak pernah
+dijalankan, alur tidak dihentikan, dan snapshot tetap memegang objek terakhir
+**dengan keyakinan lamanya**. Layar menampilkan identitas yang sama seolah
+sensor masih hidup — persis *false confidence* yang dilarang PRD, dan tidak
+bisa dibantah dari layar karena tidak ada teks yang berubah.
+
+#### Aturan 89 — yang diukur adalah sambungan, bukan bentuk
+
+`Tools/check-aturan89-saluran-sensor.py` memeriksa tiga hal:
+
+1. Setiap blok yang **menyatakan sensor hilang** — ditandai penulisan
+   `unavailableReason = …` yang bukan `nil` — wajib memanggil
+   `publishSensorLoss()` di dalam blok yang sama. Penandanya sengaja
+   `unavailableReason`, bukan nama fungsi: `start` dan `handleFailure` punya
+   bentuk berbeda (satu `guard … else`, satu badan fungsi), dan aturan yang
+   mengunci nama fungsi akan diam begitu salah satunya diganti nama.
+2. `publishSensorLoss()` wajib masih memanggil
+   `controller.setSensorAvailable(false)` **dan** `onUpdate?` — fungsi yang
+   dipanggil tapi isinya dikosongkan sama saja dengan tidak dipanggil.
+3. Jumlah jalur wajib **tepat 2**. Kalau tumbuh jalur ketiga, aturan memerah;
+   kalau menyusut jadi 1, itu juga memerah — bukan karena cacat, tapi karena
+   aturan ini berhenti mengukur apa yang ia kira diukur.
+
+#### Dua kesalahan aturan ini, ditemukan oleh harnessnya sendiri
+
+`Tools/bukti-mutasi-aturan89-saluran-sensor.py` menuntut lima keadaan:
+pohon bersih **hijau**, lalu empat cacat **merah** dengan pesan yang
+menyebut sebabnya (termasuk `MotionLogger.swift` dihapus → merah, bukan
+"bersih karena kosong").
+
+Harness itu langsung memerah pada dua kesalahan versi pertama aturannya:
+
+* **Lookahead yang mengukur tempat yang salah.** `(?!nil\b)` setelah `\s*`
+  yang rakus bisa diperiksa pada spasi sebelum `nil` dan lolos, sehingga
+  `unavailableReason = nil` ikut terhitung dan jumlah jalur menjadi 3.
+  Diganti dengan menangkap nilainya lewat grup lalu menyaringnya.
+* **Penelusuran blok ke arah yang salah.** Versi pertama mencari `{`
+  **sesudah** penanda, jadi untuk penanda di dalam badan fungsi ia menemukan
+  `{` milik `guard … else` berikutnya dan melaporkan jalur yang **benar**
+  sebagai "tidak memanggil". Aturan yang memerah pada kode benar akan
+  dimatikan orang, jadi arahnya dibalik: telusuri ke luar.
+
+Keduanya adalah alasan keadaan "pohon bersih wajib hijau" ada di harness.
+Tanpa keadaan itu, "merah" bisa berarti aturannya salah tempat.
+
+#### Aturan 69 dan angka di README
+
+`swift-ui-lint.sh` punya 88 blok aturan tapi nomornya sampai 89: **Aturan 69
+tidak tinggal di berkas itu** (ia menjaga berkas sasaran mutasi di
+`Tools/check-jangkar-harness.py`). README sebelumnya bilang 87 dan sudah
+basi satu siklus sebelum siklus ini. Sekarang ditulis 88 — jumlah blok yang
+benar-benar berjalan — dengan alasan selisih nomornya dinyatakan, supaya
+orang berikutnya tidak "memperbaiki" angka itu menjadi 89.
+
+#### Yang TIDAK diklaim
+
+* **Tidak ada satu pun uji yang menjalankan `MotionLogger`.** Aturan 89
+  membaca teks dan memeriksa **sambungan**; ia tidak membuktikan CoreMotion
+  benar-benar memanggil `handleFailure`. Yang dijamin: kalau jalurnya ada dan
+  menyatakan sensor hilang, jalur itu memberi tahu mesin.
+* **Kontrol positif hanya membuktikan `swift test` berbunyi untuk satu
+  mutasi.** Ia tidak membuktikan ketiga gerbang saling melengkapi secara
+  umum; ia membuktikan gerbang ketiga tidak mati saat verdict dipakai.
+* **`CelestialEngine` sengaja tidak dijalankan sapuan.** `grep -rln "Apps/"`
+  di uji-ujinya kosong, jadi ia tidak bisa berbunyi untuk mutasi pohon ini —
+  dan gerbang yang tidak mungkin berbunyi tidak boleh masuk daftar.
+* **UI belum disentuh siklus ini.** Misi visual (CelestialVisual, night mode,
+  AOD, VoiceOver) belum dikerjakan di siklus ini; siklus ini menutup jalur
+  kebohongan yang akan membuat pekerjaan UI tidak bisa dipercaya.
+
+#### Gerbang
+
+Engine **222** hijau, PointingKit **1070** hijau, `swift-ui-lint.sh` 88 aturan
+lulus, `check-harness-terdaftar.py` **149 harness semuanya dirujuk**
+`engine-tests.yml` (harness Aturan 89 ikut terdaftar; gerbang pendaftaran itu
+sendiri yang menangkapnya saat pertama ditulis).
+
 ### Siklus (22 Okt 2026 — Aturan 88: sambungan LinkView → LinkReport akhirnya diukur)
 
 Siklus sebelumnya menutup celah kolom kalibrasi, dan mencatat sisanya di

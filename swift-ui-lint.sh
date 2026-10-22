@@ -14696,6 +14696,29 @@ else
 fi
 
 
+echo
+echo "== Aturan 89: setiap jalur sensor-hilang memberi tahu mesin dan layar =="
+if [ ! -f "Tools/check-aturan89-saluran-sensor.py" ]; then
+  echo "FAIL Tools/check-aturan89-saluran-sensor.py tidak ada: Aturan 89"
+  echo "     tidak mengukur apa pun, dan layar bisa terus menampilkan objek"
+  echo "     terakhir dengan keyakinan lamanya meski sensor sudah mati."
+  status=1
+else
+  saluran_sensor=$(python3 Tools/check-aturan89-saluran-sensor.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$saluran_sensor"
+    echo "-> MotionLogger wajib memanggil publishSensorLoss() di SETIAP jalur"
+    echo "   yang menyatakan sensor hilang (start tanpa sensor, dan galat di"
+    echo "   tengah pemakaian). Tanpa itu controller tidak dihentikan dan"
+    echo "   PointingEngine.snapshot tetap memegang objek terakhir seolah"
+    echo "   sensor masih hidup. Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$saluran_sensor"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

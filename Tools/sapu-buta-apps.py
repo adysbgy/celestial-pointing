@@ -2,9 +2,32 @@
 """Sapu buta badan Apps/: mutasi kecil yang mengompilasi, cari yang LOLOS seluruh gerbang.
 
 Siklus repo ini pakai metode yang sama berulang kali: mutasi satu ekspresi di
-`Apps/`, jalankan `./swift-ui-lint.sh` + `./swift-typecheck.sh` pada proses baru,
-lalu periksa mana yang tetap exit 0. Yang exit 0 padahal salah = titik yang belum
-dijaga.
+`Apps/`, jalankan gerbang lokal pada proses baru, lalu periksa mana yang tetap
+exit 0. Yang exit 0 padahal salah = titik yang belum dijaga.
+
+**Ketiga gerbang, bukan dua (22 Okt 2026).** Sampai siklus ini berkas ini hanya
+menjalankan `swift-ui-lint.sh` + `swift-typecheck.sh` dan mencetak
+**"LOLOS SELURUH GERBANG"**. Kalimat itu salah: repo ini punya gerbang lokal
+ketiga, `swift test`, dan uji-uji di `PointingKit` **membaca teks `Apps/`**
+(`PreferenceDefaultsTests`, `ObservedPropertyTests`, `AlwaysOnContentTests`, …).
+Terukur, dan itulah yang membuka siklus ini: mutasi `Apps/Shared/AudioCue.swift`
+yang menghapus cabang bawaan preferensi dicetak **"LOLOS SELURUH GERBANG"** oleh
+versi lama berkas ini, padahal `swift test` memerahkannya dengan dua kegagalan.
+Kesimpulan "titik ini belum dijaga" lalu ditulis ke docstring produksi — dan
+salah. Alat yang mengukur sebagian gerbang tapi mengucapkan "seluruh" bukan alat
+yang kurang teliti; ia alat yang **menghasilkan cacat baru** berupa gerbang teks
+yang ditulis untuk cacat yang sudah dijaga.
+
+Karena itu sekarang tiga gerbang dijalankan, dan verdict-nya menyebut **gerbang
+mana** yang berbunyi. `CelestialEngine` sengaja tidak dijalankan: tidak satu pun
+ujinya membaca `Apps/` (`grep -rln "Apps/" Packages/CelestialEngine/Tests/`
+kosong), jadi ia tidak bisa berbunyi untuk mutasi di pohon ini.
+
+Sebelum menyapu, ada **kontrol positif**: satu mutasi yang sudah terukur harus
+ditemukan `swift test` — dan harus **hanya** `swift test` yang menemukannya,
+supaya yang terbukti berbunyi adalah gerbang ketiga itu, bukan gerbang teks yang
+sudah lama bekerja. Kalau kontrolnya hijau, sapuan berhenti: gerbang ketiga tidak
+mengukur apa pun, dan setiap "LOLOS" di bawahnya tidak berarti.
 
 Yang membuat sapuan ini berbeda dari yang sudah ada: mutasi dipilih dari
 **kategori** yang belum pernah disapu — bukan argumen pemanggil yang sudah dijaga
@@ -31,20 +54,46 @@ import shutil
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APPS = os.path.join(ROOT, "Apps")
 
+#: Gerbang lokal yang bisa berbunyi untuk mutasi di `Apps/`, dalam urutan
+#: termurah lebih dulu. `swift test` sengaja terakhir: ia satu-satunya yang
+#: butuh kompilasi + ~10 detik uji, dan gerbang teks yang lebih murah sudah
+#: cukup untuk sebagian besar kandidat.
+#:
+#: `CelestialEngine` **tidak** ada di daftar ini, dan itu keputusan terukur:
+#: `grep -rln "Apps/" Packages/CelestialEngine/Tests/` kosong, jadi tidak ada
+#: uji di sana yang bisa membaca mutasi pohon ini.
+GATES = ("swift-ui-lint.sh", "swift-typecheck.sh", "swift-test.sh")
 
-def run_gates(tree: str) -> tuple[bool, str]:
-    """Jalankan kedua gerbang teks pada salinan pohon. Kembalikan (lulus, ringkas)."""
+
+def run_gates(tree: str, gates=GATES) -> tuple[bool, str, str]:
+    """Jalankan gerbang pada salinan pohon.
+
+    Kembalikan `(semua_lulus, ringkas, gerbang_yang_berbunyi)`. Nama gerbang
+    pemanggil ikut dikembalikan karena verdict "LOLOS" hanya jujur kalau
+    pembaca tahu **apa** yang lolos — kekurangan versi lama berkas ini.
+    """
     out = []
-    for script in ("swift-ui-lint.sh", "swift-typecheck.sh"):
-        proc = subprocess.run(
-            ["bash", os.path.join(tree, script)],
-            cwd=tree, capture_output=True, text=True, timeout=900,
-        )
+    for script in gates:
+        try:
+            proc = subprocess.run(
+                ["bash", os.path.join(tree, script)],
+                cwd=tree, capture_output=True, text=True, timeout=2400,
+            )
+        except subprocess.TimeoutExpired:
+            raise
         out.append(f"{script}: exit {proc.returncode}")
         if proc.returncode != 0:
-            tail = (proc.stdout + proc.stderr).strip().splitlines()
-            return False, " | ".join(out) + " || " + " ; ".join(tail[-6:])
-    return True, " | ".join(out)
+            combined = proc.stdout + proc.stderr
+            # `swift test` mencetak ratusan baris progres build; baris yang
+            # menjawab "kenapa merah" adalah baris `error:`. Tanpa penyaringan
+            # ini, laporan sapuan memuat nama berkas objek, bukan sebabnya —
+            # dan sebabnya itulah yang dibaca orang untuk memutuskan apakah
+            # gerbangnya benar atau kebetulan.
+            sebab = [ln.strip() for ln in combined.splitlines() if "error:" in ln]
+            if not sebab:
+                sebab = [ln.strip() for ln in combined.splitlines() if ln.strip()][-6:]
+            return False, " | ".join(out) + " || " + " ; ".join(s[:240] for s in sebab[:3]), script
+    return True, " | ".join(out), ""
 
 
 def buat_salinan() -> tuple[str, str]:
@@ -128,7 +177,28 @@ def mutate(tree: str, relpath: str, old: str, new: str) -> bool:
     return True
 
 
-# Kandidat mutasi: (nama, berkas relatif, potongan lama, potongan baru, kenapa relevan)
+# ── Kontrol positif: gerbang ketiga wajib terbukti berbunyi ────────────────
+#
+# Mutasinya bukan karangan: ia persis cacat yang dijaga
+# `PreferenceDefaultsTests.testUnsetKeyAccessorsAgreeWithTheDeclaredDefault` —
+# `bool(forKey:)` membaca kunci kosong sebagai `false`, jadi "belum diset"
+# runtuh menjadi "dimatikan" dan bawaan nyala hilang tanpa ada yang meminta.
+# Ia **mengompilasi** (`Bool` masuk ke parameter `Bool?` tanpa cast), tidak
+# meninggalkan satu pun tanda di kedua gerbang teks, dan hanya `swift test`
+# yang membacanya.
+#
+# Kenapa bentuk ini, bukan yang lebih dramatis: kontrol harus **bertahan pada
+# pohon yang benar**. Versi pertama kontrol ini menghapus cabang `object(forKey:)`
+# yang sudah tidak ada lagi setelah siklus ini, jadi ia akan "gagal dipasang"
+# dan menghentikan sapuan — alat yang mati karena pekerjaannya sendiri selesai.
+CONTROL = (
+    "kontrol: `as? Bool` diganti `bool(forKey:)` (wajib ditangkap swift test)",
+    "Apps/Shared/AudioCue.swift",
+    "stored: UserDefaults.standard.object(forKey: AudioCueStorage.key) as? Bool",
+    "stored: UserDefaults.standard.bool(forKey: AudioCueStorage.key)",
+    "gerbang ketiga tidak berbunyi untuk kelas cacat yang sudah terukur",
+)
+
 CANDIDATES: list[tuple[str, str, str, str, str]] = []
 
 
@@ -136,17 +206,59 @@ def add(name: str, relpath: str, old: str, new: str, why: str) -> None:
     CANDIDATES.append((name, relpath, old, new, why))
 
 
-# ── MotionLogger: kehilangan sensor ────────────────────────────────────────
-add("motion: isRunning tetap true saat sensor hilang",
-    "Apps/Shared/MotionLogger.swift",
-    "        isRunning = false\n        if manager.isDeviceMotionActive",
-    "        isRunning = true\n        if manager.isDeviceMotionActive",
-    "layar membaca isRunning untuk katakan sensor hidup; sensor sudah mati tapi layar bilang hidup")
+def jalankan_kontrol(tree: str) -> bool:
+    """Pastikan `swift test` benar-benar berbunyi, dan hanya dia yang berbunyi.
 
+    Tanpa kontrol ini, "LOLOS" dan "merah (aman)" sama-sama tidak berarti:
+    sapuan yang gerbang ketiganya tidak pernah jalan akan mencetak "LOLOS"
+    untuk **setiap** kandidat, dan itu terbaca seperti repo yang sangat buta.
+    """
+    name, relpath, old, new, _ = CONTROL
+    if not mutate(tree, relpath, old, new):
+        print(f"KONTROL GAGAL DIPASANG (jangkar tidak unik/hilang): {name}")
+        return False
+    ok, detail, berbunyi = run_gates(tree)
+    print(f"  {name}")
+    print(f"    {detail}")
+    if ok:
+        print("  KONTROL HIJAU — `swift test` tidak berbunyi untuk cacat yang "
+              "sudah terukur.\n  Sapuan dihentikan: tanpa gerbang ketiga, "
+              "\"LOLOS\" di bawah berarti \"tidak ada gerbang yang jalan\", "
+              "bukan \"tidak ada gerbang yang menjaga\".")
+        return False
+    if berbunyi != "swift-test.sh":
+        print(f"  KONTROL SALAH GERBANG — yang berbunyi `{berbunyi}`, bukan "
+              "`swift-test.sh`.\n  Kontrol ini dirancang untuk membuktikan "
+              "gerbang KETIGA bekerja; gerbang teks yang berbunyi tidak "
+              "membuktikan itu.")
+        return False
+    print("  KONTROL BENAR — hanya `swift test` yang berbunyi.\n")
+    return True
+
+
+# ── MotionLogger: kehilangan sensor ────────────────────────────────────────
+#
+# CATATAN (22 Okt 2026): kandidat "isRunning tetap true saat sensor hilang"
+# DIHAPUS dari sapuan ini, bukan karena cacatnya diperbaiki, melainkan karena
+# premisnya tidak benar dan tidak pernah benar.
+#
+# Alasannya terukur: `grep -rn '\.isRunning' Apps/` mengembalikan **nol**
+# pembacaan. Properti itu memang ditulis di tiga jalur, tapi tidak satu pun
+# layar membacanya; yang sampai ke pengguna adalah `PointingEngine.sensorNote`
+# (diisi di `PointingEngine.swift:342` dan dibaca `PointingView` serta
+# `ReducedLuminanceView`). Jadi membalik `isRunning` tidak membuat layar
+# "bilang sensor hidup" — layar tidak pernah bertanya.
+#
+# Yang menjaganya tetap jujur adalah Aturan 53 (fail-closed: bentuk
+# `isRunning = manager.isDeviceMotionActive` wajib muncul tepat sekali), dan
+# yang menjaganya tetap **tanpa pembaca** adalah peran `.bookkeeping` di
+# `ObservedProperty` beserta ujinya. Kandidat yang lolos tanpa bisa
+# dibuktikan salah adalah kandidat yang membuat sapuan ini terdengar lebih
+# teliti daripada isinya — dan itu justru yang harus dihindari.
 add("motion: alur tak diberi tahu sensor mati",
-    "Apps/Shared/MotionLogger.sh".replace(".sh", ".swift"),
-    "        publishSensorLoss()\n        return\n    }\n    guard !manager.isDeviceMotionActive",
-    "        return\n    }\n    guard !manager.isDeviceMotionActive",
+    "Apps/Shared/MotionLogger.swift",
+    "        if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }\n        publishSensorLoss()\n    }",
+    "        if manager.isDeviceMotionActive { manager.stopDeviceMotionUpdates() }\n    }",
     "snapshot UI tertinggal di objek 'terkonfirmasi' padahal sensor sudah mati")
 
 # ── LocationProvider: izin ditolak ─────────────────────────────────────────
@@ -165,8 +277,8 @@ add("lokasi: efektif selalu lokasi bawaan",
 # ── AudioCue: preferensi ───────────────────────────────────────────────────
 add("suara: preferensi dibaca terus (tak bisa dimatikan)",
     "Apps/Shared/AudioCue.swift",
-    "            if UserDefaults.standard.object(forKey: AudioCueStorage.key) == nil { return true }\n            return UserDefaults.standard.bool(forKey: AudioCueStorage.key)",
-    "            return true",
+    "            AudioPreference.isEnabled(\n                stored: UserDefaults.standard.object(forKey: AudioCueStorage.key) as? Bool)",
+    "            true",
     "pengguna matikan bunyi di toolbar, tetap berbunyi")
 
 # ── Sensor tidak tersedia ──────────────────────────────────────────────────
@@ -180,7 +292,8 @@ add("sensor: alasan tak tersedia tak pernah diset",
 def main() -> int:
     only = [int(a) for a in sys.argv[1:] if a.isdigit()]
     picked = [(i, c) for i, c in enumerate(CANDIDATES) if not only or i in only]
-    print(f"Sapu {len(picked)} mutasi dari {len(CANDIDATES)} kandidat\n")
+    print(f"Sapu {len(picked)} mutasi dari {len(CANDIDATES)} kandidat")
+    print(f"Gerbang: {', '.join(GATES)}\n")
 
     # Kontrol dasar dulu: salinan TANPA mutasi wajib hijau. Kalau tidak,
     # setiap "merah (aman)" di bawah bisa berarti salinanku kurang berkas —
@@ -188,7 +301,7 @@ def main() -> int:
     tmp, tree = buat_salinan()
     try:
         try:
-            ok, detail = run_gates(tree)
+            ok, detail, _ = run_gates(tree)
         except subprocess.TimeoutExpired:
             print("BASELINE TIMEOUT — perbaiki perkakas, bukan lanjut")
             return 2
@@ -200,6 +313,17 @@ def main() -> int:
     finally:
         bersihkan(tmp)
 
+    # Kontrol positif: buktikan gerbang ketiga berbunyi sebelum verdict apa pun
+    # di bawahnya dipakai. Tanpa ini, "LOLOS" tidak bisa dibedakan dari
+    # "gerbangnya tidak pernah jalan".
+    print("KONTROL POSITIF (gerbang ketiga wajib berbunyi):")
+    tmp, tree = buat_salinan()
+    try:
+        if not jalankan_kontrol(tree):
+            return 2
+    finally:
+        bersihkan(tmp)
+
     lolos = []
     for idx, (name, relpath, old, new, why) in picked:
         tmp, tree = buat_salinan()
@@ -208,19 +332,19 @@ def main() -> int:
                 print(f"[{idx}] LEWAT (jangkar tidak unik/hilang): {name}")
                 continue
             try:
-                ok, detail = run_gates(tree)
+                ok, detail, berbunyi = run_gates(tree)
             except subprocess.TimeoutExpired:
                 print(f"[{idx}] TIMEOUT: {name}")
                 continue
             if ok:
                 lolos.append((idx, name, why))
-                print(f"[{idx}] LOLOS SELURUH GERBANG  {name}")
+                print(f"[{idx}] LOLOS KETIGA GERBANG  {name}")
                 print(f"       kenapa: {why}")
             else:
-                print(f"[{idx}] merah (aman)          {name}")
+                print(f"[{idx}] merah (aman) lewat {berbunyi:<20} {name}")
         finally:
             bersihkan(tmp)
-    print(f"\n=== {len(lolos)} dari {len(picked)} mutasi LOLOS seluruh gerbang ===")
+    print(f"\n=== {len(lolos)} dari {len(picked)} mutasi LOLOS ketiga gerbang ===")
     for idx, name, why in lolos:
         print(f"  [{idx}] {name}\n       {why}")
     return 0

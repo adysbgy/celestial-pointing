@@ -150,10 +150,26 @@ final class PreferenceDefaultsTests: XCTestCase {
         var diperiksa = 0
 
         for (path, text) in sources where path.hasSuffix("AudioCue.swift") {
-            XCTAssertTrue(Self.stripComments(text).contains("object(forKey: AudioCueStorage.key) == nil"),
-                          "\(path): default nyala `AudioCue` bergantung pada cabang "
-                          + "`object(forKey:) == nil`; tanpa itu kunci kosong terbaca "
-                          + "sebagai false dan bertentangan dengan nilai bawaan model.")
+            // Dulu uji ini menuntut cabang literal
+            // `object(forKey: AudioCueStorage.key) == nil` di berkas ini.
+            // Cabang itu sudah **dipindah** ke `AudioPreference.isEnabled(stored:)`
+            // (PointingKit), yang punya uji sendiri di Linux — dan di sana
+            // ia mengukur perilaku, bukan bentuk teks. Yang tersisa untuk
+            // diperiksa di sini adalah **sambungannya**: berkas ini harus
+            // meneruskan nilai tersimpan (termasuk `nil`) ke fungsi itu.
+            //
+            // `as? Bool` ikut dituntut, karena di situlah bedanya "belum
+            // diset" (`nil`) dari "diset false" dipertahankan. Tanpa cast itu
+            // `bool(forKey:)` akan mengembalikan `false` untuk kunci kosong,
+            // dan default nyala hilang tanpa ada yang memintanya.
+            let kode = Self.stripComments(text)
+            XCTAssertTrue(kode.contains("AudioPreference.isEnabled("),
+                          "\(path): `AudioCue.isOn` tidak lagi meneruskan ke "
+                          + "`AudioPreference.isEnabled(stored:)`, jadi keputusan "
+                          + "bawaan nyala kembali hidup di Apps/ tanpa uji.")
+            XCTAssertTrue(kode.contains("as? Bool"),
+                          "\(path): nilai tersimpan tidak dibaca sebagai `Bool?`, "
+                          + "jadi \"belum diset\" tidak bisa dibedakan dari \"dimatikan\".")
             XCTAssertTrue(PreferenceDefaults.audioCueEnabled,
                           "AudioCue mengembalikan true untuk kunci kosong, "
                           + "jadi bawaan model harus true")

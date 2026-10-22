@@ -3011,6 +3011,17 @@ jobs:
       - name: Buktikan Aturan 88 berbunyi
         run: python3 Tools/bukti-mutasi-aturan88.py
 
+      # Aturan 89 mengukur SAMBUNGAN MotionLogger -> PointingController. Cacat
+      # yang dijaganya LOLOS ketiga gerbang lokal sebelum aturan ini ada
+      # (Tools/sapu-buta-apps.py, kandidat [0]): perintah
+      # controller.setSensorAvailable(false) masih ada tepat sekali di dalam
+      # publishSensorLoss(), jadi Aturan 53 tetap hijau — yang hilang hanya
+      # pemanggilannya, dan layar terus menampilkan objek terakhir seolah
+      # sensor masih hidup. Harness ini menuntut aturan berbunyi pada empat
+      # keadaan dan tetap hijau pada pohon bersih.
+      - name: Buktikan Aturan 89 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan89-saluran-sensor.py
+
       # Laporan tautan iPhone: satu-satunya layar yang menjelaskan apa yang
       # dilaporkan jam. Tiga cacatnya hijau di seluruh gerbang lain karena
       # gerbang repo ini membaca teks dan piksel — kolom yang tidak pernah

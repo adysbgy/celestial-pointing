@@ -96,12 +96,35 @@ enum AudioCueStorage {
 
 enum AudioCue {
     /// Default **nyala**: bunyi kunci adalah aksesibilitas, bukan gangguan.
-    /// `object(forKey:)` dipakai supaya nilai yang belum pernah diset terbaca
-    /// sebagai nyala, bukan sebagai `false` milik `bool(forKey:)`.
+    ///
+    /// **Keputusan "belum diset = nyala" tidak ditulis di sini.** Ia hidup di
+    /// `AudioPreference.isEnabled(stored:)` (PointingKit, teruji di Linux),
+    /// karena badan yang dulu tinggal di sini memutuskan politik preferensi
+    /// pengguna di `Apps/`, yang tidak pernah dibangun `./swift-test.sh`.
+    /// Di sini hanya membaca nilai tersimpan dan meneruskannya.
+    ///
+    /// **Klaim yang ditarik (22 Okt 2026).** Versi pertama komentar ini
+    /// menulis bahwa mutasi `return true` — mengabaikan saklar pengguna —
+    /// "lolos seluruh gerbang". Itu **salah**, dan salahnya terukur: `swift
+    /// test` memerahkannya dengan dua kegagalan di
+    /// `PreferenceDefaultsTests`. Yang membuat klaim itu lahir bukan repo,
+    /// melainkan `Tools/sapu-buta-apps.py`, yang menjalankan dua gerbang teks
+    /// lalu mencetak "LOLOS SELURUH GERBANG" — alat yang mengukur sebagian
+    /// dan mengucapkan seluruh. Alatnya sudah diperbaiki lebih dulu (gerbang
+    /// ketiga + kontrol positif); klaimnya ditarik di sini.
+    ///
+    /// **Cacat yang benar-benar terukur, dan yang dijaga sekarang.** Bukan
+    /// menghapus cabang, melainkan membalik nilainya: `bool(forKey:)` membaca
+    /// kunci kosong sebagai `false`, sehingga "belum diset" runtuh menjadi
+    /// "dimatikan" dan bawaan nyala hilang. Bentuk itu **mengompilasi** tanpa
+    /// satu pun peringatan dan tidak meninggalkan tanda di kedua gerbang teks.
+    /// Karena itu `as? Bool` di bawah bukan gaya penulisan: ia satu-satunya
+    /// yang mempertahankan perbedaan `nil` dari `false`, dan
+    /// `PreferenceDefaultsTests` menuntutnya secara eksplisit.
     static var isOn: Bool {
         get {
-            if UserDefaults.standard.object(forKey: AudioCueStorage.key) == nil { return true }
-            return UserDefaults.standard.bool(forKey: AudioCueStorage.key)
+            AudioPreference.isEnabled(
+                stored: UserDefaults.standard.object(forKey: AudioCueStorage.key) as? Bool)
         }
         set { UserDefaults.standard.set(newValue, forKey: AudioCueStorage.key) }
     }
