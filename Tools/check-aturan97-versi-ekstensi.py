@@ -41,14 +41,19 @@ Yang diperiksa di sini adalah hal yang sebenarnya penting: setiap
 Mewarisi dari target lain **tidak** dihitung, karena itulah persis bug
 yang terjadi.
 
-Kenapa diparse dengan PyYAML, bukan regex: `project.yml` berisi komentar
-panjang dan blok multi-baris; regex akan membaca komentar sebagai kode dan
-melaporkan target yang tidak ada. PyYAML tersedia di runner CI (dipakai
-XcodeGen sendiri) dan di mesin pengembang.
+Kenapa ada parser YAML sendiri, bukan PyYAML: percobaan pertama memakai
+`import yaml`, hijau di mesin pengembang, lalu **merah di macOS runner**
+dengan `ModuleNotFoundError: No module named 'yaml'` — gerbang yang hanya
+bisa berjalan di satu mesin bukan gerbang. `project.yml` di repo ini hanya
+memakai subset YAML yang sempit (mapping bersarang + list skalar), jadi
+parser indentasi di bawah cukup, dan tidak menambah dependensi yang harus
+diinstal CI.
 
 Yang TIDAK diklaim: aturan ini tidak memeriksa apakah nilainya **benar**
 (hanya bahwa variabelnya terdefinisi), tidak memeriksa `entitlements`, dan
-tidak menggantikan validasi App Store.
+tidak menggantikan validasi App Store. Parser di bawah bukan YAML lengkap —
+ia sengaja menolak berkas yang memakai flow mapping (`{a: b}`) atau anchor,
+karena pada berkas seperti itu ia bisa diam-diam salah membaca.
 """
 
 from __future__ import annotations
@@ -56,8 +61,6 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
-
-import yaml
 
 AKAR = Path(__file__).resolve().parent.parent
 PROYEK = AKAR / "project.yml"
@@ -79,6 +82,108 @@ BAWAAN_XCODE = {
 VAR = re.compile(r"\$\(([A-Za-z_][A-Za-z0-9_]*)\)")
 
 
+class YamlTidakDidukung(Exception):
+    """Berkas memakai bentuk YAML yang tidak bisa dibaca parser ini."""
+
+
+def buang_komentar(baris: str) -> str:
+    """Buang komentar `#` yang tidak berada di dalam tanda kutip."""
+    keluaran = []
+    kutip = None
+    for i, c in enumerate(baris):
+        if kutip:
+            if c == kutip:
+                kutip = None
+        elif c in "'\"":
+            kutip = c
+        elif c == "#" and (i == 0 or baris[i - 1] in " \t"):
+            break
+        keluaran.append(c)
+    return "".join(keluaran).rstrip()
+
+
+def skalar(teks: str) -> str:
+    teks = teks.strip()
+    if len(teks) >= 2 and teks[0] == teks[-1] and teks[0] in "'\"":
+        return teks[1:-1]
+    return teks
+
+
+def muat_yaml(teks: str) -> dict:
+    """Parser YAML subset: mapping bersarang + list skalar.
+
+    Cukup untuk `project.yml` di repo ini. Bentuk yang tidak didukung
+    dilempar sebagai `YamlTidakDidukung`, bukan diabaikan — supaya gerbang
+    tidak pernah "hijau karena tidak membaca apa pun".
+    """
+    akar: dict = {}
+    # Tumpukan (indentasi, mapping) — mapping teratas selalu tujuan penulisan.
+    tumpukan: list[tuple[int, dict]] = [(-1, akar)]
+    # Indentasi blok skalar (`|` / `>`) yang isinya dilewati apa adanya.
+    lewati_sampai: int | None = None
+
+    for nomor, mentah in enumerate(teks.splitlines(), start=1):
+        if not mentah.strip():
+            continue
+        indent_mentah = len(mentah) - len(mentah.lstrip())
+        if lewati_sampai is not None:
+            # Isi blok skalar: bukan YAML, jangan diparse. Blok berakhir saat
+            # ada baris berindentasi <= indentasi kuncinya.
+            if indent_mentah > lewati_sampai:
+                continue
+            lewati_sampai = None
+        if mentah.lstrip().startswith("#"):
+            continue
+        if "\t" in mentah[:indent_mentah]:
+            raise YamlTidakDidukung(f"baris {nomor}: indentasi tab")
+        baris = buang_komentar(mentah)
+        if not baris.strip():
+            continue
+
+        indent = len(baris) - len(baris.lstrip())
+        isi = baris.strip()
+
+        if isi.startswith("- "):
+            # Item list. Tidak ada yang dibaca dari list di aturan ini, jadi
+            # isinya dilewati; yang penting parser tidak salah menautkan
+            # kunci berikutnya ke item list.
+            continue
+
+        if ":" not in isi:
+            raise YamlTidakDidukung(f"baris {nomor}: bukan mapping: {isi[:40]!r}")
+
+        kunci, _, sisa = isi.partition(":")
+        kunci = skalar(kunci)
+        if not kunci:
+            raise YamlTidakDidukung(f"baris {nomor}: kunci kosong")
+
+        while tumpukan and indent <= tumpukan[-1][0]:
+            tumpukan.pop()
+        if not tumpukan:
+            raise YamlTidakDidukung(f"baris {nomor}: indentasi tidak konsisten")
+
+        induk = tumpukan[-1][1]
+
+        nilai = sisa.strip()
+        if nilai in ("|", ">", "|-", ">-", "|+", ">+"):
+            # Blok skalar: isinya baris-baris berindentasi lebih dalam.
+            # Isinya tidak relevan untuk aturan ini (yang diperiksa hanya
+            # nilai Info.plist), tapi harus dilewati supaya baris di dalamnya
+            # tidak dibaca sebagai kunci.
+            induk[kunci] = ""
+            lewati_sampai = indent
+        elif nilai == "":
+            anak: dict = {}
+            induk[kunci] = anak
+            tumpukan.append((indent, anak))
+        else:
+            if nilai.startswith("{") or nilai.startswith("["):
+                raise YamlTidakDidukung(f"baris {nomor}: flow collection")
+            induk[kunci] = skalar(nilai)
+
+    return akar
+
+
 def ambil_variabel(nilai) -> set[str]:
     """Semua `$(VAR)` di dalam sebuah nilai Info.plist, rekursif."""
     hasil: set[str] = set()
@@ -97,9 +202,16 @@ def variabel_target(target: dict) -> set[str]:
     """Variabel yang didefinisikan `settings` target itu sendiri."""
     definisi: set[str] = set()
     settings = target.get("settings") or {}
-    definisi.update((settings.get("base") or {}).keys())
-    for cfg in (settings.get("configs") or {}).values():
-        definisi.update((cfg or {}).keys())
+    if not isinstance(settings, dict):
+        return definisi
+    base = settings.get("base") or {}
+    if isinstance(base, dict):
+        definisi.update(base.keys())
+    configs = settings.get("configs") or {}
+    if isinstance(configs, dict):
+        for cfg in configs.values():
+            if isinstance(cfg, dict):
+                definisi.update(cfg.keys())
     return definisi
 
 
@@ -108,9 +220,16 @@ def main() -> int:
         print(f"FAIL {PROYEK} tidak ada: Aturan 97 tidak mengukur apa pun.")
         return 1
 
-    data = yaml.safe_load(PROYEK.read_text(encoding="utf-8"))
+    try:
+        data = muat_yaml(PROYEK.read_text(encoding="utf-8"))
+    except YamlTidakDidukung as e:
+        print(f"FAIL project.yml memakai YAML yang tidak didukung: {e}")
+        print("-> Perluas parser di Tools/check-aturan97-versi-ekstensi.py;")
+        print("   jangan biarkan aturan ini hijau tanpa membaca berkasnya.")
+        return 1
+
     targets = data.get("targets") or {}
-    if not targets:
+    if not isinstance(targets, dict) or not targets:
         print("FAIL project.yml tidak punya `targets`: Aturan 97 tidak mengukur apa pun.")
         return 1
 
@@ -121,7 +240,11 @@ def main() -> int:
         if not isinstance(target, dict):
             continue
         info = target.get("info") or {}
+        if not isinstance(info, dict):
+            continue
         properti = info.get("properties") or {}
+        if not isinstance(properti, dict):
+            continue
         dipakai = ambil_variabel(properti)
         if not dipakai:
             continue

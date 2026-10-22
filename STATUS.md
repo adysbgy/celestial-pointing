@@ -33543,3 +33543,103 @@ hanya `motion.stop()` hilang → bunyi; hanya `location.stop()` hilang → bunyi
 Engine tidak disentuh: CelestialEngine **222** + PointingKit **1079** =
 **1301** hijau (0 kegagalan) di Docker Swift 6.0. 92 aturan UI hijau,
 typecheck hijau, `bash -n` di bash 3.2 hijau, 152 harness terdaftar.
+
+### Siklus (22 Okt 2026 — Aturan 96: skalar yang dihitung lalu diganti literal)
+
+`CelestialVisualView` menghitung **21** nilai dari model (`earthshine`,
+`terminatorRotation`, `bandPhase`, …) lalu menggambarnya. Seluruh gerbang
+yang sudah ada memeriksa bahwa view **memanggil** modelnya; tidak satu pun
+memeriksa bahwa hasilnya sampai ke piksel.
+
+**Diukur, bukan dipercaya.** `.opacity(earthshine)` diganti `.opacity(1)` di
+`CelestialVisualView.swift`:
+
+- 95 aturan UI saat itu: **nol merah**. `if earthshine > 0` tepat di atasnya
+  masih menyebut nama variabelnya, jadi sapuan teks puas.
+- Gerbang Bulan: **nol merah**.
+- `check-visuals.py`: **hijau** — ia mengukur port Python, yang tidak ikut
+  disunting.
+- Compiler: diam. Teks di layar: tidak berubah.
+
+Satu-satunya sinyal adalah sisi gelap Bulan yang hilang, dan tidak ada yang
+melihatnya. Ini kelas yang sama dengan Aturan 95 (nilai yang tidak pernah
+diperiksa adalah nilai yang boleh berarti apa saja), hanya letaknya di
+gambar, bukan animasi.
+
+**Perbaikan.** `Tools/check-aturan96-skalar-model.py` memisahkan pemakaian
+sebuah skalar model menjadi **nilai** (argumen panggilan, anggota, subskrip,
+cabang ternary, operand aritmetika) lawan **syarat** (di dalam
+`if`/`guard`/kondisi ternary). Skalar yang hanya pernah muncul sebagai syarat
+adalah skalar yang boleh berarti apa saja. Hasil pada pohon bersih: 21/21
+dipakai sebagai nilai.
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-aturan96-skalar-model.py`, tiga
+mutasi): opasitas earthshine → literal `1` ⇒ bunyi; opasitas glow → literal
+`0.5` ⇒ bunyi; skalar dibuang seluruhnya (deklarasi **dan** pemakaian) ⇒
+bunyi; pohon apa adanya ⇒ diam.
+
+**Yang TIDAK diklaim.** Ini analisis teks per-baris, bukan analisis aliran
+data. Ia tidak membuktikan nilainya *benar*, hanya bahwa nilai yang
+dihitung benar-benar dipakai di tempat menggambar. Skalar yang dipakai
+sebagai nilai tapi kemudian diabaikan oleh parameter yang salah tetap lolos.
+
+### Siklus (22 Okt 2026 — Aturan 97: versi bundel ekstensi yang tidak pernah ada)
+
+Cacat ini tidak ditemukan dengan membaca kode. Ia **tercetak di log Apple
+Build setiap kali alur kerja itu berjalan**, dan tidak ada yang membacanya:
+
+    warning: The CFBundleVersion of an app extension (null) must match
+    that of its containing parent app ('1').
+
+Target `PointAndKnow Watch Complication` menulis
+`CFBundleVersion: $(CURRENT_PROJECT_VERSION)` di `info.properties`, tapi
+`settings.base`-nya tidak pernah mendefinisikan variabel itu. Ia memang
+ada — di target app jam dan app iPhone — dan **XcodeGen tidak mewariskan
+`settings` ke extension yang di-embed**. Info.plist yang dihasilkan berisi
+literal `null`.
+
+Kenapa lolos selama ini:
+
+- Bukan warning compiler kode sendiri, jadi gerbang "gagal bila ada compiler
+  warning" di `ios-build.yml` tidak berbunyi — ia memeriksa keluaran
+  `swiftc`, bukan validasi bundel.
+- Bukan teks di layar, jadi 96 aturan UI tidak melihatnya.
+- **Build tetap hijau.** Bundel ber-`null` masih bisa dibangun dan dijalankan
+  di simulator. Yang menolaknya adalah App Store, jauh belakangan.
+
+**Perbaikan.** `MARKETING_VERSION` dan `CURRENT_PROJECT_VERSION`
+didefinisikan di scope target complication.
+
+**Gerbang.** `Tools/check-aturan97-versi-ekstensi.py` memeriksa setiap
+`$(VARIABEL)` yang benar-benar dirujuk `info.properties` terhadap `settings`
+target itu sendiri, dan **sengaja tidak mewarisi antar-target** — karena
+pewarisan itulah bug-nya.
+
+Dua kegagalan gerbang ini sendiri, yang keduanya layak dicatat:
+
+1. Versi pertamanya `import yaml`. Hijau di mesin pengembang, lalu **merah di
+   macOS runner**: `ModuleNotFoundError: No module named 'yaml'`. Gerbang yang
+   hanya bisa berjalan di satu mesin bukan gerbang. Diganti parser indentasi
+   sendiri (subset sempit: mapping bersarang + list + blok skalar `|`), tanpa
+   dependensi.
+2. Parser tulisan sendiri hanya berguna kalau terbukti membaca hal yang sama
+   dengan YAML sungguhan. Diperiksa langsung: `muat_yaml(project.yml)` lawan
+   `yaml.safe_load(project.yml)` — nama target, `info.properties`, dan kunci
+   `settings.base` **identik untuk ketiga target**. Bentuk YAML yang tidak
+   didukung (flow mapping, tab) **melempar galat**, bukan dilewati diam-diam.
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-aturan97-versi-ekstensi.py`, tiga
+mutasi, semuanya menyunting `project.yml` sungguhan lalu mengembalikannya):
+`CURRENT_PROJECT_VERSION` hilang dari target complication ⇒ bunyi;
+`MARKETING_VERSION` hilang saja ⇒ bunyi; variabel baru `$(BUILD_NUMBER)`
+dirujuk tanpa definisi ⇒ bunyi; pohon apa adanya ⇒ diam.
+
+**Diverifikasi di CI, bukan diasumsikan.** Apple Build yang memuat perbaikan
+ini **tidak lagi** mencetak peringatan `CFBundleVersion ... (null)`;
+`grep` atas log run itu mengembalikan nol baris.
+
+**Yang TIDAK diklaim.** Aturan ini tidak memeriksa apakah nilai versinya
+*benar* (hanya bahwa variabelnya terdefinisi), tidak memeriksa
+`entitlements`, dan tidak menggantikan validasi App Store. Parser YAML-nya
+bukan implementasi lengkap — ia menolak bentuk yang tidak ia pahami, dan
+penolakan itu membuat gerbang merah, bukan hijau.
