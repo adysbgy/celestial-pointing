@@ -431,10 +431,13 @@ public final class PointingEngine: ObservableObject {
         lastComplicationSignature = signature
         ComplicationStore.shared.record(digest)
         // Menulis berkas tidak membuat watchOS menggambar ulang complication:
-        // timeline-nya `.never`, jadi ia membaca sekali lalu membeku. Panggilan
-        // ini yang memintanya membaca ulang. Sengaja di dalam penjagaan
-        // `signature` — reload adalah kerja sistem, dan memanggilnya 20×/detik
-        // untuk ringkasan yang sama hanya membakar baterai.
+        // timeline yang sudah dihitung tidak berubah karena berkas di disk
+        // berubah. Penyegaran berbasis umur (`.after(...)`) hanya menyegarkan
+        // **cuplikan yang sama** di ambang basi, bukan kunci baru. Panggilan
+        // ini yang memintanya membaca ulang setelah tanda tangan berubah.
+        // Sengaja di dalam penjagaan `signature` — reload adalah kerja sistem,
+        // dan memanggilnya 20×/detik untuk ringkasan yang sama hanya membakar
+        // baterai.
         complicationReload?()
     }
 

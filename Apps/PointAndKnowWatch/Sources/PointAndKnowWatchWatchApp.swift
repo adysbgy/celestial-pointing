@@ -67,13 +67,14 @@ struct PointAndKnowWatchApp: App {
         let cue = audioCue
         engine.audioCue = { events in cue.play(events) }
 
-        // Complication membaca ringkasan dari berkas yang dibagi, tapi
-        // timeline-nya `.never`: menulis berkas tidak membuat watchOS menggambar
-        // ulang apa pun. Tanpa panggilan ini complication menampilkan objek
-        // pertama yang pernah terkunci lalu membeku di situ — berkasnya selalu
-        // benar, layarnya yang tidak pernah menyegar. `reloadAllTimelines` aman
-        // dipanggil saat app aktif; ia hanya menandai timeline perlu dihitung
-        // ulang, bukan menggambar langsung.
+        // Complication membaca ringkasan dari berkas yang dibagi. Timeline-nya
+        // kini menyegar sendiri di ambang basi (`.after(...)` dari
+        // `nextRefreshDate(after:)`), tapi itu **tidak** cukup untuk kunci
+        // baru: pengguna mengunci lagi sebelum ambang lama tercapai, dan tanpa
+        // panggilan ini complication tetap menampilkan objek dari kunci
+        // sebelumnya sampai penyegaran berbasis umur tiba. `reloadAllTimelines`
+        // aman dipanggil saat app aktif; ia hanya menandai timeline perlu
+        // dihitung ulang, bukan menggambar langsung.
         engine.complicationReload = { WidgetCenter.shared.reloadAllTimelines() }
 
         location.start()
