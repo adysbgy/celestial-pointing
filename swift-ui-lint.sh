@@ -14951,6 +14951,41 @@ else
 fi
 
 
+echo "== Aturan 98: fungsi model yang punya kembaran port wajib sampai ke gambar =="
+# Cacatnya diukur, bukan disangka: badan `starCoreColor` di
+# `Apps/Shared/CelestialVisualView.swift` diganti satu baris `return starColor`
+# — seluruh pemutihan inti bintang di app mati — dan hasilnya
+# `./swift-ui-lint.sh` exit 0 dengan **96 aturan, nol merah**, `grep
+# starCoreRGB` atas keluarannya **0 baris**, dan
+# `check_star_spike_halving_reaches_both_languages` (satu-satunya gerbang
+# `check-visuals.py` yang membaca berkas itu) tetap HIJAU.
+#
+# Kenapa bukan memperluas Aturan 96: Aturan 96 memeriksa `let NAMA =
+# CelestialVisual.…(`, yaitu variabel lokal. `starCoreColor` adalah computed
+# property, jadi ia tidak pernah masuk jangkauannya — dan penggantian badan
+# fungsi tidak meninggalkan `let` apa pun untuk diperiksa.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-97 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan98-fungsi-port-sampai-gambar.py" ]; then
+  echo "FAIL Tools/check-aturan98-fungsi-port-sampai-gambar.py tidak ada: Aturan 98"
+  echo "     tidak mengukur apa pun, dan fungsi model yang diuji di Linux bisa"
+  echo "     hilang dari app tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  fungsi_port=$(python3 Tools/check-aturan98-fungsi-port-sampai-gambar.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$fungsi_port"
+    echo "-> Setiap fungsi model yang punya kembaran port wajib benar-benar"
+    echo "   dipakai view-nya sebagai nilai. Perbaiki view-nya, jangan"
+    echo "   longgarkan aturannya."
+    status=1
+  else
+    echo "$fungsi_port"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
