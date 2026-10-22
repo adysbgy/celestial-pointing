@@ -163,11 +163,14 @@ def main():
     try:
         from PIL import Image  # noqa: PLC0415
         import io
-        base = Image.open(io.BytesIO(original_icon)).convert("RGB")
+        base = Image.open(io.BytesIO(original_icon)).convert("RGBA")
         w, h = base.size
-        shifted = Image.new("RGB", (w, h), (10, 10, 15))
+        shifted = Image.new("RGBA", (w, h), (10, 10, 15, 255))
         shifted.paste(base, (int(w * 0.62), int(h * 0.62)))
         buf = io.BytesIO()
+        # WAJIB RGBA: `decode_png` di check-visuals.py hanya menerima RGBA8.
+        # Menyimpan sebagai RGB membuat gerbangnya melempar "hanya RGBA8 yang
+        # didukung", dan keadaan ini terbaca `None` — bukan merah.
         shifted.save(buf, format="PNG")
         states.append(("2. subjek digeser ke pojok kanan-bawah",
                        buf.getvalue(), "merah", "subjek terpusat"))
