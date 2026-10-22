@@ -13502,6 +13502,239 @@ def check_star_spike_halving_reaches_both_languages(results):
         f"view {halves['view']} vs port {halves['port']}"))
 
 
+def star_core_swift_doc():
+    """Docstring `starCoreRGB` dari sumber Swift, atau `None`.
+
+    Dibaca dari berkas model, bukan dari salinan di sini: gerbang paritas yang
+    membandingkan angka dengan salinannya sendiri tidak mengukur apa pun.
+    """
+    path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                               "CelestialVisual.swift")
+    try:
+        source = open(path, encoding="utf-8").read()
+    except OSError:
+        return None
+    anchor = "public static func starCoreRGB(forColorIndex"
+    index = source.find(anchor)
+    if index < 0:
+        return None
+    lines = source[:index].splitlines()
+    collected = []
+    for line in reversed(lines):
+        stripped = line.strip()
+        if stripped.startswith("///"):
+            collected.append(stripped[3:].strip())
+            continue
+        if stripped == "" and collected:
+            break
+        if stripped == "":
+            continue
+        break
+    if not collected:
+        return None
+    return "\n".join(reversed(collected))
+
+
+#: Angka yang **dikutip** docstring `starCoreRGB`, sebagai (bintang, sebelum,
+#: sesudah). Nilainya tidak ditulis di sini — ia dibaca dari docstringnya, dan
+#: inilah yang membuat gerbang ini bisa menangkap kutipan yang salah.
+STAR_CORE_QUOTED_ORDER = ("sirius", "faint", "betelgeuse")
+
+
+def check_star_core_docstring_quotes_measured_values(results, size=200, ss=2):
+    """Tabel angka di docstring `starCoreRGB` harus keluar dari pikselnya sendiri.
+
+    **Cacat yang ditutup, dan ia nyata di working tree ini.** Docstring
+    `starCoreRGB` mengutip angka "sebelum" yang **tidak keluar dari render
+    mana pun**:
+
+        dikutip:   Sirius 196,7   redup 196,3   Betelgeuse 164,7
+        terukur:   Sirius 190,03  redup 189,59  Betelgeuse 173,39
+
+    Selisihnya bukan pembulatan: 196,7 lawan 190,03 adalah 6,7/255, dan
+    Betelgeuse meleset 8,7/255. Komentar yang sama juga mengutip keadaan
+    **antara** ("Sirius hanya naik 190,1 → 195,7 sementara bintang redup
+    197,2, jadi urutannya terbalik") — diukur ulang, keadaan itu menghasilkan
+    Sirius **209,14** lawan redup **196,95**, yaitu Sirius memang lebih terang;
+    yang benar-benar masih salah di keadaan itu adalah Betelgeuse (186,84,
+    masih di bawah redup). Jadi komentar itu bukan cuma salah angka, ia
+    **menuduh pemeriksaan yang salah** — dan pembaca berikutnya yang
+    mempercayainya akan menyimpulkan bahwa pemeriksaan Sirius sudah cukup
+    untuk menangkap cacatnya.
+
+    Kelas cacat ini sudah lima kali dibayar repo ini
+    (`check_crater_contrast_numbers_come_from_the_sampler`,
+    `check_band_feather_docstring_quotes_measured_values`,
+    `check_spiral_arm_docstring_quotes_measured_values`,
+    `check_spiral_core_docstring_quotes_measured_values`,
+    `check_saturn_ring_order_docstring_quotes_measured_values`): **komentar
+    mengutip angka yang tidak pernah ia ukur**, padahal komentar itu
+    satu-satunya bukti yang dibaca orang saat menilai apakah 0,30/0,70 layak
+    dipercaya.
+
+    **Kenapa kolom "sebelum" ikut diukur, bukan cuma kolom "sesudah".**
+    Kolom "sesudah" mudah: ia keadaan sekarang. Kolom "sebelum" adalah
+    **alasan** fungsi ini ada, dan ia satu-satunya angka yang tidak bisa
+    diperiksa dengan membaca kode — tint mentah tidak lagi dipakai di mana
+    pun. Karena itu ia dirender ulang di sini dengan `starCoreRGB`
+    **dimatikan** (diganti tint mentah, persis keadaan pra-perbaikan) pada
+    geometri yang **sekarang**. Kalau geometri bintang berubah kelak, kedua
+    kolom bergerak bersama dan tabelnya harus diperbarui — dan gerbang ini
+    yang memberi tahu, alih-alih tabelnya membusuk diam-diam.
+
+    **Batas yang dinyatakan.** Yang diikat adalah tiga bintang (Sirius,
+    redup m +3,50, Betelgeuse) pada 200 px, `ss=2`, mode siang, puncak
+    luminansi. Rigel dikutip di docstring tetapi **tidak** diikat di sini —
+    ia bukan bagian dari tiga klaim yang membuat fungsi ini ada, dan
+    menambahkannya hanya menambah permukaan yang harus diperbarui tanpa
+    menambah klaim. Ukuran lain, `ss` lain, dan mode malam tidak diklaim.
+    Toleransinya 0,05/255: cukup untuk pembulatan kutipan dua desimal, tidak
+    cukup untuk menyembunyikan angka yang salah tempat.
+    """
+    doc = star_core_swift_doc()
+    if doc is None:
+        results.append(Result(
+            "inti bintang: docstring starCoreRGB terbaca", False,
+            "docstring `starCoreRGB` tidak ditemukan di CelestialVisual.swift "
+            "— gerbang paritas ini tidak bisa mengukur apa pun, dan itu merah, "
+            "bukan lulus"))
+        return
+
+    # Angka dikutip dalam bentuk `Nama (m …)  sebelum  sesudah`, satu per baris
+    # di dalam blok kode. Dipisah per baris supaya nama dan angkanya tidak
+    # bisa tertukar antar-baris.
+    quoted = {}
+    for line in doc.splitlines():
+        # Nama, lalu keterangan magnitudo dalam kurung (yang **mengandung
+        # angka** — `(m −1,46)` — jadi tidak boleh ditelan `[^\d]*`), lalu dua
+        # angka: sebelum dan sesudah.
+        match = re.match(r"\s*(Sirius|redup|Betelgeuse)\b\s*"
+                         r"(?:\([^)]*\))?\s*"
+                         r"([\d]+[.,][\d]+)\s+([\d]+[.,][\d]+)", line)
+        if match:
+            label = match.group(1).lower()
+            key = {"sirius": "sirius", "redup": "faint",
+                   "betelgeuse": "betelgeuse"}[label]
+            quoted[key] = (float(match.group(2).replace(",", ".")),
+                           float(match.group(3).replace(",", ".")))
+
+    missing = [name for name in STAR_CORE_QUOTED_ORDER if name not in quoted]
+    if missing:
+        results.append(Result(
+            "inti bintang: docstring mengutip ketiga angka", False,
+            f"tidak terbaca dari docstring `starCoreRGB`: {', '.join(missing)} "
+            f"(terbaca {len(quoted)} dari {len(STAR_CORE_QUOTED_ORDER)}) — "
+            "gerbang paritas yang tidak menemukan kutipannya tidak boleh hijau"))
+        return
+
+    cases = {c.name: c for c in R.build_cases()}
+
+    def peak(star, tint_only):
+        case = cases[f"star-{star}"]
+        saved = R.star_core_rgb
+        if tint_only:
+            # Keadaan pra-perbaikan: inti memakai tint mentah, bukan hasil
+            # pemanasan. `star_rgb` sudah menerima indeks B−V yang **sudah**
+            # dipetakan `drawable_star_color_index`, persis argumen yang
+            # diterima `star_core_rgb`.
+            R.star_core_rgb = lambda index, relative_size: R.star_rgb(index)
+        try:
+            buf = R.render(case, size=size, night_mode=False,
+                           show_frame=False, ss=ss).buf
+        finally:
+            R.star_core_rgb = saved
+        pixel = max(buf, key=lambda p: 0.2126 * p[0] + 0.7152 * p[1]
+                                     + 0.0722 * p[2])
+        return (0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2]) * 255
+
+    wrong = []
+    for star in STAR_CORE_QUOTED_ORDER:
+        claimed_before, claimed_after = quoted[star]
+        for label, claimed, tint_only in (("sebelum", claimed_before, True),
+                                          ("sesudah", claimed_after, False)):
+            actual = peak(star, tint_only)
+            if abs(actual - claimed) > 0.05:
+                wrong.append(f"{star} {label}: dikutip {claimed:.2f} "
+                             f"terukur {actual:.2f}")
+
+    results.append(Result(
+        "inti bintang: docstring mengutip angka terukur (sebelum & sesudah)",
+        not wrong,
+        "keenam angka cocok dengan pikselnya (toleransi 0,05/255)"
+        if not wrong
+        else "; ".join(wrong)))
+
+
+def check_star_core_whitens_with_magnitude(results, size=200, ss=2):
+    """Inti bintang harus **memutih dan menyala** seiring terangnya — dari piksel.
+
+    **Cacat yang ditutup pemeriksaan ini.** Inti bintang digambar dengan tint
+    spektral mentah, jadi inti tidak membawa isyarat terang sama sekali.
+    Terukur pada render 200 px, `ss=2`, mode siang:
+
+    - Sirius (m −1,46) berpuncak **190,03**, bintang redup (m +3,5) **189,59**.
+      Bintang paling terang di langit dan bintang yang nyaris tak terlihat
+      **sama terangnya**: selisih 0,4/255, tidak terbaca siapa pun.
+    - Betelgeuse (m +0,50) berpuncak **173,39** — jadi bintang yang lebih
+      terang justru berinti **lebih gelap**.
+
+    Sesudah perbaikan: Sirius 251,56, bintang redup 214,61, Betelgeuse 218,52.
+
+    **Kenapa gerbang ini perlu meski model sudah diuji di Linux.**
+    `testStarCoreWhitenessFollowsMagnitudeNotHue` menjaga **rumusnya**. Ia
+    tidak bisa menjaga apakah rumus itu sampai ke gambar — dan pada percobaan
+    pertama perbaikan ini memang tidak sampai: keempat baji spike berangkat
+    dari titik pusat yang sama dan menimpa inti dengan tint pada opasitas
+    0,45. Terukur pada keadaan itu: Sirius 209,14, bintang redup 196,95, dan
+    Betelgeuse **186,84** — masih di bawah bintang redup, jadi pembalikan
+    urutan belum tertutup meski Sirius sudah terlihat "menang". Tidak ada uji
+    Swift yang bisa melihat itu: yang salah adalah urutan operasi gambar, bukan
+    angkanya.
+
+    Diukur pada ukuran kartu jam yang sama dengan pemeriksaan bintang lain
+    supaya gerbang ini mengukur gambar yang tampil, bukan yang paling mudah
+    diukur.
+    """
+    magnitudes = R.catalogue_magnitudes()
+    cases = {c.name: c for c in R.build_cases()}
+
+    def core(star):
+        buf = R.render(cases[f"star-{star}"], size=size, night_mode=False,
+                       show_frame=False, ss=ss).buf
+        return max(buf, key=lambda p: 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2])
+
+    def luminance(p):
+        return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+
+    def chroma(p):
+        return max(p) - min(p)
+
+    sirius, faint, betelgeuse = core("sirius"), core("faint"), core("betelgeuse")
+
+    # (1) Bintang paling terang harus berinti lebih terang, dengan selisih yang
+    #     terbaca — bukan 0,44/255 seperti sebelumnya.
+    results.append(Result(
+        "inti Sirius lebih terang dari bintang redup (piksel)",
+        luminance(sirius) > luminance(faint) + 0.04,
+        f"luminansi sirius={luminance(sirius):.3f} redup={luminance(faint):.3f} "
+        f"(m {magnitudes['sirius']:+.2f} lawan +3.50)"))
+
+    # (2) Hue harus "habis" di inti bintang terang — inilah arti memutih.
+    #     Keduanya B−V 0,00, jadi yang terukur hanya terang, bukan hue.
+    results.append(Result(
+        "inti Sirius lebih putih dari bintang redup (kroma piksel)",
+        chroma(sirius) < chroma(faint) * 0.6,
+        f"kroma sirius={chroma(sirius):.3f} redup={chroma(faint):.3f}"))
+
+    # (3) Pembalikan yang dulu terukur: bintang hangat yang lebih terang tidak
+    #     boleh berinti lebih gelap daripada bintang redup.
+    results.append(Result(
+        "inti Betelgeuse tidak lebih gelap dari bintang redup (piksel)",
+        luminance(betelgeuse) > luminance(faint),
+        f"luminansi betelgeuse={luminance(betelgeuse):.3f} "
+        f"redup={luminance(faint):.3f}"))
+
+
 def check_star_colour_order(results, size=200, ss=2):
     """Betelgeuse harus lebih merah dari Rigel — diukur dari piksel.
 
@@ -18202,6 +18435,14 @@ def main():
         check_backdrop_port_matches_the_model(results)
     except Exception as _gate_error:  # noqa: BLE001
         _gate_failed(results, "check_backdrop_port_matches_the_model", _gate_error)
+    try:
+        check_star_core_docstring_quotes_measured_values(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_core_docstring_quotes_measured_values", _gate_error)
+    try:
+        check_star_core_whitens_with_magnitude(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_core_whitens_with_magnitude", _gate_error)
     try:
         check_star_colour_order(results, args.size, args.ss)
     except Exception as _gate_error:  # noqa: BLE001

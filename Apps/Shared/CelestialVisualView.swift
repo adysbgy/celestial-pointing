@@ -1655,12 +1655,14 @@ struct CelestialVisualView: View {
                                                            isConfirmed: isConfirmed))
         let coreRadius = radius * CGFloat(geometry.coreRadius)
         let color = starColor
-        // Denyut halus datang dari `pulse` — bukan timer di dalam view, supaya
-        // layar redup bisa menghentikannya (lihat `NightAwareContainer`).
-        // Amplitudonya dibaca dari geometri yang sama, karena batas frame
-        // dihitung pada **puncak** denyut: kalau view berdenyut lebih besar
-        // daripada yang dipakai model saat menghitung batas, bintang akan
-        // muat saat diam dan terpotong setiap kali denyut memuncak.
+        // **Inti dipanaskan ke putih, glow tetap berwarna.** Sampai siklus ini
+        // inti memakai warna yang sama dengan glow-nya, sehingga Sirius
+        // (m −1,46) dan bintang magnitudo +3,5 berpuncak sama terangnya
+        // (190,03 lawan 189,59 pada render 200 px, ss=2) dan Betelgeuse justru
+        // berpuncak paling redup dari Rigel (173,39 lawan 190,06). Rumusnya
+        // tinggal di model (`CelestialVisual.starCoreRGB`) supaya urutannya
+        // bisa diuji di Linux; di sini hanya pemetaan.
+        let coreColor = starCoreColor
         let pulseFactor = 1 + CGFloat(geometry.pulseAmplitude) * CGFloat(sin(pulse))
 
         // Glow berlapis: cincin dengan opasitas menurun.
@@ -1669,11 +1671,27 @@ struct CelestialVisualView: View {
             context.fill(Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r,
                                                width: r * 2, height: r * 2)),
                          with: .radialGradient(
-                            Gradient(colors: [color.opacity(Self.glowOpacities[
+                            // Lapis terdalam (indeks terakhir, opasitas 1.0)
+                            // memakai warna **inti**: ia yang menyentuh inti,
+                            // dan glow berwarna tepat di sebelah inti putih
+                            // terbaca sebagai cincin hue yang tidak pernah ada
+                            // di langit. Lapis luar tetap tint, karena di
+                            // situlah hue bintang memang terbaca.
+                            Gradient(colors: [(index == geometry.glowScales.count - 1
+                                               ? coreColor : color)
+                                              .opacity(Self.glowOpacities[
                                 min(index, Self.glowOpacities.count - 1)]),
                                               color.opacity(0)]),
                             center: center, startRadius: 0, endRadius: r))
         }
+        // Denyut halus datang dari `pulse` — bukan timer di dalam view, supaya
+        // layar redup bisa menghentikannya (lihat `NightAwareContainer`).
+        // Amplitudonya dibaca dari geometri yang sama, karena batas frame
+        // dihitung pada **puncak** denyut: kalau view berdenyut lebih besar
+        // daripada yang dipakai model saat menghitung batas, bintang akan
+        // muat saat diam dan terpotong setiap kali denyut memuncak.
+        // (`pulseFactor` dihitung di atas, sebelum glow.)
+
         // Empat diffraction spike tipis — ciri mata telanjang, sekaligus
         // membuat bintang terasa besar tanpa memperbesar disk intinya.
         //
@@ -1717,7 +1735,22 @@ struct CelestialVisualView: View {
             wedge.closeSubpath()
             context.fill(wedge, with: .linearGradient(
                 Gradient(stops: [
-                    .init(color: color.opacity(geometry.spikeOpacity), location: 0),
+                    // **Pangkal spike memakai warna inti, bukan tint.**
+                    // Keempat baji ini berangkat dari titik pusat yang sama,
+                    // jadi keempatnya menimpa inti. Sebelum ini pangkalnya
+                    // ber-tint pada opasitas 0,45, dan empat lapis 0,45 tint
+                    // menutup sebagian besar inti — inti yang sudah dipanaskan
+                    // jatuh kembali ke arah tint mentah. Terukur: dengan
+                    // pangkal ber-tint, Sirius hanya mencapai 209,14 sementara
+                    // bintang redup 196,95, dan Betelgeuse (m +0,50) 186,84 —
+                    // **masih di bawah** bintang redup, jadi pembalikan urutan
+                    // yang seharusnya ditutup perbaikan ini belum tertutup.
+                    // Setelah pangkal memakai warna inti: Sirius 251,56, bintang
+                    // redup 214,61, Betelgeuse 218,52 — urutannya mengikuti
+                    // magnitudo. Cahaya terdifraksi keluar **dari** inti;
+                    // pangkalnya harus seputih inti, dan hue baru terbaca di
+                    // sepanjang spike saat ia menjauh.
+                    .init(color: coreColor.opacity(geometry.spikeOpacity), location: 0),
                     .init(color: color.opacity(0), location: 1)
                 ]),
                 startPoint: center, endPoint: tip))
@@ -1780,6 +1813,29 @@ struct CelestialVisualView: View {
         let night = NightVisual.star(
             CelestialVisual.drawableStarSize(visual, isConfirmed: isConfirmed))
         return Color(red: night.red, green: night.green, blue: night.blue)
+    }
+
+    /// Warna **inti** bintang: tint spektral yang dipanaskan ke putih.
+    ///
+    /// **Kenapa terpisah dari `starColor`.** Glow dan spike harus tetap
+    /// berwarna — hue adalah ciri pengenal (biru Rigel, merah Betelgeuse) dan
+    /// itulah yang membuat bintang bisa dibedakan. Inti justru sebaliknya:
+    /// makin terang bintangnya, makin putih intinya, karena mata kelebihan
+    /// cahaya. Sebelum ini keduanya memakai warna yang sama, sehingga terang
+    /// tidak terbaca di inti sama sekali.
+    ///
+    /// **Mode malam tidak butuh jalur sendiri.** Mode malam sudah membuang hue
+    /// dengan memetakan ke merah murni; memanaskan inti ke putih akan
+    /// mengembalikan putih yang justru dilarang mode itu. Karena itu jalur
+    /// malam di sini **sama** dengan `starColor`: kecerahan merah dari ukuran,
+    /// tanpa campuran putih. Yang memanaskan hanya jalur siang.
+    private var starCoreColor: Color {
+        guard !NightMode.isOn else { return starColor }
+        let index = CelestialVisual.drawableStarColorIndex(
+            visual.colorIndexBV, isConfirmed: isConfirmed)
+        let size = CelestialVisual.drawableStarSize(visual, isConfirmed: isConfirmed)
+        return Self.color(CelestialVisual.starCoreRGB(forColorIndex: index,
+                                                       relativeSize: size))
     }
 
     // MARK: - Matahari

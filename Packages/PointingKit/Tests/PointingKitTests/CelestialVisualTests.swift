@@ -2928,6 +2928,99 @@ final class CelestialVisualTests: XCTestCase {
         XCTAssertEqual(CelestialVisual.starColorText(2.00), .starColorRed)
     }
 
+    /// Inti bintang harus **memutih dan menyala** mengikuti terangnya, bukan hue-nya.
+    ///
+    /// **Cacat yang ditangkap uji ini, diukur dari piksel render 200 px.**
+    /// Sampai siklus ini inti digambar dengan tint mentah, sehingga:
+    ///
+    /// ```
+    /// bintang            sebelum   sesudah
+    /// Sirius (m −1,46)    190,03    251,56
+    /// redup  (m +3,50)    189,59    214,61
+    /// Betelgeuse (+0,50)  173,39    218,52
+    /// ```
+    ///
+    /// Sirius dan bintang yang nyaris tak terlihat sama terangnya (selisih
+    /// 0,4/255). Lebih buruk: Betelgeuse berpuncak **173,39** sementara
+    /// bintang redup yang sewarna **189,59**, jadi bintang yang lebih terang
+    /// justru berinti lebih gelap. Kolom "sebelum" diukur ulang oleh
+    /// `check_star_core_docstring_quotes_measured_values` di `Tools/check-visuals.py`
+    /// setiap kali gerbang berjalan, jadi angka ini tidak bisa membusuk.
+    ///
+    /// **Kenapa yang diuji luminansi + kroma, bukan "kanal terendah".**
+    /// Percobaan pertama uji ini memakai kanal terendah dan **merah** — dan
+    /// merahnya benar: kanal terendah bintang hangat mulai jauh lebih rendah
+    /// (biru Betelgeuse 0,35 lawan 0,90 milik Sirius), jadi Betelgeuse bisa
+    /// punya porsi putih lebih besar namun kanal terendah tetap lebih gelap.
+    /// Itu bukan cacat gambar, itu cacat ukuran. Yang harus benar-benar
+    /// dijaga ada dua sifat yang tidak bergantung pada hue sama sekali:
+    ///
+    /// 1. **Luminansi** inti naik seiring terang bintang — inilah yang
+    ///    terbaca sebagai "bintang terang" di layar.
+    /// 2. **Kroma** inti turun seiring terang bintang — inilah yang membuat
+    ///    bintang terang tampak memutih, dan ia harus turun untuk **hue yang
+    ///    sama** supaya perbandingannya adil.
+    func testStarCoreWhitenessFollowsMagnitudeNotHue() {
+        // Ukuran relatif dari `sizeFromMagnitude` untuk bintang nyata.
+        let siriusSize = CelestialVisual.sizeFromMagnitude(-1.46)  // paling terang
+        let betelSize = CelestialVisual.sizeFromMagnitude(0.50)    // merah, lebih redup
+        let faintSize = CelestialVisual.sizeFromMagnitude(3.5)     // nyaris tak terlihat
+
+        func luminance(_ c: CelestialVisual.RGBComponents) -> Double {
+            0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue
+        }
+        func chroma(_ c: CelestialVisual.RGBComponents) -> Double {
+            max(c.red, max(c.green, c.blue)) - min(c.red, min(c.green, c.blue))
+        }
+
+        // Sirius dan bintang redup sengaja **sewarna** (B−V 0,00), supaya
+        // perbandingan kroma hanya mengukur terang, bukan hue.
+        let siriusCore = CelestialVisual.starCoreRGB(forColorIndex: 0.00,
+                                                     relativeSize: siriusSize)
+        let faintCore = CelestialVisual.starCoreRGB(forColorIndex: 0.00,
+                                                    relativeSize: faintSize)
+        let betelCore = CelestialVisual.starCoreRGB(forColorIndex: 1.85,
+                                                    relativeSize: betelSize)
+
+        // 1. Inti bintang paling terang harus benar-benar menyala. Sebelum
+        //    perbaikan keduanya 0,7495 — sama persis, karena keduanya tint.
+        XCTAssertGreaterThan(luminance(siriusCore), luminance(faintCore) + 0.05,
+                             "inti Sirius harus jelas lebih terang daripada bintang redup")
+
+        // 2. Bintang yang lebih terang tidak boleh berinti lebih gelap, bahkan
+        //    ketika ia berwarna hangat. Inilah pembalikan yang terukur di
+        //    piksel: Betelgeuse 173,39 lawan bintang redup 189,59.
+        XCTAssertGreaterThan(luminance(betelCore), luminance(faintCore),
+                             "inti Betelgeuse tidak boleh lebih gelap dari bintang redup")
+
+        // 3. Hue bintang terang harus "habis" karena kelebihan cahaya —
+        //    inilah arti memutih, dan satu-satunya isyarat terang yang masih
+        //    terbaca setelah mode malam membuang warna.
+        XCTAssertLessThan(chroma(siriusCore), chroma(faintCore) * 0.5,
+                          "inti Sirius harus jauh lebih putih daripada bintang redup")
+
+        // 4. Tapi bintang redup **tetap berwarna**: memutihkan semuanya akan
+        //    menghapus hue, dan bintang redup berhenti bisa dibedakan.
+        XCTAssertGreaterThan(chroma(faintCore), 0.08,
+                             "inti bintang redup harus tetap berwarna, bukan putih")
+    }
+
+    /// Inti yang dipanaskan tidak boleh melanggar sentinel "tidak mengklaim".
+    ///
+    /// Warna bintang saat engine ragu sengaja **akromatik** (R=G=B), karena
+    /// hue apa pun adalah klaim kelas spektral. Memanaskan inti ke putih
+    /// menaikkan ketiga kanal dengan rumus yang sama, jadi sifat akromatiknya
+    /// harus tetap utuh — kalau tidak, perbaikan terang ini diam-diam
+    /// mengembalikan klaim warna yang sudah susah payah dihapus.
+    func testStarCoreKeepsUncertainColourAchromatic() {
+        let size = CelestialVisual.drawableStarSize(
+            CelestialVisual(kind: .star, relativeSize: 0.98), isConfirmed: false)
+        let index = CelestialVisual.drawableStarColorIndex(0.00, isConfirmed: false)
+        let core = CelestialVisual.starCoreRGB(forColorIndex: index, relativeSize: size)
+        XCTAssertEqual(core.red, core.green, accuracy: 1e-12)
+        XCTAssertEqual(core.green, core.blue, accuracy: 1e-12)
+    }
+
     /// Batas antar-pita eksak, supaya pembulatan tidak menyisipkan pita ekstra.
     func testStarColorBandBoundariesAreExact() {
         // −0,10 adalah batas biru↔putih-biru: di kiri biru, di kanan putih-biru.

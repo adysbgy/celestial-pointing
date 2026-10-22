@@ -574,6 +574,18 @@ jobs:
       - name: Buktikan gerbang angka docstring urutan cincin berbunyi
         run: python3 Tools/bukti-mutasi-angka-urutan-cincin.py
 
+      # Dan bukti untuk gerbang **angka docstring inti bintang**.
+      #
+      # `check_star_core_docstring_quotes_measured_values` menutup cacat yang
+      # benar-benar ada di working tree: docstring `starCoreRGB` mengutip dua
+      # set angka yang saling bertentangan dan tidak satu pun keluar dari
+      # render mana pun (196,7 / 190,1 dikutip; 190,03 terukur). Gerbangnya
+      # menghitung ulang keenam angka itu dari piksel — dan hijau pada hari ia
+      # ditulis tidak membuktikan apa pun. Harness ini membuktikan ia bisa
+      # merah, termasuk pada angka 196,7 yang dulu benar-benar tertulis.
+      - name: Buktikan gerbang angka docstring inti bintang berbunyi
+        run: python3 Tools/bukti-mutasi-angka-inti-bintang.py
+
       # Dan bukti untuk gerbang **setengah-lebar spike bintang**.
       #
       # `spikeRootWidthFactor` (0.18) dan `spikeTipWidthFactor` (0.035)

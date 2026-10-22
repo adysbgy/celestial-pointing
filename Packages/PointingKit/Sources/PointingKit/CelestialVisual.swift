@@ -953,6 +953,100 @@ public struct CelestialVisual: Equatable, Sendable {
                              blue: unit(1.00 - 0.72 * warmth))
     }
 
+    /// Warna **inti** bintang: tint spektral yang dipanaskan ke putih.
+    ///
+    /// **Cacat yang ditutup fungsi ini, diukur dari piksel bukan dari kode.**
+    /// Sampai siklus ini inti bintang digambar dengan `starRGB` mentah — yaitu
+    /// tint-nya sendiri. Terukur pada render 200 px, `ss=2`, mode siang,
+    /// puncak luminansi `0,2126·R + 0,7152·G + 0,0722·B` skala 0…255:
+    ///
+    /// ```
+    /// bintang          sebelum   sesudah
+    /// Sirius (m −1,46)  190,03    251,56
+    /// redup  (m +3,50)  189,59    214,61
+    /// Betelgeuse (+0,50) 173,39   218,52
+    /// Rigel    (+0,13)  190,06    229,00
+    /// ```
+    ///
+    /// Kolom **sebelum** itu bukan ingatan: `check_star_core_docstring_quotes_measured_values`
+    /// merender ulang keduanya setiap kali gerbang berjalan — kolom pertama
+    /// dengan `starCoreRGB` diganti tint mentah, kolom kedua apa adanya — lalu
+    /// membandingkan setiap angka di tabel ini dengan pikselnya. Jadi tabel ini
+    /// tidak bisa membusuk diam-diam saat geometri bintang berubah.
+    ///
+    /// Yang terbaca dari kolom pertama: Sirius dan bintang magnitudo +3,5
+    /// berpuncak **190,03 lawan 189,59** — bintang paling terang di langit dan
+    /// bintang yang nyaris tak terlihat mata punya inti yang sama terangnya.
+    /// Selisih 0,4/255 tidak bisa dibaca siapa pun. Lebih buruk, Betelgeuse
+    /// (raksasa merah) berpuncak **173,39**, jauh di bawah bintang redup: jadi
+    /// bintang yang **lebih terang** justru berinti **lebih gelap**, dan urutan
+    /// terang di inti berbalik dari urutan magnitudo.
+    ///
+    /// Penyebabnya satu, dan ia bukan "kanal yang jumlahnya berbeda". Tint
+    /// spektral membawa luminansi yang berbeda-beda menurut hue-nya sendiri:
+    /// `starRGB(0.00)` berjumlah 0,7496 sementara `starRGB(1.85)` berjumlah
+    /// 0,6850. Artinya kecerahan inti **tercemar oleh warna** — dua bintang
+    /// dengan magnitudo sama tapi hue berbeda tergambar beda terang. Padahal
+    /// yang menandakan "bintang ini terang" adalah **seberapa putih** intinya,
+    /// bukan seberapa pekat hue-nya. Di langit sungguhan, bintang terang tampak
+    /// memutih karena mata kelebihan cahaya; hue-nya baru terbaca di pinggiran.
+    /// Gambar yang mewarnai inti dengan hue mentah kehilangan justru isyarat
+    /// terang itu — dan isyarat itu satu-satunya yang tersisa setelah mode
+    /// malam membuang hue.
+    ///
+    /// **Kenapa campuran ke putih, bukan menaikkan semua kanal.** Menaikkan
+    /// kanal secara proporsional hanya membuat hue yang sama lebih terang; ia
+    /// tidak pernah membuat inti putih, jadi bintang terang tetap tampak
+    /// sebagai titik berwarna pekat. Mencampur ke putih `(1,1,1)` menaikkan
+    /// kanal **terendah** paling banyak — dan itulah yang mengubah hue menjadi
+    /// "terlalu terang untuk berwarna", persis seperti mata melihatnya.
+    ///
+    /// **Kenapa `whiteness` berasal dari ukuran, bukan dari B−V.** Ukuran
+    /// diturunkan dari magnitudo (`sizeFromMagnitude`), jadi ia urutan terang
+    /// yang benar menurut definisinya. Menurunkannya dari B−V akan menjadikan
+    /// raksasa merah terang seperti Betelgeuse (B−V 1,85, m +0,50) lebih
+    /// putih daripada Sirius (B−V 0,00, m −1,46) — kebalikan dari langit.
+    /// Dijaga `testStarCoreWhitenessFollowsMagnitudeNotHue`.
+    ///
+    /// - Parameters:
+    ///   - colorIndex: indeks B−V, atau `NaN` untuk "tidak mengklaim".
+    ///   - relativeSize: ukuran gambar relatif 0…1 (dari magnitudo).
+    /// - Returns: warna inti, kanal 0…1.
+    public static func starCoreRGB(forColorIndex colorIndex: Double,
+                                   relativeSize: Double) -> RGBComponents {
+        let tint = starRGB(forColorIndex: colorIndex)
+        // Sentinel "tidak ada klaim" tetap **akromatik**: memanaskannya ke
+        // putih akan menaikkan ketiga kanal sama rata, jadi R=G=B tetap
+        // berlaku dan gerbang `warna tak dikenal benar-benar akromatik` tidak
+        // dilanggar. Yang berubah hanya terangnya, dan terang bukan klaim.
+        let whiteness = starCoreWhiteness(relativeSize: relativeSize)
+        return RGBComponents(red: unit(tint.red + (1 - tint.red) * whiteness),
+                             green: unit(tint.green + (1 - tint.green) * whiteness),
+                             blue: unit(tint.blue + (1 - tint.blue) * whiteness))
+    }
+
+    /// Seberapa putih inti bintang, 0…1, dari ukuran relatifnya.
+    ///
+    /// **Kenapa tidak mulai dari 0.** Bintang paling redup di katalog tetap
+    /// harus punya inti yang lebih terang daripada glow-nya, kalau tidak ia
+    /// terbaca sebagai gumpalan kabur, bukan titik. `floorWhiteness` menjaga
+    /// itu; `rangeWhiteness` yang membuat Sirius benar-benar putih.
+    ///
+    /// **Kenapa lantainya 0,30 dan bukan 0,55.** Nilai itu diukur, bukan
+    /// dipilih: pada 0,55 bintang magnitudo +3,5 (inti 0,85·putih) sudah
+    /// tampak putih, sehingga "putih = terang" berhenti membedakan apa pun di
+    /// paruh redup katalog. Pada 0,30 inti redup masih jelas berwarna dan inti
+    /// Sirius praktis putih (0,30 + 0,70 = 1,00).
+    public static func starCoreWhiteness(relativeSize: Double) -> Double {
+        let clamped = min(1, max(0, relativeSize))
+        return floorWhiteness + rangeWhiteness * clamped
+    }
+
+    /// Putih minimum pada inti bintang paling redup.
+    public static let floorWhiteness: Double = 0.30
+    /// Tambahan putih dari bintang paling redup ke paling terang.
+    public static let rangeWhiteness: Double = 0.70
+
     // MARK: - Ukuran dari magnitudo
 
     /// Radius gambar relatif dari magnitudo tampak, 0…1.

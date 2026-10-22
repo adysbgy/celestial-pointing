@@ -227,6 +227,19 @@ def star_rgb(index):
             unit(1.00 - 0.72 * warmth))
 
 
+def star_core_rgb(index, relative_size):
+    """`CelestialVisual.starCoreRGB(forColorIndex:relativeSize:)`.
+
+    Inti bintang dipanaskan ke putih dari tint-nya: makin terang (makin besar)
+    bintangnya, makin putih intinya. Tanpa ini Sirius dan bintang magnitudo
+    +3,5 berpuncak sama terangnya, dan Betelgeuse justru paling redup.
+    Lihat docstring `starCoreRGB` di `CelestialVisual.swift`.
+    """
+    tint = star_rgb(index)
+    whiteness = STAR_FLOOR_WHITENESS + STAR_RANGE_WHITENESS * min(1.0, max(0.0, relative_size))
+    return tuple(unit(c + (1.0 - c) * whiteness) for c in tint)
+
+
 def size_from_magnitude(m):
     """`CelestialVisual.sizeFromMagnitude` — skala logaritmik terbalik."""
     raw = 10.0 ** (-0.2 * (m - (-1.5)))
@@ -1249,6 +1262,12 @@ MARIA_RIPPLE = [(0.20, 0.7), (0.17, 2.4), (0.22, 4.1), (0.15, 1.2),
 MARIA_EDGE_SOFTNESS = 0.35                                # VIEW: `drawMoonSurfaceShading`
 MOON_PATH_STEPS = 72                                     # VIEW: `drawMoon`
 SPIKE_OPACITY = 0.45                                     # VIEW: `drawStar`
+# Putih inti bintang: `CelestialVisual.floorWhiteness` / `.rangeWhiteness`.
+# Inti bintang dipanaskan ke putih dari tint-nya menurut ukurannya. Tanpa
+# ini Sirius dan bintang magnitudo +3,5 berpuncak sama terangnya (190,03 lawan
+# 189,59 pada 200 px) dan Betelgeuse justru berpuncak paling redup (173,39).
+STAR_FLOOR_WHITENESS = 0.30                              # MODEL: `floorWhiteness`
+STAR_RANGE_WHITENESS = 0.70                              # MODEL: `rangeWhiteness`
 # Tebal diffraction spike: **pangkal dan ujung**, bukan satu lebar.
 #
 # Versi sebelumnya punya satu angka (`coreRadius * 0.18`) yang di-stroke
@@ -2716,14 +2735,21 @@ def _draw_star(canvas, cx, cy, radius, kw, night_mode):
         relative = drawable_size
         brightness = NIGHT_FLOOR_BRIGHTNESS + NIGHT_RANGE_BRIGHTNESS * min(1, max(0, relative))
         color = (brightness, 0.0, 0.0)
+        core_color = color
     else:
         color = base
+        # VIEW: `starCoreColor` — inti dipanaskan ke putih, glow tetap tint.
+        # Mode malam tidak ikut: putih dilarang di sana.
+        core_color = star_core_rgb(color_index, drawable_size)
     pulse_factor = 1 + geometry["pulse_amplitude"] * math.sin(kw.get("pulse", 0.0))
-    for index, scale in enumerate(geometry["glow_scales"]):
+    glow_scales = geometry["glow_scales"]
+    for index, scale in enumerate(glow_scales):
         r = core_radius * scale * pulse_factor
         opacity = GLOW_OPACITIES[min(index, len(GLOW_OPACITIES) - 1)]
+        # Lapis terdalam memakai warna inti; lapis luar tetap tint.
+        inner = core_color if index == len(glow_scales) - 1 else color
         canvas.disc(cx, cy, r,
-                    radial_gradient([(color, opacity), (color, 0.0)],
+                    radial_gradient([(inner, opacity), (color, 0.0)],
                                     center=(cx, cy), start_radius=0, end_radius=r))
     spike = core_radius * geometry["spike_scale"] * pulse_factor
     # Lebar **penuh** dibagi dua: `SPIKE_ROOT_WIDTH_FACTOR` memakai angka yang
@@ -2740,7 +2766,8 @@ def _draw_star(canvas, cx, cy, radius, kw, night_mode):
                         (tip[0] + px * tip_half, tip[1] + py * tip_half),
                         (tip[0] - px * tip_half, tip[1] - py * tip_half),
                         (cx - px * root_half, cy - py * root_half)],
-                       radial_gradient([(color, SPIKE_OPACITY), (color, 0.0)],
+                       radial_gradient([(core_color if not night_mode else color, SPIKE_OPACITY),
+                                        (color, 0.0)],
                                        center=(cx, cy), start_radius=0,
                                        end_radius=spike))
 
