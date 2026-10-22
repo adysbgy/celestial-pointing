@@ -14986,6 +14986,42 @@ else
 fi
 
 
+echo "== Aturan 99: complication yang membaca digest basi wajib menjadwalkan penyegaran =="
+# Lapisan basi di `ComplicationDigest` (`isStale(at:)`, `sublineContent(at:)`,
+# `presentedSymbolName(at:)`) dibangun beberapa siklus, diuji di Linux, dan
+# **seluruhnya jalur mati**: `ComplicationProvider.getTimeline` memakai
+# `Timeline(entries:policy: .never)`, dan `.never` berarti watchOS tidak pernah
+# meminta entri baru kecuali app memanggil `reloadAllTimelines()` — yang hanya
+# dipicu saat tanda tangan snapshot berubah. Cuplikan yang menua tidak
+# mengubah tanda tangan apa pun, jadi `Date()` di view hanya pernah dievaluasi
+# pada detik digest ditulis, ketika umurnya nol. Di pergelangan: centang hijau
+# dan nama objek dari jam lalu, tanpa satu penanda pun.
+#
+# Kenapa bukan Aturan 9: Aturan 9 menuntut **ada** pemanggil
+# `reloadAllTimelines` di `Apps/`. Syarat itu terpenuhi, dan justru itu yang
+# menutupi cacat ini — reload memang ada, hanya tidak pernah dipicu oleh
+# cuplikan yang menua.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-98 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan99-complication-menyegar.py" ]; then
+  echo "FAIL Tools/check-aturan99-complication-menyegar.py tidak ada: Aturan 99"
+  echo "     tidak mengukur apa pun, dan complication yang membeku akan lolos"
+  echo "     tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  complication_segar=$(python3 Tools/check-aturan99-complication-menyegar.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$complication_segar"
+    echo "-> Jadwalkan penyegaran dari umur cuplikan, bukan dari angka di view."
+    echo "   Perbaiki provider-nya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$complication_segar"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

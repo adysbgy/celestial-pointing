@@ -642,4 +642,58 @@ public struct ComplicationDigest: Codable, Sendable, Equatable {
     /// basi sambil masih punya jawaban adalah `.lock` dan `.uncertain`, dan
     /// keduanya sudah membaca ikonnya sendiri sebelum sampai ke sini.
     static let staleSymbolName = "clock.badge.exclamationmark"
+
+    // MARK: - Kapan complication harus diminta menggambar ulang
+
+    /// Kelonggaran di atas `maximumClaimedAge` sebelum complication diminta
+    /// menyegar.
+    ///
+    /// **Kenapa bukan nol.** `isStale` memakai `>` yang ketat, jadi penyegaran
+    /// yang mendarat **tepat** di `updatedAt + maximumClaimedAge` masih
+    /// membaca dirinya segar — watchOS menggambar centang hijau sekali lagi,
+    /// lalu (karena jadwal berikutnya `nil`) tidak pernah meminta lagi.
+    /// Penyegaran satu detik terlalu awal sama saja dengan tidak ada
+    /// penyegaran. Satu detik adalah resolusi jam, bukan pilihan rasa: cukup
+    /// untuk melewati batas, cukup kecil untuk tidak memperpanjang klaim.
+    public static let staleRefreshGrace: TimeInterval = 1
+
+    /// Tanggal ketika complication **perlu** diminta menggambar ulang supaya
+    /// penanda basinya benar-benar muncul, atau `nil` bila tidak perlu.
+    ///
+    /// **Cacat yang ditutup ini.** Seluruh lapisan basi di tipe ini
+    /// (`isStale`, `confirmsIdentityNow`, `sublineContent(at:)`,
+    /// `presentedSymbolName(at:)`) menerima `now` sebagai parameter, tetapi
+    /// `ComplicationProvider` memakai `Timeline(entries:policy: .never)`:
+    /// watchOS tidak pernah meminta entri baru kecuali app memanggil
+    /// `reloadAllTimelines()`, dan app hanya memanggilnya saat tanda tangan
+    /// snapshot berubah. Begitu pergelangan berhenti bergerak — tepat kasus
+    /// yang membuat cuplikan basi — tidak ada tulisan baru dan tidak ada
+    /// render baru, sehingga `Date()` di view hanya pernah dievaluasi pada
+    /// detik digest ditulis, ketika umurnya nol. Penanda basi yang diuji
+    /// rapi di Linux itu **jalur mati**: 90 menit kemudian pergelangan masih
+    /// menampilkan centang hijau dan nama objek.
+    ///
+    /// **Kenapa satu tanggal, bukan penyegaran berkala.** Umur digest hanya
+    /// berubah maknanya sekali: saat melewati ambang klaim. Menyegarkan tiap
+    /// menit berarti membangunkan widget 60×/jam untuk menggambar hal yang
+    /// sama. Jadwal ini menyebut satu titik, yaitu titik ketika jawabannya
+    /// berhenti boleh diklaim.
+    ///
+    /// **Kenapa `nil` untuk yang sudah basi atau tak punya jawaban.** Sudah
+    /// basi: penandanya sudah tergambar, menyegar lagi hanya menggambar ulang
+    /// hal yang sama. Tak punya jawaban (`searching`): tidak ada nama yang
+    /// bisa basi, dan label keadaan tidak berubah karena waktu. Stempel di
+    /// masa depan: `isStale` sudah membacanya sebagai basi (jam device salah),
+    /// jadi tanggal penyegaran akan jatuh di masa lalu dan membuat WidgetKit
+    /// meminta entri berulang-ulang.
+    ///
+    /// Yang memakainya: `ComplicationProvider.getTimeline`, sebagai
+    /// `TimelineReloadPolicy.after(_:)`.
+    public func nextRefreshDate(after now: Date) -> Date? {
+        // Tanpa jawaban tidak ada klaim yang bisa kedaluwarsa.
+        guard hasAnswer else { return nil }
+        // Sudah basi (termasuk stempel masa depan): penanda sudah tampil.
+        guard !isStale(at: now) else { return nil }
+        return updatedAt.addingTimeInterval(Self.maximumClaimedAge + Self.staleRefreshGrace)
+    }
 }

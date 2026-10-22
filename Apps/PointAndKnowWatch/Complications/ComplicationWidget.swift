@@ -98,11 +98,34 @@ struct ComplicationProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-        let entry = ComplicationEntry(date: Date(), digest: ComplicationStore.shared.read())
-        // Satu entri yang berlaku terus sampai app meminta reload. Kita tidak
-        // bisa memprediksi kapan objek berikutnya terkunci, jadi tidak ada
-        // entri masa depan — app yang memicu `reloadAllTimelines()`.
-        completion(Timeline(entries: [entry], policy: .never))
+        let now = Date()
+        let digest = ComplicationStore.shared.read()
+        let entry = ComplicationEntry(date: now, digest: digest)
+
+        // **Kenapa bukan `policy: .never` lagi.** Seluruh lapisan basi di
+        // `ComplicationDigest` (`isStale(at:)`, `sublineContent(at:)`,
+        // `presentedSymbolName(at:)`) menerima `now` sebagai parameter, tetapi
+        // dengan `.never` watchOS tidak pernah meminta entri baru kecuali app
+        // memanggil `reloadAllTimelines()` — dan app hanya memanggilnya saat
+        // tanda tangan snapshot **berubah**. Begitu pergelangan berhenti
+        // bergerak (tepat kasus yang membuat cuplikan basi), tidak ada tulisan
+        // baru dan tidak ada render baru: `Date()` di view hanya pernah
+        // dievaluasi pada detik digest ditulis, ketika umurnya nol. Penanda
+        // basi yang diuji rapi di Linux itu jalur mati, dan pergelangan tetap
+        // menampilkan centang hijau beserta nama objek dari jam lalu.
+        //
+        // Keputusan "kapan harus menyegar" adalah pertanyaan murni atas dua
+        // waktu, jadi ia tinggal di model (`nextRefreshDate(after:)`) dan
+        // diuji di Linux. Di sini hanya penerjemahannya ke API WidgetKit.
+        //
+        // `nil` (sudah basi / tak punya jawaban) kembali ke `.never`: penanda
+        // basi sudah tergambar, dan membangunkan widget untuk menggambar hal
+        // yang sama hanya membuang baterai.
+        if let refresh = digest?.nextRefreshDate(after: now) {
+            completion(Timeline(entries: [entry], policy: .after(refresh)))
+        } else {
+            completion(Timeline(entries: [entry], policy: .never))
+        }
     }
 }
 
