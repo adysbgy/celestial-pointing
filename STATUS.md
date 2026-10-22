@@ -1,3 +1,34 @@
+### Siklus (22 Okt 2026 — sigma yang dikirim jam tidak pernah tampil)
+
+Ditemukan dengan berhenti percaya status sendiri dan mengukur saluran data:
+`LinkView` di iPhone adalah satu-satunya layar yang menjelaskan **apa yang
+dilaporkan jam**. Layar itu sudah memperingatkan pembaca ketika sigma
+**tidak** disertakan (`sigmaDeg <= 0`). Tetapi ketika sigma **ada**, angka
+itu tidak pernah tampil di mana pun — padahal jam mengirimnya di **setiap**
+pesan keadaan (`WatchLinkService.send(state:at:sigmaDeg:)`).
+
+Ini bukan detail teknis yang terlewat: seluruh app berdiri di atas satu
+klaim — akurasi tunjuk belum diketahui dan sedang diukur. Angka sigma itu
+adari isi laporan, bukan hiasannya.
+
+#### Yang dikerjakan
+
+- Kunci `link.row.sigma` ("σ dari jam") + terjemahan `en`, masuk katalog.
+- Baris sigma di `LinkView`, hanya tampil bila ada.
+- Sumber baris memakai `confidencePolicy` yang **sudah teruji**
+  (`LinkMessage.swift:268`), bukan validasi baru — supaya sigma `0`,
+  negatif, `nan`, dan tak-berhingga tidak bisa terbaca sebagai akurasi
+  sempurna.
+- 4 uji baru (1045 → 1049) + count katalog 355 → 356.
+
+#### Yang TIDAK diklaim
+
+- Baris sigma belum diuji oleh gerbang UI (belum ada aturan yang menghitung
+  kolom `LinkView`).
+- σ yang tampil adalah σ **yang dilaporkan jam pada pesan itu**, bukan
+  σ yang berlaku di iPhone sekarang — keduanya bisa berbeda kalau ambang
+  keyakinan berubah setelah pesan terakhir sampai.
+
 ### Siklus (22 Okt 2026 — mode malam menjanjikan merah, tapi teks terpenting putih)
 
 Ditemukan dengan menyapu **semantik**, bukan sintaks: `sapu-semantik.py`
