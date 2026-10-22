@@ -123,7 +123,11 @@ final class ComplicationRefreshScheduleTests: XCTestCase {
     /// membeku di pergelangan sebagai nama tanpa batas umur.
     func testUncertainDigestIsScheduledToo() throws {
         let uncertain = digest(ageSeconds: 0, isConfirmed: false, state: .uncertain)
-        XCTAssertNotNil(try XCTUnwrap(uncertain.nextRefreshDate(after: fixedNow)))
+        // `XCTUnwrap` sendiri sudah gagal bila `nil`; membungkusnya dengan
+        // `XCTAssertNotNil` hanya menambah pernyataan yang selalu benar dan
+        // menyamarkan bahwa yang diuji adalah "tidak nil".
+        _ = try XCTUnwrap(uncertain.nextRefreshDate(after: fixedNow),
+                          "kandidat `.uncertain` yang punya nama wajib dijadwalkan penyegaran")
     }
 
     /// Jam device yang salah (stempel di masa depan) sudah dibaca `isStale`
