@@ -1,3 +1,86 @@
+### Siklus (22 Okt 2026 — Aturan 94: sesi audio yang tidak pernah dilepas)
+
+Siklus ini berangkat dari pertanyaan yang berbeda dari Aturan 92: bukan
+"sambungan yang hilang", melainkan **sumber daya yang diambil dan tidak pernah
+dikembalikan**. Bedanya penting — sambungan yang hilang membuat fitur diam,
+sumber daya yang tidak dilepas membuat fitur **bekerja** sambil membayar biaya
+yang tidak terlihat di layar mana pun.
+
+#### Temuan — diukur dengan menyapukan seluruh pohon
+
+`AudioCueEngine.ensureResources()` memanggil
+`AVAudioSession.sharedInstance().setActive(true)`. Sapuan `Apps/` untuk
+`setActive(false)` menghasilkan **0 kecocokan**. Sapuan yang sama di
+`swift-ui-lint.sh` dan `Tools/*.py` juga **0** — tidak ada satu pun gerbang
+yang menyebut API itu.
+
+Akibatnya terukur dari bentuk kodenya, bukan dari dugaan: bunyi kunci berdurasi
+0,13 detik, tetapi sesi audio tetap aktif setelah buffer selesai diputar.
+Di watchOS itu berarti app tetap memegang sesi audio sampai sistem memutuskan
+menghentikan prosesnya — baterai yang dibayar untuk suara yang sudah lama
+habis, pada perangkat yang baterainya paling mahal.
+
+Kenapa tidak ada gerbang yang melihatnya. Aturan 93 memanen pasangan
+start/stop dari **badan `start()`** app jam, dan itu memang menangkap
+`location.start()`/`motion.start()`. Akuisisi di sini **malas**: ia hidup di
+dalam `AudioCueEngine`, dipicu pemutaran pertama, dan tidak pernah melewati
+`start()`. Compiler diam karena `setActive(true)` sah secara tipe. Teks di
+layar tidak berubah. Ini kelas cacat yang sama dengan Aturan 93 — sumber daya
+diakuisisi tanpa jalur pelepasan — hanya saja di tempat yang tidak dipanen.
+
+#### Perbaikan
+
+`AudioCueEngine.stop()` menghentikan player node, melepas buffer, dan memanggil
+`setActive(false, options: .notifyOthersOnDeactivation)`. Dipanggil dari
+`stop()` di kedua app. Opsi `.notifyOthersOnDeactivation` dipilih dengan
+alasan: tanpa itu, app musik yang tersingkir oleh bunyi kunci kita tetap
+tersingkir setelah bunyinya selesai — kita meminjam audio pengguna dan tidak
+mengembalikannya.
+
+#### Gerbang baru: Aturan 94
+
+`Tools/check-aturan94-siklus-sumber-daya.py` memasangkan akuisisi dengan
+pelepasan untuk setiap sumber daya bersama di `Apps/`. Dua kesalahan di versi
+pertamaku, keduanya ditemukan oleh harness mutasi, bukan oleh membaca ulang:
+
+1. **Mencocokkan nama metode, bukan penerimanya.** Versi pertama mencari
+   `\bstop\(` dan menerima `motion.stop()` serta `engine.stop()` sebagai bukti
+   pelepasan audio. Sekarang yang dicocokkan adalah `audioCue.stop()` — nama
+   **penerima** yang wajib cocok dengan properti bertipe itu.
+2. **Satu panggilan di berkas mana pun dianggap cukup.** Terukur: menghapus
+   `audioCue.stop()` dari app jam tetap **hijau**, karena app iPhone memanggil
+   metode yang sama. Padahal kedua app punya instance sendiri
+   (`private let audioCue = AudioCueEngine()`), jadi melepas di satu app tidak
+   melepas apa pun di app lain. Sekarang wajib per-berkas-pemilik.
+
+Kesalahan ketiga ditemukan saat gerbang berbunyi pada pohon yang **benar**:
+tiga temuan palsu di `PointingView` dan `CalibrationView`. Penyebabnya,
+`@ObservedObject var motion: MotionLogger` adalah dependensi yang
+**disuntikkan** — view itu tidak membuatnya dan tidak boleh menghentikannya.
+Kalau `PointingView` memanggil `motion.stop()`, sensor mati untuk app jam
+seluruhnya. Gerbang sekarang memisahkan **pemilik** (`= AudioCueEngine()`)
+dari **peminjam** (`: MotionLogger`), dan hanya menuntut pelepasan dari
+pemilik.
+
+#### Bukti
+
+`Tools/bukti-mutasi-aturan94-siklus-sumber-daya.py`, 6 keadaan:
+
+| # | Mutasi | Harapan | Hasil |
+|---|--------|---------|-------|
+| 1 | `setActive(false)` dihapus | bunyi | bunyi |
+| 2 | `AudioCueEngine.stop()` dihapus | bunyi | bunyi |
+| 3 | `audioCue.stop()` hilang di app jam | bunyi | bunyi |
+| 4 | `audioCue.stop()` hilang di app iPhone | bunyi | bunyi |
+| 5 | hilang di keduanya | bunyi | bunyi |
+| 6 | pohon apa adanya | diam | diam |
+
+Keadaan 3 dan 5 adalah yang membedakan gerbang yang mengukur dari gerbang yang
+hijau karena kebetulan: keduanya **diam** pada versi pertama.
+
+Engine 222 dan PointingKit 1079 tetap hijau. `./swift-ui-lint.sh`: 93 aturan,
+exit 0. Apple Build hijau (kedua job, tanpa peringatan compiler).
+
 ### Siklus (22 Okt 2026 — suara visual: gambar yang terdengar hanya di satu app)
 
 Siklus ini berangkat dari pertanyaan yang sama seperti siklus Aturan 91, tetapi
