@@ -24,16 +24,26 @@ hilang oleh rasterisasi. Yang salah adalah klaim di komentar view bahwa 0.28
 "tergambar sebagai gumpalan pejal" pada 38 pt — pada 76 px hasilnya masih
 terbaca, sempit tetapi ada. Klaim itu sudah dikoreksi di siklus sebelumnya.
 
-#### (b) Ciri pengenal di buffer device 76 px — TIDAK hilang
+#### (b) Ciri pengenal di buffer device — TIDAK hilang (dan premis dugaan ini salah)
 
-Dugaan: semua gerbang merender di 304–400 px (`size=38, ss=8` = 304 px;
-`size=200, ss=2` = 400 px), sedangkan jam menampilkan 76 px. Selisih luas
-5,3×, jadi ciri yang lolos gerbang bisa hilang di layar.
+Dugaan awal: semua gerbang merender di 304–400 px sedangkan jam menampilkan
+76 px, jadi ciri yang lolos gerbang bisa hilang di layar.
 
-Diukur pada 400 px lawan 76 px: kontras pita Jupiter 16.63 → 15.08 (0.91),
-piksel cincin Saturnus di luar piringan 2840 → 96 (0.03, dan 0.03 itu tepat
-rasio luas (76/400)² = 0.036 — cirinya utuh, hanya areanya mengecil), sisi
-gelap/terang bulan sabit 1.00 → 0.86. **Tidak ada ciri yang jatuh ke nol.**
+**Premis itu salah, dan diukur.** `size` di `R.render()` adalah **ukuran
+buffer piksel**; `ss` hanya jumlah sampel per piksel untuk kualitas
+rasterisasi, bukan pengali. `size=38, ss=8` menghasilkan kanvas 38×38 px,
+bukan 304×304. Jadi gerbang memang sudah merender di ukuran layar:
+`size=38` dipakai 3 gerbang (`check_moon_new_disc_reads_on_the_watch`,
+`check_star_size_follows_magnitude`,
+`check_deep_sky_catalogue_values_reach_the_picture`), `size=76` dipakai 3
+gerbang, dan 46 gerbang memakai 200 px. `size=38` bahkan **lebih kecil** dari
+buffer device (38 pt @2x = 76 px), jadi ambangnya konservatif.
+
+Yang tetap diukur, dan hasilnya: pada 38 px lawan 200 px, kontras pita
+Jupiter 16.63 → 15.08, piksel cincin Saturnus di luar piringan 2840 → 96
+(0.03, tepat rasio luas (38/200)² = 0.036 — cirinya utuh, areanya mengecil),
+sisi gelap/terang bulan sabit 1.00 → 0.86. **Tidak ada ciri yang jatuh ke
+nol.**
 
 Gerbang baru untuk ini **tidak** ditambahkan, dan alasannya diukur: metrik
 yang tersedia tidak memisahkan kasus berfitur dari pembandingnya.
@@ -41,8 +51,27 @@ yang tersedia tidak memisahkan kasus berfitur dari pembandingnya.
 (pembandingnya bukan nol — bola bergradasi sudah punya simpangan sendiri);
 `planet-saturn-bare` punya **719** piksel di luar piringan, lebih banyak
 daripada `planet-saturn-confirmed` (96), karena bola `bare` lebih besar;
-`moon-crescent-jakarta` dan `…-plain` keduanya 0.857. Gerbang yang ambangnya
-tidak memisahkan dua kelas adalah upacara, bukan penjaga — jadi tidak ditulis.
+`moon-crescent-jakarta` dan `…-plain` keduanya 0.857.
+
+Satu metrik **memisahkan** dan sekarang menjadi gerbang:
+`check_jupiter_band_structure_survives_the_watch_size`. Yang diukur bukan
+besarnya kontras melainkan **jumlah balikan arah** kecerahan sepanjang kolom
+tengah — struktur, bukan amplitudo, jadi tahan skala:
+
+    kasus                       200 px   38 px
+    planet-jupiter-confirmed        3        3
+    planet-jupiter-no-feature       0        0
+    planet-jupiter-bare             0        0
+
+Angka 3 tidak berubah antara 200 px dan 38 px, dan kedua pembanding nol.
+Gerbang ini **dibuktikan bisa merah**: dengan `jupiter_bands(count=1)` (pita
+dilebur) `confirmed` jatuh ke **0 di kedua ukuran** dan gerbang gagal. Ambang
+2 dipilih dari jarak antar-kelas, bukan dengan menaikkan batas sampai hijau.
+
+Saturnus dan Mars belum masuk gerbang yang sama karena metriknya belum
+memisahkan kelas dengan bersih di sana (`saturn-confirmed` 5 → 2 lawan
+`saturn-no-feature` 0 → 1; Mars 0 di semua karena pita tidak dipakai). Itu
+dicatat sebagai kerja berikutnya, bukan diklaim selesai.
 
 #### (c) Kemurnian merah mode malam di seluruh katalog — sudah dijaga
 

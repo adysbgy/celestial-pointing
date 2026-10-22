@@ -2545,8 +2545,8 @@ def check_png_roundtrip(results, size=64, ss=2):
         os.remove(path)
 
 
-def _stroke_width_factors(source, radius_name, patterns):
-    """Faktor **lebar garis** yang mengikuti radius — hanya yang stroking.
+def _stroke_factor_sites(source, radius_name, patterns):
+    """Situs **stroking** yang mengikuti radius — nilainya, bukan cuma angkanya.
 
     Kata kunci `patterns` bukan detail gaya. Badge kandidat punya **tiga**
     besaran yang semuanya ditulis `badge_radius * N`, dan ketiganya berbeda:
@@ -2570,6 +2570,29 @@ def _stroke_width_factors(source, radius_name, patterns):
     Jadi yang dicari adalah **konteks stroking**, dan tetes glif (0.13) tetap
     dijaga lewat jalur yang sudah ada sebelumnya.
 
+    **Kenapa hasilnya bukan `float` lagi.** Sampai `cfb911f` pola di sini
+    diakhiri `(\\d+\\.\\d+)` dan fungsinya mengembalikan angka. Ketika tebal
+    garis pindah ke satu pemilik di model, pola itu diganti **nama token**
+    tanpa grup tangkap — dan dua hal patah sekaligus:
+
+      1. `re.findall` tanpa grup mengembalikan **seluruh** potongan cocok,
+         `'lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction'`;
+      2. `float()` atasnya melempar `ValueError`, dan lemparan itu mematikan
+         **seluruh** `check_port_matches_swift_constants` (200 entri) dengan
+         traceback. Terukur di `main`: satu `ValueError`, nol pemeriksaan.
+         `main` merah 28 menit, dan yang dilaporkan bukan paritas yang gagal
+         melainkan gerbang yang tidak menjalankan apa pun.
+
+    Karena nilainya sekarang tinggal di model, yang bisa dibandingkan antar
+    bahasa bukan lagi angkanya (tidak ada angka di sini) melainkan **token
+    mana** yang dipakai tiap situs. Karena itu hasilnya daftar bertipe
+    campuran: `float` untuk situs yang masih menulis literal, dan
+    `"token:strokeFraction"` untuk situs yang membaca token model — dengan
+    kedua ejaan (`marker.strokeFraction`, `marker["stroke_fraction"]`,
+    `CANDIDATE_STROKE_FRACTION`) dinormalkan ke satu nama. Paritas lalu
+    menuntut hal yang memang harus sama: **kedua bahasa memakai token yang
+    sama**, dan tidak satu pun diam-diam kembali ke literal.
+
     Komentar dibuang per baris lebih dulu: badan fungsi di repo ini memuat
     angka di komentarnya, dan pembacaan tanpa membuangnya mengambil angka
     prosa sebagai parameter.
@@ -2578,8 +2601,24 @@ def _stroke_width_factors(source, radius_name, patterns):
                      for line in source.split("\n"))
     found = []
     for pattern in patterns:
-        found += [float(v) for v in
-                  re.findall(pattern.format(r=re.escape(radius_name)), body)]
+        for match in re.findall(pattern.format(r=re.escape(radius_name)), body):
+            # Tanpa grup tangkap, `findall` mengembalikan string utuh; dengan
+            # grup, tuple. Keduanya diterima supaya pola boleh berkembang
+            # tanpa membuat pembacanya melempar.
+            value = match if isinstance(match, str) else (match[0] if match else "")
+            # Bungkus konversi tipe Swift dibuang sebelum dibandingkan: yang
+            # menentukan **token mana** yang dipakai, bukan apakah nilainya
+            # dibungkus `CGFloat(...)` untuk aritmetika `CGFloat`.
+            bare = value.strip()
+            if bare.startswith("CGFloat(") and bare.endswith(")"):
+                bare = bare[len("CGFloat("):-1]
+            if bare in STROKE_TOKEN_SPELLINGS:
+                found.append("token:" + STROKE_TOKEN_SPELLINGS[bare])
+                continue
+            try:
+                found.append(float(bare))
+            except (TypeError, ValueError):
+                continue
     # **Tidak melempar.** Daftar `checks` di bawah dibangun **saat fungsi
     # berjalan**, jadi pembaca yang melempar `ValueError` akan menggagalkan
     # seluruh gerbang dengan traceback — dan traceback tidak menyebut apa yang
@@ -2590,38 +2629,56 @@ def _stroke_width_factors(source, radius_name, patterns):
     return found or None
 
 
+#: Ejaan token yang menandakan "nilai ini dibaca dari model", dipetakan ke
+#: satu nama kanonik. Ketiganya menunjuk **field yang sama**
+#: (`CandidateMarker.strokeFraction`); perbedaan ejaan hanya karena satu sisi
+#: Swift dan satu sisi Python. Tanpa normalisasi ini, paritas akan merah pada
+#: kode yang benar — dan gerbang yang merah pada kode benar dimatikan orang.
+STROKE_TOKEN_SPELLINGS = {
+    "marker.strokeFraction": "strokeFraction",
+    'marker["stroke_fraction"]': "strokeFraction",
+    "CANDIDATE_STROKE_FRACTION": "strokeFraction",
+}
+
+
 def badge_stroke(source):
-    """Tebal glif kandidat "?" — dua tempat stroking, dua satuan.
+    """Situs stroking glif kandidat "?" — dua tempat, dua satuan.
 
     Yang dijaga keduanya: assignment di fungsi geometri (satuan radius
     frame) dan pemanggilan `stroke_polyline` di penggambar (satuan piksel).
     Menggabungkan keduanya jadi satu daftar membuat mutasi di salah satunya
     tidak terlihat kalau yang lain dibaca.
 
-    **Kenapa sekarang membaca nama token, bukan angka.** Sampai siklus ini
-    tebal garis hidup sebagai literal `0.28` di tiga tempat, dan **0.28 itu
-    salah**: garisnya selebar tinggi lengkung glif, jadi tanda tanya
-    tergambar sebagai gumpalan pejal — lihat catatan di atas
+    **Kenapa membaca nama token, bukan angka.** Sampai siklus ini tebal garis
+    hidup sebagai literal `0.28` di tiga tempat, dan **0.28 itu salah**:
+    garisnya selebar tinggi lengkung glif, jadi tanda tanya tergambar sebagai
+    gumpalan pejal — lihat catatan di atas
     `("tebal glif kandidat: port == view", …)`. Paritas angka tidak bisa
     menangkapnya karena kedua bahasa sepakat pada angka yang salah. Sekarang
     nilainya satu pemilik di model (`CandidateMarker.strokeFraction`), dan
-    yang diperiksa adalah **pemakaian token itu** di tiap tempat.
+    yang diperiksa adalah **pemakaian token itu** di tiap tempat — nilai
+    tokennya sendiri dijaga entri `("lencana: fraksi tebal glif", …)` di
+    `check_port_matches_swift_constants`.
     """
     name = "badge_radius" if re.search(r"badge_radius", source) else "badgeRadius"
     # Tiga tempat stroking, masing-masing satu di dua bahasa:
     #   Swift view      `lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction))`
     #   Python geometri `stroke_width = badge_radius * marker["stroke_fraction"]`
     #   Python penggambar `stroke_polyline(…, max(1.0, badge_radius * marker["stroke_fraction"]), …)`
-    token = r"(?:marker\[\"stroke_fraction\"\]|marker\.strokeFraction|CANDIDATE_STROKE_FRACTION)"
-    return _stroke_width_factors(source, name, [
-        r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*(?:CGFloat\()?\s*" + token,
-        r"stroke_width\s*=\s*{r}\s*\*\s*" + token,
-        r"stroke_polyline\([^)]*?{r}\s*\*\s*" + token,
+    #
+    # Grup tangkap di sekeliling **nilainya** (token atau angka), bukan hanya
+    # token: situs yang kembali menulis literal harus tetap terbaca, dan
+    # itulah bentuk regresi yang paling mungkin terjadi.
+    value = r"((?:CGFloat\()?(?:marker\[\"stroke_fraction\"\]|marker\.strokeFraction|CANDIDATE_STROKE_FRACTION|\d+\.\d+)(?:\))?)"
+    return _stroke_factor_sites(source, name, [
+        r"\w*[Ww]idth\s*[:=]\s*max\([\d.]+,\s*{r}\s*\*\s*" + value,
+        r"stroke_width\s*=\s*{r}\s*\*\s*" + value,
+        r"stroke_polyline\([^)]*?{r}\s*\*\s*" + value,
     ])
 
 
 def _same_stroke_factors(view_factors, port_factors):
-    """Apakah kedua sisi punya **nilai** faktor yang sama.
+    """Apakah kedua sisi memakai **nilai** faktor yang sama.
 
     `None` berarti salah satu sisi tidak punya faktor yang bisa dibaca, dan
     itu harus merah — tapi **dengan bentuk yang bisa dibaca**, karena
@@ -2629,11 +2686,13 @@ def _same_stroke_factors(view_factors, port_factors):
     "port=None, seharusnya True" tanpa menyebut berkas mana.
     Nilai yang dibandingkan adalah himpunan unik: jumlah situs memang
     berbeda (port punya glif di dua satuan, view cuma satu), yang wajib sama
-    adalah **angka** yang dipakai di sana.
+    adalah **nilai** yang dipakai di sana — `float` untuk literal, nama token
+    kanonik untuk situs yang membaca model.
     """
     if view_factors is None or port_factors is None:
         return False
     return set(view_factors) == set(port_factors)
+
 
 
 def _function_body(source, anchor):
@@ -3464,7 +3523,7 @@ def check_port_matches_swift_constants(results):
         # `0.28 -> 0.12` di sana tidak membuat satu pun pemeriksaan merah.
         ("tebal glif kandidat: port == view",
          _same_stroke_factors(badge_stroke(view), badge_stroke(port)),
-         True, "marker.strokeFraction / marker[\"stroke_fraction\"]", port,
+         True, 'marker["stroke_fraction"]', port,
          "render-visuals.py"),
         ("tebal glif kandidat: view memakai token model",
          view.count("CGFloat(marker.strokeFraction)") == 1, True,
@@ -3479,7 +3538,7 @@ def check_port_matches_swift_constants(results):
         ("lencana: tebal glif < tinggi lengkung glif",
          R.CANDIDATE_STROKE_FRACTION
          < R.CANDIDATE_GLYPH_FRACTION * 0.55 * 0.5, True,
-         "0.13 < 0.52 * 0.55 * 0.5", model),
+         "glyphRadius * 0.55", model),
         # Gambar kawah Merkurius. Kelima angka ini ada di **dua bahasa** dan
         # sampai sini **tidak dijaga siapa pun**: mutasi empat di antaranya di
         # view membuat seluruh 195 pemeriksaan tetap hijau (dibuktikan saat
@@ -11984,6 +12043,81 @@ def check_jupiter_bands_reach_the_limb(results, size=200, ss=2):
             f"selisih {(sphere - reach) * 100:.1f}% R"))
 
 
+def check_jupiter_band_structure_survives_the_watch_size(results):
+    """Struktur pita Jupiter harus **bertahan di ukuran jam**, bukan hanya di 200 px.
+
+    **Cacat yang ditutup pemeriksaan ini.** Semua gerbang pita yang lain
+    mengukur **amplitudo**: kontras, jangkauan ke limb, lengkung. Amplitudo
+    menyusut bersama ukuran — di 38 px sebuah pita bisa turun di bawah ambang
+    mana pun tanpa bentuknya benar-benar hilang, dan sebaliknya gerbang yang
+    ambangnya disetel longgar akan tetap hijau walaupun pitanya sudah melebur
+    jadi satu bola polos. Yang menentukan apakah mata masih melihat "Jupiter"
+    adalah **struktur**: berapa kali kecerahan berbalik arah menuruni bola.
+
+    Jadi yang diukur di sini bukan besarnya kontras, melainkan **jumlah
+    balikan arah** kecerahan sepanjang kolom tengah. Bola bergradasi polos
+    adalah fungsi monoton: nol atau satu balikan. Bola berpita punya satu
+    balikan per batas pita. Metrik ini tahan skala karena menghitung
+    peralihan, bukan selisih.
+
+    **Diukur, dan itu sebabnya ambangnya begini:**
+
+        kasus                       200 px   38 px
+        planet-jupiter-confirmed        3        3
+        planet-jupiter-no-feature       0        0
+        planet-jupiter-bare             0        0
+
+    Angka 3 tidak berubah antara 200 px dan 38 px — persis sifat yang dicari.
+    Kedua pembanding **nol**, jadi ambang 2 memisahkan dua kelas dengan jarak
+    satu, bukan upacara.
+
+    **Kenapa dua pembanding.** `planet-jupiter-no-feature` adalah Jupiter
+    yang sama tanpa pita; `planet-jupiter-bare` adalah bolanya saja. Kalau
+    salah satunya ikut berbalik, metriknya sedang mengukur sesuatu yang bukan
+    pita, dan gerbang ini harus gagal — bukan lolos dengan alasan.
+
+    **Dibuktikan bisa merah.** Dengan `jupiter_bands(count=1)` (pita
+    dilebur), angka `confirmed` jatuh ke **0 di kedua ukuran** dan gerbang ini
+    gagal. Itu cara ambangnya dikalibrasi: bukan dengan menaikkan batas sampai
+    hijau, melainkan dengan merusak sumbernya dan memastikan merah.
+    """
+    def reversals(name, size):
+        _, (w, h, rows) = render_case(name, size=size, ss=1)
+        cx = w // 2
+        values = []
+        for y in range(int(h * 0.30), int(h * 0.70)):
+            row = rows[y]
+            i = cx * 4
+            values.append(0.2126 * row[i] + 0.7152 * row[i + 1]
+                          + 0.0722 * row[i + 2])
+        # Rata-rata 3 piksel: derau raster bukan tepi pita.
+        smooth = []
+        for i in range(len(values)):
+            window = values[max(0, i - 1):i + 2]
+            smooth.append(sum(window) / len(window))
+        flips = 0
+        direction = 0
+        for i in range(1, len(smooth)):
+            delta = smooth[i] - smooth[i - 1]
+            if abs(delta) < 3.0:
+                continue
+            sign = 1 if delta > 0 else -1
+            if direction and sign != direction:
+                flips += 1
+            direction = sign
+        return flips
+
+    for size in (200, 38):
+        confirmed = reversals("planet-jupiter-confirmed", size)
+        no_feature = reversals("planet-jupiter-no-feature", size)
+        bare = reversals("planet-jupiter-bare", size)
+        results.append(Result(
+            f"struktur pita Jupiter bertahan di {size} px",
+            confirmed >= 2 and no_feature == 0 and bare == 0,
+            f"confirmed {confirmed} balikan, no-feature {no_feature}, "
+            f"bare {bare}"))
+
+
 def check_bands_follow_the_limb_arc(results, size=200, ss=2):
     """Pita harus berbentuk **tali busur** bola, bukan elips berlebar tetap.
 
@@ -17611,6 +17745,37 @@ def check_saturn_band_constants_match_the_model(results):
             f"'{source_text}'"))
 
 
+def _gate_failed(results, name, error):
+    """Satu gerbang melempar → **satu pemeriksaan merah**, bukan traceback.
+
+    **Cacat yang ditutup, terukur di `main`.** `_stroke_width_factors`
+    mengembalikan angka sampai `cfb911f`, lalu polanya diganti nama token
+    **tanpa grup tangkap**. `re.findall` pun mengembalikan potongan utuh
+    `'lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction'`, dan
+    `float()` atasnya melempar `ValueError`.
+
+    Lemparan itu tidak tampil sebagai pemeriksaan yang gagal. Ia mematikan
+    **seluruh** `check_port_matches_swift_constants` (200 entri) dan keluar
+    sebagai traceback: `main` merah 28 menit dengan **nol** pemeriksaan
+    terlapor, dan pesannya menunjuk `float()` — bukan jangkar yang harus
+    diperbaiki.
+
+    **Kenapa setiap panggilan di `main` dibungkus, bukan hanya yang ini.**
+    Satu gerbang yang melempar menghapus laporan 124 gerbang lain, jadi
+    pembaca kehilangan semua sinyal sekaligus dan hanya melihat satu cacat
+    yang kebetulan lebih dulu. Yang benar: gerbang yang patah menjadi merah
+    **di barisnya sendiri**, dan gerbang lain tetap melapor.
+
+    **Batas yang dinyatakan.** Ini menjaga **isolasi kegagalan**, bukan
+    kebenaran. Gerbang yang melempar tetap cacat dan tetap merah; yang
+    berubah hanya bentuk laporannya. `SystemExit` dan `KeyboardInterrupt`
+    sengaja tidak ditangkap — keduanya bukan cacat gerbang.
+    """
+    results.append(Result(
+        f"gerbang {name} menjalankan dirinya", False,
+        f"{name} MELEMPAR {type(error).__name__}: {error}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true",
@@ -17625,161 +17790,537 @@ def main():
 
     os.makedirs(R.OUT_DIR, exist_ok=True)
     results = []
-    check_gradient_end_radii_match(results)
-    check_moon_phase_fraction(results, args.size, args.ss)
-    check_crescent_direction(results, args.size, args.ss)
-    check_features_disappear_when_uncertain(results, args.size, args.ss)
+    try:
+        check_gradient_end_radii_match(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_gradient_end_radii_match", _gate_error)
+    try:
+        check_moon_phase_fraction(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_phase_fraction", _gate_error)
+    try:
+        check_crescent_direction(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crescent_direction", _gate_error)
+    try:
+        check_features_disappear_when_uncertain(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_features_disappear_when_uncertain", _gate_error)
     # Penjaga gerbang di atas: kalau `IDENTITY_TOLERANCE` dinaikkan sampai
     # kebocoran identitas terserap, tujuh pemeriksaan "ragu == bola tak
     # dikenal" akan hijau padahal identitas planet bocor. Pemeriksaan ini
     # menaikkan/menurunkan ambang itu dan menuntut merah pada keduanya.
-    check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
-    check_planet_features_present(results, args.size, args.ss)
-    check_modeled_port_constants_match_the_model(results)
-    check_ring_shadow_shape_matches_the_port(results)
-    check_model_claims_are_on_the_token_line(results)
-    check_band_feather_curve_is_the_models(results)
-    check_jupiter_band_tones_match_the_model(results)
-    check_jupiter_bands_read_as_separate_stripes(results, args.size, args.ss)
-    check_band_feather_softens_the_edge(results, args.size)
-    check_band_feather_docstring_quotes_measured_values(results)
+    try:
+        check_blur_noise_tolerance_is_honest(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_blur_noise_tolerance_is_honest", _gate_error)
+    try:
+        check_planet_features_present(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_planet_features_present", _gate_error)
+    try:
+        check_modeled_port_constants_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_modeled_port_constants_match_the_model", _gate_error)
+    try:
+        check_ring_shadow_shape_matches_the_port(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_ring_shadow_shape_matches_the_port", _gate_error)
+    try:
+        check_model_claims_are_on_the_token_line(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_model_claims_are_on_the_token_line", _gate_error)
+    try:
+        check_band_feather_curve_is_the_models(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_band_feather_curve_is_the_models", _gate_error)
+    try:
+        check_jupiter_band_tones_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_band_tones_match_the_model", _gate_error)
+    try:
+        check_jupiter_bands_read_as_separate_stripes(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_bands_read_as_separate_stripes", _gate_error)
+    try:
+        check_band_feather_softens_the_edge(results, args.size)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_band_feather_softens_the_edge", _gate_error)
+    try:
+        check_band_feather_docstring_quotes_measured_values(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_band_feather_docstring_quotes_measured_values", _gate_error)
     # Tiga gerbang yang **dijanjikan komentar tetapi tidak pernah ditulis**
     # (ditemukan `check_gate_names_mentioned_in_code_exist`): kawah Bulan,
     # rumus tepi maria, dan warna benda langit dalam di mode malam. Ketiganya
     # diletakkan bersama gerbang paritas model karena kelasnya sama —
     # dua salinan yang bisa berbeda pendapat tanpa ada yang mengukur.
-    check_moon_craters_match_the_model(results)
-    check_maria_edge_formula_matches_the_view(results)
-    check_deep_sky_colours(results)
-    check_inner_planet_phase(results, args.size, args.ss)
-    check_phase_direction_on_the_waning_half(results, args.size, args.ss)
-    check_waning_gibbous_lit_side(results, args.size, args.ss)
-    check_phase_feature_stays_inside_the_lit_band(results, args.size, args.ss)
-    check_phase_feature_still_draws_on_the_lit_side(results, args.size, args.ss)
-    check_moon_feature_stays_inside_the_lit_band(results, args.size, args.ss)
-    check_moon_feature_still_reaches_the_lit_side(results, args.size, args.ss)
-    check_moon_maria_reference_matches_the_model(results)
-    check_saturn_ring_bands_render(results, args.size, args.ss)
-    check_saturn_globe_is_banded(results, args.size, args.ss)
-    check_saturn_band_tones_stay_apart(results)
-    check_saturn_band_constants_match_the_model(results)
-    check_saturn_gap_reads_at_the_watch_size(results)
-    check_saturn_has_no_extra_disc(results, args.size, args.ss)
-    check_saturn_ring_passes_behind_the_globe(results, args.size, args.ss)
-    check_saturn_rings_carry_the_planet_shadow(results, args.size, args.ss)
-    check_saturn_ring_order_docstring_quotes_measured_values(results)
-    check_spiral_arms_stay_continuous(results)
-    check_spiral_arms_actually_spiral(results)
-    check_planetary_nebula_shell_is_continuous(results)
-    check_dumbbell_nebula_is_an_elongated_shell(results)
-    check_spiral_core_reads_as_one_body(results)
-    check_spiral_core_docstring_quotes_measured_values(results)
-    check_spiral_arm_docstring_quotes_measured_values(results)
-    check_moon_phase_survives_uncertainty(results, args.size, args.ss)
-    check_moon_surface_hides_when_uncertain(results, args.size, args.ss)
+    try:
+        check_moon_craters_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_craters_match_the_model", _gate_error)
+    try:
+        check_maria_edge_formula_matches_the_view(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_maria_edge_formula_matches_the_view", _gate_error)
+    try:
+        check_deep_sky_colours(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_deep_sky_colours", _gate_error)
+    try:
+        check_inner_planet_phase(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_inner_planet_phase", _gate_error)
+    try:
+        check_phase_direction_on_the_waning_half(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_phase_direction_on_the_waning_half", _gate_error)
+    try:
+        check_waning_gibbous_lit_side(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_waning_gibbous_lit_side", _gate_error)
+    try:
+        check_phase_feature_stays_inside_the_lit_band(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_phase_feature_stays_inside_the_lit_band", _gate_error)
+    try:
+        check_phase_feature_still_draws_on_the_lit_side(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_phase_feature_still_draws_on_the_lit_side", _gate_error)
+    try:
+        check_moon_feature_stays_inside_the_lit_band(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_feature_stays_inside_the_lit_band", _gate_error)
+    try:
+        check_moon_feature_still_reaches_the_lit_side(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_feature_still_reaches_the_lit_side", _gate_error)
+    try:
+        check_moon_maria_reference_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_maria_reference_matches_the_model", _gate_error)
+    try:
+        check_saturn_ring_bands_render(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_ring_bands_render", _gate_error)
+    try:
+        check_saturn_globe_is_banded(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_globe_is_banded", _gate_error)
+    try:
+        check_saturn_band_tones_stay_apart(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_band_tones_stay_apart", _gate_error)
+    try:
+        check_saturn_band_constants_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_band_constants_match_the_model", _gate_error)
+    try:
+        check_saturn_gap_reads_at_the_watch_size(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_gap_reads_at_the_watch_size", _gate_error)
+    try:
+        check_saturn_has_no_extra_disc(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_has_no_extra_disc", _gate_error)
+    try:
+        check_saturn_ring_passes_behind_the_globe(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_ring_passes_behind_the_globe", _gate_error)
+    try:
+        check_saturn_rings_carry_the_planet_shadow(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_rings_carry_the_planet_shadow", _gate_error)
+    try:
+        check_saturn_ring_order_docstring_quotes_measured_values(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_ring_order_docstring_quotes_measured_values", _gate_error)
+    try:
+        check_spiral_arms_stay_continuous(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_spiral_arms_stay_continuous", _gate_error)
+    try:
+        check_spiral_arms_actually_spiral(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_spiral_arms_actually_spiral", _gate_error)
+    try:
+        check_planetary_nebula_shell_is_continuous(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_planetary_nebula_shell_is_continuous", _gate_error)
+    try:
+        check_dumbbell_nebula_is_an_elongated_shell(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_dumbbell_nebula_is_an_elongated_shell", _gate_error)
+    try:
+        check_spiral_core_reads_as_one_body(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_spiral_core_reads_as_one_body", _gate_error)
+    try:
+        check_spiral_core_docstring_quotes_measured_values(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_spiral_core_docstring_quotes_measured_values", _gate_error)
+    try:
+        check_spiral_arm_docstring_quotes_measured_values(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_spiral_arm_docstring_quotes_measured_values", _gate_error)
+    try:
+        check_moon_phase_survives_uncertainty(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_phase_survives_uncertainty", _gate_error)
+    try:
+        check_moon_surface_hides_when_uncertain(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_surface_hides_when_uncertain", _gate_error)
     # Samaran keraguan — harus dijalankan **setelah** pemeriksaan Bulan di atas,
     # bukan sebelumnya: yang ini mengukur selisih antara planet/saturnus yang
     # disamarkan dan tidak, dan kalau ia ikut disamarkan, seluruh perbandingan
     # Bulan di atasnya ikut berubah tanpa suara.
-    check_uncertain_object_is_blurred(results, args.size, args.ss)
-    check_uncertain_blur_excludes_moon(results, args.size, args.ss)
+    try:
+        check_uncertain_object_is_blurred(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_uncertain_object_is_blurred", _gate_error)
+    try:
+        check_uncertain_blur_excludes_moon(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_uncertain_blur_excludes_moon", _gate_error)
     # Arah predikat samaran **di view** — 119 gerbang lain mengukur port, dan
     # port benar; view tidak. Lihat docstring-nya untuk cacat yang ditutup.
-    check_view_blur_predicate_matches_the_model(results)
-    check_uncertain_blur_is_reversible(results, args.size, args.ss)
-    check_earthshine(results, args.size, args.ss)
-    check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
-    check_feature_arrays_match_the_view(results)
-    check_maria_ripple_matches_the_view(results)
-    check_features_survive_the_watch_size(results)
-    check_features_survive_the_watch_size_in_night_mode(results)
-    check_drawn_visual_sizes_keep_features(results)
-    check_unreadable_features_never_pass_the_watch_size(results)
-    check_every_planet_in_the_model_has_render_cases(results)
-    check_crater_drawing_constants(results)
-    check_sun_profile_matches_the_model(results)
-    check_crater_relief_matches_the_model(results)
-    check_crater_floor_opacity_comes_from_the_model(results)
-    check_crater_contrast_numbers_come_from_the_sampler(results)
-    check_crater_rim_opacity_is_not_clamped(results)
-    check_unknown_moon_disc_uses_the_token(results)
-    check_saturn_ring_order_in_the_view(results)
-    check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
-    check_candidate_marker_survives_the_uncertainty_blur(results, args.size, args.ss)
-    check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
-    check_bands_follow_the_limb_arc(results, args.size, args.ss)
-    check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
-    check_jupiter_spot_keeps_its_curvature(results, args.size, args.ss)
-    check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
-    check_planet_phase_limb_reads_the_model_constant(results)
-    check_moon_new_disc_reads_on_the_watch(results)
-    check_jupiter_spot_reads_on_the_watch(results)
-    check_jupiter_spot_is_not_a_hole(results)
-    check_jupiter_spot_has_its_own_colour(results)
-    check_mars_caps_touch_the_limb(results)
-    check_mars_caps_fade_into_the_surface(results)
-    check_sun_edge_is_soft(results)
-    check_sun_corona_reach_matches_the_model(results)
-    check_earthshine_strength_matches_the_model(results)
-    check_sun_corona_reaches_beyond_the_disk(results)
-    check_png_is_well_formed(results)
+    try:
+        check_view_blur_predicate_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_view_blur_predicate_matches_the_model", _gate_error)
+    try:
+        check_uncertain_blur_is_reversible(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_uncertain_blur_is_reversible", _gate_error)
+    try:
+        check_earthshine(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_earthshine", _gate_error)
+    try:
+        check_unknown_phase_is_not_a_new_moon(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_unknown_phase_is_not_a_new_moon", _gate_error)
+    try:
+        check_feature_arrays_match_the_view(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_feature_arrays_match_the_view", _gate_error)
+    try:
+        check_maria_ripple_matches_the_view(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_maria_ripple_matches_the_view", _gate_error)
+    try:
+        check_features_survive_the_watch_size(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_features_survive_the_watch_size", _gate_error)
+    try:
+        check_features_survive_the_watch_size_in_night_mode(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_features_survive_the_watch_size_in_night_mode", _gate_error)
+    try:
+        check_drawn_visual_sizes_keep_features(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_drawn_visual_sizes_keep_features", _gate_error)
+    try:
+        check_unreadable_features_never_pass_the_watch_size(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_unreadable_features_never_pass_the_watch_size", _gate_error)
+    try:
+        check_every_planet_in_the_model_has_render_cases(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_every_planet_in_the_model_has_render_cases", _gate_error)
+    try:
+        check_crater_drawing_constants(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crater_drawing_constants", _gate_error)
+    try:
+        check_sun_profile_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_sun_profile_matches_the_model", _gate_error)
+    try:
+        check_crater_relief_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crater_relief_matches_the_model", _gate_error)
+    try:
+        check_crater_floor_opacity_comes_from_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crater_floor_opacity_comes_from_the_model", _gate_error)
+    try:
+        check_crater_contrast_numbers_come_from_the_sampler(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crater_contrast_numbers_come_from_the_sampler", _gate_error)
+    try:
+        check_crater_rim_opacity_is_not_clamped(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_crater_rim_opacity_is_not_clamped", _gate_error)
+    try:
+        check_unknown_moon_disc_uses_the_token(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_unknown_moon_disc_uses_the_token", _gate_error)
+    try:
+        check_saturn_ring_order_in_the_view(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_saturn_ring_order_in_the_view", _gate_error)
+    try:
+        check_candidate_marker_stays_inside_its_badge(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_candidate_marker_stays_inside_its_badge", _gate_error)
+    try:
+        check_candidate_marker_survives_the_uncertainty_blur(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_candidate_marker_survives_the_uncertainty_blur", _gate_error)
+    try:
+        check_jupiter_bands_reach_the_limb(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_bands_reach_the_limb", _gate_error)
+    try:
+        check_jupiter_band_structure_survives_the_watch_size(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_band_structure_survives_the_watch_size", _gate_error)
+    try:
+        check_bands_follow_the_limb_arc(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_bands_follow_the_limb_arc", _gate_error)
+    try:
+        check_banded_disc_keeps_its_curvature(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_banded_disc_keeps_its_curvature", _gate_error)
+    try:
+        check_jupiter_spot_keeps_its_curvature(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_spot_keeps_its_curvature", _gate_error)
+    try:
+        check_moon_disc_keeps_its_curvature(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_disc_keeps_its_curvature", _gate_error)
+    try:
+        check_planet_phase_limb_reads_the_model_constant(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_planet_phase_limb_reads_the_model_constant", _gate_error)
+    try:
+        check_moon_new_disc_reads_on_the_watch(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_moon_new_disc_reads_on_the_watch", _gate_error)
+    try:
+        check_jupiter_spot_reads_on_the_watch(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_spot_reads_on_the_watch", _gate_error)
+    try:
+        check_jupiter_spot_is_not_a_hole(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_spot_is_not_a_hole", _gate_error)
+    try:
+        check_jupiter_spot_has_its_own_colour(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_jupiter_spot_has_its_own_colour", _gate_error)
+    try:
+        check_mars_caps_touch_the_limb(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_mars_caps_touch_the_limb", _gate_error)
+    try:
+        check_mars_caps_fade_into_the_surface(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_mars_caps_fade_into_the_surface", _gate_error)
+    try:
+        check_sun_edge_is_soft(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_sun_edge_is_soft", _gate_error)
+    try:
+        check_sun_corona_reach_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_sun_corona_reach_matches_the_model", _gate_error)
+    try:
+        check_earthshine_strength_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_earthshine_strength_matches_the_model", _gate_error)
+    try:
+        check_sun_corona_reaches_beyond_the_disk(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_sun_corona_reaches_beyond_the_disk", _gate_error)
+    try:
+        check_png_is_well_formed(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_png_is_well_formed", _gate_error)
     # Setiap kasus katalog wajib menggambar sesuatu — pembanding yang kosong
     # membuat gerbang keterbacaan ciri mustahil gagal. Lihat docstring-nya.
-    check_every_catalog_case_draws_something(results)
-    check_png_roundtrip(results)
-    check_port_matches_swift_constants(results)
-    check_port_constants_reach_the_drawing(results)
-    check_night_mode_purity(results, args.size, args.ss)
-    check_night_mode_never_exceeds_day(results, 120, args.ss)
+    try:
+        check_every_catalog_case_draws_something(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_every_catalog_case_draws_something", _gate_error)
+    try:
+        check_png_roundtrip(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_png_roundtrip", _gate_error)
+    try:
+        check_port_matches_swift_constants(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_port_matches_swift_constants", _gate_error)
+    try:
+        check_port_constants_reach_the_drawing(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_port_constants_reach_the_drawing", _gate_error)
+    try:
+        check_night_mode_purity(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_night_mode_purity", _gate_error)
+    try:
+        check_night_mode_never_exceeds_day(results, 120, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_night_mode_never_exceeds_day", _gate_error)
     # Lapisan langit latar — digambar di **setiap** layar, dan sampai unit ini
     # nol cakupan render. Lihat docstring `check_backdrop_night_specks_are_red`
     # untuk cacat yang pernah dikirim (titik putih redup di mode malam).
-    check_backdrop_night_specks_are_red(results, 120, args.ss)
-    check_backdrop_day_specks_are_neutral(results, 120, args.ss)
-    check_backdrop_stops_drawing_when_reduced(results, 120, args.ss)
-    check_backdrop_view_reads_the_model_colours(results)
-    check_backdrop_radius_scales_with_width(results)
-    check_backdrop_speck_y_axis_is_height(results)
-    check_backdrop_view_wiring_matches_the_model(results)
-    check_backdrop_port_matches_the_model(results)
-    check_star_colour_order(results, args.size, args.ss)
-    check_star_size_follows_magnitude(results)
-    check_star_pulse_reaches_the_picture(results, args.size, args.ss)
-    check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
-    check_star_size_not_a_claim_when_uncertain(results, args.size, args.ss)
-    check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
-    check_cluster_cores_reach_the_picture(results, args.ss)
-    check_cluster_core_docstring_quotes_measured_values(results)
-    check_deep_sky_catalogue_values_reach_the_picture(results)
-    check_deep_sky_layouts_match_the_model(results)
-    check_every_morphology_in_the_model_has_render_cases(results)
-    check_star_colour_index_matches_the_model(results)
-    check_star_rgb_conversion_matches_the_model(results)
-    check_night_accents_match_the_model(results)
-    check_night_accents_reach_the_view(results)
-    check_star_geometry_matches_the_model(results)
-    check_star_spike_halving_reaches_both_languages(results)
-    check_magnitude_scale_matches_the_model(results)
-    check_unknown_planet_is_a_neutral_sphere(results)
-    check_uncertain_planet_loses_its_identity_colour(results)
+    try:
+        check_backdrop_night_specks_are_red(results, 120, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_night_specks_are_red", _gate_error)
+    try:
+        check_backdrop_day_specks_are_neutral(results, 120, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_day_specks_are_neutral", _gate_error)
+    try:
+        check_backdrop_stops_drawing_when_reduced(results, 120, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_stops_drawing_when_reduced", _gate_error)
+    try:
+        check_backdrop_view_reads_the_model_colours(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_view_reads_the_model_colours", _gate_error)
+    try:
+        check_backdrop_radius_scales_with_width(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_radius_scales_with_width", _gate_error)
+    try:
+        check_backdrop_speck_y_axis_is_height(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_speck_y_axis_is_height", _gate_error)
+    try:
+        check_backdrop_view_wiring_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_view_wiring_matches_the_model", _gate_error)
+    try:
+        check_backdrop_port_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_backdrop_port_matches_the_model", _gate_error)
+    try:
+        check_star_colour_order(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_colour_order", _gate_error)
+    try:
+        check_star_size_follows_magnitude(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_size_follows_magnitude", _gate_error)
+    try:
+        check_star_pulse_reaches_the_picture(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_pulse_reaches_the_picture", _gate_error)
+    try:
+        check_star_colour_not_a_claim_when_uncertain(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_colour_not_a_claim_when_uncertain", _gate_error)
+    try:
+        check_star_size_not_a_claim_when_uncertain(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_size_not_a_claim_when_uncertain", _gate_error)
+    try:
+        check_deep_sky_morphologies_render_distinct(results, args.size, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_deep_sky_morphologies_render_distinct", _gate_error)
+    try:
+        check_cluster_cores_reach_the_picture(results, args.ss)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_cluster_cores_reach_the_picture", _gate_error)
+    try:
+        check_cluster_core_docstring_quotes_measured_values(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_cluster_core_docstring_quotes_measured_values", _gate_error)
+    try:
+        check_deep_sky_catalogue_values_reach_the_picture(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_deep_sky_catalogue_values_reach_the_picture", _gate_error)
+    try:
+        check_deep_sky_layouts_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_deep_sky_layouts_match_the_model", _gate_error)
+    try:
+        check_every_morphology_in_the_model_has_render_cases(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_every_morphology_in_the_model_has_render_cases", _gate_error)
+    try:
+        check_star_colour_index_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_colour_index_matches_the_model", _gate_error)
+    try:
+        check_star_rgb_conversion_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_rgb_conversion_matches_the_model", _gate_error)
+    try:
+        check_night_accents_match_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_night_accents_match_the_model", _gate_error)
+    try:
+        check_night_accents_reach_the_view(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_night_accents_reach_the_view", _gate_error)
+    try:
+        check_star_geometry_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_geometry_matches_the_model", _gate_error)
+    try:
+        check_star_spike_halving_reaches_both_languages(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_star_spike_halving_reaches_both_languages", _gate_error)
+    try:
+        check_magnitude_scale_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_magnitude_scale_matches_the_model", _gate_error)
+    try:
+        check_unknown_planet_is_a_neutral_sphere(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_unknown_planet_is_a_neutral_sphere", _gate_error)
+    try:
+        check_uncertain_planet_loses_its_identity_colour(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_uncertain_planet_loses_its_identity_colour", _gate_error)
     # Terakhir, dan atas berkasnya sendiri: kelas cacat yang membuat pemeriksaan
     # di atas bisa hijau karena alasan yang salah.
-    check_no_loop_variable_leaks_into_a_call(results)
+    try:
+        check_no_loop_variable_leaks_into_a_call(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_no_loop_variable_leaks_into_a_call", _gate_error)
     # Paling akhir: gerbang yang **dipanggil tetapi tidak mengukur apa pun**
     # tidak bisa hijau karena alasan yang salah — ia hijau karena tidak ada.
-    check_every_gate_fills_its_results(results)
-    check_gate_names_mentioned_in_code_exist(results)
+    try:
+        check_every_gate_fills_its_results(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_every_gate_fills_its_results", _gate_error)
+    try:
+        check_gate_names_mentioned_in_code_exist(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_gate_names_mentioned_in_code_exist", _gate_error)
     # Bentuk ketiga dari kelas yang sama, dan yang terakhir ditemukan: nama
     # **uji** yang dikutip sumber produksi. Dua yang di atas menjaga nama
     # gerbang dan nama berkas; yang ini menjaga kalimat "nilainya dijaga
     # `testX`" supaya tidak menjadi izin yang tidak pernah diperiksa siapa pun.
-    check_cited_test_names_exist(results)
-    check_cited_tool_files_exist(results)
+    try:
+        check_cited_test_names_exist(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_cited_test_names_exist", _gate_error)
+    try:
+        check_cited_tool_files_exist(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_cited_tool_files_exist", _gate_error)
     # Kelas yang sama, satu tingkat lebih luas: nama uji yang dikutip di
     # **setiap** berkas sumber (bukan hanya `Apps/`), dengan tiga bidang
     # dibedakan, plus penanda sementara yang tertinggal di kode terkirim.
-    check_cited_test_names_in_every_source_exist(results)
-    check_shipped_has_no_settling_markers(results)
+    try:
+        check_cited_test_names_in_every_source_exist(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_cited_test_names_in_every_source_exist", _gate_error)
+    try:
+        check_shipped_has_no_settling_markers(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_shipped_has_no_settling_markers", _gate_error)
 
     # Saringan `--only`: nama pemeriksaan harus **mengandung** salah satu
     # substring. Sengaja `substring`, bukan `in` daftar: nama gerbang tumbuh
