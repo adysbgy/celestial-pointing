@@ -3089,5 +3089,19 @@ jobs:
       - name: Buktikan Aturan 94 berbunyi
         run: python3 Tools/bukti-mutasi-aturan94-siklus-sumber-daya.py
 
+      # Aturan 96: skalar yang DIHITUNG dari model wajib juga DIPAKAI sebagai
+      # nilai. `CelestialVisualView` menghitung 21 nilai dari `CelestialVisual.*`
+      # lalu menggambarnya. Gerbang teks yang sudah ada memeriksa bahwa view
+      # **memanggil** `CelestialVisual.earthshineStrength(`, bukan bahwa
+      # hasilnya sampai ke `.opacity(...)`. Terukur: `.opacity(earthshine)`
+      # diganti `.opacity(1)` → nol merah di seluruh 95 aturan UI dan nol merah
+      # di seluruh gerbang Bulan, karena `if earthshine > 0` di atasnya masih
+      # menyebut namanya; gerbang piksel mengukur port Python yang tetap benar,
+      # compiler diam, dan teks di layar tidak berubah. Harness ini menuntut
+      # aturan berbunyi pada tiga bentuk pemutusan — dua literal dan satu
+      # skalar yang hilang seluruhnya — serta diam pada pohon bersih.
+      - name: Buktikan Aturan 96 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan96-skalar-model.py
+
       - name: Uji PointingKit
         run: swift test --package-path Packages/PointingKit

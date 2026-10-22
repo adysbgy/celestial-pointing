@@ -14888,6 +14888,38 @@ else
 fi
 
 
+echo "== Aturan 96: skalar yang dihitung dari model wajib sampai ke gambar =="
+# Gerbang teks yang sudah ada memeriksa bahwa view **memanggil**
+# `CelestialVisual.earthshineStrength(`, bukan bahwa hasilnya dipakai. Terukur:
+# `.opacity(earthshine)` diganti `.opacity(1)` → nol merah di seluruh 95 aturan
+# dan nol merah di seluruh gerbang Bulan, karena `if earthshine > 0` di atasnya
+# masih menyebut namanya. Gerbang piksel mengukur port Python, yang tetap
+# benar; compiler diam; teks di layar tidak berubah.
+#
+# Polanya sama dengan Aturan 95 — nilai yang tidak pernah diperiksa adalah
+# nilai yang boleh berarti apa saja — hanya letaknya di gambar, bukan animasi.
+# Logikanya di `Tools/`, bukan di-inline, karena alasan yang sama dengan
+# Aturan 84-95 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan96-skalar-model.py" ]; then
+  echo "FAIL Tools/check-aturan96-skalar-model.py tidak ada: Aturan 96"
+  echo "     tidak mengukur apa pun, dan skalar yang dihitung dari model bisa"
+  echo "     diganti literal di tempat menggambar tanpa satu pun galat."
+  status=1
+else
+  skalar_model=$(python3 Tools/check-aturan96-skalar-model.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$skalar_model"
+    echo "-> Setiap skalar yang dihitung dari model wajib sampai ke posisi"
+    echo "   nilai (argumen/anggota/subskrip/operand), bukan diganti literal"
+    echo "   di tempat menggambar. Perbaiki view-nya, jangan longgarkan"
+    echo "   aturannya."
+    status=1
+  else
+    echo "$skalar_model"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
