@@ -1,3 +1,129 @@
+### Siklus (22 Okt 2026 — lencana kandidat: penanda keraguan yang ikut kabur, dan glif yang di ambang)
+
+Dua cacat di satu tempat, dan keduanya mengenai **satu-satunya penanda di
+layar** yang mengatakan "engine ragu".
+
+#### (a) Lencana digambar di dalam `Canvas` yang kemudian di-`.blur`
+
+`CelestialVisualView` menggambar objek dan lencana kandidat di `Canvas` yang
+sama, lalu memasang `.blur(radius:)` saat engine belum pasti. `.blur`
+memfilter **seluruh hasil** `Canvas` — jadi penanda keraguan ikut tersamarkan
+bersama gambar objek. Terukur pada render penuh `planet-saturn-uncertain`:
+tepi glif **0.04**, dan seluruh 901 piksel peringatan yang tersisa adalah
+olesan tanpa bentuk.
+
+Gerbang lama tidak melihatnya karena ambangnya `> 40` piksel — jumlah itu
+dipenuhi oleh sisa kabur. Jadi pemeriksaannya hijau justru pada keadaan yang
+paling perlu ditangkapnya.
+
+Sekarang lencana digambar di `.overlay` **sesudah** `.blur`. Urutannya diukur,
+bukan diasumsikan: Aturan 32 memeriksa `.overlay` tidak duduk sebelum
+`.blur` di rantai modifier, karena urutan rantai = urutan di layar.
+
+#### (b) Glif tanda tanya tergambar sebagai gumpalan pejal
+
+Tebal garis glif adalah literal `0.28 × radius lencana`. Pada kartu jam 38 pt:
+
+    radius lencana              0.3196 R = 3.04 pt
+    tebal garis 0.28 · badge    0.0895 R = 1.70 pt
+    tinggi lengkung glif        0.0914 R = 1.74 pt
+    rasio garis ÷ lengkung            0.98
+
+Garis yang setebal lengkungnya sendiri mengisi rongga lengkung itu. Diperiksa
+pada render 114 px dan 400 px: "a filled blob … no gap between the curved top
+and the bottom dot". Pada rasio 0.45 (nilai sekarang): "a legible question
+mark … a separate dot".
+
+**Koreksi, diukur ulang di resolusi device.** Klaim "gumpalan" di atas
+berasal dari render 114 px dan 400 px, sedangkan jam sungguhan menampilkan
+kartu 38 pt @2x = **76 px**, dan layar redup 30 pt @2x = **60 px**. Diukur
+ulang di sana (`probe-ambang-glif.py`, `probe-glif-mata.py`, diperiksa pada
+perbesaran 10x): tebal lama **masih terbaca** sebagai tanda tanya dengan
+celah sempit — "narrow but present", bukan gumpalan pejal. Jadi cacat (b)
+lebih lemah dari yang ditulis di atas, dan yang benar adalah: tebal lama
+**di ambang**, bukan sudah rusak.
+
+Yang tetap berlaku, dan sekarang punya angka: rasio yang **tergambar** di
+view berbeda dari rasio model, karena `max(1, badgeRadius * strokeFraction)`
+memakai **poin** sedangkan port memakai piksel. Pada ukuran kirim:
+
+    30 pt (AOD)  badge 4.79  hook 1.37  minta 0.62  tergambar 1.00  rasio 0.73
+    38 pt (kartu) badge 6.07  hook 1.74  minta 0.79  tergambar 1.00  rasio 0.58
+    48 pt         badge 7.67  hook 2.19  minta 1.00  tergambar 1.00  rasio 0.46
+    76 pt         badge 12.14 hook 3.47  minta 1.58  tergambar 1.58  rasio 0.45
+
+Lantai 1 pt itu **bukan cacat**: pada 60 px dengan rasio 0.73 glif masih
+terbaca ("clear gap"), dan bahkan pada rasio 0.95 masih terbaca ("at least
+one row of dark red pixels separating"). Lantai itu justru yang menjaga glif
+tetap punya ketebalan minimum di layar kecil. Yang perlu dicatat adalah uji
+model menguji 0.45 sementara yang tampil 0.73 — selisih itu **disengaja**
+oleh lantai, bukan penyimpangan.
+
+**Yang TIDAK diklaim.** Tidak ada uji otomatis untuk "terbaca sebagai tanda
+tanya" — penilaian di atas berasal dari pemeriksaan visual pada gambar yang
+dibesarkan, bukan dari ambang piksel. Uji yang ada menjaga **geometri**
+(`strokeToHookRatio < 0.5`), dan geometri bukan persepsi.
+
+**Kenapa paritas port↔view tidak bisa menangkapnya.** `check-visuals.py`
+mencatat sendiri bahwa mutasi VIEW `0.28 → 0.60` meninggalkan **313
+pemeriksaan hijau**. Paritas hanya menuntut kedua bahasa sepakat pada angka
+yang sama — dan keduanya sepakat pada angka yang salah. Yang bisa menguji ini
+adalah **geometrinya**: `strokeToHookRatio < 0.5`, diuji di
+`testGlyphStrokeIsThinEnoughToLeaveTheHookOpen`.
+
+Tebal garis sekarang satu pemilik di model
+(`CandidateMarker.strokeFraction = 0.13`), dan view memakai token itu.
+`testStrokeFractionIsTheSingleOwner` juga membuktikan nilai lama (0.28)
+**gagal** ambang — kalau tidak, ambangnya tidak menjaga apa pun.
+
+#### Kenapa cacatnya penting justru di sini
+
+Lencana ini satu-satunya penanda "engine ragu". Glif yang kabur atau berhenti
+terbaca sebagai tanda tanya menyisakan gambar objek **tanpa** penanda yang
+bisa dibaca — dan gambar tanpa penanda terbaca sebagai identitas yang pasti.
+Itu pelanggaran paling keras di PRD v0.4.
+
+#### Gerbang baru: `check_candidate_marker_survives_the_uncertainty_blur`
+
+Cakupannya **diturunkan dari katalog**, bukan daftar nama: setiap kasus dengan
+`is_confirmed is False` dan bukan pembanding `-bare`. Jenis objek yang nanti
+menjadi objek ragu (galaksi, gugus) ikut terukur pada hari ia ditambahkan.
+Katalog kosong menghasilkan **merah**, bukan hijau karena tidak ada yang
+diperiksa.
+
+Yang diukur: ketajaman (lompatan nilai peringatan antar piksel bersebelahan),
+bukan jumlah piksel. Glif tajam ≈ 1.0; tersamarkan ≈ 0.04.
+
+#### Yang TIDAK diklaim
+
+**Ambang 0.80 dikalibrasi di 200 pt, dan gerbangnya berjalan di parameter
+deklarasinya (200 pt, ss=2).** Diukur ulang pada ukuran kartu jam, angkanya
+terpisah tetapi tidak lolos lantai gerbang:
+
+    ukuran  keadaan benar    keadaan cacat (lencana sebelum blur)
+     38 pt  0.81 – 0.82      0.56 – 0.57  (Bulan & bintang 0.82/0.81 —
+                                           jenis itu memang tidak disamarkan)
+     48 pt  0.85             0.58
+     76 pt  0.79             0.56            ← di bawah ambang 0.80
+    114 pt  0.90 – 0.91      0.64
+    200 pt  0.90 – 1.00      0.69 – 0.72
+
+Jadi: cacatnya terpisah jelas dari keadaan benar di **setiap** ukuran, tetapi
+lantai `lit > 100` piksel adalah angka yang hanya benar di 200 pt (glif utuh
+di 38 pt hanya 83 piksel). Gerbang ini **tidak** diklaim menjaga kartu jam;
+yang menjaganya adalah Aturan 32 (urutan `.overlay` sesudah `.blur`), yang
+membaca kode dan tidak bergantung ukuran. Menaikkan cakupan ke ukuran kartu
+akan menuntut lantai per ukuran — dicatat sebagai arah, bukan dikerjakan
+setengah.
+
+Juga tidak diklaim: peak intensitas glif sebagai metrik. Diukur dan **tidak
+memisahkan apa pun** (1.00 di keadaan benar maupun cacat, semua ukuran) —
+dicatat supaya tidak ada yang mencobanya lagi.
+
+`./swift-test.sh`: 1041 tes, 0 gagal. `./swift-ui-lint.sh`: bersih.
+`Tools/bukti-mutasi-glif-lencana.py`: 8 keadaan, semuanya sesuai harapan,
+sumber pulih persis (md5 sama).
+
 ### Siklus (22 Okt 2026 — `planet-saturn-no-feature`: pembanding yang kosong)
 
 `Tools/render-visuals.py` sudah lama punya kasus pembanding `planet-X-no-feature`
