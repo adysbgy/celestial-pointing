@@ -14653,9 +14653,30 @@ else
 fi
 
 
+echo
+echo "== Aturan 87: setiap teks berwarna dari palet, bukan warisan .primary =="
+if [ ! -f "Tools/check-aturan87-warna-teks.py" ]; then
+  echo "FAIL Tools/check-aturan87-warna-teks.py tidak ada: Aturan 87"
+  echo "     tidak mengukur apa pun, dan teks tanpa warna kembali putih"
+  echo "     di mode malam tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  warna_teks=$(python3 Tools/check-aturan87-warna-teks.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$warna_teks"
+    echo "-> Setiap Text wajib berwarna: dari rantainya sendiri, dari"
+    echo "   pembungkusnya, atau dari akar palet berkasnya (forceDarkScheme)."
+    echo "   Perbaiki kodenya, jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$warna_teks"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
-echo "== SEMUA GERBANG UI LULUS =="
+  echo "== SEMUA GERBANG UI LULUS =="
 else
   echo
   echo "== GERBANG UI GAGAL =="

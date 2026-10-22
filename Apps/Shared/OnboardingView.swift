@@ -120,6 +120,20 @@ struct OnboardingView: View {
                 Button(action: onDone) {
                     Text(TextLocalization.text(.onboardingStart))
                         .font(.headline)
+                        // **Warna label tombol, bukan warna teks.** Label ini
+                        // duduk di atas `.borderedProminent` yang ditint
+                        // `PointingTone.active` — jadi latarnya aksen, bukan
+                        // permukaan. Mewarnainya dengan `textPrimary` membuat
+                        // teks dan latarnya sama-sama aksen, dan di mode malam
+                        // keduanya merah: labelnya lenyap.
+                        //
+                        // `onAccent` (hitam), bukan `.white`: terukur putih
+                        // hanya 3.70:1 di atas aksen biru dan 4.12:1 di atas
+                        // ungu — keduanya di bawah 4.5:1, jadi putih **tidak
+                        // pernah** lolos di sini. Hitam 5.68/5.09/5.25:1, dan
+                        // di mode malam ia tidak memancarkan hijau/biru sama
+                        // sekali. Dihitung + dijaga `SurfacePaletteTests`.
+                        .foregroundStyle(SurfacePalette.active.onAccentColor)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)

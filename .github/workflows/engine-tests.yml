@@ -2969,6 +2969,18 @@ jobs:
       - name: Buktikan gerbang jawaban stateRequest berbunyi
         run: python3 Tools/bukti-mutasi-aturan86-jawaban-state-request.py
 
+      # Aturan 87: setiap `Text` wajib berwarna dari palet, bukan warisan
+      # `.primary`. Terukur di `main` sebelum aturan ini ada: mode malam
+      # menjanjikan palet **merah murni**, tetapi `Text` tanpa `foregroundStyle`
+      # jatuh ke `.primary`, yang di skema gelap paksa = putih. Nama benda di
+      # kartu jam dan di panel detail iPhone — dua teks terpenting di app —
+      # keduanya putih, memancarkan tepat kanal hijau/biru yang seluruh mode
+      # malam ada untuk menekan ke nol, dan **nol dari 86 aturan** berbunyi.
+      # Harness ini menuntut keempat jalur putusnya warna berbunyi dan pohon
+      # apa adanya diam.
+      - name: Buktikan gerbang warna teks palet berbunyi
+        run: python3 Tools/bukti-mutasi-aturan87-warna-teks.py
+
       # Aturan 80: samaran ragu wajib **terpasang**, bukan hanya benar
       # angkanya. Aturan 63 menjaga `diameter * 0.06` = port Python; ia tidak
       # menjaga apakah `.opacity`/`.blur` benar-benar memakainya. Terukur pada

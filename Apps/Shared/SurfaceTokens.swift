@@ -43,6 +43,14 @@ extension SurfacePalette {
     var surface2Color: Color { return surface2.color }
     var textPrimaryColor: Color { return textPrimary.color }
     var textSecondaryColor: Color { return textSecondary.color }
+    /// Teks di atas **aksen** (label tombol `.borderedProminent`).
+    ///
+    /// Bukan `textPrimary`: label tombol tidak duduk di atas permukaan, jadi
+    /// memakai warna teks di sana membuat teks dan latarnya sama-sama aksen —
+    /// di mode malam keduanya merah dan labelnya lenyap. Nilainya dihitung dan
+    /// diuji di `SurfacePaletteTests` (≥ 4.5:1 terhadap kedua ujung aksen, dan
+    /// nol hijau/biru di mode malam).
+    var onAccentColor: Color { return onAccent.color }
 
     /// Gradien aksen "ruang" → "nebula".
     ///
@@ -150,7 +158,7 @@ extension View {
     // punya dua jalan yang sama wajarnya, dan yang salah tidak berbunyi di
     // gerbang mana pun. Yang tersisa hanya satu jalan: `appBackdrop()`.
 
-    /// Paksa skema gelap di seluruh app.
+    /// Paksa skema gelap di seluruh app, **dan pasang warna teks dari palet**.
     ///
     /// **Kenapa bukan `nil` saat siang.** Token permukaan (`SurfacePalette`)
     /// sengaja dirancang untuk latar gelap bertingkat (`#0A0A0F`/`#121216`):
@@ -162,8 +170,26 @@ extension View {
     /// berantakan dan rasa yang tidak konsisten. Skema gelap di sini bukan
     /// "mode gelap pilihan", melainkan **kontrak** dengan palet yang sudah
     /// diuji; mode malam (merah) adalah lapisan di atasnya, bukan pengganti.
+    ///
+    /// **Kenapa `foregroundStyle` ikut di sini.** Sampai siklus ini fungsi ini
+    /// hanya memasang `preferredColorScheme(.dark)`. Skema gelap membuat
+    /// `.primary` = **putih**, dan setiap `Text` yang tidak menulis warnanya
+    /// sendiri jatuh ke situ. Di mode malam — yang paletnya merah murni
+    /// (1.000, 0.000, 0.000) — nama benda yang sedang ditunjuk, yaitu jawaban
+    /// yang dicari pengguna, tetap putih sementara seluruh layar di sekitarnya
+    /// merah. Terukur di pohon utuh: `PointingView` kartu jam dan panel detail
+    /// iPhone sama-sama begitu, dan nol dari 86 aturan UI berbunyi.
+    ///
+    /// `foregroundStyle` adalah nilai lingkungan: satu pemasangan di akar
+    /// menurun ke seluruh keturunan, dan anak yang menulis warnanya sendiri
+    /// tetap menang. Karena itu perbaikannya di sini, bukan di 34 pemanggil
+    /// `Text` — yang di bawah ini hanya tinggal menyetel **satu** akar, dan
+    /// teks ke-35 yang ditambahkan besok ikut benar tanpa diingat.
+    /// Dijaga Aturan 87.
     func forceDarkScheme() -> some View {
-        preferredColorScheme(.dark)
+        self
+            .preferredColorScheme(.dark)
+            .foregroundStyle(SurfacePalette.active.textPrimaryColor)
     }
 
     /// Permukaan kartu: warna yang sudah **diuji**, plus kilau kaca tipis, plus

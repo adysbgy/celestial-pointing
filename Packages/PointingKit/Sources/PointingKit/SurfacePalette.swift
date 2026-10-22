@@ -110,6 +110,32 @@ public struct SurfacePalette: Equatable, Sendable {
 
 extension SurfacePalette {
 
+    /// Teks di atas **aksen**, bukan di atas permukaan.
+    ///
+    /// **Kenapa ini perlu ada.** Label tombol `.borderedProminent` duduk di atas
+    /// tint `accentGradient`, bukan di atas `surface1`. Tidak ada token untuk
+    /// itu, jadi labelnya jatuh ke `.primary` — putih di skema gelap. Terukur:
+    /// putih terhadap aksen siang 3.70:1 (biru) dan 4.12:1 (ungu), keduanya
+    /// **di bawah** ambang 4.5:1; terhadap aksen malam 4.00:1, juga di bawah.
+    /// Jadi label tombol utama app ini memang tidak pernah lolos WCAG, dan tidak
+    /// ada gerbang yang mengatakannya karena kontras hanya diukur teks-lawan-
+    /// permukaan.
+    ///
+    /// **Hitam, bukan putih.** Hitam terhadap kedua ujung aksen: 5.68:1 (biru),
+    /// 5.09:1 (ungu), 5.25:1 (merah malam) — ketiganya lolos. Dan di mode malam
+    /// hitam **tidak memancarkan hijau/biru sama sekali**, jadi label tombol
+    /// tidak menjadi satu-satunya piksel yang membocorkan 498–530nm di layar
+    /// yang seluruhnya merah.
+    ///
+    /// Dihitung, bukan ditulis sebagai literal warna: kalau aksen berubah, ia
+    /// harus tetap lolos, dan `SurfacePaletteTests` yang mengatakannya.
+    public var onAccent: SurfaceColor {
+        SurfaceColor(red: 0.000, green: 0.000, blue: 0.000)
+    }
+}
+
+extension SurfacePalette {
+
     /// Palet siang — "surface, bukan pure black".
     public static let day = SurfacePalette(
         background: SurfaceColor(red: 0.039, green: 0.039, blue: 0.059),

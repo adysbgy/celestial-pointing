@@ -315,6 +315,12 @@ struct CalibrationView: View {
                                 // yang melewatinya.
                                 Text(target.localizedName)
                                     .font(.subheadline.weight(.medium))
+                                    // Nama acuan adalah informasi utama baris
+                                    // ini, jadi ia memakai warna teks utama —
+                                    // bukan warisan `.primary`. Tanpa baris ini
+                                    // nama acuan tetap putih di mode malam,
+                                    // sementara tinggi di bawahnya sudah merah.
+                                    .foregroundStyle(SurfacePalette.active.textPrimaryColor)
                                     // Nama acuan juga dari katalog (30 entri,
                                     // dua bahasa) dan baris ini berbagi lebar
                                     // dengan chevron + `Spacer` di jam yang

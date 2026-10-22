@@ -1,3 +1,72 @@
+### Siklus (22 Okt 2026 — mode malam menjanjikan merah, tapi teks terpenting putih)
+
+Ditemukan dengan menyapu **semantik**, bukan sintaks: `sapu-semantik.py`
+memutasi kode dan menuntut gerbang berbunyi. Enam belas mutasi berbunyi,
+empat tidak. Keempat yang diam semuanya di satu kelas: **warna teks**.
+
+#### Cacat
+
+Mode malam (BAGIAN 3 PRD) menjanjikan palet **merah murni** — kanal 498–530nm
+ditekan ke nol, karena satu layar putih selama beberapa detik membuang
+adaptasi gelap 20–40 menit. `SurfacePalette.night.textPrimary` memang
+`(1, 0, 0)`. Tetapi `Text` yang tidak menulis `foregroundStyle` **tidak**
+mewarisi palet; ia jatuh ke `.primary`, dan karena seluruh app memaksa skema
+gelap (`forceDarkScheme()`), `.primary` = **putih**.
+
+Dua teks yang paling penting di app ini kena:
+
+- `PointingView.swift:586` — **nama benda** di kartu jam. Itu jawaban yang
+  seluruh app ini ada untuk memberi.
+- `DiagnosticsView.swift:1019` — nama benda di panel detail iPhone.
+
+Ditambah `CalibrationView` (nama acuan), `TelescopeHandoffView` (judul baris),
+dan `OnboardingView` (label tombol mulai). Terukur: **nol dari 86 aturan**
+berbunyi. Gerbang yang ada memeriksa apakah warna *dipanggil* di suatu tempat
+di berkas, bukan apakah setiap teks *punya* warna.
+
+#### Kenapa ini bukan sekadar "lupa mewarnai"
+
+Yang membuatnya bertahan adalah **warisan**. `foregroundStyle` menurun ke
+seluruh subpohon, jadi satu baris di akar layar menutupi ratusan `Text` — dan
+satu `Text` yang lupa menulis warnanya di layar yang akarnya benar tetap
+putih. Karena itu aturannya tidak bisa berbunyi per-`Text` saja: ia harus
+menerima **tiga** sumber warna yang sah (rantai sendiri, pembungkus, akar
+berkas) dan menolak yang keempat (tidak ada).
+
+#### Perbaikan
+
+1. `forceDarkScheme()` sekarang juga memasang
+   `.foregroundStyle(SurfacePalette.active.textPrimaryColor)` di akar, jadi
+   teks yang tidak menyebut warna **mewarisi palet**, bukan `.primary`.
+2. `SurfacePalette.onAccent` — token baru untuk label di atas aksen.
+   `.borderedProminent` menint latarnya dengan `accentGradient`, jadi labelnya
+   tidak pernah duduk di permukaan. **Putih bukan jawabannya**: terukur
+   3.70:1 di atas aksen biru dan 4.12:1 di atas ungu (dan 4.00:1 di mode
+   malam) — semuanya di bawah 4.5:1. Hitam 5.68/5.09/5.25:1, dan di mode
+   malam ia tidak memancarkan hijau/biru sama sekali.
+3. Tiga teks yang benar-benar tanpa warna eksplisit (`CalibrationView`,
+   `TelescopeHandoffView`, `OnboardingView`) sekarang menyebut warnanya.
+4. **Aturan 87** + `Tools/bukti-mutasi-aturan87-warna-teks.py` (didaftarkan di
+   `engine-tests.yml`): menuntut keempat jalur putusnya warna berbunyi dan
+   pohon apa adanya diam.
+
+#### Yang TIDAK diklaim
+
+- Bukan klaim bahwa semua teks kini kontras ≥ 4.5:1. Yang diuji hanya
+  `onAccent` terhadap kedua ujung aksen di kedua mode. Pasangan teks/latar
+  lain belum diukur satu per satu.
+- Bukan klaim bahwa `.primary` tidak pernah dipakai lagi. Ia masih dipakai
+  sebagai **warisan** yang kini bernilai palet; aturan menjaga sumbernya.
+- Bukan klaim visual. Tidak ada Xcode di VPS ini: gerbang ini statis, dan
+  render sebenarnya baru terbukti di CI macOS.
+
+#### Uji
+
+PointingKit 1041 → **1044**. Tiga uji baru, dan semuanya non-vakum: token
+dimutasi ke putih, suite merah **6 kegagalan**, lalu dikembalikan. Uji
+`testWhiteOnAccentFailsSoTheTokenCannotBeWhite` sengaja menahan kesimpulan
+"putih sedikit lebih redup" supaya perbaikan tidak dibalik.
+
 ### Siklus (22 Okt 2026 — yang TIDAK cacat: empat dugaan diukur, semuanya lulus)
 
 Sesudah lencana kandidat ditutup, giliran menyapu dugaan berikutnya. Empat

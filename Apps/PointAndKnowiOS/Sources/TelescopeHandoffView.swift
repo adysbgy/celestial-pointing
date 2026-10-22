@@ -170,7 +170,12 @@ struct TelescopeHandoffSection: View {
 
     private func row(_ title: String, _ value: String) -> some View {
         HStack {
+            // Judul baris adalah informasi utama pasangan ini; nilainya
+            // sekunder. Keduanya **eksplisit** dari palet — judul yang
+            // dibiarkan tanpa warna jatuh ke `.primary` (putih) dan tetap
+            // putih di mode malam, sementara nilainya sudah merah.
             Text(title)
+                .foregroundStyle(SurfacePalette.active.textPrimaryColor)
             Spacer()
             Text(value).foregroundStyle(Color.nightAwareSecondary)
         }

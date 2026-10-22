@@ -562,4 +562,68 @@ final class SurfacePaletteTests: XCTestCase {
                           "kedua mode memakai kepekatan kilau yang sama: pemilihnya "
                           + "tidak membaca palet")
     }
+
+    // MARK: - Teks di atas aksen
+
+    /// Label tombol utama harus terbaca di atas **aksen**, bukan di atas kartu.
+    ///
+    /// **Cacat yang dijaga.** `.borderedProminent` menint latarnya dengan
+    /// `accentGradient`, jadi labelnya tidak pernah duduk di `surface1`.
+    /// Tidak ada token untuk teks-di-atas-aksen, jadi labelnya jatuh ke
+    /// `.primary` — putih. Terukur: putih 3.70:1 di atas aksen biru dan
+    /// 4.12:1 di atas aksen ungu, keduanya **di bawah** 4.5:1; di mode malam
+    /// 4.00:1, juga di bawah. Label tombol terpenting app ini karena itu tidak
+    /// pernah lolos WCAG, dan tidak ada gerbang yang berbunyi — karena seluruh
+    /// uji kontras yang ada membandingkan teks dengan **permukaan**.
+    ///
+    /// Uji ini mengukur ketiga ujung yang benar-benar dipakai (biru siang,
+    /// ungu siang, merah malam). Kalau aksen digeser lebih terang, ia merah.
+    func testOnAccentTextIsReadableOnEveryAccentItSitsOn() {
+        for (nama, palet) in [("siang", SurfacePalette.day),
+                              ("malam", SurfacePalette.night)] {
+            for (ujung, aksen) in [("awal", palet.accentStart),
+                                   ("akhir", palet.accentEnd)] {
+                let rasio = palet.onAccent.contrastRatio(against: aksen)
+                XCTAssertGreaterThanOrEqual(
+                    rasio, SurfacePalette.minimumTextContrast,
+                    "label tombol mode \(nama) di atas aksen \(ujung) hanya "
+                    + "\(rasio):1 — di bawah ambang \(SurfacePalette.minimumTextContrast)")
+            }
+        }
+    }
+
+    /// Putih **bukan** jawabannya, dan uji ini mengunci alasannya.
+    ///
+    /// Kalau seseorang "memperbaiki" label tombol dengan `.white`, uji di atas
+    /// akan merah — tetapi pesannya akan terbaca seperti salah pilih warna.
+    /// Yang sebenarnya terjadi: putih di atas aksen produk ini **memang tidak
+    /// lolos**, di kedua mode. Uji ini menahan kesimpulan itu supaya
+    /// perbaikannya tidak dibalik menjadi "putih sedikit lebih redup".
+    func testWhiteOnAccentFailsSoTheTokenCannotBeWhite() {
+        let putih = SurfaceColor(red: 1, green: 1, blue: 1)
+        for (nama, palet) in [("siang", SurfacePalette.day),
+                              ("malam", SurfacePalette.night)] {
+            for (ujung, aksen) in [("awal", palet.accentStart),
+                                   ("akhir", palet.accentEnd)] {
+                XCTAssertLessThan(
+                    putih.contrastRatio(against: aksen),
+                    SurfacePalette.minimumTextContrast,
+                    "putih di atas aksen \(ujung) mode \(nama) tiba-tiba lolos: "
+                    + "kalau aksennya berubah, token `onAccent` harus ditinjau ulang, "
+                    + "bukan uji ini yang dilonggarkan")
+            }
+        }
+    }
+
+    /// Di mode malam, teks-di-atas-aksen tidak boleh membocorkan hijau/biru.
+    ///
+    /// Seluruh alasan mode malam adalah kanal 498–530nm ditekan ke nol. Satu
+    /// label putih di tengah layar merah adalah tepat piksel yang merusak
+    /// adaptasi gelap yang seluruh palet ini ada untuk menjaganya.
+    func testOnAccentTextInNightModeEmitsNoGreenOrBlue() {
+        XCTAssertEqual(SurfacePalette.night.onAccent.green, 0,
+                       "teks di atas aksen mode malam memancarkan hijau")
+        XCTAssertEqual(SurfacePalette.night.onAccent.blue, 0,
+                       "teks di atas aksen mode malam memancarkan biru")
+    }
 }
