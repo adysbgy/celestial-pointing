@@ -1,3 +1,90 @@
+### Siklus (22 Okt 2026 — Aturan 88: sambungan LinkView → LinkReport akhirnya diukur)
+
+Siklus sebelumnya menutup celah kolom kalibrasi, dan mencatat sisanya di
+bagian "Yang TIDAK diklaim" dengan kalimat yang cukup jelas untuk jadi
+pekerjaan: *"Kalau `LinkView` berhenti memanggil `stateRows` dan kembali
+menulis kolomnya sendiri, uji itu tetap hijau."* Siklus ini menutupnya.
+
+#### Kenapa uji PointingKit tidak bisa menutupnya
+
+`LinkReport` benar, dan 1065 uji PointingKit membuktikannya. Tapi tidak satu
+pun dari uji itu bisa membuktikan bahwa **view memanggilnya**. Repo ini punya
+dua jenis gerbang: yang membaca teks berkas, dan yang membaca piksel render.
+Fungsi murni yang tidak pernah dipanggil tidak punya keduanya — ia hanya punya
+uji yang hijau. Jadi celahnya bukan di `LinkReport`, melainkan di **sambungan**
+antara `LinkReport` dan layar, dan sambungan itu tidak diukur siapa pun.
+
+#### Aturan 88 — tiga hal, bukan satu
+
+`Tools/check-aturan88-sambungan-laporan.py` memeriksa tiga bentuk kegagalan
+yang berbeda, karena masing-masing lolos dari pemeriksaan yang lain:
+
+1. **Berhenti memanggil.** `LinkView` wajib memanggil `LinkReport.stateRows`
+   **dan** `LinkReport.calibrationRows`. Satu `grep` biasa sudah menangkap ini
+   — tapi hanya kalau ada yang menjalankannya.
+
+2. **Memanggil tapi membuang hasilnya** (`let _ = LinkReport.calibrationRows(…)`).
+   Ini bentuk yang paling menipu: `grep calibrationRows` tetap menemukannya,
+   uji tetap hijau, dan tidak satu baris pun sampai ke layar. Karena itu
+   pemeriksa menuntut panggilannya berada **di dalam badan `ForEach`** —
+   satu-satunya tempat hasilnya benar-benar dirender.
+
+3. **Menulis kolomnya sendiri lagi** (`row(TextLocalization.text(.linkRowYawOffset), …)`).
+   Ini bentuk asli cacatnya. Daftar kuncinya **sengaja** hanya kunci milik
+   `LinkReport` (`linkRowState`, `linkRowSigma`, `linkRowYawOffset`, …);
+   kunci status tautan dan kunci sampel memang ditulis di view dan bukan
+   bagian laporan ini. Aturan yang berbunyi untuk hal yang benar akan
+   dimatikan orang, dan aturan yang dimatikan tidak menjaga apa pun.
+
+Pemeriksa pertama kali dijalankan menemukan **4 kolom tulis tangan** di
+`LinkView` — dan keempatnya ternyata kunci status/sampel yang memang bukan
+milik `LinkReport`. Itu bukan cacat kode; itu cacat **jangkauan aturan**, dan
+jangkauannya dipersempit ke kunci yang benar sebelum aturannya dipakai.
+
+#### Bukti aturan berbunyi
+
+`Tools/bukti-mutasi-aturan88.py` — tiga mutasi, dijalankan di proses baru,
+semuanya wajib merah **dan** pesannya wajib menyebut sebabnya. Setelah itu
+berkas dipulihkan dan pemeriksa dijalankan sekali lagi; kalau pemulihannya
+gagal, skrip ini sendiri yang merah — supaya "bukti" tidak bisa lolos dari
+berkas yang setengah pulih.
+
+| Mutasi | Pesan yang wajib muncul |
+|---|---|
+| berhenti memanggil `calibrationRows` | `tidak memanggil` |
+| memanggil tapi membuang hasilnya | `tidak berada di dalam ForEach` |
+| menulis kolom laporan sendiri | `ditulis langsung` |
+
+Harness terdaftar di `engine-tests.yml`. `check-harness-terdaftar.py` sekarang
+melaporkan **148 harness, semuanya dirujuk alur kerja**.
+
+#### Yang TIDAK diklaim
+
+- **Aturan 88 hanya mengukur `LinkView`.** Bagian laporan lain yang suatu hari
+  punya fungsi murni di `LinkReport` tidak otomatis ikut terjaga; menambah
+  bagian berarti menambah namanya ke `WAJIB_DIPANGGIL`. Daftar itu memang
+  ditulis tangan, dan itu disengaja — ia daftar **sambungan yang pernah
+  putus**, bukan daftar medan yang bisa basi sendiri.
+- Pemeriksa ini membaca **teks**, bukan render. Ia bisa membuktikan `ForEach`
+  memuat panggilan itu; ia tidak bisa membuktikan barisnya terlihat di layar
+  (mis. tertutup `if` yang selalu salah). Yang menjaga itu tetap Apple Build
+  dan mata.
+- **Belum ada aturan yang mengukur apakah `LinkView` masih memakai
+  `sigmaAndTimeRows` lewat `stateRows`.** σ dan waktu dirender oleh fungsi
+  bersama, jadi keduanya ikut kalau `stateRows` dipanggil — tapi kalau
+  `sigmaAndTimeRows` sendiri dikosongkan, Aturan 88 tetap hijau. Yang
+  menangkapnya uji sapuan medan di PointingKit, bukan aturan ini.
+
+#### Keadaan gerbang
+
+`./swift-test.sh` → **222 + 1065 hijau**. `./swift-ui-lint.sh` → **87 aturan**,
+exit 0. `./swift-typecheck.sh` → exit 0. `bash -n` di bash 3.2 → exit 0.
+`check-harness-terdaftar.py` → 148/148. README 86 → 87 aturan (Aturan 10
+menghitung ulang header `== Aturan N` di skrip, jadi angkanya janji yang
+diperiksa, bukan catatan).
+
+
+
 ### Siklus (22 Okt 2026 — peta jalur kirim yang tidak dibaca siapa pun)
 
 Siklus sebelumnya menutup σ, lalu arah tunjuk, dengan uji sapuan

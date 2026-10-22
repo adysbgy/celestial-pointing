@@ -3006,6 +3006,11 @@ jobs:
       - name: Buktikan gerbang latar langit berbunyi
         run: python3 Tools/bukti-mutasi-latar-langit.py
 
+      # Aturan 88 mengukur SAMBUNGAN LinkView -> LinkReport. Uji PointingKit
+      # membuktikan LinkReport benar; ia tidak bisa membuktikan view memanggilnya.
+      - name: Buktikan Aturan 88 berbunyi
+        run: python3 Tools/bukti-mutasi-aturan88.py
+
       # Laporan tautan iPhone: satu-satunya layar yang menjelaskan apa yang
       # dilaporkan jam. Tiga cacatnya hijau di seluruh gerbang lain karena
       # gerbang repo ini membaca teks dan piksel — kolom yang tidak pernah

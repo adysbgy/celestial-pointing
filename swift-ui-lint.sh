@@ -14674,6 +14674,28 @@ else
 fi
 
 
+echo
+echo "== Aturan 88: LinkView merender keputusan LinkReport, bukan menulisnya sendiri =="
+if [ ! -f "Tools/check-aturan88-sambungan-laporan.py" ]; then
+  echo "FAIL Tools/check-aturan88-sambungan-laporan.py tidak ada: Aturan 88"
+  echo "     tidak mengukur apa pun, dan kolom laporan bisa kembali ditulis"
+  echo "     di badan view tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  sambungan_laporan=$(python3 Tools/check-aturan88-sambungan-laporan.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$sambungan_laporan"
+    echo "-> LinkView wajib memanggil LinkReport.stateRows DAN"
+    echo "   LinkReport.calibrationRows, hasilnya dirender di dalam ForEach,"
+    echo "   dan tidak menulis kolom laporan sendiri. Perbaiki kodenya,"
+    echo "   jangan longgarkan aturannya."
+    status=1
+  else
+    echo "$sambungan_laporan"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
