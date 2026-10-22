@@ -1,3 +1,145 @@
+### Siklus (22 Okt 2026 — Aturan 95: animasi yang tidak pernah bergerak)
+
+Siklus ini berangkat dari satu pertanyaan yang lebih sempit dari siklus
+sebelumnya: bukan "apa yang hilang", melainkan **apa yang ditulis tapi tidak
+dikerjakan**. Bedanya penting — fitur yang hilang terlihat oleh mata saat app
+dibuka, sedangkan gerak yang tidak bergerak hanya terlihat saat dua layar
+dibandingkan berdampingan, dan tidak ada yang melakukannya.
+
+#### Temuan — dua ujung yang sama persis
+
+Kartu jam (`PointingView.swift`) dan panel iPhone (`DiagnosticsView.swift`)
+sama-sama memegang dua `@State` untuk pop saat kunci baru tiba:
+
+```
+@State private var appearScale: CGFloat = 1
+@State private var appearOpacity: Double = 1
+...
+withAnimation(.spring(...)) {
+    appearScale = MotionPolicy.LockArrival.peakScale
+    appearOpacity = 1          // <- nilai yang sama dengan keadaan awal
+}
+```
+
+`appearScale` bergerak (1 → 1,06 → 1). `appearOpacity` **tidak pernah
+berubah**: ia lahir `1` dan ditulis `1` lagi. Core Animation tidak punya
+perubahan untuk dianimasikan, jadi `.opacity(appearOpacity)` selalu 1 dan
+yang tersisa hanya pembesaran.
+
+Yang membuat ini lebih dari sekadar kosmetik: docstring di kedua view sudah
+menjanjikan "memudar + membesar" sejak lama. Dokumentasinya benar-benar
+menggambarkan perilaku yang tidak ada, dan itu bentuk kebohongan yang paling
+sulit dilihat karena tidak ada yang bertentangan di layar — hanya ada sesuatu
+yang kurang.
+
+#### Kenapa tidak ada satu pun gerbang yang melihatnya
+
+Diukur, bukan diduga:
+
+- **Aturan 7** memeriksa bahwa penjaga reduce-motion **ada**. Gerak yang tidak
+  menggerakkan apa pun tetap memenuhi syarat itu.
+- **`Tools/bukti-mutasi-gerak-angka.py`** memutasi `appearScale`
+  (0.90 / 0.30 / 1.60) dan `minimumInterval`. Kata `opacity` tidak muncul di
+  berkas itu sama sekali.
+- **`swift-ui-lint.sh`** tidak punya satu aturan pun yang membaca opasitas.
+  Sapuan `grep -n "opacity" swift-ui-lint.sh` di area aturan gerak: kosong.
+- **Compiler** diam: `appearOpacity = 1` sah secara tipe di kedua sisi.
+- **Teks di layar** tidak berubah, jadi tidak ada pemeriksaan teks yang bisa
+  melihatnya.
+
+Ini kelas cacat yang sudah berulang di repo ini, dan siklus ini memberinya
+nama: **nilai yang tidak pernah diperiksa adalah nilai yang boleh berarti apa
+saja.** Bedanya dengan `settledScale` hanya bahwa yang satu terlihat saat dua
+layar dibandingkan, dan yang satu tidak terlihat sama sekali.
+
+#### Perbaikan — kedua ujungnya pindah ke model
+
+Bukan `appearOpacity = 0.82` di view. Angka di view tidak bisa diuji di Linux,
+dan justru angka seperti itulah yang membuat cacat ini bertahan: tidak ada
+yang bisa membuktikan `0.82` berbeda dari `1` tanpa membuka simulator.
+
+`MotionPolicy.LockArrival` sekarang memegang kedua ujungnya:
+
+- `peakOpacity = 0.82` — opasitas puncak pop
+- `settledOpacity = 1` — opasitas diam, wajib tepat 1
+- `popMovesOpacity` — ringkasan, dihitung dari keduanya
+
+Urutannya juga pindah ke model: animasi mencapai puncak **lalu** kembali
+tenang. Puncak-sesudah-tenang membuat pegas kedua menimpa yang pertama, dan
+hasil akhir kartu bergantung pada urutan internal SwiftUI alih-alih pada nilai
+yang tertulis.
+
+Empat uji baru (`LockArrivalMotionTests`):
+
+1. `testPopActuallyMovesOpacity` — kedua ujung berbeda.
+2. `testSettledOpacityIsExactlyOne` — kartu yang tenang pekat penuh; nilai
+   akhir selain 1 meninggalkan kartu yang pernah terkunci lebih pudar daripada
+   kartu yang tidak pernah.
+3. `testPeakOpacityIsAValidOpacity` — di dalam 0…1. Nilai di atas 1 dijepit
+   diam-diam oleh Core Animation, jadi ia akan "bekerja" sambil berarti
+   sesuatu yang lain.
+4. `testPopMovesOpacityAgreesWithTheNumbers` — ringkasannya sepakat dengan
+   angkanya sendiri, supaya penanda tidak bisa berbohong sendirian.
+
+#### Gerbang baru: Aturan 95
+
+`Tools/check-aturan95-pop-opasitas.py`, dipanggil dari `swift-ui-lint.sh`.
+Empat pemeriksaan per app (jam + iPhone):
+
+1. Nilai diam opasitas datang dari model, **bukan literal `1`**. Literal `1`
+   adalah bentuk asli cacat ini, dan bentuk yang paling mungkin ditulis ulang
+   orang yang menyalin baris tetangganya (`appearScale: CGFloat = 1`).
+2. Animasi mencapai `peakOpacity`.
+3. Animasi kembali ke `settledOpacity`.
+4. Puncak **mendahului** keadaan tenang.
+
+Nol temuan = GAGAL. Kalau nama `appearOpacity` hilang dari salah satu berkas,
+aturan ini berhenti mengukur — dan aturan yang berhenti mengukur tanpa berbunyi
+lebih berbahaya daripada tidak ada aturan.
+
+#### Dua kesalahan di versi pertama checker ini, keduanya ditemukan dengan mengujinya
+
+1. **Prosa docstring terbaca sebagai kode.** Pola `appearOpacity\s*=\s*([^\n]+)`
+   mencocokkan kalimat komentar yang berbunyi "menulis `appearOpacity = 1`",
+   lalu melaporkan penetapan yang tidak ada. Perbaikannya: komentar `//`
+   dibuang sebelum dipindai. Aturan yang berbunyi untuk hal benar akan
+   dimatikan orang, dan aturan yang dimatikan tidak menjaga apa pun.
+2. **Pemeriksaan keempat awalnya salah arah.** Versi pertama menuntut "tidak
+   ada penetapan balik ke nilai diam", padahal kembali ke `settledOpacity`
+   adalah tahap kedua yang benar. Yang seharusnya diukur adalah **urutan**,
+   bukan ketiadaan.
+
+#### Diuji non-vakum, bukan diasumsikan
+
+Dua mutasi pada pohon yang seharusnya hijau:
+
+| Mutasi | Pemeriksaan yang memerah |
+| --- | --- |
+| `appearOpacity: Double = 1` (cacat asli) | 1 dari 8 |
+| kedua ujung `settledOpacity` (gerak mati) | 3 dari 8 |
+
+Keduanya merah, dan pemulihannya hijau. Aturan 95 juga menuntut hitungan di
+README ikut benar — dan itu menangkap dua angka yang sudah basi: hitungan uji
+(1079 → 1083) dan hitungan aturan (93 → 94; nomornya sampai 95 karena
+Aturan 69 tinggal di `Tools/`, bukan di `swift-ui-lint.sh`).
+
+#### Yang TIDAK diklaim
+
+- **Tidak ada verifikasi visual.** Ini VPS Linux tanpa Xcode. Yang dibuktikan
+  adalah kedua ujung animasi berbeda dan berurutan di sumbernya, bukan bahwa
+  0,82 terasa enak di layar jam. Angka itu dipilih supaya terlihat, bukan
+  supaya terukur.
+- **Tidak ada pembuktian bahwa SwiftUI menganimasikannya.** Itu di luar
+  jangkauan Linux; yang dijaga adalah bahwa nilai yang diberikan ke
+  `withAnimation` memang berubah.
+- **`appearScale` tidak disentuh.** Ia sudah benar dan sudah diuji harness
+  mutasi; mengubahnya akan menguji hal lain.
+
+PointingKit **1079 → 1083 uji**, semuanya hijau. Engine 222 tetap hijau.
+Gerbang UI **94 aturan** hijau, typecheck hijau.
+
+---
+
 ### Siklus (22 Okt 2026 — Aturan 94: sesi audio yang tidak pernah dilepas)
 
 Siklus ini berangkat dari pertanyaan yang berbeda dari Aturan 92: bukan
