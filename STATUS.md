@@ -1,3 +1,90 @@
+### Siklus (22 Okt 2026 — ikon app: permukaan pertama, dan yang paling tak terjaga)
+
+Sampai siklus ini **tidak ada satu pun gerbang yang membuka
+`AppIcon-1024.png`**. `swift-ui-lint.sh` (99 aturan) membaca *teks* Swift,
+`check-visuals.py` membaca render *objek*, dan ikon app — satu-satunya
+permukaan yang dilihat pengguna **sebelum** app dibuka — tidak pernah dibaca
+siapa pun.
+
+#### Temuan — ikon yang dikirim adalah starfield acak tanpa subjek
+
+`Tools/make_app_icons.py` menggambar 120 bintang lalu selesai. Diukur pada
+PNG 1024 px yang benar-benar terkirim (`HEAD:.../AppIcon-1024.png`):
+
+    massa terang di dalam 0.35 R   0.108    ← praktis tidak ada subjek
+    piksel terang di luar topeng   0.220    ← 22% hilang di watchOS
+
+Angka kedua yang paling merugikan. watchOS memotong app icon menjadi
+**lingkaran**; 22% massa terang berada di luar lingkaran itu, jadi jam
+menampilkan sisa yang lebih redup daripada yang terlihat di katalog. Cacatnya
+tidak terlihat sebagai cacat — ia terlihat sebagai "ikonnya agak kusam".
+
+#### Perbaikan — Saturnus dengan cincin, dan bayangan yang dihitung
+
+Ikon sekarang satu subjek: Saturnus, cincin, latar malam. Digambar
+prosedural (tanpa aset eksternal), dan **hasilnya byte-identik** dengan yang
+ada di katalog — dibuktikan dengan me-render ulang dan membandingkan md5,
+bukan dengan membaca kode.
+
+Bayangan planet pada cincin dihitung lewat **perpotongan berkas–bidang**,
+bukan digeser di ruang layar. Versi pertama saya menggeser titik uji ke arah
+berlawanan cahaya, dan vision model melaporkan bayangannya "di sisi yang
+salah" — dua kali, dengan jawaban yang saling bertentangan. Pengukuran
+membuktikan keduanya salah: dengan bidang cincin lewat pusat planet, **tidak
+ada** bayangan cincin yang bisa jatuh di piringan terang pada sudut matahari
+ini, dan yang benar-benar terlihat adalah bayangan **planet pada cincin**
+(terukur 44.2 vs 92.3 luminance). Geometri yang benar bukan yang paling
+banyak komentar, melainkan yang lolos pengukuran.
+
+#### Gerbang — tiga pertanyaan, satu fungsi
+
+`check_app_icon_has_a_focal_mark` menanyakan: ada subjek? selamat dari
+topeng? berasal dari generator?
+
+    OK  ikon app punya subjek terpusat          0.438 (ambang 0.30)
+    OK  ikon app selamat dari topeng watchOS    0.003 (ambang 0.02)
+    OK  ikon app adalah keluaran generator      md5 render ulang == katalog
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-ikon-app.py`, 4 keadaan, 0 tidak
+sesuai; mengganti isi berkas ikon sungguhan lalu memulihkannya byte-per-byte):
+
+    OK  [baseline] ikon yang dikirim                              hijau
+    OK  1. ikon starfield lama (dari riwayat)                     merah
+    OK  2. subjek digeser ke pojok kanan-bawah                    merah
+    OK  3. ikon benar tetapi bukan keluaran generator             merah
+
+Keadaan 3 sengaja dibuat supaya **hanya** pemeriksaan reproduktibilitas yang
+merah: subjeknya tetap terpusat, massa terangnya tetap 0.438. Itu membuktikan
+ketiga pemeriksaan mengukur hal yang berbeda, bukan tiga salinan satu ukuran.
+
+#### Tiga cacat di harness-nya sendiri, ditemukan saat dijalankan
+
+Bentuknya berulang dan layak dicatat:
+
+1. **Keadaan 2 menyimpan PNG RGB**, sementara `decode_png` hanya menerima
+   RGBA8. Gerbangnya melempar, keadaannya terbaca `None`, dan harness
+   melaporkan "kelemahan bukti" untuk alasan yang salah.
+2. **Bahan uji diambil dari `HEAD~1`.** Setelah perbaikan di-commit, `HEAD~1`
+   *adalah* ikon baru — jadi keadaan 1 mengukur ikon yang sama dengan
+   baseline dan melaporkan "diharapkan merah, terukur hijau". Gejalanya
+   menyesatkan: tampak seperti gerbangnya longgar, padahal bahan ujinya yang
+   salah. Sekarang yang dicari adalah **versi sebelumnya yang isinya berbeda**,
+   bukan commit ke-N. Dan bukan "yang massa terangnya rendah" — itu memilih
+   bahan uji memakai metrik yang sedang diuji, jadi keadaannya lolos secara
+   lingkar.
+3. **Keadaan 2 memakai Pillow**, yang tidak dipasang di CI. Di CI ia akan
+   **dilewati** — tepat di tempat bukti itu dibutuhkan — dan harness tetap
+   melaporkan "semuanya sesuai harapan" atas dua keadaan saja. Sekarang
+   pergeseran piksel ditulis dengan `bytes` dan pembungkus PNG repo sendiri.
+
+**Yang TIDAK diklaim.** Gerbang ini menjaga **adanya subjek, keselamatannya
+dari topeng, dan asal-usulnya dari generator** — bukan keindahannya. Ikon yang
+jelek tetapi terpusat akan hijau di sini; komposisi dan warna tetap dinilai
+manusia. Ia juga tidak memeriksa ikon watchOS terpisah (kedua platform memakai
+berkas yang sama, dan itu memang disengaja: satu merek, satu ikon), tidak
+memeriksa `Contents.json` yang dihasilkan, dan tidak menjamin ikonnya sesuai
+pedoman HIG Apple di luar dua ukuran yang diukur.
+
 ### Siklus (22 Okt 2026 — Aturan 95: animasi yang tidak pernah bergerak)
 
 Siklus ini berangkat dari satu pertanyaan yang lebih sempit dari siklus
