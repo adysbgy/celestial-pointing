@@ -128,6 +128,30 @@ def write_bytes(path, data):
     mutasi_sumber.write_source(path, data)
 
 
+def decode_icon(data):
+    """(lebar, tinggi, baris RGBA) dari byte PNG — lewat dekoder repo sendiri.
+
+    Dipakai untuk membuat bahan uji keadaan 2 tanpa Pillow. `decode_png` di
+    `check-visuals.py` bekerja atas **jalur berkas** dan hanya menerima RGBA8;
+    itu justru yang diinginkan di sini, karena bahan uji jadi pasti berbentuk
+    sama dengan yang dibaca gerbang.
+    """
+    import importlib.util
+    import tempfile
+    spec = importlib.util.spec_from_file_location("cv_icon", CHECK)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"tidak bisa memuat {CHECK} sebagai modul")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as handle:
+        handle.write(data)
+        path = handle.name
+    try:
+        return module.decode_png(path)
+    finally:
+        os.unlink(path)
+
+
 def main():
     mutasi_sumber.require_clean_sources([CHECK])
     if not os.path.exists(ICON):
@@ -168,22 +192,30 @@ def main():
     # Keadaan: ikon yang subjeknya digeser keluar frame. Dibuat dari ikon yang
     # benar dengan memindahkan isinya ke tepi — meniru cacat "subjek di pojok"
     # yang lolos bila gerbang hanya memeriksa "ada piksel terang".
+    #
+    # **Kenapa tidak memakai PIL.** CI `engine-tests.yml` hanya memasang
+    # `python3`; Pillow tidak ada di sana, jadi keadaan ini akan **dilewati**
+    # di CI — yaitu tepat di tempat bukti itu dibutuhkan. Pergeseran piksel
+    # cukup ditulis dengan `bytes` dan pembungkus PNG yang sudah ada di
+    # `make_app_icons.py`, dan hasilnya deterministik.
     try:
-        from PIL import Image  # noqa: PLC0415
-        import io
-        base = Image.open(io.BytesIO(original_icon)).convert("RGBA")
-        w, h = base.size
-        shifted = Image.new("RGBA", (w, h), (10, 10, 15, 255))
-        shifted.paste(base, (int(w * 0.62), int(h * 0.62)))
-        buf = io.BytesIO()
-        # WAJIB RGBA: `decode_png` di check-visuals.py hanya menerima RGBA8.
-        # Menyimpan sebagai RGB membuat gerbangnya melempar "hanya RGBA8 yang
-        # didukung", dan keadaan ini terbaca `None` — bukan merah.
-        shifted.save(buf, format="PNG")
+        import make_app_icons  # noqa: PLC0415
+        width, height, rows = decode_icon(original_icon)
+        dx, dy = int(width * 0.62), int(height * 0.62)
+        blank = bytes((10, 10, 15, 255)) * width
+        shifted_rows = []
+        for y in range(height):
+            src = y - dy
+            if src < 0:
+                shifted_rows.append(blank)
+                continue
+            row = rows[src]
+            shifted_rows.append(bytes(dx * 4) + row[: (width - dx) * 4])
+        shifted_png = make_app_icons._png(width, height, b"".join(shifted_rows))
         states.append(("2. subjek digeser ke pojok kanan-bawah",
-                       buf.getvalue(), "merah", "subjek terpusat"))
+                       shifted_png, "merah", "subjek terpusat"))
     except Exception as exc:  # noqa: BLE001
-        print(f"CATATAN: PIL tidak tersedia ({exc}) — keadaan 2 DILEWATI.")
+        print(f"CATATAN: keadaan 2 DILEWATI ({type(exc).__name__}: {exc}).")
 
     try:
         for label, content, want, must_name in states:
