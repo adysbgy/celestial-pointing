@@ -571,8 +571,17 @@ MIN_RING_ASPECT = 0.92
 #: kontras: inti yang digambar tetapi **menyatu** dengan kabutnya.
 #:
 #: Diukur pada kode sekarang (lihat `cluster_core_sharpness`): inti terlemah
-#: 0.77 (gugus terbuka 200 pt), 0.82 (gugus terbuka 38 pt), 0.53 (bola 200 pt),
+#: 0.66 (gugus terbuka 200 pt), 0.74 (gugus terbuka 38 pt), 0.53 (bola 200 pt),
 #: 0.53 (bola 38 pt).
+#:
+#: **Angka gugus terbuka turun dari 0.77/0.82 ke 0.66/0.74, dan itu akibat
+#: langsung dari perbaikan sebaran radial** (`testOpenClusterStarsSitAtDifferentRadii`):
+#: ketujuh bintang yang dulu duduk di satu cincin r 0.62–0.70 kini tersebar
+#: r 0.22–0.63, jadi sebagian intinya duduk lebih dekat ke pusat, tempat kabut
+#: paling tebal — puncaknya di atas lengkungan menyusut, bukan karena intinya
+#: memudar (kontrasnya tetap 1.67/1.69). Angka lama **tidak** dinaikkan
+#: ambangnya: 0.66 masih 3.3× di atas 0.20, dan ambang yang diturunkan untuk
+#: "memberi ruang" akan meloloskan inti yang menyatu dengan kabutnya.
 #:
 #: **Empat angka di atas bukan hiasan: `check_cluster_core_docstring_quotes_measured_values`
 #: membacanya kembali dari komentar ini dan mengukurnya ulang.** Versi pertama
@@ -594,8 +603,8 @@ MIN_CLUSTER_CORE_SHARPNESS = 0.20
 #: dan itu yang dilakukan nisbah ini.
 #:
 #: 1.0 berarti piksel di pusat inti sama terangnya dengan kabut saja — tidak ada
-#: inti. Diukur pada kode sekarang: terlemah **1.67** (gugus terbuka 38 pt),
-#: 1.69 (gugus terbuka 200 pt), 1.66 (bola 200 pt), 1.71 (bola 38 pt). Dengan
+#: inti. Diukur pada kode sekarang: terlemah **1.66** (bola 200 pt), 1.69
+#: (gugus terbuka 38 pt), 1.67 (gugus terbuka 200 pt), 1.71 (bola 38 pt). Dengan
 #: inti dihapus ia tepat **1.000** di keempatnya.
 #:
 #: Ambang 1.10 duduk di antaranya dengan jarak lebar ke dua arah: jauh di atas

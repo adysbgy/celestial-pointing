@@ -476,6 +476,19 @@ jobs:
       - name: Buktikan gerbang inti bintang gugus berbunyi
         run: python3 Tools/bukti-mutasi-inti-gugus.py
 
+      # Dan bukti untuk gerbang **sebaran radial gugus terbuka** — pembeda
+      # satu-satunya antara gugus terbuka dan nebula planetari. Sampai siklus
+      # ini keduanya duduk pada satu radius; yang membedakan hanya *radius
+      # mana*, dan di kartu 38 pt keduanya terbaca sebagai cincin bintang
+      # tersusun rapi. Tiga uji yang sudah ada hijau di atas cincin itu.
+      #
+      # Harness ini menjalankan suite **empat kali** (`./swift-test.sh`), jadi
+      # ia satu langkah yang paling lama di blok gerbang gambar. Itu harga
+      # yang dibayar sadar: uji yang hijau pada hari ia ditulis tidak
+      # membuktikan apa pun tanpa keadaan yang membuatnya merah.
+      - name: Buktikan gerbang sebaran radial gugus terbuka berbunyi
+        run: python3 Tools/bukti-mutasi-sebaran-gugus.py
+
       # Dan bukti untuk **M27 sebagai cangkang yang dipetkan**, bukan cangkang
       # bulat: siluet yang memipih, lubang yang tetap terbuka, dan — yang baru
       # dan paling mudah hilang — **model yang berhenti memetkan sementara port

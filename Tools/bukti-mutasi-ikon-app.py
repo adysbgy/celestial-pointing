@@ -56,6 +56,25 @@ ICON_REL = ("Apps/PointAndKnowiOS/Resources/Assets.xcassets/"
 ICON = os.path.join(ROOT, ICON_REL)
 GATE = "check_app_icon_has_a_focal_mark"
 
+#: Kenapa gerbang jangkar tidak bisa memeriksa keadaan berkas ini secara statis.
+#: Berkas ini tidak punya tabel `STATES` dalam bentuk teks tetap: daftar
+#: keadaannya dirakit **saat jalan** dari isi berkas ikon yang dikirim dan dari
+#: riwayat git (`previous_icon_from_history` mencari PNG pertama yang isinya
+#: berbeda dari sekarang, sampai 11 commit ke belakang). Jangkar yang benar
+#: untuk keadaan 1 karenanya baru diketahui setelah git dibaca — dan keadaan 2/3
+#: adalah byte PNG yang dihitung dari ikon itu. Tidak ada pasangan
+#: (jangkar, pengganti) berbentuk teks yang bisa dibaca gerbang.
+#:
+#: **Kenapa tidak diakali dengan menulis jangkar palsu.** Jangkar yang tidak
+#: pernah dipakai mutasi membuat gerbang jangkar hijau atas teks yang tidak
+#: mengukur apa pun — persis kelas cacat yang `check-jangkar-harness.py` ada
+#: untuk menutup. Deklarasi ini tercetak setiap kali gerbang jalan, jadi
+#: alasannya bisa dibantah di tinjauan.
+JANGKAR_KECUALI = (
+    "keadaan dirakit saat jalan: ikon lama dicari di riwayat git sampai 11 "
+    "commit, dan keadaan 2/3 adalah byte PNG yang dihitung dari ikon itu, "
+    "jadi pasangan (jangkar, pengganti) tidak ada sebagai teks tetap")
+
 #: Dijalankan di proses baru: impor ulang `check-visuals` dari disk.
 PROBE = r"""
 import importlib.util, sys

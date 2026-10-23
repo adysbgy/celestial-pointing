@@ -1867,6 +1867,68 @@ final class CelestialVisualTests: XCTestCase {
         }
     }
 
+    /// **Gugus terbuka harus tersebar pada radius yang BERBEDA-BEDA.**
+    ///
+    /// Ini bukan sifat kosmetik, melainkan satu-satunya pembeda yang
+    /// didokumentasikan model ini sendiri. Docstring `.planetaryNebula` di
+    /// `CelestialVisual.deepSky` menulis: *"Yang membedakannya dari
+    /// `openCluster` (yang juga tanpa inti) bukan ketiadaan pusat, melainkan
+    /// **keteraturannya**: semua blob duduk pada radius yang sama, karena
+    /// cangkangnya memang sebuah kulit bola. Gugus terbuka tersebar pada
+    /// radius yang berbeda-beda."* Dan docstring
+    /// `testPlanetaryNebulaShellSitsOnOneRadius` menulis hal yang sama dari
+    /// sisi sebaliknya.
+    ///
+    /// **Cacat yang ditutup uji ini: tata letak `openCluster` ternyata
+    /// MELANGGAR aturannya sendiri.** Ketujuh bintangnya duduk pada radius
+    /// 0.620…0.703 — sebaran **0.083 R**, yaitu sebuah cincin. Diukur pada
+    /// render 200 px: **96% cahaya** gugus terbuka jatuh di satu pita radial
+    /// (r 0.6–0.7), sementara nebula planetari menaruh 88% di r 0.4–0.5.
+    /// Keduanya sama-sama "satu radius"; yang membedakan hanya *radius mana*.
+    /// Di layar itu terbaca sebagai **cincin bintang yang tersusun rapi** —
+    /// bukan gugus terbuka, dan mudah tertukar dengan nebula cincin.
+    ///
+    /// **Kenapa tiga uji yang sudah ada tidak menangkapnya.** Semuanya
+    /// benar dan tetap benar pada tata letak cincin: `HasNoCentralCore`
+    /// mengukur tepi dalam (cincin juga berongga di tengah),
+    /// `testGlobularIsMoreConcentrated` hanya membandingkan rata-rata radius
+    /// (cincin 0.657 memang lebih besar dari gugus bola 0.302), dan
+    /// `testPlanetaryNebulaShellSitsOnOneRadius` hanya memeriksa
+    /// `.planetaryNebula` — tidak pernah menuntut sisi sebaliknya pada
+    /// `.openCluster`. Kelas cacatnya sama dengan yang berulang di repo ini:
+    /// aturannya ditulis di prosa, dan tidak ada satu pun pengukuran yang
+    /// menegakkannya.
+    ///
+    /// Ambangnya **0.25 R**. Nilai itu bukan pilihan rasa: ia harus di atas
+    /// sebaran cincin lama (0.083, dengan ruang 3× supaya tata letak cincin
+    /// yang sedikit lebih longgar tetap merah) dan di bawah sebaran tata
+    /// letak sekarang (0.488). Ambang yang lebih longgar dari 0.25 akan
+    /// meloloskan cincin yang hanya digoyang sedikit — perubahan yang tidak
+    /// terlihat di kartu 38 pt, dan justru itu hijau palsunya.
+    ///
+    /// **Yang TIDAK diklaim.** Uji ini tidak mengklaim susunan bintangnya
+    /// cocok dengan M7 atau M41 yang sebenarnya: katalog ini tidak menyimpan
+    /// posisi bintang anggota, jadi yang dijaga hanya bahwa bentuknya
+    /// **tersebar**, bukan bahwa letaknya akurat. Ia juga tidak mengukur
+    /// keterbacaan di ukuran kartu — itu tugas gerbang piksel.
+    func testOpenClusterStarsSitAtDifferentRadii() {
+        for fuzziness in [0.0, 0.5, 1.0] {
+            let geometry = VisualFrame.deepSky(morphology: .openCluster,
+                                               fuzziness: fuzziness)
+            // Jarak **pusat** blob, bukan tepi dalam: yang diuji di sini
+            // adalah sebaran letak, dan tepi dalam ikut bergerak saat blob
+            // membesar — ia akan mencampur dua sifat yang berbeda.
+            let radii = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }
+            guard let smallest = radii.min(), let largest = radii.max() else {
+                return XCTFail("gugus terbuka harus punya blob")
+            }
+            XCTAssertGreaterThan(largest - smallest, 0.25,
+                                 "gugus terbuka pada fuzziness \(fuzziness) duduk pada satu radius "
+                                 + "(sebaran \(largest - smallest)) — itu cincin, bukan gugus terbuka, "
+                                 + "dan tidak bisa dibedakan dari nebula planetari")
+        }
+    }
+
     /// Gugus terbuka harus **tersebar**: tidak ada inti di pusat.
     ///
     /// Ketiadaan pusat inilah yang membedakannya dari gugus bola, bukan

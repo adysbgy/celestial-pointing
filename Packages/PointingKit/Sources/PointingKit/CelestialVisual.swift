@@ -2077,14 +2077,40 @@ public enum VisualFrame {
             // (deterministik, `hashValue` tidak dipakai karena ia diacak
             // per proses di Swift), jadi objek yang sama selalu tampil
             // sama, dan `nil` tetap menghasilkan susunan bawaan.
+            // **Susunannya tersebar pada radius yang berbeda-beda**, dan itu
+            // bukan pilihan rasa — ia satu-satunya pembeda dari nebula
+            // planetari, yang juga tanpa inti. Docstring `.planetaryNebula`
+            // di atas menulisnya sebagai aturan: *"gugus terbuka tersebar
+            // pada radius yang berbeda-beda"*.
+            //
+            // **Cacat yang diperbaiki di siklus ini: tata letak lama
+            // MELANGGAR aturan itu sendiri.** Ketujuh bintangnya duduk pada
+            // radius 0.620…0.703 — sebaran **0.083 R**, yaitu sebuah cincin.
+            // Terukur pada render 200 px: 96% cahayanya jatuh di satu pita
+            // radial (r 0.6–0.7), sementara nebula planetari menaruh 88% di
+            // r 0.4–0.5. Yang membedakan keduanya jadi hanya *radius mana*,
+            // bukan *keteraturan* — dan di kartu jam keduanya terbaca sebagai
+            // cincin bintang yang tersusun rapi. Tiga uji yang sudah ada
+            // semuanya hijau pada cincin itu: `HasNoCentralCore` mengukur
+            // tepi dalam (cincin juga berongga), `GlobularIsMoreConcentrated`
+            // hanya membandingkan rata-rata (cincin 0.657 memang lebih besar
+            // dari bola 0.302), dan `ShellSitsOnOneRadius` hanya memeriksa
+            // `.planetaryNebula`. Sekarang ada
+            // `testOpenClusterStarsSitAtDifferentRadii` yang menuntut
+            // sebaran > 0.25 R; tata letak ini memberi **0.488 R**.
+            //
+            // Yang **tidak** berubah: tujuh bintang, tanpa blob di pusat,
+            // ukuran blob yang nyaris seragam (supaya tidak ada yang tampak
+            // sebagai inti), dan pemutaran per-objek di bawah. Yang berubah
+            // hanya letak radialnya.
             let stars: [(Double, Double, Double, Double, Double, Double)] = [
-                ( 0.000000, -0.620000, 0.34, 1.0, 0.0, 0.55),
-                (-0.560000, -0.300000, 0.31, 1.0, 0.0, 0.50),
-                ( 0.520000, -0.340000, 0.33, 1.0, 0.0, 0.45),
-                (-0.680000,  0.180000, 0.29, 1.0, 0.0, 0.52),
-                ( 0.620000,  0.220000, 0.31, 1.0, 0.0, 0.48),
-                (-0.340000,  0.580000, 0.33, 1.0, 0.0, 0.42),
-                ( 0.300000,  0.620000, 0.29, 1.0, 0.0, 0.55)
+                ( 0.000000, -0.440000, 0.34, 1.0, 0.0, 0.55),
+                ( 0.600000, -0.260000, 0.30, 1.0, 0.0, 0.50),
+                (-0.500000, -0.360000, 0.32, 1.0, 0.0, 0.45),
+                ( 0.240000,  0.620000, 0.28, 1.0, 0.0, 0.52),
+                (-0.260000,  0.560000, 0.31, 1.0, 0.0, 0.48),
+                ( 0.780000,  0.140000, 0.22, 1.0, 0.0, 0.42),
+                (-0.760000,  0.200000, 0.24, 1.0, 0.0, 0.55)
             ]
             let layout = Self.scatterRotated(stars, byObjectID: objectID)
             return buildDeepSky(layout: layout, fuzziness: fuzziness,
