@@ -967,8 +967,7 @@ jobs:
       - name: Buktikan gerbang keterbacaan bulan baru berbunyi
         run: python3 Tools/bukti-mutasi-piringan-bulan-baru.py
 
-      # Gerbang **skala magnitudo** (`check_magnitude_scale_matches_the_
-      # model`): juga nirsaksi, dan yang paling berbahaya dari yang tersisa.
+      # Gerbang **skala magnitudo** (`check_magnitude_scale_matches_the_model`): juga nirsaksi, dan yang paling berbahaya dari yang tersisa.
       # `relative_size` — hasil `sizeFromMagnitude` — dipakai untuk warna
       # mode malam **dan** geometri bintang, jadi skala yang menyimpang
       # mengubah kecerahan mode malam yang diukur `check_night_mode_purity`

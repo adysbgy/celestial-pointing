@@ -2674,8 +2674,7 @@ def _draw_moon(canvas, cx, cy, radius, kw, night_mode):
     # `CelestialVisualView.drawMoonCraters`. Maria memberi Bulan **tekstur**;
     # kawah memberinya **bentuk**. Cakram Bulan adalah proyeksi bola, jadi
     # kawah menyusut menuju tepi — `crater_foreshortening` (duplikat sadar dari
-    # `VisualFrame.craterForeshortening`, dijaga `check_moon_craters_match_the_
-    # model`). Dan tiap kawah digambar sebagai cekungan tiga lapisan, aturan
+    # `VisualFrame.craterForeshortening`, dijaga `check_moon_craters_match_the_model`). Dan tiap kawah digambar sebagai cekungan tiga lapisan, aturan
     # yang sama dengan `_draw_craters` Merkurius: cakram gelap rata terbaca
     # sebagai **stiker** pada 76 px, sedangkan sabit bibir yang menghadap
     # cahaya membuatnya terbaca cekung.

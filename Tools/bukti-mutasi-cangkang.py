@@ -180,8 +180,7 @@ CURRENT_WIDTH_OLD_SPACING = _with_width(OLD_LAYOUT, "0.26")
 # Enam belas titik @22.5° pada lebar sekarang — **tata letak yang benar-benar
 # dipakai kode sampai cangkangnya dirapatkan**. Inilah keadaan yang paling
 # penting di berkas ini: ia bukan karangan, ia versi yang pernah tampil di
-# layar, dan ia **lolos** uji geometri Swift (`testPlanetaryNebulaShellIs
-# ContinuousNotBeaded`) karena blobnya memang beririsan. Yang menangkapnya
+# layar, dan ia **lolos** uji geometri Swift (`testPlanetaryNebulaShellIsContinuousNotBeaded`) karena blobnya memang beririsan. Yang menangkapnya
 # hanya ukuran piksel — dan hanya setelah gerbangnya diukur pada fuzziness
 # **katalog M57 (0.40)**, bukan pada kasus rujukan (0.8). Kalau keadaan ini
 # hijau lagi, gerbangnya sudah mundur ke lubang yang sama.

@@ -17692,8 +17692,7 @@ def _split_citations():
     **Cacat yang ditutup pemeriksaan ini — ia memerahkan CI lebih dulu.**
     `CelestialVisual.swift:2822` menulis:
 
-        /// dilukis di bawahnya. Lihat `testSunCoronaOpacityReadsAsLightWithout
-        /// CoveringTheDisk`.
+        /// dilukis di bawahnya. Lihat `testSunCoronaOpacityReadsAsLightWithoutCoveringTheDisk`.
 
     `check_cited_test_names_exist` memindai `\\btest[A-Z][A-Za-z0-9_]*` per
     berkas, jadi ia berhenti di ujung baris dan membaca
@@ -17778,6 +17777,15 @@ def _split_citations():
             opened = line[line.rindex("`") + 1:].strip()
             closed = nxt[:nxt.index("`")].strip()
             if not opened or not closed:
+                continue
+            # Buang awalan komentar pada potongan kedua. Tanpa ini,
+            # `/// CoveringTheDisk` terbaca sebagai `/// CoveringTheDisk`,
+            # sambungannya tidak pernah cocok dengan nama apa pun, dan
+            # gerbangnya **hijau di semua keadaan yang seharusnya merah** —
+            # persis kegagalan yang harness mutasinya sendiri tangkap
+            # (keadaan 1–4 hijau, lalu diperbaiki di sini).
+            closed = re.sub(r"^(?://+|/\*+|\*+|#+|--+)\s*", "", closed)
+            if not closed:
                 continue
             # Spasi di salah satu potongan berarti kalimat, bukan satu token.
             if " " in opened or " " in closed:

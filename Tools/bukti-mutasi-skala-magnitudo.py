@@ -135,8 +135,7 @@ for r in results:
 STATES = [
     # Catatan: `expected` memakai **nama pemeriksaan per-check**, bukan nama
     # gerbang. Probe menulis tiap `results` dengan nama itu, jadi kehadirannya
-    # di keluaran *adalah* bukti bahwa gerbang `check_magnitude_scale_
-    # matches_the_model` benar-benar dijalankan dan mengisi results — gerbang
+    # di keluaran *adalah* bukti bahwa gerbang `check_magnitude_scale_matches_the_model` benar-benar dijalankan dan mengisi results — gerbang
     # kosong tidak akan pernah memenuhi keadaan apa pun.
     ("[baseline] berkas bersih", None,
      {BENTUK: HIJAU, BASE: HIJAU, COEFF: HIJAU, BRIGHTEST: HIJAU,

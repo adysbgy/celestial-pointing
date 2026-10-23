@@ -5,8 +5,7 @@ import Foundation
 /// **Kenapa keputusan ini ada di `PointingKit`, bukan di view.**
 /// `NightAwareContainer` di app jam memilih satu dari dua isi: layar penuh
 /// (`fullView`) atau versi hemat (`ReducedLuminanceView`). Pemilihan itu dulu
-/// ditulis sebagai `if isLuminanceReduced` di `Apps/PointAndKnowWatch/Sources/
-/// ReducedLuminanceView.swift` — berkas yang **tidak pernah dibangun**
+/// ditulis sebagai `if isLuminanceReduced` di `Apps/PointAndKnowWatch/Sources/ReducedLuminanceView.swift` — berkas yang **tidak pernah dibangun**
 /// `swift-test.sh` di Linux dan tidak dibaca badan satu pun dari 55 aturan UI.
 ///
 /// Diukur pada salinan utuh, proses baru, sebelum tipe ini ada: mengganti
