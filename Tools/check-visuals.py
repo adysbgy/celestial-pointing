@@ -15643,8 +15643,16 @@ def check_sun_corona_opacity_matches_the_model(results):
     # `_function_body` memotong pada kurawal penutup fungsi itu sendiri, jadi
     # literal di fungsi lain tidak ikut dituduh (kelas cacat yang sudah
     # dibayar `read_deep_sky_drawing_from_swift`).
-    body = _function_body(view_source, "private func drawSun(")
-    if not body:
+    #
+    # Badannya lalu dijalankan lewat `swift_code_only`. Itu bukan kerapian:
+    # versi pertama pemeriksaan bernama di bawah membaca badan **mentah**, dan
+    # harness menangkapnya merah di keadaan 5 — `drawSun` sendiri memuat
+    # komentar yang menyebut `VisualFrame.sunCoronaOpacity`, jadi memakai
+    # literal dengan angka yang masih benar tetap lolos. Komentar bukan kode,
+    # dan pemeriksaan yang bisa dipuaskan komentar mengukur niat, bukan
+    # perilaku. Kelas yang sama dengan yang `swift_code_only` sudah tutup.
+    body = swift_code_only(_function_body(view_source, "private func drawSun("))
+    if not body.strip():
         results.append(Result(
             "opasitas corona: badan drawSun terbaca dari view", False,
             "'private func drawSun(' TIDAK ditemukan di "
