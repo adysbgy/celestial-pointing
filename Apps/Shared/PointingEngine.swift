@@ -331,6 +331,12 @@ public final class PointingEngine: ObservableObject {
     /// Arah fase planet dalam (membesar/mengecil) hasil perhitungan terakhir.
     ///
     /// Sejajar dengan `planetPhases`, dan diisi dari sampel efemeris yang sama.
+    /// **"Sejajar" itu harus dijaga bentuknya, bukan cuma niatnya:** ketiganya
+    /// ditugaskan utuh dari variabel lokal di `refreshSkyContext`, sehingga
+    /// entri yang tidak terisi pada sampel kali ini ikut hilang. Menulisi kamus
+    /// ini per kunci (`planetWaxing[p] = w`) akan membuatnya menyimpan arah
+    /// dari sampel sebelumnya saat efemeris gagal sesaat — sabit dengan lebar
+    /// segar dan arah basi. Aturan 102 memerah bila itu terjadi.
     /// **Kenapa ia harus ada di sini, bukan diturunkan di `body`.** `isWaxing`
     /// menentukan **sisi piringan mana yang menyala** pada gambar dasar,
     /// sedangkan `planetBrightLimbAngles` menentukan **ke mana** gambar itu
