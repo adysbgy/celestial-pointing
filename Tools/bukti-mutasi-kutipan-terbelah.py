@@ -139,6 +139,16 @@ def _split(name):
     return "`" + name[:half] + "\n    /// " + name[half:] + "`"
 
 
+#: Jangkar di berkas ini **dirakit saat jalan**: nama uji, nama gerbang, dan
+#: jalur berkas dipotong oleh `_split` di tengahnya, jadi pasangan
+#: (jangkar, pengganti) tidak pernah ada sebagai teks tetap yang bisa dibaca
+#: statis. Potongannya sendiri yang menjadi subjek uji, jadi menuliskannya
+#: sebagai literal akan menghapus hal yang sedang dibuktikan.
+JANGKAR_KECUALI = (
+    "jangkar dirakit saat jalan oleh _split: nama utuh dipotong di tengahnya "
+    "supaya keadaan uji benar-benar membentuk kutipan terbelah, jadi pasangan "
+    "(jangkar, pengganti) tidak ada sebagai teks tetap di berkas ini")
+
 #: Teks potongan dibangun oleh `_split`, supaya nama aslinya tetap utuh di
 #: satu tempat dan tidak ada salinan yang bisa menyimpang.
 GERBANG_POTONG = _split(GERBANG_NAMA)

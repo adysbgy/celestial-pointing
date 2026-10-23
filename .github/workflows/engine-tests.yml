@@ -2567,6 +2567,22 @@ jobs:
       - name: Buktikan gerbang nama uji yang dikutip produksi berbunyi
         run: python3 Tools/bukti-mutasi-uji-menggantung.py
 
+      # Dan bentuk **kelima**: kutipan backtick yang dibuka di satu baris dan
+      # ditutup di baris berikutnya. Cacat aslinya memerahkan `main` (lihat
+      # `b40c0ca`), tetapi merahnya **kebetulan** benar: gerbang nama uji
+      # berbunyi hanya karena potongan pertama bukan nama uji. Bila potongan
+      # pertama kebetulan nama uji yang sah, gerbangnya hijau.
+      #
+      # Keadaan 4 di harness itu membangun tepat keadaan tersebut dari nama
+      # yang benar-benar ada (`testPermissivePolicyRejectsNothing` adalah
+      # awalan `testPermissivePolicyRejectsNothingForEveryKind`) dan menuntut
+      # **dua** harapan sekaligus: gerbang lama hijau, gerbang baru merah.
+      # Satu harapan saja tidak bisa membedakan "gerbangnya buta" dari
+      # "mutasinya tidak sah" — dan tiga kali dalam siklus ini yang salah
+      # memang alat ukurnya.
+      - name: Buktikan gerbang kutipan terbelah berbunyi
+        run: python3 Tools/bukti-mutasi-kutipan-terbelah.py
+
       # Dan bentuk **keempat**: bukan nama uji, bukan nama gerbang, melainkan
       # **berkas alat**. Empat kalimat di tiga berkas menunjuk
       # `Tools/ukur-gugus.py` sebagai sumber angka yang mereka kutip, dan
