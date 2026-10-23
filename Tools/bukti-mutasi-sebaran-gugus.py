@@ -69,7 +69,9 @@ TEST_FILE = "Packages/PointingKit/Tests/PointingKitTests/CelestialVisualTests.sw
 # Uji yang **wajib** berbunyi. Ditulis namanya, bukan hanya "ada kegagalan".
 NUTUP_UJI = "testOpenClusterStarsSitAtDifferentRadii"
 
-#: Tata letak sekarang (tujuh bintang, sebaran radial 0.488 R).
+#: Tata letak sekarang (tujuh bintang, sebaran radial 0.352 R — diukur dengan
+#: hypot ketujuh pasangan, bukan dikira; angka 0.488 yang sempat tertulis di
+#: prosa tidak pernah keluar dari tabelnya sendiri).
 SEKARANG = """            let stars: [(Double, Double, Double, Double, Double, Double)] = [
                 ( 0.000000, -0.440000, 0.34, 1.0, 0.0, 0.55),
                 ( 0.600000, -0.260000, 0.30, 1.0, 0.0, 0.50),

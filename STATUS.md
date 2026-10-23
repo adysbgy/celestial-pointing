@@ -1,3 +1,125 @@
+### Siklus (23 Okt 2026, lanjutan — angka 0.488 yang tidak pernah keluar dari tabelnya sendiri)
+
+Cacat ini ditemukan **setelah** gerbangnya hijau, saat memeriksa angka di
+prosa terhadap angka di kode — bukan saat mencari bug.
+
+Tata letak gugus terbuka yang baru menulis sebaran radialnya di dua docstring:
+`CelestialVisual.swift` ("tata letak ini memberi **0.488 R**") dan
+`CelestialVisualTests.swift` ("di bawah sebaran tata letak sekarang (0.488)").
+Tabel yang sama yang docstring itu jelaskan memberi **0.352 R**:
+
+    radius tiap bintang  0.440  0.616  0.617  0.654  0.665  0.786  0.792
+    sebaran              0.792 - 0.440 = 0.352
+
+Yang membuatnya berbahaya bukan selisih 39%, melainkan **arahnya**. Ambang
+ujinya 0.25 R. Dengan angka yang benar, ambang itu berjarak 1.4× dari nilai
+terukur — cukup ketat untuk menangkap cincin yang digoyang sedikit. Dengan
+angka 0.488, jaraknya tampak hampir 2×, dan gerbangnya tampak lebih longgar
+daripada kenyataannya. Angka yang membuat gerbang sendiri tampak aman adalah
+angka yang mencegah orang memeriksanya.
+
+**Kenapa tidak ada gerbang yang menangkapnya.** `check-visuals.py` mengukur
+*piksel*, `swift-ui-lint.sh` membaca *teks Swift*, dan uji PointingKit
+mengukur *geometri*. Tidak satu pun membandingkan prosa dengan angka yang
+prosa itu klaim. Kelas cacatnya sama dengan yang sudah berulang di repo ini:
+aturannya ditulis, dan tidak ada pengukuran yang menegakkannya.
+
+**Perbaikan.** Angka di ketiga tempat (dua docstring + komentar harness)
+dikoreksi ke 0.352, dan kelas cacatnya ditutup untuk angka ini oleh uji baru
+`testOpenClusterSpreadMatchesDocumentedValue` — sebaran dipatok ke 0.352
+(toleransi 0.001 untuk pembulatan tiga desimal), jadi mengubah tabel tanpa
+mengubah prosa, atau sebaliknya, jadi merah.
+
+**Dibuktikan non-vakum, dan bukti pertama saya salah.** Mutasi pertama
+menggeser satu bintang yang bukan nilai ekstrem (radius 0.786 → 0.565):
+sebarannya tetap 0.352, ujinya tetap hijau, dan itu **bukan** kelemahan uji —
+mutasinya yang tidak mengubah apa pun. Mutasi kedua menggeser nilai minimum
+(0.440 → 0.500, sebaran jadi 0.292) dan hasilnya persis yang diharapkan:
+
+    testOpenClusterSpreadMatchesDocumentedValue   MERAH  (0.292 ≠ 0.352)
+    testOpenClusterStarsSitAtDifferentRadii       hijau
+
+Uji ambang tetap hijau pada sebaran 0.292 — dan itu memang benar, karena
+0.292 masih di atas ambang 0.25. Dua uji itu mengukur hal berbeda: yang satu
+"apakah tersebar cukup", yang lain "apakah angkanya sama dengan yang
+diklaim". Kalau keduanya merah bersamaan pada mutasi ini, pin angkanya tidak
+akan menambah apa pun.
+
+**Yang TIDAK diklaim.** Pin ini hanya menjaga satu angka. Angka lain di prosa
+berkas itu (0.083 cincin lama, 0.302 gugus bola, 0.657 rata-rata cincin)
+tetap hanya dijaga oleh pembacaan manusia — 0.083 dan 0.302 sudah saya
+verifikasi ulang dengan `hypot` saat siklus ini, tetapi tidak ada gerbang
+yang akan menangkapnya kalau berubah.
+
+
+
+### Siklus (23 Okt 2026 — gugus terbuka: cincin bintang yang menyamar jadi gugus)
+
+Cacat terukur, bukan disangka. Ketujuh bintang `openCluster` duduk pada radius
+0.620...0.703 — sebaran 0.083 R, yaitu sebuah **cincin**. Docstring
+`.planetaryNebula` sendiri menulis bahwa pembeda gugus terbuka dari nebula
+planetari adalah **keteraturannya**: "semua blob duduk pada radius yang sama,
+karena cangkangnya memang sebuah kulit bola. Gugus terbuka tersebar pada
+radius yang berbeda-beda." Tata letaknya melanggar aturannya sendiri.
+
+Diukur pada render 200 px: 96% cahaya gugus terbuka jatuh di satu pita radial
+(r 0.6-0.7), sementara nebula planetari menaruh 88% di r 0.4-0.5. Yang
+membedakan keduanya jadi hanya *radius mana*, bukan *keteraturan* — dan di
+kartu jam 38 pt keduanya terbaca sebagai cincin bintang tersusun rapi.
+
+**Kenapa tiga uji yang sudah ada hijau di atas cincin itu.**
+`HasNoCentralCore` mengukur tepi dalam (cincin juga berongga),
+`GlobularIsMoreConcentrated` hanya membandingkan dua profil, dan
+`DeepSkyMorphologiesRenderDistinct` membandingkan pasangan yang berbeda
+radius. Tidak satu pun mengukur **sebaran radius di dalam satu morfologi** —
+celah yang bentuknya berulang: gerbang mengukur hal yang *berbeda antar*
+morfoogi, bukan hal yang *seharusnya sama* di dalamnya.
+
+**Perbaikan.** Tujuh bintang kini tersebar pada radius 0.28...0.70 dengan
+sudut yang tidak beraturan, dan inti tetap kosong (gugus terbuka memang
+berongga di tengah pada aperture kecil). Uji baru
+`testOpenClusterStarsSitAtDifferentRadii` menuntut sebaran radius minimum —
+bukan sekadar "tidak semua sama", karena satu bintang menyimpang sudah lolos
+ambang itu sementara cincinnya tetap terbaca.
+
+**Dua angka docstring yang ikut bergeser, dan itu diukur ulang bukan
+disesuaikan.** Gerbang `check_cluster_cores_reach_the_picture` mengutip
+ketajaman tepi inti: 0.77 (gugus terbuka 200 pt) dan 0.82 (38 pt) berubah
+jadi **0.66** dan **0.74** setelah bintang pindah keluar. Baseline di
+`803f8cc` membuktikan angka lama memang benar di HEAD sebelumnya — jadi yang
+salah bukan dokumennya, melainkan tata letak baru yang menurunkan ketajaman
+tepi, dan angkanya diperbarui apa adanya. Kontras ikut diukur ulang: terlemah
+**1.66** (bola 200 pt), 1.67 (gugus 200 pt), 1.69 (gugus 38 pt), 1.71 (bola
+38 pt); dengan inti dihapus tepat **1.000** di keempatnya.
+
+**Dibuktikan non-vakum** (`Tools/bukti-mutasi-sebaran-gugus.py`, 4 keadaan,
+0 tidak sesuai; menyunting `CelestialVisual.swift` sungguhan lalu
+memulihkannya byte-per-byte):
+
+    OK  [baseline] pohon apa adanya                         hijau
+    OK  1. tata letak cincin ASLI (r 0.62-0.70) kembali       merah, uji disebut namanya
+    OK  2. cincin sempit buatan (r 0.55-0.60)                 merah
+    OK  3. semua bintang menumpuk di pusat (r 0.00)           merah
+
+Keadaan 2 ada karena ambang "sebaran > 0" akan lolos oleh cincin sempit: tujuh
+bintang pada radius 0.55-0.60 masih punya sebaran bukan-nol, sementara
+bentuknya tetap cincin. Harness membuktikan ambangnya menuntut sebaran yang
+cukup, bukan sekadar sebaran yang ada. Keadaan 3 menguji arah sebaliknya —
+sebaran maksimum yang menghapus morfologinya.
+
+**Cacat yang ditemukan sambil jalan, di luar cakupan.** `main` sudah merah
+sejak siklus ikon (`33bbf04`): `Tools/bukti-mutasi-ikon-app.py` merakit tabel
+keadaannya saat run dari riwayat git, sehingga `check-jangkar-harness.py`
+tidak menemukan jangkar statis dan menuduhnya tanpa jangkar. Diperbaiki
+dengan deklarasi pengecualian statis di harness itu (bukan dengan melonggarkan
+gerbangnya), lalu dibuktikan: `check-jangkar-harness.py` hijau, dan
+`bukti-mutasi-jangkar-harness.py` tetap menangkap keadaan negatifnya sendiri.
+
+**Yang TIDAK diklaim.** Susunan ini tidak cocok dengan M7/M41 sebenarnya —
+katalog tidak menyimpan posisi bintang anggota, jadi yang dijaga adalah
+"tersebar", bukan "akurat". Keterbacaan di 38 pt tetap tugas gerbang piksel,
+bukan uji model.
+
 ### Siklus (22 Okt 2026 — ikon app: permukaan pertama, dan yang paling tak terjaga)
 
 Sampai siklus ini **tidak ada satu pun gerbang yang membuka

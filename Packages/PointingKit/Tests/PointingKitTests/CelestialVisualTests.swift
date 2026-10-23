@@ -1902,9 +1902,12 @@ final class CelestialVisualTests: XCTestCase {
     /// Ambangnya **0.25 R**. Nilai itu bukan pilihan rasa: ia harus di atas
     /// sebaran cincin lama (0.083, dengan ruang 3× supaya tata letak cincin
     /// yang sedikit lebih longgar tetap merah) dan di bawah sebaran tata
-    /// letak sekarang (0.488). Ambang yang lebih longgar dari 0.25 akan
-    /// meloloskan cincin yang hanya digoyang sedikit — perubahan yang tidak
-    /// terlihat di kartu 38 pt, dan justru itu hijau palsunya.
+    /// letak sekarang (**0.352**, diukur — bukan 0.488 seperti yang ditulis
+    /// versi pertama siklus ini; angka itu tidak pernah keluar dari tabelnya
+    /// sendiri, dan selisihnya 39% terlalu longgar ke arah yang membuat ambang
+    /// tampak aman). Ambang yang lebih longgar dari 0.25 akan meloloskan
+    /// cincin yang hanya digoyang sedikit — perubahan yang tidak terlihat di
+    /// kartu 38 pt, dan justru itu hijau palsunya.
     ///
     /// **Yang TIDAK diklaim.** Uji ini tidak mengklaim susunan bintangnya
     /// cocok dengan M7 atau M41 yang sebenarnya: katalog ini tidak menyimpan
@@ -1926,6 +1929,42 @@ final class CelestialVisualTests: XCTestCase {
                                  "gugus terbuka pada fuzziness \(fuzziness) duduk pada satu radius "
                                  + "(sebaran \(largest - smallest)) — itu cincin, bukan gugus terbuka, "
                                  + "dan tidak bisa dibedakan dari nebula planetari")
+        }
+    }
+
+    /// Sebaran radial gugus terbuka **sama dengan angka yang ditulis
+    /// docstring-nya**.
+    ///
+    /// **Kenapa uji ini ada.** Docstring tata letak di `CelestialVisual` dan
+    /// docstring uji di atas sama-sama menulis **0.488 R** sebagai sebaran
+    /// tata letak baru. Tabelnya sendiri memberi **0.352 R**. Tidak ada satu
+    /// pun gerbang yang membandingkan angka di prosa dengan angkanya di
+    /// kode — jadi angkanya bebas berbohong, dan ia berbohong ke arah yang
+    /// paling merugikan: 0.488 membuat ambang 0.25 tampak berjarak hampir 2×,
+    /// padahal jaraknya 1.4×. Angka yang membuat gerbang sendiri tampak lebih
+    /// longgar daripada kenyataannya adalah angka yang mencegah orang
+    /// memeriksa gerbangnya.
+    ///
+    /// Uji ini menutup kelas cacat itu untuk satu angka: sebarannya dipatok
+    /// ke nilai terukur (toleransi 0.001 supaya pembulatan tiga desimal di
+    /// prosa sah), sehingga mengubah tabel tanpa mengubah prosa — atau
+    /// sebaliknya — jadi merah.
+    ///
+    /// **Yang TIDAK diklaim.** Ia tidak memeriksa angka lain di prosa berkas
+    /// ini; hanya sebaran gugus terbuka. Angka lain tetap bergantung pada
+    /// gerbang piksel masing-masing atau pada pembacaan manusia.
+    func testOpenClusterSpreadMatchesDocumentedValue() {
+        for fuzziness in [0.0, 0.5, 1.0] {
+            let geometry = VisualFrame.deepSky(morphology: .openCluster,
+                                               fuzziness: fuzziness)
+            let radii = geometry.blobs.map { hypot($0.offsetX, $0.offsetY) }
+            guard let smallest = radii.min(), let largest = radii.max() else {
+                return XCTFail("gugus terbuka harus punya blob")
+            }
+            XCTAssertEqual(largest - smallest, 0.352, accuracy: 0.001,
+                           "docstring menyebut sebaran 0.352 R; terukur "
+                           + "\(largest - smallest). Perbarui prosa dan angka "
+                           + "ini bersama-sama, jangan salah satunya.")
         }
     }
 

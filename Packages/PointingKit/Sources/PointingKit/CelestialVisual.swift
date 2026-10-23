@@ -2097,7 +2097,19 @@ public enum VisualFrame {
             // dari bola 0.302), dan `ShellSitsOnOneRadius` hanya memeriksa
             // `.planetaryNebula`. Sekarang ada
             // `testOpenClusterStarsSitAtDifferentRadii` yang menuntut
-            // sebaran > 0.25 R; tata letak ini memberi **0.488 R**.
+            // sebaran > 0.25 R; tata letak ini memberi **0.352 R**
+            // (radius 0.440…0.792, diukur dari tabel di bawah — bukan dikira).
+            //
+            // **Angka di komentar ini sempat salah, dan itu jenis cacat yang
+            // sama dengan yang diperbaiki gerbang piksel.** Versi pertama
+            // siklus ini menulis **0.488 R** di sini dan di docstring uji.
+            // Tabel di bawah tidak pernah memberi angka itu: `hypot` ketujuh
+            // pasangan menghasilkan 0.440…0.792, yaitu 0.352. Yang membuatnya
+            // berbahaya bukan selisihnya, melainkan arahnya — 0.488 membuat
+            // ambang 0.25 tampak berjarak 2× dari nilai sebenarnya, padahal
+            // jaraknya hanya 1.4×. Sekarang angkanya dijaga
+            // `testOpenClusterSpreadMatchesDocumentedValue`, jadi ia tidak
+            // bisa berbohong lagi tanpa uji merah.
             //
             // Yang **tidak** berubah: tujuh bintang, tanpa blob di pusat,
             // ukuran blob yang nyaris seragam (supaya tidak ada yang tampak
