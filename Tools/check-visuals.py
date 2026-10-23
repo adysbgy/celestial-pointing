@@ -13758,18 +13758,67 @@ def check_star_colour_order(results, size=200, ss=2):
     Tabel B−V diuji di Linux, dan `starRGB` juga. Yang belum: apakah warna itu
     benar-benar jadi piksel, dan apakah urutannya masih terbaca setelah
     digambar di atas latar gelap.
+
+    **Celah yang ditutup (terukur, bukan dugaan).** Versi pertama gerbang ini
+    membandingkan `star-betelgeuse` dengan `star-rigel` apa adanya, yaitu
+    memakai magnitudo katalog masing-masing. Betelgeuse m 0.50, Rigel m 0.13 —
+    jadi Rigel **lebih besar**, dan `starCoreRGB` memutihkan inti sebanding
+    ukurannya. Piksel paling terang karenanya milik inti yang terputihkan, dan
+    urutan R−B yang terukur datang dari **ukuran**, bukan dari warna spektral.
+
+    Buktinya: `star_rgb` diratakan total (`warmth = 0.5`, tidak ada warna
+    spektral sama sekali) dan gerbangnya **tetap hijau** — R−B Betelgeuse 18
+    lawan Rigel 17. Gerbang yang hijau saat fitur yang dijaganya dihapus
+    seluruhnya tidak menjaga apa pun.
+
+    Perbaikannya dua bagian, dan keduanya perlu:
+
+      1. **Ukuran disamakan** (`relative_size=size_from_magnitude(0.0)` untuk
+         kedua bintang), jadi satu-satunya yang tersisa berbeda adalah warna.
+         Pola ini sudah dipakai kasus `star-*-uncertain`; gerbang warnanya
+         saja yang belum mengikutinya.
+      2. **Inti tidak diukur.** `starCoreRGB` sengaja memutihkan inti, jadi
+         inti memang bukan tempat warna spektral berada — glow-nya yang
+         bertinta. Yang diukur: piksel paling **bertinta** di cincin glow
+         (0.35–1.0 R), bukan piksel paling terang di seluruh frame.
     """
     for star, warmer_than in (("betelgeuse", "rigel"), ("betelgeuse", "sirius")):
-        _, (w, h, rows) = render_case(f"star-{star}", size=size, ss=ss)
-        a = brightest_pixel(rows, w, h, 0, 0, w, h)
-        _, (w2, h2, rows2) = render_case(f"star-{warmer_than}", size=size, ss=ss)
-        b = brightest_pixel(rows2, w2, h2, 0, 0, w2, h2)
-        # "Lebih merah" = selisih R−B lebih besar.
-        a_warmth = a[0][0] - a[0][2]
-        b_warmth = b[0][0] - b[0][2]
+        a_warmth = _star_glow_warmth(star, size=size, ss=ss)
+        b_warmth = _star_glow_warmth(warmer_than, size=size, ss=ss)
         results.append(Result(
             f"{star} lebih merah dari {warmer_than}", a_warmth > b_warmth,
-            f"R−B {star}={a_warmth}, {warmer_than}={b_warmth}"))
+            f"R−B glow {star}={a_warmth}, {warmer_than}={b_warmth}"))
+
+
+def _star_glow_warmth(star, size=200, ss=2):
+    """R−B terkuat di cincin glow, dengan ukuran bintang disamakan.
+
+    Ukuran disamakan **di sini**, bukan di katalog, karena gerbang ini soal
+    warna: `size_from_magnitude(0.0)` yang sama untuk kedua bintang membuat
+    pemutihan inti (`starCoreRGB`) identik di keduanya, sehingga selisih R−B
+    yang tersisa hanya bisa datang dari `star_rgb` — tabel B−V.
+    """
+    case = R.VisualCase(f"__warnna-{star}", "gerbang warna, ukuran disamakan",
+                        "star", color_index=R.STAR_COLOR_INDEX[star],
+                        relative_size=R.size_from_magnitude(0.0),
+                        is_confirmed=True)
+    _, (w, h, rows) = render_case_obj(case, f"__warnna-{star}", size=size, ss=ss)
+    cx, cy = w / 2.0, h / 2.0
+    radius = min(w, h) / 2.0
+    best, best_warmth = None, -10 ** 9
+    for y in range(h):
+        row = rows[y]
+        for x in range(w):
+            d = math.hypot(x + 0.5 - cx, y + 0.5 - cy) / radius
+            if not (0.35 <= d <= 1.0):
+                continue
+            p = row[x * 4:x * 4 + 3]
+            if sum(p) < 24:
+                continue
+            warmth = p[0] - p[2]
+            if warmth > best_warmth:
+                best_warmth, best = warmth, (p, x, y)
+    return best_warmth if best is not None else -10 ** 9
 
 
 def check_star_size_not_a_claim_when_uncertain(results, size=200, ss=2):

@@ -74,17 +74,50 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402
 LINT = os.path.join(ROOT, "swift-ui-lint.sh")
 TARGET = os.path.join("Apps", "Shared", "CelestialVisualView.swift")
 
 #: Jangkar: bentuk SAH yang dipakai pohon hari ini. Harus muncul **tepat
 #: sekali**; nol berarti berkasnya berubah dan harness tidak lagi mengukur
 #: cacat yang diklaimnya.
-ANCHOR = "for band in CelestialVisual.jupiterBands()"
-#: Mutasi: nama yang diurai tetapi tidak dipakai -- persis yang ada di
-#: `aaba2d4` dan yang memerahkan Apple Build.
-MUTASI = ("let bands = CelestialVisual.jupiterBands()\n"
-          "        for (index, band) in bands.enumerated()")
+#:
+#: Jangkar ini dua kali harus dipindah, dan sebabnya sama: ia menempel pada
+#: baris yang **memang dipakai** untuk membaca nama, sehingga setiap kali
+#: pembacaan itu ditulis ulang, harness berhenti di gerbangnya sendiri
+#: (`exit 2`) dan berhenti membuktikan apa pun — diam, bukan merah.
+#:
+#:   * `for band in CelestialVisual.jupiterBands()` — hilang sejak `d5bf654`.
+#:   * pembacaan tetangga pita `allBands[(index ± 1) …]` — **tidak bisa
+#:     dipakai**, karena loop pita berisi loop `edges` yang mengurai `index`
+#:     juga. Aturan 73 memindai seluruh badan loop luar, jadi `index` dari
+#:     loop dalam terbaca sebagai "dipakai" dan mutasinya hijau. Terukur:
+#:     badan loop pita dimutasi sampai `index` benar-benar mati, Aturan 73
+#:     tetap melaporkan "6 loop berpasangan, semua nama yang diurai dipakai".
+#:     Gerbangnya benar; jangkarnya yang salah tempat.
+#:
+#: Yang dipakai sekarang: loop maria di `drawMoonSurfaceShading`. Di sana
+#: `index` dibaca **tepat satu kali** dan tidak ada loop dalam yang menutupinya.
+ANCHOR = "let ripple = index < mariaRipple.count ? mariaRipple[index] : (0, 0)"
+
+#: Mutasi: `index` tetap diurai dari pasangan tetapi berhenti dibaca. Bentuk
+#: yang paling dekat dengan cacat aslinya (`aaba2d4`): kepala loop tidak
+#: berubah, hanya badannya yang berhenti memakai nama itu — dan itulah yang
+#: memerahkan Apple Build sebagai `immutable value 'index' was never used`.
+MUTASI = "let ripple = mariaRipple.first ?? (0, 0)"
+
+#: Mutasi keadaan `_`: pembuangan yang **sengaja**. `_` hanya sah kalau tidak
+#: ada yang membacanya, jadi namanya ikut hilang dari kepala loop.
+PEMBUANGAN = "let ripple = mariaRipple.first ?? (0, 0)"
+
+#: Jangkar kepala loop. Keadaan 1 dan keadaan 3 memakai badan yang sama
+#: persis; yang membedakan keduanya hanya apakah `index` masih diurai.
+#: Tanpa jangkar ini, "nama tak dipakai" tidak bisa dibedakan dari "nama
+#: tidak ada" — dan hanya yang pertama dilaporkan compiler.
+ANCHOR_KEPALA = "for (index, blob) in maria.enumerated() {"
+KEPALA_TETAP = ANCHOR_KEPALA
+KEPALA_BUANG = "for (_, blob) in maria.enumerated() {"
 
 #: Penanda aturan di naskah gerbang; tanpa ini Aturan 73 belum diterapkan.
 RULE_MARK = "Aturan 73: nama yang diurai dari sebuah pasangan wajib dipakai"
@@ -97,9 +130,7 @@ def commit_pengenal(penanda):
     (paling tua) adalah commit yang menambahkannya. `None` berarti penanda
     tidak pernah masuk riwayat -- non-vakuitas tidak bisa dibuktikan.
     """
-    proc = subprocess.run(
-        ["git", "log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"],
-        capture_output=True, text=True, cwd=ROOT)
+    proc = mutasi_sumber._git(["log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"])
     if proc.returncode != 0:
         return None
     baris = [b for b in proc.stdout.split() if b]
@@ -160,9 +191,11 @@ def main():
                 print(f"       {baris}")
         hasil.append(ok)
 
-        # Keadaan 1: nama diurai dari pasangan lalu tidak dipakai.
+        # Keadaan 1: nama diurai dari pasangan lalu tidak dipakai. Kepala loop
+        # **tetap** mengurai `index`; hanya badannya berhenti membacanya.
         with open(sasaran, "w", encoding="utf-8") as handle:
-            handle.write(isi.replace(ANCHOR, MUTASI))
+            handle.write(isi.replace(ANCHOR, MUTASI).replace(
+                ANCHOR_KEPALA, KEPALA_TETAP))
         keluar, out = jalankan_lint(kerja)
         menyebut = "index" in out
         ok = keluar != 0 and menyebut
@@ -176,10 +209,9 @@ def main():
         hasil.append(ok)
 
         # Keadaan 3: `_` sebagai pembuangan adalah bentuk sah, wajib hijau.
-        pembuangan = ("let bands = CelestialVisual.jupiterBands()\n"
-                      "        for (_, band) in bands.enumerated()")
         with open(sasaran, "w", encoding="utf-8") as handle:
-            handle.write(isi.replace(ANCHOR, pembuangan))
+            handle.write(isi.replace(ANCHOR, PEMBUANGAN).replace(
+                ANCHOR_KEPALA, KEPALA_BUANG))
         keluar, out = jalankan_lint(kerja)
         ok = keluar == 0
         print(f"{'OK  ' if ok else 'SALAH'} `_` pembuangan sah     -> "
@@ -197,9 +229,7 @@ def main():
         # HEAD. HEAD bergerak maju sesudah aturan mendarat; begitu ia memuat
         # aturan ini sendiri, "HEAD" berhenti berarti "sebelum aturan ini" dan
         # keadaan ini berbalik jadi lawannya tanpa satu baris pun diubah.
-        proc = subprocess.run(
-            ["git", "show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"],
-            capture_output=True, text=True, cwd=ROOT)
+        proc = mutasi_sumber._git(["show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"])
         if proc.returncode != 0 or not proc.stdout.strip():
             print("SALAH aturan pra-perbaikan tidak terbaca dari git -- "
                   "non-vakuitas tidak bisa dibuktikan.")
@@ -207,15 +237,35 @@ def main():
         else:
             with open(lama, "w", encoding="utf-8") as handle:
                 handle.write(proc.stdout)
-            keluar, out = jalankan_lint(kerja, "lint-lama.sh")
-            ok = keluar == 0
-            print(f"{'OK  ' if ok else 'SALAH'} aturan pra-perbaikan   -> "
-                  f"{'hijau' if ok else 'MERAH'} pada mutasi yang sama "
-                  "(harap hijau = dulu buta)")
-            if not ok:
-                for baris in out.strip().splitlines()[-8:]:
-                    print(f"       {baris}")
-            hasil.append(ok)
+            def jalankan_lama(teks_lint, _kerja=kerja, _lama=lama):
+                with open(_lama, "w", encoding="utf-8") as handle:
+                    handle.write(teks_lint)
+                return jalankan_lint(_kerja, "lint-lama.sh")
+
+            def terapkan(_sasaran=sasaran, _isi=isi):
+                # `False` bila jangkarnya hilang: mutasi yang tidak pernah terpasang
+                # membuat kedua pengukuran identik, dan itu hijau yang paling kosong.
+                baru = _isi.replace(ANCHOR, MUTASI)
+                if baru == _isi:
+                    return False
+                with open(_sasaran, "w", encoding="utf-8") as handle:
+                    handle.write(baru)
+                return True
+
+            def pulihkan(_sasaran=sasaran, _isi=isi):
+                with open(_sasaran, "w", encoding="utf-8") as handle:
+                    handle.write(_isi)
+
+            buta, sebelum, sesudah = mutasi_sumber.arah_kedua_buta_di_pohon_salinan(
+                jalankan_lama, proc.stdout, terapkan, pulihkan)
+            if buta is None:
+                print("SALAH aturan pra-perbaikan: jangkar mutasi tidak ditemukan")
+                hasil.append(False)
+            else:
+                print(f"{'OK  ' if buta else 'SALAH'} aturan pra-perbaikan   -> "
+                      f"merah {sorted(sebelum)} -> {sorted(sesudah)} "
+                      f"(harap sama = dulu buta)")
+                hasil.append(buta)
     finally:
         shutil.rmtree(kerja, ignore_errors=True)
 

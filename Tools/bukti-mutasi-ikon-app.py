@@ -124,22 +124,21 @@ def previous_icon_from_history(current):
     di sini adalah definisi yang tidak bergantung pada metrik — versi
     sebelumnya yang isinya berbeda.
 
-    `subprocess` langsung, bukan `mutasi_sumber._git`: helper itu memakai
+    `mutasi_sumber.git_show_bytes`, bukan `_git`: helper terakhir memakai
     `text=True`, dan PNG lewat jalur teks rusak atau melempar.
     """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for depth in range(1, 12):
         ref = f"HEAD~{depth}"
-        proc = subprocess.run(
-            ["git", "-c", f"safe.directory={root}", "show", f"{ref}:{ICON_REL}"],
-            capture_output=True, cwd=ROOT)
-        if proc.returncode != 0 or len(proc.stdout) < 100:
+        try:
+            data = mutasi_sumber.git_show_bytes(ref, ICON_REL)
+        except SystemExit:
+            continue          # ref ini tidak memuat ikon — coba yang lebih tua
+        if not data.startswith(b"\x89PNG"):
             continue
-        if not proc.stdout.startswith(b"\x89PNG"):
-            continue
-        if proc.stdout == current:
+        if data == current:
             continue          # commit yang tidak mengubah ikon
-        return ref, proc.stdout
+        return ref, data
     return None
 
 

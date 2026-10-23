@@ -89,7 +89,7 @@ IOS_PANEL = "Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift"
 WATCH_DETAIL = "Apps/PointAndKnowWatch/Sources/PointingView.swift"
 
 #: Komit terakhir sebelum Aturan 52 ada. Arah kedua membaca lint dari sini.
-PRA_ATURAN52 = "b514826"
+PRA_ATURAN52 = "b51482604f792f51d35372502090384f980775e0"
 
 #: Jangkar produksi. Wajib ada tepat sekali; kalau tidak, harness berhenti
 #: alih-alih melaporkan "sesuai harapan" atas nol mutasi.
@@ -254,6 +254,18 @@ def main():
                 # pemeriksa hitungannya, aturan lain tetap utuh.
                 buang_aturan_10(tree)
 
+            # Arah kedua: acuan diukur **sebelum** mutasi, atas pohon yang
+            # sama. Dulu arah kedua menuntut lint pra-perbaikan HIJAU secara
+            # mutlak; itu membusuk karena lint lama memeriksa seluruh `Apps/`,
+            # dan `Apps/` berubah sesudah revisi itu di-commit — setiap aturan
+            # baru yang lebih ketat memerahkan arah kedua tanpa ada cacat yang
+            # diuji. Yang benar: bandingkan **himpunan aturan yang memerah**
+            # sebelum dan sesudah mutasi. Kalau sama, gerbang lama memang buta
+            # pada cacat ini, dan itu berlaku berapa pun aturan usang yang
+            # sudah merah.
+            sebelum = (mutasi_sumber.aturan_yang_merah(run_lint(tree).stdout)
+                       if pra else set())
+
             rusak = apply_edits(tree, edits)
             if rusak:
                 print("%-60s JANGKAR HILANG: %s" % (nama, "; ".join(rusak)))
@@ -262,16 +274,27 @@ def main():
 
             hasil = run_lint(tree)
             merah = hasil.returncode != 0
-            sesuai = merah == harus_merah
-            print("%-60s %s (exit %d)" % (
-                nama,
-                "MERAH, sesuai harapan" if merah else "HIJAU, sesuai harapan",
-                hasil.returncode))
+            if pra:
+                sesudah = mutasi_sumber.aturan_yang_merah(hasil.stdout)
+                sesuai = sesudah == sebelum
+                print("%-60s %s (merah %s -> %s)" % (
+                    nama, "BUTA, sesuai harapan" if sesuai else "TIDAK BUTA",
+                    sorted(sebelum), sorted(sesudah)))
+            else:
+                sesuai = merah == harus_merah
+                print("%-60s %s (exit %d)" % (
+                    nama,
+                    "MERAH, sesuai harapan" if merah else "HIJAU, sesuai harapan",
+                    hasil.returncode))
             if not sesuai:
                 gagal.append(nama)
-                print("    diharapkan %s, dapat %s"
-                      % ("MERAH" if harus_merah else "HIJAU",
-                         "MERAH" if merah else "HIJAU"))
+                if pra:
+                    print("    gerbang lama berubah pikiran: %s -> %s"
+                          % (sorted(sebelum), sorted(sesudah)))
+                else:
+                    print("    diharapkan %s, dapat %s"
+                          % ("MERAH" if harus_merah else "HIJAU",
+                             "MERAH" if merah else "HIJAU"))
             if merah and harus_merah and not pra and nama in WAJIB_MENYALA:
                 if "Aturan 52" not in hasil.stdout:
                     gagal.append(nama)

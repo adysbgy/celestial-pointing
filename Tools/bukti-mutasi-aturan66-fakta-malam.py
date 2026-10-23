@@ -227,27 +227,35 @@ def _jalankan(program):
 
 
 def _jalankan_lint_lama(teks_lint):
-    """Jalankan lint pra-perbaikan **utuh** dan wajib HIJAU.
+    """Jalankan lint pra-perbaikan **utuh**, kembalikan (exit!=0, stdout).
 
-    `swift-ui-lint.sh` ditulis ulang dengan teks lama karena Aturan 10 membaca
-    berkas itu dari cakram, bukan yang sedang berjalan. `README.md` dikembalikan
-    ke hitungan lamanya karena Aturan 10 membandingkan angka yang mencetak
-    dengan README -- lint lama punya 65, dan README baru bilang 66.
+    Dipertahankan sebagai pembungkus tipis di atas
+    `mutasi_sumber.jalankan_lint`. Arah kedua tidak memotong blok dari lint
+    lama — revisi itu belum punya blok Aturan 66 sama sekali — jadi yang
+    dijalankan memang seluruh lint lama.
+
+    **Kenapa `swift-ui-lint.sh` dan `README.md` tidak lagi ditukar di sini.**
+    Dulu keduanya ditulis ulang: lint lama dibaca Aturan 10 **dari cakram**,
+    dan hitungan aturannya dibandingkan dengan angka di README (lint lama
+    punya 65, README baru bilang 66). Itu perlu karena syarat lama
+    adalah lint lama harus **HIJAU** secara mutlak, sehingga selisih hitungan
+    saja sudah memerahkannya.
+
+    Syarat itu sudah dibuang (lihat `mutasi_sumber.arah_kedua_buta`): yang
+    dibandingkan sekarang adalah **putusan** lint lama atas pohon bersih dan
+    atas pohon termutasi. Aturan 10 memerah pada **kedua** pengukuran dengan
+    angka yang sama, jadi ia tidak bisa menyamar sebagai "gerbang lama
+    menangkap cacat ini", dan penukaran README tidak lagi mengubah apa pun.
+    Menukarnya tetap dilakukan berarti menguji lint yang berbeda dari yang
+    benar-benar ada di revisi itu — persis jenis selisih yang membuat arah
+    kedua membusuk diam-diam.
+
+    **Yang TIDAK diklaim.** Pembungkus ini tidak membuktikan lint lama hijau
+    pada pohon hari ini; ia hanya menjalankannya. Kesimpulannya ada di
+    `arah_kedua_buta`, dan kesimpulan itu berbunyi "gerbang lama tidak
+    berubah pikiran", bukan "gerbang lama bersih".
     """
-    asli_readme = io.open(README, encoding="utf-8").read()
-    asli_lint = io.open(LINT, encoding="utf-8").read()
-    try:
-        mutasi_sumber.write_source(LINT, teks_lint)
-        io.open(README, "w", encoding="utf-8").write(asli_readme.replace(
-            f"**{JUMLAH_ATURAN_KINI} aturan**",
-            f"**{JUMLAH_ATURAN_LAMA} aturan**"))
-        hasil = subprocess.run(["bash", LINT], cwd=ROOT,
-                               capture_output=True, text=True, timeout=900)
-        return hasil.returncode != 0, hasil.stdout.strip()
-    finally:
-        mutasi_sumber.write_source(LINT, asli_lint)
-        io.open(README, "w", encoding="utf-8").write(asli_readme)
-
+    return mutasi_sumber.jalankan_lint(teks_lint, ROOT)
 
 def main():
     mutasi_sumber.require_clean_sources(list(BERKAS))
@@ -323,21 +331,28 @@ def main():
             if not ok:
                 print(f"       {detail[:500]}")
 
-        print("\n── arah kedua: lint pra-perbaikan (wajib HIJAU) ──")
+        print("\n── arah kedua: gerbang lama buta pada mutasi yang sama ──")
+        # Syaratnya bukan "lint lama HIJAU" (itu membusuk: lint lama memeriksa
+        # seluruh `Apps/`, dan `Apps/` berubah sesudah revisi itu di-commit).
+        # Yang diuji: apakah mutasi ini **mengubah putusan** gerbang lama.
+        # Himpunan aturan yang memerah dibandingkan sebelum dan sesudah.
         for label, mutasi, harap in STATES:
             if not harap:
                 continue
             if terapkan(mutasi) is None:
                 continue
-            menyala, detail = _jalankan_lint_lama(lint_lama)
-            if menyala is None:
-                print(f"PROBE GAGAL: {label}: {detail}")
+            buta, sebelum, sesudah = mutasi_sumber.arah_kedua_buta(
+                lint_lama, ROOT,
+                lambda: [mutasi_sumber.restore_verified(j, asli[j])
+                         for j in BERKAS],
+                lambda m=mutasi: terapkan(m) is not None)
+            if buta is None:
+                print(f"JANGKAR TIDAK DITEMUKAN: pra: {label}")
                 salah += 1
                 continue
-            ok = not menyala
-            salah += 0 if ok else 1
-            print(f"{'OK   ' if ok else 'SALAH'} pra: {label:32s} "
-                  f"{'MERAH' if menyala else 'hijau'}")
+            salah += 0 if buta else 1
+            print(f"{'OK   ' if buta else 'SALAH'} pra: {label:32s} "
+                  f"merah {sorted(sebelum)} -> {sorted(sesudah)}")
     finally:
         for jalur in BERKAS:
             mutasi_sumber.restore_verified(jalur, asli[jalur])

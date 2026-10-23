@@ -1,3 +1,87 @@
+### Siklus (23 Okt 2026, lanjutan — tiga gerbang yang hijau tanpa mengukur apa pun)
+
+Siklus ini tidak menambah fitur. Ia menutup tiga cacat yang semuanya berbentuk
+sama: **gerbang melaporkan hijau sementara yang dijaganya sudah tidak ada.**
+Ketiganya ditemukan dengan mengukur, bukan dengan membaca; dua di antaranya
+tidak akan pernah muncul di CI mana pun sebelum diperbaiki.
+
+**1. `check_star_colour_order` mengukur ukuran, bukan warna.**
+
+Gerbang ini membandingkan `star-betelgeuse` dengan `star-rigel` apa adanya —
+yaitu memakai magnitudo katalog masing-masing. Betelgeuse m 0.50, Rigel m 0.13,
+jadi Rigel **lebih besar**, dan `starCoreRGB` memutihkan inti sebanding
+ukurannya. Piksel paling terang karenanya milik inti yang terputihkan.
+
+Buktinya bukan dugaan: `star_rgb` diratakan total (`warmth = 0.5` — tidak ada
+warna spektral sama sekali di seluruh gambar) dan gerbangnya **tetap hijau**,
+R−B Betelgeuse 18 lawan Rigel 17. Gerbang yang hijau saat fitur yang dijaganya
+dihapus seluruhnya tidak menjaga apa pun.
+
+Perbaikannya dua bagian dan keduanya perlu: ukuran **disamakan**
+(`size_from_magnitude(0.0)` untuk kedua bintang, pola yang sudah dipakai kasus
+`star-*-uncertain`), dan yang diukur adalah piksel paling **bertinta** di
+cincin glow (0.35–1.0 R) — bukan piksel paling terang di seluruh frame, karena
+inti memang sengaja diputihkan. Terukur sekarang: Betelgeuse 29, Rigel −5,
+Sirius −5. Dengan warna diratakan, ketiganya jatuh ke 6/6/6 dan gerbangnya
+memerah.
+
+**2. Keadaan 1 harness warna bintang memutasi satu pemanggil, bukan sumbernya.**
+
+Nama keadaannya "warna spektral dibuang di **sumber**", tetapi jangkarnya
+`base = star_rgb(color_index)` — satu pemanggil di `_draw_star`.
+`star_core_rgb` punya pemanggil sendiri, jadi inti tetap berwarna dan gerbang
+"dua bintang berbeda tetap berbeda saat yakin" tetap hijau. Mutasinya sekarang
+di `warmth`, baris yang menerjemahkan B−V: diratakan berarti tidak ada warna
+spektral di mana pun. Keadaan 1 naik dari 2/3 menjadi 3/3 pemeriksaan merah.
+
+**3. `swift-test.sh` keluar 127 setelah suite hijau.**
+
+`jalankan_docker` **kembali** alih-alih keluar, jadi kendali jatuh tembus ke
+cabang "tidak ada Docker" di bawahnya:
+
+    1098 tests, with 0 failures
+    GAGAL: tidak ada Docker dan tidak ada `swift` di PATH.
+    EXIT=127
+
+Di mesin pengembang ini sekadar membingungkan. Bagi pemanggil yang membaca
+exit code — termasuk harness mutasi — ini **sama dengan suite merah**, dan
+pesannya menunjuk ke kode produksi padahal kodenya benar. Itu persis bentuk
+kegagalan yang docstring skrip itu sendiri sebut paling berbahaya, dan jalur
+kedua yang ditambahkan untuk memperbaikinya yang memperkenalkannya. CI tidak
+menangkapnya karena CI **tidak punya Docker**: cabang itu tidak pernah diambil
+di sana, jadi bug ini hanya hidup di mesin yang punya Docker.
+
+Ditutup `Tools/check-swift-test-berhenti.py`, yang mengganti `docker`/`sudo`
+dengan tiruan dan mengukur **alur kendali** saja: `exit 0` setelah jalur
+Docker, dan merah (127) kalau baris itu dibuang. Gerbang ini tidak menjalankan
+Swift dan tidak mengklaim suite hijau — itu tugas `swift-test.sh` dan CI.
+
+**Dua harness yang jangkarnya basi, diperbaiki dengan memindahkan jangkarnya.**
+
+`aturan73-pasangan` berhenti di gerbangnya sendiri (`exit 2`) sejak `d5bf654`
+menulis ulang loop pita. Percobaan pertama memakai loop pita lagi dan **tetap
+hijau pada mutasi yang benar** — sebabnya terukur: badan loop pita berisi loop
+`edges` yang mengurai `index` juga, jadi Aturan 73 yang memindai seluruh badan
+loop luar membaca `index` dari loop dalam sebagai "dipakai". Gerbangnya benar;
+jangkarnya yang salah tempat. Jangkar sekarang di loop maria
+(`drawMoonSurfaceShading`), tempat `index` dibaca tepat sekali tanpa loop
+dalam yang menutupinya. `aturan74-announcement` punya sebab lain: berkas
+kontrol-negatifnya ditulis sebelum Aturan 87 ada, jadi ia sendiri memerahkan
+lint — probe-nya yang diperbaiki, bukan aturannya.
+
+**Enam harness yang menuntut lint lama hijau.** Sisa pekerjaan
+`arah_kedua_buta` dari siklus sebelumnya: `aturan70`–`aturan75` sudah menerima
+perbaikan `cwd` tetapi belum perbaikan inti. Semuanya sekarang membandingkan
+**himpunan aturan merah** lint lama sebelum/sesudah mutasi, bukan menuntut
+`exit 0` dari lint yang sudah basi. Hasilnya `[32] -> [32]` di kelimanya —
+aturan 32 memang buta terhadap cacat itu, dan itu yang perlu dibuktikan.
+
+**Yang TIDAK diklaim.** Siklus ini tidak memperbaiki satu pun tampilan.
+Tidak ada perubahan pada `Apps/`. Ketiga cacat di atas adalah cacat
+**pengukuran**: gambar yang tampil di jam tidak berubah oleh perbaikan ini.
+Yang berubah adalah kepercayaan pada gerbangnya — dan itu prasyarat untuk
+setiap klaim visual berikutnya.
+
 ### Siklus (23 Okt 2026, lanjutan — angka 0.488 yang tidak pernah keluar dari tabelnya sendiri)
 
 Cacat ini ditemukan **setelah** gerbangnya hijau, saat memeriksa angka di

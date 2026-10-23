@@ -133,7 +133,22 @@ ARAH_KEDUA = [("2 lint lama: kartu jam isStale -> false",
                [(IPHONE, IPHONE_STALE, "isStale: false,", 1)])]
 
 #: Commit pra-perluasan: sebelum derivasi panel `struct` lahir.
-LINT_PRA = "HEAD"
+#:
+#: **Bukan `HEAD`.** Nilai itu adalah bug, dan bug-nya senyap: `HEAD` bergerak
+#: bersama setiap commit, jadi sesudah harness ini di-commit, "lint lama" yang
+#: dijalankan adalah lint **baru** — yang tentu saja melihat cacatnya, karena
+#: itulah yang baru saja ditambahkan. Arah kedua lalu memerah pada setiap
+#: keadaan, dan penyebabnya terbaca sebagai "lubangnya tidak nyata" padahal
+#: yang salah adalah acuannya. Terukur 23 Okt 2026: `d392f92` (induk dari
+#: `20b1d7b`, commit yang menambahkan harness ini) — Aturan 35 di sana hanya
+#: membaca `func` PointingKit, tanpa satu pun `struct`; jadi ia memang **buta**
+#: pada `ObjectDetailView`, dan itulah yang harus dibuktikan.
+#:
+#: SHA penuh, bukan singkat: `git show` menerima keduanya, tetapi SHA singkat
+#: bisa menjadi ambigu saat repo tumbuh, dan kegagalannya akan muncul sebagai
+#: "lint lama tidak terbaca" — terbaca seperti repo rusak, bukan seperti
+#: acuan yang usang.
+LINT_PRA = "d392f92fb2ba886315c30495d97deda21a793563"
 
 _originals = {}
 
@@ -316,9 +331,7 @@ def main():
         # 8. Arah kedua: lint pra-perluasan wajib HIJAU atas mutasi yang
         #    sama. Kalau lint lama sudah merah, keadaan 1 dan 3 tidak
         #    membuktikan lubang.
-        lama = subprocess.run(["git", "-C", ROOT, "show",
-                               f"{LINT_PRA}:swift-ui-lint.sh"],
-                              capture_output=True, text=True)
+        lama = mutasi_sumber._git(["show", f"{LINT_PRA}:swift-ui-lint.sh"])
         if lama.returncode != 0:
             print(f"{'SALAH'} {'8 arah kedua: lint lama tidak terbaca':42s}")
             unexpected += 1

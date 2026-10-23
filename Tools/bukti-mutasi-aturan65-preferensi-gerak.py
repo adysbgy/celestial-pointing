@@ -231,8 +231,7 @@ BERKAS = (POINTING, DIAGNOSTICS, ONBOARDING)
 
 
 def _baca_lint(rev):
-    hasil = subprocess.run(["git", "show", f"{rev}:swift-ui-lint.sh"],
-                           cwd=ROOT, capture_output=True, text=True)
+    hasil = mutasi_sumber._git(["show", f"{rev}:swift-ui-lint.sh"])
     return hasil.stdout if hasil.returncode == 0 else None
 
 
@@ -266,43 +265,35 @@ def _jalankan(program):
 
 
 def _jalankan_lint_lama(teks_lint):
-    """Jalankan lint pra-perbaikan **utuh**, dan wajib HIJAU.
+    """Jalankan lint pra-perbaikan **utuh**, kembalikan (exit!=0, stdout).
 
-    Arah kedua tidak bisa memotong blok dari lint lama: revisi itu belum punya
-    blok Aturan 65 sama sekali. Yang harus dibuktikan justru sebaliknya --
-    bahwa **seluruh** lint lama melaporkan LULUS atas mutasi yang sekarang
-    memerah.
+    Dipertahankan sebagai pembungkus tipis di atas
+    `mutasi_sumber.jalankan_lint`. Arah kedua tidak memotong blok dari lint
+    lama — revisi itu belum punya blok Aturan 65 sama sekali — jadi yang
+    dijalankan memang seluruh lint lama.
 
-    Dua hal harus ikut dikembalikan, dan keduanya ditemukan dengan menjalankan
-    arah kedua dan membacanya, bukan disangka:
+    **Kenapa `swift-ui-lint.sh` dan `README.md` tidak lagi ditukar di sini.**
+    Dulu keduanya ditulis ulang: lint lama dibaca Aturan 10 **dari cakram**,
+    dan hitungan aturannya dibandingkan dengan angka di README (lint lama
+    punya 64, README baru bilang 65). Itu perlu karena syarat lama
+    adalah lint lama harus **HIJAU** secara mutlak, sehingga selisih hitungan
+    saja sudah memerahkannya.
 
-      * `swift-ui-lint.sh` **itu sendiri** ditulis ulang dengan teks lama.
-        Salinan di berkas lain tidak cukup: Aturan 10 membaca
-        `swift-ui-lint.sh` dari cakram, bukan berkas yang sedang berjalan.
+    Syarat itu sudah dibuang (lihat `mutasi_sumber.arah_kedua_buta`): yang
+    dibandingkan sekarang adalah **putusan** lint lama atas pohon bersih dan
+    atas pohon termutasi. Aturan 10 memerah pada **kedua** pengukuran dengan
+    angka yang sama, jadi ia tidak bisa menyamar sebagai "gerbang lama
+    menangkap cacat ini", dan penukaran README tidak lagi mengubah apa pun.
+    Menukarnya tetap dilakukan berarti menguji lint yang berbeda dari yang
+    benar-benar ada di revisi itu — persis jenis selisih yang membuat arah
+    kedua membusuk diam-diam.
 
-      * `README.md` dikembalikan ke hitungan lamanya. Aturan 10 membandingkan
-        jumlah aturan yang mencetak dengan angka di README; lint lama punya 64
-        dan README baru bilang 65, sehingga arah kedua merah karena
-        **hitungan**, bukan karena cacat yang sedang diuji.
-
-    Keduanya dipulihkan lewat `mutasi_sumber`, yang memverifikasi isi setelah
-    menulis -- bukan `try/finally` yang percaya pada dirinya sendiri.
+    **Yang TIDAK diklaim.** Pembungkus ini tidak membuktikan lint lama hijau
+    pada pohon hari ini; ia hanya menjalankannya. Kesimpulannya ada di
+    `arah_kedua_buta`, dan kesimpulan itu berbunyi "gerbang lama tidak
+    berubah pikiran", bukan "gerbang lama bersih".
     """
-    readme = os.path.join(ROOT, "README.md")
-    asli_readme = io.open(readme, encoding="utf-8").read()
-    asli_lint = io.open(LINT, encoding="utf-8").read()
-    try:
-        mutasi_sumber.write_source(LINT, teks_lint)
-        io.open(readme, "w", encoding="utf-8").write(asli_readme.replace(
-            f"**{JUMLAH_ATURAN_KINI} aturan**",
-            f"**{JUMLAH_ATURAN_LAMA} aturan**"))
-        hasil = subprocess.run(["bash", LINT], cwd=ROOT,
-                               capture_output=True, text=True, timeout=900)
-        return hasil.returncode != 0, hasil.stdout.strip()
-    finally:
-        mutasi_sumber.write_source(LINT, asli_lint)
-        io.open(readme, "w", encoding="utf-8").write(asli_readme)
-
+    return mutasi_sumber.jalankan_lint(teks_lint, ROOT)
 
 def main():
     mutasi_sumber.require_clean_sources(list(BERKAS))
@@ -369,21 +360,27 @@ def main():
             if not ok:
                 print(f"       {detail[:400]}")
 
-        print("\n── arah kedua: lint pra-perbaikan (wajib HIJAU) ──")
+        print("\n── arah kedua: gerbang lama buta pada mutasi yang sama ──")
+        # Syaratnya bukan "lint lama HIJAU" (itu membusuk: lint lama memeriksa
+        # seluruh `Apps/`, dan `Apps/` berubah sesudah revisi itu di-commit).
+        # Yang diuji: apakah mutasi ini **mengubah putusan** gerbang lama.
+        # Himpunan aturan yang memerah dibandingkan sebelum dan sesudah.
         for label, mutasi, harap in STATES:
             if not harap:
                 continue
             if terapkan(mutasi) is None:
                 continue
-            menyala, detail = _jalankan_lint_lama(lint_lama)
-            if menyala is None:
-                print(f"PROBE GAGAL: {label}: {detail}")
+            buta, sebelum, sesudah = mutasi_sumber.arah_kedua_buta(
+                lint_lama, ROOT,
+                lambda: [mutasi_sumber.write_source(j, asli[j]) for j in BERKAS],
+                lambda m=mutasi: terapkan(m) is not None)
+            if buta is None:
+                print(f"JANGKAR TIDAK DITEMUKAN: pra: {label}")
                 salah += 1
                 continue
-            ok = not menyala
-            salah += 0 if ok else 1
-            print(f"{'OK   ' if ok else 'SALAH'} pra: {label:40s} "
-                  f"{'MERAH' if menyala else 'hijau'}")
+            salah += 0 if buta else 1
+            print(f"{'OK   ' if buta else 'SALAH'} pra: {label:40s} "
+                  f"merah {sorted(sebelum)} -> {sorted(sesudah)}")
     finally:
         for jalur in BERKAS:
             mutasi_sumber.write_source(jalur, asli[jalur])

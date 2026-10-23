@@ -117,8 +117,7 @@ STATES = [
 
 
 def _baca_lint(rev):
-    hasil = subprocess.run(["git", "show", f"{rev}:swift-ui-lint.sh"],
-                           cwd=ROOT, capture_output=True, text=True)
+    hasil = mutasi_sumber._git(["show", f"{rev}:swift-ui-lint.sh"])
     return hasil.stdout if hasil.returncode == 0 else None
 
 
@@ -147,26 +146,17 @@ def _jalankan(program):
 
 
 def _jalankan_lint_lama(teks_lint):
-    """Jalankan lint pra-perbaikan **utuh**, dari salinan sementara.
+    """Jalankan lint pra-perbaikan **utuh**, dan kembalikan keluarnya.
 
-    Arah kedua tidak bisa memakai `_program` di sini: revisi pra-perbaikan
-    belum punya blok Aturan 63 sama sekali, jadi tidak ada yang bisa dipotong.
-    Yang harus dibuktikan justru sebaliknya — bahwa **seluruh** lint lama
-    melaporkan LULUS atas mutasi yang sekarang memerah. Kalau ia sudah memerah
-    sendiri (karena mutasi menyentuh aturan lain), keadaan itu tidak
-    membuktikan apa pun tentang aturan baru ini.
+    Dipertahankan sebagai pembungkus tipis di atas
+    `mutasi_sumber.jalankan_lint`: arah kedua tidak bisa memakai `_program` di
+    sini, karena revisi pra-perbaikan belum punya blok Aturan 63 sama sekali,
+    jadi tidak ada yang bisa dipotong. Yang harus dibuktikan justru
+    sebaliknya — bahwa **seluruh** lint lama memberi putusan yang **sama**
+    atas mutasi yang sekarang memerah (lihat `arah_kedua_buta`; syaratnya
+    dulu "hijau", dan itu usang — lihat catatan di sana).
     """
-    salinan = os.path.join(ROOT, ".lint-pra-63.sh")
-    try:
-        with open(salinan, "w", encoding="utf-8") as berkas:
-            berkas.write(teks_lint)
-        os.chmod(salinan, 0o755)
-        hasil = subprocess.run(["bash", salinan], cwd=ROOT,
-                               capture_output=True, text=True, timeout=900)
-        return hasil.returncode != 0, hasil.stdout.strip()
-    finally:
-        if os.path.exists(salinan):
-            os.remove(salinan)
+    return mutasi_sumber.jalankan_lint(teks_lint, ROOT)
 
 
 def main():
@@ -220,28 +210,42 @@ def main():
             if not ok:
                 print(f"       {detail[:300]}")
 
-        print("\n── arah kedua: lint pra-perbaikan (wajib HIJAU) ──")
+        print("\n── arah kedua: gerbang lama buta pada mutasi yang sama ──")
+        # Kenapa bukan "lint lama wajib HIJAU": lint lama memeriksa seluruh
+        # `Apps/`, dan `Apps/` terus berubah sesudah lint itu di-commit. Syarat
+        # hijau mutlak berarti setiap aturan baru yang lebih ketat memerahkan
+        # arah kedua — bukan karena cacat yang diuji, melainkan karena repo
+        # maju. Terukur 23 Okt 2026: `4302081` keluar 1 pada pohon **bersih**
+        # (Aturan 32 versi lama tidak mengenali lencana yang sejak `cfb911f`
+        # digambar di `.overlay`), dan keluar 0 pada pohonnya sendiri.
+        #
+        # Yang diuji: apakah mutasi ini **mengubah putusan** gerbang lama.
+        # Himpunan aturan yang memerah dibandingkan sebelum dan sesudah.
         for label, mutasi, harap in STATES:
             if not harap:
                 continue
-            isi = asli
-            for cari, ganti in mutasi:
-                if cari not in isi:
-                    isi = None
-                    break
-                isi = isi.replace(cari, ganti, 1)
-            if isi is None:
-                continue
-            mutasi_sumber.write_source(VIEW, isi)
-            menyala, detail = _jalankan_lint_lama(lint_lama)
-            if menyala is None:
-                print(f"PROBE GAGAL: {label}: {detail}")
+
+            def terapkan(mutasi=mutasi):
+                isi = asli
+                for cari, ganti in mutasi:
+                    if cari not in isi:
+                        return False
+                    isi = isi.replace(cari, ganti, 1)
+                mutasi_sumber.write_source(VIEW, isi)
+                return True
+
+            def pulihkan():
+                mutasi_sumber.write_source(VIEW, asli)
+
+            buta, sebelum, sesudah = mutasi_sumber.arah_kedua_buta(
+                lint_lama, ROOT, pulihkan, terapkan)
+            if buta is None:
+                print(f"JANGKAR TIDAK DITEMUKAN: pra: {label}")
                 salah += 1
                 continue
-            ok = not menyala
-            salah += 0 if ok else 1
-            print(f"{'OK   ' if ok else 'SALAH'} pra: {label:40s} "
-                  f"{'MERAH' if menyala else 'hijau'}")
+            salah += 0 if buta else 1
+            print(f"{'OK   ' if buta else 'SALAH'} pra: {label:40s} "
+                  f"merah {sorted(sebelum)} -> {sorted(sesudah)}")
     finally:
         mutasi_sumber.write_source(VIEW, asli)
 

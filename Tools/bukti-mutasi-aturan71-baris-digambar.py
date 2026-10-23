@@ -49,6 +49,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402
 LINT = os.path.join(ROOT, "swift-ui-lint.sh")
 TARGET = os.path.join("Apps", "PointAndKnowiOS", "Sources", "DiagnosticsView.swift")
 
@@ -71,9 +73,7 @@ def commit_pengenal(penanda):
     (paling tua) adalah commit yang menambahkannya. `None` berarti penanda
     tidak pernah masuk riwayat -- non-vakuitas tidak bisa dibuktikan.
     """
-    proc = subprocess.run(
-        ["git", "log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"],
-        capture_output=True, text=True, cwd=ROOT)
+    proc = mutasi_sumber._git(["log", "--format=%H", "-S", penanda, "--", "swift-ui-lint.sh"])
     if proc.returncode != 0:
         return None
     baris = [b for b in proc.stdout.split() if b]
@@ -149,9 +149,7 @@ def main():
         # HEAD. HEAD bergerak maju sesudah aturan mendarat; begitu ia memuat
         # aturan ini sendiri, "HEAD" berhenti berarti "sebelum aturan ini" dan
         # keadaan ini berbalik jadi lawannya tanpa satu baris pun diubah.
-        proc = subprocess.run(
-            ["git", "show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"],
-            capture_output=True, text=True, cwd=ROOT)
+        proc = mutasi_sumber._git(["show", f"{commit_pengenal(RULE_MARK)}^:swift-ui-lint.sh"])
         if proc.returncode != 0 or not proc.stdout.strip():
             print("SALAH aturan pra-perbaikan tidak terbaca dari git -- "
                   "non-vakuitas tidak bisa dibuktikan.")
@@ -159,15 +157,35 @@ def main():
         else:
             with open(lama, "w", encoding="utf-8") as handle:
                 handle.write(proc.stdout)
-            keluar, out = jalankan_lint(kerja, "lint-lama.sh")
-            ok = keluar == 0
-            print(f"{'OK  ' if ok else 'SALAH'} aturan pra-perbaikan -> "
-                  f"{'hijau' if ok else 'MERAH'} pada mutasi yang sama "
-                  "(harap hijau = dulu buta)")
-            if not ok:
-                for baris in out.strip().splitlines()[-8:]:
-                    print(f"       {baris}")
-            hasil.append(ok)
+            def jalankan_lama(teks_lint, _kerja=kerja, _lama=lama):
+                with open(_lama, "w", encoding="utf-8") as handle:
+                    handle.write(teks_lint)
+                return jalankan_lint(_kerja, "lint-lama.sh")
+
+            def terapkan(_sasaran=sasaran, _isi=isi):
+                # `False` bila jangkarnya hilang: mutasi yang tidak pernah terpasang
+                # membuat kedua pengukuran identik, dan itu hijau yang paling kosong.
+                baru = _isi.replace(ANCHOR, REPLACEMENT)
+                if baru == _isi:
+                    return False
+                with open(_sasaran, "w", encoding="utf-8") as handle:
+                    handle.write(baru)
+                return True
+
+            def pulihkan(_sasaran=sasaran, _isi=isi):
+                with open(_sasaran, "w", encoding="utf-8") as handle:
+                    handle.write(_isi)
+
+            buta, sebelum, sesudah = mutasi_sumber.arah_kedua_buta_di_pohon_salinan(
+                jalankan_lama, proc.stdout, terapkan, pulihkan)
+            if buta is None:
+                print("SALAH aturan pra-perbaikan: jangkar mutasi tidak ditemukan")
+                hasil.append(False)
+            else:
+                print(f"{'OK  ' if buta else 'SALAH'} aturan pra-perbaikan -> "
+                      f"merah {sorted(sebelum)} -> {sorted(sesudah)} "
+                      f"(harap sama = dulu buta)")
+                hasil.append(buta)
     finally:
         shutil.rmtree(kerja, ignore_errors=True)
 

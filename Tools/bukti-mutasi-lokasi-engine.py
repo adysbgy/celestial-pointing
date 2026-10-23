@@ -70,6 +70,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402
 LOCATION = "Apps/Shared/LocationProvider.swift"
 ENGINE = "Apps/Shared/PointingEngine.swift"
 OBSERVER = "Packages/PointingKit/Sources/PointingKit/ObserverLocation.swift"
@@ -253,8 +255,7 @@ def main() -> int:
         shutil.copytree(tree, lama, symlinks=True)
         try:
             for rel in ("swift-ui-lint.sh", "README.md"):
-                isi = subprocess.run(["git", "show", "HEAD:" + rel], cwd=ROOT,
-                                     capture_output=True, text=True)
+                isi = mutasi_sumber._git(["show", "HEAD:" + rel])
                 if isi.returncode != 0:
                     raise SystemExit(f"git show HEAD:{rel} gagal: {isi.stderr}")
                 with open(os.path.join(lama, rel), "w", encoding="utf-8") as fh:

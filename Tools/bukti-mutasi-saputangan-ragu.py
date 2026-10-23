@@ -102,7 +102,7 @@ PALET_LITERAL = "let palette = planet.palette.drawable(isConfirmed: true)"
 
 #: Komit terakhir sebelum Aturan 51 ada. Dipakai arah kedua: gerbang lama
 #: **wajib hijau** pada cacat yang sama, kalau tidak lubangnya tidak nyata.
-PRA_ATURAN51 = "4a0a15d"
+PRA_ATURAN51 = "4a0a15d9717483bf973aed4381200bc921cd0ad3"
 
 STATES = [
     # ── Keadaan cacat: Aturan 51 WAJIB berbunyi ────────────────────────────

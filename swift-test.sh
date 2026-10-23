@@ -80,6 +80,24 @@ jalankan_docker() {
 # bukan diasumsikan.
 if command -v docker >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
     jalankan_docker "$@"
+    # **Harus berhenti di sini.** Tanpa baris ini, skrip jatuh menembus ke
+    # cabang "tidak ada Docker" di bawah, dan mesin yang **punya** Docker
+    # melaporkan `exit 127` justru setelah seluruh suite hijau:
+    #
+    #     1098 tests, 0 failures
+    #     GAGAL: tidak ada Docker dan tidak ada `swift` di PATH.
+    #
+    # Itu persis gejala yang docstring di atas sebut sebagai yang paling
+    # berbahaya — "harness membaca exit 127 sebagai suite merah, lalu
+    # melaporkan suite tidak hijau pada kode benar". Ironisnya jalur kedua
+    # yang ditambahkan untuk memperbaikinya yang memperkenalkannya, dan ia
+    # tidak tertangkap CI karena CI **tidak** punya Docker: di sana cabang
+    # ini tidak pernah diambil, jadi `exit 127` hanya muncul di mesin
+    # pengembang. Yang merah di sini bukan uji, melainkan alur kendali.
+    #
+    # `set -e` sudah membuat kegagalan `docker run` keluar dengan kode
+    # Docker sendiri; `exit 0` di sini hanya berarti "jalur ini selesai".
+    exit 0
 fi
 
 # Sampai di sini berarti tidak ada Docker. Satu-satunya jalur yang sah

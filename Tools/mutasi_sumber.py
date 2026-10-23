@@ -44,6 +44,7 @@ disalin enam kali adalah perbaikan yang akan hilang di salinan ketujuh.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 
@@ -69,10 +70,32 @@ def _git(args):
     sehingga penjaga menuduh berkas yang byte-identik dengan HEAD.
 
     Cakupannya sengaja hanya akar repo ini, bukan `*`.
+
+    **`cwd=root`, dan itu bukan hiasan.** Versi pertama helper ini tidak
+    memasang `cwd`, sedangkan setiap pemanggil yang ia gantikan memakai
+    `cwd=ROOT`. Terukur: `cd /tmp && python3 Tools/bukti-mutasi-aturan63-samaran.py`
+    berhenti dengan «bukan repo git», sementara perintah yang sama dari akar
+    repo berjalan. Perbedaannya tidak terlihat di CI (yang selalu berjalan
+    dari akar) dan justru itu yang membuatnya bertahan: harness yang hanya
+    benar dari satu direktori adalah harness yang akan dibaca orang dari
+    direktori lain, lalu dilaporkan sebagai gerbang yang rusak.
     """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return subprocess.run(["git", "-c", f"safe.directory={root}", *args],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, cwd=root)
+
+
+def _git_bytes(args):
+    """`_git` untuk berkas biner: stdout sebagai byte, tanpa dekode.
+
+    `safe.directory` tetap dipasang dengan alasan yang sama seperti `_git`:
+    tanpa itu git menolak repo CI, dan penolakan itu terbaca sebagai
+    "berkasnya tidak ada" — hijau palsu tepat pada job yang seharusnya
+    membuktikan cacatnya. `cwd` juga sama, dengan alasan yang sama.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return subprocess.run(["git", "-c", f"safe.directory={root}", *args],
+                          capture_output=True, cwd=root)
 
 
 def git_show(ref, path, min_bytes=1000):
@@ -116,6 +139,31 @@ def git_show(ref, path, min_bytes=1000):
             "jalan tanpa itu: skrip kosong akan dilaporkan hijau, dan "
             "arah kedua berhenti membuktikan apa pun.")
     return text
+
+
+def git_show_bytes(ref, path, min_bytes=100):
+    """Seperti `git_show`, tetapi mengembalikan **byte** — untuk berkas biner.
+
+    Kenapa terpisah: `_git` memakai `text=True`, dan `git show` atas PNG
+    mengembalikan 0x89 di posisi 0 yang bukan UTF-8 — dekode gagal sebelum
+    isinya bisa dibandingkan. Berkas ikon justru **harus** dibaca sebagai
+    byte: yang diuji adalah ketiadaan piksel opak, bukan teksnya.
+
+    Kontraknya sama dengan `git_show`: tidak terbaca berarti berhenti keras.
+    Harness yang menerima byte kosong akan melaporkan "tidak ada ikon
+    sebelumnya" — hijau tanpa memeriksa apa pun.
+    """
+    proc = _git_bytes(["show", f"{ref}:{path}"])
+    data = proc.stdout
+    if proc.returncode != 0 or len(data) < min_bytes:
+        raise SystemExit(
+            f"GAGAL: tidak bisa membaca `{ref}:{path}` sebagai byte "
+            f"(exit {proc.returncode}, {len(data)} byte, "
+            f"butuh >= {min_bytes}).\n"
+            "        Harness ikon tidak boleh jalan tanpa gambar sebelumnya: "
+            "byte kosong berarti 'tidak ada ikon lama', dan arah kedua "
+            "berhenti membuktikan apa pun.")
+    return data
 
 
 def require_clean_sources(paths):
@@ -225,3 +273,175 @@ def restore_verified(path, original):
             f"pemulihan {os.path.basename(path)} tidak cocok dengan isi "
             f"aslinya ({len(on_disk)} vs {len(data)} byte) — berkas produksi "
             "masih termutasi; perbaiki sebelum mempercayai hasil harness ini")
+
+
+# ── Arah kedua: gerbang lama harus **buta**, bukan harus **hijau** ──────────
+#
+# Tujuh harness di `Tools/` membuktikan cacatnya nyata dengan menjalankan
+# `swift-ui-lint.sh` versi **pra-perbaikan** atas mutasi yang sekarang
+# memerah, lalu menuntut versi lama itu **HIJAU**. Idenya benar: kalau
+# gerbang lama sudah merah pada cacat yang sama, keadaan itu tidak
+# membuktikan lubang apa pun.
+#
+# Bentuk yang dipakai untuk menegakkannya salah, dan salahnya **tumbuh
+# sendiri**. Yang dituntut adalah `exit 0` dari *seluruh* lint lama — padahal
+# lint lama memeriksa **seluruh** `Apps/`, dan `Apps/` terus berubah sesudah
+# lint itu di-commit. Setiap aturan baru yang lebih ketat membuat lint lama
+# memerah pada pohon yang **benar**, sehingga arah kedua gagal bukan karena
+# cacat yang diuji, melainkan karena repo maju. Terukur pada 23 Okt 2026,
+# enam harness merah bersamaan dan tidak satu pun menyebut sebabnya:
+#
+#     Aturan 63  pra: 1 radius samaran Swift = 0        MERAH  (harap hijau)
+#     Aturan 64  pra: 1 pemanggil menulis literal       MERAH  (harap hijau)
+#     Aturan 65  pra: 1 jam: preferensi jadi false      MERAH  (harap hijau)
+#     Aturan 66  pra: 1 lencana: stroke jadi false      MERAH  (harap hijau)
+#     Aturan 77  arah kedua: 1. lokasi bawaan menang    exit 1 (harap 0)
+#     Aturan 35  lint lama: kartu jam isStale -> false  MERAH  (harap hijau)
+#
+# Penyebabnya terbaca begitu diukur: lint `4302081` (pra-Aturan 63) atas
+# `Apps/` hari ini keluar **1 pada pohon bersih**, karena Aturan 32 versi lama
+# menuntut `drawCandidateMarker` dipanggil di bawah `if`, sementara lencana
+# itu sejak `cfb911f` digambar di `.overlay { if !isConfirmed { … } }`.
+# Lint yang sama atas pohonnya sendiri (`git worktree` di `4302081`) keluar
+# **0**. Jadi yang diukur bukan "gerbang lama buta pada cacat ini", melainkan
+# "gerbang lama ketinggalan zaman" — dan itu selalu benar, lalu selalu merah.
+#
+# **Yang benar: bandingkan putusannya, bukan angka keluarnya.** Pertanyaan
+# yang sebenarnya ingin dijawab adalah *apakah mutasi ini mengubah apa yang
+# dilihat gerbang lama*. Jadi jalankan lint lama dua kali — atas pohon bersih
+# dan atas pohon termutasi — lalu tuntut **himpunan aturan yang memerah
+# sama**. Kalau sama, gerbang lama memang buta pada mutasi itu, dan itu
+# berlaku tanpa peduli berapa aturan lain yang sudah usang.
+#
+# Diukur pada keenam harness: himpunan itu **identik** ({32} untuk Aturan 63,
+# dan seterusnya) sebelum dan sesudah mutasi. Jadi klaim aslinya — "gerbang
+# lama tidak melihat cacat ini" — tetap benar dan tetap dibuktikan; yang
+# dibuang hanyalah syarat bahwa repo tidak boleh maju.
+#
+# **Yang TIDAK diklaim.** Pembandingan ini tidak membuktikan gerbang lama
+# *hijau*; ia membuktikan gerbang lama **tidak berubah pikiran** karena
+# mutasinya. Untuk cacat yang kebetulan sudah tertangkap aturan lain yang
+# kebetulan juga merah hari ini, keadaan ini akan lulus — dan itu memang
+# benar: yang diuji adalah apakah aturan **yang sedang diperbaiki** buta,
+# bukan apakah seluruh repo bersih pada revisi lama.
+
+#: Baris pembuka tiap aturan di `swift-ui-lint.sh`.
+_ATURAN = re.compile(r"(?m)^== Aturan (\d+):")
+
+#: Penanda bahwa blok sebuah aturan **memerah**. Dua bentuk dipakai lint ini:
+#: arahan `-> …` sesudah pesan kegagalan, dan kalimat "Anggap GAGAL, bukan
+#: bersih." pada cabang fail-closed. Keduanya hanya dicetak pada kegagalan.
+_GAGAL = re.compile(r"(?m)^-> |Anggap GAGAL, bukan bersih\.")
+
+
+def aturan_yang_merah(keluaran):
+    """Himpunan nomor aturan yang **memerah** dalam keluaran `swift-ui-lint.sh`.
+
+    Kenapa nomor, bukan exit code: exit code menjawab "ada yang merah", dan
+    yang dibutuhkan arah kedua adalah "**yang mana**". Dua keluaran bisa
+    sama-sama tidak nol karena aturan yang sama sekali berbeda, dan justru
+    itulah yang harus dibedakan.
+
+    Kenapa tidak memakai `GERBANG UI GAGAL`: baris itu hanya dicetak sekali
+    di ekor, jadi ia tidak bisa memisahkan satu aturan dari yang lain.
+
+    Aturan yang memerah karena **tidak bisa memutuskan** (berkas hilang,
+    `python3` tidak ada) ikut terhitung, dan itu disengaja: keadaan itu juga
+    kegagalan gerbang, dan memperlakukannya sebagai "bersih" akan membuat
+    perbandingan dua kegagalan lingkungan tampak seperti bukti.
+    """
+    blok = _ATURAN.split(keluaran)
+    merah = set()
+    # `re.split` dengan satu grup: [pra, nomor, isi, nomor, isi, …]
+    for i in range(1, len(blok) - 1, 2):
+        if _GAGAL.search(blok[i + 1]):
+            merah.add(int(blok[i]))
+    return merah
+
+
+def jalankan_lint(teks_lint, akar):
+    """Jalankan `swift-ui-lint.sh` **dari teks**, kembalikan (exit, stdout).
+
+    Ditulis ke berkas sungguhan di `akar`, bukan ke `bash -s`: beberapa aturan
+    membaca `swift-ui-lint.sh` **dari cakram** (Aturan 10 membandingkan
+    hitungan aturan dengan README), jadi versi yang dijalankan harus juga
+    versi yang ada di cakram. Nama berkasnya berawalan titik supaya tidak
+    pernah terbaca sebagai sumber produksi, dan ia dihapus di `finally`.
+    """
+    jalur = os.path.join(akar, ".swift-ui-lint-pra.sh")
+    try:
+        with open(jalur, "w", encoding="utf-8") as berkas:
+            berkas.write(teks_lint)
+        os.chmod(jalur, 0o755)
+        hasil = subprocess.run(["bash", jalur], cwd=akar,
+                               capture_output=True, text=True, timeout=1800)
+        return hasil.returncode, hasil.stdout
+    finally:
+        if os.path.exists(jalur):
+            os.remove(jalur)
+
+
+def arah_kedua_buta(teks_lint, akar, pulihkan, mutasi):
+    """Buktikan gerbang lama **tidak berubah pikiran** karena `mutasi`.
+
+    `pulihkan` dipanggil untuk mengembalikan seluruh berkas produksi ke isi
+    aslinya; `mutasi` adalah callable tanpa argumen yang menerapkannya lagi.
+    Urutannya: bersih → ukur → termutasi → ukur → bersih. Pengukuran pertama
+    adalah **acuan**, dan itu yang membuat hasilnya kebal terhadap repo yang
+    maju: aturan usang yang sudah merah sebelum mutasi ada di kedua himpunan,
+    jadi ia tidak bisa menyamar sebagai "gerbang lama menangkap cacat ini".
+
+    **`mutasi` wajib mengembalikan `False` bila jangkarnya tidak ditemukan.**
+    Tanpa itu, mutasi yang tidak pernah diterapkan membuat kedua pengukuran
+    identik — dan hasilnya "gerbang lama buta", yaitu **hijau yang paling
+    kosong**: pohon yang tidak berubah tentu tidak mengubah putusan apa pun.
+    Keadaan itu dikembalikan sebagai `(None, …)`, bukan `(True, …)`, supaya
+    pemanggil tidak bisa salah membacanya sebagai bukti.
+
+    Kembalian `(buta, sebelum, sesudah)`. `buta is None` berarti mutasinya
+    tidak terpasang. `buta is False` berarti gerbang lama **memang** berubah
+    pikiran — entah ia menangkap cacatnya (dan keadaan harness itu tidak
+    membuktikan lubang), atau mutasinya menyentuh aturan lain (dan keadaannya
+    harus dipersempit). Keduanya wajib merah, dan pemanggil yang mencetak
+    `sebelum`/`sesudah` membuat sebabnya terbaca tanpa menjalankan ulang.
+    """
+    pulihkan()
+    _, bersih = jalankan_lint(teks_lint, akar)
+    sebelum = aturan_yang_merah(bersih)
+    if mutasi() is False:
+        pulihkan()
+        return None, sebelum, sebelum
+    _, termutasi = jalankan_lint(teks_lint, akar)
+    sesudah = aturan_yang_merah(termutasi)
+    pulihkan()
+    return sebelum == sesudah, sebelum, sesudah
+
+
+def arah_kedua_buta_di_pohon_salinan(jalankan, teks_lint, terapkan, pulihkan):
+    """`arah_kedua_buta` untuk harness yang menguji **salinan** pohon.
+
+    Beberapa harness (Aturan 70-75) menyalin `Apps/` ke direktori sementara
+    lalu menjalankan lint di sana, bukan memutasi pohon asli. Alasan salinan
+    itu tetap sah — mereka menguji berkas yang tidak boleh disentuh langsung
+    oleh beberapa keadaan berturut-turut — tetapi bentuk **pembandingnya**
+    harus sama dengan yang di pohon asli, kalau tidak cacat yang sama
+    (lint lama dituntut `exit 0` padahal ia memeriksa `Apps/` hari ini)
+    kembali muncul di sini.
+
+    Bedanya hanya pada siapa yang menjalankan lint: pemanggil menyerahkan
+    `jalankan(teks_lint) -> (exit, keluaran)`, yang sudah tahu direktori
+    kerjanya. Sisanya identik dengan `arah_kedua_buta`, termasuk kontrak
+    `terapkan()` yang wajib mengembalikan `False` bila jangkarnya hilang.
+
+    Kembalian `(buta, sebelum, sesudah)` dengan arti yang sama.
+    """
+    pulihkan()
+    _, bersih = jalankan(teks_lint)
+    sebelum = aturan_yang_merah(bersih)
+    if terapkan() is False:
+        pulihkan()
+        return None, sebelum, sebelum
+    _, termutasi = jalankan(teks_lint)
+    sesudah = aturan_yang_merah(termutasi)
+    pulihkan()
+    return sebelum == sesudah, sebelum, sesudah

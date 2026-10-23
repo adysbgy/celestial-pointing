@@ -1353,6 +1353,16 @@ jobs:
       - name: Setiap harness bukti-mutasi dijalankan CI
         run: python3 Tools/check-harness-terdaftar.py
 
+      # `swift-test.sh` punya dua jalur (Docker di mesin pengembang, `swift`
+      # langsung di kontainer CI). `jalankan_docker` **kembali** alih-alih
+      # keluar, jadi mesin yang punya Docker jatuh tembus ke cabang "tidak ada
+      # Docker" dan keluar 127 **setelah** seluruh suite hijau. CI tidak
+      # menangkapnya karena CI tidak punya Docker: cabang itu tidak pernah
+      # diambil di sana. Gerbang ini mengganti `docker`/`sudo` dengan tiruan
+      # dan mengukur alur kendalinya saja.
+      - name: Buktikan swift-test.sh berhenti setelah jalur Docker
+        run: python3 Tools/check-swift-test-berhenti.py
+
       # Dan bukti bahwa **gerbang sapu UI sendiri** berbunyi pada hal yang
       # mereka klaim -- dua cacat yang hidup di `main`, dan keduanya kelas yang
       # sama: hijau karena tidak mengukur apa pun.

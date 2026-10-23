@@ -105,9 +105,22 @@ for r in results:
 """
 
 # ── Jangkar di dalam port ────────────────────────────────────────────────
-# Warna spektral bintang: satu fungsi, satu pemakai.
-COLOUR_CALL = "    base = star_rgb(color_index)"
-COLOUR_CALL_FLAT = "    base = star_rgb(0.0)"
+# Warna spektral bintang: satu tabel, satu penerjemah.
+#
+# **Kenapa bukan lagi `base = star_rgb(color_index)`.** Jangkar lama itu
+# memutasi **satu pemanggil** di `_draw_star`, dan `star_core_rgb` punya
+# pemanggil sendiri (`tint = star_rgb(index)`). Mutasinya karenanya hanya
+# membuang tint glow, sementara inti tetap berwarna — dan gerbang
+# "dua bintang berbeda tetap berbeda saat yakin" membaca gambar yang **masih**
+# berbeda, jadi ia tetap hijau. Terukur: dengan mutasi lama, keadaan 1
+# melaporkan 2 dari 3 pemeriksaan hijau padahal warna spektral sudah dibuang.
+#
+# Nama keadaan ini "warna spektral dibuang di **sumber**", jadi mutasinya
+# memang harus di sumber: `warmth` yang menerjemahkan B−V menjadi hangat.
+# Diratakan berarti tidak ada lagi warna spektral di mana pun — glow maupun
+# inti — dan setiap gerbang yang mengaku mengukur warna harus memerah.
+WARMTH_LINE = "    warmth = (clamped + 0.35) / 2.45"
+WARMTH_FLAT = "    warmth = 0.5"
 
 # Penjaga keraguan: warna hanya boleh sampai ke gambar saat engine yakin.
 #
@@ -123,7 +136,9 @@ GUARD = ('    if not is_confirmed:\n'
 GUARD_OFF = '    return color_index'
 
 # Tabel warna: `warmth` menerjemahkan indeks B−V menjadi hangat/dingin.
-WARMTH = "    warmth = (clamped + 0.35) / 2.45"
+# Baris jangkarnya sama dengan `WARMTH_LINE` di atas — satu baris, dua mutasi
+# (diratakan / dibalik), jadi ia tidak ditulis dua kali.
+WARMTH = WARMTH_LINE
 WARMTH_FLIPPED = "    warmth = 1.0 - (clamped + 0.35) / 2.45"
 
 # Warna "tidak mengklaim" untuk bintang. Harus **akromatik** (R=G=B): nilai
@@ -171,7 +186,7 @@ STATES = [
     # dan itu benar: keduanya memang masih identik — sekarang karena keduanya
     # sama-sama tidak berwarna.
     ("1. warna spektral dibuang di sumber",
-     [(COLOUR_CALL, COLOUR_CALL_FLAT)],
+     [(WARMTH_LINE, WARMTH_FLAT)],
      _expect(**{ORDER[0]: MERAH, ORDER[1]: MERAH,
                 IDENTICAL_WHEN_UNSURE: HIJAU, DIFFERENT_WHEN_SURE: MERAH,
                 NEUTRAL_WHEN_UNSURE: HIJAU})),

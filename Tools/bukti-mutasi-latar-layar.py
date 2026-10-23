@@ -72,7 +72,7 @@ SKY_KONTEKS = "Apps/PointAndKnowWatch/Sources/PointingView.swift"
 #: Komit terakhir sebelum arah ketiga (latar hilang, bukan latar salah) ada.
 #: Dipakai arah kedua: gerbang lama **wajib hijau** pada cacat yang sama,
 #: kalau tidak lubangnya cuma dikarang oleh aturan yang selalu berbunyi.
-PRA_ARAH_KETIGA = "b514826"
+PRA_ARAH_KETIGA = "b51482604f792f51d35372502090384f980775e0"
 
 # ── Arah ketiga: latar yang **tidak ada sama sekali** ──────────────────────
 #
@@ -168,10 +168,21 @@ STATES = [
     # entri katalog), bukan Aturan 49. Keadaan kontrol yang merah karena
     # **aturan lain** tidak membuktikan apa pun tentang aturan yang diuji; ia
     # hanya terbaca seperti itu kalau alasannya tidak dibaca.
+    #
+    # `.foregroundStyle(...)`, dan itu bukan hiasan: Aturan 87 (ditambahkan
+    # sesudah keadaan ini ditulis) menuntut setiap `Text` berwarna, jadi
+    # kontrol ini memerah pada aturan yang **sama sekali tidak berhubungan
+    # dengan latar**. Gejalanya identik dengan kegagalan Aturan 4 di atas, dan
+    # itulah sebabnya keadaan ini diperbaiki dengan memberi warna, bukan dengan
+    # melonggarkan Aturan 49: yang diuji adalah "view yang tidak menyentuh
+    # latar tidak boleh dituntut berlatar", dan view kecil yang **berwarna**
+    # tetap memenuhi maksud itu. Melonggarkan Aturan 49 akan membuang
+    # pengukurannya sendiri.
     ("kontrol: view tanpa latar sama sekali",
      {KALIBRASI: ("    private var referenceList: some View {",
                   """    private var lencana: some View {
         Text(TextLocalization.text(.pointingNightModeOn))
+            .foregroundStyle(SurfacePalette.primaryText)
     }
 
     private var referenceList: some View {""")}, False),
@@ -279,6 +290,18 @@ def main():
                     os.path.join(tree, "swift-ui-lint.sh"), lama)
                 buang_aturan_10(tree)
 
+            # Arah kedua: acuan diukur **sebelum** mutasi, atas pohon yang
+            # sama. Dulu arah kedua menuntut lint pra-perbaikan HIJAU secara
+            # mutlak; itu membusuk karena lint lama memeriksa seluruh `Apps/`,
+            # dan `Apps/` berubah sesudah revisi itu di-commit — setiap aturan
+            # baru yang lebih ketat memerahkan arah kedua tanpa ada cacat yang
+            # diuji. Yang benar: bandingkan **himpunan aturan yang memerah**
+            # sebelum dan sesudah mutasi. Kalau sama, gerbang lama memang buta
+            # pada cacat ini, dan itu berlaku berapa pun aturan usang yang
+            # sudah merah.
+            sebelum = (mutasi_sumber.aturan_yang_merah(run_lint(tree).stdout)
+                       if sisa else set())
+
             rusak = apply_edits(tree, edits)
             if rusak:
                 print("%-56s JANGKAR HILANG: %s" % (nama, "; ".join(rusak)))
@@ -287,16 +310,27 @@ def main():
 
             hasil = run_lint(tree)
             merah = hasil.returncode != 0
-            sesuai = merah == harus_merah
-            print("%-56s %s (exit %d)" % (
-                nama,
-                "MERAH, sesuai harapan" if merah else "HIJAU, sesuai harapan",
-                hasil.returncode))
+            if sisa:
+                sesudah = mutasi_sumber.aturan_yang_merah(hasil.stdout)
+                sesuai = sesudah == sebelum
+                print("%-56s %s (merah %s -> %s)" % (
+                    nama, "BUTA, sesuai harapan" if sesuai else "TIDAK BUTA",
+                    sorted(sebelum), sorted(sesudah)))
+            else:
+                sesuai = merah == harus_merah
+                print("%-56s %s (exit %d)" % (
+                    nama,
+                    "MERAH, sesuai harapan" if merah else "HIJAU, sesuai harapan",
+                    hasil.returncode))
             if not sesuai:
                 gagal.append(nama)
-                print("    diharapkan %s, dapat %s"
-                      % ("MERAH" if harus_merah else "HIJAU",
-                         "MERAH" if merah else "HIJAU"))
+                if sisa:
+                    print("    gerbang lama berubah pikiran: %s -> %s"
+                          % (sorted(sebelum), sorted(sesudah)))
+                else:
+                    print("    diharapkan %s, dapat %s"
+                          % ("MERAH" if harus_merah else "HIJAU",
+                             "MERAH" if merah else "HIJAU"))
                 if merah and not harus_merah:
                     # Tampilkan alasan merahnya: tanpa ini, "menuduh kode
                     # benar" tidak bisa dibedakan dari gerbang lain yang

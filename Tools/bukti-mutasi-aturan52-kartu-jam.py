@@ -200,8 +200,7 @@ PRA_PER_KEADAAN_3 = {3}
 
 
 def _baca_lint_dari(rev):
-    hasil = subprocess.run(["git", "show", f"{rev}:swift-ui-lint.sh"],
-                           cwd=ROOT, capture_output=True, text=True)
+    hasil = mutasi_sumber._git(["show", f"{rev}:swift-ui-lint.sh"])
     if hasil.returncode != 0:
         return None
     return hasil.stdout
