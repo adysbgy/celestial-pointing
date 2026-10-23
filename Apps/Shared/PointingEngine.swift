@@ -260,6 +260,27 @@ public final class PointingEngine: ObservableObject {
         // gambar yang tidak cocok dengan langit mana pun.
         var phases: [CelestialVisual.Planet: Double] = [:]
         var limbAngles: [CelestialVisual.Planet: Double] = [:]
+        // **Ketiga kamus dibangun di variabel lokal, lalu ditugaskan utuh.**
+        // Sampai siklus ini hanya dua yang begitu: `planetWaxing` ditulisi
+        // langsung `planetWaxing[planet] = waxing` di dalam loop, dan tidak
+        // ada satu baris pun yang mengosongkannya. Docstringnya sendiri
+        // menjanjikan sebaliknya ("Sejajar dengan `planetPhases`"), dan
+        // akibatnya terukur: bila `isPlanetWaxing` mengembalikan `nil` pada
+        // sampel berikutnya — efemeris gagal sesaat — `planetPhases` dan
+        // `planetBrightLimbAngles` kehilangan Venus, tetapi `planetWaxing`
+        // **masih memegang arah dari 30 detik lalu**. Lalu
+        // `phaseGeometry(waxing:)` memasangkan fraksi segar dengan arah basi,
+        // dan sabitnya menghadap sisi yang keliru tepat di sekitar elongasi
+        // 180° — satu-satunya tempat arah itu berbalik, jadi satu-satunya
+        // tempat kesalahan ini paling salah.
+        //
+        // Yang menahannya sekarang Aturan 102: setiap kamus fase yang dibaca
+        // untuk digambar wajib punya penugasan utuh di sini dan **tidak**
+        // boleh ditulisi per kunci. Tidak ada uji Swift yang bisa menangkapnya
+        // — berkas ini mengimpor `Combine` dan `@MainActor`, jadi tidak
+        // dikompilasi di Linux, dan seluruh uji fase menguji rumusnya, bukan
+        // pengisi kamusnya.
+        var waxing: [CelestialVisual.Planet: Bool] = [:]
         for planet in CelestialVisual.Planet.allCases where planet.showsPhase {
             if let fraction = controller.resolver.planetIlluminationFraction(
                 for: planet, at: date) {
@@ -275,12 +296,13 @@ public final class PointingEngine: ObservableObject {
             // Venus tampil sebagai bola penuh di setiap keadaan, termasuk saat
             // iluminasinya baru saja dihitung 2%. Gambar itu menyatakan
             // kebalikan dari apa yang sedang dihitung engine.
-            if let waxing = controller.resolver.isPlanetWaxing(planet, at: date) {
-                planetWaxing[planet] = waxing
+            if let isWaxing = controller.resolver.isPlanetWaxing(planet, at: date) {
+                waxing[planet] = isWaxing
             }
         }
         planetPhases = phases
         planetBrightLimbAngles = limbAngles
+        planetWaxing = waxing
     }
 
     /// Arah fase Bulan hasil perhitungan terakhir.

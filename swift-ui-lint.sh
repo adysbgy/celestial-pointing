@@ -15090,6 +15090,49 @@ else
 fi
 
 
+echo "== Aturan 102: peta fase planet dibangun ulang, bukan ditambahi =="
+# Kelas cacat yang sudah **ada di pohon** dan lolos 101 aturan. Diukur pada
+# `refreshSkyContext`:
+#
+#     planetPhases             whole-assign=1  subscript-write=0
+#     planetWaxing             whole-assign=0  subscript-write=1
+#     planetBrightLimbAngles   whole-assign=1  subscript-write=0
+#
+# Dua kamus dibangun di variabel lokal lalu **menggantikan** isi properti, jadi
+# entri yang tidak terisi pada sampel kali ini ikut hilang — itulah arti "tidak
+# diketahui". `planetWaxing` hanya pernah ditambahi, dan tidak ada satu baris
+# pun yang mengosongkannya, padahal docstringnya menjanjikan "Sejajar dengan
+# `planetPhases`". Akibatnya: bila `isPlanetWaxing` mengembalikan nil pada
+# sampel berikutnya, fraksi dan sudut hilang tetapi arah dari 30 detik lalu
+# bertahan — sabit menghadap sisi keliru tepat di sekitar elongasi 180°.
+#
+# Kenapa tidak ada uji Swift yang menangkapnya: berkasnya mengimpor `Combine`
+# dan `@MainActor`, jadi tidak dikompilasi di Linux, dan seluruh uji fase
+# menguji rumusnya (`phaseGeometry`), bukan pengisi kamusnya. Aturan 31
+# memeriksa **kunci** yang dipakai saat membaca, bukan apakah isinya pernah
+# dikosongkan.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-101 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan102-peta-fase-dibangun-ulang.py" ]; then
+  echo "FAIL Tools/check-aturan102-peta-fase-dibangun-ulang.py tidak ada: Aturan 102"
+  echo "     tidak mengukur apa pun, dan kamus fase boleh kembali ditambahi"
+  echo "     per kunci tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  peta_fase=$(python3 Tools/check-aturan102-peta-fase-dibangun-ulang.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$peta_fase"
+    echo "-> Bangun kamusnya di variabel lokal lalu tugaskan utuh, sama seperti"
+    echo "   dua kamus fase yang lain. Jangan mengosongkannya manual di awal"
+    echo "   fungsi: penugasan utuh membuat kamus kosong dengan sendirinya."
+    status=1
+  else
+    echo "$peta_fase"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="
