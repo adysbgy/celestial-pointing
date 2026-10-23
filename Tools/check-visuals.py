@@ -12551,6 +12551,81 @@ def check_bands_follow_the_limb_arc(results, size=200, ss=2):
         f"kode port masih memuat 'radius * 0.14' = {'YA' if stale else 'tidak'} "
         f"(komentar tidak dihitung)"))
 
+    # ── Kabut Venus: **opasitasnya**, dan seluruh kelas yang sama ──────
+    #
+    # **Celah yang ditutup di sini — diukur, dan lebih lebar dari Venus.**
+    # Seluruh pemeriksaan di atas menjaga *geometri* kabut: di mana elipsnya
+    # duduk dan sebesar apa. Tidak satu pun menyentuh **seberapa pekat** ia.
+    # Akibatnya `haze.opacity(0.7)` di view bisa menjadi `opacity(0.0)` — kabut
+    # Venus hilang sama sekali, Venus kembali menjadi bola kuning polos — dan
+    # **kedua gerbang paritas tetap hijau seluruhnya**. Diukur dengan
+    # menjalankan `check_port_matches_swift_constants` dan
+    # `check_modeled_port_constants_match_the_model` di proses baru: 215
+    # pemeriksaan, 215 hijau sebelum mutasi, 215 hijau sesudah, nol merah.
+    # Bukan disangka.
+    #
+    # Bentuk cacatnya bukan kebetulan Venus: setiap ciri planet lain
+    # (`jupiterBandOpacity`, `saturnBandOpacity`, `uranusBandOpacity`,
+    # `neptuneSpotOpacity`, `ringShadowOpacity`, kutub Mars) punya
+    # konstanta di model, jadi pergeserannya tertangkap pemeriksaan
+    # paritas port. Venus satu-satunya yang opasitasnya hidup sebagai
+    # literal di **dua** berkas tanpa sumber. Karena itu gerbangnya bukan
+    # "periksa 0.7", melainkan **kelasnya**: setiap konstanta `*Opacity`
+    # di model harus benar-benar **dipakai** oleh penggambar yang
+    # menggambarnya — view atau model sendiri.
+    #
+    # **Kenapa "dipakai", bukan "ada".** Konstanta yang lahir di model dan
+    # tidak pernah dibaca siapa pun adalah gerbang yang mengukur dirinya
+    # sendiri: ia hijau, ia terdokumentasi, dan ia tidak mengubah satu piksel.
+    # Itu persis bentuk yang membuat `VENUS_HAZE_OPACITY` bisa ditambahkan
+    # tanpa memperbaiki apa pun, jadi yang dituntut adalah pemakaiannya.
+    opacity_consts = re.findall(
+        r"static let (\w*[Oo]pacity\w*)\s*:\s*Double\s*=\s*([0-9.]+)",
+        model_src)
+    if not opacity_consts:
+        results.append(Result(
+            "setiap opasitas ciri di model dipakai penggambarnya", False,
+            "tidak ada 'static let *Opacity: Double = <angka>' yang terbaca "
+            "di CelestialVisual.swift — pembacanya perlu diselaraskan"))
+    else:
+        view_code = swift_code_only(view)
+        model_code = swift_code_only(model_src)
+        dead: list[str] = []
+        for name, _value in opacity_consts:
+            # Dipakai view lewat `.nama` (mis. `CelestialVisual.uranusBandOpacity`
+            # atau `VisualFrame.ringShadowOpacity`), atau dipakai model sendiri
+            # di luar baris deklarasinya (mis. `polarCapOpacity` diteruskan ke
+            # `polarCapFade`).
+            used_by_view = re.search(r"\." + re.escape(name) + r"\b",
+                                     view_code) is not None
+            used_by_model = model_code.replace(
+                f"static let {name}: Double", "", 1).count(name) > 0
+            if not (used_by_view or used_by_model):
+                dead.append(name)
+        results.append(Result(
+            "setiap opasitas ciri di model dipakai penggambarnya",
+            not dead,
+            f"{len(opacity_consts)} konstanta *Opacity terbaca, "
+            f"tanpa pemakai: {', '.join(dead) if dead else 'tidak ada'}"))
+
+    # Arah kedua untuk Venus secara khusus, karena ia satu-satunya yang
+    # digambar di **dua** situs (bola `drawBody` dan cakram berfase): gerbang
+    # di atas hijau bila *salah satu* situs memakainya, padahal yang
+    # sebenarnya dijaga adalah keduanya menampilkan kabut yang sama pekat.
+    # Pemeriksaan ini menuntut **tidak ada** literal opasitas yang tersisa di
+    # dalam `drawHaze` — angka apa pun yang ditulis di sana akan menggambar
+    # kabut yang berbeda dari yang diukur gerbang piksel port.
+    haze_body = _function_body(view, "private func drawHaze(")
+    haze_literals = re.findall(r"\.opacity\(\s*([0-9]*\.?[0-9]+)\s*\)",
+                               haze_body)
+    results.append(Result(
+        "kabut Venus: opasitas view dari model, bukan literal",
+        haze_body != "" and "CelestialVisual.venusHazeOpacity" in haze_body
+        and not [v for v in haze_literals if float(v) != 0.0],
+        f"drawHaze memuat 'CelestialVisual.venusHazeOpacity' = "
+        f"{'ada' if 'CelestialVisual.venusHazeOpacity' in haze_body else 'TIDAK'}, "
+        f"literal opasitas = {haze_literals if haze_literals else 'tidak ada'}"))
+
 
 def check_jupiter_spot_keeps_its_curvature(results, size=200, ss=2):
     """Bintik Merah Besar harus **ikut melengkung**, bukan stiker rata.

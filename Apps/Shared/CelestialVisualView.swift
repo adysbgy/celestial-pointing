@@ -1194,7 +1194,8 @@ struct CelestialVisualView: View {
                                            width: radius * CGFloat(geometry.halfWidth * 2),
                                            height: radius * CGFloat(geometry.halfHeight * 2))),
                      with: .linearGradient(
-                        Gradient(colors: [haze.opacity(0), haze.opacity(0.7)]),
+                        Gradient(colors: [haze.opacity(0),
+                                          haze.opacity(CelestialVisual.venusHazeOpacity)]),
                         startPoint: CGPoint(x: center.x, y: center.y - radius),
                         endPoint: CGPoint(x: center.x, y: center.y)))
     }

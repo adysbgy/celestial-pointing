@@ -561,6 +561,28 @@ jobs:
       - name: Buktikan gerbang urutan cincin Saturnus berbunyi
         run: python3 Tools/bukti-mutasi-urutan-cincin.py
 
+      # Dan bukti untuk gerbang **opasitas kabut Venus** — dua pemeriksaan
+      # yang lahir di `check_bands_follow_the_limb_arc` pada siklus ini.
+      #
+      # Keduanya menutup celah yang terukur: `haze.opacity(0.7)` di view bisa
+      # diganti `opacity(0.0)` — kabut Venus hilang seluruhnya, Venus kembali
+      # menjadi bola kuning polos — dan **kedua gerbang paritas tetap hijau
+      # seluruhnya** (215 pemeriksaan, 215 hijau sebelum dan sesudah mutasi).
+      #
+      # Keadaan 1 dan 2 sengaja memakai dua cacat yang **terlihat identik di
+      # layar**: `opacity(0.7)` menggambar piksel yang sama persis dengan
+      # `opacity(CelestialVisual.venusHazeOpacity)`, karena 0.7 adalah nilai
+      # konstanta itu hari ini. Yang hilang bukan gambarnya, melainkan
+      # ikatannya ke model. Tidak ada gerbang gambar yang bisa melihatnya, dan
+      # itulah alasan keadaan ini harus ada.
+      #
+      # Keadaan 3 menahan gerbangnya agar tetap generik: konstanta *Opacity
+      # baru yang tidak dipakai harus memerahkan gerbang. Kalau gerbangnya
+      # daftar tangan (Venus, Jupiter, Saturnus, ...), keadaan ini hijau dan
+      # planet berikutnya lolos dengan alasan yang sama.
+      - name: Buktikan gerbang opasitas kabut Venus berbunyi
+        run: python3 Tools/bukti-mutasi-kabut-opasitas.py
+
       # Dan bukti untuk **angka di docstring** gerbang urutan cincin itu.
       #
       # Gerbangnya hijau pada hari ditulis, dan docstringnya memuat lima

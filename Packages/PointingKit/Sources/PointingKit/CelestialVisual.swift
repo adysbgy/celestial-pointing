@@ -2851,6 +2851,42 @@ public extension CelestialVisual {
         HazeGeometry(centerY: centerY, halfWidth: halfWidth, halfHeight: halfHeight)
     }
 
+    /// Opasitas puncak kabut Venus.
+    ///
+    /// **Kenapa ini pindah ke model.** Sampai siklus ini angka `0.7` ditulis
+    /// sebagai literal di **dua** tempat: `drawHaze` di view Swift dan
+    /// `_draw_haze` di port Python. Keduanya sepakat hari ini, dan tidak ada
+    /// satu pun gerbang yang menjaga kesepakatan itu — `check-visuals.py`
+    /// mengukur geometri kabutnya (`venusHaze`) tetapi tidak pernah membaca
+    /// opasitasnya.
+    ///
+    /// **Angkanya, terukur, bukan disangka.** Dua gerbang yang membaca angka
+    /// lintas-bahasa dijalankan di proses baru pada sumber apa adanya, lalu
+    /// pada sumber dengan `haze.opacity(CelestialVisual.venusHazeOpacity)`
+    /// diganti `haze.opacity(0.0)`: **215 pemeriksaan, 215 hijau sebelum,
+    /// 215 hijau sesudah, nol merah.** Kabut Venus bisa hilang seluruhnya
+    /// dari jam tanpa satu pun gerbang berbunyi. (Versi pertama docstring ini
+    /// menulis 218 — angka yang tidak pernah diukur. Ia diganti dengan yang
+    /// diukur, karena angka yang salah di dalam docstring pengukuran adalah
+    /// kebohongan yang paling sulit dilacak.)
+    ///
+    /// Itu juga sebabnya gerbangnya bukan `check_port_matches_swift_constants`:
+    /// tabel di sana membandingkan daftar pasangan tangan, dan `VENUS_HAZE_OPACITY`
+    /// tidak pernah masuk daftar itu. Yang menahan angka ini sekarang
+    /// `check_modeled_port_constants_match_the_model`, yang membaca pengakuan
+    /// `# MODEL:` di port. Terukur: menggeser 0.7 -> 0.3 di port saja **atau**
+    /// di model saja memerahkan tepat satu pemeriksaan,
+    /// `model→port: VENUS_HAZE_OPACITY[0] == model`.
+    ///
+    /// Ciri-ciri planet lain sudah punya konstanta seperti ini
+    /// (`jupiterBandOpacity`, `saturnBandOpacity`, `uranusBandOpacity`,
+    /// `neptuneSpotOpacity`); Venus satu-satunya yang tertinggal, dan
+    /// justru ia satu-satunya ciri yang punya dua situs gambar (bola dan
+    /// berfase). Satu angka di model berarti pergeserannya tertangkap
+    /// pemeriksaan paritas, bukan menunggu ada yang membandingkan dua berkas
+    /// dengan mata.
+    static let venusHazeOpacity: Double = 0.7
+
     /// Pita samar Uranus — satu sabuk horizontal, dalam satuan radius.
     ///
     /// **Kenapa Uranus tidak diberi pita seperti Jupiter.** Uranus memang

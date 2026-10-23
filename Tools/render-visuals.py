@@ -2371,6 +2371,9 @@ def _draw_craters(canvas, cx, cy, radius, night_mode, inside_lit=None):
                                       CRATER_INNER_FLOOR_OPACITY)))
 
 
+VENUS_HAZE_OPACITY = 0.7                     # MODEL: `CelestialVisual.venusHazeOpacity`
+
+
 def venus_haze():
     """Port dari `CelestialVisual.venusHaze()` — geometri kabut Venus.
 
@@ -2390,7 +2393,15 @@ def venus_haze():
 def _draw_haze(canvas, cx, cy, radius, night_mode):
     haze = ACCENTS["venusHaze"]
     rgb = night_surface(haze) if night_mode else haze
-    gradient = linear_gradient([(rgb, 0.0), (rgb, 0.7)],
+    # Opasitasnya dari konstanta MODEL, bukan literal. Yang menahannya bukan
+    # `check_port_matches_swift_constants` — gerbang itu **tidak** membaca
+    # angka ini; terukur, menggeser 0.7 -> 0.3 di sini saja membiarkannya
+    # hijau. Yang menahannya `check_modeled_port_constants_match_the_model`,
+    # lewat komentar `# MODEL:` di baris di atas. Menulis nama gerbang yang
+    # salah di sini lebih buruk daripada tidak menulis apa pun: pembaca
+    # berikutnya akan memutasi angka, melihat hijau, dan menyimpulkan
+    # gerbangnya rusak padahal ia hanya menunjuk gerbang yang keliru.
+    gradient = linear_gradient([(rgb, 0.0), (rgb, VENUS_HAZE_OPACITY)],
                                start_point=(cx, cy - radius),
                                end_point=(cx, cy))
     center_y, half_w, half_h = venus_haze()
