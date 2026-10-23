@@ -38,14 +38,27 @@ Keadaan yang diuji:
 
   2. view: kabut dimatikan          `opacity(...)` -> `opacity(0.0)`. Ini
      (`0.0`)                        cacat aslinya: Venus kembali menjadi bola
-                                    kuning polos. Hanya pemeriksaan **pemakaian**
-                                    yang boleh berbunyi di sini — pemeriksaan
-                                    literal sengaja mengizinkan 0.0 (gradien
-                                    kabut memang mulai dari nol di tepi atas),
-                                    jadi keadaan ini membuktikan arah kedua
+                                    kuning polos. **Kedua** pemeriksaan
+                                    berbunyi di sini, dan itu benar — tapi
+                                    bukan karena keduanya mengukur hal yang
+                                    sama: yang satu melihat tokennya hilang,
+                                    yang lain melihat literalnya muncul.
+                                    Keadaan ini karena itu **tidak** bisa
+                                    memisahkan keduanya, dan draf pertama
+                                    harness ini salah mengira ia bisa
+                                    (dituntut "hanya USED yang merah", dan
+                                    keadaan itu SALAH). Pemisahannya
+                                    dikerjakan keadaan 3.
+
+  3. view: token tetap, literal      `opacity(CelestialVisual.venusHazeOpacity)`
+     tambahan 0.9                   -> `…, haze.opacity(0.9)`. Tokennya masih
+                                    dipakai, jadi pemeriksaan pemakaian
+                                    **hijau**; yang berbunyi hanya pemeriksaan
+                                    literal. Inilah satu-satunya keadaan yang
+                                    membuktikan klausa "tidak ada literal ≠ 0"
                                     punya gigi sendiri.
 
-  3. model: konstanta *Opacity      menambah `static let fakeFeatureOpacity`
+  4. model: konstanta *Opacity      menambah `static let fakeFeatureOpacity`
      baru yang tidak dipakai       ke model. Kalau gerbangnya daftar tangan
                                     (Venus, Jupiter, Saturnus, ...), keadaan
                                     ini **hijau** — dan planet berikutnya lolos
@@ -53,7 +66,7 @@ Keadaan yang diuji:
                                     sini: merah, karena gerbangnya membaca
                                     model, bukan daftar.
 
-  4. view: `drawHaze` dihapus       kontrol negatif. Gerbang harus merah
+  5. view: `drawHaze` dihapus       kontrol negatif. Gerbang harus merah
      (kontrol negatif)              karena **tidak menemukan subjeknya**, bukan
                                     hijau tanpa mengukur apa pun. Gerbang yang
                                     kehilangan subjeknya harus berbunyi.
@@ -144,18 +157,24 @@ STATES = [
      [USED, NOT_LITERAL], NEIGHBOURS),
     ("2. view: kabut dimatikan (0.0)",
      [(VIEW, VIEW_TOKEN, "haze.opacity(0.0)")],
-     # Pemeriksaan literal **sengaja** mengizinkan 0.0: gradien kabut memang
-     # mulai dari nol di tepi atasnya. Jadi yang harus berbunyi di sini hanya
-     # pemeriksaan pemakaian — dan itulah bukti bahwa ia punya gigi sendiri,
-     # bukan menumpang pada pemeriksaan literal.
-     [USED], NEIGHBOURS + [NOT_LITERAL]),
-    ("3. model: konstanta *Opacity baru tanpa pemakai",
+     # Cacat aslinya, dan **kedua** pemeriksaan berbunyi — karena keduanya
+     # memang melihat dua hal berbeda yang sama-sama hilang: tokennya, dan
+     # pengganti literalnya. Keadaan ini karena itu tidak memisahkan gigi
+     # keduanya; keadaan 3 yang melakukannya.
+     [USED, NOT_LITERAL], NEIGHBOURS),
+    ("3. view: token tetap, literal 0.9 ditambah",
+     [(VIEW, VIEW_TOKEN, VIEW_TOKEN + ", haze.opacity(0.9)")],
+     # Token masih dipakai (pemeriksaan pemakaian hijau), jadi hanya klausa
+     # "tidak ada literal != 0" yang bisa berbunyi. Satu-satunya keadaan yang
+     # membuktikan klausa itu punya gigi sendiri.
+     [NOT_LITERAL], NEIGHBOURS + [USED]),
+    ("4. model: konstanta *Opacity baru tanpa pemakai",
      [(MODEL, MODEL_INSERT_AFTER,
        MODEL_INSERT_AFTER + "    static let fakeFeatureOpacity: Double = 0.5\n")],
      # Gerbang daftar-tangan akan hijau di sini, karena `fakeFeatureOpacity`
      # tidak ada di daftar mana pun. Gerbang yang membaca model memerah.
      [USED], NEIGHBOURS + [NOT_LITERAL, PARITY]),
-    ("4. view: drawHaze dihapus (kontrol negatif)",
+    ("5. view: drawHaze dihapus (kontrol negatif)",
      [(VIEW, VIEW_HAZE_FUNC, VIEW_HAZE_FUNC.replace("drawHaze", "drawHazeGONE"))],
      # Gerbang yang kehilangan subjeknya harus berbunyi, bukan hijau tanpa
      # mengukur apa pun.
