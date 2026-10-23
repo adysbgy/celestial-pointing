@@ -17791,7 +17791,13 @@ def _split_citations():
             if " " in opened or " " in closed:
                 continue
             joined = opened + closed
-            if joined in symbols and opened not in symbols:
+            # Dilaporkan bila sambungannya nama nyata — **termasuk** ketika
+            # potongan pertama juga nama nyata. Versi pertama aturan ini
+            # mensyaratkan `opened not in symbols`, dan syarat itu justru
+            # membuang kasus paling berbahaya: potongan pertama yang sah
+            # membuat `check_cited_test_names_exist` hijau, jadi kutipannya
+            # lolos tanpa suara. Itu bukan pengecualian, itu sasaran.
+            if joined in symbols:
                 found.append((rel, index + 1, opened, closed))
 
     return found, total_ticks

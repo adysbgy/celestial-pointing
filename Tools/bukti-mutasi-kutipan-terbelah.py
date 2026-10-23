@@ -100,13 +100,6 @@ JANGKAR = ("    /// **Yang TIDAK diklaim.** Ini bukan nilai astronomi; "
 
 #: Nama gerbang nyata di `Tools/check-visuals.py`, dipotong dua.
 GERBANG_NAMA = "check_modeled_port_constants_match_the_model"
-GERBANG_POTONG = ("`check_modeled_port_constants_match_`\n"
-                  "    /// the_model`")
-
-#: Jalur berkas nyata, dipotong dua.
-JALUR_NAMA = "Apps/Shared/CelestialVisualView.swift"
-JALUR_POTONG = ("`Apps/Shared/CelestialVisual`\n"
-                "    /// View.swift`")
 
 PROBE = r"""
 import importlib.util, os, sys
@@ -133,9 +126,26 @@ for r in results:
 
 
 def _split(name):
-    """Potong `name` di tengah, hasilkan teks dua baris yang menyambung lagi."""
+    """Potong `name` di tengah, hasilkan teks dua baris yang menyambung lagi.
+
+    Bentuknya **dua** backtick: satu membuka di akhir baris pertama, satu
+    menutup di baris kedua. Versi pertama fungsi ini menaruh backtick
+    penutup juga di baris pertama, sehingga baris itu berisi dua backtick —
+    jumlahnya genap, dan gerbangnya melewatinya. Harness lalu melaporkan
+    keadaan 2–4 hijau dan menyalahkan gerbang, padahal yang cacat adalah
+    teks mutasinya.
+    """
     half = len(name) // 2
-    return "`" + name[:half] + "`\n    /// " + name[half:] + "`"
+    return "`" + name[:half] + "\n    /// " + name[half:] + "`"
+
+
+#: Teks potongan dibangun oleh `_split`, supaya nama aslinya tetap utuh di
+#: satu tempat dan tidak ada salinan yang bisa menyimpang.
+GERBANG_POTONG = _split(GERBANG_NAMA)
+
+#: Jalur berkas nyata, dipotong dua.
+JALUR_NAMA = "Apps/Shared/CelestialVisualView.swift"
+JALUR_POTONG = _split(JALUR_NAMA)
 
 
 def _states():
