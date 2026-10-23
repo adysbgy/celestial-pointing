@@ -192,7 +192,7 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **99 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **100 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
 compiler maupun mata. Nomornya sampai 99 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)

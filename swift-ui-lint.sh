@@ -15057,6 +15057,39 @@ else
 fi
 
 
+echo "== Aturan 101: setiap ciri planet tersambung ke penggambarnya =="
+# Kelas cacat yang sama dengan Aturan 100, satu tingkat lebih dalam. Diukur:
+# `case .blueDisk: drawBlueDisk(…)` diganti `case .blueDisk: break` — bintik
+# gelap Neptunus hilang dari app, Neptunus kembali piringan biru polos — dan
+# `swift-ui-lint.sh` tetap exit 0 dengan 99 aturan hijau,
+# `check_port_matches_swift_constants` 203 pemeriksaan 0 gagal, dan
+# pemeriksaan "opasitas dipakai penggambarnya" hijau (tokennya masih disebut
+# di dalam `drawBlueDisk`; fungsinya hanya tidak pernah dipanggil).
+#
+# Gerbang ini menurunkan daftar cirinya dari `enum DistinguishingFeature` di
+# model, bukan dari daftar tangan: ciri berikutnya yang lupa dipasang adalah
+# persis yang paling mungkin terlewat, dan daftar tangan akan basi tepat di
+# situ. Logikanya di `Tools/` karena alasan bash 3.2 yang sama dengan
+# Aturan 84-100.
+if [ ! -f "Tools/check-aturan101-ciri-planet-tersambung.py" ]; then
+  echo "FAIL Tools/check-aturan101-ciri-planet-tersambung.py tidak ada: Aturan 101"
+  echo "     tidak mengukur apa pun, dan sebuah planet boleh kehilangan ciri"
+  echo "     pengenalnya di layar tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  ciri_planet=$(python3 Tools/check-aturan101-ciri-planet-tersambung.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$ciri_planet"
+    echo "-> Sambungkan cabang `case .ciri:` di `drawPlanet` ke penggambarnya."
+    echo "   Jangan menghapus cirinya dari model, dan jangan biarkan cabangnya"
+    echo "   kosong: cabang kosong adalah planet yang kehilangan cirinya."
+    status=1
+  else
+    echo "$ciri_planet"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

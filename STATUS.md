@@ -156,6 +156,61 @@ ditambahkan adalah **ikatan** ke model, bukan tampilan baru. Suite
 yang saya ukur di lokal hanya dua gerbang paritas dan
 `check_bands_follow_the_limb_arc`.
 
+### Siklus (23 Okt 2026, lanjutan — tujuh planet yang kehilangan cirinya tanpa satu gerbang berbunyi)
+
+Aturan 100 menutup satu lencana. Siklus ini bertanya pertanyaan yang sama
+satu tingkat lebih dalam: **apakah `palette.feature` benar-benar sampai ke
+penggambarnya?** Jawabannya tidak, dan cakupannya lebih luas.
+
+Cacatnya, diukur di proses baru. `case .blueDisk: drawBlueDisk(…)` di
+`drawPlanet` diganti `case .blueDisk: break` — bintik gelap Neptunus hilang
+seluruhnya dari app, Neptunus kembali menjadi piringan biru polos:
+
+    ./swift-ui-lint.sh                     exit 0, 99 aturan, nol merah
+    check_port_matches_swift_constants     203 pemeriksaan, 0 gagal
+    "opasitas dipakai penggambarnya"       hijau
+
+Yang terakhir hijau karena `neptuneSpotOpacity` masih disebut di dalam
+`drawBlueDisk`, dan fungsinya masih ada di berkas. Siklus Venus menutup
+**token**-nya; yang tidak tertutup adalah **pemanggilnya**. Sebuah fungsi
+gambar yang tidak pernah dipanggil adalah token yang dipakai kode mati — dan
+kode mati menggambar nol piksel. Ini kelas yang sama dengan Aturan 100:
+gerbang yang mengukur keberadaan, bukan sambungan.
+
+**Aturan 101** menutupnya. Daftar cirinya **diturunkan** dari
+`enum DistinguishingFeature` di model, bukan ditulis tangan: keadaan yang
+paling mungkin terjadi berikutnya adalah menambah ciri baru di model dan lupa
+memasang cabangnya, dan daftar tangan akan basi tepat di situ. Untuk setiap
+ciri, gerbang mencari `case .ciri:` di switch **terluar** `drawPlanet` dan
+menuntut cabangnya memanggil sesuatu (`draw…(`), bukan `{}` atau `break`.
+
+Gerbang itu sendiri sempat cacat, dan itu bagian dari catatannya. Versi
+pertamanya memakai regex malas di seluruh badan `drawPlanet` — dan
+`drawPlanet` punya switch **kedua** di jalur sabit yang menyebut `.craters`
+dan `.haze` lagi. Mengosongkan cabang terluar `.craters` tetap hijau, karena
+regex-nya berhenti di salinan yang dalam. Aturan yang tidak bisa membedakan
+dua switch di satu fungsi akan meloloskan cacat yang jadi alasan ia ditulis.
+Perbaikannya: switch terluar dikenali dari indentasi terkecil di antara semua
+`case .` — bentuk yang bisa diputuskan dari teks.
+
+Jangkar enum-nya juga sempat salah: `"enum DistinguishingFeature"` cocok
+sebagai **awalan** dari `DistinguishingFeatureLama`, jadi mengganti nama enum
+tetap hijau sambil mengukur enum yang sudah tidak ada. Jangkar sekarang
+berakhir titik dua. Kedua cacat ini ditemukan oleh harness mutasi, bukan oleh
+membaca ulang kode — alasan harness itu ada.
+
+`Tools/bukti-mutasi-aturan101-ciri-planet.py` mengunci enam keadaan:
+baseline, cabang dikosongkan, cabang di-`break`, cabang dihapus, enum diganti
+nama (gerbang harus **merah**, bukan hijau yang tidak berarti), dan ciri baru
+`dustStorms` ditambahkan ke enum tanpa cabang. Semuanya sesuai harapan.
+
+Yang TIDAK diklaim. Ini sapuan **teks**, bukan render: ia tidak membuktikan
+bintik Neptunus terlihat benar, dan tidak membuktikan `drawBlueDisk`
+menggambar sesuatu yang tampak — itu milik gerbang piksel port. Yang dijaga
+hanya sambungan dari `palette.feature` ke penggambarnya.
+
+Engine 222 dan PointingKit 1100 tetap hijau; 100 aturan UI hijau.
+
 ### Siklus (23 Okt 2026, lanjutan — glif "?" yang teruji di model dan tidak pernah sampai ke kanvas)
 
 Siklus ini memindahkan bentuk glif tanda tanya dari delapan literal di

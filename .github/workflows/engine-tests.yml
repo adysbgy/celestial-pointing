@@ -2103,6 +2103,13 @@ jobs:
       - name: Buktikan Aturan 100 berbunyi saat glif putus dari kanvas
         run: python3 Tools/bukti-mutasi-aturan100-glif-kanvas.py
 
+      # Dan bukti untuk **Aturan 101** — kelas yang sama satu tingkat lebih
+      # dalam. Gerbangnya menjaga sambungan `palette.feature` -> penggambar;
+      # yang dibuktikan di sini adalah bahwa sambungan itu **memerah saat
+      # diputus**, termasuk saat ciri baru ditambahkan ke enum tanpa cabang.
+      - name: Buktikan Aturan 101 berbunyi saat ciri planet terputus
+        run: python3 Tools/bukti-mutasi-aturan101-ciri-planet.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
