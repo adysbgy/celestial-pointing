@@ -1951,8 +1951,9 @@ final class CelestialVisualTests: XCTestCase {
     /// sebaliknya — jadi merah.
     ///
     /// **Yang TIDAK diklaim.** Ia tidak memeriksa angka lain di prosa berkas
-    /// ini; hanya sebaran gugus terbuka. Angka lain tetap bergantung pada
-    /// gerbang piksel masing-masing atau pada pembacaan manusia.
+    /// ini; hanya sebaran gugus terbuka dan rata-rata radius gugus bola —
+    /// dua angka yang dikutip docstring tata letak di atas. Angka lain tetap
+    /// bergantung pada gerbang piksel masing-masing atau pembacaan manusia.
     func testOpenClusterSpreadMatchesDocumentedValue() {
         for fuzziness in [0.0, 0.5, 1.0] {
             let geometry = VisualFrame.deepSky(morphology: .openCluster,
@@ -1966,6 +1967,17 @@ final class CelestialVisualTests: XCTestCase {
                            + "\(largest - smallest). Perbarui prosa dan angka "
                            + "ini bersama-sama, jangan salah satunya.")
         }
+        // Rata-rata radius gugus bola juga dikutip docstring itu ("cincin
+        // 0.657 memang lebih besar dari bola 0.351"), dan angka yang tertulis
+        // di sana sempat 0.302 — 16% terlalu kecil, ke arah yang membuat
+        // jarak ke gugus terbuka tampak lebih lebar daripada kenyataannya.
+        let globular = VisualFrame.deepSky(morphology: .globularCluster,
+                                           fuzziness: 1.0).blobs
+        let mean = globular.map { hypot($0.offsetX, $0.offsetY) }
+            .reduce(0, +) / Double(globular.count)
+        XCTAssertEqual(mean, 0.351, accuracy: 0.001,
+                       "docstring menyebut rata-rata radius gugus bola 0.351; "
+                       + "terukur \(mean).")
     }
 
     /// Gugus terbuka harus **tersebar**: tidak ada inti di pusat.

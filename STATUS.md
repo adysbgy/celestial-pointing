@@ -45,11 +45,28 @@ Uji ambang tetap hijau pada sebaran 0.292 — dan itu memang benar, karena
 diklaim". Kalau keduanya merah bersamaan pada mutasi ini, pin angkanya tidak
 akan menambah apa pun.
 
-**Yang TIDAK diklaim.** Pin ini hanya menjaga satu angka. Angka lain di prosa
-berkas itu (0.083 cincin lama, 0.302 gugus bola, 0.657 rata-rata cincin)
-tetap hanya dijaga oleh pembacaan manusia — 0.083 dan 0.302 sudah saya
-verifikasi ulang dengan `hypot` saat siklus ini, tetapi tidak ada gerbang
-yang akan menangkapnya kalau berubah.
+#### Angka kedua di docstring yang sama, juga salah
+
+Docstring yang sama mengutip satu angka lagi: "cincin 0.657 memang lebih
+besar dari bola **0.302**". Diukur lewat uji yang sama persis dengan yang
+dipakai `testGlobularIsMoreConcentratedThanOpenCluster`, rata-rata radius
+gugus bola adalah **0.3508** — bukan 0.302. 16% terlalu kecil, dan lagi-lagi
+ke arah yang membuat kedua morfologi tampak lebih berjauhan daripada
+kenyataan. Diperbaiki ke 0.351 dan ikut dipatok uji.
+
+Angka 0.657 sendiri **benar** (rata-rata radius cincin lama) — jadi cacatnya
+bukan "semua angka di prosa salah", melainkan "tidak ada yang memeriksa, dan
+dua dari empat yang saya periksa ternyata salah".
+
+**Dibuktikan non-vakum untuk angka kedua** (menggeser satu bintang cincin
+luar gugus bola, 0.444326 → 0.500):
+
+    XCTAssertEqual failed: ("0.35492157859296064") is not equal to ("0.351")
+    docstring menyebut rata-rata radius gugus bola 0.351; terukur 0.3549...
+
+**Yang TIDAK diklaim.** Pin ini hanya menjaga dua angka. Angka lain di prosa
+berkas itu tetap hanya dijaga pembacaan manusia, dan itu berarti kelas cacat
+ini **belum tertutup** — hanya dua kemunculannya yang sudah.
 
 
 

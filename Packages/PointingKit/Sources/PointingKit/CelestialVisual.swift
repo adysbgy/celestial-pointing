@@ -2094,7 +2094,7 @@ public enum VisualFrame {
             // semuanya hijau pada cincin itu: `HasNoCentralCore` mengukur
             // tepi dalam (cincin juga berongga), `GlobularIsMoreConcentrated`
             // hanya membandingkan rata-rata (cincin 0.657 memang lebih besar
-            // dari bola 0.302), dan `ShellSitsOnOneRadius` hanya memeriksa
+            // dari bola **0.351**), dan `ShellSitsOnOneRadius` hanya memeriksa
             // `.planetaryNebula`. Sekarang ada
             // `testOpenClusterStarsSitAtDifferentRadii` yang menuntut
             // sebaran > 0.25 R; tata letak ini memberi **0.352 R**
