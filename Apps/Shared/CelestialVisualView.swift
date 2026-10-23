@@ -775,9 +775,9 @@ struct CelestialVisualView: View {
         // 0.580 -> 0.532 (+8.4%), sementara baris yang sama **dengan** bintik
         // menanjak 0.449 -> 0.532 (**-18.4%**) — arahnya terbalik.
         //
-        // Gerbang piksel yang ada tidak menangkapnya: `check_banded_disc_keeps
-        // _its_curvature` mengukur **baris ekuator**, dan bintiknya duduk di
-        // +0.31 R. Karena itu gerbang barunya
+        // Gerbang piksel yang ada tidak menangkapnya:
+        // `check_banded_disc_keeps_its_curvature` mengukur **baris ekuator**,
+        // dan bintiknya duduk di +0.31 R. Karena itu gerbang barunya
         // (`check_jupiter_spot_keeps_its_curvature`) mengukur baris ini.
         //
         // Yang dipakai kembali adalah gradien `drawSphere` yang sama, dipotong

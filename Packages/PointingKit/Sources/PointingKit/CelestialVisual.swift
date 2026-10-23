@@ -2819,8 +2819,8 @@ public enum VisualFrame {
     /// **Kenapa 0.40.** Cukup pekat untuk terbaca sebagai cahaya di atas latar
     /// `(10,10,15)` — gerbang piksel menuntut luminans cincin 0.85 R > 25, dan
     /// 0.40 memberinya 45.4 — tapi tidak cukup untuk menutupi piringan yang
-    /// dilukis di bawahnya. Lihat `testSunCoronaOpacityReadsAsLightWithout
-    /// CoveringTheDisk`.
+    /// dilukis di bawahnya. Lihat
+    /// `testSunCoronaOpacityReadsAsLightWithoutCoveringTheDisk`.
     ///
     /// **Yang TIDAK diklaim.** Ini bukan nilai astronomi; corona nyata tidak
     /// punya kelegapan tunggal. Yang dijaga hanya bahwa satu angka yang sama

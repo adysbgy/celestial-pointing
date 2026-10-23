@@ -564,8 +564,9 @@ struct DiagnosticsView: View {
     /// `UncertainReasonBreakdown` di `PointingKit` untuk alasannya.
     ///
     /// Policy-nya dibaca dari **sumber yang sama** dengan `confidenceChart`
-    /// dan `diagnosis` di atas (`engine.controller.resolver.
-    /// confidencePolicy`) — bukan nilai bawaan — supaya klasifikasi sebab dan
+    /// dan `diagnosis` di atas
+    /// (`engine.controller.resolver.confidencePolicy`) — bukan nilai bawaan —
+    /// supaya klasifikasi sebab dan
     /// ambang di grafik berasal dari satu keputusan yang sama. Kalau ini
     /// memakai `ConfidencePolicy()` bawaan sementara yang lain memakai policy
     /// yang berlaku, rincian bisa mengelompokkan sampel berbeda dari
