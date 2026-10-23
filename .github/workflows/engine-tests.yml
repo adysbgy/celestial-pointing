@@ -901,6 +901,32 @@ jobs:
       - name: Buktikan gerbang jangkauan corona Matahari berbunyi
         run: python3 Tools/bukti-mutasi-jangkauan-corona.py
 
+      # Dan bukti untuk **kelegapan puncak** corona — satu tingkat di dalam
+      # jangkauan, dan sisa terakhir dari kelas cacat yang sama.
+      #
+      # `drawSun` di view menulis `let coronaOpacity: Double = 0.40 // VIEW:`
+      # dengan komentar bahwa angka itu dijaga gerbang piksel. Terukur salah:
+      # angka di **view** diubah 0.40 -> 0.02 (corona hilang dari jam) dan
+      # ketiga pemeriksaan piksel Matahari tetap hijau, karena semuanya
+      # mengukur gambar **port**; angka yang sama di port diubah dan gerbangnya
+      # merah (0.85 R: 45.4 -> 12.4). Jadi satu-satunya angka yang tidak dijaga
+      # siapa pun adalah angka yang benar-benar tampil di pergelangan.
+      #
+      # Angkanya karena itu **pindah ke model** (`VisualFrame.sunCoronaOpacity`),
+      # bukan sekadar diperiksa teksnya: memeriksa teks saja akan mengikat dua
+      # salinan yang sama-sama salah. Gerbang baru menjaga ikatannya, dan
+      # `testSunCoronaOpacityReadsAsLightWithoutCoveringTheDisk` di Linux
+      # menjaga **rentang** nilainya.
+      #
+      # Keadaan 5 wajib **hijau** pada pemeriksaan berkas-utuh dan **merah**
+      # pada pemeriksaan badan fungsi. Itu bukan kerapian: versi pertama
+      # pemeriksaan bernama membaca seluruh berkas, sehingga komentar di atas
+      # `drawSun` yang menyebut `VisualFrame.sunCoronaOpacity` sudah cukup
+      # memenuhinya sementara baris yang dipakai tetap literal. Komentar bukan
+      # kode, dan keadaan 5 ada supaya perbedaan itu tidak bisa hilang diam-diam.
+      - name: Buktikan gerbang opasitas corona Matahari berbunyi
+        run: python3 Tools/bukti-mutasi-opasitas-corona.py
+
       # Dan bukti untuk **kekuatan earthshine** — lead yang ditinggalkan
       # siklus corona, dan kelas cacat yang persis sama satu langkah di
       # sebelahnya.

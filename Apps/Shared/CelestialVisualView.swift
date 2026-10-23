@@ -1887,13 +1887,17 @@ struct CelestialVisualView: View {
         // dalamnya dan memberikan glow yang paling terang tepat di limb,
         // seperti corona nyata.
         //
-        // Kelegapan puncaknya (`coronaOpacity`) adalah **satu-satunya** angka
-        // yang hidup di view untuk Matahari; ia bukan nilai model, jadi
-        // ditandai `VIEW:` dan dijaga oleh gerbang piksel
-        // `check_sun_corona_reaches_beyond_the_disk` (kalau terlalu redup,
-        // corona tidak terbaca; kalau terlalu pekat, ia menutupi piringan).
+        // Kelegapan puncaknya dibaca dari **model**
+        // (`VisualFrame.sunCoronaOpacity`), bukan ditulis di sini. Sebelumnya
+        // angka 0.40 hidup sebagai literal di baris ini dengan komentar bahwa
+        // ia "dijaga gerbang piksel" — dan itu salah: gerbang piksel mengukur
+        // gambar **port Python**, jadi angka di view bisa diubah menjadi 0.02
+        // (corona hilang dari jam) sementara ketiga pemeriksaannya tetap hijau.
+        // Angka yang sama di port diubah dan gerbangnya merah. Satu angka yang
+        // tidak dijaga siapa pun adalah angka yang benar-benar tampil di
+        // pergelangan, jadi ia pindah ke model tempat ia bisa diuji di Linux.
         let reach = CGFloat(VisualFrame.sunCoronaReach) * radius
-        let coronaOpacity: Double = 0.40 // VIEW:
+        let coronaOpacity = VisualFrame.sunCoronaOpacity
         let coronaColor = Self.accent(CelestialVisual.accents.sunPhotosphere)
         let coronaGradient = Gradient(stops: [
             Gradient.Stop(color: coronaColor.opacity(0), location: 0.0),

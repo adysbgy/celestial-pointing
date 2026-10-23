@@ -2789,6 +2789,45 @@ public enum VisualFrame {
     /// cahaya tanpa membanjiri kartu. Lihat `testSunCoronaReachIsBeyondTheDisk`.
     public static let sunCoronaReach: Double = 1.45
 
+    /// Kelegapan puncak corona Matahari — satu angka, tiga bahasa.
+    ///
+    /// **Cacat yang ditutup konstanta ini.** `drawSun` di
+    /// `CelestialVisualView.swift` menulis `let coronaOpacity: Double = 0.40`
+    /// dengan komentar yang menyatakan angka itu "dijaga oleh gerbang piksel
+    /// `check_sun_corona_reaches_beyond_the_disk`". Klaim itu **salah**, dan
+    /// diukur di proses baru, bukan disangka: `0.40` di view diubah menjadi
+    /// `0.02` — corona praktis hilang dari jam — dan ketiga pemeriksaan gerbang
+    /// piksel itu tetap **hijau**:
+    ///
+    /// ```
+    /// corona Matahari bercahaya di luar piringan        ok  (0.85 R = 45.4)
+    /// corona Matahari habis di tepi frame               ok  (0.99 R = 12.7)
+    /// corona lebih lebar dari piringan                  ok  (0.85R=45.4)
+    /// ```
+    ///
+    /// Sebabnya kelas yang sudah berulang di repo ini: gerbang piksel mengukur
+    /// **gambar port Python**, dan port-nya tidak ikut berubah. Angka yang sama
+    /// di port diubah ke `0.02` dan gerbangnya **merah** (0.85 R = 12.4) — jadi
+    /// yang diuji di Linux dan yang tampil di jam bisa menjadi dua Matahari
+    /// berbeda sementara kedua sisi hijau.
+    ///
+    /// Karena itu angkanya pindah ke sini. Ia bukan geometri, jadi ia tidak
+    /// bisa hidup di `sunProfile()` (profil itu berhenti di piringan 1.0 R dan
+    /// tidak tahu apa-apa soal halo); ia adalah **konstanta tetangga** yang
+    /// dipakai bersama oleh view dan port, seperti `sunCoronaReach`.
+    ///
+    /// **Kenapa 0.40.** Cukup pekat untuk terbaca sebagai cahaya di atas latar
+    /// `(10,10,15)` — gerbang piksel menuntut luminans cincin 0.85 R > 25, dan
+    /// 0.40 memberinya 45.4 — tapi tidak cukup untuk menutupi piringan yang
+    /// dilukis di bawahnya. Lihat `testSunCoronaOpacityReadsAsLightWithout
+    /// CoveringTheDisk`.
+    ///
+    /// **Yang TIDAK diklaim.** Ini bukan nilai astronomi; corona nyata tidak
+    /// punya kelegapan tunggal. Yang dijaga hanya bahwa satu angka yang sama
+    /// dipakai ketiga bahasa, dan bahwa angkanya berada di rentang yang masih
+    /// terbaca sebagai glow.
+    public static let sunCoronaOpacity: Double = 0.40
+
     /// Satu perhentian gradient piringan Matahari: warnanya, dan pada radius
     /// berapa ia berada.
     ///

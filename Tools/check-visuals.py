@@ -15535,6 +15535,157 @@ def check_sun_corona_reach_matches_the_model(results):
         f">1.6 menabrak bingkai kartu)"))
 
 
+def check_sun_corona_opacity_matches_the_model(results):
+    """Kelegapan puncak corona harus **satu angka** di model, port, dan view.
+
+    **Cacat yang ditutup pemeriksaan ini — dan kenapa ia tidak terlihat.**
+    `drawSun` di `CelestialVisualView.swift` menulis:
+
+        let coronaOpacity: Double = 0.40 // VIEW:
+
+    dan komentar di atasnya menyatakan angka itu "dijaga oleh gerbang piksel
+    `check_sun_corona_reaches_beyond_the_disk` (kalau terlalu redup, corona
+    tidak terbaca; kalau terlalu pekat, ia menutupi piringan)". Klaim itu
+    **tidak dijaga apa pun**. Diukur di proses baru, bukan diasumsikan —
+    angka di **view** diubah `0.40 -> 0.02`, sehingga corona praktis hilang
+    dari jam, dan hasilnya:
+
+    ```
+    corona Matahari bercahaya di luar piringan   ok  (0.85 R = 45.4)
+    corona Matahari habis di tepi frame          ok  (0.99 R = 12.7)
+    corona lebih lebar dari piringan             ok  (0.85R=45.4)
+    ```
+
+    Nol merah. Angka yang sama diubah di **port** dan gerbangnya berbunyi
+    (0.85 R: 45.4 -> 12.4). Jadi gerbang piksel itu benar-benar mengukur
+    gambar, dan gambar yang ia ukur adalah gambar **port Python** — bukan
+    yang tampil di pergelangan. Kelas yang sama dengan
+    `check_sun_corona_reach_matches_the_model`, satu tingkat lebih dalam:
+    di sana yang menyimpang adalah **jangkauan** (dan pemakaian literal di
+    view ditangkap), di sini yang menyimpang adalah **kelegapan puncaknya**,
+    satu-satunya angka Matahari yang tinggal di view.
+
+    **Kenapa angkanya pindah ke model, bukan sekadar diperiksa di sini.**
+    Memeriksa teks saja akan mengikat dua salinan angka yang sama-sama salah:
+    mengubah 0.40 -> 0.02 di **ketiga** bahasa akan tetap hijau di sini.
+    Karena itu nilai yang benar-benar dipakai sekarang hidup di
+    `VisualFrame.sunCoronaOpacity` dan diuji **rentangnya** oleh
+    `testSunCoronaOpacityReadsAsLightWithoutCoveringTheDisk` di Linux. Gerbang
+    ini menjaga **ikatannya**; uji Swift itu menjaga **nilainya**.
+
+    **Yang TIDAK diklaim.** Ia tidak membaca piksel: ia tidak membuktikan
+    corona terlihat bagus, hanya bahwa satu angka yang sama dipakai ketiga
+    bahasa dan bahwa angka itu dipakai **lewat namanya**. Ia juga tidak
+    mengikat warna corona (`sunPhotosphere`) — itu sudah dijaga
+    `check_night_accents_match_the_model`.
+    """
+    model_path = os.path.join(ROOT, "Packages/PointingKit/Sources/PointingKit/"
+                                     "CelestialVisual.swift")
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    try:
+        model_source = open(model_path).read()
+        port_source = open(R.SOURCE, encoding="utf-8").read()
+        view_source = open(view_path).read()
+    except OSError as exc:
+        results.append(Result("opasitas corona: berkas terbaca", False, str(exc)))
+        return
+
+    # Jangkar hilang = gagal bersih yang menyebut jangkarnya, bukan traceback.
+    model_anchor = "sunCoronaOpacity: Double = "
+    port_anchor = "SUN_CORONA_OPACITY = "
+    missing = [name for name, source, anchor in (
+        ("model", model_source, model_anchor),
+        ("port", port_source, port_anchor)) if anchor not in source]
+    if missing:
+        results.append(Result(
+            "opasitas corona: jangkar model dan port masih ada", False,
+            "jangkar tidak ditemukan di: " + ", ".join(missing)))
+        return
+
+    def value_of(source, anchor):
+        tail = source[source.index(anchor) + len(anchor):]
+        match = re.match(r"\s*(-?\d+(?:\.\d+)?)", tail)
+        return None if match is None else float(match.group(1))
+
+    model_opacity = value_of(model_source, model_anchor)
+    port_opacity = value_of(port_source, port_anchor)
+    if model_opacity is None or port_opacity is None:
+        results.append(Result(
+            "opasitas corona: angka model dan port terbaca", False,
+            f"model {model_opacity}, port {port_opacity}"))
+        return
+
+    results.append(Result(
+        "opasitas corona: model dan port memakai angka yang sama",
+        abs(model_opacity - port_opacity) <= 1e-9,
+        f"model {model_opacity}, port {port_opacity} — keduanya harus sama "
+        f"persis, karena komentar port mengklaim «sama dengan» model"))
+
+    # Arah kedua: pemakaian **bernama**. Angka yang cocok tapi ditulis ulang
+    # sebagai literal adalah dua angka yang kebetulan sama hari ini. Ini yang
+    # paling mungkin terjadi: yang menyunting tampilan Matahari menyalin
+    # `0.40` ke view, bukan membaca konstantanya.
+    results.append(Result(
+        "opasitas corona: port memakai konstantanya sendiri (bukan literal)",
+        "SUN_CORONA_OPACITY" in port_source
+        and "corona_alpha = SUN_CORONA_OPACITY" in port_source,
+        "pemakaian bernama di port: "
+        + ("ada" if "corona_alpha = SUN_CORONA_OPACITY" in port_source
+           else "TIDAK ada — port menulis angkanya sendiri")))
+    results.append(Result(
+        "opasitas corona: view membaca konstanta model (bukan literal)",
+        "VisualFrame.sunCoronaOpacity" in view_source,
+        "pemakaian bernama di view: "
+        + ("ada" if "VisualFrame.sunCoronaOpacity" in view_source
+           else "TIDAK ada — view menulis angkanya sendiri")))
+
+    # Arah ketiga: literal lama tidak boleh hidup lagi di badan `drawSun`.
+    # `_function_body` memotong pada kurawal penutup fungsi itu sendiri, jadi
+    # literal di fungsi lain tidak ikut dituduh (kelas cacat yang sudah
+    # dibayar `read_deep_sky_drawing_from_swift`).
+    body = _function_body(view_source, "private func drawSun(")
+    if not body:
+        results.append(Result(
+            "opasitas corona: badan drawSun terbaca dari view", False,
+            "'private func drawSun(' TIDAK ditemukan di "
+            "CelestialVisualView.swift — jangkar bergeser, gerbang ini "
+            "berhenti mengukur dan itu dilaporkan sebagai merah"))
+        return
+
+    # Pemakaian bernama diperiksa di **badan fungsi**, bukan di seluruh berkas.
+    # Versi pertama pemeriksaan ini membaca seluruh berkas, dan itu hijau pada
+    # mutasi yang seharusnya merah: komentar di atas `drawSun` yang menyebut
+    # `VisualFrame.sunCoronaOpacity` sudah cukup memenuhinya, padahal baris
+    # yang benar-benar dipakai tetap literal. Diukur, bukan diduga — mutasi
+    # `let coronaOpacity = VisualFrame.sunCoronaOpacity` -> `... : Double =
+    # 0.40` membuat pemeriksaan berkas-utuh tetap OK. Komentar bukan kode.
+    results.append(Result(
+        "opasitas corona: drawSun membaca konstanta model (bukan literal)",
+        "VisualFrame.sunCoronaOpacity" in body,
+        "pemakaian bernama di badan drawSun: "
+        + ("ada" if "VisualFrame.sunCoronaOpacity" in body
+           else "TIDAK ada — drawSun menulis angkanya sendiri")))
+
+    literal = re.search(r"coronaOpacity\s*:\s*Double\s*=\s*[\d.]+", body)
+    results.append(Result(
+        "opasitas corona: drawSun tidak menulis ulang angkanya",
+        literal is None,
+        "tidak ada literal `coronaOpacity: Double = …` di drawSun"
+        if literal is None else
+        f"drawSun masih menulis '{literal.group(0)}' — angka itu tidak "
+        f"terikat ke model dan mengubahnya tidak memerahkan apa pun"))
+
+    # Arah keempat: nilai yang tidak lagi terbaca sebagai cahaya. Diukur dari
+    # sumber, bukan dari piksel: gerbang piksel mengukur port, dan port-nya
+    # membaca konstanta yang sama, jadi angkanya sampai ke gambar lewat jalur
+    # yang sudah diperiksa di atas.
+    results.append(Result(
+        "opasitas corona: di rentang yang terbaca sebagai glow",
+        0.15 <= model_opacity <= 0.70,
+        f"model {model_opacity} (di bawah 0.15 corona tak terbaca; di atas "
+        f"0.70 ia menutupi piringan fotosfer)"))
+
+
 def earthshine_strength_body(source, anchor, style):
     """Badan fungsi `earthshineStrength` dari teks sumber, komentar dibuang.
 
@@ -18642,6 +18793,10 @@ def main():
         check_sun_corona_reach_matches_the_model(results)
     except Exception as _gate_error:  # noqa: BLE001
         _gate_failed(results, "check_sun_corona_reach_matches_the_model", _gate_error)
+    try:
+        check_sun_corona_opacity_matches_the_model(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_sun_corona_opacity_matches_the_model", _gate_error)
     try:
         check_earthshine_strength_matches_the_model(results)
     except Exception as _gate_error:  # noqa: BLE001

@@ -4353,6 +4353,39 @@ final class CelestialVisualTests: XCTestCase {
                              "inti lebih pucat (biru lebih tinggi) daripada tepi")
     }
 
+    /// Kelegapan corona harus **terbaca sebagai cahaya** tanpa menutupi piringan.
+    ///
+    /// Cacat yang ditutup uji ini, dan kenapa ia harus ada di model.
+    /// Kelegapan puncak corona dulu hidup sebagai `let coronaOpacity: Double =
+    /// 0.40` di dalam `drawSun`, dengan komentar bahwa angka itu "dijaga
+    /// gerbang piksel". Diukur di proses baru: angka di view diubah `0.40 ->
+    /// 0.02` — corona hilang dari jam — dan **ketiga** pemeriksaan
+    /// `check_sun_corona_reaches_beyond_the_disk` tetap hijau, karena gerbang
+    /// itu mengukur gambar **port Python**, bukan view. Angka yang sama diubah
+    /// di port dan gerbangnya merah (0.85 R: 45.4 -> 12.4). Jadi satu-satunya
+    /// angka yang tidak dijaga siapa pun adalah angka yang benar-benar tampil
+    /// di pergelangan.
+    ///
+    /// Uji ini menjaga **dua arah** yang bisa gagal sendiri-sendiri:
+    /// terlalu redup (corona tak terbaca, kembali menjadi disk polos yang
+    /// brief tolak) dan terlalu pekat (halo menelan piringan yang dilukis di
+    /// bawahnya, jadi Matahari tampak sebagai gumpalan rata).
+    ///
+    /// Batasnya sengaja lebar dan bukan nilai terukurnya: 0.40 hijau, 0.02 dan
+    /// 0.95 merah. Yang dijaga rentangnya, bukan supaya angka ini tidak pernah
+    /// boleh disetel — menyetelnya ke 0.30 atau 0.55 tetap sah.
+    func testSunCoronaOpacityReadsAsLightWithoutCoveringTheDisk() {
+        let opacity = VisualFrame.sunCoronaOpacity
+        XCTAssertGreaterThanOrEqual(opacity, 0.15,
+                                    "corona di bawah 0.15 R tidak lagi terbaca sebagai "
+                                    + "cahaya di atas latar gelap; Matahari kembali "
+                                    + "menjadi disk tanpa halo")
+        XCTAssertLessThanOrEqual(opacity, 0.70,
+                                 "corona di atas 0.70 menutupi piringan fotosfer yang "
+                                 + "dilukis di bawahnya, sehingga Matahari tampak "
+                                 + "sebagai gumpalan cahaya rata")
+    }
+
     // MARK: - Regresi: `CraterRelief` harus tetap bisa di-compare
 
     /// `CraterRelief` menyatakan model bibir kawah yang diuji di Linux. Ia

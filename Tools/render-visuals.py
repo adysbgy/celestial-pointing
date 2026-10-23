@@ -2840,6 +2840,13 @@ def sun_profile(core, photosphere):
 # Corona menjangkau ini × radius gambar — **sama dengan** `VisualFrame.sunCoronaReach`
 # di model Swift. Satu angka, satu sumber, supaya dua bahasa tidak menyimpang.
 SUN_CORONA_REACH = 1.45
+# Kelegapan puncak corona — **sama dengan** `VisualFrame.sunCoronaOpacity`.
+# Dulu angka ini hidup sebagai literal di `drawSun` (view) dan di sini, dengan
+# komentar bahwa gerbang piksel menjaganya. Itu salah: gerbang piksel mengukur
+# gambar **port ini**, jadi literal di view bisa berubah tanpa satu pun merah.
+# Sekarang ketiga bahasa membaca satu konstanta model, dan
+# `check_sun_corona_opacity_matches_the_model` mengikatnya.
+SUN_CORONA_OPACITY = 0.40
 
 
 def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
@@ -2862,10 +2869,12 @@ def _draw_sun(canvas, cx, cy, radius, kw, night_mode):
     # luar, menjangkau SUN_CORONA_REACH × radius, ditumpangkan di atas piringan.
     # Bentuknya **pita** (transparan→puncak→transparan) — sama seperti `drawSun`
     # di view. Kalau dimulai dari puncak di tepi, seluruh piringan tertutup
-    # warna rata. `corona_alpha` = 0.40 adalah angka VIEW: dijaga gerbang piksel.
+    # warna rata. `corona_alpha` dibaca dari konstanta bernama, bukan ditulis
+    # ulang: literal di sini dulu membuat satu bahasa punya angka yang tidak
+    # pernah dibandingkan dengan bahasa lain.
     reach = SUN_CORONA_REACH * radius
     corona_color = photo_rgb
-    corona_alpha = 0.40  # VIEW:
+    corona_alpha = SUN_CORONA_OPACITY
     corona_stops = [
         (0.0, corona_color, 0.0),
         (1.0 / SUN_CORONA_REACH, corona_color, corona_alpha),
