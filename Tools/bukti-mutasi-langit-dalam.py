@@ -41,8 +41,7 @@ Keadaan yang diuji:
      (warna tetap benar)              bentuk, terkunci maupun ragu. Arah (1)
                                       hijau (penekanan tetap benar) dan seluruh
                                       42 pemeriksaan
-                                      `check_deep_sky_morphologies_render_
-                                      distinct` juga hijau (warnanya tetap
+                                      `check_deep_sky_morphologies_render_distinct` juga hijau (warnanya tetap
                                       berbeda). Hanya arah (2) yang memerah —
                                       inilah satu-satunya gerbang yang
                                       menangkapnya.

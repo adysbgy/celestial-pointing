@@ -40,8 +40,7 @@ Jadi yang dikerjakan bukan melonggarkan harapan sampai cocok. Yang dikerjakan:
   2. Keadaan **baru** ditambahkan: boost **dibuang sepenuhnya**
      (`0.25 -> 0.0`). Harapan lama mengklaim `CORE` menangkap perubahan angka
      ini; keadaan 5 membuktikan sebaliknya — kontras terkecil hanya jatuh
-     1.687 → 1.537 menghadap ambang 1.10. Jadi `check_cluster_cores_reach_the_
-     picture` menjaga **keberadaan** inti, bukan **kekuatan** boost-nya, dan
+     1.687 → 1.537 menghadap ambang 1.10. Jadi `check_cluster_cores_reach_the_picture` menjaga **keberadaan** inti, bukan **kekuatan** boost-nya, dan
      yang mencatat kekuatannya adalah `DOC`.
 
 Matriks terukurnya ada di deklarasi `STATES`.

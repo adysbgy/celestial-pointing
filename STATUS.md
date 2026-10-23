@@ -30931,8 +30931,7 @@ terbaca sebagai **bola** atau sebagai cakram rata.
 
 Menambah dua angka ke `checks` berarti menuliskannya **ketiga** kalinya di
 dalam gerbang, menjadi entri yang tidak pernah dibandingkan dengan apa pun —
-persis kelas lubang yang seluruh berkas ini tutup. `check_gradient_end_radii
-_match` membaca kedua angka dari **kedua sumber** dan membandingkannya
+persis kelas lubang yang seluruh berkas ini tutup. `check_gradient_end_radii_match` membaca kedua angka dari **kedua sumber** dan membandingkannya
 sebagai pasangan.
 
 ### Kenapa pembedanya `startRadius`, bukan urutan nilai
@@ -33115,8 +33114,7 @@ menghitung ketiga bentuk jujur — masing-masing wajib muncul **tepat 1 kali** �
 jadi mutasi apa pun yang membaliknya membuat hitungan jadi 0 dan gerbang memerah,
 tanpa menuduh kode yang sah. Berkas hilang/dipindah juga memerah (PERINGATAN).
 
-**Bukti gerbangnya berbunyi, bukan sekadar hijau** — `Tools/bukti-mutasi-aturan53-
-kejujuran-sensor.py`, 6 keadaan, 0 tidak sesuai:
+**Bukti gerbangnya berbunyi, bukan sekadar hijau** — `Tools/bukti-mutasi-aturan53-kejujuran-sensor.py`, 6 keadaan, 0 tidak sesuai:
 
     OK   [baseline]                                   hijau
     OK   1. perintah sensor dibalik (false)->(true)    MERAH

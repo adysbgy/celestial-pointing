@@ -83,8 +83,7 @@ gerbangnya tidak lagi memeriksa ukuran yang diklaim harness ini, dan itu harus
 dibaca manusia, bukan ditelan.
 
 Berkas sumber produksi (`Tools/render-visuals.py`,
-`Apps/Shared/CelestialVisualView.swift`, `Packages/PointingKit/Sources/
-PointingKit/CelestialVisual.swift`) **dimutasi dengan sengaja** lalu dipulihkan
+`Apps/Shared/CelestialVisualView.swift`, `Packages/PointingKit/Sources/PointingKit/CelestialVisual.swift`) **dimutasi dengan sengaja** lalu dipulihkan
 di `finally` per keadaan, lewat `mutasi_sumber` (tulis atomik + pemulihan
 terverifikasi). Kegagalan di tengah tidak boleh meninggalkan mutasi hidup —
 pelajaran yang sudah dibayar di repo ini (`SIGKILL` melewati `finally`, jadi

@@ -1177,8 +1177,7 @@ def check_view_blur_predicate_matches_the_model(results):
     **Yang TIDAK diklaim.** Ini pembacaan teks satu berkas, bukan analisis
     Swift sungguhan. Ia tidak membuktikan `diameter`/`visual.kind` yang
     dipakai benar, dan tidak mengukur hasil di layar — itu
-    `check_uncertain_object_is_blurred` (port) dan `check_uncertain_blur_
-    excludes_moon`. Yang dijaga di sini hanya arah predikatnya, karena arah
+    `check_uncertain_object_is_blurred` (port) dan `check_uncertain_blur_excludes_moon`. Yang dijaga di sini hanya arah predikatnya, karena arah
     itulah yang tidak terlihat oleh gerbang mana pun.
     """
     view = swift_code_only(open(os.path.join(
@@ -1617,8 +1616,7 @@ def check_deep_sky_shape_suppression(results, size=200, ss=2):
          ini tidak bisa dipenuhi oleh warna. Ini arah yang menangkap
          kebalikannya — penggambar yang mengabaikan morfologi untuk **bentuk**
          (terkunci maupun ragu) akan hijau di keenam pemeriksaan (1) **dan**
-         hijau di seluruh 42 pemeriksaan `check_deep_sky_morphologies_render_
-         distinct`, karena keenam morfologi tetap berbeda warna. Diukur: pada
+         hijau di seluruh 42 pemeriksaan `check_deep_sky_morphologies_render_distinct`, karena keenam morfologi tetap berbeda warna. Diukur: pada
          mutasi itu, kedua gerbang tersebut hijau sementara bentuknya jelas
          sama. Hanya pemeriksaan ini yang memerah.
 
@@ -7215,8 +7213,7 @@ def check_backdrop_port_matches_the_model(results, model_source=None, view_sourc
 
     **Kenapa dibaca dari teks model, bukan dari angka yang ditulis di sini.**
     Menulis ulang `0.55` di sisi gerbang akan membuat dua salinan yang bisa
-    menyimpang lagi — persis kelas yang `check_modeled_port_constants_match_
-    the_model` ada untuk mencegah, dan kelas yang sudah dibayar repo ini
+    menyimpang lagi — persis kelas yang `check_modeled_port_constants_match_the_model` ada untuk mencegah, dan kelas yang sudah dibayar repo ini
     untuk pita Saturnus dan cincinnya.
 
     **Kenapa `maximumSpeckRadius` dihitung, bukan dibaca.** Di Swift ia
@@ -15094,8 +15091,7 @@ def _gradient_end_factors(source):
 
     Dua gradien yang dijaga, dan keduanya **tidak punya konstanta**: sampai
     gerbang ini ada, `1.35` (gradien bola) dan `1.15` (peredupan limb pada
-    piringan berfase) ditulis sebagai literal di `Apps/Shared/CelestialVisual
-    View.swift` **dan** di port Python, dan tidak disebut satu pun pemeriksaan
+    piringan berfase) ditulis sebagai literal di `Apps/Shared/CelestialVisualView.swift` **dan** di port Python, dan tidak disebut satu pun pemeriksaan
     di berkas ini.
 
     Bukti mutasi yang membuka celah ini (`out/mutasi-radius-gradasi.py`,
@@ -17642,6 +17638,189 @@ def check_cited_test_names_exist(results):
              f"{', '.join(sorted(dangling))}"))
 
 
+def _known_symbols():
+    """Himpunan nama yang **benar-benar ada** di pohon, untuk memutuskan
+    apakah sebuah kutipan terbelah memotong nama nyata atau hanya prosa.
+
+    Tiga jenis, karena ketiganya adalah hal yang dikutip sumber produksi:
+
+      - nama uji (`func test…` di `Packages/*/Tests`), lewat
+        `_defined_test_names`;
+      - nama gerbang (`def check_…`) di `Tools/*.py`;
+      - jalur berkas relatif terhadap akar repo.
+
+    **Kenapa perlu himpunan ini sama sekali.** Tanpa-nya, "kutipan terbelah"
+    dan "prosa yang dibungkus" tidak bisa dibedakan dari teksnya saja. Diukur:
+    aturan berbasis bentuk kata saja melaporkan **13** temuan di pohon ini dan
+    **semuanya salah** — `Apple` + `Build`, `enum` + `DistinguishingFeature`,
+    `CelestialVisual.moonSphereGradient` + `EndRadius`. Setiap pasangan itu
+    menyambung menjadi identifier yang *juga* masuk akal, jadi tidak ada pola
+    teks yang bisa memisahkannya.
+
+    Yang memisahkan adalah **keberadaan**: `moonSphereGradientEndRadius` bukan
+    deklarasi apa pun dan `moonSphereGradient` adalah deklarasi nyata, jadi
+    kutipan itu prosa. Sebaliknya
+    `testDeepSkyMorphologyDistinguishesThreeTypes` **adalah** uji nyata
+    sementara `testDeepSkyMorphologyDistinguishes` bukan — di situlah
+    pemotongannya.
+    """
+    symbols = set(_defined_test_names())
+
+    for path in glob.glob(os.path.join(ROOT, "Tools/*.py")):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        symbols |= set(re.findall(r"^def\s+(check_\w+)\s*\(", source, re.M))
+
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        # Direktori hasil bangun dan riwayat: bukan isi pohon yang dikutip.
+        dirnames[:] = [d for d in dirnames
+                       if d not in (".git", ".build", "out", "__pycache__")]
+        for name in filenames:
+            rel = os.path.relpath(os.path.join(dirpath, name), ROOT)
+            symbols.add(rel.replace(os.sep, "/"))
+
+    return symbols
+
+
+def _split_citations():
+    """Kutipan backtick yang **dibuka di satu baris dan ditutup di baris lain**
+    sehingga memotong sebuah nama yang benar-benar ada.
+
+    **Cacat yang ditutup pemeriksaan ini — ia memerahkan CI lebih dulu.**
+    `CelestialVisual.swift:2822` menulis:
+
+        /// dilukis di bawahnya. Lihat `testSunCoronaOpacityReadsAsLightWithout
+        /// CoveringTheDisk`.
+
+    `check_cited_test_names_exist` memindai `\\btest[A-Z][A-Za-z0-9_]*` per
+    berkas, jadi ia berhenti di ujung baris dan membaca
+    `testSunCoronaOpacityReadsAsLightWithout` sebagai nama lengkap. Nama itu
+    tidak ada, gerbangnya **merah**, dan merahnya benar.
+
+    Tapi kebenaran itu **kebetulan**. Yang menentukan apakah gerbangnya
+    berbunyi bukan bentuk kutipannya, melainkan apakah potongan pertama
+    kebetulan juga nama uji. Diukur atas 1306 uji di suite ini: **4 pasangan**
+    nama yang satu adalah awalan yang lain —
+
+        testEnglishTranslationControlsTheWords
+          / testEnglishTranslationControlsTheWordsAndInsertion
+        testFirstSampleIsPointing / testFirstSampleIsPointingNotLock
+        testPermissivePolicyRejectsNothing
+          / testPermissivePolicyRejectsNothingForEveryKind
+        testSameStarLocksAtNight / testSameStarLocksAtNightSoTheDaylightRefusalIsTheCause
+
+    — jadi 4 dari 1306 nama (~0.3%) membuat kutipan terbelah **hijau**. Itu
+    bukan hipotesis: `Tools/bukti-mutasi-kutipan-terbelah.py` membangun
+    keadaan itu dari nama uji yang benar-benar ada di pohon, dan gerbang
+    lama tetap hijau di sana. Kelas cacatnya sama dengan seluruh berkas ini:
+    hijau karena tidak mengukur apa pun.
+
+    **Kenapa bentuknya cacat, bukan hanya soal gerbang.** Identifier yang
+    dipecah melewati batas baris dibaca salah oleh **manusia** juga. Pembaca
+    yang menyalin `testSunCoronaOpacityReadsAsLightWithout` ke pencarian
+    tidak menemukan apa pun, dan kalimatnya berhenti menjadi rujukan. Arah
+    perbaikannya karena itu teksnya (lihat komit `b40c0ca`), dan gerbang ini
+    menjaga agar teksnya tidak kembali terbelah.
+
+    **Predikatnya keberadaan, bukan bentuk.** Sebuah kutipan dilaporkan hanya
+    bila `potongan1 + potongan2` **ada** di pohon sementara `potongan1`
+    sendiri **tidak**. Itu tepat definisi "pemotongan yang membuat rujukan
+    menunjuk nama yang tidak ada". Lihat `_known_symbols` untuk alasan
+    bentuk-kata saja tidak cukup (13 temuan, semuanya salah).
+
+    **Cakupan: seluruh pohon, bukan hanya sumber produksi.** `_cited_test_names`
+    sengaja tidak membaca `Tools/*.py` (riwayat di sana sah). Aturan ini
+    **tidak** punya alasan itu: nama yang terpotong salah dibaca di mana pun
+    ia berada, termasuk di docstring gerbang.
+
+    **Fail-closed.** Nol backtick terbaca berarti pembacanya tidak lagi cocok
+    dengan berkasnya — itu merah, bukan hijau.
+    """
+    found = []
+    targets = []
+    for pattern in ("Packages/**/*.swift", "Apps/**/*.swift",
+                    "Tools/*.py", "Tools/*.sh",
+                    ".github/workflows/*.yml", "*.md"):
+        targets += glob.glob(os.path.join(ROOT, pattern), recursive=True)
+
+    #: Jumlah backtick yang terbaca; dipakai untuk fail-closed.
+    total_ticks = 0
+    symbols = _known_symbols()
+
+    for path in sorted(set(targets)):
+        if "/.build/" in path or "/out/" in path:
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        rel = os.path.relpath(path, ROOT)
+        total_ticks += source.count("`")
+
+        # Baris yang punya backtick **berjumlah ganjil** membuka kutipan yang
+        # tidak ditutup di baris itu. Pasangan ``` (blok kode markdown)
+        # dihitung dua, jadi ia tidak pernah menghasilkan ganjil.
+        lines = source.splitlines()
+        for index, line in enumerate(lines):
+            if line.count("`") % 2 == 0:
+                continue
+            if index + 1 >= len(lines):
+                continue
+            # Hanya periksa bila baris berikutnya **menutupnya**: tepat satu
+            # backtick di sana.
+            nxt = lines[index + 1]
+            if nxt.count("`") != 1:
+                continue
+            opened = line[line.rindex("`") + 1:].strip()
+            closed = nxt[:nxt.index("`")].strip()
+            if not opened or not closed:
+                continue
+            # Spasi di salah satu potongan berarti kalimat, bukan satu token.
+            if " " in opened or " " in closed:
+                continue
+            joined = opened + closed
+            if joined in symbols and opened not in symbols:
+                found.append((rel, index + 1, opened, closed))
+
+    return found, total_ticks
+
+
+def check_citations_are_not_split_across_lines(results):
+    """Identifier yang dikutip backtick tidak boleh terbelah melewati baris.
+
+    Lihat `_split_citations` untuk cacat yang ditutupnya, keempat pasangan
+    nama uji yang membuat gerbang lama hijau di keadaan itu, dan alasan
+    cakupannya seluruh pohon.
+    """
+    found, total_ticks = _split_citations()
+
+    if total_ticks == 0:
+        results.append(Result(
+            "kutipan tidak terbelah melewati baris", False,
+            "tidak ada satu pun backtick terbaca dari pohon — pembacanya "
+            "perlu diselaraskan dengan bentuk berkasnya; nol bacaan bukan "
+            "berarti tidak ada yang perlu dijaga"))
+        return
+
+    for rel, line_no, opened, closed in found:
+        results.append(Result(
+            f"kutipan tidak terbelah melewati baris: {rel}:{line_no}", False,
+            f"`{opened}` + `{closed}` dibuka di satu baris dan ditutup di "
+            f"baris berikutnya — terbaca sebagai `{opened}` oleh manusia dan "
+            f"oleh gerbang, jadi rujukannya menunjuk nama yang tidak ada"))
+
+    results.append(Result(
+        "kutipan tidak terbelah melewati baris", not found,
+        f"tidak ada identifier yang terbelah di antara {total_ticks} backtick"
+        if not found
+        else f"{len(found)} kutipan terbelah: "
+             + ", ".join(f"{rel}:{n}" for rel, n, _, _ in found)))
+
+
 def _cited_tool_files():
     """Berkas `Tools/…` yang **dirujuk sumber produksi**, beserta lokasinya.
 
@@ -18994,6 +19173,16 @@ def main():
         check_cited_tool_files_exist(results)
     except Exception as _gate_error:  # noqa: BLE001
         _gate_failed(results, "check_cited_tool_files_exist", _gate_error)
+    # Kelas yang sama, satu tingkat lebih dangkal: bukan nama yang salah,
+    # melainkan **bentuk kutipannya**. Identifier yang dibuka di satu baris
+    # dan ditutup di baris berikutnya terbaca sebagai potongan pertama oleh
+    # gerbang mana pun yang memindai per baris — dan oleh manusia. Cakupannya
+    # seluruh pohon, termasuk berkas ini sendiri.
+    try:
+        check_citations_are_not_split_across_lines(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_citations_are_not_split_across_lines",
+                     _gate_error)
     # Kelas yang sama, satu tingkat lebih luas: nama uji yang dikutip di
     # **setiap** berkas sumber (bukan hanya `Apps/`), dengan tiga bidang
     # dibedakan, plus penanda sementara yang tertinggal di kode terkirim.

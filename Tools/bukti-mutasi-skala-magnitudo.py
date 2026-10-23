@@ -54,8 +54,7 @@ dinyatakan, bukan kelonggaran.
 
 - Gerbang ini mengikat **parameter** dan **hasil perhitungan** kedua bahasa.
   Ia tidak membaca piksel app mana pun; tidak ada klaim bahwa perangkat
-  Apple menggambar glow dengan ukuran persis ini. `check_star_size_follows_
-  magnitude` yang mengukur gambar port untuk itu.
+  Apple menggambar glow dengan ukuran persis ini. `check_star_size_follows_magnitude` yang mengukur gambar port untuk itu.
 - Ia tidak menahan **nilai** yang benar secara astronomis: 10^(−0.2·Δm) sudah
   benar dan tidak diubah. Yang dijaga adalah model, port, dan urutannya
   tidak boleh bercerai.
