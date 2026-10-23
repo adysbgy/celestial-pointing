@@ -1,3 +1,56 @@
+### Siklus (23 Okt 2026, lanjutan — kamus fase ketiga ditambahi, bukan dibangun)
+
+Siklus ini juga tidak menambah fitur, dan cacatnya **sudah ada di pohon** —
+bukan ditanam untuk membuktikan gerbang. Ia lolos 101 aturan UI, seluruh
+gerbang piksel port, dan 1323 uji.
+
+**Cacatnya.** `refreshSkyContext` mengisi tiga kamus yang sejajar, dan docstring
+`planetWaxing` menyatakan janjinya dengan kalimat tegas: *"Sejajar dengan
+`planetPhases`, dan diisi dari sampel efemeris yang sama"*. Diukur:
+
+    planetPhases             whole-assign=1  subscript-write=0
+    planetWaxing             whole-assign=0  subscript-write=1
+    planetBrightLimbAngles   whole-assign=1  subscript-write=0
+
+Dua kamus dibangun di variabel lokal lalu **menggantikan** isi properti, jadi
+entri yang tidak terisi pada sampel kali ini ikut hilang — itulah arti "tidak
+diketahui". `planetWaxing` hanya pernah ditambahi, dan tidak ada satu baris pun
+yang mengosongkannya. Bila `isPlanetWaxing` mengembalikan `nil` pada sampel
+berikutnya, fraksi dan sudut hilang tetapi arah dari 30 detik lalu bertahan;
+`phaseGeometry(waxing:)` lalu memasangkan fraksi segar dengan arah basi. Sabitnya
+menghadap sisi keliru tepat di sekitar elongasi 180° — satu-satunya tempat arah
+itu berbalik, jadi satu-satunya tempat kesalahan ini paling salah.
+
+**Kenapa 101 aturan tidak menangkapnya.** Aturan 31 memeriksa **kunci** yang
+dipakai saat membaca kamus (`$0`, bukan `.venus`), bukan apakah isinya pernah
+dikosongkan. Dan tidak ada uji Swift yang bisa: `PointingEngine.swift` mengimpor
+`Combine` dan `@MainActor`, jadi tidak dikompilasi di Linux, sementara seluruh
+uji fase menguji rumusnya (`phaseGeometry`), bukan pengisi kamusnya.
+
+**Perbaikannya** bentuk yang sudah dipakai dua kamus saudaranya: bangun di
+variabel lokal, tugaskan utuh. Bukan `planetWaxing = [:]` di awal fungsi —
+penugasan utuh membuat kamus kosong dengan sendirinya, sehingga tidak ada yang
+bisa lupa.
+
+**Gerbang Aturan 102** menurunkan daftar kamusnya dari deklarasi, bukan dari
+daftar tangan: kamus keempat yang lupa dibangun ulang adalah yang paling mungkin
+terlewat, dan daftar tangan akan basi tepat di situ. Dibuktikan non-vakum
+(`Tools/bukti-mutasi-aturan102-peta-fase.py`, 8 keadaan, 0 tidak sesuai):
+kembali ke bentuk aslinya, subskrip tanpa penugasan, penugasan dihapus,
+deklarasi diganti nama (gerbang berhenti mengukur = GAGAL, bukan hijau), kamus
+keempat ditambahkan, dan nama lokal disamakan dengan properti. Setiap keadaan
+menyunting `PointingEngine.swift` sungguhan lalu memulihkannya byte-per-byte.
+
+**Gerbangnya langsung menemukan angka basi di luar dirinya.** `swift-ui-lint.sh`
+menolak hijau karena README masih menyebut "100 aturan" sementara berkasnya kini
+punya 101 — persis kelas yang dijaga pemeriksa hitungan itu. Diperbarui.
+
+**Yang TIDAK diklaim.** Aturan 102 adalah sapuan **teks**: ia tidak membuktikan
+kamusnya berisi nilai yang benar, dan tidak bisa menilai apakah sabit di layar
+menghadap arah yang benar — itu milik gerbang piksel port. Yang dijaga:
+**bentuk pengisiannya** tidak bisa kembali menjadi "tambahi saja" tanpa gerbang
+merah. Ia juga tidak membaca `PointingKit` sebagai pohon yang dikompilasi.
+
 ### Siklus (23 Okt 2026, lanjutan — tiga gerbang yang hijau tanpa mengukur apa pun)
 
 Siklus ini tidak menambah fitur. Ia menutup tiga cacat yang semuanya berbentuk
