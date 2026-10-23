@@ -2092,6 +2092,17 @@ jobs:
       - name: Buktikan Aturan 99 berbunyi saat complication membeku
         run: python3 Tools/bukti-mutasi-aturan99-complication-menyegar.py
 
+      # Dan bukti untuk **Aturan 100** — gerbang yang menjaga agar bentuk glif
+      # "?" yang sudah teruji di model benar-benar **digores** di kanvas. Cacat
+      # aslinya ditemukan dengan mengukur: loop titik di `drawCandidateMarker`
+      # diganti daftar kosong, garis glif tidak pernah digambar, dan seluruh 99
+      # aturan UI tetap hijau — karena semuanya membaca model atau port Python,
+      # dan tidak satu pun membaca badan view. Harness ini menyunting
+      # `CelestialVisualView.swift` sungguhan, lalu memulihkannya
+      # byte-per-byte.
+      - name: Buktikan Aturan 100 berbunyi saat glif putus dari kanvas
+        run: python3 Tools/bukti-mutasi-aturan100-glif-kanvas.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
