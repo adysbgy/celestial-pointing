@@ -242,6 +242,21 @@ jobs:
       - name: Buktikan gerbang aksen gambar berbunyi
         run: python3 Tools/bukti-mutasi-aksen.py
 
+      # Bukti bahwa konstanta yang port klaim milik view **benar-benar dipakai**.
+      #
+      # `check_port_matches_swift_constants` hanya menanyakan apakah teks angka
+      # masih tertulis di berkas view — dan konstanta yang dideklarasikan lalu
+      # tidak pernah dibaca tetap memuat teks itu. Diukur di proses baru:
+      # memutus pemakaian `glowOpacities` dan `clusterCoreHaloScale` membiarkan
+      # `swift-ui-lint.sh` exit 0 dengan 102 aturan dan 235 pemeriksaan paritas
+      # 0 gagal. Dua ciri gambar bisa hilang tanpa satu pun gerbang berbunyi.
+      #
+      # Harness ini juga mengunci dua bentuk **benar** yang membuat draf
+      # pertamanya merah (angka difaktorkan ke konstanta; angka dibaca dari
+      # model). Gerbang yang merah pada kode benar akan dimatikan orang.
+      - name: Buktikan gerbang pemakaian konstanta view berbunyi
+        run: python3 Tools/bukti-mutasi-konstanta-view.py
+
       # Dan bukti yang sama untuk pemeriksaan ukuran bintang — cacat yang
       # ditemukan siklus ini: **setiap** kasus bintang bernama digambar dengan
       # `relative_size=size_from_magnitude(0.0)`, satu magnitudo untuk Sirius

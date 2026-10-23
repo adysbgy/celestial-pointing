@@ -1132,6 +1132,138 @@ def check_uncertain_object_is_blurred(results, size=200, ss=2):
         f"(samaran menghapus ketegasan, bukan objeknya)"))
 
 
+def check_view_literals_are_used_where_the_port_says(results,
+                                                     view_source=None,
+                                                     port_source=None):
+    """Konstanta yang port klaim sebagai milik view harus benar-benar **dipakai**.
+
+    **Cacat yang ditutup — diukur, bukan disangka.** `Tools/render-visuals.py`
+    menandai konstanta dengan `# VIEW: ...` untuk menjanjikan angka itu berasal
+    dari `CelestialVisualView`. Sampai pemeriksaan ini ada, janji itu hanya
+    diukur oleh `check_port_matches_swift_constants`, dan pemeriksaan itu
+    menanyakan **satu** hal: apakah teks `2.4` masih tertulis di berkas view.
+    Ia tidak pernah menanyakan apakah konstanta itu masih **dipakai** untuk
+    menggambar.
+
+    Diukur di proses baru, dua mutasi, keduanya pada pohon yang seharusnya
+    hijau:
+
+        .opacity(Self.glowOpacities[...])  ->  .opacity(0.5)
+            ./swift-ui-lint.sh                 exit 0, 102 aturan
+            check_port_matches_swift_constants 203 pemeriksaan, 0 gagal
+            check_modeled_port_constants...     32 pemeriksaan, 0 gagal
+
+        starRadius * Self.clusterCoreHaloScale -> starRadius * 1.0
+            ./swift-ui-lint.sh                 exit 0
+            kedua gerbang paritas              235 pemeriksaan, 0 gagal
+
+    Nol merah. Artinya dua ciri gambar — glow berlapis bintang dan halo inti
+    gugus — bisa dihapus dari jam tanpa satu pun gerbang berbunyi, dan
+    **gerbang piksel tetap hijau** karena gerbang piksel mengukur port Python,
+    yang masih memakai angkanya. Persis kelas `VENUS_HAZE_OPACITY` yang sudah
+    dibayar repo ini dua kali: konstanta yang ada, terdokumentasi, dan tidak
+    mengubah satu piksel.
+
+    **Kenapa hanya konstanta bernama, dan bukan setiap penanda `VIEW:`.** Dua
+    aturan yang lebih luas sudah dicoba dan **dibuang karena merah pada kode
+    yang benar**, dan itu lebih buruk daripada tidak ada aturan:
+
+    - "Angka port harus tertulis di badan fungsi yang ditandai" merah pada
+      `MARIA_EDGE_SOFTNESS` (view menyimpannya sebagai
+      `private static let mariaEdgeSoftness = 0.35` lalu membacanya di
+      `drawMoonSurfaceShading` — pemfaktoran yang benar, bukan cacat) dan pada
+      `SPIKE_OPACITY` (view membacanya dari model lewat
+      `geometry.spikeOpacity`, jadi angkanya memang tidak boleh muncul lagi).
+    - "Setiap penanda harus menunjuk nama yang bisa dilacak" merah pada
+      `CRATER_RIM_OFFSET`, `CRATER_INNER_SCALE`, `CRATER_RIM_OPACITY`,
+      `MARIA_OPACITY`, `MOON_PATH_STEPS` — semuanya literal telanjang di view
+      yang nilainya kebetulan cocok, dan tidak ada nama untuk dilacak.
+
+    Jadi yang ditegakkan di sini adalah **himpunan yang bisa dibuktikan**:
+    konstanta bernama yang port klaim milik view. Untuk konstanta itu,
+    pertanyaannya bisa dijawab tegas — dibaca di luar deklarasinya, atau tidak.
+
+    **Kenapa yang diperiksa "dibaca di luar baris deklarasi", bukan "muncul
+    dua kali".** Deklarasinya sendiri selalu satu kemunculan, jadi hitungan
+    mentah selalu lolos. Yang membedakan hidup dan mati adalah apakah ada
+    pembacaan **selain** baris itu.
+
+    **Kenapa tidak ada pengecualian.** Himpunannya hanya dua anggota hari ini,
+    dan keduanya hidup. Daftar pengecualian untuk himpunan sekecil ini hanya
+    akan menjadi tempat menyembunyikan konstanta mati berikutnya.
+
+    **Nol konstanta = GAGAL.** Kalau penandaan `VIEW:` hilang dari port,
+    pemeriksaan ini berhenti mengukur apa pun — dan aturan yang berhenti
+    mengukur tanpa berbunyi lebih berbahaya daripada tidak ada aturan.
+    """
+    view_path = os.path.join(ROOT, "Apps/Shared/CelestialVisualView.swift")
+    if view_source is None:
+        with open(view_path, encoding="utf-8") as handle:
+            view_source = handle.read()
+    view_code = swift_code_only(view_source)
+    if port_source is None:
+        with open(R.SOURCE, encoding="utf-8") as handle:
+            port_source = handle.read()
+    port_raw = port_source
+
+    claimed = []
+    lines = port_raw.splitlines()
+    for index, line in enumerate(lines):
+        inline = re.match(
+            r"\s*([A-Z][A-Z0-9_]+)\s*=\s*(.+?)\s*#\s*VIEW:\s*`?([A-Za-z_][A-Za-z0-9_.]*)`?",
+            line)
+        if inline:
+            port_name, _literal, target = inline.groups()
+            claimed.append((port_name, target.split(".")[-1]))
+            continue
+        # Bentuk kedua: komentar `# VIEW:` berdiri sendiri di atas penetapannya.
+        # `CLUSTER_CORE_HALO_SCALE` ditandai begini, jadi bentuk ini wajib
+        # dibaca — tanpa itu, konstanta kedua yang terbukti bisa mati diam-diam
+        # justru lolos dari pemeriksaan yang dibuat untuknya.
+        standalone = re.match(r"\s*#\s*VIEW:\s*`?([A-Za-z_][A-Za-z0-9_.]*)`?", line)
+        if not standalone:
+            continue
+        target = standalone.group(1).split(".")[-1]
+        for follow in lines[index + 1:]:
+            assignment = re.match(r"\s*([A-Z][A-Z0-9_]+)\s*=", follow)
+            if assignment:
+                claimed.append((assignment.group(1), target))
+                break
+            if follow.strip() and not follow.strip().startswith("#"):
+                break
+
+    # Hanya konstanta bernama; literal telanjang dan nama fungsi tidak punya
+    # pertanyaan yang bisa dijawab tegas (lihat docstring).
+    claimed = [(port_name, ref) for port_name, ref in claimed
+               if re.search(r"private\s+static\s+(?:let|var)\s+" + re.escape(ref) + r"\b",
+                            view_code)]
+
+    if not claimed:
+        results.append(Result(
+            "konstanta view yang diklaim port benar-benar dipakai", False,
+            "tidak ada konstanta bernama yang ditandai '# VIEW:' di "
+            "render-visuals.py — pemeriksaan ini kehilangan subjeknya"))
+        return
+
+    dead = []
+    for port_name, ref in claimed:
+        declaration = re.search(
+            r"private\s+static\s+(?:let|var)\s+" + re.escape(ref) + r"\b", view_code)
+        line_start = view_code.rfind("\n", 0, declaration.start()) + 1
+        line_end = view_code.find("\n", declaration.end())
+        outside = view_code[:line_start] + view_code[line_end:]
+        if not re.search(r"\b" + re.escape(ref) + r"\b", outside):
+            dead.append(f"{port_name} -> {ref}")
+
+    results.append(Result(
+        "konstanta view yang diklaim port benar-benar dipakai",
+        not dead,
+        f"{len(claimed)} konstanta diperiksa"
+        + ("" if not dead else
+           " — dideklarasikan tetapi tidak dibaca di luar deklarasinya: "
+           + ", ".join(dead))))
+
+
 def check_view_blur_predicate_matches_the_model(results):
     """Predikat samaran **di view** harus membaca model dengan arah yang benar.
 
@@ -18848,6 +18980,13 @@ def main():
         check_uncertain_blur_excludes_moon(results, args.size, args.ss)
     except Exception as _gate_error:  # noqa: BLE001
         _gate_failed(results, "check_uncertain_blur_excludes_moon", _gate_error)
+    # Angka view dipakai di tempat yang port akui — 235 pemeriksaan paritas
+    # mengukur port, dan port benar; view bisa berhenti memakai angkanya tanpa
+    # satu pun merah. Lihat docstring-nya untuk dua mutasi yang lolos.
+    try:
+        check_view_literals_are_used_where_the_port_says(results)
+    except Exception as _gate_error:  # noqa: BLE001
+        _gate_failed(results, "check_view_literals_are_used_where_the_port_says", _gate_error)
     # Arah predikat samaran **di view** — 119 gerbang lain mengukur port, dan
     # port benar; view tidak. Lihat docstring-nya untuk cacat yang ditutup.
     try:
