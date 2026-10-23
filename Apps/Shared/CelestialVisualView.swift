@@ -2109,32 +2109,36 @@ struct CelestialVisualView: View {
         context.fill(circle,
                      with: .color(Self.color(CelestialVisual.candidateFill(isNight: NightMode.isOn))))
         context.stroke(circle, with: .color(stroke), lineWidth: 1.5)
-        // Tanda tanya digambar sebagai Path, bukan teks: supaya tidak ikut
-        // diwarnai/ diperbesar oleh Dynamic Type, dan supaya konsisten di kedua
-        // platform tanpa aset font.
+        // **Bentuk glif datang dari model, bukan dari delapan literal di sini.**
+        // Versi lama menyusun tanda tanya langsung di badan fungsi ini, dan
+        // terukur: meluruskan lengkungnya, membuang kaitnya, atau menggeser
+        // tetesnya ke luar lencana semuanya meninggalkan **nol** gerbang merah.
+        // Kedua pemeriksaan lencana hanya mengukur "cukup banyak piksel
+        // peringatan + tepinya tajam", jadi glif yang bentuknya sudah bukan
+        // tanda tanya tetap lolos. Sekarang bentuknya satu properti model
+        // (`CandidateMarker.glyph`) yang diuji di Linux, dan di sini tinggal
+        // menskalakan titik-titiknya.
+        //
+        // Tetap `Path`, bukan teks: supaya tidak ikut diwarnai/diperbesar
+        // Dynamic Type, dan konsisten di kedua platform tanpa aset font.
+        let glyphShape = marker.glyph
         var glyph = Path()
-        let r = CGFloat(marker.glyphRadius) * radius
-        let top = center.y - r * 0.55
-        glyph.move(to: CGPoint(x: center.x - r, y: top))
-        glyph.addCurve(to: CGPoint(x: center.x, y: top + r * 0.55),
-                       control1: CGPoint(x: center.x - r * 0.1, y: top - r * 0.35),
-                       control2: CGPoint(x: center.x + r * 0.55, y: top + r * 0.05))
-        glyph.addLine(to: CGPoint(x: center.x, y: center.y + r * 0.05))
-        // **Tebal garis dari model, bukan literal.** Versi lama menulis
-        // `badgeRadius * 0.28` di sini, dan 0.28 itu terlalu tebal: pada
-        // kartu jam 38 pt garisnya 1.70 pt sedangkan tinggi lengkung glif
-        // hanya 1.74 pt, jadi garisnya mengisi rongga lengkung dan tanda
-        // tanya tergambar sebagai **gumpalan pejal**. Satu-satunya penanda
-        // "engine ragu" di layar berhenti terbaca sebagai tanda tanya —
-        // tepat pada penanda yang menjaga pengguna dari false confidence.
-        // `CandidateMarker.strokeFraction` sekarang satu pemiliknya, dan
-        // `strokeToHookRatio` yang menjaganya tetap terbuka.
+        for (index, point) in glyphShape.points.enumerated() {
+            let scaled = CGPoint(x: center.x + CGFloat(point.x - marker.centerX) * radius,
+                                 y: center.y + CGFloat(point.y - marker.centerY) * radius)
+            if index == 0 {
+                glyph.move(to: scaled)
+            } else {
+                glyph.addLine(to: scaled)
+            }
+        }
         context.stroke(glyph, with: .color(stroke),
                        lineWidth: max(1, badgeRadius * CGFloat(marker.strokeFraction)))
-        context.fill(Path(ellipseIn: CGRect(x: center.x - badgeRadius * 0.13,
-                                           y: center.y + r * 0.42,
-                                           width: badgeRadius * 0.26,
-                                           height: badgeRadius * 0.26)),
+        let dotRadius = CGFloat(glyphShape.dotRadius) * radius
+        context.fill(Path(ellipseIn: CGRect(
+            x: center.x + CGFloat(glyphShape.dotCenter.x - marker.centerX) * radius - dotRadius,
+            y: center.y + CGFloat(glyphShape.dotCenter.y - marker.centerY) * radius - dotRadius,
+            width: dotRadius * 2, height: dotRadius * 2)),
                      with: .color(stroke))
     }
 }

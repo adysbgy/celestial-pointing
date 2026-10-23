@@ -2515,6 +2515,95 @@ public enum VisualFrame {
         /// Radius glif tanda tanya (satuan radius).
         public var glyphRadius: Double { radius * glyphFraction }
 
+        // MARK: Bentuk glif "?"
+
+        /// Satu titik pada garis glif, dalam satuan radius **frame**.
+        ///
+        /// **Kenapa absolut, bukan pergeseran dari pusat lencana.** Port Python
+        /// sudah dua kali salah persis di sini: `dot_offset` adalah pergeseran
+        /// dari pusat lencana sedangkan titik Bézier absolut, dan penggambar
+        /// yang mencampur keduanya menambahkan pusat lencana **dua kali**
+        /// sehingga glifnya mendarat di luar frame — nol piksel tergambar,
+        /// tanpa satu gerbang berbunyi. Satu konvensi untuk titik, satu
+        /// konvensi untuk tetes, dan namanya menyebut yang mana.
+        public struct GlyphPoint: Equatable, Sendable {
+            public var x: Double
+            public var y: Double
+            public init(x: Double, y: Double) {
+                self.x = x
+                self.y = y
+            }
+        }
+
+        /// Glif "?" siap gambar: satu garis (lengkung + ekor) dan satu tetes.
+        ///
+        /// Titik-titiknya **sudah disampel** di model, bukan diserahkan ke
+        /// `Path.addCurve` di view. Alasannya bukan selera: seluruh gerbang
+        /// gambar repo ini mengukur render port Python, yang menyampel
+        /// lengkungnya menjadi potongan garis. Selama view menggambar kurva
+        /// Bézier eksak dan port menggambar potongan garis, keduanya
+        /// menggambar bentuk yang **berbeda** dan gerbang mengukur bentuk yang
+        /// tidak dipakai jam. Satu daftar titik, dua penggambar.
+        public struct Glyph: Equatable, Sendable {
+            /// Garis glif, dari ujung lengkung kiri-atas sampai ekor.
+            public var points: [GlyphPoint]
+            /// Pusat tetes di bawah ekor (satuan radius frame).
+            public var dotCenter: GlyphPoint
+            /// Radius tetes (satuan radius frame).
+            public var dotRadius: Double
+            /// Tebal garis glif (satuan radius frame).
+            public var strokeWidth: Double
+        }
+
+        /// Turunnya lengkung dari titik awalnya, satuan `glyphRadius`.
+        public static let glyphHookDrop: Double = 0.55
+        /// Kendali Bézier pertama, x — ke kiri pusat.
+        public static let glyphControl1X: Double = 0.10
+        /// Kendali Bézier pertama, y — ke atas dari titik awal.
+        public static let glyphControl1Y: Double = 0.35
+        /// Kendali Bézier kedua, x — ke kanan pusat.
+        public static let glyphControl2X: Double = 0.55
+        /// Kendali Bézier kedua, y — di bawah titik awal.
+        public static let glyphControl2Y: Double = 0.05
+        /// Turunnya ujung lengkung dari titik awal, satuan `glyphRadius`.
+        public static let glyphEndDrop: Double = 0.55
+        /// Ujung ekor di bawah pusat lencana, satuan `glyphRadius`.
+        public static let glyphStemEndDrop: Double = 0.05
+        /// Pusat tetes di bawah pusat lencana, satuan `glyphRadius`.
+        public static let glyphDotOffset: Double = 0.42
+        /// Radius tetes sebagai pecahan radius **lencana**.
+        public static let glyphDotFraction: Double = 0.13
+        /// Banyak potongan garis pada lengkung. 12 dipilih port Python; angka
+        /// yang sama harus dipakai kedua bahasa, kalau tidak bentuknya berbeda.
+        public static let glyphSamples: Int = 12
+
+        /// Bentuk glif "?" lengkap, dalam satuan radius frame.
+        public var glyph: Glyph {
+            let r = glyphRadius
+            let cx = centerX
+            let cy = centerY
+            let top = cy - r * Self.glyphHookDrop
+            var points: [GlyphPoint] = [GlyphPoint(x: cx - r, y: top)]
+            for step in 1...Self.glyphSamples {
+                let t = Double(step) / Double(Self.glyphSamples)
+                let u = 1 - t
+                let x = u * u * u * (cx - r)
+                    + 3 * u * u * t * (cx - r * Self.glyphControl1X)
+                    + 3 * u * t * t * (cx + r * Self.glyphControl2X)
+                    + t * t * t * cx
+                let y = u * u * u * top
+                    + 3 * u * u * t * (top - r * Self.glyphControl1Y)
+                    + 3 * u * t * t * (top + r * Self.glyphControl2Y)
+                    + t * t * t * (top + r * Self.glyphEndDrop)
+                points.append(GlyphPoint(x: x, y: y))
+            }
+            points.append(GlyphPoint(x: cx, y: cy + r * Self.glyphStemEndDrop))
+            return Glyph(points: points,
+                         dotCenter: GlyphPoint(x: cx, y: cy + r * Self.glyphDotOffset),
+                         dotRadius: radius * Self.glyphDotFraction,
+                         strokeWidth: glyphStroke)
+        }
+
         /// Tebal garis glif (satuan radius).
         public var glyphStroke: Double { radius * strokeFraction }
 

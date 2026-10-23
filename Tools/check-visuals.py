@@ -3548,6 +3548,37 @@ def check_port_matches_swift_constants(results):
          R.CANDIDATE_STROKE_FRACTION
          < R.CANDIDATE_GLYPH_FRACTION * 0.55 * 0.5, True,
          "glyphRadius * 0.55", model),
+        # **Bentuk glif "?" — delapan angka yang sampai siklus ini tidak dijaga
+        # siapa pun.** Terukur dengan memutasi view satu per satu: meluruskan
+        # lengkungnya (0.55 -> 0.0), membuang kaitnya (ekor naik, bukan turun),
+        # dan menggeser tetesnya ke luar lencana masing-masing meninggalkan
+        # **nol** gerbang merah. Kedua pemeriksaan lencana hanya mengukur
+        # "cukup banyak piksel peringatan + tepinya tajam" — sifat yang juga
+        # dimiliki gumpalan pejal. Bentuknya sekarang satu properti model
+        # (`CandidateMarker.glyph`) dan diuji di Linux; yang dijaga di sini
+        # adalah bahwa port Python menggambar bentuk **yang sama**, karena
+        # seluruh gerbang gambar membaca render port.
+        ("glif: turunnya lengkung", R.GLYPH_HOOK_DROP, 0.55,
+         "glyphHookDrop: Double = 0.55", model),
+        ("glif: kendali Bézier 1 x", R.GLYPH_CONTROL1_X, 0.10,
+         "glyphControl1X: Double = 0.10", model),
+        ("glif: kendali Bézier 1 y", R.GLYPH_CONTROL1_Y, 0.35,
+         "glyphControl1Y: Double = 0.35", model),
+        ("glif: kendali Bézier 2 x", R.GLYPH_CONTROL2_X, 0.55,
+         "glyphControl2X: Double = 0.55", model),
+        ("glif: kendali Bézier 2 y", R.GLYPH_CONTROL2_Y, 0.05,
+         "glyphControl2Y: Double = 0.05", model),
+        ("glif: turunnya ujung lengkung", R.GLYPH_END_DROP, 0.55,
+         "glyphEndDrop: Double = 0.55", model),
+        ("glif: ujung ekor", R.GLYPH_STEM_END_DROP, 0.05,
+         "glyphStemEndDrop: Double = 0.05", model),
+        ("glif: pusat tetes", R.GLYPH_DOT_OFFSET, 0.42,
+         "glyphDotOffset: Double = 0.42", model),
+        ("glif: radius tetes", R.GLYPH_DOT_FRACTION, 0.13,
+         "glyphDotFraction: Double = 0.13", model),
+        ("glif: jumlah sampel lengkung", R.GLYPH_SAMPLES, 12,
+         "glyphSamples: Int = 12", model),
+
         # Gambar kawah Merkurius. Kelima angka ini ada di **dua bahasa** dan
         # sampai sini **tidak dijaga siapa pun**: mutasi empat di antaranya di
         # view membuat seluruh 195 pemeriksaan tetap hijau (dibuktikan saat

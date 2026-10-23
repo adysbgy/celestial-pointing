@@ -745,6 +745,23 @@ CANDIDATE_GLYPH_FRACTION = 0.52
 # sini hanya salinan yang dijaga `check_port_matches_swift_constants`.
 CANDIDATE_STROKE_FRACTION = 0.13
 
+# Bentuk glif "?" — cermin `CandidateMarker.glyphHookDrop` dst. di model Swift.
+# Sampai siklus ini kedelapan angka ini hidup **hanya** di dalam dua penggambar
+# (view Swift dan `candidate_marker_glyph` di sini), dan terukur: meluruskan
+# lengkung, membuang kait, atau menggeser tetes keluar lencana meninggalkan nol
+# gerbang merah. Bentuk "?" adalah satu-satunya penanda "engine ragu", jadi ia
+# tidak boleh menjadi satu-satunya hal di repo ini yang tidak diukur.
+GLYPH_HOOK_DROP = 0.55
+GLYPH_CONTROL1_X = 0.10
+GLYPH_CONTROL1_Y = 0.35
+GLYPH_CONTROL2_X = 0.55
+GLYPH_CONTROL2_Y = 0.05
+GLYPH_END_DROP = 0.55
+GLYPH_STEM_END_DROP = 0.05
+GLYPH_DOT_OFFSET = 0.42
+GLYPH_DOT_FRACTION = 0.13
+GLYPH_SAMPLES = 12
+
 
 def candidate_marker(frame_half_extent=1.0, corner_fraction=CANDIDATE_CORNER_FRACTION,
                      inset=CANDIDATE_INSET,
@@ -771,22 +788,29 @@ def candidate_marker_glyph(marker=None):
     Konvensi satuannya yang pernah salah: `glyph_fraction` adalah pecahan dari
     radius **lencana**, bukan radius frame (lihat `CandidateMarker.glyphRadius`
     di model, dan `CGFloat(marker.glyphRadius) * radius` di view).
+
+    **Bentuknya sekarang cermin `CandidateMarker.glyph` di model Swift.** View
+    sudah menggambar dari daftar titik model itu; kalau fungsi ini masih
+    menghitung Bézier-nya sendiri, kedua bahasa menggambar bentuk yang berbeda
+    dan gerbang mengukur bentuk yang tidak dipakai jam. Setiap konstanta bentuk
+    dibaca dari `GLYPH_*` di bawah, yang dijaga `check_port_matches_swift_constants`.
     """
     marker = candidate_marker() if marker is None else marker
     badge_radius = marker["radius"]
     r = badge_radius * marker["glyph_fraction"]
     cx, cy = marker["center_x"], marker["center_y"]
-    top = cy - r * 0.55
+    top = cy - r * GLYPH_HOOK_DROP
     points = [(cx - r, top)]
-    for i in range(1, 13):
-        t = i / 12.0
+    for i in range(1, GLYPH_SAMPLES + 1):
+        t = i / float(GLYPH_SAMPLES)
         u = 1 - t
-        x = (u ** 3 * (cx - r) + 3 * u * u * t * (cx - r * 0.1)
-             + 3 * u * t * t * (cx + r * 0.55) + t ** 3 * cx)
-        y = (u ** 3 * top + 3 * u * u * t * (top - r * 0.35)
-             + 3 * u * t * t * (top + r * 0.05) + t ** 3 * (top + r * 0.55))
+        x = (u ** 3 * (cx - r) + 3 * u * u * t * (cx - r * GLYPH_CONTROL1_X)
+             + 3 * u * t * t * (cx + r * GLYPH_CONTROL2_X) + t ** 3 * cx)
+        y = (u ** 3 * top + 3 * u * u * t * (top - r * GLYPH_CONTROL1_Y)
+             + 3 * u * t * t * (top + r * GLYPH_CONTROL2_Y)
+             + t ** 3 * (top + r * GLYPH_END_DROP))
         points.append((x, y))
-    points.append((cx, cy + r * 0.05))
+    points.append((cx, cy + r * GLYPH_STEM_END_DROP))
     # **Satuan: radius frame (ternormalisasi), bukan piksel.**
     #
     # Versi pertama menulis `max(1.0, badge_radius * 0.28)`. Lantai 1.0 itu
@@ -806,8 +830,8 @@ def candidate_marker_glyph(marker=None):
     # mutlak. Versi pertama menyimpannya mutlak (`cy + r*0.42`) lalu
     # menambahkannya ke pusat lagi di penggambar, sehingga tetesnya tergeser
     # dua kali. Bentuk yang menyebut perannya tidak bisa salah pakai.
-    dot_offset = (0.0, r * 0.42)
-    dot_radius = badge_radius * 0.13
+    dot_offset = (0.0, r * GLYPH_DOT_OFFSET)
+    dot_radius = badge_radius * GLYPH_DOT_FRACTION
     return (points, stroke_width, dot_offset, dot_radius,
             badge_radius, (cx, cy))
 

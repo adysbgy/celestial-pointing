@@ -298,4 +298,108 @@ final class CandidateMarkerTests: XCTestCase {
             "nilai lama harus terbukti menutup rongga lengkung; kalau tidak, "
             + "ambang 0.5 tidak menangkap cacat yang diklaimnya")
     }
+
+    // MARK: - Bentuk glif "?"
+
+    /// Glif harus **berbentuk tanda tanya**, bukan sekadar "ada garis di lencana".
+    ///
+    /// **Kenapa uji ini ada, dan kenapa gerbang gambar tidak bisa menggantikannya.**
+    /// Sampai siklus ini bentuk glif disusun dari delapan literal di dalam
+    /// `drawCandidateMarker`. Diukur dengan memutasi sumbernya satu per satu:
+    ///
+    ///     lengkung diluruskan (0.55 -> 0.0)      nol gerbang merah
+    ///     kait dibuang (ekor naik, bukan turun)  nol gerbang merah
+    ///     tetes digeser ke luar lencana          nol gerbang merah
+    ///
+    /// Ketiganya merusak satu-satunya penanda "engine ragu" di layar, dan
+    /// keduanya yang tersisa hanya mengukur "cukup banyak piksel peringatan +
+    /// tepinya tajam" — sifat yang juga dimiliki gumpalan. Yang bisa menangkap
+    /// cacat ini adalah bentuknya sendiri, jadi bentuknya pindah ke model dan
+    /// diuji di sini.
+    func testGlyphIsShapedLikeAQuestionMark() {
+        let marker = VisualFrame.candidateMarker()
+        let glyph = marker.glyph
+        let r = marker.glyphRadius
+        // Satu titik awal + `glyphSamples` titik lengkung + satu ujung ekor.
+        XCTAssertEqual(glyph.points.count, VisualFrame.CandidateMarker.glyphSamples + 2,
+                       "glif harus tersampel penuh; jumlah titik yang menyusut "
+                       + "berarti lengkungnya berhenti di tengah")
+
+        // (a) **Lengkungnya melengkung.** Ujung lengkung duduk di kanan pusat
+        // dan di bawah titik awalnya — kalau lengkungnya diluruskan, salah
+        // satu dari dua syarat ini hilang.
+        let start = glyph.points[0]
+        let hookEnd = glyph.points[VisualFrame.CandidateMarker.glyphSamples]
+        XCTAssertLessThan(start.x, marker.centerX,
+                          "lengkung harus mulai di kiri pusat lencana")
+        XCTAssertGreaterThan(hookEnd.y, start.y,
+                             "lengkung harus turun; kalau tidak, glifnya "
+                             + "terbaca sebagai garis datar, bukan tanda tanya")
+        XCTAssertGreaterThan(hookEnd.x, start.x,
+                             "lengkung harus bergerak ke kanan")
+
+        // (b) **Rongganya terbuka.** Titik tengah lengkung harus di **atas**
+        // garis yang menghubungkan kedua ujungnya — itulah cekungan yang
+        // membuatnya terbaca sebagai "?" dan bukan busur cembung.
+        let middle = glyph.points[VisualFrame.CandidateMarker.glyphSamples / 2]
+        let chordY = start.y + (hookEnd.y - start.y)
+            * (middle.x - start.x) / (hookEnd.x - start.x)
+        XCTAssertLessThan(middle.y, chordY,
+                          "punggung lengkung harus di atas talinya (cekung); "
+                          + "kalau tidak, rongganya tertutup")
+
+        // (c) **Ekornya turun ke bawah pusat lencana**, lalu tetesnya di bawah
+        // itu. Tanpa ekor, lengkungan saja adalah koma, bukan tanda tanya.
+        let tail = glyph.points[glyph.points.count - 1]
+        XCTAssertEqual(tail.x, marker.centerX, accuracy: 1e-12,
+                       "ekor harus lurus di bawah pusat lencana")
+        XCTAssertGreaterThan(tail.y, hookEnd.y,
+                             "ekor harus turun melewati ujung lengkung")
+
+        // (d) **Tetesnya terpisah dari ekor, dan di dalam lencana.**
+        XCTAssertGreaterThan(glyph.dotCenter.y, tail.y,
+                             "tetes harus di bawah ujung ekor, bukan menempel")
+        XCTAssertGreaterThan(glyph.dotCenter.y + glyph.dotRadius, tail.y,
+                             "tetes harus punya jarak dari ekor supaya terbaca "
+                             + "sebagai titik terpisah")
+        let fromCenter = ((glyph.dotCenter.x - marker.centerX) * (glyph.dotCenter.x - marker.centerX)
+            + (glyph.dotCenter.y - marker.centerY) * (glyph.dotCenter.y - marker.centerY)).squareRoot()
+        XCTAssertLessThan(fromCenter + glyph.dotRadius, marker.radius,
+                          "tetes harus utuh di dalam lencana; di luar itu ia "
+                          + "terbaca sebagai noda, bukan bagian tanda tanya")
+        // Skala: semua titik dalam satuan radius frame, jadi glif yang benar
+        // tidak boleh menyentuh tepi frame.
+        for point in glyph.points {
+            XCTAssertLessThan(abs(point.x), 1.0, "glif keluar frame (x)")
+            XCTAssertLessThan(abs(point.y), 1.0, "glif keluar frame (y)")
+        }
+        // Radius glif yang dipakai menggambar adalah `glyphRadius`, bukan
+        // angka lain — kalau tidak, uji di atas menguji bentuk yang tidak tampil.
+        XCTAssertEqual(glyph.strokeWidth, marker.glyphStroke, accuracy: 1e-12)
+        XCTAssertEqual(glyph.dotRadius, marker.radius * 0.13, accuracy: 1e-12,
+                       "radius tetes harus dari token, bukan literal ketiga")
+    }
+
+    /// Glif harus **tidak berubah bentuk** saat lencananya diperbesar.
+    ///
+    /// Kalau satu angka di dalam `glyph` kelak ditulis sebagai piksel mutlak,
+    /// bentuknya akan berbeda di kartu jam 38 pt dan panel iPhone — dan uji
+    /// di atas tetap hijau karena ia hanya menguji satu ukuran.
+    func testGlyphShapeScalesWithoutDistortion() {
+        let watch = VisualFrame.candidateMarker(frameHalfExtent: 1.0).glyph
+        let phone = VisualFrame.candidateMarker(frameHalfExtent: 4.0).glyph
+        XCTAssertEqual(watch.points.count, phone.points.count)
+        // Nisbah jarak antar titik pertama dan kedua harus sama di kedua
+        // ukuran: itu definisi "bentuknya sama, skalanya berbeda".
+        func firstSegment(_ glyph: VisualFrame.CandidateMarker.Glyph) -> Double {
+            let a = glyph.points[0], b = glyph.points[1]
+            return ((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)).squareRoot()
+        }
+        XCTAssertGreaterThan(firstSegment(phone), firstSegment(watch) * 2.5,
+                             "glif harus ikut membesar bersama lencananya")
+        let watchRatio = watch.dotRadius / watch.strokeWidth
+        let phoneRatio = phone.dotRadius / phone.strokeWidth
+        XCTAssertEqual(watchRatio, phoneRatio, accuracy: 1e-12,
+                       "perbandingan tetes dan garis harus sama di semua ukuran")
+    }
 }

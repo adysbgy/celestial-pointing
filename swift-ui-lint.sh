@@ -15022,6 +15022,41 @@ else
 fi
 
 
+echo "== Aturan 100: glif lencana dibaca dari model dan benar-benar digores =="
+# Bentuk glif "?" pindah ke model siklus ini, dengan dua uji Swift yang
+# menguji lengkung, ekor, dan tetesnya di Linux. Itu benar, dan ia memindahkan
+# cacatnya alih-alih menutupnya: **tidak satu pun gerbang membaca badan view**.
+# Diukur — loop titik di `drawCandidateMarker` diganti daftar kosong sehingga
+# glif tidak pernah digambar — dan `swift-ui-lint.sh` tetap exit 0 dengan nol
+# merah, `bukti-mutasi-glif-lencana.py` tetap exit 0 (ia mengukur port Python),
+# dan kedua uji glif tetap hijau (mereka mengukur model).
+#
+# Kenapa bukan Aturan 98: irisan Aturan 98 adalah `public static func` yang
+# juga disebut port; `glyph` adalah computed property pada struct bersarang,
+# jadi ia tidak pernah masuk. Kenapa bukan keadaan baru di harness mutasi
+# glif: harness itu mengukur piksel port Python, dan view SwiftUI tidak bisa
+# dijalankan di Linux — yang bisa dibaca di sini hanya bentuk kodenya.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-99 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan100-glif-sampai-kanvas.py" ]; then
+  echo "FAIL Tools/check-aturan100-glif-sampai-kanvas.py tidak ada: Aturan 100"
+  echo "     tidak mengukur apa pun, dan view boleh berhenti menggambar glif"
+  echo "     tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  glif_kanvas=$(python3 Tools/check-aturan100-glif-sampai-kanvas.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$glif_kanvas"
+    echo "-> Gambar glifnya dari `marker.glyph`; jangan menulis ulang"
+    echo "   bentuknya di view, dan jangan buang hasilnya."
+    status=1
+  else
+    echo "$glif_kanvas"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

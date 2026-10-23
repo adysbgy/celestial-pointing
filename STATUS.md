@@ -82,6 +82,128 @@ Tidak ada perubahan pada `Apps/`. Ketiga cacat di atas adalah cacat
 Yang berubah adalah kepercayaan pada gerbangnya — dan itu prasyarat untuk
 setiap klaim visual berikutnya.
 
+### Siklus (23 Okt 2026, lanjutan — opasitas kabut Venus, dan angka yang saya karang sendiri)
+
+Cacatnya nyata dan terukur: **kabut Venus bisa dihapus dari jam tanpa satu
+pun gerbang berbunyi.** `haze.opacity(0.7)` di view diganti `opacity(0.0)` —
+Venus kembali menjadi bola kuning polos — dan kedua gerbang yang membaca
+angka lintas-bahasa (`check_port_matches_swift_constants`,
+`check_modeled_port_constants_match_the_model`) dijalankan di proses baru:
+**215 pemeriksaan, 215 hijau sebelum mutasi, 215 hijau sesudah, nol merah.**
+
+Bentuknya bukan kebetulan Venus. Setiap ciri planet lain punya konstanta
+`*Opacity` di model (`jupiterBandOpacity`, `saturnBandOpacity`,
+`uranusBandOpacity`, `neptuneSpotOpacity`, `ringShadowOpacity`), jadi
+pergeserannya tertangkap paritas port. Venus satu-satunya yang opasitasnya
+hidup sebagai literal di **dua** berkas tanpa sumber. Karena itu gerbangnya
+bukan "periksa 0.7" melainkan **kelasnya**: setiap `static let *Opacity:
+Double` di model harus benar-benar **dipakai** oleh penggambarnya, dan
+`drawHaze` tidak boleh menyisakan literal opasitas selain 0.
+
+**Dua kesalahan saya sendiri di siklus ini, keduanya ketahuan dengan
+mengukur, bukan dengan membaca ulang.**
+
+Pertama, docstring yang saya tulis mengklaim "**218** pemeriksaan paritas
+tetap hijau" dan "dibuktikan dengan menjalankan **seluruh suite**". Angka
+218 tidak pernah keluar dari alat ukur mana pun, dan suite penuh tidak pernah
+selesai dijalankan (ia mengukur piksel dan tidak membaca view Swift sama
+sekali — jadi ia memang bukan alat yang tepat). Angka yang benar 215, dan
+yang diukur hanya dua gerbang paritas. Angka karangan di dalam docstring
+pengukuran adalah kebohongan yang paling sulit dilacak: ia terlihat seperti
+bukti. Keduanya diganti dengan yang terukur.
+
+Kedua, komentar di `_draw_haze` menyebut gerbang yang **salah** — ia
+mengatakan `check_port_matches_swift_constants` yang memerah kalau angkanya
+bergeser. Terukur: tidak. Tabel di gerbang itu adalah daftar pasangan tangan,
+dan `VENUS_HAZE_OPACITY` tidak pernah masuk daftar itu. Yang menahan angka
+ini `check_modeled_port_constants_match_the_model`, lewat komentar `# MODEL:`
+di baris di atasnya — terukur, menggeser 0.7 -> 0.3 di port saja **atau** di
+model saja memerahkan tepat satu pemeriksaan. Menunjuk gerbang yang keliru
+lebih buruk daripada tidak menunjuk: pembaca berikutnya akan memutasi angka,
+melihat hijau, dan menyimpulkan gerbangnya rusak.
+
+**Harness `bukti-mutasi-kabut-opasitas.py`, enam keadaan.** Dan draf
+pertamanya **salah** pada satu keadaan, yang justru berguna:
+
+Keadaan 2 ("kabut dimatikan 0.0") saya tulis dengan harapan *hanya*
+pemeriksaan pemakaian yang merah, karena pemeriksaan literal sengaja
+mengizinkan 0.0 (gradien kabut memang mulai dari nol di tepi atas). Hasil
+ukurannya: **kedua** pemeriksaan merah. Sebabnya jelas setelah dilihat —
+mengganti token dengan `0.0` menghilangkan tokennya *dan* memunculkan
+literalnya, jadi dua pemeriksaan memang mengukur dua hal berbeda yang
+sama-sama hilang di sana. Keadaan itu tidak bisa memisahkan gigi keduanya,
+dan klaim saya tentang apa yang dibuktikannya keliru.
+
+Keadaan 3 ditambahkan untuk itu: token tetap dipakai, `haze.opacity(0.9)`
+ditambahkan sesudahnya. Terukur: hanya klausa "tidak ada literal ≠ 0" yang
+berbunyi, dan pemeriksaan pemakaian wajib tetap hijau. Itulah satu-satunya
+keadaan yang membuktikan klausa itu punya gigi sendiri.
+
+Keadaan 4 menahan gerbangnya agar tetap generik: `static let
+fakeFeatureOpacity` disisipkan ke model tanpa pemakai. Gerbang daftar-tangan
+akan hijau di sini — dan planet berikutnya lolos dengan alasan yang sama.
+Keadaan 5 kontrol negatif: `drawHaze` diganti nama, dan gerbangnya harus
+merah karena kehilangan subjeknya, bukan hijau tanpa mengukur apa pun.
+
+Hasil akhir: `6 keadaan, 0 tidak sesuai harapan`. Harness terdaftar di
+`engine-tests.yml` (161 harness, semuanya dirujuk — dijaga
+`check-harness-terdaftar.py`).
+
+**Yang TIDAK diklaim.** Siklus ini tidak mengubah satu piksel pun di jam.
+`0.7` dan `venusHazeOpacity` menggambar hal yang identik hari ini — yang
+ditambahkan adalah **ikatan** ke model, bukan tampilan baru. Suite
+`check-visuals.py` penuh tidak dijalankan di sini; ia berjalan di CI, dan
+yang saya ukur di lokal hanya dua gerbang paritas dan
+`check_bands_follow_the_limb_arc`.
+
+### Siklus (23 Okt 2026, lanjutan — glif "?" yang teruji di model dan tidak pernah sampai ke kanvas)
+
+Siklus ini memindahkan bentuk glif tanda tanya dari delapan literal di
+`drawCandidateMarker` ke `VisualFrame.CandidateMarker.glyph`, dengan dua uji
+Swift yang menguji lengkung, ekornya, tetesnya, dan skalanya di Linux. Itu
+perbaikan yang benar dan **tidak dibatalkan** di sini.
+
+Tetapi ia memindahkan cacatnya, bukan menutupnya. Diukur, bukan disangka —
+loop titik di `drawCandidateMarker` diganti daftar kosong sehingga garis glif
+**tidak pernah digambar**, lalu ketiga jenis gerbang dijalankan di proses baru:
+
+    ./swift-ui-lint.sh                     exit 0, 99 aturan, nol merah
+    bukti-mutasi-glif-lencana.py           exit 0  (ia mengukur port Python)
+    dua uji Swift glif                     hijau  (mereka mengukur model)
+
+Nol. Bentuknya benar, teruji, dan app boleh berhenti menggambarnya tanpa satu
+pun gerbang berbunyi — karena setiap gerbang yang ada membaca **model** atau
+**port Python**, dan tidak satu pun membaca badan view.
+
+**Kenapa bukan Aturan 98, yang justru dibuat untuk kelas ini.** Aturan 98
+memeriksa irisan `public static func` yang juga disebut port Python. `glyph`
+adalah *computed property* pada struct bersarang, jadi ia tidak pernah masuk
+irisan itu; dan seandainya masuk, Aturan 98 hanya menuntut namanya **muncul**
+sebagai nilai — sedangkan cacat di sini adalah nama itu muncul lalu `.points`
+-nya tidak dipakai. Dua syarat yang berbeda.
+
+**Aturan 100** menutupnya dengan empat pemeriksaan yang semuanya bisa merah
+sendiri-sendiri: bentuk dibaca dari model, `.points` dipakai **di dalam badan
+`drawCandidateMarker`** (batas badan dicari dengan menghitung kurung kurawal,
+bukan regex malas — badan ini penuh `{}` dari `Path` dan `CGRect`), tetesnya
+memakai `dotCenter` **dan** `dotRadius` model, dan ada `.stroke(`/`.fill(` di
+badan yang sama. Nol temuan = GAGAL: kalau `marker.glyph` hilang dari view,
+aturan ini berhenti mengukur dan itu dilaporkan sebagai merah.
+
+Dua mutasi membuktikan gigi keduanya, bukan hanya klaimnya:
+
+    loop titik diganti daftar kosong   -> FAIL "titik glif dipakai menggambar"
+    dotRadius diganti badgeRadius*0.13 -> FAIL "tetes glif dari model"
+
+**Yang TIDAK diklaim.** Ini sapuan **teks**, bukan render: ia tidak bisa
+membuktikan glifnya terlihat seperti tanda tanya di layar (itu milik uji Swift
+bentuknya dan gerbang piksel port), dan tidak bisa membuktikan
+`context.stroke` menghasilkan piksel di watchOS. Yang dijaga: garis dari model
+ke kanvas tidak bisa diputus tanpa gerbang merah. Juga: README sempat
+tertinggal (1098 lawan 1100 uji, 98 lawan 99 aturan) dan **Aturan 10 yang
+menangkapnya** — termasuk saat aturan baru ini sendiri ditambahkan, yang
+membuat hitungan aturan di README basi dalam satu commit yang sama.
+
 ### Siklus (23 Okt 2026, lanjutan — angka 0.488 yang tidak pernah keluar dari tabelnya sendiri)
 
 Cacat ini ditemukan **setelah** gerbangnya hijau, saat memeriksa angka di
