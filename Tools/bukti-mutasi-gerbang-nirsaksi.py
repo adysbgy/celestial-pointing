@@ -152,29 +152,62 @@ STATES = [
     # kanal biru yang bocor membatalkan alasannya (rhodopsin) tanpa
     # mengubah apa pun yang terlihat di layar.
     #
-    # Pemeriksaan kedua sengaja diharapkan **hijau** di sini: yang berubah
-    # hanya kanal biru, dan "malam tidak lebih terang dari siang" membaca
-    # kanal merah. Kalau kedua pemeriksaan itu memerah bersama, keduanya
-    # sedang mengukur hal yang sama — dan salah satunya tidak menjaga apa pun.
+    # **Kedua pemeriksaan memerah, dan versi pertama harness ini salah
+    # mengira tidak.** Harapannya dulu `NEVER_BRIGHTER: HIJAU` dengan alasan
+    # "yang berubah hanya kanal biru, dan pemeriksaan itu membaca kanal
+    # merah". Alasan itu tidak benar tentang kodenya:
+    # `check_night_mode_never_exceeds_day` membandingkan
+    # `luminance_field`, yaitu Rec. 709 — `0.2126 R + 0.7152 G + 0.0722 B`.
+    # Kanal biru berbobot, jadi kebocoran 0.2 menaikkan luminans sebesar
+    # `0.0722 x 0.2 x 255 = 3.7`, dan terukur persis itu: 12 kasus "ragu"
+    # memerah dengan puncak +3.7. Kasus ragu yang memerah dan yang terkunci
+    # tidak, karena pada kasus ragu malam dan siang nyaris sama terang
+    # (bola netral + samaran), sehingga 3.7 cukup untuk melewatinya.
+    #
+    # Jadi kedua gerbang memang menyala bersama di sini — dan itu benar:
+    # satu kebocoran biru melanggar **dua** janji sekaligus (kanal harus nol,
+    # malam tidak boleh lebih terang). Pemisahan keduanya dibuktikan keadaan
+    # 3, arah sebaliknya: lantai dinaikkan membuat `NEVER_BRIGHTER` merah
+    # sementara kemurnian tetap hijau. Menuntut satu keadaan membuktikan
+    # keduanya sekaligus adalah yang membuat harapan lama salah.
     ("1. mode malam tidak memurnikan (kanal biru 0.2)",
      [(NIGHT_SURFACE_PURE, NIGHT_SURFACE_TINTED)],
-     {PURITY: MERAH, NEVER_BRIGHTER: HIJAU,
+     {PURITY: MERAH, NEVER_BRIGHTER: MERAH,
       "malam murni: planet-mercury-confirmed": MERAH,
       "malam murni: moon-full": MERAH,
-      "malam murni: sun": MERAH}),
+      "malam murni: sun": MERAH,
+      "malam <= siang: planet-jupiter-uncertain": MERAH}),
 
     # ── 2. Jalur **bayangan** juga berwarna ──────────────────────────────
     #
     # Yang membedakannya dari keadaan 1: hanya benda yang menggambar aksen
     # bayangan (`moonUnlit`, planet netral, kabut langit dalam) yang boleh
-    # memerah. Bola planet yang **terkunci** tidak menggambar bayangan sama
-    # sekali, jadi ia harus tetap hijau — dan itu membuktikan mutasinya
+    # memerah. Bola planet yang **terkunci** tidak menggambar bayangan
+    # sama sekali, jadi ia harus tetap hijau — dan itu membuktikan mutasinya
     # memang menyentuh jalur bayangan, bukan seluruh gambar.
+    #
+    # **`planet-jupiter-bare` dulu diharapkan merah di sini, dan itu salah.**
+    # Kasus itu bukan keadaan produksi: ia bola berpalet tanpa ciri, dipakai
+    # sebagai pengurang bentuk. Ia tidak pernah memanggil jalur bayangan —
+    # diukur dengan menghitung pemanggilan `night_shadow` per kasus:
+    #
+    #     planet-jupiter-bare          0
+    #     planet-jupiter-confirmed     0
+    #     planet-saturn-confirmed      1   (bayangan cincin)
+    #     moon-full                    1
+    #
+    # Nol pemanggilan berarti tidak ada yang bisa dibocorkan, jadi hijau di
+    # sini adalah hasil yang **benar** dan harapan merahnya yang keliru.
+    # Penggantinya `planet-saturn-confirmed`: satu-satunya planet terkunci
+    # yang benar-benar menggambar bayangan (cincin), sehingga ia membuktikan
+    # hal yang sama tanpa meminta kasus pembanding berperilaku seperti
+    # keadaan produksi.
     ("2. jalur bayangan mode malam berwarna (hijau 0.2)",
      [(NIGHT_SHADOW_PURE, NIGHT_SHADOW_TINTED)],
      {PURITY: MERAH,
-      "malam murni: planet-jupiter-bare": MERAH,
+      "malam murni: planet-jupiter-bare": HIJAU,
       "malam murni: moon-full": MERAH,
+      "malam murni: planet-saturn-confirmed": MERAH,
       "malam murni: planet-jupiter-confirmed": HIJAU}),
 
     # ── 3. Lantai kecerahan malam dinaikkan melewati siang ───────────────
@@ -194,12 +227,28 @@ STATES = [
     # sisi berbeda: "menjangkau tepi" mengukur jarak, "mengikuti busur limb"
     # mengukur bentuknya. Yang pertama bisa lolos kalau pitanya kebetulan
     # lebar di ketinggian sampelnya; yang kedua tidak bisa.
+    #
+    # **Pita 0 dulu diharapkan hijau di sini, dan itu keliru.** Dugaan yang
+    # mendasarinya masuk akal — pita kutub paling sempit, jadi mungkin ia
+    # sudah menyentuh tepi karena sempitnya — tetapi terukur sebaliknya.
+    # Dengan bentuk kosinus, pita 0 berhenti di 0.325 R sementara bola di
+    # baris yang diukur 0.519 R: **19.4% R di dalam tepi**, hampir dua kali
+    # lipat ambangnya (2% R). Justru pita 3 (khatulistiwa) satu-satunya yang
+    # hijau, karena di sana kosinus dan `sqrt(1-y^2)` bertemu di 1.0 —
+    # 0.5% R, hanya anti-aliasing.
+    #
+    # Jadi ketujuh pita memerah bersama; yang membuktikan kedua gerbang
+    # mengukur hal berbeda bukan "sebagian hijau", melainkan angka yang
+    # dilaporkan: pita 3 hijau di **kedua** gerbang, dan galatnya naik dari
+    # pusat ke kutub (0.5% → 19.4%) hanya di gerbang jangkauan.
     ("4. tepi pita Jupiter kembali ke kosinus",
      [(BAND_ARC_HEAD, BAND_ARC_COSINE)],
      {BAND_REACH: MERAH, BAND_ARC: MERAH,
       "pita Jupiter 2 menjangkau tepi bola": MERAH,
       "pita Jupiter 2 mengikuti busur limb (tali busur, bukan elips)": MERAH,
-      "pita Jupiter 0 menjangkau tepi bola": HIJAU}),
+      "pita Jupiter 0 menjangkau tepi bola": MERAH,
+      "pita Jupiter 3 menjangkau tepi bola": HIJAU,
+      "pita Jupiter 3 mengikuti busur limb (tali busur, bukan elips)": HIJAU}),
 
     # ── 5. Kutub Mars kembali lebar tetap 0.55 R ─────────────────────────
     ("5. kutub Mars kembali lebar tetap 0.55 R",

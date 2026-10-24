@@ -15133,6 +15133,47 @@ else
 fi
 
 
+echo "== Aturan 103: lastLocked: tidak boleh dibuang di Apps/ =="
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka. Diukur pada salinan
+# utuh, proses baru, `./swift-ui-lint.sh` sungguhan dijalankan ulang:
+#
+#     snapshot.displayedObject(lastLocked: lastLockedObject)
+#  -> snapshot.displayedObject(lastLocked: nil)
+#
+#     hasil: exit 0, "SEMUA GERBANG UI LULUS"
+#
+# yaitu: seluruh 102 aturan hijau, sementara panel detail dan layar redup
+# menjadi **kosong** saat keadaan `.searching`. Cabang `.searching` di
+# `PointingSnapshot.displayedObject(lastLocked:)` adalah satu-satunya tempat
+# argumen itu menentukan hasil; `nil` membuangnya tanpa mengubah tipe, tanpa
+# cast, dan tanpa satu baris pun yang bisa dibaca sebagai salah.
+#
+# Kenapa Aturan 42 tidak menutupnya: 42 menjaga **badan** permukaan bukan-Bool
+# (`displayedObject -> lastLockedObject`). Yang salah di sini bukan badannya,
+# melainkan **argumen** yang diteruskan ke sana — dan `nil` bukan badan yang
+# bisa dibandingkan dengan jalur sah mana pun.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-102 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan103-lastlocked-tidak-dibuang.py" ]; then
+  echo "FAIL Tools/check-aturan103-lastlocked-tidak-dibuang.py tidak ada: Aturan 103"
+  echo "     tidak mengukur apa pun, dan objek yang dipertahankan boleh kembali"
+  echo "     dibuang dengan nil tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  lastlocked=$(python3 Tools/check-aturan103-lastlocked-tidak-dibuang.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$lastlocked"
+    echo "-> Teruskan lastLockedObject, jangan nil: cabang .searching"
+    echo "   di displayedObject hanya hidup dari argumen itu. Panel yang"
+    echo "   kosong tidak punya teks untuk membantah dirinya sendiri."
+    status=1
+  else
+    echo "$lastlocked"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

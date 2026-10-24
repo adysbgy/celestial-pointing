@@ -1,3 +1,100 @@
+### Siklus (24 Okt 2026 — Aturan 103: objek yang dipertahankan dibuang dengan `nil`, dan seluruh 102 aturan diam)
+
+Siklus ini menutup cacat yang **diukur buta**: seluruh 102 aturan UI lulus,
+seluruh uji hijau, sementara satu argumen membuang objek yang engine sengaja
+simpan. Ia tidak menyentuh satu piksel pun — dan justru itu bentuknya.
+
+**Cacatnya.** `PointingEngine.displayedObject` menyalurkan objek terakhir ke
+`PointingSnapshot.displayedObject(lastLocked:)`. Cabang ketiga fungsi itu:
+
+    if let best = intent?.best { return best }
+    return state == .searching ? lastLocked : nil
+
+adalah **satu-satunya** tempat argumen `lastLocked` menentukan hasil. Saat
+keadaan `.searching` engine menyimpan objek dari pandangan sebelumnya supaya
+panel detail tidak berkedip saat pergelangan bergeser sedikit. Mengganti
+argumen itu menjadi `nil` membuangnya — dan tidak ada yang berbunyi.
+
+Diukur pada pohon HEAD (worktree terpisah, proses baru), bukan disangka:
+
+    git worktree HEAD, lalu:
+      snapshot.displayedObject(lastLocked: lastLockedObject)
+        -> snapshot.displayedObject(lastLocked: nil)
+
+    exit 0, 244 baris keluaran, 101 blok aturan berjalan
+    baris terakhir: == SEMUA GERBANG UI LULUS ==
+
+Angka 101 blok adalah hitungan di pohon **sebelum** Aturan 103 ada (nomor
+sampai 102, karena Aturan 69 tinggal di `Tools/`). Jadi klaim "lolos seluruh
+aturan sebelumnya" bukan warisan docstring — ia diulang di siklus ini.
+
+**Kenapa bentuknya buta.** `lastLocked:` menerima `CelestialObject?`, jadi `nil`
+masuk tanpa cast, tanpa perubahan tipe, dan tanpa satu baris pun yang terbaca
+salah. Tidak ada teks di layar yang membantahnya, karena tidak ada teks yang
+tampil — panel detail dan layar redup hanya **kosong**. Ini kelas yang berulang
+di repo ini: setiap gerbang hijau, dan yang diukur bukan bagian yang bermasalah.
+
+**Kenapa Aturan 44 tidak menutupnya.** Aturan 44 menjaga **badan** permukaan
+bukan-Bool (`displayedObject -> lastLockedObject`), yaitu saat seluruh badan
+diganti. Di sini badannya benar; yang salah adalah **argumen** yang diteruskan
+ke badan itu, dan `nil` bukan badan yang bisa dibandingkan dengan daftar putih.
+
+**Gerbang.** `Tools/check-aturan103-lastlocked-tidak-dibuang.py` membaca setiap
+situsan `lastLocked:` di `Apps/` dan menuntut nilainya bukan `nil`,
+`Optional.none`, atau `.none`. Daftar pemanggilnya **dipanen** dari berkas, bukan
+ditulis tangan: aturan ini menemukan **lima** situs, dan situs keenam — digest
+komplikasi — justru yang paling mungkin lupa. Nol situs = GAGAL, bukan lolos.
+
+**Bukti non-vakum.** `Tools/bukti-mutasi-aturan103-lastlocked.py`, 8 keadaan,
+semuanya sesuai harapan: baseline hijau + lima situs terbaca; `nil` merah;
+`Optional.none` merah; `lastLocked:nil` tanpa spasi merah; kelima situs dibuang
+sekaligus **GAGAL** (gerbang berhenti mengukur, bukan hijau); satu situs dibuang
+tetap hijau dengan jumlah turun ke empat; dan sumber produksi pulih
+byte-per-byte. Tiga ejaan `nil` diperiksa terpisah karena aturan yang menjaga
+satu kata kunci akan diam pada ejaan lain.
+
+**Yang TIDAK diklaim.** Ini sapuan **teks**, bukan pemeriksa tipe: `lastLocked:
+beberapaObjekLain` lolos, dan pemanggil yang meneruskan argumennya lewat
+variabel perantara (`lastLocked: retained`) tidak terjangkau. Ia juga tidak
+membuktikan isi objek yang diteruskan benar. Yang dijaga sempit dan konkret:
+**jalur `nil` yang sudah terukur buta tidak bisa kembali** tanpa gerbang merah.
+
+#### Gerbang lainnya di siklus ini
+
+`Tools/bukti-mutasi-gerbang-nirsaksi.py` memperbaiki dua harapan yang salah, dan
+keduanya ditemukan dengan mengukur, bukan dengan membaca:
+
+1. **Keadaan 1 (kanal biru bocor) kini menuntut `NEVER_BRIGHTER` ikut merah.**
+   Harapan lama bilang hijau dengan alasan "pemeriksaan itu membaca kanal
+   merah". Alasan itu salah tentang kodenya: `check_night_mode_never_exceeds_day`
+   membandingkan `luminance_field`, yaitu Rec. 709 `0.2126R + 0.7152G +
+   0.0722B` — biru **berbobot**, jadi bocoran 0.2 menaikkan luminans
+   `0.0722 x 0.2 x 255 = 3.7`. Terukur persis itu: 12 kasus ragu memerah dengan
+   puncak +3.7. Kedua gerbang memang menyala bersama, dan itu benar — satu
+   kebocoran biru melanggar dua janji sekaligus. Pemisahannya dibuktikan keadaan
+   3, arah sebaliknya: lantai dinaikkan membuat `NEVER_BRIGHTER` merah sementara
+   kemurnian tetap hijau.
+2. **`planet-jupiter-bare` dulu diharapkan merah di keadaan 2, dan itu keliru.**
+   Kasus itu bukan keadaan produksi — ia bola berpalet tanpa ciri, dipakai
+   sebagai pengurang bentuk, dan diukur **0** pemanggilan jalur bayangan
+   (saturn-confirmed 1, moon-full 1). Nol pemanggilan berarti tidak ada yang bisa
+   dibocorkan, jadi hijau di sana adalah hasil yang **benar**. Penggantinya
+   `planet-saturn-confirmed`: satu-satunya planet terkunci yang benar-benar
+   menggambar bayangan (cincin).
+
+`Tools/sonde-gerbang-nirsaksi.py` ditambahkan sebagai jalan pintas: harness
+penuh menjalankan ~35 menit untuk tujuh keadaan x enam gerbang, sementara
+menyempurnakan satu harapan hanya butuh satu keadaan.
+
+#### Keadaan gerbang
+
+`./swift-test.sh` → **CelestialEngine 222 + PointingKit 1101, 0 gagal**.
+`./swift-ui-lint.sh` → **102 blok aturan** berjalan (nomor sampai 103, Aturan 69
+tinggal di `Tools/`), exit 0. `Tools/check-harness-terdaftar.py` → **168 harness,
+semuanya dirujuk** `engine-tests.yml`. `Tools/check-jangkar-harness.py` → 544
+jangkar, tidak ada mutasi tertinggal. `bash -n` di Docker `bash:3.2` → exit 0
+(heredoc macOS CI aman).
+
 ### Siklus (23 Okt 2026, lanjutan — kamus fase ketiga ditambahi, bukan dibangun)
 
 Siklus ini juga tidak menambah fitur, dan cacatnya **sudah ada di pohon** —

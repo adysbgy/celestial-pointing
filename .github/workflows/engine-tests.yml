@@ -2164,6 +2164,26 @@ jobs:
       - name: Buktikan Aturan 102 berbunyi saat kamus fase ditambahi, bukan dibangun
         run: python3 Tools/bukti-mutasi-aturan102-peta-fase.py
 
+      # Dan bukti untuk **Aturan 103** — cacat yang, sebelum aturan ini ada,
+      # lolos **seluruh 102 aturan** yang lain. Diganti `lastLocked:
+      # lastLockedObject` menjadi `lastLocked: nil` pada salinan utuh:
+      # `./swift-ui-lint.sh` keluar 0 dan mencetak "SEMUA GERBANG UI LULUS",
+      # sementara panel detail dan layar redup menjadi kosong saat `.searching`.
+      #
+      # Kenapa bentuknya lolos: `lastLocked:` menerima `CelestialObject?`,
+      # jadi `nil` masuk tanpa cast, tanpa perubahan tipe, dan tanpa satu baris
+      # pun yang terbaca sebagai salah. Tidak ada teks di layar yang
+      # membantahnya, karena tidak ada teks yang tampil — persis bentuk yang
+      # dikejar repo ini: setiap gerbang hijau, dan yang diukur bukan bagian
+      # yang bermasalah.
+      #
+      # Harness ini juga menguji arah sebaliknya: kelima situs dibuang membuat
+      # gerbang kehilangan sasarannya, dan itu harus GAGAL (fail-closed), bukan
+      # hijau. Gerbang yang tidak menemukan apa pun untuk diperiksa sudah
+      # berhenti mengukur.
+      - name: Buktikan Aturan 103 berbunyi saat objek yang dipertahankan dibuang
+        run: python3 Tools/bukti-mutasi-aturan103-lastlocked.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
