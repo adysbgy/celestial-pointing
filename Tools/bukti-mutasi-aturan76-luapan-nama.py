@@ -152,7 +152,7 @@ def jalankan(program, mutasi=None, kosongkan_apps=False):
 # sampai kedua bentuk cocok, karena itu menghapus bukti bahwa kebijakannya
 # masih ada di baris yang benar.
 WATCH_BLOK = """                .lineLimit(ObjectCardLayout.nameLineLimit(at: textSize))
-                .minimumScaleFactor(0.6)"""
+                .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)"""
 IOS_BLOK = """                            .lineLimit(ObjectCardLayout.detailNameLineLimit)
                             .minimumScaleFactor(ObjectCardLayout.detailNameScaleFloor)"""
 CALIB_BLOK = """                                    .lineLimit(ObjectCardLayout.calibrationLineLimit(at: textSize))

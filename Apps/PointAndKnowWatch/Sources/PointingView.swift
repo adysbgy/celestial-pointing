@@ -601,8 +601,11 @@ struct ObjectDetailView: View {
                 // Nama benda adalah **informasi utama**: harus jadi yang paling besar dan
                 // tebal di kartu, karena inilah yang dicari pengguna.
                 .font(.title3.bold())
+                // Lantai skala dari model, bukan angka di view — supaya model
+                // yang memutuskan kapan menyusun ulang dan huruf yang benar-benar
+                // menyusut memakai satu angka.
                 .lineLimit(ObjectCardLayout.nameLineLimit(at: textSize))
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)
                 .frame(maxWidth: .infinity, alignment: .leading)
             // Baris meta: badge keyakinan + jenis/magnitudo/koordinat.
             //
@@ -640,7 +643,11 @@ struct ObjectDetailView: View {
                     // catatan sisa itulah penanda kejujuran yang tidak boleh
                     // hilang dari pandangan.
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    // Lantai dari model, sama seperti nama di atas: baris ini
+                    // memuat tiga fakta sekunder dan memang harus ikut menyusut,
+                    // tetapi **seberapa kecil** ia boleh jadi adalah angka yang
+                    // satu sumber dengan keputusan tata letak lain.
+                    .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)
             }
             if isStale {
                 Text(TextLocalization.text(.objectDetailStaleNoteDisplay))

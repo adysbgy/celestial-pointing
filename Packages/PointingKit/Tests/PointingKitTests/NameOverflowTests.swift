@@ -749,4 +749,140 @@ final class NameOverflowTests: XCTestCase {
         }
         return nil
     }
+
+    // MARK: - Titik buta yang terukur: lantai skala di view vs model
+    //
+    // **Cacat.** Lantai skala `.minimumScaleFactor` ada di **dua** tempat,
+    // dan hanya satu di antaranya yang dijaga. Sisi model dijaga keras:
+    //
+    //     public static let nameScaleFloor: Double = 0.6   // diubah ke 0.45
+    //
+    // memerahkan lima tes di berkas ini. Sisi view tidak dijaga siapa pun:
+    //
+    //     .minimumScaleFactor(0.6)      // PointingView.swift:605
+    //
+    // diubah ke 0.45 dan **nol merah** — `swift-ui-lint.sh` exit 0, Aturan 76
+    // "Bersih" (ia hanya menuntut kebijakan *ada*, bukan nilainya cocok),
+    // `swift-typecheck.sh` exit 0, dan 1101 tes lulus. Terukur pada salinan
+    // pohon, bukan disimpulkan.
+    //
+    // Akibatnya bukan kekurangan simetri yang bisa diperbaiki nanti. Model
+    // yang memutuskan kapan kartu menyusun ulang (`stacksName`, `fit`,
+    // `linesNeeded`) menghitung dengan lantai 0.6, sementara view yang
+    // benar-benar menyusutkan huruf memakai lantai lain. Keduanya berbicara
+    // tentang nama yang sama dan berbeda pendapat tentang seberapa kecil
+    // huruf boleh jadi sebelum terpotong — dan tidak ada satu pun gerbang yang
+    // tahu mereka berbeda.
+    //
+    // **Kenapa tidak cukup memperbaiki view-nya saja.** Mengganti literal jadi
+    // token memperbaiki hari ini. Yang menahan perpecahan itu tetap: lantai
+    // adalah angka yang **bisa berubah**, dan yang ini tidak diuji. Harness
+    // Aturan 76 malah mengunci literalnya (`WATCH_BLOK` menuntut
+    // `.minimumScaleFactor(0.6)` persis), jadi memperbaiki view tanpa memperbaiki
+    // harness akan merah pada perbaikan yang benar.
+    //
+    // Yang TIDAK diklaim: uji ini membaca teks, jadi ia mengukur perjanjian
+    // **antar-teks**, bukan piksel di perangkat. Yang bisa diklaim: kedua sisi
+    // satu perhitungan tidak bisa lagi berubah sendiri-sendiri tanpa ada yang
+    // berbunyi.
+    func testEveryMinimumScaleFactorSiteNamesTheModelToken() throws {
+        let sources = Self.appsSources()
+        XCTAssertFalse(sources.isEmpty, "tidak ada berkas Apps/ terbaca — path salah")
+
+        // `.minimumScaleFactor(` — SEMUA situs, dipakai untuk penjaga non-vakum.
+        let semua = try NSRegularExpression(
+            pattern: #"\.minimumScaleFactor\s*\("#)
+        // `.minimumScaleFactor(<angka>)` — situs yang menulis lantainya sendiri.
+        // Bentuk `(<nama>.<nama>)` dan `(<nama>(...))` tidak cocok, jadi
+        // pemanggilan token tetap boleh lewat.
+        let literal = try NSRegularExpression(
+            pattern: #"\.minimumScaleFactor\(\s*[0-9]"#)
+
+        var situs = 0
+        var bermasalah: [String] = []
+        for (path, text) in sources {
+            let kode = Self.stripComments(text)
+            let range = NSRange(kode.startIndex..<kode.endIndex, in: kode)
+            situs += semua.numberOfMatches(in: kode, range: range)
+            for match in literal.matches(in: kode, range: range) {
+                guard let r = Range(match.range, in: kode) else { continue }
+                let baris = kode[kode.startIndex..<r.lowerBound]
+                    .split(separator: "\n").count
+                bermasalah.append("\(URL(fileURLWithPath: path).lastPathComponent):\(baris): "
+                                  + String(kode[r]).prefix(48))
+            }
+        }
+
+        // Bukan vacuous: yang dihitung adalah **semua** situs, bukan sisa
+        // literal. Kalau penjaganya memakai jumlah literal, ia akan menjadi
+        // lulus-pasti begitu perbaikannya masuk — hijau karena subjeknya habis,
+        // bukan karena subjeknya benar.
+        XCTAssertGreaterThanOrEqual(situs, 5,
+                                    "hanya \(situs) situs .minimumScaleFactor terbaca — "
+                                    + "pola pembacaannya berhenti bekerja")
+        XCTAssertTrue(bermasalah.isEmpty,
+                      "lantai skala ditulis sebagai angka di view, bukan token model: "
+                      + bermasalah.joined(separator: "; ")
+                      + " — pakai ObjectCardLayout.nameScaleFloor supaya view dan "
+                      + "keputusan tata letak memakai satu angka")
+    }
+
+    /// Token yang diklaim dipakai di view benar-benar ada di model.
+    ///
+    /// Tanpa ini, tes di atas bisa dipuaskan dengan menulis nama token yang
+    /// tidak ada — dan itu tidak akan terlihat sampai Mac membangunnya.
+    func testTheNamedScaleFloorTokenExists() {
+        XCTAssertEqual(ObjectCardLayout.nameScaleFloor, 0.6,
+                       "lantai kartu jam berubah — perbarui juga situs view-nya")
+        XCTAssertLessThan(ObjectCardLayout.nameScaleFloor,
+                          ObjectCardLayout.detailNameScaleFloor,
+                          "panel iPhone lebih lapang daripada kartu jam")
+        XCTAssertGreaterThan(ObjectCardLayout.nameScaleFloor,
+                             ObjectCardLayout.alwaysOnScaleFloor,
+                             "layar redup memang lebih sempit dari kartu jam")
+    }
+
+    /// Sumber `Apps/` untuk tes yang perlu membaca teks view.
+    private static func appsSources() -> [(path: String, text: String)] {
+        var hasil: [(String, String)] = []
+        let root = appsRoot
+        guard let walker = FileManager.default.enumerator(at: root,
+                                                          includingPropertiesForKeys: nil)
+        else { return hasil }
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            hasil.append((url.path, text))
+        }
+        return hasil.sorted { $0.0 < $1.0 }
+    }
+
+    /// Akar `Apps/`, dicari ke atas dari berkas tes ini.
+    private static var appsRoot: URL {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<6 {
+            dir.deleteLastPathComponent()
+            let candidate = dir.appendingPathComponent("Apps")
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        // Bentuk yang sama dengan `PreferenceDefaultsTests` supaya kegagalan
+        // pembacaannya tidak jadi XCTSkip yang diam.
+        return URL(fileURLWithPath: #filePath)
+    }
+
+    /// Buang komentar, sama seperti `buang_komentar` di `swift-ui-lint.sh`.
+    private static func stripComments(_ text: String) -> String {
+        var out = text
+        while let start = out.range(of: "/*"),
+              let end = out.range(of: "*/", range: start.upperBound..<out.endIndex) {
+            out.removeSubrange(start.lowerBound..<end.upperBound)
+        }
+        return out.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> Substring in
+                guard let idx = line.range(of: "//") else { return line }
+                return line[line.startIndex..<idx.lowerBound]
+            }
+            .joined(separator: "\n")
+    }
 }

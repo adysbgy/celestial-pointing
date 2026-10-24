@@ -3119,6 +3119,22 @@ jobs:
       - name: Buktikan gerbang luapan nama objek berbunyi
         run: python3 Tools/bukti-mutasi-aturan76-luapan-nama.py
 
+      # Lantai skala di view wajib memanggil token model, bukan menulis
+      # angkanya sendiri. Aturan 76 menuntut kebijakan luapan ADA di setiap
+      # nama katalog, dan `.minimumScaleFactor(0.45)` memenuhinya — jadi
+      # lantai yang mengecil diam-diam tak pernah dilihatnya. Diukur pada
+      # pohon sebelum gerbang ini ada: mutasi lantai kartu jam dari 0.6 ke
+      # 0.45 meninggalkan lint, typecheck, dan 1101 uji semuanya hijau,
+      # sementara model yang memutuskan kapan kartu menyusun ulang masih
+      # berhitung dengan 0.6. Harness ini menuntut empat keadaan merah
+      # (lantai jadi angka, lantai jadi 1.0, baris meta menyimpang dari
+      # nama di atasnya, complication menyimpang dari kartu jam), dua
+      # kontrol diam, dan arah kedua: lint **tanpa** blok Aturan 76 wajib
+      # hijau atas mutasi yang sama, supaya yang menangkap mutasinya
+      # terbukti gerbang lantai ini, bukan aturan lain.
+      - name: Buktikan gerbang lantai skala view berbunyi
+        run: python3 Tools/bukti-mutasi-lantai-skala-view.py
+
       # Aturan 81: terang bintang malam wajib berasal dari magnitudo, bukan
       # dari ukuran yang dikarang view. Rumusnya diuji di Linux, tetapi
       # pemasangannya tidak terlihat oleh uji model mana pun.

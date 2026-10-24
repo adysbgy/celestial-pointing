@@ -202,7 +202,10 @@ struct ComplicationView: View {
                     // sekali. `.caption2` + semibold mempertahankan beratnya
                     // sambil menyerahkan ukurannya ke sistem.
                     .font(.caption2.weight(.semibold))
-                    .minimumScaleFactor(0.6)
+                    // Lantai dari model. Satu angka dengan kartu jam, supaya
+                    // perubahan lantai tidak bisa berlaku di app tetapi tidak
+                    // di complication — keduanya menampilkan nama yang sama.
+                    .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)
             }
             .gaugeStyle(.accessoryCircular))
         case .accessoryRectangular:
@@ -239,7 +242,8 @@ struct ComplicationView: View {
                         // lebih baik daripada mendorong baris kedua (penanda
                         // keraguan) keluar dari widget.
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                        // Lantai dari model, sama seperti keluarga lain.
+                        .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)
                     // Baris kedua sudah punya ruang, jadi penanda ragu tampil
                     // sebagai **kata**, bukan hanya ikon. Ini yang membuat
                     // keadaan ragu terbaca tanpa perlu mengermat ke ikon —
@@ -271,7 +275,8 @@ struct ComplicationView: View {
             } currentValueLabel: {
                 Text(digest.headline)
                     .font(.caption2.weight(.semibold))
-                    .minimumScaleFactor(0.6)
+                    // Lantai dari model — sama dengan keluarga circular di atas.
+                    .minimumScaleFactor(ObjectCardLayout.nameScaleFloor)
             }
             .gaugeStyle(.accessoryCircular)
             .widgetLabel {

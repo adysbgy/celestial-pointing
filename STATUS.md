@@ -162,10 +162,10 @@ menyempurnakan satu harapan hanya butuh satu keadaan.
 
 #### Keadaan gerbang
 
-`./swift-test.sh` → **CelestialEngine 222 + PointingKit 1101, 0 gagal**.
-`./swift-ui-lint.sh` → **102 blok aturan** berjalan (nomor sampai 103, Aturan 69
-tinggal di `Tools/`), exit 0. `Tools/check-harness-terdaftar.py` → **168 harness,
-semuanya dirujuk** `engine-tests.yml`. `Tools/check-jangkar-harness.py` → 544
+`./swift-test.sh` → **CelestialEngine 222 + PointingKit 1103, 0 gagal**.
+`./swift-ui-lint.sh` → **103 blok aturan** berjalan (nomor sampai 104, Aturan 69
+tinggal di `Tools/`), exit 0. `Tools/check-harness-terdaftar.py` → **170 harness,
+semuanya dirujuk** `engine-tests.yml`. `Tools/check-jangkar-harness.py` → 548
 jangkar, tidak ada mutasi tertinggal. `bash -n` di Docker `bash:3.2` → exit 0
 (heredoc macOS CI aman).
 
@@ -34442,3 +34442,62 @@ WidgetKit sungguhan — watchOS tetap bisa menunda atau menggabungkan penyegaran
 dan itu di luar kendali app. Ia juga tidak memeriksa keluarga complication mana
 yang menampilkan penanda (itu sudah dijaga uji model), dan tidak menjamin
 `reloadAllTimelines()` dipanggil pada setiap transisi (itu Aturan 9).
+
+### Siklus (24 Okt 2026 — lantai skala view: dua paruh satu perhitungan)
+
+Siklus ini menutup lubang yang **sudah ada di pohon** dan bukan ditanam untuk
+membuktikan gerbang: lantai skala `.minimumScaleFactor` ada di dua tempat, dan
+hanya satu yang dijaga.
+
+**Cacatnya, diukur sebelum gerbang ini ada.** Sisi model
+(`ObjectCardLayout.nameScaleFloor`) dijaga keras — ubah 0.6 menjadi 0.45
+memerahkan lima tes di `NameOverflowTests`. Sisi view tidak dijaga siapa pun:
+
+    mutasi PointingView.swift   0.6 -> 0.45   swift-ui-lint.sh   exit 0
+                                            swift-typecheck.sh exit 0
+                                            swift-test.sh      1101 tes, 0 gagal
+
+Aturan 76 **memeriksa baris itu berulang kali** dan tetap diam, karena ia
+menuntut kebijakan luapan *ada*, bukan nilainya cocok — dan
+`.minimumScaleFactor(0.45)` memenuhinya. Akibatnya bukan kekurangan simetri:
+model yang memutuskan kapan kartu menyusun ulang (`stacksName`, `fit`,
+`linesNeeded`) berhitung dengan 0.6, sementara view yang benar-benar
+menyusutkan huruf memakai angka lain. Keduanya bicara tentang nama yang sama
+dan berbeda pendapat tentang seberapa kecil huruf boleh jadi sebelum terpotong.
+
+**Perbaikan di sumber.** Kedelapan situs `.minimumScaleFactor` di `Apps/`
+kini memanggil token model — kartu jam (nama + baris meta), ketiga keluarga
+complication, panel detail iPhone, layar redup, dan daftar acuan kalibrasi.
+Bukan cuma situs yang cacat: yang dijaga adalah perjanjian, dan perjanjian
+yang hanya dipenuhi sebagian adalah perjanjian yang akan menyimpang lagi.
+
+**Dua gerbang baru, karena satu saja tidak cukup.**
+
+1. `NameOverflowTests.testEveryMinimumScaleFactorSiteNamesTheModelToken` —
+   membaca teks `Apps/`, menuntut **nol** lantai tertulis sebagai angka, dan
+   non-vakum: yang dihitung semua situs (≥ 5), bukan sisa literal. Tanpa itu,
+   lulus-pasti begitu perbaikannya masuk — hijau karena subjeknya habis.
+   `testTheNamedScaleFloorTokenExists` menjaga token yang diklaim memang ada
+   di model, supaya tes tidak bisa dipuaskan dengan menulis nama yang tidak
+   pernah dibangun Mac.
+
+2. `Tools/bukti-mutasi-lantai-skala-view.py` — membuktikan gerbang itu
+   **bisa merah**, empat keadaan: lantai kembali jadi angka, lantai jadi 1.0
+   (huruf tak pernah menyusut), baris meta menyimpang dari nama di atasnya,
+   dan complication menyimpang dari kartu jam. Dua kontrol harus diam. Arah
+   kedua menjalankan lint dengan blok Aturan 76 **dicabut** dan menuntutnya
+   hijau atas mutasi yang sama — tanpa itu, keadaan merah bisa saja
+   ditangkap aturan lain, dan lubang yang diklaim tidak pernah terbukti ada.
+
+**Kenapa harnessnya berhenti pada pohon kotor.** Ia menolak jalan selama
+`Apps/` menyimpang dari HEAD, dan itu bukan formalitas: mutasi yang tertinggal
+dari proses yang di-`SIGKILL` pernah membuat harness sesama mengambil berkas
+**yang sudah termutasi** sebagai "aslinya", lalu melaporkan "pulih persis"
+untuk perbandingan dengan dirinya sendiri. Penjaga ini yang membuat angka
+"keadaan, tidak sesuai" berarti sesuatu.
+
+**Yang TIDAK diklaim.** Kedua gerbang membaca teks, jadi yang diukur adalah
+perjanjian **antar-teks**, bukan piksel di perangkat. Seberapa kecil huruf
+benar-benar terbaca pada jam 40 mm tetap belum terukur di sini — itu butuh
+perangkat. Yang bisa diklaim: kedua paruh satu perhitungan tidak bisa lagi
+berubah sendiri-sendiri tanpa ada yang berbunyi.
