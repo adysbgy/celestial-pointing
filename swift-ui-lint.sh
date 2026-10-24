@@ -15173,6 +15173,55 @@ else
   fi
 fi
 
+echo "== Aturan 104: sigma yang dicatat harus datang dari sigma yang berlaku =="
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka. Diukur pada
+# salinan utuh, proses baru, `./swift-ui-lint.sh` sungguhan dijalankan ulang —
+# pada **dua** jalur berbeda, masing-masing sendirian:
+#
+#     jam (pembaruan berkala):
+#       sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+#     -> sigmaDeg: 0.0)
+#
+#     iPhone (pencatatan sampel):
+#       sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+#     -> sigmaDeg: 0.0)
+#
+#     hasil keduanya: exit 0, "SEMUA GERBANG UI LULUS"
+#
+# yaitu: seluruh aturan hijau, sementara riwayat keyakinan merekam sigma 0 —
+# seolah perangkat selalu tahu arahnya, padahal PRD v0.4 menegakkan akurasi
+# Watch sebagai hipotesis. Yang membuatnya lolos tanpa satu baris pun yang
+# terbaca salah: kedua pemanggilan menerima `sigmaDeg: Double`, dan `0.0`
+# adalah nilai yang **sah** di jalur yang sama (`pointingSigmaDeg ?? 0` di
+# ConfidenceTrace.record(message:)) — nilai sah yang justru membungkam
+# peringatan sigma hilang.
+#
+# Kenapa Aturan 86 tidak menutupnya: 86 menjaga balasan permintaan state
+# (`send(state:)`); yang salah di sini jalur **pembaruan berkala** di jam dan
+# jalur **pencatatan sampel** di iPhone. Keduanya menyalurkan sigma tapi ke
+# jalur berbeda dengan ejaan berbeda, jadi jangkar 86 tidak menyentuh baris ini.
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-103 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan104-sigma-diteruskan.py" ]; then
+  echo "FAIL Tools/check-aturan104-sigma-diteruskan.py tidak ada: Aturan 104"
+  echo "     tidak mengukur apa pun, dan sigma yang berlaku boleh diganti"
+  echo "     literal nol tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  sigma_diteruskan=$(python3 Tools/check-aturan104-sigma-diteruskan.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$sigma_diteruskan"
+    echo "-> Teruskan engine.controller.resolver.confidencePolicy."
+    echo "   pointingSigmaDeg, jangan literal: telemetri yang merekam sigma 0"
+    echo "   akan dibaca sebagai jam yang selalu yakin, dan ambang keyakinan"
+    echo "   dikalibrasi ulang di atas angka yang tidak pernah diukur."
+    status=1
+  else
+    echo "$sigma_diteruskan"
+  fi
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo

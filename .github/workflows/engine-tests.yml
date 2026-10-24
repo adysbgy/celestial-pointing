@@ -2184,6 +2184,33 @@ jobs:
       - name: Buktikan Aturan 103 berbunyi saat objek yang dipertahankan dibuang
         run: python3 Tools/bukti-mutasi-aturan103-lastlocked.py
 
+      # Dan bukti untuk **Aturan 104** — cacat yang, sebelum aturan ini ada,
+      # lolos **seluruh 103 aturan** yang lain, dan pada **dua** jalur berbeda.
+      # Diganti `sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)`
+      # menjadi `sigmaDeg: 0.0)` pada salinan utuh (masing-masing sendirian):
+      # `./swift-ui-lint.sh` keluar 0 dan mencetak "SEMUA GERBANG UI LULUS",
+      # sementara riwayat keyakinan merekam σ = 0 — seolah perangkat selalu
+      # yakin arahnya.
+      #
+      # Kenapa bentuknya lolos: kedua pemanggilan menerima `sigmaDeg: Double`,
+      # jadi `0.0` masuk tanpa cast dan tanpa mengubah satu baris pun yang lain.
+      # Lebih buruk, σ = 0 adalah nilai yang **sah** di jalur yang sama
+      # (`pointingSigmaDeg ?? 0` di `ConfidenceTrace.record(message:)`), jadi
+      # tidak ada teks di layar yang membantahnya — justru nilai sah itu yang
+      # membungkam peringatan sigma hilang.
+      #
+      # Kenapa Aturan 86 tidak menutupnya: 86 menjaga balasan permintaan state
+      # (`send(state:)`), bukan pembaruan berkala di jam maupun pencatatan sampel
+      # di iPhone. Ketiganya menyalurkan sigma tapi ke jalur berbeda dengan
+      # ejaan berbeda, sehingga jangkar 86 tidak menyentuh baris-baris ini.
+      #
+      # Harness ini juga menguji arah sebaliknya: situs dibuang (di jam, dan di
+      # kedua jalur sekaligus) membuat gerbang kehilangan sasarannya, dan itu
+      # harus GAGAL (fail-closed), bukan hijau. Gerbang yang tidak menemukan apa
+      # pun untuk diperiksa sudah berhenti mengukur.
+      - name: Buktikan Aturan 104 berbunyi saat sigma yang berlaku diganti literal
+        run: python3 Tools/bukti-mutasi-aturan104-sigma.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

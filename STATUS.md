@@ -1,3 +1,77 @@
+### Siklus (24 Okt 2026 — Aturan 104: sigma pointing diganti literal nol, dan seluruh 103 aturan diam)
+
+Siklus ini menutup cacat yang **diukur buta**, kelas yang sama dengan Aturan
+103 tetapi satu lapis lebih dalam: bukan argumen *opsional* yang dibuang,
+melainkan argumen *non-opsional* yang diisi nilai yang sah-sah saja.
+
+**Cacatnya.** Dua jalur meneruskan sigma yang berlaku ke riwayat keyakinan:
+
+    jam (pembaruan berkala) — PointAndKnowWatchWatchApp:
+      link.sendIfDecisionChanged(
+          state: update.snapshot,
+          sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+
+    iPhone (pencatatan sampel) — DiagnosticsView:
+      trace.record(snapshot: update.snapshot,
+                   sigmaDeg: engine.controller.resolver.confidencePolicy.pointingSigmaDeg)
+
+Diukur pada salinan utuh, proses baru, `./swift-ui-lint.sh` sungguhan
+dijalankan ulang — **masing-masing sendirian**, bukan disangka:
+
+    jam:    sigmaDeg: ...pointingSigmaDeg) -> sigmaDeg: 0.0)
+    iPhone: sigmaDeg: ...pointingSigmaDeg) -> sigmaDeg: 0.0)
+
+    LINT exit = 0, verdict: == SEMUA GERBANG UI LULUS ==
+    (103 blok aturan berjalan pada mutasi iPhone; mutasi terbalik `sigmaDeg: 0`
+    di jam hasilnya sama)
+
+Kenapa bentuk ini lolos seluruh 103 gerbang sebelumnya: kedua pemanggilan
+menerima `sigmaDeg: Double`, jadi `0.0` masuk tanpa cast, tanpa perubahan tipe,
+dan tanpa satu baris pun yang terbaca sebagai salah. Tidak ada teks di layar
+yang membantahnya — justru sebaliknya, σ = 0 adalah nilai yang **sah** di
+jalur yang sama (`pointingSigmaDeg ?? 0` di
+`ConfidenceTrace.record(message:)`), sehingga ia membungkam peringatan sigma
+hilang alih-alih memicunya.
+
+**Kenapa ini cacat, bukan soal gaya.** Akibatnya nyata di telemetri: keadaan
+itu direkam sebagai perangkat yang tahu arahnya dengan sigma nol — keyakinan
+sempurna yang tidak pernah diukur. PRD v0.4 menegakkan akurasi Watch sebagai
+hipotesis; hipotesis tidak boleh sampai ke telemetri yang dipakai menyetel
+ulang ambang keyakinan. Aturan 86 menjaga jalur yang berbeda (balasan
+permintaan state, `send(state:)`) dengan ejaan berbeda, jadi jangkarnya tidak
+menyentuh baris ini — ketiga jalur butuh jangkar tersendiri.
+
+**Yang ditambahkan.**
+- `Tools/check-aturan104-sigma-diteruskan.py` — gerbangnya, memeriksa **kedua**
+  jalur dan menolak literal (`0.0`, `0`, `Double.zero`) karena makna, bukan
+  bentuk.
+- `Tools/bukti-mutasi-aturan104-sigma.py` — sebelas keadaan: mutasi buta `0.0`
+  di jam, mutasi buta `0.0` di iPhone, ejaan `0`, bentuk `Double.zero`,
+  argumen dibuang, situs dibuang (fail-closed), sigma benar dengan `state:`
+  dibuang (harus tetap hijau), dan kedua jalur dibuang sekaligus.
+- Blok Aturan 104 di `swift-ui-lint.sh` (nomor sampai 104, 103 blok berjalan).
+- Langkah harness di `.github/workflows/engine-tests.yml`.
+- Hitungan aturan di README: 102 -> 103.
+
+**Cacat kedua yang ditemukan sambil menguji.** Jalur iPhone (`DiagnosticsView`)
+ternyata buta terhadap cacat yang sama — diukur terpisah, mutasi `sigmaDeg: 0.0`
+di sana **juga** membuat seluruh aturan lulus. Karena itu gerbangnya diperluas
+ke dua berkas, bukan satu: menutup hanya jalur jam akan meninggalkan cacat yang
+persis sama hidup di sisi iPhone, dan justru jalur itulah yang merekam sampel
+dari jam ke telemetri.
+
+**Cacat ketiga yang ditemukan sambil jalan.** README yang baru disunting bilang
+"seluruh 102 aturan sebelumnya", dan Aturan 10 — yang memeriksa tiap
+`(angka) aturan` di README cocok dengan blok yang benar-benar berjalan —
+langsung berbunyi. Yang benar adalah sejarahnya (102 gerbang memang yang ada
+saat 103 ditulis), tapi gerbang tidak bisa membedakan sejarah dari klaim hidup.
+Diubah ke "seluruh 102 gerbang sebelumnya", satu kata, dan sejarah tetap utuh
+tanpa menyamar menjadi hitungan. Ini yang paling sering terjadi di repo ini:
+aturan memang menangkap orangnya sendiri.
+
+**Angka yang harus tetap konsisten.** lint 103 blok (nomor sampai 104, 69
+tinggal di `Tools/`), 169 harness terdaftar, 544 jangkar, bash 3.2 heredoc aman.
+
 ### Siklus (24 Okt 2026 — Aturan 103: objek yang dipertahankan dibuang dengan `nil`, dan seluruh 102 aturan diam)
 
 Siklus ini menutup cacat yang **diukur buta**: seluruh 102 aturan UI lulus,
