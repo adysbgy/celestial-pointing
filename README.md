@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **105 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **106 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 106 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 107 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.
@@ -240,6 +240,24 @@ boleh memetakan ke efek yang sama persis), kelengkapan (pola yang kehilangan
 `case` berhenti bergetar sama sekali, dan getaran adalah satu-satunya saluran
 yang tidak butuh mata), dan efeknya nyata (`.sccess` salah ketik harus merah,
 bukan diabaikan diam-diam).
+Aturan 107 (ditambah siklus ini) menutup **kelengkapan** katalog terjemahan,
+bukan pemasangannya. Aturan 91 sudah memastikan setiap `@main` memasang sumber
+terjemahan di `init()`; yang tidak pernah diperiksa adalah apakah teks yang
+**benar-benar ditulis di view** ada di katalog itu. Disapu pada pohon utuh —
+setiap literal statis argumen pertama `Label(`, `Text(`, `Button(`, `Toggle(`,
+`Section(`, `navigationTitle(` di `Apps/` dibandingkan dengan 523 kunci
+`Localizable.xcstrings` — dua teks lolos tanpa kunci: nama tab `"Experiment 1"`
+(`DiagnosticsView.swift:72`) dan `"Point & Know"` di complication kosong
+(`ComplicationWidget.swift:329`), yaitu keadaan pertama yang dilihat orang
+setelah memasang app. Keduanya tidak akan pernah diterjemahkan: kunci yang tidak
+ada di katalog tidak punya nilai `en`. Ini kelas yang berbeda dari Aturan 91 —
+91 menjaga pemasangan (kalau `init()` lupa, seluruh katalog mati dan gejalanya
+seragam), 107 menjaga kelengkapan (satu teks yang lupa didaftarkan hanya
+kehilangan dirinya sendiri, jadi tidak ada gejala yang mengarah ke sana:
+compiler diam dan 106 aturan lain hijau). Gerbang ini sengaja hanya memeriksa
+literal **statis**; `Label(teksDinamis)`, `Label(verbatim:)`, dan
+`Label("\(variabel)")` memang bukan kunci katalog karena teksnya baru diketahui
+saat berjalan, dan menuduh 200+ bentuk itu akan merah pada kode yang benar.
 Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 (aturan 7), hitungan uji di README yang tidak boleh membusuk (aturan 10),

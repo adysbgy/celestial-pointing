@@ -15413,6 +15413,60 @@ else
 fi
 
 
+# ── Aturan 107: setiap teks yang dibaca pengguna punya kunci katalog ──
+#
+# Aturan 91 menjaga **pemasangan** sumber terjemahan di `init()` setiap
+# `@main`. Ia tidak menjaga **kelengkapan**: satu teks yang lupa didaftarkan
+# hanya kehilangan dirinya sendiri, jadi tidak ada gejala yang mengarah ke
+# sana. Compiler diam, seluruh aturan lain hijau, dan yang terlihat hanya satu
+# label yang tidak ikut berganti bahasa.
+#
+# Cacat yang ditutup aturan ini **diukur**, bukan disangka. Disapu pada pohon
+# utuh: setiap literal statis argumen pertama `Label(`, `Text(`, `Button(`,
+# `Toggle(`, `Section(`, `navigationTitle(` di `Apps/` dibandingkan dengan 523
+# kunci `Localizable.xcstrings`. Dua teks lolos tanpa kunci:
+#
+#     Apps/PointAndKnowiOS/Sources/DiagnosticsView.swift:72
+#         Label("Experiment 1", systemImage: "target")     <- nama tab
+#     Apps/PointAndKnowWatch/Complications/ComplicationWidget.swift:329
+#         Label("Point & Know", systemImage: "scope")      <- complication kosong
+#
+# Keduanya teks yang dibaca pengguna: satu nama tab di layar utama, satu lagi
+# justru yang tampil di complication **sebelum ada data** — keadaan pertama
+# yang dilihat orang setelah memasang app. Keduanya tidak akan pernah
+# diterjemahkan, karena kunci yang tidak ada di katalog tidak punya nilai `en`.
+#
+# Kenapa bukan memperluas Aturan 91: 91 memeriksa satu baris di `init()` per
+# app, sedangkan cacat ini hidup di view mana pun dan bertambah seiring jumlah
+# view. Yang menjamin janji "tak ada string keras di view" adalah pemeriksaan
+# atas **seluruh** `Apps/`, bukan atas satu titik pemasangan.
+#
+# Yang TIDAK diklaim: apakah nilai `en` sudah diisi, tata bahasa, dan teks yang
+# datang dari `PointingKit` lewat `TextLocalization` (itu urusan Aturan 91).
+# Literal yang dirakit dulu ke variabel lalu diteruskan ke `Label(variabel)`
+# juga tidak tertangkap — bentuk itu tidak bisa dibedakan dari teks dinamis
+# tanpa analisis aliran data, dan menebaknya akan menghasilkan merah palsu.
+echo "== Aturan 107: setiap teks yang dibaca pengguna punya kunci katalog =="
+if [ ! -f "Tools/check-aturan107-teks-tampil.py" ]; then
+  echo "FAIL Tools/check-aturan107-teks-tampil.py tidak ada: Aturan 107"
+  echo "     tidak mengukur apa pun, dan teks tampil boleh kembali ditulis"
+  echo "     langsung di view tanpa pernah masuk katalog terjemahan."
+  status=1
+else
+  teks_tampil=$(python3 Tools/check-aturan107-teks-tampil.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$teks_tampil"
+    echo "-> Tambahkan kuncinya ke Apps/Shared/Resources/Localizable.xcstrings."
+    echo "   Kunci boleh berupa teks Indonesia (katalog ini memakainya sebagai"
+    echo "   kunci sumber); yang dituntut adalah teksnya ADA di katalog, supaya"
+    echo "   ia bisa diterjemahkan dan tidak hanya bekerja di satu bahasa."
+    status=1
+  else
+    echo "$teks_tampil"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

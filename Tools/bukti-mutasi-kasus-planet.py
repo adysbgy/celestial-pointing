@@ -207,6 +207,7 @@ FILES = [MODEL, RENDER, CHECK]
 # mencocokkan himpunan kosong — himpunan kosong selalu "sesuai harapan", dan
 # itu bentuk paling sunyi dari harness yang tidak mengukur apa pun.
 SEPAKAT = "kasus render planet: switch palet & tabel palet sepakat"
+TERBACA_DARI_MODEL = "kasus render planet: terbaca dari model"
 TERKUNCI = "kasus render planet: setiap planet di model punya kasus terkunci"
 RAGU = "kasus render planet: setiap planet berciri punya kasus ragu"
 CIRI_MATI = "kasus render planet: tidak ada ciri yang tidak dipakai planet mana pun"
@@ -228,9 +229,15 @@ FULL = (SEPAKAT, TERKUNCI, RAGU, CIRI_MATI, GERBANG_RAGU, GERBANG_JAM,
 HIJAU = "hijau"
 MERAH = "merah"
 
-# ── Jangkar: model ───────────────────────────────────────────────────────
+# ── Jangkar: model (planet baru = pluto, yang TIDAK ada di enum) ─────────
+# Urutan enum disengaja `case saturn` lalu `case pluto`: Pluto ada di
+# AstronomyKit (`case pluto = 8`) tapi **tidak** di `CelestialVisual.Planet`,
+# sehingga ia adalah planet "baru" yang jujur untuk diuji — dan uji
+# `testUnknownPlanetIDIsNotGuessed` memang menuntut `init(objectID:)` mengembalikan
+# nil untuk id "pluto". Menyuntikkan Pluto ke enum model menguji bahwa
+# penambahan itu — bila tidak dilengkapi kasus render — memerahkan gerbang.
 ENUM_OLD = "        case saturn\n"
-ENUM_NEW = "        case saturn\n        case uranus\n"
+ENUM_NEW = "        case saturn\n        case pluto\n"
 
 PHASE_OLD = ("            case .mars, .jupiter, .saturn, .uranus, .neptune:"
              " return false\n")
@@ -272,7 +279,7 @@ PLUTO_MODEL = [(MODEL, ENUM_OLD, ENUM_NEW),
                 (MODEL, PHASE_OLD, PHASE_NEW),
                 (MODEL, SATURN_CASE, SATURN_CASE + PLUTO_CASE)]
 
-# ── Jangkar: port ────────────────────────────────────────────────────────
+# ── Jangkar: port (tiga daftar harus sama-sama bertambah) ────────────────
 PORT_HEAD = "PLANET_PALETTE = {\n"
 PORT_PLUTO = ('    "pluto": dict(light=(0.70, 0.68, 0.66), '
               'dark=(0.27, 0.26, 0.25), feature="bands"),\n')
@@ -314,6 +321,11 @@ PAIR_JAM_JUPITER = ('        ("planet-jupiter-confirmed", "planet-jupiter-bare",
 PAIR_JAM_PLUTO = ('        ("planet-pluto-confirmed", "planet-pluto-bare",\n'
                   '         "pita Pluto"),\n')
 
+#: Pasangan khusus gerbang mode malam — ia punya daftar pasangannya **sendiri**
+#: (terpisah dari dua gerbang di atas), jadi Pluto harus masuk ke sini juga.
+PAIR_JAM_PLUTO_NIGHT = ('        ("planet-pluto-confirmed", "planet-pluto-bare", '
+                        '"pita Pluto"),\n')
+
 #: Jupiter kehilangan pitanya, jadi `bands` adalah ciri yang tidak dipakai
 #: planet mana pun. (Pasangan Jupiter yang kini berlebih di gerbang ciri
 #: **tidak** memerahkan pemeriksaan cakupan — terukur, lihat keadaan 3.)
@@ -330,6 +342,32 @@ JUPITER_BANDS_NEW = "feature: .none)\n        case .saturn:"
 #: `case .mars:` → `case .marsX:` **tidak** memerahkan pemeriksaan itu,
 #: karena kedua pembaca membaca wilayah `switch` yang sama dengan pola yang
 #: setara — keduanya lalu sepakat pada nama baru.
+#:
+#: **Kenapa `uranus`, bukan `pluto`.** Sempat ditulis memakai `case .pluto:`
+#: sebagai jangkar badan tak-terbaca, dengan alasan "planet yang disuntikkan
+#: keadaan ini sendiri, satu planet satu sebab". Itu keliru di atas pohon
+#: sekarang: Pluto memang **tidak** ada di `CelestialVisual.Planet`, jadi
+#: `case .pluto:` hanya hidup di dalam kotak pasir keadaan 1/2/8. Keadaan 4
+#: tidak menyuntikkan enum Pluto, sehingga jangkarnya tidak pernah cocok —
+#: harness melaporkan `KELEMAHAN BUKTI: jangkar muncul 0x` dan yang diukur
+#: bukan lagi gerbang. Uranus sebaliknya **ada** di enum dan di palet, jadi
+#: badannya bisa diganti dengan bentuk tak-terbaca yang sah dikompilasi.
+
+URANUS_UNREADABLE = ("        case .uranus:\n"
+                     "            let c = Palette(red: 0.68, green: 0.85, blue: 0.88, "
+                     "dark: 0.24, green: 0.40, blue: 0.44)\n"
+                     "            return .init(light: c.light, dark: c.dark, "
+                     "feature: .paleDisk)\n")
+
+#: Jangkar kasus `uranus` yang **sudah ada** di model. Keadaan 4 menggantinya
+#: dengan `URANUS_UNREADABLE` untuk membuktikan bahwa badan palet tak-terbaca
+#: tetap memerahkan "terbaca dari model" — satu-satunya keadaan yang begitu.
+URANUS_CASE = """        case .uranus:
+            // Piringan pucat kehijauan, nyaris polos (sabuk sangat samar).
+            return .init(light: .init(red: 0.68, green: 0.85, blue: 0.88),
+                         dark:  .init(red: 0.24, green: 0.40, blue: 0.44),
+                         feature: .paleDisk)
+"""
 
 #: Pasangan yang hilang / tertukar, per gerbang. Nama kedua sisi **ada** di
 #: keadaan 7 — yang salah pasangannya, dan hanya pemeriksaan "berpasangan"
@@ -515,10 +553,11 @@ STATES = [
     # yang baru disuntikkan oleh keadaan ini sendiri** — satu planet, satu
     # keadaan, satu sebab.
     #
-    # **Kenapa bukan `case .mars` → `case .marsX`.** Itu dugaan pertama saya,
-    # dan terukur **salah**: kedua pembaca memakai pola yang setara atas
-    # wilayah `switch` yang sama, jadi keduanya sepakat pada nama baru dan
-    # pemeriksaan itu tetap hijau.
+    # **Kenapa bukan `case .mars` → `case .marsX`.** Itu dugaan pertama, dan
+    # terukur **salah**: kedua pembaca memakai pola setara atas wilayah
+    # `switch` yang sama, jadi keduanya sepakat pada nama baru dan pemeriksaan
+    # "sepakat" tetap hijau. (Pemeriksaan itu kini bernama "terbaca dari model"
+    # setelah penjaga cakupan di 6c2fb0d menghentikan pembaca lebih awal.)
     #
     # **Dan kenapa lima pemeriksaan lain hijau di sini** — juga terukur, dan
     # juga membantah dugaan saya: cakupan gerbang ciri diturunkan dari
@@ -529,44 +568,37 @@ STATES = [
     # planet lewat begitu saja.
     #
     # Keadaan ini mengukur **pembaca teks**, bukan build. Untuk Suntingan
-    # Uranus versi lama batas itu penting (`.uranus` memang tidak ada di enum
-    # waktu itu); untuk Pluto ia bahkan lebih tegas — Pluto memang **tidak**
-    # ada di `CelestialVisual.Planet`, jadi kasusnya tidak akan pernah
-    # dikompilasi. Batas itu dinyatakan, bukan disangka tertutup.
+    # Batas itu dinyatakan, bukan disangka tertutup: keadaan ini mengukur
+    # **pembaca teks**, bukan build — `URANUS_UNREADABLE` sah dikompilasi di
+    # Swift, tapi yang berbunyi di sini adalah pola pembaca, bukan compiler.
     #
-    # **Harapannya `CABANG` dan `SEPAKAT`, keduanya merah — dan dua-duanya
-    # adalah perbaikan siklus ini.** Sempat ditulis `_full(SEPAKAT)` dan
-    # terukur merah sebagai "cacat bukti"; sempat ditulis `_full(TERKUNCI)`
-    # dan terukur merah lagi. Kedua kegagalan itu benar, dan sebabnya sama:
-    # **gerbangnya dulu salah bentuk.**
+    # **Harapannya tepat satu merah: `CABANG` — dan itu diukur, bukan
+    # disangka.** Riwayat harapan keadaan ini panjang dan dua di antaranya
+    # salah tulis: sempat `_full(SEPAKAT)`, sempat `_full(TERKUNCI)`, sempat
+    # `_full(CABANG, TERKUNCI)`. Ketiganya terukur **tidak** sesuai harapan.
+    # Yang benar sempit: badan satu kasus palet yang tak terbaca hanya
+    # menyalakan pemeriksaan pembaca.
     #
-    # Bentuk lama: pembaca melempar begitu ada cabang tak terbaca, dan
-    # pemanggilnya melaporkan lemparan itu sebagai "terbaca dari model" —
-    # **sebelum** sempat membandingkan tabel dengan `switch`. Jadi satu
-    # perubahan yang sah pada badan satu kasus palet menghasilkan pesan yang
-    # menunjuk pembaca, dan enam pemeriksaan sesudahnya tidak pernah
-    # tercatat, termasuk "sepakat" yang justru yang paling tepat menggambarkan
-    # cacatnya (tabel kehilangan planet, `switch` masih memuatnya).
+    #   CABANG   MERAH  polanya memang tidak mengenali bentuk baru itu, dan
+    #                  itu satu-satunya tempat kabar itu boleh muncul
+    #   SEPAKAT  hijau  tabel **tidak** kehilangan planetnya: pembaca
+    #                  mengembalikan cabang tak terbaca sebagai tripel dengan
+    #                  ciri bukan-`str`, jadi `uranus` tetap ada di kedua sisi
+    #   TERKUNCI hijau  kasus `planet-uranus-confirmed` memang masih ada di
+    #                  `render-visuals.py`; yang hilang hanya isi paletnya
+    #   RAGU     hijau  planet berciri dihitung dari ciri yang **berupa**
+    #                  `str`, jadi Uranus tidak dituntut punya kasus ragu atas
+    #                  dasar ciri yang tidak diketahui
     #
-    # Bentuk sekarang: pembaca mengembalikan planet yang tak terbaca sebagai
-    # tripel dengan ciri bukan-`str`, gerbang berjalan sampai selesai, dan
-    # yang merah adalah **dua nama yang tepat**, keduanya masuk akal:
-    #
-    #   CABANG     polanya memang belum mengenali bentuk baru itu — dan itu
-    #              satu-satunya tempat kabar itu boleh muncul
-    #   TERKUNCI   Pluto memang belum punya kasus render, dan itulah cacat
-    #              sebenarnya yang ingin dilihat pengguna app
-    #
-    # Yang **hijau**, sama pentingnya: `SEPAKAT` (tabel dan `switch` sepakat
-    # delapan planet — planetnya ada, yang tak terbaca hanya isinya) dan
-    # `RAGU` (Pluto tidak dihitung berciri, jadi ia tidak dituntut punya kasus
-    # ragu atas dasar ciri yang tidak diketahui). Keduanya dulu merah karena
-    # gerbangnya berhenti lebih awal; sekarang keduanya hijau karena memang
-    # begitu keadaannya. Ini yang membedakan keadaan 4 dari sekadar "gerbang
-    # menyala": bukan *apakah* ia menyalakan, melainkan *apa yang ia sebut*.
+    # Yang hijau itu bukan kelonggaran, melainkan pernyataan batas: keadaan ini
+    # mengukur bahwa **pembaca** berbunyi pada bentuk yang tidak ia kenali.
+    # Kalau `SEPAKAT` ikut merah di sini, artinya pembaca sudah membuang
+    # planetnya diam-diam — cacat yang berbeda, dan keadaan 1 yang mengukurnya
+    # (di sana `SEPAKAT` memang hijau sementara `TERKUNCI` merah, karena
+    # planetnya nyata-nyata tidak punya kasus render).
     ("4. model: satu kasus palet kehilangan badan yang terbaca",
-     [(MODEL, SATURN_CASE, SATURN_CASE + PLUTO_UNREADABLE, None)],
-     _full(CABANG, TERKUNCI), False),
+     [(MODEL, URANUS_CASE, URANUS_UNREADABLE, None)],
+     _full(CABANG), False),
 
     # ── Tiga cara gerbang ciri bisa kehilangan cakupannya ────────────────
     ("5. gerbang: pasangan mars hilang dari 'hilang saat ragu'",
@@ -597,7 +629,7 @@ STATES = [
       (RENDER, PORT_BARE, PORT_BARE_NEW, None),
       (CHECK, PAIR_RAGU_JUPITER, PAIR_RAGU_JUPITER + PAIR_RAGU_PLUTO, DISAPPEAR),
       (CHECK, PAIR_JAM_JUPITER, PAIR_JAM_JUPITER + PAIR_JAM_PLUTO, WATCH_SIZE),
-      (CHECK, PAIR_JAM_JUPITER, PAIR_JAM_JUPITER + PAIR_JAM_PLUTO, NIGHT)],
+      (CHECK, PAIR_JAM_JUPITER, PAIR_JAM_JUPITER + PAIR_JAM_PLUTO_NIGHT, NIGHT)],
      _full(), True),
 
     # ── Yang wajib hijau: enum baru SESUDAH palet ────────────────────────

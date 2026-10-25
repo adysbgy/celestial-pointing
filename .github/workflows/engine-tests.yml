@@ -2263,6 +2263,32 @@ jobs:
       - name: Buktikan Aturan 106 berbunyi saat dua pola diterjemahkan ke efek sama
         run: python3 Tools/bukti-mutasi-aturan106-terjemahan-haptic.py
 
+      # Dan bukti untuk **Aturan 107** — kelengkapan katalog terjemahan, bukan
+      # pemasangannya. Aturan 91 menjaga `init()` setiap `@main` memasang
+      # sumber terjemahan; tidak ada yang menjaga apakah teks yang benar-benar
+      # ditulis di view **ada** di katalog. Disapu pada pohon utuh, dua teks
+      # lolos tanpa kunci: nama tab `"Experiment 1"` dan `"Point & Know"` di
+      # complication kosong — keadaan pertama yang dilihat orang setelah
+      # memasang app. Keduanya mengompilasi bersih dan lolos seluruh 106
+      # gerbang lain, karena kunci yang tidak ada di katalog tidak punya nilai
+      # `en`; gejalanya hanya satu label yang tidak ikut berganti bahasa.
+      #
+      # Harness ini menuntut **sembilan** keadaan, dan yang paling penting
+      # bukan yang merah: `Label(teksDinamis)`, `Label(verbatim:)`,
+      # `Label("\(variabel)")`, `Label("")`, dan komentar yang menyebut bentuk
+      # terlarang semuanya wajib **HIJAU**. Gerbang yang menuduh 200+ bentuk
+      # dinamis akan merah pada kode yang benar, dan gerbang yang merah atas
+      # dokumentasi akan dimatikan orang.
+      #
+      # Keadaan cakupan-nol menemukan cacat **di dalam gerbangnya sendiri**
+      # saat ditulis: seluruh 29 berkas Swift dikosongkan menghasilkan
+      # "29 berkas, setiap teks tampil punya kunci katalog" dan exit 0, karena
+      # `scanned` menghitung berkas yang **dibuka**, bukan yang **berisi**.
+      # Hijau karena tidak ada baris untuk diperiksa adalah kelas cacat yang
+      # aturan ini ada untuk menutup, satu tingkat di atas dirinya sendiri.
+      - name: Buktikan Aturan 107 berbunyi saat teks tampil kehilangan kuncinya
+        run: python3 Tools/bukti-mutasi-aturan107-teks-tampil.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

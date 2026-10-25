@@ -8015,6 +8015,28 @@
           }
         }
       }
+    },
+    "Experiment 1": {
+      "comment": "Nama tab Experiment 1 di iPhone. Istilah ini nama percobaan (proper noun), jadi tidak diterjemahkan ke bahasa lain.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experiment 1"
+          }
+        }
+      }
+    },
+    "Point & Know": {
+      "comment": "Nama app yang tampil di complication saat belum ada data sama sekali. Nama produk, jadi tidak diterjemahkan.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point & Know"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
