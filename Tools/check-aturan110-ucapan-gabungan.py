@@ -82,12 +82,44 @@ def _blk_end(clean: str, start: int) -> int:
     Dipakai untuk memotong blok yang memuat `.combine` ke badan deklarasi
     yang memuatnya — bukan seluruh berkas, supaya sebuah label milik
     deklarasi lain tidak terhitung sebagai label elemen ini.
+
+    **Kenapa pencarian kata kunci tidak cukup.** Aturan ini menutup cacat
+    "label dihapus", dan harness bukti mutasinya (lima keadaan) mengukurnya.
+    Yang pertama kali terukur: harness melaporkan HIJAU untuk penghapusan
+    label statusCard, padahal wajib MERAH. Karena itu batas blok dicari
+    dengan kata kunci:
+
+        for kw in ("var body", "private var", "var ", "struct ", "func "):
+
+    kata kunci **berikutnya** itu ada di baris 559 — yaitu deklarasi
+    berikutnya, jauh sesudah `body` yang memuat `.combine` di baris 320. Blok
+    jadi 239 baris dan menelan `.accessibilityLabel` milik tiga deklarasi
+    sesudahnya. Label sesungguhnya dari elemen di baris 320 terhapus, dan
+    gerbangnya tetap hijau karena ada label lain yang masuk hitungan.
+
+    Jadi batasnya kini dari **kedalaman kurung**, bukan teks: mulai dari
+    posisi `.combine`, hitung `{`/`}` dan berhenti pada kedalaman yang lebih
+    dalam dari kedalaman awal. Deklarasi berikutnya ada di kedalaman yang
+    sama atau lebih dangkal, jadi tidak bisa lagi terbaca sebagai blok ini.
     """
-    for kw in ("var body", "private var", "var ", "struct ", "func "):
-        idx = clean.find(kw, start + 1)
-        if idx != -1:
-            return idx
-    return len(clean)
+    depth = 0
+    i = start
+    n = len(clean)
+    while i < n:
+        ch = clean[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            if depth == 0:
+                # Penutup pemilik `.combine` tanpa ada blok baru yang
+                # dibuka di antaranya.
+                return i + 1
+            depth -= 1
+            if depth == 0:
+                # Blok terdekat yang memuat `.combine` ditutup di sini.
+                return i + 1
+        i += 1
+    return n
 
 
 def scan(path: Path) -> list[tuple[int, str]]:

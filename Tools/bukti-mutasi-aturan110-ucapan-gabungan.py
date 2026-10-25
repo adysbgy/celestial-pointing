@@ -39,10 +39,26 @@ Yang TIDAK diklaim: harness ini tidak menguji apakah **isi** ucapan itu benar
 bentuknya terpaku. Ia juga tidak menguji tombol yang tidak memakai `.combine`:
 mereka masih bisa kehilangan label tanpa berbunyi, dan itu batas yang dicatat
 di `check-aturan110-ucapan-gabungan.py`.
+
+Cacat yang ditemukan di siklus ini, pada harness ini sendiri. Harness pertamanya
+memutuskan merah/hijau dari tanda `CLEAN_MARK = "punya ucapan"` yang dicari
+di keluarannya. Aturan ini mencetak judulnya **sebelum** mengukur —
+
+    == Aturan 110: elemen gabungan wajib punya ucapan ==
+
+— dan "punya ucapan" adalah substring dari judul itu. Jadi tanda itu hadir di
+**setiap** keluaran, termasuk ketika aturan merah, dan `clean` selalu benar:
+lima keadaan terukur HIJAU. Harnessnya hijau atas gerbang yang tak pernah
+berbunyi, dan ia lolos ke CI. Siklus ini juga menemukan batas blok
+checker-nya (`_blk_end`) mencari kata kunci berikutnya, bukan kurung, sehingga
+blok 239 baris menelan label deklarasi sesudahnya. Keduanya tertangkap karena
+harness ini dijalankan **lokal sampai selesai**, bukan dianggap hijau karena
+sudah terdaftar di CI.
 """
 from __future__ import annotations
 
 import os
+import re
 import signal
 import sys
 
@@ -58,8 +74,29 @@ BANNER = os.path.join(ROOT, "Apps", "Shared", "SlewVerdictBanner.swift")
 #: Tanda yang dicetak Aturan 110 saat bersih. Dibaca dari keluaran lint,
 #: bukan ditulis ulang, supaya perubahan pesannya tidak membuat harness ini
 #: berbohong.
-RULE_HEADER = "== Aturan 110:"
-CLEAN_MARK = "punya ucapan"
+#:
+#: **Kenapa bukan "punya ucapan".** Aturan ini mencetak judulnya sendiri
+#: **sebelum** mengukur:
+#:
+#:     == Aturan 110: elemen gabungan wajib punya ucapan ==
+#:
+#: dan "punya ucapan" adalah substring dari judul itu. Dipakai sebagai tanda
+#: bersih, ia hadir di **setiap** keluaran — termasuk saat aturan merah —
+#: jadi `clean` selalu benar dan kelima keadaan terukur HIJAU. Harness hijau
+#: atas gerbang yang tak pernah berbunyi: cacat yang sama persis dengan yang
+#: ditutup Aturan 107, kali ini di sisi pembaca keluarannya.
+#:
+#: Yang dicari sekarang adalah kalimat hasil yang **hanya** muncul saat
+#: bersih: "di {n} berkas punya ucapan". Bagian "di ... berkas" membuatnya
+#: tak mungkin muncul di judul, dan `{n}` dicek > 0 supaya hijau atas nol
+#: subjek tidak terbaca sebagai bersih.
+CLEAN_RE = re.compile(r"di (\d+) berkas punya ucapan")
+
+
+def bersih(keluaran: str) -> bool:
+    """Aturan 110 hijau? — dari kalimat hasilnya, bukan dari judulnya."""
+    m = CLEAN_RE.search(keluaran)
+    return m is not None and int(m.group(1)) > 0
 
 #: Jangkar di view: kartu keadaan, tepat yang FASE A tuntut.
 VIEW_LABEL = "        .accessibilityLabel(statusAccessibilityLabel)\n"
@@ -122,8 +159,7 @@ def probe(program):
     code, out, err = mutasi_sumber.jalankan_program(program, ROOT)
     if code not in (0, 1):
         return None, (err.strip().splitlines() or ["(tanpa galat)"])[-1]
-    clean = CLEAN_MARK in out
-    return (not clean), out.strip()
+    return (not bersih(out)), out.strip()
 
 
 def main():
@@ -134,7 +170,7 @@ def main():
         print("GERBANG: program Aturan 110 tidak ditemukan di "
               "swift-ui-lint.sh — harness tidak boleh jalan.", file=sys.stderr)
         sys.exit(2)
-    if RULE_HEADER not in program:
+    if "elemen gabungan wajib punya ucapan" not in program:
         print("GERBANG: Aturan 110 tidak mencetak judulnya sendiri; harness "
               "tidak bisa membedakan aturan ini dari yang lain.",
               file=sys.stderr)

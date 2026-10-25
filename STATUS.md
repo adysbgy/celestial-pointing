@@ -1,3 +1,78 @@
+### Siklus (25 Okt 2026, malam — gerbang Aturan 110 ternyata hijau atas nol ukuran)
+
+Siklus ini dimulai dari pekerjaan yang sudah tampak selesai: harness
+Aturan 110 sudah ditulis, sudah terdaftar di `engine-tests.yml`, lint hijau.
+Ternyata **ia tidak mengukur apa pun**. Dua cacat terpisah, dan keduanya
+berbentuk yang sama — gerbang yang lulus karena cara ia membaca, bukan karena
+yang diukurnya benar.
+
+**Cacat pertama: harness hijau atas lima keadaan, termasuk tiga yang wajib merah.**
+
+```
+1. bersih (acuan)                            HIJAU
+2. label statusCard dihapus                  HIJAU   ← wajib MERAH
+3. label banner GoTo dihapus                 HIJAU   ← wajib MERAH
+4. hanya komentar ditambahkan                HIJAU
+5. semua label sesudah .combine dibuang      HIJAU   ← wajib MERAH
+```
+
+Aturan ini memutuskan merah/hijau dari tanda `CLEAN_MARK` yang dicari di
+keluaran lint. Tandanya adalah `"punya ucapan"` — dan aturan itu mencetak
+judulnya sendiri **sebelum** mengukur:
+
+    == Aturan 110: elemen gabungan wajib punya ucapan ==
+
+`"punya ucapan"` adalah substring dari judulnya sendiri. Jadi tanda itu hadir
+di **setiap** keluaran, termasuk ketika aturan merah, dan `clean` selalu
+benar. Harness hijau atas gerbang yang tak pernah berbunyi — cacat yang sama
+persis dengan yang ditutup Aturan 107, kali ini di sisi pembaca keluarannya,
+dan ia lolos masuk CI.
+
+Tanda penggantinya tidak boleh lagi mungkin muncul di judul. Yang dicari
+kini kalimat hasil yang **hanya** lahir saat bersih, dengan subjeknya:
+
+    di (\d+) berkas punya ucapan
+
+dan `\d+` dicek `> 0`, supaya "hijau atas nol subjek" tidak terbaca bersih.
+
+**Cacat kedua: batas blok checker-nya menelan label tetangga.**
+
+Bahkan sesudah tanda itu dibetulkan, penghapusan label statusCard masih hijau.
+`_blk_end` mencari batas blok dengan **kata kunci** berikutnya:
+
+    for kw in ("var body", "private var", "var ", "struct ", "func "):
+
+kata kunci berikutnya sesudah `.combine` di baris 320 ada di baris 559 —
+yaitu deklarasi **berikutnya**. Blok jadi 239 baris, dan label milik tiga
+deklarasi sesudahnya ikut terhitung sebagai label elemen ini. Label
+sesungguhnya dari baris 320 terhapus, gerbang tetap hijau karena ada label
+lain yang masuk hitungan.
+
+Batasnya kini dari **kedalaman kurung**, bukan teks: hitung `{`/`}` mulai
+dari `.combine`, berhenti saat kembali ke kedalaman awal. Deklarasi
+berikutnya ada di kedalaman sama atau lebih dangkal, jadi tidak bisa lagi
+terbaca sebagai blok ini. Terukur: blok 320 -> 10 baris, dan label sesudahnya
+tidak lagi terbaca.
+
+**Kenapa kelas cacat ini layak disebut kelas, dan dicek sampai 177 harness.**
+Tanda yang dibaca harness kebetulan sama dengan teks yang dicetak gerbangnya
+sendiri bukan kesalahan satu berkas — ia bisa muncul lagi setiap kali aturan
+baru ditulis. Karena itu ke-17 harness lain yang memakai pola `CLEAN_MARK`
+diukur ulang dengan analisis struktural: tanda dicari di echo ** tingkat atas**
+bloknya (indent 0), bukan di cabang `else`. Hasilnya **nol**. Enam belas
+sisanya memakai kalimat `Bersih: …` utuh yang lahir di cabang bersih, dan
+`'Bersih: '` (potongan umum) justru tidak dipakai sebagai tanda oleh siapa
+pun. Aturan 110 memang yang satu-satunya, karena ia satu-satunya yang
+mencetak judul berisi sebelum mengukur.
+
+**Yang TIDAK diklaim.** Harness ini tidak menguji **isi** ucapan — itu urusan
+`SlewVerdictTests` di Linux — dan tidak menguji tombol yang tidak memakai
+`.combine`. Batas blok kurungnya juga tidak menyelami string literal Swift
+yang memuat `{` atau `}`; tidak ada di pohon ini, tapi batas itu dicatat di
+docstring-nya. Terakhir: harness ini sudah berjalan **lokal sampai selesai**
+sebelum push, jadi lima keadaannya terukur di sini, bukan diasumsikan dari
+faktanya sudah terdaftar di CI.
+
 ### Siklus (25 Okt 2026, lanjutan — Aturan 110: elemen `.combine` yang menggabungkan dirinya sendiri sampai senyap)
 
 Siklus ini memindahkan gerbang terakhir yang tertinggal dari commit Aturan 109:
