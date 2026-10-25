@@ -68,6 +68,29 @@ EXPERIMENT = os.path.join("Apps", "PointAndKnowiOS", "Sources", "Experiment1View
 TELESCOPE = os.path.join("Apps", "PointAndKnowiOS", "Sources", "TelescopeHandoffView.swift")
 CALIBRATION = os.path.join("Apps", "PointAndKnowWatch", "Sources", "CalibrationView.swift")
 LINKVIEW = os.path.join("Apps", "PointAndKnowiOS", "Sources", "LinkView.swift")
+#: Baris objek di layar Tautan tidak lagi ditulis di `LinkView.swift`: kolom
+#: laporan Tautan pindah ke fungsi murni `LinkReport.stateRows` di PointingKit
+#: (siklus "LinkReport: peta jalur kirim akhirnya ditegakkan"), jadi barisnya
+#: kini tinggal di `Packages/PointingKit/Sources/PointingKit/LinkReport.swift`.
+#:
+#: Jangkar dipindah ke tempat barisnya sekarang, bukan dipertahankan di berkas
+#: lama: jangkar yang menunjuk baris yang sudah tidak ada membuat harness
+#: **melempar** `AssertionError` — itu kegagalan harness (bukan "berbunyi",
+#: bukan "hijau"), dan CI menandainya merah. Versi sebelumnya melaporkannya
+#: sebagai "jangkar tidak ditemukan" yang benar; yang salah adalah jangkarnya.
+#:
+#: **Kenapa bukan melebarkan Aturan 41 ke `Packages/`.** Sudah diukur: pohon
+#: yang ditelusuri ditambahi `Packages/PointingKit/Sources` menghasilkan ~45
+#: temuan, semuanya **palsu**. Berkas seperti `ObjectDisplayName.swift`,
+#: `Targets.swift`, dan `StateAnnouncement.swift` memang menulis `object.name`,
+#: tetapi sebagai **data model** yang dibawa ke lapisan lain (mis.
+#: `PointingTarget(name: object.name)`), bukan sebagai teks yang langsung
+#: sampai ke layar. Aturan ini menjaga **permukaan tampilan**, dan membedakan
+#: "dipakai untuk menampilkan" dari "dibawa sebagai nilai" butuh pemeriksa
+#: tipe — bukan sapuan teks. Yang menjaga baris di PointingKit sesudah pindah
+#: adalah uji PointingKit sendiri (`LinkReportTests`, `LinkReportCoverageTests`).
+LINKREPORT = os.path.join(
+    "Packages", "PointingKit", "Sources", "PointingKit", "LinkReport.swift")
 
 #: Program Aturan 41 mencetak **temuan** ke stdout dan diam bila bersih.
 #:
@@ -152,15 +175,14 @@ def main() -> int:
     # **hanya** kata itu — bukan baris di sekitarnya, supaya yang diukur
     # benar-benar `name` vs `localizedName`.
     calibration_anchor = "                                Text(target.localizedName)"
-    # Jangkar layar Tautan. Perbaikannya memakai `reportedObjectName(catalogue:)`,
-    # jadi keadaan 14 (kontrol) memakai jangkar ini apa adanya dan keadaan 13
-    # memutasi **hanya** bagian `state.objectName` — bukan baris di sekitarnya.
-    # `linkview_anchor` adalah baris yang **sudah benar**, diulang persis agar
-    # mutasi ke `state.objectName` terukur sebagai satu perubahan.
-    linkview_anchor = (
-        "                        row(TextLocalization.text(.linkRowObject),\n"
-        "                            state.reportedObjectName(\n"
-        "                                catalogue: engine.controller.resolver.catalogue) ?? \"—\")")
+    # Jangkar baris objek di laporan Tautan. Perbaikannya memakai
+    # `reportedObjectName(catalogue:)`, jadi keadaan 14 (kontrol) memakai jangkar
+    # ini apa adanya dan keadaan 13 memutasi **hanya** medannya — bukan baris di
+    # sekitarnya. Barisnya sekarang di `LinkReport.stateRows` (PointingKit),
+    # bukan lagi di badan `LinkView`; lihat `LINKREPORT` untuk alasan pindahnya.
+    linkreport_anchor = (
+        "        rows.append(Row(title: TextLocalization.text(.linkRowObject),\n"
+        "                        value: message.reportedObjectName(catalogue: catalogue) ?? \"—\"))")
 
     states = [
         ("1. `?? object.name` di kartu jam",
@@ -238,12 +260,22 @@ def main() -> int:
         # sisi pembaca. Yang diuji di sini: mencantumkan medan mentahnya ke
         # layar **harus** memerah, dan penyelesai yang menyerahkan medan itu
         # sebagai cadangan harus diam.
-        ("13. `state.objectName` di layar Tautan",
-         LINKVIEW, linkview_anchor,
-         "                        row(TextLocalization.text(.linkRowObject), state.objectName ?? \"—\")",
-         True),
-        ("14. [kontrol] `state.reportedObjectName(catalogue:)` (perbaikan)",
-         LINKVIEW, linkview_anchor, linkview_anchor, False),
+        #
+        # **Keadaan 13 adalah kontrol negatif, dan itu diukur — bukan diasumsikan.**
+        # Baris laporan Tautan pindah ke `LinkReport.stateRows` di PointingKit,
+        # dan Aturan 41 hanya berjalan di `Apps/`. Jadi mengembalikan baris itu
+        # ke `message.objectName` mentah membuat aturan ini **tetap hijau**; yang
+        # menutupinya adalah uji PointingKit (`LinkReportCoverageTests`), yang
+        # sudah terukur memerah pada mutasi yang sama. Keadaan ini ada supaya
+        # batas aturan ini tercatat secara jujur: ia tidak pernah membaca berkas
+        # tempat barisnya sekarang tinggal.
+        ("13. `message.objectName` di baris laporan Tautan",
+         LINKREPORT, linkreport_anchor,
+         "                        value: message.objectName ?? \"—\"))",
+         False),
+        ("14. [kontrol] `reportedObjectName(catalogue:)` (perbaikan)",
+         LINKREPORT, linkreport_anchor, linkreport_anchor,
+         False),
         ("15. `command.objectName` di layar serah-terima teleskop",
          TELESCOPE, telescope_anchor,
          "                row(TextLocalization.text(.telescopeTargetLabel), command.objectName)",

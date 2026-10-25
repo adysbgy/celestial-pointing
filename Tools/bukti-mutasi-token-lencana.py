@@ -139,13 +139,40 @@ def run_tests() -> tuple[bool, str]:
     `--filter` dipakai supaya keadaan yang tidak dimaksud tidak ikut
     menentukan hasil: harness ini mengklaim tentang `CandidateMarkerTests`,
     bukan tentang seluruh paket (itu tugas `swift-test.sh`).
+
+    **Kenapa dua jalur, dan kenapa yang langsung didahulukan.** CI
+    (`engine-tests.yml`) berjalan *di dalam* citra `swift:6.0`
+    (`container: image:`), dan kontainer itu tidak punya `sudo` maupun
+    `docker`. Versi lama harness ini memanggil `sudo -n docker run` tanpa
+    syarat, jadi di CI ia berhenti dengan exit 2 — "tidak bisa membuktikan
+    apa pun" — dan `main` merah dengan pesan yang tidak menyebut satu pun
+    kode produksi. Yang lebih buruk: exit 2 itu **kegagalan harness**, bukan
+    "uji hijau", jadi gerbang yang lulus karena tidak pernah dijalankan
+    terlihat sama dengan gerbang yang rusak.
+
+    Jadi urutannya sama dengan `swift-test.sh`: `swift` yang ada di PATH
+    dipakai langsung (itu keadaan CI), dan Docker hanya dipakai kalau `swift`
+    tidak ada (keadaan mesin pengembang). Yang diukur tetap toolchain yang
+    sama — di CI ia memang `swift:6.0`, dan di VPS citranya juga `swift:6.0`.
+
+    **Yang TIDAK diklaim.** Jalur langsung tidak membuktikan citranya
+    `swift:6.0` persis (tidak ada `docker` di dalam kontainer untuk
+    membuktikannya); yang diukur adalah versi Swift-nya. Itu harga yang
+    dibayar supaya harness ini bisa berjalan di CI sama sekali.
     """
-    cmd = [
-        "sudo", "-n", "docker", "run", "--rm",
-        "-v", f"{ROOT}:/src",
-        "-w", "/src/Packages/PointingKit",
-        "swift:6.0", "swift", "test", "--filter", RULE,
-    ]
+    if shutil.which("swift"):
+        cmd = ["swift", "test", "--package-path",
+               os.path.join(ROOT, "Packages", "PointingKit"),
+               "--filter", RULE]
+        how = "swift langsung"
+    else:
+        cmd = [
+            "sudo", "-n", "docker", "run", "--rm",
+            "-v", f"{ROOT}:/src",
+            "-w", "/src/Packages/PointingKit",
+            "swift:6.0", "swift", "test", "--filter", RULE,
+        ]
+        how = "docker swift:6.0"
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
     except subprocess.TimeoutExpired:
@@ -156,14 +183,23 @@ def run_tests() -> tuple[bool, str]:
         # karena alasan yang salah akan dihitung sebagai bukti.
         return False, output
     if f"Test Suite '{RULE}'" not in output:
-        return False, output
+        return False, f"{how}: " + output
     return proc.returncode == 0, output
 
 
 def main() -> int:
-    if shutil.which("sudo") is None or shutil.which("docker") is None:
-        print("docker/sudo tidak ditemukan: harness tidak bisa membuktikan "
-              "apa pun.", file=sys.stderr)
+    # **Harus bisa jalan di CI.** Kontainer `swift:6.0` tidak punya `sudo`
+    # maupun `docker`; menuntut keduanya membuat harness ini berhenti dengan
+    # exit 2 di CI, dan `main` merah karena gerbang yang tidak pernah
+    # dijalankan. Yang dituntut sekarang: ada `swift` di PATH (jalur CI),
+    # **atau** ada Docker untuk citra yang sama (jalur mesin pengembang).
+    # Yang tidak boleh ada adalah keadaan "tidak ada satu pun keduanya" —
+    # di situ harness memang tidak bisa membuktikan apa pun, dan itu
+    # dilaporkan keras alih-alih diam-diam hijau.
+    if shutil.which("swift") is None and not (
+            shutil.which("docker") and shutil.which("sudo")):
+        print("tidak ada `swift` di PATH maupun `docker`+`sudo`: harness "
+              "tidak bisa membuktikan apa pun.", file=sys.stderr)
         return 2
 
     originals = {path: open(path, encoding="utf-8").read()
