@@ -1,3 +1,69 @@
+### Siklus (25 Okt 2026, malam — "bulan redup" adalah satu-satunya tepi kasus FASE C.6 yang belum punya tes)
+
+FASE C.6 menyebut tiga tepi kasus kejujuran: **objek di bawah horizon, siang
+hari, dan bulan redup**. Dua yang pertama sudah punya berkas sendiri
+(`BelowHorizonHonestyTests`, `MoonDaylightHonestyTests`). Yang ketiga tidak —
+dan ia bukan duplikat, karena arah bahayanya **berlawanan** dengan dua yang
+lain.
+
+Siang hari menolak Bulan yang **terang**. Bulan redup justru yang paling
+mungkin **lolos** penyaring kecerahan: sabit tipis tetap jauh lebih terang
+dari ambang mata telanjang. Jadi cacat yang dijaga di sini bukan "ditolak",
+melainkan **diterima lalu digambar salah** — sabit 8% yang dirender sebagai
+piringan penuh adalah klaim identitas yang tidak dihitung engine, persis yang
+dilarang PRD v0.4.
+
+**Yang diukur dulu, bukan diandaikan.** Probe (400 hari x 24 jam, Jakarta,
+dibuang setelah dipakai) menemukan sabit tipis fraksi 0,07–0,16 di langit
+gelap selalu bermagnitudo sekitar −7 sampai −8, sedangkan ambang mata
+telanjang pada konteks itu ~5,8. Probe pertama dengan fraksi < 0,02
+mengembalikan **nol** hasil — dan itu juga jawaban fisik yang benar: bulan
+yang nyaris baru selalu dekat Matahari, jadi tidak pernah tinggi di langit
+gelap. Karena itu fixture-nya memakai < 0,20, bukan < 0,02. Tanpa probe ini,
+tes akan ditulis untuk keadaan yang tidak pernah terjadi dan hijau secara
+vacuous.
+
+**Kenapa tes ini tidak menuntut `.lock`.** Keyakinan Bulan sering turun ke
+`.uncertain` meski arahnya benar (lihat catatan di `BelowHorizonHonestyTests`),
+dan itu perilaku *benar* menurut PRD. Menuntut `.lock` akan membuat tes lulus
+atau gagal karena alasan yang tidak ada hubungannya dengan kejujuran gambar.
+Yang dituntut adalah: apa pun tingkat keyakinannya, **gambar** yang diturunkan
+dari fase tidak boleh berbohong tentang bentuknya. Lima tes:
+
+1. sabit tipis **tidak** ditolak `tooFaint`/`belowHorizon`/`daylight` (bukti
+   positif bahwa redup ≠ tak terlihat);
+2. sabit tipis digambar **sempit** dan **bukan** gibbous;
+3. lebar sabit **membesar** saat iluminasi naik (non-vakum: angka tetap gagal);
+4. earthshine **ada** pada sabit, **nol** pada purnama, dan **meredup** saat
+   iluminasi naik — supaya sisi gelap tidak pernah terbaca "menyala penuh"
+   pada ukuran jam;
+5. tanpa arah fase, geometri **tidak dibuat** (`nil`) — sabit yang menghadap
+   arah salah lebih buruk daripada piringan tanpa fase, karena ia tampak yakin.
+
+**Bukti tesnya tidak vacuous.** Tiga mutasi disuntikkan satu per satu ke
+`CelestialVisual.swift`, dan masing-masing **memerahkan tes yang tepat**:
+earthshine dibuat separuh konstan → tes 4 merah (`0.5` ≠ `1.0`); `isGibbous`
+dipaksa `true` → tes 2 dan 3 merah; `waxing ?? true` (arah dikarang) → tes 5
+merah dengan `PhaseGeometry(terminatorOffset: 0.76, …)`. Sumber dipulihkan
+dan `git diff` kosong sebelum komit.
+
+**Gerbang menangkap kesalahan saya sendiri.** `swift-ui-lint.sh` langsung
+merah setelah 5 tes ditambahkan, bukan karena aturan UI, melainkan karena
+Aturan "README bilang PointingKit 1119, berkas uji berisi 1124". Angka di
+README diperbarui ke 1124 — gerbangnya benar, dan itu satu-satunya sebab
+merah.
+
+**Angka.** `./swift-test.sh` → CelestialEngine **222** + PointingKit **1124**
+(sebelumnya 1119; +5), 0 gagal. `./swift-ui-lint.sh` → exit 0, semua gerbang
+lulus.
+
+**Yang TIDAK diklaim.** Tes ini tidak membuktikan kanvas SwiftUI benar-benar
+menggambar sabit selebar angka itu — geometri fase diuji sebagai fungsi murni
+di Linux, dan pemetaannya ke `Path` tetap hanya terbukti di CI macOS. Juga
+tidak diklaim bahwa bulan redup selalu bisa dinamai: yang dijaga adalah
+penolakannya tidak datang dari alasan yang salah, dan gambarnya tidak
+mengarang bentuk.
+
 ### Siklus (25 Okt 2026, malam — Aturan 15 hijau karena computed property meminjam penjaga tetangganya)
 
 #### Postmortem singkat: mutasi harness yang ikut ter-commit
