@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **106 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **107 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 107 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 108 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.
@@ -254,10 +254,31 @@ ada di katalog tidak punya nilai `en`. Ini kelas yang berbeda dari Aturan 91 —
 91 menjaga pemasangan (kalau `init()` lupa, seluruh katalog mati dan gejalanya
 seragam), 107 menjaga kelengkapan (satu teks yang lupa didaftarkan hanya
 kehilangan dirinya sendiri, jadi tidak ada gejala yang mengarah ke sana:
-compiler diam dan 106 aturan lain hijau). Gerbang ini sengaja hanya memeriksa
+compiler diam dan 107 aturan lain hijau). Gerbang ini sengaja hanya memeriksa
 literal **statis**; `Label(teksDinamis)`, `Label(verbatim:)`, dan
 `Label("\(variabel)")` memang bukan kunci katalog karena teksnya baru diketahui
 saat berjalan, dan menuduh 200+ bentuk itu akan merah pada kode yang benar.
+Aturan 108 (ditambah siklus ini) menjaga **satu-satunya jalan tulis snapshot**
+di `Apps/`, bukan teks di atasnya. `Apps/Shared/PointingEngine.swift`
+mendokumentasikan choke point-nya — "semua penulisan snapshot **wajib** lewat
+sini" — dan di dalam `publish(_:)` ada **empat** penulisan berdampingan yang
+masing-masing menjaga layar berbeda: cuplikan yang dibaca semua layar, tanda
+kedatangan kunci (animasi spring + pengumuman VoiceOver "terkunci"), penyegaran
+complication di wajah jam, dan putusan keamanan GoTo. Diukur pada salinan utuh
+pohon ini (proses baru, seluruh aturan UI lain dijalankan atas `Apps/`):
+masing-masing dari keempat penulisan itu dibuang satu per satu, dan seluruh 107
+gerbang LULUS. Nol yang berbunyi, keempatnya mengompilasi bersih. Akibatnya
+bukan crash melainkan **keheningan** — layar tetap menampilkan keadaan yang
+benar, hanya peristiwanya yang tidak pernah sampai: animasi dan ucapan
+"terkunci" tidak menyala, wajah jam tetap menampilkan objek dari pandangan
+**sebelumnya** sampai ambang basi tiba, dan peringatan "jangan mengarahkan ke
+Matahari" membeku di nilai pertama sementara layar berkata "aman" atas langit
+yang sudah bergerak. Yang dijaga karena itu bukan keberadaan baris, melainkan
+bahwa keempat penulisan itu tetap **di dalam tubuh `publish`**: memindahkan
+salah satunya ke pemanggil memecah choke point-nya secara senyap, dan enam
+jalur pemanggil menjadi enam kesempatan untuk lupa — alasan yang sama yang
+tertulis di komentar `setConfidencePolicy`, tempat pemanggil yang menyentuh
+controller langsung membuat snapshot tidak ikut berubah.
 Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 (aturan 7), hitungan uji di README yang tidak boleh membusuk (aturan 10),

@@ -15467,6 +15467,60 @@ else
 fi
 
 
+# ── Aturan 108: jalan tulis snapshot tetap satu, dengan keempat efeknya ──
+#
+# `PointingEngine.swift` mendokumentasikan satu choke point: "semua penulisan
+# snapshot **wajib** lewat sini". Di dalam `publish(_:)` ada **empat** penulisan
+# berdampingan, masing-masing menjaga layar yang berbeda:
+#
+#     snapshot = value                       kartu, panel detail, layar redup
+#     lockArrival = arrivalGate.update(...)  tanda "baru mengunci" (animasi + ucapan)
+#     recordComplicationIfChanged()          complication di wajah jam
+#     refreshSlewVerdict(at:)                putusan keamanan GoTo
+#
+# Diukur pada salinan utuh pohon ini (proses baru, `./swift-ui-lint.sh`
+# dijalankan atas `Apps/`): masing-masing dibuang satu per satu, dan seluruh 107
+# gerbang LULUS untuk keempatnya. Tidak ada yang berbunyi karena yang hilang
+# bukan teks melainkan **peristiwa** — layar tetap menampilkan keadaan yang
+# benar, hanya animasi spring dan pengumuman VoiceOver "terkunci" tidak pernah
+# menyala, wajah jam tetap menampilkan objek dari pandangan sebelumnya sampai
+# ambang basi tiba, dan peringatan "jangan mengarahkan ke Matahari" membeku di
+# nilai pertama sementara layar berkata "aman" atas langit yang sudah bergerak.
+#
+# Kenapa bukan sekadar "jangan hapus baris". Yang dijaga bukan keberadaan baris,
+# melainkan bahwa keempat penulisan itu tetap **di dalam tubuh `publish`**.
+# Memindahkan salah satunya ke pemanggil memecah choke point-nya secara senyap:
+# enam jalur pemanggil menjadi enam kesempatan untuk lupa, dan tidak ada satu
+# pun teks di layar yang membantahnya. Itu alasan yang sama yang tertulis di
+# komentar `setConfidencePolicy` — pemanggil yang menyentuh controller langsung
+# membuat snapshot tidak ikut berubah.
+#
+# Yang TIDAK diklaim: apakah `value` yang disimpan memang snapshot terbaru
+# (`snapshot = nilaiLain` lolos), dan urutan panggilan. Ini sapuan teks, bukan
+# pemeriksa tipe. Yang dijaga sempit dan konkret: empat penulisan yang sudah
+# terukur buta tidak bisa dibuang lagi tanpa gerbang merah.
+echo "== Aturan 108: jalan tulis snapshot tetap satu dengan keempat efeknya =="
+if [ ! -f "Tools/check-aturan108-jalan-tulis-snapshot.py" ]; then
+  echo "FAIL Tools/check-aturan108-jalan-tulis-snapshot.py tidak ada: Aturan 108"
+  echo "     tidak mengukur apa pun, dan salah satu dari empat efek samping"
+  echo "     `publish(_:)` boleh dibuang lagi tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  jalan_tulis=$(python3 Tools/check-aturan108-jalan-tulis-snapshot.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$jalan_tulis"
+    echo "-> Kembalikan keempat penulisan ke dalam tubuh `publish(_:)`:"
+    echo "   snapshot, lockArrival, recordComplicationIfChanged(), dan"
+    echo "   refreshSlewVerdict(at:). Jangan menulis `snapshot =` langsung di"
+    echo "   pemanggil — choke point yang utuh adalah satu-satunya alasan layar,"
+    echo "   wajah jam, dan peringatan GoTo tidak bisa berbeda pendapat."
+    status=1
+  else
+    echo "$jalan_tulis"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

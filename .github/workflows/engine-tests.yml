@@ -2289,6 +2289,33 @@ jobs:
       - name: Buktikan Aturan 107 berbunyi saat teks tampil kehilangan kuncinya
         run: python3 Tools/bukti-mutasi-aturan107-teks-tampil.py
 
+      # Dan bukti untuk **Aturan 108** — choke point tulis snapshot di `Apps/`.
+      # `PointingEngine.swift` mendokumentasikan satu jalan tulis snapshot, dan
+      # di dalam `publish(_:)` ada **empat** penulisan berdampingan, masing-masing
+      # menjaga layar yang berbeda: cuplikan itu sendiri, tanda kedatangan kunci
+      # (animasi spring + pengumuman VoiceOver "terkunci"), penyegaran complication
+      # di wajah jam, dan putusan keamanan GoTo.
+      #
+      # Diukur sebelum aturan ini ada: masing-masing dari keempat penulisan itu
+      # dibuang satu per satu, dan seluruh 107 gerbang LULUS. Nol yang berbunyi,
+      # dan keempatnya mengompilasi bersih. Yang terjadi di layar bukan crash
+      # melainkan keheningan — layar tetap menampilkan keadaan yang benar, hanya
+      # peristiwanya yang tidak sampai. Persis bentuk yang paling sulit dilihat:
+      # tidak ada teks yang membantahnya, karena teksnya tidak salah.
+      #
+      # Harness ini menuntut **sembilan** keadaan, dan yang paling penting bukan
+      # yang merah: komentar yang menyebut `snapshot = value` harus tetap HIJAU
+      # (gerbang yang merah atas dokumentasi yang benar akan dimatikan orang),
+      # dan pemanggil `publish(` ketujuh yang ditambahkan harus HIJAU juga
+      # sementara hitungannya naik 6 → 7 — gerbang yang menghitung tetap hidup.
+      # Penulisan `snapshot =` langsung di pemanggil harus MERAH, karena di situ
+      # choke point-nya pecah: tiga efek samping tidak ikut berubah.
+      #
+      # Keadaan cakupan-nol (seluruh 29 berkas Swift dikosongkan) menutup arah
+      # paling sunyi: hijau karena tidak ada baris untuk diperiksa bukan lulus.
+      - name: Buktikan Aturan 108 berbunyi saat jalan tulis snapshot dibongkar
+        run: python3 Tools/bukti-mutasi-aturan108-jalan-tulis.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

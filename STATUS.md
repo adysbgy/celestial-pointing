@@ -1,3 +1,79 @@
+### Siklus (25 Okt 2026, lanjutan — Aturan 108: `publish(_:)` dibongkar satu baris, dan keempat efek sampingnya hilang tanpa satu pun gerbang berbunyi)
+
+Siklus ini menutup cacat yang **diukur buta**, dan itu kelas yang sudah berulang
+di repo ini: bukan teks yang salah di layar, melainkan **peristiwa yang tidak
+pernah sampai**. `Apps/Shared/PointingEngine.swift` mendokumentasikan satu choke
+point — "semua penulisan snapshot **wajib** lewat sini" — dan di dalam
+`publish(_ value:)` ada empat penulisan berdampingan, masing-masing menjaga layar
+yang berbeda:
+
+    snapshot = value                       kartu, panel detail, layar redup
+    lockArrival = arrivalGate.update(...)  tanda "baru mengunci" (animasi + ucapan)
+    recordComplicationIfChanged()          complication di wajah jam
+    refreshSlewVerdict(at:)                putusan keamanan GoTo
+
+Diukur pada salinan utuh pohon ini (proses baru, `./swift-ui-lint.sh` sungguhan
+dijalankan atas `Apps/` dengan blok Aturan 108 dibuang lebih dulu), keempat
+penulisan itu dibuang satu per satu:
+
+    lockArrival = ... dihapus               → LINT exit 0
+    recordComplicationIfChanged() dihapus  → LINT exit 0
+    refreshSlewVerdict(at: ...) dihapus    → LINT exit 0
+    snapshot = value dihapus               → LINT exit 0
+
+Nol yang berbunyi, dan keempatnya mengompilasi bersih. Yang terjadi di layar
+bukan crash melainkan **keheningan**: layar tetap menampilkan keadaan yang benar,
+hanya tanpa satu dari empat hal yang tidak punya teks.
+
+**Kenapa ini bukan "jangan hapus baris".** Yang dijaga bukan keberadaan baris,
+melainkan bahwa keempat penulisan itu tetap berada di **dalam tubuh `publish`**.
+Memindahkan salah satunya ke pemanggil memecah choke point-nya secara senyap —
+enam jalur pemanggil menjadi enam kesempatan untuk lupa, dan tidak ada teks di
+layar yang membantahnya. Itu alasan yang sama yang tertulis di komentar
+`setConfidencePolicy`: pemanggil yang menyentuh controller langsung membuat
+snapshot tidak ikut berubah. Karena itu aturan ini memeriksa **dua arah**: tanda
+tangan keempat penulisan di dalam tubuh, dan larangan `snapshot =` langsung di
+luarnya. Yang kedua dibuktikan merah pada keadaan 5 harness (`ingest` menulis
+`snapshot = update.snapshot` sendiri).
+
+**Yang ditambahkan.**
+
+- `Tools/check-aturan108-jalan-tulis-snapshot.py` — gerbangnya. Komentar dan isi
+  string dibuang lebih dulu, karena docstring berkas itu sendiri menyebut
+  `snapshot = value` dan `refreshSlewVerdict(at: Date())` beberapa kali dalam
+  kalimat penjelasan. Tanpa penyaringan, gerbangnya menuduh dokumentasi yang
+  benar — dan keadaan 6 harness mengunci bahwa komentar tetap HIJAU.
+- `Tools/bukti-mutasi-aturan108-jalan-tulis.py` — **9 keadaan, 0 tidak sesuai**:
+  baseline hijau; keempat penulisan dibuang satu per satu (semua merah);
+  `snapshot = update.snapshot` ditulis langsung di `ingest` (merah — choke point
+  pecah); komentar yang menyebut bentuk terlarang (hijau); pemanggil ketujuh
+  ditambahkan (hijau, hitungannya naik 6 → 7 — gerbang yang menghitung tetap
+  hidup); dan cakupan nol, seluruh 29 berkas Swift dikosongkan (**merah**, bukan
+  hijau atas nol berkas).
+- Blok Aturan 108 di `swift-ui-lint.sh` (setelah 107), langkah CI-nya, dan
+  penjelasan "kenapa" di README.
+
+**Angka.** `./swift-test.sh` → **CelestialEngine 222 + PointingKit 1115, 0
+gagal**. `./swift-ui-lint.sh` → **107 blok aturan berjalan** (nomor sampai 108,
+Aturan 69 tinggal di `Tools/`), exit 0. `swift-typecheck.sh` exit 0.
+`check-harness-terdaftar.py` → **175 harness, semuanya dirujuk**.
+`check-jangkar-harness.py` → 553 jangkar, tidak ada mutasi tertinggal.
+`bash -n` di Docker `bash:3.2` → exit 0.
+
+**Catatan proses.** STATUS.md sempat tertinggal dua siklus: commit `f11bf46`
+(Aturan 107) tidak menyentuhnya sama sekali, jadi catatan Aturan 106 adalah yang
+teratas padahal Aturan 107 sudah berjalan di CI. Itu bukan kelalaian dokumen
+saja — siklus berikutnya yang membaca STATUS untuk tahu "apa yang sudah
+dijaga" akan melewatkan satu gerbang. Siklus ini menulis catatan Aturan 108
+lebih dulu; catatan Aturan 107 tetap yang berikutnya dikerjakan.
+
+**Yang TIDAK diklaim.** Ini sapuan **teks**, bukan pemeriksa tipe: `snapshot =
+nilaiLain` lolos, dan urutan panggilan tidak diperiksa. Ia juga tidak membuktikan
+`value` yang disimpan memang snapshot terbaru. Yang dijaga sempit dan konkret:
+**empat penulisan yang sudah terukur buta tidak bisa dibuang lagi tanpa gerbang
+merah**, dan choke point-nya tidak bisa pecah ke pemanggil secara senyap.
+
+
 ### Siklus (25 Okt 2026 — Aturan 106: terjemahan pola→efek haptic di `Apps/` — rantai yang injektif tetap bisa menyatu kembali)
 
 Siklus ini menutup satu langkah dalam rantai haptic yang lolos dari **dua**
