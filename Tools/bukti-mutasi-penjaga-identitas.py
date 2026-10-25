@@ -223,7 +223,18 @@ NEGATIVE_STATES = {
 #: `phaseDirection` ada di dua jalur gambar (kandidat dan terkunci); keduanya
 #: wajib ikut bermutasi, jadi jumlahnya diperiksa sebagai angka, bukan
 #: dipaksa 1.
-EXPECTED_COUNTS = {"phaseDirection": 2}
+#:
+#: `starColour` menyusul ke dua: `starColor` (warna dasar titik bintang) dan
+#: `starCoreColor` (inti yang dipanaskan ke putih). Keduanya menyebut
+#: `drawableStarColorIndex(…, isConfirmed:)`, jadi keduanya jalur **klaim
+#: identitas** — biru Rigel lawan merah Betelgeuse. Sebelum inti bintang
+#: dipanaskan (siklus "inti bintang"), jangkarnya tunggal; sesudahnya ia
+#: muncul dua kali dan harness berhenti dengan exit 2 — bukan merah palsu,
+#: tetapi juga bukan bukti. Kalau jumlahnya dipaksa 1 dengan `replace(…, 1)`,
+#: gerbangnya tetap berbunyi sementara situs kedua boleh memaksa klaim
+#: identitas tanpa satu pun keadaan yang mengukur; `mutate()` memakai
+#: `replace` penuh justru supaya kedua situs ikut, seperti `phaseDirection`.
+EXPECTED_COUNTS = {"phaseDirection": 2, "starColour": 2}
 
 _originals = {}
 #: Berkas di luar `SOURCES` yang ikut disuntik (mis. `OnboardingView.swift`),
@@ -243,13 +254,7 @@ def restore(*_):
 
 def extract_rule34():
     text = open(LINT, encoding="utf-8").read()
-    start = text.find("# ── Aturan 34")
-    if start < 0:
-        return None
-    end = text.find('if [ "$status" -eq 0 ]; then', start)
-    if end < 0:
-        return None
-    return text[start:end]
+    return mutasi_sumber.batas_aturan(text, 34)
 
 
 def probe(program):

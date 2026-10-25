@@ -96,13 +96,7 @@ def restore(*_):
 
 def extract_rule58():
     text = open(LINT, encoding="utf-8").read()
-    start = text.find("# ── Aturan 58")
-    if start < 0:
-        return None
-    end = text.find('if [ "$status" -eq 0 ]; then', start)
-    if end < 0:
-        return None
-    return text[start:end]
+    return mutasi_sumber.batas_aturan(text, 58)
 
 
 def probe(program):

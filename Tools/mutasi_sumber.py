@@ -381,6 +381,78 @@ def jalankan_lint(teks_lint, akar):
             os.remove(jalur)
 
 
+def batas_aturan(teks_lint, nomor):
+    """Potong **satu** blok `# ── Aturan N` dari `swift-ui-lint.sh`.
+
+    Kenapa tidak `text[start:end]` dengan `end = find('if [ "$status" -eq 0 ]
+    ; then', start)`. Bentuk itu mengira baris penutup global ada **tepat
+    sesudah** aturan yang dicari. Ia benar selama aturannya yang terakhir.
+    Begitu aturan lain ditambahkan sesudahnya, potongannya berisi **semua**
+    aturan berikutnya sampai ekor global — dan itu bukan cacat kosmetik:
+
+        Tools/bukti-mutasi-lencana-ragu.py   Aturan 32
+          potongan 450.583 byte  (32 aturan, 52 judul, s/d Aturan 106)
+          `subprocess.run(["bash", "-c", program])`
+          -> OSError [Errno 7] Argument list too long
+          -> main MERAH, seluruh job "Engine Tests (Linux)" merah
+
+    Batas 128 KiB itu `MAX_ARG_STRLEN` di Linux: satu argumen tidak boleh
+    melebihi 128 KiB, dan `bash -c` menerima programnya sebagai **satu**
+    argumen. Di macOS tidak ada batas itu, jadi cacatnya hanya muncul di CI
+    Linux — tepat di tempat yang menjalankan seluruh harness.
+
+    **Batasnya judul aturan berikutnya yang bernomor lain, bukan `nomor + 1`.**
+    `Aturan 69` tidak tinggal di berkas ini (ia di `Tools/`), jadi mencari
+    `Aturan 69` mengembalikan -1 dan blok Aturan 68 jatuh kembali ke ekor
+    global: terukur 130.765 byte, masih di atas batas. Sama untuk 72, 77, 85.
+    Nomor berikutnya yang **ada** yang dipakai — dicari sebagai judul, bukan
+    sebagai angka, karena jarak nomornya memang berlubang.
+
+    Nol blok = `None`, supaya pemanggil berhenti dengan alasan yang benar
+    alih-alih menjalankan potongan kosong yang selalu hijau.
+    """
+    awal = teks_lint.find(f"# ── Aturan {nomor}")
+    if awal < 0:
+        return None
+    # Judul bernomor **lain** sesudah blok ini; judul bernomor sama bisa
+    # muncul dua kali (Aturan 39 dan 41 punya dua bagian) dan bukan batas.
+    for judul in re.finditer(r"# ── Aturan (\d+)", teks_lint[awal + 1:]):
+        if int(judul.group(1)) != nomor:
+            blok = teks_lint[awal:awal + 1 + judul.start()]
+            return blok or None
+    ekor = teks_lint.find('if [ "$status" -eq 0 ]; then', awal)
+    blok = teks_lint[awal:ekor] if ekor > awal else teks_lint[awal:]
+    return blok or None
+
+
+def jalankan_program(program, cwd, timeout=1800):
+    """Jalankan potongan `swift-ui-lint.sh` → `(exit, stdout, stderr)`.
+
+    **Bukan `bash -c program`.** Program yang diekstrak dari lint bisa
+    melebihi 128 KiB (`MAX_ARG_STRLEN` di Linux) dan `bash -c` menerimanya
+    sebagai satu argumen, jadi ia gagal `OSError [Errno 7] Argument list too
+    long` sebelum satu aturan pun berjalan — harness lalu merah karena
+    infrastrukturnya, bukan karena gerbangnya. Ditulis ke berkas sementara
+    berawalan titik di `cwd` (dihapus di `finally`), dengan alasan yang sama
+    seperti `jalankan_lint`: aturan yang membaca lint **dari cakram** harus
+    melihat berkas yang benar-benar ada.
+
+    `$0` dan `BASH_SOURCE` tidak dipakai satu pun aturan, jadi memindahkan
+    program ke berkas tidak mengubah apa yang diukur.
+    """
+    jalur = os.path.join(cwd, ".potongan-aturan.sh")
+    try:
+        with open(jalur, "w", encoding="utf-8") as berkas:
+            berkas.write(program)
+        os.chmod(jalur, 0o755)
+        hasil = subprocess.run(["bash", jalur], cwd=cwd,
+                               capture_output=True, text=True, timeout=timeout)
+        return hasil.returncode, hasil.stdout, hasil.stderr
+    finally:
+        if os.path.exists(jalur):
+            os.remove(jalur)
+
+
 def arah_kedua_buta(teks_lint, akar, pulihkan, mutasi):
     """Buktikan gerbang lama **tidak berubah pikiran** karena `mutasi`.
 

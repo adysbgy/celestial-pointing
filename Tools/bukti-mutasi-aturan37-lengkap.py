@@ -90,6 +90,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "Tools"))
+import mutasi_sumber  # noqa: E402  (batas blok aturan, lihat modulnya)
 LINT = os.path.join(ROOT, "swift-ui-lint.sh")
 
 #: Judul yang dicetak Aturan 37. Dibaca dari keluaran lint, bukan ditulis
@@ -308,13 +310,7 @@ def extract_rule37():
     """
     with open(LINT, encoding="utf-8") as handle:
         text = handle.read()
-    start = text.find("# ── Aturan 37")
-    if start < 0:
-        return None
-    end = text.find('if [ "$status" -eq 0 ]; then', start)
-    if end < 0:
-        return None
-    return text[start:end]
+    return mutasi_sumber.batas_aturan(text, 37)
 
 
 def build_tree(destination):

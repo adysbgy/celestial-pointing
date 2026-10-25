@@ -212,24 +212,36 @@ def extract_rule32():
     tetap hijau walau aturan aslinya dilonggarkan — persis kelas cacat yang
     ditutup `check-harness-terdaftar.py` (gerbang yang tidak pernah
     dieksekusi selalu hijau).
+
+    **Batasnya blok Aturan 32, bukan sampai ekor lint.** Versi lama memotong
+    dari judul Aturan 32 sampai `if [ "$status" -eq 0 ]; then` — baris
+    penutup **global**. Selama Aturan 32 yang terakhir itu benar; sejak
+    aturan 33…106 menyusul, potongannya menjadi 450.583 byte, dan
+    `probe()` menyerahkannya ke `bash -c` sebagai satu argumen. Linux
+    menolak argumen di atas 128 KiB (`MAX_ARG_STRLEN`), jadi keadaan
+    [baseline] pun gagal jalan dan `main` merah:
+
+        OSError: [Errno 7] Argument list too long: 'bash'
+
+    Yang penting: potongan 450 KB itu **bukan** Aturan 32. Ia menjalankan 32
+    aturan, mencetak 52 judul, dan `CLEAN_MARK` Aturan 32 bisa datang dari
+    aturan mana pun di antaranya — bukti yang hijau untuk alasan yang salah,
+    sebelum ia sempat gagal.
     """
-    text = open(LINT, encoding="utf-8").read()
-    start = text.find("# ── Aturan 32")
-    if start < 0:
-        return None
-    end = text.find('if [ "$status" -eq 0 ]; then', start)
-    if end < 0:
-        return None
-    return text[start:end]
+    return mutasi_sumber.batas_aturan(
+        open(LINT, encoding="utf-8").read(), 32)
 
 
 def probe(program):
-    """Jalankan Aturan 32 sendiri → (merah?, detail)."""
-    proc = subprocess.run(["bash", "-c", program], cwd=ROOT,
-                          capture_output=True, text=True)
-    if proc.returncode not in (0, 1):
-        return None, (proc.stderr.strip().splitlines() or ["(tanpa galat)"])[-1]
-    out = proc.stdout
+    """Jalankan Aturan 32 sendiri → (merah?, detail).
+
+    Lewat `mutasi_sumber.jalankan_program` (berkas, bukan `bash -c`), supaya
+    panjang program tidak bisa lagi membuat harness merah karena batas
+    argumen Linux alih-alih karena gerbangnya.
+    """
+    code, out, err = mutasi_sumber.jalankan_program(program, ROOT)
+    if code not in (0, 1):
+        return None, (err.strip().splitlines() or ["(tanpa galat)"])[-1]
     clean = CLEAN_MARK in out
     return (not clean), out.strip()
 
