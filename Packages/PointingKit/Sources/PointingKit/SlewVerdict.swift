@@ -193,6 +193,26 @@ public extension SlewDecision {
         let reasons = hazards.map { $0.message }
         return TextLocalization.text(.slewVerdictRejectedPrefix) + " " + reasons.joined(separator: " ")
     }
+
+    /// Putusan dalam bentuk **kata**, untuk pengumuman VoiceOver.
+    ///
+    /// **Kenapa ini ada, padahal `verdictText` sudah terlihat.** Kalimat
+    /// terlihat berjalan di dalam `SlewVerdictBanner` bersama sebuah ikon SF
+    /// Symbol yang `accessibilityHidden`, jadi `.accessibilityElement(children:
+    /// .combine)` mengumumkan teksnya sendiri tanpa label tambahan. Yang
+    /// dibaca betul — tapi yang dibaca hanya *sebabnya*, tanpa satu kata
+    /// yang menyebut bahwa GoTo-nya **ditangguhkan**. Kalimat terlihat
+    /// memakai prefiks "GoTo ditolak:", dan itu kata yang harus ikut
+    /// terbaca: pembaca layar yang mendengar "Terlalu dekat Matahari."
+    /// tanpa konteks bisa mengira itu deskripsi langit, bukan penolakan.
+    ///
+    /// Bentuknya satu kalimat, bukan baris judul-nilai: `verdictText` sudah
+    /// lengkap dengan sebabnya, dan memecahnya jadi dua baris justru
+    /// membuatnya dua pengumuman yang harus diusap.
+    var spokenVerdict: String? {
+        guard let text = verdictText else { return nil }
+        return TextLocalization.text(.rowSpeechSlewVerdict, text)
+    }
 }
 
 public extension LocalizedText {

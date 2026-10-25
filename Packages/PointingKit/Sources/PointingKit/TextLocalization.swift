@@ -804,6 +804,7 @@ public extension LocalizedText {
         .rowSpeechLabel, .rowSpeechDegrees, .rowSpeechDegreesPerSecond,
         .rowSpeechErrorWord, .rowSpeechError, .rowSpeechWristRate,
         .rowSpeechWristRateWord, .rowSpeechStateLine,
+        .rowSpeechSlewVerdict,
         // Warna spektral bintang. Masuk daftar karena inilah satu-satunya
         // jalur warna sampai ke pengguna VoiceOver: gambar prosedural mewarnai
         // titik bintang dari indeks B−V katalog, dan tanpa kunci ini "Rigel"

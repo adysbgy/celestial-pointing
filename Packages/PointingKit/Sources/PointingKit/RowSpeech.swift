@@ -256,4 +256,17 @@ public extension LocalizedText {
     static let rowSpeechStateLine = LocalizedText(
         key: "row.speech.stateLine",
         id: "Keadaan: %@.")
+
+    /// Awalan pengumuman putusan GoTo yang **ditolak**: `"Ditangguhkan. %@"`
+    ///
+    /// `%@` = `SlewDecision.verdictText` lengkap dengan sebabnya. Kenapa
+    /// satu kata lagi di depan, padahal kalimat terlihat sudah memakai
+    /// prefiks "GoTo ditolak:": yang diucapkan tidak boleh dimulai dengan
+    /// nama bahaya. "Terlalu dekat Matahari." yang muncul sebagai
+    /// pengumuman pertama terdengar seperti deskripsi langit, bukan
+    /// penolakan — dan satu-satunya penolakan yang berbahaya justru yang
+    /// paling sering didengar tanpa melihat layar. Lihat `spokenVerdict`.
+    static let rowSpeechSlewVerdict = LocalizedText(
+        key: "row.speech.slewVerdict",
+        id: "Ditangguhkan. %@")
 }

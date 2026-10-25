@@ -259,4 +259,57 @@ final class SlewVerdictTests: XCTestCase {
         XCTAssertTrue(allowed.isAllowed)
         XCTAssertNil(allowed.safetyWarningText)
     }
+
+    // MARK: - Ucapan putusan: sebab tidak boleh jadi pengumuman pertama
+
+    /// Ucapan tidak boleh **dimulai** dengan nama bahaya.
+    ///
+    /// Kalimat terlihat memakai prefiks "GoTo ditolak:", dan itu satu-satunya
+    /// kata yang menyebut bahwa teleskop **tidak bergerak**. Kalau pengumuman
+    /// VoiceOver dimulai langsung dengan "Terlalu dekat Matahari.", yang
+    /// terdengar adalah deskripsi langit — bukan penolakan. Itu false
+    /// confidence dalam bentuk audio.
+    func testSpokenVerdictDoesNotStartWithHazard() {
+        let decision = SlewDecision.rejected(hazards: [.sunProximity])
+        let spoken = try? XCTUnwrap(decision.spokenVerdict)
+        XCTAssertNotNil(spoken)
+        XCTAssertFalse(spoken?.isEmpty ?? true)
+        // Prefiks "ditangguhkan" harus ada, dan bukan di akhir kalimat.
+        XCTAssertTrue(spoken?.hasPrefix("Ditangguhkan") ?? false,
+                      "sebab tidak boleh jadi kata pertama: \(spoken ?? "nil")")
+        // Sebabnya tetap ikut — ucapan bukan pengganti, tapi tambahan.
+        XCTAssertTrue(spoken?.contains("Matahari") ?? false)
+    }
+
+    /// GoTo aman -> ucapan `nil`. Sama sepenuhnya dengan `verdictText`:
+    /// putusan adalah penjelasan atas masalah, dan "aman" bukan masalah.
+    func testSpokenVerdictIsNilWhenAllowed() {
+        let allowed = allowedDecision(for: CelestialObject(
+            id: "polaris", name: "Polaris", kind: .star,
+            raDeg: 37.95, decDeg: 89.26, magnitude: 1.98))
+        XCTAssertNil(allowed.spokenVerdict)
+    }
+
+    /// Bahaya mutu juga diucapkan — bukan hanya yang berbahaya.
+    ///
+    /// Penolakan karena "terlalu redup" tidak membahayakan alat, tapi tetap
+    /// berarti teleskop tidak bergerak. Ucapannya diam = pengguna VoiceOver
+    /// menduga GoTo berjalan.
+    func testSpokenVerdictCoversQualityHazardsToo() {
+        let quality = SlewDecision.rejected(hazards: [.tooFaint])
+        let spoken = try? XCTUnwrap(quality.spokenVerdict)
+        XCTAssertTrue(spoken?.hasPrefix("Ditangguhkan") ?? false,
+                      "bahaya mutu juga menangguhkan GoTo: \(spoken ?? "nil")")
+    }
+
+    /// Ucapan bukan teks terlihat yang disalin mentah — ia mengandung lebih
+    /// banyak kata, jadi mengubahnya tidak bisa tak terlihat.
+    func testSpokenVerdictAddsContextBeyondVisibleText() {
+        let decision = SlewDecision.rejected(hazards: [.sunProximity])
+        let visible = decision.verdictText ?? ""
+        let spoken = decision.spokenVerdict ?? ""
+        XCTAssertNotEqual(visible, spoken,
+                          "ucapan harus menambah kata yang menyebut penolakan")
+        XCTAssertGreaterThan(spoken.count, visible.count)
+    }
 }

@@ -360,9 +360,17 @@ final class TextLocalizationTests: XCTestCase {
     /// karena aturan bekerja pada teks dan gambar, sedangkan cacatnya adalah
     /// **kolom yang tidak pernah ditulis**. Karena itu barisnya pindah ke
     /// `LinkReport` (fungsi murni, diuji di Linux).
+    ///
+    /// Angka 357 → 358 karena `.rowSpeechSlewVerdict`: ucapan putusan GoTo
+    /// yang **ditangguhkan**. `SlewVerdictBanner` sudah mengumumkan
+    /// kalimatnya lewat `.combine`, tapi kalimat itu dimulai dengan nama
+    /// bahaya — "Terlalu dekat Matahari." sebagai pengumuman pertama
+    /// terdengar seperti deskripsi langit, bukan penolakan. Satu kata di
+    /// depan yang menyebut penolakannya membuatnya tidak bisa disalahpahami,
+    /// dan kata itu harus ikut diterjemahkan.
     func testDeclaredKeysAreUniqueNonEmptyAndComplete() {
         let keys = LocalizedText.allKeys
-        XCTAssertEqual(keys.count, 357, "jumlah kunci berubah — perbarui gerbang & katalog")
+        XCTAssertEqual(keys.count, 358, "jumlah kunci berubah — perbarui gerbang & katalog")
         XCTAssertEqual(Set(keys.map(\.rawValue)).count, keys.count, "ada kunci kembar")
         for key in keys {
             XCTAssertFalse(key.rawValue.isEmpty, "kunci kosong")

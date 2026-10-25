@@ -78,6 +78,12 @@ struct SlewVerdictBanner: View {
             // keselamatan yang terpecah jadi tiga item yang harus diusap satu
             // per satu justru lebih mudah terlewat.
             .accessibilityElement(children: .combine)
+            // Ucapan putusan, bukan teks terlihat. Yang digabungkan hanya
+            // teks, jadi `.combine` tanpa label ini sudah mengumumkan
+            // kalimatnya sendiri — tapi tanpa satu kata di depan yang
+            // menyebut bahwa GoTo **ditangguhkan**, sebabnya terbaca seperti
+            // deskripsi langit. Lihat `SlewDecision.spokenVerdict`.
+            .accessibilityLabel(decision.spokenVerdict ?? text)
         }
     }
 }
