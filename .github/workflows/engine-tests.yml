@@ -2344,6 +2344,31 @@ jobs:
       - name: Buktikan Aturan 109 berbunyi saat cabang statis TimelineView dibuang
         run: python3 Tools/bukti-mutasi-aturan109-cabang-statis.py
 
+      # Dan bukti untuk **Aturan 110** — elemen `.accessibilityElement(children:
+      # .combine)` yang kehilangan ucapannya.
+      #
+      # Diukur sebelum aturan ini ada: tiga dari empat label VoiceOver yang FASE
+      # A tuntut dihapus satu per satu, dan seluruh 109 gerbang LULUS. Nol yang
+      # berbunyi. Yang membuat kelas cacat ini tak terlihat: `.combine` bukan
+      # hiasan. Ia mengganti seluruh subtree dengan SATU elemen yang diumumkan
+      # murni dari labelnya — jadi menghapus `.accessibilityLabel` dari sana sah
+      # secara tipe (compiler hanya melihat modifier yang hilang) sementara kartu
+      # keadaan dan tombol yang persis FASE A tuntut jadi SENYAP. Bukan kurang
+      # baik: hilang.
+      #
+      # Harness ini menuntut **lima** keadaan, dan dua di antaranya bukan yang
+      # merah: menambahkan hanya komentar di antara `.combine` dan labelnya wajib
+      # HIJAU (gambarnya identik sampai bit), dan membuang semua label sesudah
+      # `.combine` wajib MERAH — gerbang yang kehilangan subjeknya harus berhenti
+      # mengukur, bukan hijau tanpa berbunyi.
+      #
+      # Keadaan "label banner GoTo dihapus" adalah yang menemukan cacat nyata
+      # di pohon: 15 elemen gabungan sudah punya label, satu tidak — banner
+      # putusan keamanan, yang mengumumkan sebabnya ("Terlalu dekat Matahari.")
+      # tanpa satu kata yang menyebut GoTo-nya ditangguhkan.
+      - name: Buktikan Aturan 110 berbunyi saat elemen gabungan kehilangan ucapannya
+        run: python3 Tools/bukti-mutasi-aturan110-ucapan-gabungan.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

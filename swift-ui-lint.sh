@@ -15568,6 +15568,39 @@ else
   fi
 fi
 
+# ── Aturan 110: elemen `.combine` wajib punya ucapan ──
+#
+# Diukur pada salinan utuh pohon ini, proses baru: tiga dari empat label
+# VoiceOver yang FASE A tuntut dihapus satu-satu, dan `swift-ui-lint.sh`
+# **exit 0** untuk semuanya. Nol yang berbunyi.
+#
+# Yang membuat kelas cacat ini tak terlihat: `.accessibilityElement(children:
+# .combine)` bukan hiasan. Ia mengganti seluruh subtree dengan SATU elemen
+# yang diumumkan murni dari labelnya. Menghapus `.accessibilityLabel` dari
+# sana sah secara tipe — compiler hanya melihat sebuah modifier yang hilang
+# — tapi kartu keadaan dan tombol yang persis FASE A tuntut jadi **senyap**
+# bagi pembaca layar. Tidak kurang baik: hilang.
+echo "== Aturan 110: elemen gabungan wajib punya ucapan =="
+if [ ! -f "Tools/check-aturan110-ucapan-gabungan.py" ]; then
+  echo "FAIL Tools/check-aturan110-ucapan-gabungan.py tidak ada: Aturan 110"
+  echo "     tidak mengukur apa pun, dan satu elemen gabungan boleh kehilangan"
+  echo "     ucapannya lagi tanpa satu pun gerbang berbunyi — statusCard,"
+  echo "     ObjectDetailView, dan tombol Catat kembali senyap."
+  status=1
+else
+  ucapan=$(python3 Tools/check-aturan110-ucapan-gabungan.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$ucapan"
+    echo "-> Tambahkan .accessibilityLabel setelah .accessibilityElement"
+    echo "   (children: .combine). Yang digabungkan itu SATU elemen yang"
+    echo "   diumumkan murni dari labelnya — tanpa label ia SENYAP bagi"
+    echo "   pembaca layar, bukan sekadar kurang informatif."
+    status=1
+  else
+    echo "$ucapan"
+  fi
+fi
+
 
 if [ "$status" -eq 0 ]; then
   echo

@@ -1,3 +1,72 @@
+### Siklus (25 Okt 2026, lanjutan — Aturan 110: elemen `.combine` yang menggabungkan dirinya sendiri sampai senyap)
+
+Siklus ini memindahkan gerbang terakhir yang tertinggal dari commit Aturan 109:
+aturan dan perbaikan sumbernya sudah ditulis, tetapi **harness-nya tidak
+pernah dirujuk `engine-tests.yml`**, dan dua angka README sudah basi. Aturan 10
+menangkap keduanya di lint pertama — `PointingKit 1115` lawan 1119 uji sungguhan,
+dan `108 aturan` lawan 109 blok. Itu tepat yang tugasnya: gerbang yang
+menghitung bukan gerbang yang harus diperbarui tangan.
+
+**Cacat yang ditutup aturannya, dan kenapa bentuknya tak terlihat.** FASE A
+menuntut `.accessibilityLabel` di empat tempat. Diukur pada salinan utuh pohon
+ini, proses baru: tiga di antaranya dihapus satu per satu, dan
+`./swift-ui-lint.sh` **exit 0** untuk semuanya. Nol yang berbunyi, nol
+peringatan compiler.
+
+Yang membuatnya bukan "label yang hilang" biasa:
+`.accessibilityElement(children: .combine)` mengganti seluruh subtree dengan
+**satu** elemen yang diumumkan murni dari labelnya. Menghapus
+`.accessibilityLabel` dari sana sah secara tipe — compiler hanya melihat
+sebuah modifier yang hilang — sementara kartu keadaan dan tombol yang persis
+FASE A tuntut jadi **senyap** bagi pembaca layar. Bukan kurang baik: hilang.
+
+**Satu elemen gabungan ternyata memang tidak punya label, dan itu situs yang
+paling merugikan.** 15 elemen `.combine` sudah berlabel; yang tidak adalah
+`SlewVerdictBanner` — banner putusan keamanan GoTo. Di perangkat ia sudah
+mengumumkan kalimatnya sendiri lewat `.combine`, tapi yang terbaca hanya
+**sebabnya**: "Terlalu dekat Matahari." Sebagai pengumuman pertama itu
+terdengar seperti deskripsi langit, bukan penolakan. Pembaca layar tidak punya
+cara tahu bahwa teleskop **tidak bergerak** — false confidence dalam bentuk
+audio, dan justru pada penolakan yang paling berbahaya.
+
+Karena itu `SlewDecision.spokenVerdict` menambahkan satu kata di depan:
+"Ditangguhkan. Terlalu dekat Matahari." Satu kalimat, bukan baris
+judul-nilai, karena `verdictText` sudah lengkap dengan sebabnya dan memecahnya
+menjadi dua pengumuman yang harus diusap. Empat uji baru mengunci arahnya —
+ucapan tidak boleh **dimulai** dengan nama bahaya, GoTo aman wajib `nil`,
+bahaya mutu (terlalu redup) juga menangguhkan GoTo dan karena itu wajib
+diucapkan, dan ucapannya wajib menambah kata di atas teks terlihat.
+
+**Yang ditambahkan di sini, menyelesaikan siklus Aturan 109.**
+
+- Langkah harness `Tools/bukti-mutasi-aturan110-ucapan-gabungan.py` di
+  `engine-tests.yml` (177 harness, semuanya dirujuk — dijaga
+  `check-harness-terdaftar.py`). Harness itu sudah ada di disk sejak commit
+  sebelumnya, dan tanpa langkah CI ia **tidak pernah berjalan**: gerbang yang
+  tidak dieksekusi selalu hijau, kelas cacat yang sama yang ditutup Aturan 107.
+- Kunci katalog `row.speech.slewVerdict` di `Localizable.xcstrings` (id + en),
+  yang Aturan 6 tuntut. Ia tertinggal karena kunci itu lahir bersama perubahan
+  sumber di commit sebelumnya, sementara katalog tidak ikut.
+- Angka README: PointingKit 1115 -> **1119**, 108 -> **109 aturan** (nomor
+  sampai 110).
+
+**Angka.** `./swift-test.sh` -> CelestialEngine 222 + PointingKit 1119, 0
+gagal. `./swift-ui-lint.sh` -> **110 blok aturan berjalan** (nomor sampai 110,
+Aturan 69 tinggal di `Tools/`), exit 0. `swift-typecheck.sh` exit 0.
+`check-harness-terdaftar.py` -> 177 harness, semuanya dirujuk.
+`check-jangkar-harness.py` -> 562 jangkar, tidak ada mutasi tertinggal.
+`bash -n` di Docker `bash:3.2` -> exit 0.
+
+**Yang TIDAK diklaim.** Harness Aturan 110 dijalankan lokal sampai selesai di
+commit ini — bukan di CI, karena CI baru menjalankannya setelah push ini. Lima
+keadaannya: baseline hijau; label statusCard dihapus (merah); label banner GoTo
+dihapus (merah); hanya komentar ditambahkan (wajib **hijau**, karena gambarnya
+identik sampai bit); semua label sesudah `.combine` dibuang (merah, karena
+gerbang yang kehilangan subjeknya harus berhenti mengukur). Ia tidak menguji
+**isi** ucapan — itu urusan `SlewVerdictTests` di Linux — dan tidak menguji
+tombol yang tidak memakai `.combine`: mereka masih bisa kehilangan label tanpa
+berbunyi, dan itu batas yang ditulis di docstring checker-nya.
+
 ### Siklus (25 Okt 2026, lanjutan — Aturan 109: cabang statis sesudah `TimelineView` dibuang, dan planet/Bulan/Matahari lenyap tanpa satu pun gerbang berbunyi)
 
 Siklus ini menutup cacat yang lebih gelap dari Aturan 108: kali ini yang hilang

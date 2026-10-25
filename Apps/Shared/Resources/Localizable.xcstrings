@@ -6946,6 +6946,23 @@
         }
       }
     },
+    "row.speech.slewVerdict": {
+      "comment": "Awalan pengumuman putusan GoTo yang DITANGGUHKAN. %@ = SlewDecision.verdictText lengkap dengan sebabnya. Kenapa satu kata lagi di depan, padahal kalimat terlihat sudah memakai prefiks \"GoTo ditolak:\": yang diucapkan tidak boleh dimulai dengan nama bahaya. \"Terlalu dekat Matahari.\" sebagai pengumuman pertama terdengar seperti deskripsi langit, bukan penolakan — dan satu-satunya penolakan yang berbahaya justru yang paling sering didengar tanpa melihat layar.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deferred. %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditangguhkan. %@"
+          }
+        }
+      }
+    },
     "sensor.location.accuracy": {
       "comment": "Status akurasi lokasi. %.0f = meter.",
       "localizations": {
