@@ -15268,6 +15268,58 @@ else
 fi
 
 
+# ── Aturan 106: terjemahan pola→efek haptic di Apps/ injektif ──
+#
+# Aturan 47 menutup satu tingkat kelas ini: keputusan "peristiwa mana mendapat
+# pola mana" tidak boleh ditulis sendiri di `Apps/`, jadi ia dipindah ke
+# `HapticPolicy` dan diuji di Linux. Aturan 105 menutup tingkat lain lagi pada
+# saluran audio. Yang tertinggal justru langkah **antara** keduanya, dan
+# bentuknya hanya terasa di tangan:
+#
+#     Apps/PointAndKnowiOS/Sources/PhoneHapticEngine.swift
+#         case .unsettled: UIImpactFeedbackGenerator(style: .rigid)
+#         case .completed: UIImpactFeedbackGenerator(style: .medium)
+#
+# Diukur pada salinan utuh pohon ini (proses baru, seluruh aturan UI lain
+# dijalankan atas `Apps/`), dua mutasi yang mengompilasi bersih:
+#
+#     .unsettled: .rigid   ->   .unsettled: .medium      LULUS  (buta)
+#     .unsettled: .retry   ->   .unsettled: .success     LULUS  (buta)
+#
+# Akibatnya bukan galat melainkan **kehilangan makna**: getaran "ragu"
+# menjadi tidak bisa dibedakan dari getaran "berhasil" — persis pelanggaran
+# PRD yang Aturan 47 tutup, satu tingkat lebih rendah. Model injektif tidak
+# menolong kalau terjemahannya menyatu kembali; yang menjamin janji di layar
+# adalah seluruh rantainya, dan rantai ini putus di `Apps/` yang tidak pernah
+# dibangun `swift-test.sh`.
+#
+# Kenapa bukan cuma "injektif". Terjemahan yang kehilangan satu `case` juga
+# cacat, dan berbeda arah: pola itu tidak bergetar sama sekali, padahal
+# getaran adalah satu-satunya saluran yang tidak butuh mata saat jam
+# diangkat. Karena itu kelengkapan diperiksa terpisah dari injektivitas, dan
+# efeknya dituntut nyata (`.sccess` salah ketik harus merah, bukan diabaikan).
+#
+# Yang TIDAK diklaim: jarak antar-efek "cukup lebar untuk seluruh jari".
+# `.light` dan `.medium` pada iPhone memang berdekatan; yang dikunci di sini
+# adalah bahwa **dua pola tidak boleh memetakan ke efek yang sama persis**.
+# Jarak itu tetap urusan `HapticPolicy` dan penilaian manusia di perangkat.
+echo "== Aturan 106: terjemahan pola→efek haptic injektif & lengkap =="
+if [ ! -f "Tools/check-aturan106-terjemahan-haptic.py" ]; then
+  echo "FAIL Tools/check-aturan106-terjemahan-haptic.py tidak ada: Aturan 106"
+  echo "     tidak mengukur apa pun, dan dua pola boleh kembali diterjemahkan"
+  echo "     ke efek yang sama di Apps/ tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  terjemahan_haptic=$(python3 Tools/check-aturan106-terjemahan-haptic.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$terjemahan_haptic"
+    status=1
+  else
+    echo "$terjemahan_haptic"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

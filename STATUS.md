@@ -1,4 +1,69 @@
-### Siklus (25 Okt 2026 — Aturan 105: nada kunci yang rusak hanya *terdengar*, dan satu substring yang membuat gerbangnya buta)
+### Siklus (25 Okt 2026 — Aturan 106: terjemahan pola→efek haptic di `Apps/` — rantai yang injektif tetap bisa menyatu kembali)
+
+Siklus ini menutup satu langkah dalam rantai haptic yang lolos dari **dua**
+aturan sebelumnya sekaligus. Aturan 47 sudah memindahkan keputusan "peristiwa
+mana mendapat pola mana" ke `HapticPolicy` dan mengujinya di Linux;
+`HapticPolicyTests` memang menuntut pemetaan itu **injektif**. Yang tertinggal
+adalah terjemahan pola → efek platform di `Apps/` — dua `switch` yang
+dokumentasinya sendiri menyebutnya "tanpa keputusan".
+
+**Cacatnya.** Diukur pada salinan utuh pohon ini (proses baru, seluruh 105
+aturan UI dijalankan atas `Apps/`), dua mutasi yang mengompilasi bersih:
+
+    iPhone: case .unsettled: style: .rigid  ->  style: .medium   LULUS (buta)
+    jam:   case .unsettled: .retry          ->  .success         LULUS (buta)
+
+Dua keadaan, nol yang berbunyi. Tidak ada teks di layar yang berubah, tidak
+ada peringatan compiler — yang berubah hanya **rasa getaran di tangan**, dan
+akibatnya getaran "ragu" menjadi tidak bisa dibedakan dari getaran "berhasil".
+Itu persis pelanggaran PRD yang Aturan 47 tutup, hanya satu tingkat lebih
+rendah: bukan pemetaan peristiwa→pola, melainkan pola→efek.
+
+**Kenapa ini kelas yang berbeda, bukan aturan tambahan yang sama.** Model yang
+injektif tidak menolong kalau terjemahannya menyatu kembali. Yang menjamin
+janji di layar adalah **seluruh rantainya** — peristiwa → pola → efek — dan
+rantai itu putus tepat di `Apps/`, yang tidak pernah dibangun
+`./swift-test.sh`. Ini juga kelas yang sudah pernah nyata di repo ini: nama
+kasus `HapticPattern` yang dulu `success`/`retry`/`failure`/`click` membuat
+Aturan 25 memerah karena `switch result` (atas `Result<TelescopeCommand,
+Error>`) menyandang himpunan label yang sama.
+
+**Yang ditambahkan.**
+
+- `Tools/check-aturan106-terjemahan-haptic.py` — menguji **tiga** arah sekaligus,
+  karena ketiganya cacat nyata dengan gejala berbeda:
+  1. **Injektivitas per platform**: dua pola tidak boleh memetakan ke efek yang
+     sama persis (`.rigid` vs `.medium` vs `.light` dibaca sebagai efek berbeda).
+  2. **Kelengkapan**: pola yang kehilangan `case` berhenti bergetar sama sekali
+     — dan getaran adalah satu-satunya saluran yang tidak butuh mata.
+  3. **Efeknya nyata**: `.sccess` salah ketik harus merah, bukan diabaikan
+     diam-diam. Himpunan efek yang dikenal (`WKHapticType`; gaya
+     `UIImpactFeedbackGenerator`; tipe `UINotificationFeedbackGenerator`)
+     dideklarasikan eksplisit.
+- `Tools/bukti-mutasi-aturan106-terjemahan-haptic.py` — 10 keadaan, semuanya
+  sesuai harapan: mutasi inti merah di **kedua** platform, `case` yang dibuang
+  merah, efek tak dikenal merah, arah sebaliknya (`.completed` → `.retry`
+  nabrak `.unsettled`) merah, `switch pattern` yang dibuang dan berkas yang
+  dikosongkan merah (fail-closed), dan **kontrol positif**: kedua efek disebut
+  di dalam komentar tetap hijau.
+- Blok Aturan 106 di `swift-ui-lint.sh` (setelah 105), langkah CI-nya, dan
+  penjelasan "kenapa" di README (hitungan aturan 105, nomor tertinggi 106).
+
+**Yang TIDAK diklaim.** Gerbang ini membaca **teks**, jadi yang diukur adalah
+perjanjian antar-teks, bukan rasa getaran di tangan. `.light` dan `.medium`
+pada iPhone memang berdekatan; yang dikunci di sini adalah bahwa **dua pola
+tidak boleh memetakan ke efek yang sama persis**, bukan bahwa jarak antar-efek
+sudah cukup lebar untuk seluruh jari. Jarak itu tetap urusan `HapticPolicy`
+(pola peristiwa berbeda) dan penilaian manusia di perangkat. Aturan 106 juga
+tidak mengukur apakah efeknya **cukup berbeda** untuk pengguna tunanetra — itu
+butuh perangkat, dan itu batas yang disengaja.
+
+**Catatan proses.** Lint penuh pertama kali masih merah, dan penyebabnya bukan
+aturan baru: Aturan 10 (hitungan README) membacakan "README bilang 104 aturan,
+swift-ui-lint.sh punya 105". Itu tepat yang tugasnya — gerbang yang menghitung
+bukan gerbang yang harus diperbarui tangan.
+
+
 
 Siklus ini menutup kelas cacat yang paling tidak terlihat di seluruh repo ini:
 **bunyi kunci yang rusak tidak mengubah satu piksel pun, tidak mengubah satu

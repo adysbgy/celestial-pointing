@@ -2236,6 +2236,33 @@ jobs:
       - name: Buktikan Aturan 105 berbunyi saat bentuk nada kembali ditulis di Apps
         run: python3 Tools/bukti-mutasi-aturan105-bentuk-nada.py
 
+      # Dan bukti untuk **Aturan 106** — langkah terakhir dalam rantai haptic
+      # yang lolos dari dua aturan sebelumnya sekaligus. Aturan 47 sudah
+      # memindahkan keputusan "peristiwa mana mendapat pola mana" ke
+      # `HapticPolicy` (diuji di Linux, dan ujinya memang menuntut pemetaan itu
+      # injektif). Yang tertinggal adalah terjemahan pola → efek platform di
+      # `Apps/` — dua `switch` "tanpa keputusan" yang diukur bukan bagian yang
+      # aman: `style: .rigid` → `.medium` pada `case .unsettled`, dan
+      # `.retry` → `.success` di jam, keduanya **lulus** seluruh 105 gerbang
+      # sambil mengompilasi bersih.
+      #
+      # Bentuk kegagalannya tidak terlihat di layar maupun di compiler: yang
+      # berubah hanya rasa getaran di tangan, dan akibatnya getaran "ragu"
+      # menjadi tidak bisa dibedakan dari getaran "berhasil" — pelanggaran PRD
+      # yang sama dengan yang Aturan 47 tutup, satu tingkat lebih rendah.
+      #
+      # Harness ini menguji **tiga** arah yang berbeda, karena ketiganya cacat
+      # nyata dengan gejala berbeda: injektivitas per platform (dua pola
+      # memetakan ke efek yang sama persis), kelengkapan (satu `case` dibuang →
+      # pola itu tidak bergetar sama sekali), dan efek yang nyata (`.sccess`
+      # salah ketik harus merah, bukan diabaikan diam-diam). Terjemahan yang
+      # hilang seluruhnya dan berkas yang dikosongkan harus GAGAL (fail-closed)
+      # — gerbang yang tidak menemukan subjeknya sudah berhenti mengukur —
+      # sementara efek yang disebut di dalam **komentar** tetap hijau, karena
+      # gerbang yang merah atas dokumentasi yang benar akan dimatikan orang.
+      - name: Buktikan Aturan 106 berbunyi saat dua pola diterjemahkan ke efek sama
+        run: python3 Tools/bukti-mutasi-aturan106-terjemahan-haptic.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

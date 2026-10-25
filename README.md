@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **104 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **105 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 105 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 106 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.
@@ -221,6 +221,25 @@ saluran bagi pengguna yang tidak melihat layar, jadi bisu tidak bisa
 dibedakan dari "tidak ada yang dikunci". Angka bentuk nadanya sekarang hidup
 di `ToneSynth` dan diuji di Linux (12 uji: amplop nol di kedua ujung, osilasi
 yang benar-benar terjadi, frekuensi terukur cocok dengan konstanta).
+Aturan 106 (ditambah siklus ini) menutup satu langkah dalam rantai haptic yang
+lolos dari dua aturan sebelumnya. Aturan 47 sudah memindahkan keputusan
+"peristiwa mana mendapat pola mana" ke `HapticPolicy` dan mengujinya di Linux,
+dan `HapticPolicyTests` memang menuntut pemetaan itu **injektif**. Yang tertinggal
+adalah terjemahan pola → efek platform di `Apps/` — dua `switch` "tanpa
+keputusan" yang ternyata bukan bagian yang aman. Diukur pada salinan utuh pohon
+ini (proses baru, seluruh aturan UI lain dijalankan atas `Apps/`):
+`UIImpactFeedbackGenerator(style: .rigid)` → `.medium` pada `case .unsettled`
+**lulus** seluruh 105 gerbang, begitu pula `.retry` → `.success` di jam. Dua
+mutasi, nol yang berbunyi, keduanya mengompilasi bersih — dan akibatnya hanya
+terasa di tangan: getaran "ragu" menjadi tidak bisa dibedakan dari getaran
+"berhasil". Model injektif tidak menolong kalau terjemahannya menyatu kembali,
+karena yang menjamin janji di layar adalah seluruh rantainya, dan rantai ini
+putus tepat di `Apps/` yang tidak pernah dibangun `swift-test.sh`. Aturan ini
+menguji **tiga** arah sekaligus — injektivitas per platform (dua pola tidak
+boleh memetakan ke efek yang sama persis), kelengkapan (pola yang kehilangan
+`case` berhenti bergetar sama sekali, dan getaran adalah satu-satunya saluran
+yang tidak butuh mata), dan efeknya nyata (`.sccess` salah ketik harus merah,
+bukan diabaikan diam-diam).
 Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 (aturan 7), hitungan uji di README yang tidak boleh membusuk (aturan 10),
