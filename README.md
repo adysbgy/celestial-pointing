@@ -176,7 +176,7 @@ Tidak punya Mac, atau mau cepat? Semua logika teruji di Linux.
 ./swift-ui-lint.sh     # aturan UI yang tidak bisa ditegakkan compiler
 ```
 
-Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 1103**.
+Hitungan uji saat ini: **CelestialEngine 222**, **PointingKit 1115**.
 
 Tiga gerbang itu menutup tiga celah yang berbeda, dan sengaja terpisah:
 
@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **103 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **104 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 104 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 105 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.
@@ -202,7 +202,7 @@ Aturan 103 (ditambah siklus lalu) menutup jalur `nil` pada argumen `lastLocked:`
 di `Apps/` — cacat yang lolos seluruh 102 gerbang sebelumnya: objek yang
 dipertahankan dibuang diam-diam, dan panel detail kosong saat keadaan
 `.searching` tanpa satu pun teks yang membantahnya.
-Aturan 104 (ditambah siklus ini) menutup jalur `sigmaDeg: 0.0` pada pembaruan
+Aturan 104 (ditambah siklus lalu) menutup jalur `sigmaDeg: 0.0` pada pembaruan
 berkala di jam — cacat yang lolos seluruh 103 gerbang sebelumnya: `Double`
 menerima literal nol tanpa cast, dan σ = 0 justru nilai yang **sah** di
 `ConfidenceTrace.record(message:)` (`pointingSigmaDeg ?? 0`), sehingga
@@ -210,6 +210,17 @@ telemetri keyakinan merekam jam sebagai selalu yakin arahnya. Yang dilanggar
 bukan tampilan melainkan PRD v0.4: akurasi Watch adalah hipotesis, dan
 hipotesis tidak boleh disampaikan sebagai kepastian ke telemetri yang dipakai
 menyetel ulang ambang.
+Aturan 105 (ditambah siklus ini) menutup kelas yang **paling tidak terlihat**
+di antara semuanya: bentuk nada kunci. Empat angka dan satu rumus amplopnya
+dulu ditulis di dalam gelung sampel `Apps/Shared/AudioCue.swift` — tempat
+`./swift-test.sh` tidak pernah membangunnya. Rusaknya tidak mengubah satu
+piksel, tidak mengubah satu baris teks, dan tidak gagal mengompilasi: amplop
+dibalik menghasilkan klik, frekuensi nol menghasilkan **bisu total tanpa
+galat**, amplitudo di atas 1.0 terpotong di mixer. Bunyi adalah satu-satunya
+saluran bagi pengguna yang tidak melihat layar, jadi bisu tidak bisa
+dibedakan dari "tidak ada yang dikunci". Angka bentuk nadanya sekarang hidup
+di `ToneSynth` dan diuji di Linux (12 uji: amplop nol di kedua ujung, osilasi
+yang benar-benar terjadi, frekuensi terukur cocok dengan konstanta).
 Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 (aturan 7), hitungan uji di README yang tidak boleh membusuk (aturan 10),

@@ -38,8 +38,7 @@ final class AudioCueEngine {
 
     // MARK: - Sintesis nada (prosedural, tanpa aset)
 
-    private let sampleRate: Double = 44100
-    private let duration: Double = 0.13
+    private let sampleRate: Double = ToneSynth.sampleRate
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var buffer: AVAudioPCMBuffer?
@@ -56,16 +55,26 @@ final class AudioCueEngine {
         engine.attach(node)
 
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        let frameCount = AVAudioFrameCount(sampleRate * duration)
+        // Panjang buffer datang dari model yang sama dengan bentuk nadanya.
+        // Menghitungnya ulang di sini (`sampleRate * duration`) membuat dua
+        // jawaban untuk satu pertanyaan, dan yang diuji di Linux hanya salah
+        // satunya.
+        let frameCount = AVAudioFrameCount(ToneSynth.frameCount)
         guard let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
         buf.frameLength = frameCount
         if let channel = buf.floatChannelData {
             let samples = channel[0]
             for i in 0..<Int(frameCount) {
-                let t = Double(i) / sampleRate
-                // Amplop naik lalu turun: bunyi "ping" lembut, bukan klik.
-                let envelope = sin(.pi * Double(i) / Double(frameCount))
-                samples[i] = Float(0.28 * sin(2 * .pi * 880 * t) * envelope)
+                // Bentuk nada — frekuensi, amplitudo, amplop — datang dari
+                // `ToneSynth` (PointingKit, teruji di Linux). Angka-angka itu
+                // dulu ditulis di sini, tempat `./swift-test.sh` tidak pernah
+                // membangunnya: amplop yang dibalik menghasilkan klik,
+                // frekuensi nol menghasilkan bisu total tanpa galat, dan
+                // amplitudo di atas 1.0 terpotong di mixer. Ketiganya
+                // mengompilasi bersih dan tidak terdengar sebagai kesalahan
+                // sampai ada yang mendengarkannya di perangkat.
+                samples[i] = Float(ToneSynth.sample(atIndex: i,
+                                                    frameCount: Int(frameCount)))
             }
         }
 

@@ -1,3 +1,103 @@
+### Siklus (25 Okt 2026 — Aturan 105: nada kunci yang rusak hanya *terdengar*, dan satu substring yang membuat gerbangnya buta)
+
+Siklus ini menutup kelas cacat yang paling tidak terlihat di seluruh repo ini:
+**bunyi kunci yang rusak tidak mengubah satu piksel pun, tidak mengubah satu
+baris teks pun, dan tidak gagal mengompilasi.**
+
+**Cacatnya.** `AudioCueEngine.ensureResources()` di `Apps/Shared/AudioCue.swift`
+menyintesis nada kunci langsung di dalam gelung sampel:
+
+    let sampleRate: Double = 44100
+    let duration: Double = 0.13
+    ...
+    let envelope = sin(.pi * Double(i) / Double(frameCount))
+    samples[i] = Float(0.28 * sin(2 * .pi * 880 * t) * envelope)
+
+Politik **peristiwa** (mana yang berbunyi) sudah lebih dulu dipindah ke
+`AudioEventPolicy`, dan politik **saklar** ke `AudioPreference` — keduanya
+teruji di Linux. Yang tertinggal justru bagian yang rusaknya hanya terdengar.
+Diukur: nol pemeriksaan di `Tools/` menyebut `sampleRate`, `880`, atau rumus
+amplopnya.
+
+Empat bentuk rusaknya semuanya sah secara tipe:
+
+    amplop dibalik (1 - sin(...))   -> klik di kedua ujung buffer
+    frequency = 0                   -> BISU TOTAL, tanpa satu pun galat
+    peakAmplitude > 1.0             -> terpotong (clip) di mixer
+    duration terlalu pendek         -> potongan gelombang, tinggi berubah
+
+Yang kedua paling berbahaya. Bunyi adalah **satu-satunya saluran** bagi
+pengguna yang tidak melihat layar — tepat pengguna yang fitur ini ada untuknya —
+dan bisu tidak bisa dibedakan dari "tidak ada yang dikunci".
+
+**Kenapa tidak ada gerbang yang melihatnya.** `./swift-test.sh` tidak pernah
+membangun `Apps/`. `swift-typecheck.sh` hanya mem-parse, dan setiap bentuk di
+atas adalah sintaks Swift yang sah. `swift-ui-lint.sh` membaca teks, tetapi
+tidak ada satu aturan pun yang mengenali "rumus gelombang yang ditulis di
+dalam view" sebagai cacat. Tidak ada teks di layar yang berubah, jadi tidak ada
+pemeriksaan teks yang bisa berbunyi.
+
+**Yang ditambahkan.**
+- `Packages/PointingKit/Sources/PointingKit/ToneSynth.swift` — frekuensi,
+  amplitudo, amplop, durasi, dan `frameCount` sebagai fungsi murni.
+- `ToneSynthTests` — **12 uji**, dan setiap uji ditulis untuk merah pada bentuk
+  rusak yang disebut docstring, bukan mengulang angkanya. Yang paling berguna:
+  `testTheToneActuallyOscillates` (menghitung pergantian tanda, karena
+  "amplitudo ≤ puncak" tetap hijau pada buffer yang seluruhnya nol) dan
+  `testOscillationCountMatchesTheDeclaredFrequency` (mengukur 880 Hz dari
+  sampelnya sendiri, jadi konstanta yang diubah tanpa mengubah rumus memerah).
+- `Apps/Shared/AudioCue.swift` memakai `ToneSynth`; nol literal bentuk nada.
+- `Tools/check-aturan105-bentuk-nada.py` + blok Aturan 105 di `swift-ui-lint.sh`.
+- `Tools/bukti-mutasi-aturan105-bentuk-nada.py` — **11 keadaan, 0 tidak sesuai**.
+- Langkah harness di `engine-tests.yml`; hitungan README 1103 -> 1115 uji,
+  103 -> 104 aturan.
+
+**Cacat yang ditemukan sambil menulis harness-nya sendiri, dan ini yang layak
+dicatat.** Versi pertama gerbang memakai `MODEL_SYMBOLS` dengan nama telanjang:
+
+    MODEL_SYMBOLS = ["ToneSynth.sampleRate", "ToneSynth.frameCount", "ToneSynth.sample"]
+
+`ToneSynth.sample` adalah **awalan** dari `ToneSynth.sampleRate`. Diukur pada
+salinan: baris satu-satunya yang benar-benar menghasilkan isi buffer diganti
+`samples[i] = Float(0)` — buffer menjadi nol, nada menjadi bisu total — dan
+pemeriksaan pemakaian **tetap hijau**, karena `"ToneSynth.sample" in code`
+masih benar lewat `ToneSynth.sampleRate`. Gerbang yang menjaga "Apps benar-benar
+memakai model" punya gigi nol untuk fungsi yang paling penting di model itu.
+Diperbaiki ke `ToneSynth.sample(` (terkunci tanda kurung), dan keadaan 1 harness
+sekarang membuktikannya merah. Ini kelas yang sama dengan seluruh siklus
+sebelumnya: **nama yang muncul bukan pemanggilan**, dan gerbang yang mengukur
+keberadaan bukan sambungan.
+
+Dua keadaan fail-closed saya juga salah rancang pada percobaan pertama, dan
+keduanya ketahuan dengan mengukur, bukan membaca ulang: mengganti
+`ToneSynth.sampleRate` menjadi `ToneSynth.sampleRateLain` **tidak** membuat
+gerbang kehilangan sasarannya (substring `sampleRate` masih ada), dan mengganti
+`enum ToneSynth` menjadi `enum ToneSynthLama` tetap memuat keempat deklarasi
+angkanya. Keduanya hijau, dan keduanya bukan kelemahan gerbang — rancangan
+keadaannya yang tidak menghilangkan subjek. Sekarang keadaan 7 menghapus
+deklarasi `sampleRate` dan keadaan 8 mengosongkan `ToneSynth.swift`.
+
+**Kontrol negatif yang sengaja hijau.** Keadaan 9 menaruh `44100`, `880`,
+`0.13`, dan `0.28` di dalam **komentar** `AudioCue.swift`, dan gerbang harus
+tetap hijau. Ini bukan kelonggaran: docstring berkas itu memang **menyebut**
+angka-angka tersebut untuk menjelaskan kenapa ia dipindah. Gerbang yang merah
+atas dokumentasi yang benar akan dimatikan orang, dan gerbang yang dimatikan
+tidak menjaga apa pun.
+
+**Yang TIDAK diklaim.** Ini sapuan **teks**, bukan render atau pemutaran: ia
+tidak membuktikan nada itu terdengar nyaman di jam 40 mm, tidak menjalankan
+`AVAudioEngine`, dan tidak membuktikan `AVAudioPCMBuffer` menerima sampelnya.
+Yang dijamin: kelima angka bentuk nada tidak bisa lagi berubah sendiri di
+`Apps/` tanpa gerbang merah, dan sifat-sifat yang membuatnya terdengar seperti
+konfirmasi (bukan klik, bukan bisu, tidak clip) dijalankan di Linux.
+
+**Angka.** `./swift-test.sh` → **CelestialEngine 222 + PointingKit 1115, 0
+gagal**. `./swift-ui-lint.sh` → **104 blok aturan** (nomor sampai 105, Aturan 69
+tinggal di `Tools/`), exit 0. `swift-typecheck.sh` exit 0.
+`check-harness-terdaftar.py` → **171 harness, semuanya dirujuk**.
+`check-jangkar-harness.py` → 548 jangkar, tidak ada mutasi tertinggal.
+`bash -n` di Docker `bash:3.2` → exit 0.
+
 ### Siklus (24 Okt 2026 — Aturan 104: sigma pointing diganti literal nol, dan seluruh 103 aturan diam)
 
 Siklus ini menutup cacat yang **diukur buta**, kelas yang sama dengan Aturan

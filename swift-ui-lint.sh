@@ -15223,6 +15223,51 @@ else
 fi
 
 
+echo "== Aturan 105: bentuk nada kunci datang dari model, bukan dari Apps/ =="
+# Cacat yang ditutup aturan ini **terukur**, dan tidak satu pun gerbang lain
+# bisa melihatnya. `AudioCueEngine.ensureResources()` di
+# `Apps/Shared/AudioCue.swift` dulu menyintesis nada kunci dengan empat angka
+# dan satu rumus yang ditulis langsung di dalam gelung sampel:
+#
+#     let sampleRate: Double = 44100
+#     let duration: Double = 0.13
+#     let envelope = sin(.pi * Double(i) / Double(frameCount))
+#     samples[i] = Float(0.28 * sin(2 * .pi * 880 * t) * envelope)
+#
+# `Apps/` tidak pernah dibangun `./swift-test.sh` di Linux, dan diukur: nol
+# pemeriksaan di `Tools/` menyebut `sampleRate`, `880`, atau rumus amplopnya.
+# Politik **peristiwa** sudah dipindah ke `AudioEventPolicy` dan politik
+# **saklar** ke `AudioPreference`; yang tertinggal justru bagian yang rusaknya
+# hanya **terdengar**:
+#
+#     amplop dibalik (1 - sin(...))  -> klik di kedua ujung buffer
+#     frequency = 0                  -> BISU TOTAL, tanpa satu pun galat
+#     peakAmplitude > 1.0            -> terpotong (clip) di mixer
+#     duration terlalu pendek        -> potongan gelombang, tinggi berubah
+#
+# Semuanya mengompilasi bersih dan lolos setiap gerbang teks. Yang paling
+# berbahaya yang kedua: bunyi adalah **satu-satunya saluran** bagi pengguna
+# yang tidak melihat layar, dan bisu tidak bisa dibedakan dari "tidak ada
+# yang dikunci".
+#
+# Logikanya di `Tools/`, bukan inline, karena alasan yang sama dengan
+# Aturan 84-104 (heredoc bash 3.2 di macOS CI).
+if [ ! -f "Tools/check-aturan105-bentuk-nada.py" ]; then
+  echo "FAIL Tools/check-aturan105-bentuk-nada.py tidak ada: Aturan 105"
+  echo "     tidak mengukur apa pun, dan bentuk nada kunci boleh kembali"
+  echo "     ditulis di Apps/ tanpa satu pun gerbang berbunyi."
+  status=1
+else
+  bentuk_nada=$(python3 Tools/check-aturan105-bentuk-nada.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$bentuk_nada"
+    status=1
+  else
+    echo "$bentuk_nada"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

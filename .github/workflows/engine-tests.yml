@@ -2211,6 +2211,31 @@ jobs:
       - name: Buktikan Aturan 104 berbunyi saat sigma yang berlaku diganti literal
         run: python3 Tools/bukti-mutasi-aturan104-sigma.py
 
+      # Dan bukti untuk **Aturan 105** — cacat yang bentuknya paling sulit
+      # dilihat di repo ini, karena bunyi kunci yang rusak tidak mengubah satu
+      # piksel, tidak mengubah satu baris teks, dan **tidak gagal mengompilasi**.
+      # Empat angka dan satu rumus amplopnya dulu ditulis langsung di
+      # `Apps/Shared/AudioCue.swift`, tempat `./swift-test.sh` tidak pernah
+      # membangunnya; diukur, nol pemeriksaan di `Tools/` menyebut `sampleRate`,
+      # `880`, atau rumus amplopnya. Politik peristiwa sudah pindah ke
+      # `AudioEventPolicy` dan politik saklar ke `AudioPreference`; yang tertinggal
+      # justru bagian yang rusaknya hanya **terdengar**.
+      #
+      # Bentuk rusaknya semuanya sah secara tipe: amplop dibalik = klik di kedua
+      # ujung, frekuensi 0 = bisu total tanpa galat, amplitudo > 1.0 = terpotong
+      # di mixer, durasi terlalu pendek = potongan gelombang. Yang kedua paling
+      # berbahaya: bunyi adalah satu-satunya saluran bagi pengguna yang tidak
+      # melihat layar, dan bisu tidak bisa dibedakan dari "tidak ada yang
+      # dikunci".
+      #
+      # Harness ini juga menguji dua arah yang mudah tertukar: berkas yang
+      # `samples[i] = Float(0)` harus MERAH (buffer nol walau nama model masih
+      # disebut — cacat substring yang ditemukan saat menulis harness ini), dan
+      # angka yang hanya hidup di **komentar** harus tetap HIJAU, karena gerbang
+      # yang merah atas dokumentasi yang benar akan dimatikan orang.
+      - name: Buktikan Aturan 105 berbunyi saat bentuk nada kembali ditulis di Apps
+        run: python3 Tools/bukti-mutasi-aturan105-bentuk-nada.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
