@@ -124,8 +124,8 @@ public enum ToneSynth {
     ///
     /// Dibulatkan, bukan dipotong: `0.13 × 44100 = 5733.0` tepat, tetapi
     /// perubahan durasi di kemudian hari tidak boleh diam-diam memendekkan
-    /// nada sampai di bawah satu periode. Dijaga `testFrameCountCoversAt
-    /// LeastOneFullCycle`.
+    /// nada sampai di bawah satu periode. Dijaga oleh uji
+    /// `testFrameCountCoversAtLeastOneFullCycle`.
     public static var frameCount: Int {
         Int((sampleRate * duration).rounded())
     }
