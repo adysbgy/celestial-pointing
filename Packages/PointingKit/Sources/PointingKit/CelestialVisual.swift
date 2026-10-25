@@ -2251,7 +2251,7 @@ public enum VisualFrame {
     /// dalam blob yang menaunginya, dan gugus kembali tampil sebagai noda
     /// kabur — persis cacat yang dijaga `clusterCoreRadiusFraction` dari sisi
     /// ukuran.
-    public static let clusterCoreBrighten: Double = 0.55
+    public static let clusterCoreBrighten: Double = 0.25
 
     /// Plafon jari-jari inti bintang gugus, **diturunkan dari tata letaknya**.
     ///
