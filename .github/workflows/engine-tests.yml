@@ -2845,6 +2845,17 @@ jobs:
       - name: Buktikan Aturan 60 berbunyi pada penanda kejujuran yang digambar
         run: python3 Tools/bukti-mutasi-aturan60-penanda-jujur.py
 
+      # Dan bukti untuk **arah** penanda yang sama: membalik predikatnya
+      # (`!isStale` -> `isStale`, dan `! engine.x` yang berspasi) bukan
+      # menghapus penandanya. Probe di atas membuktikan penanda bisa dibuang;
+      # probe ini membuktikan penanda tidak bisa **dibalik** -- bentuk yang
+      # lebih sulit dikenali karena kodenya tetap tampak memeriksa sesuatu.
+      # Terukur sebelum aturan 60 diperbaiki: `if ! engine.carriesUncertaintyMarker`
+      # lolos seluruh 66 aturan, jadi penanda "ragu" menyala pada objek yakin
+      # dan membungkam objek yang ragu.
+      - name: Buktikan Aturan 60 menangkap negasi penanda (bukan hanya penghapusan)
+        run: python3 Tools/bukti-mutasi-aturan60-negasi-spasi.py
+
       # Dan bukti untuk WCAG 1.4.1: sinyal yang hanya dibedakan warna. Dua
       # situs nyata (laju sudut, lokasi darurat) mengompilasi, lolos 60 aturan,
       # dan tidak terbaca oleh pengguna buta warna.

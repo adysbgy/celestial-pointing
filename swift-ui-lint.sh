@@ -10641,6 +10641,90 @@ def kasus_switch(kode):
     return hasil
 
 
+def cabang_or(kondisi):
+    """Kondisi dipecah pada operator `||` (tingkat teratas).
+
+    `if a || !b` berarti penanda boleh tampil ketika **salah satu** cabang
+    benar, jadi cukup satu cabang membaca predikat secara positif. Menguji
+    seluruh kondisi sebagai satu string akan salah: `!a || b` mengandung `b`
+    positif, dan itu memang sah -- tapi `!a || !b` tidak, walau kata `b`
+    muncul tanpa `!` di depannya.
+    """
+    hasil, buf, kedalaman, tanda = [], [], 0, False
+    i = 0
+    while i < len(kondisi):
+        dua = kondisi[i:i + 2]
+        if dua == "||" and kedalaman == 0 and not tanda:
+            hasil.append(" ".join("".join(buf).split()))
+            buf = []
+            i += 2
+            continue
+        ch = kondisi[i]
+        if ch == "(":
+            kedalaman += 1
+        elif ch == ")":
+            kedalaman -= 1
+        elif ch == '"':
+            tanda = not tanda
+        buf.append(ch)
+        i += 1
+    hasil.append(" ".join("".join(buf).split()))
+    return [c for c in hasil if c]
+
+
+def baca_positif(kondisi, predikat):
+    """Apakah `predikat` dibaca **positif** di kondisi ini?
+
+    Positif = ada sekurangnya satu cabang `||` tempat predikat itu muncul
+    tanpa negasi yang mengikatnya. Negasi yang mengikat adalah `!` (dengan
+    atau tanpa spasi setelahnya) di **depan awalan penerima** — bukan hanya di
+    depan kata predikatnya sendiri.
+
+    Kenapa awalan penerima ikut diperiksa: di `Apps/` bentuknya hampir selalu
+    `if engine.carriesUncertaintyMarker`. `!` berada sebelum `engine`, bukan
+    sebelum kata predikatnya, jadi memandang satu karakter di depan kata
+    (`(?<![!])`) tidak pernah melihat negasinya — terukur, `if ! engine.x`
+    dan `if !engine.x` dua-duanya lolos seluruh 66 aturan.
+
+    Bentuk yang sah dan yang tidak:
+
+        engine.x                 positif
+        ! engine.x / !engine.x   negasi
+        engine.x || !engine.x    positif (satu cabang cukup)
+        !engine.x || !engine.x   negasi
+        let level, !isStale      negasi (`!` tepat di depan kata)
+        !a && b                  `b` positif (`!` mengikat `a`)
+    """
+    pola = re.compile(r"\b" + re.escape(predikat) + r"\b")
+    for cabang in cabang_or(kondisi):
+        for m in pola.finditer(cabang):
+            # Awalan penerima opsional: `engine.`, `snapshot.`, `digest.`,
+            # `self.` — dan beberapa penerima berantai seperti `a.b.c.x`.
+            # Negasi boleh duduk sebelum penerima **pertama**, jadi itu yang
+            # dicari: `!` tepat di depan, hanya dipisah spasi, dari awal
+            # potongan yang berisi penerima-penerima itu.
+            awal = m.start()
+            i = awal
+            while i > 0:
+                j = i - 1
+                while j > 0 and cabang[j - 1] in " \t":
+                    j -= 1
+                if j > 0 and (cabang[j - 1].isalnum() or cabang[j - 1] == "_"):
+                    k = j
+                    while k > 0 and (cabang[k - 1].isalnum()
+                                     or cabang[k - 1] in "_."):
+                        k -= 1
+                    if k < j:
+                        i = k
+                        continue
+                break
+            depan = cabang[:i]
+            if re.search(r"!\s*$", depan):
+                continue
+            return True
+    return False
+
+
 #: (pola yang menggambar penanda, sebutan, ejaan predikat yang sah)
 #: `(nama, positif)` -- `positif=False` berarti penandanya justru harus
 #: disembunyikan saat fakta itu benar (`badge` hanya untuk yang berlaku).
@@ -10691,9 +10775,18 @@ for path in berkas:
                 kondisi = max(dalam, key=lambda b: b[0])[1]
                 ok = False
                 for predikat, positif in sah:
+                    # Negasi dicari **di seluruh kondisi**, bukan hanya di
+                    # depan predikat. Bentuk lama `(?<![!])\b<predikat>\b`
+                    # memandang satu karakter di belakang awal kata, jadi
+                    # `if ! engine.carriesUncertaintyMarker` -- spasi setelah
+                    # `!` -- terbaca positif dan lolos: terukur, seluruh 66
+                    # aturan hijau untuk mutasi itu, padahal penanda "ragu"
+                    # justru menyala pada objek yang yakin dan membungkam
+                    # objek yang ragu. Yang membedakan bukan posisi `!`,
+                    # melainkan apakah **semua** cabang `||`-nya punya `!`
+                    # yang mengikat predikat itu.
                     if positif:
-                        if re.search(r"(?<![!])\b" + re.escape(predikat)
-                                     + r"\b", kondisi):
+                        if baca_positif(kondisi, predikat):
                             ok = True
                     else:
                         if re.search(r"!\s*" + re.escape(predikat)
