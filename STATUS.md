@@ -1,5 +1,34 @@
 ### Siklus (25 Okt 2026, malam — Aturan 15 hijau karena computed property meminjam penjaga tetangganya)
 
+#### Postmortem singkat: mutasi harness yang ikut ter-commit
+
+Komit `608c028` (perbaikan Aturan 15) **memuat satu baris yang tidak pernah
+saya tulis**: `clusterCoreBrighten` menjadi `0.55`, tepat angka `MODEL_DEEPER`
+di `Tools/bukti-mutasi-inti-opasitas.py`. Sebabnya proses kerja saya, bukan
+niat: sebagian harness menyunting pohon kerja **asli** lalu memulihkannya di
+`finally`, dan `git add -A` yang saya jalankan saat sapuan masih berjalan
+menyerap mutasi yang sedang hidup. Sapuan itu memang berjalan bersamaan —
+`bukti-mutasi-linkreport-coverage.py` bahkan menyunting
+`LinkReportCoverageTests.swift` di pohon yang sama beberapa menit kemudian.
+
+Kenapa itu cacat nyata dan bukan kosmetik. Port Python
+(`Tools/render-visuals.py:686`) dan gerbangnya (`check-visuals.py:3827`)
+sama-sama memakai `0.25`; hanya model Swift yang bergeser, jadi **tidak ada
+satu pun dari 110 aturan teks yang berbunyi**. Yang menangkapnya
+`check-visuals.py --check` di CI. Terukur di sini: menyuntikkan `0.55`
+memerahkan satu pemeriksaan — `sumber memuat: inti gugus: penambahan
+opasitas (port == model)` — dan `0.25` mengembalikannya hijau dengan 203
+pemeriksaan di `check_port_matches_swift_constants` lulus. Efeknya ke
+produk: inti bintang gugus kehilangan boost 25% menjadi 55%, sehingga gugus
+terbuka kembali tampil sebagai noda kabur — persis cacat yang dijaga
+`clusterCoreRadiusFraction` dari sisi ukuran.
+
+Aturan yang saya pakai mulai sekarang: **jangan `git add -A` di repo yang
+punya harness penyunting-pohon-kerja.** Tambahkan path eksplisit, dan
+pastikan tidak ada `bukti-mutasi-*` yang sedang berjalan sebelum commit.
+`git diff HEAD` tepat sebelum commit adalah pemeriksaan terakhir yang murah.
+
+
 Siklus ini mulai dari pembacaan ulang gerbang yang **sudah** punya bukti
 mutasi, dan menemukan bahwa bukti itu mengukur satu bentuk saja. Aturan 15
 menjaga setiap `Color(red:)`/`Color(hue:)` di `Apps/` supaya berada di bawah
