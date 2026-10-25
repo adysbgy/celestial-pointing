@@ -192,9 +192,9 @@ memperingatkannya. Aturan itu pernah ditegakkan sekali, lalu muncul lagi
 di berkas yang ditambahkan belakangan — karena tidak ada yang menegakkannya
 setelahnya. Gerbang adalah satu-satunya yang mengingat.
 
-Sejak itu berkasnya tumbuh jadi **107 aturan**, dan semuanya bentuk yang sama:
+Sejak itu berkasnya tumbuh jadi **108 aturan**, dan semuanya bentuk yang sama:
 hal yang benar di sumbernya tapi salah di layar, yang tidak terlihat oleh
-compiler maupun mata. Nomornya sampai 108 karena **Aturan 69 tidak tinggal di
+compiler maupun mata. Nomornya sampai 109 karena **Aturan 69 tidak tinggal di
 berkas ini**: ia menjaga berkas sasaran mutasi (`Tools/check-jangkar-harness.py`)
 dan hidup di `Tools/`. Menghitung nomor tertinggi sebagai jumlah aturan akan
 melebihkan satu; yang dihitung di sini adalah blok yang benar-benar berjalan.
@@ -254,7 +254,7 @@ ada di katalog tidak punya nilai `en`. Ini kelas yang berbeda dari Aturan 91 —
 91 menjaga pemasangan (kalau `init()` lupa, seluruh katalog mati dan gejalanya
 seragam), 107 menjaga kelengkapan (satu teks yang lupa didaftarkan hanya
 kehilangan dirinya sendiri, jadi tidak ada gejala yang mengarah ke sana:
-compiler diam dan 107 aturan lain hijau). Gerbang ini sengaja hanya memeriksa
+compiler diam dan seluruh gerbang lain hijau). Gerbang ini sengaja hanya memeriksa
 literal **statis**; `Label(teksDinamis)`, `Label(verbatim:)`, dan
 `Label("\(variabel)")` memang bukan kunci katalog karena teksnya baru diketahui
 saat berjalan, dan menuduh 200+ bentuk itu akan merah pada kode yang benar.
@@ -279,6 +279,26 @@ salah satunya ke pemanggil memecah choke point-nya secara senyap, dan enam
 jalur pemanggil menjadi enam kesempatan untuk lupa — alasan yang sama yang
 tertulis di komentar `setConfidencePolicy`, tempat pemanggil yang menyentuh
 controller langsung membuat snapshot tidak ikut berubah.
+
+Aturan 109 (ditambah siklus ini) menutup celah yang lebih gelap dari Aturan
+108: kali ini yang hilang bukan peristiwa, melainkan **gambar itu sendiri**.
+Ketiga layar yang memutuskan denyut memakai bentuk yang sama — cabang
+beranimasi di dalam `TimelineView`, cabang statis di `else` — tetapi dengan
+predikat yang berbeda (`hasPulse` di jam dan iPhone, `!reduceMotion` di layar
+perkenalan). Diukur pada salinan utuh pohon ini (proses baru, seluruh 108
+gerbang lain **dan** `swift-typecheck.sh` dijalankan sungguhan di sebelahnya):
+cabang `else` statisnya dihapus satu per satu, dan **ketiganya LULUS** — nol
+yang berbunyi, nol peringatan compiler. Yang terjadi di perangkat bukan crash
+melainkan kekosongan: `if` tanpa `else` di dalam `ViewBuilder` menggambar
+`EmptyView`, dan itu sah secara tipe. Di jam dan iPhone, `hasPulse` bernilai
+`false` untuk planet, Bulan, dan Matahari — jadi yang hilang bukan satu
+animasi, melainkan **seluruh gambar objek**, sementara `CelestialVisualView`
+masih dipanggil di cabang `if` dan di layar lain sehingga setiap pemeriksaan
+"apakah view ini dipakai" tetap hijau. Pemicunya karena itu `TimelineView`
+sendiri — bentuk penyegaran per frame — bukan nama predikatnya: predikat ketiga
+sudah berbeda, dan predikat keempat akan membuat daftar tangan basi tepat di
+situ.
+
 Yang paling sering menyelamatkan: paritas kunci
 katalog string (aturan 6), penjaga reduce-motion pada setiap API gerak
 (aturan 7), hitungan uji di README yang tidak boleh membusuk (aturan 10),

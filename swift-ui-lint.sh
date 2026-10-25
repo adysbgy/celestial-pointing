@@ -15521,6 +15521,54 @@ else
 fi
 
 
+# ── Aturan 109: setiap cabang `TimelineView` wajib punya jawaban statis ──
+#
+# Tiga layar memutuskan denyut dengan bentuk yang sama — cabang beranimasi dan
+# cabang statis — tetapi dengan predikat **berbeda** (`hasPulse` di jam dan
+# iPhone, `!reduceMotion` di layar perkenalan). Diukur pada salinan utuh pohon
+# ini: cabang statisnya dihapus satu per satu, dan `swift-ui-lint.sh` **dan**
+# `swift-typecheck.sh` LULUS untuk ketiganya.
+#
+# Kenapa tidak ada yang berbunyi. Yang hilang bukan teks melainkan **gambar**:
+# `if` tanpa `else` di dalam `ViewBuilder` menggambar `EmptyView`, dan itu sah
+# secara tipe. Di jam dan iPhone, `hasPulse` bernilai `false` untuk planet,
+# Bulan, dan Matahari — jadi yang hilang bukan satu animasi, melainkan seluruh
+# gambar objek, sementara `CelestialVisualView` masih dipanggil di cabang `if`
+# dan di layar lain sehingga setiap pemeriksaan "apakah view ini dipakai"
+# tetap hijau.
+#
+# Kenapa pemicunya `TimelineView`, bukan nama predikatnya: predikat ketiga
+# berbeda dan predikat keempat akan membuat daftar tangan basi. `TimelineView`
+# adalah **bentuk** yang menyebabkan cacatnya — penyegaran per frame. Setiap
+# `if` yang memilih antara penyegaran per frame dan tidak wajib punya kedua
+# jawabannya tertulis.
+#
+# Yang TIDAK diklaim: bahwa cabang statisnya menggambar hal yang sama dengan
+# cabang beranimasinya (itu `MotionPolicy.staticPulsePhase` + uji `hasPulse` di
+# Linux). Yang dijaga sempit dan konkret: cabang statis yang sudah terukur bisa
+# dihapus tanpa gerbang merah tidak bisa terulang.
+echo "== Aturan 109: cabang TimelineView wajib punya jawaban statis =="
+if [ ! -f "Tools/check-aturan109-cabang-statis.py" ]; then
+  echo "FAIL Tools/check-aturan109-cabang-statis.py tidak ada: Aturan 109"
+  echo "     tidak mengukur apa pun, dan satu cabang statis boleh dibuang lagi"
+  echo "     tanpa satu pun gerbang berbunyi — planet, Bulan, dan Matahari"
+  echo "     lenyap dari layar saat denyut tidak boleh jalan."
+  status=1
+else
+  cabang_statis=$(python3 Tools/check-aturan109-cabang-statis.py 2>&1)
+  if [ $? -ne 0 ]; then
+    echo "$cabang_statis"
+    echo "-> Kembalikan cabang else yang memanggil gambar yang sama dengan"
+    echo "   pulse: MotionPolicy.staticPulsePhase. if tanpa else di"
+    echo "   dalam ViewBuilder menggambar kosong — bukan sekadar berhenti"
+    echo "   berdenyut."
+    status=1
+  else
+    echo "$cabang_statis"
+  fi
+fi
+
+
 if [ "$status" -eq 0 ]; then
   echo
   echo "== SEMUA GERBANG UI LULUS =="

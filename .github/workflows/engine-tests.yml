@@ -2316,6 +2316,34 @@ jobs:
       - name: Buktikan Aturan 108 berbunyi saat jalan tulis snapshot dibongkar
         run: python3 Tools/bukti-mutasi-aturan108-jalan-tulis.py
 
+      # Dan bukti untuk **Aturan 109** — cabang statis sesudah `TimelineView`.
+      # Ketiga layar memutuskan denyut dengan bentuk yang sama (cabang beranimasi
+      # + cabang statis) tetapi dengan predikat **berbeda** (`hasPulse` di jam
+      # dan iPhone, `!reduceMotion` di layar perkenalan), dan diukur sebelum
+      # aturan ini ada: cabang `else` statisnya dihapus satu per satu, dan
+      # seluruh 108 gerbang lain **dan** `swift-typecheck.sh` LULUS untuk
+      # ketiganya. Nol yang berbunyi, nol peringatan compiler.
+      #
+      # Yang terjadi di perangkat bukan crash melainkan kekosongan: `if` tanpa
+      # `else` di dalam `ViewBuilder` menggambar `EmptyView`, dan itu sah secara
+      # tipe. Di jam dan iPhone, `hasPulse` bernilai `false` untuk planet, Bulan,
+      # dan Matahari — jadi yang hilang bukan denyutnya, melainkan **seluruh
+      # gambar objek**. Dan karena `CelestialVisualView` masih dipanggil di
+      # cabang `if` dan di layar lain, setiap pemeriksaan "apakah view ini
+      # dipakai" tetap hijau.
+      #
+      # Harness ini menuntut **lima** keadaan. Yang paling penting bukan yang
+      # merah: keadaan 4 hanya menambah **komentar** di badan statis dan wajib
+      # tetap HIJAU — gambarnya identik sampai bit terakhir. Tanpa keadaan itu,
+      # gerbang yang mencocokkan bentuk teks alih-alih membaca struktur akan
+      # lolos seluruh keadaan lain dan terlihat seperti bukti yang kuat.
+      # Tiga keadaan mutasi masing-masing menuntut **berkas yang tepat**
+      # berbunyi: mutasi di jam tidak boleh membuat iPhone merah, dan
+      # sebaliknya. Gerbang yang berbunyi pada berkas sebelahnya mengukur hal
+      # lain daripada yang diklaimnya.
+      - name: Buktikan Aturan 109 berbunyi saat cabang statis TimelineView dibuang
+        run: python3 Tools/bukti-mutasi-aturan109-cabang-statis.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari

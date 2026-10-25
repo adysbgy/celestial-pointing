@@ -1,3 +1,83 @@
+### Siklus (25 Okt 2026, lanjutan — Aturan 109: cabang statis sesudah `TimelineView` dibuang, dan planet/Bulan/Matahari lenyap tanpa satu pun gerbang berbunyi)
+
+Siklus ini menutup cacat yang lebih gelap dari Aturan 108: kali ini yang hilang
+bukan **peristiwa**, melainkan **gambar itu sendiri**. Ketiga layar yang
+memutuskan denyut memakai bentuk yang sama — cabang beranimasi di dalam
+`TimelineView`, cabang statis di `else` — tetapi dengan predikat yang **berbeda**:
+
+    jam        if motion.allowsContinuousMotion && visual.hasPulse { TimelineView … } else { … }
+    iPhone     if motion.allowsContinuousMotion && visual.hasPulse { TimelineView … } else { … }
+    onboarding if !reduceMotion && illustration.hasPulse        { TimelineView … } else { … }
+
+Diukur pada salinan utuh pohon ini (proses baru, `./swift-ui-lint.sh` **dan**
+`./swift-typecheck.sh` sungguhan dijalankan di sebelahnya), cabang `else`
+statisnya dihapus satu per satu:
+
+    jam (PointingView)        cabang else statis dihapus  → LINT exit 0, TC exit 0
+    iPhone (DiagnosticsView)  cabang else statis dihapus  → LINT exit 0, TC exit 0
+    onboarding                cabang else statis dihapus  → LINT exit 0, TC exit 0
+
+Nol yang berbunyi, untuk ketiganya, pada kedua alat. Tidak ada galat kompilasi,
+tidak ada peringatan, dan tidak ada satu pun teks di layar yang berubah.
+
+**Kenapa tidak ada yang melihatnya.** `if` tanpa `else` di dalam `ViewBuilder`
+menggambar `EmptyView`, dan itu **sah secara tipe** — jadi compiler diam. Di jam
+dan iPhone, `hasPulse` bernilai `false` untuk planet, Bulan, dan Matahari, jadi
+yang hilang bukan satu animasi melainkan **seluruh gambar objek**. Dan karena
+`CelestialVisualView` masih dipanggil di cabang `if` serta di layar lain, setiap
+pemeriksaan "apakah view ini dipakai" tetap hijau. Yang terjadi di perangkat
+bukan crash melainkan **kekosongan**.
+
+**Kenapa pemicunya `TimelineView`, bukan nama predikatnya.** Predikatnya sudah
+tiga macam, dan predikat keempat yang ditulis besok akan membuat daftar tangan
+basi tepat di situ. `TimelineView` adalah **bentuk** yang menyebabkan cacatnya —
+penyegaran per frame. Setiap `if` yang memilih antara penyegaran per frame dan
+tidak wajib punya kedua jawabannya tertulis.
+
+**Yang ditambahkan.**
+
+- `Tools/check-aturan109-cabang-statis.py` — gerbangnya. Komentar dan isi string
+  dibuang lebih dulu, karena docstring ketiga berkas itu **menyebut**
+  `TimelineView` dan `else` berkali-kali untuk menjelaskan keputusannya; tanpa
+  penyaringan, gerbangnya menuduh dokumentasi yang benar — dan gerbang yang merah
+  atas dokumentasi yang benar akan dimatikan orang. Nol cabang `TimelineView` di
+  seluruh `Apps/` = **GAGAL**, karena gerbang yang hijau atas nol subjek tidak
+  mengukur apa pun.
+- `Tools/bukti-mutasi-aturan109-cabang-statis.py` — **5 keadaan, 0 tidak sesuai**:
+  baseline hijau; ketiga cabang statis dibuang satu per satu, dan masing-masing
+  menuntut **berkas yang tepat** berbunyi (mutasi di jam tidak boleh membuat
+  iPhone merah); dan keadaan 4 hanya menambah **komentar** di badan statis —
+  wajib tetap HIJAU, karena gambarnya identik sampai bit terakhir. Tanpa keadaan
+  itu, gerbang yang mencocokkan bentuk teks alih-alih membaca struktur akan lolos
+  seluruh keadaan lain dan terlihat seperti bukti yang kuat.
+- Blok Aturan 109 di `swift-ui-lint.sh` (setelah 108), langkah CI-nya, dan
+  penjelasan "kenapa" di README.
+
+**Angka.** `./swift-test.sh` → **CelestialEngine 222 + PointingKit 1115, 0
+gagal** (1115 test dieksekusi, 0 failure, exit 0). `./swift-ui-lint.sh` → **108
+blok aturan berjalan** (nomor sampai 109, Aturan 69 tinggal di `Tools/`), exit 0.
+`swift-typecheck.sh` exit 0. `check-harness-terdaftar.py` → **176 harness,
+semuanya dirujuk**. `bash -n` di Docker `bash:3.2` → exit 0.
+
+**Yang TIDAK diklaim.** Ini sapuan **teks**, bukan render: ia tidak membuktikan
+cabang statisnya menggambar hal yang sama dengan cabang beranimasinya (itu
+`MotionPolicy.staticPulsePhase` + uji `hasPulse` di Linux), dan tidak
+membuktikan `TimelineView` benar-benar berdetak di perangkat. Ia juga tidak
+membedakan `else if` — bentuk itu terbaca sebagai `else` dengan badan yang
+memuat `(`; yang dijaga adalah "ada jawaban kedua", bukan "jawabannya tepat
+satu". Yang dijaga sempit dan konkret: **cabang statis yang sudah terukur bisa
+dihapus tanpa gerbang merah** tidak bisa terulang.
+
+**Catatan proses.** Aturan 10 (hitungan aturan di README) ternyata **sudah merah
+sebelum siklus ini** — README bilang 107 sementara `swift-ui-lint.sh` sudah punya
+108 blok. Itu drift yang tertinggal dari siklus Aturan 108, bukan dari perubahan
+ini; siklus ini memperbaruinya ke 108 (nomor sampai 109) sekaligus. Satu kalimat
+lain di README juga menulis "107 aturan lain hijau" di tengah narasi Aturan 107 —
+kalimat itu diganti menjadi "seluruh gerbang lain hijau", karena pemeriksa
+Aturan 10 membaca **setiap** pola `N aturan` dan sebuah angka historis di tengah
+prosa akan terus dihitung sebagai klaim.
+
+
 ### Siklus (25 Okt 2026, lanjutan — Aturan 108: `publish(_:)` dibongkar satu baris, dan keempat efek sampingnya hilang tanpa satu pun gerbang berbunyi)
 
 Siklus ini menutup cacat yang **diukur buta**, dan itu kelas yang sudah berulang
