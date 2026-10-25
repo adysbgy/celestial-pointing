@@ -1,3 +1,80 @@
+### Siklus (25 Okt 2026, malam — Aturan 15 hijau karena computed property meminjam penjaga tetangganya)
+
+Siklus ini mulai dari pembacaan ulang gerbang yang **sudah** punya bukti
+mutasi, dan menemukan bahwa bukti itu mengukur satu bentuk saja. Aturan 15
+menjaga setiap `Color(red:)`/`Color(hue:)` di `Apps/` supaya berada di bawah
+penjaga `NightMode.isOn` — alasan fisiologis, bukan gaya: sel batang paling
+sensitif di ~498–530nm, dan hijau/biru mematikan adaptasi gelap 20–40 menit.
+
+Docstring-nya sendiri sudah mencatat satu lubang yang pernah nyata: `DECL`
+tidak mengenali `@ViewBuilder func` dan `override func`, sehingga cacat di
+dalamnya jatuh ke rentang fungsi **sebelumnya** dan penjaga fungsi itu
+membelanya. Lubang itu sudah ditutup. Yang tidak ditutup adalah bentuk yang
+sama persis, satu lapis lebih luar — di **batas bloknya**:
+
+    DECL hanya mengenali `func`. Deklarasi lain tidak pernah menjadi batas,
+    jadi `Color(red:)` di dalamnya diukur dengan rentang `func` sebelumnya.
+
+Di `Apps/`, bentuk non-`func` yang bisa memuat warna adalah **computed
+property**. Terukur pada pohon salinan, proses baru:
+
+    func warnaAman() -> Color {
+        guard NightMode.isOn else { return Color(white: 0.4) }   // penjaga
+        return Color(red: 1, green: 0, blue: 0)
+    }
+
+    var warnaBocor: Color {                                      // bukan batas
+        Color(red: 0.2, green: 0.9, blue: 0.4)                   // hijau/biru
+    }
+
+Ketiga baris dibaca sebagai **satu** blok, `GUARD` menemukan penjaga milik
+`warnaAman`, dan gate mencetak `Bersih: setiap warna prosedural melewati
+penjaga mode malam` dengan **exit 0** — sementara layar memancarkan
+hijau/biru penuh di mode malam, yaitu persis yang aturan ini ditulis untuk
+mencegah. Nol peringatan compiler: `Color(red:)` adalah API biasa.
+
+**Kenapa ini bukan "aturan yang kurang ketat".** Tidak ada aturan yang
+dilonggarkan. Yang salah adalah **pembacanya**: ia mengenali satu bentuk
+deklarasi dan diam pada bentuk lain, lalu menyimpulkan "tidak ada warna di
+luar penjaga" dari ketidakmampuannya membaca. Itu kelas yang sama dengan
+Aturan 107/110 — hijau karena cara ia membaca, bukan karena yang diukurnya
+benar. Karena itu perbaikannya di `DECL`, bukan di aturan yang baru.
+
+`var nama: Tipe {` sekarang ikut menjadi batas blok. Yang **tidak** menjadi
+batas: `let` dan `var` tanpa anotasi tipe, karena keduanya tidak membuka blok
+`{` — dan menambahkannya akan memotong blok `func` di tengah.
+
+**Yang TIDAK diklaim.** Tidak ada cacat warna yang **hidup** di pohon ini:
+pemindaian ulang dengan batas deklarasi yang benar (func **atau** computed
+var) menemukan **nol** situs tak terjaga. Jadi ini penutupan lubang gerbang,
+bukan perbaikan bug yang terlihat pengguna — dan itu dikatakan apa adanya,
+bukan dibesar-besarkan menjadi "memperbaiki mode malam". Batas baru juga
+belum menyelami `var` yang tipenya ditulis di baris berikutnya, atau `subscript`;
+keduanya tidak ada di pohon ini dan dicatat sebagai batas.
+
+**Angka.** `./swift-test.sh` → CelestialEngine **222** + PointingKit **1119**,
+0 gagal. `./swift-ui-lint.sh` → **110 blok aturan berjalan**, exit 0, dan
+Aturan 15 tetap mencetak `Bersih` di pohon produksi (tidak ada temuan palsu
+dari batas yang lebih ketat). `swift-typecheck.sh` exit 0. `bash -n` di
+Docker `bash:3.2` exit 0. `check-harness-terdaftar.py` → **178 harness**,
+semuanya dirujuk. `check-jangkar-harness.py` → 562 jangkar, tidak ada mutasi
+tertinggal.
+
+Harness baru `Tools/bukti-mutasi-batas-deklarasi-aturan15.py` menguji empat
+keadaan, dan **ketiga kendalinya sengaja hijau** supaya gerbang yang lebih
+ketat tidak menuduh bentuk yang benar: computed var bocor (MERAH), computed
+var berpenjaga sendiri (hijau), computed var netral (hijau), dan computed var
+berpenjaga yang diletakkan **sebelum** `func` (hijau) — yang terakhir
+membuktikan urutan tidak menentukan hasil. Kodenya diekstrak dari
+`swift-ui-lint.sh` saat dijalankan, bukan disalin, jadi ia tidak bisa basi
+terhadap gate yang berubah.
+
+Bukti bahwa perbaikannya **perlu**, bukan kebetulan: `DECL` dikembalikan ke
+versi `func`-saja di pohon kerja, harness dijalankan ulang → keadaan bocor
+kembali **hijau** dan harness exit 1. Dipulihkan, dijalankan lagi → keempat
+keadaan sesuai harapan. Arah kedua itu yang membuat klaimnya sah; harness
+yang hijau pada kedua versi tidak membuktikan apa pun.
+
 ### Siklus (25 Okt 2026, malam — gerbang Aturan 110 ternyata hijau atas nol ukuran)
 
 Siklus ini dimulai dari pekerjaan yang sudah tampak selesai: harness

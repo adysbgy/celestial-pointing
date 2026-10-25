@@ -1919,12 +1919,46 @@ GUARD = re.compile(r'\b(?:guard\s+NightMode\.isOn\s+else|if\s+NightMode\.isOn|Ni
 # yang **paling mungkin** dialam di berkas SwiftUI, jadi lubangnya tepat di
 # tempat yang paling sering ditulis. `nonisolated`/`async` ikut dimasukkan
 # supaya daftar pengubahnya tidak perlu diperluas lagi.
+#
+# **Lubang kedua, dan kelasnya sama: batas bloknya hanya `func`.** `DECL` di
+# bawah semula hanya mengenali deklarasi `func`, jadi deklarasi lain tidak
+# pernah menjadi batas — dan `Color(red:)` di dalamnya diukur dengan rentang
+# `func` **sebelumnya**. Kalau fungsi sebelumnya kebetulan berpenjaga, warna
+# tanpa penjaga lolos bukan karena ia benar, melainkan karena ia meminjam
+# penjaga tetangganya.
+#
+# Bentuk non-`func` yang bisa memuat warna di `Apps/` adalah **computed
+# property**:
+#
+#   func warnaAman() -> Color {
+#       guard NightMode.isOn else { return Color(white: 0.4) }   // penjaga
+#       return Color(red: 1, green: 0, blue: 0)
+#   }
+#   var warnaBocor: Color {                                      // bukan batas
+#       Color(red: 0.2, green: 0.9, blue: 0.4)                   // hijau/biru
+#   }
+#
+# Terukur sebelum diperbaiki: ketiga baris dibaca sebagai **satu** blok,
+# `GUARD` menemukan penjaga milik `warnaAman`, dan gate mencetak
+# "Bersih" dengan exit 0 — sementara layar memancarkan hijau/biru penuh di
+# mode malam, yaitu persis yang aturan ini ditulis untuk mencegah. Sekarang
+# `var nama: Tipe {` ikut menjadi batas. Yang **tidak** menjadi batas adalah
+# `var` tanpa anotasi tipe (mis. `var body: some View` sudah tercakup, tapi
+# `var x = 1` bukan deklarasi berbadan) dan `let`, karena keduanya tidak
+# memuat blok `{`.
+#
+# Dijaga `Tools/bukti-mutasi-batas-deklarasi-aturan15.py` pada empat keadaan:
+# computed var bocor (merah), computed var berpenjaga sendiri (hijau), var
+# netral (hijau), dan var berpenjaga yang diletakkan **sebelum** func
+# (hijau) — supaya urutan tidak pernah menentukan hasil.
 DECL = re.compile(
-    r'^\s*'
-    r'(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s+)*'      # @ViewBuilder, @MainActor
+    r'^[^\S\n]*'
+    r'(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?[^\S\n]*)*'      # @ViewBuilder, @MainActor
     r'(?:(?:public|private|internal|fileprivate|open|static|final|mutating|'
-    r'nonisolated|override|class|dynamic|lazy|weak|unowned)\s+)*'
-    r'func\s', re.M)
+    r'nonisolated|override|class|dynamic|lazy|weak|unowned)[^\S\n]+)*'
+    r'(?:func[^\S\n]+[A-Za-z_]'                                 # func apa pun
+    r'|var[^\S\n]+[A-Za-z_][A-Za-z0-9_]*[^\S\n]*:[^{=\n]*\{)',  # var berbadan
+    re.M)
 
 problems = []
 for root, _, files in os.walk("Apps"):

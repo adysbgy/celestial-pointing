@@ -2369,6 +2369,25 @@ jobs:
       - name: Buktikan Aturan 110 berbunyi saat elemen gabungan kehilangan ucapannya
         run: python3 Tools/bukti-mutasi-aturan110-ucapan-gabungan.py
 
+      # Aturan 15 menjaga warna prosedural (planet/bintang/Bulan) supaya
+      # melewati penjaga `NightMode.isOn` — alasan fisiologis: hijau/biru
+      # mematikan adaptasi gelap 20-40 menit. Gate-nya sudah pernah ditutup
+      # untuk lubang `@ViewBuilder`/`override func`; yang tersisa adalah
+      # lubang di **batas bloknya**, kelas yang sama persis: `DECL` hanya
+      # mengenali `func`, sehingga `Color(red:)` di dalam computed property
+      # diukur dengan rentang fungsi sebelumnya dan meminjam penjaganya.
+      #
+      # Terukur sebelum diperbaiki: `func` berpenjaga diikuti
+      # `var bocor: Color { Color(red: 0.2, green: 0.9, blue: 0.4) }`
+      # menghasilkan exit 0 dan "Bersih" — hijau penuh di mode malam, tepat
+      # yang aturan ini ditulis untuk mencegah.
+      #
+      # Empat keadaan diuji: bocor (MERAH), berpenjaga sendiri (hijau),
+      # netral (hijau), dan berpenjaga yang diletakkan sebelum func (hijau) —
+      # supaya urutan tidak pernah menentukan hasil.
+      - name: Buktikan Aturan 15 mengukur computed property, bukan hanya func
+        run: python3 Tools/bukti-mutasi-batas-deklarasi-aturan15.py
+
       # Dan bukti untuk **dua gerbang PNG** — yang menjaga berkas keluaran
       # `render-visuals.py` benar-benar PNG yang bisa dibaca dunia luar, bukan
       # hanya oleh pembaca toleran di repo ini. Keduanya hijau pada hari
